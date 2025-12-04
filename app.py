@@ -1,4 +1,4 @@
-
+ 
 # app.py — MAT-BOT (robustno, bez SyntaxError-a, sa ispravljenim promptovima i vizijom/Mathpix tokom)
 from flask import Flask, render_template, request, session, redirect, url_for, send_from_directory, jsonify
 from dotenv import load_dotenv
