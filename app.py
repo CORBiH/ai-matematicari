@@ -705,9 +705,11 @@ def too_large(e):
 @app.route("/clear", methods=["POST"])
 def clear():
     if request.form.get("confirm_clear") == "1":
-        session.pop("history", None); session.pop("razred", None); session.pop("last_image_url", None)
-    if request.form.get("ajax") == "1": return render_template("index.html", history=[], razred=None)
-    return redirect("/")
+        session.pop("history", None)
+        session.pop("razred", None)
+        session.pop("last_image_url", None)
+        session.pop("api_history", None)  # << očisti i API historiju
+
 
 @app.get("/healthz")
 def healthz(): return {"ok": True, "local_mode": LOCAL_MODE}, 200
@@ -876,19 +878,60 @@ def looks_heavy(user_text: str, has_image: bool) -> bool:
     toks = estimate_tokens(user_text or "")
     return has_image or toks > HEAVY_TOKEN_THRESHOLD
 
-def _sync_process_once(razred: str, user_text: str, requested: list, image_url: str | None, file_bytes: bytes | None, file_mime: str | None, timeout_s: float) -> dict:
+def _sync_process_once(
+    razred: str,
+    user_text: str,
+    requested: list,
+    image_url: str | None,
+    file_bytes: bytes | None,
+    file_mime: str | None,
+    timeout_s: float,
+    history: list | None = None,
+) -> dict:
+    """
+    Jedan sync pokušaj obrade. Koristi zadnju historiju iz sesije (ako je došla),
+    ali ne mijenja je – samo je prosljeđuje modelu.
+    """
     try:
-        history = []
+        # ako nije poslano ništa, radi kao prije
+        if history is None:
+            history = []
+        else:
+            # napravimo kopiju da slučajno ne diramo session listu
+            history = list(history)
+
         if image_url:
-            html_out, used_path, used_model = route_image_flow_url(image_url, razred, history, user_text=user_text, timeout_override=timeout_s)
+            html_out, used_path, used_model = route_image_flow_url(
+                image_url,
+                razred,
+                history,
+                user_text=user_text,
+                timeout_override=timeout_s,
+            )
             return {"ok": True, "result": {"html": html_out, "path": used_path, "model": used_model}}
+
         if file_bytes:
-            html_out, used_path, used_model = route_image_flow(file_bytes, razred, history, user_text=user_text, timeout_override=timeout_s, mime_hint=file_mime or None)
+            html_out, used_path, used_model = route_image_flow(
+                file_bytes,
+                razred,
+                history,
+                user_text=user_text,
+                timeout_override=timeout_s,
+                mime_hint=file_mime or None,
+            )
             return {"ok": True, "result": {"html": html_out, "path": used_path, "model": used_model}}
-        html_out, used_model = answer_with_text_pipeline(user_text, razred, history, requested, timeout_override=timeout_s)
+
+        html_out, used_model = answer_with_text_pipeline(
+            user_text,
+            razred,
+            history,
+            requested,
+            timeout_override=timeout_s,
+        )
         return {"ok": True, "result": {"html": html_out, "path": "text", "model": used_model}}
     except Exception as e:
         return {"ok": False, "error": str(e)}
+
 
 def _prepare_async_payload(job_id: str, razred: str, user_text: str, requested: list, image_url: str | None, file_bytes: bytes | None, file_name: str | None, file_mime: str | None, image_b64_str: str | None) -> dict:
     payload = {
@@ -946,6 +989,11 @@ def submit():
     has_image = bool(image_url or file_bytes or image_b64_str)
     if mode not in ("auto", "sync", "async"):
         mode = "auto"
+         # ---- API historija po sesiji (zadnja 3 pitanja/odgovora) ----
+    api_history = session.get("api_history", [])
+    if not isinstance(api_history, list):
+        api_history = []
+
     if mode == "async":
         job_id = str(uuid4())
         store_job(job_id, {"status": "pending", "created_at": datetime.datetime.utcnow().isoformat() + "Z", "razred": razred, "user_text": user_text, "requested": requested}, merge=True)
@@ -967,24 +1015,56 @@ def submit():
         except Exception as e:
             store_job(job_id, {"status": "error", "error": str(e)}, merge=True)
             return jsonify({"error": "submit_failed", "detail": str(e)}), 500
-    sync_try = _sync_process_once(
+        sync_try = _sync_process_once(
         razred=razred,
         user_text=user_text,
         requested=requested,
         image_url=(image_url or None),
         file_bytes=file_bytes,
         file_mime=file_mime,
-        timeout_s=SYNC_SOFT_TIMEOUT_S
+        timeout_s=SYNC_SOFT_TIMEOUT_S,
+        history=api_history,  # << ovdje ide historija iz sesije
     )
-    if sync_try.get("ok"):
+
+        if sync_try.get("ok"):
         html_out = sync_try["result"]["html"]
+
+        # crtanje grafa, sada prosljeđujemo istu historiju (iako je ne koristi)
         if should_plot(user_text):
-            expr = extract_plot_expression(user_text, razred=razred, history=[])
-            if expr: html_out = add_plot_div_once(html_out, expr)
-        try: log_to_sheet(f"sync-{uuid4().hex[:8]}", razred, user_text, html_out, sync_try["result"]["path"], sync_try["result"]["model"])
-        except Exception: pass
+            expr = extract_plot_expression(user_text, razred=razred, history=api_history)
+            if expr:
+                html_out = add_plot_div_once(html_out, expr)
+
+        # ---- ovdje upisujemo novi Q/A u api_history ----
+        api_history.append({"user": user_text, "bot": html_out})
+        # čuvamo samo zadnja 3
+        api_history = api_history[-3:]
+        session["api_history"] = api_history
+
+        try:
+            log_to_sheet(
+                f"sync-{uuid4().hex[:8]}",
+                razred,
+                user_text,
+                html_out,
+                sync_try["result"]["path"],
+                sync_try["result"]["model"],
+            )
+        except Exception:
+            pass
+
         mode_tag = "auto(sync)" if mode == "auto" else "sync"
-        return jsonify({"mode": mode_tag, "result": {"html": html_out, "path": sync_try["result"]["path"], "model": sync_try["result"]["model"]}}), 200
+        return jsonify(
+            {
+                "mode": mode_tag,
+                "result": {
+                    "html": html_out,
+                    "path": sync_try["result"]["path"],
+                    "model": sync_try["result"]["model"],
+                },
+            }
+        ), 200
+
     job_id = str(uuid4())
     store_job(job_id, {"status": "pending", "created_at": datetime.datetime.utcnow().isoformat() + "Z", "razred": razred, "user_text": user_text, "requested": requested}, merge=True)
     payload = _prepare_async_payload(job_id, razred, user_text, requested, image_url or None, file_bytes, file_name, file_mime, image_b64_str)
@@ -1039,8 +1119,10 @@ def set_razred():
     if g:
         session["razred"] = g
         session["history"] = []
+        session["api_history"] = []      # reset i API historije
         session.pop("last_image_url", None)
     return ("", 204)
+
 
 # Dodatni CSP za Thinkific okvir (ostavljam; možeš prebrisati preko FRAME_ANCESTORS headera u add_no_cache_headers)
 @app.after_request
