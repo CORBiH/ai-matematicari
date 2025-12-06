@@ -299,8 +299,10 @@ COMMON_RULES = (
     "(koliko iznosi cijeli broj ako je poznat dio i razlomak). "
     " - Ako učenik napiše da nije shvatio, podrazumijevaj da se to odnosi na tvoj posljednji odgovor i objasni ponovo, jednostavnije ili sa paralelnim primjerom. "
     " - Ako pitanje nije iz matematike, odgovori: 'Molim te, postavi matematičko pitanje.' i nemoj ulaziti u druge teme. "
+    " - Nikada na kraju odgovora NE postavljaj dodatna pitanja, mini provjere, kvizove ili nove zadatke. "
     " - Odgovore uvijek piši u formatu: 'Korak 1: ...', 'Korak 2: ...', ..., 'Završni odgovor: ...'. "
 )
+
 
 
 ORDINAL_WORDS = {
