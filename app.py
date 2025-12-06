@@ -708,7 +708,9 @@ def clear():
         session.pop("history", None)
         session.pop("razred", None)
         session.pop("last_image_url", None)
-        session.pop("api_history", None)  # << očisti i API historiju
+        session.pop("api_history", None)  # očisti i API historiju
+    return redirect(url_for("index"))
+
 
 
 @app.get("/healthz")
@@ -964,19 +966,27 @@ def _prepare_async_payload(job_id: str, razred: str, user_text: str, requested: 
 def submit():
     if request.method == "OPTIONS":
         return ("", 204)
+
+    # --- osnovni parametri ---
     razred = (request.form.get("razred") or request.args.get("razred") or "").strip()
     user_text = (request.form.get("user_text") or request.form.get("pitanje") or "").strip()
     image_url = (request.form.get("image_url") or request.args.get("image_url") or "").strip()
     mode = (request.form.get("mode") or request.args.get("mode") or "auto").strip().lower()
+
+    # JSON tijelo (ako postoji) ima prednost
     data = request.get_json(silent=True) or {}
     if data:
         razred    = (data.get("razred")    or razred).strip()
         user_text = (data.get("pitanje")   or data.get("user_text") or user_text).strip()
         image_url = (data.get("image_url") or image_url).strip()
         mode      = (data.get("mode")      or mode).strip().lower()
+
     if razred not in DOZVOLJENI_RAZREDI:
         razred = "5"
+
     requested = extract_requested_tasks(user_text)
+
+    # fajl (slika) iz forme
     file_storage = request.files.get("file")
     file_bytes = None
     file_mime = None
@@ -985,37 +995,63 @@ def submit():
         file_bytes = file_storage.read()
         file_mime = file_storage.mimetype or "application/octet-stream"
         file_name = file_storage.filename
+
+    # base64 slika iz JSON-a (ako ima)
     image_b64_str = (data.get("image_b64") if data else None)
+
     has_image = bool(image_url or file_bytes or image_b64_str)
+
     if mode not in ("auto", "sync", "async"):
         mode = "auto"
-         # ---- API historija po sesiji (zadnja 3 pitanja/odgovora) ----
+
+    # ---- API historija po sesiji (zadnja 3 pitanja/odgovora) ----
     api_history = session.get("api_history", [])
     if not isinstance(api_history, list):
         api_history = []
 
-    if mode == "async":
+    # --- 1) Čisti async mode ili heavy auto → odmah queue ---
+    heavy = looks_heavy(user_text, has_image=has_image)
+    if mode == "async" or (mode == "auto" and heavy):
         job_id = str(uuid4())
-        store_job(job_id, {"status": "pending", "created_at": datetime.datetime.utcnow().isoformat() + "Z", "razred": razred, "user_text": user_text, "requested": requested}, merge=True)
-        payload = _prepare_async_payload(job_id, razred, user_text, requested, image_url or None, file_bytes, file_name, file_mime, image_b64_str)
+        store_job(
+            job_id,
+            {
+                "status": "pending",
+                "created_at": datetime.datetime.utcnow().isoformat() + "Z",
+                "razred": razred,
+                "user_text": user_text,
+                "requested": requested,
+            },
+            merge=True,
+        )
+        payload = _prepare_async_payload(
+            job_id,
+            razred,
+            user_text,
+            requested,
+            image_url or None,
+            file_bytes,
+            file_name,
+            file_mime,
+            image_b64_str,
+        )
         try:
             _enqueue(payload)
-            return jsonify({"mode": "async", "job_id": job_id, "status": "queued", "local_mode": LOCAL_MODE}), 202
+            mode_tag = "async" if mode == "async" else "auto→async"
+            return jsonify(
+                {
+                    "mode": mode_tag,
+                    "job_id": job_id,
+                    "status": "queued",
+                    "local_mode": LOCAL_MODE,
+                }
+            ), 202
         except Exception as e:
             store_job(job_id, {"status": "error", "error": str(e)}, merge=True)
             return jsonify({"error": "submit_failed", "detail": str(e), "job_id": job_id}), 500
-    heavy = looks_heavy(user_text, has_image=has_image)
-    if mode == "auto" and heavy:
-        job_id = str(uuid4())
-        store_job(job_id, {"status": "pending", "created_at": datetime.datetime.utcnow().isoformat() + "Z", "razred": razred, "user_text": user_text, "requested": requested}, merge=True)
-        payload = _prepare_async_payload(job_id, razred, user_text, requested, image_url or None, file_bytes, file_name, file_mime, image_b64_str)
-        try:
-            _enqueue(payload)
-            return jsonify({"mode": "auto→async", "job_id": job_id, "status": "queued", "local_mode": LOCAL_MODE}), 202
-        except Exception as e:
-            store_job(job_id, {"status": "error", "error": str(e)}, merge=True)
-            return jsonify({"error": "submit_failed", "detail": str(e)}), 500
-        sync_try = _sync_process_once(
+
+    # --- 2) Sync pokušaj (mode == "sync" ili "auto" bez heavy) ---
+    sync_try = _sync_process_once(
         razred=razred,
         user_text=user_text,
         requested=requested,
@@ -1023,24 +1059,24 @@ def submit():
         file_bytes=file_bytes,
         file_mime=file_mime,
         timeout_s=SYNC_SOFT_TIMEOUT_S,
-        history=api_history,  # << ovdje ide historija iz sesije
+        history=api_history,  # zadnja 3 Q/A iz sesije
     )
 
-        if sync_try.get("ok"):
+    if sync_try.get("ok"):
         html_out = sync_try["result"]["html"]
 
-        # crtanje grafa, sada prosljeđujemo istu historiju (iako je ne koristi)
+        # crtanje grafa ako treba
         if should_plot(user_text):
             expr = extract_plot_expression(user_text, razred=razred, history=api_history)
             if expr:
                 html_out = add_plot_div_once(html_out, expr)
 
-        # ---- ovdje upisujemo novi Q/A u api_history ----
+        # upis u api_history (zadržati samo zadnja 3)
         api_history.append({"user": user_text, "bot": html_out})
-        # čuvamo samo zadnja 3
         api_history = api_history[-3:]
         session["api_history"] = api_history
 
+        # log u Google Sheets (best-effort)
         try:
             log_to_sheet(
                 f"sync-{uuid4().hex[:8]}",
@@ -1065,16 +1101,46 @@ def submit():
             }
         ), 200
 
+    # --- 3) Sync nije uspio → fallback na async ---
     job_id = str(uuid4())
-    store_job(job_id, {"status": "pending", "created_at": datetime.datetime.utcnow().isoformat() + "Z", "razred": razred, "user_text": user_text, "requested": requested}, merge=True)
-    payload = _prepare_async_payload(job_id, razred, user_text, requested, image_url or None, file_bytes, file_name, file_mime, image_b64_str)
+    store_job(
+        job_id,
+        {
+            "status": "pending",
+            "created_at": datetime.datetime.utcnow().isoformat() + "Z",
+            "razred": razred,
+            "user_text": user_text,
+            "requested": requested,
+        },
+        merge=True,
+    )
+    payload = _prepare_async_payload(
+        job_id,
+        razred,
+        user_text,
+        requested,
+        image_url or None,
+        file_bytes,
+        file_name,
+        file_mime,
+        image_b64_str,
+    )
     try:
         _enqueue(payload)
         mode_tag = "auto(sync→async)" if mode == "auto" else "sync→async"
-        return jsonify({"mode": mode_tag, "job_id": job_id, "status": "queued", "local_mode": LOCAL_MODE, "reason": sync_try.get("error", "soft-timeout-or-error")}), 202
+        return jsonify(
+            {
+                "mode": mode_tag,
+                "job_id": job_id,
+                "status": "queued",
+                "local_mode": LOCAL_MODE,
+                "reason": sync_try.get("error", "soft-timeout-or-error"),
+            }
+        ), 202
     except Exception as e:
         store_job(job_id, {"status": "error", "error": str(e)}, merge=True)
         return jsonify({"error": "submit_failed", "detail": str(e), "job_id": job_id}), 500
+
 
 @app.get("/status/<job_id>")
 def async_status(job_id):
