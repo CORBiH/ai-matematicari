@@ -214,33 +214,30 @@ ULOGA = (
 )
 
 KOMUNIKACIJA_I_FORMATIRANJE = (
-    "Decimalni zarez: Uvijek koristi zarez (,), nikada tačku (.). "
+    "1. Decimalni zarez: Uvijek koristi zarez (,), nikada tačku (.). "
     "U 5. razredu se decimalni zarez i decimalni brojevi uopšte ne koriste. "
-    "Bez crtica: Nikada ne počinji red crticom (-). Zabranjene su liste sa crticama jer liče na minus. "
-    "Umjesto toga koristi etikete sa dvotačkom (Dato:, Traži se:, Postupak:, Korak 1:, Zaključak:, Završni odgovor:) "
-    "ili pune rečenice u novom redu. "
-    "Znak minus (-) koristi ISKLJUČIVO unutar matematičkog izraza. "
-    "Format koraka: Svaki korak mora imati opisni naslov. "
-    "Red odmah ispod naslova koraka MORA početi znakom '=' bez početnog razmaka "
-    "i mora sadržavati CIJELI prepisani izraz u trenutnom stanju. "
-    "Tabele: Isključivo stabilni tekstualni format (npr. x | 0 | 1, y | n | k+n). "
-    "Strogo zabranjeno korištenje Markdown linija (---)."
+    "2. Bez crtica i razmaka: Nikada ne počinji red crticom (-). "
+    "Red odmah ispod naslova koraka mora početi znakom jednakosti (=) bez početnog razmaka. "
+    "3. Tabele: Isključivo stabilni tekstualni format. Strogo zabranjeno korištenje "
+    "Markdown linija (---) ili ekstra linija u LaTeX-u koje bi mogle razbiti prikaz."
 )
 
 POSTUPAK_KONTINUIRANI = (
-    "Svaki korak mora imati opisni naslov. "
-    "Red odmah ispod naslova MORA početi znakom '=' i sadržavati CIJELI prepisani izraz u trenutnom stanju. "
+    "Svaki korak mora imati opisni naslov. Red odmah ispod naslova MORA početi "
+    "znakom '=' i sadržavati CIJELI prepisani izraz u trenutnom stanju. "
     "Nikada ne piši izolirane računske operacije sa strane. "
-    "Primjer 6. razred (jednačine bez prebacivanja): "
+    
+    "PRIMJER 6. RAZRED (Jednačine bez prebacivanja): "
     "Korak 1: Nepoznati sabirak dobijemo oduzimanjem poznatog sabirka od zbira "
     "= x = 150 - 50 "
     "Korak 2: Izračunaj krajnji rezultat "
     "= x = 100 "
-    "Primjer 7. razred (hibridni račun): "
+
+    "PRIMJER 7. RAZRED (Hibridni račun): "
     "Korak 1: Pretvori mješoviti broj i decimalni broj u razlomke "
-    "= 1 1/2 + 0,2 · 5/2 "
+    "= 1 1/2 + 0,2 * 5/2 "
     "Korak 2: Pretvori u nepravi razlomak i decimalni u obični "
-    "= 3/2 + 2/10 · 5/2 "
+    "= 3/2 + 2/10 * 5/2 "
     "Korak 3: Izvrši množenje unutar izraza "
     "= 3/2 + 1/2 "
     "Korak 4: Saberi rezultate "
@@ -248,46 +245,23 @@ POSTUPAK_KONTINUIRANI = (
 )
 
 RAZREDNA_PRAVILA = {
-    "5": (
-        "Prirodni brojevi i nula. Decimalni brojevi se ne koriste. "
-        "Razlomci samo najjednostavniji (1/2, 1/3, 1/4). "
-        "Veliki brojevi sa razmakom (1 000 000). Skupovi i pripadnost ∈. "
-        "Uglovi: oštri, tupi, pravi."
-    ),
-    "6": (
-        "Cijeli brojevi. Jednačine rješavati logičkom vezom operacija "
-        "(npr. 'nepoznati umanjilac dobijemo...'). "
-        "Zabranjeno prebacivanje članova preko znaka jednakosti."
-    ),
-    "7": (
-        "Hibridni račun: Ako se pojavljuju decimalni i razlomci, sve pretvori u razlomke. "
-        "Rezultat mora biti razlomak ili cijeli broj (ne decimalni), osim ako zadatak traži drugačije. "
-        "Jednačine: prebacivanje članova uz promjenu znaka, ali korak-po-korak."
-    ),
-    "8": (
-        "Pitagora: c² = a² + b². Obavezno djelimično korjenovanje (√12 = 2√3). "
-        "Proporcije: strelice u naslovu koraka (↑↑ direktna, ↑↓ obrnuta) "
-        "i tekstualni opis pored izraza (npr. 'direktna proporcionalnost')."
-    ),
-    "9": (
-        "Linearna funkcija: y = kx + n. Obavezna stabilna tabela sa najmanje 2 tačke. "
-        "Polinomi: kvadrat binoma, razlika kvadrata. "
-        "Algebarski razlomci: opisni metod, stanje piši kao (brojnik)/(nazivnik)."
-    ),
+    "5": "Prirodni brojevi i nula. Decimalni zarez se ne koristi. Razlomci samo najjednostavniji (1/2). Veliki brojevi sa razmakom (1 000 000). Skupovi (∈), uglovi (oštri, tupi, pravi).",
+    "6": "Cijeli brojevi. Jednačine rješavati logičkom vezom operacija (npr. 'nepoznati umanjilac dobijemo...'). Zabranjeno prebacivanje članova preko znaka jednakosti.",
+    "7": "Hibridni račun: Ako se pojavljuju decimalni i razlomci, obavezno sve pretvori u razlomke. Rezultat mora biti razlomak ili cijeli broj.",
+    "8": "Pitagora (c² = a² + b²), djelimično korjenovanje (√12 = 2√3). Proporcije: strelice u naslovu koraka (↑↑ = direktna, ↑↓ = obrnuta) i tekstualni opis pored samog izraza (npr. 'direktna proporcionalnost').",
+    "9": "Linearna funkcija y = kx + n (stabilna tabela s min. 2 tačke). Polinomi: kvadrat binoma, razlika kvadrata. Algebarski razlomci: opisni metod (brojnik/nazivnik)."
 }
 
 VIZUELNI_SIMBOLI = (
     "Koristi Unicode stepene i korijene (², ³, √). "
     "Uglovi: α, β, γ samo ako su u postavci; inače 'ugao A'. "
-    "Razlomke piši kao 3/4. Algebarske razlomke isključivo kao (…)/(…)."
+    "LaTeX ($...$) koristi isključivo za razlomke i složene korijene unutar izraza radi preglednosti."
 )
 
 ZABRANE = (
     "Strogo zabranjeno: sin, cos, tg, ctg, logaritmi, gradivo srednje škole. "
-    "Zabranjen LaTeX i znak ^. "
-    "Nikada ne koristi Markdown liste sa crticama (-) niti da red počinje crticom. "
-    "Nikada ne piši razmak prije znaka '=' u liniji izraza. "
-    "Ne koristi / za algebarske razlomke bez zagrada (mora (…)/(…))."
+    "Nikada ne koristi Markdown liste sa crticama (-). "
+    "Nikada ne počinji red crticom ili razmakom prije znaka jednakosti."
 )
 
 # --- Ovo zamjenjuje BASE_GUIDANCE u tvojoj staroj strukturi ---
