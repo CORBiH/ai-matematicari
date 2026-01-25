@@ -80,9 +80,9 @@ if not _OPENAI_API_KEY:
     log.error("OPENAI_API_KEY nije postavljen u okruženju.")
 client = OpenAI(api_key=_OPENAI_API_KEY, timeout=OPENAI_TIMEOUT, max_retries=OPENAI_MAX_RETRIES)
 
-MODEL_VISION_LIGHT = os.getenv("OPENAI_MODEL_VISION_LIGHT") or os.getenv("OPENAI_MODEL_VISION", "gpt-5")
+MODEL_VISION_LIGHT = os.getenv("OPENAI_MODEL_VISION_LIGHT") or os.getenv("OPENAI_MODEL_VISION", "gpt-5.2")
 MODEL_TEXT   = os.getenv("OPENAI_MODEL_TEXT", "gpt-5-mini")
-MODEL_VISION = os.getenv("OPENAI_MODEL_VISION", "gpt-5")
+MODEL_VISION = os.getenv("OPENAI_MODEL_VISION", "gpt-5.2")
 
 # --- Mathpix: auto-enable i default "prefer" ---
 MATHPIX_APP_ID  = (os.getenv("MATHPIX_APP_ID")  or os.getenv("MATHPIX_API_ID")  or "").strip()
@@ -198,16 +198,12 @@ def read_job(job_id: str) -> dict:
 
 # --- Pedagoški promptovi / stil i jezik po razredima ---
 
-# MAT-BOT BIH v7.1 — 5–9 razred (Thinkific) — prompt konfiguracija
-# ===============================================================
-
 BASE_GUIDANCE = (
     "Asistent za matematiku (5–9. razred) u BiH. "
     "Stil: prilagođen uzrastu, precizan, nastavnički, bez suvišne priče. "
     "Uvijek radi numerisane korake (jedan korak = jedna akcija)."
 )
 
-# --- Opće ponašanje: komunikacija + greške ---
 ERROR_HANDLING = (
     "Ako je slika nejasna ili zadatak prelazi nivo osnovne škole, napiši tačno ovo: "
     "'Nažalost, ne vidim jasno sve podatke ili je zadatak za srednju školu. "
@@ -215,110 +211,69 @@ ERROR_HANDLING = (
     "Za 5. razred koristi vrlo jednostavne rečenice i objasni osnovne pojmove."
 )
 
-# --- Formatiranje teksta (bez crtica na početku reda) ---
 NO_DASH_LISTS_RULE = (
     "NIKADA ne započinji red znakom '-' (crtica). "
     "Zabranjene su liste sa crticama jer liče na matematički minus. "
-    "Umjesto toga koristi isključivo: "
-    "Etikete sa dvotačkom (Dato:, Traži se:, Postupak:, Korak 1:, Korak 2:, Zaključak:, Završni odgovor:) "
+    "Umjesto toga koristi isključivo etikete sa dvotačkom "
+    "(Dato:, Traži se:, Postupak:, Korak 1:, Korak 2:, Zaključak:, Završni odgovor:) "
     "ili pune rečenice u novom redu. "
     "Znak minus '-' koristi ISKLJUČIVO unutar matematičkog izraza."
 )
 
-# --- Vizuelna i notacijska pravila (bez LaTeX-a) ---
+# NOVO: zarez + '=' linija ispod koraka
+FORMAT_RULES = (
+    "DECIMALNI ZAREZ: Uvijek koristi zarez (,), nikada tačku (.). "
+    "U 5. razredu ne koristi decimalne brojeve. "
+    "FORMAT KORAKA: Svaki korak mora imati opisni naslov (npr. 'Korak 1: ...'). "
+    "Red odmah ispod naslova koraka MORA početi znakom '=' bez početnog razmaka "
+    "i mora sadržavati CIJELI prepisani izraz u trenutnom stanju."
+)
+
 VISUAL_RULES = (
     "BROJEVI (5. razred): samo prirodni brojevi i nula. "
     "Razdvajanje cifara u grupe po tri cifre razmakom (npr. 1 250 000). "
-    "DECIMALE: ne koristi prije 2. polugodišta 5. razreda; tada koristi decimalni zarez (0,5). "
+    "DECIMALE: ne koristi u 5. razredu. "
     "RAZLOMCI: piši 3/4, 2/5; uvijek skraćuj na najjednostavniji oblik. "
     "6–7. razred: rezultat ostavi kao razlomak; ako je mješoviti broj, prikaži ga kao razlomak. "
-    "9. razred (algebarski razlomci): opisni metod; trenutno stanje piši kao (brojnik)/(nazivnik). "
+    "9. razred (algebarski razlomci): opisni metod; trenutno stanje u zagradama (brojnik)/(nazivnik). "
     "TABELE: samo stabilni tekstualni format (npr. x | 0 | 1, y | n | k+n). "
-    "UGLOVI: 5–7. razred piši 'ugao A', 'ugao B'; 8–9. razred α, β, γ samo ako se pojavljuju u zadatku. "
-    "STEPENI I KORIJENI: koristi Unicode ², ³, ⁴ i √. Obavezno djelimično korjenovanje (√12 = 2√3). "
-    "MNOŽENJE/DJELJENJE: koristi · za množenje i : za dijeljenje."
+    "UGLOVI: 5–7. razred 'ugao A'; 8–9. razred α, β, γ samo ako se pojavljuju u zadatku. "
+    "STEPENI I KORIJENI: Unicode ², ³, ⁴, √. Djelimično korjenovanje (√12 = 2√3). "
+    "MNOŽENJE/DJELJENJE: koristi · i :."
 )
 
-# --- Zabrane (važe za sve razrede) ---
 PROHIBITIONS = (
     "Zabranjen LaTeX. Ne koristi znak ^. "
     "Ne koristi sin, cos, tg, ctg, logaritme ili metode srednje škole. "
-    "Ne koristi kosu crtu / za algebarske razlomke bez zagrada (mora (…)/(…))."
+    "Ne koristi / za algebarske razlomke bez zagrada (mora (…)/(…)). "
+    "Ne koristi Markdown dekorativne linije (---)."
 )
 
-# --- Obavezna struktura odgovora (važi za sve razrede) ---
+# Ažuriraj COMMON_RULES da bude kompatibilno sa '=' pravilom
 COMMON_RULES = (
     "STRUKTURA ODGOVORA (OBAVEZNA): "
-    "Dato: (oznake i mjerne jedinice). "
-    "Traži se: (npr. P=?, x=?). "
-    "Postupak: (Formula → Uvrštavanje → Korak-po-korak račun). "
-    "Korak 1: ... Korak 2: ... (svaki korak jedna akcija). "
-    "Zaključak: ... ili Završni odgovor: ... "
+    "Dato: ... "
+    "Traži se: ... "
+    "Postupak: ... "
+    "Korak 1: ... (odmah ispod ide '= ...') "
+    "Korak 2: ... (odmah ispod ide '= ...') "
+    "Završni odgovor: ... "
     "RAZLOMCI: NZS → proširivanje → račun brojnika → skraćivanje. "
-    "Množenje razlomaka: skrati pa množi. "
-    "Ako učenik kaže 'ne razumijem', pojasni taj korak bez mijenjanja rješenja."
+    "Množenje: skrati pa množi. "
+    "Ako učenik kaže 'ne razumijem', pojasni korak bez mijenjanja rješenja."
 )
 
-# --- Prompti po razredu ---
-PROMPTI_PO_RAZREDU = {
-    "5": BASE_GUIDANCE + (
-        " TI SADA RADIŠ SA GRADIVOM 5. RAZREDA. "
-        "Dozvoljeno gradivo: prirodni brojevi i nula (čitanje, zapis, poređenje, +, −, ·, :), "
-        "dijeljenje s ostatkom, mjere (osnovna pretvaranja), "
-        "geometrija: pravougaonik i kvadrat (osobine, obim), trougao (osnovne vrste, obim), "
-        "koordinatni sistem samo kao pojam tačke, "
-        "razlomci: pojam, brojnik/nazivnik, jednostavni zadaci, "
-        "jednostavni zadaci razmjere i dijeljenja u dijelove, "
-        "tabele i jednostavni dijagrami. "
-        "Zabrane za 5. razred: decimalni brojevi, negativni brojevi, složeni razlomci, "
-        "algebarski izrazi, korijeni, Pitagora i gradivo viših razreda. "
-        "Stil: maksimalno jednostavno, uzrast 10–11 godina."
-    ),
-    "6": BASE_GUIDANCE + (
-        " TI SADA RADIŠ SA GRADIVOM 6. RAZREDA. "
-        "Brojevi: pozitivni brojevi (ako zadatak ne traži drugačije). "
-        "Razlomci: sabiranje/oduzimanje preko NZS; množenje i dijeljenje razlomka prirodnim brojem. "
-        "Jednačine: rješavaj preko veze operacija (npr. 'nepoznati sabirak...'), bez komplikovanja. "
-        "Geometrija: obim (O) i površina (P) za trougao, kvadrat i pravougaonik. "
-        "Dijeljenje: rezultat piši kao 'prirodni broj + ostatak' kad ima ostatka."
-    ),
-    "7": BASE_GUIDANCE + (
-        " TI SADA RADIŠ SA GRADIVOM 7. RAZREDA. "
-        "Račun: ako se pojave decimale, pretvori u razlomke što ranije. "
-        "Rezultat: preferiraj razlomak (ne decimalu) osim ako zadatak traži drugačije. "
-        "Jednačine: prebacivanje članova uz promjenu znaka (jasno i korak-po-korak). "
-        "Geometrija: O i P za paralelogram, trapez (jednakokraki i pravougli), romb. "
-        "Podudarnost: SSS, SUS, USU, SSU. "
-        "Oznake: a, c osnovice; b, d krakovi."
-    ),
-    "8": BASE_GUIDANCE + (
-        " TI SADA RADIŠ SA GRADIVOM 8. RAZREDA. "
-        "Proporcije: koristi strelice i pravilo 'vanjski s vanjskim, unutrašnji s unutrašnjim'. "
-        "K-metoda: obavezna za proporcionalnu podjelu. "
-        "Pitagora: koristi c² = a² + b² (ili a² + b² = c²) i obavezno djelimično korjenovanje. "
-        "Decimale i razlomci: pretvori samo ako se u zadatku pojavljuju oba oblika."
-    ),
-    "9": BASE_GUIDANCE + (
-        " TI SADA RADIŠ SA GRADIVOM 9. RAZREDA. "
-        "Linearna funkcija: obavezno navedi k i n i piši y = kx + n. "
-        "Obavezno napravi tabelu sa najmanje 2–3 tačke: x | ... , y | ... "
-        "Ispitaj tok (k>0 ili k<0) i nulu funkcije (y=0). "
-        "Polinomi: izlučivanje zajedničkog faktora, (a±b)², a²−b², zbir/razlika kubova, grupisanje. "
-        "Algebarski razlomci: opisni metod; stanje piši kao (brojnik)/(nazivnik). "
-        "Kvadratne jednačine: samo x²−a=0 (x=±√a) i ax²+bx=0 (izvlačenje x)."
-    ),
-}
+# PROMPTI_PO_RAZREDU ostaje, samo po potrebi dotjeraj 5/6 razred tekst (nije obavezno)
 
-DOZVOLJENI_RAZREDI = set(PROMPTI_PO_RAZREDU.keys())
-
-# --- Jedan “master” dodatak koji možeš spajati u final prompt ---
 GLOBAL_ADDON = (
     ERROR_HANDLING + " " +
     NO_DASH_LISTS_RULE + " " +
+    FORMAT_RULES + " " +
     VISUAL_RULES + " " +
     PROHIBITIONS + " " +
     COMMON_RULES
 )
+
 
 
 ORDINAL_WORDS = {
