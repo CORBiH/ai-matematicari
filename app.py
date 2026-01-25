@@ -215,6 +215,16 @@ ERROR_HANDLING = (
     "Za 5. razred koristi vrlo jednostavne rečenice i objasni osnovne pojmove."
 )
 
+# --- Formatiranje teksta (bez crtica na početku reda) ---
+NO_DASH_LISTS_RULE = (
+    "NIKADA ne započinji red znakom '-' (crtica). "
+    "Zabranjene su liste sa crticama jer liče na matematički minus. "
+    "Umjesto toga koristi isključivo: "
+    "Etikete sa dvotačkom (Dato:, Traži se:, Postupak:, Korak 1:, Korak 2:, Zaključak:, Završni odgovor:) "
+    "ili pune rečenice u novom redu. "
+    "Znak minus '-' koristi ISKLJUČIVO unutar matematičkog izraza."
+)
+
 # --- Vizuelna i notacijska pravila (bez LaTeX-a) ---
 VISUAL_RULES = (
     "BROJEVI (5. razred): samo prirodni brojevi i nula. "
@@ -239,10 +249,11 @@ PROHIBITIONS = (
 # --- Obavezna struktura odgovora (važi za sve razrede) ---
 COMMON_RULES = (
     "STRUKTURA ODGOVORA (OBAVEZNA): "
-    "1) Dato: (oznake i mjerne jedinice). "
-    "2) Traži se: (npr. P=?, x=?). "
-    "3) Postupak: (Formula → Uvrštavanje → Korak-po-korak račun). "
-    "FORMAT KORAKA: 'Korak 1: ...', 'Korak 2: ...', ..., 'Završni odgovor: ...'. "
+    "Dato: (oznake i mjerne jedinice). "
+    "Traži se: (npr. P=?, x=?). "
+    "Postupak: (Formula → Uvrštavanje → Korak-po-korak račun). "
+    "Korak 1: ... Korak 2: ... (svaki korak jedna akcija). "
+    "Zaključak: ... ili Završni odgovor: ... "
     "RAZLOMCI: NZS → proširivanje → račun brojnika → skraćivanje. "
     "Množenje razlomaka: skrati pa množi. "
     "Ako učenik kaže 'ne razumijem', pojasni taj korak bez mijenjanja rješenja."
@@ -303,13 +314,12 @@ DOZVOLJENI_RAZREDI = set(PROMPTI_PO_RAZREDU.keys())
 # --- Jedan “master” dodatak koji možeš spajati u final prompt ---
 GLOBAL_ADDON = (
     ERROR_HANDLING + " " +
+    NO_DASH_LISTS_RULE + " " +
     VISUAL_RULES + " " +
     PROHIBITIONS + " " +
     COMMON_RULES
 )
 
-# Ako praviš final prompt:
-# final_prompt = PROMPTI_PO_RAZREDU[razred] + " " + GLOBAL_ADDON
 
 ORDINAL_WORDS = {
     "prvi": 1, "drugi": 2, "treći": 3, "treci": 3, "četvrti": 4, "cetvrti": 4,
