@@ -209,54 +209,59 @@ BASE_GUIDANCE = (
 
 # --- Opće ponašanje: komunikacija + greške ---
 ERROR_HANDLING = (
-    "Ako je slika nejasna ili zadatak prelazi nivo osnovne škole, napiši tačno ovo: "
-    "'Nažalost, ne vidim jasno sve podatke ili je zadatak za srednju školu. "
-    "Možeš li poslati bolju sliku ili prepisati tekst?' "
-    "Za 5. razred koristi vrlo jednostavne rečenice i objasni osnovne pojmove."
+    "1. Decimalni zarez: Uvijek koristi zarez (,), nikada tačku (.). "
+    "U 5. razredu se decimalni zarez i decimalni brojevi uopšte ne koriste. "
+    "2. Bez crtica i razmaka: Nikada ne počinji red crticom (-). "
+    "Red odmah ispod naslova koraka mora početi znakom jednakosti (=) bez početnog razmaka. "
+    "3. Tabele: Isključivo stabilni tekstualni format. Strogo zabranjeno korištenje "
+    "Markdown linija (---) ili ekstra linija u LaTeX-u koje bi mogle razbiti prikaz."
 )
 
-# --- Formatiranje teksta (bez crtica na početku reda) ---
-NO_DASH_LISTS_RULE = (
-    "NIKADA ne započinji red znakom '-' (crtica). "
-    "Zabranjene su liste sa crticama jer liče na matematički minus. "
-    "Umjesto toga koristi isključivo: "
-    "Etikete sa dvotačkom (Dato:, Traži se:, Postupak:, Korak 1:, Korak 2:, Zaključak:, Završni odgovor:) "
-    "ili pune rečenice u novom redu. "
-    "Znak minus '-' koristi ISKLJUČIVO unutar matematičkog izraza."
-)
 
 # --- Vizuelna i notacijska pravila (bez LaTeX-a) ---
 VISUAL_RULES = (
-    "BROJEVI (5. razred): samo prirodni brojevi i nula. "
-    "Razdvajanje cifara u grupe po tri cifre razmakom (npr. 1 250 000). "
-    "DECIMALE: ne koristi prije 2. polugodišta 5. razreda; tada koristi decimalni zarez (0,5). "
-    "RAZLOMCI: piši 3/4, 2/5; uvijek skraćuj na najjednostavniji oblik. "
-    "6–7. razred: rezultat ostavi kao razlomak; ako je mješoviti broj, prikaži ga kao razlomak. "
-    "9. razred (algebarski razlomci): opisni metod; trenutno stanje piši kao (brojnik)/(nazivnik). "
-    "TABELE: samo stabilni tekstualni format (npr. x | 0 | 1, y | n | k+n). "
-    "UGLOVI: 5–7. razred piši 'ugao A', 'ugao B'; 8–9. razred α, β, γ samo ako se pojavljuju u zadatku. "
-    "STEPENI I KORIJENI: koristi Unicode ², ³, ⁴ i √. Obavezno djelimično korjenovanje (√12 = 2√3). "
-    "MNOŽENJE/DJELJENJE: koristi · za množenje i : za dijeljenje."
+   "Svaki korak mora imati opisni naslov. Red odmah ispod naslova MORA početi "
+    "znakom '=' i sadržavati CIJELI prepisani izraz u trenutnom stanju. "
+    "Nikada ne piši izolirane računske operacije sa strane. "
+    
+    "PRIMJER 6. RAZRED (Jednačine bez prebacivanja): "
+    "Korak 1: Nepoznati sabirak dobijemo oduzimanjem poznatog sabirka od zbira "
+    "= x = 150 - 50 "
+    "Korak 2: Izračunaj krajnji rezultat "
+    "= x = 100 "
+
+    "PRIMJER 7. RAZRED (Hibridni račun): "
+    "Korak 1: Pretvori mješoviti broj i decimalni broj u razlomke "
+    "= 1 1/2 + 0,2 * 5/2 "
+    "Korak 2: Pretvori u nepravi razlomak i decimalni u obični "
+    "= 3/2 + 2/10 * 5/2 "
+    "Korak 3: Izvrši množenje unutar izraza "
+    "= 3/2 + 1/2 "
+    "Korak 4: Saberi rezultate "
+    "= 4/2 = 2"
 )
 
-# --- Zabrane (važe za sve razrede) ---
-PROHIBITIONS = (
-    "Zabranjen LaTeX. Ne koristi znak ^. "
-    "Ne koristi sin, cos, tg, ctg, logaritme ili metode srednje škole. "
-    "Ne koristi kosu crtu / za algebarske razlomke bez zagrada (mora (…)/(…))."
-)
+
 
 # --- Obavezna struktura odgovora (važi za sve razrede) ---
 COMMON_RULES = (
-    "STRUKTURA ODGOVORA (OBAVEZNA): "
-    "Dato: (oznake i mjerne jedinice). "
-    "Traži se: (npr. P=?, x=?). "
-    "Postupak: (Formula → Uvrštavanje → Korak-po-korak račun). "
-    "Korak 1: ... Korak 2: ... (svaki korak jedna akcija). "
-    "Zaključak: ... ili Završni odgovor: ... "
-    "RAZLOMCI: NZS → proširivanje → račun brojnika → skraćivanje. "
-    "Množenje razlomaka: skrati pa množi. "
-    "Ako učenik kaže 'ne razumijem', pojasni taj korak bez mijenjanja rješenja."
+    "5": "Prirodni brojevi i nula. Decimalni zarez se ne koristi. Razlomci samo najjednostavniji (1/2). Veliki brojevi sa razmakom (1 000 000). Skupovi (∈), uglovi (oštri, tupi, pravi).",
+    "6": "Cijeli brojevi. Jednačine rješavati logičkom vezom operacija (npr. 'nepoznati umanjilac dobijemo...'). Zabranjeno prebacivanje članova preko znaka jednakosti.",
+    "7": "Hibridni račun: Ako se pojavljuju decimalni i razlomci, obavezno sve pretvori u razlomke. Rezultat mora biti razlomak ili cijeli broj.",
+    "8": "Pitagora (c² = a² + b²), djelimično korjenovanje (√12 = 2√3). Proporcije: strelice u naslovu koraka (↑↑ = direktna, ↑↓ = obrnuta) i tekstualni opis pored samog izraza (npr. 'direktna proporcionalnost').",
+    "9": "Linearna funkcija y = kx + n (stabilna tabela s min. 2 tačke). Polinomi: kvadrat binoma, razlika kvadrata. Algebarski razlomci: opisni metod (brojnik/nazivnik)."
+}
+
+VIZUELNI_SIMBOLI = (
+    "Koristi Unicode stepene i korijene (², ³, √). "
+    "Uglovi: α, β, γ samo ako su u postavci; inače 'ugao A'. "
+    "LaTeX ($...$) koristi isključivo za razlomke i složene korijene unutar izraza radi preglednosti."
+)
+
+ZABRANE = (
+    "Strogo zabranjeno: sin, cos, tg, ctg, logaritmi, gradivo srednje škole. "
+    "Nikada ne koristi Markdown liste sa crticama (-). "
+    "Nikada ne počinji red crticom ili razmakom prije znaka jednakosti."
 )
 
 # --- Prompti po razredu ---
@@ -314,9 +319,9 @@ DOZVOLJENI_RAZREDI = set(PROMPTI_PO_RAZREDU.keys())
 # --- Jedan “master” dodatak koji možeš spajati u final prompt ---
 GLOBAL_ADDON = (
     ERROR_HANDLING + " " +
-    NO_DASH_LISTS_RULE + " " +
     VISUAL_RULES + " " +
-    PROHIBITIONS + " " +
+    VIZUELNI_SIMBOLI + " " +
+    ZABRANE + " " +
     COMMON_RULES
 )
 
