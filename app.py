@@ -80,9 +80,13 @@ if not _OPENAI_API_KEY:
     log.error("OPENAI_API_KEY nije postavljen u okruženju.")
 client = OpenAI(api_key=_OPENAI_API_KEY, timeout=OPENAI_TIMEOUT, max_retries=OPENAI_MAX_RETRIES)
 
-MODEL_VISION_LIGHT = os.getenv("OPENAI_MODEL_VISION_LIGHT") or os.getenv("OPENAI_MODEL_VISION", "gpt-5")
-MODEL_TEXT   = os.getenv("OPENAI_MODEL_TEXT", "gpt-5-mini")
-MODEL_VISION = os.getenv("OPENAI_MODEL_VISION", "gpt-5")
+DEFAULT_MODEL_VISION = "gpt-5.2"
+DEFAULT_MODEL_TEXT = "gpt-5-mini"
+
+MODEL_VISION = os.getenv("OPENAI_MODEL_VISION", DEFAULT_MODEL_VISION)
+MODEL_VISION_LIGHT = os.getenv("OPENAI_MODEL_VISION_LIGHT", MODEL_VISION)
+MODEL_TEXT = os.getenv("OPENAI_MODEL_TEXT", DEFAULT_MODEL_TEXT)
+
 
 # --- Mathpix: auto-enable i default "prefer" ---
 MATHPIX_APP_ID  = (os.getenv("MATHPIX_APP_ID")  or os.getenv("MATHPIX_API_ID")  or "").strip()
