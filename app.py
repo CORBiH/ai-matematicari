@@ -270,14 +270,14 @@ RAZREDNA_PRAVILA = {
 }
 
 VIZUELNI_SIMBOLI = (
-    "Koristi Unicode stepene i korijene (², ³, √). "
-    "Uglovi: α, β, γ samo ako su u postavci; inače 'ugao A'. "
-    "LaTeX ($...$) koristi isključivo za razlomke i složene korijene unutar izraza radi preglednosti."
-)
-
-VIZUELNI_SIMBOLI = (
     "Unicode stepeni i korijeni (², ³, √). "
     "LaTeX ($...$) samo za razlomke i složene korijene."
+)
+
+ZABRANE = (
+    "Strogo zabranjeno: gradivo srednje škole, sin, cos, log. "
+    "Zabranjeno: Markdown liste sa crticama (-). "
+    "Zabranjeno: Počinjanje reda razmakom prije znaka '='."
 )
 
 # --- Ovo zamjenjuje BASE_GUIDANCE u tvojoj staroj strukturi ---
