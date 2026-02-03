@@ -217,11 +217,20 @@ KOMUNIKACIJA_I_FORMATIRANJE = (
     "1. Decimalni zarez: Uvijek koristi zarez (,), nikada tačku (.). "
     "U 5. razredu se decimalni zarez ne koristi. "
     "2. Bez crtica i razmaka: Nikada ne počinji red crticom (-). "
-    "3. Kontinuitet: Red ispod naslova koraka sadrži CIJELI izraz u kontinuitetu "
-    "(npr. 2*(3+5)=2*8=16). '=' se koristi samo unutar izraza, nikad na početku reda. "
+    "3. Kontinuitet: Red ispod naslova koraka prepisuje CIJELI izraz. "
+    "Rezultate unutar istog reda veži znakom jednakosti (npr. 2*(3+5)=2*8=16). "
+    "Znak jednakosti se nikada ne piše na početku reda; koristi ga samo između izraza. "
     "4. Tabele: Isključivo stabilni tekstualni format bez Markdown linija (---). "
-    "5. TERMINOLOGIJA RAZLOMAKA: Obavezno koristi 'brojnik (brojilac)' i 'nazivnik (imenilac)'. "
-    "6. NZD/NZS: Koristi code-block (tri backtick-a) isključivo za vertikalni račun, monospaced font."
+    "5. TERMINOLOGIJA RAZLOMAKA: Obavezno koristi oba termina: 'brojnik (brojilac)' i 'nazivnik (imenilac)'. "
+    "6. NZD/NZS: Koristi code-block (tri backtick-a) za vertikalni račun zbog poravnanja. "
+    "7. KORIJENI: Nikada ne koristi 'sqrt(...)'; uvijek koristi simbol √."
+)
+
+REGIONALNA_TERMINOLOGIJA = (
+    "Geometrija u BiH: "
+    "- Trapez: duža osnovica = a, kraća osnovica = c, krak = b. "
+    "- Jednakokraki trougao: krak = b, osnovica = a. "
+    "- Koristiti ove oznake dosljedno u svim zadacima."
 )
 
 POSTUPAK_KONTINUIRANI = (
@@ -231,14 +240,13 @@ POSTUPAK_KONTINUIRANI = (
 
 METOD_NZD_NZS = (
     "NZD i NZS rješavaj metodom vertikalne linije: "
-    "Primjer formata (vodi računa o poravnanju brojeva): "
+    "Primjer formata: "
     "```\n"
     "12  18 | 2\n"
     " 6   9 | 3\n"
     " 2   3 |\n"
     "```\n"
-    "NZD je proizvod brojeva desno (2 * 3 = 6). "
-    "NZS ide do kraja dok na lijevoj strani ne budu sve jedinice (1)."
+    "NZD = proizvod brojeva desno (2 * 3 = 6). NZS = dijeli dok ne ostanu sve jedinice (1) na lijevoj strani."
 )
 
 RAZREDNA_PRAVILA = {
@@ -267,10 +275,9 @@ VIZUELNI_SIMBOLI = (
     "LaTeX ($...$) koristi isključivo za razlomke i složene korijene unutar izraza radi preglednosti."
 )
 
-ZABRANE = (
-    "Strogo zabranjeno: sin, cos, tg, ctg, logaritmi, gradivo srednje škole. "
-    "Nikada ne koristi Markdown liste sa crticama (-). "
-    "Nikada ne počinji red crticom ili razmakom prije znaka jednakosti."
+VIZUELNI_SIMBOLI = (
+    "Unicode stepeni i korijeni (², ³, √). "
+    "LaTeX ($...$) samo za razlomke i složene korijene."
 )
 
 # --- Ovo zamjenjuje BASE_GUIDANCE u tvojoj staroj strukturi ---
@@ -326,6 +333,7 @@ GLOBAL_ADDON = (
     METOD_NZD_NZS + " " +
     POSTUPAK_KONTINUIRANI + " " +
     VIZUELNI_SIMBOLI + " " +
+    REGIONALNA_TERMINOLOGIJA + " " +
     ZABRANE + " " +
     COMMON_RULES
 )
