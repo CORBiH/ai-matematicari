@@ -215,41 +215,50 @@ ULOGA = (
 
 KOMUNIKACIJA_I_FORMATIRANJE = (
     "1. Decimalni zarez: Uvijek koristi zarez (,), nikada tačku (.). "
-    "U 5. razredu se decimalni zarez i decimalni brojevi uopšte ne koriste. "
+    "U 5. razredu se decimalni zarez ne koristi. "
     "2. Bez crtica i razmaka: Nikada ne počinji red crticom (-). "
-    "Red odmah ispod naslova koraka mora početi znakom jednakosti (=) bez početnog razmaka. "
-    "3. Tabele: Isključivo stabilni tekstualni format. Strogo zabranjeno korištenje "
-    "Markdown linija (---) ili ekstra linija u LaTeX-u koje bi mogle razbiti prikaz."
+    "3. Kontinuitet: Red ispod naslova koraka sadrži CIJELI izraz u kontinuitetu "
+    "(npr. 2*(3+5)=2*8=16). '=' se koristi samo unutar izraza, nikad na početku reda. "
+    "4. Tabele: Isključivo stabilni tekstualni format bez Markdown linija (---). "
+    "5. TERMINOLOGIJA RAZLOMAKA: Obavezno koristi 'brojnik (brojilac)' i 'nazivnik (imenilac)'. "
+    "6. NZD/NZS: Koristi code-block (tri backtick-a) isključivo za vertikalni račun, monospaced font."
 )
 
 POSTUPAK_KONTINUIRANI = (
-    "Svaki korak mora imati opisni naslov. Red odmah ispod naslova MORA početi "
-    "znakom '=' i sadržavati CIJELI prepisani izraz u trenutnom stanju. "
-    "Nikada ne piši izolirane računske operacije sa strane. "
-    
-    "PRIMJER 6. RAZRED (Jednačine bez prebacivanja): "
-    "Korak 1: Nepoznati sabirak dobijemo oduzimanjem poznatog sabirka od zbira "
-    "= x = 150 - 50 "
-    "Korak 2: Izračunaj krajnji rezultat "
-    "= x = 100 "
+    "Svaki korak mora imati opisni naslov. Nikada ne piši izolirane operacije sa strane. "
+    "Sve se računa unutar glavnog izraza."
+)
 
-    "PRIMJER 7. RAZRED (Hibridni račun): "
-    "Korak 1: Pretvori mješoviti broj i decimalni broj u razlomke "
-    "= 1 1/2 + 0,2 * 5/2 "
-    "Korak 2: Pretvori u nepravi razlomak i decimalni u obični "
-    "= 3/2 + 2/10 * 5/2 "
-    "Korak 3: Izvrši množenje unutar izraza "
-    "= 3/2 + 1/2 "
-    "Korak 4: Saberi rezultate "
-    "= 4/2 = 2"
+METOD_NZD_NZS = (
+    "NZD i NZS rješavaj metodom vertikalne linije: "
+    "Primjer formata (vodi računa o poravnanju brojeva): "
+    "```\n"
+    "12  18 | 2\n"
+    " 6   9 | 3\n"
+    " 2   3 |\n"
+    "```\n"
+    "NZD je proizvod brojeva desno (2 * 3 = 6). "
+    "NZS ide do kraja dok na lijevoj strani ne budu sve jedinice (1)."
 )
 
 RAZREDNA_PRAVILA = {
-    "5": "Prirodni brojevi i nula. Decimalni zarez se ne koristi. Razlomci samo najjednostavniji (1/2). Veliki brojevi sa razmakom (1 000 000). Skupovi (∈), uglovi (oštri, tupi, pravi).",
-    "6": "Cijeli brojevi. Jednačine rješavati logičkom vezom operacija (npr. 'nepoznati umanjilac dobijemo...'). Zabranjeno prebacivanje članova preko znaka jednakosti.",
-    "7": "Hibridni račun: Ako se pojavljuju decimalni i razlomci, obavezno sve pretvori u razlomke. Rezultat mora biti razlomak ili cijeli broj.",
-    "8": "Pitagora (c² = a² + b²), djelimično korjenovanje (√12 = 2√3). Proporcije: strelice u naslovu koraka (↑↑ = direktna, ↑↓ = obrnuta) i tekstualni opis pored samog izraza (npr. 'direktna proporcionalnost').",
-    "9": "Linearna funkcija y = kx + n (stabilna tabela s min. 2 tačke). Polinomi: kvadrat binoma, razlika kvadrata. Algebarski razlomci: opisni metod (brojnik/nazivnik)."
+    "5": (
+        "Prirodni brojevi i nula. Decimalni zarez ZABRANJEN. "
+        "JEDNAČINE/NEJEDNAČINE rješavaj isključivo preko pravila: "
+        "'nepoznati sabirak = zbir − poznati sabirak', "
+        "'nepoznati umanjenik = umanjilac + razlika', "
+        "'nepoznati umanjilac = umanjenik − razlika', "
+        "'nepoznati faktor (činilac) = proizvod : poznati faktor (činilac)', "
+        "'nepoznati djeljenik = količnik · djelilac', "
+        "'nepoznati djelilac = djeljenik : količnik'. "
+        "ZABRANJENO: Prebacivanje preko znaka jednakosti i algebarske transformacije. "
+        "Obavezno imenovati ulogu nepoznate (npr. 'nepoznati umanjilac')."
+    ),
+    "6": "Cijeli brojevi. Jednačine logičkom vezom. Zabranjeno prebacivanje članova. "
+         "NZD i NZS metodom vertikalne linije.",
+    "7": "Hibridni račun: Sve pretvori u razlomke. Rezultat je razlomak ili cijeli broj.",
+    "8": "Pitagora (c² = a² + b²), djelimično korjenovanje. Proporcije: strelice u naslovu (↑↑ ili ↑↓).",
+    "9": "Linearna funkcija y = kx + n (tabela min. 2 tačke), polinomi, algebarski razlomci."
 }
 
 VIZUELNI_SIMBOLI = (
@@ -314,6 +323,7 @@ DOZVOLJENI_RAZREDI = set(PROMPTI_PO_RAZREDU.keys())
 GLOBAL_ADDON = (
     ERROR_HANDLING + " " +
     KOMUNIKACIJA_I_FORMATIRANJE + " " +
+    METOD_NZD_NZS + " " +
     POSTUPAK_KONTINUIRANI + " " +
     VIZUELNI_SIMBOLI + " " +
     ZABRANE + " " +
