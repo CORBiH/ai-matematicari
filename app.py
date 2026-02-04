@@ -311,11 +311,6 @@ VIZUELNI_SIMBOLI = (
     "Simbol π: koristi Unicode π. Piši 25π umjesto 78,5 osim ako zadatak traži približno."
 )
 
-VIZUELNI_SIMBOLI = (
-    "Unicode stepeni i korijeni (², ³, √). "
-    "LaTeX ($...$) samo za razlomke i složene korijene. "
-    "Simbol π: koristi Unicode π. Piši 25π umjesto 78,5 osim ako zadatak traži približno."
-)
 
 # --- Ovo zamjenjuje BASE_GUIDANCE u tvojoj staroj strukturi ---
 BASE_GUIDANCE = ULOGA
