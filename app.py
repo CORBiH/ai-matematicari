@@ -328,8 +328,6 @@ NO_DASH_LISTS_RULE = KOMUNIKACIJA_I_FORMATIRANJE
 # --- Vizuelna pravila (u tvom starom formatu) ---
 VISUAL_RULES = VIZUELNI_SIMBOLI
 
-# --- Zabrane (u tvom starom formatu) ---
-PROHIBITIONS = ZABRANE
 
 # --- Obavezna struktura odgovora (tvoj stari COMMON_RULES, ali usklađen sa '=' pravilom) ---
 COMMON_RULES = (
@@ -361,7 +359,6 @@ GLOBAL_ADDON = (
     KOMUNIKACIJA_I_FORMATIRANJE + " " +
     METOD_PROPORCIJA + " " +
     REGIONALNA_TERMINOLOGIJA + " " +
-    RAZREDNA_PRAVILA + " " +
     METOD_NZD_NZS + " " +
     POSTUPAK_KONTINUIRANI + " " +
     VIZUELNI_SIMBOLI + " " +
@@ -484,7 +481,7 @@ def answer_with_text_pipeline(pure_text: str, razred: str, history, requested, t
         only_clause = " Riješi ISKLJUČIVO sljedeće zadatke: " + ", ".join(map(str, requested)) + ". Ostale ignoriraj."
     system_message = {
         "role": "system",
-        "content": prompt_za_razred + COMMON_RULES + only_clause + " " + strict_geom_policy
+        "content": prompt_za_razred + GLOBAL_ADDON + only_clause + " " + strict_geom_policy
     }
     messages = [system_message]
     # koristi zadnjih 5 izmjena iz historije
@@ -503,7 +500,7 @@ def _vision_messages_base(razred: str, history, only_clause: str, strict_geom_po
     prompt_za_razred = PROMPTI_PO_RAZREDU.get(razred, PROMPTI_PO_RAZREDU["5"])
     system_message = {
         "role": "system",
-        "content": prompt_za_razred + COMMON_RULES + " " + only_clause + " " + strict_geom_policy
+        "content": prompt_za_razred + GLOBAL_ADDON + " " + only_clause + " " + strict_geom_policy
     }
     messages = [system_message]
     for msg in history[-5:]:
