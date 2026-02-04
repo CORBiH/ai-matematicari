@@ -365,7 +365,6 @@ GLOBAL_ADDON = (
     METOD_NZD_NZS + " " +
     POSTUPAK_KONTINUIRANI + " " +
     VIZUELNI_SIMBOLI + " " +
-    ZABRANE + " " +
     COMMON_RULES
 )
 
