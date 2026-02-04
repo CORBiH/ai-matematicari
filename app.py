@@ -10,6 +10,8 @@ from urllib.parse import urlparse
 from openai import OpenAI
 from flask_cors import CORS
 import time
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
+
 
 
 # --- Optional PIL (for image heuristics and selftest) ---
@@ -935,17 +937,15 @@ def _sync_process_once(
     history: list | None = None,
 ) -> dict:
     """
-    Jedan sync pokušaj obrade. Koristi zadnju historiju iz sesije (ako je došla),
-    ali ne mijenja je – samo je prosljeđuje modelu.
+    Jedan sync pokušaj obrade, ali sa hard cutoff nakon timeout_s.
+    Ako probije cutoff → vrati ok=False i submit će fallback na async.
     """
-    try:
-        # ako nije poslano ništa, radi kao prije
-        if history is None:
-            history = []
-        else:
-            # napravimo kopiju da slučajno ne diramo session listu
-            history = list(history)
+    if history is None:
+        history = []
+    else:
+        history = list(history)
 
+    def work():
         if image_url:
             html_out, used_path, used_model = route_image_flow_url(
                 image_url,
@@ -954,7 +954,7 @@ def _sync_process_once(
                 user_text=user_text,
                 timeout_override=timeout_s,
             )
-            return {"ok": True, "result": {"html": html_out, "path": used_path, "model": used_model}}
+            return {"html": html_out, "path": used_path, "model": used_model}
 
         if file_bytes:
             html_out, used_path, used_model = route_image_flow(
@@ -965,7 +965,7 @@ def _sync_process_once(
                 timeout_override=timeout_s,
                 mime_hint=file_mime or None,
             )
-            return {"ok": True, "result": {"html": html_out, "path": used_path, "model": used_model}}
+            return {"html": html_out, "path": used_path, "model": used_model}
 
         html_out, used_model = answer_with_text_pipeline(
             user_text,
@@ -974,9 +974,18 @@ def _sync_process_once(
             requested,
             timeout_override=timeout_s,
         )
-        return {"ok": True, "result": {"html": html_out, "path": "text", "model": used_model}}
+        return {"html": html_out, "path": "text", "model": used_model}
+
+    try:
+        with ThreadPoolExecutor(max_workers=1) as ex:
+            fut = ex.submit(work)
+            result = fut.result(timeout=timeout_s)   # <-- OVO JE PRAVI SOFT TIMEOUT
+        return {"ok": True, "result": result}
+    except FuturesTimeout:
+        return {"ok": False, "error": f"soft-timeout-{timeout_s}s"}
     except Exception as e:
         return {"ok": False, "error": str(e)}
+
 
 
 def _prepare_async_payload(job_id: str, razred: str, user_text: str, requested: list, image_url: str | None, file_bytes: bytes | None, file_name: str | None, file_mime: str | None, image_b64_str: str | None) -> dict:
