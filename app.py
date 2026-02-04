@@ -9,6 +9,8 @@ import requests
 from urllib.parse import urlparse
 from openai import OpenAI
 from flask_cors import CORS
+import time
+
 
 # --- Optional PIL (for image heuristics and selftest) ---
 try:
@@ -68,6 +70,21 @@ OPENAI_MAX_RETRIES = 2
 
 SYNC_SOFT_TIMEOUT_S = float(os.getenv("SYNC_SOFT_TIMEOUT_S", "8"))
 HEAVY_TOKEN_THRESHOLD = int(os.getenv("HEAVY_TOKEN_THRESHOLD", "1500"))
+
+def _ms():
+    return time.perf_counter() * 1000.0
+
+class Prof:
+    def __init__(self):
+        self.t0 = _ms()
+        self.steps = []
+        self.meta = {}
+    def mark(self, name: str):
+        self.steps.append({"step": name, "ms": round(_ms() - self.t0, 1)})
+    def set(self, k, v):
+        self.meta[k] = v
+    def out(self):
+        return {"total_ms": round(_ms() - self.t0, 1), "steps": self.steps, "meta": self.meta}
 
 def _budgeted_timeout(default: float | int = None, margin: float = 5.0) -> float:
     run_lim = float(os.getenv("RUN_TIMEOUT_SECONDS", "300") or 300)
@@ -424,7 +441,7 @@ def strip_ascii_graph_blocks(text: str) -> str:
     text = graf_re.sub(lambda m: "" if "```" in m.group(0) else m.group(0), text)
     return fence.sub(repl, text)
 
-def answer_with_text_pipeline(pure_text: str, razred: str, history, requested, timeout_override: float | None = None):
+def answer_with_text_pipeline(pure_text: str, razred: str, history, requested, timeout_override: float | None = None, prof=None):
     only_clause = ""
     if requested:
         only_clause = " Riješi ISKLJUČIVO sljedeće zadatke: " + ", ".join(map(str, requested)) + ". Ostale ignoriraj."
@@ -439,8 +456,13 @@ def answer_with_text_pipeline(pure_text: str, razred: str, history, requested, t
         messages.append({"role":"user","content": msg["user"]})
         messages.append({"role":"assistant","content": msg["bot"]})
     messages.append({"role":"user","content": pure_text})
+    if prof: prof.mark("openai_text_start")
     response = _openai_chat(MODEL_TEXT, messages, timeout=timeout_override or OPENAI_TIMEOUT)
     actual_model = getattr(response, "model", MODEL_TEXT)
+    if prof:
+        prof.mark("openai_text_done")
+        prof.set("openai_text_model", actual_model)
+
     raw = response.choices[0].message.content
     raw = strip_ascii_graph_blocks(raw)
     html_out = "<p>" + latexify_fractions(html.escape(raw)).replace("\n", "<br>") + "</p>"
@@ -512,7 +534,11 @@ def mathpix_ocr_to_text(img_bytes: bytes) -> tuple[str | None, float]:
             "data_options": {"include_asciimath": False, "include_latex": False},
             "rm_spaces": True
         }
+        t0 = _ms()
         r = requests.post("https://api.mathpix.com/v3/text", headers=headers, json=payload, timeout=30)
+        t1 = _ms()
+        log.info("TIMING mathpix_post_ms=%.1f status=%s", (t1 - t0), r.status_code)
+
         if r.status_code != 200:
             return (None, 0.0)
         j = r.json() or {}
@@ -533,7 +559,11 @@ def mathpix_ocr_to_text(img_bytes: bytes) -> tuple[str | None, float]:
 def route_image_flow_url(image_url: str, razred: str, history, user_text=None, timeout_override: float | None = None):
     only_clause, strict_geom_policy = _vision_clauses()
     try:
+        t0 = _ms()
         r = requests.get(image_url, timeout=15)
+        t1 = _ms()
+        log.info("TIMING image_download_ms=%.1f", (t1 - t0))
+
         r.raise_for_status()
         mime_hint = r.headers.get("Content-Type") or None
         return route_image_flow(
@@ -976,8 +1006,15 @@ def _prepare_async_payload(job_id: str, razred: str, user_text: str, requested: 
         return payload
     return payload
 
+
+
+
 @app.route("/submit", methods=["POST", "OPTIONS"])
 def submit():
+    debug = (request.args.get("debug") == "1") or (request.headers.get("X-Debug") == "1")
+    prof = Prof() if debug else None
+    if prof: prof.mark("submit_start")
+
     if request.method == "OPTIONS":
         return ("", 204)
 
@@ -994,6 +1031,13 @@ def submit():
         user_text = (data.get("pitanje")   or data.get("user_text") or user_text).strip()
         image_url = (data.get("image_url") or image_url).strip()
         mode      = (data.get("mode")      or mode).strip().lower()
+
+
+    if prof:
+        prof.set("has_image", bool(image_url or request.files.get("file") or (data.get("image_b64") if data else None)))
+        prof.set("mode", mode)
+        prof.set("user_len", len(user_text or ""))
+
 
     if razred not in DOZVOLJENI_RAZREDI:
         razred = "5"
@@ -1065,6 +1109,7 @@ def submit():
             return jsonify({"error": "submit_failed", "detail": str(e), "job_id": job_id}), 500
 
     # --- 2) Sync pokušaj (mode == "sync" ili "auto" bez heavy) ---
+    if prof: prof.mark("sync_try_start")
     sync_try = _sync_process_once(
         razred=razred,
         user_text=user_text,
@@ -1075,6 +1120,9 @@ def submit():
         timeout_s=SYNC_SOFT_TIMEOUT_S,
         history=api_history,  # zadnja 3 Q/A iz sesije
     )
+
+    if prof: prof.mark("sync_try_done")
+
 
     if sync_try.get("ok"):
         html_out = sync_try["result"]["html"]
@@ -1104,16 +1152,19 @@ def submit():
             pass
 
         mode_tag = "auto(sync)" if mode == "auto" else "sync"
-        return jsonify(
-            {
-                "mode": mode_tag,
-                "result": {
-                    "html": html_out,
-                    "path": sync_try["result"]["path"],
-                    "model": sync_try["result"]["model"],
-                },
-            }
-        ), 200
+        payload = {
+            "mode": mode_tag,
+            "result": {
+                "html": html_out,
+                "path": sync_try["result"]["path"],
+                "model": sync_try["result"]["model"],
+        },
+    }
+        if prof:
+            prof.mark("before_return_200")
+            payload["timings"] = prof.out()
+        return jsonify(payload), 200
+
 
     # --- 3) Sync nije uspio → fallback na async ---
     job_id = str(uuid4())
@@ -1142,6 +1193,8 @@ def submit():
     try:
         _enqueue(payload)
         mode_tag = "auto(sync→async)" if mode == "auto" else "sync→async"
+        if prof:
+            prof.mark("before_return_202")
         return jsonify(
             {
                 "mode": mode_tag,
@@ -1149,6 +1202,8 @@ def submit():
                 "status": "queued",
                 "local_mode": LOCAL_MODE,
                 "reason": sync_try.get("error", "soft-timeout-or-error"),
+                "timings": prof.out() if prof else None
+
             }
         ), 202
     except Exception as e:
@@ -1204,11 +1259,7 @@ def set_razred():
     return ("", 204)
 
 
-# Dodatni CSP za Thinkific okvir (ostavljam; možeš prebrisati preko FRAME_ANCESTORS headera u add_no_cache_headers)
-@app.after_request
-def add_csp(resp):
-    resp.headers["Content-Security-Policy"] = "frame-ancestors https://*.thinkific.com"
-    return resp
+
 # ==== APP VERSION / FINGERPRINT (dodaj blizu vrha fajla, uz ostale env var) ====
 APP_VERSION = os.getenv("APP_VERSION", "dev")
 
