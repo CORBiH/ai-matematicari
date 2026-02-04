@@ -926,6 +926,7 @@ def looks_heavy(user_text: str, has_image: bool) -> bool:
     toks = estimate_tokens(user_text or "")
     return has_image or toks > HEAVY_TOKEN_THRESHOLD
 
+import concurrent.futures as cf
 
 def _sync_process_once(
     razred: str,
@@ -960,20 +961,19 @@ def _sync_process_once(
         )
         return {"html": html_out, "path": "text", "model": used_model}
 
-    ex = ThreadPoolExecutor(max_workers=1)
-    fut = ex.submit(work)
-
     try:
-        result = fut.result(timeout=timeout_s)
-        ex.shutdown(wait=False, cancel_futures=True)
-        return {"ok": True, "result": result}
-    except FuturesTimeout:
-        # KLJUČ: ne čekaj da thread završi
-        ex.shutdown(wait=False, cancel_futures=True)
+        with cf.ThreadPoolExecutor(max_workers=1) as ex:
+            fut = ex.submit(work)
+            result = fut.result(timeout=timeout_s)   # OVO MORA puknuti nakon timeout_s
+            return {"ok": True, "result": result}
+
+    except (cf.TimeoutError, TimeoutError):
+        # ne možeš ubiti thread, ali bar request mora izaći za ~timeout_s
         return {"ok": False, "error": f"soft-timeout-{float(timeout_s)}s"}
+
     except Exception as e:
-        ex.shutdown(wait=False, cancel_futures=True)
         return {"ok": False, "error": str(e)}
+
 
 
 
