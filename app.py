@@ -1024,6 +1024,9 @@ def submit():
     if request.method == "OPTIONS":
         return ("", 204)
 
+    # ✅ ALWAYS define this so fallback never crashes
+    sync_try = {"ok": False, "error": None}
+
     # --- osnovni parametri ---
     razred = (request.form.get("razred") or request.args.get("razred") or "").strip()
     user_text = (request.form.get("user_text") or request.form.get("pitanje") or "").strip()
@@ -1038,12 +1041,10 @@ def submit():
         image_url = (data.get("image_url") or image_url).strip()
         mode      = (data.get("mode")      or mode).strip().lower()
 
-
     if prof:
         prof.set("has_image", bool(image_url or request.files.get("file") or (data.get("image_b64") if data else None)))
         prof.set("mode", mode)
         prof.set("user_len", len(user_text or ""))
-
 
     if razred not in DOZVOLJENI_RAZREDI:
         razred = "5"
@@ -1099,7 +1100,6 @@ def submit():
             file_mime,
             image_b64_str,
         )
-        sync_try = {"ok": False, "error": "soft-timeout-or-error"}  # default
 
         try:
             _enqueue(payload)
@@ -1119,9 +1119,8 @@ def submit():
     # --- 2) Sync pokušaj (mode == "sync" ili "auto" bez heavy) ---
     if prof: prof.mark("sync_try_start")
     try:
-        # direktan sync pokušaj sa "fast" OpenAI klijentom (timeout ~8s, bez retry-a)
+        # za slike: preskoči sync pokušaj, odmah fallback na async
         if image_url or file_bytes or image_b64_str:
-            # za slike: nemoj sync pokušaj (vision zna kasniti), odmah async
             raise TimeoutError("skip-sync-for-images")
 
         html_out, actual_model = answer_with_text_pipeline(
@@ -1143,17 +1142,18 @@ def submit():
         except Exception:
             pass
 
-        payload = {"mode": "auto(sync)" if mode == "auto" else "sync",
-                "result": {"html": html_out, "path": "text", "model": actual_model}}
+        payload = {
+            "mode": "auto(sync)" if mode == "auto" else "sync",
+            "result": {"html": html_out, "path": "text", "model": actual_model}
+        }
         if prof:
             prof.mark("before_return_200")
             payload["timings"] = prof.out()
         return jsonify(payload), 200
 
     except Exception as e:
-        # fallback async kao i do sada
-        pass
-
+        # ✅ IMPORTANT: store why sync failed so async response can show reason
+        sync_try = {"ok": False, "error": str(e)}
 
     # --- 3) Sync nije uspio → fallback na async ---
     job_id = str(uuid4())
@@ -1190,14 +1190,14 @@ def submit():
                 "job_id": job_id,
                 "status": "queued",
                 "local_mode": LOCAL_MODE,
-                "reason": sync_try.get("error", "soft-timeout-or-error"),
+                "reason": sync_try.get("error") or "soft-timeout-or-error",
                 "timings": prof.out() if prof else None
-
             }
         ), 202
     except Exception as e:
         store_job(job_id, {"status": "error", "error": str(e)}, merge=True)
         return jsonify({"error": "submit_failed", "detail": str(e), "job_id": job_id}), 500
+
 
 
 @app.get("/status/<job_id>")
