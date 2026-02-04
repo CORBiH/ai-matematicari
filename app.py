@@ -1153,21 +1153,6 @@ def submit():
         pass
 
 
-        mode_tag = "auto(sync)" if mode == "auto" else "sync"
-        payload = {
-            "mode": mode_tag,
-            "result": {
-                "html": html_out,
-                "path": sync_try["result"]["path"],
-                "model": sync_try["result"]["model"],
-        },
-    }
-        if prof:
-            prof.mark("before_return_200")
-            payload["timings"] = prof.out()
-        return jsonify(payload), 200
-
-
     # --- 3) Sync nije uspio → fallback na async ---
     job_id = str(uuid4())
     store_job(
