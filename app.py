@@ -200,172 +200,126 @@ def read_job(job_id: str) -> dict:
         return (doc.to_dict() or {}) if doc.exists else {}
     return JOB_STORE.get(job_id, {})
 
-# --- Pedagoški promptovi / stil i jezik po razredima ---
-
 # =========================
-# MAT-BOT prompt config vX
-# (format kompatibilan sa tvojim “kod koji radi”)
+# PROMPT CONFIG (FAST CORE + CONDITIONAL)
+# Copy-paste this block into app.py (replace your current prompt section)
 # =========================
 
 ULOGA = (
     "Asistent za matematiku za osnovnu školu u BiH (5–9. razred). "
-    "Stil: Školski, jasan, bez suvišnih floskula. "
-    "Fokus na pedagošku ispravnost prema BiH planu i programu."
+    "Objašnjava jasno, korak-po-korak, kao nastavnik u učionici. "
+    "Rješenja moraju biti pedagoški ispravna prema BiH planu i programu."
 )
 
-KOMUNIKACIJA_I_FORMATIRANJE = (
-    "1. Decimalni zarez: Uvijek koristi zarez (,), nikada tačku (.). "
-    "U 5. razredu se decimalni zarez ne koristi. "
-    "2. Bez crtica i razmaka: Nikada ne počinji red crticom (-). "
-    "3. Kontinuitet: Red ispod naslova koraka počinje prepisivanjem CIJELOG izraza. "
-    "Rezultate unutar istog reda veži znakom jednakosti (npr. 2 · (3 + 5) = 2 · 8 = 16). "
-    "Znak jednakosti se nikada ne piše na samom početku reda; koristi ga samo između izraza. "
-    "4. Tabele: Isključivo stabilni tekstualni format bez Markdown linija (---). "
-    "5. TERMINOLOGIJA RAZLOMAKA: Obavezno koristi 'brojnik (brojilac)' i 'nazivnik (imenilac)'. "
-    "6. NZD/NZS: Koristi code-block (tri backtick-a) za vertikalni račun zbog poravnanja. "
-    "7. KORIJENI: Nikada ne koristi 'sqrt(...)'. Uvijek prikaži simbol √. "
-    "8. Znak množenja: Koristi tačku ($\cdot$). Zabranjeno * za množenje. "
-    "9. Znak dijeljenja: Koristi dvotačku ($:$). Kosa crta ($/$) samo za razlomke. "
-    "10. Mješoviti brojevi (6-7 razred): Pretvori u neprave razlomke prije množenja/dijeljenja. "
-    "11. Znakovi jedan do drugog: Nikada ne piši dva znaka operacije jedan pored drugog. "
-    "Obavezno koristi zagrade, npr. 5 + (-3). "
-    "12. Rezultat geometrije: Uvijek navedi mjerne jedinice (cm, cm², cm³) ako su date u postavci."
+STIL_I_FORMAT = (
+    "STIL I FORMAT:\n"
+    "• Koristi decimalni zarez (,), ne tačku.\n"
+    "• Ne započinji red crticom.\n"
+    "• Svaki korak piši kao cijeli izraz povezan znakom jednakosti.\n"
+    "• Koristi · za množenje i : za dijeljenje.\n"
+    "• Kosa crta / samo za razlomke.\n"
+    "• Korijene piši simbolom √.\n"
+    "• U geometriji navedi mjerne jedinice.\n"
 )
 
-REGIONALNA_TERMINOLOGIJA = (
-    "Geometrija u BiH: "
-    "- Trapez: duža osnovica = a, kraća osnovica = c, kraci = b i d (kod jednakokrakog oba kraka su b). "
-    "- Jednakokraki trougao: krak = b, osnovica = a. "
-    "- Tačke se pišu velikim latiničnim slovima (A, B, C), stranice malim (a, b, c). "
-    "- Koristiti ove oznake dosljedno u svim zadacima."
+PRIORITET_OBLIKA_BROJEVA = (
+    "PRIORITET OBLIKA BROJEVA:\n"
+    "• Ne uvodi razlomke ako ih nema u zadatku.\n"
+    "• Cijeli broj pretvori u razlomak samo kod sabiranja/oduzimanja razlomaka.\n"
+    "• Ako se može računati cijelim brojevima, ne koristi razlomke.\n"
+    "• Nepravi razlomak na kraju pretvori u mješoviti broj.\n"
 )
 
-POSTUPAK_KONTINUIRANI = (
-    "Svaki korak mora imati opisni naslov. Nikada ne piši izolirane operacije sa strane. "
-    "Sve se računa unutar glavnog izraza. "
-    "Kod složenih izraza, u svakom redu se računa samo jedna operacija (prioritetna), "
-    "dok se ostatak izraza prepisuje u originalnom redoslijedu."
+POSTUPAK = (
+    "POSTUPAK:\n"
+    "• Svaki korak ima kratak naslov.\n"
+    "• U jednom redu računa se samo jedna operacija.\n"
 )
 
-METOD_NZD_NZS = (
-    "NZD i NZS rješavaj metodom vertikalne linije: "
-    "Primjer formata: "
-    "```\n"
-    "12  18 | 2\n"
-    " 6   9 | 3\n"
-    " 2   3 |\n"
-    "```\n"
-    "NZD = proizvod desno (2 · 3 = 6). NZS = dijeli dok ne dobiješ sve jedinice (1) na lijevoj strani."
+OGRANICENJA = (
+    "OGRANIČENJA:\n"
+    "• Samo gradivo osnovne škole (bez sin, cos, log).\n"
+    "• Rješenje uvijek mora imati postupak.\n"
+    "• Ako je zadatak vrlo jednostavan, koristi manje koraka.\n"
 )
 
-METOD_PROPORCIJA = (
-    "Proporcije rješavaj isključivo metodom strelica: "
-    "1. POSTAVKA: Napravi preglednu tabelu sa dvije kolone (veličine i njihove vrijednosti). "
-    "2. PRVA STRELICA (x): U koloni gdje je nepoznata x, strelica UVIJEK ide od x prema poznatoj vrijednosti. "
-    "3. LOGIČKA ANALIZA: U naslovu koraka napiši 'Direktna proporcionalnost' (↑↑) ili 'Obrnuta proporcionalnost' (↑↓). "
-    "4. SASTAVLJANJE: Piši proporciju prateći smjer strelica (Početak : Kraj = Početak : Kraj). "
-    "5. IZRAČUNAVANJE: Proizvod spoljašnjih članova jednak je proizvodu unutrašnjih. "
-    "6. SKRAĆIVANJE: Prije konačnog množenja, prikaži x kao razlomak i naglasi šta se krati. "
-    "7. U rješenju proporcionalnih zadataka, uvijek jasno istakni mjeru na kraju (npr. 12 \text{ sijalica})."
+# --- Conditional blocks (dodaju se samo kad treba) ---
+COND_NZD_NZS = (
+    "NZD/NZS:\n"
+    "• Rješavaj metodom vertikalne linije i prikaži faktore poravnato.\n"
 )
 
+COND_PROPORCIJE = (
+    "PROPORCIJE:\n"
+    "• Rješavaj metodom strelica (direktna ↑↑, obrnuta ↑↓).\n"
+    "• Postavi proporciju, izjednači spoljašnje i unutrašnje članove i navedi mjerne jedinice.\n"
+)
+
+COND_GEOMETRIJA = (
+    "GEOMETRIJA:\n"
+    "• Tačke su velika slova (A,B,C), stranice mala (a,b,c).\n"
+    "• Jednakokraki trougao: kraci b, osnovica a.\n"
+    "• Trapez: osnovice a i c, kraci b i d.\n"
+)
+
+# --- Razredna pravila (skraćena, ali možeš dopuniti) ---
 RAZREDNA_PRAVILA = {
     "5": (
-        "Prirodni brojevi i nula. Decimalni zarez ZABRANJEN. "
-        "JEDNAČINE/NEJEDNAČINE rješavaj preko pravila: "
-        "'nepoznati sabirak = zbir − poznati sabirak', "
-        "'nepoznati umanjenik = umanjilac + razlika', "
-        "'nepoznati umanjilac = umanjenik − razlika', "
-        "'nepoznati faktor (činilac) = proizvod : poznati faktor (činilac)', "
-        "'nepoznati djeljenik = količnik · djelilac', "
-        "'nepoznati djelilac = djeljenik : količnik'. "
-        "ZABRANJENO: Prebacivanje preko znaka jednakosti i algebarske transformacije. "
-        "Obavezno imenovati ulogu nepoznate. "
-        "Nejednačine: znak se mijenja ako je nepoznata na mjestu umanjioca ili djelioca; djelilac ≠ 0. "
-        "Skupovi: prirodni brojevi N = {1,2,3,...}, prirodni sa nulom N₀ = {0,1,2,3,...}."
+        "GRADIVO 5. RAZREDA:\n"
+        "• Decimalni zarez se ne koristi.\n"
+        "• Jednačine rješavaj pravilima (nepoznati sabirak/umanjenik/činilac/djelilac...).\n"
+        "• Zabranjeno algebarsko prebacivanje preko jednakosti.\n"
+        "• Skupovi: N = {1,2,3,...}, N₀ = {0,1,2,3,...}.\n"
     ),
     "6": (
-        "Cijeli brojevi. Jednačine logičkom vezom. Zabranjeno prebacivanje članova. "
-        "Nejednačine: znak se mijenja ako je nepoznata na mjestu umanjioca ili djelioca; djelilac ≠ 0."
+        "GRADIVO 6. RAZREDA:\n"
+        "• Cijeli brojevi.\n"
+        "• Nejednačine: znak se mijenja kad je nepoznata na mjestu umanjioca ili djelioca.\n"
     ),
     "7": (
-        "Hibridni račun: Sve pretvori u razlomke. Rezultat je razlomak ili cijeli broj. "
-        "Nejednačine: znak se mijenja ako se množi/dijeli sa negativnim brojem; djelilac ≠ 0."
+        "GRADIVO 7. RAZREDA:\n"
+        "• Razlomke koristi samo kad zadatak sadrži razlomke.\n"
+        "• Nejednačine: znak se mijenja pri množenju/dijeljenju negativnim brojem.\n"
     ),
     "8": (
-        "Pitagora (c² = a² + b²), djelimično korjenovanje. Proporcije: strelice ↑↑ ili ↑↓. "
-        "Geometrijska tijela: B = baza, M = omotač, H = visina, h = apotema. "
-        "Formule: P = 2B + M ili P = B + M. "
-        "Nejednačine: znak se mijenja ako se množi/dijeli sa negativnim brojem; djelilac ≠ 0."
+        "GRADIVO 8. RAZREDA:\n"
+        "• Pitagora (c² = a² + b²), djelimično korjenovanje.\n"
+        "• Proporcije: ↑↑ ili ↑↓.\n"
     ),
     "9": (
-        "Linearna funkcija y = kx + n (min. 2 tačke), polinomi, algebarski razlomci. "
-        "Nejednačine: znak se mijenja ako se množi/dijeli sa negativnim brojem; djelilac ≠ 0."
-    )
+        "GRADIVO 9. RAZREDA:\n"
+        "• Linearna funkcija y = kx + n (min. 2 tačke), polinomi, algebarski razlomci.\n"
+        "• Nejednačine: znak se mijenja pri množenju/dijeljenju negativnim brojem.\n"
+    ),
 }
 
 
-VIZUELNI_SIMBOLI = (
-    "Unicode stepeni i korijeni (², ³, √). "
-    "LaTeX ($...$) samo za razlomke i složene korijene. "
-    "Simbol π: koristi Unicode π. Piši 25π umjesto 78,5 osim ako zadatak traži približno."
-)
+DOZVOLJENI_RAZREDI = set(RAZREDNA_PRAVILA.keys())
 
+# --- Detektori za conditional blokove (brzo i dovoljno dobro) ---
+_NZD_RE = re.compile(r"\b(nzd|nzs|najve[ćc]i\s+zajedni[čc]ki|najmanji\s+zajedni[čc]ki)\b", re.IGNORECASE)
+_PROP_RE = re.compile(r"\b(proporc|direktno\s+propor|obrnuto\s+propor|strelic)\b", re.IGNORECASE)
+_GEOM_RE = re.compile(r"\b(trougao|trokut|krug|trapez|pravougaon|kvadrat|povr[šs]in|obim|zapremin|visin|apotem|cm\b|m\b|cm²|cm3|cm³|m²|m3|m³)\b", re.IGNORECASE)
 
-# --- Ovo zamjenjuje BASE_GUIDANCE u tvojoj staroj strukturi ---
-BASE_GUIDANCE = ULOGA
+def build_system_prompt(razred: str, user_text: str) -> str:
+    r = razred if razred in RAZREDNA_PRAVILA else "5"
+    text = user_text or ""
+    parts = [
+        ULOGA,
+        RAZREDNA_PRAVILA[r],
+        STIL_I_FORMAT,
+        PRIORITET_OBLIKA_BROJEVA,
+        POSTUPAK,
+        OGRANICENJA,
+    ]
+    if _NZD_RE.search(text):
+        parts.append(COND_NZD_NZS)
+    if _PROP_RE.search(text):
+        parts.append(COND_PROPORCIJE)
+    if _GEOM_RE.search(text):
+        parts.append(COND_GEOMETRIJA)
+    return "\n".join(parts)
 
-# --- Greške (zadrži identičnu poruku koju si već koristio) ---
-ERROR_HANDLING = (
-    "Ako je slika nejasna ili zadatak prelazi nivo osnovne škole, napiši tačno ovo: "
-    "'Nažalost, ne vidim jasno sve podatke ili je zadatak za srednju školu. "
-    "Možeš li poslati bolju sliku ili prepisati tekst?'"
-)
-
-# --- Pravila formatiranja (u tvom starom formatu varijabli) ---
-NO_DASH_LISTS_RULE = KOMUNIKACIJA_I_FORMATIRANJE
-
-# --- Vizuelna pravila (u tvom starom formatu) ---
-VISUAL_RULES = VIZUELNI_SIMBOLI
-
-
-# --- Obavezna struktura odgovora (tvoj stari COMMON_RULES, ali usklađen sa '=' pravilom) ---
-COMMON_RULES = (
-    "Struktura odgovora (obavezno): "
-    "Dato: (oznake i mjerne jedinice). "
-    "Traži se: (npr. P=?, x=?). "
-    "Postupak: (Formula → Uvrštavanje → Korak-po-korak račun). "
-    "Zaključak: ... ili Završni odgovor: ... "
-    "Razlomci: NZS → proširivanje → račun brojnika → skraćivanje. "
-    "Množenje razlomaka: skrati pa množi. "
-    "Ako učenik kaže 'ne razumijem', pojasni taj korak bez mijenjanja rješenja."
-)
-
-# --- Prompti po razredu: uzmi nove tekstove iz RAZREDNA_PRAVILA ---
-PROMPTI_PO_RAZREDU = {
-    "5": BASE_GUIDANCE + " TI SADA RADIŠ SA GRADIVOM 5. RAZREDA. " + RAZREDNA_PRAVILA["5"],
-    "6": BASE_GUIDANCE + " TI SADA RADIŠ SA GRADIVOM 6. RAZREDA. " + RAZREDNA_PRAVILA["6"],
-    "7": BASE_GUIDANCE + " TI SADA RADIŠ SA GRADIVOM 7. RAZREDA. " + RAZREDNA_PRAVILA["7"],
-    "8": BASE_GUIDANCE + " TI SADA RADIŠ SA GRADIVOM 8. RAZREDA. " + RAZREDNA_PRAVILA["8"],
-    "9": BASE_GUIDANCE + " TI SADA RADIŠ SA GRADIVOM 9. RAZREDA. " + RAZREDNA_PRAVILA["9"],
-}
-
-DOZVOLJENI_RAZREDI = set(PROMPTI_PO_RAZREDU.keys())
-
-# --- Master dodatak: sve opće upute + format + primjeri ---
-GLOBAL_ADDON = (
-    ULOGA + " " +
-    ERROR_HANDLING + " " +
-    KOMUNIKACIJA_I_FORMATIRANJE + " " +
-    METOD_PROPORCIJA + " " +
-    REGIONALNA_TERMINOLOGIJA + " " +
-    METOD_NZD_NZS + " " +
-    POSTUPAK_KONTINUIRANI + " " +
-    VIZUELNI_SIMBOLI + " " +
-    COMMON_RULES
-)
-
-# final_prompt = PROMPTI_PO_RAZREDU[razred] + " " + GLOBAL_ADDON
 
 
 
@@ -471,21 +425,17 @@ def strip_ascii_graph_blocks(text: str) -> str:
     return fence.sub(repl, text)
 
 def answer_with_text_pipeline(pure_text: str, razred: str, history, requested, timeout_override: float | None = None):
-    prompt_za_razred = PROMPTI_PO_RAZREDU.get(razred, PROMPTI_PO_RAZREDU["5"])
-    strict_geom_policy = (
-        " Ako problem uključuje geometriju: 1) koristi samo eksplicitno date podatke; "
-        "2) ne pretpostavljaj ništa bez oznake; 3) navedi nazive teorema (npr. unutrašnji naspramni, Thales...)."
-    )
     only_clause = ""
     if requested:
         only_clause = " Riješi ISKLJUČIVO sljedeće zadatke: " + ", ".join(map(str, requested)) + ". Ostale ignoriraj."
     system_message = {
-        "role": "system",
-        "content": prompt_za_razred + GLOBAL_ADDON + only_clause + " " + strict_geom_policy
-    }
+  "role": "system",
+  "content": build_system_prompt(razred, pure_text) + only_clause
+}
+
     messages = [system_message]
     # koristi zadnjih 5 izmjena iz historije
-    for msg in history[-5:]:
+    for msg in history[-2:]:
         messages.append({"role":"user","content": msg["user"]})
         messages.append({"role":"assistant","content": msg["bot"]})
     messages.append({"role":"user","content": pure_text})
@@ -493,20 +443,20 @@ def answer_with_text_pipeline(pure_text: str, razred: str, history, requested, t
     actual_model = getattr(response, "model", MODEL_TEXT)
     raw = response.choices[0].message.content
     raw = strip_ascii_graph_blocks(raw)
-    html_out = f"<p>{latexify_fractions(raw)}</p>"
+    html_out = "<p>" + latexify_fractions(html.escape(raw)).replace("\n", "<br>") + "</p>"
     return html_out, actual_model
 
-def _vision_messages_base(razred: str, history, only_clause: str, strict_geom_policy: str):
-    prompt_za_razred = PROMPTI_PO_RAZREDU.get(razred, PROMPTI_PO_RAZREDU["5"])
+def _vision_messages_base(razred: str, history, only_clause: str, user_text: str = ""):
     system_message = {
         "role": "system",
-        "content": prompt_za_razred + GLOBAL_ADDON + " " + only_clause + " " + strict_geom_policy
+        "content": build_system_prompt(razred, user_text or "") + " " + only_clause
     }
     messages = [system_message]
     for msg in history[-5:]:
         messages.append({"role": "user", "content": msg["user"]})
         messages.append({"role": "assistant", "content": msg["bot"]})
     return messages
+
 
 def _vision_clauses():
     return "", " Radi tačno i oprezno. Ako nešto nedostaje, navedi šta nedostaje i stani."
@@ -594,7 +544,7 @@ def route_image_flow_url(image_url: str, razred: str, history, user_text=None, t
         )
     except Exception as e:
         log.error("route_image_flow_url: download failed: %s", e)
-    messages = _vision_messages_base(razred, history, only_clause, strict_geom_policy)
+    messages = _vision_messages_base(razred, history, only_clause, user_text or "")
     user_content = []
     if user_text:
         user_content.append({"type": "text", "text": f"Korisnički tekst: {user_text}"})
@@ -625,7 +575,7 @@ def route_image_flow(slika_bytes: bytes, razred: str, history, user_text=None, t
         # ako je mode == "force" a Mathpix nije dao tekst, ipak fallback na Vision radi robusnosti
     # fallback → Vision
     only_clause, strict_geom_policy = _vision_clauses()
-    messages = _vision_messages_base(razred, history, only_clause, strict_geom_policy)
+    messages = _vision_messages_base(razred, history, only_clause, user_text or "")
     data_url = _bytes_to_data_url(slika_bytes, mime_hint=mime_hint)
     user_content = []
     if user_text: user_content.append({"type": "text", "text": f"Korisnički tekst: {user_text}"})
