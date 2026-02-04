@@ -98,6 +98,10 @@ _OPENAI_API_KEY = (os.getenv("OPENAI_API_KEY") or "").strip()
 if not _OPENAI_API_KEY:
     log.error("OPENAI_API_KEY nije postavljen u okruženju.")
 client = OpenAI(api_key=_OPENAI_API_KEY, timeout=OPENAI_TIMEOUT, max_retries=OPENAI_MAX_RETRIES)
+# --- Sync OpenAI client (brzi pokušaj, bez retry-a) ---
+SYNC_OPENAI_TIMEOUT_S = float(os.getenv("SYNC_OPENAI_TIMEOUT_S", str(SYNC_SOFT_TIMEOUT_S)))
+sync_client = OpenAI(api_key=_OPENAI_API_KEY, timeout=SYNC_OPENAI_TIMEOUT_S, max_retries=0)
+
 
 DEFAULT_MODEL_VISION = "gpt-5.2"
 DEFAULT_MODEL_TEXT = "gpt-5-mini"
@@ -409,10 +413,13 @@ def _name_from_url(u: str) -> str:
     except Exception:
         return _short_name_for_display(u)
 
-def _openai_chat(model: str, messages: list, timeout: float = None, max_tokens: int | None = None):
+def _openai_chat(model: str, messages: list, timeout: float = None, max_tokens: int | None = None, fast: bool = False):
+
     def _do(params):
-        cli = client if timeout is None else client.with_options(timeout=timeout)
+        base = sync_client if fast else client
+        cli = base if timeout is None else base.with_options(timeout=timeout)
         return cli.chat.completions.create(**params)
+
     params = {"model": model, "messages": messages}
     if max_tokens is not None:
         # novi SDK: max_completion_tokens; fallback na max_tokens ako zatreba
@@ -443,7 +450,7 @@ def strip_ascii_graph_blocks(text: str) -> str:
     text = graf_re.sub(lambda m: "" if "```" in m.group(0) else m.group(0), text)
     return fence.sub(repl, text)
 
-def answer_with_text_pipeline(pure_text: str, razred: str, history, requested, timeout_override: float | None = None, prof=None):
+def answer_with_text_pipeline(pure_text: str, razred: str, history, requested, timeout_override: float | None = None, prof=None, fast: bool = False):
     only_clause = ""
     if requested:
         only_clause = " Riješi ISKLJUČIVO sljedeće zadatke: " + ", ".join(map(str, requested)) + ". Ostale ignoriraj."
@@ -459,7 +466,7 @@ def answer_with_text_pipeline(pure_text: str, razred: str, history, requested, t
         messages.append({"role":"assistant","content": msg["bot"]})
     messages.append({"role":"user","content": pure_text})
     if prof: prof.mark("openai_text_start")
-    response = _openai_chat(MODEL_TEXT, messages, timeout=timeout_override or OPENAI_TIMEOUT)
+    response = _openai_chat(MODEL_TEXT, messages, timeout=timeout_override or OPENAI_TIMEOUT, fast=fast)
     actual_model = getattr(response, "model", MODEL_TEXT)
     if prof:
         prof.mark("openai_text_done")
@@ -1109,46 +1116,42 @@ def submit():
 
     # --- 2) Sync pokušaj (mode == "sync" ili "auto" bez heavy) ---
     if prof: prof.mark("sync_try_start")
-    sync_try = _sync_process_once(
-        razred=razred,
-        user_text=user_text,
-        requested=requested,
-        image_url=(image_url or None),
-        file_bytes=file_bytes,
-        file_mime=file_mime,
-        timeout_s=SYNC_SOFT_TIMEOUT_S,
-        history=api_history,  # zadnja 3 Q/A iz sesije
-    )
+    try:
+        # direktan sync pokušaj sa "fast" OpenAI klijentom (timeout ~8s, bez retry-a)
+        if image_url or file_bytes or image_b64_str:
+            # za slike: nemoj sync pokušaj (vision zna kasniti), odmah async
+            raise TimeoutError("skip-sync-for-images")
 
-    if prof: prof.mark("sync_try_done")
+        html_out, actual_model = answer_with_text_pipeline(
+            user_text, razred, api_history, requested,
+            timeout_override=SYNC_SOFT_TIMEOUT_S,
+            fast=True
+        )
 
-
-    if sync_try.get("ok"):
-        html_out = sync_try["result"]["html"]
-
-        # crtanje grafa ako treba
         if should_plot(user_text):
             expr = extract_plot_expression(user_text, razred=razred, history=api_history)
             if expr:
                 html_out = add_plot_div_once(html_out, expr)
 
-        # upis u api_history (zadržati samo zadnja 3)
         api_history.append({"user": user_text, "bot": html_out})
-        api_history = api_history[-3:]
-        session["api_history"] = api_history
+        session["api_history"] = api_history[-3:]
 
-        # log u Google Sheets (best-effort)
         try:
-            log_to_sheet(
-                f"sync-{uuid4().hex[:8]}",
-                razred,
-                user_text,
-                html_out,
-                sync_try["result"]["path"],
-                sync_try["result"]["model"],
-            )
+            log_to_sheet(f"sync-{uuid4().hex[:8]}", razred, user_text, html_out, "text", actual_model)
         except Exception:
             pass
+
+        payload = {"mode": "auto(sync)" if mode == "auto" else "sync",
+                "result": {"html": html_out, "path": "text", "model": actual_model}}
+        if prof:
+            prof.mark("before_return_200")
+            payload["timings"] = prof.out()
+        return jsonify(payload), 200
+
+    except Exception as e:
+        # fallback async kao i do sada
+        pass
+
 
         mode_tag = "auto(sync)" if mode == "auto" else "sync"
         payload = {
