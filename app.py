@@ -1099,6 +1099,8 @@ def submit():
             file_mime,
             image_b64_str,
         )
+        sync_try = {"ok": False, "error": "soft-timeout-or-error"}  # default
+
         try:
             _enqueue(payload)
             mode_tag = "async" if mode == "async" else "auto→async"
