@@ -926,6 +926,7 @@ def looks_heavy(user_text: str, has_image: bool) -> bool:
     toks = estimate_tokens(user_text or "")
     return has_image or toks > HEAVY_TOKEN_THRESHOLD
 
+
 def _sync_process_once(
     razred: str,
     user_text: str,
@@ -936,10 +937,6 @@ def _sync_process_once(
     timeout_s: float,
     history: list | None = None,
 ) -> dict:
-    """
-    Jedan sync pokušaj obrade, ali sa hard cutoff nakon timeout_s.
-    Ako probije cutoff → vrati ok=False i submit će fallback na async.
-    """
     if history is None:
         history = []
     else:
@@ -948,43 +945,36 @@ def _sync_process_once(
     def work():
         if image_url:
             html_out, used_path, used_model = route_image_flow_url(
-                image_url,
-                razred,
-                history,
-                user_text=user_text,
-                timeout_override=timeout_s,
+                image_url, razred, history, user_text=user_text, timeout_override=timeout_s
             )
             return {"html": html_out, "path": used_path, "model": used_model}
 
         if file_bytes:
             html_out, used_path, used_model = route_image_flow(
-                file_bytes,
-                razred,
-                history,
-                user_text=user_text,
-                timeout_override=timeout_s,
-                mime_hint=file_mime or None,
+                file_bytes, razred, history, user_text=user_text, timeout_override=timeout_s, mime_hint=file_mime or None
             )
             return {"html": html_out, "path": used_path, "model": used_model}
 
         html_out, used_model = answer_with_text_pipeline(
-            user_text,
-            razred,
-            history,
-            requested,
-            timeout_override=timeout_s,
+            user_text, razred, history, requested, timeout_override=timeout_s
         )
         return {"html": html_out, "path": "text", "model": used_model}
 
+    ex = ThreadPoolExecutor(max_workers=1)
+    fut = ex.submit(work)
+
     try:
-        with ThreadPoolExecutor(max_workers=1) as ex:
-            fut = ex.submit(work)
-            result = fut.result(timeout=timeout_s)   # <-- OVO JE PRAVI SOFT TIMEOUT
+        result = fut.result(timeout=timeout_s)
+        ex.shutdown(wait=False, cancel_futures=True)
         return {"ok": True, "result": result}
     except FuturesTimeout:
-        return {"ok": False, "error": f"soft-timeout-{timeout_s}s"}
+        # KLJUČ: ne čekaj da thread završi
+        ex.shutdown(wait=False, cancel_futures=True)
+        return {"ok": False, "error": f"soft-timeout-{float(timeout_s)}s"}
     except Exception as e:
+        ex.shutdown(wait=False, cancel_futures=True)
         return {"ok": False, "error": str(e)}
+
 
 
 
