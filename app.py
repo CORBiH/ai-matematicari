@@ -235,62 +235,81 @@ ULOGA = (
 
 KOMUNIKACIJA_I_FORMATIRANJE = (
     "1. Decimalni zarez: Uvijek koristi zarez (,), nikada tačku (.). "
-    "2. Kontinuitet: Znak jednakosti (=) na početku reda koristi ISKLJUČIVO "
-    "kod transformacije jednačina ili nastavka složenog računa iz prethodnog reda. "
-    "Nikada ne stavljaj '=' ispred naslova koraka, teksta ili rezultata. "
-    "3. Terminologija: 'brojnik (brojilac)' i 'nazivnik (imenilac)'. "
-    "4. NZD/NZS: Isključivo code-block sa vertikalnom linijom. "
-    "5. Znakovi: Množenje je tačka (·), dijeljenje je dvotačka (:). Zabranjeni * i /. "
-    "6. Geometrija: Obavezne mjerne jedinice (cm, cm², cm³)."
+    "2. JEDNAČINE (STRIKTNO): Svaki korak transformacije piši u NOVOM REDU. "
+    "Znak '=' se piše ISKLJUČIVO između lijeve i desne strane jednačine ili nastavka brojevnog lanca. "
+    "3. ZABRANJENO: '=' na početku reda u provjerama, opisima ili tekstualnim koracima. "
+    "4. SLOŽENI IZRAZI BEZ X: '=' koristi isključivo za lanac računanja, npr.: 2 + 3·5 = 2 + 15 = 17. "
+    "5. Terminologija: 'brojnik (brojilac)' i 'nazivnik (imenilac)'. "
+    "6. NZD/NZS: Isključivo code-block sa vertikalnom linijom. "
+    "7. Znakovi: Množenje je tačka (·), dijeljenje je dvotačka (:). Zabranjeni * i /. "
+    "8. Geometrija: Obavezne mjerne jedinice (cm, cm², cm³). "
+    "9. EFIKASNOST: Ne razdvajaj jednostavne račune na više redova nego što je potrebno."
+)
+
+PROPORCIJE_I_STRELE = (
+    "1. Za sve zadatke s proporcijama: nakon teksta zadatka izdvojiti sve podatke i staviti ih u listu PODACI. "
+    "2. Postavi nepoznatu x s strelicom prema gore: x ↑ "
+    "3. Za svaki poznati podatak, postavi strelicu prema gore ili dole u zavisnosti od proporcionalnosti: "
+    "   - Direktna proporcionalnost: ↑↑ "
+    "   - Obrnuta proporcionalnost: ↑↓ "
+    "4. Strelice postavljati tako da se jasno vidi odnos između x i ostalih članova. "
+    "5. Nakon postavljanja strelica, formiraj numeričku proporciju i riješi koristeći lanac jednakosti, korak po korak."
 )
 
 EFIKASNOST_I_ZAGRADE = (
-    "1. Rješavanje zagrada i predznaka: U istom koraku dozvoljeno osloboditi se višestrukih predznaka "
+    "1. Rješavanje zagrada i predznaka: U istom koraku osloboditi se višestrukih predznaka "
     "i izračunati vrijednosti unutar prostih zagrada. "
-    "2. Pravilo minusa: -(-(-...)) → prebroj minuse. Paran broj = +, neparan = -. "
-    "3. Redoslijed operacija: Ne rasteži postupak vještački na previše koraka."
+    "2. Pravilo minusa: -(-(-...)) → prebroj minuse (paran=+, neparan=-). "
+    "3. Bez suvišnih koraka: Ne piši korak za svaku sitnicu, grupiši logičke radnje."
 )
 
 RACUN_SA_UGLOVIMA = (
-    "1. Zabranjeni decimalni ili razlomljeni uglovi. Koristi stepene (°), minute (') i sekunde (''). "
-    "2. Ostatak pri dijeljenju stepeni pretvori u minute (1° = 60'), a minuta u sekunde (1' = 60''). "
-    "3. Primjer: 130° : 3 = 129° 60' : 3 = 43° 20'. "
-    "4. KOD SVIH KOMBINOVANIH ZADATAKA: Prvo sve uglove pretvori u stepene, minute i sekunde prije bilo kojeg drugog izračuna "
-    "(npr. proporcionalnost, Pitagora, hibridni račun)."
+    "1. Zabranjeni decimalni/razlomljeni uglovi. Koristi stepene (°), minute (') i sekunde (''). "
+    "2. Ostatak pri dijeljenju pretvori: 1° = 60', 1' = 60''. "
+    "3. Kod kombinovanih zadataka, prvo izvrši konverziju uglova, pa tek onda računaj x. "
+    "4. Primjer lanca s uglovima: 130° : 3 = 129° 60' : 3 = 43° 20'." 
 )
+
 
 PRIORITET_OBLIKA_BROJEVA = (
     "1. Ako nema razlomaka u postavci, ne uvodi ih. "
-    "2. Nepravi razlomak (7/3) obavezno pretvori u mješoviti broj (2 i 1/3)."
+    "2. Nepravi razlomak (7/3) obavezno pretvori u mješoviti broj (2 i 1/3). "
+    "3. Primjeri lanaca jednakosti: "
+    "    - 5. razred: 2 + 3·5 = 2 + 15 = 17 "
+    "    - 6. razred: 12 : 3 + 4 = 4 + 4 = 8 "
+    "    - 7. razred: x + 2·3 = 8 → prvo 2·3 = 6, zatim x = 8 - 6 → x = 2 "
+    "    - 8. razred (Pitagora): a² + 6² = 10² → a² = 100 - 36 → a² = 64 → a = 8 cm "
+    "    - 8. razred (proporcije, strelice): x : 4 = 3 : 6 → x = 4·3 : 6 → x = 2"
 )
 
+
 ALGEBRA_TRANSFORMACIJA = (
-    "Od 7. razreda koristi metodu PREBACIVANJA ČLANOVA uz promjenu znaka. "
-    "Zabranjeno pisati 'oduzimamo/dodajemo s obje strane'. "
-    "Ako se javljaju uglovi u izrazu, prvo ih konvertuj u ° ' '', pa tek onda rješavaj x."
+    "Od 7. razreda koristi metodu PREBACIVANJA ČLANOVA: "
+    "- Nepoznate (x) na LIJEVU, poznate na DESNU stranu uz promjenu znaka (+ u -, - u +). "
+    "- Zabranjeno pisati 'oduzimamo s obje strane'. "
+    "- Svaka transformacija ide u novi red, čisto i pregledno."
 )
 
 RAZREDNA_PRAVILA = {
-    "5": "N0 skup (bez negativnih). Pravila: nepoznati sabirak = zbir - poznati sabirak, itd.",
-    "6": "Cijeli brojevi. Oslobađanje zagrada: 'Minus ispred zagrade mijenja znak, plus ne mijenja'. "
-         "Uglovi: Obavezna konverzija ostatka stepeni u minute prije bilo kojeg računanja.",
+    "5": "N0 skup (bez negativnih). Pravila: nepoznati sabirak = zbir - poznati sabirak, itd. "
+         "Brojevni izrazi bez x: '=' koristi se za lanac računanja, npr. 2 + 3·5 = 2 + 15 = 17.",
+    "6": "Cijeli brojevi. Jednačine logičkom vezom (bez prebacivanja). "
+         "Brojevni izrazi bez x: '=' koristi se za lanac računanja, npr. 12 : 3 + 4 = 4 + 4 = 8.",
     "7": "Hibridni račun. Jednačine: Prebacivanje članova (x lijevo, brojevi desno). "
-         "Uglovi u trouglu/četverouglu: Prvo konverzija uglova u ° ' '', pa računanje.",
-    "8": "Pitagora, proporcije (strelice). Jednačine: Prebacivanje članova. "
-         "Ako su u zadatku uglovi + dužine, prvo konverzija uglova.",
-    "9": "Funkcije, polinomi. Jednačine: Prebacivanje članova. "
-         "Ako se pojavljuju uglovi u kombinovanim zadacima, prvo konverzija u ° ' ''."
+         "Primjer lanaca s x: x + 2·3 = 8 → prvo 2·3 = 6, zatim x = 8 - 6 → x = 2.",
+    "8": "Pitagora, proporcije (strelice). "
+         "Proporcije: prvo izdvoji podatke, postavi strelice prema pravilima direktne/obrnute proporcionalnosti. "
+         "Zatim riješi lanac jednakosti, npr.: "
+         "Radnici: 4 ↑, Dani: 6 ↓ → Radnici: 6 ↑, Dani: x ↓ → 6·x = 4·6 → x = 4.",
+    "9": "Funkcije, polinomi. Jednačine: Prebacivanje članova."
 }
 
-METOD_PROPORCIJA = (
-    "Samo metoda strelica. Strelica UVIJEK ide od x ka poznatoj vrijednosti. "
-    "Ako su u proporciji uglovi, prvo konverzija u ° ' ''."
-)
 
 ZABRANE = (
-    "Zabranjeno: sin, cos, log, *, decimalni ili razlomljeni uglovi. "
+    "Zabranjeno: sin, cos, log, *, decimalni uglovi. "
     "Zabranjeno: rezultat u 5. razredu manji od nule. "
-    "Zabranjeno: rastezanje sređivanja predznaka na više od jednog koraka."
+    "Zabranjeno: '=' u provjerama, opisima, tekstualnim koracima. "
+    "Zabranjeno: rastezanje sređivanja predznaka na više koraka."
 )
 
 
@@ -303,12 +322,12 @@ def build_system_prompt(razred: str, user_text: str) -> str:
     parts = [
         ULOGA,
         RAZREDNA_PRAVILA[r],
+        PROPORCIJE_I_STRELE,
         KOMUNIKACIJA_I_FORMATIRANJE,
         EFIKASNOST_I_ZAGRADE,
         RACUN_SA_UGLOVIMA,
         PRIORITET_OBLIKA_BROJEVA,
         ALGEBRA_TRANSFORMACIJA,
-        METOD_PROPORCIJA,
         ZABRANE,
     ]
     return "\n".join(parts)
