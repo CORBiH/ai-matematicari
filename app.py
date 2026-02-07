@@ -312,7 +312,6 @@ def build_system_prompt(razred: str, user_text: str) -> str:
     parts = [
         ULOGA,
         RAZREDNA_PRAVILA[r],
-        PROPORCIJE_I_STRELE,
         KOMUNIKACIJA_I_FORMATIRANJE,
         EFIKASNOST_I_ZAGRADE,
         RACUN_SA_UGLOVIMA,
