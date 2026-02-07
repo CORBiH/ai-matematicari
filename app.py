@@ -287,6 +287,7 @@ PROPORCIJE_I_STRELICE = (
     "4. Rješavanje: formiraj proporciju prateći strelice i riješi x koristeći lanac jednakosti."
 )
 
+
 RAZREDNA_PRAVILA = {
     "5": "N0 skup (bez negativnih). Nepoznati sabirak = zbir - poznati sabirak. Lanac jednakosti za izraze.",
     "6": "Cijeli brojevi. Jednačine logičkom vezom (bez prebacivanja). Lanac jednakosti za izraze.",
