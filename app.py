@@ -291,8 +291,7 @@ ZABRANE = (
     "Zabranjeno: sin, cos, log, *, decimalni ili razlomljeni uglovi. "
     "Zabranjeno: rezultat u 5. razredu manji od nule. "
     "Zabranjeno: rastezanje sređivanja predznaka na više od jednog koraka."
-),
-}
+)
 
 
 DOZVOLJENI_RAZREDI = set(RAZREDNA_PRAVILA.keys())
@@ -301,7 +300,6 @@ DOZVOLJENI_RAZREDI = set(RAZREDNA_PRAVILA.keys())
 
 def build_system_prompt(razred: str, user_text: str) -> str:
     r = razred if razred in RAZREDNA_PRAVILA else "5"
-    text = user_text or ""
     parts = [
         ULOGA,
         RAZREDNA_PRAVILA[r],
@@ -311,9 +309,10 @@ def build_system_prompt(razred: str, user_text: str) -> str:
         PRIORITET_OBLIKA_BROJEVA,
         ALGEBRA_TRANSFORMACIJA,
         METOD_PROPORCIJA,
-        ZABRANE 
-        
+        ZABRANE,
     ]
+    return "\n".join(parts)
+
    
 
 
