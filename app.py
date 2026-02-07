@@ -315,6 +315,7 @@ def build_system_prompt(razred: str, user_text: str) -> str:
         KOMUNIKACIJA_I_FORMATIRANJE,
         EFIKASNOST_I_ZAGRADE,
         RACUN_SA_UGLOVIMA,
+        PROPORCIJE_I_STRELICE,
         PRIORITET_OBLIKA_BROJEVA,
         ALGEBRA_TRANSFORMACIJA,
         ZABRANE,
