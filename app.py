@@ -265,22 +265,22 @@ RAZREDNA_PRAVILA = {
 }
 
 
-SISTEMI_9 = (
+SISTEMI = (
         "Vitičasta zagrada $\begin{cases} ... \end{cases}$ OBAVEZNA u svakom koraku. "
         "Operativna crta $| \cdot (-2)$ desno. Horizontalna crta sabiranja '---' ispod."
-    )
+)
 
-PROPORCIJE_8 = (
+PROPORCIJE = (
         "Lista PODACI, strelica uz x ide gore ($x \uparrow$). "
         "Logičko ispitivanje (direktna/obrnuta srazmjera) prije druge strelice. "
         "Postavi proporciju prateći smjer strelica: 'od repa prema vrhu'."
-    )
+)
 
 GEOMETRIJA = (
         "Struktura: **Dato:**, **Traži se:**, **Rješenje:**. "
         "Formule piši prvo opštim simbolima, pa uvrštavaj. "
         "Mjerne jedinice ($cm$, $cm^2$, $cm^3$) obavezne u svakom redu računa."
-    )
+)
 
 
 ZABRANE = (
@@ -302,8 +302,8 @@ def build_system_prompt(razred: str, user_text: str) -> str:
         ULOGA,
         RAZREDNA_PRAVILA[r],
         KOMUNIKACIJA_I_FORMATIRANJE,
-        SISTEMI_9,
-        PROPORCIJE_8,
+        SISTEMI,
+        PROPORCIJE,
         GEOMETRIJA,
         ZABRANE
         
