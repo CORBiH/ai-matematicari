@@ -238,11 +238,12 @@ KOMUNIKACIJA_I_FORMATIRANJE = (
     "1. DECIMALNI ZAREZ: Isključivo zarez (,), nikada tačka (.)."
     "2. PROSTOR: Obavezan prazan red između faza: [Postavka], [Račun], [Odgovor]."
     "3. LaTeX MASTER: SVE matematičko ide u $...$. "
-    "   - Razlomci: $\frac{a}{b}$. Mješoviti: $2\,\frac{1}{3}$ (razmak \,)."
+    r"   - Razlomci: $\frac{a}{b}$. Mješoviti: $2\,\frac{1}{3}$ (razmak \,)."
     "   - Rezultat: Razlomak UVIJEK skrati do kraja i pretvori u mješoviti broj."
     "4. NZD/NZS: Code-block sa vertikalnom linijom (|) – obavezno za 6. razred."
     "5. ZNAKOVI: Množenje ($\cdot$), dijeljenje ($:$). Zabranjeni * i /."
 )
+
 
 RAZREDNA_PRAVILA = {
     "5": (
@@ -266,15 +267,17 @@ RAZREDNA_PRAVILA = {
 
 
 SISTEMI = (
-        "Vitičasta zagrada $\begin{cases} ... \end{cases}$ OBAVEZNA u svakom koraku. "
-        "Operativna crta $| \cdot (-2)$ desno. Horizontalna crta sabiranja '---' ispod."
+    r"Vitičasta zagrada $\begin{cases} ... \end{cases}$ OBAVEZNA u svakom koraku. "
+    r"Operativna crta $| \cdot (-2)$ desno. Horizontalna crta sabiranja '---' ispod."
 )
 
+
 PROPORCIJE = (
-        "Lista PODACI, strelica uz x ide gore ($x \uparrow$). "
-        "Logičko ispitivanje (direktna/obrnuta srazmjera) prije druge strelice. "
-        "Postavi proporciju prateći smjer strelica: 'od repa prema vrhu'."
+    r"Lista PODACI, strelica uz x ide gore ($x \uparrow$). "
+    "Logičko ispitivanje (direktna/obrnuta srazmjera) prije druge strelice. "
+    "Postavi proporciju prateći smjer strelica: 'od repa prema vrhu'."
 )
+
 
 GEOMETRIJA = (
         "Struktura: **Dato:**, **Traži se:**, **Rješenje:**. "
