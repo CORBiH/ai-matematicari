@@ -239,45 +239,54 @@ KOMUNIKACIJA_I_FORMATIRANJE = (
     "2. PROSTOR: Obavezan prazan red između faza: [Postavka], [Račun], [Odgovor]."
     "3. LaTeX MASTER: SVE matematičko ide u $...$. "
     "   - Razlomci: $\frac{a}{b}$. Mješoviti: $2\,\frac{1}{3}$ (razmak \,)."
-    "   - Rezultat: Razlomak UVIJEK skrati do kraja i pretvori u mješoviti broj ako je nepravi."
-    "4. NZD/NZS: Code-block sa vertikalnom linijom (|) – obavezno u 6. razredu."
-    "5. ZNAKOVI: Množenje ($\cdot$), dijeljenje ($:$)."
-    "6. AUTOMATIZACIJA: Decimalni + razlomci = Sve u razlomke. Ako su samo decimalni, računaj decimalno."
+    "   - Rezultat: Razlomak UVIJEK skrati do kraja i pretvori u mješoviti broj."
+    "4. NZD/NZS: Code-block sa vertikalnom linijom (|) – obavezno za 6. razred."
+    "5. ZNAKOVI: Množenje ($\cdot$), dijeljenje ($:$). Zabranjeni * i /."
 )
 
-RAZREDNA_PRAVILA = {
+RAZREDNA_METODIKA = {
     "5": (
-        "Skup N0 (0, 1, 2...). STROGO ZABRANJENI razlomci, decimalni i negativni brojevi. "
-        "Jednačine/Nejednačine: koristi nazive članova (Sabirak, Umanjenik, Faktor, Djelilac...). "
-        "NEJEDNAČINE: Znak se okreće SAMO kod UMANJIOCA i DJELIOCA. "
-        "DIJELJENJE NULOM: Naglasi da x ne može biti 0 ako je djelilac. "
+        "Skup N0. STROGO ZABRANJENI razlomci, decimale i negativni brojevi. "
+        "Jednačine/Nejednačine: po mjestu nepoznate (Sabirak, Faktor, Djelilac...). "
+        "Znak nejednakosti se okreće SAMO kod UMANJIOCA i DJELIOCA. "
         "Rezultat: Skup rješenja $x \in \{...\}$."
     ),
     "6": (
-        "Pozitivni racionalni brojevi (Q+). Decimalni i postotni zapis dozvoljeni. "
+        "Q+ (Pozitivni racionalni). Decimalni i postotni zapis dozvoljeni. "
         "ZABRANJENO: Negativni brojevi (Skup Z). "
-        "NZD/NZS: Obavezan postupak rastavljanja. "
-        "Jednačine/Nejednačine: Logička veza po mjestu x."
+        "Jednačine: I dalje logička veza po mjestu nepoznate."
     ),
-    "7": (
-        "Uvođenje skupa Z i Q. Metoda PREBACIVANJA ČLANOVA (promjena znaka). "
-        "Sređivanje predznaka: $-(-a) = +a$."
+    "7-9": (
+        "Skup Z i Q. Metoda PREBACIVANJA ČLANOVA: "
+        " - 'Nepoznate na lijevu, poznate na desnu stranu znaka $=$ ili $\lessgtr$'. "
+        " - OBAVEZNO naglasiti: 'Član koji prelazi na drugu stranu mijenja svoj predznak'. "
+        " - Nejednačine: Ako se množi/dijeli negativnim brojem, okreni znak nejednakosti."
+    )
+}
+
+MODULI_POSTUPKA = {
+    "SISTEMI_9": (
+        "Vitičasta zagrada $\begin{cases} ... \end{cases}$ OBAVEZNA u svakom koraku. "
+        "Operativna crta $| \cdot (-2)$ desno. Horizontalna crta sabiranja '---' ispod."
     ),
-    "8": (
-        "Realni brojevi, Pitagora, Proporcije (Pravilo trojno). "
-        "Sistemi u geometriji: Metoda zamjene. Proporcije: PODACI, x ↑ i strelice."
+    "PROPORCIJE_8": (
+        "Lista PODACI, strelica uz x ide gore ($x \uparrow$). "
+        "Logičko ispitivanje (direktna/obrnuta srazmjera) prije druge strelice. "
+        "Postavi proporciju prateći smjer strelica: 'od repa prema vrhu'."
     ),
-    "9": (
-        "Sistemi 2x2: Vitičasta zagrada $\begin{cases} ... \end{cases}$ i horizontalna crta sabiranja. "
-        "Linearne funkcije: $y = kx + n$ (nagib i odsječak). Bez strelica!"
+    "GEOMETRIJA": (
+        "Struktura: **Dato:**, **Traži se:**, **Rješenje:**. "
+        "Formule piši prvo opštim simbolima, pa uvrštavaj. "
+        "Mjerne jedinice ($cm$, $cm^2$, $cm^3$) obavezne u svakom redu računa."
     )
 }
 
 ZABRANE = (
     "1. Zabranjeno: kosa crta (a/b), sqrt(x), x^2 izvan LaTeX-a."
-    "2. Zabranjeno: Deljenje nulom. Uvek napomenuti $x \neq 0$ ako je x djelilac."
-    "3. Zabranjeno: Ostavljanje neskraćenih razlomaka ili nepravih razlomaka bez pretvaranja u mješovite."
-    "4. Zabranjeno: Strelice u geometriji, linearnim funkcijama i nejednačinama 5./6. razreda."
+    "2. Zabranjeno: Deljenje nulom ($x \neq 0$)."
+    "3. Zabranjeno: Ostavljanje neskraćenih razlomaka ili nepravih razlomaka."
+    "4. Zabranjeno: Strelice u geometriji, linearnim funkcijama ili nejednačinama 5./6. razreda."
+    "5. Zabranjeno: Prebacivanje članova (algebra) u 5. i 6. razredu."
 )
 
 
@@ -289,8 +298,9 @@ def build_system_prompt(razred: str, user_text: str) -> str:
     r = razred if razred in RAZREDNA_PRAVILA else "5"
     parts = [
         ULOGA,
-        RAZREDNA_PRAVILA[r],
+        RAZREDNA_METODIKA[r],
         KOMUNIKACIJA_I_FORMATIRANJE,
+        MODULI_POSTUPKA,
         ZABRANE
         
     ]
