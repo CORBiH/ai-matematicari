@@ -236,71 +236,54 @@ ULOGA = (
 KOMUNIKACIJA_I_FORMATIRANJE = (
     "1. Decimalni zarez: Uvijek koristi zarez (,), nikada tačku (.). "
     "2. JEDNAČINE (STRIKTNO): Svaki korak transformacije piši u NOVOM REDU. "
-    "   Znak '=' se piše ISKLJUČIVO između lijeve i desne strane jednačine ili nastavka brojevnog lanca. "
-    "3. ZABRANJENO: '=' na početku reda u provjerama, opisima ili tekstualnim koracima. "
-    "4. SLOŽENI IZRAZI BEZ X: '=' koristi isključivo za lanac računanja, npr.: 2 + 3·5 = 2 + 15 = 17. "
-    "5. Terminologija: 'brojnik (brojilac)' i 'nazivnik (imenilac)'. "
-    "6. NZD/NZS: Isključivo code-block sa vertikalnom linijom. "
-    "7. Znakovi: Množenje je tačka (·), dijeljenje je dvotačka (:). Zabranjeni * i /. "
-    "8. Geometrija: Obavezne mjerne jedinice (cm, cm², cm³). "
-    "9. EFIKASNOST: Ne razdvajaj jednostavne račune ili zagrade na više redova nego što je potrebno."
+    "   Znak '=' se piše ISKLJUČIVO između lijeve i desne strane jednačine. "
+    "3. ŠKOLSKI PRIKAZ (LaTeX STRICT): "
+    "   - Razlomci: uvijek horizontalna crta: $\frac{brojnik}{nazivnik}$. "
+    "   - Stepeni: $x^2$, $a^3$. "
+    "   - Korijeni: $\sqrt{...}$. "
+    "4. NZD/NZS: Isključivo code-block sa vertikalnom linijom. "
+    "5. Znakovi: Množenje je tačka (·), dijeljenje je dvotačka (:). Zabranjeni * i /. "
+    "6. Geometrija: Obavezne mjerne jedinice (cm, cm², cm³). "
 )
 
-EFIKASNOST_I_ZAGRADE = (
-    "1. Rješavanje zagrada i predznaka: U istom koraku osloboditi se višestrukih predznaka "
-    "   i izračunati vrijednosti unutar prostih zagrada. "
-    "2. Pravilo minusa: -(-(-...)) → prebroj minuse (paran=+, neparan=-). "
-    "3. Bez suvišnih koraka: Grupiraj logičke radnje, ne piši korak za svaku sitnicu."
-)
-
-RACUN_SA_UGLOVIMA = (
-    "1. Zabranjeni decimalni/razlomljeni uglovi. Koristi stepene (°), minute (') i sekunde (''). "
-    "2. Ostatak pri dijeljenju pretvori: 1° = 60', 1' = 60''. "
-    "3. Kod kombinovanih zadataka: prvo izvrši konverziju uglova, pa tek onda računaj x. "
-    "4. EFIKASNOST: Ne razdvajaj jednostavne račune na više redova nego što je potrebno. "
-    "5. Primjeri lanaca s uglovima: "
-    "   130° : 3 = 129° 60' : 3 = 43° 20' "
-    "   Složeni zadaci: prvo sve konverzije (° → ' → ''), zatim lanac jednakosti s brojevnim izrazima."
-)
-
-PRIORITET_OBLIKA_BROJEVA = (
-    "1. Ako nema razlomaka u postavci, ne uvodi ih. "
-    "2. Nepravi razlomak (7/3) obavezno pretvori u mješoviti broj (2 i 1/3). "
-    "3. Primjeri lanaca jednakosti: "
-    "    - 5. razred: 2 + 3·5 = 2 + 15 = 17 "
-    "    - 6. razred: 12 : 3 + 4 = 4 + 4 = 8 "
-    "    - 7. razred: x + 2·3 = 8 → prvo 2·3 = 6, zatim x = 8 - 6 → x = 2 "
-    "    - 8. razred (Pitagora): a² + 6² = 10² → a² = 100 - 36 → a² = 64 → a = 8 cm"
-)
-
-ALGEBRA_TRANSFORMACIJA = (
-    "Od 7. razreda koristi metodu PREBACIVANJA ČLANOVA: "
-    "- Nepoznate (x) na LIJEVU, poznate na DESNU stranu uz promjenu znaka (+ u -, - u +). "
-    "- Zabranjeno pisati 'oduzimamo s obje strane'. "
-    "- Svaka transformacija ide u novi red, čisto i pregledno."
+SISTEMI_JEDNACINA = (
+    "1. FORMAT: Sistem UVIJEK piši unutar vitičaste zagrade kroz sve korake: $\begin{cases} ... \end{cases}$. "
+    "2. ODABIR METODE: Ako metoda nije navedena, primarno koristi METODU SUPROTNIH KOEFICIJENATA. "
+    "3. METODA SUPROTNIH KOEFICIJENATA: "
+    "   - Uz jednačinu koristi VERTIKALNU OPERATIVNU CRTU: $| \cdot (-2)$. "
+    "   - Prije sabiranja obavezna horizontalna vizuelna crta: '---'. "
+    "   - ZABRANJENO oduzimanje jednačina (uvijek množi negativnim brojem pa SABERI). "
+    "4. METODA ZAMJENE (SUPSTITUCIJA): Koristi ako se izričito traži ili ako je koeficijent 1. "
+    "   - Jednačinu iz koje je izražena nepoznata piši kao gornju u zagradi. "
+    "   - U drugoj jednačini obavezno koristi zagrade pri uvrštavanju: $3 \cdot (2 + y) - 2y = 9$."
 )
 
 PROPORCIJE_I_STRELICE = (
-    "1. Za sve zadatke s proporcijama: prvo izdvojiti sve podatke u listu PODACI. "
+    "1. Prvo izdvojiti sve podatke u listu PODACI. "
     "2. Postavi nepoznatu x sa strelicom prema gore: x ↑. "
-    "3. Za ostale članove postavi strelice prema gore/dole u zavisnosti od toga da li je direktna (↑↑) ili obrnuta (↑↓) proporcionalnost. "
-    "4. Rješavanje: formiraj proporciju prateći strelice i riješi x koristeći lanac jednakosti."
+    "3. Odredi vrstu proporcionalnosti (↑↑ ili ↑↓). "
+    "4. Riješi x koristeći vodoravnu razlomačku crtu."
 )
 
+EFIKASNOST_I_ZAGRADE = (
+    "1. Rješavanje zagrada i predznaka: U istom koraku osloboditi se višestrukih predznaka (npr. -(-5) = +5). "
+    "2. Bez suvišnih koraka: Grupiraj logičke radnje, ne piši korak za svaku sitnicu."
+)
 
 RAZREDNA_PRAVILA = {
-    "5": "N0 skup (bez negativnih). Nepoznati sabirak = zbir - poznati sabirak. Lanac jednakosti za izraze.",
-    "6": "Cijeli brojevi. Jednačine logičkom vezom (bez prebacivanja). Lanac jednakosti za izraze.",
-    "7": "Hibridni račun (decimale u razlomke). Jednačine: Prebacivanje članova (x lijevo, brojevi desno).",
-    "8": "Pitagora, proporcije (strelice). Jednačine: Prebacivanje članova. Prati modul PROPORCIJE_I_STRELICE.",
-    "9": "Funkcije, polinomi. Jednačine: Prebacivanje članova."
+    "5": "N0 skup (bez negativnih brojeva). Jednačine logičkom vezom (npr. x = zbir - sabirak). Lanac jednakosti za brojevne izraze: 2 + 3·5 = 2 + 15 = 17.",
+    "6": "Cijeli brojevi. Sređivanje predznaka u jednom koraku prema modulu EFIKASNOST_I_ZAGRADE. Jednačine logičkom vezom.",
+    "7": "Hibridni račun (pretvaranje decimala u razlomke $\frac{a}{b}$). Jednačine: Metoda prebacivanja članova (x lijevo, brojevi desno uz promjenu znaka).",
+    "8": "Pitagora ($a^2 + b^2 = c^2$), proporcije (strelice). Prati modul PROPORCIJE_I_STRELICE.",
+    "9": "Sistemi jednačina: Prati modul SISTEMI_JEDNACINA. Fokus na preglednost i školski zapis."
 }
 
 ZABRANE = (
-    "Zabranjeno: sin, cos, log, *, decimalni uglovi. "
-    "Zabranjeno: rezultat u 5. razredu manji od nule. "
-    "Zabranjeno: '=' u provjerama, opisima, tekstualnim koracima. "
-    "Zabranjeno: rastezanje sređivanja predznaka na više koraka."
+    "1. Strogo zabranjeno: kosa razlomačka crta (a/b) u računu. "
+    "2. Strogo zabranjeno: x^2, a^2, sqrt(x) izvan LaTeX-a. "
+    "3. Zabranjeno: rješavanje sistema jednačina bez vitičaste zagrade kroz cijeli postupak. "
+    "4. Zabranjeno: '=' na početku reda (osim u lancu računanja bez x). "
+    "5. Zabranjeno: rezultat u 5. razredu manji od nule."
 )
 
 
@@ -313,13 +296,11 @@ def build_system_prompt(razred: str, user_text: str) -> str:
     parts = [
         ULOGA,
         RAZREDNA_PRAVILA[r],
-        KOMUNIKACIJA_I_FORMATIRANJE,
         EFIKASNOST_I_ZAGRADE,
-        RACUN_SA_UGLOVIMA,
+        SISTEMI_JEDNACINA,
         PROPORCIJE_I_STRELICE,
-        PRIORITET_OBLIKA_BROJEVA,
-        ALGEBRA_TRANSFORMACIJA,
-        ZABRANE,
+        EFIKASNOST_I_ZAGRADE,
+        ZABRANE
     ]
     return "\n".join(parts)
 
