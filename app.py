@@ -244,7 +244,7 @@ KOMUNIKACIJA_I_FORMATIRANJE = (
     "5. ZNAKOVI: Množenje ($\cdot$), dijeljenje ($:$). Zabranjeni * i /."
 )
 
-RAZREDNA_METODIKA = {
+RAZREDNA_PRAVILA = {
     "5": (
         "Skup N0. STROGO ZABRANJENI razlomci, decimale i negativni brojevi. "
         "Jednačine/Nejednačine: po mjestu nepoznate (Sabirak, Faktor, Djelilac...). "
@@ -300,7 +300,7 @@ def build_system_prompt(razred: str, user_text: str) -> str:
     r = razred if razred in RAZREDNA_PRAVILA else "5"
     parts = [
         ULOGA,
-        RAZREDNA_METODIKA[r],
+        RAZREDNA_PRAVILA[r],
         KOMUNIKACIJA_I_FORMATIRANJE,
         SISTEMI_9,
         PROPORCIJE_8,
