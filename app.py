@@ -281,7 +281,7 @@ GEOMETRIJA = (
         "Formule piši prvo opštim simbolima, pa uvrštavaj. "
         "Mjerne jedinice ($cm$, $cm^2$, $cm^3$) obavezne u svakom redu računa."
     )
-}
+
 
 ZABRANE = (
     "1. Zabranjeno: kosa crta (a/b), sqrt(x), x^2 izvan LaTeX-a."
