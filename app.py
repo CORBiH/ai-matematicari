@@ -454,7 +454,7 @@ def build_system_prompt(razred: str, user_text: str = "") -> str:
         GLOBALNA_PRAVILA_ZAPISA_ZA_JEDNACINE,
         JEDNACINE_NEJEDNACINE_FORMAT,
         RAZREDNA_PRAVILA[r],
-        SISTEMI_LINEARних_JEDNACINA,
+        SISTEMI_LINEARNIH_JEDNACINA,
         LINEARNA_FUNKCIJA,
         UGLOVI,
         OPERACIJE_SA_RAZLOMCIMA,
