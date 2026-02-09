@@ -442,7 +442,7 @@ RAZNE_ZABRANE_I_KONTROLA = (
 
 DOZVOLJENI_RAZREDI = set(RAZREDNA_PRAVILA.keys())
 
-def build_system_prompt(razred: str) -> str:
+def build_system_prompt(razred: str, user_text: str = "") -> str:
     r = razred if razred in RAZREDNA_PRAVILA else "5"
     parts = [
         ULOGA,
@@ -451,16 +451,17 @@ def build_system_prompt(razred: str) -> str:
         DIJELJENJE_DECIMALNIH_BROJEVA,
         JEDNACINE_NEJEDNACINE_LOGIKA_I_METODOLOGIJA,
         GLOBALNA_PRAVILA_ZAPISA,
-        GLOBALNA_PRAVILA_ZAPISA_ZA_JEDNACINE,   # ✅ ubačeno kako si tražio
+        GLOBALNA_PRAVILA_ZAPISA_ZA_JEDNACINE,
         JEDNACINE_NEJEDNACINE_FORMAT,
         RAZREDNA_PRAVILA[r],
-        SISTEMI_LINEARNIH_JEDNACINA,
+        SISTEMI_LINEARних_JEDNACINA,
         LINEARNA_FUNKCIJA,
         UGLOVI,
         OPERACIJE_SA_RAZLOMCIMA,
         RAZNE_ZABRANE_I_KONTROLA,
     ]
     return "\n".join(parts).strip()
+
 
 
 
