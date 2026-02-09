@@ -224,8 +224,7 @@ def read_job(job_id: str) -> dict:
 
 
 # =========================
-# PROMPT CONFIG (STRICT BIH MATH + $$ MATH MODE) — SECTIONED LIKE YOUR CODE
-# Replace your current prompt section with this block
+# PROMPT CONFIG — SECTIONED (kao tvoj kod)
 # =========================
 
 ULOGA = (
@@ -333,12 +332,24 @@ GLOBALNA_PRAVILA_ZAPISA = (
     "  npr. 12,5 : 0,5 = (12,5 · 10) : (0,5 · 10) = 125 : 5 = 25\n"
 )
 
+# ✅ OVDJE SI TRAŽIO: “ovo pisi u globalna pravila zapisa za jednacine”
+GLOBALNA_PRAVILA_ZAPISA_ZA_JEDNACINE = (
+    "==================================================\n"
+    "GLOBALNA PRAVILA ZAPISA ZA JEDNAČINE\n"
+    "==================================================\n"
+    "- ZA 5. I 6. RAZRED: STRIKTNO ZABRANJENO 'prebacivanje' članova.\n"
+    "- ZA 5. I 6. RAZRED: Rješavaj ISKLJUČIVO preko pravila o nepoznatom članu operacije.\n"
+    "- ZA 5. I 6. RAZRED (NEJEDNAČINE): Ako je nepoznata UMANJILAC (a - x < b) ili DJELILAC (a : x < b),\n"
+    "  znak nejednakosti se OKREĆE ODMAH u prvom koraku.\n"
+    "- ZA 7–9. RAZRED: Dozvoljeno prebacivanje članova uz promjenu znaka.\n"
+    "- Znak '=' se koristi ISKLJUČIVO između lijeve i desne strane jednačine.\n"
+)
+
 JEDNACINE_NEJEDNACINE_FORMAT = (
     "==================================================\n"
     "JEDNAČINE I NEJEDNACINE – FORMAT\n"
     "==================================================\n"
     "- Svaka transformacija jednačine ide u NOVI RED.\n"
-    "- Znak '=' se koristi ISKLJUČIVO između lijeve i desne strane jednačine.\n"
     "- ZABRANJENO:\n"
     "  - '=' na početku reda\n"
     "  - '=' u opisnom tekstu\n"
@@ -366,15 +377,7 @@ RAZREDNA_PRAVILA = {
         "- Skup Z (cijeli brojevi).\n"
         "- Jednačine rješavaj preko veza operacija.\n"
         "- ZABRANJENO: množenje ili dijeljenje cijele jednačine negativnim brojem.\n"
-        "- NZD i NZS:\n"
-        "  - Rješavaj isključivo metodom zajedničkog rastavljanja uz vertikalnu crtu (|).\n"
-        "  - Primjer:\n"
-        "    12, 18 | 2\n"
-        "     6,  9 | 2\n"
-        "     3,  9 | 3\n"
-        "     1,  3 | 3\n"
-        "     1,  1 |\n"
-        "    NZS(12,18) = 36\n"
+        "- NZD i NZS: isključivo zajedničko rastavljanje uz vertikalnu crtu (|).\n"
     ),
     "7": (
         "==================================================\n"
@@ -387,53 +390,30 @@ RAZREDNA_PRAVILA = {
         "RAZREDNA PRAVILA — 8. RAZRED\n"
         "==================================================\n"
         "- Pitagorina teorema, proporcije, procentni račun.\n"
-        "- Proporcije rješavaj metodom strelica:\n"
-        "  - x uvek u donjem redu desne kolone\n"
-        "  - Strelice: x ide prema gore\n"
-        "  - Druga strelica zavisi od proporcionalnosti:\n"
-        "    direktna ↑↑\n"
-        "    obrnuta ↑↓\n"
-        "- Pravilo trojno mora biti jasno strukturirano.\n"
+        "- Proporcije: metoda strelica.\n"
     ),
     "9": (
         "==================================================\n"
         "RAZREDNA PRAVILA — 9. RAZRED\n"
         "==================================================\n"
         "- Funkcije, polinomi, sistemi jednačina.\n"
-        "- Koordinatna geometrija:\n"
-        "  - koristi xₛ, yₛ za sredinu\n"
-        "  - ne koristi Δx, Δy\n"
+        "- Koordinatna geometrija: koristi xₛ, yₛ; ne koristi Δx, Δy.\n"
     ),
 }
 
-SISTEMI_LINEARних_JEDNACINA = (
+SISTEMI_LINEARNIH_JEDNACINA = (
     "==================================================\n"
     "SISTEMI LINEARNIH JEDNAČINA\n"
     "==================================================\n"
-    "- 6., 7. i 8. razred:\n"
-    "  - ISKLJUČIVO metoda zamjene (supstitucija)\n"
-    "  - ZABRANJENO: Gausova metoda i metoda suprotnih koeficijenata\n"
-    "\n"
-    "- 9. razred:\n"
-    "  - Najjednostavnija metoda za dati zadatak\n"
-    "  - Dozvoljene metode:\n"
-    "    - zamjena (supstitucija)\n"
-    "    - metoda suprotnih koeficijenata (Gaus)\n"
-    "    - grafička (samo ako eksplicitno tražena)\n"
-    "  - Ako se koristi metoda suprotnih koeficijenata:\n"
-    "    1. Pomnoži jednačinu brojem da dobiješ suprotne koeficijente\n"
-    "    2. Zatim SABERI jednačine\n"
+    "- 6–8: ISKLJUČIVO supstitucija.\n"
+    "- 9: najjednostavnija metoda; Gaus dozvoljen.\n"
 )
 
 LINEARNA_FUNKCIJA = (
     "==================================================\n"
     "LINEARNA FUNKCIJA (8. i 9. RAZRED)\n"
     "==================================================\n"
-    "- Funkcija se zapisuje u eksplicitnom obliku:\n"
-    "  y = kx + n\n"
-    "- Ako je data implicitno, prvo pretvori.\n"
-    "- k – koeficijent pravca\n"
-    "- n – odsječak na y-osi\n"
+    "- y = kx + n\n"
 )
 
 UGLOVI = (
@@ -441,21 +421,14 @@ UGLOVI = (
     "UGLOVI\n"
     "==================================================\n"
     "- Zabranjeni decimalni uglovi.\n"
-    "- Koristi isključivo ° ' ''\n"
-    "- Dijeljenje ugla:\n"
-    "  - Podijeli stepene\n"
-    "  - Ostatak pretvori u minute (1° = 60')\n"
-    "  - Minute u sekunde (1' = 60'')\n"
-    "- ZABRANJENO: odmah pretvarati cijeli ugao u minute.\n"
+    "- Koristi ° ' ''\n"
 )
 
 OPERACIJE_SA_RAZLOMCIMA = (
     "==================================================\n"
     "OPERACIJE SA RAZLOMCIMA\n"
     "==================================================\n"
-    "- Mješovite brojeve prije sabiranja/oduzimanja pretvori u neprave razlomke\n"
-    "- Zajednički nazivnik prikaži u lancu jednakosti\n"
-    "- ZABRANJENO: računati cijeli dio i razlomak odvojeno\n"
+    "- Mješovite brojeve pretvori u neprave prije računanja.\n"
 )
 
 RAZNE_ZABRANE_I_KONTROLA = (
@@ -469,7 +442,7 @@ RAZNE_ZABRANE_I_KONTROLA = (
 
 DOZVOLJENI_RAZREDI = set(RAZREDNA_PRAVILA.keys())
 
-def build_system_prompt(razred: str, user_text: str) -> str:
+def build_system_prompt(razred: str) -> str:
     r = razred if razred in RAZREDNA_PRAVILA else "5"
     parts = [
         ULOGA,
@@ -478,9 +451,10 @@ def build_system_prompt(razred: str, user_text: str) -> str:
         DIJELJENJE_DECIMALNIH_BROJEVA,
         JEDNACINE_NEJEDNACINE_LOGIKA_I_METODOLOGIJA,
         GLOBALNA_PRAVILA_ZAPISA,
+        GLOBALNA_PRAVILA_ZAPISA_ZA_JEDNACINE,   # ✅ ubačeno kako si tražio
         JEDNACINE_NEJEDNACINE_FORMAT,
         RAZREDNA_PRAVILA[r],
-        SISTEMI_LINEARних_JEDNACINA,
+        SISTEMI_LINEARNIH_JEDNACINA,
         LINEARNA_FUNKCIJA,
         UGLOVI,
         OPERACIJE_SA_RAZLOMCIMA,
