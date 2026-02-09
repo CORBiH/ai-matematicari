@@ -263,26 +263,48 @@ DIJELJENJE_DECIMALNIH_BROJEVA = (
     "(10, 100, 1000...) tako da djelilac postane cijeli broj. Djeljenik ne mora postati cijeli broj.\n"
 )
 
+JEDNACINE_NEJEDNACINE_5_6 = (
+    "==================================================\n"
+    "JEDNAČINE I NEJEDNAČINE (5–6. razred)\n"
+    "==================================================\n"
+    "- Jednačine rješavaj ISKLJUČIVO prema mjestu gdje se nepoznata nalazi (metoda nepoznatog člana).\n"
+    "- ZABRANJENO je 'prebacivanje' članova preko znaka jednakosti.\n"
+    "\n"
+    "PRAVILA ZA JEDNAČINE:\n"
+    "- NEPOZNATI SABIRAK = ZBIR – POZNATI SABIRAK\n"
+    "- NEPOZNATI UMANJENIK = RAZLIKA + UMANJILAC\n"
+    "- NEPOZNATI UMANJILAC = UMANJENIK – RAZLIKA\n"
+    "- NEPOZNATI FAKTOR (ČINILAC) = PROIZVOD : POZNATI FAKTOR (ČINILAC)\n"
+    "- NEPOZNATI DJELJENIK = KOLIČNIK · DJELILAC\n"
+    "- NEPOZNATI DJELILAC = DJELJENIK : KOLIČNIK\n"
+    "\n"
+    "PRAVILA ZA NEJEDNAČINE:\n"
+    "- Postupak je isti kao kod jednačina (metoda nepoznatog člana).\n"
+    "- Ako je nepoznata na mjestu UMANJIOCA (a - x < b) ili DJELIOCA (a : x < b),\n"
+    "  znak nejednakosti se MIJENJA ODMAH u prvom koraku.\n"
+)
+
+JEDNACINE_NEJEDNACINE_7_9 = (
+    "==================================================\n"
+    "JEDNAČINE I NEJEDNAČINE (7–9. razred)\n"
+    "==================================================\n"
+    "- Jednačine i nejednačine rješavaj prebacivanjem:\n"
+    "  - nepoznate na lijevu stranu,\n"
+    "  - brojeve na desnu stranu.\n"
+    "- Brojevi i nepoznati koji prelaze na drugu stranu MIJENJAJU PREDZNAK (+ u −, − u +).\n"
+    "- Dozvoljeno množenje/dijeljenje cijele jednačine/nejednačine istim brojem (npr. 6x = 4 | :2).\n"
+    "- Kod nejednačina: znak nejednakosti se MIJENJA SAMO ako se cijela nejednačina\n"
+    "  množi ili dijeli NEGATIVNIM brojem.\n"
+    "- Koristi izraz: 'znak nejednakosti' (ne piši 'smjer nejednakosti').\n"
+)
+
 JEDNACINE_NEJEDNACINE_LOGIKA_I_METODOLOGIJA = (
     "==================================================\n"
     "JEDNAČINE I NEJEDNAČINE - LOGIKA I METODOLOGIJA\n"
     "==================================================\n"
-
-    "1. ZA 5. I 6. RAZRED (METODA NEPOZNATOG ČLANA):\n"
-    "- STRIKTNO ZABRANJENO prebacivanje članova.\n"
-    "- Rješavaj isključivo preko veza operacija.\n"
-    "- Kod nejednačina: ako je nepoznata umanjilac ili djelilac, znak se okreće odmah.\n"
-
-    "\n"
-    "2. ZA 7, 8. I 9. RAZRED (METODA PREBACIVANJA):\n"
-    "- JEDNAČINE I NEJEDNAČINE rješavaj prebacivanjem:\n"
-    "  • nepoznate na jednu stranu\n"
-    "  • brojeve na drugu stranu\n"
-    "- Svaki član koji prelazi na drugu stranu MIJENJA PREDZNAK.\n"
-    "- Dozvoljeno množenje i dijeljenje cijele jednačine/nejednačine istim brojem.\n"
-    "- Kod nejednačina:\n"
-    "  Znak nejednakosti se okreće SAMO ako se cijela nejednačina množi ili dijeli negativnim brojem.\n"
+    "- Pravila zavise od razreda (5–6: nepoznati član; 7–9: prebacivanje).\n"
 )
+
 
 
 GLOBALNA_PRAVILA_ZAPISA = (
@@ -460,12 +482,19 @@ DOZVOLJENI_RAZREDI = set(RAZREDNA_PRAVILA.keys())
 
 def build_system_prompt(razred: str, user_text: str = "") -> str:
     r = razred if razred in RAZREDNA_PRAVILA else "5"
+
+    # ✅ OVO DODAŠ
+    eq_rules = JEDNACINE_NEJEDNACINE_5_6 if r in ("5", "6") else JEDNACINE_NEJEDNACINE_7_9
+
     parts = [
         ULOGA,
         OPSTA_OGRANICENJA,
         VIZUELNI_ZAPIS_PRAVA_MATEMATIKA,
         DIJELJENJE_DECIMALNIH_BROJEVA,
-        JEDNACINE_NEJEDNACINE_LOGIKA_I_METODOLOGIJA,
+
+        # ✅ OVO UBACIŠ (umjesto ili uz stari blok)
+        eq_rules,
+
         GLOBALNA_PRAVILA_ZAPISA,
         GLOBALNA_PRAVILA_ZAPISA_ZA_JEDNACINE,
         JEDNACINE_NEJEDNACINE_FORMAT,
@@ -477,6 +506,7 @@ def build_system_prompt(razred: str, user_text: str = "") -> str:
         RAZNE_ZABRANE_I_KONTROLA,
     ]
     return "\n".join(parts).strip()
+
 
 
 
