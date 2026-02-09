@@ -267,17 +267,23 @@ JEDNACINE_NEJEDNACINE_LOGIKA_I_METODOLOGIJA = (
     "==================================================\n"
     "JEDNAČINE I NEJEDNAČINE - LOGIKA I METODOLOGIJA\n"
     "==================================================\n"
+
     "1. ZA 5. I 6. RAZRED (METODA NEPOZNATOG ČLANA):\n"
-    "- STRIKTNO ZABRANJENO 'prebacivanje' članova preko znaka jednakosti.\n"
-    "- Rješavaj ISKLJUČIVO preko pravila o nepoznatom članu operacije.\n"
-    "- KOD NEJEDNAČINA: Ako je nepoznata UMANJILAC (a - x < b) ili DJELILAC (a : x < b), "
-    "znak nejednakosti se OKREĆE ODMAH u prvom koraku.\n"
+    "- STRIKTNO ZABRANJENO prebacivanje članova.\n"
+    "- Rješavaj isključivo preko veza operacija.\n"
+    "- Kod nejednačina: ako je nepoznata umanjilac ili djelilac, znak se okreće odmah.\n"
+
     "\n"
     "2. ZA 7, 8. I 9. RAZRED (METODA PREBACIVANJA):\n"
-    "- Dozvoljeno 'prebacivanje' članova uz promjenu znaka (npr. x + 2 = 5 => x = 5 - 2).\n"
-    "- Dozvoljeno množenje/dijeljenje cijele jednačine istim brojem (npr. 6x = 4 | :2).\n"
-    "- KOD NEJEDNAČINA: Znak nejednakosti se okreće SAMO ako se cijela nejednačina množi ili dijeli negativnim brojem.\n"
+    "- JEDNAČINE I NEJEDNAČINE rješavaj prebacivanjem:\n"
+    "  • nepoznate na jednu stranu\n"
+    "  • brojeve na drugu stranu\n"
+    "- Svaki član koji prelazi na drugu stranu MIJENJA PREDZNAK.\n"
+    "- Dozvoljeno množenje i dijeljenje cijele jednačine/nejednačine istim brojem.\n"
+    "- Kod nejednačina:\n"
+    "  Znak nejednakosti se okreće SAMO ako se cijela nejednačina množi ili dijeli negativnim brojem.\n"
 )
+
 
 GLOBALNA_PRAVILA_ZAPISA = (
     "==================================================\n"
@@ -332,18 +338,28 @@ GLOBALNA_PRAVILA_ZAPISA = (
     "  npr. 12,5 : 0,5 = (12,5 · 10) : (0,5 · 10) = 125 : 5 = 25\n"
 )
 
-# ✅ OVDJE SI TRAŽIO: “ovo pisi u globalna pravila zapisa za jednacine”
 GLOBALNA_PRAVILA_ZAPISA_ZA_JEDNACINE = (
     "==================================================\n"
     "GLOBALNA PRAVILA ZAPISA ZA JEDNAČINE\n"
     "==================================================\n"
-    "- ZA 5. I 6. RAZRED: STRIKTNO ZABRANJENO 'prebacivanje' članova.\n"
-    "- ZA 5. I 6. RAZRED: Rješavaj ISKLJUČIVO preko pravila o nepoznatom članu operacije.\n"
-    "- ZA 5. I 6. RAZRED (NEJEDNAČINE): Ako je nepoznata UMANJILAC (a - x < b) ili DJELILAC (a : x < b),\n"
-    "  znak nejednakosti se OKREĆE ODMAH u prvom koraku.\n"
-    "- ZA 7–9. RAZRED: Dozvoljeno prebacivanje članova uz promjenu znaka.\n"
-    "- Znak '=' se koristi ISKLJUČIVO između lijeve i desne strane jednačine.\n"
+
+    "ZA 5. I 6. RAZRED:\n"
+    "- Zabranjeno prebacivanje članova.\n"
+    "- Rješavanje samo preko veza operacija.\n"
+    "- Kod nejednačina sa nepoznatim umanjiocem ili djeliteljem znak se okreće odmah.\n"
+
+    "\n"
+    "ZA 7–9. RAZRED:\n"
+    "- Jednačine i nejednačine rješavaj prebacivanjem.\n"
+    "- Nepoznate na jednu stranu, brojeve na drugu.\n"
+    "- Svaki član koji prelazi mijenja predznak.\n"
+    "- Dozvoljeno množenje/dijeljenje cijele jednačine ili nejednačine istim brojem.\n"
+    "- Znak nejednakosti se okreće SAMO kod množenja ili dijeljenja negativnim brojem.\n"
+
+    "\n"
+    "- Znak '=' koristi se samo između lijeve i desne strane.\n"
 )
+
 
 JEDNACINE_NEJEDNACINE_FORMAT = (
     "==================================================\n"
