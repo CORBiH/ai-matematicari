@@ -221,8 +221,10 @@ def read_job(job_id: str) -> dict:
         return (doc.to_dict() or {}) if doc.exists else {}
     return JOB_STORE.get(job_id, {})
 
+
+
 # =========================
-# PROMPT CONFIG (STRICT BIH MATH, 5–9) — SECTIONED LIKE YOUR CODE
+# PROMPT CONFIG (STRICT BIH MATH + $$ MATH MODE) — SECTIONED LIKE YOUR CODE
 # Replace your current prompt section with this block
 # =========================
 
@@ -240,27 +242,61 @@ OPSTA_OGRANICENJA = (
     "- Rješenja moraju izgledati kao u svesci ili udžbeniku.\n"
 )
 
-MJEŠOVITI_BROJEVI = (
+VIZUELNI_ZAPIS_PRAVA_MATEMATIKA = (
+    "==================================================\n"
+    "VIZUELNI ZAPIS (PRAVA MATEMATIKA)\n"
+    "==================================================\n"
+    "- SVE matematičke izraze i razlomke OBAVEZNO piši unutar dvostrukih znakova dolara ($$).\n"
+    "- Za razlomke koristi isključivo: $$\\frac{brojnik}{nazivnik}$$\n"
+    "- Mješoviti brojevi: cijeli broj piši ispred razlomka, npr. $$2\\frac{1}{3}$$\n"
+    "- ZABRANJENO: Pisanje koda \\frac bez $$ znakova.\n"
+    "- ZABRANJENO: Pisanje kose crte (/) za razlomke.\n"
+    "- Množenje unutar $$ zapisuj kao \\cdot (npr. $$2 \\cdot x$$).\n"
+)
+
+DIJELJENJE_DECIMALNIH_BROJEVA = (
+    "==================================================\n"
+    "DIJELJENJE DECIMALNIH BROJEVA\n"
+    "==================================================\n"
+    "1. DJELILAC JE CIJELI BROJ: Dijeli normalno. Čim završiš dijeljenje cijelog dijela djeljenika, "
+    "odmah u količniku napiši zarez (,) i nastavi dijeljenje decimala.\n"
+    "2. DJELILAC JE DECIMALNI BROJ: Prvo izvrši proširivanje oba broja potrebnom dekadskom jedinicom "
+    "(10, 100, 1000...) tako da djelilac postane cijeli broj. Djeljenik ne mora postati cijeli broj.\n"
+)
+
+JEDNACINE_NEJEDNACINE_LOGIKA_I_METODOLOGIJA = (
+    "==================================================\n"
+    "JEDNAČINE I NEJEDNAČINE - LOGIKA I METODOLOGIJA\n"
+    "==================================================\n"
+    "1. ZA 5. I 6. RAZRED (METODA NEPOZNATOG ČLANA):\n"
+    "- STRIKTNO ZABRANJENO 'prebacivanje' članova preko znaka jednakosti.\n"
+    "- Rješavaj ISKLJUČIVO preko pravila o nepoznatom članu operacije.\n"
+    "- KOD NEJEDNAČINA: Ako je nepoznata UMANJILAC (a - x < b) ili DJELILAC (a : x < b), "
+    "znak nejednakosti se OKREĆE ODMAH u prvom koraku.\n"
+    "\n"
+    "2. ZA 7, 8. I 9. RAZRED (METODA PREBACIVANJA):\n"
+    "- Dozvoljeno 'prebacivanje' članova uz promjenu znaka (npr. x + 2 = 5 => x = 5 - 2).\n"
+    "- Dozvoljeno množenje/dijeljenje cijele jednačine istim brojem (npr. 6x = 4 | :2).\n"
+    "- KOD NEJEDNAČINA: Znak nejednakosti se okreće SAMO ako se cijela nejednačina množi ili dijeli negativnim brojem.\n"
+)
+
+GLOBALNA_PRAVILA_ZAPISA = (
+    "==================================================\n"
+    "GLOBALNA PRAVILA ZAPISA (VAŽE ZA SVE RAZREDE)\n"
+    "==================================================\n"
     "1. MJEŠOVITI BROJEVI:\n"
     "- Mješoviti broj se piše BEZ riječi „i“.\n"
     "  Ispravno: 2 1/3\n"
     "  Pogrešno: 2 i 1/3\n"
-)
-
-RAZLOMCI = (
+    "\n"
     "2. RAZLOMCI:\n"
     "- Razlomke zapisuj sa vizuelnom razlomačkom crtom (kao u udžbeniku/svesci).\n"
     "- ZABRANJENO je koristiti znak '/' umjesto razlomačke crte.\n"
-    "- Ako se izlaz renderuje u LaTeX/MathJax okruženju, možeš koristiti \\frac{a}{b} radi bolje vizualizacije.\n"
-)
-
-STEPENOVANJE = (
+    "\n"
     "3. STEPENOVANJE:\n"
     "- Stepen se piše školski: x², a³, (2x)²\n"
     "- ZABRANJENO: koristiti znak ^\n"
-)
-
-KORIJEN = (
+    "\n"
     "4. KORIJEN:\n"
     "- Korijen se piše ISKLJUČIVO sa znakom √\n"
     "- ZABRANJENO: koristiti 'sqrt'\n"
@@ -268,22 +304,16 @@ KORIJEN = (
     "  √20 = √(4 · 5)\n"
     "  √20 = √4 · √5\n"
     "  √20 = 2√5\n"
-)
-
-VIZUELNI_ZAPIS = (
+    "\n"
     "5. VIZUELNI ZAPIS:\n"
     "- Svaki logički korak ide u NOVI RED.\n"
     "- Između različitih faza rješenja ostavi jedan prazan red.\n"
     "- Razmake koristi tako da zapis bude pregledan i „školski“.\n"
-)
-
-TERMINOLOGIJA = (
+    "\n"
     "6. TERMINOLOGIJA:\n"
     "- Jednako koristi: 'Jednakokraki trougao', 'Zbir', 'Stepenovanje'\n"
     "- Zabranjeno: jednakokračni, zbrojili, suma, potenciranje\n"
-)
-
-OPSTA_NOTACIJA = (
+    "\n"
     "7. OPŠTA MATEMATIČKA NOTACIJA:\n"
     "- Decimalni separator je ZAREZ (,), nikad tačka.\n"
     "- Množenje: tačka (·)\n"
@@ -293,18 +323,14 @@ OPSTA_NOTACIJA = (
     "  - Unutrašnji uglovi: α, β, γ, δ.\n"
     "  - Vanjski uglovi: α₁, β₁, γ₁, δ₁ (obavezno indeks 1)\n"
     "  - Jednakokraki trougao: krakovi su b, osnovica je a\n"
-)
-
-KOORDINATNA_GEOMETRIJA = (
+    "\n"
     "8. KOORDINATNA GEOMETRIJA:\n"
     "- RASTOJANJE TAČAKA: koristi (x₂ - x₁) i (y₂ - y₁), ZABRANJENO Δx i Δy.\n"
     "- SREDIŠTE DUŽI: koordinate središta označavaj sa xₛ i yₛ (subscript malo 's').\n"
-)
-
-DIJELJENJE_DECIMALNIH = (
+    "\n"
     "9. DIJELJENJE DECIMALNIH:\n"
     "- Ako je djelilac decimalni broj, OBAVEZNO prvo prikaži proširivanje:\n"
-    "  12,5 : 0,5 = (12,5 · 10) : (0,5 · 10) = 125 : 5 = 25\n"
+    "  npr. 12,5 : 0,5 = (12,5 · 10) : (0,5 · 10) = 125 : 5 = 25\n"
 )
 
 JEDNACINE_NEJEDNACINE_FORMAT = (
@@ -317,6 +343,7 @@ JEDNACINE_NEJEDNACINE_FORMAT = (
     "  - '=' na početku reda\n"
     "  - '=' u opisnom tekstu\n"
     "  - '=' u istom redu sa znakom nejednakosti\n"
+    "\n"
     "Ispravno:\n"
     "2x < 5 - 1\n"
     "2x < 4\n"
@@ -324,14 +351,18 @@ JEDNACINE_NEJEDNACINE_FORMAT = (
 
 RAZREDNA_PRAVILA = {
     "5": (
-        "5. RAZRED:\n"
+        "==================================================\n"
+        "RAZREDNA PRAVILA — 5. RAZRED\n"
+        "==================================================\n"
         "- Skup N₀ (prirodni brojevi i nula).\n"
         "- Rezultati ne smiju biti negativni.\n"
         "- Jednačine rješavaj ISKLJUČIVO preko veza operacija.\n"
         "- ZABRANJENO: negativni brojevi u bilo kojem obliku.\n"
     ),
     "6": (
-        "6. RAZRED:\n"
+        "==================================================\n"
+        "RAZREDNA PRAVILA — 6. RAZRED\n"
+        "==================================================\n"
         "- Skup Z (cijeli brojevi).\n"
         "- Jednačine rješavaj preko veza operacija.\n"
         "- ZABRANJENO: množenje ili dijeljenje cijele jednačine negativnim brojem.\n"
@@ -346,11 +377,15 @@ RAZREDNA_PRAVILA = {
         "    NZS(12,18) = 36\n"
     ),
     "7": (
-        "7. RAZRED:\n"
+        "==================================================\n"
+        "RAZREDNA PRAVILA — 7. RAZRED\n"
+        "==================================================\n"
         "- Dozvoljeno prebacivanje članova uz promjenu znaka.\n"
     ),
     "8": (
-        "8. RAZRED:\n"
+        "==================================================\n"
+        "RAZREDNA PRAVILA — 8. RAZRED\n"
+        "==================================================\n"
         "- Pitagorina teorema, proporcije, procentni račun.\n"
         "- Proporcije rješavaj metodom strelica:\n"
         "  - x uvek u donjem redu desne kolone\n"
@@ -361,15 +396,17 @@ RAZREDNA_PRAVILA = {
         "- Pravilo trojno mora biti jasno strukturirano.\n"
     ),
     "9": (
-        "9. RAZRED:\n"
+        "==================================================\n"
+        "RAZREDNA PRAVILA — 9. RAZRED\n"
+        "==================================================\n"
         "- Funkcije, polinomi, sistemi jednačina.\n"
         "- Koordinatna geometrija:\n"
         "  - koristi xₛ, yₛ za sredinu\n"
         "  - ne koristi Δx, Δy\n"
-    )
+    ),
 }
 
-SISTEMI_LINEARNIH_JEDNACINA = (
+SISTEMI_LINEARних_JEDNACINA = (
     "==================================================\n"
     "SISTEMI LINEARNIH JEDNAČINA\n"
     "==================================================\n"
@@ -416,12 +453,12 @@ OPERACIJE_SA_RAZLOMCIMA = (
     "==================================================\n"
     "OPERACIJE SA RAZLOMCIMA\n"
     "==================================================\n"
-    "- Mješovite brojeve prije sabiranja/oduzimanja pretvori u neprave razlomke.\n"
-    "- Zajednički nazivnik prikaži u lancu jednakosti.\n"
-    "- ZABRANJENO: računati cijeli dio i razlomak odvojeno.\n"
+    "- Mješovite brojeve prije sabiranja/oduzimanja pretvori u neprave razlomke\n"
+    "- Zajednički nazivnik prikaži u lancu jednakosti\n"
+    "- ZABRANJENO: računati cijeli dio i razlomak odvojeno\n"
 )
 
-RAZNE_ZABRANE = (
+RAZNE_ZABRANE_I_KONTROLA = (
     "==================================================\n"
     "RAZNE ZABRANE I KONTROLA\n"
     "==================================================\n"
@@ -434,39 +471,23 @@ DOZVOLJENI_RAZREDI = set(RAZREDNA_PRAVILA.keys())
 
 def build_system_prompt(razred: str, user_text: str) -> str:
     r = razred if razred in RAZREDNA_PRAVILA else "5"
-
     parts = [
         ULOGA,
         OPSTA_OGRANICENJA,
-
-        "==================================================\n"
-        "GLOBALNA PRAVILA ZAPISA (VAŽE ZA SVE RAZREDE)\n"
-        "==================================================\n",
-
-        MJEŠOVITI_BROJEVI,
-        RAZLOMCI,
-        STEPENOVANJE,
-        KORIJEN,
-        VIZUELNI_ZAPIS,
-        TERMINOLOGIJA,
-        OPSTA_NOTACIJA,
-        KOORDINATNA_GEOMETRIJA,
-        DIJELJENJE_DECIMALNIH,
-
+        VIZUELNI_ZAPIS_PRAVA_MATEMATIKA,
+        DIJELJENJE_DECIMALNIH_BROJEVA,
+        JEDNACINE_NEJEDNACINE_LOGIKA_I_METODOLOGIJA,
+        GLOBALNA_PRAVILA_ZAPISA,
         JEDNACINE_NEJEDNACINE_FORMAT,
-
-        "==================================================\n"
-        "RAZREDNA PRAVILA\n"
-        "==================================================\n",
         RAZREDNA_PRAVILA[r],
-
-        SISTEMI_LINEARNIH_JEDNACINA,
+        SISTEMI_LINEARних_JEDNACINA,
         LINEARNA_FUNKCIJA,
         UGLOVI,
         OPERACIJE_SA_RAZLOMCIMA,
-        RAZNE_ZABRANE,
+        RAZNE_ZABRANE_I_KONTROLA,
     ]
     return "\n".join(parts).strip()
+
 
 
 
