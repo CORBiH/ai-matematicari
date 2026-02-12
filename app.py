@@ -313,7 +313,7 @@ TERMINOLOGIJA_I_JEZIK = (
     "- Nikada ne koristi riječ 'kutomer'. Taj izraz je nepravilan.\n"
     "\n"
     "2. Obavezan izraz:\n"
-    "- Umjesto 'kutomer', isključivo koristi riječ 'uglаomjer'.\n"
+    "- Umjesto 'kutomer', isključivo koristi riječ 'uglomjer'.\n"
     "\n"
     "3. Dvostruki nazivi:\n"
     "- Za lenjir uvijek koristi oba naziva u formatu: linijar (lenjir).\n"
