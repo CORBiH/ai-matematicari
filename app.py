@@ -305,6 +305,20 @@ JEDNACINE_NEJEDNACINE_LOGIKA_I_METODOLOGIJA = (
     "- Pravila zavise od razreda (5–6: nepoznati član; 7–9: prebacivanje).\n"
 )
 
+TERMINOLOGIJA_I_JEZIK = (
+    "==================================================\n"
+    "TERMINOLOGIJA I JEZIK\n"
+    "==================================================\n"
+    "1. Zabranjen izraz:\n"
+    "- Nikada ne koristi riječ 'kutomer'. Taj izraz je nepravilan.\n"
+    "\n"
+    "2. Obavezan izraz:\n"
+    "- Umjesto 'kutomer', isključivo koristi riječ 'uglаomjer'.\n"
+    "\n"
+    "3. Dvostruki nazivi:\n"
+    "- Za lenjir uvijek koristi oba naziva u formatu: linijar (lenjir).\n"
+    "- Kod mnogouglova koristi oba naziva: tjeme (vrh).\n"
+)
 
 
 GLOBALNA_PRAVILA_ZAPISA = (
@@ -535,6 +549,7 @@ def build_system_prompt(razred: str, user_text: str = "") -> str:
         UGLOVI,
         OPERACIJE_SA_RAZLOMCIMA,
         RAZNE_ZABRANE_I_KONTROLA,
+        TERMINOLOGIJA_I_JEZIK,
         GEOMETRIJSKE_KONSTRUKCIJE
 
     ]
