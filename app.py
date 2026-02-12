@@ -478,12 +478,46 @@ RAZNE_ZABRANE_I_KONTROLA = (
     "- ZABRANJENO: odgovaranje na bilo šta što nije matematika\n"
 )
 
+GEOMETRIJSKE_KONSTRUKCIJE = (
+    "==================================================\n"
+    "UNIVERZALNI GEOMETRIJSKI PROMPT (KONSTRUKCIJE)\n"
+    "==================================================\n"
+    "Kada korisnik postavi zadatak koji zahtijeva geometrijsku konstrukciju trouglom, "
+    "linijarom i šestarom, pridržavaj se sljedećih pravila:\n"
+    "\n"
+    "Bez vizuelnih skica:\n"
+    "- Nemoj koristiti ASCII art ili LaTeX.\n"
+    "- Sav fokus stavi na precizan, tekstualni opis postupka.\n"
+    "\n"
+    "Uloga:\n"
+    "- Ti si pedantan nastavnik matematike koji objašnjava učeniku "
+    "kako da koristi pribor korak-po-korak.\n"
+    "\n"
+    "Pravila simbola:\n"
+    "- Koristi običan tekst (tačka A', prava s, duž AB, ugao od 60 stepeni).\n"
+    "\n"
+    "Smjer uglova kod rotacije (Standard):\n"
+    "- Pozitivan (+) = rotacija suprotno od kazaljke na satu.\n"
+    "- Negativan (-) = rotacija u smjeru kazaljke na satu.\n"
+    "\n"
+    "STRUKTURA ODGOVORA (OBAVEZNA):\n"
+    "ANALIZA – šta je dato i šta treba dobiti.\n"
+    "POTREBAN PRIBOR – lista pribora.\n"
+    "POSTUPAK KONSTRUKCIJE – numerisani koraci.\n"
+    "PROVJERA – kako provjeriti tačnost.\n"
+    "\n"
+    "Specijalni savjeti za pribor:\n"
+    "- Za translaciju i paralele objasni klizanje jednog trougla niz drugi.\n"
+    "- Za osnu simetriju i normale koristi ivicu trougla za pravi ugao (90 stepeni).\n"
+)
+
+
 DOZVOLJENI_RAZREDI = set(RAZREDNA_PRAVILA.keys())
 
 def build_system_prompt(razred: str, user_text: str = "") -> str:
     r = razred if razred in RAZREDNA_PRAVILA else "5"
 
-    # ✅ OVO DODAŠ
+    
     eq_rules = JEDNACINE_NEJEDNACINE_5_6 if r in ("5", "6") else JEDNACINE_NEJEDNACINE_7_9
 
     parts = [
@@ -491,10 +525,7 @@ def build_system_prompt(razred: str, user_text: str = "") -> str:
         OPSTA_OGRANICENJA,
         VIZUELNI_ZAPIS_PRAVA_MATEMATIKA,
         DIJELJENJE_DECIMALNIH_BROJEVA,
-
-        # ✅ OVO UBACIŠ (umjesto ili uz stari blok)
         eq_rules,
-
         GLOBALNA_PRAVILA_ZAPISA,
         GLOBALNA_PRAVILA_ZAPISA_ZA_JEDNACINE,
         JEDNACINE_NEJEDNACINE_FORMAT,
@@ -504,6 +535,8 @@ def build_system_prompt(razred: str, user_text: str = "") -> str:
         UGLOVI,
         OPERACIJE_SA_RAZLOMCIMA,
         RAZNE_ZABRANE_I_KONTROLA,
+        GEOMETRIJSKE_KONSTRUKCIJE
+
     ]
     return "\n".join(parts).strip()
 
@@ -1193,7 +1226,7 @@ def submit():
     if request.method == "OPTIONS":
         return ("", 204)
 
-    # ✅ ALWAYS define this so fallback never crashes
+    #ALWAYS define this so fallback never crashes
     sync_try = {"ok": False, "error": None}
 
     # --- osnovni parametri ---
@@ -1321,7 +1354,7 @@ def submit():
         return jsonify(payload), 200
 
     except Exception as e:
-        # ✅ IMPORTANT: store why sync failed so async response can show reason
+        # IMPORTANT: store why sync failed so async response can show reason
         sync_try = {"ok": False, "error": str(e)}
 
     # --- 3) Sync nije uspio → fallback na async ---
