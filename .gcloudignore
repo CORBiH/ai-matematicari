@@ -1,9 +1,6 @@
-cd ~/ai-matematicari
-
-cat > .gcloudignore <<'EOF'
-# Eksplicitno: NE diramo templates/
-# Standardno ignoriši samo “smeće”:
+# Fajlovi koji se NE šalju u Cloud Build (templates/ se namjerno šalje).
 .git
+.gitignore
 *.pyc
 __pycache__/
 .env
@@ -15,4 +12,6 @@ node_modules/
 .idea/
 .vscode/
 *.log
-EOF
+.pytest_cache/
+tests/
+docs/

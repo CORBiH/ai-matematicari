@@ -648,24 +648,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function poll(jobId){
     const sleep = (ms)=> new Promise(r=>setTimeout(r, ms));
+    let failures = 0; // tolerišemo par prolaznih mrežnih grešaka prije odustajanja
     for (let i=0;i<180;i++){
       await sleep(2000);
       try{
         const r = await fetch(`/status/${jobId}`, {cache:'no-store', credentials:'include'});
         if (!r.ok) throw new Error('status http '+r.status);
         const data = await r.json();
+        failures = 0;
         if (data.status === 'done'){
-          appendBotHTML((data.result && data.result.html) || '<i>Nema rezultata.</i>');
+          const botHtml = (data.result && data.result.html) || '<i>Nema rezultata.</i>';
+          appendBotHTML(botHtml);
+          pushHistory(HIST_KEY, window.__lastUserLabel || '(follow-up)', botHtml);
           hideTyping(); return;
         }
         if (data.status === 'error'){
-          appendBotHTML('<div class="alert alert-danger">Greška u asinkronoj obradi.</div>');
-          pushHistory(HIST_KEY, window.__lastUserLabel || '(follow-up)', (data.result && data.result.html) || '');
+          appendBotHTML('<div class="alert alert-danger">Greška u asinkronoj obradi. Pokušaj ponovo.</div>');
           hideTyping(); return;
         }
       }catch(_){
-        appendBotHTML('<div class="alert alert-danger">Greška pri provjeri statusa.</div>');
-        hideTyping(); return;
+        failures += 1;
+        if (failures >= 3){
+          appendBotHTML('<div class="alert alert-danger">Veza je prekinuta pri provjeri statusa. Provjeri internet pa pokušaj ponovo.</div>');
+          hideTyping(); return;
+        }
       }
     }
     appendBotHTML('<div class="alert alert-warning">Istek vremena čekanja na rezultat.</div>');

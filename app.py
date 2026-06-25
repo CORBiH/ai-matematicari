@@ -1,20 +1,22 @@
 from flask import Flask, render_template, request, session, redirect, url_for, send_from_directory, jsonify
 from dotenv import load_dotenv
-import os, re, base64, json, html, datetime, logging, mimetypes, threading, traceback
+import os, base64, json, html, datetime, logging, mimetypes, threading
+import socket, ipaddress
 from datetime import timedelta
 from uuid import uuid4
 import requests
 from urllib.parse import urlparse
 from openai import OpenAI
 from flask_cors import CORS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 import time
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
 
 
 
 # --- Optional PIL (for image heuristics and selftest) ---
 try:
-    from PIL import Image, ImageStat, ImageDraw, ImageFont
+    from PIL import Image, ImageStat, ImageDraw
     HAVE_PIL = True
 except Exception:
     HAVE_PIL = False
@@ -42,6 +44,9 @@ load_dotenv(override=False)
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
 log = logging.getLogger("matbot")
 
+LOCAL_MODE = os.getenv("LOCAL_MODE", "0") == "1"
+USE_FIRESTORE = os.getenv("USE_FIRESTORE", "1") == "1" and not LOCAL_MODE
+
 SECURE_COOKIES = os.getenv("COOKIE_SECURE", "0") == "1"
 app = Flask(__name__)
 app.config.update(
@@ -50,23 +55,78 @@ app.config.update(
     SESSION_COOKIE_NAME="matbot_session_v2",
     PERMANENT_SESSION_LIFETIME=timedelta(hours=12),
     SEND_FILE_MAX_AGE_DEFAULT=0,
-    ETAG_DISABLED=True,
 )
-CORS(app, supports_credentials=True)
-app.secret_key = os.getenv("SECRET_KEY", "tajna_lozinka")
 
-LOCAL_MODE = os.getenv("LOCAL_MODE", "0") == "1"
-USE_FIRESTORE = os.getenv("USE_FIRESTORE", "1") == "1" and not LOCAL_MODE
+# CORS: ako je CORS_ORIGINS postavljen (zarezom odvojene domene), ograniči;
+# inače zadrži dosadašnje ponašanje (sve domene) radi kompatibilnosti.
+_cors_origins = [o.strip() for o in (os.getenv("CORS_ORIGINS") or "").split(",") if o.strip()]
+if _cors_origins:
+    CORS(app, supports_credentials=True, origins=_cors_origins)
+else:
+    CORS(app, supports_credentials=True)
 
-MAX_MB = int(os.getenv("MAX_CONTENT_LENGTH_MB", "200"))
+# Produkcija (cloudbuild) postavlja FLASK_SECRET_KEY; stariji setupi SECRET_KEY.
+_secret_key = (os.getenv("FLASK_SECRET_KEY") or os.getenv("SECRET_KEY") or "").strip()
+if not _secret_key:
+    _secret_key = "tajna_lozinka"
+    if not LOCAL_MODE:
+        log.error("FLASK_SECRET_KEY/SECRET_KEY nije postavljen — koristi se NESIGURAN default! "
+                  "Postavi FLASK_SECRET_KEY u okruženju.")
+app.secret_key = _secret_key
+
+MAX_MB = int(os.getenv("MAX_CONTENT_LENGTH_MB", "20"))
 app.config["MAX_CONTENT_LENGTH"] = MAX_MB * 1024 * 1024
 
-UPLOAD_DIR = "/tmp/uploads"
+UPLOAD_DIR = os.getenv("UPLOAD_DIR", "/tmp/uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+UPLOAD_MAX_AGE_S = int(os.getenv("UPLOAD_MAX_AGE_S", "3600"))
+
+def cleanup_stale_uploads(max_age_s: int | None = None):
+    """Best-effort brisanje starih fajlova iz UPLOAD_DIR (na Cloud Runu /tmp živi u RAM-u)."""
+    cutoff = time.time() - (max_age_s if max_age_s is not None else UPLOAD_MAX_AGE_S)
+    try:
+        for name in os.listdir(UPLOAD_DIR):
+            path = os.path.join(UPLOAD_DIR, name)
+            try:
+                if os.path.isfile(path) and os.path.getmtime(path) < cutoff:
+                    os.remove(path)
+            except OSError as e:
+                log.warning("cleanup_stale_uploads: ne mogu obrisati %s: %s", path, e)
+    except OSError as e:
+        log.warning("cleanup_stale_uploads: %s", e)
 
 HARD_TIMEOUT_S = float(os.getenv("HARD_TIMEOUT_S", "120"))
-OPENAI_TIMEOUT = HARD_TIMEOUT_S
-OPENAI_MAX_RETRIES = 2
+OPENAI_TIMEOUT = float(os.getenv("OPENAI_TIMEOUT", str(HARD_TIMEOUT_S)))
+OPENAI_MAX_RETRIES = int(os.getenv("OPENAI_MAX_RETRIES", "2"))
+
+# --- Rate limiting (env-podesivo; default vrlo darežljiv da ne smeta učenicima) ---
+RATE_LIMIT_ENABLED = os.getenv("RATE_LIMIT_ENABLED", "1") == "1"
+
+def _client_ip():
+    # Cloud Run je iza proxyja: prva adresa u X-Forwarded-For je stvarni klijent.
+    xff = (request.headers.get("X-Forwarded-For") or "").split(",")[0].strip()
+    return xff or get_remote_address()
+
+def _submit_rate_limit():
+    return os.getenv("RATE_LIMIT_SUBMIT", "30 per minute")
+
+def _diag_rate_limit():
+    return os.getenv("RATE_LIMIT_DIAG", "10 per minute")
+
+limiter = Limiter(
+    key_func=_client_ip,
+    app=app,
+    default_limits=[],
+    storage_uri=os.getenv("RATE_LIMIT_STORAGE_URI", "memory://"),
+    enabled=RATE_LIMIT_ENABLED,
+)
+
+@app.errorhandler(429)
+def rate_limited(e):
+    return jsonify({
+        "error": "rate_limited",
+        "detail": "Previše zahtjeva u kratkom vremenu. Sačekaj malo pa pokušaj ponovo.",
+    }), 429
 
 SYNC_SOFT_TIMEOUT_S = float(os.getenv("SYNC_SOFT_TIMEOUT_S", "8"))
 HEAVY_TOKEN_THRESHOLD = int(os.getenv("HEAVY_TOKEN_THRESHOLD", "1500"))
@@ -133,6 +193,8 @@ GSHEET_ID   = os.getenv("GSHEET_ID", "").strip()
 GSHEET_NAME = os.getenv("GSHEET_NAME", "matematika-bot").strip()
 
 sheet = None
+_sheets_initialized = False
+_sheets_lock = threading.Lock()
 _sheets_diag = {
     "enabled": False, "mode": None, "sa_email": None,
     "spreadsheet_title": None, "spreadsheet_id": None,
@@ -148,48 +210,71 @@ def _try_get_sa_email_from_creds(creds):
         pass
     return None
 
-try:
-    gc = None
-    b64 = os.getenv("GOOGLE_SHEETS_CREDENTIALS_B64", "").strip()
-    if b64:
-        info  = json.loads(base64.b64decode(b64).decode("utf-8"))
-        creds = SACreds.from_service_account_info(info, scopes=SHEETS_SCOPES)
-        gc = gspread.authorize(creds)
-        _sheets_diag["mode"] = "b64"; _sheets_diag["sa_email"] = info.get("client_email")
-    elif os.path.exists("credentials.json"):
-        creds = SACreds.from_service_account_file("credentials.json", scopes=SHEETS_SCOPES)
-        gc = gspread.authorize(creds)
-        _sheets_diag["mode"] = "file"; _sheets_diag["sa_email"] = _try_get_sa_email_from_creds(creds)
-    else:
-        adc_creds, _ = google.auth.default(scopes=SHEETS_SCOPES)
-        gc = gspread.authorize(adc_creds)
-        _sheets_diag["mode"] = "adc"; _sheets_diag["sa_email"] = _try_get_sa_email_from_creds(adc_creds)
+def _init_sheets():
+    """Lijena inicijalizacija Sheets klijenta — mrežni poziv tek pri prvoj upotrebi,
+    ne pri importu (brži cold start, testovi bez mreže)."""
+    global sheet, _sheets_initialized
+    if _sheets_initialized:
+        return sheet
+    with _sheets_lock:
+        if _sheets_initialized:
+            return sheet
+        try:
+            gc = None
+            b64 = os.getenv("GOOGLE_SHEETS_CREDENTIALS_B64", "").strip()
+            if b64:
+                info  = json.loads(base64.b64decode(b64).decode("utf-8"))
+                creds = SACreds.from_service_account_info(info, scopes=SHEETS_SCOPES)
+                gc = gspread.authorize(creds)
+                _sheets_diag["mode"] = "b64"; _sheets_diag["sa_email"] = info.get("client_email")
+            elif os.path.exists("credentials.json"):
+                creds = SACreds.from_service_account_file("credentials.json", scopes=SHEETS_SCOPES)
+                gc = gspread.authorize(creds)
+                _sheets_diag["mode"] = "file"; _sheets_diag["sa_email"] = _try_get_sa_email_from_creds(creds)
+            elif LOCAL_MODE:
+                raise RuntimeError("LOCAL_MODE: Sheets isključen (nema eksplicitnih kredencijala).")
+            else:
+                adc_creds, _ = google.auth.default(scopes=SHEETS_SCOPES)
+                gc = gspread.authorize(adc_creds)
+                _sheets_diag["mode"] = "adc"; _sheets_diag["sa_email"] = _try_get_sa_email_from_creds(adc_creds)
 
-    if not GSHEET_ID and not GSHEET_NAME:
-        raise RuntimeError("GSHEET_ID ili GSHEET_NAME moraju biti postavljeni.")
-    ss = gc.open_by_key(GSHEET_ID) if GSHEET_ID else gc.open(GSHEET_NAME)
-    try: ws = ss.sheet1
-    except Exception: ws = ss.get_worksheet(0)
-    sheet = ws
-    _sheets_diag.update({
-        "enabled": True,
-        "spreadsheet_title": getattr(ss, "title", None),
-        "spreadsheet_id": getattr(ss, "id", None),
-        "worksheet_title": getattr(ws, "title", None),
-    })
-except Exception as e:
-    _sheets_diag["error"] = str(e); sheet = None
+            if not GSHEET_ID and not GSHEET_NAME:
+                raise RuntimeError("GSHEET_ID ili GSHEET_NAME moraju biti postavljeni.")
+            ss = gc.open_by_key(GSHEET_ID) if GSHEET_ID else gc.open(GSHEET_NAME)
+            try: ws = ss.sheet1
+            except Exception: ws = ss.get_worksheet(0)
+            sheet = ws
+            _sheets_diag.update({
+                "enabled": True,
+                "spreadsheet_title": getattr(ss, "title", None),
+                "spreadsheet_id": getattr(ss, "id", None),
+                "worksheet_title": getattr(ws, "title", None),
+            })
+        except Exception as e:
+            _sheets_diag["error"] = str(e); sheet = None
+            log.warning("Sheets inicijalizacija nije uspjela: %s", e)
+        _sheets_initialized = True
+    return sheet
 
 def sheets_append_row_safe(values):
-    if not sheet: return False
+    ws = _init_sheets()
+    if not ws: return False
     try:
-        sheet.append_row(values, value_input_option="USER_ENTERED"); return True
-    except Exception:
+        ws.append_row(values, value_input_option="USER_ENTERED"); return True
+    except Exception as e:
+        log.warning("Sheets append nije uspio: %s", e)
         return False
+
+SHEETS_ASYNC_LOG = os.getenv("SHEETS_ASYNC_LOG", "1") == "1"
 
 def log_to_sheet(job_id, razred, user_text, odgovor_html, source_tag, model_name):
     ts = datetime.datetime.utcnow().isoformat()
-    sheets_append_row_safe([ts, razred, user_text, odgovor_html, f"{source_tag}|{model_name}", job_id])
+    row = [ts, razred, user_text, odgovor_html, f"{source_tag}|{model_name}", job_id]
+    if SHEETS_ASYNC_LOG:
+        # van hot patha — upis u Sheet zna trajati i 0.5s+
+        threading.Thread(target=sheets_append_row_safe, args=(row,), daemon=True).start()
+    else:
+        sheets_append_row_safe(row)
 
 # --- GCS & Firestore ---
 GCS_BUCKET = (os.getenv("GCS_BUCKET") or "").strip()
@@ -206,8 +291,14 @@ JOB_STORE = {}
 if USE_FIRESTORE and fs_lib is not None:
     try:
         fs_db = fs_lib.Client(project=os.getenv("GOOGLE_CLOUD_PROJECT") or None)
-    except Exception:
+    except Exception as e:
         fs_db = None
+        log.warning("Firestore klijent nije inicijalizovan: %s", e)
+
+log.info("Job store: %s", "firestore" if fs_db else "in-memory dict")
+if fs_db is None and not LOCAL_MODE:
+    log.warning("Job store je in-memory, a LOCAL_MODE nije aktivan — kod više Cloud Run "
+                "instanci polling /status može promašiti instancu i job ostaje 'pending'.")
 
 def store_job(job_id: str, data: dict, merge: bool = True):
     if fs_db:
@@ -223,412 +314,21 @@ def read_job(job_id: str) -> dict:
 
 
 
-# =========================
-# PROMPT CONFIG — SECTIONED (kao tvoj kod)
-# =========================
+# Prompt sekcije (čisti tekst, bez logike) izdvojene su u prompts.py:
+from prompts import build_system_prompt, DOZVOLJENI_RAZREDI
 
-ULOGA = (
-    "TI SI:\n"
-    "Asistent za matematiku za osnovnu školu u Bosni i Hercegovini (5–9. razred).\n"
+# Parsiranje broja zadatka izdvojeno je u task_parsing.py.
+from task_parsing import extract_requested_tasks, requested_clause, FOLLOWUP_TASK_RE
+
+# Rendering izlaza modela + detekcija grafova izdvojeni su u rendering.py.
+# (latexify_fractions / strip_ascii_graph_blocks koristi render_model_html; re-export radi testova.)
+from rendering import (
+    latexify_fractions, strip_ascii_graph_blocks, render_model_html,
+    add_plot_div_once, should_plot, extract_plot_expression,
 )
 
-OPSTA_OGRANICENJA = (
-    "OPŠTA OGRANIČENJA:\n"
-    "- STRIKTNO odgovaraj ISKLJUČIVO na zadatke i pitanja iz matematike za osnovnu školu.\n"
-    "- Ako korisnik postavi pitanje van matematike, odgovori TAČNO:\n"
-    '  "Postavi mi pitanje ili zadatak iz matematike."\n'
-    "- Stil mora biti školski, pedagoški ispravan, jasan i u skladu sa NPP BiH.\n"
-    "- Rješenja moraju izgledati kao u svesci ili udžbeniku.\n"
-)
-
-VIZUELNI_ZAPIS_PRAVA_MATEMATIKA = (
-    "==================================================\n"
-    "VIZUELNI ZAPIS (PRAVA MATEMATIKA)\n"
-    "==================================================\n"
-    "- SVE matematičke izraze i razlomke OBAVEZNO piši unutar dvostrukih znakova dolara ($$).\n"
-    "- Za razlomke koristi isključivo: $$\\frac{brojnik}{nazivnik}$$\n"
-    "- Mješoviti brojevi: cijeli broj piši ispred razlomka, npr. $$2\\frac{1}{3}$$\n"
-    "- ZABRANJENO: Pisanje koda \\frac bez $$ znakova.\n"
-    "- ZABRANJENO: Pisanje kose crte (/) za razlomke.\n"
-    "- Množenje unutar $$ zapisuj kao \\cdot (npr. $$2 \\cdot x$$).\n"
-)
-
-DIJELJENJE_DECIMALNIH_BROJEVA = (
-    "==================================================\n"
-    "DIJELJENJE DECIMALNIH BROJEVA\n"
-    "==================================================\n"
-    "1. DJELILAC JE CIJELI BROJ: Dijeli normalno. Čim završiš dijeljenje cijelog dijela djeljenika, "
-    "odmah u količniku napiši zarez (,) i nastavi dijeljenje decimala.\n"
-    "2. DJELILAC JE DECIMALNI BROJ: Prvo izvrši proširivanje oba broja potrebnom dekadskom jedinicom "
-    "(10, 100, 1000...) tako da djelilac postane cijeli broj. Djeljenik ne mora postati cijeli broj.\n"
-)
-
-JEDNACINE_NEJEDNACINE_5_6 = (
-    "==================================================\n"
-    "JEDNAČINE I NEJEDNAČINE (5–6. razred)\n"
-    "==================================================\n"
-    "- Jednačine rješavaj ISKLJUČIVO prema mjestu gdje se nepoznata nalazi (metoda nepoznatog člana).\n"
-    "- ZABRANJENO je 'prebacivanje' članova preko znaka jednakosti.\n"
-    "\n"
-    "PRAVILA ZA JEDNAČINE:\n"
-    "- NEPOZNATI SABIRAK = ZBIR – POZNATI SABIRAK\n"
-    "- NEPOZNATI UMANJENIK = RAZLIKA + UMANJILAC\n"
-    "- NEPOZNATI UMANJILAC = UMANJENIK – RAZLIKA\n"
-    "- NEPOZNATI FAKTOR (ČINILAC) = PROIZVOD : POZNATI FAKTOR (ČINILAC)\n"
-    "- NEPOZNATI DJELJENIK = KOLIČNIK · DJELILAC\n"
-    "- NEPOZNATI DJELILAC = DJELJENIK : KOLIČNIK\n"
-    "\n"
-    "PRAVILA ZA NEJEDNAČINE:\n"
-    "- Postupak je isti kao kod jednačina (metoda nepoznatog člana).\n"
-    "- Ako je nepoznata na mjestu UMANJIOCA (a - x < b) ili DJELIOCA (a : x < b),\n"
-    "  znak nejednakosti se MIJENJA ODMAH u prvom koraku.\n"
-)
-
-JEDNACINE_NEJEDNACINE_7_9 = (
-    "==================================================\n"
-    "JEDNAČINE I NEJEDNAČINE (7–9. razred)\n"
-    "==================================================\n"
-    "- Jednačine i nejednačine rješavaj prebacivanjem:\n"
-    "  - nepoznate na lijevu stranu,\n"
-    "  - brojeve na desnu stranu.\n"
-    "- Brojevi i nepoznati koji prelaze na drugu stranu MIJENJAJU PREDZNAK (+ u −, − u +).\n"
-    "- Dozvoljeno množenje/dijeljenje cijele jednačine/nejednačine istim brojem (npr. 6x = 4 | :2).\n"
-    "- Kod nejednačina: znak nejednakosti se MIJENJA SAMO ako se cijela nejednačina\n"
-    "  množi ili dijeli NEGATIVNIM brojem.\n"
-    "- Koristi izraz: 'znak nejednakosti' (ne piši 'smjer nejednakosti').\n"
-)
-
-JEDNACINE_NEJEDNACINE_LOGIKA_I_METODOLOGIJA = (
-    "==================================================\n"
-    "JEDNAČINE I NEJEDNAČINE - LOGIKA I METODOLOGIJA\n"
-    "==================================================\n"
-    "- Pravila zavise od razreda (5–6: nepoznati član; 7–9: prebacivanje).\n"
-)
-
-TERMINOLOGIJA_I_JEZIK = (
-    "==================================================\n"
-    "TERMINOLOGIJA I JEZIK\n"
-    "==================================================\n"
-    "1. Zabranjen izraz:\n"
-    "- Nikada ne koristi riječ 'kutomer'. Taj izraz je nepravilan.\n"
-    "\n"
-    "2. Obavezan izraz:\n"
-    "- Umjesto 'kutomer', isključivo koristi riječ 'uglomjer'.\n"
-    "\n"
-    "3. Dvostruki nazivi:\n"
-    "- Za lenjir uvijek koristi oba naziva u formatu: linijar (lenjir).\n"
-    "- Kod mnogouglova koristi oba naziva: tjeme (vrh).\n"
-)
-
-
-GLOBALNA_PRAVILA_ZAPISA = (
-    "==================================================\n"
-    "GLOBALNA PRAVILA ZAPISA (VAŽE ZA SVE RAZREDE)\n"
-    "==================================================\n"
-    "1. MJEŠOVITI BROJEVI:\n"
-    "- Mješoviti broj se piše BEZ riječi „i“.\n"
-    "  Ispravno: 2 1/3\n"
-    "  Pogrešno: 2 i 1/3\n"
-    "\n"
-    "2. RAZLOMCI:\n"
-    "- Razlomke zapisuj sa vizuelnom razlomačkom crtom (kao u udžbeniku/svesci).\n"
-    "- ZABRANJENO je koristiti znak '/' umjesto razlomačke crte.\n"
-    "\n"
-    "3. STEPENOVANJE:\n"
-    "- Stepen se piše školski: x², a³, (2x)²\n"
-    "- ZABRANJENO: koristiti znak ^\n"
-    "\n"
-    "4. KORIJEN:\n"
-    "- Korijen se piše ISKLJUČIVO sa znakom √\n"
-    "- ZABRANJENO: koristiti 'sqrt'\n"
-    "- Djelomično korjenovanje mora biti prikazano korak po korak:\n"
-    "  √20 = √(4 · 5)\n"
-    "  √20 = √4 · √5\n"
-    "  √20 = 2√5\n"
-    "\n"
-    "5. VIZUELNI ZAPIS:\n"
-    "- Svaki logički korak ide u NOVI RED.\n"
-    "- Između različitih faza rješenja ostavi jedan prazan red.\n"
-    "- Razmake koristi tako da zapis bude pregledan i „školski“.\n"
-    "\n"
-    "6. TERMINOLOGIJA:\n"
-    "- Jednako koristi: 'Jednakokraki trougao', 'Zbir', 'Stepenovanje'\n"
-    "- Zabranjeno: jednakokračni, zbrojili, suma, potenciranje\n"
-    "\n"
-    "7. OPŠTA MATEMATIČKA NOTACIJA:\n"
-    "- Decimalni separator je ZAREZ (,), nikad tačka.\n"
-    "- Množenje: tačka (·)\n"
-    "- Dijeljenje: dvotačka (:)\n"
-    "- Zabranjeni znakovi: *, /\n"
-    "- GEOMETRIJA:\n"
-    "  - Unutrašnji uglovi: α, β, γ, δ.\n"
-    "  - Vanjski uglovi: α₁, β₁, γ₁, δ₁ (obavezno indeks 1)\n"
-    "  - Jednakokraki trougao: krakovi su b, osnovica je a\n"
-    "\n"
-    "8. KOORDINATNA GEOMETRIJA:\n"
-    "- RASTOJANJE TAČAKA: koristi (x₂ - x₁) i (y₂ - y₁), ZABRANJENO Δx i Δy.\n"
-    "- SREDIŠTE DUŽI: koordinate središta označavaj sa xₛ i yₛ (subscript malo 's').\n"
-    "\n"
-    "9. DIJELJENJE DECIMALNIH:\n"
-    "- Ako je djelilac decimalni broj, OBAVEZNO prvo prikaži proširivanje:\n"
-    "  npr. 12,5 : 0,5 = (12,5 · 10) : (0,5 · 10) = 125 : 5 = 25\n"
-)
-
-GLOBALNA_PRAVILA_ZAPISA_ZA_JEDNACINE = (
-    "==================================================\n"
-    "GLOBALNA PRAVILA ZAPISA ZA JEDNAČINE\n"
-    "==================================================\n"
-
-    "ZA 5. I 6. RAZRED:\n"
-    "- Zabranjeno prebacivanje članova.\n"
-    "- Rješavanje samo preko veza operacija.\n"
-    "- Kod nejednačina sa nepoznatim umanjiocem ili djeliteljem znak se okreće odmah.\n"
-
-    "\n"
-    "ZA 7–9. RAZRED:\n"
-    "- Jednačine i nejednačine rješavaj prebacivanjem.\n"
-    "- Nepoznate na jednu stranu, brojeve na drugu.\n"
-    "- Svaki član koji prelazi mijenja predznak.\n"
-    "- Dozvoljeno množenje/dijeljenje cijele jednačine ili nejednačine istim brojem.\n"
-    "- Znak nejednakosti se okreće SAMO kod množenja ili dijeljenja negativnim brojem.\n"
-
-    "\n"
-    "- Znak '=' koristi se samo između lijeve i desne strane.\n"
-)
-
-
-JEDNACINE_NEJEDNACINE_FORMAT = (
-    "==================================================\n"
-    "JEDNAČINE I NEJEDNACINE – FORMAT\n"
-    "==================================================\n"
-    "- Svaka transformacija jednačine ide u NOVI RED.\n"
-    "- ZABRANJENO:\n"
-    "  - '=' na početku reda\n"
-    "  - '=' u opisnom tekstu\n"
-    "  - '=' u istom redu sa znakom nejednakosti\n"
-    "\n"
-    "Ispravno:\n"
-    "2x < 5 - 1\n"
-    "2x < 4\n"
-)
-
-RAZREDNA_PRAVILA = {
-    "5": (
-        "==================================================\n"
-        "RAZREDNA PRAVILA — 5. RAZRED\n"
-        "==================================================\n"
-        "- Skup N₀ (prirodni brojevi i nula).\n"
-        "- Rezultati ne smiju biti negativni.\n"
-        "- Jednačine rješavaj ISKLJUČIVO preko veza operacija.\n"
-        "- ZABRANJENO: negativni brojevi u bilo kojem obliku.\n"
-    ),
-    "6": (
-        "==================================================\n"
-        "RAZREDNA PRAVILA — 6. RAZRED\n"
-        "==================================================\n"
-        "- Skup Z (cijeli brojevi).\n"
-        "- Jednačine rješavaj preko veza operacija.\n"
-        "- ZABRANJENO: množenje ili dijeljenje cijele jednačine negativnim brojem.\n"
-        "- NZD i NZS: isključivo zajedničko rastavljanje uz vertikalnu crtu (|).\n"
-    ),
-    "7": (
-        "==================================================\n"
-        "RAZREDNA PRAVILA — 7. RAZRED\n"
-        "==================================================\n"
-        "- Dozvoljeno prebacivanje članova uz promjenu znaka.\n"
-    ),
-    "8": (
-        "==================================================\n"
-        "RAZREDNA PRAVILA — 8. RAZRED\n"
-        "==================================================\n"
-        "- Pitagorina teorema, proporcije, procentni račun.\n"
-        "- Proporcije: metoda strelica.\n"
-    ),
-    "9": (
-        "==================================================\n"
-        "RAZREDNA PRAVILA — 9. RAZRED\n"
-        "==================================================\n"
-        "- Funkcije, polinomi, sistemi jednačina.\n"
-        "- Koordinatna geometrija: koristi xₛ, yₛ; ne koristi Δx, Δy.\n"
-    ),
-}
-
-SISTEMI_LINEARNIH_JEDNACINA = (
-    "==================================================\n"
-    "SISTEMI LINEARNIH JEDNAČINA\n"
-    "==================================================\n"
-    "- 6–8: ISKLJUČIVO supstitucija.\n"
-    "- 9: najjednostavnija metoda; Gaus dozvoljen.\n"
-)
-
-LINEARNA_FUNKCIJA = (
-    "==================================================\n"
-    "LINEARNA FUNKCIJA (8. i 9. RAZRED)\n"
-    "==================================================\n"
-    "- y = kx + n\n"
-)
-
-UGLOVI = (
-    "==================================================\n"
-    "UGLOVI\n"
-    "==================================================\n"
-    "- Zabranjeni decimalni uglovi.\n"
-    "- Koristi ° ' ''\n"
-)
-
-OPERACIJE_SA_RAZLOMCIMA = (
-    "==================================================\n"
-    "OPERACIJE SA RAZLOMCIMA\n"
-    "==================================================\n"
-    "- Mješovite brojeve pretvori u neprave prije računanja.\n"
-)
-
-RAZNE_ZABRANE_I_KONTROLA = (
-    "==================================================\n"
-    "RAZNE ZABRANE I KONTROLA\n"
-    "==================================================\n"
-    "- ZABRANJENO: sin, cos, tg, log, *, decimalni uglovi\n"
-    "- ZABRANJENO: sqrt, ^\n"
-    "- ZABRANJENO: odgovaranje na bilo šta što nije matematika\n"
-)
-
-GEOMETRIJSKE_KONSTRUKCIJE = (
-    "==================================================\n"
-    "UNIVERZALNI GEOMETRIJSKI PROMPT (KONSTRUKCIJE)\n"
-    "==================================================\n"
-    "Kada korisnik postavi zadatak koji zahtijeva geometrijsku konstrukciju trouglom, "
-    "linijarom i šestarom, pridržavaj se sljedećih pravila:\n"
-    "\n"
-    "Bez vizuelnih skica:\n"
-    "- Nemoj koristiti ASCII art ili LaTeX.\n"
-    "- Sav fokus stavi na precizan, tekstualni opis postupka.\n"
-    "\n"
-    "Uloga:\n"
-    "- Ti si pedantan nastavnik matematike koji objašnjava učeniku "
-    "kako da koristi pribor korak-po-korak.\n"
-    "\n"
-    "Pravila simbola:\n"
-    "- Koristi običan tekst (tačka A', prava s, duž AB, ugao od 60 stepeni).\n"
-    "\n"
-    "Smjer uglova kod rotacije (Standard):\n"
-    "- Pozitivan (+) = rotacija suprotno od kazaljke na satu.\n"
-    "- Negativan (-) = rotacija u smjeru kazaljke na satu.\n"
-    "\n"
-    "STRUKTURA ODGOVORA (OBAVEZNA):\n"
-    "ANALIZA – šta je dato i šta treba dobiti.\n"
-    "POTREBAN PRIBOR – lista pribora.\n"
-    "POSTUPAK KONSTRUKCIJE – numerisani koraci.\n"
-    "PROVJERA – kako provjeriti tačnost.\n"
-    "\n"
-    "Specijalni savjeti za pribor:\n"
-    "- Za translaciju i paralele objasni klizanje jednog trougla niz drugi.\n"
-    "- Za osnu simetriju i normale koristi ivicu trougla za pravi ugao (90 stepeni).\n"
-)
-
-
-DOZVOLJENI_RAZREDI = set(RAZREDNA_PRAVILA.keys())
-
-def build_system_prompt(razred: str, user_text: str = "") -> str:
-    r = razred if razred in RAZREDNA_PRAVILA else "5"
-
-    
-    eq_rules = JEDNACINE_NEJEDNACINE_5_6 if r in ("5", "6") else JEDNACINE_NEJEDNACINE_7_9
-
-    parts = [
-        ULOGA,
-        OPSTA_OGRANICENJA,
-        VIZUELNI_ZAPIS_PRAVA_MATEMATIKA,
-        DIJELJENJE_DECIMALNIH_BROJEVA,
-        eq_rules,
-        GLOBALNA_PRAVILA_ZAPISA,
-        GLOBALNA_PRAVILA_ZAPISA_ZA_JEDNACINE,
-        JEDNACINE_NEJEDNACINE_FORMAT,
-        RAZREDNA_PRAVILA[r],
-        SISTEMI_LINEARNIH_JEDNACINA,
-        LINEARNA_FUNKCIJA,
-        UGLOVI,
-        OPERACIJE_SA_RAZLOMCIMA,
-        RAZNE_ZABRANE_I_KONTROLA,
-        TERMINOLOGIJA_I_JEZIK,
-        GEOMETRIJSKE_KONSTRUKCIJE
-
-    ]
-    return "\n".join(parts).strip()
-
-
-
-
-
-
-
-
-
-ORDINAL_WORDS = {
-    "prvi": 1, "drugi": 2, "treći": 3, "treci": 3, "četvrti": 4, "cetvrti": 4,
-    "peti": 5, "šesti": 6, "sesti": 6, "sedmi": 7, "osmi": 8, "deveti": 9, "deseti": 10,
-    "zadnji": -1, "posljednji": -1
-}
-_task_num_re = re.compile(
-    r"(?:zadatak\s*(?:broj\s*)?(\d{1,4}))|(?:\b(\d{1,4})\s*\.)|(?:\b(" + "|".join(ORDINAL_WORDS.keys()) + r")\b)",
-    flags=re.IGNORECASE
-)
-FOLLOWUP_TASK_RE = re.compile(r"^\s*\d{2,5}\s*[a-z]\)?\s*$", re.IGNORECASE)
-
-def extract_requested_tasks(text: str):
-    if not text: return []
-    tasks = []
-    for m in _task_num_re.finditer(text):
-        if m.group(1): tasks.append(int(m.group(1)))
-        elif m.group(2): tasks.append(int(m.group(2)))
-        elif m.group(3): tasks.append(ORDINAL_WORDS.get(m.group(3).lower()))
-    out, seen = [], set()
-    for n in tasks:
-        if n not in seen: out.append(n); seen.add(n)
-    return out
-
-def latexify_fractions(text):
-    def zamijeni(m):
-        return f"\\(\\frac{{{m.group(1)}}}{{{m.group(2)}}}\\)"
-    return re.sub(r'\b(\d{1,4})/(\d{1,4})\b', zamijeni, text)
-
-def add_plot_div_once(odgovor_html: str, expression: str) -> str:
-    marker = f'class="plot-request"'
-    expr_attr = f'data-expression="{html.escape(expression)}"'
-    if (marker in odgovor_html) and (expr_attr in odgovor_html): return odgovor_html
-    return odgovor_html + f'<div class="plot-request" data-expression="{html.escape(expression)}"></div>'
-
-TRIGGER_PHRASES = [r"\bnacrtaj\b", r"\bnacrtati\b", r"\bcrtaj\b", r"\biscrtaj\b", r"\bskiciraj\b", r"\bgraf\b", r"\bgrafik\b", r"\bprika[žz]i\s+graf\b", r"\bplot\b", r"\bvizualizuj\b", r"\bnasrtaj\b"]
-NEGATION_PHRASES = [r"\bbez\s+grafa\b", r"\bne\s+crt(a|aj)\b", r"\bnemoj\s+crtati\b", r"\bne\s+treba\s+graf\b"]
-_trigger_re  = re.compile("|".join(TRIGGER_PHRASES), flags=re.IGNORECASE)
-_negation_re = re.compile("|".join(NEGATION_PHRASES), flags=re.IGNORECASE)
-
-def should_plot(text: str) -> bool:
-    if not text: return False
-    if _negation_re.search(text): return False
-    return _trigger_re.search(text) is not None
-
-_FUNC_PAT = re.compile(r"(?:y\s*=\s*[^;,\n]+)|(?:[fFgG]\s*\(\s*x\s*\)\s*=\s*[^;,\n]+)", flags=re.IGNORECASE)
-def extract_plot_expression(user_text: str, razred: str = "", history=None) -> str | None:
-    if not user_text: return None
-    m = _FUNC_PAT.search(user_text)
-    if m:
-        expr = re.sub(r"\s+", " ", m.group(0).strip())
-        return expr
-    return None
-
-def _short_name_for_display(name: str, maxlen: int = 60) -> str:
-    n = os.path.basename(name or "").strip() or "nepoznato"
-    if len(n) > maxlen:
-        n = n[:maxlen-3] + "..."
-    return html.escape(n)
-
-def _name_from_url(u: str) -> str:
-    try:
-        p = urlparse(u)
-        base = os.path.basename(p.path) or ""
-        return _short_name_for_display(base if base else u.split("?")[0].split("/")[-1] or u)
-    except Exception:
-        return _short_name_for_display(u)
+# Sitne čiste pomoćne funkcije izdvojene su u utils.py.
+from utils import _short_name_for_display, _name_from_url, _sniff_image_mime, _bytes_to_data_url
 
 def _openai_chat(model: str, messages: list, timeout: float = None, max_tokens: int | None = None, fast: bool = False):
 
@@ -651,36 +351,20 @@ def _openai_chat(model: str, messages: list, timeout: float = None, max_tokens: 
             return _do(params)
         raise
 
-def strip_ascii_graph_blocks(text: str) -> str:
-    fence = re.compile(r"```([\s\S]*?)```", flags=re.MULTILINE)
-    def looks_like_ascii_graph(block: str) -> bool:
-        sample = block.strip()
-        if len(sample) == 0: return False
-        allowed = set(" \t\r\n-_|*^><().,/\\0123456789xyXY")
-        ratio_allowed = sum(c in allowed for c in sample) / len(sample)
-        lines = sample.splitlines()
-        return (ratio_allowed > 0.9) and (3 <= len(lines) <= 40)
-    def repl(m):
-        block = m.group(1)
-        return "" if looks_like_ascii_graph(block) else m.group(0)
-    graf_re = re.compile(r"(Grafički prikaz.*?:\s*)?```[\s\S]*?```", re.IGNORECASE)
-    text = graf_re.sub(lambda m: "" if "```" in m.group(0) else m.group(0), text)
-    return fence.sub(repl, text)
+# Historija razgovora (sanitizacija + gradnja poruka) izdvojena je u history.py.
+from history import (
+    HISTORY_MAX_TURNS, HISTORY_MAX_CHARS, HISTORY_CONTEXT_TURNS,
+    strip_html_to_text, sanitize_history, _append_history_messages,
+)
 
 def answer_with_text_pipeline(pure_text: str, razred: str, history, requested, timeout_override: float | None = None, prof=None, fast: bool = False):
-    only_clause = ""
-    if requested:
-        only_clause = " Riješi ISKLJUČIVO sljedeće zadatke: " + ", ".join(map(str, requested)) + ". Ostale ignoriraj."
     system_message = {
-  "role": "system",
-  "content": build_system_prompt(razred, pure_text) + only_clause
-}
+        "role": "system",
+        "content": build_system_prompt(razred) + requested_clause(requested)
+    }
 
     messages = [system_message]
-    # koristi zadnjih 5 izmjena iz historije
-    for msg in history[-2:]:
-        messages.append({"role":"user","content": msg["user"]})
-        messages.append({"role":"assistant","content": msg["bot"]})
+    _append_history_messages(messages, history)
     messages.append({"role":"user","content": pure_text})
     if prof: prof.mark("openai_text_start")
     response = _openai_chat(MODEL_TEXT, messages, timeout=timeout_override or OPENAI_TIMEOUT, fast=fast)
@@ -690,39 +374,14 @@ def answer_with_text_pipeline(pure_text: str, razred: str, history, requested, t
         prof.set("openai_text_model", actual_model)
 
     raw = response.choices[0].message.content
-    raw = strip_ascii_graph_blocks(raw)
-    html_out = "<p>" + latexify_fractions(html.escape(raw)).replace("\n", "<br>") + "</p>"
+    html_out = render_model_html(raw)
     return html_out, actual_model
 
-def _vision_messages_base(razred: str, history, only_clause: str, user_text: str = ""):
-    system_message = {
-        "role": "system",
-        "content": build_system_prompt(razred, user_text or "") + " " + only_clause
-    }
+def _vision_messages_base(razred: str, history):
+    system_message = {"role": "system", "content": build_system_prompt(razred)}
     messages = [system_message]
-    for msg in history[-5:]:
-        messages.append({"role": "user", "content": msg["user"]})
-        messages.append({"role": "assistant", "content": msg["bot"]})
+    _append_history_messages(messages, history)
     return messages
-
-
-def _vision_clauses():
-    return "", " Radi tačno i oprezno. Ako nešto nedostaje, navedi šta nedostaje i stani."
-
-def _sniff_image_mime(raw: bytes) -> str:
-    if len(raw) >= 12:
-        if raw.startswith(b"\x89PNG\r\n\x1a\n"): return "image/png"
-        if raw[:3] == b"\xff\xd8\xff": return "image/jpeg"
-        if raw.startswith(b"GIF87a") or raw.startswith(b"GIF89a"): return "image/gif"
-        if raw.startswith(b"BM"): return "image/bmp"
-        if raw.startswith(b"II*\x00") or raw.startswith(b"MM\x00*"): return "image/tiff"
-        if raw.startswith(b"RIFF") and raw[8:12] == b"WEBP": return "image/webp"
-    return "image/jpeg"
-
-def _bytes_to_data_url(raw: bytes, mime_hint: str | None = None) -> str:
-    mime = mime_hint if (mime_hint and mime_hint.startswith("image/")) else _sniff_image_mime(raw)
-    b64 = base64.b64encode(raw).decode()
-    return f"data:{mime};base64,{b64}"
 
 def _heuristic_plain_text_image(img_bytes: bytes) -> bool:
     try:
@@ -766,6 +425,7 @@ def mathpix_ocr_to_text(img_bytes: bytes) -> tuple[str | None, float]:
         log.info("TIMING mathpix_post_ms=%.1f status=%s", (t1 - t0), r.status_code)
 
         if r.status_code != 200:
+            log.warning("Mathpix OCR vratio status %s", r.status_code)
             return (None, 0.0)
         j = r.json() or {}
         plain = (j.get("text") or "").strip()
@@ -779,28 +439,76 @@ def mathpix_ocr_to_text(img_bytes: bytes) -> tuple[str | None, float]:
                  .replace("—", "-")
         )
         return (plain, conf)
-    except Exception:
+    except Exception as e:
+        log.warning("Mathpix OCR nije uspio: %s", e)
         return (None, 0.0)
 
+# --- SSRF zaštita za image_url ---
+ALLOW_PRIVATE_IMAGE_URLS = os.getenv("ALLOW_PRIVATE_IMAGE_URLS", "0") == "1"
+IMAGE_FETCH_MAX_MB = int(os.getenv("IMAGE_FETCH_MAX_MB", "20"))
+_BLOCKED_HOSTNAMES = {"metadata.google.internal", "metadata", "localhost"}
+
+def is_safe_external_url(url: str) -> bool:
+    """Dozvoli samo http(s) prema javnim adresama; blokiraj loopback/privatne/link-local
+    i GCP metadata host. ALLOW_PRIVATE_IMAGE_URLS=1 isključuje provjeru (testovi/dev)."""
+    if ALLOW_PRIVATE_IMAGE_URLS:
+        return True
+    try:
+        p = urlparse(url or "")
+        if p.scheme not in ("http", "https"):
+            return False
+        host = (p.hostname or "").strip().lower()
+        if not host or host in _BLOCKED_HOSTNAMES:
+            return False
+        infos = socket.getaddrinfo(host, p.port or (443 if p.scheme == "https" else 80),
+                                   proto=socket.IPPROTO_TCP)
+        if not infos:
+            return False
+        for info in infos:
+            ip = ipaddress.ip_address(info[4][0])
+            if (ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved
+                    or ip.is_multicast or ip.is_unspecified):
+                return False
+        return True
+    except Exception:
+        return False
+
+def _fetch_image_bytes(image_url: str) -> tuple[bytes, str | None]:
+    """Preuzmi sliku uz limit veličine (streaming, bez učitavanja neograničenog tijela)."""
+    limit = IMAGE_FETCH_MAX_MB * 1024 * 1024
+    r = requests.get(image_url, timeout=15, stream=True)
+    r.raise_for_status()
+    mime_hint = r.headers.get("Content-Type") or None
+    cl = r.headers.get("Content-Length")
+    if cl and cl.isdigit() and int(cl) > limit:
+        raise ValueError(f"slika veća od {IMAGE_FETCH_MAX_MB} MB")
+    chunks, total = [], 0
+    for chunk in r.iter_content(64 * 1024):
+        total += len(chunk)
+        if total > limit:
+            raise ValueError(f"slika veća od {IMAGE_FETCH_MAX_MB} MB")
+        chunks.append(chunk)
+    return b"".join(chunks), mime_hint
+
 def route_image_flow_url(image_url: str, razred: str, history, user_text=None, timeout_override: float | None = None):
-    only_clause, strict_geom_policy = _vision_clauses()
+    if not is_safe_external_url(image_url):
+        log.warning("route_image_flow_url: blokiran nedozvoljen URL: %r", image_url)
+        return ("<p><b>Link slike nije prihvaćen.</b> Pošalji sliku kao prilog (upload) "
+                "ili koristi javni https link.</p>", "blocked_url", "n/a")
     try:
         t0 = _ms()
-        r = requests.get(image_url, timeout=15)
+        img_bytes, mime_hint = _fetch_image_bytes(image_url)
         t1 = _ms()
         log.info("TIMING image_download_ms=%.1f", (t1 - t0))
-
-        r.raise_for_status()
-        mime_hint = r.headers.get("Content-Type") or None
         return route_image_flow(
-            r.content, razred, history,
+            img_bytes, razred, history,
             user_text=user_text,
             timeout_override=timeout_override,
             mime_hint=mime_hint
         )
     except Exception as e:
-        log.error("route_image_flow_url: download failed: %s", e)
-    messages = _vision_messages_base(razred, history, only_clause, user_text or "")
+        log.warning("route_image_flow_url: download nije uspio (%s), šaljem URL direktno Vision-u", e)
+    messages = _vision_messages_base(razred, history)
     user_content = []
     if user_text:
         user_content.append({"type": "text", "text": f"Korisnički tekst: {user_text}"})
@@ -810,8 +518,7 @@ def route_image_flow_url(image_url: str, razred: str, history, user_text=None, t
     resp = _openai_chat(MODEL_VISION, messages, timeout=timeout_override or OPENAI_TIMEOUT)
     actual_model = getattr(resp, "model", MODEL_VISION)
     raw = resp.choices[0].message.content
-    raw = strip_ascii_graph_blocks(raw)
-    return f"<p>{latexify_fractions(raw)}</p>", "vision_url", actual_model
+    return render_model_html(raw), "vision_url", actual_model
 
 def route_image_flow(slika_bytes: bytes, razred: str, history, user_text=None, timeout_override: float | None = None, mime_hint: str | None = None):
     # Try Mathpix first if mode prefers/forces it, OR if heuristika prepoznaje plain-tekst
@@ -826,12 +533,11 @@ def route_image_flow(slika_bytes: bytes, razred: str, history, user_text=None, t
                     timeout_override=timeout_override or OPENAI_TIMEOUT
                 )
                 return html_out, "mathpix", actual_model
-            except Exception:
-                pass
+            except Exception as e:
+                log.warning("Mathpix→tekst pipeline nije uspio, fallback na Vision: %s", e)
         # ako je mode == "force" a Mathpix nije dao tekst, ipak fallback na Vision radi robusnosti
     # fallback → Vision
-    only_clause, strict_geom_policy = _vision_clauses()
-    messages = _vision_messages_base(razred, history, only_clause, user_text or "")
+    messages = _vision_messages_base(razred, history)
     data_url = _bytes_to_data_url(slika_bytes, mime_hint=mime_hint)
     user_content = []
     if user_text: user_content.append({"type": "text", "text": f"Korisnički tekst: {user_text}"})
@@ -841,18 +547,22 @@ def route_image_flow(slika_bytes: bytes, razred: str, history, user_text=None, t
     resp = _openai_chat(MODEL_VISION, messages, timeout=timeout_override or OPENAI_TIMEOUT)
     actual_model = getattr(resp, "model", MODEL_VISION)
     raw = resp.choices[0].message.content
-    raw = strip_ascii_graph_blocks(raw)
-    return f"<p>{latexify_fractions(raw)}</p>", "vision_direct", actual_model
+    return render_model_html(raw), "vision_direct", actual_model
 
 
 def get_history_from_request():
+    """Pročitaj i sanitizuj historiju koju šalje klijent (form polje ili JSON tijelo)."""
     try:
         hx = request.form.get("history_json")
+        if not hx:
+            data_json = request.get_json(silent=True) or {}
+            hx = data_json.get("history_json") or data_json.get("history")
         if hx:
-            data = json.loads(hx)
-            if isinstance(data, list): return data
-    except Exception:
-        pass
+            data = json.loads(hx) if isinstance(hx, str) else hx
+            if isinstance(data, list):
+                return sanitize_history(data)
+    except Exception as e:
+        log.warning("history_json se ne može parsirati: %s", e)
     return None
 
 def gcs_upload_bytes(job_id: str, raw: bytes, filename_hint: str = "image.bin", content_type: str | None = None) -> str | None:
@@ -865,26 +575,8 @@ def gcs_upload_bytes(job_id: str, raw: bytes, filename_hint: str = "image.bin", 
     try:
         blob.upload_from_string(raw, content_type=content_type or "application/octet-stream")
         return blob_name
-    except Exception:
-        return None
-
-def gcs_upload_filestorage(f):
-    if not (storage_client and GCS_BUCKET):
-        return None
-    ext = os.path.splitext(f.filename or "")[1].lower() or ".jpg"
-    blob_name = f"uploads/{uuid4().hex}{ext}"
-    bucket = storage_client.bucket(GCS_BUCKET)
-    blob = bucket.blob(blob_name)
-    try:
-        f.stream.seek(0)
-        blob.upload_from_file(f.stream, content_type=f.mimetype or "application/octet-stream")
-        if GCS_SIGNED_GET:
-            url = blob.generate_signed_url(version="V4", expiration=datetime.timedelta(minutes=45), method="GET")
-        else:
-            try: blob.make_public(); url = blob.public_url
-            except Exception: url = blob.generate_signed_url(version="V4", expiration=datetime.timedelta(minutes=45), method="GET")
-        return url
-    except Exception:
+    except Exception as e:
+        log.warning("GCS upload nije uspio (%s): %s", blob_name, e)
         return None
 
 # ---------------- Web routes ----------------
@@ -921,6 +613,7 @@ def index():
                 body = slika.read()
                 odgovor, used_path, used_model = route_image_flow(body, razred, history, user_text=combined_text, timeout_override=HARD_TIMEOUT_S, mime_hint=slika.mimetype or None)
                 try:
+                    cleanup_stale_uploads()
                     ext = os.path.splitext(slika.filename or "")[1].lower() or ".img"
                     fname = f"{uuid4().hex}{ext}"
                     with open(os.path.join(UPLOAD_DIR, fname), "wb") as fp: fp.write(body)
@@ -990,19 +683,38 @@ def _healthz(): return {"ok": True}, 200
 @app.get("/_ah/health")
 def ah_health(): return "OK", 200
 
+# --- Dijagnostički endpointi: javno isključeni; pristup uz DIAG_TOKEN ili u LOCAL_MODE ---
+DIAG_TOKEN = (os.getenv("DIAG_TOKEN") or "").strip()
+
+def _diag_allowed() -> bool:
+    if LOCAL_MODE:
+        return True
+    return bool(DIAG_TOKEN) and request.headers.get("X-Diag-Token") == DIAG_TOKEN
+
 @app.get("/sheets/diag")
-def sheets_diag(): return jsonify(_sheets_diag), 200
+@limiter.limit(_diag_rate_limit)
+def sheets_diag():
+    if not _diag_allowed():
+        return jsonify({"error": "forbidden"}), 403
+    _init_sheets()
+    return jsonify(_sheets_diag), 200
 
 @app.post("/sheets/selftest")
+@limiter.limit(_diag_rate_limit)
 def sheets_selftest():
-    if not sheet:
+    if not _diag_allowed():
+        return jsonify({"error": "forbidden"}), 403
+    if not _init_sheets():
         return jsonify({"ok": False, "error": _sheets_diag.get("error") or "Sheets not initialized"}), 500
     row = [datetime.datetime.utcnow().isoformat(), "selftest", "Hello from /sheets/selftest", "<p>OK</p>", "selftest|none", f"self-{uuid4().hex[:8]}"]
     ok = sheets_append_row_safe(row); return jsonify({"ok": ok}), (200 if ok else 500)
 
 # --- Mathpix selftest (opcionalno) ---
 @app.get("/mathpix/selftest")
+@limiter.limit(_diag_rate_limit)
 def mathpix_selftest():
+    if not _diag_allowed():
+        return jsonify({"error": "forbidden"}), 403
     if not _mathpix_enabled():
         return jsonify({"ok": False, "reason": "no-keys"}), 400
     if not HAVE_PIL:
@@ -1034,7 +746,10 @@ def serve_upload(filename):
     return send_from_directory(UPLOAD_DIR, filename, as_attachment=False)
 
 @app.post("/gcs/signed-upload")
+@limiter.limit(_diag_rate_limit)
 def gcs_signed_upload():
+    if not _diag_allowed():
+        return jsonify({"error": "forbidden"}), 403
     if not storage_client or not GCS_BUCKET or LOCAL_MODE:
         return jsonify({"ok": False, "reason": "no-gcs"}), 200
     data = request.get_json(force=True, silent=True) or {}
@@ -1090,6 +805,13 @@ def _create_task_cloud(payload: dict):
 
 def _enqueue(payload: dict):
     if LOCAL_MODE or (not tasks_v2) or (not TASKS_TARGET_URL) or (not PROJECT_ID):
+        reason = ("LOCAL_MODE" if LOCAL_MODE else
+                  "tasks_v2 nije instaliran" if not tasks_v2 else
+                  "TASKS_TARGET_URL nije postavljen" if not TASKS_TARGET_URL else
+                  "PROJECT_ID nije postavljen")
+        if not LOCAL_MODE:
+            log.warning("_enqueue: Cloud Tasks nedostupan (%s) — job %s ide u lokalni thread "
+                        "(na Cloud Runu može biti CPU-throttlan).", reason, payload.get("job_id"))
         threading.Thread(target=_local_worker, daemon=True, args=(payload,)).start()
     else:
         _create_task_cloud(payload)
@@ -1104,7 +826,7 @@ def _process_job_core(payload: dict) -> dict:
     user_text  = (payload.get("user_text") or "").strip()
     requested  = payload.get("requested") or []
     if razred not in DOZVOLJENI_RAZREDI: razred = "5"
-    history = []
+    history = sanitize_history(payload.get("history") or [])
     task_ai_timeout = _budgeted_timeout(default=HARD_TIMEOUT_S, margin=5.0)
     if image_path:
         if not storage_client:
@@ -1121,6 +843,11 @@ def _process_job_core(payload: dict) -> dict:
     else:
         odgovor_html, used_model = answer_with_text_pipeline(user_text, razred, history, requested, timeout_override=task_ai_timeout)
         used_path = "text"
+    # graf radi i za async/slikovne odgovore (ranije samo u sync putanji)
+    if should_plot(user_text):
+        expr = extract_plot_expression(user_text, razred=razred, history=history)
+        if expr:
+            odgovor_html = add_plot_div_once(odgovor_html, expr)
     result = {"html": odgovor_html, "path": used_path, "model": used_model}
     return {
         "status": "done",
@@ -1150,63 +877,12 @@ def looks_heavy(user_text: str, has_image: bool) -> bool:
     toks = estimate_tokens(user_text or "")
     return has_image or toks > HEAVY_TOKEN_THRESHOLD
 
-import concurrent.futures as cf
 
-def _sync_process_once(
-    razred: str,
-    user_text: str,
-    requested: list,
-    image_url: str | None,
-    file_bytes: bytes | None,
-    file_mime: str | None,
-    timeout_s: float,
-    history: list | None = None,
-) -> dict:
-    if history is None:
-        history = []
-    else:
-        history = list(history)
-
-    def work():
-        if image_url:
-            html_out, used_path, used_model = route_image_flow_url(
-                image_url, razred, history, user_text=user_text, timeout_override=timeout_s
-            )
-            return {"html": html_out, "path": used_path, "model": used_model}
-
-        if file_bytes:
-            html_out, used_path, used_model = route_image_flow(
-                file_bytes, razred, history, user_text=user_text, timeout_override=timeout_s, mime_hint=file_mime or None
-            )
-            return {"html": html_out, "path": used_path, "model": used_model}
-
-        html_out, used_model = answer_with_text_pipeline(
-            user_text, razred, history, requested, timeout_override=timeout_s
-        )
-        return {"html": html_out, "path": "text", "model": used_model}
-
-    try:
-        with cf.ThreadPoolExecutor(max_workers=1) as ex:
-            fut = ex.submit(work)
-            result = fut.result(timeout=timeout_s)   # OVO MORA puknuti nakon timeout_s
-            return {"ok": True, "result": result}
-
-    except (cf.TimeoutError, TimeoutError):
-        # ne možeš ubiti thread, ali bar request mora izaći za ~timeout_s
-        return {"ok": False, "error": f"soft-timeout-{float(timeout_s)}s"}
-
-    except Exception as e:
-        return {"ok": False, "error": str(e)}
-
-
-
-
-
-def _prepare_async_payload(job_id: str, razred: str, user_text: str, requested: list, image_url: str | None, file_bytes: bytes | None, file_name: str | None, file_mime: str | None, image_b64_str: str | None) -> dict:
+def _prepare_async_payload(job_id: str, razred: str, user_text: str, requested: list, image_url: str | None, file_bytes: bytes | None, file_name: str | None, file_mime: str | None, image_b64_str: str | None, history: list | None = None) -> dict:
     payload = {
         "job_id": job_id, "razred": razred, "user_text": user_text, "requested": requested,
         "bucket": GCS_BUCKET, "image_path": None, "image_url": image_url or None,
-        "image_inline_b64": None,
+        "image_inline_b64": None, "history": sanitize_history(history or []),
     }
     if file_bytes:
         if not LOCAL_MODE and (storage_client and GCS_BUCKET):
@@ -1233,6 +909,7 @@ def _prepare_async_payload(job_id: str, razred: str, user_text: str, requested: 
 
 
 @app.route("/submit", methods=["POST", "OPTIONS"])
+@limiter.limit(_submit_rate_limit, exempt_when=lambda: request.method == "OPTIONS")
 def submit():
     debug = (request.args.get("debug") == "1") or (request.headers.get("X-Debug") == "1")
     prof = Prof() if debug else None
@@ -1286,10 +963,13 @@ def submit():
     if mode not in ("auto", "sync", "async"):
         mode = "auto"
 
-    # ---- API historija po sesiji (zadnja 3 pitanja/odgovora) ----
-    api_history = session.get("api_history", [])
-    if not isinstance(api_history, list):
-        api_history = []
+    # ---- Historija razgovora ----
+    # Primarni izvor: history_json koji šalje frontend (radi i u iframe-u, bez kolačića).
+    # Fallback: stara sesijska api_history (kompatibilnost sa starijim klijentima).
+    api_history = get_history_from_request()
+    if api_history is None:
+        _sess_hist = session.get("api_history", [])
+        api_history = sanitize_history(_sess_hist if isinstance(_sess_hist, list) else [])
 
     # --- 1) Čisti async mode ili heavy auto → odmah queue ---
     heavy = looks_heavy(user_text, has_image=has_image)
@@ -1316,6 +996,7 @@ def submit():
             file_name,
             file_mime,
             image_b64_str,
+            history=api_history,
         )
 
         try:
@@ -1351,8 +1032,13 @@ def submit():
             if expr:
                 html_out = add_plot_div_once(html_out, expr)
 
+        # Sesijska kopija je samo fallback za starije klijente: čisti tekst i kratko,
+        # jer session kolačić ima limit ~4KB (puni HTML ga je ranije tiho prepunjavao).
         api_history.append({"user": user_text, "bot": html_out})
-        session["api_history"] = api_history[-3:]
+        _sess_fallback = [{"user": (m.get("user") or "")[:300],
+                           "bot": strip_html_to_text(m.get("bot") or "")[:600]}
+                          for m in api_history[-3:]]
+        session["api_history"] = _sess_fallback
 
         try:
             log_to_sheet(f"sync-{uuid4().hex[:8]}", razred, user_text, html_out, "text", actual_model)
@@ -1395,6 +1081,7 @@ def submit():
         file_name,
         file_mime,
         image_b64_str,
+        history=api_history,
     )
     try:
         _enqueue(payload)

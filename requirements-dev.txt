@@ -1,0 +1,3 @@
+# Lokalni razvoj i testiranje (NE ide u produkcijski image)
+-r requirements.txt
+pytest>=8.0

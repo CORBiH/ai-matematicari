@@ -1,0 +1,68 @@
+# MAT-BOT — Implementirane promjene (lokalno, jun 2026)
+
+Sve promjene su lokalne; ništa nije deploy-ano niti je produkcija dirana.
+Verifikacija: `python -m py_compile app.py` + `pytest` (104 testa, svi prolaze,
+svi vanjski servisi mockirani).
+
+## app.py
+
+### Sigurnost
+| Promjena | Detalj | Rizik |
+|---|---|---|
+| Secret key | Čita `FLASK_SECRET_KEY` pa `SECRET_KEY`; ERROR log ako se koristi default van LOCAL_MODE | nizak |
+| XSS | Novi `render_model_html()` — JEDINO mjesto gdje output modela postaje HTML (escape → latexify → `<br>`); koriste ga tekstualni, Mathpix i oba Vision toka | nizak–srednji (slikovni odgovori sada renderuju newline kao `<br>`; vizuelno praktično isto) |
+| SSRF | `is_safe_external_url()` — samo http(s), blokira loopback/privatne/link-local/metadata adrese (uklj. DNS-rebinding provjeru preko `getaddrinfo`); `_fetch_image_bytes()` sa stream limitom `IMAGE_FETCH_MAX_MB` (20). Escape hatch: `ALLOW_PRIVATE_IMAGE_URLS=1` | nizak |
+| Upload limit | `MAX_CONTENT_LENGTH_MB` default 200 → **20** (env-podesivo) | nizak |
+| /tmp čišćenje | `cleanup_stale_uploads()` — briše fajlove starije od `UPLOAD_MAX_AGE_S` (3600s) pri svakom novom uploadu | nizak |
+| Rate limiting | `flask-limiter` (već u requirements): `/submit` → `RATE_LIMIT_SUBMIT` (default "30 per minute" po IP-u iz X-Forwarded-For); diag endpointi → `RATE_LIMIT_DIAG`; isključivo: `RATE_LIMIT_ENABLED=0`; 429 vraća JSON sa bosanskom porukom | srednji — default 30/min po IP-u; škole iza NAT-a dijele IP → po potrebi povećati env varom |
+| Diag endpointi | `/sheets/diag`, `/sheets/selftest`, `/mathpix/selftest`, `/gcs/signed-upload` sada traže LOCAL_MODE ili header `X-Diag-Token: $DIAG_TOKEN` → inače 403 | nizak (frontend ih ne koristi; ops mora postaviti DIAG_TOKEN ako ih treba) |
+| CORS | `CORS_ORIGINS` env (zarezom odvojene domene) → restrikcija; bez env-a ponašanje nepromijenjeno (sve domene). Produkcijska odluka u next-steps | nula (default isti) |
+
+### Ispravnost
+| Promjena | Detalj |
+|---|---|
+| Kontekst razgovora | `/submit` sada čita `history_json` (form ili JSON), `sanitize_history()` validira (lista `{user,bot}` stringova, zadnjih `HISTORY_MAX_TURNS=5`, po poruci `HISTORY_MAX_CHARS=2000`, bot HTML → čisti tekst). Ide i u sync i u async (kroz task payload `history`). Sesijska `api_history` ostaje samo kao mali fallback (čisti tekst, 3×600 znakova). |
+| Async kontekst | `_process_job_core` čita `payload["history"]` umjesto fiksnog `[]` — slike i teška pitanja sada imaju kontekst ("uradi i b)" radi). |
+| Async grafovi | `should_plot`/`add_plot_div_once` se primjenjuju i u `_process_job_core`. |
+| Fence-stripping | `strip_ascii_graph_blocks` više ne briše SVE code blokove — samo one koji liče na ASCII graf. |
+| Broj zadatka | Bare "N." se ne hvata za decimale ("3.5") ni "N. razred"; `requested_clause()` prevodi `-1` ("zadnji") u "posljednji" umjesto da modelu šalje "-1". |
+| Historija — robusnost | Gradnja poruka koristi `.get()` (nema više KeyError na klijentskim podacima); bot poruke se uvijek šalju modelu kao čisti tekst. Konzistentno `HISTORY_CONTEXT_TURNS=5` za tekst i vision (ranije tekst 2, vision 5, komentar tvrdio 5). |
+| Env knobs | `OPENAI_TIMEOUT` i `OPENAI_MAX_RETRIES` se sada stvarno čitaju iz env-a (defaulti nepromijenjeni: HARD_TIMEOUT_S / 2). |
+
+### Performanse i observability
+- Sheets init je lijen (`_init_sheets()` pri prvoj upotrebi, ne na importu) — brži cold start; u LOCAL_MODE se preskače u potpunosti.
+- `log_to_sheet` ide u daemon thread (`SHEETS_ASYNC_LOG=1` default) — skida ~0.3–0.8s sa svakog sync odgovora.
+- `log.warning` umjesto tihih `except: pass`: Sheets append/init, GCS upload, Mathpix OCR i fallback, parsiranje historije, blokirani URL-ovi, download slika.
+- Startup log: koji job store (firestore/memory) + upozorenje ako je memory van LOCAL_MODE; `_enqueue` loguje zašto pada na lokalni thread.
+
+### Uklonjen mrtvi kod
+- `_sync_process_once` + `import concurrent.futures as cf` (nikad pozvano)
+- top-level `ThreadPoolExecutor`/`FuturesTimeout`/`traceback`/`ImageFont` importi
+- `gcs_upload_filestorage` (nikad pozvana)
+- `JEDNACINE_NEJEDNACINE_LOGIKA_I_METODOLOGIJA` (nikad u promptu)
+- nekorišteni `user_text` parametar `build_system_prompt`; `_vision_clauses` (vraćala prazan string)
+- bogus `ETAG_DISABLED` config ključ (ne postoji u Flasku)
+
+## templates/index.html
+- `poll()`: toleriše do 3 uzastopne mrežne greške prije odustajanja (ranije: prva greška prekida čekanje).
+- Uspješan async odgovor se sada upisuje u localStorage historiju (`pushHistory`) — ranije se upisivala samo greška (obrnuta logika), pa follow-up nakon async odgovora nije imao kontekst.
+- Jasnije bosanske poruke pri prekidu veze.
+
+## Novi/izmijenjeni fajlovi
+- `tests/` — 104 testa: `conftest.py` (env + anti-network guard + OpenAI mock), `test_utils.py`, `test_prompts_history.py`, `test_ssrf.py`, `test_routes_sync.py`, `test_routes_async.py`, `test_limits_and_gating.py`
+- `pytest.ini`, `requirements-dev.txt`
+- `.gcloudignore` — ranije sadržavao zalijepljen shell skript umjesto patterna; sada ispravan
+- `.gitignore` — dodano `.pytest_cache/`, `.env.*`, `venv/`
+- `docs/fable-audit.md`, `docs/fable-changes.md`, `docs/fable-next-steps.md`
+- `README.md` — osvježen (lokalno pokretanje, env tabela, testiranje)
+
+## Obrisani fajlovi
+- `Procfile.bak` (zastarjeli backup)
+- `list_models.py` (importovao `google.generativeai` koji nije ni u requirements — mrtav/pokvaren)
+- `test_env.py` (prazan stub; zamijenjen pravim testovima)
+- `.deploy-ping` (jednokratni deploy trigger iz 2025)
+- `~/matbot-refresh.sh` (slučajno commitovan folder doslovnog imena `~`)
+
+## Namjerno NIJE mijenjano
+- `requirements.txt`, `Dockerfile`, `cloudbuild.yaml`, `deploy.sh`, `Procfile`
+- modeli, oblici API odgovora, pedagoški promptovi, bosanski tekstovi, legacy `/` ruta
