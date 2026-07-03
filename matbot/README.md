@@ -140,6 +140,22 @@ becomes "Upiši svoj odgovor na zadatak...". The **legacy chat + `/submit` form 
 image upload moved unchanged into a collapsed `<details>` "Upload slike / napredni
 način"** section below. Backend untouched.
 
+### Phase 5 — session_id + minimal activity log (SQLite)
+
+- Frontend auto-creates `session_id` (localStorage key `matbot_session_id`,
+  `crypto.randomUUID()` with fallback) and sends it in every `/api/ai-tutor/chat`
+  payload; never shown in UI. No student_id/parent-email UI was added.
+- `matbot/activity_log.py`: SQLite at `MATBOT_DB_PATH` env or
+  `storage/matbot.sqlite3` (folder auto-created, gitignored). Table
+  `student_activity_log` stores **metadata only** — never `student_message`, AI
+  answers, images, or secrets. `init_db` / `log_student_activity` /
+  `get_recent_activity` / `classify_event_type` (`practice_answer` >
+  `exam_mode_used` > `topic_selected` > `ai_message`). Logging errors are caught —
+  a failed insert never breaks the chat response (`handle_chat` also wraps the
+  call). Parent-report email/Thinkific integration is deliberately NOT implemented.
+  Tests: `tests/test_activity_log.py` + logging tests in
+  `tests/test_ai_tutor_chat_endpoint.py`.
+
 ### Phase 4.3 — practice answer flow + rendering polish
 
 - **Frontend state:** after a ready practice answer the widget sets

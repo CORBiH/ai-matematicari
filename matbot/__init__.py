@@ -34,6 +34,11 @@ resolution). Phase 2 adds ``prompt_builder`` (structured prompt from Phase 1 out
 Importing this package changes no runtime behavior on its own.
 """
 
+from matbot.activity_log import (
+    get_recent_activity,
+    init_db,
+    log_student_activity,
+)
 from matbot.ai_tutor_service import handle_chat, list_topics
 from matbot.content_loader import (
     ContentLoadError,
@@ -85,4 +90,8 @@ __all__: list[str] = [
     # ai_tutor_service (Phase 3/4)
     "handle_chat",
     "list_topics",
+    # activity_log (Phase 5)
+    "init_db",
+    "log_student_activity",
+    "get_recent_activity",
 ]

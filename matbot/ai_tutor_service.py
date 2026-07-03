@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
+from matbot.activity_log import log_student_activity
 from matbot.content_loader import get_master, get_thinkific_map, normalize_value
 from matbot.prompt_builder import build_tutor_prompt, get_topic_context
 from matbot.topic_lookup import get_final_topic
@@ -144,7 +145,7 @@ def handle_chat(
         else "neutral"
     )
 
-    return {
+    response = {
         "answer": answer,
         "final_topic": prompt_result.get("final_topic", "unknown"),
         "opened_lesson_topic": prompt_result.get("opened_lesson_topic", "unknown"),
@@ -157,3 +158,12 @@ def handle_chat(
         "status": status,
         "mode": mode,
     }
+
+    # Phase 5: minimalni activity log (samo metapodaci — bez poruka/odgovora).
+    # Greška u logovanju NIKAD ne smije srušiti tutor odgovor.
+    try:
+        log_student_activity(payload, response)
+    except Exception:
+        pass
+
+    return response

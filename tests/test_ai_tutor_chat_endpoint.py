@@ -12,6 +12,13 @@ from matbot import content_loader as cl
 CHAT_URL = "/api/ai-tutor/chat"
 
 
+@pytest.fixture(autouse=True)
+def _tmp_activity_db(monkeypatch, tmp_path):
+    """Phase 5: svaki test u ovom modulu loguje u svoj tmp SQLite (ne u repo storage/)."""
+    monkeypatch.setenv("MATBOT_DB_PATH", str(tmp_path / "activity.sqlite3"))
+    yield tmp_path / "activity.sqlite3"
+
+
 @pytest.fixture(scope="module")
 def tmap():
     return cl.load_thinkific_map()
@@ -164,6 +171,70 @@ def test_empty_object_is_forgiving_fallback(client):
 def test_options_preflight(client):
     resp = client.open(CHAT_URL, method="OPTIONS")
     assert resp.status_code == 204
+
+
+# --- Phase 5: activity logging ---------------------------------------------------
+
+def test_chat_logs_ready_response(client, fake_openai, _tmp_activity_db):
+    from matbot import activity_log as al
+    resp = client.post(CHAT_URL, json={
+        "selected_topic": "skupovi_uvod",
+        "entry_source": "manual_topic_choice",
+        "session_id": "sess-log-1",
+        "student_message": "OVO JE TAJNA PORUKA 12345",
+    })
+    assert resp.status_code == 200
+    rows = al.get_recent_activity(session_id="sess-log-1", path=_tmp_activity_db)
+    assert len(rows) == 1
+    r = rows[0]
+    assert r["event_type"] == "topic_selected"
+    assert r["final_topic"] == "skupovi_uvod"
+    assert r["status"] == "ready"
+    assert r["session_id"] == "sess-log-1"
+    assert r["student_id"] is None                       # student_id nije obavezan
+    # u DB NEMA pune poruke niti AI odgovora
+    raw = _tmp_activity_db.read_bytes()
+    assert b"OVO JE TAJNA PORUKA 12345" not in raw
+    assert fake_openai.state["reply"].encode("utf-8") not in raw
+
+
+def test_chat_logs_fallback_response(client, _tmp_activity_db):
+    from matbot import activity_log as al
+    resp = client.post(CHAT_URL, json={
+        "session_id": "sess-log-2",
+        "student_message": "nepoznato pitanje",
+    })
+    assert resp.status_code == 200
+    rows = al.get_recent_activity(session_id="sess-log-2", path=_tmp_activity_db)
+    assert len(rows) == 1
+    assert rows[0]["status"] == "fallback"
+    assert rows[0]["event_type"] == "ai_message"
+
+
+def test_chat_logs_practice_answer_event(client, fake_openai, _tmp_activity_db):
+    from matbot import activity_log as al
+    client.post(CHAT_URL, json={
+        "selected_topic": "skupovi_uvod",
+        "session_id": "sess-log-3",
+        "interaction_phase": "answering_practice_task",
+        "last_tutor_task": "Da li je 2∈S?",
+        "student_message": "da",
+    })
+    rows = al.get_recent_activity(session_id="sess-log-3", path=_tmp_activity_db)
+    assert rows and rows[0]["event_type"] == "practice_answer"
+    assert rows[0]["mode"] == "practice"
+
+
+def test_chat_ok_when_logging_fails(client, fake_openai, monkeypatch):
+    import matbot.ai_tutor_service as svc
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("baza nedostupna")
+
+    monkeypatch.setattr(svc, "log_student_activity", _boom)
+    resp = client.post(CHAT_URL, json={"selected_topic": "skupovi_uvod"})
+    assert resp.status_code == 200
+    assert resp.get_json()["status"] == "ready"          # odgovor preživi pad logovanja
 
 
 # --- response shape -------------------------------------------------------------

@@ -1,0 +1,118 @@
+"""Testovi za matbot.activity_log (Phase 5) + session_id u templateu.
+
+Sve na tmp_path SQLite fajlovima — bez mreže, bez diranja repo storage/ foldera.
+"""
+import sqlite3
+
+import pytest
+
+from matbot import activity_log as al
+
+
+def _cols(db_path):
+    conn = sqlite3.connect(str(db_path))
+    try:
+        return [r[1] for r in conn.execute("PRAGMA table_info(student_activity_log)")]
+    finally:
+        conn.close()
+
+
+# --- init_db ---------------------------------------------------------------------
+
+def test_init_db_creates_folder_and_table(tmp_path):
+    db = tmp_path / "novi_folder" / "log.sqlite3"   # folder ne postoji → kreira se
+    p = al.init_db(db)
+    assert p.exists()
+    cols = _cols(p)
+    for col in ("id", "student_id", "session_id", "timestamp", "event_type",
+                "entry_source", "course_name", "section_name", "lesson_title",
+                "final_topic", "mode", "status", "parent_report_signal",
+                "mistake_tag", "recommendation", "topic_conflict"):
+        assert col in cols
+    # NE postoje kolone za pune poruke/odgovore
+    assert "student_message" not in cols
+    assert "answer" not in cols
+
+
+def test_resolve_db_path_env(monkeypatch, tmp_path):
+    monkeypatch.setenv("MATBOT_DB_PATH", str(tmp_path / "env.sqlite3"))
+    assert al.resolve_db_path() == tmp_path / "env.sqlite3"
+    monkeypatch.delenv("MATBOT_DB_PATH")
+    assert al.resolve_db_path() == al.DEFAULT_DB_PATH
+    # eksplicitna putanja ima prednost nad env
+    monkeypatch.setenv("MATBOT_DB_PATH", str(tmp_path / "env.sqlite3"))
+    assert al.resolve_db_path(tmp_path / "x.sqlite3") == tmp_path / "x.sqlite3"
+
+
+# --- log_student_activity ---------------------------------------------------------
+
+def test_log_inserts_one_row(tmp_path):
+    db = tmp_path / "log.sqlite3"
+    ok = al.log_student_activity(
+        {"session_id": "s-1", "student_id": "u-9", "entry_source": "manual_topic_choice",
+         "course_name": "Matematika 6", "section_name": "Skupovi",
+         "lesson_title": "Lekcija", "student_message": "TAJNA PORUKA"},
+        {"final_topic": "skupovi_uvod", "mode": "explain", "status": "ready",
+         "parent_report_signal": "neutral", "topic_conflict": False,
+         "entry_source_used": "manual_topic_choice", "answer": "TAJNI ODGOVOR"},
+        path=db,
+    )
+    assert ok is True
+    rows = al.get_recent_activity(session_id="s-1", path=db)
+    assert len(rows) == 1
+    r = rows[0]
+    assert r["student_id"] == "u-9"
+    assert r["event_type"] == "topic_selected"
+    assert r["final_topic"] == "skupovi_uvod"
+    assert r["status"] == "ready"
+    assert r["timestamp"]
+    assert r["topic_conflict"] == 0
+    # metapodaci samo: poruka i odgovor NIKAD u bazi
+    raw = db.read_bytes()
+    assert b"TAJNA PORUKA" not in raw
+    assert b"TAJNI ODGOVOR" not in raw
+
+
+def test_event_type_priorities():
+    # practice_answer > exam > topic_selected > ai_message
+    assert al.classify_event_type(
+        {"interaction_phase": "answering_practice_task", "entry_source": "manual_topic_choice"},
+        {"mode": "exam"},
+    ) == "practice_answer"
+    assert al.classify_event_type(
+        {"entry_source": "manual_topic_choice"}, {"mode": "exam"}
+    ) == "exam_mode_used"
+    assert al.classify_event_type(
+        {"entry_source": "manual_topic_choice"}, {"mode": "practice"}
+    ) == "topic_selected"
+    assert al.classify_event_type({}, {"mode": "explain"}) == "ai_message"
+
+
+def test_get_recent_filters_by_session(tmp_path):
+    db = tmp_path / "log.sqlite3"
+    for sid, n in (("s-a", 2), ("s-b", 3)):
+        for _ in range(n):
+            al.log_student_activity({"session_id": sid}, {"mode": "explain", "status": "ready"}, path=db)
+    assert len(al.get_recent_activity(session_id="s-a", path=db)) == 2
+    assert len(al.get_recent_activity(session_id="s-b", path=db)) == 3
+    assert len(al.get_recent_activity(path=db)) == 5
+    # limit radi
+    assert len(al.get_recent_activity(path=db, limit=1)) == 1
+
+
+def test_log_failure_returns_false_never_raises(tmp_path):
+    # roditeljska "putanja" je fajl → mkdir puca → False, bez izuzetka
+    blocker = tmp_path / "blocker"
+    blocker.write_text("x")
+    bad = blocker / "sub" / "log.sqlite3"
+    assert al.log_student_activity({"session_id": "s"}, {"status": "ready"}, path=bad) is False
+    assert al.get_recent_activity(session_id="s", path=bad) == []
+
+
+# --- template šalje session_id (Phase 5, frontend) --------------------------------
+
+def test_template_sends_session_id(client):
+    html = client.get("/").get_data(as_text=True)
+    assert "matbot_session_id" in html              # localStorage ključ
+    assert "session_id: sessionId" in html          # ide u tutor payload
+    assert "crypto.randomUUID" in html              # UUID sa fallbackom
