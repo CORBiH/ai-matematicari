@@ -330,6 +330,10 @@ from rendering import (
 # Sitne čiste pomoćne funkcije izdvojene su u utils.py.
 from utils import _short_name_for_display, _name_from_url, _sniff_image_mime, _bytes_to_data_url
 
+# Phase 3: modularni AI tutor endpoint (payload → lookup → prompt builder → OpenAI).
+# Servis je čist i ne uvozi app; rutu ispod injektujemo postojećim _openai_chat.
+from matbot import ai_tutor_service
+
 def _openai_chat(model: str, messages: list, timeout: float = None, max_tokens: int | None = None, fast: bool = False):
 
     def _do(params):
@@ -906,6 +910,26 @@ def _prepare_async_payload(job_id: str, razred: str, user_text: str, requested: 
     return payload
 
 
+
+
+@app.route("/api/ai-tutor/chat", methods=["POST", "OPTIONS"])
+@limiter.limit(_submit_rate_limit, exempt_when=lambda: request.method == "OPTIONS")
+def ai_tutor_chat():
+    """Phase 3: modularni AI tutor chat (6. razred MVP). Tanak wrapper oko
+    matbot.ai_tutor_service.handle_chat; koristi postojeći _openai_chat."""
+    if request.method == "OPTIONS":
+        return ("", 204)
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"error": "invalid_json", "detail": "Očekivan je JSON objekt sa poljima zahtjeva."}), 400
+    try:
+        result = ai_tutor_service.handle_chat(
+            data, openai_chat=_openai_chat, model=MODEL_TEXT, timeout=OPENAI_TIMEOUT,
+        )
+    except Exception as e:
+        log.exception("ai_tutor_chat: neuspjeh")
+        return jsonify({"error": "ai_tutor_failed", "detail": str(e)}), 500
+    return jsonify(result), 200
 
 
 @app.route("/submit", methods=["POST", "OPTIONS"])

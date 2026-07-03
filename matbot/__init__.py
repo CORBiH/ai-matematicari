@@ -28,10 +28,13 @@ Phase 1 (6. razred modular MVP) adds two *self-contained* modules that are NOT
 wired into ``app.py`` and do not read any file at import time (loading is lazy):
 ``content_loader`` (Excel → normalized data) and ``topic_lookup`` (final_topic
 resolution). Phase 2 adds ``prompt_builder`` (structured prompt from Phase 1 output
-+ master topic content; **no OpenAI call**). Importing them changes no runtime
-behavior.
++ master topic content; **no OpenAI call**). Phase 3 adds ``ai_tutor_service``
+(orchestration for ``POST /api/ai-tutor/chat``); the app injects its existing
+``_openai_chat`` into the service, so this package still never imports ``app.py``.
+Importing this package changes no runtime behavior on its own.
 """
 
+from matbot.ai_tutor_service import handle_chat
 from matbot.content_loader import (
     ContentLoadError,
     get_master,
@@ -79,4 +82,6 @@ __all__: list[str] = [
     "normalize_mode",
     "trim_conversation_history",
     "build_mode_instructions",
+    # ai_tutor_service (Phase 3)
+    "handle_chat",
 ]

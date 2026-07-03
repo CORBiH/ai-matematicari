@@ -79,3 +79,24 @@ and deterministic):
   `opened_lesson_topic` and the `effective_topic` are returned. Never invents a topic.
 
 Tests: `tests/test_prompt_builder_modular.py`.
+
+### Phase 3 — `ai_tutor_service.py` + `POST /api/ai-tutor/chat`
+
+Orchestrates the full chain for the widget endpoint: request payload → Phase 1
+`get_final_topic` → Phase 2 `build_tutor_prompt` → (only when `status == "ready"`)
+the app's existing `_openai_chat` → structured JSON.
+
+- `handle_chat(data, openai_chat, master=None, tmap=None, *, model, timeout)` is pure
+  given the injected `openai_chat` and **does not import `app.py`** (no cycle). The
+  Flask route in `app.py` is a tiny wrapper that injects `_openai_chat` / `MODEL_TEXT`
+  / `OPENAI_TIMEOUT` — reusing the existing OpenAI client, no new client.
+- **Non-ready statuses (`fallback`/`ambiguous`/`invalid`) never call OpenAI**; they
+  return the deterministic student-facing Bosnian message from Phase 1.
+- `answer` is **raw model text** (no `render_model_html`); math/HTML rendering is left
+  to the Phase 4 widget.
+- Response: `answer, final_topic, opened_lesson_topic, effective_topic,
+  entry_source_used, topic_conflict, recommended_mode, recommend_video,
+  parent_report_signal, status, mode`.
+
+Tests: `tests/test_ai_tutor_chat_endpoint.py` (OpenAI mocked via the existing
+`fake_openai` fixture; non-ready tests prove OpenAI is not called).
