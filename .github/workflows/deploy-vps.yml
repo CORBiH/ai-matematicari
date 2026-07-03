@@ -50,10 +50,26 @@ jobs:
             docker compose build
             docker compose up -d --remove-orphans
 
-            docker compose ps
+                        docker compose ps
             docker compose logs --tail=80
 
-            curl -fsS http://127.0.0.1:8080/ > /dev/null
+            echo "Waiting for app to become healthy..."
+            for i in {1..20}; do
+              if curl -fsS --max-time 10 http://127.0.0.1:8080/ > /dev/null; then
+                echo "App is healthy"
+                break
+              fi
+
+              echo "Health check attempt $i failed, waiting..."
+              sleep 3
+
+              if [ "$i" -eq 20 ]; then
+                echo "Health check failed after 20 attempts"
+                docker compose ps
+                docker compose logs --tail=150
+                exit 1
+              fi
+            done
 
             echo "Deployment successful: $VERSION"
           EOF
