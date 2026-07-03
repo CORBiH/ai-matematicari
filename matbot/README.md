@@ -125,3 +125,17 @@ default Bosnian prompt; exam with no topic still sends (backend asks which area)
 explain/practice with no topic and no text show the topic-selector fallback. Typed
 text is cleared only after a successful send; a busy-guard prevents overlapping
 requests. Backend unchanged. Tests: `tests/test_ai_tutor_widget_template.py`.
+
+### Phase 4.2 — one polished "AI Tutor" panel (template-only)
+
+`templates/index.html` now has a single main **AI Tutor card**: title + subtitle,
+topic selector, the four action buttons, the tutor transcript (`#tutorChat`, bubbles
+user-right / tutor-left), fallback banner near the selector (with focus + brief
+highlight), textarea + "Pošalji tutoru", and the muted meta line — all inside the
+card. Loading shows "Tutor razmišlja..." inside the transcript and disables the
+buttons. Answers go through a small safe renderer (`renderTutorHTML`: escape first,
+`**bold**` → `<strong>`, line breaks, `-`/`1.` lists; MathJax still typesets
+`$$...$$`; no markdown lib, no XSS). After a ready practice answer the placeholder
+becomes "Upiši svoj odgovor na zadatak...". The **legacy chat + `/submit` form +
+image upload moved unchanged into a collapsed `<details>` "Upload slike / napredni
+način"** section below. Backend untouched.

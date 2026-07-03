@@ -161,15 +161,49 @@
   /* sakrij prazan chat-karton na startu */
   .card.is-empty{display:none}
 
-  /* ===== Phase 4: modularni AI tutor ===== */
-  .tutor-title{font-weight:800;font-size:1.15rem;margin-bottom:.25rem;}
-  .mode-row{display:flex;gap:.5rem;flex-wrap:wrap;margin:.6rem 0;}
-  .mode-btn{opacity:.72;}
+  /* ===== Phase 4.2: AI Tutor — jedan glavni panel ===== */
+  .tutor-card{border-top:4px solid var(--accent-bot);}
+  .tutor-title{font-weight:800;font-size:1.3rem;}
+  .tutor-sub{margin:.15rem 0 .75rem;}
+  .tutor-controls{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin-bottom:.5rem;}
+  .tutor-controls label{white-space:nowrap;font-weight:600;}
+  .tutor-topic{min-width:260px;max-width:100%;flex:1;}
+  .mode-row{display:flex;gap:.5rem;flex-wrap:wrap;margin:.35rem 0 .6rem;}
+  .mode-btn{opacity:.8;}
   .mode-btn.active{opacity:1;outline:3px solid var(--accent-user);outline-offset:1px;box-shadow:0 2px 10px rgba(0,0,0,.14);}
+  .mode-btn:disabled{opacity:.45;cursor:not-allowed;}
   .tutor-fallback{background:#fff6e6;border:2px dashed #f0b25f;color:#7a5a1e;padding:.6rem .8rem;border-radius:12px;margin:.5rem 0;}
-  body.dark .tutor-fallback{background:#241d0f;color:#f0d9a6;}
-  #tutorTopic{max-width:100%;}
-  #tutorMeta{font-size:.85rem;}
+  body.dark .tutor-fallback{background:#241d0f;color:#f0d9a6;border-color:#8a6a2f;}
+  .topic-attn{outline:3px solid #f0b25f;outline-offset:2px;border-radius:10px;}
+
+  .tutor-chat{display:none;flex-direction:column;gap:.55rem;max-height:52vh;overflow-y:auto;scroll-behavior:smooth;
+    border:1px solid var(--card-border);border-radius:12px;padding:.6rem;margin:.35rem 0 .6rem;background:var(--input-bg);}
+  .tutor-chat.open{display:flex;}
+  .tmsg{display:flex;width:100%;word-break:break-word;}
+  .tmsg-user{justify-content:flex-end;}
+  .tmsg-bot{justify-content:flex-start;}
+  .tbubble{padding:.75rem .95rem;border-radius:12px;max-width:85%;line-height:1.65;font-size:1rem;
+    box-shadow:0 1px 4px rgba(0,0,0,.06);background:var(--bubble-bg);color:var(--bubble-text);animation:fadeIn .22s ease;}
+  .tmsg-bot .tbubble{border-left:4px solid var(--accent-bot);}
+  .tmsg-user .tbubble{background:#c8ebf0;border-right:4px solid var(--accent-user);border-left:0;}
+  body.dark .tmsg-user .tbubble{background:#12333a;}
+  .tbubble ul,.tbubble ol{margin:.35rem 0 .35rem 1.25rem;padding:0;}
+  .tbubble li{margin:.15rem 0;}
+  .tutor-typing{align-self:flex-start;font-weight:600;background:var(--type-bg);border-left:4px solid var(--type-border);
+    border-radius:10px;padding:.5rem .7rem;}
+  .tutor-typing.hidden{display:none;}
+  .tutor-typing .dots::after{content:'...';animation:dots 1s steps(3,end) infinite;margin-left:.2rem;}
+
+  .tutor-inputrow{display:flex;gap:.6rem;align-items:stretch;flex-wrap:wrap;}
+  .tutor-inputrow textarea{flex:1;min-width:220px;min-height:74px;}
+  .tutor-inputrow .btn{align-self:flex-end;}
+  #tutorMeta{font-size:.85rem;margin-top:.4rem;}
+
+  /* napredni (legacy) dio — sklopljen ispod tutora */
+  #advanced-card summary{cursor:pointer;font-weight:700;font-size:1.02rem;padding:.15rem 0;}
+  .advanced-body{margin-top:.85rem;}
+  .legacy-chat{margin-bottom:.9rem;}
+  .legacy-chat.is-empty{display:none;}
   </style>
 </head>
 <body>
@@ -209,19 +243,17 @@
   </header>
 
   <main class="stack">
-    <!-- CHAT -->
-    <div class="card is-empty" id="chat-card">
-      <div id="chat-container"></div>
-      <!-- TIPKANJE sa fazama -->
-      <div id="typing" class="typing-indicator" aria-live="polite">
-        🤖 <span id="phaseText">Razmišljam</span><span class="dots"></span>
-      </div>
-    </div>
+    <!-- ===== AI TUTOR (Phase 4.2: jedan glavni panel) ===== -->
+    <div class="card tutor-card" id="tutor-card">
+      <div class="tutor-title">🤖 AI Tutor</div>
+      <div class="muted tutor-sub">Izaberi temu i klikni šta želiš — ili samo upiši pitanje pa pošalji.</div>
 
-    <!-- MODULARNI AI TUTOR (Phase 4) — dodatni panel, ne dira legacy formu ispod -->
-    <div class="card" id="tutor-card">
-      <div class="tutor-title">🤖 AI Tutor (modularni)</div>
-      <div class="muted" style="margin-bottom:.4rem;">Izaberi način rada i po želji temu, pa pošalji pitanje.</div>
+      <div class="tutor-controls">
+        <label for="tutorTopic">Oblast / tema:</label>
+        <select id="tutorTopic" class="grade-select tutor-topic">
+          <option value="">— izaberi temu —</option>
+        </select>
+      </div>
 
       <div class="mode-row" id="tutorModes" role="group" aria-label="Način rada">
         <button type="button" class="btn sm mode-btn active" data-mode="explain" data-action="tutor-send">📘 Objasni mi</button>
@@ -230,28 +262,31 @@
         <button type="button" class="btn sm mode-btn" data-mode="quick" data-action="tutor-send">⚡ Samo rezultat</button>
       </div>
 
-      <div id="tutor-fallback" class="tutor-fallback hidden" aria-live="polite">
-        <span id="tutorFallbackMsg"></span>
+      <div id="tutor-fallback" class="tutor-fallback hidden" aria-live="polite"><span id="tutorFallbackMsg"></span></div>
+
+      <div id="tutorChat" class="tutor-chat" aria-live="polite"><div id="tutorTyping" class="tutor-typing hidden">🤖 Tutor razmišlja<span class="dots"></span></div></div>
+
+      <div class="tutor-inputrow">
+        <textarea id="tutorMessage" placeholder="Upiši pitanje ili zadatak..."></textarea>
+        <button id="tutorSend" type="button" class="btn">✉️ Pošalji tutoru</button>
       </div>
+      <div class="muted" id="tutorMeta"></div>
+    </div><!-- /tutor-card -->
 
-      <label for="tutorTopic" style="display:block;margin-top:.5rem;">Oblast / tema (opcionalno):</label>
-      <select id="tutorTopic" class="grade-select" style="min-width:280px;">
-        <option value="">— izaberi temu —</option>
-      </select>
+    <!-- ===== NAPREDNO: legacy forma + upload slike (sklopljeno) ===== -->
+    <div class="card" id="advanced-card">
+      <details id="advancedLegacy">
+        <summary>📤 Upload slike / napredni način</summary>
+        <div class="advanced-body">
+          <!-- LEGACY CHAT (za /submit tok) -->
+          <div class="legacy-chat is-empty" id="chat-card">
+            <div id="chat-container"></div>
+            <!-- TIPKANJE sa fazama -->
+            <div id="typing" class="typing-indicator" aria-live="polite">
+              🤖 <span id="phaseText">Razmišljam</span><span class="dots"></span>
+            </div>
+          </div>
 
-      <label for="tutorMessage" style="display:block;margin-top:.6rem;">Tvoje pitanje:</label>
-      <textarea id="tutorMessage" style="min-height:90px;" placeholder="Npr. Ne razumijem ovaj zadatak..."></textarea>
-
-      <div class="form-actions">
-        <div class="left muted" id="tutorMeta"></div>
-        <div class="right">
-          <button id="tutorSend" type="button" class="btn">✉️ Pošalji tutoru</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- FORMA -->
-    <div class="card">
       <!-- START GRADE ASK -->
       <div id="grade-start" class="grade-start">
         <label for="gradeSelectStart">Koji si razred?</label>
@@ -289,6 +324,8 @@
           </div>
         </div>
       </form>
+        </div><!-- /advanced-body -->
+      </details>
     </div>
   </main>
 
@@ -732,9 +769,60 @@ document.addEventListener('DOMContentLoaded', () => {
     const fbBox    = document.getElementById('tutor-fallback');
     const fbMsg    = document.getElementById('tutorFallbackMsg');
     const metaBox  = document.getElementById('tutorMeta');
-    if(!modeRow || !topicSel || !sendTutor || !msgBox) return; // panel nije prisutan
+    const tutorChat  = document.getElementById('tutorChat');
+    const tutorTyping= document.getElementById('tutorTyping');
+    if(!modeRow || !topicSel || !sendTutor || !msgBox || !tutorChat || !tutorTyping) return; // panel nije prisutan
 
     let currentMode = 'explain';
+
+    /* Mini bezbjedni renderer (bez markdown biblioteke, bez XSS):
+       1) escape HTML-a  2) **bold** → <strong>  3) liste i novi redovi.
+       MathJax poslije toga normalno tipografiše $$...$$. */
+    function renderTutorHTML(raw){
+      const esc = escapeHtml(raw || '');
+      const bold = esc.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+      const lines = bold.split(/\r?\n/);
+      let out = '', list = null;
+      const flush = ()=>{ if(list){ out += '</' + list + '>'; list = null; } };
+      for (const line of lines){
+        const t = line.trim();
+        let m;
+        if ((m = /^[-*•]\s+(.+)$/.exec(t))){
+          if (list !== 'ul'){ flush(); out += '<ul>'; list = 'ul'; }
+          out += '<li>' + m[1] + '</li>';
+        } else if ((m = /^\d+[.)]\s+(.+)$/.exec(t))){
+          if (list !== 'ol'){ flush(); out += '<ol>'; list = 'ol'; }
+          out += '<li>' + m[1] + '</li>';
+        } else {
+          flush();
+          out += (t ? line : '') + '<br>';
+        }
+      }
+      flush();
+      return out;
+    }
+
+    /* Poruke se dodaju UNUTAR tutor kartice (tutorChat), ne u legacy chat. */
+    function appendTutorMsg(role, html){
+      tutorChat.classList.add('open');
+      const row = document.createElement('div');
+      row.className = 'tmsg ' + (role === 'user' ? 'tmsg-user' : 'tmsg-bot');
+      const b = document.createElement('div');
+      b.className = 'tbubble';
+      b.innerHTML = html || '<i>Nema odgovora.</i>';
+      row.appendChild(b);
+      tutorChat.insertBefore(row, tutorTyping);
+      if (window.MathJax && MathJax.typesetPromise) MathJax.typesetPromise([b]);
+      tutorChat.scrollTop = tutorChat.scrollHeight;
+    }
+
+    function showTutorTyping(){
+      tutorChat.classList.add('open');
+      tutorChat.appendChild(tutorTyping);       // uvijek na dno
+      tutorTyping.classList.remove('hidden');
+      tutorChat.scrollTop = tutorChat.scrollHeight;
+    }
+    function hideTutorTyping(){ tutorTyping.classList.add('hidden'); }
 
     /* siguran localStorage ključ: nikad undefined (fallback "default") */
     let cid = 'default';
@@ -791,10 +879,12 @@ document.addEventListener('DOMContentLoaded', () => {
       let msg = '';
       if (status === 'ambiguous') msg = 'Pronašao sam više sličnih lekcija. Izaberi oblast/temu koju trenutno radiš.';
       else if (status === 'fallback') msg = 'Ne mogu automatski prepoznati lekciju. Izaberi oblast iz liste ili pošalji zadatak.';
-      else if (status === 'invalid') msg = 'Izaberi temu iz liste ispod, pa pošalji ponovo.';
+      else if (status === 'invalid') msg = 'Izaberi temu iz liste, pa pošalji ponovo.';
       else return;
       fbMsg.textContent = msg;
       fbBox.classList.remove('hidden');
+      topicSel.classList.add('topic-attn');
+      setTimeout(()=> topicSel.classList.remove('topic-attn'), 3500);
       try { topicSel.focus(); } catch(_){}
     }
 
@@ -823,11 +913,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let tutorBusy = false;
     async function sendTutorMsg(){
-      if (tutorBusy) return;                       // spriječi preklapanje zahtjeva
+      if (tutorBusy) return;                       // spriječi dupli submit dok traje zahtjev
       const resolved = resolveOutgoing();
-      if (resolved.block){                         // validacija/fallback bez slanja
+      if (resolved.block){                         // validacija bez slanja
         fbMsg.textContent = resolved.block;
         fbBox.classList.remove('hidden');
+        topicSel.classList.add('topic-attn');
+        setTimeout(()=> topicSel.classList.remove('topic-attn'), 3500);
         try { (topicSel.value ? msgBox : topicSel).focus(); } catch(_){}
         return;
       }
@@ -846,11 +938,10 @@ document.addEventListener('DOMContentLoaded', () => {
       };
 
       tutorBusy = true;
-      document.getElementById('chat-card')?.classList.remove('is-empty');
-      appendUserBubble({ text });
+      appendTutorMsg('user', escapeHtml(text));
       pushTutor('user', text);
       fbBox.classList.add('hidden');
-      showTyping();
+      showTutorTyping();
       setTutorBusy(true);
 
       try{
@@ -862,15 +953,16 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         const j = await r.json().catch(()=>({}));
         const answer = (j && j.answer) ? j.answer : 'Nema odgovora.';
-        appendBotHTML('<div style="white-space:pre-wrap">' + escapeHtml(answer) + '</div>');
+        appendTutorMsg('bot', renderTutorHTML(answer));
         pushTutor('assistant', answer);
         if (metaBox) metaBox.textContent = 'tema: ' + (j.final_topic || '—') + ' · mod: ' + (j.mode || currentMode) + ' · status: ' + (j.status || '—');
         if (resolved.fromTyped) msgBox.value = '';   // očisti tek nakon uspješnog slanja UPISANE poruke
+        if (currentMode === 'practice' && j.status === 'ready') msgBox.placeholder = 'Upiši svoj odgovor na zadatak...';
         if (j.status && j.status !== 'ready') showFallback(j.status);
       }catch(_){
-        appendBotHTML('<div class="alert alert-danger">Greška pri slanju zahtjeva.</div>');
+        appendTutorMsg('bot', '<em>Greška pri slanju zahtjeva. Pokušaj ponovo.</em>');
       }finally{
-        hideTyping();
+        hideTutorTyping();
         setTutorBusy(false);
         tutorBusy = false;
       }

@@ -1,8 +1,9 @@
-"""Phase 4.1 — smoke testovi renderovanog widget templatea.
+"""Phase 4.2 — smoke testovi renderovanog tutor UI-a.
 
-Server uvijek renderuje puni index.html (iframe gate je klijentski JS), pa GET '/'
-vraća sav HTML. Provjeravamo da su mode dugmad AKCIJSKA i da legacy /submit forma
-i dalje postoji. Bez OpenAI/mreže.
+Server renderuje puni index.html (iframe gate je klijentski JS), pa GET '/' vraća
+sav HTML. Provjeravamo: jedan glavni tutor panel sa transkriptom UNUTAR kartice,
+akcijska mode dugmad, i legacy /submit forma očuvana ali sklopljena u <details>.
+Bez OpenAI/mreže.
 """
 import re
 
@@ -15,45 +16,92 @@ def _html(client):
     return r.get_data(as_text=True)
 
 
+def _tutor_block(html):
+    """Sadržaj glavne tutor kartice (do markera kraja)."""
+    start = html.index('id="tutor-card"')
+    end = html.index("<!-- /tutor-card -->")
+    assert start < end
+    return html[start:end]
+
+
+def _details_block(html):
+    """Sadržaj sklopljene (advanced/legacy) sekcije."""
+    start = html.index("<details")
+    end = html.index("</details>")
+    assert start < end
+    return html[start:end]
+
+
 def test_index_renders(client):
     assert client.get("/").status_code == 200
 
 
-def test_mode_buttons_present_with_data_mode(client):
+def test_main_tutor_card_contains_everything(client):
+    block = _tutor_block(_html(client))
+    # header + subtitle
+    assert "AI Tutor" in block
+    assert 'class="muted tutor-sub"' in block
+    # topic selector, mode dugmad, fallback, transkript, typing, input, send, meta
+    for needle in (
+        'id="tutorTopic"',
+        'id="tutorModes"',
+        'id="tutor-fallback"',
+        'id="tutorChat"',
+        'id="tutorTyping"',
+        'id="tutorMessage"',
+        'id="tutorSend"',
+        'id="tutorMeta"',
+    ):
+        assert needle in block, f"nedostaje {needle} unutar tutor kartice"
+
+
+def test_transcript_inside_tutor_card_not_legacy(client):
     html = _html(client)
-    for mode in MODES:
-        assert f'data-mode="{mode}"' in html
+    # tutor transkript je u tutor kartici…
+    assert 'id="tutorChat"' in _tutor_block(html)
+    # …a legacy chat-container je u sklopljenoj advanced sekciji
+    assert 'id="chat-container"' in _details_block(html)
 
 
 def test_mode_buttons_are_action_buttons(client):
     html = _html(client)
-    # sva 4 mode dugmeta su označena kao akcijska (odmah šalju)
-    assert html.count('data-action="tutor-send"') == 4
-    # svako akcijsko dugme je ujedno mode-btn sa data-mode
-    action_btns = re.findall(r"<button[^>]*data-action=\"tutor-send\"[^>]*>", html)
+    block = _tutor_block(html)
+    assert block.count('data-action="tutor-send"') == 4
+    action_btns = re.findall(r"<button[^>]*data-action=\"tutor-send\"[^>]*>", block)
     assert len(action_btns) == 4
     for b in action_btns:
-        assert "mode-btn" in b
-        assert "data-mode=" in b
+        assert "mode-btn" in b and "data-mode=" in b
+    for mode in MODES:
+        assert f'data-mode="{mode}"' in block
 
 
-def test_mode_buttons_wired_to_send(client):
+def test_mode_buttons_wired_to_send_and_renderer_present(client):
     html = _html(client)
-    # klik na mode dugme poziva tutor send funkciju (akcija, ne samo selekcija)
-    assert "sendTutorMsg()" in html
-    # ručni "Pošalji tutoru" i dalje postoji
-    assert 'id="tutorSend"' in html
+    assert "sendTutorMsg()" in html           # akcijska dugmad odmah šalju
+    assert "renderTutorHTML" in html          # mini bezbjedni renderer
+    assert "Tutor razmišlja" in html          # loading unutar tutor chata
 
 
 def test_quick_empty_validation_message_present(client):
-    html = _html(client)
-    assert "Unesi zadatak za koji želiš samo rezultat." in html
+    assert "Unesi zadatak za koji želiš samo rezultat." in _html(client)
 
 
-def test_legacy_submit_form_preserved(client):
+def test_practice_answer_placeholder_present(client):
+    assert "Upiši svoj odgovor na zadatak..." in _html(client)
+
+
+def test_legacy_form_preserved_inside_details(client):
     html = _html(client)
-    assert 'id="ask-form"' in html
-    assert 'action="/submit"' in html
-    # legacy send dugme i upload i dalje postoje
-    assert 'id="sendBtn"' in html
-    assert 'name="file"' in html
+    details = _details_block(html)
+    # legacy forma i upload žive, ali sklopljeni u <details>
+    assert 'id="ask-form"' in details
+    assert 'action="/submit"' in details
+    assert 'id="sendBtn"' in details
+    assert 'id="slika"' in details and 'name="file"' in details
+    assert "Upload slike / napredni način" in html
+
+
+def test_legacy_form_not_in_tutor_card(client):
+    block = _tutor_block(_html(client))
+    assert 'id="ask-form"' not in block
+    assert 'action="/submit"' not in block
