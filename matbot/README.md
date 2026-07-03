@@ -156,6 +156,16 @@ način"** section below. Backend untouched.
   Tests: `tests/test_activity_log.py` + logging tests in
   `tests/test_ai_tutor_chat_endpoint.py`.
 
+### Phase 5.1 — single-tutor layout polish (template-only)
+
+The page now renders **one** card: the legacy `/submit` form (grade select, textarea,
+image upload, its chat area) moved unchanged into a collapsed `<details>` in the
+tutor card's footer — summary "📷 Imam sliku zadatka / napredni način", with a note
+that it's only for image tasks. Added an empty-state helper inside the tutor area
+("Izaberi temu ili samo upiši pitanje…", hidden after the first message) and the
+topic label now reads "Tema ako znaš (opcionalno):". No JS behavior changes beyond
+hiding the empty state; backend untouched.
+
 ### Phase 4.3 — practice answer flow + rendering polish
 
 - **Frontend state:** after a ready practice answer the widget sets

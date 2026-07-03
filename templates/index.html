@@ -205,11 +205,18 @@
   .tutor-inputrow .btn{align-self:flex-end;}
   #tutorMeta{font-size:.85rem;margin-top:.4rem;}
 
-  /* napredni (legacy) dio — sklopljen ispod tutora */
-  #advanced-card summary{cursor:pointer;font-weight:700;font-size:1.02rem;padding:.15rem 0;}
-  .advanced-body{margin-top:.85rem;}
+  /* napredni (legacy) dio — sekundarno, sklopljeno u podnožju tutor kartice */
+  .tutor-advanced{margin-top:1rem;border-top:1px dashed var(--card-border);padding-top:.6rem;}
+  .tutor-advanced summary{cursor:pointer;font-weight:600;font-size:.95rem;color:var(--muted);}
+  .tutor-advanced summary:hover{color:var(--text);}
+  .advanced-note{margin:.5rem 0 .6rem;font-size:.92rem;}
+  .advanced-body{margin-top:.5rem;}
   .legacy-chat{margin-bottom:.9rem;}
   .legacy-chat.is-empty{display:none;}
+
+  /* empty-state pomoć prije prve poruke */
+  .tutor-empty{background:var(--input-bg);border:1px dashed var(--card-border);border-radius:12px;
+    padding:.7rem .9rem;margin:.35rem 0 .6rem;font-size:.95rem;}
   </style>
 </head>
 <body>
@@ -255,7 +262,7 @@
       <div class="muted tutor-sub">Izaberi temu i klikni šta želiš — ili samo upiši pitanje pa pošalji.</div>
 
       <div class="tutor-controls">
-        <label for="tutorTopic">Oblast / tema:</label>
+        <label for="tutorTopic">Tema ako znaš (opcionalno):</label>
         <select id="tutorTopic" class="grade-select tutor-topic">
           <option value="">— izaberi temu —</option>
         </select>
@@ -270,6 +277,8 @@
 
       <div id="tutor-fallback" class="tutor-fallback hidden" aria-live="polite"><span id="tutorFallbackMsg"></span></div>
 
+      <div id="tutorEmptyState" class="tutor-empty muted">Izaberi temu ili samo upiši pitanje. Primjer: <em>Kako se računa aritmetička sredina brojeva 4, 6 i 8?</em></div>
+
       <div id="tutorChat" class="tutor-chat" aria-live="polite"><div id="tutorTyping" class="tutor-typing hidden">🤖 Tutor razmišlja<span class="dots"></span></div></div>
 
       <div class="tutor-inputrow">
@@ -277,13 +286,12 @@
         <button id="tutorSend" type="button" class="btn">✉️ Pošalji tutoru</button>
       </div>
       <div class="muted" id="tutorMeta"></div>
-    </div><!-- /tutor-card -->
 
-    <!-- ===== NAPREDNO: legacy forma + upload slike (sklopljeno) ===== -->
-    <div class="card" id="advanced-card">
-      <details id="advancedLegacy">
-        <summary>📤 Upload slike / napredni način</summary>
+      <!-- NAPREDNO (sekundarno): legacy /submit forma + upload — sklopljeno u podnožju tutora -->
+      <details id="advancedLegacy" class="tutor-advanced">
+        <summary>📷 Imam sliku zadatka / napredni način</summary>
         <div class="advanced-body">
+          <p class="muted advanced-note">Za obična pitanja koristi AI Tutor iznad. Ovaj dio koristi samo ako želiš poslati sliku zadatka.</p>
           <!-- LEGACY CHAT (za /submit tok) -->
           <div class="legacy-chat is-empty" id="chat-card">
             <div id="chat-container"></div>
@@ -332,7 +340,7 @@
       </form>
         </div><!-- /advanced-body -->
       </details>
-    </div>
+    </div><!-- /tutor-card -->
   </main>
 
   <!-- TOASTS -->
@@ -777,6 +785,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const metaBox  = document.getElementById('tutorMeta');
     const tutorChat  = document.getElementById('tutorChat');
     const tutorTyping= document.getElementById('tutorTyping');
+    const tutorEmpty = document.getElementById('tutorEmptyState');
     if(!modeRow || !topicSel || !sendTutor || !msgBox || !tutorChat || !tutorTyping) return; // panel nije prisutan
 
     let currentMode = 'explain';
@@ -822,6 +831,7 @@ document.addEventListener('DOMContentLoaded', () => {
     /* Poruke se dodaju UNUTAR tutor kartice (tutorChat), ne u legacy chat. */
     function appendTutorMsg(role, html){
       tutorChat.classList.add('open');
+      if (tutorEmpty) tutorEmpty.classList.add('hidden');
       const row = document.createElement('div');
       row.className = 'tmsg ' + (role === 'user' ? 'tmsg-user' : 'tmsg-bot');
       const b = document.createElement('div');
@@ -835,6 +845,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function showTutorTyping(){
       tutorChat.classList.add('open');
+      if (tutorEmpty) tutorEmpty.classList.add('hidden');
       tutorChat.appendChild(tutorTyping);       // uvijek na dno
       tutorTyping.classList.remove('hidden');
       tutorChat.scrollTop = tutorChat.scrollHeight;

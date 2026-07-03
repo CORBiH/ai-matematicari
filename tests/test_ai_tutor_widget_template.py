@@ -98,13 +98,34 @@ def test_legacy_form_preserved_inside_details(client):
     assert 'action="/submit"' in details
     assert 'id="sendBtn"' in details
     assert 'id="slika"' in details and 'name="file"' in details
-    assert "Upload slike / napredni način" in html
+    assert "Imam sliku zadatka / napredni način" in html
 
 
-def test_legacy_form_not_in_tutor_card(client):
+def test_advanced_section_secondary_inside_tutor_card(client):
+    """Phase 5.1: jedan glavni tutor — legacy dio je sklopljen u podnožju tutor kartice."""
+    html = _html(client)
+    block = _tutor_block(html)
+    # details sekcija je UNUTAR tutor kartice…
+    assert "<details" in block and 'id="advancedLegacy"' in block
+    # …sklopljena po defaultu (bez atributa open)
+    assert "<details open" not in html
+    assert 'id="advancedLegacy" class="tutor-advanced" open' not in html
+    # napomena da je ovo sekundarni put
+    assert "Za obična pitanja koristi AI Tutor iznad" in block
+    # legacy forma je unutar details, ne kao druga vidljiva kartica
+    details = _details_block(html)
+    assert 'id="ask-form"' in details
+
+
+def test_empty_state_helper_in_tutor_card(client):
     block = _tutor_block(_html(client))
-    assert 'id="ask-form"' not in block
-    assert 'action="/submit"' not in block
+    assert 'id="tutorEmptyState"' in block
+    assert "Izaberi temu ili samo upiši pitanje" in block
+    assert "aritmetička sredina brojeva 4, 6 i 8" in block
+
+
+def test_topic_label_optional(client):
+    assert "Tema ako znaš (opcionalno):" in _tutor_block(_html(client))
 
 
 # --- Phase 4.3: practice follow-up stanje + renderer ------------------------------
