@@ -1,0 +1,59 @@
+name: Deploy to Hetzner VPS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-vps
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Deploy on VPS
+        run: |
+          ssh -i ~/.ssh/vps_key "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" << 'EOF'
+            set -e
+
+            cd "${{ secrets.VPS_APP_DIR }}"
+
+            echo "Before deploy:"
+            git log -1 --oneline || true
+
+            git fetch origin main
+            git reset --hard origin/main
+
+            VERSION=$(git rev-parse --short HEAD)
+            echo "Deploying version: $VERSION"
+
+            if grep -q '^APP_VERSION=' .env; then
+              sed -i "s/^APP_VERSION=.*/APP_VERSION=$VERSION/" .env
+            else
+              echo "APP_VERSION=$VERSION" >> .env
+            fi
+
+            docker compose build
+            docker compose up -d --remove-orphans
+
+            docker compose ps
+            docker compose logs --tail=80
+
+            curl -fsS http://127.0.0.1:8080/ > /dev/null
+
+            echo "Deployment successful: $VERSION"
+          EOF
