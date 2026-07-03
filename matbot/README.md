@@ -57,3 +57,25 @@ AI tutor:
 Nothing here is imported by `app.py`; there is no file I/O at import time (loading is
 lazy + cached). Tests: `tests/test_content_loader.py`, `tests/test_topic_lookup.py`.
 Content is **never** hardcoded — the Excel files are the source of truth.
+
+### Phase 2 — `prompt_builder.py`
+
+Turns Phase 1 output into a structured prompt (**no OpenAI/network/file writes** — pure
+and deterministic):
+
+- `build_tutor_prompt(payload, lookup_result, master_content, thinkific_map=None)` —
+  composes `system_prompt` (base tutor via `prompts.build_system_prompt`, lazily +
+  fallback, so `app.py`/`prompts.py` are untouched) + global modular guidelines +
+  the topic row's pedagogy (`lesson_scope`, mistakes, hints, solved example, tasks,
+  `controlni_*`, `forbidden_ai_behavior`, …), plus optional VIDEO_FLOW and mode
+  instructions. Returns `{system_prompt, user_prompt, mode, final_topic,
+  opened_lesson_topic, effective_topic, status, topic_context_used, video_flow_used,
+  topic_conflict}`.
+- Helpers: `get_topic_context`, `get_video_flow_context`, `normalize_mode`,
+  `trim_conversation_history` (last 5), `build_mode_instructions`,
+  `build_fallback_prompt` (unknown/ambiguous/invalid).
+- Topic-conflict rule (guidelines §9): a valid `detected_topic` that differs from the
+  opened `thinkific_lesson` topic becomes the `effective_topic`; both the original
+  `opened_lesson_topic` and the `effective_topic` are returned. Never invents a topic.
+
+Tests: `tests/test_prompt_builder_modular.py`.

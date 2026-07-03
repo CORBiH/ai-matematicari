@@ -27,7 +27,9 @@ entrypoint module and is unrelated to this package's name.
 Phase 1 (6. razred modular MVP) adds two *self-contained* modules that are NOT
 wired into ``app.py`` and do not read any file at import time (loading is lazy):
 ``content_loader`` (Excel → normalized data) and ``topic_lookup`` (final_topic
-resolution). Importing them changes no runtime behavior.
+resolution). Phase 2 adds ``prompt_builder`` (structured prompt from Phase 1 output
++ master topic content; **no OpenAI call**). Importing them changes no runtime
+behavior.
 """
 
 from matbot.content_loader import (
@@ -37,6 +39,15 @@ from matbot.content_loader import (
     load_master_content,
     load_thinkific_map,
     validate_mapped_topics,
+)
+from matbot.prompt_builder import (
+    build_fallback_prompt,
+    build_mode_instructions,
+    build_tutor_prompt,
+    get_topic_context,
+    get_video_flow_context,
+    normalize_mode,
+    trim_conversation_history,
 )
 from matbot.topic_lookup import (
     find_lesson,
@@ -60,4 +71,12 @@ __all__: list[str] = [
     "validate_detected_topic",
     "find_lesson",
     "get_final_topic",
+    # prompt_builder
+    "build_tutor_prompt",
+    "build_fallback_prompt",
+    "get_topic_context",
+    "get_video_flow_context",
+    "normalize_mode",
+    "trim_conversation_history",
+    "build_mode_instructions",
 ]

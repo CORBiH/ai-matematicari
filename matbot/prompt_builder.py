@@ -1,0 +1,506 @@
+"""Phase 2 — modularni prompt builder za 6. razred (MVP AI tutor).
+
+Spaja izlaz Phase 1 (``content_loader`` + ``topic_lookup``) sa pedagoškim
+sadržajem iz AI_MATH_CONTENT_MASTER u strukturiran prompt rezultat. **NE zove
+OpenAI** i **ne radi mrežne/IO operacije** — čist je i deterministički.
+
+Ništa iz sadržaja (teme, zadaci, greške, hintovi) NIJE hardkodirano: dolazi iz
+``master_content`` (Excel je izvor istine). Hardkodiran je samo *tekst pravila
+ponašanja* (globalne modularne smjernice i mode-instrukcije), isto kao što
+``prompts.py`` drži pedagoška pravila.
+
+Rezultat (``build_tutor_prompt`` / ``build_fallback_prompt``)::
+
+    {
+      "system_prompt": str,
+      "user_prompt": str,
+      "mode": "explain|practice|exam|quick",
+      "final_topic": str,               # = effective_topic (ili "unknown")
+      "opened_lesson_topic": str,       # tema otvorene Thinkific lekcije (iz lookup-a)
+      "effective_topic": str,           # tema stvarno korištena za kontekst prompta
+      "status": "ready|fallback|ambiguous|invalid",
+      "topic_context_used": bool,
+      "video_flow_used": bool,
+      "topic_conflict": bool,
+    }
+
+Base tutor ponašanje se preuzima iz ``prompts.build_system_prompt`` (lijeno,
+bez diranja app.py/prompts.py). Ako import nije moguć ili se potpis promijeni,
+koristi se mali fallback base prompt (``_BASE_FALLBACK_SYSTEM_PROMPT``).
+"""
+from __future__ import annotations
+
+import re
+from typing import Any
+
+from matbot.content_loader import normalize_value
+
+# --- Modovi ---------------------------------------------------------------------
+VALID_MODES = ("explain", "practice", "exam", "quick")
+DEFAULT_MODE = "explain"
+
+# Kanonske vrijednosti + bosanski UI aliasi (mapirani nakon lower+underscore).
+_MODE_ALIASES = {
+    "explain": "explain",
+    "objasni": "explain",
+    "objasni_mi": "explain",
+    "practice": "practice",
+    "vjezba": "practice",
+    "vjezbaj": "practice",
+    "vjezbaj_sa_mnom": "practice",
+    "exam": "exam",
+    "kontrolni": "exam",
+    "test": "exam",
+    "sutra_imam_kontrolni": "exam",
+    "quick": "quick",
+    "brzo": "quick",
+    "rezultat": "quick",
+    "samo_rezultat": "quick",
+}
+
+# --- Polja topic konteksta (tačno prema handoff §4/§6) --------------------------
+TOPIC_CONTEXT_FIELDS = (
+    "lesson_scope",
+    "common_mistake_1", "common_mistake_2", "common_mistake_3",
+    "ai_if_mistake_1", "ai_if_mistake_2", "ai_if_mistake_3",
+    "hint_method",
+    "solved_example_problem",
+    "solved_example_step_1", "solved_example_step_2",
+    "solved_example_step_3", "solved_example_step_4",
+    "solved_example_answer",
+    "typical_task_1", "typical_task_2", "typical_task_3",
+    "controlni_task_1", "controlni_task_2", "controlni_task_3",
+    "controlni_trick", "controlni_warning",
+    "forbidden_ai_behavior",
+    "when_to_recommend_video",
+    "exit_criteria",
+)
+_TOPIC_META_FIELDS = ("grade", "oblast", "display_name", "topic_type", "difficulty_level")
+
+# --- Globalne modularne smjernice (tekst ponašanja, ne podaci) ------------------
+GLOBAL_MODULAR_GUIDELINES = (
+    "==================================================\n"
+    "MODULARNA PRAVILA (6. RAZRED — BiH)\n"
+    "==================================================\n"
+    "- Ti si AI tutor za 6. razred osnovne škole u Bosni i Hercegovini.\n"
+    "- Odgovaraj KRATKO, jasno i školski, primjereno uzrastu 6. razreda.\n"
+    "- 6. razred je BIBLIOTEKA tema (modularni model). NE postoji jedan univerzalni\n"
+    "  redoslijed gradiva za sve škole, kantone ili entitete.\n"
+    "- NIKADA ne tvrdi da učenik 'kasni' s gradivom, niti da je neka tema obavezna\n"
+    "  za svaku školu ili da se mora raditi određenim redom.\n"
+    "- NE izmišljaj teme. Radi ISKLJUČIVO sa temom (final_topic) koju ti sistem da.\n"
+    "  Ako teme nema, zamoli učenika da izabere oblast ili pošalje zadatak.\n"
+    "- Koristi SAMO pedagoški sadržaj dat u ovom promptu (iz mastera).\n"
+    "- NE komentariši teme koje učenik nije radio i NE pravi dugoročnu memoriju.\n"
+    "- Ako je zadatak sa slike/teksta nejasan, traži jasniju sliku ili prepisan\n"
+    "  tekst; ne izmišljaj podatke.\n"
+)
+
+_BASE_FALLBACK_SYSTEM_PROMPT = (
+    "TI SI:\n"
+    "Asistent za matematiku za osnovnu školu u Bosni i Hercegovini (6. razred).\n"
+    "Odgovaraj isključivo na matematička pitanja, školskim stilom, korak po korak.\n"
+)
+
+# statusi
+_STATUS_READY = "ready"
+_FALLBACK_STATUS = {"unknown": "fallback", "ambiguous": "ambiguous", "invalid": "invalid"}
+
+
+# --- Male pomoćne funkcije ------------------------------------------------------
+
+def _base_system_prompt(grade: Any) -> str:
+    """Base tutor prompt iz prompts.py (lijeno, bez side-efekata). Fallback ako
+    import nije moguć ili se potpis razlikuje."""
+    g = normalize_value(grade) or "6"
+    try:
+        from prompts import build_system_prompt  # čista funkcija, bez IO/Flask-a
+        text = build_system_prompt(g)
+        if isinstance(text, str) and text.strip():
+            return text
+    except Exception:
+        pass
+    return _BASE_FALLBACK_SYSTEM_PROMPT
+
+
+def _collect(ctx: dict, keys: tuple[str, ...]) -> list[str]:
+    return [ctx.get(k, "") for k in keys if ctx.get(k)]
+
+
+# --- Javne pomoćne funkcije -----------------------------------------------------
+
+def normalize_mode(mode: Any) -> str:
+    """Vrati jedan od ``explain|practice|exam|quick``. Nepoznato/prazno → explain."""
+    key = re.sub(r"[\s\-]+", "_", normalize_value(mode).lower())
+    return _MODE_ALIASES.get(key, DEFAULT_MODE)
+
+
+def trim_conversation_history(history: Any, limit: int = 5) -> list:
+    """Zadnjih ``limit`` poruka. None/ne-lista → []. Redoslijed očuvan."""
+    if not isinstance(history, list) or limit <= 0:
+        return []
+    return history[-limit:]
+
+
+def get_topic_context(final_topic: Any, master_content: dict) -> dict:
+    """Izvuci polja iz TOPICS reda za dati topic. ``{}`` ako je tema
+    ``unknown``/nepostojeća (nikad ne izmišlja sadržaj)."""
+    tid = normalize_value(final_topic)
+    if not tid or tid.lower() == "unknown":
+        return {}
+    row = (master_content or {}).get("topics_by_id", {}).get(tid)
+    if not row:
+        return {}
+    ctx: dict[str, str] = {"topic": tid}
+    for f in _TOPIC_META_FIELDS:
+        if row.get(f):
+            ctx[f] = row[f]
+    for f in TOPIC_CONTEXT_FIELDS:
+        ctx[f] = row.get(f, "")
+    return ctx
+
+
+def get_video_flow_context(
+    payload: dict, final_topic: Any, master_content: dict
+) -> dict | None:
+    """VIDEO_FLOW red za temu — SAMO ako je ``entry_source == 'thinkific_lesson'``
+    i postoji red sa istim ``topic``. Bira najprecizniji red: lesson_title, pa
+    lesson_order, pa prvi red za tu temu. Inače ``None``."""
+    payload = payload or {}
+    if normalize_value(payload.get("entry_source")) != "thinkific_lesson":
+        return None
+    tid = normalize_value(final_topic)
+    if not tid or tid.lower() == "unknown":
+        return None
+    rows = (master_content or {}).get("video_flow") or []
+    topic_rows = [r for r in rows if r.get("topic") == tid]
+    if not topic_rows:
+        return None
+
+    title = normalize_value(payload.get("lesson_title"))
+    if title:
+        exact = [r for r in topic_rows if r.get("lesson_title") == title]
+        if exact:
+            return exact[0]
+    order = normalize_value(payload.get("lesson_order"))
+    if order:
+        by_order = [r for r in topic_rows if r.get("lesson_order") == order]
+        if by_order:
+            return by_order[0]
+    return topic_rows[0]
+
+
+def build_mode_instructions(mode: Any, final_topic: Any, topic_context: dict) -> str:
+    """Mode-specifične instrukcije (bosanski). ``exam`` bez teme traži oblast."""
+    mode = normalize_mode(mode)
+    tid = normalize_value(final_topic)
+    known = bool(topic_context) and bool(tid) and tid.lower() != "unknown"
+
+    if mode == "practice":
+        block = (
+            "MOD: VJEŽBAJ (practice)\n"
+            "- Daj TAČNO JEDAN zadatak i onda ČEKAJ odgovor učenika.\n"
+            "- NE daji 10 zadataka odjednom.\n"
+        )
+        tasks = _collect(topic_context, ("typical_task_1", "typical_task_2", "typical_task_3"))
+        if tasks:
+            block += "- Izaberi JEDAN od ponuđenih tipičnih zadataka:\n"
+            block += "".join(f"   • {t}\n" for t in tasks)
+        return block
+
+    if mode == "exam":
+        if not known:
+            return (
+                "MOD: KONTROLNI (exam)\n"
+                "- Tema kontrolnog NIJE poznata. PRVO pitaj učenika iz koje je "
+                "OBLASTI/TEME kontrolni (npr. skupovi, djeljivost, razlomci, "
+                "decimalni brojevi, kružnica/uglovi). NE pretpostavljaj temu.\n"
+            )
+        block = (
+            "MOD: KONTROLNI (exam)\n"
+            "- Daj TAČNO 3 kontrolna zadatka, zatim 1 trik i 1 upozorenje.\n"
+        )
+        c_tasks = _collect(
+            topic_context, ("controlni_task_1", "controlni_task_2", "controlni_task_3")
+        )
+        if c_tasks:
+            block += "- Kontrolni zadaci:\n"
+            block += "".join(f"   • {t}\n" for t in c_tasks)
+        trick = topic_context.get("controlni_trick", "")
+        warning = topic_context.get("controlni_warning", "")
+        if trick:
+            block += f"- Trik: {trick}\n"
+        if warning:
+            block += f"- Upozorenje: {warning}\n"
+        return block
+
+    if mode == "quick":
+        return (
+            "MOD: SAMO REZULTAT (quick)\n"
+            "- Daj SAMO rezultat i MAKSIMALNO 1–2 rečenice provjere.\n"
+            "- Bez dugog objašnjenja i bez nizanja koraka.\n"
+        )
+
+    # explain (default)
+    return (
+        "MOD: OBJASNI (explain)\n"
+        "- Odgovori KRATKO i jasno: prvo ideja/pristup, zatim 2–5 koraka, pa "
+        "rezultat i kratka provjera.\n"
+        "- Ako nedostaje kontekst za rješavanje, postavi JEDNO kratko pitanje "
+        "prije rješavanja.\n"
+    )
+
+
+# --- Blokovi user prompta -------------------------------------------------------
+
+_ENTRY_LABELS = (
+    ("grade", "Razred"),
+    ("entry_source", "Entry source"),
+    ("course_name", "Kurs"),
+    ("section_name", "Sekcija"),
+    ("lesson_order", "Lesson order"),
+    ("lesson_title", "Thinkific lekcija"),
+    ("selected_topic", "Selected topic"),
+    ("detected_topic", "Detected topic"),
+)
+
+_TOPIC_LABELS = (
+    ("display_name", "Naziv teme"),
+    ("oblast", "Oblast"),
+    ("lesson_scope", "Opseg lekcije (lesson_scope)"),
+    ("common_mistake_1", "Česta greška 1"),
+    ("common_mistake_2", "Česta greška 2"),
+    ("common_mistake_3", "Česta greška 3"),
+    ("ai_if_mistake_1", "AI ako greška 1"),
+    ("ai_if_mistake_2", "AI ako greška 2"),
+    ("ai_if_mistake_3", "AI ako greška 3"),
+    ("hint_method", "Metoda hinta"),
+    ("solved_example_problem", "Riješeni primjer — zadatak"),
+    ("solved_example_step_1", "Riješeni primjer — korak 1"),
+    ("solved_example_step_2", "Riješeni primjer — korak 2"),
+    ("solved_example_step_3", "Riješeni primjer — korak 3"),
+    ("solved_example_step_4", "Riješeni primjer — korak 4"),
+    ("solved_example_answer", "Riješeni primjer — odgovor"),
+    ("typical_task_1", "Tipičan zadatak 1"),
+    ("typical_task_2", "Tipičan zadatak 2"),
+    ("typical_task_3", "Tipičan zadatak 3"),
+    ("controlni_task_1", "Kontrolni zadatak 1"),
+    ("controlni_task_2", "Kontrolni zadatak 2"),
+    ("controlni_task_3", "Kontrolni zadatak 3"),
+    ("controlni_trick", "Kontrolni trik"),
+    ("controlni_warning", "Kontrolni upozorenje"),
+    ("when_to_recommend_video", "Kada preporučiti video"),
+    ("exit_criteria", "Kriterij izlaska"),
+)
+
+_VIDEO_LABELS = (
+    ("sta_ucenik_upravo_naucio", "Šta je učenik upravo naučio"),
+    ("ai_after_video", "AI poslije videa"),
+    ("recommended_mode", "Preporučeni mod"),
+)
+
+
+def _build_entry_context(payload: dict, final_topic: str, mode: str) -> str:
+    lines = ["KONTEKST:"]
+    for key, label in _ENTRY_LABELS:
+        val = normalize_value(payload.get(key))
+        if val:
+            lines.append(f"- {label}: {val}")
+    lines.append(f"- Final topic: {final_topic}")
+    lines.append(f"- Mod: {mode}")
+    return "\n".join(lines)
+
+
+def _build_topic_block(topic_context: dict) -> str:
+    if not topic_context:
+        return ""
+    lines = ["PODACI O TEMI (iz AI_MATH_CONTENT_MASTER):"]
+    for key, label in _TOPIC_LABELS:
+        val = topic_context.get(key, "")
+        if val:
+            lines.append(f"- {label}: {val}")
+    return "\n".join(lines)
+
+
+def _build_video_flow_block(vf: dict | None) -> str:
+    if not vf:
+        return ""
+    lines = ["VIDEO_FLOW KONTEKST (učenik dolazi iz Thinkific lekcije):"]
+    for key, label in _VIDEO_LABELS:
+        val = normalize_value(vf.get(key))
+        if val:
+            lines.append(f"- {label}: {val}")
+    return "\n".join(lines)
+
+
+def _build_student_block(payload: dict) -> str:
+    parts = []
+    msg = normalize_value(payload.get("student_message") or payload.get("message"))
+    if msg:
+        parts.append(f"PORUKA UČENIKA:\n{msg}")
+    ocr = normalize_value(
+        payload.get("image_ocr_text")
+        or payload.get("ocr_text")
+        or payload.get("image_text")
+    )
+    if ocr:
+        parts.append(f"TEKST ZADATKA SA SLIKE (OCR):\n{ocr}")
+    return "\n\n".join(parts)
+
+
+def _build_history_block(history: Any) -> str:
+    trimmed = trim_conversation_history(history)
+    if not trimmed:
+        return ""
+    lines = ["ZADNJE PORUKE (max 5):"]
+    for msg in trimmed:
+        if isinstance(msg, dict):
+            role = normalize_value(msg.get("role")) or "user"
+            content = normalize_value(
+                msg.get("content") or msg.get("text") or msg.get("message")
+            )
+        else:
+            role, content = "user", normalize_value(msg)
+        if content:
+            lines.append(f"- {role}: {content}")
+    return "\n".join(lines) if len(lines) > 1 else ""
+
+
+# --- Glavni builderi ------------------------------------------------------------
+
+def build_tutor_prompt(
+    payload: dict,
+    lookup_result: dict,
+    master_content: dict,
+    thinkific_map: dict | None = None,  # rezervisano; nije potrebno u Phase 2
+) -> dict:
+    """Sagradi strukturiran prompt iz Phase 1 lookup rezultata + master sadržaja.
+
+    ``lookup_result.status``: ``found`` → puni prompt (status ``ready``); ostalo
+    (``unknown``/``ambiguous``/``invalid``) → ``build_fallback_prompt``.
+    """
+    payload = payload or {}
+    lookup_result = lookup_result or {}
+    master_content = master_content or {}
+
+    status = normalize_value(lookup_result.get("status")).lower() or "unknown"
+    if status != "found":
+        reason = status if status in ("ambiguous", "invalid") else "unknown"
+        return build_fallback_prompt(payload, reason)
+
+    mode = normalize_mode(payload.get("mode"))
+    lesson_topic = normalize_value(lookup_result.get("final_topic"))
+    topic_ids = master_content.get("topic_ids", set())
+
+    # Konflikt tema (guidelines §9): otvorena lekcija vs. validan detected_topic.
+    detected = normalize_value(payload.get("detected_topic"))
+    is_lesson_ctx = normalize_value(payload.get("entry_source")) == "thinkific_lesson"
+    topic_conflict = (
+        is_lesson_ctx
+        and bool(detected)
+        and detected.lower() != "unknown"
+        and detected in topic_ids
+        and detected != lesson_topic
+    )
+    effective_topic = detected if topic_conflict else lesson_topic
+
+    topic_context = get_topic_context(effective_topic, master_content)
+    video_flow = get_video_flow_context(payload, effective_topic, master_content)
+
+    # --- system prompt ---
+    system_parts = [_base_system_prompt(payload.get("grade")), GLOBAL_MODULAR_GUIDELINES]
+    forbidden = topic_context.get("forbidden_ai_behavior", "")
+    if forbidden:
+        system_parts.append(
+            "ZABRANJENO PONAŠANJE ZA OVU TEMU (forbidden_ai_behavior):\n- " + forbidden
+        )
+    system_prompt = "\n\n".join(p for p in system_parts if p).strip()
+
+    # --- user prompt ---
+    user_parts = [_build_entry_context(payload, effective_topic, mode)]
+    if topic_conflict:
+        user_parts.append(
+            "NAPOMENA O NESLAGANJU TEME:\n"
+            f"- Otvorena lekcija je tema '{lesson_topic}', ali zadatak izgleda kao "
+            f"tema '{effective_topic}'.\n"
+            "- Riješi zadatak prema STVARNOJ temi zadatka i KRATKO napomeni ovo "
+            "neslaganje učeniku."
+        )
+    for block in (
+        _build_topic_block(topic_context),
+        _build_video_flow_block(video_flow),
+        build_mode_instructions(mode, effective_topic, topic_context),
+        _build_student_block(payload),
+        _build_history_block(payload.get("conversation_history")),
+    ):
+        if block:
+            user_parts.append(block)
+    user_prompt = "\n\n".join(user_parts).strip()
+
+    return {
+        "system_prompt": system_prompt,
+        "user_prompt": user_prompt,
+        "mode": mode,
+        "final_topic": effective_topic,
+        "opened_lesson_topic": lesson_topic,
+        "effective_topic": effective_topic,
+        "status": _STATUS_READY,
+        "topic_context_used": bool(topic_context),
+        "video_flow_used": bool(video_flow),
+        "topic_conflict": topic_conflict,
+    }
+
+
+def build_fallback_prompt(payload: dict, reason: Any) -> dict:
+    """Prompt kada tema NIJE upotrebljiva. ``reason``:
+    ``unknown`` → status ``fallback``; ``ambiguous`` → ``ambiguous``;
+    ``invalid`` → ``invalid``. Nikad ne izmišlja temu."""
+    payload = payload or {}
+    reason = normalize_value(reason).lower() or "unknown"
+    status = _FALLBACK_STATUS.get(reason, "fallback")
+    mode = normalize_mode(payload.get("mode"))
+
+    system_prompt = "\n\n".join(
+        [_base_system_prompt(payload.get("grade")), GLOBAL_MODULAR_GUIDELINES]
+    ).strip()
+
+    if reason == "ambiguous":
+        ask = (
+            "Pronašao sam više sličnih lekcija i ne mogu sa sigurnošću odabrati temu.\n"
+            "Zamoli učenika da izabere OBLAST/TEMU koju TRENUTNO radi (ručni izbor)."
+        )
+    elif reason == "invalid":
+        ask = (
+            "Tražena tema nije prepoznata kao validna tema iz mastera.\n"
+            "NE izmišljaj temu. Zamoli učenika da izabere postojeću oblast/temu ili "
+            "pošalje zadatak."
+        )
+    elif mode == "exam":
+        ask = (
+            "Tema kontrolnog nije poznata. Pitaj učenika iz koje je OBLASTI/TEME "
+            "kontrolni (npr. skupovi, djeljivost, razlomci, decimalni brojevi, "
+            "kružnica/uglovi). NE pretpostavljaj temu."
+        )
+    else:  # unknown
+        ask = (
+            "Ne mogu automatski prepoznati lekciju/temu.\n"
+            "Zamoli učenika da izabere oblast iz liste ili pošalje zadatak, pa "
+            "pomozi korak po korak."
+        )
+
+    user_prompt = "\n\n".join(
+        [_build_entry_context(payload, "unknown", mode), "FALLBACK:\n" + ask]
+    ).strip()
+
+    return {
+        "system_prompt": system_prompt,
+        "user_prompt": user_prompt,
+        "mode": mode,
+        "final_topic": "unknown",
+        "opened_lesson_topic": "unknown",
+        "effective_topic": "unknown",
+        "status": status,
+        "topic_context_used": False,
+        "video_flow_used": False,
+        "topic_conflict": False,
+    }
