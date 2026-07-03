@@ -251,6 +251,31 @@ def build_mode_instructions(mode: Any, final_topic: Any, topic_context: dict) ->
     )
 
 
+def build_practice_followup_instructions(payload: dict, topic_context: dict) -> str:
+    """Phase 4.3 — instrukcije kada je učenikova poruka ODGOVOR na prethodni
+    practice zadatak (``payload.interaction_phase == 'answering_practice_task'``).
+
+    Zamjenjuje standardne practice instrukcije: AI provjerava odgovor umjesto da
+    postavlja novi zadatak ili ponavlja lekciju."""
+    last_task = normalize_value((payload or {}).get("last_tutor_task"))[:600]
+    block = (
+        "MOD: VJEŽBA — PROVJERA ODGOVORA (practice follow-up)\n"
+        "- Učenikova poruka je ODGOVOR na prethodno postavljeni zadatak — NE "
+        "tretiraj je kao novo pitanje niti kao zahtjev za novi zadatak.\n"
+        "- Provjeri tačnost odgovora koristeći ZADNJI ZADATAK i historiju razgovora.\n"
+        "- Ako je TAČNO: kratko potvrdi (npr. \"Tačno!\"), u 1–2 rečenice objasni "
+        "zašto, pa po želji daj JEDAN novi mali zadatak ili sljedeći korak.\n"
+        "- Ako NIJE tačno: blago reci da nije tačno i daj JEDAN hint ili JEDAN "
+        "sljedeći korak; NE otkrivaj cijelo rješenje osim ako učenik to zatraži.\n"
+        "- NE ponavljaj cijelo objašnjenje teme i NE počinji isti zadatak ispočetka.\n"
+        "- Odgovor mora biti KRATAK i prirodan za chat: bez naslova poput "
+        "\"### Tema\" i bez dugih lekcija.\n"
+    )
+    if last_task:
+        block += f"ZADNJI ZADATAK (kojem učenik odgovara):\n{last_task}\n"
+    return block
+
+
 # --- Blokovi user prompta -------------------------------------------------------
 
 _ENTRY_LABELS = (
@@ -389,6 +414,13 @@ def build_tutor_prompt(
         return build_fallback_prompt(payload, reason)
 
     mode = normalize_mode(payload.get("mode"))
+    # Phase 4.3: follow-up odgovor na practice zadatak uvijek ide kao practice.
+    is_practice_followup = (
+        normalize_value(payload.get("interaction_phase")).lower()
+        == "answering_practice_task"
+    )
+    if is_practice_followup:
+        mode = "practice"
     lesson_topic = normalize_value(lookup_result.get("final_topic"))
     topic_ids = master_content.get("topic_ids", set())
 
@@ -426,10 +458,15 @@ def build_tutor_prompt(
             "- Riješi zadatak prema STVARNOJ temi zadatka i KRATKO napomeni ovo "
             "neslaganje učeniku."
         )
+    mode_block = (
+        build_practice_followup_instructions(payload, topic_context)
+        if is_practice_followup
+        else build_mode_instructions(mode, effective_topic, topic_context)
+    )
     for block in (
         _build_topic_block(topic_context),
         _build_video_flow_block(video_flow),
-        build_mode_instructions(mode, effective_topic, topic_context),
+        mode_block,
         _build_student_block(payload),
         _build_history_block(payload.get("conversation_history")),
     ):

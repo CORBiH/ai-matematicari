@@ -105,3 +105,30 @@ def test_legacy_form_not_in_tutor_card(client):
     block = _tutor_block(_html(client))
     assert 'id="ask-form"' not in block
     assert 'action="/submit"' not in block
+
+
+# --- Phase 4.3: practice follow-up stanje + renderer ------------------------------
+
+def test_practice_followup_state_present(client):
+    html = _html(client)
+    assert "awaiting_practice_answer" in html      # JS stanje
+    assert "answering_practice_task" in html       # interaction_phase u payloadu
+    assert "last_tutor_task" in html               # zadnji zadatak se šalje backendu
+    assert "matbot_tutor_lasttask_" in html        # localStorage ključ
+
+
+def test_renderer_handles_headings_and_bold(client):
+    html = _html(client)
+    # ### naslovi se pretvaraju u h3/h2 (ne prikazuje se sirovi markdown)
+    assert "'<h3>'+m[1]+'</h3>'" in html
+    assert "'<h2>'+m[1]+'</h2>'" in html
+    # **bold** → <strong>
+    assert "<strong>$1</strong>" in html
+    # linije sa samo "." se uklanjaju
+    assert "t === '.'" in html
+
+
+def test_friendly_meta_present(client):
+    html = _html(client)
+    assert "Režim:" in html
+    assert "topicNames" in html                    # display_name umjesto sirovog id-a

@@ -282,6 +282,57 @@ def test_no_conflict_when_detected_equals_lesson(master):
     assert res["final_topic"] == TOPIC
 
 
+# --- practice follow-up (Phase 4.3) ---------------------------------------------
+
+def test_practice_followup_instructions_included(master):
+    payload = {
+        "selected_topic": TOPIC,
+        "mode": "practice",
+        "interaction_phase": "answering_practice_task",
+        "last_tutor_task": "Da li je 2∈S ako je S={1,2,3}?",
+        "student_message": "da",
+    }
+    res = pb.build_tutor_prompt(payload, _found(), master)
+    up = res["user_prompt"]
+    assert "PROVJERA ODGOVORA" in up
+    assert "Da li je 2∈S ako je S={1,2,3}?" in up          # last_tutor_task u promptu
+    assert "ODGOVOR na prethodno postavljeni zadatak" in up
+    assert res["mode"] == "practice"
+
+
+def test_practice_followup_does_not_restart_task(master):
+    payload = {
+        "selected_topic": TOPIC,
+        "mode": "practice",
+        "interaction_phase": "answering_practice_task",
+        "student_message": "6",
+    }
+    res = pb.build_tutor_prompt(payload, _found(), master)
+    up = res["user_prompt"]
+    # follow-up NE smije instruisati novi svježi zadatak
+    assert "Daj TAČNO JEDAN zadatak i onda ČEKAJ" not in up
+    assert "NE počinji isti zadatak ispočetka" in up
+
+
+def test_practice_followup_forces_practice_mode(master):
+    # čak i bez mode polja, follow-up ide kao practice
+    res = pb.build_tutor_prompt(
+        {"selected_topic": TOPIC, "interaction_phase": "answering_practice_task",
+         "student_message": "6"},
+        _found(), master,
+    )
+    assert res["mode"] == "practice"
+
+
+def test_practice_followup_truncates_long_task(master):
+    long_task = "x" * 2000
+    txt = pb.build_practice_followup_instructions(
+        {"last_tutor_task": long_task}, {}
+    )
+    assert "x" * 600 in txt
+    assert "x" * 601 not in txt
+
+
 # --- struktura rezultata / guardrails -------------------------------------------
 
 def test_result_shape_keys(master):

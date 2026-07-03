@@ -139,3 +139,23 @@ buttons. Answers go through a small safe renderer (`renderTutorHTML`: escape fir
 becomes "Upiši svoj odgovor na zadatak...". The **legacy chat + `/submit` form +
 image upload moved unchanged into a collapsed `<details>` "Upload slike / napredni
 način"** section below. Backend untouched.
+
+### Phase 4.3 — practice answer flow + rendering polish
+
+- **Frontend state:** after a ready practice answer the widget sets
+  `interactionPhase = "awaiting_practice_answer"` and stores the task in
+  `localStorage` (`matbot_tutor_lasttask_<cid>`). The next typed message is sent as
+  an **answer**, with `interaction_phase: "answering_practice_task"`,
+  `last_tutor_task` (truncated to 600 chars) and `mode: "practice"` (via
+  "Pošalji tutoru"). Clicking any mode button resets the phase.
+- **`prompt_builder.py`:** new `build_practice_followup_instructions(payload,
+  topic_context)`; when `payload.interaction_phase == "answering_practice_task"` it
+  replaces the fresh-practice block — AI must evaluate the student's answer against
+  `last_tutor_task`/history (correct → confirm + brief why + optional next small
+  task; wrong → gentle + one hint), no topic re-explanations, no "### Tema"
+  headings, and the mode is forced to `practice`. `ai_tutor_service` needed no
+  change (payload passes through).
+- **Renderer:** `renderTutorHTML` now converts `###`→`<h3>`, `#`/`##`→`<h2>`,
+  drops "."-only lines, collapses excess `<br>`, still escapes first (no XSS, no
+  markdown lib); bubbles got heading/math/width polish. Meta line is friendly
+  ("Tema: <display_name> · Režim: Vježba") and hides raw topic ids.

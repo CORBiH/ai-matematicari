@@ -189,6 +189,12 @@
   body.dark .tmsg-user .tbubble{background:#12333a;}
   .tbubble ul,.tbubble ol{margin:.35rem 0 .35rem 1.25rem;padding:0;}
   .tbubble li{margin:.15rem 0;}
+  .tmsg-bot .tbubble{max-width:90%;}
+  .tmsg-user .tbubble{max-width:75%;}
+  .tbubble h2,.tbubble h3{margin:.55rem 0 .3rem;line-height:1.3;font-weight:700;}
+  .tbubble h2{font-size:1.08rem;border-bottom:1px solid var(--card-border);padding-bottom:.15rem;}
+  .tbubble h3{font-size:1.02rem;}
+  .tbubble mjx-container{margin:.35rem 0 !important;}
   .tutor-typing{align-self:flex-start;font-weight:600;background:var(--type-bg);border-left:4px solid var(--type-border);
     border-radius:10px;padding:.5rem .7rem;}
   .tutor-typing.hidden{display:none;}
@@ -786,8 +792,13 @@ document.addEventListener('DOMContentLoaded', () => {
       const flush = ()=>{ if(list){ out += '</' + list + '>'; list = null; } };
       for (const line of lines){
         const t = line.trim();
+        if (t === '.') continue;                      // beskorisne linije sa samo "."
         let m;
-        if ((m = /^[-*•]\s+(.+)$/.exec(t))){
+        if ((m = /^#{3,}\s*(.+)$/.exec(t))){          // ### Naslov → h3
+          flush(); out += '<h3>'+m[1]+'</h3>';
+        } else if ((m = /^##?\s+(.+)$/.exec(t))){     // # / ## Naslov → h2
+          flush(); out += '<h2>'+m[1]+'</h2>';
+        } else if ((m = /^[-*•]\s+(.+)$/.exec(t))){
           if (list !== 'ul'){ flush(); out += '<ul>'; list = 'ul'; }
           out += '<li>' + m[1] + '</li>';
         } else if ((m = /^\d+[.)]\s+(.+)$/.exec(t))){
@@ -799,7 +810,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       }
       flush();
-      return out;
+      /* čisti razmaci: max jedan prazan red, bez <br> na početku/kraju */
+      return out
+        .replace(/(<br>){3,}/g, '<br><br>')
+        .replace(/^(<br>)+/, '')
+        .replace(/(<br>)+$/, '')
+        .replace(/(<\/h[23]>)(<br>)+/g, '$1')
+        .replace(/(<br>)+(<h[23]>)/g, '$2');
     }
 
     /* Poruke se dodaju UNUTAR tutor kartice (tutorChat), ne u legacy chat. */
@@ -828,6 +845,14 @@ document.addEventListener('DOMContentLoaded', () => {
     let cid = 'default';
     try { cid = (typeof getCID === 'function' && getCID()) || 'default'; } catch(_){ cid = 'default'; }
     const TKEY = 'matbot_tutor_history_' + cid;
+    const LASTTASK_KEY = 'matbot_tutor_lasttask_' + cid;
+
+    /* Phase 4.3: lagano stanje interakcije (practice tok: zadatak → odgovor → feedback) */
+    let interactionPhase = null;   // 'awaiting_practice_answer' | null
+    const DEFAULT_PLACEHOLDER = 'Upiši pitanje ili zadatak...';
+    const ANSWER_PLACEHOLDER = 'Upiši svoj odgovor na zadatak...';
+    const MODE_LABELS = { explain: 'Objašnjenje', practice: 'Vježba', exam: 'Kontrolni', quick: 'Rezultat' };
+    const topicNames = {};         // topic id → display_name (za prijateljski meta red)
 
     function tutorHistory(){
       try { const a = JSON.parse(localStorage.getItem(TKEY) || '[]'); return Array.isArray(a) ? a : []; }
@@ -843,6 +868,8 @@ document.addEventListener('DOMContentLoaded', () => {
     modeRow.querySelectorAll('.mode-btn').forEach(b=>{
       b.addEventListener('click', ()=>{
         currentMode = b.dataset.mode || 'explain';
+        interactionPhase = null;                 // novi režim prekida čekanje odgovora na zadatak
+        msgBox.placeholder = DEFAULT_PLACEHOLDER;
         modeRow.querySelectorAll('.mode-btn').forEach(x=>x.classList.toggle('active', x === b));
         sendTutorMsg();   // akcija: odmah šalje (sa default porukom ako je textarea prazan)
       });
@@ -859,6 +886,7 @@ document.addEventListener('DOMContentLoaded', () => {
           const og = document.createElement('optgroup');
           og.label = oblast;
           (grouped[oblast] || []).forEach(t=>{
+            topicNames[t.topic] = t.display_name || t.topic;
             const opt = document.createElement('option');
             opt.value = t.topic;
             opt.textContent = t.display_name || t.topic;
@@ -893,6 +921,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function resolveOutgoing(){
       const typed = (msgBox.value || '').trim();
       const topic = topicSel.value || '';
+      if (typed && interactionPhase === 'awaiting_practice_answer')
+        return { message: typed, fromTyped: true, phase: 'answering_practice_task' }; // odgovor na zadatak, ne novi zahtjev
       if (typed) return { message: typed, fromTyped: true };           // upisano pitanje → uvijek šalji
       if (currentMode === 'quick')
         return { block: 'Unesi zadatak za koji želiš samo rezultat.' }; // quick bez teksta → ne šalji
@@ -936,6 +966,12 @@ document.addEventListener('DOMContentLoaded', () => {
         student_message: text,
         conversation_history: tutorHistory()
       };
+      if (resolved.phase){                        // odgovor na practice zadatak
+        payload.interaction_phase = resolved.phase;
+        payload.mode = 'practice';
+        try { payload.last_tutor_task = (localStorage.getItem(LASTTASK_KEY) || '').slice(0, 600); }
+        catch(_){ payload.last_tutor_task = ''; }
+      }
 
       tutorBusy = true;
       appendTutorMsg('user', escapeHtml(text));
@@ -955,9 +991,20 @@ document.addEventListener('DOMContentLoaded', () => {
         const answer = (j && j.answer) ? j.answer : 'Nema odgovora.';
         appendTutorMsg('bot', renderTutorHTML(answer));
         pushTutor('assistant', answer);
-        if (metaBox) metaBox.textContent = 'tema: ' + (j.final_topic || '—') + ' · mod: ' + (j.mode || currentMode) + ' · status: ' + (j.status || '—');
+        if (metaBox){                              // prijateljski meta red (bez sirovih id-eva)
+          const tid = j.final_topic || '';
+          const tname = topicNames[tid] || '';
+          const rez = MODE_LABELS[j.mode || currentMode] || '';
+          metaBox.textContent = (tname && tid !== 'unknown')
+            ? ('Tema: ' + tname + ' · Režim: ' + rez)
+            : (rez ? 'Režim: ' + rez : '');
+        }
         if (resolved.fromTyped) msgBox.value = '';   // očisti tek nakon uspješnog slanja UPISANE poruke
-        if (currentMode === 'practice' && j.status === 'ready') msgBox.placeholder = 'Upiši svoj odgovor na zadatak...';
+        if ((currentMode === 'practice' || resolved.phase) && j.status === 'ready'){
+          interactionPhase = 'awaiting_practice_answer';   // sljedeća upisana poruka = odgovor na zadatak
+          msgBox.placeholder = ANSWER_PLACEHOLDER;
+          try { localStorage.setItem(LASTTASK_KEY, (answer || '').slice(0, 600)); } catch(_){}
+        }
         if (j.status && j.status !== 'ready') showFallback(j.status);
       }catch(_){
         appendTutorMsg('bot', '<em>Greška pri slanju zahtjeva. Pokušaj ponovo.</em>');
