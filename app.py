@@ -918,9 +918,10 @@ def ai_tutor_topics():
     Čita iz Phase 1 content_loader-a; ništa se ne hardkodira, bez tajni."""
     try:
         return jsonify(ai_tutor_service.list_topics()), 200
-    except Exception as e:
+    except Exception:
         log.exception("ai_tutor_topics: neuspjeh")
-        return jsonify({"error": "ai_tutor_topics_failed", "detail": str(e)}), 500
+        return jsonify({"error": "ai_tutor_topics_failed",
+                        "detail": "Došlo je do greške na serveru. Pokušaj ponovo."}), 500
 
 
 @app.route("/api/ai-tutor/chat", methods=["POST", "OPTIONS"])
@@ -937,9 +938,10 @@ def ai_tutor_chat():
         result = ai_tutor_service.handle_chat(
             data, openai_chat=_openai_chat, model=MODEL_TEXT, timeout=OPENAI_TIMEOUT,
         )
-    except Exception as e:
+    except Exception:
         log.exception("ai_tutor_chat: neuspjeh")
-        return jsonify({"error": "ai_tutor_failed", "detail": str(e)}), 500
+        return jsonify({"error": "ai_tutor_failed",
+                        "detail": "Došlo je do greške na serveru. Pokušaj ponovo."}), 500
     return jsonify(result), 200
 
 

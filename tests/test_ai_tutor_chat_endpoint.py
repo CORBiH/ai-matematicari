@@ -173,6 +173,127 @@ def test_options_preflight(client):
     assert resp.status_code == 204
 
 
+# --- Phase 6: free_chat detekcija teme + pametniji fallbackovi --------------------
+
+@pytest.fixture(scope="module")
+def master():
+    return cl.load_master_content()
+
+
+def test_free_chat_aritmeticka_sredina_ready(client, fake_openai):
+    """Tema NIJE izabrana — heuristika prepoznaje aritmetičku sredinu → ready."""
+    resp = client.post(CHAT_URL, json={
+        "entry_source": "free_chat",
+        "student_message": "Kako se računa aritmetička sredina brojeva 4, 6 i 8?",
+    })
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["status"] == "ready"
+    assert body["final_topic"] == "aritmeticka_sredina"
+    assert body["answer"] == fake_openai.state["reply"]
+    # heuristika je pogodila → samo JEDAN OpenAI poziv (odgovor, bez klasifikatora)
+    assert len(fake_openai.calls.messages) == 1
+
+
+def test_free_chat_fractions_no_topic_required(client, fake_openai, master):
+    resp = client.post(CHAT_URL, json={"student_message": "Izračunaj 1/2 + 1/3"})
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["status"] == "ready"
+    assert body["final_topic"].startswith("razlomci_")
+    assert body["final_topic"] in master["topic_ids"]
+
+
+def test_free_chat_classifier_valid_topic_accepted(client, fake_openai):
+    """Heuristika ne pogađa; LLM klasifikator (mock) vraća validnu temu."""
+    fake_openai.state["reply"] = '{"detected_topic": "n_n0_mnozenje"}'
+    resp = client.post(CHAT_URL, json={"student_message": "Izračunaj 25 · 37"})
+    body = resp.get_json()
+    assert body["status"] == "ready"
+    assert body["final_topic"] == "n_n0_mnozenje"
+    # klasifikator + odgovor = 2 poziva
+    assert len(fake_openai.calls.messages) == 2
+
+
+def test_free_chat_classifier_garbage_general_answer(client, fake_openai):
+    """Klasifikator vrati smeće → unknown → opšti odgovor BEZ izmišljene teme."""
+    # default fake reply "Test odgovor: x = 3" nije JSON → klasifikator = unknown
+    resp = client.post(CHAT_URL, json={"student_message": "Izračunaj 25 · 37 - 4"})
+    body = resp.get_json()
+    assert body["status"] == "ready"                 # ipak odgovaramo (opšti prompt)
+    assert body["final_topic"] == "unknown"          # tema NIJE izmišljena
+    assert len(fake_openai.calls.messages) == 2      # klasifikator + odgovor
+    # opšti prompt ne smije imati topic kontekst
+    answer_prompt = fake_openai.calls.messages[-1][-1]["content"]
+    assert "PODACI O TEMI" not in answer_prompt
+
+
+def test_classifier_not_called_when_topic_selected(client, fake_openai):
+    resp = client.post(CHAT_URL, json={
+        "selected_topic": "skupovi_uvod",
+        "student_message": "Izračunaj 25 · 37",     # i konkretna poruka
+    })
+    assert resp.get_json()["final_topic"] == "skupovi_uvod"
+    assert len(fake_openai.calls.messages) == 1      # samo odgovor, bez detekcije
+
+
+def test_vague_free_chat_still_fallback(client):
+    # bez fake_openai — dokaz da se OpenAI NE zove za vague poruke
+    resp = client.post(CHAT_URL, json={"student_message": "Kako ovo"})
+    body = resp.get_json()
+    assert body["status"] == "fallback"
+    assert body["final_topic"] == "unknown"
+
+
+def test_exam_no_topic_asks_oblast(client, master):
+    resp = client.post(CHAT_URL, json={"mode": "exam", "student_message": "Sutra imam kontrolni"})
+    body = resp.get_json()
+    assert body["status"] == "fallback"
+    assert "Iz koje oblasti je kontrolni?" in body["answer"]
+    # lista oblasti dolazi iz mastera (data-driven, ne hardkodirano)
+    some_oblast = master["topics"][0]["oblast"]
+    assert some_oblast in body["answer"]
+
+
+def test_message_cap_4000(client, fake_openai):
+    long_msg = "Izračunaj " + "X" * 8000
+    resp = client.post(CHAT_URL, json={"selected_topic": "skupovi_uvod",
+                                       "student_message": long_msg})
+    assert resp.status_code == 200
+    sent = fake_openai.calls.messages[-1][-1]["content"]
+    assert "X" * 3000 in sent                        # poruka je stigla…
+    assert "X" * 4001 not in sent                    # …ali skraćena na max 4000
+
+
+def test_history_caps(client, fake_openai):
+    history = [{"role": "user", "content": f"H{i}" + "y" * 3000} for i in range(7)]
+    resp = client.post(CHAT_URL, json={
+        "selected_topic": "skupovi_uvod",
+        "conversation_history": history,
+    })
+    assert resp.status_code == 200
+    sent = fake_openai.calls.messages[-1][-1]["content"]
+    assert "H6" in sent and "H2" in sent             # zadnjih 5 (H2..H6)
+    assert "H1" not in sent and "H0" not in sent
+    # po stavci max 1500 ukupno ("H6" + 1498 y-ona)
+    assert "y" * 1400 in sent
+    assert "y" * 1499 not in sent
+
+
+def test_500_does_not_leak_exception(client, monkeypatch):
+    import app as app_mod
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("SUPER TAJNA INTERNA GREŠKA 42")
+
+    monkeypatch.setattr(app_mod.ai_tutor_service, "handle_chat", _boom)
+    resp = client.post(CHAT_URL, json={"selected_topic": "skupovi_uvod"})
+    assert resp.status_code == 500
+    text = resp.get_data(as_text=True)
+    assert "SUPER TAJNA" not in text                 # bez curenja internih detalja
+    assert resp.get_json()["error"] == "ai_tutor_failed"
+
+
 # --- Phase 5: activity logging ---------------------------------------------------
 
 def test_chat_logs_ready_response(client, fake_openai, _tmp_activity_db):

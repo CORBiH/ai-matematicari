@@ -488,6 +488,46 @@ def build_tutor_prompt(
     }
 
 
+def build_general_tutor_prompt(payload: dict) -> dict:
+    """Phase 6 — free_chat sa KONKRETNIM pitanjem, ali tema nije prepoznata.
+
+    Gradi prompt BEZ topic konteksta (ništa se ne izmišlja): base tutor + modularna
+    pravila + mode instrukcije + poruka učenika. Status je ``ready`` jer se OpenAI
+    poziva; ``final_topic`` ostaje ``"unknown"``."""
+    payload = payload or {}
+    mode = normalize_mode(payload.get("mode"))
+
+    system_prompt = "\n\n".join(
+        [_base_system_prompt(payload.get("grade")), GLOBAL_MODULAR_GUIDELINES]
+    ).strip()
+
+    user_parts = [
+        _build_entry_context(payload, "unknown", mode),
+        "NAPOMENA (tema nije prepoznata):\n"
+        "- Pitanje učenika je konkretno, ali tema nije pronađena u biblioteci tema.\n"
+        "- Odgovori na KONKRETNO pitanje koristeći gradivo 6. razreda, kratko i "
+        "korak po korak.\n"
+        "- NE izmišljaj temu i ne spominji internu listu tema.",
+        build_mode_instructions(mode, "unknown", {}),
+        _build_student_block(payload),
+        _build_history_block(payload.get("conversation_history")),
+    ]
+    user_prompt = "\n\n".join(p for p in user_parts if p).strip()
+
+    return {
+        "system_prompt": system_prompt,
+        "user_prompt": user_prompt,
+        "mode": mode,
+        "final_topic": "unknown",
+        "opened_lesson_topic": "unknown",
+        "effective_topic": "unknown",
+        "status": _STATUS_READY,
+        "topic_context_used": False,
+        "video_flow_used": False,
+        "topic_conflict": False,
+    }
+
+
 def build_fallback_prompt(payload: dict, reason: Any) -> dict:
     """Prompt kada tema NIJE upotrebljiva. ``reason``:
     ``unknown`` → status ``fallback``; ``ambiguous`` → ``ambiguous``;

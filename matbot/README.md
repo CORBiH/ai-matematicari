@@ -156,6 +156,29 @@ način"** section below. Backend untouched.
   Tests: `tests/test_activity_log.py` + logging tests in
   `tests/test_ai_tutor_chat_endpoint.py`.
 
+### Phase 6 — free_chat topic detection + smarter fallbacks
+
+Topic selection is now truly optional. `matbot/topic_detector.py`:
+`is_vague_message` (math signals + topic keywords), `detect_topic_heuristic`
+(static patterns → candidate ids validated against the master; broad terms map to
+the *first* topic of that prefix in TOPICS sheet order — data-driven), and
+`detect_topic_llm` (cheap classifier through the injected `openai_chat`, JSON-only
+`{"detected_topic": ...}`, every output coerced through `validate_detected_topic`
+— garbage/invented → unknown; never raises). Order: heuristics first, LLM only when
+they miss on a concrete message.
+
+`handle_chat` flow: lookup unknown + concrete message → detect → if valid topic,
+re-resolve via `get_final_topic` and answer normally; if still unknown → new
+`build_general_tutor_prompt` (base prompt, **no invented topic**, `final_topic=
+"unknown"`, `status="ready"`). Vague messages still fall back — now mode-specific
+(`_fallback_answer`): exam asks "Iz koje oblasti je kontrolni?" with the oblast
+list built from the master, practice asks for a topic/task, quick requires a
+concrete task. Also added: input caps (message 4000, history 5×1500,
+last_tutor_task 1000), per-mode `max_tokens` (quick 250 / explain+practice 700 /
+exam 900), and sanitized 500 responses in `app.py` (no raw `str(e)` to clients).
+Tests: `tests/test_topic_detector.py` + Phase 6 block in
+`tests/test_ai_tutor_chat_endpoint.py`.
+
 ### Phase 5.1 — single-tutor layout polish (template-only)
 
 The page now renders **one** card: the legacy `/submit` form (grade select, textarea,
