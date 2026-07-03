@@ -114,3 +114,14 @@ Tests: `tests/test_ai_tutor_chat_endpoint.py` (OpenAI mocked via the existing
   as escaped `pre-wrap` text through the page's existing MathJax. The **legacy
   `#ask-form` → `/submit` flow and image upload are untouched**; no new JS/CSS
   frameworks. Tests: `tests/test_ai_tutor_topics_endpoint.py`.
+
+### Phase 4.1 — mode buttons become action shortcuts
+
+The four mode buttons (`data-action="tutor-send"`) now set the mode, mark themselves
+active, and **immediately send** (same path as "Pošalji tutoru"). When the textarea is
+empty they use sensible defaults: explain/practice/exam with a selected topic send a
+default Bosnian prompt; exam with no topic still sends (backend asks which area);
+`quick` with an empty textarea shows a validation message and does **not** send;
+explain/practice with no topic and no text show the topic-selector fallback. Typed
+text is cleared only after a successful send; a busy-guard prevents overlapping
+requests. Backend unchanged. Tests: `tests/test_ai_tutor_widget_template.py`.

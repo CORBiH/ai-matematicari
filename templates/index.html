@@ -224,10 +224,10 @@
       <div class="muted" style="margin-bottom:.4rem;">Izaberi način rada i po želji temu, pa pošalji pitanje.</div>
 
       <div class="mode-row" id="tutorModes" role="group" aria-label="Način rada">
-        <button type="button" class="btn sm mode-btn active" data-mode="explain">📘 Objasni mi</button>
-        <button type="button" class="btn sm mode-btn" data-mode="practice">✏️ Vježbaj sa mnom</button>
-        <button type="button" class="btn sm mode-btn" data-mode="exam">📝 Sutra imam kontrolni</button>
-        <button type="button" class="btn sm mode-btn" data-mode="quick">⚡ Samo rezultat</button>
+        <button type="button" class="btn sm mode-btn active" data-mode="explain" data-action="tutor-send">📘 Objasni mi</button>
+        <button type="button" class="btn sm mode-btn" data-mode="practice" data-action="tutor-send">✏️ Vježbaj sa mnom</button>
+        <button type="button" class="btn sm mode-btn" data-mode="exam" data-action="tutor-send">📝 Sutra imam kontrolni</button>
+        <button type="button" class="btn sm mode-btn" data-mode="quick" data-action="tutor-send">⚡ Samo rezultat</button>
       </div>
 
       <div id="tutor-fallback" class="tutor-fallback hidden" aria-live="polite">
@@ -751,11 +751,12 @@ document.addEventListener('DOMContentLoaded', () => {
       try { localStorage.setItem(TKEY, JSON.stringify(a.slice(-5))); } catch(_){}
     }
 
-    /* mode dugmad */
+    /* mode dugmad = AKCIJSKA dugmad: postavi mod, markiraj aktivno, ODMAH pošalji */
     modeRow.querySelectorAll('.mode-btn').forEach(b=>{
       b.addEventListener('click', ()=>{
         currentMode = b.dataset.mode || 'explain';
         modeRow.querySelectorAll('.mode-btn').forEach(x=>x.classList.toggle('active', x === b));
+        sendTutorMsg();   // akcija: odmah šalje (sa default porukom ako je textarea prazan)
       });
     });
 
@@ -797,11 +798,42 @@ document.addEventListener('DOMContentLoaded', () => {
       try { topicSel.focus(); } catch(_){}
     }
 
-    async function sendTutorMsg(){
-      const text  = (msgBox.value || '').trim();
+    /* Odredi poruku koja se šalje. Ako je textarea prazan, akcijska dugmad
+       koriste smislen default po modu/temi; neki slučajevi se NE šalju (block). */
+    function resolveOutgoing(){
+      const typed = (msgBox.value || '').trim();
       const topic = topicSel.value || '';
-      if(!text){ showToast('Unesi pitanje.', 'err'); return; }
+      if (typed) return { message: typed, fromTyped: true };           // upisano pitanje → uvijek šalji
+      if (currentMode === 'quick')
+        return { block: 'Unesi zadatak za koji želiš samo rezultat.' }; // quick bez teksta → ne šalji
+      if (currentMode === 'exam')
+        return { message: topic ? 'Sutra imam kontrolni iz ove teme. Pripremi me.'
+                                : 'Sutra imam kontrolni.', fromTyped: false }; // bez teme → backend pita oblast
+      if (!topic)
+        return { block: 'Izaberi temu iz liste ili upiši svoje pitanje.' }; // explain/practice bez teme i teksta
+      if (currentMode === 'practice')
+        return { message: 'Daj mi jedan zadatak za vježbu iz ove teme.', fromTyped: false };
+      return { message: 'Objasni mi ovu temu.', fromTyped: false };     // explain + tema
+    }
 
+    function setTutorBusy(on){
+      sendTutor.disabled = on;
+      modeRow.querySelectorAll('.mode-btn').forEach(b=> b.disabled = on);
+    }
+
+    let tutorBusy = false;
+    async function sendTutorMsg(){
+      if (tutorBusy) return;                       // spriječi preklapanje zahtjeva
+      const resolved = resolveOutgoing();
+      if (resolved.block){                         // validacija/fallback bez slanja
+        fbMsg.textContent = resolved.block;
+        fbBox.classList.remove('hidden');
+        try { (topicSel.value ? msgBox : topicSel).focus(); } catch(_){}
+        return;
+      }
+
+      const text  = resolved.message;
+      const topic = topicSel.value || '';
       const gradeVal = (typeof razredHidden !== 'undefined' && razredHidden && razredHidden.value) ? razredHidden.value : '6';
       const payload = {
         grade: parseInt(gradeVal, 10) || 6,
@@ -813,13 +845,13 @@ document.addEventListener('DOMContentLoaded', () => {
         conversation_history: tutorHistory()
       };
 
+      tutorBusy = true;
       document.getElementById('chat-card')?.classList.remove('is-empty');
       appendUserBubble({ text });
       pushTutor('user', text);
-      msgBox.value = '';
       fbBox.classList.add('hidden');
       showTyping();
-      sendTutor.disabled = true;
+      setTutorBusy(true);
 
       try{
         const r = await fetch('/api/ai-tutor/chat', {
@@ -833,15 +865,18 @@ document.addEventListener('DOMContentLoaded', () => {
         appendBotHTML('<div style="white-space:pre-wrap">' + escapeHtml(answer) + '</div>');
         pushTutor('assistant', answer);
         if (metaBox) metaBox.textContent = 'tema: ' + (j.final_topic || '—') + ' · mod: ' + (j.mode || currentMode) + ' · status: ' + (j.status || '—');
+        if (resolved.fromTyped) msgBox.value = '';   // očisti tek nakon uspješnog slanja UPISANE poruke
         if (j.status && j.status !== 'ready') showFallback(j.status);
       }catch(_){
         appendBotHTML('<div class="alert alert-danger">Greška pri slanju zahtjeva.</div>');
       }finally{
         hideTyping();
-        sendTutor.disabled = false;
+        setTutorBusy(false);
+        tutorBusy = false;
       }
     }
 
+    /* "Pošalji tutoru" = ručno slanje sa trenutno aktivnim modom i upisanom porukom */
     sendTutor.addEventListener('click', sendTutorMsg);
   })();
 });
