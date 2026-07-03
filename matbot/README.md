@@ -39,3 +39,21 @@ needed for back-compat, and `gunicorn app:app` keeps working unchanged.
 
 Each phase is its own reviewable step: small move → update its test seam → `pytest` green
 → stop and summarize. Do **not** batch phases.
+
+## Separate track: `content_loader` + `topic_lookup` (6. razred MVP, Phase 1)
+
+These two modules are **not** part of the `app.py` → factory migration above and touch
+none of its test seams. They are self-contained data logic for the modular 6th-grade
+AI tutor:
+
+- `content_loader.py` — loads/normalizes the two source-of-truth Excel files in
+  `data/6_razred/` (`AI_MATH_CONTENT_MASTER…` TOPICS + optional sheets;
+  `THINKIFIC_MAP…` MAP + optional TOPIC_REFERENCE) via `openpyxl`, and validates that
+  every mapped topic exists in TOPICS.
+- `topic_lookup.py` — `topic_exists` / `validate_topic` / `validate_detected_topic` /
+  `find_lesson` / `get_final_topic`, implementing the lookup priority from
+  `docs/handoff/…`. Returns structured `{final_topic, status, source, message, matches}`.
+
+Nothing here is imported by `app.py`; there is no file I/O at import time (loading is
+lazy + cached). Tests: `tests/test_content_loader.py`, `tests/test_topic_lookup.py`.
+Content is **never** hardcoded — the Excel files are the source of truth.

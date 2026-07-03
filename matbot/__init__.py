@@ -23,6 +23,41 @@ Phase status
 
 NOTE: the test alias ``import app as matbot`` is a private alias of the legacy
 entrypoint module and is unrelated to this package's name.
+
+Phase 1 (6. razred modular MVP) adds two *self-contained* modules that are NOT
+wired into ``app.py`` and do not read any file at import time (loading is lazy):
+``content_loader`` (Excel → normalized data) and ``topic_lookup`` (final_topic
+resolution). Importing them changes no runtime behavior.
 """
 
-__all__: list[str] = []
+from matbot.content_loader import (
+    ContentLoadError,
+    get_master,
+    get_thinkific_map,
+    load_master_content,
+    load_thinkific_map,
+    validate_mapped_topics,
+)
+from matbot.topic_lookup import (
+    find_lesson,
+    get_final_topic,
+    topic_exists,
+    validate_detected_topic,
+    validate_topic,
+)
+
+__all__: list[str] = [
+    # content_loader
+    "ContentLoadError",
+    "load_master_content",
+    "load_thinkific_map",
+    "validate_mapped_topics",
+    "get_master",
+    "get_thinkific_map",
+    # topic_lookup
+    "topic_exists",
+    "validate_topic",
+    "validate_detected_topic",
+    "find_lesson",
+    "get_final_topic",
+]

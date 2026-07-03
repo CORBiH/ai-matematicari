@@ -18,6 +18,9 @@ google-cloud-tasks>=2.16.0
 # --- Google Sheets ---
 gspread>=6.0.0
 
+# --- Excel content za 6. razred (modular data: master + Thinkific mapa) ---
+openpyxl>=3.1
+
 # --- Ostalo što već koristiš ---
 numpy
 sympy
