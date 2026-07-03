@@ -100,3 +100,17 @@ the app's existing `_openai_chat` → structured JSON.
 
 Tests: `tests/test_ai_tutor_chat_endpoint.py` (OpenAI mocked via the existing
 `fake_openai` fixture; non-ready tests prove OpenAI is not called).
+
+### Phase 4 — frontend widget + `GET /api/ai-tutor/topics`
+
+- `list_topics(master=None)` (in `ai_tutor_service.py`) → `{"grade", "topics":
+  [{oblast, topic, display_name}], "grouped": {oblast: [...]}}`, READY-only, sorted
+  by (oblast, display_name), loaded from Phase 1 `get_master()` (no hardcoding, no
+  secrets). Exposed via `GET /api/ai-tutor/topics` (thin additive route in `app.py`).
+- `templates/index.html` gains a **separate additive "Modularni AI tutor" card**
+  (4 mode buttons, backend-populated topic `<select>`, message box, fallback area,
+  debug meta) that POSTs to `/api/ai-tutor/chat`, keeps the last 5 messages in
+  `localStorage` (safe `matbot_tutor_history_<cid|default>` key), and renders `answer`
+  as escaped `pre-wrap` text through the page's existing MathJax. The **legacy
+  `#ask-form` → `/submit` flow and image upload are untouched**; no new JS/CSS
+  frameworks. Tests: `tests/test_ai_tutor_topics_endpoint.py`.

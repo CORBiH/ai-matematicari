@@ -34,7 +34,7 @@ resolution). Phase 2 adds ``prompt_builder`` (structured prompt from Phase 1 out
 Importing this package changes no runtime behavior on its own.
 """
 
-from matbot.ai_tutor_service import handle_chat
+from matbot.ai_tutor_service import handle_chat, list_topics
 from matbot.content_loader import (
     ContentLoadError,
     get_master,
@@ -82,6 +82,7 @@ __all__: list[str] = [
     "normalize_mode",
     "trim_conversation_history",
     "build_mode_instructions",
-    # ai_tutor_service (Phase 3)
+    # ai_tutor_service (Phase 3/4)
     "handle_chat",
+    "list_topics",
 ]

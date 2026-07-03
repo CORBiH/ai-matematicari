@@ -35,6 +35,49 @@ _DEFAULT_FALLBACK_ANSWER = (
 )
 
 
+def list_topics(master: dict | None = None) -> dict:
+    """Phase 4 — lista tema za UI dropdown (GET /api/ai-tutor/topics).
+
+    Učitava iz Phase 1 ``get_master`` (Excel je izvor istine; ništa nije
+    hardkodirano). Vraća samo READY teme (ako postoji ``status`` kolona),
+    sortirano i grupisano po oblasti::
+
+        {
+          "grade": 6,
+          "topics":  [{"oblast": ..., "topic": ..., "display_name": ...}, ...],
+          "grouped": {"Skupovi": [ ... ], ...},
+        }
+    """
+    master = master if master is not None else get_master()
+    rows = master.get("topics", [])
+
+    ready = [
+        r
+        for r in rows
+        if r.get("topic")
+        and (not r.get("status") or normalize_value(r.get("status")).upper() == "READY")
+    ]
+
+    topics = [
+        {
+            "oblast": r.get("oblast", ""),
+            "topic": r["topic"],
+            "display_name": r.get("display_name") or r["topic"],
+        }
+        for r in ready
+    ]
+    topics.sort(key=lambda t: (t["oblast"], t["display_name"]))
+
+    grouped: dict[str, list] = {}
+    for t in topics:
+        grouped.setdefault(t["oblast"], []).append(t)
+
+    grades = {normalize_value(r.get("grade")) for r in ready if r.get("grade")}
+    grade = int(next(iter(grades))) if len(grades) == 1 and next(iter(grades)).isdigit() else DEFAULT_GRADE
+
+    return {"grade": grade, "topics": topics, "grouped": grouped}
+
+
 def _extract_answer(resp: Any) -> str:
     """Izvuci tekst iz OpenAI odgovora (isti oblik kao postojeći app: choices[0].message.content)."""
     try:

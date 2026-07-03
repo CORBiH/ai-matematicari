@@ -160,6 +160,16 @@
 
   /* sakrij prazan chat-karton na startu */
   .card.is-empty{display:none}
+
+  /* ===== Phase 4: modularni AI tutor ===== */
+  .tutor-title{font-weight:800;font-size:1.15rem;margin-bottom:.25rem;}
+  .mode-row{display:flex;gap:.5rem;flex-wrap:wrap;margin:.6rem 0;}
+  .mode-btn{opacity:.72;}
+  .mode-btn.active{opacity:1;outline:3px solid var(--accent-user);outline-offset:1px;box-shadow:0 2px 10px rgba(0,0,0,.14);}
+  .tutor-fallback{background:#fff6e6;border:2px dashed #f0b25f;color:#7a5a1e;padding:.6rem .8rem;border-radius:12px;margin:.5rem 0;}
+  body.dark .tutor-fallback{background:#241d0f;color:#f0d9a6;}
+  #tutorTopic{max-width:100%;}
+  #tutorMeta{font-size:.85rem;}
   </style>
 </head>
 <body>
@@ -205,6 +215,38 @@
       <!-- TIPKANJE sa fazama -->
       <div id="typing" class="typing-indicator" aria-live="polite">
         🤖 <span id="phaseText">Razmišljam</span><span class="dots"></span>
+      </div>
+    </div>
+
+    <!-- MODULARNI AI TUTOR (Phase 4) — dodatni panel, ne dira legacy formu ispod -->
+    <div class="card" id="tutor-card">
+      <div class="tutor-title">🤖 AI Tutor (modularni)</div>
+      <div class="muted" style="margin-bottom:.4rem;">Izaberi način rada i po želji temu, pa pošalji pitanje.</div>
+
+      <div class="mode-row" id="tutorModes" role="group" aria-label="Način rada">
+        <button type="button" class="btn sm mode-btn active" data-mode="explain">📘 Objasni mi</button>
+        <button type="button" class="btn sm mode-btn" data-mode="practice">✏️ Vježbaj sa mnom</button>
+        <button type="button" class="btn sm mode-btn" data-mode="exam">📝 Sutra imam kontrolni</button>
+        <button type="button" class="btn sm mode-btn" data-mode="quick">⚡ Samo rezultat</button>
+      </div>
+
+      <div id="tutor-fallback" class="tutor-fallback hidden" aria-live="polite">
+        <span id="tutorFallbackMsg"></span>
+      </div>
+
+      <label for="tutorTopic" style="display:block;margin-top:.5rem;">Oblast / tema (opcionalno):</label>
+      <select id="tutorTopic" class="grade-select" style="min-width:280px;">
+        <option value="">— izaberi temu —</option>
+      </select>
+
+      <label for="tutorMessage" style="display:block;margin-top:.6rem;">Tvoje pitanje:</label>
+      <textarea id="tutorMessage" style="min-height:90px;" placeholder="Npr. Ne razumijem ovaj zadatak..."></textarea>
+
+      <div class="form-actions">
+        <div class="left muted" id="tutorMeta"></div>
+        <div class="right">
+          <button id="tutorSend" type="button" class="btn">✉️ Pošalji tutoru</button>
+        </div>
       </div>
     </div>
 
@@ -680,6 +722,128 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('sendBtn').addEventListener('click', sendOne);
   form.addEventListener('submit',(e)=>{ e.preventDefault(); sendOne(); });
+
+  /* ====== PHASE 4: MODULARNI AI TUTOR (POST /api/ai-tutor/chat) ====== */
+  (function initTutor(){
+    const modeRow  = document.getElementById('tutorModes');
+    const topicSel = document.getElementById('tutorTopic');
+    const msgBox   = document.getElementById('tutorMessage');
+    const sendTutor= document.getElementById('tutorSend');
+    const fbBox    = document.getElementById('tutor-fallback');
+    const fbMsg    = document.getElementById('tutorFallbackMsg');
+    const metaBox  = document.getElementById('tutorMeta');
+    if(!modeRow || !topicSel || !sendTutor || !msgBox) return; // panel nije prisutan
+
+    let currentMode = 'explain';
+
+    /* siguran localStorage ključ: nikad undefined (fallback "default") */
+    let cid = 'default';
+    try { cid = (typeof getCID === 'function' && getCID()) || 'default'; } catch(_){ cid = 'default'; }
+    const TKEY = 'matbot_tutor_history_' + cid;
+
+    function tutorHistory(){
+      try { const a = JSON.parse(localStorage.getItem(TKEY) || '[]'); return Array.isArray(a) ? a : []; }
+      catch(_){ return []; }
+    }
+    function pushTutor(role, content){
+      const a = tutorHistory();
+      a.push({ role, content });
+      try { localStorage.setItem(TKEY, JSON.stringify(a.slice(-5))); } catch(_){}
+    }
+
+    /* mode dugmad */
+    modeRow.querySelectorAll('.mode-btn').forEach(b=>{
+      b.addEventListener('click', ()=>{
+        currentMode = b.dataset.mode || 'explain';
+        modeRow.querySelectorAll('.mode-btn').forEach(x=>x.classList.toggle('active', x === b));
+      });
+    });
+
+    /* teme iz backenda (nikad hardkodirano) */
+    (async function loadTopics(){
+      try{
+        const r = await fetch('/api/ai-tutor/topics', { credentials:'include', cache:'no-store' });
+        if(!r.ok) return;
+        const data = await r.json();
+        const grouped = (data && data.grouped) || {};
+        Object.keys(grouped).forEach(oblast=>{
+          const og = document.createElement('optgroup');
+          og.label = oblast;
+          (grouped[oblast] || []).forEach(t=>{
+            const opt = document.createElement('option');
+            opt.value = t.topic;
+            opt.textContent = t.display_name || t.topic;
+            opt.dataset.oblast = oblast;
+            og.appendChild(opt);
+          });
+          topicSel.appendChild(og);
+        });
+      }catch(_){ /* dropdown ostaje prazan; korisnik i dalje može slati kao free_chat */ }
+    })();
+
+    function selectedOblast(){
+      const opt = topicSel.options[topicSel.selectedIndex];
+      return (opt && opt.dataset && opt.dataset.oblast) ? opt.dataset.oblast : '';
+    }
+
+    function showFallback(status){
+      let msg = '';
+      if (status === 'ambiguous') msg = 'Pronašao sam više sličnih lekcija. Izaberi oblast/temu koju trenutno radiš.';
+      else if (status === 'fallback') msg = 'Ne mogu automatski prepoznati lekciju. Izaberi oblast iz liste ili pošalji zadatak.';
+      else if (status === 'invalid') msg = 'Izaberi temu iz liste ispod, pa pošalji ponovo.';
+      else return;
+      fbMsg.textContent = msg;
+      fbBox.classList.remove('hidden');
+      try { topicSel.focus(); } catch(_){}
+    }
+
+    async function sendTutorMsg(){
+      const text  = (msgBox.value || '').trim();
+      const topic = topicSel.value || '';
+      if(!text){ showToast('Unesi pitanje.', 'err'); return; }
+
+      const gradeVal = (typeof razredHidden !== 'undefined' && razredHidden && razredHidden.value) ? razredHidden.value : '6';
+      const payload = {
+        grade: parseInt(gradeVal, 10) || 6,
+        mode: currentMode,
+        entry_source: topic ? 'manual_topic_choice' : 'free_chat',
+        selected_topic: topic,
+        selected_oblast: topic ? selectedOblast() : '',
+        student_message: text,
+        conversation_history: tutorHistory()
+      };
+
+      document.getElementById('chat-card')?.classList.remove('is-empty');
+      appendUserBubble({ text });
+      pushTutor('user', text);
+      msgBox.value = '';
+      fbBox.classList.add('hidden');
+      showTyping();
+      sendTutor.disabled = true;
+
+      try{
+        const r = await fetch('/api/ai-tutor/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+          credentials: 'include'
+        });
+        const j = await r.json().catch(()=>({}));
+        const answer = (j && j.answer) ? j.answer : 'Nema odgovora.';
+        appendBotHTML('<div style="white-space:pre-wrap">' + escapeHtml(answer) + '</div>');
+        pushTutor('assistant', answer);
+        if (metaBox) metaBox.textContent = 'tema: ' + (j.final_topic || '—') + ' · mod: ' + (j.mode || currentMode) + ' · status: ' + (j.status || '—');
+        if (j.status && j.status !== 'ready') showFallback(j.status);
+      }catch(_){
+        appendBotHTML('<div class="alert alert-danger">Greška pri slanju zahtjeva.</div>');
+      }finally{
+        hideTyping();
+        sendTutor.disabled = false;
+      }
+    }
+
+    sendTutor.addEventListener('click', sendTutorMsg);
+  })();
 });
 
 /* ------- Plot helpers ------- */
