@@ -185,8 +185,8 @@ def test_topics_load_failure_message(client):
 # --- Phase 6.2: slika zadatka u glavnom tutoru --------------------------------------
 
 def _composer_row(html):
-    """Sadržaj composer reda (.tutor-inputrow) — + dugme | textarea | send."""
-    start = html.index('class="tutor-inputrow"')
+    """Sadržaj composer pilla (.composer) — + dugme | textarea | send strelica."""
+    start = html.index('id="tutorComposer"')
     end = html.index("</div>", start)
     return html[start:end]
 
@@ -202,15 +202,27 @@ def test_image_upload_ui_inside_tutor_card(client):
     assert 'aria-label="Dodaj sliku zadatka"' in block
 
 
-def test_plus_button_in_composer_row(client):
-    """textarea, + dugme i send su u istom composer redu."""
+def test_composer_pill_layout(client):
+    """Jedan zaobljeni composer pill: [ + ] [ textarea ] [ ↑ ]."""
+    html = _html(client)
+    assert 'class="composer"' in html and 'id="tutorComposer"' in html
+    row = _composer_row(html)
+    assert 'class="composer-plus"' in row      # lijevo: + (upload)
+    assert 'for="tutorImage"' in row           # + otvara postojeći file input
+    assert 'id="tutorMessage"' in row          # sredina: input/textarea
+    assert 'placeholder="Unesi pitanje ili zadatak..."' in row
+    assert 'class="composer-send"' in row      # desno: send strelica
+    assert 'id="tutorSend"' in row
+    assert "↑" in row
+    # redoslijed: + prije textarea prije send strelice
+    assert row.index("composer-plus") < row.index("tutorMessage") < row.index("composer-send")
+
+
+def test_no_big_send_text_in_composer(client):
+    """Composer koristi strelicu, ne veliko 'Pošalji tutoru' dugme."""
     row = _composer_row(_html(client))
-    assert 'class="tutor-plus"' in row
-    assert 'for="tutorImage"' in row          # + otvara postojeći file input
-    assert 'id="tutorMessage"' in row         # textarea
-    assert 'id="tutorSend"' in row            # send dugme
-    # redoslijed: textarea prije + dugmeta prije send-a
-    assert row.index("tutorMessage") < row.index("tutor-plus") < row.index("tutorSend")
+    assert "Pošalji tutoru" not in row
+    assert ">Pošalji<" not in row
 
 
 def test_old_standalone_upload_button_gone(client):

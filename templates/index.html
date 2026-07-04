@@ -200,17 +200,22 @@
   .tutor-typing.hidden{display:none;}
   .tutor-typing .dots::after{content:'...';animation:dots 1s steps(3,end) infinite;margin-left:.2rem;}
 
-  .tutor-inputrow{display:flex;gap:.5rem;align-items:flex-end;flex-wrap:wrap;}
-  .tutor-inputrow textarea{flex:1;min-width:200px;min-height:74px;}
-  /* kompaktni send: manja visina/padding, poravnat sa + dugmetom */
-  .tutor-send{align-self:flex-end;height:42px;padding:0 .95rem;font-size:.95rem;border-radius:12px;
-    display:inline-flex;align-items:center;flex:0 0 auto;}
-  /* + dugme za sliku unutar composer reda (ChatGPT-stil) */
-  .tutor-plus{flex:0 0 auto;align-self:flex-end;display:inline-flex;align-items:center;justify-content:center;
-    width:42px;height:42px;border-radius:50%;background:var(--btn-bg);color:#fff;font-size:1.4rem;line-height:1;
-    cursor:pointer;user-select:none;transition:background .15s ease;}
-  .tutor-plus:hover{background:var(--btn-bg-hover);}
-  .tutor-plus:active{transform:translateY(1px);}
+  /* ChatGPT-stil composer: jedan tamni zaobljeni pill [ + ] [ input ] [ ↑ ] */
+  .composer{display:flex;align-items:flex-end;gap:.5rem;background:#202123;border:1px solid #343541;
+    border-radius:26px;padding:.4rem .55rem;box-shadow:0 2px 10px rgba(0,0,0,.18);}
+  .composer textarea{flex:1;min-width:0;background:transparent;border:0;outline:0;color:#ececf1;resize:none;
+    box-shadow:none;font-size:1.02rem;line-height:1.5;padding:.5rem .35rem;min-height:24px;max-height:180px;overflow-y:auto;}
+  .composer textarea::placeholder{color:#9aa0aa;}
+  .composer-plus{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;
+    border-radius:50%;background:transparent;color:#c9ccd3;font-size:1.5rem;line-height:1;cursor:pointer;user-select:none;
+    transition:background .15s ease,color .15s ease;}
+  .composer-plus:hover{background:#343541;color:#fff;}
+  .composer-send{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;
+    border:0;border-radius:50%;background:#ececf1;color:#202123;font-size:1.25rem;font-weight:700;line-height:1;
+    cursor:pointer;transition:opacity .15s ease,transform .05s ease;}
+  .composer-send:hover{opacity:.85;}
+  .composer-send:active{transform:translateY(1px);}
+  .composer-send:disabled{opacity:.4;cursor:not-allowed;}
   .tutor-chip{margin:0 0 .5rem;}
   #tutorMeta{font-size:.85rem;margin-top:.4rem;}
 
@@ -296,11 +301,11 @@
 
       <span id="tutorImageChip" class="file-chip tutor-chip"><span id="tutorImageName">Nije odabrana slika</span><button type="button" class="remove" id="tutorImageRemove" title="Ukloni sliku">×</button></span>
 
-      <div class="tutor-inputrow">
+      <div class="composer" id="tutorComposer">
         <input id="tutorImage" type="file" accept="image/*" style="display:none;">
-        <textarea id="tutorMessage" placeholder="Upiši pitanje ili zadatak..."></textarea>
-        <label for="tutorImage" id="tutorImageBtn" class="tutor-plus" title="Dodaj sliku zadatka" aria-label="Dodaj sliku zadatka">＋</label>
-        <button id="tutorSend" type="button" class="btn tutor-send">Pošalji</button>
+        <label for="tutorImage" id="tutorImageBtn" class="composer-plus" title="Dodaj sliku zadatka" aria-label="Dodaj sliku zadatka">+</label>
+        <textarea id="tutorMessage" rows="1" placeholder="Unesi pitanje ili zadatak..."></textarea>
+        <button id="tutorSend" type="button" class="composer-send" title="Pošalji" aria-label="Pošalji">↑</button>
       </div>
       <div class="muted" id="tutorMeta"></div>
 
@@ -1107,7 +1112,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ? ('Tema: ' + tname + ' · Režim: ' + rez)
             : (rez ? 'Režim: ' + rez : '');
         }
-        if (resolved.fromTyped) msgBox.value = '';   // očisti tek nakon uspješnog slanja UPISANE poruke
+        if (resolved.fromTyped){ msgBox.value = ''; autoGrow(); }  // očisti + resetuj visinu nakon uspješnog slanja
         if (j.status === 'ready') clearTutorImage(); // slika je potrošena u ovom zahtjevu
         if ((currentMode === 'practice' || resolved.phase) && j.status === 'ready'){
           interactionPhase = 'awaiting_practice_answer';   // sljedeća upisana poruka = odgovor na zadatak
@@ -1134,6 +1139,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!tutorBusy) sendTutorMsg();
       }
     });
+
+    /* composer auto-grow: kreće kao jedan red, raste do max-height (pa scroll) */
+    function autoGrow(){
+      msgBox.style.height = 'auto';
+      msgBox.style.height = Math.min(msgBox.scrollHeight, 180) + 'px';
+    }
+    msgBox.addEventListener('input', autoGrow);
   })();
 });
 

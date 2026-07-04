@@ -198,11 +198,14 @@ Tests: `tests/test_topic_detector.py` + Phase 6 block in
   topic detection), else sends a multimodal Vision message (`MODEL_VISION`) with
   the same modular system prompt. Empty-text image sends get per-mode default
   messages. No new OCR/vision code; keys stay server-side.
-- **Composer polish**: the image control is now a compact round "＋" button
-  (`.tutor-plus`, `aria-label="Dodaj sliku zadatka"`) at the left of the composer
-  row — compact `[textarea] [＋] [Pošalji]` (42px controls). It's a `<label
-  for="tutorImage">` opening the same hidden file input; filename chip + remove
-  sit just above the row. All send/validation/multipart behavior unchanged.
+- **Composer**: a single dark rounded pill (`.composer` / `#tutorComposer`),
+  ChatGPT-style `[ + ] [ auto-grow textarea ] [ ↑ ]`. Left `+` (`.composer-plus`,
+  `<label for="tutorImage">`, `aria-label="Dodaj sliku zadatka"`) opens the hidden
+  image input; center textarea (`placeholder="Unesi pitanje ili zadatak..."`,
+  auto-grows one→multi line); right circular `↑` send (`.composer-send`,
+  `aria-label="Pošalji"`) calls the same `sendTutorMsg`. No mic, no model selector,
+  no big "Pošalji" text. Filename chip + remove sit above the pill. All
+  send/validation/multipart/Enter/Shift+Enter/busy behavior unchanged.
 
 ### Phase 6.1 — quick hardening + UX cleanup
 
