@@ -38,9 +38,6 @@ def test_index_renders(client):
 
 def test_main_tutor_card_contains_everything(client):
     block = _tutor_block(_html(client))
-    # header + subtitle
-    assert "AI Tutor" in block
-    assert 'class="muted tutor-sub"' in block
     # topic selector, mode dugmad, fallback, transkript, typing, input, send, meta
     for needle in (
         'id="tutorTopic"',
@@ -53,6 +50,32 @@ def test_main_tutor_card_contains_everything(client):
         'id="tutorMeta"',
     ):
         assert needle in block, f"nedostaje {needle} unutar tutor kartice"
+
+
+def test_navbar_hidden_for_focused_tutor_layout(client):
+    html = _html(client)
+    assert 'id="main-header" aria-hidden="true"' in html
+    assert "display:none;align-items:center;justify-content:center;" in html
+    assert '<body class="dark tutor-fullscreen">' in html
+
+
+def test_tutor_title_and_subtitle_not_visible_header(client):
+    html = _html(client)
+    block = _tutor_block(html)
+    assert 'class="tutor-title"' not in block
+    assert 'class="muted tutor-sub"' not in block
+    assert "AI Tutor" not in block
+    assert "Izaberi temu i klikni" not in html
+
+
+def test_topic_selector_is_first_visible_tutor_control(client):
+    block = _tutor_block(_html(client))
+    controls_idx = block.index('class="tutor-controls"')
+    topic_idx = block.index('id="tutorTopic"')
+    modes_idx = block.index('id="tutorModes"')
+    chat_idx = block.index('id="tutorChat"')
+    composer_idx = block.index('id="tutorComposer"')
+    assert controls_idx < topic_idx < modes_idx < chat_idx < composer_idx
 
 
 def test_transcript_inside_tutor_card_not_legacy(client):
@@ -115,8 +138,8 @@ def test_single_visible_tutor_card(client):
 def test_empty_state_helper_in_tutor_card(client):
     block = _tutor_block(_html(client))
     assert 'id="tutorEmptyState"' in block
-    assert "Izaberi temu ili samo upiši pitanje" in block
-    assert "aritmetička sredina brojeva 4, 6 i 8" in block
+    assert "Upiši pitanje, pošalji zadatak ili izaberi temu za vježbu." in block
+    assert block.index('id="tutorChat"') < block.index('id="tutorEmptyState"')
 
 
 def test_topic_label_optional(client):
