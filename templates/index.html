@@ -200,12 +200,14 @@
   .tutor-typing.hidden{display:none;}
   .tutor-typing .dots::after{content:'...';animation:dots 1s steps(3,end) infinite;margin-left:.2rem;}
 
-  .tutor-inputrow{display:flex;gap:.6rem;align-items:flex-end;flex-wrap:wrap;}
+  .tutor-inputrow{display:flex;gap:.5rem;align-items:flex-end;flex-wrap:wrap;}
   .tutor-inputrow textarea{flex:1;min-width:200px;min-height:74px;}
-  .tutor-inputrow .btn{align-self:flex-end;}
+  /* kompaktni send: manja visina/padding, poravnat sa + dugmetom */
+  .tutor-send{align-self:flex-end;height:42px;padding:0 .95rem;font-size:.95rem;border-radius:12px;
+    display:inline-flex;align-items:center;flex:0 0 auto;}
   /* + dugme za sliku unutar composer reda (ChatGPT-stil) */
   .tutor-plus{flex:0 0 auto;align-self:flex-end;display:inline-flex;align-items:center;justify-content:center;
-    width:44px;height:44px;border-radius:50%;background:var(--btn-bg);color:#fff;font-size:1.6rem;line-height:1;
+    width:42px;height:42px;border-radius:50%;background:var(--btn-bg);color:#fff;font-size:1.4rem;line-height:1;
     cursor:pointer;user-select:none;transition:background .15s ease;}
   .tutor-plus:hover{background:var(--btn-bg-hover);}
   .tutor-plus:active{transform:translateY(1px);}
@@ -298,7 +300,7 @@
         <input id="tutorImage" type="file" accept="image/*" style="display:none;">
         <textarea id="tutorMessage" placeholder="Upiši pitanje ili zadatak..."></textarea>
         <label for="tutorImage" id="tutorImageBtn" class="tutor-plus" title="Dodaj sliku zadatka" aria-label="Dodaj sliku zadatka">＋</label>
-        <button id="tutorSend" type="button" class="btn">✉️ Pošalji tutoru</button>
+        <button id="tutorSend" type="button" class="btn tutor-send">Pošalji</button>
       </div>
       <div class="muted" id="tutorMeta"></div>
 
