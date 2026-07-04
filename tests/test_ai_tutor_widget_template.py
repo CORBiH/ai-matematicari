@@ -203,14 +203,14 @@ def test_image_upload_ui_inside_tutor_card(client):
 
 
 def test_plus_button_in_composer_row(client):
-    """+ dugme, textarea i send su u istom composer redu (ChatGPT-stil)."""
+    """textarea, + dugme i send su u istom composer redu."""
     row = _composer_row(_html(client))
     assert 'class="tutor-plus"' in row
     assert 'for="tutorImage"' in row          # + otvara postojeći file input
     assert 'id="tutorMessage"' in row         # textarea
     assert 'id="tutorSend"' in row            # send dugme
-    # redoslijed: plus prije textarea prije send
-    assert row.index("tutor-plus") < row.index("tutorMessage") < row.index("tutorSend")
+    # redoslijed: textarea prije + dugmeta prije send-a
+    assert row.index("tutorMessage") < row.index("tutor-plus") < row.index("tutorSend")
 
 
 def test_old_standalone_upload_button_gone(client):
