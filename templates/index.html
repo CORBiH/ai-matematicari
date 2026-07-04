@@ -211,19 +211,19 @@
   .tmsg{display:flex;width:100%;word-break:break-word;}
   .tmsg-user{justify-content:flex-end;}
   .tmsg-bot{justify-content:flex-start;}
-  .tbubble{padding:.68rem .82rem;border-radius:12px;max-width:94%;line-height:1.62;font-size:1rem;
+  .tbubble{padding:.68rem .82rem;border-radius:12px;max-width:94%;line-height:1.55;font-size:1rem;
     box-shadow:0 1px 4px rgba(0,0,0,.10);background:var(--bubble-bg);color:var(--bubble-text);animation:fadeIn .22s ease;}
   .tmsg-bot .tbubble{border-left:3px solid var(--accent-bot);}
   .tmsg-user .tbubble{background:#113d38;border-right:3px solid var(--accent-user);border-left:0;}
   body.dark .tmsg-user .tbubble{background:#113d38;}
-  .tbubble ul,.tbubble ol{margin:.35rem 0 .35rem 1.25rem;padding:0;}
-  .tbubble li{margin:.15rem 0;}
+  .tbubble ul,.tbubble ol{margin:.25rem 0 .25rem 1.15rem;padding:0;}
+  .tbubble li{margin:.1rem 0;}
   .tmsg-bot .tbubble{max-width:94%;}
   .tmsg-user .tbubble{max-width:70%;}
-  .tbubble h2,.tbubble h3{margin:.55rem 0 .3rem;line-height:1.3;font-weight:700;}
+  .tbubble h2,.tbubble h3{margin:.45rem 0 .25rem;line-height:1.3;font-weight:700;}
   .tbubble h2{font-size:1.08rem;border-bottom:1px solid var(--card-border);padding-bottom:.15rem;}
   .tbubble h3{font-size:1.02rem;}
-  .tbubble mjx-container{margin:.35rem 0 !important;}
+  .tbubble mjx-container{margin:.15rem 0 !important;}
   .tutor-typing{align-self:flex-start;font-weight:600;background:var(--type-bg);border-left:3px solid var(--type-border);
     border-radius:10px;padding:.45rem .65rem;}
   .tutor-typing.hidden{display:none;}
@@ -972,12 +972,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const state = { grade: '6', mode: 'quick', topic: '', topicName: '', topicOblast: '', oblast: '' };
 
     /* Mini bezbjedni renderer (bez markdown biblioteke, bez XSS):
-       1) escape HTML-a  2) **bold** → <strong>  3) liste i novi redovi.
-       MathJax poslije toga normalno tipografiše $$...$$. */
+       1) escape HTML-a  2) **bold** → <strong>  3) kratki $$...$$ → inline \(...\)
+       4) liste i novi redovi. MathJax poslije toga tipografiše \(...\) i $$...$$. */
     function renderTutorHTML(raw){
       const esc = escapeHtml(raw || '');
       const bold = esc.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-      const lines = bold.split(/\r?\n/);
+      /* kratki jednoredni display blok ($$6|12$$, $$5-1=4$$) → inline \(...\);
+         dugi/višeredni display ($$...\\...$$, \begin, >40 znakova) ostaje blok */
+      const compact = bold.replace(/\$\$([^$\n]{1,60}?)\$\$/g, (m0, expr)=>{
+        const e = expr.trim();
+        if (!e || e.length > 40 || e.indexOf('\\\\') !== -1 || e.indexOf('\\begin') !== -1) return m0;
+        return '\\(' + e + '\\)';
+      });
+      const lines = compact.split(/\r?\n/);
       let out = '', list = null;
       const flush = ()=>{ if(list){ out += '</' + list + '>'; list = null; } };
       for (const line of lines){
@@ -994,19 +1001,22 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if ((m = /^\d+[.)]\s+(.+)$/.exec(t))){
           if (list !== 'ol'){ flush(); out += '<ol>'; list = 'ol'; }
           out += '<li>' + m[1] + '</li>';
+        } else if (!t && list){
+          continue;                                   // prazan red NE prekida listu (spriječi ponavljanje "1.")
         } else {
           flush();
           out += (t ? line : '') + '<br>';
         }
       }
       flush();
-      /* čisti razmaci: max jedan prazan red, bez <br> na početku/kraju */
+      /* čisti razmaci: prazni redovi → jedan <br>, bez <br> na rubovima i oko naslova/listi */
       return out
-        .replace(/(<br>){3,}/g, '<br><br>')
+        .replace(/(<br>){2,}/g, '<br>')
         .replace(/^(<br>)+/, '')
         .replace(/(<br>)+$/, '')
         .replace(/(<\/h[23]>)(<br>)+/g, '$1')
-        .replace(/(<br>)+(<h[23]>)/g, '$2');
+        .replace(/(<br>)+(<h[23]>)/g, '$2')
+        .replace(/(<br>)+(<(?:ul|ol)>)/g, '$2');
     }
 
     /* Poruke se dodaju UNUTAR tutor kartice (tutorChat), ne u legacy chat. */

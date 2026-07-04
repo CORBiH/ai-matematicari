@@ -352,3 +352,33 @@ def test_legacy_form_preserved_but_hidden(client):
     assert 'id="advancedLegacy" class="legacy-holder" hidden' in html
     # nema vidljivog <details>/summary dvojnika
     assert "<details" not in html
+
+
+# --- Phase 7.1: kompaktan renderer + CSS ---------------------------------------------
+
+def test_renderer_compacts_short_display_math(client):
+    r"""Kratki jednoredni $$...$$ se pretvara u inline \(...\) prije MathJax-a."""
+    html = _html(client)
+    assert r"\$\$([^$\n]{1,60}?)\$\$" in html      # regex za kratke display blokove
+    assert "e.length > 40" in html                 # dugi blokovi ostaju display
+    assert r"'\\begin'" in html                    # \begin okruženja ostaju display
+    assert r"'\\(' + e + '\\)'" in html            # konverzija u inline \(...\)
+
+
+def test_renderer_merges_interrupted_ordered_lists(client):
+    """Prazan red između numerisanih stavki NE prekida <ol> (nema ponovljenih '1.')."""
+    html = _html(client)
+    assert "(!t && list)" in html
+
+
+def test_renderer_collapses_blank_lines_aggressively(client):
+    html = _html(client)
+    assert "(<br>){2,}" in html                    # prazni redovi → jedan <br>
+    assert "(<(?:ul|ol)>)" in html                 # bez <br> viška prije listi
+
+
+def test_bubble_spacing_compact(client):
+    html = _html(client)
+    assert ".tbubble mjx-container{margin:.15rem 0 !important;}" in html
+    assert ".tbubble ul,.tbubble ol{margin:.25rem 0 .25rem 1.15rem;padding:0;}" in html
+    assert ".tbubble li{margin:.1rem 0;}" in html

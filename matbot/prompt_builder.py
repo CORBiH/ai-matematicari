@@ -96,6 +96,32 @@ GLOBAL_MODULAR_GUIDELINES = (
     "  tekst; ne izmišljaj podatke.\n"
 )
 
+# --- Format odgovora za chat (Phase 7.1) -----------------------------------------
+# Ide POSLIJE baznog prompta: bazna matematička pravila (npr. $$...$$ za "pravu
+# matematiku") ostaju, ali se za chat UI preciziraju — sitni izrazi inline, display
+# blokovi samo za važan višekoračni račun, bez sirovih markdown naslova.
+CHAT_FORMATTING_GUIDELINES = (
+    "==================================================\n"
+    "FORMAT ODGOVORA (CHAT)\n"
+    "==================================================\n"
+    "- Odgovaraj KOMPAKTNO i prirodno za chat: kratki pasusi, bez suvišnih "
+    "praznih redova.\n"
+    "- NE lomi običnu rečenicu na više redova i NE stavljaj svaku malu formulu "
+    "ili simbol u poseban red.\n"
+    "- Kratke izraze piši INLINE matematikom \\( ... \\) unutar rečenice, "
+    "npr. \\(12 : 6 = 2\\).\n"
+    "- Display matematiku $$...$$ koristi SAMO za važan višekoračni račun — "
+    "nikad za sitne izraze ili pojedinačne simbole.\n"
+    "- NE koristi sirove markdown naslove (###, ##). Koristi kratke oznake u "
+    "redu: \"Ideja:\", \"Primjer:\", \"Koraci:\", \"Zaključak:\".\n"
+    "- Numerisane liste piši 1., 2., 3. — NE počinji svaku stavku ponovo sa \"1.\".\n"
+    "- DJELJIVOST: izbjegavaj izolovan zapis poput 6|12 ili 6|(12+18) u posebnom "
+    "redu. Piši školskim rečenicama: \"6 dijeli 12, jer je 12 : 6 = 2.\" "
+    "\"6 dijeli 18, jer je 18 : 6 = 3.\" \"Zato 6 dijeli i zbir 12 + 18 = 30, "
+    "jer je 30 : 6 = 5.\" Ako koristiš notaciju djeljivosti, piši je inline kao "
+    "\\(6 \\mid 12\\) i ne prekidaj rečenicu oko simbola djeljivosti.\n"
+)
+
 _BASE_FALLBACK_SYSTEM_PROMPT = (
     "TI SI:\n"
     "Asistent za matematiku za osnovnu školu u Bosni i Hercegovini (6. razred).\n"
@@ -235,6 +261,8 @@ def build_mode_instructions(mode: Any, final_topic: Any, topic_context: dict) ->
         block = (
             "MOD: KONTROLNI (exam)\n"
             "- Daj TAČNO 3 kontrolna zadatka, zatim 1 trik i 1 upozorenje.\n"
+            "- Format: zadaci kao numerisana lista 1., 2., 3., zatim red "
+            "\"Trik:\" i red \"Upozorenje:\".\n"
         )
         c_tasks = _collect(
             topic_context, ("controlni_task_1", "controlni_task_2", "controlni_task_3")
@@ -253,8 +281,9 @@ def build_mode_instructions(mode: Any, final_topic: Any, topic_context: dict) ->
     if mode == "quick":
         return (
             "MOD: SAMO REZULTAT (quick)\n"
-            "- Daj SAMO rezultat i MAKSIMALNO 1–2 rečenice provjere.\n"
-            "- Bez dugog objašnjenja i bez nizanja koraka.\n"
+            "- Odgovor mora biti KOMPAKTAN: SAMO rezultat + najviše JEDNA kratka "
+            "rečenica provjere, sve u jednom kratkom pasusu.\n"
+            "- Bez dugog objašnjenja, bez naslova i bez nizanja koraka.\n"
         )
 
     # explain (default)
@@ -262,6 +291,7 @@ def build_mode_instructions(mode: Any, final_topic: Any, topic_context: dict) ->
         "MOD: OBJASNI (explain)\n"
         "- Odgovori KRATKO i jasno: prvo ideja/pristup, zatim 2–5 koraka, pa "
         "rezultat i kratka provjera.\n"
+        "- Budi kratak; detaljno objašnjavaj SAMO ako učenik to izričito zatraži.\n"
         "- Ako nedostaje kontekst za rješavanje, postavi JEDNO kratko pitanje "
         "prije rješavanja.\n"
     )
@@ -457,7 +487,11 @@ def build_tutor_prompt(
     video_flow = get_video_flow_context(payload, effective_topic, master_content)
 
     # --- system prompt ---
-    system_parts = [_base_system_prompt(payload.get("grade")), GLOBAL_MODULAR_GUIDELINES]
+    system_parts = [
+        _base_system_prompt(payload.get("grade")),
+        GLOBAL_MODULAR_GUIDELINES,
+        CHAT_FORMATTING_GUIDELINES,
+    ]
     forbidden = topic_context.get("forbidden_ai_behavior", "")
     if forbidden:
         system_parts.append(
@@ -515,7 +549,8 @@ def build_general_tutor_prompt(payload: dict) -> dict:
     mode = normalize_mode(payload.get("mode"))
 
     system_prompt = "\n\n".join(
-        [_base_system_prompt(payload.get("grade")), GLOBAL_MODULAR_GUIDELINES]
+        [_base_system_prompt(payload.get("grade")), GLOBAL_MODULAR_GUIDELINES,
+         CHAT_FORMATTING_GUIDELINES]
     ).strip()
 
     user_parts = [
@@ -571,7 +606,8 @@ def build_exam_oblast_prompt(payload: dict, master_content: dict) -> dict | None
     canonical = normalize_value(rows[0].get("oblast")) or oblast
 
     system_prompt = "\n\n".join(
-        [_base_system_prompt(payload.get("grade")), GLOBAL_MODULAR_GUIDELINES]
+        [_base_system_prompt(payload.get("grade")), GLOBAL_MODULAR_GUIDELINES,
+         CHAT_FORMATTING_GUIDELINES]
     ).strip()
 
     lines = [
@@ -599,6 +635,8 @@ def build_exam_oblast_prompt(payload: dict, master_content: dict) -> dict | None
         "tema ove oblasti (koristi ponuđene kontrolne zadatke kao uzor).\n"
         "- Zatim navedi TAČNO 1 čest trik i TAČNO 1 upozorenje iz ponuđenog "
         "materijala.\n"
+        "- Format: zadaci kao numerisana lista 1., 2., 3., zatim red "
+        "\"Trik:\" i red \"Upozorenje:\".\n"
         "- Koristi ISKLJUČIVO teme i materijal iz bloka iznad — NE izmišljaj "
         "teme ni sadržaj.\n"
     )
@@ -638,7 +676,8 @@ def build_fallback_prompt(payload: dict, reason: Any) -> dict:
     mode = normalize_mode(payload.get("mode"))
 
     system_prompt = "\n\n".join(
-        [_base_system_prompt(payload.get("grade")), GLOBAL_MODULAR_GUIDELINES]
+        [_base_system_prompt(payload.get("grade")), GLOBAL_MODULAR_GUIDELINES,
+         CHAT_FORMATTING_GUIDELINES]
     ).strip()
 
     if reason == "ambiguous":

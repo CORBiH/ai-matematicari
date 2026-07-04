@@ -116,8 +116,8 @@ def test_quick_mode_short(master):
     res = pb.build_tutor_prompt({"selected_topic": TOPIC, "mode": "quick"}, _found(), master)
     up = res["user_prompt"].lower()
     assert res["mode"] == "quick"
-    assert "maksimalno" in up
-    assert "rečenice" in up
+    assert "kompaktan" in up
+    assert "rečenica" in up
     assert "rezultat" in up
 
 
@@ -496,3 +496,92 @@ def test_exam_oblast_uses_base_prompt_and_guidelines(master, oblast):
 def test_get_oblast_topics_unknown_empty(master):
     assert pb.get_oblast_topics("nema_takve_oblasti", master) == []
     assert pb.get_oblast_topics("", master) == []
+
+
+# --- Phase 7.1: FORMAT ODGOVORA (CHAT) — kompaktno formatiranje -------------------
+
+def test_chat_formatting_in_all_modular_paths(master, oblast):
+    """Format blok ide POSLIJE baznog prompta u SVIM modularnim putanjama."""
+    results = [
+        # selected_topic ready
+        pb.build_tutor_prompt({"selected_topic": TOPIC, "mode": "explain"}, _found(), master),
+        # thinkific_lesson
+        pb.build_tutor_prompt(
+            {"entry_source": "thinkific_lesson", "mode": "explain"},
+            _found(source="composite"), master),
+        # free_chat detected_topic
+        pb.build_tutor_prompt(
+            {"detected_topic": TOPIC}, _found(source="detected_topic"), master),
+        # practice + practice follow-up
+        pb.build_tutor_prompt({"selected_topic": TOPIC, "mode": "practice"}, _found(), master),
+        pb.build_tutor_prompt(
+            {"selected_topic": TOPIC, "interaction_phase": "answering_practice_task"},
+            _found(), master),
+        # exam + quick
+        pb.build_tutor_prompt({"selected_topic": TOPIC, "mode": "exam"}, _found(), master),
+        pb.build_tutor_prompt({"selected_topic": TOPIC, "mode": "quick"}, _found(), master),
+        # free_chat unknown/general
+        pb.build_general_tutor_prompt({"mode": "quick", "student_message": "5-1"}),
+        # fallback
+        pb.build_fallback_prompt({"mode": "exam"}, "unknown"),
+        # exam-by-oblast
+        pb.build_exam_oblast_prompt({"mode": "exam", "selected_oblast": oblast}, master),
+    ]
+    for res in results:
+        sp = res["system_prompt"]
+        assert "FORMAT ODGOVORA (CHAT)" in sp
+        assert "KOMPAKTNO" in sp
+
+
+def test_formatting_block_comes_after_base_prompt(master):
+    sp = pb.build_tutor_prompt(
+        {"selected_topic": TOPIC, "grade": 6}, _found(), master
+    )["system_prompt"]
+    # bazna matematička pravila ostaju i dolaze PRIJE chat format pravila
+    assert sp.index("MODULARNA PRAVILA") < sp.index("FORMAT ODGOVORA (CHAT)")
+
+
+def test_formatting_inline_vs_display_rules(master):
+    sp = pb.build_tutor_prompt({"selected_topic": TOPIC}, _found(), master)["system_prompt"]
+    # kratki izrazi → inline \( ... \)
+    assert r"INLINE matematikom \( ... \)" in sp
+    # display $$...$$ rezervisan za važan višekoračni račun
+    assert "SAMO za važan višekoračni račun" in sp
+    # bez sirovih markdown naslova; kratke oznake u redu
+    assert "NE koristi sirove markdown naslove" in sp
+    assert '"Ideja:"' in sp and '"Zaključak:"' in sp
+    # numerisane liste bez ponavljanja "1."
+    assert 'NE počinji svaku stavku ponovo sa "1."' in sp
+
+
+def test_formatting_divisibility_rules(master):
+    sp = pb.build_tutor_prompt({"selected_topic": TOPIC}, _found(), master)["system_prompt"]
+    assert "izbjegavaj izolovan zapis poput 6|12" in sp
+    assert "6 dijeli 12, jer je 12 : 6 = 2." in sp
+    assert r"\(6 \mid 12\)" in sp
+    assert "ne prekidaj rečenicu oko simbola djeljivosti" in sp
+
+
+def test_quick_mode_compact_result_only():
+    block = pb.build_mode_instructions("quick", "unknown", {})
+    assert "KOMPAKTAN" in block
+    assert "SAMO rezultat" in block
+    assert "JEDNA kratka" in block
+
+
+def test_explain_mode_short_unless_asked():
+    block = pb.build_mode_instructions("explain", "unknown", {})
+    assert "detaljno objašnjavaj SAMO ako učenik to izričito zatraži" in block
+
+
+def test_exam_modes_clean_task_format(master, oblast):
+    block = pb.build_mode_instructions("exam", TOPIC, pb.get_topic_context(TOPIC, master))
+    assert '"Trik:"' in block and '"Upozorenje:"' in block
+    res = pb.build_exam_oblast_prompt({"mode": "exam", "selected_oblast": oblast}, master)
+    assert '"Trik:"' in res["user_prompt"] and '"Upozorenje:"' in res["user_prompt"]
+
+
+def test_followup_compact_feedback_no_topic_restart():
+    block = pb.build_practice_followup_instructions({}, {})
+    assert "KRATAK i prirodan za chat" in block
+    assert "NE ponavljaj cijelo objašnjenje teme" in block

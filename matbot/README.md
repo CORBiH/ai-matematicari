@@ -280,6 +280,42 @@ Tests: `tests/test_ai_tutor_widget_template.py` (rewritten for the two-screen
 flow), Phase 7 blocks in `tests/test_prompt_builder_modular.py` and
 `tests/test_ai_tutor_chat_endpoint.py`.
 
+### Phase 7.1 — compact chat formatting (prompt + renderer + CSS)
+
+Answers used to render as sprawling display math (`$$6|12$$` centered on its own
+line), split sentences and repeated "1." lists. Fixed in three layers, keeping
+the `prompts.build_system_prompt` inheritance, MathJax and escape-first
+rendering untouched:
+
+- **Prompt** (`prompt_builder.CHAT_FORMATTING_GUIDELINES`, appended AFTER the
+  base prompt in **all** modular paths — ready/thinkific/detected/general/
+  fallback/exam-by-oblast, so base math rules stay but chat formatting wins):
+  compact chat-friendly answers, no splitting sentences across lines, short
+  expressions as inline `\( ... \)`, `$$...$$` reserved for important
+  multi-step calculations, no raw markdown headings (use "Ideja:", "Primjer:",
+  "Koraci:", "Zaključak:" labels), numbered lists as 1., 2., 3. (never
+  restarting at "1."), and a divisibility rule: school-style sentences
+  ("6 dijeli 12, jer je 12 : 6 = 2.") instead of isolated `6|12` lines, with
+  `\(6 \mid 12\)` inline if notation is used. Mode instructions tightened:
+  quick = compact result + at most one short check sentence; explain = short
+  unless the student explicitly asks for detail; exam (topic and oblast) =
+  numbered 1./2./3. tasks then "Trik:" and "Upozorenje:" lines.
+- **Renderer** (`renderTutorHTML`, still escape-first/no markdown lib): short
+  single-line `$$...$$` blocks (≤40 chars, no `\\` or `\begin`) are converted
+  to inline `\(...\)` before MathJax typesets; long/multi-line display math is
+  preserved. Blank lines inside a numbered/bulleted list no longer break the
+  list (repeated "1." items merge into one `<ol>` that numbers itself), blank
+  lines collapse to a single `<br>`, and stray `<br>`s before lists/headings
+  are stripped.
+- **CSS**: `.tbubble` line-height 1.62→1.55, `mjx-container` margin
+  .35→.15rem, tighter list/heading margins. Wide bot bubbles / right-aligned
+  user bubbles / mobile unchanged.
+
+Checks: `scripts/check_js.mjs` (9 renderer behavior checks incl. short-vs-long
+display math, merged lists, aggressive `<br>` collapse, XSS) + Phase 7.1 test
+blocks in `tests/test_prompt_builder_modular.py` and
+`tests/test_ai_tutor_widget_template.py`.
+
 ### Phase 4.3 — practice answer flow + rendering polish
 
 - **Frontend state:** after a ready practice answer the widget sets
