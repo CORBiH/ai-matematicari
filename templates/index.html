@@ -200,9 +200,16 @@
   .tutor-typing.hidden{display:none;}
   .tutor-typing .dots::after{content:'...';animation:dots 1s steps(3,end) infinite;margin-left:.2rem;}
 
-  .tutor-inputrow{display:flex;gap:.6rem;align-items:stretch;flex-wrap:wrap;}
-  .tutor-inputrow textarea{flex:1;min-width:220px;min-height:74px;}
+  .tutor-inputrow{display:flex;gap:.6rem;align-items:flex-end;flex-wrap:wrap;}
+  .tutor-inputrow textarea{flex:1;min-width:200px;min-height:74px;}
   .tutor-inputrow .btn{align-self:flex-end;}
+  /* + dugme za sliku unutar composer reda (ChatGPT-stil) */
+  .tutor-plus{flex:0 0 auto;align-self:flex-end;display:inline-flex;align-items:center;justify-content:center;
+    width:44px;height:44px;border-radius:50%;background:var(--btn-bg);color:#fff;font-size:1.6rem;line-height:1;
+    cursor:pointer;user-select:none;transition:background .15s ease;}
+  .tutor-plus:hover{background:var(--btn-bg-hover);}
+  .tutor-plus:active{transform:translateY(1px);}
+  .tutor-chip{margin:0 0 .5rem;}
   #tutorMeta{font-size:.85rem;margin-top:.4rem;}
 
   /* napredni (legacy) dio — sekundarno, sklopljeno u podnožju tutor kartice */
@@ -218,8 +225,7 @@
   .tutor-empty{background:var(--input-bg);border:1px dashed var(--card-border);border-radius:12px;
     padding:.7rem .9rem;margin:.35rem 0 .6rem;font-size:.95rem;}
 
-  /* Phase 6.2: slika zadatka u tutoru; legacy markup je potpuno skriven */
-  .tutor-imagerow{display:flex;align-items:center;gap:.6rem;margin:.15rem 0 .5rem;flex-wrap:wrap;}
+  /* Phase 6.2: legacy markup je potpuno skriven */
   .legacy-holder[hidden]{display:none !important;}
   </style>
 </head>
@@ -286,13 +292,11 @@
 
       <div id="tutorChat" class="tutor-chat" aria-live="polite"><div id="tutorTyping" class="tutor-typing hidden">🤖 Tutor razmišlja<span class="dots"></span></div></div>
 
-      <div class="tutor-imagerow">
-        <input id="tutorImage" type="file" accept="image/*" style="display:none;">
-        <label for="tutorImage" class="btn secondary sm">📷 Dodaj sliku zadatka</label>
-        <span id="tutorImageChip" class="file-chip"><span id="tutorImageName">Nije odabrana slika</span><button type="button" class="remove" id="tutorImageRemove" title="Ukloni sliku">×</button></span>
-      </div>
+      <span id="tutorImageChip" class="file-chip tutor-chip"><span id="tutorImageName">Nije odabrana slika</span><button type="button" class="remove" id="tutorImageRemove" title="Ukloni sliku">×</button></span>
 
       <div class="tutor-inputrow">
+        <input id="tutorImage" type="file" accept="image/*" style="display:none;">
+        <label for="tutorImage" id="tutorImageBtn" class="tutor-plus" title="Dodaj sliku zadatka" aria-label="Dodaj sliku zadatka">＋</label>
         <textarea id="tutorMessage" placeholder="Upiši pitanje ili zadatak..."></textarea>
         <button id="tutorSend" type="button" class="btn">✉️ Pošalji tutoru</button>
       </div>

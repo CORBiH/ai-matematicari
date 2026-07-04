@@ -184,14 +184,42 @@ def test_topics_load_failure_message(client):
 
 # --- Phase 6.2: slika zadatka u glavnom tutoru --------------------------------------
 
+def _composer_row(html):
+    """Sadržaj composer reda (.tutor-inputrow) — + dugme | textarea | send."""
+    start = html.index('class="tutor-inputrow"')
+    end = html.index("</div>", start)
+    return html[start:end]
+
+
 def test_image_upload_ui_inside_tutor_card(client):
     html = _html(client)
     block = _tutor_block(html)
     assert 'id="tutorImage"' in block
     assert 'accept="image/*"' in block
-    assert "Dodaj sliku zadatka" in block
     assert 'id="tutorImageChip"' in block
     assert 'id="tutorImageRemove"' in block
+    # dostupnost: + dugme ima aria-label/title
+    assert 'aria-label="Dodaj sliku zadatka"' in block
+
+
+def test_plus_button_in_composer_row(client):
+    """+ dugme, textarea i send su u istom composer redu (ChatGPT-stil)."""
+    row = _composer_row(_html(client))
+    assert 'class="tutor-plus"' in row
+    assert 'for="tutorImage"' in row          # + otvara postojeći file input
+    assert 'id="tutorMessage"' in row         # textarea
+    assert 'id="tutorSend"' in row            # send dugme
+    # redoslijed: plus prije textarea prije send
+    assert row.index("tutor-plus") < row.index("tutorMessage") < row.index("tutorSend")
+
+
+def test_old_standalone_upload_button_gone(client):
+    html = _html(client)
+    # stari veliki samostalni upload dugme/red više ne postoji
+    assert "tutor-imagerow" not in html
+    assert "📷 Dodaj sliku zadatka" not in html
+    # hidden file input i dalje postoji i povezan je
+    assert 'id="tutorImage"' in html and 'accept="image/*"' in html
 
 
 def test_image_send_uses_multipart(client):
