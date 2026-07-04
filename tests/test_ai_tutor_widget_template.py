@@ -157,33 +157,30 @@ def test_chat_screen_contains_everything(client):
         assert needle in block, f"nedostaje {needle} unutar chat kartice"
 
 
-def test_topbar_context_and_controls(client):
-    block = _tutor_block(_html(client))
+def test_topbar_single_action_promijeni_only(client):
+    """Phase 7.2: topbar ima SAMO 'Promijeni' — 'Nova konverzacija' je uklonjena."""
+    html = _html(client)
+    block = _tutor_block(html)
     assert 'id="topbarGrade"' in block
     assert 'id="topbarMode"' in block
     assert 'id="topbarTopic"' in block
     assert 'id="tutorChangeBtn"' in block and "Promijeni" in block
-    assert 'id="tutorNewBtn"' in block and "Nova konverzacija" in block
+    assert 'id="tutorNewBtn"' not in html
+    assert "Nova konverzacija" not in html
 
 
-def test_change_returns_home_and_keeps_history(client):
+def test_change_resets_practice_state_keeps_history(client):
+    """Promijeni: nazad na izbor, čisti fazu/zadnji zadatak/sliku/placeholder,
+    ali NE briše historiju razgovora (TKEY ostaje)."""
     html = _html(client)
     idx = html.index("changeBtn.addEventListener")
-    snippet = html[idx:idx + 300]
+    snippet = html[idx:idx + 500]
     assert "showHome()" in snippet
-    # Promijeni NE briše historiju (to radi samo Nova konverzacija)
-    assert "localStorage.removeItem" not in snippet
-
-
-def test_new_conversation_clears_state(client):
-    html = _html(client)
-    idx = html.index("newBtn.addEventListener")
-    snippet = html[idx:idx + 800]
-    assert "localStorage.removeItem(TKEY)" in snippet
-    assert "localStorage.removeItem(LASTTASK_KEY)" in snippet
     assert "interactionPhase = null" in snippet
+    assert "localStorage.removeItem(LASTTASK_KEY)" in snippet
     assert "clearTutorImage()" in snippet
-    assert "showHome()" in snippet
+    assert "DEFAULT_PLACEHOLDER" in snippet
+    assert "localStorage.removeItem(TKEY)" not in snippet   # historija OSTAJE
 
 
 def test_mode_cards_not_inside_chat_card(client):
@@ -382,3 +379,50 @@ def test_bubble_spacing_compact(client):
     assert ".tbubble mjx-container{margin:.15rem 0 !important;}" in html
     assert ".tbubble ul,.tbubble ol{margin:.25rem 0 .25rem 1.15rem;padding:0;}" in html
     assert ".tbubble li{margin:.1rem 0;}" in html
+
+
+# --- Phase 7.2: follow-up nastavak + robusnije practice stanje ----------------------
+
+def test_followup_detection_present(client):
+    """JS prepoznaje kratke potvrde ("može", "hocu", "nastavi") kao nastavak."""
+    html = _html(client)
+    assert "function isFollowupMessage(t)" in html
+    for token in ("moze|može", "hocu|hoću", "nastavi|dalje", "jos|još", "primjer"):
+        assert token in html
+    # detekcija se koristi samo za upisane poruke, uz postojanje zadnje poruke
+    assert "lastTutorMessage && isFollowupMessage(typed)" in html
+
+
+def test_followup_payload_fields(client):
+    html = _html(client)
+    assert "'continuing_explanation'" in html
+    assert "payload.last_tutor_message = lastTutorMessage.slice(0, 600)" in html
+    # zadnja poruka tutora se pamti nakon ready odgovora
+    assert "lastTutorMessage = (answer || '').slice(0, 600)" in html
+
+
+def test_practice_answer_takes_precedence_over_followup(client):
+    """Dok se čeka odgovor na zadatak, i 'da'/'može' ide kao practice odgovor."""
+    html = _html(client)
+    idx = html.index("if (interactionPhase === 'awaiting_practice_answer')")
+    followup_idx = html.index("lastTutorMessage && isFollowupMessage(typed)")
+    assert idx < followup_idx                    # practice grana se provjerava PRVA
+
+
+def test_mode_topic_oblast_change_resets_practice_state(client):
+    html = _html(client)
+    # klik na mode karticu resetuje fazu
+    idx = html.index("modeGrid.querySelectorAll('.home-mode-card').forEach(btn=>{")
+    snippet = html[idx:idx + 700]
+    assert "interactionPhase = null" in snippet
+    # izbor lekcije, oblasti i quick ulaz čiste zadnji zadatak
+    assert html.count("localStorage.removeItem(LASTTASK_KEY)") >= 4
+
+
+def test_answer_send_does_not_clear_last_task_upfront(client):
+    """Slanje odgovora NE briše zadnji zadatak; ažurira se tek nakon feedbacka."""
+    html = _html(client)
+    idx = html.index("if (answerPhase){")
+    snippet = html[idx:idx + 400]
+    assert "localStorage.removeItem" not in snippet
+    assert "localStorage.getItem(LASTTASK_KEY)" in snippet

@@ -71,3 +71,30 @@ if (failed.length) {
   process.exit(1);
 }
 console.log('renderer checks OK (' + Object.keys(checks).length + ' provjera)');
+
+// 3) isFollowupMessage behavior (kratke potvrde → follow-up, konkretno → ne)
+const fuMatch = main.match(/function isFollowupMessage\(t\)\{[\s\S]*?\n    \}/);
+if (!fuMatch) { console.error('FAILED: isFollowupMessage nije pronađen'); process.exit(1); }
+const isFollowupMessage = new Function(fuMatch[0] + '; return isFollowupMessage;')();
+
+const fuChecks = {
+  moze: isFollowupMessage('moze'),
+  moze_dijakritika: isFollowupMessage('Može!'),
+  hocu: isFollowupMessage('hocu') && isFollowupMessage('hoću'),
+  da: isFollowupMessage('da'),
+  nastavi: isFollowupMessage('nastavi'),
+  dalje: isFollowupMessage('dalje'),
+  jos: isFollowupMessage('jos') && isFollowupMessage('još'),
+  moze_primjer: isFollowupMessage('može primjer'),
+  daj_primjer: isFollowupMessage('daj primjer'),
+  konkretno_pitanje_nije: !isFollowupMessage('koliko je 5-1'),
+  broj_nije: !isFollowupMessage('24'),
+  duga_poruka_nije: !isFollowupMessage('može li mi neko objasniti kako se računa NZS'),
+  prazno_nije: !isFollowupMessage(''),
+};
+const fuFailed = Object.entries(fuChecks).filter(([, ok]) => !ok).map(([k]) => k);
+if (fuFailed.length) {
+  console.error('FOLLOWUP FAILED:', fuFailed.join(', '));
+  process.exit(1);
+}
+console.log('followup checks OK (' + Object.keys(fuChecks).length + ' provjera)');

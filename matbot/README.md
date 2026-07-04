@@ -316,6 +316,45 @@ display math, merged lists, aggressive `<br>` collapse, XSS) + Phase 7.1 test
 blocks in `tests/test_prompt_builder_modular.py` and
 `tests/test_ai_tutor_widget_template.py`.
 
+### Phase 7.2 — natural follow-ups, robust practice answers, one top-bar action
+
+- **Follow-up continuation**: the widget detects short confirmations
+  (`isFollowupMessage`: "da", "može"/"moze", "hoću"/"hocu", "nastavi", "dalje",
+  "jos"/"još", "može primjer", "daj primjer", …, ≤30 chars) typed after a ready
+  answer and sends `interaction_phase: "continuing_explanation"` +
+  `last_tutor_message` (last assistant answer, 600-char cap; server re-caps at
+  1000 via `_sanitize_payload`). `prompt_builder.build_continuation_instructions`
+  replaces the mode block in **all** paths (topic/general/exam-by-oblast):
+  continue exactly where the last message stopped, never repeat the explanation
+  or "Ideja:" block, offered example → give one concrete example, offered
+  guided solving → start one guided example, short + one next question, no
+  re-printed "Tema:". In `handle_chat` a vague continuation ("može") skips both
+  the deterministic fallback and the LLM topic classifier — it answers via the
+  general prompt with history.
+- **Practice answer robustness**: typed messages while
+  `awaiting_practice_answer` are *always* sent as
+  `answering_practice_task` + `mode: "practice"` + stored `last_tutor_task`
+  (the practice branch is checked before follow-up detection, so "da"/"može"
+  count as answers to the task). Follow-up instructions now add: "ne znam"/
+  "objasni"/"pomozi" → one guided hint (no new task, no full solution), short
+  confirmation → next small task/step, never repeat the same task unless the
+  answer was unclear. The general (no-topic) prompt path also honors the
+  practice follow-up phase. Frontend safeguards: mode-card click, topic pick,
+  oblast pick, quick entry and "Promijeni" all reset the phase and stored task;
+  sending an answer never clears `last_tutor_task` (it is only overwritten
+  after ready feedback); the busy-guard still prevents double-send.
+- **Explain style**: conversational — idea in 2–3 sentences + one short example
+  or an offer ("Hoćeš primjer?"); never dump the whole lesson or repeat an
+  explanation already present in history; topic data is help, not a script.
+- **Top bar**: "Nova konverzacija" removed — **"Promijeni" is the only action**:
+  back to onboarding, clears interaction phase / `last_tutor_task` / attached
+  image / placeholder, keeps the transcript and localStorage history.
+
+Checks: `scripts/check_js.mjs` adds 13 `isFollowupMessage` behavior checks;
+Phase 7.2 test blocks in `tests/test_prompt_builder_modular.py`,
+`tests/test_ai_tutor_chat_endpoint.py` and
+`tests/test_ai_tutor_widget_template.py`.
+
 ### Phase 4.3 — practice answer flow + rendering polish
 
 - **Frontend state:** after a ready practice answer the widget sets

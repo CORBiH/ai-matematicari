@@ -110,9 +110,10 @@ def _sanitize_payload(payload: dict) -> dict:
         val = payload.get(key)
         if isinstance(val, str) and len(val) > MAX_MESSAGE_CHARS:
             payload[key] = val[:MAX_MESSAGE_CHARS]
-    val = payload.get("last_tutor_task")
-    if isinstance(val, str) and len(val) > MAX_LAST_TASK_CHARS:
-        payload["last_tutor_task"] = val[:MAX_LAST_TASK_CHARS]
+    for key in ("last_tutor_task", "last_tutor_message"):
+        val = payload.get(key)
+        if isinstance(val, str) and len(val) > MAX_LAST_TASK_CHARS:
+            payload[key] = val[:MAX_LAST_TASK_CHARS]
     hist = payload.get("conversation_history")
     if isinstance(hist, list):
         trimmed = []
@@ -233,7 +234,15 @@ def handle_chat(
         )
         ocr_text = normalize_value(payload.get("image_ocr_text"))
         combined = " ".join(x for x in (student_msg, ocr_text) if x)
-        if combined and (has_image or not is_vague_message(combined)):
+        # Phase 7.2: kratka potvrda ("može", "nastavi") kao nastavak razgovora —
+        # nikad fallback i nikad LLM klasifikator teme; opći prompt + historija.
+        is_continuation = (
+            normalize_value(payload.get("interaction_phase")).lower()
+            == "continuing_explanation"
+        )
+        if is_continuation and combined:
+            general_answer = True
+        elif combined and (has_image or not is_vague_message(combined)):
             detection = detect_topic(
                 combined, master, tmap,
                 openai_chat=openai_chat, model=model, timeout=timeout,

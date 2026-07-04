@@ -289,8 +289,16 @@ def build_mode_instructions(mode: Any, final_topic: Any, topic_context: dict) ->
     # explain (default)
     return (
         "MOD: OBJASNI (explain)\n"
-        "- Odgovori KRATKO i jasno: prvo ideja/pristup, zatim 2–5 koraka, pa "
-        "rezultat i kratka provjera.\n"
+        "- Budi razgovoran, ne repetitivan: prvo ideja/pristup u 2–3 kratke "
+        "rečenice, zatim JEDAN kratak primjer ILI ponudi primjer pitanjem "
+        "(npr. \"Hoćeš primjer?\").\n"
+        "- NE prepričavaj cijelu lekciju odjednom i NE ispisuj sav sadržaj teme "
+        "svaki put — podatke o temi koristi kao pomoć, ne kao skriptu.\n"
+        "- Ako historija razgovora VEĆ sadrži objašnjenje ove teme, NE ponavljaj "
+        "ga: nastavi razgovor, odgovori na follow-up ili daj sljedeći "
+        "primjer/korak.\n"
+        "- Ako učenik kratko potvrdi (\"može\", \"hoću\", \"nastavi\"), nastavi "
+        "primjerom ili sljedećim korakom — bez ponavljanja objašnjenja.\n"
         "- Budi kratak; detaljno objašnjavaj SAMO ako učenik to izričito zatraži.\n"
         "- Ako nedostaje kontekst za rješavanje, postavi JEDNO kratko pitanje "
         "prije rješavanja.\n"
@@ -313,12 +321,46 @@ def build_practice_followup_instructions(payload: dict, topic_context: dict) -> 
         "zašto, pa po želji daj JEDAN novi mali zadatak ili sljedeći korak.\n"
         "- Ako NIJE tačno: blago reci da nije tačno i daj JEDAN hint ili JEDAN "
         "sljedeći korak; NE otkrivaj cijelo rješenje osim ako učenik to zatraži.\n"
+        "- Ako učenik napiše \"ne znam\", \"objasni\" ili \"pomozi\": daj JEDAN "
+        "vođeni hint ili JEDAN sljedeći korak — NE novi zadatak i NE cijelo "
+        "rješenje odmah.\n"
+        "- Ako učenik kratko potvrdi (npr. \"može\", \"da\", \"hajde\"): nastavi "
+        "— daj sljedeći mali zadatak ili sljedeći korak.\n"
+        "- NE ponavljaj isti zadatak osim ako je odgovor nejasan.\n"
         "- NE ponavljaj cijelo objašnjenje teme i NE počinji isti zadatak ispočetka.\n"
         "- Odgovor mora biti KRATAK i prirodan za chat: bez naslova poput "
         "\"### Tema\" i bez dugih lekcija.\n"
     )
     if last_task:
         block += f"ZADNJI ZADATAK (kojem učenik odgovara):\n{last_task}\n"
+    return block
+
+
+def build_continuation_instructions(payload: dict) -> str:
+    """Phase 7.2 — učenikova poruka je KRATKA POTVRDA/nastavak ("može", "hoću",
+    "nastavi", "daj primjer") poslije prethodnog odgovora tutora
+    (``payload.interaction_phase == 'continuing_explanation'``).
+
+    Zamjenjuje standardni mode blok: AI nastavlja od svoje zadnje poruke
+    (``last_tutor_message``) umjesto da ponavlja objašnjenje teme ispočetka."""
+    last_msg = normalize_value((payload or {}).get("last_tutor_message"))[:600]
+    block = (
+        "MOD: NASTAVAK RAZGOVORA (follow-up)\n"
+        "- Učenikova poruka je kratka potvrda/nastavak (npr. \"može\", \"hoću\", "
+        "\"nastavi\", \"daj primjer\") — NE tretiraj je kao novi zahtjev za "
+        "objašnjenjem teme.\n"
+        "- NASTAVI tačno tamo gdje je tvoja ZADNJA PORUKA stala; NE ponavljaj "
+        "objašnjenje ni \"Ideja:\" blok ispočetka.\n"
+        "- Ako je zadnja poruka ponudila primjer (npr. \"Hoćeš primjer?\"), daj "
+        "JEDAN konkretan primjer korak po korak.\n"
+        "- Ako je zadnja poruka ponudila zajedničko rješavanje, počni JEDAN "
+        "vođeni primjer i uključi učenika.\n"
+        "- Budi kratak i prirodan; po potrebi završi JEDNIM kratkim pitanjem za "
+        "sljedeći korak.\n"
+        "- NE ispisuj ponovo naslov teme (\"Tema:\") osim ako je zaista potrebno.\n"
+    )
+    if last_msg:
+        block += f"ZADNJA PORUKA TUTORA (nastavi od nje):\n{last_msg}\n"
     return block
 
 
@@ -462,10 +504,10 @@ def build_tutor_prompt(
 
     mode = normalize_mode(payload.get("mode"))
     # Phase 4.3: follow-up odgovor na practice zadatak uvijek ide kao practice.
-    is_practice_followup = (
-        normalize_value(payload.get("interaction_phase")).lower()
-        == "answering_practice_task"
-    )
+    # Phase 7.2: kratka potvrda ("može", "nastavi") → nastavak, ne novo objašnjenje.
+    interaction_phase = normalize_value(payload.get("interaction_phase")).lower()
+    is_practice_followup = interaction_phase == "answering_practice_task"
+    is_continuation = interaction_phase == "continuing_explanation"
     if is_practice_followup:
         mode = "practice"
     lesson_topic = normalize_value(lookup_result.get("final_topic"))
@@ -509,11 +551,12 @@ def build_tutor_prompt(
             "- Riješi zadatak prema STVARNOJ temi zadatka i KRATKO napomeni ovo "
             "neslaganje učeniku."
         )
-    mode_block = (
-        build_practice_followup_instructions(payload, topic_context)
-        if is_practice_followup
-        else build_mode_instructions(mode, effective_topic, topic_context)
-    )
+    if is_practice_followup:
+        mode_block = build_practice_followup_instructions(payload, topic_context)
+    elif is_continuation:
+        mode_block = build_continuation_instructions(payload)
+    else:
+        mode_block = build_mode_instructions(mode, effective_topic, topic_context)
     for block in (
         _build_topic_block(topic_context),
         _build_video_flow_block(video_flow),
@@ -547,6 +590,16 @@ def build_general_tutor_prompt(payload: dict) -> dict:
     poziva; ``final_topic`` ostaje ``"unknown"``."""
     payload = payload or {}
     mode = normalize_mode(payload.get("mode"))
+    # Phase 7.2: i bez prepoznate teme poštuj fazu interakcije (practice odgovor
+    # ili nastavak razgovora) umjesto standardnog mode bloka.
+    phase = normalize_value(payload.get("interaction_phase")).lower()
+    if phase == "answering_practice_task":
+        mode = "practice"
+        mode_block = build_practice_followup_instructions(payload, {})
+    elif phase == "continuing_explanation":
+        mode_block = build_continuation_instructions(payload)
+    else:
+        mode_block = build_mode_instructions(mode, "unknown", {})
 
     system_prompt = "\n\n".join(
         [_base_system_prompt(payload.get("grade")), GLOBAL_MODULAR_GUIDELINES,
@@ -560,7 +613,7 @@ def build_general_tutor_prompt(payload: dict) -> dict:
         "- Odgovori na KONKRETNO pitanje koristeći gradivo 6. razreda, kratko i "
         "korak po korak.\n"
         "- NE izmišljaj temu i ne spominji internu listu tema.",
-        build_mode_instructions(mode, "unknown", {}),
+        mode_block,
         _build_student_block(payload),
         _build_history_block(payload.get("conversation_history")),
     ]
@@ -640,6 +693,10 @@ def build_exam_oblast_prompt(payload: dict, master_content: dict) -> dict | None
         "- Koristi ISKLJUČIVO teme i materijal iz bloka iznad — NE izmišljaj "
         "teme ni sadržaj.\n"
     )
+    # Phase 7.2: "može"/"nastavi" usred exam sesije → nastavak od zadnje poruke,
+    # ne ponovni ispis 3 zadatka (materijal oblasti ostaje kao kontekst).
+    if normalize_value(payload.get("interaction_phase")).lower() == "continuing_explanation":
+        mode_block = build_continuation_instructions(payload)
 
     user_parts = [
         _build_entry_context(payload, "unknown", "exam"),

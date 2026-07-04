@@ -538,3 +538,66 @@ def test_exam_by_oblast_logged(client, fake_openai, oblast_name, _tmp_activity_d
     rows = al.get_recent_activity(session_id="sess-log-oblast", path=_tmp_activity_db)
     assert rows and rows[0]["event_type"] == "exam_mode_used"
     assert rows[0]["status"] == "ready"
+
+
+# --- Phase 7.2: nastavak razgovora (continuing_explanation) ------------------------
+
+def test_continuation_vague_message_not_fallback(client, fake_openai):
+    """'može' bez teme, ali sa continuing_explanation → ready nastavak (opći
+    prompt), NE deterministički fallback i NE LLM klasifikator teme."""
+    resp = client.post(CHAT_URL, json={
+        "mode": "explain",
+        "student_message": "može",
+        "interaction_phase": "continuing_explanation",
+        "last_tutor_message": "NZS je najmanji zajednički sadržilac. Hoćeš primjer?",
+    })
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["status"] == "ready"
+    assert body["final_topic"] == "unknown"
+    assert body["answer"] == fake_openai.state["reply"]
+    assert len(fake_openai.calls.messages) == 1          # samo odgovor, bez detekcije
+    user_prompt = fake_openai.calls.messages[0][-1]["content"]
+    assert "NASTAVAK RAZGOVORA" in user_prompt
+    assert "Hoćeš primjer?" in user_prompt
+
+
+def test_continuation_with_topic_uses_continuation_block(client, fake_openai):
+    resp = client.post(CHAT_URL, json={
+        "selected_topic": "skupovi_uvod",
+        "mode": "explain",
+        "student_message": "nastavi",
+        "interaction_phase": "continuing_explanation",
+        "last_tutor_message": "Hoćeš da zajedno riješimo primjer?",
+    })
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["status"] == "ready"
+    assert body["final_topic"] == "skupovi_uvod"
+    up = fake_openai.calls.messages[-1][-1]["content"]
+    assert "NASTAVAK RAZGOVORA" in up
+    assert "MOD: OBJASNI" not in up                      # ne ponavlja objašnjenje
+
+
+def test_continuation_without_message_still_fallback(client):
+    """Prazna poruka sa continuation fazom → i dalje deterministički fallback
+    (bez OpenAI poziva — _isolate bi digao AssertionError)."""
+    resp = client.post(CHAT_URL, json={
+        "interaction_phase": "continuing_explanation",
+        "last_tutor_message": "Hoćeš primjer?",
+    })
+    assert resp.status_code == 200
+    assert resp.get_json()["status"] == "fallback"
+
+
+def test_last_tutor_message_capped(client, fake_openai):
+    resp = client.post(CHAT_URL, json={
+        "selected_topic": "skupovi_uvod",
+        "student_message": "može",
+        "interaction_phase": "continuing_explanation",
+        "last_tutor_message": "Y" * 5000,
+    })
+    assert resp.status_code == 200
+    sent = fake_openai.calls.messages[-1][-1]["content"]
+    assert "Y" * 600 in sent                             # poruka je stigla…
+    assert "Y" * 1001 not in sent                        # …ali skraćena (cap 1000)

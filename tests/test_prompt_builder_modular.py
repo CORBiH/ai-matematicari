@@ -78,7 +78,7 @@ def test_explain_mode_idea_and_steps(master):
     up = res["user_prompt"].lower()
     assert res["mode"] == "explain"
     assert "ideja" in up
-    assert "2" in up and "5" in up
+    assert "primjer" in up
     assert "korak" in up
 
 
@@ -585,3 +585,102 @@ def test_followup_compact_feedback_no_topic_restart():
     block = pb.build_practice_followup_instructions({}, {})
     assert "KRATAK i prirodan za chat" in block
     assert "NE ponavljaj cijelo objašnjenje teme" in block
+
+
+# --- Phase 7.2: nastavak razgovora + robusniji practice follow-up -----------------
+
+def test_continuation_instructions_block():
+    block = pb.build_continuation_instructions(
+        {"last_tutor_message": "NZS je najmanji zajednički sadržilac. Hoćeš primjer?"}
+    )
+    assert "NASTAVAK RAZGOVORA" in block
+    assert "NE tretiraj je kao novi zahtjev" in block
+    assert "NE ponavljaj" in block
+    assert "JEDAN konkretan primjer" in block
+    assert "vođeni primjer" in block
+    assert "Hoćeš primjer?" in block               # zadnja poruka ulazi u blok
+    assert 'naslov teme ("Tema:")' in block
+
+
+def test_continuation_truncates_long_message():
+    block = pb.build_continuation_instructions({"last_tutor_message": "x" * 2000})
+    assert "x" * 600 in block
+    assert "x" * 601 not in block
+
+
+def test_tutor_prompt_continuation_replaces_explain_block(master):
+    res = pb.build_tutor_prompt(
+        {"selected_topic": TOPIC, "mode": "explain",
+         "interaction_phase": "continuing_explanation",
+         "student_message": "može",
+         "last_tutor_message": "Hoćeš da zajedno riješimo primjer?"},
+        _found(), master,
+    )
+    up = res["user_prompt"]
+    assert res["status"] == "ready"
+    assert "NASTAVAK RAZGOVORA" in up
+    assert "Hoćeš da zajedno riješimo primjer?" in up
+    assert "MOD: OBJASNI" not in up                # ne ponavlja objašnjenje ispočetka
+
+
+def test_general_prompt_continuation(master):
+    res = pb.build_general_tutor_prompt(
+        {"mode": "explain", "interaction_phase": "continuing_explanation",
+         "student_message": "nastavi", "last_tutor_message": "Prvi korak je..."}
+    )
+    assert "NASTAVAK RAZGOVORA" in res["user_prompt"]
+    assert "MOD: OBJASNI" not in res["user_prompt"]
+
+
+def test_exam_oblast_continuation(master, oblast):
+    res = pb.build_exam_oblast_prompt(
+        {"mode": "exam", "selected_oblast": oblast,
+         "interaction_phase": "continuing_explanation",
+         "student_message": "može", "last_tutor_message": "Hoćeš da počnemo s prvim?"},
+        master,
+    )
+    up = res["user_prompt"]
+    assert "NASTAVAK RAZGOVORA" in up
+    assert "KONTROLNI IZ OBLASTI" not in up        # ne ispisuje ponovo 3 zadatka
+    assert "OBLAST KONTROLNOG" in up               # materijal oblasti ostaje kontekst
+
+
+def test_general_prompt_practice_followup():
+    res = pb.build_general_tutor_prompt(
+        {"interaction_phase": "answering_practice_task",
+         "last_tutor_task": "Koliko je 2+2?", "student_message": "4"}
+    )
+    assert res["mode"] == "practice"
+    assert "PROVJERA ODGOVORA" in res["user_prompt"]
+    assert "Koliko je 2+2?" in res["user_prompt"]
+
+
+def test_practice_answer_not_treated_as_new_request(master):
+    res = pb.build_tutor_prompt(
+        {"selected_topic": TOPIC, "interaction_phase": "answering_practice_task",
+         "last_tutor_task": "Da li je 2 element skupa S?", "student_message": "da"},
+        _found(), master,
+    )
+    up = res["user_prompt"]
+    assert res["mode"] == "practice"
+    assert "PROVJERA ODGOVORA" in up
+    assert "MOD: VJEŽBAJ (practice)" not in up     # nije novi svježi zadatak
+
+
+def test_followup_hint_for_ne_znam_and_confirmations():
+    block = pb.build_practice_followup_instructions({}, {})
+    assert '"ne znam"' in block                    # hint umjesto novog zadatka
+    assert "NE novi zadatak" in block
+    assert "NE ponavljaj isti zadatak osim ako je odgovor nejasan." in block
+    assert '"hajde"' in block                      # potvrda → sljedeći korak
+
+
+def test_explain_mode_conversational_not_repetitive(master):
+    res = pb.build_tutor_prompt(
+        {"selected_topic": TOPIC, "mode": "explain"}, _found(), master
+    )
+    up = res["user_prompt"]
+    assert "razgovoran" in up
+    assert "NE prepričavaj cijelu lekciju" in up
+    assert "VEĆ sadrži objašnjenje ove teme" in up
+    assert '"Hoćeš primjer?"' in up
