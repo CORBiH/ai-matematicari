@@ -160,6 +160,22 @@ def get_topic_context(final_topic: Any, master_content: dict) -> dict:
     return ctx
 
 
+def get_oblast_topics(oblast: Any, master_content: dict) -> list[dict]:
+    """READY topic redovi za datu oblast (case-insensitive poređenje naziva),
+    u redoslijedu TOPICS sheeta. ``[]`` ako oblast ne postoji — nikad se ne
+    izmišlja."""
+    key = normalize_value(oblast).lower()
+    if not key:
+        return []
+    return [
+        r
+        for r in (master_content or {}).get("topics", [])
+        if r.get("topic")
+        and normalize_value(r.get("oblast")).lower() == key
+        and (not r.get("status") or normalize_value(r.get("status")).upper() == "READY")
+    ]
+
+
 def get_video_flow_context(
     payload: dict, final_topic: Any, master_content: dict
 ) -> dict | None:
@@ -286,6 +302,7 @@ _ENTRY_LABELS = (
     ("lesson_order", "Lesson order"),
     ("lesson_title", "Thinkific lekcija"),
     ("selected_topic", "Selected topic"),
+    ("selected_oblast", "Selected oblast"),
     ("detected_topic", "Detected topic"),
 )
 
@@ -525,6 +542,89 @@ def build_general_tutor_prompt(payload: dict) -> dict:
         "topic_context_used": False,
         "video_flow_used": False,
         "topic_conflict": False,
+    }
+
+
+def build_exam_oblast_prompt(payload: dict, master_content: dict) -> dict | None:
+    """Phase 7 — priprema kontrolnog za CIJELU OBLAST (bez pojedinačne teme).
+
+    Vraća ready prompt SAMO kada su ispunjeni svi uslovi: ``mode == exam``,
+    ``selected_topic`` prazan, a ``selected_oblast`` postoji u masteru
+    (case-insensitive). U svakom drugom slučaju vraća ``None`` i pozivalac
+    nastavlja postojeći tok (topic-based exam ostaje netaknut).
+
+    Kontekst su ISKLJUČIVO READY teme te oblasti iz mastera (display_name +
+    ``controlni_*`` materijal) — teme se nikad ne izmišljaju. ``final_topic``
+    ostaje ``"unknown"`` (pravilo 10: non-unknown final_topic mora postojati u
+    TOPICS), a oblast se vraća kroz dodatni ključ ``exam_oblast``."""
+    payload = payload or {}
+    if normalize_mode(payload.get("mode")) != "exam":
+        return None
+    if normalize_value(payload.get("selected_topic")):
+        return None
+    oblast = normalize_value(payload.get("selected_oblast"))
+    if not oblast:
+        return None
+    rows = get_oblast_topics(oblast, master_content or {})
+    if not rows:
+        return None
+    canonical = normalize_value(rows[0].get("oblast")) or oblast
+
+    system_prompt = "\n\n".join(
+        [_base_system_prompt(payload.get("grade")), GLOBAL_MODULAR_GUIDELINES]
+    ).strip()
+
+    lines = [
+        f"OBLAST KONTROLNOG: {canonical}",
+        "TEME I KONTROLNI MATERIJAL OVE OBLASTI (iz AI_MATH_CONTENT_MASTER):",
+    ]
+    for r in rows:
+        lines.append(f"- Tema: {r.get('display_name') or r['topic']}")
+        for key, label in (
+            ("controlni_task_1", "Kontrolni zadatak"),
+            ("controlni_task_2", "Kontrolni zadatak"),
+            ("controlni_task_3", "Kontrolni zadatak"),
+            ("controlni_trick", "Trik"),
+            ("controlni_warning", "Upozorenje"),
+        ):
+            val = normalize_value(r.get(key))
+            if val:
+                lines.append(f"   • {label}: {val}")
+    oblast_block = "\n".join(lines)
+
+    mode_block = (
+        "MOD: KONTROLNI IZ OBLASTI (exam)\n"
+        "- Učenik sutra ima kontrolni iz CIJELE OBLASTI, ne iz jedne lekcije.\n"
+        "- Daj TAČNO 3 zadatka u stilu kontrolnog, IZBALANSIRANO iz RAZLIČITIH "
+        "tema ove oblasti (koristi ponuđene kontrolne zadatke kao uzor).\n"
+        "- Zatim navedi TAČNO 1 čest trik i TAČNO 1 upozorenje iz ponuđenog "
+        "materijala.\n"
+        "- Koristi ISKLJUČIVO teme i materijal iz bloka iznad — NE izmišljaj "
+        "teme ni sadržaj.\n"
+    )
+
+    user_parts = [
+        _build_entry_context(payload, "unknown", "exam"),
+        oblast_block,
+        mode_block,
+        _build_student_block(payload),
+        _build_history_block(payload.get("conversation_history")),
+    ]
+    user_prompt = "\n\n".join(p for p in user_parts if p).strip()
+
+    return {
+        "system_prompt": system_prompt,
+        "user_prompt": user_prompt,
+        "mode": "exam",
+        "final_topic": "unknown",
+        "opened_lesson_topic": "unknown",
+        "effective_topic": "unknown",
+        "status": _STATUS_READY,
+        "topic_context_used": False,
+        "video_flow_used": False,
+        "topic_conflict": False,
+        "oblast_context_used": True,
+        "exam_oblast": canonical,
     }
 
 

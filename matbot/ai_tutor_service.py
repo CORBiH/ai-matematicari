@@ -16,6 +16,7 @@ from typing import Any, Callable
 from matbot.activity_log import log_student_activity
 from matbot.content_loader import get_master, get_thinkific_map, normalize_value
 from matbot.prompt_builder import (
+    build_exam_oblast_prompt,
     build_general_tutor_prompt,
     build_tutor_prompt,
     get_topic_context,
@@ -213,12 +214,20 @@ def handle_chat(
 
     lookup_result = get_final_topic(payload, master, tmap)
 
+    # --- Phase 7: kontrolni za CIJELU OBLAST (selected_oblast bez teme) ---------
+    # Ima prednost nad free_chat detekcijom: auto-poruka "Sutra imam kontrolni..."
+    # ne smije pokrenuti LLM klasifikator teme. None ako uslovi nisu ispunjeni
+    # (nevalidna oblast pada na postojeći exam fallback koji pita oblast).
+    exam_oblast_prompt = None
+    if lookup_result["status"] == "unknown":
+        exam_oblast_prompt = build_exam_oblast_prompt(payload, master)
+
     # --- Phase 6: free_chat detekcija teme -------------------------------------
     # Tema je opcionalna: ako lookup ne nađe ništa, a poruka (ili OCR teksta
     # slike) je KONKRETNA, pokušaj detekciju (heuristike → LLM klasifikator).
     # Detektovana tema se validira kroz get_final_topic (nikad se ne izmišlja).
     general_answer = False
-    if lookup_result["status"] == "unknown":
+    if exam_oblast_prompt is None and lookup_result["status"] == "unknown":
         student_msg = normalize_value(
             payload.get("student_message") or payload.get("message")
         )
@@ -240,7 +249,9 @@ def handle_chat(
             # slika bez teksta i bez OCR-a → Vision odgovor bez teme
             general_answer = True
 
-    if general_answer:
+    if exam_oblast_prompt is not None:
+        prompt_result = exam_oblast_prompt
+    elif general_answer:
         prompt_result = build_general_tutor_prompt(payload)
     else:
         prompt_result = build_tutor_prompt(payload, lookup_result, master, tmap)

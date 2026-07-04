@@ -424,3 +424,75 @@ def test_build_fallback_prompt_direct(master):
     assert res["status"] == "fallback"
     assert res["final_topic"] == "unknown"
     assert res["topic_context_used"] is False
+
+
+# --- Phase 7: exam za CIJELU OBLAST (build_exam_oblast_prompt) --------------------
+
+@pytest.fixture(scope="module")
+def oblast(master):
+    return master["topics_by_id"][TOPIC]["oblast"]
+
+
+def test_exam_oblast_prompt_ready(master, oblast):
+    res = pb.build_exam_oblast_prompt(
+        {"mode": "exam", "selected_oblast": oblast,
+         "student_message": "Sutra imam kontrolni iz ove oblasti. Pripremi me."},
+        master,
+    )
+    assert res is not None
+    assert res["status"] == "ready"
+    assert res["mode"] == "exam"
+    assert res["final_topic"] == "unknown"       # pravilo 10: bez izmišljene teme
+    assert res["exam_oblast"] == oblast
+    up = res["user_prompt"]
+    assert "OBLAST KONTROLNOG" in up
+    assert "KONTROLNI IZ OBLASTI" in up
+    # sve READY teme te oblasti su navedene (display_name), ništa izmišljeno
+    rows = pb.get_oblast_topics(oblast, master)
+    assert rows
+    for row in rows:
+        assert (row.get("display_name") or row["topic"]) in up
+    assert "NE izmišljaj" in up
+
+
+def test_exam_oblast_includes_controlni_material(master, oblast, topic_row):
+    res = pb.build_exam_oblast_prompt({"mode": "exam", "selected_oblast": oblast}, master)
+    up = res["user_prompt"]
+    # kontrolni materijal teme iz te oblasti ulazi u prompt (stvarne ćelije sheeta)
+    for field in ("controlni_task_1", "controlni_trick", "controlni_warning"):
+        if topic_row.get(field):
+            assert topic_row[field] in up
+
+
+def test_exam_oblast_case_insensitive_and_canonical(master, oblast):
+    res = pb.build_exam_oblast_prompt(
+        {"mode": "exam", "selected_oblast": oblast.upper()}, master
+    )
+    assert res is not None
+    assert res["exam_oblast"] == oblast          # kanonski naziv iz mastera
+
+
+def test_exam_oblast_none_when_not_applicable(master, oblast):
+    # non-exam mod → None
+    assert pb.build_exam_oblast_prompt(
+        {"mode": "practice", "selected_oblast": oblast}, master) is None
+    # selected_topic ima prednost (postojeći topic-based exam netaknut) → None
+    assert pb.build_exam_oblast_prompt(
+        {"mode": "exam", "selected_topic": TOPIC, "selected_oblast": oblast}, master) is None
+    # nepostojeća/prazna oblast → None (pada na postojeći exam fallback)
+    assert pb.build_exam_oblast_prompt(
+        {"mode": "exam", "selected_oblast": "nepostojeca_oblast_xyz"}, master) is None
+    assert pb.build_exam_oblast_prompt(
+        {"mode": "exam", "selected_oblast": ""}, master) is None
+
+
+def test_exam_oblast_uses_base_prompt_and_guidelines(master, oblast):
+    res = pb.build_exam_oblast_prompt(
+        {"mode": "exam", "selected_oblast": oblast, "grade": 6}, master
+    )
+    assert "MODULARNA PRAVILA" in res["system_prompt"]
+
+
+def test_get_oblast_topics_unknown_empty(master):
+    assert pb.get_oblast_topics("nema_takve_oblasti", master) == []
+    assert pb.get_oblast_topics("", master) == []

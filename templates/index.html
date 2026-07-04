@@ -161,22 +161,46 @@
   /* sakrij prazan chat-karton na startu */
   .card.is-empty{display:none}
 
-  /* ===== Phase 4.2: AI Tutor — jedan glavni panel ===== */
+  /* ===== Screen switching (home ↔ chat) ===== */
+  #tutorHome[hidden],#tutor-card[hidden]{display:none !important;}
+
+  /* ===== SCREEN 1: Start/Home — onboarding kartica ===== */
+  .home-screen{flex:1 1 auto;min-height:0;overflow-y:auto;display:flex;align-items:flex-start;justify-content:center;padding:5vh .25rem 2rem;}
+  .home-card{width:min(100%,660px);background:var(--card-bg);border:1px solid var(--card-border);border-radius:20px;
+    padding:1.9rem 1.7rem 1.7rem;box-shadow:0 18px 60px rgba(0,0,0,.4);backdrop-filter:blur(10px);animation:fadeIn .25s ease;}
+  .home-brand{font-size:.92rem;font-weight:800;letter-spacing:.14em;color:var(--accent-bot);text-transform:uppercase;}
+  .home-heading{margin:.35rem 0 .2rem;font-size:1.5rem;line-height:1.25;font-weight:800;}
+  .home-lede{margin:0;color:var(--muted);font-size:.95rem;}
+  .home-step{margin-top:1.35rem;}
+  .home-step-label{display:block;font-weight:700;font-size:1rem;margin-bottom:.55rem;}
+  .home-grade-select{width:100%;max-width:280px;font-size:1.05rem;padding:.6rem .8rem;border-radius:12px;
+    border:1px solid var(--input-border);background:var(--input-bg);color:var(--text);}
+  .home-grade-select option:disabled{color:#6b7a76;}
+  .home-modes{display:grid;grid-template-columns:1fr 1fr;gap:.7rem;}
+  .home-mode-card{display:flex;flex-direction:column;align-items:flex-start;gap:.3rem;text-align:left;
+    background:#101c18;border:1px solid rgba(86,200,143,.22);border-radius:14px;padding:.95rem 1rem;
+    color:var(--text);cursor:pointer;font:inherit;transition:border-color .15s ease,transform .08s ease,background .15s ease;}
+  .home-mode-card:hover{border-color:var(--accent-bot);background:#122019;transform:translateY(-1px);}
+  .home-mode-card.active{border-color:var(--accent-user);outline:2px solid var(--accent-user);outline-offset:1px;}
+  .home-mode-title{font-weight:700;font-size:1.02rem;}
+  .home-mode-sub{color:var(--muted);font-size:.86rem;line-height:1.45;}
+  .home-picker-select{width:100%;font-size:1rem;padding:.6rem .8rem;border-radius:12px;
+    border:1px solid var(--input-border);background:var(--input-bg);color:var(--text);}
+  .home-picker-actions{display:flex;justify-content:space-between;gap:.6rem;margin-top:.9rem;}
+
+  /* ===== SCREEN 2: Chat — jedan fokusiran panel ===== */
   .tutor-card{border-top:0;display:flex;flex-direction:column;height:100%;min-height:0;padding:.55rem .7rem .65rem;}
   .tutor-title,.tutor-sub{display:none;}
-  .tutor-controls{display:flex;align-items:center;gap:.45rem;flex-wrap:wrap;margin:0 0 .25rem;flex:0 0 auto;}
-  .tutor-controls label{white-space:nowrap;font-weight:600;font-size:.88rem;color:#d8e6e2;}
-  .tutor-topic{min-width:260px;max-width:100%;flex:1;font-size:.9rem;padding:.38rem .6rem;background:#0f171c;color:var(--text);border-color:#2a3f43;}
-  .mode-row{display:flex;gap:.35rem;flex-wrap:wrap;margin:0 0 .3rem;max-width:100%;flex:0 0 auto;}
-  .mode-row::-webkit-scrollbar{height:6px;}
-  .mode-row::-webkit-scrollbar-thumb{background:rgba(107,122,134,.38);border-radius:999px;}
-  .mode-btn{opacity:.8;}
-  .mode-btn.active{opacity:1;outline:2px solid var(--accent-user);outline-offset:1px;box-shadow:0 2px 12px rgba(24,183,160,.16);}
-  .mode-btn:disabled{opacity:.45;cursor:not-allowed;}
-  .mode-btn.btn.sm{padding:.4rem .58rem;font-size:.86rem;border-radius:9px;background:#18332d;color:#f1faf7;border:1px solid rgba(86,200,143,.22);}
+  .tutor-topbar{display:flex;align-items:center;justify-content:space-between;gap:.6rem;flex-wrap:wrap;
+    padding:.15rem .1rem .45rem;border-bottom:1px solid var(--card-border);margin-bottom:.35rem;flex:0 0 auto;}
+  .tutor-topbar-info{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;min-width:0;}
+  .tutor-pill{display:inline-flex;align-items:center;background:#12211c;border:1px solid rgba(86,200,143,.25);
+    color:#d8efe7;border-radius:999px;padding:.22rem .6rem;font-size:.82rem;font-weight:600;white-space:nowrap;
+    max-width:46vw;overflow:hidden;text-overflow:ellipsis;}
+  .tutor-topbar-actions{display:flex;gap:.4rem;flex:0 0 auto;}
+  .tutor-topbar-actions .btn.sm{padding:.35rem .6rem;font-size:.82rem;border-radius:9px;}
   .tutor-fallback{background:#211a0f;border:1px dashed #b8842e;color:#f0d9a6;padding:.5rem .65rem;border-radius:10px;margin:.25rem 0;flex:0 0 auto;}
   body.dark .tutor-fallback{background:#241d0f;color:#f0d9a6;border-color:#8a6a2f;}
-  .topic-attn{outline:3px solid #f0b25f;outline-offset:2px;border-radius:10px;}
 
   .tutor-chat{display:flex;flex:1 1 auto;min-height:0;flex-direction:column;gap:.55rem;overflow-y:auto;scroll-behavior:smooth;
     border:0;border-radius:12px;padding:.25rem .15rem .55rem;margin:.05rem 0 .35rem;background:transparent;}
@@ -263,11 +287,12 @@
     .tutor-card{min-height:0;padding:.5rem;}
     .tutor-title{font-size:1rem;}
     .tutor-sub{font-size:.84rem;margin-bottom:.45rem;}
-    .tutor-controls{align-items:stretch;gap:.35rem;}
-    .tutor-controls label{width:100%;font-size:.86rem;}
-    .tutor-topic{min-width:0;width:100%;flex-basis:100%;}
-    .mode-row{flex-wrap:nowrap;overflow-x:auto;padding-bottom:.15rem;}
-    .mode-btn.btn.sm{flex:0 0 auto;white-space:nowrap;}
+    .home-screen{padding:2vh .35rem 1rem;}
+    .home-card{padding:1.3rem 1rem 1.1rem;border-radius:16px;}
+    .home-heading{font-size:1.25rem;}
+    .home-modes{grid-template-columns:1fr;}
+    .tutor-pill{max-width:60vw;font-size:.78rem;}
+    .tutor-topbar-actions .btn.sm{padding:.32rem .5rem;font-size:.78rem;}
     .tbubble{max-width:96%;font-size:.96rem;line-height:1.58;}
     .tmsg-bot .tbubble{max-width:96%;}
     .tmsg-user .tbubble{max-width:78%;}
@@ -318,27 +343,80 @@
   </header>
 
   <main class="stack">
-    <!-- ===== AI TUTOR (Phase 4.2: jedan glavni panel) ===== -->
-    <div class="card tutor-card" id="tutor-card">
-      <div class="tutor-controls">
-        <label for="tutorTopic">Tema ako znaš (opcionalno):</label>
-        <select id="tutorTopic" class="grade-select tutor-topic">
-          <option value="">— izaberi temu —</option>
-        </select>
-        <span id="tutorTopicError" class="muted hidden">Teme trenutno nisu dostupne — svejedno možeš upisati pitanje.</span>
-      </div>
+    <!-- ===== SCREEN 1: Start/Home — onboarding (razred → izbor → lekcija/oblast) ===== -->
+    <section id="tutorHome" class="home-screen" aria-label="Početni ekran">
+      <div class="home-card">
+        <div class="home-brand">MAT-BOT</div>
+        <h1 class="home-heading">Tvoj AI tutor za matematiku</h1>
+        <p class="home-lede">Izaberi šta ti treba, pa razgovaraj s tutorom svojim tempom.</p>
 
-      <div class="mode-row" id="tutorModes" role="group" aria-label="Način rada">
-        <button type="button" class="btn sm mode-btn active" data-mode="explain" data-action="tutor-send">📘 Objasni mi</button>
-        <button type="button" class="btn sm mode-btn" data-mode="practice" data-action="tutor-send">✏️ Vježbaj sa mnom</button>
-        <button type="button" class="btn sm mode-btn" data-mode="exam" data-action="tutor-send">📝 Sutra imam kontrolni</button>
-        <button type="button" class="btn sm mode-btn" data-mode="quick" data-action="tutor-send">⚡ Samo rezultat</button>
+        <div class="home-step">
+          <label class="home-step-label" for="homeGrade">Koji si razred?</label>
+          <select id="homeGrade" class="home-grade-select" aria-label="Razred">
+            <option value="6" selected>6. razred</option>
+            <option value="7" disabled>7. razred (uskoro)</option>
+            <option value="8" disabled>8. razred (uskoro)</option>
+            <option value="9" disabled>9. razred (uskoro)</option>
+          </select>
+        </div>
+
+        <div class="home-step">
+          <div class="home-step-label">Šta želiš da uradimo?</div>
+          <div class="home-modes" id="homeModes" role="group" aria-label="Izbor načina rada">
+            <button type="button" class="home-mode-card" data-mode="explain">
+              <span class="home-mode-title">📘 Objasni mi</span>
+              <span class="home-mode-sub">Izaberi lekciju i dobij kratko objašnjenje.</span>
+            </button>
+            <button type="button" class="home-mode-card" data-mode="practice">
+              <span class="home-mode-title">✏️ Vježbaj sa mnom</span>
+              <span class="home-mode-sub">Izaberi lekciju i dobij jedan zadatak za vježbu.</span>
+            </button>
+            <button type="button" class="home-mode-card" data-mode="exam">
+              <span class="home-mode-title">📝 Sutra imam kontrolni</span>
+              <span class="home-mode-sub">Izaberi oblast i dobij pripremu za kontrolni.</span>
+            </button>
+            <button type="button" class="home-mode-card" data-mode="quick">
+              <span class="home-mode-title">⚡ Samo rezultat</span>
+              <span class="home-mode-sub">Pošalji zadatak ili sliku i dobij kratak odgovor.</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="home-step hidden" id="homePicker">
+          <label class="home-step-label" id="homePickerLabel" for="homeTopicSelect">Koju lekciju radiš?</label>
+          <select id="homeTopicSelect" class="home-picker-select">
+            <option value="">— izaberi lekciju —</option>
+          </select>
+          <select id="homeOblastSelect" class="home-picker-select hidden" aria-label="Oblast kontrolnog">
+            <option value="">— izaberi oblast —</option>
+          </select>
+          <p id="homeTopicsError" class="muted hidden">Teme trenutno nisu dostupne — pokušaj „Samo rezultat“ ili osvježi stranicu.</p>
+          <div class="home-picker-actions">
+            <button type="button" class="btn secondary sm" id="homeBack">Nazad</button>
+            <button type="button" class="btn" id="homeContinue">Nastavi</button>
+          </div>
+        </div>
+      </div>
+    </section><!-- /tutor-home -->
+
+    <!-- ===== SCREEN 2: Chat — fokusiran razgovor (bez velikih izbora) ===== -->
+    <div class="card tutor-card" id="tutor-card" hidden>
+      <div class="tutor-topbar" id="tutorTopbar">
+        <div class="tutor-topbar-info">
+          <span class="tutor-pill" id="topbarGrade">6. razred</span>
+          <span class="tutor-pill" id="topbarMode"></span>
+          <span class="tutor-pill hidden" id="topbarTopic"></span>
+        </div>
+        <div class="tutor-topbar-actions">
+          <button type="button" class="btn secondary sm" id="tutorChangeBtn" title="Vrati se na izbor">Promijeni</button>
+          <button type="button" class="btn secondary sm" id="tutorNewBtn" title="Obriši razgovor i počni ispočetka">Nova konverzacija</button>
+        </div>
       </div>
 
       <div id="tutor-fallback" class="tutor-fallback hidden" aria-live="polite"><span id="tutorFallbackMsg"></span></div>
 
       <div id="tutorChat" class="tutor-chat" aria-live="polite">
-        <div id="tutorEmptyState" class="tutor-empty muted">Upiši pitanje, pošalji zadatak ili izaberi temu za vježbu.</div>
+        <div id="tutorEmptyState" class="tutor-empty muted">Upiši zadatak ili pitanje, ili dodaj sliku preko +.</div>
         <div id="tutorTyping" class="tutor-typing hidden">🤖 Tutor razmišlja<span class="dots"></span></div>
       </div>
 
@@ -347,7 +425,7 @@
       <div class="composer" id="tutorComposer">
         <input id="tutorImage" type="file" accept="image/*" style="display:none;">
         <label for="tutorImage" id="tutorImageBtn" class="composer-plus" title="Dodaj sliku zadatka" aria-label="Dodaj sliku zadatka">+</label>
-        <textarea id="tutorMessage" rows="1" placeholder="Unesi pitanje ili zadatak..."></textarea>
+        <textarea id="tutorMessage" rows="1" placeholder="Upiši pitanje ili zadatak..."></textarea>
         <button id="tutorSend" type="button" class="composer-send" title="Pošalji" aria-label="Pošalji">↑</button>
       </div>
       <div class="muted" id="tutorMeta"></div>
@@ -855,10 +933,26 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('sendBtn').addEventListener('click', sendOne);
   form.addEventListener('submit',(e)=>{ e.preventDefault(); sendOne(); });
 
-  /* ====== PHASE 4: MODULARNI AI TUTOR (POST /api/ai-tutor/chat) ====== */
+  /* ====== AI TUTOR: onboarding home ekran (SCREEN 1) + fokusirani chat (SCREEN 2) ====== */
   (function initTutor(){
-    const modeRow  = document.getElementById('tutorModes');
-    const topicSel = document.getElementById('tutorTopic');
+    /* SCREEN 1: home/onboarding */
+    const home        = document.getElementById('tutorHome');
+    const gradeSel    = document.getElementById('homeGrade');
+    const modeGrid    = document.getElementById('homeModes');
+    const picker      = document.getElementById('homePicker');
+    const pickerLabel = document.getElementById('homePickerLabel');
+    const topicSelect = document.getElementById('homeTopicSelect');
+    const oblastSelect= document.getElementById('homeOblastSelect');
+    const topicsError = document.getElementById('homeTopicsError');
+    const backBtn     = document.getElementById('homeBack');
+    const continueBtn = document.getElementById('homeContinue');
+    /* SCREEN 2: chat */
+    const card        = document.getElementById('tutor-card');
+    const topbarGrade = document.getElementById('topbarGrade');
+    const topbarMode  = document.getElementById('topbarMode');
+    const topbarTopic = document.getElementById('topbarTopic');
+    const changeBtn   = document.getElementById('tutorChangeBtn');
+    const newBtn      = document.getElementById('tutorNewBtn');
     const msgBox   = document.getElementById('tutorMessage');
     const sendTutor= document.getElementById('tutorSend');
     const fbBox    = document.getElementById('tutor-fallback');
@@ -871,9 +965,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const tutorImgChip = document.getElementById('tutorImageChip');
     const tutorImgName = document.getElementById('tutorImageName');
     const tutorImgRemove = document.getElementById('tutorImageRemove');
-    if(!modeRow || !topicSel || !sendTutor || !msgBox || !tutorChat || !tutorTyping) return; // panel nije prisutan
+    if(!home || !card || !modeGrid || !picker || !topicSelect || !oblastSelect ||
+       !continueBtn || !sendTutor || !msgBox || !tutorChat || !tutorTyping) return; // panel nije prisutan
 
-    let currentMode = 'explain';
+    /* stanje izabrano na home ekranu; chat ga samo koristi */
+    const state = { grade: '6', mode: 'quick', topic: '', topicName: '', topicOblast: '', oblast: '' };
 
     /* Mini bezbjedni renderer (bez markdown biblioteke, bez XSS):
        1) escape HTML-a  2) **bold** → <strong>  3) liste i novi redovi.
@@ -958,8 +1054,15 @@ document.addEventListener('DOMContentLoaded', () => {
     /* Phase 4.3: lagano stanje interakcije (practice tok: zadatak → odgovor → feedback) */
     let interactionPhase = null;   // 'awaiting_practice_answer' | null
     const DEFAULT_PLACEHOLDER = 'Upiši pitanje ili zadatak...';
+    const QUICK_PLACEHOLDER = 'Upiši zadatak ili dodaj sliku...';
     const ANSWER_PLACEHOLDER = 'Upiši svoj odgovor na zadatak...';
     const MODE_LABELS = { explain: 'Objašnjenje', practice: 'Vježba', exam: 'Kontrolni', quick: 'Rezultat' };
+    /* auto-poruka koja se šalje odmah po ulasku u chat (quick nema auto-poruku) */
+    const AUTO_MESSAGES = {
+      explain: 'Objasni mi ovu temu.',
+      practice: 'Daj mi jedan zadatak za vježbu iz ove teme.',
+      exam: 'Sutra imam kontrolni iz ove oblasti. Pripremi me.'
+    };
     const topicNames = {};         // topic id → display_name (za prijateljski meta red)
 
     function tutorHistory(){
@@ -972,18 +1075,108 @@ document.addEventListener('DOMContentLoaded', () => {
       try { localStorage.setItem(TKEY, JSON.stringify(a.slice(-5))); } catch(_){}
     }
 
-    /* mode dugmad = AKCIJSKA dugmad: postavi mod, markiraj aktivno, ODMAH pošalji */
-    modeRow.querySelectorAll('.mode-btn').forEach(b=>{
-      b.addEventListener('click', ()=>{
-        currentMode = b.dataset.mode || 'explain';
-        interactionPhase = null;                 // novi režim prekida čekanje odgovora na zadatak
-        msgBox.placeholder = DEFAULT_PLACEHOLDER;
-        modeRow.querySelectorAll('.mode-btn').forEach(x=>x.classList.toggle('active', x === b));
-        sendTutorMsg();   // akcija: odmah šalje (sa default porukom ako je textarea prazan)
+    /* ------- SCREEN 1: onboarding koraci (razred → izbor → lekcija/oblast) ------- */
+    function hidePicker(){
+      picker.classList.add('hidden');
+      modeGrid.querySelectorAll('.home-mode-card').forEach(x=>x.classList.remove('active'));
+    }
+    function showPicker(mode){
+      const isExam = mode === 'exam';
+      pickerLabel.textContent = isExam ? 'Iz koje oblasti je kontrolni?' : 'Koju lekciju radiš?';
+      pickerLabel.setAttribute('for', isExam ? 'homeOblastSelect' : 'homeTopicSelect');
+      topicSelect.classList.toggle('hidden', isExam);
+      oblastSelect.classList.toggle('hidden', !isExam);
+      picker.classList.remove('hidden');
+      try { (isExam ? oblastSelect : topicSelect).focus(); } catch(_){}
+    }
+
+    /* mode kartice: explain/practice traže lekciju, exam traži oblast, quick ide odmah u chat */
+    modeGrid.querySelectorAll('.home-mode-card').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        state.grade = gradeSel.value || '6';
+        state.mode = btn.dataset.mode || 'quick';
+        interactionPhase = null;                 // novi izbor prekida čekanje odgovora na zadatak
+        modeGrid.querySelectorAll('.home-mode-card').forEach(x=>x.classList.toggle('active', x === btn));
+        if (state.mode === 'quick'){
+          state.topic = ''; state.topicName = ''; state.topicOblast = ''; state.oblast = '';
+          hidePicker();
+          enterChat('');                         // bez teme/oblasti i bez auto-poruke
+          return;
+        }
+        showPicker(state.mode);
       });
     });
 
-    /* teme iz backenda (nikad hardkodirano) */
+    backBtn.addEventListener('click', hidePicker);
+
+    continueBtn.addEventListener('click', ()=>{
+      if (state.mode === 'exam'){
+        const ob = oblastSelect.value;
+        if (!ob){ showToast('Prvo izaberi oblast.', 'err'); try{ oblastSelect.focus(); }catch(_){} return; }
+        state.oblast = ob; state.topic = ''; state.topicName = ''; state.topicOblast = '';
+        enterChat(AUTO_MESSAGES.exam);
+        return;
+      }
+      const t = topicSelect.value;
+      if (!t){ showToast('Prvo izaberi lekciju.', 'err'); try{ topicSelect.focus(); }catch(_){} return; }
+      const opt = topicSelect.options[topicSelect.selectedIndex];
+      state.topic = t;
+      state.topicName = (opt && opt.textContent) || t;
+      state.topicOblast = (opt && opt.dataset && opt.dataset.oblast) || '';
+      state.oblast = '';
+      try { localStorage.removeItem(LASTTASK_KEY); } catch(_){} // nova tema = svjež practice tok
+      enterChat(AUTO_MESSAGES[state.mode] || AUTO_MESSAGES.explain);
+    });
+
+    /* ------- prelaz između ekrana ------- */
+    function updateTopbar(){
+      topbarGrade.textContent = state.grade + '. razred';
+      topbarMode.textContent = MODE_LABELS[state.mode] || '';
+      const ctx = state.topicName || state.oblast || '';
+      topbarTopic.textContent = ctx;
+      topbarTopic.classList.toggle('hidden', !ctx);
+    }
+    function enterChat(autoMessage){
+      updateTopbar();
+      msgBox.placeholder = (state.mode === 'quick') ? QUICK_PLACEHOLDER : DEFAULT_PLACEHOLDER;
+      fbBox.classList.add('hidden');
+      home.hidden = true;
+      card.hidden = false;
+      tutorChat.scrollTop = tutorChat.scrollHeight;
+      try { msgBox.focus(); } catch(_){}
+      if (autoMessage) sendTutorMsg(autoMessage);
+    }
+    function showHome(){
+      card.hidden = true;
+      home.hidden = false;
+      hidePicker();
+    }
+
+    /* "Promijeni": nazad na izbor — historija razgovora OSTAJE */
+    changeBtn.addEventListener('click', ()=>{
+      interactionPhase = null;
+      msgBox.placeholder = DEFAULT_PLACEHOLDER;
+      showHome();
+    });
+
+    /* "Nova konverzacija": transcript + tutor localStorage + zadnji zadatak + faza */
+    newBtn.addEventListener('click', ()=>{
+      try { localStorage.removeItem(TKEY); localStorage.removeItem(LASTTASK_KEY); } catch(_){}
+      interactionPhase = null;
+      tutorChat.querySelectorAll('.tmsg').forEach(n=>n.remove());
+      if (tutorEmpty) tutorEmpty.classList.remove('hidden');
+      hideTutorTyping();
+      clearTutorImage();
+      msgBox.value = '';
+      autoGrow();
+      msgBox.placeholder = DEFAULT_PLACEHOLDER;
+      if (metaBox) metaBox.textContent = '';
+      fbBox.classList.add('hidden');
+      showHome();
+    });
+
+    /* teme i oblasti iz backenda (nikad hardkodirano): lekcije grupisane po
+       oblasti za explain/practice, lista oblasti za exam */
     (async function loadTopics(){
       try{
         const r = await fetch('/api/ai-tutor/topics', { credentials:'include', cache:'no-store' });
@@ -1001,12 +1194,15 @@ document.addEventListener('DOMContentLoaded', () => {
             opt.dataset.oblast = oblast;
             og.appendChild(opt);
           });
-          topicSel.appendChild(og);
+          topicSelect.appendChild(og);
+          const ob = document.createElement('option');
+          ob.value = oblast;
+          ob.textContent = oblast;
+          oblastSelect.appendChild(ob);
         });
       }catch(_){
-        /* dropdown ostaje prazan; free_chat i dalje radi — samo prijateljska poruka */
-        const err = document.getElementById('tutorTopicError');
-        if (err) err.classList.remove('hidden');
+        /* izbor tema nije dostupan; "Samo rezultat" i slobodno pitanje i dalje rade */
+        if (topicsError) topicsError.classList.remove('hidden');
       }
     })();
 
@@ -1035,100 +1231,67 @@ document.addEventListener('DOMContentLoaded', () => {
       if (tutorImgRemove) tutorImgRemove.addEventListener('click', clearTutorImage);
     }
 
-    /* Phase 6.1: promjena teme resetuje practice stanje (historija ostaje) */
-    topicSel.addEventListener('change', ()=>{
-      interactionPhase = null;
-      msgBox.placeholder = DEFAULT_PLACEHOLDER;
-      try { localStorage.removeItem(LASTTASK_KEY); } catch(_){}
-    });
-
-    function selectedOblast(){
-      const opt = topicSel.options[topicSel.selectedIndex];
-      return (opt && opt.dataset && opt.dataset.oblast) ? opt.dataset.oblast : '';
-    }
-
     function showFallback(status){
       let msg = '';
-      if (status === 'ambiguous') msg = 'Pronašao sam više sličnih lekcija. Izaberi oblast/temu koju trenutno radiš.';
-      else if (status === 'fallback') msg = 'Ne mogu automatski prepoznati lekciju. Izaberi oblast iz liste ili pošalji zadatak.';
-      else if (status === 'invalid') msg = 'Izaberi temu iz liste, pa pošalji ponovo.';
+      if (status === 'ambiguous') msg = 'Pronašao sam više sličnih lekcija. Klikni "Promijeni" pa izaberi lekciju koju trenutno radiš.';
+      else if (status === 'fallback') msg = 'Ne mogu automatski prepoznati lekciju. Klikni "Promijeni" i izaberi lekciju, ili pošalji konkretan zadatak.';
+      else if (status === 'invalid') msg = 'Izabrana tema nije prepoznata. Klikni "Promijeni" i izaberi lekciju iz liste.';
       else return;
       fbMsg.textContent = msg;
       fbBox.classList.remove('hidden');
-      topicSel.classList.add('topic-attn');
-      setTimeout(()=> topicSel.classList.remove('topic-attn'), 3500);
-      try { topicSel.focus(); } catch(_){}
     }
 
-    /* Odredi poruku koja se šalje. Ako je textarea prazan, akcijska dugmad
-       koriste smislen default po modu/temi; neki slučajevi se NE šalju (block). */
-    function resolveOutgoing(){
-      const typed = (msgBox.value || '').trim();
-      const topic = topicSel.value || '';
-      if (typed && interactionPhase === 'awaiting_practice_answer')
-        return { message: typed, fromTyped: true, phase: 'answering_practice_task' }; // odgovor na zadatak, ne novi zahtjev
-      if (typed) return { message: typed, fromTyped: true };           // upisano pitanje → uvijek šalji
-      if (tutorImageFile()){
-        // slika bez teksta → default poruka po modu (slika je zadatak)
-        const IMG_DEFAULTS = {
-          explain: 'Objasni mi zadatak sa slike.',
-          practice: 'Daj mi sličan zadatak za vježbu na osnovu slike.',
-          exam: 'Pripremi me za kontrolni koristeći zadatak sa slike kao kontekst.',
-          quick: 'Daj mi samo rezultat zadatka sa slike.'
-        };
-        return { message: IMG_DEFAULTS[currentMode] || IMG_DEFAULTS.explain, fromTyped: false };
-      }
-      if (currentMode === 'quick')
-        return { block: 'Unesi zadatak za koji želiš samo rezultat.' }; // quick bez teksta → ne šalji
-      if (currentMode === 'exam')
-        return { message: topic ? 'Sutra imam kontrolni iz ove teme. Pripremi me.'
-                                : 'Sutra imam kontrolni.', fromTyped: false }; // bez teme → backend pita oblast
-      if (!topic)
-        return { block: 'Izaberi temu iz liste ili upiši svoje pitanje.' }; // explain/practice bez teme i teksta
-      if (currentMode === 'practice')
-        return { message: 'Daj mi jedan zadatak za vježbu iz ove teme.', fromTyped: false };
-      return { message: 'Objasni mi ovu temu.', fromTyped: false };     // explain + tema
-    }
+    /* slika bez teksta → default poruka po modu (slika je zadatak) */
+    const IMG_DEFAULTS = {
+      explain: 'Objasni mi zadatak sa slike.',
+      practice: 'Daj mi sličan zadatak za vježbu na osnovu slike.',
+      exam: 'Pripremi me za kontrolni koristeći zadatak sa slike kao kontekst.',
+      quick: 'Daj mi samo rezultat zadatka sa slike.'
+    };
 
     function setTutorBusy(on){
       sendTutor.disabled = on;
-      modeRow.querySelectorAll('.mode-btn').forEach(b=> b.disabled = on);
     }
 
     let tutorBusy = false;
-    async function sendTutorMsg(){
+    async function sendTutorMsg(autoMessage){
       if (tutorBusy) return;                       // spriječi dupli submit dok traje zahtjev
-      const resolved = resolveOutgoing();
-      if (resolved.block){                         // validacija bez slanja
-        fbMsg.textContent = resolved.block;
+      const typed = (msgBox.value || '').trim();
+      const imgFile = tutorImageFile();
+      let text, fromTyped = false, answerPhase = null;
+      if (autoMessage){
+        text = autoMessage;                        // auto-poruka pri ulasku u chat
+      } else if (typed){
+        text = typed; fromTyped = true;
+        if (interactionPhase === 'awaiting_practice_answer')
+          answerPhase = 'answering_practice_task'; // odgovor na zadatak, ne novi zahtjev
+      } else if (imgFile){
+        text = IMG_DEFAULTS[state.mode] || IMG_DEFAULTS.explain;
+      } else {                                     // validacija bez slanja
+        fbMsg.textContent = (state.mode === 'quick')
+          ? 'Unesi zadatak za koji želiš samo rezultat.'
+          : 'Upiši pitanje ili zadatak, ili dodaj sliku preko +.';
         fbBox.classList.remove('hidden');
-        topicSel.classList.add('topic-attn');
-        setTimeout(()=> topicSel.classList.remove('topic-attn'), 3500);
-        try { (topicSel.value ? msgBox : topicSel).focus(); } catch(_){}
+        try { msgBox.focus(); } catch(_){}
         return;
       }
 
-      const text  = resolved.message;
-      const topic = topicSel.value || '';
-      const gradeVal = (typeof razredHidden !== 'undefined' && razredHidden && razredHidden.value) ? razredHidden.value : '6';
       const payload = {
         session_id: sessionId,
-        grade: parseInt(gradeVal, 10) || 6,
-        mode: currentMode,
-        entry_source: topic ? 'manual_topic_choice' : 'free_chat',
-        selected_topic: topic,
-        selected_oblast: topic ? selectedOblast() : '',
+        grade: parseInt(state.grade, 10) || 6,
+        mode: state.mode,
+        entry_source: state.topic ? 'manual_topic_choice' : 'free_chat',
+        selected_topic: state.topic,
+        selected_oblast: state.topic ? state.topicOblast : (state.mode === 'exam' ? state.oblast : ''),
         student_message: text,
         conversation_history: tutorHistory()
       };
-      if (resolved.phase){                        // odgovor na practice zadatak
-        payload.interaction_phase = resolved.phase;
+      if (answerPhase){                            // odgovor na practice zadatak
+        payload.interaction_phase = answerPhase;
         payload.mode = 'practice';
         try { payload.last_tutor_task = (localStorage.getItem(LASTTASK_KEY) || '').slice(0, 600); }
         catch(_){ payload.last_tutor_task = ''; }
       }
-
-      const imgFile = tutorImageFile();
       tutorBusy = true;
       appendTutorMsg('user', escapeHtml(text) +
         (imgFile ? '<br><strong>📷 ' + escapeHtml(imgFile.name) + '</strong>' : ''));
@@ -1160,14 +1323,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (metaBox){                              // prijateljski meta red (bez sirovih id-eva)
           const tid = j.final_topic || '';
           const tname = topicNames[tid] || '';
-          const rez = MODE_LABELS[j.mode || currentMode] || '';
+          const rez = MODE_LABELS[j.mode || state.mode] || '';
           metaBox.textContent = (tname && tid !== 'unknown')
             ? ('Tema: ' + tname + ' · Režim: ' + rez)
             : (rez ? 'Režim: ' + rez : '');
         }
-        if (resolved.fromTyped){ msgBox.value = ''; autoGrow(); }  // očisti + resetuj visinu nakon uspješnog slanja
+        if (fromTyped){ msgBox.value = ''; autoGrow(); }  // očisti + resetuj visinu nakon uspješnog slanja
         if (j.status === 'ready') clearTutorImage(); // slika je potrošena u ovom zahtjevu
-        if ((currentMode === 'practice' || resolved.phase) && j.status === 'ready'){
+        if ((state.mode === 'practice' || answerPhase) && j.status === 'ready'){
           interactionPhase = 'awaiting_practice_answer';   // sljedeća upisana poruka = odgovor na zadatak
           msgBox.placeholder = ANSWER_PLACEHOLDER;
           try { localStorage.setItem(LASTTASK_KEY, (answer || '').slice(0, 600)); } catch(_){}
@@ -1182,8 +1345,9 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    /* "Pošalji tutoru" = ručno slanje sa trenutno aktivnim modom i upisanom porukom */
-    sendTutor.addEventListener('click', sendTutorMsg);
+    /* send strelica = ručno slanje sa trenutno aktivnim modom i upisanom porukom
+       (wrapper: click event NE smije završiti kao autoMessage) */
+    sendTutor.addEventListener('click', ()=>{ sendTutorMsg(); });
 
     /* Phase 6.1: Enter šalje, Shift+Enter novi red; ne šalje dok traje zahtjev */
     msgBox.addEventListener('keydown', (e)=>{

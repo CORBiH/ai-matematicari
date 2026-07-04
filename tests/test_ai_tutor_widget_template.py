@@ -1,9 +1,9 @@
-"""Phase 4.2 — smoke testovi renderovanog tutor UI-a.
+"""Phase 7 — smoke testovi renderovanog tutor UI-a (onboarding + fokusirani chat).
 
 Server renderuje puni index.html (iframe gate je klijentski JS), pa GET '/' vraća
-sav HTML. Provjeravamo: jedan glavni tutor panel sa transkriptom UNUTAR kartice,
-akcijska mode dugmad, i legacy /submit forma očuvana ali sklopljena u <details>.
-Bez OpenAI/mreže.
+sav HTML. Novi tok: SCREEN 1 (home/onboarding: razred → 4 kartice izbora →
+lekcija/oblast po potrebi) → SCREEN 2 (čist chat sa malim topbar-om). Legacy
+/submit markup ostaje skriven. Bez OpenAI/mreže.
 """
 import re
 
@@ -16,8 +16,16 @@ def _html(client):
     return r.get_data(as_text=True)
 
 
+def _home_block(html):
+    """Sadržaj home/onboarding ekrana (SCREEN 1)."""
+    start = html.index('id="tutorHome"')
+    end = html.index("<!-- /tutor-home -->")
+    assert start < end
+    return html[start:end]
+
+
 def _tutor_block(html):
-    """Sadržaj glavne tutor kartice (do markera kraja)."""
+    """Sadržaj chat kartice (SCREEN 2, do markera kraja)."""
     start = html.index('id="tutor-card"')
     end = html.index("<!-- /tutor-card -->")
     assert start < end
@@ -25,10 +33,17 @@ def _tutor_block(html):
 
 
 def _legacy_block(html):
-    """Sadržaj SKRIVENOG legacy dijela (Phase 6.2: nema više <details>)."""
+    """Sadržaj SKRIVENOG legacy dijela."""
     start = html.index('id="advancedLegacy"')
     end = html.index("<!-- /legacy-holder -->")
     assert start < end
+    return html[start:end]
+
+
+def _composer_row(html):
+    """Sadržaj composer pilla (.composer) — + dugme | textarea | send strelica."""
+    start = html.index('id="tutorComposer"')
+    end = html.index("</div>", start)
     return html[start:end]
 
 
@@ -36,117 +51,191 @@ def test_index_renders(client):
     assert client.get("/").status_code == 200
 
 
-def test_main_tutor_card_contains_everything(client):
+# --- SCREEN 1: home/onboarding -----------------------------------------------------
+
+def test_home_screen_present_and_chat_hidden_at_start(client):
+    html = _html(client)
+    home = _home_block(html)
+    assert 'class="home-card"' in home
+    assert "Koji si razred?" in home
+    assert 'id="homeModes"' in home
+    # home dolazi prije chat kartice; chat startuje skriven (hidden atribut)
+    assert html.index('id="tutorHome"') < html.index('id="tutor-card"')
+    assert 'id="tutor-card" hidden' in html
+
+
+def test_grade_dropdown_only_grade6_enabled(client):
+    home = _home_block(_html(client))
+    assert 'id="homeGrade"' in home
+    assert '<option value="6" selected>6. razred</option>' in home
+    for g in ("7", "8", "9"):
+        assert f'<option value="{g}" disabled>{g}. razred (uskoro)</option>' in home
+
+
+def test_four_mode_cards_with_subtitles(client):
+    home = _home_block(_html(client))
+    cards = re.findall(r'<button[^>]*class="home-mode-card"[^>]*>', home)
+    assert len(cards) == 4
+    for mode in MODES:
+        assert f'data-mode="{mode}"' in home
+    for title, sub in (
+        ("Objasni mi", "Izaberi lekciju i dobij kratko objašnjenje."),
+        ("Vježbaj sa mnom", "Izaberi lekciju i dobij jedan zadatak za vježbu."),
+        ("Sutra imam kontrolni", "Izaberi oblast i dobij pripremu za kontrolni."),
+        ("Samo rezultat", "Pošalji zadatak ili sliku i dobij kratak odgovor."),
+    ):
+        assert title in home
+        assert sub in home
+
+
+def test_explain_practice_require_topic_selection(client):
+    html = _html(client)
+    home = _home_block(html)
+    assert 'id="homeTopicSelect"' in home
+    assert "Koju lekciju radiš?" in html
+    # "Nastavi" bez izabrane lekcije NE ulazi u chat
+    assert "Prvo izaberi lekciju." in html
+    # explain/practice otvaraju picker umjesto direktnog ulaska
+    assert "showPicker(state.mode)" in html
+
+
+def test_exam_requires_oblast_only(client):
+    html = _html(client)
+    home = _home_block(html)
+    assert 'id="homeOblastSelect"' in home
+    assert "Iz koje oblasti je kontrolni?" in html
+    assert "Prvo izaberi oblast." in html
+    # auto-poruka pri ulasku u exam chat
+    assert "Sutra imam kontrolni iz ove oblasti. Pripremi me." in html
+
+
+def test_quick_path_enters_chat_directly(client):
+    html = _html(client)
+    idx = html.index("if (state.mode === 'quick')")
+    snippet = html[idx:idx + 350]
+    # quick: bez picker-a, bez teme/oblasti, odmah u chat bez auto-poruke
+    assert "hidePicker()" in snippet
+    assert "enterChat('')" in snippet
+    assert "Upiši zadatak ili dodaj sliku..." in html
+
+
+def test_auto_messages_for_topic_modes(client):
+    html = _html(client)
+    assert "Objasni mi ovu temu." in html
+    assert "Daj mi jedan zadatak za vježbu iz ove teme." in html
+
+
+def test_topics_and_oblasti_loaded_from_backend(client):
+    """Ništa hardkodirano: lekcije i oblasti dolaze iz /api/ai-tutor/topics."""
+    html = _html(client)
+    assert "/api/ai-tutor/topics" in html
+    assert "data.grouped" in html
+    assert "topicSelect.appendChild(og)" in html
+    assert "oblastSelect.appendChild(ob)" in html
+
+
+def test_topics_load_failure_message(client):
+    html = _html(client)
+    assert 'id="homeTopicsError"' in html
+    assert "Teme trenutno nisu dostupne" in html
+
+
+# --- SCREEN 2: chat ----------------------------------------------------------------
+
+def test_chat_screen_contains_everything(client):
     block = _tutor_block(_html(client))
-    # topic selector, mode dugmad, fallback, transkript, typing, input, send, meta
     for needle in (
-        'id="tutorTopic"',
-        'id="tutorModes"',
+        'id="tutorTopbar"',
         'id="tutor-fallback"',
         'id="tutorChat"',
         'id="tutorTyping"',
         'id="tutorMessage"',
         'id="tutorSend"',
         'id="tutorMeta"',
+        'id="tutorComposer"',
     ):
-        assert needle in block, f"nedostaje {needle} unutar tutor kartice"
+        assert needle in block, f"nedostaje {needle} unutar chat kartice"
 
 
-def test_navbar_hidden_for_focused_tutor_layout(client):
+def test_topbar_context_and_controls(client):
+    block = _tutor_block(_html(client))
+    assert 'id="topbarGrade"' in block
+    assert 'id="topbarMode"' in block
+    assert 'id="topbarTopic"' in block
+    assert 'id="tutorChangeBtn"' in block and "Promijeni" in block
+    assert 'id="tutorNewBtn"' in block and "Nova konverzacija" in block
+
+
+def test_change_returns_home_and_keeps_history(client):
+    html = _html(client)
+    idx = html.index("changeBtn.addEventListener")
+    snippet = html[idx:idx + 300]
+    assert "showHome()" in snippet
+    # Promijeni NE briše historiju (to radi samo Nova konverzacija)
+    assert "localStorage.removeItem" not in snippet
+
+
+def test_new_conversation_clears_state(client):
+    html = _html(client)
+    idx = html.index("newBtn.addEventListener")
+    snippet = html[idx:idx + 800]
+    assert "localStorage.removeItem(TKEY)" in snippet
+    assert "localStorage.removeItem(LASTTASK_KEY)" in snippet
+    assert "interactionPhase = null" in snippet
+    assert "clearTutorImage()" in snippet
+    assert "showHome()" in snippet
+
+
+def test_mode_cards_not_inside_chat_card(client):
+    """Velike opcije žive SAMO na home ekranu — ne u aktivnom chat pogledu."""
+    html = _html(client)
+    block = _tutor_block(html)
+    assert "home-mode-card" not in block
+    # stara mode dugmad i stalni topic selector više ne postoje
+    assert 'id="tutorModes"' not in html
+    assert 'id="tutorTopic"' not in html
+    assert 'data-action="tutor-send"' not in html
+    assert "Tema ako znaš (opcionalno):" not in html
+
+
+def test_navbar_hidden_for_focused_layout(client):
     html = _html(client)
     assert 'id="main-header" aria-hidden="true"' in html
     assert "display:none;align-items:center;justify-content:center;" in html
     assert '<body class="dark tutor-fullscreen">' in html
-
-
-def test_tutor_title_and_subtitle_not_visible_header(client):
-    html = _html(client)
+    # bez velikog naslova/podnaslova u chat kartici
     block = _tutor_block(html)
-    assert 'class="tutor-title"' not in block
-    assert 'class="muted tutor-sub"' not in block
     assert "AI Tutor" not in block
-    assert "Izaberi temu i klikni" not in html
 
 
-def test_topic_selector_is_first_visible_tutor_control(client):
-    block = _tutor_block(_html(client))
-    controls_idx = block.index('class="tutor-controls"')
-    topic_idx = block.index('id="tutorTopic"')
-    modes_idx = block.index('id="tutorModes"')
-    chat_idx = block.index('id="tutorChat"')
-    composer_idx = block.index('id="tutorComposer"')
-    assert controls_idx < topic_idx < modes_idx < chat_idx < composer_idx
-
-
-def test_transcript_inside_tutor_card_not_legacy(client):
+def test_single_visible_card(client):
     html = _html(client)
-    # tutor transkript je u tutor kartici…
-    assert 'id="tutorChat"' in _tutor_block(html)
-    # …a legacy chat-container je u SKRIVENOM legacy dijelu
-    assert 'id="chat-container"' in _legacy_block(html)
-
-
-def test_mode_buttons_are_action_buttons(client):
-    html = _html(client)
-    block = _tutor_block(html)
-    assert block.count('data-action="tutor-send"') == 4
-    action_btns = re.findall(r"<button[^>]*data-action=\"tutor-send\"[^>]*>", block)
-    assert len(action_btns) == 4
-    for b in action_btns:
-        assert "mode-btn" in b and "data-mode=" in b
-    for mode in MODES:
-        assert f'data-mode="{mode}"' in block
-
-
-def test_mode_buttons_wired_to_send_and_renderer_present(client):
-    html = _html(client)
-    assert "sendTutorMsg()" in html           # akcijska dugmad odmah šalju
-    assert "renderTutorHTML" in html          # mini bezbjedni renderer
-    assert "Tutor razmišlja" in html          # loading unutar tutor chata
-
-
-def test_quick_empty_validation_message_present(client):
-    assert "Unesi zadatak za koji želiš samo rezultat." in _html(client)
-
-
-def test_practice_answer_placeholder_present(client):
-    assert "Upiši svoj odgovor na zadatak..." in _html(client)
-
-
-def test_legacy_form_preserved_but_hidden(client):
-    """Phase 6.2: legacy markup POSTOJI (JS/backend netaknuti) ali je skriven."""
-    html = _html(client)
-    legacy = _legacy_block(html)
-    # legacy forma i upload žive (backend /submit ostaje), ali NE kao vidljiv bot
-    assert 'id="ask-form"' in legacy
-    assert 'action="/submit"' in legacy
-    assert 'id="sendBtn"' in legacy
-    assert 'id="slika"' in legacy and 'name="file"' in legacy
-    # holder je skriven hidden atributom
-    assert 'id="advancedLegacy" class="legacy-holder" hidden' in html
-    # nema više vidljivog <details>/summary dvojnika
-    assert "<details" not in html
-    assert "Imam sliku zadatka / napredni način" not in html
-
-
-def test_single_visible_tutor_card(client):
-    html = _html(client)
-    # samo jedna vidljiva kartica; legacy je unutar skrivenog holdera
+    # samo jedna .card (chat); home koristi .home-card; legacy je skriven
     assert html.count('<div class="card') == 1
 
 
-def test_empty_state_helper_in_tutor_card(client):
-    block = _tutor_block(_html(client))
-    assert 'id="tutorEmptyState"' in block
-    assert "Upiši pitanje, pošalji zadatak ili izaberi temu za vježbu." in block
-    assert block.index('id="tutorChat"') < block.index('id="tutorEmptyState"')
+def test_screen_switch_helpers_present(client):
+    html = _html(client)
+    assert "#tutorHome[hidden],#tutor-card[hidden]{display:none !important;}" in html
+    assert "home.hidden = true" in html and "card.hidden = false" in html
+    assert "card.hidden = true" in html and "home.hidden = false" in html
 
 
-def test_topic_label_optional(client):
-    assert "Tema ako znaš (opcionalno):" in _tutor_block(_html(client))
+# --- chat ponašanje (payload, practice tok, Enter, renderer) ------------------------
+
+def test_payload_uses_home_state(client):
+    html = _html(client)
+    assert "session_id: sessionId" in html
+    assert "selected_topic: state.topic" in html
+    assert "state.mode === 'exam' ? state.oblast : ''" in html
+    assert "grade: parseInt(state.grade, 10) || 6" in html
 
 
-# --- Phase 4.3: practice follow-up stanje + renderer ------------------------------
+def test_session_id_auto_created(client):
+    html = _html(client)
+    assert "matbot_session_id" in html
+    assert "crypto.randomUUID" in html
+
 
 def test_practice_followup_state_present(client):
     html = _html(client)
@@ -154,6 +243,26 @@ def test_practice_followup_state_present(client):
     assert "answering_practice_task" in html       # interaction_phase u payloadu
     assert "last_tutor_task" in html               # zadnji zadatak se šalje backendu
     assert "matbot_tutor_lasttask_" in html        # localStorage ključ
+
+
+def test_practice_answer_placeholder_present(client):
+    assert "Upiši svoj odgovor na zadatak..." in _html(client)
+
+
+def test_quick_empty_validation_message_present(client):
+    assert "Unesi zadatak za koji želiš samo rezultat." in _html(client)
+
+
+def test_enter_to_send_markers(client):
+    html = _html(client)
+    assert "e.key === 'Enter'" in html
+    assert "e.shiftKey" in html
+    assert "if (!tutorBusy) sendTutorMsg()" in html
+
+
+def test_send_click_does_not_pass_event_as_message(client):
+    html = _html(client)
+    assert "sendTutor.addEventListener('click', ()=>{ sendTutorMsg(); });" in html
 
 
 def test_renderer_handles_headings_and_bold(client):
@@ -173,17 +282,11 @@ def test_friendly_meta_present(client):
     assert "topicNames" in html                    # display_name umjesto sirovog id-a
 
 
-# --- Phase 6.1: hardening/UX markeri ----------------------------------------------
-
-def test_topic_change_resets_practice_state(client):
+def test_fallback_banner_present(client):
     html = _html(client)
-    # change listener na topic selectu resetuje fazu + briše zadnji zadatak
-    assert "topicSel.addEventListener('change'" in html
-    idx = html.index("topicSel.addEventListener('change'")
-    snippet = html[idx:idx + 400]
-    assert "interactionPhase = null" in snippet
-    assert "LASTTASK_KEY" in snippet
-    assert "DEFAULT_PLACEHOLDER" in snippet
+    assert 'id="tutor-fallback"' in html
+    assert "Ne mogu automatski prepoznati lekciju." in html
+    assert "Pronašao sam više sličnih lekcija." in html
 
 
 def test_clear_chat_clears_tutor_keys(client):
@@ -192,31 +295,10 @@ def test_clear_chat_clears_tutor_keys(client):
     assert "k.startsWith('matbot_tutor_lasttask_')" in html
 
 
-def test_enter_to_send_markers(client):
-    html = _html(client)
-    assert "e.key === 'Enter'" in html
-    assert "e.shiftKey" in html
-    assert "if (!tutorBusy) sendTutorMsg()" in html
-
-
-def test_topics_load_failure_message(client):
-    html = _html(client)
-    assert 'id="tutorTopicError"' in html
-    assert "Teme trenutno nisu dostupne" in html
-
-
-# --- Phase 6.2: slika zadatka u glavnom tutoru --------------------------------------
-
-def _composer_row(html):
-    """Sadržaj composer pilla (.composer) — + dugme | textarea | send strelica."""
-    start = html.index('id="tutorComposer"')
-    end = html.index("</div>", start)
-    return html[start:end]
-
+# --- slika zadatka u composer-u ------------------------------------------------------
 
 def test_image_upload_ui_inside_tutor_card(client):
-    html = _html(client)
-    block = _tutor_block(html)
+    block = _tutor_block(_html(client))
     assert 'id="tutorImage"' in block
     assert 'accept="image/*"' in block
     assert 'id="tutorImageChip"' in block
@@ -233,7 +315,7 @@ def test_composer_pill_layout(client):
     assert 'class="composer-plus"' in row      # lijevo: + (upload)
     assert 'for="tutorImage"' in row           # + otvara postojeći file input
     assert 'id="tutorMessage"' in row          # sredina: input/textarea
-    assert 'placeholder="Unesi pitanje ili zadatak..."' in row
+    assert 'placeholder="Upiši pitanje ili zadatak..."' in row
     assert 'class="composer-send"' in row      # desno: send strelica
     assert 'id="tutorSend"' in row
     assert "↑" in row
@@ -242,19 +324,9 @@ def test_composer_pill_layout(client):
 
 
 def test_no_big_send_text_in_composer(client):
-    """Composer koristi strelicu, ne veliko 'Pošalji tutoru' dugme."""
     row = _composer_row(_html(client))
     assert "Pošalji tutoru" not in row
     assert ">Pošalji<" not in row
-
-
-def test_old_standalone_upload_button_gone(client):
-    html = _html(client)
-    # stari veliki samostalni upload dugme/red više ne postoji
-    assert "tutor-imagerow" not in html
-    assert "📷 Dodaj sliku zadatka" not in html
-    # hidden file input i dalje postoji i povezan je
-    assert 'id="tutorImage"' in html and 'accept="image/*"' in html
 
 
 def test_image_send_uses_multipart(client):
@@ -264,3 +336,19 @@ def test_image_send_uses_multipart(client):
     # default poruke po modu za sliku bez teksta
     assert "Daj mi samo rezultat zadatka sa slike." in html
     assert "Objasni mi zadatak sa slike." in html
+
+
+# --- legacy /submit ostaje skriven ---------------------------------------------------
+
+def test_legacy_form_preserved_but_hidden(client):
+    """Legacy markup POSTOJI (JS/backend netaknuti) ali NIJE vidljiv kao drugi bot."""
+    html = _html(client)
+    legacy = _legacy_block(html)
+    assert 'id="ask-form"' in legacy
+    assert 'action="/submit"' in legacy
+    assert 'id="sendBtn"' in legacy
+    assert 'id="slika"' in legacy and 'name="file"' in legacy
+    # holder je skriven hidden atributom
+    assert 'id="advancedLegacy" class="legacy-holder" hidden' in html
+    # nema vidljivog <details>/summary dvojnika
+    assert "<details" not in html

@@ -472,3 +472,69 @@ def test_response_has_all_fields(client, fake_openai):
         assert key in body
     # quick → recommended_mode explain
     assert body["recommended_mode"] == "explain"
+
+
+# --- Phase 7: exam za CIJELU OBLAST (selected_oblast bez selected_topic) ----------
+
+@pytest.fixture(scope="module")
+def oblast_name(master):
+    return master["topics_by_id"]["skupovi_uvod"]["oblast"]
+
+
+def test_exam_by_oblast_returns_ready(client, fake_openai, oblast_name):
+    resp = client.post(CHAT_URL, json={
+        "mode": "exam",
+        "selected_oblast": oblast_name,
+        "student_message": "Sutra imam kontrolni iz ove oblasti. Pripremi me.",
+    })
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["status"] == "ready"
+    assert body["mode"] == "exam"
+    assert body["final_topic"] == "unknown"          # tema se ne izmišlja
+    assert body["answer"] == fake_openai.state["reply"]
+    # tačno JEDAN OpenAI poziv (bez klasifikatora teme za auto-poruku)
+    assert len(fake_openai.calls.messages) == 1
+    user_prompt = fake_openai.calls.messages[0][-1]["content"]
+    assert "OBLAST KONTROLNOG" in user_prompt
+    assert "KONTROLNI IZ OBLASTI" in user_prompt
+
+
+def test_exam_by_unknown_oblast_falls_back_without_openai(client):
+    # nepostojeća oblast → deterministički exam fallback; bez fake_openai
+    # fixture-a bi _isolate digao AssertionError da je OpenAI pozvan
+    resp = client.post(CHAT_URL, json={
+        "mode": "exam",
+        "selected_oblast": "nepostojeca_oblast_xyz",
+        "student_message": "Sutra imam kontrolni iz ove oblasti. Pripremi me.",
+    })
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["status"] == "fallback"
+    assert body["final_topic"] == "unknown"
+    assert "Iz koje oblasti je kontrolni?" in body["answer"]
+
+
+def test_exam_with_topic_still_topic_based(client, fake_openai, oblast_name):
+    # postojeći topic-based exam tok netaknut i kada frontend pošalje i oblast
+    resp = client.post(CHAT_URL, json={
+        "mode": "exam",
+        "selected_topic": "skupovi_uvod",
+        "selected_oblast": oblast_name,
+    })
+    body = resp.get_json()
+    assert body["status"] == "ready"
+    assert body["final_topic"] == "skupovi_uvod"
+
+
+def test_exam_by_oblast_logged(client, fake_openai, oblast_name, _tmp_activity_db):
+    from matbot import activity_log as al
+    client.post(CHAT_URL, json={
+        "mode": "exam",
+        "selected_oblast": oblast_name,
+        "session_id": "sess-log-oblast",
+        "student_message": "Sutra imam kontrolni iz ove oblasti. Pripremi me.",
+    })
+    rows = al.get_recent_activity(session_id="sess-log-oblast", path=_tmp_activity_db)
+    assert rows and rows[0]["event_type"] == "exam_mode_used"
+    assert rows[0]["status"] == "ready"

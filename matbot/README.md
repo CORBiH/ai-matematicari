@@ -229,6 +229,57 @@ that it's only for image tasks. Added an empty-state helper inside the tutor are
 topic label now reads "Tema ako znaš (opcionalno):". No JS behavior changes beyond
 hiding the empty state; backend untouched.
 
+### Phase 7 — onboarding home screen + focused chat + exam-by-oblast
+
+**Product flow** (`templates/index.html`): the page now has two screens instead of
+one form-like panel.
+
+- **SCREEN 1 — Start/Home** (`#tutorHome`, centered `.home-card`, no navbar):
+  1. "Koji si razred?" — `#homeGrade` dropdown; only **6. razred** is enabled,
+     7/8/9 are `disabled` and marked "(uskoro)".
+  2. Four large mode cards (`.home-mode-card`, `data-mode`): *Objasni mi* /
+     *Vježbaj sa mnom* / *Sutra imam kontrolni* / *Samo rezultat*, each with a
+     subtitle.
+  3. Depending on the card: explain/practice show a **lesson picker**
+     (`#homeTopicSelect`, optgroups per oblast from `/api/ai-tutor/topics`);
+     exam shows an **oblast picker** (`#homeOblastSelect`, grouped keys from the
+     same endpoint); quick skips pickers entirely. "Nastavi" validates the
+     selection (toast if empty). Nothing is hardcoded — only UI labels.
+- **SCREEN 2 — Chat** (`#tutor-card`, starts `hidden`): a minimal top bar
+  (`#tutorTopbar`) with grade/mode/topic-or-oblast pills plus **"Promijeni"**
+  (back to home, transcript and localStorage history kept) and **"Nova
+  konverzacija"** (clears transcript, `matbot_tutor_history_*`,
+  `matbot_tutor_lasttask_*`, practice phase, image, meta — then back to home);
+  the transcript; and the `[ + ] [ input ] [ ↑ ]` composer. The four cards and
+  topic selector are **not** part of the chat view.
+- **Entering chat auto-sends** the intent: explain → "Objasni mi ovu temu.",
+  practice → "Daj mi jedan zadatak za vježbu iz ove teme.", exam → "Sutra imam
+  kontrolni iz ove oblasti. Pripremi me.". Quick enters silently with
+  placeholder "Upiši zadatak ili dodaj sliku...". JS keeps selection in a
+  `state` object (grade/mode/topic/topicOblast/oblast); payload still sends
+  `session_id`, `selected_topic`, `selected_oblast`, history; practice
+  follow-up, Enter/Shift+Enter, busy-guard, image multipart, fallback banner
+  and MathJax rendering are unchanged. Legacy `/submit` markup stays hidden.
+
+**Backend — exam prep for a whole oblast** (`prompt_builder.build_exam_oblast_prompt`
++ `get_oblast_topics`, wired in `ai_tutor_service.handle_chat`): when
+`mode == "exam"`, `selected_topic` is empty and `selected_oblast` matches an
+oblast in the master (case-insensitive), the service builds a ready prompt from
+that oblast's READY topics (display names + `controlni_task_1..3` /
+`controlni_trick` / `controlni_warning`) and instructs: exactly 3
+controlni-style tasks balanced across the oblast's topics, 1 trick, 1 warning,
+never inventing topics. The branch runs **before** free-chat topic detection
+(the auto-message must not trigger the LLM classifier) and only when the Phase 1
+lookup returned `unknown` — topic-based exam mode is untouched. `status` is
+`ready`; `final_topic` stays `"unknown"` (rule 10: non-unknown topics must exist
+in TOPICS), with the oblast exposed as `exam_oblast` in the prompt result. An
+invalid/unknown oblast falls back to the existing deterministic exam fallback
+("Iz koje oblasti je kontrolni?") without calling OpenAI.
+
+Tests: `tests/test_ai_tutor_widget_template.py` (rewritten for the two-screen
+flow), Phase 7 blocks in `tests/test_prompt_builder_modular.py` and
+`tests/test_ai_tutor_chat_endpoint.py`.
+
 ### Phase 4.3 — practice answer flow + rendering polish
 
 - **Frontend state:** after a ready practice answer the widget sets
