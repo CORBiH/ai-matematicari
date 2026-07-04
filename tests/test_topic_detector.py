@@ -48,6 +48,8 @@ def test_concrete_messages():
         "Šta su djelitelji broja 18?",
         "Objasni mi decimalne brojeve",
         "Koliko je pet plus tri",
+        "5-1",          # Phase 6.2: kratki izrazi sa signalom su KONKRETNI
+        "2+2",
     ):
         assert td.is_vague_message(msg) is False, msg
 

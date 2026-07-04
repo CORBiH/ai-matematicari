@@ -217,6 +217,10 @@
   /* empty-state pomoć prije prve poruke */
   .tutor-empty{background:var(--input-bg);border:1px dashed var(--card-border);border-radius:12px;
     padding:.7rem .9rem;margin:.35rem 0 .6rem;font-size:.95rem;}
+
+  /* Phase 6.2: slika zadatka u tutoru; legacy markup je potpuno skriven */
+  .tutor-imagerow{display:flex;align-items:center;gap:.6rem;margin:.15rem 0 .5rem;flex-wrap:wrap;}
+  .legacy-holder[hidden]{display:none !important;}
   </style>
 </head>
 <body>
@@ -266,6 +270,7 @@
         <select id="tutorTopic" class="grade-select tutor-topic">
           <option value="">— izaberi temu —</option>
         </select>
+        <span id="tutorTopicError" class="muted hidden">Teme trenutno nisu dostupne — svejedno možeš upisati pitanje.</span>
       </div>
 
       <div class="mode-row" id="tutorModes" role="group" aria-label="Način rada">
@@ -281,17 +286,22 @@
 
       <div id="tutorChat" class="tutor-chat" aria-live="polite"><div id="tutorTyping" class="tutor-typing hidden">🤖 Tutor razmišlja<span class="dots"></span></div></div>
 
+      <div class="tutor-imagerow">
+        <input id="tutorImage" type="file" accept="image/*" style="display:none;">
+        <label for="tutorImage" class="btn secondary sm">📷 Dodaj sliku zadatka</label>
+        <span id="tutorImageChip" class="file-chip"><span id="tutorImageName">Nije odabrana slika</span><button type="button" class="remove" id="tutorImageRemove" title="Ukloni sliku">×</button></span>
+      </div>
+
       <div class="tutor-inputrow">
         <textarea id="tutorMessage" placeholder="Upiši pitanje ili zadatak..."></textarea>
         <button id="tutorSend" type="button" class="btn">✉️ Pošalji tutoru</button>
       </div>
       <div class="muted" id="tutorMeta"></div>
 
-      <!-- NAPREDNO (sekundarno): legacy /submit forma + upload — sklopljeno u podnožju tutora -->
-      <details id="advancedLegacy" class="tutor-advanced">
-        <summary>📷 Imam sliku zadatka / napredni način</summary>
+      <!-- Legacy /submit markup: SKRIVEN od korisnika (Phase 6.2). Backend /submit i
+           legacy JS ostaju netaknuti; jedini vidljivi tutor je modularni iznad. -->
+      <div id="advancedLegacy" class="legacy-holder" hidden>
         <div class="advanced-body">
-          <p class="muted advanced-note">Za obična pitanja koristi AI Tutor iznad. Ovaj dio koristi samo ako želiš poslati sliku zadatka.</p>
           <!-- LEGACY CHAT (za /submit tok) -->
           <div class="legacy-chat is-empty" id="chat-card">
             <div id="chat-container"></div>
@@ -339,7 +349,7 @@
         </div>
       </form>
         </div><!-- /advanced-body -->
-      </details>
+      </div><!-- /legacy-holder -->
     </div><!-- /tutor-card -->
   </main>
 
@@ -602,6 +612,13 @@ document.addEventListener('DOMContentLoaded', () => {
       await fetch("/clear", { method: "POST", body: fd, credentials: "include" });
     } catch (_) {}
     resetHistory(HIST_KEY, hiddenHistory);
+    /* Phase 6.1: očisti i tutor stanje (historija, zadnji zadatak) za sve cid-ove.
+       Reload ispod resetuje transcript, fazu i loading stanje. */
+    try {
+      Object.keys(localStorage)
+        .filter(k => k.startsWith('matbot_tutor_history_') || k.startsWith('matbot_tutor_lasttask_'))
+        .forEach(k => localStorage.removeItem(k));
+    } catch (_) {}
     closeModal('#confirm-clear');
     location.reload();
   });
@@ -786,6 +803,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const tutorChat  = document.getElementById('tutorChat');
     const tutorTyping= document.getElementById('tutorTyping');
     const tutorEmpty = document.getElementById('tutorEmptyState');
+    const tutorImg = document.getElementById('tutorImage');
+    const tutorImgChip = document.getElementById('tutorImageChip');
+    const tutorImgName = document.getElementById('tutorImageName');
+    const tutorImgRemove = document.getElementById('tutorImageRemove');
     if(!modeRow || !topicSel || !sendTutor || !msgBox || !tutorChat || !tutorTyping) return; // panel nije prisutan
 
     let currentMode = 'explain';
@@ -902,7 +923,7 @@ document.addEventListener('DOMContentLoaded', () => {
     (async function loadTopics(){
       try{
         const r = await fetch('/api/ai-tutor/topics', { credentials:'include', cache:'no-store' });
-        if(!r.ok) return;
+        if(!r.ok) throw new Error('topics http ' + r.status);
         const data = await r.json();
         const grouped = (data && data.grouped) || {};
         Object.keys(grouped).forEach(oblast=>{
@@ -918,8 +939,44 @@ document.addEventListener('DOMContentLoaded', () => {
           });
           topicSel.appendChild(og);
         });
-      }catch(_){ /* dropdown ostaje prazan; korisnik i dalje može slati kao free_chat */ }
+      }catch(_){
+        /* dropdown ostaje prazan; free_chat i dalje radi — samo prijateljska poruka */
+        const err = document.getElementById('tutorTopicError');
+        if (err) err.classList.remove('hidden');
+      }
     })();
+
+    /* Phase 6.2: slika zadatka u tutoru (opciono, sekundarno) */
+    function tutorImageFile(){
+      return (tutorImg && tutorImg.files && tutorImg.files[0]) ? tutorImg.files[0] : null;
+    }
+    function clearTutorImage(){
+      if (!tutorImg) return;
+      try { const dt = new DataTransfer(); tutorImg.files = dt.files; } catch(_){}
+      tutorImg.value = '';
+      if (tutorImgChip) tutorImgChip.classList.remove('show');
+    }
+    if (tutorImg){
+      tutorImg.addEventListener('change', ()=>{
+        const f = tutorImageFile();
+        if (!f) { clearTutorImage(); return; }
+        if (!f.type || !f.type.startsWith('image/')){
+          clearTutorImage();
+          showToast('To nije slika. Pošalji JPG/PNG.', 'err');
+          return;
+        }
+        if (tutorImgName) tutorImgName.textContent = f.name;
+        if (tutorImgChip) tutorImgChip.classList.add('show');
+      });
+      if (tutorImgRemove) tutorImgRemove.addEventListener('click', clearTutorImage);
+    }
+
+    /* Phase 6.1: promjena teme resetuje practice stanje (historija ostaje) */
+    topicSel.addEventListener('change', ()=>{
+      interactionPhase = null;
+      msgBox.placeholder = DEFAULT_PLACEHOLDER;
+      try { localStorage.removeItem(LASTTASK_KEY); } catch(_){}
+    });
 
     function selectedOblast(){
       const opt = topicSel.options[topicSel.selectedIndex];
@@ -947,6 +1004,16 @@ document.addEventListener('DOMContentLoaded', () => {
       if (typed && interactionPhase === 'awaiting_practice_answer')
         return { message: typed, fromTyped: true, phase: 'answering_practice_task' }; // odgovor na zadatak, ne novi zahtjev
       if (typed) return { message: typed, fromTyped: true };           // upisano pitanje → uvijek šalji
+      if (tutorImageFile()){
+        // slika bez teksta → default poruka po modu (slika je zadatak)
+        const IMG_DEFAULTS = {
+          explain: 'Objasni mi zadatak sa slike.',
+          practice: 'Daj mi sličan zadatak za vježbu na osnovu slike.',
+          exam: 'Pripremi me za kontrolni koristeći zadatak sa slike kao kontekst.',
+          quick: 'Daj mi samo rezultat zadatka sa slike.'
+        };
+        return { message: IMG_DEFAULTS[currentMode] || IMG_DEFAULTS.explain, fromTyped: false };
+      }
       if (currentMode === 'quick')
         return { block: 'Unesi zadatak za koji želiš samo rezultat.' }; // quick bez teksta → ne šalji
       if (currentMode === 'exam')
@@ -997,20 +1064,31 @@ document.addEventListener('DOMContentLoaded', () => {
         catch(_){ payload.last_tutor_task = ''; }
       }
 
+      const imgFile = tutorImageFile();
       tutorBusy = true;
-      appendTutorMsg('user', escapeHtml(text));
+      appendTutorMsg('user', escapeHtml(text) +
+        (imgFile ? '<br><strong>📷 ' + escapeHtml(imgFile.name) + '</strong>' : ''));
       pushTutor('user', text);
       fbBox.classList.add('hidden');
       showTutorTyping();
       setTutorBusy(true);
 
       try{
-        const r = await fetch('/api/ai-tutor/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-          credentials: 'include'
-        });
+        let r;
+        if (imgFile){
+          // multipart: JSON payload + slika (backend radi OCR/Vision, ključevi ostaju na serveru)
+          const fd = new FormData();
+          fd.append('payload', JSON.stringify(payload));
+          fd.append('image', imgFile, imgFile.name);
+          r = await fetch('/api/ai-tutor/chat', { method: 'POST', body: fd, credentials: 'include' });
+        } else {
+          r = await fetch('/api/ai-tutor/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+            credentials: 'include'
+          });
+        }
         const j = await r.json().catch(()=>({}));
         const answer = (j && j.answer) ? j.answer : 'Nema odgovora.';
         appendTutorMsg('bot', renderTutorHTML(answer));
@@ -1024,6 +1102,7 @@ document.addEventListener('DOMContentLoaded', () => {
             : (rez ? 'Režim: ' + rez : '');
         }
         if (resolved.fromTyped) msgBox.value = '';   // očisti tek nakon uspješnog slanja UPISANE poruke
+        if (j.status === 'ready') clearTutorImage(); // slika je potrošena u ovom zahtjevu
         if ((currentMode === 'practice' || resolved.phase) && j.status === 'ready'){
           interactionPhase = 'awaiting_practice_answer';   // sljedeća upisana poruka = odgovor na zadatak
           msgBox.placeholder = ANSWER_PLACEHOLDER;
@@ -1041,6 +1120,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /* "Pošalji tutoru" = ručno slanje sa trenutno aktivnim modom i upisanom porukom */
     sendTutor.addEventListener('click', sendTutorMsg);
+
+    /* Phase 6.1: Enter šalje, Shift+Enter novi red; ne šalje dok traje zahtjev */
+    msgBox.addEventListener('keydown', (e)=>{
+      if (e.key === 'Enter' && !e.shiftKey){
+        e.preventDefault();
+        if (!tutorBusy) sendTutorMsg();
+      }
+    });
   })();
 });
 

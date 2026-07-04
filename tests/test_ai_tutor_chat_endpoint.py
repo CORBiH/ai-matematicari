@@ -294,6 +294,99 @@ def test_500_does_not_leak_exception(client, monkeypatch):
     assert resp.get_json()["error"] == "ai_tutor_failed"
 
 
+# --- Phase 6.2: bazna pravila + "5-1" + slika u modularnom tutoru -----------------
+
+def test_quick_simple_expression_no_topic(client, fake_openai):
+    """'5-1' u quick modu bez teme: NE fallback — poziva se OpenAI sa baznim pravilima."""
+    resp = client.post(CHAT_URL, json={"mode": "quick", "student_message": "5-1"})
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["status"] == "ready"
+    assert body["answer"] == fake_openai.state["reply"]
+    # sistemska poruka odgovora sadrži PRAVA bazna pravila iz prompts.py
+    system_sent = fake_openai.calls.messages[-1][0]["content"]
+    assert "Postavi mi pitanje ili zadatak iz matematike." in system_sent
+    assert "VIZUELNI ZAPIS (PRAVA MATEMATIKA)" in system_sent
+    assert "RAZREDNA PRAVILA — 6. RAZRED" in system_sent
+
+
+import io as _io
+import json as _json
+
+
+def _multipart(payload: dict, filename="zadatak.png", content=b"fake-image-bytes"):
+    return {
+        "payload": _json.dumps(payload),
+        "image": (_io.BytesIO(content), filename),
+    }
+
+
+def test_multipart_image_vision_path(client, fake_openai):
+    """Slika + tema: OCR je isključen u testu okruženju → Vision multimodalna poruka."""
+    resp = client.post(
+        CHAT_URL,
+        data=_multipart({"selected_topic": "skupovi_uvod", "mode": "quick"}),
+        content_type="multipart/form-data",
+    )
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["status"] == "ready"
+    assert body["final_topic"] == "skupovi_uvod"
+    # zadnja poruka je multimodalna: tekst + data: URL slike
+    content = fake_openai.calls.messages[-1][-1]["content"]
+    assert isinstance(content, list)
+    assert any(
+        p.get("type") == "image_url" and p["image_url"]["url"].startswith("data:")
+        for p in content
+    )
+    # bazna pravila i dalje u system promptu
+    assert "VIZUELNI ZAPIS (PRAVA MATEMATIKA)" in fake_openai.calls.messages[-1][0]["content"]
+
+
+def test_multipart_image_no_text_no_topic(client, fake_openai):
+    """Slika bez teksta i bez teme → opšti Vision odgovor, tema se NE izmišlja."""
+    resp = client.post(
+        CHAT_URL,
+        data=_multipart({"mode": "quick"}),
+        content_type="multipart/form-data",
+    )
+    body = resp.get_json()
+    assert body["status"] == "ready"
+    assert body["final_topic"] == "unknown"
+    content = fake_openai.calls.messages[-1][-1]["content"]
+    assert isinstance(content, list)
+
+
+def test_multipart_rejects_non_image(client):
+    resp = client.post(
+        CHAT_URL,
+        data=_multipart({"mode": "quick"}, filename="zadatak.txt"),
+        content_type="multipart/form-data",
+    )
+    assert resp.status_code == 400
+    assert resp.get_json()["error"] == "invalid_image"
+
+
+def test_multipart_bad_payload_json(client):
+    resp = client.post(
+        CHAT_URL,
+        data={"payload": "ovo nije json"},
+        content_type="multipart/form-data",
+    )
+    assert resp.status_code == 400
+    assert resp.get_json()["error"] == "invalid_json"
+
+
+def test_multipart_without_image_still_works(client, fake_openai):
+    resp = client.post(
+        CHAT_URL,
+        data={"payload": _json.dumps({"selected_topic": "skupovi_uvod"})},
+        content_type="multipart/form-data",
+    )
+    assert resp.status_code == 200
+    assert resp.get_json()["status"] == "ready"
+
+
 # --- Phase 5: activity logging ---------------------------------------------------
 
 def test_chat_logs_ready_response(client, fake_openai, _tmp_activity_db):

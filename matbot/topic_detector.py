@@ -63,10 +63,13 @@ def is_vague_message(text: Any) -> bool:
     Konkretna = sadrži matematički signal (brojevi/operatori/glagoli) ILI pogađa
     neku tematsku heuristiku ("decimalni brojevi", "razlomci", ...)."""
     t = normalize_value(text)
-    if len(t) < 4:
+    if not t:
         return True
+    # matematički signal PRIJE provjere dužine — i "5-1" je konkretan zadatak
     if _MATH_SIGNAL_RE.search(t):
         return False
+    if len(t) < 4:
+        return True
     for pattern, _cands, _prefix in _RULES:
         if pattern.search(t):
             return False

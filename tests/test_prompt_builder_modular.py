@@ -333,6 +333,71 @@ def test_practice_followup_truncates_long_task(master):
     assert "x" * 601 not in txt
 
 
+# --- Phase 6.2: nasljeđivanje baznih matematičkih pravila iz prompts.py -----------
+
+# markeri koji dokazuju da je pravi build_system_prompt("6") u system promptu
+BASE_MARKERS = (
+    "Postavi mi pitanje ili zadatak iz matematike.",   # ne-matematika odbijanje
+    "VIZUELNI ZAPIS (PRAVA MATEMATIKA)",               # \frac / $$ pravila
+    "\\frac",                                          # razlomci bez kose crte
+    "\\cdot",                                          # množenje tačkom
+    "RAZREDNA PRAVILA — 6. RAZRED",                    # razredna ograničenja
+    "JEDNAČINE I NEJEDNAČINE (5–6. razred)",           # metoda nepoznatog člana
+    "TERMINOLOGIJA I JEZIK",                           # uglomjer itd.
+)
+
+
+def _assert_base_rules(system_prompt):
+    for marker in BASE_MARKERS:
+        assert marker in system_prompt, f"nedostaje bazno pravilo: {marker}"
+
+
+def test_base_rules_in_ready_prompt(master):
+    res = pb.build_tutor_prompt({"selected_topic": TOPIC, "grade": 6}, _found(), master)
+    _assert_base_rules(res["system_prompt"])
+
+
+def test_base_rules_in_quick_mode(master):
+    # "Samo rezultat" NE smije oslabiti pravila zapisa
+    res = pb.build_tutor_prompt(
+        {"selected_topic": TOPIC, "mode": "quick", "grade": 6}, _found(), master
+    )
+    _assert_base_rules(res["system_prompt"])
+
+
+def test_base_rules_in_general_prompt(master):
+    res = pb.build_general_tutor_prompt({"student_message": "5-1", "mode": "quick"})
+    _assert_base_rules(res["system_prompt"])
+
+
+def test_base_rules_in_practice_followup(master):
+    res = pb.build_tutor_prompt(
+        {"selected_topic": TOPIC, "interaction_phase": "answering_practice_task",
+         "student_message": "6"},
+        _found(), master,
+    )
+    _assert_base_rules(res["system_prompt"])
+
+
+def test_base_rules_in_fallback_prompt(master):
+    res = pb.build_fallback_prompt({"mode": "explain"}, "unknown")
+    _assert_base_rules(res["system_prompt"])
+
+
+def test_no_duplicate_base_prompt_in_builder_source():
+    """Bazni prompt živi SAMO u prompts.py — builder ga uvozi, ne kopira."""
+    import inspect
+    import matbot.prompt_builder as builder
+    src = inspect.getsource(builder)
+    for sentinel in (
+        "VIZUELNI ZAPIS (PRAVA MATEMATIKA)",
+        "GLOBALNA PRAVILA ZAPISA",
+        "RAZREDNA PRAVILA — 6. RAZRED",
+        "GEOMETRIJSKI PROMPT",
+    ):
+        assert sentinel not in src, f"duplikat baznog prompta u prompt_builder.py: {sentinel}"
+
+
 # --- struktura rezultata / guardrails -------------------------------------------
 
 def test_result_shape_keys(master):

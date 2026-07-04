@@ -60,20 +60,36 @@ def resolve_db_path(path: str | Path | None = None) -> Path:
     return Path(env) if env else DEFAULT_DB_PATH
 
 
+_INDEXES = (
+    "CREATE INDEX IF NOT EXISTS idx_activity_session_ts "
+    "ON student_activity_log (session_id, timestamp)",
+    "CREATE INDEX IF NOT EXISTS idx_activity_student_ts "
+    "ON student_activity_log (student_id, timestamp)",
+)
+
+
 def _connect(path: Path) -> sqlite3.Connection:
     path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(path), timeout=5)
     conn.row_factory = sqlite3.Row
+    # Phase 6.1: WAL + busy_timeout — sigurnije za istovremene upise (gunicorn threadovi)
+    try:
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout=5000")
+    except sqlite3.Error:
+        pass
     return conn
 
 
 def init_db(path: str | Path | None = None) -> Path:
-    """Kreiraj DB fajl + tabelu ako ne postoje; vrati putanju."""
+    """Kreiraj DB fajl + tabelu + indekse ako ne postoje; vrati putanju."""
     p = resolve_db_path(path)
     conn = _connect(p)
     try:
         with conn:
             conn.execute(_SCHEMA)
+            for idx in _INDEXES:
+                conn.execute(idx)
     finally:
         conn.close()
     return p

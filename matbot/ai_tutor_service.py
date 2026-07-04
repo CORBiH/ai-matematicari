@@ -177,11 +177,20 @@ def handle_chat(
     *,
     model: str = DEFAULT_MODEL,
     timeout: float | None = None,
+    image_bytes: bytes | None = None,
+    image_data_url: str | None = None,
+    ocr_image: Callable | None = None,
+    vision_model: str | None = None,
 ) -> dict:
     """Obradi jedan /api/ai-tutor/chat zahtjev i vrati response dict.
 
     ``openai_chat`` mora imati potpis ``(model, messages, timeout=...)`` i vratiti
     objekt sa ``choices[0].message.content`` (tj. postojeći ``app._openai_chat``).
+
+    Phase 6.2 — slika zadatka: ``ocr_image`` je postojeći legacy OCR
+    (``app.mathpix_ocr_to_text``, injektovan — ništa se ne piše iznova). Ako OCR
+    da tekst, ide normalan tekstualni put (detekcija teme + topic prompt). Ako ne,
+    slika ide Vision modelu (``image_data_url``) uz isti modularni system prompt.
     """
     payload = dict(data or {})
     # Default: grade → 6 ako nije zadan (utiče na base prompt); mode default rješava builder.
@@ -192,20 +201,32 @@ def handle_chat(
     master = master if master is not None else get_master()
     tmap = tmap if tmap is not None else get_thinkific_map()
 
+    # --- Phase 6.2: slika zadatka — prvo pokušaj OCR (postojeći legacy Mathpix) --
+    has_image = bool(image_bytes or image_data_url)
+    if has_image and image_bytes is not None and ocr_image is not None:
+        try:
+            ocr_text, _conf = ocr_image(image_bytes)
+        except Exception:
+            ocr_text = None
+        if ocr_text:
+            payload["image_ocr_text"] = normalize_value(ocr_text)[:MAX_MESSAGE_CHARS]
+
     lookup_result = get_final_topic(payload, master, tmap)
 
     # --- Phase 6: free_chat detekcija teme -------------------------------------
-    # Tema je opcionalna: ako lookup ne nađe ništa, a poruka je KONKRETNA,
-    # pokušaj detekciju (heuristike → LLM klasifikator). Detektovana tema se
-    # validira kroz postojeći get_final_topic (nikad se ne izmišlja).
+    # Tema je opcionalna: ako lookup ne nađe ništa, a poruka (ili OCR teksta
+    # slike) je KONKRETNA, pokušaj detekciju (heuristike → LLM klasifikator).
+    # Detektovana tema se validira kroz get_final_topic (nikad se ne izmišlja).
     general_answer = False
     if lookup_result["status"] == "unknown":
         student_msg = normalize_value(
             payload.get("student_message") or payload.get("message")
         )
-        if student_msg and not is_vague_message(student_msg):
+        ocr_text = normalize_value(payload.get("image_ocr_text"))
+        combined = " ".join(x for x in (student_msg, ocr_text) if x)
+        if combined and (has_image or not is_vague_message(combined)):
             detection = detect_topic(
-                student_msg, master, tmap,
+                combined, master, tmap,
                 openai_chat=openai_chat, model=model, timeout=timeout,
             )
             if detection["detected_topic"] != "unknown":
@@ -215,6 +236,9 @@ def handle_chat(
                 # konkretno pitanje bez prepoznate teme → odgovori bez topic
                 # konteksta (final_topic ostaje "unknown", ništa se ne izmišlja)
                 general_answer = True
+        elif has_image and not combined:
+            # slika bez teksta i bez OCR-a → Vision odgovor bez teme
+            general_answer = True
 
     if general_answer:
         prompt_result = build_general_tutor_prompt(payload)
@@ -225,13 +249,24 @@ def handle_chat(
     status = prompt_result["status"]      # ready|fallback|ambiguous|invalid
 
     if status == "ready":
+        # Slika bez uspješnog OCR-a → multimodalna poruka Vision modelu; inače
+        # čisti tekst (OCR tekst je već u user_promptu kroz _build_student_block).
+        if image_data_url and not normalize_value(payload.get("image_ocr_text")):
+            user_content: Any = [
+                {"type": "text", "text": prompt_result["user_prompt"]},
+                {"type": "image_url", "image_url": {"url": image_data_url}},
+            ]
+            use_model = vision_model or model
+        else:
+            user_content = prompt_result["user_prompt"]
+            use_model = model
         messages = [
             {"role": "system", "content": prompt_result["system_prompt"]},
-            {"role": "user", "content": prompt_result["user_prompt"]},
+            {"role": "user", "content": user_content},
         ]
         answer = _extract_answer(
             openai_chat(
-                model, messages, timeout=timeout,
+                use_model, messages, timeout=timeout,
                 max_tokens=_MAX_TOKENS.get(mode, 700),
             )
         )

@@ -931,12 +931,35 @@ def ai_tutor_chat():
     matbot.ai_tutor_service.handle_chat; koristi postojeći _openai_chat."""
     if request.method == "OPTIONS":
         return ("", 204)
-    data = request.get_json(silent=True)
-    if not isinstance(data, dict):
-        return jsonify({"error": "invalid_json", "detail": "Očekivan je JSON objekt sa poljima zahtjeva."}), 400
+
+    # Phase 6.2: multipart = JSON payload + opciona slika zadatka (modularni tutor).
+    image_bytes = None
+    image_data_url = None
+    if "multipart/form-data" in (request.content_type or ""):
+        try:
+            data = json.loads(request.form.get("payload") or "{}")
+        except Exception:
+            data = None
+        if not isinstance(data, dict):
+            return jsonify({"error": "invalid_json", "detail": "Očekivan je JSON objekt u 'payload' polju."}), 400
+        f = request.files.get("image")
+        if f and f.filename:
+            mime = (f.mimetype or "").lower()
+            if not mime.startswith("image/"):
+                return jsonify({"error": "invalid_image", "detail": "Fajl nije prepoznat kao slika. Pošalji JPG/PNG."}), 400
+            image_bytes = f.read()
+            if len(image_bytes) > IMAGE_FETCH_MAX_MB * 1024 * 1024:
+                return jsonify({"error": "image_too_large", "detail": f"Slika je veća od {IMAGE_FETCH_MAX_MB} MB."}), 413
+            image_data_url = _bytes_to_data_url(image_bytes, mime_hint=mime)
+    else:
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return jsonify({"error": "invalid_json", "detail": "Očekivan je JSON objekt sa poljima zahtjeva."}), 400
     try:
         result = ai_tutor_service.handle_chat(
             data, openai_chat=_openai_chat, model=MODEL_TEXT, timeout=OPENAI_TIMEOUT,
+            image_bytes=image_bytes, image_data_url=image_data_url,
+            ocr_image=mathpix_ocr_to_text, vision_model=MODEL_VISION,
         )
     except Exception:
         log.exception("ai_tutor_chat: neuspjeh")

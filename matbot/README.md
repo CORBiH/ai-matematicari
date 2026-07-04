@@ -179,6 +179,38 @@ exam 900), and sanitized 500 responses in `app.py` (no raw `str(e)` to clients).
 Tests: `tests/test_topic_detector.py` + Phase 6 block in
 `tests/test_ai_tutor_chat_endpoint.py`.
 
+### Phase 6.2 — base-prompt unification, single visible tutor, image in tutor
+
+- **Base math rules**: every modular path (ready/thinkific/free_chat/general/
+  fallback/practice/follow-up/exam/quick) already builds its system prompt from
+  `prompts.build_system_prompt(grade)` via `_base_system_prompt` — Phase 6.2 adds
+  tests proving it (`BASE_MARKERS`: non-math refusal, `\frac`/`\cdot` rules,
+  grade-6 rules, 5–6 equation method, terminology) and a source-check that the
+  base prompt is never duplicated into `prompt_builder.py`. `is_vague_message`
+  now checks math signals before length, so "5-1" is a concrete task.
+- **UI**: the legacy `/submit` chat+form markup is fully **hidden**
+  (`#advancedLegacy.legacy-holder[hidden]`; no more `<details>`), keeping legacy
+  JS/backend intact — the page shows one AI Tutor only. Backend `/submit` remains.
+- **Image in the tutor**: "📷 Dodaj sliku zadatka" inside the tutor card; sends
+  `multipart/form-data` (`payload` JSON + `image`) to `/api/ai-tutor/chat`. Route
+  validates image type/size and builds a data-URL; `handle_chat` first tries the
+  injected legacy `mathpix_ocr_to_text` (OCR text → normal text pipeline with
+  topic detection), else sends a multimodal Vision message (`MODEL_VISION`) with
+  the same modular system prompt. Empty-text image sends get per-mode default
+  messages. No new OCR/vision code; keys stay server-side.
+
+### Phase 6.1 — quick hardening + UX cleanup
+
+- Frontend: changing the topic resets the practice phase and stored last task;
+  "Očisti chat" now also removes `matbot_tutor_history_*` / `matbot_tutor_lasttask_*`
+  (reload resets transcript/phase); Enter sends (Shift+Enter = newline, blocked while
+  busy); a friendly note appears if `/api/ai-tutor/topics` fails (free_chat still works).
+- `activity_log._connect` sets `PRAGMA journal_mode=WAL` + `busy_timeout=5000`;
+  `init_db` creates indexes `idx_activity_session_ts` / `idx_activity_student_ts`
+  (for the future parent-report queries). Concurrency smoke-tested.
+- `scripts/check_js.mjs` — repeatable node check (inline JS syntax + renderTutorHTML
+  behavior: headings/bold/lists/XSS/dot-lines/br-collapse). Run: `node scripts/check_js.mjs`.
+
 ### Phase 5.1 — single-tutor layout polish (template-only)
 
 The page now renders **one** card: the legacy `/submit` form (grade select, textarea,

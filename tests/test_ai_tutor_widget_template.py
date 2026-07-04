@@ -24,10 +24,10 @@ def _tutor_block(html):
     return html[start:end]
 
 
-def _details_block(html):
-    """Sadržaj sklopljene (advanced/legacy) sekcije."""
-    start = html.index("<details")
-    end = html.index("</details>")
+def _legacy_block(html):
+    """Sadržaj SKRIVENOG legacy dijela (Phase 6.2: nema više <details>)."""
+    start = html.index('id="advancedLegacy"')
+    end = html.index("<!-- /legacy-holder -->")
     assert start < end
     return html[start:end]
 
@@ -59,8 +59,8 @@ def test_transcript_inside_tutor_card_not_legacy(client):
     html = _html(client)
     # tutor transkript je u tutor kartici…
     assert 'id="tutorChat"' in _tutor_block(html)
-    # …a legacy chat-container je u sklopljenoj advanced sekciji
-    assert 'id="chat-container"' in _details_block(html)
+    # …a legacy chat-container je u SKRIVENOM legacy dijelu
+    assert 'id="chat-container"' in _legacy_block(html)
 
 
 def test_mode_buttons_are_action_buttons(client):
@@ -90,31 +90,26 @@ def test_practice_answer_placeholder_present(client):
     assert "Upiši svoj odgovor na zadatak..." in _html(client)
 
 
-def test_legacy_form_preserved_inside_details(client):
+def test_legacy_form_preserved_but_hidden(client):
+    """Phase 6.2: legacy markup POSTOJI (JS/backend netaknuti) ali je skriven."""
     html = _html(client)
-    details = _details_block(html)
-    # legacy forma i upload žive, ali sklopljeni u <details>
-    assert 'id="ask-form"' in details
-    assert 'action="/submit"' in details
-    assert 'id="sendBtn"' in details
-    assert 'id="slika"' in details and 'name="file"' in details
-    assert "Imam sliku zadatka / napredni način" in html
+    legacy = _legacy_block(html)
+    # legacy forma i upload žive (backend /submit ostaje), ali NE kao vidljiv bot
+    assert 'id="ask-form"' in legacy
+    assert 'action="/submit"' in legacy
+    assert 'id="sendBtn"' in legacy
+    assert 'id="slika"' in legacy and 'name="file"' in legacy
+    # holder je skriven hidden atributom
+    assert 'id="advancedLegacy" class="legacy-holder" hidden' in html
+    # nema više vidljivog <details>/summary dvojnika
+    assert "<details" not in html
+    assert "Imam sliku zadatka / napredni način" not in html
 
 
-def test_advanced_section_secondary_inside_tutor_card(client):
-    """Phase 5.1: jedan glavni tutor — legacy dio je sklopljen u podnožju tutor kartice."""
+def test_single_visible_tutor_card(client):
     html = _html(client)
-    block = _tutor_block(html)
-    # details sekcija je UNUTAR tutor kartice…
-    assert "<details" in block and 'id="advancedLegacy"' in block
-    # …sklopljena po defaultu (bez atributa open)
-    assert "<details open" not in html
-    assert 'id="advancedLegacy" class="tutor-advanced" open' not in html
-    # napomena da je ovo sekundarni put
-    assert "Za obična pitanja koristi AI Tutor iznad" in block
-    # legacy forma je unutar details, ne kao druga vidljiva kartica
-    details = _details_block(html)
-    assert 'id="ask-form"' in details
+    # samo jedna vidljiva kartica; legacy je unutar skrivenog holdera
+    assert html.count('<div class="card') == 1
 
 
 def test_empty_state_helper_in_tutor_card(client):
@@ -153,3 +148,56 @@ def test_friendly_meta_present(client):
     html = _html(client)
     assert "Režim:" in html
     assert "topicNames" in html                    # display_name umjesto sirovog id-a
+
+
+# --- Phase 6.1: hardening/UX markeri ----------------------------------------------
+
+def test_topic_change_resets_practice_state(client):
+    html = _html(client)
+    # change listener na topic selectu resetuje fazu + briše zadnji zadatak
+    assert "topicSel.addEventListener('change'" in html
+    idx = html.index("topicSel.addEventListener('change'")
+    snippet = html[idx:idx + 400]
+    assert "interactionPhase = null" in snippet
+    assert "LASTTASK_KEY" in snippet
+    assert "DEFAULT_PLACEHOLDER" in snippet
+
+
+def test_clear_chat_clears_tutor_keys(client):
+    html = _html(client)
+    assert "k.startsWith('matbot_tutor_history_')" in html
+    assert "k.startsWith('matbot_tutor_lasttask_')" in html
+
+
+def test_enter_to_send_markers(client):
+    html = _html(client)
+    assert "e.key === 'Enter'" in html
+    assert "e.shiftKey" in html
+    assert "if (!tutorBusy) sendTutorMsg()" in html
+
+
+def test_topics_load_failure_message(client):
+    html = _html(client)
+    assert 'id="tutorTopicError"' in html
+    assert "Teme trenutno nisu dostupne" in html
+
+
+# --- Phase 6.2: slika zadatka u glavnom tutoru --------------------------------------
+
+def test_image_upload_ui_inside_tutor_card(client):
+    html = _html(client)
+    block = _tutor_block(html)
+    assert 'id="tutorImage"' in block
+    assert 'accept="image/*"' in block
+    assert "Dodaj sliku zadatka" in block
+    assert 'id="tutorImageChip"' in block
+    assert 'id="tutorImageRemove"' in block
+
+
+def test_image_send_uses_multipart(client):
+    html = _html(client)
+    assert "fd.append('payload', JSON.stringify(payload))" in html
+    assert "fd.append('image', imgFile, imgFile.name)" in html
+    # default poruke po modu za sliku bez teksta
+    assert "Daj mi samo rezultat zadatka sa slike." in html
+    assert "Objasni mi zadatak sa slike." in html

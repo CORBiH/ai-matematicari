@@ -109,6 +109,49 @@ def test_log_failure_returns_false_never_raises(tmp_path):
     assert al.get_recent_activity(session_id="s", path=bad) == []
 
 
+# --- Phase 6.1: WAL, busy_timeout, indeksi ----------------------------------------
+
+def test_wal_mode_and_busy_timeout(tmp_path):
+    db = tmp_path / "wal.sqlite3"
+    al.init_db(db)
+    conn = al._connect(db)
+    try:
+        assert conn.execute("PRAGMA journal_mode").fetchone()[0].lower() == "wal"
+        assert conn.execute("PRAGMA busy_timeout").fetchone()[0] == 5000
+    finally:
+        conn.close()
+
+
+def test_indexes_created(tmp_path):
+    db = tmp_path / "idx.sqlite3"
+    al.init_db(db)
+    conn = sqlite3.connect(str(db))
+    try:
+        names = {r[0] for r in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='index'")}
+    finally:
+        conn.close()
+    assert "idx_activity_session_ts" in names
+    assert "idx_activity_student_ts" in names
+
+
+def test_concurrent_writes_smoke(tmp_path):
+    """WAL + busy_timeout: par threadova upisuje istovremeno bez greške."""
+    import threading
+    db = tmp_path / "conc.sqlite3"
+    results = []
+
+    def work(i):
+        ok = al.log_student_activity({"session_id": f"s{i % 2}"}, {"status": "ready"}, path=db)
+        results.append(ok)
+
+    threads = [threading.Thread(target=work, args=(i,)) for i in range(8)]
+    for t in threads: t.start()
+    for t in threads: t.join()
+    assert all(results)
+    assert len(al.get_recent_activity(path=db, limit=20)) == 8
+
+
 # --- template šalje session_id (Phase 5, frontend) --------------------------------
 
 def test_template_sends_session_id(client):
