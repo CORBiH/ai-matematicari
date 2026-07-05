@@ -180,6 +180,11 @@ def master():
     return cl.load_master_content()
 
 
+@pytest.fixture(scope="module")
+def master7():
+    return cl.load_master_content(grade=7)
+
+
 def test_free_chat_aritmeticka_sredina_ready(client, fake_openai):
     """Tema NIJE izabrana — heuristika prepoznaje aritmetičku sredinu → ready."""
     resp = client.post(CHAT_URL, json={
@@ -193,6 +198,71 @@ def test_free_chat_aritmeticka_sredina_ready(client, fake_openai):
     assert body["answer"] == fake_openai.state["reply"]
     # heuristika je pogodila → samo JEDAN OpenAI poziv (odgovor, bez klasifikatora)
     assert len(fake_openai.calls.messages) == 1
+
+
+def test_grade_7_selected_topic_returns_ready_with_grade_7_context(client, fake_openai, master7):
+    topic = "cijeli_sabiranje_oduzimanje"
+    resp = client.post(CHAT_URL, json={
+        "grade": 7,
+        "selected_topic": topic,
+        "mode": "explain",
+    })
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["status"] == "ready"
+    assert body["final_topic"] == topic
+    assert topic in master7["topic_ids"]
+    system_prompt = fake_openai.calls.messages[-1][0]["content"]
+    user_prompt = fake_openai.calls.messages[-1][-1]["content"]
+    assert "7. RAZRED" in system_prompt
+    assert "MODULARNA PRAVILA (6. RAZRED" not in system_prompt
+    assert "Sabiranje i oduzimanje cijelih brojeva" in user_prompt
+
+
+def test_grade_7_free_chat_cijeli_brojevi_ready_not_grade_6(client, fake_openai, master, master7):
+    resp = client.post(CHAT_URL, json={
+        "grade": "7",
+        "entry_source": "free_chat",
+        "student_message": "Kako se sabiraju cijeli brojevi?",
+    })
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["status"] == "ready"
+    assert body["final_topic"] == "cijeli_sabiranje_oduzimanje"
+    assert body["final_topic"] in master7["topic_ids"]
+    assert body["final_topic"] not in master["topic_ids"]
+    user_prompt = fake_openai.calls.messages[-1][-1]["content"]
+    assert "Cijeli brojevi" in user_prompt
+    assert "Skupovi" not in user_prompt
+
+
+def test_grade_7_exam_oblast_ready(client, fake_openai):
+    resp = client.post(CHAT_URL, json={
+        "grade": 7,
+        "mode": "exam",
+        "selected_oblast": "Cijeli brojevi",
+        "student_message": "Sutra imam kontrolni iz ove oblasti. Pripremi me.",
+    })
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["status"] == "ready"
+    assert body["mode"] == "exam"
+    assert body["final_topic"] == "unknown"
+    user_prompt = fake_openai.calls.messages[-1][-1]["content"]
+    assert "OBLAST KONTROLNOG: Cijeli brojevi" in user_prompt
+
+
+def test_grade_7_quick_mode_ready(client, fake_openai):
+    resp = client.post(CHAT_URL, json={
+        "grade": 7,
+        "mode": "quick",
+        "student_message": "-5 + 8",
+    })
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["status"] == "ready"
+    assert body["mode"] == "quick"
+    assert body["answer"] == fake_openai.state["reply"]
 
 
 def test_free_chat_fractions_no_topic_required(client, fake_openai, master):
@@ -410,6 +480,20 @@ def test_chat_logs_ready_response(client, fake_openai, _tmp_activity_db):
     raw = _tmp_activity_db.read_bytes()
     assert b"OVO JE TAJNA PORUKA 12345" not in raw
     assert fake_openai.state["reply"].encode("utf-8") not in raw
+
+
+def test_chat_logs_grade(client, fake_openai, _tmp_activity_db):
+    from matbot import activity_log as al
+    resp = client.post(CHAT_URL, json={
+        "grade": 7,
+        "selected_topic": "cijeli_sabiranje_oduzimanje",
+        "entry_source": "manual_topic_choice",
+        "session_id": "sess-log-grade-7",
+    })
+    assert resp.status_code == 200
+    rows = al.get_recent_activity(session_id="sess-log-grade-7", path=_tmp_activity_db)
+    assert len(rows) == 1
+    assert rows[0]["grade"] == 7
 
 
 def test_chat_logs_fallback_response(client, _tmp_activity_db):

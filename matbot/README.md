@@ -58,6 +58,29 @@ Nothing here is imported by `app.py`; there is no file I/O at import time (loadi
 lazy + cached). Tests: `tests/test_content_loader.py`, `tests/test_topic_lookup.py`.
 Content is **never** hardcoded — the Excel files are the source of truth.
 
+### Grade-aware modular tutor loading (6. and 7. razred)
+
+The modular tutor now uses the same architecture for grade 6 and grade 7. There is
+no separate 7th-grade AI system: the request payload grade selects which Excel
+workbooks are loaded.
+
+- `load_master_content(grade=6|7)` / `get_master(grade=6|7)` load
+  `data/{grade}_razred/AI_MATH_CONTENT_MASTER_{grade}_RAZRED_MODULAR_FINAL.xlsx`.
+- `load_thinkific_map(grade=6|7)` / `get_thinkific_map(grade=6|7)` load
+  `data/{grade}_razred/THINKIFIC_MAP_{grade}_RAZRED_MODULAR_FINAL.xlsx`.
+- Default caches are per grade. Explicit `path=` arguments still load directly and
+  do not populate the default cache.
+- Unsupported grades raise `ContentLoadError` with a clear message; the Flask
+  topics/chat routes return `400 {"error": "unsupported_grade", ...}`.
+- `GET /api/ai-tutor/topics?grade=6` and `?grade=7` return READY topics grouped by
+  the selected grade's oblasti. Chat payloads use `grade` to load the matching
+  master/map before selected-topic validation, free-chat detection, image-task
+  detection, exam oblast prompts, and quick mode.
+
+Activity logging stores the payload grade in `student_activity_log.grade`. Existing
+SQLite databases are migrated with `ALTER TABLE ... ADD COLUMN grade INTEGER NULL`
+inside `init_db`; old rows may keep `NULL`.
+
 ### Phase 2 — `prompt_builder.py`
 
 Turns Phase 1 output into a structured prompt (**no OpenAI/network/file writes** — pure
@@ -235,8 +258,8 @@ hiding the empty state; backend untouched.
 one form-like panel.
 
 - **SCREEN 1 — Start/Home** (`#tutorHome`, centered `.home-card`, no navbar):
-  1. "Koji si razred?" — `#homeGrade` dropdown; only **6. razred** is enabled,
-     7/8/9 are `disabled` and marked "(uskoro)".
+  1. "Koji si razred?" — `#homeGrade` dropdown; **6. razred** and **7. razred**
+     are enabled; 8/9 are `disabled` and marked "(uskoro)".
   2. Four large mode cards (`.home-mode-card`, `data-mode`): *Objasni mi* /
      *Vježbaj sa mnom* / *Sutra imam kontrolni* / *Samo rezultat*, each with a
      subtitle.

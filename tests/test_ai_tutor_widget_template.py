@@ -64,11 +64,12 @@ def test_home_screen_present_and_chat_hidden_at_start(client):
     assert 'id="tutor-card" hidden' in html
 
 
-def test_grade_dropdown_only_grade6_enabled(client):
+def test_grade_dropdown_grade6_and_grade7_enabled(client):
     home = _home_block(_html(client))
     assert 'id="homeGrade"' in home
     assert '<option value="6" selected>6. razred</option>' in home
-    for g in ("7", "8", "9"):
+    assert '<option value="7">7. razred</option>' in home
+    for g in ("8", "9"):
         assert f'<option value="{g}" disabled>{g}. razred (uskoro)</option>' in home
 
 
@@ -129,6 +130,9 @@ def test_topics_and_oblasti_loaded_from_backend(client):
     """Ništa hardkodirano: lekcije i oblasti dolaze iz /api/ai-tutor/topics."""
     html = _html(client)
     assert "/api/ai-tutor/topics" in html
+    assert "grade=' + encodeURIComponent(grade)" in html
+    assert "gradeSel.addEventListener('change'" in html
+    assert "loadTopicsForGrade(state.grade)" in html
     assert "data.grouped" in html
     assert "topicSelect.appendChild(og)" in html
     assert "oblastSelect.appendChild(ob)" in html

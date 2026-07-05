@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
@@ -30,6 +31,7 @@ CREATE TABLE IF NOT EXISTS student_activity_log (
     session_id TEXT NULL,
     timestamp TEXT NOT NULL,
     event_type TEXT NOT NULL,
+    grade INTEGER NULL,
     entry_source TEXT NULL,
     course_name TEXT NULL,
     section_name TEXT NULL,
@@ -45,7 +47,7 @@ CREATE TABLE IF NOT EXISTS student_activity_log (
 """
 
 _COLUMNS = (
-    "student_id", "session_id", "timestamp", "event_type", "entry_source",
+    "student_id", "session_id", "timestamp", "event_type", "grade", "entry_source",
     "course_name", "section_name", "lesson_title", "final_topic", "mode",
     "status", "parent_report_signal", "mistake_tag", "recommendation",
     "topic_conflict",
@@ -65,6 +67,10 @@ _INDEXES = (
     "ON student_activity_log (session_id, timestamp)",
     "CREATE INDEX IF NOT EXISTS idx_activity_student_ts "
     "ON student_activity_log (student_id, timestamp)",
+)
+
+_MIGRATIONS = (
+    ("grade", "ALTER TABLE student_activity_log ADD COLUMN grade INTEGER NULL"),
 )
 
 
@@ -88,6 +94,12 @@ def init_db(path: str | Path | None = None) -> Path:
     try:
         with conn:
             conn.execute(_SCHEMA)
+            existing = {
+                r[1] for r in conn.execute("PRAGMA table_info(student_activity_log)")
+            }
+            for col, sql in _MIGRATIONS:
+                if col not in existing:
+                    conn.execute(sql)
             for idx in _INDEXES:
                 conn.execute(idx)
     finally:
@@ -98,6 +110,14 @@ def init_db(path: str | Path | None = None) -> Path:
 def _clean(val: Any) -> str | None:
     s = str(val).strip() if val is not None else ""
     return s or None
+
+
+def _clean_grade(val: Any) -> int | None:
+    s = _clean(val)
+    if not s:
+        return None
+    match = re.search(r"\d+", s)
+    return int(match.group(0)) if match else None
 
 
 def classify_event_type(payload: dict, response: dict) -> str:
@@ -131,6 +151,7 @@ def log_student_activity(
             "session_id": _clean(payload.get("session_id")),
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "event_type": classify_event_type(payload, response),
+            "grade": _clean_grade(payload.get("grade")),
             "entry_source": _clean(
                 response.get("entry_source_used") or payload.get("entry_source")
             ),

@@ -333,6 +333,7 @@ from utils import _short_name_for_display, _name_from_url, _sniff_image_mime, _b
 # Phase 3: modularni AI tutor endpoint (payload → lookup → prompt builder → OpenAI).
 # Servis je čist i ne uvozi app; rutu ispod injektujemo postojećim _openai_chat.
 from matbot import ai_tutor_service
+from matbot.content_loader import ContentLoadError
 
 def _openai_chat(model: str, messages: list, timeout: float = None, max_tokens: int | None = None, fast: bool = False):
 
@@ -917,7 +918,10 @@ def ai_tutor_topics():
     """Phase 4: lista READY tema (grupisano po oblasti) za UI dropdown.
     Čita iz Phase 1 content_loader-a; ništa se ne hardkodira, bez tajni."""
     try:
-        return jsonify(ai_tutor_service.list_topics()), 200
+        grade = request.args.get("grade") or 6
+        return jsonify(ai_tutor_service.list_topics(grade=grade)), 200
+    except ContentLoadError as exc:
+        return jsonify({"error": "unsupported_grade", "detail": str(exc)}), 400
     except Exception:
         log.exception("ai_tutor_topics: neuspjeh")
         return jsonify({"error": "ai_tutor_topics_failed",
@@ -961,6 +965,8 @@ def ai_tutor_chat():
             image_bytes=image_bytes, image_data_url=image_data_url,
             ocr_image=mathpix_ocr_to_text, vision_model=MODEL_VISION,
         )
+    except ContentLoadError as exc:
+        return jsonify({"error": "unsupported_grade", "detail": str(exc)}), 400
     except Exception:
         log.exception("ai_tutor_chat: neuspjeh")
         return jsonify({"error": "ai_tutor_failed",

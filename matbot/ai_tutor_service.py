@@ -14,7 +14,12 @@ from __future__ import annotations
 from typing import Any, Callable
 
 from matbot.activity_log import log_student_activity
-from matbot.content_loader import get_master, get_thinkific_map, normalize_value
+from matbot.content_loader import (
+    get_master,
+    get_thinkific_map,
+    normalize_grade,
+    normalize_value,
+)
 from matbot.prompt_builder import (
     build_exam_oblast_prompt,
     build_general_tutor_prompt,
@@ -51,7 +56,7 @@ _DEFAULT_FALLBACK_ANSWER = (
 )
 
 
-def list_topics(master: dict | None = None) -> dict:
+def list_topics(master: dict | None = None, grade: int | str = DEFAULT_GRADE) -> dict:
     """Phase 4 — lista tema za UI dropdown (GET /api/ai-tutor/topics).
 
     Učitava iz Phase 1 ``get_master`` (Excel je izvor istine; ništa nije
@@ -64,7 +69,8 @@ def list_topics(master: dict | None = None) -> dict:
           "grouped": {"Skupovi": [ ... ], ...},
         }
     """
-    master = master if master is not None else get_master()
+    g = normalize_grade(grade)
+    master = master if master is not None else get_master(grade=g)
     rows = master.get("topics", [])
 
     ready = [
@@ -89,7 +95,7 @@ def list_topics(master: dict | None = None) -> dict:
         grouped.setdefault(t["oblast"], []).append(t)
 
     grades = {normalize_value(r.get("grade")) for r in ready if r.get("grade")}
-    grade = int(next(iter(grades))) if len(grades) == 1 and next(iter(grades)).isdigit() else DEFAULT_GRADE
+    grade = int(next(iter(grades))) if len(grades) == 1 and next(iter(grades)).isdigit() else g
 
     return {"grade": grade, "topics": topics, "grouped": grouped}
 
@@ -195,13 +201,13 @@ def handle_chat(
     slika ide Vision modelu (``image_data_url``) uz isti modularni system prompt.
     """
     payload = dict(data or {})
-    # Default: grade → 6 ako nije zadan (utiče na base prompt); mode default rješava builder.
-    if not normalize_value(payload.get("grade")):
-        payload["grade"] = DEFAULT_GRADE
+    # Default: grade -> 6 ako nije zadan; grade bira master/map i base prompt.
+    payload["grade"] = normalize_grade(payload.get("grade") or DEFAULT_GRADE)
     _sanitize_payload(payload)
 
-    master = master if master is not None else get_master()
-    tmap = tmap if tmap is not None else get_thinkific_map()
+    grade = payload["grade"]
+    master = master if master is not None else get_master(grade=grade)
+    tmap = tmap if tmap is not None else get_thinkific_map(grade=grade)
 
     # --- Phase 6.2: slika zadatka — prvo pokušaj OCR (postojeći legacy Mathpix) --
     has_image = bool(image_bytes or image_data_url)

@@ -25,7 +25,7 @@ def test_init_db_creates_folder_and_table(tmp_path):
     assert p.exists()
     cols = _cols(p)
     for col in ("id", "student_id", "session_id", "timestamp", "event_type",
-                "entry_source", "course_name", "section_name", "lesson_title",
+                "grade", "entry_source", "course_name", "section_name", "lesson_title",
                 "final_topic", "mode", "status", "parent_report_signal",
                 "mistake_tag", "recommendation", "topic_conflict"):
         assert col in cols
@@ -50,6 +50,7 @@ def test_log_inserts_one_row(tmp_path):
     db = tmp_path / "log.sqlite3"
     ok = al.log_student_activity(
         {"session_id": "s-1", "student_id": "u-9", "entry_source": "manual_topic_choice",
+         "grade": 7,
          "course_name": "Matematika 6", "section_name": "Skupovi",
          "lesson_title": "Lekcija", "student_message": "TAJNA PORUKA"},
         {"final_topic": "skupovi_uvod", "mode": "explain", "status": "ready",
@@ -63,6 +64,7 @@ def test_log_inserts_one_row(tmp_path):
     r = rows[0]
     assert r["student_id"] == "u-9"
     assert r["event_type"] == "topic_selected"
+    assert r["grade"] == 7
     assert r["final_topic"] == "skupovi_uvod"
     assert r["status"] == "ready"
     assert r["timestamp"]
@@ -71,6 +73,27 @@ def test_log_inserts_one_row(tmp_path):
     raw = db.read_bytes()
     assert b"TAJNA PORUKA" not in raw
     assert b"TAJNI ODGOVOR" not in raw
+
+
+def test_init_db_migrates_existing_table_adds_grade(tmp_path):
+    db = tmp_path / "old.sqlite3"
+    conn = sqlite3.connect(str(db))
+    try:
+        conn.execute(
+            "CREATE TABLE student_activity_log ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+            "student_id TEXT NULL, session_id TEXT NULL, timestamp TEXT NOT NULL, "
+            "event_type TEXT NOT NULL, entry_source TEXT NULL, course_name TEXT NULL, "
+            "section_name TEXT NULL, lesson_title TEXT NULL, final_topic TEXT NULL, "
+            "mode TEXT NULL, status TEXT NULL, parent_report_signal TEXT NULL, "
+            "mistake_tag TEXT NULL, recommendation TEXT NULL, topic_conflict INTEGER DEFAULT 0)"
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    al.init_db(db)
+    assert "grade" in _cols(db)
 
 
 def test_event_type_priorities():

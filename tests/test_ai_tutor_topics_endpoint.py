@@ -15,6 +15,11 @@ def master():
     return cl.load_master_content()
 
 
+@pytest.fixture(scope="module")
+def master7():
+    return cl.load_master_content(grade=7)
+
+
 # --- list_topics (servis) -------------------------------------------------------
 
 def test_list_topics_shape(master):
@@ -25,6 +30,14 @@ def test_list_topics_shape(master):
     for t in data["topics"]:
         assert set(t.keys()) == {"oblast", "topic", "display_name"}
         assert t["topic"] and t["display_name"]
+
+
+def test_list_topics_grade_7_shape(master7):
+    data = svc.list_topics(master7, grade=7)
+    assert data["grade"] == 7
+    assert isinstance(data["topics"], list) and data["topics"]
+    assert isinstance(data["grouped"], dict) and data["grouped"]
+    assert "Cijeli brojevi" in data["grouped"]
 
 
 def test_list_topics_only_ready(master):
@@ -52,7 +65,7 @@ def test_list_topics_sorted_and_grouped(master):
 # --- HTTP endpoint --------------------------------------------------------------
 
 def test_topics_endpoint_ok(client, master):
-    resp = client.get(TOPICS_URL)
+    resp = client.get(f"{TOPICS_URL}?grade=6")
     assert resp.status_code == 200
     assert resp.is_json
     body = resp.get_json()
@@ -65,6 +78,34 @@ def test_topics_endpoint_ok(client, master):
     # broj tema == broj READY tema u masteru
     ready = [r for r in master["topics"] if r.get("status", "").upper() == "READY"]
     assert len(body["topics"]) == len(ready)
+
+
+def test_topics_endpoint_grade_7_ok(client, master7):
+    resp = client.get(f"{TOPICS_URL}?grade=7")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["grade"] == 7
+    expected = {
+        "Cijeli brojevi",
+        "Racionalni brojevi",
+        "Vektori",
+        "Izometrijska preslikavanja",
+        "Operacije sa uglovima",
+        "Trougao",
+        "Četverougao",
+    }
+    assert expected.issubset(set(body["grouped"]))
+    assert any(k.startswith("Osnovne geometrijske konstrukcije") for k in body["grouped"])
+    ready = [r for r in master7["topics"] if r.get("status", "").upper() == "READY"]
+    assert len(body["topics"]) == len(ready)
+
+
+def test_topics_endpoint_unsupported_grade(client):
+    resp = client.get(f"{TOPICS_URL}?grade=8")
+    assert resp.status_code == 400
+    body = resp.get_json()
+    assert body["error"] == "unsupported_grade"
+    assert "Nepodrzan razred" in body["detail"]
 
 
 def test_topics_endpoint_no_secrets(client):

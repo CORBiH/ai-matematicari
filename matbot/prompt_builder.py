@@ -96,6 +96,19 @@ GLOBAL_MODULAR_GUIDELINES = (
     "  tekst; ne izmišljaj podatke.\n"
 )
 
+
+def _global_modular_guidelines(grade: Any) -> str:
+    g = normalize_value(grade) or "6"
+    text = GLOBAL_MODULAR_GUIDELINES
+    if g == "6":
+        return text
+    return (
+        text.replace("MODULARNA PRAVILA (6. RAZRED", f"MODULARNA PRAVILA ({g}. RAZRED")
+        .replace("za 6. razred", f"za {g}. razred")
+        .replace("uzrastu 6. razreda", f"uzrastu {g}. razreda")
+        .replace("- 6. razred je BIBLIOTEKA", f"- {g}. razred je BIBLIOTEKA")
+    )
+
 # --- Format odgovora za chat (Phase 7.1) -----------------------------------------
 # Ide POSLIJE baznog prompta: bazna matematička pravila (npr. $$...$$ za "pravu
 # matematiku") ostaju, ali se za chat UI preciziraju — sitni izrazi inline, display
@@ -531,7 +544,7 @@ def build_tutor_prompt(
     # --- system prompt ---
     system_parts = [
         _base_system_prompt(payload.get("grade")),
-        GLOBAL_MODULAR_GUIDELINES,
+        _global_modular_guidelines(payload.get("grade")),
         CHAT_FORMATTING_GUIDELINES,
     ]
     forbidden = topic_context.get("forbidden_ai_behavior", "")
@@ -602,7 +615,7 @@ def build_general_tutor_prompt(payload: dict) -> dict:
         mode_block = build_mode_instructions(mode, "unknown", {})
 
     system_prompt = "\n\n".join(
-        [_base_system_prompt(payload.get("grade")), GLOBAL_MODULAR_GUIDELINES,
+        [_base_system_prompt(payload.get("grade")), _global_modular_guidelines(payload.get("grade")),
          CHAT_FORMATTING_GUIDELINES]
     ).strip()
 
@@ -610,7 +623,7 @@ def build_general_tutor_prompt(payload: dict) -> dict:
         _build_entry_context(payload, "unknown", mode),
         "NAPOMENA (tema nije prepoznata):\n"
         "- Pitanje učenika je konkretno, ali tema nije pronađena u biblioteci tema.\n"
-        "- Odgovori na KONKRETNO pitanje koristeći gradivo 6. razreda, kratko i "
+        f"- Odgovori na KONKRETNO pitanje koristeći gradivo {normalize_value(payload.get('grade')) or '6'}. razreda, kratko i "
         "korak po korak.\n"
         "- NE izmišljaj temu i ne spominji internu listu tema.",
         mode_block,
@@ -659,7 +672,7 @@ def build_exam_oblast_prompt(payload: dict, master_content: dict) -> dict | None
     canonical = normalize_value(rows[0].get("oblast")) or oblast
 
     system_prompt = "\n\n".join(
-        [_base_system_prompt(payload.get("grade")), GLOBAL_MODULAR_GUIDELINES,
+        [_base_system_prompt(payload.get("grade")), _global_modular_guidelines(payload.get("grade")),
          CHAT_FORMATTING_GUIDELINES]
     ).strip()
 
@@ -733,7 +746,7 @@ def build_fallback_prompt(payload: dict, reason: Any) -> dict:
     mode = normalize_mode(payload.get("mode"))
 
     system_prompt = "\n\n".join(
-        [_base_system_prompt(payload.get("grade")), GLOBAL_MODULAR_GUIDELINES,
+        [_base_system_prompt(payload.get("grade")), _global_modular_guidelines(payload.get("grade")),
          CHAT_FORMATTING_GUIDELINES]
     ).strip()
 

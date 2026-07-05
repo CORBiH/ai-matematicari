@@ -354,7 +354,7 @@
           <label class="home-step-label" for="homeGrade">Koji si razred?</label>
           <select id="homeGrade" class="home-grade-select" aria-label="Razred">
             <option value="6" selected>6. razred</option>
-            <option value="7" disabled>7. razred (uskoro)</option>
+            <option value="7">7. razred</option>
             <option value="8" disabled>8. razred (uskoro)</option>
             <option value="9" disabled>9. razred (uskoro)</option>
           </select>
@@ -1084,6 +1084,7 @@ document.addEventListener('DOMContentLoaded', () => {
       exam: 'Sutra imam kontrolni iz ove oblasti. Pripremi me.'
     };
     const topicNames = {};         // topic id → display_name (za prijateljski meta red)
+    let topicsLoadedGrade = null;
 
     function tutorHistory(){
       try { const a = JSON.parse(localStorage.getItem(TKEY) || '[]'); return Array.isArray(a) ? a : []; }
@@ -1101,6 +1102,7 @@ document.addEventListener('DOMContentLoaded', () => {
       modeGrid.querySelectorAll('.home-mode-card').forEach(x=>x.classList.remove('active'));
     }
     function showPicker(mode){
+      loadTopicsForGrade(state.grade);
       const isExam = mode === 'exam';
       pickerLabel.textContent = isExam ? 'Iz koje oblasti je kontrolni?' : 'Koju lekciju radiš?';
       pickerLabel.setAttribute('for', isExam ? 'homeOblastSelect' : 'homeTopicSelect');
@@ -1126,6 +1128,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         showPicker(state.mode);
       });
+    });
+
+    gradeSel.addEventListener('change', ()=>{
+      state.grade = gradeSel.value || '6';
+      state.topic = ''; state.topicName = ''; state.topicOblast = ''; state.oblast = '';
+      hidePicker();
+      loadTopicsForGrade(state.grade);
     });
 
     backBtn.addEventListener('click', hidePicker);
@@ -1188,9 +1197,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /* teme i oblasti iz backenda (nikad hardkodirano): lekcije grupisane po
        oblasti za explain/practice, lista oblasti za exam */
-    (async function loadTopics(){
+    function resetTopicOptions(){
+      Object.keys(topicNames).forEach(k=>{ delete topicNames[k]; });
+      topicSelect.innerHTML = '<option value="">— izaberi lekciju —</option>';
+      oblastSelect.innerHTML = '<option value="">— izaberi oblast —</option>';
+    }
+
+    async function loadTopicsForGrade(grade){
+      grade = grade || '6';
+      if (topicsLoadedGrade === grade) return;
       try{
-        const r = await fetch('/api/ai-tutor/topics', { credentials:'include', cache:'no-store' });
+        resetTopicOptions();
+        topicsError.classList.add('hidden');
+        const r = await fetch('/api/ai-tutor/topics?grade=' + encodeURIComponent(grade), { credentials:'include', cache:'no-store' });
         if(!r.ok) throw new Error('topics http ' + r.status);
         const data = await r.json();
         const grouped = (data && data.grouped) || {};
@@ -1211,11 +1230,14 @@ document.addEventListener('DOMContentLoaded', () => {
           ob.textContent = oblast;
           oblastSelect.appendChild(ob);
         });
+        topicsLoadedGrade = grade;
       }catch(_){
         /* izbor tema nije dostupan; "Samo rezultat" i slobodno pitanje i dalje rade */
         if (topicsError) topicsError.classList.remove('hidden');
+        topicsLoadedGrade = null;
       }
-    })();
+    }
+    loadTopicsForGrade(state.grade);
 
     /* Phase 6.2: slika zadatka u tutoru (opciono, sekundarno) */
     function tutorImageFile(){

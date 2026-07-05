@@ -32,8 +32,18 @@ def master():
 
 
 @pytest.fixture(scope="module")
+def master7():
+    return cl.load_master_content(grade=7)
+
+
+@pytest.fixture(scope="module")
 def tmap():
     return cl.load_thinkific_map()
+
+
+@pytest.fixture(scope="module")
+def tmap7():
+    return cl.load_thinkific_map(grade="7")
 
 
 # --- normalizacija --------------------------------------------------------------
@@ -65,6 +75,18 @@ def test_master_loads(master):
     assert "razlomci_pojam_vrste" in master["topic_ids"]
 
 
+def test_grade_7_master_loads(master7):
+    assert master7["grade"] == 7
+    assert master7["topic_ids"], "7. razred TOPICS mora imati bar jedan topic"
+    assert "cijeli_sabiranje_oduzimanje" in master7["topic_ids"]
+
+
+def test_get_master_cache_is_per_grade(master, master7):
+    assert cl.get_master(grade=6)["grade"] == 6
+    assert cl.get_master(grade="7")["grade"] == 7
+    assert cl.get_master(grade=6)["source_path"] != cl.get_master(grade=7)["source_path"]
+
+
 def test_master_required_columns_present(master):
     for col in cl.REQUIRED_TOPIC_COLUMNS:
         assert col in master["columns"], f"nedostaje obavezna kolona {col}"
@@ -74,6 +96,11 @@ def test_master_optional_sheets_detected(master):
     # oba opciona sheet-a postoje u finalnom fajlu
     assert master["video_flow"] is not None
     assert master["parent_report"] is not None
+
+
+def test_grade_7_optional_sheets_detected(master7):
+    assert master7["parent_report"] is not None
+    assert master7["video_flow"] is not None
 
 
 def test_master_topics_by_id_maps_row(master):
@@ -130,6 +157,12 @@ def test_thinkific_map_loads(tmap):
     assert tmap["mapped_topics"], "MAP mora mapirati bar jedan topic"
 
 
+def test_grade_7_thinkific_map_loads(tmap7):
+    assert tmap7["grade"] == 7
+    assert tmap7["lessons"], "7. razred MAP mora imati redove"
+    assert tmap7["mapped_topics"], "7. razred MAP mora mapirati bar jedan topic"
+
+
 def test_map_required_columns_present(tmap):
     for col in cl.REQUIRED_MAP_COLUMNS:
         assert col in tmap["columns"], f"nedostaje obavezna kolona {col}"
@@ -138,6 +171,16 @@ def test_map_required_columns_present(tmap):
 def test_topic_reference_optional_detected(tmap):
     assert tmap["topic_reference"] is not None
     assert tmap["topic_reference_ids"]
+
+
+def test_grade_7_topic_reference_detected(tmap7):
+    assert tmap7["topic_reference"] is not None
+    assert tmap7["topic_reference_ids"]
+
+
+def test_unsupported_grade_clear_error():
+    with pytest.raises(cl.ContentLoadError, match="Nepodrzan razred"):
+        cl.load_master_content(grade=8)
 
 
 def test_map_missing_sheet_raises(tmp_path):
@@ -151,3 +194,8 @@ def test_map_missing_sheet_raises(tmp_path):
 def test_all_mapped_topics_exist_in_master(master, tmap):
     missing = cl.validate_mapped_topics(master, tmap)
     assert missing == [], f"MAP topic-i koji ne postoje u TOPICS: {missing}"
+
+
+def test_all_mapped_topics_exist_in_grade_7_master(master7, tmap7):
+    missing = cl.validate_mapped_topics(master7, tmap7, grade=7)
+    assert missing == [], f"7. razred MAP topic-i koji ne postoje u TOPICS: {missing}"

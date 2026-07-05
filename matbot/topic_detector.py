@@ -38,6 +38,13 @@ _MATH_SIGNAL_RE = re.compile(
 # (pattern, kandidati po tačnom id-u, prefiks za prvu temu iz sheet-a)
 # Redoslijed je bitan: specifičnije prije širih.
 _RULES: tuple[tuple[re.Pattern, tuple[str, ...], str], ...] = (
+    (re.compile(r"cijel\w*\s+broj|sabir\w*\s+cijel|oduzim\w*\s+cijel", re.I), ("cijeli_sabiranje_oduzimanje",), "cijeli_"),
+    (re.compile(r"mno[Ĺľz]en\w*\s+cijel|dijeljen\w*\s+cijel", re.I), ("cijeli_mnozenje_dijeljenje",), "cijeli_"),
+    (re.compile(r"racionaln\w*\s+broj", re.I), (), "racionalni_"),
+    (re.compile(r"\bvektor", re.I), (), "vektori_"),
+    (re.compile(r"izometrij|translacij|rotacij|osn\w*\s+simetrij|centraln\w*\s+simetrij", re.I), (), "izometrije_"),
+    (re.compile(r"trougl", re.I), (), "trougao_"),
+    (re.compile(r"[ÄŤc]etverougl|paralelogram|trapez|romb|pravougaonik|kvadrat", re.I), (), "cetverougao_"),
     (re.compile(r"aritmeti[čc]k\w*\s+sredin\w*|\bprosjek\w*", re.I), ("aritmeticka_sredina",), ""),
     (re.compile(r"\bnzd\b|najve[ćc]\w* zajedni[čc]k\w* djel", re.I), ("djeljivost_NZD",), "djeljivost_"),
     (re.compile(r"\bnzs\b|najmanj\w* zajedni[čc]k\w* sadr", re.I), ("djeljivost_NZS",), "djeljivost_"),
@@ -130,7 +137,7 @@ def detect_topic_llm(
             {
                 "role": "system",
                 "content": (
-                    "Ti si klasifikator tema za matematiku 6. razreda (BiH). "
+                    f"Ti si klasifikator tema za matematiku {master.get('grade', 6)}. razreda (BiH). "
                     "Odgovori ISKLJUČIVO JSON-om oblika "
                     '{"detected_topic": "<topic_id>"} ili {"detected_topic": "unknown"}. '
                     "Dozvoljene su SAMO teme sa liste. Ako nisi siguran, vrati unknown. "
