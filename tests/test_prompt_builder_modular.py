@@ -23,6 +23,11 @@ def master7():
 
 
 @pytest.fixture(scope="module")
+def master8():
+    return cl.load_master_content(grade=8)
+
+
+@pytest.fixture(scope="module")
 def topic_row(master):
     return master["topics_by_id"][TOPIC]
 
@@ -489,6 +494,31 @@ def test_grade7_prompt_has_grade7_rules_only(master7):
     assert "DIDAKTIKA — 6. RAZRED" not in sp
     assert "NEPOZNATI UMANJENIK" not in sp                 # veze operacija su 6. razred
     assert "bez linearne funkcije" in sp                   # više gradivo eksplicitno zabranjeno
+
+
+def test_grade8_prompt_has_grade8_rules_only(master8):
+    topic = "alg_razlomci_definiciono_podrucje_domena_i_nula_razlomljene_racionalne_funkcije"
+    payload = {"selected_topic": topic, "grade": 8}
+    res = pb.build_tutor_prompt(payload, _found(topic), master8)
+    sp = res["system_prompt"]
+    assert "DIDAKTIKA — 8. RAZRED" in sp
+    for expected in (
+        "Stepeni: pravila objašnjavaj korak po korak",
+        "Korijeni i realni brojevi",
+        "prepoznaj hipotenuzu",
+        "pazi na predznake, slične članove",
+        "imenilac ne smije biti nula",
+        "Koordinatni sistem i linearne funkcije",
+        "Geometrijska tijela",
+        "Sličnost trouglova i Talesova teorema",
+    ):
+        assert expected in sp
+    assert "DIDAKTIKA — 6. RAZRED" not in sp
+    assert "DIDAKTIKA — 7. RAZRED" not in sp
+    assert "NEPOZNATI UMANJENIK" not in sp
+    assert "prebacivanjem: nepoznate na lijevu" not in sp
+    assert "MIJENJA PREDZNAK" not in sp
+    assert "bez linearne funkcije" not in sp
 
 
 def test_constructions_only_when_topic_requires(master, master7):

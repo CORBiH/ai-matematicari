@@ -179,6 +179,16 @@ def master7():
     return cl.load_master_content(grade=7)
 
 
+@pytest.fixture(scope="module")
+def master8():
+    return cl.load_master_content(grade=8)
+
+
+@pytest.fixture(scope="module")
+def tmap8():
+    return cl.load_thinkific_map(grade=8)
+
+
 def test_fold_diacritics():
     assert td.fold_diacritics("Šta je ČETVEROUGAO? množenje đak žir ćup") == \
         "sta je cetverougao? mnozenje dak zir cup"
@@ -251,3 +261,60 @@ def test_vague_check_folds_diacritics():
     # tematska riječ bez dijakritika i dalje čini poruku konkretnom
     assert td.is_vague_message("cetverougao") is False
     assert td.is_vague_message("četverougao") is False
+
+
+# --- 8. razred ---------------------------------------------------------------------
+
+def test_grade8_heuristics_common_terms(master8):
+    cases = {
+        "Objasni mi stepene, eksponent i bazu": "stepeni_pravila_i_pojasnjenja_stepeni",
+        "Kako se racuna korijen iz broja?": "realni_korijeni_pravila_za_racunske_operacije",
+        "Sta su realni i iracionalni brojevi?": "realni_iracionalni_brojevi_i_skup_realnih_brojeva",
+        "Pitagora, hipotenuza i kateta": "pitagora_pitagorina_teorema_osnovno",
+        "Kako ide kvadrat binoma?": "polinomi_kvadrat_binoma",
+        "Sta je polinom i slicni monomi?": "polinomi_sta_je_to_polinom_a_sta_nije",
+        "Domena algebarskog razlomka: imenilac ne smije biti nula": "alg_razlomci_definiciono_podrucje_domena_i_nula_razlomljene_racionalne_funkcije",
+        "Kruznica, krug, poluprecnik i precnik": "kruznica_krug_prava_i_kruznica_centralna_udaljenost_prave_sekanta_tangenta",
+        "Talesova teorema i slicnost trouglova": "tales_slicnost_talesova_teorema",
+        "Razmjera i proporcija": "proporcije_razmjera_omjer_mjerilo",
+        "Koordinatni sistem i grafik linearne funkcije": "koordinatni_funkcija_pravougli_dekartov_koordinatni_sistem",
+        "Mnogougao i dijagonale mnogougla": "mnogougao_sta_je_mnogougao_a_sta_nije",
+        "Zadatak za valjak": "tijela_valjak_osnove",
+    }
+    for msg, expected in cases.items():
+        tid = td.detect_topic_heuristic(msg, master8)
+        assert tid == expected, msg
+        assert tid in master8["topic_ids"]
+
+
+def test_grade8_body_terms_route_to_specific_existing_topics(master8):
+    cases = {
+        "Izracunaj zapreminu kocke stranice 4 cm": "tijela_kocka_zadatak_1",
+        "Objasni kvadar": "tijela_kvadar_zadatak_1",
+        "Prizma zadatak": "tijela_prizme_osnove",
+        "Piramida zadatak": "tijela_piramide_osnove",
+        "Kupa zadatak": "tijela_kupa_osnove",
+        "Lopta zadatak": "tijela_lopta_zadatak_1",
+    }
+    for msg, expected in cases.items():
+        assert td.detect_topic_heuristic(msg, master8) == expected
+
+
+def test_grade8_heuristics_do_not_return_grade6_or_grade7_topics(master8):
+    samples = [
+        "Objasni mi stepene",
+        "Pitagorina teorema",
+        "Domena algebarskog razlomka",
+        "Grafik linearne funkcije",
+        "Geometrijska tijela",
+        "Ne postoji posebna tema xyz",
+    ]
+    for msg in samples:
+        tid = td.detect_topic_heuristic(msg, master8)
+        assert tid == "unknown" or tid in master8["topic_ids"]
+
+
+def test_grade8_detect_topic_accepts_llm_topic_reference(master8, tmap8):
+    chat = _fake_chat('{"detected_topic": "tijela_valjak_osnove"}')
+    res = td.detect_topic("Neki nejasan opis zadatka 2 + 2", master8, tmap8, chat, "m")
+    assert res["detected_topic"] == "tijela_valjak_osnove"

@@ -22,6 +22,16 @@ def tmap():
     return cl.load_thinkific_map()
 
 
+@pytest.fixture(scope="module")
+def master8():
+    return cl.load_master_content(grade=8)
+
+
+@pytest.fixture(scope="module")
+def tmap8():
+    return cl.load_thinkific_map(grade=8)
+
+
 # --- sintetički graditelji ------------------------------------------------------
 
 def _mk_master(topic_ids):
@@ -119,6 +129,26 @@ def test_composite_lookup_real(master, tmap):
     assert res["source"] == "composite"
     assert res["final_topic"] == row["topic"]
     assert res["final_topic"] in master["topic_ids"]  # pravilo 10
+
+
+def test_grade8_composite_lookup_real(master8, tmap8):
+    row = next(
+        l for l in tmap8["lessons"]
+        if l["topic"] and l["course_name"] and l["section_name"]
+        and l["lesson_order"] and l["lesson_title"]
+    )
+    payload = {
+        "entry_source": "thinkific_lesson",
+        "course_name": row["course_name"],
+        "section_name": row["section_name"],
+        "lesson_order": row["lesson_order"],
+        "lesson_title": row["lesson_title"],
+    }
+    res = tl.get_final_topic(payload, master8, tmap8)
+    assert res["status"] == "found"
+    assert res["source"] == "composite"
+    assert res["final_topic"] == row["topic"]
+    assert res["final_topic"] in master8["topic_ids"]
 
 
 def test_duplicate_title_is_ambiguous_real(tmap):

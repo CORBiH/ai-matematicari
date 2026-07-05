@@ -26,7 +26,7 @@ def test_cases_file_valid():
     ids = [c["id"] for c in cases]
     assert len(ids) == len(set(ids)), "duplirani case id"
     grades = {c["payload"].get("grade") for c in cases}
-    assert {6, 7} <= grades                       # oba razreda pokrivena
+    assert {6, 7, 8} <= grades                    # svi podržani tutor razredi pokriveni
     # pokriveni svi modovi + wrong-answer follow-up + image-like slučaj
     blob = json.dumps(cases, ensure_ascii=False)
     for needle in ("answering_practice_task", "image_ocr_text",
@@ -65,3 +65,12 @@ def test_dry_regression_mnozenje_cijelih():
     case58 = next(r for r in results if r["id"] == "g6-practice-answer-correct")
     assert case58["final_topic"] == "razlomci_mnozenje_razlomkom_svojstva"
     assert case58["mode"] == "practice"
+
+
+def test_dry_regression_grade8_cases():
+    _, results = eval_tutor.run_eval(live=False)
+    by_id = {r["id"]: r for r in results}
+    assert by_id["g8-explain-stepeni"]["final_topic"] == "stepeni_pravila_i_pojasnjenja_stepeni"
+    assert by_id["g8-practice-korijeni"]["final_topic"] == "realni_korijeni_pravila_za_racunske_operacije"
+    assert by_id["g8-image-conflict-koordinatni-pitagora"]["final_topic"] == "pitagora_pitagorina_teorema_osnovno"
+    assert by_id["g8-practice-valjak-ne-znam"]["mode"] == "practice"

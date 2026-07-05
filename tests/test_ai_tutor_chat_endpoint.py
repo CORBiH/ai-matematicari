@@ -25,6 +25,11 @@ def tmap():
 
 
 @pytest.fixture(scope="module")
+def tmap8():
+    return cl.load_thinkific_map(grade=8)
+
+
+@pytest.fixture(scope="module")
 def composite_payload(tmap):
     """Stvaran kompozitni payload iz MAP-a (robusno na izmjene sadržaja)."""
     row = next(
@@ -33,6 +38,24 @@ def composite_payload(tmap):
         and l["lesson_order"] and l["lesson_title"]
     )
     return {
+        "entry_source": "thinkific_lesson",
+        "course_name": row["course_name"],
+        "section_name": row["section_name"],
+        "lesson_order": row["lesson_order"],
+        "lesson_title": row["lesson_title"],
+        "mode": "explain",
+    }, row["topic"]
+
+
+@pytest.fixture(scope="module")
+def composite_payload8(tmap8):
+    row = next(
+        l for l in tmap8["lessons"]
+        if l["topic"] and l["course_name"] and l["section_name"]
+        and l["lesson_order"] and l["lesson_title"]
+    )
+    return {
+        "grade": 8,
         "entry_source": "thinkific_lesson",
         "course_name": row["course_name"],
         "section_name": row["section_name"],
@@ -205,6 +228,11 @@ def master7():
     return cl.load_master_content(grade=7)
 
 
+@pytest.fixture(scope="module")
+def master8():
+    return cl.load_master_content(grade=8)
+
+
 def test_free_chat_aritmeticka_sredina_ready(client, fake_openai):
     """Tema NIJE izabrana — heuristika prepoznaje aritmetičku sredinu → ready."""
     resp = client.post(CHAT_URL, json={
@@ -283,6 +311,106 @@ def test_grade_7_quick_mode_ready(client, fake_openai):
     assert body["status"] == "ready"
     assert body["mode"] == "quick"
     assert body["answer"] == fake_openai.state["reply"]
+
+
+def test_grade_8_selected_topic_returns_ready_with_grade_8_context(client, fake_openai, master8):
+    topic = "alg_razlomci_definiciono_podrucje_domena_i_nula_razlomljene_racionalne_funkcije"
+    resp = client.post(CHAT_URL, json={
+        "grade": 8,
+        "selected_topic": topic,
+        "mode": "explain",
+        "student_message": "Objasni mi domenu.",
+    })
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["status"] == "ready"
+    assert body["final_topic"] == topic
+    assert topic in master8["topic_ids"]
+    system_prompt = fake_openai.calls.messages[-1][0]["content"]
+    user_prompt = fake_openai.calls.messages[-1][-1]["content"]
+    assert "8. RAZRED" in system_prompt
+    assert "imenilac ne smije biti nula" in system_prompt
+    assert "Definiciono područje" in user_prompt
+
+
+def test_grade_8_free_chat_pitagora_ready(client, fake_openai, master8):
+    resp = client.post(CHAT_URL, json={
+        "grade": 8,
+        "entry_source": "free_chat",
+        "student_message": "Kako se koristi Pitagorina teorema za hipotenuzu i katete?",
+    })
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["status"] == "ready"
+    assert body["final_topic"] == "pitagora_pitagorina_teorema_osnovno"
+    assert body["final_topic"] in master8["topic_ids"]
+    assert len(fake_openai.calls.messages) == 1
+
+
+def test_grade_8_exam_oblast_ready(client, fake_openai):
+    resp = client.post(CHAT_URL, json={
+        "grade": 8,
+        "mode": "exam",
+        "selected_oblast": "Pitagorina teorema",
+        "student_message": "Sutra imam kontrolni iz ove oblasti. Pripremi me.",
+    })
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["status"] == "ready"
+    assert body["mode"] == "exam"
+    assert body["final_topic"] == "unknown"
+    user_prompt = fake_openai.calls.messages[-1][-1]["content"]
+    assert "OBLAST KONTROLNOG: Pitagorina teorema" in user_prompt
+    assert "KONTROLNI IZ OBLASTI" in user_prompt
+
+
+def test_grade_8_quick_mode_ready(client, fake_openai):
+    resp = client.post(CHAT_URL, json={
+        "grade": 8,
+        "mode": "quick",
+        "selected_topic": "polinomi_kvadrat_binoma",
+        "student_message": "Izračunaj (x+3)^2",
+    })
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["status"] == "ready"
+    assert body["mode"] == "quick"
+    assert body["final_topic"] == "polinomi_kvadrat_binoma"
+
+
+def test_grade_8_composite_thinkific_returns_final_topic(client, fake_openai, composite_payload8):
+    payload, expected_topic = composite_payload8
+    resp = client.post(CHAT_URL, json=payload)
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["status"] == "ready"
+    assert body["final_topic"] == expected_topic
+    assert body["entry_source_used"] == "thinkific_lesson"
+
+
+def test_grade_8_practice_followup_keeps_exact_task(client, fake_openai, master8):
+    topic = "alg_razlomci_definiciono_podrucje_domena_i_nula_razlomljene_racionalne_funkcije"
+    visible_task = "Odredi uslov za razlomak 1/(x-3)."
+    resp = client.post(CHAT_URL, json={
+        "grade": 8,
+        "mode": "practice",
+        "selected_topic": topic,
+        "interaction_phase": "answering_practice_task",
+        "last_tutor_task": visible_task,
+        "student_message": "ne znam",
+    })
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["status"] == "ready"
+    assert body["mode"] == "practice"
+    user_prompt = fake_openai.calls.messages[-1][-1]["content"]
+    assert f"The student is responding to this exact previous task: {visible_task}" in user_prompt
+    assert "Do not introduce a new task unless the student asks for one." in user_prompt
+    assert "Tipičan zadatak" not in user_prompt
+    row = master8["topics_by_id"][topic]
+    for key in ("typical_task_1", "typical_task_2", "typical_task_3"):
+        if row.get(key) and row[key] not in visible_task:
+            assert row[key] not in user_prompt
 
 
 def test_free_chat_fractions_no_topic_required(client, fake_openai, master):
@@ -641,6 +769,20 @@ def test_chat_logs_grade(client, fake_openai, _tmp_activity_db):
     rows = al.get_recent_activity(session_id="sess-log-grade-7", path=_tmp_activity_db)
     assert len(rows) == 1
     assert rows[0]["grade"] == 7
+
+
+def test_chat_logs_grade_8(client, fake_openai, _tmp_activity_db):
+    from matbot import activity_log as al
+    resp = client.post(CHAT_URL, json={
+        "grade": 8,
+        "selected_topic": "stepeni_pravila_i_pojasnjenja_stepeni",
+        "entry_source": "manual_topic_choice",
+        "session_id": "sess-log-grade-8",
+    })
+    assert resp.status_code == 200
+    rows = al.get_recent_activity(session_id="sess-log-grade-8", path=_tmp_activity_db)
+    assert len(rows) == 1
+    assert rows[0]["grade"] == 8
 
 
 def test_chat_logs_fallback_response(client, _tmp_activity_db):

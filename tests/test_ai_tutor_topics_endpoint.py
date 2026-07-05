@@ -20,6 +20,11 @@ def master7():
     return cl.load_master_content(grade=7)
 
 
+@pytest.fixture(scope="module")
+def master8():
+    return cl.load_master_content(grade=8)
+
+
 # --- list_topics (servis) -------------------------------------------------------
 
 def test_list_topics_shape(master):
@@ -38,6 +43,16 @@ def test_list_topics_grade_7_shape(master7):
     assert isinstance(data["topics"], list) and data["topics"]
     assert isinstance(data["grouped"], dict) and data["grouped"]
     assert "Cijeli brojevi" in data["grouped"]
+
+
+def test_list_topics_grade_8_shape(master8):
+    data = svc.list_topics(master8, grade=8)
+    assert data["grade"] == 8
+    assert isinstance(data["topics"], list) and data["topics"]
+    assert isinstance(data["grouped"], dict) and data["grouped"]
+    assert data["oblast_order"][:3] == ["Stepeni", "Vektori", "Realni brojevi"]
+    assert "Geometrijska tijela" in data["grouped"]
+    assert data["grouped"]["Stepeni"][0]["topic"] == "stepeni_pravila_i_pojasnjenja_stepeni"
 
 
 def test_list_topics_only_ready(master):
@@ -125,8 +140,36 @@ def test_topics_endpoint_grade_7_ok(client, master7):
     assert len(body["topics"]) == len(ready)
 
 
-def test_topics_endpoint_unsupported_grade(client):
+def test_topics_endpoint_grade_8_ok(client, master8):
     resp = client.get(f"{TOPICS_URL}?grade=8")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["grade"] == 8
+    expected = {
+        "Stepeni",
+        "Vektori",
+        "Realni brojevi",
+        "Pitagorina teorema",
+        "Cijeli racionalni izrazi (polinomi)",
+        "Algebarski razlomci",
+        "Kružnica, krug",
+        "Talesova teorema i sličnost trouglova",
+        "Razmjere i proporcije",
+        "Pravougli koordinatni sistem i grafik linearne funkcije",
+        "Mnogougao",
+        "Geometrijska tijela",
+    }
+    assert set(body["oblast_order"]) == expected
+    assert body["oblast_order"] == [
+        r["oblast"] for i, r in enumerate(master8["topics"])
+        if r.get("oblast") and r["oblast"] not in [x["oblast"] for x in master8["topics"][:i]]
+    ]
+    ready = [r for r in master8["topics"] if r.get("status", "").upper() == "READY"]
+    assert len(body["topics"]) == len(ready)
+
+
+def test_topics_endpoint_unsupported_grade(client):
+    resp = client.get(f"{TOPICS_URL}?grade=9")
     assert resp.status_code == 400
     body = resp.get_json()
     assert body["error"] == "unsupported_grade"

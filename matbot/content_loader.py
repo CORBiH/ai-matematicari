@@ -14,7 +14,7 @@ import openpyxl
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 
-SUPPORTED_GRADES = frozenset({6, 7})
+SUPPORTED_GRADES = frozenset({6, 7, 8})
 DEFAULT_GRADE = 6
 
 # Backwards-compatible constants for grade 6 callers/tests.

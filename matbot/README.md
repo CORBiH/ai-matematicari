@@ -58,22 +58,22 @@ Nothing here is imported by `app.py`; there is no file I/O at import time (loadi
 lazy + cached). Tests: `tests/test_content_loader.py`, `tests/test_topic_lookup.py`.
 Content is **never** hardcoded — the Excel files are the source of truth.
 
-### Grade-aware modular tutor loading (6. and 7. razred)
+### Grade-aware modular tutor loading (6, 7. and 8. razred)
 
-The modular tutor now uses the same architecture for grade 6 and grade 7. There is
-no separate 7th-grade AI system: the request payload grade selects which Excel
+The modular tutor now uses the same architecture for grades 6, 7, and 8. There is
+no separate grade-specific AI system: the request payload grade selects which Excel
 workbooks are loaded.
 
-- `load_master_content(grade=6|7)` / `get_master(grade=6|7)` load
+- `load_master_content(grade=6|7|8)` / `get_master(grade=6|7|8)` load
   `data/{grade}_razred/AI_MATH_CONTENT_MASTER_{grade}_RAZRED_MODULAR_FINAL.xlsx`.
-- `load_thinkific_map(grade=6|7)` / `get_thinkific_map(grade=6|7)` load
+- `load_thinkific_map(grade=6|7|8)` / `get_thinkific_map(grade=6|7|8)` load
   `data/{grade}_razred/THINKIFIC_MAP_{grade}_RAZRED_MODULAR_FINAL.xlsx`.
 - Default caches are per grade. Explicit `path=` arguments still load directly and
   do not populate the default cache.
 - Unsupported grades raise `ContentLoadError` with a clear message; the Flask
   topics/chat routes return `400 {"error": "unsupported_grade", ...}`.
-- `GET /api/ai-tutor/topics?grade=6` and `?grade=7` return READY topics grouped by
-  the selected grade's oblasti. Chat payloads use `grade` to load the matching
+- `GET /api/ai-tutor/topics?grade=6`, `?grade=7`, and `?grade=8` return READY topics
+  grouped by the selected grade's oblasti. Chat payloads use `grade` to load the matching
   master/map before selected-topic validation, free-chat detection, image-task
   detection, exam oblast prompts, and quick mode.
 
@@ -127,8 +127,8 @@ Tests: `tests/test_ai_tutor_chat_endpoint.py` (OpenAI mocked via the existing
 ### Phase 4 — frontend widget + `GET /api/ai-tutor/topics`
 
 - `list_topics(master=None)` (in `ai_tutor_service.py`) → `{"grade", "topics":
-  [{oblast, topic, display_name}], "grouped": {oblast: [...]}}`, READY-only, sorted
-  by (oblast, display_name), loaded from Phase 1 `get_master()` (no hardcoding, no
+  [{oblast, topic, display_name}], "grouped": {oblast: [...]}}`, READY-only, in
+  TOPICS sheet order, loaded from Phase 1 `get_master()` (no hardcoding, no
   secrets). Exposed via `GET /api/ai-tutor/topics` (thin additive route in `app.py`).
 - `templates/index.html` gains a **separate additive "Modularni AI tutor" card**
   (4 mode buttons, backend-populated topic `<select>`, message box, fallback area,

@@ -64,13 +64,13 @@ def test_home_screen_present_and_chat_hidden_at_start(client):
     assert 'id="tutor-card" hidden' in html
 
 
-def test_grade_dropdown_grade6_and_grade7_enabled(client):
+def test_grade_dropdown_grade6_grade7_and_grade8_enabled(client):
     home = _home_block(_html(client))
     assert 'id="homeGrade"' in home
     assert '<option value="6" selected>6. razred</option>' in home
     assert '<option value="7">7. razred</option>' in home
-    for g in ("8", "9"):
-        assert f'<option value="{g}" disabled>{g}. razred (uskoro)</option>' in home
+    assert '<option value="8">8. razred</option>' in home
+    assert '<option value="9" disabled>9. razred (uskoro)</option>' in home
 
 
 def test_four_mode_cards_with_subtitles(client):

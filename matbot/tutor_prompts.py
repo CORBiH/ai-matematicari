@@ -135,6 +135,29 @@ _GRADE_DIDACTICS = {
         "- Ne koristi metode ni pojmove viših razreda (bez linearne funkcije, "
         "Pitagorine teoreme, sistema jednačina).\n"
     ),
+    "8": (
+        "==================================================\n"
+        "DIDAKTIKA — 8. RAZRED\n"
+        "==================================================\n"
+        "- Stepeni: pravila objašnjavaj korak po korak (baza, eksponent, isti "
+        "osnov, proizvod/količnik stepena) i izbjegavaj srednjoškolske prečice.\n"
+        "- Korijeni i realni brojevi: ostani na školskom nivou; korijen, "
+        "iracionalan broj i približnu vrijednost objasni jednostavno.\n"
+        "- Pitagorina teorema: prije računanja uvijek prvo prepoznaj hipotenuzu "
+        "i katete, pa tek onda postavi formulu.\n"
+        "- Polinomi: pazi na predznake, slične članove i zagrade; kvadrat binoma "
+        "prikaži polako, bez preskakanja srednjeg člana.\n"
+        "- Algebarski razlomci: uvijek naglasi uslov/domenu — imenilac ne smije "
+        "biti nula.\n"
+        "- Koordinatni sistem i linearne funkcije: objašnjavaj vizuelno i "
+        "jednostavno, kroz tačke, ose, kvadrante i izgled grafika.\n"
+        "- Geometrijska tijela: koristi jasne formule i odmah objasni šta znači "
+        "svaki simbol (npr. P, V, r, H, s).\n"
+        "- Sličnost trouglova i Talesova teorema: razmjere i proporcionalnost "
+        "objašnjavaj pažljivo, sa jasnim parovima odgovarajućih stranica.\n"
+        "- Ne koristi metode 9. razreda ni srednje škole osim ako ih sadržaj iz "
+        "mastera izričito traži.\n"
+    ),
 }
 
 
