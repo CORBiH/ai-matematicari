@@ -82,3 +82,27 @@ def test_cleanup_stale_uploads(tmp_path, monkeypatch):
     matbot.cleanup_stale_uploads(max_age_s=3600)
     assert not old.exists()
     assert new.exists()
+
+
+def test_tasks_process_denies_all_without_secret(client, monkeypatch):
+    """Phase 1 (audit): bez TASKS_SECRET-a /tasks/process u produkciji odbija SVE
+    (ranije je default "super-secret" bio pogodiv i endpoint je bio otvoren)."""
+    monkeypatch.setattr(matbot, "LOCAL_MODE", False)
+    monkeypatch.setattr(matbot, "TASKS_SECRET", "")
+    for headers in ({}, {"X-Tasks-Secret": ""}, {"X-Tasks-Secret": "super-secret"}):
+        r = client.post("/tasks/process", json={"job_id": "j-sec"}, headers=headers)
+        assert r.status_code == 403, headers
+
+
+def test_tasks_process_denies_wrong_secret(client, monkeypatch):
+    monkeypatch.setattr(matbot, "LOCAL_MODE", False)
+    monkeypatch.setattr(matbot, "TASKS_SECRET", "pravi-secret")
+    r = client.post("/tasks/process", json={"job_id": "j-sec2"},
+                    headers={"X-Tasks-Secret": "pogresan"})
+    assert r.status_code == 403
+
+
+def test_tasks_secret_has_no_insecure_default():
+    import inspect
+    src = inspect.getsource(matbot)
+    assert 'os.getenv("TASKS_SECRET", "super-secret")' not in src

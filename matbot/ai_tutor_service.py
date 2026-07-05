@@ -11,6 +11,7 @@ se NE zove — vraća se determinističan bosanski fallback tekst.
 """
 from __future__ import annotations
 
+import logging
 from typing import Any, Callable
 
 from matbot.activity_log import log_student_activity
@@ -29,6 +30,8 @@ from matbot.prompt_builder import (
 from matbot.topic_detector import detect_topic, is_vague_message
 from matbot.topic_lookup import get_final_topic
 
+log = logging.getLogger("matbot.ai_tutor")
+
 DEFAULT_GRADE = 6
 DEFAULT_MODEL = "gpt-5-mini"
 
@@ -38,8 +41,18 @@ MAX_HISTORY_ITEMS = 5
 MAX_HISTORY_ITEM_CHARS = 1500
 MAX_LAST_TASK_CHARS = 1000
 
-# max_tokens po modu (app._openai_chat podržava max_tokens parametar)
-_MAX_TOKENS = {"quick": 250, "explain": 700, "practice": 700, "exam": 900}
+# max_tokens po modu (app._openai_chat podržava max_tokens parametar).
+# Phase 1 (audit): quick 250→400 — reasoning modeli troše dio budžeta na
+# razmišljanje, pa je 250 znao dati prazan/odsječen odgovor.
+_MAX_TOKENS = {"quick": 400, "explain": 700, "practice": 700, "exam": 900}
+# Retry budžet kad je odgovor prazan/odsječen (finish_reason == "length").
+_RETRY_MAX_TOKENS_CAP = 1400
+
+# Student-facing poruka kada model ni nakon retry-a ne vrati tekst.
+_EMPTY_ANSWER_FALLBACK = (
+    "Nisam uspio sastaviti odgovor. Pokušaj ponovo za koji trenutak ili "
+    "preformuliši pitanje."
+)
 
 # recommended_mode: jednostavno mapiranje trenutnog moda u preporučeni sljedeći.
 _RECOMMENDED_MODE = {
@@ -60,13 +73,17 @@ def list_topics(master: dict | None = None, grade: int | str = DEFAULT_GRADE) ->
     """Phase 4 — lista tema za UI dropdown (GET /api/ai-tutor/topics).
 
     Učitava iz Phase 1 ``get_master`` (Excel je izvor istine; ništa nije
-    hardkodirano). Vraća samo READY teme (ako postoji ``status`` kolona),
-    sortirano i grupisano po oblasti::
+    hardkodirano). Vraća samo READY teme (ako postoji ``status`` kolona).
+
+    Phase 1 (audit): redoslijed = redoslijed TOPICS sheeta (nastavni redoslijed),
+    NE abecedni. ``oblast_order`` nosi redoslijed oblasti kroz JSON (nizovi
+    garantovano čuvaju redoslijed; ključevi objekta ne moraju)::
 
         {
           "grade": 6,
           "topics":  [{"oblast": ..., "topic": ..., "display_name": ...}, ...],
           "grouped": {"Skupovi": [ ... ], ...},
+          "oblast_order": ["Skupovi", "N i N0 Skupovi", ...],
         }
     """
     g = normalize_grade(grade)
@@ -88,16 +105,18 @@ def list_topics(master: dict | None = None, grade: int | str = DEFAULT_GRADE) ->
         }
         for r in ready
     ]
-    topics.sort(key=lambda t: (t["oblast"], t["display_name"]))
 
     grouped: dict[str, list] = {}
+    oblast_order: list[str] = []
     for t in topics:
+        if t["oblast"] not in grouped:
+            oblast_order.append(t["oblast"])
         grouped.setdefault(t["oblast"], []).append(t)
 
     grades = {normalize_value(r.get("grade")) for r in ready if r.get("grade")}
     grade = int(next(iter(grades))) if len(grades) == 1 and next(iter(grades)).isdigit() else g
 
-    return {"grade": grade, "topics": topics, "grouped": grouped}
+    return {"grade": grade, "topics": topics, "grouped": grouped, "oblast_order": oblast_order}
 
 
 def _extract_answer(resp: Any) -> str:
@@ -107,6 +126,52 @@ def _extract_answer(resp: Any) -> str:
     except (AttributeError, IndexError, TypeError):
         return ""
     return content if isinstance(content, str) else (content or "")
+
+
+def _finish_reason(resp: Any) -> str | None:
+    """finish_reason prvog choice-a, defenzivno (mockovi ga ne moraju imati)."""
+    try:
+        return getattr(resp.choices[0], "finish_reason", None)
+    except (AttributeError, IndexError, TypeError):
+        return None
+
+
+def _call_model_with_retry(
+    openai_chat: Callable, model: str, messages: list, timeout: float | None, mode: str
+) -> str:
+    """Phase 1 (audit): jedan poziv + JEDAN retry sa većim max_tokens ako je
+    odgovor prazan ili odsječen (``finish_reason == "length"``). Ako i retry
+    zakaže, vraća prijateljsku bosansku poruku umjesto praznog stringa.
+
+    Prvi poziv namjerno propušta izuzetke (ruta vraća postojeći 500 odgovor);
+    samo retry je zaštićen try/except-om."""
+    cap = _MAX_TOKENS.get(mode, 700)
+    resp = openai_chat(model, messages, timeout=timeout, max_tokens=cap)
+    answer = _extract_answer(resp)
+    finish = _finish_reason(resp)
+
+    if answer.strip() and finish != "length":
+        return answer
+
+    retry_cap = min(cap * 2, _RETRY_MAX_TOKENS_CAP)
+    log.warning(
+        "ai_tutor: prazan/odsječen odgovor (finish_reason=%s, mode=%s, max_tokens=%s) "
+        "— retry sa max_tokens=%s", finish, mode, cap, retry_cap,
+    )
+    try:
+        retry_resp = openai_chat(model, messages, timeout=timeout, max_tokens=retry_cap)
+        retry_answer = _extract_answer(retry_resp)
+        if retry_answer.strip():
+            return retry_answer
+        log.warning(
+            "ai_tutor: retry također prazan (finish_reason=%s, mode=%s)",
+            _finish_reason(retry_resp), mode,
+        )
+    except Exception:
+        log.exception("ai_tutor: retry poziv nije uspio (mode=%s)", mode)
+
+    # odsječen ali neprazan prvi odgovor je bolji od generičke poruke
+    return answer if answer.strip() else _EMPTY_ANSWER_FALLBACK
 
 
 def _sanitize_payload(payload: dict) -> dict:
@@ -290,12 +355,7 @@ def handle_chat(
             {"role": "system", "content": prompt_result["system_prompt"]},
             {"role": "user", "content": user_content},
         ]
-        answer = _extract_answer(
-            openai_chat(
-                use_model, messages, timeout=timeout,
-                max_tokens=_MAX_TOKENS.get(mode, 700),
-            )
-        )
+        answer = _call_model_with_retry(openai_chat, use_model, messages, timeout, mode)
     else:
         # fallback/ambiguous/invalid → NE zovi OpenAI (deterministički bosanski tekst)
         answer = _fallback_answer(lookup_result, mode, master)

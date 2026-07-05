@@ -98,6 +98,10 @@ def cleanup_stale_uploads(max_age_s: int | None = None):
 HARD_TIMEOUT_S = float(os.getenv("HARD_TIMEOUT_S", "120"))
 OPENAI_TIMEOUT = float(os.getenv("OPENAI_TIMEOUT", str(HARD_TIMEOUT_S)))
 OPENAI_MAX_RETRIES = int(os.getenv("OPENAI_MAX_RETRIES", "2"))
+# Modularni tutor: kraći timeout i manje retry-a — učenik ne smije čekati minutama
+# (frontend prekida na ~60s; vidi AbortController u templates/index.html).
+AI_TUTOR_TIMEOUT = float(os.getenv("AI_TUTOR_TIMEOUT", "45"))
+AI_TUTOR_MAX_RETRIES = int(os.getenv("AI_TUTOR_MAX_RETRIES", "1"))
 
 # --- Rate limiting (env-podesivo; default vrlo darežljiv da ne smeta učenicima) ---
 RATE_LIMIT_ENABLED = os.getenv("RATE_LIMIT_ENABLED", "1") == "1"
@@ -335,11 +339,14 @@ from utils import _short_name_for_display, _name_from_url, _sniff_image_mime, _b
 from matbot import ai_tutor_service
 from matbot.content_loader import ContentLoadError
 
-def _openai_chat(model: str, messages: list, timeout: float = None, max_tokens: int | None = None, fast: bool = False):
+def _openai_chat(model: str, messages: list, timeout: float = None, max_tokens: int | None = None, fast: bool = False, max_retries: int | None = None):
 
     def _do(params):
         base = sync_client if fast else client
-        cli = base if timeout is None else base.with_options(timeout=timeout)
+        opts = {}
+        if timeout is not None: opts["timeout"] = timeout
+        if max_retries is not None: opts["max_retries"] = max_retries
+        cli = base.with_options(**opts) if opts else base
         return cli.chat.completions.create(**params)
 
     params = {"model": model, "messages": messages}
@@ -355,6 +362,16 @@ def _openai_chat(model: str, messages: list, timeout: float = None, max_tokens: 
             if max_tokens is not None: params["max_tokens"] = max_tokens
             return _do(params)
         raise
+
+
+def _tutor_openai_chat(model: str, messages: list, timeout: float = None, max_tokens: int | None = None, fast: bool = False):
+    """OpenAI poziv za modularni tutor: max_retries=AI_TUTOR_MAX_RETRIES (default 1)
+    umjesto globalnog defaulta. Namjerno rezolvira ``_openai_chat`` kao modulnu
+    globalu pri pozivu (testovi je monkeypatchaju)."""
+    return _openai_chat(
+        model, messages, timeout=timeout, max_tokens=max_tokens, fast=fast,
+        max_retries=AI_TUTOR_MAX_RETRIES,
+    )
 
 # Historija razgovora (sanitizacija + gradnja poruka) izdvojena je u history.py.
 from history import (
@@ -787,7 +804,9 @@ PROJECT_ID        = (os.getenv("GOOGLE_CLOUD_PROJECT") or os.getenv("GCP_PROJECT
 REGION            = os.getenv("REGION", "europe-west1")
 TASKS_QUEUE       = os.getenv("TASKS_QUEUE", "matbot-queue")
 TASKS_TARGET_URL  = os.getenv("TASKS_TARGET_URL")
-TASKS_SECRET      = os.getenv("TASKS_SECRET", "super-secret")
+# BEZ nesigurnog defaulta ("super-secret" je bio pogodiv): ako nije postavljen,
+# /tasks/process u produkciji odbija SVE zahtjeve (vidi tasks_process).
+TASKS_SECRET      = (os.getenv("TASKS_SECRET") or "").strip()
 
 def _create_task_cloud(payload: dict):
     if not tasks_v2:
@@ -796,6 +815,8 @@ def _create_task_cloud(payload: dict):
         raise RuntimeError("TASKS_TARGET_URL je obavezan")
     if not PROJECT_ID:
         raise RuntimeError("GOOGLE_CLOUD_PROJECT/GCP_PROJECT je obavezan")
+    if not TASKS_SECRET:
+        raise RuntimeError("TASKS_SECRET je obavezan za Cloud Tasks (bez defaulta)")
     tc = tasks_v2.CloudTasksClient()
     parent = tc.queue_path(PROJECT_ID, REGION, TASKS_QUEUE)
     task = {
@@ -961,7 +982,7 @@ def ai_tutor_chat():
             return jsonify({"error": "invalid_json", "detail": "Očekivan je JSON objekt sa poljima zahtjeva."}), 400
     try:
         result = ai_tutor_service.handle_chat(
-            data, openai_chat=_openai_chat, model=MODEL_TEXT, timeout=OPENAI_TIMEOUT,
+            data, openai_chat=_tutor_openai_chat, model=MODEL_TEXT, timeout=AI_TUTOR_TIMEOUT,
             image_bytes=image_bytes, image_data_url=image_data_url,
             ocr_image=mathpix_ocr_to_text, vision_model=MODEL_VISION,
         )
@@ -1189,7 +1210,9 @@ def async_result(job_id):
 
 @app.post("/tasks/process")
 def tasks_process():
-    if not LOCAL_MODE and request.headers.get("X-Tasks-Secret") != TASKS_SECRET:
+    # Bez TASKS_SECRET-a endpoint je u produkciji ZATVOREN (deny-all) — ranije je
+    # default "super-secret" tiho otvarao vrata svakome ko pogodi header.
+    if not LOCAL_MODE and (not TASKS_SECRET or request.headers.get("X-Tasks-Secret") != TASKS_SECRET):
         return "Forbidden", 403
     try:
         payload = request.get_json(force=True)
@@ -1236,6 +1259,32 @@ def version():
     except Exception:
         sha = "unknown"
     return jsonify({"version": APP_VERSION, "app_py_sha": sha}), 200
+
+
+def _startup_env_sanity():
+    """Phase 1 (audit): glasna provjera env varijabli pri startu u produkciji.
+
+    Ne ruši aplikaciju (ponašanje je sigurno i bez varijabli — endpointi se
+    zatvaraju), ali svaki propust mora biti VIDLJIV u logovima prve minute."""
+    if LOCAL_MODE:
+        return
+    if not _OPENAI_API_KEY:
+        log.error("ENV SANITY: OPENAI_API_KEY nije postavljen — bot ne može odgovarati.")
+    if _secret_key == "tajna_lozinka":
+        log.error("ENV SANITY: FLASK_SECRET_KEY/SECRET_KEY nije postavljen — "
+                  "sesije koriste NESIGURAN default.")
+    if not TASKS_SECRET:
+        log.warning("ENV SANITY: TASKS_SECRET nije postavljen — /tasks/process "
+                    "odbija sve zahtjeve (async Cloud Tasks tok je isključen).")
+    if not _cors_origins:
+        log.warning("ENV SANITY: CORS_ORIGINS nije postavljen — CORS je otvoren za "
+                    "SVE domene. Postavi npr. CORS_ORIGINS=https://skola.thinkific.com")
+    if not DIAG_TOKEN:
+        log.info("ENV SANITY: DIAG_TOKEN nije postavljen — dijagnostički endpointi "
+                 "su nedostupni (to je OK ako ih ne koristiš).")
+
+
+_startup_env_sanity()
 
 
 if __name__ == "__main__":

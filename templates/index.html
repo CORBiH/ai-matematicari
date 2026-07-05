@@ -9,7 +9,8 @@
     MathJax = { tex: { inlineMath: [["$", "$"], ["\\(", "\\)"]] }, svg: { fontCache: "global" } };
   </script>
   <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-  <script src="https://cdn.plot.ly/plotly-2.27.1.min.js"></script>
+  <!-- Plotly (~3.5MB) se NE učitava unaprijed: tutor ne crta grafove, a legacy
+       graf tok ga lijeno učita tek kad se stvarno traži (vidi ensurePlotly). -->
 
   <style>
   :root{
@@ -409,6 +410,7 @@
         </div>
         <div class="tutor-topbar-actions">
           <button type="button" class="btn secondary sm" id="tutorChangeBtn" title="Vrati se na izbor">Promijeni</button>
+          <button type="button" class="btn secondary sm" id="tutorNewBtn" title="Obriši razgovor i počni iznova">🆕 Nova konverzacija</button>
         </div>
       </div>
 
@@ -757,7 +759,8 @@ document.addEventListener('DOMContentLoaded', () => {
        Reload ispod resetuje transcript, fazu i loading stanje. */
     try {
       Object.keys(localStorage)
-        .filter(k => k.startsWith('matbot_tutor_history_') || k.startsWith('matbot_tutor_lasttask_'))
+        .filter(k => k.startsWith('matbot_tutor_history_') || k.startsWith('matbot_tutor_lasttask_')
+                  || k.startsWith('matbot_tutor_ctx_'))
         .forEach(k => localStorage.removeItem(k));
     } catch (_) {}
     closeModal('#confirm-clear');
@@ -951,6 +954,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const topbarMode  = document.getElementById('topbarMode');
     const topbarTopic = document.getElementById('topbarTopic');
     const changeBtn   = document.getElementById('tutorChangeBtn');
+    const newBtn      = document.getElementById('tutorNewBtn');
     const msgBox   = document.getElementById('tutorMessage');
     const sendTutor= document.getElementById('tutorSend');
     const fbBox    = document.getElementById('tutor-fallback');
@@ -1046,6 +1050,13 @@ document.addEventListener('DOMContentLoaded', () => {
     try { cid = (typeof getCID === 'function' && getCID()) || 'default'; } catch(_){ cid = 'default'; }
     const TKEY = 'matbot_tutor_history_' + cid;
     const LASTTASK_KEY = 'matbot_tutor_lasttask_' + cid;
+    /* Phase 1 (audit): historija je vezana za kontekst (razred+mod+tema/oblast).
+       Promjena konteksta BRIŠE staru historiju — stara tema ne smije "nevidljivo"
+       curiti u novu konverzaciju. */
+    const CTX_KEY = 'matbot_tutor_ctx_' + cid;
+    function tutorContextKey(){
+      return [state.grade, state.mode, state.topic || '', state.oblast || ''].join('|');
+    }
 
     /* Phase 5: session_id — automatski, šalje se u svakom zahtjevu, NE prikazuje se u UI */
     let sessionId = '';
@@ -1094,6 +1105,43 @@ document.addEventListener('DOMContentLoaded', () => {
       const a = tutorHistory();
       a.push({ role, content });
       try { localStorage.setItem(TKEY, JSON.stringify(a.slice(-5))); } catch(_){}
+    }
+
+    /* Phase 1 (audit): potpuni reset razgovora — briše i vidljivi transcript i
+       pohranjenu historiju/zadnji zadatak, tako da vidljivo stanje UVIJEK
+       odgovara onome što model pamti. */
+    function resetTutorConversation(){
+      interactionPhase = null;
+      lastTutorMessage = '';
+      try { localStorage.removeItem(TKEY); } catch(_){}
+      try { localStorage.removeItem(LASTTASK_KEY); } catch(_){}
+      clearTutorImage();
+      msgBox.value = '';
+      msgBox.placeholder = DEFAULT_PLACEHOLDER;
+      fbBox.classList.add('hidden');
+      if (metaBox) metaBox.textContent = '';
+      tutorChat.querySelectorAll('.tmsg').forEach(n=>n.remove());
+      hideTutorTyping();
+      if (tutorEmpty) tutorEmpty.classList.remove('hidden');
+      tutorChat.classList.remove('open');
+    }
+
+    /* Poslije reload-a transcript je prazan, a historija istog konteksta postoji:
+       iscrtaj je, da model i učenik gledaju ISTI razgovor (bez nevidljive memorije). */
+    function replayTutorHistory(){
+      if (tutorChat.querySelectorAll('.tmsg').length) return;
+      const hist = tutorHistory();
+      for (const m of hist){
+        if (!m || !m.content) continue;
+        if (m.role === 'user') appendTutorMsg('user', escapeHtml(m.content));
+        else appendTutorMsg('bot', renderTutorHTML(m.content));
+      }
+      for (let i = hist.length - 1; i >= 0; i--){
+        if (hist[i] && hist[i].role === 'assistant' && hist[i].content){
+          lastTutorMessage = String(hist[i].content).slice(0, 600);
+          break;
+        }
+      }
     }
 
     /* ------- SCREEN 1: onboarding koraci (razred → izbor → lekcija/oblast) ------- */
@@ -1169,13 +1217,26 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     function enterChat(autoMessage){
       updateTopbar();
+      /* kontekst (razred+mod+tema/oblast): promjena = svjež razgovor; isti
+         kontekst poslije reload-a = iscrtaj postojeću historiju i NE šalji
+         auto-poruku ponovo */
+      const ctx = tutorContextKey();
+      let prevCtx = null;
+      try { prevCtx = localStorage.getItem(CTX_KEY); } catch(_){}
+      if (prevCtx !== ctx){
+        resetTutorConversation();
+        try { localStorage.setItem(CTX_KEY, ctx); } catch(_){}
+      } else {
+        replayTutorHistory();
+      }
+      const resuming = tutorHistory().length > 0;
       msgBox.placeholder = (state.mode === 'quick') ? QUICK_PLACEHOLDER : DEFAULT_PLACEHOLDER;
       fbBox.classList.add('hidden');
       home.hidden = true;
       card.hidden = false;
       tutorChat.scrollTop = tutorChat.scrollHeight;
       try { msgBox.focus(); } catch(_){}
-      if (autoMessage) sendTutorMsg(autoMessage);
+      if (autoMessage && !resuming) sendTutorMsg(autoMessage);
     }
     function showHome(){
       card.hidden = true;
@@ -1192,6 +1253,14 @@ document.addEventListener('DOMContentLoaded', () => {
       clearTutorImage();
       msgBox.placeholder = DEFAULT_PLACEHOLDER;
       fbBox.classList.add('hidden');
+      showHome();
+    });
+
+    /* Phase 1 (audit): "Nova konverzacija" — vraćena vidljiva akcija koja briše
+       transcript, historiju, zadnji zadatak i fazu, pa vodi na početni ekran. */
+    if (newBtn) newBtn.addEventListener('click', ()=>{
+      resetTutorConversation();
+      try { localStorage.removeItem(CTX_KEY); } catch(_){}
       showHome();
     });
 
@@ -1213,7 +1282,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if(!r.ok) throw new Error('topics http ' + r.status);
         const data = await r.json();
         const grouped = (data && data.grouped) || {};
-        Object.keys(grouped).forEach(oblast=>{
+        /* nastavni redoslijed oblasti dolazi kao NIZ (JSON objekti ne garantuju
+           redoslijed ključeva); fallback na ključeve za starije odgovore */
+        const oblastOrder = (data && Array.isArray(data.oblast_order) && data.oblast_order.length)
+          ? data.oblast_order : Object.keys(grouped);
+        oblastOrder.forEach(oblast=>{
           const og = document.createElement('optgroup');
           og.label = oblast;
           (grouped[oblast] || []).forEach(t=>{
@@ -1339,6 +1412,10 @@ document.addEventListener('DOMContentLoaded', () => {
       showTutorTyping();
       setTutorBusy(true);
 
+      /* Phase 1 (audit): frontend prekida zahtjev nakon 60s — učenik ne smije
+         zauvijek gledati "Tutor razmišlja..." (backend tutor timeout je 45s). */
+      const ac = new AbortController();
+      const abortTimer = setTimeout(()=>{ try { ac.abort(); } catch(_){} }, 60000);
       try{
         let r;
         if (imgFile){
@@ -1346,13 +1423,14 @@ document.addEventListener('DOMContentLoaded', () => {
           const fd = new FormData();
           fd.append('payload', JSON.stringify(payload));
           fd.append('image', imgFile, imgFile.name);
-          r = await fetch('/api/ai-tutor/chat', { method: 'POST', body: fd, credentials: 'include' });
+          r = await fetch('/api/ai-tutor/chat', { method: 'POST', body: fd, credentials: 'include', signal: ac.signal });
         } else {
           r = await fetch('/api/ai-tutor/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
-            credentials: 'include'
+            credentials: 'include',
+            signal: ac.signal
           });
         }
         const j = await r.json().catch(()=>({}));
@@ -1380,9 +1458,14 @@ document.addEventListener('DOMContentLoaded', () => {
           try { localStorage.setItem(LASTTASK_KEY, (answer || '').slice(0, 600)); } catch(_){}
         }
         if (j.status && j.status !== 'ready') showFallback(j.status);
-      }catch(_){
-        appendTutorMsg('bot', '<em>Greška pri slanju zahtjeva. Pokušaj ponovo.</em>');
+      }catch(err){
+        if (err && err.name === 'AbortError'){
+          appendTutorMsg('bot', '<em>⏳ Odgovor traje duže nego obično. Pokušaj ponovo za koji trenutak.</em>');
+        } else {
+          appendTutorMsg('bot', '<em>Greška pri slanju zahtjeva. Pokušaj ponovo.</em>');
+        }
       }finally{
+        clearTimeout(abortTimer);
         hideTutorTyping();
         setTutorBusy(false);
         tutorBusy = false;
@@ -1423,6 +1506,22 @@ function transformExpression(expr){
     .replace(/(?<!\.)\b(sin|cos|tan|exp|log|sqrt|abs)\b/g,'Math.$1')
     .replace(/\bln\b/g,'Math.log');
 }
+/* Plotly se učitava LIJENO tek pri prvom stvarnom crtanju grafa (legacy tok);
+   tutor stranica tako ne vuče ~3.5MB skripte koju gotovo niko ne koristi. */
+let plotlyLoader = null;
+function ensurePlotly(){
+  if (window.Plotly) return Promise.resolve();
+  if (!plotlyLoader){
+    plotlyLoader = new Promise((resolve, reject)=>{
+      const s = document.createElement('script');
+      s.src = 'https://cdn.plot.ly/plotly-2.27.1.min.js';
+      s.onload = resolve;
+      s.onerror = ()=>{ plotlyLoader = null; reject(new Error('plotly load failed')); };
+      document.head.appendChild(s);
+    });
+  }
+  return plotlyLoader;
+}
 function drawPlot(expression, container){
   const parsed = transformExpression(expression);
   const x=[], y=[]; let f;
@@ -1430,20 +1529,22 @@ function drawPlot(expression, container){
   for(let i=-10;i<=10;i+=0.1){
     try{ const res=f(i); x.push(i); y.push(isFinite(res)?res:null);}catch{ x.push(i); y.push(null);}
   }
-  const styles = getComputedStyle(document.body);
-  const paperBg = styles.getPropertyValue('--card-bg').trim() || '#fff';
-  const textCol = styles.getPropertyValue('--text').trim() || '#111';
-  const data=[{x,y,mode:'lines',line:{width:3},name:expression}];
-  const layout={
-    title:`Graf funkcije: y = ${expression}`,
-    xaxis:{title:'x',color:textCol,tickcolor:textCol,gridcolor:'rgba(255,255,255,.08)'},
-    yaxis:{title:'y',color:textCol,tickcolor:textCol,gridcolor:'rgba(255,255,255,.08)'},
-    margin:{t:40},plot_bgcolor:paperBg,paper_bgcolor:paperBg
-  };
-  const graphDiv=document.createElement("div");
-  graphDiv.style="width:100%;max-width:700px;height:400px;margin-top:1rem;";
-  container.appendChild(graphDiv);
-  Plotly.newPlot(graphDiv,data,layout);
+  ensurePlotly().then(()=>{
+    const styles = getComputedStyle(document.body);
+    const paperBg = styles.getPropertyValue('--card-bg').trim() || '#fff';
+    const textCol = styles.getPropertyValue('--text').trim() || '#111';
+    const data=[{x,y,mode:'lines',line:{width:3},name:expression}];
+    const layout={
+      title:`Graf funkcije: y = ${expression}`,
+      xaxis:{title:'x',color:textCol,tickcolor:textCol,gridcolor:'rgba(255,255,255,.08)'},
+      yaxis:{title:'y',color:textCol,tickcolor:textCol,gridcolor:'rgba(255,255,255,.08)'},
+      margin:{t:40},plot_bgcolor:paperBg,paper_bgcolor:paperBg
+    };
+    const graphDiv=document.createElement("div");
+    graphDiv.style="width:100%;max-width:700px;height:400px;margin-top:1rem;";
+    container.appendChild(graphDiv);
+    Plotly.newPlot(graphDiv,data,layout);
+  }).catch(()=>{});
 }
 function applyPlotsIn(root){
   root.querySelectorAll('.plot-request').forEach(plotDiv=>{

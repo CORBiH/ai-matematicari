@@ -55,7 +55,7 @@ jobs:
 
             echo "Waiting for app to become healthy..."
             for i in {1..20}; do
-              if curl -fsS --max-time 10 http://127.0.0.1:8080/ > /dev/null; then
+              if curl -fsS --max-time 10 http://127.0.0.1:8080/healthz > /dev/null; then
                 echo "App is healthy"
                 break
               fi

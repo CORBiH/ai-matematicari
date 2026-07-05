@@ -158,3 +158,84 @@ def test_detect_vague_skips_llm(master, tmap):
 def test_detect_without_openai_chat(master, tmap):
     res = td.detect_topic("Izračunaj 25 · 37", master, tmap, openai_chat=None)
     assert res == {"detected_topic": "unknown", "method": "none"}
+
+
+# --- Phase 1 fixes: dijakritici + redoslijed pravila (regresije iz audita) ----------
+
+@pytest.fixture(scope="module")
+def master7():
+    return cl.load_master_content(grade=7)
+
+
+def test_fold_diacritics():
+    assert td.fold_diacritics("Šta je ČETVEROUGAO? množenje đak žir ćup") == \
+        "sta je cetverougao? mnozenje dak zir cup"
+    assert td.fold_diacritics(None) == ""
+    assert td.fold_diacritics("  ABC  ") == "abc"
+
+
+def test_mnozenje_cijelih_not_sabiranje(master7):
+    """Regresija: pitanje o MNOŽENJU cijelih brojeva ne smije završiti na temi
+    sabiranja/oduzimanja (generičko pravilo je ranije gutalo specifično)."""
+    for msg in (
+        "Kako se množe cijeli brojevi?",
+        "kako se mnoze cijeli brojevi",           # bez dijakritika
+        "množenje cijelih brojeva",
+        "kako se dijele cijeli brojevi",
+        "podijeli cijele brojeve -8 i 2",
+    ):
+        tid = td.detect_topic_heuristic(msg, master7)
+        assert tid == "cijeli_mnozenje_dijeljenje", msg
+        assert tid != "cijeli_sabiranje_oduzimanje"
+
+
+def test_sabiranje_cijelih_still_detected(master7):
+    for msg in ("Kako se sabiraju cijeli brojevi?", "oduzimanje cijelih brojeva"):
+        assert td.detect_topic_heuristic(msg, master7) == "cijeli_sabiranje_oduzimanje", msg
+
+
+def test_generic_cijeli_brojevi_first_topic(master7):
+    """Generičko "cijeli brojevi" (bez operacije) → prva cijeli_ tema iz sheeta."""
+    tid = td.detect_topic_heuristic("Objasni mi cijele brojeve", master7)
+    assert tid.startswith("cijeli_")
+    assert tid in master7["topic_ids"]
+    first = next(r["topic"] for r in master7["topics"] if r["topic"].startswith("cijeli_"))
+    assert tid == first
+
+
+def test_cetverougao_with_and_without_diacritics(master7):
+    """Regresija: mojibake u obrascu ([ÄŤc]etverougl) je blokirao prepoznavanje."""
+    for msg in ("Šta je četverougao?", "sta je cetverougao", "osobine četverougla"):
+        tid = td.detect_topic_heuristic(msg, master7)
+        assert tid.startswith("cetverougao_"), msg
+        assert tid in master7["topic_ids"]
+
+
+def test_cetverougao_unknown_for_grade6(master):
+    """6. razred nema cetverougao_ teme → heuristika NE izmišlja temu."""
+    assert td.detect_topic_heuristic("Šta je četverougao?", master) == "unknown"
+
+
+def test_trougao_nominative(master7):
+    """"trougao" (nominativ, bez 'l') mora biti prepoznat, ne samo "trougla"."""
+    for msg in ("Šta je trougao?", "osobine trougla"):
+        tid = td.detect_topic_heuristic(msg, master7)
+        assert tid.startswith("trougao_"), msg
+
+
+def test_diacritic_variants_match_same_topic(master):
+    """Isti upit sa i bez kvačica daje ISTU temu."""
+    pairs = [
+        ("Kako se računa aritmetička sredina?", "kako se racuna aritmeticka sredina?"),
+        ("Šta je kružnica?", "sta je kruznica?"),
+        ("Objasni mi razlomke", "objasni mi razlomke"),
+    ]
+    for with_d, without_d in pairs:
+        assert td.detect_topic_heuristic(with_d, master) == \
+            td.detect_topic_heuristic(without_d, master), with_d
+
+
+def test_vague_check_folds_diacritics():
+    # tematska riječ bez dijakritika i dalje čini poruku konkretnom
+    assert td.is_vague_message("cetverougao") is False
+    assert td.is_vague_message("četverougao") is False

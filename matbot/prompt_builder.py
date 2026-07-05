@@ -109,6 +109,28 @@ def _global_modular_guidelines(grade: Any) -> str:
         .replace("- 6. razred je BIBLIOTEKA", f"- {g}. razred je BIBLIOTEKA")
     )
 
+# --- Jezik i ton tutora (Phase 1 quick-win iz audita) -----------------------------
+# Bazni prompt je gust na zabranama; ovaj blok eksplicitno definiše jezik i topao
+# ton tutora. Ide u SVE modularne system prompte (ready/general/exam-oblast/fallback).
+LANGUAGE_TONE_GUIDELINES = (
+    "==================================================\n"
+    "JEZIK I TON (TUTOR)\n"
+    "==================================================\n"
+    "- Odgovaraj ISKLJUČIVO na bosanskom jeziku (ijekavica).\n"
+    "- Obraćaj se učeniku sa \"ti\", toplo, strpljivo i ohrabrujuće — kao "
+    "omiljeni nastavnik, ne kao robot.\n"
+    "- Pohvali trud i svaki tačan korak. Kad učenik pogriješi, blago ispravi "
+    "bez kritike: prvo reci šta je dobro, pa gdje je zapelo.\n"
+    "- Izbjegavaj ponavljanje istih fraza iz poruke u poruku; zvuči prirodno "
+    "i razgovorno.\n"
+    "- Objašnjavaj jednostavno, primjereno učeniku osnovne škole; svaki "
+    "stručni pojam odmah objasni običnim riječima.\n"
+    "- Budi KRATAK: 3–6 rečenica ili do 5 koraka. Detaljno objašnjavaj samo "
+    "ako učenik to izričito zatraži.\n"
+    "- Odgovor završi kratkim pitanjem ili prijedlogom sljedećeg koraka "
+    "(npr. \"Hoćeš da probamo jedan zadatak?\").\n"
+)
+
 # --- Format odgovora za chat (Phase 7.1) -----------------------------------------
 # Ide POSLIJE baznog prompta: bazna matematička pravila (npr. $$...$$ za "pravu
 # matematiku") ostaju, ali se za chat UI preciziraju — sitni izrazi inline, display
@@ -117,6 +139,9 @@ CHAT_FORMATTING_GUIDELINES = (
     "==================================================\n"
     "FORMAT ODGOVORA (CHAT)\n"
     "==================================================\n"
+    "- Ova pravila za chat imaju PREDNOST nad ranijim pravilima vizuelnog "
+    "zapisa: u chatu NE važi \"svaki izraz u $$...$$\" niti \"svaki korak u "
+    "novi red sa praznim redom\".\n"
     "- Odgovaraj KOMPAKTNO i prirodno za chat: kratki pasusi, bez suvišnih "
     "praznih redova.\n"
     "- NE lomi običnu rečenicu na više redova i NE stavljaj svaku malu formulu "
@@ -164,6 +189,22 @@ def _base_system_prompt(grade: Any) -> str:
 
 def _collect(ctx: dict, keys: tuple[str, ...]) -> list[str]:
     return [ctx.get(k, "") for k in keys if ctx.get(k)]
+
+
+def _compose_system_prompt(grade: Any, extra: list[str] | None = None) -> str:
+    """Jedinstvena tačka sastavljanja system prompta za SVE modularne putanje:
+    baza (prompts.py) → modularna pravila → jezik/ton → chat format (+ ``extra``,
+    npr. forbidden_ai_behavior). Redoslijed je bitan: kasniji blokovi preciziraju
+    ranije."""
+    parts = [
+        _base_system_prompt(grade),
+        _global_modular_guidelines(grade),
+        LANGUAGE_TONE_GUIDELINES,
+        CHAT_FORMATTING_GUIDELINES,
+    ]
+    if extra:
+        parts.extend(extra)
+    return "\n\n".join(p for p in parts if p).strip()
 
 
 # --- Javne pomoćne funkcije -----------------------------------------------------
@@ -438,11 +479,51 @@ def _build_entry_context(payload: dict, final_topic: str, mode: str) -> str:
     return "\n".join(lines)
 
 
-def _build_topic_block(topic_context: dict) -> str:
+# Phase 1 (audit): topic blok filtriran po modu — explain ne treba kontrolne
+# zadatke, exam ne treba riješeni primjer itd. Manji prompt = jasnije instrukcije.
+_META_FIELDS = ("display_name", "oblast", "lesson_scope")
+_MISTAKE_FIELDS = (
+    "common_mistake_1", "common_mistake_2", "common_mistake_3",
+    "ai_if_mistake_1", "ai_if_mistake_2", "ai_if_mistake_3",
+)
+_SOLVED_FIELDS = (
+    "solved_example_problem",
+    "solved_example_step_1", "solved_example_step_2",
+    "solved_example_step_3", "solved_example_step_4",
+    "solved_example_answer",
+)
+_TYPICAL_FIELDS = ("typical_task_1", "typical_task_2", "typical_task_3")
+_CONTROLNI_FIELDS = (
+    "controlni_task_1", "controlni_task_2", "controlni_task_3",
+    "controlni_trick", "controlni_warning",
+)
+_EXTRA_FIELDS = ("when_to_recommend_video", "exit_criteria")
+
+_MODE_TOPIC_FIELDS = {
+    "explain": frozenset(
+        _META_FIELDS + _MISTAKE_FIELDS + ("hint_method",) + _SOLVED_FIELDS + _EXTRA_FIELDS
+    ),
+    "practice": frozenset(
+        _META_FIELDS + _MISTAKE_FIELDS + ("hint_method",)
+        + _TYPICAL_FIELDS + _SOLVED_FIELDS + _EXTRA_FIELDS
+    ),
+    "exam": frozenset(
+        _META_FIELDS + _MISTAKE_FIELDS + ("hint_method",) + _CONTROLNI_FIELDS
+    ),
+    "quick": frozenset(_META_FIELDS),
+}
+
+
+def _build_topic_block(topic_context: dict, mode: str | None = None) -> str:
+    """Topic blok za user prompt. ``mode`` filtrira polja po namjeni (Phase 1);
+    ``None``/nepoznat mod zadržava staro ponašanje (sva polja)."""
     if not topic_context:
         return ""
+    allowed = _MODE_TOPIC_FIELDS.get(mode)
     lines = ["PODACI O TEMI (iz AI_MATH_CONTENT_MASTER):"]
     for key, label in _TOPIC_LABELS:
+        if allowed is not None and key not in allowed:
+            continue
         val = topic_context.get(key, "")
         if val:
             lines.append(f"- {label}: {val}")
@@ -542,17 +623,13 @@ def build_tutor_prompt(
     video_flow = get_video_flow_context(payload, effective_topic, master_content)
 
     # --- system prompt ---
-    system_parts = [
-        _base_system_prompt(payload.get("grade")),
-        _global_modular_guidelines(payload.get("grade")),
-        CHAT_FORMATTING_GUIDELINES,
-    ]
     forbidden = topic_context.get("forbidden_ai_behavior", "")
-    if forbidden:
-        system_parts.append(
-            "ZABRANJENO PONAŠANJE ZA OVU TEMU (forbidden_ai_behavior):\n- " + forbidden
-        )
-    system_prompt = "\n\n".join(p for p in system_parts if p).strip()
+    extra = (
+        ["ZABRANJENO PONAŠANJE ZA OVU TEMU (forbidden_ai_behavior):\n- " + forbidden]
+        if forbidden
+        else None
+    )
+    system_prompt = _compose_system_prompt(payload.get("grade"), extra)
 
     # --- user prompt ---
     user_parts = [_build_entry_context(payload, effective_topic, mode)]
@@ -571,7 +648,7 @@ def build_tutor_prompt(
     else:
         mode_block = build_mode_instructions(mode, effective_topic, topic_context)
     for block in (
-        _build_topic_block(topic_context),
+        _build_topic_block(topic_context, mode=mode),
         _build_video_flow_block(video_flow),
         mode_block,
         _build_student_block(payload),
@@ -614,10 +691,7 @@ def build_general_tutor_prompt(payload: dict) -> dict:
     else:
         mode_block = build_mode_instructions(mode, "unknown", {})
 
-    system_prompt = "\n\n".join(
-        [_base_system_prompt(payload.get("grade")), _global_modular_guidelines(payload.get("grade")),
-         CHAT_FORMATTING_GUIDELINES]
-    ).strip()
+    system_prompt = _compose_system_prompt(payload.get("grade"))
 
     user_parts = [
         _build_entry_context(payload, "unknown", mode),
@@ -671,10 +745,7 @@ def build_exam_oblast_prompt(payload: dict, master_content: dict) -> dict | None
         return None
     canonical = normalize_value(rows[0].get("oblast")) or oblast
 
-    system_prompt = "\n\n".join(
-        [_base_system_prompt(payload.get("grade")), _global_modular_guidelines(payload.get("grade")),
-         CHAT_FORMATTING_GUIDELINES]
-    ).strip()
+    system_prompt = _compose_system_prompt(payload.get("grade"))
 
     lines = [
         f"OBLAST KONTROLNOG: {canonical}",
@@ -745,10 +816,7 @@ def build_fallback_prompt(payload: dict, reason: Any) -> dict:
     status = _FALLBACK_STATUS.get(reason, "fallback")
     mode = normalize_mode(payload.get("mode"))
 
-    system_prompt = "\n\n".join(
-        [_base_system_prompt(payload.get("grade")), _global_modular_guidelines(payload.get("grade")),
-         CHAT_FORMATTING_GUIDELINES]
-    ).strip()
+    system_prompt = _compose_system_prompt(payload.get("grade"))
 
     if reason == "ambiguous":
         ask = (

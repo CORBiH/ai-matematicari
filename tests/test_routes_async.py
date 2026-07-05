@@ -137,11 +137,14 @@ def test_tasks_process_requires_secret_outside_local(client, fake_openai, monkey
     assert r.status_code == 403
 
 def test_tasks_process_with_secret(client, fake_openai, monkeypatch):
+    # Phase 1 (audit): TASKS_SECRET više nema default — mora biti eksplicitno
+    # postavljen i header se mora poklopiti.
     monkeypatch.setattr(matbot, "LOCAL_MODE", False)
+    monkeypatch.setattr(matbot, "TASKS_SECRET", "test-tasks-secret")
     payload = {"job_id": "j-test", "razred": "7", "user_text": "2+2", "requested": [],
                "history": [{"user": "ranije", "bot": "odgovor"}]}
     r = client.post("/tasks/process", data=json.dumps(payload),
                     content_type="application/json",
-                    headers={"X-Tasks-Secret": matbot.TASKS_SECRET})
+                    headers={"X-Tasks-Secret": "test-tasks-secret"})
     assert r.status_code == 200
     assert matbot.JOB_STORE["j-test"]["status"] == "done"

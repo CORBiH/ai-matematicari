@@ -13,6 +13,12 @@ Redoslijed:
 2. ``detect_topic_llm`` — jeftin klasifikator kroz injektovani ``openai_chat``
    (isti kao app._openai_chat). Vraća isključivo JSON; sve nevalidno → unknown.
    U testovima se mockira — nikad stvarni API poziv.
+
+Robusnost na dijakritike: ulaz se prije poklapanja normalizuje kroz
+``fold_diacritics`` (č/ć→c, đ→d, š→s, ž→z + lowercase), pa svi obrasci u
+``_RULES`` žive u ASCII prostoru. Učenici često pišu bez kvačica; ranije su
+obrasci sa dijakriticima bili i korumpirani (mojibake), pa npr. "četverougao"
+nije bio prepoznat.
 """
 from __future__ import annotations
 
@@ -28,39 +34,59 @@ log = logging.getLogger("matbot.topic_detector")
 
 UNKNOWN = "unknown"
 
+# BiH dijakritici → ASCII; obuhvata i velika slova (poslije ide .lower()).
+_DIACRITIC_MAP = str.maketrans({
+    "č": "c", "ć": "c", "đ": "d", "š": "s", "ž": "z",
+    "Č": "c", "Ć": "c", "Đ": "d", "Š": "s", "Ž": "z",
+})
+
+
+def fold_diacritics(text: Any) -> str:
+    """Normalizuj tekst za heuristike: dijakritici → ASCII + lowercase.
+
+    "Šta je četverougao?" → "sta je cetverougao?" — isti obrazac pokriva
+    i pisanje sa i bez kvačica."""
+    return normalize_value(text).translate(_DIACRITIC_MAP).lower()
+
+
 # Signal da je poruka konkretan matematički zadatak/pitanje (brojevi, operatori,
 # tipični glagoli) — bez ovoga i bez tematskih ključnih riječi poruka je "vague".
+# NAPOMENA: obrazac je u ASCII prostoru — poklapa se na fold_diacritics(tekst).
 _MATH_SIGNAL_RE = re.compile(
-    r"\d|[+\-*/=<>%^√·×÷]|\b(izra[čc]unaj|rije[šs]i|zadatak|koliko|jedna[čc]in\w*|nejedna[čc]in\w*)\b",
-    re.IGNORECASE,
+    r"\d|[+\-*/=<>%^√·×÷]|\b(izracunaj|rijesi|zadatak|koliko|jednacin\w*|nejednacin\w*)\b"
 )
 
 # (pattern, kandidati po tačnom id-u, prefiks za prvu temu iz sheet-a)
-# Redoslijed je bitan: specifičnije prije širih.
+# Obrasci se poklapaju na FOLDANOM tekstu (bez dijakritika, lowercase).
+# Redoslijed je bitan: SPECIFIČNIJE PRIJE ŠIRIH — npr. "množenje cijelih" mora
+# doći prije generičkog "cijeli brojevi", inače pitanje o množenju završi na
+# temi sabiranja.
 _RULES: tuple[tuple[re.Pattern, tuple[str, ...], str], ...] = (
-    (re.compile(r"cijel\w*\s+broj|sabir\w*\s+cijel|oduzim\w*\s+cijel", re.I), ("cijeli_sabiranje_oduzimanje",), "cijeli_"),
-    (re.compile(r"mno[Ĺľz]en\w*\s+cijel|dijeljen\w*\s+cijel", re.I), ("cijeli_mnozenje_dijeljenje",), "cijeli_"),
-    (re.compile(r"racionaln\w*\s+broj", re.I), (), "racionalni_"),
-    (re.compile(r"\bvektor", re.I), (), "vektori_"),
-    (re.compile(r"izometrij|translacij|rotacij|osn\w*\s+simetrij|centraln\w*\s+simetrij", re.I), (), "izometrije_"),
-    (re.compile(r"trougl", re.I), (), "trougao_"),
-    (re.compile(r"[ÄŤc]etverougl|paralelogram|trapez|romb|pravougaonik|kvadrat", re.I), (), "cetverougao_"),
-    (re.compile(r"aritmeti[čc]k\w*\s+sredin\w*|\bprosjek\w*", re.I), ("aritmeticka_sredina",), ""),
-    (re.compile(r"\bnzd\b|najve[ćc]\w* zajedni[čc]k\w* djel", re.I), ("djeljivost_NZD",), "djeljivost_"),
-    (re.compile(r"\bnzs\b|najmanj\w* zajedni[čc]k\w* sadr", re.I), ("djeljivost_NZS",), "djeljivost_"),
-    (re.compile(r"prost\w*\s+broj", re.I), ("djeljivost_prosti",), "djeljivost_"),
-    (re.compile(r"djelitelj|djelioc|djelilac|djeljiv|sadr[žz]ilac|sadr[žz]ioc", re.I), (), "djeljivost_"),
-    (re.compile(r"\bdecimaln", re.I), (), "decimalni_"),
-    (re.compile(r"razlom(ak|k|c|c[ie])", re.I), (), "razlomci_"),
+    # --- cijeli brojevi (7. razred): operacije PRIJE generičkog pojma ---
+    (re.compile(r"(?:mnoz|pomnoz|dijel|podijel)\w*\s+cijel"), ("cijeli_mnozenje_dijeljenje",), "cijeli_"),
+    (re.compile(r"(?:sabir|saber|oduzim|oduzm|zbir)\w*\s+cijel"), ("cijeli_sabiranje_oduzimanje",), "cijeli_"),
+    (re.compile(r"cijel\w*\s+broj"), (), "cijeli_"),
+    (re.compile(r"racionaln\w*\s+broj"), (), "racionalni_"),
+    (re.compile(r"\bvektor"), (), "vektori_"),
+    (re.compile(r"izometrij|translacij|rotacij|osn\w*\s+simetrij|centraln\w*\s+simetrij"), (), "izometrije_"),
+    (re.compile(r"\btroug"), (), "trougao_"),
+    (re.compile(r"cetveroug|cetvoroug|paralelogram|trapez|romb|pravougaonik|kvadrat"), (), "cetverougao_"),
+    (re.compile(r"aritmetick\w*\s+sredin\w*|\bprosjek\w*"), ("aritmeticka_sredina",), ""),
+    (re.compile(r"\bnzd\b|najvec\w*\s+zajednick\w*\s+djel"), ("djeljivost_NZD",), "djeljivost_"),
+    (re.compile(r"\bnzs\b|najmanj\w*\s+zajednick\w*\s+sadr"), ("djeljivost_NZS",), "djeljivost_"),
+    (re.compile(r"prost\w*\s+broj"), ("djeljivost_prosti",), "djeljivost_"),
+    (re.compile(r"djelitelj|djelioc|djelilac|djeljiv|sadrzilac|sadrzioc"), (), "djeljivost_"),
+    (re.compile(r"\bdecimaln"), (), "decimalni_"),
+    (re.compile(r"razlom(ak|k|c|c[ie])"), (), "razlomci_"),
     (re.compile(r"\b\d+\s*/\s*\d+\b"), (), "razlomci_"),
-    (re.compile(r"\bkomplement", re.I), ("skupovi_komplement",), "skupovi_"),
-    (re.compile(r"\bunij[aiu]|\bpresjek", re.I), ("skupovi_operacije",), "skupovi_"),
-    (re.compile(r"\bpodskup|prazan\s+skup", re.I), ("skupovi_prazan",), "skupovi_"),
-    (re.compile(r"\bvenn", re.I), ("skupovi_iz_vennovog_dijagrama",), "skupovi_"),
-    (re.compile(r"\bskup(ovi|ova|u|a)?\b|\belement\w*\s+skup", re.I), (), "skupovi_"),
-    (re.compile(r"kru[žz]nic|krug\b|krugov", re.I), ("kruznica_i_krug", "elementi_kruznice"), ""),
-    (re.compile(r"\btetiv|tangent", re.I), ("centralni_ugao_luk_tetiva", "konstrukcija_tangente"), ""),
-    (re.compile(r"\bug(ao|la|lu|lovi|love|lova)\b|uglomjer", re.I), ("ugao_pojam_elementi", "vrste_uglova"), ""),
+    (re.compile(r"\bkomplement"), ("skupovi_komplement",), "skupovi_"),
+    (re.compile(r"\bunij[aiu]|\bpresjek"), ("skupovi_operacije",), "skupovi_"),
+    (re.compile(r"\bpodskup|prazan\s+skup"), ("skupovi_prazan",), "skupovi_"),
+    (re.compile(r"\bvenn"), ("skupovi_iz_vennovog_dijagrama",), "skupovi_"),
+    (re.compile(r"\bskup(ovi|ova|u|a)?\b|\belement\w*\s+skup"), (), "skupovi_"),
+    (re.compile(r"kruznic|\bkrug\b|krugov"), ("kruznica_i_krug", "elementi_kruznice"), ""),
+    (re.compile(r"\btetiv|tangent"), ("centralni_ugao_luk_tetiva", "konstrukcija_tangente"), ""),
+    (re.compile(r"\bug(ao|la|lu|lovi|love|lova)\b|uglomjer"), ("ugao_pojam_elementi", "vrste_uglova"), ""),
 )
 
 
@@ -69,7 +95,7 @@ def is_vague_message(text: Any) -> bool:
 
     Konkretna = sadrži matematički signal (brojevi/operatori/glagoli) ILI pogađa
     neku tematsku heuristiku ("decimalni brojevi", "razlomci", ...)."""
-    t = normalize_value(text)
+    t = fold_diacritics(text)
     if not t:
         return True
     # matematički signal PRIJE provjere dužine — i "5-1" je konkretan zadatak
@@ -97,7 +123,7 @@ def _first_topic_with_prefix(prefix: str, master: dict) -> str | None:
 def detect_topic_heuristic(message: Any, master: dict | None = None) -> str:
     """Leksička detekcija. Vraća topic id iz mastera ili ``"unknown"``."""
     master = master if master is not None else get_master()
-    text = normalize_value(message)
+    text = fold_diacritics(message)
     if not text:
         return UNKNOWN
     topic_ids = master.get("topic_ids", set())

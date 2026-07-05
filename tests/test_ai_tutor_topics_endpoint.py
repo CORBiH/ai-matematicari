@@ -48,18 +48,43 @@ def test_list_topics_only_ready(master):
     assert all(t["topic"] in master["topic_ids"] for t in data["topics"])
 
 
-def test_list_topics_sorted_and_grouped(master):
+def test_list_topics_preserves_sheet_order(master):
+    """Phase 1 (audit): redoslijed tema = nastavni redoslijed iz TOPICS sheeta,
+    NE abecedni (abeceda je razbijala redoslijed učenja u dropdownu)."""
     data = svc.list_topics(master)
-    # globalno sortirano po (oblast, display_name)
-    pairs = [(t["oblast"], t["display_name"]) for t in data["topics"]]
-    assert pairs == sorted(pairs)
-    # grouped: ključevi su oblasti, svaka grupa sortirana po display_name
+    ready_ids = [
+        r["topic"] for r in master["topics"]
+        if r.get("topic") and (not r.get("status") or r["status"].upper() == "READY")
+    ]
+    assert [t["topic"] for t in data["topics"]] == ready_ids
+    # oblast_order = redoslijed prvog pojavljivanja u sheetu (kroz JSON kao niz)
+    seen: list[str] = []
+    for r in master["topics"]:
+        if r.get("oblast") and r["oblast"] not in seen:
+            seen.append(r["oblast"])
+    assert data["oblast_order"] == seen
+    assert list(data["grouped"].keys()) == seen
+    # grupe: sve stavke pripadaju oblasti, redoslijed unutar grupe = sheet
     for oblast, items in data["grouped"].items():
         assert all(it["oblast"] == oblast for it in items)
-        names = [it["display_name"] for it in items]
-        assert names == sorted(names)
+        sheet_ids = [r["topic"] for r in master["topics"] if r.get("oblast") == oblast]
+        assert [it["topic"] for it in items] == [tid for tid in sheet_ids if tid in ready_ids]
     # ukupan broj u grupama == broj tema
     assert sum(len(v) for v in data["grouped"].values()) == len(data["topics"])
+
+
+def test_topics_endpoint_oblast_order_in_json(client, master):
+    """oblast_order stiže kroz HTTP JSON kao NIZ (objektni ključevi mogu biti
+    presortirani od strane serializera — frontend koristi niz)."""
+    body = client.get(f"{TOPICS_URL}?grade=6").get_json()
+    assert isinstance(body.get("oblast_order"), list) and body["oblast_order"]
+    expected = []
+    for r in master["topics"]:
+        if r.get("oblast") and r["oblast"] not in expected:
+            expected.append(r["oblast"])
+    assert body["oblast_order"] == expected
+    # prva oblast u sheetu NIJE nužno prva po abecedi — upravo to štitimo
+    assert set(body["oblast_order"]) == set(body["grouped"].keys())
 
 
 # --- HTTP endpoint --------------------------------------------------------------

@@ -71,13 +71,15 @@ def fake_openai(monkeypatch):
     state["raise_fast"]   — exception samo za fast=True pozive (sync pokušaj)
     state["raise_always"] — exception za svaki poziv
     """
-    calls = types.SimpleNamespace(messages=[], models=[], fast_flags=[])
+    calls = types.SimpleNamespace(messages=[], models=[], fast_flags=[], max_tokens=[], kwargs=[])
     state = {"reply": "Test odgovor: x = 3", "raise_fast": None, "raise_always": None}
 
-    def _fake(model, messages, timeout=None, max_tokens=None, fast=False):
+    def _fake(model, messages, timeout=None, max_tokens=None, fast=False, **kwargs):
         calls.messages.append(messages)
         calls.models.append(model)
         calls.fast_flags.append(fast)
+        calls.max_tokens.append(max_tokens)
+        calls.kwargs.append(kwargs)
         if state["raise_always"] is not None:
             raise state["raise_always"]
         if fast and state["raise_fast"] is not None:

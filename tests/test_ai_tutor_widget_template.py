@@ -161,16 +161,69 @@ def test_chat_screen_contains_everything(client):
         assert needle in block, f"nedostaje {needle} unutar chat kartice"
 
 
-def test_topbar_single_action_promijeni_only(client):
-    """Phase 7.2: topbar ima SAMO 'Promijeni' — 'Nova konverzacija' je uklonjena."""
+def test_topbar_actions_promijeni_and_nova_konverzacija(client):
+    """Phase 1 (audit): topbar ima 'Promijeni' I vraćenu 'Nova konverzacija' —
+    učenik MORA imati vidljiv način da počne svjež razgovor."""
     html = _html(client)
     block = _tutor_block(html)
     assert 'id="topbarGrade"' in block
     assert 'id="topbarMode"' in block
     assert 'id="topbarTopic"' in block
     assert 'id="tutorChangeBtn"' in block and "Promijeni" in block
-    assert 'id="tutorNewBtn"' not in html
-    assert "Nova konverzacija" not in html
+    assert 'id="tutorNewBtn"' in block
+    assert "Nova konverzacija" in block
+
+
+def test_nova_konverzacija_clears_everything(client):
+    """'Nova konverzacija' briše historiju, zadnji zadatak, kontekst i transcript."""
+    html = _html(client)
+    idx = html.index("newBtn.addEventListener")
+    snippet = html[idx:idx + 300]
+    assert "resetTutorConversation()" in snippet
+    assert "localStorage.removeItem(CTX_KEY)" in snippet
+    assert "showHome()" in snippet
+    ridx = html.index("function resetTutorConversation()")
+    rsnippet = html[ridx:ridx + 900]
+    assert "localStorage.removeItem(TKEY)" in rsnippet
+    assert "localStorage.removeItem(LASTTASK_KEY)" in rsnippet
+    assert "interactionPhase = null" in rsnippet
+    assert "lastTutorMessage = ''" in rsnippet
+    assert "querySelectorAll('.tmsg')" in rsnippet          # briše i vidljivi transcript
+
+
+def test_history_scoped_by_context(client):
+    """Phase 1 (audit): promjena razred/mod/tema/oblast briše staru historiju;
+    isti kontekst poslije reload-a iscrtava postojeću (bez nevidljive memorije)."""
+    html = _html(client)
+    assert "matbot_tutor_ctx_" in html
+    assert "function tutorContextKey()" in html
+    assert "[state.grade, state.mode, state.topic || '', state.oblast || ''].join('|')" in html
+    idx = html.index("function enterChat(autoMessage)")
+    snippet = html[idx:idx + 1200]
+    assert "prevCtx !== ctx" in snippet
+    assert "resetTutorConversation()" in snippet
+    assert "replayTutorHistory()" in snippet
+    assert "if (autoMessage && !resuming)" in snippet       # bez duple auto-poruke
+
+
+def test_fetch_timeout_with_friendly_message(client):
+    """Phase 1 (audit): AbortController prekida zahtjev na 60s + poruka djetetu."""
+    html = _html(client)
+    assert "new AbortController()" in html
+    assert "60000" in html
+    assert "signal: ac.signal" in html
+    assert "Odgovor traje duže nego obično" in html
+
+
+def test_plotly_not_loaded_upfront(client):
+    """Phase 1 (audit): Plotly (~3.5MB) se ne učitava unaprijed — lijeno tek
+    kad legacy graf tok stvarno zatraži crtanje."""
+    html = _html(client)
+    assert '<script src="https://cdn.plot.ly' not in html
+    assert "function ensurePlotly()" in html
+    assert "ensurePlotly().then" in html
+    # MathJax OSTAJE učitan unaprijed (formule su u svakom odgovoru)
+    assert "mathjax@3/es5/tex-mml-chtml.js" in html
 
 
 def test_change_resets_practice_state_keeps_history(client):

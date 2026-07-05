@@ -684,3 +684,81 @@ def test_explain_mode_conversational_not_repetitive(master):
     assert "NE prepričavaj cijelu lekciju" in up
     assert "VEĆ sadrži objašnjenje ove teme" in up
     assert '"Hoćeš primjer?"' in up
+
+
+# --- Phase 1 (audit): jezik i ton tutora u SVIM modularnim system promptovima ------
+
+def test_language_tone_in_all_modular_paths(master, oblast):
+    results = [
+        pb.build_tutor_prompt({"selected_topic": TOPIC, "mode": "explain"}, _found(), master),
+        pb.build_tutor_prompt({"selected_topic": TOPIC, "mode": "quick"}, _found(), master),
+        pb.build_general_tutor_prompt({"mode": "quick", "student_message": "5-1"}),
+        pb.build_fallback_prompt({"mode": "exam"}, "unknown"),
+        pb.build_exam_oblast_prompt({"mode": "exam", "selected_oblast": oblast}, master),
+    ]
+    for res in results:
+        sp = res["system_prompt"]
+        assert "JEZIK I TON (TUTOR)" in sp
+        assert "bosanskom jeziku (ijekavica)" in sp
+        assert "Pohvali trud" in sp
+        assert 'Obraćaj se učeniku sa "ti"' in sp
+        # ton dolazi prije chat formata, poslije modularnih pravila
+        assert sp.index("MODULARNA PRAVILA") < sp.index("JEZIK I TON (TUTOR)")
+        assert sp.index("JEZIK I TON (TUTOR)") < sp.index("FORMAT ODGOVORA (CHAT)")
+
+
+def test_chat_format_overrides_legacy_notation(master):
+    sp = pb.build_tutor_prompt({"selected_topic": TOPIC}, _found(), master)["system_prompt"]
+    assert "PREDNOST nad ranijim pravilima vizuelnog zapisa" in sp
+
+
+# --- Phase 1 (audit): topic blok filtriran po modu ----------------------------------
+
+def test_topic_block_explain_excludes_controlni(master, topic_row):
+    res = pb.build_tutor_prompt({"selected_topic": TOPIC, "mode": "explain"}, _found(), master)
+    up = res["user_prompt"]
+    # explain zadržava scope/greške/hint/riješeni primjer...
+    assert topic_row["lesson_scope"] in up
+    assert topic_row["common_mistake_1"] in up
+    assert topic_row["solved_example_problem"] in up
+    # ...ali NE šalje kontrolne zadatke ni tipične zadatke za vježbu
+    assert topic_row["controlni_task_1"] not in up
+    assert "Kontrolni zadatak 1" not in up
+    assert "Tipičan zadatak 1" not in up
+
+
+def test_topic_block_practice_has_typical_no_controlni(master, topic_row):
+    res = pb.build_tutor_prompt({"selected_topic": TOPIC, "mode": "practice"}, _found(), master)
+    up = res["user_prompt"]
+    assert topic_row["typical_task_1"] in up
+    assert topic_row["common_mistake_1"] in up
+    assert topic_row["hint_method"] in up
+    assert "Kontrolni zadatak 1" not in up
+
+
+def test_topic_block_exam_has_controlni_no_solved_example(master, topic_row):
+    res = pb.build_tutor_prompt({"selected_topic": TOPIC, "mode": "exam"}, _found(), master)
+    up = res["user_prompt"]
+    assert topic_row["controlni_task_1"] in up
+    assert topic_row["controlni_trick"] in up
+    # riješeni primjer i tipični zadaci ne idu u exam kontekst
+    assert "Riješeni primjer — zadatak" not in up
+    assert "Tipičan zadatak 1" not in up
+
+
+def test_topic_block_quick_minimal(master, topic_row):
+    res = pb.build_tutor_prompt({"selected_topic": TOPIC, "mode": "quick"}, _found(), master)
+    up = res["user_prompt"]
+    assert topic_row["lesson_scope"] in up               # meta ostaje
+    for label in ("Kontrolni zadatak", "Tipičan zadatak", "Riješeni primjer",
+                  "Česta greška", "Metoda hinta"):
+        assert label not in up, label
+
+
+def test_topic_block_unknown_mode_keeps_all_fields(master, topic_row):
+    """Backward-compat: bez poznatog moda blok šalje sva polja (staro ponašanje)."""
+    ctx = pb.get_topic_context(TOPIC, master)
+    block = pb._build_topic_block(ctx, mode=None)
+    assert topic_row["controlni_task_1"] in block
+    assert topic_row["typical_task_1"] in block
+    assert topic_row["solved_example_problem"] in block

@@ -1,0 +1,29 @@
+# MAT-BOT — docker compose za Hetzner VPS (i lokalni run).
+#
+# VAŽNO PRIJE PRVOG DEPLOYA S OVIM FAJLOM: deploy workflow radi
+# `git reset --hard origin/main` u VPS_APP_DIR — ako na VPS-u već postoji
+# ručno održavan docker-compose.yml, OVAJ fajl će ga pregaziti.
+# Uporedi (`diff`) postojeći VPS fajl sa ovim i uskladi prije merge-a.
+#
+# Pokretanje:  docker compose up -d --build
+# Logovi:      docker compose logs -f
+# Health:      curl -fsS http://127.0.0.1:8080/healthz
+
+services:
+  matbot:
+    build: .
+    image: matbot:latest
+    restart: unless-stopped
+    env_file: .env            # kopiraj .env.example → .env i popuni
+    environment:
+      PORT: "8080"
+    ports:
+      - "127.0.0.1:8080:8080" # samo lokalno; javni saobraćaj ide kroz nginx
+    volumes:
+      - ./storage:/app/storage   # SQLite activity log preživi rebuild/restart
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
