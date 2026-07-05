@@ -113,7 +113,7 @@ def test_exam_requires_oblast_only(client):
 def test_quick_path_enters_chat_directly(client):
     html = _html(client)
     idx = html.index("if (state.mode === 'quick')")
-    snippet = html[idx:idx + 350]
+    snippet = html[idx:idx + 650]
     # quick: bez picker-a, bez teme/oblasti, odmah u chat bez auto-poruke
     assert "hidePicker()" in snippet
     assert "enterChat('')" in snippet
@@ -280,6 +280,7 @@ def test_screen_switch_helpers_present(client):
 def test_payload_uses_home_state(client):
     html = _html(client)
     assert "session_id: sessionId" in html
+    assert "entry_source: state.topic ? (state.topicSource || 'manual_topic_choice') : 'free_chat'" in html
     assert "selected_topic: state.topic" in html
     assert "state.mode === 'exam' ? state.oblast : ''" in html
     assert "grade: parseInt(state.grade, 10) || 6" in html
@@ -347,6 +348,7 @@ def test_clear_chat_clears_tutor_keys(client):
     html = _html(client)
     assert "k.startsWith('matbot_tutor_history_')" in html
     assert "k.startsWith('matbot_tutor_lasttask_')" in html
+    assert "k.startsWith('matbot_tutor_lasttopic_')" in html
 
 
 # --- slika zadatka u composer-u ------------------------------------------------------
@@ -458,10 +460,38 @@ def test_followup_payload_fields(client):
     assert "lastTutorMessage = (answer || '').slice(0, 600)" in html
 
 
+def test_short_answer_with_stored_task_becomes_practice_answer(client):
+    html = _html(client)
+    assert "function storedLastTask()" in html
+    assert "function isShortPracticeAnswer(t)" in html
+    assert "savedTask && isShortPracticeAnswer(typed)" in html
+    assert "payload.mode = 'practice'" in html
+    assert "payload.last_tutor_task = savedTask.slice(0, 600)" in html
+
+
+def test_detected_topic_adopted_for_next_payload(client):
+    html = _html(client)
+    assert "const LASTTOPIC_KEY = 'matbot_tutor_lasttopic_'" in html
+    assert "function adoptResponseTopic(j)" in html
+    assert "state.topic = tid" in html
+    assert "state.topicSource = 'detected_topic'" in html
+    assert "if (j.status === 'ready') adoptResponseTopic(j)" in html
+    assert "topicOblasti[t.topic] = oblast" in html
+
+
+def test_tutor_task_detection_updates_last_task(client):
+    html = _html(client)
+    assert "function looksLikeTutorTask(t)" in html
+    assert "setAwaitingPracticeTask(answer)" in html
+    assert "clearAwaitingPracticeTask()" in html
+    assert "restoreActiveTopic()" in html
+    assert "storedLastTask()" in html
+
+
 def test_practice_answer_takes_precedence_over_followup(client):
     """Dok se čeka odgovor na zadatak, i 'da'/'može' ide kao practice odgovor."""
     html = _html(client)
-    idx = html.index("if (interactionPhase === 'awaiting_practice_answer')")
+    idx = html.index("interactionPhase === 'awaiting_practice_answer'")
     followup_idx = html.index("lastTutorMessage && isFollowupMessage(typed)")
     assert idx < followup_idx                    # practice grana se provjerava PRVA
 
@@ -482,4 +512,4 @@ def test_answer_send_does_not_clear_last_task_upfront(client):
     idx = html.index("if (answerPhase){")
     snippet = html[idx:idx + 400]
     assert "localStorage.removeItem" not in snippet
-    assert "localStorage.getItem(LASTTASK_KEY)" in snippet
+    assert "payload.last_tutor_task = savedTask.slice(0, 600)" in snippet

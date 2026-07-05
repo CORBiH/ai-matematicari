@@ -274,6 +274,47 @@ def test_free_chat_fractions_no_topic_required(client, fake_openai, master):
     assert body["final_topic"] in master["topic_ids"]
 
 
+def test_fraction_multiplication_task_then_short_answer_keeps_topic(client, fake_openai):
+    topic = "razlomci_mnozenje_razlomkom_svojstva"
+    first_msg = (
+        "nikako ne razumijem mnozenje razlomaka "
+        "daj mi neki zadatak i objasni kako ga radis"
+    )
+    first = client.post(CHAT_URL, json={
+        "entry_source": "free_chat",
+        "mode": "quick",
+        "student_message": first_msg,
+    })
+    assert first.status_code == 200
+    first_body = first.get_json()
+    assert first_body["status"] == "ready"
+    assert first_body["final_topic"] == topic
+    assert first_body["mode"] == "quick"
+
+    second = client.post(CHAT_URL, json={
+        "entry_source": "free_chat",
+        "mode": "quick",
+        "interaction_phase": "answering_practice_task",
+        "last_tutor_task": "3/4 * 2/5",
+        "student_message": "5/18",
+        "conversation_history": [
+            {"role": "user", "content": first_msg},
+            {"role": "assistant", "content": "Zadatak: 3/4 * 2/5"},
+        ],
+    })
+    assert second.status_code == 200
+    second_body = second.get_json()
+    assert second_body["status"] == "ready"
+    assert second_body["mode"] == "practice"
+    assert second_body["final_topic"] == topic
+    assert len(fake_openai.calls.messages) == 2
+    user_prompt = fake_openai.calls.messages[-1][-1]["content"]
+    assert "PROVJERA ODGOVORA" in user_prompt
+    assert "ZADNJI ZADATAK" in user_prompt
+    assert "3/4 * 2/5" in user_prompt
+    assert "Množenje razlomka razlomkom" in user_prompt
+
+
 def test_free_chat_classifier_valid_topic_accepted(client, fake_openai):
     """Heuristika ne pogađa; LLM klasifikator (mock) vraća validnu temu."""
     fake_openai.state["reply"] = '{"detected_topic": "n_n0_mnozenje"}'

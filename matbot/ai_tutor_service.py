@@ -304,13 +304,16 @@ def handle_chat(
             payload.get("student_message") or payload.get("message")
         )
         ocr_text = normalize_value(payload.get("image_ocr_text"))
-        combined = " ".join(x for x in (student_msg, ocr_text) if x)
+        phase = normalize_value(payload.get("interaction_phase")).lower()
+        last_task = normalize_value(payload.get("last_tutor_task"))
+        is_practice_followup = phase == "answering_practice_task"
+        combined_parts = (student_msg, ocr_text)
+        if is_practice_followup and last_task:
+            combined_parts = (last_task, student_msg, ocr_text)
+        combined = " ".join(x for x in combined_parts if x)
         # Phase 7.2: kratka potvrda ("može", "nastavi") kao nastavak razgovora —
         # nikad fallback i nikad LLM klasifikator teme; opći prompt + historija.
-        is_continuation = (
-            normalize_value(payload.get("interaction_phase")).lower()
-            == "continuing_explanation"
-        )
+        is_continuation = phase == "continuing_explanation"
         if is_continuation and combined:
             general_answer = True
         elif combined and (has_image or not is_vague_message(combined)):

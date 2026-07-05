@@ -69,6 +69,18 @@ def test_heuristic_fractions(master):
     assert tid in master["topic_ids"]
 
 
+def test_heuristic_mnozenje_razlomaka_specific(master):
+    for msg in (
+        "nikako ne razumijem mnozenje razlomaka",
+        "Kako se množe razlomci?",
+        "3/4 * 2/5",
+    ):
+        assert (
+            td.detect_topic_heuristic(msg, master)
+            == "razlomci_mnozenje_razlomkom_svojstva"
+        )
+
+
 def test_heuristic_decimalni(master):
     tid = td.detect_topic_heuristic("Objasni mi decimalne brojeve", master)
     assert tid.startswith("decimalni_")

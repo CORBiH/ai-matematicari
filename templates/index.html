@@ -760,6 +760,7 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       Object.keys(localStorage)
         .filter(k => k.startsWith('matbot_tutor_history_') || k.startsWith('matbot_tutor_lasttask_')
+                  || k.startsWith('matbot_tutor_lasttopic_')
                   || k.startsWith('matbot_tutor_ctx_'))
         .forEach(k => localStorage.removeItem(k));
     } catch (_) {}
@@ -971,7 +972,11 @@ document.addEventListener('DOMContentLoaded', () => {
        !continueBtn || !sendTutor || !msgBox || !tutorChat || !tutorTyping) return; // panel nije prisutan
 
     /* stanje izabrano na home ekranu; chat ga samo koristi */
-    const state = { grade: '6', mode: 'quick', topic: '', topicName: '', topicOblast: '', oblast: '' };
+    const state = {
+      grade: '6', mode: 'quick',
+      topic: '', topicName: '', topicOblast: '', topicSource: '',
+      oblast: ''
+    };
 
     /* Mini bezbjedni renderer (bez markdown biblioteke, bez XSS):
        1) escape HTML-a  2) **bold** → <strong>  3) kratki $$...$$ → inline \(...\)
@@ -1050,6 +1055,7 @@ document.addEventListener('DOMContentLoaded', () => {
     try { cid = (typeof getCID === 'function' && getCID()) || 'default'; } catch(_){ cid = 'default'; }
     const TKEY = 'matbot_tutor_history_' + cid;
     const LASTTASK_KEY = 'matbot_tutor_lasttask_' + cid;
+    const LASTTOPIC_KEY = 'matbot_tutor_lasttopic_' + cid;
     /* Phase 1 (audit): historija je vezana za kontekst (razred+mod+tema/oblast).
        Promjena konteksta BRIŠE staru historiju — stara tema ne smije "nevidljivo"
        curiti u novu konverzaciju. */
@@ -1095,6 +1101,7 @@ document.addEventListener('DOMContentLoaded', () => {
       exam: 'Sutra imam kontrolni iz ove oblasti. Pripremi me.'
     };
     const topicNames = {};         // topic id → display_name (za prijateljski meta red)
+    const topicOblasti = {};       // topic id → oblast (za payload kada je tema detektovana)
     let topicsLoadedGrade = null;
 
     function tutorHistory(){
@@ -1107,6 +1114,88 @@ document.addEventListener('DOMContentLoaded', () => {
       try { localStorage.setItem(TKEY, JSON.stringify(a.slice(-5))); } catch(_){}
     }
 
+    function foldTutorText(t){
+      return (t || '').toLowerCase()
+        .replace(/[čć]/g, 'c').replace(/[đ]/g, 'd')
+        .replace(/[š]/g, 's').replace(/[ž]/g, 'z');
+    }
+    function storedLastTask(){
+      try { return (localStorage.getItem(LASTTASK_KEY) || '').trim(); }
+      catch(_){ return ''; }
+    }
+    function isStoredQuickContext(){
+      try {
+        const parts = (localStorage.getItem(CTX_KEY) || '').split('|');
+        return tutorHistory().length > 0 && parts[0] === state.grade && parts[1] === 'quick';
+      } catch(_){ return false; }
+    }
+    function isShortPracticeAnswer(t){
+      const s = foldTutorText(t).trim();
+      if (!s || s.length > 80) return false;
+      if (/\b(kako|zasto|objasni|daj|izracunaj|rijesi|pomozi|zadatak)\b/.test(s)) return false;
+      if (/^[-+]?\d+\s*(?:\/\s*[-+]?\d+)?$/.test(s)) return true;
+      if (/^[a-z]\s*=\s*[-+]?\d+\s*(?:\/\s*[-+]?\d+)?$/.test(s)) return true;
+      return /^(da|ne|tacno|netacno|ne znam)$/.test(s);
+    }
+    function looksLikeTutorTask(t){
+      const s = foldTutorText(t);
+      if (!s) return false;
+      const mathExpr = /(?:\d+\s*\/\s*\d+|\d+)\s*(?:[*x×·:+-]|:)\s*(?:\d+\s*\/\s*\d+|\d+)/.test(s) || /\\frac\{/.test(s);
+      const taskWords = /\b(zadatak|izracunaj|rijesi|probaj|pokusaj|koliko je|pomnozi|podijeli)\b/.test(s);
+      const bareFractionProduct = /\d+\s*\/\s*\d+\s*(?:[*x×·])\s*\d+\s*\/\s*\d+/.test(s) && !/=/.test(s);
+      return mathExpr && (taskWords || bareFractionProduct);
+    }
+    function setAwaitingPracticeTask(taskText){
+      interactionPhase = 'awaiting_practice_answer';
+      msgBox.placeholder = ANSWER_PLACEHOLDER;
+      try { localStorage.setItem(LASTTASK_KEY, (taskText || '').slice(0, 600)); } catch(_){}
+    }
+    function clearAwaitingPracticeTask(){
+      interactionPhase = null;
+      msgBox.placeholder = (state.mode === 'quick') ? QUICK_PLACEHOLDER : DEFAULT_PLACEHOLDER;
+      try { localStorage.removeItem(LASTTASK_KEY); } catch(_){}
+    }
+    function clearStoredActiveTopic(){
+      try { localStorage.removeItem(LASTTOPIC_KEY); } catch(_){}
+    }
+    function saveActiveTopic(){
+      if (!state.topic) return;
+      try {
+        localStorage.setItem(LASTTOPIC_KEY, JSON.stringify({
+          topic: state.topic,
+          topicName: state.topicName,
+          topicOblast: state.topicOblast,
+          topicSource: state.topicSource || 'detected_topic'
+        }));
+        localStorage.setItem(CTX_KEY, tutorContextKey());
+      } catch(_){}
+    }
+    function restoreActiveTopic(){
+      if (state.topic || !tutorHistory().length) return;
+      try {
+        const saved = JSON.parse(localStorage.getItem(LASTTOPIC_KEY) || '{}');
+        if (!saved || !saved.topic) return;
+        state.topic = saved.topic;
+        state.topicName = saved.topicName || topicNames[saved.topic] || saved.topic;
+        state.topicOblast = saved.topicOblast || topicOblasti[saved.topic] || '';
+        state.topicSource = saved.topicSource || 'detected_topic';
+        state.oblast = '';
+      } catch(_){}
+    }
+    function adoptResponseTopic(j){
+      const tid = (j && (j.effective_topic || j.final_topic) || '').trim();
+      if (!tid || tid === 'unknown') return;
+      state.topic = tid;
+      state.topicName = topicNames[tid] || state.topicName || tid;
+      state.topicOblast = topicOblasti[tid] || state.topicOblast || '';
+      if (!state.topicSource || state.topicSource === 'free_chat'){
+        state.topicSource = 'detected_topic';
+      }
+      state.oblast = '';
+      saveActiveTopic();
+      updateTopbar();
+    }
+
     /* Phase 1 (audit): potpuni reset razgovora — briše i vidljivi transcript i
        pohranjenu historiju/zadnji zadatak, tako da vidljivo stanje UVIJEK
        odgovara onome što model pamti. */
@@ -1115,6 +1204,7 @@ document.addEventListener('DOMContentLoaded', () => {
       lastTutorMessage = '';
       try { localStorage.removeItem(TKEY); } catch(_){}
       try { localStorage.removeItem(LASTTASK_KEY); } catch(_){}
+      clearStoredActiveTopic();
       clearTutorImage();
       msgBox.value = '';
       msgBox.placeholder = DEFAULT_PLACEHOLDER;
@@ -1142,6 +1232,10 @@ document.addEventListener('DOMContentLoaded', () => {
           break;
         }
       }
+      if (storedLastTask()){
+        interactionPhase = 'awaiting_practice_answer';
+        msgBox.placeholder = ANSWER_PLACEHOLDER;
+      }
     }
 
     /* ------- SCREEN 1: onboarding koraci (razred → izbor → lekcija/oblast) ------- */
@@ -1168,8 +1262,12 @@ document.addEventListener('DOMContentLoaded', () => {
         interactionPhase = null;                 // novi izbor prekida čekanje odgovora na zadatak
         modeGrid.querySelectorAll('.home-mode-card').forEach(x=>x.classList.toggle('active', x === btn));
         if (state.mode === 'quick'){
-          state.topic = ''; state.topicName = ''; state.topicOblast = ''; state.oblast = '';
-          try { localStorage.removeItem(LASTTASK_KEY); } catch(_){} // bez starog practice stanja
+          const resumeQuick = isStoredQuickContext();
+          if (!resumeQuick){
+            state.topic = ''; state.topicName = ''; state.topicOblast = ''; state.topicSource = ''; state.oblast = '';
+            try { localStorage.removeItem(LASTTASK_KEY); } catch(_){} // bez starog practice stanja
+            clearStoredActiveTopic();
+          }
           hidePicker();
           enterChat('');                         // bez teme/oblasti i bez auto-poruke
           return;
@@ -1180,7 +1278,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     gradeSel.addEventListener('change', ()=>{
       state.grade = gradeSel.value || '6';
-      state.topic = ''; state.topicName = ''; state.topicOblast = ''; state.oblast = '';
+      state.topic = ''; state.topicName = ''; state.topicOblast = ''; state.topicSource = ''; state.oblast = '';
+      clearStoredActiveTopic();
       hidePicker();
       loadTopicsForGrade(state.grade);
     });
@@ -1191,8 +1290,9 @@ document.addEventListener('DOMContentLoaded', () => {
       if (state.mode === 'exam'){
         const ob = oblastSelect.value;
         if (!ob){ showToast('Prvo izaberi oblast.', 'err'); try{ oblastSelect.focus(); }catch(_){} return; }
-        state.oblast = ob; state.topic = ''; state.topicName = ''; state.topicOblast = '';
+        state.oblast = ob; state.topic = ''; state.topicName = ''; state.topicOblast = ''; state.topicSource = '';
         try { localStorage.removeItem(LASTTASK_KEY); } catch(_){} // nova oblast = svjež practice tok
+        clearStoredActiveTopic();
         enterChat(AUTO_MESSAGES.exam);
         return;
       }
@@ -1202,8 +1302,10 @@ document.addEventListener('DOMContentLoaded', () => {
       state.topic = t;
       state.topicName = (opt && opt.textContent) || t;
       state.topicOblast = (opt && opt.dataset && opt.dataset.oblast) || '';
+      state.topicSource = 'manual_topic_choice';
       state.oblast = '';
       try { localStorage.removeItem(LASTTASK_KEY); } catch(_){} // nova tema = svjež practice tok
+      clearStoredActiveTopic();
       enterChat(AUTO_MESSAGES[state.mode] || AUTO_MESSAGES.explain);
     });
 
@@ -1216,6 +1318,7 @@ document.addEventListener('DOMContentLoaded', () => {
       topbarTopic.classList.toggle('hidden', !ctx);
     }
     function enterChat(autoMessage){
+      restoreActiveTopic();
       updateTopbar();
       /* kontekst (razred+mod+tema/oblast): promjena = svjež razgovor; isti
          kontekst poslije reload-a = iscrtaj postojeću historiju i NE šalji
@@ -1260,6 +1363,7 @@ document.addEventListener('DOMContentLoaded', () => {
        transcript, historiju, zadnji zadatak i fazu, pa vodi na početni ekran. */
     if (newBtn) newBtn.addEventListener('click', ()=>{
       resetTutorConversation();
+      state.topic = ''; state.topicName = ''; state.topicOblast = ''; state.topicSource = ''; state.oblast = '';
       try { localStorage.removeItem(CTX_KEY); } catch(_){}
       showHome();
     });
@@ -1268,6 +1372,7 @@ document.addEventListener('DOMContentLoaded', () => {
        oblasti za explain/practice, lista oblasti za exam */
     function resetTopicOptions(){
       Object.keys(topicNames).forEach(k=>{ delete topicNames[k]; });
+      Object.keys(topicOblasti).forEach(k=>{ delete topicOblasti[k]; });
       topicSelect.innerHTML = '<option value="">— izaberi lekciju —</option>';
       oblastSelect.innerHTML = '<option value="">— izaberi oblast —</option>';
     }
@@ -1291,6 +1396,7 @@ document.addEventListener('DOMContentLoaded', () => {
           og.label = oblast;
           (grouped[oblast] || []).forEach(t=>{
             topicNames[t.topic] = t.display_name || t.topic;
+            topicOblasti[t.topic] = oblast;
             const opt = document.createElement('option');
             opt.value = t.topic;
             opt.textContent = t.display_name || t.topic;
@@ -1364,12 +1470,13 @@ document.addEventListener('DOMContentLoaded', () => {
       if (tutorBusy) return;                       // spriječi dupli submit dok traje zahtjev
       const typed = (msgBox.value || '').trim();
       const imgFile = tutorImageFile();
+      const savedTask = storedLastTask();
       let text, fromTyped = false, answerPhase = null, continuation = false;
       if (autoMessage){
         text = autoMessage;                        // auto-poruka pri ulasku u chat
       } else if (typed){
         text = typed; fromTyped = true;
-        if (interactionPhase === 'awaiting_practice_answer'){
+        if (interactionPhase === 'awaiting_practice_answer' || (savedTask && isShortPracticeAnswer(typed))){
           answerPhase = 'answering_practice_task'; // odgovor na zadatak, ne novi zahtjev
         } else if (lastTutorMessage && isFollowupMessage(typed)){
           continuation = true;                     // "može"/"nastavi" → nastavak, ne ponovno objašnjenje
@@ -1389,7 +1496,7 @@ document.addEventListener('DOMContentLoaded', () => {
         session_id: sessionId,
         grade: parseInt(state.grade, 10) || 6,
         mode: state.mode,
-        entry_source: state.topic ? 'manual_topic_choice' : 'free_chat',
+        entry_source: state.topic ? (state.topicSource || 'manual_topic_choice') : 'free_chat',
         selected_topic: state.topic,
         selected_oblast: state.topic ? state.topicOblast : (state.mode === 'exam' ? state.oblast : ''),
         student_message: text,
@@ -1398,8 +1505,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (answerPhase){                            // odgovor na practice zadatak
         payload.interaction_phase = answerPhase;
         payload.mode = 'practice';
-        try { payload.last_tutor_task = (localStorage.getItem(LASTTASK_KEY) || '').slice(0, 600); }
-        catch(_){ payload.last_tutor_task = ''; }
+        payload.last_tutor_task = savedTask.slice(0, 600);
       } else if (continuation){                    // "može"/"nastavi" → nastavi od zadnje poruke
         payload.interaction_phase = 'continuing_explanation';
         payload.last_tutor_message = lastTutorMessage.slice(0, 600);
@@ -1437,9 +1543,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const answer = (j && j.answer) ? j.answer : 'Nema odgovora.';
         appendTutorMsg('bot', renderTutorHTML(answer));
         pushTutor('assistant', answer);
+        if (j.status === 'ready') adoptResponseTopic(j);
         if (metaBox){                              // prijateljski meta red (bez sirovih id-eva)
-          const tid = j.final_topic || '';
-          const tname = topicNames[tid] || '';
+          const tid = j.effective_topic || j.final_topic || state.topic || '';
+          const tname = topicNames[tid] || (tid === state.topic ? state.topicName : '');
           const rez = MODE_LABELS[j.mode || state.mode] || '';
           metaBox.textContent = (tname && tid !== 'unknown')
             ? ('Tema: ' + tname + ' · Režim: ' + rez)
@@ -1452,10 +1559,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         /* practice stanje se ažurira tek NAKON primljenog feedbacka (zadnji
            zadatak se ne dira pri slanju odgovora) */
-        if ((state.mode === 'practice' || answerPhase) && j.status === 'ready'){
-          interactionPhase = 'awaiting_practice_answer';   // sljedeća upisana poruka = odgovor na zadatak
-          msgBox.placeholder = ANSWER_PLACEHOLDER;
-          try { localStorage.setItem(LASTTASK_KEY, (answer || '').slice(0, 600)); } catch(_){}
+        if (j.status === 'ready'){
+          if (looksLikeTutorTask(answer)){
+            setAwaitingPracticeTask(answer);       // sljedeća upisana poruka = odgovor na zadatak
+          } else if (answerPhase){
+            clearAwaitingPracticeTask();
+          }
         }
         if (j.status && j.status !== 'ready') showFallback(j.status);
       }catch(err){
