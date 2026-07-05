@@ -27,10 +27,51 @@ from matbot.prompt_builder import (
     build_tutor_prompt,
     get_topic_context,
 )
-from matbot.topic_detector import detect_topic, is_vague_message
+from matbot.topic_detector import detect_topic, fold_diacritics, is_vague_message
 from matbot.topic_lookup import get_final_topic
 
 log = logging.getLogger("matbot.ai_tutor")
+
+# --- Phase 2 (audit): slika — kada OCR NIJE dovoljan pa treba i Vision ------------
+# Mathpix vraća (text, confidence). Za geometriju/dijagrame tekst je često
+# nepotpun (labele bez figure), pa slika ide modelu ZAJEDNO sa OCR tekstom.
+OCR_CONFIDENCE_MIN = 0.75
+OCR_MIN_CHARS = 12
+
+_GEOMETRY_HINTS_RE = None  # lijeno kompajlirano u _looks_geometric
+
+
+def _looks_geometric(text: str) -> bool:
+    """Heuristika: tekst (poruka + OCR + tema) upućuje na geometriju/dijagram."""
+    global _GEOMETRY_HINTS_RE
+    if _GEOMETRY_HINTS_RE is None:
+        import re
+        _GEOMETRY_HINTS_RE = re.compile(
+            r"troug|cetveroug|cetvoroug|paralelogram|trapez|romb|kvadrat|"
+            r"pravougaonik|\bug(ao|la|lu|lovi|love|lova)\b|uglomjer|kruznic|"
+            r"\bkrug\b|precnik|poluprecnik|tetiv|tangent|simetri|vektor|"
+            r"konstrukcij|izometrij|translacij|rotacij|nacrta|skic|dijagram|"
+            r"koordinat|\bgraf|povrsin|\bobim\b|slika prikazuje|na slici"
+        )
+    return bool(_GEOMETRY_HINTS_RE.search(fold_diacritics(text)))
+
+
+def _image_needs_vision(ocr_text: str, ocr_conf: float, probe_text: str) -> bool:
+    """True ako sliku treba poslati modelu i pored OCR teksta.
+
+    - bez OCR teksta → uvijek Vision (postojeće ponašanje);
+    - nizak confidence ili prekratak tekst → OCR je vjerovatno nepotpun;
+    - geometrijski signal (poruka/OCR/tema) → figura nosi informaciju koju
+      tekst nema.
+    Čist tekstualni zadatak sa sigurnim OCR-om ostaje tekstualni (jeftinije i
+    brže — bez Visiona)."""
+    if not ocr_text:
+        return True
+    if ocr_conf < OCR_CONFIDENCE_MIN:
+        return True
+    if len(ocr_text.strip()) < OCR_MIN_CHARS:
+        return True
+    return _looks_geometric(probe_text)
 
 DEFAULT_GRADE = 6
 DEFAULT_MODEL = "gpt-5-mini"
@@ -242,6 +283,178 @@ def _fallback_answer(lookup_result: dict, mode: str, master: dict) -> str:
     )
 
 
+def _prepare_chat(
+    data: dict,
+    openai_chat: Callable,
+    master: dict | None,
+    tmap: dict | None,
+    *,
+    model: str,
+    timeout: float | None,
+    image_bytes: bytes | None,
+    image_data_url: str | None,
+    ocr_image: Callable | None,
+    vision_model: str | None,
+) -> dict:
+    """Sve PRIJE glavnog model poziva: sanitizacija, OCR, lookup teme,
+    detekcija, prompt, messages. Zajedničko za sync (handle_chat) i
+    streaming (handle_chat_stream) put — jedna logika, dva transporta."""
+    payload = dict(data or {})
+    # Default: grade -> 6 ako nije zadan; grade bira master/map i tutor prompt.
+    payload["grade"] = normalize_grade(payload.get("grade") or DEFAULT_GRADE)
+    _sanitize_payload(payload)
+
+    grade = payload["grade"]
+    master = master if master is not None else get_master(grade=grade)
+    tmap = tmap if tmap is not None else get_thinkific_map(grade=grade)
+
+    # --- Phase 6.2: slika zadatka — prvo pokušaj OCR (postojeći legacy Mathpix) --
+    has_image = bool(image_bytes or image_data_url)
+    ocr_conf = 0.0
+    if has_image and image_bytes is not None and ocr_image is not None:
+        try:
+            ocr_text, ocr_conf = ocr_image(image_bytes)
+        except Exception:
+            ocr_text, ocr_conf = None, 0.0
+        if ocr_text:
+            payload["image_ocr_text"] = normalize_value(ocr_text)[:MAX_MESSAGE_CHARS]
+
+    lookup_result = get_final_topic(payload, master, tmap)
+
+    # --- Phase 7: kontrolni za CIJELU OBLAST (selected_oblast bez teme) ---------
+    exam_oblast_prompt = None
+    if lookup_result["status"] == "unknown":
+        exam_oblast_prompt = build_exam_oblast_prompt(payload, master)
+
+    # --- Phase 6: free_chat detekcija teme (heuristike → LLM klasifikator) -------
+    general_answer = False
+    if exam_oblast_prompt is None and lookup_result["status"] == "unknown":
+        student_msg = normalize_value(
+            payload.get("student_message") or payload.get("message")
+        )
+        ocr_text = normalize_value(payload.get("image_ocr_text"))
+        phase = normalize_value(payload.get("interaction_phase")).lower()
+        last_task = normalize_value(payload.get("last_tutor_task"))
+        is_practice_followup = phase == "answering_practice_task"
+        combined_parts = (student_msg, ocr_text)
+        if is_practice_followup and last_task:
+            combined_parts = (last_task, student_msg, ocr_text)
+        combined = " ".join(x for x in combined_parts if x)
+        is_continuation = phase == "continuing_explanation"
+        if is_continuation and combined:
+            general_answer = True
+        elif combined and (has_image or not is_vague_message(combined)):
+            detection = detect_topic(
+                combined, master, tmap,
+                openai_chat=openai_chat, model=model, timeout=timeout,
+            )
+            if detection["detected_topic"] != "unknown":
+                payload["detected_topic"] = detection["detected_topic"]
+                lookup_result = get_final_topic(payload, master, tmap)
+            else:
+                general_answer = True
+        elif has_image and not combined:
+            general_answer = True
+
+    if exam_oblast_prompt is not None:
+        prompt_result = exam_oblast_prompt
+    elif general_answer:
+        prompt_result = build_general_tutor_prompt(payload)
+    else:
+        prompt_result = build_tutor_prompt(payload, lookup_result, master, tmap)
+
+    mode = prompt_result["mode"]
+    status = prompt_result["status"]
+    effective_topic = prompt_result.get("effective_topic") or prompt_result.get(
+        "final_topic", "unknown"
+    )
+    topic_context = get_topic_context(effective_topic, master)
+
+    messages = None
+    use_model = model
+    if status == "ready":
+        # Phase 2 (audit): slika ide modelu kad OCR NIJE dovoljan — bez OCR-a,
+        # nizak confidence, prekratak tekst ILI geometrijski/dijagramski signal.
+        # Siguran čisto-tekstualni OCR ostaje tekstualni (brže i jeftinije).
+        ocr_text_norm = normalize_value(payload.get("image_ocr_text"))
+        if image_data_url:
+            probe = " ".join(x for x in (
+                normalize_value(payload.get("student_message") or payload.get("message")),
+                ocr_text_norm,
+                topic_context.get("display_name", ""),
+                topic_context.get("oblast", ""),
+                normalize_value(effective_topic),
+            ) if x)
+            send_image = _image_needs_vision(ocr_text_norm, ocr_conf, probe)
+        else:
+            send_image = False
+
+        if send_image:
+            user_content: Any = [
+                {"type": "text", "text": prompt_result["user_prompt"]},
+                {"type": "image_url", "image_url": {"url": image_data_url}},
+            ]
+            use_model = vision_model or model
+        else:
+            user_content = prompt_result["user_prompt"]
+            use_model = model
+        # Phase 2: historija kao PRAVE role poruke (system → history → user).
+        messages = [{"role": "system", "content": prompt_result["system_prompt"]}]
+        messages.extend(prompt_result.get("history_messages") or [])
+        messages.append({"role": "user", "content": user_content})
+
+    return {
+        "payload": payload,
+        "master": master,
+        "lookup_result": lookup_result,
+        "prompt_result": prompt_result,
+        "mode": mode,
+        "status": status,
+        "effective_topic": effective_topic,
+        "topic_context": topic_context,
+        "messages": messages,
+        "use_model": use_model,
+    }
+
+
+def _finalize_response(prep: dict, answer: str) -> dict:
+    """Sastavi response dict + activity log (zajedničko za oba puta)."""
+    payload = prep["payload"]
+    prompt_result = prep["prompt_result"]
+    mode, status = prep["mode"], prep["status"]
+
+    entry_source_used = normalize_value(payload.get("entry_source")) or normalize_value(
+        prep["lookup_result"].get("source")
+    )
+    parent_report_signal = (
+        "needs_work"
+        if (mode in ("practice", "exam") or status == "fallback")
+        else "neutral"
+    )
+
+    response = {
+        "answer": answer,
+        "final_topic": prompt_result.get("final_topic", "unknown"),
+        "opened_lesson_topic": prompt_result.get("opened_lesson_topic", "unknown"),
+        "effective_topic": prep["effective_topic"],
+        "entry_source_used": entry_source_used,
+        "topic_conflict": bool(prompt_result.get("topic_conflict", False)),
+        "recommended_mode": _RECOMMENDED_MODE.get(mode, "practice"),
+        "recommend_video": bool(prep["topic_context"].get("when_to_recommend_video")),
+        "parent_report_signal": parent_report_signal,
+        "status": status,
+        "mode": mode,
+    }
+
+    # Phase 5: minimalni activity log — greška NIKAD ne ruši tutor odgovor.
+    try:
+        log_student_activity(payload, response)
+    except Exception:
+        pass
+
+    return response
+
+
 def handle_chat(
     data: dict,
     openai_chat: Callable,
@@ -259,143 +472,89 @@ def handle_chat(
 
     ``openai_chat`` mora imati potpis ``(model, messages, timeout=...)`` i vratiti
     objekt sa ``choices[0].message.content`` (tj. postojeći ``app._openai_chat``).
-
-    Phase 6.2 — slika zadatka: ``ocr_image`` je postojeći legacy OCR
-    (``app.mathpix_ocr_to_text``, injektovan — ništa se ne piše iznova). Ako OCR
-    da tekst, ide normalan tekstualni put (detekcija teme + topic prompt). Ako ne,
-    slika ide Vision modelu (``image_data_url``) uz isti modularni system prompt.
     """
-    payload = dict(data or {})
-    # Default: grade -> 6 ako nije zadan; grade bira master/map i base prompt.
-    payload["grade"] = normalize_grade(payload.get("grade") or DEFAULT_GRADE)
-    _sanitize_payload(payload)
+    prep = _prepare_chat(
+        data, openai_chat, master, tmap,
+        model=model, timeout=timeout,
+        image_bytes=image_bytes, image_data_url=image_data_url,
+        ocr_image=ocr_image, vision_model=vision_model,
+    )
 
-    grade = payload["grade"]
-    master = master if master is not None else get_master(grade=grade)
-    tmap = tmap if tmap is not None else get_thinkific_map(grade=grade)
-
-    # --- Phase 6.2: slika zadatka — prvo pokušaj OCR (postojeći legacy Mathpix) --
-    has_image = bool(image_bytes or image_data_url)
-    if has_image and image_bytes is not None and ocr_image is not None:
-        try:
-            ocr_text, _conf = ocr_image(image_bytes)
-        except Exception:
-            ocr_text = None
-        if ocr_text:
-            payload["image_ocr_text"] = normalize_value(ocr_text)[:MAX_MESSAGE_CHARS]
-
-    lookup_result = get_final_topic(payload, master, tmap)
-
-    # --- Phase 7: kontrolni za CIJELU OBLAST (selected_oblast bez teme) ---------
-    # Ima prednost nad free_chat detekcijom: auto-poruka "Sutra imam kontrolni..."
-    # ne smije pokrenuti LLM klasifikator teme. None ako uslovi nisu ispunjeni
-    # (nevalidna oblast pada na postojeći exam fallback koji pita oblast).
-    exam_oblast_prompt = None
-    if lookup_result["status"] == "unknown":
-        exam_oblast_prompt = build_exam_oblast_prompt(payload, master)
-
-    # --- Phase 6: free_chat detekcija teme -------------------------------------
-    # Tema je opcionalna: ako lookup ne nađe ništa, a poruka (ili OCR teksta
-    # slike) je KONKRETNA, pokušaj detekciju (heuristike → LLM klasifikator).
-    # Detektovana tema se validira kroz get_final_topic (nikad se ne izmišlja).
-    general_answer = False
-    if exam_oblast_prompt is None and lookup_result["status"] == "unknown":
-        student_msg = normalize_value(
-            payload.get("student_message") or payload.get("message")
+    if prep["status"] == "ready":
+        answer = _call_model_with_retry(
+            openai_chat, prep["use_model"], prep["messages"], timeout, prep["mode"]
         )
-        ocr_text = normalize_value(payload.get("image_ocr_text"))
-        phase = normalize_value(payload.get("interaction_phase")).lower()
-        last_task = normalize_value(payload.get("last_tutor_task"))
-        is_practice_followup = phase == "answering_practice_task"
-        combined_parts = (student_msg, ocr_text)
-        if is_practice_followup and last_task:
-            combined_parts = (last_task, student_msg, ocr_text)
-        combined = " ".join(x for x in combined_parts if x)
-        # Phase 7.2: kratka potvrda ("može", "nastavi") kao nastavak razgovora —
-        # nikad fallback i nikad LLM klasifikator teme; opći prompt + historija.
-        is_continuation = phase == "continuing_explanation"
-        if is_continuation and combined:
-            general_answer = True
-        elif combined and (has_image or not is_vague_message(combined)):
-            detection = detect_topic(
-                combined, master, tmap,
-                openai_chat=openai_chat, model=model, timeout=timeout,
-            )
-            if detection["detected_topic"] != "unknown":
-                payload["detected_topic"] = detection["detected_topic"]
-                lookup_result = get_final_topic(payload, master, tmap)
-            else:
-                # konkretno pitanje bez prepoznate teme → odgovori bez topic
-                # konteksta (final_topic ostaje "unknown", ništa se ne izmišlja)
-                general_answer = True
-        elif has_image and not combined:
-            # slika bez teksta i bez OCR-a → Vision odgovor bez teme
-            general_answer = True
-
-    if exam_oblast_prompt is not None:
-        prompt_result = exam_oblast_prompt
-    elif general_answer:
-        prompt_result = build_general_tutor_prompt(payload)
-    else:
-        prompt_result = build_tutor_prompt(payload, lookup_result, master, tmap)
-
-    mode = prompt_result["mode"]          # već normalizovan (explain|practice|exam|quick)
-    status = prompt_result["status"]      # ready|fallback|ambiguous|invalid
-
-    if status == "ready":
-        # Slika bez uspješnog OCR-a → multimodalna poruka Vision modelu; inače
-        # čisti tekst (OCR tekst je već u user_promptu kroz _build_student_block).
-        if image_data_url and not normalize_value(payload.get("image_ocr_text")):
-            user_content: Any = [
-                {"type": "text", "text": prompt_result["user_prompt"]},
-                {"type": "image_url", "image_url": {"url": image_data_url}},
-            ]
-            use_model = vision_model or model
-        else:
-            user_content = prompt_result["user_prompt"]
-            use_model = model
-        messages = [
-            {"role": "system", "content": prompt_result["system_prompt"]},
-            {"role": "user", "content": user_content},
-        ]
-        answer = _call_model_with_retry(openai_chat, use_model, messages, timeout, mode)
     else:
         # fallback/ambiguous/invalid → NE zovi OpenAI (deterministički bosanski tekst)
-        answer = _fallback_answer(lookup_result, mode, master)
+        answer = _fallback_answer(prep["lookup_result"], prep["mode"], prep["master"])
 
-    effective_topic = prompt_result.get("effective_topic") or prompt_result.get(
-        "final_topic", "unknown"
+    return _finalize_response(prep, answer)
+
+
+# Student-facing poruka kada se stream prekine prije prvog teksta.
+_STREAM_ERROR_ANSWER = (
+    "Došlo je do greške u toku odgovora. Pokušaj ponovo za koji trenutak."
+)
+
+
+def handle_chat_stream(
+    data: dict,
+    openai_chat: Callable,
+    openai_chat_stream: Callable,
+    master: dict | None = None,
+    tmap: dict | None = None,
+    *,
+    model: str = DEFAULT_MODEL,
+    timeout: float | None = None,
+    vision_model: str | None = None,
+):
+    """Phase 2 (audit) — streaming varijanta handle_chat-a (generator događaja).
+
+    Yield-a dictove transport-agnostički (Flask ruta ih serializuje u SSE):
+      {"event": "delta", "data": {"delta": str}}   — komad teksta
+      {"event": "done",  "data": {...}}            — puni response dict (kao handle_chat)
+      {"event": "error", "data": {"detail": str}}  — greška prije ijednog teksta
+
+    ``openai_chat`` služi za NE-streaming pomoćne pozive (LLM klasifikator teme);
+    ``openai_chat_stream(model, messages, timeout=, max_tokens=)`` je generator
+    tekst-delti. Slike NISU podržane u streaming putu (idu na non-streaming
+    endpoint) — v1 ograničenje, dokumentovano.
+
+    Napomena: retry-na-prazan-odgovor iz sync puta ovdje NE postoji (deltas su
+    već poslani klijentu); prazan stream vraća prijateljsku poruku u done.
+    """
+    prep = _prepare_chat(
+        data, openai_chat, master, tmap,
+        model=model, timeout=timeout,
+        image_bytes=None, image_data_url=None,
+        ocr_image=None, vision_model=vision_model,
     )
-    topic_context = get_topic_context(effective_topic, master)
 
-    entry_source_used = normalize_value(payload.get("entry_source")) or normalize_value(
-        lookup_result.get("source")
-    )
-    parent_report_signal = (
-        "needs_work"
-        if (mode in ("practice", "exam") or status == "fallback")
-        else "neutral"
-    )
+    if prep["status"] != "ready":
+        answer = _fallback_answer(prep["lookup_result"], prep["mode"], prep["master"])
+        yield {"event": "done", "data": _finalize_response(prep, answer)}
+        return
 
-    response = {
-        "answer": answer,
-        "final_topic": prompt_result.get("final_topic", "unknown"),
-        "opened_lesson_topic": prompt_result.get("opened_lesson_topic", "unknown"),
-        "effective_topic": effective_topic,
-        "entry_source_used": entry_source_used,
-        "topic_conflict": bool(prompt_result.get("topic_conflict", False)),
-        "recommended_mode": _RECOMMENDED_MODE.get(mode, "practice"),
-        "recommend_video": bool(topic_context.get("when_to_recommend_video")),
-        "parent_report_signal": parent_report_signal,
-        "status": status,
-        "mode": mode,
-    }
-
-    # Phase 5: minimalni activity log (samo metapodaci — bez poruka/odgovora).
-    # Greška u logovanju NIKAD ne smije srušiti tutor odgovor.
+    assembled: list[str] = []
     try:
-        log_student_activity(payload, response)
+        for delta in openai_chat_stream(
+            prep["use_model"], prep["messages"],
+            timeout=timeout, max_tokens=_MAX_TOKENS.get(prep["mode"], 700),
+        ):
+            if delta:
+                assembled.append(delta)
+                yield {"event": "delta", "data": {"delta": delta}}
     except Exception:
-        pass
+        log.exception("ai_tutor stream: prekid toka (mode=%s)", prep["mode"])
+        if not assembled:
+            yield {"event": "error", "data": {"detail": _STREAM_ERROR_ANSWER}}
+            return
+        # djelimičan odgovor je stigao — završi sa onim što imamo
 
-    return response
+    answer = "".join(assembled).strip()
+    if not answer:
+        log.warning("ai_tutor stream: prazan odgovor (mode=%s)", prep["mode"])
+        answer = _EMPTY_ANSWER_FALLBACK
+        yield {"event": "delta", "data": {"delta": answer}}
+
+    yield {"event": "done", "data": _finalize_response(prep, answer)}

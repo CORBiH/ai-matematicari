@@ -3,10 +3,11 @@ FROM python:3.11-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-# OS paketi potrebni za build (psycopg2, Pillow, itd.)
+# Phase 2 (audit): build-essential + libpq-dev uklonjeni — trebali su samo za
+# psycopg2/matplotlib koji više nisu u requirements.txt (sve preostale
+# zavisnosti imaju gotove wheel-ove za py3.11). curl ostaje za healthcheck.
+# Rollback: vrati build-essential/libpq-dev ako se psycopg2 ikad vrati.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      build-essential \
-      libpq-dev \
       curl \
   && rm -rf /var/lib/apt/lists/*
 

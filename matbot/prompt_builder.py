@@ -24,9 +24,9 @@ Rezultat (``build_tutor_prompt`` / ``build_fallback_prompt``)::
       "topic_conflict": bool,
     }
 
-Base tutor ponašanje se preuzima iz ``prompts.build_system_prompt`` (lijeno,
-bez diranja app.py/prompts.py). Ako import nije moguć ili se potpis promijeni,
-koristi se mali fallback base prompt (``_BASE_FALLBACK_SYSTEM_PROMPT``).
+Phase 2 (audit): system prompt za tutor putanju dolazi ISKLJUČIVO iz
+``matbot.tutor_prompts`` (novi, razred-uslovni stack bez legacy baze iz
+``prompts.py``). Legacy ``/submit`` i dalje koristi ``prompts.py`` — netaknuto.
 """
 from __future__ import annotations
 
@@ -34,6 +34,13 @@ import re
 from typing import Any
 
 from matbot.content_loader import normalize_value
+from matbot.tutor_prompts import (
+    CHAT_FORMATTING_GUIDELINES,
+    GLOBAL_MODULAR_GUIDELINES,
+    LANGUAGE_TONE_GUIDELINES,
+    build_tutor_system_prompt,
+)
+from matbot.tutor_prompts import global_modular_guidelines as _global_modular_guidelines
 
 # --- Modovi ---------------------------------------------------------------------
 VALID_MODES = ("explain", "practice", "exam", "quick")
@@ -77,94 +84,9 @@ TOPIC_CONTEXT_FIELDS = (
 )
 _TOPIC_META_FIELDS = ("grade", "oblast", "display_name", "topic_type", "difficulty_level")
 
-# --- Globalne modularne smjernice (tekst ponašanja, ne podaci) ------------------
-GLOBAL_MODULAR_GUIDELINES = (
-    "==================================================\n"
-    "MODULARNA PRAVILA (6. RAZRED — BiH)\n"
-    "==================================================\n"
-    "- Ti si AI tutor za 6. razred osnovne škole u Bosni i Hercegovini.\n"
-    "- Odgovaraj KRATKO, jasno i školski, primjereno uzrastu 6. razreda.\n"
-    "- 6. razred je BIBLIOTEKA tema (modularni model). NE postoji jedan univerzalni\n"
-    "  redoslijed gradiva za sve škole, kantone ili entitete.\n"
-    "- NIKADA ne tvrdi da učenik 'kasni' s gradivom, niti da je neka tema obavezna\n"
-    "  za svaku školu ili da se mora raditi određenim redom.\n"
-    "- NE izmišljaj teme. Radi ISKLJUČIVO sa temom (final_topic) koju ti sistem da.\n"
-    "  Ako teme nema, zamoli učenika da izabere oblast ili pošalje zadatak.\n"
-    "- Koristi SAMO pedagoški sadržaj dat u ovom promptu (iz mastera).\n"
-    "- NE komentariši teme koje učenik nije radio i NE pravi dugoročnu memoriju.\n"
-    "- Ako je zadatak sa slike/teksta nejasan, traži jasniju sliku ili prepisan\n"
-    "  tekst; ne izmišljaj podatke.\n"
-)
-
-
-def _global_modular_guidelines(grade: Any) -> str:
-    g = normalize_value(grade) or "6"
-    text = GLOBAL_MODULAR_GUIDELINES
-    if g == "6":
-        return text
-    return (
-        text.replace("MODULARNA PRAVILA (6. RAZRED", f"MODULARNA PRAVILA ({g}. RAZRED")
-        .replace("za 6. razred", f"za {g}. razred")
-        .replace("uzrastu 6. razreda", f"uzrastu {g}. razreda")
-        .replace("- 6. razred je BIBLIOTEKA", f"- {g}. razred je BIBLIOTEKA")
-    )
-
-# --- Jezik i ton tutora (Phase 1 quick-win iz audita) -----------------------------
-# Bazni prompt je gust na zabranama; ovaj blok eksplicitno definiše jezik i topao
-# ton tutora. Ide u SVE modularne system prompte (ready/general/exam-oblast/fallback).
-LANGUAGE_TONE_GUIDELINES = (
-    "==================================================\n"
-    "JEZIK I TON (TUTOR)\n"
-    "==================================================\n"
-    "- Odgovaraj ISKLJUČIVO na bosanskom jeziku (ijekavica).\n"
-    "- Obraćaj se učeniku sa \"ti\", toplo, strpljivo i ohrabrujuće — kao "
-    "omiljeni nastavnik, ne kao robot.\n"
-    "- Pohvali trud i svaki tačan korak. Kad učenik pogriješi, blago ispravi "
-    "bez kritike: prvo reci šta je dobro, pa gdje je zapelo.\n"
-    "- Izbjegavaj ponavljanje istih fraza iz poruke u poruku; zvuči prirodno "
-    "i razgovorno.\n"
-    "- Objašnjavaj jednostavno, primjereno učeniku osnovne škole; svaki "
-    "stručni pojam odmah objasni običnim riječima.\n"
-    "- Budi KRATAK: 3–6 rečenica ili do 5 koraka. Detaljno objašnjavaj samo "
-    "ako učenik to izričito zatraži.\n"
-    "- Odgovor završi kratkim pitanjem ili prijedlogom sljedećeg koraka "
-    "(npr. \"Hoćeš da probamo jedan zadatak?\").\n"
-)
-
-# --- Format odgovora za chat (Phase 7.1) -----------------------------------------
-# Ide POSLIJE baznog prompta: bazna matematička pravila (npr. $$...$$ za "pravu
-# matematiku") ostaju, ali se za chat UI preciziraju — sitni izrazi inline, display
-# blokovi samo za važan višekoračni račun, bez sirovih markdown naslova.
-CHAT_FORMATTING_GUIDELINES = (
-    "==================================================\n"
-    "FORMAT ODGOVORA (CHAT)\n"
-    "==================================================\n"
-    "- Ova pravila za chat imaju PREDNOST nad ranijim pravilima vizuelnog "
-    "zapisa: u chatu NE važi \"svaki izraz u $$...$$\" niti \"svaki korak u "
-    "novi red sa praznim redom\".\n"
-    "- Odgovaraj KOMPAKTNO i prirodno za chat: kratki pasusi, bez suvišnih "
-    "praznih redova.\n"
-    "- NE lomi običnu rečenicu na više redova i NE stavljaj svaku malu formulu "
-    "ili simbol u poseban red.\n"
-    "- Kratke izraze piši INLINE matematikom \\( ... \\) unutar rečenice, "
-    "npr. \\(12 : 6 = 2\\).\n"
-    "- Display matematiku $$...$$ koristi SAMO za važan višekoračni račun — "
-    "nikad za sitne izraze ili pojedinačne simbole.\n"
-    "- NE koristi sirove markdown naslove (###, ##). Koristi kratke oznake u "
-    "redu: \"Ideja:\", \"Primjer:\", \"Koraci:\", \"Zaključak:\".\n"
-    "- Numerisane liste piši 1., 2., 3. — NE počinji svaku stavku ponovo sa \"1.\".\n"
-    "- DJELJIVOST: izbjegavaj izolovan zapis poput 6|12 ili 6|(12+18) u posebnom "
-    "redu. Piši školskim rečenicama: \"6 dijeli 12, jer je 12 : 6 = 2.\" "
-    "\"6 dijeli 18, jer je 18 : 6 = 3.\" \"Zato 6 dijeli i zbir 12 + 18 = 30, "
-    "jer je 30 : 6 = 5.\" Ako koristiš notaciju djeljivosti, piši je inline kao "
-    "\\(6 \\mid 12\\) i ne prekidaj rečenicu oko simbola djeljivosti.\n"
-)
-
-_BASE_FALLBACK_SYSTEM_PROMPT = (
-    "TI SI:\n"
-    "Asistent za matematiku za osnovnu školu u Bosni i Hercegovini (6. razred).\n"
-    "Odgovaraj isključivo na matematička pitanja, školskim stilom, korak po korak.\n"
-)
+# NAPOMENA (Phase 2): GLOBAL_MODULAR_GUIDELINES, LANGUAGE_TONE_GUIDELINES i
+# CHAT_FORMATTING_GUIDELINES sada žive u matbot.tutor_prompts (jedan izvor
+# system-prompt teksta); ovdje su re-importovani radi kompatibilnosti.
 
 # statusi
 _STATUS_READY = "ready"
@@ -173,38 +95,21 @@ _FALLBACK_STATUS = {"unknown": "fallback", "ambiguous": "ambiguous", "invalid": 
 
 # --- Male pomoćne funkcije ------------------------------------------------------
 
-def _base_system_prompt(grade: Any) -> str:
-    """Base tutor prompt iz prompts.py (lijeno, bez side-efekata). Fallback ako
-    import nije moguć ili se potpis razlikuje."""
-    g = normalize_value(grade) or "6"
-    try:
-        from prompts import build_system_prompt  # čista funkcija, bez IO/Flask-a
-        text = build_system_prompt(g)
-        if isinstance(text, str) and text.strip():
-            return text
-    except Exception:
-        pass
-    return _BASE_FALLBACK_SYSTEM_PROMPT
-
-
 def _collect(ctx: dict, keys: tuple[str, ...]) -> list[str]:
     return [ctx.get(k, "") for k in keys if ctx.get(k)]
 
 
-def _compose_system_prompt(grade: Any, extra: list[str] | None = None) -> str:
-    """Jedinstvena tačka sastavljanja system prompta za SVE modularne putanje:
-    baza (prompts.py) → modularna pravila → jezik/ton → chat format (+ ``extra``,
-    npr. forbidden_ai_behavior). Redoslijed je bitan: kasniji blokovi preciziraju
-    ranije."""
-    parts = [
-        _base_system_prompt(grade),
-        _global_modular_guidelines(grade),
-        LANGUAGE_TONE_GUIDELINES,
-        CHAT_FORMATTING_GUIDELINES,
-    ]
-    if extra:
-        parts.extend(extra)
-    return "\n\n".join(p for p in parts if p).strip()
+def _compose_system_prompt(
+    grade: Any,
+    extra: list[str] | None = None,
+    topic_context: dict | None = None,
+) -> str:
+    """Jedinstvena tačka sastavljanja system prompta za SVE modularne putanje.
+
+    Phase 2 (audit): delegira na ``tutor_prompts.build_tutor_system_prompt``
+    (razred-uslovni stack, bez legacy baze; konstrukcijska pravila ulaze samo
+    kada ih tema traži — ``topic_context``)."""
+    return build_tutor_system_prompt(grade, topic_context=topic_context, extra=extra)
 
 
 # --- Javne pomoćne funkcije -----------------------------------------------------
@@ -557,22 +462,31 @@ def _build_student_block(payload: dict) -> str:
     return "\n\n".join(parts)
 
 
-def _build_history_block(history: Any) -> str:
-    trimmed = trim_conversation_history(history)
-    if not trimmed:
-        return ""
-    lines = ["ZADNJE PORUKE (max 5):"]
-    for msg in trimmed:
+_ASSISTANT_ROLES = {"assistant", "bot", "tutor", "ai"}
+
+
+def build_history_messages(history: Any) -> list[dict]:
+    """Phase 2 (audit) — historija kao PRAVE chat poruke umjesto teksta u user
+    promptu. Modeli znatno bolje prate tok dijaloga kroz role poruke.
+
+    Vraća listu ``{"role": "user"|"assistant", "content": str}`` (zadnjih 5,
+    prazno/nevalidno se preskače). Nepoznate role se tretiraju kao user."""
+    messages: list[dict] = []
+    for msg in trim_conversation_history(history):
         if isinstance(msg, dict):
-            role = normalize_value(msg.get("role")) or "user"
+            role = normalize_value(msg.get("role")).lower() or "user"
             content = normalize_value(
                 msg.get("content") or msg.get("text") or msg.get("message")
             )
         else:
             role, content = "user", normalize_value(msg)
-        if content:
-            lines.append(f"- {role}: {content}")
-    return "\n".join(lines) if len(lines) > 1 else ""
+        if not content:
+            continue
+        messages.append({
+            "role": "assistant" if role in _ASSISTANT_ROLES else "user",
+            "content": content,
+        })
+    return messages
 
 
 # --- Glavni builderi ------------------------------------------------------------
@@ -630,7 +544,9 @@ def build_tutor_prompt(
         if forbidden
         else None
     )
-    system_prompt = _compose_system_prompt(payload.get("grade"), extra)
+    system_prompt = _compose_system_prompt(
+        payload.get("grade"), extra, topic_context=topic_context
+    )
 
     # --- user prompt ---
     user_parts = [_build_entry_context(payload, effective_topic, mode)]
@@ -653,7 +569,6 @@ def build_tutor_prompt(
         _build_video_flow_block(video_flow),
         mode_block,
         _build_student_block(payload),
-        _build_history_block(payload.get("conversation_history")),
     ):
         if block:
             user_parts.append(block)
@@ -662,6 +577,8 @@ def build_tutor_prompt(
     return {
         "system_prompt": system_prompt,
         "user_prompt": user_prompt,
+        # Phase 2: historija ide kao PRAVE role poruke (system → history → user)
+        "history_messages": build_history_messages(payload.get("conversation_history")),
         "mode": mode,
         "final_topic": effective_topic,
         "opened_lesson_topic": lesson_topic,
@@ -703,13 +620,13 @@ def build_general_tutor_prompt(payload: dict) -> dict:
         "- NE izmišljaj temu i ne spominji internu listu tema.",
         mode_block,
         _build_student_block(payload),
-        _build_history_block(payload.get("conversation_history")),
     ]
     user_prompt = "\n\n".join(p for p in user_parts if p).strip()
 
     return {
         "system_prompt": system_prompt,
         "user_prompt": user_prompt,
+        "history_messages": build_history_messages(payload.get("conversation_history")),
         "mode": mode,
         "final_topic": "unknown",
         "opened_lesson_topic": "unknown",
@@ -746,7 +663,11 @@ def build_exam_oblast_prompt(payload: dict, master_content: dict) -> dict | None
         return None
     canonical = normalize_value(rows[0].get("oblast")) or oblast
 
-    system_prompt = _compose_system_prompt(payload.get("grade"))
+    # oblast (npr. "Osnovne geometrijske konstrukcije...") može tražiti
+    # konstrukcijski blok i bez pojedinačne teme
+    system_prompt = _compose_system_prompt(
+        payload.get("grade"), topic_context={"oblast": canonical}
+    )
 
     lines = [
         f"OBLAST KONTROLNOG: {canonical}",
@@ -788,13 +709,13 @@ def build_exam_oblast_prompt(payload: dict, master_content: dict) -> dict | None
         oblast_block,
         mode_block,
         _build_student_block(payload),
-        _build_history_block(payload.get("conversation_history")),
     ]
     user_prompt = "\n\n".join(p for p in user_parts if p).strip()
 
     return {
         "system_prompt": system_prompt,
         "user_prompt": user_prompt,
+        "history_messages": build_history_messages(payload.get("conversation_history")),
         "mode": "exam",
         "final_topic": "unknown",
         "opened_lesson_topic": "unknown",
@@ -850,6 +771,7 @@ def build_fallback_prompt(payload: dict, reason: Any) -> dict:
     return {
         "system_prompt": system_prompt,
         "user_prompt": user_prompt,
+        "history_messages": [],   # ne-ready ne zove model; ključ postoji radi oblika
         "mode": mode,
         "final_topic": "unknown",
         "opened_lesson_topic": "unknown",

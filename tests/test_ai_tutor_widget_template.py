@@ -188,7 +188,8 @@ def test_nova_konverzacija_clears_everything(client):
     assert "localStorage.removeItem(LASTTASK_KEY)" in rsnippet
     assert "interactionPhase = null" in rsnippet
     assert "lastTutorMessage = ''" in rsnippet
-    assert "querySelectorAll('.tmsg')" in rsnippet          # briše i vidljivi transcript
+    assert "querySelectorAll('.tmsg, .tutor-video-hint')" in rsnippet  # briše transcript + hintove
+    assert "hideChips()" in rsnippet                        # i quick-reply chips
 
 
 def test_history_scoped_by_context(client):
@@ -513,3 +514,58 @@ def test_answer_send_does_not_clear_last_task_upfront(client):
     snippet = html[idx:idx + 400]
     assert "localStorage.removeItem" not in snippet
     assert "payload.last_tutor_task = savedTask.slice(0, 600)" in snippet
+
+
+# --- Phase 2: streaming + chips + video hint + token -----------------------------
+
+def test_streaming_client_present_with_json_fallback(client):
+    """SSE klijent postoji; pad streama pada nazad na non-streaming JSON put."""
+    html = _html(client)
+    assert "/api/ai-tutor/chat/stream" in html
+    assert "function streamTutorRequest(payload, ac)" in html
+    assert "text/event-stream" in html
+    assert "r.body.getReader()" in html
+    # fallback grana: bez streama → jsonTutorRequest
+    assert "jsonTutorRequest(payload, ac, imgFile)" in html
+    # MathJax se tipografiše TEK na kraju (finalni render jednom, ne po tokenu)
+    idx = html.index("function streamTutorRequest")
+    snippet = html[idx:html.index("function applyTutorResponse")]
+    assert snippet.count("MathJax.typesetPromise([made.bubble])") == 1
+    assert "made.bubble.textContent = acc" in snippet       # progresivni tekst bez HTML-a
+
+
+def test_streaming_not_used_for_images(client):
+    html = _html(client)
+    idx = html.index("if (!imgFile){")
+    snippet = html[idx:idx + 400]
+    assert "streamTutorRequest" in snippet                  # stream SAMO bez slike
+
+
+def test_quick_reply_chips_present(client):
+    html = _html(client)
+    block = _tutor_block(html)
+    assert 'id="tutorChips"' in block
+    assert "function chipDefs(j)" in html
+    assert "function renderChips(j)" in html
+    # dječiji, korisni chipovi
+    for label in ("Daj mi zadatak", "Objasni jednostavnije", "Još jedan primjer",
+                  "Ne znam — daj mi hint", "Objasni postupak"):
+        assert label in html, label
+    # chip ide kroz NORMALNI typed tok (poštuje practice/followup logiku)
+    assert "msgBox.value = c.msg;" in html
+
+
+def test_video_hint_present_and_guarded(client):
+    html = _html(client)
+    assert "function maybeVideoHint(j)" in html
+    assert "recommend_video" in html
+    assert "Možda ti pomogne da prvo pogledaš video lekciju" in html
+    assert "videoHintShown.has(tid)" in html                # samo JEDNOM po temi
+    assert "tid === 'unknown'" in html                      # bez izmišljenih preporuka
+
+
+def test_embed_token_meta_and_header(client):
+    html = _html(client)
+    assert 'name="matbot-embed-token"' in html
+    assert "function tutorHeaders(extra)" in html
+    assert "h['X-Tutor-Token'] = EMBED_TOKEN" in html

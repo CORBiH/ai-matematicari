@@ -4,6 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>MAT-BOT</title>
+  <!-- Phase 2: potpisani kratkotrajni token za /api/ai-tutor/* (server ga ugrađuje;
+       prazan kada AI_TUTOR_EMBED_SECRET nije postavljen ili u LOCAL_MODE) -->
+  <meta name="matbot-embed-token" content="{{ embed_token or '' }}">
 
   <script>
     MathJax = { tex: { inlineMath: [["$", "$"], ["\\(", "\\)"]] }, svg: { fontCache: "global" } };
@@ -249,6 +252,19 @@
   .tutor-chip{margin:0 0 .45rem;flex:0 0 auto;}
   #tutorMeta{font-size:.82rem;margin-top:.35rem;min-height:1rem;flex:0 0 auto;}
 
+  /* Phase 2: quick-reply chips ispod razgovora (velike, tapabilne, dječije) */
+  .tutor-chips{display:flex;flex-wrap:wrap;gap:.4rem;margin:.1rem 0 .45rem;flex:0 0 auto;}
+  .tutor-chips[hidden]{display:none;}
+  .chip-btn{background:#12211c;border:1px solid rgba(86,200,143,.35);color:#d8efe7;
+    border-radius:999px;padding:.42rem .75rem;font-size:.88rem;font-weight:600;cursor:pointer;
+    transition:border-color .15s ease,background .15s ease,transform .05s ease;}
+  .chip-btn:hover{border-color:var(--accent-bot);background:#16281f;}
+  .chip-btn:active{transform:translateY(1px);}
+
+  /* Phase 2: mala preporuka video lekcije unutar transcripta */
+  .tutor-video-hint{align-self:flex-start;color:var(--muted);font-size:.85rem;
+    padding:.15rem .35rem;max-width:94%;}
+
   /* napredni (legacy) dio — sekundarno, sklopljeno u podnožju tutor kartice */
   .tutor-advanced{margin-top:1rem;border-top:1px dashed var(--card-border);padding-top:.6rem;}
   .tutor-advanced summary{cursor:pointer;font-weight:600;font-size:.95rem;color:var(--muted);}
@@ -420,6 +436,9 @@
         <div id="tutorEmptyState" class="tutor-empty muted">Upiši zadatak ili pitanje, ili dodaj sliku preko +.</div>
         <div id="tutorTyping" class="tutor-typing hidden">🤖 Tutor razmišlja<span class="dots"></span></div>
       </div>
+
+      <!-- Phase 2: brzi odgovori (chips) — pune se iz JS-a prema zadnjem odgovoru -->
+      <div id="tutorChips" class="tutor-chips" hidden></div>
 
       <span id="tutorImageChip" class="file-chip tutor-chip"><span id="tutorImageName">Nije odabrana slika</span><button type="button" class="remove" id="tutorImageRemove" title="Ukloni sliku">×</button></span>
 
@@ -968,6 +987,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const tutorImgChip = document.getElementById('tutorImageChip');
     const tutorImgName = document.getElementById('tutorImageName');
     const tutorImgRemove = document.getElementById('tutorImageRemove');
+    const chipsBox = document.getElementById('tutorChips');
+
+    /* Phase 2: potpisani token iz <meta> — šalje se u headeru na tutor API */
+    const EMBED_TOKEN = (document.querySelector('meta[name="matbot-embed-token"]') || {}).content || '';
+    function tutorHeaders(extra){
+      const h = Object.assign({}, extra || {});
+      if (EMBED_TOKEN) h['X-Tutor-Token'] = EMBED_TOKEN;
+      return h;
+    }
     if(!home || !card || !modeGrid || !picker || !topicSelect || !oblastSelect ||
        !continueBtn || !sendTutor || !msgBox || !tutorChat || !tutorTyping) return; // panel nije prisutan
 
@@ -1027,18 +1055,23 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     /* Poruke se dodaju UNUTAR tutor kartice (tutorChat), ne u legacy chat. */
-    function appendTutorMsg(role, html){
+    function createTutorBubble(role){
       tutorChat.classList.add('open');
       if (tutorEmpty) tutorEmpty.classList.add('hidden');
       const row = document.createElement('div');
       row.className = 'tmsg ' + (role === 'user' ? 'tmsg-user' : 'tmsg-bot');
       const b = document.createElement('div');
       b.className = 'tbubble';
-      b.innerHTML = html || '<i>Nema odgovora.</i>';
       row.appendChild(b);
       tutorChat.insertBefore(row, tutorTyping);
-      if (window.MathJax && MathJax.typesetPromise) MathJax.typesetPromise([b]);
+      return { row: row, bubble: b };
+    }
+    function appendTutorMsg(role, html){
+      const made = createTutorBubble(role);
+      made.bubble.innerHTML = html || '<i>Nema odgovora.</i>';
+      if (window.MathJax && MathJax.typesetPromise) MathJax.typesetPromise([made.bubble]);
       tutorChat.scrollTop = tutorChat.scrollHeight;
+      return made;
     }
 
     function showTutorTyping(){
@@ -1210,7 +1243,9 @@ document.addEventListener('DOMContentLoaded', () => {
       msgBox.placeholder = DEFAULT_PLACEHOLDER;
       fbBox.classList.add('hidden');
       if (metaBox) metaBox.textContent = '';
-      tutorChat.querySelectorAll('.tmsg').forEach(n=>n.remove());
+      tutorChat.querySelectorAll('.tmsg, .tutor-video-hint').forEach(n=>n.remove());
+      hideChips();
+      videoHintShown.clear();
       hideTutorTyping();
       if (tutorEmpty) tutorEmpty.classList.remove('hidden');
       tutorChat.classList.remove('open');
@@ -1383,7 +1418,8 @@ document.addEventListener('DOMContentLoaded', () => {
       try{
         resetTopicOptions();
         topicsError.classList.add('hidden');
-        const r = await fetch('/api/ai-tutor/topics?grade=' + encodeURIComponent(grade), { credentials:'include', cache:'no-store' });
+        const r = await fetch('/api/ai-tutor/topics?grade=' + encodeURIComponent(grade),
+                              { credentials:'include', cache:'no-store', headers: tutorHeaders() });
         if(!r.ok) throw new Error('topics http ' + r.status);
         const data = await r.json();
         const grouped = (data && data.grouped) || {};
@@ -1441,6 +1477,83 @@ document.addEventListener('DOMContentLoaded', () => {
         if (tutorImgChip) tutorImgChip.classList.add('show');
       });
       if (tutorImgRemove) tutorImgRemove.addEventListener('click', clearTutorImage);
+    }
+
+    /* ===== Phase 2: quick-reply chips (S5) + preporuka videa (S6) ===== */
+    function hideChips(){
+      if (!chipsBox) return;
+      chipsBox.hidden = true;
+      chipsBox.innerHTML = '';
+    }
+    /* chip → upiši poruku u polje i pošalji kroz NORMALNI typed tok (tako
+       "Ne znam" tokom vježbe ide kao odgovor na zadatak, a "Daj mi još jedan
+       primjer" kao nastavak — ista logika kao da je učenik kucao) */
+    function chipDefs(j){
+      if (!j || j.status !== 'ready') return [];
+      if (interactionPhase === 'awaiting_practice_answer'){
+        return [
+          { label: '🙋 Ne znam — daj mi hint', msg: 'Ne znam.' },
+          { label: '🔁 Ponovi zadatak', msg: 'Možeš li ponoviti zadatak?' }
+        ];
+      }
+      const mode = j.mode || state.mode;
+      if (mode === 'explain') return [
+        { label: '✏️ Daj mi zadatak', msg: 'Daj mi jedan zadatak za vježbu.', mode: 'practice' },
+        { label: '🐢 Objasni jednostavnije', msg: 'Objasni mi to jednostavnije.' },
+        { label: '➕ Još jedan primjer', msg: 'Daj mi još jedan primjer.' }
+      ];
+      if (mode === 'practice') return [
+        { label: '➕ Još jedan zadatak', msg: 'Daj mi još jedan zadatak.' },
+        { label: '📘 Objasni mi ovo', msg: 'Objasni mi ovaj zadatak korak po korak.' }
+      ];
+      if (mode === 'exam') return [
+        { label: '➕ Daj još zadataka', msg: 'Daj mi još zadataka za vježbu.' },
+        { label: '📘 Objasni prvi zadatak', msg: 'Objasni mi prvi zadatak korak po korak.' }
+      ];
+      return [   /* quick */
+        { label: '📘 Objasni postupak', msg: 'Objasni mi postupak korak po korak.', mode: 'explain' },
+        { label: '✏️ Sličan zadatak', msg: 'Daj mi sličan zadatak za vježbu.', mode: 'practice' }
+      ];
+    }
+    function renderChips(j){
+      hideChips();
+      if (!chipsBox) return;
+      const defs = chipDefs(j);
+      if (!defs.length) return;
+      defs.forEach(c=>{
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'chip-btn';
+        b.textContent = c.label;
+        b.addEventListener('click', ()=>{
+          if (tutorBusy) return;
+          if (c.mode && c.mode !== state.mode){
+            state.mode = c.mode;
+            interactionPhase = null;
+            updateTopbar();
+          }
+          hideChips();
+          msgBox.value = c.msg;
+          sendTutorMsg();
+        });
+        chipsBox.appendChild(b);
+      });
+      chipsBox.hidden = false;
+    }
+
+    /* preporuka video lekcije: samo kad backend kaže (recommend_video), samo
+       JEDNOM po temi u konverzaciji, bez izmišljenih linkova */
+    const videoHintShown = new Set();
+    function maybeVideoHint(j){
+      if (!j || j.status !== 'ready' || !j.recommend_video) return;
+      const tid = j.effective_topic || j.final_topic || '';
+      if (!tid || tid === 'unknown' || videoHintShown.has(tid)) return;
+      videoHintShown.add(tid);
+      const div = document.createElement('div');
+      div.className = 'tutor-video-hint';
+      div.textContent = '💡 Možda ti pomogne da prvo pogledaš video lekciju za ovu temu u kursu.';
+      tutorChat.insertBefore(div, tutorTyping);
+      tutorChat.scrollTop = tutorChat.scrollHeight;
     }
 
     function showFallback(status){
@@ -1515,6 +1628,7 @@ document.addEventListener('DOMContentLoaded', () => {
         (imgFile ? '<br><strong>📷 ' + escapeHtml(imgFile.name) + '</strong>' : ''));
       pushTutor('user', text);
       fbBox.classList.add('hidden');
+      hideChips();
       showTutorTyping();
       setTutorBusy(true);
 
@@ -1523,50 +1637,25 @@ document.addEventListener('DOMContentLoaded', () => {
       const ac = new AbortController();
       const abortTimer = setTimeout(()=>{ try { ac.abort(); } catch(_){} }, 60000);
       try{
-        let r;
-        if (imgFile){
-          // multipart: JSON payload + slika (backend radi OCR/Vision, ključevi ostaju na serveru)
-          const fd = new FormData();
-          fd.append('payload', JSON.stringify(payload));
-          fd.append('image', imgFile, imgFile.name);
-          r = await fetch('/api/ai-tutor/chat', { method: 'POST', body: fd, credentials: 'include', signal: ac.signal });
-        } else {
-          r = await fetch('/api/ai-tutor/chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-            credentials: 'include',
-            signal: ac.signal
-          });
-        }
-        const j = await r.json().catch(()=>({}));
-        const answer = (j && j.answer) ? j.answer : 'Nema odgovora.';
-        appendTutorMsg('bot', renderTutorHTML(answer));
-        pushTutor('assistant', answer);
-        if (j.status === 'ready') adoptResponseTopic(j);
-        if (metaBox){                              // prijateljski meta red (bez sirovih id-eva)
-          const tid = j.effective_topic || j.final_topic || state.topic || '';
-          const tname = topicNames[tid] || (tid === state.topic ? state.topicName : '');
-          const rez = MODE_LABELS[j.mode || state.mode] || '';
-          metaBox.textContent = (tname && tid !== 'unknown')
-            ? ('Tema: ' + tname + ' · Režim: ' + rez)
-            : (rez ? 'Režim: ' + rez : '');
-        }
-        if (fromTyped){ msgBox.value = ''; autoGrow(); }  // očisti + resetuj visinu nakon uspješnog slanja
-        if (j.status === 'ready'){
-          clearTutorImage();                       // slika je potrošena u ovom zahtjevu
-          lastTutorMessage = (answer || '').slice(0, 600);  // osnova za follow-up nastavak
-        }
-        /* practice stanje se ažurira tek NAKON primljenog feedbacka (zadnji
-           zadatak se ne dira pri slanju odgovora) */
-        if (j.status === 'ready'){
-          if (looksLikeTutorTask(answer)){
-            setAwaitingPracticeTask(answer);       // sljedeća upisana poruka = odgovor na zadatak
-          } else if (answerPhase){
-            clearAwaitingPracticeTask();
+        let result = null;   // {j, rendered:true} | {errorShown:true} | null
+        if (!imgFile){
+          /* Phase 2: streaming (SSE) — tekstualne poruke; pad streama prije
+             ijednog teksta pada nazad na non-streaming JSON put */
+          try {
+            result = await streamTutorRequest(payload, ac);
+          } catch (streamErr){
+            if (streamErr && streamErr.name === 'AbortError') throw streamErr;
+            result = null;
           }
         }
-        if (j.status && j.status !== 'ready') showFallback(j.status);
+        if (result && result.errorShown){
+          /* stream je već ispisao prijateljsku grešku u bubble */
+        } else if (result && result.j){
+          applyTutorResponse(result.j, { fromTyped, answerPhase, rendered: true });
+        } else {
+          const j = await jsonTutorRequest(payload, ac, imgFile);
+          applyTutorResponse(j, { fromTyped, answerPhase, rendered: false });
+        }
       }catch(err){
         if (err && err.name === 'AbortError'){
           appendTutorMsg('bot', '<em>⏳ Odgovor traje duže nego obično. Pokušaj ponovo za koji trenutak.</em>');
@@ -1579,6 +1668,130 @@ document.addEventListener('DOMContentLoaded', () => {
         setTutorBusy(false);
         tutorBusy = false;
       }
+    }
+
+    /* non-streaming JSON/multipart poziv (slike + fallback kad stream ne uspije) */
+    async function jsonTutorRequest(payload, ac, imgFile){
+      let r;
+      if (imgFile){
+        // multipart: JSON payload + slika (backend radi OCR/Vision, ključevi ostaju na serveru)
+        const fd = new FormData();
+        fd.append('payload', JSON.stringify(payload));
+        fd.append('image', imgFile, imgFile.name);
+        r = await fetch('/api/ai-tutor/chat', {
+          method: 'POST', body: fd, credentials: 'include',
+          headers: tutorHeaders(), signal: ac.signal
+        });
+      } else {
+        r = await fetch('/api/ai-tutor/chat', {
+          method: 'POST',
+          headers: tutorHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify(payload),
+          credentials: 'include',
+          signal: ac.signal
+        });
+      }
+      return await r.json().catch(()=>({}));
+    }
+
+    /* Phase 2: SSE klijent — progresivan tekst u bubble, MathJax TEK na kraju.
+       Vraća {j, rendered} | {errorShown} | null (null → pozivalac ide na JSON). */
+    async function streamTutorRequest(payload, ac){
+      const r = await fetch('/api/ai-tutor/chat/stream', {
+        method: 'POST',
+        headers: tutorHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(payload),
+        credentials: 'include',
+        signal: ac.signal
+      });
+      const ct = r.headers.get('content-type') || '';
+      if (!r.ok || ct.indexOf('text/event-stream') === -1 || !r.body) return null;
+
+      const made = createTutorBubble('bot');
+      let acc = '', doneData = null, errData = null, buf = '';
+      const reader = r.body.getReader();
+      const dec = new TextDecoder();
+      try {
+        while (true){
+          const chunk = await reader.read();
+          if (chunk.done) break;
+          buf += dec.decode(chunk.value, { stream: true });
+          let idx;
+          while ((idx = buf.indexOf('\n\n')) !== -1){
+            const block = buf.slice(0, idx); buf = buf.slice(idx + 2);
+            let ev = 'message', dataStr = '';
+            for (const line of block.split('\n')){
+              if (line.indexOf('event:') === 0) ev = line.slice(6).trim();
+              else if (line.indexOf('data:') === 0) dataStr += line.slice(5).trim();
+            }
+            let data = {};
+            try { data = JSON.parse(dataStr || '{}'); } catch(_){}
+            if (ev === 'delta' && data.delta){
+              hideTutorTyping();                     // stigao prvi tekst
+              acc += data.delta;
+              made.bubble.textContent = acc;         // brzo i sigurno (bez HTML-a)
+              tutorChat.scrollTop = tutorChat.scrollHeight;
+            } else if (ev === 'done'){
+              doneData = data;
+            } else if (ev === 'error'){
+              errData = data;
+            }
+          }
+        }
+      } catch (readErr){
+        if (readErr && readErr.name === 'AbortError'){ made.row.remove(); throw readErr; }
+        // prekid toka: sa djelimičnim tekstom završi lokalno, bez teksta → fallback
+        if (!acc){ made.row.remove(); return null; }
+      }
+      if (errData && !doneData){
+        if (acc){                                    // djelimičan tekst + greška → zadrži tekst
+          made.bubble.innerHTML = renderTutorHTML(acc);
+        } else {
+          made.bubble.innerHTML = '<em>' + escapeHtml(errData.detail || 'Greška. Pokušaj ponovo.') + '</em>';
+          return { errorShown: true };
+        }
+      }
+      if (!doneData){
+        if (!acc){ made.row.remove(); return null; } // ništa nije stiglo → JSON fallback
+        doneData = { answer: acc, status: 'ready', mode: payload.mode };
+      }
+      const finalAnswer = doneData.answer || acc;
+      made.bubble.innerHTML = renderTutorHTML(finalAnswer);   // finalni render JEDNOM
+      if (window.MathJax && MathJax.typesetPromise) MathJax.typesetPromise([made.bubble]);
+      tutorChat.scrollTop = tutorChat.scrollHeight;
+      return { j: doneData, rendered: true };
+    }
+
+    /* zajednička obrada odgovora za streaming i non-streaming put */
+    function applyTutorResponse(j, opts){
+      const answer = (j && j.answer) ? j.answer : ((j && j.detail) ? j.detail : 'Nema odgovora.');
+      if (!opts.rendered) appendTutorMsg('bot', renderTutorHTML(answer));
+      pushTutor('assistant', answer);
+      if (j.status === 'ready') adoptResponseTopic(j);
+      if (metaBox){                              // prijateljski meta red (bez sirovih id-eva)
+        const tid = j.effective_topic || j.final_topic || state.topic || '';
+        const tname = topicNames[tid] || (tid === state.topic ? state.topicName : '');
+        const rez = MODE_LABELS[j.mode || state.mode] || '';
+        metaBox.textContent = (tname && tid !== 'unknown')
+          ? ('Tema: ' + tname + ' · Režim: ' + rez)
+          : (rez ? 'Režim: ' + rez : '');
+      }
+      if (opts.fromTyped){ msgBox.value = ''; autoGrow(); }  // očisti nakon uspješnog slanja
+      if (j.status === 'ready'){
+        clearTutorImage();                       // slika je potrošena u ovom zahtjevu
+        lastTutorMessage = (answer || '').slice(0, 600);  // osnova za follow-up nastavak
+      }
+      /* practice stanje se ažurira tek NAKON primljenog feedbacka */
+      if (j.status === 'ready'){
+        if (looksLikeTutorTask(answer)){
+          setAwaitingPracticeTask(answer);       // sljedeća upisana poruka = odgovor na zadatak
+        } else if (opts.answerPhase){
+          clearAwaitingPracticeTask();
+        }
+      }
+      if (j.status && j.status !== 'ready') showFallback(j.status);
+      renderChips(j);                            // Phase 2 (S5): brzi odgovori
+      maybeVideoHint(j);                         // Phase 2 (S6): preporuka videa
     }
 
     /* send strelica = ručno slanje sa trenutno aktivnim modom i upisanom porukom

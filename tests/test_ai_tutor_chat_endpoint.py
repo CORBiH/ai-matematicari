@@ -125,18 +125,38 @@ def test_invalid_mode_defaults_to_explain(client, fake_openai):
 
 # --- 7: conversation_history stiže do prompt buildera (i trimuje se na 5) --------
 
-def test_conversation_history_passed_to_prompt(client, fake_openai):
+def test_conversation_history_passed_as_role_messages(client, fake_openai):
+    """Phase 2: historija ide kao PRAVE role poruke između system i user poruke,
+    NE kao tekst unutar user prompta."""
     history = [{"role": "user", "content": f"MSG{i}"} for i in range(8)]
     resp = client.post(
         CHAT_URL,
         json={"selected_topic": "skupovi_uvod", "conversation_history": history},
     )
     assert resp.status_code == 200
-    # provjeri šta je stvarno poslano modelu (zadnji mock poziv)
-    sent_messages = fake_openai.calls.messages[-1]
-    user_content = sent_messages[-1]["content"]
-    assert "MSG7" in user_content and "MSG3" in user_content  # zadnjih 5
-    assert "MSG2" not in user_content and "MSG0" not in user_content
+    sent = fake_openai.calls.messages[-1]
+    # struktura: [system, MSG3..MSG7, finalna user poruka]
+    assert sent[0]["role"] == "system"
+    middle = sent[1:-1]
+    assert [m["content"] for m in middle] == ["MSG3", "MSG4", "MSG5", "MSG6", "MSG7"]
+    assert all(m["role"] == "user" for m in middle)
+    # finalna user poruka NE sadrži historiju (topic kontekst da, historiju ne)
+    final_user = sent[-1]["content"]
+    assert "MSG7" not in final_user and "MSG3" not in final_user
+    assert "PODACI O TEMI" in final_user                 # topic kontekst ostaje
+
+
+def test_history_roles_preserved_in_messages(client, fake_openai):
+    history = [
+        {"role": "user", "content": "Objasni mi razlomke"},
+        {"role": "assistant", "content": "Razlomak je dio cjeline. Hoćeš primjer?"},
+    ]
+    client.post(CHAT_URL, json={"selected_topic": "skupovi_uvod",
+                                "conversation_history": history})
+    sent = fake_openai.calls.messages[-1]
+    assert sent[1] == {"role": "user", "content": "Objasni mi razlomke"}
+    assert sent[2]["role"] == "assistant"
+    assert "Hoćeš primjer?" in sent[2]["content"]
 
 
 # --- 8: student_id nije obavezan ------------------------------------------------
@@ -383,12 +403,16 @@ def test_history_caps(client, fake_openai):
         "conversation_history": history,
     })
     assert resp.status_code == 200
-    sent = fake_openai.calls.messages[-1][-1]["content"]
-    assert "H6" in sent and "H2" in sent             # zadnjih 5 (H2..H6)
-    assert "H1" not in sent and "H0" not in sent
+    # Phase 2: historija su role poruke [system, H2..H6, user]
+    sent = fake_openai.calls.messages[-1]
+    hist_contents = [m["content"] for m in sent[1:-1]]
+    assert any(c.startswith("H6") for c in hist_contents)
+    assert any(c.startswith("H2") for c in hist_contents)   # zadnjih 5 (H2..H6)
+    assert not any(c.startswith("H1") or c.startswith("H0") for c in hist_contents)
     # po stavci max 1500 ukupno ("H6" + 1498 y-ona)
-    assert "y" * 1400 in sent
-    assert "y" * 1499 not in sent
+    for c in hist_contents:
+        assert len(c) <= 1500
+    assert "y" * 1400 in hist_contents[-1]
 
 
 def test_500_does_not_leak_exception(client, monkeypatch):
@@ -414,11 +438,11 @@ def test_quick_simple_expression_no_topic(client, fake_openai):
     body = resp.get_json()
     assert body["status"] == "ready"
     assert body["answer"] == fake_openai.state["reply"]
-    # sistemska poruka odgovora sadrži PRAVA bazna pravila iz prompts.py
+    # sistemska poruka sadrži novi tutor stack (Phase 2 — matbot.tutor_prompts)
     system_sent = fake_openai.calls.messages[-1][0]["content"]
     assert "Postavi mi pitanje ili zadatak iz matematike." in system_sent
-    assert "VIZUELNI ZAPIS (PRAVA MATEMATIKA)" in system_sent
-    assert "RAZREDNA PRAVILA — 6. RAZRED" in system_sent
+    assert "DIDAKTIKA — 6. RAZRED" in system_sent
+    assert "TERMINOLOGIJA I ZAPIS" in system_sent
 
 
 import io as _io
@@ -450,8 +474,8 @@ def test_multipart_image_vision_path(client, fake_openai):
         p.get("type") == "image_url" and p["image_url"]["url"].startswith("data:")
         for p in content
     )
-    # bazna pravila i dalje u system promptu
-    assert "VIZUELNI ZAPIS (PRAVA MATEMATIKA)" in fake_openai.calls.messages[-1][0]["content"]
+    # tutor pravila i dalje u system promptu (Phase 2 stack)
+    assert "TERMINOLOGIJA I ZAPIS" in fake_openai.calls.messages[-1][0]["content"]
 
 
 def test_multipart_image_no_text_no_topic(client, fake_openai):

@@ -9,23 +9,22 @@ python-dotenv>=1.0
 openai>=1.40.0
 requests>=2.31.0
 
-# --- Google Cloud (GCS + Firestore + Tasks + Auth) ---
+# --- Google Cloud (opciono; importi su guardovani u app.py) ---
+# Na VPS-u se NE koriste u runtime-u (USE_FIRESTORE=0, bez GCS/Cloud Tasks) —
+# ostavljeni jer su mali i čuvaju legacy async put; kandidati za uklanjanje kad
+# se Cloud Run definitivno penzioniše (docs/fable-next-steps.md).
 google-auth>=2.28.0
 google-cloud-storage>=2.16.0
 google-cloud-firestore>=2.15.0
 google-cloud-tasks>=2.16.0
 
-# --- Google Sheets ---
+# --- Google Sheets (bezuslovan import u app.py) ---
 gspread>=6.0.0
 
-# --- Excel content za 6. razred (modular data: master + Thinkific mapa) ---
+# --- Excel content (modular data: master + Thinkific mapa) ---
 openpyxl>=3.1
 
-# --- Ostalo što već koristiš ---
-numpy
-sympy
-matplotlib
-scikit-learn
-argon2-cffi
-PyJWT
-psycopg2-binary
+# UKLONJENO (Phase 2 audit — NULA importa u kodu, provjereno grep-om):
+#   numpy, sympy, matplotlib, scikit-learn, argon2-cffi, PyJWT, psycopg2-binary
+# Rollback: vrati linije paketa i (za psycopg2) build-essential + libpq-dev
+# u Dockerfile, pa `docker compose build`.

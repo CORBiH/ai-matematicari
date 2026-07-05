@@ -10,6 +10,10 @@ dolaze iz Excel fajlova u `data/`), ugrađen kao iframe u Thinkific.
 - **Modularni tutor** (`/api/ai-tutor/chat`): 4 moda — Objasni mi / Vježbaj sa
   mnom / Sutra imam kontrolni / Samo rezultat; tema se bira ručno ili detektuje
   iz pitanja (heuristike → LLM klasifikator); tema se NIKAD ne izmišlja
+- **Streaming odgovora** (`/api/ai-tutor/chat/stream`, SSE): tekst stiže
+  progresivno; pad streama automatski pada na non-streaming put. Slike idu
+  non-streaming putem (OCR + Vision zajedno kad OCR nije dovoljan)
+- **Quick-reply chips** + preporuka video lekcije poslije odgovora
 - Slike zadataka → Mathpix OCR, fallback na OpenAI Vision
 - Excel kao izvor istine: `data/6_razred/`, `data/7_razred/` (MASTER + Thinkific mapa)
 - SQLite activity log (samo metapodaci, bez sadržaja poruka) u `storage/`
@@ -69,6 +73,13 @@ node scripts/check_js.mjs
 Testovi **ne zovu nijedan vanjski servis** (OpenAI, Mathpix, Sheets, GCS,
 Firestore, Cloud Tasks su mockirani; pokušaj stvarnog mrežnog poziva obara test).
 
+Eval kvaliteta odgovora (`docs/eval/RUBRIC.md`):
+
+```powershell
+.\.venv\Scripts\python scripts\eval_tutor.py            # DRY: rutiranje/promptovi, bez API-ja
+# LIVE (svjesno, zove OpenAI): MATBOT_EVAL_LIVE=1 + OPENAI_API_KEY + --live
+```
+
 ## 🔧 Env varijable
 
 Kompletna komentarisana lista: [.env.example](.env.example). Pregled:
@@ -95,6 +106,7 @@ Kompletna komentarisana lista: [.env.example](.env.example). Pregled:
 | `RATE_LIMIT_STORAGE_URI` | `memory://` | Storage za limiter (per-instanca!). |
 | `CORS_ORIGINS` | sve + WARNING log | Zarezom odvojene dozvoljene domene. |
 | `DIAG_TOKEN` | — | `X-Diag-Token` header za `/sheets/*`, `/mathpix/selftest`, `/gcs/signed-upload` van LOCAL_MODE. |
+| `AI_TUTOR_EMBED_SECRET` / `AI_TUTOR_TOKEN_TTL_S` | — / `7200` | Potpisani token za `/api/ai-tutor/chat[/stream]` (prazno = isključeno + warning); vidi `docs/deploy/embed-token.md`. |
 | `ALLOW_PRIVATE_IMAGE_URLS` | `0` | `1` isključuje SSRF zaštitu (samo dev). |
 | `HISTORY_MAX_TURNS` / `HISTORY_MAX_CHARS` / `HISTORY_CONTEXT_TURNS` | `5` / `2000` / `5` | Kontekst razgovora (legacy tok). |
 | `MATBOT_DB_PATH` | `storage/matbot.sqlite3` | SQLite activity log (metapodaci tutora). |

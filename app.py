@@ -1,7 +1,10 @@
-from flask import Flask, render_template, request, session, redirect, url_for, send_from_directory, jsonify
+from flask import (
+    Flask, render_template, request, session, redirect, url_for,
+    send_from_directory, jsonify, Response, stream_with_context,
+)
 from dotenv import load_dotenv
 import os, base64, json, html, datetime, logging, mimetypes, threading
-import socket, ipaddress
+import socket, ipaddress, hmac, hashlib
 from datetime import timedelta
 from uuid import uuid4
 import requests
@@ -102,6 +105,52 @@ OPENAI_MAX_RETRIES = int(os.getenv("OPENAI_MAX_RETRIES", "2"))
 # (frontend prekida na ~60s; vidi AbortController u templates/index.html).
 AI_TUTOR_TIMEOUT = float(os.getenv("AI_TUTOR_TIMEOUT", "45"))
 AI_TUTOR_MAX_RETRIES = int(os.getenv("AI_TUTOR_MAX_RETRIES", "1"))
+
+# --- Phase 2: potpisani kratkotrajni token za /api/ai-tutor/* ----------------------
+# Server ga UGRAĐUJE u stranicu (GET /) kao <meta>; frontend ga šalje u headeru
+# X-Tutor-Token. Štiti skupe tutor pozive od direktnog skriptovanja API-ja.
+# Enforcement je UKLJUČEN samo kada je secret postavljen (sigurno uvođenje);
+# LOCAL_MODE uvijek prolazi. Detalji: docs/deploy/embed-token.md
+AI_TUTOR_EMBED_SECRET = (os.getenv("AI_TUTOR_EMBED_SECRET") or "").strip()
+AI_TUTOR_TOKEN_TTL_S = int(os.getenv("AI_TUTOR_TOKEN_TTL_S", "7200"))
+
+
+def mint_embed_token(expires_at: int | None = None) -> str:
+    """"<exp_unix>.<hmac_sha256(secret, exp)>" ili "" kada secret nije postavljen."""
+    if not AI_TUTOR_EMBED_SECRET:
+        return ""
+    exp = int(expires_at if expires_at is not None else time.time() + AI_TUTOR_TOKEN_TTL_S)
+    sig = hmac.new(AI_TUTOR_EMBED_SECRET.encode(), str(exp).encode(), hashlib.sha256).hexdigest()
+    return f"{exp}.{sig}"
+
+
+def verify_embed_token(token: str) -> bool:
+    """LOCAL_MODE → uvijek OK; bez secreta → OK (enforcement isključen);
+    inače: važeći potpis + neistekao rok."""
+    if LOCAL_MODE:
+        return True
+    if not AI_TUTOR_EMBED_SECRET:
+        return True
+    try:
+        exp_s, sig = (token or "").split(".", 1)
+        exp = int(exp_s)
+    except (ValueError, AttributeError):
+        return False
+    if exp < time.time():
+        return False
+    expected = hmac.new(AI_TUTOR_EMBED_SECRET.encode(), str(exp).encode(), hashlib.sha256).hexdigest()
+    return hmac.compare_digest(sig, expected)
+
+
+def _embed_token_ok() -> bool:
+    token = request.headers.get("X-Tutor-Token") or request.args.get("emb") or ""
+    return verify_embed_token(token)
+
+
+_EMBED_TOKEN_DENIED = {
+    "error": "invalid_token",
+    "detail": "Sesija je istekla ili pristup nije dozvoljen. Osvježi stranicu pa pokušaj ponovo.",
+}
 
 # --- Rate limiting (env-podesivo; default vrlo darežljiv da ne smeta učenicima) ---
 RATE_LIMIT_ENABLED = os.getenv("RATE_LIMIT_ENABLED", "1") == "1"
@@ -372,6 +421,38 @@ def _tutor_openai_chat(model: str, messages: list, timeout: float = None, max_to
         model, messages, timeout=timeout, max_tokens=max_tokens, fast=fast,
         max_retries=AI_TUTOR_MAX_RETRIES,
     )
+
+
+def _tutor_openai_chat_stream(model: str, messages: list, timeout: float = None, max_tokens: int | None = None):
+    """Phase 2 — streaming OpenAI poziv za tutor: generator TEKST-DELTI.
+
+    Isti max_completion_tokens/max_tokens fallback kao _openai_chat. Testovi
+    monkeypatchaju cijelu funkciju (nikad stvarni API)."""
+    cli = client.with_options(
+        timeout=timeout if timeout is not None else AI_TUTOR_TIMEOUT,
+        max_retries=AI_TUTOR_MAX_RETRIES,
+    )
+    params = {"model": model, "messages": messages, "stream": True}
+    if max_tokens is not None:
+        params["max_completion_tokens"] = max_tokens
+    try:
+        stream = cli.chat.completions.create(**params)
+    except Exception as e:
+        msg = str(e)
+        if "max_completion_tokens" in msg:
+            params.pop("max_completion_tokens", None)
+            if max_tokens is not None:
+                params["max_tokens"] = max_tokens
+            stream = cli.chat.completions.create(**params)
+        else:
+            raise
+    for chunk in stream:
+        try:
+            delta = chunk.choices[0].delta.content
+        except (AttributeError, IndexError, TypeError):
+            delta = None
+        if delta:
+            yield delta
 
 # Historija razgovora (sanitizacija + gradnja poruka) izdvojena je u history.py.
 from history import (
@@ -680,7 +761,8 @@ def index():
             if request.form.get("ajax") == "1":
                 return render_template("index.html", history=history, razred=razred)
             return redirect(url_for("index"))
-    return render_template("index.html", history=history, razred=razred)
+    return render_template("index.html", history=history, razred=razred,
+                           embed_token=mint_embed_token())
 
 @app.errorhandler(413)
 def too_large(e):
@@ -956,6 +1038,8 @@ def ai_tutor_chat():
     matbot.ai_tutor_service.handle_chat; koristi postojeći _openai_chat."""
     if request.method == "OPTIONS":
         return ("", 204)
+    if not _embed_token_ok():
+        return jsonify(_EMBED_TOKEN_DENIED), 403
 
     # Phase 6.2: multipart = JSON payload + opciona slika zadatka (modularni tutor).
     image_bytes = None
@@ -993,6 +1077,54 @@ def ai_tutor_chat():
         return jsonify({"error": "ai_tutor_failed",
                         "detail": "Došlo je do greške na serveru. Pokušaj ponovo."}), 500
     return jsonify(result), 200
+
+
+def _sse_line(event: str, data: dict) -> str:
+    return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+
+@app.route("/api/ai-tutor/chat/stream", methods=["POST", "OPTIONS"])
+@limiter.limit(_submit_rate_limit, exempt_when=lambda: request.method == "OPTIONS")
+def ai_tutor_chat_stream():
+    """Phase 2 — SSE streaming tutor odgovora (samo JSON/tekst; slike idu na
+    non-streaming /api/ai-tutor/chat). Događaji: delta / done / error."""
+    if request.method == "OPTIONS":
+        return ("", 204)
+    if not _embed_token_ok():
+        return jsonify(_EMBED_TOKEN_DENIED), 403
+
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"error": "invalid_json",
+                        "detail": "Očekivan je JSON objekt sa poljima zahtjeva."}), 400
+
+    def _sse():
+        try:
+            for ev in ai_tutor_service.handle_chat_stream(
+                data,
+                openai_chat=_tutor_openai_chat,
+                openai_chat_stream=_tutor_openai_chat_stream,
+                model=MODEL_TEXT, timeout=AI_TUTOR_TIMEOUT, vision_model=MODEL_VISION,
+            ):
+                yield _sse_line(ev.get("event", "message"), ev.get("data", {}))
+        except ContentLoadError as exc:
+            yield _sse_line("error", {"error": "unsupported_grade", "detail": str(exc)})
+        except Exception:
+            log.exception("ai_tutor_chat_stream: neuspjeh")
+            yield _sse_line("error", {
+                "error": "ai_tutor_failed",
+                "detail": "Došlo je do greške na serveru. Pokušaj ponovo.",
+            })
+
+    return Response(
+        stream_with_context(_sse()),
+        mimetype="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            # nginx: bez proxy bufferinga za SSE (vidi docs/deploy/nginx.example.conf)
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @app.route("/submit", methods=["POST", "OPTIONS"])
@@ -1279,6 +1411,9 @@ def _startup_env_sanity():
     if not _cors_origins:
         log.warning("ENV SANITY: CORS_ORIGINS nije postavljen — CORS je otvoren za "
                     "SVE domene. Postavi npr. CORS_ORIGINS=https://skola.thinkific.com")
+    if not AI_TUTOR_EMBED_SECRET:
+        log.warning("ENV SANITY: AI_TUTOR_EMBED_SECRET nije postavljen — token "
+                    "zaštita /api/ai-tutor/* je ISKLJUČENA (svi zahtjevi prolaze).")
     if not DIAG_TOKEN:
         log.info("ENV SANITY: DIAG_TOKEN nije postavljen — dijagnostički endpointi "
                  "su nedostupni (to je OK ako ih ne koristiš).")
