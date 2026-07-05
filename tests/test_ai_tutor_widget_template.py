@@ -465,9 +465,13 @@ def test_short_answer_with_stored_task_becomes_practice_answer(client):
     html = _html(client)
     assert "function storedLastTask()" in html
     assert "function isShortPracticeAnswer(t)" in html
+    assert "function isNewPracticeTaskRequest(t)" in html
     assert "savedTask && isShortPracticeAnswer(typed)" in html
+    assert "!asksNewTask && (interactionPhase === 'awaiting_practice_answer'" in html
     assert "payload.mode = 'practice'" in html
     assert "payload.last_tutor_task = savedTask.slice(0, 600)" in html
+    assert "ne kontam|ne razumijem|pomozi|pomoc|hint|daj hint|objasni" in html
+    assert "jos\\s+jedan|sljedeci|slican" in html
 
 
 def test_detected_topic_adopted_for_next_payload(client):
@@ -483,10 +487,34 @@ def test_detected_topic_adopted_for_next_payload(client):
 def test_tutor_task_detection_updates_last_task(client):
     html = _html(client)
     assert "function looksLikeTutorTask(t)" in html
-    assert "setAwaitingPracticeTask(answer)" in html
+    assert "function extractTutorTask(j, answer)" in html
+    assert "function structuredTutorTask(j)" in html
+    assert "last_tutor_task', 'practice_task', 'task_text" in html
+    assert "uporedi|usporedi|poredi|odredi" in html
+    assert "prethodnik|sljedbenik" in html
+    assert "setAwaitingPracticeTask(taskText)" in html
     assert "clearAwaitingPracticeTask()" in html
     assert "restoreActiveTopic()" in html
     assert "storedLastTask()" in html
+
+
+def test_tutor_task_saved_before_history_for_stream_and_json(client):
+    html = _html(client)
+    idx = html.index("function applyTutorResponse")
+    snippet = html[idx:idx + 900]
+    assert "const taskText = (j && j.status === 'ready') ? extractTutorTask(j, answer) : ''" in snippet
+    assert snippet.index("setAwaitingPracticeTask(taskText)") < snippet.index("pushTutor('assistant', answer)")
+    assert "sačuvaj zadatak prije historije" in snippet
+
+
+def test_practice_new_task_request_bypasses_answer_phase(client):
+    html = _html(client)
+    idx = html.index("const asksNewTask = isNewPracticeTaskRequest(typed);")
+    snippet = html[idx:idx + 360]
+    assert "!asksNewTask &&" in snippet
+    assert "answering_practice_task" in snippet
+    assert "!asksNewTask && lastTutorMessage && isFollowupMessage(typed)" in snippet
+    assert "Daj mi još jedan zadatak." in html
 
 
 def test_practice_answer_takes_precedence_over_followup(client):

@@ -98,3 +98,35 @@ if (fuFailed.length) {
   process.exit(1);
 }
 console.log('followup checks OK (' + Object.keys(fuChecks).length + ' provjera)');
+
+// 4) practice task-state helpers
+const practiceMatch = main.match(/function foldTutorText\(t\)\{[\s\S]*?function looksLikeTutorTask\(t\)\{[\s\S]*?\n    \}/);
+if (!practiceMatch) { console.error('FAILED: practice state helperi nisu pronađeni'); process.exit(1); }
+const practiceFns = new Function(
+  practiceMatch[0] +
+  '; return { isNewPracticeTaskRequest, isShortPracticeAnswer, extractTutorTask, looksLikeTutorTask };'
+)();
+
+const comparisonTask = 'Uporedi brojeve: 7 205 i 7 250. Koji je veći broj? Koristi znakove <, > ili =.';
+const practiceChecks = {
+  extract_comparison_task: practiceFns.extractTutorTask(null, comparisonTask) === comparisonTask,
+  structured_task_preferred:
+    practiceFns.extractTutorTask({ last_tutor_task: 'Odredi prethodnik broja 1 000.' }, comparisonTask) ===
+    'Odredi prethodnik broja 1 000.',
+  comparison_task_detected: practiceFns.looksLikeTutorTask(comparisonTask),
+  ne_znam_answer: practiceFns.isShortPracticeAnswer('ne znam'),
+  help_answers: practiceFns.isShortPracticeAnswer('pomozi') &&
+    practiceFns.isShortPracticeAnswer('daj hint') &&
+    practiceFns.isShortPracticeAnswer('objasni'),
+  spaced_number_answer: practiceFns.isShortPracticeAnswer('7 250'),
+  fraction_answer: practiceFns.isShortPracticeAnswer('5/18'),
+  new_task_detected: practiceFns.isNewPracticeTaskRequest('daj mi novi zadatak'),
+  new_task_not_answer: !practiceFns.isShortPracticeAnswer('daj mi novi zadatak'),
+  hint_not_new_task: !practiceFns.isNewPracticeTaskRequest('daj hint'),
+};
+const practiceFailed = Object.entries(practiceChecks).filter(([, ok]) => !ok).map(([k]) => k);
+if (practiceFailed.length) {
+  console.error('PRACTICE STATE FAILED:', practiceFailed.join(', '));
+  process.exit(1);
+}
+console.log('practice state checks OK (' + Object.keys(practiceChecks).length + ' provjera)');

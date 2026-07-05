@@ -273,11 +273,15 @@ def build_practice_followup_instructions(payload: dict, topic_context: dict) -> 
     last_task = normalize_value((payload or {}).get("last_tutor_task"))[:600]
     block = (
         "MOD: VJEŽBA — PROVJERA ODGOVORA (practice follow-up)\n"
+        "- The student is responding to this exact previous task: "
+        f"{last_task or '[last_tutor_task nije poslan]'}\n"
+        "- Do not introduce a new task unless the student asks for one.\n"
         "- Učenikova poruka je ODGOVOR na prethodno postavljeni zadatak — NE "
         "tretiraj je kao novo pitanje niti kao zahtjev za novi zadatak.\n"
-        "- Provjeri tačnost odgovora koristeći ZADNJI ZADATAK i historiju razgovora.\n"
+        "- Provjeri tačnost odgovora koristeći TAČNO taj prethodni vidljivi zadatak "
+        "i historiju razgovora.\n"
         "- Ako je TAČNO: kratko potvrdi (npr. \"Tačno!\"), u 1–2 rečenice objasni "
-        "zašto, pa po želji daj JEDAN novi mali zadatak ili sljedeći korak.\n"
+        "zašto, ali NE dodaji novi zadatak ako ga učenik nije zatražio.\n"
         "- Ako NIJE tačno: blago reci da nije tačno. Za kratak računski zadatak "
         "prikaži tačan račun i rezultat; za konceptualni zadatak daj JEDAN hint "
         "ili JEDAN sljedeći korak.\n"
@@ -285,14 +289,16 @@ def build_practice_followup_instructions(payload: dict, topic_context: dict) -> 
         "vođeni hint ili JEDAN sljedeći korak — NE novi zadatak i NE cijelo "
         "rješenje odmah.\n"
         "- Ako učenik kratko potvrdi (npr. \"može\", \"da\", \"hajde\"): nastavi "
-        "— daj sljedeći mali zadatak ili sljedeći korak.\n"
+        "sa sljedećim korakom za isti zadatak.\n"
+        "- Ako učenik izričito traži novi zadatak, tek tada smiješ dati JEDAN novi "
+        "zadatak iz iste teme.\n"
         "- NE ponavljaj isti zadatak osim ako je odgovor nejasan.\n"
         "- NE ponavljaj cijelo objašnjenje teme i NE počinji isti zadatak ispočetka.\n"
         "- Odgovor mora biti KRATAK i prirodan za chat: bez naslova poput "
         "\"### Tema\" i bez dugih lekcija.\n"
     )
     if last_task:
-        block += f"ZADNJI ZADATAK (kojem učenik odgovara):\n{last_task}\n"
+        block += f"ZADNJI ZADATAK (tačan vidljivi tekst):\n{last_task}\n"
     return block
 
 
@@ -412,6 +418,9 @@ _MODE_TOPIC_FIELDS = {
     "practice": frozenset(
         _META_FIELDS + _MISTAKE_FIELDS + ("hint_method",)
         + _TYPICAL_FIELDS + _SOLVED_FIELDS + _EXTRA_FIELDS
+    ),
+    "practice_followup": frozenset(
+        _META_FIELDS + _MISTAKE_FIELDS + ("hint_method",) + _EXTRA_FIELDS
     ),
     "exam": frozenset(
         _META_FIELDS + _MISTAKE_FIELDS + ("hint_method",) + _CONTROLNI_FIELDS
@@ -564,8 +573,9 @@ def build_tutor_prompt(
         mode_block = build_continuation_instructions(payload)
     else:
         mode_block = build_mode_instructions(mode, effective_topic, topic_context)
+    topic_block_mode = "practice_followup" if is_practice_followup else mode
     for block in (
-        _build_topic_block(topic_context, mode=mode),
+        _build_topic_block(topic_context, mode=topic_block_mode),
         _build_video_flow_block(video_flow),
         mode_block,
         _build_student_block(payload),

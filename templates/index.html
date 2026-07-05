@@ -1156,6 +1156,16 @@ document.addEventListener('DOMContentLoaded', () => {
       try { return (localStorage.getItem(LASTTASK_KEY) || '').trim(); }
       catch(_){ return ''; }
     }
+    function isNewPracticeTaskRequest(t){
+      const s = foldTutorText(t).trim();
+      if (!s || s.length > 120) return false;
+      if (/\b(ponovi|ponoviti|isti|ovaj|hint|pomozi|pomoc|objasni)\b/.test(s)) return false;
+      return (
+        /\b(daj|zadaj|posalji|moze|mozes|hocu|zelim|trebam)\b.*\b(novi|nov|drugi|jos\s+jedan|jos|sljedeci|slican|slicni)\b.*\b(zadatak|primjer)\b/.test(s) ||
+        /\b(novi|nov|drugi|jos\s+jedan|sljedeci|slican|slicni)\s+(zadatak|primjer)\b/.test(s) ||
+        /\b(daj|zadaj|posalji)\b.*\b(zadatak|zadatke)\b/.test(s)
+      );
+    }
     function isStoredQuickContext(){
       try {
         const parts = (localStorage.getItem(CTX_KEY) || '').split('|');
@@ -1164,19 +1174,87 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     function isShortPracticeAnswer(t){
       const s = foldTutorText(t).trim();
-      if (!s || s.length > 80) return false;
-      if (/\b(kako|zasto|objasni|daj|izracunaj|rijesi|pomozi|zadatak)\b/.test(s)) return false;
-      if (/^[-+]?\d+\s*(?:\/\s*[-+]?\d+)?$/.test(s)) return true;
-      if (/^[a-z]\s*=\s*[-+]?\d+\s*(?:\/\s*[-+]?\d+)?$/.test(s)) return true;
+      if (!s || s.length > 120) return false;
+      if (isNewPracticeTaskRequest(t)) return false;
+      if (/\b(ne znam|nemam pojma|ne kontam|ne razumijem|pomozi|pomoc|hint|daj hint|objasni|ponovi zadatak|ponoviti zadatak)\b/.test(s)) return true;
+      if (/^(?:[<>]=?|=)$/.test(s)) return true;
+      const num = "[-+]?\\d+(?:[\\s.,]\\d{3})*(?:\\s*\\/\\s*[-+]?\\d+(?:[\\s.,]\\d{3})*)?";
+      if (new RegExp("^" + num + "$").test(s)) return true;
+      if (new RegExp("^[a-z]\\s*=\\s*" + num + "$").test(s)) return true;
+      if (new RegExp("^" + num + "\\s*(?:<|>|=)\\s*" + num + "$").test(s)) return true;
+      if (/\b(kako|zasto|izracunaj|rijesi)\b/.test(s)) return false;
       return /^(da|ne|tacno|netacno|ne znam)$/.test(s);
     }
-    function looksLikeTutorTask(t){
+    function cleanTutorTaskText(t){
+      return (t || '')
+        .replace(/\r/g, '')
+        .split('\n')
+        .map(x => x.replace(/^\s*(?:[-*\u2022]+|\d+[.)])\s*/, '').trim())
+        .filter(Boolean)
+        .join('\n')
+        .trim()
+        .slice(0, 600);
+    }
+    function taskCandidateLooksVisible(t){
       const s = foldTutorText(t);
       if (!s) return false;
-      const mathExpr = /(?:\d+\s*\/\s*\d+|\d+)\s*(?:[*x×·:+-]|:)\s*(?:\d+\s*\/\s*\d+|\d+)/.test(s) || /\\frac\{/.test(s);
-      const taskWords = /\b(zadatak|izracunaj|rijesi|probaj|pokusaj|koliko je|pomnozi|podijeli)\b/.test(s);
-      const bareFractionProduct = /\d+\s*\/\s*\d+\s*(?:[*x×·])\s*\d+\s*\/\s*\d+/.test(s) && !/=/.test(s);
-      return mathExpr && (taskWords || bareFractionProduct);
+      if (/^(evo\s+)?(jedan\s+|mali\s+|sljedeci\s+|slican\s+)?(zadatak|primjer)\s*:?\s*$/.test(s)) return false;
+      const action = /\b(zadatak|izracunaj|rijesi|uporedi|usporedi|poredi|odredi|nadji|izaberi|oznaci|nacrtaj|konstruisi|konstruiraj|pomnozi|podijeli|saberi|oduzmi|skrati|pretvori|zaokruzi|dopuni|napisi|koristi|koliko|koji|koja|koje|da li)\b/.test(s);
+      const signal = /\d|[<>=+\-*/:^]|\\frac\{|nzd|nzs|prethodnik|sljedbenik|skup|ugao|razlom|decimal|stepen|procent|prava|duz|tacka|trougao|cetverougao/.test(s);
+      return action && (signal || s.split(/\s+/).length >= 4);
+    }
+    function structuredTutorTask(j){
+      if (!j || typeof j !== 'object') return '';
+      for (const key of ['last_tutor_task', 'practice_task', 'task_text']){
+        const val = (j[key] || '').toString().trim();
+        if (val) return val.slice(0, 600);
+      }
+      return '';
+    }
+    function stripTutorTaskLabel(t){
+      const raw = cleanTutorTaskText(t);
+      const folded = foldTutorText(raw);
+      const m = folded.match(/\bzadatak(?:\s+za\s+vjezbu)?\s*[:.-]\s*/);
+      if (m && typeof m.index === 'number' && m.index + m[0].length < raw.length - 2){
+        return raw.slice(m.index + m[0].length).trim().slice(0, 600);
+      }
+      return raw;
+    }
+    function extractTutorTask(j, answer){
+      const structured = structuredTutorTask(j);
+      if (structured) return structured;
+      const raw = (answer || '').toString().trim();
+      if (!raw) return '';
+      const paragraphs = raw.split(/\n\s*\n/).map(stripTutorTaskLabel).filter(Boolean);
+      for (const p of paragraphs){
+        if (taskCandidateLooksVisible(p)) return p.slice(0, 600);
+      }
+      const lines = raw.split('\n').map(stripTutorTaskLabel).filter(Boolean);
+      for (let i = 0; i < lines.length; i++){
+        const line = lines[i];
+        if (/^(evo\s+)?(jedan\s+|mali\s+|sljedeci\s+|slican\s+)?(zadatak|primjer)\s*:?\s*$/.test(foldTutorText(line)) && lines[i + 1] && taskCandidateLooksVisible(lines[i + 1])){
+          return lines[i + 1].slice(0, 600);
+        }
+        if (taskCandidateLooksVisible(line)) return line.slice(0, 600);
+      }
+      const sentences = (raw.replace(/\s+/g, ' ').match(/[^.!?]+(?:[.!?]+|$)/g) || []).map(stripTutorTaskLabel).filter(Boolean);
+      for (let i = 0; i < sentences.length; i++){
+        if (!taskCandidateLooksVisible(sentences[i])) continue;
+        const parts = [sentences[i]];
+        for (const nxt of sentences.slice(i + 1, i + 4)){
+          const f = foldTutorText(nxt);
+          if (/^(koji|koja|koje|koristi|upisi|napisi|odgovori|objasni|zaokruzi|izaberi|pazi)\b/.test(f) || taskCandidateLooksVisible(nxt)){
+            parts.push(nxt);
+          } else {
+            break;
+          }
+        }
+        return parts.join(' ').trim().slice(0, 600);
+      }
+      return '';
+    }
+    function looksLikeTutorTask(t){
+      return !!extractTutorTask(null, t);
     }
     function setAwaitingPracticeTask(taskText){
       interactionPhase = 'awaiting_practice_answer';
@@ -1589,9 +1667,10 @@ document.addEventListener('DOMContentLoaded', () => {
         text = autoMessage;                        // auto-poruka pri ulasku u chat
       } else if (typed){
         text = typed; fromTyped = true;
-        if (interactionPhase === 'awaiting_practice_answer' || (savedTask && isShortPracticeAnswer(typed))){
+        const asksNewTask = isNewPracticeTaskRequest(typed);
+        if (!asksNewTask && (interactionPhase === 'awaiting_practice_answer' || (savedTask && isShortPracticeAnswer(typed)))){
           answerPhase = 'answering_practice_task'; // odgovor na zadatak, ne novi zahtjev
-        } else if (lastTutorMessage && isFollowupMessage(typed)){
+        } else if (!asksNewTask && lastTutorMessage && isFollowupMessage(typed)){
           continuation = true;                     // "može"/"nastavi" → nastavak, ne ponovno objašnjenje
         }
       } else if (imgFile){
@@ -1765,6 +1844,8 @@ document.addEventListener('DOMContentLoaded', () => {
     /* zajednička obrada odgovora za streaming i non-streaming put */
     function applyTutorResponse(j, opts){
       const answer = (j && j.answer) ? j.answer : ((j && j.detail) ? j.detail : 'Nema odgovora.');
+      const taskText = (j && j.status === 'ready') ? extractTutorTask(j, answer) : '';
+      if (taskText) setAwaitingPracticeTask(taskText);  // sačuvaj zadatak prije historije
       if (!opts.rendered) appendTutorMsg('bot', renderTutorHTML(answer));
       pushTutor('assistant', answer);
       if (j.status === 'ready') adoptResponseTopic(j);
@@ -1783,11 +1864,8 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       /* practice stanje se ažurira tek NAKON primljenog feedbacka */
       if (j.status === 'ready'){
-        if (looksLikeTutorTask(answer)){
-          setAwaitingPracticeTask(answer);       // sljedeća upisana poruka = odgovor na zadatak
-        } else if (opts.answerPhase){
-          clearAwaitingPracticeTask();
-        }
+        const prevTask = storedLastTask();
+        if (!taskText && opts.answerPhase && prevTask) setAwaitingPracticeTask(prevTask);
       }
       if (j.status && j.status !== 'ready') showFallback(j.status);
       renderChips(j);                            // Phase 2 (S5): brzi odgovori

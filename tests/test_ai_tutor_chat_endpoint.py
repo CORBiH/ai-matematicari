@@ -332,7 +332,89 @@ def test_fraction_multiplication_task_then_short_answer_keeps_topic(client, fake
     assert "PROVJERA ODGOVORA" in user_prompt
     assert "ZADNJI ZADATAK" in user_prompt
     assert "3/4 * 2/5" in user_prompt
+    assert "Do not introduce a new task unless the student asks for one." in user_prompt
     assert "Množenje razlomka razlomkom" in user_prompt
+
+
+def test_nonstreaming_practice_response_includes_last_tutor_task(client, fake_openai):
+    task = "Uporedi brojeve: 7 205 i 7 250. Koji je veći broj? Koristi znakove <, > ili =."
+    fake_openai.state["reply"] = task
+    resp = client.post(CHAT_URL, json={
+        "mode": "practice",
+        "selected_topic": "n_n0_uporedjivanje_poluprava_prethodnik_sljedbenik",
+        "student_message": "Daj mi jedan zadatak za vježbu iz ove teme.",
+    })
+    body = resp.get_json()
+    assert body["status"] == "ready"
+    assert body["last_tutor_task"] == task
+
+
+def test_ne_znam_after_comparison_task_prompt_keeps_exact_task(client, fake_openai, master):
+    topic = "n_n0_uporedjivanje_poluprava_prethodnik_sljedbenik"
+    visible_task = (
+        "Uporedi brojeve: 7 205 i 7 250. Koji je veći broj? "
+        "Koristi znakove <, > ili =."
+    )
+    resp = client.post(CHAT_URL, json={
+        "mode": "practice",
+        "selected_topic": topic,
+        "interaction_phase": "answering_practice_task",
+        "last_tutor_task": visible_task,
+        "student_message": "ne znam",
+        "conversation_history": [
+            {"role": "assistant", "content": visible_task},
+        ],
+    })
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["status"] == "ready"
+    assert body["mode"] == "practice"
+    user_prompt = fake_openai.calls.messages[-1][-1]["content"]
+    assert f"The student is responding to this exact previous task: {visible_task}" in user_prompt
+    assert "Do not introduce a new task unless the student asks for one." in user_prompt
+    assert visible_task in user_prompt
+    assert "Tipičan zadatak" not in user_prompt
+    row = master["topics_by_id"][topic]
+    for key in ("typical_task_1", "typical_task_2", "typical_task_3"):
+        if row.get(key) and row[key] not in visible_task:
+            assert row[key] not in user_prompt
+
+
+def test_answering_practice_task_other_topic_is_not_hardcoded(client, fake_openai, master7):
+    topic = "cijeli_sabiranje_oduzimanje"
+    visible_task = "Izračunaj: -7 + 12."
+    resp = client.post(CHAT_URL, json={
+        "grade": 7,
+        "mode": "practice",
+        "selected_topic": topic,
+        "interaction_phase": "answering_practice_task",
+        "last_tutor_task": visible_task,
+        "student_message": "-5",
+    })
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["status"] == "ready"
+    assert body["mode"] == "practice"
+    user_prompt = fake_openai.calls.messages[-1][-1]["content"]
+    assert f"The student is responding to this exact previous task: {visible_task}" in user_prompt
+    row = master7["topics_by_id"][topic]
+    for key in ("typical_task_1", "typical_task_2", "typical_task_3"):
+        if row.get(key):
+            assert row[key] not in user_prompt
+
+
+def test_new_task_request_still_uses_fresh_practice_prompt(client, fake_openai):
+    resp = client.post(CHAT_URL, json={
+        "mode": "practice",
+        "selected_topic": "n_n0_uporedjivanje_poluprava_prethodnik_sljedbenik",
+        "student_message": "Daj mi novi zadatak.",
+    })
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["status"] == "ready"
+    user_prompt = fake_openai.calls.messages[-1][-1]["content"]
+    assert "MOD: VJEŽBAJ (practice)" in user_prompt
+    assert "PROVJERA ODGOVORA" not in user_prompt
 
 
 def test_free_chat_classifier_valid_topic_accepted(client, fake_openai):

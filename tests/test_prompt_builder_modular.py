@@ -323,6 +323,8 @@ def test_practice_followup_instructions_included(master):
     up = res["user_prompt"]
     assert "PROVJERA ODGOVORA" in up
     assert "Da li je 2∈S ako je S={1,2,3}?" in up          # last_tutor_task u promptu
+    assert "The student is responding to this exact previous task:" in up
+    assert "Do not introduce a new task unless the student asks for one." in up
     assert "ODGOVOR na prethodno postavljeni zadatak" in up
     assert res["mode"] == "practice"
 
@@ -339,6 +341,23 @@ def test_practice_followup_does_not_restart_task(master):
     # follow-up NE smije instruisati novi svježi zadatak
     assert "Daj TAČNO JEDAN zadatak i onda ČEKAJ" not in up
     assert "NE počinji isti zadatak ispočetka" in up
+
+
+def test_practice_followup_topic_block_excludes_typical_tasks(master, topic_row):
+    payload = {
+        "selected_topic": TOPIC,
+        "mode": "practice",
+        "interaction_phase": "answering_practice_task",
+        "last_tutor_task": "Da li je 2∈S ako je S={1,2,3}?",
+        "student_message": "ne znam",
+    }
+    res = pb.build_tutor_prompt(payload, _found(), master)
+    up = res["user_prompt"]
+    assert "PODACI O TEMI" in up
+    assert topic_row["hint_method"] in up
+    assert topic_row["typical_task_1"] not in up
+    assert "Tipičan zadatak" not in up
+    assert "MOD: VJEŽBAJ (practice)" not in up
 
 
 def test_practice_followup_forces_practice_mode(master):

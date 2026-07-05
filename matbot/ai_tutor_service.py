@@ -12,6 +12,7 @@ se NE zove — vraća se determinističan bosanski fallback tekst.
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any, Callable
 
 from matbot.activity_log import log_student_activity
@@ -108,6 +109,109 @@ _DEFAULT_FALLBACK_ANSWER = (
     "Ne mogu automatski prepoznati temu. Izaberi oblast/temu koju trenutno radiš "
     "ili pošalji zadatak, pa ću ti pomoći korak po korak."
 )
+
+_TASK_ACTION_RE = re.compile(
+    r"\b("
+    r"zadatak|izracunaj|rijesi|uporedi|usporedi|poredi|odredi|nadji|"
+    r"izaberi|oznaci|nacrtaj|konstruisi|konstruiraj|pomnozi|podijeli|"
+    r"saberi|oduzmi|skrati|pretvori|zaokruzi|dopuni|napisi|koristi|"
+    r"koliko|koji|koja|koje|da\s+li"
+    r")\b"
+)
+_TASK_SIGNAL_RE = re.compile(
+    r"\d|[<>=+\-*/:^]|\b("
+    r"nzd|nzs|prethodnik|sljedbenik|skup|ugao|razlom|decimal|"
+    r"stepen|procent|prava|duz|tacka|trougao|cetverougao"
+    r")\b"
+)
+_TASK_LABEL_RE = re.compile(r"\bzadatak(?:\s+za\s+vjezbu)?\s*[:.\-]\s*")
+_TASK_LABEL_ONLY_RE = re.compile(
+    r"^(?:evo\s+)?(?:jedan\s+|mali\s+|sljedeci\s+|slican\s+)?"
+    r"(?:zadatak|primjer)\s*:?\s*$"
+)
+_TASK_CONTINUATION_RE = re.compile(
+    r"^(koji|koja|koje|koristi|upisi|napisi|odgovori|objasni|"
+    r"zaokruzi|izaberi|pazi)\b"
+)
+
+
+def _clean_task_candidate(text: Any, limit: int = MAX_LAST_TASK_CHARS) -> str:
+    """Normalize a visible assistant task without inventing or rewriting it."""
+    raw = normalize_value(text).replace("\r\n", "\n").replace("\r", "\n")
+    lines: list[str] = []
+    for line in raw.splitlines():
+        line = re.sub(r"^\s*(?:[-*\u2022]+|\d+[.)])\s*", "", line).strip()
+        if line:
+            lines.append(line)
+    cleaned = "\n".join(lines).strip()
+    folded = fold_diacritics(cleaned)
+    label = _TASK_LABEL_RE.search(folded)
+    if label and label.end() < len(cleaned) - 2:
+        cleaned = cleaned[label.end():].strip()
+    return cleaned[:limit]
+
+
+def _looks_like_practice_task_text(text: Any) -> bool:
+    folded = fold_diacritics(text)
+    if not folded or len(folded) < 4:
+        return False
+    if _TASK_LABEL_ONLY_RE.fullmatch(folded):
+        return False
+    has_action = bool(_TASK_ACTION_RE.search(folded))
+    has_signal = bool(_TASK_SIGNAL_RE.search(folded))
+    return has_action and (has_signal or len(folded.split()) >= 4)
+
+
+def extract_practice_task(answer: Any, limit: int = 600) -> str:
+    """Best-effort extraction of the exact visible task from an assistant answer.
+
+    The response text remains the source of truth; this only turns the visible
+    task into structured metadata so the browser can carry it into the next turn.
+    """
+    raw = normalize_value(answer).replace("\r\n", "\n").replace("\r", "\n").strip()
+    if not raw:
+        return ""
+
+    paragraphs = [
+        _clean_task_candidate(p, limit)
+        for p in re.split(r"\n\s*\n", raw)
+        if normalize_value(p)
+    ]
+    for paragraph in paragraphs:
+        if _looks_like_practice_task_text(paragraph):
+            return paragraph[:limit]
+
+    lines = [_clean_task_candidate(line, limit) for line in raw.splitlines()]
+    lines = [line for line in lines if line]
+    for i, line in enumerate(lines):
+        folded = fold_diacritics(line)
+        if _TASK_LABEL_ONLY_RE.fullmatch(folded) and i + 1 < len(lines):
+            nxt = lines[i + 1]
+            if _looks_like_practice_task_text(nxt):
+                return nxt[:limit]
+        if _looks_like_practice_task_text(line):
+            return line[:limit]
+
+    compact = re.sub(r"\s+", " ", raw)
+    sentences = re.findall(r"[^.!?]+(?:[.!?]+|$)", compact)
+    for i, sentence in enumerate(sentences):
+        candidate = _clean_task_candidate(sentence, limit)
+        if not _looks_like_practice_task_text(candidate):
+            continue
+        parts = [candidate]
+        for nxt in sentences[i + 1:i + 4]:
+            nxt_clean = _clean_task_candidate(nxt, limit)
+            folded_next = fold_diacritics(nxt_clean)
+            if (
+                _TASK_CONTINUATION_RE.search(folded_next)
+                or _looks_like_practice_task_text(nxt_clean)
+            ):
+                parts.append(nxt_clean)
+            else:
+                break
+        return " ".join(parts).strip()[:limit]
+
+    return ""
 
 
 def list_topics(master: dict | None = None, grade: int | str = DEFAULT_GRADE) -> dict:
@@ -445,6 +549,9 @@ def _finalize_response(prep: dict, answer: str) -> dict:
         "status": status,
         "mode": mode,
     }
+    task_text = extract_practice_task(answer) if status == "ready" else ""
+    if task_text:
+        response["last_tutor_task"] = task_text
 
     # Phase 5: minimalni activity log — greška NIKAD ne ruši tutor odgovor.
     try:

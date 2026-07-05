@@ -78,6 +78,21 @@ def test_stream_ready_deltas_and_done(client, fake_openai, fake_stream):
     assert fake_stream["calls"] == 1
 
 
+def test_streamed_practice_response_includes_last_tutor_task(client, fake_openai, fake_stream):
+    task = "Uporedi brojeve: 7 205 i 7 250. Koji je veći broj? Koristi znakove <, > ili =."
+    fake_stream["deltas"] = [task[:35], task[35:]]
+    resp = client.post(STREAM_URL, json={
+        "selected_topic": "n_n0_uporedjivanje_poluprava_prethodnik_sljedbenik",
+        "mode": "practice",
+        "student_message": "Daj mi jedan zadatak za vježbu iz ove teme.",
+    })
+    assert resp.status_code == 200
+    events = _parse_sse(resp.get_data(as_text=True))
+    done = [d for name, d in events if name == "done"]
+    assert done and done[0]["answer"] == task
+    assert done[0]["last_tutor_task"] == task
+
+
 def test_stream_messages_include_system_history_user(client, fake_openai, fake_stream):
     history = [{"role": "user", "content": "HISTORIJA-1"},
                {"role": "assistant", "content": "ODGOVOR-1"}]
