@@ -92,9 +92,12 @@ def test_four_mode_cards_with_subtitles(client):
 def test_explain_practice_require_topic_selection(client):
     html = _html(client)
     home = _home_block(html)
+    assert 'id="homeOblastSelect"' in home
     assert 'id="homeTopicSelect"' in home
-    assert "Koju lekciju radiš?" in html
+    assert 'id="homeTopicGroup"' in home
+    assert html.index('id="homeOblastSelect"') < html.index('id="homeTopicSelect"')
     # "Nastavi" bez izabrane lekcije NE ulazi u chat
+    assert "Prvo izaberi oblast." in html
     assert "Prvo izaberi lekciju." in html
     # explain/practice otvaraju picker umjesto direktnog ulaska
     assert "showPicker(state.mode)" in html
@@ -104,8 +107,9 @@ def test_exam_requires_oblast_only(client):
     html = _html(client)
     home = _home_block(html)
     assert 'id="homeOblastSelect"' in home
-    assert "Iz koje oblasti je kontrolni?" in html
+    assert "Izaberi oblast za kontrolni" in html
     assert "Prvo izaberi oblast." in html
+    assert "kontrolni je iz cijele oblasti" in html
     # auto-poruka pri ulasku u exam chat
     assert "Sutra imam kontrolni iz ove oblasti. Pripremi me." in html
 
@@ -134,8 +138,26 @@ def test_topics_and_oblasti_loaded_from_backend(client):
     assert "gradeSel.addEventListener('change'" in html
     assert "loadTopicsForGrade(state.grade)" in html
     assert "data.grouped" in html
-    assert "topicSelect.appendChild(og)" in html
+    assert "data.oblast_order" in html
+    assert "oblastOrderCache = oblastOrder.slice()" in html
+    assert "topicsByOblast[oblast] = (grouped[oblast] || []).slice()" in html
+    assert "function populateLessonOptions(oblast)" in html
+    assert "topicSelect.appendChild(opt)" in html
     assert "oblastSelect.appendChild(ob)" in html
+
+
+def test_lesson_selector_updates_after_oblast_selection(client):
+    html = _html(client)
+    assert "oblastSelect.addEventListener('change'" in html
+    idx = html.index("oblastSelect.addEventListener('change'")
+    snippet = html[idx:idx + 520]
+    assert "populateLessonOptions(ob)" in snippet
+    assert "resetLessonOptions('— kontrolni je iz cijele oblasti —')" in snippet
+    pidx = html.index("function populateLessonOptions(oblast)")
+    psnippet = html[pidx:pidx + 900]
+    assert "const lessons = topicsByOblast[oblast] || []" in psnippet
+    assert "topicSelect.disabled = lessons.length === 0" in psnippet
+    assert "topicGroup.classList.toggle('hidden', lessons.length === 0)" in psnippet
 
 
 def test_topics_load_failure_message(client):
@@ -161,23 +183,26 @@ def test_chat_screen_contains_everything(client):
         assert needle in block, f"nedostaje {needle} unutar chat kartice"
 
 
-def test_topbar_actions_promijeni_and_nova_konverzacija(client):
-    """Phase 1 (audit): topbar ima 'Promijeni' I vraćenu 'Nova konverzacija' —
-    učenik MORA imati vidljiv način da počne svjež razgovor."""
+def test_topbar_has_single_visible_nazad_action(client):
+    """Chat topbar ima jednu jasnu akciju: Nazad."""
     html = _html(client)
     block = _tutor_block(html)
     assert 'id="topbarGrade"' in block
     assert 'id="topbarMode"' in block
     assert 'id="topbarTopic"' in block
-    assert 'id="tutorChangeBtn"' in block and "Promijeni" in block
-    assert 'id="tutorNewBtn"' in block
-    assert "Nova konverzacija" in block
+    assert 'id="tutorBackBtn"' in block
+    assert 'class="btn sm tutor-back-btn"' in block
+    assert block.count(">Nazad<") == 1
+    assert 'id="tutorChangeBtn"' not in block
+    assert 'id="tutorNewBtn"' not in block
+    assert "Promijeni" not in block
+    assert "Nova konverzacija" not in block
 
 
-def test_nova_konverzacija_clears_everything(client):
-    """'Nova konverzacija' briše historiju, zadnji zadatak, kontekst i transcript."""
+def test_internal_fresh_conversation_reset_still_available(client):
+    """Interni reset briše historiju, zadnji zadatak, kontekst i transcript."""
     html = _html(client)
-    idx = html.index("newBtn.addEventListener")
+    idx = html.index("function startFreshTutorConversation()")
     snippet = html[idx:idx + 300]
     assert "resetTutorConversation()" in snippet
     assert "localStorage.removeItem(CTX_KEY)" in snippet
@@ -227,11 +252,11 @@ def test_plotly_not_loaded_upfront(client):
     assert "mathjax@3/es5/tex-mml-chtml.js" in html
 
 
-def test_change_resets_practice_state_keeps_history(client):
-    """Promijeni: nazad na izbor, čisti fazu/zadnji zadatak/sliku/placeholder,
+def test_nazad_resets_practice_state_keeps_history(client):
+    """Nazad: vraća na izbor, čisti fazu/zadnji zadatak/sliku/placeholder,
     ali NE briše historiju razgovora (TKEY ostaje)."""
     html = _html(client)
-    idx = html.index("changeBtn.addEventListener")
+    idx = html.index("chatBackBtn.addEventListener")
     snippet = html[idx:idx + 500]
     assert "showHome()" in snippet
     assert "interactionPhase = null" in snippet
@@ -370,14 +395,28 @@ def test_composer_pill_layout(client):
     assert 'class="composer"' in html and 'id="tutorComposer"' in html
     row = _composer_row(html)
     assert 'class="composer-plus"' in row      # lijevo: + (upload)
+    assert 'class="composer-plus-icon"' in row
     assert 'for="tutorImage"' in row           # + otvara postojeći file input
     assert 'id="tutorMessage"' in row          # sredina: input/textarea
     assert 'placeholder="Upiši pitanje ili zadatak..."' in row
     assert 'class="composer-send"' in row      # desno: send strelica
+    assert 'class="composer-send-icon"' in row
     assert 'id="tutorSend"' in row
     assert "↑" in row
     # redoslijed: + prije textarea prije send strelice
     assert row.index("composer-plus") < row.index("tutorMessage") < row.index("composer-send")
+
+
+def test_composer_and_close_button_polish_styles(client):
+    html = _html(client)
+    assert ".composer{display:flex;align-items:center;" in html
+    assert ".composer-plus{flex:0 0 auto;display:grid;place-items:center;" in html
+    assert ".composer-send{flex:0 0 auto;display:grid;place-items:center;" in html
+    assert ".composer-plus-icon,.composer-send-icon" in html
+    assert ".modal-close" in html
+    assert 'class="modal-close" data-close="#confirm-clear"' in html
+    assert 'class="modal-close" data-close="#confirm-grade"' in html
+    assert ".file-chip .remove{display:grid;place-items:center;width:28px;height:28px;" in html
 
 
 def test_no_big_send_text_in_composer(client):

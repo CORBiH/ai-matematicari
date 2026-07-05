@@ -115,8 +115,9 @@
   textarea{width:100%;min-height:140px;padding:1rem;font-size:1.08rem;outline:none;resize:vertical;box-shadow:0 2px 8px rgba(0,0,0,.04);}
   textarea:focus{border-color:#3d7d66;box-shadow:0 4px 14px rgba(0,0,0,.08);}
 
-  .btn{background:var(--btn-bg);color:#fff;border:none;padding:.9rem 1.15rem;font-size:1rem;border-radius:12px;cursor:pointer;width:fit-content;transition: transform .05s ease, background .15s ease;}
+  .btn{background:var(--btn-bg);color:#fff;border:none;padding:.9rem 1.15rem;font-size:1rem;border-radius:12px;cursor:pointer;width:fit-content;transition: transform .05s ease, background .15s ease, border-color .15s ease, box-shadow .15s ease;}
   .btn:hover{background:var(--btn-bg-hover);} .btn:active{transform:translateY(1px);}
+  .btn:focus-visible{outline:2px solid rgba(86,200,143,.75);outline-offset:2px;}
   .btn.secondary{background:transparent;color:var(--btn-bg);border:2px solid var(--btn-bg);}
   .btn.danger{background:var(--danger);}
   .btn.sm{padding:.55rem .75rem;font-size:.95rem;border-radius:10px;}
@@ -131,15 +132,18 @@
   /* file chip */
   .file-chip{display:none;align-items:center;gap:.5rem;background:#13231f;border:1px dashed rgba(86,200,143,.45);color:#d8efe7;padding:.35rem .55rem;border-radius:999px;font-size:.88rem;}
   .file-chip.show{display:inline-flex;}
-  .file-chip .remove{background:transparent;border:none;font-size:1rem;cursor:pointer;color:inherit;line-height:1;}
+  .file-chip .remove{display:grid;place-items:center;width:28px;height:28px;background:#203139;border:1px solid rgba(255,255,255,.16);border-radius:999px;font-size:1.15rem;cursor:pointer;color:#f3fbf8;line-height:1;padding:0;}
+  .file-chip .remove:hover,.file-chip .remove:focus-visible{background:#2d4b43;border-color:rgba(86,200,143,.55);outline:none;}
 
   /* modal */
   .overlay{position:fixed;inset:0;background:var(--overlay);display:none;z-index:1100;}
   .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:1101;}
-  .modal .box{background:var(--modal-bg);color:var(--text);border:1px solid var(--modal-border);border-radius:14px;box-shadow:0 18px 60px rgba(0,0,0,.25);width:min(92vw,520px);padding:1rem;}
+  .modal .box{position:relative;background:var(--modal-bg);color:var(--text);border:1px solid var(--modal-border);border-radius:14px;box-shadow:0 18px 60px rgba(0,0,0,.25);width:min(92vw,520px);padding:1.05rem 3.2rem 1rem 1rem;}
   .modal .box h3{margin:.2rem 0 .6rem;font-size:1.25rem}
   .modal .box p{margin:.3rem 0 .9rem}
   .modal .actions{display:flex;gap:.5rem;justify-content:flex-end;margin-top:.6rem}
+  .modal-close{position:absolute;top:.65rem;right:.65rem;display:grid;place-items:center;width:40px;height:40px;border-radius:12px;border:1px solid rgba(255,255,255,.16);background:#233137;color:#f3fbf8;font-size:1.45rem;line-height:1;cursor:pointer;}
+  .modal-close:hover,.modal-close:focus-visible{background:#2d4b43;border-color:rgba(86,200,143,.6);outline:2px solid rgba(86,200,143,.35);outline-offset:2px;}
 
   /* start-grade box (kompaktno) */
   .grade-start{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;background:#16221e;border:2px dashed rgba(86,200,143,.45);padding:.75rem .9rem;border-radius:12px;margin-bottom:.9rem}
@@ -190,6 +194,10 @@
   .home-mode-sub{color:var(--muted);font-size:.86rem;line-height:1.45;}
   .home-picker-select{width:100%;font-size:1rem;padding:.6rem .8rem;border-radius:12px;
     border:1px solid var(--input-border);background:var(--input-bg);color:var(--text);}
+  .home-picker-grid{display:grid;gap:.8rem;}
+  .home-picker-group{display:grid;gap:.38rem;}
+  .home-field-label{font-weight:700;font-size:.92rem;color:#d8efe7;}
+  .home-picker-select:disabled{opacity:.58;cursor:not-allowed;}
   .home-picker-actions{display:flex;justify-content:space-between;gap:.6rem;margin-top:.9rem;}
 
   /* ===== SCREEN 2: Chat — jedan fokusiran panel ===== */
@@ -202,7 +210,9 @@
     color:#d8efe7;border-radius:999px;padding:.22rem .6rem;font-size:.82rem;font-weight:600;white-space:nowrap;
     max-width:46vw;overflow:hidden;text-overflow:ellipsis;}
   .tutor-topbar-actions{display:flex;gap:.4rem;flex:0 0 auto;}
-  .tutor-topbar-actions .btn.sm{padding:.35rem .6rem;font-size:.82rem;border-radius:9px;}
+  .tutor-topbar-actions .btn.sm{padding:.42rem .75rem;font-size:.88rem;border-radius:10px;}
+  .tutor-back-btn{display:inline-flex;align-items:center;justify-content:center;gap:.35rem;min-height:36px;min-width:86px;background:#d8efe7;color:#0d1815;border:1px solid rgba(216,239,231,.85);font-weight:800;box-shadow:0 6px 18px rgba(0,0,0,.22);}
+  .tutor-back-btn:hover{background:#eef6f3;color:#09100e;border-color:#eef6f3;}
   .tutor-fallback{background:#211a0f;border:1px dashed #b8842e;color:#f0d9a6;padding:.5rem .65rem;border-radius:10px;margin:.25rem 0;flex:0 0 auto;}
   body.dark .tutor-fallback{background:#241d0f;color:#f0d9a6;border-color:#8a6a2f;}
 
@@ -234,17 +244,18 @@
   .tutor-typing .dots::after{content:'...';animation:dots 1s steps(3,end) infinite;margin-left:.2rem;}
 
   /* ChatGPT-stil composer: jedan tamni zaobljeni pill [ + ] [ input ] [ ↑ ] */
-  .composer{display:flex;align-items:flex-end;gap:.45rem;background:#111315;border:1px solid #2b3033;
+  .composer{display:flex;align-items:center;gap:.45rem;background:#111315;border:1px solid #2b3033;
     border-radius:22px;padding:.32rem .45rem;box-shadow:0 2px 14px rgba(0,0,0,.28);flex:0 0 auto;}
   .composer textarea{flex:1;min-width:0;background:transparent;border:0;outline:0;color:#ececf1;resize:none;
     box-shadow:none;font-size:1.02rem;line-height:1.5;padding:.5rem .35rem;min-height:24px;max-height:180px;overflow-y:auto;}
   .composer textarea::placeholder{color:#9aa0aa;}
-  .composer-plus{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;
-    border-radius:50%;background:transparent;color:#c9ccd3;font-size:1.5rem;line-height:1;cursor:pointer;user-select:none;
+  .composer-plus{flex:0 0 auto;display:grid;place-items:center;width:36px;height:36px;padding:0;
+    border-radius:50%;background:transparent;color:#c9ccd3;font-size:1.5rem;line-height:0;cursor:pointer;user-select:none;
     transition:background .15s ease,color .15s ease;}
   .composer-plus:hover{background:#23282b;color:#fff;}
-  .composer-send{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;
-    border:0;border-radius:50%;background:#eef6f3;color:#101416;font-size:1.25rem;font-weight:700;line-height:1;
+  .composer-plus-icon,.composer-send-icon{display:block;line-height:1;transform:translateY(-1px);}
+  .composer-send{flex:0 0 auto;display:grid;place-items:center;width:36px;height:36px;padding:0;
+    border:0;border-radius:50%;background:#eef6f3;color:#101416;font-size:1.25rem;font-weight:700;line-height:0;
     cursor:pointer;transition:opacity .15s ease,transform .05s ease;}
   .composer-send:hover{opacity:.85;}
   .composer-send:active{transform:translateY(1px);}
@@ -309,7 +320,8 @@
     .home-heading{font-size:1.25rem;}
     .home-modes{grid-template-columns:1fr;}
     .tutor-pill{max-width:60vw;font-size:.78rem;}
-    .tutor-topbar-actions .btn.sm{padding:.32rem .5rem;font-size:.78rem;}
+    .tutor-topbar{align-items:flex-start;}
+    .tutor-topbar-actions .btn.sm{padding:.38rem .7rem;font-size:.82rem;}
     .tbubble{max-width:96%;font-size:.96rem;line-height:1.58;}
     .tmsg-bot .tbubble{max-width:96%;}
     .tmsg-user .tbubble{max-width:78%;}
@@ -400,13 +412,21 @@
         </div>
 
         <div class="home-step hidden" id="homePicker">
-          <label class="home-step-label" id="homePickerLabel" for="homeTopicSelect">Koju lekciju radiš?</label>
-          <select id="homeTopicSelect" class="home-picker-select">
-            <option value="">— izaberi lekciju —</option>
-          </select>
-          <select id="homeOblastSelect" class="home-picker-select hidden" aria-label="Oblast kontrolnog">
-            <option value="">— izaberi oblast —</option>
-          </select>
+          <div class="home-step-label" id="homePickerLabel">Izaberi oblast</div>
+          <div class="home-picker-grid">
+            <div class="home-picker-group" id="homeOblastGroup">
+              <label class="home-field-label" id="homeOblastLabel" for="homeOblastSelect">Oblast</label>
+              <select id="homeOblastSelect" class="home-picker-select" aria-label="Oblast">
+                <option value="">— izaberi oblast —</option>
+              </select>
+            </div>
+            <div class="home-picker-group hidden" id="homeTopicGroup">
+              <label class="home-field-label" id="homeTopicLabel" for="homeTopicSelect">Lekcija</label>
+              <select id="homeTopicSelect" class="home-picker-select" disabled>
+                <option value="">— prvo izaberi oblast —</option>
+              </select>
+            </div>
+          </div>
           <p id="homeTopicsError" class="muted hidden">Teme trenutno nisu dostupne — pokušaj „Samo rezultat“ ili osvježi stranicu.</p>
           <div class="home-picker-actions">
             <button type="button" class="btn secondary sm" id="homeBack">Nazad</button>
@@ -425,8 +445,7 @@
           <span class="tutor-pill hidden" id="topbarTopic"></span>
         </div>
         <div class="tutor-topbar-actions">
-          <button type="button" class="btn secondary sm" id="tutorChangeBtn" title="Vrati se na izbor">Promijeni</button>
-          <button type="button" class="btn secondary sm" id="tutorNewBtn" title="Obriši razgovor i počni iznova">🆕 Nova konverzacija</button>
+          <button type="button" class="btn sm tutor-back-btn" id="tutorBackBtn" title="Nazad na izbor">Nazad</button>
         </div>
       </div>
 
@@ -444,9 +463,9 @@
 
       <div class="composer" id="tutorComposer">
         <input id="tutorImage" type="file" accept="image/*" style="display:none;">
-        <label for="tutorImage" id="tutorImageBtn" class="composer-plus" title="Dodaj sliku zadatka" aria-label="Dodaj sliku zadatka">+</label>
+        <label for="tutorImage" id="tutorImageBtn" class="composer-plus" title="Dodaj sliku zadatka" aria-label="Dodaj sliku zadatka"><span class="composer-plus-icon" aria-hidden="true">+</span></label>
         <textarea id="tutorMessage" rows="1" placeholder="Upiši pitanje ili zadatak..."></textarea>
-        <button id="tutorSend" type="button" class="composer-send" title="Pošalji" aria-label="Pošalji">↑</button>
+        <button id="tutorSend" type="button" class="composer-send" title="Pošalji" aria-label="Pošalji"><span class="composer-send-icon" aria-hidden="true">↑</span></button>
       </div>
       <div class="muted" id="tutorMeta"></div>
 
@@ -513,6 +532,7 @@
 
   <div class="modal" id="confirm-clear">
     <div class="box">
+      <button type="button" class="modal-close" data-close="#confirm-clear" aria-label="Zatvori">×</button>
       <h3>Očisti chat?</h3>
       <p>Ova radnja briše cijelu konverzaciju. Ne može se poništiti.</p>
       <div class="actions">
@@ -524,6 +544,7 @@
 
   <div class="modal" id="confirm-grade">
     <div class="box">
+      <button type="button" class="modal-close" data-close="#confirm-grade" aria-label="Zatvori">×</button>
       <h3>Promjena razreda</h3>
       <p id="gradeMsg">Promijeniti razred?</p>
       <div class="actions">
@@ -963,6 +984,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const modeGrid    = document.getElementById('homeModes');
     const picker      = document.getElementById('homePicker');
     const pickerLabel = document.getElementById('homePickerLabel');
+    const oblastGroup = document.getElementById('homeOblastGroup');
+    const topicGroup  = document.getElementById('homeTopicGroup');
+    const oblastLabel = document.getElementById('homeOblastLabel');
+    const topicLabel  = document.getElementById('homeTopicLabel');
     const topicSelect = document.getElementById('homeTopicSelect');
     const oblastSelect= document.getElementById('homeOblastSelect');
     const topicsError = document.getElementById('homeTopicsError');
@@ -973,8 +998,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const topbarGrade = document.getElementById('topbarGrade');
     const topbarMode  = document.getElementById('topbarMode');
     const topbarTopic = document.getElementById('topbarTopic');
-    const changeBtn   = document.getElementById('tutorChangeBtn');
-    const newBtn      = document.getElementById('tutorNewBtn');
+    const chatBackBtn = document.getElementById('tutorBackBtn');
     const msgBox   = document.getElementById('tutorMessage');
     const sendTutor= document.getElementById('tutorSend');
     const fbBox    = document.getElementById('tutor-fallback');
@@ -1135,6 +1159,8 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     const topicNames = {};         // topic id → display_name (za prijateljski meta red)
     const topicOblasti = {};       // topic id → oblast (za payload kada je tema detektovana)
+    const topicsByOblast = {};     // oblast → lekcije u nastavnom redoslijedu
+    let oblastOrderCache = [];
     let topicsLoadedGrade = null;
 
     function tutorHistory(){
@@ -1356,15 +1382,38 @@ document.addEventListener('DOMContentLoaded', () => {
       picker.classList.add('hidden');
       modeGrid.querySelectorAll('.home-mode-card').forEach(x=>x.classList.remove('active'));
     }
-    function showPicker(mode){
-      loadTopicsForGrade(state.grade);
+    function resetLessonOptions(placeholder){
+      topicSelect.innerHTML = '<option value="">' + (placeholder || '— prvo izaberi oblast —') + '</option>';
+      topicSelect.value = '';
+      topicSelect.disabled = true;
+      if (topicGroup) topicGroup.classList.add('hidden');
+    }
+    function populateLessonOptions(oblast){
+      resetLessonOptions(oblast ? '— izaberi lekciju —' : '— prvo izaberi oblast —');
+      if (!oblast || state.mode === 'exam') return;
+      const lessons = topicsByOblast[oblast] || [];
+      lessons.forEach(t=>{
+        const opt = document.createElement('option');
+        opt.value = t.topic;
+        opt.textContent = t.display_name || t.topic;
+        opt.dataset.oblast = oblast;
+        topicSelect.appendChild(opt);
+      });
+      topicSelect.disabled = lessons.length === 0;
+      if (topicGroup) topicGroup.classList.toggle('hidden', lessons.length === 0);
+    }
+    async function showPicker(mode){
+      await loadTopicsForGrade(state.grade);
       const isExam = mode === 'exam';
-      pickerLabel.textContent = isExam ? 'Iz koje oblasti je kontrolni?' : 'Koju lekciju radiš?';
-      pickerLabel.setAttribute('for', isExam ? 'homeOblastSelect' : 'homeTopicSelect');
-      topicSelect.classList.toggle('hidden', isExam);
-      oblastSelect.classList.toggle('hidden', !isExam);
+      pickerLabel.textContent = isExam ? 'Izaberi oblast za kontrolni' : 'Izaberi oblast, pa lekciju';
+      if (oblastLabel) oblastLabel.textContent = 'Oblast';
+      if (topicLabel) topicLabel.textContent = 'Lekcija';
+      if (oblastGroup) oblastGroup.classList.remove('hidden');
+      oblastSelect.value = '';
+      state.oblast = '';
+      resetLessonOptions(isExam ? '— kontrolni je iz cijele oblasti —' : '— prvo izaberi oblast —');
       picker.classList.remove('hidden');
-      try { (isExam ? oblastSelect : topicSelect).focus(); } catch(_){}
+      try { oblastSelect.focus(); } catch(_){}
     }
 
     /* mode kartice: explain/practice traže lekciju, exam traži oblast, quick ide odmah u chat */
@@ -1398,6 +1447,16 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     backBtn.addEventListener('click', hidePicker);
+    oblastSelect.addEventListener('change', ()=>{
+      const ob = oblastSelect.value || '';
+      if (state.mode === 'exam'){
+        state.oblast = ob;
+        resetLessonOptions('— kontrolni je iz cijele oblasti —');
+      } else {
+        state.oblast = '';
+        populateLessonOptions(ob);
+      }
+    });
 
     continueBtn.addEventListener('click', ()=>{
       if (state.mode === 'exam'){
@@ -1409,12 +1468,14 @@ document.addEventListener('DOMContentLoaded', () => {
         enterChat(AUTO_MESSAGES.exam);
         return;
       }
+      const ob = oblastSelect.value;
+      if (!ob){ showToast('Prvo izaberi oblast.', 'err'); try{ oblastSelect.focus(); }catch(_){} return; }
       const t = topicSelect.value;
       if (!t){ showToast('Prvo izaberi lekciju.', 'err'); try{ topicSelect.focus(); }catch(_){} return; }
       const opt = topicSelect.options[topicSelect.selectedIndex];
       state.topic = t;
       state.topicName = (opt && opt.textContent) || t;
-      state.topicOblast = (opt && opt.dataset && opt.dataset.oblast) || '';
+      state.topicOblast = (opt && opt.dataset && opt.dataset.oblast) || ob;
       state.topicSource = 'manual_topic_choice';
       state.oblast = '';
       try { localStorage.removeItem(LASTTASK_KEY); } catch(_){} // nova tema = svjež practice tok
@@ -1460,10 +1521,10 @@ document.addEventListener('DOMContentLoaded', () => {
       hidePicker();
     }
 
-    /* "Promijeni" (jedina topbar akcija): nazad na izbor — transcript i historija
+    /* "Nazad" (jedina topbar akcija): nazad na izbor — transcript i historija
        razgovora OSTAJU, ali se practice/follow-up stanje čisti da staro stanje
        ne procuri u novi izbor (faza, zadnji zadatak, slika, placeholder). */
-    changeBtn.addEventListener('click', ()=>{
+    chatBackBtn.addEventListener('click', ()=>{
       interactionPhase = null;
       try { localStorage.removeItem(LASTTASK_KEY); } catch(_){}
       clearTutorImage();
@@ -1472,21 +1533,23 @@ document.addEventListener('DOMContentLoaded', () => {
       showHome();
     });
 
-    /* Phase 1 (audit): "Nova konverzacija" — vraćena vidljiva akcija koja briše
-       transcript, historiju, zadnji zadatak i fazu, pa vodi na početni ekran. */
-    if (newBtn) newBtn.addEventListener('click', ()=>{
+    /* Interni reset ostaje dostupan ako zatreba: briše transcript, historiju,
+       zadnji zadatak i fazu, pa vodi na početni ekran. Nije izložen kao topbar dugme. */
+    function startFreshTutorConversation(){
       resetTutorConversation();
       state.topic = ''; state.topicName = ''; state.topicOblast = ''; state.topicSource = ''; state.oblast = '';
       try { localStorage.removeItem(CTX_KEY); } catch(_){}
       showHome();
-    });
+    }
 
     /* teme i oblasti iz backenda (nikad hardkodirano): lekcije grupisane po
        oblasti za explain/practice, lista oblasti za exam */
     function resetTopicOptions(){
       Object.keys(topicNames).forEach(k=>{ delete topicNames[k]; });
       Object.keys(topicOblasti).forEach(k=>{ delete topicOblasti[k]; });
-      topicSelect.innerHTML = '<option value="">— izaberi lekciju —</option>';
+      Object.keys(topicsByOblast).forEach(k=>{ delete topicsByOblast[k]; });
+      oblastOrderCache = [];
+      resetLessonOptions();
       oblastSelect.innerHTML = '<option value="">— izaberi oblast —</option>';
     }
 
@@ -1505,19 +1568,13 @@ document.addEventListener('DOMContentLoaded', () => {
            redoslijed ključeva); fallback na ključeve za starije odgovore */
         const oblastOrder = (data && Array.isArray(data.oblast_order) && data.oblast_order.length)
           ? data.oblast_order : Object.keys(grouped);
+        oblastOrderCache = oblastOrder.slice();
         oblastOrder.forEach(oblast=>{
-          const og = document.createElement('optgroup');
-          og.label = oblast;
-          (grouped[oblast] || []).forEach(t=>{
+          topicsByOblast[oblast] = (grouped[oblast] || []).slice();
+          topicsByOblast[oblast].forEach(t=>{
             topicNames[t.topic] = t.display_name || t.topic;
             topicOblasti[t.topic] = oblast;
-            const opt = document.createElement('option');
-            opt.value = t.topic;
-            opt.textContent = t.display_name || t.topic;
-            opt.dataset.oblast = oblast;
-            og.appendChild(opt);
           });
-          topicSelect.appendChild(og);
           const ob = document.createElement('option');
           ob.value = oblast;
           ob.textContent = oblast;
@@ -1636,9 +1693,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function showFallback(status){
       let msg = '';
-      if (status === 'ambiguous') msg = 'Pronašao sam više sličnih lekcija. Klikni "Promijeni" pa izaberi lekciju koju trenutno radiš.';
-      else if (status === 'fallback') msg = 'Ne mogu automatski prepoznati lekciju. Klikni "Promijeni" i izaberi lekciju, ili pošalji konkretan zadatak.';
-      else if (status === 'invalid') msg = 'Izabrana tema nije prepoznata. Klikni "Promijeni" i izaberi lekciju iz liste.';
+      if (status === 'ambiguous') msg = 'Pronašao sam više sličnih lekcija. Klikni "Nazad" pa izaberi oblast i lekciju koju trenutno radiš.';
+      else if (status === 'fallback') msg = 'Ne mogu automatski prepoznati lekciju. Klikni "Nazad" i izaberi oblast/lekciju, ili pošalji konkretan zadatak.';
+      else if (status === 'invalid') msg = 'Izabrana tema nije prepoznata. Klikni "Nazad" i izaberi lekciju iz liste.';
       else return;
       fbMsg.textContent = msg;
       fbBox.classList.remove('hidden');
