@@ -16,6 +16,8 @@ import re
 from typing import Any, Callable
 
 from matbot.activity_log import log_student_activity
+from matbot.answer_checker import check_practice_answer, summarize_result
+from matbot.bosnian import to_ijekavica
 from matbot.content_loader import (
     get_master,
     get_thinkific_map,
@@ -82,6 +84,9 @@ MAX_MESSAGE_CHARS = 4000
 MAX_HISTORY_ITEMS = 5
 MAX_HISTORY_ITEM_CHARS = 1500
 MAX_LAST_TASK_CHARS = 1000
+# Audit: anti-ponavljanje zadataka — frontend šalje zadnje date zadatke.
+MAX_RECENT_TASKS = 6
+MAX_RECENT_TASK_CHARS = 300
 
 # max_tokens po modu (app._openai_chat podržava max_tokens parametar).
 # Phase 1 (audit): quick 250→400 — reasoning modeli troše dio budžeta na
@@ -162,15 +167,44 @@ def _looks_like_practice_task_text(text: Any) -> bool:
     return has_action and (has_signal or len(folded.split()) >= 4)
 
 
-def extract_practice_task(answer: Any, limit: int = 600) -> str:
+_NUMBERED_TASK_LINE_RE = re.compile(r"^\s*(\d{1,2})[.)]\s+(.+)$")
+
+
+def _extract_numbered_tasks(raw: str, limit: int) -> str:
+    """Audit: exam odgovor sadrži VIŠE numerisanih zadataka (1., 2., 3.) —
+    sačuvaj ih SVE sa numeracijom, da provjera odgovora "1) ... 2) ..." zna
+    koje stavke postoje (ranije se pamtio samo prvi zadatak)."""
+    tasks: list[tuple[int, str]] = []
+    for line in raw.splitlines():
+        m = _NUMBERED_TASK_LINE_RE.match(line)
+        if not m:
+            continue
+        n, body = int(m.group(1)), m.group(2).strip()
+        if _looks_like_practice_task_text(body) and (
+            any(ch.isdigit() for ch in body) or body.rstrip().endswith("?")
+        ):
+            tasks.append((n, body))
+    numbers = [n for n, _b in tasks]
+    if len(tasks) < 2 or numbers[0] != 1 or any(b <= a for a, b in zip(numbers, numbers[1:])):
+        return ""
+    return "\n".join(f"{n}. {b}" for n, b in tasks)[:limit]
+
+
+def extract_practice_task(answer: Any, limit: int = 600, mode: str | None = None) -> str:
     """Best-effort extraction of the exact visible task from an assistant answer.
 
     The response text remains the source of truth; this only turns the visible
     task into structured metadata so the browser can carry it into the next turn.
+    ``mode == "exam"`` prvo pokušava više numerisanih zadataka odjednom.
     """
     raw = normalize_value(answer).replace("\r\n", "\n").replace("\r", "\n").strip()
     if not raw:
         return ""
+
+    if mode == "exam":
+        numbered = _extract_numbered_tasks(raw, limit)
+        if numbered:
+            return numbered
 
     paragraphs = [
         _clean_task_candidate(p, limit)
@@ -346,6 +380,16 @@ def _sanitize_payload(payload: dict) -> dict:
         payload["conversation_history"] = trimmed
     else:
         payload["conversation_history"] = []
+    # anti-ponavljanje: lista nedavno datih zadataka (samo stringovi, skraćeno)
+    recent = payload.get("recent_tasks")
+    if isinstance(recent, list):
+        payload["recent_tasks"] = [
+            normalize_value(t)[:MAX_RECENT_TASK_CHARS]
+            for t in recent[-MAX_RECENT_TASKS:]
+            if isinstance(t, str) and normalize_value(t)
+        ]
+    else:
+        payload["recent_tasks"] = []
     return payload
 
 
@@ -407,6 +451,17 @@ def _prepare_chat(
     # Default: grade -> 6 ako nije zadan; grade bira master/map i tutor prompt.
     payload["grade"] = normalize_grade(payload.get("grade") or DEFAULT_GRADE)
     _sanitize_payload(payload)
+
+    # --- Audit: deterministička provjera odgovora PRIJE prompta -----------------
+    # Kada je poruka odgovor na prethodni zadatak, kod sam izračuna i uporedi
+    # rezultat(e) gdje god može (razlomci, mješoviti brojevi, komplement,
+    # pretvaranje, direktan račun). Presuda ulazi u prompt i model je NE SMIJE
+    # mijenjati — time nestaje klasa grešaka "tačan odgovor proglašen netačnim".
+    if normalize_value(payload.get("interaction_phase")).lower() == "answering_practice_task":
+        _task = normalize_value(payload.get("last_tutor_task"))
+        _student = normalize_value(payload.get("student_message") or payload.get("message"))
+        if _task and _student:
+            payload["answer_check"] = check_practice_answer(_task, _student)
 
     grade = payload["grade"]
     master = master if master is not None else get_master(grade=grade)
@@ -527,6 +582,11 @@ def _finalize_response(prep: dict, answer: str) -> dict:
     prompt_result = prep["prompt_result"]
     mode, status = prep["mode"], prep["status"]
 
+    # Audit: jezička zaštita — vrlo česti ekavski oblici ("deo", "rešenje") →
+    # ijekavica. Streaming klijent na kraju ponovo renderuje answer iz "done"
+    # događaja, pa ispravka važi i za streamane odgovore.
+    answer = to_ijekavica(answer)
+
     entry_source_used = normalize_value(payload.get("entry_source")) or normalize_value(
         prep["lookup_result"].get("source")
     )
@@ -549,9 +609,15 @@ def _finalize_response(prep: dict, answer: str) -> dict:
         "status": status,
         "mode": mode,
     }
-    task_text = extract_practice_task(answer) if status == "ready" else ""
+    task_text = extract_practice_task(answer, mode=mode) if status == "ready" else ""
     if task_text:
         response["last_tutor_task"] = task_text
+
+    # Audit: sažetak determinističke provjere u response (telemetrija/testovi).
+    check = payload.get("answer_check")
+    check_summary = summarize_result(check) if check is not None else None
+    if check_summary:
+        response["answer_check"] = check_summary
 
     # Phase 5: minimalni activity log — greška NIKAD ne ruši tutor odgovor.
     try:

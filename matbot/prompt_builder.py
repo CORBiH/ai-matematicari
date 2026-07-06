@@ -33,6 +33,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from matbot.answer_checker import format_check_block
 from matbot.content_loader import normalize_value
 from matbot.tutor_prompts import (
     CHAT_FORMATTING_GUIDELINES,
@@ -202,10 +203,17 @@ def build_mode_instructions(mode: Any, final_topic: Any, topic_context: dict) ->
             "MOD: VJEŽBAJ (practice)\n"
             "- Daj TAČNO JEDAN zadatak i onda ČEKAJ odgovor učenika.\n"
             "- NE daji 10 zadataka odjednom.\n"
+            "- Ako je u kontekstu naveden spisak NEDAVNO DATIH ZADATAKA, tvoj "
+            "novi zadatak mora biti RAZLIČIT od svih njih: drugi brojevi i "
+            "drugi kontekst (ne mijenjaj samo jednu riječ).\n"
         )
         tasks = _collect(topic_context, ("typical_task_1", "typical_task_2", "typical_task_3"))
         if tasks:
-            block += "- Izaberi JEDAN od ponuđenih tipičnih zadataka:\n"
+            block += (
+                "- Ponuđeni tipični zadaci su UZOR za tip i težinu; ako su svi "
+                "već iskorišteni, napravi novi zadatak istog tipa sa drugim "
+                "brojevima:\n"
+            )
             block += "".join(f"   • {t}\n" for t in tasks)
         return block
 
@@ -269,8 +277,11 @@ def build_practice_followup_instructions(payload: dict, topic_context: dict) -> 
     practice zadatak (``payload.interaction_phase == 'answering_practice_task'``).
 
     Zamjenjuje standardne practice instrukcije: AI provjerava odgovor umjesto da
-    postavlja novi zadatak ili ponavlja lekciju."""
-    last_task = normalize_value((payload or {}).get("last_tutor_task"))[:600]
+    postavlja novi zadatak ili ponavlja lekciju. Audit: ako postoji
+    ``payload["answer_check"]`` (deterministička provjera iz koda), njena presuda
+    je OBAVEZUJUĆA za model."""
+    payload = payload or {}
+    last_task = normalize_value(payload.get("last_tutor_task"))[:600]
     block = (
         "MOD: VJEŽBA — PROVJERA ODGOVORA (practice follow-up)\n"
         "- The student is responding to this exact previous task: "
@@ -280,11 +291,29 @@ def build_practice_followup_instructions(payload: dict, topic_context: dict) -> 
         "tretiraj je kao novo pitanje niti kao zahtjev za novi zadatak.\n"
         "- Provjeri tačnost odgovora koristeći TAČNO taj prethodni vidljivi zadatak "
         "i historiju razgovora.\n"
+        "- OBAVEZAN POSTUPAK PROVJERE: PRVO sam riješi zadatak i izračunaj tačan "
+        "rezultat, TEK ONDA uporedi sa učenikovim odgovorom. NIKAD ne piši "
+        "\"Nije tačno\" prije nego što si sam izračunao rezultat.\n"
+        "- PRIHVATI EKVIVALENTNE OBLIKE kao tačne: neskraćeni razlomak "
+        "(3/5 = 6/10), mješoviti i nepravi zapis istog broja (2 1/4 = 9/4), "
+        "decimalni zapis iste vrijednosti — osim kada zadatak izričito traži "
+        "određeni oblik (tada je vrijednost tačna, ali objasni traženi oblik).\n"
+        "- PRVA REČENICA tvog odgovora mora sadržavati konačan sud (npr. "
+        "\"Tačno!\", \"Nije tačno.\", \"Djelimično tačno.\") i OSTATAK odgovora "
+        "NE SMIJE protivrječiti tom sudu.\n"
+        "- Ako zadatak ima VIŠE numerisanih stavki: ocijeni SVAKU stavku posebno "
+        "i jasno navedi koja je tačna, a koja nije. Stavku na koju učenik NIJE "
+        "odgovorio NE ocjenjuj kao netačnu — na kraju zamoli odgovor SAMO za nju. "
+        "NIKAD ne proglašavaj cijeli odgovor netačnim ako je samo jedna stavka "
+        "pogrešna.\n"
         "- Ako je TAČNO: kratko potvrdi (npr. \"Tačno!\"), u 1–2 rečenice objasni "
         "zašto, ali NE dodaji novi zadatak ako ga učenik nije zatražio.\n"
-        "- Ako NIJE tačno: blago reci da nije tačno. Za kratak računski zadatak "
-        "prikaži tačan račun i rezultat; za konceptualni zadatak daj JEDAN hint "
-        "ili JEDAN sljedeći korak.\n"
+        "- Ako NIJE tačno: blago reci da nije tačno i POKAŽI tačan račun korak po "
+        "korak (nikad samo \"nije tačno\" bez računa); za konceptualni zadatak "
+        "daj JEDAN hint ili JEDAN sljedeći korak.\n"
+        "- Ako si prikazao KOMPLETNO rješenje zadatka, NE traži od učenika da "
+        "\"proba ponovo\" ISTI zadatak — umjesto toga ponudi JEDAN sličan novi "
+        "zadatak (npr. \"Hoćeš sličan zadatak da provježbaš?\").\n"
         "- Ako učenik napiše \"ne znam\", \"objasni\" ili \"pomozi\": daj JEDAN "
         "vođeni hint ili JEDAN sljedeći korak — NE novi zadatak i NE cijelo "
         "rješenje odmah.\n"
@@ -299,6 +328,11 @@ def build_practice_followup_instructions(payload: dict, topic_context: dict) -> 
     )
     if last_task:
         block += f"ZADNJI ZADATAK (tačan vidljivi tekst):\n{last_task}\n"
+    check = payload.get("answer_check")
+    if check is not None:
+        check_block = format_check_block(check)
+        if check_block:
+            block += check_block + "\n"
     return block
 
 
@@ -456,6 +490,25 @@ def _build_video_flow_block(vf: dict | None) -> str:
     return "\n".join(lines)
 
 
+def _build_recent_tasks_block(payload: dict, mode: str, interaction_phase: str = "") -> str:
+    """Audit: anti-ponavljanje — spisak nedavno datih zadataka (šalje ga browser).
+
+    Ulazi u prompt SAMO kada model treba generisati novi zadatak (practice/exam
+    bez follow-up faze); model se ne oslanja na vlastito pamćenje historije."""
+    if mode not in ("practice", "exam") or interaction_phase:
+        return ""
+    tasks = [normalize_value(t) for t in (payload or {}).get("recent_tasks") or []]
+    tasks = [t for t in tasks if t]
+    if not tasks:
+        return ""
+    lines = [
+        "NEDAVNO DATI ZADACI (učenik ih je VEĆ dobio — novi zadatak mora biti "
+        "drugačiji: drugi brojevi I drugi kontekst):"
+    ]
+    lines.extend(f"- {t}" for t in tasks[-6:])
+    return "\n".join(lines)
+
+
 def _build_student_block(payload: dict) -> str:
     parts = []
     msg = normalize_value(payload.get("student_message") or payload.get("message"))
@@ -577,6 +630,7 @@ def build_tutor_prompt(
     for block in (
         _build_topic_block(topic_context, mode=topic_block_mode),
         _build_video_flow_block(video_flow),
+        _build_recent_tasks_block(payload, mode, interaction_phase),
         mode_block,
         _build_student_block(payload),
     ):
@@ -628,6 +682,7 @@ def build_general_tutor_prompt(payload: dict) -> dict:
         f"- Odgovori na KONKRETNO pitanje koristeći gradivo {normalize_value(payload.get('grade')) or '6'}. razreda, kratko i "
         "korak po korak.\n"
         "- NE izmišljaj temu i ne spominji internu listu tema.",
+        _build_recent_tasks_block(payload, mode, phase),
         mode_block,
         _build_student_block(payload),
     ]
@@ -708,15 +763,19 @@ def build_exam_oblast_prompt(payload: dict, master_content: dict) -> dict | None
         "\"Trik:\" i red \"Upozorenje:\".\n"
         "- Koristi ISKLJUČIVO teme i materijal iz bloka iznad — NE izmišljaj "
         "teme ni sadržaj.\n"
+        "- Ako je naveden spisak NEDAVNO DATIH ZADATAKA, novi zadaci moraju "
+        "biti različiti od njih (drugi brojevi i kontekst).\n"
     )
+    exam_phase = normalize_value(payload.get("interaction_phase")).lower()
     # Phase 7.2: "može"/"nastavi" usred exam sesije → nastavak od zadnje poruke,
     # ne ponovni ispis 3 zadatka (materijal oblasti ostaje kao kontekst).
-    if normalize_value(payload.get("interaction_phase")).lower() == "continuing_explanation":
+    if exam_phase == "continuing_explanation":
         mode_block = build_continuation_instructions(payload)
 
     user_parts = [
         _build_entry_context(payload, "unknown", "exam"),
         oblast_block,
+        _build_recent_tasks_block(payload, "exam", exam_phase),
         mode_block,
         _build_student_block(payload),
     ]

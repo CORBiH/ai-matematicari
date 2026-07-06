@@ -66,3 +66,46 @@ svi vanjski servisi mockirani).
 ## Namjerno NIJE mijenjano
 - `requirements.txt`, `Dockerfile`, `cloudbuild.yaml`, `deploy.sh`, `Procfile`
 - modeli, oblici API odgovora, pedagoški promptovi, bosanski tekstovi, legacy `/` ruta
+
+---
+
+# Tutor/practice pouzdanost — audit jul 2026 (lokalno)
+
+Cilj: ukloniti klase grešaka u ocjenjivanju (tačan odgovor proglašen netačnim,
+kontradikcije, ignorisane/pogrešno ocijenjene stavke), ponavljanje zadataka,
+ekavske oblike i loš auto-scroll. Verifikacija: `pytest` (510 testova) +
+`python scripts/eval_tutor.py` (34 slučaja, rutiranje 0 grešaka).
+
+## Novi moduli
+| Modul | Šta radi |
+|---|---|
+| `matbot/answer_checker.py` | Deterministička provjera odgovora u KODU (`fractions.Fraction`): komplement razlomka ("koji dio nije/ostaje"), pretvaranje mješoviti↔nepravi, direktan račun (`izračunaj ...` i čisti izrazi), skraćivanje; numerisane stavke ("1) 3/5 2) 1/4"); ekvivalencija (3/5=6/10, 2 1/4=9/4); parsira i LaTeX zapis zadatka (`\frac{a}{b}`). KONZERVATIVNO: kad nije sigurno → `unverified` (nikad izmišljeno "netačno"); komplement bez riječi "dio" smije samo POTVRDITI tačno (positive_only). |
+| `matbot/bosnian.py` | `to_ijekavica()` — zadnja linija odbrane za česte ekavske oblike (deo→dio, rešenje→rješenje, vežba→vježba...); word-boundary, čuva veliko slovo, ne dira matematički zapis ni riječi poput "video". |
+
+## matbot/ai_tutor_service.py
+- `_prepare_chat`: pri `interaction_phase=answering_practice_task` pokreće checker; presuda ide u prompt (obavezujuća za model) i u response (`answer_check`).
+- `_sanitize_payload`: novo polje `recent_tasks` (max 6 × 300 znakova) — anti-ponavljanje.
+- `_finalize_response`: `to_ijekavica(answer)` (važi i za stream — klijent finalni render radi iz `done.answer`); `extract_practice_task(..., mode=...)`.
+- `extract_practice_task`: za `exam` hvata SVE numerisane zadatke (1., 2., 3.) sa numeracijom — ranije samo prvi, pa provjera "1) ... 2) ..." nije imala stavke 2 i 3.
+
+## Promptovi (matbot/tutor_prompts.py, matbot/prompt_builder.py)
+- Nova system sekcija TAČNOST PRI PROVJERI ODGOVORA: prvo sam izračunaj pa presudi; ekvivalentni zapisi su tačni; numerisane stavke posebno; bez kontradikcije; PROVJERA IZ SISTEMA je obavezujuća.
+- JEZIK I TON: eksplicitno dio/cijeli/rješenje/vježba/primjer/sljedeći (NIKAD ekavski).
+- Practice follow-up: blok PROVJERA IZ SISTEMA (per-stavka TAČNO/NETAČNO/BEZ ODGOVORA/neprovjereno); prva rečenica = konačan sud; neodgovorena stavka se NE ocjenjuje nego traži; poslije kompletnog rješenja NEMA "probaj ponovo" za isti zadatak.
+- Practice/exam: blok NEDAVNO DATI ZADACI (iz `recent_tasks`) + pravilo da novi zadatak mora imati druge brojeve i kontekst; tipični zadaci iz mastera su "uzor", ne fiksna lista.
+
+## Frontend (templates/index.html)
+- Auto-scroll: `scrollTutorToBottom()` i NAKON `MathJax.typesetPromise` (typeset naknadno mijenja visinu poruke) — za poruke i za finalni render streama.
+- Chips: uklonjen "🔁 Ponovi zadatak" (dupliranje chata); tokom čekanja odgovora sada hint + "➕ Novi zadatak".
+- `recent_tasks`: localStorage (`matbot_tutor_recent_<cid>`, zadnjih 6) → šalje se u payloadu; čisti se pri resetu konverzacije i "Očisti chat".
+
+## Testovi
+- `tests/test_answer_checker.py` (30): primjeri A–D kao regresije opštih klasa + ekvivalencija, mješoviti/nepravi, LaTeX, decimalni zarez, konzervativnost (jedinice, dodatni brojevi, "ne znam").
+- `tests/test_tutor_grading_flow.py` (26): presuda u promptu i responsu (sync + stream), anti-ponavljanje, exam multi-task ekstrakcija, ijekavica post-processing, system prompt pravila.
+- `tests/test_ai_tutor_widget_template.py` (+3): auto-scroll poslije typeseta, chips bez duplikata, recent_tasks plumbing.
+- `docs/eval/eval_cases.json` (+5): grading regresije za LIVE eval (A–D + no-repeat).
+
+## Poznata ograničenja
+- Checker pokriva razlomke/cijele/decimalne i 4 klase zadataka; ostalo ocjenjuje model uz stroža pravila (prvo izračunaj, pa presudi).
+- Stream može nakratko prikazati ekavski oblik dok traje kucanje; finalni render je ispravljen.
+- `temperature` se namjerno NE šalje (gpt-5 familija ne prima custom vrijednost kroz chat completions).

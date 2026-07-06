@@ -636,3 +636,43 @@ def test_embed_token_meta_and_header(client):
     assert 'name="matbot-embed-token"' in html
     assert "function tutorHeaders(extra)" in html
     assert "h['X-Tutor-Token'] = EMBED_TOKEN" in html
+
+
+# --- Audit: auto-scroll, chips bez duplikata, anti-ponavljanje zadataka -----------
+
+def test_autoscroll_after_mathjax_typeset(client):
+    """Scroll na dno se ponavlja NAKON MathJax typeseta — typeset je asinhron i
+    naknadno mijenja visinu poruke (bez ovoga odgovor ostane van ekrana)."""
+    html = _html(client)
+    assert "function scrollTutorToBottom()" in html
+    # i za obicne poruke i za finalni render streama
+    assert html.count(".then(scrollTutorToBottom)") >= 2
+
+
+def test_repeat_task_chip_removed_new_task_chip_present(client):
+    """"Ponovi zadatak" chip je uklonjen (dupliralo je obican chat); tokom
+    cekanja odgovora ostaju hint + novi zadatak."""
+    html = _html(client)
+    assert "Ponovi zadatak" not in html
+    assert "Ne znam — daj mi hint" in html
+    assert "Novi zadatak" in html
+    assert "Daj mi novi zadatak." in html       # ide kroz isNewPracticeTaskRequest
+
+
+def test_recent_tasks_tracked_and_sent(client):
+    """Zadnji dati zadaci se pamte lokalno i salju backendu (recent_tasks) —
+    zastita od ponavljanja istih zadataka."""
+    html = _html(client)
+    assert "matbot_tutor_recent_" in html
+    assert "function storedRecentTasks()" in html
+    assert "function pushRecentTask(t)" in html
+    assert "payload.recent_tasks = recentTasks" in html
+    # pamti se tek kad odgovor stvarno sadrzi zadatak
+    idx = html.index("function applyTutorResponse")
+    snippet = html[idx:idx + 900]
+    assert "pushRecentTask(taskText)" in snippet
+    # cisti se i pri resetu konverzacije i u "Ocisti chat"
+    ridx = html.index("function resetTutorConversation()")
+    assert "RECENTTASKS_KEY" in html[ridx:ridx + 900]
+    didx = html.index("doClear")
+    assert "matbot_tutor_recent_" in html[didx:html.index("promjena razreda kroz meni")]

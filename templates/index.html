@@ -801,6 +801,7 @@ document.addEventListener('DOMContentLoaded', () => {
       Object.keys(localStorage)
         .filter(k => k.startsWith('matbot_tutor_history_') || k.startsWith('matbot_tutor_lasttask_')
                   || k.startsWith('matbot_tutor_lasttopic_')
+                  || k.startsWith('matbot_tutor_recent_')
                   || k.startsWith('matbot_tutor_ctx_'))
         .forEach(k => localStorage.removeItem(k));
     } catch (_) {}
@@ -1090,11 +1091,19 @@ document.addEventListener('DOMContentLoaded', () => {
       tutorChat.insertBefore(row, tutorTyping);
       return { row: row, bubble: b };
     }
+    /* Audit: scroll na dno i ODMAH i NAKON MathJax typeseta — typeset je
+       asinhron i naknadno povećava visinu bubble-a, pa scroll prije njega
+       ostavi poruku djelimično van ekrana (desktop i mobilni). */
+    function scrollTutorToBottom(){
+      tutorChat.scrollTop = tutorChat.scrollHeight;
+    }
     function appendTutorMsg(role, html){
       const made = createTutorBubble(role);
       made.bubble.innerHTML = html || '<i>Nema odgovora.</i>';
-      if (window.MathJax && MathJax.typesetPromise) MathJax.typesetPromise([made.bubble]);
-      tutorChat.scrollTop = tutorChat.scrollHeight;
+      scrollTutorToBottom();
+      if (window.MathJax && MathJax.typesetPromise){
+        MathJax.typesetPromise([made.bubble]).then(scrollTutorToBottom).catch(()=>{});
+      }
       return made;
     }
 
@@ -1113,6 +1122,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const TKEY = 'matbot_tutor_history_' + cid;
     const LASTTASK_KEY = 'matbot_tutor_lasttask_' + cid;
     const LASTTOPIC_KEY = 'matbot_tutor_lasttopic_' + cid;
+    /* Audit: zadnjih ~6 datih zadataka — šalju se backendu (recent_tasks) da
+       novi generisani zadatak NE ponovi iste brojeve/kontekst. Model se ne
+       oslanja na vlastito pamćenje historije. */
+    const RECENTTASKS_KEY = 'matbot_tutor_recent_' + cid;
     /* Phase 1 (audit): historija je vezana za kontekst (razred+mod+tema/oblast).
        Promjena konteksta BRIŠE staru historiju — stara tema ne smije "nevidljivo"
        curiti u novu konverzaciju. */
@@ -1181,6 +1194,17 @@ document.addEventListener('DOMContentLoaded', () => {
     function storedLastTask(){
       try { return (localStorage.getItem(LASTTASK_KEY) || '').trim(); }
       catch(_){ return ''; }
+    }
+    function storedRecentTasks(){
+      try { const a = JSON.parse(localStorage.getItem(RECENTTASKS_KEY) || '[]'); return Array.isArray(a) ? a : []; }
+      catch(_){ return []; }
+    }
+    function pushRecentTask(t){
+      const s = (t || '').trim().slice(0, 300);
+      if (!s) return;
+      const a = storedRecentTasks().filter(x => x !== s);
+      a.push(s);
+      try { localStorage.setItem(RECENTTASKS_KEY, JSON.stringify(a.slice(-6))); } catch(_){}
     }
     function isNewPracticeTaskRequest(t){
       const s = foldTutorText(t).trim();
@@ -1341,6 +1365,7 @@ document.addEventListener('DOMContentLoaded', () => {
       lastTutorMessage = '';
       try { localStorage.removeItem(TKEY); } catch(_){}
       try { localStorage.removeItem(LASTTASK_KEY); } catch(_){}
+      try { localStorage.removeItem(RECENTTASKS_KEY); } catch(_){}
       clearStoredActiveTopic();
       clearTutorImage();
       msgBox.value = '';
@@ -1626,9 +1651,12 @@ document.addEventListener('DOMContentLoaded', () => {
     function chipDefs(j){
       if (!j || j.status !== 'ready') return [];
       if (interactionPhase === 'awaiting_practice_answer'){
+        /* Audit: chip za ponavljanje zadatka je uklonjen — duplirao je običan
+           chat i navodio tutora da isti zadatak ispiše ponovo. Koristan par
+           je hint + novi zadatak. */
         return [
           { label: '🙋 Ne znam — daj mi hint', msg: 'Ne znam.' },
-          { label: '🔁 Ponovi zadatak', msg: 'Možeš li ponoviti zadatak?' }
+          { label: '➕ Novi zadatak', msg: 'Daj mi novi zadatak.' }
         ];
       }
       const mode = j.mode || state.mode;
@@ -1751,6 +1779,8 @@ document.addEventListener('DOMContentLoaded', () => {
         student_message: text,
         conversation_history: tutorHistory()
       };
+      const recentTasks = storedRecentTasks();
+      if (recentTasks.length) payload.recent_tasks = recentTasks;
       if (answerPhase){                            // odgovor na practice zadatak
         payload.interaction_phase = answerPhase;
         payload.mode = 'practice';
@@ -1893,8 +1923,9 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       const finalAnswer = doneData.answer || acc;
       made.bubble.innerHTML = renderTutorHTML(finalAnswer);   // finalni render JEDNOM
-      if (window.MathJax && MathJax.typesetPromise) MathJax.typesetPromise([made.bubble]);
-      tutorChat.scrollTop = tutorChat.scrollHeight;
+      scrollTutorToBottom();
+      /* scroll i poslije typeseta — MathJax naknadno mijenja visinu poruke */
+      if (window.MathJax && MathJax.typesetPromise) MathJax.typesetPromise([made.bubble]).then(scrollTutorToBottom).catch(()=>{});
       return { j: doneData, rendered: true };
     }
 
@@ -1902,7 +1933,10 @@ document.addEventListener('DOMContentLoaded', () => {
     function applyTutorResponse(j, opts){
       const answer = (j && j.answer) ? j.answer : ((j && j.detail) ? j.detail : 'Nema odgovora.');
       const taskText = (j && j.status === 'ready') ? extractTutorTask(j, answer) : '';
-      if (taskText) setAwaitingPracticeTask(taskText);  // sačuvaj zadatak prije historije
+      if (taskText){
+        setAwaitingPracticeTask(taskText);  // sačuvaj zadatak prije historije
+        pushRecentTask(taskText);           // anti-ponavljanje za sljedeći "novi zadatak"
+      }
       if (!opts.rendered) appendTutorMsg('bot', renderTutorHTML(answer));
       pushTutor('assistant', answer);
       if (j.status === 'ready') adoptResponseTopic(j);
