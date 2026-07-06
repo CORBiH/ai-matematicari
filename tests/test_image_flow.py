@@ -130,6 +130,43 @@ def test_empty_ocr_falls_back_to_vision(master, tmap):
     _assert_multimodal_with_ocr(chat)
 
 
+def test_image_context_returned_and_used_for_followup(master, tmap):
+    ocr = (
+        "1. Izračunaj 2 + 3.\n"
+        "2. Izračunaj 4 + 5."
+    )
+    first_chat = _chat_recorder("1. Rezultat je 5.\n2. Rezultat je 9.")
+    first = svc.handle_chat(
+        {"grade": 6, "mode": "quick", "student_message": "Daj rezultate sa slike."},
+        first_chat, master, tmap,
+        model="text-model", timeout=1,
+        image_bytes=b"fake-bytes", image_data_url="data:image/png;base64,AAA=",
+        ocr_image=lambda b: (ocr, 0.97), vision_model="vision-model",
+    )
+    assert first["status"] == "ready"
+    assert "image_context" in first
+    assert "1. Izračunaj 2 + 3." in first["image_context"]
+    assert "2. Rezultat je 9." in first["image_context"]
+
+    follow_chat = _chat_recorder("Prvi zadatak: 2 + 3 = 5.")
+    follow = svc.handle_chat(
+        {
+            "grade": 6,
+            "mode": "explain",
+            "student_message": "kako si uradio prvi",
+            "last_image_context": first["image_context"],
+        },
+        follow_chat, master, tmap, model="text-model", timeout=1,
+    )
+    assert follow["status"] == "ready"
+    assert follow["final_topic"] == "unknown"
+    prompt = follow_chat.calls["messages"][-1][-1]["content"]
+    assert "KONTEKST ZADNJE SLIKE" in prompt
+    assert "sačuvaj originalnu numeraciju" in prompt
+    assert "1. Izračunaj 2 + 3." in prompt
+    assert "Postavi mi pitanje ili zadatak iz matematike" not in prompt
+
+
 # --- heuristika _looks_geometric -------------------------------------------------------
 
 def test_looks_geometric_unit():

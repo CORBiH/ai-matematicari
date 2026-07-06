@@ -273,6 +273,7 @@ def test_grade8_heuristics_common_terms(master8):
         "Pitagora, hipotenuza i kateta": "pitagora_pitagorina_teorema_osnovno",
         "Kako ide kvadrat binoma?": "polinomi_kvadrat_binoma",
         "Sta je polinom i slicni monomi?": "polinomi_sta_je_to_polinom_a_sta_nije",
+        "Domena algebarskog razlomka: nazivnik ne smije biti nula": "alg_razlomci_definiciono_podrucje_domena_i_nula_razlomljene_racionalne_funkcije",
         "Domena algebarskog razlomka: imenilac ne smije biti nula": "alg_razlomci_definiciono_podrucje_domena_i_nula_razlomljene_racionalne_funkcije",
         "Kruznica, krug, poluprecnik i precnik": "kruznica_krug_prava_i_kruznica_centralna_udaljenost_prave_sekanta_tangenta",
         "Talesova teorema i slicnost trouglova": "tales_slicnost_talesova_teorema",

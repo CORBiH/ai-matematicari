@@ -39,6 +39,7 @@ const sample = [
   '1. korak A',
   '',
   '1. korak B',
+  '1. korak C',
   '', '', '',
   'Ako je $$6|12$$ i $$6 \\mid 18$$, vrijedi.',
   '$$5 - 1 = 4$$',
@@ -52,7 +53,7 @@ const checks = {
   bold: out.includes('<strong>boldom</strong>'),
   ul: out.includes('<ul><li>prva</li><li>druga</li></ul>'),
   // ponovljene "1." stavke razdvojene praznim redom → JEDNA <ol> (browser broji 1,2)
-  ol_merged: out.includes('<ol><li>korak A</li><li>korak B</li></ol>'),
+  ol_merged: out.includes('<ol><li>korak A</li><li>korak B</li><li>korak C</li></ol>'),
   xss_escaped: !out.includes('<script>') && out.includes('&lt;script&gt;'),
   dot_lines_removed: !out.includes('<br>.<br>'),
   // agresivnije sažimanje praznih redova: nikad dupli <br>
@@ -99,7 +100,26 @@ if (fuFailed.length) {
 }
 console.log('followup checks OK (' + Object.keys(fuChecks).length + ' provjera)');
 
-// 4) practice task-state helpers
+// 4) image follow-up helper
+const imageFuMatch = main.match(/function foldTutorText\(t\)\{[\s\S]*?function isImageFollowupMessage\(t\)\{[\s\S]*?\n    \}/);
+if (!imageFuMatch) { console.error('FAILED: isImageFollowupMessage nije pronađen'); process.exit(1); }
+const imageFns = new Function(imageFuMatch[0] + '; return { isImageFollowupMessage };')();
+const imageChecks = {
+  prvi: imageFns.isImageFollowupMessage('objasni prvi zadatak'),
+  kako_prvi: imageFns.isImageFollowupMessage('kako si uradio prvi'),
+  rezultat_2: imageFns.isImageFollowupMessage('kako si dobio rezultat za 2.'),
+  slika: imageFns.isImageFollowupMessage('ne razumijem zadatak sa slike'),
+  unrelated_math_not_image: !imageFns.isImageFollowupMessage('koliko je 5-1'),
+  unrelated_text_not_image: !imageFns.isImageFollowupMessage('može li primjer iz razlomaka'),
+};
+const imageFailed = Object.entries(imageChecks).filter(([, ok]) => !ok).map(([k]) => k);
+if (imageFailed.length) {
+  console.error('IMAGE FOLLOWUP FAILED:', imageFailed.join(', '));
+  process.exit(1);
+}
+console.log('image followup checks OK (' + Object.keys(imageChecks).length + ' provjera)');
+
+// 5) practice task-state helpers
 const practiceMatch = main.match(/function foldTutorText\(t\)\{[\s\S]*?function looksLikeTutorTask\(t\)\{[\s\S]*?\n    \}/);
 if (!practiceMatch) { console.error('FAILED: practice state helperi nisu pronađeni'); process.exit(1); }
 const practiceFns = new Function(

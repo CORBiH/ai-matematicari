@@ -480,6 +480,8 @@ def test_grade6_prompt_excludes_higher_grade_rules(master):
     sp = pb.build_tutor_prompt({"selected_topic": TOPIC, "grade": 6}, _found(), master)["system_prompt"]
     assert "DIDAKTIKA — 6. RAZRED" in sp
     assert "metodom nepoznatog člana" in sp
+    assert "kratke rečenice" in sp
+    assert "poznati primjeri iz svakodnevice" in sp
     for higher in ("LINEARNA FUNKCIJA", "Pitagorin", "prebacivanjem: nepoznate na lijevu",
                    "DIDAKTIKA — 7. RAZRED", "sistemi jednačina", "koordinatn"):
         assert higher.lower() not in sp.lower(), higher
@@ -491,6 +493,7 @@ def test_grade7_prompt_has_grade7_rules_only(master7):
     sp = res["system_prompt"]
     assert "DIDAKTIKA — 7. RAZRED" in sp
     assert "MIJENJA PREDZNAK" in sp                        # prebacivanje (7. razred)
+    assert "malo formalniji nego u 6." in sp
     assert "DIDAKTIKA — 6. RAZRED" not in sp
     assert "NEPOZNATI UMANJENIK" not in sp                 # veze operacija su 6. razred
     assert "bez linearne funkcije" in sp                   # više gradivo eksplicitno zabranjeno
@@ -507,10 +510,11 @@ def test_grade8_prompt_has_grade8_rules_only(master8):
         "Korijeni i realni brojevi",
         "prepoznaj hipotenuzu",
         "pazi na predznake, slične članove",
-        "imenilac ne smije biti nula",
+        "nazivnik ne smije biti nula",
         "Koordinatni sistem i linearne funkcije",
         "Geometrijska tijela",
         "Sličnost trouglova i Talesova teorema",
+        "nešto formalniji matematički jezik",
     ):
         assert expected in sp
     assert "DIDAKTIKA — 6. RAZRED" not in sp
@@ -744,6 +748,7 @@ def test_followup_compact_feedback_no_topic_restart():
     block = pb.build_practice_followup_instructions({}, {})
     assert "KRATAK i prirodan za chat" in block
     assert "NE ponavljaj cijelo objašnjenje teme" in block
+    assert "Želiš li sličan zadatak za vježbu?" in block
 
 
 # --- Phase 7.2: nastavak razgovora + robusniji practice follow-up -----------------
@@ -789,6 +794,20 @@ def test_general_prompt_continuation(master):
     )
     assert "NASTAVAK RAZGOVORA" in res["user_prompt"]
     assert "MOD: OBJASNI" not in res["user_prompt"]
+
+
+def test_general_prompt_uses_last_image_context():
+    res = pb.build_general_tutor_prompt(
+        {
+            "mode": "explain",
+            "student_message": "Objasni prvi zadatak.",
+            "last_image_context": "1. Izračunaj 2 + 3.\n2. Izračunaj 4 + 5.",
+        }
+    )
+    up = res["user_prompt"]
+    assert "KONTEKST ZADNJE SLIKE" in up
+    assert "1. Izračunaj 2 + 3." in up
+    assert "sačuvaj originalnu numeraciju" in up
 
 
 def test_exam_oblast_continuation(master, oblast):
@@ -859,6 +878,9 @@ def test_language_tone_in_all_modular_paths(master, oblast):
         sp = res["system_prompt"]
         assert "JEZIK I TON (TUTOR)" in sp
         assert "bosanskom jeziku (ijekavica)" in sp
+        assert "brojnik i nazivnik" in sp
+        assert "brojilac" in sp and "imenilac" in sp   # samo u NIKAD zabrani
+        assert "brojilac i imenilac" not in sp
         assert "Pohvali trud" in sp
         assert 'Obraćaj se učeniku sa "ti"' in sp
         # ton dolazi prije chat formata, poslije modularnih pravila

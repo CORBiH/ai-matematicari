@@ -1,10 +1,10 @@
 """Mala jezička zaštita: najčešći ekavski/srpski oblici → bosanska ijekavica.
 
 Sistemska prompt pravila već traže ijekavicu, ali model povremeno "procuri"
-("deo", "rešenje", "vežba"). Ovo je zadnja linija odbrane SAMO za vrlo česte i
-jednoznačne oblike — namjerno kratka lista sa granicama riječi, da se ništa ne
-prekoriguje (npr. "video" sadrži "deo" ali ga \\b štiti; matematički zapis nema
-ovakve riječi pa je netaknut).
+("deo", "rešenje", "vežba") ili starije termine za razlomke. Ovo je zadnja
+linija odbrane SAMO za vrlo česte i jednoznačne oblike — namjerno kratka lista
+sa granicama riječi, da se ništa ne prekoriguje (npr. "video" sadrži "deo" ali
+ga \\b štiti).
 """
 from __future__ import annotations
 
@@ -51,7 +51,36 @@ _REPLACEMENTS: tuple[tuple[re.Pattern, str], ...] = tuple(
         (r"uspeh", "uspjeh"),
         (r"vrednost(\w*)", r"vrijednost\1"),
         (r"promenljiv(\w*)", r"promjenljiv\1"),
+        (r"brojilac", "brojnik"),
+        (r"brojioca", "brojnika"),
+        (r"brojiocu", "brojniku"),
+        (r"brojiocem", "brojnikom"),
+        (r"brojioci", "brojnici"),
+        (r"brojilaca", "brojnika"),
+        (r"brojiocima", "brojnicima"),
+        (r"imenilac", "nazivnik"),
+        (r"imenioca", "nazivnika"),
+        (r"imeniocu", "nazivniku"),
+        (r"imeniocem", "nazivnikom"),
+        (r"imenioci", "nazivnici"),
+        (r"imenilaca", "nazivnika"),
+        (r"imeniocima", "nazivnicima"),
+        (r"prvih\s+dvoje\s+odgovora", "prva dva odgovora"),
+        (r"prvih\s+dvoje\s+zadataka", "prva dva zadatka"),
+        (r"prvih\s+dvoje", "prva dva"),
+        (r"probaj\s+ponovo", "Želiš li sličan zadatak za vježbu?"),
     )
+)
+
+_PROTECTED_RE = re.compile(
+    r"```[\s\S]*?```"
+    r"|`[^`\n]*`"
+    r"|https?://[^\s<>)]+"
+    r"|www\.[^\s<>)]+"
+    r"|\\\([\s\S]*?\\\)"
+    r"|\\\[[\s\S]*?\\\]"
+    r"|\$\$[\s\S]*?\$\$"
+    r"|\$[^$\n]*\$"
 )
 
 
@@ -62,10 +91,7 @@ def _preserve_case(source: str, replacement: str) -> str:
     return replacement
 
 
-def to_ijekavica(text: str) -> str:
-    """Zamijeni vrlo česte ekavske oblike ijekavskim; sve ostalo netaknuto."""
-    if not text:
-        return text
+def _apply_replacements(text: str) -> str:
     out = text
     for pattern, repl in _REPLACEMENTS:
         # case-insensitive prolaz sa čuvanjem velikog početnog slova
@@ -75,4 +101,19 @@ def to_ijekavica(text: str) -> str:
             return _preserve_case(m.group(0), m.expand(_repl))
 
         out = ci.sub(_sub, out)
+    out = re.sub(r"(Želiš li sličan zadatak za vježbu\?)[.!?]+", r"\1", out)
     return out
+
+
+def to_ijekavica(text: str) -> str:
+    """Zamijeni česte oblike, ali ne diraj URL-ove, kod i matematičke blokove."""
+    if not text:
+        return text
+    out: list[str] = []
+    pos = 0
+    for m in _PROTECTED_RE.finditer(text):
+        out.append(_apply_replacements(text[pos:m.start()]))
+        out.append(m.group(0))
+        pos = m.end()
+    out.append(_apply_replacements(text[pos:]))
+    return "".join(out)

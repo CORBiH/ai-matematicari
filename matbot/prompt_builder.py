@@ -306,14 +306,19 @@ def build_practice_followup_instructions(payload: dict, topic_context: dict) -> 
         "odgovorio NE ocjenjuj kao netačnu — na kraju zamoli odgovor SAMO za nju. "
         "NIKAD ne proglašavaj cijeli odgovor netačnim ako je samo jedna stavka "
         "pogrešna.\n"
+        "- Ako učenik spomene SAMO jednu stavku (npr. \"treće pitanje\", \"3.\", "
+        "\"zadnji zadatak\"), ocijeni ISKLJUČIVO nju. Ostale stavke NE ocjenjuj, "
+        "NE rješavaj i NE izmišljaj učenikove odgovore na njih — samo kratko "
+        "navedi da još čekaju odgovor i zatraži preostale stavke jednu po jednu "
+        "(prvo najniži broj koji nedostaje).\n"
         "- Ako je TAČNO: kratko potvrdi (npr. \"Tačno!\"), u 1–2 rečenice objasni "
         "zašto, ali NE dodaji novi zadatak ako ga učenik nije zatražio.\n"
         "- Ako NIJE tačno: blago reci da nije tačno i POKAŽI tačan račun korak po "
         "korak (nikad samo \"nije tačno\" bez računa); za konceptualni zadatak "
         "daj JEDAN hint ili JEDAN sljedeći korak.\n"
         "- Ako si prikazao KOMPLETNO rješenje zadatka, NE traži od učenika da "
-        "\"proba ponovo\" ISTI zadatak — umjesto toga ponudi JEDAN sličan novi "
-        "zadatak (npr. \"Hoćeš sličan zadatak da provježbaš?\").\n"
+        "\"proba ponovo\" ISTI zadatak — umjesto toga pitaj: "
+        "\"Želiš li sličan zadatak za vježbu?\".\n"
         "- Ako učenik napiše \"ne znam\", \"objasni\" ili \"pomozi\": daj JEDAN "
         "vođeni hint ili JEDAN sljedeći korak — NE novi zadatak i NE cijelo "
         "rješenje odmah.\n"
@@ -524,6 +529,19 @@ def _build_student_block(payload: dict) -> str:
     return "\n\n".join(parts)
 
 
+def _build_image_context_block(payload: dict) -> str:
+    ctx = normalize_value((payload or {}).get("last_image_context"))[:2000]
+    if not ctx:
+        return ""
+    return (
+        "KONTEKST ZADNJE SLIKE (sačuvano iz prethodnog zadatka sa slike):\n"
+        f"{ctx}\n"
+        "Ako učenik pita za prvi/drugi/treći zadatak, rezultat ili postupak "
+        "sa slike, koristi OVAJ kontekst i sačuvaj originalnu numeraciju. "
+        "NE odgovaraj da treba poslati novo pitanje ako je ovaj kontekst dovoljan."
+    )
+
+
 _ASSISTANT_ROLES = {"assistant", "bot", "tutor", "ai"}
 
 
@@ -630,6 +648,7 @@ def build_tutor_prompt(
     for block in (
         _build_topic_block(topic_context, mode=topic_block_mode),
         _build_video_flow_block(video_flow),
+        _build_image_context_block(payload),
         _build_recent_tasks_block(payload, mode, interaction_phase),
         mode_block,
         _build_student_block(payload),
@@ -682,6 +701,7 @@ def build_general_tutor_prompt(payload: dict) -> dict:
         f"- Odgovori na KONKRETNO pitanje koristeći gradivo {normalize_value(payload.get('grade')) or '6'}. razreda, kratko i "
         "korak po korak.\n"
         "- NE izmišljaj temu i ne spominji internu listu tema.",
+        _build_image_context_block(payload),
         _build_recent_tasks_block(payload, mode, phase),
         mode_block,
         _build_student_block(payload),
@@ -775,6 +795,7 @@ def build_exam_oblast_prompt(payload: dict, master_content: dict) -> dict | None
     user_parts = [
         _build_entry_context(payload, "unknown", "exam"),
         oblast_block,
+        _build_image_context_block(payload),
         _build_recent_tasks_block(payload, "exam", exam_phase),
         mode_block,
         _build_student_block(payload),

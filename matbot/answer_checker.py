@@ -383,6 +383,51 @@ def parse_student_answers(student_text: str) -> tuple[str, dict[int, NumberToken
     return "none", {}
 
 
+# --- Eksplicitno referenciranje stavki ("treće pitanje", "zadatak 2") ---------------
+
+_ORDINAL_WORDS = (
+    (1, r"prv(?:i|a|o|og|om|u)"),
+    (2, r"drug(?:i|a|o|og|om|u)"),
+    (3, r"trec(?:i|a|e|eg|em|u)"),
+    (4, r"cetvrt(?:i|a|o|og|om|u)"),
+    (5, r"pet(?:i|a|o|og|om|u)"),
+    (6, r"sest(?:i|a|o|og|om|u)"),
+    (7, r"sedm(?:i|a|o|og|om|u)"),
+    (8, r"osm(?:i|a|o|og|om|u)"),
+)
+_ITEM_NOUN = r"(?:pitanj\w*|zadat\w*|zadac\w*|stavk\w*)"
+_LAST_ITEM_RE = re.compile(rf"\b(?:zadnj|posljednj)\w*\s+{_ITEM_NOUN}")
+_REFERENCED_NUMBER_RE = re.compile(
+    r"\b(?:na|za|kod|u)\s+(\d{1,2})\s*[.)]?(?!\s*/)"
+)
+
+
+def detect_referenced_items(student_text: str, valid_numbers: list[int]) -> set[int]:
+    """Stavke koje učenik EKSPLICITNO spominje: "odgovor na treće pitanje",
+    "zadatak 2", "3. pitanje", "zadnji zadatak". Prazan skup = bez referenci.
+
+    Referenca znači samo "učenik je POKUŠAO ovu stavku" — ostale se označavaju
+    kao nepokušane (nikad kao netačne)."""
+    folded = _fold(_normalize_math_text(student_text or ""))
+    if not folded or not valid_numbers:
+        return set()
+    refs: set[int] = set()
+    for n, pat in _ORDINAL_WORDS:
+        if re.search(rf"\b{pat}\s+{_ITEM_NOUN}", folded) or re.search(rf"\bna\s+{pat}\b(?!\s*\d)", folded):
+            refs.add(n)
+    for m in re.finditer(rf"\b(\d{{1,2}})\s*[.)]?\s*{_ITEM_NOUN}", folded):
+        refs.add(int(m.group(1)))
+    for m in re.finditer(rf"\b{_ITEM_NOUN}\s+(?:broj\s+)?(\d{{1,2}})\b", folded):
+        refs.add(int(m.group(1)))
+    # "odgovor za 2.", "na 3. je..." — važno za konceptualne odgovore bez
+    # numeričkog tokena, gdje parse_student_answers ne može mapirati stavku.
+    for m in _REFERENCED_NUMBER_RE.finditer(folded):
+        refs.add(int(m.group(1)))
+    if _LAST_ITEM_RE.search(folded):
+        refs.add(max(valid_numbers))
+    return {n for n in refs if n in valid_numbers}
+
+
 # --- Glavna provjera ----------------------------------------------------------------
 
 @dataclass
@@ -391,7 +436,12 @@ class ItemCheck:
     task: str
     expected: Expected | None
     given: NumberToken | None
-    verdict: str    # "correct" | "correct_value_wrong_form" | "incorrect" | "missing" | "unverified"
+    # "correct" | "correct_value_wrong_form" | "incorrect" | "missing"
+    # | "not_attempted" | "unverified"
+    # missing = odgovarao je na skup stavki, ali ovu izostavio;
+    # not_attempted = eksplicitno je rješavao SAMO druge stavke.
+    # Ni missing ni not_attempted se NIKAD ne opisuju kao "netačno".
+    verdict: str
 
 
 @dataclass
@@ -401,8 +451,13 @@ class CheckResult:
 
     @property
     def has_verdicts(self) -> bool:
-        return any(i.verdict in ("correct", "correct_value_wrong_form", "incorrect", "missing")
-                   for i in self.items)
+        return any(
+            i.verdict in (
+                "correct", "correct_value_wrong_form", "incorrect",
+                "missing", "not_attempted",
+            )
+            for i in self.items
+        )
 
 
 def _judge(expected: Expected | None, given: NumberToken | None, answered: bool) -> str:
@@ -441,48 +496,63 @@ def _check(task_text: str, student_text: str) -> CheckResult:
     if not items:
         return CheckResult(checkable=False)
 
+    valid = [n for n, _t in items]
     mode, answers = parse_student_answers(student_text)
-    if mode == "none":
+    # "odgovor na treće pitanje je ..." — eksplicitna referenca vrijedi i kada
+    # sam odgovor nije numerički parsiran (konceptualne stavke)
+    refs = detect_referenced_items(student_text, valid) if len(items) > 1 else set()
+    if mode == "none" and not refs:
         return CheckResult(checkable=False)
 
     expected_by_n = {n: derive_expected(text) for n, text in items}
-    # ništa nismo znali izračunati → nema presuda, model provjerava sam
-    if all(e is None for e in expected_by_n.values()):
-        return CheckResult(checkable=False)
 
-    given_by_n: dict[int, NumberToken | None] = {}
+    given_by_n: dict[int, NumberToken] = {}
     answered_ns: set[int] = set()
+    refs_mode = False
     if mode == "numbered":
         # prihvati samo brojeve stavki koje stvarno postoje u zadatku
-        valid = {n for n, _t in items}
-        if not set(answers) & valid:
+        if not set(answers) & set(valid):
             return CheckResult(checkable=False)
-        given_by_n = {n: t for n, t in answers.items() if n in valid}
-        answered_ns = set(given_by_n)
+        given_by_n = {n: t for n, t in answers.items() if n in valid and t is not None}
+        answered_ns = {n for n in answers if n in valid}
+    elif refs:
+        # učenik rješava SAMO stavke koje spominje; ostale NIJE pokušao —
+        # one su not_attempted i nikad se ne ocjenjuju kao netačne
+        refs_mode = True
+        answered_ns = set(refs)
+        if len(refs) == 1 and mode == "single":
+            given_by_n = {next(iter(refs)): answers[1]}
     elif mode == "single":
-        if len(items) == 1:
-            given_by_n = {items[0][0]: answers[1]}
-            answered_ns = set(given_by_n)
-        else:
+        if len(items) != 1:
             # jedan nenumerisan odgovor na više stavki — ne nagađamo koju
             return CheckResult(checkable=False)
-    else:  # ordered
-        if len(answers) == len(items):
-            given_by_n = {items[i][0]: answers[i + 1] for i in range(len(items))}
-            answered_ns = set(given_by_n)
-        else:
+        given_by_n = {items[0][0]: answers[1]}
+        answered_ns = set(given_by_n)
+    elif mode == "ordered":
+        if len(answers) != len(items):
             return CheckResult(checkable=False)
+        given_by_n = {valid[i]: answers[i + 1] for i in range(len(items))}
+        answered_ns = set(given_by_n)
+    else:
+        return CheckResult(checkable=False)
 
-    checks = [
-        ItemCheck(
-            n=n,
-            task=text[:200],
-            expected=expected_by_n[n],
-            given=given_by_n.get(n),
-            verdict=_judge(expected_by_n[n], given_by_n.get(n), answered=n in answered_ns),
-        )
-        for n, text in items
-    ]
+    # Bez ijednog izračunljivog očekivanja provjera i dalje ima smisla ako
+    # razlikuje pokušane od nepokušanih stavki (djelimičan odgovor na
+    # višestavkovni zadatak); inače model provjerava sam.
+    partial = len(items) > 1 and answered_ns and len(answered_ns) < len(items)
+    if all(e is None for e in expected_by_n.values()) and not partial:
+        return CheckResult(checkable=False)
+
+    checks: list[ItemCheck] = []
+    for n, text in items:
+        given = given_by_n.get(n)
+        if n in answered_ns:
+            verdict = _judge(expected_by_n[n], given, answered=True)
+        else:
+            verdict = "not_attempted" if refs_mode else "missing"
+        checks.append(ItemCheck(
+            n=n, task=text[:200], expected=expected_by_n[n], given=given, verdict=verdict,
+        ))
     return CheckResult(checkable=True, items=checks)
 
 
@@ -522,6 +592,14 @@ def format_check_block(result: CheckResult) -> str:
             lines.append(
                 f"- Stavka {item.n}: BEZ ODGOVORA — NE ocjenjuj je kao netačnu; "
                 f"na kraju zamoli učenika da odgovori SAMO na ovu stavku."
+            )
+        elif item.verdict == "not_attempted":
+            lines.append(
+                f"- Stavka {item.n}: NIJE POKUŠANA — učenik je u ovoj poruci "
+                f"rješavao samo stavke koje je izričito spomenuo. NE ocjenjuj je, "
+                f"NE izmišljaj njegov odgovor i ne spominji je kao tačnu ni "
+                f"netačnu; na kraju zatraži preostale stavke jednu po jednu "
+                f"(prvo najniži broj koji nedostaje)."
             )
         else:  # unverified
             lines.append(

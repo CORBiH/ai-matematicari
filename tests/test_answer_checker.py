@@ -150,6 +150,26 @@ def test_multi_question_missing_item_example_d():
     assert "Stavka 3: TAČNO" in block
 
 
+def test_multi_question_only_third_referenced_conceptual_answer():
+    task = (
+        "1. Šta je djelilac?\n"
+        "2. Kada je broj djeljiv sa 2?\n"
+        "3. Zašto se broj ne može dijeliti nulom?"
+    )
+    r = check_practice_answer(
+        task,
+        "Odgovor na treće pitanje je da se broj ne može dijeliti sa nulom.",
+    )
+    assert r.checkable
+    assert _verdicts(r) == ["not_attempted", "not_attempted", "unverified"]
+    block = format_check_block(r)
+    assert "Stavka 1: NIJE POKUŠANA" in block
+    assert "Stavka 2: NIJE POKUŠANA" in block
+    assert "Stavka 3: nije automatski provjerena" in block
+    assert "NE izmišljaj njegov odgovor" in block
+    assert "netačnu" in block
+
+
 def test_unparseable_numbered_answer_is_unverified_not_missing():
     r = check_practice_answer(TASK_C, "1) 3/5 ili 2/5 2) 1/4 3) 5/6")
     assert _verdicts(r)[0] == "unverified"      # odgovorio je, samo nejasno

@@ -75,7 +75,7 @@ _RULES: tuple[tuple[re.Pattern, tuple[str, ...], str], ...] = (
      ("polinomi_kvadrat_binoma",), "polinomi_"),
     (re.compile(r"\b(?:polinom|monom|binom)\w*|slicn\w*\s+monom|razlik\w*\s+kvadrat|rastavlj\w*\s+polinom"),
      ("polinomi_sta_je_to_polinom_a_sta_nije",), "polinomi_"),
-    (re.compile(r"algebarsk\w*\s+razlom|definicion\w*\s+podruc|domen[aeu]?\b|imenilac\s+(?:ne\s+smije|ne\s+sme|nije)\s+biti\s+nula|imenilac\s*(?:!=|≠)\s*0"),
+    (re.compile(r"algebarsk\w*\s+razlom|definicion\w*\s+podruc|domen[aeu]?\b|(?:nazivnik|imenilac)\s+(?:ne\s+smije|ne\s+sme|nije)\s+biti\s+nula|(?:nazivnik|imenilac)\s*(?:!=|≠)\s*0"),
      ("alg_razlomci_definiciono_podrucje_domena_i_nula_razlomljene_racionalne_funkcije",), "alg_razlomci_"),
     (re.compile(r"kruznic|\bkrug\b|krugov|poluprecnik|precnik|sekant|tangent"),
      ("kruznica_krug_prava_i_kruznica_centralna_udaljenost_prave_sekanta_tangenta",), "kruznica_krug_"),

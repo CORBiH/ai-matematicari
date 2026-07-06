@@ -375,6 +375,7 @@ def test_clear_chat_clears_tutor_keys(client):
     assert "k.startsWith('matbot_tutor_history_')" in html
     assert "k.startsWith('matbot_tutor_lasttask_')" in html
     assert "k.startsWith('matbot_tutor_lasttopic_')" in html
+    assert "k.startsWith('matbot_tutor_lastimagectx_')" in html
 
 
 # --- slika zadatka u composer-u ------------------------------------------------------
@@ -432,6 +433,16 @@ def test_image_send_uses_multipart(client):
     # default poruke po modu za sliku bez teksta
     assert "Daj mi samo rezultat zadatka sa slike." in html
     assert "Objasni mi zadatak sa slike." in html
+
+
+def test_image_context_persisted_for_followups(client):
+    html = _html(client)
+    assert "const LASTIMAGECTX_KEY = 'matbot_tutor_lastimagectx_'" in html
+    assert "function storedLastImageContext()" in html
+    assert "function isImageFollowupMessage(t)" in html
+    assert "payload.last_image_context = savedImageContext.slice(0, 2000)" in html
+    assert "if (j.image_context) setLastImageContext(j.image_context)" in html
+    assert "localStorage.removeItem(LASTIMAGECTX_KEY)" in html
 
 
 # --- legacy /submit ostaje skriven ---------------------------------------------------

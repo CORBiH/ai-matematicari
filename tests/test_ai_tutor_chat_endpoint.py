@@ -329,7 +329,7 @@ def test_grade_8_selected_topic_returns_ready_with_grade_8_context(client, fake_
     system_prompt = fake_openai.calls.messages[-1][0]["content"]
     user_prompt = fake_openai.calls.messages[-1][-1]["content"]
     assert "8. RAZRED" in system_prompt
-    assert "imenilac ne smije biti nula" in system_prompt
+    assert "nazivnik ne smije biti nula" in system_prompt
     assert "Definiciono područje" in user_prompt
 
 

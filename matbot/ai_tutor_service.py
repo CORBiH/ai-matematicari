@@ -84,6 +84,7 @@ MAX_MESSAGE_CHARS = 4000
 MAX_HISTORY_ITEMS = 5
 MAX_HISTORY_ITEM_CHARS = 1500
 MAX_LAST_TASK_CHARS = 1000
+MAX_IMAGE_CONTEXT_CHARS = 2000
 # Audit: anti-ponavljanje zadataka — frontend šalje zadnje date zadatke.
 MAX_RECENT_TASKS = 6
 MAX_RECENT_TASK_CHARS = 300
@@ -114,6 +115,20 @@ _DEFAULT_FALLBACK_ANSWER = (
     "Ne mogu automatski prepoznati temu. Izaberi oblast/temu koju trenutno radiš "
     "ili pošalji zadatak, pa ću ti pomoći korak po korak."
 )
+
+_IMAGE_FOLLOWUP_RE = re.compile(
+    r"\b("
+    r"slik\w*|zadat\w*|zadac\w*|pitanj\w*|rezultat\w*|postupak|"
+    r"prv\w*|drug\w*|trec\w*|cetvrt\w*|pet\w*|"
+    r"kako\s+si|uradio|uradila|dobio|dobila|objasni|ne\s+razumijem"
+    r")\b|\b\d{1,2}\s*[.)]"
+)
+
+
+def _is_image_followup_message(text: Any) -> bool:
+    """Follow-up koji se prirodno poziva na prethodni zadatak sa slike."""
+    folded = fold_diacritics(text)
+    return bool(_IMAGE_FOLLOWUP_RE.search(folded))
 
 _TASK_ACTION_RE = re.compile(
     r"\b("
@@ -364,6 +379,9 @@ def _sanitize_payload(payload: dict) -> dict:
         val = payload.get(key)
         if isinstance(val, str) and len(val) > MAX_LAST_TASK_CHARS:
             payload[key] = val[:MAX_LAST_TASK_CHARS]
+    val = payload.get("last_image_context")
+    if isinstance(val, str) and len(val) > MAX_IMAGE_CONTEXT_CHARS:
+        payload["last_image_context"] = val[:MAX_IMAGE_CONTEXT_CHARS]
     hist = payload.get("conversation_history")
     if isinstance(hist, list):
         trimmed = []
@@ -469,6 +487,7 @@ def _prepare_chat(
 
     # --- Phase 6.2: slika zadatka — prvo pokušaj OCR (postojeći legacy Mathpix) --
     has_image = bool(image_bytes or image_data_url)
+    payload["has_image"] = has_image
     ocr_conf = 0.0
     if has_image and image_bytes is not None and ocr_image is not None:
         try:
@@ -513,6 +532,12 @@ def _prepare_chat(
             else:
                 general_answer = True
         elif has_image and not combined:
+            general_answer = True
+        elif (
+            normalize_value(payload.get("last_image_context"))
+            and student_msg
+            and _is_image_followup_message(student_msg)
+        ):
             general_answer = True
 
     if exam_oblast_prompt is not None:
@@ -576,6 +601,22 @@ def _prepare_chat(
     }
 
 
+def _make_image_context(payload: dict, answer: str) -> str:
+    """Kompaktan tekst koji frontend može vratiti u sljedećem follow-upu."""
+    if not (payload.get("has_image") or payload.get("image_ocr_text")):
+        return ""
+    parts: list[str] = []
+    ocr = normalize_value(payload.get("image_ocr_text"))
+    if ocr:
+        parts.append("TEKST SA SLIKE (OCR):\n" + ocr[:MAX_MESSAGE_CHARS])
+    msg = normalize_value(payload.get("student_message") or payload.get("message"))
+    if msg:
+        parts.append("PORUKA UČENIKA UZ SLIKU:\n" + msg[:500])
+    if answer:
+        parts.append("ODGOVOR TUTORA NA SLIKU:\n" + normalize_value(answer)[:1200])
+    return "\n\n".join(parts).strip()[:MAX_IMAGE_CONTEXT_CHARS]
+
+
 def _finalize_response(prep: dict, answer: str) -> dict:
     """Sastavi response dict + activity log (zajedničko za oba puta)."""
     payload = prep["payload"]
@@ -609,6 +650,9 @@ def _finalize_response(prep: dict, answer: str) -> dict:
         "status": status,
         "mode": mode,
     }
+    image_context = _make_image_context(payload, answer)
+    if image_context:
+        response["image_context"] = image_context
     task_text = extract_practice_task(answer, mode=mode) if status == "ready" else ""
     if task_text:
         response["last_tutor_task"] = task_text

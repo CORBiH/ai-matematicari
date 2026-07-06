@@ -105,6 +105,29 @@ def test_multi_item_missing_answer_requested_not_failed(master, tmap):
     assert verdicts == ["missing", "correct", "correct"]
 
 
+def test_partial_referenced_third_task_does_not_grade_first_two(master, tmap):
+    task = (
+        "1. Šta znači djeljivost?\n"
+        "2. Navedi pravilo djeljivosti sa 2.\n"
+        "3. Zašto se broj ne može dijeliti nulom?"
+    )
+    chat = _fake_chat()
+    out = svc.handle_chat(
+        _answer_payload(
+            task,
+            "Odgovor na treće pitanje je da se broj ne može dijeliti sa nulom.",
+        ),
+        chat, master, tmap, model="m", timeout=1,
+    )
+    up = _last_user_prompt(chat)
+    verdicts = [i["verdict"] for i in out["answer_check"]["items"]]
+    assert verdicts == ["not_attempted", "not_attempted", "unverified"]
+    assert "Stavka 1: NIJE POKUŠANA" in up
+    assert "Stavka 2: NIJE POKUŠANA" in up
+    assert "NE izmišljaj njegov odgovor" in up
+    assert "prvo najniži broj koji nedostaje" in up
+
+
 def test_unverifiable_answer_has_no_verdict_but_keeps_rules(master, tmap):
     chat = _fake_chat()
     out = svc.handle_chat(
@@ -126,7 +149,8 @@ def test_followup_prompt_contains_grading_safety_rules(master, tmap):
     up = _last_user_prompt(chat)
     assert "PRVA REČENICA" in up                # konačan sud bez kontradikcije
     assert "PRIHVATI EKVIVALENTNE OBLIKE" in up
-    assert "proba ponovo" in up                 # bez "probaj ponovo" poslije rješenja
+    assert "Želiš li sličan zadatak za vježbu?" in up
+    assert "ponudi JEDAN sličan novi" not in up
 
 
 # --- anti-ponavljanje zadataka -------------------------------------------------------
@@ -201,7 +225,11 @@ def test_practice_single_task_extraction_unchanged(master, tmap):
 # --- bosanska ijekavica --------------------------------------------------------------
 
 def test_ijekavica_postprocessing_on_answer(master, tmap):
-    chat = _fake_chat("Tačno! Obojeni deo je 3/8, a rešenje je 5/8. Sada vežba dalje.")
+    chat = _fake_chat(
+        "Tačno! Obojeni deo je 3/8, a rešenje je 5/8. "
+        "Brojilac je 5, imenilac je 8. Prvih dvoje odgovora su dobra. "
+        "Probaj ponovo."
+    )
     out = svc.handle_chat(
         _answer_payload("Ako su obojane 3/8 kruga, koji dio nije obojen?", "5/8"),
         chat, master, tmap, model="m", timeout=1,
@@ -209,7 +237,15 @@ def test_ijekavica_postprocessing_on_answer(master, tmap):
     assert "deo" not in out["answer"].split()
     assert "dio" in out["answer"]
     assert "rješenje" in out["answer"]
-    assert "vježba" in out["answer"]
+    assert "vježb" in out["answer"]
+    assert "brojilac" not in out["answer"].lower()
+    assert "imenilac" not in out["answer"].lower()
+    assert "brojnik" in out["answer"].lower()
+    assert "nazivnik" in out["answer"].lower()
+    assert "prvih dvoje" not in out["answer"].lower()
+    assert "prva dva odgovora" in out["answer"].lower()
+    assert "Probaj ponovo" not in out["answer"]
+    assert "Želiš li sličan zadatak za vježbu?" in out["answer"]
 
 
 @pytest.mark.parametrize("src,expected", [
@@ -221,6 +257,10 @@ def test_ijekavica_postprocessing_on_answer(master, tmap):
     ("celi broj", "cijeli broj"),
     ("sledeći korak", "sljedeći korak"),
     ("primer iz knjige", "primjer iz knjige"),
+    ("brojilac je iznad crte", "brojnik je iznad crte"),
+    ("imenilac ne smije biti nula", "nazivnik ne smije biti nula"),
+    ("prvih dvoje zadataka", "prva dva zadatka"),
+    ("Probaj ponovo.", "Želiš li sličan zadatak za vježbu?"),
 ])
 def test_to_ijekavica_replacements(src, expected):
     assert to_ijekavica(src) == expected
@@ -230,6 +270,9 @@ def test_to_ijekavica_replacements(src, expected):
     "pogledaj video lekciju",            # "video" sadrži "deo" ali NIJE riječ deo
     "dio kruga je obojen",               # već ispravno
     "\\(\\frac{3}{5}\\) ostaje isto",    # matematički zapis netaknut
+    "`imenilac` u kodu ostaje isto",
+    "imenilac_var = 0",
+    "https://example.com/imenilac ostaje URL",
     "modeli i dijelovi",
 ])
 def test_to_ijekavica_does_not_overcorrect(untouched):
@@ -240,6 +283,10 @@ def test_system_prompt_has_accuracy_and_ijekavica_rules():
     sp = build_tutor_system_prompt(6)
     assert "TAČNOST PRI PROVJERI ODGOVORA" in sp
     assert "NIKAD 'deo'" in sp
+    assert "brojnik i nazivnik" in sp
+    assert "NIKAD 'brojilac'" in sp
+    assert "NIKAD \"prvih dvoje\"" in sp
+    assert "kratke rečenice" in sp
     assert "3/5 = 6/10" in sp
     assert "2 1/4 = 9/4" in sp
 

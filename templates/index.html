@@ -649,7 +649,7 @@ function buildPromptHints(razred){
       : "jasno, razumljivo i stručno, uz korake i kratka objašnjenja.",
     terminology: {
       lcm_prefer: "nzs — najmanji zajednički sadržalac",
-      fractions_terms: "koristi: brojnik (brojilac) i nazivnik (imenilac) kod razlomaka",
+      fractions_terms: "koristi: brojnik i nazivnik kod razlomaka",
       verbs: {
         add: "saberi",
         subtract: "oduzmi",
@@ -801,6 +801,7 @@ document.addEventListener('DOMContentLoaded', () => {
       Object.keys(localStorage)
         .filter(k => k.startsWith('matbot_tutor_history_') || k.startsWith('matbot_tutor_lasttask_')
                   || k.startsWith('matbot_tutor_lasttopic_')
+                  || k.startsWith('matbot_tutor_lastimagectx_')
                   || k.startsWith('matbot_tutor_recent_')
                   || k.startsWith('matbot_tutor_ctx_'))
         .forEach(k => localStorage.removeItem(k));
@@ -1122,6 +1123,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const TKEY = 'matbot_tutor_history_' + cid;
     const LASTTASK_KEY = 'matbot_tutor_lasttask_' + cid;
     const LASTTOPIC_KEY = 'matbot_tutor_lasttopic_' + cid;
+    const LASTIMAGECTX_KEY = 'matbot_tutor_lastimagectx_' + cid;
     /* Audit: zadnjih ~6 datih zadataka — šalju se backendu (recent_tasks) da
        novi generisani zadatak NE ponovi iste brojeve/kontekst. Model se ne
        oslanja na vlastito pamćenje historije. */
@@ -1194,6 +1196,20 @@ document.addEventListener('DOMContentLoaded', () => {
     function storedLastTask(){
       try { return (localStorage.getItem(LASTTASK_KEY) || '').trim(); }
       catch(_){ return ''; }
+    }
+    function storedLastImageContext(){
+      try { return (localStorage.getItem(LASTIMAGECTX_KEY) || '').trim(); }
+      catch(_){ return ''; }
+    }
+    function setLastImageContext(t){
+      const s = (t || '').trim().slice(0, 2000);
+      if (!s) return;
+      try { localStorage.setItem(LASTIMAGECTX_KEY, s); } catch(_){}
+    }
+    function isImageFollowupMessage(t){
+      const s = foldTutorText(t).trim();
+      if (!s || s.length > 160) return false;
+      return /\b(slik\w*|zadat\w*|zadac\w*|pitanj\w*|rezultat\w*|postupak|prv\w*|drug\w*|trec\w*|cetvrt\w*|pet\w*|kako\s+si|uradio|uradila|dobio|dobila|objasni|ne\s+razumijem)\b|\b\d{1,2}\s*[.)]/.test(s);
     }
     function storedRecentTasks(){
       try { const a = JSON.parse(localStorage.getItem(RECENTTASKS_KEY) || '[]'); return Array.isArray(a) ? a : []; }
@@ -1365,6 +1381,7 @@ document.addEventListener('DOMContentLoaded', () => {
       lastTutorMessage = '';
       try { localStorage.removeItem(TKEY); } catch(_){}
       try { localStorage.removeItem(LASTTASK_KEY); } catch(_){}
+      try { localStorage.removeItem(LASTIMAGECTX_KEY); } catch(_){}
       try { localStorage.removeItem(RECENTTASKS_KEY); } catch(_){}
       clearStoredActiveTopic();
       clearTutorImage();
@@ -1747,6 +1764,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const typed = (msgBox.value || '').trim();
       const imgFile = tutorImageFile();
       const savedTask = storedLastTask();
+      const savedImageContext = storedLastImageContext();
       let text, fromTyped = false, answerPhase = null, continuation = false;
       if (autoMessage){
         text = autoMessage;                        // auto-poruka pri ulasku u chat
@@ -1781,6 +1799,9 @@ document.addEventListener('DOMContentLoaded', () => {
       };
       const recentTasks = storedRecentTasks();
       if (recentTasks.length) payload.recent_tasks = recentTasks;
+      if (!imgFile && savedImageContext && isImageFollowupMessage(text)){
+        payload.last_image_context = savedImageContext.slice(0, 2000);
+      }
       if (answerPhase){                            // odgovor na practice zadatak
         payload.interaction_phase = answerPhase;
         payload.mode = 'practice';
@@ -1951,6 +1972,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (opts.fromTyped){ msgBox.value = ''; autoGrow(); }  // očisti nakon uspješnog slanja
       if (j.status === 'ready'){
         clearTutorImage();                       // slika je potrošena u ovom zahtjevu
+        if (j.image_context) setLastImageContext(j.image_context);
         lastTutorMessage = (answer || '').slice(0, 600);  // osnova za follow-up nastavak
       }
       /* practice stanje se ažurira tek NAKON primljenog feedbacka */
