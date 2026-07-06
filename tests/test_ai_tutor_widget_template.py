@@ -213,6 +213,7 @@ def test_internal_fresh_conversation_reset_still_available(client):
     assert "localStorage.removeItem(LASTTASK_KEY)" in rsnippet
     assert "interactionPhase = null" in rsnippet
     assert "lastTutorMessage = ''" in rsnippet
+    assert "clearNextState()" in rsnippet
     assert "querySelectorAll('.tmsg, .tutor-video-hint')" in rsnippet  # briše transcript + hintove
     assert "hideChips()" in rsnippet                        # i quick-reply chips
 
@@ -324,6 +325,7 @@ def test_practice_followup_state_present(client):
     assert "answering_practice_task" in html       # interaction_phase u payloadu
     assert "last_tutor_task" in html               # zadnji zadatak se šalje backendu
     assert "matbot_tutor_lasttask_" in html        # localStorage ključ
+    assert "matbot_tutor_nextstate_" in html       # explicit next-turn state contract
 
 
 def test_practice_answer_placeholder_present(client):
@@ -376,6 +378,7 @@ def test_clear_chat_clears_tutor_keys(client):
     assert "k.startsWith('matbot_tutor_lasttask_')" in html
     assert "k.startsWith('matbot_tutor_lasttopic_')" in html
     assert "k.startsWith('matbot_tutor_lastimagectx_')" in html
+    assert "k.startsWith('matbot_tutor_nextstate_')" in html
 
 
 # --- slika zadatka u composer-u ------------------------------------------------------
@@ -507,6 +510,7 @@ def test_followup_payload_fields(client):
     html = _html(client)
     assert "'continuing_explanation'" in html
     assert "payload.last_tutor_message = lastTutorMessage.slice(0, 600)" in html
+    assert "if (j && j.next_state) setNextState(j.next_state)" in html
     # zadnja poruka tutora se pamti nakon ready odgovora
     assert "lastTutorMessage = (answer || '').slice(0, 600)" in html
 
@@ -560,19 +564,27 @@ def test_tutor_task_saved_before_history_for_stream_and_json(client):
 def test_practice_new_task_request_bypasses_answer_phase(client):
     html = _html(client)
     idx = html.index("const asksNewTask = isNewPracticeTaskRequest(typed);")
-    snippet = html[idx:idx + 360]
+    snippet = html[idx:idx + 1200]
     assert "!asksNewTask &&" in snippet
     assert "answering_practice_task" in snippet
     assert "!asksNewTask && lastTutorMessage && isFollowupMessage(typed)" in snippet
     assert "Daj mi još jedan zadatak." in html
 
 
-def test_practice_answer_takes_precedence_over_followup(client):
-    """Dok se čeka odgovor na zadatak, i 'da'/'može' ide kao practice odgovor."""
+def test_next_state_confirmation_takes_precedence_over_practice_answer(client):
+    """Explicit continue_confirmation state wins before short answer heuristics."""
     html = _html(client)
-    idx = html.index("interactionPhase === 'awaiting_practice_answer'")
-    followup_idx = html.index("lastTutorMessage && isFollowupMessage(typed)")
-    assert idx < followup_idx                    # practice grana se provjerava PRVA
+    assert "function storedNextState()" in html
+    assert "payload.previous_next_state = previousNextState" in html
+    assert "payload.intent = confirmationIntent" in html
+    assert "'continue_confirmation'" in html
+    assert "'confirmation_declined'" in html
+    assert "function isAffirmativeConfirmation(t)" in html
+    assert "function isNegativeConfirmation(t)" in html
+    state_idx = html.index("previousNextState && previousNextState.expected_user_action === 'continue_confirmation'")
+    idx = html.index("interactionPhase === 'awaiting_practice_answer'", state_idx)
+    followup_idx = html.index("lastTutorMessage && isFollowupMessage(typed)", idx)
+    assert state_idx < idx < followup_idx
 
 
 def test_mode_topic_oblast_change_resets_practice_state(client):

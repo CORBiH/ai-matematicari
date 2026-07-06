@@ -153,6 +153,129 @@ def test_followup_prompt_contains_grading_safety_rules(master, tmap):
     assert "ponudi JEDAN sličan novi" not in up
 
 
+# --- explicit next_state / confirmation contract ------------------------------------
+
+def test_next_state_marks_image_continue_confirmation(master, tmap):
+    chat = _fake_chat("Hoćeš da nastavimo sa zadatkom 12?")
+    out = svc.handle_chat({
+        "grade": 6,
+        "mode": "explain",
+        "selected_topic": FR_TOPIC,
+        "student_message": "Objasni rezultate sa slike.",
+        "last_image_context": "Zadatak 11 je već objašnjen. Zadatak 12 čeka.",
+    }, chat, master, tmap, model="m", timeout=1)
+
+    assert out["next_state"]["expected_user_action"] == "continue_confirmation"
+    assert out["next_state"]["pending_action"] == {
+        "type": "continue_image_test",
+        "source": "image_context",
+        "next_item": 12,
+    }
+    assert out["next_state"]["active_task_kind"] == "image_test"
+
+
+def test_confirmation_da_continues_image_item_without_grading(master, tmap):
+    chat = _fake_chat("Zadatak 12: rezultat je 4.")
+    out = svc.handle_chat({
+        "grade": 6,
+        "mode": "practice",
+        "selected_topic": FR_TOPIC,
+        "student_message": "da",
+        "interaction_phase": "confirmation",
+        "intent": "continue_confirmation",
+        "pending_action": {
+            "type": "continue_image_test",
+            "source": "image_context",
+            "next_item": 12,
+        },
+        "last_tutor_task": "Zadatak 11: izračunaj 2 + 2.",
+        "last_image_context": "Zadatak 11 je već objašnjen. Zadatak 12: 2 + 2.",
+    }, chat, master, tmap, model="m", timeout=1)
+
+    up = _last_user_prompt(chat)
+    assert "PROVJERA IZ SISTEMA" not in up
+    assert "answer_check" not in out
+    assert "Nije tačno" not in out["answer"]
+    assert "zadatkom 12" in svc.fold_diacritics(up)
+
+
+def test_confirmation_da_generates_similar_task_without_grading(master, tmap):
+    chat = _fake_chat("Novi zadatak: Izračunaj 2/3 + 1/6.")
+    out = svc.handle_chat({
+        "grade": 6,
+        "mode": "practice",
+        "selected_topic": FR_TOPIC,
+        "student_message": "da",
+        "interaction_phase": "confirmation",
+        "intent": "continue_confirmation",
+        "pending_action": {
+            "type": "generate_similar_task",
+            "source": "practice",
+            "next_item": None,
+        },
+        "last_tutor_task": "Izračunaj 1/2 + 1/3.",
+        "recent_tasks": ["Izračunaj 1/2 + 1/3."],
+    }, chat, master, tmap, model="m", timeout=1)
+
+    up = _last_user_prompt(chat)
+    assert "PROVJERA IZ SISTEMA" not in up
+    assert "answer_check" not in out
+    assert "slican novi zadatak" in svc.fold_diacritics(up)
+    assert "NEDAVNO DATI ZADACI" in up
+
+
+def test_confirmation_moze_explains_task_without_grading(master, tmap):
+    chat = _fake_chat("Objašnjenje: prvo nađemo zajednički nazivnik.")
+    out = svc.handle_chat({
+        "grade": 6,
+        "mode": "practice",
+        "selected_topic": FR_TOPIC,
+        "student_message": "može",
+        "interaction_phase": "confirmation",
+        "intent": "continue_confirmation",
+        "pending_action": {
+            "type": "explain_task",
+            "source": "current_task",
+            "next_item": None,
+        },
+        "last_tutor_task": "Izračunaj 1/2 + 1/3.",
+    }, chat, master, tmap, model="m", timeout=1)
+
+    up = _last_user_prompt(chat)
+    assert "PROVJERA IZ SISTEMA" not in up
+    assert "answer_check" not in out
+    assert "objasni prethodni zadatak" in svc.fold_diacritics(up)
+
+
+def test_short_confirmation_without_pending_action_is_not_graded(master, tmap):
+    chat = _fake_chat("Ovo ne smije biti pozvano.")
+    out = svc.handle_chat({
+        "grade": 6,
+        "mode": "practice",
+        "selected_topic": FR_TOPIC,
+        "student_message": "da",
+        "interaction_phase": "answering_practice_task",
+        "last_tutor_task": "Izračunaj 1/2 + 1/3.",
+    }, chat, master, tmap, model="m", timeout=1)
+
+    assert chat.calls["messages"] == []
+    assert "answer_check" not in out
+    assert "Nije tačno" not in out["answer"]
+    assert out["next_state"]["expected_user_action"] == "none"
+
+
+def test_next_state_marks_similar_task_offer_after_grading(master, tmap):
+    chat = _fake_chat("Tačno! Želiš li sličan zadatak za vježbu?")
+    out = svc.handle_chat(
+        _answer_payload("Ako su obojane 3/8 kruga, koji dio nije obojen?", "5/8"),
+        chat, master, tmap, model="m", timeout=1,
+    )
+
+    assert out["next_state"]["expected_user_action"] == "continue_confirmation"
+    assert out["next_state"]["pending_action"]["type"] == "generate_similar_task"
+    assert out["next_state"]["active_task_kind"] == "practice"
+
+
 # --- anti-ponavljanje zadataka -------------------------------------------------------
 
 def test_recent_tasks_enter_practice_prompt(master, tmap):

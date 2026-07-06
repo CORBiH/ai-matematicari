@@ -122,6 +122,41 @@ _DEFAULT_FALLBACK_ANSWER = (
     "ili pošalji zadatak, pa ću ti pomoći korak po korak."
 )
 
+_NEXT_EXPECTED_ACTIONS = {
+    "answer_task",
+    "continue_confirmation",
+    "choose_next",
+    "ask_followup",
+    "none",
+}
+_PENDING_ACTION_TYPES = {
+    "continue_image_test",
+    "generate_similar_task",
+    "explain_task",
+}
+_PENDING_ACTION_SOURCES = {
+    "image_context",
+    "practice",
+    "general",
+    "current_task",
+}
+_ACTIVE_TASK_KINDS = {
+    "practice",
+    "image_test",
+    "explanation",
+}
+
+_SHORT_AFFIRMATIVE_RE = re.compile(
+    r"^(da|moze|mozes|nastavi|hajde|ajde|ok|okej|u\s?redu|yes)[\s.!?]*$"
+)
+_SHORT_NEGATIVE_RE = re.compile(
+    r"^(ne|nemoj|stani|dosta|no)[\s.!?]*$"
+)
+_YES_NO_TASK_RE = re.compile(
+    r"\b(da\s+li|je\s+li|jesu\s+li|tacno\s+ili\s+netacno|"
+    r"odgovori\s+(?:sa\s+)?da\s+ili\s+ne|da/ne)\b"
+)
+
 _IMAGE_FOLLOWUP_RE = re.compile(
     r"\b("
     r"slik\w*|zadat\w*|zadac\w*|pitanj\w*|rezultat\w*|postupak|"
@@ -135,6 +170,219 @@ def _is_image_followup_message(text: Any) -> bool:
     """Follow-up koji se prirodno poziva na prethodni zadatak sa slike."""
     folded = fold_diacritics(text)
     return bool(_IMAGE_FOLLOWUP_RE.search(folded))
+
+
+def _empty_pending_action() -> dict:
+    return {"type": None, "source": None, "next_item": None}
+
+
+def _empty_next_state() -> dict:
+    return {
+        "expected_user_action": "none",
+        "pending_action": _empty_pending_action(),
+        "active_task_kind": None,
+    }
+
+
+def _normalize_next_item(value: Any) -> int | None:
+    if value is None or value == "":
+        return None
+    try:
+        item = int(value)
+    except (TypeError, ValueError):
+        return None
+    return item if 0 < item < 1000 else None
+
+
+def _normalize_pending_action(raw: Any) -> dict:
+    if not isinstance(raw, dict):
+        return _empty_pending_action()
+    action_type = normalize_value(raw.get("type")).lower()
+    source = normalize_value(raw.get("source")).lower()
+    return {
+        "type": action_type if action_type in _PENDING_ACTION_TYPES else None,
+        "source": source if source in _PENDING_ACTION_SOURCES else None,
+        "next_item": _normalize_next_item(raw.get("next_item")),
+    }
+
+
+def _has_pending_action(action: dict | None) -> bool:
+    return bool(action and action.get("type"))
+
+
+def _normalize_next_state(raw: Any) -> dict:
+    if not isinstance(raw, dict):
+        return _empty_next_state()
+    expected = normalize_value(raw.get("expected_user_action")).lower()
+    active = normalize_value(raw.get("active_task_kind")).lower()
+    return {
+        "expected_user_action": expected if expected in _NEXT_EXPECTED_ACTIONS else "none",
+        "pending_action": _normalize_pending_action(raw.get("pending_action")),
+        "active_task_kind": active if active in _ACTIVE_TASK_KINDS else None,
+    }
+
+
+def _previous_next_state(payload: dict) -> dict:
+    return _normalize_next_state(
+        payload.get("previous_next_state") or payload.get("tutor_state")
+    )
+
+
+def _pending_action_from_payload(payload: dict) -> dict:
+    pending = _normalize_pending_action(payload.get("pending_action"))
+    if _has_pending_action(pending):
+        return pending
+    return _previous_next_state(payload).get("pending_action") or _empty_pending_action()
+
+
+def _short_confirmation_kind(text: Any) -> str:
+    folded = fold_diacritics(text).strip()
+    if _SHORT_AFFIRMATIVE_RE.fullmatch(folded):
+        return "affirmative"
+    if _SHORT_NEGATIVE_RE.fullmatch(folded):
+        return "negative"
+    return ""
+
+
+def _task_allows_yes_no_answer(task: Any) -> bool:
+    return bool(_YES_NO_TASK_RE.search(fold_diacritics(task)))
+
+
+def _confirmation_intent(payload: dict) -> str:
+    explicit = normalize_value(payload.get("intent")).lower()
+    if explicit in ("continue_confirmation", "decline_confirmation"):
+        return explicit
+
+    previous = _previous_next_state(payload)
+    if previous.get("expected_user_action") == "continue_confirmation":
+        kind = _short_confirmation_kind(
+            payload.get("student_message") or payload.get("message")
+        )
+        if kind == "affirmative":
+            return "continue_confirmation"
+        if kind == "negative":
+            return "decline_confirmation"
+    return ""
+
+
+def _direct_prompt_result(payload: dict) -> dict:
+    mode = normalize_value(payload.get("mode")).lower()
+    if mode not in _MAX_TOKENS:
+        mode = "explain"
+    return {
+        "system_prompt": "",
+        "user_prompt": "",
+        "history_messages": [],
+        "mode": mode,
+        "final_topic": "unknown",
+        "opened_lesson_topic": "unknown",
+        "effective_topic": "unknown",
+        "status": "ready",
+        "topic_context_used": False,
+        "video_flow_used": False,
+        "topic_conflict": False,
+    }
+
+
+def _natural_confirmation_clarifier() -> str:
+    return (
+        "Može. Samo mi reci šta želiš dalje: da nastavim objašnjenje, "
+        "dam sličan zadatak ili da provjerim tvoj konkretan odgovor."
+    )
+
+
+def _decline_confirmation_answer() -> str:
+    return (
+        "U redu, neću nastaviti taj korak. Napiši mi šta želiš sljedeće: "
+        "novi zadatak, objašnjenje ili samo rezultat."
+    )
+
+
+def _rewrite_confirmation_payload(payload: dict, action: dict) -> None:
+    action_type = action.get("type")
+    next_item = action.get("next_item")
+    payload["_skip_answer_check"] = True
+    payload["pending_action"] = action
+
+    if action_type == "continue_image_test":
+        payload["mode"] = "explain"
+        payload["interaction_phase"] = "continuing_explanation"
+        if next_item:
+            payload["student_message"] = (
+                f"Nastavi sa zadatkom {next_item} iz prethodne slike. "
+                "Ne ponavljaj prethodno riješeni zadatak; kreni na taj zadatak."
+            )
+        else:
+            payload["student_message"] = (
+                "Nastavi sa sljedećim zadatkom iz prethodne slike. "
+                "Ne ponavljaj prethodno riješeni zadatak."
+            )
+        payload.setdefault(
+            "last_tutor_message",
+            "Tutor je tražio potvrdu za nastavak zadataka sa slike.",
+        )
+        return
+
+    if action_type == "generate_similar_task":
+        payload["mode"] = "practice"
+        payload["interaction_phase"] = ""
+        payload["student_message"] = (
+            "Da, daj mi jedan sličan novi zadatak za vježbu. "
+            "Ne ocjenjuj ovu potvrdu kao odgovor."
+        )
+        return
+
+    if action_type == "explain_task":
+        payload["mode"] = "explain"
+        payload["interaction_phase"] = "continuing_explanation"
+        task = normalize_value(payload.get("last_tutor_task"))
+        if task:
+            payload["student_message"] = (
+                "Objasni prethodni zadatak korak po korak. "
+                "Ne ocjenjuj ovu potvrdu kao odgovor.\n\n"
+                f"PRETHODNI ZADATAK:\n{task[:600]}"
+            )
+        else:
+            payload["student_message"] = (
+                "Objasni prethodni zadatak ili prethodni korak. "
+                "Ne ocjenjuj ovu potvrdu kao odgovor."
+            )
+        payload.setdefault(
+            "last_tutor_message",
+            "Tutor je tražio potvrdu za dodatno objašnjenje.",
+        )
+
+
+def _apply_confirmation_contract(payload: dict) -> None:
+    intent = _confirmation_intent(payload)
+    if intent == "decline_confirmation":
+        payload["_skip_answer_check"] = True
+        payload["intent"] = intent
+        payload["pending_action"] = _pending_action_from_payload(payload)
+        payload["_direct_answer"] = _decline_confirmation_answer()
+        return
+
+    if intent == "continue_confirmation":
+        payload["intent"] = intent
+        action = _pending_action_from_payload(payload)
+        if _has_pending_action(action):
+            _rewrite_confirmation_payload(payload, action)
+        else:
+            payload["_skip_answer_check"] = True
+            payload["pending_action"] = action
+            payload["_direct_answer"] = _natural_confirmation_clarifier()
+        return
+
+    phase = normalize_value(payload.get("interaction_phase")).lower()
+    student = payload.get("student_message") or payload.get("message")
+    if (
+        phase == "answering_practice_task"
+        and _short_confirmation_kind(student)
+        and not _task_allows_yes_no_answer(payload.get("last_tutor_task"))
+    ):
+        payload["_skip_answer_check"] = True
+        payload["_direct_answer"] = _natural_confirmation_clarifier()
+
 
 _TASK_ACTION_RE = re.compile(
     r"\b("
@@ -182,6 +430,12 @@ def _looks_like_practice_task_text(text: Any) -> bool:
     if not folded or len(folded) < 4:
         return False
     if _TASK_LABEL_ONLY_RE.fullmatch(folded):
+        return False
+    if re.search(
+        r"\b(zelis|hoces|hocemo|treba|mogu)\b.*"
+        r"\b(slican|slicni|novi|nov)\b.*\b(zadatak|zadatke|primjer)\b",
+        folded,
+    ):
         return False
     has_action = bool(_TASK_ACTION_RE.search(folded))
     has_signal = bool(_TASK_SIGNAL_RE.search(folded))
@@ -475,6 +729,26 @@ def _prepare_chat(
     # Default: grade -> 6 ako nije zadan; grade bira master/map i tutor prompt.
     payload["grade"] = normalize_grade(payload.get("grade") or DEFAULT_GRADE)
     _sanitize_payload(payload)
+    _apply_confirmation_contract(payload)
+
+    if payload.get("_direct_answer") is not None:
+        master = master if master is not None else get_master(grade=payload["grade"])
+        tmap = tmap if tmap is not None else get_thinkific_map(grade=payload["grade"])
+        prompt_result = _direct_prompt_result(payload)
+        return {
+            "payload": payload,
+            "master": master,
+            "lookup_result": {"status": "found", "source": "intent_contract"},
+            "prompt_result": prompt_result,
+            "mode": prompt_result["mode"],
+            "status": prompt_result["status"],
+            "effective_topic": "unknown",
+            "topic_context": {},
+            "messages": None,
+            "use_model": model,
+            "direct_answer": payload.get("_direct_answer"),
+        }
+
     student_for_image_ctx = normalize_value(
         payload.get("student_message") or payload.get("message")
     )
@@ -492,7 +766,10 @@ def _prepare_chat(
     # rezultat(e) gdje god može (razlomci, mješoviti brojevi, komplement,
     # pretvaranje, direktan račun). Presuda ulazi u prompt i model je NE SMIJE
     # mijenjati — time nestaje klasa grešaka "tačan odgovor proglašen netačnim".
-    if normalize_value(payload.get("interaction_phase")).lower() == "answering_practice_task":
+    if (
+        not payload.get("_skip_answer_check")
+        and normalize_value(payload.get("interaction_phase")).lower() == "answering_practice_task"
+    ):
         _task = normalize_value(payload.get("last_tutor_task"))
         _student = normalize_value(payload.get("student_message") or payload.get("message"))
         if _task and _student:
@@ -640,6 +917,102 @@ def _make_image_context(payload: dict, answer: str) -> str:
     return "\n\n".join(parts).strip()[:MAX_IMAGE_CONTEXT_CHARS]
 
 
+def _pending_action_from_answer(payload: dict, answer: str) -> dict:
+    if payload.get("_direct_answer") is not None:
+        return _empty_pending_action()
+
+    folded = fold_diacritics(answer)
+    has_question = "?" in answer or bool(
+        re.search(r"\b(zelis|hoces|hocemo|mogu|treba|da\s+li)\b", folded)
+    )
+    has_image_context = bool(
+        payload.get("has_image")
+        or normalize_value(payload.get("image_ocr_text"))
+        or normalize_value(payload.get("last_image_context"))
+    )
+
+    if has_question and has_image_context:
+        m = re.search(
+            r"\b(?:nastavim|nastavimo|nastaviti|dalje|sljedec\w*)\b"
+            r".{0,80}\bzadat\w*\s*(\d{1,3})\b",
+            folded,
+        )
+        if not m:
+            m = re.search(
+                r"\bzadat\w*\s*(\d{1,3})\b.{0,80}"
+                r"\b(?:nastavim|nastavimo|nastaviti|dalje|sljedec\w*)\b",
+                folded,
+            )
+        if m:
+            return {
+                "type": "continue_image_test",
+                "source": "image_context",
+                "next_item": _normalize_next_item(m.group(1)),
+            }
+        if re.search(r"\b(?:nastavim|nastavimo|nastaviti|dalje|sljedec\w*)\b", folded):
+            return {
+                "type": "continue_image_test",
+                "source": "image_context",
+                "next_item": None,
+            }
+
+    if has_question and re.search(
+        r"\b(slican|slicni|novi|nov)\b.{0,80}\b(zadatak|zadatke|primjer)\b",
+        folded,
+    ):
+        return {
+            "type": "generate_similar_task",
+            "source": "practice",
+            "next_item": None,
+        }
+
+    if has_question and re.search(
+        r"\b(objasnim|objasnjenje|postupak|korak\s+po\s+korak)\b",
+        folded,
+    ):
+        return {
+            "type": "explain_task",
+            "source": "current_task" if normalize_value(payload.get("last_tutor_task")) else "general",
+            "next_item": None,
+        }
+
+    return _empty_pending_action()
+
+
+def _next_state_for_response(
+    payload: dict,
+    answer: str,
+    *,
+    mode: str,
+    status: str,
+    task_text: str,
+) -> dict:
+    if status != "ready":
+        return _empty_next_state()
+
+    if task_text and mode in ("practice", "exam"):
+        return {
+            "expected_user_action": "answer_task",
+            "pending_action": _empty_pending_action(),
+            "active_task_kind": "practice",
+        }
+
+    pending = _pending_action_from_answer(payload, answer)
+    if _has_pending_action(pending):
+        active = {
+            "continue_image_test": "image_test",
+            "generate_similar_task": "practice",
+            "explain_task": "explanation",
+        }.get(pending.get("type"))
+        return {
+            "expected_user_action": "continue_confirmation",
+            "pending_action": pending,
+            "active_task_kind": active,
+        }
+
+    return _empty_next_state()
+
+
 def _finalize_response(prep: dict, answer: str) -> dict:
     """Sastavi response dict + activity log (zajedničko za oba puta)."""
     payload = prep["payload"]
@@ -690,9 +1063,16 @@ def _finalize_response(prep: dict, answer: str) -> dict:
         response["image_context"] = image_context
     if image_verification:
         response["image_verification"] = image_verification
-    task_text = extract_practice_task(answer, mode=mode) if status == "ready" else ""
+    task_text = (
+        ""
+        if payload.get("_direct_answer") is not None
+        else (extract_practice_task(answer, mode=mode) if status == "ready" else "")
+    )
     if task_text:
         response["last_tutor_task"] = task_text
+    response["next_state"] = _next_state_for_response(
+        payload, answer, mode=mode, status=status, task_text=task_text
+    )
 
     # Audit: sažetak determinističke provjere u response (telemetrija/testovi).
     check = payload.get("answer_check")
@@ -734,7 +1114,9 @@ def handle_chat(
         ocr_image=ocr_image, vision_model=vision_model,
     )
 
-    if prep["status"] == "ready":
+    if prep.get("direct_answer") is not None:
+        answer = prep["direct_answer"]
+    elif prep["status"] == "ready":
         answer = _call_model_with_retry(
             openai_chat, prep["use_model"], prep["messages"], timeout, prep["mode"]
         )
@@ -783,6 +1165,10 @@ def handle_chat_stream(
         image_bytes=None, image_data_url=None,
         ocr_image=None, vision_model=vision_model,
     )
+
+    if prep.get("direct_answer") is not None:
+        yield {"event": "done", "data": _finalize_response(prep, prep["direct_answer"])}
+        return
 
     if prep["status"] != "ready":
         answer = _fallback_answer(prep["lookup_result"], prep["mode"], prep["master"])

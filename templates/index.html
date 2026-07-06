@@ -803,6 +803,7 @@ document.addEventListener('DOMContentLoaded', () => {
                   || k.startsWith('matbot_tutor_lasttopic_')
                   || k.startsWith('matbot_tutor_lastimagectx_')
                   || k.startsWith('matbot_tutor_recent_')
+                  || k.startsWith('matbot_tutor_nextstate_')
                   || k.startsWith('matbot_tutor_ctx_'))
         .forEach(k => localStorage.removeItem(k));
     } catch (_) {}
@@ -1128,6 +1129,7 @@ document.addEventListener('DOMContentLoaded', () => {
        novi generisani zadatak NE ponovi iste brojeve/kontekst. Model se ne
        oslanja na vlastito pamćenje historije. */
     const RECENTTASKS_KEY = 'matbot_tutor_recent_' + cid;
+    const NEXTSTATE_KEY = 'matbot_tutor_nextstate_' + cid;
     /* Phase 1 (audit): historija je vezana za kontekst (razred+mod+tema/oblast).
        Promjena konteksta BRIŠE staru historiju — stara tema ne smije "nevidljivo"
        curiti u novu konverzaciju. */
@@ -1192,6 +1194,31 @@ document.addEventListener('DOMContentLoaded', () => {
       return (t || '').toLowerCase()
         .replace(/[čć]/g, 'c').replace(/[đ]/g, 'd')
         .replace(/[š]/g, 's').replace(/[ž]/g, 'z');
+    }
+    function storedNextState(){
+      try {
+        const s = JSON.parse(localStorage.getItem(NEXTSTATE_KEY) || 'null');
+        return (s && typeof s === 'object') ? s : null;
+      } catch(_){ return null; }
+    }
+    function setNextState(s){
+      if (!s || typeof s !== 'object') { clearNextState(); return; }
+      try { localStorage.setItem(NEXTSTATE_KEY, JSON.stringify(s)); } catch(_){}
+    }
+    function clearNextState(){
+      try { localStorage.removeItem(NEXTSTATE_KEY); } catch(_){}
+    }
+    function confirmationPendingAction(stateObj){
+      return (stateObj && stateObj.pending_action && stateObj.pending_action.type)
+        ? stateObj.pending_action : null;
+    }
+    function isAffirmativeConfirmation(t){
+      const s = foldTutorText(t).trim();
+      return /^(da|moze|mozes|nastavi|hajde|ajde|ok|okej|u\s?redu|yes)[\s.!?]*$/.test(s);
+    }
+    function isNegativeConfirmation(t){
+      const s = foldTutorText(t).trim();
+      return /^(ne|nemoj|stani|dosta|no)[\s.!?]*$/.test(s);
     }
     function storedLastTask(){
       try { return (localStorage.getItem(LASTTASK_KEY) || '').trim(); }
@@ -1383,6 +1410,7 @@ document.addEventListener('DOMContentLoaded', () => {
       try { localStorage.removeItem(LASTTASK_KEY); } catch(_){}
       try { localStorage.removeItem(LASTIMAGECTX_KEY); } catch(_){}
       try { localStorage.removeItem(RECENTTASKS_KEY); } catch(_){}
+      clearNextState();
       clearStoredActiveTopic();
       clearTutorImage();
       msgBox.value = '';
@@ -1569,6 +1597,7 @@ document.addEventListener('DOMContentLoaded', () => {
     chatBackBtn.addEventListener('click', ()=>{
       interactionPhase = null;
       try { localStorage.removeItem(LASTTASK_KEY); } catch(_){}
+      clearNextState();
       clearTutorImage();
       msgBox.placeholder = DEFAULT_PLACEHOLDER;
       fbBox.classList.add('hidden');
@@ -1765,13 +1794,23 @@ document.addEventListener('DOMContentLoaded', () => {
       const imgFile = tutorImageFile();
       const savedTask = storedLastTask();
       const savedImageContext = storedLastImageContext();
+      const previousNextState = storedNextState();
       let text, fromTyped = false, answerPhase = null, continuation = false;
+      let confirmationIntent = '', confirmationPending = null, confirmationPhase = '';
       if (autoMessage){
         text = autoMessage;                        // auto-poruka pri ulasku u chat
       } else if (typed){
         text = typed; fromTyped = true;
         const asksNewTask = isNewPracticeTaskRequest(typed);
-        if (!asksNewTask && (interactionPhase === 'awaiting_practice_answer' || (savedTask && isShortPracticeAnswer(typed)))){
+        if (!asksNewTask && previousNextState && previousNextState.expected_user_action === 'continue_confirmation' && isAffirmativeConfirmation(typed)){
+          confirmationIntent = 'continue_confirmation';
+          confirmationPending = confirmationPendingAction(previousNextState);
+          confirmationPhase = 'confirmation';
+        } else if (!asksNewTask && previousNextState && previousNextState.expected_user_action === 'continue_confirmation' && isNegativeConfirmation(typed)){
+          confirmationIntent = 'decline_confirmation';
+          confirmationPending = confirmationPendingAction(previousNextState);
+          confirmationPhase = 'confirmation_declined';
+        } else if (!asksNewTask && (interactionPhase === 'awaiting_practice_answer' || (savedTask && isShortPracticeAnswer(typed)))){
           answerPhase = 'answering_practice_task'; // odgovor na zadatak, ne novi zahtjev
         } else if (!asksNewTask && lastTutorMessage && isFollowupMessage(typed)){
           continuation = true;                     // "može"/"nastavi" → nastavak, ne ponovno objašnjenje
@@ -1797,12 +1836,17 @@ document.addEventListener('DOMContentLoaded', () => {
         student_message: text,
         conversation_history: tutorHistory()
       };
+      if (previousNextState) payload.previous_next_state = previousNextState;
       const recentTasks = storedRecentTasks();
       if (recentTasks.length) payload.recent_tasks = recentTasks;
       if (!imgFile && savedImageContext && isImageFollowupMessage(text)){
         payload.last_image_context = savedImageContext.slice(0, 2000);
       }
-      if (answerPhase){                            // odgovor na practice zadatak
+      if (confirmationIntent){
+        payload.intent = confirmationIntent;
+        payload.interaction_phase = confirmationPhase;
+        if (confirmationPending) payload.pending_action = confirmationPending;
+      } else if (answerPhase){                     // odgovor na practice zadatak
         payload.interaction_phase = answerPhase;
         payload.mode = 'practice';
         payload.last_tutor_task = savedTask.slice(0, 600);
@@ -1954,6 +1998,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function applyTutorResponse(j, opts){
       const answer = (j && j.answer) ? j.answer : ((j && j.detail) ? j.detail : 'Nema odgovora.');
       const taskText = (j && j.status === 'ready') ? extractTutorTask(j, answer) : '';
+      if (j && j.next_state) setNextState(j.next_state);
+      else clearNextState();
       if (taskText){
         setAwaitingPracticeTask(taskText);  // sačuvaj zadatak prije historije
         pushRecentTask(taskText);           // anti-ponavljanje za sljedeći "novi zadatak"
