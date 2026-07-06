@@ -123,6 +123,33 @@ def test_simplify_requires_reduced_form():
     ]
 
 
+def test_rate_problem_time_distance_speed():
+    task = "Automobil prijeđe 65 km za 1 sat. Koliko sati mu treba za 260 km?"
+    e = derive_expected(task)
+    assert e is not None
+    assert e.value == Fraction(4)
+    assert e.unit == "sata"
+    assert "260 : 65 = 4 sata" in e.basis
+    assert _verdicts(check_practice_answer(task, "4 sata")) == ["correct"]
+    assert _verdicts(check_practice_answer(task, "2 sata")) == ["incorrect"]
+
+
+def test_rate_problem_distance_and_speed_forms():
+    assert derive_expected(
+        "Koliki put pređe automobil brzinom 65 km/h za 4 sata?"
+    ).value == Fraction(260)
+    assert derive_expected(
+        "Kolika brzina ako pređe 260 km za 4 sata?"
+    ).value == Fraction(65)
+
+
+def test_time_ratio_40_minutes_to_2_hours():
+    e = derive_expected("Odredi omjer 40 minuta prema 2 sata.")
+    assert e is not None
+    assert e.value == Fraction(1, 3)
+    assert e.required_form == "fraction"
+
+
 # --- više numerisanih stavki --------------------------------------------------------
 
 def test_multi_question_all_correct_example_c():

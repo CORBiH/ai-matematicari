@@ -40,7 +40,11 @@ def test_dry_eval_runs_offline_and_routes_correctly():
     # DRY: nijedan odgovor nije pravi model output
     for r in results:
         if r["status"] == "ready":
-            assert r["answer"] == eval_tutor.DRY_ANSWER, r["id"]
+            if r["id"] == "g6-image-rate-followup-corrects-old-result":
+                assert r["answer"].endswith(eval_tutor.DRY_ANSWER), r["id"]
+                assert "Ranije sam pogrešno napisao 2 sata" in r["answer"]
+            else:
+                assert r["answer"] == eval_tutor.DRY_ANSWER, r["id"]
     # rutiranje: SVI expect_* checkovi moraju proći (regresioni čuvar)
     bad = [(r["id"], r["checks"]) for r in results
            if any(not ok for *_x, ok in r["checks"])]

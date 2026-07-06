@@ -176,8 +176,10 @@ def split_numbered_items(task_text: str) -> list[tuple[int, str]]:
 @dataclass
 class Expected:
     value: Fraction
-    kind: str                     # "complement" | "to_improper" | "to_mixed" | "arithmetic" | "simplify"
+    kind: str                     # "complement" | "to_improper" | "to_mixed" | "arithmetic" | "simplify" | "rate_*" | "ratio"
     required_form: str | None = None   # "fraction" (nepravi) | "mixed" | None
+    unit: str | None = None
+    basis: str = ""
     # "high" → smije se presuditi i TAČNO i NETAČNO; "positive_only" → samo
     # potvrda tačnog (kontekst bi mogao mijenjati jedinicu odgovora, pa se
     # različit odgovor NE proglašava netačnim nego unverified).
@@ -194,6 +196,53 @@ _TO_MIXED_RE = re.compile(r"m[ij]e[sš]?ovit\w*\s+broj\w*")
 _CONVERT_RE = re.compile(r"\bpretvori|\bzapisi|\bnapisi|\bpredstavi")
 _SIMPLIFY_RE = re.compile(r"\bskrati")
 _CALC_LEAD_RE = re.compile(r"\b(izracunaj|koliko\s+je|odredi\s+vrijednost)\b")
+
+
+_NUM_UNIT = r"(-?\d+(?:[,.]\d+)?)"
+_DIST_RE = re.compile(rf"\b{_NUM_UNIT}\s*(km|kilomet(?:ar|ra|ara|araima|rima)?|m|met(?:ar|ra|ara|rima)?)\b")
+_TIME_RE = re.compile(rf"\b{_NUM_UNIT}\s*(h|sat(?:i|a|om)?|min(?:uta|ute|ut)?)\b")
+_SPEED_RE = re.compile(
+    rf"\b{_NUM_UNIT}\s*(?:km\s*/\s*h|km\s*/\s*sat|kmh|kilomet(?:ara|ra)?\s+na\s+sat)\b"
+)
+_TIME_ASK_RE = re.compile(r"\b(koliko\s+(?:mu\s+|joj\s+)?(?:treba|vremena|sat\w*|minut\w*)|za\s+koliko\s+vremena)\b")
+_DIST_ASK_RE = re.compile(r"\b(koliki\s+(?:put|put\s+predje|put\s+prede)|kolika\s+(?:udaljenost|duzina)|koliko\s+(?:km|kilomet\w*|metara))\b")
+_SPEED_ASK_RE = re.compile(r"\b(kolika\s+brzin\w*|odredi\s+brzin\w*|izracunaj\s+brzin\w*)\b")
+_RATIO_ASK_RE = re.compile(r"\b(omjer|odnos|prema)\b")
+
+
+def _num_to_fraction(raw: str) -> Fraction:
+    return Fraction(raw.replace(",", "."))
+
+
+def _time_to_minutes(value: Fraction, unit: str) -> Fraction:
+    return value * 60 if unit.startswith("sat") or unit == "h" else value
+
+
+def _minutes_to_unit(minutes: Fraction, unit: str) -> Fraction:
+    return minutes / 60 if unit == "sata" else minutes
+
+
+def _time_unit_from_question(folded: str, fallback: str = "sata") -> str:
+    if re.search(r"\bminut|min\b", folded):
+        return "minuta"
+    if re.search(r"\bsat|sati|sata|h\b", folded):
+        return "sata"
+    return fallback
+
+
+def _distance_to_km(value: Fraction, unit: str) -> Fraction:
+    return value / 1000 if unit.startswith("m") and unit != "km" else value
+
+
+def _fmt_fraction(value: Fraction) -> str:
+    if value.denominator == 1:
+        return str(value.numerator)
+    return f"{value.numerator}/{value.denominator}"
+
+
+def _fmt_expected(expected: Expected) -> str:
+    base = _fmt_fraction(expected.value)
+    return f"{base} {expected.unit}".strip() if expected.unit else base
 
 
 def _try_complement(folded: str, tokens: list[NumberToken]) -> Expected | None:
@@ -236,6 +285,91 @@ def _try_simplify(folded: str, tokens: list[NumberToken]) -> Expected | None:
     if len(fracs) != 1:
         return None
     return Expected(value=fracs[0].value, kind="simplify", required_form="fraction")
+
+
+def _try_rate_or_ratio(folded: str, norm_text: str) -> Expected | None:
+    distances = [
+        (m.start(), _distance_to_km(_num_to_fraction(m.group(1)), m.group(2)))
+        for m in _DIST_RE.finditer(norm_text)
+    ]
+    times = [
+        (m.start(), _time_to_minutes(_num_to_fraction(m.group(1)), m.group(2)))
+        for m in _TIME_RE.finditer(norm_text)
+    ]
+    speeds = [
+        (m.start(), _num_to_fraction(m.group(1)))
+        for m in _SPEED_RE.finditer(norm_text)
+    ]
+
+    # "Odredi omjer 40 minuta prema 2 sata" -> 40/120 = 1/3.
+    if _RATIO_ASK_RE.search(folded) and len(times) >= 2:
+        first = times[0][1]
+        second = times[1][1]
+        if second:
+            value = first / second
+            return Expected(
+                value=value,
+                kind="ratio",
+                required_form="fraction",
+                basis=f"{_fmt_fraction(first)} minuta : {_fmt_fraction(second)} minuta = {_fmt_fraction(value)}",
+            )
+
+    if _TIME_ASK_RE.search(folded):
+        unit = _time_unit_from_question(folded)
+        # "65 km za 1 sat, koliko sati za 260 km" -> 260 * 60 / 65 = 240 min = 4 sata.
+        if len(distances) >= 2 and times:
+            base_km = distances[0][1]
+            target_km = distances[-1][1]
+            base_minutes = times[0][1]
+            if base_km and base_minutes:
+                minutes = target_km * base_minutes / base_km
+                value = _minutes_to_unit(minutes, unit)
+                basis = (
+                    f"{_fmt_fraction(target_km)} : "
+                    f"{_fmt_fraction(base_km / (base_minutes / 60))} = "
+                    f"{_fmt_fraction(value)} {unit}"
+                    if base_minutes
+                    else ""
+                )
+                return Expected(value=value, kind="rate_time", unit=unit, basis=basis)
+        # "260 km brzinom 65 km/h, koliko vremena" -> 260 / 65 = 4 sata.
+        if distances and speeds:
+            target_km = distances[-1][1]
+            speed = speeds[0][1]
+            if speed:
+                hours = target_km / speed
+                value = _minutes_to_unit(hours * 60, unit)
+                return Expected(
+                    value=value,
+                    kind="rate_time",
+                    unit=unit,
+                    basis=f"{_fmt_fraction(target_km)} : {_fmt_fraction(speed)} = {_fmt_fraction(value)} {unit}",
+                )
+
+    if _DIST_ASK_RE.search(folded) and speeds and times:
+        speed = speeds[0][1]
+        hours = times[0][1] / 60
+        value = speed * hours
+        return Expected(
+            value=value,
+            kind="rate_distance",
+            unit="km",
+            basis=f"{_fmt_fraction(speed)} · {_fmt_fraction(hours)} = {_fmt_fraction(value)} km",
+        )
+
+    if _SPEED_ASK_RE.search(folded) and distances and times:
+        km = distances[-1][1]
+        hours = times[0][1] / 60
+        if hours:
+            value = km / hours
+            return Expected(
+                value=value,
+                kind="rate_speed",
+                unit="km/h",
+                basis=f"{_fmt_fraction(km)} : {_fmt_fraction(hours)} = {_fmt_fraction(value)} km/h",
+            )
+
+    return None
 
 
 _EXPR_PREFIX_RE = re.compile(
@@ -332,6 +466,9 @@ def derive_expected(item_text: str) -> Expected | None:
         result = solver(folded, tokens)
         if result is not None:
             return result
+    rate = _try_rate_or_ratio(folded, norm)
+    if rate is not None:
+        return rate
     return _try_arithmetic(folded, norm)
 
 
@@ -558,12 +695,6 @@ def _check(task_text: str, student_text: str) -> CheckResult:
 
 # --- Render bloka za prompt ---------------------------------------------------------
 
-def _fmt_fraction(value: Fraction) -> str:
-    if value.denominator == 1:
-        return str(value.numerator)
-    return f"{value.numerator}/{value.denominator}"
-
-
 def format_check_block(result: CheckResult) -> str:
     """Bosanski blok za user prompt; prazan string kada nema presuda."""
     if not result.checkable or not result.has_verdicts:
@@ -576,7 +707,7 @@ def format_check_block(result: CheckResult) -> str:
         if item.verdict == "correct":
             lines.append(
                 f"- Stavka {item.n}: TAČNO. Učenik: {given}; tačan rezultat: "
-                f"{_fmt_fraction(item.expected.value)}."
+                f"{_fmt_expected(item.expected)}."
             )
         elif item.verdict == "correct_value_wrong_form":
             lines.append(
@@ -586,7 +717,7 @@ def format_check_block(result: CheckResult) -> str:
         elif item.verdict == "incorrect":
             lines.append(
                 f"- Stavka {item.n}: NETAČNO. Učenik: {given}; tačan rezultat: "
-                f"{_fmt_fraction(item.expected.value)}. Prikaži račun."
+                f"{_fmt_expected(item.expected)}. Prikaži račun."
             )
         elif item.verdict == "missing":
             lines.append(
@@ -623,6 +754,7 @@ def summarize_result(result: CheckResult) -> dict | None:
                 "n": i.n,
                 "verdict": i.verdict,
                 "expected": _fmt_fraction(i.expected.value) if i.expected else None,
+                "unit": i.expected.unit if i.expected else None,
                 "given": i.given.raw if i.given else None,
             }
             for i in result.items

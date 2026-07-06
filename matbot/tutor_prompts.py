@@ -248,6 +248,12 @@ ACCURACY_GUIDELINES = (
     "- Nikad ne protivrječi sam sebi: konačan sud iz prve rečenice mora "
     "vrijediti do kraja odgovora.\n"
     "- Ako je uz zahtjev data PROVJERA IZ SISTEMA, ona je obavezujuća.\n"
+    "- Za zadatke sa slike: pažljivo pročitaj svaki zadatak i interno izračunaj "
+    "rezultat prije nego što ga napišeš. Ako učenik traži samo rezultate, i dalje "
+    "moraš provjeriti račun prije konačne liste.\n"
+    "- Ne smiješ dati rezultat koji će kasnije objašnjenje opovrgnuti. Ako nisi "
+    "siguran šta piše na slici ili koji su podaci, reci da je zadatak nejasan "
+    "umjesto da pogađaš broj.\n"
     "- Ako si već dao kompletan račun i konačan odgovor, NE traži od učenika "
     "da isti zadatak proba ponovo. Pitaj: \"Želiš li sličan zadatak za vježbu?\"\n"
 )

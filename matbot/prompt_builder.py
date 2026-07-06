@@ -538,6 +538,10 @@ def _build_image_context_block(payload: dict) -> str:
         f"{ctx}\n"
         "Ako učenik pita za prvi/drugi/treći zadatak, rezultat ili postupak "
         "sa slike, koristi OVAJ kontekst i sačuvaj originalnu numeraciju. "
+        "Prije objašnjenja ponovo provjeri sačuvani odgovor prema tekstu zadatka. "
+        "Ako blok PROVJERA SAČUVANOG KONTEKSTA kaže da je raniji odgovor bio "
+        "pogrešan, počni jasnom ispravkom (npr. \"Ranije sam pogrešno napisao ...\") "
+        "i zatim objasni tačan račun. NE smiješ tiho promijeniti rezultat. "
         "NE odgovaraj da treba poslati novo pitanje ako je ovaj kontekst dovoljan."
     )
 

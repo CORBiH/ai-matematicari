@@ -24,6 +24,12 @@ from matbot.content_loader import (
     normalize_grade,
     normalize_value,
 )
+from matbot.image_result_verifier import (
+    augment_saved_image_context,
+    correction_preface_from_context,
+    format_image_verification_for_context,
+    verify_image_result_answer,
+)
 from matbot.prompt_builder import (
     build_exam_oblast_prompt,
     build_general_tutor_prompt,
@@ -469,6 +475,17 @@ def _prepare_chat(
     # Default: grade -> 6 ako nije zadan; grade bira master/map i tutor prompt.
     payload["grade"] = normalize_grade(payload.get("grade") or DEFAULT_GRADE)
     _sanitize_payload(payload)
+    student_for_image_ctx = normalize_value(
+        payload.get("student_message") or payload.get("message")
+    )
+    if (
+        normalize_value(payload.get("last_image_context"))
+        and student_for_image_ctx
+        and _is_image_followup_message(student_for_image_ctx)
+    ):
+        payload["last_image_context"] = augment_saved_image_context(
+            payload["last_image_context"]
+        )
 
     # --- Audit: deterministička provjera odgovora PRIJE prompta -----------------
     # Kada je poruka odgovor na prethodni zadatak, kod sam izračuna i uporedi
@@ -612,8 +629,14 @@ def _make_image_context(payload: dict, answer: str) -> str:
     msg = normalize_value(payload.get("student_message") or payload.get("message"))
     if msg:
         parts.append("PORUKA UČENIKA UZ SLIKU:\n" + msg[:500])
+    verification = format_image_verification_for_context(
+        payload.get("image_result_verification")
+    )
+    if verification:
+        parts.append(verification)
     if answer:
-        parts.append("ODGOVOR TUTORA NA SLIKU:\n" + normalize_value(answer)[:1200])
+        answer_limit = 800 if verification else 1200
+        parts.append("ODGOVOR TUTORA NA SLIKU:\n" + normalize_value(answer)[:answer_limit])
     return "\n\n".join(parts).strip()[:MAX_IMAGE_CONTEXT_CHARS]
 
 
@@ -627,6 +650,18 @@ def _finalize_response(prep: dict, answer: str) -> dict:
     # ijekavica. Streaming klijent na kraju ponovo renderuje answer iz "done"
     # događaja, pa ispravka važi i za streamane odgovore.
     answer = to_ijekavica(answer)
+    correction_preface = correction_preface_from_context(
+        payload.get("last_image_context", "")
+    )
+    if correction_preface and "Ranije sam pogrešno napisao" not in answer:
+        answer = correction_preface + "\n\n" + answer
+    image_verification = None
+    if status == "ready" and normalize_value(payload.get("image_ocr_text")):
+        answer, image_verification = verify_image_result_answer(
+            payload.get("image_ocr_text"), answer
+        )
+        if image_verification:
+            payload["image_result_verification"] = image_verification
 
     entry_source_used = normalize_value(payload.get("entry_source")) or normalize_value(
         prep["lookup_result"].get("source")
@@ -653,6 +688,8 @@ def _finalize_response(prep: dict, answer: str) -> dict:
     image_context = _make_image_context(payload, answer)
     if image_context:
         response["image_context"] = image_context
+    if image_verification:
+        response["image_verification"] = image_verification
     task_text = extract_practice_task(answer, mode=mode) if status == "ready" else ""
     if task_text:
         response["last_tutor_task"] = task_text

@@ -751,6 +751,13 @@ def test_followup_compact_feedback_no_topic_restart():
     assert "Želiš li sličan zadatak za vježbu?" in block
 
 
+def test_system_prompt_has_image_result_verification_rule(master):
+    sp = pb.build_tutor_prompt({"selected_topic": TOPIC, "grade": 6}, _found(), master)["system_prompt"]
+    assert "Za zadatke sa slike" in sp
+    assert "Ako učenik traži samo rezultate" in sp
+    assert "Ne smiješ dati rezultat koji će kasnije objašnjenje opovrgnuti" in sp
+
+
 # --- Phase 7.2: nastavak razgovora + robusniji practice follow-up -----------------
 
 def test_continuation_instructions_block():

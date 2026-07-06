@@ -167,6 +167,74 @@ def test_image_context_returned_and_used_for_followup(master, tmap):
     assert "Postavi mi pitanje ili zadatak iz matematike" not in prompt
 
 
+def test_image_result_rate_answer_corrected_before_display(master, tmap):
+    ocr = "5. c) Automobil prijeđe 65 km za 1 sat. Koliko sati mu treba za 260 km?"
+    chat = _chat_recorder("5. c) Treba mu 2 sata za prijeći 260 kilometara.")
+    out = svc.handle_chat(
+        {"grade": 6, "mode": "quick", "student_message": "Daj mi samo rezultat zadatka sa slike."},
+        chat, master, tmap,
+        model="text-model", timeout=1,
+        image_bytes=b"fake-bytes", image_data_url="data:image/png;base64,AAA=",
+        ocr_image=lambda b: (ocr, 0.97), vision_model="vision-model",
+    )
+    assert out["status"] == "ready"
+    assert "5. c) 4 sata" in out["answer"]
+    assert "2 sata" not in out["answer"]
+    assert out["image_verification"]["items"][0]["status"] == "corrected"
+    assert out["image_verification"]["items"][0]["expected"] == "4 sata"
+    assert "ISPRAVLJENO" in out["image_context"]
+    assert "tačno je 4 sata" in out["image_context"]
+
+
+def test_saved_image_context_disagreement_forces_clear_correction(master, tmap):
+    ctx = (
+        "TEKST SA SLIKE (OCR):\n"
+        "5. c) Automobil prijeđe 65 km za 1 sat. Koliko sati mu treba za 260 km?\n\n"
+        "ODGOVOR TUTORA NA SLIKU:\n"
+        "5. c) Treba mu 2 sata za prijeći 260 kilometara."
+    )
+    chat = _chat_recorder("Za 260 km računamo 260 : 65 = 4 sata.")
+    out = svc.handle_chat(
+        {
+            "grade": 6,
+            "mode": "explain",
+            "student_message": "ne kontam kako si dobio to rješenje za zadnji zadatak",
+            "last_image_context": ctx,
+        },
+        chat, master, tmap, model="text-model", timeout=1,
+    )
+    assert out["status"] == "ready"
+    assert out["answer"].startswith("Ranije sam pogrešno napisao 2 sata.")
+    assert "Tačno je 4 sata" in out["answer"]
+    assert "260 : 65 = 4 sata" in out["answer"]
+    prompt = chat.calls["messages"][-1][-1]["content"]
+    assert "PROVJERA SAČUVANOG KONTEKSTA" in prompt
+    assert "RANIJI ODGOVOR JE POGREŠAN" in prompt
+    assert "NE smiješ tiho promijeniti rezultat" in prompt
+
+
+def test_saved_image_context_verified_answer_has_no_correction_prefix(master, tmap):
+    ctx = (
+        "TEKST SA SLIKE (OCR):\n"
+        "5. c) Automobil prijeđe 65 km za 1 sat. Koliko sati mu treba za 260 km?\n\n"
+        "ODGOVOR TUTORA NA SLIKU:\n"
+        "5. c) 4 sata"
+    )
+    chat = _chat_recorder("Za 260 km računamo 260 : 65 = 4 sata.")
+    out = svc.handle_chat(
+        {
+            "grade": 6,
+            "mode": "explain",
+            "student_message": "objasni zadnji zadatak",
+            "last_image_context": ctx,
+        },
+        chat, master, tmap, model="text-model", timeout=1,
+    )
+    assert out["status"] == "ready"
+    assert not out["answer"].startswith("Ranije sam pogrešno napisao")
+    assert "4 sata" in out["answer"]
+
+
 # --- heuristika _looks_geometric -------------------------------------------------------
 
 def test_looks_geometric_unit():
