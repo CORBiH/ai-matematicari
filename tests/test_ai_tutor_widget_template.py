@@ -555,8 +555,10 @@ def test_tutor_task_detection_updates_last_task(client):
 def test_tutor_task_saved_before_history_for_stream_and_json(client):
     html = _html(client)
     idx = html.index("function applyTutorResponse")
-    snippet = html[idx:idx + 900]
-    assert "const taskText = (j && j.status === 'ready') ? extractTutorTask(j, answer) : ''" in snippet
+    snippet = html[idx:idx + 1200]
+    # image_test tok NE pretvara prozu odgovora u last_tutor_task
+    assert "const taskText = (j && j.status === 'ready' && !inImageTest) ? extractTutorTask(j, answer) : ''" in snippet
+    assert "j.next_state.active_task_kind === 'image_test'" in snippet
     assert snippet.index("setAwaitingPracticeTask(taskText)") < snippet.index("pushTutor('assistant', answer)")
     assert "sačuvaj zadatak prije historije" in snippet
 
@@ -699,3 +701,32 @@ def test_recent_tasks_tracked_and_sent(client):
     assert "RECENTTASKS_KEY" in html[ridx:ridx + 900]
     didx = html.index("doClear")
     assert "matbot_tutor_recent_" in html[didx:html.index("promjena razreda kroz meni")]
+
+
+# --- image_test tok: perzistencija konteksta + state-driven rutiranje -------------
+
+def test_image_test_frontend_contract(client):
+    html = _html(client)
+    # kontekst slike se salje i uz potvrde i dok je image_test aktivan
+    assert "previousNextState.active_task_kind === 'image_test'" in html
+    assert "isImageFollowupMessage(text) || confirmationIntent || imageTestActive" in html
+    # prosireni follow-up rjecnik hvata "uradi mi korak po korak", "nastavi", "sve"
+    assert r"korak|nastav\w*|dalje|sljedec\w*|sve" in html
+    # greska bez statusa NE brise sacuvano stanje (next_state ostaje)
+    assert "else if (j && j.status) clearNextState()" in html
+
+
+def test_transition_text_never_becomes_task_frontend(client):
+    html = _html(client)
+    assert "function looksLikeTransitionText(t)" in html
+    assert "if (looksLikeTransitionText(s)) return false;" in html
+    # tokom image_test toka proza odgovora se ne pretvara u last_tutor_task
+    assert "const inImageTest = !!(j && j.next_state && j.next_state.active_task_kind === 'image_test')" in html
+    assert "if (inImageTest) clearAwaitingPracticeTask();" in html
+
+
+def test_nastavi_is_not_new_task_request(client):
+    html = _html(client)
+    idx = html.index("function isNewPracticeTaskRequest(t)")
+    snippet = html[idx:idx + 700]
+    assert "|objasni|nastavi)" in snippet

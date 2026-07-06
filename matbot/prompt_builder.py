@@ -529,6 +529,46 @@ def _build_student_block(payload: dict) -> str:
     return "\n\n".join(parts)
 
 
+def build_image_test_instructions(payload: dict) -> str:
+    """Mode blok kada je aktivan image_test tok (``payload["_image_test"]``).
+
+    Stanje (koja stavka je na redu) određuje KOD, ne model — blok samo prenosi
+    odluku: riješi isključivo tekuću stavku, zadrži numeraciju, ne izmišljaj
+    nepovezane zadatke."""
+    img = (payload or {}).get("_image_test") or {}
+    current = normalize_value(img.get("current"))
+    if not current:
+        return ""
+    labels = [normalize_value(l) for l in img.get("labels") or []]
+    solved = [normalize_value(s) for s in img.get("solved") or []]
+    task = normalize_value(img.get("current_task"))[:500]
+    block = (
+        "MOD: ZADACI SA SLIKE (image_test)\n"
+        f"- Učenik rješava zadatke sa poslane slike (ukupno {len(labels)}: "
+        f"{', '.join(labels)}). Već riješeno: {', '.join(solved) or 'ništa'}.\n"
+        f"- SADA riješi ili objasni ISKLJUČIVO zadatak {current} — prema onome "
+        "što učenik traži.\n"
+        "- NE rješavaj ostale zadatke unaprijed i NIKAD ne izmišljaj novi "
+        "nepovezani zadatak za vježbu dok traje rad na slici.\n"
+        f"- Zadrži originalnu numeraciju sa slike (piši \"{current}.\").\n"
+    )
+    if task:
+        block += f"- Tekst zadatka {current}: {task}\n"
+    if img.get("style") == "result_only":
+        block += "- STIL: samo rezultat + najviše jedna kratka rečenica provjere.\n"
+    else:
+        block += "- STIL: korak po korak, kratko i jasno, primjereno razredu.\n"
+    remaining = [l for l in labels if l not in solved and l != current]
+    if remaining:
+        block += (
+            f"- Na kraju kratko pitaj želi li učenik nastaviti na zadatak "
+            f"{remaining[0]}.\n"
+        )
+    else:
+        block += "- Ovo je posljednji zadatak sa slike — na kraju kratko pohvali i ponudi vježbu.\n"
+    return block
+
+
 def _build_image_context_block(payload: dict) -> str:
     ctx = normalize_value((payload or {}).get("last_image_context"))[:2000]
     if not ctx:
@@ -642,7 +682,12 @@ def build_tutor_prompt(
             "- Riješi zadatak prema STVARNOJ temi zadatka i KRATKO napomeni ovo "
             "neslaganje učeniku."
         )
-    if is_practice_followup:
+    image_test_block = build_image_test_instructions(payload)
+    if image_test_block:
+        # image_test tok nadjačava standardne modove: stanje bira stavku,
+        # model je samo rješava (nikad ne generiše nepovezani zadatak)
+        mode_block = image_test_block
+    elif is_practice_followup:
         mode_block = build_practice_followup_instructions(payload, topic_context)
     elif is_continuation:
         mode_block = build_continuation_instructions(payload)
@@ -688,7 +733,10 @@ def build_general_tutor_prompt(payload: dict) -> dict:
     # Phase 7.2: i bez prepoznate teme poštuj fazu interakcije (practice odgovor
     # ili nastavak razgovora) umjesto standardnog mode bloka.
     phase = normalize_value(payload.get("interaction_phase")).lower()
-    if phase == "answering_practice_task":
+    image_test_block = build_image_test_instructions(payload)
+    if image_test_block:
+        mode_block = image_test_block          # stanje bira stavku sa slike
+    elif phase == "answering_practice_task":
         mode = "practice"
         mode_block = build_practice_followup_instructions(payload, {})
     elif phase == "continuing_explanation":

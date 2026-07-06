@@ -16,7 +16,11 @@ import re
 from typing import Any, Callable
 
 from matbot.activity_log import log_student_activity
-from matbot.answer_checker import check_practice_answer, summarize_result
+from matbot.answer_checker import (
+    check_practice_answer,
+    detect_referenced_items,
+    summarize_result,
+)
 from matbot.bosnian import to_ijekavica
 from matbot.content_loader import (
     get_master,
@@ -27,7 +31,9 @@ from matbot.content_loader import (
 from matbot.image_result_verifier import (
     augment_saved_image_context,
     correction_preface_from_context,
+    extract_image_tasks,
     format_image_verification_for_context,
+    ocr_from_saved_context,
     verify_image_result_answer,
 )
 from matbot.prompt_builder import (
@@ -161,7 +167,8 @@ _IMAGE_FOLLOWUP_RE = re.compile(
     r"\b("
     r"slik\w*|zadat\w*|zadac\w*|pitanj\w*|rezultat\w*|postupak|"
     r"prv\w*|drug\w*|trec\w*|cetvrt\w*|pet\w*|"
-    r"kako\s+si|uradio|uradila|dobio|dobila|objasni|ne\s+razumijem"
+    r"kako\s+si|urad\w*|rijesi\w*|dobio|dobila|objasni|ne\s+razumijem|"
+    r"korak|nastav\w*|dalje|sljedec\w*|sve"
     r")\b|\b\d{1,2}\s*[.)]"
 )
 
@@ -170,6 +177,59 @@ def _is_image_followup_message(text: Any) -> bool:
     """Follow-up koji se prirodno poziva na prethodni zadatak sa slike."""
     folded = fold_diacritics(text)
     return bool(_IMAGE_FOLLOWUP_RE.search(folded))
+
+
+# --- Eksplicitna namjera učenika (stil + obim) — nadjačava UI mod -------------------
+# State-driven kontrakt: namjera se čita iz PORUKE UČENIKA (ne iz odgovora
+# modela) i primjenjuje PRIJE rutiranja teme/prompta.
+
+_STYLE_STEP_RE = re.compile(
+    r"korak\s+po\s+korak|objasni\s+(?:mi\s+)?postupak|postupak\s+rjesavanja|"
+    r"rijesi\s+detaljno|detaljno\s+(?:objasni|rijesi|uradi)|s[av]\s+postupkom"
+)
+_STYLE_RESULT_RE = re.compile(
+    r"samo\s+rezultat|samo\s+rjesenj\w*|samo\s+odgovor\w*|bez\s+postupka"
+)
+_SOLVE_ALL_RE = re.compile(
+    r"(?:uradi|rijesi|izracunaj|zavrsi)\w*\s+(?:mi\s+)?(?:i\s+)?"
+    r"(?:sve|svaki|cijeli|kompletn\w*)|sve\s+zadatke|cijeli\s+test"
+)
+
+
+def detect_explicit_intent(text: Any) -> dict:
+    """{"style": "step_by_step"|"result_only"|None, "solve_all": bool}."""
+    folded = fold_diacritics(text)
+    style = None
+    if _STYLE_STEP_RE.search(folded):
+        style = "step_by_step"
+    elif _STYLE_RESULT_RE.search(folded):
+        style = "result_only"
+    return {"style": style, "solve_all": bool(_SOLVE_ALL_RE.search(folded))}
+
+
+def _apply_explicit_intent(payload: dict) -> None:
+    """Postavi ``explicit_style``/``solve_all`` i po potrebi nadjačaj UI mod.
+
+    Radi na ORIGINALNOJ poruci (prije confirmation-rewrite-a). NE dira mod
+    kada je poruka odgovor na zadatak (ocjenjivanje) ili eksplicitni intent."""
+    if normalize_value(payload.get("intent")):
+        return
+    phase = normalize_value(payload.get("interaction_phase")).lower()
+    if phase == "answering_practice_task":
+        return
+    intent = detect_explicit_intent(
+        payload.get("student_message") or payload.get("message")
+    )
+    if intent["style"]:
+        payload["explicit_style"] = intent["style"]
+    if intent["solve_all"]:
+        payload["solve_all"] = True
+    mode = normalize_value(payload.get("mode")).lower()
+    # "korak po korak" u modu Rezultat → objašnjenje; "samo rezultat" → quick.
+    if intent["style"] == "step_by_step" and mode in ("quick", "rezultat", "samo_rezultat", "brzo"):
+        payload["mode"] = "explain"
+    elif intent["style"] == "result_only":
+        payload["mode"] = "quick"
 
 
 def _empty_pending_action() -> dict:
@@ -181,17 +241,56 @@ def _empty_next_state() -> dict:
         "expected_user_action": "none",
         "pending_action": _empty_pending_action(),
         "active_task_kind": None,
+        "image_test": None,
     }
 
 
-def _normalize_next_item(value: Any) -> int | None:
-    if value is None or value == "":
+# Oznaka stavke sa slike: "3" (int) ili pod-oznaka poput "5.c" (string).
+_ITEM_LABEL_RE = re.compile(r"^\d{1,3}(?:\.[a-zčć0-9])?$")
+
+
+def _normalize_next_item(value: Any) -> int | str | None:
+    if value is None or value == "" or isinstance(value, bool):
         return None
     try:
         item = int(value)
+        return item if 0 < item < 1000 else None
     except (TypeError, ValueError):
+        label = normalize_value(value).lower()
+        return label if _ITEM_LABEL_RE.fullmatch(label) else None
+
+
+def _item_out(label: str) -> int | str:
+    """Kanonski oblik oznake za response: čisti broj → int, "5.c" → string."""
+    return int(label) if str(label).isdigit() else str(label)
+
+
+def _normalize_image_test(raw: Any) -> dict | None:
+    """Validiraj ``image_test`` pod-stanje iz klijenta; None = nevalidno/nema."""
+    if not isinstance(raw, dict):
         return None
-    return item if 0 < item < 1000 else None
+    labels = [
+        normalize_value(x).lower()[:8]
+        for x in (raw.get("item_labels") or [])
+        if normalize_value(x)
+    ][:20]
+    labels = [l for l in labels if _ITEM_LABEL_RE.fullmatch(l)]
+    if not labels:
+        return None
+    solved = [
+        normalize_value(x).lower()[:8]
+        for x in (raw.get("solved") or [])
+        if normalize_value(x)
+    ][:20]
+    solved = [s for s in solved if s in labels]
+    next_item = _normalize_next_item(raw.get("next_item"))
+    style = normalize_value(raw.get("style")).lower()
+    return {
+        "item_labels": labels,
+        "solved": solved,
+        "next_item": next_item,
+        "style": style if style in ("step_by_step", "result_only") else None,
+    }
 
 
 def _normalize_pending_action(raw: Any) -> dict:
@@ -219,6 +318,8 @@ def _normalize_next_state(raw: Any) -> dict:
         "expected_user_action": expected if expected in _NEXT_EXPECTED_ACTIONS else "none",
         "pending_action": _normalize_pending_action(raw.get("pending_action")),
         "active_task_kind": active if active in _ACTIVE_TASK_KINDS else None,
+        # image_test pod-stanje putuje kroz klijenta netaknuto (state-driven tok)
+        "image_test": _normalize_image_test(raw.get("image_test")),
     }
 
 
@@ -384,6 +485,84 @@ def _apply_confirmation_contract(payload: dict) -> None:
         payload["_direct_answer"] = _natural_confirmation_clarifier()
 
 
+# --- image_test: deterministička mašina stanja za zadatke sa slike ------------------
+
+_CONTINUE_SIGNAL_RE = re.compile(r"\b(nastav\w*|sljedec\w*|dalje|idemo)\b")
+
+
+def _resolve_image_test_state(payload: dict) -> dict | None:
+    """Odredi image_test stanje za OVAJ potez — state-driven, nikad iz proze.
+
+    Izvor zadataka je ISKLJUČIVO OCR (svježa slika ili sačuvani
+    ``last_image_context``); odgovor modela se NE parsira za ovu odluku.
+    ``None`` = potez nije korak image_test toka (normalan tok netaknut).
+
+    Ulazi u koračanje samo na jasan signal: potvrda ``continue_image_test``,
+    eksplicitno "sve zadatke"/"korak po korak" uz sliku, referenca na
+    konkretan zadatak ("nastavi na treći zadatak") ili "nastavi" uz
+    postojeće image_test stanje."""
+    if normalize_value(payload.get("interaction_phase")).lower() == "answering_practice_task":
+        return None      # učenik odgovara na practice zadatak — ne otimaj tok
+
+    fresh_ocr = normalize_value(payload.get("image_ocr_text"))
+    saved_ctx = normalize_value(payload.get("last_image_context"))
+    ocr = fresh_ocr or (ocr_from_saved_context(saved_ctx) if saved_ctx else "")
+    if not ocr:
+        return None
+    items = extract_image_tasks(ocr)
+    if len(items) < 2:
+        return None      # jedan zadatak sa slike = običan tok, bez koračanja
+    labels = [str(it["label"]).lower() for it in items]
+    tasks_by_label = {str(it["label"]).lower(): it["task"] for it in items}
+
+    prev = _previous_next_state(payload).get("image_test") or {}
+    prev_solved = [s for s in prev.get("solved") or [] if s in labels]
+    pending = _pending_action_from_payload(payload)
+    style = (
+        normalize_value(payload.get("explicit_style")).lower()
+        or normalize_value(prev.get("style")).lower()
+        or ("result_only"
+            if normalize_value(payload.get("mode")).lower() == "quick"
+            else "step_by_step")
+    )
+    if style not in ("step_by_step", "result_only"):
+        style = "step_by_step"
+
+    message = normalize_value(payload.get("student_message") or payload.get("message"))
+    numeric = [int(l) for l in labels if l.isdigit()]
+    refs = detect_referenced_items(message, numeric) if numeric else set()
+
+    current: str | None = None
+    if (
+        normalize_value(payload.get("intent")).lower() == "continue_confirmation"
+        and pending.get("type") == "continue_image_test"
+    ):
+        pn = pending.get("next_item")
+        current = str(pn).lower() if pn is not None else None
+    elif payload.get("solve_all") or normalize_value(payload.get("explicit_style")) == "step_by_step":
+        current = None                       # → prva neriješena stavka ispod
+    elif refs:
+        current = str(min(refs))             # "nastavi na treći zadatak" → 3
+    elif prev and _CONTINUE_SIGNAL_RE.search(fold_diacritics(message)):
+        pn = prev.get("next_item")
+        current = str(pn).lower() if pn is not None else None
+    else:
+        return None
+
+    unsolved = [l for l in labels if l not in prev_solved]
+    if current is None or current not in labels:
+        current = unsolved[0] if unsolved else None
+    if current is None:
+        return None                          # sve riješeno — image tok je gotov
+    return {
+        "labels": labels,
+        "solved": prev_solved,
+        "current": current,
+        "style": style,
+        "current_task": normalize_value(tasks_by_label.get(current, ""))[:500],
+    }
+
+
 _TASK_ACTION_RE = re.compile(
     r"\b("
     r"zadatak|izracunaj|rijesi|uporedi|usporedi|poredi|odredi|nadji|"
@@ -425,6 +604,19 @@ def _clean_task_candidate(text: Any, limit: int = MAX_LAST_TASK_CHARS) -> str:
     return cleaned[:limit]
 
 
+# Prelazne/veznične fraze ("Odlično, idemo na sljedeći zadatak!") NISU zadatak
+# i ne smiju nikad postati last_tutor_task. Odbacuju se samo kada nema
+# matematičkog signala (pravi zadaci gotovo uvijek imaju broj/operator/pojam).
+_TRANSITION_TEXT_RE = re.compile(
+    r"^(?:odlicno|super|bravo|sjajno|top|dobro|ok|okej|u\s+redu|hajde|ajmo|"
+    r"hajmo|idemo|nastavljamo|nastavimo|nastavi)\b"
+)
+_CONTINUE_OFFER_RE = re.compile(
+    r"\b(?:zelis|hoces|hocemo|da\s+li|mozemo)\b.{0,40}"
+    r"\b(?:nastavi\w*|sljedec\w*|dalje|jos)\b"
+)
+
+
 def _looks_like_practice_task_text(text: Any) -> bool:
     folded = fold_diacritics(text)
     if not folded or len(folded) < 4:
@@ -437,8 +629,12 @@ def _looks_like_practice_task_text(text: Any) -> bool:
         folded,
     ):
         return False
-    has_action = bool(_TASK_ACTION_RE.search(folded))
     has_signal = bool(_TASK_SIGNAL_RE.search(folded))
+    if not has_signal and (
+        _TRANSITION_TEXT_RE.match(folded) or _CONTINUE_OFFER_RE.search(folded)
+    ):
+        return False
+    has_action = bool(_TASK_ACTION_RE.search(folded))
     return has_action and (has_signal or len(folded.split()) >= 4)
 
 
@@ -729,6 +925,9 @@ def _prepare_chat(
     # Default: grade -> 6 ako nije zadan; grade bira master/map i tutor prompt.
     payload["grade"] = normalize_grade(payload.get("grade") or DEFAULT_GRADE)
     _sanitize_payload(payload)
+    # Eksplicitna namjera (stil/obim) se čita iz ORIGINALNE poruke, prije nego
+    # što je confirmation contract eventualno zamijeni sintetičkom.
+    _apply_explicit_intent(payload)
     _apply_confirmation_contract(payload)
 
     if payload.get("_direct_answer") is not None:
@@ -790,6 +989,14 @@ def _prepare_chat(
             ocr_text, ocr_conf = None, 0.0
         if ocr_text:
             payload["image_ocr_text"] = normalize_value(ocr_text)[:MAX_MESSAGE_CHARS]
+
+    # --- image_test: deterministički korak kroz zadatke sa slike -----------------
+    # Stanje se gradi iz OCR-a + prethodnog next_state (nikad iz proze odgovora);
+    # prompt builder ga koristi kao mode blok, _next_state_for_response kao izvor
+    # sljedećeg koraka.
+    image_test = _resolve_image_test_state(payload)
+    if image_test:
+        payload["_image_test"] = image_test
 
     lookup_result = get_final_topic(payload, master, tmap)
 
@@ -990,11 +1197,41 @@ def _next_state_for_response(
     if status != "ready":
         return _empty_next_state()
 
+    # image_test ima APSOLUTNU prednost i računa se iz stanja, ne iz proze:
+    # stavka koju smo u OVOM potezu dali modelu postaje "riješena", sljedeća
+    # neriješena ide u pending_action.next_item.
+    img = payload.get("_image_test")
+    if img:
+        solved = list(img.get("solved") or [])
+        current = img.get("current")
+        if current and current not in solved:
+            solved.append(current)
+        unsolved = [l for l in img.get("labels") or [] if l not in solved]
+        if unsolved:
+            nxt = unsolved[0]
+            return {
+                "expected_user_action": "continue_confirmation",
+                "pending_action": {
+                    "type": "continue_image_test",
+                    "source": "image_context",
+                    "next_item": _item_out(nxt),
+                },
+                "active_task_kind": "image_test",
+                "image_test": {
+                    "item_labels": list(img.get("labels") or []),
+                    "solved": solved,
+                    "next_item": _item_out(nxt),
+                    "style": img.get("style"),
+                },
+            }
+        # sve stavke riješene → image tok završen, dalje normalna logika
+
     if task_text and mode in ("practice", "exam"):
         return {
             "expected_user_action": "answer_task",
             "pending_action": _empty_pending_action(),
             "active_task_kind": "practice",
+            "image_test": None,
         }
 
     pending = _pending_action_from_answer(payload, answer)
@@ -1008,6 +1245,7 @@ def _next_state_for_response(
             "expected_user_action": "continue_confirmation",
             "pending_action": pending,
             "active_task_kind": active,
+            "image_test": None,
         }
 
     return _empty_next_state()
@@ -1063,9 +1301,11 @@ def _finalize_response(prep: dict, answer: str) -> dict:
         response["image_context"] = image_context
     if image_verification:
         response["image_verification"] = image_verification
+    # Tokom image_test toka odgovor NIKAD ne postaje last_tutor_task — aktivni
+    # "zadatak" je stavka sa slike i živi u next_state.image_test, ne u prozi.
     task_text = (
         ""
-        if payload.get("_direct_answer") is not None
+        if payload.get("_direct_answer") is not None or payload.get("_image_test")
         else (extract_practice_task(answer, mode=mode) if status == "ready" else "")
     )
     if task_text:

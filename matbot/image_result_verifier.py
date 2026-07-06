@@ -285,6 +285,20 @@ def _extract_context_section(context: str, heading: str) -> str:
     return normalize_value(m.group("body")) if m else ""
 
 
+def ocr_from_saved_context(context: str) -> str:
+    """OCR sekcija iz sačuvanog image konteksta (izvor istine za image_test).
+
+    Vraća "" kada kontekst nema OCR sekciju — pozivalac tada NE gradi
+    image_test stanje (nikad se ne izmišljaju zadaci)."""
+    ctx = normalize_value(context)
+    if not ctx:
+        return ""
+    return (
+        _extract_context_section(ctx, r"TEKST SA SLIKE \(OCR\)")
+        or _extract_context_section(ctx, r"TEKST ZADATKA SA SLIKE \(OCR\)")
+    )
+
+
 def augment_saved_image_context(context: str) -> str:
     """Append a deterministic re-check block to old/new saved image context."""
     ctx = normalize_value(context)

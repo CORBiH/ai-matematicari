@@ -109,3 +109,34 @@ ekavske oblike i loš auto-scroll. Verifikacija: `pytest` (510 testova) +
 - Checker pokriva razlomke/cijele/decimalne i 4 klase zadataka; ostalo ocjenjuje model uz stroža pravila (prvo izračunaj, pa presudi).
 - Stream može nakratko prikazati ekavski oblik dok traje kucanje; finalni render je ispravljen.
 - `temperature` se namjerno NE šalje (gpt-5 familija ne prima custom vrijednost kroz chat completions).
+
+---
+
+# image_test tok — state-driven stanje razgovora (jul 2026, lokalno)
+
+Uzrok bugova: active_task_kind/pending_action/last_tutor_task su se izvodili
+PARSIRANJEM PROZE odgovora modela. Sada su state-driven.
+
+## Backend (matbot/ai_tutor_service.py)
+- `detect_explicit_intent` + `_apply_explicit_intent`: "korak po korak/objasni postupak/rijesi detaljno" → step_by_step (quick→explain); "samo rezultat" → result_only (→quick); "sve zadatke/cijeli test" → solve_all. Čita se iz ORIGINALNE poruke učenika, prije confirmation-rewrite-a; ne dira ocjenjivanje (answering_practice_task).
+- `_resolve_image_test_state`: deterministička mašina stanja za zadatke sa slike. Izvor stavki je ISKLJUČIVO OCR (svježa slika ili OCR sekcija iz last_image_context preko `ocr_from_saved_context`); ulaz u koračanje samo na jasan signal (potvrda continue_image_test, solve_all/step intent uz sliku, "nastavi na treći zadatak" referenca, "nastavi" uz postojeće image_test stanje). ≥2 stavke obavezno; answering_practice_task nikad ne otima.
+- `_next_state_for_response`: image_test grana ima APSOLUTNU prednost pred prozom — solved/current/next_item se računaju iz stanja; schema: `next_state.image_test = {item_labels, solved, next_item, style}` + `pending_action={type:continue_image_test, source:image_context, next_item}` + `active_task_kind=image_test`. Zadnja stavka riješena → izlaz iz image toka.
+- Guard: tokom image_test odgovor NIKAD ne postaje last_tutor_task; `_looks_like_practice_task_text` odbacuje prelazne fraze bez matematičkog signala ("Odlično, idemo na sljedeći zadatak!", "Super, nastavljamo", "Želiš li da nastavimo?").
+- `_normalize_next_state` propušta image_test pod-stanje (validirano); next_item podržava i pod-oznake ("5.c").
+
+## Prompt (matbot/prompt_builder.py)
+- `build_image_test_instructions`: mode blok koji NADJAČAVA standardne modove — riješi isključivo tekuću stavku (tekst stavke ide u prompt), zadrži numeraciju, stil po stanju, nikad nepovezani zadatak; najavi sljedeću stavku.
+
+## Frontend (templates/index.html)
+- `last_image_context` se šalje uz follow-up formulacije (prošireni rječnik: uradi/rijesi/korak/nastavi/sve/dalje), uz SVE potvrde i dok je image_test aktivan.
+- `applyTutorResponse`: tokom image_test proza se NE pretvara u last_tutor_task (inImageTest gate + clearAwaitingPracticeTask); greška bez statusa ne briše next_state.
+- `looksLikeTransitionText` ogledalo backend filtera; `isNewPracticeTaskRequest` isključuje "nastavi..." fraze.
+
+## Testovi
+- tests/test_image_test_state.py (22): start koračanja (korak po korak/sve zadatke), "da" nastavlja stavku 2 (ne vježbu), "nastavi na treći zadatak" → stavka 3, izlaz nakon zadnje, prelazni tekst nije zadatak, stil nadjačava quick, bez konteksta "nastavi" → pojašnjenje/fallback, jedna stavka bez koračanja, ocjenjivanje se ne otima, streaming nosi stanje.
+- test_ai_tutor_widget_template.py (+3 image_test kontrakt), eval_cases (+3).
+- Verifikacija: pytest 560 passed; node scripts/check_js.mjs OK; dry eval 41/0; git diff --check čist.
+
+## Poznata ograničenja
+- Vision-only slike (bez OCR teksta) nemaju image_test koračanje (nema pouzdanih stavki) — kontekst se i dalje čuva.
+- Odlazak u nepovezanu vježbu usred image_test toka ne pamti progres (image_test se ne prenosi kroz nepovezan potez); "objasni prvi zadatak sa slike" i dalje radi preko last_image_context.

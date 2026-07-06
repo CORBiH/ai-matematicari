@@ -1236,7 +1236,10 @@ document.addEventListener('DOMContentLoaded', () => {
     function isImageFollowupMessage(t){
       const s = foldTutorText(t).trim();
       if (!s || s.length > 160) return false;
-      return /\b(slik\w*|zadat\w*|zadac\w*|pitanj\w*|rezultat\w*|postupak|prv\w*|drug\w*|trec\w*|cetvrt\w*|pet\w*|kako\s+si|uradio|uradila|dobio|dobila|objasni|ne\s+razumijem)\b|\b\d{1,2}\s*[.)]/.test(s);
+      /* BUG 3 fix: pokriva i prezent ("uradi", "rijesi"), "korak po korak",
+         "nastavi/dalje/sljedeci/sve" — ranije je "uradi mi korak po korak"
+         promaklo pa follow-up nije nosio kontekst slike */
+      return /\b(slik\w*|zadat\w*|zadac\w*|pitanj\w*|rezultat\w*|postupak|prv\w*|drug\w*|trec\w*|cetvrt\w*|pet\w*|kako\s+si|urad\w*|rijesi\w*|dobio|dobila|objasni|ne\s+razumijem|korak|nastav\w*|dalje|sljedec\w*|sve)\b|\b\d{1,2}\s*[.)]/.test(s);
     }
     function storedRecentTasks(){
       try { const a = JSON.parse(localStorage.getItem(RECENTTASKS_KEY) || '[]'); return Array.isArray(a) ? a : []; }
@@ -1252,7 +1255,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function isNewPracticeTaskRequest(t){
       const s = foldTutorText(t).trim();
       if (!s || s.length > 120) return false;
-      if (/\b(ponovi|ponoviti|isti|ovaj|hint|pomozi|pomoc|objasni)\b/.test(s)) return false;
+      /* "nastavi na drugi zadatak" je NASTAVAK (image_test/objasnjenje),
+         ne zahtjev za novim zadatkom */
+      if (/\b(ponovi|ponoviti|isti|ovaj|hint|pomozi|pomoc|objasni|nastavi)\b/.test(s)) return false;
       return (
         /\b(daj|zadaj|posalji|moze|mozes|hocu|zelim|trebam)\b.*\b(novi|nov|drugi|jos\s+jedan|jos|sljedeci|slican|slicni)\b.*\b(zadatak|primjer)\b/.test(s) ||
         /\b(novi|nov|drugi|jos\s+jedan|sljedeci|slican|slicni)\s+(zadatak|primjer)\b/.test(s) ||
@@ -1288,10 +1293,21 @@ document.addEventListener('DOMContentLoaded', () => {
         .trim()
         .slice(0, 600);
     }
+    /* Prelazni tekst ("Odlično, idemo na sljedeći zadatak!") NIJE zadatak i ne
+       smije postati last_tutor_task (ogledalo backend filtera). */
+    function looksLikeTransitionText(t){
+      const s = foldTutorText(t).trim();
+      if (!s) return false;
+      const signal = /\d|[<>=+\-*/:^]|\\frac\{|nzd|nzs|prethodnik|sljedbenik|skup|ugao|razlom|decimal|stepen|procent|prava|duz|tacka|trougao|cetverougao/.test(s);
+      if (signal) return false;
+      return /^(odlicno|super|bravo|sjajno|top|dobro|ok|okej|u\s+redu|hajde|ajmo|hajmo|idemo|nastavljamo|nastavimo|nastavi)\b/.test(s)
+          || /\b(zelis|hoces|hocemo|da\s+li|mozemo)\b.{0,40}\b(nastavi\w*|sljedec\w*|dalje|jos)\b/.test(s);
+    }
     function taskCandidateLooksVisible(t){
       const s = foldTutorText(t);
       if (!s) return false;
       if (/^(evo\s+)?(jedan\s+|mali\s+|sljedeci\s+|slican\s+)?(zadatak|primjer)\s*:?\s*$/.test(s)) return false;
+      if (looksLikeTransitionText(s)) return false;
       const action = /\b(zadatak|izracunaj|rijesi|uporedi|usporedi|poredi|odredi|nadji|izaberi|oznaci|nacrtaj|konstruisi|konstruiraj|pomnozi|podijeli|saberi|oduzmi|skrati|pretvori|zaokruzi|dopuni|napisi|koristi|koliko|koji|koja|koje|da li)\b/.test(s);
       const signal = /\d|[<>=+\-*/:^]|\\frac\{|nzd|nzs|prethodnik|sljedbenik|skup|ugao|razlom|decimal|stepen|procent|prava|duz|tacka|trougao|cetverougao/.test(s);
       return action && (signal || s.split(/\s+/).length >= 4);
@@ -1839,7 +1855,11 @@ document.addEventListener('DOMContentLoaded', () => {
       if (previousNextState) payload.previous_next_state = previousNextState;
       const recentTasks = storedRecentTasks();
       if (recentTasks.length) payload.recent_tasks = recentTasks;
-      if (!imgFile && savedImageContext && isImageFollowupMessage(text)){
+      /* BUG 3/6 fix: kontekst slike ide uz SVAKI nastavak image toka —
+         follow-up formulacije, potvrde ("da"/"nastavi") i aktivan image_test */
+      const imageTestActive = !!(previousNextState && previousNextState.active_task_kind === 'image_test');
+      if (!imgFile && savedImageContext &&
+          (isImageFollowupMessage(text) || confirmationIntent || imageTestActive)){
         payload.last_image_context = savedImageContext.slice(0, 2000);
       }
       if (confirmationIntent){
@@ -1997,9 +2017,13 @@ document.addEventListener('DOMContentLoaded', () => {
     /* zajednička obrada odgovora za streaming i non-streaming put */
     function applyTutorResponse(j, opts){
       const answer = (j && j.answer) ? j.answer : ((j && j.detail) ? j.detail : 'Nema odgovora.');
-      const taskText = (j && j.status === 'ready') ? extractTutorTask(j, answer) : '';
+      /* image_test tok: aktivni "zadatak" je stavka sa slike (u next_state),
+         proza odgovora se NE pretvara u last_tutor_task */
+      const inImageTest = !!(j && j.next_state && j.next_state.active_task_kind === 'image_test');
+      const taskText = (j && j.status === 'ready' && !inImageTest) ? extractTutorTask(j, answer) : '';
       if (j && j.next_state) setNextState(j.next_state);
-      else clearNextState();
+      else if (j && j.status) clearNextState();   // greška bez statusa NE briše stanje
+      if (inImageTest) clearAwaitingPracticeTask();
       if (taskText){
         setAwaitingPracticeTask(taskText);  // sačuvaj zadatak prije historije
         pushRecentTask(taskText);           // anti-ponavljanje za sljedeći "novi zadatak"
