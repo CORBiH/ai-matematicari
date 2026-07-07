@@ -256,6 +256,13 @@ ACCURACY_GUIDELINES = (
     "umjesto da pogađaš broj.\n"
     "- Ako si već dao kompletan račun i konačan odgovor, NE traži od učenika "
     "da isti zadatak proba ponovo. Pitaj: \"Želiš li sličan zadatak za vježbu?\"\n"
+    "- STIL KAD JE ODGOVOR TAČAN: počni potvrdom (\"Tačno!\" ili \"Da, tačno!\"), "
+    "budi kratak (1–3 rečenice) — samo kratka provjera računa pa ponuda sličnog "
+    "zadatka. NE piši puni postupak korak-po-korak i NE počinji sa \"Pogledajmo "
+    "zajedno\" osim ako je učenik izričito tražio objašnjenje (\"objasni\", "
+    "\"kako\", \"korak po korak\"). Piši prirodno: \"Tvoj odgovor je tačan.\", "
+    "izbjegavaj rogobatne fraze poput \"tvoj odgovor na pitanje o tome...\".\n"
+    "- STIL KAD JE ODGOVOR NETAČAN: tada je u redu objasniti korak po korak.\n"
 )
 
 

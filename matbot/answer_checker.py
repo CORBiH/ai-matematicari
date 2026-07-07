@@ -975,6 +975,24 @@ def format_check_block(result: CheckResult) -> str:
         "OBAVEZNO: tvoja ocjena po stavkama mora biti IDENTIČNA ovoj provjeri. "
         "Stavku označenu kao TAČNO nikad ne proglašavaj netačnom."
     )
+    verdicts = [i.verdict for i in result.items]
+    all_correct = bool(verdicts) and all(
+        v in ("correct", "correct_value_wrong_form") for v in verdicts
+    )
+    any_incorrect = any(v == "incorrect" for v in verdicts)
+    if all_correct:
+        lines.append(
+            "STIL (TAČAN ODGOVOR): počni potvrdom (\"Tačno!\" ili \"Da, tačno!\"), "
+            "pa SAMO kratka provjera računa (1–2 rečenice) i ponuda novog sličnog "
+            "zadatka. NE piši puni postupak korak-po-korak osim ako je učenik "
+            "izričito tražio objašnjenje (\"objasni\", \"kako\", \"korak po korak\"). "
+            "Ne počinji sa \"Pogledajmo zajedno\" ni sličnim uvodom. Ukupno 1–3 rečenice."
+        )
+    elif any_incorrect:
+        lines.append(
+            "STIL (NETAČAN ODGOVOR): blago reci da nije tačno, pa objasni ispravan "
+            "postupak korak po korak i na kraju daj tačan rezultat."
+        )
     return "\n".join(lines)
 
 

@@ -188,10 +188,22 @@ def test_incorrect_verdict_false_positive_opener_neutralized():
     assert not out.lower().startswith("tačno")
 
 
-def test_guard_is_noop_without_grading_language():
+def test_correct_answer_gets_positive_first_opener():
+    # STIL: tačan odgovor mora POČETI potvrdom, i kad model ne napiše "Tačno".
     cr = check_practice_answer("Izračunaj: 1/2 + 1/3", "5/6")
     text = "Rezultat je 5/6. Želiš li sličan zadatak za vježbu?"
-    assert enforce_grading_consistency(text, cr) == text
+    out = enforce_grading_consistency(text, cr)
+    assert out.lower().startswith("tačno")
+    assert "5/6" in out and "sličan zadatak" in out       # sadržaj sačuvan
+
+
+def test_correct_answer_strips_hedge_opener_keeps_verification():
+    cr = check_practice_answer("Izračunaj: 1/2 + 1/3", "5/6")
+    text = "Pogledajmo zajedno. 1/2 + 1/3 = 5/6. To je tvoj odgovor."
+    out = enforce_grading_consistency(text, cr)
+    assert out.lower().startswith("tačno")
+    assert not out.lower().startswith("pogledajmo")
+    assert "1/2 + 1/3 = 5/6" in out                        # provjera računa ostaje
 
 
 def test_guard_never_raises_on_garbage():

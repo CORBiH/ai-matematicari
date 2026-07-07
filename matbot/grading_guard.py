@@ -204,14 +204,45 @@ def _prepend(opener: str, text: str) -> str:
     return f"{opener} {body}"
 
 
+def _first_sentence(text: str) -> str:
+    m = re.match(r"[^.!?\n]*[.!?\n]?", text.strip())
+    return m.group(0) if m else text[:80]
+
+
+def _starts_positive(text: str) -> bool:
+    """Prva rečenica sadrži potvrdu tačnosti (odgovor POČINJE pozitivno)."""
+    head = fold_diacritics(_first_sentence(text))
+    return bool(_POS_GRADE_RE.search(_mask(head, _neg_spans(head))))
+
+
+# Uvod tipa "Pogledajmo/Provjerimo/Hajde da riješimo zajedno …" — prikladan dok
+# provjeravamo, ali NE za odgovor koji je već potvrđeno tačan (BUG: stil).
+# Skida SAMO uvodnu frazu (glagol + par pratećih riječi + interpunkcija), NIKAD
+# do kraja rečenice — da ne pojede provjeru računa koja slijedi u istoj rečenici.
+_HEDGE_OPENER_RE = re.compile(
+    r"^\s*(?:e\s+)?(?:pa\s+)?(?:hajde\s+da\s+|hajdemo\s+da\s+|idemo\s+(?:da\s+)?|da\s+)?"
+    r"(?:pogledaj\w*|provjeri\w*|provjerimo|vidimo|rijesi\w*|rijesimo|"
+    r"izracunaj\w*|racunajmo|krenimo|krecemo)"
+    r"(?:\s+(?:ovaj|ovu|ovo|taj|to|ga|je|zajedno|zadatak\w*|primjer\w*|rezultat\w*))*"
+    r"\s*[:,.\-—]*\s*"
+)
+
+
 def _make_positive(answer: str) -> str:
-    """Autoritativno TAČNO: skini lažno negativne ocjene, osiguraj potvrdu."""
-    out, changed = _remove_negative_verdicts(answer)
-    if not changed:
-        return answer
-    if not out.strip():
-        return "Tačno! Tvoj odgovor je ispravan."
-    if not _has_positive_verdict(out):
+    """Autoritativno TAČNO: skini lažno negativne ocjene i garantuj potvrdan,
+    prirodan uvod ("Tačno! …"), bez uvodnog "Pogledajmo zajedno …"."""
+    out, _changed = _remove_negative_verdicts(answer)
+    out = out.strip()
+    if not out:
+        return "Tačno! Tvoj odgovor je tačan."
+    # skini uvodni hedge samo ako sam po sebi ne nosi potvrdu tačnosti
+    hedge = _HEDGE_OPENER_RE.match(fold_diacritics(out))
+    if hedge and not _starts_positive(out):
+        stripped = out[hedge.end():].lstrip()
+        if stripped:
+            out = stripped
+    # garantuj da odgovor POČINJE potvrdom
+    if not _starts_positive(out):
         out = _prepend("Tačno!", out)
     return out
 

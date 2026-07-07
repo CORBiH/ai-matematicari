@@ -201,6 +201,88 @@ def test_challenge_when_student_was_actually_wrong_recheck_not_new_task(master, 
     assert out.get("last_tutor_task") is None         # nema novog zadatka
 
 
+# --- Stil odgovora za TAČAN odgovor (kratko, potvrda prva) -------------------------
+
+def _last_user_prompt(chat):
+    return chat.calls["messages"][-1][-1]["content"] if hasattr(chat, "calls") else None
+
+
+def _grading_chat(reply):
+    calls = {"messages": []}
+
+    def chat(model, messages, timeout=None, max_tokens=None, fast=False, **kw):
+        calls["messages"].append(messages)
+        msg = types.SimpleNamespace(content=reply)
+        return types.SimpleNamespace(choices=[types.SimpleNamespace(message=msg)])
+    chat.calls = calls
+    return chat
+
+
+def test_correct_answer_starts_with_positive_verdict(master, tmap):
+    # model zakopa potvrdu na kraj → finalni odgovor MORA početi potvrdom
+    chat = _grading_chat(
+        "Ostaje da plate 236,50 KM. Jer je 85,50 × 3 = 256,50, a 256,50 − 20,00 = 236,50."
+    )
+    out = svc.handle_chat(
+        _grade_payload("Izračunaj: 1/2 + 1/3", "5/6"), chat, master, tmap,
+        model="m", timeout=1,
+    )
+    assert out["answer_check"]["items"][0]["verdict"] == "correct"
+    assert out["answer"].lower().startswith(("tačno", "da, tačno"))
+
+
+def test_correct_answer_does_not_start_with_pogledajmo(master, tmap):
+    chat = _grading_chat("Pogledajmo zajedno. 1/2 + 1/3 = 5/6. To je tvoj odgovor.")
+    out = svc.handle_chat(
+        _grade_payload("Izračunaj: 1/2 + 1/3", "5/6"), chat, master, tmap,
+        model="m", timeout=1,
+    )
+    assert not out["answer"].lower().startswith("pogledajmo")
+    assert out["answer"].lower().startswith("tačno")
+    assert "1/2 + 1/3 = 5/6" in out["answer"]          # kratka provjera ostaje
+
+
+def test_correct_answer_prompt_carries_brevity_policy(master, tmap):
+    chat = _grading_chat("Tačno! 5/6.")
+    svc.handle_chat(
+        _grade_payload("Izračunaj: 1/2 + 1/3", "5/6"), chat, master, tmap,
+        model="m", timeout=1,
+    )
+    up = _last_user_prompt(chat)
+    assert "STIL (TAČAN ODGOVOR)" in up
+    assert "korak-po-korak osim ako" in up             # puni postupak samo na zahtjev
+
+
+def test_correct_answer_short_reply_is_not_bloated(master, tmap):
+    # kratak tačan odgovor ostaje kratak (guard ništa ne dodaje osim uvoda ako fali)
+    reply = "Tačno! Ostaje 5/6. Hoćeš li još jedan sličan zadatak?"
+    chat = _grading_chat(reply)
+    out = svc.handle_chat(
+        _grade_payload("Izračunaj: 1/2 + 1/3", "5/6"), chat, master, tmap,
+        model="m", timeout=1,
+    )
+    assert out["answer"] == reply                        # nepromijenjeno, već je kratko i potvrdno
+    assert out["answer"].count(".") <= 3
+
+
+def test_incorrect_answer_can_use_step_by_step(master, tmap):
+    steps = (
+        "Nije tačno. Korak 1: nađemo zajednički nazivnik 6. "
+        "Korak 2: 1/2 = 3/6 i 1/3 = 2/6. Korak 3: 3/6 + 2/6 = 5/6. Tačan rezultat je 5/6."
+    )
+    chat = _grading_chat(steps)
+    out = svc.handle_chat(
+        _grade_payload("Izračunaj: 1/2 + 1/3", "2/6"), chat, master, tmap,
+        model="m", timeout=1,
+    )
+    assert out["answer_check"]["items"][0]["verdict"] == "incorrect"
+    # korak-po-korak objašnjenje se NE skraćuje kad je odgovor netačan
+    assert "Korak 1" in out["answer"] and "Korak 3" in out["answer"]
+    assert "nije tačno" in out["answer"].lower()
+    up = _last_user_prompt(chat)
+    assert "STIL (NETAČAN ODGOVOR)" in up
+
+
 # --- Result mod bez teme ------------------------------------------------------------
 
 def test_result_mode_without_topic_still_answers(master, tmap):

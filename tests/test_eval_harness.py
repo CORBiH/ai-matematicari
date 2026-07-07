@@ -37,14 +37,13 @@ def test_cases_file_valid():
 def test_dry_eval_runs_offline_and_routes_correctly():
     report, results = eval_tutor.run_eval(live=False)
     assert len(results) >= 15
-    # DRY: nijedan odgovor nije pravi model output
+    # DRY: nijedan odgovor nije pravi model output — DRY placeholder je uvijek
+    # prisutan (grading guard smije dodati potvrdni uvod / korekcijski preface).
     for r in results:
         if r["status"] == "ready":
+            assert r["answer"].endswith(eval_tutor.DRY_ANSWER), r["id"]
             if r["id"] == "g6-image-rate-followup-corrects-old-result":
-                assert r["answer"].endswith(eval_tutor.DRY_ANSWER), r["id"]
                 assert "Ranije sam pogrešno napisao 2 sata" in r["answer"]
-            else:
-                assert r["answer"] == eval_tutor.DRY_ANSWER, r["id"]
     # rutiranje: SVI expect_* checkovi moraju proći (regresioni čuvar)
     bad = [(r["id"], r["checks"]) for r in results
            if any(not ok for *_x, ok in r["checks"])]

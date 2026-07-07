@@ -102,6 +102,9 @@ def _apply_replacements(text: str) -> str:
 
         out = ci.sub(_sub, out)
     out = re.sub(r"(Želiš li sličan zadatak za vježbu\?)[.!?]+", r"\1", out)
+    # Razmak između iznosa i valute: "236,50KM" → "236,50 KM" (decimalni zarez
+    # se NE dira). Samo prilijepljen slučaj; već razmaknuto ostaje isto.
+    out = re.sub(r"(?<=\d)(?=KM\b)", " ", out)
     return out
 
 
