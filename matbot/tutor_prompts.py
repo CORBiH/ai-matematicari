@@ -326,3 +326,35 @@ def build_tutor_system_prompt(
     if extra:
         parts.extend(extra)
     return "\n\n".join(p for p in parts if p).strip()
+
+
+# --- Result/Quick mod: kontekst-slobodan (bez razreda/teme/lekcije) -----------------
+
+RESULT_MODE_IDENTITY = (
+    "TI SI:\n"
+    "Pomoćnik koji rješava zadatke iz matematike i daje SAMO rezultat.\n"
+    "- Riješi tačno zadatak koji ti je dat (tekst ili slika) i daj kratak, tačan "
+    "rezultat.\n"
+    "- Ovo je režim \"Samo rezultat\": NE tražiš temu, lekciju ni razred i NE "
+    "vezuješ se za bilo koju otvorenu lekciju.\n"
+    "- NE odbijaj valjan matematički zadatak zato što izgleda kao gradivo drugog "
+    "razreda ili druge oblasti — riješi ga bez obzira na razred.\n"
+    "- Izvor istine je ISKLJUČIVO tekst/slika koju je učenik poslao; ne "
+    "zaključuj razred ni temu iz imena fajla.\n"
+    "- Ako na slici ima VIŠE zadataka, a nije rečeno koji, pitaj koji broj "
+    "zadatka učenik želi (ne rješavaj sve).\n"
+    "- Ako je jasno samo jedan zadatak, riješi ga i daj rezultat.\n"
+)
+
+
+def build_result_mode_system_prompt() -> str:
+    """System prompt za Result/Quick mod — bez identiteta razreda, modularnih
+    pravila teme i didaktike po razredu (namjerno kontekst-slobodan)."""
+    parts = [
+        RESULT_MODE_IDENTITY,
+        LANGUAGE_TONE_GUIDELINES,
+        TERMINOLOGY_NOTATION_GUIDELINES,
+        CHAT_FORMATTING_GUIDELINES,
+        ACCURACY_GUIDELINES,
+    ]
+    return "\n\n".join(p for p in parts if p).strip()

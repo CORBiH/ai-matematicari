@@ -18,6 +18,7 @@ from typing import Any, Callable
 from matbot.activity_log import log_student_activity
 from matbot.answer_checker import (
     check_practice_answer,
+    derive_expected,
     detect_referenced_items,
     parse_student_answers,
     summarize_result,
@@ -41,6 +42,7 @@ from matbot.image_result_verifier import (
 from matbot.prompt_builder import (
     build_exam_oblast_prompt,
     build_general_tutor_prompt,
+    build_result_mode_prompt,
     build_tutor_prompt,
     get_topic_context,
 )
@@ -612,6 +614,94 @@ def _apply_challenge_contract(payload: dict) -> None:
     payload["student_message"] = prev
 
 
+# --- Result/Quick mod: kontekst-slobodno rješavanje (bez razreda/teme/lekcije) -----
+
+RESULT_MODES = {"quick", "rezultat", "samo_rezultat", "brzo"}
+
+# Množina ("daj rezultate/sve zadatke") → riješi sve; jednina ("rezultat
+# zadatka") bez broja + više zadataka na slici → pitaj koji broj.
+_WANTS_ALL_RESULTS_RE = re.compile(r"\b(sve|svih|svaki|sva|rezultate|rezultati)\b")
+_WANTS_SINGLE_RESULT_RE = re.compile(r"\brezultat\b")
+
+
+def is_result_mode(payload: dict) -> bool:
+    """Da li je ovaj potez Result/Quick mod (rješenje bez teme/razreda konteksta)?
+
+    Ne primjenjuje se kada je poruka odgovor na practice zadatak, potvrda ili
+    nastavak — tada mod nije rezultatski (npr. UI je poslao practice)."""
+    if payload.get("_direct_answer") is not None or payload.get("_skip_answer_check"):
+        return False
+    phase = normalize_value(payload.get("interaction_phase")).lower()
+    if phase in ("answering_practice_task", "continuing_explanation"):
+        return False
+    return normalize_value(payload.get("mode")).lower() in RESULT_MODES
+
+
+def _result_ocr(payload: dict) -> str:
+    """OCR tekst za result-mod odluku: svježa slika ili sačuvani image kontekst."""
+    fresh = normalize_value(payload.get("image_ocr_text"))
+    if fresh:
+        return fresh
+    saved = normalize_value(payload.get("last_image_context"))
+    return ocr_from_saved_context(saved) if saved else ""
+
+
+def _fmt_result_value(expected) -> str:
+    """Kratak prikaz determinističkog rezultata stavke (broj / nejednakost)."""
+    val = expected.value
+    if getattr(expected, "kind", "") == "inequality" and expected.required_form:
+        num = str(val.numerator) if val.denominator == 1 else f"{val.numerator}/{val.denominator}"
+        return f"x {expected.required_form} {num}"
+    base = str(val.numerator) if val.denominator == 1 else f"{val.numerator}/{val.denominator}"
+    return f"{base} {expected.unit}".strip() if expected.unit else base
+
+
+def _multi_task_ask_message(items: list[dict]) -> str:
+    """Pitaj koji broj zadatka; ako verifikator za neku stavku ima siguran
+    rezultat, ponudi ga kao primjer (spec ponašanje)."""
+    for it in items:
+        expected = derive_expected(normalize_value(it.get("task")))
+        if expected is not None:
+            label = normalize_value(it.get("label"))
+            return (
+                f"Vidim više zadataka. Za {label}. zadatak mogu sigurno dati rezultat: "
+                f"{_fmt_result_value(expected)}. Napiši broj zadatka koji želiš."
+            )
+    return "Na slici ima više zadataka. Koji broj zadatka želiš?"
+
+
+def _resolve_result_selection(payload: dict) -> dict | None:
+    """Za Result mod sa slikom više zadataka odredi šta raditi.
+
+    Vrati ``None`` (jedan zadatak ili bez slike → normalno riješi), ili:
+      {"action": "ask", "message": str, "count": int}         — pitaj koji broj
+      {"action": "solve", "item": int|str, "count": int}      — riješi tu stavku
+    """
+    ocr = _result_ocr(payload)
+    if not ocr:
+        return None
+    items = extract_image_tasks(ocr)
+    count = len(items)
+    if count < 2:
+        return None
+    payload["_image_result_available"] = any(
+        derive_expected(normalize_value(it.get("task"))) is not None for it in items
+    )
+    numeric = [int(it["label"]) for it in items if str(it.get("label", "")).isdigit()]
+    message = normalize_value(payload.get("student_message") or payload.get("message"))
+    folded = fold_diacritics(message)
+    refs = detect_referenced_items(message, numeric) if numeric else set()
+    if refs:
+        return {"action": "solve", "item": min(refs), "count": count}
+    # "rezultate/sve zadatke" (množina) → riješi sve (normalan tok, ne pitaj).
+    if _WANTS_ALL_RESULTS_RE.search(folded):
+        return None
+    # "rezultat zadatka" (jednina) bez broja + više zadataka → pitaj koji broj.
+    if _WANTS_SINGLE_RESULT_RE.search(folded):
+        return {"action": "ask", "message": _multi_task_ask_message(items), "count": count}
+    return None
+
+
 # --- image_test: deterministička mašina stanja za zadatke sa slike ------------------
 
 _CONTINUE_SIGNAL_RE = re.compile(r"\b(nastav\w*|sljedec\w*|dalje|idemo)\b")
@@ -1079,6 +1169,26 @@ def _prepare_chat(
             "direct_answer": payload.get("_direct_answer"),
         }
 
+    def _result_direct_prep(message: str) -> dict:
+        """Determinističan Result-mod odgovor (npr. "koji broj zadatka?")."""
+        payload["_direct_answer"] = message
+        m = master if master is not None else get_master(grade=payload["grade"])
+        prompt_result = _direct_prompt_result(payload)
+        prompt_result["context_policy"] = "disabled_for_result_mode"
+        return {
+            "payload": payload,
+            "master": m,
+            "lookup_result": {"status": "found", "source": "result_mode_disabled"},
+            "prompt_result": prompt_result,
+            "mode": prompt_result["mode"],
+            "status": prompt_result["status"],
+            "effective_topic": None,
+            "topic_context": {},
+            "messages": None,
+            "use_model": model,
+            "direct_answer": message,
+        }
+
     student_for_image_ctx = normalize_value(
         payload.get("student_message") or payload.get("message")
     )
@@ -1122,62 +1232,82 @@ def _prepare_chat(
             payload["image_ocr_text"] = normalize_value(ocr_text)[:MAX_MESSAGE_CHARS]
 
     # --- image_test: deterministički korak kroz zadatke sa slike -----------------
-    # Stanje se gradi iz OCR-a + prethodnog next_state (nikad iz proze odgovora);
-    # prompt builder ga koristi kao mode blok, _next_state_for_response kao izvor
-    # sljedećeg koraka.
+    # Stanje se gradi iz OCR-a + prethodnog next_state (nikad iz proze); prompt
+    # builder ga koristi kao mode blok. image_test tok (nastavi/„da"/sve zadatke)
+    # ima prednost i radi u više modova — zato se rješava PRIJE result-mod grane.
     image_test = _resolve_image_test_state(payload)
     if image_test:
         payload["_image_test"] = image_test
 
-    lookup_result = get_final_topic(payload, master, tmap)
-
-    # --- Phase 7: kontrolni za CIJELU OBLAST (selected_oblast bez teme) ---------
-    exam_oblast_prompt = None
-    if lookup_result["status"] == "unknown":
-        exam_oblast_prompt = build_exam_oblast_prompt(payload, master)
-
-    # --- Phase 6: free_chat detekcija teme (heuristike → LLM klasifikator) -------
-    general_answer = False
-    if exam_oblast_prompt is None and lookup_result["status"] == "unknown":
-        student_msg = normalize_value(
-            payload.get("student_message") or payload.get("message")
-        )
-        ocr_text = normalize_value(payload.get("image_ocr_text"))
-        phase = normalize_value(payload.get("interaction_phase")).lower()
-        last_task = normalize_value(payload.get("last_tutor_task"))
-        is_practice_followup = phase == "answering_practice_task"
-        combined_parts = (student_msg, ocr_text)
-        if is_practice_followup and last_task:
-            combined_parts = (last_task, student_msg, ocr_text)
-        combined = " ".join(x for x in combined_parts if x)
-        is_continuation = phase == "continuing_explanation"
-        if is_continuation and combined:
-            general_answer = True
-        elif combined and (has_image or not is_vague_message(combined)):
-            detection = detect_topic(
-                combined, master, tmap,
-                openai_chat=openai_chat, model=model, timeout=timeout,
-            )
-            if detection["detected_topic"] != "unknown":
-                payload["detected_topic"] = detection["detected_topic"]
-                lookup_result = get_final_topic(payload, master, tmap)
-            else:
-                general_answer = True
-        elif has_image and not combined:
-            general_answer = True
-        elif (
-            normalize_value(payload.get("last_image_context"))
-            and student_msg
-            and _is_image_followup_message(student_msg)
-        ):
-            general_answer = True
-
-    if exam_oblast_prompt is not None:
-        prompt_result = exam_oblast_prompt
-    elif general_answer:
-        prompt_result = build_general_tutor_prompt(payload)
+    # --- Result/Quick mod: POTPUNO odvojen od razreda/teme/lekcije ---------------
+    # Kontekst (opened_lesson_topic, selected_topic, thinkific mapa, video) se NE
+    # koristi; izvor istine je tekst/slika. Topic lookup i detekcija se preskaču.
+    # Primjenjuje se SAMO kad nema aktivnog image_test toka.
+    if image_test is None and is_result_mode(payload):
+        payload["_context_policy"] = "disabled_for_result_mode"
+        selection = _resolve_result_selection(payload)
+        if selection is not None:
+            payload["_detected_task_count"] = selection["count"]
+            if selection["action"] == "ask":
+                # više zadataka, nije rečeno koji → deterministički pitaj broj
+                return _result_direct_prep(selection["message"])
+            if selection["action"] == "solve":
+                payload["_result_solve_item"] = selection["item"]
+        lookup_result = {
+            "status": "unknown", "source": "result_mode_disabled",
+            "final_topic": "unknown", "message": "", "matches": [],
+        }
+        prompt_result = build_result_mode_prompt(payload)
     else:
-        prompt_result = build_tutor_prompt(payload, lookup_result, master, tmap)
+        lookup_result = get_final_topic(payload, master, tmap)
+
+        # --- Phase 7: kontrolni za CIJELU OBLAST (selected_oblast bez teme) -----
+        exam_oblast_prompt = None
+        if lookup_result["status"] == "unknown":
+            exam_oblast_prompt = build_exam_oblast_prompt(payload, master)
+
+        # --- Phase 6: free_chat detekcija teme (heuristike → LLM klasifikator) --
+        general_answer = False
+        if exam_oblast_prompt is None and lookup_result["status"] == "unknown":
+            student_msg = normalize_value(
+                payload.get("student_message") or payload.get("message")
+            )
+            ocr_text = normalize_value(payload.get("image_ocr_text"))
+            phase = normalize_value(payload.get("interaction_phase")).lower()
+            last_task = normalize_value(payload.get("last_tutor_task"))
+            is_practice_followup = phase == "answering_practice_task"
+            combined_parts = (student_msg, ocr_text)
+            if is_practice_followup and last_task:
+                combined_parts = (last_task, student_msg, ocr_text)
+            combined = " ".join(x for x in combined_parts if x)
+            is_continuation = phase == "continuing_explanation"
+            if is_continuation and combined:
+                general_answer = True
+            elif combined and (has_image or not is_vague_message(combined)):
+                detection = detect_topic(
+                    combined, master, tmap,
+                    openai_chat=openai_chat, model=model, timeout=timeout,
+                )
+                if detection["detected_topic"] != "unknown":
+                    payload["detected_topic"] = detection["detected_topic"]
+                    lookup_result = get_final_topic(payload, master, tmap)
+                else:
+                    general_answer = True
+            elif has_image and not combined:
+                general_answer = True
+            elif (
+                normalize_value(payload.get("last_image_context"))
+                and student_msg
+                and _is_image_followup_message(student_msg)
+            ):
+                general_answer = True
+
+        if exam_oblast_prompt is not None:
+            prompt_result = exam_oblast_prompt
+        elif general_answer:
+            prompt_result = build_general_tutor_prompt(payload)
+        else:
+            prompt_result = build_tutor_prompt(payload, lookup_result, master, tmap)
 
     mode = prompt_result["mode"]
     status = prompt_result["status"]
@@ -1419,7 +1549,15 @@ def _finalize_response(prep: dict, answer: str) -> dict:
     if correction_preface and "Ranije sam pogrešno napisao" not in answer:
         answer = correction_preface + "\n\n" + answer
     image_verification = None
-    if status == "ready" and normalize_value(payload.get("image_ocr_text")):
+    # Kad se u Result modu rješava SAMO jedna stavka sa slike (npr. 2. zadatak),
+    # odgovor je JEDAN rezultat, a ne numerisana lista za cijelu sliku —
+    # verifikator koji poravnava sve OCR stavke bi ga prepisao u pogrešnu listu.
+    # Zato se tada NE pokreće. Za sliku s jednim zadatkom verifikacija ostaje.
+    if (
+        status == "ready"
+        and normalize_value(payload.get("image_ocr_text"))
+        and not payload.get("_result_solve_item")
+    ):
         answer, image_verification = verify_image_result_answer(
             payload.get("image_ocr_text"), answer
         )
@@ -1447,19 +1585,39 @@ def _finalize_response(prep: dict, answer: str) -> dict:
         else "neutral"
     )
 
+    result_mode = payload.get("_context_policy") == "disabled_for_result_mode"
     response = {
         "answer": answer,
-        "final_topic": prompt_result.get("final_topic", "unknown"),
-        "opened_lesson_topic": prompt_result.get("opened_lesson_topic", "unknown"),
-        "effective_topic": prep["effective_topic"],
+        # Result/Quick mod je kontekst-slobodan: tema/lekcija se NE koriste (null).
+        "final_topic": None if result_mode else prompt_result.get("final_topic", "unknown"),
+        "opened_lesson_topic": None if result_mode else prompt_result.get("opened_lesson_topic", "unknown"),
+        "effective_topic": None if result_mode else prep["effective_topic"],
         "entry_source_used": entry_source_used,
         "topic_conflict": bool(prompt_result.get("topic_conflict", False)),
         "recommended_mode": _RECOMMENDED_MODE.get(mode, "practice"),
-        "recommend_video": bool(prep["topic_context"].get("when_to_recommend_video")),
+        # video preporuka je vezana za temu → u result modu uvijek False
+        "recommend_video": (
+            False if result_mode else bool(prep["topic_context"].get("when_to_recommend_video"))
+        ),
         "parent_report_signal": parent_report_signal,
         "status": status,
         "mode": mode,
     }
+    if result_mode:
+        response["context_policy"] = "disabled_for_result_mode"
+        response["debug"] = {
+            "context_policy": "disabled_for_result_mode",
+            "grade_source": "soft_metadata_ignored",
+            "topic_source": "disabled",
+            "ignored_opened_lesson_topic": (
+                normalize_value(payload.get("selected_topic"))
+                or normalize_value(payload.get("lesson_title"))
+                or None
+            ),
+            "refusal_reason": None,
+            "detected_task_count": payload.get("_detected_task_count"),
+            "image_result_available": bool(payload.get("_image_result_available")),
+        }
     image_context = _make_image_context(payload, answer)
     if image_context:
         response["image_context"] = image_context

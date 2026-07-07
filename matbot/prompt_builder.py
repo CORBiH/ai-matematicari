@@ -39,6 +39,7 @@ from matbot.tutor_prompts import (
     CHAT_FORMATTING_GUIDELINES,
     GLOBAL_MODULAR_GUIDELINES,
     LANGUAGE_TONE_GUIDELINES,
+    build_result_mode_system_prompt,
     build_tutor_system_prompt,
 )
 from matbot.tutor_prompts import global_modular_guidelines as _global_modular_guidelines
@@ -772,6 +773,55 @@ def build_general_tutor_prompt(payload: dict) -> dict:
         "topic_context_used": False,
         "video_flow_used": False,
         "topic_conflict": False,
+    }
+
+
+def build_result_mode_prompt(payload: dict) -> dict:
+    """Result/Quick mod — potpuno odvojen od razreda/teme/lekcije.
+
+    Izvor istine je tekst/slika učenika. NE ubacuje se topic kontekst, modularna
+    pravila ni didaktika razreda; tema ostaje ``None`` (kontekst je isključen).
+    """
+    payload = payload or {}
+    system_prompt = build_result_mode_system_prompt()
+
+    solve_item = normalize_value(payload.get("_result_solve_item"))
+    user_parts = []
+    if solve_item:
+        user_parts.append(
+            "ZADATAK SA SLIKE:\n"
+            f"- Odgovori SAMO na zadatak broj {solve_item}. Ostale zadatke sa slike "
+            "ignoriši. Daj kratak, tačan rezultat tog zadatka."
+        )
+    else:
+        user_parts.append(
+            "MOD: SAMO REZULTAT (bez teme i razreda)\n"
+            "- Riješi zadatak koji je učenik poslao (tekst ili slika) i daj kratak, "
+            "tačan rezultat. Ne traži temu ni razred i ne odbijaj valjan matematički "
+            "zadatak zbog razreda/oblasti."
+        )
+    for block in (
+        _build_image_context_block(payload),
+        build_mode_instructions("quick", "unknown", {}),
+        _build_student_block(payload),
+    ):
+        if block:
+            user_parts.append(block)
+    user_prompt = "\n\n".join(p for p in user_parts if p).strip()
+
+    return {
+        "system_prompt": system_prompt,
+        "user_prompt": user_prompt,
+        "history_messages": build_history_messages(payload.get("conversation_history")),
+        "mode": "quick",
+        "final_topic": None,
+        "opened_lesson_topic": None,
+        "effective_topic": None,
+        "status": _STATUS_READY,
+        "topic_context_used": False,
+        "video_flow_used": False,
+        "topic_conflict": False,
+        "context_policy": "disabled_for_result_mode",
     }
 
 

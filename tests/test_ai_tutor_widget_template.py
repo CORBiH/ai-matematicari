@@ -307,10 +307,21 @@ def test_screen_switch_helpers_present(client):
 def test_payload_uses_home_state(client):
     html = _html(client)
     assert "session_id: sessionId" in html
-    assert "entry_source: state.topic ? (state.topicSource || 'manual_topic_choice') : 'free_chat'" in html
-    assert "selected_topic: state.topic" in html
+    # Result/Quick mod: tema/lekcija se NE šalju kao ograničenje (kontekst-slobodno).
+    assert "const resultMode = (state.mode === 'quick');" in html
+    assert "selected_topic: resultMode ? '' : state.topic" in html
+    assert "entry_source: resultMode ? 'free_chat'" in html
     assert "state.mode === 'exam' ? state.oblast : ''" in html
     assert "grade: parseInt(state.grade, 10) || 6" in html
+
+
+def test_result_mode_hides_grade_and_topic_pills(client):
+    """Result/Quick mod: topbar skriva razred i temu, ostaje samo mod."""
+    html = _html(client)
+    assert "topbarGrade.classList.toggle('hidden', resultMode);" in html
+    assert "const ctx = resultMode ? '' : (state.topicName || state.oblast || '');" in html
+    # donji status: u result modu samo "Režim", nikad "Tema: ..."
+    assert "if (resultMode){                         // kontekst-slobodno: samo režim" in html
 
 
 def test_session_id_auto_created(client):

@@ -1571,9 +1571,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /* ------- prelaz između ekrana ------- */
     function updateTopbar(){
+      /* Rezultat/Quick mod je kontekst-slobodan: bez razreda i teme, samo mod. */
+      const resultMode = (state.mode === 'quick');
       topbarGrade.textContent = state.grade + '. razred';
+      topbarGrade.classList.toggle('hidden', resultMode);
       topbarMode.textContent = MODE_LABELS[state.mode] || '';
-      const ctx = state.topicName || state.oblast || '';
+      const ctx = resultMode ? '' : (state.topicName || state.oblast || '');
       topbarTopic.textContent = ctx;
       topbarTopic.classList.toggle('hidden', !ctx);
     }
@@ -1842,13 +1845,18 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
+      /* Rezultat/Quick mod: NE šalji temu/lekciju kao ograničenje — samo mod +
+         poruka/slika. Razred ide kao meka metapodatak (backend ga ne koristi
+         kao tvrdi kontekst u ovom modu). */
+      const resultMode = (state.mode === 'quick');
       const payload = {
         session_id: sessionId,
         grade: parseInt(state.grade, 10) || 6,
         mode: state.mode,
-        entry_source: state.topic ? (state.topicSource || 'manual_topic_choice') : 'free_chat',
-        selected_topic: state.topic,
-        selected_oblast: state.topic ? state.topicOblast : (state.mode === 'exam' ? state.oblast : ''),
+        entry_source: resultMode ? 'free_chat'
+                                 : (state.topic ? (state.topicSource || 'manual_topic_choice') : 'free_chat'),
+        selected_topic: resultMode ? '' : state.topic,
+        selected_oblast: resultMode ? '' : (state.topic ? state.topicOblast : (state.mode === 'exam' ? state.oblast : '')),
         student_message: text,
         conversation_history: tutorHistory()
       };
@@ -2032,12 +2040,17 @@ document.addEventListener('DOMContentLoaded', () => {
       pushTutor('assistant', answer);
       if (j.status === 'ready') adoptResponseTopic(j);
       if (metaBox){                              // prijateljski meta red (bez sirovih id-eva)
-        const tid = j.effective_topic || j.final_topic || state.topic || '';
-        const tname = topicNames[tid] || (tid === state.topic ? state.topicName : '');
         const rez = MODE_LABELS[j.mode || state.mode] || '';
-        metaBox.textContent = (tname && tid !== 'unknown')
-          ? ('Tema: ' + tname + ' · Režim: ' + rez)
-          : (rez ? 'Režim: ' + rez : '');
+        const resultMode = ((j.mode || state.mode) === 'quick');
+        if (resultMode){                         // kontekst-slobodno: samo režim
+          metaBox.textContent = rez ? 'Režim: ' + rez : '';
+        } else {
+          const tid = j.effective_topic || j.final_topic || state.topic || '';
+          const tname = topicNames[tid] || (tid === state.topic ? state.topicName : '');
+          metaBox.textContent = (tname && tid !== 'unknown')
+            ? ('Tema: ' + tname + ' · Režim: ' + rez)
+            : (rez ? 'Režim: ' + rez : '');
+        }
       }
       if (opts.fromTyped){ msgBox.value = ''; autoGrow(); }  // očisti nakon uspješnog slanja
       if (j.status === 'ready'){

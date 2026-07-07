@@ -365,6 +365,7 @@ def test_grade_8_exam_oblast_ready(client, fake_openai):
 
 
 def test_grade_8_quick_mode_ready(client, fake_openai):
+    # Result/Quick mod je kontekst-slobodan: selected_topic se IGNORIŠE, tema null.
     resp = client.post(CHAT_URL, json={
         "grade": 8,
         "mode": "quick",
@@ -375,7 +376,11 @@ def test_grade_8_quick_mode_ready(client, fake_openai):
     body = resp.get_json()
     assert body["status"] == "ready"
     assert body["mode"] == "quick"
-    assert body["final_topic"] == "polinomi_kvadrat_binoma"
+    assert body["final_topic"] is None
+    assert body["effective_topic"] is None
+    assert body["recommend_video"] is False
+    assert body["context_policy"] == "disabled_for_result_mode"
+    assert body["debug"]["ignored_opened_lesson_topic"] == "polinomi_kvadrat_binoma"
 
 
 def test_grade_8_composite_thinkific_returns_final_topic(client, fake_openai, composite_payload8):
@@ -436,7 +441,8 @@ def test_fraction_multiplication_task_then_short_answer_keeps_topic(client, fake
     assert first.status_code == 200
     first_body = first.get_json()
     assert first_body["status"] == "ready"
-    assert first_body["final_topic"] == topic
+    # Result/Quick mod: prvi (quick) potez je kontekst-slobodan → tema null.
+    assert first_body["final_topic"] is None
     assert first_body["mode"] == "quick"
 
     second = client.post(CHAT_URL, json={
@@ -642,16 +648,20 @@ def test_500_does_not_leak_exception(client, monkeypatch):
 # --- Phase 6.2: bazna pravila + "5-1" + slika u modularnom tutoru -----------------
 
 def test_quick_simple_expression_no_topic(client, fake_openai):
-    """'5-1' u quick modu bez teme: NE fallback — poziva se OpenAI sa baznim pravilima."""
+    """'5-1' u quick modu bez teme: NE fallback — poziva se OpenAI sa result-mod
+    (kontekst-slobodnim) pravilima: bez razredne didaktike, uz terminologiju/zapis."""
     resp = client.post(CHAT_URL, json={"mode": "quick", "student_message": "5-1"})
     assert resp.status_code == 200
     body = resp.get_json()
     assert body["status"] == "ready"
     assert body["answer"] == fake_openai.state["reply"]
-    # sistemska poruka sadrži novi tutor stack (Phase 2 — matbot.tutor_prompts)
+    assert body["final_topic"] is None
+    # Result mod system prompt: identitet "Samo rezultat", BEZ razredne didaktike
     system_sent = fake_openai.calls.messages[-1][0]["content"]
-    assert "Postavi mi pitanje ili zadatak iz matematike." in system_sent
-    assert "DIDAKTIKA — 6. RAZRED" in system_sent
+    assert "Samo rezultat" in system_sent
+    assert "ne odbijaj valjan matematički zadatak" in system_sent.lower()
+    assert "DIDAKTIKA — 6. RAZRED" not in system_sent
+    assert "MODULARNA PRAVILA" not in system_sent
     assert "TERMINOLOGIJA I ZAPIS" in system_sent
 
 
@@ -667,7 +677,7 @@ def _multipart(payload: dict, filename="zadatak.png", content=b"fake-image-bytes
 
 
 def test_multipart_image_vision_path(client, fake_openai):
-    """Slika + tema: OCR je isključen u testu okruženju → Vision multimodalna poruka."""
+    """Slika + quick: Vision multimodalna poruka; tema se IGNORIŠE (result mod)."""
     resp = client.post(
         CHAT_URL,
         data=_multipart({"selected_topic": "skupovi_uvod", "mode": "quick"}),
@@ -676,7 +686,7 @@ def test_multipart_image_vision_path(client, fake_openai):
     assert resp.status_code == 200
     body = resp.get_json()
     assert body["status"] == "ready"
-    assert body["final_topic"] == "skupovi_uvod"
+    assert body["final_topic"] is None          # result mod: bez teme
     # zadnja poruka je multimodalna: tekst + data: URL slike
     content = fake_openai.calls.messages[-1][-1]["content"]
     assert isinstance(content, list)
@@ -684,7 +694,7 @@ def test_multipart_image_vision_path(client, fake_openai):
         p.get("type") == "image_url" and p["image_url"]["url"].startswith("data:")
         for p in content
     )
-    # tutor pravila i dalje u system promptu (Phase 2 stack)
+    # result-mod pravila u system promptu (terminologija/zapis ostaje)
     assert "TERMINOLOGIJA I ZAPIS" in fake_openai.calls.messages[-1][0]["content"]
 
 
@@ -697,7 +707,7 @@ def test_multipart_image_no_text_no_topic(client, fake_openai):
     )
     body = resp.get_json()
     assert body["status"] == "ready"
-    assert body["final_topic"] == "unknown"
+    assert body["final_topic"] is None          # result mod: tema null, ne "unknown"
     content = fake_openai.calls.messages[-1][-1]["content"]
     assert isinstance(content, list)
 
