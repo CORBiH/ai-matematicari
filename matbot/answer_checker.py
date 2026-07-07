@@ -64,7 +64,17 @@ def _normalize_math_text(text: str) -> str:
     t = _CDOT_RE.sub("*", t)
     t = _DIV_RE.sub(":", t)
     t = t.replace("−", "-").replace("–", "-")
+    # Bosanski lokal: decimalni separator je zarez. Tačka IZMEĐU dvije cifre je
+    # skoro sigurno decimalna ("8.45" → "8,45"); tako "8.45" ne biva pogrešno
+    # pročitano kao stavka "8." s odgovorom "45". Tačka koja nije između cifara
+    # (kraj rečenice, "8.45.") ostaje netaknuta. Hiljadni separatori se u ovom
+    # gradivu ne pišu tačkom, pa nema dvosmislenosti koju bismo pokvarili.
+    t = _DOT_DECIMAL_RE.sub(",", t)
     return t
+
+
+# Tačka između dvije cifre = decimalni separator (konzervativno, samo taj slučaj).
+_DOT_DECIMAL_RE = re.compile(r"(?<=\d)\.(?=\d)")
 
 
 # --- Parsiranje jednog broja (razlomak / mješoviti / cijeli / decimalni) ---------
@@ -241,6 +251,8 @@ def _fmt_fraction(value: Fraction) -> str:
 
 
 def _fmt_expected(expected: Expected) -> str:
+    if expected.kind == "inequality" and expected.required_form:
+        return f"x {expected.required_form} {_fmt_fraction(expected.value)}"
     base = _fmt_fraction(expected.value)
     return f"{base} {expected.unit}".strip() if expected.unit else base
 
@@ -457,6 +469,207 @@ def _eval_expr(expr: str) -> Fraction | None:
         return None
 
 
+# --- Proste linearne jednačine s jednom nepoznatom (x) -----------------------------
+# Opšta klasa (ne primjeri): svaka jednačina koja stane u ovu gramatiku rješava se
+# egzaktno preko Fraction, bez obzira na temu/razred/formulaciju. Ako parsiranje
+# nije sigurno → None (nikad izmišljena presuda).
+
+_EQ_LABEL_RE = re.compile(
+    r"^\s*(?:"
+    r"rij?e[sš]?i(?:\s+(?:jedna[cč]inu|nejedna[cč]inu))?"   # riješi [ne]jednačinu
+    r"|odredi\s+x|izra[cč]unaj\s+x|nadj?i\s+x"
+    r"|nadj?i\s+nepoznat\w*\s+broj"
+    r"|kolik[oa]\s+je\s+x|kolika\s+je\s+vrijednost\s+x"
+    r")\s*[:.\-]?\s*",
+    re.IGNORECASE,
+)
+# Poslije skidanja labela: čista jednačina smije sadržati samo matematičke znakove
+# i nepoznatu x (bilo koje drugo slovo/riječ → nije čista jednačina → ne diramo).
+_CLEAN_EQ_RE = re.compile(r"^[0-9x/*():+\-,\s=]+$")
+_NUM_FACTOR_RE = re.compile(r"^-?\d+(?:,\d+)?$")
+
+
+def _paren_strip_numbers(expr: str) -> str:
+    """"(2/3)" → "2/3" (samo zagrada oko čistog broja/razlomka)."""
+    prev = None
+    while prev != expr:
+        prev = expr
+        expr = re.sub(r"\((-?\d+(?:,\d+)?(?:/-?\d+(?:,\d+)?)?)\)", r"\1", expr)
+    return expr
+
+
+def _insert_implicit_mult(expr: str) -> str:
+    """"2/3 x"→"2/3*x", "(2/3)x"→"...*x", "3x"→"3*x", ")(" → ")*("."""
+    expr = expr.replace(" ", "")
+    expr = re.sub(r"(?<=[0-9)])(?=[x(])", "*", expr)
+    expr = re.sub(r"(?<=x)(?=[0-9(])", "*", expr)
+    expr = re.sub(r"(?<=\))(?=\()", "*", expr)
+    return expr
+
+
+def _num_factor(tok: str) -> Fraction | None:
+    if not _NUM_FACTOR_RE.match(tok):
+        return None
+    return Fraction(tok.replace(",", "."))
+
+
+def _eval_linear_term(body: str) -> tuple[Fraction, int] | None:
+    """Jedan proizvod faktora → (koeficijent, stepen_x); None ako nepodržano."""
+    if not body:
+        return None
+    parts = re.split(r"([*/])", body)
+    factors = parts[0::2]
+    ops = parts[1::2]
+    coeff = Fraction(1)
+    xdeg = 0
+    for i, factor in enumerate(factors):
+        op = "*" if i == 0 else ops[i - 1]
+        if factor == "x":
+            if op == "/":
+                return None                       # x u nazivniku — nepodržano
+            xdeg += 1
+            continue
+        val = _num_factor(factor)
+        if val is None:
+            return None
+        if op == "*":
+            coeff *= val
+        elif val == 0:
+            return None                           # dijeljenje nulom
+        else:
+            coeff /= val
+    if xdeg > 1:
+        return None                               # nelinearno (x·x)
+    return coeff, xdeg
+
+
+def _parse_linear_side(side: str) -> tuple[Fraction, Fraction] | None:
+    """Strana jednačine → (a, b) za a·x + b; None ako nije podržano."""
+    side = _insert_implicit_mult(_paren_strip_numbers(side.replace(":", "/")))
+    if not side or "(" in side or ")" in side:
+        return None
+    if side[0] not in "+-":
+        side = "+" + side
+    a = Fraction(0)
+    b = Fraction(0)
+    matched_end = 0
+    for m in re.finditer(r"[+-][^+-]+", side):
+        if m.start() != matched_end:
+            return None
+        matched_end = m.end()
+        sign = -1 if m.group(0)[0] == "-" else 1
+        term = _eval_linear_term(m.group(0)[1:])
+        if term is None:
+            return None
+        coeff, xdeg = term
+        if xdeg == 1:
+            a += sign * coeff
+        else:
+            b += sign * coeff
+    if matched_end != len(side):
+        return None
+    return a, b
+
+
+def _try_linear_equation(folded: str, norm_text: str) -> Expected | None:
+    """"Riješi: (2/3)x = 8/9" → x = 4/3. Rješava a₁x+b₁ = a₂x+b₂ egzaktno."""
+    m = _EQ_LABEL_RE.match(folded)
+    expr = norm_text[m.end():] if m else norm_text
+    expr = expr.strip().rstrip(".!?").strip()
+    if expr.count("=") != 1 or "x" not in expr:
+        return None
+    if not _CLEAN_EQ_RE.match(expr):
+        return None
+    lhs, rhs = expr.split("=")
+    left = _parse_linear_side(lhs)
+    right = _parse_linear_side(rhs)
+    if left is None or right is None:
+        return None
+    a = left[0] - right[0]           # koeficijent uz x
+    b = right[1] - left[1]           # slobodni članovi na desnu stranu
+    if a == 0:
+        return None                  # nema jedinstvenog rješenja
+    return Expected(value=b / a, kind="equation", confidence="high")
+
+
+# --- Proste linearne nejednačine s jednom nepoznatom (x) ---------------------------
+# Rješenje se svodi na kanonski oblik "x OP granica" (OP ∈ {<, <=, >, >=}) i
+# poredi i po ZNAKU i po GRANICI. Znak se OKREĆE pri dijeljenju negativnim
+# koeficijentom uz x. Ekvivalentni oblici ("x < 8" == "8 > x") daju isti kanon.
+# Namjerno ODVOJENO od jednačina: ovdje presuda nosi operator, a ne samo broj,
+# pa NE ide kroz numerički _judge (koji operator ne poznaje).
+
+_INEQ_OP_RE = re.compile(r"<=|>=|<|>")
+_CLEAN_INEQ_SIDE_RE = re.compile(r"^[0-9x/*():+\-,\s]+$")
+_FLIP_OP = {"<": ">", ">": "<", "<=": ">=", ">=": "<="}
+
+
+def _normalize_ineq_ops(text: str) -> str:
+    """Ujednači zapis znakova nejednakosti (unicode/LaTeX/„=<") na <,<=,>,>=."""
+    return (
+        (text or "")
+        .replace("≤", "<=").replace("≥", ">=")
+        .replace("\\leq", "<=").replace("\\geq", ">=")
+        .replace("\\le", "<=").replace("\\ge", ">=")
+        .replace("\\lt", "<").replace("\\gt", ">")
+        .replace("=<", "<=").replace("=>", ">=")
+    )
+
+
+def _solve_linear_inequality(math_text: str) -> tuple[str, Fraction] | None:
+    """Linearna nejednačina po x → (kanonski_op, granica); None ako nepodržano.
+
+    ``math_text`` je već prošao ``_normalize_math_text`` (frac, decimalni zarez).
+    """
+    expr = _normalize_ineq_ops(math_text).strip().rstrip(".!?").strip()
+    ops = _INEQ_OP_RE.findall(expr)
+    if len(ops) != 1 or "x" not in expr:
+        return None                       # bez znaka, jednakost, ili složeno
+    op = ops[0]
+    m = _INEQ_OP_RE.search(expr)
+    lhs, rhs = expr[:m.start()], expr[m.end():]
+    if not _CLEAN_INEQ_SIDE_RE.match(lhs) or not _CLEAN_INEQ_SIDE_RE.match(rhs):
+        return None
+    left = _parse_linear_side(lhs)
+    right = _parse_linear_side(rhs)
+    if left is None or right is None:
+        return None
+    a = left[0] - right[0]                 # koeficijent uz x
+    b = left[1] - right[1]                 # slobodni član (na lijevoj strani)
+    if a == 0:
+        return None                        # nema x → nije nejednačina po x
+    # a·x + b OP 0  →  x (OP ili OP-flip pri a<0) (-b/a)
+    canon = op if a > 0 else _FLIP_OP[op]
+    return canon, -b / a
+
+
+def _check_single_inequality(task_text: str, student_text: str) -> "CheckResult | None":
+    """Puna presuda za jednu podržanu nejednačinu; None → nije nejednačina ili
+    učenikov odgovor nije parsiran kao nejednačina (ostavi opštem toku)."""
+    norm_task = _normalize_math_text(task_text)
+    m = _EQ_LABEL_RE.match(_fold(norm_task))
+    task_expr = norm_task[m.end():] if m else norm_task
+    expected = _solve_linear_inequality(task_expr)
+    if expected is None:
+        return None
+    student = _solve_linear_inequality(_normalize_math_text(student_text))
+    if student is None:
+        return None                        # odgovor nije jasna nejednačina po x
+    exp_op, exp_val = expected
+    stu_op, stu_val = student
+    expected_obj = Expected(
+        value=exp_val, kind="inequality", required_form=exp_op, confidence="high"
+    )
+    given = NumberToken(
+        value=stu_val, form="inequality", raw=f"x {stu_op} {_fmt_fraction(stu_val)}"
+    )
+    verdict = "correct" if (stu_op == exp_op and stu_val == exp_val) else "incorrect"
+    return CheckResult(checkable=True, items=[
+        ItemCheck(n=1, task=task_text.strip()[:200], expected=expected_obj,
+                  given=given, verdict=verdict),
+    ])
+
+
 def derive_expected(item_text: str) -> Expected | None:
     """Pokušaj deterministički izračunati očekivani rezultat stavke; None = ne zna."""
     norm = _normalize_math_text(item_text or "")
@@ -466,6 +679,9 @@ def derive_expected(item_text: str) -> Expected | None:
         result = solver(folded, tokens)
         if result is not None:
             return result
+    equation = _try_linear_equation(folded, norm)
+    if equation is not None:
+        return equation
     rate = _try_rate_or_ratio(folded, norm)
     if rate is not None:
         return rate
@@ -597,13 +813,27 @@ class CheckResult:
         )
 
 
+def _values_match(expected: Expected, given: NumberToken) -> bool:
+    """Egzaktna jednakost; uz malu toleranciju SAMO kad učenik da decimalnu
+    aproksimaciju razlomka (npr. 1,333333 za 4/3). Zahtijeva ≥3 decimale da se
+    kratke vrijednosti (1,3) i dalje traže egzaktno."""
+    if given.value == expected.value:
+        return True
+    if given.form == "decimal" and expected.value.denominator != 1:
+        frac_digits = len(given.raw.split(",")[-1]) if "," in given.raw else 0
+        if frac_digits >= 3:
+            ev, gv = float(expected.value), float(given.value)
+            return abs(gv - ev) <= 5e-4 * max(1.0, abs(ev))
+    return False
+
+
 def _judge(expected: Expected | None, given: NumberToken | None, answered: bool) -> str:
     if given is None:
         # answered=True znači: odgovor postoji, ali ga nismo znali pročitati
         return "unverified" if answered else "missing"
     if expected is None:
         return "unverified"
-    if given.value != expected.value:
+    if not _values_match(expected, given):
         # positive_only: različita vrijednost može biti druga jedinica/oblik —
         # ne smijemo tvrditi "netačno", model provjerava sam
         return "incorrect" if expected.confidence == "high" else "unverified"
@@ -625,6 +855,10 @@ def check_practice_answer(task_text: str, student_text: str) -> CheckResult:
 
 
 def _check(task_text: str, student_text: str) -> CheckResult:
+    # Nejednačine se presuđuju posebno (presuda nosi operator, ne samo broj).
+    inequality = _check_single_inequality(task_text, student_text)
+    if inequality is not None:
+        return inequality
     numbered_items = split_numbered_items(task_text)
     if numbered_items:
         items = numbered_items
@@ -753,7 +987,7 @@ def summarize_result(result: CheckResult) -> dict | None:
             {
                 "n": i.n,
                 "verdict": i.verdict,
-                "expected": _fmt_fraction(i.expected.value) if i.expected else None,
+                "expected": _fmt_expected(i.expected) if i.expected else None,
                 "unit": i.expected.unit if i.expected else None,
                 "given": i.given.raw if i.given else None,
             }

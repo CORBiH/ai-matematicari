@@ -19,10 +19,11 @@ from matbot.activity_log import log_student_activity
 from matbot.answer_checker import (
     check_practice_answer,
     detect_referenced_items,
+    parse_student_answers,
     summarize_result,
 )
 from matbot.bosnian import to_ijekavica
-from matbot.grading_guard import enforce_grading_consistency
+from matbot.grading_guard import authoritative_verdict, enforce_grading_consistency, has_grade_contradiction
 from matbot.content_loader import (
     get_master,
     get_thinkific_map,
@@ -153,8 +154,14 @@ _ACTIVE_TASK_KINDS = {
     "explanation",
 }
 
+# Afirmativna potvrda ponude ("Hoćeš li još jedan zadatak?" → "može"/"daj"/
+# "može još jedan"). Jezgro potvrde smije nositi opcioni dodatak "još jedan/
+# jednu(-i) [zadatak]" — sve to znači "da, izvrši ponuđeno".
 _SHORT_AFFIRMATIVE_RE = re.compile(
-    r"^(da|moze|mozes|nastavi|hajde|ajde|ok|okej|u\s?redu|yes)[\s.!?]*$"
+    r"^(?:da|moze|mozes|mozemo|nastavi|hajde|ajde|ajmo|ok|okej|u\s?redu|yes|"
+    r"daj|naravno|svakako|moze\s+moze|moze\s+da)"
+    r"(?:\s+(?:jos\s+)?(?:jedan|jednu|jedno)(?:\s+zadatak\w*)?)?"
+    r"[\s.!?]*$"
 )
 _SHORT_NEGATIVE_RE = re.compile(
     r"^(ne|nemoj|stani|dosta|no)[\s.!?]*$"
@@ -162,6 +169,17 @@ _SHORT_NEGATIVE_RE = re.compile(
 _YES_NO_TASK_RE = re.compile(
     r"\b(da\s+li|je\s+li|jesu\s+li|tacno\s+ili\s+netacno|"
     r"odgovori\s+(?:sa\s+)?da\s+ili\s+ne|da/ne)\b"
+)
+
+# Ponuda novog sličnog zadatka — mora pokriti sve uobičajene formulacije, ne
+# samo "sličan/novi zadatak": i "još jedan zadatak", "probamo još jedan",
+# "hoćeš li još jedan?". Bez ovoga se ponuda ne upamti kao pending_action pa
+# potvrda ("može") ne izvrši ništa (BUG3).
+_SIMILAR_TASK_OFFER_RE = re.compile(
+    r"\b(?:slic\w+|nov\w*)\b.{0,80}\b(?:zadat\w+|primjer\w*)\b"
+    r"|\bjos\s+(?:jedan|jednu|jedno)\b.{0,40}\b(?:zadat\w+|primjer\w*|vjezb\w*)\b"
+    r"|\bprob\w+\b.{0,40}\bjos\s+(?:jedan|jednu|jedno)\b"
+    r"|\bjos\s+(?:jedan|jednu|jedno)\b[^?]*\?"
 )
 
 _IMAGE_FOLLOWUP_RE = re.compile(
@@ -484,6 +502,114 @@ def _apply_confirmation_contract(payload: dict) -> None:
     ):
         payload["_skip_answer_check"] = True
         payload["_direct_answer"] = _natural_confirmation_clarifier()
+
+
+# --- Osporavanje ranije ocjene ("pa to sam i odgovorio") ----------------------------
+# Učenik tvrdi da je već dao (tačan) odgovor. To NIJE novi zadatak ni novi
+# odgovor — sistem PONOVO deterministički provjeri prethodni odgovor na
+# prethodni zadatak i, ako je učenik bio u pravu, prizna grešku.
+
+_CHALLENGE_INTENT_RE = re.compile(
+    r"\bto\s+sam\s+(?:i\s+)?(?:odgovor\w*|rek\w+|napisa\w+|kaza\w+)"
+    r"|\bpa\s+to\s+sam\b"
+    r"|\bpa\s+rek\w+\s+sam\b"
+    r"|\b(?:rekao|rekla|napisao|napisala|odgovorio|odgovorila|kazao|kazala)\s+sam\b"
+    r"|\bisti\s+odgovor\b"
+    r"|\bpa\s+to\s+je\s+isto\b"
+)
+# Broj kako ga je učenik NAPISAO (čuva tačku: "8.45"), za tekst izvinjenja.
+_NUM_IN_TEXT_RE = re.compile(r"-?\d+(?:\s+\d+\s*/\s*\d+|\s*/\s*\d+|[.,]\d+)?")
+
+
+def detect_challenge_intent(text: Any) -> bool:
+    """Učenik osporava raniju ocjenu ("pa to sam i odgovorio", "rekao sam da je
+    8.45", "pa to je isto"). Ne tretirati kao novi odgovor ni novi zadatak."""
+    return bool(_CHALLENGE_INTENT_RE.search(fold_diacritics(text)))
+
+
+def _first_number_str(text: Any) -> str:
+    m = _NUM_IN_TEXT_RE.search(normalize_value(text))
+    return m.group(0).strip() if m else ""
+
+
+def _has_clean_numeric_answer(text: str) -> bool:
+    mode, answers = parse_student_answers(text)
+    return mode in ("single", "ordered", "numbered") and any(
+        t is not None for t in answers.values()
+    )
+
+
+def _previous_answer_text(payload: dict) -> str:
+    """Povrati učenikov PRETHODNI odgovor u izvornom obliku (čuva tačku/zarez).
+
+    Redoslijed: broj naveden u samoj poruci osporavanja → eksplicitno polje
+    klijenta → zadnji kratki numerički korisnički unos iz historije."""
+    msg = normalize_value(payload.get("student_message") or payload.get("message"))
+    if _has_clean_numeric_answer(msg):
+        num = _first_number_str(msg)
+        if num:
+            return num
+    field = normalize_value(
+        payload.get("last_student_answer") or payload.get("previous_student_answer")
+    )
+    if field:
+        return _first_number_str(field) or field
+    for item in reversed(payload.get("conversation_history") or []):
+        if isinstance(item, dict):
+            role = normalize_value(item.get("role")).lower()
+            if role and role != "user":
+                continue
+            content = normalize_value(
+                item.get("content") or item.get("text") or item.get("message")
+            )
+        elif isinstance(item, str):
+            content = normalize_value(item)
+        else:
+            continue
+        if content and _has_clean_numeric_answer(content):
+            num = _first_number_str(content)
+            if num:
+                return num
+    return ""
+
+
+def _challenge_apology_answer(prev: str, check) -> str:
+    equiv = f" To je isto kao {prev.replace('.', ',')}." if "." in prev else ""
+    return (
+        f"U pravu si — tvoj odgovor {prev} je tačan.{equiv} "
+        "Izvini na ranijoj zabuni."
+    )
+
+
+def _apply_challenge_contract(payload: dict) -> None:
+    """Osporavanje → ponovna deterministička provjera prethodnog odgovora."""
+    if payload.get("_direct_answer") is not None or payload.get("_skip_answer_check"):
+        return
+    if normalize_value(payload.get("intent")):
+        return
+    message = payload.get("student_message") or payload.get("message")
+    if not detect_challenge_intent(message):
+        return
+    task = normalize_value(payload.get("last_tutor_task"))
+    if not task:
+        return
+    prev = _previous_answer_text(payload)
+    if not prev:
+        return
+    check = check_practice_answer(task, prev)
+    payload["answer_check"] = check
+    payload["_challenge_recheck"] = prev
+    if authoritative_verdict(check) == "correct":
+        # Siguran, determinističan odgovor: priznaj grešku i potvrdi tačnost;
+        # bez novog zadatka i bez modela.
+        payload["_skip_answer_check"] = True
+        payload["_direct_answer"] = _challenge_apology_answer(prev, check)
+        return
+    # Netačno / neprovjerivo → ocijeni ponovo kao ocjenjivački potez: model
+    # objašnjava razliku uz OBAVEZUJUĆU presudu iz sistema; guard čuva
+    # konzistentnost. Nikad se ne generiše novi zadatak.
+    payload["interaction_phase"] = "answering_practice_task"
+    payload["student_message"] = prev
 
 
 # --- image_test: deterministička mašina stanja za zadatke sa slike ------------------
@@ -930,6 +1056,10 @@ def _prepare_chat(
     # što je confirmation contract eventualno zamijeni sintetičkom.
     _apply_explicit_intent(payload)
     _apply_confirmation_contract(payload)
+    # Osporavanje ranije ocjene ("pa to sam i odgovorio") → ponovna provjera
+    # prethodnog odgovora (ne novi zadatak). Poslije confirmation contract-a da
+    # potvrde ("da"/"ne") imaju prednost.
+    _apply_challenge_contract(payload)
 
     if payload.get("_direct_answer") is not None:
         master = master if master is not None else get_master(grade=payload["grade"])
@@ -1164,10 +1294,7 @@ def _pending_action_from_answer(payload: dict, answer: str) -> dict:
                 "next_item": None,
             }
 
-    if has_question and re.search(
-        r"\b(slican|slicni|novi|nov)\b.{0,80}\b(zadatak|zadatke|primjer)\b",
-        folded,
-    ):
+    if has_question and _SIMILAR_TASK_OFFER_RE.search(folded):
         return {
             "type": "generate_similar_task",
             "source": "practice",
@@ -1298,6 +1425,18 @@ def _finalize_response(prep: dict, answer: str) -> dict:
         )
         if image_verification:
             payload["image_result_verification"] = image_verification
+
+    # BUG5 sigurnosni prolaz: provjera slike mijenja SAMO numeričke redove
+    # rezultata (ne dodaje riječi ocjene), pa ne može uvesti novu kontradikciju
+    # ocjene. Ali za svaki slučaj, na ocjenjivačkom potezu BEZ korekcijskog uvoda
+    # (koji je legitimno samo-priznanje i ne smije se dirati), ako je ipak ostala
+    # kontradikcija — pomiri je još jednom. Idempotentno.
+    if (
+        _is_grading_turn(payload)
+        and not correction_preface
+        and has_grade_contradiction(answer)
+    ):
+        answer = enforce_grading_consistency(answer, payload.get("answer_check"))
 
     entry_source_used = normalize_value(payload.get("entry_source")) or normalize_value(
         prep["lookup_result"].get("source")
