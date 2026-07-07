@@ -22,6 +22,7 @@ from matbot.answer_checker import (
     summarize_result,
 )
 from matbot.bosnian import to_ijekavica
+from matbot.grading_guard import enforce_grading_consistency
 from matbot.content_loader import (
     get_master,
     get_thinkific_map,
@@ -1251,6 +1252,19 @@ def _next_state_for_response(
     return _empty_next_state()
 
 
+def _is_grading_turn(payload: dict) -> bool:
+    """Da li ovaj potez ocjenjuje učenikov odgovor na zadatak?
+
+    Samo tada se primjenjuje autoritativno pomirenje ocjene. Potvrde
+    (``_skip_answer_check``) i direktni odgovori nisu ocjenjivanje, kao ni
+    objašnjenja/nastavci sa slike."""
+    if payload.get("_direct_answer") is not None or payload.get("_skip_answer_check"):
+        return False
+    if payload.get("answer_check") is not None:
+        return True
+    return normalize_value(payload.get("interaction_phase")).lower() == "answering_practice_task"
+
+
 def _finalize_response(prep: dict, answer: str) -> dict:
     """Sastavi response dict + activity log (zajedničko za oba puta)."""
     payload = prep["payload"]
@@ -1261,6 +1275,17 @@ def _finalize_response(prep: dict, answer: str) -> dict:
     # ijekavica. Streaming klijent na kraju ponovo renderuje answer iz "done"
     # događaja, pa ispravka važi i za streamane odgovore.
     answer = to_ijekavica(answer)
+
+    # Autoritativno pomirenje ocjene: JEDAN sud (deterministički answer_check)
+    # → konzistentan odgovor. Uklanja lažno negativne ocjene za provjereno
+    # tačan odgovor i neutrališe samo-kontradikciju ("Nije tačno … tačan").
+    # Radi SAMO na potezu ocjenjivanja učenikovog odgovora i PRIJE nego što se
+    # doda korekcijski uvod sa slike ("Ranije sam pogrešno napisao …") — taj
+    # uvod je priznanje ranije greške tutora, ne ocjena učenika, i ne smije se
+    # tumačiti kao kontradikcija.
+    if _is_grading_turn(payload):
+        answer = enforce_grading_consistency(answer, payload.get("answer_check"))
+
     correction_preface = correction_preface_from_context(
         payload.get("last_image_context", "")
     )
@@ -1372,6 +1397,29 @@ _STREAM_ERROR_ANSWER = (
     "Došlo je do greške u toku odgovora. Pokušaj ponovo za koji trenutak."
 )
 
+# Veličina komada za progresivan prikaz pomirenog (puferovanog) odgovora.
+_STREAM_CHUNK_CHARS = 40
+
+
+def _chunk_for_stream(text: str, size: int = _STREAM_CHUNK_CHARS) -> list[str]:
+    """Podijeli pomireni tekst na komade za progresivan prikaz.
+
+    Cijepa na granicama riječi (čuva bijele znakove), pa je zbir komada TAČNO
+    jednak ulazu — klijent koji spaja delte dobije isti tekst kao "done"."""
+    if not text:
+        return []
+    chunks: list[str] = []
+    buf = ""
+    for token in re.split(r"(\s+)", text):
+        if buf and len(buf) + len(token) > size:
+            chunks.append(buf)
+            buf = token
+        else:
+            buf += token
+    if buf:
+        chunks.append(buf)
+    return chunks
+
 
 def handle_chat_stream(
     data: dict,
@@ -1415,6 +1463,12 @@ def handle_chat_stream(
         yield {"event": "done", "data": _finalize_response(prep, answer)}
         return
 
+    # Ocjenjivački potez se PUFERUJE: autoritativni sud (answer_check) poznat je
+    # PRIJE poziva modela, pa se sirovi tok (koji može početi lažnim "Nije
+    # tačno") NE smije prikazati prije pomirenja. Delte se šalju tek nakon što
+    # _finalize_response pomiri odgovor. Ne-ocjenjivački potezi teku uživo
+    # (token po token) kao i ranije.
+    grading_turn = _is_grading_turn(prep["payload"])
     assembled: list[str] = []
     try:
         for delta in openai_chat_stream(
@@ -1423,7 +1477,8 @@ def handle_chat_stream(
         ):
             if delta:
                 assembled.append(delta)
-                yield {"event": "delta", "data": {"delta": delta}}
+                if not grading_turn:
+                    yield {"event": "delta", "data": {"delta": delta}}
     except Exception:
         log.exception("ai_tutor stream: prekid toka (mode=%s)", prep["mode"])
         if not assembled:
@@ -1435,6 +1490,16 @@ def handle_chat_stream(
     if not answer:
         log.warning("ai_tutor stream: prazan odgovor (mode=%s)", prep["mode"])
         answer = _EMPTY_ANSWER_FALLBACK
-        yield {"event": "delta", "data": {"delta": answer}}
+        if not grading_turn:
+            yield {"event": "delta", "data": {"delta": answer}}
 
-    yield {"event": "done", "data": _finalize_response(prep, answer)}
+    done = _finalize_response(prep, answer)
+
+    # Ocjenjivački potez: odgovor je sada pomiren (bez kontradikcije i lažno
+    # negativnog uvoda) — emituj GA kao delte radi progresivnog prikaza. Zbir
+    # delti je tačno ``done["answer"]``, isti tekst koji nosi i "done" događaj.
+    if grading_turn:
+        for chunk in _chunk_for_stream(done["answer"]):
+            yield {"event": "delta", "data": {"delta": chunk}}
+
+    yield {"event": "done", "data": done}
