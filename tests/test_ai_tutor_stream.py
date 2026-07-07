@@ -189,6 +189,66 @@ def test_stream_options_preflight(client):
     assert client.open(STREAM_URL, method="OPTIONS").status_code == 204
 
 
+# --- ocjenjivački potez: puferovanje sirovog toka do pomirenja ----------------------
+
+def _grading_stream_payload(task, student):
+    return {
+        "grade": 6,
+        "mode": "practice",
+        "selected_topic": "razlomci_pojam_vrste",
+        "interaction_phase": "answering_practice_task",
+        "last_tutor_task": task,
+        "student_message": student,
+    }
+
+
+def test_stream_grading_turn_never_leaks_false_negative_delta(client, fake_openai, fake_stream):
+    """Tačan odgovor, a model KRENE lažnim "Nije tačno" — nijedna delta ne smije
+    prikazati negativnu ocjenu; klijent vidi samo pomireni (pozitivni) tekst."""
+    fake_stream["deltas"] = ["Nije tačno. ", "Tačan rezultat je 5/8. ", "Bravo!"]
+    resp = client.post(STREAM_URL, json=_grading_stream_payload(
+        "Ako su obojane 3/8 kruga, koji dio nije obojen?", "5/8"
+    ))
+    assert resp.status_code == 200
+    events = _parse_sse(resp.get_data(as_text=True))
+    deltas = [d["delta"] for name, d in events if name == "delta"]
+    streamed = "".join(deltas)
+    done = [d for name, d in events if name == "done"][0]
+
+    # nijedna delta ne sadrži negativnu ocjenu, a zbir delti == done answer
+    assert "nije tačno" not in streamed.lower()
+    assert streamed == done["answer"]
+    assert "nije tačno" not in done["answer"].lower()
+    assert done["answer_check"]["items"][0]["verdict"] == "correct"
+    assert "5/8" in done["answer"]
+
+
+def test_stream_grading_turn_self_contradiction_resolved_in_deltas(client, fake_openai, fake_stream):
+    """Neprovjeriv odgovor, a model SAM SEBI protivrječi — puferovani tok se
+    pomiri: klijent nikad ne vidi i "nije tačno" i "tačno" zajedno."""
+    fake_stream["deltas"] = ["Nije tačno. ", "Ali zapravo je tačno, ispravno je."]
+    resp = client.post(STREAM_URL, json=_grading_stream_payload(
+        "Riješi nejednačinu: x + 3 < 7.", "x < 4"
+    ))
+    events = _parse_sse(resp.get_data(as_text=True))
+    streamed = "".join(d["delta"] for name, d in events if name == "delta")
+    done = [d for name, d in events if name == "done"][0]
+    assert streamed == done["answer"]
+    assert "nije tačno" not in streamed.lower()
+
+
+def test_stream_nongrading_turn_still_streams_live(client, fake_openai, fake_stream):
+    """Ne-ocjenjivački potez i dalje teče uživo (delte == sirovi model izlaz)."""
+    fake_stream["deltas"] = ["Prvo ", "objasnimo ", "temu."]
+    resp = client.post(STREAM_URL, json={
+        "selected_topic": "razlomci_pojam_vrste", "mode": "explain",
+        "student_message": "Objasni mi razlomke.",
+    })
+    events = _parse_sse(resp.get_data(as_text=True))
+    deltas = [d["delta"] for name, d in events if name == "delta"]
+    assert deltas == ["Prvo ", "objasnimo ", "temu."]
+
+
 def test_nonstreaming_endpoint_untouched(client, fake_openai):
     """Non-streaming put ostaje netaknut (fallback za slike i starije klijente)."""
     resp = client.post("/api/ai-tutor/chat", json={"selected_topic": "skupovi_uvod"})
