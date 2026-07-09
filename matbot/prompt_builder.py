@@ -301,9 +301,11 @@ def build_practice_followup_instructions(payload: dict, topic_context: dict) -> 
         "(3/5 = 6/10), mješoviti i nepravi zapis istog broja (2 1/4 = 9/4), "
         "decimalni zapis iste vrijednosti — osim kada zadatak izričito traži "
         "određeni oblik (tada je vrijednost tačna, ali objasni traženi oblik).\n"
-        "- PRVA REČENICA tvog odgovora mora sadržavati konačan sud (npr. "
-        "\"Tačno!\", \"Nije tačno.\", \"Djelimično tačno.\") i OSTATAK odgovora "
-        "NE SMIJE protivrječiti tom sudu.\n"
+        "- PRVA REČENICA tvog odgovora mora sadržavati TAČNO JEDAN konačan sud: "
+        "ako je sistemska presuda correct, počni sa \"Tačno.\"; ako je "
+        "correct_value_wrong_form, počni sa \"Djelimično tačno.\"; ako je "
+        "incorrect, počni sa \"Netačno.\". OSTATAK odgovora NE SMIJE "
+        "protivrječiti tom sudu i ne smije koristiti drugu labelu.\n"
         "- Ako zadatak ima VIŠE numerisanih stavki: ocijeni SVAKU stavku posebno "
         "i jasno navedi koja je tačna, a koja nije. Stavku na koju učenik NIJE "
         "odgovorio NE ocjenjuj kao netačnu — na kraju zamoli odgovor SAMO za nju. "
@@ -314,7 +316,7 @@ def build_practice_followup_instructions(payload: dict, topic_context: dict) -> 
         "NE rješavaj i NE izmišljaj učenikove odgovore na njih — samo kratko "
         "navedi da još čekaju odgovor i zatraži preostale stavke jednu po jednu "
         "(prvo najniži broj koji nedostaje).\n"
-        "- Ako je TAČNO: kratko potvrdi (npr. \"Tačno!\"), u 1–2 rečenice objasni "
+        "- Ako je TAČNO: kratko potvrdi labelom \"Tačno.\", u 1–2 rečenice objasni "
         "zašto, ali NE dodaji novi zadatak ako ga učenik nije zatražio.\n"
         "- Ako NIJE tačno: blago reci da nije tačno i POKAŽI tačan račun korak po "
         "korak (nikad samo \"nije tačno\" bez računa); za konceptualni zadatak "
@@ -341,6 +343,41 @@ def build_practice_followup_instructions(payload: dict, topic_context: dict) -> 
         check_block = format_check_block(check)
         if check_block:
             block += check_block + "\n"
+    return block
+
+
+def build_practice_help_instructions(payload: dict, topic_context: dict) -> str:
+    """Učenik ne šalje odgovor, nego traži pomoć/hint/rješenje za aktivni zadatak."""
+    payload = payload or {}
+    intent = normalize_value(payload.get("_practice_help_intent")).lower()
+    task = normalize_value(payload.get("_practice_help_task"))[:600]
+    item = normalize_value(payload.get("_practice_help_item"))
+    item_text = f" stavku {item}" if item else ""
+    block = (
+        "MOD: VJEŽBA — POMOĆ ZA AKTIVNI ZADATAK\n"
+        f"- Učenik NE šalje odgovor za ocjenjivanje, nego traži pomoć za{item_text} "
+        "iz prethodnog practice zadatka.\n"
+        "- NE koristi ocjenjivačke labele \"Tačno.\", \"Djelimično tačno.\" ili "
+        "\"Netačno.\" jer ovo nije provjera učenikovog odgovora.\n"
+        "- Radi samo zadatak naveden u bloku ispod; ne uvodi novu temu i ne "
+        "ocjenjuj ostale stavke.\n"
+    )
+    if intent == "hint":
+        block += (
+            "- Učenik traži HINT: daj JEDAN kratak sljedeći korak ili pitanje "
+            "koje vodi ka rješenju. NE otkrivaj konačan rezultat.\n"
+            "- Na kraju kratko pozovi učenika da pokuša nastaviti.\n"
+        )
+    else:
+        block += (
+            "- Učenik traži da pokažeš/objasniš zadatak: možeš prikazati kompletno "
+            "rješenje ako je to prirodno za poruku.\n"
+            "- Ako prikažeš kompletno rješenje, NE traži od učenika da odgovori na "
+            "isti zadatak ponovo. Umjesto toga pitaj želi li sličan zadatak ili "
+            "sljedeću stavku.\n"
+        )
+    if task:
+        block += f"AKTIVNI ZADATAK ZA POMOĆ:\n{task}\n"
     return block
 
 
@@ -695,9 +732,12 @@ def build_tutor_prompt(
     # Phase 7.2: kratka potvrda ("može", "nastavi") → nastavak, ne novo objašnjenje.
     interaction_phase = normalize_value(payload.get("interaction_phase")).lower()
     is_practice_followup = interaction_phase == "answering_practice_task"
+    is_practice_help = interaction_phase == "practice_help"
     is_continuation = interaction_phase == "continuing_explanation"
     if is_practice_followup:
         mode = "practice"
+    elif is_practice_help:
+        mode = "explain"
     lesson_topic = normalize_value(lookup_result.get("final_topic"))
     topic_ids = master_content.get("topic_ids", set())
 
@@ -752,6 +792,8 @@ def build_tutor_prompt(
         mode_block = image_test_block
     elif is_practice_followup:
         mode_block = build_practice_followup_instructions(payload, topic_context)
+    elif is_practice_help:
+        mode_block = build_practice_help_instructions(payload, topic_context)
     elif is_continuation:
         mode_block = build_continuation_instructions(payload)
     else:
@@ -804,6 +846,9 @@ def build_general_tutor_prompt(payload: dict) -> dict:
     elif phase == "answering_practice_task":
         mode = "practice"
         mode_block = build_practice_followup_instructions(payload, {})
+    elif phase == "practice_help":
+        mode = "explain"
+        mode_block = build_practice_help_instructions(payload, {})
     elif phase == "continuing_explanation":
         mode_block = build_continuation_instructions(payload)
     else:

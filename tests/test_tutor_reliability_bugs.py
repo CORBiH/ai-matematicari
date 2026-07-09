@@ -84,7 +84,7 @@ def test_fractional_equation_wrong_stays_incorrect(master, tmap):
         model="m", timeout=1,
     )
     assert out["answer_check"]["items"][0]["verdict"] == "incorrect"
-    assert "nije tačno" in out["answer"].lower()
+    assert out["answer"].lower().startswith("netačno")
 
 
 # --- Linearne nejednačine: autoritativna presuda kroz handle_chat ------------------
@@ -261,7 +261,7 @@ def test_correct_answer_short_reply_is_not_bloated(master, tmap):
         _grade_payload("Izračunaj: 1/2 + 1/3", "5/6"), chat, master, tmap,
         model="m", timeout=1,
     )
-    assert out["answer"] == reply                        # nepromijenjeno, već je kratko i potvrdno
+    assert out["answer"] == reply.replace("Tačno!", "Tačno.", 1)
     assert out["answer"].count(".") <= 3
 
 
@@ -278,7 +278,7 @@ def test_incorrect_answer_can_use_step_by_step(master, tmap):
     assert out["answer_check"]["items"][0]["verdict"] == "incorrect"
     # korak-po-korak objašnjenje se NE skraćuje kad je odgovor netačan
     assert "Korak 1" in out["answer"] and "Korak 3" in out["answer"]
-    assert "nije tačno" in out["answer"].lower()
+    assert out["answer"].lower().startswith("netačno")
     up = _last_user_prompt(chat)
     assert "STIL (NETAČAN ODGOVOR)" in up
 

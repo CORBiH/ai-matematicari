@@ -190,6 +190,7 @@ class Expected:
     required_form: str | None = None   # "fraction" (nepravi) | "mixed" | None
     unit: str | None = None
     basis: str = ""
+    target_denominator: int | None = None
     # "high" → smije se presuditi i TAČNO i NETAČNO; "positive_only" → samo
     # potvrda tačnog (kontekst bi mogao mijenjati jedinicu odgovora, pa se
     # različit odgovor NE proglašava netačnim nego unverified).
@@ -204,6 +205,11 @@ _DIO_RE = re.compile(r"\b(dio|dijel\w*|deo|dela)\b")
 _TO_IMPROPER_RE = re.compile(r"neprav\w*\s+razlom\w*")
 _TO_MIXED_RE = re.compile(r"m[ij]e[sš]?ovit\w*\s+broj\w*")
 _CONVERT_RE = re.compile(r"\bpretvori|\bzapisi|\bnapisi|\bpredstavi")
+_EXPAND_RE = re.compile(r"\bprosir\w*")
+_EXPAND_TARGET_DEN_RE = re.compile(
+    r"\b(?:na|do)\s+(?:desn\w+\s+)?nazivnik\w*\s+(\d+)\b"
+    r"|\bnazivnik\w*\s+(\d+)\b"
+)
 _SIMPLIFY_RE = re.compile(r"\bskrati")
 _CALC_LEAD_RE = re.compile(r"\b(izracunaj|koliko\s+je|odredi\s+vrijednost)\b")
 
@@ -253,6 +259,10 @@ def _fmt_fraction(value: Fraction) -> str:
 def _fmt_expected(expected: Expected) -> str:
     if expected.kind == "inequality" and expected.required_form:
         return f"x {expected.required_form} {_fmt_fraction(expected.value)}"
+    if expected.kind == "expand" and expected.target_denominator:
+        numerator = expected.value * expected.target_denominator
+        if numerator.denominator == 1:
+            return f"{numerator.numerator}/{expected.target_denominator}"
     base = _fmt_fraction(expected.value)
     return f"{base} {expected.unit}".strip() if expected.unit else base
 
@@ -297,6 +307,26 @@ def _try_simplify(folded: str, tokens: list[NumberToken]) -> Expected | None:
     if len(fracs) != 1:
         return None
     return Expected(value=fracs[0].value, kind="simplify", required_form="fraction")
+
+
+def _try_expand(folded: str, tokens: list[NumberToken]) -> Expected | None:
+    if not _EXPAND_RE.search(folded):
+        return None
+    fracs = [t for t in tokens if t.form == "fraction"]
+    if len(fracs) != 1:
+        return None
+    target = None
+    for m in _EXPAND_TARGET_DEN_RE.finditer(folded):
+        target = int(next(g for g in m.groups() if g))
+        break
+    if not target or target <= 0:
+        return None
+    return Expected(
+        value=fracs[0].value,
+        kind="expand",
+        required_form="fraction",
+        target_denominator=target,
+    )
 
 
 def _try_rate_or_ratio(folded: str, norm_text: str) -> Expected | None:
@@ -675,7 +705,7 @@ def derive_expected(item_text: str) -> Expected | None:
     norm = _normalize_math_text(item_text or "")
     folded = _fold(norm)
     tokens = _scan_number_tokens(norm)
-    for solver in (_try_conversion, _try_simplify, _try_complement):
+    for solver in (_try_conversion, _try_expand, _try_simplify, _try_complement):
         result = solver(folded, tokens)
         if result is not None:
             return result
@@ -843,6 +873,10 @@ def _judge(expected: Expected | None, given: NumberToken | None, answered: bool)
         return "correct_value_wrong_form"
     if expected.kind == "simplify" and not given.is_reduced_fraction:
         return "correct_value_wrong_form"
+    if expected.kind == "expand":
+        _num, den = _fraction_parts(given.raw)
+        if expected.target_denominator and den != expected.target_denominator:
+            return "correct_value_wrong_form"
     return "correct"
 
 
@@ -944,9 +978,19 @@ def format_check_block(result: CheckResult) -> str:
                 f"{_fmt_expected(item.expected)}."
             )
         elif item.verdict == "correct_value_wrong_form":
+            expected = _fmt_expected(item.expected) if item.expected else "traženi oblik"
+            detail = f" Očekivani oblik: {expected}."
+            if item.expected and item.expected.kind == "simplify":
+                detail = f" Može se još skratiti do {expected}."
+            elif item.expected and item.expected.kind == "expand" and item.expected.target_denominator:
+                detail = (
+                    f" Traženi nazivnik je {item.expected.target_denominator}; "
+                    f"očekivani oblik je {expected}."
+                )
             lines.append(
-                f"- Stavka {item.n}: VRIJEDNOST TAČNA ({given}), ali NIJE u traženom "
-                f"obliku — objasni koji se oblik traži, bez riječi \"netačno\"."
+                f"- Stavka {item.n}: DJELIMIČNO TAČNO. Vrijednost je ekvivalentna "
+                f"({given}), ali NIJE u traženom obliku.{detail} Počni odgovor "
+                f"tačno sa \"Djelimično tačno.\" i nemoj koristiti labelu \"Tačno.\"."
             )
         elif item.verdict == "incorrect":
             lines.append(
@@ -976,17 +1020,25 @@ def format_check_block(result: CheckResult) -> str:
         "Stavku označenu kao TAČNO nikad ne proglašavaj netačnom."
     )
     verdicts = [i.verdict for i in result.items]
-    all_correct = bool(verdicts) and all(
+    all_correct = bool(verdicts) and all(v == "correct" for v in verdicts)
+    all_partial_or_correct = bool(verdicts) and all(
         v in ("correct", "correct_value_wrong_form") for v in verdicts
-    )
+    ) and any(v == "correct_value_wrong_form" for v in verdicts)
     any_incorrect = any(v == "incorrect" for v in verdicts)
     if all_correct:
         lines.append(
-            "STIL (TAČAN ODGOVOR): počni potvrdom (\"Tačno!\" ili \"Da, tačno!\"), "
+            "STIL (TAČAN ODGOVOR): počni tačno sa \"Tačno.\", "
             "pa SAMO kratka provjera računa (1–2 rečenice) i ponuda novog sličnog "
             "zadatka. NE piši puni postupak korak-po-korak osim ako je učenik "
             "izričito tražio objašnjenje (\"objasni\", \"kako\", \"korak po korak\"). "
             "Ne počinji sa \"Pogledajmo zajedno\" ni sličnim uvodom. Ukupno 1–3 rečenice."
+        )
+    elif all_partial_or_correct:
+        lines.append(
+            "STIL (DJELIMIČNO TAČAN ODGOVOR): počni tačno sa "
+            "\"Djelimično tačno.\". Zatim kratko reci da je vrijednost "
+            "ekvivalentna, ali oblik nije dovršen/tražen, i napiši očekivani "
+            "oblik. NE koristi labelu \"Tačno.\" i NE govori \"Netačno.\"."
         )
     elif any_incorrect:
         lines.append(

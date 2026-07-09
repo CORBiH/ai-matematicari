@@ -103,6 +103,7 @@ def test_bare_expression_task_is_checkable():
     r = check_practice_answer("3/4 * 2/5", "3/10")
     assert _verdicts(r) == ["correct"]
     assert _verdicts(check_practice_answer("3/4 * 2/5", "5/18")) == ["incorrect"]
+    assert _verdicts(check_practice_answer("Izračunaj 3/4 · 2.", "3/2")) == ["correct"]
 
 
 def test_decimal_comma_answer():
@@ -120,6 +121,25 @@ def test_simplify_requires_reduced_form():
     assert _verdicts(check_practice_answer("Skrati razlomak 6/10.", "3/5")) == ["correct"]
     assert _verdicts(check_practice_answer("Skrati razlomak 6/10.", "6/10")) == [
         "correct_value_wrong_form"
+    ]
+    assert _verdicts(check_practice_answer("Skrati razlomak 18/24.", "9/12")) == [
+        "correct_value_wrong_form"
+    ]
+    assert _verdicts(check_practice_answer("Skrati razlomak 18/24.", "3/4")) == ["correct"]
+
+
+def test_expand_fraction_to_target_denominator():
+    task = "Proširi razlomak 3/5 na desni nazivnik 15."
+    correct = check_practice_answer(task, "9/15")
+    assert _verdicts(correct) == ["correct"]
+    assert summarize_result(correct)["items"][0]["expected"] == "9/15"
+
+    wrong_form = check_practice_answer(task, "6/10")
+    assert _verdicts(wrong_form) == ["correct_value_wrong_form"]
+    assert summarize_result(wrong_form)["items"][0]["expected"] == "9/15"
+
+    assert _verdicts(check_practice_answer("Prosiri razlomak 3/5 do nazivnika 15.", "9/15")) == [
+        "correct"
     ]
 
 

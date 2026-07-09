@@ -21,6 +21,7 @@ from matbot.answer_checker import (
     derive_expected,
     detect_referenced_items,
     parse_student_answers,
+    split_numbered_items,
     summarize_result,
 )
 from matbot.bosnian import to_ijekavica
@@ -226,6 +227,128 @@ def detect_explicit_intent(text: Any) -> dict:
     elif _STYLE_RESULT_RE.search(folded):
         style = "result_only"
     return {"style": style, "solve_all": bool(_SOLVE_ALL_RE.search(folded))}
+
+
+_PRACTICE_ORDINAL_WORDS = (
+    (1, r"prv\w*"),
+    (2, r"drug\w*"),
+    (3, r"trec\w*"),
+    (4, r"cetvrt\w*"),
+    (5, r"pet\w*"),
+    (6, r"sest\w*"),
+    (7, r"sedm\w*"),
+    (8, r"osm\w*"),
+)
+_PRACTICE_HINT_RE = re.compile(
+    r"\b(hint|daj\s+hint|savjet|nagovjestaj|pomozi|pomoc)\b"
+)
+_PRACTICE_EXPLAIN_RE = re.compile(
+    r"\b(objasni|pojasni|kako\s+(?:ide|se|da)|postupak|korak\s+po\s+korak)\b"
+)
+_PRACTICE_SOLVE_RE = re.compile(
+    r"\b(uradi|rijesi|izracunaj|pokazi|prikazi|daj)\b"
+)
+_PRACTICE_ANSWER_CLAIM_RE = re.compile(
+    r"\b(odgovor\w*|mislim|dobio|dobila|napisao|napisala|jednako|je\s+da)\b|="
+)
+
+
+def _practice_referenced_items(message: Any, valid_numbers: list[int]) -> set[int]:
+    refs = set(detect_referenced_items(message, valid_numbers))
+    folded = fold_diacritics(message)
+    for n, pat in _PRACTICE_ORDINAL_WORDS:
+        if n in valid_numbers and re.search(rf"\b{pat}\b", folded):
+            refs.add(n)
+    for m in re.finditer(
+        r"\b(\d{1,2})\s*[.)]?\s*(?:zadat\w*|pitanj\w*|stavk\w*)?\s*\?",
+        folded,
+    ):
+        refs.add(int(m.group(1)))
+    return {n for n in refs if n in valid_numbers}
+
+
+def _has_practice_answer_attempt(message: Any, valid_numbers: list[int]) -> bool:
+    mode, answers = parse_student_answers(message)
+    if mode == "none":
+        return False
+    if mode == "numbered":
+        return bool(set(answers) & set(valid_numbers or []))
+    return mode in ("single", "ordered")
+
+
+def _select_practice_help_task(task: str, message: Any) -> tuple[int | None, str]:
+    items = split_numbered_items(task)
+    if not items:
+        return None, task
+    valid = [n for n, _text in items]
+    refs = _practice_referenced_items(message, valid)
+    if refs:
+        wanted = min(refs)
+        by_n = {n: text for n, text in items}
+        return wanted, by_n.get(wanted, task)
+    return None, task
+
+
+def _apply_practice_help_contract(payload: dict) -> None:
+    """Practice follow-up koji traži pomoć/rješenje nije pokušaj odgovora."""
+    if payload.get("_direct_answer") is not None or payload.get("_skip_answer_check"):
+        return
+    if normalize_value(payload.get("intent")):
+        return
+    if normalize_value(payload.get("interaction_phase")).lower() != "answering_practice_task":
+        return
+
+    task = normalize_value(payload.get("last_tutor_task"))
+    message = normalize_value(payload.get("student_message") or payload.get("message"))
+    if not task or not message:
+        return
+
+    items = split_numbered_items(task)
+    valid = [n for n, _text in items] if items else [1]
+    folded = fold_diacritics(message)
+    refs = _practice_referenced_items(message, valid) if items else set()
+    has_answer = _has_practice_answer_attempt(message, valid)
+    wants_hint = bool(_PRACTICE_HINT_RE.search(folded))
+    wants_explain = bool(_PRACTICE_EXPLAIN_RE.search(folded))
+    wants_solve = bool(
+        not wants_hint
+        and _PRACTICE_SOLVE_RE.search(folded)
+        and (refs or not has_answer)
+    )
+    terse_ref_request = bool(
+        refs
+        and not has_answer
+        and len(folded) <= 80
+        and not _PRACTICE_ANSWER_CLAIM_RE.search(folded)
+    )
+    if not (wants_hint or wants_explain or wants_solve or terse_ref_request):
+        return
+    if has_answer and not (wants_hint or wants_explain or wants_solve):
+        return
+
+    item, help_task = _select_practice_help_task(task, message)
+    intent = "hint" if wants_hint and not (wants_explain or wants_solve or terse_ref_request) else "solve"
+    payload["_skip_answer_check"] = True
+    payload["_practice_help_intent"] = intent
+    payload["_practice_help_task"] = help_task[:600]
+    if item:
+        payload["_practice_help_item"] = item
+    payload["mode"] = "explain"
+    payload["interaction_phase"] = "practice_help"
+    if intent == "hint":
+        payload["student_message"] = (
+            "Daj mi jedan kratki hint za ovaj zadatak. "
+            "Ne otkrivaj konačan rezultat.\n\n"
+            f"ZADATAK:\n{help_task[:600]}"
+        )
+    else:
+        payload["_solution_revealed"] = True
+        label = f"{item}. zadatak" if item else "prethodni zadatak"
+        payload["student_message"] = (
+            f"Objasni i riješi {label}. Ako prikažeš kompletno rješenje, "
+            "ne traži od mene da ponovo odgovorim na isti zadatak.\n\n"
+            f"ZADATAK:\n{help_task[:600]}"
+        )
 
 
 def _apply_explicit_intent(payload: dict) -> None:
@@ -671,7 +794,7 @@ def is_result_mode(payload: dict) -> bool:
     if payload.get("_direct_answer") is not None or payload.get("_skip_answer_check"):
         return False
     phase = normalize_value(payload.get("interaction_phase")).lower()
-    if phase in ("answering_practice_task", "continuing_explanation"):
+    if phase in ("answering_practice_task", "practice_help", "continuing_explanation"):
         return False
     return normalize_value(payload.get("mode")).lower() in RESULT_MODES
 
@@ -1204,6 +1327,9 @@ def _prepare_chat(
     # prethodnog odgovora (ne novi zadatak). Poslije confirmation contract-a da
     # potvrde ("da"/"ne") imaju prednost.
     _apply_challenge_contract(payload)
+    # "a treći zadatak?", "daj hint", "objasni treći" nisu predani odgovori.
+    # Preusmjeri ih prije determinističkog ocjenjivanja.
+    _apply_practice_help_contract(payload)
 
     if payload.get("_direct_answer") is not None:
         master = master if master is not None else get_master(grade=payload["grade"])
@@ -1689,11 +1815,17 @@ def _finalize_response(prep: dict, answer: str) -> dict:
         response["image_context"] = image_context
     if image_verification:
         response["image_verification"] = image_verification
+    if payload.get("_solution_revealed"):
+        response["practice_task_state"] = "solution_revealed"
     # Tokom image_test toka odgovor NIKAD ne postaje last_tutor_task — aktivni
     # "zadatak" je stavka sa slike i živi u next_state.image_test, ne u prozi.
     task_text = (
         ""
-        if payload.get("_direct_answer") is not None or payload.get("_image_test")
+        if (
+            payload.get("_direct_answer") is not None
+            or payload.get("_image_test")
+            or payload.get("_solution_revealed")
+        )
         else (extract_practice_task(answer, mode=mode) if status == "ready" else "")
     )
     if task_text:

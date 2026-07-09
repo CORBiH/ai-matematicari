@@ -570,7 +570,7 @@ def test_tutor_task_saved_before_history_for_stream_and_json(client):
     idx = html.index("function applyTutorResponse")
     snippet = html[idx:idx + 1200]
     # image_test tok NE pretvara prozu odgovora u last_tutor_task
-    assert "const taskText = (j && j.status === 'ready' && !inImageTest) ? extractTutorTask(j, answer) : ''" in snippet
+    assert "const taskText = (j && j.status === 'ready' && !inImageTest && !solutionRevealed) ? extractTutorTask(j, answer) : ''" in snippet
     assert "j.next_state.active_task_kind === 'image_test'" in snippet
     assert snippet.index("setAwaitingPracticeTask(taskText)") < snippet.index("pushTutor('assistant', answer)")
     assert "sačuvaj zadatak prije historije" in snippet
@@ -619,6 +619,13 @@ def test_answer_send_does_not_clear_last_task_upfront(client):
     snippet = html[idx:idx + 400]
     assert "localStorage.removeItem" not in snippet
     assert "payload.last_tutor_task = savedTask.slice(0, 600)" in snippet
+
+
+def test_solution_revealed_clears_practice_task_after_feedback(client):
+    html = _html(client)
+    assert "practice_task_state === 'solution_revealed'" in html
+    assert "if (inImageTest || solutionRevealed) clearAwaitingPracticeTask()" in html
+    assert "&& !solutionRevealed) setAwaitingPracticeTask(prevTask)" in html
 
 
 # --- Phase 2: streaming + chips + video hint + token -----------------------------
@@ -707,7 +714,7 @@ def test_recent_tasks_tracked_and_sent(client):
     assert "payload.recent_tasks = recentTasks" in html
     # pamti se tek kad odgovor stvarno sadrzi zadatak
     idx = html.index("function applyTutorResponse")
-    snippet = html[idx:idx + 900]
+    snippet = html[idx:idx + 1100]
     assert "pushRecentTask(taskText)" in snippet
     # cisti se i pri resetu konverzacije i u "Ocisti chat"
     ridx = html.index("function resetTutorConversation()")
@@ -735,7 +742,7 @@ def test_transition_text_never_becomes_task_frontend(client):
     assert "if (looksLikeTransitionText(s)) return false;" in html
     # tokom image_test toka proza odgovora se ne pretvara u last_tutor_task
     assert "const inImageTest = !!(j && j.next_state && j.next_state.active_task_kind === 'image_test')" in html
-    assert "if (inImageTest) clearAwaitingPracticeTask();" in html
+    assert "if (inImageTest || solutionRevealed) clearAwaitingPracticeTask();" in html
 
 
 def test_nastavi_is_not_new_task_request(client):

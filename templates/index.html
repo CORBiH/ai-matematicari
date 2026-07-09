@@ -2028,10 +2028,11 @@ document.addEventListener('DOMContentLoaded', () => {
       /* image_test tok: aktivni "zadatak" je stavka sa slike (u next_state),
          proza odgovora se NE pretvara u last_tutor_task */
       const inImageTest = !!(j && j.next_state && j.next_state.active_task_kind === 'image_test');
-      const taskText = (j && j.status === 'ready' && !inImageTest) ? extractTutorTask(j, answer) : '';
+      const solutionRevealed = !!(j && j.practice_task_state === 'solution_revealed');
+      const taskText = (j && j.status === 'ready' && !inImageTest && !solutionRevealed) ? extractTutorTask(j, answer) : '';
       if (j && j.next_state) setNextState(j.next_state);
       else if (j && j.status) clearNextState();   // greška bez statusa NE briše stanje
-      if (inImageTest) clearAwaitingPracticeTask();
+      if (inImageTest || solutionRevealed) clearAwaitingPracticeTask();
       if (taskText){
         setAwaitingPracticeTask(taskText);  // sačuvaj zadatak prije historije
         pushRecentTask(taskText);           // anti-ponavljanje za sljedeći "novi zadatak"
@@ -2061,7 +2062,7 @@ document.addEventListener('DOMContentLoaded', () => {
       /* practice stanje se ažurira tek NAKON primljenog feedbacka */
       if (j.status === 'ready'){
         const prevTask = storedLastTask();
-        if (!taskText && opts.answerPhase && prevTask) setAwaitingPracticeTask(prevTask);
+        if (!taskText && opts.answerPhase && prevTask && !solutionRevealed) setAwaitingPracticeTask(prevTask);
       }
       if (j.status && j.status !== 'ready') showFallback(j.status);
       renderChips(j);                            // Phase 2 (S5): brzi odgovori

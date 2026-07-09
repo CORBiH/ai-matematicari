@@ -92,6 +92,71 @@ def test_wrong_answer_verdict_includes_correct_result(master, tmap):
     assert out["answer_check"]["items"][0]["verdict"] == "incorrect"
 
 
+def test_wrong_form_answer_final_feedback_is_partial(master, tmap):
+    chat = _fake_chat(
+        "Tačno! 9/12 je ekvivalentno 18/24, ali može se još skratiti do 3/4."
+    )
+    out = svc.handle_chat(
+        _answer_payload("Skrati razlomak 18/24.", "9/12"),
+        chat, master, tmap, model="m", timeout=1,
+    )
+    assert out["answer_check"]["items"][0]["verdict"] == "correct_value_wrong_form"
+    assert out["answer"].startswith("Djelimično tačno.")
+    assert "3/4" in out["answer"]
+    up = _last_user_prompt(chat)
+    assert "DJELIMIČNO TAČNO" in up
+    assert "Djelimično tačno." in up
+
+
+def test_reduced_simplify_answer_stays_fully_correct(master, tmap):
+    chat = _fake_chat("Tačno. 18/24 se skraćuje na 3/4.")
+    out = svc.handle_chat(
+        _answer_payload("Skrati razlomak 18/24.", "3/4"),
+        chat, master, tmap, model="m", timeout=1,
+    )
+    assert out["answer_check"]["items"][0]["verdict"] == "correct"
+    assert out["answer"].lower().startswith("tačno")
+
+
+def test_referenced_third_task_request_is_help_not_grading(master, tmap):
+    task = (
+        "1. Izračunaj 1/2 + 1/3.\n"
+        "2. Skrati razlomak 6/10.\n"
+        "3. Izračunaj 3/4 · 2."
+    )
+    chat = _fake_chat(
+        "Treći zadatak: 3/4 · 2 = 6/4 = 3/2. Želiš li sličan zadatak?"
+    )
+    out = svc.handle_chat(
+        _answer_payload(task, "a treci zadatak?"),
+        chat, master, tmap, model="m", timeout=1,
+    )
+    assert "answer_check" not in out
+    assert out["mode"] == "explain"
+    assert out["practice_task_state"] == "solution_revealed"
+    assert out["next_state"]["expected_user_action"] != "answer_task"
+    up = _last_user_prompt(chat)
+    assert "POMOĆ ZA AKTIVNI ZADATAK" in up
+    assert "PROVJERA ODGOVORA" not in up
+    assert "Izračunaj 3/4" in up
+
+
+def test_hint_request_is_not_graded_and_does_not_reveal_solution(master, tmap):
+    chat = _fake_chat(
+        "Pogledaj prvo šta se dešava s brojiocem kada množiš razlomak cijelim brojem."
+    )
+    out = svc.handle_chat(
+        _answer_payload("Izračunaj 3/4 · 2.", "daj mi hint"),
+        chat, master, tmap, model="m", timeout=1,
+    )
+    assert "answer_check" not in out
+    assert out.get("practice_task_state") != "solution_revealed"
+    assert "3/2" not in out["answer"]
+    up = _last_user_prompt(chat)
+    assert "Učenik traži HINT" in up
+    assert "NE otkrivaj konačan rezultat" in up
+
+
 def test_multi_item_missing_answer_requested_not_failed(master, tmap):
     chat = _fake_chat()
     out = svc.handle_chat(

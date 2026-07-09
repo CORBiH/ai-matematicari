@@ -12,6 +12,8 @@ JEDNIM autoritativnim sudom (``answer_checker.CheckResult``):
 
 - ``correct``  → iz odgovora se uklanjaju negativne ocjene (bile su lažno
   negativne); ako ne ostane nijedna potvrda, dodaje se kratka pozitivna.
+- ``partial`` (tačna vrijednost, pogrešan/ nedovršen oblik) → odgovor mora
+  početi sa "Djelimično tačno.", ne sa punim "Tačno.".
 - ``incorrect`` → ako odgovor lažno POČINJE potvrdom ("Tačno!"), uvod se
   neutrališe; sama korekcija ("tačno je 5/8") ostaje.
 - ``mixed`` (više stavki: neke tačne, neke ne) → po-stavkovna ocjena je
@@ -97,11 +99,12 @@ def has_grade_contradiction(text: Any) -> bool:
 
 # --- Autoritativni sud iz determinističke provjere ---------------------------------
 
-_POSITIVE_VERDICTS = ("correct", "correct_value_wrong_form")
+_POSITIVE_VERDICTS = ("correct",)
+_PARTIAL_VERDICTS = ("correct_value_wrong_form",)
 
 
 def authoritative_verdict(result: Any) -> str:
-    """``CheckResult`` → jedan sud: correct | incorrect | mixed | unknown.
+    """``CheckResult`` → jedan sud: correct | partial | incorrect | mixed | unknown.
 
     "mixed" = više ocijenjenih stavki gdje su neke tačne, a neke ne (legitimna
     po-stavkovna ocjena). "unknown" = kod nema pouzdanu presudu."""
@@ -110,15 +113,22 @@ def authoritative_verdict(result: Any) -> str:
     graded = [
         i.verdict
         for i in getattr(result, "items", [])
-        if i.verdict in _POSITIVE_VERDICTS or i.verdict == "incorrect"
+        if i.verdict in _POSITIVE_VERDICTS
+        or i.verdict in _PARTIAL_VERDICTS
+        or i.verdict == "incorrect"
     ]
     if not graded:
         return "unknown"
     has_incorrect = any(v == "incorrect" for v in graded)
     has_correct = any(v in _POSITIVE_VERDICTS for v in graded)
-    if has_incorrect and has_correct:
+    has_partial = any(v in _PARTIAL_VERDICTS for v in graded)
+    if has_incorrect and (has_correct or has_partial):
         return "mixed"
-    return "incorrect" if has_incorrect else "correct"
+    if has_incorrect:
+        return "incorrect"
+    if has_partial:
+        return "partial"
+    return "correct"
 
 
 def _all_items_correct(result: Any) -> bool:
@@ -130,6 +140,16 @@ def _all_items_correct(result: Any) -> bool:
         return False
     items = getattr(result, "items", [])
     return bool(items) and all(i.verdict in _POSITIVE_VERDICTS for i in items)
+
+
+def _all_items_partial_or_correct(result: Any) -> bool:
+    if result is None or not getattr(result, "checkable", False):
+        return False
+    items = getattr(result, "items", [])
+    return bool(items) and all(
+        i.verdict in _POSITIVE_VERDICTS or i.verdict in _PARTIAL_VERDICTS
+        for i in items
+    ) and any(i.verdict in _PARTIAL_VERDICTS for i in items)
 
 
 _MULTI_ITEM_TEXT_RE = re.compile(
@@ -230,21 +250,21 @@ _HEDGE_OPENER_RE = re.compile(
 
 def _make_positive(answer: str) -> str:
     """Autoritativno TAČNO: skini lažno negativne ocjene i garantuj potvrdan,
-    prirodan uvod ("Tačno! …"), bez uvodnog "Pogledajmo zajedno …"."""
+    prirodan uvod ("Tačno. …"), bez uvodnog "Pogledajmo zajedno …"."""
     out, _changed = _remove_negative_verdicts(answer)
     out = out.strip()
     if not out:
-        return "Tačno! Tvoj odgovor je tačan."
+        return "Tačno. Tvoj odgovor je tačan."
     # skini uvodni hedge samo ako sam po sebi ne nosi potvrdu tačnosti
     hedge = _HEDGE_OPENER_RE.match(fold_diacritics(out))
     if hedge and not _starts_positive(out):
         stripped = out[hedge.end():].lstrip()
         if stripped:
             out = stripped
-    # garantuj da odgovor POČINJE potvrdom
-    if not _starts_positive(out):
-        out = _prepend("Tačno!", out)
-    return out
+    stripped = _strip_positive_label(out)
+    if stripped != out:
+        return _prepend("Tačno.", stripped)
+    return _prepend("Tačno.", out)
 
 
 def _neutralize_negative(answer: str) -> str:
@@ -262,6 +282,22 @@ def _neutralize_negative(answer: str) -> str:
 _POSITIVE_OPENER_RE = re.compile(
     r"^\s*(taca?n\w*|toca?n\w*|bravo|odlicno|super|svaka\s+cast|tako\s+je)\b[^.!?\n]*[.!?]?"
 )
+_POSITIVE_LABEL_OPENER_RE = re.compile(
+    r"^\s*(tacno|tocno|bravo|odlicno|super|svaka\s+cast|tako\s+je)\b[^.!?\n]*[.!?]?"
+)
+_POSITIVE_IS_RE = re.compile(r"^\s*(?:tacno|tocno)\s+je\s+")
+_PARTIAL_OPENER_RE = re.compile(r"^\s*djelimicn\w*\s+taca?n\w*\.?")
+
+
+def _strip_positive_label(text: str) -> str:
+    folded = fold_diacritics(text)
+    m = _POSITIVE_IS_RE.match(folded)
+    if m:
+        return text[m.end():].lstrip(" .!?:;-")
+    m = _POSITIVE_LABEL_OPENER_RE.match(folded)
+    if m:
+        return text[m.end():].lstrip(" .!?:;-")
+    return text
 
 
 def _fix_false_positive_opener(answer: str) -> str:
@@ -276,6 +312,33 @@ def _fix_false_positive_opener(answer: str) -> str:
     rest = answer[m.end():].lstrip()
     return _prepend("Skoro — hajde da provjerimo zajedno.", rest) if rest else \
         "Skoro — hajde da provjerimo zajedno."
+
+
+def _make_incorrect(answer: str) -> str:
+    """Autoritativno NETAČNO: stabilna prva labela bez pozitivnog uvoda."""
+    folded = fold_diacritics(answer)
+    stripped = _strip_positive_label(answer)
+    if stripped != answer:
+        answer = stripped
+        return _prepend("Netačno.", answer)
+    spans = _neg_spans(folded)
+    if spans and spans[0][0] <= 3:
+        _s, e = spans[0]
+        rest = answer[e:].lstrip(" .!?:;-")
+        return _prepend("Netačno.", rest)
+    return _prepend("Netačno.", answer.strip())
+
+
+def _make_partial(answer: str) -> str:
+    """Autoritativno DJELIMIČNO: vrijednost je dobra, ali traženi oblik nije."""
+    out, _changed = _remove_negative_verdicts(answer)
+    folded = fold_diacritics(out)
+    partial = _PARTIAL_OPENER_RE.match(folded)
+    if partial:
+        rest = out[partial.end():].lstrip(" .!?:;-")
+        return _prepend("Djelimično tačno.", rest)
+    out = _strip_positive_label(out)
+    return _prepend("Djelimično tačno.", out.strip())
 
 
 def enforce_grading_consistency(answer: Any, check_result: Any = None) -> str:
@@ -294,16 +357,19 @@ def enforce_grading_consistency(answer: Any, check_result: Any = None) -> str:
         if _all_items_correct(check_result):
             return _make_positive(answer)
 
+        # Vrijednost je ekvivalentna, ali traženi oblik nije zadovoljen (npr.
+        # skraćivanje nije do kraja ili proširivanje nije na traženi nazivnik).
+        # To nije puno "Tačno", nego stabilna djelimična ocjena.
+        if _all_items_partial_or_correct(check_result):
+            return _make_partial(answer)
+
         # Miješano (neke tačne, neke ne) ili višestavkovni kontekst → po-stavkovna
         # ocjena je legitimna, tekst se ne dira.
         if verdict == "mixed" or multi:
             return answer
 
         if verdict == "incorrect":
-            # jedna stavka, netačna, a odgovor lažno POČINJE potvrdom
-            if _POSITIVE_OPENER_RE.match(fold_diacritics(answer)):
-                return _fix_false_positive_opener(answer)
-            return answer
+            return _make_incorrect(answer)
 
         # unknown / djelimično provjereno (jedna stavka): samo ako se odgovor
         # SAM SEBI protivrječi — makni negativno da ne bude lažno negativno.

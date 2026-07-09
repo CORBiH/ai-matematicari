@@ -112,6 +112,18 @@ def test_correct_arithmetic_pure_false_negative_gets_positive_opener():
     assert "5/6" in out
 
 
+def test_wrong_form_verdict_becomes_partial_not_fully_correct():
+    cr = check_practice_answer("Skrati razlomak 18/24.", "9/12")
+    assert authoritative_verdict(cr) == "partial"
+    out = enforce_grading_consistency(
+        "Tačno! 9/12 je ekvivalentno 18/24, ali može se skratiti na 3/4.",
+        cr,
+    )
+    assert out.startswith("Djelimično tačno.")
+    assert not out.startswith("Tačno")
+    assert "3/4" in out
+
+
 # --- nepovezane klase zadataka (kroz handle_chat, nad stvarnim odgovorom) -----------
 
 CONTRADICTORY_REPLY = "Nije tačno. Ali zapravo je tačno, odgovor je ispravan."
@@ -158,7 +170,7 @@ def test_verified_wrong_answer_through_chat_stays_negative(master, tmap):
     assert out["answer_check"]["items"][0]["verdict"] == "incorrect"
     # netačan odgovor: negativna ocjena OSTAJE (i to nije kontradikcija — "tačan
     # rezultat je 5/8" je saopštavanje tačnog rezultata, ne potvrda učenika)
-    assert "nije tačno" in out["answer"].lower()
+    assert out["answer"].lower().startswith("netačno")
 
 
 # --- legitimna po-stavkovna ocjena se NE dira ---------------------------------------
