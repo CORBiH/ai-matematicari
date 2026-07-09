@@ -61,7 +61,7 @@ def test_result_mode_ignores_opened_lesson_topic(master, tmap):
     chat = _chat("6 · 7 = 42.")
     out = svc.handle_chat({
         "grade": 6, "mode": "quick",
-        "selected_topic": "skupovi_uvod", "entry_source": "thinkific_lesson",
+        "selected_topic": "6-01-001", "entry_source": "thinkific_lesson",
         "student_message": "Koliko je 6·7?",
     }, chat, master, tmap, model="m", timeout=1)
     assert out["final_topic"] is None
@@ -69,7 +69,7 @@ def test_result_mode_ignores_opened_lesson_topic(master, tmap):
     assert out["opened_lesson_topic"] is None
     assert out["recommend_video"] is False
     assert out["context_policy"] == "disabled_for_result_mode"
-    assert out["debug"]["ignored_opened_lesson_topic"] == "skupovi_uvod"
+    assert out["debug"]["ignored_opened_lesson_topic"] == "6-01-001"
     assert out["debug"]["topic_source"] == "disabled"
     # system prompt: result-mod identitet, BEZ razredne didaktike/modularnih pravila
     sp = chat.messages[0]["content"]
@@ -82,7 +82,7 @@ def test_result_mode_does_not_refuse_other_grade_math(master, tmap):
     # OCR sa "Testovi matematika 8" + valjan zadatak → NE odbija zbog razreda
     chat = _chat("(x+3)^2 = x^2 + 6x + 9.")
     out = svc.handle_chat({
-        "grade": 6, "mode": "quick", "selected_topic": "skupovi_uvod",
+        "grade": 6, "mode": "quick", "selected_topic": "6-01-001",
         "student_message": "Daj mi rezultat sa slike.",
     }, chat, master, tmap, model="m", timeout=1,
         image_bytes=b"x", ocr_image=_ocr("Testovi matematika 8\nIzračunaj (x+3)^2."))
@@ -162,23 +162,23 @@ def test_result_mode_filename_does_not_set_topic_or_grade(client, fake_openai):
 
 def test_practice_mode_still_uses_topic(client, fake_openai):
     resp = client.post(CHAT_URL, json={
-        "grade": 6, "mode": "practice", "selected_topic": "skupovi_uvod",
+        "grade": 6, "mode": "practice", "selected_topic": "6-01-001",
         "student_message": "Daj mi jedan zadatak za vježbu.",
     })
     assert resp.status_code == 200
     body = resp.get_json()
     assert body["status"] == "ready"
-    assert body["final_topic"] == "skupovi_uvod"
+    assert body["final_topic"] == "6-01-001"
     assert body.get("context_policy") is None    # nije result mod
 
 
 def test_explain_mode_still_uses_topic(client, fake_openai):
     resp = client.post(CHAT_URL, json={
-        "grade": 6, "mode": "explain", "selected_topic": "skupovi_uvod",
+        "grade": 6, "mode": "explain", "selected_topic": "6-01-001",
         "student_message": "Objasni mi ovu temu.",
     })
     assert resp.status_code == 200
     body = resp.get_json()
-    assert body["final_topic"] == "skupovi_uvod"
-    assert body["effective_topic"] == "skupovi_uvod"
+    assert body["final_topic"] == "6-01-001"
+    assert body["effective_topic"] == "6-01-001"
     assert body.get("context_policy") is None

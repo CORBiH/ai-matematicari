@@ -22,7 +22,7 @@ from matbot import ai_tutor_service as svc
 from matbot import content_loader as cl
 from matbot.grading_guard import has_grade_contradiction
 
-FR_TOPIC = "razlomci_pojam_vrste"
+FR_TOPIC = "6-04-031"
 
 
 @pytest.fixture(autouse=True)

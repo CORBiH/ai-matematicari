@@ -263,7 +263,17 @@ def _empty_next_state() -> dict:
         "pending_action": _empty_pending_action(),
         "active_task_kind": None,
         "image_test": None,
+        "stuck_count": 0,
     }
+
+
+# F5 (Vježbajmo): koliko je puta zaredom učenik zapeo na istoj temi. Na pragu se
+# u promptu aktivira preporuka videa (prompt_builder: payload["_student_stuck"]).
+STUCK_THRESHOLD = 2
+_STUCK_SIGNAL_RE = re.compile(
+    r"\bne\s+znam\b|\bne\s+razumijem\b|\bne\s+kapiram\b|\bne\s+umijem\b|"
+    r"\bne\s+mogu\b|\bnemam\s+pojma\b|\bpomozi\b|\bne\s+kontam\b|\bzapeo\b|\bzapela\b"
+)
 
 
 # Oznaka stavke sa slike: "3" (int) ili pod-oznaka poput "5.c" (string).
@@ -335,12 +345,17 @@ def _normalize_next_state(raw: Any) -> dict:
         return _empty_next_state()
     expected = normalize_value(raw.get("expected_user_action")).lower()
     active = normalize_value(raw.get("active_task_kind")).lower()
+    try:
+        stuck = int(raw.get("stuck_count") or 0)
+    except (TypeError, ValueError):
+        stuck = 0
     return {
         "expected_user_action": expected if expected in _NEXT_EXPECTED_ACTIONS else "none",
         "pending_action": _normalize_pending_action(raw.get("pending_action")),
         "active_task_kind": active if active in _ACTIVE_TASK_KINDS else None,
         # image_test pod-stanje putuje kroz klijenta netaknuto (state-driven tok)
         "image_test": _normalize_image_test(raw.get("image_test")),
+        "stuck_count": max(0, stuck),
     }
 
 
@@ -612,6 +627,30 @@ def _apply_challenge_contract(payload: dict) -> None:
     # konzistentnost. Nikad se ne generiše novi zadatak.
     payload["interaction_phase"] = "answering_practice_task"
     payload["student_message"] = prev
+
+
+def _update_stuck_state(payload: dict) -> None:
+    """F5: prati koliko puta zaredom je učenik zapeo (Vježbajmo) i na pragu aktivira
+    preporuku videa. "Zapeo" = odgovor na practice zadatak je deterministički
+    netačan ILI poruka je "ne znam/ne razumijem/pomozi". Tačan odgovor ili nova
+    tema resetuju brojač. Prompt builder čita ``_student_stuck``; response nosi
+    ``stuck_count`` naprijed kroz next_state."""
+    phase = normalize_value(payload.get("interaction_phase")).lower()
+    prev = _previous_next_state(payload).get("stuck_count", 0)
+
+    stuck_signal = False
+    if phase == "answering_practice_task":
+        check = payload.get("answer_check")
+        if check is not None and authoritative_verdict(check) == "incorrect":
+            stuck_signal = True
+        student = payload.get("student_message") or payload.get("message")
+        if _STUCK_SIGNAL_RE.search(fold_diacritics(student)):
+            stuck_signal = True
+
+    new_stuck = prev + 1 if stuck_signal else 0
+    payload["_stuck_count"] = new_stuck
+    if new_stuck >= STUCK_THRESHOLD:
+        payload["_student_stuck"] = True
 
 
 # --- Result/Quick mod: kontekst-slobodno rješavanje (bez razreda/teme/lekcije) -----
@@ -937,25 +976,26 @@ def extract_practice_task(answer: Any, limit: int = 600, mode: str | None = None
 
 
 def list_topics(master: dict | None = None, grade: int | str = DEFAULT_GRADE) -> dict:
-    """Phase 4 — lista tema za UI dropdown (GET /api/ai-tutor/topics).
+    """Lista NPP tema za UI dropdown (GET /api/ai-tutor/topics), oblast-first.
 
-    Učitava iz Phase 1 ``get_master`` (Excel je izvor istine; ništa nije
-    hardkodirano). Vraća samo READY teme (ako postoji ``status`` kolona).
-
-    Phase 1 (audit): redoslijed = redoslijed TOPICS sheeta (nastavni redoslijed),
-    NE abecedni. ``oblast_order`` nosi redoslijed oblasti kroz JSON (nizovi
-    garantovano čuvaju redoslijed; ključevi objekta ne moraju)::
+    Izvor je ``get_master`` (Excel je izvor istine; ništa nije hardkodirano).
+    U NPP modelu ``topic`` = ``npp_topic_id``, ``display_name`` = ``tema_ui``.
+    Redoslijed oblasti je iz ``master["areas"]`` (po ``area_order``), a teme unutar
+    oblasti u redoslijedu NPP_TOPICS sheeta. Svaka tema nosi ``has_video`` da UI
+    može prikazati "Objasni mi" oznaku za video, i ``oblast`` radi lakšeg filtera::
 
         {
           "grade": 6,
-          "topics":  [{"oblast": ..., "topic": ..., "display_name": ...}, ...],
-          "grouped": {"Skupovi": [ ... ], ...},
-          "oblast_order": ["Skupovi", "N i N0 Skupovi", ...],
+          "areas": [{"oblast","area_order","topic_count","topics_with_video"}, ...],
+          "oblast_order": ["Skupovi i skupovne operacije", ...],
+          "topics":  [{"oblast","topic","display_name","has_video"}, ...],
+          "grouped": {"Skupovi i skupovne operacije": [ ... ], ...},
         }
     """
     g = normalize_grade(grade)
     master = master if master is not None else get_master(grade=g)
     rows = master.get("topics", [])
+    videos = master.get("videos_by_topic", {})
 
     ready = [
         r
@@ -969,21 +1009,35 @@ def list_topics(master: dict | None = None, grade: int | str = DEFAULT_GRADE) ->
             "oblast": r.get("oblast", ""),
             "topic": r["topic"],
             "display_name": r.get("display_name") or r["topic"],
+            "has_video": bool(videos.get(r["topic"])),
         }
         for r in ready
     ]
 
     grouped: dict[str, list] = {}
-    oblast_order: list[str] = []
+    seen_order: list[str] = []
     for t in topics:
         if t["oblast"] not in grouped:
-            oblast_order.append(t["oblast"])
+            seen_order.append(t["oblast"])
         grouped.setdefault(t["oblast"], []).append(t)
+
+    # Oblast redoslijed iz areas (area_order); teme bez oblasti idu na kraj.
+    areas = [a for a in master.get("areas", []) if a["oblast"] in grouped]
+    oblast_order = [a["oblast"] for a in areas]
+    for oblast in seen_order:  # fallback: bilo koja oblast koje nema u areas
+        if oblast not in oblast_order:
+            oblast_order.append(oblast)
 
     grades = {normalize_value(r.get("grade")) for r in ready if r.get("grade")}
     grade = int(next(iter(grades))) if len(grades) == 1 and next(iter(grades)).isdigit() else g
 
-    return {"grade": grade, "topics": topics, "grouped": grouped, "oblast_order": oblast_order}
+    return {
+        "grade": grade,
+        "areas": areas,
+        "oblast_order": oblast_order,
+        "topics": topics,
+        "grouped": grouped,
+    }
 
 
 def _extract_answer(resp: Any) -> str:
@@ -1215,6 +1269,9 @@ def _prepare_chat(
         if _task and _student:
             payload["answer_check"] = check_practice_answer(_task, _student)
 
+    # F5: ažuriraj "stuck" brojač (za preporuku videa u Vježbajmo) prije prompta.
+    _update_stuck_state(payload)
+
     grade = payload["grade"]
     master = master if master is not None else get_master(grade=grade)
     tmap = tmap if tmap is not None else get_thinkific_map(grade=grade)
@@ -1268,7 +1325,15 @@ def _prepare_chat(
 
         # --- Phase 6: free_chat detekcija teme (heuristike → LLM klasifikator) --
         general_answer = False
-        if exam_oblast_prompt is None and lookup_result["status"] == "unknown":
+        if (
+            payload.get("_image_test")
+            and exam_oblast_prompt is None
+            and lookup_result["status"] == "unknown"
+        ):
+            # image_test tok rješava stavke sa slike (stanje, ne proza) — detekcija
+            # teme nije potrebna i ne smije trošiti dodatni LLM poziv.
+            general_answer = True
+        elif exam_oblast_prompt is None and lookup_result["status"] == "unknown":
             student_msg = normalize_value(
                 payload.get("student_message") or payload.get("message")
             )
@@ -1283,7 +1348,7 @@ def _prepare_chat(
             is_continuation = phase == "continuing_explanation"
             if is_continuation and combined:
                 general_answer = True
-            elif combined and (has_image or not is_vague_message(combined)):
+            elif combined and (has_image or not is_vague_message(combined, master)):
                 detection = detect_topic(
                     combined, master, tmap,
                     openai_chat=openai_chat, model=model, timeout=timeout,
@@ -1595,9 +1660,10 @@ def _finalize_response(prep: dict, answer: str) -> dict:
         "entry_source_used": entry_source_used,
         "topic_conflict": bool(prompt_result.get("topic_conflict", False)),
         "recommended_mode": _RECOMMENDED_MODE.get(mode, "practice"),
-        # video preporuka je vezana za temu → u result modu uvijek False
+        # video preporuka (NPP VIDEO_LINKS) dolazi iz prompt buildera: explain nudi
+        # video ako postoji, practice samo kad je učenik zapeo. U result modu False.
         "recommend_video": (
-            False if result_mode else bool(prep["topic_context"].get("when_to_recommend_video"))
+            False if result_mode else bool(prompt_result.get("video_recommended"))
         ),
         "parent_report_signal": parent_report_signal,
         "status": status,
@@ -1635,6 +1701,8 @@ def _finalize_response(prep: dict, answer: str) -> dict:
     response["next_state"] = _next_state_for_response(
         payload, answer, mode=mode, status=status, task_text=task_text
     )
+    # F5: prenesi "stuck" brojač naprijed da klijent vrati stanje sljedeći put.
+    response["next_state"]["stuck_count"] = int(payload.get("_stuck_count", 0) or 0)
 
     # Audit: sažetak determinističke provjere u response (telemetrija/testovi).
     check = payload.get("answer_check")

@@ -64,16 +64,16 @@ def test_dry_regression_mnozenje_cijelih():
     """Čuvar detektorske regresije kroz eval: množenje cijelih ide na pravu temu."""
     _, results = eval_tutor.run_eval(live=False)
     case = next(r for r in results if r["id"] == "g7-freechat-mnozenje-cijelih")
-    assert case["final_topic"] == "cijeli_mnozenje_dijeljenje"
+    assert case["final_topic"] == "7-01-001"
     case58 = next(r for r in results if r["id"] == "g6-practice-answer-correct")
-    assert case58["final_topic"] == "razlomci_mnozenje_razlomkom_svojstva"
+    assert case58["final_topic"] == "6-04-041"
     assert case58["mode"] == "practice"
 
 
 def test_dry_regression_grade8_cases():
     _, results = eval_tutor.run_eval(live=False)
     by_id = {r["id"]: r for r in results}
-    assert by_id["g8-explain-stepeni"]["final_topic"] == "stepeni_pravila_i_pojasnjenja_stepeni"
-    assert by_id["g8-practice-korijeni"]["final_topic"] == "realni_korijeni_pravila_za_racunske_operacije"
-    assert by_id["g8-image-conflict-koordinatni-pitagora"]["final_topic"] == "pitagora_pitagorina_teorema_osnovno"
+    assert by_id["g8-explain-stepeni"]["final_topic"] == "8-01-001"
+    assert by_id["g8-practice-korijeni"]["final_topic"] == "8-03-015"
+    assert by_id["g8-image-conflict-koordinatni-pitagora"]["final_topic"] == "8-04-025"
     assert by_id["g8-practice-valjak-ne-znam"]["mode"] == "practice"

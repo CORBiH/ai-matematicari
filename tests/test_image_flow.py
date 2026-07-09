@@ -9,7 +9,7 @@ import pytest
 from matbot import ai_tutor_service as svc
 from matbot import content_loader as cl
 
-TOPIC = "skupovi_uvod"
+TOPIC = "6-01-001"
 GOOD_OCR = "Izračunaj presjek skupova A = {1,2,3} i B = {2,3,4}."
 
 
@@ -105,7 +105,7 @@ def test_geometric_topic_sends_image_too(master, tmap):
     out, chat = _run(
         master, tmap,
         ocr_result=("Izracunaj vrijednost iz date figure: r = 5 cm, O je centar.", 0.95),
-        payload={"selected_topic": "kruznica_i_krug", "mode": "explain"},
+        payload={"selected_topic": "6-08-074", "mode": "explain"},
     )
     _assert_multimodal_with_ocr(chat)
 

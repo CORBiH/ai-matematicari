@@ -24,7 +24,7 @@ from matbot.grading_guard import (
     has_grade_contradiction,
 )
 
-FR_TOPIC = "razlomci_pojam_vrste"
+FR_TOPIC = "6-04-031"
 
 
 @pytest.fixture(autouse=True)

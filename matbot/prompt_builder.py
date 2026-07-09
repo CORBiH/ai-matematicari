@@ -84,7 +84,9 @@ TOPIC_CONTEXT_FIELDS = (
     "when_to_recommend_video",
     "exit_criteria",
 )
-_TOPIC_META_FIELDS = ("grade", "oblast", "display_name", "topic_type", "difficulty_level")
+_TOPIC_META_FIELDS = (
+    "grade", "oblast", "display_name", "npp_scope", "topic_type", "difficulty_level"
+)
 
 # NAPOMENA (Phase 2): GLOBAL_MODULAR_GUIDELINES, LANGUAGE_TONE_GUIDELINES i
 # CHAT_FORMATTING_GUIDELINES sada žive u matbot.tutor_prompts (jedan izvor
@@ -387,6 +389,7 @@ _ENTRY_LABELS = (
 _TOPIC_LABELS = (
     ("display_name", "Naziv teme"),
     ("oblast", "Oblast"),
+    ("npp_scope", "NPP opseg (nivo teme)"),
     ("lesson_scope", "Opseg lekcije (lesson_scope)"),
     ("common_mistake_1", "Česta greška 1"),
     ("common_mistake_2", "Česta greška 2"),
@@ -433,7 +436,7 @@ def _build_entry_context(payload: dict, final_topic: str, mode: str) -> str:
 
 # Phase 1 (audit): topic blok filtriran po modu — explain ne treba kontrolne
 # zadatke, exam ne treba riješeni primjer itd. Manji prompt = jasnije instrukcije.
-_META_FIELDS = ("display_name", "oblast", "lesson_scope")
+_META_FIELDS = ("display_name", "oblast", "npp_scope", "lesson_scope")
 _MISTAKE_FIELDS = (
     "common_mistake_1", "common_mistake_2", "common_mistake_3",
     "ai_if_mistake_1", "ai_if_mistake_2", "ai_if_mistake_3",
@@ -494,6 +497,57 @@ def _build_video_flow_block(vf: dict | None) -> str:
         if val:
             lines.append(f"- {label}: {val}")
     return "\n".join(lines)
+
+
+def get_video_recommendation(topic: Any, master_content: dict) -> list[dict]:
+    """VIDEO_LINKS redovi (lesson_type == 'video') za temu, ili ``[]``.
+
+    Izvor je ``master["videos_by_topic"]`` (NPP). URL trenutno nije dostupan pa se
+    lekcija preporučuje po nazivu (section_name/lesson_title)."""
+    tid = normalize_value(topic)
+    if not tid or tid.lower() == "unknown":
+        return []
+    return list((master_content or {}).get("videos_by_topic", {}).get(tid, []))
+
+
+def _video_labels(videos: list[dict], limit: int = 2) -> list[str]:
+    names: list[str] = []
+    for v in videos[:limit]:
+        section = normalize_value(v.get("section_name"))
+        title = normalize_value(v.get("lesson_title"))
+        if title and section and title != section:
+            names.append(f"{title} (sekcija: {section})")
+        elif title or section:
+            names.append(title or section)
+    return names
+
+
+def build_video_reco_block(videos: list[dict], stuck: bool = False) -> str:
+    """Blok koji modelu daje NAZIVE povezanih video lekcija (bez URL-a).
+
+    ``stuck=True`` (Vježbajmo, učenik zapeo) → aktivno preporuči video;
+    inače (Objasni mi) → ponudi ga opciono na kraju. Model ne smije izmišljati
+    URL ni druge lekcije."""
+    names = _video_labels(videos)
+    if not names:
+        return ""
+    listed = "; ".join(names)
+    if stuck:
+        lead = (
+            "UČENIK JE ZAPEO — PREPORUČI VIDEO:\n"
+            "- Učenik više puta griješi ili ne zna. Ljubazno mu predloži da "
+            "pogleda povezanu video lekciju prije nego nastavite."
+        )
+    else:
+        lead = (
+            "VIDEO LEKCIJA (opciono ponudi na kraju):\n"
+            "- Ako je korisno, na KRAJU kratko ponudi povezanu video lekciju."
+        )
+    return (
+        f"{lead}\n"
+        f"- Poveži isključivo s ovom lekcijom, po nazivu (link nije dostupan): {listed}\n"
+        "- NE izmišljaj URL, broj lekcije ni druge lekcije — koristi samo ovaj naziv."
+    )
 
 
 def _build_recent_tasks_block(payload: dict, mode: str, interaction_phase: str = "") -> str:
@@ -662,6 +716,14 @@ def build_tutor_prompt(
     topic_context = get_topic_context(effective_topic, master_content)
     video_flow = get_video_flow_context(payload, effective_topic, master_content)
 
+    # --- NPP video preporuka (VIDEO_LINKS) ---
+    # Objasni mi (explain): ponudi video opciono; Vježbajmo (practice): samo kada
+    # je učenik zapeo (payload["_student_stuck"], postavlja ga ai_tutor_service).
+    videos = get_video_recommendation(effective_topic, master_content)
+    stuck = bool(payload.get("_student_stuck"))
+    want_video = bool(videos) and (mode == "explain" or (mode == "practice" and stuck))
+    video_reco_block = build_video_reco_block(videos, stuck=stuck) if want_video else ""
+
     # --- system prompt ---
     forbidden = topic_context.get("forbidden_ai_behavior", "")
     extra = (
@@ -698,6 +760,7 @@ def build_tutor_prompt(
     for block in (
         _build_topic_block(topic_context, mode=topic_block_mode),
         _build_video_flow_block(video_flow),
+        video_reco_block,
         _build_image_context_block(payload),
         _build_recent_tasks_block(payload, mode, interaction_phase),
         mode_block,
@@ -719,6 +782,7 @@ def build_tutor_prompt(
         "status": _STATUS_READY,
         "topic_context_used": bool(topic_context),
         "video_flow_used": bool(video_flow),
+        "video_recommended": want_video,
         "topic_conflict": topic_conflict,
     }
 

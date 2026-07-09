@@ -172,6 +172,28 @@ _GRADE_DIDACTICS = {
         "- Ne koristi metode 9. razreda ni srednje škole osim ako ih sadržaj iz "
         "mastera izričito traži.\n"
     ),
+    "9": (
+        "==================================================\n"
+        "DIDAKTIKA — 9. RAZRED\n"
+        "==================================================\n"
+        "- Algebarski razlomci: uvijek prvo napiši uslov/domenu (nazivnik ≠ 0), "
+        "pa tek onda skraćuj, sabiraj ili množi; rastavljanje na faktore radi "
+        "korak po korak.\n"
+        "- Linearne jednačine, nejednačine i sistemi: rješavaj prebacivanjem "
+        "(član koji prelazi mijenja predznak); kod nejednačina znak nejednakosti "
+        "se mijenja SAMO pri množenju/dijeljenju negativnim brojem. Sisteme "
+        "objašnjavaj metodom zamjene i metodom suprotnih koeficijenata.\n"
+        "- Linearna funkcija y = kx + n: objasni značenje k (nagib) i n (odsječak) "
+        "i crtanje grafika kroz dvije tačke.\n"
+        "- Sličnost i Talesova teorema: parove odgovarajućih stranica i razmjere "
+        "postavljaj pažljivo i uredno.\n"
+        "- Kružnica i krug: centralni i periferni ugao, tetiva, tangenta, "
+        "površina i obim — uz jasno značenje svakog simbola (r, d, O, P).\n"
+        "- Geometrijska tijela (prizma, piramida, valjak, kupa, lopta): koristi "
+        "jasne formule za P i V i odmah objasni šta znači svaki simbol.\n"
+        "- Za 9. razred koristi formalniji matematički jezik, ali zadrži jasne "
+        "korake i kratke provjere razumijevanja; ne uvodi srednjoškolske prečice.\n"
+    ),
 }
 
 

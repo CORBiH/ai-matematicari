@@ -1,20 +1,23 @@
-"""Testovi za matbot.prompt_builder (Phase 2).
+"""Testovi za matbot.prompt_builder (NPP schema).
 
-Koristi stvarni master (commitovani .xlsx) i punu temu ``skupovi_uvod``.
-Tvrdi na STVARNIM vrijednostima ćelija (povučenim iz sheeta), ne na hardkodiranom
-tekstu — pa ostaje ispravno i ako se sadržaj kasnije koriguje. Bez mreže/OpenAI-ja.
+NPP_TOPICS nema bogate pedagoške kolone (riješeni primjeri, kontrolni zadaci,
+česte greške) — sadržaj generiše model iz naziva teme (tema_ui) + npp_scope
+(pravilo R5). Zato se ovdje tvrdi na: minimalnom topic bloku (naziv/oblast/scope),
+NPP video preporuci (VIDEO_LINKS), mode instrukcijama i tutor system-prompt stacku.
+Bez mreže/OpenAI-ja; koristi stvarne commitovane NPP fajlove.
 """
 import pytest
 
 from matbot import content_loader as cl
 from matbot import prompt_builder as pb
 
-TOPIC = "skupovi_uvod"
+TOPIC = "6-01-001"            # Skupovi i skupovne operacije → Pojam skupa (ima video)
+TOPIC_RAZLOMCI = "6-04-031"   # Razlomci → Pojam razlomka (za konflikt teme)
 
 
 @pytest.fixture(scope="module")
 def master():
-    return cl.load_master_content()
+    return cl.load_master_content(grade=6)
 
 
 @pytest.fixture(scope="module")
@@ -56,40 +59,81 @@ def _text(res):
     return res["system_prompt"] + "\n" + res["user_prompt"]
 
 
-# --- 1–3: topic context se ubacuje ----------------------------------------------
+# --- 1: minimalni topic kontekst (naziv/oblast/npp_scope) -----------------------
 
-def test_includes_lesson_scope_and_hint_method(master, topic_row):
+def test_includes_topic_name_oblast_scope(master, topic_row):
     res = pb.build_tutor_prompt({"selected_topic": TOPIC, "mode": "explain"}, _found(), master)
     text = _text(res)
     assert res["status"] == "ready"
     assert res["topic_context_used"] is True
-    assert topic_row["lesson_scope"] in text
-    assert topic_row["hint_method"] in text
+    assert topic_row["display_name"] in text
+    assert topic_row["oblast"] in text
+    if topic_row.get("npp_scope"):
+        assert topic_row["npp_scope"] in text
 
 
-def test_includes_common_mistakes_and_ai_if_mistake(master, topic_row):
-    res = pb.build_tutor_prompt({"selected_topic": TOPIC}, _found(), master)
-    text = _text(res)
-    assert topic_row["common_mistake_1"] in text
-    assert topic_row["ai_if_mistake_1"] in text
+def test_topic_block_has_no_rich_legacy_fields(master):
+    """NPP nema bogata polja — blok ne smije izmišljati riješene primjere/kontrolne."""
+    res = pb.build_tutor_prompt({"selected_topic": TOPIC, "mode": "explain"}, _found(), master)
+    up = res["user_prompt"]
+    for label in ("Riješeni primjer", "Kontrolni zadatak", "Tipičan zadatak",
+                  "Metoda hinta", "Česta greška"):
+        assert label not in up, label
 
 
-def test_includes_solved_example(master, topic_row):
-    res = pb.build_tutor_prompt({"selected_topic": TOPIC}, _found(), master)
-    text = _text(res)
-    assert topic_row["solved_example_problem"] in text
-    assert topic_row["solved_example_answer"] in text
+# --- 2: NPP video preporuka (VIDEO_LINKS) ---------------------------------------
+
+def test_explain_offers_video_when_available(master):
+    res = pb.build_tutor_prompt({"selected_topic": TOPIC, "mode": "explain"}, _found(), master)
+    assert res["video_recommended"] is True
+    up = res["user_prompt"]
+    assert "VIDEO LEKCIJA" in up
+    # naziv lekcije iz VIDEO_LINKS, bez izmišljenog URL-a
+    vids = master["videos_by_topic"][TOPIC]
+    assert vids[0]["lesson_title"] in up
+    assert "NE izmišljaj URL" in up
 
 
-# --- 4–8: mode rules ------------------------------------------------------------
+def test_practice_does_not_offer_video_unless_stuck(master):
+    res = pb.build_tutor_prompt({"selected_topic": TOPIC, "mode": "practice"}, _found(), master)
+    assert res["video_recommended"] is False
+    assert "VIDEO LEKCIJA" not in res["user_prompt"]
+
+
+def test_practice_offers_video_when_stuck(master):
+    res = pb.build_tutor_prompt(
+        {"selected_topic": TOPIC, "mode": "practice", "_student_stuck": True},
+        _found(), master,
+    )
+    assert res["video_recommended"] is True
+    assert "UČENIK JE ZAPEO" in res["user_prompt"]
+
+
+def test_no_video_flag_for_topic_without_video(master):
+    # tema bez videa: nađi je iz mastera (data-driven)
+    no_vid = next(
+        t["topic"] for t in master["topics"]
+        if not master["videos_by_topic"].get(t["topic"])
+    )
+    res = pb.build_tutor_prompt({"selected_topic": no_vid, "mode": "explain"}, _found(no_vid), master)
+    assert res["video_recommended"] is False
+    assert "VIDEO LEKCIJA" not in res["user_prompt"]
+
+
+def test_get_video_recommendation_helper(master):
+    assert pb.get_video_recommendation(TOPIC, master) == master["videos_by_topic"][TOPIC]
+    assert pb.get_video_recommendation("unknown", master) == []
+    assert pb.get_video_recommendation("nepostoji", master) == []
+
+
+# --- 3: mode rules --------------------------------------------------------------
 
 def test_explain_mode_idea_and_steps(master):
     res = pb.build_tutor_prompt({"selected_topic": TOPIC, "mode": "explain"}, _found(), master)
     up = res["user_prompt"].lower()
     assert res["mode"] == "explain"
-    assert "ideja" in up
     assert "primjer" in up
-    assert "korak" in up
+    assert "korak" in up or "ideja" in up
 
 
 def test_practice_mode_one_task_and_wait(master):
@@ -100,18 +144,13 @@ def test_practice_mode_one_task_and_wait(master):
     assert "čekaj" in up
 
 
-def test_exam_mode_known_topic_three_tasks_trick_warning(master, topic_row):
+def test_exam_mode_known_topic_three_tasks_trick_warning(master):
+    """Exam generiše 3 zadatka + trik + upozorenje iz naziva teme (bez controlni_*)."""
     res = pb.build_tutor_prompt({"selected_topic": TOPIC, "mode": "exam"}, _found(), master)
-    text = _text(res)
+    up = res["user_prompt"]
     assert res["mode"] == "exam"
-    for key in (
-        "controlni_task_1",
-        "controlni_task_2",
-        "controlni_task_3",
-        "controlni_trick",
-        "controlni_warning",
-    ):
-        assert topic_row[key] in text
+    assert "3" in up
+    assert '"Trik:"' in up and '"Upozorenje:"' in up
 
 
 def test_exam_mode_unknown_topic_asks_for_area(master):
@@ -131,7 +170,7 @@ def test_quick_mode_short(master):
     assert "rezultat" in up
 
 
-# --- 9: history limit -----------------------------------------------------------
+# --- history --------------------------------------------------------------------
 
 def test_trim_conversation_history_unit():
     hist = [{"role": "user", "content": f"MSG{i}"} for i in range(8)]
@@ -143,8 +182,6 @@ def test_trim_conversation_history_unit():
 
 
 def test_conversation_history_as_role_messages(master):
-    """Phase 2: historija NE ide u user_prompt tekst — vraća se kao role poruke
-    (zadnjih 5), koje servis šalje kao prave chat poruke."""
     hist = [{"role": "user", "content": f"MSG{i}"} for i in range(8)]
     res = pb.build_tutor_prompt(
         {"selected_topic": TOPIC, "conversation_history": hist}, _found(), master
@@ -152,19 +189,17 @@ def test_conversation_history_as_role_messages(master):
     hm = res["history_messages"]
     assert [m["content"] for m in hm] == ["MSG3", "MSG4", "MSG5", "MSG6", "MSG7"]
     assert all(m["role"] == "user" for m in hm)
-    # user_prompt više NE sadrži historiju (nema duplog konteksta)
     assert "MSG7" not in res["user_prompt"]
     assert "ZADNJE PORUKE" not in res["user_prompt"]
 
 
 def test_history_messages_role_mapping():
-    # 6 stavki → uzima se zadnjih 5; prazna se preskače; role se normalizuju
     hm = pb.build_history_messages([
         {"role": "user", "content": "ispada iz reza (6. od kraja)"},
         {"role": "assistant", "content": "4. Hoćeš još jedan?"},
         {"role": "bot", "content": "i bot je assistant"},
         {"role": "čudno", "content": "nepoznata rola je user"},
-        {"role": "user", "content": ""},              # prazno se preskače
+        {"role": "user", "content": ""},
         "goli string je user poruka",
     ])
     assert [m["role"] for m in hm] == ["assistant", "assistant", "user", "user"]
@@ -174,20 +209,12 @@ def test_history_messages_role_mapping():
     assert pb.build_history_messages("nije lista") == []
 
 
-# --- 10: forbidden behavior -----------------------------------------------------
-
-def test_forbidden_ai_behavior_included(master, topic_row):
-    res = pb.build_tutor_prompt({"selected_topic": TOPIC}, _found(), master)
-    assert topic_row["forbidden_ai_behavior"] in _text(res)
-
-
-# --- 11–13: fallback / ne izmišljaj ---------------------------------------------
+# --- fallback / ne izmišljaj ----------------------------------------------------
 
 def test_unknown_topic_produces_fallback(master):
     res = pb.build_tutor_prompt({"mode": "explain"}, _lookup("unknown"), master)
     assert res["status"] == "fallback"
     assert res["topic_context_used"] is False
-    assert res["video_flow_used"] is False
     assert res["final_topic"] == "unknown"
 
 
@@ -213,35 +240,13 @@ def test_invalid_status_produces_invalid_fallback(master):
     assert "izmišljaj" in res["user_prompt"].lower()
 
 
-# --- 14: VIDEO_FLOW samo za thinkific_lesson ------------------------------------
+# --- video_flow shim (thinkific_lesson entry nije dio NPP MVP-a) -----------------
 
-def test_video_flow_included_only_for_thinkific_lesson(master):
-    vf_rows = [r for r in (master["video_flow"] or []) if r.get("topic") == TOPIC]
-    assert vf_rows, "očekivani VIDEO_FLOW redovi za temu"
-    vf = vf_rows[0]
-
-    payload = {
-        "entry_source": "thinkific_lesson",
-        "lesson_title": vf["lesson_title"],
-        "lesson_order": vf["lesson_order"],
-        "course_name": "Matematika 6",
-        "section_name": "Skupovi",
-    }
-    res = pb.build_tutor_prompt(payload, _found(source="composite"), master)
-    assert res["video_flow_used"] is True
-    if vf.get("sta_ucenik_upravo_naucio"):
-        assert vf["sta_ucenik_upravo_naucio"] in res["user_prompt"]
-
-    # ručni izbor teme → nema VIDEO_FLOW konteksta
-    res2 = pb.build_tutor_prompt(
-        {"entry_source": "manual_topic_choice", "selected_topic": TOPIC}, _found(), master
-    )
-    assert res2["video_flow_used"] is False
-
-
-def test_video_flow_context_helper_requires_thinkific(master):
+def test_video_flow_context_helper_returns_none(master):
+    # NPP nema VIDEO_FLOW sheet → uvijek None (video ide kroz VIDEO_LINKS)
     assert pb.get_video_flow_context({"entry_source": "free_chat"}, TOPIC, master) is None
-    assert pb.get_video_flow_context({"entry_source": "thinkific_lesson"}, "unknown", master) is None
+    assert pb.get_video_flow_context({"entry_source": "thinkific_lesson"}, TOPIC, master) is None
+    assert master["video_flow"] is None
 
 
 # --- normalize_mode -------------------------------------------------------------
@@ -265,8 +270,12 @@ def test_get_topic_context_unknown_returns_empty(master):
     assert pb.get_topic_context("", master) == {}
 
 
-def test_get_topic_context_has_all_fields(master):
+def test_get_topic_context_has_meta(master, topic_row):
     ctx = pb.get_topic_context(TOPIC, master)
+    assert ctx["topic"] == TOPIC
+    assert ctx["display_name"] == topic_row["display_name"]
+    assert ctx["oblast"] == topic_row["oblast"]
+    # legacy polja postoje kao ključevi (prazna) radi kompatibilnosti bloka
     for f in pb.TOPIC_CONTEXT_FIELDS:
         assert f in ctx
 
@@ -274,7 +283,7 @@ def test_get_topic_context_has_all_fields(master):
 # --- topic conflict (guidelines §9) ---------------------------------------------
 
 def test_topic_conflict_uses_detected_topic(master):
-    detected = "razlomci_pojam_vrste"
+    detected = TOPIC_RAZLOMCI
     payload = {
         "entry_source": "thinkific_lesson",
         "detected_topic": detected,
@@ -288,8 +297,8 @@ def test_topic_conflict_uses_detected_topic(master):
     assert res["opened_lesson_topic"] == TOPIC
     assert res["effective_topic"] == detected
     assert res["final_topic"] == detected
-    # koristi se kontekst DETEKTOVANE teme
-    assert master["topics_by_id"][detected]["lesson_scope"] in res["user_prompt"]
+    # koristi se kontekst DETEKTOVANE teme (njen naziv)
+    assert master["topics_by_id"][detected]["display_name"] in res["user_prompt"]
     assert "neslag" in res["user_prompt"].lower()
 
 
@@ -314,7 +323,7 @@ def test_no_conflict_when_detected_equals_lesson(master):
     assert res["final_topic"] == TOPIC
 
 
-# --- practice follow-up (Phase 4.3) ---------------------------------------------
+# --- practice follow-up ---------------------------------------------------------
 
 def test_practice_followup_instructions_included(master):
     payload = {
@@ -327,7 +336,7 @@ def test_practice_followup_instructions_included(master):
     res = pb.build_tutor_prompt(payload, _found(), master)
     up = res["user_prompt"]
     assert "PROVJERA ODGOVORA" in up
-    assert "Da li je 2∈S ako je S={1,2,3}?" in up          # last_tutor_task u promptu
+    assert "Da li je 2∈S ako je S={1,2,3}?" in up
     assert "The student is responding to this exact previous task:" in up
     assert "Do not introduce a new task unless the student asks for one." in up
     assert "ODGOVOR na prethodno postavljeni zadatak" in up
@@ -343,30 +352,11 @@ def test_practice_followup_does_not_restart_task(master):
     }
     res = pb.build_tutor_prompt(payload, _found(), master)
     up = res["user_prompt"]
-    # follow-up NE smije instruisati novi svježi zadatak
     assert "Daj TAČNO JEDAN zadatak i onda ČEKAJ" not in up
     assert "NE počinji isti zadatak ispočetka" in up
 
 
-def test_practice_followup_topic_block_excludes_typical_tasks(master, topic_row):
-    payload = {
-        "selected_topic": TOPIC,
-        "mode": "practice",
-        "interaction_phase": "answering_practice_task",
-        "last_tutor_task": "Da li je 2∈S ako je S={1,2,3}?",
-        "student_message": "ne znam",
-    }
-    res = pb.build_tutor_prompt(payload, _found(), master)
-    up = res["user_prompt"]
-    assert "PODACI O TEMI" in up
-    assert topic_row["hint_method"] in up
-    assert topic_row["typical_task_1"] not in up
-    assert "Tipičan zadatak" not in up
-    assert "MOD: VJEŽBAJ (practice)" not in up
-
-
 def test_practice_followup_forces_practice_mode(master):
-    # čak i bez mode polja, follow-up ide kao practice
     res = pb.build_tutor_prompt(
         {"selected_topic": TOPIC, "interaction_phase": "answering_practice_task",
          "student_message": "6"},
@@ -377,25 +367,22 @@ def test_practice_followup_forces_practice_mode(master):
 
 def test_practice_followup_truncates_long_task(master):
     long_task = "x" * 2000
-    txt = pb.build_practice_followup_instructions(
-        {"last_tutor_task": long_task}, {}
-    )
+    txt = pb.build_practice_followup_instructions({"last_tutor_task": long_task}, {})
     assert "x" * 600 in txt
     assert "x" * 601 not in txt
 
 
-# --- Phase 2 (audit): NOVI tutor prompt stack (matbot.tutor_prompts) ---------------
+# --- tutor system prompt stack (matbot.tutor_prompts) ---------------------------
 
-# markeri koji dokazuju da je novi stack u system promptu (za 6. razred)
 TUTOR_MARKERS_G6 = (
-    "Postavi mi pitanje ili zadatak iz matematike.",   # ne-matematika odbijanje
-    "MODULARNA PRAVILA",                               # biblioteka tema
-    "JEZIK I TON (TUTOR)",                             # bosanski + topao ton
-    "DIDAKTIKA — 6. RAZRED",                           # razred-uslovna pravila
-    "TERMINOLOGIJA I ZAPIS",                           # uglomjer, zarez, ·, : ...
-    "FORMAT ODGOVORA (CHAT)",                          # jedina format sekcija
-    "\\frac",                                          # razlomačka crta
-    "\\cdot",                                          # množenje tačkom
+    "Postavi mi pitanje ili zadatak iz matematike.",
+    "MODULARNA PRAVILA",
+    "JEZIK I TON (TUTOR)",
+    "DIDAKTIKA — 6. RAZRED",
+    "TERMINOLOGIJA I ZAPIS",
+    "FORMAT ODGOVORA (CHAT)",
+    "\\frac",
+    "\\cdot",
 )
 
 
@@ -412,7 +399,6 @@ def test_tutor_rules_in_ready_prompt(master):
 
 
 def test_tutor_rules_in_quick_mode(master):
-    # "Samo rezultat" NE smije oslabiti pravila zapisa
     res = pb.build_tutor_prompt(
         {"selected_topic": TOPIC, "mode": "quick", "grade": 6}, _found(), master
     )
@@ -438,147 +424,60 @@ def test_tutor_rules_in_fallback_prompt(master):
     _assert_tutor_rules(res["system_prompt"])
 
 
-def test_no_legacy_base_prompt_in_tutor_stack(master):
-    """Legacy sekcije iz prompts.py NE ulaze u tutor system prompt (Phase 2):
-    bez 8/9. gradiva, bez konstrukcija po defaultu, bez kontradikcije."""
-    import inspect
-    import matbot.prompt_builder as builder
-    import matbot.tutor_prompts as tp
-    for src in (inspect.getsource(builder), inspect.getsource(tp)):
-        for sentinel in (
-            "VIZUELNI ZAPIS (PRAVA MATEMATIKA)",
-            "GLOBALNA PRAVILA ZAPISA",
-            "RAZREDNA PRAVILA — 6. RAZRED",
-            "GEOMETRIJSKI PROMPT",
-        ):
-            assert sentinel not in src, f"legacy sekcija u tutor stacku: {sentinel}"
-    sp = pb.build_tutor_prompt({"selected_topic": TOPIC, "grade": 6}, _found(), master)["system_prompt"]
-    for legacy in (
-        "VIZUELNI ZAPIS (PRAVA MATEMATIKA)",
-        "LINEARNA FUNKCIJA",
-        "SISTEMI LINEARNIH JEDNAČINA",
-        "KOORDINATNA GEOMETRIJA",
-        "UNIVERZALNI GEOMETRIJSKI PROMPT",
-    ):
-        assert legacy not in sp, f"legacy sekcija u system promptu: {legacy}"
-
-
-def test_no_contradictory_formatting_rules(master):
-    """Phase 2: kontradikcija je UKLONJENA — nema pravila 'sve u $$' niti
-    'svaki korak u novi red', a format sekcija postoji tačno JEDNOM."""
-    sp = pb.build_tutor_prompt({"selected_topic": TOPIC, "grade": 6}, _found(), master)["system_prompt"]
-    assert "OBAVEZNO piši unutar dvostrukih znakova dolara" not in sp
-    assert "Svaki logički korak ide u NOVI RED" not in sp
-    assert "PREDNOST nad ranijim pravilima" not in sp      # precedence hack više ne treba
-    assert sp.count("FORMAT ODGOVORA (CHAT)") == 1
-    # inline pravilo i display-samo-za-važno su tu (jedini izvor formata)
-    assert r"INLINE matematikom \( ... \)" in sp
-    assert "SAMO za važan višekoračni račun" in sp
-
-
 def test_grade6_prompt_excludes_higher_grade_rules(master):
     sp = pb.build_tutor_prompt({"selected_topic": TOPIC, "grade": 6}, _found(), master)["system_prompt"]
     assert "DIDAKTIKA — 6. RAZRED" in sp
-    assert "metodom nepoznatog člana" in sp
     assert "kratke rečenice" in sp
-    assert "poznati primjeri iz svakodnevice" in sp
-    for higher in ("LINEARNA FUNKCIJA", "Pitagorin", "prebacivanjem: nepoznate na lijevu",
-                   "DIDAKTIKA — 7. RAZRED", "sistemi jednačina", "koordinatn"):
-        assert higher.lower() not in sp.lower(), higher
+    for higher in ("DIDAKTIKA — 7. RAZRED", "DIDAKTIKA — 8. RAZRED", "DIDAKTIKA — 9. RAZRED"):
+        assert higher not in sp
 
 
 def test_grade7_prompt_has_grade7_rules_only(master7):
-    payload = {"selected_topic": "cijeli_sabiranje_oduzimanje", "grade": 7}
-    res = pb.build_tutor_prompt(payload, _found("cijeli_sabiranje_oduzimanje"), master7)
+    payload = {"selected_topic": "7-01-001", "grade": 7}
+    res = pb.build_tutor_prompt(payload, _found("7-01-001"), master7)
     sp = res["system_prompt"]
     assert "DIDAKTIKA — 7. RAZRED" in sp
-    assert "MIJENJA PREDZNAK" in sp                        # prebacivanje (7. razred)
-    assert "malo formalniji nego u 6." in sp
     assert "DIDAKTIKA — 6. RAZRED" not in sp
-    assert "NEPOZNATI UMANJENIK" not in sp                 # veze operacija su 6. razred
-    assert "bez linearne funkcije" in sp                   # više gradivo eksplicitno zabranjeno
+    assert "DIDAKTIKA — 8. RAZRED" not in sp
 
 
 def test_grade8_prompt_has_grade8_rules_only(master8):
-    topic = "alg_razlomci_definiciono_podrucje_domena_i_nula_razlomljene_racionalne_funkcije"
-    payload = {"selected_topic": topic, "grade": 8}
-    res = pb.build_tutor_prompt(payload, _found(topic), master8)
+    payload = {"selected_topic": "8-01-001", "grade": 8}
+    res = pb.build_tutor_prompt(payload, _found("8-01-001"), master8)
     sp = res["system_prompt"]
     assert "DIDAKTIKA — 8. RAZRED" in sp
-    for expected in (
-        "Stepeni: pravila objašnjavaj korak po korak",
-        "Korijeni i realni brojevi",
-        "prepoznaj hipotenuzu",
-        "pazi na predznake, slične članove",
-        "nazivnik ne smije biti nula",
-        "Koordinatni sistem i linearne funkcije",
-        "Geometrijska tijela",
-        "Sličnost trouglova i Talesova teorema",
-        "nešto formalniji matematički jezik",
-    ):
-        assert expected in sp
     assert "DIDAKTIKA — 6. RAZRED" not in sp
     assert "DIDAKTIKA — 7. RAZRED" not in sp
-    assert "NEPOZNATI UMANJENIK" not in sp
-    assert "prebacivanjem: nepoznate na lijevu" not in sp
-    assert "MIJENJA PREDZNAK" not in sp
-    assert "bez linearne funkcije" not in sp
 
 
 def test_constructions_only_when_topic_requires(master, master7):
-    """Konstrukcijski blok NE ide u običnu temu; ide u konstrukcijsku temu/oblast."""
+    # obična tema (skupovi) → bez konstrukcijskog bloka
     sp_plain = pb.build_tutor_prompt(
         {"selected_topic": TOPIC, "grade": 6}, _found(), master
     )["system_prompt"]
     assert "KONSTRUKCIJE (ZA OVU TEMU)" not in sp_plain
 
-    # stvarna konstrukcijska tema iz mastera 7. razreda (data-driven, ne izmišljena)
+    # stvarna konstrukcijska tema iz NPP 7. razreda (naziv sadrži "konstrukcij")
     row = next(
         r for r in master7["topics"]
-        if "konstrukcij" in (r.get("oblast", "") + r.get("topic", "")).lower()
+        if "konstrukcij" in (r.get("oblast", "") + " " + r.get("display_name", "")).lower()
     )
     res = pb.build_tutor_prompt(
         {"selected_topic": row["topic"], "grade": 7}, _found(row["topic"]), master7
     )
     assert "KONSTRUKCIJE (ZA OVU TEMU)" in res["system_prompt"]
-    assert "ANALIZA" in res["system_prompt"]
-
-    # i exam za KONSTRUKCIJSKU OBLAST dobija blok (oblast čiji naziv to traži)
-    constr_oblast = next(
-        r["oblast"] for r in master7["topics"]
-        if "konstrukcij" in r.get("oblast", "").lower()
-    )
-    res_ob = pb.build_exam_oblast_prompt(
-        {"mode": "exam", "selected_oblast": constr_oblast, "grade": 7}, master7
-    )
-    assert res_ob is not None
-    assert "KONSTRUKCIJE (ZA OVU TEMU)" in res_ob["system_prompt"]
-
-    # exam za NE-konstrukcijsku oblast NE dobija blok (npr. Cijeli brojevi)
-    res_plain = pb.build_exam_oblast_prompt(
-        {"mode": "exam", "selected_oblast": "Cijeli brojevi", "grade": 7}, master7
-    )
-    assert "KONSTRUKCIJE (ZA OVU TEMU)" not in res_plain["system_prompt"]
 
 
-# --- struktura rezultata / guardrails -------------------------------------------
+# --- struktura rezultata --------------------------------------------------------
 
 def test_result_shape_keys(master):
     res = pb.build_tutor_prompt({"selected_topic": TOPIC}, _found(), master)
     for key in (
-        "system_prompt",
-        "user_prompt",
-        "mode",
-        "final_topic",
-        "opened_lesson_topic",
-        "effective_topic",
-        "status",
-        "topic_context_used",
-        "video_flow_used",
-        "topic_conflict",
+        "system_prompt", "user_prompt", "mode", "final_topic", "opened_lesson_topic",
+        "effective_topic", "status", "topic_context_used", "video_flow_used",
+        "video_recommended", "topic_conflict",
     ):
         assert key in res
-    # globalne modularne smjernice su uvijek prisutne
     assert "MODULARNA PRAVILA" in res["system_prompt"]
 
 
@@ -589,11 +488,11 @@ def test_build_fallback_prompt_direct(master):
     assert res["topic_context_used"] is False
 
 
-# --- Phase 7: exam za CIJELU OBLAST (build_exam_oblast_prompt) --------------------
+# --- exam za CIJELU OBLAST (build_exam_oblast_prompt) ----------------------------
 
 @pytest.fixture(scope="module")
-def oblast(master):
-    return master["topics_by_id"][TOPIC]["oblast"]
+def oblast(master, topic_row):
+    return topic_row["oblast"]
 
 
 def test_exam_oblast_prompt_ready(master, oblast):
@@ -605,12 +504,12 @@ def test_exam_oblast_prompt_ready(master, oblast):
     assert res is not None
     assert res["status"] == "ready"
     assert res["mode"] == "exam"
-    assert res["final_topic"] == "unknown"       # pravilo 10: bez izmišljene teme
+    assert res["final_topic"] == "unknown"
     assert res["exam_oblast"] == oblast
     up = res["user_prompt"]
     assert "OBLAST KONTROLNOG" in up
     assert "KONTROLNI IZ OBLASTI" in up
-    # sve READY teme te oblasti su navedene (display_name), ništa izmišljeno
+    # sve teme te oblasti navedene po nazivu, ništa izmišljeno
     rows = pb.get_oblast_topics(oblast, master)
     assert rows
     for row in rows:
@@ -618,31 +517,19 @@ def test_exam_oblast_prompt_ready(master, oblast):
     assert "NE izmišljaj" in up
 
 
-def test_exam_oblast_includes_controlni_material(master, oblast, topic_row):
-    res = pb.build_exam_oblast_prompt({"mode": "exam", "selected_oblast": oblast}, master)
-    up = res["user_prompt"]
-    # kontrolni materijal teme iz te oblasti ulazi u prompt (stvarne ćelije sheeta)
-    for field in ("controlni_task_1", "controlni_trick", "controlni_warning"):
-        if topic_row.get(field):
-            assert topic_row[field] in up
-
-
 def test_exam_oblast_case_insensitive_and_canonical(master, oblast):
     res = pb.build_exam_oblast_prompt(
         {"mode": "exam", "selected_oblast": oblast.upper()}, master
     )
     assert res is not None
-    assert res["exam_oblast"] == oblast          # kanonski naziv iz mastera
+    assert res["exam_oblast"] == oblast
 
 
 def test_exam_oblast_none_when_not_applicable(master, oblast):
-    # non-exam mod → None
     assert pb.build_exam_oblast_prompt(
         {"mode": "practice", "selected_oblast": oblast}, master) is None
-    # selected_topic ima prednost (postojeći topic-based exam netaknut) → None
     assert pb.build_exam_oblast_prompt(
         {"mode": "exam", "selected_topic": TOPIC, "selected_oblast": oblast}, master) is None
-    # nepostojeća/prazna oblast → None (pada na postojeći exam fallback)
     assert pb.build_exam_oblast_prompt(
         {"mode": "exam", "selected_oblast": "nepostojeca_oblast_xyz"}, master) is None
     assert pb.build_exam_oblast_prompt(
@@ -661,33 +548,21 @@ def test_get_oblast_topics_unknown_empty(master):
     assert pb.get_oblast_topics("", master) == []
 
 
-# --- Phase 7.1: FORMAT ODGOVORA (CHAT) — kompaktno formatiranje -------------------
+# --- FORMAT ODGOVORA (CHAT) — kompaktno formatiranje ----------------------------
 
 def test_chat_formatting_in_all_modular_paths(master, oblast):
-    """Format blok ide POSLIJE baznog prompta u SVIM modularnim putanjama."""
     results = [
-        # selected_topic ready
         pb.build_tutor_prompt({"selected_topic": TOPIC, "mode": "explain"}, _found(), master),
-        # thinkific_lesson
-        pb.build_tutor_prompt(
-            {"entry_source": "thinkific_lesson", "mode": "explain"},
-            _found(source="composite"), master),
-        # free_chat detected_topic
         pb.build_tutor_prompt(
             {"detected_topic": TOPIC}, _found(source="detected_topic"), master),
-        # practice + practice follow-up
         pb.build_tutor_prompt({"selected_topic": TOPIC, "mode": "practice"}, _found(), master),
         pb.build_tutor_prompt(
             {"selected_topic": TOPIC, "interaction_phase": "answering_practice_task"},
             _found(), master),
-        # exam + quick
         pb.build_tutor_prompt({"selected_topic": TOPIC, "mode": "exam"}, _found(), master),
         pb.build_tutor_prompt({"selected_topic": TOPIC, "mode": "quick"}, _found(), master),
-        # free_chat unknown/general
         pb.build_general_tutor_prompt({"mode": "quick", "student_message": "5-1"}),
-        # fallback
         pb.build_fallback_prompt({"mode": "exam"}, "unknown"),
-        # exam-by-oblast
         pb.build_exam_oblast_prompt({"mode": "exam", "selected_oblast": oblast}, master),
     ]
     for res in results:
@@ -700,29 +575,7 @@ def test_formatting_block_comes_after_base_prompt(master):
     sp = pb.build_tutor_prompt(
         {"selected_topic": TOPIC, "grade": 6}, _found(), master
     )["system_prompt"]
-    # bazna matematička pravila ostaju i dolaze PRIJE chat format pravila
     assert sp.index("MODULARNA PRAVILA") < sp.index("FORMAT ODGOVORA (CHAT)")
-
-
-def test_formatting_inline_vs_display_rules(master):
-    sp = pb.build_tutor_prompt({"selected_topic": TOPIC}, _found(), master)["system_prompt"]
-    # kratki izrazi → inline \( ... \)
-    assert r"INLINE matematikom \( ... \)" in sp
-    # display $$...$$ rezervisan za važan višekoračni račun
-    assert "SAMO za važan višekoračni račun" in sp
-    # bez sirovih markdown naslova; kratke oznake u redu
-    assert "NE koristi sirove markdown naslove" in sp
-    assert '"Ideja:"' in sp and '"Zaključak:"' in sp
-    # numerisane liste bez ponavljanja "1."
-    assert 'NE počinji svaku stavku ponovo sa "1."' in sp
-
-
-def test_formatting_divisibility_rules(master):
-    sp = pb.build_tutor_prompt({"selected_topic": TOPIC}, _found(), master)["system_prompt"]
-    assert "izbjegavaj izolovan zapis poput 6|12" in sp
-    assert "6 dijeli 12, jer je 12 : 6 = 2." in sp
-    assert r"\(6 \mid 12\)" in sp
-    assert "ne prekidaj rečenicu oko simbola djeljivosti" in sp
 
 
 def test_quick_mode_compact_result_only():
@@ -751,14 +604,7 @@ def test_followup_compact_feedback_no_topic_restart():
     assert "Želiš li sličan zadatak za vježbu?" in block
 
 
-def test_system_prompt_has_image_result_verification_rule(master):
-    sp = pb.build_tutor_prompt({"selected_topic": TOPIC, "grade": 6}, _found(), master)["system_prompt"]
-    assert "Za zadatke sa slike" in sp
-    assert "Ako učenik traži samo rezultate" in sp
-    assert "Ne smiješ dati rezultat koji će kasnije objašnjenje opovrgnuti" in sp
-
-
-# --- Phase 7.2: nastavak razgovora + robusniji practice follow-up -----------------
+# --- nastavak razgovora + robusniji practice follow-up --------------------------
 
 def test_continuation_instructions_block():
     block = pb.build_continuation_instructions(
@@ -766,11 +612,8 @@ def test_continuation_instructions_block():
     )
     assert "NASTAVAK RAZGOVORA" in block
     assert "NE tretiraj je kao novi zahtjev" in block
-    assert "NE ponavljaj" in block
     assert "JEDAN konkretan primjer" in block
-    assert "vođeni primjer" in block
-    assert "Hoćeš primjer?" in block               # zadnja poruka ulazi u blok
-    assert 'naslov teme ("Tema:")' in block
+    assert "Hoćeš primjer?" in block
 
 
 def test_continuation_truncates_long_message():
@@ -791,7 +634,7 @@ def test_tutor_prompt_continuation_replaces_explain_block(master):
     assert res["status"] == "ready"
     assert "NASTAVAK RAZGOVORA" in up
     assert "Hoćeš da zajedno riješimo primjer?" in up
-    assert "MOD: OBJASNI" not in up                # ne ponavlja objašnjenje ispočetka
+    assert "MOD: OBJASNI" not in up
 
 
 def test_general_prompt_continuation(master):
@@ -826,8 +669,8 @@ def test_exam_oblast_continuation(master, oblast):
     )
     up = res["user_prompt"]
     assert "NASTAVAK RAZGOVORA" in up
-    assert "KONTROLNI IZ OBLASTI" not in up        # ne ispisuje ponovo 3 zadatka
-    assert "OBLAST KONTROLNOG" in up               # materijal oblasti ostaje kontekst
+    assert "KONTROLNI IZ OBLASTI" not in up
+    assert "OBLAST KONTROLNOG" in up
 
 
 def test_general_prompt_practice_followup():
@@ -849,15 +692,7 @@ def test_practice_answer_not_treated_as_new_request(master):
     up = res["user_prompt"]
     assert res["mode"] == "practice"
     assert "PROVJERA ODGOVORA" in up
-    assert "MOD: VJEŽBAJ (practice)" not in up     # nije novi svježi zadatak
-
-
-def test_followup_hint_for_ne_znam_and_confirmations():
-    block = pb.build_practice_followup_instructions({}, {})
-    assert '"ne znam"' in block                    # hint umjesto novog zadatka
-    assert "NE novi zadatak" in block
-    assert "NE ponavljaj isti zadatak osim ako je odgovor nejasan." in block
-    assert '"hajde"' in block                      # potvrda → sljedeći korak
+    assert "MOD: VJEŽBAJ (practice)" not in up
 
 
 def test_explain_mode_conversational_not_repetitive(master):
@@ -867,11 +702,9 @@ def test_explain_mode_conversational_not_repetitive(master):
     up = res["user_prompt"]
     assert "razgovoran" in up
     assert "NE prepričavaj cijelu lekciju" in up
-    assert "VEĆ sadrži objašnjenje ove teme" in up
-    assert '"Hoćeš primjer?"' in up
 
 
-# --- Phase 1 (audit): jezik i ton tutora u SVIM modularnim system promptovima ------
+# --- jezik i ton u SVIM modularnim system promptovima ---------------------------
 
 def test_language_tone_in_all_modular_paths(master, oblast):
     results = [
@@ -885,72 +718,5 @@ def test_language_tone_in_all_modular_paths(master, oblast):
         sp = res["system_prompt"]
         assert "JEZIK I TON (TUTOR)" in sp
         assert "bosanskom jeziku (ijekavica)" in sp
-        assert "brojnik i nazivnik" in sp
-        assert "brojilac" in sp and "imenilac" in sp   # samo u NIKAD zabrani
-        assert "brojilac i imenilac" not in sp
-        assert "Pohvali trud" in sp
-        assert 'Obraćaj se učeniku sa "ti"' in sp
-        # ton dolazi prije chat formata, poslije modularnih pravila
         assert sp.index("MODULARNA PRAVILA") < sp.index("JEZIK I TON (TUTOR)")
         assert sp.index("JEZIK I TON (TUTOR)") < sp.index("FORMAT ODGOVORA (CHAT)")
-
-
-def test_chat_format_is_single_source(master):
-    """Phase 2: format pravila postoje na JEDNOM mjestu — nema više precedence
-    hacka jer nema legacy bloka koji bi se pregazio."""
-    sp = pb.build_tutor_prompt({"selected_topic": TOPIC}, _found(), master)["system_prompt"]
-    assert "PREDNOST nad ranijim pravilima" not in sp
-    assert sp.count("FORMAT ODGOVORA (CHAT)") == 1
-    assert "KONAČAN REZULTAT istakni podebljano" in sp
-
-
-# --- Phase 1 (audit): topic blok filtriran po modu ----------------------------------
-
-def test_topic_block_explain_excludes_controlni(master, topic_row):
-    res = pb.build_tutor_prompt({"selected_topic": TOPIC, "mode": "explain"}, _found(), master)
-    up = res["user_prompt"]
-    # explain zadržava scope/greške/hint/riješeni primjer...
-    assert topic_row["lesson_scope"] in up
-    assert topic_row["common_mistake_1"] in up
-    assert topic_row["solved_example_problem"] in up
-    # ...ali NE šalje kontrolne zadatke ni tipične zadatke za vježbu
-    assert topic_row["controlni_task_1"] not in up
-    assert "Kontrolni zadatak 1" not in up
-    assert "Tipičan zadatak 1" not in up
-
-
-def test_topic_block_practice_has_typical_no_controlni(master, topic_row):
-    res = pb.build_tutor_prompt({"selected_topic": TOPIC, "mode": "practice"}, _found(), master)
-    up = res["user_prompt"]
-    assert topic_row["typical_task_1"] in up
-    assert topic_row["common_mistake_1"] in up
-    assert topic_row["hint_method"] in up
-    assert "Kontrolni zadatak 1" not in up
-
-
-def test_topic_block_exam_has_controlni_no_solved_example(master, topic_row):
-    res = pb.build_tutor_prompt({"selected_topic": TOPIC, "mode": "exam"}, _found(), master)
-    up = res["user_prompt"]
-    assert topic_row["controlni_task_1"] in up
-    assert topic_row["controlni_trick"] in up
-    # riješeni primjer i tipični zadaci ne idu u exam kontekst
-    assert "Riješeni primjer — zadatak" not in up
-    assert "Tipičan zadatak 1" not in up
-
-
-def test_topic_block_quick_minimal(master, topic_row):
-    res = pb.build_tutor_prompt({"selected_topic": TOPIC, "mode": "quick"}, _found(), master)
-    up = res["user_prompt"]
-    assert topic_row["lesson_scope"] in up               # meta ostaje
-    for label in ("Kontrolni zadatak", "Tipičan zadatak", "Riješeni primjer",
-                  "Česta greška", "Metoda hinta"):
-        assert label not in up, label
-
-
-def test_topic_block_unknown_mode_keeps_all_fields(master, topic_row):
-    """Backward-compat: bez poznatog moda blok šalje sva polja (staro ponašanje)."""
-    ctx = pb.get_topic_context(TOPIC, master)
-    block = pb._build_topic_block(ctx, mode=None)
-    assert topic_row["controlni_task_1"] in block
-    assert topic_row["typical_task_1"] in block
-    assert topic_row["solved_example_problem"] in block

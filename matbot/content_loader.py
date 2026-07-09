@@ -1,7 +1,33 @@
-"""Load modular AI tutor content from grade-specific Excel workbooks.
+"""Load NPP AI-tutor content from grade-specific Excel workbooks (grades 6–9).
 
-The Excel files remain the source of truth. This module only normalizes sheet
-data, validates required columns, and caches default loads per grade.
+Since 2026-07 all grades use ONE unified NPP workbook per grade
+(``data/{g}_razred/AI_MATH_{g}_NPP_BASE_UNIFIED_SIMPLE.xlsx``). The primary
+sheet ``NPP_TOPICS`` is structurally identical across grades; secondary sheets
+(``VIDEO_LINKS``, ``AREA_SELECTOR`` …) diverge between the older grade-6 variant
+and the newer 7/8/9 variant. To stay robust we read strictly BY HEADER NAME and
+treat any variant-only column as optional, and we derive the oblast list from
+``NPP_TOPICS`` itself (never from the divergent ``AREA_SELECTOR``).
+
+Excel remains the single source of truth: this module only normalizes rows,
+validates the few columns that exist in every variant, and caches loads per
+grade. Nothing about topics/videos/oblasti is hardcoded.
+
+``load_master_content`` returns::
+
+    {
+      "topics":        [row, ...],          # NPP topics, sheet order
+      "topics_by_id":  {npp_topic_id: row},
+      "topic_ids":     {npp_topic_id, ...},
+      "videos_by_topic": {npp_topic_id: [video_row, ...]},
+      "areas":         [{"oblast","area_order","topic_count","topics_with_video"}],
+      "grade": int, "source_path": str, "columns": [...],
+      # backwards-compatible keys expected by older callers/tests:
+      "video_flow": None, "parent_report": None,
+    }
+
+Each topic ``row`` is the raw NPP row plus normalized aliases used downstream:
+``topic`` = ``npp_topic_id``, ``oblast`` = ``oblast_ui``, ``display_name`` =
+``tema_ui``.
 """
 from __future__ import annotations
 
@@ -14,43 +40,21 @@ import openpyxl
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 
-SUPPORTED_GRADES = frozenset({6, 7, 8})
+SUPPORTED_GRADES = frozenset({6, 7, 8, 9})
 DEFAULT_GRADE = 6
 
-# Backwards-compatible constants for grade 6 callers/tests.
-MASTER_PATH = (
-    _REPO_ROOT
-    / "data"
-    / "6_razred"
-    / "AI_MATH_CONTENT_MASTER_6_RAZRED_MODULAR_FINAL.xlsx"
-)
-THINKIFIC_MAP_PATH = (
-    _REPO_ROOT
-    / "data"
-    / "6_razred"
-    / "THINKIFIC_MAP_6_RAZRED_MODULAR_FINAL.xlsx"
-)
+# --- NPP sheet / column names ---------------------------------------------------
+NPP_TOPICS_SHEET = "NPP_TOPICS"
+VIDEO_LINKS_SHEET = "VIDEO_LINKS"
 
-MASTER_TOPICS_SHEET = "TOPICS"
-MASTER_OPTIONAL_SHEETS = ("VIDEO_FLOW", "PARENT_REPORT")
-THINKIFIC_MAP_SHEET = "MAP"
-THINKIFIC_TOPIC_REFERENCE_SHEET = "TOPIC_REFERENCE"
-
+# Columns present in NPP_TOPICS across ALL grade variants (safe to require).
 REQUIRED_TOPIC_COLUMNS = frozenset(
-    {"grade", "oblast", "topic", "display_name", "lesson_scope"}
+    {"grade", "npp_topic_id", "oblast_ui", "tema_ui"}
 )
-REQUIRED_MAP_COLUMNS = frozenset(
-    {
-        "course_name",
-        "section_name",
-        "lesson_order",
-        "lesson_title",
-        "lesson_url",
-        "thinkific_lesson_id",
-        "topic",
-        "status",
-    }
-)
+
+# Only "video" lessons are offered as video recommendations (podsjetnik/other
+# resource types are ignored for the reco list).
+_VIDEO_LESSON_TYPE = "video"
 
 
 class ContentLoadError(Exception):
@@ -92,22 +96,11 @@ def _grade_dir(grade: Any = DEFAULT_GRADE) -> Path:
 
 def master_path_for_grade(grade: Any = DEFAULT_GRADE) -> Path:
     g = normalize_grade(grade)
-    preferred = _grade_dir(g) / f"AI_MATH_CONTENT_MASTER_{g}_RAZRED_MODULAR_FINAL.xlsx"
-    if g == 6 and not preferred.exists():
-        legacy = _REPO_ROOT / "AI_MATH_CONTENT_MASTER_6_RAZRED_MODULAR_FINAL.xlsx"
-        if legacy.exists():
-            return legacy
-    return preferred
+    return _grade_dir(g) / f"AI_MATH_{g}_NPP_BASE_UNIFIED_SIMPLE.xlsx"
 
 
-def thinkific_map_path_for_grade(grade: Any = DEFAULT_GRADE) -> Path:
-    g = normalize_grade(grade)
-    preferred = _grade_dir(g) / f"THINKIFIC_MAP_{g}_RAZRED_MODULAR_FINAL.xlsx"
-    if g == 6 and not preferred.exists():
-        legacy = _REPO_ROOT / "THINKIFIC_MAP_6_RAZRED_MODULAR_FINAL.xlsx"
-        if legacy.exists():
-            return legacy
-    return preferred
+# Backwards-compatible module constant (grade-6 default workbook path).
+MASTER_PATH = master_path_for_grade(DEFAULT_GRADE)
 
 
 def _read_sheet(wb, sheet_name: str) -> tuple[list[str], list[dict[str, str]]]:
@@ -143,6 +136,81 @@ def _open_workbook(path: Path):
         raise ContentLoadError(f"Ne mogu otvoriti Excel fajl {path}: {exc}") from exc
 
 
+def _topic_row(raw: dict[str, str]) -> dict[str, str]:
+    """Raw NPP_TOPICS row + downstream aliases (topic/oblast/display_name)."""
+    row = dict(raw)
+    row["topic"] = raw.get("npp_topic_id", "")
+    row["oblast"] = raw.get("oblast_ui", "")
+    row["display_name"] = raw.get("tema_ui", "")
+    return row
+
+
+def _video_sort_key(v: dict[str, str]) -> tuple[int, int]:
+    """Order videos by recommendation_priority (g6) then lesson_order; missing
+    values sort last. Both columns are read defensively (variant-dependent)."""
+    def _int(val: str, default: int) -> int:
+        try:
+            return int(val)
+        except (TypeError, ValueError):
+            return default
+
+    return (
+        _int(v.get("recommendation_priority", ""), 99),
+        _int(v.get("lesson_order", ""), 999),
+    )
+
+
+def _build_videos_by_topic(wb) -> dict[str, list[dict[str, str]]]:
+    """Index VIDEO_LINKS by npp_topic_id (only lesson_type == 'video').
+
+    Robust to the two schema variants: g6 has lesson_url/thinkific_lesson_id/
+    recommendation_priority; g7/8/9 have recommendation_rule instead. We keep the
+    raw row and only rely on always-present columns downstream."""
+    if VIDEO_LINKS_SHEET not in wb.sheetnames:
+        return {}
+    _, rows = _read_sheet(wb, VIDEO_LINKS_SHEET)
+    by_topic: dict[str, list[dict[str, str]]] = {}
+    for r in rows:
+        if normalize_value(r.get("lesson_type")).lower() != _VIDEO_LESSON_TYPE:
+            continue
+        tid = r.get("npp_topic_id", "")
+        if not tid:
+            continue
+        by_topic.setdefault(tid, []).append(r)
+    for tid in by_topic:
+        by_topic[tid].sort(key=_video_sort_key)
+    return by_topic
+
+
+def _build_areas(topics: list[dict[str, str]]) -> list[dict[str, Any]]:
+    """Oblast list derived from NPP_TOPICS (NOT AREA_SELECTOR, which diverges).
+
+    Ordered by area_order (falling back to first-seen order). Carries topic_count
+    and topics_with_video so the UI can render an oblast-first selector."""
+    order: list[str] = []
+    meta: dict[str, dict[str, Any]] = {}
+    for t in topics:
+        oblast = t.get("oblast", "")
+        if not oblast:
+            continue
+        if oblast not in meta:
+            order.append(oblast)
+            ao = normalize_value(t.get("area_order"))
+            meta[oblast] = {
+                "oblast": oblast,
+                "area_order": int(ao) if ao.isdigit() else 999,
+                "topic_count": 0,
+                "topics_with_video": 0,
+            }
+        meta[oblast]["topic_count"] += 1
+        if normalize_value(t.get("has_thinkific_video")).upper() == "DA":
+            meta[oblast]["topics_with_video"] += 1
+    return sorted(
+        (meta[o] for o in order),
+        key=lambda m: (m["area_order"], order.index(m["oblast"])),
+    )
+
+
 def load_master_content(
     path: str | Path | None = None, grade: Any = DEFAULT_GRADE
 ) -> dict[str, Any]:
@@ -150,29 +218,24 @@ def load_master_content(
     path = Path(path) if path is not None else master_path_for_grade(g)
     wb = _open_workbook(path)
     try:
-        if MASTER_TOPICS_SHEET not in wb.sheetnames:
+        if NPP_TOPICS_SHEET not in wb.sheetnames:
             raise ContentLoadError(
-                f"Master nema obavezni sheet '{MASTER_TOPICS_SHEET}'."
+                f"NPP workbook nema obavezni sheet '{NPP_TOPICS_SHEET}'."
             )
-        columns, all_rows = _read_sheet(wb, MASTER_TOPICS_SHEET)
+        columns, all_rows = _read_sheet(wb, NPP_TOPICS_SHEET)
         missing = REQUIRED_TOPIC_COLUMNS - set(columns)
         if missing:
             raise ContentLoadError(
-                f"Sheet '{MASTER_TOPICS_SHEET}' nema obavezne kolone: "
-                f"{sorted(missing)}"
+                f"Sheet '{NPP_TOPICS_SHEET}' nema obavezne kolone: {sorted(missing)}"
             )
 
-        topics = [r for r in all_rows if r.get("topic")]
+        topics = [_topic_row(r) for r in all_rows if r.get("npp_topic_id")]
         topics_by_id: dict[str, dict[str, str]] = {}
         for row in topics:
             topics_by_id.setdefault(row["topic"], row)
 
-        video_flow = None
-        if "VIDEO_FLOW" in wb.sheetnames:
-            _, video_flow = _read_sheet(wb, "VIDEO_FLOW")
-        parent_report = None
-        if "PARENT_REPORT" in wb.sheetnames:
-            _, parent_report = _read_sheet(wb, "PARENT_REPORT")
+        videos_by_topic = _build_videos_by_topic(wb)
+        areas = _build_areas(topics)
     finally:
         wb.close()
 
@@ -180,52 +243,36 @@ def load_master_content(
         "topics": topics,
         "topics_by_id": topics_by_id,
         "topic_ids": set(topics_by_id),
-        "video_flow": video_flow,
-        "parent_report": parent_report,
+        "videos_by_topic": videos_by_topic,
+        "areas": areas,
         "columns": columns,
         "source_path": str(path),
         "grade": g,
+        # backwards-compatible keys (old schema had these sheets; NPP does not)
+        "video_flow": None,
+        "parent_report": None,
     }
 
 
 def load_thinkific_map(
     path: str | Path | None = None, grade: Any = DEFAULT_GRADE
 ) -> dict[str, Any]:
+    """Compatibility shim for the old two-file schema.
+
+    The NPP model keeps everything in one workbook, so there is no separate
+    Thinkific map. Downstream validators only need ``topic_reference_ids`` to
+    accept a detected topic; every NPP topic id is authoritative, so we expose
+    the topic ids here and leave the lesson-lookup surfaces empty (Thinkific
+    lesson entry is not part of the NPP MVP)."""
     g = normalize_grade(grade)
-    path = Path(path) if path is not None else thinkific_map_path_for_grade(g)
-    wb = _open_workbook(path)
-    try:
-        if THINKIFIC_MAP_SHEET not in wb.sheetnames:
-            raise ContentLoadError(
-                f"Thinkific mapa nema obavezni sheet '{THINKIFIC_MAP_SHEET}'."
-            )
-        columns, lessons = _read_sheet(wb, THINKIFIC_MAP_SHEET)
-        missing = REQUIRED_MAP_COLUMNS - set(columns)
-        if missing:
-            raise ContentLoadError(
-                f"Sheet '{THINKIFIC_MAP_SHEET}' nema obavezne kolone: "
-                f"{sorted(missing)}"
-            )
-
-        mapped_topics = {r["topic"] for r in lessons if r.get("topic")}
-
-        topic_reference = None
-        topic_reference_ids: set[str] = set()
-        if THINKIFIC_TOPIC_REFERENCE_SHEET in wb.sheetnames:
-            _, topic_reference = _read_sheet(wb, THINKIFIC_TOPIC_REFERENCE_SHEET)
-            topic_reference_ids = {
-                r["topic"] for r in topic_reference if r.get("topic")
-            }
-    finally:
-        wb.close()
-
+    master = load_master_content(path, grade=g) if path is not None else get_master(grade=g)
     return {
-        "lessons": lessons,
-        "mapped_topics": mapped_topics,
-        "topic_reference": topic_reference,
-        "topic_reference_ids": topic_reference_ids,
-        "columns": columns,
-        "source_path": str(path),
+        "lessons": [],
+        "mapped_topics": set(),
+        "topic_reference": None,
+        "topic_reference_ids": set(master["topic_ids"]),
+        "columns": [],
+        "source_path": master["source_path"],
         "grade": g,
     }
 
@@ -235,10 +282,21 @@ def validate_mapped_topics(
     tmap: dict[str, Any] | None = None,
     grade: Any = DEFAULT_GRADE,
 ) -> list[str]:
+    """Kept for API compatibility. NPP has no separate lesson map, so there are
+    never orphaned mapped topics; always returns an empty list."""
     master = master if master is not None else get_master(grade=grade)
     tmap = tmap if tmap is not None else get_thinkific_map(grade=grade)
     topic_ids = master["topic_ids"]
     return sorted(t for t in tmap["mapped_topics"] if t not in topic_ids)
+
+
+def videos_for_topic(topic_id: Any, master: dict[str, Any] | None = None) -> list[dict[str, str]]:
+    """Ordered VIDEO_LINKS rows (lesson_type == 'video') for a topic, or []."""
+    master = master if master is not None else get_master()
+    tid = normalize_value(topic_id)
+    if not tid:
+        return []
+    return list(master.get("videos_by_topic", {}).get(tid, []))
 
 
 _lock = threading.Lock()
@@ -269,6 +327,11 @@ def get_thinkific_map(
         return load_thinkific_map(path, grade=grade)
     g = normalize_grade(grade)
     with _lock:
-        if g not in _tmap_cache or reload:
-            _tmap_cache[g] = load_thinkific_map(grade=g)
-        return _tmap_cache[g]
+        if g in _tmap_cache and not reload:
+            return _tmap_cache[g]
+    # Build OUTSIDE the lock: load_thinkific_map → get_master takes _lock itself,
+    # and threading.Lock is not reentrant (holding it here would deadlock).
+    tm = load_thinkific_map(grade=g)
+    with _lock:
+        _tmap_cache[g] = tm
+    return tm

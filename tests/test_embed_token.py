@@ -62,34 +62,34 @@ def test_mint_empty_without_secret(monkeypatch):
 # --- endpoint gating ------------------------------------------------------------------
 
 def test_chat_missing_token_rejected_in_production(client, prod_gate):
-    resp = client.post(CHAT_URL, json={"selected_topic": "skupovi_uvod"})
+    resp = client.post(CHAT_URL, json={"selected_topic": "6-01-001"})
     assert resp.status_code == 403
     assert resp.get_json()["error"] == "invalid_token"
 
 
 def test_chat_invalid_token_rejected(client, prod_gate):
-    resp = client.post(CHAT_URL, json={"selected_topic": "skupovi_uvod"},
+    resp = client.post(CHAT_URL, json={"selected_topic": "6-01-001"},
                        headers={"X-Tutor-Token": "999999.pogresan"})
     assert resp.status_code == 403
 
 
 def test_chat_expired_token_rejected(client, prod_gate):
     expired = matbot.mint_embed_token(expires_at=int(time.time()) - 5)
-    resp = client.post(CHAT_URL, json={"selected_topic": "skupovi_uvod"},
+    resp = client.post(CHAT_URL, json={"selected_topic": "6-01-001"},
                        headers={"X-Tutor-Token": expired})
     assert resp.status_code == 403
 
 
 def test_chat_valid_token_accepted(client, prod_gate, fake_openai):
     tok = matbot.mint_embed_token()
-    resp = client.post(CHAT_URL, json={"selected_topic": "skupovi_uvod"},
+    resp = client.post(CHAT_URL, json={"selected_topic": "6-01-001"},
                        headers={"X-Tutor-Token": tok})
     assert resp.status_code == 200
     assert resp.get_json()["status"] == "ready"
 
 
 def test_stream_missing_token_rejected(client, prod_gate):
-    resp = client.post(STREAM_URL, json={"selected_topic": "skupovi_uvod"})
+    resp = client.post(STREAM_URL, json={"selected_topic": "6-01-001"})
     assert resp.status_code == 403
 
 
@@ -97,7 +97,7 @@ def test_stream_valid_token_accepted(client, prod_gate, fake_openai, monkeypatch
     monkeypatch.setattr(matbot, "_tutor_openai_chat_stream",
                         lambda *a, **k: iter(["ok"]))
     tok = matbot.mint_embed_token()
-    resp = client.post(STREAM_URL, json={"selected_topic": "skupovi_uvod"},
+    resp = client.post(STREAM_URL, json={"selected_topic": "6-01-001"},
                        headers={"X-Tutor-Token": tok})
     assert resp.status_code == 200
 
@@ -106,7 +106,7 @@ def test_stream_valid_token_accepted(client, prod_gate, fake_openai, monkeypatch
 
 def test_local_mode_needs_no_token(client, fake_openai):
     """Testno okruženje je LOCAL_MODE=1 — bez tokena i dalje radi (dev UX)."""
-    resp = client.post(CHAT_URL, json={"selected_topic": "skupovi_uvod"})
+    resp = client.post(CHAT_URL, json={"selected_topic": "6-01-001"})
     assert resp.status_code == 200
 
 
@@ -115,7 +115,7 @@ def test_no_secret_means_no_enforcement(client, fake_openai, monkeypatch):
     startup warning (ENV SANITY)."""
     monkeypatch.setattr(matbot, "LOCAL_MODE", False)
     monkeypatch.setattr(matbot, "AI_TUTOR_EMBED_SECRET", "")
-    resp = client.post(CHAT_URL, json={"selected_topic": "skupovi_uvod"})
+    resp = client.post(CHAT_URL, json={"selected_topic": "6-01-001"})
     assert resp.status_code == 200
 
 

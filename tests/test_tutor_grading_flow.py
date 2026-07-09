@@ -14,7 +14,7 @@ from matbot.bosnian import to_ijekavica
 from matbot.tutor_prompts import build_tutor_system_prompt
 
 CHAT_URL = "/api/ai-tutor/chat"
-FR_TOPIC = "razlomci_pojam_vrste"
+FR_TOPIC = "6-04-031"
 
 TASK_D = (
     "1. Ako je obojeno 5/12 pizze, koji dio nije obojen?\n"

@@ -11,7 +11,7 @@ from matbot import ai_tutor_service as svc
 from matbot import content_loader as cl
 
 CHAT_URL = "/api/ai-tutor/chat"
-TOPIC = "skupovi_uvod"
+TOPIC = "6-01-001"
 
 
 @pytest.fixture(autouse=True)

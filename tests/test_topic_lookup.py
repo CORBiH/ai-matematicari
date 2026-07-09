@@ -77,20 +77,20 @@ def _mk_tmap(lessons, topic_reference_ids=()):
 # ================================================================================
 
 def test_topic_exists(master):
-    assert tl.topic_exists("skupovi_uvod", master) is True
+    assert tl.topic_exists("6-01-001", master) is True
     assert tl.topic_exists("ne_postoji_xyz", master) is False
     assert tl.topic_exists("", master) is False
     assert tl.topic_exists(None, master) is False
 
 
 def test_validate_topic(master):
-    assert tl.validate_topic("skupovi_uvod", master)["status"] == "found"
+    assert tl.validate_topic("6-01-001", master)["status"] == "found"
     assert tl.validate_topic("ne_postoji_xyz", master)["status"] == "invalid"
     assert tl.validate_topic("", master)["status"] == "invalid"
 
 
 def test_validate_detected_topic(master, tmap):
-    assert tl.validate_detected_topic("skupovi_uvod", master, tmap)["status"] == "found"
+    assert tl.validate_detected_topic("6-01-001", master, tmap)["status"] == "found"
     # "unknown" je dozvoljeno
     assert tl.validate_detected_topic("unknown", master, tmap)["status"] == "unknown"
     assert tl.validate_detected_topic("", master, tmap)["status"] == "unknown"
@@ -110,58 +110,27 @@ def test_validate_detected_topic_accepts_topic_reference(master, tmap):
 # find_lesson — stvarni podaci: kompozitni lookup + realna dvosmislenost
 # ================================================================================
 
-def test_composite_lookup_real(master, tmap):
-    # uzmi prvi red sa kompletnim kompozitnim ključem i temom
-    row = next(
-        l for l in tmap["lessons"]
-        if l["topic"] and l["course_name"] and l["section_name"]
-        and l["lesson_order"] and l["lesson_title"]
+def test_npp_tmap_has_no_lesson_map(tmap, tmap8):
+    """NPP model drži sve u jednom workbooku — nema zasebne Thinkific lesson mape,
+    pa je ``lessons`` prazan, a ``topic_reference_ids`` = svi npp_topic_id-evi.
+    (Prioritet ključeva find_lesson-a i dalje se testira sintetički niže.)"""
+    for tm in (tmap, tmap8):
+        assert tm["lessons"] == []
+        assert tm["mapped_topics"] == set()
+        assert tm["topic_reference_ids"]
+
+
+def test_lesson_context_falls_through_when_no_lessons(master, tmap):
+    """Bez lesson mape, thinkific_lesson kontekst se ne razriješi → pada na
+    selected_topic (Objasni mi) ili detected_topic (Vježbajmo)."""
+    res = tl.get_final_topic(
+        {"entry_source": "thinkific_lesson", "lesson_title": "Bilo šta",
+         "selected_topic": "6-01-001"},
+        master, tmap,
     )
-    payload = {
-        "entry_source": "thinkific_lesson",
-        "course_name": row["course_name"],
-        "section_name": row["section_name"],
-        "lesson_order": row["lesson_order"],
-        "lesson_title": row["lesson_title"],
-    }
-    res = tl.get_final_topic(payload, master, tmap)
     assert res["status"] == "found"
-    assert res["source"] == "composite"
-    assert res["final_topic"] == row["topic"]
-    assert res["final_topic"] in master["topic_ids"]  # pravilo 10
-
-
-def test_grade8_composite_lookup_real(master8, tmap8):
-    row = next(
-        l for l in tmap8["lessons"]
-        if l["topic"] and l["course_name"] and l["section_name"]
-        and l["lesson_order"] and l["lesson_title"]
-    )
-    payload = {
-        "entry_source": "thinkific_lesson",
-        "course_name": row["course_name"],
-        "section_name": row["section_name"],
-        "lesson_order": row["lesson_order"],
-        "lesson_title": row["lesson_title"],
-    }
-    res = tl.get_final_topic(payload, master8, tmap8)
-    assert res["status"] == "found"
-    assert res["source"] == "composite"
-    assert res["final_topic"] == row["topic"]
-    assert res["final_topic"] in master8["topic_ids"]
-
-
-def test_duplicate_title_is_ambiguous_real(tmap):
-    """U stvarnim podacima postoji naslov koji vodi na >1 temu → ne biraj tiho."""
-    by_title = {}
-    for l in tmap["lessons"]:
-        by_title.setdefault(l["lesson_title"], set()).add(l["topic"])
-    ambiguous_titles = [t for t, topics in by_title.items() if len(topics) > 1]
-    assert ambiguous_titles, "Očekivan bar jedan dvosmislen naslov u MAP-u"
-    res = tl.find_lesson({"lesson_title": ambiguous_titles[0]}, tmap)
-    assert res["status"] == "ambiguous"
-    assert res["final_topic"] == "unknown"
-    assert len(res["matches"]) >= 2
+    assert res["source"] == "selected_topic"
+    assert res["final_topic"] == "6-01-001"
 
 
 # ================================================================================
@@ -366,8 +335,8 @@ def test_ambiguous_lesson_requires_manual_selection():
 def test_final_topic_guarantee_exists_in_master(master, tmap):
     # invariant (pravilo 10): svaki non-unknown final_topic postoji u masteru
     payloads = [
-        {"selected_topic": "skupovi_uvod"},
-        {"detected_topic": "razlomci_pojam_vrste"},
+        {"selected_topic": "6-01-001"},
+        {"detected_topic": "6-04-031"},
         {},
         {"selected_topic": "ne_postoji"},
     ]

@@ -1,46 +1,528 @@
 {
   "comment": "Reprezentativni slučajevi za eval tutor odgovora (6, 7. i 8. razred). payload ide direktno u handle_chat. expect_* polja provjerava DRY prolaz (rutiranje), a čovjek ocjenjuje LIVE odgovore po docs/eval/RUBRIC.md.",
   "cases": [
-    {"id": "g6-explain-razlomci", "payload": {"grade": 6, "mode": "explain", "entry_source": "manual_topic_choice", "selected_topic": "razlomci_pojam_vrste", "student_message": "Objasni mi ovu temu."}, "expect_status": "ready", "expect_topic": "razlomci_pojam_vrste"},
-    {"id": "g6-explain-simpler-followup", "payload": {"grade": 6, "mode": "explain", "selected_topic": "razlomci_pojam_vrste", "student_message": "Objasni mi to jednostavnije.", "conversation_history": [{"role": "user", "content": "Objasni mi ovu temu."}, {"role": "assistant", "content": "Razlomak je dio cjeline... Hoćeš primjer?"}]}, "expect_status": "ready"},
-    {"id": "g6-practice-djeljivost", "payload": {"grade": 6, "mode": "practice", "selected_topic": "djeljivost_uvod", "student_message": "Daj mi jedan zadatak za vježbu iz ove teme."}, "expect_status": "ready", "expect_mode": "practice"},
-    {"id": "g6-practice-answer-correct", "payload": {"grade": 6, "mode": "practice", "selected_topic": "razlomci_mnozenje_razlomkom_svojstva", "interaction_phase": "answering_practice_task", "last_tutor_task": "Izračunaj: 1/2 · 5/9.", "student_message": "5/18"}, "expect_status": "ready", "expect_mode": "practice", "expect_topic": "razlomci_mnozenje_razlomkom_svojstva"},
-    {"id": "g6-practice-answer-wrong", "payload": {"grade": 6, "mode": "practice", "selected_topic": "razlomci_mnozenje_razlomkom_svojstva", "interaction_phase": "answering_practice_task", "last_tutor_task": "Izračunaj: 1/2 · 5/9.", "student_message": "6/11"}, "expect_status": "ready", "expect_mode": "practice"},
-    {"id": "g6-practice-ne-znam", "payload": {"grade": 6, "mode": "practice", "selected_topic": "djeljivost_NZD", "interaction_phase": "answering_practice_task", "last_tutor_task": "Odredi NZD(12, 18).", "student_message": "ne znam"}, "expect_status": "ready", "expect_mode": "practice"},
-    {"id": "g6-grading-complement-correct", "payload": {"grade": 6, "mode": "practice", "selected_topic": "razlomci_pojam_vrste", "interaction_phase": "answering_practice_task", "last_tutor_task": "Ako su obojane 3/8 kruga, koji dio nije obojen?", "student_message": "5/8"}, "expect_status": "ready", "expect_mode": "practice", "note": "regresija (primjer A): PROVJERA IZ SISTEMA kaže TAČNO. LIVE: odgovor počinje potvrdom, NIKAD 'Nije tačno'."},
-    {"id": "g6-grading-equivalent-accepted", "payload": {"grade": 6, "mode": "practice", "selected_topic": "razlomci_pojam_vrste", "interaction_phase": "answering_practice_task", "last_tutor_task": "Ako je pojedeno 7/12 pizze, koji dio je ostao?", "student_message": "10/24"}, "expect_status": "ready", "expect_mode": "practice", "note": "regresija (primjer B + ekvivalencija): 10/24 = 5/12 mora biti prihvaćeno kao tačno."},
-    {"id": "g6-grading-multi-all-correct", "payload": {"grade": 6, "mode": "practice", "selected_topic": "razlomci_pojam_vrste", "interaction_phase": "answering_practice_task", "last_tutor_task": "1. Ako je obojano 2/5 kruga, koji dio nije obojen?\n2. Prepelica je pojela 3/4 zrna riže. Koliko zrna ostaje?\n3. Na torti je pojedeno 1/6. Koliki dio torte je ostao?", "student_message": "1) 3/5 2) 1/4 3) 5/6"}, "expect_status": "ready", "expect_mode": "practice", "note": "regresija (primjer C): sve tri stavke tačne; LIVE odgovor ne smije nijednu proglasiti netačnom."},
-    {"id": "g6-grading-multi-missing-item", "payload": {"grade": 6, "mode": "practice", "selected_topic": "razlomci_pojam_vrste", "interaction_phase": "answering_practice_task", "last_tutor_task": "1. Ako je obojeno 5/12 pizze, koji dio nije obojen?\n2. Dječak je potrošio 3/10 novca. Koji dio novca mu je ostao?\n3. Pretvori 2 1/4 u nepravi razlomak.", "student_message": "2) 7/10 3) 9/4"}, "expect_status": "ready", "expect_mode": "practice", "note": "regresija (primjer D): 2 i 3 tačno; stavka 1 NIJE netačna nego nedostaje — tražiti samo nju."},
-    {"id": "g6-grading-only-third-referenced", "payload": {"grade": 6, "mode": "practice", "selected_topic": "djeljivost_uvod", "interaction_phase": "answering_practice_task", "last_tutor_task": "1. Šta znači djeljivost?\n2. Kada je broj djeljiv sa 2?\n3. Zašto se broj ne može dijeliti nulom?", "student_message": "Odgovor na treće pitanje je da se broj ne može dijeliti sa nulom."}, "expect_status": "ready", "expect_mode": "practice", "note": "LIVE: ocijeniti samo 3. stavku; 1. i 2. su nepokušane, ne netačne."},
-    {"id": "g6-practice-new-task-no-repeat", "payload": {"grade": 6, "mode": "practice", "selected_topic": "razlomci_pojam_vrste", "student_message": "Daj mi novi zadatak.", "recent_tasks": ["Ako su obojane 3/8 kruga, koji dio nije obojen?", "Izračunaj 1/2 + 1/4."]}, "expect_status": "ready", "expect_mode": "practice", "note": "LIVE: novi zadatak mora biti različit od nedavno datih (drugi brojevi/kontekst)."},
-    {"id": "g6-exam-oblast-skupovi", "payload": {"grade": 6, "mode": "exam", "selected_oblast": "Skupovi", "student_message": "Sutra imam kontrolni iz ove oblasti. Pripremi me."}, "expect_status": "ready", "expect_mode": "exam"},
-    {"id": "g6-quick-fractions", "payload": {"grade": 6, "mode": "quick", "student_message": "Izračunaj 1/2 + 1/3"}, "expect_status": "ready", "expect_mode": "quick"},
-    {"id": "g6-freechat-prosjek", "payload": {"grade": 6, "entry_source": "free_chat", "student_message": "Kako se računa aritmetička sredina brojeva 4, 6 i 8?"}, "expect_status": "ready", "expect_topic": "aritmeticka_sredina"},
-    {"id": "g6-vague-fallback", "payload": {"grade": 6, "student_message": "Pomozi"}, "expect_status": "fallback"},
-    {"id": "g6-continuation-moze", "payload": {"grade": 6, "mode": "explain", "selected_topic": "skupovi_uvod", "interaction_phase": "continuing_explanation", "student_message": "može", "last_tutor_message": "Skup je grupa jasno određenih objekata. Hoćeš primjer?"}, "expect_status": "ready"},
-    {"id": "g6-image-ocr-geometry", "payload": {"grade": 6, "mode": "quick", "student_message": "", "image_ocr_text": "U trouglu ABC ugao alfa je 40 stepeni, ugao beta 60 stepeni. Koliki je ugao gama?"}, "expect_status": "ready"},
-    {"id": "g6-image-followup-first-task", "payload": {"grade": 6, "mode": "explain", "student_message": "kako si uradio prvi", "last_image_context": "TEKST SA SLIKE (OCR):\n1. Izračunaj 2 + 3.\n2. Izračunaj 4 + 5.\n\nODGOVOR TUTORA NA SLIKU:\n1. Rezultat je 5.\n2. Rezultat je 9."}, "expect_status": "ready", "note": "LIVE: mora objasniti prvi zadatak iz zadnje slike, ne tražiti novo pitanje."},
-    {"id": "g6-image-rate-result-verified", "payload": {"grade": 6, "mode": "quick", "student_message": "Daj mi samo rezultat zadatka sa slike.", "image_ocr_text": "5. c) Automobil prijeđe 65 km za 1 sat. Koliko sati mu treba za 260 km?"}, "expect_status": "ready", "expect_mode": "quick", "note": "LIVE/pytest: rezultat mora biti 4 sata; 2 sata se ispravlja determinističkom provjerom."},
-    {"id": "g6-image-rate-followup-corrects-old-result", "payload": {"grade": 6, "mode": "explain", "student_message": "ne kontam kako si dobio to rješenje za zadnji zadatak", "last_image_context": "TEKST SA SLIKE (OCR):\n5. c) Automobil prijeđe 65 km za 1 sat. Koliko sati mu treba za 260 km?\n\nODGOVOR TUTORA NA SLIKU:\n5. c) Treba mu 2 sata za prijeći 260 kilometara."}, "expect_status": "ready", "note": "LIVE/pytest: mora jasno reći da je raniji odgovor 2 sata bio pogrešan i objasniti 260 ÷ 65 = 4."},
-    {"id": "g6-imagetest-solve-all-start", "payload": {"grade": 6, "mode": "quick", "student_message": "uradi mi sve zadatke", "image_ocr_text": "1. Izračunaj 1/2 + 1/4.\n2. Izračunaj 3/5 - 1/5.\n3. Izračunaj 2 · 3/7."}, "expect_status": "ready", "expect_mode": "quick", "note": "image_test: LIVE mora riješiti SAMO zadatak 1 i najaviti zadatak 2; next_state je image_test/continue_image_test."},
-    {"id": "g6-imagetest-da-continues-item2", "payload": {"grade": 6, "mode": "quick", "student_message": "da", "previous_next_state": {"expected_user_action": "continue_confirmation", "pending_action": {"type": "continue_image_test", "source": "image_context", "next_item": 2}, "active_task_kind": "image_test", "image_test": {"item_labels": ["1", "2", "3"], "solved": ["1"], "next_item": 2, "style": "step_by_step"}}, "last_image_context": "TEKST SA SLIKE (OCR):\n1. Izračunaj 1/2 + 1/4.\n2. Izračunaj 3/5 - 1/5.\n3. Izračunaj 2 · 3/7."}, "expect_status": "ready", "expect_mode": "explain", "note": "LIVE: 'da' mora riješiti zadatak 2 sa slike — NIKAD novi nepovezani zadatak za vježbu."},
-    {"id": "g6-imagetest-step-style-overrides-quick", "payload": {"grade": 6, "mode": "quick", "student_message": "uradi mi korak po korak", "image_ocr_text": "1. Izračunaj 1/2 + 1/4.\n2. Izračunaj 3/5 - 1/5."}, "expect_status": "ready", "expect_mode": "explain", "note": "eksplicitno 'korak po korak' nadjačava UI mod Rezultat."},
-    {"id": "g6-offtopic-refusal", "payload": {"grade": 6, "mode": "quick", "student_message": "Ko je pobijedio na svjetskom prvenstvu 2022?"}, "expect_status": "ready", "note": "LIVE: mora odgovoriti tačno 'Postavi mi pitanje ili zadatak iz matematike.'"},
-    {"id": "g7-explain-cijeli", "payload": {"grade": 7, "mode": "explain", "selected_topic": "cijeli_sabiranje_oduzimanje", "student_message": "Objasni mi ovu temu."}, "expect_status": "ready", "expect_topic": "cijeli_sabiranje_oduzimanje"},
-    {"id": "g7-freechat-mnozenje-cijelih", "payload": {"grade": 7, "entry_source": "free_chat", "student_message": "Kako se množe cijeli brojevi?"}, "expect_status": "ready", "expect_topic": "cijeli_mnozenje_dijeljenje", "note": "regresija: NE smije završiti na sabiranju"},
-    {"id": "g7-practice-racionalni", "payload": {"grade": 7, "mode": "practice", "selected_topic": "racionalni_mnozenje", "student_message": "Daj mi jedan zadatak za vježbu iz ove teme."}, "expect_status": "ready", "expect_mode": "practice"},
-    {"id": "g7-exam-oblast-cijeli", "payload": {"grade": 7, "mode": "exam", "selected_oblast": "Cijeli brojevi", "student_message": "Sutra imam kontrolni iz ove oblasti. Pripremi me."}, "expect_status": "ready", "expect_mode": "exam"},
-    {"id": "g7-quick-negativni", "payload": {"grade": 7, "mode": "quick", "student_message": "-5 + 8"}, "expect_status": "ready", "expect_mode": "quick"},
-    {"id": "g7-wrong-answer-negativni", "payload": {"grade": 7, "mode": "practice", "selected_topic": "cijeli_sabiranje_oduzimanje", "interaction_phase": "answering_practice_task", "last_tutor_task": "Izračunaj: -7 + 12.", "student_message": "-5"}, "expect_status": "ready", "expect_mode": "practice"},
-    {"id": "g7-konstrukcija-explain", "payload": {"grade": 7, "mode": "explain", "selected_topic": "trougao_konstrukcija_jednakostranicni", "student_message": "Objasni mi ovu temu."}, "expect_status": "ready", "note": "system prompt mora imati KONSTRUKCIJE blok"},
-    {"id": "g8-explain-stepeni", "payload": {"grade": 8, "mode": "explain", "entry_source": "manual_topic_choice", "selected_topic": "stepeni_pravila_i_pojasnjenja_stepeni", "student_message": "Objasni mi pravila za stepene."}, "expect_status": "ready", "expect_topic": "stepeni_pravila_i_pojasnjenja_stepeni", "note": "LIVE: objasniti stepene bez srednjoškolskih prečica."},
-    {"id": "g8-practice-korijeni", "payload": {"grade": 8, "mode": "practice", "selected_topic": "realni_korijeni_pravila_za_racunske_operacije", "student_message": "Daj mi jedan zadatak za vježbu iz korijena."}, "expect_status": "ready", "expect_mode": "practice", "expect_topic": "realni_korijeni_pravila_za_racunske_operacije"},
-    {"id": "g8-exam-pitagora-oblast", "payload": {"grade": 8, "mode": "exam", "selected_oblast": "Pitagorina teorema", "student_message": "Sutra imam kontrolni iz ove oblasti. Pripremi me."}, "expect_status": "ready", "expect_mode": "exam"},
-    {"id": "g8-quick-kvadrat-binoma", "payload": {"grade": 8, "mode": "quick", "selected_topic": "polinomi_kvadrat_binoma", "student_message": "Izračunaj (x+3)^2"}, "expect_status": "ready", "expect_mode": "quick", "expect_topic": null},
-    {"id": "g8-explain-alg-razlomci-domena", "payload": {"grade": 8, "mode": "explain", "selected_topic": "alg_razlomci_definiciono_podrucje_domena_i_nula_razlomljene_racionalne_funkcije", "student_message": "Objasni mi domenu algebarskog razlomka."}, "expect_status": "ready", "expect_topic": "alg_razlomci_definiciono_podrucje_domena_i_nula_razlomljene_racionalne_funkcije", "note": "LIVE: naglasiti da nazivnik ne smije biti nula."},
-    {"id": "g8-image-conflict-koordinatni-pitagora", "payload": {"grade": 8, "mode": "explain", "entry_source": "thinkific_lesson", "course_name": "Matematika 8", "section_name": "Pravougli koordinatni sistem i grafik linearne funkcije", "lesson_order": "1", "lesson_title": "PRAVOUGLI (DEKARTOV) KOORDINATNI SISTEM", "detected_topic": "pitagora_pitagorina_teorema_osnovno", "image_ocr_text": "U pravouglom trouglu katete su 6 cm i 8 cm. Odredi hipotenuzu.", "student_message": "Objasni zadatak sa slike."}, "expect_status": "ready", "expect_topic": "pitagora_pitagorina_teorema_osnovno"},
-    {"id": "g8-unknown-lesson-fallback", "payload": {"grade": 8, "mode": "explain", "entry_source": "thinkific_lesson", "lesson_title": "Nepostojeća lekcija iz 8. razreda", "student_message": "Objasni mi lekciju."}, "expect_status": "fallback"},
-    {"id": "g8-practice-valjak", "payload": {"grade": 8, "mode": "practice", "selected_topic": "tijela_valjak_osnove", "student_message": "Daj mi jedan zadatak za vježbu iz valjka."}, "expect_status": "ready", "expect_mode": "practice", "expect_topic": "tijela_valjak_osnove"},
-    {"id": "g8-practice-valjak-ne-znam", "payload": {"grade": 8, "mode": "practice", "selected_topic": "tijela_valjak_osnove", "interaction_phase": "answering_practice_task", "last_tutor_task": "Izračunaj zapreminu valjka ako je r=3 cm i H=5 cm.", "student_message": "ne znam"}, "expect_status": "ready", "expect_mode": "practice", "expect_topic": "tijela_valjak_osnove"}
+    {
+      "id": "g6-explain-razlomci",
+      "payload": {
+        "grade": 6,
+        "mode": "explain",
+        "entry_source": "manual_topic_choice",
+        "selected_topic": "6-04-031",
+        "student_message": "Objasni mi ovu temu."
+      },
+      "expect_status": "ready",
+      "expect_topic": "6-04-031"
+    },
+    {
+      "id": "g6-explain-simpler-followup",
+      "payload": {
+        "grade": 6,
+        "mode": "explain",
+        "selected_topic": "6-04-031",
+        "student_message": "Objasni mi to jednostavnije.",
+        "conversation_history": [
+          {
+            "role": "user",
+            "content": "Objasni mi ovu temu."
+          },
+          {
+            "role": "assistant",
+            "content": "Razlomak je dio cjeline... Hoćeš primjer?"
+          }
+        ]
+      },
+      "expect_status": "ready"
+    },
+    {
+      "id": "g6-practice-djeljivost",
+      "payload": {
+        "grade": 6,
+        "mode": "practice",
+        "selected_topic": "6-03-021",
+        "student_message": "Daj mi jedan zadatak za vježbu iz ove teme."
+      },
+      "expect_status": "ready",
+      "expect_mode": "practice"
+    },
+    {
+      "id": "g6-practice-answer-correct",
+      "payload": {
+        "grade": 6,
+        "mode": "practice",
+        "selected_topic": "6-04-041",
+        "interaction_phase": "answering_practice_task",
+        "last_tutor_task": "Izračunaj: 1/2 · 5/9.",
+        "student_message": "5/18"
+      },
+      "expect_status": "ready",
+      "expect_mode": "practice",
+      "expect_topic": "6-04-041"
+    },
+    {
+      "id": "g6-practice-answer-wrong",
+      "payload": {
+        "grade": 6,
+        "mode": "practice",
+        "selected_topic": "6-04-041",
+        "interaction_phase": "answering_practice_task",
+        "last_tutor_task": "Izračunaj: 1/2 · 5/9.",
+        "student_message": "6/11"
+      },
+      "expect_status": "ready",
+      "expect_mode": "practice"
+    },
+    {
+      "id": "g6-practice-ne-znam",
+      "payload": {
+        "grade": 6,
+        "mode": "practice",
+        "selected_topic": "6-03-028",
+        "interaction_phase": "answering_practice_task",
+        "last_tutor_task": "Odredi NZD(12, 18).",
+        "student_message": "ne znam"
+      },
+      "expect_status": "ready",
+      "expect_mode": "practice"
+    },
+    {
+      "id": "g6-grading-complement-correct",
+      "payload": {
+        "grade": 6,
+        "mode": "practice",
+        "selected_topic": "6-04-031",
+        "interaction_phase": "answering_practice_task",
+        "last_tutor_task": "Ako su obojane 3/8 kruga, koji dio nije obojen?",
+        "student_message": "5/8"
+      },
+      "expect_status": "ready",
+      "expect_mode": "practice",
+      "note": "regresija (primjer A): PROVJERA IZ SISTEMA kaže TAČNO. LIVE: odgovor počinje potvrdom, NIKAD 'Nije tačno'."
+    },
+    {
+      "id": "g6-grading-equivalent-accepted",
+      "payload": {
+        "grade": 6,
+        "mode": "practice",
+        "selected_topic": "6-04-031",
+        "interaction_phase": "answering_practice_task",
+        "last_tutor_task": "Ako je pojedeno 7/12 pizze, koji dio je ostao?",
+        "student_message": "10/24"
+      },
+      "expect_status": "ready",
+      "expect_mode": "practice",
+      "note": "regresija (primjer B + ekvivalencija): 10/24 = 5/12 mora biti prihvaćeno kao tačno."
+    },
+    {
+      "id": "g6-grading-multi-all-correct",
+      "payload": {
+        "grade": 6,
+        "mode": "practice",
+        "selected_topic": "6-04-031",
+        "interaction_phase": "answering_practice_task",
+        "last_tutor_task": "1. Ako je obojano 2/5 kruga, koji dio nije obojen?\n2. Prepelica je pojela 3/4 zrna riže. Koliko zrna ostaje?\n3. Na torti je pojedeno 1/6. Koliki dio torte je ostao?",
+        "student_message": "1) 3/5 2) 1/4 3) 5/6"
+      },
+      "expect_status": "ready",
+      "expect_mode": "practice",
+      "note": "regresija (primjer C): sve tri stavke tačne; LIVE odgovor ne smije nijednu proglasiti netačnom."
+    },
+    {
+      "id": "g6-grading-multi-missing-item",
+      "payload": {
+        "grade": 6,
+        "mode": "practice",
+        "selected_topic": "6-04-031",
+        "interaction_phase": "answering_practice_task",
+        "last_tutor_task": "1. Ako je obojeno 5/12 pizze, koji dio nije obojen?\n2. Dječak je potrošio 3/10 novca. Koji dio novca mu je ostao?\n3. Pretvori 2 1/4 u nepravi razlomak.",
+        "student_message": "2) 7/10 3) 9/4"
+      },
+      "expect_status": "ready",
+      "expect_mode": "practice",
+      "note": "regresija (primjer D): 2 i 3 tačno; stavka 1 NIJE netačna nego nedostaje — tražiti samo nju."
+    },
+    {
+      "id": "g6-grading-only-third-referenced",
+      "payload": {
+        "grade": 6,
+        "mode": "practice",
+        "selected_topic": "6-03-021",
+        "interaction_phase": "answering_practice_task",
+        "last_tutor_task": "1. Šta znači djeljivost?\n2. Kada je broj djeljiv sa 2?\n3. Zašto se broj ne može dijeliti nulom?",
+        "student_message": "Odgovor na treće pitanje je da se broj ne može dijeliti sa nulom."
+      },
+      "expect_status": "ready",
+      "expect_mode": "practice",
+      "note": "LIVE: ocijeniti samo 3. stavku; 1. i 2. su nepokušane, ne netačne."
+    },
+    {
+      "id": "g6-practice-new-task-no-repeat",
+      "payload": {
+        "grade": 6,
+        "mode": "practice",
+        "selected_topic": "6-04-031",
+        "student_message": "Daj mi novi zadatak.",
+        "recent_tasks": [
+          "Ako su obojane 3/8 kruga, koji dio nije obojen?",
+          "Izračunaj 1/2 + 1/4."
+        ]
+      },
+      "expect_status": "ready",
+      "expect_mode": "practice",
+      "note": "LIVE: novi zadatak mora biti različit od nedavno datih (drugi brojevi/kontekst)."
+    },
+    {
+      "id": "g6-exam-oblast-skupovi",
+      "payload": {
+        "grade": 6,
+        "mode": "exam",
+        "selected_oblast": "Skupovi i skupovne operacije",
+        "student_message": "Sutra imam kontrolni iz ove oblasti. Pripremi me."
+      },
+      "expect_status": "ready",
+      "expect_mode": "exam"
+    },
+    {
+      "id": "g6-quick-fractions",
+      "payload": {
+        "grade": 6,
+        "mode": "quick",
+        "student_message": "Izračunaj 1/2 + 1/3"
+      },
+      "expect_status": "ready",
+      "expect_mode": "quick"
+    },
+    {
+      "id": "g6-freechat-prosjek",
+      "payload": {
+        "grade": 6,
+        "entry_source": "free_chat",
+        "student_message": "Kako se računa aritmetička sredina brojeva 4, 6 i 8?"
+      },
+      "expect_status": "ready",
+      "expect_topic": "6-06-062"
+    },
+    {
+      "id": "g6-vague-fallback",
+      "payload": {
+        "grade": 6,
+        "student_message": "Pomozi"
+      },
+      "expect_status": "fallback"
+    },
+    {
+      "id": "g6-continuation-moze",
+      "payload": {
+        "grade": 6,
+        "mode": "explain",
+        "selected_topic": "6-01-001",
+        "interaction_phase": "continuing_explanation",
+        "student_message": "može",
+        "last_tutor_message": "Skup je grupa jasno određenih objekata. Hoćeš primjer?"
+      },
+      "expect_status": "ready"
+    },
+    {
+      "id": "g6-image-ocr-geometry",
+      "payload": {
+        "grade": 6,
+        "mode": "quick",
+        "student_message": "",
+        "image_ocr_text": "U trouglu ABC ugao alfa je 40 stepeni, ugao beta 60 stepeni. Koliki je ugao gama?"
+      },
+      "expect_status": "ready"
+    },
+    {
+      "id": "g6-image-followup-first-task",
+      "payload": {
+        "grade": 6,
+        "mode": "explain",
+        "student_message": "kako si uradio prvi",
+        "last_image_context": "TEKST SA SLIKE (OCR):\n1. Izračunaj 2 + 3.\n2. Izračunaj 4 + 5.\n\nODGOVOR TUTORA NA SLIKU:\n1. Rezultat je 5.\n2. Rezultat je 9."
+      },
+      "expect_status": "ready",
+      "note": "LIVE: mora objasniti prvi zadatak iz zadnje slike, ne tražiti novo pitanje."
+    },
+    {
+      "id": "g6-image-rate-result-verified",
+      "payload": {
+        "grade": 6,
+        "mode": "quick",
+        "student_message": "Daj mi samo rezultat zadatka sa slike.",
+        "image_ocr_text": "5. c) Automobil prijeđe 65 km za 1 sat. Koliko sati mu treba za 260 km?"
+      },
+      "expect_status": "ready",
+      "expect_mode": "quick",
+      "note": "LIVE/pytest: rezultat mora biti 4 sata; 2 sata se ispravlja determinističkom provjerom."
+    },
+    {
+      "id": "g6-image-rate-followup-corrects-old-result",
+      "payload": {
+        "grade": 6,
+        "mode": "explain",
+        "student_message": "ne kontam kako si dobio to rješenje za zadnji zadatak",
+        "last_image_context": "TEKST SA SLIKE (OCR):\n5. c) Automobil prijeđe 65 km za 1 sat. Koliko sati mu treba za 260 km?\n\nODGOVOR TUTORA NA SLIKU:\n5. c) Treba mu 2 sata za prijeći 260 kilometara."
+      },
+      "expect_status": "ready",
+      "note": "LIVE/pytest: mora jasno reći da je raniji odgovor 2 sata bio pogrešan i objasniti 260 ÷ 65 = 4."
+    },
+    {
+      "id": "g6-imagetest-solve-all-start",
+      "payload": {
+        "grade": 6,
+        "mode": "quick",
+        "student_message": "uradi mi sve zadatke",
+        "image_ocr_text": "1. Izračunaj 1/2 + 1/4.\n2. Izračunaj 3/5 - 1/5.\n3. Izračunaj 2 · 3/7."
+      },
+      "expect_status": "ready",
+      "expect_mode": "quick",
+      "note": "image_test: LIVE mora riješiti SAMO zadatak 1 i najaviti zadatak 2; next_state je image_test/continue_image_test."
+    },
+    {
+      "id": "g6-imagetest-da-continues-item2",
+      "payload": {
+        "grade": 6,
+        "mode": "quick",
+        "student_message": "da",
+        "previous_next_state": {
+          "expected_user_action": "continue_confirmation",
+          "pending_action": {
+            "type": "continue_image_test",
+            "source": "image_context",
+            "next_item": 2
+          },
+          "active_task_kind": "image_test",
+          "image_test": {
+            "item_labels": [
+              "1",
+              "2",
+              "3"
+            ],
+            "solved": [
+              "1"
+            ],
+            "next_item": 2,
+            "style": "step_by_step"
+          }
+        },
+        "last_image_context": "TEKST SA SLIKE (OCR):\n1. Izračunaj 1/2 + 1/4.\n2. Izračunaj 3/5 - 1/5.\n3. Izračunaj 2 · 3/7."
+      },
+      "expect_status": "ready",
+      "expect_mode": "explain",
+      "note": "LIVE: 'da' mora riješiti zadatak 2 sa slike — NIKAD novi nepovezani zadatak za vježbu."
+    },
+    {
+      "id": "g6-imagetest-step-style-overrides-quick",
+      "payload": {
+        "grade": 6,
+        "mode": "quick",
+        "student_message": "uradi mi korak po korak",
+        "image_ocr_text": "1. Izračunaj 1/2 + 1/4.\n2. Izračunaj 3/5 - 1/5."
+      },
+      "expect_status": "ready",
+      "expect_mode": "explain",
+      "note": "eksplicitno 'korak po korak' nadjačava UI mod Rezultat."
+    },
+    {
+      "id": "g6-offtopic-refusal",
+      "payload": {
+        "grade": 6,
+        "mode": "quick",
+        "student_message": "Ko je pobijedio na svjetskom prvenstvu 2022?"
+      },
+      "expect_status": "ready",
+      "note": "LIVE: mora odgovoriti tačno 'Postavi mi pitanje ili zadatak iz matematike.'"
+    },
+    {
+      "id": "g7-explain-cijeli",
+      "payload": {
+        "grade": 7,
+        "mode": "explain",
+        "selected_topic": "7-01-002",
+        "student_message": "Objasni mi ovu temu."
+      },
+      "expect_status": "ready",
+      "expect_topic": "7-01-002"
+    },
+    {
+      "id": "g7-freechat-mnozenje-cijelih",
+      "payload": {
+        "grade": 7,
+        "entry_source": "free_chat",
+        "student_message": "Kako se množe cijeli brojevi?"
+      },
+      "expect_status": "ready",
+      "expect_topic": "7-01-001",
+      "note": "regresija: NE smije završiti na sabiranju"
+    },
+    {
+      "id": "g7-practice-racionalni",
+      "payload": {
+        "grade": 7,
+        "mode": "practice",
+        "selected_topic": "7-02-010",
+        "student_message": "Daj mi jedan zadatak za vježbu iz ove teme."
+      },
+      "expect_status": "ready",
+      "expect_mode": "practice"
+    },
+    {
+      "id": "g7-exam-oblast-cijeli",
+      "payload": {
+        "grade": 7,
+        "mode": "exam",
+        "selected_oblast": "Cijeli brojevi",
+        "student_message": "Sutra imam kontrolni iz ove oblasti. Pripremi me."
+      },
+      "expect_status": "ready",
+      "expect_mode": "exam"
+    },
+    {
+      "id": "g7-quick-negativni",
+      "payload": {
+        "grade": 7,
+        "mode": "quick",
+        "student_message": "-5 + 8"
+      },
+      "expect_status": "ready",
+      "expect_mode": "quick"
+    },
+    {
+      "id": "g7-wrong-answer-negativni",
+      "payload": {
+        "grade": 7,
+        "mode": "practice",
+        "selected_topic": "7-01-002",
+        "interaction_phase": "answering_practice_task",
+        "last_tutor_task": "Izračunaj: -7 + 12.",
+        "student_message": "-5"
+      },
+      "expect_status": "ready",
+      "expect_mode": "practice"
+    },
+    {
+      "id": "g7-konstrukcija-explain",
+      "payload": {
+        "grade": 7,
+        "mode": "explain",
+        "selected_topic": "7-06-067",
+        "student_message": "Objasni mi ovu temu."
+      },
+      "expect_status": "ready",
+      "note": "system prompt mora imati KONSTRUKCIJE blok"
+    },
+    {
+      "id": "g8-explain-stepeni",
+      "payload": {
+        "grade": 8,
+        "mode": "explain",
+        "entry_source": "manual_topic_choice",
+        "selected_topic": "8-01-001",
+        "student_message": "Objasni mi pravila za stepene."
+      },
+      "expect_status": "ready",
+      "expect_topic": "8-01-001",
+      "note": "LIVE: objasniti stepene bez srednjoškolskih prečica."
+    },
+    {
+      "id": "g8-practice-korijeni",
+      "payload": {
+        "grade": 8,
+        "mode": "practice",
+        "selected_topic": "8-03-015",
+        "student_message": "Daj mi jedan zadatak za vježbu iz korijena."
+      },
+      "expect_status": "ready",
+      "expect_mode": "practice",
+      "expect_topic": "8-03-015"
+    },
+    {
+      "id": "g8-exam-pitagora-oblast",
+      "payload": {
+        "grade": 8,
+        "mode": "exam",
+        "selected_oblast": "Pitagorina teorema",
+        "student_message": "Sutra imam kontrolni iz ove oblasti. Pripremi me."
+      },
+      "expect_status": "ready",
+      "expect_mode": "exam"
+    },
+    {
+      "id": "g8-quick-kvadrat-binoma",
+      "payload": {
+        "grade": 8,
+        "mode": "quick",
+        "selected_topic": "8-05-047",
+        "student_message": "Izračunaj (x+3)^2"
+      },
+      "expect_status": "ready",
+      "expect_mode": "quick",
+      "expect_topic": null
+    },
+    {
+      "id": "g8-explain-alg-razlomci-domena",
+      "payload": {
+        "grade": 8,
+        "mode": "explain",
+        "selected_topic": "8-06-055",
+        "student_message": "Objasni mi domenu algebarskog razlomka."
+      },
+      "expect_status": "ready",
+      "expect_topic": "8-06-055",
+      "note": "LIVE: naglasiti da nazivnik ne smije biti nula."
+    },
+    {
+      "id": "g8-image-conflict-koordinatni-pitagora",
+      "payload": {
+        "grade": 8,
+        "mode": "explain",
+        "entry_source": "thinkific_lesson",
+        "course_name": "Matematika 8",
+        "section_name": "Pravougli koordinatni sistem i grafik linearne funkcije",
+        "lesson_order": "1",
+        "lesson_title": "PRAVOUGLI (DEKARTOV) KOORDINATNI SISTEM",
+        "detected_topic": "8-04-025",
+        "image_ocr_text": "U pravouglom trouglu katete su 6 cm i 8 cm. Odredi hipotenuzu.",
+        "student_message": "Objasni zadatak sa slike."
+      },
+      "expect_status": "ready",
+      "expect_topic": "8-04-025"
+    },
+    {
+      "id": "g8-unknown-lesson-fallback",
+      "payload": {
+        "grade": 8,
+        "mode": "explain",
+        "entry_source": "thinkific_lesson",
+        "lesson_title": "Nepostojeća lekcija iz 8. razreda",
+        "student_message": "Objasni mi lekciju."
+      },
+      "expect_status": "fallback"
+    },
+    {
+      "id": "g8-practice-valjak",
+      "payload": {
+        "grade": 8,
+        "mode": "practice",
+        "selected_topic": "8-12-136",
+        "student_message": "Daj mi jedan zadatak za vježbu iz valjka."
+      },
+      "expect_status": "ready",
+      "expect_mode": "practice",
+      "expect_topic": "8-12-136"
+    },
+    {
+      "id": "g8-practice-valjak-ne-znam",
+      "payload": {
+        "grade": 8,
+        "mode": "practice",
+        "selected_topic": "8-12-136",
+        "interaction_phase": "answering_practice_task",
+        "last_tutor_task": "Izračunaj zapreminu valjka ako je r=3 cm i H=5 cm.",
+        "student_message": "ne znam"
+      },
+      "expect_status": "ready",
+      "expect_mode": "practice",
+      "expect_topic": "8-12-136"
+    }
   ]
 }

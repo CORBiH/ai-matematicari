@@ -58,7 +58,7 @@ def fake_stream(monkeypatch):
 # --- happy path ---------------------------------------------------------------------
 
 def test_stream_ready_deltas_and_done(client, fake_openai, fake_stream):
-    resp = client.post(STREAM_URL, json={"selected_topic": "skupovi_uvod",
+    resp = client.post(STREAM_URL, json={"selected_topic": "6-01-001",
                                          "mode": "explain",
                                          "student_message": "Objasni mi ovu temu."})
     assert resp.status_code == 200
@@ -71,7 +71,7 @@ def test_stream_ready_deltas_and_done(client, fake_openai, fake_stream):
     body = done[0]
     # done nosi ISTI oblik kao non-streaming odgovor
     assert body["answer"] == "Zdravo svijete!"
-    assert body["final_topic"] == "skupovi_uvod"
+    assert body["final_topic"] == "6-01-001"
     assert body["status"] == "ready"
     for key in ("recommended_mode", "recommend_video", "mode", "effective_topic"):
         assert key in body
@@ -81,7 +81,7 @@ def test_stream_ready_deltas_and_done(client, fake_openai, fake_stream):
 def test_stream_grade_8_ready_deltas_and_done(client, fake_openai, fake_stream):
     resp = client.post(STREAM_URL, json={
         "grade": 8,
-        "selected_topic": "tijela_valjak_osnove",
+        "selected_topic": "8-01-001",
         "mode": "practice",
         "student_message": "Daj mi jedan zadatak za vježbu iz ove teme.",
     })
@@ -89,7 +89,7 @@ def test_stream_grade_8_ready_deltas_and_done(client, fake_openai, fake_stream):
     events = _parse_sse(resp.get_data(as_text=True))
     done = [d for name, d in events if name == "done"]
     assert done and done[0]["status"] == "ready"
-    assert done[0]["final_topic"] == "tijela_valjak_osnove"
+    assert done[0]["final_topic"] == "8-01-001"
     assert done[0]["mode"] == "practice"
     assert fake_stream["calls"] == 1
     system_prompt = fake_stream["messages"][-1][0]["content"]
@@ -100,7 +100,7 @@ def test_streamed_practice_response_includes_last_tutor_task(client, fake_openai
     task = "Uporedi brojeve: 7 205 i 7 250. Koji je veći broj? Koristi znakove <, > ili =."
     fake_stream["deltas"] = [task[:35], task[35:]]
     resp = client.post(STREAM_URL, json={
-        "selected_topic": "n_n0_uporedjivanje_poluprava_prethodnik_sljedbenik",
+        "selected_topic": "6-01-001",
         "mode": "practice",
         "student_message": "Daj mi jedan zadatak za vježbu iz ove teme.",
     })
@@ -114,7 +114,7 @@ def test_streamed_practice_response_includes_last_tutor_task(client, fake_openai
 def test_stream_messages_include_system_history_user(client, fake_openai, fake_stream):
     history = [{"role": "user", "content": "HISTORIJA-1"},
                {"role": "assistant", "content": "ODGOVOR-1"}]
-    client.post(STREAM_URL, json={"selected_topic": "skupovi_uvod",
+    client.post(STREAM_URL, json={"selected_topic": "6-01-001",
                                   "conversation_history": history,
                                   "student_message": "nastavimo"})
     sent = fake_stream["messages"][-1]
@@ -143,7 +143,7 @@ def test_stream_fallback_single_done_no_model_call(client, fake_stream):
 
 def test_stream_error_before_any_text(client, fake_openai, fake_stream):
     fake_stream["raise_after"] = 0            # pukne prije prve delte
-    resp = client.post(STREAM_URL, json={"selected_topic": "skupovi_uvod"})
+    resp = client.post(STREAM_URL, json={"selected_topic": "6-01-001"})
     events = _parse_sse(resp.get_data(as_text=True))
     assert [name for name, _ in events] == ["error"]
     assert "Pokušaj ponovo" in events[0][1]["detail"]
@@ -152,7 +152,7 @@ def test_stream_error_before_any_text(client, fake_openai, fake_stream):
 def test_stream_partial_then_done_with_partial_answer(client, fake_openai, fake_stream):
     fake_stream["deltas"] = ["Pola ", "odgovora", " nikad ne stigne"]
     fake_stream["raise_after"] = 2            # pukne poslije 2 delte
-    resp = client.post(STREAM_URL, json={"selected_topic": "skupovi_uvod"})
+    resp = client.post(STREAM_URL, json={"selected_topic": "6-01-001"})
     events = _parse_sse(resp.get_data(as_text=True))
     names = [name for name, _ in events]
     assert names == ["delta", "delta", "done"]
@@ -161,7 +161,7 @@ def test_stream_partial_then_done_with_partial_answer(client, fake_openai, fake_
 
 def test_stream_empty_answer_friendly_fallback(client, fake_openai, fake_stream):
     fake_stream["deltas"] = []
-    resp = client.post(STREAM_URL, json={"selected_topic": "skupovi_uvod"})
+    resp = client.post(STREAM_URL, json={"selected_topic": "6-01-001"})
     events = _parse_sse(resp.get_data(as_text=True))
     done = [d for name, d in events if name == "done"]
     assert done and "Pokušaj ponovo" in done[0]["answer"]
@@ -177,7 +177,7 @@ def test_stream_invalid_json_400(client):
 
 def test_stream_logs_activity(client, fake_openai, fake_stream, _tmp_activity_db):
     from matbot import activity_log as al
-    resp = client.post(STREAM_URL, json={"selected_topic": "skupovi_uvod",
+    resp = client.post(STREAM_URL, json={"selected_topic": "6-01-001",
                                          "session_id": "sess-stream-1"})
     resp.get_data()          # stream je lijen — konzumiraj tijelo da generator prođe
     rows = al.get_recent_activity(session_id="sess-stream-1", path=_tmp_activity_db)
@@ -195,7 +195,7 @@ def _grading_stream_payload(task, student):
     return {
         "grade": 6,
         "mode": "practice",
-        "selected_topic": "razlomci_pojam_vrste",
+        "selected_topic": "6-04-031",
         "interaction_phase": "answering_practice_task",
         "last_tutor_task": task,
         "student_message": student,
@@ -241,7 +241,7 @@ def test_stream_nongrading_turn_still_streams_live(client, fake_openai, fake_str
     """Ne-ocjenjivački potez i dalje teče uživo (delte == sirovi model izlaz)."""
     fake_stream["deltas"] = ["Prvo ", "objasnimo ", "temu."]
     resp = client.post(STREAM_URL, json={
-        "selected_topic": "razlomci_pojam_vrste", "mode": "explain",
+        "selected_topic": "6-04-031", "mode": "explain",
         "student_message": "Objasni mi razlomke.",
     })
     events = _parse_sse(resp.get_data(as_text=True))
@@ -251,6 +251,6 @@ def test_stream_nongrading_turn_still_streams_live(client, fake_openai, fake_str
 
 def test_nonstreaming_endpoint_untouched(client, fake_openai):
     """Non-streaming put ostaje netaknut (fallback za slike i starije klijente)."""
-    resp = client.post("/api/ai-tutor/chat", json={"selected_topic": "skupovi_uvod"})
+    resp = client.post("/api/ai-tutor/chat", json={"selected_topic": "6-01-001"})
     assert resp.status_code == 200
     assert resp.get_json()["answer"] == fake_openai.state["reply"]
