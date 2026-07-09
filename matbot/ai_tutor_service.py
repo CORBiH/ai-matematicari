@@ -376,6 +376,65 @@ def _apply_explicit_intent(payload: dict) -> None:
         payload["mode"] = "quick"
 
 
+_FRESH_EXAM_PREP_RE = re.compile(r"\b(kontroln\w*|test\w*|priprem\w*)\b")
+
+
+def _is_fresh_exam_prep_request(payload: dict) -> bool:
+    mode = normalize_value(payload.get("mode")).lower()
+    if mode not in ("exam", "kontrolni", "test", "sutra_imam_kontrolni"):
+        return False
+    if normalize_value(payload.get("interaction_phase")):
+        return False
+    message = fold_diacritics(
+        payload.get("student_message") or payload.get("message")
+    )
+    return bool(_FRESH_EXAM_PREP_RE.search(message))
+
+
+def _apply_exam_context_contract(payload: dict, master: dict) -> None:
+    """Fresh controlni prep must use the current explicit UI selection.
+
+    Old practice state/history is useful for follow-ups, but it is dangerous for a
+    new exam-prep turn: a stale fractions task in last_tutor_task/recent_tasks or
+    an old selected_topic can steer the model away from the chips the student sees.
+    """
+    if not _is_fresh_exam_prep_request(payload):
+        return
+
+    selected_topic = normalize_value(payload.get("selected_topic"))
+    selected_oblast = normalize_value(payload.get("selected_oblast"))
+    if not selected_topic and not selected_oblast:
+        return
+
+    # This is a fresh prep request, not an answer to the previous practice task.
+    for key in (
+        "last_tutor_task",
+        "previous_next_state",
+        "tutor_state",
+        "pending_action",
+        "last_tutor_message",
+        "detected_topic",
+    ):
+        payload.pop(key, None)
+    payload["recent_tasks"] = []
+    payload["conversation_history"] = []
+
+    # If an old selected_topic conflicts with the explicit oblast currently sent
+    # by the UI, prefer the current oblast so exam-by-oblast can build the prompt.
+    if selected_topic and selected_oblast:
+        topic_ctx = get_topic_context(selected_topic, master)
+        topic_oblast = normalize_value(topic_ctx.get("oblast")).lower() if topic_ctx else ""
+        if not topic_ctx or (topic_oblast and topic_oblast != selected_oblast.lower()):
+            log.info(
+                "ai_tutor exam context: ignoring stale selected_topic=%s for selected_oblast=%s",
+                selected_topic,
+                selected_oblast,
+            )
+            payload["selected_topic"] = ""
+            if normalize_value(payload.get("entry_source")) == "manual_topic_choice":
+                payload["entry_source"] = "free_chat"
+
+
 def _empty_pending_action() -> dict:
     return {"type": None, "source": None, "next_item": None}
 
@@ -1401,6 +1460,7 @@ def _prepare_chat(
     grade = payload["grade"]
     master = master if master is not None else get_master(grade=grade)
     tmap = tmap if tmap is not None else get_thinkific_map(grade=grade)
+    _apply_exam_context_contract(payload, master)
 
     # --- Phase 6.2: slika zadatka — prvo pokušaj OCR (postojeći legacy Mathpix) --
     has_image = bool(image_bytes or image_data_url)

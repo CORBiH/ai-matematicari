@@ -1550,6 +1550,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!ob){ showToast('Prvo izaberi oblast.', 'err'); try{ oblastSelect.focus(); }catch(_){} return; }
         state.oblast = ob; state.topic = ''; state.topicName = ''; state.topicOblast = ''; state.topicSource = '';
         try { localStorage.removeItem(LASTTASK_KEY); } catch(_){} // nova oblast = svjež practice tok
+        try { localStorage.removeItem(RECENTTASKS_KEY); } catch(_){}
         clearStoredActiveTopic();
         enterChat(AUTO_MESSAGES.exam);
         return;
@@ -1581,7 +1582,7 @@ document.addEventListener('DOMContentLoaded', () => {
       topbarTopic.classList.toggle('hidden', !ctx);
     }
     function enterChat(autoMessage){
-      restoreActiveTopic();
+      if (state.mode !== 'exam') restoreActiveTopic();
       updateTopbar();
       /* kontekst (razred+mod+tema/oblast): promjena = svjež razgovor; isti
          kontekst poslije reload-a = iscrtaj postojeću historiju i NE šalji
@@ -1849,20 +1850,26 @@ document.addEventListener('DOMContentLoaded', () => {
          poruka/slika. Razred ide kao meka metapodatak (backend ga ne koristi
          kao tvrdi kontekst u ovom modu). */
       const resultMode = (state.mode === 'quick');
+      const examMode = (state.mode === 'exam');
+      const freshExamPrep = examMode && !answerPhase && !continuation && !confirmationIntent
+        && /\b(kontrolni|test|priprem)/.test(foldTutorText(text));
+      const selectedTopicForPayload = resultMode ? '' : ((examMode && state.oblast) ? '' : state.topic);
+      const selectedOblastForPayload = resultMode ? ''
+        : (selectedTopicForPayload ? state.topicOblast : (examMode ? state.oblast : ''));
       const payload = {
         session_id: sessionId,
         grade: parseInt(state.grade, 10) || 6,
         mode: state.mode,
         entry_source: resultMode ? 'free_chat'
-                                 : (state.topic ? (state.topicSource || 'manual_topic_choice') : 'free_chat'),
-        selected_topic: resultMode ? '' : state.topic,
-        selected_oblast: resultMode ? '' : (state.topic ? state.topicOblast : (state.mode === 'exam' ? state.oblast : '')),
+                                 : (selectedTopicForPayload ? (state.topicSource || 'manual_topic_choice') : 'free_chat'),
+        selected_topic: selectedTopicForPayload,
+        selected_oblast: selectedOblastForPayload,
         student_message: text,
-        conversation_history: tutorHistory()
+        conversation_history: freshExamPrep ? [] : tutorHistory()
       };
-      if (previousNextState) payload.previous_next_state = previousNextState;
+      if (previousNextState && !freshExamPrep) payload.previous_next_state = previousNextState;
       const recentTasks = storedRecentTasks();
-      if (recentTasks.length) payload.recent_tasks = recentTasks;
+      if (recentTasks.length && !freshExamPrep) payload.recent_tasks = recentTasks;
       /* BUG 3/6 fix: kontekst slike ide uz SVAKI nastavak image toka —
          follow-up formulacije, potvrde ("da"/"nastavi") i aktivan image_test */
       const imageTestActive = !!(previousNextState && previousNextState.active_task_kind === 'image_test');

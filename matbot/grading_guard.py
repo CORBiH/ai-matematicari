@@ -152,6 +152,138 @@ def _all_items_partial_or_correct(result: Any) -> bool:
     ) and any(i.verdict in _PARTIAL_VERDICTS for i in items)
 
 
+def _correct_subset_with_missing(result: Any) -> tuple[list[int], list[int], bool] | None:
+    """Answered subset is correct/partial, but at least one numbered item is missing."""
+    if result is None or not getattr(result, "checkable", False):
+        return None
+    items = list(getattr(result, "items", []) or [])
+    if len(items) <= 1:
+        return None
+    answered: list[int] = []
+    missing: list[int] = []
+    has_partial = False
+    for item in items:
+        verdict = getattr(item, "verdict", "")
+        if verdict in _POSITIVE_VERDICTS:
+            answered.append(getattr(item, "n", 0))
+        elif verdict in _PARTIAL_VERDICTS:
+            answered.append(getattr(item, "n", 0))
+            has_partial = True
+        elif verdict in ("missing", "not_attempted"):
+            missing.append(getattr(item, "n", 0))
+        else:
+            return None
+    if not answered or not missing:
+        return None
+    return answered, missing, has_partial
+
+
+def _join_numbers(nums: list[int]) -> str:
+    clean = [str(n) for n in nums if n]
+    if not clean:
+        return ""
+    if len(clean) == 1:
+        return clean[0]
+    return ", ".join(clean[:-1]) + " i " + clean[-1]
+
+
+def _missing_sentence(nums: list[int]) -> str:
+    joined = _join_numbers(nums)
+    if not joined:
+        return ""
+    if len([n for n in nums if n]) == 1:
+        return f"Zadatak {joined} još čeka tvoj odgovor."
+    return f"Zadaci {joined} još čekaju tvoj odgovor."
+
+
+def _answered_subset_sentence(nums: list[int], has_partial: bool) -> str:
+    joined = _join_numbers(nums)
+    if not joined:
+        return ""
+    if len([n for n in nums if n]) == 1:
+        return (
+            f"Zadatak {joined} je djelimično tačan."
+            if has_partial
+            else f"Zadatak {joined} je tačan."
+        )
+    return (
+        f"Zadaci {joined} su tačni ili djelimično tačni."
+        if has_partial
+        else f"Zadaci {joined} su tačni."
+    )
+
+
+_ORDINAL_LINE_PREFIXES = {
+    1: r"prv\w*",
+    2: r"drug\w*",
+    3: r"tre[cć]\w*",
+    4: r"(?:cetvrt|četvrt)\w*",
+    5: r"pet\w*",
+    6: r"(?:sest|šest)\w*",
+    7: r"sedm\w*",
+    8: r"osm\w*",
+    9: r"devet\w*",
+}
+
+
+def _prefix_missing_ordinal_lines(text: str, missing: list[int]) -> str:
+    out = text
+    for n in missing:
+        if not n or re.search(rf"(?m)^\s*{n}[.)]\s+", out):
+            continue
+        ordinal = _ORDINAL_LINE_PREFIXES.get(n)
+        if not ordinal:
+            continue
+        pattern = re.compile(
+            rf"(?im)^(\s*)({ordinal}\s+(?:stavk\w*|zadat\w*|pitanj\w*)\b)"
+        )
+        out = pattern.sub(rf"\g<1>{n}. \g<2>", out, count=1)
+    return out
+
+
+def _renumber_numbered_lines(text: str) -> str:
+    counter = 0
+
+    def repl(match: re.Match) -> str:
+        nonlocal counter
+        counter += 1
+        return f"{match.group(1)}{counter}. "
+
+    return re.sub(r"(?m)^(\s*)\d{1,2}[.)]\s+", repl, text)
+
+
+def _body_mentions_missing_items(text: str, missing: list[int]) -> bool:
+    folded = fold_diacritics(text)
+    for n in missing:
+        if not n:
+            continue
+        numbered_waits = re.search(rf"(?m)^\s*{n}[.)].{{0,180}}\bcek", folded)
+        named_waits = re.search(rf"\bzadatak\s+{n}\b.{{0,180}}\bcek", folded)
+        if not (numbered_waits or named_waits):
+            return False
+    return True
+
+
+def _make_multi_missing(answer: str, result: Any) -> str:
+    subset = _correct_subset_with_missing(result)
+    if not subset:
+        return answer
+    answered, missing, has_partial = subset
+    body = answer.strip()
+    stripped = _strip_positive_label(body)
+    if stripped != body:
+        body = stripped
+    body = _prefix_missing_ordinal_lines(body, missing)
+    body = _renumber_numbered_lines(body)
+    summary_parts = [_answered_subset_sentence(answered, has_partial)]
+    if not _body_mentions_missing_items(body, missing):
+        summary_parts.append(_missing_sentence(missing))
+    summary = " ".join(p for p in summary_parts if p)
+    if summary and not fold_diacritics(body).startswith(fold_diacritics(summary)):
+        return _prepend(summary, body)
+    return body
+
+
 _MULTI_ITEM_TEXT_RE = re.compile(
     r"\bstavk\w*|\bprv\w+\b.{0,60}\bdrug\w+\b|\bdrug\w+\b.{0,60}\btrec\w+\b"
 )
@@ -362,6 +494,9 @@ def enforce_grading_consistency(answer: Any, check_result: Any = None) -> str:
         # To nije puno "Tačno", nego stabilna djelimična ocjena.
         if _all_items_partial_or_correct(check_result):
             return _make_partial(answer)
+
+        if _correct_subset_with_missing(check_result):
+            return _make_multi_missing(answer, check_result)
 
         # Miješano (neke tačne, neke ne) ili višestavkovni kontekst → po-stavkovna
         # ocjena je legitimna, tekst se ne dira.

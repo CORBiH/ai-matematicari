@@ -15,6 +15,7 @@ from matbot.tutor_prompts import build_tutor_system_prompt
 
 CHAT_URL = "/api/ai-tutor/chat"
 FR_TOPIC = "6-04-031"
+EXPR_TOPIC = "6-02-019"
 
 TASK_D = (
     "1. Ako je obojeno 5/12 pizze, koji dio nije obojen?\n"
@@ -398,6 +399,86 @@ def test_exam_multi_task_extraction_keeps_all_items(master, tmap):
     assert "2. Dječak je potrošio 3/10" in task
     assert "3. Pretvori 2 1/4" in task
     assert "Trik:" not in task
+
+
+def test_exam_selected_topic_ignores_stale_fraction_state(master, tmap):
+    row = master["topics_by_id"][EXPR_TOPIC]
+    chat = _fake_chat("Evo tri zadatka za kontrolni iz izraza s promjenljivim.")
+    out = svc.handle_chat({
+        "grade": 6,
+        "mode": "exam",
+        "selected_topic": EXPR_TOPIC,
+        "selected_oblast": row["oblast"],
+        "detected_topic": FR_TOPIC,
+        "student_message": "Sutra imam kontrolni iz ove oblasti. Pripremi me.",
+        "last_tutor_task": "Skrati razlomak 18/24.",
+        "recent_tasks": ["Skrati razlomak 18/24."],
+        "previous_next_state": {"active_task_kind": "practice"},
+        "conversation_history": [
+            {"role": "assistant", "content": "Evo tri zadatka za tvoj kontrolni iz razlomaka."}
+        ],
+    }, chat, master, tmap, model="m", timeout=1)
+
+    up = _last_user_prompt(chat)
+    all_messages = "\n".join(m["content"] for m in chat.calls["messages"][-1] if isinstance(m.get("content"), str))
+    assert out["effective_topic"] == EXPR_TOPIC
+    assert row["display_name"] in up
+    assert "Razlomci" not in all_messages
+    assert "Skrati razlomak" not in all_messages
+
+
+def test_exam_selected_oblast_beats_stale_selected_topic(master, tmap):
+    row = master["topics_by_id"][EXPR_TOPIC]
+    chat = _fake_chat("Evo tri zadatka za kontrolni iz prirodnih brojeva i izraza.")
+    out = svc.handle_chat({
+        "grade": 6,
+        "mode": "exam",
+        "selected_topic": FR_TOPIC,
+        "selected_oblast": row["oblast"],
+        "student_message": "Sutra imam kontrolni iz ove oblasti. Pripremi me.",
+        "last_tutor_task": "Skrati razlomak 18/24.",
+        "recent_tasks": ["Skrati razlomak 18/24."],
+        "conversation_history": [
+            {"role": "assistant", "content": "Vjezbali smo razlomke."}
+        ],
+    }, chat, master, tmap, model="m", timeout=1)
+
+    up = _last_user_prompt(chat)
+    all_messages = "\n".join(m["content"] for m in chat.calls["messages"][-1] if isinstance(m.get("content"), str))
+    assert out["effective_topic"] == "unknown"
+    assert f"OBLAST KONTROLNOG: {row['oblast']}" in up
+    assert row["display_name"] in up
+    assert "Pojam razlomka" not in all_messages
+    assert "Skrati razlomak" not in all_messages
+
+
+def test_multi_answer_partial_feedback_no_global_tacno_and_fixed_numbering(master, tmap):
+    task = (
+        "1. Saberi razlomke 2/5 i 3/10.\n"
+        "2. Uporedi razlomke 4/9 i 2/3 i odredi koji je ve\u0107i.\n"
+        "3. Izra\u010dunaj rezultat izraza 3 \u00b7 4/5."
+    )
+    chat = _fake_chat(
+        "Ta\u010dno.\n\n"
+        "1. Kada sabere\u0161 2/5 i 3/10, dobije\u0161 7/10.\n"
+        "1. Upore\u0111uju\u0107i razlomke 4/9 i 2/3, ve\u0107i je 2/3.\n"
+        "Tre\u0107a stavka jo\u0161 \u010deka tvoj odgovor. Kako si izra\u010dunao 3 \u00b7 4/5?"
+    )
+    out = svc.handle_chat(
+        _answer_payload(task, "1) 7/10 2) veci je 2/3"),
+        chat, master, tmap, model="m", timeout=1,
+    )
+
+    verdicts = [i["verdict"] for i in out["answer_check"]["items"]]
+    assert verdicts == ["correct", "correct", "missing"]
+    assert out["answer"].startswith("Zadaci 1 i 2 su ta\u010dni.")
+    assert not out["answer"].startswith("Ta\u010dno.")
+    assert "\n2. Upore" in out["answer"]
+    assert "\n1. Upore" not in out["answer"]
+    assert "\n3. Tre" in out["answer"]
+    up = _last_user_prompt(chat)
+    assert "globalnom" in up
+    assert "1., 1." in up
 
 
 def test_practice_single_task_extraction_unchanged(master, tmap):

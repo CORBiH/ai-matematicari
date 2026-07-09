@@ -311,9 +311,12 @@ def test_payload_uses_home_state(client):
     assert "session_id: sessionId" in html
     # Result/Quick mod: tema/lekcija se NE šalju kao ograničenje (kontekst-slobodno).
     assert "const resultMode = (state.mode === 'quick');" in html
-    assert "selected_topic: resultMode ? '' : state.topic" in html
+    assert "const freshExamPrep = examMode" in html
+    assert "const selectedTopicForPayload" in html
+    assert "selected_topic: selectedTopicForPayload" in html
     assert "entry_source: resultMode ? 'free_chat'" in html
-    assert "state.mode === 'exam' ? state.oblast : ''" in html
+    assert "selected_oblast: selectedOblastForPayload" in html
+    assert "freshExamPrep ? [] : tutorHistory()" in html
     assert "grade: parseInt(state.grade, 10) || 6" in html
 
 

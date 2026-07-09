@@ -212,6 +212,11 @@ _EXPAND_TARGET_DEN_RE = re.compile(
 )
 _SIMPLIFY_RE = re.compile(r"\bskrati")
 _CALC_LEAD_RE = re.compile(r"\b(izracunaj|koliko\s+je|odredi\s+vrijednost)\b")
+_ADD_WORD_RE = re.compile(r"\b(saberi|zbroji|zbir|suma)\b")
+_SUB_WORD_RE = re.compile(r"\b(oduzmi|razlika)\b")
+_COMPARE_WORD_RE = re.compile(r"\b(uporedi|usporedi|poredi|uporedjuj)\b")
+_GREATER_WORD_RE = re.compile(r"\b(vec\w*|najvec\w*)\b")
+_SMALLER_WORD_RE = re.compile(r"\b(manj\w*|najmanj\w*)\b")
 
 
 _NUM_UNIT = r"(-?\d+(?:[,.]\d+)?)"
@@ -329,6 +334,36 @@ def _try_expand(folded: str, tokens: list[NumberToken]) -> Expected | None:
     )
 
 
+def _try_worded_fraction_operation(folded: str, tokens: list[NumberToken]) -> Expected | None:
+    if len(tokens) != 2:
+        return None
+    if _ADD_WORD_RE.search(folded):
+        return Expected(
+            value=tokens[0].value + tokens[1].value,
+            kind="arithmetic",
+            required_form="fraction",
+        )
+    if _SUB_WORD_RE.search(folded):
+        return Expected(
+            value=tokens[0].value - tokens[1].value,
+            kind="arithmetic",
+            required_form="fraction",
+        )
+    return None
+
+
+def _try_fraction_comparison(folded: str, tokens: list[NumberToken]) -> Expected | None:
+    fracs = [t for t in tokens if t.form == "fraction"]
+    if len(fracs) != 2 or not _COMPARE_WORD_RE.search(folded):
+        return None
+    wants_greater = bool(_GREATER_WORD_RE.search(folded))
+    wants_smaller = bool(_SMALLER_WORD_RE.search(folded))
+    if wants_greater == wants_smaller:
+        return None
+    chosen = max(fracs, key=lambda t: t.value) if wants_greater else min(fracs, key=lambda t: t.value)
+    return Expected(value=chosen.value, kind="comparison", required_form="fraction")
+
+
 def _try_rate_or_ratio(folded: str, norm_text: str) -> Expected | None:
     distances = [
         (m.start(), _distance_to_km(_num_to_fraction(m.group(1)), m.group(2)))
@@ -429,6 +464,8 @@ def _try_arithmetic(folded: str, norm_text: str) -> Expected | None:
     if m:
         tail = norm_text[m.end():]
         expr_m = _EXPR_PREFIX_RE.match(tail)
+        if not expr_m:
+            expr_m = _EXPR_PREFIX_RE.search(tail)
     else:
         # bez "izračunaj": prihvati SAMO ako je cijela stavka čist izraz
         # (uz opcioni "Zadatak:" prefiks i završnu interpunkciju)
@@ -705,7 +742,14 @@ def derive_expected(item_text: str) -> Expected | None:
     norm = _normalize_math_text(item_text or "")
     folded = _fold(norm)
     tokens = _scan_number_tokens(norm)
-    for solver in (_try_conversion, _try_expand, _try_simplify, _try_complement):
+    for solver in (
+        _try_conversion,
+        _try_expand,
+        _try_simplify,
+        _try_complement,
+        _try_worded_fraction_operation,
+        _try_fraction_comparison,
+    ):
         result = solver(folded, tokens)
         if result is not None:
             return result
@@ -1024,6 +1068,18 @@ def format_check_block(result: CheckResult) -> str:
     all_partial_or_correct = bool(verdicts) and all(
         v in ("correct", "correct_value_wrong_form") for v in verdicts
     ) and any(v == "correct_value_wrong_form" for v in verdicts)
+    missing_ns = [
+        i.n for i in result.items if i.verdict in ("missing", "not_attempted")
+    ]
+    answered_ok_ns = [
+        i.n
+        for i in result.items
+        if i.verdict in ("correct", "correct_value_wrong_form")
+    ]
+    answered_subset_ok = bool(missing_ns) and bool(answered_ok_ns) and all(
+        i.verdict in ("correct", "correct_value_wrong_form", "missing", "not_attempted")
+        for i in result.items
+    )
     any_incorrect = any(v == "incorrect" for v in verdicts)
     if all_correct:
         lines.append(
@@ -1039,6 +1095,16 @@ def format_check_block(result: CheckResult) -> str:
             "\"Djelimično tačno.\". Zatim kratko reci da je vrijednost "
             "ekvivalentna, ali oblik nije dovršen/tražen, i napiši očekivani "
             "oblik. NE koristi labelu \"Tačno.\" i NE govori \"Netačno.\"."
+        )
+    elif answered_subset_ok:
+        answered = ", ".join(str(n) for n in answered_ok_ns)
+        missing = ", ".join(str(n) for n in missing_ns)
+        lines.append(
+            "STIL (DIO VIŠESTAVKOVNOG ODGOVORA JE TAČAN): NE počinji globalnom "
+            "labelom \"Tačno.\" jer nisu odgovorene sve stavke. Počni jasnom "
+            f"rečenicom da su zadaci {answered} tačni, a da zadaci {missing} "
+            "još čekaju odgovor. Objašnjenja numeriši prema originalnim brojevima "
+            "zadataka (1., 2., 3.); nikad ne piši 1., 1. za dvije različite stavke."
         )
     elif any_incorrect:
         lines.append(
