@@ -307,8 +307,8 @@
         "last_image_context": "TEKST SA SLIKE (OCR):\n1. Izračunaj 1/2 + 1/4.\n2. Izračunaj 3/5 - 1/5.\n3. Izračunaj 2 · 3/7."
       },
       "expect_status": "ready",
-      "expect_mode": "explain",
-      "note": "LIVE: 'da' mora riješiti zadatak 2 sa slike — NIKAD novi nepovezani zadatak za vježbu."
+      "expect_mode": "quick",
+      "note": "LIVE: 'da' mora riješiti zadatak 2 sa slike — NIKAD novi nepovezani zadatak za vježbu. BUG 14 (2026-07-10): Rezultat sesija OSTAJE quick i poslije potvrde."
     },
     {
       "id": "g6-imagetest-step-style-overrides-quick",

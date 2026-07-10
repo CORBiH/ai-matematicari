@@ -328,7 +328,8 @@ def test_practice_followup_keeps_exact_task(client, fake_openai):
     assert body["mode"] == "practice"
     up = fake_openai.calls.messages[-1][-1]["content"]
     assert f"The student is responding to this exact previous task: {visible_task}" in up
-    assert "Do not introduce a new task unless the student asks for one." in up
+    # BUG 2 (2026-07-10): poslije tačnog odgovora tutor ODMAH daje novi zadatak.
+    assert "ODMAH daj JEDAN novi zadatak" in up
     assert "Tipičan zadatak" not in up
 
 

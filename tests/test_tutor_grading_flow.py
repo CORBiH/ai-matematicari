@@ -215,7 +215,8 @@ def test_followup_prompt_contains_grading_safety_rules(master, tmap):
     up = _last_user_prompt(chat)
     assert "PRVA REČENICA" in up                # konačan sud bez kontradikcije
     assert "PRIHVATI EKVIVALENTNE OBLIKE" in up
-    assert "Želiš li sličan zadatak za vježbu?" in up
+    # BUG 2 (2026-07-10): poslije tačnog ODMAH novi zadatak, bez pitanja
+    assert "ODMAH daj JEDAN novi zadatak" in up
     assert "ponudi JEDAN sličan novi" not in up
 
 
@@ -313,8 +314,10 @@ def test_confirmation_moze_explains_task_without_grading(master, tmap):
     assert "objasni prethodni zadatak" in svc.fold_diacritics(up)
 
 
-def test_short_confirmation_without_pending_action_is_not_graded(master, tmap):
-    chat = _fake_chat("Ovo ne smije biti pozvano.")
+def test_short_confirmation_without_pending_action_gives_new_task(master, tmap):
+    """BUG 1/6 (2026-07-10): "da" u vježbi bez upamćene ponude = "daj novi
+    zadatak" — nikad meta-pitanje i nikad ocjenjivanje potvrde."""
+    chat = _fake_chat("Zadatak: Izračunaj 2/5 + 1/5.")
     out = svc.handle_chat({
         "grade": 6,
         "mode": "practice",
@@ -324,10 +327,12 @@ def test_short_confirmation_without_pending_action_is_not_graded(master, tmap):
         "last_tutor_task": "Izračunaj 1/2 + 1/3.",
     }, chat, master, tmap, model="m", timeout=1)
 
-    assert chat.calls["messages"] == []
-    assert "answer_check" not in out
+    assert "answer_check" not in out                       # potvrda se NE ocjenjuje
     assert "Nije tačno" not in out["answer"]
-    assert out["next_state"]["expected_user_action"] == "none"
+    assert "Samo mi reci šta želiš dalje" not in out["answer"]   # nema meta-pitanja
+    up = _last_user_prompt(chat)
+    assert "sličan novi zadatak" in up                     # rewrite → novi zadatak
+    assert "Ne ocjenjuj ovu potvrdu kao odgovor." in up
 
 
 def test_next_state_marks_similar_task_offer_after_grading(master, tmap):
@@ -357,12 +362,14 @@ def test_recent_tasks_enter_practice_prompt(master, tmap):
     assert "drugi brojevi" in up
 
 
-def test_recent_tasks_not_in_answer_checking_prompt(master, tmap):
+def test_recent_tasks_in_answer_checking_prompt_for_next_task(master, tmap):
+    """BUG 2 (2026-07-10): poslije tačnog odgovora tutor ODMAH daje novi zadatak
+    u istoj poruci — pa i grading potez treba anti-ponavljanje spisak."""
     chat = _fake_chat()
     payload = _answer_payload("Izračunaj: 1/2 + 1/3", "5/6")
     payload["recent_tasks"] = ["Izračunaj 1/2 + 1/4."]
     svc.handle_chat(payload, chat, master, tmap, model="m", timeout=1)
-    assert "NEDAVNO DATI ZADACI" not in _last_user_prompt(chat)
+    assert "NEDAVNO DATI ZADACI" in _last_user_prompt(chat)
 
 
 def test_recent_tasks_sanitized(master, tmap):

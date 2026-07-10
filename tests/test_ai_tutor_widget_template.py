@@ -571,9 +571,11 @@ def test_tutor_task_detection_updates_last_task(client):
 def test_tutor_task_saved_before_history_for_stream_and_json(client):
     html = _html(client)
     idx = html.index("function applyTutorResponse")
-    snippet = html[idx:idx + 1200]
-    # image_test tok NE pretvara prozu odgovora u last_tutor_task
-    assert "const taskText = (j && j.status === 'ready' && !inImageTest && !solutionRevealed) ? extractTutorTask(j, answer) : ''" in snippet
+    snippet = html[idx:idx + 2200]
+    # BUG 3/9/11: zadatak se prati SAMO u practice/exam; server (last_tutor_task)
+    # je izvor istine, JS heuristika samo fallback za stare odgovore
+    assert "const canTrackTask = (state.mode === 'practice' || state.mode === 'exam');" in snippet
+    assert "('last_tutor_task' in j)" in snippet
     assert "j.next_state.active_task_kind === 'image_test'" in snippet
     assert snippet.index("setAwaitingPracticeTask(taskText)") < snippet.index("pushTutor('assistant', answer)")
     assert "sačuvaj zadatak prije historije" in snippet
@@ -662,8 +664,9 @@ def test_quick_reply_chips_present(client):
     assert 'id="tutorChips"' in block
     assert "function chipDefs(j)" in html
     assert "function renderChips(j)" in html
-    # dječiji, korisni chipovi
-    for label in ("Daj mi zadatak", "Objasni jednostavnije", "Još jedan primjer",
+    # dječiji, korisni chipovi (BUG 3/9: explain bez "Daj mi zadatak" —
+    # umjesto toga eksplicitni prelazak "Pređi na vježbu")
+    for label in ("Pređi na vježbu", "Objasni jednostavnije", "Još jedan primjer",
                   "Ne znam — daj mi hint", "Objasni postupak"):
         assert label in html, label
     # chip ide kroz NORMALNI typed tok (poštuje practice/followup logiku)
@@ -717,7 +720,7 @@ def test_recent_tasks_tracked_and_sent(client):
     assert "payload.recent_tasks = recentTasks" in html
     # pamti se tek kad odgovor stvarno sadrzi zadatak
     idx = html.index("function applyTutorResponse")
-    snippet = html[idx:idx + 1100]
+    snippet = html[idx:idx + 2200]
     assert "pushRecentTask(taskText)" in snippet
     # cisti se i pri resetu konverzacije i u "Ocisti chat"
     ridx = html.index("function resetTutorConversation()")

@@ -62,6 +62,19 @@ _POS_GRADE_RE = re.compile(
 )
 
 
+# Fold koji ČUVA DUŽINU (bez strip-a) — indeksi iz foldanog teksta moraju biti
+# poravnati s originalom za bezbedno brisanje spanova. ``fold_diacritics`` iz
+# topic_detector radi i strip pa dužine divergiraju na tekstu s okolnim \n.
+_DIACRITIC_MAP = str.maketrans({
+    "č": "c", "ć": "c", "đ": "d", "š": "s", "ž": "z",
+    "Č": "c", "Ć": "c", "Đ": "d", "Š": "s", "Ž": "z",
+})
+
+
+def _fold_keep_len(text: Any) -> str:
+    return str(text or "").translate(_DIACRITIC_MAP).lower()
+
+
 def _neg_spans(folded: str) -> list[tuple[int, int]]:
     return [m.span() for m in _NEG_GRADE_RE.finditer(folded)]
 
@@ -332,7 +345,7 @@ def _remove_negative_verdicts(text: str) -> tuple[str, bool]:
 
     Indeksi iz foldanog teksta poravnati su s originalom (folding je 1:1 po
     znaku za naš domen). Ako se dužine ne poklope, radije NE mijenjamo tekst."""
-    folded = fold_diacritics(text)
+    folded = _fold_keep_len(text)
     if len(folded) != len(text):
         return text, False
     spans = _neg_spans(folded)
@@ -382,9 +395,13 @@ _HEDGE_OPENER_RE = re.compile(
 
 def _make_positive(answer: str) -> str:
     """Autoritativno TAČNO: skini lažno negativne ocjene i garantuj potvrdan,
-    prirodan uvod ("Tačno. …"), bez uvodnog "Pogledajmo zajedno …"."""
+    prirodan uvod ("Tačno. …"), bez uvodnog "Pogledajmo zajedno …".
+
+    BUG 5 (2026-07-10): uklanjaju se i "Djelimično tačno." labele iz tijela —
+    ranije je "Djelimično tačno. …" dobio prefiks pa je ispalo
+    "Tačno. Djelimično tačno."."""
     out, _changed = _remove_negative_verdicts(answer)
-    out = out.strip()
+    out = _remove_partial_labels(out).strip()
     if not out:
         return "Tačno. Tvoj odgovor je tačan."
     # skini uvodni hedge samo ako sam po sebi ne nosi potvrdu tačnosti
@@ -393,9 +410,7 @@ def _make_positive(answer: str) -> str:
         stripped = out[hedge.end():].lstrip()
         if stripped:
             out = stripped
-    stripped = _strip_positive_label(out)
-    if stripped != out:
-        return _prepend("Tačno.", stripped)
+    out = _strip_leading_labels(out) or out
     return _prepend("Tačno.", out)
 
 
@@ -418,7 +433,41 @@ _POSITIVE_LABEL_OPENER_RE = re.compile(
     r"^\s*(tacno|tocno|bravo|odlicno|super|svaka\s+cast|tako\s+je)\b[^.!?\n]*[.!?]?"
 )
 _POSITIVE_IS_RE = re.compile(r"^\s*(?:tacno|tocno)\s+je\s+")
-_PARTIAL_OPENER_RE = re.compile(r"^\s*djelimicn\w*\s+taca?n\w*\.?")
+_PARTIAL_OPENER_RE = re.compile(r"^\s*dj?el[io]micn\w*\s+taca?n\w*\.?")
+# Labela "Djelimično tačno."/"Djelomično točno." BILO GDJE u tekstu (foldano).
+_PARTIAL_LABEL_ANY_RE = re.compile(r"dj?el[io]micn\w*\s+taca?n\w*[.!:]?")
+# Gole ocjenjivačke labele na početku ("Tačno.", "Netačno.", "Djelimično tačno.")
+_LEADING_LABEL_RE = re.compile(
+    r"^\s*(?:netaca?n\w*|taca?no|toca?no|dj?el[io]micn\w*\s+taca?n\w*)\s*[.!:]\s*"
+)
+
+
+def _strip_leading_labels(text: str) -> str:
+    """Skini SVE uzastopne ocjenjivačke labele s početka ("Tačno. Djelimično
+    tačno. ..." → "..."), da pozivalac postavi tačno JEDNU autoritativnu."""
+    out = text
+    for _ in range(4):                     # više od 4 uzastopne labele ne postoji
+        folded = fold_diacritics(out)
+        m = _LEADING_LABEL_RE.match(folded)
+        if not m:
+            break
+        out = out[m.end():].lstrip(" .!?:;-")
+    return out
+
+
+def _remove_partial_labels(text: str) -> str:
+    """Ukloni "Djelimično tačno." labele iz TIJELA teksta (poslije autoritativne
+    presude "correct" nijedna djelimična labela nije legitimna) — BUG 5."""
+    folded = _fold_keep_len(text)
+    if len(folded) != len(text):
+        return text
+    spans = [m.span() for m in _PARTIAL_LABEL_ANY_RE.finditer(folded)]
+    if not spans:
+        return text
+    chars = list(text)
+    for s, e in sorted(spans, reverse=True):
+        del chars[s:e]
+    return _cleanup("".join(chars))
 
 
 def _strip_positive_label(text: str) -> str:
@@ -448,11 +497,12 @@ def _fix_false_positive_opener(answer: str) -> str:
 
 def _make_incorrect(answer: str) -> str:
     """Autoritativno NETAČNO: stabilna prva labela bez pozitivnog uvoda."""
+    stripped = _strip_leading_labels(answer)
+    if stripped == answer:
+        stripped = _strip_positive_label(answer)
+    if stripped != answer and stripped:
+        return _prepend("Netačno.", stripped)
     folded = fold_diacritics(answer)
-    stripped = _strip_positive_label(answer)
-    if stripped != answer:
-        answer = stripped
-        return _prepend("Netačno.", answer)
     spans = _neg_spans(folded)
     if spans and spans[0][0] <= 3:
         _s, e = spans[0]
@@ -462,15 +512,120 @@ def _make_incorrect(answer: str) -> str:
 
 
 def _make_partial(answer: str) -> str:
-    """Autoritativno DJELIMIČNO: vrijednost je dobra, ali traženi oblik nije."""
+    """Autoritativno DJELIMIČNO: vrijednost je dobra, ali traženi oblik nije.
+
+    Skida SVE uzastopne vodeće labele ("Tačno. Djelimično tačno. …") pa
+    postavlja tačno jednu — bez dupliranja (BUG 5)."""
     out, _changed = _remove_negative_verdicts(answer)
-    folded = fold_diacritics(out)
-    partial = _PARTIAL_OPENER_RE.match(folded)
-    if partial:
-        rest = out[partial.end():].lstrip(" .!?:;-")
-        return _prepend("Djelimično tačno.", rest)
-    out = _strip_positive_label(out)
+    out = _strip_leading_labels(out) or out.strip()
     return _prepend("Djelimično tačno.", out.strip())
+
+
+# --- Po-stavkovno pomirenje u višestavkovnom kontekstu (BUG 13) ---------------------
+# "mixed"/multi odgovori su se ranije vraćali NETAKNUTI, pa je kontradikcija
+# UNUTAR jedne stavke ("Netačno. … Tvoj odgovor je tačan!" ili "nije 12. Tačan
+# rezultat je 12.") prolazila. Ovdje se svaki numerisani segment pomiruje
+# posebno — legitimna miješana ocjena (1. tačno, 2. netačno) se NE dira.
+
+# Pozitivna ocjena UPUĆENA UČENIKU (ne korekcija "tačan rezultat je X"):
+_STUDENT_POS_RE = re.compile(
+    r"tvoj\w*\s+(?:odgovor|rezultat|racun)\w*\s+(?:\w+\s+){0,3}?je\s+taca?n"
+    r"|tvoj\w*\s+(?:odgovor|rezultat)\s+je\s+ispravan"
+    r"|to\s+je\s+tacno|u\s+pravu\s+si|odgovor\s+je\s+tacan"
+)
+# "nije 12" — vrijednost koju negativna fraza negira.
+_NEGATED_VALUE_RE = re.compile(r"ni(?:je|su)\s+(-?\d[\w/,.]*)")
+_AFFIRMED_VALUE_RE = re.compile(
+    r"taca?n\w*\s+(?:rezultat|odgovor)\w*\s+je\s+(-?\d[\w/,.]*)"
+)
+_SEGMENT_SPLIT_RE = re.compile(r"(?m)(?=^\s*\d{1,2}[.)]\s)")
+
+
+def _same_value_conflict(folded: str) -> set[str]:
+    """Vrijednosti koje su u ISTOM tekstu i negirane ("nije 12") i potvrđene
+    ("tačan rezultat je 12") — intrinzično samo-protivrječje."""
+    negated = {m.group(1).rstrip(".,;:!?") for m in _NEGATED_VALUE_RE.finditer(folded)}
+    affirmed = {m.group(1).rstrip(".,;:!?") for m in _AFFIRMED_VALUE_RE.finditer(folded)}
+    return negated & affirmed
+
+
+def _segment_self_contradicts(segment: str) -> bool:
+    """Kontradikcija UNUTAR segmenta koja je sigurno samo-protivrječje:
+    (a) negativna ocjena + pozitivna ocjena upućena učeniku, ili
+    (b) "nije X … tačan rezultat je X" za ISTU vrijednost X."""
+    folded = _fold_keep_len(segment)
+    spans = _neg_spans(folded)
+    if spans and _STUDENT_POS_RE.search(_mask(folded, spans)):
+        return True
+    return bool(_same_value_conflict(folded))
+
+
+def _remove_value_negations(text: str) -> tuple[str, bool]:
+    """Ukloni "nije X" fraze za vrijednosti koje isti tekst odmah potvrđuje
+    ("tačan rezultat je X") — negacija je sigurno lažna (BUG 13, S2 slučaj)."""
+    folded = _fold_keep_len(text)
+    if len(folded) != len(text):
+        return text, False
+    conflict = _same_value_conflict(folded)
+    if not conflict:
+        return text, False
+    spans = [
+        m.span()
+        for m in _NEGATED_VALUE_RE.finditer(folded)
+        if m.group(1).rstrip(".,;:!?") in conflict
+    ]
+    if not spans:
+        return text, False
+    chars = list(text)
+    for s, e in sorted(spans, reverse=True):
+        del chars[s:e]
+    return _cleanup("".join(chars)), True
+
+
+def _reconcile_multi_item(answer: str, check_result: Any) -> str:
+    """Pomiri višestavkovni odgovor segment po segment.
+
+    Segment = tekst od jednog numerisanog markera do sljedećeg (plus uvod prije
+    prvog markera). Presuda po stavci (kad postoji) je autoritativna; bez nje
+    se ispravlja samo SIGURNO samo-protivrječje unutar segmenta."""
+    segments = _SEGMENT_SPLIT_RE.split(answer)
+    if len(segments) <= 1:
+        # nema numerisanih segmenata — tretiraj cijeli tekst kao jedan segment
+        segments = [answer]
+
+    verdict_by_n: dict[int, str] = {}
+    for item in getattr(check_result, "items", []) or []:
+        n = getattr(item, "n", None)
+        if n:
+            verdict_by_n[n] = getattr(item, "verdict", "")
+
+    out_segments: list[str] = []
+    for seg in segments:
+        m = re.match(r"\s*(\d{1,2})[.)]\s", seg)
+        n = int(m.group(1)) if m else None
+        verdict = verdict_by_n.get(n, "")
+        cleaned = None
+        if verdict in _POSITIVE_VERDICTS:
+            # stavka je provjereno tačna → negativne fraze u njoj su lažne
+            candidate, changed = _remove_negative_verdicts(seg)
+            if changed and candidate.strip():
+                cleaned = candidate
+        elif _segment_self_contradicts(seg):
+            candidate, changed = _remove_negative_verdicts(seg)
+            if not changed:
+                # "nije 12 … tačan rezultat je 12" — negacija vrijednosti,
+                # ne fraza ocjene; ukloni samo lažnu negaciju
+                candidate, changed = _remove_value_negations(seg)
+            if changed and candidate.strip():
+                cleaned = candidate
+        if cleaned is None:
+            out_segments.append(seg)
+        else:
+            # _cleanup skida završne praznine — vrati original trailing
+            # whitespace da se segmenti ne zalijepe u isti red
+            trail = seg[len(seg.rstrip()):]
+            out_segments.append(cleaned.rstrip() + trail)
+    return "".join(out_segments)
 
 
 def enforce_grading_consistency(answer: Any, check_result: Any = None) -> str:
@@ -498,10 +653,10 @@ def enforce_grading_consistency(answer: Any, check_result: Any = None) -> str:
         if _correct_subset_with_missing(check_result):
             return _make_multi_missing(answer, check_result)
 
-        # Miješano (neke tačne, neke ne) ili višestavkovni kontekst → po-stavkovna
-        # ocjena je legitimna, tekst se ne dira.
+        # Miješano ili višestavkovni kontekst → po-stavkovna ocjena je legitimna,
+        # ali kontradikcija UNUTAR JEDNE stavke nije: pomiri segment po segment.
         if verdict == "mixed" or multi:
-            return answer
+            return _reconcile_multi_item(answer, check_result)
 
         if verdict == "incorrect":
             return _make_incorrect(answer)

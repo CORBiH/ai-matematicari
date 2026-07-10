@@ -264,6 +264,14 @@ def _fmt_fraction(value: Fraction) -> str:
 def _fmt_expected(expected: Expected) -> str:
     if expected.kind == "inequality" and expected.required_form:
         return f"x {expected.required_form} {_fmt_fraction(expected.value)}"
+    if expected.kind == "yes_no":
+        # value: 1 = "da", 0 = "ne"; basis nosi kratko obrazloženje
+        word = "da" if expected.value else "ne"
+        return f"{word} ({expected.basis})" if expected.basis else word
+    if expected.kind == "choice":
+        # unit nosi izabranu opciju ("ugao D"), value njenu vrijednost
+        label = expected.unit or ""
+        return f"{label} ({_fmt_fraction(expected.value)})".strip()
     if expected.kind == "expand" and expected.target_denominator:
         numerator = expected.value * expected.target_denominator
         if numerator.denominator == 1:
@@ -362,6 +370,28 @@ def _try_fraction_comparison(folded: str, tokens: list[NumberToken]) -> Expected
         return None
     chosen = max(fracs, key=lambda t: t.value) if wants_greater else min(fracs, key=lambda t: t.value)
     return Expected(value=chosen.value, kind="comparison", required_form="fraction")
+
+
+_NZD_RE = re.compile(r"najvec\w*\s+zajednick\w*\s+dj?el\w*|\bnzd\b")
+_NZS_RE = re.compile(r"najmanj\w*\s+zajednick\w*\s+sadrz\w*|\bnzs\b")
+
+
+def _try_gcd_lcm(folded: str, tokens: list[NumberToken]) -> Expected | None:
+    """"Koji je NZD brojeva 24 i 36?" → 12; NZS analogno (math.gcd/lcm).
+
+    Konzervativno: tačno dva cijela pozitivna broja u stavci."""
+    wants_gcd = bool(_NZD_RE.search(folded))
+    wants_lcm = bool(_NZS_RE.search(folded))
+    if wants_gcd == wants_lcm:          # ni jedno ni oboje → ne diramo
+        return None
+    ints = [t for t in tokens if t.form == "integer" and t.value > 0]
+    if len(ints) != 2:
+        return None
+    from math import gcd
+    a, b = int(ints[0].value), int(ints[1].value)
+    if wants_gcd:
+        return Expected(value=Fraction(gcd(a, b)), kind="arithmetic")
+    return Expected(value=Fraction(a * b // gcd(a, b)), kind="arithmetic")
 
 
 def _try_rate_or_ratio(folded: str, norm_text: str) -> Expected | None:
@@ -749,6 +779,7 @@ def derive_expected(item_text: str) -> Expected | None:
         _try_complement,
         _try_worded_fraction_operation,
         _try_fraction_comparison,
+        _try_gcd_lcm,
     ):
         result = solver(folded, tokens)
         if result is not None:
@@ -932,11 +963,124 @@ def check_practice_answer(task_text: str, student_text: str) -> CheckResult:
         return CheckResult(checkable=False)
 
 
+# --- Izbor između imenovanih opcija ("Koji je ugao veći, C ili D?") -----------------
+# BUG 7 (2026-07-10): odgovor-slovo ("d") nije numerički pa je provjera vraćala
+# checkable=False, a model je sam ocijenio i pogriješio. Ovdje se poređenje sa
+# imenovanim vrijednostima presuđuje deterministički.
+
+_NAMED_VALUE_RE = re.compile(
+    r"(?:m\s*[∠<]\s*|ug(?:ao|la|lu|lom)\s+|razlomak\s+)?"
+    r"\b([a-z])\b\s*(?:=|iznosi|je)\s*(-?\d+(?:,\d+)?)"
+)
+_CHOICE_QUESTION_RE = re.compile(
+    r"\bkoji\w*\b.{0,60}\b(vec\w*|manj\w*|najvec\w*|najmanj\w*)\b"
+)
+_CHOICE_LETTER_ANSWER_RE = re.compile(
+    r"^\s*(?:ug(?:ao|la|lu)\s+)?([a-z])\s*(?:je)?(?:\s+vec\w*|\s+manj\w*)?\s*[.!?]*\s*$"
+)
+
+
+def _check_choice_comparison(task_text: str, student_text: str) -> CheckResult | None:
+    """Presudi izbor imenovane opcije kad zadatak daje vrijednosti (npr. uglovi)."""
+    if split_numbered_items(task_text):
+        return None                       # višestavkovni zadatak — opšti tok
+    norm_task = _normalize_math_text(task_text)
+    folded_task = _fold(norm_task)
+    q = _CHOICE_QUESTION_RE.search(folded_task)
+    if not q:
+        return None
+    wants_greater = q.group(1).startswith(("vec", "najvec"))
+    named: dict[str, Fraction] = {}
+    for m in _NAMED_VALUE_RE.finditer(folded_task):
+        letter, raw = m.group(1), m.group(2)
+        try:
+            named[letter] = Fraction(raw.replace(",", "."))
+        except (ValueError, ZeroDivisionError):
+            return None
+    if len(named) != 2:
+        return None
+    (l1, v1), (l2, v2) = sorted(named.items())
+    if v1 == v2:
+        return None                       # jednake vrijednosti — nema izbora
+    if wants_greater:
+        exp_letter, exp_val = (l1, v1) if v1 > v2 else (l2, v2)
+    else:
+        exp_letter, exp_val = (l1, v1) if v1 < v2 else (l2, v2)
+
+    ans = _CHOICE_LETTER_ANSWER_RE.match(_fold(student_text or "").strip())
+    if not ans:
+        return None                       # odgovor nije čisto slovo — opšti tok
+    given_letter = ans.group(1)
+    if given_letter not in named:
+        return None
+    expected = Expected(
+        value=exp_val, kind="choice", unit=f"ugao {exp_letter.upper()}",
+    )
+    given = NumberToken(
+        value=named[given_letter], form="choice", raw=given_letter.upper(),
+    )
+    verdict = "correct" if given_letter == exp_letter else "incorrect"
+    return CheckResult(checkable=True, items=[
+        ItemCheck(n=1, task=task_text.strip()[:200], expected=expected,
+                  given=given, verdict=verdict),
+    ])
+
+
+# --- Da/ne zadaci djeljivosti ("Da li je 48 djeljiv sa 6?") -------------------------
+# BUG 6/7 (2026-07-10): "da"/"ne" na yes-no zadatak je ODGOVOR i presudiv je u
+# kodu (N % k); ranije je model sam ocjenjivao i znao pogriješiti.
+
+_DIVISIBILITY_ASK_RE = re.compile(
+    r"(?:da\s+li\s+|provjeri\s+(?:da\s+li\s+)?)?je\s*(?:li)?\s+(?:broj\s+)?(\d+)\s+dj?eljiv\w*\s+sa?\s+(\d+)"
+)
+_YES_ANSWER_RE = re.compile(r"^\s*(da|jeste|jest|djeljiv\s+je)\b[\s.!?]*$")
+_NO_ANSWER_RE = re.compile(r"^\s*(ne|nije)\b[\s.!?]*$")
+
+
+def _check_yes_no_divisibility(task_text: str, student_text: str) -> CheckResult | None:
+    if split_numbered_items(task_text):
+        return None
+    folded_task = _fold(_normalize_math_text(task_text))
+    m = _DIVISIBILITY_ASK_RE.search(folded_task)
+    if not m:
+        return None
+    n, k = int(m.group(1)), int(m.group(2))
+    if k == 0:
+        return None
+    ans = _fold(student_text or "").strip()
+    if _YES_ANSWER_RE.match(ans):
+        said_yes = True
+    elif _NO_ANSWER_RE.match(ans):
+        said_yes = False
+    else:
+        return None                       # nije čist da/ne — opšti tok
+    truth = (n % k == 0)
+    q, r = divmod(n, k)
+    basis = f"{n} : {k} = {q}" if truth else f"{n} : {k} = {q}, ostatak {r}"
+    expected = Expected(value=Fraction(1 if truth else 0), kind="yes_no", basis=basis)
+    given = NumberToken(
+        value=Fraction(1 if said_yes else 0), form="yes_no",
+        raw="da" if said_yes else "ne",
+    )
+    verdict = "correct" if said_yes == truth else "incorrect"
+    return CheckResult(checkable=True, items=[
+        ItemCheck(n=1, task=task_text.strip()[:200], expected=expected,
+                  given=given, verdict=verdict),
+    ])
+
+
 def _check(task_text: str, student_text: str) -> CheckResult:
     # Nejednačine se presuđuju posebno (presuda nosi operator, ne samo broj).
     inequality = _check_single_inequality(task_text, student_text)
     if inequality is not None:
         return inequality
+    # Izbor imenovane opcije i da/ne djeljivost — cijeli zadatak, prije stavki.
+    choice = _check_choice_comparison(task_text, student_text)
+    if choice is not None:
+        return choice
+    yes_no = _check_yes_no_divisibility(task_text, student_text)
+    if yes_no is not None:
+        return yes_no
     numbered_items = split_numbered_items(task_text)
     if numbered_items:
         items = numbered_items
@@ -1084,17 +1228,21 @@ def format_check_block(result: CheckResult) -> str:
     if all_correct:
         lines.append(
             "STIL (TAČAN ODGOVOR): počni tačno sa \"Tačno.\", "
-            "pa SAMO kratka provjera računa (1–2 rečenice) i ponuda novog sličnog "
-            "zadatka. NE piši puni postupak korak-po-korak osim ako je učenik "
-            "izričito tražio objašnjenje (\"objasni\", \"kako\", \"korak po korak\"). "
-            "Ne počinji sa \"Pogledajmo zajedno\" ni sličnim uvodom. Ukupno 1–3 rečenice."
+            "pa SAMO kratka provjera računa (1–2 rečenice). NE piši puni postupak "
+            "korak-po-korak osim ako je učenik izričito tražio objašnjenje "
+            "(\"objasni\", \"kako\", \"korak po korak\"). "
+            "Ne počinji sa \"Pogledajmo zajedno\" ni sličnim uvodom. "
+            "Ako uputa moda kaže da poslije tačnog odgovora slijedi novi zadatak, "
+            "dodaj ga ODMAH u istoj poruci (red \"Zadatak: ...\")."
         )
     elif all_partial_or_correct:
         lines.append(
             "STIL (DJELIMIČNO TAČAN ODGOVOR): počni tačno sa "
             "\"Djelimično tačno.\". Zatim kratko reci da je vrijednost "
             "ekvivalentna, ali oblik nije dovršen/tražen, i napiši očekivani "
-            "oblik. NE koristi labelu \"Tačno.\" i NE govori \"Netačno.\"."
+            "oblik. NE koristi labelu \"Tačno.\" i NE govori \"Netačno.\". "
+            "Ako uputa moda kaže da poslije tačnog odgovora slijedi novi zadatak, "
+            "dodaj ga ODMAH u istoj poruci (red \"Zadatak: ...\")."
         )
     elif answered_subset_ok:
         answered = ", ".join(str(n) for n in answered_ok_ns)

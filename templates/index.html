@@ -1264,6 +1264,17 @@ document.addEventListener('DOMContentLoaded', () => {
         /\b(daj|zadaj|posalji)\b.*\b(zadatak|zadatke)\b/.test(s)
       );
     }
+    /* BUG 9: kucani zahtjev za ZADATKOM u Objašnjenju/Rezultatu → eksplicitni
+       prelazak u Vježbu (explain nikad ne zadaje zadatke). "Primjer" NIJE
+       zadatak — "još jedan primjer" ostaje u Objašnjenju. */
+    function wantsPracticeTask(t){
+      const s = foldTutorText(t).trim();
+      if (!s || s.length > 80) return false;
+      if (/\b(primjer\w*|objasni|pojasni|kako|zasto|hint|pomozi|pomoc)\b/.test(s)) return false;
+      if (/\bzadat\w*\b/.test(s) &&
+          /\b(daj|zadaj|posalji|novi|nov|drugi|jos|sljedeci|slican|zelim|hocu|moze|mozes|trebam)\b/.test(s)) return true;
+      return /^(zadatak|tezi|laksi)[\s.!?]*$/.test(s);
+    }
     function isStoredQuickContext(){
       try {
         const parts = (localStorage.getItem(CTX_KEY) || '').split('|');
@@ -1725,11 +1736,14 @@ document.addEventListener('DOMContentLoaded', () => {
           { label: '➕ Novi zadatak', msg: 'Daj mi novi zadatak.' }
         ];
       }
-      const mode = j.mode || state.mode;
+      /* BUG 10: chipovi prate mod SESIJE, ne interni prompt-mod backenda */
+      const mode = j.session_mode || state.mode;
       if (mode === 'explain') return [
-        { label: '✏️ Daj mi zadatak', msg: 'Daj mi jedan zadatak za vježbu.', mode: 'practice' },
+        /* BUG 3/9: Objašnjenje je čisto objašnjenje — bez opcije "Novi zadatak";
+           "Pređi na vježbu" je eksplicitan prelazak u drugi mod */
         { label: '🐢 Objasni jednostavnije', msg: 'Objasni mi to jednostavnije.' },
-        { label: '➕ Još jedan primjer', msg: 'Daj mi još jedan primjer.' }
+        { label: '➕ Još jedan primjer', msg: 'Daj mi još jedan primjer.' },
+        { label: '✏️ Pređi na vježbu', msg: 'Daj mi jedan zadatak za vježbu.', mode: 'practice' }
       ];
       if (mode === 'practice') return [
         { label: '➕ Još jedan zadatak', msg: 'Daj mi još jedan zadatak.' },
@@ -1821,6 +1835,13 @@ document.addEventListener('DOMContentLoaded', () => {
         text = autoMessage;                        // auto-poruka pri ulasku u chat
       } else if (typed){
         text = typed; fromTyped = true;
+        /* BUG 9: zadatak zatražen u Objašnjenju/Rezultatu → pređi u Vježbu
+           (isti mehanizam kao chip; mod se vidljivo mijenja u meta redu) */
+        if ((state.mode === 'explain' || state.mode === 'quick') && wantsPracticeTask(typed)){
+          state.mode = 'practice';
+          interactionPhase = null;
+          updateTopbar();
+        }
         const asksNewTask = isNewPracticeTaskRequest(typed);
         if (!asksNewTask && previousNextState && previousNextState.expected_user_action === 'continue_confirmation' && isAffirmativeConfirmation(typed)){
           confirmationIntent = 'continue_confirmation';
@@ -2036,7 +2057,16 @@ document.addEventListener('DOMContentLoaded', () => {
          proza odgovora se NE pretvara u last_tutor_task */
       const inImageTest = !!(j && j.next_state && j.next_state.active_task_kind === 'image_test');
       const solutionRevealed = !!(j && j.practice_task_state === 'solution_revealed');
-      const taskText = (j && j.status === 'ready' && !inImageTest && !solutionRevealed) ? extractTutorTask(j, answer) : '';
+      /* BUG 3/9/11: aktivni zadatak se prati SAMO u modovima vježbe/kontrolnog —
+         explain/quick nikad ne ulaze u awaiting_practice_answer. Server je izvor
+         istine za zadatak (šalje last_tutor_task i kad je prazan); JS heuristika
+         je samo fallback za stare odgovore bez tog polja. */
+      const canTrackTask = (state.mode === 'practice' || state.mode === 'exam');
+      const taskText = (j && j.status === 'ready' && !inImageTest && !solutionRevealed && canTrackTask)
+        ? (('last_tutor_task' in j)
+            ? ((j.last_tutor_task || '').toString().trim().slice(0, 600))
+            : extractTutorTask(j, answer))
+        : '';
       if (j && j.next_state) setNextState(j.next_state);
       else if (j && j.status) clearNextState();   // greška bez statusa NE briše stanje
       if (inImageTest || solutionRevealed) clearAwaitingPracticeTask();
@@ -2048,8 +2078,11 @@ document.addEventListener('DOMContentLoaded', () => {
       pushTutor('assistant', answer);
       if (j.status === 'ready') adoptResponseTopic(j);
       if (metaBox){                              // prijateljski meta red (bez sirovih id-eva)
-        const rez = MODE_LABELS[j.mode || state.mode] || '';
-        const resultMode = ((j.mode || state.mode) === 'quick');
+        /* BUG 10: labela prati mod SESIJE (izbor učenika), ne interni prompt-mod
+           kojim backend rutira follow-up (npr. exam ocjena ide kao practice) */
+        const sessMode = (j.session_mode || state.mode);
+        const rez = MODE_LABELS[sessMode] || '';
+        const resultMode = (sessMode === 'quick');
         if (resultMode){                         // kontekst-slobodno: samo režim
           metaBox.textContent = rez ? 'Režim: ' + rez : '';
         } else {

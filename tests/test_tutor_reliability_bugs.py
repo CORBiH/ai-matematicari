@@ -171,7 +171,7 @@ def test_challenge_with_number_in_message_admits_and_confirms(master, tmap):
     assert "u pravu si" in out["answer"].lower()
     assert "8.45" in out["answer"]                    # čuva izvorni oblik s tačkom
     assert "nije tačno" not in out["answer"].lower()
-    assert out.get("last_tutor_task") is None         # NE generiše novi zadatak
+    assert not out.get("last_tutor_task")             # NE generiše novi zadatak
 
 
 def test_challenge_numberless_recovers_from_history(master, tmap):
@@ -198,7 +198,7 @@ def test_challenge_when_student_was_actually_wrong_recheck_not_new_task(master, 
     }, chat, master, tmap, model="m", timeout=1)
     # ponovna provjera: učenik je zapravo bio u krivu → presuda ostaje incorrect
     assert out["answer_check"]["items"][0]["verdict"] == "incorrect"
-    assert out.get("last_tutor_task") is None         # nema novog zadatka
+    assert not out.get("last_tutor_task")             # nema novog zadatka
 
 
 # --- Stil odgovora za TAČAN odgovor (kratko, potvrda prva) -------------------------

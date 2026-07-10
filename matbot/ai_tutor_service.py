@@ -109,7 +109,9 @@ MAX_RECENT_TASK_CHARS = 300
 # max_tokens po modu (app._openai_chat podržava max_tokens parametar).
 # Phase 1 (audit): quick 250→400 — reasoning modeli troše dio budžeta na
 # razmišljanje, pa je 250 znao dati prazan/odsječen odgovor.
-_MAX_TOKENS = {"quick": 400, "explain": 700, "practice": 700, "exam": 900}
+# BUG 14 (2026-07-10): odgovori za sliku sa više pod-stavki znali su biti
+# odsječeni usred rečenice — budžeti podignuti (quick 400→600, ostali +200).
+_MAX_TOKENS = {"quick": 600, "explain": 900, "practice": 900, "exam": 1100}
 # Retry budžet kad je odgovor prazan/odsječen (finish_reason == "length").
 _RETRY_MAX_TOKENS_CAP = 1400
 
@@ -351,6 +353,94 @@ def _apply_practice_help_contract(payload: dict) -> None:
         )
 
 
+# --- Zahtjev za NOVI (teži/lakši) zadatak — BUG 6/8 (2026-07-10) --------------------
+# "zadatak", "novi zadatak", "daj mi teži", "lakši" tokom vježbe NISU odgovor za
+# ocjenjivanje niti molba za objašnjenje starog zadatka — učenik traži NOVI
+# zadatak. Ranije je "zadatak" išao na re-grade, a "daj mi teži" u help contract
+# (re-rješavanje starog zadatka).
+
+_NEW_TASK_WORD_RE = re.compile(r"\b(zadatak|zadatke|zadacic\w*|primjer)\b")
+_DIFF_HARDER_RE = re.compile(r"\btez\w*\b")
+_DIFF_EASIER_RE = re.compile(r"\blaks\w*\b")
+_NEW_TASK_BLOCKER_RE = re.compile(
+    r"\b(objasni|pojasni|ponovi|isti|ovaj|hint|pomoc|pomozi|kako|zasto|"
+    r"rijesi|uradi|pokazi|prikazi|provjeri|odgovor\w*)\b|[=?]|\d"
+)
+
+
+# Riječi koje smiju činiti čist zahtjev za novim zadatkom — sve OSTALO znači da
+# poruka nosi dodatni sadržaj (npr. temu: "daj mi zadatke sa razlomcima") i NE
+# smije se prepisati sintetičkom porukom (izgubila bi se tema).
+_NEW_TASK_FILLER = frozenset({
+    "daj", "mi", "jos", "jedan", "jednu", "jedno", "novi", "nov", "novu",
+    "drugi", "drugu", "sljedeci", "sljedecu", "slican", "slicni", "slicnu",
+    "zadatak", "zadatke", "primjer", "primjere", "za", "vjezbu", "vjezba",
+    "molim", "te", "mozes", "moze", "mozemo", "hocu", "zelim", "trebam",
+    "malo", "sada", "sad", "idemo", "hajde", "ajde", "tezi", "teze", "tezu",
+    "laksi", "lakse", "laksu", "iz", "iste", "teme",
+})
+
+
+def detect_new_task_request(text: Any) -> str | None:
+    """"harder" | "easier" | "same" kada je poruka ČIST zahtjev za novim
+    zadatkom; None inače. Konzervativno: kratka poruka bez brojeva, odgovora,
+    objašnjenja i bez dodatnog sadržaja (teme)."""
+    folded = fold_diacritics(text).strip()
+    if not folded or len(folded) > 60:
+        return None
+    if _NEW_TASK_BLOCKER_RE.search(folded):
+        return None
+    harder = bool(_DIFF_HARDER_RE.search(folded))
+    easier = bool(_DIFF_EASIER_RE.search(folded))
+    if not (_NEW_TASK_WORD_RE.search(folded) or harder or easier):
+        return None
+    words = re.findall(r"[a-z]+", folded)
+    if any(w not in _NEW_TASK_FILLER for w in words):
+        return None                         # nosi temu/sadržaj — normalan tok
+    if harder:
+        return "harder"
+    if easier:
+        return "easier"
+    return "same"
+
+
+def _apply_new_task_intent(payload: dict) -> None:
+    """Preusmjeri zahtjev za novim zadatkom PRIJE ocjenjivanja i help contract-a.
+
+    Radi SAMO u kontekstu vježbe/kontrolnog (mod ili aktivna practice faza) —
+    u Objašnjenju "još jedan primjer" ostaje objašnjenje, a prelazak u Vježbu
+    radi UI eksplicitno."""
+    if payload.get("_direct_answer") is not None or payload.get("_skip_answer_check"):
+        return
+    if normalize_value(payload.get("intent")):
+        return
+    mode_l = normalize_value(payload.get("mode")).lower()
+    phase = normalize_value(payload.get("interaction_phase")).lower()
+    if mode_l not in ("practice", "vjezba", "exam", "kontrolni") and phase != "answering_practice_task":
+        return
+    diff = detect_new_task_request(
+        payload.get("student_message") or payload.get("message")
+    )
+    if diff is None:
+        return
+    payload["_skip_answer_check"] = True
+    payload["intent"] = "new_task_request"
+    # Kontrolni sesija zadržava exam (novi set zadataka); sve ostalo → practice.
+    if normalize_value(payload.get("mode")).lower() not in ("exam", "kontrolni"):
+        payload["mode"] = "practice"
+    payload["interaction_phase"] = ""
+    if diff in ("harder", "easier"):
+        payload["_difficulty_hint"] = diff
+    extra = {
+        "harder": " Neka bude malo TEŽI od prethodnog (veći brojevi ili korak više).",
+        "easier": " Neka bude malo LAKŠI od prethodnog.",
+    }.get(diff, "")
+    payload["student_message"] = (
+        "Daj mi jedan novi zadatak iz iste teme za vježbu." + extra +
+        " Ne ocjenjuj ovu poruku kao odgovor."
+    )
+
+
 def _apply_explicit_intent(payload: dict) -> None:
     """Postavi ``explicit_style``/``solve_all`` i po potrebi nadjačaj UI mod.
 
@@ -446,7 +536,35 @@ def _empty_next_state() -> dict:
         "active_task_kind": None,
         "image_test": None,
         "stuck_count": 0,
+        "correct_streak": 0,
+        "task_items": None,
     }
+
+
+def _normalize_task_items(raw: Any) -> dict | None:
+    """Validiraj ``task_items`` pod-stanje (BUG 12): koje stavke višestavkovnog
+    zadatka su VEĆ ocijenjene. ``None`` = nema/nevalidno (jednostavan zadatak)."""
+    if not isinstance(raw, dict):
+        return None
+    labels: list[int] = []
+    for x in raw.get("labels") or []:
+        try:
+            n = int(x)
+        except (TypeError, ValueError):
+            continue
+        if 0 < n <= 20 and n not in labels:
+            labels.append(n)
+    if len(labels) < 2:
+        return None
+    graded: list[int] = []
+    for x in raw.get("graded") or []:
+        try:
+            n = int(x)
+        except (TypeError, ValueError):
+            continue
+        if n in labels and n not in graded:
+            graded.append(n)
+    return {"labels": labels, "graded": sorted(graded)}
 
 
 # F5 (Vježbajmo): koliko je puta zaredom učenik zapeo na istoj temi. Na pragu se
@@ -531,6 +649,10 @@ def _normalize_next_state(raw: Any) -> dict:
         stuck = int(raw.get("stuck_count") or 0)
     except (TypeError, ValueError):
         stuck = 0
+    try:
+        streak = int(raw.get("correct_streak") or 0)
+    except (TypeError, ValueError):
+        streak = 0
     return {
         "expected_user_action": expected if expected in _NEXT_EXPECTED_ACTIONS else "none",
         "pending_action": _normalize_pending_action(raw.get("pending_action")),
@@ -538,6 +660,10 @@ def _normalize_next_state(raw: Any) -> dict:
         # image_test pod-stanje putuje kroz klijenta netaknuto (state-driven tok)
         "image_test": _normalize_image_test(raw.get("image_test")),
         "stuck_count": max(0, stuck),
+        # F-kvalitet: niz tačnih zaredom (ljestvica težine novih zadataka)
+        "correct_streak": max(0, streak),
+        # BUG 12: stanje višestavkovnog zadatka (koje stavke su već ocijenjene)
+        "task_items": _normalize_task_items(raw.get("task_items")),
     }
 
 
@@ -624,7 +750,10 @@ def _rewrite_confirmation_payload(payload: dict, action: dict) -> None:
     payload["pending_action"] = action
 
     if action_type == "continue_image_test":
-        payload["mode"] = "explain"
+        # BUG 14: Rezultat sesija OSTAJE quick (style result_only) — hardkodirani
+        # "explain" je pravio drift Rezultat→Objašnjenje i duge postupke.
+        if normalize_value(payload.get("mode")).lower() not in RESULT_MODES:
+            payload["mode"] = "explain"
         payload["interaction_phase"] = "continuing_explanation"
         if next_item:
             payload["student_message"] = (
@@ -645,6 +774,9 @@ def _rewrite_confirmation_payload(payload: dict, action: dict) -> None:
     if action_type == "generate_similar_task":
         payload["mode"] = "practice"
         payload["interaction_phase"] = ""
+        # Ljestvica težine: poslije niza tačnih novi zadatak ide stepenicu gore.
+        if _previous_next_state(payload).get("correct_streak", 0) >= 1:
+            payload.setdefault("_difficulty_hint", "harder")
         payload["student_message"] = (
             "Da, daj mi jedan sličan novi zadatak za vježbu. "
             "Ne ocjenjuj ovu potvrdu kao odgovor."
@@ -672,6 +804,23 @@ def _rewrite_confirmation_payload(payload: dict, action: dict) -> None:
         )
 
 
+def _practice_flow_context(payload: dict) -> bool:
+    """Da li je "da" izgovoreno u kontekstu vježbe (aktivni zadatak / practice
+    mod)? Tada afirmacija bez upamćene ponude znači "daj mi novi zadatak"."""
+    if normalize_value(payload.get("interaction_phase")).lower() == "answering_practice_task":
+        return True
+    if normalize_value(payload.get("mode")).lower() in ("practice", "vjezba", "exam", "kontrolni"):
+        return True
+    return bool(normalize_value(payload.get("last_tutor_task")))
+
+
+_SIMILAR_TASK_ACTION = {
+    "type": "generate_similar_task",
+    "source": "practice",
+    "next_item": None,
+}
+
+
 def _apply_confirmation_contract(payload: dict) -> None:
     intent = _confirmation_intent(payload)
     if intent == "decline_confirmation":
@@ -686,6 +835,10 @@ def _apply_confirmation_contract(payload: dict) -> None:
         action = _pending_action_from_payload(payload)
         if _has_pending_action(action):
             _rewrite_confirmation_payload(payload, action)
+        elif _practice_flow_context(payload):
+            # BUG 1/6: "da" u vježbi bez upamćene ponude = "daj novi zadatak" —
+            # nikad meta-pitanje (cilj moda je što više zadataka).
+            _rewrite_confirmation_payload(payload, dict(_SIMILAR_TASK_ACTION))
         else:
             payload["_skip_answer_check"] = True
             payload["pending_action"] = action
@@ -696,11 +849,20 @@ def _apply_confirmation_contract(payload: dict) -> None:
     student = payload.get("student_message") or payload.get("message")
     if (
         phase == "answering_practice_task"
-        and _short_confirmation_kind(student)
+        and _short_confirmation_kind(student) == "affirmative"
+        and not _task_allows_yes_no_answer(payload.get("last_tutor_task"))
+    ):
+        # Afirmacija umjesto odgovora na zadatak → novi sličan zadatak (BUG 1).
+        payload["intent"] = "continue_confirmation"
+        _rewrite_confirmation_payload(payload, dict(_SIMILAR_TASK_ACTION))
+        return
+    if (
+        phase == "answering_practice_task"
+        and _short_confirmation_kind(student) == "negative"
         and not _task_allows_yes_no_answer(payload.get("last_tutor_task"))
     ):
         payload["_skip_answer_check"] = True
-        payload["_direct_answer"] = _natural_confirmation_clarifier()
+        payload["_direct_answer"] = _decline_confirmation_answer()
 
 
 # --- Osporavanje ranije ocjene ("pa to sam i odgovorio") ----------------------------
@@ -818,12 +980,17 @@ def _update_stuck_state(payload: dict) -> None:
     tema resetuju brojač. Prompt builder čita ``_student_stuck``; response nosi
     ``stuck_count`` naprijed kroz next_state."""
     phase = normalize_value(payload.get("interaction_phase")).lower()
-    prev = _previous_next_state(payload).get("stuck_count", 0)
+    prev_state = _previous_next_state(payload)
+    prev = prev_state.get("stuck_count", 0)
+    prev_streak = prev_state.get("correct_streak", 0)
 
     stuck_signal = False
+    verdict = ""
     if phase == "answering_practice_task":
         check = payload.get("answer_check")
-        if check is not None and authoritative_verdict(check) == "incorrect":
+        if check is not None:
+            verdict = authoritative_verdict(check)
+        if verdict == "incorrect":
             stuck_signal = True
         student = payload.get("student_message") or payload.get("message")
         if _STUCK_SIGNAL_RE.search(fold_diacritics(student)):
@@ -833,6 +1000,14 @@ def _update_stuck_state(payload: dict) -> None:
     payload["_stuck_count"] = new_stuck
     if new_stuck >= STUCK_THRESHOLD:
         payload["_student_stuck"] = True
+
+    # Ljestvica težine: niz tačnih odgovora zaredom raste, netačan/zapeo resetuje.
+    if verdict in ("correct", "partial"):
+        payload["_correct_streak"] = prev_streak + 1
+    elif stuck_signal or verdict == "incorrect":
+        payload["_correct_streak"] = 0
+    else:
+        payload["_correct_streak"] = prev_streak
 
 
 # --- Result/Quick mod: kontekst-slobodno rješavanje (bez razreda/teme/lekcije) -----
@@ -878,17 +1053,16 @@ def _fmt_result_value(expected) -> str:
 
 
 def _multi_task_ask_message(items: list[dict]) -> str:
-    """Pitaj koji broj zadatka; ako verifikator za neku stavku ima siguran
-    rezultat, ponudi ga kao primjer (spec ponašanje)."""
-    for it in items:
-        expected = derive_expected(normalize_value(it.get("task")))
-        if expected is not None:
-            label = normalize_value(it.get("label"))
-            return (
-                f"Vidim više zadataka. Za {label}. zadatak mogu sigurno dati rezultat: "
-                f"{_fmt_result_value(expected)}. Napiši broj zadatka koji želiš."
-            )
-    return "Na slici ima više zadataka. Koji broj zadatka želiš?"
+    """Pitaj koji broj zadatka — BEZ otkrivanja rezultata unaprijed (BUG 11:
+    nepozvano "za 2. zadatak mogu dati: -6/7" zbunjuje; samo pitaj broj)."""
+    labels = [normalize_value(it.get("label")) for it in items if normalize_value(it.get("label"))]
+    listed = ", ".join(labels[:8])
+    if listed:
+        return (
+            f"Na slici vidim više zadataka ({listed}). "
+            "Napiši broj zadatka čiji rezultat želiš."
+        )
+    return "Na slici ima više zadataka. Napiši broj zadatka čiji rezultat želiš."
 
 
 def _resolve_result_selection(payload: dict) -> dict | None:
@@ -1157,6 +1331,51 @@ def extract_practice_task(answer: Any, limit: int = 600, mode: str | None = None
     return ""
 
 
+# BUG 1 (2026-07-10): na potezu OCJENJIVANJA riješeni izraz iz objašnjenja se znao
+# prepoznati kao "novi zadatak" pa je ponuda ("Želiš li još jedan?") gubila
+# pending_action, a sljedeće "da" padalo u meta-pitanje. Na grading potezu se zato
+# novi zadatak prihvata ISKLJUČIVO uz eksplicitni "Zadatak:" marker (prompt
+# instrukcije ga traže od modela).
+_TASK_MARKER_LINE_RE = re.compile(r"(?m)^[ \t]*zadatak(?:\s+za\s+vjezbu)?\s*[:\-—]")
+
+
+def extract_marked_task(answer: Any, limit: int = 600) -> str:
+    """Izvuci zadatak SAMO ako u odgovoru postoji eksplicitni "Zadatak:" red;
+    uzima se POSLJEDNJI takav (novi zadatak dolazi na kraju ocjene)."""
+    raw = normalize_value(answer).replace("\r\n", "\n").replace("\r", "\n")
+    if not raw:
+        return ""
+    folded = fold_diacritics(raw)
+    if len(folded) != len(raw):
+        folded = raw.lower()
+    last = None
+    for m in _TASK_MARKER_LINE_RE.finditer(folded):
+        last = m
+    if last is None:
+        return ""
+    return extract_practice_task(raw[last.start():], limit=limit)
+
+
+# BUG 4 (2026-07-10): model kod višestavčne ocjene numeriše svaku stavku "1."
+# (markdown navika). Deterministička renumeracija: SAMO kada su SVI numerisani
+# redovi "1." (degenerisan slučaj — nikad legitiman), postaju 1., 2., 3. …
+_NUMBERED_LINE_START_RE = re.compile(r"(?m)^([ \t]*)(\d{1,2})([.)])\s")
+
+
+def fix_repeated_item_numbering(text: str) -> str:
+    numbers = [int(m.group(2)) for m in _NUMBERED_LINE_START_RE.finditer(text or "")]
+    if len(numbers) < 2 or any(n != 1 for n in numbers):
+        return text
+    counter = 0
+
+    def _renum(m: re.Match) -> str:
+        nonlocal counter
+        counter += 1
+        return f"{m.group(1)}{counter}{m.group(3)} "
+
+    return _NUMBERED_LINE_START_RE.sub(_renum, text)
+
+
 def list_topics(master: dict | None = None, grade: int | str = DEFAULT_GRADE) -> dict:
     """Lista NPP tema za UI dropdown (GET /api/ai-tutor/topics), oblast-first.
 
@@ -1277,6 +1496,43 @@ def _call_model_with_retry(
     return answer if answer.strip() else _EMPTY_ANSWER_FALLBACK
 
 
+def _run_answer_check(payload: dict) -> None:
+    """Deterministička provjera odgovora + atribucija stavke (BUG 12).
+
+    Kod višestavkovnog zadatka stanje ``task_items`` (iz prethodnog next_state)
+    zna koje su stavke VEĆ ocijenjene. Ako učenik pošalje JEDAN nenumerisan
+    odgovor, a preostala je TAČNO JEDNA stavka, odgovor se pripisuje njoj —
+    ranije je provjera vraćala checkable=False pa je model pogađao i brkao
+    stavke."""
+    task = normalize_value(payload.get("last_tutor_task"))
+    student = normalize_value(payload.get("student_message") or payload.get("message"))
+    if not (task and student):
+        return
+
+    items = split_numbered_items(task)
+    prev_items = _previous_next_state(payload).get("task_items")
+    if items and prev_items:
+        labels = [n for n, _t in items]
+        if set(prev_items.get("labels") or []) == set(labels):
+            graded = [n for n in prev_items.get("graded") or [] if n in labels]
+            pending = [n for n in labels if n not in graded]
+            payload["_task_items_prev"] = {"labels": labels, "graded": graded}
+            answer_mode, _answers = parse_student_answers(student)
+            refs = detect_referenced_items(student, labels)
+            if len(pending) == 1 and not refs and answer_mode == "single":
+                n = pending[0]
+                by_n = dict(items)
+                result = check_practice_answer(by_n.get(n, ""), student)
+                if result.checkable and result.items:
+                    for item_check in result.items:
+                        item_check.n = n
+                    payload["answer_check"] = result
+                    payload["_current_task_item"] = n
+                    return
+
+    payload["answer_check"] = check_practice_answer(task, student)
+
+
 def _sanitize_payload(payload: dict) -> dict:
     """Phase 6: sigurnosni limiti ulaza — poruka, historija i last_tutor_task se
     skraćuju; historija na zadnjih MAX_HISTORY_ITEMS stavki."""
@@ -1378,10 +1634,16 @@ def _prepare_chat(
     # Default: grade -> 6 ako nije zadan; grade bira master/map i tutor prompt.
     payload["grade"] = normalize_grade(payload.get("grade") or DEFAULT_GRADE)
     _sanitize_payload(payload)
+    # Session mod = ono što je korisnik izabrao u UI-ju; contracts smiju mijenjati
+    # SAMO prompt-mod (interno rutiranje), a UI prikazuje session mod (BUG 10/14).
+    payload["_session_mode"] = normalize_value(payload.get("mode")).lower() or "explain"
     # Eksplicitna namjera (stil/obim) se čita iz ORIGINALNE poruke, prije nego
     # što je confirmation contract eventualno zamijeni sintetičkom.
     _apply_explicit_intent(payload)
     _apply_confirmation_contract(payload)
+    # "zadatak", "novi zadatak", "daj mi teži/lakši" → NOVI zadatak, ne ocjena
+    # ni objašnjenje starog (BUG 6/8). Poslije potvrda, prije challenge/help.
+    _apply_new_task_intent(payload)
     # Osporavanje ranije ocjene ("pa to sam i odgovorio") → ponovna provjera
     # prethodnog odgovora (ne novi zadatak). Poslije confirmation contract-a da
     # potvrde ("da"/"ne") imaju prednost.
@@ -1449,10 +1711,7 @@ def _prepare_chat(
         not payload.get("_skip_answer_check")
         and normalize_value(payload.get("interaction_phase")).lower() == "answering_practice_task"
     ):
-        _task = normalize_value(payload.get("last_tutor_task"))
-        _student = normalize_value(payload.get("student_message") or payload.get("message"))
-        if _task and _student:
-            payload["answer_check"] = check_practice_answer(_task, _student)
+        _run_answer_check(payload)
 
     # F5: ažuriraj "stuck" brojač (za preporuku videa u Vježbajmo) prije prompta.
     _update_stuck_state(payload)
@@ -1760,6 +2019,39 @@ def _next_state_for_response(
     return _empty_next_state()
 
 
+# "unverified" = učenik JESTE odgovorio stavku, ali je kod nije mogao provjeriti
+# (model ju je ocijenio sam). Za praćenje stanja bitno je "odgovoreno", pa i ona
+# izlazi iz pending skupa — sljedeći kratki odgovor pripada preostaloj stavci.
+_ANSWERED_VERDICTS = ("correct", "correct_value_wrong_form", "incorrect", "unverified")
+
+
+def _task_items_for_response(payload: dict, task_text: str) -> dict | None:
+    """BUG 12: novo/ažurirano ``task_items`` stanje za response.
+
+    Novi višestavkovni zadatak → svježe stanje (ništa ocijenjeno). Grading potez
+    bez novog zadatka → prethodno stanje + stavke odgovorene u OVOM potezu."""
+    if task_text:
+        items = split_numbered_items(task_text)
+        if len(items) >= 2:
+            return {"labels": [n for n, _t in items], "graded": []}
+        return None
+    prev = payload.get("_task_items_prev") or _previous_next_state(payload).get("task_items")
+    if not prev:
+        return None
+    labels = list(prev.get("labels") or [])
+    graded = [n for n in prev.get("graded") or [] if n in labels]
+    check = payload.get("answer_check")
+    for item_check in getattr(check, "items", []) or []:
+        n = getattr(item_check, "n", None)
+        if (
+            n in labels
+            and n not in graded
+            and getattr(item_check, "verdict", "") in _ANSWERED_VERDICTS
+        ):
+            graded.append(n)
+    return {"labels": labels, "graded": sorted(graded)}
+
+
 def _is_grading_turn(payload: dict) -> bool:
     """Da li ovaj potez ocjenjuje učenikov odgovor na zadatak?
 
@@ -1783,6 +2075,11 @@ def _finalize_response(prep: dict, answer: str) -> dict:
     # ijekavica. Streaming klijent na kraju ponovo renderuje answer iz "done"
     # događaja, pa ispravka važi i za streamane odgovore.
     answer = to_ijekavica(answer)
+
+    # BUG 4: višestavčna ocjena/kontrolni sa svim stavkama "1." → renumeriši
+    # deterministički (radi samo u degenerisanom slučaju kada su SVE "1.").
+    if _is_grading_turn(payload) or mode == "exam":
+        answer = fix_repeated_item_numbering(answer)
 
     # Autoritativno pomirenje ocjene: JEDAN sud (deterministički answer_check)
     # → konzistentan odgovor. Uklanja lažno negativne ocjene za provjereno
@@ -1854,6 +2151,9 @@ def _finalize_response(prep: dict, answer: str) -> dict:
         "parent_report_signal": parent_report_signal,
         "status": status,
         "mode": mode,
+        # BUG 10: mod SESIJE (UI izbor) — contracts smiju interno preusmjeriti
+        # prompt-mod, ali UI labela/chipovi prate session mod.
+        "session_mode": payload.get("_session_mode") or mode,
     }
     if result_mode:
         response["context_policy"] = "disabled_for_result_mode"
@@ -1879,22 +2179,32 @@ def _finalize_response(prep: dict, answer: str) -> dict:
         response["practice_task_state"] = "solution_revealed"
     # Tokom image_test toka odgovor NIKAD ne postaje last_tutor_task — aktivni
     # "zadatak" je stavka sa slike i živi u next_state.image_test, ne u prozi.
-    task_text = (
-        ""
-        if (
-            payload.get("_direct_answer") is not None
-            or payload.get("_image_test")
-            or payload.get("_solution_revealed")
-        )
-        else (extract_practice_task(answer, mode=mode) if status == "ready" else "")
-    )
-    if task_text:
-        response["last_tutor_task"] = task_text
+    if (
+        payload.get("_direct_answer") is not None
+        or payload.get("_image_test")
+        or payload.get("_solution_revealed")
+        or status != "ready"
+    ):
+        task_text = ""
+    elif _is_grading_turn(payload):
+        # BUG 1: na ocjenjivačkom potezu SAMO eksplicitni "Zadatak:" marker —
+        # riješeni izraz iz objašnjenja ne smije postati "novi zadatak".
+        task_text = extract_marked_task(answer)
+    else:
+        task_text = extract_practice_task(answer, mode=mode)
+    # Server je jedini izvor istine za aktivni zadatak: polje se šalje UVIJEK
+    # (i prazno), da klijent ne izvodi vlastitu heuristiku nad prozom.
+    response["last_tutor_task"] = task_text
     response["next_state"] = _next_state_for_response(
         payload, answer, mode=mode, status=status, task_text=task_text
     )
     # F5: prenesi "stuck" brojač naprijed da klijent vrati stanje sljedeći put.
     response["next_state"]["stuck_count"] = int(payload.get("_stuck_count", 0) or 0)
+    response["next_state"]["correct_streak"] = int(payload.get("_correct_streak", 0) or 0)
+    # BUG 12: stanje višestavkovnog zadatka (labels + graded) putuje naprijed.
+    task_items = _task_items_for_response(payload, task_text)
+    if task_items:
+        response["next_state"]["task_items"] = task_items
 
     # Audit: sažetak determinističke provjere u response (telemetrija/testovi).
     check = payload.get("answer_check")

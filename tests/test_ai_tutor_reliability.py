@@ -72,8 +72,8 @@ def test_empty_answer_retried_with_higher_cap(master, tmap):
     out = svc.handle_chat(_payload("explain"), chat, master, tmap, model="m", timeout=1)
     assert out["answer"] == "Drugi pokušaj radi."
     assert chat.calls["n"] == 2
-    # retry ide sa duplo većim budžetom (700 → 1400)
-    assert chat.calls["max_tokens"] == [700, 1400]
+    # retry ide sa uvećanim budžetom do kapa (900 → 1400)
+    assert chat.calls["max_tokens"] == [900, 1400]
 
 
 def test_truncated_answer_retried(master, tmap):
@@ -109,10 +109,12 @@ def test_first_call_exception_still_propagates(master, tmap):
 
 # --- max_tokens po modu -------------------------------------------------------------
 
-def test_quick_mode_cap_raised_to_400(master, tmap):
+def test_quick_mode_cap_raised_to_600(master, tmap):
+    # BUG 14 (2026-07-10): quick 400→600 — odgovori za sliku sa više pod-stavki
+    # znali su biti odsječeni usred rečenice.
     chat = _seq_chat([_resp("4")])
     svc.handle_chat(_payload("quick"), chat, master, tmap, model="m", timeout=1)
-    assert chat.calls["max_tokens"][0] == 400
+    assert chat.calls["max_tokens"][0] == 600
 
 
 # --- ruta koristi tutor-specifični timeout i max_retries ----------------------------

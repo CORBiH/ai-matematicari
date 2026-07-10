@@ -81,7 +81,7 @@ def test_step_intent_starts_image_test_and_returns_context(master, tmap):
         "item_labels": ["1", "2", "3"], "solved": ["1"],
         "next_item": 2, "style": "step_by_step",
     }
-    assert "last_tutor_task" not in out              # proza nije zadatak
+    assert not out.get("last_tutor_task")            # proza nije zadatak
     up = _prompt(chat)
     assert "MOD: ZADACI SA SLIKE (image_test)" in up
     assert "ISKLJUČIVO zadatak 1" in up
@@ -194,7 +194,7 @@ def test_transition_answer_does_not_become_last_tutor_task(master, tmap):
          "last_tutor_task": "Izračunaj 1/2 + 1/4."},
         chat, master, tmap, model="m", timeout=1,
     )
-    assert "last_tutor_task" not in out
+    assert not out.get("last_tutor_task")
     assert out["next_state"]["active_task_kind"] != "practice"
 
 

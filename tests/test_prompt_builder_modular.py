@@ -338,7 +338,8 @@ def test_practice_followup_instructions_included(master):
     assert "PROVJERA ODGOVORA" in up
     assert "Da li je 2∈S ako je S={1,2,3}?" in up
     assert "The student is responding to this exact previous task:" in up
-    assert "Do not introduce a new task unless the student asks for one." in up
+    # BUG 2 (2026-07-10): poslije tačnog odgovora slijedi novi zadatak u istoj poruci
+    assert "ODMAH daj JEDAN novi zadatak" in up
     assert "ODGOVOR na prethodno postavljeni zadatak" in up
     assert res["mode"] == "practice"
 
@@ -601,7 +602,9 @@ def test_followup_compact_feedback_no_topic_restart():
     block = pb.build_practice_followup_instructions({}, {})
     assert "KRATAK i prirodan za chat" in block
     assert "NE ponavljaj cijelo objašnjenje teme" in block
-    assert "Želiš li sličan zadatak za vježbu?" in block
+    # BUG 2 (2026-07-10): tačan odgovor → odmah novi zadatak ("Zadatak: ...")
+    assert "ODMAH daj JEDAN novi zadatak" in block
+    assert 'Zadatak: ...' in block
 
 
 # --- nastavak razgovora + robusniji practice follow-up --------------------------
