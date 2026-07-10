@@ -76,4 +76,6 @@ def test_dry_regression_grade8_cases():
     assert by_id["g8-explain-stepeni"]["final_topic"] == "8-01-001"
     assert by_id["g8-practice-korijeni"]["final_topic"] == "8-03-015"
     assert by_id["g8-image-conflict-koordinatni-pitagora"]["final_topic"] == "8-04-025"
-    assert by_id["g8-practice-valjak-ne-znam"]["mode"] == "practice"
+    # 'ne znam' bez odgovora → help/hint (prompt-mod explain); UI vidi Vježbu
+    # kroz session_mode. Popravka 2026-07-10.
+    assert by_id["g8-practice-valjak-ne-znam"]["mode"] == "explain"

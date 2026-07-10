@@ -409,6 +409,49 @@ def test_exam_extraction_rejects_gap_and_plain_text():
     assert svc.extract_practice_task("Objasnicu ukratko šta je razlomak i kako se čita.", mode="exam") == ""
 
 
+# ===== "ne znam gdje je zapelo" → hint, ne "Netačno" (live nalaz 2026-07-10) =====
+
+def _stuck_payload(msg):
+    return {
+        "grade": 6, "mode": "practice", "selected_topic": FR_TOPIC,
+        "interaction_phase": "answering_practice_task",
+        "last_tutor_task": "Ivan je pojeo 3/8 pice, pa još 1/4. Koliko je ukupno pojeo?",
+        "student_message": msg,
+    }
+
+
+@pytest.mark.parametrize("msg", [
+    "ne znam gdje je zapelo", "ne znam", "ne razumijem ovo", "ne kontam", "nemam pojma",
+])
+def test_stuck_message_routes_to_help_not_grading(msg):
+    p = _stuck_payload(msg)
+    svc._apply_practice_help_contract(p)
+    assert p.get("interaction_phase") == "practice_help"
+    assert p.get("_skip_answer_check") is True
+    assert p.get("_practice_help_intent") == "hint"
+
+
+@pytest.mark.parametrize("msg", ["5/8", "3/8 + 1/4 = 5/8", "mislim da je 5/8"])
+def test_numeric_answer_still_graded_not_help(msg):
+    p = _stuck_payload(msg)
+    svc._apply_practice_help_contract(p)
+    # pravi odgovor ostaje za ocjenjivanje (nije preusmjeren u help)
+    assert p.get("interaction_phase") == "answering_practice_task"
+    assert not p.get("_skip_answer_check")
+
+
+def test_stuck_message_not_labeled_incorrect(master, tmap):
+    """End-to-end: 'ne znam gdje je zapelo' NE smije dobiti labelu 'Netačno.'."""
+    chat = _fake_chat("Bez brige — koji ti korak nije jasan? Kako smo sveli 1/4 na 2/8?")
+    out = svc.handle_chat(_stuck_payload("ne znam gdje je zapelo"),
+                          chat, master, tmap, model="m", timeout=1)
+    assert "answer_check" not in out            # ništa se ne ocjenjuje
+    assert "netačno" not in out["answer"].lower()
+    up = _last_user_prompt(chat)
+    assert "POMOĆ ZA AKTIVNI ZADATAK" in up
+    assert "NE ponavljaj cijelo rješenje" in up
+
+
 # ===== jezik: novi oblici =====
 
 def test_ijekavica_new_forms():

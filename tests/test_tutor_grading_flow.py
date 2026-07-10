@@ -154,7 +154,7 @@ def test_hint_request_is_not_graded_and_does_not_reveal_solution(master, tmap):
     assert out.get("practice_task_state") != "solution_revealed"
     assert "3/2" not in out["answer"]
     up = _last_user_prompt(chat)
-    assert "Učenik traži HINT" in up
+    assert "traži HINT" in up
     assert "NE otkrivaj konačan rezultat" in up
 
 

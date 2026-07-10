@@ -82,7 +82,8 @@
         "student_message": "ne znam"
       },
       "expect_status": "ready",
-      "expect_mode": "practice"
+      "expect_mode": "explain",
+      "note": "'ne znam' bez odgovora → help/hint (prompt-mod explain; session_mode ostaje practice, UI pokazuje Vježbu). Popravka 2026-07-10."
     },
     {
       "id": "g6-grading-complement-correct",
@@ -521,8 +522,9 @@
         "student_message": "ne znam"
       },
       "expect_status": "ready",
-      "expect_mode": "practice",
-      "expect_topic": "8-12-136"
+      "expect_mode": "explain",
+      "expect_topic": "8-12-136",
+      "note": "'ne znam' bez odgovora → help/hint (prompt-mod explain; session_mode ostaje practice, UI pokazuje Vježbu). Popravka 2026-07-10."
     }
   ]
 }

@@ -450,8 +450,13 @@ def build_practice_help_instructions(payload: dict, topic_context: dict) -> str:
     )
     if intent == "hint":
         block += (
-            "- Učenik traži HINT: daj JEDAN kratak sljedeći korak ili pitanje "
-            "koje vodi ka rješenju. NE otkrivaj konačan rezultat.\n"
+            "- Učenik je zapeo ili traži HINT: daj JEDAN kratak sljedeći korak "
+            "ILI konkretno pitanje koje vodi ka rješenju. NE otkrivaj konačan "
+            "rezultat i NE ocjenjuj (bez \"Tačno.\"/\"Netačno.\").\n"
+            "- NE ponavljaj cijelo rješenje ni prethodno objašnjenje od početka. "
+            "Ako je rješenje već pokazano, umjesto ponavljanja pitaj KONKRETNO "
+            "koji korak učeniku nije jasan (npr. \"Je li ti jasno kako smo "
+            "\\(\\frac{1}{4}\\) sveli na \\(\\frac{2}{8}\\)?\").\n"
             "- Na kraju kratko pozovi učenika da pokuša nastaviti.\n"
         )
     else:
@@ -850,7 +855,12 @@ def build_tutor_prompt(
     # je učenik zapeo (payload["_student_stuck"], postavlja ga ai_tutor_service).
     videos = get_video_recommendation(effective_topic, master_content)
     stuck = bool(payload.get("_student_stuck"))
-    want_video = bool(videos) and (mode == "explain" or (mode == "practice" and stuck))
+    if is_practice_help and payload.get("_stuck_help"):
+        # "ne znam" → help: video se nudi SAMO na pragu (F5 ramp), ne odmah,
+        # iako je prompt-mod postao explain.
+        want_video = bool(videos) and stuck
+    else:
+        want_video = bool(videos) and (mode == "explain" or (mode == "practice" and stuck))
     video_reco_block = build_video_reco_block(videos, stuck=stuck) if want_video else ""
 
     # --- system prompt ---

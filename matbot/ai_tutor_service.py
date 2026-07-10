@@ -322,19 +322,31 @@ def _apply_practice_help_contract(payload: dict) -> None:
         and _PRACTICE_SOLVE_RE.search(folded)
         and (refs or not has_answer)
     )
+    # BUG (2026-07-10): "ne znam / ne razumijem / ne znam gdje je zapelo" BEZ
+    # pokušaja odgovora je signal da je učenik zapeo — NIJE odgovor za ocjenu.
+    # Ranije je padao u grading pa je model lupao "Netačno" i ponavljao rješenje.
+    is_stuck = bool(_STUCK_SIGNAL_RE.search(folded)) and not has_answer
     terse_ref_request = bool(
         refs
         and not has_answer
         and len(folded) <= 80
         and not _PRACTICE_ANSWER_CLAIM_RE.search(folded)
     )
-    if not (wants_hint or wants_explain or wants_solve or terse_ref_request):
+    if not (wants_hint or wants_explain or wants_solve or terse_ref_request or is_stuck):
         return
     if has_answer and not (wants_hint or wants_explain or wants_solve):
         return
 
     item, help_task = _select_practice_help_task(task, message)
-    intent = "hint" if wants_hint and not (wants_explain or wants_solve or terse_ref_request) else "solve"
+    intent = (
+        "hint"
+        if (wants_hint or is_stuck) and not (wants_explain or wants_solve or terse_ref_request)
+        else "solve"
+    )
+    if is_stuck:
+        # F5: "ne znam" i dalje broji kao "zapeo" (video ramp), iako je poruka
+        # preusmjerena u help umjesto grading.
+        payload["_stuck_help"] = True
     payload["_skip_answer_check"] = True
     payload["_practice_help_intent"] = intent
     payload["_practice_help_task"] = help_task[:600]
@@ -991,6 +1003,9 @@ def _update_stuck_state(payload: dict) -> None:
 
     stuck_signal = False
     verdict = ""
+    # "ne znam" preusmjeren u help i dalje broji kao zapeo (flag iz help contract-a).
+    if payload.get("_stuck_help"):
+        stuck_signal = True
     if phase == "answering_practice_task":
         check = payload.get("answer_check")
         if check is not None:

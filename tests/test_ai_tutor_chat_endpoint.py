@@ -317,11 +317,12 @@ def test_nonstreaming_practice_response_includes_last_tutor_task(client, fake_op
 
 
 def test_practice_followup_keeps_exact_task(client, fake_openai):
+    # "da" je valjan odgovor na da/ne zadatak (ne 'ne znam', koje ide u help)
     visible_task = "Da li je 2 element skupa S = {1,2,3}?"
     resp = client.post(CHAT_URL, json={
         "mode": "practice", "selected_topic": TOPIC6,
         "interaction_phase": "answering_practice_task",
-        "last_tutor_task": visible_task, "student_message": "ne znam",
+        "last_tutor_task": visible_task, "student_message": "da",
     })
     body = resp.get_json()
     assert body["status"] == "ready"
