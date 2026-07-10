@@ -384,6 +384,31 @@ def test_nzd_answer_checked():
     assert res3.items[0].verdict == "incorrect"
 
 
+# ===== exam ekstrakcija: uzastopne stavke, bez rupe (live nalaz 2026-07-10) =====
+
+def test_exam_extraction_keeps_verbally_phrased_item():
+    """Stavka bez cifre i bez '?' (verbalno formulisana) NE smije ispasti —
+    ranije su labele bile [1,3] pa je grading preskakao stavku 2."""
+    ans = (
+        "Evo tri zadatka:\n"
+        "1. Izračunaj 3/8 + 1/4. Rezultat izrazi kao skraćeni razlomak.\n"
+        "2. Predstavi dio kruga koji je obojen ako su obojana tri od osam dijela.\n"
+        "3. Skrati 6/9.\n"
+        "Trik: prvo zajednički nazivnik.\nUpozorenje: pazi na jedinice."
+    )
+    from matbot.answer_checker import split_numbered_items
+    et = svc.extract_practice_task(ans, mode="exam")
+    assert [n for n, _ in split_numbered_items(et)] == [1, 2, 3]
+
+
+def test_exam_extraction_rejects_gap_and_plain_text():
+    # rupa [1,3] (stavka 2 nedostaje) → nije validna numerisana lista
+    gap = "1. Izračunaj 3/8 + 1/4.\n3. Skrati 6/9."
+    assert svc._extract_numbered_tasks(gap, 600) == ""
+    # slučajna inline numeracija u prozi nije spisak zadataka
+    assert svc.extract_practice_task("Objasnicu ukratko šta je razlomak i kako se čita.", mode="exam") == ""
+
+
 # ===== jezik: novi oblici =====
 
 def test_ijekavica_new_forms():

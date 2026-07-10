@@ -111,9 +111,14 @@ MAX_RECENT_TASK_CHARS = 300
 # razmišljanje, pa je 250 znao dati prazan/odsječen odgovor.
 # BUG 14 (2026-07-10): odgovori za sliku sa više pod-stavki znali su biti
 # odsječeni usred rečenice — budžeti podignuti (quick 400→600, ostali +200).
-_MAX_TOKENS = {"quick": 600, "explain": 900, "practice": 900, "exam": 1100}
+# LIVE nalaz (2026-07-10): gpt-5-mini je reasoning model — reasoning tokeni
+# troše dio budžeta pa je 900 (practice) redovno pucao na finish_reason=length
+# i radio retry (2 poziva/potez). Baza podignuta da većina poteza bude 1 poziv;
+# max_completion_tokens uključuje i reasoning, pa je viša baza jeftinija (manje
+# odbačenih odsječenih poziva), ne skuplja.
+_MAX_TOKENS = {"quick": 900, "explain": 1400, "practice": 1400, "exam": 1700}
 # Retry budžet kad je odgovor prazan/odsječen (finish_reason == "length").
-_RETRY_MAX_TOKENS_CAP = 1400
+_RETRY_MAX_TOKENS_CAP = 2400
 
 # Student-facing poruka kada model ni nakon retry-a ne vrati tekst.
 _EMPTY_ANSWER_FALLBACK = (
@@ -1256,21 +1261,32 @@ _NUMBERED_TASK_LINE_RE = re.compile(r"^\s*(\d{1,2})[.)]\s+(.+)$")
 def _extract_numbered_tasks(raw: str, limit: int) -> str:
     """Audit: exam odgovor sadrži VIŠE numerisanih zadataka (1., 2., 3.) —
     sačuvaj ih SVE sa numeracijom, da provjera odgovora "1) ... 2) ..." zna
-    koje stavke postoje (ranije se pamtio samo prvi zadatak)."""
-    tasks: list[tuple[int, str]] = []
+    koje stavke postoje (ranije se pamtio samo prvi zadatak).
+
+    BUG (2026-07-10): stavka verbalno formulisana (bez cifre i bez "?", npr.
+    "2. Predstavi dio kruga ako su obojana tri od osam dijela") je ispadala pa
+    su labele bile [1,3] (rupa), a grading je preskakao stavku 2. Popravka:
+    numerisana lista se prihvata SAMO ako je UZASTOPNA (1,2,3,…) i tada se
+    zadržavaju SVE stavke, uključujući verbalno formulisane."""
+    all_lines: list[tuple[int, str]] = []
     for line in raw.splitlines():
         m = _NUMBERED_TASK_LINE_RE.match(line)
-        if not m:
-            continue
-        n, body = int(m.group(1)), m.group(2).strip()
-        if _looks_like_practice_task_text(body) and (
-            any(ch.isdigit() for ch in body) or body.rstrip().endswith("?")
-        ):
-            tasks.append((n, body))
-    numbers = [n for n, _b in tasks]
-    if len(tasks) < 2 or numbers[0] != 1 or any(b <= a for a, b in zip(numbers, numbers[1:])):
+        if m:
+            all_lines.append((int(m.group(1)), m.group(2).strip()))
+    numbers = [n for n, _b in all_lines]
+    # mora biti tačno uzastopna lista 1..k (nikad rupa: rupa = nešto je ispalo)
+    if len(all_lines) < 2 or numbers != list(range(1, len(all_lines) + 1)):
         return ""
-    return "\n".join(f"{n}. {b}" for n, b in tasks)[:limit]
+    # bar polovina stavki mora ličiti na zadatak (inače to nije spisak zadataka)
+    task_like = sum(
+        1 for _n, b in all_lines
+        if _looks_like_practice_task_text(b)
+        or any(ch.isdigit() for ch in b)
+        or b.rstrip().endswith("?")
+    )
+    if task_like * 2 < len(all_lines):
+        return ""
+    return "\n".join(f"{n}. {b}" for n, b in all_lines)[:limit]
 
 
 def extract_practice_task(answer: Any, limit: int = 600, mode: str | None = None) -> str:
@@ -2184,7 +2200,10 @@ def _finalize_response(prep: dict, answer: str) -> dict:
         or payload.get("_image_test")
         or payload.get("_solution_revealed")
         or status != "ready"
+        or mode not in ("practice", "exam")
     ):
+        # BUG 3/9: samo Vježba/Kontrolni prate aktivni zadatak; explain/quick
+        # nikad (proza objašnjenja ne smije postati last_tutor_task).
         task_text = ""
     elif _is_grading_turn(payload):
         # BUG 1: na ocjenjivačkom potezu SAMO eksplicitni "Zadatak:" marker —
