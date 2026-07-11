@@ -657,12 +657,18 @@ def _normalize_image_test(raw: Any) -> dict | None:
     solved = [s for s in solved if s in labels]
     next_item = _normalize_next_item(raw.get("next_item"))
     style = normalize_value(raw.get("style")).lower()
-    return {
+    current = _normalize_next_item(raw.get("current"))
+    out = {
         "item_labels": labels,
         "solved": solved,
         "next_item": next_item,
-        "style": style if style in ("step_by_step", "result_only") else None,
+        # AUD-01: "practice" = učenik SAM rješava stavke sa slike (jedna po jedna),
+        # za razliku od "step_by_step"/"result_only" gdje tutor rješava.
+        "style": style if style in ("step_by_step", "result_only", "practice") else None,
     }
+    if current is not None and normalize_value(current).lower() in labels:
+        out["current"] = normalize_value(current).lower()
+    return out
 
 
 def _normalize_pending_action(raw: Any) -> dict:
@@ -1174,14 +1180,16 @@ def _resolve_image_test_state(payload: dict) -> dict | None:
     prev = _previous_next_state(payload).get("image_test") or {}
     prev_solved = [s for s in prev.get("solved") or [] if s in labels]
     pending = _pending_action_from_payload(payload)
+    mode_val = normalize_value(payload.get("mode")).lower()
     style = (
         normalize_value(payload.get("explicit_style")).lower()
         or normalize_value(prev.get("style")).lower()
-        or ("result_only"
-            if normalize_value(payload.get("mode")).lower() == "quick"
+        or ("result_only" if mode_val == "quick"
+            # AUD-01: u Vježbi/Kontrolnom učenik sam rješava zadatke sa slike
+            else "practice" if mode_val in ("practice", "exam")
             else "step_by_step")
     )
-    if style not in ("step_by_step", "result_only"):
+    if style not in ("step_by_step", "result_only", "practice"):
         style = "step_by_step"
 
     message = normalize_value(payload.get("student_message") or payload.get("message"))
@@ -1202,6 +1210,11 @@ def _resolve_image_test_state(payload: dict) -> dict | None:
     elif prev and _CONTINUE_SIGNAL_RE.search(fold_diacritics(message)):
         pn = prev.get("next_item")
         current = str(pn).lower() if pn is not None else None
+    elif fresh_ocr and not prev and style == "practice":
+        # AUD-01: SVJEŽA slika sa ≥2 zadatka u Vježbi/Kontrolnom bez ijednog
+        # drugog signala → učenik sam rješava, kreni od prve stavke (umjesto da
+        # practice generator izmisli nepovezane zadatke).
+        current = None                       # → prva neriješena stavka ispod
     else:
         return None
 
@@ -1674,6 +1687,38 @@ def _sanitize_payload(payload: dict) -> dict:
     return payload
 
 
+def _apply_image_practice_followup(payload: dict) -> None:
+    """AUD-01: kad učenik odgovara na stavku iz image_test "practice" toka,
+    izračunaj SLJEDEĆU stavku sa slike da followup prompt ponudi baš nju (a NE
+    izmišljeni novi zadatak). Postavlja ``payload["_image_practice_answer"]``."""
+    if payload.get("_skip_answer_check"):
+        return
+    if normalize_value(payload.get("interaction_phase")).lower() != "answering_practice_task":
+        return
+    prev_img = _previous_next_state(payload).get("image_test") or {}
+    if prev_img.get("style") != "practice":
+        return
+    saved = normalize_value(payload.get("last_image_context"))
+    ocr = ocr_from_saved_context(saved) if saved else ""
+    items = extract_image_tasks(ocr) if ocr else []
+    labels = [str(it["label"]).lower() for it in items]
+    tasks_by_label = {str(it["label"]).lower(): it["task"] for it in items}
+    solved = [s for s in (prev_img.get("solved") or []) if s in labels]
+    cur = normalize_value(prev_img.get("current")).lower()
+    if cur and cur not in solved:
+        solved.append(cur)
+    unsolved = [l for l in labels if l not in solved]
+    if unsolved:
+        nxt = unsolved[0]
+        payload["_image_practice_answer"] = {
+            "next_label": nxt,
+            "next_task": normalize_value(tasks_by_label.get(nxt, ""))[:500],
+            "done": False,
+        }
+    else:
+        payload["_image_practice_answer"] = {"next_label": None, "next_task": "", "done": True}
+
+
 def _oblast_list(master: dict) -> str:
     """Lista oblasti iz mastera (redoslijed sheeta, bez hardkodiranja)."""
     seen: list[str] = []
@@ -1810,6 +1855,9 @@ def _prepare_chat(
         and normalize_value(payload.get("interaction_phase")).lower() == "answering_practice_task"
     ):
         _run_answer_check(payload)
+    # AUD-01: odgovor na stavku image_test "practice" toka → pripremi SLJEDEĆU
+    # stavku sa slike (da followup ne izmisli novi zadatak).
+    _apply_image_practice_followup(payload)
 
     # F5: ažuriraj "stuck" brojač (za preporuku videa u Vježbajmo) prije prompta.
     _update_stuck_state(payload)
@@ -2063,11 +2111,61 @@ def _next_state_for_response(
     if status != "ready":
         return _empty_next_state()
 
+    # AUD-01: image_test "practice" — učenik SAM rješava stavke sa slike, pa se
+    # na potezu ODGOVORA (kad _image_test nije aktivan jer answering_practice_task
+    # vraća None) tekuća stavka označava riješenom i nudi se nastavak na sljedeću.
+    prev_img = _previous_next_state(payload).get("image_test") or {}
+    answering = normalize_value(payload.get("interaction_phase")).lower() == "answering_practice_task"
+    img = payload.get("_image_test")
+    if (not img and answering and prev_img.get("style") == "practice"
+            and not payload.get("_skip_answer_check")):
+        labels = [normalize_value(l).lower() for l in prev_img.get("item_labels") or []]
+        solved = [s for s in (prev_img.get("solved") or []) if s in labels]
+        cur = normalize_value(prev_img.get("current")).lower()
+        if not cur or cur not in labels:
+            rem = [l for l in labels if l not in solved]
+            cur = rem[0] if rem else ""
+        if cur and cur not in solved:
+            solved.append(cur)
+        unsolved = [l for l in labels if l not in solved]
+        if unsolved:
+            nxt = unsolved[0]
+            return {
+                "expected_user_action": "continue_confirmation",
+                "pending_action": {
+                    "type": "continue_image_test",
+                    "source": "image_context",
+                    "next_item": _item_out(nxt),
+                },
+                "active_task_kind": "image_test",
+                "image_test": {
+                    "item_labels": labels, "solved": solved,
+                    "next_item": _item_out(nxt), "style": "practice",
+                },
+            }
+        # sve stavke sa slike riješene → izlaz iz image toka (normalna logika ispod)
+
     # image_test ima APSOLUTNU prednost i računa se iz stanja, ne iz proze:
     # stavka koju smo u OVOM potezu dali modelu postaje "riješena", sljedeća
     # neriješena ide u pending_action.next_item.
-    img = payload.get("_image_test")
     if img:
+        if img.get("style") == "practice":
+            # PREZENTACIONI potez: tekuća stavka se NE označava riješenom —
+            # učenik tek treba poslati svoj odgovor (grade-a se sljedeći potez).
+            labels = list(img.get("labels") or [])
+            solved = list(img.get("solved") or [])
+            cur = img.get("current")
+            remaining = [l for l in labels if l not in solved and l != cur]
+            return {
+                "expected_user_action": "answer_task",
+                "pending_action": _empty_pending_action(),
+                "active_task_kind": "image_test",
+                "image_test": {
+                    "item_labels": labels, "solved": solved, "current": cur,
+                    "next_item": _item_out(remaining[0]) if remaining else None,
+                    "style": "practice",
+                },
+            }
         solved = list(img.get("solved") or [])
         current = img.get("current")
         if current and current not in solved:
@@ -2277,7 +2375,13 @@ def _finalize_response(prep: dict, answer: str) -> dict:
         response["practice_task_state"] = "solution_revealed"
     # Tokom image_test toka odgovor NIKAD ne postaje last_tutor_task — aktivni
     # "zadatak" je stavka sa slike i živi u next_state.image_test, ne u prozi.
-    if (
+    _img_state = payload.get("_image_test") or {}
+    if _img_state.get("style") == "practice" and normalize_value(_img_state.get("current_task")):
+        # AUD-01: kod image_test "practice" stila TEKUĆA stavka sa slike JESTE
+        # aktivni zadatak — postavi je kao last_tutor_task da se učenikov naredni
+        # odgovor deterministički provjeri protiv OCR teksta (ne protiv izmišljenog).
+        task_text = normalize_value(_img_state.get("current_task"))[:600]
+    elif (
         payload.get("_direct_answer") is not None
         or payload.get("_image_test")
         or payload.get("_solution_revealed")

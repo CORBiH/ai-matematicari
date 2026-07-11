@@ -475,6 +475,26 @@ def build_practice_followup_instructions(payload: dict, topic_context: dict) -> 
         check_block = format_check_block(check)
         if check_block:
             block += check_block + "\n"
+    # AUD-01: odgovor na stavku sa SLIKE (image_test practice) — poslije ocjene
+    # NE izmišljaj novi zadatak; ponudi SLJEDEĆU stavku SA SLIKE (ili završi).
+    ipa = payload.get("_image_practice_answer")
+    if isinstance(ipa, dict):
+        if ipa.get("done"):
+            block += (
+                "‼️ ZADACI SA SLIKE: ovo je bila POSLJEDNJA stavka sa slike. "
+                "Poslije ocjene kratko pohvali i ponudi običnu vježbu ili novu "
+                "sliku — NE izmišljaj novi zadatak sa slike.\n"
+            )
+        else:
+            nxt_label = normalize_value(ipa.get("next_label"))
+            nxt_task = normalize_value(ipa.get("next_task"))[:400]
+            block += (
+                "‼️ ZADACI SA SLIKE: poslije ocjene NE izmišljaj novi zadatak. "
+                f"Kratko ponudi učeniku da nastavi na sljedeći zadatak {nxt_label} "
+                "SA SLIKE"
+                + (f" (tekst: {nxt_task})" if nxt_task else "")
+                + ". Sačuvaj originalnu numeraciju sa slike.\n"
+            )
     return block
 
 
@@ -797,7 +817,22 @@ def build_image_test_instructions(payload: dict) -> str:
     )
     if task:
         block += f"- Tekst zadatka {current}: {task}\n"
-    if img.get("style") == "result_only":
+    style = img.get("style")
+    if style == "practice":
+        # AUD-01: učenik SAM rješava — NE rješavaj zadatak, samo ga predstavi i
+        # zatraži odgovor (kao Vježba). Zadatak dolazi SA SLIKE, ne izmišljaj.
+        block = block.replace(
+            f"- SADA riješi ili objasni ISKLJUČIVO zadatak {current} — prema onome "
+            "što učenik traži.\n",
+            f"- SADA predstavi učeniku ISKLJUČIVO zadatak {current} SA SLIKE i "
+            "zatraži da ga on riješi — NE rješavaj ga ti i NE izmišljaj novi "
+            "zadatak za vježbu.\n",
+        )
+        block += (
+            "- STIL: kratko predstavi zadatak sa slike i pozovi učenika da pošalje "
+            "svoj odgovor; ne daji rješenje unaprijed.\n"
+        )
+    elif style == "result_only":
         block += "- STIL: samo rezultat + najviše jedna kratka rečenica provjere.\n"
     else:
         block += "- STIL: korak po korak, kratko i jasno, primjereno razredu.\n"

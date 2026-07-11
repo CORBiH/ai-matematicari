@@ -810,6 +810,46 @@ def derive_expected(item_text: str) -> Expected | None:
 # (mješoviti broj) ne protumači kao "stavka 2, odgovor 1/4".
 _ANSWER_MARKER_RE = re.compile(r"(?:^|[\s,;])(\d{1,2})\s*[).:]\s*")
 
+# AUD-02 (2026-07-11): ordinalno imenovani odgovori — "prvi je 6/9, drugi 4/8,
+# treci ne znam". Ranije: parse_student_answers → "none" (izgubljeni odgovori).
+_ORDINAL_STEM_NUM = {
+    "prv": 1, "drug": 2, "trec": 3, "cetvrt": 4, "pet": 5,
+    "sest": 6, "sedm": 7, "osm": 8,
+}
+# Marker: ordinalni korijen + rod-nastavak + opcioni veznik "je"/"="/":". Radi
+# na foldovanom tekstu (č/ć/š/ž/đ → ascii); _fold je 1:1 pa su indeksi poravnati
+# s originalom.
+_ORDINAL_MARKER_RE = re.compile(
+    r"(?:^|[\s,;.])(prv|drug|trec|cetvrt|pet|sest|sedm|osm)"
+    r"(?:i|a|o|e|og|om|u|oj)?\b\s*(?:je\b|=|:)?\s*"
+)
+# Poslije ordinala ovo NIJE odgovor nego referenca/objašnjenje ("prvi KORAK",
+# "drugi NAČIN", "treći ZADATAK mi nije jasan", "prvi primjer") → ne parsiraj kao
+# predani odgovor.
+_ORDINAL_GUARD_RE = re.compile(
+    r"^(?:korak|nacin|primjer|zadat\w*|zadac\w*|pitanj\w*|stavk\w*|razlom\w*|"
+    r"broj(?:nik\w*|itelj\w*)?\b|nazivnik\w*|clan\w*|sabir\w*|put\b|dio\b|nije\b|"
+    r"treba\w*|metod\w*|razred\w*|primjer\w*|je\s+lak|je\s+tez|mi\b|se\b|je\b)"
+)
+
+
+def _ordinal_answer_marks(folded: str) -> list[tuple[int, int, int]]:
+    """Vrati (start, end_of_marker, item_number) za svaki ordinal koji NIJE
+    referenca/objašnjenje (guard). Radi na foldovanom tekstu."""
+    out: list[tuple[int, int, int]] = []
+    for m in _ORDINAL_MARKER_RE.finditer(folded):
+        n = _ORDINAL_STEM_NUM.get(m.group(1))
+        if not n:
+            continue
+        seg = folded[m.end():]
+        if _NONANSWER_SEG_RE.match(seg):
+            out.append((m.start(1), m.end(), n))     # "treci ne znam" → nepokušano
+            continue
+        if _ORDINAL_GUARD_RE.match(seg):
+            continue                                  # referenca/objašnjenje, ne odgovor
+        out.append((m.start(1), m.end(), n))
+    return out
+
 
 def parse_student_answers(student_text: str) -> tuple[str, dict[int, NumberToken | None]]:
     """Vrati ("numbered", {n: token|None}) | ("ordered", {1: t1, 2: t2, ...}) |
@@ -833,6 +873,24 @@ def parse_student_answers(student_text: str) -> tuple[str, dict[int, NumberToken
                 numbered[n] = toks[0] if len(toks) == 1 else None
         if any(t is not None for t in numbered.values()):
             return "numbered", numbered
+
+    # AUD-02: ordinalno imenovani odgovori ("prvi je 6/9, drugi 4/8, treci ne
+    # znam"). Traži ≥2 markera (jedan ordinal je dvosmislen → prepušta se
+    # detect_referenced_items/single putu) i bar jedan stvaran broj.
+    folded = _fold(norm)
+    omarks = _ordinal_answer_marks(folded)
+    if len(omarks) >= 2:
+        ordinal: dict[int, NumberToken | None] = {}
+        for i, (_s, e, n) in enumerate(omarks):
+            end = omarks[i + 1][0] if i + 1 < len(omarks) else len(norm)
+            seg = norm[e:end]
+            if _NONANSWER_SEG_RE.match(_fold(seg)):
+                ordinal[n] = None                     # nepokušano ("ne znam")
+            else:
+                toks = _scan_number_tokens(seg)
+                ordinal[n] = toks[0] if len(toks) == 1 else None
+        if any(t is not None for t in ordinal.values()):
+            return "numbered", ordinal
 
     tokens = _scan_number_tokens(norm)
     if len(tokens) == 1:
@@ -861,13 +919,20 @@ _NONANSWER_SEG_RE = re.compile(
 
 
 def _numbered_nonanswer_items(student_text: str) -> set[int]:
-    """Brojevi stavki čiji je segment eksplicitan ne-odgovor ("3) ne znam")."""
+    """Brojevi stavki čiji je segment eksplicitan ne-odgovor ("3) ne znam" ili
+    ordinalno "treci ne znam")."""
     norm = _fold(_normalize_math_text(student_text or ""))
+    out: set[int] = set()
     marks = [(m.start(1), m.end(), int(m.group(1)))
              for m in _ANSWER_MARKER_RE.finditer(norm)]
-    out: set[int] = set()
     for i, (_s, e, n) in enumerate(marks):
         end = marks[i + 1][0] if i + 1 < len(marks) else len(norm)
+        if _NONANSWER_SEG_RE.match(norm[e:end]):
+            out.add(n)
+    # AUD-02: ordinalni ne-odgovori ("treci ne znam")
+    omarks = _ordinal_answer_marks(norm)
+    for i, (_s, e, n) in enumerate(omarks):
+        end = omarks[i + 1][0] if i + 1 < len(omarks) else len(norm)
         if _NONANSWER_SEG_RE.match(norm[e:end]):
             out.add(n)
     return out
@@ -905,6 +970,11 @@ def detect_referenced_items(student_text: str, valid_numbers: list[int]) -> set[
     for n, pat in _ORDINAL_WORDS:
         if re.search(rf"\b{pat}\s+{_ITEM_NOUN}", folded) or re.search(rf"\bna\s+{pat}\b(?!\s*\d)", folded):
             refs.add(n)
+    # AUD-02: direktna referenca s odgovorom ("treci je 5/6", "drugi = 4/8",
+    # "cetvrti 7", "prvi je x=4"). Guard u _ordinal_answer_marks isključuje
+    # "prvi korak"/"drugi zadatak" (to hvataju gornja pravila kao referencu).
+    for _s, _e, n in _ordinal_answer_marks(folded):
+        refs.add(n)
     for m in re.finditer(rf"\b(\d{{1,2}})\s*[.)]?\s*{_ITEM_NOUN}", folded):
         refs.add(int(m.group(1)))
     for m in re.finditer(rf"\b{_ITEM_NOUN}\s+(?:broj\s+)?(\d{{1,2}})\b", folded):
