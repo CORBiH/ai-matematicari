@@ -274,6 +274,10 @@ def build_mode_instructions(
         "- Budi razgovoran, ne repetitivan: prvo ideja/pristup u 2–3 kratke "
         "rečenice, zatim JEDAN kratak RIJEŠENI primjer (ti ga riješiš do "
         "kraja) ILI ponudi primjer pitanjem (npr. \"Hoćeš primjer?\").\n"
+        "- U riješenom primjeru rezultat napiši prirodno u rečenici "
+        "(npr. \"pa je \\(\\frac{3}{8}+\\frac{2}{8}=\\frac{5}{8}\\)\"). NE "
+        "koristi podebljanu oznaku \"**Rezultat:**\" — ona pripada modu Vježba/"
+        "Rezultat, ne objašnjenju.\n"
         "- NE prepričavaj cijelu lekciju odjednom i NE ispisuj sav sadržaj teme "
         "svaki put — podatke o temi koristi kao pomoć, ne kao skriptu.\n"
         "- Ako historija razgovora VEĆ sadrži objašnjenje ove teme, NE ponavljaj "
@@ -349,6 +353,40 @@ def _task_items_note(payload: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
+# Živi nalaz 2026-07-11 (bug #2): u Vježbi (help/followup) mode-blok je task-
+# fokusiran pa "priguši" empatija-pravilo iz sistemskog prompta — model na
+# "glup sam"/"preteško" odmah ide na proceduru. Zato distres detektujemo
+# deterministički i ubacujemo ISTAKNUTU direktivu na VRH bloka.
+_DISTRESS_RE = re.compile(
+    r"\b(glup\w*|blesav\w*|tup(?:a|av\w*)?|ne\s+mogu|ne\s+umijem|ne\s+umem|"
+    r"pretesk\w*|pretesko|mrzim|ne\s+volim|nikad(?:a)?\s+ne(?:\s+cu|cu)?\s*(?:\w+\s+)?nauc\w*|"
+    r"odustaj\w*|glupa\s+matematika|bezveze|ne\s+ide\s+mi|beznadezn\w*|"
+    r"nisam\s+sposoban\w*|nesposoban\w*|frustr\w*)\b"
+)
+
+
+def _student_in_distress(payload: dict) -> bool:
+    # _original_student_message: servis prepiše student_message sintetičkim
+    # hint-tekstom pri reroute-u na practice_help; original nosi emociju.
+    payload = payload or {}
+    msg = normalize_value(payload.get("_original_student_message")
+                          or payload.get("student_message"))
+    if not msg:
+        return False
+    folded = (msg.lower().replace("č", "c").replace("ć", "c").replace("đ", "d")
+              .replace("š", "s").replace("ž", "z"))
+    return bool(_DISTRESS_RE.search(folded))
+
+
+_EMPATHY_DIRECTIVE = (
+    "‼️ PRIORITET — EMOCIJA UČENIKA: učenik je izrazio frustraciju ili "
+    "samokritiku. PRVA rečenica tvog odgovora MORA biti kratko, iskreno "
+    "ohrabrenje koje normalizuje grešku (npr. \"Nisi glup — ovo mnogi prvo "
+    "pobrkaju, idemo polako zajedno.\"). Tek POSLIJE toga daj hint/korak. "
+    "NIKAD ne počinji procedurom ni ocjenskom labelom prije ohrabrenja.\n"
+)
+
+
 def build_practice_followup_instructions(payload: dict, topic_context: dict) -> str:
     """Phase 4.3 — instrukcije kada je učenikova poruka ODGOVOR na prethodni
     practice zadatak (``payload.interaction_phase == 'answering_practice_task'``).
@@ -406,6 +444,9 @@ def build_practice_followup_instructions(payload: dict, topic_context: dict) -> 
         "- Ako učenik napiše \"ne znam\", \"objasni\" ili \"pomozi\": daj JEDAN "
         "vođeni hint ili JEDAN sljedeći korak — NE novi zadatak i NE cijelo "
         "rješenje odmah.\n"
+        "- EMPATIJA: ako učenik uz odgovor izrazi frustraciju ili samokritiku "
+        "(\"glup sam\", \"ne mogu\", \"preteško\"), poslije ocjenske labele "
+        "dodaj kratko ohrabrenje koje normalizuje grešku prije nego nastaviš.\n"
         "- NE ponavljaj isti zadatak osim ako je odgovor nejasan.\n"
         "- NE ponavljaj cijelo objašnjenje teme i NE počinji isti zadatak ispočetka.\n"
         "- Odgovor mora biti KRATAK i prirodan za chat: bez naslova poput "
@@ -447,6 +488,11 @@ def build_practice_help_instructions(payload: dict, topic_context: dict) -> str:
         "iz prethodnog practice zadatka.\n"
         "- NE koristi ocjenjivačke labele \"Tačno.\", \"Djelimično tačno.\" ili "
         "\"Netačno.\" jer ovo nije provjera učenikovog odgovora.\n"
+        "- EMPATIJA PRIJE HINTA: ako učenikova poruka izražava frustraciju ili "
+        "samokritiku (\"glup sam\", \"ne mogu\", \"preteško mi je\", \"mrzim\"), "
+        "PRVA rečenica mora biti kratko ohrabrenje koje normalizuje grešku "
+        "(npr. \"Nisi glup, ovo mnogi prvo pobrkaju — idemo polako.\"), pa TEK "
+        "ONDA hint. Ne prelazi odmah na proceduru.\n"
         "- Radi samo zadatak naveden u bloku ispod; ne uvodi novu temu i ne "
         "ocjenjuj ostale stavke.\n"
     )
@@ -471,6 +517,10 @@ def build_practice_help_instructions(payload: dict, topic_context: dict) -> str:
         )
     if task:
         block += f"AKTIVNI ZADATAK ZA POMOĆ:\n{task}\n"
+    # bug #2: kad je distres stvarno detektovan, istaknuta direktiva na VRHU
+    # (bullet u listi model zna preskočiti).
+    if _student_in_distress(payload):
+        block = _EMPATHY_DIRECTIVE + block
     return block
 
 

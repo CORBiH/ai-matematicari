@@ -354,6 +354,10 @@ def _apply_practice_help_contract(payload: dict) -> None:
         payload["_practice_help_item"] = item
     payload["mode"] = "explain"
     payload["interaction_phase"] = "practice_help"
+    # bug #2 (2026-07-11): originalnu poruku čuvamo PRIJE nego je prepišemo
+    # sintetičkim hint-tekstom — prompt_builder iz nje detektuje frustraciju
+    # ("glup sam"/"preteško") i ubacuje istaknutu empatija-direktivu.
+    payload["_original_student_message"] = message
     if intent == "hint":
         payload["student_message"] = (
             "Daj mi jedan kratki hint za ovaj zadatak. "
@@ -1320,6 +1324,12 @@ def extract_practice_task(answer: Any, limit: int = 600, mode: str | None = None
         if numbered:
             return numbered
 
+    # bug #4 (2026-07-11): eksplicitni "Zadatak:" marker je pouzdaniji od
+    # paragraf-heuristike (koja preferira trailing imperativ). Prompti ga traže.
+    marked = _extract_marker_paragraph(raw, limit)
+    if marked:
+        return marked
+
     paragraphs = [
         _clean_task_candidate(p, limit)
         for p in re.split(r"\n\s*\n", raw)
@@ -1370,10 +1380,15 @@ def extract_practice_task(answer: Any, limit: int = 600, mode: str | None = None
 _TASK_MARKER_LINE_RE = re.compile(r"(?m)^[ \t]*zadatak(?:\s+za\s+vjezbu)?\s*[:\-—]")
 
 
-def extract_marked_task(answer: Any, limit: int = 600) -> str:
-    """Izvuci zadatak SAMO ako u odgovoru postoji eksplicitni "Zadatak:" red;
-    uzima se POSLJEDNJI takav (novi zadatak dolazi na kraju ocjene)."""
-    raw = normalize_value(answer).replace("\r\n", "\n").replace("\r", "\n")
+def _extract_marker_paragraph(raw: Any, limit: int = 600) -> str:
+    """Kad postoji eksplicitni "Zadatak:" red, uzmi tekst POSLJEDNJEg markera
+    ograničen na NJEGOV paragraf (do prve prazne linije).
+
+    2026-07-11 (bug #4): trailing meta-uputa u zasebnom paragrafu ("Riješi
+    zadatak i napiši svoje odgovore.") znala je biti izabrana umjesto samog
+    zadatka jer paragraf-heuristika preferira imperativ. Pošto prompti sada
+    OBAVEZUJU format "Zadatak: ...", marker je pouzdaniji izvor."""
+    raw = normalize_value(raw).replace("\r\n", "\n").replace("\r", "\n")
     if not raw:
         return ""
     folded = fold_diacritics(raw)
@@ -1384,7 +1399,29 @@ def extract_marked_task(answer: Any, limit: int = 600) -> str:
         last = m
     if last is None:
         return ""
-    return extract_practice_task(raw[last.start():], limit=limit)
+    segment = raw[last.start():]
+    para = re.split(r"\n\s*\n", segment, maxsplit=1)[0]
+    cleaned = _clean_task_candidate(para, limit)
+    if not cleaned or len(cleaned) < 8:
+        return ""
+    # Model je EKSPLICITNO označio ovo kao "Zadatak:" — vjerujemo labeli i ne
+    # tražimo strogu proznu heuristiku (_looks_like_practice_task_text je
+    # podešen za NEoznačenu prozu i propušta zadatke s glagolima "navedi/
+    # zapiši/koliki" kojih nema u action-regexu). Dovoljan je math-signal ili
+    # smislena dužina; odbaci samo čiste prelazne/ponudne fraze.
+    folded_clean = fold_diacritics(cleaned)
+    if _TRANSITION_TEXT_RE.match(folded_clean) or _CONTINUE_OFFER_RE.search(folded_clean):
+        if not _TASK_SIGNAL_RE.search(folded_clean):
+            return ""
+    if _TASK_SIGNAL_RE.search(folded_clean) or len(cleaned.split()) >= 4:
+        return cleaned[:limit]
+    return ""
+
+
+def extract_marked_task(answer: Any, limit: int = 600) -> str:
+    """Izvuci zadatak SAMO ako u odgovoru postoji eksplicitni "Zadatak:" red;
+    uzima se POSLJEDNJI takav (novi zadatak dolazi na kraju ocjene)."""
+    return _extract_marker_paragraph(answer, limit=limit)
 
 
 # BUG 4 (2026-07-10): model kod višestavčne ocjene numeriše svaku stavku "1."

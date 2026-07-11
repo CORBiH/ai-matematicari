@@ -78,6 +78,23 @@ def test_bug1_grading_turn_extracts_only_marked_task():
     assert "2/7" in svc.extract_marked_task(marked) or "frac{2}{7}" in svc.extract_marked_task(marked)
 
 
+def test_bug4b_marker_task_not_trailing_meta_line():
+    """Živi nalaz 2026-07-11: kad zadatak koristi glagole van action-regexa
+    ('navedi/zapiši/koliki'), a poslije njega stoji meta-uputa u zasebnom
+    paragrafu ('Riješi zadatak i napiši svoje odgovore.'), ekstrakcija je birala
+    meta-liniju. Sad marker 'Zadatak:' ima prednost i uzima svoj paragraf."""
+    ans = ("Zadatak: Čokolada je podijeljena na 12 jednakih kocki. Marija pojede "
+           "5 kocki. Kako to zapišemo razlomkom? Navedi brojnik i nazivnik.\n\n"
+           "Riješi zadatak i napiši svoje odgovore.")
+    for fn in (lambda a: svc.extract_practice_task(a, mode="practice"),
+               svc.extract_marked_task):
+        got = fn(ans)
+        assert "Čokolada" in got and "12" in got
+        assert "napiši svoje odgovore" not in got
+    # čista ponuda (bez markera i math-signala) i dalje nije zadatak
+    assert svc.extract_practice_task("Odlično! Hoćeš da nastavimo dalje?", mode="practice") == ""
+
+
 def test_bug1_offer_survives_grading_turn(master, tmap):
     """Ocjena sa računicom + ponuda → pending_action=generate_similar_task
     (ranije je izraz iz ocjene 'pojeo' ponudu)."""

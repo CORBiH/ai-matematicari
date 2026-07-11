@@ -785,3 +785,55 @@ def test_incorrect_answer_names_mistake_first():
     )
     assert "IMENUJ vjerovatnu grešku" in fu
     assert "sabrao i nazivnike" in fu  # primjer netačnog odgovora imenuje grešku
+
+
+# --- živi nalazi 2026-07-11: koordinatni sistem, empatija u Vježbi, Rezultat-leak ---
+
+def test_grade6_coordinate_system_first_quadrant_only(master):
+    """Bug #1: 6. razred koordinatni sistem SAMO prvi kvadrant, bez negativnih."""
+    sp = pb.build_tutor_prompt(
+        {"selected_topic": "6-10-098", "mode": "explain"}, _found("6-10-098"), master
+    )["system_prompt"]
+    assert "SAMO PRVI KVADRANT" in sp
+    assert "ZABRANJENO" in sp and "negativne koordinate" in sp
+    # 7. razred SMIJE negativne (skup Z) — pravilo je grade-specifično
+    from matbot import tutor_prompts as tp
+    assert "SAMO PRVI KVADRANT" not in tp.grade_didactics(7)
+
+
+def test_empathy_in_practice_help_and_followup():
+    """Bug #2: empatija na frustraciju i u Vježba help/followup blokovima."""
+    help_block = pb.build_practice_help_instructions(
+        {"_practice_help_intent": "hint", "_practice_help_task": "1/4 + 1/4"}, {}
+    )
+    assert "EMPATIJA PRIJE HINTA" in help_block
+    fu = pb.build_practice_followup_instructions({"last_tutor_task": "2/5 + 1/5"}, {})
+    assert "EMPATIJA" in fu and "samokritiku" in fu
+
+
+def test_distress_detection_and_prominent_directive():
+    """Bug #2 (živi nalaz): kad je frustracija stvarno u poruci, istaknuta
+    PRIORITET direktiva ide na VRH help-bloka; inače je nema."""
+    assert pb._student_in_distress({"student_message": "ne znam, glup sam za matematiku"})
+    assert pb._student_in_distress({"student_message": "ne mogu ovo, pretesko mi je"})
+    assert pb._student_in_distress({"student_message": "mrzim matematiku"})
+    assert not pb._student_in_distress({"student_message": "koliko je 2/5 + 1/5"})
+    distressed = pb.build_practice_help_instructions(
+        {"_practice_help_intent": "hint", "_practice_help_task": "2/5 + 1/5",
+         "student_message": "ne znam, glup sam za matematiku"}, {}
+    )
+    assert distressed.startswith("‼️ PRIORITET")
+    calm = pb.build_practice_help_instructions(
+        {"_practice_help_intent": "hint", "_practice_help_task": "2/5 + 1/5",
+         "student_message": "daj mi hint"}, {}
+    )
+    assert not calm.startswith("‼️ PRIORITET")
+
+
+def test_explain_forbids_rezultat_bold(master):
+    """Bug #3: 'Rezultat:' bold ne curi u riješeni primjer u Objašnjenju."""
+    up = pb.build_tutor_prompt(
+        {"selected_topic": TOPIC, "mode": "explain"}, _found(), master
+    )["user_prompt"]
+    assert "**Rezultat:**" in up  # zabrana je izražena eksplicitno
+    assert "pripada modu Vježba" in up
