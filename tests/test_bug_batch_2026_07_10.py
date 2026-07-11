@@ -459,3 +459,11 @@ def test_ijekavica_new_forms():
     assert to_ijekavica("Množimo brojitelj sa 10.") == "Množimo brojnik sa 10."
     assert to_ijekavica("To je točno.") == "To je tačno."
     assert "na primjer" in to_ijekavica("primjerice, kada mjeriš dužinu")
+
+
+def test_dobro_pitanje_grammar():
+    # KORAK 3 (2026-07-11): rod se ne slaže ("pitanje" je srednji rod).
+    assert to_ijekavica("Dobar je pitanje!") == "Dobro pitanje!"
+    assert to_ijekavica("dobar pitanje") == "dobro pitanje"
+    # ne dira ispravno korišten muški rod ispred druge imenice
+    assert to_ijekavica("Dobar zadatak.") == "Dobar zadatak."

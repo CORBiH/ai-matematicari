@@ -221,6 +221,12 @@ MODEL_VISION = os.getenv("OPENAI_MODEL_VISION", DEFAULT_MODEL_VISION)
 MODEL_VISION_LIGHT = os.getenv("OPENAI_MODEL_VISION_LIGHT", MODEL_VISION)
 MODEL_TEXT = os.getenv("OPENAI_MODEL_TEXT", DEFAULT_MODEL_TEXT)
 
+# gpt-5-mini je reasoning model: bez ovoga troši puni default reasoning po
+# potezu (izmjereno 12–43 s/odgovor). "low" je 2–7× brže uz isti ili bolji
+# kvalitet (A/B potvrđeno 2026-07-11); tačnost i onako presuđuje answer_checker.
+# Prazan string (OPENAI_REASONING_EFFORT="") vraća stari default (ne šalje param).
+TUTOR_REASONING_EFFORT = os.getenv("OPENAI_REASONING_EFFORT", "low").strip() or None
+
 
 # --- Mathpix: auto-enable i default "prefer" ---
 MATHPIX_APP_ID  = (os.getenv("MATHPIX_APP_ID")  or os.getenv("MATHPIX_API_ID")  or "").strip()
@@ -388,7 +394,7 @@ from utils import _short_name_for_display, _name_from_url, _sniff_image_mime, _b
 from matbot import ai_tutor_service
 from matbot.content_loader import ContentLoadError
 
-def _openai_chat(model: str, messages: list, timeout: float = None, max_tokens: int | None = None, fast: bool = False, max_retries: int | None = None):
+def _openai_chat(model: str, messages: list, timeout: float = None, max_tokens: int | None = None, fast: bool = False, max_retries: int | None = None, reasoning_effort: str | None = None):
 
     def _do(params):
         base = sync_client if fast else client
@@ -402,10 +408,19 @@ def _openai_chat(model: str, messages: list, timeout: float = None, max_tokens: 
     if max_tokens is not None:
         # novi SDK: max_completion_tokens; fallback na max_tokens ako zatreba
         params["max_completion_tokens"] = max_tokens
+    if reasoning_effort is not None:
+        params["reasoning_effort"] = reasoning_effort
     try:
         return _do(params)
     except Exception as e:
         msg = str(e)
+        # model ne podržava reasoning_effort (npr. ne-reasoning model) → izbaci i pokušaj ponovo
+        if "reasoning_effort" in msg and reasoning_effort is not None:
+            params.pop("reasoning_effort", None)
+            try:
+                return _do(params)
+            except Exception as e2:
+                msg = str(e2)
         if "max_completion_tokens" in msg or "Unsupported parameter: 'max_completion_tokens'" in msg:
             params.pop("max_completion_tokens", None)
             if max_tokens is not None: params["max_tokens"] = max_tokens
@@ -413,13 +428,16 @@ def _openai_chat(model: str, messages: list, timeout: float = None, max_tokens: 
         raise
 
 
-def _tutor_openai_chat(model: str, messages: list, timeout: float = None, max_tokens: int | None = None, fast: bool = False):
+def _tutor_openai_chat(model: str, messages: list, timeout: float = None, max_tokens: int | None = None, fast: bool = False, reasoning_effort: str | None = TUTOR_REASONING_EFFORT):
     """OpenAI poziv za modularni tutor: max_retries=AI_TUTOR_MAX_RETRIES (default 1)
     umjesto globalnog defaulta. Namjerno rezolvira ``_openai_chat`` kao modulnu
-    globalu pri pozivu (testovi je monkeypatchaju)."""
+    globalu pri pozivu (testovi je monkeypatchaju).
+
+    ``reasoning_effort`` default je TUTOR_REASONING_EFFORT ("low"); retry na prazan
+    odgovor smije ga spustiti na "minimal" da oslobodi completion budžet."""
     return _openai_chat(
         model, messages, timeout=timeout, max_tokens=max_tokens, fast=fast,
-        max_retries=AI_TUTOR_MAX_RETRIES,
+        max_retries=AI_TUTOR_MAX_RETRIES, reasoning_effort=reasoning_effort,
     )
 
 
@@ -435,11 +453,26 @@ def _tutor_openai_chat_stream(model: str, messages: list, timeout: float = None,
     params = {"model": model, "messages": messages, "stream": True}
     if max_tokens is not None:
         params["max_completion_tokens"] = max_tokens
+    if TUTOR_REASONING_EFFORT is not None:
+        params["reasoning_effort"] = TUTOR_REASONING_EFFORT
     try:
         stream = cli.chat.completions.create(**params)
     except Exception as e:
         msg = str(e)
-        if "max_completion_tokens" in msg:
+        if "reasoning_effort" in msg and TUTOR_REASONING_EFFORT is not None:
+            params.pop("reasoning_effort", None)
+            try:
+                stream = cli.chat.completions.create(**params)
+            except Exception as e2:
+                msg = str(e2)
+                if "max_completion_tokens" in msg:
+                    params.pop("max_completion_tokens", None)
+                    if max_tokens is not None:
+                        params["max_tokens"] = max_tokens
+                    stream = cli.chat.completions.create(**params)
+                else:
+                    raise
+        elif "max_completion_tokens" in msg:
             params.pop("max_completion_tokens", None)
             if max_tokens is not None:
                 params["max_tokens"] = max_tokens

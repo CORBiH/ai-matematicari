@@ -398,10 +398,11 @@ def build_practice_followup_instructions(payload: dict, topic_context: dict) -> 
         "\"Zadatak: ...\" i neka bude malo teži od prethodnog (osim ako TEŽINA "
         "ispod kaže drugačije). Izuzetak: ako sve stavke višestavkovnog zadatka "
         "još nisu odgovorene, prvo zatraži preostale stavke, bez novog zadatka.\n"
-        "- AKO NIJE TAČNO: blago reci da nije tačno i POKAŽI tačan račun korak po "
-        "korak (nikad samo \"nije tačno\" bez računa). NE daji odmah novi "
-        "zadatak — završi jednim kratkim pitanjem razumijevanja ili ponudi "
-        "LAKŠI zadatak.\n"
+        "- AKO NIJE TAČNO: blago reci da nije tačno, pa PRVO kratko IMENUJ "
+        "vjerovatnu grešku (npr. \"čini se da si sabrao i nazivnike\") da učenik "
+        "shvati ZAŠTO je pogriješio, TEK ONDA pokaži tačan račun korak po korak "
+        "(nikad samo \"nije tačno\" bez računa). NE daji odmah novi zadatak — "
+        "završi jednim kratkim pitanjem razumijevanja ili ponudi LAKŠI zadatak.\n"
         "- Ako učenik napiše \"ne znam\", \"objasni\" ili \"pomozi\": daj JEDAN "
         "vođeni hint ili JEDAN sljedeći korak — NE novi zadatak i NE cijelo "
         "rješenje odmah.\n"
@@ -414,9 +415,10 @@ def build_practice_followup_instructions(payload: dict, topic_context: dict) -> 
         "  Tačno. Lijepo si sabrao brojnike, nazivnik ostaje isti.\n"
         "  Zadatak: Izračunaj \\(\\frac{7}{12} - \\frac{5}{12}\\).\n"
         "PRIMJER DOBROG ODGOVORA (netačno):\n"
-        "  Netačno. Pogledajmo zajedno: brojnici se saberu, a nazivnik ostaje "
-        "isti, pa je \\(\\frac{2}{9} + \\frac{5}{9} = \\frac{7}{9}\\). Gdje "
-        "misliš da je zapelo?\n"
+        "  Netačno, ali blizu si. Čini se da si sabrao i nazivnike — to je "
+        "najčešća greška. Kod istih nazivnika brojnici se saberu, a nazivnik "
+        "ostaje isti, pa je \\(\\frac{2}{9} + \\frac{5}{9} = \\frac{7}{9}\\). "
+        "Gdje misliš da je zapelo?\n"
     )
     block += _difficulty_line(payload)
     items_note = _task_items_note(payload)
@@ -853,7 +855,13 @@ def build_tutor_prompt(
     # --- NPP video preporuka (VIDEO_LINKS) ---
     # Objasni mi (explain): ponudi video opciono; Vježbajmo (practice): samo kada
     # je učenik zapeo (payload["_student_stuck"], postavlja ga ai_tutor_service).
-    videos = get_video_recommendation(effective_topic, master_content)
+    # P10 (2026-07-11): video prati temu PITANJA (detektovanu) kad je poznata i
+    # različita od otvorene lekcije — ne otvorenu/izabranu lekciju. Decoupled od
+    # is_lesson_ctx gejta koji vrijedi za effective_topic (framing lekcije).
+    video_topic = effective_topic
+    if detected and detected.lower() != "unknown" and detected in topic_ids and detected != effective_topic:
+        video_topic = detected
+    videos = get_video_recommendation(video_topic, master_content)
     stuck = bool(payload.get("_student_stuck"))
     if is_practice_help and payload.get("_stuck_help"):
         # "ne znam" → help: video se nudi SAMO na pragu (F5 ramp), ne odmah,

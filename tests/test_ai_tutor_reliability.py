@@ -128,3 +128,14 @@ def test_route_uses_tutor_retries_and_timeout(client, fake_openai):
     # tutor timeout je kraći od legacy HARD_TIMEOUT-a
     assert app_mod.AI_TUTOR_TIMEOUT == 45.0
     assert app_mod.AI_TUTOR_TIMEOUT < app_mod.HARD_TIMEOUT_S
+
+
+def test_route_sends_reasoning_effort(client, fake_openai):
+    """U2 (2026-07-11): tutor pozivi šalju reasoning_effort da gpt-5-mini ne
+    troši puni default reasoning (latencija 12–43 s → 6 s, A/B potvrđeno).
+    Regresioni čuvar: ako se param prestane slati, ovaj test pada."""
+    import app as app_mod
+    resp = client.post(CHAT_URL, json={"selected_topic": TOPIC, "mode": "explain"})
+    assert resp.status_code == 200
+    assert fake_openai.calls.kwargs[-1].get("reasoning_effort") == app_mod.TUTOR_REASONING_EFFORT
+    assert app_mod.TUTOR_REASONING_EFFORT == "low"

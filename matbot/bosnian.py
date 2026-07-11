@@ -79,6 +79,9 @@ _REPLACEMENTS: tuple[tuple[re.Pattern, str], ...] = tuple(
         (r"prvih\s+dvoje\s+zadataka", "prva dva zadatka"),
         (r"prvih\s+dvoje", "prva dva"),
         (r"probaj\s+ponovo", "Želiš li sličan zadatak za vježbu?"),
+        # 2026-07-11 (KORAK 3): rod se ne slaže — "pitanje" je srednji rod.
+        # Cilja SAMO ispred "pitanje", pa "dobar zadatak" ostaje netaknut.
+        (r"dobar\s+(?:je\s+)?pitanje", "dobro pitanje"),
     )
 )
 

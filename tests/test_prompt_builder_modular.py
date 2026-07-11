@@ -120,6 +120,27 @@ def test_no_video_flag_for_topic_without_video(master):
     assert "VIDEO LEKCIJA" not in res["user_prompt"]
 
 
+def test_video_follows_detected_question_topic_not_selected(master):
+    """KORAK 4 / P10 (2026-07-11): kad je izabrana tema A, a pitanje detektovano
+    kao tema B (koja ima svoj video), video prati temu PITANJA (B), ne izabranu A."""
+    selected = "6-04-031"   # Pojam razlomka (izabrana lekcija)
+    detected = "6-04-040"   # Sabiranje/oduzimanje razlomaka različitih nazivnika (ima video)
+    assert detected in master["topic_ids"]
+    detected_title = master["videos_by_topic"][detected][0]["lesson_title"]
+    res = pb.build_tutor_prompt(
+        {"selected_topic": selected, "mode": "explain", "detected_topic": detected},
+        _found(selected), master,
+    )
+    up = res["user_prompt"]
+    assert res["video_recommended"] is True
+    assert detected_title in up               # video teme PITANJA je ponuđen
+    # ako izabrana tema ima DRUGAČIJI video, on NE smije biti ponuđen
+    sel_vids = master["videos_by_topic"].get(selected) or []
+    for v in sel_vids:
+        if v["lesson_title"] != detected_title:
+            assert v["lesson_title"] not in up
+
+
 def test_get_video_recommendation_helper(master):
     assert pb.get_video_recommendation(TOPIC, master) == master["videos_by_topic"][TOPIC]
     assert pb.get_video_recommendation("unknown", master) == []
@@ -723,3 +744,44 @@ def test_language_tone_in_all_modular_paths(master, oblast):
         assert "bosanskom jeziku (ijekavica)" in sp
         assert sp.index("MODULARNA PRAVILA") < sp.index("JEZIK I TON (TUTOR)")
         assert sp.index("JEZIK I TON (TUTOR)") < sp.index("FORMAT ODGOVORA (CHAT)")
+
+
+# --- KORAK 2 (2026-07-11): ton za dijete — empatija, imenuj grešku, "Rezultat:" ---
+
+def test_empathy_rule_in_tutor_system_prompt(master):
+    """Na samokritiku ("glup sam") PRVA rečenica mora biti ohrabrenje."""
+    sp = pb.build_tutor_prompt(
+        {"selected_topic": TOPIC, "mode": "practice"}, _found(), master
+    )["system_prompt"]
+    assert "EMPATIJA (OBAVEZNO)" in sp
+    assert "glup sam" in sp
+    assert "normalizuje grešku" in sp
+
+
+def test_concept_translation_and_short_sentences(master):
+    sp = pb.build_tutor_prompt(
+        {"selected_topic": TOPIC, "mode": "explain"}, _found(), master
+    )["system_prompt"]
+    assert "NZS — najmanji broj koji i 3 i 4 dijele" in sp
+    assert "KRATKE rečenice" in sp
+    # generičko "Razumiješ li?" zamijenjeno konkretnom mikro-provjerom
+    assert "Razumiješ li?" in sp and "mikro-zadatak" in sp
+
+
+def test_rezultat_bold_only_when_solving(master):
+    sp = pb.build_tutor_prompt(
+        {"selected_topic": TOPIC, "mode": "explain"}, _found(), master
+    )["system_prompt"]
+    assert "SAMO kada stvarno" in sp
+    assert "NE piši \"**Rezultat:**\"" in sp
+
+
+def test_incorrect_answer_names_mistake_first():
+    """ACCURACY + practice followup: netačan odgovor prvo IMENUJE grešku."""
+    from matbot import tutor_prompts as tp
+    assert "IMENUJ vjerovatnu" in tp.ACCURACY_GUIDELINES
+    fu = pb.build_practice_followup_instructions(
+        {"last_tutor_task": "Izračunaj \\(\\frac{2}{9}+\\frac{5}{9}\\)"}, {}
+    )
+    assert "IMENUJ vjerovatnu grešku" in fu
+    assert "sabrao i nazivnike" in fu  # primjer netačnog odgovora imenuje grešku

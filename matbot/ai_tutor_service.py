@@ -1509,10 +1509,20 @@ def _call_model_with_retry(
     retry_cap = min(cap * 2, _RETRY_MAX_TOKENS_CAP)
     log.warning(
         "ai_tutor: prazan/odsječen odgovor (finish_reason=%s, mode=%s, max_tokens=%s) "
-        "— retry sa max_tokens=%s", finish, mode, cap, retry_cap,
+        "— retry sa max_tokens=%s + reasoning_effort=minimal", finish, mode, cap, retry_cap,
     )
     try:
-        retry_resp = openai_chat(model, messages, timeout=timeout, max_tokens=retry_cap)
+        # KORAK 3 (2026-07-11): na retry-u spusti reasoning na "minimal" da se
+        # oslobodi completion budžet (gpt-5-mini troši dio na razmišljanje pa je
+        # prazan odgovor često znak da je reasoning pojeo max_completion_tokens).
+        # Ako injektovani callable ne podržava kwarg, padni na poziv bez njega.
+        try:
+            retry_resp = openai_chat(
+                model, messages, timeout=timeout, max_tokens=retry_cap,
+                reasoning_effort="minimal",
+            )
+        except TypeError:
+            retry_resp = openai_chat(model, messages, timeout=timeout, max_tokens=retry_cap)
         retry_answer = _extract_answer(retry_resp)
         if retry_answer.strip():
             return retry_answer
