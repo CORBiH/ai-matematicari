@@ -211,7 +211,13 @@ _EXPAND_TARGET_DEN_RE = re.compile(
     r"|\bnazivnik\w*\s+(\d+)\b"
 )
 _SIMPLIFY_RE = re.compile(r"\bskrati")
-_CALC_LEAD_RE = re.compile(r"\b(izracunaj|koliko\s+je|odredi\s+vrijednost)\b")
+# 2026-07-11 (#2): imperativi "pomnozi/saberi/oduzmi/podijeli" uz eksplicitan
+# izraz iza njih ("Pomnoži: 7/3 · 2") ranije nisu hvatani pa deterministički
+# rezultat nije izveden i model je znao halucinirati (7/3 umjesto 14/3).
+_CALC_LEAD_RE = re.compile(
+    r"\b(izracunaj|izracunajte|koliko\s+je|odredi\s+vrijednost|"
+    r"pomnozi|izmnozi|saberi|zberi|oduzmi|podijeli|podeli)\b"
+)
 _ADD_WORD_RE = re.compile(r"\b(saberi|zbroji|zbir|suma)\b")
 _SUB_WORD_RE = re.compile(r"\b(oduzmi|razlika)\b")
 _COMPARE_WORD_RE = re.compile(r"\b(uporedi|usporedi|poredi|uporedjuj)\b")
@@ -301,6 +307,11 @@ def _try_complement(folded: str, tokens: list[NumberToken]) -> Expected | None:
 
 def _try_conversion(folded: str, tokens: list[NumberToken]) -> Expected | None:
     if not _CONVERT_RE.search(folded):
+        return None
+    # #2 (2026-07-11): "Pomnoži ... i napiši kao mješoviti broj: 7/3 · 2" NIJE
+    # čista konverzija — ima pravu operaciju. Ne uzimaj samo prvi razlomak;
+    # prepusti aritmetici (inače bi vratili 7/3 umjesto 14/3).
+    if _EXPR_PREFIX_RE.search(folded):
         return None
     if _TO_IMPROPER_RE.search(folded):
         mixed = [t for t in tokens if t.form == "mixed"]
@@ -841,6 +852,27 @@ def parse_student_answers(student_text: str) -> tuple[str, dict[int, NumberToken
     return "none", {}
 
 
+# Segment stavke koji je EKSPLICITAN NE-odgovor ("3) ne znam") — učenik nije
+# pokušao tu stavku, ne smije se računati kao odgovorena/ocijenjena (#5).
+_NONANSWER_SEG_RE = re.compile(
+    r"^\s*(?:ne\s*znam\w*|nemam\s+pojma|ne\s+znam\s+kako|preskac\w*|preskoci\w*|"
+    r"nista|ne\s+umijem|ne\s+umem|\?+|-{1,3}|prazno|bez\s+odgovora|pas)\s*$"
+)
+
+
+def _numbered_nonanswer_items(student_text: str) -> set[int]:
+    """Brojevi stavki čiji je segment eksplicitan ne-odgovor ("3) ne znam")."""
+    norm = _fold(_normalize_math_text(student_text or ""))
+    marks = [(m.start(1), m.end(), int(m.group(1)))
+             for m in _ANSWER_MARKER_RE.finditer(norm)]
+    out: set[int] = set()
+    for i, (_s, e, n) in enumerate(marks):
+        end = marks[i + 1][0] if i + 1 < len(marks) else len(norm)
+        if _NONANSWER_SEG_RE.match(norm[e:end]):
+            out.add(n)
+    return out
+
+
 # --- Eksplicitno referenciranje stavki ("treće pitanje", "zadatak 2") ---------------
 
 _ORDINAL_WORDS = (
@@ -1106,8 +1138,12 @@ def _check(task_text: str, student_text: str) -> CheckResult:
         # prihvati samo brojeve stavki koje stvarno postoje u zadatku
         if not set(answers) & set(valid):
             return CheckResult(checkable=False)
+        # #5: "3) ne znam" NIJE pokušaj — stavka ostaje nepokušana (pending)
+        nonanswer = _numbered_nonanswer_items(student_text)
         given_by_n = {n: t for n, t in answers.items() if n in valid and t is not None}
-        answered_ns = {n for n in answers if n in valid}
+        answered_ns = {n for n in answers if n in valid and n not in nonanswer}
+        if not answered_ns:
+            return CheckResult(checkable=False)
     elif refs:
         # učenik rješava SAMO stavke koje spominje; ostale NIJE pokušao —
         # one su not_attempted i nikad se ne ocjenjuju kao netačne

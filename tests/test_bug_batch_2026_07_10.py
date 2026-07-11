@@ -469,6 +469,97 @@ def test_stuck_message_not_labeled_incorrect(master, tmap):
     assert "NE ponavljaj cijelo rješenje" in up
 
 
+# ===== živi nalazi simulacije 2026-07-11: routing frustracije/pitanja + solver =====
+
+@pytest.mark.parametrize("msg", [
+    "uh ovo mi je pretesko, mrzim razlomke",
+    "glup sam za ovo",
+    "ne volim razlomke, dosadno mi je",
+])
+def test_frustration_routes_to_help_not_grading(msg):
+    """#1: frustracija bez odgovora → pomoć/empatija, NE ocjena 'Netačno'."""
+    p = _stuck_payload(msg)
+    svc._apply_practice_help_contract(p)
+    assert p.get("interaction_phase") == "practice_help"
+    assert p.get("_skip_answer_check") is True
+    assert p.get("_stuck_help") is True
+    assert p.get("_original_student_message") == msg  # empatija-detekcija ga koristi
+
+
+@pytest.mark.parametrize("msg", ["kolko je to", "koliko je to", "koji je rezultat"])
+def test_vague_question_routes_to_help_not_grading(msg):
+    """#3: nejasno pitanje bez odgovora → pomoć, NE ocjena 'Tačno'."""
+    p = _stuck_payload(msg)
+    svc._apply_practice_help_contract(p)
+    assert p.get("_skip_answer_check") is True
+    assert p.get("interaction_phase") == "practice_help"
+
+
+def test_real_answer_still_graded_not_rerouted():
+    """Regres-čuvar: stvaran numerički odgovor SE i dalje ocjenjuje."""
+    p = _stuck_payload("5/8")
+    svc._apply_practice_help_contract(p)
+    assert p.get("_skip_answer_check") is not True
+
+
+def test_fraction_times_integer_solver():
+    """#2: 'Pomnoži ... 7/3 · 2' daje 14/3 (ranije 7/3 — konverzija presretala)."""
+    from matbot.answer_checker import derive_expected
+    e = derive_expected(r"Pomnoži i napiši kao mješoviti broj: \(\frac{7}{3}\cdot 2\).")
+    assert e is not None and e.value == __import__("fractions").Fraction(14, 3)
+    # čista konverzija i dalje radi
+    e2 = derive_expected(r"Pretvori \(\frac{7}{3}\) u mješoviti broj.")
+    assert e2 is not None and e2.value == __import__("fractions").Fraction(7, 3)
+
+
+def test_continuation_block_forbids_rezultat_bold():
+    """#4: 'Rezultat:' bold ne curi ni u nastavku objašnjenja."""
+    from matbot import prompt_builder as pb
+    block = pb.build_continuation_instructions({"last_tutor_message": "Ideja: ..."})
+    assert "**Rezultat:**" in block  # zabrana izražena
+
+
+# ===== #5: exam višestavkovni tok — "ne znam" ostaje pending, task persistira =====
+
+def test_numbered_ne_znam_not_counted_as_answered():
+    """#5: '3) ne znam' NIJE pokušaj — stavka 3 ostaje nepocijenjena."""
+    from matbot.answer_checker import _numbered_nonanswer_items, check_practice_answer
+    assert _numbered_nonanswer_items("1) 3/5 2) 1/2 3) ne znam") == {3}
+    task = ("1. Saberi: \\(\\frac{3}{4}+\\frac{5}{6}\\).\n"
+            "2. Pomnoži: \\(\\frac{7}{3}\\cdot 2\\).\n"
+            "3. Podijeli \\(\\frac{5}{6}\\) na 3 dijela.")
+    res = check_practice_answer(task, "1) 3/5 2) 1/2 3) ne znam")
+    by_n = {it.n: it.verdict for it in res.items}
+    assert by_n.get(1) == "incorrect" and by_n.get(2) in ("incorrect", "unverified")
+    # stavka 3 nije "odgovorena": missing/not_attempted, NIKAD unverified/incorrect
+    assert by_n.get(3) in ("missing", "not_attempted")
+
+
+def test_exam_task_persists_when_items_pending(master, tmap):
+    """#5: poslije grading poteza sa preostalom stavkom, last_tutor_task se
+    ZADRŽAVA (ranije se brisao pa je sljedeći odgovor gubio kontekst)."""
+    exam = ("1. Saberi: \\(\\frac{3}{4}+\\frac{5}{6}\\).\n"
+            "2. Pomnoži: \\(\\frac{7}{3}\\cdot 2\\).\n"
+            "3. Podijeli \\(\\frac{5}{6}\\) na 3 dijela.")
+    chat = _fake_chat("1. Netačno...\n2. Netačno...\n3. Reci mi odgovor za stavku 3.")
+    out = svc.handle_chat({
+        "grade": 6, "mode": "practice", "selected_topic": FR_TOPIC,
+        "interaction_phase": "answering_practice_task",
+        "last_tutor_task": exam, "student_message": "1) 3/5 2) 1/2 3) ne znam",
+        "previous_next_state": {"task_items": {"labels": [1, 2, 3], "graded": []}},
+    }, chat, master, tmap, model="m", timeout=1)
+    ti = out["next_state"].get("task_items")
+    assert ti == {"labels": [1, 2, 3], "graded": [1, 2]}   # 3 ostaje pending
+    assert out["last_tutor_task"].startswith("1.")          # exam zadržan
+
+
+def test_multi_item_followup_forbids_top_label():
+    """#5: kod više stavki labela ide UZ SVAKU, ne jedna zajednička na vrh."""
+    from matbot import prompt_builder as pb
+    fu = pb.build_practice_followup_instructions({"last_tutor_task": "1. ... 2. ..."}, {})
+    assert "NE stavljaj jednu zajedničku labelu" in fu
+
+
 # ===== jezik: novi oblici =====
 
 def test_ijekavica_new_forms():
@@ -476,6 +567,9 @@ def test_ijekavica_new_forms():
     assert to_ijekavica("Množimo brojitelj sa 10.") == "Množimo brojnik sa 10."
     assert to_ijekavica("To je točno.") == "To je tačno."
     assert "na primjer" in to_ijekavica("primjerice, kada mjeriš dužinu")
+    # #6: provera→provjera (ne dira već ijekavski oblik)
+    assert to_ijekavica("Provera: 25 · 0,5 = 12,5.") == "Provjera: 25 · 0,5 = 12,5."
+    assert to_ijekavica("Provjera je tačna.") == "Provjera je tačna."
 
 
 def test_dobro_pitanje_grammar():

@@ -258,6 +258,21 @@ _PRACTICE_SOLVE_RE = re.compile(
 _PRACTICE_ANSWER_CLAIM_RE = re.compile(
     r"\b(odgovor\w*|mislim|dobio|dobila|napisao|napisala|jednako|je\s+da)\b|="
 )
+# Živi nalaz 2026-07-11: frustracija/samokritika bez pokušaja odgovora ("uh
+# preteško, mrzim razlomke", "glup sam") padala je u grading pa je dobijala
+# labelu "Netačno". Treba je tretirati kao poziv u pomoć (empatija + hint).
+_DISTRESS_SIGNAL_RE = re.compile(
+    r"\bglup\w*\b|\bpretesk\w*\b|\btesko\s+mi\b|\bmrzim\b|\bne\s+volim\b|"
+    r"\bodustaj\w*\b|\bne\s+ide\s+mi\b|\bbezveze\b|\bnesposoban\w*\b|\bblesav\w*\b|"
+    r"\bmrsko\b|\bdosadn\w*\b|\bnikad(?:a)?\s+ne(?:\s+cu|cu)?\b|\bbeznadezn\w*\b"
+)
+# Nejasno pitanje "kolko je to / koji je rezultat" bez odgovora je molba za
+# pomoć, ne pokušaj odgovora — ranije ocijenjeno "Tačno" (model ga sam riješi).
+_VAGUE_QUESTION_RE = re.compile(
+    r"\bkoli?ko\s+je\s+(?:to|ovo|ono)\b"
+    r"|\b(?:koji|koja|koje)\s+je\s+(?:rezultat|rjesenj\w*|odgovor)\b"
+    r"|\b(?:sta)\s+je\s+(?:rezultat|rjesenj\w*|odgovor|tacno)\b"
+)
 
 
 def _practice_referenced_items(message: Any, valid_numbers: list[int]) -> set[int]:
@@ -326,13 +341,17 @@ def _apply_practice_help_contract(payload: dict) -> None:
     # pokušaja odgovora je signal da je učenik zapeo — NIJE odgovor za ocjenu.
     # Ranije je padao u grading pa je model lupao "Netačno" i ponavljao rješenje.
     is_stuck = bool(_STUCK_SIGNAL_RE.search(folded)) and not has_answer
+    # frustracija (#1) i nejasno pitanje (#3): bez pokušaja odgovora → pomoć
+    is_distress = bool(_DISTRESS_SIGNAL_RE.search(folded)) and not has_answer
+    is_vague_q = bool(_VAGUE_QUESTION_RE.search(folded)) and not has_answer
     terse_ref_request = bool(
         refs
         and not has_answer
         and len(folded) <= 80
         and not _PRACTICE_ANSWER_CLAIM_RE.search(folded)
     )
-    if not (wants_hint or wants_explain or wants_solve or terse_ref_request or is_stuck):
+    if not (wants_hint or wants_explain or wants_solve or terse_ref_request
+            or is_stuck or is_distress or is_vague_q):
         return
     if has_answer and not (wants_hint or wants_explain or wants_solve):
         return
@@ -340,12 +359,13 @@ def _apply_practice_help_contract(payload: dict) -> None:
     item, help_task = _select_practice_help_task(task, message)
     intent = (
         "hint"
-        if (wants_hint or is_stuck) and not (wants_explain or wants_solve or terse_ref_request)
+        if (wants_hint or is_stuck or is_distress or is_vague_q)
+        and not (wants_explain or wants_solve or terse_ref_request)
         else "solve"
     )
-    if is_stuck:
-        # F5: "ne znam" i dalje broji kao "zapeo" (video ramp), iako je poruka
-        # preusmjerena u help umjesto grading.
+    if is_stuck or is_distress:
+        # F5: "ne znam"/frustracija i dalje broji kao "zapeo" (video ramp), iako
+        # je poruka preusmjerena u help umjesto grading.
         payload["_stuck_help"] = True
     payload["_skip_answer_check"] = True
     payload["_practice_help_intent"] = intent
@@ -2286,6 +2306,17 @@ def _finalize_response(prep: dict, answer: str) -> dict:
     task_items = _task_items_for_response(payload, task_text)
     if task_items:
         response["next_state"]["task_items"] = task_items
+        # #5 (2026-07-11): na višestavkovnom (exam) potezu bez NOVOG zadatka, a
+        # kad preostaju NEocijenjene stavke, zadrži prethodni zadatak u
+        # last_tutor_task da se naredni odgovor na jednu stavku može pripisati
+        # (inače se briše pa turn+1 ocjenjuje sve iz historije). NE dira task_text
+        # koji je već ušao u stanje (graded se ne resetuje).
+        if not task_text and mode in ("practice", "exam"):
+            labels = task_items.get("labels") or []
+            pending = [n for n in labels if n not in (task_items.get("graded") or [])]
+            persisted = normalize_value(payload.get("last_tutor_task"))
+            if len(labels) >= 2 and pending and persisted:
+                response["last_tutor_task"] = persisted[:600]
 
     # Audit: sažetak determinističke provjere u response (telemetrija/testovi).
     check = payload.get("answer_check")

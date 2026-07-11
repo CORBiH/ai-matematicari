@@ -51,6 +51,7 @@ _REPLACEMENTS: tuple[tuple[re.Pattern, str], ...] = tuple(
         (r"uspeh", "uspjeh"),
         (r"vrednost(\w*)", r"vrijednost\1"),
         (r"promenljiv(\w*)", r"promjenljiv\1"),
+        (r"prover(a|e|i|u|om|avaj\w*|imo|iti|it)", r"provjer\1"),  # provera→provjera (ne dira 'provjer')
         # 2026-07-10: oblici uhvaćeni na Farisovim testovima
         (r"umesto", "umjesto"),
         (r"poslednj(\w*)", r"posljednj\1"),
