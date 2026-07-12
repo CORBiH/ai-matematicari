@@ -229,3 +229,66 @@ def test_refusal_redirect_line_is_not_a_task():
         "Postavi mi pitanje ili zadatak iz matematike.") is False
     assert svc.extract_practice_task(
         "Postavi mi pitanje ili zadatak iz matematike.") == ""
+
+
+# ============ Nalazi 2026-07-12 (screenshotovi): marker/re-explain/scroll ============
+
+def test_new_task_marker_lead_in_variants_extracted():
+    """Bot koji napiše 'Evo novi zadatak za tebe: ...' umjesto 'Zadatak: ...'
+    NE smije izgubiti novi zadatak (inače se sljedeći odgovor ocijeni protiv
+    PRETHODNOG zadatka — jagode/kruške bug sa screenshota)."""
+    got = svc.extract_marked_task(
+        "Djelimično tačno. Dobro si postavio razlomak.\n"
+        "Evo novi zadatak za tebe: Napiši razlomak koji predstavlja odnos "
+        "između 5 jagoda i 10 jagoda.")
+    assert "5 jagoda" in got and "10 jagoda" in got
+    assert "Evo novi" not in got and "za tebe" not in got
+    # čisti 'Zadatak:' i dalje radi
+    assert "2/5 + 1/5" in svc.extract_marked_task(
+        "Tačno.\nZadatak: Izračunaj 2/5 + 1/5.")
+    # 'Sljedeći zadatak:' varijanta
+    assert "3/4 - 1/4" in svc.extract_marked_task(
+        "Bravo.\nSljedeći zadatak: Izračunaj 3/4 - 1/4.")
+
+
+def test_reexplain_simpler_reexplains_current_not_next():
+    """'Objasni jednostavnije' usred koračanja sa slike PONAVLJA zadnji
+    objašnjeni zadatak — NE prelazi na sljedeći (screenshot: skočio na zadatak 4)."""
+    payload = {
+        "grade": 6, "mode": "explain",
+        "student_message": "objasni mi to jednostavnije",
+        "image_ocr_text": OCR3,
+        "previous_next_state": {
+            "active_task_kind": "image_test",
+            "image_test": {"item_labels": ["1", "2", "3"],
+                           "solved": ["1", "2"], "next_item": "3"},
+        },
+    }
+    st = svc._resolve_image_test_state(payload)
+    assert st is not None
+    assert st["current"] == "2"                 # zadnji objašnjeni, NE "3"
+    assert payload.get("_reexplain_simpler") is True
+
+
+def test_reexplain_directive_present_in_image_prompt():
+    block = pb.build_image_test_instructions({
+        "_image_test": {"labels": ["1", "2", "3"], "solved": ["1", "2"],
+                        "current": "2", "current_task": "Izračunaj 3 1/2 - 1 3/4",
+                        "style": "step_by_step"},
+        "_reexplain_simpler": True,
+    })
+    assert "JEDNOSTAVNIJE" in block and "NE prelazi na sljedeći" in block
+
+
+def test_no_nisi_glup_phrasing_in_prompts():
+    """Bot NIKAD ne smije reći 'nisi glup' (učenik to nije izrekao)."""
+    assert "nisi glup" not in pb._EMPATHY_DIRECTIVE.lower()
+    from matbot import tutor_prompts as tp
+    joined = " ".join(v for v in vars(tp).values() if isinstance(v, str)).lower()
+    assert "nisi glup" not in joined
+    # help blok za distres takođe čist
+    distressed = pb.build_practice_help_instructions(
+        {"grade": 6, "mode": "practice",
+         "interaction_phase": "practice_help",
+         "student_message": "ne mogu ovo, glup sam"}, {})
+    assert "nisi glup" not in distressed.lower()

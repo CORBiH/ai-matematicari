@@ -1098,6 +1098,12 @@ document.addEventListener('DOMContentLoaded', () => {
        ostavi poruku djelimično van ekrana (desktop i mobilni). */
     function scrollTutorToBottom(){
       tutorChat.scrollTop = tutorChat.scrollHeight;
+      /* Late layout (asinhroni MathJax, slike, chip-red brzih odgovora) mijenja
+         visinu NAKON prvog scrolla, pa dugačak odgovor ostane djelimično ispod
+         ekrana. Ponovi scroll na sljedeći frame i kratko poslije da odgovor
+         uvijek završi na dnu — učenik ne mora ručno skrolati. */
+      requestAnimationFrame(function(){ tutorChat.scrollTop = tutorChat.scrollHeight; });
+      setTimeout(function(){ tutorChat.scrollTop = tutorChat.scrollHeight; }, 180);
     }
     function appendTutorMsg(role, html){
       const made = createTutorBubble(role);

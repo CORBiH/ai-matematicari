@@ -1270,6 +1270,13 @@ def _resolve_result_selection(payload: dict) -> dict | None:
 # --- image_test: deterministička mašina stanja za zadatke sa slike ------------------
 
 _CONTINUE_SIGNAL_RE = re.compile(r"\b(nastav\w*|sljedec\w*|dalje|idemo)\b")
+# Zahtjev da se PRETHODNO objašnjenje ponovi jednostavnije/drugačije — NE prelazi
+# na sljedeći zadatak (dugme "Objasni jednostavnije" i sl.).
+_REEXPLAIN_SIMPLER_RE = re.compile(
+    r"\b(jednostavnij\w*|pojednostav\w*|jednostavnije|prostij\w*|"
+    r"lakse|razumljivij\w*|jos\s+jednom|opet\s+objasni|ponovo\s+objasni|"
+    r"ne\s+razumijem\s+objasnjenje)\b|objasni\s+mi\s+to\b"
+)
 
 
 def _resolve_image_test_state(payload: dict) -> dict | None:
@@ -1315,9 +1322,15 @@ def _resolve_image_test_state(payload: dict) -> dict | None:
     message = normalize_value(payload.get("student_message") or payload.get("message"))
     numeric = [int(l) for l in labels if l.isdigit()]
     refs = detect_referenced_items(message, numeric) if numeric else set()
+    reexplain = bool(_REEXPLAIN_SIMPLER_RE.search(fold_diacritics(message)))
 
     current: str | None = None
-    if (
+    if reexplain and prev_solved and not refs and style != "practice":
+        # "Objasni jednostavnije" usred koračanja sa slike: PONOVI zadnji
+        # objašnjeni zadatak jednostavnije — NE prelazi na sljedeći.
+        current = prev_solved[-1]
+        payload["_reexplain_simpler"] = True
+    elif (
         normalize_value(payload.get("intent")).lower() == "continue_confirmation"
         and pending.get("type") == "continue_image_test"
     ):
@@ -1366,7 +1379,7 @@ _TASK_SIGNAL_RE = re.compile(
     r"stepen|procent|prava|duz|tacka|trougao|cetverougao"
     r")\b"
 )
-_TASK_LABEL_RE = re.compile(r"\bzadatak(?:\s+za\s+vjezbu)?\s*[:.\-]\s*")
+_TASK_LABEL_RE = re.compile(r"\bzadatak(?:\s+za\s+(?:vjezbu|tebe))?\s*[:.\-]\s*")
 _TASK_LABEL_ONLY_RE = re.compile(
     r"^(?:evo\s+)?(?:jedan\s+|mali\s+|sljedeci\s+|slican\s+)?"
     r"(?:zadatak|primjer)\s*:?\s*$"
@@ -1533,7 +1546,13 @@ def extract_practice_task(answer: Any, limit: int = 600, mode: str | None = None
 # pending_action, a sljedeće "da" padalo u meta-pitanje. Na grading potezu se zato
 # novi zadatak prihvata ISKLJUČIVO uz eksplicitni "Zadatak:" marker (prompt
 # instrukcije ga traže od modela).
-_TASK_MARKER_LINE_RE = re.compile(r"(?m)^[ \t]*zadatak(?:\s+za\s+vjezbu)?\s*[:\-—]")
+# Prihvata i uvodne fraze koje model povremeno napiše umjesto čistog "Zadatak:"
+# ("Evo novi zadatak za tebe:", "Sljedeći zadatak:", "Još jedan zadatak:") — inače
+# se novi zadatak izgubi pa se naredni odgovor ocijeni protiv PRETHODNOG zadatka.
+_TASK_MARKER_LINE_RE = re.compile(
+    r"(?m)^[ \t]*(?:evo(?:\s+ti)?\s+)?(?:novi|novo|sljedec\w*|jos\s+jedan|drugi)?\s*"
+    r"zadatak(?:\s+za\s+(?:tebe|vjezbu))?\s*[:\-—]"
+)
 
 
 def _extract_marker_paragraph(raw: Any, limit: int = 600) -> str:

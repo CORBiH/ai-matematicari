@@ -400,10 +400,12 @@ def _student_in_distress(payload: dict) -> bool:
 _EMPATHY_DIRECTIVE = (
     "‼️ PRIORITET — EMOCIJA UČENIKA: učenik je izrazio frustraciju ili "
     "samokritiku. PRVA rečenica tvog odgovora MORA biti kratko, iskreno "
-    "ohrabrenje koje normalizuje grešku (varijraj: \"Nisi glup — ovo mnogi "
+    "ohrabrenje koje normalizuje grešku (varijraj: \"Ovo mnogi "
     "prvo pobrkaju.\", \"Ma nije to ništa strašno, sredit ćemo.\", \"Svi "
     "zapnu baš tu — idemo polako.\"). Ako je ista fraza već korištena u "
-    "razgovoru, upotrijebi drugu. Tek POSLIJE toga daj hint/korak. NIKAD ne "
+    "razgovoru, upotrijebi drugu. NIKAD ne koristi riječ \"glup\" ni u "
+    "kakvom obliku — čak ni da je poričeš — jer je učenik nije izrekao. "
+    "Tek POSLIJE toga daj hint/korak. NIKAD ne "
     "počinji procedurom ni ocjenskom labelom prije ohrabrenja.\n"
 )
 
@@ -456,8 +458,9 @@ def build_practice_followup_instructions(payload: dict, topic_context: dict) -> 
         "NE rješavaj i NE izmišljaj učenikove odgovore na njih.\n"
         "- AKO JE TAČNO (ili djelimično tačno): potvrdi labelom i u 1–2 rečenice "
         "objasni zašto, PA U ISTOJ PORUCI ODMAH daj JEDAN novi zadatak iz iste "
-        "teme — bez pitanja \"želiš li još\". Novi zadatak počni novim redom "
-        "\"Zadatak: ...\" i neka bude malo teži od prethodnog (osim ako TEŽINA "
+        "teme — bez pitanja \"želiš li još\". Novi zadatak OBAVEZNO počni novim "
+        "redom \"Zadatak: ...\" (TAČNO tom riječju — nikad \"Evo novi zadatak "
+        "za tebe:\" ni sličnim uvodom) i neka bude malo teži od prethodnog (osim ako TEŽINA "
         "ispod kaže drugačije). Izuzetak: ako sve stavke višestavkovnog zadatka "
         "još nisu odgovorene, prvo zatraži preostale stavke, bez novog zadatka.\n"
         "- AKO NIJE TAČNO: blago reci da nije tačno, pa PRVO kratko IMENUJ "
@@ -538,7 +541,8 @@ def build_practice_help_instructions(payload: dict, topic_context: dict) -> str:
         "- EMPATIJA PRIJE HINTA: ako učenikova poruka izražava frustraciju ili "
         "samokritiku (\"glup sam\", \"ne mogu\", \"preteško mi je\", \"mrzim\"), "
         "PRVA rečenica mora biti kratko ohrabrenje koje normalizuje grešku "
-        "(npr. \"Nisi glup, ovo mnogi prvo pobrkaju — idemo polako.\"), pa TEK "
+        "(npr. \"Ovo mnogi prvo pobrkaju — idemo polako.\"; NIKAD ne koristi "
+        "riječ \"glup\" ni u kakvom obliku, čak ni da je poričeš), pa TEK "
         "ONDA hint. Ne prelazi odmah na proceduru.\n"
         "- Radi samo zadatak naveden u bloku ispod; ne uvodi novu temu i ne "
         "ocjenjuj ostale stavke.\n"
@@ -849,6 +853,15 @@ def build_image_test_instructions(payload: dict) -> str:
     )
     if task:
         block += f"- Tekst zadatka {current}: {task}\n"
+    if (payload or {}).get("_reexplain_simpler"):
+        # "Objasni jednostavnije": ponovi ISTI zadatak drugačije/jednostavnije,
+        # NE prelazi na sljedeći.
+        block += (
+            f"‼️ Učenik traži da mu zadatak {current} objasniš JEDNOSTAVNIJE "
+            "(kraće rečenice, drugi pristup, više malih koraka). PONOVI OBJAŠNJENJE "
+            f"ISTOG zadatka {current} — NE prelazi na sljedeći zadatak i NE mijenjaj "
+            "zadatak.\n"
+        )
     style = img.get("style")
     if style == "practice":
         # AUD-01: učenik SAM rješava — NE rješavaj zadatak, samo ga predstavi i
