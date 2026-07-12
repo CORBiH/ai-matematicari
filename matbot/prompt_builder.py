@@ -205,6 +205,25 @@ def build_mode_instructions(
     payload = payload or {}
 
     if mode == "practice":
+        student_task = normalize_value(payload.get("_student_task"))
+        if student_task:
+            # N1 (2026-07-12): učenik je POSLAO SVOJ zadatak (domaća/knjiga) —
+            # radi se NJEGOV zadatak, nikad "sličan" izmišljeni.
+            multi = "\n" in student_task
+            return (
+                "MOD: VJEŽBAJ — UČENIKOV VLASTITI ZADATAK\n"
+                "- Učenik je u poruci poslao SVOJ zadatak (npr. iz domaće zadaće "
+                "ili knjige). Radi ISKLJUČIVO s NJEGOVIM zadatkom navedenim ispod "
+                "— NIKAD ne izmišljaj novi ni \"sličan\" zadatak umjesto njega.\n"
+                "- Kratko potvrdi zadatak i zatraži UČENIKOV pokušaj/postupak — "
+                "NE rješavaj ga unaprijed, osim ako je učenik izričito tražio "
+                "rješenje ili postupak.\n"
+                + ("- Zadatak ima više stavki: predstavi ih numerisane i reci da "
+                   "može odgovarati redom ili sve odjednom.\n" if multi else "")
+                + "- Ako učenik uz zadatak pita KAKO se radi, daj kratko uputstvo "
+                "za prvi korak (bez konačnog rezultata).\n"
+                f"UČENIKOV ZADATAK (doslovno, koristi baš ove brojeve):\n{student_task}\n"
+            )
         block = (
             "MOD: VJEŽBAJ (practice)\n"
             "- Daj TAČNO JEDAN zadatak i onda ČEKAJ odgovor učenika.\n"
@@ -381,9 +400,11 @@ def _student_in_distress(payload: dict) -> bool:
 _EMPATHY_DIRECTIVE = (
     "‼️ PRIORITET — EMOCIJA UČENIKA: učenik je izrazio frustraciju ili "
     "samokritiku. PRVA rečenica tvog odgovora MORA biti kratko, iskreno "
-    "ohrabrenje koje normalizuje grešku (npr. \"Nisi glup — ovo mnogi prvo "
-    "pobrkaju, idemo polako zajedno.\"). Tek POSLIJE toga daj hint/korak. "
-    "NIKAD ne počinji procedurom ni ocjenskom labelom prije ohrabrenja.\n"
+    "ohrabrenje koje normalizuje grešku (varijraj: \"Nisi glup — ovo mnogi "
+    "prvo pobrkaju.\", \"Ma nije to ništa strašno, sredit ćemo.\", \"Svi "
+    "zapnu baš tu — idemo polako.\"). Ako je ista fraza već korištena u "
+    "razgovoru, upotrijebi drugu. Tek POSLIJE toga daj hint/korak. NIKAD ne "
+    "počinji procedurom ni ocjenskom labelom prije ohrabrenja.\n"
 )
 
 
@@ -447,6 +468,9 @@ def build_practice_followup_instructions(payload: dict, topic_context: dict) -> 
         "- Ako učenik napiše \"ne znam\", \"objasni\" ili \"pomozi\": daj JEDAN "
         "vođeni hint ili JEDAN sljedeći korak — NE novi zadatak i NE cijelo "
         "rješenje odmah.\n"
+        "- Ako učenikova poruka UOPŠTE NIJE pokušaj odgovora (opisuje pribor ili "
+        "situaciju, postavlja pitanje, priča o školi): NE koristi ocjensku "
+        "labelu — odgovori na ono što je rekao i vrati ga na zadatak.\n"
         "- EMPATIJA: ako učenik uz odgovor izrazi frustraciju ili samokritiku "
         "(\"glup sam\", \"ne mogu\", \"preteško\"), poslije ocjenske labele "
         "dodaj kratko ohrabrenje koje normalizuje grešku prije nego nastaviš.\n"
@@ -519,6 +543,14 @@ def build_practice_help_instructions(payload: dict, topic_context: dict) -> str:
         "- Radi samo zadatak naveden u bloku ispod; ne uvodi novu temu i ne "
         "ocjenjuj ostale stavke.\n"
     )
+    if payload.get("_no_solution_requested"):
+        # N2: dijete je IZRIČITO reklo "nemoj rješenje" — apsolutna zabrana.
+        block = (
+            "‼️ UČENIK JE IZRIČITO TRAŽIO DA MU NE OTKRIJEŠ RJEŠENJE. NE SMIJEŠ "
+            "napisati konačan rezultat, međurezultat koji ga direktno otkriva, "
+            "niti \"**Rezultat:**\". Daj SAMO prvi korak ili navodeće pitanje i "
+            "stani — učenik želi sam završiti.\n"
+        ) + block
     if intent == "hint":
         block += (
             "- Učenik je zapeo ili traži HINT: daj JEDAN kratak sljedeći korak "

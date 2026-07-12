@@ -496,6 +496,33 @@ _EXPR_PREFIX_RE = re.compile(
 )
 _TASK_LEAD_STRIP_RE = re.compile(r"^\s*(zadatak(\s+za\s+vjezbu)?|primjer)\s*[:.\-]?\s*", re.IGNORECASE)
 
+# N1 (2026-07-12): dječiji riječi-operatori → simboli (samo za detekciju izraza
+# u poruci; konzervativno — samo jednoznačne fraze).
+_WORD_OPS = (
+    (re.compile(r"\bpodijeljeno\s+sa?\b|\bkroz\b"), ":"),
+    (re.compile(r"\bputa\b|\bpomnozeno\s+sa?\b"), "*"),
+    (re.compile(r"\bplus\b"), "+"),
+    (re.compile(r"\bminus\b(?=\s*\d)"), "-"),   # samo ispred broja ("minus 5", ne "minus brojevi")
+)
+
+
+def extract_task_expressions(text: str, limit: int = 5) -> list[str]:
+    """Nađi konkretne računske izraze u učenikovoj poruci ("evo zadatak: 3/4 + 5/6",
+    "1/2+1/4, 2/3+1/6"). Vraća normalizovane izraze (·→*, riječi-operatori→simboli)
+    ili []. Koristi se da bot PREUZME učenikov zadatak umjesto da izmišlja svoj."""
+    norm = _normalize_math_text(text or "")
+    folded = _fold(norm)
+    for pat, sym in _WORD_OPS:
+        folded = pat.sub(f" {sym} ", folded)
+    out: list[str] = []
+    for m in _EXPR_PREFIX_RE.finditer(folded):
+        expr = re.sub(r"\s+", " ", m.group(1).strip())
+        if expr and expr not in out:
+            out.append(expr)
+        if len(out) >= limit:
+            break
+    return out
+
 
 def _try_arithmetic(folded: str, norm_text: str) -> Expected | None:
     """"Izračunaj: 1/2 + 1/3" → 5/6; isto i kada je zadatak SAMO izraz

@@ -397,7 +397,8 @@ def test_practice_followup_truncates_long_task(master):
 # --- tutor system prompt stack (matbot.tutor_prompts) ---------------------------
 
 TUTOR_MARKERS_G6 = (
-    "Postavi mi pitanje ili zadatak iz matematike.",
+    # N4 (2026-07-12): hladni fiksni refusal zamijenjen toplim preusmjeravanjem
+    "NIKAD hladno ne odbijaj dijete",
     "MODULARNA PRAVILA",
     "JEZIK I TON (TUTOR)",
     "DIDAKTIKA — 6. RAZRED",

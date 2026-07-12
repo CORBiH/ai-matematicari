@@ -20,6 +20,7 @@ from matbot.answer_checker import (
     check_practice_answer,
     derive_expected,
     detect_referenced_items,
+    extract_task_expressions,
     parse_student_answers,
     split_numbered_items,
     summarize_result,
@@ -250,7 +251,19 @@ _PRACTICE_HINT_RE = re.compile(
     r"\b(hint|daj\s+hint|savjet|nagovjestaj|pomozi|pomoc)\b"
 )
 _PRACTICE_EXPLAIN_RE = re.compile(
-    r"\b(objasni|pojasni|kako\s+(?:ide|se|da)|postupak|korak\s+po\s+korak)\b"
+    r"\b(objasni|pojasni|kako\s+(?:ide|se|da)|postupak|korak\s+po\s+korak|"
+    r"zasto|zbog\s+cega|otkud)\b"        # N6: "a zašto..." je pitanje, ne odgovor
+)
+# N6: pitanja o bodovima/ocjeni ("koliko bi to bilo bodova, jesam prosao") nisu
+# odgovor za ocjenjivanje — ranije su dobijala labelu ili ponovljeno rješenje.
+_SCORE_QUESTION_RE = re.compile(
+    r"\bbod(?:ova|a|ovi)?\b|\bjesam\s+(?:li\s+)?pros(?:ao|la)\b|"
+    r"\bkoja\s+(?:bi\s+)?(?:mi\s+)?(?:to\s+)?(?:bila\s+)?ocjena\b|\bkolika\s+ocjena\b"
+)
+# N2: učenik izričito traži da mu se NE otkrije rješenje.
+_NO_SOLUTION_RE = re.compile(
+    r"\bnemoj\s+(?:mi\s+)?(?:dat[i]?\s+|reci\s+|napisat[i]?\s+)?rjesenj|"
+    r"\bbez\s+rjesenja\b|\bne\s+otkrivaj\b|\bnemoj\s+rijesit\b"
 )
 _PRACTICE_SOLVE_RE = re.compile(
     r"\b(uradi|rijesi|izracunaj|pokazi|prikazi|daj)\b"
@@ -344,6 +357,10 @@ def _apply_practice_help_contract(payload: dict) -> None:
     # frustracija (#1) i nejasno pitanje (#3): bez pokušaja odgovora → pomoć
     is_distress = bool(_DISTRESS_SIGNAL_RE.search(folded)) and not has_answer
     is_vague_q = bool(_VAGUE_QUESTION_RE.search(folded)) and not has_answer
+    # N6: pitanje o bodovima/ocjeni — meta, ne odgovor (broj "100" nije pokušaj)
+    is_score_q = bool(_SCORE_QUESTION_RE.search(folded))
+    if is_score_q:
+        has_answer = False
     terse_ref_request = bool(
         refs
         and not has_answer
@@ -351,7 +368,7 @@ def _apply_practice_help_contract(payload: dict) -> None:
         and not _PRACTICE_ANSWER_CLAIM_RE.search(folded)
     )
     if not (wants_hint or wants_explain or wants_solve or terse_ref_request
-            or is_stuck or is_distress or is_vague_q):
+            or is_stuck or is_distress or is_vague_q or is_score_q):
         return
     if has_answer and not (wants_hint or wants_explain or wants_solve):
         return
@@ -359,10 +376,17 @@ def _apply_practice_help_contract(payload: dict) -> None:
     item, help_task = _select_practice_help_task(task, message)
     intent = (
         "hint"
-        if (wants_hint or is_stuck or is_distress or is_vague_q)
+        if (wants_hint or is_stuck or is_distress or is_vague_q or is_score_q)
         and not (wants_explain or wants_solve or terse_ref_request)
         else "solve"
     )
+    # N2: "daj hint ali NEMOJ rješenje" — izričita zabrana otkrivanja rezultata
+    if _NO_SOLUTION_RE.search(folded):
+        payload["_no_solution_requested"] = True
+        intent = "hint"
+    # N6: pitanje o bodovima/ocjeni ide kao meta-pitanje uz zadatak
+    if is_score_q and not (wants_hint or wants_explain or wants_solve):
+        payload["_score_question"] = True
     if is_stuck or is_distress:
         # F5: "ne znam"/frustracija i dalje broji kao "zapeo" (video ramp), iako
         # je poruka preusmjerena u help umjesto grading.
@@ -378,7 +402,31 @@ def _apply_practice_help_contract(payload: dict) -> None:
     # sintetičkim hint-tekstom — prompt_builder iz nje detektuje frustraciju
     # ("glup sam"/"preteško") i ubacuje istaknutu empatija-direktivu.
     payload["_original_student_message"] = message
-    if intent == "hint":
+    # N6: konceptualno "zašto/zbog čega" pitanje — odgovori NA PITANJE, ne
+    # rješavaj zadatak (sintetička "objasni i riješi" poruka bi otkrila rezultat).
+    is_why_q = bool(re.search(r"\bzasto\b|\bzbog\s+cega\b|\botkud\b", folded))
+    if is_why_q and not (wants_hint or wants_solve or payload.get("_score_question")):
+        payload["student_message"] = (
+            "Učenik postavlja konceptualno pitanje uz aktivni zadatak:\n"
+            f"\"{message[:300]}\"\n"
+            "Odgovori kratko i razumljivo NA NJEGOVO PITANJE (zašto pravilo "
+            "vrijedi), bez ocjenske labele. NEMOJ riješiti ni otkriti rezultat "
+            "aktivnog zadatka — poslije objašnjenja pozovi učenika da ga sam "
+            "pokuša.\n\n"
+            f"AKTIVNI ZADATAK (kontekst):\n{help_task[:400]}"
+        )
+        return
+    if payload.get("_score_question"):
+        # N6: meta-pitanje o bodovima/ocjeni — odgovori na NJEGA, bez ocjenske
+        # labele i bez ponavljanja rješenja.
+        payload["student_message"] = (
+            "Učenik pita koliko bi bodova/koju ocjenu donio njegov dosadašnji rad "
+            "i je li prošao. Na osnovu prethodnih poruka (koje su stavke tačne, a "
+            "koje ne) kratko i realno procijeni, naglasi da konačnu ocjenu daje "
+            "nastavnik, i ohrabri ga za dalje. NE ponavljaj rješenja zadataka i "
+            "NE koristi ocjenske labele."
+        )
+    elif intent == "hint":
         payload["student_message"] = (
             "Daj mi jedan kratki hint za ovaj zadatak. "
             "Ne otkrivaj konačan rezultat.\n\n"
@@ -394,17 +442,87 @@ def _apply_practice_help_contract(payload: dict) -> None:
         )
 
 
+# --- N5 (2026-07-12): meta pitanja o botu — deterministički topli odgovor -----------
+# Djeca sigurno pitaju "jesi li robot", "ko te napravio", "špijuniraš li me".
+# Ranije: hladni refusal / lista tema. Sada: kratak prijateljski odgovor bez
+# modela, pa nazad na matematiku.
+
+_META_IDENTITY_RE = re.compile(
+    r"\bjesi\s+li\s+(?:ti\s+)?(?:pravi\s+)?(?:covjek|ziv\w*|robot|bot|masina|"
+    r"program|ai|umjetna)\b|"
+    r"\bko\s+te\s+(?:je\s+)?(?:napravio|programirao|stvorio|izmislio)\b|"
+    r"\bkako\s+se\s+zoves\b|\bimas\s+li\s+ime\b|"
+    r"\bspijuniras\b|\bpratis\s+(?:li\s+)?(?:me|nas)\b|"
+    r"\bvidis\s+li\s+sta\s+(?:radim|kucam|gledam)\b|\bsnimas\s+(?:li\s+)?me\b"
+)
+
+_META_IDENTITY_ANSWER = (
+    "Ja sam AI tutor za matematiku — program, ne čovjek. 🙂 Napravljen sam da ti "
+    "pomognem oko zadataka i lekcija. Ne vidim ništa na tvom uređaju niti te "
+    "pratim — vidim samo poruke koje mi ovdje pošalješ. Hajmo na matematiku: "
+    "šta radimo danas?"
+)
+
+
+def _apply_meta_identity_contract(payload: dict) -> None:
+    if payload.get("_direct_answer") is not None:
+        return
+    if normalize_value(payload.get("intent")):
+        return
+    if normalize_value(payload.get("interaction_phase")):
+        return                                  # usred zadatka → model (bez labele)
+    message = fold_diacritics(
+        payload.get("student_message") or payload.get("message")
+    )
+    if message and _META_IDENTITY_RE.search(message):
+        payload["_direct_answer"] = _META_IDENTITY_ANSWER
+
+
+# --- N1 (2026-07-12): UČENIKOV VLASTITI ZADATAK u Vježbi ----------------------------
+# Dijete radi SVOJU domaću: "evo prvi zadatak iz knjige: 3/4 + 5/6" ili lista
+# "1/2+1/4, 2/3+1/6, ...". Ranije je bot generisao SVOJ "sličan" zadatak pa su
+# tačni odgovori na učenikov zadatak dobijali "Netačno". Sada: konkretni izrazi
+# iz poruke postaju AKTIVNI zadatak (last_tutor_task + task_items za više njih),
+# a prompt vodi učenika kroz NJEGOV zadatak.
+
+def _apply_student_task_contract(payload: dict) -> None:
+    if payload.get("_direct_answer") is not None or payload.get("_skip_answer_check"):
+        return
+    if normalize_value(payload.get("intent")):
+        return
+    if normalize_value(payload.get("interaction_phase")):
+        return                                    # odgovori/potvrde/nastavci — ne
+    if normalize_value(payload.get("mode")).lower() not in ("practice", "vjezba"):
+        return
+    message = normalize_value(payload.get("student_message") or payload.get("message"))
+    if not message:
+        return
+    exprs = extract_task_expressions(message)
+    if not exprs:
+        return
+    pretty = [e.replace("*", "·") for e in exprs]
+    if len(pretty) == 1:
+        task = f"Izračunaj: {pretty[0]}"
+    else:
+        task = "\n".join(f"{i}. Izračunaj: {e}" for i, e in enumerate(pretty, 1))
+    payload["_student_task"] = task[:600]
+
+
 # --- Zahtjev za NOVI (teži/lakši) zadatak — BUG 6/8 (2026-07-10) --------------------
 # "zadatak", "novi zadatak", "daj mi teži", "lakši" tokom vježbe NISU odgovor za
 # ocjenjivanje niti molba za objašnjenje starog zadatka — učenik traži NOVI
 # zadatak. Ranije je "zadatak" išao na re-grade, a "daj mi teži" u help contract
 # (re-rješavanje starog zadatka).
 
-_NEW_TASK_WORD_RE = re.compile(r"\b(zadatak|zadatke|zadacic\w*|primjer)\b")
+_NEW_TASK_WORD_RE = re.compile(
+    r"\b(zadatak|zadatke|zadacic\w*|primjer)\b|\bjos\s+jedn?(?:an|u|o)\b"
+)
 _DIFF_HARDER_RE = re.compile(r"\btez\w*\b")
 _DIFF_EASIER_RE = re.compile(r"\blaks\w*\b")
+# N6 (2026-07-12): "isti" maknut iz blokera — "daj jos jedan isti takav" je
+# zahtjev za NOVIM zadatkom iste težine (ponavljanje i dalje blokira "ponovi").
 _NEW_TASK_BLOCKER_RE = re.compile(
-    r"\b(objasni|pojasni|ponovi|isti|ovaj|hint|pomoc|pomozi|kako|zasto|"
+    r"\b(objasni|pojasni|ponovi|ovaj|hint|pomoc|pomozi|kako|zasto|"
     r"rijesi|uradi|pokazi|prikazi|provjeri|odgovor\w*)\b|[=?]|\d"
 )
 
@@ -419,6 +537,8 @@ _NEW_TASK_FILLER = frozenset({
     "molim", "te", "mozes", "moze", "mozemo", "hocu", "zelim", "trebam",
     "malo", "sada", "sad", "idemo", "hajde", "ajde", "tezi", "teze", "tezu",
     "laksi", "lakse", "laksu", "iz", "iste", "teme",
+    # N6: "isti takav" = nov zadatak iste vrste/težine
+    "isti", "istu", "isto", "takav", "takvu", "takvo", "ovakav", "ovakvu",
 })
 
 
@@ -1290,6 +1410,9 @@ def _looks_like_practice_task_text(text: Any) -> bool:
     folded = fold_diacritics(text)
     if not folded or len(folded) < 4:
         return False
+    # N4 guard: preusmjerenje/refusal nikad nije zadatak ("Postavi mi pitanje...")
+    if folded.startswith("postavi mi pitanje"):
+        return False
     if _TASK_LABEL_ONLY_RE.fullmatch(folded):
         return False
     if re.search(
@@ -1688,9 +1811,13 @@ def _sanitize_payload(payload: dict) -> dict:
 
 
 def _apply_image_practice_followup(payload: dict) -> None:
-    """AUD-01: kad učenik odgovara na stavku iz image_test "practice" toka,
-    izračunaj SLJEDEĆU stavku sa slike da followup prompt ponudi baš nju (a NE
-    izmišljeni novi zadatak). Postavlja ``payload["_image_practice_answer"]``."""
+    """AUD-01 + N3: odgovor na stavku iz image_test "practice" toka.
+
+    Pripiše odgovor PRAVOJ stavci (poslana/current → prva pending → zadnja
+    riješena za ispravke; ako je odgovor tačan za neku kasniju kandidatkinju,
+    prebaci ocjenu na nju), postavi ``_image_answered_label`` (state) i
+    ``_image_practice_answer`` (prompt: SLJEDEĆA stavka sa slike, ne izmišljaj)
+    te ``_image_next_task_text`` (persist za last_tutor_task)."""
     if payload.get("_skip_answer_check"):
         return
     if normalize_value(payload.get("interaction_phase")).lower() != "answering_practice_task":
@@ -1702,21 +1829,64 @@ def _apply_image_practice_followup(payload: dict) -> None:
     ocr = ocr_from_saved_context(saved) if saved else ""
     items = extract_image_tasks(ocr) if ocr else []
     labels = [str(it["label"]).lower() for it in items]
-    tasks_by_label = {str(it["label"]).lower(): it["task"] for it in items}
+    tasks_by_label = {str(it["label"]).lower(): normalize_value(it["task"]) for it in items}
+    if not labels:
+        return
     solved = [s for s in (prev_img.get("solved") or []) if s in labels]
-    cur = normalize_value(prev_img.get("current")).lower()
-    if cur and cur not in solved:
-        solved.append(cur)
-    unsolved = [l for l in labels if l not in solved]
-    if unsolved:
-        nxt = unsolved[0]
+
+    # koja stavka je odgovorena? poslani task (browser = izvor istine) → current
+    sent = normalize_value(payload.get("last_tutor_task"))
+    sent_label = None
+    if sent:
+        for lbl, text in tasks_by_label.items():
+            if text and (text[:600] == sent or sent.startswith(text[:80]) or text.startswith(sent[:80])):
+                sent_label = lbl
+                break
+    prev_current = normalize_value(prev_img.get("current")).lower()
+    if prev_current not in labels:
+        prev_current = None
+    pending = [l for l in labels if l not in solved]
+    student = normalize_value(payload.get("student_message") or payload.get("message"))
+
+    def _chk(lbl):
+        text = tasks_by_label.get(lbl or "", "")
+        return check_practice_answer(text, student) if text else None
+
+    # kandidati po prioritetu; tačan pogodak bilo gdje pobjeđuje (N3: ispravka
+    # poslije reveala ili odgovor na najavljenu sljedeću stavku bez "da")
+    cands: list[str] = []
+    for lbl in (sent_label or prev_current,
+                pending[0] if pending else None,
+                solved[-1] if solved else None):
+        if lbl and lbl not in cands:
+            cands.append(lbl)
+    answered, result = None, None
+    for lbl in cands:
+        r = _chk(lbl)
+        if r and r.checkable and r.items and r.items[0].verdict in (
+                "correct", "correct_value_wrong_form"):
+            answered, result = lbl, r
+            break
+    if answered is None and cands:
+        answered = cands[0]
+        result = _chk(answered)
+    if answered:
+        if result is not None and result.checkable:
+            payload["answer_check"] = result
+        payload["_image_answered_label"] = answered
+    new_solved = solved + ([answered] if answered and answered not in solved else [])
+    rem = [l for l in labels if l not in new_solved]
+    if rem:
+        nxt = rem[0]
         payload["_image_practice_answer"] = {
             "next_label": nxt,
-            "next_task": normalize_value(tasks_by_label.get(nxt, ""))[:500],
+            "next_task": tasks_by_label.get(nxt, "")[:500],
             "done": False,
         }
+        payload["_image_next_task_text"] = tasks_by_label.get(nxt, "")[:600]
     else:
         payload["_image_practice_answer"] = {"next_label": None, "next_task": "", "done": True}
+        payload["_image_next_task_text"] = ""
 
 
 def _oblast_list(master: dict) -> str:
@@ -1794,6 +1964,10 @@ def _prepare_chat(
     # "a treći zadatak?", "daj hint", "objasni treći" nisu predani odgovori.
     # Preusmjeri ih prije determinističkog ocjenjivanja.
     _apply_practice_help_contract(payload)
+    # N1: "evo moj zadatak: 3/4 + 5/6" u Vježbi → TAJ zadatak postaje aktivni.
+    _apply_student_task_contract(payload)
+    # N5: "jesi li robot / ko te napravio / špijuniraš li me" → topli direktni odgovor.
+    _apply_meta_identity_contract(payload)
 
     if payload.get("_direct_answer") is not None:
         master = master if master is not None else get_master(grade=payload["grade"])
@@ -2121,11 +2295,12 @@ def _next_state_for_response(
             and not payload.get("_skip_answer_check")):
         labels = [normalize_value(l).lower() for l in prev_img.get("item_labels") or []]
         solved = [s for s in (prev_img.get("solved") or []) if s in labels]
-        cur = normalize_value(prev_img.get("current")).lower()
+        # N3: stavku određuje helper (poslani task / ispravka / eager-next);
+        # bez pogađanja rem[0] — ispravka NE smije "pojesti" sljedeću stavku.
+        cur = normalize_value(payload.get("_image_answered_label")).lower()
         if not cur or cur not in labels:
-            rem = [l for l in labels if l not in solved]
-            cur = rem[0] if rem else ""
-        if cur and cur not in solved:
+            cur = normalize_value(prev_img.get("current")).lower()
+        if cur and cur in labels and cur not in solved:
             solved.append(cur)
         unsolved = [l for l in labels if l not in solved]
         if unsolved:
@@ -2381,6 +2556,19 @@ def _finalize_response(prep: dict, answer: str) -> dict:
         # aktivni zadatak — postavi je kao last_tutor_task da se učenikov naredni
         # odgovor deterministički provjeri protiv OCR teksta (ne protiv izmišljenog).
         task_text = normalize_value(_img_state.get("current_task"))[:600]
+    elif (
+        payload.get("_student_task")
+        and status == "ready"
+        and mode in ("practice", "exam")
+        and not payload.get("_image_test")
+    ):
+        # N1: učenikov vlastiti zadatak iz poruke JESTE aktivni zadatak.
+        task_text = normalize_value(payload["_student_task"])[:600]
+    elif payload.get("_image_practice_answer") is not None:
+        # N3: odgovor na stavku sa slike — SLJEDEĆA ponuđena stavka postaje
+        # aktivni zadatak (persist; prazno kad su sve riješene). Model ne smije
+        # izmišljati zadatke usred image toka, pa se proza ne ekstrahuje.
+        task_text = normalize_value(payload.get("_image_next_task_text"))[:600]
     elif (
         payload.get("_direct_answer") is not None
         or payload.get("_image_test")
