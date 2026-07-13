@@ -98,15 +98,29 @@ potreban rewrite. Reference bugova: `MATBOT_BUG_REPRODUCTIONS.md`.
 
 ## Faza C — Routing i izolacija modova
 
-### C1. LLM topic-klasifikator kvalитет (AUD-03)
-- **Prioritet:** P1 | **Kompleksnost:** Medium
-- **Fajlovi:** `matbot/topic_detector.py` (`detect_topic_llm` prompt),
-  `docs/eval/eval_cases.json` (nova offline lista), opciono `data/*` (sinonimi).
-- **Pristup:** (1) u klasifikatorski prompt uz `tema_ui` dodati oblast + 2–3
-  ključne riječi/sinonima (generisati jednom po razredu, keširati);
-  (2) few-shot primjeri dječijeg jezika („ne kontam X" → id); (3) mjeriti:
-  offline lista 30 poruka → očekivani prefix, prag ≥80%.
-- **Rizici:** duži prompt = trošak; keširati sistemski dio.
+### C1. LLM topic-klasifikator kvalитет (AUD-03) — ✅ URAĐENO (2026-07-14)
+- **Prioritet:** P1 | **Status:** riješeno, live eval **45% → 100%** (40 poruka, razredi 6–9)
+- **PRAVI korijen (nije bio "kvalitet prompta"):** `gpt-5-mini` je REASONING model,
+  a `detect_topic_llm` je slao `max_tokens=60`. Svih 60 tokena odlazilo je na
+  reasoning → `finish_reason="length"`, `content=""` → klasifikator je **UVIJEK**
+  vraćao `unknown`. Nikad nije ni stigao odgovoriti. Dokaz: ista poruka/model sa
+  `max_tokens=300` → `{"detected_topic":"8-04-025"}` (tačno).
+- **Urađeno:**
+  1. `max_tokens` 60 → **400** (mjereno: reasoning ~64 + ~20 za JSON).
+  2. Lista tema sada nosi **OBLAST** (`npp_id | OBLAST | naziv`) + pravila
+     značenjskog mapiranja i primjeri dječijeg jezika (hipotenuza→Pitagora,
+     porcenti→Postotak, nagib prave→linearna funkcija).
+  3. **Veto nad lažnim jednorječnim pogotkom heuristike**: dugi nazivi (8. razred,
+     VERZAL) nose usputne riječi koje su slučajno jedinstvene — „…KAO OSNOVOM"
+     je hvatao „mnoze stepeni sa istom OSNOVOM" → Geometrijska tijela; „SLIČNI
+     monomi" je hvatao „SLIČNI trouglovi" → polinomi. Sada: ako druga sadržajna
+     riječ (po STEMU) pokazuje isključivo na drugu oblast → `unknown` → LLM.
+     Glagoli radnje („izračunaj") izuzeti iz veta.
+  4. `is_vague_message`: propusnica za mat. pojmove kojih **nema u nazivima tema**
+     (`medijana`, `modus`, `hipotenuza`) — ranije su bili „vague" pa LLM nikad
+     nije pozvan. Meta-poruke („sutra imam kontrolni") ostaju vague (bez troška).
+- **Regresije:** `tests/test_topic_detector.py` (6 novih testova zaključavaju sve
+  gore navedeno, uključujući da meta-poruke ostaju vague).
 
 ### C2. HR/ekavski dopune (AUD-09)
 - **Prioritet:** P3 | **Kompleksnost:** Small

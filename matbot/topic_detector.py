@@ -69,6 +69,20 @@ _STOPWORDS = frozenset({
     "racunala", "racunalo", "dzepnog",
 })
 
+# C1 (2026-07-14): matematički pojmovi koje djeca koriste, a KOJIH NEMA u
+# nazivima NPP tema (naziv kaže "Srednje vrijednosti", učenik piše "medijana").
+# Služi SAMO kao propusnica do LLM klasifikatora (is_vague_message) — ne mapira
+# temu i ne može izmisliti pogrešnu. Namjerno bez generičkih riječi ("nepoznato")
+# da meta-poruke ("nepoznato pitanje", "sutra imam kontrolni") ostanu vague.
+_MATH_TERM_STEMS = frozenset({
+    "medi", "modu", "pros", "sred",                      # statistika
+    "hipo", "kate", "prec", "tang", "dija",              # geometrija
+    "povr", "zapr", "obim",                              # mjere
+    "koef", "nagi", "bino", "mono", "kori",              # algebra
+    "apso", "pred",                                      # predznak, apsolutna vrij.
+    "porc", "proc", "post",                              # procenti/postotak
+})
+
 _WORD_RE = re.compile(r"[a-z]{4,}")
 # Skraćenice: velika slova (2–5) BEZ samoglasnika (NZD, NZS) — tako ne hvatamo
 # velika-slovima pisane obične riječi (PITAGORINA, MNOGOUGAO imaju samoglasnike).
@@ -114,6 +128,10 @@ def _build_index(master: dict) -> dict[str, Any]:
     oblast_word_topics: dict[str, set[str]] = defaultdict(set)
     first_topic_of_oblast: dict[str, str] = {}
     stem_keywords: set[str] = set()
+    # STEM riječi → SVE oblasti u čijim se nazivima pojavljuje (i dvosmislene).
+    # Stem (ne tačna riječ) jer učenik piše drugi padež: "trouglovi" vs naziv
+    # "TROUGLOVA". Koristi se za veto nad lažnim jednorječnim pogotkom.
+    word_oblasti: dict[str, set[str]] = defaultdict(set)
 
     for t in master.get("topics", []):
         tid = t.get("topic", "")
@@ -123,10 +141,13 @@ def _build_index(master: dict) -> dict[str, Any]:
         display = t.get("display_name", "")
         first_topic_of_oblast.setdefault(oblast, tid)
 
-        for w in _content_words(display) | _abbrevs(display):
+        display_words = _content_words(display) | _abbrevs(display)
+        for w in display_words:
             tema_word_topics[w].add(tid)
+            word_oblasti[_stem(w)].add(oblast)
         for w in _content_words(oblast) | _abbrevs(oblast):
             oblast_word_topics[w].add(tid)
+            word_oblasti[_stem(w)].add(oblast)
 
         stem_keywords |= {_stem(w) for w in _content_words(display)}
         stem_keywords |= {_stem(w) for w in _content_words(oblast)}
@@ -144,6 +165,7 @@ def _build_index(master: dict) -> dict[str, Any]:
         "topic_words": topic_words,
         "oblast_words": oblast_words,
         "stem_keywords": stem_keywords,
+        "word_oblasti": dict(word_oblasti),
     }
     _INDEX_CACHE[grade] = index
     return index
@@ -172,7 +194,51 @@ def is_vague_message(text: Any, master: dict | None = None) -> bool:
         msg_stems = {_stem(w) for w in _content_words(text)} | _abbrevs(text)
         if msg_stems & index["stem_keywords"]:
             return False
+        # C1 (2026-07-14): matematički POJAM kojeg NEMA u nazivima tema
+        # ("medijana", "modus", "hipotenuza") — ranije je takva poruka bila
+        # "vague" pa LLM klasifikator NIKAD nije ni pozvan (AUD-03).
+        if msg_stems & _MATH_TERM_STEMS:
+            return False
     return True
+
+
+# Generički glagoli/upitne riječi: nose RADNJU, ne temu. Iz VETA se izuzimaju —
+# inače "izračunaj" (stem "izra") slučajno pogodi "Izrazi…" i poništi valjan
+# pogodak ("izračunaj NZD" → unknown). Indeks se NE dira, samo veto.
+_VETO_IGNORE_STEMS = frozenset({
+    _stem(w) for w in (
+        "izracunaj", "izracunati", "izracunavanje", "racunaj", "racunati",
+        "rijesi", "rjesava", "rjesavanje", "odredi", "napisi", "nacrtaj",
+        "crtati", "pokazi", "provjeri", "pretvori", "pretvorim", "skrati",
+        "skratim", "mjeri", "mjerim", "konstruise", "konstruisi",
+    )
+})
+
+
+def _contradicted_by_other_words(
+    words: set[str], chosen_oblast: str, index: dict
+) -> bool:
+    """C1 (2026-07-14): veto nad LAŽNIM jednorječnim pogotkom.
+
+    Dugi nazivi tema (naročito 8. razred, VERZALOM) nose usputne riječi koje su
+    slučajno jedinstvene: "…KAO OSNOVOM" je hvatao "mnoze stepeni sa istom
+    OSNOVOM" → Geometrijska tijela, a "SLIČNI monomi" je hvatao "SLIČNI
+    trouglovi" → polinomi. Prava tematska riječi ("stepeni", "trouglovi") je
+    pritom odbačena jer je dvosmislena.
+
+    Pravilo: ako neka DRUGA sadržajna riječ poruke postoji u nazivima tema, ali
+    NIJEDNA njena oblast nije izabrana → pogodak je vjerovatno slučajan.
+    Vrati True (→ unknown → prepusti LLM-u, koji je pouzdaniji za značenje).
+
+    Poređenje ide po STEMU (učenik piše "trouglovi", naziv ima "TROUGLOVA")."""
+    for w in words:
+        st = _stem(w)
+        if st in _VETO_IGNORE_STEMS:
+            continue                # glagol radnje ne osporava temu
+        oblasti = index["word_oblasti"].get(st)
+        if oblasti and chosen_oblast not in oblasti:
+            return True
+    return False
 
 
 def detect_topic_heuristic(message: Any, master: dict | None = None) -> str:
@@ -188,7 +254,16 @@ def detect_topic_heuristic(message: Any, master: dict | None = None) -> str:
 
     topic_hits = {index["topic_words"][w] for w in words if w in index["topic_words"]}
     if len(topic_hits) == 1:
-        return next(iter(topic_hits))
+        tid = next(iter(topic_hits))
+        matched = {w for w in words if index["topic_words"].get(w) == tid}
+        chosen_oblast = normalize_value(
+            master.get("topics_by_id", {}).get(tid, {}).get("oblast")
+        )
+        if chosen_oblast and _contradicted_by_other_words(
+            words - matched, chosen_oblast, index
+        ):
+            return UNKNOWN          # slučajan pogodak → LLM odlučuje
+        return tid
     if len(topic_hits) > 1:
         return UNKNOWN  # dvosmisleno → prepusti LLM-u
 
@@ -213,8 +288,11 @@ def detect_topic_llm(
     unknown. Svaki izlaz se validira; garbage → unknown. Nikad ne baca izuzetak."""
     try:
         text = normalize_value(message)[:1000]
+        # Oblast uz naziv: učenik često koristi riječ koje NEMA u nazivu teme
+        # ("hipotenuza" → oblast "Pitagorina teorema"; "porcenti" → "Postotak…").
         topics_list = "\n".join(
-            f"- {t['topic']} ({t.get('display_name', '')})" for t in master.get("topics", [])
+            f"- {t['topic']} | {t.get('oblast', '')} | {t.get('display_name', '')}"
+            for t in master.get("topics", [])
         )
         messages = [
             {
@@ -223,8 +301,22 @@ def detect_topic_llm(
                     f"Ti si klasifikator NPP tema za matematiku {master.get('grade', 6)}. "
                     "razreda (BiH). Odgovori ISKLJUČIVO JSON-om oblika "
                     '{"detected_topic": "<npp_topic_id>"} ili {"detected_topic": "unknown"}. '
-                    "Dozvoljeni su SAMO npp_topic_id-evi sa liste. Ako nisi siguran, vrati "
-                    "unknown. Ne dodaji nikakav drugi tekst."
+                    "Dozvoljeni su SAMO npp_topic_id-evi sa liste.\n"
+                    "Lista je u formatu: npp_id | OBLAST | naziv teme.\n"
+                    "PRAVILA:\n"
+                    "1. Učenik piše neformalno, s greškama i sinonimima. Poveži "
+                    "ZNAČENJE poruke s temom, ne doslovne riječi (npr. "
+                    "\"hipotenuza\" → Pitagorina teorema; \"porcenti\" → Postotak; "
+                    "\"minus puta minus\" → množenje cijelih brojeva; "
+                    "\"prosjek ocjena\" → aritmetička sredina; \"nagib prave\" → "
+                    "linearna funkcija).\n"
+                    "2. Ako poruka jasno pripada nekoj OBLASTI, izaberi "
+                    "najprikladniju temu iz te oblasti — nemoj vraćati unknown "
+                    "samo zato što ne znaš tačnu pod-temu.\n"
+                    "3. Vrati \"unknown\" SAMO ako poruka nije o matematici ili je "
+                    "presiromašna da se odredi oblast (npr. \"zdravo\", \"ne znam\", "
+                    "\"pomozi mi\").\n"
+                    "Ne dodaji nikakav drugi tekst."
                 ),
             },
             {
@@ -232,7 +324,12 @@ def detect_topic_llm(
                 "content": f"Poruka učenika:\n{text}\n\nDozvoljene teme:\n{topics_list}",
             },
         ]
-        resp = openai_chat(model, messages, timeout=timeout, max_tokens=60)
+        # AUD-03 root cause (2026-07-14): gpt-5-mini je REASONING model —
+        # reasoning tokeni troše isti budžet kao odgovor. Sa max_tokens=60 svih
+        # 60 je odlazilo na reasoning (finish_reason="length", content=""), pa je
+        # klasifikator UVIJEK vraćao unknown. Mjereno: reasoning ~64 tok. + ~20
+        # za JSON → 400 daje udoban rezervoar bez bitnog troška.
+        resp = openai_chat(model, messages, timeout=timeout, max_tokens=400)
         raw = resp.choices[0].message.content or ""
         m = _JSON_RE.search(raw)
         if not m:

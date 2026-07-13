@@ -202,3 +202,71 @@ def test_detect_topic_result_always_valid(masters, grade):
     for msg in ("razlomci", "pomozi", "Izračunaj 2+2", "nepostojece xyz"):
         res = td.detect_topic(msg, m, tmap, openai_chat=None)
         assert res["detected_topic"] == "unknown" or res["detected_topic"] in m["topic_ids"]
+
+
+# ===================== C1 (2026-07-14): AUD-03 — klasifikator je bio slijep ==========
+# Korijen: gpt-5-mini je REASONING model, a max_tokens=60 je trošio SVE tokene na
+# reasoning (finish_reason="length", content="") → LLM je UVIJEK vraćao unknown.
+# Uz to: (a) heuristika je hvatala usputne riječi iz dugih naziva, (b) is_vague je
+# blokirao pojmove kojih nema u nazivima tema. Live eval: 45% → 100% (40 poruka).
+
+def test_llm_classifier_has_room_for_reasoning_tokens(master, tmap):
+    """max_tokens mora biti dovoljan da poslije reasoning tokena OSTANE JSON."""
+    seen = {}
+
+    def chat(model, messages, timeout=None, max_tokens=None, fast=False):
+        seen["max_tokens"] = max_tokens
+        msg = types.SimpleNamespace(content='{"detected_topic": "6-03-028"}')
+        return types.SimpleNamespace(choices=[types.SimpleNamespace(message=msg)])
+
+    td.detect_topic_llm("sta je NZD", master, tmap, chat, "m")
+    assert seen["max_tokens"] >= 200, (
+        "reasoning tokeni pojedu budžet — sa 60 je content bio prazan (AUD-03)"
+    )
+
+
+def test_llm_prompt_carries_oblast_and_meaning_rules(master, tmap):
+    """Lista tema mora nositi OBLAST (učenik piše riječ koje nema u nazivu:
+    'hipotenuza' → oblast 'Pitagorina teorema')."""
+    chat = _fake_chat('{"detected_topic": "6-03-028"}')
+    td.detect_topic_llm("sta je hipotenuza", master, tmap, chat, "m")
+    system = chat.calls["messages"][0][0]["content"]
+    user = chat.calls["messages"][0][1]["content"]
+    assert "OBLAST" in system                      # format liste objašnjen
+    assert "hipotenuza" in system                  # primjer značenjskog mapiranja
+    assert "unknown" in system
+    first_topic = master["topics"][0]
+    assert first_topic["oblast"] in user           # oblast stvarno u listi
+
+
+def test_heuristic_veto_rejects_incidental_word_hit(masters):
+    """Usputna riječ iz dugog naziva ('…KAO OSNOVOM', 'SLIČNI monomi') NE smije
+    oteti poruku kad prava tematska riječ pokazuje na drugu oblast."""
+    m8 = masters[8]
+    assert td.detect_topic_heuristic("kako se mnoze stepeni sa istom osnovom", m8) == "unknown"
+    assert td.detect_topic_heuristic("sta su slicni trouglovi", m8) == "unknown"
+
+
+def test_heuristic_veto_does_not_break_real_hits(master, masters):
+    """Veto NE smije rušiti valjane pogotke — glagol radnje ('izračunaj') se
+    ignoriše (stem 'izra' se slučajno poklapa sa 'Izrazi…')."""
+    nzd = td.detect_topic_heuristic("izračunaj NZD za 12 i 18", master)
+    assert nzd in master["topic_ids"]
+    pit = td.detect_topic_heuristic("pitagorina teorema mi nikako ne ide", masters[8])
+    assert pit in masters[8]["topic_ids"]
+
+
+def test_math_term_absent_from_titles_reaches_llm(masters):
+    """'medijana'/'modus' nema ni u jednom nazivu teme → ranije vague → LLM nikad
+    pozvan. Sada poruka mora proći do klasifikatora."""
+    m9 = masters[9]
+    assert td.is_vague_message("kako se racuna medijana i modus", m9) is False
+    assert td.is_vague_message("sta je hipotenuza", masters[8]) is False
+
+
+def test_meta_messages_stay_vague(master, masters):
+    """Propusnica ne smije postati rupa: meta/emotivne poruke ostaju vague
+    (bez trošenja LLM poziva)."""
+    for msg in ("Sutra imam kontrolni", "nepoznato pitanje", "pomozi mi",
+                "ne znam", "mrzim matematiku"):
+        assert td.is_vague_message(msg, master) is True, msg
