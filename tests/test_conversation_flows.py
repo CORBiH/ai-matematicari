@@ -112,12 +112,15 @@ def test_practice_multi_image_second_answer_checked_and_flow_completes(master, t
 # ---- regresije: NE dirati postojeće image tokove ----
 
 def test_quick_multi_image_does_not_enter_practice_image_test(master, tmap):
-    """Result/Quick mod NE ulazi u image_test 'practice' — zadržava svoj tok."""
+    """Result/Quick mod NE ulazi u image_test 'practice' — zadržava svoj tok.
+    AUD-07 (B3, 2026-07-13): prazna/generička poruka + svježa multi-slika sad
+    deterministički PITA koji broj (bez poziva modela), umjesto da model
+    povremeno riješi sve."""
     c = ConversationClient(master, tmap, mode="quick")
-    out = c.send("", "1) 7/10 2) 1/6 3) 5 km/h", image_ocr=OCR3)
+    out = c.send("", "NE SMIJE BITI POZVAN", image_ocr=OCR3, expect_model=False)
     ns = out["next_state"]
-    # quick multi-slika: bez practice image_test (style nikad 'practice')
     assert (ns.get("image_test") or {}).get("style") != "practice"
+    assert "broj zadatka" in out["answer"].lower()      # deterministički ask
 
 
 def test_single_task_image_practice_does_not_step(master, tmap):

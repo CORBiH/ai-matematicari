@@ -62,9 +62,11 @@ class ConversationClient:
 
     def send(self, message: str, reply: str, *, phase: str | None = None,
              mode: str | None = None, seed_task: str | None = None,
-             image_ocr: str | None = None, extra: dict | None = None) -> dict:
+             image_ocr: str | None = None, extra: dict | None = None,
+             expect_model: bool = True) -> dict:
         """Jedan potez. ``phase``: None|'answer'|'continue'|'confirm'.
-        ``image_ocr``: ako je dato, simulira upload slike (OCR sloj mockiran)."""
+        ``image_ocr``: ako je dato, simulira upload slike (OCR sloj mockiran).
+        ``expect_model=False``: potez je deterministički (model se NE poziva)."""
         if seed_task is not None:
             self.saved_task = seed_task
         use_mode = mode or self.mode
@@ -118,5 +120,9 @@ class ConversationClient:
         if self.saved_task:
             self.recent_tasks = ([self.saved_task]
                                  + [t for t in self.recent_tasks if t != self.saved_task])[:8]
-        out["_prompt"] = last_user_prompt(chat)
+        if expect_model:
+            out["_prompt"] = last_user_prompt(chat)
+        else:
+            assert not chat.calls, "očekivan deterministički odgovor, a model JE pozvan"
+            out["_prompt"] = ""
         return out

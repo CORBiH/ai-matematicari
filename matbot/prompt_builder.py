@@ -423,6 +423,34 @@ def build_practice_followup_instructions(payload: dict, topic_context: dict) -> 
     ne razmjena ljubaznosti."""
     payload = payload or {}
     last_task = normalize_value(payload.get("last_tutor_task"))[:600]
+    if payload.get("_post_hint_reply"):
+        # CLASS 1 (2026-07-12): učenik odgovara na TVOJ hint (pod-korak). Ovdje
+        # NE koristimo standardni "provjera odgovora" blok jer on TJERA ocjensku
+        # labelu ("PRVA REČENICA = jedan konačan sud → Netačno") pa tačan
+        # međukorak (npr. "3/6" na hint "svedi 1/2 na nazivnik 6") dobija
+        # "Netačno". Umjesto toga vodimo dijalog korak po korak.
+        step_block = (
+            "MOD: VJEŽBA — VOĐENJE KROZ KORAK (odgovor na hint)\n"
+            "- Prethodno je učenik rekao \"ne znam\"/tražio pomoć i ti si dao HINT "
+            "sa pod-pitanjem. OVA poruka je odgovor na TAJ hint — to je najčešće "
+            "MEĐUKORAK, ne konačan odgovor.\n"
+            "- NAJPRIJE sam provjeri je li taj KORAK tačan (npr. je li "
+            "\\(\\frac{1}{2}=\\frac{3}{6}\\) ispravno svođenje).\n"
+            "- Ako je korak TAČAN: potvrdi ga toplo i prirodno (\"Tako je!\", "
+            "\"Bravo, to je tačno.\") i navedi SLJEDEĆI mali korak jednim "
+            "pitanjem. NE piši ocjensku labelu \"Netačno.\" i NE tretiraj "
+            "nedovršen račun kao grešku.\n"
+            "- Ako je korak POGREŠAN: blago reci da tu nešto ne štima, kratko "
+            "pokaži ispravan korak i pozovi ga da nastavi. Bez tvrde presude.\n"
+            "- Ako je učenik ODMAH dao TAČAN KONAČAN odgovor: počni sa \"Tačno.\" "
+            "i po pravilima Vježbe daj novi zadatak.\n"
+            "- Ne otkrivaj cijelo rješenje unaprijed; idi korak po korak i kratko.\n"
+            "- Ne ponavljaj cijelo objašnjenje teme; budi kratak i razgovoran.\n"
+        )
+        step_block += _difficulty_line(payload)
+        if last_task:
+            step_block += f"ZADNJI ZADATAK (tačan vidljivi tekst):\n{last_task}\n"
+        return step_block
     block = (
         "MOD: VJEŽBA — PROVJERA ODGOVORA (practice follow-up)\n"
         "- The student is responding to this exact previous task: "
@@ -607,6 +635,10 @@ def build_continuation_instructions(payload: dict) -> str:
         "- NE ispisuj ponovo naslov teme (\"Tema:\") osim ako je zaista potrebno.\n"
         "- Ovo je objašnjenje, ne rješavanje zadatka: rezultat primjera napiši "
         "prirodno u rečenici, NE koristi podebljanu oznaku \"**Rezultat:**\".\n"
+        # AUD-08 (D1): "Zadatak:" red u nastavku objašnjenja aktivira praćenje
+        # zadatka i miješa modove — za vježbu postoji mod Vježba.
+        "- NE piši red \"Zadatak:\" i ne zadaji zadatak za vježbu — ako učenik "
+        "želi vježbati, kratko ga uputi na mod Vježba.\n"
     )
     if last_msg:
         block += f"ZADNJA PORUKA TUTORA (nastavi od nje):\n{last_msg}\n"
@@ -1137,8 +1169,19 @@ def build_result_mode_prompt(payload: dict) -> dict:
     system_prompt = build_result_mode_system_prompt()
 
     solve_item = normalize_value(payload.get("_result_solve_item"))
+    solve_task = normalize_value(payload.get("_result_solve_task"))
     user_parts = []
-    if solve_item:
+    if solve_item and solve_task:
+        # CLASS 3: slika ima dva lista s istom numeracijom — broj nije dovoljan,
+        # pa šaljemo TAČAN tekst izabranog zadatka (nema miješanja listova).
+        user_parts.append(
+            "ZADATAK SA SLIKE (tačan tekst — riješi ISKLJUČIVO ovaj):\n"
+            f"{solve_task}\n"
+            f"- To je zadatak broj {solve_item} sa lista koji je učenik naveo. "
+            "Ostale zadatke sa slike potpuno ignoriši (na slici ima dva lista s "
+            "istim brojevima). Daj kratak, tačan rezultat."
+        )
+    elif solve_item:
         user_parts.append(
             "ZADATAK SA SLIKE:\n"
             f"- Odgovori SAMO na zadatak broj {solve_item}. Ostale zadatke sa slike "

@@ -70,11 +70,19 @@ def _normalize_math_text(text: str) -> str:
     # (kraj rečenice, "8.45.") ostaje netaknuta. Hiljadni separatori se u ovom
     # gradivu ne pišu tačkom, pa nema dvosmislenosti koju bismo pokvarili.
     t = _DOT_DECIMAL_RE.sub(",", t)
+    # A3 (AUD-05): zagrade oko JEDNOG broja su samo zapis ("(-3) + 5" → "-3 + 5")
+    # — skidanjem ih izraz postaje parsabilan za _EXPR_PREFIX_RE/_eval_expr.
+    t = _PAREN_NUMBER_RE.sub(r"\1", t)
     return t
 
 
 # Tačka između dvije cifre = decimalni separator (konzervativno, samo taj slučaj).
 _DOT_DECIMAL_RE = re.compile(r"(?<=\d)\.(?=\d)")
+
+# Zagrada oko jednog broja/razlomka: "(-3)", "( 2/5 )", "(1,5)" → goli broj.
+_PAREN_NUMBER_RE = re.compile(
+    r"\(\s*(-?\d+(?:[,.]\d+)?(?:\s*/\s*\d+)?(?:\s+\d+\s*/\s*\d+)?)\s*\)"
+)
 
 
 # --- Parsiranje jednog broja (razlomak / mješoviti / cijeli / decimalni) ---------
@@ -381,6 +389,124 @@ def _try_fraction_comparison(folded: str, tokens: list[NumberToken]) -> Expected
         return None
     chosen = max(fracs, key=lambda t: t.value) if wants_greater else min(fracs, key=lambda t: t.value)
     return Expected(value=chosen.value, kind="comparison", required_form="fraction")
+
+
+# --- A3 (AUD-05/11, 2026-07-13): procenti, stepeni, pretvaranje jedinica -------------
+
+_PERCENT_OF_RE = re.compile(
+    r"(\d+(?:[,.]\d+)?)\s*%\s*(?:od|broja)\s*(\d+(?:[,.]\d+)?)"
+)
+_PERCENT_REVERSE_RE = re.compile(
+    r"(\d+(?:[,.]\d+)?)\s*%\s*(?:nekog\s+|nepoznatog\s+)?broja\s+(?:je|iznosi)\s*(\d+(?:[,.]\d+)?)"
+)
+
+
+def _try_percent_of(folded: str, tokens: list[NumberToken]) -> Expected | None:
+    """"Koliko je 20% od 50?" → 10; "15% broja je 30, koji je broj?" → 200."""
+    m = _PERCENT_REVERSE_RE.search(folded)
+    if m:
+        pct = _num_to_fraction(m.group(1))
+        value = _num_to_fraction(m.group(2))
+        if pct > 0:
+            return Expected(value=value * 100 / pct, kind="arithmetic")
+    m = _PERCENT_OF_RE.search(folded)
+    if m:
+        pct = _num_to_fraction(m.group(1))
+        base = _num_to_fraction(m.group(2))
+        return Expected(value=base * pct / 100, kind="arithmetic")
+    return None
+
+
+_POWER_RE = re.compile(r"(-?\d+(?:[,.]\d+)?|-?\d+\s*/\s*\d+)\s*(?:\^|\*\*)\s*(\d)")
+_POWER_WORD_RE = re.compile(
+    r"(?:kvadrat\s+broja|kvadriraj)\s+(-?\d+(?:[,.]\d+)?)"
+    r"|(-?\d+(?:[,.]\d+)?)\s+na\s+(kvadrat|kub|drugu|trecu)"
+)
+
+
+def _try_power(folded: str, tokens: list[NumberToken]) -> Expected | None:
+    """"3^2", "5 na kvadrat", "kvadrat broja 4" → mali stepeni (eksponent ≤ 6).
+
+    Konzervativno: stepen mora biti JEDINI račun u stavci ("2^3 + 1" se ne
+    presuđuje — kombinovani izrazi bi dali pogrešan expected)."""
+    m = _POWER_RE.search(folded)
+    if m:
+        exp = int(m.group(2))
+        if exp > 6:
+            return None
+        # kombinovani izraz? van stepena ne smije ostati ni jedna cifra
+        rest = folded[:m.start()] + folded[m.end():]
+        if re.search(r"\d", rest):
+            return None
+        toks = _scan_number_tokens(m.group(1))
+        if len(toks) == 1:
+            return Expected(value=toks[0].value ** exp, kind="arithmetic")
+        return None
+    m = _POWER_WORD_RE.search(folded)
+    if m:
+        if m.group(1) is not None:
+            return Expected(value=_num_to_fraction(m.group(1)) ** 2, kind="arithmetic")
+        base = _num_to_fraction(m.group(2))
+        exp = 3 if m.group(3) in ("kub", "trecu") else 2
+        return Expected(value=base ** exp, kind="arithmetic")
+    return None
+
+
+# Faktor prema OSNOVNOJ jedinici grupe (dužina→mm, masa→g, vrijeme→min).
+_UNIT_FACTORS = {
+    "km": ("len", Fraction(1_000_000)), "kilometar": ("len", Fraction(1_000_000)),
+    "m": ("len", Fraction(1000)), "metar": ("len", Fraction(1000)),
+    "dm": ("len", Fraction(100)),
+    "cm": ("len", Fraction(10)), "centimetar": ("len", Fraction(10)),
+    "mm": ("len", Fraction(1)), "milimetar": ("len", Fraction(1)),
+    "t": ("mass", Fraction(1_000_000)), "tona": ("mass", Fraction(1_000_000)),
+    "kg": ("mass", Fraction(1000)), "kilogram": ("mass", Fraction(1000)),
+    "dag": ("mass", Fraction(10)), "dekagram": ("mass", Fraction(10)),
+    "g": ("mass", Fraction(1)), "gram": ("mass", Fraction(1)),
+    "h": ("time", Fraction(60)), "sat": ("time", Fraction(60)),
+    "min": ("time", Fraction(1)), "minut": ("time", Fraction(1)), "minuta": ("time", Fraction(1)),
+}
+# Duži oblici PRIJE kraćih (inače "m" pojede početak od "min"/"mm") + \b iza.
+_UNIT_WORD = (
+    r"(kilomet\w*|centimet\w*|milimet\w*|met(?:ar|ra|ara|rima)?|"
+    r"kilogram\w*|dekagram\w*|gram\w*|ton\w*|minut\w*|sat\w*|"
+    r"km|dm|cm|mm|kg|dag|min|m|t|g|h)\b"
+)
+_UNIT_CONVERT_RE = re.compile(
+    rf"(?:pretvori|izrazi|koliko\s+(?:je|ima|iznosi))\b.{{0,30}}?"
+    rf"(-?\d+(?:[,.]\d+)?)\s*{_UNIT_WORD}\s+(?:u|ima\s+u)\s+{_UNIT_WORD}"
+)
+
+
+def _unit_key(raw: str) -> str | None:
+    raw = raw.lower()
+    if raw in _UNIT_FACTORS:
+        return raw
+    for stem, key in (
+        ("kilomet", "km"), ("centimet", "cm"), ("milimet", "mm"), ("met", "m"),
+        ("kilogram", "kg"), ("dekagram", "dag"), ("gram", "g"), ("ton", "t"),
+        ("sat", "h"), ("minut", "min"),
+    ):
+        if raw.startswith(stem):
+            return key
+    return None
+
+
+def _try_unit_conversion(folded: str, tokens: list[NumberToken]) -> Expected | None:
+    """"Pretvori 3 m u cm" → 300 cm; dužina/masa/vrijeme unutar iste grupe."""
+    m = _UNIT_CONVERT_RE.search(folded)
+    if not m:
+        return None
+    src = _unit_key(m.group(2))
+    dst = _unit_key(m.group(3))
+    if not src or not dst or src == dst:
+        return None
+    src_group, src_f = _UNIT_FACTORS[src]
+    dst_group, dst_f = _UNIT_FACTORS[dst]
+    if src_group != dst_group:
+        return None
+    value = _num_to_fraction(m.group(1)) * src_f / dst_f
+    return Expected(value=value, kind="arithmetic", unit=dst)
 
 
 _NZD_RE = re.compile(r"najvec\w*\s+zajednick\w*\s+dj?el\w*|\bnzd\b")
@@ -818,10 +944,19 @@ def derive_expected(item_text: str) -> Expected | None:
         _try_worded_fraction_operation,
         _try_fraction_comparison,
         _try_gcd_lcm,
+        # A3 (2026-07-13): procenti, stepeni, jedinice
+        _try_percent_of,
+        _try_power,
+        _try_unit_conversion,
     ):
         result = solver(folded, tokens)
         if result is not None:
             return result
+    # A3 guard: stepen koji solver NIJE riješio (kombinovani izraz "2^3 + 1")
+    # ne smije pasti u _try_arithmetic — on ne zna "^" pa bi parsirao samo
+    # ostatak ("3 + 1") i dao POGREŠAN expected. Bolje "ne znam" nego krivo.
+    if re.search(r"\^|\*\*|\bna\s+(?:kvadrat|kub|drugu|trecu)\b", folded):
+        return None
     equation = _try_linear_equation(folded, norm)
     if equation is not None:
         return equation

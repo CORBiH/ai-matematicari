@@ -427,6 +427,10 @@ def _apply_practice_help_contract(payload: dict) -> None:
             "NE koristi ocjenske labele."
         )
     elif intent == "hint":
+        # CLASS 1: hint tipično postavi pod-korak ("koliko je 1/2 s nazivnikom
+        # 6?"). Označi potez da sljedeći učenikov odgovor ne ocijenimo kao
+        # FINALNI (tačan međukorak ne smije dobiti "Netačno").
+        payload["_gave_hint_step"] = True
         payload["student_message"] = (
             "Daj mi jedan kratki hint za ovaj zadatak. "
             "Ne otkrivaj konačan rezultat.\n\n"
@@ -519,10 +523,45 @@ _NEW_TASK_WORD_RE = re.compile(
 )
 _DIFF_HARDER_RE = re.compile(r"\btez\w*\b")
 _DIFF_EASIER_RE = re.compile(r"\blaks\w*\b")
+# CLASS 2 (2026-07-12): težinski zahtjev u PRIRODNOJ rečenici ("to je previše
+# lagano daj mi teže", "ovo mi je prelagano", "hoću izazov"). Ranije je
+# detekcija zahtijevala da SVE riječi budu filler pa je ovakva poruka propadala
+# modelu, koji bi onda riješio svoj zadatak umjesto da da teži.
+_DIFF_HARDER_STRONG_RE = re.compile(
+    r"\bprelagan\w*|\bprelak\w*|\bprevise\s+lagan\w*|\bprevise\s+lak\w*|"
+    r"\bpre\s?lagan\w*|\bizazov\w*|\bkomplikovanij\w*"
+)
+_DIFF_EASIER_STRONG_RE = re.compile(
+    r"\blaks\w*|\blaganij\w*|\bjednostavnij\w*|\bpretesk\w*|\bpretez\w*|\bprekompl\w*"
+)
+_DIFF_HARDER_WEAK_RE = re.compile(r"\btez\w*")
+# Poruka koja imenuje DRUGU (konkretnu) temu/oblast — tada NE preusmjeravaj kao
+# čist "teži zadatak iz iste teme" (izgubila bi se tema); pusti normalan tok.
+_NAMES_OTHER_TOPIC_RE = re.compile(
+    r"\b(razlom\w*|procen\w*|postot\w*|ugl\w*|ugao|uglov\w*|geometr\w*|"
+    r"jednacin\w*|nejednacin\w*|decimal\w*|djeljiv\w*|deljiv\w*|kruzn\w*|"
+    r"povrsin\w*|obim\w*|razmjer\w*|koordinat\w*|skupov\w*|mnozenj\w*|"
+    r"dijeljenj\w*|sabiranj\w*|oduzimanj\w*|stepen\w*|prostih\s+broj\w*)\b"
+)
+
+
+def _detect_difficulty_adjustment(folded: str) -> str | None:
+    """"harder"|"easier"|None iz slobodne rečenice (redoslijed bitan: "prelagano"
+    sadrži "lagan", a "pretesko" sadrži "tesk" — jaki obrasci se provjeravaju
+    prije slabih)."""
+    if _DIFF_HARDER_STRONG_RE.search(folded):
+        return "harder"
+    if _DIFF_EASIER_STRONG_RE.search(folded):
+        return "easier"
+    if _DIFF_HARDER_WEAK_RE.search(folded):
+        return "harder"
+    return None
+
+
 # N6 (2026-07-12): "isti" maknut iz blokera — "daj jos jedan isti takav" je
 # zahtjev za NOVIM zadatkom iste težine (ponavljanje i dalje blokira "ponovi").
 _NEW_TASK_BLOCKER_RE = re.compile(
-    r"\b(objasni|pojasni|ponovi|ovaj|hint|pomoc|pomozi|kako|zasto|"
+    r"\b(objasni|pojasni|ponovi|hint|pomoc|pomozi|kako|zasto|"
     r"rijesi|uradi|pokazi|prikazi|provjeri|odgovor\w*)\b|[=?]|\d"
 )
 
@@ -539,6 +578,10 @@ _NEW_TASK_FILLER = frozenset({
     "laksi", "lakse", "laksu", "iz", "iste", "teme",
     # N6: "isti takav" = nov zadatak iste vrste/težine
     "isti", "istu", "isto", "takav", "takvu", "takvo", "ovakav", "ovakvu",
+    # N12: "samo jos jedan pa idem (spavati)" — najava kraja NE poništava
+    # zahtjev za još jednim zadatkom.
+    "samo", "pa", "onda", "idem", "moram", "ici", "spavat", "spavati",
+    "kuci", "gotov", "gotovo", "zavrsavam", "kraj", "zadnji", "posljednji",
 })
 
 
@@ -547,21 +590,21 @@ def detect_new_task_request(text: Any) -> str | None:
     zadatkom; None inače. Konzervativno: kratka poruka bez brojeva, odgovora,
     objašnjenja i bez dodatnog sadržaja (teme)."""
     folded = fold_diacritics(text).strip()
-    if not folded or len(folded) > 60:
+    if not folded or len(folded) > 80:
         return None
     if _NEW_TASK_BLOCKER_RE.search(folded):
         return None
-    harder = bool(_DIFF_HARDER_RE.search(folded))
-    easier = bool(_DIFF_EASIER_RE.search(folded))
-    if not (_NEW_TASK_WORD_RE.search(folded) or harder or easier):
+    # CLASS 2: težinski zahtjev važi i u prirodnoj rečenici ("to je previše
+    # lagano daj mi teže") — SAMO ako poruka ne imenuje DRUGU temu (tada tema
+    # ima prednost pa ide normalnim tokom).
+    diff = _detect_difficulty_adjustment(folded)
+    if diff and not _NAMES_OTHER_TOPIC_RE.search(folded):
+        return diff
+    if not _NEW_TASK_WORD_RE.search(folded):
         return None
     words = re.findall(r"[a-z]+", folded)
     if any(w not in _NEW_TASK_FILLER for w in words):
         return None                         # nosi temu/sadržaj — normalan tok
-    if harder:
-        return "harder"
-    if easier:
-        return "easier"
     return "same"
 
 
@@ -628,6 +671,33 @@ def _apply_explicit_intent(payload: dict) -> None:
 
 
 _FRESH_EXAM_PREP_RE = re.compile(r"\b(kontroln\w*|test\w*|priprem\w*)\b")
+
+
+# N8 (2026-07-13): "objasni mi X" u Vježbi BEZ aktivne answer-faze = zahtjev za
+# OBJAŠNJENJEM — potez ide kao explain, pa proza objašnjenja ne postaje
+# last_tutor_task (ranije: objašnjenje ušlo u task state → sljedeći odgovor
+# ocjenjivan protiv proze).
+_EXPLAIN_REQUEST_RE = re.compile(
+    r"^(?:ma\s+|a\s+|pa\s+)?(?:objasni|pojasni)\b|\bobjasni\s+mi\b|\bpojasni\s+mi\b"
+)
+
+
+def _apply_explain_request_contract(payload: dict) -> None:
+    if payload.get("_direct_answer") is not None or payload.get("_skip_answer_check"):
+        return
+    if normalize_value(payload.get("intent")):
+        return
+    if normalize_value(payload.get("interaction_phase")):
+        return                              # answer/help faze imaju svoje contracte
+    if normalize_value(payload.get("mode")).lower() not in ("practice", "vjezba", "exam", "kontrolni"):
+        return
+    message = normalize_value(payload.get("student_message") or payload.get("message"))
+    folded = fold_diacritics(message)
+    if not _EXPLAIN_REQUEST_RE.search(folded):
+        return
+    if extract_task_expressions(message):
+        return                              # "objasni mi 3/4+5/6" nosi SVOJ zadatak (N1)
+    payload["mode"] = "explain"             # prompt-mod; UI session_mode ostaje
 
 
 def _is_fresh_exam_prep_request(payload: dict) -> bool:
@@ -699,6 +769,9 @@ def _empty_next_state() -> dict:
         "stuck_count": 0,
         "correct_streak": 0,
         "task_items": None,
+        # CLASS 1 (2026-07-12): prethodni potez je bio hint sa pod-korakom —
+        # sljedeći odgovor može biti MEĐUKORAK, ne finalni odgovor.
+        "just_hinted": False,
     }
 
 
@@ -831,6 +904,8 @@ def _normalize_next_state(raw: Any) -> dict:
         "correct_streak": max(0, streak),
         # BUG 12: stanje višestavkovnog zadatka (koje stavke su već ocijenjene)
         "task_items": _normalize_task_items(raw.get("task_items")),
+        # CLASS 1: marker da je prethodni potez bio hint (pod-korak)
+        "just_hinted": bool(raw.get("just_hinted")),
     }
 
 
@@ -1222,9 +1297,108 @@ def _fmt_result_value(expected) -> str:
     return f"{base} {expected.unit}".strip() if expected.unit else base
 
 
+def _duplicate_task_numbering(items: list[dict]) -> bool:
+    """CLASS 3 (2026-07-12): True kada OCR sadrži RESTART numeracije — npr. dvije
+    strane/lista testa (1..5, pa opet 1..5). Tada se labeli sudaraju (dict
+    ``tasks_by_label`` kolabira na zadnji), pa "prvi" postaje dvosmislen i
+    sadržaj se miješa između listova (prijavljeni bug: test_mat.webp)."""
+    nums = [int(it["label"]) for it in items if str(it.get("label", "")).isdigit()]
+    return any(nums[i] <= nums[i - 1] for i in range(1, len(nums)))
+
+
+def _group_task_sheets(items: list[dict]) -> list[list[dict]]:
+    """Razdvoji stavke na LISTOVE: novi list počinje kad numeracija krene ispočetka
+    (broj <= prethodnom). Slovne pod-stavke ostaju uz svoj list."""
+    sheets: list[list[dict]] = []
+    current: list[dict] = []
+    last_num: int | None = None
+    for it in items:
+        label = str(it.get("label", ""))
+        if label.isdigit():
+            n = int(label)
+            if last_num is not None and n <= last_num and current:
+                sheets.append(current)
+                current = []
+            last_num = n
+        current.append(it)
+    if current:
+        sheets.append(current)
+    return sheets
+
+
+# "prvi list", "s druge strane", "drugi set", "drugi papir"
+_SHEET_REF_RE = re.compile(
+    r"\b(prv\w*|drug\w*|gornj\w*|donj\w*)\s+(list\w*|stran\w*|set\w*|papir\w*|dio|dijel\w*)\b"
+    r"|\b(list\w*|stran\w*|set\w*)\s+(prv\w*|drug\w*|jedan|dva|1|2)\b"
+)
+_SHEET_FIRST_RE = re.compile(r"\b(prv\w*|gornj\w*|jedan|1)\b")
+_SHEET_SECOND_RE = re.compile(r"\b(drug\w*|donj\w*|dva|2)\b")
+
+
+def _detect_sheet_ref(folded: str, sheet_count: int) -> int | None:
+    """Indeks lista (0-based) iz poruke tipa 'prvi list' / 's druge strane'."""
+    m = _SHEET_REF_RE.search(folded)
+    if not m:
+        return None
+    span = m.group(0)
+    if _SHEET_SECOND_RE.search(span):
+        idx = 1
+    elif _SHEET_FIRST_RE.search(span):
+        idx = 0
+    else:
+        return None
+    return idx if idx < sheet_count else None
+
+
+def _duplicate_sets_message(chosen: int | str | None = None) -> str:
+    """Poruka kada slika sadrži dva odvojena seta zadataka (dupla numeracija)."""
+    if chosen:
+        return (
+            f"Na slici vidim dva seta zadataka i broj {chosen} se pojavljuje u "
+            "oba. Reci mi s kojeg lista ga želiš — npr. \"{0}. zadatak s prvog "
+            "lista\" ili \"{0}. zadatak s drugog lista\".".format(chosen)
+        )
+    return (
+        "Izgleda da slika sadrži dva odvojena seta zadataka (numeracija se "
+        "ponavlja). Reci mi s kojeg lista i koji broj želiš — npr. \"prvi "
+        "zadatak s drugog lista\"."
+    )
+
+
+def _duplicate_sheets_clarification(payload: dict) -> str:
+    """CLASS 3: kada slika sadrži dva lista s istom numeracijom, ne pogađaj koji
+    zadatak učenik misli — vrati pitanje za razjašnjenje (prazno = normalan tok).
+
+    Vrijedi u SVIM modovima (Vježba/Kontrolni/Rezultat), jer bi inače koračanje
+    kroz sliku ili result-selekcija pomiješali listove."""
+    ocr = _result_ocr(payload)
+    if not ocr:
+        return ""
+    items = extract_image_tasks(ocr)
+    if len(items) < 2 or not _duplicate_task_numbering(items):
+        return ""
+    message = normalize_value(payload.get("student_message") or payload.get("message"))
+    folded = fold_diacritics(message)
+    sheets = _group_task_sheets(items)
+    if _detect_sheet_ref(folded, len(sheets)) is not None:
+        return ""                       # učenik je naveo list — normalan tok
+    numeric = [int(it["label"]) for it in items if str(it.get("label", "")).isdigit()]
+    refs = detect_referenced_items(message, numeric) if numeric else set()
+    chosen = min(refs) if refs else None
+    if chosen is not None and numeric.count(chosen) > 1:
+        return _duplicate_sets_message(chosen)      # "prvi" postoji na oba lista
+    if chosen is None and (
+        payload.get("image_ocr_text") or _WANTS_SINGLE_RESULT_RE.search(folded)
+    ):
+        return _duplicate_sets_message()            # svježa slika / traži rezultat
+    return ""
+
+
 def _multi_task_ask_message(items: list[dict]) -> str:
     """Pitaj koji broj zadatka — BEZ otkrivanja rezultata unaprijed (BUG 11:
     nepozvano "za 2. zadatak mogu dati: -6/7" zbunjuje; samo pitaj broj)."""
+    if _duplicate_task_numbering(items):
+        return _duplicate_sets_message()
     labels = [normalize_value(it.get("label")) for it in items if normalize_value(it.get("label"))]
     listed = ", ".join(labels[:8])
     if listed:
@@ -1255,7 +1429,24 @@ def _resolve_result_selection(payload: dict) -> dict | None:
     numeric = [int(it["label"]) for it in items if str(it.get("label", "")).isdigit()]
     message = normalize_value(payload.get("student_message") or payload.get("message"))
     folded = fold_diacritics(message)
+    dup = _duplicate_task_numbering(items)
     refs = detect_referenced_items(message, numeric) if numeric else set()
+    if dup:
+        # CLASS 3: slika sadrži dva lista (numeracija se ponavlja). Broj sam po
+        # sebi je dvosmislen — treba i LIST. Kad znamo oboje, modelu šaljemo
+        # TAČAN TEKST zadatka (ne samo broj) da se listovi ne mogu pomiješati.
+        sheets = _group_task_sheets(items)
+        sheet_idx = _detect_sheet_ref(folded, len(sheets))
+        chosen = min(refs) if refs else None
+        if sheet_idx is not None and chosen is not None:
+            for it in sheets[sheet_idx]:
+                if str(it.get("label", "")) == str(chosen):
+                    payload["_result_solve_task"] = normalize_value(it.get("task"))[:600]
+                    return {"action": "solve", "item": chosen, "count": count}
+        if chosen is not None and numeric.count(chosen) > 1:
+            return {"action": "ask", "message": _duplicate_sets_message(chosen), "count": count}
+        if chosen is None and _WANTS_SINGLE_RESULT_RE.search(folded):
+            return {"action": "ask", "message": _duplicate_sets_message(), "count": count}
     if refs:
         return {"action": "solve", "item": min(refs), "count": count}
     # "rezultate/sve zadatke" (množina) → riješi sve (normalan tok, ne pitaj).
@@ -1263,6 +1454,15 @@ def _resolve_result_selection(payload: dict) -> dict | None:
         return None
     # "rezultat zadatka" (jednina) bez broja + više zadataka → pitaj koji broj.
     if _WANTS_SINGLE_RESULT_RE.search(folded):
+        return {"action": "ask", "message": _multi_task_ask_message(items), "count": count}
+    # AUD-07 (B3): SVJEŽA slika sa ≥2 zadatka + generička/prazna poruka (bez
+    # broja, bez vlastitog zadatka) → deterministički pitaj koji broj, umjesto
+    # da model povremeno riješi SVE. Poruka s brojevima/zadatkom ide normalno.
+    if (
+        payload.get("image_ocr_text")
+        and len(folded) <= 60
+        and not re.search(r"\d", folded)
+    ):
         return {"action": "ask", "message": _multi_task_ask_message(items), "count": count}
     return None
 
@@ -1301,6 +1501,11 @@ def _resolve_image_test_state(payload: dict) -> dict | None:
     items = extract_image_tasks(ocr)
     if len(items) < 2:
         return None      # jedan zadatak sa slike = običan tok, bez koračanja
+    if _duplicate_task_numbering(items):
+        # CLASS 3: slika sadrži dva lista s istom numeracijom — labeli se sudaraju
+        # (tasks_by_label bi kolabirao na zadnji list) pa bi koračanje miješalo
+        # zadatke. Ne koračaj; razjašnjenje ide kroz _duplicate_sheets_clarification.
+        return None
     labels = [str(it["label"]).lower() for it in items]
     tasks_by_label = {str(it["label"]).lower(): it["task"] for it in items}
 
@@ -1749,6 +1954,27 @@ def _call_model_with_retry(
     return answer if answer.strip() else _EMPTY_ANSWER_FALLBACK
 
 
+def _soften_post_hint_reply(payload: dict) -> None:
+    """CLASS 1: kad je prethodni potez bio hint (pod-korak), učenikov odgovor
+    može biti tačan MEĐUKORAK, a ne finalni odgovor.
+
+    Ako je deterministička provjera dala PUN tačan finalni odgovor → ostavi je
+    (učenik je riješio zadatak, slijedi "Tačno." + novi zadatak). Inače povuci
+    presudu i pusti model da procijeni korak (uz `_post_hint_reply` direktivu):
+    tačan međukorak dobija potvrdu i sljedeći korak, a NIKAD "Netačno." samo zato
+    što nije finalni rezultat."""
+    check = payload.get("answer_check")
+    items = getattr(check, "items", None) if check is not None else None
+    verdicts = [getattr(i, "verdict", None) for i in items] if items else []
+    all_correct = bool(verdicts) and all(v == "correct" for v in verdicts)
+    if all_correct:
+        return                      # finalni tačan odgovor — deterministička Tačno ostaje
+    # Nije (pouzdano) finalno tačno → tretiraj kao mogući međukorak.
+    payload["answer_check"] = None
+    payload["_skip_answer_check"] = True
+    payload["_post_hint_reply"] = True
+
+
 def _run_answer_check(payload: dict) -> None:
     """Deterministička provjera odgovora + atribucija stavke (BUG 12).
 
@@ -1985,6 +2211,9 @@ def _prepare_chat(
     _apply_practice_help_contract(payload)
     # N1: "evo moj zadatak: 3/4 + 5/6" u Vježbi → TAJ zadatak postaje aktivni.
     _apply_student_task_contract(payload)
+    # N8: "objasni mi X" u Vježbi bez answer-faze → explain potez (proza
+    # objašnjenja ne smije postati last_tutor_task).
+    _apply_explain_request_contract(payload)
     # N5: "jesi li robot / ko te napravio / špijuniraš li me" → topli direktni odgovor.
     _apply_meta_identity_contract(payload)
 
@@ -2004,6 +2233,26 @@ def _prepare_chat(
             "messages": None,
             "use_model": model,
             "direct_answer": payload.get("_direct_answer"),
+        }
+
+    def _plain_direct_prep(message: str) -> dict:
+        """Determinističan direktan odgovor u BILO kojem modu (npr. CLASS 3
+        razjašnjenje "s kojeg lista?"). Ne dira result-mod context policy."""
+        payload["_direct_answer"] = message
+        m = master if master is not None else get_master(grade=payload["grade"])
+        prompt_result = _direct_prompt_result(payload)
+        return {
+            "payload": payload,
+            "master": m,
+            "lookup_result": {"status": "found", "source": "intent_contract"},
+            "prompt_result": prompt_result,
+            "mode": prompt_result["mode"],
+            "status": prompt_result["status"],
+            "effective_topic": "unknown",
+            "topic_context": {},
+            "messages": None,
+            "use_model": model,
+            "direct_answer": message,
         }
 
     def _result_direct_prep(message: str) -> dict:
@@ -2043,11 +2292,20 @@ def _prepare_chat(
     # rezultat(e) gdje god može (razlomci, mješoviti brojevi, komplement,
     # pretvaranje, direktan račun). Presuda ulazi u prompt i model je NE SMIJE
     # mijenjati — time nestaje klasa grešaka "tačan odgovor proglašen netačnim".
-    if (
-        not payload.get("_skip_answer_check")
-        and normalize_value(payload.get("interaction_phase")).lower() == "answering_practice_task"
-    ):
+    answering = normalize_value(payload.get("interaction_phase")).lower() == "answering_practice_task"
+    # CLASS 1 (2026-07-12): prethodni potez je bio hint sa pod-korakom. Učenikov
+    # odgovor sada može biti tačan MEĐUKORAK (npr. hint pita "koliko je 1/2 s
+    # nazivnikom 6?", učenik: "3/6"). Bez ovoga bi se gradirao protiv FINALNOG
+    # rezultata i dobio "Netačno" iako je korak tačan (live: 5/6 slučajeva).
+    post_hint = (
+        answering
+        and not payload.get("_skip_answer_check")
+        and bool(_previous_next_state(payload).get("just_hinted"))
+    )
+    if not payload.get("_skip_answer_check") and answering:
         _run_answer_check(payload)
+    if post_hint:
+        _soften_post_hint_reply(payload)
     # AUD-01: odgovor na stavku image_test "practice" toka → pripremi SLJEDEĆU
     # stavku sa slike (da followup ne izmisli novi zadatak).
     _apply_image_practice_followup(payload)
@@ -2071,6 +2329,14 @@ def _prepare_chat(
             ocr_text, ocr_conf = None, 0.0
         if ocr_text:
             payload["image_ocr_text"] = normalize_value(ocr_text)[:MAX_MESSAGE_CHARS]
+
+    # --- CLASS 3: slika sa DVA lista (numeracija se ponavlja) --------------------
+    # "prvi" tada postoji na oba lista. Ne pogađaj — pitaj s kojeg lista, inače se
+    # zadaci miješaju (prijavljeni bug: test_mat.webp, "prvi" → zadatak s 2. lista,
+    # a objašnjenje s 1.). Vrijedi u svim modovima, PRIJE image_test/result grane.
+    dup_sheets_msg = _duplicate_sheets_clarification(payload)
+    if dup_sheets_msg:
+        return _plain_direct_prep(dup_sheets_msg)
 
     # --- image_test: deterministički korak kroz zadatke sa slike -----------------
     # Stanje se gradi iz OCR-a + prethodnog next_state (nikad iz proze); prompt
@@ -2442,6 +2708,17 @@ def _task_items_for_response(payload: dict, task_text: str) -> dict | None:
     return {"labels": labels, "graded": sorted(graded)}
 
 
+def _pending_items_after_grading(payload: dict) -> list:
+    """AUD-04 (B2): stavke višestavkovnog zadatka koje POSLIJE ovog grading
+    poteza i dalje čekaju odgovor. Prazna lista = ništa ne čeka."""
+    state = _task_items_for_response(payload, "")
+    if not state:
+        return []
+    labels = state.get("labels") or []
+    graded = set(state.get("graded") or [])
+    return [n for n in labels if n not in graded]
+
+
 def _is_grading_turn(payload: dict) -> bool:
     """Da li ovaj potez ocjenjuje učenikov odgovor na zadatak?
 
@@ -2592,16 +2869,23 @@ def _finalize_response(prep: dict, answer: str) -> dict:
         payload.get("_direct_answer") is not None
         or payload.get("_image_test")
         or payload.get("_solution_revealed")
+        or payload.get("_post_hint_reply")
         or status != "ready"
         or mode not in ("practice", "exam")
     ):
         # BUG 3/9: samo Vježba/Kontrolni prate aktivni zadatak; explain/quick
         # nikad (proza objašnjenja ne smije postati last_tutor_task).
+        # CLASS 1: post-hint vođeni potez ne mijenja zadatak — original persistira.
         task_text = ""
     elif _is_grading_turn(payload):
         # BUG 1: na ocjenjivačkom potezu SAMO eksplicitni "Zadatak:" marker —
         # riješeni izraz iz objašnjenja ne smije postati "novi zadatak".
         task_text = extract_marked_task(answer)
+        # AUD-04 (B2): dok stavke višestavkovnog zadatka ČEKAJU odgovor, novi
+        # zadatak je zabranjen — model ga povremeno ipak doda, pa bi zamijenio
+        # aktivni multi-zadatak i pokvario task_items praćenje. Server gate.
+        if task_text and _pending_items_after_grading(payload):
+            task_text = ""
     else:
         task_text = extract_practice_task(answer, mode=mode)
     # Server je jedini izvor istine za aktivni zadatak: polje se šalje UVIJEK
@@ -2613,6 +2897,9 @@ def _finalize_response(prep: dict, answer: str) -> dict:
     # F5: prenesi "stuck" brojač naprijed da klijent vrati stanje sljedeći put.
     response["next_state"]["stuck_count"] = int(payload.get("_stuck_count", 0) or 0)
     response["next_state"]["correct_streak"] = int(payload.get("_correct_streak", 0) or 0)
+    # CLASS 1: ako je OVAJ potez bio hint sa pod-korakom, obilježi ga da sljedeći
+    # učenikov odgovor tretiramo kao mogući međukorak (ne finalni).
+    response["next_state"]["just_hinted"] = bool(payload.get("_gave_hint_step"))
     # BUG 12: stanje višestavkovnog zadatka (labels + graded) putuje naprijed.
     task_items = _task_items_for_response(payload, task_text)
     if task_items:

@@ -83,6 +83,24 @@ _REPLACEMENTS: tuple[tuple[re.Pattern, str], ...] = tuple(
         # 2026-07-11 (KORAK 3): rod se ne slaže — "pitanje" je srednji rod.
         # Cilja SAMO ispred "pitanje", pa "dobar zadatak" ostaje netaknut.
         (r"dobar\s+(?:je\s+)?pitanje", "dobro pitanje"),
+        # 2026-07-13 (AUD-09/C2): hrvatski/stariji termini iz audita.
+        (r"zbroj", "zbir"),
+        (r"zbroja", "zbira"),
+        (r"zbroju", "zbiru"),
+        (r"zbrojem", "zbirom"),
+        (r"zbrojiti", "sabrati"),
+        (r"zbroji", "saberi"),
+        # "okomit" SAMO u frazama gdje zamjena čuva gramatiku ("okomito na" /
+        # "okomit(a/e/i) na"); goli pridjev se ne dira (pokvario bi rečenicu).
+        (r"okomit(?:o|a|e|i|u)?\s+na", "pod pravim uglom na"),
+        (r"okomic(a|e|i|u|om)", r"normal\1"),
+        (r"decimaln(a|e|u|oj)\s+ta[čc]k(a|e|u|om|i)", r"decimalni zarez"),
+        (r"pithagor(\w*)", r"pitagor\1"),
+        (r"kutov(\w*)", r"uglov\1"),
+        (r"\bkut\b", "ugao"),
+        (r"\bkuta\b", "ugla"),
+        (r"\bkutu\b", "uglu"),
+        (r"\bkutom\b", "uglom"),
     )
 )
 
