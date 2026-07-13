@@ -116,8 +116,14 @@ LANGUAGE_TONE_GUIDELINES = (
     "ako učenik to izričito zatraži.\n"
     "- Odgovor završi kratkim pitanjem ili prijedlogom sljedećeg koraka. "
     "Umjesto praznog \"Razumiješ li?\" radije provjeri KONKRETNO — daj sitan "
-    "mikro-zadatak (npr. \"Probaj ti: koliko je \\(\\frac{3}{8}+\\frac{2}{8}\\)?\") "
-    "ili predloži sljedeći korak (\"Hoćeš da probamo jedan zadatak?\").\n"
+    "mikro-zadatak ili predloži sljedeći korak (\"Hoćeš da probamo jedan "
+    "zadatak?\").\n"
+    "- MIKRO-ZADATAK (N9): ako provjeravaš razumijevanje sitnim zadatkom, napiši "
+    "ga NOVIM REDOM koji počinje TAČNO sa \"Probaj ti:\" i stane u JEDAN red "
+    "(npr. \"Probaj ti: koliko je \\(\\frac{3}{8}+\\frac{2}{8}\\)?\"). Taj marker "
+    "sistem prati da bi provjerio učenikov odgovor — bez njega odgovor propada. "
+    "Daj NAJVIŠE JEDAN mikro-zadatak i NIKAD ne piši \"Zadatak:\" (to pripada "
+    "modu Vježba).\n"
 )
 
 

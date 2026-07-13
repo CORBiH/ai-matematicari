@@ -604,3 +604,86 @@ def test_n8_explain_request_in_practice_does_not_track_prose(master, tmap):
 def test_d1_continuation_block_forbids_task_marker():
     block = pb.build_continuation_instructions({"last_tutor_message": "Evo objašnjenja..."})
     assert "NE piši red \"Zadatak:\"" in block
+
+
+# ============ N9 (2026-07-14): mikro-zadatak u Objašnjenju ("Probaj ti: …") ==========
+# Produkt-odluka: Objašnjenje SMIJE provjeriti razumijevanje, ali NE postaje mod
+# koji prati zadatke — mikro-zadatak živi u next_state.micro_task, nikad u
+# last_tutor_task, i ocjena se saopštava toplo (bez labela "Tačno."/"Netačno.").
+
+_EXPL = ("Kod istih nazivnika sabereš samo brojnike, nazivnik ostaje isti.\n"
+         "Probaj ti: koliko je 3/8 + 2/8?")
+
+
+def test_micro_task_extracted_only_with_marker():
+    assert svc.extract_micro_task(_EXPL) == "koliko je 3/8 + 2/8?"
+    # bez markera → ništa (proza se ne pogađa)
+    assert svc.extract_micro_task("Hoćeš da probamo jedan zadatak?") == ""
+    # marker bez matematičkog signala nije zadatak
+    assert svc.extract_micro_task("Probaj ti: razmisli malo o tome") == ""
+
+
+def test_micro_task_lives_outside_last_tutor_task(master, tmap):
+    """Objašnjenje NE smije postati mod koji prati zadatke (BUG 3/9, N8)."""
+    out = svc.handle_chat(
+        {"grade": 6, "mode": "explain", "selected_topic": "6-04-039",
+         "student_message": "objasni sabiranje razlomaka istih nazivnika"},
+        _chat(_EXPL), master, tmap, model="m", timeout=1)
+    assert out["last_tutor_task"] == ""                       # i dalje prazno
+    assert out["next_state"]["micro_task"] == "koliko je 3/8 + 2/8?"
+
+
+def test_micro_task_survives_state_normalization():
+    ns = svc._normalize_next_state({"micro_task": "koliko je 3/8 + 2/8?"})
+    assert ns["micro_task"] == "koliko je 3/8 + 2/8?"
+    assert svc._empty_next_state()["micro_task"] == ""
+
+
+def test_micro_task_reply_is_checked_and_consumed(master, tmap):
+    """Odgovor na mikro-zadatak se deterministički provjeri; zadatak se troši."""
+    prev = {"micro_task": "koliko je 3/8 + 2/8?"}
+    out = svc.handle_chat(
+        {"grade": 6, "mode": "explain", "selected_topic": "6-04-039",
+         "previous_next_state": prev, "student_message": "5/8"},
+        _chat("Tako je, bravo!"), master, tmap, model="m", timeout=1)
+    chk = out["answer_check"] or {}
+    assert [i["verdict"] for i in chk.get("items", [])] == ["correct"]
+    assert out["next_state"]["micro_task"] == ""              # potrošen
+    assert out["last_tutor_task"] == ""                       # nikad ne curi
+
+
+def test_micro_task_reply_prompt_block_forbids_labels(master, tmap):
+    chat = _chat("Tako je!")
+    svc.handle_chat(
+        {"grade": 6, "mode": "explain", "selected_topic": "6-04-039",
+         "previous_next_state": {"micro_task": "koliko je 3/8 + 2/8?"},
+         "student_message": "5/8"},
+        chat, master, tmap, model="m", timeout=1)
+    up = _prompt(chat)
+    assert "PROVJERA MIKRO-ZADATKA" in up
+    assert "NIKAD ne piši ocjenske labele" in up
+
+
+def test_micro_task_hard_label_is_stripped_and_softened():
+    """Model povremeno ipak napiše 'Netačno.' — deterministički enforcement."""
+    from matbot.answer_checker import check_practice_answer
+    chk = check_practice_answer("koliko je 3/8 + 2/8?", "5/16")
+    out = svc._soften_micro_task_answer("Netačno. Saberi brojnike: 3+2=5.", chk)
+    assert not out.lower().startswith("netačno")
+    assert out.startswith("Nije baš —")
+    # tačan odgovor → topla potvrda
+    chk2 = check_practice_answer("koliko je 3/8 + 2/8?", "5/8")
+    out2 = svc._soften_micro_task_answer("Tačno. Nazivnik ostaje 8.", chk2)
+    assert out2.startswith("Tako je!")
+    # ne dupliraj uvod kad tekst već ima meki sud
+    out3 = svc._soften_micro_task_answer("Netačno. Nije baš tačno, probaj opet.", chk)
+    assert out3.startswith("Nije baš tačno")
+
+
+def test_micro_task_question_does_not_hijack(master, tmap):
+    """Pitanje (ne odgovor) poslije mikro-zadatka ide normalnim tokom."""
+    p = {"grade": 6, "mode": "explain",
+         "previous_next_state": {"micro_task": "koliko je 3/8 + 2/8?"},
+         "student_message": "a sta ako su nazivnici razliciti?"}
+    svc._apply_micro_task_contract(p)
+    assert not p.get("_micro_task_reply")

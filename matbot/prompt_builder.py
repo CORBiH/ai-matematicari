@@ -286,13 +286,21 @@ def build_mode_instructions(
     # explain (default)
     return (
         "MOD: OBJASNI (explain)\n"
-        "- Ovaj mod ISKLJUČIVO objašnjava, što jednostavnije moguće. "
-        "NIKAD ne zadaji zadatak za vježbu, ne piši \"Zadatak:\" i ne traži "
-        "od učenika da nešto riješi i javi rezultat — za vježbu postoji mod "
+        "- Ovaj mod objašnjava, što jednostavnije moguće. NIKAD ne zadaji seriju "
+        "zadataka za vježbu i NIKAD ne piši \"Zadatak:\" — za vježbu postoji mod "
         "Vježba.\n"
         "- Budi razgovoran, ne repetitivan: prvo ideja/pristup u 2–3 kratke "
         "rečenice, zatim JEDAN kratak RIJEŠENI primjer (ti ga riješiš do "
         "kraja) ILI ponudi primjer pitanjem (npr. \"Hoćeš primjer?\").\n"
+        # N9 (2026-07-14, produkt-odluka): objašnjenje SMIJE provjeriti
+        # razumijevanje JEDNIM sitnim zadatkom. Marker je obavezan — sistem po
+        # njemu prati odgovor i deterministički ga provjeri.
+        "- PROVJERA RAZUMIJEVANJA: poslije objašnjenja možeš dati NAJVIŠE JEDAN "
+        "sitan mikro-zadatak da provjeriš je li učenik shvatio. Napiši ga NOVIM "
+        "REDOM koji počinje TAČNO sa \"Probaj ti:\" i stane u JEDAN red (npr. "
+        "\"Probaj ti: koliko je \\(\\frac{3}{8}+\\frac{2}{8}\\)?\"). Bez tog "
+        "markera sistem ne može provjeriti odgovor. Mikro-zadatak mora biti "
+        "lakši od primjera koji si upravo riješio.\n"
         "- U riješenom primjeru rezultat napiši prirodno u rečenici "
         "(npr. \"pa je \\(\\frac{3}{8}+\\frac{2}{8}=\\frac{5}{8}\\)\"). NE "
         "koristi podebljanu oznaku \"**Rezultat:**\" — ona pripada modu Vježba/"
@@ -608,6 +616,43 @@ def build_practice_help_instructions(payload: dict, topic_context: dict) -> str:
     # (bullet u listi model zna preskočiti).
     if _student_in_distress(payload):
         block = _EMPATHY_DIRECTIVE + block
+    return block
+
+
+def build_micro_task_reply_instructions(payload: dict) -> str:
+    """N9 (2026-07-14): učenik je odgovorio na mikro-zadatak iz OBJAŠNJENJA
+    ("Probaj ti: koliko je 3/8 + 2/8?").
+
+    Produkt-odluka: provjeravamo razumijevanje, ali Objašnjenje NIJE Vježba —
+    zato NIKAD tvrde labele ("Tačno."/"Netačno."), nego topla potvrda ili blago
+    navođenje. Presuda iz koda (ako postoji) je OBAVEZUJUĆA za sadržaj suda."""
+    payload = payload or {}
+    micro = normalize_value(payload.get("_micro_task"))[:300]
+    block = (
+        "MOD: OBJAŠNJENJE — PROVJERA MIKRO-ZADATKA\n"
+        f"- Ti si u prethodnoj poruci dao mikro-zadatak: {micro}\n"
+        "- Učenikova poruka je ODGOVOR na TAJ mikro-zadatak — ne tretiraj je kao "
+        "novo pitanje i ne rješavaj nešto drugo.\n"
+        "- Ovo je Objašnjenje, NE Vježba: NIKAD ne piši ocjenske labele "
+        "\"Tačno.\"/\"Djelimično tačno.\"/\"Netačno.\" i ne piši \"Zadatak:\".\n"
+        "- AKO JE ODGOVOR TAČAN: potvrdi toplo i prirodno (\"Tako je!\", "
+        "\"Bravo, upravo tako.\"), u jednoj rečenici reci ZAŠTO je tačno, pa "
+        "ponudi sljedeći korak (npr. prelazak na Vježbu ili sljedeći pojam).\n"
+        "- AKO NIJE TAČAN: bez tvrde presude — kratko i blago pokaži gdje je "
+        "zapelo, izvedi tačan račun u jednoj-dvije rečenice i ohrabri. Ne "
+        "ponavljaj cijelo objašnjenje.\n"
+        "- Budi KRATAK (2–4 rečenice) i razgovoran.\n"
+    )
+    check = payload.get("_micro_task_check")
+    if check is not None:
+        check_block = format_check_block(check)
+        if check_block:
+            block += (
+                check_block
+                + "\nNAPOMENA: gornja presuda određuje SADRŽAJ suda (tačno/netačno), "
+                "ali labele iz nje NE prepisuj — u Objašnjenju sud saopšti "
+                "prirodnim riječima.\n"
+            )
     return block
 
 
@@ -1064,6 +1109,8 @@ def build_tutor_prompt(
         # image_test tok nadjačava standardne modove: stanje bira stavku,
         # model je samo rješava (nikad ne generiše nepovezani zadatak)
         mode_block = image_test_block
+    elif payload.get("_micro_task_reply"):
+        mode_block = build_micro_task_reply_instructions(payload)
     elif is_practice_followup:
         mode_block = build_practice_followup_instructions(payload, topic_context)
     elif is_practice_help:

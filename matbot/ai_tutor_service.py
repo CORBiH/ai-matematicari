@@ -772,6 +772,10 @@ def _empty_next_state() -> dict:
         # CLASS 1 (2026-07-12): prethodni potez je bio hint sa pod-korakom —
         # sljedeći odgovor može biti MEĐUKORAK, ne finalni odgovor.
         "just_hinted": False,
+        # N9 (2026-07-14): mikro-zadatak iz OBJAŠNJENJA ("Probaj ti: 3/8 + 2/8?").
+        # NAMJERNO odvojen od last_tutor_task — Objašnjenje ne smije postati mod
+        # koji prati zadatke (to je bio izvor BUG 3/9 i N8).
+        "micro_task": "",
     }
 
 
@@ -906,6 +910,8 @@ def _normalize_next_state(raw: Any) -> dict:
         "task_items": _normalize_task_items(raw.get("task_items")),
         # CLASS 1: marker da je prethodni potez bio hint (pod-korak)
         "just_hinted": bool(raw.get("just_hinted")),
+        # N9: mikro-zadatak iz objašnjenja (odvojen od last_tutor_task)
+        "micro_task": normalize_value(raw.get("micro_task"))[:300],
     }
 
 
@@ -1954,6 +1960,111 @@ def _call_model_with_retry(
     return answer if answer.strip() else _EMPTY_ANSWER_FALLBACK
 
 
+# --- N9 (2026-07-14): mikro-zadatak u Objašnjenju ("Probaj ti: …") ------------------
+# Produkt-odluka (Faris): Objašnjenje SMIJE provjeriti razumijevanje mikro-zadatkom,
+# ali NE postaje mod koji prati zadatke — zadatak živi u next_state.micro_task,
+# nikad u last_tutor_task. Odgovor se deterministički provjeri, ali se saopštava
+# TOPLO (vođeni korak), bez tvrde labele "Netačno." — isto kao post-hint tok.
+
+_MICRO_TASK_RE = re.compile(
+    r"(?mi)^[ \t>*-]*probaj\s+ti\s*[:\-—]\s*(.+?)\s*$"
+)
+
+
+def extract_micro_task(answer: Any, limit: int = 300) -> str:
+    """Tekst mikro-zadatka iz odgovora tutora ("Probaj ti: koliko je 3/8 + 2/8?").
+
+    Uzima POSLJEDNJI marker; prazan string kada ga nema. Marker je eksplicitan
+    (prompt ga zahtijeva) pa se proza nikad ne pogađa."""
+    raw = normalize_value(answer)
+    last = None
+    for m in _MICRO_TASK_RE.finditer(raw):
+        last = m
+    if last is None:
+        return ""
+    text = re.sub(r"\s+", " ", last.group(1)).strip()
+    # mora nositi matematički signal (broj/operator) — inače nije zadatak
+    if not text or not _TASK_SIGNAL_RE.search(fold_diacritics(text)):
+        return ""
+    return text[:limit]
+
+
+_MICRO_LABEL_RE = re.compile(
+    r"^\s*(?:netaca?n\w*|taca?no|toca?no|dj?el[io]micn\w*\s+taca?n\w*)\s*[.!:,–—-]*\s*"
+)
+_MICRO_OPENER = {
+    "correct": "Tako je!",
+    "partial": "Blizu si —",
+    "incorrect": "Nije baš —",
+}
+# Tekst koji VEĆ počinje mekim sudom ("Nije baš tačno…", "Skoro!") ne treba još
+# jedan uvod — inače ispadne "Nije baš — Nije baš tačno…".
+_MICRO_HAS_OPENER_RE = re.compile(
+    r"^\s*(nije\b|skoro\b|blizu\b|ma\s+nije\b|tako\s+je\b|bravo\b|"
+    r"dobar\s+pokusaj\b|odlicno\b|super\b)"
+)
+
+
+def _soften_micro_task_answer(answer: Any, check: Any) -> str:
+    """N9: Objašnjenje NIJE Vježba — nikad ocjenske labele.
+
+    Presuda iz koda ostaje obavezujuća (guard uklanja kontradikciju), ali se
+    tvrda labela ("Netačno.") zamjenjuje toplim uvodom. Model je povremeno ipak
+    napiše uprkos zabrani u promptu, pa je ovo deterministički enforcement."""
+    out = normalize_value(answer)
+    if not out:
+        return out
+    if check is not None:
+        out = enforce_grading_consistency(out, check)
+    verdict = authoritative_verdict(check) if check is not None else "unknown"
+    stripped = out
+    for _ in range(3):                       # "Netačno. Tačno. …" → očisti sve
+        folded = fold_diacritics(stripped)
+        m = _MICRO_LABEL_RE.match(folded)
+        if not m:
+            break
+        # i zaostalu interpunkciju/crticu ("Netačno — izgleda…" → "izgleda…"),
+        # inače uvod ispadne "Nije baš — — izgleda…"
+        stripped = stripped[m.end():].lstrip(" \t.!?:;,-–—")
+    if stripped == out or not stripped:
+        return out                           # nije bilo labele — ne diraj
+    opener = _MICRO_OPENER.get(verdict)
+    if not opener or _MICRO_HAS_OPENER_RE.match(fold_diacritics(stripped)):
+        return stripped                      # već ima meki uvod — ne dupliraj
+    return f"{opener} {stripped}"
+
+
+def _apply_micro_task_contract(payload: dict) -> None:
+    """Učenik odgovara na mikro-zadatak iz prethodnog OBJAŠNJENJA."""
+    if payload.get("_direct_answer") is not None or payload.get("_skip_answer_check"):
+        return
+    if normalize_value(payload.get("intent")):
+        return
+    if normalize_value(payload.get("interaction_phase")).lower() == "answering_practice_task":
+        return                              # pravi practice odgovor ima prednost
+    micro = normalize_value(_previous_next_state(payload).get("micro_task"))
+    if not micro:
+        return
+    message = normalize_value(payload.get("student_message") or payload.get("message"))
+    if not message:
+        return
+    # Samo POKUŠAJ ODGOVORA preuzima tok; pitanje/novi zahtjev ide normalno.
+    mode_parsed, _answers = parse_student_answers(message)
+    if mode_parsed == "none":
+        return
+    if detect_new_task_request(message) or _PRACTICE_EXPLAIN_RE.search(fold_diacritics(message)):
+        return
+    result = check_practice_answer(micro, message)
+    payload["_micro_task"] = micro
+    payload["_micro_task_reply"] = True
+    payload["_skip_answer_check"] = True    # nije grading potez → bez tvrde labele
+    if result is not None and result.checkable:
+        payload["_micro_task_check"] = result
+        # izloži presudu i u response-u (telemetrija/testovi); _skip_answer_check
+        # drži ovo IZVAN grading toka, pa guard ne postavlja ocjensku labelu.
+        payload["answer_check"] = result
+
+
 def _soften_post_hint_reply(payload: dict) -> None:
     """CLASS 1: kad je prethodni potez bio hint (pod-korak), učenikov odgovor
     može biti tačan MEĐUKORAK, a ne finalni odgovor.
@@ -2214,6 +2325,8 @@ def _prepare_chat(
     # N8: "objasni mi X" u Vježbi bez answer-faze → explain potez (proza
     # objašnjenja ne smije postati last_tutor_task).
     _apply_explain_request_contract(payload)
+    # N9: odgovor na mikro-zadatak iz prethodnog objašnjenja ("Probaj ti: …").
+    _apply_micro_task_contract(payload)
     # N5: "jesi li robot / ko te napravio / špijuniraš li me" → topli direktni odgovor.
     _apply_meta_identity_contract(payload)
 
@@ -2758,6 +2871,11 @@ def _finalize_response(prep: dict, answer: str) -> dict:
     if _is_grading_turn(payload):
         answer = enforce_grading_consistency(answer, payload.get("answer_check"))
 
+    # N9: odgovor na mikro-zadatak iz Objašnjenja — presuda iz koda je obavezujuća
+    # (bez kontradikcije), ali se saopštava TOPLO, bez ocjenske labele.
+    if payload.get("_micro_task_reply"):
+        answer = _soften_micro_task_answer(answer, payload.get("_micro_task_check"))
+
     correction_preface = correction_preface_from_context(
         payload.get("last_image_context", "")
     )
@@ -2900,6 +3018,14 @@ def _finalize_response(prep: dict, answer: str) -> dict:
     # CLASS 1: ako je OVAJ potez bio hint sa pod-korakom, obilježi ga da sljedeći
     # učenikov odgovor tretiramo kao mogući međukorak (ne finalni).
     response["next_state"]["just_hinted"] = bool(payload.get("_gave_hint_step"))
+    # N9: mikro-zadatak iz OBJAŠNJENJA živi u vlastitom polju (ne last_tutor_task),
+    # da Objašnjenje ostane mod koji ne prati zadatke. Persistira dok učenik ne
+    # odgovori (ili dok objašnjenje ne ponudi novi).
+    if status == "ready" and mode == "explain" and not payload.get("_image_test"):
+        micro = extract_micro_task(answer)
+        if not micro and payload.get("_micro_task_reply"):
+            micro = ""                      # odgovorio je — mikro-zadatak potrošen
+        response["next_state"]["micro_task"] = micro
     # BUG 12: stanje višestavkovnog zadatka (labels + graded) putuje naprijed.
     task_items = _task_items_for_response(payload, task_text)
     if task_items:
