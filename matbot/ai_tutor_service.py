@@ -26,7 +26,12 @@ from matbot.answer_checker import (
     summarize_result,
 )
 from matbot.bosnian import to_ijekavica
-from matbot.grading_guard import authoritative_verdict, enforce_grading_consistency, has_grade_contradiction
+from matbot.grading_guard import (
+    authoritative_verdict,
+    enforce_grading_consistency,
+    has_grade_contradiction,
+    neutralize_non_answer_grade,
+)
 from matbot.content_loader import (
     get_master,
     get_thinkific_map,
@@ -811,6 +816,31 @@ STUCK_THRESHOLD = 2
 _STUCK_SIGNAL_RE = re.compile(
     r"\bne\s+znam\b|\bne\s+razumijem\b|\bne\s+kapiram\b|\bne\s+umijem\b|"
     r"\bne\s+mogu\b|\bnemam\s+pojma\b|\bpomozi\b|\bne\s+kontam\b|\bzapeo\b|\bzapela\b"
+)
+
+# Fix 3 (2026-07-14): poruka koja je REFLEKSIJA/META, ne pokušaj rješavanja
+# ("nisam znao da li se sabira ili oduzima", "zaboravio sam", "pobrkao sam",
+# "zato što nisam pazio"). Bez broja/izraza + ovaj signal → ne smije dobiti
+# ocjensku labelu. Radi na foldanom tekstu (č/ć/š/ž/đ → ascii).
+_NON_ANSWER_REFLECTION_RE = re.compile(
+    r"\bnisam\s+(?:znao|znala|siguran|sigurna|bio\s+siguran|bila\s+sigurna|"
+    r"razumio|razumjela|skontao|skontala|shvatio|shvatila|vidio|vidjela|"
+    r"primijetio|primijetila|pazio|pazila|kontao|kontala)\b"
+    r"|\bne\s+znam\s+(?:da\s+li|jel|je\s+li|kako|zasto|sta)\b"
+    r"|\bzaboravi(?:o|la)\s+sam\b"
+    r"|\bpobrka(?:o|la)\s+sam\b|\bzbuni(?:o|la)\s+sam\s+se\b|\bzbunjen\w*\b"
+    r"|\bpomij?esa(?:o|la)\s+sam\b"
+    r"|\bzato\s+(?:sto|jer)\b|\bjer\s+nisam\b|\bnisam\s+ni\b"
+)
+# Tutorovo prethodno PITANJE koje traži refleksiju (ne novi zadatak): "Gdje
+# misliš da je zapelo?", "Šta misliš?", "Gdje si zapeo?". Kad prethodna botova
+# poruka time završi, učenikov odgovor je refleksija — ne pokušaj rješenja.
+_REFLECTIVE_PROMPT_RE = re.compile(
+    r"gdje\s+(?:misli[sš]|si)\b[^?]{0,40}\bzape\w*"
+    r"|gdje\s+je\s+zape\w*"
+    r"|[sš]ta\s+misli[sš]\b"
+    r"|za[sš]to\s+misli[sš]\b"
+    r"|gdje\s+(?:ti\s+)?(?:je\s+)?(?:zastalo|zapelo|zapinj\w*)"
 )
 
 
@@ -1810,6 +1840,30 @@ def extract_marked_task(answer: Any, limit: int = 600) -> str:
     return _extract_marker_paragraph(answer, limit=limit)
 
 
+def _remove_marked_task_paragraph(answer: Any) -> str:
+    """Ukloni POSLJEDNJI "Zadatak: ..." paragraf iz odgovora.
+
+    AUD-04 (B2) dopuna 2026-07-14: kada server gate zabrani novi zadatak (stavke
+    višestavkovnog zadatka još čekaju), do sada se čistilo samo STANJE, a
+    zabranjeni zadatak je OSTAJAO u vidljivom tekstu — učenik dobije zadatak
+    koji sistem ne prati. Prazan string = paragraf je bio cijeli odgovor
+    (pozivalac tada zadržava original)."""
+    raw = normalize_value(answer).replace("\r\n", "\n").replace("\r", "\n")
+    if not raw:
+        return ""
+    folded = fold_diacritics(raw)
+    if len(folded) != len(raw):
+        folded = raw.lower()
+    last = None
+    for m in _TASK_MARKER_LINE_RE.finditer(folded):
+        last = m
+    if last is None:
+        return raw
+    tail = re.search(r"\n\s*\n", raw[last.start():])
+    end = last.start() + tail.start() if tail else len(raw)
+    return (raw[:last.start()].rstrip() + ("\n" + raw[end:].lstrip() if tail else "")).strip()
+
+
 # BUG 4 (2026-07-10): model kod višestavčne ocjene numeriše svaku stavku "1."
 # (markdown navika). Deterministička renumeracija: SAMO kada su SVI numerisani
 # redovi "1." (degenerisan slučaj — nikad legitiman), postaju 1., 2., 3. …
@@ -2077,9 +2131,21 @@ def _soften_post_hint_reply(payload: dict) -> None:
     check = payload.get("answer_check")
     items = getattr(check, "items", None) if check is not None else None
     verdicts = [getattr(i, "verdict", None) for i in items] if items else []
-    all_correct = bool(verdicts) and all(v == "correct" for v in verdicts)
+    # not_attempted/missing siblings iz atribucije ne kvare sud o ODGOVORENOJ
+    # stavci (2026-07-14) — gleda se samo ono što je stvarno presuđeno.
+    effective = [v for v in verdicts if v not in ("missing", "not_attempted")]
+    all_correct = bool(effective) and all(v == "correct" for v in effective)
     if all_correct:
         return                      # finalni tačan odgovor — deterministička Tačno ostaje
+    # 2026-07-14: deterministički POTVRĐEN međukorak ("2x<12" ⇔ "x<6") —
+    # presuda OSTAJE (prompt dobija "TAČAN MEĐUKORAK" blok, guard briše lažne
+    # tvrdnje o grešci), a stil je vođenje kroz korak, bez ocjenske labele.
+    step_confirmed = bool(effective) and any(
+        v == "correct_step" for v in effective
+    ) and all(v in ("correct", "correct_step") for v in effective)
+    if step_confirmed:
+        payload["_post_hint_reply"] = True
+        return
     # Nije (pouzdano) finalno tačno → tretiraj kao mogući međukorak.
     payload["answer_check"] = None
     payload["_skip_answer_check"] = True
@@ -2090,16 +2156,17 @@ def _run_answer_check(payload: dict) -> None:
     """Deterministička provjera odgovora + atribucija stavke (BUG 12).
 
     Kod višestavkovnog zadatka stanje ``task_items`` (iz prethodnog next_state)
-    zna koje su stavke VEĆ ocijenjene. Ako učenik pošalje JEDAN nenumerisan
-    odgovor, a preostala je TAČNO JEDNA stavka, odgovor se pripisuje njoj —
-    ranije je provjera vraćala checkable=False pa je model pogađao i brkao
-    stavke."""
+    zna koje su stavke VEĆ ocijenjene; lista pending stavki ide checkeru, koji
+    JEDAN nenumerisan odgovor ("x=4 1/4", "2x<12") pripisuje pravoj stavci —
+    ranije je provjera vraćala checkable=False pa je model pogađao, brkao
+    stavke i znao tačan odgovor proglasiti netačnim (2026-07-14)."""
     task = normalize_value(payload.get("last_tutor_task"))
     student = normalize_value(payload.get("student_message") or payload.get("message"))
     if not (task and student):
         return
 
     items = split_numbered_items(task)
+    pending: list[int] | None = None
     prev_items = _previous_next_state(payload).get("task_items")
     if items and prev_items:
         labels = [n for n, _t in items]
@@ -2107,20 +2174,72 @@ def _run_answer_check(payload: dict) -> None:
             graded = [n for n in prev_items.get("graded") or [] if n in labels]
             pending = [n for n in labels if n not in graded]
             payload["_task_items_prev"] = {"labels": labels, "graded": graded}
-            answer_mode, _answers = parse_student_answers(student)
-            refs = detect_referenced_items(student, labels)
-            if len(pending) == 1 and not refs and answer_mode == "single":
-                n = pending[0]
-                by_n = dict(items)
-                result = check_practice_answer(by_n.get(n, ""), student)
-                if result.checkable and result.items:
-                    for item_check in result.items:
-                        item_check.n = n
-                    payload["answer_check"] = result
-                    payload["_current_task_item"] = n
-                    return
 
-    payload["answer_check"] = check_practice_answer(task, student)
+    result = check_practice_answer(task, student, pending_items=pending)
+    payload["answer_check"] = result
+    # Odgovor pripisan tačno JEDNOJ stavci → prompt ocjenjuje isključivo nju.
+    if items and result.checkable:
+        attempted = [
+            i.n for i in result.items
+            if i.verdict in ("correct", "correct_value_wrong_form",
+                             "correct_step", "incorrect", "unverified")
+        ]
+        if len(attempted) == 1:
+            payload["_current_task_item"] = attempted[0]
+
+
+def _flag_non_answer_reflection(payload: dict) -> None:
+    """Fix 3 (2026-07-14): učenikova poruka je REFLEKSIJA/META (nije pokušaj
+    rješavanja) na ocjenjivačkom potezu bez determinističke presude.
+
+    Screenshot 1: bot pita "Gdje misliš da je zapelo?", učenik odgovori "nisam
+    znao da li se sabira ili oduzima" → model lupi "Netačno." Kada nema pravog
+    odgovora za provjeru (answer_check None/neprovjeriv) i poruka nosi jasan
+    signal ne-odgovora (ili je odgovor na tutorovo refleksivno pitanje), postavi
+    ``_non_answer_reflection`` — prompt dobija zabranu labele, a guard je skida
+    deterministički (enforcement, ne molba)."""
+    if payload.get("_skip_answer_check") or payload.get("_direct_answer") is not None:
+        return
+    if normalize_value(payload.get("interaction_phase")).lower() != "answering_practice_task":
+        return
+    check = payload.get("answer_check")
+    if check is not None and getattr(check, "checkable", False) and getattr(check, "has_verdicts", False):
+        return                              # ima pravu presudu — ne diramo
+    task = normalize_value(payload.get("last_tutor_task"))
+    message = normalize_value(payload.get("student_message") or payload.get("message"))
+    if not (task and message):
+        return
+    items = split_numbered_items(task)
+    valid = [n for n, _t in items] if items else [1]
+    # stvaran pokušaj (broj/izraz) NIJE refleksija — njega gradiramo normalno
+    if _has_practice_answer_attempt(message, valid) or extract_task_expressions(message):
+        return
+    folded = fold_diacritics(message)
+    prev_bot = fold_diacritics(_previous_tutor_message(payload))
+    is_reflection = bool(_NON_ANSWER_REFLECTION_RE.search(folded))
+    answered_reflective_q = bool(prev_bot and _REFLECTIVE_PROMPT_RE.search(prev_bot))
+    if is_reflection or answered_reflective_q:
+        payload["_non_answer_reflection"] = True
+
+
+def _previous_tutor_message(payload: dict) -> str:
+    """Tekst PRETHODNE botove poruke: eksplicitno polje ili zadnji assistant
+    unos iz historije. Prazan string ako ga nema."""
+    direct = normalize_value(payload.get("last_tutor_message"))
+    if direct:
+        return direct
+    hist = payload.get("conversation_history")
+    if isinstance(hist, list):
+        for item in reversed(hist):
+            if not isinstance(item, dict):
+                continue
+            role = normalize_value(item.get("role") or item.get("author")).lower()
+            if role in ("assistant", "tutor", "bot", "ai"):
+                for ck in ("content", "text", "message"):
+                    val = normalize_value(item.get(ck))
+                    if val:
+                        return val
+    return ""
 
 
 def _sanitize_payload(payload: dict) -> dict:
@@ -2419,6 +2538,9 @@ def _prepare_chat(
         _run_answer_check(payload)
     if post_hint:
         _soften_post_hint_reply(payload)
+    # Fix 3: refleksija/ne-odgovor na ocjenjivačkom potezu bez presude → ne smije
+    # dobiti ocjensku labelu (prompt zabrana + guard enforcement).
+    _flag_non_answer_reflection(payload)
     # AUD-01: odgovor na stavku image_test "practice" toka → pripremi SLJEDEĆU
     # stavku sa slike (da followup ne izmisli novi zadatak).
     _apply_image_practice_followup(payload)
@@ -2871,6 +2993,12 @@ def _finalize_response(prep: dict, answer: str) -> dict:
     if _is_grading_turn(payload):
         answer = enforce_grading_consistency(answer, payload.get("answer_check"))
 
+    # Fix 3 (2026-07-14): poruka nije bila pokušaj rješavanja (refleksija/meta) —
+    # skini svaku ocjensku labelu koju je model svejedno dodao. Radi i kad
+    # _is_grading_turn ostane True (nema presude), pa mora poslije guarda.
+    if payload.get("_non_answer_reflection"):
+        answer = neutralize_non_answer_grade(answer)
+
     # N9: odgovor na mikro-zadatak iz Objašnjenja — presuda iz koda je obavezujuća
     # (bez kontradikcije), ali se saopštava TOPLO, bez ocjenske labele.
     if payload.get("_micro_task_reply"):
@@ -3004,6 +3132,12 @@ def _finalize_response(prep: dict, answer: str) -> dict:
         # aktivni multi-zadatak i pokvario task_items praćenje. Server gate.
         if task_text and _pending_items_after_grading(payload):
             task_text = ""
+            # 2026-07-14: zabranjeni zadatak se briše i iz VIDLJIVOG teksta —
+            # učenik ne smije dobiti zadatak koji sistem ne prati.
+            stripped = _remove_marked_task_paragraph(answer)
+            if stripped:
+                answer = stripped
+                response["answer"] = answer
     else:
         task_text = extract_practice_task(answer, mode=mode)
     # Server je jedini izvor istine za aktivni zadatak: polje se šalje UVIJEK

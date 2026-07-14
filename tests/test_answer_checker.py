@@ -222,9 +222,39 @@ def test_unparseable_numbered_answer_is_unverified_not_missing():
     assert _verdicts(r)[0] == "unverified"      # odgovorio je, samo nejasno
 
 
-def test_single_unnumbered_answer_to_multi_item_task_not_guessed():
+def test_single_unnumbered_answer_attributed_when_unambiguous():
+    # 2026-07-14: "3/5" je tačan odgovor SAMO za stavku 1 (1 - 2/5) →
+    # pripisuje se njoj; ostale stavke NISU POKUŠANE (ne "netačne").
     r = check_practice_answer(TASK_C, "3/5")
+    assert r.checkable
+    by_n = {i.n: i.verdict for i in r.items}
+    assert by_n[1] == "correct"
+    assert by_n[2] == "not_attempted"
+    assert by_n[3] == "not_attempted"
+
+
+def test_single_unnumbered_answer_not_guessed_when_ambiguous():
+    # "3/4" je tačan i za stavku 1 (1/2 + 1/4) i za stavku 2 (skraćeni 6/8)
+    # → dvosmisleno, kod NE nagađa (model ocjenjuje sam, kao do sada).
+    task = "1. Izračunaj 1/2 + 1/4.\n2. Skrati razlomak 6/8."
+    r = check_practice_answer(task, "3/4")
     assert not r.checkable
+
+
+def test_single_wrong_answer_multi_pending_not_guessed():
+    # Pogrešan odgovor bez broja stavke uz VIŠE otvorenih stavki — ne zna se
+    # koju je pokušao, pa nema presude.
+    r = check_practice_answer(TASK_C, "1/2")
+    assert not r.checkable
+
+
+def test_single_wrong_answer_attributed_to_sole_pending_item():
+    # Kad je preostala TAČNO JEDNA stavka, i netačan odgovor se pripisuje njoj.
+    r = check_practice_answer(TASK_C, "1/2", pending_items=[1])
+    assert r.checkable
+    by_n = {i.n: i.verdict for i in r.items}
+    assert by_n[1] == "incorrect"
+    assert 2 not in by_n and 3 not in by_n   # ocijenjene ranije — ne diraju se
 
 
 # --- konzervativnost (nikad izmišljeno "netačno") -----------------------------------

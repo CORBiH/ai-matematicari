@@ -14,6 +14,9 @@ JEDNIM autoritativnim sudom (``answer_checker.CheckResult``):
   negativne); ako ne ostane nijedna potvrda, dodaje se kratka pozitivna.
 - ``partial`` (tačna vrijednost, pogrešan/ nedovršen oblik) → odgovor mora
   početi sa "Djelimično tačno.", ne sa punim "Tačno.".
+- ``step`` (tačan MEĐUKORAK: tvrdnja ekvivalentna zadatku, nedovršena — npr.
+  "2x < 12" za "2x − 5 < 7") → bez ocjenskih labela; tvrdnje o grešci
+  (i meke: "došlo je do male greške") se brišu, odgovor počinje potvrdom koraka.
 - ``incorrect`` → ako odgovor lažno POČINJE potvrdom ("Tačno!"), uvod se
   neutrališe; sama korekcija ("tačno je 5/8") ostaje.
 - ``mixed`` (više stavki: neke tačne, neke ne) → po-stavkovna ocjena je
@@ -37,6 +40,7 @@ __all__ = [
     "enforce_grading_consistency",
     "grade_contradiction_phrases",
     "has_grade_contradiction",
+    "neutralize_non_answer_grade",
 ]
 
 # --- Fraze ocjene (poklapaju se na FOLDANOM tekstu: dijakritici → ASCII, lower) -----
@@ -50,8 +54,20 @@ _NEG_GRADE_RE = re.compile(
     r"|netaca?n\w*|netoca?n\w*"            # netačno/netačan/netočno
     r"|ni(?:je|su)\s+isprav\w*|neisprav\w*"
     r"|ni(?:je|su)\s+dobr\w*"
-    r"|(?<!nije )(?<!nisu )pogres\w*"      # "pogrešno", ali NE "nije pogrešno"
+    # "pogrešno" i ijek. "pogriješio/pogrješka", ali NE "nije pogrešno"
+    r"|(?<!nije )(?<!nisu )pogr(?:e|ije|je)s\w*"
     r"|\bwrong\b|\bincorrect\b"
+)
+
+# Meke tvrdnje o grešci ("došlo je do male greške", "tu nešto ne štima") —
+# nisu ocjenske labele, ali za učenika znače isto što i "Netačno". Uklanjaju se
+# kad je presuda TAČNO ili TAČAN MEĐUKORAK. Namjerno usko: golo "greška"
+# ("greška je dio učenja" iz empatije) se NE dira.
+_SOFT_NEG_RE = re.compile(
+    r"(?:doslo\s+(?:je\s+)?do|tu\s+(?:je|se)|imas|napravio\s+si|napravila\s+si|"
+    r"potkrala\s+(?:ti\s+)?se|desila\s+(?:ti\s+)?se|vidim)\s+"
+    r"(?:mal[aeu]|sitn[aeu]|jedn[aeu])?\s*gres[kc]\w*"
+    r"|(?:tu\s+)?nesto\s+ne\s+stima|tu\s+ne\s+stima"
 )
 # Nakon maskiranja negativnih: samo jasne potvrde tačnosti (ne generičko "dobro").
 _POS_GRADE_RE = re.compile(
@@ -114,13 +130,18 @@ def has_grade_contradiction(text: Any) -> bool:
 
 _POSITIVE_VERDICTS = ("correct",)
 _PARTIAL_VERDICTS = ("correct_value_wrong_form",)
+# Tačan MEĐUKORAK (ekvivalentna tvrdnja, nedovršen oblik) — nije ni puno
+# "Tačno" (stavka ostaje pending) ni "Netačno" (tvrdnja je istinita).
+_STEP_VERDICTS = ("correct_step",)
 
 
 def authoritative_verdict(result: Any) -> str:
-    """``CheckResult`` → jedan sud: correct | partial | incorrect | mixed | unknown.
+    """``CheckResult`` → jedan sud: correct | partial | step | incorrect |
+    mixed | unknown.
 
     "mixed" = više ocijenjenih stavki gdje su neke tačne, a neke ne (legitimna
-    po-stavkovna ocjena). "unknown" = kod nema pouzdanu presudu."""
+    po-stavkovna ocjena). "step" = tačan međukorak (bez ijedne netačne).
+    "unknown" = kod nema pouzdanu presudu."""
     if result is None or not getattr(result, "checkable", False):
         return "unknown"
     graded = [
@@ -128,6 +149,7 @@ def authoritative_verdict(result: Any) -> str:
         for i in getattr(result, "items", [])
         if i.verdict in _POSITIVE_VERDICTS
         or i.verdict in _PARTIAL_VERDICTS
+        or i.verdict in _STEP_VERDICTS
         or i.verdict == "incorrect"
     ]
     if not graded:
@@ -135,10 +157,13 @@ def authoritative_verdict(result: Any) -> str:
     has_incorrect = any(v == "incorrect" for v in graded)
     has_correct = any(v in _POSITIVE_VERDICTS for v in graded)
     has_partial = any(v in _PARTIAL_VERDICTS for v in graded)
-    if has_incorrect and (has_correct or has_partial):
+    has_step = any(v in _STEP_VERDICTS for v in graded)
+    if has_incorrect and (has_correct or has_partial or has_step):
         return "mixed"
     if has_incorrect:
         return "incorrect"
+    if has_step:
+        return "step"
     if has_partial:
         return "partial"
     return "correct"
@@ -163,6 +188,22 @@ def _all_items_partial_or_correct(result: Any) -> bool:
         i.verdict in _POSITIVE_VERDICTS or i.verdict in _PARTIAL_VERDICTS
         for i in items
     ) and any(i.verdict in _PARTIAL_VERDICTS for i in items)
+
+
+def _step_confirmed_result(result: Any) -> bool:
+    """Bar jedna stavka je TAČAN MEĐUKORAK, a nijedna nije netačna/djelimična —
+    svaka tvrdnja o grešci u odgovoru je tada LAŽNA i smije se ukloniti."""
+    if result is None or not getattr(result, "checkable", False):
+        return False
+    items = getattr(result, "items", [])
+    if not items or not any(i.verdict in _STEP_VERDICTS for i in items):
+        return False
+    return all(
+        i.verdict in _STEP_VERDICTS
+        or i.verdict in _POSITIVE_VERDICTS
+        or i.verdict in ("missing", "not_attempted")
+        for i in items
+    )
 
 
 def _correct_subset_with_missing(result: Any) -> tuple[list[int], list[int], bool] | None:
@@ -265,13 +306,47 @@ def _renumber_numbered_lines(text: str) -> str:
     return re.sub(r"(?m)^(\s*)\d{1,2}[.)]\s+", repl, text)
 
 
+# Formulacije "još se čeka odgovor" koje model prirodno varira — ako ih tijelo
+# već sadrži za SVAKU stavku, sažetak se ne duplira (2026-07-14: live nalaz,
+# guard je prepend-ao "Zadaci 2 i 3 još čekaju..." iako je model to već rekao).
+_WAIT_PHRASE = (
+    r"(?:cek\w*|nij?e\s+rij?esen\w*|nisu\s+rij?esen\w*"
+    r"|nisi\s+(?:odgovori\w*|rij?esi\w*|pokusa\w*|posla\w*)"
+    r"|jos\s+nema\w*|posalji|preosta\w*)"
+)
+
+
+def _body_asserts_answered_items(text: str, answered: list[int]) -> bool:
+    """Početak tijela već tvrdi da su odgovorene stavke tačne ("Zadatak 1 je
+    tačan, a zadaci 2 i 3 još čekaju...") — sažetak se tada ne duplira."""
+    head = fold_diacritics(text)[:250]
+    for n in answered:
+        if not n:
+            continue
+        if not re.search(
+            rf"\b(?:zada\w*|stavk\w*|pitanj\w*)\s+"
+            rf"(?:\d{{1,2}}[.)]?\s*(?:,\s*|i\s+)?)*{n}[.)]?\b.{{0,80}}\btac",
+            head,
+        ):
+            return False
+    return True
+
+
 def _body_mentions_missing_items(text: str, missing: list[int]) -> bool:
     folded = fold_diacritics(text)
     for n in missing:
         if not n:
             continue
-        numbered_waits = re.search(rf"(?m)^\s*{n}[.)].{{0,180}}\bcek", folded)
-        named_waits = re.search(rf"\bzadatak\s+{n}\b.{{0,180}}\bcek", folded)
+        numbered_waits = re.search(
+            rf"(?m)^\s*{n}[.)].{{0,180}}\b{_WAIT_PHRASE}", folded
+        )
+        # "zadatak 2 još čeka", "zadaci 2. i 3. još čekaju", "stavka 3 nije riješena"
+        named_waits = re.search(
+            rf"\b(?:zada\w*|stavk\w*|pitanj\w*)\s+"
+            rf"(?:\d{{1,2}}[.)]?\s*(?:,\s*|i\s+)?)*{n}[.)]?\b"
+            rf".{{0,180}}\b{_WAIT_PHRASE}",
+            folded,
+        )
         if not (numbered_waits or named_waits):
             return False
     return True
@@ -286,9 +361,19 @@ def _make_multi_missing(answer: str, result: Any) -> str:
     stripped = _strip_positive_label(body)
     if stripped != body:
         body = stripped
+    if not has_partial:
+        # sve ODGOVORENE stavke su tačne, ostale nisu ni pokušane → svaka
+        # negativna ocjena u tekstu je lažna (2026-07-14: "Netačno, ali blizu
+        # si" na tačan odgovor jedine odgovorene stavke)
+        cleaned, changed = _remove_negative_verdicts(body)
+        if changed and cleaned.strip():
+            body = cleaned
+        body = _remove_soft_negatives(body)
     body = _prefix_missing_ordinal_lines(body, missing)
     body = _renumber_numbered_lines(body)
-    summary_parts = [_answered_subset_sentence(answered, has_partial)]
+    summary_parts = []
+    if not _body_asserts_answered_items(body, answered):
+        summary_parts.append(_answered_subset_sentence(answered, has_partial))
     if not _body_mentions_missing_items(body, missing):
         summary_parts.append(_missing_sentence(missing))
     summary = " ".join(p for p in summary_parts if p)
@@ -357,6 +442,48 @@ def _remove_negative_verdicts(text: str) -> tuple[str, bool]:
     return _cleanup("".join(chars)), True
 
 
+def _remove_soft_negatives(text: str) -> str:
+    """Ukloni meke tvrdnje o grešci ("došlo je do male greške") — koristi se
+    SAMO kad autoritativni sud kaže da greške NEMA (correct / correct_step)."""
+    folded = _fold_keep_len(text)
+    if len(folded) != len(text):
+        return text
+    spans = [m.span() for m in _SOFT_NEG_RE.finditer(folded)]
+    if not spans:
+        return text
+    chars = list(text)
+    for s, e in sorted(spans, reverse=True):
+        del chars[s:e]
+    return _cleanup("".join(chars))
+
+
+_SENTENCE_PIECES_RE = re.compile(r"([.!?]+[\s\n]+|\n+)")
+
+
+def _drop_error_claim_sentences(text: str) -> str:
+    """Izbaci CIJELE rečenice koje su čista tvrdnja o grešci ("Izgleda da je tu
+    došlo do male greške.") — fraza-brisanje bi ostavilo batrljak ("Izgleda da
+    je tu."). Rečenica se izbacuje samo ako je kratka i ne nosi račun
+    (bez cifara i LaTeX-a), da se nikad ne obriše matematički sadržaj."""
+    pieces = _SENTENCE_PIECES_RE.split(text)
+    out: list[str] = []
+    i = 0
+    while i < len(pieces):
+        sentence = pieces[i]
+        separator = pieces[i + 1] if i + 1 < len(pieces) else ""
+        folded = fold_diacritics(sentence)
+        is_claim = bool(_SOFT_NEG_RE.search(folded) or _NEG_GRADE_RE.search(folded))
+        carries_math = bool(re.search(r"\d|\\\(|\\\[", sentence))
+        if is_claim and not carries_math and len(sentence) <= 160:
+            i += 2
+            continue
+        out.append(sentence)
+        out.append(separator)
+        i += 2
+    result = "".join(out).strip()
+    return result if result else text
+
+
 def _has_positive_verdict(text: str) -> bool:
     folded = fold_diacritics(text)
     return bool(_POS_GRADE_RE.search(_mask(folded, _neg_spans(folded))))
@@ -401,6 +528,7 @@ def _make_positive(answer: str) -> str:
     ranije je "Djelimično tačno. …" dobio prefiks pa je ispalo
     "Tačno. Djelimično tačno."."""
     out, _changed = _remove_negative_verdicts(answer)
+    out = _remove_soft_negatives(out)
     out = _remove_partial_labels(out).strip()
     if not out:
         return "Tačno. Tvoj odgovor je tačan."
@@ -521,6 +649,24 @@ def _make_partial(answer: str) -> str:
     return _prepend("Djelimično tačno.", out.strip())
 
 
+def _make_step_confirmed(answer: str) -> str:
+    """Autoritativno TAČAN MEĐUKORAK: učenikova tvrdnja je istinita, samo nije
+    dovršena. Svaka tvrdnja o grešci je LAŽNA — briše se (i meke: "došlo je do
+    male greške"), ocjenske labele se skidaju (međukorak ne dobija ni "Tačno."
+    ni "Netačno."), a odgovor mora POČETI potvrdom koraka."""
+    out = _strip_leading_labels(answer) or answer.strip()
+    out = _drop_error_claim_sentences(out)
+    out, _changed = _remove_negative_verdicts(out)
+    out = _remove_soft_negatives(out)
+    out, _changed = _remove_value_negations(out)
+    out = _remove_partial_labels(out).strip()
+    if not out:
+        return "Tako je — taj korak je tačan. Nastavi do kraja!"
+    if not _starts_positive(out):
+        out = _prepend("Tako je — taj korak je tačan.", out)
+    return out
+
+
 # --- Po-stavkovno pomirenje u višestavkovnom kontekstu (BUG 13) ---------------------
 # "mixed"/multi odgovori su se ranije vraćali NETAKNUTI, pa je kontradikcija
 # UNUTAR jedne stavke ("Netačno. … Tvoj odgovor je tačan!" ili "nije 12. Tačan
@@ -628,6 +774,40 @@ def _reconcile_multi_item(answer: str, check_result: Any) -> str:
     return "".join(out_segments)
 
 
+def neutralize_non_answer_grade(answer: Any) -> str:
+    """Ukloni ocjensku labelu s odgovora na PORUKU KOJA NIJE POKUŠAJ RJEŠAVANJA
+    (refleksija "nisam znao da li se sabira ili oduzima", meta-komentar,
+    odgovor na tutorovo pitanje "Gdje misliš da je zapelo?").
+
+    Fix 3 (2026-07-14, screenshot 1): checker se tu suzdrži (nema odgovora za
+    provjeru), a model je stohastično lijepio "Netačno." na ne-odgovor. Prompt
+    to zabranjuje, ali molba nije garancija — ovo je provođenje. Skida vodeće
+    labele ("Tačno."/"Netačno.") i vodeću negativnu frazu ("Netačno, ali blizu
+    si"), NE dodaje novu ocjenu. Idempotentno; nikad ne baca izuzetak."""
+    if not isinstance(answer, str) or not answer.strip():
+        return answer
+    try:
+        out = (_strip_leading_labels(answer) or answer).strip()
+        neg, _pos = grade_contradiction_phrases(out)
+        if neg:
+            # vodeća/uvodna negativna fraza ("Netačno, ali blizu si …") → makni
+            # samu frazu (bez uvodnog "Hajde da provjerimo" — ovo nije osporena
+            # presuda, nego poruka koja se uopšte ne ocjenjuje).
+            cleaned, changed = _remove_negative_verdicts(out)
+            if changed and cleaned.strip():
+                out = cleaned.strip()
+        # lažni "Tačno je …" uvod na ne-odgovor isto ne pripada. NE diramo opću
+        # toplinu ("Odlično pitanje!", "Bravo") — to nije ocjena odgovora, a
+        # ocjenske labele ("Tačno.") je već skinuo _strip_leading_labels.
+        folded = fold_diacritics(out)
+        m = _POSITIVE_IS_RE.match(folded)
+        if m:
+            out = out[m.end():].lstrip(" .!?:;-") or out
+        return out or answer
+    except Exception:
+        return answer
+
+
 def enforce_grading_consistency(answer: Any, check_result: Any = None) -> str:
     """Pomiri generisani odgovor sa JEDNIM autoritativnim sudom o tačnosti.
 
@@ -649,6 +829,12 @@ def enforce_grading_consistency(answer: Any, check_result: Any = None) -> str:
         # To nije puno "Tačno", nego stabilna djelimična ocjena.
         if _all_items_partial_or_correct(check_result):
             return _make_partial(answer)
+
+        # Tačan MEĐUKORAK (CLASS 1): tvrdnja je istinita, samo nedovršena —
+        # nijedna tvrdnja o grešci nije legitimna. Prije multi-grane, jer
+        # atribuirani rezultat ima i not_attempted stavke.
+        if _step_confirmed_result(check_result):
+            return _make_step_confirmed(answer)
 
         if _correct_subset_with_missing(check_result):
             return _make_multi_missing(answer, check_result)

@@ -456,8 +456,18 @@ def build_practice_followup_instructions(payload: dict, topic_context: dict) -> 
             "- Ne ponavljaj cijelo objašnjenje teme; budi kratak i razgovoran.\n"
         )
         step_block += _difficulty_line(payload)
+        items_note = _task_items_note(payload)
+        if items_note:
+            step_block += items_note
         if last_task:
             step_block += f"ZADNJI ZADATAK (tačan vidljivi tekst):\n{last_task}\n"
+        # 2026-07-14: deterministički potvrđen MEĐUKORAK — presuda iz koda je
+        # obavezujuća i ovdje (model ne smije tačan korak nazvati greškom).
+        check = payload.get("answer_check")
+        if check is not None:
+            check_block = format_check_block(check)
+            if check_block:
+                step_block += check_block + "\n"
         return step_block
     block = (
         "MOD: VJEŽBA — PROVJERA ODGOVORA (practice follow-up)\n"
@@ -477,7 +487,9 @@ def build_practice_followup_instructions(payload: dict, topic_context: dict) -> 
         "- KOD ODGOVORA NA JEDNU STAVKU/ZADATAK: PRVA REČENICA mora sadržavati "
         "TAČNO JEDAN konačan sud: ako je sistemska presuda correct, počni sa "
         "\"Tačno.\"; ako je correct_value_wrong_form, počni sa \"Djelimično "
-        "tačno.\"; ako je incorrect, počni sa \"Netačno.\". OSTATAK odgovora NE "
+        "tačno.\"; ako je incorrect, počni sa \"Netačno.\"; ako je "
+        "correct_step (tačan međukorak), BEZ labele — potvrdi korak i traži "
+        "da ga dovrši. OSTATAK odgovora NE "
         "SMIJE protivrječiti tom sudu, ne smije koristiti drugu labelu i te "
         "labele NE ponavljaj nigdje dalje u istoj poruci. (Kod više stavki "
         "odjednom vidi pravilo ispod — labela ide UZ SVAKU stavku, ne na vrh.)\n"
@@ -528,6 +540,17 @@ def build_practice_followup_instructions(payload: dict, topic_context: dict) -> 
         "Gdje misliš da je zapelo?\n"
     )
     block += _difficulty_line(payload)
+    if payload.get("_non_answer_reflection"):
+        # Fix 3: poruka NIJE pokušaj rješavanja — refleksija/objašnjenje/odgovor
+        # na tvoje pitanje ("Gdje misliš da je zapelo?"). Zabrani ocjenu izričito.
+        block += (
+            "‼️ OVA PORUKA NIJE POKUŠAJ ODGOVORA: učenik razmišlja naglas ili "
+            "odgovara na tvoje ranije pitanje (npr. \"nisam znao da li se sabira "
+            "ili oduzima\"). NE koristi NIJEDNU ocjensku labelu (\"Tačno.\", "
+            "\"Netačno.\", \"Djelimično tačno.\") i NE reci da je pogriješio. "
+            "Toplo odgovori na ono što je rekao, razjasni tu nedoumicu u 1–2 "
+            "rečenice i nježno ga vrati na zadatak.\n"
+        )
     items_note = _task_items_note(payload)
     if items_note:
         block += items_note

@@ -203,6 +203,10 @@ class Expected:
     # potvrda tačnog (kontekst bi mogao mijenjati jedinicu odgovora, pa se
     # različit odgovor NE proglašava netačnim nego unverified).
     confidence: str = "high"
+    # CLASS 1 (2026-07-14): vrijednosti tačnih MEĐUKORAKA računa — prefiks
+    # rezultati izraza istog prioriteta ("5/12 + 7/12 - 3/12" → {1}). Odgovor
+    # jednak međukoraku je correct_step, nikad "netačno".
+    step_values: tuple = ()
 
 
 _COMPLEMENT_SIGNAL_RE = re.compile(
@@ -672,7 +676,11 @@ def _try_arithmetic(folded: str, norm_text: str) -> Expected | None:
     value = _eval_expr(expr_m.group(1))
     if value is None:
         return None
-    return Expected(value=value, kind="arithmetic")
+    return Expected(
+        value=value,
+        kind="arithmetic",
+        step_values=_expr_step_values(expr_m.group(1), value),
+    )
 
 
 _NUMBER_CHUNK_RE = re.compile(
@@ -681,11 +689,13 @@ _NUMBER_CHUNK_RE = re.compile(
 _OP_CHUNK_RE = re.compile(r"\s*([+\-*:])")
 
 
-def _eval_expr(expr: str) -> Fraction | None:
-    """Evaluiraj niz broj-operator-broj... sa prioritetom (*, :) pa (+, -)."""
+def _parse_expr_items(expr: str) -> list | None:
+    """Izraz → naizmjenična lista [vrijednost, op, vrijednost, ...]; None ako
+    nije čist niz broj-operator-broj."""
     pos = 0
-    items: list = []   # naizmjenično Fraction vrijednosti i operatori
+    items: list = []
     expect_number = True
+    m = None
     while pos < len(expr):
         if expect_number:
             m = _NUMBER_CHUNK_RE.match(expr, pos)
@@ -704,6 +714,46 @@ def _eval_expr(expr: str) -> Fraction | None:
             expect_number = True
         pos = m.end()
     if expect_number or len(items) < 3 or expr[pos:].strip():
+        return None
+    return items
+
+
+def _expr_step_values(expr: str, final: Fraction) -> tuple:
+    """Vrijednosti tačnih MEĐUKORAKA računa: kumulativni prefiksi izraza,
+    s lijeva na desno ("5/12 + 7/12 - 3/12" → (1,)).
+
+    Samo kad su SVI operatori istog prioriteta (svi aditivni ili svi
+    multiplikativni) — kod miješanog prioriteta prefiks slijeva NIJE validan
+    međukorak. Konačan rezultat se isključuje (to je pun odgovor)."""
+    items = _parse_expr_items(expr)
+    if not items or len(items) < 5:          # bar dva operatora → postoji međukorak
+        return ()
+    ops = {items[i] for i in range(1, len(items), 2)}
+    if not (ops <= {"+", "-"} or ops <= {"*", ":"}):
+        return ()
+    steps: list[Fraction] = []
+    acc = items[0]
+    try:
+        for i in range(1, len(items) - 2, 2):
+            op, val = items[i], items[i + 1]
+            if op == "+":
+                acc = acc + val
+            elif op == "-":
+                acc = acc - val
+            elif op == "*":
+                acc = acc * val
+            else:
+                acc = acc / val
+            steps.append(acc)
+    except ZeroDivisionError:
+        return ()
+    return tuple(s for s in steps if s != final)
+
+
+def _eval_expr(expr: str) -> Fraction | None:
+    """Evaluiraj niz broj-operator-broj... sa prioritetom (*, :) pa (+, -)."""
+    items = _parse_expr_items(expr)
+    if items is None:
         return None
     # prvo * i :
     try:
@@ -737,7 +787,8 @@ def _eval_expr(expr: str) -> Fraction | None:
 
 _EQ_LABEL_RE = re.compile(
     r"^\s*(?:"
-    r"rij?e[sš]?i(?:\s+(?:jedna[cč]inu|nejedna[cč]inu))?"   # riješi [ne]jednačinu
+    # riješi [ne]jednačinu [s razlomkom/razlomcima]
+    r"rij?e[sš]?i(?:\s+(?:jedna[cč]inu|nejedna[cč]inu)(?:\s+sa?\s+razlom\w*)?)?"
     r"|odredi\s+x|izra[cč]unaj\s+x|nadj?i\s+x"
     r"|nadj?i\s+nepoznat\w*\s+broj"
     r"|kolik[oa]\s+je\s+x|kolika\s+je\s+vrijednost\s+x"
@@ -757,6 +808,23 @@ def _paren_strip_numbers(expr: str) -> str:
         prev = expr
         expr = re.sub(r"\((-?\d+(?:,\d+)?(?:/-?\d+(?:,\d+)?)?)\)", r"\1", expr)
     return expr
+
+
+def _mixed_to_improper(expr: str) -> str:
+    """"4 1/4" → "17/4" prije parsiranja strane jednačine/nejednačine.
+
+    ``_insert_implicit_mult`` briše razmake, pa bi mješoviti broj bez ove
+    konverzije postao "41/4" — pogrešna vrijednost koja tačan odgovor
+    proglasi netačnim."""
+    def repl(m: re.Match) -> str:
+        whole, num, den = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        if den == 0:
+            return m.group(0)
+        sign = -1 if whole < 0 else 1
+        value = Fraction(whole) + sign * Fraction(num, den)
+        return f"{value.numerator}/{value.denominator}"
+
+    return _MIXED_RE.sub(repl, expr)
 
 
 def _insert_implicit_mult(expr: str) -> str:
@@ -806,6 +874,7 @@ def _eval_linear_term(body: str) -> tuple[Fraction, int] | None:
 
 def _parse_linear_side(side: str) -> tuple[Fraction, Fraction] | None:
     """Strana jednačine → (a, b) za a·x + b; None ako nije podržano."""
+    side = _mixed_to_improper(side)
     side = _insert_implicit_mult(_paren_strip_numbers(side.replace(":", "/")))
     if not side or "(" in side or ")" in side:
         return None
@@ -864,6 +933,22 @@ _INEQ_OP_RE = re.compile(r"<=|>=|<|>")
 _CLEAN_INEQ_SIDE_RE = re.compile(r"^[0-9x/*():+\-,\s]+$")
 _FLIP_OP = {"<": ">", ">": "<", "<=": ">=", ">=": "<="}
 
+# Konačan oblik rješenja: nepoznata SAMA na jednoj strani, čist broj (cijeli,
+# decimalni, razlomak ili mješoviti) na drugoj. "2x < 12" NIJE konačan oblik.
+_BARE_NUMBER_RE = re.compile(
+    r"^\s*-?\d+(?:,\d+)?(?:\s*/\s*\d+)?(?:\s+\d+\s*/\s*\d+)?\s*$"
+)
+
+
+def _is_final_form(lhs: str, rhs: str) -> bool:
+    """Da li je "lhs OP rhs" konačan oblik ("x = 17/4", "x < 6", "6 > x")?"""
+    left, right = lhs.strip(), rhs.strip()
+    if left == "x" and "x" not in right and _BARE_NUMBER_RE.match(right):
+        return True
+    if right == "x" and "x" not in left and _BARE_NUMBER_RE.match(left):
+        return True
+    return False
+
 
 def _normalize_ineq_ops(text: str) -> str:
     """Ujednači zapis znakova nejednakosti (unicode/LaTeX/„=<") na <,<=,>,>=."""
@@ -877,8 +962,9 @@ def _normalize_ineq_ops(text: str) -> str:
     )
 
 
-def _solve_linear_inequality(math_text: str) -> tuple[str, Fraction] | None:
-    """Linearna nejednačina po x → (kanonski_op, granica); None ako nepodržano.
+def _solve_linear_inequality(math_text: str) -> tuple[str, Fraction, bool] | None:
+    """Linearna nejednačina po x → (kanonski_op, granica, konačan_oblik);
+    None ako nepodržano.
 
     ``math_text`` je već prošao ``_normalize_math_text`` (frac, decimalni zarez).
     """
@@ -901,12 +987,16 @@ def _solve_linear_inequality(math_text: str) -> tuple[str, Fraction] | None:
         return None                        # nema x → nije nejednačina po x
     # a·x + b OP 0  →  x (OP ili OP-flip pri a<0) (-b/a)
     canon = op if a > 0 else _FLIP_OP[op]
-    return canon, -b / a
+    return canon, -b / a, _is_final_form(lhs, rhs)
 
 
 def _check_single_inequality(task_text: str, student_text: str) -> "CheckResult | None":
     """Puna presuda za jednu podržanu nejednačinu; None → nije nejednačina ili
-    učenikov odgovor nije parsiran kao nejednačina (ostavi opštem toku)."""
+    učenikov odgovor nije parsiran kao nejednačina (ostavi opštem toku).
+
+    CLASS 1 (2026-07-14): ekvivalentna tvrdnja koja NIJE konačan oblik
+    ("2x < 12" za zadatak "2x - 5 < 7") je TAČAN MEĐUKORAK (``correct_step``),
+    nikad "netačno" — učenik je na dobrom putu, samo nije dovršio."""
     norm_task = _normalize_math_text(task_text)
     m = _EQ_LABEL_RE.match(_fold(norm_task))
     task_expr = norm_task[m.end():] if m else norm_task
@@ -916,17 +1006,79 @@ def _check_single_inequality(task_text: str, student_text: str) -> "CheckResult 
     student = _solve_linear_inequality(_normalize_math_text(student_text))
     if student is None:
         return None                        # odgovor nije jasna nejednačina po x
-    exp_op, exp_val = expected
-    stu_op, stu_val = student
+    exp_op, exp_val, _task_final = expected
+    stu_op, stu_val, stu_final = student
     expected_obj = Expected(
         value=exp_val, kind="inequality", required_form=exp_op, confidence="high"
     )
+    raw_student = re.sub(r"\s+", " ", _student_statement_raw(student_text))[:80]
     given = NumberToken(
-        value=stu_val, form="inequality", raw=f"x {stu_op} {_fmt_fraction(stu_val)}"
+        value=stu_val, form="inequality",
+        raw=raw_student or f"x {stu_op} {_fmt_fraction(stu_val)}",
     )
-    verdict = "correct" if (stu_op == exp_op and stu_val == exp_val) else "incorrect"
+    if stu_op == exp_op and stu_val == exp_val:
+        verdict = "correct" if stu_final else "correct_step"
+    else:
+        verdict = "incorrect"
     return CheckResult(checkable=True, items=[
         ItemCheck(n=1, task=task_text.strip()[:200], expected=expected_obj,
+                  given=given, verdict=verdict),
+    ])
+
+
+def _student_statement_raw(text: str) -> str:
+    """Kratak, čitljiv zapis učenikove tvrdnje za prompt ("2x<12", "x = 17/4")."""
+    return _normalize_ineq_ops(_normalize_math_text(text or "")).strip().rstrip(".!?")
+
+
+def _solve_student_equation(student_text: str) -> tuple[Fraction, bool] | None:
+    """Učenikova tvrdnja-jednačina po x → (rješenje, konačan_oblik); None ako
+    poruka nije čista jednačina (tada odlučuje opšti tok)."""
+    norm = _normalize_math_text(student_text)
+    m = _EQ_LABEL_RE.match(_fold(norm))
+    expr = norm[m.end():] if m else norm
+    expr = expr.strip().rstrip(".!?").strip()
+    if expr.count("=") != 1 or "x" not in expr:
+        return None
+    if not _CLEAN_EQ_RE.match(expr):
+        return None
+    lhs, rhs = expr.split("=")
+    left = _parse_linear_side(lhs)
+    right = _parse_linear_side(rhs)
+    if left is None or right is None:
+        return None
+    a = left[0] - right[0]
+    b = right[1] - left[1]
+    if a == 0:
+        return None                        # "3 = 3" i sl. — nema x rješenja
+    return b / a, _is_final_form(lhs, rhs)
+
+
+def _check_single_equation(task_text: str, student_text: str) -> "CheckResult | None":
+    """Puna presuda kada je zadatak linearna jednačina po x, a učenikov odgovor
+    je TVRDNJA-JEDNAČINA ("x = 4 1/4", "x = 5 - 3/4", "2x = 12").
+
+    Učenikova jednačina se RIJEŠI pa uporedi sa rješenjem zadatka:
+    - isto rješenje + konačan oblik ("x = broj")  → correct
+    - isto rješenje, nedovršen oblik ("2x = 12")  → correct_step (tačan međukorak)
+    - različito rješenje                          → incorrect (tvrdnja je
+      matematički nespojiva sa zadatkom — transformacija je pogrešna)."""
+    norm_task = _normalize_math_text(task_text)
+    expected = _try_linear_equation(_fold(norm_task), norm_task)
+    if expected is None:
+        return None
+    student = _solve_student_equation(student_text)
+    if student is None:
+        return None
+    stu_val, stu_final = student
+    raw_student = re.sub(r"\s+", " ", _student_statement_raw(student_text))[:80]
+    given = NumberToken(value=stu_val, form="equation", raw=raw_student)
+    if stu_val == expected.value:
+        verdict = "correct" if stu_final else "correct_step"
+    else:
+        verdict = "incorrect"
+    return CheckResult(checkable=True, items=[
+        ItemCheck(n=1, task=task_text.strip()[:200], expected=expected,
                   given=given, verdict=verdict),
     ])
 
@@ -1158,8 +1310,10 @@ class ItemCheck:
     task: str
     expected: Expected | None
     given: NumberToken | None
-    # "correct" | "correct_value_wrong_form" | "incorrect" | "missing"
-    # | "not_attempted" | "unverified"
+    # "correct" | "correct_value_wrong_form" | "correct_step" | "incorrect"
+    # | "missing" | "not_attempted" | "unverified"
+    # correct_step = tvrdnja ekvivalentna zadatku, ali NIJE konačan oblik
+    #   ("2x < 12" za "2x - 5 < 7") — tačan međukorak, NIKAD "netačno";
     # missing = odgovarao je na skup stavki, ali ovu izostavio;
     # not_attempted = eksplicitno je rješavao SAMO druge stavke.
     # Ni missing ni not_attempted se NIKAD ne opisuju kao "netačno".
@@ -1175,8 +1329,8 @@ class CheckResult:
     def has_verdicts(self) -> bool:
         return any(
             i.verdict in (
-                "correct", "correct_value_wrong_form", "incorrect",
-                "missing", "not_attempted",
+                "correct", "correct_value_wrong_form", "correct_step",
+                "incorrect", "missing", "not_attempted",
             )
             for i in self.items
         )
@@ -1203,6 +1357,10 @@ def _judge(expected: Expected | None, given: NumberToken | None, answered: bool)
     if expected is None:
         return "unverified"
     if not _values_match(expected, given):
+        # CLASS 1: vrijednost tačnog MEĐUKORAKA ("12/12" za 5/12+7/12-3/12,
+        # poslije hinta "prvo saberi") — tačan korak, ne "netačno".
+        if any(given.value == s for s in expected.step_values):
+            return "correct_step"
         # positive_only: različita vrijednost može biti druga jedinica/oblik —
         # ne smijemo tvrditi "netačno", model provjerava sam
         return "incorrect" if expected.confidence == "high" else "unverified"
@@ -1219,10 +1377,18 @@ def _judge(expected: Expected | None, given: NumberToken | None, answered: bool)
     return "correct"
 
 
-def check_practice_answer(task_text: str, student_text: str) -> CheckResult:
-    """Uporedi učenikov odgovor sa zadatkom, po stavkama. Nikad ne baca izuzetak."""
+def check_practice_answer(
+    task_text: str,
+    student_text: str,
+    pending_items: list[int] | None = None,
+) -> CheckResult:
+    """Uporedi učenikov odgovor sa zadatkom, po stavkama. Nikad ne baca izuzetak.
+
+    ``pending_items``: brojevi stavki višestavkovnog zadatka koje JOŠ NISU
+    ocijenjene (iz ``task_items`` stanja). Koristi se za atribuciju jednog
+    nenumerisanog odgovora pravoj stavci; None = sve stavke dolaze u obzir."""
     try:
-        return _check(task_text or "", student_text or "")
+        return _check(task_text or "", student_text or "", pending_items)
     except Exception:
         return CheckResult(checkable=False)
 
@@ -1333,11 +1499,82 @@ def _check_yes_no_divisibility(task_text: str, student_text: str) -> CheckResult
     ])
 
 
-def _check(task_text: str, student_text: str) -> CheckResult:
+# Presude kojima se odgovor smije PRIPISATI stavci: tačan, tačna vrijednost u
+# pogrešnom obliku ili tačan međukorak. "incorrect" se pripisuje SAMO kada je
+# preostala tačno jedna stavka (inače ne znamo koju je stavku pokušao).
+_ATTRIBUTABLE_VERDICTS = ("correct", "correct_value_wrong_form", "correct_step")
+
+
+def _attribute_unnumbered_answer(
+    items: list[tuple[int, str]],
+    student_text: str,
+    pending_items: list[int] | None,
+) -> CheckResult | None:
+    """JEDAN nenumerisan odgovor na višestavkovni zadatak → pripiši ga stavci.
+
+    Svaka pending (još neocijenjena) stavka se provjeri kao samostalan zadatak.
+    Pripisujemo SAMO kad je nedvosmisleno:
+    - odgovor je tačan/tačan-međukorak za TAČNO JEDNU pending stavku, ili
+    - preostala je TAČNO JEDNA pending stavka (tada vrijedi i "netačno").
+    Sve ostalo → None (konzervativno; model ocjenjuje sam kao do sada).
+    Već ocijenjene stavke se NE vraćaju u rezultat (guard ih ne smije
+    proglašavati "bez odgovora")."""
+    valid = [n for n, _t in items]
+    if pending_items is None:
+        pending = list(valid)
+    else:
+        pending = [n for n in pending_items if n in valid] or list(valid)
+    candidates = [(n, text) for n, text in items if n in pending]
+    if not candidates:
+        return None
+    minis: dict[int, CheckResult] = {
+        n: _check(text, student_text) for n, text in candidates
+    }
+
+    def _sole_verdict(result: CheckResult) -> str:
+        if result.checkable and len(result.items) == 1:
+            return result.items[0].verdict
+        return ""
+
+    positive = [n for n in minis if _sole_verdict(minis[n]) in _ATTRIBUTABLE_VERDICTS]
+    chosen: int | None = None
+    if len(positive) == 1:
+        chosen = positive[0]
+    elif not positive and len(candidates) == 1 and \
+            _sole_verdict(minis[candidates[0][0]]) == "incorrect":
+        chosen = candidates[0][0]
+    if chosen is None:
+        return None
+
+    chosen_item = minis[chosen].items[0]
+    checks: list[ItemCheck] = []
+    for n, text in items:
+        if n == chosen:
+            checks.append(ItemCheck(
+                n=n, task=text[:200], expected=chosen_item.expected,
+                given=chosen_item.given, verdict=chosen_item.verdict,
+            ))
+        elif n in pending:
+            checks.append(ItemCheck(
+                n=n, task=text[:200], expected=None, given=None,
+                verdict="not_attempted",
+            ))
+    return CheckResult(checkable=True, items=checks)
+
+
+def _check(
+    task_text: str,
+    student_text: str,
+    pending_items: list[int] | None = None,
+) -> CheckResult:
     # Nejednačine se presuđuju posebno (presuda nosi operator, ne samo broj).
     inequality = _check_single_inequality(task_text, student_text)
     if inequality is not None:
         return inequality
+    # Tvrdnja-jednačina ("x = 5 - 3/4", "2x = 12") na zadatak-jednačinu.
+    equation = _check_single_equation(task_text, student_text)
+    if equation is not None:
+        return equation
     # Izbor imenovane opcije i da/ne djeljivost — cijeli zadatak, prije stavki.
     choice = _check_choice_comparison(task_text, student_text)
     if choice is not None:
@@ -1358,6 +1595,15 @@ def _check(task_text: str, student_text: str) -> CheckResult:
     # "odgovor na treće pitanje je ..." — eksplicitna referenca vrijedi i kada
     # sam odgovor nije numerički parsiran (konceptualne stavke)
     refs = detect_referenced_items(student_text, valid) if len(items) > 1 else set()
+    # Atribucija (2026-07-14): JEDAN nenumerisan odgovor ("x=4 1/4", "2x<12",
+    # "da") na višestavkovni zadatak — provjeri ga protiv svake pending stavke
+    # kao samostalnog zadatka i pripiši kad je nedvosmisleno. Ranije se odmah
+    # odustajalo (checkable=False) pa je model ocjenjivao sam i znao tačan
+    # odgovor proglasiti netačnim.
+    if len(items) > 1 and not refs and mode in ("single", "none"):
+        attributed = _attribute_unnumbered_answer(items, student_text, pending_items)
+        if attributed is not None:
+            return attributed
     if mode == "none" and not refs:
         return CheckResult(checkable=False)
 
@@ -1448,6 +1694,18 @@ def format_check_block(result: CheckResult) -> str:
                 f"({given}), ali NIJE u traženom obliku.{detail} Počni odgovor "
                 f"tačno sa \"Djelimično tačno.\" i nemoj koristiti labelu \"Tačno.\"."
             )
+        elif item.verdict == "correct_step":
+            expected = _fmt_expected(item.expected) if item.expected else ""
+            final_note = (
+                f" Konačan oblik (NE otkrivaj ga učeniku): {expected}."
+                if expected else ""
+            )
+            lines.append(
+                f"- Stavka {item.n}: TAČAN MEĐUKORAK. Učenikova tvrdnja "
+                f"({given}) je TAČNA i ekvivalentna zadatku, ali nije dovršena "
+                f"do konačnog oblika.{final_note} NIKAD ne reci da je "
+                f"pogriješio niti da je došlo do greške."
+            )
         elif item.verdict == "incorrect":
             lines.append(
                 f"- Stavka {item.n}: NETAČNO. Učenik: {given}; tačan rezultat: "
@@ -1477,6 +1735,10 @@ def format_check_block(result: CheckResult) -> str:
     )
     verdicts = [i.verdict for i in result.items]
     all_correct = bool(verdicts) and all(v == "correct" for v in verdicts)
+    step_confirmed = any(v == "correct_step" for v in verdicts) and all(
+        v in ("correct", "correct_step", "missing", "not_attempted")
+        for v in verdicts
+    )
     all_partial_or_correct = bool(verdicts) and all(
         v in ("correct", "correct_value_wrong_form") for v in verdicts
     ) and any(v == "correct_value_wrong_form" for v in verdicts)
@@ -1493,7 +1755,16 @@ def format_check_block(result: CheckResult) -> str:
         for i in result.items
     )
     any_incorrect = any(v == "incorrect" for v in verdicts)
-    if all_correct:
+    if step_confirmed:
+        lines.append(
+            "STIL (TAČAN MEĐUKORAK): NE koristi ocjenske labele (\"Tačno.\", "
+            "\"Netačno.\", \"Djelimično tačno.\") i NIKAD ne reci da je učenik "
+            "pogriješio, da je došlo do greške ili da nešto ne štima — korak JE "
+            "tačan. Potvrdi ga toplo i prirodno (\"Tako je!\", \"Bravo, to je "
+            "tačno.\"), pa JEDNIM kratkim pitanjem traži da dovrši do konačnog "
+            "oblika. NE otkrivaj konačan rezultat i NE daji novi zadatak."
+        )
+    elif all_correct:
         lines.append(
             "STIL (TAČAN ODGOVOR): počni tačno sa \"Tačno.\", "
             "pa SAMO kratka provjera računa (1–2 rečenice). NE piši puni postupak "
