@@ -90,3 +90,43 @@ def test_index_is_get_only(client):
     """POST / je bio legacy forma — sada ne postoji."""
     assert client.get("/").status_code == 200
     assert client.post("/").status_code == 405
+
+
+# --- neispravna slika: korisnička greška, NE 500 (nalaz 2026-07-14) --------------------
+
+def test_unreadable_image_is_400_not_500(client, monkeypatch):
+    """Model odbije oštećenu/nepodržanu sliku (image_parse_error). Ranije je to
+    curilo kao 500 "Greška na serveru" + traceback; dijete mora dobiti jasnu uputu."""
+    class _ImgErr(Exception):
+        code = "image_parse_error"
+
+    def _boom(*a, **kw):
+        raise _ImgErr("You uploaded an unsupported image.")
+
+    monkeypatch.setattr(matbot, "_tutor_openai_chat", _boom)
+    r = client.post(CHAT_URL, data={
+        "payload": '{"grade": 6, "mode": "quick", "student_message": "rijesi sa slike"}',
+        "image": (io.BytesIO(b"\x89PNG\r\n\x1a\n" + b"\x00" * 32), "z.png"),
+    }, content_type="multipart/form-data")
+    assert r.status_code == 400
+    j = r.get_json()
+    assert j["error"] == "unreadable_image"
+    assert "jasniju fotografiju" in j["detail"]
+
+
+def test_unreadable_image_detected_by_message_too(client):
+    """Prepoznaje se i kada klijent zamota izuzetak (bez .code atributa)."""
+    assert matbot._is_unreadable_image_error(Exception("Error: image_parse_error")) is True
+    assert matbot._is_unreadable_image_error(Exception("You uploaded an unsupported image")) is True
+    assert matbot._is_unreadable_image_error(Exception("timeout")) is False
+
+
+def test_real_server_error_still_500(client, monkeypatch):
+    """Regres: prava serverska greška NE smije postati 400."""
+    def _boom(*a, **kw):
+        raise RuntimeError("nesto puklo")
+
+    monkeypatch.setattr(matbot, "_tutor_openai_chat", _boom)
+    r = client.post(CHAT_URL, json={"grade": 6, "student_message": "2+2"})
+    assert r.status_code == 500
+    assert r.get_json()["error"] == "ai_tutor_failed"

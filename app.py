@@ -535,11 +535,39 @@ def ai_tutor_chat():
         )
     except ContentLoadError as exc:
         return jsonify({"error": "unsupported_grade", "detail": str(exc)}), 400
-    except Exception:
+    except Exception as exc:
+        # Neispravna/oštećena slika: model vrati image_parse_error. To NIJE greška
+        # servera — dijete treba jasnu uputu, a ne "Greška na serveru" + traceback.
+        if _is_unreadable_image_error(exc):
+            log.info("ai_tutor_chat: model nije mogao pročitati sliku")
+            return jsonify({"error": "unreadable_image",
+                            "detail": _UNREADABLE_IMAGE_MSG}), 400
         log.exception("ai_tutor_chat: neuspjeh")
         return jsonify({"error": "ai_tutor_failed",
                         "detail": "Došlo je do greške na serveru. Pokušaj ponovo."}), 500
     return jsonify(result), 200
+
+
+_UNREADABLE_IMAGE_MSG = (
+    "Ne mogu pročitati ovu sliku. Pošalji jasniju fotografiju (JPG ili PNG), "
+    "dobro osvijetljenu i bez zamućenja."
+)
+
+
+def _is_unreadable_image_error(exc: Exception) -> bool:
+    """Model odbio sliku (oštećen/nepodržan sadržaj) — korisnička, ne serverska greška.
+
+    OpenAI to javlja kao 400 `image_parse_error`; hvatamo po kodu i po tekstu
+    (da preživi promjenu poruke), a ne po tipu izuzetka — klijent ga zna
+    zamotati."""
+    code = getattr(exc, "code", "") or ""
+    if code == "image_parse_error":
+        return True
+    body = getattr(exc, "body", None)
+    if isinstance(body, dict) and (body.get("error") or {}).get("code") == "image_parse_error":
+        return True
+    text = str(exc).lower()
+    return "image_parse_error" in text or "unsupported image" in text
 
 
 def _sse_line(event: str, data: dict) -> str:
