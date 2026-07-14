@@ -2,8 +2,8 @@
 
 Server renderuje puni index.html (iframe gate je klijentski JS), pa GET '/' vraća
 sav HTML. Novi tok: SCREEN 1 (home/onboarding: razred → 4 kartice izbora →
-lekcija/oblast po potrebi) → SCREEN 2 (čist chat sa malim topbar-om). Legacy
-/submit markup ostaje skriven. Bez OpenAI/mreže.
+lekcija/oblast po potrebi) → SCREEN 2 (čist chat sa malim topbar-om).
+Legacy /submit markup je OBRISAN (2026-07-14). Bez OpenAI/mreže.
 """
 import re
 
@@ -28,14 +28,6 @@ def _tutor_block(html):
     """Sadržaj chat kartice (SCREEN 2, do markera kraja)."""
     start = html.index('id="tutor-card"')
     end = html.index("<!-- /tutor-card -->")
-    assert start < end
-    return html[start:end]
-
-
-def _legacy_block(html):
-    """Sadržaj SKRIVENOG legacy dijela."""
-    start = html.index('id="advancedLegacy"')
-    end = html.index("<!-- /legacy-holder -->")
     assert start < end
     return html[start:end]
 
@@ -244,13 +236,12 @@ def test_fetch_timeout_with_friendly_message(client):
     assert "Odgovor traje duže nego obično" in html
 
 
-def test_plotly_not_loaded_upfront(client):
-    """Phase 1 (audit): Plotly (~3.5MB) se ne učitava unaprijed — lijeno tek
-    kad legacy graf tok stvarno zatraži crtanje."""
+def test_plotly_is_gone(client):
+    """Plotly (~3.5MB) je POTPUNO uklonjen zajedno sa legacy graf tokom —
+    tutor ne crta grafove, pa se skripta ni lijeno ne učitava."""
     html = _html(client)
-    assert '<script src="https://cdn.plot.ly' not in html
-    assert "function ensurePlotly()" in html
-    assert "ensurePlotly().then" in html
+    for dead in ("plot.ly", "Plotly", "ensurePlotly", "drawPlot", "applyPlotsIn"):
+        assert dead not in html, dead
     # MathJax OSTAJE učitan unaprijed (formule su u svakom odgovoru)
     assert "mathjax@3/es5/tex-mml-chtml.js" in html
 
@@ -435,7 +426,6 @@ def test_composer_and_close_button_polish_styles(client):
     assert ".composer-plus-icon,.composer-send-icon" in html
     assert ".modal-close" in html
     assert 'class="modal-close" data-close="#confirm-clear"' in html
-    assert 'class="modal-close" data-close="#confirm-grade"' in html
     assert ".file-chip .remove{display:grid;place-items:center;width:28px;height:28px;" in html
 
 
@@ -464,19 +454,18 @@ def test_image_context_persisted_for_followups(client):
     assert "localStorage.removeItem(LASTIMAGECTX_KEY)" in html
 
 
-# --- legacy /submit ostaje skriven ---------------------------------------------------
+# --- legacy /submit stack je OBRISAN (2026-07-14) --------------------------------------
 
-def test_legacy_form_preserved_but_hidden(client):
-    """Legacy markup POSTOJI (JS/backend netaknuti) ali NIJE vidljiv kao drugi bot."""
+def test_legacy_markup_is_gone(client):
+    """Regres: legacy forma i njen JS su obrisani — ne smiju vaskrsnuti.
+
+    Ostatak bi zvao rute kojih više nema (/submit, /clear, /set-razred, /status),
+    pa bi tiho 404-ovao u browseru."""
     html = _html(client)
-    legacy = _legacy_block(html)
-    assert 'id="ask-form"' in legacy
-    assert 'action="/submit"' in legacy
-    assert 'id="sendBtn"' in legacy
-    assert 'id="slika"' in legacy and 'name="file"' in legacy
-    # holder je skriven hidden atributom
-    assert 'id="advancedLegacy" class="legacy-holder" hidden' in html
-    # nema vidljivog <details>/summary dvojnika
+    for dead in ('id="ask-form"', 'action="/submit"', 'id="advancedLegacy"',
+                 "legacy-holder", "/set-razred", "/status/", 'id="razredHidden"',
+                 "function sendOne", "appendUserBubble", "buildPromptHints"):
+        assert dead not in html, dead
     assert "<details" not in html
 
 
@@ -725,8 +714,8 @@ def test_recent_tasks_tracked_and_sent(client):
     # cisti se i pri resetu konverzacije i u "Ocisti chat"
     ridx = html.index("function resetTutorConversation()")
     assert "RECENTTASKS_KEY" in html[ridx:ridx + 900]
-    didx = html.index("doClear")
-    assert "matbot_tutor_recent_" in html[didx:html.index("promjena razreda kroz meni")]
+    didx = html.index("getElementById('doClear').addEventListener")
+    assert "matbot_tutor_recent_" in html[didx:didx + 900]
 
 
 # --- image_test tok: perzistencija konteksta + state-driven rutiranje -------------

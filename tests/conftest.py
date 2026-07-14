@@ -7,29 +7,21 @@ stvarne ključeve ni stvarne servise.
 """
 import os
 import sys
-import tempfile
 import types
 
 import pytest
 
 # --- Env MORA biti postavljen prije importa app ---
 os.environ["LOCAL_MODE"] = "1"
-os.environ["USE_FIRESTORE"] = "0"
 os.environ["OPENAI_API_KEY"] = "test-key-not-real"
 os.environ["FLASK_SECRET_KEY"] = "test-secret-key"
 os.environ["RATE_LIMIT_ENABLED"] = "1"
 os.environ["RATE_LIMIT_SUBMIT"] = "100000 per minute"   # darežljivo; poseban test ovo suzi
 os.environ["RATE_LIMIT_DIAG"] = "100000 per minute"
 os.environ["MAX_CONTENT_LENGTH_MB"] = "1"               # za 413 test
-os.environ["SHEETS_ASYNC_LOG"] = "0"                    # sinhrono => deterministički testovi
 os.environ["USE_MATHPIX"] = "0"
 os.environ["MATHPIX_APP_ID"] = ""
 os.environ["MATHPIX_APP_KEY"] = ""
-os.environ["GOOGLE_SHEETS_CREDENTIALS_B64"] = ""
-os.environ["GSHEET_ID"] = ""
-os.environ["GCS_BUCKET"] = ""
-os.environ["TASKS_TARGET_URL"] = ""
-os.environ["UPLOAD_DIR"] = os.path.join(tempfile.gettempdir(), "matbot-test-uploads")
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -38,17 +30,11 @@ import app as matbot  # noqa: E402
 
 @pytest.fixture(autouse=True)
 def _isolate(monkeypatch):
-    """Izolacija svakog testa: prazan job store, resetovan limiter, bez mreže,
-    bez stvarnog OpenAI-ja i bez Sheets inicijalizacije."""
-    matbot.JOB_STORE.clear()
+    """Izolacija svakog testa: resetovan limiter, bez mreže, bez stvarnog OpenAI-ja."""
     try:
         matbot.limiter.reset()
     except Exception:
         pass
-
-    # Sheets: označi kao inicijalizovan (sheet=None) da se nikad ne pokuša mrežna init.
-    monkeypatch.setattr(matbot, "_sheets_initialized", True)
-    monkeypatch.setattr(matbot, "sheet", None)
 
     # Sigurnosna mreža: nijedan test ne smije napraviti stvaran HTTP poziv.
     def _blocked(*args, **kwargs):

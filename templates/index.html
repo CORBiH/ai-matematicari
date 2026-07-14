@@ -12,8 +12,6 @@
     MathJax = { tex: { inlineMath: [["$", "$"], ["\\(", "\\)"]] }, svg: { fontCache: "global" } };
   </script>
   <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-  <!-- Plotly (~3.5MB) se NE učitava unaprijed: tutor ne crta grafove, a legacy
-       graf tok ga lijeno učita tek kad se stvarno traži (vidi ensurePlotly). -->
 
   <style>
   :root{
@@ -91,7 +89,6 @@
   .card{background:var(--card-bg);border:1px solid var(--card-border);border-radius:14px;padding:1rem;box-shadow:0 12px 38px rgba(0,0,0,.32);backdrop-filter: blur(10px);}
   .stack{display:flex;flex-direction:column;gap:0;}
 
-  #chat-container{display:flex;flex-direction:column;gap:.75rem;max-height:60vh;overflow-y:auto;scroll-behavior:smooth;padding:.25rem .25rem .5rem;border-radius:12px;}
   .chat-message{display:flex;width:100%;word-break:break-word;}
   .user-message{justify-content:flex-end;}
   .bot-message{justify-content:flex-start;}
@@ -146,8 +143,6 @@
   .modal-close:hover,.modal-close:focus-visible{background:#2d4b43;border-color:rgba(86,200,143,.6);outline:2px solid rgba(86,200,143,.35);outline-offset:2px;}
 
   /* start-grade box (kompaktno) */
-  .grade-start{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;background:#16221e;border:2px dashed rgba(86,200,143,.45);padding:.75rem .9rem;border-radius:12px;margin-bottom:.9rem}
-  .grade-start label{font-weight:700;margin-right:.25rem}
   .grade-select{font-size:1.08rem;padding:.5rem .8rem;border-radius:10px;border:1px solid var(--input-border);background:var(--input-bg);min-width:140px;}
   .grade-confirm{padding:.6rem 1rem}
 
@@ -276,21 +271,11 @@
   .tutor-video-hint{align-self:flex-start;color:var(--muted);font-size:.85rem;
     padding:.15rem .35rem;max-width:94%;}
 
-  /* napredni (legacy) dio — sekundarno, sklopljeno u podnožju tutor kartice */
-  .tutor-advanced{margin-top:1rem;border-top:1px dashed var(--card-border);padding-top:.6rem;}
-  .tutor-advanced summary{cursor:pointer;font-weight:600;font-size:.95rem;color:var(--muted);}
-  .tutor-advanced summary:hover{color:var(--text);}
-  .advanced-note{margin:.5rem 0 .6rem;font-size:.92rem;}
-  .advanced-body{margin-top:.5rem;}
-  .legacy-chat{margin-bottom:.9rem;}
-  .legacy-chat.is-empty{display:none;}
 
   /* empty-state pomoć prije prve poruke */
   .tutor-empty{align-self:flex-start;background:transparent;border:0;border-radius:0;
     padding:.3rem .15rem;margin:.1rem 0 .2rem;font-size:.88rem;flex:0 0 auto;color:var(--muted);}
 
-  /* Phase 6.2: legacy markup je potpuno skriven */
-  .legacy-holder[hidden]{display:none !important;}
 
   body.tutor-fullscreen{padding:0;}
   body.tutor-fullscreen header{min-height:48px;padding:.35rem .8rem;box-shadow:0 2px 10px rgba(0,0,0,.12);}
@@ -356,17 +341,6 @@
 
         <button class="menu-item" id="menuClear">🗑️ Očisti chat…</button>
 
-        <div class="menu-item" id="menuGrades">
-          <div style="font-weight:700;margin-bottom:.35rem;">🎓 Promijeni razred</div>
-          <div style="display:flex;gap:.4rem;flex-wrap:wrap">
-            <button class="btn sm secondary grade-btn" data-grade="5">5</button>
-            <button class="btn sm secondary grade-btn" data-grade="6">6</button>
-            <button class="btn sm secondary grade-btn" data-grade="7">7</button>
-            <button class="btn sm secondary grade-btn" data-grade="8">8</button>
-            <button class="btn sm secondary grade-btn" data-grade="9">9</button>
-          </div>
-          <div class="muted" style="margin-top:.4rem">Trenutni: <span id="curGradeLabel">—</span></div>
-        </div>
       </div>
     </div>
   </header>
@@ -469,58 +443,6 @@
       </div>
       <div class="muted" id="tutorMeta"></div>
 
-      <!-- Legacy /submit markup: SKRIVEN od korisnika (Phase 6.2). Backend /submit i
-           legacy JS ostaju netaknuti; jedini vidljivi tutor je modularni iznad. -->
-      <div id="advancedLegacy" class="legacy-holder" hidden>
-        <div class="advanced-body">
-          <!-- LEGACY CHAT (za /submit tok) -->
-          <div class="legacy-chat is-empty" id="chat-card">
-            <div id="chat-container"></div>
-            <!-- TIPKANJE sa fazama -->
-            <div id="typing" class="typing-indicator" aria-live="polite">
-              🤖 <span id="phaseText">Razmišljam</span><span class="dots"></span>
-            </div>
-          </div>
-
-      <!-- START GRADE ASK -->
-      <div id="grade-start" class="grade-start">
-        <label for="gradeSelectStart">Koji si razred?</label>
-        <select id="gradeSelectStart" class="grade-select" aria-label="Razred">
-          <option value="" selected disabled>— odaberi —</option>
-          <option value="5">5</option>
-          <option value="6">6</option>
-          <option value="7">7</option>
-          <option value="8">8</option>
-          <option value="9">9</option>
-        </select>
-        <button id="gradeConfirmStart" class="btn secondary sm grade-confirm">Potvrdi</button>
-      </div>
-
-      <form id="ask-form" method="POST" enctype="multipart/form-data" autocomplete="off" action="/submit">
-        <input type="hidden" id="razredHidden" name="razred" value="">
-        <input type="hidden" id="history_json_main" name="history_json" value="[]">
-        <!-- Novo: backend moze čitati ovaj hidden ili ga možemo samo dodati preko FormData -->
-        <input type="hidden" id="prompt_hints_json" name="prompt_hints_json" value="{}">
-
-        <label for="pitanje">Postavi mi matematičko pitanje (tekst ili slika):</label>
-        <textarea name="pitanje" id="pitanje" placeholder="Ovdje možeš unijeti zadatak ili pitanje..." disabled></textarea>
-
-        <div class="form-actions">
-          <div class="left">
-            <input id="slika" type="file" name="file" accept="image/*" style="display:none;" disabled />
-            <label for="slika" id="uploadLabel" class="btn secondary sm" aria-disabled="true">📤 Upload slike</label>
-            <span id="file-chip" class="file-chip">
-              <span id="file-name">Nije odabran fajl</span>
-              <button type="button" class="remove" id="remove-file" title="Ukloni fajl">×</button>
-            </span>
-          </div>
-          <div class="right">
-            <button id="sendBtn" type="button" class="btn" disabled>✉️ Pošalji</button>
-          </div>
-        </div>
-      </form>
-        </div><!-- /advanced-body -->
-      </div><!-- /legacy-holder -->
     </div><!-- /tutor-card -->
   </main>
 
@@ -538,18 +460,6 @@
       <div class="actions">
         <button class="btn secondary" data-close="#confirm-clear">Odustani</button>
         <button class="btn danger" id="doClear">Obriši</button>
-      </div>
-    </div>
-  </div>
-
-  <div class="modal" id="confirm-grade">
-    <div class="box">
-      <button type="button" class="modal-close" data-close="#confirm-grade" aria-label="Zatvori">×</button>
-      <h3>Promjena razreda</h3>
-      <p id="gradeMsg">Promijeniti razred?</p>
-      <div class="actions">
-        <button class="btn secondary" data-close="#confirm-grade">Odustani</button>
-        <button class="btn" id="doGrade">Potvrdi</button>
       </div>
     </div>
   </div>
@@ -589,7 +499,6 @@ function hideTyping(){
   clearInterval(phaseTimer);
   document.getElementById('typing').style.display='none';
 }
-function scrollToBottom(){ const chat=document.getElementById('chat-container'); if(chat) chat.scrollTop = chat.scrollHeight; }
 
 /* --- MODALI --- */
 function openModal(id){ document.getElementById('overlay').style.display='block'; document.querySelector(id).style.display='flex'; }
@@ -638,36 +547,6 @@ function pushHistory(HIST_KEY, user, bot){
   if (hidden) hidden.value = JSON.stringify(arr.slice(-5));
 }
 
-/* ====== PROMPT PREFERENCES (Bosanski + terminologija) ====== */
-function buildPromptHints(razred){
-  const isLower = (razred === '5' || razred === '6');
-  return {
-    language: "bosanski (ijekavica) — odgovaraj isključivo na bosanskom jeziku.",
-    grade: razred || null,
-    tone: isLower
-      ? "objasni što jednostavnije moguće za učenika 5./6. razreda: kratke rečenice, jasni koraci, minimalno tehničkih termina."
-      : "jasno, razumljivo i stručno, uz korake i kratka objašnjenja.",
-    terminology: {
-      lcm_prefer: "nzs — najmanji zajednički sadržalac",
-      fractions_terms: "koristi: brojnik i nazivnik kod razlomaka",
-      verbs: {
-        add: "saberi",
-        subtract: "oduzmi",
-        multiply: "pomnoži",
-        divide: "podijeli"
-      },
-      prefer_bosnian_forms: true,
-      avoid: ["zbroj", "zbroji", "zbrojiti", "najmanji zajednički nazivnik"], /* umjesto toga koristi nzs */
-      enforce_examples_language: "Ako se spominju nazivi pojmova, koristi bosanske izraze."
-    },
-    formatting: {
-      show_steps: true,
-      use_bullets_for_steps: isLower,
-      highlight_key_terms: false
-    }
-  };
-}
-
 document.addEventListener('DOMContentLoaded', () => {
   /* ====== 1) SAMO UNUTAR THINKIFICA (iframe check) ====== */
   const isIframe = (window.top !== window.self);
@@ -691,112 +570,12 @@ document.addEventListener('DOMContentLoaded', () => {
     return;
   }
 
-  /* ====== 2) OBRIŠI RAZRED NA SVAKI REFRESH ====== */
-  try{
-    localStorage.removeItem('mb_grade_confirmed');
-    localStorage.removeItem('mb_grade_value');
-  }catch(_){}
-  const razredHidden = document.getElementById('razredHidden');
-  if (razredHidden) razredHidden.value = "";
-  document.getElementById('curGradeLabel').textContent = '—';
-
-  /* ====== Inic i elementi ====== */
-  const form = document.getElementById('ask-form');
-  const sendBtn = document.getElementById('sendBtn');
-  const textarea = document.getElementById('pitanje');
-  const fileInput = document.getElementById('slika');
-  const uploadLabel = document.getElementById('uploadLabel');
-  const fileChip = document.getElementById('file-chip');
-  const fileName = document.getElementById('file-name');
-  const removeFileBtn = document.getElementById('remove-file');
-  const chat = document.getElementById('chat-container');
-  const hiddenHints = document.getElementById('prompt_hints_json');
-
-  /* ====== HISTORY INIT ====== */
-  const hiddenHistory = document.getElementById('history_json_main');
-  const HIST_KEY = 'matbot_history_' + getCID();
-  try{
-    const arr = JSON.parse(localStorage.getItem(HIST_KEY) || '[]');
-    hiddenHistory.value = JSON.stringify((Array.isArray(arr)?arr:[]).slice(-5));
-  }catch(_){
-    hiddenHistory.value = '[]';
-  }
-
-  /* helper: enable/disable unosa */
-  function setInputsEnabled(on){
-    textarea.disabled = !on;
-    fileInput.disabled = !on;
-    sendBtn.disabled = !on;
-    uploadLabel.setAttribute('aria-disabled', on ? 'false' : 'true');
-    uploadLabel.style.opacity = on ? '1' : '.6';
-  }
-
-  /* ------ START RAZRED BOX ------ */
-  const gradeStart = document.getElementById('grade-start');
-  const gradeSelStart = document.getElementById('gradeSelectStart');
-  const gradeBtnStart = document.getElementById('gradeConfirmStart');
-  setInputsEnabled(false); // razred je obrisan na refresh
-
-  gradeBtnStart.addEventListener('click', ()=>{
-    const g = gradeSelStart.value;
-    if(!g){
-      showToast('Prvo odaberi razred.', 'err'); return;
-    }
-    razredHidden.value = g;
-    document.getElementById('curGradeLabel').textContent = g;
-
-    /* generiši i upiši prompt hints prema izabranom razredu */
-    const hints = buildPromptHints(g);
-    if (hiddenHints) hiddenHints.value = JSON.stringify(hints);
-
-    gradeStart.classList.add('hidden');
-    gradeStart.style.display = 'none';
-    setInputsEnabled(true);
-    showToast(`Razred postavljen na ${g}.`, 'ok');
+  /* ====== Meni: očisti chat ====== */
+  /* Pravi posao je brisanje tutor stanja iz localStorage (server ne drži chat). */
+  document.getElementById('menuClear').addEventListener('click', ()=>{
+    openModal('#confirm-clear'); closeDropdown();
   });
-
-  /* file chip + validacija tipa */
-  function updateFileUI(){
-    if(fileInput.files && fileInput.files[0]){
-      const f = fileInput.files[0];
-      if (!f.type || !f.type.startsWith('image/')) {
-        clearFile();
-        showToast('To nije slika. Pošalji JPG/PNG ili tekst zadatka.', 'err');
-        return;
-      }
-      fileName.textContent = f.name;
-      fileChip.classList.add('show');
-    }else{
-      fileName.textContent = 'Nije odabran fajl';
-      fileChip.classList.remove('show');
-    }
-  }
-  function clearFile(){
-    const dt = new DataTransfer();
-    fileInput.files = dt.files;
-    fileInput.value = "";
-    fileChip.classList.remove('show');
-    fileName.textContent='Nije odabran fajl';
-  }
-  fileInput.addEventListener('change', updateFileUI);
-  removeFileBtn.addEventListener('click', clearFile);
-
-  /* meni: clear (otvori modal) */
-  document.getElementById('menuClear').addEventListener('click', (e)=>{
-    e.preventDefault();
-    openModal('#confirm-clear');
-    closeDropdown();
-  });
-
-  /* potvrda clear */
-  document.getElementById('doClear').addEventListener('click', async () => {
-    try {
-      const fd = new URLSearchParams({ confirm_clear: "1", ajax: "1" });
-      await fetch("/clear", { method: "POST", body: fd, credentials: "include" });
-    } catch (_) {}
-    resetHistory(HIST_KEY, hiddenHistory);
-    /* Phase 6.1: očisti i tutor stanje (historija, zadnji zadatak) za sve cid-ove.
-       Reload ispod resetuje transcript, fazu i loading stanje. */
+  document.getElementById('doClear').addEventListener('click', () => {
     try {
       Object.keys(localStorage)
         .filter(k => k.startsWith('matbot_tutor_history_') || k.startsWith('matbot_tutor_lasttask_')
@@ -811,173 +590,10 @@ document.addEventListener('DOMContentLoaded', () => {
     location.reload();
   });
 
-  /* promjena razreda kroz meni */
-  document.querySelectorAll('.grade-btn').forEach(btn=>{
-    btn.addEventListener('click',(e)=>{
-      e.preventDefault();
-      const g = btn.dataset.grade;
-      document.getElementById('gradeMsg').textContent = `Promijeniti razred na ${g} i obrisati chat?`;
-      document.getElementById('doGrade').setAttribute('data-grade', g);
-      openModal('#confirm-grade'); closeDropdown();
-    });
-  });
-  document.getElementById('doGrade').addEventListener('click', async (e)=>{
-    const g = e.target.getAttribute('data-grade');
-    if(!g) return;
-    try{
-      const fd = new FormData(); fd.append("razred", g);
-      const r = await fetch("/set-razred",{method:"POST", body:fd, credentials:"include"});
-      if(r.ok){
-        razredHidden.value = g;
-
-        /* ažuriraj i prompt hints nakon promjene razreda */
-        const hints = buildPromptHints(g);
-        if (hiddenHints) hiddenHints.value = JSON.stringify(hints);
-
-        closeModal('#confirm-grade');
-        location.reload();
-      }
-    }catch(_){
-      closeModal('#confirm-grade');
-    }
-  });
-
   function escapeHtml(s){
     return (s||'').replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
   }
 
-  function appendUserBubble({text, fileName}){
-    const wrap = document.createElement('div');
-    wrap.className = 'chat-message user-message';
-    const bubble = document.createElement('div');
-    bubble.className = 'bubble user';
-    let html = '';
-    if (text && text.trim()) html += `<p>${escapeHtml(text)}</p>`;
-    if (fileName) html += `<p><strong>📷 ${escapeHtml(fileName)}</strong></p>`;
-    if (!html) html = '<p><em>(prazna poruka)</em></p>';
-    bubble.innerHTML = html;
-    wrap.appendChild(bubble);
-    chat.appendChild(wrap);
-    scrollToBottom();
-  }
-
-  function appendBotHTML(html){
-    const wrap = document.createElement('div');
-    wrap.className = 'chat-message bot-message';
-    const bubble = document.createElement('div');
-    bubble.className = 'bubble';
-    bubble.innerHTML = html || '<i>Nema odgovora.</i>';
-    wrap.appendChild(bubble);
-    chat.appendChild(wrap);
-    if (window.MathJax && MathJax.typesetPromise) MathJax.typesetPromise([bubble]);
-    applyPlotsIn(bubble);
-    scrollToBottom();
-  }
-
-  async function sendOne(){
-    const razred = razredHidden.value;
-    const text = textarea.value.trim();
-    const file = fileInput.files[0];
-
-    const userLabel = text || (file ? file.name : '(prazno)');
-    window.__lastUserLabel = userLabel; // da poll() zna koga da upari
-
-    if(!razred){ showToast('Prvo postavi razred.', 'err'); return; }
-    if(!text && !file){ showToast('Unesi pitanje ili dodaj sliku prije slanja.', 'err'); return; }
-    if(file && (!file.type || !file.type.startsWith('image/'))){
-      showToast('Fajl nije prepoznat kao slika. Pošalji JPG/PNG ili samo tekst.', 'err'); return;
-    }
-
-    /* osiguraj da prompt_hints uvijek prati aktuelni razred */
-    const hintsObj = buildPromptHints(razred);
-    if (hiddenHints) hiddenHints.value = JSON.stringify(hintsObj);
-
-    document.getElementById('chat-card')?.classList.remove('is-empty');
-    showTyping();
-    sendBtn.disabled = true;
-    textarea.disabled = true;
-    document.querySelectorAll('.grade-btn').forEach(b=>b.disabled=true);
-
-    appendUserBubble({text, fileName: file?.name});
-
-    textarea.value = '';
-    clearFile();
-
-    const fd = new FormData();
-    fd.append('razred', razred);
-    if (text) fd.append('user_text', text);
-    if (file) fd.append('file', file, file.name);
-    const hiddenMain = document.getElementById('history_json_main');
-    if (hiddenMain && hiddenMain.value) {
-      fd.append('history_json', hiddenMain.value);
-    }
-    // pošalji i naše “prompt hints”
-    fd.append('prompt_hints_json', JSON.stringify(hintsObj));
-
-    let keepTyping = false;
-    try{
-      const r = await fetch(form.action || '/submit', { method:'POST', body: fd, credentials:'include' });
-      const ct = r.headers.get('content-type') || '';
-      const isJSON = ct.includes('application/json');
-      if (r.status === 409){
-        appendBotHTML('<div class="alert alert-warning">Već se generiše jedan odgovor. Sačekaj trenutak.</div>');
-      } else if (!r.ok){
-        const t = isJSON ? JSON.stringify(await r.json()) : await r.text();
-        appendBotHTML(`<div class="alert alert-danger">Greška: ${escapeHtml(t)}</div>`);
-      } else {
-        const j = isJSON ? await r.json() : {};
-        if (j.mode && j.job_id && !j.result){
-          keepTyping = true;
-          poll(j.job_id);
-        } else {
-          appendBotHTML(j?.result?.html || '<i>Nema rezultata.</i>');
-          pushHistory(HIST_KEY, userLabel, j?.result?.html || '');
-        }
-      }
-    } catch (e){
-      appendBotHTML('<div class="alert alert-danger">Greška pri slanju zahtjeva.</div>');
-    } finally {
-      if (!keepTyping) hideTyping();
-      sendBtn.disabled = false;
-      textarea.disabled = false;
-      document.querySelectorAll('.grade-btn').forEach(b=>b.disabled=false);
-    }
-  }
-
-  async function poll(jobId){
-    const sleep = (ms)=> new Promise(r=>setTimeout(r, ms));
-    let failures = 0; // tolerišemo par prolaznih mrežnih grešaka prije odustajanja
-    for (let i=0;i<180;i++){
-      await sleep(2000);
-      try{
-        const r = await fetch(`/status/${jobId}`, {cache:'no-store', credentials:'include'});
-        if (!r.ok) throw new Error('status http '+r.status);
-        const data = await r.json();
-        failures = 0;
-        if (data.status === 'done'){
-          const botHtml = (data.result && data.result.html) || '<i>Nema rezultata.</i>';
-          appendBotHTML(botHtml);
-          pushHistory(HIST_KEY, window.__lastUserLabel || '(follow-up)', botHtml);
-          hideTyping(); return;
-        }
-        if (data.status === 'error'){
-          appendBotHTML('<div class="alert alert-danger">Greška u asinkronoj obradi. Pokušaj ponovo.</div>');
-          hideTyping(); return;
-        }
-      }catch(_){
-        failures += 1;
-        if (failures >= 3){
-          appendBotHTML('<div class="alert alert-danger">Veza je prekinuta pri provjeri statusa. Provjeri internet pa pokušaj ponovo.</div>');
-          hideTyping(); return;
-        }
-      }
-    }
-    appendBotHTML('<div class="alert alert-warning">Istek vremena čekanja na rezultat.</div>');
-    hideTyping();
-  }
-
-  document.getElementById('sendBtn').addEventListener('click', sendOne);
-  form.addEventListener('submit',(e)=>{ e.preventDefault(); sendOne(); });
 
   /* ====== AI TUTOR: onboarding home ekran (SCREEN 1) + fokusirani chat (SCREEN 2) ====== */
   (function initTutor(){
@@ -1081,7 +697,6 @@ document.addEventListener('DOMContentLoaded', () => {
         .replace(/(<br>)+(<(?:ul|ol)>)/g, '$2');
     }
 
-    /* Poruke se dodaju UNUTAR tutor kartice (tutorChat), ne u legacy chat. */
     function createTutorBubble(role){
       tutorChat.classList.add('open');
       if (tutorEmpty) tutorEmpty.classList.add('hidden');
@@ -2136,69 +1751,6 @@ document.addEventListener('DOMContentLoaded', () => {
   })();
 });
 
-/* ------- Plot helpers ------- */
-function transformExpression(expr){
-  return expr.replace(/\s+/g,'')
-    .replace(/([0-9])([a-zA-Z])/g,'$1*$2')
-    .replace(/([a-zA-Z])([a-zA-Z])/g,'$1*$2')
-    .replace(/([a-zA-Z])(\d)/g,'$1*$2')
-    .replace(/(\))(\()/g,'$1*$2')
-    .replace(/(\))([a-zA-Z])/g,'$1*$2')
-    .replace(/([a-zA-Z])(\()/g,'$1*$2')
-    .replace(/(\d+|\w+)\^(\d+|\w+)/g,'Math.pow($1,$2)')
-    .replace(/(?<!\.)\b(sin|cos|tan|exp|log|sqrt|abs)\b/g,'Math.$1')
-    .replace(/\bln\b/g,'Math.log');
-}
-/* Plotly se učitava LIJENO tek pri prvom stvarnom crtanju grafa (legacy tok);
-   tutor stranica tako ne vuče ~3.5MB skripte koju gotovo niko ne koristi. */
-let plotlyLoader = null;
-function ensurePlotly(){
-  if (window.Plotly) return Promise.resolve();
-  if (!plotlyLoader){
-    plotlyLoader = new Promise((resolve, reject)=>{
-      const s = document.createElement('script');
-      s.src = 'https://cdn.plot.ly/plotly-2.27.1.min.js';
-      s.onload = resolve;
-      s.onerror = ()=>{ plotlyLoader = null; reject(new Error('plotly load failed')); };
-      document.head.appendChild(s);
-    });
-  }
-  return plotlyLoader;
-}
-function drawPlot(expression, container){
-  const parsed = transformExpression(expression);
-  const x=[], y=[]; let f;
-  try{ f=new Function('x',`return ${parsed}`); }catch(e){ return; }
-  for(let i=-10;i<=10;i+=0.1){
-    try{ const res=f(i); x.push(i); y.push(isFinite(res)?res:null);}catch{ x.push(i); y.push(null);}
-  }
-  ensurePlotly().then(()=>{
-    const styles = getComputedStyle(document.body);
-    const paperBg = styles.getPropertyValue('--card-bg').trim() || '#fff';
-    const textCol = styles.getPropertyValue('--text').trim() || '#111';
-    const data=[{x,y,mode:'lines',line:{width:3},name:expression}];
-    const layout={
-      title:`Graf funkcije: y = ${expression}`,
-      xaxis:{title:'x',color:textCol,tickcolor:textCol,gridcolor:'rgba(255,255,255,.08)'},
-      yaxis:{title:'y',color:textCol,tickcolor:textCol,gridcolor:'rgba(255,255,255,.08)'},
-      margin:{t:40},plot_bgcolor:paperBg,paper_bgcolor:paperBg
-    };
-    const graphDiv=document.createElement("div");
-    graphDiv.style="width:100%;max-width:700px;height:400px;margin-top:1rem;";
-    container.appendChild(graphDiv);
-    Plotly.newPlot(graphDiv,data,layout);
-  }).catch(()=>{});
-}
-function applyPlotsIn(root){
-  root.querySelectorAll('.plot-request').forEach(plotDiv=>{
-    let expression=plotDiv.getAttribute("data-expression");
-    const parent=plotDiv.closest(".bubble") || root;
-    if(!expression||!parent) return;
-    if(expression.trim().startsWith("y=")) expression=expression.replace(/^y\s*=\s*/i,"").trim();
-    drawPlot(expression,parent);
-    plotDiv.remove();
-  });
-}
 </script>
 </body>
 </html>

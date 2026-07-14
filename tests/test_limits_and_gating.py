@@ -1,32 +1,42 @@
-"""Limit veličine zahtjeva, rate limiting i zaštita dijagnostičkih endpointa."""
+"""Limit veličine zahtjeva, rate limiting i zaštita dijagnostičkih endpointa.
+
+Poslije brisanja legacy /submit stacka (2026-07-14) rate limit i 413 se testiraju
+na ŽIVOJ ruti — /api/ai-tutor/chat (jedini skup poziv koji je ostao).
+"""
 import io
 
 import app as matbot
+
+CHAT_URL = "/api/ai-tutor/chat"
 
 
 def test_oversized_upload_413(client):
     """MAX_CONTENT_LENGTH_MB=1 u testu → 2MB upload mora biti odbijen."""
     big = io.BytesIO(b"\xff\xd8\xff" + b"0" * (2 * 1024 * 1024))
-    r = client.post("/submit", data={"razred": "7", "file": (big, "velika.jpg")})
+    r = client.post(CHAT_URL, data={
+        "payload": '{"grade": 6, "student_message": "evo slika"}',
+        "image": (big, "velika.jpg"),
+    }, content_type="multipart/form-data")
     assert r.status_code == 413
 
 
-def test_rate_limit_submit(client, fake_openai, monkeypatch):
+def test_rate_limit_chat(client, fake_openai, monkeypatch):
     monkeypatch.setenv("RATE_LIMIT_SUBMIT", "2 per minute")
     matbot.limiter.reset()
     codes = [
-        client.post("/submit", data={"razred": "7", "user_text": f"2+{i}"}).status_code
+        client.post(CHAT_URL, json={"grade": 6, "student_message": f"2+{i}"}).status_code
         for i in range(3)
     ]
     assert codes[:2] == [200, 200]
     assert codes[2] == 429
     matbot.limiter.reset()
 
+
 def test_rate_limit_429_is_json_bosnian(client, fake_openai, monkeypatch):
     monkeypatch.setenv("RATE_LIMIT_SUBMIT", "1 per minute")
     matbot.limiter.reset()
-    client.post("/submit", data={"razred": "7", "user_text": "2+2"})
-    r = client.post("/submit", data={"razred": "7", "user_text": "2+3"})
+    client.post(CHAT_URL, json={"grade": 6, "student_message": "2+2"})
+    r = client.post(CHAT_URL, json={"grade": 6, "student_message": "2+3"})
     assert r.status_code == 429
     j = r.get_json()
     assert j["error"] == "rate_limited"
@@ -35,74 +45,48 @@ def test_rate_limit_429_is_json_bosnian(client, fake_openai, monkeypatch):
 
 
 def test_diag_open_in_local_mode(client):
-    assert client.get("/sheets/diag").status_code == 200
+    """Dozvoljen pristup: 400 "no-keys" (Mathpix nije konfigurisan u testu) —
+    bitno je da NIJE 403."""
+    r = client.get("/mathpix/selftest")
+    assert r.status_code == 400
+    assert r.get_json()["reason"] == "no-keys"
+
 
 def test_diag_blocked_outside_local(client, monkeypatch):
     monkeypatch.setattr(matbot, "LOCAL_MODE", False)
     monkeypatch.setattr(matbot, "DIAG_TOKEN", "")
-    assert client.get("/sheets/diag").status_code == 403
-    assert client.post("/sheets/selftest").status_code == 403
     assert client.get("/mathpix/selftest").status_code == 403
-    assert client.post("/gcs/signed-upload", json={}).status_code == 403
+
 
 def test_diag_allowed_with_token(client, monkeypatch):
     monkeypatch.setattr(matbot, "LOCAL_MODE", False)
     monkeypatch.setattr(matbot, "DIAG_TOKEN", "tajni-token")
-    r = client.get("/sheets/diag", headers={"X-Diag-Token": "tajni-token"})
-    assert r.status_code == 200
-    r2 = client.get("/sheets/diag", headers={"X-Diag-Token": "pogresan"})
-    assert r2.status_code == 403
-
-
-def test_sheets_selftest_local_reports_disabled(client):
-    # U LOCAL_MODE dozvoljen, ali Sheets nije inicijalizovan → 500 sa porukom
-    r = client.post("/sheets/selftest")
-    assert r.status_code == 500
-    assert r.get_json()["ok"] is False
+    # ispravan token → prolazi kapiju (400 no-keys, ne 403)
+    assert client.get("/mathpix/selftest",
+                      headers={"X-Diag-Token": "tajni-token"}).status_code == 400
+    assert client.get("/mathpix/selftest",
+                      headers={"X-Diag-Token": "pogresan"}).status_code == 403
 
 
 def test_secret_key_is_from_env():
     assert matbot.app.secret_key == "test-secret-key"
 
+
 def test_openai_knobs_read_from_env():
-    # default iz conftest okruženja: nema override → vrijednosti su brojevi
     assert isinstance(matbot.OPENAI_TIMEOUT, float)
     assert isinstance(matbot.OPENAI_MAX_RETRIES, int)
 
 
-def test_cleanup_stale_uploads(tmp_path, monkeypatch):
-    import os, time
-    monkeypatch.setattr(matbot, "UPLOAD_DIR", str(tmp_path))
-    old = tmp_path / "star.png"
-    new = tmp_path / "nov.png"
-    old.write_bytes(b"x")
-    new.write_bytes(b"y")
-    past = time.time() - 7200
-    os.utime(old, (past, past))
-    matbot.cleanup_stale_uploads(max_age_s=3600)
-    assert not old.exists()
-    assert new.exists()
+def test_legacy_routes_are_gone(client):
+    """Regres: legacy /submit stack je obrisan — rute NE smiju vaskrsnuti."""
+    for path in ("/submit", "/clear", "/set-razred", "/gcs/signed-upload",
+                 "/tasks/process", "/sheets/diag", "/sheets/selftest"):
+        assert client.post(path).status_code == 404, path
+    for path in ("/status/abc", "/result/abc", "/uploads/x.png"):
+        assert client.get(path).status_code == 404, path
 
 
-def test_tasks_process_denies_all_without_secret(client, monkeypatch):
-    """Phase 1 (audit): bez TASKS_SECRET-a /tasks/process u produkciji odbija SVE
-    (ranije je default "super-secret" bio pogodiv i endpoint je bio otvoren)."""
-    monkeypatch.setattr(matbot, "LOCAL_MODE", False)
-    monkeypatch.setattr(matbot, "TASKS_SECRET", "")
-    for headers in ({}, {"X-Tasks-Secret": ""}, {"X-Tasks-Secret": "super-secret"}):
-        r = client.post("/tasks/process", json={"job_id": "j-sec"}, headers=headers)
-        assert r.status_code == 403, headers
-
-
-def test_tasks_process_denies_wrong_secret(client, monkeypatch):
-    monkeypatch.setattr(matbot, "LOCAL_MODE", False)
-    monkeypatch.setattr(matbot, "TASKS_SECRET", "pravi-secret")
-    r = client.post("/tasks/process", json={"job_id": "j-sec2"},
-                    headers={"X-Tasks-Secret": "pogresan"})
-    assert r.status_code == 403
-
-
-def test_tasks_secret_has_no_insecure_default():
-    import inspect
-    src = inspect.getsource(matbot)
-    assert 'os.getenv("TASKS_SECRET", "super-secret")' not in src
+def test_index_is_get_only(client):
+    """POST / je bio legacy forma — sada ne postoji."""
+    assert client.get("/").status_code == 200
+    assert client.post("/").status_code == 405

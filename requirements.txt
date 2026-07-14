@@ -9,22 +9,14 @@ python-dotenv>=1.0
 openai>=1.40.0
 requests>=2.31.0
 
-# --- Google Cloud (opciono; importi su guardovani u app.py) ---
-# Na VPS-u se NE koriste u runtime-u (USE_FIRESTORE=0, bez GCS/Cloud Tasks) —
-# ostavljeni jer su mali i čuvaju legacy async put; kandidati za uklanjanje kad
-# se Cloud Run definitivno penzioniše (docs/fable-next-steps.md).
-google-auth>=2.28.0
-google-cloud-storage>=2.16.0
-google-cloud-firestore>=2.15.0
-google-cloud-tasks>=2.16.0
-
-# --- Google Sheets (bezuslovan import u app.py) ---
-gspread>=6.0.0
-
 # --- Excel content (modular data: master + Thinkific mapa) ---
 openpyxl>=3.1
 
 # UKLONJENO (Phase 2 audit — NULA importa u kodu, provjereno grep-om):
 #   numpy, sympy, matplotlib, scikit-learn, argon2-cffi, PyJWT, psycopg2-binary
-# Rollback: vrati linije paketa i (za psycopg2) build-essential + libpq-dev
-# u Dockerfile, pa `docker compose build`.
+#
+# UKLONJENO (2026-07-14, brisanje legacy /submit stacka):
+#   google-auth, google-cloud-storage, google-cloud-firestore, google-cloud-tasks,
+#   gspread — koristio ih je ISKLJUČIVO legacy async/Sheets put, koji je obrisan.
+#   Tutor loguje u SQLite (matbot/activity_log.py) i ne dira GCP.
+# Rollback: `git revert` commita koji je uklonio legacy stack.
