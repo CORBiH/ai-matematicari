@@ -4,11 +4,11 @@ from flask import (
 )
 from dotenv import load_dotenv
 import os, base64, json, html, datetime, logging, mimetypes, threading
-import socket, ipaddress, hmac, hashlib
+import socket, ipaddress, hmac, hashlib, fnmatch
 from datetime import timedelta
 from uuid import uuid4
 import requests
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlsplit
 from openai import OpenAI
 from flask_cors import CORS
 from flask_limiter import Limiter
@@ -145,6 +145,69 @@ def verify_embed_token(token: str) -> bool:
 def _embed_token_ok() -> bool:
     token = request.headers.get("X-Tutor-Token") or request.args.get("emb") or ""
     return verify_embed_token(token)
+
+
+# --- Embed gate: aplikaciji se ulazi SAMO kroz dozvoljeni embed (Thinkific) --------
+# Rupa koju ovo zatvara: token se ugrađuje u GET /, pa je do sada svako ko zna URL
+# mogao otvoriti stranicu, pokupiti svjež token i koristiti bota direktno.
+#
+# Zašto je provjera OVDJE, a ne na /api/*: tutor pozivi su SAME-ORIGIN (naša
+# stranica zove naš API), pa bi traženje Thinkific origina na API-ju odbilo
+# legitimne pozive. Cross-site zahtjev iz Thinkific iframe-a stiže tačno na GET /,
+# i tu se odlučuje hoće li se token uopšte iskovati.
+EMBED_ALLOWED_ORIGINS = [
+    o.strip().rstrip("/")
+    for o in (os.getenv("EMBED_ALLOWED_ORIGINS") or "").split(",")
+    if o.strip()
+]
+
+
+def _origin_matches(origin: str, patterns: list[str]) -> bool:
+    """Poređenje sa podrškom za wildcard u hostu ("https://*.thinkific.com")."""
+    origin = (origin or "").strip().rstrip("/").lower()
+    if not origin:
+        return False
+    return any(fnmatch.fnmatch(origin, p.lower()) for p in patterns)
+
+
+def _embed_referrer_origin() -> str:
+    """Origin one stranice koja NAS ugrađuje (ne naš vlastiti).
+
+    Na navigaciji iframe-a browser šalje Referer stranice-domaćina. Origin header
+    se na GET navigaciji uglavnom ne šalje, pa je Referer glavni signal; uz
+    strict-origin-when-cross-origin politiku Thinkific pošalje bar goli origin.
+    """
+    origin = (request.headers.get("Origin") or "").strip()
+    if origin and origin.lower() != "null":
+        return origin
+    referer = (request.headers.get("Referer") or "").strip()
+    if not referer:
+        return ""
+    parts = urlsplit(referer)
+    if not parts.scheme or not parts.netloc:
+        return ""
+    return f"{parts.scheme}://{parts.netloc}"
+
+
+def embed_entry_allowed() -> bool:
+    """Smije li ovaj zahtjev otvoriti aplikaciju? Prazna lista = kapija ISKLJUČENA."""
+    if LOCAL_MODE or not EMBED_ALLOWED_ORIGINS:
+        return True
+    return _origin_matches(_embed_referrer_origin(), EMBED_ALLOWED_ORIGINS)
+
+
+_EMBED_GATE_HTML = (
+    "<!doctype html><html lang=\"bs\"><meta charset=\"utf-8\">"
+    "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+    "<title>MAT-BOT</title>"
+    "<style>body{font-family:system-ui,sans-serif;background:#0f172a;color:#e2e8f0;"
+    "display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0;"
+    "padding:24px}main{max-width:420px;text-align:center}h1{font-size:1.25rem;margin:0 0 .5rem}"
+    "p{color:#94a3b8;line-height:1.5;margin:0}</style>"
+    "<main><h1>MAT-BOT je dostupan kroz lekciju</h1>"
+    "<p>Otvori bota iz svoje lekcije na platformi kursa. "
+    "Direktan pristup ovoj adresi nije omogućen.</p></main></html>"
+)
 
 
 _EMBED_TOKEN_DENIED = {
@@ -718,6 +781,11 @@ def gcs_upload_bytes(job_id: str, raw: bytes, filename_hint: str = "image.bin", 
 # ---------------- Web routes ----------------
 @app.route("/", methods=["GET", "POST"])
 def index():
+    # Embed kapija: bez dozvoljenog embed origina ne serviramo ni stranicu ni token,
+    # pa tutor API (koji traži token) ostaje nedostupan direktnim posjetiocima.
+    if not embed_entry_allowed():
+        log.info("embed gate: odbijen ulaz (origin=%r)", _embed_referrer_origin())
+        return _EMBED_GATE_HTML, 403
     plot_expression_added = False
     history = get_history_from_request() or session.get("history", [])
     razred = (request.form.get("razred") or session.get("razred") or "").strip()
@@ -1447,6 +1515,14 @@ def _startup_env_sanity():
     if not AI_TUTOR_EMBED_SECRET:
         log.warning("ENV SANITY: AI_TUTOR_EMBED_SECRET nije postavljen — token "
                     "zaštita /api/ai-tutor/* je ISKLJUČENA (svi zahtjevi prolaze).")
+    if not EMBED_ALLOWED_ORIGINS:
+        log.warning("ENV SANITY: EMBED_ALLOWED_ORIGINS nije postavljen — botu se "
+                    "može pristupiti DIREKTNO preko URL-a, ne samo kroz Thinkific. "
+                    "Postavi npr. EMBED_ALLOWED_ORIGINS=https://*.thinkific.com")
+    elif not AI_TUTOR_EMBED_SECRET:
+        log.error("ENV SANITY: EMBED_ALLOWED_ORIGINS je postavljen, ali "
+                  "AI_TUTOR_EMBED_SECRET NIJE — kapija tada štiti samo stranicu, a "
+                  "tutor API ostaje otvoren. Postavi OBA.")
     if not DIAG_TOKEN:
         log.info("ENV SANITY: DIAG_TOKEN nije postavljen — dijagnostički endpointi "
                  "su nedostupni (to je OK ako ih ne koristiš).")

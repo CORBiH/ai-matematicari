@@ -20,16 +20,14 @@ dijele IP — pratiti 429 u logovima prve sedmice i po potrebi dići
 `RATE_LIMIT_STORAGE_URI` ka zajedničkom storageu (memorija je per-instanca —
 limit je tada efektivno N× veći, što je prihvatljivo za zaštitu od grubog abusea).
 
-## 4. Slimovanje dependencija (build promjena — nadzirani deploy)
-`numpy, sympy, matplotlib, scikit-learn, argon2-cffi, PyJWT, psycopg2-binary`
-se ne importuju nigdje u kodu (provjereno grep-om; jedini korisnik psycopg2/JWT/argon2
-je bio davno uklonjen auth kod — cloudbuild još uvijek mounta AUTH_* secrete koje
-niko ne čita). Ukloniti iz `requirements.txt`, iz Dockerfile-a `build-essential` i
-`libpq-dev`, iz cloudbuilda nekorištene secrete (`AUTH_JWT_SECRET`, `AUTH_PEPPER`,
-`ACCESS_CODE_HASH`, `DATABASE_URL`, `EXTERNAL_DATABASE_URL`, `PLAIN_ACCESS_CODE`,
-`adminEmail`, `adminPass`, `OPENAI_MODEL_IMAGE`). Očekivani dobitak: image manji
-za nekoliko stotina MB, brži build i cold start. Rizik: ako neki vanjski skript
-u istom imageu importuje ove pakete — zato samo uz nadzirani deploy i health check.
+## 4. ~~Slimovanje dependencija~~ — ✅ URAĐENO (Phase 2 audit)
+`numpy, sympy, matplotlib, scikit-learn, argon2-cffi, PyJWT, psycopg2-binary` su
+uklonjeni iz `requirements.txt`, a `build-essential`/`libpq-dev` iz Dockerfile-a.
+Provjereno 2026-07-14: nema ih ni u `app.py`, ni u `matbot/`, ni u `scripts/`.
+
+**Preostalo (veće, čeka odluku):** legacy `/submit` stack je MRTAV — UI je `hidden`
+u templateu, a `matbot/` (tutor) ne importuje NIŠTA iz root modula. Uklanjanjem bi
+otpalo i `google-cloud-storage/firestore/tasks`, `gspread`, `google-auth`.
 
 ## 5. SameSite kolačići u iframe-u
 Sesijski kolačić sa `SameSite=Lax` ne radi u Thinkific iframe-u. Pošto kontekst
