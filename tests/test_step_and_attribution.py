@@ -329,6 +329,28 @@ def test_guard_leaves_unlabeled_reflection_untouched():
     assert neutralize_non_answer_grade(text) == text
 
 
+def test_flag_set_for_where_did_i_go_wrong_questions():
+    # sim500 nalaz: "gdje sam pogriješio?" poslije Netačno je META pitanje —
+    # bot je ponovo otvarao sa "Netačno." (6/15 wrong-sesija)
+    for msg in (
+        "gdje sam pogriješio?",
+        "šta sam pogriješio",
+        "u čemu sam pogriješila?",
+        "gdje mi je greška?",
+        "zašto je netačno?",
+    ):
+        p = _reflection_payload(msg)
+        _flag_non_answer_reflection(p)
+        assert p.get("_non_answer_reflection") is True, msg
+
+
+def test_flag_not_set_for_wrong_answer_mentioning_greska():
+    # odgovor s brojem koji spominje grešku i dalje JE pokušaj
+    p = _reflection_payload("x=5, valjda nije greška")
+    _flag_non_answer_reflection(p)
+    assert not p.get("_non_answer_reflection")
+
+
 # --- aritmetički međukorak preko prefiks-vrijednosti izraza --------------------------
 
 def test_arithmetic_prefix_midstep_is_correct_step():

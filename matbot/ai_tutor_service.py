@@ -831,6 +831,13 @@ _NON_ANSWER_REFLECTION_RE = re.compile(
     r"|\bpobrka(?:o|la)\s+sam\b|\bzbuni(?:o|la)\s+sam\s+se\b|\bzbunjen\w*\b"
     r"|\bpomij?esa(?:o|la)\s+sam\b"
     r"|\bzato\s+(?:sto|jer)\b|\bjer\s+nisam\b|\bnisam\s+ni\b"
+    # sim500 (2026-07-14, 6/15 wrong-sesija): PITANJE o vlastitoj grešci poslije
+    # "Netačno" ("gdje sam pogriješio?") je meta, ne novi odgovor — bot je znao
+    # ponovo otvoriti sa "Netačno." iako učenik ništa nije predao.
+    r"|\b(?:gdje|sta|u\s+cemu|kako|koliko)\s+sam\s+(?:ja\s+)?"
+    r"(?:pogr(?:e|ije|je)si\w*|krivo\b|falio|falila|zeznu\w*)"
+    r"|\b(?:gdje|koja|sta|u\s+cemu)\s+(?:mi\s+)?je\s+(?:bila\s+)?gres[kc]\w*"
+    r"|\bzasto\s+(?:je\s+)?netacno\b|\bzasto\s+nije\s+tacno\b"
 )
 # Tutorovo prethodno PITANJE koje traži refleksiju (ne novi zadatak): "Gdje
 # misliš da je zapelo?", "Šta misliš?", "Gdje si zapeo?". Kad prethodna botova
