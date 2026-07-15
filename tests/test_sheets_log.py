@@ -159,6 +159,25 @@ def test_log_transcript_without_env_is_noop(monkeypatch):
     assert sl.log_transcript_to_sheet(payload, response) is False
 
 
+def test_log_transcript_uses_credentials_file_in_local_mode(monkeypatch):
+    worksheet = FakeWorksheet()
+    client = FakeClient(worksheet)
+    fake_gspread = FakeGspread(client)
+    monkeypatch.setattr(sl, "gspread", fake_gspread)
+    monkeypatch.setattr(sl, "SACreds", FakeCredentials)
+    monkeypatch.setenv("LOCAL_MODE", "1")
+    monkeypatch.setenv("GSHEET_NAME", "matematika-bot")
+    monkeypatch.setenv("SHEETS_ASYNC_LOG", "0")
+    sl._credentials_file().write_text("{}", encoding="utf-8")
+
+    payload, response = _payload_response()
+    assert sl.log_transcript_to_sheet(payload, response) is True
+
+    assert FakeCredentials.filename == "credentials.json"
+    assert client.opened_by_name == ["matematika-bot"]
+    assert len(worksheet.appended) == 1
+
+
 def test_log_transcript_append_failure_returns_false(monkeypatch):
     worksheet = FakeWorksheet(fail=True)
     fake_gspread = FakeGspread(FakeClient(worksheet))

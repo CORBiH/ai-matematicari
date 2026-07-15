@@ -56,9 +56,6 @@ def _credentials_file() -> Path:
 def _has_explicit_credentials() -> bool:
     if (os.getenv("GOOGLE_SHEETS_CREDENTIALS_B64") or "").strip():
         return True
-    # In LOCAL_MODE, avoid accidental test/dev network calls from a stray file.
-    if _env_flag("LOCAL_MODE"):
-        return False
     return _credentials_file().exists()
 
 
@@ -92,12 +89,12 @@ def _init_sheets():
             if b64:
                 info = json.loads(base64.b64decode(b64).decode("utf-8"))
                 creds = SACreds.from_service_account_info(info, scopes=SHEETS_SCOPES)
-            elif _env_flag("LOCAL_MODE"):
-                return None
             elif _credentials_file().exists():
                 creds = SACreds.from_service_account_file(
                     str(_credentials_file()), scopes=SHEETS_SCOPES
                 )
+            elif _env_flag("LOCAL_MODE"):
+                return None
             else:
                 return None
 
