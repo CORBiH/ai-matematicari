@@ -577,6 +577,7 @@ def test_route_correct_answer_check_in_response(client, fake_openai):
     body = resp.get_json()
     assert body["status"] == "ready"
     assert body["answer_check"]["items"][0]["verdict"] == "correct"
+    assert body["answer_verdict"] == "correct"
     up = fake_openai.calls.messages[-1][-1]["content"]
     assert "PROVJERA IZ SISTEMA" in up
     assert "Stavka 1: TAČNO" in up

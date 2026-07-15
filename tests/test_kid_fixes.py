@@ -210,6 +210,26 @@ def test_jos_jedan_isti_takav_is_new_task_request():
     assert svc.detect_new_task_request("mozes mi ponoviti isti zadatak") is None
 
 
+def test_difficulty_request_payload_sets_hard_hint():
+    p = _answer_payload("Daj mi teži zadatak.")
+    p["difficulty_request"] = "harder"
+    svc._apply_new_task_intent(p)
+    assert p.get("intent") == "new_task_request"
+    assert p.get("_difficulty_hint") == "harder"
+    assert p.get("_skip_answer_check") is True
+
+
+def test_explicit_hint_request_routes_to_practice_help():
+    p = _answer_payload("Ne znam.")
+    p["intent"] = "hint_request"
+    svc._apply_hint_request_contract(p)
+    assert p.get("_skip_answer_check") is True
+    assert p.get("_practice_help_intent") == "hint"
+    assert p.get("_explicit_hint_request") is True
+    assert p.get("interaction_phase") == "practice_help"
+    assert "Ne otkrivaj konačan rezultat" in p["student_message"]
+
+
 # ===================== N2 — 'nemoj rješenje' =====================
 
 def test_no_solution_request_flag_and_directive():
@@ -304,6 +324,22 @@ def test_hint_turn_sets_just_hinted(master, tmap):
          "interaction_phase": "answering_practice_task",
          "last_tutor_task": "Izračunaj 1/2 + 1/3", "student_message": "ne znam"},
         _chat("Svedi na nazivnik 6: koliko je 1/2 = ?/6?"), master, tmap, model="m", timeout=1)
+    assert out["next_state"]["just_hinted"] is True
+
+
+def test_explicit_hint_request_never_grades_or_consumes_task(master, tmap):
+    task = "Izračunaj 1/2 + 1/3"
+    out = svc.handle_chat(
+        {"grade": 6, "mode": "practice", "selected_topic": "6-04-040",
+         "interaction_phase": "practice_help", "intent": "hint_request",
+         "last_tutor_task": task, "student_message": "Ne znam."},
+        _chat("Netačno. Svedi na nazivnik 6: koliko je 1/2 = ?/6?"),
+        master, tmap, model="m", timeout=1,
+    )
+    assert "answer_check" not in out
+    assert "Netačno" not in out["answer"]
+    assert out["last_tutor_task"] == task
+    assert out["next_state"]["expected_user_action"] == "answer_task"
     assert out["next_state"]["just_hinted"] is True
 
 

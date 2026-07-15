@@ -452,6 +452,60 @@ def _apply_practice_help_contract(payload: dict) -> None:
         )
 
 
+def _apply_hint_request_contract(payload: dict) -> None:
+    """Explicit frontend hint intent: skip grading and preserve active task."""
+    if normalize_value(payload.get("intent")).lower() != "hint_request":
+        return
+    task = normalize_value(payload.get("last_tutor_task"))
+    if not task:
+        return
+    message = normalize_value(payload.get("student_message") or payload.get("message"))
+    item, help_task = _select_practice_help_task(task, message)
+    payload["_skip_answer_check"] = True
+    payload["_practice_help_intent"] = "hint"
+    payload["_practice_help_task"] = help_task[:600]
+    payload["_explicit_hint_request"] = True
+    payload["_stuck_help"] = True
+    payload["_gave_hint_step"] = True
+    if item:
+        payload["_practice_help_item"] = item
+    payload["mode"] = "explain"
+    payload["interaction_phase"] = "practice_help"
+    payload["_original_student_message"] = message
+    payload["student_message"] = (
+        "Daj mi jedan kratki hint za ovaj zadatak. "
+        "Ne otkrivaj konačan rezultat.\n\n"
+        f"ZADATAK:\n{help_task[:600]}"
+    )
+
+
+_VIDEO_REQUEST_RE = re.compile(
+    r"\b(preporuci|predlozi|posalji|daj|imas)\b.{0,60}\b(video|klip|snimak|lekcij\w*)\b|"
+    r"\b(video|klip|snimak)\b.{0,60}\b(preporuci|predlozi|posalji|daj)\b"
+)
+
+
+def _apply_video_recommendation_contract(payload: dict) -> None:
+    """Explicit video request: answer with named lesson/link without grading."""
+    intent = normalize_value(payload.get("intent")).lower()
+    message = payload.get("student_message") or payload.get("message")
+    if intent != "recommend_video" and not _VIDEO_REQUEST_RE.search(fold_diacritics(message)):
+        return
+    mode_l = normalize_value(payload.get("mode")).lower()
+    if mode_l not in ("explain", "practice", "vjezba", "exam", "kontrolni"):
+        return
+    payload["_skip_answer_check"] = True
+    payload["intent"] = "recommend_video"
+    payload["_explicit_video_request"] = True
+    payload["interaction_phase"] = ""
+    payload["student_message"] = (
+        "Učenik eksplicitno traži preporuku video lekcije za ovu temu. "
+        "Ako postoji povezana video lekcija u kontekstu, imenuj je tačno i daj "
+        "URL samo ako je priložen. Ne napuštaj započeti zadatak i ne ocjenjuj "
+        "ovu poruku kao odgovor."
+    )
+
+
 # --- N5 (2026-07-12): meta pitanja o botu — deterministički topli odgovor -----------
 # Djeca sigurno pitaju "jesi li robot", "ko te napravio", "špijuniraš li me".
 # Ranije: hladni refusal / lista tema. Sada: kratak prijateljski odgovor bez
@@ -628,7 +682,8 @@ def _apply_new_task_intent(payload: dict) -> None:
     phase = normalize_value(payload.get("interaction_phase")).lower()
     if mode_l not in ("practice", "vjezba", "exam", "kontrolni") and phase != "answering_practice_task":
         return
-    diff = detect_new_task_request(
+    explicit_diff = normalize_value(payload.get("difficulty_request")).lower()
+    diff = explicit_diff if explicit_diff in ("harder", "easier") else detect_new_task_request(
         payload.get("student_message") or payload.get("message")
     )
     if diff is None:
@@ -2440,6 +2495,8 @@ def _prepare_chat(
     # "zadatak", "novi zadatak", "daj mi teži/lakši" → NOVI zadatak, ne ocjena
     # ni objašnjenje starog (BUG 6/8). Poslije potvrda, prije challenge/help.
     _apply_new_task_intent(payload)
+    _apply_hint_request_contract(payload)
+    _apply_video_recommendation_contract(payload)
     # Osporavanje ranije ocjene ("pa to sam i odgovorio") → ponovna provjera
     # prethodnog odgovora (ne novi zadatak). Poslije confirmation contract-a da
     # potvrde ("da"/"ne") imaju prednost.
@@ -2893,7 +2950,7 @@ def _next_state_for_response(
             }
         # sve stavke riješene → image tok završen, dalje normalna logika
 
-    if task_text and mode in ("practice", "exam"):
+    if task_text and (mode in ("practice", "exam") or payload.get("_explicit_hint_request")):
         return {
             "expected_user_action": "answer_task",
             "pending_action": _empty_pending_action(),
@@ -2975,6 +3032,17 @@ def _is_grading_turn(payload: dict) -> bool:
     return normalize_value(payload.get("interaction_phase")).lower() == "answering_practice_task"
 
 
+def _answer_verdict_for_response(payload: dict) -> str | None:
+    verdict = authoritative_verdict(payload.get("answer_check"))
+    if verdict == "correct":
+        return "correct"
+    if verdict == "incorrect":
+        return "incorrect"
+    if verdict in ("partial", "step", "mixed"):
+        return "partial"
+    return None
+
+
 def _finalize_response(prep: dict, answer: str) -> dict:
     """Sastavi response dict + activity log (zajedničko za oba puta)."""
     payload = prep["payload"]
@@ -3005,6 +3073,12 @@ def _finalize_response(prep: dict, answer: str) -> dict:
     # skini svaku ocjensku labelu koju je model svejedno dodao. Radi i kad
     # _is_grading_turn ostane True (nema presude), pa mora poslije guarda.
     if payload.get("_non_answer_reflection"):
+        answer = neutralize_non_answer_grade(answer)
+
+    if payload.get("_explicit_hint_request") or (
+        normalize_value(payload.get("_practice_help_intent")).lower() == "hint"
+        and normalize_value(payload.get("interaction_phase")).lower() == "practice_help"
+    ):
         answer = neutralize_non_answer_grade(answer)
 
     # N9: odgovor na mikro-zadatak iz Objašnjenja — presuda iz koda je obavezujuća
@@ -3069,9 +3143,12 @@ def _finalize_response(prep: dict, answer: str) -> dict:
         "recommend_video": (
             False if result_mode else bool(prompt_result.get("video_recommended"))
         ),
+        "video_title": "" if result_mode else normalize_value(prompt_result.get("video_title")),
+        "video_url": "" if result_mode else normalize_value(prompt_result.get("video_url")),
         "parent_report_signal": parent_report_signal,
         "status": status,
         "mode": mode,
+        "answer_verdict": _answer_verdict_for_response(payload),
         # BUG 10: mod SESIJE (UI izbor) — contracts smiju interno preusmjeriti
         # prompt-mod, ali UI labela/chipovi prate session mod.
         "session_mode": payload.get("_session_mode") or mode,
@@ -3119,6 +3196,9 @@ def _finalize_response(prep: dict, answer: str) -> dict:
         # aktivni zadatak (persist; prazno kad su sve riješene). Model ne smije
         # izmišljati zadatke usred image toka, pa se proza ne ekstrahuje.
         task_text = normalize_value(payload.get("_image_next_task_text"))[:600]
+    elif payload.get("_explicit_hint_request") and normalize_value(payload.get("last_tutor_task")):
+        # Hint ne troši i ne mijenja aktivni zadatak.
+        task_text = normalize_value(payload.get("last_tutor_task"))[:600]
     elif (
         payload.get("_direct_answer") is not None
         or payload.get("_image_test")

@@ -558,6 +558,33 @@ def test_chat_ok_when_sheets_logging_fails(client, fake_openai, monkeypatch):
     assert resp.get_json()["status"] == "ready"
 
 
+def test_feedback_endpoint_logs_vote(client, _tmp_activity_db):
+    from matbot import activity_log as al
+    resp = client.post("/api/ai-tutor/feedback", json={
+        "session_id": "sess-fb-1",
+        "message_index": 2,
+        "verdict": "up",
+        "mode": "practice",
+        "topic": TOPIC6,
+    })
+    assert resp.status_code == 200
+    assert resp.get_json()["ok"] is True
+    rows = al.get_recent_feedback(session_id="sess-fb-1", path=_tmp_activity_db)
+    assert len(rows) == 1
+    assert rows[0]["message_index"] == 2
+    assert rows[0]["verdict"] == "up"
+    assert rows[0]["mode"] == "practice"
+
+
+def test_feedback_endpoint_validates_payload(client):
+    resp = client.post("/api/ai-tutor/feedback", json={
+        "session_id": "sess-fb-bad",
+        "message_index": 0,
+        "verdict": "maybe",
+    })
+    assert resp.status_code == 400
+
+
 # --- response shape -------------------------------------------------------------
 
 def test_response_has_all_fields(client, fake_openai):
@@ -565,7 +592,8 @@ def test_response_has_all_fields(client, fake_openai):
     for key in (
         "answer", "final_topic", "opened_lesson_topic", "effective_topic",
         "entry_source_used", "topic_conflict", "recommended_mode", "recommend_video",
-        "parent_report_signal", "status", "mode",
+        "video_title", "video_url", "parent_report_signal", "status", "mode",
+        "answer_verdict",
     ):
         assert key in body
     assert body["recommended_mode"] == "explain"

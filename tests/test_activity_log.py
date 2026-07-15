@@ -123,6 +123,29 @@ def test_get_recent_filters_by_session(tmp_path):
     assert len(al.get_recent_activity(path=db, limit=1)) == 1
 
 
+def test_log_tutor_feedback(tmp_path):
+    db = tmp_path / "feedback.sqlite3"
+    ok = al.log_tutor_feedback(
+        {"session_id": "s-fb", "message_index": 1, "verdict": "down",
+         "mode": "practice", "topic": "6-01-001"},
+        path=db,
+    )
+    assert ok is True
+    rows = al.get_recent_feedback(session_id="s-fb", path=db)
+    assert len(rows) == 1
+    assert rows[0]["message_index"] == 1
+    assert rows[0]["verdict"] == "down"
+    assert rows[0]["topic"] == "6-01-001"
+
+
+def test_log_tutor_feedback_rejects_invalid(tmp_path):
+    db = tmp_path / "feedback_bad.sqlite3"
+    assert al.log_tutor_feedback(
+        {"session_id": "s-fb", "message_index": 1, "verdict": "maybe"},
+        path=db,
+    ) is False
+
+
 def test_log_failure_returns_false_never_raises(tmp_path):
     # roditeljska "putanja" je fajl → mkdir puca → False, bez izuzetka
     blocker = tmp_path / "blocker"

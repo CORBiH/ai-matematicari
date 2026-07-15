@@ -177,15 +177,18 @@ def test_chat_screen_contains_everything(client):
         assert needle in block, f"nedostaje {needle} unutar chat kartice"
 
 
-def test_topbar_has_single_visible_nazad_action(client):
-    """Chat topbar ima jednu jasnu akciju: Nazad."""
+def test_topbar_has_nazad_and_clear_actions(client):
+    """Chat topbar ima Nazad i vidljivo Obriši dugme."""
     html = _html(client)
     block = _tutor_block(html)
     assert 'id="topbarGrade"' in block
     assert 'id="topbarMode"' in block
     assert 'id="topbarTopic"' in block
+    assert 'id="topbarStreak"' in block
+    assert 'id="tutorClearBtn"' in block
     assert 'id="tutorBackBtn"' in block
     assert 'class="btn sm tutor-back-btn"' in block
+    assert "Obriši" in block
     assert block.count(">Nazad<") == 1
     assert 'id="tutorChangeBtn"' not in block
     assert 'id="tutorNewBtn"' not in block
@@ -207,6 +210,7 @@ def test_internal_fresh_conversation_reset_still_available(client):
     assert "localStorage.removeItem(LASTTASK_KEY)" in rsnippet
     assert "interactionPhase = null" in rsnippet
     assert "lastTutorMessage = ''" in rsnippet
+    assert "resetSessionStats()" in rsnippet
     assert "clearNextState()" in rsnippet
     assert "querySelectorAll('.tmsg, .tutor-video-hint')" in rsnippet  # briše transcript + hintove
     assert "hideChips()" in rsnippet                        # i quick-reply chips
@@ -250,7 +254,7 @@ def test_nazad_resets_practice_state_keeps_history(client):
     """Nazad: vraća na izbor, čisti fazu/zadnji zadatak/sliku/placeholder,
     ali NE briše historiju razgovora (TKEY ostaje)."""
     html = _html(client)
-    idx = html.index("chatBackBtn.addEventListener")
+    idx = html.index("function exitTutorToHome()")
     snippet = html[idx:idx + 500]
     assert "showHome()" in snippet
     assert "interactionPhase = null" in snippet
@@ -272,10 +276,13 @@ def test_mode_cards_not_inside_chat_card(client):
     assert "Tema ako znaš (opcionalno):" not in html
 
 
-def test_navbar_hidden_for_focused_layout(client):
+def test_dead_header_menu_markup_is_gone(client):
     html = _html(client)
-    assert 'id="main-header" aria-hidden="true"' in html
-    assert "display:none;align-items:center;justify-content:center;" in html
+    for dead in (
+        'id="main-header"', 'id="menuWrap"', "dropdown-toggle", "dropdown-content",
+        "toggleDropdown", "closeDropdown", "darkToggle", "menuClear",
+    ):
+        assert dead not in html, dead
     assert '<body class="dark tutor-fullscreen">' in html
     # bez velikog naslova/podnaslova u chat kartici
     block = _tutor_block(html)
@@ -381,11 +388,11 @@ def test_fallback_banner_present(client):
 
 def test_clear_chat_clears_tutor_keys(client):
     html = _html(client)
-    assert "k.startsWith('matbot_tutor_history_')" in html
-    assert "k.startsWith('matbot_tutor_lasttask_')" in html
-    assert "k.startsWith('matbot_tutor_lasttopic_')" in html
-    assert "k.startsWith('matbot_tutor_lastimagectx_')" in html
-    assert "k.startsWith('matbot_tutor_nextstate_')" in html
+    assert 'id="confirm-clear"' in html
+    assert "Obriši razgovor?" in html
+    assert "window.startFreshTutorConversation()" in html
+    assert "window.startFreshTutorConversation = startFreshTutorConversation" in html
+    assert "resetTutorConversation()" in html
 
 
 # --- slika zadatka u composer-u ------------------------------------------------------
@@ -515,7 +522,8 @@ def test_followup_payload_fields(client):
     html = _html(client)
     assert "'continuing_explanation'" in html
     assert "payload.last_tutor_message = lastTutorMessage.slice(0, 600)" in html
-    assert "if (j && j.next_state) setNextState(j.next_state)" in html
+    assert "if (j && j.next_state)" in html
+    assert "setNextState(j.next_state)" in html
     # zadnja poruka tutora se pamti nakon ready odgovora
     assert "lastTutorMessage = (answer || '').slice(0, 600)" in html
 
@@ -660,6 +668,52 @@ def test_quick_reply_chips_present(client):
         assert label in html, label
     # chip ide kroz NORMALNI typed tok (poštuje practice/followup logiku)
     assert "msgBox.value = c.msg;" in html
+    assert "pendingChipMeta" in html
+    assert "intent: 'hint_request'" in html
+    assert "difficulty_request: 'easier'" in html
+    assert "difficulty_request: 'harder'" in html
+    assert "Preporuči mi klip" in html
+    assert "Objasni drugačije" in html
+
+
+def test_streak_pill_and_session_summary_present(client):
+    html = _html(client)
+    assert 'id="topbarStreak"' in html
+    assert "function updateStreakPill" in html
+    assert "correct_streak" in html
+    assert "5 tačnih zaredom" in html
+    assert 'id="session-summary"' in html
+    assert "function maybeShowSessionSummary" in html
+    assert "answer_verdict" in html
+    assert "matbot_tutor_sessionstats_" in html
+
+
+def test_feedback_buttons_post_once(client):
+    html = _html(client)
+    assert "function attachBotFeedback" in html
+    assert "/api/ai-tutor/feedback" in html
+    assert "message_index: feedbackIndex" in html
+    assert "wrap.dataset.locked === '1'" in html
+    assert "Hvala!" in html
+
+
+def test_camera_capture_and_manifest_present(client):
+    html = _html(client)
+    assert 'rel="manifest" href="/static/manifest.json"' in html
+    assert 'name="theme-color"' in html
+    block = _tutor_block(html)
+    assert 'id="tutorCameraImage"' in block
+    assert 'capture="environment"' in block
+    assert 'id="tutorCameraBtn"' in block
+
+
+def test_manifest_static_file(client):
+    data = client.get("/static/manifest.json")
+    assert data.status_code == 200
+    manifest = data.get_json()
+    assert manifest["name"] == "MAT-BOT"
+    assert manifest["display"] == "standalone"
+    assert manifest["icons"]
 
 
 def test_video_hint_present_and_guarded(client):
@@ -667,6 +721,9 @@ def test_video_hint_present_and_guarded(client):
     assert "function maybeVideoHint(j)" in html
     assert "recommend_video" in html
     assert "Možda ti pomogne da prvo pogledaš video lekciju" in html
+    assert "j.video_url" in html
+    assert "target = '_blank'" in html
+    assert "rel = 'noopener noreferrer'" in html
     assert "videoHintShown.has(tid)" in html                # samo JEDNOM po temi
     assert "tid === 'unknown'" in html                      # bez izmišljenih preporuka
 
@@ -711,11 +768,11 @@ def test_recent_tasks_tracked_and_sent(client):
     idx = html.index("function applyTutorResponse")
     snippet = html[idx:idx + 2200]
     assert "pushRecentTask(taskText)" in snippet
-    # cisti se i pri resetu konverzacije i u "Ocisti chat"
+    # cisti se pri centralnom resetu koji koristi i "Obrisi razgovor"
     ridx = html.index("function resetTutorConversation()")
     assert "RECENTTASKS_KEY" in html[ridx:ridx + 900]
     didx = html.index("getElementById('doClear').addEventListener")
-    assert "matbot_tutor_recent_" in html[didx:didx + 900]
+    assert "startFreshTutorConversation" in html[didx:didx + 300]
 
 
 # --- image_test tok: perzistencija konteksta + state-driven rutiranje -------------

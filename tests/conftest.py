@@ -22,6 +22,11 @@ os.environ["MAX_CONTENT_LENGTH_MB"] = "1"               # za 413 test
 os.environ["USE_MATHPIX"] = "0"
 os.environ["MATHPIX_APP_ID"] = ""
 os.environ["MATHPIX_APP_KEY"] = ""
+os.environ["GSHEET_ID"] = ""
+os.environ["GSHEET_NAME"] = ""
+os.environ["GOOGLE_SHEETS_CREDENTIALS_B64"] = ""
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = ""
+os.environ["SHEETS_ASYNC_LOG"] = "0"
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 

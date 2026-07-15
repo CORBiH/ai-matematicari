@@ -97,7 +97,28 @@ def test_explain_offers_video_when_available(master):
 def test_practice_does_not_offer_video_unless_stuck(master):
     res = pb.build_tutor_prompt({"selected_topic": TOPIC, "mode": "practice"}, _found(), master)
     assert res["video_recommended"] is False
+    assert res["video_title"]
     assert "VIDEO LEKCIJA" not in res["user_prompt"]
+
+
+def test_practice_explicit_video_request_offers_named_video(master):
+    res = pb.build_tutor_prompt(
+        {"selected_topic": TOPIC, "mode": "practice", "_explicit_video_request": True},
+        _found(), master,
+    )
+    assert res["video_recommended"] is True
+    assert res["video_title"]
+    assert "EKSPLICITAN ZAHTJEV ZA VIDEO" in res["user_prompt"]
+    assert master["videos_by_topic"][TOPIC][0]["lesson_title"] in res["user_prompt"]
+
+
+def test_exam_explicit_video_request_offers_named_video(master):
+    res = pb.build_tutor_prompt(
+        {"selected_topic": TOPIC, "mode": "exam", "_explicit_video_request": True},
+        _found(), master,
+    )
+    assert res["video_recommended"] is True
+    assert "EKSPLICITAN ZAHTJEV ZA VIDEO" in res["user_prompt"]
 
 
 def test_practice_offers_video_when_stuck(master):
@@ -118,6 +139,19 @@ def test_no_video_flag_for_topic_without_video(master):
     res = pb.build_tutor_prompt({"selected_topic": no_vid, "mode": "explain"}, _found(no_vid), master)
     assert res["video_recommended"] is False
     assert "VIDEO LEKCIJA" not in res["user_prompt"]
+
+
+def test_payload_difficulty_request_instruction(master):
+    hard = pb.build_tutor_prompt(
+        {"selected_topic": TOPIC, "mode": "practice", "_difficulty_hint": "harder"},
+        _found(), master,
+    )["user_prompt"]
+    easy = pb.build_tutor_prompt(
+        {"selected_topic": TOPIC, "mode": "practice", "_difficulty_hint": "easier"},
+        _found(), master,
+    )["user_prompt"]
+    assert "malo TEŽI" in hard
+    assert "malo LAKŠI" in easy
 
 
 def test_video_follows_detected_question_topic_not_selected(master):

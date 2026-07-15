@@ -46,6 +46,18 @@ CREATE TABLE IF NOT EXISTS student_activity_log (
 )
 """
 
+_FEEDBACK_SCHEMA = """
+CREATE TABLE IF NOT EXISTS tutor_feedback_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT NOT NULL,
+    timestamp TEXT NOT NULL,
+    message_index INTEGER NOT NULL,
+    verdict TEXT NOT NULL,
+    mode TEXT NULL,
+    topic TEXT NULL
+)
+"""
+
 _COLUMNS = (
     "student_id", "session_id", "timestamp", "event_type", "grade", "entry_source",
     "course_name", "section_name", "lesson_title", "final_topic", "mode",
@@ -67,6 +79,8 @@ _INDEXES = (
     "ON student_activity_log (session_id, timestamp)",
     "CREATE INDEX IF NOT EXISTS idx_activity_student_ts "
     "ON student_activity_log (student_id, timestamp)",
+    "CREATE INDEX IF NOT EXISTS idx_feedback_session_ts "
+    "ON tutor_feedback_log (session_id, timestamp)",
 )
 
 _MIGRATIONS = (
@@ -94,6 +108,7 @@ def init_db(path: str | Path | None = None) -> Path:
     try:
         with conn:
             conn.execute(_SCHEMA)
+            conn.execute(_FEEDBACK_SCHEMA)
             existing = {
                 r[1] for r in conn.execute("PRAGMA table_info(student_activity_log)")
             }
@@ -181,6 +196,68 @@ def log_student_activity(
     except Exception:
         log.exception("activity log: upis nije uspio — tutor odgovor se ne prekida")
         return False
+
+
+def log_tutor_feedback(
+    payload: dict, path: str | Path | None = None
+) -> bool:
+    """Upiši thumbs-up/down metapodatke za bot poruku. Bez teksta poruke."""
+    try:
+        payload = payload or {}
+        row = {
+            "session_id": _clean(payload.get("session_id")) or "",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "message_index": int(payload.get("message_index")),
+            "verdict": _clean(payload.get("verdict")) or "",
+            "mode": _clean(payload.get("mode")),
+            "topic": _clean(payload.get("topic")),
+        }
+        if not row["session_id"] or row["verdict"] not in ("up", "down"):
+            return False
+        p = init_db(path)
+        conn = _connect(p)
+        try:
+            with conn:
+                conn.execute(
+                    "INSERT INTO tutor_feedback_log "
+                    "(session_id, timestamp, message_index, verdict, mode, topic) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    (
+                        row["session_id"], row["timestamp"], row["message_index"],
+                        row["verdict"], row["mode"], row["topic"],
+                    ),
+                )
+        finally:
+            conn.close()
+        return True
+    except Exception:
+        log.exception("feedback log: upis nije uspio")
+        return False
+
+
+def get_recent_feedback(
+    session_id: str | None = None,
+    limit: int = 50,
+    path: str | Path | None = None,
+) -> list[dict]:
+    """Zadnji feedback zapisi, najnoviji prvi. Greška → prazna lista."""
+    try:
+        p = init_db(path)
+        query = "SELECT * FROM tutor_feedback_log"
+        params: list[Any] = []
+        if session_id:
+            query += " WHERE session_id = ?"
+            params.append(str(session_id))
+        query += " ORDER BY id DESC LIMIT ?"
+        params.append(int(limit))
+        conn = _connect(p)
+        try:
+            return [dict(r) for r in conn.execute(query, params).fetchall()]
+        finally:
+            conn.close()
+    except Exception:
+        log.exception("feedback log: čitanje nije uspjelo")
+        return []
 
 
 def get_recent_activity(

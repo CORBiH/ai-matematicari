@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="MAT-BOT">
+  <rect width="512" height="512" rx="96" fill="#0b1113"/>
+  <circle cx="256" cy="256" r="178" fill="#14221e" stroke="#56c88f" stroke-width="18"/>
+  <path d="M150 326 218 170h34l68 156h-38l-14-34h-69l-14 34h-35zm62-66h43l-21-52-22 52z" fill="#eef6f3"/>
+  <path d="M337 184h42v142h-42z" fill="#18b7a0"/>
+  <path d="M322 184h72v34h-72z" fill="#18b7a0"/>
+  <path d="M322 292h72v34h-72z" fill="#18b7a0"/>
+</svg>

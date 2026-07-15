@@ -3,6 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0b1113" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="MAT-BOT" />
+  <link rel="manifest" href="/static/manifest.json" />
   <title>MAT-BOT</title>
   <!-- Phase 2: potpisani kratkotrajni token za /api/ai-tutor/* (server ga ugrađuje;
        prazan kada AI_TUTOR_EMBED_SECRET nije postavljen ili u LOCAL_MODE) -->
@@ -57,33 +62,6 @@
   *{box-sizing:border-box}
   html,body{height:100%}
   body{font-family:"Segoe UI", Tahoma, Geneva, Verdana, sans-serif;background:var(--page-bg);color:var(--text);margin:0;padding:0;overflow:hidden;}
-
-  /* header + logo (VEĆI NAVBAR) */
-  header{
-    position:fixed;top:0;left:0;right:0;z-index:1000;
-    background:#2f5c4e;color:#fff;
-    padding:1rem 1.25rem;
-    display:none;align-items:center;justify-content:center;
-    box-shadow:0 4px 14px rgba(0,0,0,.15);
-  }
-  .logo-left{position:absolute;left:1rem;display:flex;align-items:center;gap:.5rem}
-  .logo-left img{height:80px;width:auto;display:block}
-  .title-container{font-size:2.05rem;font-weight:800;letter-spacing:.6px;}
-  .dropdown{position:absolute;right:1rem;top:.6rem;}
-  .dropdown-toggle{background:var(--btn-bg);color:#fff;border:none;padding:.65rem 1rem;font-size:1.05rem;border-radius:12px;cursor:pointer;}
-  .dropdown-toggle:hover{background:var(--btn-bg-hover);}
-  .dropdown-content{display:none;position:absolute;top:115%;right:0;min-width:280px;background:var(--card-bg);color:var(--text);border:2px solid var(--card-border);box-shadow:0 12px 30px rgba(0,0,0,.22);border-radius:12px;padding:1rem;backdrop-filter:blur(8px)}
-  .dropdown.open .dropdown-content{display:block;}
-  .menu-item{width:100%;text-align:left;background:transparent;border:2px solid var(--card-border);color:var(--text);padding:.7rem .85rem;border-radius:12px;cursor:pointer;margin-top:.75rem}
-  .menu-item:hover{background:rgba(127,255,212,.06)}
-  .menu-line{margin:.7rem 0;border-top:2px dashed var(--card-border);}
-
-  .toggle-row{display:flex;align-items:center;justify-content:space-between;gap:.9rem;border:2px solid var(--card-border);padding:.55rem .7rem;border-radius:12px;}
-  .toggle-slider{position:relative;width:68px;height:34px;background:#cfd8dc;border-radius:34px;cursor:pointer;transition:background .25s;}
-  .toggle-slider::before{content:"";position:absolute;top:4px;left:4px;width:26px;height:26px;background:#fff;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,.25);transition:transform .25s;}
-  #darkToggle{display:none;}
-  #darkToggle:checked + .toggle-slider{background:#4caf50;}
-  #darkToggle:checked + .toggle-slider::before{transform: translateX(34px);}
 
   main{width:min(100% - 16px,1120px);margin:0 auto;padding:8px 0;height:100dvh;}
   .card{background:var(--card-bg);border:1px solid var(--card-border);border-radius:14px;padding:1rem;box-shadow:0 12px 38px rgba(0,0,0,.32);backdrop-filter: blur(10px);}
@@ -204,10 +182,15 @@
   .tutor-pill{display:inline-flex;align-items:center;background:#12211c;border:1px solid rgba(86,200,143,.25);
     color:#d8efe7;border-radius:999px;padding:.22rem .6rem;font-size:.82rem;font-weight:600;white-space:nowrap;
     max-width:46vw;overflow:hidden;text-overflow:ellipsis;}
+  .tutor-streak-pill{background:#2a2110;border-color:rgba(240,178,95,.45);color:#ffe2ad;}
+  .tutor-streak-pill.pulse{animation:streakPulse .42s ease;}
+  @keyframes streakPulse{0%{transform:scale(1)}45%{transform:scale(1.08)}100%{transform:scale(1)}}
   .tutor-topbar-actions{display:flex;gap:.4rem;flex:0 0 auto;}
   .tutor-topbar-actions .btn.sm{padding:.42rem .75rem;font-size:.88rem;border-radius:10px;}
   .tutor-back-btn{display:inline-flex;align-items:center;justify-content:center;gap:.35rem;min-height:36px;min-width:86px;background:#d8efe7;color:#0d1815;border:1px solid rgba(216,239,231,.85);font-weight:800;box-shadow:0 6px 18px rgba(0,0,0,.22);}
   .tutor-back-btn:hover{background:#eef6f3;color:#09100e;border-color:#eef6f3;}
+  .tutor-clear-btn{display:inline-flex;align-items:center;justify-content:center;min-height:36px;background:#23191a;color:#ffdede;border:1px solid rgba(208,98,98,.45);font-weight:800;}
+  .tutor-clear-btn:hover{background:#332020;border-color:rgba(208,98,98,.7);}
   .tutor-fallback{background:#211a0f;border:1px dashed #b8842e;color:#f0d9a6;padding:.5rem .65rem;border-radius:10px;margin:.25rem 0;flex:0 0 auto;}
   body.dark .tutor-fallback{background:#241d0f;color:#f0d9a6;border-color:#8a6a2f;}
 
@@ -219,7 +202,7 @@
   .tutor-chat::-webkit-scrollbar-thumb,.composer textarea::-webkit-scrollbar-thumb{background:rgba(107,122,134,.38);border-radius:999px;}
   .tmsg{display:flex;width:100%;word-break:break-word;}
   .tmsg-user{justify-content:flex-end;}
-  .tmsg-bot{justify-content:flex-start;}
+  .tmsg-bot{justify-content:flex-start;align-items:flex-start;flex-direction:column;}
   .tbubble{padding:.68rem .82rem;border-radius:12px;max-width:94%;line-height:1.55;font-size:1rem;
     box-shadow:0 1px 4px rgba(0,0,0,.10);background:var(--bubble-bg);color:var(--bubble-text);animation:fadeIn .22s ease;}
   .tmsg-bot .tbubble{border-left:3px solid var(--accent-bot);}
@@ -248,6 +231,7 @@
     border-radius:50%;background:transparent;color:#c9ccd3;font-size:1.5rem;line-height:0;cursor:pointer;user-select:none;
     transition:background .15s ease,color .15s ease;}
   .composer-plus:hover{background:#23282b;color:#fff;}
+  .composer-camera{font-size:1.1rem;}
   .composer-plus-icon,.composer-send-icon{display:block;line-height:1;transform:translateY(-1px);}
   .composer-send{flex:0 0 auto;display:grid;place-items:center;width:36px;height:36px;padding:0;
     border:0;border-radius:50%;background:#eef6f3;color:#101416;font-size:1.25rem;font-weight:700;line-height:0;
@@ -270,6 +254,12 @@
   /* Phase 2: mala preporuka video lekcije unutar transcripta */
   .tutor-video-hint{align-self:flex-start;color:var(--muted);font-size:.85rem;
     padding:.15rem .35rem;max-width:94%;}
+  .tutor-video-hint a{color:#9ee6c4;text-decoration:underline;text-underline-offset:2px;}
+
+  .bot-feedback{display:flex;align-items:center;gap:.35rem;margin:.15rem 0 .35rem .45rem;color:var(--muted);font-size:.78rem;}
+  .feedback-btn{display:grid;place-items:center;width:30px;height:30px;border-radius:999px;border:1px solid rgba(255,255,255,.14);background:#111a1d;color:#d8efe7;cursor:pointer;}
+  .feedback-btn:hover,.feedback-btn:focus-visible{border-color:rgba(86,200,143,.6);background:#16281f;outline:none;}
+  .feedback-btn:disabled{opacity:.55;cursor:default;}
 
 
   /* empty-state pomoć prije prve poruke */
@@ -278,23 +268,11 @@
 
 
   body.tutor-fullscreen{padding:0;}
-  body.tutor-fullscreen header{min-height:48px;padding:.35rem .8rem;box-shadow:0 2px 10px rgba(0,0,0,.12);}
-  body.tutor-fullscreen .logo-left{left:.75rem;}
-  body.tutor-fullscreen .logo-left img{height:36px;}
-  body.tutor-fullscreen .title-container{font-size:1.05rem;letter-spacing:.2px;}
-  body.tutor-fullscreen .dropdown{top:.32rem;right:.6rem;}
-  body.tutor-fullscreen .dropdown-toggle{padding:.42rem .65rem;font-size:.9rem;border-radius:10px;}
   body.tutor-fullscreen main{height:100dvh;padding:8px 0;width:min(100% - 16px,1120px);}
   body.tutor-fullscreen .tutor-card{min-height:0;border-radius:14px;}
 
   @media (max-width: 720px){
     body{padding:0;}
-    header{padding:.75rem .8rem;}
-    .logo-left img{height:54px;}
-    .title-container{font-size:1.35rem;}
-    .dropdown{right:.55rem;top:.45rem;}
-    .dropdown-toggle{padding:.5rem .65rem;font-size:.9rem;}
-    .dropdown-content{right:0;min-width:min(92vw,300px);}
     main{width:min(100% - 8px,1120px);height:100dvh;padding:4px 0;}
     .card{border-radius:12px;}
     .tutor-card{min-height:0;padding:.5rem;}
@@ -314,37 +292,11 @@
     .composer-plus,.composer-send{width:34px;height:34px;}
     #tutorMeta{font-size:.78rem;}
     body.tutor-fullscreen{padding:0;}
-    body.tutor-fullscreen .logo-left img{height:30px;}
-    body.tutor-fullscreen .title-container{font-size:.92rem;}
     body.tutor-fullscreen main{width:min(100% - 8px,1120px);height:100dvh;padding:4px 0;}
   }
   </style>
 </head>
 <body class="dark tutor-fullscreen">
-  <header id="main-header" aria-hidden="true">
-    <div class="logo-left">
-      <img src="https://s3.amazonaws.com/thinkific-import/307785/cmQxwUYXTjWxCFQJjrA4_MATEMATICAR_3_01_Transparent_png" alt="Matematicari logo">
-    </div>
-    <div class="title-container">MAT-BOT</div>
-    <div class="dropdown" id="menuWrap">
-      <button class="dropdown-toggle" onclick="toggleDropdown(event)">☰ Meni</button>
-      <div class="dropdown-content">
-        <div class="toggle-row">
-          <span class="toggle-label">🌙 Dark Mode</span>
-          <label style="display:flex;align-items:center;gap:.5rem;">
-            <input type="checkbox" id="darkToggle">
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
-
-        <div class="menu-line"></div>
-
-        <button class="menu-item" id="menuClear">🗑️ Očisti chat…</button>
-
-      </div>
-    </div>
-  </header>
-
   <main class="stack">
     <!-- ===== SCREEN 1: Start/Home — onboarding (razred → izbor → lekcija/oblast) ===== -->
     <section id="tutorHome" class="home-screen" aria-label="Početni ekran">
@@ -417,8 +369,10 @@
           <span class="tutor-pill" id="topbarGrade">6. razred</span>
           <span class="tutor-pill" id="topbarMode"></span>
           <span class="tutor-pill hidden" id="topbarTopic"></span>
+          <span class="tutor-pill tutor-streak-pill hidden" id="topbarStreak" aria-live="polite"></span>
         </div>
         <div class="tutor-topbar-actions">
+          <button type="button" class="btn sm tutor-clear-btn" id="tutorClearBtn" title="Obriši razgovor">🗑️ Obriši</button>
           <button type="button" class="btn sm tutor-back-btn" id="tutorBackBtn" title="Nazad na izbor">Nazad</button>
         </div>
       </div>
@@ -437,7 +391,9 @@
 
       <div class="composer" id="tutorComposer">
         <input id="tutorImage" type="file" accept="image/*" style="display:none;">
+        <input id="tutorCameraImage" type="file" accept="image/*" capture="environment" style="display:none;">
         <label for="tutorImage" id="tutorImageBtn" class="composer-plus" title="Dodaj sliku zadatka" aria-label="Dodaj sliku zadatka"><span class="composer-plus-icon" aria-hidden="true">+</span></label>
+        <label for="tutorCameraImage" id="tutorCameraBtn" class="composer-plus composer-camera" title="Otvori kameru" aria-label="Otvori kameru"><span aria-hidden="true">📷</span></label>
         <textarea id="tutorMessage" rows="1" placeholder="Upiši pitanje ili zadatak..."></textarea>
         <button id="tutorSend" type="button" class="composer-send" title="Pošalji" aria-label="Pošalji"><span class="composer-send-icon" aria-hidden="true">↑</span></button>
       </div>
@@ -455,8 +411,8 @@
   <div class="modal" id="confirm-clear">
     <div class="box">
       <button type="button" class="modal-close" data-close="#confirm-clear" aria-label="Zatvori">×</button>
-      <h3>Očisti chat?</h3>
-      <p>Ova radnja briše cijelu konverzaciju. Ne može se poništiti.</p>
+      <h3>Obriši razgovor?</h3>
+      <p>Ova radnja briše cijeli razgovor i vraća te na početni ekran.</p>
       <div class="actions">
         <button class="btn secondary" data-close="#confirm-clear">Odustani</button>
         <button class="btn danger" id="doClear">Obriši</button>
@@ -464,24 +420,20 @@
     </div>
   </div>
 
-<script>
-/* --- MENI & TEMA --- */
-function toggleDropdown(e){ e.preventDefault(); document.getElementById('menuWrap').classList.toggle('open'); }
-function closeDropdown(){ document.getElementById('menuWrap')?.classList.remove('open'); }
-function initDarkToggle(){
-  const cb = document.getElementById('darkToggle');
-  document.body.classList.add('dark');
-  try { localStorage.setItem('matbot_dark', '1'); } catch(_){}
-  if (!cb) return;
-  cb.checked = true;
-  cb.disabled = true;
-  cb.addEventListener('change', ()=>{
-    cb.checked = true;
-    document.body.classList.add('dark');
-    try { localStorage.setItem('matbot_dark', '1'); } catch(_){}
-  });
-}
+  <div class="modal" id="session-summary">
+    <div class="box">
+      <button type="button" class="modal-close" data-close="#session-summary" aria-label="Zatvori">×</button>
+      <h3>Kratki rezime</h3>
+      <p id="sessionSummaryText"></p>
+      <p id="sessionSummaryVideo" class="muted hidden"></p>
+      <div class="actions">
+        <button class="btn secondary" id="summaryContinue">Nastavi vježbati</button>
+        <button class="btn" id="summaryExit">Izađi</button>
+      </div>
+    </div>
+  </div>
 
+<script>
 /* --- TIPKANJE: rotirajuće faze --- */
 let phaseTimer=null;
 function showTyping(){
@@ -505,13 +457,6 @@ function openModal(id){ document.getElementById('overlay').style.display='block'
 function closeModal(id){ document.getElementById('overlay').style.display='none'; document.querySelector(id).style.display='none'; }
 document.getElementById('overlay').addEventListener('click', ()=>{ document.querySelectorAll('.modal').forEach(m=>m.style.display='none'); document.getElementById('overlay').style.display='none'; });
 document.addEventListener('click',(e)=>{ const closeSel=e.target.getAttribute?.('data-close'); if (closeSel){ e.preventDefault(); closeModal(closeSel); }});
-
-/* auto-zatvori meni klikom izvan */
-document.addEventListener('click', (e)=>{
-  const menu = document.getElementById('menuWrap');
-  if(!menu) return;
-  if(!menu.contains(e.target) && menu.classList.contains('open')) menu.classList.remove('open');
-});
 
 /* --- TOAST --- */
 function showToast(msg, type='warn', timeout=2600){
@@ -556,8 +501,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const hasBypassToken = fromThinkific && !!urlParams.get('t');
   document.body.classList.toggle('tutor-fullscreen', isIframe || fromThinkific || isTestMode);
 
-  initDarkToggle();
-
   if(!(isIframe || hasBypassToken || isTestMode)){
     document.body.innerHTML = `
       <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:2rem;text-align:center">
@@ -570,24 +513,11 @@ document.addEventListener('DOMContentLoaded', () => {
     return;
   }
 
-  /* ====== Meni: očisti chat ====== */
-  /* Pravi posao je brisanje tutor stanja iz localStorage (server ne drži chat). */
-  document.getElementById('menuClear').addEventListener('click', ()=>{
-    openModal('#confirm-clear'); closeDropdown();
-  });
   document.getElementById('doClear').addEventListener('click', () => {
-    try {
-      Object.keys(localStorage)
-        .filter(k => k.startsWith('matbot_tutor_history_') || k.startsWith('matbot_tutor_lasttask_')
-                  || k.startsWith('matbot_tutor_lasttopic_')
-                  || k.startsWith('matbot_tutor_lastimagectx_')
-                  || k.startsWith('matbot_tutor_recent_')
-                  || k.startsWith('matbot_tutor_nextstate_')
-                  || k.startsWith('matbot_tutor_ctx_'))
-        .forEach(k => localStorage.removeItem(k));
-    } catch (_) {}
     closeModal('#confirm-clear');
-    location.reload();
+    if (typeof window.startFreshTutorConversation === 'function'){
+      window.startFreshTutorConversation();
+    }
   });
 
   function escapeHtml(s){
@@ -617,7 +547,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const topbarGrade = document.getElementById('topbarGrade');
     const topbarMode  = document.getElementById('topbarMode');
     const topbarTopic = document.getElementById('topbarTopic');
+    const topbarStreak= document.getElementById('topbarStreak');
     const chatBackBtn = document.getElementById('tutorBackBtn');
+    const clearChatBtn= document.getElementById('tutorClearBtn');
+    const summaryText = document.getElementById('sessionSummaryText');
+    const summaryVideo= document.getElementById('sessionSummaryVideo');
+    const summaryContinue = document.getElementById('summaryContinue');
+    const summaryExit = document.getElementById('summaryExit');
     const msgBox   = document.getElementById('tutorMessage');
     const sendTutor= document.getElementById('tutorSend');
     const fbBox    = document.getElementById('tutor-fallback');
@@ -627,6 +563,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const tutorTyping= document.getElementById('tutorTyping');
     const tutorEmpty = document.getElementById('tutorEmptyState');
     const tutorImg = document.getElementById('tutorImage');
+    const tutorCameraImg = document.getElementById('tutorCameraImage');
     const tutorImgChip = document.getElementById('tutorImageChip');
     const tutorImgName = document.getElementById('tutorImageName');
     const tutorImgRemove = document.getElementById('tutorImageRemove');
@@ -729,6 +666,53 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       return made;
     }
+    function lastBotMessage(){
+      const rows = tutorChat.querySelectorAll('.tmsg-bot');
+      return rows.length ? rows[rows.length - 1] : null;
+    }
+    function attachBotFeedback(row, j){
+      if (!row || row.dataset.feedbackReady === '1') return;
+      row.dataset.feedbackReady = '1';
+      const feedbackIndex = botMessageIndex++;
+      const wrap = document.createElement('div');
+      wrap.className = 'bot-feedback';
+      const thanks = document.createElement('span');
+      thanks.className = 'hidden';
+      thanks.textContent = 'Hvala!';
+      function makeBtn(label, verdict){
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'feedback-btn';
+        b.textContent = label;
+        b.title = verdict === 'up' ? 'Ovo mi je pomoglo' : 'Ovo mi nije pomoglo';
+        b.setAttribute('aria-label', b.title);
+        b.addEventListener('click', async ()=>{
+          if (wrap.dataset.locked === '1') return;
+          wrap.dataset.locked = '1';
+          wrap.querySelectorAll('button').forEach(x=>x.disabled = true);
+          try {
+            await fetch('/api/ai-tutor/feedback', {
+              method: 'POST',
+              headers: tutorHeaders({ 'Content-Type': 'application/json' }),
+              credentials: 'include',
+              body: JSON.stringify({
+                session_id: sessionId,
+                message_index: feedbackIndex,
+                verdict: verdict,
+                mode: j.session_mode || state.mode,
+                topic: j.effective_topic || j.final_topic || state.topic || ''
+              })
+            });
+          } catch(_){}
+          thanks.classList.remove('hidden');
+        });
+        return b;
+      }
+      wrap.appendChild(makeBtn('👍', 'up'));
+      wrap.appendChild(makeBtn('👎', 'down'));
+      wrap.appendChild(thanks);
+      row.appendChild(wrap);
+    }
 
     function showTutorTyping(){
       tutorChat.classList.add('open');
@@ -751,6 +735,7 @@ document.addEventListener('DOMContentLoaded', () => {
        oslanja na vlastito pamćenje historije. */
     const RECENTTASKS_KEY = 'matbot_tutor_recent_' + cid;
     const NEXTSTATE_KEY = 'matbot_tutor_nextstate_' + cid;
+    const SESSIONSTATS_KEY = 'matbot_tutor_sessionstats_' + cid;
     /* Phase 1 (audit): historija je vezana za kontekst (razred+mod+tema/oblast).
        Promjena konteksta BRIŠE staru historiju — stara tema ne smije "nevidljivo"
        curiti u novu konverzaciju. */
@@ -775,6 +760,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let interactionPhase = null;   // 'awaiting_practice_answer' | null
     /* Phase 7.2: zadnja poruka tutora (za follow-up nastavak: "može", "nastavi") */
     let lastTutorMessage = '';
+    let lastTurnWasGraded = false;
+    let pendingChipMeta = null;
+    let botMessageIndex = 0;
 
     /* Kratka potvrda/nastavak ("može", "hoću", "nastavi", "daj primjer") →
        follow-up intent umjesto novog zahtjeva za objašnjenjem */
@@ -828,6 +816,59 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     function clearNextState(){
       try { localStorage.removeItem(NEXTSTATE_KEY); } catch(_){}
+    }
+    function emptySessionStats(){
+      return { total: 0, correct: 0, incorrect: 0, bestStreak: 0, videoTitle: '', videoUrl: '' };
+    }
+    function sessionStats(){
+      try {
+        const s = JSON.parse(localStorage.getItem(SESSIONSTATS_KEY) || 'null');
+        return (s && typeof s === 'object') ? Object.assign(emptySessionStats(), s) : emptySessionStats();
+      } catch(_){ return emptySessionStats(); }
+    }
+    function saveSessionStats(s){
+      try { localStorage.setItem(SESSIONSTATS_KEY, JSON.stringify(Object.assign(emptySessionStats(), s || {}))); } catch(_){}
+    }
+    function resetSessionStats(){
+      try { localStorage.removeItem(SESSIONSTATS_KEY); } catch(_){}
+      updateStreakPill(0, state.mode);
+    }
+    function modeShowsStreak(mode){
+      return mode === 'practice' || mode === 'exam';
+    }
+    let lastDisplayedStreak = 0;
+    function updateStreakPill(streak, mode){
+      if (!topbarStreak) return;
+      const n = Math.max(0, parseInt(streak || 0, 10) || 0);
+      if (!modeShowsStreak(mode || state.mode) || n < 2){
+        topbarStreak.classList.add('hidden');
+        topbarStreak.classList.remove('pulse');
+        lastDisplayedStreak = n;
+        return;
+      }
+      topbarStreak.textContent = '🔥 ' + n + ' zaredom';
+      topbarStreak.classList.remove('hidden');
+      if (n > lastDisplayedStreak){
+        topbarStreak.classList.remove('pulse');
+        void topbarStreak.offsetWidth;
+        topbarStreak.classList.add('pulse');
+        if (n === 5) showToast('🏆 5 tačnih zaredom — svaka čast!', 'ok', 3200);
+      }
+      lastDisplayedStreak = n;
+    }
+    function updateSessionStatsFromResponse(j){
+      if (!j || !j.answer_verdict) return;
+      const mode = j.session_mode || state.mode;
+      if (!modeShowsStreak(mode)) return;
+      const stats = sessionStats();
+      stats.total += 1;
+      if (j.answer_verdict === 'correct') stats.correct += 1;
+      else stats.incorrect += 1;
+      const streak = (j.next_state && parseInt(j.next_state.correct_streak || 0, 10)) || 0;
+      stats.bestStreak = Math.max(stats.bestStreak || 0, streak);
+      if (j.video_title) stats.videoTitle = j.video_title;
+      if (j.video_url) stats.videoUrl = j.video_url;
+      saveSessionStats(stats);
     }
     function confirmationPendingAction(stateObj){
       return (stateObj && stateObj.pending_action && stateObj.pending_action.type)
@@ -1054,11 +1095,15 @@ document.addEventListener('DOMContentLoaded', () => {
     function resetTutorConversation(){
       interactionPhase = null;
       lastTutorMessage = '';
+      lastTurnWasGraded = false;
+      pendingChipMeta = null;
+      botMessageIndex = 0;
       try { localStorage.removeItem(TKEY); } catch(_){}
       try { localStorage.removeItem(LASTTASK_KEY); } catch(_){}
       try { localStorage.removeItem(LASTIMAGECTX_KEY); } catch(_){}
       try { localStorage.removeItem(RECENTTASKS_KEY); } catch(_){}
       clearNextState();
+      resetSessionStats();
       clearStoredActiveTopic();
       clearTutorImage();
       msgBox.value = '';
@@ -1212,6 +1257,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const ctx = resultMode ? '' : (state.topicName || state.oblast || '');
       topbarTopic.textContent = ctx;
       topbarTopic.classList.toggle('hidden', !ctx);
+      const ns = storedNextState();
+      updateStreakPill(ns ? ns.correct_streak : 0, state.mode);
     }
     function enterChat(autoMessage){
       if (state.mode !== 'exam') restoreActiveTopic();
@@ -1246,7 +1293,7 @@ document.addEventListener('DOMContentLoaded', () => {
     /* "Nazad" (jedina topbar akcija): nazad na izbor — transcript i historija
        razgovora OSTAJU, ali se practice/follow-up stanje čisti da staro stanje
        ne procuri u novi izbor (faza, zadnji zadatak, slika, placeholder). */
-    chatBackBtn.addEventListener('click', ()=>{
+    function exitTutorToHome(){
       interactionPhase = null;
       try { localStorage.removeItem(LASTTASK_KEY); } catch(_){}
       clearNextState();
@@ -1254,7 +1301,38 @@ document.addEventListener('DOMContentLoaded', () => {
       msgBox.placeholder = DEFAULT_PLACEHOLDER;
       fbBox.classList.add('hidden');
       showHome();
+    }
+    function maybeShowSessionSummary(){
+      const stats = sessionStats();
+      if (!modeShowsStreak(state.mode) || !stats.total){
+        exitTutorToHome();
+        return;
+      }
+      if (summaryText){
+        summaryText.textContent = 'Danas si radio: ' + stats.total + ' zadataka, tačno ' +
+          stats.correct + '. 🔥 Najduži niz: ' + (stats.bestStreak || 0) + '.';
+      }
+      if (summaryVideo){
+        summaryVideo.classList.toggle('hidden', !stats.videoTitle && !stats.videoUrl);
+        if (stats.videoUrl){
+          summaryVideo.innerHTML = 'Za ovu temu može pomoći i video: <a href="' +
+            escapeHtml(stats.videoUrl) + '" target="_blank" rel="noopener noreferrer">' +
+            escapeHtml(stats.videoTitle || stats.videoUrl) + '</a>.';
+        } else if (stats.videoTitle){
+          summaryVideo.textContent = 'Za ovu temu može pomoći i video lekcija: ' + stats.videoTitle + '.';
+        } else {
+          summaryVideo.textContent = '';
+        }
+      }
+      openModal('#session-summary');
+    }
+    chatBackBtn.addEventListener('click', maybeShowSessionSummary);
+    if (summaryContinue) summaryContinue.addEventListener('click', ()=>closeModal('#session-summary'));
+    if (summaryExit) summaryExit.addEventListener('click', ()=>{
+      closeModal('#session-summary');
+      exitTutorToHome();
     });
+    if (clearChatBtn) clearChatBtn.addEventListener('click', ()=>openModal('#confirm-clear'));
 
     /* Interni reset ostaje dostupan ako zatreba: briše transcript, historiju,
        zadnji zadatak i fazu, pa vodi na početni ekran. Nije izložen kao topbar dugme. */
@@ -1264,6 +1342,7 @@ document.addEventListener('DOMContentLoaded', () => {
       try { localStorage.removeItem(CTX_KEY); } catch(_){}
       showHome();
     }
+    window.startFreshTutorConversation = startFreshTutorConversation;
 
     /* teme i oblasti iz backenda (nikad hardkodirano): lekcije grupisane po
        oblasti za explain/practice, lista oblasti za exam */
@@ -1314,16 +1393,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /* Phase 6.2: slika zadatka u tutoru (opciono, sekundarno) */
     function tutorImageFile(){
+      if (tutorCameraImg && tutorCameraImg.files && tutorCameraImg.files[0]) return tutorCameraImg.files[0];
       return (tutorImg && tutorImg.files && tutorImg.files[0]) ? tutorImg.files[0] : null;
     }
     function clearTutorImage(){
-      if (!tutorImg) return;
-      try { const dt = new DataTransfer(); tutorImg.files = dt.files; } catch(_){}
-      tutorImg.value = '';
+      if (tutorImg){
+        try { const dt = new DataTransfer(); tutorImg.files = dt.files; } catch(_){}
+        tutorImg.value = '';
+      }
+      if (tutorCameraImg){
+        try { const dt = new DataTransfer(); tutorCameraImg.files = dt.files; } catch(_){}
+        tutorCameraImg.value = '';
+      }
       if (tutorImgChip) tutorImgChip.classList.remove('show');
     }
-    if (tutorImg){
-      tutorImg.addEventListener('change', ()=>{
+    function handleTutorImageChange(input){
+      if (!input) return;
+      input.addEventListener('change', ()=>{
         const f = tutorImageFile();
         if (!f) { clearTutorImage(); return; }
         if (!f.type || !f.type.startsWith('image/')){
@@ -1334,8 +1420,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (tutorImgName) tutorImgName.textContent = f.name;
         if (tutorImgChip) tutorImgChip.classList.add('show');
       });
-      if (tutorImgRemove) tutorImgRemove.addEventListener('click', clearTutorImage);
     }
+    handleTutorImageChange(tutorImg);
+    handleTutorImageChange(tutorCameraImg);
+    if (tutorImgRemove) tutorImgRemove.addEventListener('click', clearTutorImage);
 
     /* ===== Phase 2: quick-reply chips (S5) + preporuka videa (S6) ===== */
     function hideChips(){
@@ -1352,10 +1440,17 @@ document.addEventListener('DOMContentLoaded', () => {
         /* Audit: chip za ponavljanje zadatka je uklonjen — duplirao je običan
            chat i navodio tutora da isti zadatak ispiše ponovo. Koristan par
            je hint + novi zadatak. */
-        return [
-          { label: '🙋 Ne znam — daj mi hint', msg: 'Ne znam.' },
+        const out = [
+          { label: '🙋 Ne znam — daj mi hint', msg: 'Ne znam.', intent: 'hint_request' },
           { label: '➕ Novi zadatak', msg: 'Daj mi novi zadatak.' }
         ];
+        if (lastTurnWasGraded){
+          out.push(
+            { label: '⬇️ Lakši zadatak', msg: 'Daj mi lakši zadatak.', difficulty_request: 'easier' },
+            { label: '⬆️ Teži zadatak', msg: 'Daj mi teži zadatak.', difficulty_request: 'harder' }
+          );
+        }
+        return out;
       }
       /* BUG 10: chipovi prate mod SESIJE, ne interni prompt-mod backenda */
       const mode = j.session_mode || state.mode;
@@ -1363,16 +1458,19 @@ document.addEventListener('DOMContentLoaded', () => {
         /* BUG 3/9: Objašnjenje je čisto objašnjenje — bez opcije "Novi zadatak";
            "Pređi na vježbu" je eksplicitan prelazak u drugi mod */
         { label: '🐢 Objasni jednostavnije', msg: 'Objasni mi to jednostavnije.' },
+        { label: '🔄 Objasni drugačije', msg: 'Objasni mi to na drugačiji način, kroz primjer iz svakodnevnog života.' },
         { label: '➕ Još jedan primjer', msg: 'Daj mi još jedan primjer.' },
         { label: '✏️ Pređi na vježbu', msg: 'Daj mi jedan zadatak za vježbu.', mode: 'practice' }
       ];
       if (mode === 'practice') return [
         { label: '➕ Još jedan zadatak', msg: 'Daj mi još jedan zadatak.' },
-        { label: '📘 Objasni mi ovo', msg: 'Objasni mi ovaj zadatak korak po korak.' }
+        { label: '📘 Objasni mi ovo', msg: 'Objasni mi ovaj zadatak korak po korak.' },
+        { label: '🎬 Preporuči mi klip', msg: 'Preporuči mi video lekciju za ovu temu.', intent: 'recommend_video' }
       ];
       if (mode === 'exam') return [
         { label: '➕ Daj još zadataka', msg: 'Daj mi još zadataka za vježbu.' },
-        { label: '📘 Objasni prvi zadatak', msg: 'Objasni mi prvi zadatak korak po korak.' }
+        { label: '📘 Objasni prvi zadatak', msg: 'Objasni mi prvi zadatak korak po korak.' },
+        { label: '🎬 Preporuči mi klip', msg: 'Preporuči mi video lekciju za ovu temu.', intent: 'recommend_video' }
       ];
       return [   /* quick */
         { label: '📘 Objasni postupak', msg: 'Objasni mi postupak korak po korak.', mode: 'explain' },
@@ -1397,6 +1495,10 @@ document.addEventListener('DOMContentLoaded', () => {
             updateTopbar();
           }
           hideChips();
+          pendingChipMeta = {
+            intent: c.intent || '',
+            difficulty_request: c.difficulty_request || ''
+          };
           msgBox.value = c.msg;
           sendTutorMsg();
         });
@@ -1415,7 +1517,20 @@ document.addEventListener('DOMContentLoaded', () => {
       videoHintShown.add(tid);
       const div = document.createElement('div');
       div.className = 'tutor-video-hint';
-      div.textContent = '💡 Možda ti pomogne da prvo pogledaš video lekciju za ovu temu u kursu.';
+      if (j.video_url){
+        const a = document.createElement('a');
+        a.href = j.video_url;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        a.textContent = j.video_title || 'video lekciju';
+        div.appendChild(document.createTextNode('💡 Možda ti pomogne da pogledaš '));
+        div.appendChild(a);
+        div.appendChild(document.createTextNode('.'));
+      } else if (j.video_title){
+        div.textContent = '💡 Možda ti pomogne video lekcija: ' + j.video_title + '.';
+      } else {
+        div.textContent = '💡 Možda ti pomogne da prvo pogledaš video lekciju za ovu temu u kursu.';
+      }
       tutorChat.insertBefore(div, tutorTyping);
       tutorChat.scrollTop = tutorChat.scrollHeight;
     }
@@ -1450,8 +1565,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const savedTask = storedLastTask();
       const savedImageContext = storedLastImageContext();
       const previousNextState = storedNextState();
+      const chipMeta = pendingChipMeta || {};
+      pendingChipMeta = null;
       let text, fromTyped = false, answerPhase = null, continuation = false;
       let confirmationIntent = '', confirmationPending = null, confirmationPhase = '';
+      const explicitHintRequest = chipMeta.intent === 'hint_request';
       if (autoMessage){
         text = autoMessage;                        // auto-poruka pri ulasku u chat
       } else if (typed){
@@ -1472,7 +1590,7 @@ document.addEventListener('DOMContentLoaded', () => {
           confirmationIntent = 'decline_confirmation';
           confirmationPending = confirmationPendingAction(previousNextState);
           confirmationPhase = 'confirmation_declined';
-        } else if (!asksNewTask && (interactionPhase === 'awaiting_practice_answer' || (savedTask && isShortPracticeAnswer(typed)))){
+        } else if (!explicitHintRequest && !asksNewTask && (interactionPhase === 'awaiting_practice_answer' || (savedTask && isShortPracticeAnswer(typed)))){
           answerPhase = 'answering_practice_task'; // odgovor na zadatak, ne novi zahtjev
         } else if (!asksNewTask && lastTutorMessage && isFollowupMessage(typed)){
           continuation = true;                     // "može"/"nastavi" → nastavak, ne ponovno objašnjenje
@@ -1509,6 +1627,8 @@ document.addEventListener('DOMContentLoaded', () => {
         student_message: text,
         conversation_history: freshExamPrep ? [] : tutorHistory()
       };
+      if (chipMeta.intent) payload.intent = chipMeta.intent;
+      if (chipMeta.difficulty_request) payload.difficulty_request = chipMeta.difficulty_request;
       if (previousNextState && !freshExamPrep) payload.previous_next_state = previousNextState;
       const recentTasks = storedRecentTasks();
       if (recentTasks.length && !freshExamPrep) payload.recent_tasks = recentTasks;
@@ -1519,7 +1639,12 @@ document.addEventListener('DOMContentLoaded', () => {
           (isImageFollowupMessage(text) || confirmationIntent || imageTestActive)){
         payload.last_image_context = savedImageContext.slice(0, 2000);
       }
-      if (confirmationIntent){
+      if (explicitHintRequest && savedTask){
+        payload.intent = 'hint_request';
+        payload.interaction_phase = 'practice_help';
+        payload.mode = 'practice';
+        payload.last_tutor_task = savedTask.slice(0, 600);
+      } else if (confirmationIntent){
         payload.intent = confirmationIntent;
         payload.interaction_phase = confirmationPhase;
         if (confirmationPending) payload.pending_action = confirmationPending;
@@ -1674,6 +1799,7 @@ document.addEventListener('DOMContentLoaded', () => {
     /* zajednička obrada odgovora za streaming i non-streaming put */
     function applyTutorResponse(j, opts){
       const answer = (j && j.answer) ? j.answer : ((j && j.detail) ? j.detail : 'Nema odgovora.');
+      opts = opts || {};
       /* image_test tok: aktivni "zadatak" je stavka sa slike (u next_state),
          proza odgovora se NE pretvara u last_tutor_task */
       const inImageTest = !!(j && j.next_state && j.next_state.active_task_kind === 'image_test');
@@ -1688,14 +1814,19 @@ document.addEventListener('DOMContentLoaded', () => {
             ? ((j.last_tutor_task || '').toString().trim().slice(0, 600))
             : extractTutorTask(j, answer))
         : '';
-      if (j && j.next_state) setNextState(j.next_state);
+      if (j && j.next_state) {
+        setNextState(j.next_state);
+        updateStreakPill(j.next_state.correct_streak, j.session_mode || state.mode);
+      }
       else if (j && j.status) clearNextState();   // greška bez statusa NE briše stanje
       if (inImageTest || solutionRevealed) clearAwaitingPracticeTask();
       if (taskText){
         setAwaitingPracticeTask(taskText);  // sačuvaj zadatak prije historije
         pushRecentTask(taskText);           // anti-ponavljanje za sljedeći "novi zadatak"
       }
-      if (!opts.rendered) appendTutorMsg('bot', renderTutorHTML(answer));
+      let renderedBot = null;
+      if (!opts.rendered) renderedBot = appendTutorMsg('bot', renderTutorHTML(answer));
+      else renderedBot = { row: lastBotMessage() };
       pushTutor('assistant', answer);
       if (j.status === 'ready') adoptResponseTopic(j);
       if (metaBox){                              // prijateljski meta red (bez sirovih id-eva)
@@ -1719,6 +1850,7 @@ document.addEventListener('DOMContentLoaded', () => {
         clearTutorImage();                       // slika je potrošena u ovom zahtjevu
         if (j.image_context) setLastImageContext(j.image_context);
         lastTutorMessage = (answer || '').slice(0, 600);  // osnova za follow-up nastavak
+        attachBotFeedback(renderedBot && renderedBot.row, j);
       }
       /* practice stanje se ažurira tek NAKON primljenog feedbacka */
       if (j.status === 'ready'){
@@ -1726,6 +1858,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!taskText && opts.answerPhase && prevTask && !solutionRevealed) setAwaitingPracticeTask(prevTask);
       }
       if (j.status && j.status !== 'ready') showFallback(j.status);
+      updateSessionStatsFromResponse(j);
+      lastTurnWasGraded = !!(opts.answerPhase && j && j.answer_verdict);
       renderChips(j);                            // Phase 2 (S5): brzi odgovori
       maybeVideoHint(j);                         // Phase 2 (S6): preporuka videa
     }

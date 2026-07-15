@@ -274,6 +274,7 @@ from utils import _bytes_to_data_url
 # Phase 3: modularni AI tutor endpoint (payload → lookup → prompt builder → OpenAI).
 # Servis je čist i ne uvozi app; rutu ispod injektujemo postojećim _openai_chat.
 from matbot import ai_tutor_service
+from matbot.activity_log import log_tutor_feedback
 from matbot.content_loader import ContentLoadError
 
 def _openai_chat(model: str, messages: list, timeout: float = None, max_tokens: int | None = None, fast: bool = False, max_retries: int | None = None, reasoning_effort: str | None = None):
@@ -546,6 +547,39 @@ def ai_tutor_chat():
         return jsonify({"error": "ai_tutor_failed",
                         "detail": "Došlo je do greške na serveru. Pokušaj ponovo."}), 500
     return jsonify(result), 200
+
+
+@app.route("/api/ai-tutor/feedback", methods=["POST", "OPTIONS"])
+@limiter.limit(_submit_rate_limit, exempt_when=lambda: request.method == "OPTIONS")
+def ai_tutor_feedback():
+    """Loguj thumbs-up/down feedback na bot poruku. Bez LLM poziva."""
+    if request.method == "OPTIONS":
+        return ("", 204)
+    if not _embed_token_ok():
+        return jsonify(_EMBED_TOKEN_DENIED), 403
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"error": "invalid_json", "detail": "Očekivan je JSON objekt."}), 400
+    session_id = str(data.get("session_id") or "").strip()
+    verdict = str(data.get("verdict") or "").strip().lower()
+    try:
+        message_index = int(data.get("message_index"))
+    except (TypeError, ValueError):
+        message_index = -1
+    if not session_id:
+        return jsonify({"error": "invalid_feedback", "detail": "Nedostaje session_id."}), 400
+    if message_index < 0:
+        return jsonify({"error": "invalid_feedback", "detail": "message_index mora biti broj."}), 400
+    if verdict not in ("up", "down"):
+        return jsonify({"error": "invalid_feedback", "detail": "verdict mora biti up ili down."}), 400
+    ok = log_tutor_feedback({
+        "session_id": session_id,
+        "message_index": message_index,
+        "verdict": verdict,
+        "mode": str(data.get("mode") or "")[:40],
+        "topic": str(data.get("topic") or "")[:120],
+    })
+    return jsonify({"ok": bool(ok)}), (200 if ok else 500)
 
 
 _UNREADABLE_IMAGE_MSG = (

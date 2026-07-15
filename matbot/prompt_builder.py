@@ -903,7 +903,17 @@ def _video_labels(videos: list[dict], limit: int = 2) -> list[str]:
     return names
 
 
-def build_video_reco_block(videos: list[dict], stuck: bool = False) -> str:
+def _video_title(v: dict) -> str:
+    section = normalize_value(v.get("section_name"))
+    title = normalize_value(v.get("lesson_title"))
+    if title and section and title != section:
+        return f"{title} (sekcija: {section})"
+    return title or section
+
+
+def build_video_reco_block(
+    videos: list[dict], stuck: bool = False, explicit: bool = False
+) -> str:
     """Blok koji modelu daje KONKRETNU povezanu video lekciju (naziv + link ako
     postoji).
 
@@ -916,7 +926,14 @@ def build_video_reco_block(videos: list[dict], stuck: bool = False) -> str:
         return ""
     listed = "; ".join(names)
     has_link = any("link:" in n for n in names)
-    if stuck:
+    if explicit:
+        lead = (
+            "EKSPLICITAN ZAHTJEV ZA VIDEO:\n"
+            "- Učenik je tražio preporuku klipa/video lekcije. Odgovori kratko, "
+            "imenuj baš ovu konkretnu lekciju i daj link samo ako je priložen. "
+            "Ne mijenjaj i ne napuštaj započeti zadatak."
+        )
+    elif stuck:
         lead = (
             "UČENIK JE ZAPEO — PREPORUČI VIDEO:\n"
             "- Učenik više puta griješi ili ne zna. Ljubazno mu predloži da "
@@ -1151,13 +1168,18 @@ def build_tutor_prompt(
         video_topic = detected
     videos = get_video_recommendation(video_topic, master_content)
     stuck = bool(payload.get("_student_stuck"))
+    explicit_video = bool(payload.get("_explicit_video_request"))
     if is_practice_help and payload.get("_stuck_help"):
         # "ne znam" → help: video se nudi SAMO na pragu (F5 ramp), ne odmah,
         # iako je prompt-mod postao explain.
-        want_video = bool(videos) and stuck
+        want_video = bool(videos) and (stuck or explicit_video)
     else:
-        want_video = bool(videos) and (mode == "explain" or (mode == "practice" and stuck))
-    video_reco_block = build_video_reco_block(videos, stuck=stuck) if want_video else ""
+        want_video = bool(videos) and (
+            explicit_video or mode == "explain" or (mode == "practice" and stuck)
+        )
+    video_reco_block = build_video_reco_block(
+        videos, stuck=stuck, explicit=explicit_video
+    ) if want_video else ""
 
     # --- system prompt ---
     forbidden = topic_context.get("forbidden_ai_behavior", "")
@@ -1222,6 +1244,8 @@ def build_tutor_prompt(
         "topic_context_used": bool(topic_context),
         "video_flow_used": bool(video_flow),
         "video_recommended": want_video,
+        "video_title": _video_title(videos[0]) if videos else "",
+        "video_url": _video_url(videos[0]) if videos else "",
         "topic_conflict": topic_conflict,
     }
 

@@ -1,0 +1,17 @@
+{
+  "name": "MAT-BOT",
+  "short_name": "MAT-BOT",
+  "description": "AI tutor za matematiku",
+  "start_url": "/?t=test",
+  "display": "standalone",
+  "background_color": "#0b1113",
+  "theme_color": "#0b1113",
+  "icons": [
+    {
+      "src": "/static/icons/matbot-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
