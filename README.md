@@ -25,7 +25,7 @@ dolaze iz Excel fajlova u `data/`), ugrađen kao iframe u Thinkific.
 ├── app.py                  # Flask backend (rute, OpenAI/Mathpix klijenti)
 ├── matbot/                 # Modularni tutor: content_loader, topic_lookup,
 │                           #   prompt_builder, topic_detector, ai_tutor_service,
-│                           #   activity_log
+│                           #   activity_log, sheets_log
 ├── prompts.py              # Bazni sistemski prompt (5–9. razred)
 ├── data/{6,7}_razred/      # Excel: AI_MATH_CONTENT_MASTER + THINKIFIC_MAP
 ├── templates/index.html    # Frontend (home/onboarding + chat; inline CSS/JS)
@@ -96,7 +96,7 @@ Kompletna komentarisana lista: [.env.example](.env.example). Pregled:
 | `MAX_CONTENT_LENGTH_MB` | `20` | Maksimalna veličina zahtjeva (upload). |
 | `UPLOAD_DIR` / `UPLOAD_MAX_AGE_S` | `/tmp/uploads` / `3600` | Privremeni fajlovi + starost za čišćenje. |
 | `MATHPIX_APP_ID` / `MATHPIX_APP_KEY` / `MATHPIX_MODE` | — / — / `prefer` | OCR; `off` isključuje. |
-| `GOOGLE_SHEETS_CREDENTIALS_B64` / `GSHEET_ID` / `GSHEET_NAME` | — | Sheets evidencija (lijena init). |
+| `GOOGLE_SHEETS_CREDENTIALS_B64` / `GSHEET_ID` / `GSHEET_NAME` | `—` / `—` / `matematika-bot` | Google Sheets puna transkripcija tutor razgovora (opciono; lijena init). |
 | `SHEETS_ASYNC_LOG` | `1` | Upis u Sheet van hot patha (thread). |
 | `GCS_BUCKET` / `GCS_SIGNED_GET` | — / `1` | Slike za async jobove (Cloud Run era). |
 | `USE_FIRESTORE` | `1` | Job store (inače in-memory — samo za 1 instancu/workera!). |

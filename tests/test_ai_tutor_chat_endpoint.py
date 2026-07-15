@@ -546,6 +546,18 @@ def test_chat_ok_when_logging_fails(client, fake_openai, monkeypatch):
     assert resp.get_json()["status"] == "ready"
 
 
+def test_chat_ok_when_sheets_logging_fails(client, fake_openai, monkeypatch):
+    import matbot.ai_tutor_service as svc
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("sheets nedostupan")
+
+    monkeypatch.setattr(svc, "log_transcript_to_sheet", _boom)
+    resp = client.post(CHAT_URL, json={"selected_topic": TOPIC6})
+    assert resp.status_code == 200
+    assert resp.get_json()["status"] == "ready"
+
+
 # --- response shape -------------------------------------------------------------
 
 def test_response_has_all_fields(client, fake_openai):

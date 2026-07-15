@@ -53,6 +53,7 @@ from matbot.prompt_builder import (
     build_tutor_prompt,
     get_topic_context,
 )
+from matbot.sheets_log import log_transcript_to_sheet
 from matbot.topic_detector import detect_topic, fold_diacritics, is_vague_message
 from matbot.topic_lookup import get_final_topic
 
@@ -3194,6 +3195,11 @@ def _finalize_response(prep: dict, answer: str) -> dict:
         log_student_activity(payload, response)
     except Exception:
         pass
+    if status == "ready":
+        try:
+            log_transcript_to_sheet(payload, response)
+        except Exception:
+            pass
 
     return response
 

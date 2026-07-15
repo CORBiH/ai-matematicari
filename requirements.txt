@@ -12,11 +12,14 @@ requests>=2.31.0
 # --- Excel content (modular data: master + Thinkific mapa) ---
 openpyxl>=3.1
 
+# --- Google Sheets transcript logging (optional at runtime) ---
+gspread>=6.0
+google-auth>=2.0
+
 # UKLONJENO (Phase 2 audit — NULA importa u kodu, provjereno grep-om):
 #   numpy, sympy, matplotlib, scikit-learn, argon2-cffi, PyJWT, psycopg2-binary
 #
 # UKLONJENO (2026-07-14, brisanje legacy /submit stacka):
-#   google-auth, google-cloud-storage, google-cloud-firestore, google-cloud-tasks,
-#   gspread — koristio ih je ISKLJUČIVO legacy async/Sheets put, koji je obrisan.
-#   Tutor loguje u SQLite (matbot/activity_log.py) i ne dira GCP.
+#   google-cloud-storage, google-cloud-firestore, google-cloud-tasks.
+#   Sheets je vracen samo kao opcioni tutor transcript log (gspread/google-auth).
 # Rollback: `git revert` commita koji je uklonio legacy stack.
