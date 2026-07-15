@@ -255,6 +255,30 @@ def build_mode_instructions(
                 "OBLASTI/TEME kontrolni (npr. skupovi, djeljivost, razlomci, "
                 "decimalni brojevi, kružnica/uglovi). NE pretpostavljaj temu.\n"
             )
+        # Prvi potez (fresh exam prep) ima praznu historiju; svaki NASTAVAK je
+        # rad KROZ već date zadatke. Tada ne dajemo novi set od 3 zadatka nego
+        # vodimo učenika kroz jedan po jedan i NIKAD ne napuštamo započeti
+        # zadatak (prijavljeni bug: učenik zapne na domeni, bot skoči na 2. zadatak).
+        if payload.get("conversation_history"):
+            return (
+                "MOD: KONTROLNI — VOĐENJE KROZ ZADATAK (nastavak)\n"
+                "- Već si dao kontrolne zadatke; učenik ih sada rješava. NE daji "
+                "novi set od 3 zadatka i NE prepisuj cijelu listu ispočetka.\n"
+                "- Vodi učenika kroz JEDAN zadatak korak po korak dok ga ne "
+                "ZAVRŠITE, pa tek onda pređi na sljedeći po redu.\n"
+                "‼️ NE NAPUŠTAJ ZAPOČETI ZADATAK: ako učenik kaže \"ne znam\" ili "
+                "zapne usred zadatka, NIKAD ne prelazi na drugi zadatak da bi "
+                "izbjegao ovaj. Umjesto toga daj sljedeći KONKRETAN korak; a ako "
+                "je učenik već uradio najveći dio, DOVRŠI taj zadatak umjesto "
+                "njega (napiši konačan odgovor i kratko objasni), pa ga TEK ONDA "
+                "pitaj želi li na sljedeći zadatak.\n"
+                "- Primjer: ako je učenik već našao da nazivnik ne smije biti 0 i "
+                "da je \\(x=2\\) zabranjeno, a onda kaže \"ne znam\", ti dovrši: "
+                "napiši domenu (svi realni osim \\(x=2\\)) i objasni je — ne "
+                "prebacuj se na drugi zadatak.\n"
+                "- Kad je zadatak gotov, kratko potvrdi i ponudi sljedeći; budi "
+                "topao i sažet, korak po korak (ne ocjenjuj labelama kao u Vježbi).\n"
+            )
         block = (
             "MOD: KONTROLNI (exam)\n"
             "- Daj TAČNO 3 kontrolna zadatka, zatim 1 trik i 1 upozorenje.\n"
@@ -851,43 +875,72 @@ def get_video_recommendation(topic: Any, master_content: dict) -> list[dict]:
     return list((master_content or {}).get("videos_by_topic", {}).get(tid, []))
 
 
+def _video_url(v: dict) -> str:
+    """Upotrebljiv link video-lekcije ili "" — SAMO kada ``has_url == 'DA'`` i
+    postoji stvarni URL. Trenutno su svi redovi ``has_url='NE'`` (link se tek
+    autoruje u VIDEO_LINKS), pa ovo obično vrati "" i preporučuje se po nazivu."""
+    if normalize_value(v.get("has_url")).upper() != "DA":
+        return ""
+    return normalize_value(v.get("lesson_url") or v.get("url"))
+
+
 def _video_labels(videos: list[dict], limit: int = 2) -> list[str]:
+    """Nazivi povezanih lekcija; ako lekcija ima link (has_url='DA'), doda ga."""
     names: list[str] = []
     for v in videos[:limit]:
         section = normalize_value(v.get("section_name"))
         title = normalize_value(v.get("lesson_title"))
         if title and section and title != section:
-            names.append(f"{title} (sekcija: {section})")
+            label = f"{title} (sekcija: {section})"
         elif title or section:
-            names.append(title or section)
+            label = title or section
+        else:
+            continue
+        url = _video_url(v)
+        if url:
+            label += f" — link: {url}"
+        names.append(label)
     return names
 
 
 def build_video_reco_block(videos: list[dict], stuck: bool = False) -> str:
-    """Blok koji modelu daje NAZIVE povezanih video lekcija (bez URL-a).
+    """Blok koji modelu daje KONKRETNU povezanu video lekciju (naziv + link ako
+    postoji).
 
     ``stuck=True`` (Vježbajmo, učenik zapeo) → aktivno preporuči video;
-    inače (Objasni mi) → ponudi ga opciono na kraju. Model ne smije izmišljati
-    URL ni druge lekcije."""
+    inače (Objasni mi) → na kraju preporuči baš tu konkretnu lekciju kao
+    sljedeći korak. Model ne smije izmišljati URL ni druge lekcije: link nudi
+    samo ako je gore priložen (has_url='DA')."""
     names = _video_labels(videos)
     if not names:
         return ""
     listed = "; ".join(names)
+    has_link = any("link:" in n for n in names)
     if stuck:
         lead = (
             "UČENIK JE ZAPEO — PREPORUČI VIDEO:\n"
             "- Učenik više puta griješi ili ne zna. Ljubazno mu predloži da "
-            "pogleda povezanu video lekciju prije nego nastavite."
+            "pogleda baš ovu konkretnu video lekciju prije nego nastavite."
         )
     else:
         lead = (
-            "VIDEO LEKCIJA (opciono ponudi na kraju):\n"
-            "- Ako je korisno, na KRAJU kratko ponudi povezanu video lekciju."
+            "VIDEO LEKCIJA (preporuči konkretno na kraju):\n"
+            "- U Objašnjenju na KRAJU preporuči učeniku baš OVU konkretnu video "
+            "lekciju kao sljedeći korak — imenuj je tačno (ne šalji ga na cijeli "
+            "kurs niti generički \"pogledaj neki video\")."
         )
+    link_line = (
+        "- Ako je uz lekciju gore priložen link, daj ga učeniku; ako link nije "
+        "priložen, uputi ga da lekciju potraži pod tačno tim nazivom.\n"
+        if not has_link
+        else "- Daj učeniku priloženi link na tu lekciju.\n"
+    )
     return (
         f"{lead}\n"
-        f"- Poveži isključivo s ovom lekcijom, po nazivu (link nije dostupan): {listed}\n"
-        "- NE izmišljaj URL, broj lekcije ni druge lekcije — koristi samo ovaj naziv."
+        f"- Poveži isključivo s ovom lekcijom: {listed}\n"
+        f"{link_line}"
+        "- NE izmišljaj URL, broj lekcije ni druge lekcije — koristi samo ovaj "
+        "naziv i, ako je dat, priloženi link."
     )
 
 
