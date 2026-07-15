@@ -147,6 +147,23 @@ def _build_transcript_row(payload: dict, response: dict) -> list[Any]:
     ]
 
 
+def _build_feedback_row(payload: dict) -> list[Any]:
+    return [
+        datetime.now(timezone.utc).isoformat(),
+        _clean_cell(payload.get("session_id")),
+        "",
+        _clean_cell(payload.get("mode")),
+        _clean_cell(payload.get("topic")),
+        "feedback",
+        "",
+        "",
+        "ready",
+        "feedback",
+        _clean_cell(payload.get("message_index")),
+        _clean_cell(payload.get("verdict")),
+    ]
+
+
 def _async_enabled() -> bool:
     return _env_flag("SHEETS_ASYNC_LOG", "1")
 
@@ -175,4 +192,30 @@ def log_transcript_to_sheet(payload: dict, response: dict) -> bool:
         return sheets_append_row_safe(row)
     except Exception:
         log.exception("Sheets transcript log nije uspio - tutor odgovor se ne prekida")
+        return False
+
+
+def log_feedback_to_sheet(payload: dict) -> bool:
+    """Log thumbs-up/down metadata to Google Sheets.
+
+    Row shape extends transcript rows with: event_type, message_index,
+    feedback_verdict. It never stores message text.
+    """
+    try:
+        payload = payload or {}
+        if not _has_explicit_credentials():
+            return False
+        if gspread is None or SACreds is None:
+            log.warning("Sheets feedback log iskljucen: gspread/google-auth nisu dostupni")
+            return False
+        verdict = _clean_cell(payload.get("verdict"))
+        if verdict not in ("up", "down"):
+            return False
+        row = _build_feedback_row(payload)
+        if _async_enabled():
+            threading.Thread(target=sheets_append_row_safe, args=(row,), daemon=True).start()
+            return True
+        return sheets_append_row_safe(row)
+    except Exception:
+        log.exception("Sheets feedback log nije uspio - tutor odgovor se ne prekida")
         return False

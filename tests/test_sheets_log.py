@@ -203,3 +203,58 @@ def test_log_transcript_skips_non_ready_status(monkeypatch):
     payload, response = _payload_response(status="fallback")
     assert sl.log_transcript_to_sheet(payload, response) is False
     assert worksheet.appended == []
+
+
+def test_log_feedback_appends_verdict_row(monkeypatch):
+    worksheet = FakeWorksheet()
+    client = FakeClient(worksheet)
+    fake_gspread = FakeGspread(client)
+    monkeypatch.setattr(sl, "gspread", fake_gspread)
+    monkeypatch.setattr(sl, "SACreds", FakeCredentials)
+    monkeypatch.setenv("GOOGLE_SHEETS_CREDENTIALS_B64", _b64_creds())
+    monkeypatch.setenv("GSHEET_ID", "sheet-123")
+    monkeypatch.setenv("SHEETS_ASYNC_LOG", "0")
+
+    assert sl.log_feedback_to_sheet({
+        "session_id": "sess-fb",
+        "message_index": 4,
+        "verdict": "down",
+        "mode": "practice",
+        "topic": "6-04-040",
+    }) is True
+
+    assert client.opened_by_key == ["sheet-123"]
+    assert len(worksheet.appended) == 1
+    row, option = worksheet.appended[0]
+    datetime.fromisoformat(row[0])
+    assert row[1:] == [
+        "sess-fb",
+        "",
+        "practice",
+        "6-04-040",
+        "feedback",
+        "",
+        "",
+        "ready",
+        "feedback",
+        4,
+        "down",
+    ]
+    assert option == "USER_ENTERED"
+
+
+def test_log_feedback_invalid_verdict_noop(monkeypatch):
+    worksheet = FakeWorksheet()
+    fake_gspread = FakeGspread(FakeClient(worksheet))
+    monkeypatch.setattr(sl, "gspread", fake_gspread)
+    monkeypatch.setattr(sl, "SACreds", FakeCredentials)
+    monkeypatch.setenv("GOOGLE_SHEETS_CREDENTIALS_B64", _b64_creds())
+    monkeypatch.setenv("GSHEET_ID", "sheet-123")
+    monkeypatch.setenv("SHEETS_ASYNC_LOG", "0")
+
+    assert sl.log_feedback_to_sheet({
+        "session_id": "sess-fb",
+        "message_index": 4,
+        "verdict": "maybe",
+    }) is False
+    assert worksheet.appended == []

@@ -576,6 +576,34 @@ def test_feedback_endpoint_logs_vote(client, _tmp_activity_db):
     assert rows[0]["mode"] == "practice"
 
 
+def test_feedback_endpoint_attempts_sheets_log(client, _tmp_activity_db, monkeypatch):
+    import app as matbot
+
+    seen = {}
+
+    def _fake(payload):
+        seen.update(payload)
+        return True
+
+    monkeypatch.setattr(matbot, "log_feedback_to_sheet", _fake)
+    resp = client.post("/api/ai-tutor/feedback", json={
+        "session_id": "sess-fb-sheet",
+        "message_index": 7,
+        "verdict": "down",
+        "mode": "exam",
+        "topic": TOPIC6,
+    })
+    assert resp.status_code == 200
+    assert resp.get_json()["sheets_logged"] is True
+    assert seen == {
+        "session_id": "sess-fb-sheet",
+        "message_index": 7,
+        "verdict": "down",
+        "mode": "exam",
+        "topic": TOPIC6,
+    }
+
+
 def test_feedback_endpoint_validates_payload(client):
     resp = client.post("/api/ai-tutor/feedback", json={
         "session_id": "sess-fb-bad",

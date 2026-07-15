@@ -276,6 +276,7 @@ from utils import _bytes_to_data_url
 from matbot import ai_tutor_service
 from matbot.activity_log import log_tutor_feedback
 from matbot.content_loader import ContentLoadError
+from matbot.sheets_log import log_feedback_to_sheet
 
 def _openai_chat(model: str, messages: list, timeout: float = None, max_tokens: int | None = None, fast: bool = False, max_retries: int | None = None, reasoning_effort: str | None = None):
 
@@ -572,14 +573,20 @@ def ai_tutor_feedback():
         return jsonify({"error": "invalid_feedback", "detail": "message_index mora biti broj."}), 400
     if verdict not in ("up", "down"):
         return jsonify({"error": "invalid_feedback", "detail": "verdict mora biti up ili down."}), 400
-    ok = log_tutor_feedback({
+    feedback_payload = {
         "session_id": session_id,
         "message_index": message_index,
         "verdict": verdict,
         "mode": str(data.get("mode") or "")[:40],
         "topic": str(data.get("topic") or "")[:120],
-    })
-    return jsonify({"ok": bool(ok)}), (200 if ok else 500)
+    }
+    ok = log_tutor_feedback(feedback_payload)
+    sheets_ok = False
+    try:
+        sheets_ok = log_feedback_to_sheet(feedback_payload)
+    except Exception:
+        sheets_ok = False
+    return jsonify({"ok": bool(ok), "sheets_logged": bool(sheets_ok)}), (200 if ok else 500)
 
 
 _UNREADABLE_IMAGE_MSG = (
