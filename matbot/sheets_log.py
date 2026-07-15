@@ -34,7 +34,31 @@ SHEETS_SCOPES = [
 
 sheet = None
 _sheets_initialized = False
+_sheet_layout_prepared = False
 _sheets_lock = threading.Lock()
+
+SHEET_HEADERS = [
+    "timestamp_iso",
+    "event_type",
+    "session_id",
+    "message_index",
+    "grade",
+    "mode",
+    "topic",
+    "entry_source",
+    "status",
+    "answer_verdict",
+    "feedback_verdict",
+    "recommend_video",
+    "correct_streak",
+    "topic_conflict",
+    "selected_oblast",
+    "last_tutor_task",
+    "student_message",
+    "answer",
+    "answer_check",
+    "next_state",
+]
 
 
 def _env_flag(name: str, default: str = "0") -> bool:
@@ -47,6 +71,15 @@ def _clean_cell(value: Any) -> Any:
     if isinstance(value, str):
         return value.strip()
     return value
+
+
+def _json_cell(value: Any) -> str:
+    if value in (None, "", [], {}):
+        return ""
+    try:
+        return json.dumps(value, ensure_ascii=False, sort_keys=True, default=str)
+    except Exception:
+        return str(value)
 
 
 def _credentials_file() -> Path:
@@ -119,12 +152,54 @@ def _init_sheets():
     return sheet
 
 
+def _ensure_sheet_layout(ws: Any) -> None:
+    """Best-effort header/format setup. Never raises."""
+    global _sheet_layout_prepared
+    if _sheet_layout_prepared or not ws:
+        return
+    try:
+        existing = []
+        if hasattr(ws, "row_values"):
+            try:
+                existing = list(ws.row_values(1) or [])
+            except Exception:
+                existing = []
+        if existing[: len(SHEET_HEADERS)] != SHEET_HEADERS and hasattr(ws, "update"):
+            end_col = chr(ord("A") + len(SHEET_HEADERS) - 1)
+            ws.update(f"A1:{end_col}1", [SHEET_HEADERS])
+        for method_name, args in (
+            ("freeze", {"rows": 1}),
+            ("set_basic_filter", {"name": f"A1:{chr(ord('A') + len(SHEET_HEADERS) - 1)}1"}),
+        ):
+            method = getattr(ws, method_name, None)
+            if callable(method):
+                try:
+                    if method_name == "set_basic_filter":
+                        method(args["name"])
+                    else:
+                        method(**args)
+                except Exception:
+                    pass
+        fmt = getattr(ws, "format", None)
+        if callable(fmt):
+            try:
+                fmt("A1:T1", {"textFormat": {"bold": True}})
+                fmt("P:T", {"wrapStrategy": "WRAP"})
+            except Exception:
+                pass
+    except Exception:
+        log.debug("Sheets layout priprema nije uspjela", exc_info=True)
+    finally:
+        _sheet_layout_prepared = True
+
+
 def sheets_append_row_safe(values: list[Any]) -> bool:
     """Append one row to Sheets. Errors are logged and converted to False."""
     try:
         ws = _init_sheets()
         if not ws:
             return False
+        _ensure_sheet_layout(ws)
         ws.append_row(values, value_input_option="USER_ENTERED")
         return True
     except Exception as exc:
@@ -134,33 +209,53 @@ def sheets_append_row_safe(values: list[Any]) -> bool:
 
 def _build_transcript_row(payload: dict, response: dict) -> list[Any]:
     topic = response.get("final_topic") or response.get("effective_topic")
+    next_state = response.get("next_state") or {}
     return [
         datetime.now(timezone.utc).isoformat(),
+        "chat",
         _clean_cell(payload.get("session_id")),
+        _clean_cell(payload.get("message_index")),
         _clean_cell(payload.get("grade")),
         _clean_cell(response.get("mode")),
         _clean_cell(topic),
         _clean_cell(response.get("entry_source_used")),
+        _clean_cell(response.get("status")),
+        _clean_cell(response.get("answer_verdict")),
+        "",
+        _clean_cell(response.get("recommend_video")),
+        _clean_cell(next_state.get("correct_streak") if isinstance(next_state, dict) else ""),
+        _clean_cell(response.get("topic_conflict")),
+        _clean_cell(payload.get("selected_oblast")),
+        _clean_cell(response.get("last_tutor_task")),
         _clean_cell(payload.get("student_message")),
         _clean_cell(response.get("answer")),
-        _clean_cell(response.get("status")),
+        _json_cell(response.get("answer_check")),
+        _json_cell(response.get("next_state")),
     ]
 
 
 def _build_feedback_row(payload: dict) -> list[Any]:
     return [
         datetime.now(timezone.utc).isoformat(),
+        "feedback",
         _clean_cell(payload.get("session_id")),
+        _clean_cell(payload.get("message_index")),
         "",
         _clean_cell(payload.get("mode")),
         _clean_cell(payload.get("topic")),
         "feedback",
-        "",
-        "",
         "ready",
-        "feedback",
-        _clean_cell(payload.get("message_index")),
+        "",
         _clean_cell(payload.get("verdict")),
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
     ]
 
 

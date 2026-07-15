@@ -35,11 +35,33 @@ class FakeWorksheet:
     def __init__(self, *, fail=False):
         self.fail = fail
         self.appended = []
+        self.updated = []
+        self.formats = []
+        self.frozen = []
+        self.filters = []
+        self.rows = {1: []}
 
     def append_row(self, values, value_input_option=None):
         if self.fail:
             raise RuntimeError("append failed")
         self.appended.append((values, value_input_option))
+
+    def row_values(self, row):
+        return self.rows.get(row, [])
+
+    def update(self, rng, values):
+        self.updated.append((rng, values))
+        if rng.startswith("A1:"):
+            self.rows[1] = list(values[0])
+
+    def freeze(self, **kwargs):
+        self.frozen.append(kwargs)
+
+    def set_basic_filter(self, rng):
+        self.filters.append(rng)
+
+    def format(self, rng, fmt):
+        self.formats.append((rng, fmt))
 
 
 class FakeSpreadsheet:
@@ -90,9 +112,11 @@ def isolate_sheets(monkeypatch, tmp_path):
         monkeypatch.delenv(name, raising=False)
     sl.sheet = None
     sl._sheets_initialized = False
+    sl._sheet_layout_prepared = False
     yield
     sl.sheet = None
     sl._sheets_initialized = False
+    sl._sheet_layout_prepared = False
 
 
 def _b64_creds() -> str:
@@ -134,15 +158,29 @@ def test_log_transcript_appends_expected_row(monkeypatch):
     assert len(worksheet.appended) == 1
     row, option = worksheet.appended[0]
     datetime.fromisoformat(row[0])
+    assert worksheet.updated == [("A1:T1", [sl.SHEET_HEADERS])]
+    assert worksheet.frozen == [{"rows": 1}]
+    assert worksheet.filters == ["A1:T1"]
     assert row[1:] == [
+        "chat",
         "sess-1",
+        "",
         7,
         "practice",
         "6-01-001",
         "manual_topic_choice",
+        "ready",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
         "Koliko je 2+2?",
         "4",
-        "ready",
+        "",
+        "",
     ]
     assert option == "USER_ENTERED"
 
@@ -227,18 +265,27 @@ def test_log_feedback_appends_verdict_row(monkeypatch):
     assert len(worksheet.appended) == 1
     row, option = worksheet.appended[0]
     datetime.fromisoformat(row[0])
+    assert worksheet.updated == [("A1:T1", [sl.SHEET_HEADERS])]
     assert row[1:] == [
+        "feedback",
         "sess-fb",
+        4,
         "",
         "practice",
         "6-04-040",
         "feedback",
-        "",
-        "",
         "ready",
-        "feedback",
-        4,
+        "",
         "down",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
     ]
     assert option == "USER_ENTERED"
 
