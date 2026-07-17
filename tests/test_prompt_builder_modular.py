@@ -846,6 +846,39 @@ def test_empathy_in_practice_help_and_followup():
     assert "EMPATIJA" in fu and "samokritiku" in fu
 
 
+def test_adaptive_hint_prompt_levels_include_mc_and_followup_rules():
+    mc_block = pb.build_practice_help_instructions({
+        "_practice_help_intent": "hint",
+        "_practice_help_task": "Rijesi jednacinu: 2/3 x = 8.",
+        "_hint_level": 3,
+        "_multiple_choice_hint": {
+            "question": "Koji je najbolji sljedeci korak?",
+            "correct_id": "A",
+            "options": [
+                {"id": "A", "text": "Pomnozi obje strane sa 3/2.", "correct": True},
+                {"id": "B", "text": "Dodaj 2/3 na obje strane.", "correct": False},
+                {"id": "C", "text": "Podijeli obje strane sa 8.", "correct": False},
+            ],
+        },
+    }, {})
+
+    assert "ADAPTIVNI HINT NIVO 3" in mc_block
+    assert "TACNO tri ponudjena odgovora" in mc_block
+    assert "A) Pomnozi obje strane sa 3/2." in mc_block
+    assert "Interno: tacna opcija je A" in mc_block
+
+    reveal_block = pb.build_practice_help_instructions({
+        "_practice_help_intent": "hint",
+        "_practice_help_task": "Rijesi jednacinu: 2/3 x = 8.",
+        "_hint_level": 5,
+        "_adaptive_followup_task": "Rijesi jednacinu: 3/4 x = 9.",
+    }, {})
+
+    assert "ADAPTIVNI HINT NIVO 5" in reveal_block
+    assert "NIJE samostalno rijesen zadatak" in reveal_block
+    assert "Zadatak: Rijesi jednacinu: 3/4 x = 9." in reveal_block
+
+
 def test_distress_detection_and_prominent_directive():
     """Bug #2 (živi nalaz): kad je frustracija stvarno u poruci, istaknuta
     PRIORITET direktiva ide na VRH help-bloka; inače je nema."""

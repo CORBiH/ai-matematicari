@@ -6,11 +6,15 @@ logging must never break the tutor response path.
 """
 from __future__ import annotations
 
+import atexit
 import base64
+import hashlib
 import json
 import logging
 import os
+import queue
 import threading
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -36,6 +40,29 @@ sheet = None
 _sheets_initialized = False
 _sheet_layout_prepared = False
 _sheets_lock = threading.Lock()
+_append_lock = threading.Lock()
+
+_ASYNC_STOP = object()
+_ASYNC_STATUS_LIMIT = 500
+_async_condition = threading.Condition()
+_async_queue: queue.Queue | None = None
+_async_worker: threading.Thread | None = None
+_async_shutdown = False
+_async_pending = 0
+_async_active = 0
+_async_statuses: dict[str, dict[str, Any]] = {}
+_async_status_order: list[str] = []
+_async_stats: dict[str, int] = {
+    "queued": 0,
+    "delivered": 0,
+    "retried": 0,
+    "permanently_failed": 0,
+    "dropped_on_shutdown": 0,
+}
+
+
+class _SheetsPermanentError(RuntimeError):
+    """Permanent local/configuration failure that should not be retried."""
 
 SHEET_HEADERS = [
     "timestamp_iso",
@@ -72,7 +99,26 @@ SHEET_HEADERS = [
     "total_attempt_count",
     "wrong_attempt_count",
     "hint_count",
+    "parent_task_id",
+    "followup_task_id",
+    "task_origin",
+    "completed_parent_task",
+    "hint_level",
+    "highest_hint_level",
+    "hint_reason",
+    "hint_history",
+    "repeated_hint_prevented",
+    "solution_revealed",
+    "solved_independently",
+    "solved_with_hints",
+    "requires_independent_solution",
+    "independent_followup_result",
+    "last_hint_signature",
+    "progress_signature",
+    "multiple_choice_hint",
+    "multiple_choice_result",
     "answer_verdict_detail",
+    "sheets_event_id",
 ]
 
 
@@ -108,6 +154,96 @@ def _sheet_col(n: int) -> str:
 
 def _credentials_file() -> Path:
     return Path("credentials.json")
+
+
+def _event_id_for_row(row: list[Any]) -> str:
+    def cell(name: str) -> str:
+        try:
+            idx = SHEET_HEADERS.index(name)
+            return str(row[idx] if idx < len(row) else "")
+        except ValueError:
+            return ""
+
+    seed = "|".join([
+        cell("timestamp_iso"),
+        cell("event_type"),
+        cell("session_id"),
+        cell("message_index"),
+        cell("task_id"),
+    ])
+    return "sheet_" + hashlib.sha256(seed.encode("utf-8", "replace")).hexdigest()[:24]
+
+
+def _set_row_event_id(row: list[Any], event_id: str) -> None:
+    try:
+        idx = SHEET_HEADERS.index("sheets_event_id")
+    except ValueError:
+        return
+    while len(row) < len(SHEET_HEADERS):
+        row.append("")
+    row[idx] = event_id
+
+
+def _event_kind(row: list[Any]) -> str:
+    try:
+        idx = SHEET_HEADERS.index("event_type")
+        return str(row[idx] if idx < len(row) else "") or "unknown"
+    except ValueError:
+        return "unknown"
+
+
+def _make_event(row: list[Any]) -> dict[str, Any]:
+    event_id = _event_id_for_row(row)
+    _set_row_event_id(row, event_id)
+    return {
+        "event_id": event_id,
+        "kind": _event_kind(row),
+        "row": row,
+        "enqueued_at": time.time(),
+    }
+
+
+def _status_snapshot(event: dict[str, Any], status: str, **extra: Any) -> dict[str, Any]:
+    now = time.time()
+    out = {
+        "event_id": event.get("event_id"),
+        "kind": event.get("kind"),
+        "status": status,
+        "enqueue_ts": event.get("enqueued_at"),
+        "updated_ts": now,
+        "retry_count": int(extra.pop("retry_count", 0) or 0),
+    }
+    out.update({k: v for k, v in extra.items() if v not in (None, "")})
+    return out
+
+
+def _record_status(event: dict[str, Any], status: str, **extra: Any) -> None:
+    event_id = str(event.get("event_id") or "")
+    if not event_id:
+        return
+    rec = _status_snapshot(event, status, **extra)
+    with _async_condition:
+        if event_id not in _async_statuses:
+            _async_status_order.append(event_id)
+            while len(_async_status_order) > _ASYNC_STATUS_LIMIT:
+                old = _async_status_order.pop(0)
+                _async_statuses.pop(old, None)
+        else:
+            prior = _async_statuses.get(event_id) or {}
+            rec["retry_count"] = max(
+                int(prior.get("retry_count", 0) or 0),
+                int(rec.get("retry_count", 0) or 0),
+            )
+            if prior.get("enqueue_ts") is not None:
+                rec["enqueue_ts"] = prior.get("enqueue_ts")
+        _async_statuses[event_id] = rec
+        _async_condition.notify_all()
+
+
+def _bump_stat(name: str, amount: int = 1) -> None:
+    with _async_condition:
+        _async_stats[name] = int(_async_stats.get(name, 0) or 0) + amount
+        _async_condition.notify_all()
 
 
 def _has_explicit_credentials() -> bool:
@@ -170,7 +306,10 @@ def _init_sheets():
             )
         except Exception as exc:
             sheet = None
-            log.warning("Sheets inicijalizacija nije uspjela: %s", exc)
+            log.warning(
+                "Sheets inicijalizacija nije uspjela (category=%s)",
+                _sheets_error_category(exc),
+            )
         finally:
             _sheets_initialized = True
     return sheet
@@ -218,18 +357,141 @@ def _ensure_sheet_layout(ws: Any) -> None:
         _sheet_layout_prepared = True
 
 
-def sheets_append_row_safe(values: list[Any]) -> bool:
-    """Append one row to Sheets. Errors are logged and converted to False."""
+def _status_code_from_exception(exc: Exception) -> int | None:
+    for attr in ("status_code", "code"):
+        value = getattr(exc, attr, None)
+        try:
+            if value is not None:
+                return int(value)
+        except (TypeError, ValueError):
+            pass
+    response = getattr(exc, "response", None)
+    value = getattr(response, "status_code", None)
     try:
+        return int(value) if value is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _sheets_error_category(exc: Exception) -> str:
+    status = _status_code_from_exception(exc)
+    if status == 429:
+        return "rate_limited"
+    if status in (500, 502, 503, 504):
+        return "temporary_server_error"
+    if status in (401, 403):
+        return "auth_or_permission"
+    if status == 404:
+        return "sheet_not_found"
+    if status is not None and 400 <= status < 500:
+        return "invalid_request"
+    if isinstance(exc, _SheetsPermanentError):
+        return "not_configured"
+    name = type(exc).__name__.lower()
+    text = str(exc).lower()
+    if "timeout" in name or "timeout" in text:
+        return "timeout"
+    if "connection" in name or "connection" in text:
+        return "connection_error"
+    if "rate" in text and "limit" in text:
+        return "rate_limited"
+    if "invalid_grant" in text or "unauthorized" in text or "forbidden" in text:
+        return "auth_or_permission"
+    if "not found" in text:
+        return "sheet_not_found"
+    return "unexpected"
+
+
+def _is_transient_category(category: str) -> bool:
+    return category in {
+        "timeout",
+        "connection_error",
+        "rate_limited",
+        "temporary_server_error",
+    }
+
+
+def _retry_count() -> int:
+    try:
+        return max(0, int(os.getenv("SHEETS_ASYNC_MAX_RETRIES", "2") or 2))
+    except (TypeError, ValueError):
+        return 2
+
+
+def _retry_backoff_seconds(attempt: int) -> float:
+    try:
+        base = max(0.0, float(os.getenv("SHEETS_ASYNC_RETRY_BASE_S", "0.25") or 0.25))
+    except (TypeError, ValueError):
+        base = 0.25
+    return min(5.0, base * (2 ** max(0, attempt - 1)))
+
+
+def _append_row_once(values: list[Any]) -> None:
+    with _append_lock:
         ws = _init_sheets()
         if not ws:
-            return False
+            raise _SheetsPermanentError("sheets_not_configured")
         _ensure_sheet_layout(ws)
         ws.append_row(values, value_input_option="USER_ENTERED")
-        return True
-    except Exception as exc:
-        log.warning("Sheets append nije uspio: %s", exc)
-        return False
+
+
+def _deliver_event(event: dict[str, Any]) -> bool:
+    max_retries = _retry_count()
+    retry_count = 0
+    for attempt in range(max_retries + 1):
+        try:
+            _record_status(event, "delivering", retry_count=retry_count)
+            _append_row_once(list(event.get("row") or []))
+            _bump_stat("delivered")
+            _record_status(
+                event,
+                "delivered",
+                retry_count=retry_count,
+                delivered_ts=time.time(),
+            )
+            return True
+        except Exception as exc:
+            category = _sheets_error_category(exc)
+            retryable = _is_transient_category(category) and attempt < max_retries
+            if retryable:
+                retry_count += 1
+                _bump_stat("retried")
+                _record_status(
+                    event,
+                    "retried",
+                    retry_count=retry_count,
+                    error_category=category,
+                )
+                log.warning(
+                    "Sheets async delivery retry event_id=%s category=%s retry=%s",
+                    event.get("event_id"),
+                    category,
+                    retry_count,
+                )
+                time.sleep(_retry_backoff_seconds(retry_count))
+                continue
+            _bump_stat("permanently_failed")
+            _record_status(
+                event,
+                "permanently_failed",
+                retry_count=retry_count,
+                error_category=category,
+                delivered_ts=time.time(),
+            )
+            log.warning(
+                "Sheets delivery failed event_id=%s category=%s retries=%s",
+                event.get("event_id"),
+                category,
+                retry_count,
+            )
+            return False
+    return False
+
+
+def sheets_append_row_safe(values: list[Any]) -> bool:
+    """Append one row to Sheets synchronously. Errors are sanitized and False."""
+    event = _make_event(list(values))
+    return _deliver_event(event)
 
 
 def _first_answer_check_item(response: dict) -> dict:
@@ -246,6 +508,12 @@ def _build_transcript_row(payload: dict, response: dict) -> list[Any]:
     topic = response.get("final_topic") or response.get("effective_topic")
     next_state = response.get("next_state") or {}
     item = _first_answer_check_item(response)
+    def _telemetry(key: str) -> Any:
+        value = response.get(key)
+        if value is None and isinstance(next_state, dict):
+            value = next_state.get(key)
+        return value
+
     return [
         datetime.now(timezone.utc).isoformat(),
         "chat",
@@ -281,52 +549,180 @@ def _build_transcript_row(payload: dict, response: dict) -> list[Any]:
         _clean_cell(response.get("total_attempt_count") or next_state.get("total_attempt_count") or next_state.get("attempt_count")),
         _clean_cell(response.get("wrong_attempt_count") or next_state.get("wrong_attempt_count")),
         _clean_cell(response.get("hint_count") or next_state.get("hint_count")),
+        _clean_cell(_telemetry("parent_task_id")),
+        _clean_cell(_telemetry("followup_task_id")),
+        _clean_cell(_telemetry("task_origin")),
+        _json_cell(_telemetry("completed_parent_task")),
+        _clean_cell(_telemetry("hint_level")),
+        _clean_cell(_telemetry("highest_hint_level")),
+        _clean_cell(_telemetry("hint_reason")),
+        _json_cell(_telemetry("hint_history")),
+        _clean_cell(_telemetry("repeated_hint_prevented")),
+        _clean_cell(_telemetry("solution_revealed")),
+        _clean_cell(_telemetry("solved_independently")),
+        _clean_cell(_telemetry("solved_with_hints")),
+        _clean_cell(_telemetry("requires_independent_solution")),
+        _clean_cell(_telemetry("independent_followup_result")),
+        _clean_cell(_telemetry("last_hint_signature")),
+        _clean_cell(_telemetry("progress_signature")),
+        _json_cell(_telemetry("multiple_choice_hint")),
+        _json_cell(_telemetry("multiple_choice_result")),
         _clean_cell(response.get("answer_verdict_detail") or item.get("verdict")),
+        "",
     ]
 
 
 def _build_feedback_row(payload: dict) -> list[Any]:
-    return [
-        datetime.now(timezone.utc).isoformat(),
-        "feedback",
-        _clean_cell(payload.get("session_id")),
-        _clean_cell(payload.get("message_index")),
-        "",
-        _clean_cell(payload.get("mode")),
-        _clean_cell(payload.get("topic")),
-        "feedback",
-        "ready",
-        "",
-        _clean_cell(payload.get("verdict")),
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-        "",
-    ]
+    row = [""] * len(SHEET_HEADERS)
+    values = {
+        "timestamp_iso": datetime.now(timezone.utc).isoformat(),
+        "event_type": "feedback",
+        "session_id": _clean_cell(payload.get("session_id")),
+        "message_index": _clean_cell(payload.get("message_index")),
+        "mode": _clean_cell(payload.get("mode")),
+        "topic": _clean_cell(payload.get("topic")),
+        "entry_source": "feedback",
+        "status": "ready",
+        "feedback_verdict": _clean_cell(payload.get("verdict")),
+    }
+    for key, value in values.items():
+        try:
+            row[SHEET_HEADERS.index(key)] = value
+        except ValueError:
+            pass
+    return row
 
 
 def _async_enabled() -> bool:
     return _env_flag("SHEETS_ASYNC_LOG", "1")
+
+
+def _async_worker_loop(q: queue.Queue) -> None:
+    global _async_active, _async_pending
+    while True:
+        item = q.get()
+        try:
+            if item is _ASYNC_STOP:
+                return
+            with _async_condition:
+                _async_active += 1
+            _deliver_event(item)
+        except Exception:
+            # Defensive only: _deliver_event should sanitize/handle everything.
+            log.exception("Sheets async worker unexpected failure")
+        finally:
+            if item is not _ASYNC_STOP:
+                with _async_condition:
+                    _async_pending = max(0, _async_pending - 1)
+                    _async_active = max(0, _async_active - 1)
+                    _async_condition.notify_all()
+            try:
+                q.task_done()
+            except Exception:
+                pass
+
+
+def _ensure_async_worker() -> queue.Queue | None:
+    global _async_queue, _async_worker
+    with _async_condition:
+        if _async_shutdown:
+            return None
+        if _async_queue is None:
+            _async_queue = queue.Queue()
+        if _async_worker is None or not _async_worker.is_alive():
+            _async_worker = threading.Thread(
+                target=_async_worker_loop,
+                args=(_async_queue,),
+                name="matbot-sheets-logger",
+                daemon=True,
+            )
+            _async_worker.start()
+        return _async_queue
+
+
+def _enqueue_event(event: dict[str, Any]) -> bool:
+    global _async_pending
+    q = _ensure_async_worker()
+    rejected = False
+    with _async_condition:
+        if q is None or _async_shutdown:
+            _async_stats["dropped_on_shutdown"] = int(_async_stats.get("dropped_on_shutdown", 0) or 0) + 1
+            rejected = True
+        else:
+            _async_pending += 1
+            _async_stats["queued"] = int(_async_stats.get("queued", 0) or 0) + 1
+    if rejected:
+        _record_status(event, "dropped_on_shutdown")
+        log.warning("Sheets async enqueue rejected after shutdown event_id=%s", event.get("event_id"))
+        return False
+    _record_status(event, "queued")
+    q.put(event)
+    return True
+
+
+def flush(timeout: float = 10.0) -> bool:
+    """Wait until accepted async rows finish delivery, bounded by timeout."""
+    deadline = time.monotonic() + max(0.0, float(timeout or 0.0))
+    with _async_condition:
+        while _async_pending > 0 or _async_active > 0:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return False
+            _async_condition.wait(timeout=remaining)
+        return True
+
+
+def shutdown(wait: bool = True, timeout: float = 10.0) -> bool:
+    """Stop the async worker. A bounded flush is attempted when wait=True."""
+    global _async_shutdown
+    deadline = time.monotonic() + max(0.0, float(timeout or 0.0))
+    with _async_condition:
+        _async_shutdown = True
+    flushed = True
+    if wait:
+        flushed = flush(timeout=max(0.0, deadline - time.monotonic()))
+    with _async_condition:
+        q = _async_queue
+        worker = _async_worker
+        remaining_pending = _async_pending
+        if remaining_pending > 0:
+            _async_stats["dropped_on_shutdown"] = int(_async_stats.get("dropped_on_shutdown", 0) or 0) + remaining_pending
+    if q is not None:
+        try:
+            q.put(_ASYNC_STOP)
+        except Exception:
+            pass
+    if wait and worker is not None and worker.is_alive() and worker is not threading.current_thread():
+        worker.join(timeout=max(0.0, deadline - time.monotonic()))
+    return bool(flushed and remaining_pending == 0)
+
+
+def get_delivery_stats() -> dict[str, Any]:
+    with _async_condition:
+        return {
+            **{k: int(v or 0) for k, v in _async_stats.items()},
+            "pending": int(_async_pending),
+            "active": int(_async_active),
+            "shutdown": bool(_async_shutdown),
+            "worker_alive": bool(_async_worker and _async_worker.is_alive()),
+            "recent_statuses": [dict(_async_statuses[eid]) for eid in _async_status_order if eid in _async_statuses],
+        }
+
+
+def _reset_async_state_for_tests() -> None:
+    global _async_queue, _async_worker, _async_shutdown, _async_pending, _async_active
+    shutdown(wait=True, timeout=1.0)
+    with _async_condition:
+        _async_queue = None
+        _async_worker = None
+        _async_shutdown = False
+        _async_pending = 0
+        _async_active = 0
+        _async_statuses.clear()
+        _async_status_order.clear()
+        for key in list(_async_stats):
+            _async_stats[key] = 0
+        _async_condition.notify_all()
 
 
 def log_transcript_to_sheet(payload: dict, response: dict) -> bool:
@@ -347,10 +743,10 @@ def log_transcript_to_sheet(payload: dict, response: dict) -> bool:
             return False
 
         row = _build_transcript_row(payload, response)
+        event = _make_event(row)
         if _async_enabled():
-            threading.Thread(target=sheets_append_row_safe, args=(row,), daemon=True).start()
-            return True
-        return sheets_append_row_safe(row)
+            return _enqueue_event(event)
+        return _deliver_event(event)
     except Exception:
         log.exception("Sheets transcript log nije uspio - tutor odgovor se ne prekida")
         return False
@@ -373,10 +769,13 @@ def log_feedback_to_sheet(payload: dict) -> bool:
         if verdict not in ("up", "down"):
             return False
         row = _build_feedback_row(payload)
+        event = _make_event(row)
         if _async_enabled():
-            threading.Thread(target=sheets_append_row_safe, args=(row,), daemon=True).start()
-            return True
-        return sheets_append_row_safe(row)
+            return _enqueue_event(event)
+        return _deliver_event(event)
     except Exception:
         log.exception("Sheets feedback log nije uspio - tutor odgovor se ne prekida")
         return False
+
+
+atexit.register(lambda: shutdown(wait=True, timeout=5.0))

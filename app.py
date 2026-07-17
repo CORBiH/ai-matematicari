@@ -276,7 +276,11 @@ from utils import _bytes_to_data_url
 from matbot import ai_tutor_service
 from matbot.activity_log import log_tutor_feedback
 from matbot.content_loader import ContentLoadError
-from matbot.sheets_log import log_feedback_to_sheet
+from matbot.sheets_log import (
+    flush as flush_sheets_log,
+    get_delivery_stats as get_sheets_delivery_stats,
+    log_feedback_to_sheet,
+)
 
 def _openai_chat(model: str, messages: list, timeout: float = None, max_tokens: int | None = None, fast: bool = False, max_retries: int | None = None, reasoning_effort: str | None = None):
 
@@ -465,6 +469,30 @@ def mathpix_selftest():
         return jsonify({"ok": True, "text": out, "confidence": conf}), 200
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.get("/sheets/status")
+@limiter.limit(_diag_rate_limit)
+def sheets_status():
+    if not _diag_allowed():
+        return jsonify({"error": "forbidden"}), 403
+    return jsonify({"ok": True, "stats": get_sheets_delivery_stats()}), 200
+
+
+@app.post("/sheets/flush")
+@limiter.limit(_diag_rate_limit)
+def sheets_flush():
+    if not _diag_allowed():
+        return jsonify({"error": "forbidden"}), 403
+    data = request.get_json(silent=True) if request.is_json else {}
+    try:
+        timeout = float((data or {}).get("timeout", 10.0))
+    except (TypeError, ValueError):
+        timeout = 10.0
+    timeout = max(0.0, min(timeout, 30.0))
+    ok = flush_sheets_log(timeout=timeout)
+    return jsonify({"ok": bool(ok), "stats": get_sheets_delivery_stats()}), 200
+
 
 @app.after_request
 def add_no_cache_headers(resp):

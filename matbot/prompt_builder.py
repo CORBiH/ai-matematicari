@@ -681,6 +681,83 @@ def build_practice_help_instructions(payload: dict, topic_context: dict) -> str:
             "niti \"**Rezultat:**\". Daj SAMO prvi korak ili navodeće pitanje i "
             "stani — učenik želi sam završiti.\n"
         ) + block
+    try:
+        hint_level = int(
+            payload.get("_hint_level")
+            or ((payload.get("_adaptive_hint") or {}).get("level") if isinstance(payload.get("_adaptive_hint"), dict) else 0)
+            or 0
+        )
+    except (TypeError, ValueError):
+        hint_level = 0
+    if hint_level:
+        block += (
+            f"ADAPTIVNI HINT NIVO {hint_level}:\n"
+            "- Ovo je progresivna pomoc za ISTI aktivni zadatak; ne mijenjaj zadatak "
+            "osim na nivou 5 kada je izricito trazen nezavisan follow-up.\n"
+            "- Ne ponavljaj isti hint. Ako je repeated_hint_prevented=true, daj "
+            "drugaciji i konkretniji sljedeci oblik pomoci.\n"
+        )
+        if hint_level == 1:
+            block += (
+                "- NIVO 1: samo konceptualna ideja ili podsjetnik na pravilo. "
+                "Bez racunanja, bez prvog konkretnog koraka i bez rezultata.\n"
+                "- STROGA GRANICA NIVOA 1: ne smijes napisati tacnu operaciju koju "
+                "treba uraditi nad obje strane (npr. 'podijeli 8 sa ...', "
+                "'pomnozi obje strane sa ...') i ne smijes navesti recipročnu "
+                "vrijednost. Postavi samo navodece konceptualno pitanje.\n"
+            )
+        elif hint_level == 2:
+            block += (
+                "- NIVO 2: daj jedan konkretan prvi korak. Stani odmah poslije "
+                "tog koraka i pozovi ucenika da nastavi. Bez konacnog rezultata.\n"
+            )
+        elif hint_level == 3:
+            block += (
+                "- NIVO 3: napisi TACNO tri ponudjena odgovora, oznacena A), B), C). "
+                "Samo jedna opcija smije biti ispravna. Ne otkrivaj kompletno rjesenje.\n"
+                "- STROGA GRANICA NIVOA 3: poslije opcije C) odmah stani. Ne dodaj "
+                "objasnjenje, ne reci koja opcija je tacna i ne pisi sljedeci korak.\n"
+            )
+            mc = payload.get("_multiple_choice_hint")
+            if isinstance(mc, dict) and isinstance(mc.get("options"), list):
+                question = normalize_value(mc.get("question"))[:220]
+                if question:
+                    block += f"MC PITANJE: {question}\n"
+                for opt in mc.get("options")[:3]:
+                    if isinstance(opt, dict):
+                        oid = normalize_value(opt.get("id")).upper()[:1]
+                        text = normalize_value(opt.get("text"))[:220]
+                        if oid and text:
+                            block += f"{oid}) {text}\n"
+                correct_id = normalize_value(mc.get("correct_id")).upper()[:1]
+                if correct_id:
+                    block += (
+                        f"Interno: tacna opcija je {correct_id}. Nemoj reci da je "
+                        "tacna dok ucenik ne odgovori.\n"
+                    )
+        elif hint_level == 4:
+            block += (
+                "- NIVO 4: vodi kroz tacno jedan sljedeci korak. Smijes traziti "
+                "da ucenik izracuna mali medjurezultat, ali ne zavrsavaj cijelo rjesenje.\n"
+            )
+        else:
+            followup = normalize_value(payload.get("_adaptive_followup_task"))[:300]
+            block += (
+                "- NIVO 5: puno rjesenje je dozvoljeno samo zato sto su prethodni "
+                "hintovi iscrpljeni. Jasno reci da ovo NIJE samostalno rijesen zadatak.\n"
+                "- Poslije rjesenja OBAVEZNO daj slican nezavisan zadatak u posebnom "
+                "redu koji pocinje tacno sa 'Zadatak:'.\n"
+            )
+            if followup:
+                block += f"NEZAVISNI FOLLOW-UP ZADATAK KOJI TREBAS DATI:\nZadatak: {followup}\n"
+    progress = normalize_value(payload.get("_student_progress_signature"))[:220]
+    if progress:
+        block += (
+            "UCENIKOV ZADNJI SMISLENI POKUSAJ/NAPREDAK:\n"
+            f"{progress}\n"
+            "- Nastavi od ovog pokusaja i jasno se nadovezi na njega; ne pocinji "
+            "objasnjenje ispocetka ako je taj korak upotrebljiv.\n"
+        )
     if intent == "hint":
         block += (
             "- Učenik je zapeo ili traži HINT: daj JEDAN kratak sljedeći korak "

@@ -15,6 +15,7 @@ import logging
 import json
 import re
 import uuid
+from fractions import Fraction
 from typing import Any, Callable
 
 from matbot.activity_log import log_student_activity
@@ -332,6 +333,347 @@ def _select_practice_help_task(task: str, message: Any) -> tuple[int | None, str
     return None, task
 
 
+_ADAPTIVE_HINT_MAX_LEVEL = 5
+_ADAPTIVE_HISTORY_LIMIT = 8
+_ADAPTIVE_RESPONSE_FIELDS = (
+    "parent_task_id",
+    "followup_task_id",
+    "task_origin",
+    "completed_parent_task",
+    "hint_level",
+    "highest_hint_level",
+    "hint_reason",
+    "hint_history",
+    "repeated_hint_prevented",
+    "solution_revealed",
+    "solved_independently",
+    "solved_with_hints",
+    "requires_independent_solution",
+    "independent_followup_result",
+    "last_hint_signature",
+    "progress_signature",
+    "multiple_choice_hint",
+    "multiple_choice_result",
+)
+
+
+def _coerce_nonnegative_int(value: Any, default: int = 0, cap: int | None = None) -> int:
+    try:
+        out = int(value)
+    except (TypeError, ValueError):
+        out = default
+    out = max(0, out)
+    return min(out, cap) if cap is not None else out
+
+
+def _signature_text(value: Any, limit: int = 120) -> str:
+    text = fold_diacritics(normalize_value(value)).lower()
+    text = re.sub(r"\s+", " ", text).strip()
+    return text[:limit]
+
+
+def _progress_signature(value: Any) -> str:
+    text = _signature_text(value, limit=160)
+    if not text:
+        return ""
+    # Drop very generic help requests so they do not look like mathematical progress.
+    if re.fullmatch(r"(?:daj\s+)?(?:mi\s+)?(?:hint|pomoc|pomozi|ne znam|ne kontam)[.!?\s]*", text):
+        return ""
+    if (
+        re.search(r"\b(?:hint|pomoc|pomozi|ne\s+znam|ne\s+kontam|nemam\s+pojma)\b", text)
+        and not re.search(r"[\d=<>/]|\b[a-z]?\s*x\b", text)
+    ):
+        return ""
+    return text
+
+
+def _task_hint_signature(task: Any, level: int) -> str:
+    task_sig = _signature_text(task, limit=90) or "task"
+    return f"{task_sig}|L{max(1, min(_ADAPTIVE_HINT_MAX_LEVEL, level))}"
+
+
+def _clean_hint_history(raw: Any) -> list[dict]:
+    if not isinstance(raw, list):
+        return []
+    out: list[dict] = []
+    for item in raw[-_ADAPTIVE_HISTORY_LIMIT:]:
+        if not isinstance(item, dict):
+            continue
+        level = _coerce_nonnegative_int(item.get("level"), cap=_ADAPTIVE_HINT_MAX_LEVEL)
+        if level <= 0:
+            continue
+        out.append({
+            "level": level,
+            "reason": normalize_value(item.get("reason"))[:80],
+            "signature": normalize_value(item.get("signature"))[:160],
+        })
+    return out[-_ADAPTIVE_HISTORY_LIMIT:]
+
+
+def _choice_key(value: Any) -> str:
+    folded = fold_diacritics(normalize_value(value)).lower()
+    folded = re.sub(r"^\s*(?:opcija\s*)?[abc]\s*[\).:\-]\s*", "", folded)
+    folded = re.sub(r"[^a-z0-9/<>+=,\-]+", " ", folded)
+    return re.sub(r"\s+", " ", folded).strip(" .,:;!?")
+
+
+def _normalize_multiple_choice_hint(raw: Any) -> dict | None:
+    if not isinstance(raw, dict):
+        return None
+    options_raw = raw.get("options")
+    if not isinstance(options_raw, list):
+        return None
+    options: list[dict] = []
+    correct_id = normalize_value(raw.get("correct_id")).upper()[:1]
+    for idx, opt in enumerate(options_raw[:3]):
+        expected_id = chr(ord("A") + idx)
+        if isinstance(opt, dict):
+            opt_id = normalize_value(opt.get("id")).upper()[:1] or expected_id
+            text = normalize_value(opt.get("text"))[:220]
+            is_correct = bool(opt.get("correct"))
+        else:
+            opt_id = expected_id
+            text = normalize_value(opt)[:220]
+            is_correct = False
+        if opt_id not in ("A", "B", "C"):
+            opt_id = expected_id
+        if not text:
+            return None
+        if is_correct:
+            correct_id = opt_id
+        options.append({"id": opt_id, "text": text, "correct": is_correct})
+    if len(options) != 3:
+        return None
+    if correct_id not in ("A", "B", "C"):
+        correct_id = "A"
+    for opt in options:
+        opt["correct"] = opt["id"] == correct_id
+    return {
+        "question": normalize_value(raw.get("question"))[:220] or "Koji je najbolji sljedeci korak?",
+        "options": options,
+        "correct_id": correct_id,
+    }
+
+
+def _normalize_multiple_choice_result(raw: Any) -> dict | None:
+    if not isinstance(raw, dict):
+        return None
+    choice_id = normalize_value(raw.get("choice_id")).upper()[:1]
+    if choice_id not in ("A", "B", "C"):
+        return None
+    correct_id = normalize_value(raw.get("correct_id")).upper()[:1]
+    return {
+        "choice_id": choice_id,
+        "choice_text": normalize_value(raw.get("choice_text"))[:220],
+        "correct": bool(raw.get("correct")),
+        "correct_id": correct_id if correct_id in ("A", "B", "C") else "",
+    }
+
+
+def _normalize_completed_parent_task(raw: Any) -> dict | None:
+    if not isinstance(raw, dict):
+        return None
+    task_id = normalize_value(raw.get("task_id") or raw.get("completed_task_id"))[:80]
+    followup_task_id = normalize_value(raw.get("followup_task_id"))[:80]
+    if not task_id:
+        return None
+    attempt_number = _coerce_nonnegative_int(
+        raw.get("attempt_number", raw.get("total_attempt_count", raw.get("attempt_count", 0)))
+    )
+    return {
+        "task_id": task_id,
+        "completed_task_id": task_id,
+        "task_status": "completed",
+        "attempt_number": attempt_number,
+        "attempt_count": attempt_number,
+        "total_attempt_count": attempt_number,
+        "wrong_attempt_count": _coerce_nonnegative_int(raw.get("wrong_attempt_count")),
+        "hint_count": _coerce_nonnegative_int(raw.get("hint_count")),
+        "hint_level": _coerce_nonnegative_int(raw.get("hint_level"), cap=_ADAPTIVE_HINT_MAX_LEVEL),
+        "highest_hint_level": _coerce_nonnegative_int(
+            raw.get("highest_hint_level"), cap=_ADAPTIVE_HINT_MAX_LEVEL
+        ),
+        "solution_revealed": bool(raw.get("solution_revealed")),
+        "solved_independently": bool(raw.get("solved_independently")),
+        "solved_with_hints": bool(raw.get("solved_with_hints")),
+        "requires_independent_solution": bool(raw.get("requires_independent_solution")),
+        "parent_task_id": normalize_value(raw.get("parent_task_id"))[:80] or None,
+        "followup_task_id": followup_task_id or None,
+        "task_origin": normalize_value(raw.get("task_origin")).lower() or "normal",
+    }
+
+
+def _default_multiple_choice_hint(task: Any) -> dict:
+    folded = _signature_text(task, limit=260)
+    if re.search(r"(?:2\s*/\s*3|2/3|\\frac\{2\}\{3\})\s*\*?\s*x\s*=\s*8", folded):
+        question = "Koji je najbolji sljedeci korak?"
+        options = [
+            {"id": "A", "text": "Pomnozi obje strane sa 3/2.", "correct": True},
+            {"id": "B", "text": "Dodaj 2/3 na obje strane.", "correct": False},
+            {"id": "C", "text": "Podijeli obje strane sa 8.", "correct": False},
+        ]
+    elif re.search(r"2\s*x\s*\+\s*3\s*=\s*11", folded):
+        question = "Sta je najbolji prvi korak?"
+        options = [
+            {"id": "A", "text": "Oduzmi 3 sa obje strane.", "correct": True},
+            {"id": "B", "text": "Podijeli 3 sa 11.", "correct": False},
+            {"id": "C", "text": "Dodaj 3 na lijevu stranu.", "correct": False},
+        ]
+    else:
+        question = "Koji je najbolji sljedeci korak?"
+        options = [
+            {"id": "A", "text": "Uradi jedan mali korak koji cuva jednakost ili vrijednost.", "correct": True},
+            {"id": "B", "text": "Prepisati rezultat bez provjere.", "correct": False},
+            {"id": "C", "text": "Promijeniti jedinicu ili znak nasumicno.", "correct": False},
+        ]
+    return {"question": question, "options": options, "correct_id": "A"}
+
+
+def _match_multiple_choice_answer(student: Any, hint: dict) -> dict | None:
+    mc = _normalize_multiple_choice_hint(hint)
+    if not mc:
+        return None
+    raw = normalize_value(student)
+    folded = fold_diacritics(raw).lower().strip()
+    if not folded:
+        return None
+    choice_id = ""
+    m = re.match(r"^\s*(?:opcija\s*)?([abc])(?:\b|[\).:\-])", folded)
+    if m:
+        choice_id = m.group(1).upper()
+    student_key = _choice_key(raw)
+    if not choice_id and student_key:
+        for opt in mc["options"]:
+            opt_key = _choice_key(opt.get("text"))
+            if student_key == opt_key or (len(student_key) >= 12 and student_key in opt_key):
+                choice_id = opt["id"]
+                break
+    if choice_id not in ("A", "B", "C"):
+        return None
+    option = next((o for o in mc["options"] if o["id"] == choice_id), None)
+    if not option:
+        return None
+    return {
+        "choice_id": choice_id,
+        "choice_text": option["text"],
+        "correct": choice_id == mc["correct_id"],
+        "correct_id": mc["correct_id"],
+    }
+
+
+def _looks_like_final_math_answer(student: Any) -> bool:
+    text = normalize_value(student)
+    if not text:
+        return False
+    mode, answers = parse_student_answers(text)
+    if mode != "none" and any(value is not None for value in (answers or {}).values()):
+        return True
+    return bool(re.search(r"\b[a-z]?\s*x\s*(?:=|<|>)|[=<>]|\d+\s*/\s*\d+", fold_diacritics(text)))
+
+
+def _similar_followup_task(task: Any) -> str:
+    folded = _signature_text(task, limit=260)
+    if re.search(r"(?:2\s*/\s*3|2/3|\\frac\{2\}\{3\})\s*\*?\s*x\s*=\s*8", folded):
+        return "Rijesi jednacinu: 3/4 x = 9."
+    if re.search(r"2\s*x\s*\+\s*3\s*=\s*11", folded):
+        return "Rijesi jednacinu: 3x + 2 = 14."
+    if re.search(r"razlom|frac|/", folded):
+        return "Izracunaj: 3/5 + 1/10."
+    return "Rijesi zadatak: 3x + 2 = 14."
+
+
+def _configure_adaptive_hint(payload: dict, help_task: str, message: Any) -> None:
+    prev = _previous_next_state(payload)
+    prev_level = _coerce_nonnegative_int(prev.get("hint_level"), cap=_ADAPTIVE_HINT_MAX_LEVEL)
+    prev_highest = _coerce_nonnegative_int(prev.get("highest_hint_level"), cap=_ADAPTIVE_HINT_MAX_LEVEL)
+    prev_hints = _coerce_nonnegative_int(prev.get("hint_count"))
+    wrong = _coerce_nonnegative_int(prev.get("wrong_attempt_count"))
+    progress = _progress_signature(message)
+    prev_progress = normalize_value(prev.get("progress_signature"))
+    no_new_progress = not progress or progress == prev_progress
+    if prev_progress and no_new_progress:
+        payload["_student_progress_signature"] = prev_progress
+
+    level = prev_level + 1 if prev_level else 1
+    reason = "conceptual"
+    if wrong >= 1 and prev_hints >= 1:
+        level = max(level, 2)
+        reason = "after_wrong_attempt"
+    if wrong >= 2 or prev_hints >= 2:
+        level = max(level, 3)
+        reason = "repeated_stuck"
+    if prev_hints >= 3:
+        level = max(level, 4)
+        reason = "guided_step_needed"
+    if prev_hints >= 4:
+        level = max(level, 5)
+        reason = "solution_needed"
+    if payload.get("_stuck_help") and prev_hints >= 1:
+        level = max(level, 2)
+    if no_new_progress and prev_hints >= 1:
+        payload["_repeated_hint_prevented"] = True
+        reason = "repeated_hint_prevented"
+
+    if payload.get("_no_solution_requested"):
+        level = min(level, 4)
+    level = max(1, min(_ADAPTIVE_HINT_MAX_LEVEL, level))
+    signature = _task_hint_signature(help_task, level)
+    highest = max(prev_highest, level)
+    history = _clean_hint_history(prev.get("hint_history"))
+    history.append({"level": level, "reason": reason, "signature": signature})
+    history = history[-_ADAPTIVE_HISTORY_LIMIT:]
+
+    payload["_hint_level"] = level
+    payload["_highest_hint_level"] = highest
+    payload["_hint_reason"] = reason
+    payload["_last_hint_signature"] = signature
+    payload["_hint_history"] = history
+    payload["_adaptive_hint"] = {
+        "level": level,
+        "reason": reason,
+        "signature": signature,
+        "repeated_hint_prevented": bool(payload.get("_repeated_hint_prevented")),
+    }
+    if progress:
+        payload["_progress_signature"] = progress
+
+    if level == 3:
+        payload["_multiple_choice_hint"] = _default_multiple_choice_hint(help_task)
+    else:
+        payload["_clear_multiple_choice_hint"] = True
+
+    if level >= 5 and not payload.get("_no_solution_requested"):
+        payload["_solution_revealed"] = True
+        payload["_adaptive_followup_required"] = True
+        payload["_adaptive_followup_task"] = _similar_followup_task(help_task)
+        payload["_gave_hint_step"] = False
+
+
+def _adaptive_hint_request_text(payload: dict, help_task: str) -> str:
+    level = _coerce_nonnegative_int(payload.get("_hint_level"), default=1, cap=_ADAPTIVE_HINT_MAX_LEVEL) or 1
+    base = (
+        f"ADAPTIVNI_HINT_NIVO={level}\n"
+        "Daj pomoc za aktivni zadatak prema adaptivnom nivou. "
+    )
+    if level == 1:
+        base += "Daj samo konceptualni hint, bez racuna i bez rezultata."
+    elif level == 2:
+        base += "Daj konkretan prvi korak, bez konacnog rezultata."
+    elif level == 3:
+        base += "Daj tacno tri ponudjena odgovora A, B i C za sljedeci korak."
+    elif level == 4:
+        base += "Vodi ucenika kroz jedan korak i zavrsi kratkim pitanjem."
+    else:
+        followup = normalize_value(payload.get("_adaptive_followup_task"))
+        base += (
+            "Pokazi puno rjesenje samo sada, oznaci da rjesenje nije samostalan "
+            "uspjeh, pa odmah daj slican nezavisan zadatak u novom redu 'Zadatak: ...'."
+        )
+        if followup:
+            base += f" Koristi ovaj follow-up zadatak: {followup}"
+    return base + f"\n\nZADATAK:\n{help_task[:600]}"
+
+
 def _apply_practice_help_contract(payload: dict) -> None:
     """Practice follow-up koji traži pomoć/rješenje nije pokušaj odgovora."""
     if payload.get("_direct_answer") is not None or payload.get("_skip_answer_check"):
@@ -450,11 +792,8 @@ def _apply_practice_help_contract(payload: dict) -> None:
         # FINALNI (tačan međukorak ne smije dobiti "Netačno").
         payload["_gave_hint_step"] = True
         payload["_hint_count_increment"] = True
-        payload["student_message"] = (
-            "Daj mi jedan kratki hint za ovaj zadatak. "
-            "Ne otkrivaj konačan rezultat.\n\n"
-            f"ZADATAK:\n{help_task[:600]}"
-        )
+        _configure_adaptive_hint(payload, help_task, message)
+        payload["student_message"] = _adaptive_hint_request_text(payload, help_task)
     else:
         payload["_solution_revealed"] = True
         label = f"{item}. zadatak" if item else "prethodni zadatak"
@@ -497,10 +836,68 @@ def _apply_hint_request_contract(payload: dict) -> None:
     payload["mode"] = "explain"
     payload["interaction_phase"] = "practice_help"
     payload["_original_student_message"] = message
+    _configure_adaptive_hint(payload, help_task, message)
+    payload["student_message"] = _adaptive_hint_request_text(payload, help_task)
+
+
+def _apply_multiple_choice_answer_contract(payload: dict) -> None:
+    """Answer to an adaptive level-3 hint option, not a final task answer."""
+    if payload.get("_direct_answer") is not None or payload.get("_skip_answer_check"):
+        return
+    if normalize_value(payload.get("intent")):
+        return
+    if normalize_value(payload.get("interaction_phase")).lower() != "answering_practice_task":
+        return
+    prev = _previous_next_state(payload)
+    mc = _normalize_multiple_choice_hint(prev.get("multiple_choice_hint"))
+    if not mc:
+        return
+    message = normalize_value(payload.get("student_message") or payload.get("message"))
+    match = _match_multiple_choice_answer(message, mc)
+    if not match:
+        if not _looks_like_final_math_answer(message):
+            payload["_skip_answer_check"] = True
+            payload["_adaptive_mc_ambiguous"] = True
+            payload["_adaptive_preserve_active_task"] = True
+            payload["_hint_reason"] = "multiple_choice_ambiguous"
+            payload["_direct_answer"] = (
+                "Nisam siguran koju opciju biras. Odgovori samo A, B ili C, "
+                "ili napisi svoj konacni matematicki odgovor."
+            )
+        return
+
+    task = normalize_value(payload.get("last_tutor_task"))
+    if not task:
+        return
+    prev_level = _coerce_nonnegative_int(prev.get("hint_level"), cap=_ADAPTIVE_HINT_MAX_LEVEL)
+    level = min(_ADAPTIVE_HINT_MAX_LEVEL, max(prev_level, 3) + (0 if match["correct"] else 1))
+    if match["correct"]:
+        level = max(level, 4)
+    payload["_skip_answer_check"] = True
+    payload["_mc_answer_attempt"] = True
+    payload["_mc_answer_correct"] = bool(match["correct"])
+    payload["_adaptive_mc_reply"] = True
+    payload["_adaptive_preserve_active_task"] = True
+    payload["_practice_help_intent"] = "hint"
+    payload["_practice_help_task"] = task[:600]
+    payload["_hint_level"] = level
+    payload["_highest_hint_level"] = max(
+        _coerce_nonnegative_int(prev.get("highest_hint_level"), cap=_ADAPTIVE_HINT_MAX_LEVEL),
+        level,
+    )
+    payload["_hint_reason"] = "multiple_choice_correct" if match["correct"] else "multiple_choice_retry"
+    payload["_multiple_choice_result"] = match
+    payload["_clear_multiple_choice_hint"] = True
+    payload["_gave_hint_step"] = True
     payload["student_message"] = (
-        "Daj mi jedan kratki hint za ovaj zadatak. "
-        "Ne otkrivaj konačan rezultat.\n\n"
-        f"ZADATAK:\n{help_task[:600]}"
+        "Ucenik je odgovorio na ponudjeni hint izbor.\n"
+        f"Pitanje: {mc['question']}\n"
+        f"Izbor ucenika: {match['choice_id']}) {match['choice_text']}\n"
+        f"Je li izbor tacan: {'da' if match['correct'] else 'ne'}.\n"
+        "Ako je tacan, kratko potvrdi i daj sljedeci vodjeni korak bez rjesenja. "
+        "Ako nije tacan, blago ispravi i vodi kroz jedan mali korak. "
+        "Ne tretiraj ovo kao konacni odgovor na zadatak.\n\n"
+        f"AKTIVNI ZADATAK:\n{task[:600]}"
     )
 
 
@@ -860,6 +1257,24 @@ def _empty_next_state() -> dict:
         "total_attempt_count": 0,
         "wrong_attempt_count": 0,
         "hint_count": 0,
+        "parent_task_id": None,
+        "followup_task_id": None,
+        "task_origin": "normal",
+        "completed_parent_task": None,
+        "hint_level": 0,
+        "highest_hint_level": 0,
+        "hint_reason": "",
+        "hint_history": [],
+        "last_hint_signature": "",
+        "progress_signature": "",
+        "repeated_hint_prevented": False,
+        "solution_revealed": False,
+        "solved_independently": False,
+        "solved_with_hints": False,
+        "requires_independent_solution": False,
+        "independent_followup_result": "",
+        "multiple_choice_hint": None,
+        "multiple_choice_result": None,
         "completed_task_id": None,
         "task_items": None,
         # CLASS 1 (2026-07-12): prethodni potez je bio hint sa pod-korakom —
@@ -1054,6 +1469,28 @@ def _normalize_next_state(raw: Any) -> dict:
         "total_attempt_count": max(0, total_attempts),
         "wrong_attempt_count": max(0, wrong_attempts),
         "hint_count": max(0, hints),
+        "parent_task_id": normalize_value(raw.get("parent_task_id"))[:80] or None,
+        "followup_task_id": normalize_value(raw.get("followup_task_id"))[:80] or None,
+        "task_origin": (
+            normalize_value(raw.get("task_origin")).lower()
+            if normalize_value(raw.get("task_origin")).lower() in ("normal", "student_task", "independent_followup")
+            else "normal"
+        ),
+        "completed_parent_task": _normalize_completed_parent_task(raw.get("completed_parent_task")),
+        "hint_level": _coerce_nonnegative_int(raw.get("hint_level"), cap=_ADAPTIVE_HINT_MAX_LEVEL),
+        "highest_hint_level": _coerce_nonnegative_int(raw.get("highest_hint_level"), cap=_ADAPTIVE_HINT_MAX_LEVEL),
+        "hint_reason": normalize_value(raw.get("hint_reason"))[:80],
+        "hint_history": _clean_hint_history(raw.get("hint_history")),
+        "last_hint_signature": normalize_value(raw.get("last_hint_signature"))[:160],
+        "progress_signature": normalize_value(raw.get("progress_signature"))[:160],
+        "repeated_hint_prevented": bool(raw.get("repeated_hint_prevented")),
+        "solution_revealed": bool(raw.get("solution_revealed")),
+        "solved_independently": bool(raw.get("solved_independently")),
+        "solved_with_hints": bool(raw.get("solved_with_hints")),
+        "requires_independent_solution": bool(raw.get("requires_independent_solution")),
+        "independent_followup_result": normalize_value(raw.get("independent_followup_result"))[:80],
+        "multiple_choice_hint": _normalize_multiple_choice_hint(raw.get("multiple_choice_hint")),
+        "multiple_choice_result": _normalize_multiple_choice_result(raw.get("multiple_choice_result")),
         "completed_task_id": normalize_value(raw.get("completed_task_id"))[:80] or None,
         # BUG 12: stanje višestavkovnog zadatka (koje stavke su već ocijenjene)
         "task_items": _normalize_task_items(raw.get("task_items")),
@@ -2090,7 +2527,8 @@ _CONTEXTUAL_WORK_RE = re.compile(
     r"\b(?:dobio|dobila|oduzeo|oduzela|dodao|dodala|sabirao|sabirala|sabrao|sabrala|"
     r"podijelio|podijelila|podijelio\s+sam|pomnozio|pomnozila|pomnozio\s+sam|"
     r"izracunao|izracunala|zatim|onda|prvo|drugo|postupak|korak|obje\s+strane|"
-    r"obe\s+strane|jer|zato\s+sto|posto)\b"
+    r"obe\s+strane|imenilac|nazivnik|zajednicki|prosiri\w*|prosirio|prosirila|"
+    r"svedi|sveo|svela|jer|zato\s+sto|posto)\b"
 )
 
 
@@ -2104,6 +2542,10 @@ def _student_has_contextual_work(message: Any) -> bool:
         return True
     # Kratak lanac jednacina poput "2x=8, x=4" je postupak, ne samo finalni unos.
     if re.search(r"\b\d+\s*x\s*=", folded) and re.search(r"\bx\s*=", folded):
+        return True
+    if re.search(r"\d+\s*/\s*\d+\s*=\s*\d+\s*/\s*\d+", folded):
+        return True
+    if re.search(r"\bzajednicki\s+(?:imenilac|nazivnik)\b", folded):
         return True
     return False
 
@@ -2127,6 +2569,27 @@ def _is_low_information_unclear_answer(message: Any) -> bool:
         return False
     words = re.findall(r"[a-z]+", folded)
     return len(words) <= 10 and bool(_LOW_INFO_UNCLEAR_RE.search(folded))
+
+
+def _has_false_fraction_equivalence(message: Any) -> bool:
+    folded = fold_diacritics(normalize_value(message)).lower()
+    if not folded:
+        return False
+    for m in re.finditer(
+        r"(\d+)\s*/\s*(\d+)\s*=\s*(\d+)\s*/\s*(\d+)",
+        folded,
+    ):
+        prefix = folded[:m.start()].rstrip()
+        if prefix and prefix[-1] in "+-*:":
+            continue
+        try:
+            left = Fraction(int(m.group(1)), int(m.group(2)))
+            right = Fraction(int(m.group(3)), int(m.group(4)))
+        except (ValueError, ZeroDivisionError):
+            continue
+        if left != right:
+            return True
+    return False
 
 
 def _should_run_contextual_gpt_grade(payload: dict) -> bool:
@@ -2291,6 +2754,14 @@ def _run_contextual_gpt_grade(
         grade["verdict"] = "ambiguous"
         grade["confidence"] = min(grade.get("confidence", 0.55), 0.7)
         grade["public_feedback"] = "Nejasno je šta tačno tvrdiš; napiši odgovor malo preciznije."
+    if grade["verdict"] in ("correct", "partial") and _has_false_fraction_equivalence(student):
+        grade["verdict"] = "incorrect"
+        grade["confidence"] = max(grade.get("confidence", 0.55), 0.8)
+        grade["public_feedback"] = (
+            "U zapisanom postupku postoji pogresna jednakost razlomaka, "
+            "pa odgovor ne mogu prihvatiti kao tacan korak."
+        )
+        payload["_false_fraction_equivalence"] = True
     payload["_gpt_check_used"] = True
     payload["_gpt_answer_verdict"] = grade["verdict"]
     payload["_gpt_check_confidence"] = grade["confidence"]
@@ -2768,6 +3239,7 @@ def _prepare_chat(
     # ni objašnjenje starog (BUG 6/8). Poslije potvrda, prije challenge/help.
     _apply_new_task_intent(payload)
     _apply_hint_request_contract(payload)
+    _apply_multiple_choice_answer_contract(payload)
     _apply_video_recommendation_contract(payload)
     # Osporavanje ranije ocjene ("pa to sam i odgovorio") → ponovna provjera
     # prethodnog odgovora (ne novi zadatak). Poslije confirmation contract-a da
@@ -3171,6 +3643,8 @@ def _attempt_count_for_next_state(payload: dict, *, new_active_task: bool) -> in
         return 0
     prev = _previous_next_state(payload)
     attempts = int(prev.get("total_attempt_count", prev.get("attempt_count", 0)) or 0)
+    if payload.get("_mc_answer_attempt"):
+        return attempts + 1
     if _is_grading_turn(payload):
         if _grading_outcome(payload) == "ambiguous":
             return attempts
@@ -3183,11 +3657,15 @@ def _wrong_attempt_count_for_next_state(payload: dict, *, new_active_task: bool)
         return 0
     prev = _previous_next_state(payload)
     wrong = int(prev.get("wrong_attempt_count", 0) or 0)
+    if payload.get("_mc_answer_attempt"):
+        return wrong + (0 if payload.get("_mc_answer_correct") else 1)
     if not _is_grading_turn(payload):
         return wrong
     fallback = normalize_value(payload.get("_gpt_answer_verdict")).lower()
     if fallback == "incorrect":
         return wrong + 1
+    if fallback in ("correct", "partial", "ambiguous"):
+        return wrong
     check = payload.get("answer_check")
     if check is not None and authoritative_verdict(check) == "incorrect":
         return wrong + 1
@@ -3200,6 +3678,143 @@ def _hint_count_for_next_state(payload: dict, *, new_active_task: bool) -> int:
     prev = _previous_next_state(payload)
     hints = int(prev.get("hint_count", 0) or 0)
     return hints + 1 if payload.get("_hint_count_increment") else hints
+
+
+def _completed_parent_task_snapshot(payload: dict, followup_task_id: str | None) -> dict | None:
+    if not payload.get("_adaptive_followup_required"):
+        return None
+    prev = _previous_next_state(payload)
+    parent_id = _previous_task_id(payload)
+    if not parent_id:
+        return None
+    attempts = int(prev.get("total_attempt_count", prev.get("attempt_count", 0)) or 0)
+    hints = int(prev.get("hint_count", 0) or 0)
+    if payload.get("_hint_count_increment"):
+        hints += 1
+    hint_level = _coerce_nonnegative_int(
+        payload.get("_hint_level", prev.get("hint_level")), cap=_ADAPTIVE_HINT_MAX_LEVEL
+    )
+    highest = max(
+        _coerce_nonnegative_int(prev.get("highest_hint_level"), cap=_ADAPTIVE_HINT_MAX_LEVEL),
+        _coerce_nonnegative_int(payload.get("_highest_hint_level"), cap=_ADAPTIVE_HINT_MAX_LEVEL),
+        hint_level,
+    )
+    return _normalize_completed_parent_task({
+        "task_id": parent_id,
+        "completed_task_id": parent_id,
+        "task_status": "completed",
+        "attempt_number": attempts,
+        "attempt_count": attempts,
+        "total_attempt_count": attempts,
+        "wrong_attempt_count": prev.get("wrong_attempt_count", 0),
+        "hint_count": hints,
+        "hint_level": hint_level,
+        "highest_hint_level": highest,
+        "solution_revealed": True,
+        "solved_independently": False,
+        "solved_with_hints": True,
+        "requires_independent_solution": False,
+        "parent_task_id": None,
+        "followup_task_id": followup_task_id,
+        "task_origin": normalize_value(prev.get("task_origin")).lower() or "normal",
+    })
+
+
+def _adaptive_lifecycle_fields(
+    payload: dict,
+    *,
+    active: bool,
+    completed: bool,
+    new_active_task: bool,
+    task_id: str | None,
+    hint_count: int,
+) -> dict:
+    prev = _previous_next_state(payload)
+    empty = _empty_next_state()
+    keys = (
+        "parent_task_id", "followup_task_id", "task_origin", "completed_parent_task",
+        "hint_level", "highest_hint_level", "hint_reason", "hint_history",
+        "last_hint_signature", "progress_signature", "repeated_hint_prevented",
+        "solution_revealed", "solved_independently", "solved_with_hints",
+        "requires_independent_solution", "independent_followup_result",
+        "multiple_choice_hint", "multiple_choice_result",
+    )
+    fields = {k: empty.get(k) for k in keys} if new_active_task else {k: prev.get(k, empty.get(k)) for k in keys}
+
+    if completed and payload.get("_completed_task_hint_rejected"):
+        fields["repeated_hint_prevented"] = False
+        fields["multiple_choice_hint"] = None
+        return fields
+
+    if new_active_task and payload.get("_adaptive_followup_required"):
+        parent_id = _previous_task_id(payload)
+        fields.update({
+            "parent_task_id": parent_id,
+            "followup_task_id": task_id,
+            "task_origin": "independent_followup",
+            "completed_parent_task": _completed_parent_task_snapshot(payload, task_id),
+            "requires_independent_solution": True,
+            "solution_revealed": False,
+            "hint_level": 0,
+            "highest_hint_level": 0,
+            "hint_reason": "",
+            "hint_history": [],
+            "last_hint_signature": "",
+            "progress_signature": "",
+            "multiple_choice_hint": None,
+            "multiple_choice_result": None,
+        })
+
+    if not new_active_task:
+        if payload.get("_hint_level") is not None:
+            fields["hint_level"] = _coerce_nonnegative_int(
+                payload.get("_hint_level"), cap=_ADAPTIVE_HINT_MAX_LEVEL
+            )
+        if payload.get("_highest_hint_level") is not None:
+            fields["highest_hint_level"] = _coerce_nonnegative_int(
+                payload.get("_highest_hint_level"), cap=_ADAPTIVE_HINT_MAX_LEVEL
+            )
+        if payload.get("_hint_reason") is not None:
+            fields["hint_reason"] = normalize_value(payload.get("_hint_reason"))[:80]
+        if payload.get("_hint_history") is not None:
+            fields["hint_history"] = _clean_hint_history(payload.get("_hint_history"))
+        if payload.get("_last_hint_signature") is not None:
+            fields["last_hint_signature"] = normalize_value(payload.get("_last_hint_signature"))[:160]
+        if payload.get("_progress_signature") is not None:
+            fields["progress_signature"] = normalize_value(payload.get("_progress_signature"))[:160]
+        elif _is_grading_turn(payload):
+            sig = _progress_signature(payload.get("student_message") or payload.get("message"))
+            if sig:
+                fields["progress_signature"] = sig
+        if payload.get("_multiple_choice_hint") is not None:
+            fields["multiple_choice_hint"] = _normalize_multiple_choice_hint(payload.get("_multiple_choice_hint"))
+        elif payload.get("_clear_multiple_choice_hint"):
+            fields["multiple_choice_hint"] = None
+        if payload.get("_multiple_choice_result") is not None:
+            fields["multiple_choice_result"] = _normalize_multiple_choice_result(payload.get("_multiple_choice_result"))
+        if payload.get("_solution_revealed"):
+            fields["solution_revealed"] = True
+
+    fields["repeated_hint_prevented"] = False if new_active_task else bool(payload.get("_repeated_hint_prevented"))
+    if not fields.get("task_origin"):
+        fields["task_origin"] = "normal"
+
+    if completed:
+        outcome = _grading_outcome(payload)
+        solved = outcome == "correct"
+        revealed = bool(fields.get("solution_revealed"))
+        fields["solved_independently"] = bool(solved and hint_count == 0 and not revealed)
+        fields["solved_with_hints"] = bool(solved and hint_count > 0 and not revealed)
+        if fields.get("requires_independent_solution"):
+            fields["independent_followup_result"] = outcome if outcome in ("correct", "partial", "incorrect", "ambiguous") else ""
+        fields["multiple_choice_hint"] = None
+    elif active:
+        fields["solved_independently"] = False
+        fields["solved_with_hints"] = False
+        if new_active_task and not fields.get("independent_followup_result"):
+            fields["independent_followup_result"] = ""
+
+    return fields
 
 
 def _task_lifecycle_fields(
@@ -3223,6 +3838,14 @@ def _task_lifecycle_fields(
         "hint_count": _hint_count_for_next_state(payload, new_active_task=new_active_task),
         "completed_task_id": prev_id if completed else None,
     }
+    fields.update(_adaptive_lifecycle_fields(
+        payload,
+        active=active,
+        completed=completed,
+        new_active_task=new_active_task,
+        task_id=task_id,
+        hint_count=int(fields.get("hint_count", 0) or 0),
+    ))
     return fields
 
 
@@ -3254,6 +3877,14 @@ def _next_state_for_response(
             "hint_count": int(prev.get("hint_count", 0) or 0),
             "completed_task_id": completed_id or None,
         })
+        state.update(_adaptive_lifecycle_fields(
+            payload,
+            active=False,
+            completed=True,
+            new_active_task=False,
+            task_id=None,
+            hint_count=int(state.get("hint_count", 0) or 0),
+        ))
         return state
 
     # AUD-01: image_test "practice" — učenik SAM rješava stavke sa slike, pa se
@@ -3339,10 +3970,19 @@ def _next_state_for_response(
             }
         # sve stavke riješene → image tok završen, dalje normalna logika
 
-    if task_text and (mode in ("practice", "exam") or payload.get("_explicit_hint_request")):
+    hint_preserves_task = normalize_value(payload.get("_practice_help_intent")).lower() == "hint"
+    if task_text and (
+        mode in ("practice", "exam")
+        or payload.get("_explicit_hint_request")
+        or payload.get("_adaptive_preserve_active_task")
+        or payload.get("_adaptive_followup_required")
+        or hint_preserves_task
+    ):
         prev_task = normalize_value(payload.get("last_tutor_task"))[:600]
-        new_active_task = not (
+        new_active_task = bool(payload.get("_adaptive_followup_required")) or not (
             payload.get("_explicit_hint_request")
+            or payload.get("_adaptive_preserve_active_task")
+            or hint_preserves_task
             or (_is_grading_turn(payload) and prev_task and task_text == prev_task)
         )
         return {
@@ -3486,7 +4126,8 @@ def _gpt_text_verdict(answer: str) -> str | None:
         return "ambiguous"
     if re.match(
         r"^\s*(?:dj?el[io]micn\w*\s+taca?n\w*|djelimicn\w*\s+taca?n\w*"
-        r"|nepotpun\w*|dobar\s+korak\b|dobro\s+si\s+(?:poceo|pocela|krenuo|krenula)\b)\b",
+        r"|nepotpun\w*|dobar\s+(?:pocetak|korak)\b|dobro\s+si\s+(?:poceo|pocela|krenuo|krenula)\b"
+        r"|ispravan\s+korak\b|tacno\s+si\b|pravilno\s+si\b)\b",
         head,
     ):
         return "partial"
@@ -3538,8 +4179,13 @@ def _enforce_gpt_fallback_label(answer: str, payload: dict) -> str:
         "ambiguous": "Nejasno.",
     }[verdict]
     current = _gpt_label_kind(answer)
+    feedback = normalize_value((payload.get("_contextual_gpt_grade") or {}).get("public_feedback"))
+    if payload.get("_false_fraction_equivalence") and feedback:
+        return f"{expected} {feedback}".strip()
     if current == verdict or (verdict == "partial" and current == "partial"):
         return answer
+    if current and feedback:
+        return f"{expected} {feedback}".strip()
     body = _GPT_LABEL_PREFIX_RE.sub("", answer, count=1).lstrip()
     return f"{expected} {body}".strip() if body else expected
 
@@ -3581,6 +4227,8 @@ def _apply_gpt_fallback_verdict(payload: dict, answer: str) -> None:
 
 
 def _answer_verdict_for_response(payload: dict) -> str | None:
+    if payload.get("_mc_answer_attempt"):
+        return "partial" if payload.get("_mc_answer_correct") else "incorrect"
     fallback = payload.get("_gpt_answer_verdict")
     if fallback in ("correct", "incorrect", "partial"):
         return fallback
@@ -3597,6 +4245,10 @@ def _answer_verdict_for_response(payload: dict) -> str | None:
 
 
 def _answer_verdict_detail_for_response(payload: dict) -> str | None:
+    if payload.get("_adaptive_mc_ambiguous"):
+        return "multiple_choice_ambiguous"
+    if payload.get("_mc_answer_attempt"):
+        return "multiple_choice_correct" if payload.get("_mc_answer_correct") else "multiple_choice_incorrect"
     if payload.get("_gpt_answer_verdict"):
         return f"gpt_{payload['_gpt_answer_verdict']}"
     check = payload.get("answer_check")
@@ -3772,6 +4424,20 @@ def _finalize_response(prep: dict, answer: str) -> dict:
         # aktivni zadatak (persist; prazno kad su sve riješene). Model ne smije
         # izmišljati zadatke usred image toka, pa se proza ne ekstrahuje.
         task_text = normalize_value(payload.get("_image_next_task_text"))[:600]
+    elif payload.get("_adaptive_followup_required"):
+        # Full solution reveal consumes the parent task as assisted practice and
+        # immediately tracks a clean independent follow-up task.
+        task_text = extract_marked_task(answer) or normalize_value(payload.get("_adaptive_followup_task"))[:600]
+        if task_text and "Zadatak:" not in answer:
+            answer = (answer.rstrip() + f"\n\nZadatak: {task_text}").strip()
+            response["answer"] = answer
+    elif payload.get("_adaptive_preserve_active_task") and normalize_value(payload.get("last_tutor_task")):
+        task_text = normalize_value(payload.get("last_tutor_task"))[:600]
+    elif (
+        normalize_value(payload.get("_practice_help_intent")).lower() == "hint"
+        and normalize_value(payload.get("last_tutor_task"))
+    ):
+        task_text = normalize_value(payload.get("last_tutor_task"))[:600]
     elif payload.get("_explicit_hint_request") and normalize_value(payload.get("last_tutor_task")):
         # Hint ne troši i ne mijenja aktivni zadatak.
         task_text = normalize_value(payload.get("last_tutor_task"))[:600]
@@ -3827,6 +4493,14 @@ def _finalize_response(prep: dict, answer: str) -> dict:
     response["total_attempt_count"] = response["next_state"].get("total_attempt_count", response["attempt_number"])
     response["wrong_attempt_count"] = response["next_state"].get("wrong_attempt_count", 0)
     response["hint_count"] = response["next_state"].get("hint_count", 0)
+    for key in _ADAPTIVE_RESPONSE_FIELDS:
+        response[key] = response["next_state"].get(key)
+    if payload.get("_solution_revealed"):
+        response["solution_revealed"] = True
+    if payload.get("_multiple_choice_result") is not None:
+        response["multiple_choice_result"] = _normalize_multiple_choice_result(
+            payload.get("_multiple_choice_result")
+        )
     # CLASS 1: ako je OVAJ potez bio hint sa pod-korakom, obilježi ga da sljedeći
     # učenikov odgovor tretiramo kao mogući međukorak (ne finalni).
     response["next_state"]["just_hinted"] = bool(payload.get("_gave_hint_step"))

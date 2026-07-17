@@ -15,6 +15,7 @@ import logging
 import os
 import re
 import sqlite3
+import json
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -42,7 +43,23 @@ CREATE TABLE IF NOT EXISTS student_activity_log (
     parent_report_signal TEXT NULL,
     mistake_tag TEXT NULL,
     recommendation TEXT NULL,
-    topic_conflict INTEGER DEFAULT 0
+    topic_conflict INTEGER DEFAULT 0,
+    task_id TEXT NULL,
+    task_status TEXT NULL,
+    attempt_number INTEGER NULL,
+    total_attempt_count INTEGER NULL,
+    wrong_attempt_count INTEGER NULL,
+    hint_count INTEGER NULL,
+    parent_task_id TEXT NULL,
+    followup_task_id TEXT NULL,
+    task_origin TEXT NULL,
+    hint_level INTEGER NULL,
+    highest_hint_level INTEGER NULL,
+    hint_reason TEXT NULL,
+    solution_revealed INTEGER DEFAULT 0,
+    solved_independently INTEGER DEFAULT 0,
+    solved_with_hints INTEGER DEFAULT 0,
+    completed_parent_task TEXT NULL
 )
 """
 
@@ -62,7 +79,11 @@ _COLUMNS = (
     "student_id", "session_id", "timestamp", "event_type", "grade", "entry_source",
     "course_name", "section_name", "lesson_title", "final_topic", "mode",
     "status", "parent_report_signal", "mistake_tag", "recommendation",
-    "topic_conflict",
+    "topic_conflict", "task_id", "task_status", "attempt_number",
+    "total_attempt_count", "wrong_attempt_count", "hint_count", "parent_task_id",
+    "followup_task_id", "task_origin", "hint_level", "highest_hint_level",
+    "hint_reason", "solution_revealed", "solved_independently",
+    "solved_with_hints", "completed_parent_task",
 )
 
 
@@ -85,6 +106,22 @@ _INDEXES = (
 
 _MIGRATIONS = (
     ("grade", "ALTER TABLE student_activity_log ADD COLUMN grade INTEGER NULL"),
+    ("task_id", "ALTER TABLE student_activity_log ADD COLUMN task_id TEXT NULL"),
+    ("task_status", "ALTER TABLE student_activity_log ADD COLUMN task_status TEXT NULL"),
+    ("attempt_number", "ALTER TABLE student_activity_log ADD COLUMN attempt_number INTEGER NULL"),
+    ("total_attempt_count", "ALTER TABLE student_activity_log ADD COLUMN total_attempt_count INTEGER NULL"),
+    ("wrong_attempt_count", "ALTER TABLE student_activity_log ADD COLUMN wrong_attempt_count INTEGER NULL"),
+    ("hint_count", "ALTER TABLE student_activity_log ADD COLUMN hint_count INTEGER NULL"),
+    ("parent_task_id", "ALTER TABLE student_activity_log ADD COLUMN parent_task_id TEXT NULL"),
+    ("followup_task_id", "ALTER TABLE student_activity_log ADD COLUMN followup_task_id TEXT NULL"),
+    ("task_origin", "ALTER TABLE student_activity_log ADD COLUMN task_origin TEXT NULL"),
+    ("hint_level", "ALTER TABLE student_activity_log ADD COLUMN hint_level INTEGER NULL"),
+    ("highest_hint_level", "ALTER TABLE student_activity_log ADD COLUMN highest_hint_level INTEGER NULL"),
+    ("hint_reason", "ALTER TABLE student_activity_log ADD COLUMN hint_reason TEXT NULL"),
+    ("solution_revealed", "ALTER TABLE student_activity_log ADD COLUMN solution_revealed INTEGER DEFAULT 0"),
+    ("solved_independently", "ALTER TABLE student_activity_log ADD COLUMN solved_independently INTEGER DEFAULT 0"),
+    ("solved_with_hints", "ALTER TABLE student_activity_log ADD COLUMN solved_with_hints INTEGER DEFAULT 0"),
+    ("completed_parent_task", "ALTER TABLE student_activity_log ADD COLUMN completed_parent_task TEXT NULL"),
 )
 
 
@@ -135,6 +172,28 @@ def _clean_grade(val: Any) -> int | None:
     return int(match.group(0)) if match else None
 
 
+def _clean_int(val: Any) -> int | None:
+    if val in (None, ""):
+        return None
+    try:
+        return int(val)
+    except (TypeError, ValueError):
+        return None
+
+
+def _clean_bool_int(val: Any) -> int:
+    return 1 if bool(val) else 0
+
+
+def _json_meta(val: Any) -> str | None:
+    if val in (None, "", [], {}):
+        return None
+    try:
+        return json.dumps(val, ensure_ascii=False, sort_keys=True, default=str)
+    except Exception:
+        return str(val)
+
+
 def classify_event_type(payload: dict, response: dict) -> str:
     """event_type po prioritetu (handoff §9):
     practice_answer > exam_mode_used > topic_selected > ai_message."""
@@ -161,6 +220,14 @@ def log_student_activity(
     try:
         payload = payload or {}
         response = response or {}
+        next_state = response.get("next_state") if isinstance(response.get("next_state"), dict) else {}
+
+        def _telemetry(key: str) -> Any:
+            value = response.get(key)
+            if value is None and isinstance(next_state, dict):
+                value = next_state.get(key)
+            return value
+
         row = {
             "student_id": _clean(payload.get("student_id")),
             "session_id": _clean(payload.get("session_id")),
@@ -180,6 +247,34 @@ def log_student_activity(
             "mistake_tag": None,       # rezervisano za kasnije faze
             "recommendation": None,    # rezervisano za kasnije faze
             "topic_conflict": 1 if response.get("topic_conflict") else 0,
+            "task_id": _clean(
+                response.get("task_id")
+                or next_state.get("task_id")
+                or next_state.get("completed_task_id")
+            ),
+            "task_status": _clean(response.get("task_status") or next_state.get("task_status")),
+            "attempt_number": _clean_int(
+                _telemetry("attempt_number")
+                if _telemetry("attempt_number") is not None
+                else _telemetry("attempt_count")
+            ),
+            "total_attempt_count": _clean_int(
+                _telemetry("total_attempt_count")
+                if _telemetry("total_attempt_count") is not None
+                else _telemetry("attempt_count")
+            ),
+            "wrong_attempt_count": _clean_int(_telemetry("wrong_attempt_count")),
+            "hint_count": _clean_int(_telemetry("hint_count")),
+            "parent_task_id": _clean(_telemetry("parent_task_id")),
+            "followup_task_id": _clean(_telemetry("followup_task_id")),
+            "task_origin": _clean(_telemetry("task_origin")),
+            "hint_level": _clean_int(_telemetry("hint_level")),
+            "highest_hint_level": _clean_int(_telemetry("highest_hint_level")),
+            "hint_reason": _clean(_telemetry("hint_reason")),
+            "solution_revealed": _clean_bool_int(_telemetry("solution_revealed")),
+            "solved_independently": _clean_bool_int(_telemetry("solved_independently")),
+            "solved_with_hints": _clean_bool_int(_telemetry("solved_with_hints")),
+            "completed_parent_task": _json_meta(_telemetry("completed_parent_task")),
         }
         p = init_db(path)
         conn = _connect(p)

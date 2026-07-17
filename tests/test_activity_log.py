@@ -27,7 +27,13 @@ def test_init_db_creates_folder_and_table(tmp_path):
     for col in ("id", "student_id", "session_id", "timestamp", "event_type",
                 "grade", "entry_source", "course_name", "section_name", "lesson_title",
                 "final_topic", "mode", "status", "parent_report_signal",
-                "mistake_tag", "recommendation", "topic_conflict"):
+                "mistake_tag", "recommendation", "topic_conflict", "task_id",
+                "task_status", "attempt_number", "total_attempt_count",
+                "wrong_attempt_count", "hint_count", "parent_task_id",
+                "followup_task_id", "task_origin", "hint_level",
+                "highest_hint_level", "hint_reason", "solution_revealed",
+                "solved_independently", "solved_with_hints",
+                "completed_parent_task"):
         assert col in cols
     # NE postoje kolone za pune poruke/odgovore
     assert "student_message" not in cols
@@ -109,6 +115,57 @@ def test_event_type_priorities():
         {"entry_source": "manual_topic_choice"}, {"mode": "practice"}
     ) == "topic_selected"
     assert al.classify_event_type({}, {"mode": "explain"}) == "ai_message"
+
+
+def test_log_includes_task_lifecycle_metadata_without_full_text(tmp_path):
+    db = tmp_path / "lifecycle.sqlite3"
+    ok = al.log_student_activity(
+        {"session_id": "s-life", "student_message": "SECRET STUDENT TEXT"},
+        {
+            "status": "ready",
+            "mode": "practice",
+            "task_id": "task-child",
+            "task_status": "active",
+            "attempt_number": 0,
+            "total_attempt_count": 0,
+            "wrong_attempt_count": 0,
+            "hint_count": 0,
+            "parent_task_id": "task-parent",
+            "followup_task_id": "task-child",
+            "task_origin": "independent_followup",
+            "hint_level": 0,
+            "highest_hint_level": 0,
+            "solution_revealed": False,
+            "solved_independently": False,
+            "solved_with_hints": False,
+            "completed_parent_task": {
+                "task_id": "task-parent",
+                "task_status": "completed",
+                "attempt_number": 2,
+                "wrong_attempt_count": 1,
+                "hint_count": 5,
+                "solution_revealed": True,
+                "solved_with_hints": True,
+                "followup_task_id": "task-child",
+            },
+            "answer": "SECRET TUTOR TEXT",
+        },
+        path=db,
+    )
+    assert ok is True
+    row = al.get_recent_activity(session_id="s-life", path=db)[0]
+    assert row["task_id"] == "task-child"
+    assert row["task_status"] == "active"
+    assert row["attempt_number"] == 0
+    assert row["wrong_attempt_count"] == 0
+    assert row["hint_count"] == 0
+    assert row["parent_task_id"] == "task-parent"
+    assert row["followup_task_id"] == "task-child"
+    assert row["task_origin"] == "independent_followup"
+    assert '"task_id": "task-parent"' in row["completed_parent_task"]
+    raw = db.read_bytes()
+    assert b"SECRET STUDENT TEXT" not in raw
+    assert b"SECRET TUTOR TEXT" not in raw
 
 
 def test_get_recent_filters_by_session(tmp_path):

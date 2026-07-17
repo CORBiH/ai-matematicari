@@ -228,7 +228,25 @@ def test_explicit_hint_request_routes_to_practice_help():
     assert p.get("_practice_help_intent") == "hint"
     assert p.get("_explicit_hint_request") is True
     assert p.get("interaction_phase") == "practice_help"
-    assert "Ne otkrivaj konačan rezultat" in p["student_message"]
+    assert "ADAPTIVNI_HINT_NIVO=1" in p["student_message"]
+    assert p.get("_hint_level") == 1
+
+
+def test_hint_request_carries_previous_progress_signature_to_prompt():
+    p = _answer_payload("Daj jos jedan hint.", task="Izračunaj: 1/2 + 1/3")
+    p["intent"] = "hint_request"
+    p["previous_next_state"] = {
+        "task_id": "task-progress",
+        "task_status": "active",
+        "progress_signature": "1/2 = 3/6, ali ne znam sta dalje",
+        "hint_count": 1,
+        "hint_level": 1,
+    }
+    svc._apply_hint_request_contract(p)
+    block = pb.build_practice_help_instructions(p, {})
+    assert p.get("_repeated_hint_prevented") is True
+    assert "UCENIKOV ZADNJI SMISLENI POKUSAJ" in block
+    assert "1/2 = 3/6" in block
 
 
 # ===================== N2 — 'nemoj rješenje' =====================

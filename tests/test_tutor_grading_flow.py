@@ -513,6 +513,10 @@ def test_completed_task_preserves_attempt_and_hint_history(master, tmap):
     assert correct["total_attempt_count"] == 2
     assert correct["wrong_attempt_count"] == 1
     assert correct["hint_count"] == 1
+    assert correct["solved_independently"] is False
+    assert correct["solved_with_hints"] is True
+    assert correct["hint_level"] == 1
+    assert correct["highest_hint_level"] == 1
 
     late_hint = svc.handle_chat({
         "grade": 6,
@@ -557,7 +561,216 @@ def test_new_task_after_completed_state_starts_with_clean_counters(master, tmap)
     assert out["total_attempt_count"] == 0
     assert out["wrong_attempt_count"] == 0
     assert out["hint_count"] == 0
+    assert out["hint_level"] == 0
+    assert out["highest_hint_level"] == 0
+    assert out["task_origin"] == "normal"
+    assert out["solution_revealed"] is False
+    assert out["multiple_choice_hint"] is None
     assert out["next_state"]["task_status"] == "active"
+
+
+def test_adaptive_hint_levels_escalate_and_preserve_task_id(master, tmap):
+    task = "Rijesi jednacinu: 2/3 x = 8."
+    state = {"task_id": "task-adapt", "task_status": "active"}
+
+    for level in (1, 2, 3):
+        chat = _fake_chat(f"Hint nivo {level}.")
+        out = svc.handle_chat({
+            "grade": 6,
+            "mode": "practice",
+            "selected_topic": EXPR_TOPIC,
+            "intent": "hint_request",
+            "student_message": "Daj jos jedan hint." if level == 2 else "daj hint",
+            "last_tutor_task": task,
+            "previous_next_state": state,
+        }, chat, master, tmap, model="m", timeout=1)
+
+        assert "answer_check" not in out
+        assert out["task_id"] == "task-adapt"
+        assert out["task_status"] == "active"
+        assert out["attempt_number"] == 0
+        assert out["hint_count"] == level
+        assert out["hint_level"] == level
+        assert out["highest_hint_level"] == level
+        assert out["next_state"]["hint_history"][-1]["level"] == level
+        if level >= 2:
+            assert out["repeated_hint_prevented"] is True
+        if level == 3:
+            mc = out["multiple_choice_hint"]
+            assert mc["correct_id"] == "A"
+            assert [o["id"] for o in mc["options"]] == ["A", "B", "C"]
+            assert len(mc["options"]) == 3
+            prompt = _last_user_prompt(chat)
+            assert "ADAPTIVNI HINT NIVO 3" in prompt
+            assert "A) Pomnozi obje strane sa 3/2." in prompt
+        state = out["next_state"]
+
+
+def test_adaptive_multiple_choice_accepts_full_option_text(master, tmap):
+    task = "Rijesi jednacinu: 2/3 x = 8."
+    mc = svc._default_multiple_choice_hint(task)
+    chat = _fake_chat("Tako je. Sada izracunaj 8 * 3/2.")
+    out = svc.handle_chat({
+        "grade": 6,
+        "mode": "practice",
+        "selected_topic": EXPR_TOPIC,
+        "interaction_phase": "answering_practice_task",
+        "student_message": "Pomnozi obje strane sa 3/2.",
+        "last_tutor_task": task,
+        "previous_next_state": {
+            "task_id": "task-adapt",
+            "task_status": "active",
+            "hint_count": 3,
+            "hint_level": 3,
+            "highest_hint_level": 3,
+            "multiple_choice_hint": mc,
+        },
+    }, chat, master, tmap, model="m", timeout=1)
+
+    assert "answer_check" not in out
+    assert out["task_id"] == "task-adapt"
+    assert out["task_status"] == "active"
+    assert out["attempt_number"] == 1
+    assert out["total_attempt_count"] == 1
+    assert out["wrong_attempt_count"] == 0
+    assert out["hint_count"] == 3
+    assert out["hint_level"] == 4
+    assert out["answer_verdict"] == "partial"
+    assert out["answer_verdict_detail"] == "multiple_choice_correct"
+    assert out["multiple_choice_result"]["choice_id"] == "A"
+    assert out["multiple_choice_result"]["correct"] is True
+    assert out["next_state"]["multiple_choice_hint"] is None
+
+
+@pytest.mark.parametrize("student", ["B", "Dodaj 2/3 na obje strane."])
+def test_wrong_multiple_choice_counts_as_wrong_attempt(master, tmap, student):
+    task = "Rijesi jednacinu: 2/3 x = 8."
+    mc = svc._default_multiple_choice_hint(task)
+    out = svc.handle_chat({
+        "grade": 6,
+        "mode": "practice",
+        "selected_topic": EXPR_TOPIC,
+        "interaction_phase": "answering_practice_task",
+        "student_message": student,
+        "last_tutor_task": task,
+        "previous_next_state": {
+            "task_id": "task-adapt",
+            "task_status": "active",
+            "attempt_count": 2,
+            "total_attempt_count": 2,
+            "wrong_attempt_count": 1,
+            "hint_count": 3,
+            "hint_level": 3,
+            "highest_hint_level": 3,
+            "multiple_choice_hint": mc,
+        },
+    }, _fake_chat("Nije tacno. Probaj razmisliti sta uklanja mnozenje sa 2/3."),
+        master, tmap, model="m", timeout=1)
+
+    assert "answer_check" not in out
+    assert out["task_id"] == "task-adapt"
+    assert out["task_status"] == "active"
+    assert out["attempt_number"] == 3
+    assert out["total_attempt_count"] == 3
+    assert out["wrong_attempt_count"] == 2
+    assert out["hint_count"] == 3
+    assert out["answer_verdict"] == "incorrect"
+    assert out["answer_verdict_detail"] == "multiple_choice_incorrect"
+    assert out["multiple_choice_result"]["choice_id"] == "B"
+    assert out["multiple_choice_result"]["correct"] is False
+
+
+def test_ambiguous_multiple_choice_input_does_not_count_wrong_attempt(master, tmap):
+    task = "Rijesi jednacinu: 2/3 x = 8."
+    mc = svc._default_multiple_choice_hint(task)
+    chat = _fake_chat("SHOULD-NOT-BE-CALLED")
+    out = svc.handle_chat({
+        "grade": 6,
+        "mode": "practice",
+        "selected_topic": EXPR_TOPIC,
+        "interaction_phase": "answering_practice_task",
+        "student_message": "mozda ona prva opcija",
+        "last_tutor_task": task,
+        "previous_next_state": {
+            "task_id": "task-adapt",
+            "task_status": "active",
+            "attempt_count": 2,
+            "total_attempt_count": 2,
+            "wrong_attempt_count": 1,
+            "hint_count": 3,
+            "hint_level": 3,
+            "highest_hint_level": 3,
+            "multiple_choice_hint": mc,
+        },
+    }, chat, master, tmap, model="m", timeout=1)
+
+    assert not chat.calls["messages"]
+    assert out["task_id"] == "task-adapt"
+    assert out["task_status"] == "active"
+    assert out["attempt_number"] == 2
+    assert out["total_attempt_count"] == 2
+    assert out["wrong_attempt_count"] == 1
+    assert out["hint_count"] == 3
+    assert out["answer_verdict"] is None
+    assert out["answer_verdict_detail"] == "multiple_choice_ambiguous"
+    assert out["next_state"]["multiple_choice_hint"] == mc
+
+
+def test_solution_reveal_creates_clean_independent_followup(master, tmap):
+    parent_state = {
+        "task_id": "task-parent",
+        "task_status": "active",
+        "attempt_count": 2,
+        "total_attempt_count": 2,
+        "wrong_attempt_count": 1,
+        "hint_count": 4,
+        "hint_level": 4,
+        "highest_hint_level": 4,
+        "hint_history": [
+            {"level": 1, "reason": "conceptual", "signature": "s1"},
+            {"level": 2, "reason": "repeated_hint_prevented", "signature": "s2"},
+            {"level": 3, "reason": "repeated_stuck", "signature": "s3"},
+            {"level": 4, "reason": "guided_step_needed", "signature": "s4"},
+        ],
+    }
+    chat = _fake_chat("Rjesenje: pomnozi obje strane sa 3/2 i dobijes x = 12.")
+    out = svc.handle_chat({
+        "grade": 6,
+        "mode": "practice",
+        "selected_topic": EXPR_TOPIC,
+        "intent": "hint_request",
+        "student_message": "daj hint",
+        "last_tutor_task": "Rijesi jednacinu: 2/3 x = 8.",
+        "previous_next_state": parent_state,
+    }, chat, master, tmap, model="m", timeout=1)
+
+    assert out["solution_revealed"] is True
+    assert "Zadatak: Rijesi jednacinu: 3/4 x = 9." in out["answer"]
+    assert out["task_status"] == "active"
+    assert out["task_id"] and out["task_id"] != "task-parent"
+    assert out["parent_task_id"] == "task-parent"
+    assert out["followup_task_id"] == out["task_id"]
+    assert out["task_origin"] == "independent_followup"
+    assert out["requires_independent_solution"] is True
+    assert out["attempt_number"] == 0
+    assert out["hint_count"] == 0
+    assert out["hint_level"] == 0
+    assert out["highest_hint_level"] == 0
+    parent = out["completed_parent_task"]
+    assert parent["task_id"] == "task-parent"
+    assert parent["task_status"] == "completed"
+    assert parent["solution_revealed"] is True
+    assert parent["solved_independently"] is False
+    assert parent["solved_with_hints"] is True
+    assert parent["highest_hint_level"] == 5
+    assert parent["hint_count"] == 5
+    assert parent["attempt_number"] == 2
+    assert parent["total_attempt_count"] == 2
+    assert parent["wrong_attempt_count"] == 1
+    assert parent["followup_task_id"] == out["task_id"]
+    assert out["next_state"]["completed_parent_task"] == parent
+    assert out["next_state"]["solution_revealed"] is False
+    assert out["next_state"]["repeated_hint_prevented"] is False
 
 
 def test_gpt_textual_verdict_updates_answer_verdict_and_streak(master, tmap):
@@ -736,6 +949,122 @@ def test_structured_gpt_ambiguous_does_not_count_attempt_or_log_reasoning(master
     assert out["hint_count"] == 1
     assert "reasoning" not in str(out["answer_check"]).lower()
     assert "ne smije logovati" not in str(out["answer_check"]).lower()
+
+
+def test_fraction_intermediate_work_is_partial_not_ambiguous(master, tmap):
+    chat = _fake_chat_sequence(
+        '{"verdict":"partial","confidence":0.84,'
+        '"public_feedback":"Tacno si prosirio 1/2, ali postupak nije zavrsen."}',
+        "Dobar pocetak. Tacno je da je 1/2 = 3/6; sada prosiri i 1/3.",
+    )
+    out = svc.handle_chat({
+        **_answer_payload(
+            "Izracunaj: 1/2 + 1/3",
+            "1/2 = 3/6, a 1/3 jos trebam prosiriti",
+        ),
+        "previous_next_state": {"task_id": "task-fr", "task_status": "active"},
+    }, chat, master, tmap, model="m", timeout=1)
+
+    assert out["gpt_check_used"] is True
+    assert out["answer_verdict"] == "partial"
+    assert out["answer_verdict_detail"] == "gpt_partial"
+    assert out["task_status"] == "active"
+    assert out["task_id"] == "task-fr"
+    assert out["attempt_number"] == 1
+    assert out["wrong_attempt_count"] == 0
+
+
+def test_common_denominator_statement_is_partial_not_ambiguous(master, tmap):
+    chat = _fake_chat_sequence(
+        '{"verdict":"partial","confidence":0.8,'
+        '"public_feedback":"Zajednicki imenilac 6 je dobar korak, ali rezultat nedostaje."}',
+        "Djelimicno tacno. Zajednicki imenilac je 6; sada prebaci oba razlomka.",
+    )
+    out = svc.handle_chat({
+        **_answer_payload("Izracunaj: 1/2 + 1/3", "Zajednicki imenilac je 6"),
+        "previous_next_state": {"task_id": "task-fr", "task_status": "active"},
+    }, chat, master, tmap, model="m", timeout=1)
+
+    assert out["gpt_check_used"] is True
+    assert out["answer_verdict"] == "partial"
+    assert out["answer_verdict_detail"] == "gpt_partial"
+    assert out["task_status"] == "active"
+    assert out["attempt_number"] == 1
+    assert out["wrong_attempt_count"] == 0
+
+
+def test_wrong_intermediate_fraction_is_not_valid_partial(master, tmap):
+    chat = _fake_chat_sequence(
+        '{"verdict":"partial","confidence":0.86,'
+        '"public_feedback":"Student je poceo prosirivanje, ali nije zavrsio."}',
+        "Djelimicno tacno. Lijepo si poceo prosirivanje.",
+    )
+    out = svc.handle_chat({
+        **_answer_payload("Izracunaj: 1/2 + 1/3", "1/2 = 2/6"),
+        "previous_next_state": {"task_id": "task-fr", "task_status": "active"},
+    }, chat, master, tmap, model="m", timeout=1)
+
+    assert out["gpt_check_used"] is True
+    assert out["answer_verdict"] == "incorrect"
+    assert out["answer_verdict_detail"] == "gpt_incorrect"
+    assert out["task_status"] == "active"
+    assert out["attempt_number"] == 1
+    assert out["wrong_attempt_count"] == 1
+    assert out["answer"].startswith("Neta")
+    assert "pogresna jednakost" in out["answer"]
+
+
+def test_unclear_fraction_text_stays_ambiguous(master, tmap):
+    chat = _fake_chat_sequence(
+        '{"verdict":"ambiguous","confidence":0.58,'
+        '"public_feedback":"Nije jasno koji korak ili odgovor predlazes."}',
+        "Nejasno. Nije mi jasno koji tacan korak predlazes.",
+    )
+    out = svc.handle_chat({
+        **_answer_payload("Izracunaj: 1/2 + 1/3", "nesto sa sesticom"),
+        "previous_next_state": {
+            "task_id": "task-fr",
+            "task_status": "active",
+            "attempt_count": 1,
+            "total_attempt_count": 1,
+            "wrong_attempt_count": 0,
+        },
+    }, chat, master, tmap, model="m", timeout=1)
+
+    assert out["gpt_check_used"] is True
+    assert out["answer_verdict"] is None
+    assert out["answer_verdict_detail"] == "gpt_ambiguous"
+    assert out["task_status"] == "active"
+    assert out["attempt_number"] == 1
+    assert out["wrong_attempt_count"] == 0
+
+
+def test_completed_fraction_procedure_is_correct(master, tmap):
+    chat = _fake_chat_sequence(
+        '{"verdict":"correct","confidence":0.9,'
+        '"public_feedback":"Postupak i konacan rezultat su tacni."}',
+        "Tacno. Dobro si prosirio oba razlomka i dobio 5/6.",
+    )
+    out = svc.handle_chat({
+        **_answer_payload(
+            "Izracunaj: 1/2 + 1/3",
+            "1/2 = 3/6, 1/3 = 2/6, zato je 3/6 + 2/6 = 5/6.",
+        ),
+        "previous_next_state": {
+            "task_id": "task-fr",
+            "task_status": "active",
+            "hint_count": 1,
+        },
+    }, chat, master, tmap, model="m", timeout=1)
+
+    assert out["gpt_check_used"] is True
+    assert out["answer_verdict"] == "correct"
+    assert out["answer_verdict_detail"] == "gpt_correct"
+    assert out["task_status"] == "completed"
+    assert out["task_id"] == "task-fr"
+    assert out["attempt_number"] == 1
+    assert out["hint_count"] == 1
+    assert out["solved_with_hints"] is True
 
 
 # --- anti-ponavljanje zadataka -------------------------------------------------------
