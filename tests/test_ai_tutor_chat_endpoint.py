@@ -415,7 +415,9 @@ def test_quick_simple_expression_no_topic(client, fake_openai):
     resp = client.post(CHAT_URL, json={"mode": "quick", "student_message": "5-1"})
     body = resp.get_json()
     assert body["status"] == "ready"
-    assert body["answer"] == fake_openai.state["reply"]
+    assert body["answer"] == "4"
+    assert body["math_verification"]["math_verification_used"] is True
+    assert body["math_verification"]["corrected_before_response"] is True
     assert body["final_topic"] is None
     system_sent = fake_openai.calls.messages[-1][0]["content"]
     assert "Samo rezultat" in system_sent

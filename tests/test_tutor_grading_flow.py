@@ -1322,3 +1322,330 @@ def test_route_streaming_done_includes_answer_check(client, fake_openai, monkeyp
         for block in raw.split("\n\n") if "event: done" in block
     ]
     assert done and done[0]["answer_check"]["items"][0]["verdict"] == "correct"
+
+
+# --- production-style regressions: exam, quick verification, task validation ---------
+
+def test_quick_linear_equation_wrong_model_result_is_corrected(master, tmap):
+    chat = _fake_chat("x = 2/5")
+    out = svc.handle_chat(
+        {"grade": 6, "mode": "quick", "student_message": "12 - 23x = 4x"},
+        chat, master, tmap, model="m", timeout=1,
+    )
+    assert out["answer"] == "x = 4/9"
+    assert out["math_verification"]["math_verification_used"] is True
+    assert out["math_verification"]["math_verification_match"] is False
+    assert out["math_verification"]["corrected_before_response"] is True
+
+
+def test_quick_linear_equation_matching_model_result_not_corrected(master, tmap):
+    chat = _fake_chat("x = 4/9")
+    out = svc.handle_chat(
+        {"grade": 6, "mode": "quick", "student_message": "12 - 23x = 4x"},
+        chat, master, tmap, model="m", timeout=1,
+    )
+    assert out["answer"] == "x = 4/9"
+    assert out["math_verification"]["math_verification_match"] is True
+    assert out["math_verification"]["corrected_before_response"] is False
+
+
+def test_explain_embedded_linear_equation_has_deterministic_recovery(master, tmap):
+    chat = _fake_chat("Nisam uspio sastaviti odgovor.")
+    out = svc.handle_chat(
+        {
+            "grade": 6,
+            "mode": "explain",
+            "student_message": "Objasni korak po korak kako se rjesava 12 - 23x = 4x.",
+        },
+        chat, master, tmap, model="m", timeout=1,
+    )
+    assert "x = 4/9" in out["answer"]
+    assert out["math_verification"]["math_verification_used"] is True
+    assert out["math_verification"]["corrected_before_response"] is True
+
+
+def test_exam_mode_survives_and_single_answer_grades_only_current_item(master, tmap):
+    exam_text = (
+        "1. In a right triangle, one angle is 30\u00b0 and one is 90\u00b0. Find the other angle.\n"
+        "2. U trouglu su dva ugla 45\u00b0 i 65\u00b0. Odredi treci ugao.\n"
+        "3. U trouglu su dva ugla 80\u00b0 i 40\u00b0. Odredi treci ugao."
+    )
+    first = svc.handle_chat(
+        {"grade": 6, "mode": "exam", "selected_topic": FR_TOPIC, "student_message": "Pripremi me."},
+        _fake_chat(exam_text), master, tmap, model="m", timeout=1,
+    )
+    assert first["mode"] == "exam"
+    assert first["next_state"]["exam_state"]["current_item_index"] == 0
+    assert first["task_validation"]["validation_status"] == "validated"
+
+    answer = svc.handle_chat(
+        {
+            "grade": 6,
+            "mode": "practice",  # simulate old browser drift on answer turns
+            "interaction_phase": "answering_practice_task",
+            "last_tutor_task": first["last_tutor_task"],
+            "previous_next_state": first["next_state"],
+            "student_message": "60",
+        },
+        _fake_chat("Sva tri su netacna."), master, tmap, model="m", timeout=1,
+    )
+    assert answer["mode"] == "exam"
+    assert answer["session_mode"] == "exam"
+    assert answer["answer_check"]["items"][0]["n"] == 1
+    assert answer["answer_check"]["items"][0]["verdict"] == "correct_missing_notation"
+    assert answer["next_state"]["task_items"]["graded"] == [1]
+    items = answer["next_state"]["exam_state"]["items"]
+    assert items[0]["status"] == "graded"
+    assert items[0]["verdict"] == "correct_missing_notation"
+    assert items[1]["status"] == "unanswered"
+    assert items[2]["status"] == "unanswered"
+    assert answer["next_state"]["exam_state"]["current_item_index"] == 1
+
+
+EXAM_ANGLE_TASK = (
+    "1. U trouglu su dva ugla 30° i 90°. Odredi treci ugao.\n"
+    "2. U trouglu su dva ugla 45° i 65°. Odredi treci ugao.\n"
+    "3. U trouglu su dva ugla 80° i 40°. Odredi treci ugao."
+)
+
+GPT_TRIES_FRESH_ANGLE_QUESTIONS = (
+    "Tačno. 1. Odredi stepeni vrijednost ugla α ako je ugao β 40°.\n"
+    "2. U pravouglom trouglu su uglovi 30° i 60°. Izračunaj treći ugao.\n"
+    "3. Koliko iznosi suplement ugla od 85°?"
+)
+
+
+def _start_exam(master, tmap, task=EXAM_ANGLE_TASK, previous_next_state=None):
+    payload = {
+        "grade": 6,
+        "mode": "exam",
+        "selected_oblast": "Uglovi",
+        "student_message": "Pripremi me za kontrolni.",
+    }
+    if previous_next_state:
+        payload["previous_next_state"] = previous_next_state
+    return svc.handle_chat(payload, _fake_chat(task), master, tmap, model="m", timeout=1)
+
+
+def _answer_exam(master, tmap, prev, answer, reply=GPT_TRIES_FRESH_ANGLE_QUESTIONS):
+    return svc.handle_chat(
+        {
+            "grade": 6,
+            "mode": "practice",  # old browser drift must not break exam mode
+            "selected_oblast": "Uglovi",
+            "interaction_phase": "answering_practice_task",
+            "last_tutor_task": prev["last_tutor_task"],
+            "previous_next_state": prev["next_state"],
+            "student_message": answer,
+        },
+        _fake_chat(reply), master, tmap, model="m", timeout=1,
+    )
+
+
+def test_exam_progression_uses_exact_stored_next_items_and_final_summary(master, tmap):
+    first = _start_exam(master, tmap)
+    first_state = first["next_state"]["exam_state"]
+    original_items = first_state["items"]
+    original_item_ids = [item["item_id"] for item in original_items]
+    assert len(original_items) == 3
+    assert first_state["current_item_index"] == 0
+
+    one = _answer_exam(master, tmap, first, "60")
+    assert one["mode"] == "exam"
+    assert one["session_mode"] == "exam"
+    assert one["answer_check"]["items"][0]["n"] == 1
+    assert one["next_state"]["exam_state"]["items"][0]["status"] == "graded"
+    assert one["next_state"]["exam_state"]["items"][1]["status"] == "unanswered"
+    assert one["next_state"]["exam_state"]["items"][2]["status"] == "unanswered"
+    assert one["next_state"]["exam_state"]["current_item_index"] == 1
+    assert "Zadatak 2 od 3:" in one["answer"]
+    assert original_items[1]["question"] in one["answer"]
+    assert "Odredi stepeni vrijednost" not in one["answer"]
+
+    two = _answer_exam(master, tmap, one, "70")
+    assert two["mode"] == "exam"
+    assert two["answer_check"]["items"][0]["n"] == 2
+    assert two["next_state"]["exam_state"]["items"][0]["status"] == "graded"
+    assert two["next_state"]["exam_state"]["items"][1]["status"] == "graded"
+    assert two["next_state"]["exam_state"]["items"][2]["status"] == "unanswered"
+    assert two["next_state"]["exam_state"]["current_item_index"] == 2
+    assert "Zadatak 3 od 3:" in two["answer"]
+    assert original_items[2]["question"] in two["answer"]
+
+    three = _answer_exam(master, tmap, two, "60")
+    final_state = three["next_state"]["exam_state"]
+    assert three["mode"] == "exam"
+    assert three["session_mode"] == "exam"
+    assert three["task_status"] == "completed"
+    assert three["last_tutor_task"] == ""
+    assert three["answer_check"]["items"][0]["n"] == 3
+    assert final_state["exam_status"] == "completed"
+    assert final_state["expected_user_action"] == "none"
+    assert final_state["current_item_index"] is None
+    assert all(item["status"] == "graded" for item in final_state["items"])
+    assert [item["item_id"] for item in final_state["items"]] == original_item_ids
+    assert len(final_state["items"]) == 3
+    assert "Kontrolni je završen." in three["answer"]
+    assert "Rezultat: 3/3" in three["answer"]
+    assert "Zadatak:" not in three["answer"]
+    assert "Odredi stepeni vrijednost" not in three["answer"]
+
+
+def test_exam_final_summary_handles_mixed_results_and_sheets_state(master, tmap):
+    mixed_task = (
+        "1. U trouglu su dva ugla 30° i 90°. Odredi treci ugao.\n"
+        "2. Pretvori 3/2 u mješoviti broj.\n"
+        "3. U trouglu su dva ugla 80° i 40°. Odredi treci ugao."
+    )
+    first = _start_exam(master, tmap, task=mixed_task)
+    one = _answer_exam(master, tmap, first, "60")
+    two = _answer_exam(master, tmap, one, "3/2")
+    three = _answer_exam(master, tmap, two, "0")
+
+    assert three["task_status"] == "completed"
+    assert three["next_state"]["exam_state"]["exam_status"] == "completed"
+    assert "Rezultat: 1,5/3" in three["answer"]
+    assert "Djelimično tačno: 1" in three["answer"]
+    assert "Netačno: 1" in three["answer"]
+    assert "Za ponavljanje:" in three["answer"]
+    assert len(three["next_state"]["exam_state"]["items"]) == 3
+
+    from matbot import sheets_log as sl
+    row = sl._build_transcript_row(
+        {
+            "session_id": "sess-exam-final",
+            "grade": 6,
+            "mode": "exam",
+            "selected_oblast": "Uglovi",
+            "student_message": "0",
+        },
+        three,
+    )
+    by_header = dict(zip(sl.SHEET_HEADERS, row))
+    assert by_header["task_status"] == "completed"
+    assert "exam_state" in by_header["next_state"]
+    assert "correct_value_wrong_form" in by_header["next_state"]
+
+
+def test_exam_unclear_answer_does_not_advance_or_grade(master, tmap):
+    first = _start_exam(master, tmap)
+    unclear = _answer_exam(master, tmap, first, "??")
+
+    state = unclear["next_state"]["exam_state"]
+    assert unclear["mode"] == "exam"
+    assert unclear["task_status"] == "active"
+    assert unclear["attempt_number"] == 0
+    assert state["exam_status"] == "active"
+    assert state["expected_user_action"] == "clarify_answer"
+    assert state["current_item_index"] == 0
+    assert state["items"][0]["status"] == "unanswered"
+    assert state["items"][1]["status"] == "unanswered"
+    assert "jasniji odgovor" in unclear["answer"]
+
+
+def test_new_exam_after_completion_gets_new_exam_id_and_clean_items(master, tmap):
+    first = _start_exam(master, tmap)
+    one = _answer_exam(master, tmap, first, "60")
+    two = _answer_exam(master, tmap, one, "70")
+    three = _answer_exam(master, tmap, two, "60")
+    old_exam_id = three["next_state"]["exam_state"]["exam_id"]
+
+    new_exam = _start_exam(master, tmap, previous_next_state=three["next_state"])
+    new_state = new_exam["next_state"]["exam_state"]
+    assert new_state["exam_id"] != old_exam_id
+    assert new_state["exam_status"] == "active"
+    assert new_state["current_item_index"] == 0
+    assert len(new_state["items"]) == 3
+    assert all(item["status"] == "unanswered" for item in new_state["items"])
+
+
+def test_generated_arc_task_has_validated_measurement_metadata(master, tmap):
+    task = "Zadatak: Poluprecnik kruznice je 8 cm, centralni ugao je 90\u00b0. Izracunaj duzinu kruznog luka."
+    out = svc.handle_chat(
+        {"grade": 6, "mode": "practice", "selected_topic": FR_TOPIC, "student_message": "daj zadatak"},
+        _fake_chat(task), master, tmap, model="m", timeout=1,
+    )
+    item = out["task_validation"]["items"][0]
+    assert out["task_validation"]["validation_status"] == "validated"
+    assert item["answer_type"] == "measurement"
+    assert item["expected_unit"] == "cm"
+    assert "12" in item["expected_answer_display"]
+
+
+def test_invalid_tangent_length_task_is_replaced_before_activation(master, tmap):
+    bad = "Zadatak: Nacrtaj tangentu kroz tacku A i izmjeri duzinu na tangentnoj pravoj."
+    out = svc.handle_chat(
+        {"grade": 6, "mode": "practice", "selected_topic": FR_TOPIC, "student_message": "daj zadatak"},
+        _fake_chat(bad), master, tmap, model="m", timeout=1,
+    )
+    assert "ugao" in out["last_tutor_task"].lower()
+    assert out["task_validation"]["validation_status"] == "validated"
+    assert out["task_validation"]["items"][0]["expected_answer_display"] == "90\u00b0"
+
+
+def test_level3_multiple_choice_is_task_specific_and_generic_options_rejected():
+    arc = "Poluprecnik kruznice je 8 cm, centralni ugao je 90\u00b0. Izracunaj duzinu kruznog luka."
+    mc = svc._default_multiple_choice_hint(arc)
+    assert svc._validate_multiple_choice_quality(mc, arc)
+    joined = " ".join([mc["question"]] + [o["text"] for o in mc["options"]]).lower()
+    assert "90" in joined or "kruzn" in joined
+    generic = {
+        "question": "Koji je najbolji sljedeci korak?",
+        "correct_id": "A",
+        "options": [
+            {"id": "A", "text": "Uradi jedan mali korak koji cuva jednakost ili vrijednost.", "correct": True},
+            {"id": "B", "text": "Prepisati rezultat bez provjere.", "correct": False},
+            {"id": "C", "text": "Promijeniti jedinicu ili znak nasumicno.", "correct": False},
+        ],
+    }
+    assert not svc._validate_multiple_choice_quality(generic, arc)
+
+
+def test_equation_explanation_rejects_unrelated_or_malformed_micro_task():
+    bad = "Rijesimo 12 - 23x = 4x.\n\nProbaj ti: koliko je 5 + 3 = 8?"
+    good = "Rijesimo 12 - 23x = 4x.\n\nProbaj ti: Rijesi jednacinu: 10 - 7x = 2x."
+    assert svc.extract_micro_task(bad) == ""
+    assert svc.extract_micro_task(good).startswith("Rijesi jednacinu")
+
+
+def test_short_pending_context_question_uses_previous_micro_task_without_topic_fallback(master, tmap):
+    chat = _fake_chat("NE SMIJE SE POZVATI")
+    out = svc.handle_chat(
+        {
+            "grade": 6,
+            "mode": "explain",
+            "student_message": "sta da probam",
+            "previous_next_state": {
+                "micro_task": "Rijesi jednacinu: 10 - 7x = 2x.",
+            },
+        },
+        chat, master, tmap, model="m", timeout=1,
+    )
+    assert chat.calls["messages"] == []
+    assert "10 - 7x" in out["answer"]
+
+
+def test_sheets_row_contains_quick_math_verification_metadata():
+    from matbot import sheets_log as sl
+
+    response = {
+        "mode": "quick",
+        "status": "ready",
+        "answer": "x = 4/9",
+        "math_verification": {
+            "math_verification_used": True,
+            "math_verification_match": False,
+            "corrected_before_response": True,
+            "verified_answer": "x = 4/9",
+        },
+        "next_state": {},
+    }
+    row = sl._build_transcript_row(
+        {"session_id": "test-quick-verification", "grade": 6, "student_message": "12-23x=4x"},
+        response,
+    )
+    by_header = dict(zip(sl.SHEET_HEADERS, row))
+    assert by_header["math_verification_used"] is True
+    assert by_header["math_verification_match"] is False
+    assert by_header["corrected_before_response"] is True
+    assert by_header["verified_answer"] == "x = 4/9"

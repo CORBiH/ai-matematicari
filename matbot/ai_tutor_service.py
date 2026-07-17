@@ -392,6 +392,50 @@ def _task_hint_signature(task: Any, level: int) -> str:
     return f"{task_sig}|L{max(1, min(_ADAPTIVE_HINT_MAX_LEVEL, level))}"
 
 
+def _hint_pedagogy(task: Any, level: int) -> dict:
+    folded = _signature_text(task, limit=260)
+    level = max(1, min(_ADAPTIVE_HINT_MAX_LEVEL, level))
+    if re.search(r"\b(luk\w*|luka)\b.*\b(kruzn|krug)|\b(kruzn|krug).*\b(luk\w*|luka)\b", folded):
+        subgoals = {
+            1: ("arc_length", "identify_angle_fraction", "conceptual_hint", ["90/360"]),
+            2: ("arc_length", "compute_circumference", "direct_step", ["C=2*pi*r"]),
+            3: ("arc_length", "choose_angle_fraction", "multiple_choice", ["90/360"]),
+            4: ("arc_length", "take_fraction_of_circumference", "guided_step", ["one_quarter_of_circumference"]),
+            5: ("arc_length", "full_solution", "solution_reveal", ["final_answer"]),
+        }
+    elif re.search(r"\bx\b.*=", folded):
+        subgoals = {
+            1: ("linear_equation", "isolate_variable_idea", "conceptual_hint", ["balance"]),
+            2: ("linear_equation", "move_constant_or_terms", "direct_step", ["same_operation_both_sides"]),
+            3: ("linear_equation", "choose_first_operation", "multiple_choice", ["first_operation"]),
+            4: ("linear_equation", "divide_by_coefficient", "guided_step", ["coefficient"]),
+            5: ("linear_equation", "full_solution", "solution_reveal", ["final_answer"]),
+        }
+    elif re.search(r"razlom|/", folded):
+        subgoals = {
+            1: ("fractions", "recognize_needed_form", "conceptual_hint", ["form_or_denominator"]),
+            2: ("fractions", "find_common_denominator", "direct_step", ["common_denominator"]),
+            3: ("fractions", "choose_fraction_operation", "multiple_choice", ["operation"]),
+            4: ("fractions", "complete_fraction_step", "guided_step", ["combine_or_convert"]),
+            5: ("fractions", "full_solution", "solution_reveal", ["final_answer"]),
+        }
+    else:
+        subgoals = {
+            1: ("general_math", "understand_question", "conceptual_hint", ["given_and_asked"]),
+            2: ("general_math", "first_calculation_step", "direct_step", ["first_step"]),
+            3: ("general_math", "choose_next_step", "multiple_choice", ["next_step"]),
+            4: ("general_math", "guided_next_step", "guided_step", ["guided_step"]),
+            5: ("general_math", "full_solution", "solution_reveal", ["final_answer"]),
+        }
+    skill, subgoal, instruction_type, revealed = subgoals[level]
+    return {
+        "skill": skill,
+        "subgoal": subgoal,
+        "instruction_type": instruction_type,
+        "revealed_information": revealed,
+    }
+
+
 def _clean_hint_history(raw: Any) -> list[dict]:
     if not isinstance(raw, list):
         return []
@@ -406,6 +450,10 @@ def _clean_hint_history(raw: Any) -> list[dict]:
             "level": level,
             "reason": normalize_value(item.get("reason"))[:80],
             "signature": normalize_value(item.get("signature"))[:160],
+            "skill": normalize_value(item.get("skill"))[:80],
+            "subgoal": normalize_value(item.get("subgoal"))[:120],
+            "instruction_type": normalize_value(item.get("instruction_type"))[:80],
+            "revealed_information": item.get("revealed_information") if isinstance(item.get("revealed_information"), list) else [],
         })
     return out[-_ADAPTIVE_HISTORY_LIMIT:]
 
@@ -505,7 +553,14 @@ def _normalize_completed_parent_task(raw: Any) -> dict | None:
 
 def _default_multiple_choice_hint(task: Any) -> dict:
     folded = _signature_text(task, limit=260)
-    if re.search(r"(?:2\s*/\s*3|2/3|\\frac\{2\}\{3\})\s*\*?\s*x\s*=\s*8", folded):
+    if re.search(r"\b(luk\w*|luka)\b.*\b(kruzn|krug)|\b(kruzn|krug).*\b(luk\w*|luka)\b", folded):
+        question = "Koji dio pune kruznice predstavlja centralni ugao od 90\u00b0?"
+        options = [
+            {"id": "A", "text": "1/4 pune kruznice", "correct": True},
+            {"id": "B", "text": "1/2 pune kruznice", "correct": False},
+            {"id": "C", "text": "1/3 pune kruznice", "correct": False},
+        ]
+    elif re.search(r"(?:2\s*/\s*3|2/3|\\frac\{2\}\{3\})\s*\*?\s*x\s*=\s*8", folded):
         question = "Koji je najbolji sljedeci korak?"
         options = [
             {"id": "A", "text": "Pomnozi obje strane sa 3/2.", "correct": True},
@@ -519,14 +574,71 @@ def _default_multiple_choice_hint(task: Any) -> dict:
             {"id": "B", "text": "Podijeli 3 sa 11.", "correct": False},
             {"id": "C", "text": "Dodaj 3 na lijevu stranu.", "correct": False},
         ]
-    else:
-        question = "Koji je najbolji sljedeci korak?"
+    elif re.search(r"\bx\b.*=", folded):
+        question = "Sta prvo treba uraditi u ovoj jednacini?"
         options = [
-            {"id": "A", "text": "Uradi jedan mali korak koji cuva jednakost ili vrijednost.", "correct": True},
-            {"id": "B", "text": "Prepisati rezultat bez provjere.", "correct": False},
-            {"id": "C", "text": "Promijeniti jedinicu ili znak nasumicno.", "correct": False},
+            {"id": "A", "text": "Prebaciti clanove tako da x ostane na jednoj strani.", "correct": True},
+            {"id": "B", "text": "Pomnoziti samo desnu stranu jednacine.", "correct": False},
+            {"id": "C", "text": "Promijeniti znak jednakosti u znak nejednakosti.", "correct": False},
         ]
-    return {"question": question, "options": options, "correct_id": "A"}
+    elif re.search(r"razlom|/", folded):
+        question = "Sta je koristan sljedeci korak s razlomcima?"
+        options = [
+            {"id": "A", "text": "Svesti razlomke na zajednicki nazivnik.", "correct": True},
+            {"id": "B", "text": "Sabirati brojioce i nazivnike odvojeno.", "correct": False},
+            {"id": "C", "text": "Zanemariti nazivnike ako su brojioci slicni.", "correct": False},
+        ]
+    elif re.search(r"trougl|trokut|ugao|ugl", folded):
+        question = "Koju cinjenicu koristis za uglove u trouglu?"
+        options = [
+            {"id": "A", "text": "Zbir unutrasnjih uglova trougla je 180\u00b0.", "correct": True},
+            {"id": "B", "text": "Svaki trougao ima zbir uglova 90\u00b0.", "correct": False},
+            {"id": "C", "text": "Zbir uglova trougla zavisi od duzine stranica.", "correct": False},
+        ]
+    elif re.search(r"\b(km|m|dm|cm|mm|kg|g|h|min)\b", folded):
+        question = "Sta prvo provjeravas kod zadatka s mjernim jedinicama?"
+        options = [
+            {"id": "A", "text": "Da su vrijednosti izrazene u uporedivim jedinicama.", "correct": True},
+            {"id": "B", "text": "Da se broj uvijek poveca pri pretvaranju.", "correct": False},
+            {"id": "C", "text": "Da jedinicu mozes izostaviti iz odgovora.", "correct": False},
+        ]
+    else:
+        nums = re.findall(r"-?\d+(?:[,.]\d+)?(?:\s*/\s*\d+)?", folded)
+        number_hint = f" s brojem {nums[0]}" if nums else ""
+        question = f"Koji je prvi mali matematicki korak u ovom zadatku{number_hint}?"
+        options = [
+            {"id": "A", "text": "Izdvojiti zadane brojeve i sta se tacno trazi.", "correct": True},
+            {"id": "B", "text": "Koristiti samo prvi broj i zanemariti pitanje.", "correct": False},
+            {"id": "C", "text": "Zamijeniti trazenu velicinu nekim drugim podatkom.", "correct": False},
+        ]
+    mc = {"question": question, "options": options, "correct_id": "A"}
+    return mc if _validate_multiple_choice_quality(mc, task) else {
+        "question": "Sta prvo izdvajamo iz ovog konkretnog zadatka?",
+        "options": [
+            {"id": "A", "text": "Zadane podatke i trazenu velicinu.", "correct": True},
+            {"id": "B", "text": "Samo zadnji broj iz teksta.", "correct": False},
+            {"id": "C", "text": "Podatak koji nije naveden u zadatku.", "correct": False},
+        ],
+        "correct_id": "A",
+    }
+
+
+def _validate_multiple_choice_quality(raw: Any, task: Any = "") -> bool:
+    mc = _normalize_multiple_choice_hint(raw)
+    if not mc:
+        return False
+    options = mc.get("options") or []
+    if len(options) != 3 or sum(1 for opt in options if opt.get("correct")) != 1:
+        return False
+    combined = fold_diacritics(" ".join([mc.get("question", "")] + [o.get("text", "") for o in options]))
+    if re.search(r"nasumic|bez\s+provjere|cuva\s+jednakost\s+ili\s+vrijednost|random", combined):
+        return False
+    task_folded = fold_diacritics(task)
+    task_tokens = set(re.findall(r"\b(?:x|razlom\w*|nazivnik\w*|ugao|ugl\w*|trougl\w*|kruzn\w*|luk\w*|jednacin\w*|cm|mm|m|km|\d+)\b", task_folded))
+    if task_tokens and not any(tok in combined for tok in task_tokens):
+        return False
+    texts = [_choice_key(opt.get("text")) for opt in options]
+    return len(set(texts)) == 3
 
 
 def _match_multiple_choice_answer(student: Any, hint: dict) -> dict | None:
@@ -618,9 +730,29 @@ def _configure_adaptive_hint(payload: dict, help_task: str, message: Any) -> Non
         level = min(level, 4)
     level = max(1, min(_ADAPTIVE_HINT_MAX_LEVEL, level))
     signature = _task_hint_signature(help_task, level)
+    pedagogy = _hint_pedagogy(help_task, level)
     highest = max(prev_highest, level)
     history = _clean_hint_history(prev.get("hint_history"))
-    history.append({"level": level, "reason": reason, "signature": signature})
+    if any(
+        h.get("skill") == pedagogy.get("skill")
+        and h.get("subgoal") == pedagogy.get("subgoal")
+        and no_new_progress
+        for h in history
+    ):
+        payload["_repeated_hint_prevented"] = True
+        reason = "repeated_subgoal_prevented"
+        next_level = min(_ADAPTIVE_HINT_MAX_LEVEL, level + 1)
+        if next_level != level:
+            level = next_level
+            signature = _task_hint_signature(help_task, level)
+            pedagogy = _hint_pedagogy(help_task, level)
+            highest = max(highest, level)
+    history.append({
+        "level": level,
+        "reason": reason,
+        "signature": signature,
+        **pedagogy,
+    })
     history = history[-_ADAPTIVE_HISTORY_LIMIT:]
 
     payload["_hint_level"] = level
@@ -1277,6 +1409,8 @@ def _empty_next_state() -> dict:
         "multiple_choice_result": None,
         "completed_task_id": None,
         "task_items": None,
+        "exam_state": None,
+        "task_validation": None,
         # CLASS 1 (2026-07-12): prethodni potez je bio hint sa pod-korakom —
         # sljedeći odgovor može biti MEĐUKORAK, ne finalni odgovor.
         "just_hinted": False,
@@ -1311,6 +1445,202 @@ def _normalize_task_items(raw: Any) -> dict | None:
         if n in labels and n not in graded:
             graded.append(n)
     return {"labels": labels, "graded": sorted(graded)}
+
+
+def _short_fraction(value: Fraction) -> str:
+    return str(value.numerator) if value.denominator == 1 else f"{value.numerator}/{value.denominator}"
+
+
+def _expected_display_for_metadata(expected: Any) -> str:
+    if expected is None:
+        return ""
+    display = normalize_value(getattr(expected, "expected_display", ""))
+    if display:
+        return display
+    value = getattr(expected, "value", None)
+    if value is None:
+        return ""
+    base = _short_fraction(value)
+    if getattr(expected, "kind", "") == "inequality" and getattr(expected, "required_form", None):
+        return f"x {expected.required_form} {base}"
+    if getattr(expected, "kind", "") == "equation":
+        return f"x = {base}"
+    unit = normalize_value(getattr(expected, "unit", ""))
+    return f"{base}{unit}" if unit == "\u00b0" else f"{base} {unit}".strip()
+
+
+def _task_answer_metadata(task_text: Any) -> list[dict]:
+    text = normalize_value(task_text)
+    if not text:
+        return []
+    items = split_numbered_items(text) or [(1, text)]
+    out: list[dict] = []
+    for n, item_text in items:
+        expected = derive_expected(item_text)
+        out.append({
+            "item_id": f"item_{n}",
+            "n": n,
+            "question": normalize_value(item_text)[:300],
+            "answer_type": normalize_value(getattr(expected, "answer_type", "")) or None,
+            "expected_answer_display": _expected_display_for_metadata(expected) or None,
+            "expected_value": _short_fraction(expected.value) if expected is not None else None,
+            "expected_unit": normalize_value(getattr(expected, "unit", "")) or None,
+            "required_form": normalize_value(getattr(expected, "required_form", "")) or None,
+            "equivalent_forms_allowed": (
+                bool(getattr(expected, "equivalent_forms_allowed", True))
+                if expected is not None else None
+            ),
+            "tolerance": (
+                _short_fraction(getattr(expected, "tolerance"))
+                if expected is not None and getattr(expected, "tolerance", None) is not None
+                else None
+            ),
+            "validation_status": "validated" if expected is not None else "unvalidated",
+        })
+    return out
+
+
+def _looks_like_numeric_generated_task(task_text: Any) -> bool:
+    folded = fold_diacritics(task_text)
+    if not folded or not re.search(r"\d|[=<>]|\\frac|/", folded):
+        return False
+    return bool(re.search(
+        r"\b(izracunaj|odredi|rijesi|nadj|koliko|koliki|kolika|pretvori|"
+        r"saberi|oduzmi|pomnozi|podijeli|skrati|prosiri|ugao|duzina|obim|"
+        r"povrsina|poluprecnik|polumjer|centralni|luk)\b",
+        folded,
+    ))
+
+
+def _invalid_tangent_task_reason(task_text: Any) -> str:
+    folded = fold_diacritics(task_text)
+    if "tangent" not in folded:
+        return ""
+    asks_undefined_length = bool(
+        re.search(r"\b(izmjeri|odredi|izracunaj|nadji)\b.{0,80}\bduzin\w*", folded)
+        or re.search(r"\bduzin\w*.{0,80}\b(tangent|prav\w*)\b", folded)
+    )
+    asks_angle = bool(re.search(r"\bugao|ugl\w*|90\b|\bprav\b", folded))
+    named_segment = bool(re.search(r"\b[A-Z]\s*[A-Z]\b", normalize_value(task_text)))
+    if asks_undefined_length and not asks_angle and not named_segment:
+        return "undefined_tangent_segment"
+    return ""
+
+
+def _validate_task_activation(task_text: Any, *, mode: str = "practice") -> dict:
+    text = normalize_value(task_text)
+    meta = _task_answer_metadata(text)
+    invalid_reason = _invalid_tangent_task_reason(text)
+    if invalid_reason:
+        return {
+            "validation_status": "rejected",
+            "reason": invalid_reason,
+            "items": meta,
+        }
+    if not text:
+        return {"validation_status": "rejected", "reason": "empty_task", "items": []}
+    needs_expected = mode == "exam" or _looks_like_numeric_generated_task(text)
+    if needs_expected and (not meta or any(i.get("validation_status") != "validated" for i in meta)):
+        return {
+            "validation_status": "rejected",
+            "reason": "missing_expected_answer",
+            "items": meta,
+        }
+    return {
+        "validation_status": "validated",
+        "reason": "",
+        "items": meta,
+    }
+
+
+def _fallback_valid_task(payload: dict, *, mode: str, reason: str) -> str:
+    topic_probe = " ".join(str(x or "") for x in (
+        payload.get("selected_topic"), payload.get("selected_oblast"),
+        payload.get("student_message"), payload.get("last_tutor_task"),
+    ))
+    folded = fold_diacritics(topic_probe)
+    if reason == "undefined_tangent_segment" or "tangent" in folded:
+        return "Koji ugao grade radijus OA i tangenta u tacki A?"
+    if mode == "exam":
+        return (
+            "1. U trouglu su dva ugla 30\u00b0 i 90\u00b0. Odredi treci ugao.\n"
+            "2. U trouglu su dva ugla 45\u00b0 i 65\u00b0. Odredi treci ugao.\n"
+            "3. U trouglu su dva ugla 80\u00b0 i 40\u00b0. Odredi treci ugao."
+        )
+    if "luk" in folded or "kruzn" in folded:
+        return "Poluprecnik kruznice je 8 cm, centralni ugao je 90\u00b0. Izracunaj duzinu kruznog luka."
+    return "Rijesi jednacinu: 3x + 2 = 14."
+
+
+def _normalize_task_validation(raw: Any) -> dict | None:
+    if not isinstance(raw, dict):
+        return None
+    status = normalize_value(raw.get("validation_status")).lower()
+    if status not in ("validated", "rejected", "unvalidated"):
+        return None
+    items = raw.get("items") if isinstance(raw.get("items"), list) else []
+    cleaned = []
+    for item in items[:10]:
+        if not isinstance(item, dict):
+            continue
+        cleaned.append({
+            "item_id": normalize_value(item.get("item_id"))[:80],
+            "n": _coerce_nonnegative_int(item.get("n")),
+            "answer_type": normalize_value(item.get("answer_type"))[:80] or None,
+            "expected_answer_display": normalize_value(item.get("expected_answer_display"))[:120] or None,
+            "expected_value": normalize_value(item.get("expected_value"))[:80] or None,
+            "expected_unit": normalize_value(item.get("expected_unit"))[:40] or None,
+            "validation_status": normalize_value(item.get("validation_status")).lower() or "unvalidated",
+        })
+    return {
+        "validation_status": status,
+        "reason": normalize_value(raw.get("reason"))[:80],
+        "items": cleaned,
+    }
+
+
+def _normalize_exam_state(raw: Any) -> dict | None:
+    if not isinstance(raw, dict):
+        return None
+    items_raw = raw.get("items") if isinstance(raw.get("items"), list) else []
+    items: list[dict] = []
+    for idx, item in enumerate(items_raw[:20]):
+        if not isinstance(item, dict):
+            continue
+        status = normalize_value(item.get("status")).lower()
+        if status not in ("unanswered", "answered", "graded"):
+            status = "unanswered"
+        verdict = normalize_value(item.get("verdict")).lower() or None
+        items.append({
+            "item_id": normalize_value(item.get("item_id"))[:80] or f"item_{idx + 1}",
+            "question": normalize_value(item.get("question"))[:300],
+            "answer_metadata": item.get("answer_metadata") if isinstance(item.get("answer_metadata"), dict) else {},
+            "status": status,
+            "student_answer": normalize_value(item.get("student_answer"))[:200] or None,
+            "verdict": verdict,
+            "score": item.get("score"),
+        })
+    if not items:
+        return None
+    exam_status = normalize_value(raw.get("exam_status")).lower()
+    if exam_status not in ("active", "completed"):
+        exam_status = "completed" if all(item.get("status") == "graded" for item in items) else "active"
+    raw_idx = raw.get("current_item_index")
+    if exam_status == "completed" or raw_idx is None:
+        current_item_index = None if exam_status == "completed" else 0
+    else:
+        current_item_index = min(_coerce_nonnegative_int(raw_idx), max(0, len(items) - 1))
+    expected_action = normalize_value(raw.get("expected_user_action")).lower()
+    if expected_action not in ("answer_task", "clarify_answer", "none"):
+        expected_action = "none" if exam_status == "completed" else "answer_task"
+    return {
+        "exam_id": normalize_value(raw.get("exam_id"))[:80] or f"exam_{uuid.uuid4().hex}",
+        "mode": "exam",
+        "exam_status": exam_status,
+        "current_item_index": current_item_index,
+        "expected_user_action": expected_action,
+        "items": items,
+    }
 
 
 # F5 (Vježbajmo): koliko je puta zaredom učenik zapeo na istoj temi. Na pragu se
@@ -1494,6 +1824,8 @@ def _normalize_next_state(raw: Any) -> dict:
         "completed_task_id": normalize_value(raw.get("completed_task_id"))[:80] or None,
         # BUG 12: stanje višestavkovnog zadatka (koje stavke su već ocijenjene)
         "task_items": _normalize_task_items(raw.get("task_items")),
+        "exam_state": _normalize_exam_state(raw.get("exam_state")),
+        "task_validation": _normalize_task_validation(raw.get("task_validation")),
         # CLASS 1: marker da je prethodni potez bio hint (pod-korak)
         "just_hinted": bool(raw.get("just_hinted")),
         # N9: mikro-zadatak iz objašnjenja (odvojen od last_tutor_task)
@@ -1505,6 +1837,19 @@ def _previous_next_state(payload: dict) -> dict:
     return _normalize_next_state(
         payload.get("previous_next_state") or payload.get("tutor_state")
     )
+
+
+def _apply_mode_preservation_contract(payload: dict) -> None:
+    prev = _previous_next_state(payload)
+    exam_state = prev.get("exam_state")
+    phase = normalize_value(payload.get("interaction_phase")).lower()
+    if (
+        exam_state
+        and phase in ("answering_practice_task", "practice_help", "continuing_explanation")
+        and normalize_value(prev.get("task_status")).lower() == "active"
+    ):
+        payload["mode"] = "exam"
+        payload["_session_mode"] = "exam"
 
 
 def _pending_action_from_payload(payload: dict) -> dict:
@@ -1887,6 +2232,92 @@ def _fmt_result_value(expected) -> str:
         return f"x {expected.required_form} {num}"
     base = str(val.numerator) if val.denominator == 1 else f"{val.numerator}/{val.denominator}"
     return f"{base} {expected.unit}".strip() if expected.unit else base
+
+
+def _verified_result_phrase(expected: Any) -> str:
+    value = _fmt_result_value(expected)
+    if getattr(expected, "kind", "") == "equation":
+        return f"x = {value}"
+    return value
+
+
+def _result_verification_task(payload: dict) -> str:
+    raw = (
+        normalize_value(payload.get("_result_solve_task"))
+        or normalize_value(payload.get("_result_solve_item"))
+        or normalize_value(payload.get("student_message") or payload.get("message"))
+    )
+    if derive_expected(raw) is not None:
+        return raw
+    candidates = re.findall(
+        r"[-+0-9xX/*():,\s]{1,80}=[-+0-9xX/*():,\s]{1,80}",
+        raw,
+    )
+    for candidate in reversed(candidates):
+        cleaned = candidate.strip(" .,:;!?")
+        if derive_expected(cleaned) is not None:
+            return cleaned
+    return raw
+
+
+def _candidate_generated_result(answer: str, expected: Any) -> str:
+    text = normalize_value(answer)
+    kind = normalize_value(getattr(expected, "kind", "")).lower()
+    if kind == "equation":
+        matches = re.findall(
+            r"\bx\s*=\s*-?\d+(?:[,.]\d+)?(?:\s*/\s*-?\d+)?(?:\s+\d+\s*/\s*\d+)?",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if matches:
+            return matches[-1]
+    if kind == "inequality":
+        matches = re.findall(
+            r"\bx\s*(?:<=|>=|<|>)\s*-?\d+(?:[,.]\d+)?(?:\s*/\s*-?\d+)?",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if matches:
+            return matches[-1]
+    return text
+
+
+def _apply_math_result_verification(payload: dict, answer: str, *, mode: str, status: str) -> str:
+    if status != "ready" or _is_grading_turn(payload):
+        return answer
+    if payload.get("_skip_answer_check") or payload.get("_practice_help_intent") or payload.get("_explicit_hint_request"):
+        return answer
+    if "[DRY RUN" in answer:
+        return answer
+    if mode in ("practice", "exam"):
+        return answer
+    task = _result_verification_task(payload)
+    expected = derive_expected(task)
+    if expected is None:
+        return answer
+    candidate = _candidate_generated_result(answer, expected)
+    check = check_practice_answer(task, candidate)
+    verdict = authoritative_verdict(check)
+    match = verdict == "correct"
+    verified = _verified_result_phrase(expected)
+    payload["_math_verification"] = {
+        "generated_answer": candidate[:200],
+        "verified_answer": verified,
+        "math_verification_used": True,
+        "math_verification_match": match,
+        "corrected_before_response": not match,
+    }
+    if match:
+        return answer
+    if mode == "quick":
+        return verified
+    if getattr(expected, "kind", "") == "equation":
+        return (
+            f"Provjereno rjesenje je {verified}. "
+            "Kratko: prebaci clanove s x na jednu stranu, brojeve na drugu, "
+            "pa podijeli koeficijent uz x."
+        )
+    return f"Provjeren rezultat je {verified}."
 
 
 def _duplicate_task_numbering(items: list[dict]) -> bool:
@@ -2842,6 +3273,14 @@ def extract_micro_task(answer: Any, limit: int = 300) -> str:
     # mora nositi matematički signal (broj/operator) — inače nije zadatak
     if not text or not _TASK_SIGNAL_RE.search(fold_diacritics(text)):
         return ""
+    folded_text = fold_diacritics(text)
+    folded_raw = fold_diacritics(raw)
+    if re.search(r"\bkoliko\s+je\b[^?]{0,80}=", folded_text):
+        return ""
+    if re.search(r"\bx\b|jednacin", folded_raw) and not re.search(r"\bx\b|jednacin", folded_text):
+        return ""
+    if _looks_like_numeric_generated_task(text) and derive_expected(text) is None:
+        return ""
     return text[:limit]
 
 
@@ -2921,6 +3360,50 @@ def _apply_micro_task_contract(payload: dict) -> None:
         payload["answer_check"] = result
 
 
+_PENDING_CONTEXT_QUESTION_RE = re.compile(
+    r"\b(sta\s+da\s+probam|sta\s+dalje|kako\s+to|koji\s+korak|ne\s+razumijem|ne\s+kontam)\b"
+)
+
+
+def _apply_pending_context_question_contract(payload: dict) -> None:
+    if payload.get("_direct_answer") is not None or payload.get("_skip_answer_check"):
+        return
+    if normalize_value(payload.get("intent")):
+        return
+    if normalize_value(payload.get("interaction_phase")).lower():
+        return
+    message = fold_diacritics(payload.get("student_message") or payload.get("message"))
+    if not _PENDING_CONTEXT_QUESTION_RE.search(message):
+        return
+    prev = _previous_next_state(payload)
+    micro = normalize_value(prev.get("micro_task"))
+    if micro:
+        payload["_direct_answer"] = (
+            f"Mislim na ovaj mali zadatak: {micro} "
+            "Kreni tako sto ces izdvojiti sta je dato i sta se trazi."
+        )
+        return
+    if prev.get("just_hinted") and normalize_value(payload.get("last_tutor_task")):
+        payload["_direct_answer"] = (
+            "Nastavi od zadnjeg hinta za aktivni zadatak. Uradi samo taj mali "
+            "korak, pa mi posalji rezultat."
+        )
+        return
+    pending = prev.get("pending_action") or {}
+    if pending.get("type"):
+        payload["_direct_answer"] = (
+            "Mislio sam na prethodno pitanje u razgovoru. Odgovori kratko na "
+            "njega, pa nastavljamo odatle."
+        )
+        return
+    prev_msg = normalize_value(payload.get("last_tutor_message") or _previous_tutor_message(payload))
+    if "?" in prev_msg:
+        payload["_direct_answer"] = (
+            "Mislio sam na pitanje iz prethodne poruke. Ako ti nije jasno, "
+            "posalji mi taj dio koji zbunjuje pa cu ga rastaviti na manji korak."
+        )
+
+
 def _soften_post_hint_reply(payload: dict) -> None:
     """CLASS 1: kad je prethodni potez bio hint (pod-korak), učenikov odgovor
     može biti tačan MEĐUKORAK, a ne finalni odgovor.
@@ -2970,12 +3453,20 @@ def _run_answer_check(payload: dict) -> None:
     items = split_numbered_items(task)
     pending: list[int] | None = None
     prev_items = _previous_next_state(payload).get("task_items")
+    prev_exam = _previous_next_state(payload).get("exam_state")
     if items and prev_items:
         labels = [n for n, _t in items]
         if set(prev_items.get("labels") or []) == set(labels):
             graded = [n for n in prev_items.get("graded") or [] if n in labels]
             pending = [n for n in labels if n not in graded]
             payload["_task_items_prev"] = {"labels": labels, "graded": graded}
+            if prev_exam:
+                idx = _coerce_nonnegative_int(prev_exam.get("current_item_index"))
+                exam_items = prev_exam.get("items") or []
+                if 0 <= idx < len(exam_items):
+                    current_n = idx + 1
+                    if current_n in pending:
+                        pending = [current_n]
 
     result = check_practice_answer(task, student, pending_items=pending)
     payload["answer_check"] = result
@@ -3231,6 +3722,7 @@ def _prepare_chat(
     # Session mod = ono što je korisnik izabrao u UI-ju; contracts smiju mijenjati
     # SAMO prompt-mod (interno rutiranje), a UI prikazuje session mod (BUG 10/14).
     payload["_session_mode"] = normalize_value(payload.get("mode")).lower() or "explain"
+    _apply_mode_preservation_contract(payload)
     # Eksplicitna namjera (stil/obim) se čita iz ORIGINALNE poruke, prije nego
     # što je confirmation contract eventualno zamijeni sintetičkom.
     _apply_explicit_intent(payload)
@@ -3255,6 +3747,7 @@ def _prepare_chat(
     _apply_explain_request_contract(payload)
     # N9: odgovor na mikro-zadatak iz prethodnog objašnjenja ("Probaj ti: …").
     _apply_micro_task_contract(payload)
+    _apply_pending_context_question_contract(payload)
     # N5: "jesi li robot / ko te napravio / špijuniraš li me" → topli direktni odgovor.
     _apply_meta_identity_contract(payload)
 
@@ -4034,6 +4527,7 @@ _ACCEPTED_ITEM_VERDICTS = (
 )
 _PARTIAL_ITEM_VERDICTS = ("correct_value_wrong_form", "partially_correct", "correct_step")
 _RETRY_ITEM_VERDICTS = ("incorrect", "wrong_unit", "incomplete")
+_EXAM_CLARIFICATION_VERDICTS = ("unverified", "ambiguous", "needs_review")
 
 
 def _task_items_for_response(payload: dict, task_text: str) -> dict | None:
@@ -4057,15 +4551,259 @@ def _task_items_for_response(payload: dict, task_text: str) -> dict | None:
     labels = list(prev.get("labels") or [])
     graded = [n for n in prev.get("graded") or [] if n in labels]
     check = payload.get("answer_check")
+    exam_mode = bool(_previous_next_state(payload).get("exam_state")) or normalize_value(
+        payload.get("_session_mode") or payload.get("mode")
+    ).lower() == "exam"
+    answered_verdicts = _ANSWERED_VERDICTS
+    if exam_mode:
+        answered_verdicts = tuple(v for v in _ANSWERED_VERDICTS if v not in _EXAM_CLARIFICATION_VERDICTS)
     for item_check in getattr(check, "items", []) or []:
         n = getattr(item_check, "n", None)
         if (
             n in labels
             and n not in graded
-            and getattr(item_check, "verdict", "") in _ANSWERED_VERDICTS
+            and getattr(item_check, "verdict", "") in answered_verdicts
         ):
             graded.append(n)
     return {"labels": labels, "graded": sorted(graded)}
+
+
+def _exam_state_for_response(payload: dict, task_text: str, task_items: dict | None) -> dict | None:
+    prev = _previous_next_state(payload)
+    prev_exam = prev.get("exam_state")
+    source_task = normalize_value(task_text) or normalize_value(payload.get("last_tutor_task"))
+    items = split_numbered_items(source_task)
+    if not items:
+        return prev_exam
+    meta = {m["n"]: m for m in _task_answer_metadata(source_task)}
+    prev_items = (prev_exam or {}).get("items") or []
+    check_by_n = {
+        getattr(i, "n", None): i
+        for i in (getattr(payload.get("answer_check"), "items", []) or [])
+    }
+    graded = set((task_items or {}).get("graded") or [])
+    states: list[dict] = []
+    for idx, (n, text) in enumerate(items):
+        prev_item = prev_items[idx] if idx < len(prev_items) and isinstance(prev_items[idx], dict) else {}
+        item_check = check_by_n.get(n)
+        check_verdict = normalize_value(getattr(item_check, "verdict", "")).lower()
+        attempted = item_check is not None and check_verdict not in (
+            "missing", "not_attempted", *_EXAM_CLARIFICATION_VERDICTS,
+        )
+        if item_check is not None and check_verdict in _EXAM_CLARIFICATION_VERDICTS:
+            graded.discard(n)
+        verdict = normalize_value(getattr(item_check, "verdict", "")).lower() if attempted else normalize_value(prev_item.get("verdict")).lower()
+        status = "graded" if (attempted or n in graded or verdict) else "unanswered"
+        score = prev_item.get("score")
+        if attempted:
+            score = 1 if verdict in _ACCEPTED_ITEM_VERDICTS else 0.5 if verdict in _PARTIAL_ITEM_VERDICTS else 0
+        states.append({
+            "item_id": normalize_value(prev_item.get("item_id")) or f"item_{n}",
+            "question": normalize_value(text)[:300],
+            "answer_metadata": meta.get(n, {}),
+            "status": status,
+            "student_answer": (
+                normalize_value(getattr(getattr(item_check, "given", None), "raw", ""))[:200]
+                if attempted else normalize_value(prev_item.get("student_answer"))[:200] or None
+            ),
+            "verdict": verdict or None,
+            "score": score,
+        })
+    next_idx = next((i for i, item in enumerate(states) if item.get("status") != "graded"), len(states))
+    completed = next_idx >= len(states)
+    check = payload.get("answer_check")
+    needs_clarification = (
+        _is_grading_turn(payload)
+        and check is not None
+        and (
+            not getattr(check, "checkable", False)
+            or any(
+                normalize_value(getattr(i, "verdict", "")).lower() in _EXAM_CLARIFICATION_VERDICTS
+                for i in (getattr(check, "items", []) or [])
+            )
+        )
+    )
+    reuse_exam_id = bool(prev_exam) and (
+        _is_grading_turn(payload)
+        or normalize_value(payload.get("last_tutor_task"))[:600] == source_task[:600]
+    )
+    return {
+        "exam_id": (
+            normalize_value((prev_exam or {}).get("exam_id"))[:80]
+            if reuse_exam_id else ""
+        ) or f"exam_{uuid.uuid4().hex}",
+        "mode": "exam",
+        "exam_status": "completed" if completed else "active",
+        "current_item_index": None if completed else min(next_idx, max(0, len(states) - 1)),
+        "expected_user_action": "none" if completed else "clarify_answer" if needs_clarification else "answer_task",
+        "items": states,
+    }
+
+
+def _exam_attempted_item_index(payload: dict, exam_state: dict) -> int | None:
+    check = payload.get("answer_check")
+    for item_check in getattr(check, "items", []) or []:
+        verdict = normalize_value(getattr(item_check, "verdict", "")).lower()
+        n = getattr(item_check, "n", None)
+        if verdict and verdict not in ("missing", "not_attempted"):
+            try:
+                idx = int(n) - 1
+            except (TypeError, ValueError):
+                continue
+            if 0 <= idx < len(exam_state.get("items") or []):
+                return idx
+    prev_idx = (_previous_next_state(payload).get("exam_state") or {}).get("current_item_index")
+    try:
+        idx = int(prev_idx)
+    except (TypeError, ValueError):
+        return None
+    return idx if 0 <= idx < len(exam_state.get("items") or []) else None
+
+
+def _exam_expected_answer(item: dict) -> str:
+    meta = item.get("answer_metadata") if isinstance(item.get("answer_metadata"), dict) else {}
+    return (
+        normalize_value(meta.get("expected_answer_display"))
+        or normalize_value(meta.get("expected"))
+        or normalize_value(meta.get("expected_answer"))
+        or normalize_value(meta.get("expected_value"))
+    )
+
+
+def _exam_verdict_label(verdict: str | None) -> str:
+    v = normalize_value(verdict).lower()
+    if v in _ACCEPTED_ITEM_VERDICTS:
+        return "Tačno"
+    if v in _PARTIAL_ITEM_VERDICTS:
+        return "Djelimično tačno"
+    if v in _EXAM_CLARIFICATION_VERDICTS:
+        return "Nejasno"
+    return "Netačno"
+
+
+def _exam_item_feedback(item: dict, index: int) -> str:
+    label = _exam_verdict_label(item.get("verdict"))
+    expected = _exam_expected_answer(item)
+    student = normalize_value(item.get("student_answer"))
+    n = index + 1
+    if label == "Tačno":
+        answer = student or expected
+        return f"Tačno, odgovor na zadatak {n} je {answer}." if answer else f"Tačno za zadatak {n}."
+    if label == "Djelimično tačno":
+        return f"Djelimično tačno za zadatak {n}. Vrijednost je blizu, ali oblik odgovora još treba popraviti."
+    if label == "Nejasno":
+        return f"Treba mi jasniji odgovor za zadatak {n}. Pošalji samo odgovor za taj zadatak."
+    return f"Netačno za zadatak {n}. Tačan odgovor je {expected}." if expected else f"Netačno za zadatak {n}."
+
+
+def _exam_review_topics(items: list[dict], payload: dict) -> list[str]:
+    topics: list[str] = []
+    for item in items:
+        try:
+            score = float(item.get("score") or 0)
+        except (TypeError, ValueError):
+            score = 0.0
+        if score >= 1:
+            continue
+        folded = fold_diacritics(item.get("question"))
+        if "suplement" in folded:
+            topic = "suplementarni uglovi"
+        elif "komplement" in folded:
+            topic = "komplementarni uglovi"
+        elif "trougl" in folded or "trokut" in folded:
+            topic = "zbir uglova u trouglu"
+        elif "central" in folded or "perifer" in folded:
+            topic = "centralni i periferijski uglovi"
+        elif "luk" in folded or "kruzn" in folded:
+            topic = "kružnica i kružni luk"
+        else:
+            topic = normalize_value(payload.get("selected_oblast")) or "zadaci koje nisi potpuno riješio"
+        if topic not in topics:
+            topics.append(topic)
+    return topics[:4]
+
+
+def _format_exam_score(score: float) -> str:
+    if abs(score - round(score)) < 1e-9:
+        return str(int(round(score)))
+    return f"{score:.1f}".replace(".", ",")
+
+
+def _exam_final_summary(exam_state: dict, payload: dict) -> str:
+    items = exam_state.get("items") or []
+    total = len(items)
+    score = sum(float(item.get("score") or 0) for item in items)
+    correct = sum(1 for item in items if float(item.get("score") or 0) >= 1)
+    partial = sum(1 for item in items if 0 < float(item.get("score") or 0) < 1)
+    incorrect = max(0, total - correct - partial)
+    lines = [
+        "Kontrolni je završen.",
+        "",
+        f"Rezultat: {_format_exam_score(score)}/{total}",
+        f"Tačno: {correct}",
+    ]
+    if partial:
+        lines.append(f"Djelimično tačno: {partial}")
+    lines.append(f"Netačno: {incorrect}")
+    lines.append("")
+    for idx, item in enumerate(items, start=1):
+        verdict = _exam_verdict_label(item.get("verdict"))
+        student = normalize_value(item.get("student_answer")) or "bez odgovora"
+        expected = _exam_expected_answer(item)
+        line = f"{idx}. {verdict} — odgovor: {student}"
+        if verdict != "Tačno" and expected:
+            line += f"; tačan odgovor je {expected}"
+        lines.append(line)
+    review = _exam_review_topics(items, payload)
+    if review:
+        lines.extend(["", "Za ponavljanje:"])
+        lines.extend(f"- {topic}" for topic in review)
+    return "\n".join(lines).strip()
+
+
+def _deterministic_exam_response(payload: dict, exam_state: dict) -> str:
+    items = exam_state.get("items") or []
+    attempted_idx = _exam_attempted_item_index(payload, exam_state)
+    if attempted_idx is None or attempted_idx >= len(items):
+        current_idx = exam_state.get("current_item_index")
+        if current_idx is None:
+            return _exam_final_summary(exam_state, payload)
+        return f"Treba mi jasniji odgovor za zadatak {int(current_idx) + 1}. Pošalji samo odgovor za taj zadatak."
+    attempted_item = items[attempted_idx]
+    verdict = normalize_value(attempted_item.get("verdict")).lower()
+    if verdict in _EXAM_CLARIFICATION_VERDICTS or attempted_item.get("status") != "graded":
+        return f"Treba mi jasniji odgovor za zadatak {attempted_idx + 1}. Pošalji samo odgovor za taj zadatak."
+    if exam_state.get("exam_status") == "completed":
+        return _exam_final_summary(exam_state, payload)
+    next_idx = exam_state.get("current_item_index")
+    try:
+        next_idx_i = int(next_idx)
+    except (TypeError, ValueError):
+        return _exam_final_summary(exam_state, payload)
+    next_item = items[next_idx_i]
+    return (
+        f"{_exam_item_feedback(attempted_item, attempted_idx)}\n\n"
+        f"Zadatak {next_idx_i + 1} od {len(items)}:\n"
+        f"{normalize_value(next_item.get('question'))}"
+    ).strip()
+
+
+def _exam_response_verdict(payload: dict, exam_state: dict) -> tuple[str | None, str | None]:
+    idx = _exam_attempted_item_index(payload, exam_state)
+    items = exam_state.get("items") or []
+    if idx is None or idx >= len(items):
+        return None, "ambiguous" if exam_state.get("expected_user_action") == "clarify_answer" else None
+    item = items[idx]
+    verdict = normalize_value(item.get("verdict")).lower()
+    if item.get("status") != "graded" or verdict in _EXAM_CLARIFICATION_VERDICTS:
+        return None, "ambiguous"
+    if verdict in _ACCEPTED_ITEM_VERDICTS:
+        return "correct", verdict
+    if verdict in _PARTIAL_ITEM_VERDICTS:
+        return "partial", verdict
+    if verdict in _RETRY_ITEM_VERDICTS:
+        return "incorrect", verdict
+    return None, verdict or "ambiguous"
 
 
 def _pending_items_after_grading(payload: dict) -> list:
@@ -4340,6 +5078,8 @@ def _finalize_response(prep: dict, answer: str) -> dict:
     ):
         answer = enforce_grading_consistency(answer, payload.get("answer_check"))
 
+    answer = _apply_math_result_verification(payload, answer, mode=mode, status=status)
+
     _apply_gpt_fallback_verdict(payload, answer)
     if payload.get("_gpt_answer_verdict"):
         answer = _enforce_gpt_fallback_label(answer, payload)
@@ -4396,6 +5136,8 @@ def _finalize_response(prep: dict, answer: str) -> dict:
             "detected_task_count": payload.get("_detected_task_count"),
             "image_result_available": bool(payload.get("_image_result_available")),
         }
+    if payload.get("_math_verification"):
+        response["math_verification"] = payload.get("_math_verification")
     image_context = _make_image_context(payload, answer)
     if image_context:
         response["image_context"] = image_context
@@ -4475,12 +5217,40 @@ def _finalize_response(prep: dict, answer: str) -> dict:
             task_text = normalize_value(payload.get("last_tutor_task"))[:600]
     else:
         task_text = extract_practice_task(answer, mode=mode)
+    if task_text and mode in ("practice", "exam"):
+        prev_task_text = normalize_value(payload.get("last_tutor_task"))[:600]
+        new_generated_task = bool(task_text and task_text != prev_task_text and not _is_grading_turn(payload))
+        validation = _validate_task_activation(task_text, mode=mode)
+        if validation.get("validation_status") != "validated" and new_generated_task:
+            fallback_task = _fallback_valid_task(
+                payload, mode=mode, reason=normalize_value(validation.get("reason"))
+            )
+            fallback_validation = _validate_task_activation(fallback_task, mode=mode)
+            if fallback_validation.get("validation_status") == "validated":
+                task_text = fallback_task[:600]
+                validation = fallback_validation
+                answer = f"Zadatak: {task_text}"
+                response["answer"] = answer
+            else:
+                task_text = ""
+                answer = (
+                    "Ovaj zadatak nije imao dovoljno jasne podatke za jednoznacan "
+                    "odgovor, pa ga necu aktivirati. Posalji mi novi zadatak ili "
+                    "izaberi temu za vjezbu."
+                )
+                response["answer"] = answer
+        payload["_task_validation"] = validation
     # Server je jedini izvor istine za aktivni zadatak: polje se šalje UVIJEK
     # (i prazno), da klijent ne izvodi vlastitu heuristiku nad prozom.
     response["last_tutor_task"] = task_text
     response["next_state"] = _next_state_for_response(
         payload, answer, mode=mode, status=status, task_text=task_text
     )
+    if payload.get("_task_validation"):
+        task_validation = _normalize_task_validation(payload.get("_task_validation"))
+        if task_validation:
+            response["task_validation"] = task_validation
+            response["next_state"]["task_validation"] = task_validation
     # F5: prenesi "stuck" brojač naprijed da klijent vrati stanje sljedeći put.
     response["next_state"]["stuck_count"] = int(payload.get("_stuck_count", 0) or 0)
     response["next_state"]["correct_streak"] = int(payload.get("_correct_streak", 0) or 0)
@@ -4528,6 +5298,61 @@ def _finalize_response(prep: dict, answer: str) -> dict:
             if len(labels) >= 2 and pending and persisted:
                 response["last_tutor_task"] = persisted[:600]
 
+    if mode == "exam" or _previous_next_state(payload).get("exam_state"):
+        exam_state = _exam_state_for_response(
+            payload,
+            response.get("last_tutor_task") or task_text,
+            response["next_state"].get("task_items"),
+        )
+        if exam_state:
+            response["exam_state"] = exam_state
+            response["next_state"]["exam_state"] = exam_state
+            if _is_grading_turn(payload):
+                response["answer"] = _deterministic_exam_response(payload, exam_state)
+                response["mode"] = "exam"
+                response["session_mode"] = "exam"
+                response["recommended_mode"] = "exam"
+                exam_coarse, exam_detail = _exam_response_verdict(payload, exam_state)
+                if exam_state.get("expected_user_action") == "clarify_answer":
+                    payload.pop("_gpt_answer_verdict", None)
+                    payload["_gpt_check_used"] = False
+                    payload["_gpt_check_confidence"] = None
+                completed_exam = exam_state.get("exam_status") == "completed"
+                if completed_exam:
+                    response["last_tutor_task"] = ""
+                    response["next_state"].update(
+                        _task_lifecycle_fields(payload, active=False, completed=True)
+                    )
+                    response["next_state"].update({
+                        "expected_user_action": "none",
+                        "active_task_kind": None,
+                        "pending_action": _empty_pending_action(),
+                    })
+                else:
+                    response["last_tutor_task"] = (
+                        normalize_value(payload.get("last_tutor_task"))[:600]
+                        or response.get("last_tutor_task", "")
+                    )
+                    response["next_state"].update(
+                        _task_lifecycle_fields(payload, active=True, new_active_task=False)
+                    )
+                    response["next_state"].update({
+                        "expected_user_action": (
+                            "clarify_answer"
+                            if exam_state.get("expected_user_action") == "clarify_answer"
+                            else "answer_task"
+                        ),
+                        "active_task_kind": "exam",
+                        "pending_action": _empty_pending_action(),
+                    })
+                response["next_state"]["exam_state"] = exam_state
+                response["answer_verdict"] = exam_coarse
+                response["answer_verdict_detail"] = exam_detail
+                response["gpt_check_used"] = bool(payload.get("_gpt_check_used"))
+                response["gpt_check_confidence"] = (
+                    payload.get("_gpt_check_confidence") if payload.get("_gpt_check_used") else None
+                )
+
     # Audit: sažetak determinističke provjere u response (telemetrija/testovi).
     check = payload.get("answer_check")
     check_summary = summarize_result(check) if check is not None else None
@@ -4562,6 +5387,18 @@ def _finalize_response(prep: dict, answer: str) -> dict:
         }
     if check_summary:
         response["answer_check"] = check_summary
+
+    response["task_id"] = (
+        response["next_state"].get("task_id")
+        or response["next_state"].get("completed_task_id")
+    )
+    response["task_status"] = response["next_state"].get("task_status")
+    response["attempt_number"] = response["next_state"].get("attempt_count", 0)
+    response["total_attempt_count"] = response["next_state"].get(
+        "total_attempt_count", response["attempt_number"]
+    )
+    response["wrong_attempt_count"] = response["next_state"].get("wrong_attempt_count", 0)
+    response["hint_count"] = response["next_state"].get("hint_count", 0)
 
     # Phase 5: minimalni activity log — greška NIKAD ne ruši tutor odgovor.
     try:

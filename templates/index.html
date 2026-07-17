@@ -1436,7 +1436,7 @@ document.addEventListener('DOMContentLoaded', () => {
        primjer" kao nastavak — ista logika kao da je učenik kucao) */
     function chipDefs(j){
       if (!j || j.status !== 'ready') return [];
-      if (interactionPhase === 'awaiting_practice_answer'){
+      if (interactionPhase === 'awaiting_practice_answer' && state.mode !== 'exam'){
         /* Audit: chip za ponavljanje zadatka je uklonjen — duplirao je običan
            chat i navodio tutora da isti zadatak ispiše ponovo. Koristan par
            je hint + novi zadatak. */
@@ -1648,9 +1648,9 @@ document.addEventListener('DOMContentLoaded', () => {
         payload.intent = confirmationIntent;
         payload.interaction_phase = confirmationPhase;
         if (confirmationPending) payload.pending_action = confirmationPending;
-      } else if (answerPhase){                     // odgovor na practice zadatak
+      } else if (answerPhase){                     // odgovor na practice/exam zadatak
         payload.interaction_phase = answerPhase;
-        payload.mode = 'practice';
+        payload.mode = state.mode;
         payload.last_tutor_task = savedTask.slice(0, 600);
       } else if (continuation){                    // "može"/"nastavi" → nastavi od zadnje poruke
         payload.interaction_phase = 'continuing_explanation';
