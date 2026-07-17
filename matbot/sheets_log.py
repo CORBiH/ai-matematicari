@@ -93,10 +93,6 @@ SHEET_HEADERS = [
     "student_answer",
     "normalized_student",
     "deterministic_check",
-    "math_verification_used",
-    "math_verification_match",
-    "corrected_before_response",
-    "verified_answer",
     "gpt_check_used",
     "gpt_check_confidence",
     "attempt_number",
@@ -512,7 +508,6 @@ def _build_transcript_row(payload: dict, response: dict) -> list[Any]:
     topic = response.get("final_topic") or response.get("effective_topic")
     next_state = response.get("next_state") or {}
     item = _first_answer_check_item(response)
-    math_verification = response.get("math_verification") if isinstance(response.get("math_verification"), dict) else {}
     def _telemetry(key: str) -> Any:
         value = response.get(key)
         if value is None and isinstance(next_state, dict):
@@ -548,10 +543,6 @@ def _build_transcript_row(payload: dict, response: dict) -> list[Any]:
         _clean_cell(item.get("student_answer") or item.get("given") or payload.get("student_message")),
         _clean_cell(item.get("normalized_student")),
         _json_cell(item.get("deterministic_check")),
-        _clean_cell(math_verification.get("math_verification_used")),
-        _clean_cell(math_verification.get("math_verification_match")),
-        _clean_cell(math_verification.get("corrected_before_response")),
-        _clean_cell(math_verification.get("verified_answer")),
         _clean_cell(response.get("gpt_check_used")),
         _clean_cell(response.get("gpt_check_confidence")),
         _clean_cell(response.get("attempt_number") or next_state.get("attempt_count")),

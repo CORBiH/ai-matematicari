@@ -1255,7 +1255,7 @@ def build_tutor_prompt(
     is_practice_followup = interaction_phase == "answering_practice_task"
     is_practice_help = interaction_phase == "practice_help"
     is_continuation = interaction_phase == "continuing_explanation"
-    if is_practice_followup and mode != "exam":
+    if is_practice_followup:
         mode = "practice"
     elif is_practice_help:
         mode = "explain"
@@ -1385,8 +1385,7 @@ def build_general_tutor_prompt(payload: dict) -> dict:
     if image_test_block:
         mode_block = image_test_block          # stanje bira stavku sa slike
     elif phase == "answering_practice_task":
-        if mode != "exam":
-            mode = "practice"
+        mode = "practice"
         mode_block = build_practice_followup_instructions(payload, {})
     elif phase == "practice_help":
         mode = "explain"

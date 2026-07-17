@@ -605,121 +605,6 @@ def _try_angle_arithmetic(folded: str, norm_text: str) -> Expected | None:
     return expected
 
 
-_TRIANGLE_WORD_RE = re.compile(r"\b(trougl\w*|trokut\w*|triangle\w*)\b")
-_MISSING_TRIANGLE_ANGLE_RE = re.compile(
-    r"\b(?:trec\w*|preostal\w*|drug\w*|other|missing|unknown|find|nepoznat\w*|koliki|kolika|odredi|nadj?i|izracunaj)\b"
-)
-_DEGREE_VALUE_RE = re.compile(r"(-?\d+(?:[,.]\d+)?)\s*(?:\u00b0|stepen\w*)", re.IGNORECASE)
-
-
-def _try_triangle_missing_angle(folded: str, norm_text: str) -> Expected | None:
-    """Missing angle in a triangle: two known angles imply the third.
-
-    Conservative by design: requires triangle wording, a prompt for the missing
-    angle, and at least two explicit degree values (or one plus right-triangle
-    wording).
-    """
-    if not _TRIANGLE_WORD_RE.search(folded):
-        return None
-    if not _MISSING_TRIANGLE_ANGLE_RE.search(folded):
-        return None
-    values: list[Fraction] = []
-    for m in _DEGREE_VALUE_RE.finditer(norm_text):
-        try:
-            values.append(Fraction(m.group(1).replace(",", ".")))
-        except (ValueError, ZeroDivisionError):
-            return None
-    if len(values) == 1 and re.search(r"\bpravougl\w*|pravokut\w*|right\s+triangle|prav\w*\s+ug\w*\b", folded):
-        values.append(Fraction(90))
-    if len(values) < 2:
-        return None
-    known = values[:2]
-    missing = Fraction(180) - sum(known)
-    if missing <= 0 or missing >= 180:
-        return None
-    return Expected(
-        value=missing,
-        kind="angle",
-        unit="\u00b0",
-        answer_type="angle",
-        unit_policy="optional_if_clear",
-    )
-
-
-_ARC_TOPIC_RE = re.compile(r"\b(kruzn\w*|kruznic\w*|krug\w*)\b.*\b(luk\w*|luka)\b|\b(luk\w*|luka)\b.*\b(kruzn\w*|kruznic\w*|krug\w*)\b")
-_ARC_UNIT_WORD = r"(kilomet\w*|centimet\w*|milimet\w*|met(?:ar|ra|ara|rima)?|km|dm|cm|mm|m)\b"
-_RADIUS_RE = re.compile(
-    rf"(?:r\s*=\s*|poluprecnik\w*(?:\s+kruznic\w*)?\s*(?:je|iznosi|=)?\s*|"
-    rf"polumjer\w*(?:\s+kruznic\w*)?\s*(?:je|iznosi|=)?\s*)"
-    rf"(-?\d+(?:[,.]\d+)?)\s*{_ARC_UNIT_WORD}",
-    re.IGNORECASE,
-)
-_CENTRAL_ANGLE_RE = re.compile(
-    r"(?:centraln\w+\s+)?ug(?:ao|la|lu)?\w*\s*(?:je|iznosi|=)?\s*"
-    r"(-?\d+(?:[,.]\d+)?)\s*(?:\u00b0|stepen\w*)",
-    re.IGNORECASE,
-)
-
-
-def _try_arc_length(folded: str, norm_text: str) -> Expected | None:
-    """Arc length from radius and central angle.
-
-    Expected stores a decimal approximation because the checker core is rational;
-    ``expected_display`` keeps the exact pi form visible for logging/UI.
-    """
-    if not _ARC_TOPIC_RE.search(folded):
-        return None
-    if not re.search(r"\b(duzin\w*|duljin\w*|izracunaj|odredi|kolik\w*)\b", folded):
-        return None
-    radius_m = _RADIUS_RE.search(norm_text)
-    angle_m = _CENTRAL_ANGLE_RE.search(norm_text) or _DEGREE_VALUE_RE.search(norm_text)
-    if not (radius_m and angle_m):
-        return None
-    try:
-        radius = Fraction(radius_m.group(1).replace(",", "."))
-        angle = Fraction(angle_m.group(1).replace(",", "."))
-    except (ValueError, ZeroDivisionError):
-        return None
-    if radius <= 0 or angle <= 0 or angle > 360:
-        return None
-    unit = _unit_key(radius_m.group(2) or "")
-    if unit not in {"mm", "cm", "dm", "m", "km"}:
-        return None
-    pi_coeff = Fraction(2) * radius * angle / Fraction(360)
-    approx = Fraction(round(float(pi_coeff) * 3.141592653589793 * 100), 100)
-    if pi_coeff.denominator == 1:
-        exact = f"{pi_coeff.numerator}\u03c0"
-    else:
-        exact = f"{pi_coeff.numerator}\u03c0/{pi_coeff.denominator}"
-    return Expected(
-        value=approx,
-        kind="arc_length",
-        unit=unit,
-        answer_type="measurement",
-        expected_display=f"{exact} {unit} \u2248 {_fmt_fraction(approx)} {unit}",
-        unit_policy="required",
-        tolerance=Fraction(2, 100),
-        confidence="high",
-    )
-
-
-def _try_tangent_radius_angle(folded: str, norm_text: str) -> Expected | None:
-    """Radius and tangent at the point of tangency are perpendicular."""
-    if "tangent" not in folded:
-        return None
-    if not re.search(r"\bradijus|poluprecnik|polumjer\b", folded):
-        return None
-    if not re.search(r"\bugao|ugl\w*|grade|zaklap\w*|koliki|odredi|izracunaj", folded):
-        return None
-    return Expected(
-        value=Fraction(90),
-        kind="angle",
-        unit="\u00b0",
-        answer_type="angle",
-        unit_policy="optional_if_clear",
-    )
-
-
 _POWER_RE = re.compile(r"(-?\d+(?:[,.]\d+)?|-?\d+\s*/\s*\d+)\s*(?:\^|\*\*)\s*(\d)")
 _POWER_WORD_RE = re.compile(
     r"(?:kvadrat\s+broja|kvadriraj)\s+(-?\d+(?:[,.]\d+)?)"
@@ -1513,15 +1398,6 @@ def derive_expected(item_text: str) -> Expected | None:
     angle = _try_angle_arithmetic(folded, norm)
     if angle is not None:
         return angle
-    triangle_angle = _try_triangle_missing_angle(folded, norm)
-    if triangle_angle is not None:
-        return triangle_angle
-    arc = _try_arc_length(folded, norm)
-    if arc is not None:
-        return arc
-    tangent = _try_tangent_radius_angle(folded, norm)
-    if tangent is not None:
-        return tangent
     # A3 guard: stepen koji solver NIJE riješio (kombinovani izraz "2^3 + 1")
     # ne smije pasti u _try_arithmetic — on ne zna "^" pa bi parsirao samo
     # ostatak ("3 + 1") i dao POGREŠAN expected. Bolje "ne znam" nego krivo.
@@ -2166,9 +2042,7 @@ def format_check_block(result: CheckResult) -> str:
         elif item.verdict == "incorrect":
             lines.append(
                 f"- Stavka {item.n}: NETAČNO. Učenik: {given}; tačan rezultat: "
-                f"{_fmt_expected(item.expected)}. Ne prikazuj kompletno rjesenje "
-                "na ovom obicnom pogresnom pokusaju; daj kratak feedback i pozovi "
-                "ucenika da zatrazi hint ako zeli sljedeci korak."
+                f"{_fmt_expected(item.expected)}. Prikaži račun."
             )
         elif item.verdict == "wrong_unit":
             lines.append(
@@ -2271,9 +2145,8 @@ def format_check_block(result: CheckResult) -> str:
         )
     elif any_incorrect:
         lines.append(
-            "STIL (NETAČAN ODGOVOR): blago reci da nije tačno. Ne otkrivaj "
-            "kompletno rješenje ni konačni rezultat prije adaptivnog hinta nivoa 5; "
-            "daj samo kratku povratnu informaciju ili jedan mali sljedeći korak."
+            "STIL (NETAČAN ODGOVOR): blago reci da nije tačno, pa objasni ispravan "
+            "postupak korak po korak i na kraju daj tačan rezultat."
         )
     return "\n".join(lines)
 
