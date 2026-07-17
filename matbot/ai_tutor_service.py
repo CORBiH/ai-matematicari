@@ -12,7 +12,9 @@ se NE zove — vraća se determinističan bosanski fallback tekst.
 from __future__ import annotations
 
 import logging
+import json
 import re
+import uuid
 from typing import Any, Callable
 
 from matbot.activity_log import log_student_activity
@@ -348,9 +350,19 @@ def _apply_practice_help_contract(payload: dict) -> None:
     valid = [n for n, _text in items] if items else [1]
     folded = fold_diacritics(message)
     refs = _practice_referenced_items(message, valid) if items else set()
-    has_answer = _has_practice_answer_attempt(message, valid)
     wants_hint = bool(_PRACTICE_HINT_RE.search(folded))
     wants_explain = bool(_PRACTICE_EXPLAIN_RE.search(folded))
+    has_written_work = bool(re.search(
+        r"(?:=|\b\d+\s*x\b|\bx\s*=|\b(?:dobio|dobila|oduzeo|oduzela|"
+        r"podijelio|podijelila|pomnozio|pomnozila|sabrao|sabrala|"
+        r"izracunao|izracunala)\b)",
+        folded,
+    )) and bool(re.search(r"\d", folded))
+    has_answer = (
+        _has_practice_answer_attempt(message, valid)
+        or bool(extract_task_expressions(message))
+        or has_written_work
+    )
     wants_solve = bool(
         not wants_hint
         and _PRACTICE_SOLVE_RE.search(folded)
@@ -437,6 +449,7 @@ def _apply_practice_help_contract(payload: dict) -> None:
         # 6?"). Označi potez da sljedeći učenikov odgovor ne ocijenimo kao
         # FINALNI (tačan međukorak ne smije dobiti "Netačno").
         payload["_gave_hint_step"] = True
+        payload["_hint_count_increment"] = True
         payload["student_message"] = (
             "Daj mi jedan kratki hint za ovaj zadatak. "
             "Ne otkrivaj konačan rezultat.\n\n"
@@ -456,6 +469,17 @@ def _apply_hint_request_contract(payload: dict) -> None:
     """Explicit frontend hint intent: skip grading and preserve active task."""
     if normalize_value(payload.get("intent")).lower() != "hint_request":
         return
+    prev = _previous_next_state(payload)
+    if prev.get("task_status") == "completed" and prev.get("expected_user_action") != "answer_task":
+        payload["_skip_answer_check"] = True
+        payload["_completed_task_hint_rejected"] = True
+        payload["_correct_streak"] = int(prev.get("correct_streak", 0) or 0)
+        payload["_stuck_count"] = int(prev.get("stuck_count", 0) or 0)
+        payload["_direct_answer"] = (
+            "Taj zadatak smo već završili. Ako želiš, pošalji novi zadatak ili "
+            "izaberi Vježbu za sljedeći primjer."
+        )
+        return
     task = normalize_value(payload.get("last_tutor_task"))
     if not task:
         return
@@ -467,6 +491,7 @@ def _apply_hint_request_contract(payload: dict) -> None:
     payload["_explicit_hint_request"] = True
     payload["_stuck_help"] = True
     payload["_gave_hint_step"] = True
+    payload["_hint_count_increment"] = True
     if item:
         payload["_practice_help_item"] = item
     payload["mode"] = "explain"
@@ -829,6 +854,13 @@ def _empty_next_state() -> dict:
         "image_test": None,
         "stuck_count": 0,
         "correct_streak": 0,
+        "task_id": None,
+        "task_status": None,
+        "attempt_count": 0,
+        "total_attempt_count": 0,
+        "wrong_attempt_count": 0,
+        "hint_count": 0,
+        "completed_task_id": None,
         "task_items": None,
         # CLASS 1 (2026-07-12): prethodni potez je bio hint sa pod-korakom —
         # sljedeći odgovor može biti MEĐUKORAK, ne finalni odgovor.
@@ -990,6 +1022,23 @@ def _normalize_next_state(raw: Any) -> dict:
         streak = int(raw.get("correct_streak") or 0)
     except (TypeError, ValueError):
         streak = 0
+    try:
+        attempts = int(raw.get("attempt_count") or 0)
+    except (TypeError, ValueError):
+        attempts = 0
+    try:
+        total_attempts = int(raw.get("total_attempt_count", attempts) or attempts)
+    except (TypeError, ValueError):
+        total_attempts = attempts
+    try:
+        wrong_attempts = int(raw.get("wrong_attempt_count") or 0)
+    except (TypeError, ValueError):
+        wrong_attempts = 0
+    try:
+        hints = int(raw.get("hint_count") or 0)
+    except (TypeError, ValueError):
+        hints = 0
+    task_status = normalize_value(raw.get("task_status")).lower()
     return {
         "expected_user_action": expected if expected in _NEXT_EXPECTED_ACTIONS else "none",
         "pending_action": _normalize_pending_action(raw.get("pending_action")),
@@ -999,6 +1048,13 @@ def _normalize_next_state(raw: Any) -> dict:
         "stuck_count": max(0, stuck),
         # F-kvalitet: niz tačnih zaredom (ljestvica težine novih zadataka)
         "correct_streak": max(0, streak),
+        "task_id": normalize_value(raw.get("task_id"))[:80] or None,
+        "task_status": task_status if task_status in ("active", "completed") else None,
+        "attempt_count": max(0, total_attempts),
+        "total_attempt_count": max(0, total_attempts),
+        "wrong_attempt_count": max(0, wrong_attempts),
+        "hint_count": max(0, hints),
+        "completed_task_id": normalize_value(raw.get("completed_task_id"))[:80] or None,
         # BUG 12: stanje višestavkovnog zadatka (koje stavke su već ocijenjene)
         "task_items": _normalize_task_items(raw.get("task_items")),
         # CLASS 1: marker da je prethodni potez bio hint (pod-korak)
@@ -1334,7 +1390,7 @@ def _update_stuck_state(payload: dict) -> None:
         check = payload.get("answer_check")
         if check is not None:
             verdict = authoritative_verdict(check)
-        if verdict == "incorrect":
+        if verdict in ("incorrect", "incomplete"):
             stuck_signal = True
         student = payload.get("student_message") or payload.get("message")
         if _STUCK_SIGNAL_RE.search(fold_diacritics(student)):
@@ -1346,9 +1402,9 @@ def _update_stuck_state(payload: dict) -> None:
         payload["_student_stuck"] = True
 
     # Ljestvica težine: niz tačnih odgovora zaredom raste, netačan/zapeo resetuje.
-    if verdict in ("correct", "partial"):
+    if verdict == "correct":
         payload["_correct_streak"] = prev_streak + 1
-    elif stuck_signal or verdict == "incorrect":
+    elif stuck_signal or verdict in ("incorrect", "incomplete"):
         payload["_correct_streak"] = 0
     else:
         payload["_correct_streak"] = prev_streak
@@ -2029,6 +2085,218 @@ def _finish_reason(resp: Any) -> str | None:
         return None
 
 
+_CONTEXTUAL_GPT_VERDICTS = {"correct", "partial", "incorrect", "ambiguous"}
+_CONTEXTUAL_WORK_RE = re.compile(
+    r"\b(?:dobio|dobila|oduzeo|oduzela|dodao|dodala|sabirao|sabirala|sabrao|sabrala|"
+    r"podijelio|podijelila|podijelio\s+sam|pomnozio|pomnozila|pomnozio\s+sam|"
+    r"izracunao|izracunala|zatim|onda|prvo|drugo|postupak|korak|obje\s+strane|"
+    r"obe\s+strane|jer|zato\s+sto|posto)\b"
+)
+
+
+def _student_has_contextual_work(message: Any) -> bool:
+    folded = fold_diacritics(normalize_value(message)).lower()
+    if not folded:
+        return False
+    if _CONTEXTUAL_WORK_RE.search(folded):
+        return True
+    if folded.count("=") >= 2:
+        return True
+    # Kratak lanac jednacina poput "2x=8, x=4" je postupak, ne samo finalni unos.
+    if re.search(r"\b\d+\s*x\s*=", folded) and re.search(r"\bx\s*=", folded):
+        return True
+    return False
+
+
+def _student_has_textual_signal(message: Any) -> bool:
+    folded = fold_diacritics(normalize_value(message)).lower()
+    return bool(re.search(r"[a-z]{3,}", folded))
+
+
+_LOW_INFO_UNCLEAR_RE = re.compile(
+    r"\b(?:onako|nekako|nesto|ono|valjda|mozda|ne\s+znam|nisam\s+sigur\w*|"
+    r"nemam\s+pojma|otprilike)\b"
+)
+
+
+def _is_low_information_unclear_answer(message: Any) -> bool:
+    folded = fold_diacritics(normalize_value(message)).lower()
+    if not folded or _student_has_contextual_work(folded):
+        return False
+    if re.search(r"[\d=<>/]", folded):
+        return False
+    words = re.findall(r"[a-z]+", folded)
+    return len(words) <= 10 and bool(_LOW_INFO_UNCLEAR_RE.search(folded))
+
+
+def _should_run_contextual_gpt_grade(payload: dict) -> bool:
+    if not _is_grading_turn(payload):
+        return False
+    if payload.get("_direct_answer") is not None or payload.get("_skip_answer_check"):
+        return False
+    if payload.get("_non_answer_reflection"):
+        return False
+    task = normalize_value(payload.get("last_tutor_task"))
+    student = normalize_value(payload.get("student_message") or payload.get("message"))
+    if not (task and student):
+        return False
+
+    check = payload.get("answer_check")
+    reliable_check = bool(
+        check is not None
+        and getattr(check, "checkable", False)
+        and getattr(check, "has_verdicts", False)
+    )
+    if _student_has_contextual_work(student):
+        return True
+    return (not reliable_check) and _student_has_textual_signal(student)
+
+
+def _json_object_from_text(raw: str) -> dict | None:
+    text = normalize_value(raw).strip()
+    if not text:
+        return None
+    text = re.sub(r"^\s*```(?:json)?\s*", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"\s*```\s*$", "", text)
+    if not text.startswith("{"):
+        match = re.search(r"\{.*\}", text, flags=re.DOTALL)
+        if not match:
+            return None
+        text = match.group(0)
+    try:
+        parsed = json.loads(text)
+    except (TypeError, ValueError):
+        return None
+    return parsed if isinstance(parsed, dict) else None
+
+
+def _normalize_contextual_verdict(value: Any) -> str | None:
+    folded = fold_diacritics(normalize_value(value)).lower().strip()
+    if not folded:
+        return None
+    if re.search(r"\b(?:ambiguous|unclear|nejasn\w*|needs[_\s-]?review|not[_\s-]?checkable)\b", folded):
+        return "ambiguous"
+    if re.search(r"\b(?:partial|incomplete|nepotpun\w*|djelimicn\w*|djelomicn\w*)\b", folded):
+        return "partial"
+    if re.search(r"\b(?:incorrect|wrong|netacn\w*|nije\s+tacn\w*)\b", folded):
+        return "incorrect"
+    if re.search(r"\b(?:correct|fully[_\s-]?correct|tacn\w*|ispravn\w*)\b", folded):
+        return "correct"
+    return None
+
+
+def _normalize_contextual_confidence(value: Any) -> float:
+    try:
+        confidence = float(value)
+    except (TypeError, ValueError):
+        return 0.55
+    if confidence > 1.0 and confidence <= 100.0:
+        confidence = confidence / 100.0
+    return max(0.0, min(1.0, confidence))
+
+
+def _parse_contextual_gpt_grade(raw: str) -> dict | None:
+    parsed = _json_object_from_text(raw)
+    if not parsed:
+        return None
+    verdict = _normalize_contextual_verdict(
+        parsed.get("verdict")
+        or parsed.get("answer_verdict")
+        or parsed.get("grade")
+        or parsed.get("label")
+    )
+    if verdict not in _CONTEXTUAL_GPT_VERDICTS:
+        return None
+    confidence = _normalize_contextual_confidence(parsed.get("confidence"))
+    feedback = normalize_value(
+        parsed.get("public_feedback")
+        or parsed.get("feedback")
+        or parsed.get("student_feedback")
+        or ""
+    )[:240]
+    return {
+        "verdict": verdict,
+        "confidence": confidence,
+        "public_feedback": feedback,
+    }
+
+
+def _run_contextual_gpt_grade(
+    payload: dict,
+    openai_chat: Callable,
+    *,
+    model: str,
+    timeout: float | None,
+) -> None:
+    """Strict JSON fallback for textual/procedural answers.
+
+    The result is intentionally tiny and public-facing only. We do not store raw
+    model output or hidden reasoning.
+    """
+    if not _should_run_contextual_gpt_grade(payload):
+        return
+
+    check = payload.get("answer_check")
+    deterministic = "none"
+    if check is not None and getattr(check, "checkable", False):
+        deterministic = authoritative_verdict(check) or "checkable"
+    task = normalize_value(payload.get("last_tutor_task"))[:900]
+    student = normalize_value(payload.get("student_message") or payload.get("message"))[:900]
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are a strict Bosnian elementary math answer grader. "
+                "Return only compact JSON, no markdown and no reasoning. "
+                "Use exactly one verdict: correct, partial, incorrect, ambiguous. "
+                "Grade the full student answer in context. If the final number is "
+                "right but an intermediate mathematical step is flawed, do not use "
+                "correct. If the procedure is good but unfinished, use partial. "
+                "If the answer is unclear, use ambiguous. Do not include chain of thought."
+            ),
+        },
+        {
+            "role": "user",
+            "content": (
+                "Return JSON with keys verdict, confidence, public_feedback.\n"
+                f"Grade: {normalize_value(payload.get('grade')) or DEFAULT_GRADE}\n"
+                f"Deterministic numeric check: {deterministic}\n"
+                "Note: the deterministic check may only see a final value; your job is "
+                "to verify the whole written procedure or concept when present.\n"
+                f"Question:\n{task}\n\n"
+                f"Student answer:\n{student}"
+            ),
+        },
+    ]
+    try:
+        try:
+            resp = openai_chat(
+                model,
+                messages,
+                timeout=timeout,
+                max_tokens=320,
+                fast=True,
+                reasoning_effort="minimal",
+            )
+        except TypeError:
+            resp = openai_chat(model, messages, timeout=timeout, max_tokens=320, fast=True)
+    except Exception:
+        log.exception("ai_tutor: contextual GPT grade failed")
+        return
+
+    grade = _parse_contextual_gpt_grade(_extract_answer(resp))
+    if not grade:
+        return
+    if grade["verdict"] in ("incorrect", "partial") and _is_low_information_unclear_answer(student):
+        grade["verdict"] = "ambiguous"
+        grade["confidence"] = min(grade.get("confidence", 0.55), 0.7)
+        grade["public_feedback"] = "Nejasno je šta tačno tvrdiš; napiši odgovor malo preciznije."
+    payload["_gpt_check_used"] = True
+    payload["_gpt_answer_verdict"] = grade["verdict"]
+    payload["_gpt_check_confidence"] = grade["confidence"]
+    payload["_contextual_gpt_grade"] = grade
+
+
 def _call_model_with_retry(
     openai_chat: Callable, model: str, messages: list, timeout: float | None, mode: str
 ) -> str:
@@ -2197,7 +2465,7 @@ def _soften_post_hint_reply(payload: dict) -> None:
     # not_attempted/missing siblings iz atribucije ne kvare sud o ODGOVORENOJ
     # stavci (2026-07-14) — gleda se samo ono što je stvarno presuđeno.
     effective = [v for v in verdicts if v not in ("missing", "not_attempted")]
-    all_correct = bool(effective) and all(v == "correct" for v in effective)
+    all_correct = bool(effective) and all(v in _ACCEPTED_ITEM_VERDICTS for v in effective)
     if all_correct:
         return                      # finalni tačan odgovor — deterministička Tačno ostaje
     # 2026-07-14: deterministički POTVRĐEN međukorak ("2x<12" ⇔ "x<6") —
@@ -2205,7 +2473,7 @@ def _soften_post_hint_reply(payload: dict) -> None:
     # tvrdnje o grešci), a stil je vođenje kroz korak, bez ocjenske labele.
     step_confirmed = bool(effective) and any(
         v == "correct_step" for v in effective
-    ) and all(v in ("correct", "correct_step") for v in effective)
+    ) and all(v in _ACCEPTED_ITEM_VERDICTS + ("correct_step",) for v in effective)
     if step_confirmed:
         payload["_post_hint_reply"] = True
         return
@@ -2244,8 +2512,11 @@ def _run_answer_check(payload: dict) -> None:
     if items and result.checkable:
         attempted = [
             i.n for i in result.items
-            if i.verdict in ("correct", "correct_value_wrong_form",
-                             "correct_step", "incorrect", "unverified")
+            if i.verdict in (
+                "correct", "correct_equivalent_form", "correct_missing_notation",
+                "correct_missing_unit", "correct_value_wrong_form",
+                "correct_step", "incorrect", "wrong_unit", "incomplete", "unverified",
+            )
         ]
         if len(attempted) == 1:
             payload["_current_task_item"] = attempted[0]
@@ -2402,7 +2673,8 @@ def _apply_image_practice_followup(payload: dict) -> None:
     for lbl in cands:
         r = _chk(lbl)
         if r and r.checkable and r.items and r.items[0].verdict in (
-                "correct", "correct_value_wrong_form"):
+                "correct", "correct_equivalent_form", "correct_missing_notation",
+                "correct_missing_unit", "correct_value_wrong_form"):
             answered, result = lbl, r
             break
     if answered is None and cands:
@@ -2609,6 +2881,9 @@ def _prepare_chat(
     # AUD-01: odgovor na stavku image_test "practice" toka → pripremi SLJEDEĆU
     # stavku sa slike (da followup ne izmisli novi zadatak).
     _apply_image_practice_followup(payload)
+    # Tekstualni/proceduralni odgovori trebaju zasebnu, strukturiranu ocjenu.
+    # Proza tutora je previĹˇe varijabilna da bi bila pouzdan izvor telemetrije.
+    _run_contextual_gpt_grade(payload, openai_chat, model=model, timeout=timeout)
 
     # F5: ažuriraj "stuck" brojač (za preporuku videa u Vježbajmo) prije prompta.
     _update_stuck_state(payload)
@@ -2859,6 +3134,98 @@ def _pending_action_from_answer(payload: dict, answer: str) -> dict:
     return _empty_pending_action()
 
 
+def _new_task_id() -> str:
+    return f"task_{uuid.uuid4().hex}"
+
+
+def _previous_task_id(payload: dict) -> str | None:
+    prev = _previous_next_state(payload)
+    return normalize_value(prev.get("task_id")) or None
+
+
+def _grading_outcome(payload: dict) -> str:
+    check = payload.get("answer_check")
+    fallback = normalize_value(payload.get("_gpt_answer_verdict")).lower()
+    if fallback in ("correct", "incorrect", "partial", "ambiguous"):
+        return fallback
+    if check is not None and getattr(check, "checkable", False):
+        if _all_items_accepted(check):
+            return "correct"
+        if _has_retry_verdict(check):
+            return "incorrect"
+        if _has_partial_verdict(check):
+            return "partial"
+    return "ambiguous"
+
+
+def _grading_should_keep_active_task(payload: dict) -> bool:
+    if not _is_grading_turn(payload):
+        return False
+    if _pending_items_after_grading(payload):
+        return True
+    return _grading_outcome(payload) in ("incorrect", "partial", "ambiguous")
+
+
+def _attempt_count_for_next_state(payload: dict, *, new_active_task: bool) -> int:
+    if new_active_task:
+        return 0
+    prev = _previous_next_state(payload)
+    attempts = int(prev.get("total_attempt_count", prev.get("attempt_count", 0)) or 0)
+    if _is_grading_turn(payload):
+        if _grading_outcome(payload) == "ambiguous":
+            return attempts
+        return attempts + 1
+    return attempts
+
+
+def _wrong_attempt_count_for_next_state(payload: dict, *, new_active_task: bool) -> int:
+    if new_active_task:
+        return 0
+    prev = _previous_next_state(payload)
+    wrong = int(prev.get("wrong_attempt_count", 0) or 0)
+    if not _is_grading_turn(payload):
+        return wrong
+    fallback = normalize_value(payload.get("_gpt_answer_verdict")).lower()
+    if fallback == "incorrect":
+        return wrong + 1
+    check = payload.get("answer_check")
+    if check is not None and authoritative_verdict(check) == "incorrect":
+        return wrong + 1
+    return wrong
+
+
+def _hint_count_for_next_state(payload: dict, *, new_active_task: bool) -> int:
+    if new_active_task:
+        return 0
+    prev = _previous_next_state(payload)
+    hints = int(prev.get("hint_count", 0) or 0)
+    return hints + 1 if payload.get("_hint_count_increment") else hints
+
+
+def _task_lifecycle_fields(
+    payload: dict,
+    *,
+    active: bool,
+    completed: bool = False,
+    new_active_task: bool = False,
+) -> dict:
+    prev_id = _previous_task_id(payload)
+    if completed and not prev_id and normalize_value(payload.get("last_tutor_task")):
+        prev_id = _new_task_id()
+    task_id = _new_task_id() if new_active_task or (active and not prev_id) else prev_id
+    attempts = _attempt_count_for_next_state(payload, new_active_task=new_active_task)
+    fields = {
+        "task_id": task_id if active else None,
+        "task_status": "active" if active else "completed" if completed else None,
+        "attempt_count": attempts,
+        "total_attempt_count": attempts,
+        "wrong_attempt_count": _wrong_attempt_count_for_next_state(payload, new_active_task=new_active_task),
+        "hint_count": _hint_count_for_next_state(payload, new_active_task=new_active_task),
+        "completed_task_id": prev_id if completed else None,
+    }
+    return fields
+
+
 def _next_state_for_response(
     payload: dict,
     answer: str,
@@ -2869,6 +3236,25 @@ def _next_state_for_response(
 ) -> dict:
     if status != "ready":
         return _empty_next_state()
+
+    if payload.get("_completed_task_hint_rejected"):
+        prev = _previous_next_state(payload)
+        completed_id = (
+            normalize_value(prev.get("completed_task_id"))
+            or normalize_value(prev.get("task_id"))
+            or _previous_task_id(payload)
+        )
+        state = _empty_next_state()
+        state.update({
+            "task_id": None,
+            "task_status": "completed",
+            "attempt_count": int(prev.get("total_attempt_count", prev.get("attempt_count", 0)) or 0),
+            "total_attempt_count": int(prev.get("total_attempt_count", prev.get("attempt_count", 0)) or 0),
+            "wrong_attempt_count": int(prev.get("wrong_attempt_count", 0) or 0),
+            "hint_count": int(prev.get("hint_count", 0) or 0),
+            "completed_task_id": completed_id or None,
+        })
+        return state
 
     # AUD-01: image_test "practice" — učenik SAM rješava stavke sa slike, pa se
     # na potezu ODGOVORA (kad _image_test nije aktivan jer answering_practice_task
@@ -2902,6 +3288,7 @@ def _next_state_for_response(
                     "item_labels": labels, "solved": solved,
                     "next_item": _item_out(nxt), "style": "practice",
                 },
+                **_task_lifecycle_fields(payload, active=False),
             }
         # sve stavke sa slike riješene → izlaz iz image toka (normalna logika ispod)
 
@@ -2925,6 +3312,7 @@ def _next_state_for_response(
                     "next_item": _item_out(remaining[0]) if remaining else None,
                     "style": "practice",
                 },
+                **_task_lifecycle_fields(payload, active=True, new_active_task=not _previous_task_id(payload)),
             }
         solved = list(img.get("solved") or [])
         current = img.get("current")
@@ -2947,15 +3335,22 @@ def _next_state_for_response(
                     "next_item": _item_out(nxt),
                     "style": img.get("style"),
                 },
+                **_task_lifecycle_fields(payload, active=False),
             }
         # sve stavke riješene → image tok završen, dalje normalna logika
 
     if task_text and (mode in ("practice", "exam") or payload.get("_explicit_hint_request")):
+        prev_task = normalize_value(payload.get("last_tutor_task"))[:600]
+        new_active_task = not (
+            payload.get("_explicit_hint_request")
+            or (_is_grading_turn(payload) and prev_task and task_text == prev_task)
+        )
         return {
             "expected_user_action": "answer_task",
             "pending_action": _empty_pending_action(),
             "active_task_kind": "practice",
             "image_test": None,
+            **_task_lifecycle_fields(payload, active=True, new_active_task=new_active_task),
         }
 
     pending = _pending_action_from_answer(payload, answer)
@@ -2970,7 +3365,17 @@ def _next_state_for_response(
             "pending_action": pending,
             "active_task_kind": active,
             "image_test": None,
+            **_task_lifecycle_fields(
+                payload,
+                active=False,
+                completed=_is_grading_turn(payload) and _grading_outcome(payload) in ("correct", "partial"),
+            ),
         }
+
+    if _is_grading_turn(payload) and _grading_outcome(payload) in ("correct", "partial"):
+        state = _empty_next_state()
+        state.update(_task_lifecycle_fields(payload, active=False, completed=True))
+        return state
 
     return _empty_next_state()
 
@@ -2978,7 +3383,17 @@ def _next_state_for_response(
 # "unverified" = učenik JESTE odgovorio stavku, ali je kod nije mogao provjeriti
 # (model ju je ocijenio sam). Za praćenje stanja bitno je "odgovoreno", pa i ona
 # izlazi iz pending skupa — sljedeći kratki odgovor pripada preostaloj stavci.
-_ANSWERED_VERDICTS = ("correct", "correct_value_wrong_form", "incorrect", "unverified")
+_ANSWERED_VERDICTS = (
+    "correct", "correct_equivalent_form", "correct_missing_notation",
+    "correct_missing_unit", "correct_value_wrong_form", "incorrect",
+    "wrong_unit", "incomplete", "unverified",
+)
+_ACCEPTED_ITEM_VERDICTS = (
+    "correct", "correct_equivalent_form", "correct_missing_notation",
+    "correct_missing_unit",
+)
+_PARTIAL_ITEM_VERDICTS = ("correct_value_wrong_form", "partially_correct", "correct_step")
+_RETRY_ITEM_VERDICTS = ("incorrect", "wrong_unit", "incomplete")
 
 
 def _task_items_for_response(payload: dict, task_text: str) -> dict | None:
@@ -2987,10 +3402,15 @@ def _task_items_for_response(payload: dict, task_text: str) -> dict | None:
     Novi višestavkovni zadatak → svježe stanje (ništa ocijenjeno). Grading potez
     bez novog zadatka → prethodno stanje + stavke odgovorene u OVOM potezu."""
     if task_text:
-        items = split_numbered_items(task_text)
-        if len(items) >= 2:
-            return {"labels": [n for n, _t in items], "graded": []}
-        return None
+        same_persisted_task = (
+            normalize_value(payload.get("last_tutor_task"))[:600] == task_text
+            and _is_grading_turn(payload)
+        )
+        if not same_persisted_task:
+            items = split_numbered_items(task_text)
+            if len(items) >= 2:
+                return {"labels": [n for n, _t in items], "graded": []}
+            return None
     prev = payload.get("_task_items_prev") or _previous_next_state(payload).get("task_items")
     if not prev:
         return None
@@ -3032,14 +3452,163 @@ def _is_grading_turn(payload: dict) -> bool:
     return normalize_value(payload.get("interaction_phase")).lower() == "answering_practice_task"
 
 
+def _item_verdicts(check: Any) -> list[str]:
+    return [
+        normalize_value(getattr(i, "verdict", "")).lower()
+        for i in (getattr(check, "items", []) or [])
+        if normalize_value(getattr(i, "verdict", ""))
+    ]
+
+
+def _all_items_accepted(check: Any) -> bool:
+    verdicts = _item_verdicts(check)
+    return bool(verdicts) and all(v in _ACCEPTED_ITEM_VERDICTS for v in verdicts)
+
+
+def _has_retry_verdict(check: Any) -> bool:
+    return any(v in _RETRY_ITEM_VERDICTS for v in _item_verdicts(check))
+
+
+def _has_partial_verdict(check: Any) -> bool:
+    return any(v in _PARTIAL_ITEM_VERDICTS for v in _item_verdicts(check))
+
+
+def _gpt_text_verdict(answer: str) -> str | None:
+    folded = fold_diacritics(answer)
+    if not folded:
+        return None
+    head = folded[:240].strip()
+    if re.match(
+        r"^\s*(?:nejasn\w*|nije\s+dovoljno\s+jasn\w*|ne\s+mogu\s+procijen\w*"
+        r"|treba\s+mi\s+jasnij\w*|nisam\s+sigur\w*)\b",
+        head,
+    ):
+        return "ambiguous"
+    if re.match(
+        r"^\s*(?:dj?el[io]micn\w*\s+taca?n\w*|djelimicn\w*\s+taca?n\w*"
+        r"|nepotpun\w*|dobar\s+korak\b|dobro\s+si\s+(?:poceo|pocela|krenuo|krenula)\b)\b",
+        head,
+    ):
+        return "partial"
+    if re.match(r"^\s*(?:netaca?n\w*|nije\s+taca?n\w*)\b", head):
+        return "incorrect"
+    if re.match(r"^\s*taca?n\w*\b", head):
+        # Conservative guard for contextual grading: a matching final result is
+        # not fully correct when the prose itself notes a flawed/unneeded step.
+        if re.search(r"\b(?:pogres|gresk|nije\s+bilo\s+potrebno|nepotrebn)\w*", folded):
+            return "partial"
+        if re.search(r"\bmedutim\b.{0,160}\b(?:korak|mnoz|dijel|racun|postup)\w*", folded):
+            return "partial"
+        return "correct"
+    if re.search(r"\b(?:nejasn\w*|ne\s+mogu\s+pouzdano|nisam\s+sigur\w*)\b", head):
+        return "ambiguous"
+    return None
+
+
+_GPT_LABEL_PREFIX_RE = re.compile(
+    r"^\s*(?:ta(?:č|c)n\w*|dj?el[io]mi(?:č|c)n\w*\s+ta(?:č|c)n\w*|"
+    r"nepotpun\w*|neta(?:č|c)n\w*|nejasn\w*)\s*[.!?:,;–—-]*\s*",
+    re.IGNORECASE,
+)
+
+
+def _gpt_label_kind(text: str) -> str | None:
+    folded = fold_diacritics(text[:120]).lower().strip()
+    if re.match(r"^nejasn\w*\b", folded):
+        return "ambiguous"
+    if re.match(r"^(?:djelimicn\w*|djelomicn\w*)\s+tacn\w*\b", folded):
+        return "partial"
+    if re.match(r"^nepotpun\w*\b", folded):
+        return "partial"
+    if re.match(r"^netacn\w*\b", folded):
+        return "incorrect"
+    if re.match(r"^tacn\w*\b", folded):
+        return "correct"
+    return None
+
+
+def _enforce_gpt_fallback_label(answer: str, payload: dict) -> str:
+    verdict = normalize_value(payload.get("_gpt_answer_verdict")).lower()
+    if verdict not in _CONTEXTUAL_GPT_VERDICTS:
+        return answer
+    expected = {
+        "correct": "Tačno.",
+        "partial": "Djelimično tačno.",
+        "incorrect": "Netačno.",
+        "ambiguous": "Nejasno.",
+    }[verdict]
+    current = _gpt_label_kind(answer)
+    if current == verdict or (verdict == "partial" and current == "partial"):
+        return answer
+    body = _GPT_LABEL_PREFIX_RE.sub("", answer, count=1).lstrip()
+    return f"{expected} {body}".strip() if body else expected
+
+
+def _apply_gpt_fallback_verdict(payload: dict, answer: str) -> None:
+    if not _is_grading_turn(payload):
+        return
+    check = payload.get("answer_check")
+    verdict = normalize_value(payload.get("_gpt_answer_verdict")).lower()
+    has_structured_verdict = verdict in _CONTEXTUAL_GPT_VERDICTS
+    if (
+        not has_structured_verdict
+        and check is not None
+        and getattr(check, "checkable", False)
+        and getattr(check, "has_verdicts", False)
+    ):
+        return
+    if not has_structured_verdict:
+        verdict = _gpt_text_verdict(answer)
+        if verdict is None:
+            return
+        payload["_gpt_answer_verdict"] = verdict
+    payload["_gpt_check_used"] = True
+    if payload.get("_gpt_check_confidence") is None:
+        payload["_gpt_check_confidence"] = 0.55
+    prev_state = _previous_next_state(payload)
+    prev_streak = int(prev_state.get("correct_streak", 0) or 0)
+    if verdict == "correct":
+        payload["_correct_streak"] = prev_streak + 1
+        payload["_stuck_count"] = 0
+    elif verdict == "incorrect":
+        payload["_correct_streak"] = 0
+        payload["_stuck_count"] = int(prev_state.get("stuck_count", 0) or 0) + 1
+    elif verdict == "ambiguous":
+        payload["_correct_streak"] = prev_streak
+        payload["_stuck_count"] = int(prev_state.get("stuck_count", 0) or 0)
+    else:
+        payload["_correct_streak"] = prev_streak
+
+
 def _answer_verdict_for_response(payload: dict) -> str | None:
+    fallback = payload.get("_gpt_answer_verdict")
+    if fallback in ("correct", "incorrect", "partial"):
+        return fallback
     verdict = authoritative_verdict(payload.get("answer_check"))
     if verdict == "correct":
         return "correct"
     if verdict == "incorrect":
         return "incorrect"
+    if verdict == "incomplete":
+        return "partial"
     if verdict in ("partial", "step", "mixed"):
         return "partial"
+    return None
+
+
+def _answer_verdict_detail_for_response(payload: dict) -> str | None:
+    if payload.get("_gpt_answer_verdict"):
+        return f"gpt_{payload['_gpt_answer_verdict']}"
+    check = payload.get("answer_check")
+    verdicts = _item_verdicts(check)
+    effective = [v for v in verdicts if v not in ("missing", "not_attempted")]
+    if len(effective) == 1:
+        return effective[0]
+    coarse = _answer_verdict_for_response(payload)
+    if coarse:
+        return coarse
+    if _is_grading_turn(payload):
+        return "ambiguous"
     return None
 
 
@@ -3119,6 +3688,10 @@ def _finalize_response(prep: dict, answer: str) -> dict:
     ):
         answer = enforce_grading_consistency(answer, payload.get("answer_check"))
 
+    _apply_gpt_fallback_verdict(payload, answer)
+    if payload.get("_gpt_answer_verdict"):
+        answer = _enforce_gpt_fallback_label(answer, payload)
+
     entry_source_used = normalize_value(payload.get("entry_source")) or normalize_value(
         prep["lookup_result"].get("source")
     )
@@ -3149,6 +3722,9 @@ def _finalize_response(prep: dict, answer: str) -> dict:
         "status": status,
         "mode": mode,
         "answer_verdict": _answer_verdict_for_response(payload),
+        "answer_verdict_detail": _answer_verdict_detail_for_response(payload),
+        "gpt_check_used": bool(payload.get("_gpt_check_used")),
+        "gpt_check_confidence": payload.get("_gpt_check_confidence") if payload.get("_gpt_check_used") else None,
         # BUG 10: mod SESIJE (UI izbor) — contracts smiju interno preusmjeriti
         # prompt-mod, ali UI labela/chipovi prate session mod.
         "session_mode": payload.get("_session_mode") or mode,
@@ -3215,17 +3791,22 @@ def _finalize_response(prep: dict, answer: str) -> dict:
         # BUG 1: na ocjenjivačkom potezu SAMO eksplicitni "Zadatak:" marker —
         # riješeni izraz iz objašnjenja ne smije postati "novi zadatak".
         task_text = extract_marked_task(answer)
-        # AUD-04 (B2): dok stavke višestavkovnog zadatka ČEKAJU odgovor, novi
-        # zadatak je zabranjen — model ga povremeno ipak doda, pa bi zamijenio
-        # aktivni multi-zadatak i pokvario task_items praćenje. Server gate.
-        if task_text and _pending_items_after_grading(payload):
+        keep_active = _grading_should_keep_active_task(payload)
+        outcome = _grading_outcome(payload)
+        # AUD-04 (B2) + lifecycle guard: grading turns do not auto-start a
+        # model-invented next task. The current task either stays active
+        # (retry/form/ambiguous) or completes; a fresh task starts on the
+        # student's explicit next-task turn or confirmation.
+        if task_text and (keep_active or outcome in ("correct", "partial")):
             task_text = ""
-            # 2026-07-14: zabranjeni zadatak se briše i iz VIDLJIVOG teksta —
+            # Zabranjeni zadatak se briše i iz VIDLJIVOG teksta —
             # učenik ne smije dobiti zadatak koji sistem ne prati.
             stripped = _remove_marked_task_paragraph(answer)
             if stripped:
                 answer = stripped
                 response["answer"] = answer
+        if not task_text and keep_active:
+            task_text = normalize_value(payload.get("last_tutor_task"))[:600]
     else:
         task_text = extract_practice_task(answer, mode=mode)
     # Server je jedini izvor istine za aktivni zadatak: polje se šalje UVIJEK
@@ -3237,6 +3818,15 @@ def _finalize_response(prep: dict, answer: str) -> dict:
     # F5: prenesi "stuck" brojač naprijed da klijent vrati stanje sljedeći put.
     response["next_state"]["stuck_count"] = int(payload.get("_stuck_count", 0) or 0)
     response["next_state"]["correct_streak"] = int(payload.get("_correct_streak", 0) or 0)
+    response["task_id"] = (
+        response["next_state"].get("task_id")
+        or response["next_state"].get("completed_task_id")
+    )
+    response["task_status"] = response["next_state"].get("task_status")
+    response["attempt_number"] = response["next_state"].get("attempt_count", 0)
+    response["total_attempt_count"] = response["next_state"].get("total_attempt_count", response["attempt_number"])
+    response["wrong_attempt_count"] = response["next_state"].get("wrong_attempt_count", 0)
+    response["hint_count"] = response["next_state"].get("hint_count", 0)
     # CLASS 1: ako je OVAJ potez bio hint sa pod-korakom, obilježi ga da sljedeći
     # učenikov odgovor tretiramo kao mogući međukorak (ne finalni).
     response["next_state"]["just_hinted"] = bool(payload.get("_gave_hint_step"))
@@ -3267,6 +3857,35 @@ def _finalize_response(prep: dict, answer: str) -> dict:
     # Audit: sažetak determinističke provjere u response (telemetrija/testovi).
     check = payload.get("answer_check")
     check_summary = summarize_result(check) if check is not None else None
+    if check_summary and payload.get("_gpt_answer_verdict"):
+        check_summary["gpt_check_used"] = True
+        check_summary["gpt_check_confidence"] = payload.get("_gpt_check_confidence", 0.55)
+        check_summary["gpt_answer_verdict"] = payload.get("_gpt_answer_verdict")
+    if not check_summary and payload.get("_gpt_answer_verdict"):
+        check_summary = {
+            "gpt_check_used": True,
+            "gpt_check_confidence": payload.get("_gpt_check_confidence", 0.55),
+            "gpt_answer_verdict": payload.get("_gpt_answer_verdict"),
+            "items": [{
+                "n": 1,
+                "verdict": payload.get("_gpt_answer_verdict"),
+                "expected": None,
+                "expected_answer": None,
+                "normalized_expected": None,
+                "answer_type": "text",
+                "expected_unit": None,
+                "unit_policy": "not_applicable",
+                "required_form": None,
+                "equivalent_forms_allowed": None,
+                "unit": None,
+                "given": normalize_value(payload.get("student_message") or payload.get("message"))[:300] or None,
+                "student_answer": normalize_value(payload.get("student_message") or payload.get("message"))[:300] or None,
+                "normalized_student": None,
+                "student_unit": None,
+                "unrecognized_unit": None,
+                "deterministic_check": {"parsed": False},
+            }],
+        }
     if check_summary:
         response["answer_check"] = check_summary
 

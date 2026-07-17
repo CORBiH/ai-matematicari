@@ -53,7 +53,7 @@ def test_ordinal_nonanswer_item_remains_unattempted():
     task = "1. Izračunaj: 2/9 + 4/9\n2. Izračunaj: 5/8 - 1/8\n3. Izračunaj: 1/2 + 1/3"
     res = check_practice_answer(task, "prvi je 6/9, drugi 4/8, treci ne znam")
     by_n = {i.n: i.verdict for i in res.items}
-    assert by_n[1] == "correct" and by_n[2] == "correct"
+    assert by_n[1] == "correct_equivalent_form" and by_n[2] == "correct_equivalent_form"
     assert by_n[3] in ("missing", "not_attempted")
 
 

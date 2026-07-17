@@ -128,16 +128,21 @@ def has_grade_contradiction(text: Any) -> bool:
 
 # --- Autoritativni sud iz determinističke provjere ---------------------------------
 
-_POSITIVE_VERDICTS = ("correct",)
-_PARTIAL_VERDICTS = ("correct_value_wrong_form",)
+_POSITIVE_VERDICTS = (
+    "correct", "correct_equivalent_form", "correct_missing_notation",
+    "correct_missing_unit",
+)
+_PARTIAL_VERDICTS = ("correct_value_wrong_form", "partially_correct")
+_INCOMPLETE_VERDICTS = ("incomplete",)
+_INCORRECT_VERDICTS = ("incorrect", "wrong_unit")
 # Tačan MEĐUKORAK (ekvivalentna tvrdnja, nedovršen oblik) — nije ni puno
 # "Tačno" (stavka ostaje pending) ni "Netačno" (tvrdnja je istinita).
 _STEP_VERDICTS = ("correct_step",)
 
 
 def authoritative_verdict(result: Any) -> str:
-    """``CheckResult`` → jedan sud: correct | partial | step | incorrect |
-    mixed | unknown.
+    """``CheckResult`` → jedan sud: correct | partial | step | incomplete |
+    incorrect | mixed | unknown.
 
     "mixed" = više ocijenjenih stavki gdje su neke tačne, a neke ne (legitimna
     po-stavkovna ocjena). "step" = tačan međukorak (bez ijedne netačne).
@@ -150,18 +155,22 @@ def authoritative_verdict(result: Any) -> str:
         if i.verdict in _POSITIVE_VERDICTS
         or i.verdict in _PARTIAL_VERDICTS
         or i.verdict in _STEP_VERDICTS
-        or i.verdict == "incorrect"
+        or i.verdict in _INCOMPLETE_VERDICTS
+        or i.verdict in _INCORRECT_VERDICTS
     ]
     if not graded:
         return "unknown"
-    has_incorrect = any(v == "incorrect" for v in graded)
+    has_incorrect = any(v in _INCORRECT_VERDICTS for v in graded)
     has_correct = any(v in _POSITIVE_VERDICTS for v in graded)
     has_partial = any(v in _PARTIAL_VERDICTS for v in graded)
     has_step = any(v in _STEP_VERDICTS for v in graded)
-    if has_incorrect and (has_correct or has_partial or has_step):
+    has_incomplete = any(v in _INCOMPLETE_VERDICTS for v in graded)
+    if (has_incorrect or has_incomplete) and (has_correct or has_partial or has_step):
         return "mixed"
     if has_incorrect:
         return "incorrect"
+    if has_incomplete:
+        return "incomplete"
     if has_step:
         return "step"
     if has_partial:
@@ -493,6 +502,8 @@ def _prepend(opener: str, text: str) -> str:
     body = text.lstrip()
     if not body:
         return opener
+    if fold_diacritics(body).startswith("zadatak:"):
+        return f"{opener}\n{body}"
     return f"{opener} {body}"
 
 
@@ -639,6 +650,15 @@ def _make_incorrect(answer: str) -> str:
     return _prepend("Netačno.", answer.strip())
 
 
+def _make_incomplete(answer: str) -> str:
+    """Autoritativno NEPOTPUNO: odgovor je matematički povezan, ali nije rješenje."""
+    out, _changed = _remove_negative_verdicts(answer)
+    out = _strip_leading_labels(out) or out.strip()
+    if not out:
+        return "Nepotpuno. Dao si primjer koji odgovara uslovu, ali treba napisati cijelo rješenje."
+    return _prepend("Nepotpuno.", out.strip())
+
+
 def _make_partial(answer: str) -> str:
     """Autoritativno DJELIMIČNO: vrijednost je dobra, ali traženi oblik nije.
 
@@ -756,6 +776,10 @@ def _reconcile_multi_item(answer: str, check_result: Any) -> str:
             candidate, changed = _remove_negative_verdicts(seg)
             if changed and candidate.strip():
                 cleaned = candidate
+        elif verdict in _INCOMPLETE_VERDICTS:
+            cleaned = _make_incomplete(seg)
+        elif verdict in _INCORRECT_VERDICTS and _starts_positive(seg):
+            cleaned = _make_incorrect(seg)
         elif _segment_self_contradicts(seg):
             candidate, changed = _remove_negative_verdicts(seg)
             if not changed:
@@ -843,6 +867,9 @@ def enforce_grading_consistency(answer: Any, check_result: Any = None) -> str:
         # ali kontradikcija UNUTAR JEDNE stavke nije: pomiri segment po segment.
         if verdict == "mixed" or multi:
             return _reconcile_multi_item(answer, check_result)
+
+        if verdict == "incomplete":
+            return _make_incomplete(answer)
 
         if verdict == "incorrect":
             return _make_incorrect(answer)

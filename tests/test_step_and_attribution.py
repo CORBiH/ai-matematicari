@@ -362,7 +362,7 @@ def test_arithmetic_prefix_midstep_is_correct_step():
 
 def test_arithmetic_final_and_wrong_values_unchanged():
     task = "Izračunaj \\frac{5}{12} + \\frac{7}{12} - \\frac{3}{12}."
-    assert _by_n(check_practice_answer(task, "9/12")) == {1: "correct"}
+    assert _by_n(check_practice_answer(task, "9/12")) == {1: "correct_equivalent_form"}
     assert _by_n(check_practice_answer(task, "3/4")) == {1: "correct"}
     assert _by_n(check_practice_answer(task, "5/12")) == {1: "incorrect"}  # nije međukorak
 

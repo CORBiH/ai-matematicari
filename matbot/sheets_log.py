@@ -58,6 +58,21 @@ SHEET_HEADERS = [
     "answer",
     "answer_check",
     "next_state",
+    "task_id",
+    "task_status",
+    "answer_type",
+    "expected_answer",
+    "normalized_expected",
+    "student_answer",
+    "normalized_student",
+    "deterministic_check",
+    "gpt_check_used",
+    "gpt_check_confidence",
+    "attempt_number",
+    "total_attempt_count",
+    "wrong_attempt_count",
+    "hint_count",
+    "answer_verdict_detail",
 ]
 
 
@@ -80,6 +95,15 @@ def _json_cell(value: Any) -> str:
         return json.dumps(value, ensure_ascii=False, sort_keys=True, default=str)
     except Exception:
         return str(value)
+
+
+def _sheet_col(n: int) -> str:
+    """1-based spreadsheet column name: 1 -> A, 27 -> AA."""
+    out = ""
+    while n > 0:
+        n, rem = divmod(n - 1, 26)
+        out = chr(ord("A") + rem) + out
+    return out or "A"
 
 
 def _credentials_file() -> Path:
@@ -165,11 +189,11 @@ def _ensure_sheet_layout(ws: Any) -> None:
             except Exception:
                 existing = []
         if existing[: len(SHEET_HEADERS)] != SHEET_HEADERS and hasattr(ws, "update"):
-            end_col = chr(ord("A") + len(SHEET_HEADERS) - 1)
+            end_col = _sheet_col(len(SHEET_HEADERS))
             ws.update(f"A1:{end_col}1", [SHEET_HEADERS])
         for method_name, args in (
             ("freeze", {"rows": 1}),
-            ("set_basic_filter", {"name": f"A1:{chr(ord('A') + len(SHEET_HEADERS) - 1)}1"}),
+            ("set_basic_filter", {"name": f"A1:{_sheet_col(len(SHEET_HEADERS))}1"}),
         ):
             method = getattr(ws, method_name, None)
             if callable(method):
@@ -183,8 +207,9 @@ def _ensure_sheet_layout(ws: Any) -> None:
         fmt = getattr(ws, "format", None)
         if callable(fmt):
             try:
-                fmt("A1:T1", {"textFormat": {"bold": True}})
-                fmt("P:T", {"wrapStrategy": "WRAP"})
+                end_col = _sheet_col(len(SHEET_HEADERS))
+                fmt(f"A1:{end_col}1", {"textFormat": {"bold": True}})
+                fmt(f"P:{end_col}", {"wrapStrategy": "WRAP"})
             except Exception:
                 pass
     except Exception:
@@ -207,9 +232,20 @@ def sheets_append_row_safe(values: list[Any]) -> bool:
         return False
 
 
+def _first_answer_check_item(response: dict) -> dict:
+    check = response.get("answer_check")
+    if not isinstance(check, dict):
+        return {}
+    items = check.get("items")
+    if isinstance(items, list) and items and isinstance(items[0], dict):
+        return items[0]
+    return {}
+
+
 def _build_transcript_row(payload: dict, response: dict) -> list[Any]:
     topic = response.get("final_topic") or response.get("effective_topic")
     next_state = response.get("next_state") or {}
+    item = _first_answer_check_item(response)
     return [
         datetime.now(timezone.utc).isoformat(),
         "chat",
@@ -231,6 +267,21 @@ def _build_transcript_row(payload: dict, response: dict) -> list[Any]:
         _clean_cell(response.get("answer")),
         _json_cell(response.get("answer_check")),
         _json_cell(response.get("next_state")),
+        _clean_cell(response.get("task_id") or next_state.get("task_id") or next_state.get("completed_task_id")),
+        _clean_cell(response.get("task_status") or next_state.get("task_status")),
+        _clean_cell(item.get("answer_type")),
+        _clean_cell(item.get("expected_answer") or item.get("expected")),
+        _clean_cell(item.get("normalized_expected")),
+        _clean_cell(item.get("student_answer") or item.get("given") or payload.get("student_message")),
+        _clean_cell(item.get("normalized_student")),
+        _json_cell(item.get("deterministic_check")),
+        _clean_cell(response.get("gpt_check_used")),
+        _clean_cell(response.get("gpt_check_confidence")),
+        _clean_cell(response.get("attempt_number") or next_state.get("attempt_count")),
+        _clean_cell(response.get("total_attempt_count") or next_state.get("total_attempt_count") or next_state.get("attempt_count")),
+        _clean_cell(response.get("wrong_attempt_count") or next_state.get("wrong_attempt_count")),
+        _clean_cell(response.get("hint_count") or next_state.get("hint_count")),
+        _clean_cell(response.get("answer_verdict_detail") or item.get("verdict")),
     ]
 
 
@@ -247,6 +298,21 @@ def _build_feedback_row(payload: dict) -> list[Any]:
         "ready",
         "",
         _clean_cell(payload.get("verdict")),
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
         "",
         "",
         "",

@@ -123,9 +123,9 @@ def test_bug1_da_without_pending_gives_new_task_not_meta_question(master, tmap):
     assert "sličan novi zadatak" in _last_user_prompt(chat)
 
 
-# ===== BUG 2: poslije tačnog odgovora slijedi novi (teži) zadatak =====
+# ===== BUG 2: tačan odgovor završava trenutni zadatak; novi kreće eksplicitno =====
 
-def test_bug2_marked_new_task_becomes_last_tutor_task_on_grading(master, tmap):
+def test_bug2_marked_new_task_after_grading_is_not_auto_started(master, tmap):
     reply = (
         "Tačno. Lijepo si sabrao brojnike.\n"
         "Zadatak: Izračunaj 5/11 + 3/11."
@@ -137,8 +137,10 @@ def test_bug2_marked_new_task_becomes_last_tutor_task_on_grading(master, tmap):
         "last_tutor_task": "Izračunaj: 2/7 + 3/7",
         "student_message": "5/7",
     }, chat, master, tmap, model="m", timeout=1)
-    assert "5/11" in out.get("last_tutor_task", "")
-    assert out["next_state"]["expected_user_action"] == "answer_task"
+    assert out.get("last_tutor_task", "") == ""
+    assert "5/11" not in out["answer"]
+    assert out["next_state"]["expected_user_action"] == "none"
+    assert out["next_state"]["task_status"] == "completed"
 
 
 def test_bug2_correct_streak_travels_forward(master, tmap):

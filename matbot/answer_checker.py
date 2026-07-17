@@ -64,6 +64,7 @@ def _normalize_math_text(text: str) -> str:
     t = _CDOT_RE.sub("*", t)
     t = _DIV_RE.sub(":", t)
     t = t.replace("−", "-").replace("–", "-")
+    t = _normalize_vulgar_fractions(t)
     # Bosanski lokal: decimalni separator je zarez. Tačka IZMEĐU dvije cifre je
     # skoro sigurno decimalna ("8.45" → "8,45"); tako "8.45" ne biva pogrešno
     # pročitano kao stavka "8." s odgovorom "45". Tačka koja nije između cifara
@@ -83,6 +84,19 @@ _DOT_DECIMAL_RE = re.compile(r"(?<=\d)\.(?=\d)")
 _PAREN_NUMBER_RE = re.compile(
     r"\(\s*(-?\d+(?:[,.]\d+)?(?:\s*/\s*\d+)?(?:\s+\d+\s*/\s*\d+)?)\s*\)"
 )
+_VULGAR_FRACTIONS = {
+    "\u00bd": "1/2",
+    "\u00bc": "1/4",
+    "\u00be": "3/4",
+}
+
+
+def _normalize_vulgar_fractions(text: str) -> str:
+    out = text
+    for glyph, frac in _VULGAR_FRACTIONS.items():
+        out = re.sub(rf"(?<=\d)\s*{re.escape(glyph)}", f" {frac}", out)
+        out = out.replace(glyph, f" {frac} ")
+    return out
 
 
 # --- Parsiranje jednog broja (razlomak / mješoviti / cijeli / decimalni) ---------
@@ -92,6 +106,10 @@ class NumberToken:
     value: Fraction
     form: str          # "fraction" | "mixed" | "integer" | "decimal"
     raw: str = ""
+    unit: str | None = None
+    unit_raw: str = ""
+    notation: str | None = None
+    unrecognized_unit: str = ""
 
     @property
     def is_reduced_fraction(self) -> bool:
@@ -120,6 +138,59 @@ _MIXED_RE = re.compile(r"(?<![\d/,.])(-?\d+)\s+(\d+)\s*/\s*(\d+)(?!\s*/)(?![.,]\
 _SIMPLE_FRAC_RE = re.compile(r"(?<![\d/,.])(-?\d+)\s*/\s*(\d+)(?!\s*/)(?![.,]\d)")
 _DECIMAL_RE = re.compile(r"(?<![\d/,.])(-?\d+),(\d+)(?![\d/])")
 _INT_RE = re.compile(r"(?<![\d/,.])(-?\d+)(?!\s*/)(?![.,]\d)(?!\s+\d+\s*/)")
+_ANSWER_SUFFIX_RE = re.compile(
+    r"\s*(%|\u00b0|[A-Za-zČĆĐŠŽčćđšž]+(?:\s*/\s*[A-Za-zČĆĐŠŽčćđšž]+)?)"
+)
+_DEGREE_WORD_RE = re.compile(r"^(?:stepen\w*|stupanj\w*|stupnje\w*)$")
+
+
+def _with_suffix(norm: str, end: int, tok: NumberToken) -> tuple[int, NumberToken]:
+    """Attach a tightly following answer suffix (unit, %, degree) to a token.
+
+    Unknown alphabetic suffixes are preserved as evidence but not folded into
+    ``raw``; otherwise prose like "5 plus 3" could become a fake clean answer.
+    """
+    m = _ANSWER_SUFFIX_RE.match(norm, end)
+    if not m:
+        return end, tok
+    suffix = m.group(1).strip()
+    folded = _fold(suffix).replace(" ", "")
+    raw = (tok.raw + norm[end:m.end()]).strip()
+    if suffix == "%":
+        return m.end(), NumberToken(
+            value=tok.value / 100,
+            form="percentage",
+            raw=raw,
+            unit="%",
+            unit_raw=suffix,
+            notation="percent",
+        )
+    if suffix == "\u00b0" or _DEGREE_WORD_RE.match(folded):
+        return m.end(), NumberToken(
+            value=tok.value,
+            form=tok.form,
+            raw=raw,
+            unit="\u00b0",
+            unit_raw=suffix,
+            notation="degree",
+        )
+    unit = _unit_key(folded)
+    if unit:
+        return m.end(), NumberToken(
+            value=tok.value,
+            form=tok.form,
+            raw=raw,
+            unit=unit,
+            unit_raw=suffix,
+        )
+    if len(folded) <= 12:
+        return end, NumberToken(
+            value=tok.value,
+            form=tok.form,
+            raw=tok.raw,
+            unrecognized_unit=suffix,
+        )
+    return end, tok
 
 
 def parse_number_token(text: str) -> NumberToken | None:
@@ -133,10 +204,11 @@ def _scan_number_tokens(norm: str) -> list[NumberToken]:
     found: list[tuple[int, int, NumberToken]] = []
 
     def _add(m: re.Match, tok: NumberToken):
+        span_end, tok = _with_suffix(norm, m.end(), tok)
         for s, e, _t in found:
-            if m.start() < e and m.end() > s:
+            if m.start() < e and span_end > s:
                 return
-        found.append((m.start(), m.end(), tok))
+        found.append((m.start(), span_end, tok))
 
     for m in _MIXED_RE.finditer(norm):
         whole, num, den = int(m.group(1)), int(m.group(2)), int(m.group(3))
@@ -198,6 +270,12 @@ class Expected:
     required_form: str | None = None   # "fraction" (nepravi) | "mixed" | None
     unit: str | None = None
     basis: str = ""
+    answer_type: str = "number"
+    expected_display: str = ""
+    unit_policy: str = "not_applicable"
+    equivalent_forms_allowed: bool = True
+    form_affects_score: bool = False
+    tolerance: Fraction | None = None
     target_denominator: int | None = None
     # "high" → smije se presuditi i TAČNO i NETAČNO; "positive_only" → samo
     # potvrda tačnog (kontekst bi mogao mijenjati jedinicu odgovora, pa se
@@ -280,6 +358,8 @@ def _fmt_fraction(value: Fraction) -> str:
 
 
 def _fmt_expected(expected: Expected) -> str:
+    if expected.expected_display:
+        return expected.expected_display
     if expected.kind == "inequality" and expected.required_form:
         return f"x {expected.required_form} {_fmt_fraction(expected.value)}"
     if expected.kind == "yes_no":
@@ -294,6 +374,10 @@ def _fmt_expected(expected: Expected) -> str:
         numerator = expected.value * expected.target_denominator
         if numerator.denominator == 1:
             return f"{numerator.numerator}/{expected.target_denominator}"
+    if expected.answer_type == "percentage" or expected.unit == "%":
+        return f"{_fmt_fraction(expected.value * 100)}%"
+    if expected.answer_type == "angle" or expected.unit == "\u00b0":
+        return f"{_fmt_fraction(expected.value)}\u00b0"
     base = _fmt_fraction(expected.value)
     return f"{base} {expected.unit}".strip() if expected.unit else base
 
@@ -314,7 +398,12 @@ def _try_complement(folded: str, tokens: list[NumberToken]) -> Expected | None:
     if not (_COMPLEMENT_SIGNAL_RE.search(folded) and _QUESTION_SIGNAL_RE.search(folded)):
         return None
     confidence = "high" if _DIO_RE.search(folded) else "positive_only"
-    return Expected(value=Fraction(1) - tok.value, kind="complement", confidence=confidence)
+    return Expected(
+        value=Fraction(1) - tok.value,
+        kind="complement",
+        answer_type="rational",
+        confidence=confidence,
+    )
 
 
 def _try_conversion(folded: str, tokens: list[NumberToken]) -> Expected | None:
@@ -328,11 +417,23 @@ def _try_conversion(folded: str, tokens: list[NumberToken]) -> Expected | None:
     if _TO_IMPROPER_RE.search(folded):
         mixed = [t for t in tokens if t.form == "mixed"]
         if len(mixed) == 1:
-            return Expected(value=mixed[0].value, kind="to_improper", required_form="fraction")
+            return Expected(
+                value=mixed[0].value,
+                kind="to_improper",
+                required_form="fraction",
+                answer_type="rational",
+                form_affects_score=True,
+            )
     if _TO_MIXED_RE.search(folded):
         improper = [t for t in tokens if t.form == "fraction" and abs(t.value) > 1]
         if len(improper) == 1:
-            return Expected(value=improper[0].value, kind="to_mixed", required_form="mixed")
+            return Expected(
+                value=improper[0].value,
+                kind="to_mixed",
+                required_form="mixed",
+                answer_type="mixed_number",
+                form_affects_score=True,
+            )
     return None
 
 
@@ -342,7 +443,13 @@ def _try_simplify(folded: str, tokens: list[NumberToken]) -> Expected | None:
     fracs = [t for t in tokens if t.form == "fraction"]
     if len(fracs) != 1:
         return None
-    return Expected(value=fracs[0].value, kind="simplify", required_form="fraction")
+    return Expected(
+        value=fracs[0].value,
+        kind="simplify",
+        required_form="fraction",
+        answer_type="rational",
+        form_affects_score=True,
+    )
 
 
 def _try_expand(folded: str, tokens: list[NumberToken]) -> Expected | None:
@@ -361,6 +468,8 @@ def _try_expand(folded: str, tokens: list[NumberToken]) -> Expected | None:
         value=fracs[0].value,
         kind="expand",
         required_form="fraction",
+        answer_type="rational",
+        form_affects_score=True,
         target_denominator=target,
     )
 
@@ -373,12 +482,14 @@ def _try_worded_fraction_operation(folded: str, tokens: list[NumberToken]) -> Ex
             value=tokens[0].value + tokens[1].value,
             kind="arithmetic",
             required_form="fraction",
+            answer_type="rational",
         )
     if _SUB_WORD_RE.search(folded):
         return Expected(
             value=tokens[0].value - tokens[1].value,
             kind="arithmetic",
             required_form="fraction",
+            answer_type="rational",
         )
     return None
 
@@ -392,7 +503,12 @@ def _try_fraction_comparison(folded: str, tokens: list[NumberToken]) -> Expected
     if wants_greater == wants_smaller:
         return None
     chosen = max(fracs, key=lambda t: t.value) if wants_greater else min(fracs, key=lambda t: t.value)
-    return Expected(value=chosen.value, kind="comparison", required_form="fraction")
+    return Expected(
+        value=chosen.value,
+        kind="comparison",
+        required_form="fraction",
+        answer_type="rational",
+    )
 
 
 # --- A3 (AUD-05/11, 2026-07-13): procenti, stepeni, pretvaranje jedinica -------------
@@ -419,6 +535,74 @@ def _try_percent_of(folded: str, tokens: list[NumberToken]) -> Expected | None:
         base = _num_to_fraction(m.group(2))
         return Expected(value=base * pct / 100, kind="arithmetic")
     return None
+
+
+_PERCENT_FORM_TASK_RE = re.compile(
+    r"\b(?:kao|u)\s+(?:procen\w*|postot\w*|%)\b|\bprocen\w*\s+zapis\w*"
+)
+_DECIMAL_FORM_TASK_RE = re.compile(r"\b(?:kao|u)\s+decimal\w*\b|decimaln\w*\s+zapis\w*")
+_FRACTION_FORM_TASK_RE = re.compile(r"\b(?:kao|u)\s+razlom\w*\b|razloma\w*\s+zapis\w*")
+
+
+def _try_percent_fraction_conversion(folded: str, tokens: list[NumberToken]) -> Expected | None:
+    """Simple percent/fraction/decimal representation tasks.
+
+    The stored value is the underlying ratio, so 50%, 0.5 and 1/2 can compare
+    exactly; required-form wording is handled separately by ``_judge``.
+    """
+    has_form_signal = bool(
+        _PERCENT_FORM_TASK_RE.search(folded)
+        or _DECIMAL_FORM_TASK_RE.search(folded)
+        or _FRACTION_FORM_TASK_RE.search(folded)
+    )
+    has_percent_value = any(t.form == "percentage" for t in tokens)
+    if not has_form_signal and not has_percent_value:
+        return None
+    if len(tokens) != 1:
+        return None
+    tok = tokens[0]
+    if tok.form not in ("fraction", "decimal", "integer", "percentage"):
+        return None
+    required = None
+    answer_type = "number"
+    unit = None
+    if _PERCENT_FORM_TASK_RE.search(folded):
+        required = "percentage"
+        answer_type = "percentage"
+        unit = "%"
+    elif _DECIMAL_FORM_TASK_RE.search(folded):
+        required = "decimal"
+        answer_type = "decimal"
+    elif _FRACTION_FORM_TASK_RE.search(folded):
+        required = "fraction"
+        answer_type = "rational"
+    else:
+        answer_type = "percentage" if tok.form == "percentage" else "number"
+        unit = "%" if tok.form == "percentage" else None
+    return Expected(
+        value=tok.value,
+        kind="percentage" if answer_type == "percentage" else "conversion",
+        required_form=required,
+        unit=unit,
+        answer_type=answer_type,
+        unit_policy="not_applicable",
+        form_affects_score=bool(required),
+    )
+
+
+def _try_angle_arithmetic(folded: str, norm_text: str) -> Expected | None:
+    """Angle arithmetic where the degree mark is notation, not a new unit scale."""
+    if "\u00b0" not in norm_text and not re.search(r"\bug(ao|la|lu|lovi|love|lova)\b|\bstepen", folded):
+        return None
+    stripped = re.sub(r"\s*(?:\u00b0|stepen\w*)", "", norm_text, flags=re.IGNORECASE)
+    expected = _try_arithmetic(_fold(stripped), stripped)
+    if expected is None:
+        return None
+    expected.kind = "angle"
+    expected.unit = "\u00b0"
+    expected.answer_type = "angle"
+    expected.unit_policy = "optional_if_clear"
+    return expected
 
 
 _POWER_RE = re.compile(r"(-?\d+(?:[,.]\d+)?|-?\d+\s*/\s*\d+)\s*(?:\^|\*\*)\s*(\d)")
@@ -496,6 +680,80 @@ def _unit_key(raw: str) -> str | None:
     return None
 
 
+def _unit_factor(unit: str | None) -> tuple[str, Fraction] | None:
+    key = _unit_key(unit or "")
+    if not key:
+        return None
+    return _UNIT_FACTORS.get(key)
+
+
+def _judge_measurement(expected: Expected, given: NumberToken) -> str | None:
+    if expected.answer_type != "measurement" or not expected.unit:
+        return None
+    exp = _unit_factor(expected.unit)
+    if exp is None:
+        return None
+    exp_group, exp_factor = exp
+    exp_base = expected.value * exp_factor
+    if given.unrecognized_unit:
+        return "wrong_unit" if given.value == expected.value else "incorrect"
+    if given.unit:
+        stu = _unit_factor(given.unit)
+        if stu is None:
+            return "wrong_unit" if given.value == expected.value else "incorrect"
+        stu_group, stu_factor = stu
+        if stu_group != exp_group:
+            return "wrong_unit"
+        if given.value * stu_factor == exp_base:
+            exp_key = _unit_key(expected.unit)
+            stu_key = _unit_key(given.unit)
+            return "correct" if stu_key == exp_key and given.value == expected.value else "correct_equivalent_form"
+        return "wrong_unit" if given.value == expected.value else "incorrect"
+    if _values_match(expected, given):
+        return "correct_missing_unit"
+    return "incorrect"
+
+
+def _judge_angle(expected: Expected, given: NumberToken) -> str | None:
+    if expected.answer_type != "angle":
+        return None
+    if not _values_match(expected, given):
+        return "incorrect"
+    if given.unrecognized_unit:
+        return "wrong_unit"
+    if given.notation == "degree" or given.unit == "\u00b0":
+        return "correct"
+    if given.unit:
+        return "wrong_unit"
+    return "correct_missing_notation"
+
+
+def _judge_percentage(expected: Expected, given: NumberToken) -> str | None:
+    if expected.answer_type != "percentage":
+        return None
+    if not _values_match(expected, given):
+        return "incorrect"
+    if expected.required_form == "percentage" and given.form != "percentage":
+        return "correct_value_wrong_form"
+    return "correct" if given.form == "percentage" else "correct_equivalent_form"
+
+
+def _compact_math_text(text: str) -> str:
+    return re.sub(r"\s+", "", (text or "").replace(",", "."))
+
+
+def _equivalent_form_verdict(expected: Expected, given: NumberToken) -> str | None:
+    if not expected.equivalent_forms_allowed or expected.answer_type != "rational":
+        return None
+    if given.form not in ("fraction", "mixed", "decimal", "integer", "percentage"):
+        return None
+    expected_raw = _compact_math_text(_fmt_expected(expected))
+    given_raw = _compact_math_text(given.raw)
+    if expected_raw and given_raw and expected_raw != given_raw:
+        return "correct_equivalent_form"
+    return None
+
+
 def _try_unit_conversion(folded: str, tokens: list[NumberToken]) -> Expected | None:
     """"Pretvori 3 m u cm" → 300 cm; dužina/masa/vrijeme unutar iste grupe."""
     m = _UNIT_CONVERT_RE.search(folded)
@@ -510,7 +768,13 @@ def _try_unit_conversion(folded: str, tokens: list[NumberToken]) -> Expected | N
     if src_group != dst_group:
         return None
     value = _num_to_fraction(m.group(1)) * src_f / dst_f
-    return Expected(value=value, kind="arithmetic", unit=dst)
+    return Expected(
+        value=value,
+        kind="measurement",
+        unit=dst,
+        answer_type="measurement",
+        unit_policy="optional_if_clear",
+    )
 
 
 _NZD_RE = re.compile(r"najvec\w*\s+zajednick\w*\s+dj?el\w*|\bnzd\b")
@@ -559,6 +823,8 @@ def _try_rate_or_ratio(folded: str, norm_text: str) -> Expected | None:
                 value=value,
                 kind="ratio",
                 required_form="fraction",
+                answer_type="rational",
+                form_affects_score=True,
                 basis=f"{_fmt_fraction(first)} minuta : {_fmt_fraction(second)} minuta = {_fmt_fraction(value)}",
             )
 
@@ -676,9 +942,11 @@ def _try_arithmetic(folded: str, norm_text: str) -> Expected | None:
     value = _eval_expr(expr_m.group(1))
     if value is None:
         return None
+    answer_type = "decimal" if re.search(r"\d+,\d+", expr_m.group(1)) else "rational"
     return Expected(
         value=value,
         kind="arithmetic",
+        answer_type=answer_type,
         step_values=_expr_step_values(expr_m.group(1), value),
     )
 
@@ -919,7 +1187,12 @@ def _try_linear_equation(folded: str, norm_text: str) -> Expected | None:
     b = right[1] - left[1]           # slobodni članovi na desnu stranu
     if a == 0:
         return None                  # nema jedinstvenog rješenja
-    return Expected(value=b / a, kind="equation", confidence="high")
+    return Expected(
+        value=b / a,
+        kind="equation",
+        answer_type="equation_solution",
+        confidence="high",
+    )
 
 
 # --- Proste linearne nejednačine s jednom nepoznatom (x) ---------------------------
@@ -1004,13 +1277,30 @@ def _check_single_inequality(task_text: str, student_text: str) -> "CheckResult 
     if expected is None:
         return None
     student = _solve_linear_inequality(_normalize_math_text(student_text))
-    if student is None:
-        return None                        # odgovor nije jasna nejednačina po x
     exp_op, exp_val, _task_final = expected
-    stu_op, stu_val, stu_final = student
     expected_obj = Expected(
-        value=exp_val, kind="inequality", required_form=exp_op, confidence="high"
+        value=exp_val,
+        kind="inequality",
+        required_form=exp_op,
+        answer_type="inequality_solution",
+        confidence="high",
     )
+    if student is None:
+        number = parse_number_token(student_text)
+        if number is None:
+            return None                    # odgovor nije jasna nejednačina po x
+        satisfies = {
+            "<": number.value < exp_val,
+            "<=": number.value <= exp_val,
+            ">": number.value > exp_val,
+            ">=": number.value >= exp_val,
+        }[exp_op]
+        verdict = "incomplete" if satisfies else "incorrect"
+        return CheckResult(checkable=True, items=[
+            ItemCheck(n=1, task=task_text.strip()[:200], expected=expected_obj,
+                      given=number, verdict=verdict),
+        ])
+    stu_op, stu_val, stu_final = student
     raw_student = re.sub(r"\s+", " ", _student_statement_raw(student_text))[:80]
     given = NumberToken(
         value=stu_val, form="inequality",
@@ -1090,6 +1380,7 @@ def derive_expected(item_text: str) -> Expected | None:
     tokens = _scan_number_tokens(norm)
     for solver in (
         _try_conversion,
+        _try_percent_fraction_conversion,
         _try_expand,
         _try_simplify,
         _try_complement,
@@ -1104,6 +1395,9 @@ def derive_expected(item_text: str) -> Expected | None:
         result = solver(folded, tokens)
         if result is not None:
             return result
+    angle = _try_angle_arithmetic(folded, norm)
+    if angle is not None:
+        return angle
     # A3 guard: stepen koji solver NIJE riješio (kombinovani izraz "2^3 + 1")
     # ne smije pasti u _try_arithmetic — on ne zna "^" pa bi parsirao samo
     # ostatak ("3 + 1") i dao POGREŠAN expected. Bolje "ne znam" nego krivo.
@@ -1329,8 +1623,10 @@ class CheckResult:
     def has_verdicts(self) -> bool:
         return any(
             i.verdict in (
-                "correct", "correct_value_wrong_form", "correct_step",
-                "incorrect", "missing", "not_attempted",
+                "correct", "correct_equivalent_form", "correct_missing_notation",
+                "correct_missing_unit", "correct_value_wrong_form", "correct_step",
+                "partially_correct", "incomplete", "wrong_unit", "incorrect",
+                "ambiguous", "needs_review", "missing", "not_attempted",
             )
             for i in self.items
         )
@@ -1341,6 +1637,8 @@ def _values_match(expected: Expected, given: NumberToken) -> bool:
     aproksimaciju razlomka (npr. 1,333333 za 4/3). Zahtijeva ≥3 decimale da se
     kratke vrijednosti (1,3) i dalje traže egzaktno."""
     if given.value == expected.value:
+        return True
+    if expected.tolerance is not None and abs(given.value - expected.value) <= expected.tolerance:
         return True
     if given.form == "decimal" and expected.value.denominator != 1:
         frac_digits = len(given.raw.split(",")[-1]) if "," in given.raw else 0
@@ -1356,6 +1654,13 @@ def _judge(expected: Expected | None, given: NumberToken | None, answered: bool)
         return "unverified" if answered else "missing"
     if expected is None:
         return "unverified"
+    specialized = (
+        _judge_measurement(expected, given)
+        or _judge_angle(expected, given)
+        or _judge_percentage(expected, given)
+    )
+    if specialized is not None:
+        return specialized
     if not _values_match(expected, given):
         # CLASS 1: vrijednost tačnog MEĐUKORAKA ("12/12" za 5/12+7/12-3/12,
         # poslije hinta "prvo saberi") — tačan korak, ne "netačno".
@@ -1368,12 +1673,19 @@ def _judge(expected: Expected | None, given: NumberToken | None, answered: bool)
         return "correct_value_wrong_form"
     if expected.required_form == "mixed" and given.form not in ("mixed", "integer"):
         return "correct_value_wrong_form"
+    if expected.required_form == "percentage" and given.form != "percentage":
+        return "correct_value_wrong_form"
+    if expected.required_form == "decimal" and given.form != "decimal":
+        return "correct_value_wrong_form"
     if expected.kind == "simplify" and not given.is_reduced_fraction:
         return "correct_value_wrong_form"
     if expected.kind == "expand":
         _num, den = _fraction_parts(given.raw)
         if expected.target_denominator and den != expected.target_denominator:
             return "correct_value_wrong_form"
+    equiv = _equivalent_form_verdict(expected, given)
+    if equiv:
+        return equiv
     return "correct"
 
 
@@ -1502,7 +1814,10 @@ def _check_yes_no_divisibility(task_text: str, student_text: str) -> CheckResult
 # Presude kojima se odgovor smije PRIPISATI stavci: tačan, tačna vrijednost u
 # pogrešnom obliku ili tačan međukorak. "incorrect" se pripisuje SAMO kada je
 # preostala tačno jedna stavka (inače ne znamo koju je stavku pokušao).
-_ATTRIBUTABLE_VERDICTS = ("correct", "correct_value_wrong_form", "correct_step")
+_ATTRIBUTABLE_VERDICTS = (
+    "correct", "correct_equivalent_form", "correct_missing_notation",
+    "correct_missing_unit", "correct_value_wrong_form", "correct_step",
+)
 
 
 def _attribute_unnumbered_answer(
@@ -1679,6 +1994,24 @@ def format_check_block(result: CheckResult) -> str:
                 f"- Stavka {item.n}: TAČNO. Učenik: {given}; tačan rezultat: "
                 f"{_fmt_expected(item.expected)}."
             )
+        elif item.verdict == "correct_equivalent_form":
+            lines.append(
+                f"- Stavka {item.n}: TAČNO, EKVIVALENTAN OBLIK. Učenik: {given}; "
+                f"očekivani zapis: {_fmt_expected(item.expected)}. Prihvati kao "
+                "tačno i kratko spomeni da je oblik ekvivalentan."
+            )
+        elif item.verdict == "correct_missing_notation":
+            lines.append(
+                f"- Stavka {item.n}: TAČNO, NEDOSTAJE OZNAKA. Učenik: {given}; "
+                f"tačan zapis: {_fmt_expected(item.expected)}. Počni kao tačno i "
+                "kratko podsjeti učenika na oznaku."
+            )
+        elif item.verdict == "correct_missing_unit":
+            lines.append(
+                f"- Stavka {item.n}: TAČNO, NEDOSTAJE MJERNA JEDINICA. Učenik: {given}; "
+                f"tačan zapis: {_fmt_expected(item.expected)}. Počni kao tačno i "
+                "kratko podsjeti učenika na jedinicu."
+            )
         elif item.verdict == "correct_value_wrong_form":
             expected = _fmt_expected(item.expected) if item.expected else "traženi oblik"
             detail = f" Očekivani oblik: {expected}."
@@ -1711,6 +2044,19 @@ def format_check_block(result: CheckResult) -> str:
                 f"- Stavka {item.n}: NETAČNO. Učenik: {given}; tačan rezultat: "
                 f"{_fmt_expected(item.expected)}. Prikaži račun."
             )
+        elif item.verdict == "wrong_unit":
+            lines.append(
+                f"- Stavka {item.n}: POGREŠNA ILI NEPREPOZNATA JEDINICA. "
+                f"Učenik: {given}; očekivano: {_fmt_expected(item.expected)}. "
+                "Ne prihvataj kao potpuno tačno; objasni razliku u jedinici ili "
+                "pitaj je li jedinica tipfeler."
+            )
+        elif item.verdict == "incomplete":
+            lines.append(
+                f"- Stavka {item.n}: NEPOTPUN ODGOVOR. Učenik je dao primjer "
+                f"({given}), ali zadatak traži cijelo rješenje: "
+                f"{_fmt_expected(item.expected)}. Ne označavaj kao tačno."
+            )
         elif item.verdict == "missing":
             lines.append(
                 f"- Stavka {item.n}: BEZ ODGOVORA — NE ocjenjuj je kao netačnu; "
@@ -1734,13 +2080,17 @@ def format_check_block(result: CheckResult) -> str:
         "Stavku označenu kao TAČNO nikad ne proglašavaj netačnom."
     )
     verdicts = [i.verdict for i in result.items]
-    all_correct = bool(verdicts) and all(v == "correct" for v in verdicts)
+    accepted_verdicts = (
+        "correct", "correct_equivalent_form", "correct_missing_notation",
+        "correct_missing_unit",
+    )
+    all_correct = bool(verdicts) and all(v in accepted_verdicts for v in verdicts)
     step_confirmed = any(v == "correct_step" for v in verdicts) and all(
-        v in ("correct", "correct_step", "missing", "not_attempted")
+        v in accepted_verdicts + ("correct_step", "missing", "not_attempted")
         for v in verdicts
     )
     all_partial_or_correct = bool(verdicts) and all(
-        v in ("correct", "correct_value_wrong_form") for v in verdicts
+        v in accepted_verdicts + ("correct_value_wrong_form",) for v in verdicts
     ) and any(v == "correct_value_wrong_form" for v in verdicts)
     missing_ns = [
         i.n for i in result.items if i.verdict in ("missing", "not_attempted")
@@ -1748,13 +2098,13 @@ def format_check_block(result: CheckResult) -> str:
     answered_ok_ns = [
         i.n
         for i in result.items
-        if i.verdict in ("correct", "correct_value_wrong_form")
+        if i.verdict in accepted_verdicts + ("correct_value_wrong_form",)
     ]
     answered_subset_ok = bool(missing_ns) and bool(answered_ok_ns) and all(
-        i.verdict in ("correct", "correct_value_wrong_form", "missing", "not_attempted")
+        i.verdict in accepted_verdicts + ("correct_value_wrong_form", "missing", "not_attempted")
         for i in result.items
     )
-    any_incorrect = any(v == "incorrect" for v in verdicts)
+    any_incorrect = any(v in ("incorrect", "wrong_unit", "incomplete") for v in verdicts)
     if step_confirmed:
         lines.append(
             "STIL (TAČAN MEĐUKORAK): NE koristi ocjenske labele (\"Tačno.\", "
@@ -1805,14 +2155,67 @@ def summarize_result(result: CheckResult) -> dict | None:
     """Kompaktan sažetak za response JSON / testove; None kada nema provjere."""
     if not result.checkable or not result.has_verdicts:
         return None
+    def _norm_student(tok: NumberToken | None) -> str | None:
+        if tok is None:
+            return None
+        base = _fmt_fraction(tok.value)
+        if tok.form == "percentage":
+            return f"{_fmt_fraction(tok.value * 100)}%"
+        if tok.unit:
+            return f"{base} {tok.unit}".strip()
+        if tok.unrecognized_unit:
+            return f"{base} {tok.unrecognized_unit}".strip()
+        return base
+
+    def _deterministic_details(item: ItemCheck) -> dict:
+        expected = item.expected
+        given = item.given
+        numeric_match = bool(
+            expected is not None and given is not None and _values_match(expected, given)
+        )
+        unit_match = bool(
+            expected is not None
+            and given is not None
+            and expected.unit
+            and given.unit
+            and _unit_key(expected.unit) == _unit_key(given.unit)
+        )
+        return {
+            "parsed": given is not None,
+            "numeric_match": numeric_match,
+            "unit_match": unit_match,
+            "unit_missing": bool(expected and expected.unit and given and not given.unit and not given.unrecognized_unit),
+            "unit_unrecognized": bool(given and given.unrecognized_unit),
+            "required_form_match": bool(
+                expected is None
+                or not expected.required_form
+                or (given is not None and given.form == expected.required_form)
+                or (expected.required_form == "mixed" and given is not None and given.form == "integer")
+            ),
+        }
+
     return {
+        "gpt_check_used": False,
+        "gpt_check_confidence": None,
         "items": [
             {
                 "n": i.n,
                 "verdict": i.verdict,
                 "expected": _fmt_expected(i.expected) if i.expected else None,
+                "expected_answer": _fmt_expected(i.expected) if i.expected else None,
+                "normalized_expected": _fmt_fraction(i.expected.value) if i.expected else None,
+                "answer_type": i.expected.answer_type if i.expected else None,
+                "expected_unit": i.expected.unit if i.expected else None,
+                "unit_policy": i.expected.unit_policy if i.expected else None,
+                "required_form": i.expected.required_form if i.expected else None,
+                "equivalent_forms_allowed": i.expected.equivalent_forms_allowed if i.expected else None,
                 "unit": i.expected.unit if i.expected else None,
                 "given": i.given.raw if i.given else None,
+                "student_answer": i.given.raw if i.given else None,
+                "normalized_student": _norm_student(i.given),
+                "student_unit": i.given.unit if i.given else None,
+                "unrecognized_unit": i.given.unrecognized_unit if i.given else None,
+                "deterministic_check": _deterministic_details(i),
             }
             for i in result.items
         ]

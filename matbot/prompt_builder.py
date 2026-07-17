@@ -508,6 +508,9 @@ def build_practice_followup_instructions(payload: dict, topic_context: dict) -> 
         "(3/5 = 6/10), mješoviti i nepravi zapis istog broja (2 1/4 = 9/4), "
         "decimalni zapis iste vrijednosti — osim kada zadatak izričito traži "
         "određeni oblik (tada je vrijednost tačna, ali objasni traženi oblik).\n"
+        "- Za jedinice i oznake koristi sistemsku presudu: nedostajuću jedinicu "
+        "ili oznaku spomeni kao podsjetnik, ali pogrešnu/neprepoznatu jedinicu "
+        "ne prihvataj kao potpuno tačnu.\n"
         "- KOD ODGOVORA NA JEDNU STAVKU/ZADATAK: PRVA REČENICA mora sadržavati "
         "TAČNO JEDAN konačan sud: ako je sistemska presuda correct, počni sa "
         "\"Tačno.\"; ako je correct_value_wrong_form, počni sa \"Djelimično "
@@ -585,6 +588,46 @@ def build_practice_followup_instructions(payload: dict, topic_context: dict) -> 
         check_block = format_check_block(check)
         if check_block:
             block += check_block + "\n"
+    structured_grade = payload.get("_contextual_gpt_grade")
+    if isinstance(structured_grade, dict) and structured_grade.get("verdict"):
+        verdict = normalize_value(structured_grade.get("verdict")).lower()
+        label = {
+            "correct": "Tačno.",
+            "partial": "Djelimično tačno.",
+            "incorrect": "Netačno.",
+            "ambiguous": "Nejasno.",
+        }.get(verdict, "Nejasno.")
+        feedback = normalize_value(structured_grade.get("public_feedback"))
+        block += (
+            "STRUKTURIRANA GPT PROVJERA (obavezujuće za ovaj tekstualni/proceduralni odgovor):\n"
+            f"- Sistemski zaključak: {verdict}.\n"
+            f"- Prva rečenica tvog odgovora MORA početi tačno ovako: \"{label}\"\n"
+            "- Ako se ovaj zaključak razlikuje od numeričke provjere konačne vrijednosti, "
+            "slijedi ovaj zaključak jer on provjerava cijeli postupak/kontekst.\n"
+        )
+        if feedback:
+            block += f"- Kratka javna povratna informacija iz provjere: {feedback}\n"
+    elif check is None:
+        block += (
+            "KONTEKSTUALNA PROVJERA (nema pouzdane sistemske numeričke presude):\n"
+            "- Ako učenik daje pisani postupak, konceptualno objašnjenje ili tekstualan odgovor, "
+            "sam ga provjeri pažljivo i konzervativno.\n"
+            "- Ovo je i dalje OCJENJIVAČKI potez: prva riječ/prve riječi odgovora MORAJU biti jedna "
+            "od labela ispod, prije empatije ili objašnjenja.\n"
+            "- Ne prihvataj odgovor kao potpuno tačan samo zato što se negdje pojavljuje konačan broj; "
+            "ako postupak ima matematičku grešku, označi kao djelimično tačno ili netačno, prema grešci.\n"
+            "- Ako je postupak dobar ali nedovršen, NE piši \"Tačno.\"; počni sa "
+            "\"Nepotpuno.\" ili \"Djelimično tačno.\".\n"
+            "- Ako je konačan broj tačan, ali je neki međukorak matematički pogrešan ili nelogičan, "
+            "NE piši \"Tačno.\"; počni sa \"Djelimično tačno.\" ili \"Netačno.\".\n"
+            "- Ako je tekstualni odgovor nejasan, početak mora biti tačno \"Nejasno.\" i zatim kratko "
+            "zatraži jasniji odgovor; ne pogađaj da je tačno.\n"
+            "- Prva rečenica mora jasno početi jednim od: \"Tačno.\", \"Djelimično tačno.\", "
+            "\"Nepotpuno.\", \"Netačno.\" ili \"Nejasno.\". Koristi \"Nejasno.\" kada iz poruke "
+            "ne možeš pouzdano zaključiti odgovor.\n"
+            "- Ne zapisuj skriveno rasuđivanje niti lanac misli; učeniku daj samo kratku provjeru i "
+            "sljedeći korak.\n"
+        )
     # AUD-01: odgovor na stavku sa SLIKE (image_test practice) — poslije ocjene
     # NE izmišljaj novi zadatak; ponudi SLJEDEĆU stavku SA SLIKE (ili završi).
     ipa = payload.get("_image_practice_answer")

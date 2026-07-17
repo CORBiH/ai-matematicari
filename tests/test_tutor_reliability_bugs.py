@@ -198,7 +198,7 @@ def test_challenge_when_student_was_actually_wrong_recheck_not_new_task(master, 
     }, chat, master, tmap, model="m", timeout=1)
     # ponovna provjera: učenik je zapravo bio u krivu → presuda ostaje incorrect
     assert out["answer_check"]["items"][0]["verdict"] == "incorrect"
-    assert not out.get("last_tutor_task")             # nema novog zadatka
+    assert out.get("last_tutor_task") == "Riješi: (2/3)x = 8/9"
 
 
 # --- Stil odgovora za TAČAN odgovor (kratko, potvrda prva) -------------------------

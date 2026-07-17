@@ -129,6 +129,7 @@ def test_inequality_summary_shows_operator_and_bound():
     assert summarize_result(cr)["items"][0]["expected"] == "x < 8"
 
 
-def test_inequality_unparsed_student_answer_stays_unverified():
-    # zadatak jeste nejednačina, ali "8" bez znaka ne potvrđuje smjer → ne diramo
-    assert _verdict("Riješi: x/2 - 3 < 1", "8") == "not_checkable"
+def test_inequality_bare_number_is_not_complete_solution():
+    # broj na granici nije rješenje, a jedan primjer svakako nije cijeli skup rješenja
+    assert _verdict("Riješi: x/2 - 3 < 1", "8") == "incorrect"
+    assert _verdict("Riješi: x > 3", "4") == "incomplete"

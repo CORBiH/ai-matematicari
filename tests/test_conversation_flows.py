@@ -139,8 +139,8 @@ def test_ordinal_multi_updates_task_items(master, tmap):
                  phase="answer", seed_task=MULTI3,
                  extra={"previous_next_state": {"task_items": {"labels": [1, 2, 3], "graded": []}}})
     check = {i["n"]: i["verdict"] for i in (out.get("answer_check") or {}).get("items", [])}
-    assert check.get(1) == "correct"                            # 6/9 = 2/3
-    assert check.get(2) == "correct"                            # 4/8 = 1/2
+    assert check.get(1) == "correct_equivalent_form"            # 6/9 = 2/3
+    assert check.get(2) == "correct_equivalent_form"            # 4/8 = 1/2
     assert check.get(3) in ("missing", "not_attempted")         # 'ne znam' → nepokušano
     assert out["next_state"]["task_items"] == {"labels": [1, 2, 3], "graded": [1, 2]}
 

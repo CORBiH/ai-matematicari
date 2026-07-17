@@ -105,7 +105,8 @@ def test_student_task_list_becomes_multi_item(master, tmap):
          "student_message": "za drugi sam dobio 5/6, treci 4/8, cetvrti 1/2, peti 3/10"},
         _chat("Bravo!"), master, tmap, model="m", timeout=1)
     by_n = {i["n"]: i["verdict"] for i in out2["answer_check"]["items"]}
-    assert by_n[2] == by_n[3] == by_n[4] == by_n[5] == "correct"
+    accepted = {"correct", "correct_equivalent_form"}
+    assert {by_n[2], by_n[3], by_n[4], by_n[5]} <= accepted
     assert out2["next_state"]["task_items"]["graded"] == [2, 3, 4, 5]
 
 
@@ -148,7 +149,7 @@ def test_image_practice_correction_does_not_eat_next_item(master, tmap):
     assert "28 učenika" in o4["last_tutor_task"]          # persist: stavka 3
     # ISPRAVKA — prepoznata kao stavka 2, stavka 3 OSTAJE pending
     o5 = c.send("aha da, 1 3/4", "Tako je!", phase="answer")
-    assert [i["verdict"] for i in o5["answer_check"]["items"]] == ["correct"]
+    assert [i["verdict"] for i in o5["answer_check"]["items"]] == ["correct_equivalent_form"]
     assert o5["next_state"]["image_test"]["solved"] == ["1", "2"]
     assert o5["next_state"]["pending_action"]["next_item"] == 3
     # EAGER odgovor na stavku 3 bez 'da' → zatvara tok čisto

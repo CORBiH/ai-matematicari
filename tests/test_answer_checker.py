@@ -55,7 +55,7 @@ def test_incorrect_single_fraction_answer():
 
 def test_equivalent_fraction_accepted_as_correct():
     r = check_practice_answer("Ako je pojedeno 7/12 pizze, koji dio je ostao?", "10/24")
-    assert _verdicts(r) == ["correct"]
+    assert _verdicts(r) == ["correct_equivalent_form"]
 
 
 def test_answer_inside_short_sentence_still_parsed():
@@ -69,7 +69,7 @@ def test_answer_inside_short_sentence_still_parsed():
 
 def test_mixed_number_equals_improper_fraction():
     r = check_practice_answer("Izračunaj: 1/2 + 3/4", "1 1/4")
-    assert _verdicts(r) == ["correct"]
+    assert _verdicts(r) == ["correct_equivalent_form"]
     assert r.items[0].expected.value == Fraction(5, 4)
 
 
@@ -168,6 +168,57 @@ def test_time_ratio_40_minutes_to_2_hours():
     assert e is not None
     assert e.value == Fraction(1, 3)
     assert e.required_form == "fraction"
+
+
+# --- hibridni checker: jedinice, notacija, oblici -----------------------------------
+
+def test_measurement_units_and_typos():
+    task = "Pretvori 0,15 m u cm."
+    cases = {
+        "15 cm": "correct",
+        "15": "correct_missing_unit",
+        "0.15 m": "correct_equivalent_form",
+        "150 mm": "correct_equivalent_form",
+        "15 mm": "wrong_unit",
+        "15cmm": "wrong_unit",
+        "15 centimetara": "correct",
+        "15 CM": "correct",
+    }
+    for answer, verdict in cases.items():
+        assert _verdicts(check_practice_answer(task, answer)) == [verdict]
+
+
+def test_angle_missing_degree_notation():
+    assert _verdicts(check_practice_answer("Izračunaj: 20° + 20°.", "40")) == [
+        "correct_missing_notation"
+    ]
+    assert _verdicts(check_practice_answer("Izračunaj: 20° + 20°.", "40°")) == ["correct"]
+
+
+def test_fraction_equivalent_forms_and_vulgar_half():
+    task = "Izračunaj: 1 + 1/2."
+    assert _verdicts(check_practice_answer(task, "1 1/2")) == ["correct_equivalent_form"]
+    assert _verdicts(check_practice_answer(task, "6/4")) == ["correct_equivalent_form"]
+    assert _verdicts(check_practice_answer(task, "1.5")) == ["correct_equivalent_form"]
+    assert _verdicts(check_practice_answer(task, "1½")) == ["correct_equivalent_form"]
+
+
+def test_required_forms_are_enforced_without_false_incorrect():
+    assert _verdicts(check_practice_answer("Pretvori 3/2 u mješoviti broj.", "3/2")) == [
+        "correct_value_wrong_form"
+    ]
+    assert _verdicts(check_practice_answer("Zapiši 1,5 kao razlomak.", "1.5")) == [
+        "correct_value_wrong_form"
+    ]
+
+
+def test_percentage_equivalent_when_form_not_restricted():
+    assert _verdicts(check_practice_answer("Pretvori 50% u ekvivalentan zapis.", "0.5")) == [
+        "correct_equivalent_form"
+    ]
+    assert _verdicts(check_practice_answer("Pretvori 50% u ekvivalentan zapis.", "1/2")) == [
+        "correct_equivalent_form"
+    ]
 
 
 # --- više numerisanih stavki --------------------------------------------------------

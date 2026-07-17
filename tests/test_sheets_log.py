@@ -158,9 +158,9 @@ def test_log_transcript_appends_expected_row(monkeypatch):
     assert len(worksheet.appended) == 1
     row, option = worksheet.appended[0]
     datetime.fromisoformat(row[0])
-    assert worksheet.updated == [("A1:T1", [sl.SHEET_HEADERS])]
+    assert worksheet.updated == [(f"A1:{sl._sheet_col(len(sl.SHEET_HEADERS))}1", [sl.SHEET_HEADERS])]
     assert worksheet.frozen == [{"rows": 1}]
-    assert worksheet.filters == ["A1:T1"]
+    assert worksheet.filters == [f"A1:{sl._sheet_col(len(sl.SHEET_HEADERS))}1"]
     assert row[1:] == [
         "chat",
         "sess-1",
@@ -181,7 +181,7 @@ def test_log_transcript_appends_expected_row(monkeypatch):
         "4",
         "",
         "",
-    ]
+    ] + ["", "", "", "", "", "Koliko je 2+2?", "", "", "", "", "", "", "", "", ""]
     assert option == "USER_ENTERED"
 
 
@@ -265,7 +265,7 @@ def test_log_feedback_appends_verdict_row(monkeypatch):
     assert len(worksheet.appended) == 1
     row, option = worksheet.appended[0]
     datetime.fromisoformat(row[0])
-    assert worksheet.updated == [("A1:T1", [sl.SHEET_HEADERS])]
+    assert worksheet.updated == [(f"A1:{sl._sheet_col(len(sl.SHEET_HEADERS))}1", [sl.SHEET_HEADERS])]
     assert row[1:] == [
         "feedback",
         "sess-fb",
@@ -286,7 +286,7 @@ def test_log_feedback_appends_verdict_row(monkeypatch):
         "",
         "",
         "",
-    ]
+    ] + [""] * 15
     assert option == "USER_ENTERED"
 
 
