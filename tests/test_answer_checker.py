@@ -143,6 +143,39 @@ def test_expand_fraction_to_target_denominator():
     ]
 
 
+def test_expand_fraction_preserves_required_form_and_display():
+    # BUG (fraction expansion): traženi OBLIK (9/24) mora se sačuvati, ne samo
+    # normalizovana vrijednost (3/8).
+    task = "Proširi razlomak 3/8 na nazivnik 24."
+    expected = derive_expected(task)
+    assert expected is not None
+    assert expected.kind == "expand"
+    assert expected.target_denominator == 24
+    assert expected.value == Fraction(3, 8)          # vrijednost za ekvivalenciju
+    # prikaz koji vidi učenik/sažetak = 8×3=24, 3×3=9 → 9/24
+    assert summarize_result(check_practice_answer(task, "9/24"))["items"][0]["expected"] == "9/24"
+
+    # 2/5 → nazivnik 20 → 8/20
+    task2 = "Proširi razlomak 2/5 na nazivnik 20."
+    assert summarize_result(check_practice_answer(task2, "8/20"))["items"][0]["expected"] == "8/20"
+
+    # tačna vrijednost, pogrešan traženi oblik (nazivnik nije 24)
+    assert _verdicts(check_practice_answer(task, "3/8")) == ["correct_value_wrong_form"]
+    # tačan oblik
+    assert _verdicts(check_practice_answer(task, "9/24")) == ["correct"]
+    # netačno (18/24 = 3/4 ≠ 3/8)
+    assert _verdicts(check_practice_answer(task, "18/24")) == ["incorrect"]
+
+
+def test_expand_rejects_non_divisible_target_denominator():
+    # 20 nije djeljivo sa 8 → proširivanje cijelim brojem nemoguće → derive_expected
+    # vraća None (validacija zadatka ga odbija/regeneriše).
+    assert derive_expected("Proširi razlomak 3/8 na nazivnik 20.") is None
+    assert derive_expected("Proširi razlomak 2/5 na nazivnik 12.") is None
+    # kontrola: djeljiv nazivnik i dalje radi
+    assert derive_expected("Proširi razlomak 3/8 na nazivnik 24.") is not None
+
+
 def test_rate_problem_time_distance_speed():
     task = "Automobil prijeđe 65 km za 1 sat. Koliko sati mu treba za 260 km?"
     e = derive_expected(task)

@@ -464,6 +464,13 @@ def _try_expand(folded: str, tokens: list[NumberToken]) -> Expected | None:
         break
     if not target or target <= 0:
         return None
+    # Proširivanje = množenje brojnika I nazivnika istim CIJELIM brojem, pa traženi
+    # nazivnik mora biti djeljiv originalnim (npr. 3/8 → 24 ✓, 3/8 → 20 ✗). Ako
+    # nije, zadatak nema rješenje u traženom obliku → vrati None (validacija ga
+    # odbija/regeneriše umjesto da čuvamo pogrešan expected).
+    _num, written_den = _fraction_parts(fracs[0].raw)
+    if written_den <= 0 or target % written_den != 0:
+        return None
     return Expected(
         value=fracs[0].value,
         kind="expand",

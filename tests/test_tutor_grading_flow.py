@@ -1527,6 +1527,32 @@ def test_exam_final_summary_handles_mixed_results_and_sheets_state(master, tmap)
     assert "correct_value_wrong_form" in by_header["next_state"]
 
 
+def test_exam_summary_shows_required_fraction_form_not_normalized_value(master, tmap):
+    # BUG (fraction expansion): "Proširi 3/8 na nazivnik 24" — sažetak MORA
+    # pokazati traženi oblik 9/24, ne normalizovanu vrijednost 3/8.
+    task = (
+        "1. U trouglu su dva ugla 30° i 90°. Odredi treci ugao.\n"
+        "2. U trouglu su dva ugla 45° i 65°. Odredi treci ugao.\n"
+        "3. Proširi razlomak 3/8 na nazivnik 24."
+    )
+    first = _start_exam(master, tmap, task=task)
+    item3_meta = first["next_state"]["exam_state"]["items"][2]["answer_metadata"]
+    assert item3_meta["expected_answer_display"] == "9/24"
+    assert item3_meta["expected_value"] == "3/8"
+    assert item3_meta["required_denominator"] == 24
+
+    one = _answer_exam(master, tmap, first, "60")
+    two = _answer_exam(master, tmap, one, "70")
+    three = _answer_exam(master, tmap, two, "18/24")
+
+    final = three["next_state"]["exam_state"]
+    assert final["exam_status"] == "completed"
+    assert final["items"][2]["verdict"] == "incorrect"
+    # 18/24 = 3/4 ≠ 3/8 → netačno; sažetak pokazuje 9/24, NE "tačan odgovor je 3/8"
+    assert "9/24" in three["answer"]
+    assert "tačan odgovor je 3/8" not in three["answer"]
+
+
 def test_exam_unclear_answer_does_not_advance_or_grade(master, tmap):
     first = _start_exam(master, tmap)
     unclear = _answer_exam(master, tmap, first, "??")
@@ -1557,6 +1583,107 @@ def test_new_exam_after_completion_gets_new_exam_id_and_clean_items(master, tmap
     assert new_state["current_item_index"] == 0
     assert len(new_state["items"]) == 3
     assert all(item["status"] == "unanswered" for item in new_state["items"])
+
+
+# --- BUG 2: follow-up poslije ZAVRŠENOG kontrolnog objašnjava stavku ----------------
+
+_EXAM_FRACTION_TASK = (
+    "1. U trouglu su dva ugla 30° i 90°. Odredi treci ugao.\n"
+    "2. U trouglu su dva ugla 45° i 65°. Odredi treci ugao.\n"
+    "3. Proširi razlomak 3/8 na nazivnik 24."
+)
+
+
+def _complete_exam_with_wrong_third(master, tmap):
+    first = _start_exam(master, tmap, task=_EXAM_FRACTION_TASK)
+    one = _answer_exam(master, tmap, first, "60")     # tačno
+    two = _answer_exam(master, tmap, one, "70")        # tačno
+    three = _answer_exam(master, tmap, two, "18/24")   # netačno (3/4 ≠ 3/8)
+    assert three["next_state"]["exam_state"]["exam_status"] == "completed"
+    return three
+
+
+def _exam_followup(master, tmap, prev, message, reply="MODEL_NE_SMIJE_BITI_POZVAN"):
+    chat = _fake_chat(reply)
+    out = svc.handle_chat(
+        {
+            "grade": 6,
+            "mode": "exam",
+            "previous_next_state": prev["next_state"],
+            "last_tutor_task": prev["last_tutor_task"],
+            "student_message": message,
+        },
+        chat, master, tmap, model="m", timeout=1,
+    )
+    return out, chat
+
+
+def test_completed_exam_followup_explains_single_incorrect_item(master, tmap):
+    done = _complete_exam_with_wrong_third(master, tmap)
+    old_exam_id = done["next_state"]["exam_state"]["exam_id"]
+    old_task_id = done["next_state"].get("task_id")
+
+    out, chat = _exam_followup(master, tmap, done, "gdje sam pogriješio")
+
+    # objašnjava SAMO treću (netačnu) stavku, sa traženim oblikom 9/24
+    assert "trećem" in out["answer"]
+    assert "9/24" in out["answer"]
+    assert "18/24" in out["answer"]
+    # NE ponavlja cijeli sažetak i ne generiše novi zadatak
+    assert "Kontrolni je završen." not in out["answer"]
+    assert "Rezultat:" not in out["answer"]
+    assert "Zadatak:" not in out["answer"]
+    assert out["last_tutor_task"] == ""
+    # kontrolni ostaje završen; nema novog exam_id ni task_id
+    assert out["mode"] == "exam"
+    assert out["task_status"] == "completed"
+    final = out["next_state"]["exam_state"]
+    assert final["exam_status"] == "completed"
+    assert final["current_item_index"] is None
+    assert final["exam_id"] == old_exam_id
+    assert out["next_state"].get("task_id") in (None, old_task_id)
+    # deterministički odgovor — model NIJE pozvan (ne može izmisliti novi zadatak)
+    assert chat.calls["messages"] == []
+
+
+def test_completed_exam_followup_objasni_treci_resolves_item_three(master, tmap):
+    done = _complete_exam_with_wrong_third(master, tmap)
+    out, _chat = _exam_followup(master, tmap, done, "objasni treći")
+    assert "trećem" in out["answer"] or "Zadatak 3" in out["answer"]
+    assert "9/24" in out["answer"]
+    assert "Kontrolni je završen." not in out["answer"]
+    assert out["next_state"]["exam_state"]["exam_status"] == "completed"
+
+
+def test_completed_exam_followup_multiple_incorrect_asks_which(master, tmap):
+    first = _start_exam(master, tmap, task=_EXAM_FRACTION_TASK)
+    one = _answer_exam(master, tmap, first, "10")       # netačno (treći ugao je 60)
+    two = _answer_exam(master, tmap, one, "70")          # tačno
+    three = _answer_exam(master, tmap, two, "18/24")     # netačno
+    assert three["next_state"]["exam_state"]["exam_status"] == "completed"
+
+    out, _chat = _exam_followup(master, tmap, three, "gdje sam pogriješio")
+    # dvije netačne (1 i 3) → traži da izabere koju
+    assert "1" in out["answer"] and "3" in out["answer"]
+    assert "Koji da ti objasnim" in out["answer"]
+    assert "Kontrolni je završen." not in out["answer"]
+    assert out["next_state"]["exam_state"]["exam_status"] == "completed"
+
+
+def test_completed_exam_followup_summary_only_when_explicitly_asked(master, tmap):
+    done = _complete_exam_with_wrong_third(master, tmap)
+    out, _chat = _exam_followup(master, tmap, done, "ponovi mi rezultat")
+    # eksplicitan zahtjev za sažetkom SMIJE ponoviti sažetak
+    assert "Rezultat:" in out["answer"]
+    assert out["next_state"]["exam_state"]["exam_status"] == "completed"
+
+
+def test_completed_exam_followup_logged_exactly_once(master, tmap, monkeypatch):
+    done = _complete_exam_with_wrong_third(master, tmap)
+    activity_calls = []
+    monkeypatch.setattr(svc, "log_student_activity", lambda p, r: activity_calls.append(1))
+    _exam_followup(master, tmap, done, "gdje sam pogriješio")
+    assert len(activity_calls) == 1
 
 
 def test_generated_arc_task_has_validated_measurement_metadata(master, tmap):

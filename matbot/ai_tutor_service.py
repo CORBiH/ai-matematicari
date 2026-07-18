@@ -936,6 +936,71 @@ def _apply_practice_help_contract(payload: dict) -> None:
         )
 
 
+# BUG 2: poruke koje poslije ZAVRŠENOG kontrolnog traže objašnjenje greške, ne
+# ponovni sažetak. Rade na foldanom tekstu (č/ć/š/ž/đ → ascii).
+_EXAM_FOLLOWUP_MISTAKE_RE = re.compile(
+    r"\bgdje\s+(?:sam\s+)?(?:ja\s+)?pogr(?:e|ije|je)si\w*"
+    r"|\bgdje\s+sam\s+(?:pao|pala|falio|falila|zeznu\w*|krivo|omasio|omasila)\b"
+    r"|\bobjasni\s+(?:mi\s+)?(?:moju?\s+)?gres[kc]\w*"
+    r"|\bobjasni\s+(?:mi\s+)?gdje\s+sam\s+(?:pogr\w*|gr\w*)"
+    r"|\bkoj[uae]\s+(?:sam\s+)?(?:napravio|napravila|imao|imala)?\s*gres[kc]\w*"
+    r"|\b(?:sta|shta)\s+sam\s+(?:pogr(?:e|ije|je)si\w*|uradio\s+krivo|uradila\s+krivo)\b"
+)
+_EXAM_FOLLOWUP_WHY_RE = re.compile(
+    r"\bzasto\s+(?:je\s+)?netacn\w*\b|\bzasto\s+nije\s+tacn\w*\b"
+    r"|\bzbog\s+cega\s+(?:je\s+)?netacn\w*\b"
+)
+_EXAM_FOLLOWUP_SUMMARY_RE = re.compile(
+    r"\bsazetak\b|\bponovi\s+(?:mi\s+)?(?:rezultat|sazetak)\b"
+    r"|\bcijeli\s+rezultat\b|\bukupn\w*\s+rezultat\b"
+    r"|\bjesam\s+li\s+(?:ja\s+)?pro(?:sa|s)\w*\b"
+)
+
+
+def _apply_completed_exam_followup_contract(payload: dict) -> None:
+    """Poslije ZAVRŠENOG kontrolnog: "gdje sam pogriješio" / "objasni treći" /
+    "zašto je netačno" objašnjavaju KONKRETNU stavku iz sačuvanog completed
+    exam_state — bez novog zadatka i bez ponavljanja cijelog sažetka."""
+    if payload.get("_direct_answer") is not None or payload.get("_skip_answer_check"):
+        return
+    if normalize_value(payload.get("intent")):
+        return
+    prev_exam = _previous_next_state(payload).get("exam_state")
+    if not prev_exam or normalize_value(prev_exam.get("exam_status")).lower() != "completed":
+        return
+    # Svjež zahtjev za NOVIM kontrolnim ("pripremi me za kontrolni") ide svojim
+    # tokom (novi set), ne kao objašnjenje starog.
+    if _is_fresh_exam_prep_request(payload):
+        return
+    items = prev_exam.get("items") or []
+    if not items:
+        return
+    message = normalize_value(payload.get("student_message") or payload.get("message"))
+    if not message:
+        return
+    folded = fold_diacritics(message)
+    valid = list(range(1, len(items) + 1))
+    refs = _practice_referenced_items(message, valid)
+    if refs:
+        intent = "item"
+    elif _EXAM_FOLLOWUP_WHY_RE.search(folded):
+        intent = "why"
+    elif _EXAM_FOLLOWUP_MISTAKE_RE.search(folded):
+        intent = "mistake"
+    elif _EXAM_FOLLOWUP_SUMMARY_RE.search(folded):
+        intent = "summary"
+    else:
+        return
+
+    payload["_completed_exam_followup"] = True
+    payload["_skip_answer_check"] = True
+    payload["mode"] = "exam"
+    payload["_session_mode"] = "exam"
+    payload["_stuck_count"] = int(_previous_next_state(payload).get("stuck_count", 0) or 0)
+    payload["_correct_streak"] = int(_previous_next_state(payload).get("correct_streak", 0) or 0)
+    payload["_direct_answer"] = _completed_exam_followup_answer(payload, prev_exam, refs, intent)
+
+
 def _apply_hint_request_contract(payload: dict) -> None:
     """Explicit frontend hint intent: skip grading and preserve active task."""
     if normalize_value(payload.get("intent")).lower() != "hint_request":
@@ -1465,6 +1530,15 @@ def _expected_display_for_metadata(expected: Any) -> str:
         return f"x {expected.required_form} {base}"
     if getattr(expected, "kind", "") == "equation":
         return f"x = {base}"
+    # BUG (fraction expansion): za "pro\u0161iri 3/8 na nazivnik 24" tra\u017eeni OBLIK je
+    # 9/24, ne normalizovana vrijednost 3/8. Sa\u010duvaj transformisani prikaz da
+    # sa\u017eetak kontrolnog i grading pokazuju 9/24 (target_denominator garantovano
+    # dijeli nazivnik \u2192 cijeli brojnik).
+    target_den = getattr(expected, "target_denominator", None)
+    if getattr(expected, "kind", "") == "expand" and target_den:
+        numerator = value * target_den
+        if numerator.denominator == 1:
+            return f"{numerator.numerator}/{target_den}"
     unit = normalize_value(getattr(expected, "unit", ""))
     return f"{base}{unit}" if unit == "\u00b0" else f"{base} {unit}".strip()
 
@@ -1486,6 +1560,11 @@ def _task_answer_metadata(task_text: Any) -> list[dict]:
             "expected_value": _short_fraction(expected.value) if expected is not None else None,
             "expected_unit": normalize_value(getattr(expected, "unit", "")) or None,
             "required_form": normalize_value(getattr(expected, "required_form", "")) or None,
+            # Fraction expansion: čuvamo i traženi nazivnik da grading/prikaz mogu
+            # zahtijevati baš taj oblik (9/24), ne samo ekvivalentnu vrijednost 3/8.
+            "required_denominator": (
+                getattr(expected, "target_denominator", None) if expected is not None else None
+            ),
             "equivalent_forms_allowed": (
                 bool(getattr(expected, "equivalent_forms_allowed", True))
                 if expected is not None else None
@@ -3730,6 +3809,9 @@ def _prepare_chat(
     # "zadatak", "novi zadatak", "daj mi teži/lakši" → NOVI zadatak, ne ocjena
     # ni objašnjenje starog (BUG 6/8). Poslije potvrda, prije challenge/help.
     _apply_new_task_intent(payload)
+    # BUG 2: poslije završenog kontrolnog "gdje sam pogriješio"/"objasni treći"
+    # objašnjavaju konkretnu stavku, ne otvaraju novi zadatak niti ponavljaju sažetak.
+    _apply_completed_exam_followup_contract(payload)
     _apply_hint_request_contract(payload)
     _apply_multiple_choice_answer_contract(payload)
     _apply_video_recommendation_contract(payload)
@@ -4761,6 +4843,116 @@ def _exam_final_summary(exam_state: dict, payload: dict) -> str:
     return "\n".join(lines).strip()
 
 
+# BUG 2: objašnjenje POJEDINE stavke poslije završenog kontrolnog ("gdje sam
+# pogriješio", "objasni treći"). Rješava se protiv sačuvanog completed exam_state
+# — bez novog zadatka, bez ponavljanja cijelog sažetka.
+_EXAM_ORDINAL_LOCATIVE = {
+    1: "prvom", 2: "drugom", 3: "trećem", 4: "četvrtom",
+    5: "petom", 6: "šestom", 7: "sedmom", 8: "osmom",
+}
+
+
+def _reduce_fraction_str(raw: Any) -> str:
+    m = re.search(r"(-?\d+)\s*/\s*(\d+)", normalize_value(raw))
+    if not m:
+        return ""
+    try:
+        f = Fraction(int(m.group(1)), int(m.group(2)))
+    except (ValueError, ZeroDivisionError):
+        return ""
+    return str(f.numerator) if f.denominator == 1 else f"{f.numerator}/{f.denominator}"
+
+
+def _completed_exam_incorrect_indices(items: list[dict]) -> list[int]:
+    out: list[int] = []
+    for i, item in enumerate(items):
+        try:
+            score = float(item.get("score") or 0)
+        except (TypeError, ValueError):
+            score = 0.0
+        if score < 1:
+            out.append(i)
+    return out
+
+
+def _explain_exam_item(item: dict, index: int) -> str:
+    n = index + 1
+    ordloc = _EXAM_ORDINAL_LOCATIVE.get(n, f"{n}.")
+    meta = item.get("answer_metadata") if isinstance(item.get("answer_metadata"), dict) else {}
+    question = normalize_value(item.get("question"))
+    student = normalize_value(item.get("student_answer"))
+    expected = _exam_expected_answer(item)
+    verdict = normalize_value(item.get("verdict")).lower()
+    is_correct = verdict in _ACCEPTED_ITEM_VERDICTS
+    intro = f"Zadatak {n}:" if is_correct else f"Pogriješio si u {ordloc} zadatku."
+
+    # Proširivanje razlomka: pokaži množenje nazivnika i brojnika istim brojem.
+    req_den = meta.get("required_denominator")
+    exp_val = normalize_value(meta.get("expected_value"))
+    m = re.match(r"^\s*(-?\d+)\s*/\s*(\d+)\s*$", exp_val)
+    if req_den and m:
+        num, den = int(m.group(1)), int(m.group(2))
+        try:
+            target = int(req_den)
+        except (TypeError, ValueError):
+            target = 0
+        if target and den and target % den == 0:
+            factor = target // den
+            new_num = num * factor
+            body = (
+                f"{intro} Da bi nazivnik {den} postao {target}, množimo ga sa "
+                f"{factor}. Zato i brojnik {num} množimo sa {factor}:\n\n"
+                f"{num}/{den} = {new_num}/{target}"
+            )
+            if student and not is_correct:
+                reduced = _reduce_fraction_str(student)
+                if reduced and reduced != f"{num}/{den}":
+                    body += (
+                        f"\n\nTi si napisao {student}, a taj razlomak je jednak "
+                        f"{reduced}, pa nije jednak početnom razlomku {num}/{den}."
+                    )
+                else:
+                    body += f"\n\nTi si napisao {student}."
+            return body
+
+    # Opšti slučaj: kratko objašnjenje sa tačnim odgovorom i onim što je učenik dao.
+    parts = [intro]
+    if expected:
+        parts.append(f"Tačan odgovor je {expected}.")
+    if student:
+        parts.append(f"Ti si napisao {student}.")
+    if not expected and not student and question:
+        parts.append(f"Zadatak je glasio: {question}")
+    return " ".join(parts).strip()
+
+
+def _completed_exam_followup_answer(
+    payload: dict, exam_state: dict, refs: set[int], intent: str
+) -> str:
+    items = exam_state.get("items") or []
+    if intent == "summary":
+        return _exam_final_summary(exam_state, payload)
+    if intent == "item" and refs:
+        idx = min(refs) - 1
+        if 0 <= idx < len(items):
+            return _explain_exam_item(items[idx], idx)
+        return _exam_final_summary(exam_state, payload)
+    incorrect = _completed_exam_incorrect_indices(items)
+    if not incorrect:
+        return "Nisi pogriješio ni u jednom zadatku — svi su tačni. Odlično!"
+    if intent == "why":
+        # "zašto je netačno" odmah poslije sažetka → najskorija netačna stavka.
+        return _explain_exam_item(items[incorrect[-1]], incorrect[-1])
+    # intent == "mistake": jedna netačna → objasni je; više → pitaj koju.
+    if len(incorrect) == 1:
+        return _explain_exam_item(items[incorrect[0]], incorrect[0])
+    numbers = ", ".join(str(i + 1) for i in incorrect)
+    return (
+        f"Pogriješio si u više zadataka (zadaci {numbers}). "
+        "Koji da ti objasnim? Napiši broj zadatka."
+    )
+
+
 def _deterministic_exam_response(payload: dict, exam_state: dict) -> str:
     items = exam_state.get("items") or []
     attempted_idx = _exam_attempted_item_index(payload, exam_state)
@@ -5352,6 +5544,26 @@ def _finalize_response(prep: dict, answer: str) -> dict:
                 response["gpt_check_confidence"] = (
                     payload.get("_gpt_check_confidence") if payload.get("_gpt_check_used") else None
                 )
+            elif (
+                payload.get("_completed_exam_followup")
+                and exam_state.get("exam_status") == "completed"
+            ):
+                # BUG 2: objašnjenje pojedine stavke poslije ZAVRŠENOG kontrolnog.
+                # Direktni odgovor je već objašnjenje; kontrolni OSTAJE završen
+                # (ne otvaramo ga, ne pravimo novi zadatak/exam_id).
+                response["mode"] = "exam"
+                response["session_mode"] = "exam"
+                response["recommended_mode"] = "exam"
+                response["last_tutor_task"] = ""
+                response["next_state"].update(
+                    _task_lifecycle_fields(payload, active=False, completed=True)
+                )
+                response["next_state"].update({
+                    "expected_user_action": "none",
+                    "active_task_kind": None,
+                    "pending_action": _empty_pending_action(),
+                })
+                response["next_state"]["exam_state"] = exam_state
 
     # Audit: sažetak determinističke provjere u response (telemetrija/testovi).
     check = payload.get("answer_check")
