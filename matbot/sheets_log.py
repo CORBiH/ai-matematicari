@@ -510,6 +510,10 @@ def _first_answer_check_item(response: dict) -> dict:
 
 def _build_transcript_row(payload: dict, response: dict) -> list[Any]:
     topic = response.get("final_topic") or response.get("effective_topic")
+    # Kontrolni iz oblasti: final/effective ostaju "unknown" (NPP pravilo), ali je
+    # razriješena tema oblast — loguj nju umjesto "unknown".
+    if (not topic or str(topic).strip().lower() == "unknown") and response.get("resolved_exam_topic"):
+        topic = response.get("resolved_exam_topic")
     next_state = response.get("next_state") or {}
     item = _first_answer_check_item(response)
     math_verification = response.get("math_verification") if isinstance(response.get("math_verification"), dict) else {}

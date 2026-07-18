@@ -1686,6 +1686,120 @@ def test_completed_exam_followup_logged_exactly_once(master, tmap, monkeypatch):
     assert len(activity_calls) == 1
 
 
+# --- exam-topic routing: kontrolni IZ OBLASTI ostaje u toj oblasti ------------------
+
+_EXAM_MSG = "Sutra imam kontrolni iz ove oblasti. Pripremi me."
+_FRACTION_REPLY = (
+    "1. Marko je pojeo 2/5 čokolade. Koliki dio je ostao?\n"
+    "2. Uporedi razlomke 3/4 i 2/3.\n"
+    "3. Izračunaj 1/2 + 1/3?\nTrik: zajednički nazivnik.\nUpozorenje: skrati."
+)
+_VECTOR_REPLY = (
+    "1. Dati su vektori a(2,3) i b(1,4). Odredi a + b.\n"
+    "2. Kolika je dužina vektora a(3,4)?\n"
+    "3. Odredi a - b za a(5,2), b(1,2)."
+)
+_ANGLE_REPLY = (
+    "1. U trouglu su dva ugla 30° i 90°. Odredi treci ugao.\n"
+    "2. U trouglu su dva ugla 45° i 65°. Odredi treci ugao.\n"
+    "3. U trouglu su dva ugla 80° i 40°. Odredi treci ugao."
+)
+
+
+def _exam_by_oblast(grade, oblast, reply, message=_EXAM_MSG):
+    # master/tmap=None → handle_chat učita ispravan razred sam.
+    return svc.handle_chat(
+        {"grade": grade, "mode": "exam", "selected_oblast": oblast,
+         "entry_source": "free_chat", "student_message": message},
+        _fake_chat(reply), None, None, model="m", timeout=1,
+    )
+
+
+def test_exam_grade6_razlomci_resolves_to_razlomci():
+    out = _exam_by_oblast(6, "Razlomci", _FRACTION_REPLY)
+    assert out["resolved_exam_topic"] == "Razlomci"          # (1)
+    assert out["selected_oblast"] == "Razlomci"
+    assert out["mode"] == "exam"                             # (4)
+    assert out["next_state"]["active_task_kind"] == "exam"   # (5)
+    # model dao razlomke → zadržani, bez trougao-ugao fallbacka
+    assert "troug" not in out["answer"].lower()             # (6)
+    assert "2/5" in out["answer"]
+
+
+def test_exam_grade7_vektori_resolves_to_vektori():
+    out = _exam_by_oblast(7, "Vektori", _VECTOR_REPLY)
+    assert out["resolved_exam_topic"] == "Vektori"          # (2)
+    assert out["mode"] == "exam"
+    assert out["next_state"]["active_task_kind"] == "exam"
+    assert "vektor" in out["answer"].lower()
+    assert "troug" not in out["answer"].lower()
+
+
+def test_exam_topic_not_unknown_when_oblast_valid():
+    from matbot import sheets_log as sl
+    out = _exam_by_oblast(6, "Razlomci", _FRACTION_REPLY)
+    row = dict(zip(sl.SHEET_HEADERS, sl._build_transcript_row(
+        {"grade": 6, "mode": "exam", "selected_oblast": "Razlomci",
+         "student_message": _EXAM_MSG}, out)))
+    assert row["topic"] == "Razlomci"                       # (3),(12)
+    assert row["topic"].lower() != "unknown"
+    assert row["selected_oblast"] == "Razlomci"
+    assert row["entry_source"] == "exam"
+
+
+def test_exam_fraction_oblast_rejects_triangle_angle_items():
+    # model vrati trougao-ugao za kontrolni iz razlomaka → odbij + rezerva u oblasti
+    out = _exam_by_oblast(6, "Razlomci", _ANGLE_REPLY)
+    assert "troug" not in out["answer"].lower()             # (6),(8)
+    assert "razlom" in out["answer"].lower()
+    assert out["task_validation"]["validation_status"] == "validated"
+
+
+def test_exam_vector_oblast_rejects_angle_and_fraction_items():
+    out = _exam_by_oblast(7, "Vektori", _ANGLE_REPLY)
+    assert "troug" not in out["answer"].lower()             # (7)
+    assert "razlom" not in out["answer"].lower()
+    assert "vektor" in out["answer"].lower()
+
+
+def test_exam_oblast_validator_rejects_unrelated_items():
+    # (8) topic-match validator: eksplicitna presuda
+    v = svc._validate_exam_oblast_task(_ANGLE_REPLY, "Razlomci")
+    assert v["validation_status"] == "rejected"
+    assert v["reason"].startswith("off_oblast")
+    ok = svc._validate_exam_oblast_task(_FRACTION_REPLY, "Razlomci")
+    assert ok["validation_status"] == "validated"
+
+
+def test_exam_oblast_fallback_is_topic_specific():
+    # (9) deterministička rezerva ostaje u pravoj oblasti
+    frac = svc._oblast_fallback_exam("Razlomci")
+    assert "razlom" in frac.lower() and "troug" not in frac.lower()
+    vec = svc._oblast_fallback_exam("Vektori")
+    assert "vektor" in vec.lower() and "troug" not in vec.lower() and "razlom" not in vec.lower()
+
+
+def test_exam_oblast_fallback_renders_three_numbered_questions():
+    # (11) tri zadatka kao 1./2./3. — bez "Zadatak:" prefiksa
+    out = _exam_by_oblast(6, "Razlomci", _ANGLE_REPLY)
+    ans = out["answer"]
+    assert not ans.lower().startswith("zadatak:")
+    assert ans.lstrip().startswith("1.")
+    assert "\n2." in ans and "\n3." in ans
+    assert "Zadatak: 1." not in ans
+
+
+def test_exam_payload_preserves_grade_topic_oblast_in_template():
+    # (10) frontend payload dosljedno šalje grade + selected_oblast + mode
+    import pathlib
+    html = pathlib.Path("templates/index.html").read_text(encoding="utf-8")
+    assert "grade: parseInt(state.grade, 10)" in html
+    assert "selected_oblast: selectedOblastForPayload" in html
+    assert "selected_topic: selectedTopicForPayload" in html
+    # za exam sa izabranom oblašću: oblast ide iz state.oblast
+    assert "examMode ? state.oblast" in html
+
+
 def test_generated_arc_task_has_validated_measurement_metadata(master, tmap):
     task = "Zadatak: Poluprecnik kruznice je 8 cm, centralni ugao je 90\u00b0. Izracunaj duzinu kruznog luka."
     out = svc.handle_chat(

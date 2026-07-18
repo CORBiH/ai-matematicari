@@ -1651,6 +1651,127 @@ def _fallback_valid_task(payload: dict, *, mode: str, reason: str) -> str:
     return "Rijesi jednacinu: 3x + 2 = 14."
 
 
+# --- Exam-topic routing: kontrolni IZ OBLASTI mora ostati U toj oblasti --------------
+# Root bug: numeri\u010dka validacija je odbijala validne zadatke oblasti (razlomci,
+# vektori \u2014 odgovori nisu uvijek deterministi\u010dki izra\u010dunljivi), pa je exam padao na
+# tvrdo kodirani trougao-ugao fallback. Za kontrolni-iz-oblasti koristimo konzervativan
+# TOPIC-MATCH validator (metadata/klju\u010dne rije\u010di), ne numeri\u010dku izra\u010dunljivost.
+_OBLAST_SIGNATURES: list[tuple[str, "re.Pattern[str]"]] = [
+    ("razlomci", re.compile(
+        r"\brazlom\w*|\bbrojnik\w*|\bnazivnik\w*|\bimenilac\w*|\bbrojilac\w*|"
+        r"\bmjesovit\w*|\bskrati\b|\bprosir\w*"
+    )),
+    ("uglovi", re.compile(
+        r"\bugao\b|\bugl[aou]\w*|\btrougl\w*|\btrokut\w*|\bsuplement\w*|"
+        r"\bkomplement\w*|\bstepen\w*|\bradijus\w*\s+i\s+tangent"
+    )),
+    ("vektori", re.compile(r"\bvektor\w*|\bintenzitet\w*|\bkolinearn\w*")),
+    ("decimalni", re.compile(r"\bdecimaln\w*|\bzarez\w*")),
+    ("cijeli", re.compile(
+        r"\bcijel\w+\s+broj\w*|\bnegativn\w*\s+broj\w*|\bapsolutn\w*\s+vrijednost"
+    )),
+]
+_OBLAST_SIG_MAP = {key: rx for key, rx in _OBLAST_SIGNATURES}
+
+# Oblasti gdje se primjenjuje topic-match (umjesto numeričke) validacije kontrolnog:
+# tačno one kod kojih je model znao pobjeći na trougao-ugao fallback. Geometrijske
+# oblasti (uglovi) zadržavaju postojeću numeričku validaciju (mješoviti zadaci OK).
+_TOPIC_MATCH_OBLASTI = {"razlomci", "vektori"}
+
+# Deterministi\u010dke, GARANTOVANO u-oblasti rezerve (koristi se samo ako model vrati
+# zadatke van oblasti). Numeri\u010dki provjerljive gdje god je mogu\u0107e.
+_OBLAST_FALLBACK_EXAMS = {
+    "razlomci": (
+        "1. Skrati razlomak 8/12.\n"
+        "2. Izra\u010dunaj 2/7 + 3/7.\n"
+        "3. Pro\u0161iri razlomak 3/8 na nazivnik 24."
+    ),
+    "vektori": (
+        "1. Dati su vektori a(2, 3) i b(1, 4). Odredi koordinate vektora a + b.\n"
+        "2. Vektor a ima koordinate (3, 4). Izra\u010dunaj intenzitet (du\u017einu) vektora a.\n"
+        "3. Dati su vektori a(5, 2) i b(1, 2). Odredi koordinate vektora a \u2212 b."
+    ),
+    "decimalni": (
+        "1. Izra\u010dunaj 0,5 + 0,25.\n"
+        "2. Izra\u010dunaj 1,2 \u00b7 3.\n"
+        "3. Izra\u010dunaj 4,8 : 2."
+    ),
+    "cijeli": (
+        "1. Izra\u010dunaj -7 + 12.\n"
+        "2. Izra\u010dunaj -3 \u00b7 4.\n"
+        "3. Izra\u010dunaj 15 - 23."
+    ),
+    "uglovi": (
+        "1. U trouglu su dva ugla 30\u00b0 i 90\u00b0. Odredi tre\u0107i ugao.\n"
+        "2. U trouglu su dva ugla 45\u00b0 i 65\u00b0. Odredi tre\u0107i ugao.\n"
+        "3. U trouglu su dva ugla 80\u00b0 i 40\u00b0. Odredi tre\u0107i ugao."
+    ),
+}
+
+
+def _exam_oblast_signature_key(oblast: Any) -> str | None:
+    """Mapiraj naziv oblasti na klju\u010d potpisa (za topic-match). None = nepoznata
+    oblast (tada validator konzervativno prihvata sve \u2014 ne izmi\u0161lja odbijanje)."""
+    folded = fold_diacritics(oblast)
+    if not folded:
+        return None
+    for key, _rx in _OBLAST_SIGNATURES:
+        if key in folded:
+            return key
+    # nazivi oblasti koji ne sadr\u017ee doslovno klju\u010d (npr. "Operacije sa uglovima")
+    if "razlom" in folded:
+        return "razlomci"
+    if "ugao" in folded or "ugl" in folded:
+        return "uglovi"
+    if "vektor" in folded:
+        return "vektori"
+    if "decimaln" in folded:
+        return "decimalni"
+    if "cijel" in folded:
+        return "cijeli"
+    return None
+
+
+def _validate_exam_oblast_task(task_text: Any, oblast: Any) -> dict:
+    """Konzervativan topic-match validator za kontrolni-iz-oblasti. Odbija SAMO
+    stavke koje jasno pripadaju DRUGOJ poznatoj oblasti (npr. trougao-ugao u
+    kontrolnom iz razlomaka). Neutralne stavke se prihvataju."""
+    text = normalize_value(task_text)
+    meta = _task_answer_metadata(text)
+    if not text:
+        return {"validation_status": "rejected", "reason": "empty_task", "items": meta}
+    own = _exam_oblast_signature_key(oblast)
+    if own is None:
+        return {"validation_status": "validated", "reason": "", "items": meta}
+    own_rx = _OBLAST_SIG_MAP.get(own)
+    items = split_numbered_items(text) or [(1, text)]
+    for _n, item_text in items:
+        folded = fold_diacritics(item_text)
+        own_match = bool(own_rx and own_rx.search(folded))
+        foreign = [k for k, rx in _OBLAST_SIGNATURES if k != own and rx.search(folded)]
+        if foreign and not own_match:
+            return {
+                "validation_status": "rejected",
+                "reason": f"off_oblast:{foreign[0]}",
+                "items": meta,
+            }
+    return {"validation_status": "validated", "reason": "", "items": meta}
+
+
+def _oblast_fallback_exam(oblast: Any) -> str:
+    """Deterministi\u010dka rezerva u pravoj oblasti (nikad trougao-ugao za razlomke/vektore)."""
+    return _OBLAST_FALLBACK_EXAMS.get(_exam_oblast_signature_key(oblast) or "", "")
+
+
+def _format_exam_task_answer(task_text: Any) -> str:
+    """Prika\u017ei tri zadatka kao 1./2./3. \u2014 bez "Zadatak:" prefiksa (koji je davao
+    "Zadatak: 1. ...\\n1. ...")."""
+    text = normalize_value(task_text)
+    # skini eventualni "Zadatak:" label ispred numerisane liste
+    text = re.sub(r"^\s*zadatak\s*:\s*", "", text, flags=re.IGNORECASE)
+    return text.strip()
+
+
 def _normalize_task_validation(raw: Any) -> dict | None:
     if not isinstance(raw, dict):
         return None
@@ -4563,7 +4684,8 @@ def _next_state_for_response(
         return {
             "expected_user_action": "answer_task",
             "pending_action": _empty_pending_action(),
-            "active_task_kind": "practice",
+            # Kontrolni (exam) mora nositi active_task_kind="exam", ne "practice".
+            "active_task_kind": "exam" if mode == "exam" else "practice",
             "image_test": None,
             **_task_lifecycle_fields(payload, active=True, new_active_task=new_active_task),
         }
@@ -5279,6 +5401,10 @@ def _finalize_response(prep: dict, answer: str) -> dict:
     entry_source_used = normalize_value(payload.get("entry_source")) or normalize_value(
         prep["lookup_result"].get("source")
     )
+    # Kontrolni iz oblasti: ne prepisuj validan izabrani exam kontekst na free_chat —
+    # koristi exam-specifičan izvor da Sheets/telemetrija vide da je exam po oblasti.
+    if prompt_result.get("oblast_context_used") and normalize_value(prompt_result.get("mode")).lower() == "exam":
+        entry_source_used = "exam"
     parent_report_signal = (
         "needs_work"
         if (mode in ("practice", "exam") or status == "fallback")
@@ -5409,7 +5535,46 @@ def _finalize_response(prep: dict, answer: str) -> dict:
             task_text = normalize_value(payload.get("last_tutor_task"))[:600]
     else:
         task_text = extract_practice_task(answer, mode=mode)
-    if task_text and mode in ("practice", "exam"):
+    # Kontrolni IZ OBLASTI (selected_oblast, bez pojedinačne teme): validiraj po
+    # TEMI (oblasti), ne po numeričkoj izračunljivosti — inače validni razlomci/
+    # vektori padnu na trougao-ugao fallback (prijavljeni bug).
+    exam_oblast = (
+        normalize_value(prompt_result.get("exam_oblast"))
+        if prompt_result.get("oblast_context_used") else ""
+    )
+    # Topic-match validacija se primjenjuje na "sadržajne" oblasti gdje je tvrdo
+    # kodirani trougao-ugao fallback bio pogrešan (prijavljeni bug: razlomci,
+    # vektori). Geometrijske oblasti (uglovi...) zadržavaju numeričku validaciju.
+    exam_own_key = _exam_oblast_signature_key(exam_oblast) if exam_oblast else None
+    if task_text and mode == "exam" and exam_oblast and exam_own_key in _TOPIC_MATCH_OBLASTI:
+        prev_task_text = normalize_value(payload.get("last_tutor_task"))[:600]
+        new_generated_task = bool(task_text and task_text != prev_task_text and not _is_grading_turn(payload))
+        validation = _validate_exam_oblast_task(task_text, exam_oblast)
+        if validation.get("validation_status") != "validated" and new_generated_task:
+            # 1) deterministička rezerva u pravoj oblasti (nikad druga oblast).
+            fallback_task = _oblast_fallback_exam(exam_oblast)
+            fallback_validation = _validate_exam_oblast_task(fallback_task, exam_oblast)
+            if fallback_task and fallback_validation.get("validation_status") == "validated":
+                task_text = fallback_task[:600]
+                validation = fallback_validation
+                answer = _format_exam_task_answer(task_text)
+                response["answer"] = answer
+            else:
+                task_text = ""
+                answer = (
+                    "Trenutno ne mogu pripremiti kontrolni za ovu oblast. Izaberi "
+                    "konkretnu temu iz oblasti pa da počnemo."
+                )
+                response["answer"] = answer
+        else:
+            # prihvaćen zadatak: očisti eventualni "Zadatak:" prefiks (numeracija 1,2,3).
+            cleaned = _format_exam_task_answer(answer)
+            if cleaned and cleaned != normalize_value(answer):
+                answer = cleaned
+                response["answer"] = answer
+        payload["_task_validation"] = validation
+        payload["_resolved_exam_topic"] = exam_oblast
+    elif task_text and mode in ("practice", "exam"):
         prev_task_text = normalize_value(payload.get("last_tutor_task"))[:600]
         new_generated_task = bool(task_text and task_text != prev_task_text and not _is_grading_turn(payload))
         validation = _validate_task_activation(task_text, mode=mode)
@@ -5443,6 +5608,14 @@ def _finalize_response(prep: dict, answer: str) -> dict:
         if task_validation:
             response["task_validation"] = task_validation
             response["next_state"]["task_validation"] = task_validation
+    # Kontrolni iz oblasti: izloži razriješenu temu (oblast) i izabranu oblast u
+    # response/next_state/telemetriji — topic više nije "unknown" kad oblast postoji.
+    if payload.get("_resolved_exam_topic"):
+        resolved = normalize_value(payload.get("_resolved_exam_topic"))
+        response["resolved_exam_topic"] = resolved
+        response["selected_oblast"] = normalize_value(payload.get("selected_oblast")) or resolved
+        response["next_state"]["resolved_exam_topic"] = resolved
+        response["next_state"]["selected_oblast"] = response["selected_oblast"]
     # F5: prenesi "stuck" brojač naprijed da klijent vrati stanje sljedeći put.
     response["next_state"]["stuck_count"] = int(payload.get("_stuck_count", 0) or 0)
     response["next_state"]["correct_streak"] = int(payload.get("_correct_streak", 0) or 0)
