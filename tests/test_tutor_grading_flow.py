@@ -2350,3 +2350,282 @@ def test_set_answer_logged_with_operation_and_normalized_student():
     assert item["normalized_student"] == "{1, 2, 3, 4, 5, 6, 7}"
     assert item["deterministic_check"]["set_operation"] == "union"
     assert item["deterministic_check"]["numeric_match"] is True
+
+
+# --- Djeljivost/prosti faktori/NZD exam: gradabilnost + multi-odgovor rutiranje ------
+# Root bug (produkcija): "da jer je djeljiv sa 3; ne znam; 4" tretiran kao globalni
+# hint (jer sadrži "ne znam"), mod prebačen na explain, active_task_kind na practice,
+# i generisan hint sa sva tri pitanja. Uz to su stavke 1 i 2 bile unvalidated.
+
+_NUMTHEORY_EXAM = (
+    "1. Da li je 144 djeljiv sa 3? Objasni koristeći pravilo djeljivosti.\n"
+    "2. Rastavi 60 na proste faktore.\n"
+    "3. Odredi NZD(24,36)."
+)
+
+
+def _active_numtheory_exam_state():
+    items = svc.split_numbered_items(_NUMTHEORY_EXAM)
+    return {
+        "exam_state": {
+            "exam_id": "exam_numtheory_1",
+            "mode": "exam",
+            "exam_status": "active",
+            "current_item_index": 0,
+            "items": [
+                {"item_id": f"item_{n}", "question": q, "status": "unanswered"}
+                for n, q in items
+            ],
+        },
+        "task_items": {"labels": [1, 2, 3], "graded": []},
+        "entry_source": "exam",
+    }
+
+
+def _answer_active_numtheory(message, reply="HINT SA SVA TRI PITANJA"):
+    master = cl.load_master_content()
+    tmap = cl.load_thinkific_map()
+    return svc.handle_chat(
+        {
+            "grade": 6,
+            "mode": "exam",
+            "selected_oblast": "Djeljivost brojeva",
+            "entry_source": "exam",
+            "interaction_phase": "answering_practice_task",
+            "last_tutor_task": _NUMTHEORY_EXAM,
+            "previous_next_state": _active_numtheory_exam_state(),
+            "student_message": message,
+        },
+        _fake_chat(reply), master, tmap, model="m", timeout=1,
+    )
+
+
+def test_divisibility_with_explanation_metadata_validated():
+    meta = svc._task_answer_metadata("Da li je 144 djeljiv sa 3? Objasni koristeći pravilo djeljivosti.")
+    assert meta[0]["answer_type"] == "boolean_with_explanation"
+    assert meta[0]["validation_status"] == "validated"
+    assert meta[0]["expected_boolean"] is True
+    assert meta[0]["divisor"] == 3
+    assert meta[0]["required_concepts"] and any("1+4+4" in c for c in meta[0]["required_concepts"])
+
+
+def test_prime_factorization_metadata_validated():
+    meta = svc._task_answer_metadata("Rastavi 60 na proste faktore.")
+    assert meta[0]["answer_type"] == "prime_factorization"
+    assert meta[0]["validation_status"] == "validated"
+    assert meta[0]["expected_factors"] == {"2": 2, "3": 1, "5": 1}
+    assert meta[0]["expected_answer_display"] == "2² · 3 · 5"
+
+
+def test_gcd_metadata_remains_validated():
+    meta = svc._task_answer_metadata("Odredi NZD(24,36).")
+    assert meta[0]["validation_status"] == "validated"
+    assert meta[0]["expected_value"] == "12"
+
+
+def test_exam_with_any_unvalidated_item_rejected_before_activation():
+    prose_mixed = (
+        "1. Da li je 144 djeljiv sa 3? Objasni.\n"
+        "2. Objasni svojim riječima šta je prost broj.\n"
+        "3. Odredi NZD(24,36)."
+    )
+    v = svc._validate_task_activation(prose_mixed, mode="exam")
+    assert v["validation_status"] == "rejected"
+    assert v["reason"] == "missing_expected_answer"
+    # potpuno gradabilan number-theory kontrolni → aktivira se
+    assert svc._validate_task_activation(_NUMTHEORY_EXAM, mode="exam")["validation_status"] == "validated"
+
+
+def test_semicolon_three_answers_map_by_item_order():
+    from matbot.answer_checker import check_practice_answer, is_multi_segment_answer
+    msg = "da jer je djeljiv sa 3; ne znam; 4"
+    assert is_multi_segment_answer(_NUMTHEORY_EXAM, msg) is True
+    result = check_practice_answer(_NUMTHEORY_EXAM, msg)
+    by_n = {i.n: i.verdict for i in result.items}
+    assert by_n[1] == "partially_correct"     # tačan zaključak, pravilo neobjašnjeno
+    assert by_n[2] == "not_attempted"          # "ne znam" → SAMO ta stavka
+    assert by_n[3] == "incorrect"              # 4 != 12
+
+
+def test_ne_znam_in_item2_does_not_trigger_global_hint():
+    out = _answer_active_numtheory("da jer je djeljiv sa 3; ne znam; 4")
+    # mod ostaje exam, nema globalnog hinta, model nije generisao hint sa 3 pitanja
+    assert out["mode"] == "exam"
+    assert "HINT SA SVA TRI PITANJA" not in out["answer"]
+    assert out["answer_check"] is not None      # ocijenjeno, nije preusmjereno u help
+
+
+def test_item1_becomes_partial_incomplete():
+    out = _answer_active_numtheory("da jer je djeljiv sa 3; ne znam; 4")
+    item1 = out["answer_check"]["items"][0]
+    assert item1["n"] == 1
+    assert item1["verdict"] == "partially_correct"
+
+
+def test_item2_remains_unanswered():
+    out = _answer_active_numtheory("da jer je djeljiv sa 3; ne znam; 4")
+    exam_items = out["next_state"]["exam_state"]["items"]
+    assert exam_items[1]["status"] == "unanswered"
+    # exam ostaje aktivan i traži baš 2. zadatak
+    assert out["next_state"]["exam_state"]["exam_status"] == "active"
+    assert out["next_state"]["exam_state"]["current_item_index"] == 1
+
+
+def test_item3_answer_four_incorrect_with_expected_twelve():
+    out = _answer_active_numtheory("da jer je djeljiv sa 3; ne znam; 4")
+    item3 = out["answer_check"]["items"][2]
+    assert item3["n"] == 3
+    assert item3["verdict"] == "incorrect"
+    assert item3["student_answer"] == "4"
+    assert item3["expected_answer"] == "12"
+
+
+def test_mode_remains_exam_on_multi_answer():
+    out = _answer_active_numtheory("da jer je djeljiv sa 3; ne znam; 4")
+    assert out["mode"] == "exam"
+    assert out["session_mode"] == "exam"
+
+
+def test_active_task_kind_remains_exam_on_multi_answer():
+    out = _answer_active_numtheory("da jer je djeljiv sa 3; ne znam; 4")
+    assert out["next_state"]["active_task_kind"] == "exam"
+
+
+def test_entry_source_remains_exam_on_multi_answer():
+    out = _answer_active_numtheory("da jer je djeljiv sa 3; ne znam; 4")
+    assert out["entry_source_used"] == "exam"
+
+
+def test_no_adaptive_hint_with_all_three_questions():
+    out = _answer_active_numtheory("da jer je djeljiv sa 3; ne znam; 4")
+    ans = out["answer"]
+    # ne smije sadržavati sva tri pitanja niti biti globalni hint
+    assert not ("144" in ans and "60" in ans and "NZD" in ans)
+    assert "HINT SA SVA TRI PITANJA" not in ans
+
+
+def test_explicit_help_for_item2_targets_only_item2():
+    # eksplicitna pomoć za JEDNU stavku (nije multi-odgovor) → cilja samo tu stavku
+    master = cl.load_master_content()
+    tmap = cl.load_thinkific_map()
+    chat = _fake_chat("Hint za drugi zadatak.")
+    svc.handle_chat(
+        {
+            "grade": 6,
+            "mode": "exam",
+            "selected_oblast": "Djeljivost brojeva",
+            "entry_source": "exam",
+            "interaction_phase": "answering_practice_task",
+            "last_tutor_task": _NUMTHEORY_EXAM,
+            "previous_next_state": _active_numtheory_exam_state(),
+            "student_message": "daj mi hint za drugi zadatak",
+        },
+        chat, master, tmap, model="m", timeout=1,
+    )
+    prompt = _last_user_prompt(chat)
+    # hint prompt sadrži 2. zadatak (rastavljanje 60), ne cijeli kontrolni
+    assert "60" in prompt
+    assert "144" not in prompt
+
+
+def test_sheets_logs_item_level_answers_and_verdicts():
+    out = _answer_active_numtheory("da jer je djeljiv sa 3; ne znam; 4")
+    items = out["answer_check"]["items"]
+    assert items[0]["student_answer"] == "da" and items[0]["verdict"] == "partially_correct"
+    assert items[2]["student_answer"] == "4" and items[2]["verdict"] == "incorrect"
+    # item-level presude su prisutne za telemetriju/Sheets
+    assert [i["n"] for i in items] == [1, 2, 3]
+
+
+# --- Exam activation contract: SVAKA stavka mora biti gradabilna (deterministički
+# odgovor ILI strukturirana rubrika); topic-match sam NIJE dovoljan (2026-07-19). ---
+from matbot.content_loader import get_master as _get_master
+
+
+def test_activation_on_topic_ungradeable_item_rejected():
+    # (1) on-topic (vektori profil), ali bez odgovora i bez rubrike → NE aktivira se
+    m7 = _get_master(grade=7)
+    v = svc._validate_exam_oblast_task("Vektori su veličine s pravcem i smjerom.", "Vektori", m7)
+    assert v["validation_status"] == "rejected"
+    assert v["reason"] == "ungradable_item"
+    meta = svc._task_answer_metadata("Vektori su veličine s pravcem i smjerom.")[0]
+    assert meta["answer_type"] is None
+    assert meta["validation_status"] == "unvalidated"
+    assert meta["grading_method"] is None
+
+
+def test_activation_conceptual_item_with_rubric_accepted():
+    # (2) on-topic konceptualna stavka sa strukturiranom rubrikom → aktivira se
+    task = "Uporedi razlomke 3/4 i 2/3."
+    meta = svc._task_answer_metadata(task)[0]
+    assert meta["answer_type"] == "conceptual"
+    assert meta["grading_method"] == "structured_gpt"
+    assert meta["required_concepts"]
+    assert meta["validation_status"] == "validated"
+    assert svc._validate_exam_oblast_task(task, "Razlomci")["validation_status"] == "validated"
+
+
+def test_activation_deterministic_numeric_item_accepted():
+    # (3) deterministički numerički zadatak → aktivira se
+    meta = svc._task_answer_metadata("Izračunaj 2/7 + 3/7.")[0]
+    assert meta["validation_status"] == "validated"
+    assert meta["expected_value"] is not None
+    assert svc._validate_exam_oblast_task("Izračunaj 2/7 + 3/7.", "Razlomci")["validation_status"] == "validated"
+
+
+def test_activation_set_item_with_expected_elements_accepted():
+    # (4) skupovna operacija sa expected_elements → aktivira se
+    task = "A = {1,2,3}, B = {3,4}. Nađi A ∪ B."
+    meta = svc._task_answer_metadata(task)[0]
+    assert meta["answer_kind"] == "set"
+    assert meta["expected_elements"] == ["1", "2", "3", "4"]
+    assert meta["validation_status"] == "validated"
+    assert svc._validate_task_activation(task, mode="exam")["validation_status"] == "validated"
+
+
+def test_activation_divisibility_explanation_item_accepted():
+    # (5) djeljivost s obrazloženjem: expected_boolean + required_concepts → aktivira se
+    meta = svc._task_answer_metadata("Da li je 144 djeljiv sa 3? Objasni koristeći pravilo.")[0]
+    assert meta["answer_type"] == "boolean_with_explanation"
+    assert meta["expected_boolean"] is True
+    assert meta["required_concepts"]
+    assert meta["validation_status"] == "validated"
+
+
+def test_activation_vector_conceptual_item_with_rubric_accepted():
+    # (6) vektorska stavka sa strukturiranom rubrikom → aktivira se
+    m7 = _get_master(grade=7)
+    task = "Dati su vektori a(2,3) i b(1,4). Odredi a + b."
+    meta = svc._task_answer_metadata(task)[0]
+    assert meta["answer_type"] == "conceptual"
+    assert meta["grading_method"] == "structured_gpt"
+    assert meta["validation_status"] == "validated"
+    assert svc._validate_exam_oblast_task(task, "Vektori", m7)["validation_status"] == "validated"
+
+
+def test_activation_mixed_exam_one_ungradeable_rejects_entire():
+    # (7) jedna od tri stavke negradabilna → cijeli kontrolni odbijen
+    m7 = _get_master(grade=7)
+    task = (
+        "1. Dati su vektori a(2,3) i b(1,4). Odredi a + b.\n"
+        "2. Kolika je dužina vektora a(3,4)?\n"
+        "3. Vektori su veličine s pravcem i smjerom."
+    )
+    v = svc._validate_exam_oblast_task(task, "Vektori", m7)
+    assert v["validation_status"] == "rejected"
+    assert v["reason"] == "ungradable_item"
+
+
+def test_activation_no_active_exam_item_is_unvalidated():
+    # (8) aktivirani kontrolni-po-oblasti: NIJEDNA stavka nije unvalidated
+    reply = (
+        "1. Da li je 24 djeljivo sa 6?\n"
+        "2. Odredi NZD brojeva 12 i 18.\n"
+        "3. Rastavi 36 na proste faktore."
+    )
+    out = _exam_by_oblast(6, "Djeljivost brojeva", reply)
+    assert out["next_state"]["active_task_kind"] == "exam"
+    tv = out["task_validation"]
+    assert tv["validation_status"] == "validated"
+    assert all(i["validation_status"] == "validated" for i in tv["items"])
+    assert not any(i["validation_status"] == "unvalidated" for i in tv["items"])

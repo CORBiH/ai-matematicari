@@ -21,9 +21,11 @@ from typing import Any, Callable
 from matbot.activity_log import log_student_activity
 from matbot.answer_checker import (
     check_practice_answer,
+    derive_conceptual_rubric,
     derive_expected,
     detect_referenced_items,
     extract_task_expressions,
+    is_multi_segment_answer,
     parse_student_answers,
     split_numbered_items,
     summarize_result,
@@ -822,6 +824,13 @@ def _apply_practice_help_contract(payload: dict) -> None:
     if not task or not message:
         return
 
+    # Multi-odgovor po stavkama (segmenti ';' ili novi red koji odgovaraju broju
+    # stavki) je ODGOVOR, ne globalni hint — "ne znam" u JEDNOM segmentu ne smije
+    # cijelu poruku pretvoriti u zahtjev za pomoć ni promijeniti mod. Prepusti
+    # determinističkom ocjenjivanju (grade po stavci).
+    if is_multi_segment_answer(task, message):
+        return
+
     items = split_numbered_items(task)
     valid = [n for n, _text in items] if items else [1]
     folded = fold_diacritics(message)
@@ -1045,6 +1054,10 @@ def _apply_active_exam_help_contract(payload: dict) -> None:
         return
     message = normalize_value(payload.get("student_message") or payload.get("message"))
     if not message:
+        return
+    # Višestavkovni odgovor (segment po stavci) je ODGOVOR — čak i ako jedan
+    # segment kaže "ne znam kako"; ne tretiraj cijelu poruku kao molbu za pomoć.
+    if is_multi_segment_answer(normalize_value(payload.get("last_tutor_task")), message):
         return
     folded = fold_diacritics(message)
     if _ACTIVE_EXAM_NEW_RE.search(folded):
@@ -1612,11 +1625,19 @@ def _task_answer_metadata(task_text: Any) -> list[dict]:
     out: list[dict] = []
     for n, item_text in items:
         expected = derive_expected(item_text)
+        # Gradabilnost bez determinističkog broja: on-topic konceptualna/proceduralna
+        # stavka (vektori, koordinate, poređenje, djeljivost, konstrukcije) dobija
+        # strukturiranu rubriku (grading_method="structured_gpt") pa je "validated".
+        rubric = derive_conceptual_rubric(item_text) if expected is None else None
         out.append({
             "item_id": f"item_{n}",
             "n": n,
             "question": normalize_value(item_text)[:300],
-            "answer_type": normalize_value(getattr(expected, "answer_type", "")) or None,
+            "answer_type": (
+                normalize_value(getattr(expected, "answer_type", "")) or None
+                if expected is not None
+                else ("conceptual" if rubric else None)
+            ),
             "expected_answer_display": _expected_display_for_metadata(expected) or None,
             "expected_value": _short_fraction(expected.value) if expected is not None else None,
             "expected_unit": normalize_value(getattr(expected, "unit", "")) or None,
@@ -1647,7 +1668,34 @@ def _task_answer_metadata(task_text: Any) -> list[dict]:
                 if expected is not None and getattr(expected, "answer_type", "") == "set"
                 else None
             ),
-            "validation_status": "validated" if expected is not None else "unvalidated",
+            # Djeljivost s obrazloženjem: logička istina + djelilac + tražena
+            # pravila (GPT rubrika ocjenjuje kvalitet objašnjenja).
+            "expected_boolean": (
+                bool(getattr(expected, "expected_boolean"))
+                if expected is not None and getattr(expected, "expected_boolean", None) is not None
+                else None
+            ),
+            "divisor": (
+                getattr(expected, "divisor", None) if expected is not None else None
+            ),
+            "required_concepts": (
+                (list(getattr(expected, "required_concepts", ()) or ()) or None)
+                if expected is not None
+                else (list(rubric["required_concepts"]) if rubric else None)
+            ),
+            # Rastavljanje na proste faktore: {prost: eksponent}.
+            "expected_factors": (
+                {str(p): e for p, e in getattr(expected, "expected_factors", ())}
+                if expected is not None and getattr(expected, "answer_type", "") == "prime_factorization"
+                else None
+            ),
+            # Strukturirana konceptualna rubrika (kad nema determinističkog odgovora).
+            "grading_method": "structured_gpt" if rubric else None,
+            "accepted_claims": list(rubric["accepted_claims"]) if rubric else None,
+            "incorrect_claims": list(rubric["incorrect_claims"]) if rubric else None,
+            "validation_status": (
+                "validated" if (expected is not None or rubric is not None) else "unvalidated"
+            ),
         })
     return out
 
@@ -1898,6 +1946,12 @@ def _validate_exam_oblast_task(
         # ina\u010de: strana oblast ILI neutralno/neprovjereno \u2192 odbij cijeli kontrolni
         reason = f"off_oblast:{foreign[0]}" if foreign else "unverified_item"
         return {"validation_status": "rejected", "reason": reason, "items": meta}
+    # Gradabilnost (2026-07-19): topic-match NIJE dovoljan \u2014 SVAKA stavka mora biti
+    # ocjenljiva, tj. imati deterministi\u010dku metapodatak-presudu ILI strukturiranu
+    # konceptualnu rubriku. Stavka s answer_type=null i bez rubrike (unvalidated) se
+    # NIKAD ne aktivira (ni kroz exam-po-oblasti) \u2014 povuci rezervu ili u\u017eu lekciju.
+    if any(normalize_value(m.get("validation_status")) != "validated" for m in meta):
+        return {"validation_status": "rejected", "reason": "ungradable_item", "items": meta}
     return {"validation_status": "validated", "reason": "", "items": meta}
 
 

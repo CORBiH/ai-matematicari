@@ -28,9 +28,12 @@ from fractions import Fraction
 
 __all__ = [
     "check_practice_answer",
+    "derive_conceptual_rubric",
     "derive_expected",
     "format_check_block",
+    "is_multi_segment_answer",
     "parse_number_token",
+    "parse_prime_factor_product",
     "parse_set_answer",
     "parse_student_answers",
     "split_numbered_items",
@@ -293,6 +296,16 @@ class Expected:
     # imenovana operacija ("union" | "intersection" | "complement" | "elements").
     expected_elements: tuple = ()
     set_operation: str = ""
+    # Djeljivost s obrazloženjem (2026-07-19): logička istina + djelilac +
+    # tražena pravila; ocjena istine je determinsitička, kvalitet obrazloženja
+    # ocjenjuje GPT rubrika (partial ako pravilo nije objašnjeno).
+    expected_boolean: bool | None = None
+    divisor: int | None = None
+    required_concepts: tuple = ()
+    # Rastavljanje na proste faktore: ((prost, eksponent), ...) i broj koji se
+    # rastavlja; prihvataju se ekvivalentni zapisi (2²·3·5 == 2*2*3*5 == 5·3·2·2).
+    expected_factors: tuple = ()
+    target_number: int | None = None
 
 
 _COMPLEMENT_SIGNAL_RE = re.compile(
@@ -907,26 +920,187 @@ def _try_unit_conversion(folded: str, tokens: list[NumberToken]) -> Expected | N
     )
 
 
-_NZD_RE = re.compile(r"najvec\w*\s+zajednick\w*\s+dj?el\w*|\bnzd\b")
-_NZS_RE = re.compile(r"najmanj\w*\s+zajednick\w*\s+sadrz\w*|\bnzs\b")
+# \bnzd (bez zatvarajuće granice): "GCD(24,36)" nakon skidanja zagrada postane
+# "gcd24,36" pa bi "\bgcd\b" pao — prefiks-match to izbjegava.
+_NZD_RE = re.compile(r"najvec\w*\s+zajednick\w*\s+dj?el\w*|\bnzd|\bgcd")
+_NZS_RE = re.compile(r"najmanj\w*\s+zajednick\w*\s+sadrz\w*|\bnzs|\blcm")
+# "GCD(24,36)" / "NZD(24, 36)" / "24 i 36" — dva cijela broja u paru. U ovom
+# obliku zarez je RAZDVAJAČ, ne decimalni, pa se par vadi zasebno (inače bi
+# "24,36" bio pročitan kao jedan decimalni broj).
+_INT_PAIR_RE = re.compile(r"(\d+)\s*[,;]\s*(\d+)")
 
 
 def _try_gcd_lcm(folded: str, tokens: list[NumberToken]) -> Expected | None:
-    """"Koji je NZD brojeva 24 i 36?" → 12; NZS analogno (math.gcd/lcm).
+    """"Koji je NZD brojeva 24 i 36?" / "GCD(24,36)" → 12; NZS/LCM analogno.
 
-    Konzervativno: tačno dva cijela pozitivna broja u stavci."""
+    Konzervativno: tačno dva cijela pozitivna broja u stavci (ili par "a,b")."""
     wants_gcd = bool(_NZD_RE.search(folded))
     wants_lcm = bool(_NZS_RE.search(folded))
     if wants_gcd == wants_lcm:          # ni jedno ni oboje → ne diramo
         return None
-    ints = [t for t in tokens if t.form == "integer" and t.value > 0]
+    ints = [int(t.value) for t in tokens if t.form == "integer" and t.value > 0]
     if len(ints) != 2:
-        return None
+        pair = _INT_PAIR_RE.search(folded)
+        if not pair:
+            return None
+        ints = [int(pair.group(1)), int(pair.group(2))]
     from math import gcd
-    a, b = int(ints[0].value), int(ints[1].value)
+    a, b = ints[0], ints[1]
+    if a <= 0 or b <= 0:
+        return None
     if wants_gcd:
         return Expected(value=Fraction(gcd(a, b)), kind="arithmetic")
     return Expected(value=Fraction(a * b // gcd(a, b)), kind="arithmetic")
+
+
+# --- Djeljivost s obrazloženjem ("Da li je 144 djeljiv sa 3? Objasni.") -------------
+# Logička istina (N % K) je deterministička; kvalitet obrazloženja (pravilo zbira
+# cifara) ne ocjenjuje se numerički — tačan zaključak bez objašnjenja pravila je
+# NEPOTPUN (partial), ne netačan.
+_DIV_EXPLAIN_ASK_RE = re.compile(
+    r"(?:da\s+li\s+|je\s*li\s+|provjeri\s+)?(?:je\s+)?(?:broj\s+)?(\d+)\s+dj?eljiv\w*\s+sa?\s+(\d+)"
+)
+_EXPLAIN_REQUEST_RE = re.compile(
+    r"\bobjasni\w*|\bobrazlozi\w*|\bpravil\w*\s+dj?eljiv\w*|\bkoristeci\s+pravil\w*"
+    r"|\bzasto\b|\bkako\s+znas\b"
+)
+_DIGIT_SUM_RULE_DIVISORS = {3, 9}
+
+
+def _digit_sum(n: int) -> int:
+    return sum(int(d) for d in str(abs(n)))
+
+
+def _try_divisibility_with_explanation(folded: str, norm_text: str) -> Expected | None:
+    m = _DIV_EXPLAIN_ASK_RE.search(folded)
+    if not m or not _EXPLAIN_REQUEST_RE.search(folded):
+        return None
+    n, k = int(m.group(1)), int(m.group(2))
+    if k == 0:
+        return None
+    truth = (n % k == 0)
+    concepts: list[str] = []
+    if k in _DIGIT_SUM_RULE_DIVISORS:
+        ds = _digit_sum(n)
+        digits = "+".join(str(d) for d in str(n))
+        concepts = [
+            "zbir cifara",
+            f"{digits}={ds}",
+            f"{ds} {'jeste' if ds % k == 0 else 'nije'} djeljiv sa {k}",
+        ]
+    else:
+        concepts = [f"pravilo djeljivosti sa {k}"]
+    return Expected(
+        value=Fraction(1 if truth else 0),
+        kind="divisibility_explained",
+        answer_type="boolean_with_explanation",
+        expected_boolean=truth,
+        divisor=k,
+        required_concepts=tuple(concepts),
+        expected_display="da" if truth else "ne",
+        confidence="high",
+    )
+
+
+# --- Rastavljanje na proste faktore ("Rastavi 60 na proste faktore.") ---------------
+_PRIME_FACTOR_ASK_RE = re.compile(
+    r"\brastavi\w*\b.{0,40}\bproste?\s+(?:faktor\w*|cinioc\w*|cinilac\w*)\b"
+    r"|\bproste?\s+(?:faktor\w*|cinioc\w*)\b.{0,40}\brastav\w*"
+    r"|\bfaktorizuj\w*|\bfaktorizir\w*|\bprime\s+factor\w*"
+)
+_SUPERSCRIPT_DIGITS = {
+    "⁰": "0", "¹": "1", "²": "2", "³": "3", "⁴": "4",
+    "⁵": "5", "⁶": "6", "⁷": "7", "⁸": "8", "⁹": "9",
+}
+
+
+def _prime_factorization(n: int) -> dict[int, int]:
+    factors: dict[int, int] = {}
+    d = 2
+    while d * d <= n:
+        while n % d == 0:
+            factors[d] = factors.get(d, 0) + 1
+            n //= d
+        d += 1
+    if n > 1:
+        factors[n] = factors.get(n, 0) + 1
+    return factors
+
+
+_SUP_MAP = {2: "²", 3: "³", 4: "⁴", 5: "⁵"}
+
+
+def _format_prime_factors(factors: dict[int, int]) -> str:
+    parts: list[str] = []
+    for base in sorted(factors):
+        exp = factors[base]
+        if exp == 1:
+            parts.append(str(base))
+        elif exp in _SUP_MAP:
+            parts.append(f"{base}{_SUP_MAP[exp]}")
+        else:
+            parts.append(f"{base}^{exp}")
+    return " · ".join(parts)
+
+
+def _desuperscript(text: str) -> str:
+    def repl(m: re.Match) -> str:
+        return "^" + "".join(_SUPERSCRIPT_DIGITS[c] for c in m.group(0))
+    return re.sub(r"[⁰¹²³⁴⁵⁶⁷⁸⁹]+", repl, text)
+
+
+def _is_prime(n: int) -> bool:
+    if n < 2:
+        return False
+    d = 2
+    while d * d <= n:
+        if n % d == 0:
+            return False
+        d += 1
+    return True
+
+
+def parse_prime_factor_product(text: str) -> list[tuple[int, int]] | None:
+    """"2²·3·5" / "2*2*3*5" / "2^2 x 3 x 5" → [(base, exp), ...]; None ako nije
+    čist proizvod potencija (npr. proza ili jedan broj bez množenja)."""
+    t = _fold(_desuperscript(text or ""))
+    t = t.replace("×", "*").replace("·", "*").replace("⋅", "*")
+    t = re.sub(r"(?<=\d)\s*x\s*(?=\d)", "*", t)        # "3 x 5" → "3*5"
+    t = re.sub(r"[=\s]", "", t.strip())
+    t = t.strip(".")
+    if not t or "*" not in t and not re.search(r"\^|\*\*", t):
+        return None                                    # jedan broj nije rastavljanje
+    out: list[tuple[int, int]] = []
+    for part in t.split("*"):
+        if part == "":
+            continue                                   # "2**2" → prazan srednji dio
+        m = re.fullmatch(r"(\d+)(?:\^(\d+))?", part)
+        if not m:
+            return None
+        base = int(m.group(1))
+        exp = int(m.group(2)) if m.group(2) else 1
+        out.append((base, exp))
+    return out or None
+
+
+def _try_prime_factorization(folded: str, norm_text: str) -> Expected | None:
+    if not _PRIME_FACTOR_ASK_RE.search(folded):
+        return None
+    nums = [int(x) for x in re.findall(r"\b(\d+)\b", norm_text)]
+    targets = [x for x in nums if x >= 2]
+    if len(targets) != 1:
+        return None
+    n = targets[0]
+    factors = _prime_factorization(n)
+    return Expected(
+        value=Fraction(n),
+        kind="prime_factorization",
+        answer_type="prime_factorization",
+        expected_factors=tuple(sorted(factors.items())),
+        target_number=n,
+        expected_display=_format_prime_factors(factors),
+        confidence="high",
+    )
 
 
 def _try_rate_or_ratio(folded: str, norm_text: str) -> Expected | None:
@@ -1645,6 +1819,81 @@ def _try_set_operation(folded: str, raw_text: str) -> Expected | None:
     )
 
 
+# --- Strukturirana konceptualna rubrika (gradabilnost bez determinističkog broja) ---
+# Stavke koje NEMAJU izračunljiv broj, ali JESU provjerljive po strukturi (vektorske
+# operacije, koordinate/preslikavanja, poređenje, djeljivost, konstrukcije) dobijaju
+# strukturiranu rubriku (grading_method="structured_gpt"). Otvorena proza bez
+# prepoznate strukture ("Objasni šta je skup") NE dobija rubriku → ostaje negradabilna.
+_RUBRIC_TASK_RE = re.compile(
+    r"\b(odredi|izracunaj|izracunajte|uporedi|usporedi|poredi|uporedjuj\w*|"
+    r"preslikaj|nacrtaj|ocitaj|procitaj|izmjeri|izmeri|konstrui\w*|konstruisi|"
+    r"dokazi|pokazi|nadji|nadi|rastavi|skrati|prosiri|izrazi|pretvori|zaokruzi|"
+    r"procijeni|rijesi|sabe\w*|oduzm\w*|pomnoz\w*|podijeli|koliko|kolik[aoiu]|"
+    r"koje|koji|koja|da\s+li|je\s+li|jesu\s+li|provjeri)\b"
+)
+_COORD_PAIR_RE = re.compile(r"[a-z]\s*\(\s*-?\d+\s*[,;]\s*-?\d+\s*\)")
+
+
+def _conceptual_rubric(domain: str, concepts: list[str]) -> dict:
+    return {
+        "answer_type": "conceptual",
+        "required_concepts": concepts,
+        "accepted_claims": [],
+        "incorrect_claims": [],
+        "grading_method": "structured_gpt",
+        "validation_status": "validated",
+        "domain": domain,
+    }
+
+
+def derive_conceptual_rubric(item_text: str) -> dict | None:
+    """Strukturirana rubrika za on-topic stavku koja nije deterministički
+    izračunljiva, ali JESTE provjerljiva po strukturi; None za otvorenu prozu."""
+    folded = _fold(item_text or "")
+    has_task = bool(_RUBRIC_TASK_RE.search(folded))
+    # 1. Vektorske operacije (zbir/razlika/intenzitet) ili koordinatni par vektora
+    if re.search(r"\bvektor\w*", folded) or _COORD_PAIR_RE.search(folded):
+        if has_task or re.search(r"[+\-]", folded) or re.search(
+            r"\b(zbir|razlik|duzin|intenzitet|modul)\w*", folded
+        ):
+            return _conceptual_rubric(
+                "vectors",
+                ["ispravna operacija nad komponentama vektora",
+                 "tačan konačan vektor ili njegov intenzitet"],
+            )
+    # 2. Koordinatni sistem / relacije / preslikavanja / udaljenost
+    if re.search(r"\bkoordinat\w*|\bpreslikaj\w*|\bsimetr\w*|\btranslacij\w*"
+                 r"|\budaljenost\w*|\bosn[aoe]\s+simetr\w*", folded) and has_task:
+        return _conceptual_rubric(
+            "coordinates",
+            ["ispravno očitane ili izračunate koordinate",
+             "ispravan postupak preslikavanja/udaljenosti"],
+        )
+    # 3. Poređenje razlomaka/brojeva ("uporedi 3/4 i 2/3")
+    if re.search(r"\b(uporedi|usporedi|poredi|uporedjuj\w*)\b", folded) and re.search(r"\d", folded):
+        return _conceptual_rubric(
+            "comparison",
+            ["svođenje na zajednički nazivnik ili decimalni oblik",
+             "ispravan zaključak koji je veći/manji"],
+        )
+    # 4. Djeljivost (da/ne ili primjena pravila) bez punog objašnjenja
+    if re.search(r"\bdj?eljiv\w*", folded) and re.search(
+        r"\b(da\s+li|je\s+li|jesu\s+li|provjeri|pravil\w*)", folded
+    ):
+        return _conceptual_rubric(
+            "divisibility",
+            ["primjena pravila djeljivosti", "tačan zaključak da/ne"],
+        )
+    # 5. Geometrijske konstrukcije
+    if re.search(r"\bkonstrui\w*|\bsimetral\w*|\bnormal\w*|\btangent\w*|\bnacrtaj\b", folded) and \
+            re.search(r"\bugao|ugl\w*|duz\w*|prav\w*|kruzn\w*|trougl\w*|tack\w*", folded):
+        return _conceptual_rubric(
+            "construction",
+            ["ispravan konstrukcijski postupak", "tačan rezultat konstrukcije"],
+        )
+    return None
+
+
 def derive_expected(item_text: str) -> Expected | None:
     """Pokušaj deterministički izračunati očekivani rezultat stavke; None = ne zna."""
     # Skupovne operacije PRVE: rade na sirovom tekstu (zarez = separator, ne
@@ -1654,6 +1903,14 @@ def derive_expected(item_text: str) -> Expected | None:
         return set_op
     norm = _normalize_math_text(item_text or "")
     folded = _fold(norm)
+    # Djeljivost s obrazloženjem i rastavljanje na proste faktore: rade na cijeloj
+    # (foldovanoj) rečenici, ne na tokenima — prije token-baziranih solvera.
+    div_explained = _try_divisibility_with_explanation(folded, norm)
+    if div_explained is not None:
+        return div_explained
+    prime_fact = _try_prime_factorization(folded, norm)
+    if prime_fact is not None:
+        return prime_fact
     tokens = _scan_number_tokens(norm)
     for solver in (
         _try_conversion,
@@ -2097,6 +2354,144 @@ def _check_yes_no_divisibility(task_text: str, student_text: str) -> CheckResult
     ])
 
 
+# --- Djeljivost s obrazloženjem: presuda (istina determinist., pravilo = kvalitet) --
+_DIV_BOOL_YES_RE = re.compile(r"^\s*(?:da|jeste|jest|tacno|je\s+djeljiv|djeljiv\s+je)\b")
+_DIV_BOOL_NO_RE = re.compile(r"^\s*(?:ne|nije)\b")
+_DIV_RULE_EVIDENCE_RE = re.compile(
+    r"\d\s*\+\s*\d|zbir\s+cifar\w*|zbir\s+znamen\w*|suma\s+cifar\w*|zbroj\s+cifar\w*"
+)
+
+
+def _check_divisibility_explanation(task_text: str, student_text: str) -> "CheckResult | None":
+    """"Da li je 144 djeljiv sa 3? Objasni." — "da"/"ne" je determinsitička istina;
+    tačan zaključak BEZ objašnjenja pravila zbira cifara je NEPOTPUN (incomplete),
+    ne netačan. GPT rubrika ocjenjuje samo kvalitet obrazloženja."""
+    if split_numbered_items(task_text):
+        return None
+    norm = _normalize_math_text(task_text)
+    expected = _try_divisibility_with_explanation(_fold(norm), norm)
+    if expected is None:
+        return None
+    folded = _fold(student_text or "").strip()
+    if _DIV_BOOL_YES_RE.match(folded):
+        said = True
+    elif _DIV_BOOL_NO_RE.match(folded):
+        said = False
+    else:
+        return None                        # nije jasan da/ne — opšti tok / GPT
+    given = NumberToken(
+        value=Fraction(1 if said else 0), form="boolean",
+        raw="da" if said else "ne",
+    )
+    if said != expected.expected_boolean:
+        verdict = "incorrect"
+    elif expected.divisor in _DIGIT_SUM_RULE_DIVISORS and not _DIV_RULE_EVIDENCE_RE.search(folded):
+        # tačan zaključak, ali pravilo (zbir cifara) nije objašnjeno → DJELIMIČNO
+        verdict = "partially_correct"
+    else:
+        verdict = "correct"
+    return CheckResult(checkable=True, items=[
+        ItemCheck(n=1, task=task_text.strip()[:200], expected=expected,
+                  given=given, verdict=verdict),
+    ])
+
+
+# --- Rastavljanje na proste faktore: presuda (proizvod == N i svi faktori prosti) ---
+def _collapse_factors(parsed: list[tuple[int, int]]) -> dict[int, int]:
+    out: dict[int, int] = {}
+    for base, exp in parsed:
+        out[base] = out.get(base, 0) + exp
+    return out
+
+
+def _check_prime_factorization(task_text: str, student_text: str) -> "CheckResult | None":
+    if split_numbered_items(task_text):
+        return None
+    norm = _normalize_math_text(task_text)
+    expected = _try_prime_factorization(_fold(norm), norm)
+    if expected is None:
+        return None
+    parsed = parse_prime_factor_product(student_text)
+    if parsed is None:
+        return None                        # nije proizvod potencija — opšti tok
+    product = 1
+    all_prime = True
+    for base, exp in parsed:
+        product *= base ** exp
+        if not _is_prime(base):
+            all_prime = False              # npr. "6·10" — tačan proizvod, nije rastavljeno
+    collapsed = _collapse_factors(parsed)
+    given = NumberToken(
+        value=Fraction(product), form="factorization",
+        raw=_format_prime_factors(collapsed),
+    )
+    verdict = "correct" if (product == expected.target_number and all_prime) else "incorrect"
+    return CheckResult(checkable=True, items=[
+        ItemCheck(n=1, task=task_text.strip()[:200], expected=expected,
+                  given=given, verdict=verdict),
+    ])
+
+
+# --- Multi-odgovor po SEGMENTIMA (novi red / ';') za višestavkovni (exam) zadatak ---
+_SEGMENT_SPLIT_RE = re.compile(r"[;\n]+")
+
+
+def _split_answer_segments(student_text: str) -> list[str]:
+    parts = [p.strip() for p in _SEGMENT_SPLIT_RE.split(student_text or "")]
+    return [p for p in parts if p]
+
+
+def _is_nonanswer_segment(seg: str) -> bool:
+    folded = _fold((seg or "").strip())
+    return not folded or bool(_NONANSWER_SEG_RE.match(folded))
+
+
+def _strip_item_marker(seg: str) -> str:
+    return re.sub(r"^\s*\d{1,2}\s*[.):]\s*", "", seg or "").strip()
+
+
+def is_multi_segment_answer(task_text: str, student_text: str) -> bool:
+    """Da li je poruka viševstavkovni odgovor (segmenti odvojeni ';' ili novim
+    redom) čiji broj tačno odgovara broju stavki zadatka, s bar jednim stvarnim
+    odgovorom? Koristi rutiranje: takva poruka je ODGOVOR, ne globalni hint."""
+    items = split_numbered_items(task_text or "")
+    if len(items) < 2:
+        return False
+    segments = _split_answer_segments(student_text)
+    if len(segments) != len(items):
+        return False
+    return not all(_is_nonanswer_segment(s) for s in segments)
+
+
+def _check_segmented_answers(
+    items: list[tuple[int, str]], student_text: str
+) -> "CheckResult | None":
+    """Mapiraj segmente na stavke po redu (broj segmenata == broj stavki). "ne
+    znam" u segmentu → SAMO ta stavka nepokušana (not_attempted), nikad globalni
+    hint. Segment koji nije jednoznačno provjeriv → "unverified" (odgovoreno)."""
+    segments = _split_answer_segments(student_text)
+    if len(segments) != len(items):
+        return None
+    if all(_is_nonanswer_segment(s) for s in segments):
+        return None                        # sve "ne znam" — prepusti opštem toku
+    checks: list[ItemCheck] = []
+    for (n, text), seg in zip(items, segments):
+        seg_clean = _strip_item_marker(seg)
+        if _is_nonanswer_segment(seg_clean):
+            checks.append(ItemCheck(n=n, task=text[:200], expected=derive_expected(text),
+                                    given=None, verdict="not_attempted"))
+            continue
+        sub = _check(text, seg_clean)
+        if sub.checkable and len(sub.items) == 1:
+            item = sub.items[0]
+            checks.append(ItemCheck(n=n, task=text[:200], expected=item.expected,
+                                    given=item.given, verdict=item.verdict))
+        else:
+            checks.append(ItemCheck(n=n, task=text[:200], expected=derive_expected(text),
+                                    given=None, verdict="unverified"))
+    return CheckResult(checkable=True, items=checks)
+
+
 # Presude kojima se odgovor smije PRIPISATI stavci: tačan, tačna vrijednost u
 # pogrešnom obliku ili tačan međukorak. "incorrect" se pripisuje SAMO kada je
 # preostala tačno jedna stavka (inače ne znamo koju je stavku pokušao).
@@ -2277,6 +2672,13 @@ def _check(
     yes_no = _check_yes_no_divisibility(task_text, student_text)
     if yes_no is not None:
         return yes_no
+    # Djeljivost s obrazloženjem i rastavljanje na proste faktore (jedna stavka).
+    div_explained = _check_divisibility_explanation(task_text, student_text)
+    if div_explained is not None:
+        return div_explained
+    prime_fact = _check_prime_factorization(task_text, student_text)
+    if prime_fact is not None:
+        return prime_fact
     numbered_items = split_numbered_items(task_text)
     if numbered_items:
         items = numbered_items
@@ -2284,6 +2686,13 @@ def _check(
         items = [(1, task_text.strip())] if task_text.strip() else []
     if not items:
         return CheckResult(checkable=False)
+
+    # Multi-odgovor po segmentima (';' / novi red) — mapiraj na stavke po redu.
+    # "ne znam" u jednom segmentu ostaje SAMO ta stavka (ne globalni hint).
+    if len(items) >= 2:
+        segmented = _check_segmented_answers(items, student_text)
+        if segmented is not None:
+            return segmented
 
     valid = [n for n, _t in items]
     mode, answers = parse_student_answers(student_text)
@@ -2438,6 +2847,13 @@ def format_check_block(result: CheckResult) -> str:
                 f"- Stavka {item.n}: NEPOTPUN ODGOVOR. Učenik je dao primjer "
                 f"({given}), ali zadatak traži cijelo rješenje: "
                 f"{_fmt_expected(item.expected)}. Ne označavaj kao tačno."
+            )
+        elif item.verdict == "partially_correct":
+            lines.append(
+                f"- Stavka {item.n}: DJELIMIČNO TAČNO. Zaključak ({given}) je "
+                f"tačan, ali obrazloženje/pravilo nije potpuno objašnjeno. Počni "
+                "sa \"Djelimično tačno.\" i kratko traži da dovrši obrazloženje; "
+                "NE koristi labelu \"Tačno.\" ni \"Netačno.\"."
             )
         elif item.verdict == "missing":
             lines.append(
