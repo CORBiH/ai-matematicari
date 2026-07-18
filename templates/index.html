@@ -1468,15 +1468,23 @@ document.addEventListener('DOMContentLoaded', () => {
         { label: '📘 Objasni mi ovo', msg: 'Objasni mi ovaj zadatak korak po korak.' },
         { label: '🎬 Preporuči mi klip', msg: 'Preporuči mi video lekciju za ovu temu.', intent: 'recommend_video' }
       ];
-      if (mode === 'exam') return [
-        /* BUG 4: "Daj još zadataka" pokreće NOVU vježbu (novi zadatak iz iste
-           oblasti), a NE objašnjenje prve stavke kontrolnog. Zato eksplicitno
-           prelazi u practice mod i šalje jasan zahtjev za novim zadatkom.
-           "Objasni prvi zadatak" ostaje zaseban — objašnjava 1. stavku kontrolnog. */
-        { label: '➕ Daj još zadataka', msg: 'Daj mi jedan novi zadatak za vježbu.', mode: 'practice' },
-        { label: '📘 Objasni prvi zadatak', msg: 'Objasni mi prvi zadatak iz kontrolnog korak po korak.' },
-        { label: '🎬 Preporuči mi klip', msg: 'Preporuči mi video lekciju za ovu temu.', intent: 'recommend_video' }
-      ];
+      if (mode === 'exam'){
+        /* Prečice za ZAVRŠEN kontrolni ("Daj još zadataka", "Objasni prvi
+           zadatak", "Preporuči klip") smiju se pojaviti SAMO kad je kontrolni
+           završen. Dok je kontrolni AKTIVAN (exam_status === 'active') ne
+           prikazujemo prečice — učenik treba riješiti tekuću stavku. */
+        const examStatus = (j.exam_state && j.exam_state.exam_status) || '';
+        if (examStatus === 'active') return [];
+        return [
+          /* BUG 4: "Daj još zadataka" pokreće NOVU vježbu (novi zadatak iz iste
+             oblasti), a NE objašnjenje prve stavke kontrolnog. Zato eksplicitno
+             prelazi u practice mod i šalje jasan zahtjev za novim zadatkom.
+             "Objasni prvi zadatak" ostaje zaseban — objašnjava 1. stavku kontrolnog. */
+          { label: '➕ Daj još zadataka', msg: 'Daj mi jedan novi zadatak za vježbu.', mode: 'practice' },
+          { label: '📘 Objasni prvi zadatak', msg: 'Objasni mi prvi zadatak iz kontrolnog korak po korak.' },
+          { label: '🎬 Preporuči mi klip', msg: 'Preporuči mi video lekciju za ovu temu.', intent: 'recommend_video' }
+        ];
+      }
       return [   /* quick */
         { label: '📘 Objasni postupak', msg: 'Objasni mi postupak korak po korak.', mode: 'explain' },
         { label: '✏️ Sličan zadatak', msg: 'Daj mi sličan zadatak za vježbu.', mode: 'practice' }

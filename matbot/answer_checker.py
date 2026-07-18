@@ -31,6 +31,7 @@ __all__ = [
     "derive_expected",
     "format_check_block",
     "parse_number_token",
+    "parse_set_answer",
     "parse_student_answers",
     "split_numbered_items",
 ]
@@ -110,6 +111,9 @@ class NumberToken:
     unit_raw: str = ""
     notation: str | None = None
     unrecognized_unit: str = ""
+    # Skupovi: kada je ``form == "set"`` odgovor je SKUP kanonskih elemenata
+    # (``value`` tada nosi broj elemenata radi kompatibilnosti, ``raw`` prikaz).
+    elements: "frozenset[str] | None" = None
 
     @property
     def is_reduced_fraction(self) -> bool:
@@ -285,6 +289,10 @@ class Expected:
     # rezultati izraza istog prioriteta ("5/12 + 7/12 - 3/12" → {1}). Odgovor
     # jednak međukoraku je correct_step, nikad "netačno".
     step_values: tuple = ()
+    # Skupovne operacije (2026-07-19): kanonski elementi očekivanog SKUPA i
+    # imenovana operacija ("union" | "intersection" | "complement" | "elements").
+    expected_elements: tuple = ()
+    set_operation: str = ""
 
 
 _COMPLEMENT_SIGNAL_RE = re.compile(
@@ -1495,8 +1503,155 @@ def _check_single_equation(task_text: str, student_text: str) -> "CheckResult | 
     ])
 
 
+# --- Skupovi i skupovne operacije (unija, presjek, komplement, elementi) ------------
+# Opšta klasa: definisani skupovi "A = {..}" + operacija → deterministički rezultat
+# kao SKUP. Poređenje je PRAVA jednakost skupova (redoslijed i duplikati nebitni,
+# vitičaste zagrade opcione). Konzervativno: bez definisanih skupova ili bez
+# prepoznate operacije → None (ne izmišlja se presuda). Radi na SIROVOM tekstu (ne
+# kroz _normalize_math_text) da se zarezi-separatori ne pomiješaju s decimalnim.
+_SET_DEF_RE = re.compile(r"(?<![A-Za-z0-9])([A-Za-z])\s*=\s*\{([^{}]*)\}")
+_UNIVERSE_RE = re.compile(
+    r"\b(?:univerz\w*|univers\w*|osnovni\s+skup|univerzaln\w*\s+skup|universe)\b"
+    r"\s*(?:je|=|:)?\s*\{([^{}]*)\}",
+    re.IGNORECASE,
+)
+_SET_UNION_RE = re.compile(r"∪|\\cup|\bunij\w*|\bunion\b")
+_SET_INTERSECT_RE = re.compile(r"∩|\\cap|\bpres[ijy]?ek\w*|\bintersection\b")
+_SET_COMPLEMENT_RE = re.compile(r"\bkomplement\w*|\bcomplement\b|\\complement|\bnisu\s+u\b")
+_SET_ELEMENTS_RE = re.compile(
+    r"\belement\w*\s+skup\w*|\bnabroj\s+element\w*|\bkoji\s+su\s+element\w*"
+)
+_EMPTY_SET_RE = re.compile(
+    r"^\s*(?:\{\s*\}|∅|\\emptyset|\\varnothing|prazan\s+skup|nema\s+element\w*)\s*$",
+    re.IGNORECASE,
+)
+
+
+def _canon_set_element(raw: str) -> str | None:
+    """Jedan element skupa → kanonski oblik; None ako nije valjan element.
+    Cijeli/decimalni broj → numerički kanon; jedno slovo → malo slovo. Višeznakovne
+    riječi se ODBIJAJU (spriječi da proza "unija"/"skup" prođe kao element)."""
+    tok = _fold(raw.strip()).strip(".")
+    if not tok:
+        return None
+    if re.fullmatch(r"-?\d+", tok):
+        return str(int(tok))
+    if re.fullmatch(r"-?\d+[.,]\d+", tok):
+        return tok.replace(",", ".")
+    if re.fullmatch(r"[a-z]", tok):
+        return tok
+    return None
+
+
+def _parse_set_body(body: str) -> "frozenset[str] | None":
+    """Sadržaj između zagrada ("1, 2, 3" ili "c, b") → skup kanonskih elemenata."""
+    body = (body or "").strip()
+    if body == "":
+        return frozenset()
+    out: list[str] = []
+    for part in re.split(r"[,;]|\s+", body):
+        if not part:
+            continue
+        canon = _canon_set_element(part)
+        if canon is None:
+            return None
+        out.append(canon)
+    return frozenset(out)
+
+
+def _is_numeric_element(element: str) -> bool:
+    try:
+        Fraction(element)
+        return True
+    except (ValueError, ZeroDivisionError):
+        return False
+
+
+def _format_set(elements) -> str:
+    numeric = sorted((e for e in elements if _is_numeric_element(e)), key=Fraction)
+    symbolic = sorted(e for e in elements if not _is_numeric_element(e))
+    return "{" + ", ".join([*numeric, *symbolic]) + "}"
+
+
+def parse_set_answer(text: str) -> "frozenset[str] | None":
+    """Učenikov odgovor-skup → skup kanonskih elemenata; None ako nije skup.
+
+    Prihvata (redoslijed/duplikati/zagrade nebitni): ``{1,2,3}``, ``1,2,3``,
+    ``1 2 3``, ``A ∪ B = {1,2,3}``, ``C ∩ D = {c,b}``, prazan skup
+    (``{}``, ``∅``, "prazan skup"). Bez zagrada prolazi SAMO čista lista
+    elemenata — rečenica sa riječima se odbija (višeznakovne riječi nisu element)."""
+    if not text:
+        return None
+    raw = text.strip()
+    if _EMPTY_SET_RE.match(_fold(raw)):
+        return frozenset()
+    if "=" in raw:                       # "LHS = RHS" → rezultat je desna strana
+        raw = raw.rsplit("=", 1)[1].strip()
+    brace = re.search(r"\{([^{}]*)\}", raw)
+    body = brace.group(1) if brace else raw
+    return _parse_set_body(body)
+
+
+def _try_set_operation(folded: str, raw_text: str) -> Expected | None:
+    named: dict[str, "frozenset[str]"] = {}
+    for m in _SET_DEF_RE.finditer(raw_text):
+        body = _parse_set_body(m.group(2))
+        if body is not None:
+            named[m.group(1)] = body
+    universe = None
+    um = _UNIVERSE_RE.search(raw_text)
+    if um:
+        universe = _parse_set_body(um.group(1))
+    if universe is None and "U" in named:
+        universe = named.pop("U")        # imenovani univerzalni skup "U = {..}"
+    if not named:
+        return None
+    if _SET_UNION_RE.search(folded):
+        op = "union"
+    elif _SET_INTERSECT_RE.search(folded):
+        op = "intersection"
+    elif _SET_COMPLEMENT_RE.search(folded):
+        op = "complement"
+    elif _SET_ELEMENTS_RE.search(folded):
+        op = "elements"
+    else:
+        return None
+    if op == "union":
+        if len(named) < 2:
+            return None
+        result = frozenset().union(*named.values())
+    elif op == "intersection":
+        if len(named) < 2:
+            return None
+        sets = list(named.values())
+        result = sets[0]
+        for s in sets[1:]:
+            result = result & s
+    elif op == "complement":
+        if universe is None or len(named) < 1:
+            return None
+        target = next(iter(named.values()))
+        result = frozenset(universe - target)
+    else:                                # elements
+        result = next(iter(named.values()))
+    return Expected(
+        value=Fraction(len(result)),
+        kind="set",
+        answer_type="set",
+        expected_elements=tuple(sorted(result)),
+        expected_display=_format_set(result),
+        set_operation=op,
+        confidence="high",
+    )
+
+
 def derive_expected(item_text: str) -> Expected | None:
     """Pokušaj deterministički izračunati očekivani rezultat stavke; None = ne zna."""
+    # Skupovne operacije PRVE: rade na sirovom tekstu (zarez = separator, ne
+    # decimalni) pa moraju prije bilo koje brojevne normalizacije.
+    set_op = _try_set_operation(_fold(item_text or ""), item_text or "")
+    if set_op is not None:
+        return set_op
     norm = _normalize_math_text(item_text or "")
     folded = _fold(norm)
     tokens = _scan_number_tokens(norm)
@@ -2008,11 +2163,105 @@ def _attribute_unnumbered_answer(
     return CheckResult(checkable=True, items=checks)
 
 
+def _extract_numbered_set_answers(
+    student_text: str, valid: list[int]
+) -> dict[int, "frozenset[str]"]:
+    """"1) {1,2,3} 2) {b,c}" → {1: {..}, 2: {..}} (samo postojeći brojevi stavki)."""
+    norm = student_text or ""
+    marks = [
+        (m.start(1), m.end(), int(m.group(1)))
+        for m in _ANSWER_MARKER_RE.finditer(norm)
+    ]
+    if not marks:
+        return {}
+    out: dict[int, "frozenset[str]"] = {}
+    for i, (_s, e, n) in enumerate(marks):
+        end = marks[i + 1][0] if i + 1 < len(marks) else len(norm)
+        parsed = parse_set_answer(norm[e:end])
+        if parsed is not None and n in valid:
+            out[n] = parsed
+    return out
+
+
+def _check_set_task(
+    task_text: str, student_text: str, pending_items: list[int] | None = None
+) -> CheckResult | None:
+    """Puna presuda kada je zadatak skupovna operacija (unija/presjek/komplement).
+
+    Presuda je PRAVA jednakost skupova. Podržava numerisane odgovore
+    ("1) {..} 2) {..}") i jedan skup pripisan tekućoj stavci. None → nije skupovni
+    zadatak ili odgovor nije skup (prepusti opštem toku)."""
+    stripped = (task_text or "").strip()
+    if not stripped:
+        return None
+    items = split_numbered_items(task_text) or [(1, stripped)]
+    expected_by_n = {n: _try_set_operation(_fold(text), text) for n, text in items}
+    if not any(e is not None for e in expected_by_n.values()):
+        return None
+    valid = [n for n, _t in items]
+    numbered = _extract_numbered_set_answers(student_text, valid)
+    given_by_n: dict[int, "frozenset[str]"] = {}
+    answered: set[int] = set()
+    if numbered:
+        given_by_n = dict(numbered)
+        answered = set(numbered)
+    else:
+        single = parse_set_answer(student_text)
+        if single is None:
+            return None
+        pending = [n for n in (pending_items or valid) if n in valid] or valid
+        pend_set = [n for n in pending if expected_by_n.get(n) is not None]
+        matches = [
+            n for n in pend_set
+            if frozenset(expected_by_n[n].expected_elements) == single
+        ]
+        if len(matches) == 1:
+            target = matches[0]
+        elif len(pend_set) == 1:
+            target = pend_set[0]
+        elif len([n for n, e in expected_by_n.items() if e is not None]) == 1:
+            target = next(n for n, e in expected_by_n.items() if e is not None)
+        else:
+            return None
+        given_by_n = {target: single}
+        answered = {target}
+    checks: list[ItemCheck] = []
+    for n, text in items:
+        expected = expected_by_n[n]
+        if n in answered:
+            if expected is None:
+                checks.append(ItemCheck(n=n, task=text[:200], expected=None,
+                                        given=None, verdict="unverified"))
+                continue
+            given_set = given_by_n[n]
+            verdict = (
+                "correct"
+                if given_set == frozenset(expected.expected_elements)
+                else "incorrect"
+            )
+            given = NumberToken(
+                value=Fraction(len(given_set)), form="set",
+                raw=_format_set(given_set), elements=given_set,
+            )
+            checks.append(ItemCheck(n=n, task=text[:200], expected=expected,
+                                    given=given, verdict=verdict))
+        else:
+            checks.append(ItemCheck(
+                n=n, task=text[:200], expected=expected, given=None,
+                verdict="not_attempted" if len(items) > 1 else "missing",
+            ))
+    return CheckResult(checkable=True, items=checks)
+
+
 def _check(
     task_text: str,
     student_text: str,
     pending_items: list[int] | None = None,
 ) -> CheckResult:
+    # Skupovne operacije prve — presuda je jednakost skupova, ne brojevni token.
+    set_result = _check_set_task(task_text, student_text, pending_items)
+    if set_result is not None:
+        return set_result
     # Nejednačine se presuđuju posebno (presuda nosi operator, ne samo broj).
     inequality = _check_single_inequality(task_text, student_text)
     if inequality is not None:
@@ -2292,6 +2541,8 @@ def summarize_result(result: CheckResult) -> dict | None:
     def _norm_student(tok: NumberToken | None) -> str | None:
         if tok is None:
             return None
+        if tok.form == "set":
+            return tok.raw or _format_set(tok.elements or frozenset())
         base = _fmt_fraction(tok.value)
         if tok.form == "percentage":
             return f"{_fmt_fraction(tok.value * 100)}%"
@@ -2304,6 +2555,21 @@ def summarize_result(result: CheckResult) -> dict | None:
     def _deterministic_details(item: ItemCheck) -> dict:
         expected = item.expected
         given = item.given
+        if expected is not None and expected.answer_type == "set":
+            return {
+                "parsed": given is not None,
+                "numeric_match": bool(
+                    given is not None
+                    and given.elements == frozenset(expected.expected_elements)
+                ),
+                "unit_match": False,
+                "unit_missing": False,
+                "unit_unrecognized": False,
+                "required_form_match": True,
+                "set_operation": expected.set_operation or None,
+                "expected_elements": list(expected.expected_elements),
+                "student_elements": sorted(given.elements) if given and given.elements is not None else None,
+            }
         numeric_match = bool(
             expected is not None and given is not None and _values_match(expected, given)
         )
@@ -2337,7 +2603,11 @@ def summarize_result(result: CheckResult) -> dict | None:
                 "verdict": i.verdict,
                 "expected": _fmt_expected(i.expected) if i.expected else None,
                 "expected_answer": _fmt_expected(i.expected) if i.expected else None,
-                "normalized_expected": _fmt_fraction(i.expected.value) if i.expected else None,
+                "normalized_expected": (
+                    _fmt_expected(i.expected)
+                    if i.expected and i.expected.answer_type == "set"
+                    else _fmt_fraction(i.expected.value) if i.expected else None
+                ),
                 "answer_type": i.expected.answer_type if i.expected else None,
                 "expected_unit": i.expected.unit if i.expected else None,
                 "unit_policy": i.expected.unit_policy if i.expected else None,

@@ -2185,3 +2185,168 @@ def test_sheets_row_contains_quick_math_verification_metadata():
     assert by_header["math_verification_match"] is False
     assert by_header["corrected_before_response"] is True
     assert by_header["verified_answer"] == "x = 4/9"
+
+
+# --- Skupovne operacije (unija/presjek/komplement): grading + metadata + intent -----
+# Root bug (produkcija): generisani kontrolni iz oblasti "Skupovi i skupovne
+# operacije" nije imao izvediv očekivani odgovor pa je stavka bila unvalidated i
+# svaki tačan odgovor ("{1,2,3,4,5,6,7}") vraćao "Treba mi jasniji odgovor".
+
+_SET_UNION_ITEM = "A = {1,2,3,4,5}, B = {4,5,6,7}. Nađi A ∪ B."
+_SET_INTERSECT_ITEM = "C = {a,b,c}, D = {b,c,d}. Odredi C ∩ D."
+_SET_COMPLEMENT_ITEM = (
+    "E = {2,3,5,7}, U = {1,2,3,4,5,6,7,8,9}. Odredi komplement skupa E."
+)
+
+
+def test_set_union_metadata_generated_and_validated():
+    meta = svc._task_answer_metadata(_SET_UNION_ITEM)
+    assert len(meta) == 1
+    assert meta[0]["answer_kind"] == "set"
+    assert meta[0]["set_operation"] == "union"
+    assert meta[0]["validation_status"] == "validated"
+    assert meta[0]["expected_answer_display"] == "{1, 2, 3, 4, 5, 6, 7}"
+    assert meta[0]["expected_elements"] == ["1", "2", "3", "4", "5", "6", "7"]
+
+
+def test_set_intersection_metadata_generated_and_validated():
+    meta = svc._task_answer_metadata(_SET_INTERSECT_ITEM)
+    assert meta[0]["answer_kind"] == "set"
+    assert meta[0]["set_operation"] == "intersection"
+    assert meta[0]["validation_status"] == "validated"
+    assert meta[0]["expected_answer_display"] == "{b, c}"
+
+
+def test_set_complement_metadata_generated_and_validated():
+    meta = svc._task_answer_metadata(_SET_COMPLEMENT_ITEM)
+    assert meta[0]["answer_kind"] == "set"
+    assert meta[0]["set_operation"] == "complement"
+    assert meta[0]["validation_status"] == "validated"
+    assert meta[0]["expected_answer_display"] == "{1, 4, 6, 8, 9}"
+
+
+def _set_verdict(task, answer):
+    from matbot.answer_checker import check_practice_answer
+    return check_practice_answer(task, answer).items[0].verdict
+
+
+def test_set_union_braced_answer_accepted():
+    assert _set_verdict(_SET_UNION_ITEM, "{1,2,3,4,5,6,7}") == "correct"
+
+
+def test_set_union_comma_answer_accepted():
+    assert _set_verdict(_SET_UNION_ITEM, "1,2,3,4,5,6,7") == "correct"
+
+
+def test_set_union_space_answer_accepted():
+    assert _set_verdict(_SET_UNION_ITEM, "1 2 3 4 5 6 7") == "correct"
+
+
+def test_set_union_reordered_answer_accepted():
+    assert _set_verdict(_SET_UNION_ITEM, "7 6 5 4 3 2 1") == "correct"
+    assert _set_verdict(_SET_UNION_ITEM, "A ∪ B = {7,1,2,3,6,5,4}") == "correct"
+
+
+def test_set_missing_or_extra_element_incorrect():
+    assert _set_verdict(_SET_UNION_ITEM, "{1,2,3,4,5,6}") == "incorrect"      # nedostaje 7
+    assert _set_verdict(_SET_UNION_ITEM, "{1,2,3,4,5,6,7,8}") == "incorrect"  # višak 8
+
+
+def test_set_symbolic_order_insensitive_equivalence():
+    assert _set_verdict(_SET_INTERSECT_ITEM, "{b,c}") == "correct"
+    assert _set_verdict(_SET_INTERSECT_ITEM, "{c,b}") == "correct"
+    assert _set_verdict(_SET_INTERSECT_ITEM, "c b") == "correct"
+    assert _set_verdict(_SET_INTERSECT_ITEM, "C ∩ D = {c,b}") == "correct"
+
+
+def test_set_numbered_multi_answer_extracts_current_item():
+    from matbot.answer_checker import check_practice_answer
+    exam = f"1. {_SET_UNION_ITEM}\n2. {_SET_INTERSECT_ITEM}\n3. {_SET_COMPLEMENT_ITEM}"
+    result = check_practice_answer(exam, "1) {1,2,3,4,5,6,7} 2) {b,c}")
+    by_n = {i.n: i.verdict for i in result.items}
+    assert by_n[1] == "correct"
+    assert by_n[2] == "correct"
+    # a single set answer with pending item 3 → pripisan komplementu
+    single = check_practice_answer(exam, "{1,4,6,8,9}", pending_items=[3])
+    assert {i.n: i.verdict for i in single.items}[3] == "correct"
+
+
+def test_generated_exam_with_unvalidated_metadata_rejected_before_activation():
+    # Prozni kontrolni bez ijednog izvedivog odgovora → NE smije se aktivirati.
+    prose = (
+        "1. Objasni šta je skup.\n"
+        "2. Navedi jedan primjer skupa iz svakodnevnog života.\n"
+        "3. Zašto su skupovi korisni?"
+    )
+    v = svc._validate_task_activation(prose, mode="exam")
+    assert v["validation_status"] == "rejected"
+    assert v["reason"] == "missing_expected_answer"
+    # a validan skupovni kontrolni (svi izvedivi) → aktivira se
+    good = f"1. {_SET_UNION_ITEM}\n2. {_SET_INTERSECT_ITEM}\n3. {_SET_COMPLEMENT_ITEM}"
+    assert svc._validate_task_activation(good, mode="exam")["validation_status"] == "validated"
+
+
+def test_active_exam_reveal_request_does_not_create_new_exam(master, tmap):
+    first = _start_exam(master, tmap)
+    first_state = first["next_state"]["exam_state"]
+    first_id = first_state["exam_id"]
+    assert first_state["exam_status"] == "active"
+
+    out = svc.handle_chat(
+        {
+            "grade": 6,
+            "mode": "exam",
+            "selected_oblast": "Uglovi",
+            "last_tutor_task": first["last_tutor_task"],
+            "previous_next_state": first["next_state"],
+            "student_message": "daj mi odgovor za taj zadatak",
+        },
+        _fake_chat("NOVI KONTROLNI KOJI SE NE SMIJE POJAVITI"),
+        master, tmap, model="m", timeout=1,
+    )
+    exam_state = out["next_state"]["exam_state"]
+    # (12/13) isti exam_id, i dalje aktivan, ista tekuća stavka; bez novog seta
+    assert exam_state["exam_id"] == first_id
+    assert exam_state["exam_status"] == "active"
+    assert exam_state["current_item_index"] == 0
+    assert "NOVI KONTROLNI KOJI SE NE SMIJE POJAVITI" not in out["answer"]
+    assert "ne dajem gotovo rjesenje" in svc.fold_diacritics(out["answer"])
+
+
+def test_explicit_new_exam_phrase_still_allowed_during_active_exam(master, tmap):
+    first = _start_exam(master, tmap)
+    out = svc.handle_chat(
+        {
+            "grade": 6,
+            "mode": "exam",
+            "selected_oblast": "Uglovi",
+            "last_tutor_task": first["last_tutor_task"],
+            "previous_next_state": first["next_state"],
+            "student_message": "napravi novi kontrolni",
+        },
+        _fake_chat(EXAM_ANGLE_TASK),
+        master, tmap, model="m", timeout=1,
+    )
+    # eksplicitno "novi kontrolni" NE ide u help-blok (nije direktan refuz)
+    assert "ne dajem gotovo rjesenje" not in svc.fold_diacritics(out["answer"])
+
+
+def test_active_exam_buttons_hidden_in_template():
+    import pathlib
+    html = pathlib.Path("templates/index.html").read_text(encoding="utf-8")
+    # prečice za završen kontrolni skrivene dok je exam_status === 'active'
+    assert "j.exam_state && j.exam_state.exam_status" in html
+    assert "examStatus === 'active'" in html
+
+
+def test_set_answer_logged_with_operation_and_normalized_student():
+    from matbot.answer_checker import check_practice_answer, summarize_result
+    result = check_practice_answer(_SET_UNION_ITEM, "1,2,3,4,5,6,7")
+    summary = summarize_result(result)
+    item = summary["items"][0]
+    assert item["answer_type"] == "set"
+    assert item["verdict"] == "correct"
+    assert item["expected_answer"] == "{1, 2, 3, 4, 5, 6, 7}"
+    assert item["normalized_student"] == "{1, 2, 3, 4, 5, 6, 7}"
+    assert item["deterministic_check"]["set_operation"] == "union"
+    assert item["deterministic_check"]["numeric_match"] is True

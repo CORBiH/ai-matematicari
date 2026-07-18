@@ -1001,6 +1001,67 @@ def _apply_completed_exam_followup_contract(payload: dict) -> None:
     payload["_direct_answer"] = _completed_exam_followup_answer(payload, prev_exam, refs, intent)
 
 
+# Tokom AKTIVNOG kontrolnog: molba za gotovo rješenje / pomoć nije predani odgovor
+# i NE smije pokrenuti novi kontrolni. Samo eksplicitno "novi kontrolni" to smije.
+_ACTIVE_EXAM_NEW_RE = re.compile(
+    r"\b(?:napravi|zapocni|pokreni|zapoceti|daj\s+mi\s+novi|jos\s+jedan|drugi)\s+"
+    r"(?:novi\s+)?(?:kontroln\w*|test\w*)\b"
+    r"|\bnovi\s+(?:kontroln\w*|test\w*)\b"
+    r"|\bjos\s+jedan\s+(?:kontroln\w*|test\w*)\b"
+)
+_ACTIVE_EXAM_REVEAL_RE = re.compile(
+    r"\bdaj\s+mi\s+(?:taca?n\w*\s+)?(?:odgovor\w*|rjesenj\w*|rezultat\w*)\b"
+    r"|\breci\s+mi\s+(?:taca?n\w*\s+)?(?:odgovor\w*|rjesenj\w*|rezultat\w*)\b"
+    r"|\bkoji\s+je\s+(?:taca?n\w*\s+)?(?:odgovor\w*|rezultat\w*)\b"
+    r"|\botkri\w*\s+(?:mi\s+)?(?:odgovor\w*|rjesenj\w*)\b"
+    r"|\brij?e[sš]?i\s+(?:mi\s+)?(?:ovaj\s+|taj\s+)?zadatak\b"
+    r"|\bpomozi\s+mi\b|\bne\s+znam\s+kako\b|\bzapeo\s+sam\b|\bzapela\s+sam\b"
+)
+
+
+def _active_exam_help_answer(item_number: int | None) -> str:
+    where = f" zadatak {item_number}" if item_number else " zadatak"
+    return (
+        f"Tokom kontrolnog ti ne dajem gotovo rješenje — želim da provjeriš "
+        f"koliko sam znaš. Ako ti{where} nije jasan, reci mi konkretno šta te "
+        f"muči (koji korak ili pojam) pa ću te navesti pitanjima. Kad budeš "
+        f"spreman/spremna, pošalji svoj odgovor."
+    )
+
+
+def _apply_active_exam_help_contract(payload: dict) -> None:
+    """Tokom AKTIVNOG kontrolnog: "daj mi odgovor za taj zadatak" / "pomozi" /
+    "riješi ovaj zadatak" NE otkrivaju rješenje i NE pokreću novi kontrolni.
+
+    Odgovori kratkom porukom i zadrži isti exam_id/task_id/current_item_index
+    (finalize ponovo emituje aktivni exam_state). Samo eksplicitno
+    "napravi novi kontrolni" smije početi novi (tada se ništa ne dira)."""
+    if payload.get("_direct_answer") is not None or payload.get("_skip_answer_check"):
+        return
+    if normalize_value(payload.get("intent")):
+        return
+    prev_exam = _previous_next_state(payload).get("exam_state")
+    if not prev_exam or normalize_value(prev_exam.get("exam_status")).lower() != "active":
+        return
+    message = normalize_value(payload.get("student_message") or payload.get("message"))
+    if not message:
+        return
+    folded = fold_diacritics(message)
+    if _ACTIVE_EXAM_NEW_RE.search(folded):
+        return                      # eksplicitno novi kontrolni → postojeći tok
+    if not _ACTIVE_EXAM_REVEAL_RE.search(folded):
+        return                      # nije molba za rješenje/pomoć → normalan tok
+    idx = prev_exam.get("current_item_index")
+    item_number = (idx + 1) if isinstance(idx, int) else None
+    payload["_active_exam_help"] = True
+    payload["_skip_answer_check"] = True
+    payload["mode"] = "exam"
+    payload["_session_mode"] = "exam"
+    payload["_stuck_count"] = int(_previous_next_state(payload).get("stuck_count", 0) or 0)
+    payload["_correct_streak"] = int(_previous_next_state(payload).get("correct_streak", 0) or 0)
+    payload["_direct_answer"] = _active_exam_help_answer(item_number)
+
+
 def _apply_hint_request_contract(payload: dict) -> None:
     """Explicit frontend hint intent: skip grading and preserve active task."""
     if normalize_value(payload.get("intent")).lower() != "hint_request":
@@ -1572,6 +1633,18 @@ def _task_answer_metadata(task_text: Any) -> list[dict]:
             "tolerance": (
                 _short_fraction(getattr(expected, "tolerance"))
                 if expected is not None and getattr(expected, "tolerance", None) is not None
+                else None
+            ),
+            # Skupovne operacije: kanonski elementi + imenovana operacija, da
+            # grading/Sheets/UI vide skup (a ne broj elemenata).
+            "answer_kind": (
+                "set" if expected is not None and getattr(expected, "answer_type", "") == "set"
+                else None
+            ),
+            "set_operation": normalize_value(getattr(expected, "set_operation", "")) or None,
+            "expected_elements": (
+                list(getattr(expected, "expected_elements", ()) or ())
+                if expected is not None and getattr(expected, "answer_type", "") == "set"
                 else None
             ),
             "validation_status": "validated" if expected is not None else "unvalidated",
@@ -4031,6 +4104,9 @@ def _prepare_chat(
     # BUG 2: poslije završenog kontrolnog "gdje sam pogriješio"/"objasni treći"
     # objašnjavaju konkretnu stavku, ne otvaraju novi zadatak niti ponavljaju sažetak.
     _apply_completed_exam_followup_contract(payload)
+    # Tokom AKTIVNOG kontrolnog: molba za rješenje/pomoć ne otkriva odgovor i ne
+    # pravi novi kontrolni (čuva exam_id/task_id/current_item_index).
+    _apply_active_exam_help_contract(payload)
     _apply_hint_request_contract(payload)
     _apply_multiple_choice_answer_contract(payload)
     _apply_video_recommendation_contract(payload)
