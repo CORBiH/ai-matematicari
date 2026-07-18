@@ -843,6 +843,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!modeShowsStreak(mode || state.mode) || n < 2){
         topbarStreak.classList.add('hidden');
         topbarStreak.classList.remove('pulse');
+        topbarStreak.textContent = '';   // ne ostavljaj stari "🔥 N zaredom" tekst iza sakrivenog pilla
         lastDisplayedStreak = n;
         return;
       }
@@ -1818,7 +1819,14 @@ document.addEventListener('DOMContentLoaded', () => {
         setNextState(j.next_state);
         updateStreakPill(j.next_state.correct_streak, j.session_mode || state.mode);
       }
-      else if (j && j.status) clearNextState();   // greška bez statusa NE briše stanje
+      else if (j && j.status) {
+        clearNextState();   // greška bez statusa NE briše stanje
+        /* Ocjenjivački potez bez next_state (npr. sintetizovani 'done' kad stream
+           izgubi završni događaj): streak sa servera je nepoznat → osvježi pill
+           na 0 umjesto da vizuelno zadržimo staru vrijednost. Obični ne-ocjenjivački
+           potezi NE diraju pill (validan streak se ne resetuje bez nove vrijednosti). */
+        if (opts.answerPhase) updateStreakPill(0, j.session_mode || state.mode);
+      }
       if (inImageTest || solutionRevealed) clearAwaitingPracticeTask();
       if (taskText){
         setAwaitingPracticeTask(taskText);  // sačuvaj zadatak prije historije

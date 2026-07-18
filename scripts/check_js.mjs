@@ -150,3 +150,40 @@ if (practiceFailed.length) {
   process.exit(1);
 }
 console.log('practice state checks OK (' + Object.keys(practiceChecks).length + ' provjera)');
+
+// 6) streak pill — netačan odgovor (correct_streak=0) NE smije zadržati stari "🔥 N zaredom"
+const modeShowsMatch = main.match(/function modeShowsStreak\(mode\)\{[\s\S]*?\n    \}/);
+const streakPillMatch = main.match(/let lastDisplayedStreak = 0;[\s\S]*?function updateStreakPill\(streak, mode\)\{[\s\S]*?\n    \}/);
+if (!modeShowsMatch || !streakPillMatch) { console.error('FAILED: updateStreakPill nije pronađen'); process.exit(1); }
+const streakClasses = new Set(['hidden']);
+const topbarStreakMock = {
+  textContent: '',
+  offsetWidth: 0,
+  classList: { add: c => streakClasses.add(c), remove: c => streakClasses.delete(c), contains: c => streakClasses.has(c) },
+};
+const streakState = { mode: 'exam' };
+const { updateStreakPill } = new Function(
+  'topbarStreak', 'state', 'showToast',
+  modeShowsMatch[0] + '\n' + streakPillMatch[0] + '\n; return { updateStreakPill };'
+)(topbarStreakMock, streakState, () => {});
+const shows = () => !streakClasses.has('hidden');
+const showsTwo = () => shows() && topbarStreakMock.textContent.includes('2 zaredom');
+// niz: tačno #1 → tačno #2 (pokaži 🔥2) → NETAČNO (correct_streak=0) → sakrij i očisti tekst
+updateStreakPill(1, 'exam');
+updateStreakPill(2, 'exam');
+const showedTwo = showsTwo();
+updateStreakPill(0, 'exam');
+const streakChecks = {
+  streak2_shown: showedTwo,
+  streak0_hidden_after_incorrect: !shows(),
+  streak0_text_not_stale: !topbarStreakMock.textContent.includes('2 zaredom'),
+  // null/undefined streak → tretiraj kao 0 (sakriveno)
+  null_streak_hidden: (updateStreakPill(null, 'exam'), !shows()),
+  missing_streak_hidden: (updateStreakPill(undefined, 'exam'), !shows()),
+};
+const streakFailed = Object.entries(streakChecks).filter(([, ok]) => !ok).map(([k]) => k);
+if (streakFailed.length) {
+  console.error('STREAK PILL FAILED:', streakFailed.join(', '));
+  process.exit(1);
+}
+console.log('streak pill checks OK (' + Object.keys(streakChecks).length + ' provjera)');
