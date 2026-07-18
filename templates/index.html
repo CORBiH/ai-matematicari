@@ -1469,8 +1469,12 @@ document.addEventListener('DOMContentLoaded', () => {
         { label: '🎬 Preporuči mi klip', msg: 'Preporuči mi video lekciju za ovu temu.', intent: 'recommend_video' }
       ];
       if (mode === 'exam') return [
-        { label: '➕ Daj još zadataka', msg: 'Daj mi još zadataka za vježbu.' },
-        { label: '📘 Objasni prvi zadatak', msg: 'Objasni mi prvi zadatak korak po korak.' },
+        /* BUG 4: "Daj još zadataka" pokreće NOVU vježbu (novi zadatak iz iste
+           oblasti), a NE objašnjenje prve stavke kontrolnog. Zato eksplicitno
+           prelazi u practice mod i šalje jasan zahtjev za novim zadatkom.
+           "Objasni prvi zadatak" ostaje zaseban — objašnjava 1. stavku kontrolnog. */
+        { label: '➕ Daj još zadataka', msg: 'Daj mi jedan novi zadatak za vježbu.', mode: 'practice' },
+        { label: '📘 Objasni prvi zadatak', msg: 'Objasni mi prvi zadatak iz kontrolnog korak po korak.' },
         { label: '🎬 Preporuči mi klip', msg: 'Preporuči mi video lekciju za ovu temu.', intent: 'recommend_video' }
       ];
       return [   /* quick */

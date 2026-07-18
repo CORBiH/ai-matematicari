@@ -165,6 +165,26 @@ def get_oblast_topics(oblast: Any, master_content: dict) -> list[dict]:
     ]
 
 
+def resolve_selected_oblast(selected: Any, master_content: dict) -> str:
+    """Vrati kanonski naziv oblasti za izabrani string. Prihvata i naziv OBLASTI
+    i naziv TEME/lekcije (tema_ui / selector_label / display_name) — tada vraća
+    oblast te teme. ``""`` ako se ništa ne poklopi (izbor se ne izmišlja)."""
+    key = normalize_value(selected).lower()
+    if not key:
+        return ""
+    rows = (master_content or {}).get("topics", []) or []
+    # 1) direktno ime oblasti
+    for r in rows:
+        if normalize_value(r.get("oblast")).lower() == key:
+            return normalize_value(r.get("oblast"))
+    # 2) tema/lekcija → njena oblast
+    for field in ("tema_ui", "selector_label", "display_name"):
+        for r in rows:
+            if normalize_value(r.get(field)).lower() == key:
+                return normalize_value(r.get("oblast"))
+    return ""
+
+
 def get_video_flow_context(
     payload: dict, final_topic: Any, master_content: dict
 ) -> dict | None:
@@ -1507,10 +1527,13 @@ def build_exam_oblast_prompt(payload: dict, master_content: dict) -> dict | None
     oblast = normalize_value(payload.get("selected_oblast"))
     if not oblast:
         return None
-    rows = get_oblast_topics(oblast, master_content or {})
+    # Izabrani string može biti OBLAST ili TEMA — razriješi u kanonsku oblast, da
+    # kontrolni radi za SVAKI valjan NPP izbor (ne samo za tačan naziv oblasti).
+    canonical = resolve_selected_oblast(oblast, master_content or {}) or oblast
+    rows = get_oblast_topics(canonical, master_content or {})
     if not rows:
         return None
-    canonical = normalize_value(rows[0].get("oblast")) or oblast
+    canonical = normalize_value(rows[0].get("oblast")) or canonical
 
     # oblast (npr. "Osnovne geometrijske konstrukcije...") može tražiti
     # konstrukcijski blok i bez pojedinačne teme

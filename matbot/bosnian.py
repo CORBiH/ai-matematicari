@@ -42,6 +42,18 @@ _REPLACEMENTS: tuple[tuple[re.Pattern, str], ...] = tuple(
         (r"primer(\w*)", r"primjer\1"),
         (r"sledeć(\w*)", r"sljedeć\1"),
         (r"sledec(\w*)", r"sljedec\1"),
+        # 2026-07-18 (jezička konzistentnost): česti srpski/ekavski oblici prijavljeni
+        # sa produkcije. "razume-" → "razumije-"; "obe" → "obje"; "devoj-" → "djevoj-".
+        (r"razumem", "razumijem"),
+        (r"razumemo", "razumijemo"),
+        (r"razumeš", "razumiješ"),
+        (r"razumeju", "razumiju"),
+        (r"razume", "razumije"),
+        (r"obe", "obje"),
+        (r"devoj(\w*)", r"djevoj\1"),
+        # Diacritic-stripped redni broj "treci ugao" → "treći ugao" (matematički
+        # termin "ugao" ostaje netaknut; samo redni broj dobija ć).
+        (r"trec(eg|em|oj|om|ih|im|i|a|e|u)", r"treć\1"),
         (r"uvek", "uvijek"),
         (r"posle", "poslije"),
         (r"ovde", "ovdje"),

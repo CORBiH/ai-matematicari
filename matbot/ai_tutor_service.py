@@ -54,7 +54,9 @@ from matbot.prompt_builder import (
     build_general_tutor_prompt,
     build_result_mode_prompt,
     build_tutor_prompt,
+    get_oblast_topics,
     get_topic_context,
+    resolve_selected_oblast,
 )
 from matbot.sheets_log import log_transcript_to_sheet
 from matbot.topic_detector import detect_topic, fold_diacritics, is_vague_message
@@ -968,10 +970,6 @@ def _apply_completed_exam_followup_contract(payload: dict) -> None:
     prev_exam = _previous_next_state(payload).get("exam_state")
     if not prev_exam or normalize_value(prev_exam.get("exam_status")).lower() != "completed":
         return
-    # Svjež zahtjev za NOVIM kontrolnim ("pripremi me za kontrolni") ide svojim
-    # tokom (novi set), ne kao objašnjenje starog.
-    if _is_fresh_exam_prep_request(payload):
-        return
     items = prev_exam.get("items") or []
     if not items:
         return
@@ -990,6 +988,8 @@ def _apply_completed_exam_followup_contract(payload: dict) -> None:
     elif _EXAM_FOLLOWUP_SUMMARY_RE.search(folded):
         intent = "summary"
     else:
+        # Nijedan followup signal (npr. "pripremi me za kontrolni") → nije
+        # objašnjenje starog kontrolnog; ide svojim tokom (novi set).
         return
 
     payload["_completed_exam_followup"] = True
@@ -1673,10 +1673,35 @@ _OBLAST_SIGNATURES: list[tuple[str, "re.Pattern[str]"]] = [
 ]
 _OBLAST_SIG_MAP = {key: rx for key, rx in _OBLAST_SIGNATURES}
 
-# Oblasti gdje se primjenjuje topic-match (umjesto numeričke) validacije kontrolnog:
-# tačno one kod kojih je model znao pobjeći na trougao-ugao fallback. Geometrijske
-# oblasti (uglovi) zadržavaju postojeću numeričku validaciju (mješoviti zadaci OK).
-_TOPIC_MATCH_OBLASTI = {"razlomci", "vektori"}
+# Riječi bez kojih vlastiti profil oblasti ne bi bio distinktivan (veznici,
+# generičke imenice). Ne filtriramo previše — profil se koristi SAMO da potvrdi
+# pripadnost (nikad da odbije), pa je preširok profil bezopasan.
+_OBLAST_PROFILE_STOP = frozenset({
+    "zadatak", "zadaci", "zadatka", "zadatke", "pomocu", "preko", "izmedu",
+    "koje", "koji", "koja", "kroz", "njih", "samo", "jedan", "jedne",
+    "ostal", "ostale", "opste", "opsti", "osnov", "osnovni", "osnovne",
+})
+
+
+def _word_stem(token: str) -> str:
+    return token[:6]
+
+
+def _oblast_keyword_profile(oblast: Any, master: dict) -> set[str]:
+    """Skup korijena (stem) riječi koje karakterišu oblast — iz naziva oblasti +
+    tema_ui/display_name svih tema te oblasti (NPP metadata). Koristi se da
+    POTVRDI da stavka pripada oblasti (nikad za odbijanje)."""
+    canonical = resolve_selected_oblast(oblast, master) or normalize_value(oblast)
+    stems: set[str] = set()
+    sources = [normalize_value(oblast), canonical]
+    for r in get_oblast_topics(canonical, master):
+        sources.append(normalize_value(r.get("tema_ui")))
+        sources.append(normalize_value(r.get("display_name")))
+    for src in sources:
+        for tok in re.findall(r"[a-z]{5,}", fold_diacritics(src)):
+            if tok not in _OBLAST_PROFILE_STOP:
+                stems.add(_word_stem(tok))
+    return stems
 
 # Deterministi\u010dke, GARANTOVANO u-oblasti rezerve (koristi se samo ako model vrati
 # zadatke van oblasti). Numeri\u010dki provjerljive gdje god je mogu\u0107e.
@@ -1732,44 +1757,117 @@ def _exam_oblast_signature_key(oblast: Any) -> str | None:
     return None
 
 
-def _validate_exam_oblast_task(task_text: Any, oblast: Any) -> dict:
-    """Konzervativan topic-match validator za kontrolni-iz-oblasti. Odbija SAMO
-    stavke koje jasno pripadaju DRUGOJ poznatoj oblasti (npr. trougao-ugao u
-    kontrolnom iz razlomaka). Neutralne stavke se prihvataju."""
+# (3) Deterministi\u010dki tipovi zadataka NEDVOSMISLENO dozvoljeni za oblast, \u010dak i
+# kad tekst ne sadr\u017ei naziv oblasti (npr. "Izra\u010dunaj 2/5 + 1/5" je razlomci zadatak
+# zbog zapisa a/b; "a(5,2)" je vektorski). Provjerava se SAMO za IZABRANU oblast.
+_OBLAST_ALLOWED_TASK_TYPE = {
+    "razlomci": re.compile(r"\b\d+\s*/\s*\d+\b"),
+    "decimalni": re.compile(r"\b\d+,\d+\b"),
+    "vektori": re.compile(r"\b[a-z]\s*\(\s*-?\d+\s*[,;]\s*-?\d+\s*\)"),
+    "uglovi": re.compile(r"\d+\s*(?:\u00b0|stepen)"),
+}
+
+
+def _item_belongs_to_oblast(folded_item: str, own_key: str | None, own_stems: set[str]) -> bool:
+    """Da li stavka PRIPADA izabranoj oblasti (vlastiti potpis ili NPP profil)."""
+    own_rx = _OBLAST_SIG_MAP.get(own_key) if own_key else None
+    if own_rx and own_rx.search(folded_item):
+        return True
+    return any(stem in folded_item for stem in own_stems)
+
+
+def _item_allowed_task_type(folded_item: str, own_key: str | None) -> bool:
+    """Da li je stavka deterministi\u010dki tip zadatka dozvoljen za IZABRANU oblast."""
+    rx = _OBLAST_ALLOWED_TASK_TYPE.get(own_key) if own_key else None
+    return bool(rx and rx.search(folded_item))
+
+
+def _validate_exam_oblast_task(
+    task_text: Any,
+    oblast: Any,
+    master: dict | None = None,
+    item_topics: dict | None = None,
+) -> dict:
+    """Strogi topic-match validator za kontrolni IZ OBLASTI (svaka NPP oblast).
+
+    Kontrolni iz IZABRANE oblasti mora imati SVAKU stavku vezanu za tu oblast.
+    Stavka je validna SAMO ako vrijedi bar jedno:
+      1. pozitivan match sa oblasti/NPP temom (vlastiti potpis ili profil),
+      2. strukturirani topic metapodatak (``item_topics[n]``) IZRI\u010cITO imenuje
+         izabranu oblast/temu i nije u sukobu sa sadr\u017eajem (nema stranog signala),
+      3. deterministi\u010dki tip zadatka dozvoljen za tu oblast (npr. zapis razlomka).
+    Ako ni\u0161ta ne vrijedi (strana oblast ILI neutralno/neprovjereno) \u2192 odbija se
+    CIJELI generisani kontrolni. Odsustvo stranog signala NIJE dovoljno."""
     text = normalize_value(task_text)
     meta = _task_answer_metadata(text)
     if not text:
         return {"validation_status": "rejected", "reason": "empty_task", "items": meta}
-    own = _exam_oblast_signature_key(oblast)
-    if own is None:
-        return {"validation_status": "validated", "reason": "", "items": meta}
-    own_rx = _OBLAST_SIG_MAP.get(own)
+    own_key = _exam_oblast_signature_key(oblast)
+    own_stems = _oblast_keyword_profile(oblast, master or {})
+    canonical = fold_diacritics(resolve_selected_oblast(oblast, master or {}) or normalize_value(oblast))
+    topics = item_topics or {}
     items = split_numbered_items(text) or [(1, text)]
-    for _n, item_text in items:
+    for n, item_text in items:
         folded = fold_diacritics(item_text)
-        own_match = bool(own_rx and own_rx.search(folded))
-        foreign = [k for k, rx in _OBLAST_SIGNATURES if k != own and rx.search(folded)]
-        if foreign and not own_match:
-            return {
-                "validation_status": "rejected",
-                "reason": f"off_oblast:{foreign[0]}",
-                "items": meta,
-            }
+        foreign = [k for k, rx in _OBLAST_SIGNATURES if k != own_key and rx.search(folded)]
+        # (1) pozitivan match sa izabranom oblasti / NPP temom
+        if _item_belongs_to_oblast(folded, own_key, own_stems):
+            continue
+        # (2) strukturirani metapodatak imenuje oblast/temu, konzistentno sa sadr\u017eajem
+        declared = normalize_value(topics.get(n))
+        if declared and not foreign:
+            declared_canon = fold_diacritics(resolve_selected_oblast(declared, master or {}))
+            if declared_canon and declared_canon == canonical:
+                continue
+        # (3) dozvoljen deterministi\u010dki tip zadatka za oblast
+        if not foreign and _item_allowed_task_type(folded, own_key):
+            continue
+        # ina\u010de: strana oblast ILI neutralno/neprovjereno \u2192 odbij cijeli kontrolni
+        reason = f"off_oblast:{foreign[0]}" if foreign else "unverified_item"
+        return {"validation_status": "rejected", "reason": reason, "items": meta}
     return {"validation_status": "validated", "reason": "", "items": meta}
 
 
 def _oblast_fallback_exam(oblast: Any) -> str:
-    """Deterministi\u010dka rezerva u pravoj oblasti (nikad trougao-ugao za razlomke/vektore)."""
+    """Deterministi\u010dka rezerva U PRAVOJ oblasti (nikad generi\u010dki trougao-ugao za
+    nesrodnu oblast). ``""`` ako oblast nema pripremljen skup \u2014 tada pozivalac
+    tra\u017ei u\u017eu lekciju umjesto da prika\u017ee nesrodne zadatke."""
     return _OBLAST_FALLBACK_EXAMS.get(_exam_oblast_signature_key(oblast) or "", "")
 
 
-def _format_exam_task_answer(task_text: Any) -> str:
-    """Prika\u017ei tri zadatka kao 1./2./3. \u2014 bez "Zadatak:" prefiksa (koji je davao
-    "Zadatak: 1. ...\\n1. ...")."""
+def _oblast_narrower_lesson_message(oblast: Any, master: dict | None = None) -> str:
+    """Kad nema sigurne rezerve za oblast: tra\u017ei od u\u010denika U\u017dU lekciju (vezano za
+    ba\u0161 tu oblast), umjesto da prika\u017ee nesrodne (trougao-ugao) zadatke."""
+    canonical = resolve_selected_oblast(oblast, master or {}) or normalize_value(oblast)
+    temas: list[str] = []
+    for r in get_oblast_topics(canonical, master or {}):
+        t = normalize_value(r.get("tema_ui")) or normalize_value(r.get("display_name"))
+        if t and t not in temas:
+            temas.append(t)
+        if len(temas) >= 5:
+            break
+    msg = (
+        f"Za kontrolni iz oblasti \u201e{canonical}\u201c treba mi malo u\u017ea tema da "
+        "pripremim prave zadatke. Izaberi jednu lekciju:"
+    )
+    if temas:
+        msg += "\n" + "\n".join(f"- {t}" for t in temas)
+    return msg
+
+
+def _format_exam_task_answer(task_text: Any, oblast: Any = "") -> str:
+    """Prika\u017ei kontrolni kao:  "Kontrolni \u2013 <oblast>" + numerisani zadaci 1., 2.,
+    3. sa praznim redom izme\u0111u \u2014 bez suvi\u0161nog "Zadatak:" prefiksa. Redoslijed
+    stavki se NE mijenja; matematika/LaTeX se prenosi doslovno."""
     text = normalize_value(task_text)
-    # skini eventualni "Zadatak:" label ispred numerisane liste
     text = re.sub(r"^\s*zadatak\s*:\s*", "", text, flags=re.IGNORECASE)
-    return text.strip()
+    items = split_numbered_items(text)
+    if not items:
+        return text.strip()
+    oblast_name = normalize_value(oblast)
+    header = f"Kontrolni \u2013 {oblast_name}" if oblast_name else "Kontrolni"
+    body = "\n\n".join(f"{n}. {q}".strip() for n, q in items)
+    return f"{header}\n\n{body}".strip()
 
 
 def _normalize_task_validation(raw: Any) -> dict | None:
@@ -5542,35 +5640,34 @@ def _finalize_response(prep: dict, answer: str) -> dict:
         normalize_value(prompt_result.get("exam_oblast"))
         if prompt_result.get("oblast_context_used") else ""
     )
-    # Topic-match validacija se primjenjuje na "sadržajne" oblasti gdje je tvrdo
-    # kodirani trougao-ugao fallback bio pogrešan (prijavljeni bug: razlomci,
-    # vektori). Geometrijske oblasti (uglovi...) zadržavaju numeričku validaciju.
-    exam_own_key = _exam_oblast_signature_key(exam_oblast) if exam_oblast else None
-    if task_text and mode == "exam" and exam_oblast and exam_own_key in _TOPIC_MATCH_OBLASTI:
+    # Kontrolni IZ OBLASTI vrijedi za SVAKU valjanu NPP oblast: validiramo po temi
+    # (pripada li oblasti), ne po numeričkoj izračunljivosti. Ako model promaši
+    # oblast, koristimo rezervu u pravoj oblasti ili tražimo užu lekciju — nikad
+    # generički trougao-ugao za nesrodnu oblast.
+    exam_master = prep.get("master") or {}
+    if task_text and mode == "exam" and exam_oblast:
         prev_task_text = normalize_value(payload.get("last_tutor_task"))[:600]
         new_generated_task = bool(task_text and task_text != prev_task_text and not _is_grading_turn(payload))
-        validation = _validate_exam_oblast_task(task_text, exam_oblast)
+        validation = _validate_exam_oblast_task(task_text, exam_oblast, exam_master)
         if validation.get("validation_status") != "validated" and new_generated_task:
-            # 1) deterministička rezerva u pravoj oblasti (nikad druga oblast).
+            # 1) deterministička rezerva u pravoj oblasti.
             fallback_task = _oblast_fallback_exam(exam_oblast)
-            fallback_validation = _validate_exam_oblast_task(fallback_task, exam_oblast)
+            fallback_validation = _validate_exam_oblast_task(fallback_task, exam_oblast, exam_master)
             if fallback_task and fallback_validation.get("validation_status") == "validated":
                 task_text = fallback_task[:600]
                 validation = fallback_validation
-                answer = _format_exam_task_answer(task_text)
+                answer = _format_exam_task_answer(task_text, exam_oblast)
                 response["answer"] = answer
             else:
+                # 2) nema sigurne rezerve → traži užu lekciju (nikad nesrodni zadaci).
                 task_text = ""
-                answer = (
-                    "Trenutno ne mogu pripremiti kontrolni za ovu oblast. Izaberi "
-                    "konkretnu temu iz oblasti pa da počnemo."
-                )
+                answer = _oblast_narrower_lesson_message(exam_oblast, exam_master)
                 response["answer"] = answer
         else:
-            # prihvaćen zadatak: očisti eventualni "Zadatak:" prefiks (numeracija 1,2,3).
-            cleaned = _format_exam_task_answer(answer)
-            if cleaned and cleaned != normalize_value(answer):
-                answer = cleaned
+            # prihvaćen zadatak: formatiraj (header + 1.,2.,3. sa praznim redom).
+            formatted = _format_exam_task_answer(task_text or answer, exam_oblast)
+            if formatted:
+                answer = formatted
                 response["answer"] = answer
         payload["_task_validation"] = validation
         payload["_resolved_exam_topic"] = exam_oblast

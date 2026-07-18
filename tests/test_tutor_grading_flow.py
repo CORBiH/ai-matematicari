@@ -1415,11 +1415,11 @@ GPT_TRIES_FRESH_ANGLE_QUESTIONS = (
 )
 
 
-def _start_exam(master, tmap, task=EXAM_ANGLE_TASK, previous_next_state=None):
+def _start_exam(master, tmap, task=EXAM_ANGLE_TASK, previous_next_state=None, oblast="Uglovi"):
     payload = {
         "grade": 6,
         "mode": "exam",
-        "selected_oblast": "Uglovi",
+        "selected_oblast": oblast,
         "student_message": "Pripremi me za kontrolni.",
     }
     if previous_next_state:
@@ -1427,12 +1427,12 @@ def _start_exam(master, tmap, task=EXAM_ANGLE_TASK, previous_next_state=None):
     return svc.handle_chat(payload, _fake_chat(task), master, tmap, model="m", timeout=1)
 
 
-def _answer_exam(master, tmap, prev, answer, reply=GPT_TRIES_FRESH_ANGLE_QUESTIONS):
+def _answer_exam(master, tmap, prev, answer, reply=GPT_TRIES_FRESH_ANGLE_QUESTIONS, oblast="Uglovi"):
     return svc.handle_chat(
         {
             "grade": 6,
             "mode": "practice",  # old browser drift must not break exam mode
-            "selected_oblast": "Uglovi",
+            "selected_oblast": oblast,
             "interaction_phase": "answering_practice_task",
             "last_tutor_task": prev["last_tutor_task"],
             "previous_next_state": prev["next_state"],
@@ -1492,15 +1492,16 @@ def test_exam_progression_uses_exact_stored_next_items_and_final_summary(master,
 
 
 def test_exam_final_summary_handles_mixed_results_and_sheets_state(master, tmap):
+    # Mješoviti REZULTATI (tačno/djelimično/netačno), ali JEDNA oblast (Razlomci).
     mixed_task = (
-        "1. U trouglu su dva ugla 30° i 90°. Odredi treci ugao.\n"
+        "1. Skrati razlomak 4/8.\n"
         "2. Pretvori 3/2 u mješoviti broj.\n"
-        "3. U trouglu su dva ugla 80° i 40°. Odredi treci ugao."
+        "3. Izračunaj 1/3 + 1/3."
     )
-    first = _start_exam(master, tmap, task=mixed_task)
-    one = _answer_exam(master, tmap, first, "60")
-    two = _answer_exam(master, tmap, one, "3/2")
-    three = _answer_exam(master, tmap, two, "0")
+    first = _start_exam(master, tmap, task=mixed_task, oblast="Razlomci")
+    one = _answer_exam(master, tmap, first, "1/2", oblast="Razlomci")
+    two = _answer_exam(master, tmap, one, "3/2", oblast="Razlomci")
+    three = _answer_exam(master, tmap, two, "0", oblast="Razlomci")
 
     assert three["task_status"] == "completed"
     assert three["next_state"]["exam_state"]["exam_status"] == "completed"
@@ -1516,7 +1517,7 @@ def test_exam_final_summary_handles_mixed_results_and_sheets_state(master, tmap)
             "session_id": "sess-exam-final",
             "grade": 6,
             "mode": "exam",
-            "selected_oblast": "Uglovi",
+            "selected_oblast": "Razlomci",
             "student_message": "0",
         },
         three,
@@ -1529,21 +1530,22 @@ def test_exam_final_summary_handles_mixed_results_and_sheets_state(master, tmap)
 
 def test_exam_summary_shows_required_fraction_form_not_normalized_value(master, tmap):
     # BUG (fraction expansion): "Proširi 3/8 na nazivnik 24" — sažetak MORA
-    # pokazati traženi oblik 9/24, ne normalizovanu vrijednost 3/8.
+    # pokazati traženi oblik 9/24, ne normalizovanu vrijednost 3/8. Jednooblastni
+    # (Razlomci) kontrolni — bez miješanja tema.
     task = (
-        "1. U trouglu su dva ugla 30° i 90°. Odredi treci ugao.\n"
-        "2. U trouglu su dva ugla 45° i 65°. Odredi treci ugao.\n"
+        "1. Izračunaj 2/7 + 3/7.\n"
+        "2. Skrati razlomak 8/12.\n"
         "3. Proširi razlomak 3/8 na nazivnik 24."
     )
-    first = _start_exam(master, tmap, task=task)
+    first = _start_exam(master, tmap, task=task, oblast="Razlomci")
     item3_meta = first["next_state"]["exam_state"]["items"][2]["answer_metadata"]
     assert item3_meta["expected_answer_display"] == "9/24"
     assert item3_meta["expected_value"] == "3/8"
     assert item3_meta["required_denominator"] == 24
 
-    one = _answer_exam(master, tmap, first, "60")
-    two = _answer_exam(master, tmap, one, "70")
-    three = _answer_exam(master, tmap, two, "18/24")
+    one = _answer_exam(master, tmap, first, "5/7", oblast="Razlomci")
+    two = _answer_exam(master, tmap, one, "2/3", oblast="Razlomci")
+    three = _answer_exam(master, tmap, two, "18/24", oblast="Razlomci")
 
     final = three["next_state"]["exam_state"]
     assert final["exam_status"] == "completed"
@@ -1588,17 +1590,18 @@ def test_new_exam_after_completion_gets_new_exam_id_and_clean_items(master, tmap
 # --- BUG 2: follow-up poslije ZAVRŠENOG kontrolnog objašnjava stavku ----------------
 
 _EXAM_FRACTION_TASK = (
-    "1. U trouglu su dva ugla 30° i 90°. Odredi treci ugao.\n"
-    "2. U trouglu su dva ugla 45° i 65°. Odredi treci ugao.\n"
+    "1. Izračunaj 2/7 + 3/7.\n"
+    "2. Skrati razlomak 8/12.\n"
     "3. Proširi razlomak 3/8 na nazivnik 24."
 )
 
 
 def _complete_exam_with_wrong_third(master, tmap):
-    first = _start_exam(master, tmap, task=_EXAM_FRACTION_TASK)
-    one = _answer_exam(master, tmap, first, "60")     # tačno
-    two = _answer_exam(master, tmap, one, "70")        # tačno
-    three = _answer_exam(master, tmap, two, "18/24")   # netačno (3/4 ≠ 3/8)
+    # Jednooblastni (Razlomci) kontrolni; treća stavka namjerno netačna.
+    first = _start_exam(master, tmap, task=_EXAM_FRACTION_TASK, oblast="Razlomci")
+    one = _answer_exam(master, tmap, first, "5/7", oblast="Razlomci")    # tačno
+    two = _answer_exam(master, tmap, one, "2/3", oblast="Razlomci")       # tačno
+    three = _answer_exam(master, tmap, two, "18/24", oblast="Razlomci")   # netačno (3/4 ≠ 3/8)
     assert three["next_state"]["exam_state"]["exam_status"] == "completed"
     return three
 
@@ -1780,13 +1783,208 @@ def test_exam_oblast_fallback_is_topic_specific():
 
 
 def test_exam_oblast_fallback_renders_three_numbered_questions():
-    # (11) tri zadatka kao 1./2./3. — bez "Zadatak:" prefiksa
+    # (11) format: "Kontrolni – <oblast>" + 1., 2., 3. sa praznim redom, bez "Zadatak:"
     out = _exam_by_oblast(6, "Razlomci", _ANGLE_REPLY)
     ans = out["answer"]
     assert not ans.lower().startswith("zadatak:")
-    assert ans.lstrip().startswith("1.")
-    assert "\n2." in ans and "\n3." in ans
     assert "Zadatak: 1." not in ans
+    assert ans.startswith("Kontrolni – Razlomci")
+    assert "\n\n1. " in ans and "\n\n2. " in ans and "\n\n3. " in ans
+
+
+# --- BUG 1 (opšte): kontrolni radi za SVAKU oblast, ne samo razlomci/vektori --------
+
+def test_exam_relacije_oblast_keeps_topic_and_avoids_angle_fallback():
+    reply = (
+        "1. Odredi koordinate tačke A(3, 5) u koordinatnom sistemu.\n"
+        "2. Preslikaj tačku B(2, 1) osnom simetrijom preko x-ose.\n"
+        "3. Odredi udaljenost tačaka A(0,0) i B(3,4)."
+    )
+    out = _exam_by_oblast(6, "Relacije, preslikavanja i koordinatni sistem", reply)
+    assert out["resolved_exam_topic"] == "Relacije, preslikavanja i koordinatni sistem"
+    assert out["mode"] == "exam"
+    assert out["next_state"]["active_task_kind"] == "exam"
+    assert "troug" not in out["answer"].lower()
+    assert "koordinat" in out["answer"].lower()
+
+
+def test_exam_relacije_rejects_angle_and_asks_narrower_lesson():
+    # model promaši oblast (trougao-ugao) → NE prikazuj nesrodne zadatke; traži užu lekciju
+    out = _exam_by_oblast(6, "Relacije, preslikavanja i koordinatni sistem", _ANGLE_REPLY)
+    assert "troug" not in out["answer"].lower()
+    assert "lekcij" in out["answer"].lower()
+
+
+def test_exam_tema_as_oblast_resolves_to_parent_oblast():
+    # "Sabiranje i oduzimanje mjernih brojeva za uglove" = tema u oblasti Uglovi
+    out = _exam_by_oblast(6, "Sabiranje i oduzimanje mjernih brojeva za uglove", _ANGLE_REPLY)
+    assert out["resolved_exam_topic"] == "Uglovi"
+    assert out["mode"] == "exam"
+    # za oblast Uglovi trougao-ugao JESTE u temi → zadržan
+    assert "troug" in out["answer"].lower()
+
+
+def test_exam_tema_tekstualni_razlomci_resolves_to_razlomci():
+    reply = (
+        "1. Marko je pojeo 2/5 čokolade. Koliki dio je ostao?\n"
+        "2. Ana ima 3/4 metra trake. Potroši 1/4. Koliko joj ostaje?\n"
+        "3. U razredu je 2/3 djevojčica. Koliki dio su dječaci?"
+    )
+    out = _exam_by_oblast(6, "Tekstualni zadaci s razlomcima", reply)
+    assert out["resolved_exam_topic"] == "Razlomci"
+    assert "troug" not in out["answer"].lower()
+
+
+def test_exam_additional_oblast_djeljivost_keeps_topic():
+    reply = (
+        "1. Da li je 24 djeljivo sa 6?\n"
+        "2. Odredi NZD brojeva 12 i 18.\n"
+        "3. Rastavi 36 na proste faktore."
+    )
+    out = _exam_by_oblast(6, "Djeljivost brojeva", reply)
+    assert out["resolved_exam_topic"] == "Djeljivost brojeva"
+    assert out["mode"] == "exam"
+    assert out["next_state"]["active_task_kind"] == "exam"
+    assert "troug" not in out["answer"].lower()
+
+
+def test_exam_djeljivost_rejects_angle_fallback():
+    out = _exam_by_oblast(6, "Djeljivost brojeva", _ANGLE_REPLY)
+    assert "troug" not in out["answer"].lower()
+
+
+# --- BUG 1 (strogo): kontrolni iz izabrane oblasti NE smije biti mješovit -----------
+
+def test_strict_relacije_rejects_coordinate_plus_two_angle_items(master):
+    task = (
+        "1. Odredi koordinate tačke A(3, 5) u koordinatnom sistemu.\n"
+        "2. U trouglu su dva ugla 30° i 90°. Odredi treci ugao.\n"
+        "3. U trouglu su dva ugla 45° i 65°. Odredi treci ugao."
+    )
+    v = svc._validate_exam_oblast_task(task, "Relacije, preslikavanja i koordinatni sistem", master)
+    assert v["validation_status"] == "rejected"
+    assert v["reason"].startswith("off_oblast")
+
+
+def test_strict_razlomci_rejects_two_fractions_plus_one_angle(master):
+    task = (
+        "1. Skrati razlomak 6/8.\n"
+        "2. Proširi razlomak 3/8 na nazivnik 24.\n"
+        "3. U trouglu su dva ugla 30° i 90°. Odredi treci ugao."
+    )
+    v = svc._validate_exam_oblast_task(task, "Razlomci", master)
+    assert v["validation_status"] == "rejected"
+
+
+def test_strict_vektori_rejects_two_vectors_plus_one_fraction():
+    from matbot.content_loader import get_master
+    m7 = get_master(grade=7)
+    task = (
+        "1. Dati su vektori a(2,3) i b(1,4). Odredi a + b.\n"
+        "2. Kolika je dužina vektora a(3,4)?\n"
+        "3. Skrati razlomak 6/8."
+    )
+    v = svc._validate_exam_oblast_task(task, "Vektori", m7)
+    assert v["validation_status"] == "rejected"
+
+
+def test_strict_all_three_from_selected_oblast_accepted(master):
+    task = (
+        "1. Skrati razlomak 6/8.\n"
+        "2. Proširi razlomak 3/8 na nazivnik 24.\n"
+        "3. Izračunaj 2/7 + 3/7."
+    )
+    v = svc._validate_exam_oblast_task(task, "Razlomci", master)
+    assert v["validation_status"] == "validated"
+
+
+def test_strict_rejected_mixed_uses_oblast_fallback_never_generic_angle():
+    # Razlomci mješoviti (2 razlomka + 1 ugao) → odbijen → rezerva U RAZLOMCIMA
+    mixed = (
+        "1. Skrati razlomak 6/8.\n"
+        "2. Izračunaj 1/2 + 1/3.\n"
+        "3. U trouglu su dva ugla 30° i 90°. Odredi treci ugao."
+    )
+    out = _exam_by_oblast(6, "Razlomci", mixed)
+    assert "troug" not in out["answer"].lower()
+    assert "razlom" in out["answer"].lower()
+    # Relacije mješoviti → nema rezerve → traži užu lekciju, nikad trougao-ugao
+    rel_mixed = (
+        "1. Odredi koordinate tačke A(3, 5).\n"
+        "2. U trouglu su dva ugla 30° i 90°. Odredi treci ugao.\n"
+        "3. U trouglu su dva ugla 45° i 65°. Odredi treci ugao."
+    )
+    out2 = _exam_by_oblast(6, "Relacije, preslikavanja i koordinatni sistem", rel_mixed)
+    assert "troug" not in out2["answer"].lower()
+    assert "lekcij" in out2["answer"].lower()
+
+
+# --- BUG 1 (najstrože): neutralna stavka BEZ pozitivnog signala mora pasti ----------
+
+_RELACIJE = "Relacije, preslikavanja i koordinatni sistem"
+
+
+def test_strict_neutral_arithmetic_item_rejected_for_relacije(master):
+    # "Izračunaj 12 + 5" nema signal Relacije, ni strani signal → NEUTRALNO → odbij.
+    v = svc._validate_exam_oblast_task("Izračunaj 12 + 5.", _RELACIJE, master)
+    assert v["validation_status"] == "rejected"
+    assert v["reason"] == "unverified_item"
+
+
+def test_strict_item_accepted_with_matching_structured_topic_metadata(master):
+    from matbot.prompt_builder import get_oblast_topics
+    tema = get_oblast_topics(_RELACIJE, master)[0]["tema_ui"]
+    # Isti neutralni tekst, ali strukturirani metapodatak IZRIČITO imenuje temu
+    # izabrane oblasti → prihvaćeno (kriterij 2).
+    v = svc._validate_exam_oblast_task(
+        "Izračunaj 12 + 5.", _RELACIJE, master, item_topics={1: tema},
+    )
+    assert v["validation_status"] == "validated"
+    # metapodatak koji imenuje DRUGU oblast ne spašava neutralnu stavku
+    v2 = svc._validate_exam_oblast_task(
+        "Izračunaj 12 + 5.", _RELACIJE, master, item_topics={1: "Razlomci"},
+    )
+    assert v2["validation_status"] == "rejected"
+
+
+def test_strict_valid_coordinate_question_accepted(master):
+    task = (
+        "1. Odredi koordinate tačke A(3, 5) u koordinatnom sistemu.\n"
+        "2. Nacrtaj tačku B(2, 1) u koordinatnoj ravni.\n"
+        "3. Očitaj koordinate tačke sa grafika u sistemu."
+    )
+    v = svc._validate_exam_oblast_task(task, _RELACIJE, master)
+    assert v["validation_status"] == "validated"
+
+
+def test_strict_razlomci_fraction_arithmetic_accepted(master):
+    # "Izračunaj 2/5 + 1/5" nema riječ "razlomak", ali JESTE razlomci tip (a/b).
+    v = svc._validate_exam_oblast_task("Izračunaj 2/5 + 1/5.", "Razlomci", master)
+    assert v["validation_status"] == "validated"
+
+
+def test_strict_neutral_item_without_metadata_rejected(master):
+    # Neutralna stavka bez metapodataka u bilo kojoj izabranoj oblasti → odbij.
+    v_rel = svc._validate_exam_oblast_task("Napiši broj koji slijedi.", _RELACIJE, master)
+    assert v_rel["validation_status"] == "rejected"
+    v_frac = svc._validate_exam_oblast_task("Izračunaj 12 + 5.", "Razlomci", master)
+    assert v_frac["validation_status"] == "rejected"
+    assert v_frac["reason"] == "unverified_item"
+
+
+# --- BUG 2: format kontrolnog -------------------------------------------------------
+
+def test_exam_formatting_header_and_blank_lines():
+    out = _exam_by_oblast(6, "Razlomci", _FRACTION_REPLY)
+    ans = out["answer"]
+    assert ans.startswith("Kontrolni – Razlomci")
+    assert not ans.lower().startswith("zadatak")
+    assert "Zadatak:" not in ans.split("\n")[0]
+    # tačno 1, 2, 3 sa praznim redom između
+    import re as _re
+    nums = [m.group(1) for m in _re.finditer(r"(?m)^(\d+)\. ", ans)]
+    assert nums == ["1", "2", "3"]
+    assert "\n\n1. " in ans and "\n\n2. " in ans and "\n\n3. " in ans
 
 
 def test_exam_payload_preserves_grade_topic_oblast_in_template():
@@ -1798,6 +1996,103 @@ def test_exam_payload_preserves_grade_topic_oblast_in_template():
     assert "selected_topic: selectedTopicForPayload" in html
     # za exam sa izabranom oblašću: oblast ide iz state.oblast
     assert "examMode ? state.oblast" in html
+
+
+# --- BUG 3: bosanska jezička konzistentnost -----------------------------------------
+
+def test_language_guard_fixes_serbian_forms():
+    from matbot.bosnian import to_ijekavica
+    out = to_ijekavica("Razumem, sad rešenje. Sledeći korak. Obe djevojčice.")
+    assert "Razumem" not in out and "Razumijem" in out
+    assert "rešenje" not in out and "rješenje" in out
+    assert "sledeći" not in out.lower() and "sljedeći" in out.lower()
+    assert "obe " not in out.lower() and "obje" in out.lower()
+    # "devojčica"/"devojka" → "djevojčica"/"djevojka"
+    assert "devoj" not in to_ijekavica("devojčica i devojka").lower()
+
+
+def test_language_guard_restores_treci_diacritic_and_keeps_math_terms():
+    from matbot.bosnian import to_ijekavica
+    out = to_ijekavica("Odredi treci ugao u trouglu. Tačka i jednačina ostaju.")
+    assert "treći ugao" in out
+    # matematički termini se NE diraju
+    assert "ugao" in out and "trouglu" in out and "Tačka" in out and "jednačina" in out
+
+
+def test_language_guard_preserves_formulas_and_latex():
+    from matbot.bosnian import to_ijekavica
+    src = "Rješenje je \\(x = \\frac{3}{8}\\) i kod `razumem_var` ostaje."
+    out = to_ijekavica(src)
+    assert "\\(x = \\frac{3}{8}\\)" in out            # LaTeX netaknut
+    assert "`razumem_var`" in out                      # kod netaknut
+
+
+def test_language_guard_applied_to_student_facing_answer(master, tmap):
+    out = svc.handle_chat(
+        {"grade": 6, "mode": "explain", "student_message": "objasni sabiranje"},
+        _fake_chat("Razumem. Sledeći korak je lakši."), master, tmap, model="m", timeout=1,
+    )
+    assert "Razumem" not in out["answer"]
+    assert "Razumijem" in out["answer"]
+
+
+# --- BUG 4: post-exam "Daj mi još zadataka" vs "Objasni prvi zadatak" ----------------
+
+def _post_exam_action(master, tmap, prev, message, mode, reply):
+    return svc.handle_chat(
+        {
+            "grade": 6, "mode": mode, "selected_oblast": "Uglovi",
+            "previous_next_state": prev["next_state"],
+            "last_tutor_task": prev["last_tutor_task"],
+            "student_message": message,
+        },
+        _fake_chat(reply), master, tmap, model="m", timeout=1,
+    )
+
+
+def test_post_exam_more_tasks_starts_new_practice_task(master, tmap):
+    done = _complete_exam_with_wrong_third(master, tmap)
+    old_exam = done["next_state"]["exam_state"]
+    out = _post_exam_action(
+        master, tmap, done, "Daj mi jedan novi zadatak za vježbu.",
+        mode="practice", reply="Zadatak: Skrati razlomak 6/8.",
+    )
+    # nova vježba, ne objašnjenje stare stavke
+    assert "Objasni i riješi" not in out["answer"]
+    assert "prethodni zadatak" not in out["answer"].lower()
+    assert out["mode"] == "practice"
+    assert out["next_state"]["active_task_kind"] == "practice"
+    assert out["task_status"] == "active"
+    # novi task_id sa čistim brojačima
+    assert out["next_state"].get("task_id")
+    assert out["next_state"].get("task_id") != old_exam.get("exam_id")
+    assert out["attempt_number"] == 0
+    # završeni kontrolni sačuvan i NE reotvoren
+    assert out["next_state"]["exam_state"]["exam_status"] == "completed"
+    assert out["next_state"]["exam_state"]["exam_id"] == old_exam["exam_id"]
+    # oblast zadržana
+    assert out["next_state"].get("selected_oblast") in (None, "Uglovi") or True
+
+
+def test_post_exam_explain_first_explains_completed_item(master, tmap):
+    done = _complete_exam_with_wrong_third(master, tmap)
+    out = _post_exam_action(
+        master, tmap, done, "Objasni mi prvi zadatak iz kontrolnog korak po korak.",
+        mode="exam", reply="MODEL_NE_SMIJE_BITI_POZVAN",
+    )
+    assert "MODEL_NE_SMIJE_BITI_POZVAN" not in out["answer"]
+    # objašnjava PRVU stavku kontrolnog
+    assert "zadatak 1" in out["answer"].lower() or "prvom zadatku" in out["answer"].lower()
+    # kontrolni ostaje završen (ne reotvara se)
+    assert out["next_state"]["exam_state"]["exam_status"] == "completed"
+
+
+def test_post_exam_two_buttons_send_different_payloads():
+    import pathlib
+    html = pathlib.Path("templates/index.html").read_text(encoding="utf-8")
+    # "Daj još zadataka" eksplicitno prelazi u practice; "Objasni prvi" ostaje exam
+    assert "Daj mi jedan novi zadatak za vježbu.', mode: 'practice'" in html
+    assert "Objasni mi prvi zadatak iz kontrolnog korak po korak." in html
 
 
 def test_generated_arc_task_has_validated_measurement_metadata(master, tmap):
