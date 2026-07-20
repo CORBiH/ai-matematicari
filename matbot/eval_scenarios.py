@@ -292,6 +292,34 @@ SCENARIOS: list[Scenario] = [
         ],
     ),
 
+    Scenario(
+        id="prod-multi-divisor-30-bare-da", category="multi_condition", payload=_G6,
+        regression_of="multi-condition divisibility collapsed to one boolean (30 / 5 and 3)",
+        applies_to=("grading", "all_v2"),
+        seed_task="Provjeri da li je broj 30 djeljiv sa 5 i sa 3. Obrazloži svoj odgovor za oba broja.",
+        turns=[Turn("da", phase="answer", reply="Pogledajmo.", gpt_verdict="correct",
+                    expect={"verdict": "partial", "task_status": "active",
+                            "streak": 0, "last_task_nonempty": True})],
+    ),
+    Scenario(
+        id="prod-multi-divisor-240-jeste", category="multi_condition", payload=_G6,
+        regression_of="multi-condition divisibility collapsed to one boolean (240 / 10 and 15)",
+        applies_to=("grading", "all_v2"),
+        seed_task="Provjeri da li je broj 240 djeljiv sa 10 i sa 15. Obrazloži svoj odgovor za oba broja.",
+        turns=[Turn("jeste djeljivo", phase="answer", reply="Pogledajmo.",
+                    expect={"verdict": "partial", "task_status": "active",
+                            "streak": 0})],
+    ),
+    Scenario(
+        id="prod-multi-divisor-full-explanation", category="multi_condition", payload=_G6,
+        regression_of="full multi-divisor explanation must complete the task",
+        applies_to=("grading", "all_v2"),
+        seed_task="Provjeri da li je broj 30 djeljiv sa 5 i sa 3. Obrazloži svoj odgovor za oba broja.",
+        turns=[Turn("da, sa 5 jer se završava nulom, i sa 3 jer je zbir cifara 3 djeljiv sa 3",
+                    phase="answer", reply="Bravo!",
+                    expect={"verdict": "correct"})],
+    ),
+
     # ---------------- language ----------------------------------------------
     Scenario(
         id="language-engine-output", category="language", payload=_G6,

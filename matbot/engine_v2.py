@@ -206,10 +206,11 @@ def route_grader(evidence: GradingEvidence) -> str:
            if evidence.deterministic_checkable else None)
     gpt = _map_structured(evidence.structured_gpt_verdict)
 
-    # A VERIFIED full-answer deterministic "correct" is decisive: the checker
-    # validated the required reasoning, so a GPT opinion cannot downgrade a
-    # verified mathematical fact (BUG 1).
-    if det == VERDICT_CORRECT and evidence.deterministic_scope == "full_answer":
+    # A VERIFIED full-answer deterministic result is decisive in BOTH directions:
+    # the checker validated every required condition + its reasoning, so GPT may
+    # neither downgrade a verified "correct" nor upgrade a verified "incomplete"
+    # (a bare "da" on a multi-divisor explanation task stays incomplete).
+    if det is not None and evidence.deterministic_scope == "full_answer":
         return "deterministic"
     if gpt is not None:
         # Value-only positives and NEGATIVE deterministic verdicts stay

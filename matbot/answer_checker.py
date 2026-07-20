@@ -302,6 +302,14 @@ class Expected:
     expected_boolean: bool | None = None
     divisor: int | None = None
     required_concepts: tuple = ()
+    # MULTI-CONDITION djeljivost (2026-07-20): "djeljiv sa 5 i sa 3" traži SVE
+    # uslove. ``divisor``/``expected_boolean``/``required_concepts`` ostaju prvi
+    # uslov (kompatibilnost); struktura ispod nosi kompletan zahtjev.
+    divisors: tuple = ()                  # svi traženi djelioci, redom
+    divisor_expected: tuple = ()          # očekivana istina po djeliocu
+    divisor_concepts: tuple = ()          # tuple(tuple[str, ...]) — pravila po djeliocu
+    requires_full_explanation: bool = False
+    all_conditions_required: bool = False
     # Rastavljanje na proste faktore: ((prost, eksponent), ...) i broj koji se
     # rastavlja; prihvataju se ekvivalentni zapisi (2²·3·5 == 2*2*3*5 == 5·3·2·2).
     expected_factors: tuple = ()
@@ -971,35 +979,67 @@ def _digit_sum(n: int) -> int:
     return sum(int(d) for d in str(abs(n)))
 
 
+# Nastavak liste djelilaca: "… sa 5 i sa 3", "… sa 3 i 4", "… sa 2, 3 i 5".
+_DIV_MORE_RE = re.compile(r"(?:,|\bi\b)\s*(?:sa\s+)?(\d+)")
+
+
+def _divisor_concepts(n: int, k: int) -> tuple[str, ...]:
+    """Traženo obrazloženje za djeljivost broja ``n`` sa ``k``."""
+    if k in _DIGIT_SUM_RULE_DIVISORS:
+        ds = _digit_sum(n)
+        digits = "+".join(str(d) for d in str(abs(n)))
+        return (
+            "zbir cifara",
+            f"{digits}={ds}",
+            f"{ds} {'jeste' if ds % k == 0 else 'nije'} djeljiv sa {k}",
+        )
+    return (f"pravilo djeljivosti sa {k}",)
+
+
 def _try_divisibility_with_explanation(folded: str, norm_text: str) -> Expected | None:
     m = _DIV_EXPLAIN_ASK_RE.search(folded)
     if not m or not _EXPLAIN_REQUEST_RE.search(folded):
         return None
-    n, k = int(m.group(1)), int(m.group(2))
-    if k == 0:
+    n, first = int(m.group(1)), int(m.group(2))
+    if first == 0:
         return None
-    truth = (n % k == 0)
-    concepts: list[str] = []
-    if k in _DIGIT_SUM_RULE_DIVISORS:
-        ds = _digit_sum(n)
-        digits = "+".join(str(d) for d in str(n))
-        concepts = [
-            "zbir cifara",
-            f"{digits}={ds}",
-            f"{ds} {'jeste' if ds % k == 0 else 'nije'} djeljiv sa {k}",
-        ]
-    else:
-        concepts = [f"pravilo djeljivosti sa {k}"]
+
+    # MULTI-CONDITION: pokupi SVE tražene djelioce iz iste rečenice ("sa 5 i sa
+    # 3"). Ranije se uzimao samo prvi, pa je golo "da" prolazilo kao potpun
+    # odgovor iako drugi uslov i obrazloženje nisu ni provjereni.
+    divisors: list[int] = [first]
+    tail = folded[m.end():]
+    stop = min([p for p in (tail.find("."), tail.find("?")) if p != -1] or [len(tail)])
+    for extra in _DIV_MORE_RE.finditer(tail[:stop]):
+        k = int(extra.group(1))
+        if k and k not in divisors:
+            divisors.append(k)
+
+    expected_flags = tuple((n % k) == 0 for k in divisors)
+    concepts_per = tuple(_divisor_concepts(n, k) for k in divisors)
+    truth_all = all(expected_flags)
     return Expected(
-        value=Fraction(1 if truth else 0),
+        value=Fraction(1 if truth_all else 0),
         kind="divisibility_explained",
         answer_type="boolean_with_explanation",
-        expected_boolean=truth,
-        divisor=k,
-        required_concepts=tuple(concepts),
-        expected_display="da" if truth else "ne",
+        expected_boolean=truth_all,
+        divisor=divisors[0],                       # kompatibilnost (prvi uslov)
+        required_concepts=tuple(c for group in concepts_per for c in group),
+        divisors=tuple(divisors),
+        divisor_expected=expected_flags,
+        divisor_concepts=concepts_per,
+        requires_full_explanation=True,            # zadatak eksplicitno traži obrazloženje
+        all_conditions_required=True,
+        expected_display=_divisibility_display(n, divisors, expected_flags),
         confidence="high",
     )
+
+
+def _divisibility_display(n: int, divisors: list[int], flags: tuple) -> str:
+    if len(divisors) == 1:
+        return "da" if flags[0] else "ne"
+    parts = [f"sa {k}: {'da' if ok else 'ne'}" for k, ok in zip(divisors, flags)]
+    return "; ".join(parts)
 
 
 # --- Rastavljanje na proste faktore ("Rastavi 60 na proste faktore.") ---------------
@@ -2332,7 +2372,19 @@ def _check_yes_no_divisibility(task_text: str, student_text: str) -> CheckResult
     n, k = int(m.group(1)), int(m.group(2))
     if k == 0:
         return None
+    # Ovaj checker pokriva SAMO prosto "Je li N djeljiv sa K?" bez obrazloženja i
+    # sa JEDNIM djeliocem. Ako zadatak traži obrazloženje ili više uslova, presudu
+    # donosi _check_divisibility_explanation (inače bi golo "da" prošlo kao potpun
+    # odgovor na višeuslovni zadatak).
+    if _EXPLAIN_REQUEST_RE.search(folded_task):
+        return None
+    tail = folded_task[m.end():]
+    stop = min([p for p in (tail.find("."), tail.find("?")) if p != -1] or [len(tail)])
+    if _DIV_MORE_RE.search(tail[:stop]):
+        return None                       # višeuslovni zahtjev → strukturirani checker
     ans = _fold(student_text or "").strip()
+    if _DIV_HELP_RE.search(ans):
+        return None                        # traži pomoć → bez ocjene (pravilo 6)
     if _YES_ANSWER_RE.match(ans):
         said_yes = True
     elif _NO_ANSWER_RE.match(ans):
@@ -2354,6 +2406,80 @@ def _check_yes_no_divisibility(task_text: str, student_text: str) -> CheckResult
     ])
 
 
+# Opšti signal obrazloženja (bilo koje pravilo/razlog), ne samo zbir cifara.
+_DIV_ANY_REASON_RE = re.compile(
+    r"\bjer\b|\bzato\s+sto\b|\bposto\b|\bzbir\s+cifara\b|\bposljednj\w*\s+cifr\w*"
+    r"|\bzadnj\w*\s+cifr\w*|\bzadnj\w*\s+dv\w*\b|\bparan\b|\bparn\w*|\bdijeli\s+se\b"
+    r"|\bbez\s+ostatka\b|\bostatak\b|\d+\s*[:/]\s*\d+|\bkolicnik\b"
+)
+
+
+def divisibility_coverage(expected: Expected, student_text: str) -> list[dict]:
+    """Po djeliocu: je li OBRAĐEN, OBRAZLOŽEN i je li tvrdnja tačna.
+
+    Koristi se i za presudu i za povratnu informaciju (šta je učenik zaista dao,
+    a šta još nedostaje). Gleda ISKLJUČIVO učenikov tekst — tutorova proza nikad
+    nije dokaz."""
+    folded = _fold(student_text or "")
+    divisors = list(expected.divisors or ([expected.divisor] if expected.divisor else []))
+    flags = list(expected.divisor_expected or (
+        (expected.expected_boolean,) if expected.expected_boolean is not None else ()))
+    concepts = list(expected.divisor_concepts or ((expected.required_concepts,) if divisors else ()))
+    out: list[dict] = []
+    for idx, k in enumerate(divisors):
+        want = flags[idx] if idx < len(flags) else None
+        # "obrađen" = djelilac je spomenut (npr. "sa 3", "sa 5", "3", "5")
+        mentioned = bool(re.search(rf"(?<!\d){k}(?!\d)", folded))
+        # segment oko spomena nosi obrazloženje (ili ga cijela poruka nosi kad je
+        # samo jedan djelilac)
+        seg = folded
+        if len(divisors) > 1 and mentioned:
+            pos = re.search(rf"(?<!\d){k}(?!\d)", folded)
+            seg = folded[max(0, pos.start() - 90): pos.end() + 90]
+        rule = concepts[idx] if idx < len(concepts) else ()
+        # Za djelioce sa pravilom zbira cifara (3, 9) traži se BAŠ to pravilo —
+        # opšti razlog ("jer se dijeli") nije dovoljan (zadržava raniju strogost).
+        digit_rule = k in _DIGIT_SUM_RULE_DIVISORS
+        evidence_re = _DIV_RULE_EVIDENCE_RE if digit_rule else _DIV_ANY_REASON_RE
+        justified = bool(mentioned and evidence_re.search(seg))
+        # negacija u segmentu → učenik tvrdi da NIJE djeljiv tim brojem
+        claim = None
+        if mentioned:
+            claim = not bool(re.search(r"\bnije\b|\bne\s+dijeli\b|\bnedjeljiv\w*", seg))
+        out.append({
+            "divisor": k, "expected": want, "addressed": mentioned,
+            "justified": justified, "claim": claim,
+            "claim_ok": (claim == want) if claim is not None else None,
+            "required_concepts": tuple(rule),
+        })
+    return out
+
+
+def divisibility_missing_summary(expected: Expected, student_text: str) -> dict:
+    """Sažetak za povratnu informaciju: šta je pokriveno, a šta nedostaje."""
+    cov = divisibility_coverage(expected, student_text)
+    supplied = [c["divisor"] for c in cov if c["addressed"] and c["justified"]]
+    missing = [c["divisor"] for c in cov if not (c["addressed"] and c["justified"])]
+    return {
+        "supplied_divisors": supplied,
+        "missing_divisors": missing,
+        "next_divisor": missing[0] if missing else None,
+        "next_required_concepts": next(
+            (c["required_concepts"] for c in cov if c["divisor"] == (missing[0] if missing else None)),
+            (),
+        ),
+        "all_covered": not missing,
+    }
+
+
+# "ne znam" / "pomozi" počinju sa "ne", pa bi ih yes/no parser pročitao kao
+# tvrdnju da broj NIJE djeljiv → lažno "netačno". Traženje pomoći nikad ne dobija
+# negativnu ocjenu (pravilo 6): vraćamo None i tok ide na help/hint.
+_DIV_HELP_RE = re.compile(
+    r"\bne\s*znam\b|\bnemam\s+pojma\b|\bne\s+razumijem\b|\bne\s+kapiram\b"
+    r"|\bpomoc\w*\b|\bpomozi\b|\bhint\b|\bnisam\s+sigur\w*|\bne\s+umijem\b"
+)
+
 # --- Djeljivost s obrazloženjem: presuda (istina determinist., pravilo = kvalitet) --
 _DIV_BOOL_YES_RE = re.compile(r"^\s*(?:da|jeste|jest|tacno|je\s+djeljiv|djeljiv\s+je)\b")
 _DIV_BOOL_NO_RE = re.compile(r"^\s*(?:ne|nije)\b")
@@ -2373,23 +2499,42 @@ def _check_divisibility_explanation(task_text: str, student_text: str) -> "Check
     if expected is None:
         return None
     folded = _fold(student_text or "").strip()
+    if _DIV_HELP_RE.search(folded):
+        return None                        # traži pomoć → bez ocjene (pravilo 6)
     if _DIV_BOOL_YES_RE.match(folded):
         said = True
     elif _DIV_BOOL_NO_RE.match(folded):
         said = False
     else:
         return None                        # nije jasan da/ne — opšti tok / GPT
+
     given = NumberToken(
         value=Fraction(1 if said else 0), form="boolean",
         raw="da" if said else "ne",
     )
-    if said != expected.expected_boolean:
+    coverage = divisibility_coverage(expected, student_text)
+    divisors = list(expected.divisors or ([expected.divisor] if expected.divisor else []))
+
+    # (5) Pogrešna tvrdnja za bilo koji OBRAĐEN uslov → netačno.
+    wrong_claim = any(c["addressed"] and c["claim"] is not None and not c["claim_ok"]
+                      for c in coverage)
+    if wrong_claim or (not any(c["addressed"] for c in coverage)
+                       and said != expected.expected_boolean):
         verdict = "incorrect"
-    elif expected.divisor in _DIGIT_SUM_RULE_DIVISORS and not _DIV_RULE_EVIDENCE_RE.search(folded):
-        # tačan zaključak, ali pravilo (zbir cifara) nije objašnjeno → DJELIMIČNO
-        verdict = "partially_correct"
     else:
-        verdict = "correct"
+        justified = [c for c in coverage if c["addressed"] and c["justified"]]
+        addressed = [c for c in coverage if c["addressed"]]
+        # (4) zaključak + obrazloženje za SVE uslove → tačno.
+        if len(justified) == len(divisors) and len(divisors) > 0:
+            verdict = "correct"
+        elif justified or addressed:
+            # (1)/(3) dio uslova pokriven, ILI je zaključak za neki djelilac tačan
+            # ali pravilo nije objašnjeno → DJELIMIČNO (ranije ponašanje).
+            verdict = "partially_correct"
+        else:
+            # (2) golo "da"/"jeste" — nijedan uslov nije ni dotaknut → NEPOTPUNO.
+            verdict = "incomplete"
+
     return CheckResult(checkable=True, items=[
         ItemCheck(n=1, task=task_text.strip()[:200], expected=expected,
                   given=given, verdict=verdict),
@@ -2769,6 +2914,35 @@ def _check(
 
 # --- Render bloka za prompt ---------------------------------------------------------
 
+def _multi_condition_block(result: CheckResult) -> list[str]:
+    """Za višeuslovnu djeljivost: šta je učenik STVARNO dao, šta NEDOSTAJE i koji
+    je sljedeći uslov. Tutor NE SMIJE sam napisati obrazloženje umjesto učenika."""
+    lines: list[str] = []
+    for item in result.items:
+        exp = item.expected
+        if exp is None or not getattr(exp, "all_conditions_required", False):
+            continue
+        divisors = list(getattr(exp, "divisors", ()) or ())
+        if len(divisors) < 2:
+            continue
+        cov = divisibility_coverage(exp, item.given.raw if item.given else "")
+        supplied = [c["divisor"] for c in cov if c["addressed"] and c["justified"]]
+        missing = [c["divisor"] for c in cov if not (c["addressed"] and c["justified"])]
+        lines.append(
+            f"- VIŠEUSLOVNI ZADATAK: traženi djelioci {divisors}. "
+            f"Učenik je obrazložio: {supplied or 'ništa'}. Nedostaje: {missing or 'ništa'}."
+        )
+        if missing:
+            nxt = missing[0]
+            lines.append(
+                f"- OBAVEZNO: potvrdi SAMO ono što je učenik zaista dao, reci šta još "
+                f"nedostaje i postavi PITANJE za sljedeći uslov (djeljivost sa {nxt}). "
+                f"NE piši sam obrazloženje za {nxt} i ne pripisuj ga učeniku. "
+                f"Zadatak ostaje aktivan dok učenik ne pokrije sve uslove."
+            )
+    return lines
+
+
 def format_check_block(result: CheckResult) -> str:
     """Bosanski blok za user prompt; prazan string kada nema presuda."""
     if not result.checkable or not result.has_verdicts:
@@ -2776,6 +2950,7 @@ def format_check_block(result: CheckResult) -> str:
     lines = [
         "PROVJERA IZ SISTEMA (izračunata u kodu — POUZDANA, ne smiješ joj protivrječiti):",
     ]
+    lines.extend(_multi_condition_block(result))
     for item in result.items:
         given = item.given.raw if item.given else None
         if item.verdict == "correct":

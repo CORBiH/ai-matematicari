@@ -196,8 +196,13 @@ def test_bug5_make_partial_no_duplicate():
 
 def test_bug6_yes_no_divisibility_correct_and_incorrect():
     task = "Provjeri da li je broj 48 djeljiv sa 6. Koristi pravilo djeljivosti sa 6."
+    # 2026-07-20: the task explicitly demands the RULE, so a bare "da" is an
+    # INCOMPLETE answer, not a full one (multi-condition grading policy, rule 2).
     ok = check_practice_answer(task, "da")
-    assert ok.checkable and ok.items[0].verdict == "correct"
+    assert ok.checkable and ok.items[0].verdict == "incomplete"
+    # …with the rule stated it is fully correct.
+    full = check_practice_answer(task, "da, 48 je djeljiv sa 6 jer je paran i zbir cifara je djeljiv sa 3")
+    assert full.checkable and full.items[0].verdict == "correct"
     bad = check_practice_answer(task, "ne")
     assert bad.checkable and bad.items[0].verdict == "incorrect"
     # 75 JESTE djeljiv sa 3 → "ne" je netačno

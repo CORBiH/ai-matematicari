@@ -1691,6 +1691,28 @@ def _task_answer_metadata(task_text: Any) -> list[dict]:
             "divisor": (
                 getattr(expected, "divisor", None) if expected is not None else None
             ),
+            # MULTI-CONDITION djeljivost: sačuvaj SVE tražene uslove i pravila,
+            # da TaskDefinition/answer_schema ne izgubi drugi (i treći) djelilac.
+            "divisors": (
+                list(getattr(expected, "divisors", ()) or ()) or None
+                if expected is not None else None
+            ),
+            "divisor_expected": (
+                [bool(x) for x in (getattr(expected, "divisor_expected", ()) or ())] or None
+                if expected is not None else None
+            ),
+            "divisor_concepts": (
+                [list(g) for g in (getattr(expected, "divisor_concepts", ()) or ())] or None
+                if expected is not None else None
+            ),
+            "all_conditions_required": (
+                bool(getattr(expected, "all_conditions_required", False))
+                if expected is not None else None
+            ),
+            "requires_full_explanation": (
+                bool(getattr(expected, "requires_full_explanation", False))
+                if expected is not None else None
+            ),
             "required_concepts": (
                 (list(getattr(expected, "required_concepts", ()) or ()) or None)
                 if expected is not None
@@ -5804,17 +5826,17 @@ def _deterministic_scope(check: Any) -> str:
 
 
 def _deterministic_full_task_decisive(payload: dict) -> bool:
-    """True when the checker VERIFIED the complete answer and found it correct.
+    """True when the checker VERIFIED the complete answer (all required
+    conditions + reasoning), whatever the outcome.
 
-    Such a result states a verified mathematical fact: a structured-GPT opinion
-    must not downgrade it (BUG 1: 144 divisible by 3 and 4). A NEGATIVE
-    deterministic verdict is never 'decisive' here, because the checker may have
-    mistaken an intermediate statement for a final answer (common-denominator)."""
+    Such a result states verified facts, so structured GPT may neither downgrade
+    a verified ``correct`` (BUG 1: 144 divisible by 3 and 4) NOR upgrade a
+    verified ``incomplete``/``partial`` — e.g. a bare "da" on a multi-divisor
+    explanation task must stay incomplete. Scope ``value_only`` stays fully
+    overridable, which preserves the common-denominator case."""
     if not _deterministic_decisive(payload):
         return False
     check = payload.get("answer_check")
-    if authoritative_verdict(check) != "correct":
-        return False
     return _deterministic_scope(check) == "full_answer"
 
 

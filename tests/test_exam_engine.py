@@ -46,7 +46,14 @@ def _exam_turn(master, tmap, message, prev, session="s1"):
     return svc.handle_chat(payload, _no_model(), master, tmap, model="m", timeout=1)
 
 
-def _correct(question):
+def _correct(question, item=None):
+    """The canonical, VALIDATED answer for an exam item.
+
+    Prefer the item's stored ``expected_display`` (the template's self-validated
+    answer, which for explanation tasks includes the required reasoning); fall
+    back to the checker's formatted expectation."""
+    if item and item.get("expected_display"):
+        return item["expected_display"]
     return _fmt_expected(derive_expected(question))
 
 
@@ -133,8 +140,9 @@ def test_start_presents_validated_items(monkeypatch, master, tmap):
 def test_one_answer_one_item(monkeypatch, master, tmap):
     monkeypatch.setenv("MATBOT_ENGINE_V2_EXAM", "on")
     ns = _exam_turn(master, tmap, "kontrolni", None)["next_state"]
-    q1 = ns["exam_state"]["items"][0]["question"]
-    out = _exam_turn(master, tmap, _correct(q1), ns)
+    es_items = ns["exam_state"]["items"]
+    q1 = es_items[0]["question"]
+    out = _exam_turn(master, tmap, _correct(q1, es_items[0]), ns)
     es = out["exam_state"]
     # exactly ONE item graded, cursor advanced by one (no bleed).
     graded = [it["correct"] for it in es["items"]]
@@ -146,10 +154,10 @@ def test_one_answer_one_item(monkeypatch, master, tmap):
 def test_full_exam_completes_and_scores(monkeypatch, master, tmap):
     monkeypatch.setenv("MATBOT_ENGINE_V2_EXAM", "on")
     ns = _exam_turn(master, tmap, "kontrolni", None)["next_state"]
-    questions = [it["question"] for it in ns["exam_state"]["items"]]
+    items = list(ns["exam_state"]["items"])
     out = None
-    for q in questions:
-        out = _exam_turn(master, tmap, _correct(q), ns)
+    for it in items:
+        out = _exam_turn(master, tmap, _correct(it["question"], it), ns)
         ns = out["next_state"]
     es = out["exam_state"]
     assert es["exam_status"] == "completed"
@@ -199,8 +207,8 @@ def test_help_never_creates_new_exam(monkeypatch, master, tmap):
 # --------------------------------------------------------------------------- #
 def _complete_exam(master, tmap, session="s1"):
     ns = _exam_turn(master, tmap, "kontrolni", None, session)["next_state"]
-    for q in [it["question"] for it in ns["exam_state"]["items"]]:
-        ns = _exam_turn(master, tmap, _correct(q), ns, session)["next_state"]
+    for it in list(ns["exam_state"]["items"]):
+        ns = _exam_turn(master, tmap, _correct(it["question"], it), ns, session)["next_state"]
     return ns
 
 

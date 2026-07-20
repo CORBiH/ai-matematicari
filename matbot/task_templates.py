@@ -66,9 +66,13 @@ _UNLIKE_DENOMS = [(2, 3), (3, 4), (2, 5), (3, 5), (4, 5), (2, 7), (3, 7), (5, 6)
 
 
 def _g_divisibility6(rng: random.Random) -> tuple[str, str]:
+    """Zadatak traži OBRAZLOŽENJE, pa kanonski odgovor mora sadržavati i pravilo
+    (golo "da" je nepotpun odgovor — vidi multi-condition grading)."""
     n = 6 * rng.randint(3, 45) if rng.random() < 0.65 else rng.randint(20, 260)
-    return (f"Provjeri da li je broj {n} djeljiv sa 6. Obrazloži svoj odgovor.",
-            "da" if n % 6 == 0 else "ne")
+    q = f"Provjeri da li je broj {n} djeljiv sa 6. Obrazloži svoj odgovor."
+    if n % 6 == 0:
+        return q, f"da, {n} je djeljiv sa 6 jer je paran i zbir cifara mu je djeljiv sa 3"
+    return q, f"ne, {n} nije djeljiv sa 6 jer ne ispunjava oba uslova (2 i 3)"
 
 
 def _g_prime_factorization(rng: random.Random) -> tuple[str, str]:
