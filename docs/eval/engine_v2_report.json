@@ -1,10 +1,10 @@
 {
   "summary": {
-    "total_cases": 162,
-    "passed": 162,
+    "total_cases": 180,
+    "passed": 180,
     "failed": 0,
     "pass_rate": 100.0,
-    "scenarios": 27,
+    "scenarios": 30,
     "configs": [
       "legacy",
       "shadow",
@@ -101,6 +101,16 @@
       "passed": 6,
       "pass_rate": 100.0
     },
+    "grader_conflict": {
+      "total": 12,
+      "passed": 12,
+      "pass_rate": 100.0
+    },
+    "tema_preservation": {
+      "total": 6,
+      "passed": 6,
+      "pass_rate": 100.0
+    },
     "language": {
       "total": 6,
       "passed": 6,
@@ -109,43 +119,53 @@
   },
   "by_config": {
     "legacy": {
-      "total": 27,
-      "passed": 27,
+      "total": 30,
+      "passed": 30,
       "failures": [],
       "pass_rate": 100.0
     },
     "shadow": {
-      "total": 27,
-      "passed": 27,
+      "total": 30,
+      "passed": 30,
       "failures": [],
       "pass_rate": 100.0
     },
     "grading": {
-      "total": 27,
-      "passed": 27,
+      "total": 30,
+      "passed": 30,
       "failures": [],
       "pass_rate": 100.0
     },
     "practice": {
-      "total": 27,
-      "passed": 27,
+      "total": 30,
+      "passed": 30,
       "failures": [],
       "pass_rate": 100.0
     },
     "exam": {
-      "total": 27,
-      "passed": 27,
+      "total": 30,
+      "passed": 30,
       "failures": [],
       "pass_rate": 100.0
     },
     "all_v2": {
-      "total": 27,
-      "passed": 27,
+      "total": 30,
+      "passed": 30,
       "failures": [],
       "pass_rate": 100.0
     }
   },
   "legacy_vs_v2_divergences": [
+    {
+      "id": "prod-144-verified-not-downgraded",
+      "config": "grading",
+      "legacy": [
+        "partial"
+      ],
+      "v2": [
+        "correct"
+      ]
+    },
     {
       "id": "div6-guided-completion",
       "config": "practice",
@@ -269,17 +289,28 @@
         null,
         "incorrect"
       ]
+    },
+    {
+      "id": "prod-144-verified-not-downgraded",
+      "config": "all_v2",
+      "legacy": [
+        "partial"
+      ],
+      "v2": [
+        "correct"
+      ]
     }
   ],
   "grader_source_distribution": {
-    "deterministic": 24,
-    "structured_gpt": 3,
-    "none": 15
+    "deterministic": 26,
+    "structured_gpt": 4,
+    "none": 16
   },
   "shadow_conflicts": {
-    "no_conflict": 30,
+    "no_conflict": 32,
     "legacy_prose_verdict": 1,
-    "uncheckable": 11
+    "uncheckable": 12,
+    "verdict_mismatch": 1
   },
   "template_validation_failures": [],
   "state_machine_failures": [],
@@ -290,31 +321,31 @@
   "latency": {
     "by_config": {
       "legacy": {
-        "mean_ms": 8.26,
-        "max_ms": 17.27
+        "mean_ms": 7.95,
+        "max_ms": 17.93
       },
       "shadow": {
-        "mean_ms": 7.59,
-        "max_ms": 10.1
+        "mean_ms": 8.85,
+        "max_ms": 41.49
       },
       "grading": {
-        "mean_ms": 7.58,
-        "max_ms": 8.62
+        "mean_ms": 7.47,
+        "max_ms": 8.66
       },
       "practice": {
-        "mean_ms": 7.76,
-        "max_ms": 9.39
+        "mean_ms": 7.53,
+        "max_ms": 8.42
       },
       "exam": {
-        "mean_ms": 7.76,
-        "max_ms": 8.79
+        "mean_ms": 7.87,
+        "max_ms": 9.84
       },
       "all_v2": {
-        "mean_ms": 7.79,
-        "max_ms": 9.18
+        "mean_ms": 7.73,
+        "max_ms": 8.93
       }
     },
-    "all_v2_vs_legacy_pct": -5.7
+    "all_v2_vs_legacy_pct": -2.8
   },
   "release_gates": {
     "no_false_incorrect_on_verified_correct": true,

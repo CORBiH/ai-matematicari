@@ -28,7 +28,8 @@ MAX_QUESTION_CHARS = 600
 MAX_SCHEMA_ITEMS = 20
 
 _VALIDATION_STATES = ("validated", "rejected", "unvalidated")
-_SOURCES = ("gpt_generated", "gpt_rubric", "fallback_template", "student_task", "unknown")
+_SOURCES = ("template", "gpt_generated", "gpt_rubric", "fallback_template",
+            "student_task", "unknown")
 
 
 def _s(value: Any, limit: int = 120) -> str:
@@ -153,6 +154,7 @@ def build_task_definition(
     question: Any,
     validation: Any,
     source: str | None = None,
+    skill_id: str | None = None,
 ) -> TaskDefinition | None:
     """Construct a TaskDefinition from an already-computed validation dict.
 
@@ -174,7 +176,9 @@ def build_task_definition(
         grade=grade,
         oblast_id=_s(oblast_id, 80),
         tema_id=_s(tema_id, 80),
-        skill_id=derive_skill_id(schema),
+        # A template-generated task carries its STABLE template skill_id; only
+        # model/student tasks fall back to schema-derived inference.
+        skill_id=_s(skill_id, 80) or derive_skill_id(schema),
         mode=_s(mode, 20) or "practice",
         question=q,
         answer_schema=schema,

@@ -72,8 +72,10 @@ def test_topic_selection_is_on_topic():
     dj = {t.skill_id for t in tt.select_templates(6, "Djeljivost brojeva")}
     assert "divisibility_by_6" in dj and "prime_factorization" in dj
     assert "fraction_add_sub" not in dj                    # razlomci not in djeljivost
+    # Oblast-level selection returns every Razlomci skill; TEMA-level selection
+    # narrows to exactly one (see test_tema_selects_exactly_one_skill).
     ra = {t.skill_id for t in tt.select_templates(6, "Razlomci")}
-    assert ra == {"fraction_add_sub", "fraction_mul"}
+    assert ra == {"fraction_expand", "fraction_add_sub", "fraction_mul"}
 
 
 def test_grade_gating():

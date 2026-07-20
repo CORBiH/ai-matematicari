@@ -123,6 +123,9 @@ class GradingEvidence:
     structured_gpt_verdict: str | None = None  # ONLY from parsed GPT JSON
     structured_gpt_confidence: float | None = None
     structured_attempted: bool = False         # the turn ROUTED to structured grading
+    # How much the checker verified: "full_answer" (incl. required reasoning),
+    # "value_only" (final value only), or "none".
+    deterministic_scope: str = "none"
     task_status: str | None = None             # legacy next_state (context only)
     answer_type: str | None = None
 
@@ -199,9 +202,21 @@ def route_grader(evidence: GradingEvidence) -> str:
 
     Tutor prose is never an input here, so it can never be grading evidence.
     """
-    if _map_structured(evidence.structured_gpt_verdict) is not None:
+    det = (_map_deterministic(evidence.deterministic_verdict)
+           if evidence.deterministic_checkable else None)
+    gpt = _map_structured(evidence.structured_gpt_verdict)
+
+    # A VERIFIED full-answer deterministic "correct" is decisive: the checker
+    # validated the required reasoning, so a GPT opinion cannot downgrade a
+    # verified mathematical fact (BUG 1).
+    if det == VERDICT_CORRECT and evidence.deterministic_scope == "full_answer":
+        return "deterministic"
+    if gpt is not None:
+        # Value-only positives and NEGATIVE deterministic verdicts stay
+        # overridable: the checker may have graded only a value, or mistaken an
+        # intermediate statement for a final answer (common-denominator case).
         return "structured_gpt"
-    if evidence.deterministic_checkable and _map_deterministic(evidence.deterministic_verdict) is not None:
+    if det is not None:
         return "deterministic"
     return "none"
 
@@ -258,9 +273,17 @@ def reduce_shadow(evidence: GradingEvidence) -> ShadowGradingResult:
         "deterministic_verdict": evidence.deterministic_verdict if evidence.deterministic_checkable else None,
         "gpt_structured_verdict": evidence.structured_gpt_verdict,
         "structured_attempted": bool(evidence.structured_attempted),
+        "deterministic_scope": evidence.deterministic_scope,
         "task_status": evidence.task_status,
         "answer_type": evidence.answer_type,
         "deterministic_gpt_conflict": conflict,
+        # Sanitized conflict class for this defect family (BUG 1).
+        "conflict_class": (
+            "gpt_contradicted_verified_deterministic"
+            if (conflict and source == "deterministic"
+                and evidence.deterministic_scope == "full_answer")
+            else ("deterministic_overridden_by_structured_gpt" if conflict else None)
+        ),
     }
     return result
 

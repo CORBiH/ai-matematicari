@@ -417,7 +417,8 @@ def test_shadow_telemetry_has_no_secrets_or_reasoning(monkeypatch, master, tmap)
         assert banned not in blob, banned
     allowed_evidence = {
         "deterministic_verdict", "gpt_structured_verdict", "structured_attempted",
-        "task_status", "answer_type", "deterministic_gpt_conflict",
+        "deterministic_scope", "task_status", "answer_type",
+        "deterministic_gpt_conflict", "conflict_class",
     }
     assert set(out["shadow_grading"]["evidence"].keys()) <= allowed_evidence
 

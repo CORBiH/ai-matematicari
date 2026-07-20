@@ -258,6 +258,40 @@ SCENARIOS: list[Scenario] = [
                             "task_validated": True})],
     ),
 
+    # ---------------- production defects (permanent fixtures) ----------------
+    Scenario(
+        id="prod-144-verified-not-downgraded", category="grader_conflict", payload=_G6,
+        regression_of="structured GPT downgraded verified deterministic (144 / 3 and 4)",
+        applies_to=("grading", "all_v2"),
+        seed_task="Provjeri je li broj 144 djeljiv sa 3 i 4. Obrazloži svoje odgovore.",
+        turns=[Turn("Jest jer je zbir cifara djeljiv sa 3 i zadnja dva broja su djeljiva sa 4.",
+                    phase="answer", reply="Pogledajmo.", gpt_verdict="partial",
+                    expect={"verdict": "correct",
+                            "answer_not_contains": ["nije djeljiv sa 4"]})],
+    ),
+    Scenario(
+        id="prod-common-denominator-still-partial", category="grader_conflict", payload=_G6,
+        regression_of="common denominator must stay partial after the 144 fix",
+        applies_to=("grading", "all_v2"),
+        seed_task="Izračunaj: 1/2 + 1/3.",
+        turns=[Turn("Zajednički nazivnik je 6", phase="answer", reply="Dobar korak.",
+                    gpt_verdict="partial", expect={"verdict": "partial"})],
+    ),
+    Scenario(
+        id="prod-tema-expansion-not-collapsed", category="tema_preservation",
+        payload={"grade": 6, "mode": "practice", "selected_oblast": "Razlomci",
+                 "selected_topic": "6-04-035", "lesson_title": "Proširivanje razlomaka"},
+        regression_of="selected tema collapsed to broader oblast",
+        applies_to=PRACTICE,
+        turns=[
+            Turn("daj mi zadatak", reply="Zadatak: LEGACY-MODEL",
+                 expect={"answer_contains": ["proširi"]}),
+            Turn("Daj mi teži zadatak iz iste teme.", reply="Zadatak: LEGACY-MODEL",
+                 expect={"answer_contains": ["proširi"],
+                         "answer_not_contains": ["·"]}),
+        ],
+    ),
+
     # ---------------- language ----------------------------------------------
     Scenario(
         id="language-engine-output", category="language", payload=_G6,

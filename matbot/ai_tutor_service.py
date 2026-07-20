@@ -2704,7 +2704,12 @@ def _maybe_generate_practice_task(payload: dict) -> None:
         return
     grade = payload.get("grade")
     oblast = normalize_value(payload.get("selected_oblast"))
-    tema = normalize_value(payload.get("selected_topic") or payload.get("lesson_title"))
+    # Tema probe carries BOTH the stable NPP id and the lesson title, so exact
+    # tema identity (id first, then name) drives template selection.
+    tema = " ".join(x for x in (
+        normalize_value(payload.get("selected_topic")),
+        normalize_value(payload.get("lesson_title")),
+    ) if x)
     if not task_templates.has_coverage(grade, oblast, tema):
         return                              # no template → legacy model path
     avoid = {
@@ -5762,6 +5767,57 @@ def _deterministic_decisive(payload: dict) -> bool:
     )
 
 
+# Expected answers whose verification covers the WHOLE answer (including the
+# required reasoning), not merely a final value.
+_FULL_ANSWER_TYPES = ("boolean_with_explanation", "conceptual")
+_SCOPE_GRADED_VERDICTS = (
+    "correct", "correct_equivalent_form", "correct_missing_notation",
+    "correct_missing_unit", "correct_value_wrong_form", "correct_step",
+    "partially_correct", "incomplete", "wrong_unit", "incorrect",
+)
+
+
+def _deterministic_scope(check: Any) -> str:
+    """How much of the student's answer did the deterministic checker verify?
+
+    ``full_answer`` — the expected answer carries required concepts / is an
+        explanation-type answer, so a POSITIVE verdict means the complete answer
+        (including its reasoning) was verified.
+    ``value_only``  — only a final value was compared; any procedure the student
+        wrote around it was NOT inspected by the checker.
+    ``none``        — nothing was graded.
+    """
+    if check is None or not getattr(check, "checkable", False):
+        return "none"
+    graded = [i for i in getattr(check, "items", []) if i.verdict in _SCOPE_GRADED_VERDICTS]
+    if not graded:
+        return "none"
+    for item in graded:
+        expected = item.expected
+        if expected is None:
+            return "value_only"
+        has_concepts = bool(getattr(expected, "required_concepts", ()) or ())
+        atype = normalize_value(getattr(expected, "answer_type", "")).lower()
+        if not (has_concepts or atype in _FULL_ANSWER_TYPES):
+            return "value_only"         # conservative: ALL items must be full-answer
+    return "full_answer"
+
+
+def _deterministic_full_task_decisive(payload: dict) -> bool:
+    """True when the checker VERIFIED the complete answer and found it correct.
+
+    Such a result states a verified mathematical fact: a structured-GPT opinion
+    must not downgrade it (BUG 1: 144 divisible by 3 and 4). A NEGATIVE
+    deterministic verdict is never 'decisive' here, because the checker may have
+    mistaken an intermediate statement for a final answer (common-denominator)."""
+    if not _deterministic_decisive(payload):
+        return False
+    check = payload.get("answer_check")
+    if authoritative_verdict(check) != "correct":
+        return False
+    return _deterministic_scope(check) == "full_answer"
+
+
 def _apply_gpt_fallback_verdict(payload: dict, answer: str) -> None:
     if not _is_grading_turn(payload):
         return
@@ -5781,10 +5837,28 @@ def _apply_gpt_fallback_verdict(payload: dict, answer: str) -> None:
     # denominator "6" — as a wrong final answer), so the structured GPT grader,
     # which evaluated the whole procedure, must stay authoritative when it ran.
     # For clean answers the structured grader does not run, so the checker decides.
+    #
+    # BUG 1 (production): a VERIFIED full-answer deterministic "correct" (the
+    # checker validated the required reasoning, not just a value) states a
+    # mathematical fact — a structured-GPT opinion must not downgrade it. A
+    # NEGATIVE deterministic verdict stays overridable, because the checker may
+    # have mistaken an intermediate for a final answer (common-denominator).
     # Rollback = flag off → legacy branch below, verbatim.
     if engine_v2.grading_authoritative():
         if not has_structured_verdict:
             return  # no structured grade → no prose guess; deterministic result stands
+        if _deterministic_full_task_decisive(payload):
+            det = authoritative_verdict(check)
+            if verdict != det:
+                payload["_grading_conflict"] = "gpt_contradicted_verified_deterministic"
+                log.info(
+                    "engine_v2 grading conflict: verified deterministic=%s "
+                    "overrode structured_gpt=%s", det, verdict,
+                )
+            payload.pop("_gpt_answer_verdict", None)
+            payload["_gpt_check_used"] = False
+            payload["_gpt_check_confidence"] = None
+            return                       # deterministic (verified) is authoritative
         payload["_gpt_check_used"] = True
         if payload.get("_gpt_check_confidence") is None:
             payload["_gpt_check_confidence"] = 0.55
@@ -5878,22 +5952,27 @@ def _attach_task_definition(payload: dict, response: dict) -> None:
         # Task persisted from a prior turn without re-validation this turn →
         # derive the schema now (same validator the legacy gate uses).
         validation = _validate_task_activation(question, mode=mode)
-    source = "student_task" if payload.get("_student_task") else None
+    generated = payload.get("_generated_practice_task") or {}
+    source = ("template" if generated
+              else ("student_task" if payload.get("_student_task") else None))
     td = task_model.build_task_definition(
         task_id=next_state.get("task_id"),
         grade=payload.get("grade"),
         oblast_id=(
-            normalize_value(payload.get("selected_oblast"))
+            normalize_value(generated.get("oblast_id"))
+            or normalize_value(payload.get("selected_oblast"))
             or normalize_value(response.get("selected_oblast"))
         ),
         tema_id=(
-            normalize_value(response.get("effective_topic"))
+            normalize_value(generated.get("tema_id"))
+            or normalize_value(response.get("effective_topic"))
             or normalize_value(payload.get("selected_topic"))
         ),
         mode=mode,
         question=question,
         validation=validation,
         source=source,
+        skill_id=normalize_value(generated.get("skill_id")) or None,
     )
     td_dict = td.to_dict() if td else None
     next_state["task"] = td_dict
@@ -5945,6 +6024,7 @@ def _attach_engine_v2_shadow(payload: dict, response: dict) -> None:
         structured_gpt_verdict=structured_verdict or None,
         structured_gpt_confidence=structured_conf,
         structured_attempted=bool(structured_attempted),
+        deterministic_scope=_deterministic_scope(check),
         task_status=normalize_value(next_state.get("task_status")) or None,
         answer_type=item.get("answer_type"),
     )
@@ -6553,7 +6633,10 @@ def _exam_engine_response(payload: dict) -> dict:
         seed=seed,
         grade=payload.get("grade"),
         oblast=normalize_value(payload.get("selected_oblast")),
-        tema=normalize_value(payload.get("selected_topic") or payload.get("lesson_title")),
+        tema=" ".join(x for x in (
+            normalize_value(payload.get("selected_topic")),
+            normalize_value(payload.get("lesson_title")),
+        ) if x),
     )
     prev_ns = _previous_next_state(payload)
     released = result.exam_state is None          # V2 state released (drain rollback)

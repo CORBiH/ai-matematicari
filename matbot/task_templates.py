@@ -96,6 +96,14 @@ def _g_fraction_add_sub(rng: random.Random) -> tuple[str, str]:
     return f"Izračunaj: {a}/{b} {op} {c}/{d}.", _frac_str(val)
 
 
+def _g_fraction_expand(rng: random.Random) -> tuple[str, str]:
+    """Proširivanje razlomaka: a/b → (a·k)/(b·k) na zadani nazivnik."""
+    b = rng.choice([2, 3, 4, 5, 6, 8])
+    a = rng.randint(1, b - 1)
+    k = rng.choice([2, 3, 4, 5])
+    return f"Proširi {a}/{b} na nazivnik {b * k}.", f"{a * k}/{b * k}"
+
+
 def _g_fraction_mul(rng: random.Random) -> tuple[str, str]:
     b, d = rng.randint(2, 9), rng.randint(2, 9)
     a, c = rng.randint(1, b), rng.randint(1, d)
@@ -147,10 +155,18 @@ def _g_set_union(rng: random.Random) -> tuple[str, str]:
 # --------------------------------------------------------------------------- #
 @dataclass(frozen=True)
 class SkillTemplate:
+    """A skill template.
+
+    Selection is TEMA-FIRST: ``tema_ids`` (stable NPP identifiers) beat
+    ``tema_keywords`` (tema-name match), which beat ``oblast_keywords``. A tema is
+    never allowed to collapse into its broader oblast (see ``select_templates``).
+    """
     skill_id: str
     grades: tuple[int, ...]
-    keywords: tuple[str, ...]           # matched against folded oblast AND tema
+    oblast_keywords: tuple[str, ...]    # matched against the OBLAST only
     generate: Callable[[random.Random], tuple[str, str]]
+    tema_ids: tuple[str, ...] = ()      # stable NPP tema ids (exact match)
+    tema_keywords: tuple[str, ...] = () # tema-NAME keywords (specific, not oblast-wide)
 
     @property
     def guidable(self) -> bool:
@@ -158,17 +174,36 @@ class SkillTemplate:
 
 
 _TEMPLATES: tuple[SkillTemplate, ...] = (
-    SkillTemplate("divisibility_by_6", (6,), ("djeljiv", "djelji"), _g_divisibility6),
-    SkillTemplate("prime_factorization", (6,), ("djeljiv", "prost", "faktor", "prirodn"), _g_prime_factorization),
-    SkillTemplate("gcd", (6,), ("djeljiv", "nzd", "najveci zajednicki"), _g_gcd),
-    SkillTemplate("lcm", (6,), ("djeljiv", "nzs", "najmanji zajednicki"), _g_lcm),
-    SkillTemplate("fraction_add_sub", (6, 7), ("razlom", "racionaln"), _g_fraction_add_sub),
-    SkillTemplate("fraction_mul", (6, 7), ("razlom", "racionaln"), _g_fraction_mul),
-    SkillTemplate("percent_of", (6, 7), ("postotak", "procent", "razmjer"), _g_percent_of),
-    SkillTemplate("unit_conversion", (6,), ("mjerenje", "mjerne", "jedinic"), _g_unit_conversion),
-    SkillTemplate("linear_equation", (6, 7), ("jednacin", "jednacine", "izraz"), _g_linear_equation),
-    SkillTemplate("triangle_angle", (6, 7), ("ugao", "ugl", "trougao", "trokut"), _g_triangle_angle),
-    SkillTemplate("set_union", (6, 7), ("skup",), _g_set_union),
+    SkillTemplate("divisibility_by_6", (6,), ("djeljiv", "djelji"), _g_divisibility6,
+                  tema_keywords=("djeljivost", "djeljiv")),
+    SkillTemplate("prime_factorization", (6,), ("djeljiv", "prost", "faktor", "prirodn"),
+                  _g_prime_factorization,
+                  tema_keywords=("prost", "faktor", "rastavljanje")),
+    SkillTemplate("gcd", (6,), ("djeljiv", "nzd", "najveci zajednicki"), _g_gcd,
+                  tema_keywords=("nzd", "najveci zajednicki")),
+    SkillTemplate("lcm", (6,), ("djeljiv", "nzs", "najmanji zajednicki"), _g_lcm,
+                  tema_keywords=("nzs", "najmanji zajednicki")),
+    # --- Razlomci: each tema maps to exactly ONE skill (no collapsing) ---------
+    SkillTemplate("fraction_expand", (6,), ("razlom",), _g_fraction_expand,
+                  tema_ids=("6-04-035",),
+                  tema_keywords=("prosirivanje", "prosiri")),
+    SkillTemplate("fraction_add_sub", (6, 7), ("razlom", "racionaln"), _g_fraction_add_sub,
+                  tema_ids=("6-04-040",),
+                  tema_keywords=("sabiranje", "oduzimanje", "razlicitih imenilaca",
+                                 "razlicitih nazivnika")),
+    SkillTemplate("fraction_mul", (6, 7), ("razlom", "racionaln"), _g_fraction_mul,
+                  tema_ids=("6-04-041",),
+                  tema_keywords=("mnozenje", "mnozenja")),
+    SkillTemplate("percent_of", (6, 7), ("postotak", "procent", "razmjer"), _g_percent_of,
+                  tema_keywords=("postotak", "procent")),
+    SkillTemplate("unit_conversion", (6,), ("mjerenje", "mjerne", "jedinic"), _g_unit_conversion,
+                  tema_keywords=("mjerne jedinic", "pretvaranje")),
+    SkillTemplate("linear_equation", (6, 7), ("jednacin", "jednacine", "izraz"), _g_linear_equation,
+                  tema_keywords=("jednacin",)),
+    SkillTemplate("triangle_angle", (6, 7), ("ugao", "ugl", "trougao", "trokut"), _g_triangle_angle,
+                  tema_keywords=("ugao", "ugl", "trougao", "trokut")),
+    SkillTemplate("set_union", (6, 7), ("skup",), _g_set_union,
+                  tema_keywords=("skup", "unija", "presjek")),
 )
 
 _BY_ID = {t.skill_id: t for t in _TEMPLATES}
@@ -182,21 +217,32 @@ def _grade_int(grade: Any) -> int | None:
 
 
 def select_templates(grade: Any, oblast: Any = "", tema: Any = "") -> list[SkillTemplate]:
-    """Templates matching the selected grade and (oblast/tema) keywords.
+    """Templates for the selected grade, with TEMA-FIRST precedence.
 
-    When neither oblast nor tema is given, ALL grade-matching templates match
-    (a generic exam). When a topic IS given but nothing matches, returns []."""
+    1. A selected tema is matched by stable ``tema_ids`` (exact NPP id) first,
+       then by specific ``tema_keywords`` (tema NAME).
+    2. If a tema IS selected but nothing matches it, the result is EMPTY — a tema
+       must NEVER silently collapse into its broader oblast (that produced
+       "Proširivanje razlomaka" → fraction multiplication). Callers fall back
+       explicitly.
+    3. Only when no tema is selected do we match ``oblast_keywords``.
+    4. With neither, all grade-matching templates apply (generic).
+    """
     g = _grade_int(grade)
-    probe = f"{_fold(oblast)} {_fold(tema)}".strip()
-    out = []
-    for t in _TEMPLATES:
-        if g is not None and g not in t.grades:
-            continue
-        if not probe:
-            out.append(t)
-        elif any(k in probe for k in t.keywords):
-            out.append(t)
-    return out
+    graded = [t for t in _TEMPLATES if g is None or g in t.grades]
+    tema_probe = _fold(tema)
+
+    if tema_probe:
+        by_id = [t for t in graded if any(tid in tema_probe for tid in t.tema_ids)]
+        if by_id:
+            return by_id
+        by_name = [t for t in graded if any(k in tema_probe for k in t.tema_keywords)]
+        return by_name                  # possibly [] → explicit "no coverage"
+
+    oblast_probe = _fold(oblast)
+    if oblast_probe:
+        return [t for t in graded if any(k in oblast_probe for k in t.oblast_keywords)]
+    return graded
 
 
 def has_coverage(grade: Any, oblast: Any = "", tema: Any = "") -> bool:
