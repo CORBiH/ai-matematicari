@@ -42,6 +42,7 @@ from matbot import task_model
 from matbot import solution_plan
 from matbot import exam_engine
 from matbot import task_templates
+from matbot import topic_resolver
 from matbot.content_loader import (
     get_master,
     get_thinkific_map,
@@ -2726,14 +2727,22 @@ def _maybe_generate_practice_task(payload: dict) -> None:
         return
     grade = payload.get("grade")
     oblast = normalize_value(payload.get("selected_oblast"))
-    # Tema probe carries BOTH the stable NPP id and the lesson title, so exact
-    # tema identity (id first, then name) drives template selection.
-    tema = " ".join(x for x in (
-        normalize_value(payload.get("selected_topic")),
-        normalize_value(payload.get("lesson_title")),
-    ) if x)
-    if not task_templates.has_coverage(grade, oblast, tema):
-        return                              # no template → legacy model path
+    raw_topic = normalize_value(payload.get("selected_topic"))
+    # A RUNTIME topic id (e.g. "12880") is canonicalized to "<npp_id> <tema>" so
+    # exact tema identity drives selection; unresolved values pass through.
+    resolved = topic_resolver.resolve_topic(grade, raw_topic)
+    tema = topic_resolver.canonical_tema_probe(
+        grade, raw_topic, normalize_value(payload.get("lesson_title")))
+    if task_templates.has_coverage(grade, oblast, tema):
+        pass                                # exact tema is covered
+    elif resolved is None and raw_topic and task_templates.has_coverage(grade, oblast, ""):
+        # The tema id could not be resolved at all. Falling through to free model
+        # generation produced an OFF-TOPIC task (an equation under Razlomci), so
+        # stay inside the selected OBLAST — same topic, validated.
+        tema = ""
+        payload["_generation_topic_fallback"] = "oblast"
+    else:
+        return                              # explicit: no deterministic coverage
     avoid = {
         normalize_value(t)
         for t in ([payload.get("last_tutor_task")] + list(payload.get("recent_tasks") or []))
@@ -2889,6 +2898,14 @@ def _update_stuck_state(payload: dict) -> None:
 
 RESULT_MODES = {"quick", "rezultat", "samo_rezultat", "brzo"}
 
+# Poruka koja izričito traži obrazloženje/postupak/provjeru — takav zahtjev NIKAD
+# nije "samo rezultat", bez obzira na (zaostali) UI mod.
+_EXPLANATION_REQUEST_RE = re.compile(
+    r"\bobrazloz\w*|\bobjasn\w*|\bprovjeri\b|\bprovjer\w*\s+da\s+li\b|\bdokazi\b"
+    r"|\bkorak\s+po\s+korak\b|\bzasto\b|\bkako\s+znas\b|\bpokazi\s+postup\w*"
+    r"|\bpravil\w*\s+dj?eljiv\w*"
+)
+
 # Množina ("daj rezultate/sve zadatke") → riješi sve; jednina ("rezultat
 # zadatka") bez broja + više zadataka na slici → pitaj koji broj.
 _WANTS_ALL_RESULTS_RE = re.compile(r"\b(sve|svih|svaki|sva|rezultate|rezultati)\b")
@@ -2905,7 +2922,15 @@ def is_result_mode(payload: dict) -> bool:
     phase = normalize_value(payload.get("interaction_phase")).lower()
     if phase in ("answering_practice_task", "practice_help", "continuing_explanation"):
         return False
-    return normalize_value(payload.get("mode")).lower() in RESULT_MODES
+    if normalize_value(payload.get("mode")).lower() not in RESULT_MODES:
+        return False
+    # Eksplicitan zahtjev za OBRAZLOŽENJEM/POSTUPKOM nikad nije "samo rezultat" —
+    # čak i ako je UI (ili zaostali state) poslao quick (produkcijski bug: pitanje
+    # "…Obrazloži." završilo u Quick modu i dobilo odgovor "1").
+    message = normalize_value(payload.get("student_message") or payload.get("message"))
+    if _EXPLANATION_REQUEST_RE.search(fold_diacritics(message)):
+        return False
+    return True
 
 
 def _result_ocr(payload: dict) -> str:
@@ -2918,7 +2943,19 @@ def _result_ocr(payload: dict) -> str:
 
 
 def _fmt_result_value(expected) -> str:
-    """Kratak prikaz determinističkog rezultata stavke (broj / nejednakost)."""
+    """Kratak prikaz determinističkog rezultata stavke (broj / nejednakost).
+
+    LOGIČKI rezultat se NIKAD ne prikazuje kao goli 1/0 — učeniku ide "Da"/"Ne"
+    uz minimalan zaključak (produkcijski bug: odgovor je bio samo "1")."""
+    if getattr(expected, "expected_boolean", None) is not None or \
+            normalize_value(getattr(expected, "answer_type", "")).lower() == "boolean_with_explanation":
+        yes = bool(getattr(expected, "expected_boolean", None))
+        divisors = list(getattr(expected, "divisors", ()) or ())
+        if divisors:
+            flags = list(getattr(expected, "divisor_expected", ())) or [yes] * len(divisors)
+            parts = [f"sa {k} {'da' if ok else 'ne'}" for k, ok in zip(divisors, flags)]
+            return ("Da" if all(flags) else "Ne") + f" ({', '.join(parts)})"
+        return "Da" if yes else "Ne"
     val = expected.value
     if getattr(expected, "kind", "") == "inequality" and expected.required_form:
         num = str(val.numerator) if val.denominator == 1 else f"{val.numerator}/{val.denominator}"
@@ -4422,6 +4459,20 @@ def _prepare_chat(
     # Session mod = ono što je korisnik izabrao u UI-ju; contracts smiju mijenjati
     # SAMO prompt-mod (interno rutiranje), a UI prikazuje session mod (BUG 10/14).
     payload["_session_mode"] = normalize_value(payload.get("mode")).lower() or "explain"
+    # An explicit request for an EXPLANATION is never a context-free "just the
+    # result" turn. If a stale/implicit Quick mode arrives with such a message,
+    # promote the session to Objašnjenje so the visible mode and the backend
+    # session_mode agree (production: header said Objašnjenje, backend answered
+    # in Quick and returned a bare "1").
+    if (normalize_value(payload.get("mode")).lower() in RESULT_MODES
+            and not payload.get("_skip_answer_check")
+            and normalize_value(payload.get("interaction_phase")).lower()
+            not in ("answering_practice_task", "practice_help")
+            and _EXPLANATION_REQUEST_RE.search(fold_diacritics(
+                normalize_value(payload.get("student_message") or payload.get("message"))))):
+        payload["mode"] = "explain"
+        payload["_session_mode"] = "explain"
+        payload["_explanation_mode_promoted"] = True
     _apply_mode_preservation_contract(payload)
     # Eksplicitna namjera (stil/obim) se čita iz ORIGINALNE poruke, prije nego
     # što je confirmation contract eventualno zamijeni sintetičkom.
@@ -5986,7 +6037,9 @@ def _attach_task_definition(payload: dict, response: dict) -> None:
             or normalize_value(response.get("selected_oblast"))
         ),
         tema_id=(
-            normalize_value(generated.get("tema_id"))
+            (lambda c: c.npp_id if c else "")(topic_resolver.resolve_topic(
+                payload.get("grade"), payload.get("selected_topic")))
+            or normalize_value(generated.get("tema_id"))
             or normalize_value(response.get("effective_topic"))
             or normalize_value(payload.get("selected_topic"))
         ),
@@ -5995,6 +6048,10 @@ def _attach_task_definition(payload: dict, response: dict) -> None:
         validation=validation,
         source=source,
         skill_id=normalize_value(generated.get("skill_id")) or None,
+        runtime_topic_id=normalize_value(payload.get("selected_topic")),
+        tema_title=(_canon.tema if (_canon := topic_resolver.resolve_topic(
+            payload.get("grade"), payload.get("selected_topic"))) else
+            normalize_value(payload.get("lesson_title"))),
     )
     td_dict = td.to_dict() if td else None
     next_state["task"] = td_dict
@@ -6655,10 +6712,11 @@ def _exam_engine_response(payload: dict) -> dict:
         seed=seed,
         grade=payload.get("grade"),
         oblast=normalize_value(payload.get("selected_oblast")),
-        tema=" ".join(x for x in (
+        tema=topic_resolver.canonical_tema_probe(
+            payload.get("grade"),
             normalize_value(payload.get("selected_topic")),
             normalize_value(payload.get("lesson_title")),
-        ) if x),
+        ),
     )
     prev_ns = _previous_next_state(payload)
     released = result.exam_state is None          # V2 state released (drain rollback)

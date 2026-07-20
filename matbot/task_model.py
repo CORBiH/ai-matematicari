@@ -125,6 +125,10 @@ class TaskDefinition:
     validation_status: str
     source: str
     solution_plan: Any = None          # Phase 3
+    # Topic identity: the RUNTIME id the client sent plus the canonical tema title
+    # (tema_id holds the canonical NPP id when it could be resolved).
+    runtime_topic_id: str = ""
+    tema_title: str = ""
     engine_version: str = "v1-shadow"  # marks this as the Phase-1 shadow record
 
     def to_dict(self) -> dict:
@@ -138,6 +142,8 @@ class TaskDefinition:
             "question": self.question,
             "answer_schema": self.answer_schema,
             "solution_plan": self.solution_plan,
+            "runtime_topic_id": self.runtime_topic_id,
+            "tema_title": self.tema_title,
             "validation_status": self.validation_status,
             "source": self.source,
             "engine_version": self.engine_version,
@@ -155,6 +161,8 @@ def build_task_definition(
     validation: Any,
     source: str | None = None,
     skill_id: str | None = None,
+    runtime_topic_id: Any = "",
+    tema_title: Any = "",
 ) -> TaskDefinition | None:
     """Construct a TaskDefinition from an already-computed validation dict.
 
@@ -184,6 +192,8 @@ def build_task_definition(
         answer_schema=schema,
         validation_status=status,
         source=_derive_source(schema, source),
+        runtime_topic_id=_s(runtime_topic_id, 80),
+        tema_title=_s(tema_title, 120),
     )
 
 
@@ -216,6 +226,8 @@ def normalize_task_definition(raw: Any) -> dict | None:
         "question": q,
         "answer_schema": schema,
         "solution_plan": None,
+        "runtime_topic_id": _s(raw.get("runtime_topic_id"), 80),
+        "tema_title": _s(raw.get("tema_title"), 120),
         "validation_status": status,
         "source": source if source in _SOURCES else "unknown",
         "engine_version": _s(raw.get("engine_version"), 20) or "v1-shadow",

@@ -320,6 +320,88 @@ SCENARIOS: list[Scenario] = [
                     expect={"verdict": "correct"})],
     ),
 
+    # ---------------- prod round 3: mode sync / exam intents / topic id ------
+    Scenario(
+        id="prod-explanation-request-in-stale-quick", category="mode_sync",
+        payload={"grade": 6, "mode": "quick", "selected_topic": "6-04-031"},
+        regression_of=("UI showed Objašnjenje while backend ran Quick and replied "
+                       "with the bare result 1"),
+        turns=[Turn("Provjeri da li je broj 30 djeljiv sa 5 i sa 3. Obrazloži.",
+                    reply="Pogledajmo oba uslova.",
+                    expect={"mode": "explain",
+                            "answer_not_contains": ["rezultat: 1", "= 1\n"]})],
+    ),
+    Scenario(
+        id="prod-boolean-never-rendered-as-1", category="mode_sync",
+        payload={"grade": 6, "mode": "quick"},
+        regression_of="boolean result rendered as raw 1/0 instead of Da/Ne",
+        turns=[Turn("Da li je 30 djeljivo sa 5 i sa 3?", reply="Da.",
+                    expect={"answer_not_contains": ["rezultat: 1", "rezultat: 0"]})],
+    ),
+    Scenario(
+        id="prod-genuine-quick-stays-quick", category="mode_sync",
+        payload={"grade": 6, "mode": "quick"},
+        regression_of="explanation promotion must not swallow genuine Quick",
+        turns=[Turn("12 - 23x = 4x", reply="x = 12/27.",
+                    expect={"mode": "quick"})],
+    ),
+    Scenario(
+        id="prod-exam-help-does-not-advance", category="exam", payload=_EXAM,
+        regression_of=("exam stored „objasni ti” / „ne znam” as the answer and "
+                       "advanced to the next item"),
+        applies_to=EXAM,
+        turns=[
+            Turn("daj mi kontrolni", reply="Krećemo.",
+                 expect={"exam_status": "active", "exam_index": 0}),
+            Turn("ne znam", reply="U redu.",
+                 expect={"exam_status": "active", "exam_index": 0,
+                         "graded_flags": [None, None, None]}),
+            Turn("objasni ti", reply="U redu.",
+                 expect={"exam_status": "active", "exam_index": 0}),
+            Turn("pomozi", reply="U redu.",
+                 expect={"exam_status": "active", "exam_index": 0}),
+        ],
+    ),
+    Scenario(
+        id="prod-exam-skip-advances-as-skipped", category="exam", payload=_EXAM,
+        regression_of="only an explicit skip may advance an unanswered item",
+        applies_to=EXAM,
+        turns=[
+            Turn("daj mi kontrolni", reply="Krećemo."),
+            Turn("preskoči", reply="U redu.",
+                 expect={"exam_status": "active", "exam_index": 1}),
+        ],
+    ),
+    Scenario(
+        id="prod-exam-review-never-quotes-help", category="exam", payload=_EXAM,
+        regression_of="post-exam review claimed a help request was the answer",
+        applies_to=EXAM,
+        turns=[
+            Turn("daj mi kontrolni", reply="Krećemo."),
+            Turn("objasni ti", reply="U redu."),
+            Turn("predaj", reply="Gotovo.", expect={"exam_status": "completed"}),
+            Turn("objasni prvi zadatak", reply="Evo.",
+                 expect={"answer_not_contains": ["objasni ti"]}),
+        ],
+    ),
+    Scenario(
+        id="prod-runtime-topic-id-stays-on-tema", category="topic_identity",
+        payload={"grade": 6, "mode": "practice", "selected_oblast": "Razlomci",
+                 "selected_topic": "999999"},
+        regression_of=("unmapped RUNTIME topic id (12880) under „Proširivanje "
+                       "razlomaka” produced a linear equation"),
+        applies_to=PRACTICE,
+        turns=[Turn("daj mi zadatak", reply="Zadatak: Riješi jednačinu: 3x + 2 = 14.",
+                    expect={"last_task_not_contains": ["jednačin", "jednacin"],
+                            "task_validated": True, "last_task_nonempty": True})],
+    ),
+    Scenario(
+        id="prod-no-trivial-gcd-item", category="task_quality", payload=_G6,
+        regression_of="exam produced the trivial item „Odredi NZD(32, 32)”",
+        seed_task="Odredi NZD(32, 32).",
+        turns=[Turn("32", phase="answer", reply="Tačno.", expect={})],
+    ),
+
     # ---------------- language ----------------------------------------------
     Scenario(
         id="language-engine-output", category="language", payload=_G6,

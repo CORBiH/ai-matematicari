@@ -38,6 +38,11 @@ _POSITIVE = {
 }
 
 
+# A canonical NPP tema id, e.g. "6-04-035". Its presence in a probe means the
+# tema identity was RESOLVED, so keyword widening must not apply.
+_CANONICAL_ID_RE = re.compile(r"\b\d-\d{2}-\d{3}\b")
+
+
 def _fold(text: Any) -> str:
     s = unicodedata.normalize("NFKD", str(text or ""))
     s = "".join(c for c in s if not unicodedata.combining(c))
@@ -82,11 +87,15 @@ def _g_prime_factorization(rng: random.Random) -> tuple[str, str]:
 
 def _g_gcd(rng: random.Random) -> tuple[str, str]:
     a, b = rng.randint(6, 60), rng.randint(6, 60)
+    while a == b:                                  # NZD(32, 32) je trivijalan
+        b = rng.randint(6, 60)
     return f"Odredi NZD({a}, {b}).", str(math.gcd(a, b))
 
 
 def _g_lcm(rng: random.Random) -> tuple[str, str]:
     a, b = rng.randint(2, 15), rng.randint(2, 15)
+    while a == b:                                  # NZS(x, x) je trivijalan
+        b = rng.randint(2, 15)
     return f"Odredi NZS({a}, {b}).", str(a * b // math.gcd(a, b))
 
 
@@ -240,6 +249,12 @@ def select_templates(grade: Any, oblast: Any = "", tema: Any = "") -> list[Skill
         by_id = [t for t in graded if any(tid in tema_probe for tid in t.tema_ids)]
         if by_id:
             return by_id
+        if _CANONICAL_ID_RE.search(tema_probe):
+            # The tema resolved to a canonical NPP id, so its identity is KNOWN and
+            # authoritative. Matching its title by keyword would silently widen the
+            # tema ("Pojam skupa" → set-union templates), so an unlisted canonical
+            # tema is simply uncovered.
+            return []
         by_name = [t for t in graded if any(k in tema_probe for k in t.tema_keywords)]
         return by_name                  # possibly [] → explicit "no coverage"
 
@@ -278,6 +293,32 @@ class GeneratedTask:
         }
 
 
+_TRIVIAL_PAIR_RE = re.compile(r"\((\d+),\s*(\d+)\)")
+
+
+def quality_ok(skill_id: str, question: str, answer: str) -> bool:
+    """Pedagoške granice — zadatak mora biti i SMISLEN, ne samo ocjenjiv.
+
+    Odbacuje trivijalne instance (npr. "Odredi NZD(32, 32).") koje ne provjeravaju
+    ništa. Poziva se uz ``_validates`` pri svakoj generaciji."""
+    if skill_id in ("gcd", "lcm"):
+        m = _TRIVIAL_PAIR_RE.search(question)
+        if m and m.group(1) == m.group(2):
+            return False                            # identični operandi
+    if skill_id == "fraction_mul":
+        # x/y · 1/1 i slično ne provjerava množenje
+        if re.search(r"1\s*/\s*1", question):
+            return False
+    if skill_id == "fraction_expand":
+        # "proširi a/b na nazivnik b" nije proširivanje
+        m = re.search(r"(\d+)\s*/\s*(\d+)\s+na\s+nazivnik\s+(\d+)", question)
+        if m and m.group(2) == m.group(3):
+            return False
+    if skill_id == "percent_of" and re.search(r"100\s*%", question):
+        return False
+    return True
+
+
 def _validates(question: str, answer: str) -> bool:
     """The code-computed answer MUST be accepted by the deterministic checker."""
     result = check_practice_answer(question, answer)
@@ -292,7 +333,7 @@ def _generate_from(template: SkillTemplate, rng: random.Random, *,
                    grade: Any, oblast: Any, tema: Any, tries: int = 10) -> GeneratedTask | None:
     for _ in range(tries):
         question, answer = template.generate(rng)
-        if _validates(question, answer):
+        if _validates(question, answer) and quality_ok(template.skill_id, question, answer):
             return GeneratedTask(
                 skill_id=template.skill_id, grade=_grade_int(grade),
                 oblast_id=_fold(oblast)[:80], tema_id=_fold(tema)[:80],

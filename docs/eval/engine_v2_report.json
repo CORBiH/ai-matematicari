@@ -1,351 +1,371 @@
 {
-  "summary": {
-    "total_cases": 198,
-    "passed": 198,
-    "failed": 0,
-    "pass_rate": 100.0,
-    "scenarios": 33,
-    "configs": [
-      "legacy",
-      "shadow",
-      "grading",
-      "practice",
-      "exam",
-      "all_v2"
-    ],
-    "engine_canary": "0"
-  },
-  "pass_rate_by_category": {
-    "exact_correct": {
-      "total": 12,
-      "passed": 12,
-      "pass_rate": 100.0
-    },
-    "equivalent_form": {
-      "total": 30,
-      "passed": 30,
-      "pass_rate": 100.0
-    },
-    "partial_reasoning": {
-      "total": 12,
-      "passed": 12,
-      "pass_rate": 100.0
-    },
-    "wrong_intermediate": {
-      "total": 6,
-      "passed": 6,
-      "pass_rate": 100.0
-    },
-    "ambiguous": {
-      "total": 6,
-      "passed": 6,
-      "pass_rate": 100.0
-    },
-    "prose_not_evidence": {
-      "total": 12,
-      "passed": 12,
-      "pass_rate": 100.0
-    },
-    "practice_step_completion": {
-      "total": 6,
-      "passed": 6,
-      "pass_rate": 100.0
-    },
-    "correct_intermediate": {
-      "total": 6,
-      "passed": 6,
-      "pass_rate": 100.0
-    },
-    "ne_znam_hint": {
-      "total": 12,
-      "passed": 12,
-      "pass_rate": 100.0
-    },
-    "task_id_persistence": {
-      "total": 6,
-      "passed": 6,
-      "pass_rate": 100.0
-    },
-    "short_followup": {
-      "total": 6,
-      "passed": 6,
-      "pass_rate": 100.0
-    },
-    "exam_lifecycle": {
-      "total": 6,
-      "passed": 6,
-      "pass_rate": 100.0
-    },
-    "item_attribution": {
-      "total": 6,
-      "passed": 6,
-      "pass_rate": 100.0
-    },
-    "mode_preservation": {
-      "total": 6,
-      "passed": 6,
-      "pass_rate": 100.0
-    },
-    "unsupported_fallback": {
-      "total": 12,
-      "passed": 12,
-      "pass_rate": 100.0
-    },
-    "post_exam": {
-      "total": 6,
-      "passed": 6,
-      "pass_rate": 100.0
-    },
-    "ungradeable_rejection": {
-      "total": 6,
-      "passed": 6,
-      "pass_rate": 100.0
-    },
-    "grader_conflict": {
-      "total": 12,
-      "passed": 12,
-      "pass_rate": 100.0
-    },
-    "tema_preservation": {
-      "total": 6,
-      "passed": 6,
-      "pass_rate": 100.0
-    },
-    "multi_condition": {
-      "total": 18,
-      "passed": 18,
-      "pass_rate": 100.0
-    },
-    "language": {
-      "total": 6,
-      "passed": 6,
-      "pass_rate": 100.0
-    }
-  },
-  "by_config": {
-    "legacy": {
-      "total": 33,
-      "passed": 33,
-      "failures": [],
-      "pass_rate": 100.0
-    },
-    "shadow": {
-      "total": 33,
-      "passed": 33,
-      "failures": [],
-      "pass_rate": 100.0
-    },
-    "grading": {
-      "total": 33,
-      "passed": 33,
-      "failures": [],
-      "pass_rate": 100.0
-    },
-    "practice": {
-      "total": 33,
-      "passed": 33,
-      "failures": [],
-      "pass_rate": 100.0
-    },
-    "exam": {
-      "total": 33,
-      "passed": 33,
-      "failures": [],
-      "pass_rate": 100.0
-    },
-    "all_v2": {
-      "total": 33,
-      "passed": 33,
-      "failures": [],
-      "pass_rate": 100.0
-    }
-  },
-  "legacy_vs_v2_divergences": [
-    {
-      "id": "prod-144-verified-not-downgraded",
-      "config": "grading",
-      "legacy": [
-        "partial"
-      ],
-      "v2": [
-        "correct"
-      ]
-    },
-    {
-      "id": "div6-guided-completion",
-      "config": "practice",
-      "legacy": [
-        "partial",
-        null,
-        "correct"
-      ],
-      "v2": [
-        "partial",
-        "partial",
-        "correct"
-      ]
-    },
-    {
-      "id": "help-preserves-cursor",
-      "config": "practice",
-      "legacy": [
-        null,
-        null
-      ],
-      "v2": [
-        null,
-        "partial"
-      ]
-    },
-    {
-      "id": "task-id-stable-across-steps",
-      "config": "practice",
-      "legacy": [
-        null,
-        null,
-        null
-      ],
-      "v2": [
-        null,
-        "partial",
-        "correct"
-      ]
-    },
-    {
-      "id": "exam-one-answer-one-item",
-      "config": "exam",
-      "legacy": [
-        null,
-        null
-      ],
-      "v2": [
-        null,
-        "incorrect"
-      ]
-    },
-    {
-      "id": "div6-guided-completion",
-      "config": "all_v2",
-      "legacy": [
-        "partial",
-        null,
-        "correct"
-      ],
-      "v2": [
-        "partial",
-        "partial",
-        "correct"
-      ]
-    },
-    {
-      "id": "help-preserves-cursor",
-      "config": "all_v2",
-      "legacy": [
-        null,
-        null
-      ],
-      "v2": [
-        null,
-        "partial"
-      ]
-    },
-    {
-      "id": "task-id-stable-across-steps",
-      "config": "all_v2",
-      "legacy": [
-        null,
-        null,
-        null
-      ],
-      "v2": [
-        null,
-        "partial",
-        "correct"
-      ]
-    },
-    {
-      "id": "exam-one-answer-one-item",
-      "config": "all_v2",
-      "legacy": [
-        null,
-        null
-      ],
-      "v2": [
-        null,
-        "incorrect"
-      ]
-    },
-    {
-      "id": "prod-144-verified-not-downgraded",
-      "config": "all_v2",
-      "legacy": [
-        "partial"
-      ],
-      "v2": [
-        "correct"
-      ]
-    }
+ "summary": {
+  "total_cases": 246,
+  "passed": 246,
+  "failed": 0,
+  "pass_rate": 100.0,
+  "scenarios": 41,
+  "configs": [
+   "legacy",
+   "shadow",
+   "grading",
+   "practice",
+   "exam",
+   "all_v2"
   ],
-  "grader_source_distribution": {
-    "deterministic": 33,
-    "structured_gpt": 4,
-    "none": 15
+  "engine_canary": "0"
+ },
+ "pass_rate_by_category": {
+  "exact_correct": {
+   "total": 12,
+   "passed": 12,
+   "pass_rate": 100.0
   },
-  "shadow_conflicts": {
-    "no_conflict": 37,
-    "legacy_prose_verdict": 1,
-    "uncheckable": 13,
-    "verdict_mismatch": 1
+  "equivalent_form": {
+   "total": 30,
+   "passed": 30,
+   "pass_rate": 100.0
   },
-  "template_validation_failures": [],
-  "state_machine_failures": [],
-  "language_failures": [],
-  "consistency_failures": [],
-  "telemetry_failures": [],
-  "sheets_failures": [],
-  "latency": {
-    "by_config": {
-      "legacy": {
-        "mean_ms": 21.08,
-        "max_ms": 58.88
-      },
-      "shadow": {
-        "mean_ms": 19.95,
-        "max_ms": 67.27
-      },
-      "grading": {
-        "mean_ms": 7.34,
-        "max_ms": 8.52
-      },
-      "practice": {
-        "mean_ms": 7.51,
-        "max_ms": 8.41
-      },
-      "exam": {
-        "mean_ms": 7.67,
-        "max_ms": 13.41
-      },
-      "all_v2": {
-        "mean_ms": 7.6,
-        "max_ms": 8.79
-      }
-    },
-    "all_v2_vs_legacy_pct": -63.9
+  "partial_reasoning": {
+   "total": 12,
+   "passed": 12,
+   "pass_rate": 100.0
   },
-  "release_gates": {
-    "no_false_incorrect_on_verified_correct": true,
-    "multi_step_completion_100": true,
-    "no_exam_answer_bleed": true,
-    "no_exam_mode_drift": true,
-    "no_completed_exam_reopen": true,
-    "no_verdict_prose_counter_contradiction": true,
-    "no_language_leaks": true,
-    "template_validation_100": true,
-    "unsupported_explicitly_handled": true,
-    "no_duplicate_sheets_rows": true,
-    "no_secrets_or_prompts_in_telemetry": true,
-    "no_material_latency_regression": true
+  "wrong_intermediate": {
+   "total": 6,
+   "passed": 6,
+   "pass_rate": 100.0
   },
-  "release_gates_passed": true,
-  "failures": []
+  "ambiguous": {
+   "total": 6,
+   "passed": 6,
+   "pass_rate": 100.0
+  },
+  "prose_not_evidence": {
+   "total": 12,
+   "passed": 12,
+   "pass_rate": 100.0
+  },
+  "practice_step_completion": {
+   "total": 6,
+   "passed": 6,
+   "pass_rate": 100.0
+  },
+  "correct_intermediate": {
+   "total": 6,
+   "passed": 6,
+   "pass_rate": 100.0
+  },
+  "ne_znam_hint": {
+   "total": 12,
+   "passed": 12,
+   "pass_rate": 100.0
+  },
+  "task_id_persistence": {
+   "total": 6,
+   "passed": 6,
+   "pass_rate": 100.0
+  },
+  "short_followup": {
+   "total": 6,
+   "passed": 6,
+   "pass_rate": 100.0
+  },
+  "exam_lifecycle": {
+   "total": 6,
+   "passed": 6,
+   "pass_rate": 100.0
+  },
+  "item_attribution": {
+   "total": 6,
+   "passed": 6,
+   "pass_rate": 100.0
+  },
+  "mode_preservation": {
+   "total": 6,
+   "passed": 6,
+   "pass_rate": 100.0
+  },
+  "unsupported_fallback": {
+   "total": 12,
+   "passed": 12,
+   "pass_rate": 100.0
+  },
+  "post_exam": {
+   "total": 6,
+   "passed": 6,
+   "pass_rate": 100.0
+  },
+  "ungradeable_rejection": {
+   "total": 6,
+   "passed": 6,
+   "pass_rate": 100.0
+  },
+  "grader_conflict": {
+   "total": 12,
+   "passed": 12,
+   "pass_rate": 100.0
+  },
+  "tema_preservation": {
+   "total": 6,
+   "passed": 6,
+   "pass_rate": 100.0
+  },
+  "multi_condition": {
+   "total": 18,
+   "passed": 18,
+   "pass_rate": 100.0
+  },
+  "mode_sync": {
+   "total": 18,
+   "passed": 18,
+   "pass_rate": 100.0
+  },
+  "exam": {
+   "total": 18,
+   "passed": 18,
+   "pass_rate": 100.0
+  },
+  "topic_identity": {
+   "total": 6,
+   "passed": 6,
+   "pass_rate": 100.0
+  },
+  "task_quality": {
+   "total": 6,
+   "passed": 6,
+   "pass_rate": 100.0
+  },
+  "language": {
+   "total": 6,
+   "passed": 6,
+   "pass_rate": 100.0
+  }
+ },
+ "by_config": {
+  "legacy": {
+   "total": 41,
+   "passed": 41,
+   "failures": [],
+   "pass_rate": 100.0
+  },
+  "shadow": {
+   "total": 41,
+   "passed": 41,
+   "failures": [],
+   "pass_rate": 100.0
+  },
+  "grading": {
+   "total": 41,
+   "passed": 41,
+   "failures": [],
+   "pass_rate": 100.0
+  },
+  "practice": {
+   "total": 41,
+   "passed": 41,
+   "failures": [],
+   "pass_rate": 100.0
+  },
+  "exam": {
+   "total": 41,
+   "passed": 41,
+   "failures": [],
+   "pass_rate": 100.0
+  },
+  "all_v2": {
+   "total": 41,
+   "passed": 41,
+   "failures": [],
+   "pass_rate": 100.0
+  }
+ },
+ "legacy_vs_v2_divergences": [
+  {
+   "id": "prod-144-verified-not-downgraded",
+   "config": "grading",
+   "legacy": [
+    "partial"
+   ],
+   "v2": [
+    "correct"
+   ]
+  },
+  {
+   "id": "div6-guided-completion",
+   "config": "practice",
+   "legacy": [
+    "partial",
+    null,
+    "correct"
+   ],
+   "v2": [
+    "partial",
+    "partial",
+    "correct"
+   ]
+  },
+  {
+   "id": "help-preserves-cursor",
+   "config": "practice",
+   "legacy": [
+    null,
+    null
+   ],
+   "v2": [
+    null,
+    "partial"
+   ]
+  },
+  {
+   "id": "task-id-stable-across-steps",
+   "config": "practice",
+   "legacy": [
+    null,
+    null,
+    null
+   ],
+   "v2": [
+    null,
+    "partial",
+    "correct"
+   ]
+  },
+  {
+   "id": "exam-one-answer-one-item",
+   "config": "exam",
+   "legacy": [
+    null,
+    null
+   ],
+   "v2": [
+    null,
+    "incorrect"
+   ]
+  },
+  {
+   "id": "div6-guided-completion",
+   "config": "all_v2",
+   "legacy": [
+    "partial",
+    null,
+    "correct"
+   ],
+   "v2": [
+    "partial",
+    "partial",
+    "correct"
+   ]
+  },
+  {
+   "id": "help-preserves-cursor",
+   "config": "all_v2",
+   "legacy": [
+    null,
+    null
+   ],
+   "v2": [
+    null,
+    "partial"
+   ]
+  },
+  {
+   "id": "task-id-stable-across-steps",
+   "config": "all_v2",
+   "legacy": [
+    null,
+    null,
+    null
+   ],
+   "v2": [
+    null,
+    "partial",
+    "correct"
+   ]
+  },
+  {
+   "id": "exam-one-answer-one-item",
+   "config": "all_v2",
+   "legacy": [
+    null,
+    null
+   ],
+   "v2": [
+    null,
+    "incorrect"
+   ]
+  },
+  {
+   "id": "prod-144-verified-not-downgraded",
+   "config": "all_v2",
+   "legacy": [
+    "partial"
+   ],
+   "v2": [
+    "correct"
+   ]
+  }
+ ],
+ "grader_source_distribution": {
+  "deterministic": 35,
+  "structured_gpt": 4,
+  "none": 15
+ },
+ "shadow_conflicts": {
+  "no_conflict": 39,
+  "legacy_prose_verdict": 1,
+  "uncheckable": 13,
+  "verdict_mismatch": 1
+ },
+ "template_validation_failures": [],
+ "state_machine_failures": [],
+ "language_failures": [],
+ "consistency_failures": [],
+ "telemetry_failures": [],
+ "sheets_failures": [],
+ "latency": {
+  "by_config": {
+   "legacy": {
+    "mean_ms": 11.75,
+    "max_ms": 54.54
+   },
+   "shadow": {
+    "mean_ms": 9.97,
+    "max_ms": 51.16
+   },
+   "grading": {
+    "mean_ms": 7.67,
+    "max_ms": 10.17
+   },
+   "practice": {
+    "mean_ms": 8.76,
+    "max_ms": 34.24
+   },
+   "exam": {
+    "mean_ms": 7.94,
+    "max_ms": 10.73
+   },
+   "all_v2": {
+    "mean_ms": 8.0,
+    "max_ms": 12.19
+   }
+  },
+  "all_v2_vs_legacy_pct": -31.9
+ },
+ "release_gates": {
+  "no_false_incorrect_on_verified_correct": true,
+  "multi_step_completion_100": true,
+  "no_exam_answer_bleed": true,
+  "no_exam_mode_drift": true,
+  "no_completed_exam_reopen": true,
+  "no_verdict_prose_counter_contradiction": true,
+  "no_language_leaks": true,
+  "template_validation_100": true,
+  "unsupported_explicitly_handled": true,
+  "no_duplicate_sheets_rows": true,
+  "no_secrets_or_prompts_in_telemetry": true,
+  "no_material_latency_regression": true
+ },
+ "release_gates_passed": true,
+ "failures": []
 }

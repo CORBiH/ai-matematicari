@@ -580,8 +580,12 @@ document.addEventListener('DOMContentLoaded', () => {
        !continueBtn || !sendTutor || !msgBox || !tutorChat || !tutorTyping) return; // panel nije prisutan
 
     /* stanje izabrano na home ekranu; chat ga samo koristi */
+    /* Default mode is EXPLAIN, never 'quick': a session whose mode was not
+       explicitly chosen used to send mode:'quick', so the header showed
+       "Objašnjenje" while the backend answered in Quick (returning a bare "1").
+       Quick must always be an explicit user choice. */
     const state = {
-      grade: '6', mode: 'quick',
+      grade: '6', mode: 'explain',
       topic: '', topicName: '', topicOblast: '', topicSource: '',
       oblast: ''
     };
