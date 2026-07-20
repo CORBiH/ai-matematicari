@@ -10,6 +10,7 @@ import pytest
 
 from matbot import ai_tutor_service as svc
 from matbot import content_loader as cl
+from matbot import engine_v2
 from matbot.bosnian import to_ijekavica
 from matbot.tutor_prompts import build_tutor_system_prompt
 
@@ -27,6 +28,10 @@ TASK_D = (
 @pytest.fixture(autouse=True)
 def _tmp_activity_db(monkeypatch, tmp_path):
     monkeypatch.setenv("MATBOT_DB_PATH", str(tmp_path / "activity.sqlite3"))
+    # These tests exercise the legacy/grading path — isolate them from the Phase 3
+    # Practice Step Engine and the Phase 4 Exam Engine (both have their own files).
+    monkeypatch.setenv("MATBOT_ENGINE_V2_PRACTICE", "off")
+    monkeypatch.setenv("MATBOT_ENGINE_V2_EXAM", "off")
     yield
 
 
@@ -785,10 +790,16 @@ def test_gpt_textual_verdict_updates_answer_verdict_and_streak(master, tmap):
         "previous_next_state": {"correct_streak": 2, "task_id": "task-text"},
     }, chat, master, tmap, model="m", timeout=1)
 
-    assert out["answer_verdict"] == "correct"
-    assert out["answer_verdict_detail"] == "gpt_correct"
-    assert out["answer_check"]["gpt_check_used"] is True
-    assert out["next_state"]["correct_streak"] == 3
+    if engine_v2.grading_authoritative():
+        # Phase 2: tutor prose is NEVER a grader → no verdict from "Tačno." prose.
+        assert out["answer_verdict"] is None
+        assert out["gpt_check_used"] is False
+        assert out["task_status"] == "active"
+    else:
+        assert out["answer_verdict"] == "correct"
+        assert out["answer_verdict_detail"] == "gpt_correct"
+        assert out["answer_check"]["gpt_check_used"] is True
+        assert out["next_state"]["correct_streak"] == 3
 
 
 def test_gpt_textual_partial_keeps_task_active_and_counts_attempt(master, tmap):
@@ -809,15 +820,22 @@ def test_gpt_textual_partial_keeps_task_active_and_counts_attempt(master, tmap):
         },
     }, chat, master, tmap, model="m", timeout=1)
 
-    assert out["answer_verdict"] == "partial"
-    assert out["answer_verdict_detail"] == "gpt_partial"
-    assert out["answer_check"]["gpt_check_used"] is True
-    assert out["task_status"] == "active"
-    assert out["task_id"] == "task-text"
-    assert out["attempt_number"] == 2
-    assert out["total_attempt_count"] == 2
-    assert out["wrong_attempt_count"] == 1
-    assert out["hint_count"] == 1
+    if engine_v2.grading_authoritative():
+        # Phase 2: prose "Djelimično tačno." is not a grader → ungraded, task kept.
+        assert out["answer_verdict"] is None
+        assert out["gpt_check_used"] is False
+        assert out["task_status"] == "active"
+        assert out["task_id"] == "task-text"
+    else:
+        assert out["answer_verdict"] == "partial"
+        assert out["answer_verdict_detail"] == "gpt_partial"
+        assert out["answer_check"]["gpt_check_used"] is True
+        assert out["task_status"] == "active"
+        assert out["task_id"] == "task-text"
+        assert out["attempt_number"] == 2
+        assert out["total_attempt_count"] == 2
+        assert out["wrong_attempt_count"] == 1
+        assert out["hint_count"] == 1
 
 
 def test_gpt_textual_ambiguous_keeps_task_without_counting_attempt(master, tmap):
@@ -839,14 +857,19 @@ def test_gpt_textual_ambiguous_keeps_task_without_counting_attempt(master, tmap)
     }, chat, master, tmap, model="m", timeout=1)
 
     assert out["answer_verdict"] is None
-    assert out["answer_verdict_detail"] == "gpt_ambiguous"
-    assert out["answer_check"]["gpt_check_used"] is True
     assert out["task_status"] == "active"
     assert out["task_id"] == "task-text"
     assert out["attempt_number"] == 2
     assert out["total_attempt_count"] == 2
     assert out["wrong_attempt_count"] == 1
     assert out["hint_count"] == 1
+    if engine_v2.grading_authoritative():
+        # Phase 2: prose is not a grader → detail is not a prose-derived label.
+        assert out["gpt_check_used"] is False
+        assert out["answer_verdict_detail"] != "gpt_ambiguous"
+    else:
+        assert out["answer_verdict_detail"] == "gpt_ambiguous"
+        assert out["answer_check"]["gpt_check_used"] is True
 
 
 def test_gpt_textual_partial_variants_are_conservative(master, tmap):
@@ -861,9 +884,13 @@ def test_gpt_textual_partial_variants_are_conservative(master, tmap):
     }, _fake_chat("Dobro si počeo — tačno je da je 2x = 8. Sada dovrši dijeljenjem sa 2."),
         master, tmap, model="m", timeout=1)
 
-    assert out["answer_verdict"] == "partial"
-    assert out["answer_verdict_detail"] == "gpt_partial"
-    assert out["task_status"] == "active"
+    if engine_v2.grading_authoritative():
+        assert out["answer_verdict"] is None            # prose is not a grader
+        assert out["task_status"] == "active"
+    else:
+        assert out["answer_verdict"] == "partial"
+        assert out["answer_verdict_detail"] == "gpt_partial"
+        assert out["task_status"] == "active"
 
     flawed = svc.handle_chat({
         "grade": 6,
@@ -876,9 +903,13 @@ def test_gpt_textual_partial_variants_are_conservative(master, tmap):
     }, _fake_chat("Tačno. Konačan broj je x = 4. Međutim, prvi korak u postupku nije dobar."),
         master, tmap, model="m", timeout=1)
 
-    assert flawed["answer_verdict"] == "partial"
-    assert flawed["answer_verdict_detail"] == "gpt_partial"
-    assert flawed["task_status"] == "active"
+    if engine_v2.grading_authoritative():
+        assert flawed["answer_verdict"] is None         # prose is not a grader
+        assert flawed["task_status"] == "active"
+    else:
+        assert flawed["answer_verdict"] == "partial"
+        assert flawed["answer_verdict_detail"] == "gpt_partial"
+        assert flawed["task_status"] == "active"
 
 
 def test_structured_gpt_grade_overrides_conflicting_tutor_prose(master, tmap):

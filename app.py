@@ -274,6 +274,7 @@ from utils import _bytes_to_data_url
 # Phase 3: modularni AI tutor endpoint (payload → lookup → prompt builder → OpenAI).
 # Servis je čist i ne uvozi app; rutu ispod injektujemo postojećim _openai_chat.
 from matbot import ai_tutor_service
+from matbot import engine_v2
 from matbot.activity_log import log_tutor_feedback
 from matbot.content_loader import ContentLoadError
 from matbot.sheets_log import (
@@ -492,6 +493,16 @@ def sheets_flush():
     timeout = max(0.0, min(timeout, 30.0))
     ok = flush_sheets_log(timeout=timeout)
     return jsonify({"ok": bool(ok), "stats": get_sheets_delivery_stats()}), 200
+
+
+@app.get("/diag/engine-v2")
+@limiter.limit(_diag_rate_limit)
+def engine_v2_metrics():
+    # Phase 0: read-only shadow-grading aggregates. No student content, no prose,
+    # no secrets — only counts and conflict categories.
+    if not _diag_allowed():
+        return jsonify({"error": "forbidden"}), 403
+    return jsonify({"ok": True, "metrics": engine_v2.get_metrics()}), 200
 
 
 @app.after_request

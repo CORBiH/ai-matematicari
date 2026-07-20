@@ -988,6 +988,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     function structuredTutorTask(j){
       if (!j || typeof j !== 'object') return '';
+      /* Phase 1 (Engine V2): server-authoritative TaskDefinition wins when present.
+         Additive — absent when the backend flag is off, and equal to
+         last_tutor_task when present, so legacy behavior is unchanged. */
+      const td = (j.task && j.task.question)
+              || (j.next_state && j.next_state.task && j.next_state.task.question);
+      if (td) return td.toString().trim().slice(0, 600);
       for (const key of ['last_tutor_task', 'practice_task', 'task_text']){
         const val = (j[key] || '').toString().trim();
         if (val) return val.slice(0, 600);

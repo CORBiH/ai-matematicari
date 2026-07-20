@@ -568,7 +568,9 @@ def test_tutor_task_detection_updates_last_task(client):
 def test_tutor_task_saved_before_history_for_stream_and_json(client):
     html = _html(client)
     idx = html.index("function applyTutorResponse")
-    snippet = html[idx:idx + 2200]
+    # Window must cover the whole function: it grew past the old hard-coded 2200
+    # chars, which made this test fail on ordering even though the contract held.
+    snippet = html[idx:idx + 4000]
     # BUG 3/9/11: zadatak se prati SAMO u practice/exam; server (last_tutor_task)
     # je izvor istine, JS heuristika samo fallback za stare odgovore
     assert "const canTrackTask = (state.mode === 'practice' || state.mode === 'exam');" in snippet
@@ -766,7 +768,9 @@ def test_recent_tasks_tracked_and_sent(client):
     assert "payload.recent_tasks = recentTasks" in html
     # pamti se tek kad odgovor stvarno sadrzi zadatak
     idx = html.index("function applyTutorResponse")
-    snippet = html[idx:idx + 2200]
+    # Window must cover the whole function: it grew past the old hard-coded 2200
+    # chars, which made this test fail on ordering even though the contract held.
+    snippet = html[idx:idx + 4000]
     assert "pushRecentTask(taskText)" in snippet
     # cisti se pri centralnom resetu koji koristi i "Obrisi razgovor"
     ridx = html.index("function resetTutorConversation()")
@@ -785,7 +789,10 @@ def test_image_test_frontend_contract(client):
     # prosireni follow-up rjecnik hvata "uradi mi korak po korak", "nastavi", "sve"
     assert r"korak|nastav\w*|dalje|sljedec\w*|sve" in html
     # greska bez statusa NE brise sacuvano stanje (next_state ostaje)
-    assert "else if (j && j.status) clearNextState()" in html
+    # Whitespace-tolerant: the one-liner was reformatted into a block, but the
+    # contract is unchanged — state is cleared ONLY when j.status is present
+    # (an error without status must NOT clear saved next_state).
+    assert re.search(r"else\s+if\s*\(\s*j\s*&&\s*j\.status\s*\)\s*\{?\s*clearNextState\(\)", html)
 
 
 def test_transition_text_never_becomes_task_frontend(client):

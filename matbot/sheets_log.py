@@ -123,6 +123,12 @@ SHEET_HEADERS = [
     "multiple_choice_result",
     "answer_verdict_detail",
     "sheets_event_id",
+    # Phase 0 (Engine V2 shadow): one sanitized JSON telemetry field appended at
+    # the END so existing columns/indices stay stable and old rows pad cleanly.
+    "shadow_telemetry",
+    # Phase 7 canary cohort marker ("1"/"0"). Telemetry ONLY — never affects
+    # grading, state, counters or the student-visible response.
+    "engine_canary",
 ]
 
 
@@ -136,6 +142,15 @@ def _clean_cell(value: Any) -> Any:
     if isinstance(value, str):
         return value.strip()
     return value
+
+
+def _canary_marker() -> str:
+    """Sanitized canary cohort flag for every row (telemetry only)."""
+    try:
+        from matbot.engine_v2 import canary_marker
+        return canary_marker()
+    except Exception:
+        return "0"
 
 
 def _json_cell(value: Any) -> str:
@@ -581,7 +596,9 @@ def _build_transcript_row(payload: dict, response: dict) -> list[Any]:
         _json_cell(_telemetry("multiple_choice_hint")),
         _json_cell(_telemetry("multiple_choice_result")),
         _clean_cell(response.get("answer_verdict_detail") or item.get("verdict")),
-        "",
+        "",  # sheets_event_id (populated by _set_row_event_id)
+        _json_cell(response.get("shadow_grading")),
+        _canary_marker(),
     ]
 
 

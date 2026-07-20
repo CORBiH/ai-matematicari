@@ -1,16 +1,63 @@
 """Mala jezička zaštita: najčešći ekavski/srpski oblici → bosanska ijekavica.
 
-Sistemska prompt pravila već traže ijekavicu, ali model povremeno "procuri"
-("deo", "rešenje", "vežba") ili starije termine za razlomke. Ovo je zadnja
-linija odbrane SAMO za vrlo česte i jednoznačne oblike — namjerno kratka lista
-sa granicama riječi, da se ništa ne prekoriguje (npr. "video" sadrži "deo" ali
-ga \\b štiti).
+Sistemska prompt pravila i sav sistemski tekst se PIŠU u ijekavici uzvodno; ovo
+je ZADNJA linija odbrane (safety net) SAMO za vrlo česte i jednoznačne oblike
+koji povremeno "procure" (model ili starije stringove), sa granicama riječi da
+se ništa ne prekoriguje (npr. "video" sadrži "deo" ali ga \\b štiti). Primjenjuje
+se ISKLJUČIVO na sistemski generisan tekst (odgovori/hintovi/sažeci), NIKAD na
+učenikov unos ni OCR — matematički blokovi (\\(...\\), $...$, kod, URL) su zaštićeni.
+
+TERMINOLOŠKA KONVENCIJA (jedna za cijelu aplikaciju — Bosanski, ijekavica):
+  * jezik: dio, rješenje, vježba, sljedeći/sljedeća, uvijek, poslije, dvije,
+           razumijem, obje, djevojčica, cio/cijeli, lijepo
+  * razlomak → brojnik, nazivnik (NE imenilac/imenitelj, NE brojilac/brojitelj)
+  * zajednički nazivnik (NE "zajednički imenilac"); najmanji zajednički sadržalac
+  * jednačina, nejednačina (NE jednadžba)
+  * djeljivost, djelilac (NE djelitelj), djeljiv
+  * rastavljanje na proste faktore; prost broj
+  * aritmetička sredina
+  * skup: unija (∪), presjek (∩), razlika
+  * zbir, sabrati (NE zbroj, zbrojiti)
+  * ugao (NE kut); pod pravim uglom (NE okomit)
+  * decimalni zarez (NE decimalna tačka); stepen; Pitagora
+  * ocjene: tačan, djelimično tačan, netačan
+  * pokušaj, rješenje, objašnjenje
+
+NAPOMENA: projekt (i ovaj filter) koristi "nazivnik" (bosanski standard); ulazni
+"imenilac"/"imenitelj" se normalizuju u "nazivnik". Ovo je namjerno odstupanje od
+jednog primjera u zahtjevu ("zajednički imenilac") radi konzistentnosti s
+postojećim kodom i bosanskim standardom.
 """
 from __future__ import annotations
 
 import re
 
-__all__ = ["to_ijekavica"]
+__all__ = ["to_ijekavica", "TERMINOLOGY"]
+
+# Referentni rječnik odabrane terminologije (za dokumentaciju i testove).
+TERMINOLOGY: dict[str, str] = {
+    "denominator": "nazivnik",
+    "numerator": "brojnik",
+    "common_denominator": "zajednički nazivnik",
+    "fraction": "razlomak",
+    "equation": "jednačina",
+    "inequality": "nejednačina",
+    "divisibility": "djeljivost",
+    "divisor": "djelilac",
+    "prime_factorization": "rastavljanje na proste faktore",
+    "arithmetic_mean": "aritmetička sredina",
+    "set_union": "unija",
+    "set_intersection": "presjek",
+    "set_difference": "razlika",
+    "sum": "zbir",
+    "angle": "ugao",
+    "correct": "tačan",
+    "partially_correct": "djelimično tačan",
+    "incorrect": "netačan",
+    "attempt": "pokušaj",
+    "solution": "rješenje",
+    "explanation": "objašnjenje",
+}
 
 # (ekavski obrazac, ijekavska zamjena) — poredak nebitan, obrasci disjunktni.
 # Samo oblici koji su NEDVOSMISLENO ekavski; dvosmislene riječi se ne diraju.
@@ -27,6 +74,7 @@ _REPLACEMENTS: tuple[tuple[re.Pattern, str], ...] = tuple(
         (r"rešiti", "riješiti"),
         (r"reši", "riješi"),
         (r"vežb(\w*)", r"vježb\1"),
+        (r"vezb(\w*)", r"vježb\1"),        # ekavski BEZ dijakritika ("vezbu") — Phase 7 nalaz
         (r"deljenj(\w*)", r"dijeljenj\1"),
         (r"deljiv(\w*)", r"djeljiv\1"),
         (r"deliti", "dijeliti"),
@@ -41,7 +89,7 @@ _REPLACEMENTS: tuple[tuple[re.Pattern, str], ...] = tuple(
         (r"celin(\w*)", r"cjelin\1"),
         (r"primer(\w*)", r"primjer\1"),
         (r"sledeć(\w*)", r"sljedeć\1"),
-        (r"sledec(\w*)", r"sljedec\1"),
+        (r"sledec(\w*)", r"sljedeć\1"),        # ekavski "sledeci" → "sljedeći" (uz ć)
         # 2026-07-18 (jezička konzistentnost): česti srpski/ekavski oblici prijavljeni
         # sa produkcije. "razume-" → "razumije-"; "obe" → "obje"; "devoj-" → "djevoj-".
         (r"razumem", "razumijem"),
@@ -113,6 +161,32 @@ _REPLACEMENTS: tuple[tuple[re.Pattern, str], ...] = tuple(
         (r"\bkuta\b", "ugla"),
         (r"\bkutu\b", "uglu"),
         (r"\bkutom\b", "uglom"),
+        # 2026-07-19 (Phase 6): vraćanje dijakritika za VRLO česte sistemske/model
+        # oblike koji "procure" bez č/ć/š/ž. Jednoznačni i ograničeni granicama
+        # riječi; primjenjuju se samo na sistemski tekst (nikad na unos/OCR).
+        (r"rijesi", "riješi"),
+        (r"rijesiti", "riješiti"),
+        (r"rjesenj(\w*)", r"rješenj\1"),
+        (r"rjesava(\w*)", r"rješava\1"),
+        (r"rjesi(\w*)", r"riješi\1"),
+        (r"matematick(\w*)", r"matematičk\1"),
+        (r"jednoznac(\w*)", r"jednoznač\1"),
+        (r"vjezb(\w*)", r"vježb\1"),
+        (r"posalj(\w*)", r"pošalj\1"),
+        (r"pomoc(\w*)", r"pomoć\1"),
+        (r"konacn(\w*)", r"konačn\1"),
+        (r"gresk(\w*)", r"grešk\1"),
+        (r"izracunaj(\w*)", r"izračunaj\1"),
+        (r"nec(u|e|emo|ete)", r"neć\1"),
+        (r"netacn(\w*)", r"netačn\1"),
+        (r"netacan", "netačan"),
+        (r"tacn(\w*)", r"tačn\1"),
+        (r"tacan", "tačan"),
+        (r"djelimicn(\w*)", r"djelimičn\1"),
+        (r"sljedec(i|a|e|u|eg|em|oj|om|ih|im)", r"sljedeć\1"),
+        (r"zajednick(\w*)", r"zajedničk\1"),
+        (r"objasnjenj(\w*)", r"objašnjenj\1"),
+        (r"rjesenje", "rješenje"),
     )
 )
 

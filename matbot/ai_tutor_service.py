@@ -37,6 +37,11 @@ from matbot.grading_guard import (
     has_grade_contradiction,
     neutralize_non_answer_grade,
 )
+from matbot import engine_v2
+from matbot import task_model
+from matbot import solution_plan
+from matbot import exam_engine
+from matbot import task_templates
 from matbot.content_loader import (
     get_master,
     get_thinkific_map,
@@ -609,7 +614,7 @@ def _default_multiple_choice_hint(task: Any) -> dict:
     else:
         nums = re.findall(r"-?\d+(?:[,.]\d+)?(?:\s*/\s*\d+)?", folded)
         number_hint = f" s brojem {nums[0]}" if nums else ""
-        question = f"Koji je prvi mali matematicki korak u ovom zadatku{number_hint}?"
+        question = f"Koji je prvi mali matematički korak u ovom zadatku{number_hint}?"
         options = [
             {"id": "A", "text": "Izdvojiti zadane brojeve i sta se tacno trazi.", "correct": True},
             {"id": "B", "text": "Koristiti samo prvi broj i zanemariti pitanje.", "correct": False},
@@ -695,7 +700,7 @@ def _similar_followup_task(task: Any) -> str:
         return "Rijesi jednacinu: 3x + 2 = 14."
     if re.search(r"razlom|frac|/", folded):
         return "Izracunaj: 3/5 + 1/10."
-    return "Rijesi zadatak: 3x + 2 = 14."
+    return "Riješi zadatak: 3x + 2 = 14."
 
 
 def _configure_adaptive_hint(payload: dict, help_task: str, message: Any) -> None:
@@ -1557,6 +1562,14 @@ def _empty_next_state() -> dict:
         # NAMJERNO odvojen od last_tutor_task — Objašnjenje ne smije postati mod
         # koji prati zadatke (to je bio izvor BUG 3/9 i N8).
         "micro_task": "",
+        # Phase 1 (Engine V2): durable, server-authoritative TaskDefinition mirror
+        # of the active task. None = no active task. Legacy last_tutor_task remains
+        # authoritative for behavior; this is an additive record (emitted only when
+        # the Engine V2 flag is not "off").
+        "task": None,
+        # Phase 3 (Engine V2): durable Practice Step Engine cursor. None = no plan.
+        # Emitted only when MATBOT_ENGINE_V2_PRACTICE=on; round-trips otherwise.
+        "step_cursor": None,
     }
 
 
@@ -1760,7 +1773,7 @@ def _fallback_valid_task(payload: dict, *, mode: str, reason: str) -> str:
     ))
     folded = fold_diacritics(topic_probe)
     if reason == "undefined_tangent_segment" or "tangent" in folded:
-        return "Koji ugao grade radijus OA i tangenta u tacki A?"
+        return "Koji ugao grade radijus OA i tangenta u tački A?"
     if mode == "exam":
         return (
             "1. U trouglu su dva ugla 30\u00b0 i 90\u00b0. Odredi treci ugao.\n"
@@ -2255,6 +2268,12 @@ def _normalize_next_state(raw: Any) -> dict:
         "just_hinted": bool(raw.get("just_hinted")),
         # N9: mikro-zadatak iz objašnjenja (odvojen od last_tutor_task)
         "micro_task": normalize_value(raw.get("micro_task"))[:300],
+        # Phase 1 (Engine V2): round-trip the durable TaskDefinition unchanged.
+        "task": task_model.normalize_task_definition(raw.get("task")),
+        # Phase 3 (Engine V2): round-trip the Practice Step Engine cursor.
+        "step_cursor": (
+            _c.to_dict() if (_c := solution_plan.normalize_cursor(raw.get("step_cursor"))) else None
+        ),
     }
 
 
@@ -2577,12 +2596,234 @@ def _apply_challenge_contract(payload: dict) -> None:
     payload["student_message"] = prev
 
 
+_STEP_VERDICT_MAP = {
+    solution_plan.CORRECT_STEP: "partial",
+    solution_plan.FINAL_CORRECT: "correct",
+    solution_plan.WRONG_STEP: "incorrect",
+    solution_plan.FINAL_WRONG: "incorrect",
+    solution_plan.HELP: None,
+    solution_plan.UNCLEAR: None,
+}
+
+
+def _apply_step_engine_state(payload: dict, response: dict) -> None:
+    """Phase 3: write the deterministic step lifecycle into the response.
+
+    Parent task stays active (last_tutor_task preserved) until the FINAL step is
+    solved; the cursor rides forward in ``next_state.step_cursor``. Correct
+    intermediate steps neither complete the task nor bump the whole-task streak
+    (already handled in the resolver)."""
+    step = payload.get("_step_engine") or {}
+    cursor = step.get("cursor")
+    complete = bool(step.get("is_complete"))
+    parent = normalize_value(step.get("parent_task"))[:600]
+    prev = _previous_next_state(payload)
+    ns = response["next_state"]
+    ns["active_task_kind"] = "practice"
+    if complete:
+        response["last_tutor_task"] = ""
+        ns.update(_task_lifecycle_fields(payload, active=False, completed=True))
+        ns["expected_user_action"] = "none"
+        ns["pending_action"] = _empty_pending_action()
+    else:
+        response["last_tutor_task"] = parent
+        # Parent task stays stable: SAME task_id across hints/retries/intermediate
+        # answers (never a new task) — new_active_task=False keeps the prior id.
+        ns.update(_task_lifecycle_fields(payload, active=True, new_active_task=False))
+        ns["expected_user_action"] = "answer_task"
+        ns["pending_action"] = _empty_pending_action()
+    # Counters follow the deterministic step outcome (explicit — help NEVER counts
+    # a wrong attempt; correct intermediate does not bump the whole-task streak).
+    ns["correct_streak"] = int(payload.get("_correct_streak", 0) or 0)
+    ns["stuck_count"] = int(payload.get("_stuck_count", 0) or 0)
+    prev_attempt = int(prev.get("total_attempt_count", prev.get("attempt_count", 0)) or 0)
+    prev_wrong = int(prev.get("wrong_attempt_count", 0) or 0)
+    prev_hint = int(prev.get("hint_count", 0) or 0)
+    attempts = prev_attempt + int(step.get("attempt_delta", 0) or 0)
+    ns["attempt_count"] = attempts
+    ns["total_attempt_count"] = attempts
+    ns["wrong_attempt_count"] = prev_wrong + int(step.get("wrong_delta", 0) or 0)
+    ns["hint_count"] = prev_hint + int(step.get("hint_delta", 0) or 0)
+    # The cursor is the durable Phase-3 state — set LAST so lifecycle can't drop it.
+    ns["step_cursor"] = cursor
+
+
+def _step_engine_directive(step: dict) -> str:
+    """Prompt block that makes the model NARRATE the deterministic step decision.
+    It never lets the model choose the progression — that is fixed in state.
+    Skill-agnostic: the concrete next-step prompt and hint come from the plan."""
+    classification = normalize_value(step.get("classification"))
+    active_prompt = normalize_value(step.get("active_prompt"))
+    active_hint = normalize_value(step.get("active_hint"))
+    lines = [
+        "\n\nVOĐENJE KROZ ZADATAK (korak-po-korak — OBAVEZNO poštuj):",
+        "- Ovo je vođeni zadatak s više koraka. Prati TAČNO uputstvo ispod;",
+        "  ne otkrivaj cijelo rješenje ni sljedeće korake odjednom, i ne preskači korake.",
+    ]
+    if classification == solution_plan.CORRECT_STEP:
+        lines += [
+            "- Učenik je tačno riješio trenutni pod-korak. Kratko i toplo to potvrdi",
+            "  (BEZ ocjenske etikete za cijeli zadatak), pa postavi SLJEDEĆI pod-korak:",
+            f'  "{active_prompt}"',
+        ]
+    elif classification == solution_plan.FINAL_CORRECT:
+        lines += [
+            "- Učenik je tačno zaključio cijeli zadatak. Potvrdi da je zadatak riješen",
+            "  i pohvali ga. Zamoli ga da svojim riječima izgovori KONAČAN odgovor/obrazloženje.",
+        ]
+    elif classification in (solution_plan.WRONG_STEP, solution_plan.FINAL_WRONG):
+        lines += [
+            "- Učenikov odgovor na trenutni pod-korak NIJE tačan. NE reci da je cijeli",
+            "  zadatak netačan; nježno ga navedi i PONOVO postavi ISTI pod-korak:",
+            f'  "{active_prompt}"',
+        ]
+        if active_hint:
+            lines.append(f"  Možeš dodati mali nagovještaj: {active_hint}")
+    else:  # help / unclear
+        lines += [
+            "- Učenik traži pomoć ili je odgovor nejasan. Daj SAMO JEDAN mali hint za",
+            "  TRENUTNI pod-korak (ne otkrivaj kasnije korake ni konačno rješenje),",
+            f'  pa ponovo postavi taj isti pod-korak: "{active_prompt}"',
+        ]
+        if active_hint:
+            lines.append(f"  Hint za ovaj korak: {active_hint}")
+    return "\n".join(lines)
+
+
+def _maybe_generate_practice_task(payload: dict) -> None:
+    """Phase 5: fulfill a new-task request with a DETERMINISTIC template task when
+    the selected grade/tema is supported. Sets a direct answer presenting the task;
+    the task is validated + guidable. Uncovered temas fall through to legacy."""
+    if not engine_v2.practice_engine_enabled():
+        return
+    if payload.get("_direct_answer") is not None:
+        return
+    if normalize_value(payload.get("intent")).lower() != "new_task_request":
+        return
+    if normalize_value(payload.get("mode")).lower() in ("exam", "kontrolni"):
+        return
+    grade = payload.get("grade")
+    oblast = normalize_value(payload.get("selected_oblast"))
+    tema = normalize_value(payload.get("selected_topic") or payload.get("lesson_title"))
+    if not task_templates.has_coverage(grade, oblast, tema):
+        return                              # no template → legacy model path
+    avoid = {
+        normalize_value(t)
+        for t in ([payload.get("last_tutor_task")] + list(payload.get("recent_tasks") or []))
+        if normalize_value(t)
+    }
+    seed = "-".join(str(x) for x in (
+        payload.get("session_id"), payload.get("message_index"), uuid.uuid4().hex[:8]
+    ))
+    task = task_templates.generate_one(grade, oblast, tema, seed=seed, avoid=avoid)
+    if task is None:
+        return
+    payload["_generated_practice_task"] = task.to_dict()
+    payload["_direct_answer"] = f"Zadatak: {task.question}"
+
+
+def _resolve_practice_step_engine(payload: dict) -> None:
+    """Phase 3 (Engine V2, flag-gated): resolve the Practice Step Engine for a
+    practice-answer turn whose active task has a SolutionPlan.
+
+    Deterministically classifies the student's turn against the ACTIVE step and
+    advances the cursor. Sets ``_step_engine`` (consumed by the prompt builder and
+    the finalizer) and the streak/stuck counters. Never reads tutor prose. With
+    the flag off (default) this is a no-op → legacy prose-timed hints."""
+    if not engine_v2.practice_engine_enabled():
+        return
+    # Gate on the FRONTEND phase — help contracts flip interaction_phase to
+    # "practice_help" before we run, but a step-answer/help turn is still ours.
+    if normalize_value(payload.get("_orig_interaction_phase")) != "answering_practice_task":
+        return
+    # A deterministic direct answer already owns the turn — do not override it.
+    # NOTE: we intentionally do NOT bail on `_skip_answer_check`: legacy help
+    # contracts set it for "ne znam"/hint, but the step engine OWNS help too.
+    if payload.get("_direct_answer") is not None:
+        return
+    # Image-test flows (solving tasks off a photo) have their own state machine.
+    if payload.get("_image_test") or _previous_next_state(payload).get("image_test"):
+        return
+    # Exam sessions are owned by the Exam Engine — the two engines never share a
+    # turn. (v2 exams short-circuit before this runs; this also fences legacy exams.)
+    if normalize_value(payload.get("mode")).lower() in ("exam", "kontrolni"):
+        return
+    if _previous_next_state(payload).get("exam_state") or _raw_prev_exam(payload):
+        return
+    task = normalize_value(payload.get("last_tutor_task"))
+    student = normalize_value(payload.get("student_message") or payload.get("message"))
+    if not (task and student):
+        return
+    prior = _previous_next_state(payload).get("step_cursor")
+    resolved = solution_plan.cursor_for_task(task, prior)
+    if resolved is None:
+        return
+    plan, cursor = resolved
+    if cursor.is_complete:
+        return                              # already finished; let normal flow run
+    prior_cursor = solution_plan.normalize_cursor(prior)
+    in_progress = prior_cursor is not None and prior_cursor.skill_id == plan.skill_id
+    classification = solution_plan.classify_turn(plan, cursor, student)
+    # Engagement policy: on a FRESH task the engine engages ONLY when the student
+    # is stepping (a correct intermediate) or asking for help. A complete, wrong,
+    # or unclear first answer is left to the legacy grader (no hijack). Once a plan
+    # is in progress, the engine owns every turn (including wrong/help).
+    if not in_progress and classification not in (solution_plan.CORRECT_STEP, solution_plan.HELP):
+        return
+    new_cursor = solution_plan.advance(plan, cursor, classification)
+    completed_step = (
+        cursor.active_step_id
+        if classification in (solution_plan.CORRECT_STEP, solution_plan.FINAL_CORRECT)
+        else None
+    )
+    payload["_step_engine"] = {
+        "skill_id": plan.skill_id,
+        "classification": classification,
+        "cursor": new_cursor.to_dict(),
+        # For help/wrong the cursor stays, so active_prompt/hint refer to the SAME
+        # step; for correct_step it is the NEXT step. Later steps are never revealed.
+        "active_prompt": solution_plan.active_prompt(plan, new_cursor),
+        "active_hint": solution_plan.active_hint(plan, new_cursor),
+        "is_complete": bool(new_cursor.is_complete),
+        "verdict": _STEP_VERDICT_MAP.get(classification),
+        "completed_step": completed_step,
+        "parent_task": task[:600],
+        # Per-classification counter deltas (help NEVER counts a wrong attempt).
+        "attempt_delta": 1 if classification in (
+            solution_plan.CORRECT_STEP, solution_plan.WRONG_STEP,
+            solution_plan.FINAL_CORRECT, solution_plan.FINAL_WRONG) else 0,
+        "wrong_delta": 1 if classification in (
+            solution_plan.WRONG_STEP, solution_plan.FINAL_WRONG) else 0,
+        "hint_delta": 1 if classification == solution_plan.HELP else 0,
+    }
+
+    # Counters follow the deterministic step outcome (NOT the whole-task check).
+    prev_state = _previous_next_state(payload)
+    prev_streak = int(prev_state.get("correct_streak", 0) or 0)
+    prev_stuck = int(prev_state.get("stuck_count", 0) or 0)
+    if classification == solution_plan.FINAL_CORRECT:
+        payload["_correct_streak"] = prev_streak + 1     # whole task solved
+        payload["_stuck_count"] = 0
+    elif classification == solution_plan.CORRECT_STEP:
+        payload["_correct_streak"] = prev_streak         # intermediate: NO bump
+        payload["_stuck_count"] = 0
+    elif classification in (solution_plan.WRONG_STEP, solution_plan.FINAL_WRONG):
+        payload["_correct_streak"] = 0
+        payload["_stuck_count"] = prev_stuck + 1
+    else:                                                # help / unclear
+        payload["_correct_streak"] = prev_streak
+        payload["_stuck_count"] = prev_stuck + 1
+
+
 def _update_stuck_state(payload: dict) -> None:
     """F5: prati koliko puta zaredom je učenik zapeo (Vježbajmo) i na pragu aktivira
     preporuku videa. "Zapeo" = odgovor na practice zadatak je deterministički
     netačan ILI poruka je "ne znam/ne razumijem/pomozi". Tačan odgovor ili nova
     tema resetuju brojač. Prompt builder čita ``_student_stuck``; response nosi
     ``stuck_count`` naprijed kroz next_state."""
+    # Phase 3: when the step engine owns the turn it already set streak/stuck.
+    if payload.get("_step_engine"):
+        return
     phase = normalize_value(payload.get("interaction_phase")).lower()
     prev_state = _previous_next_state(payload)
     prev = prev_state.get("stuck_count", 0)
@@ -3453,6 +3694,8 @@ def _should_run_contextual_gpt_grade(payload: dict) -> bool:
         return False
     if payload.get("_direct_answer") is not None or payload.get("_skip_answer_check"):
         return False
+    if payload.get("_step_engine"):        # Phase 3: step engine owns grading
+        return False
     if payload.get("_non_answer_reflection"):
         return False
     task = normalize_value(payload.get("last_tutor_task"))
@@ -3921,6 +4164,8 @@ def _flag_non_answer_reflection(payload: dict) -> None:
     deterministički (enforcement, ne molba)."""
     if payload.get("_skip_answer_check") or payload.get("_direct_answer") is not None:
         return
+    if payload.get("_step_engine"):         # Phase 3: step engine owns grading
+        return
     if normalize_value(payload.get("interaction_phase")).lower() != "answering_practice_task":
         return
     check = payload.get("answer_check")
@@ -4144,6 +4389,9 @@ def _prepare_chat(
     # Default: grade -> 6 ako nije zadan; grade bira master/map i tutor prompt.
     payload["grade"] = normalize_grade(payload.get("grade") or DEFAULT_GRADE)
     _sanitize_payload(payload)
+    # Phase 3: capture the FRONTEND interaction phase before any contract mutates
+    # it (help contracts flip it to "practice_help"); the step engine gates on this.
+    payload["_orig_interaction_phase"] = normalize_value(payload.get("interaction_phase")).lower()
     # Session mod = ono što je korisnik izabrao u UI-ju; contracts smiju mijenjati
     # SAMO prompt-mod (interno rutiranje), a UI prikazuje session mod (BUG 10/14).
     payload["_session_mode"] = normalize_value(payload.get("mode")).lower() or "explain"
@@ -4155,6 +4403,11 @@ def _prepare_chat(
     # "zadatak", "novi zadatak", "daj mi teži/lakši" → NOVI zadatak, ne ocjena
     # ni objašnjenje starog (BUG 6/8). Poslije potvrda, prije challenge/help.
     _apply_new_task_intent(payload)
+    # Phase 5 (Engine V2, flag-gated): a new-task request in a SUPPORTED grade/tema
+    # is fulfilled DETERMINISTICALLY from the shared template layer (no model
+    # invention) — the generated task is validated and guidable. Uncovered temas
+    # fall through to the legacy model path unchanged.
+    _maybe_generate_practice_task(payload)
     # BUG 2: poslije završenog kontrolnog "gdje sam pogriješio"/"objasni treći"
     # objašnjavaju konkretnu stavku, ne otvaraju novi zadatak niti ponavljaju sažetak.
     _apply_completed_exam_followup_contract(payload)
@@ -4258,6 +4511,10 @@ def _prepare_chat(
     # pretvaranje, direktan račun). Presuda ulazi u prompt i model je NE SMIJE
     # mijenjati — time nestaje klasa grešaka "tačan odgovor proglašen netačnim".
     answering = normalize_value(payload.get("interaction_phase")).lower() == "answering_practice_task"
+    # Phase 3 (Engine V2, flag-gated): the Practice Step Engine deterministically
+    # advances a SolutionPlan cursor and OWNS grading for this turn — so the legacy
+    # whole-task check never mis-scores an intermediate step (the 240÷6 trigger bug).
+    _resolve_practice_step_engine(payload)
     # CLASS 1 (2026-07-12): prethodni potez je bio hint sa pod-korakom. Učenikov
     # odgovor sada može biti tačan MEĐUKORAK (npr. hint pita "koliko je 1/2 s
     # nazivnikom 6?", učenik: "3/6"). Bez ovoga bi se gradirao protiv FINALNOG
@@ -4265,9 +4522,10 @@ def _prepare_chat(
     post_hint = (
         answering
         and not payload.get("_skip_answer_check")
+        and not payload.get("_step_engine")
         and bool(_previous_next_state(payload).get("just_hinted"))
     )
-    if not payload.get("_skip_answer_check") and answering:
+    if not payload.get("_skip_answer_check") and not payload.get("_step_engine") and answering:
         _run_answer_check(payload)
     if post_hint:
         _soften_post_hint_reply(payload)
@@ -4394,6 +4652,11 @@ def _prepare_chat(
             prompt_result = build_general_tutor_prompt(payload)
         else:
             prompt_result = build_tutor_prompt(payload, lookup_result, master, tmap)
+
+    # Phase 3: steer the model with the deterministic step directive. The model
+    # NARRATES the step the engine chose — it cannot change the progression.
+    if payload.get("_step_engine") and isinstance(prompt_result.get("system_prompt"), str):
+        prompt_result["system_prompt"] += _step_engine_directive(payload["_step_engine"])
 
     mode = prompt_result["mode"]
     status = prompt_result["status"]
@@ -4958,6 +5221,7 @@ _ACCEPTED_ITEM_VERDICTS = (
     "correct_missing_unit",
 )
 _PARTIAL_ITEM_VERDICTS = ("correct_value_wrong_form", "partially_correct", "correct_step")
+_STEP_ITEM_VERDICTS = ("correct_step",)
 _RETRY_ITEM_VERDICTS = ("incorrect", "wrong_unit", "incomplete")
 _EXAM_CLARIFICATION_VERDICTS = ("unverified", "ambiguous", "needs_review")
 
@@ -5470,27 +5734,8 @@ def _enforce_gpt_fallback_label(answer: str, payload: dict) -> str:
     return f"{expected} {body}".strip() if body else expected
 
 
-def _apply_gpt_fallback_verdict(payload: dict, answer: str) -> None:
-    if not _is_grading_turn(payload):
-        return
-    check = payload.get("answer_check")
-    verdict = normalize_value(payload.get("_gpt_answer_verdict")).lower()
-    has_structured_verdict = verdict in _CONTEXTUAL_GPT_VERDICTS
-    if (
-        not has_structured_verdict
-        and check is not None
-        and getattr(check, "checkable", False)
-        and getattr(check, "has_verdicts", False)
-    ):
-        return
-    if not has_structured_verdict:
-        verdict = _gpt_text_verdict(answer)
-        if verdict is None:
-            return
-        payload["_gpt_answer_verdict"] = verdict
-    payload["_gpt_check_used"] = True
-    if payload.get("_gpt_check_confidence") is None:
-        payload["_gpt_check_confidence"] = 0.55
+def _apply_verdict_streak(payload: dict, verdict: str) -> None:
+    """Streak/stuck bookkeeping for a coarse verdict (shared legacy + Phase 2)."""
     prev_state = _previous_next_state(payload)
     prev_streak = int(prev_state.get("correct_streak", 0) or 0)
     if verdict == "correct":
@@ -5506,7 +5751,69 @@ def _apply_gpt_fallback_verdict(payload: dict, answer: str) -> None:
         payload["_correct_streak"] = prev_streak
 
 
+def _deterministic_decisive(payload: dict) -> bool:
+    """The deterministic checker produced a real verdict this grading turn."""
+    check = payload.get("answer_check")
+    return bool(
+        check is not None
+        and getattr(check, "checkable", False)
+        and getattr(check, "has_verdicts", False)
+        and authoritative_verdict(check) != "unknown"
+    )
+
+
+def _apply_gpt_fallback_verdict(payload: dict, answer: str) -> None:
+    if not _is_grading_turn(payload):
+        return
+    if payload.get("_step_engine"):         # Phase 3: step engine owns the verdict
+        return
+    check = payload.get("answer_check")
+    verdict = normalize_value(payload.get("_gpt_answer_verdict")).lower()
+    has_structured_verdict = verdict in _CONTEXTUAL_GPT_VERDICTS
+
+    # --- Phase 2 (Engine V2 grading, flag-gated): prose is NEVER a grader ------
+    # The ONE authoritative-grading defect confirmed by the divergence replay is
+    # the prose->verdict fallback: legacy parses the tutor's own prose ("Tačno.")
+    # into a verdict when the structured grader returns nothing. Phase 2 removes
+    # exactly that path. It deliberately does NOT force "deterministic-first":
+    # the review showed the deterministic checker is unreliable on procedural /
+    # intermediate answers (it misreads an intermediate number — e.g. the common
+    # denominator "6" — as a wrong final answer), so the structured GPT grader,
+    # which evaluated the whole procedure, must stay authoritative when it ran.
+    # For clean answers the structured grader does not run, so the checker decides.
+    # Rollback = flag off → legacy branch below, verbatim.
+    if engine_v2.grading_authoritative():
+        if not has_structured_verdict:
+            return  # no structured grade → no prose guess; deterministic result stands
+        payload["_gpt_check_used"] = True
+        if payload.get("_gpt_check_confidence") is None:
+            payload["_gpt_check_confidence"] = 0.55
+        _apply_verdict_streak(payload, verdict)
+        return
+
+    # --- Legacy path (flag off): unchanged -------------------------------------
+    if (
+        not has_structured_verdict
+        and check is not None
+        and getattr(check, "checkable", False)
+        and getattr(check, "has_verdicts", False)
+    ):
+        return
+    if not has_structured_verdict:
+        verdict = _gpt_text_verdict(answer)
+        if verdict is None:
+            return
+        payload["_gpt_answer_verdict"] = verdict
+    payload["_gpt_check_used"] = True
+    if payload.get("_gpt_check_confidence") is None:
+        payload["_gpt_check_confidence"] = 0.55
+    _apply_verdict_streak(payload, verdict)
+
+
 def _answer_verdict_for_response(payload: dict) -> str | None:
+    step = payload.get("_step_engine")
+    if step:                                # Phase 3: step engine is authoritative
+        return step.get("verdict")
     if payload.get("_mc_answer_attempt"):
         return "partial" if payload.get("_mc_answer_correct") else "incorrect"
     fallback = payload.get("_gpt_answer_verdict")
@@ -5525,6 +5832,9 @@ def _answer_verdict_for_response(payload: dict) -> str | None:
 
 
 def _answer_verdict_detail_for_response(payload: dict) -> str | None:
+    step = payload.get("_step_engine")
+    if step:                                # Phase 3: step engine detail
+        return f"step_{step.get('classification')}"
     if payload.get("_adaptive_mc_ambiguous"):
         return "multiple_choice_ambiguous"
     if payload.get("_mc_answer_attempt"):
@@ -5542,6 +5852,139 @@ def _answer_verdict_detail_for_response(payload: dict) -> str | None:
     if _is_grading_turn(payload):
         return "ambiguous"
     return None
+
+
+def _attach_task_definition(payload: dict, response: dict) -> None:
+    """Phase 1 (Engine V2): emit a durable, server-authoritative TaskDefinition
+    mirror of the active task into ``next_state.task`` and ``response.task``.
+
+    Additive and behavior-inert: ``question`` equals the FINAL ``last_tutor_task``
+    by construction, and it is built from the SAME validation that already gated
+    activation — so it can never disagree with legacy state. Legacy remains
+    authoritative for behavior. Emitted only when the Engine V2 flag is not
+    ``off`` (rollback = flag off → no ``task`` field, byte-identical to legacy)."""
+    if engine_v2.engine_v2_mode() == "off":
+        return
+    next_state = response.get("next_state") or {}
+    question = normalize_value(response.get("last_tutor_task"))
+    active = normalize_value(next_state.get("task_status")).lower() == "active"
+    if not question or not active:
+        next_state["task"] = None
+        response["task"] = None
+        return
+    validation = payload.get("_task_validation")
+    mode = normalize_value(response.get("mode")) or "practice"
+    if not isinstance(validation, dict):
+        # Task persisted from a prior turn without re-validation this turn →
+        # derive the schema now (same validator the legacy gate uses).
+        validation = _validate_task_activation(question, mode=mode)
+    source = "student_task" if payload.get("_student_task") else None
+    td = task_model.build_task_definition(
+        task_id=next_state.get("task_id"),
+        grade=payload.get("grade"),
+        oblast_id=(
+            normalize_value(payload.get("selected_oblast"))
+            or normalize_value(response.get("selected_oblast"))
+        ),
+        tema_id=(
+            normalize_value(response.get("effective_topic"))
+            or normalize_value(payload.get("selected_topic"))
+        ),
+        mode=mode,
+        question=question,
+        validation=validation,
+        source=source,
+    )
+    td_dict = td.to_dict() if td else None
+    next_state["task"] = td_dict
+    response["task"] = td_dict
+
+
+def _attach_engine_v2_shadow(payload: dict, response: dict) -> None:
+    """Phase 0 (Engine V2): run the read-only shadow grading reducer BESIDE the
+    legacy flow and attach a sanitized comparison record to ``response`` for
+    logging. Does not touch prose, task state, counters, or verdicts.
+
+    Runs only when ``MATBOT_ENGINE_V2=shadow`` and only on grading turns (there
+    is nothing to grade otherwise). Any failure is swallowed by the caller."""
+    if not engine_v2.shadow_enabled() or not _is_grading_turn(payload):
+        return
+
+    check = payload.get("answer_check")
+    det_checkable = bool(
+        check is not None
+        and getattr(check, "checkable", False)
+        and getattr(check, "has_verdicts", False)
+    )
+    det_verdict = authoritative_verdict(check) if check is not None else None
+    det_step = any(v in _STEP_ITEM_VERDICTS for v in _item_verdicts(check))
+
+    # Structured GPT evidence is taken ONLY from the parsed JSON grade, never
+    # from ``_gpt_answer_verdict`` (which may have been derived from prose).
+    structured = payload.get("_contextual_gpt_grade")
+    structured_verdict = normalize_value(structured.get("verdict")) if isinstance(structured, dict) else None
+    structured_conf = structured.get("confidence") if isinstance(structured, dict) else None
+
+    next_state = response.get("next_state") or {}
+    item = {}
+    check_summary = response.get("answer_check")
+    if isinstance(check_summary, dict):
+        items = check_summary.get("items")
+        if isinstance(items, list) and items and isinstance(items[0], dict):
+            item = items[0]
+
+    # Did this turn ROUTE to structured grading? (Mirrors _run_contextual_gpt_grade
+    # gating.) Lets the reducer distinguish "structured attempted but malformed"
+    # (ambiguous) from "nothing to grade" (not_checkable).
+    structured_attempted = _should_run_contextual_gpt_grade(payload)
+
+    evidence = engine_v2.GradingEvidence(
+        deterministic_verdict=det_verdict,
+        deterministic_checkable=det_checkable,
+        deterministic_step=det_step,
+        structured_gpt_verdict=structured_verdict or None,
+        structured_gpt_confidence=structured_conf,
+        structured_attempted=bool(structured_attempted),
+        task_status=normalize_value(next_state.get("task_status")) or None,
+        answer_type=item.get("answer_type"),
+    )
+    shadow = engine_v2.reduce_shadow(evidence)
+
+    # Legacy final outcome (already computed above in _finalize_response).
+    legacy_task_completed = normalize_value(next_state.get("task_status")).lower() == "completed"
+    prose_derived_legacy = bool(
+        payload.get("_gpt_answer_verdict") and not isinstance(structured, dict)
+    )
+
+    comparison = engine_v2.compare_with_legacy(
+        shadow,
+        legacy_verdict=response.get("answer_verdict"),
+        legacy_verdict_detail=response.get("answer_verdict_detail"),
+        legacy_task_completed=legacy_task_completed,
+        legacy_correct_streak=int(next_state.get("correct_streak", 0) or 0),
+        prose_derived_legacy=prose_derived_legacy,
+    )
+    engine_v2.record_metrics(shadow, comparison)
+
+    response["shadow_grading"] = {
+        "engine_version": shadow.engine_version,
+        "shadow_enabled": True,
+        "shadow_verdict": shadow.verdict,
+        "shadow_verdict_detail": shadow.detail,
+        "shadow_grader_source": shadow.grader_source,
+        "shadow_agrees_with_legacy": comparison["agreement"],
+        "shadow_conflict_type": comparison["conflict_type"],
+        "shadow_task_completed": shadow.task_completed,
+        "shadow_step_completed": shadow.step_completed,
+        "shadow_confidence": shadow.confidence,
+        "shadow_attempt_delta": shadow.attempt_delta,
+        "shadow_wrong_attempt_delta": shadow.wrong_attempt_delta,
+        "legacy_verdict": comparison["legacy_verdict"],
+        "legacy_verdict_detail": comparison["legacy_verdict_detail"],
+        "legacy_task_completed": comparison["legacy_task_completed"],
+        "legacy_correct_streak": comparison["legacy_correct_streak"],
+        "evidence": shadow.evidence,
+    }
 
 
 def _finalize_response(prep: dict, answer: str) -> dict:
@@ -5694,7 +6137,11 @@ def _finalize_response(prep: dict, answer: str) -> dict:
     # Tokom image_test toka odgovor NIKAD ne postaje last_tutor_task — aktivni
     # "zadatak" je stavka sa slike i živi u next_state.image_test, ne u prozi.
     _img_state = payload.get("_image_test") or {}
-    if _img_state.get("style") == "practice" and normalize_value(_img_state.get("current_task")):
+    if payload.get("_generated_practice_task"):
+        # Phase 5: the deterministically generated task IS the active task (it was
+        # presented via a direct answer). It is validated + guidable next turn.
+        task_text = normalize_value(payload["_generated_practice_task"].get("question"))[:600]
+    elif _img_state.get("style") == "practice" and normalize_value(_img_state.get("current_task")):
         # AUD-01: kod image_test "practice" stila TEKUĆA stavka sa slike JESTE
         # aktivni zadatak — postavi je kao last_tutor_task da se učenikov naredni
         # odgovor deterministički provjeri protiv OCR teksta (ne protiv izmišljenog).
@@ -5818,9 +6265,9 @@ def _finalize_response(prep: dict, answer: str) -> dict:
             else:
                 task_text = ""
                 answer = (
-                    "Ovaj zadatak nije imao dovoljno jasne podatke za jednoznacan "
-                    "odgovor, pa ga necu aktivirati. Posalji mi novi zadatak ili "
-                    "izaberi temu za vjezbu."
+                    "Ovaj zadatak nije imao dovoljno jasne podatke za jednoznačan "
+                    "odgovor, pa ga neću aktivirati. Pošalji mi novi zadatak ili "
+                    "izaberi temu za vježbu."
                 )
                 response["answer"] = answer
         payload["_task_validation"] = validation
@@ -5846,6 +6293,16 @@ def _finalize_response(prep: dict, answer: str) -> dict:
     # F5: prenesi "stuck" brojač naprijed da klijent vrati stanje sljedeći put.
     response["next_state"]["stuck_count"] = int(payload.get("_stuck_count", 0) or 0)
     response["next_state"]["correct_streak"] = int(payload.get("_correct_streak", 0) or 0)
+    # Phase 3: the step engine owns lifecycle for guided turns — parent task stays
+    # active until the final step is solved; the cursor rides forward in state.
+    if payload.get("_step_engine"):
+        _apply_step_engine_state(payload, response)
+    elif engine_v2.practice_engine_enabled():
+        # A non-answer turn (help/confirmation) handled by legacy contracts must
+        # NOT lose the cursor — carry it forward while the parent task is active.
+        prev_cursor = _previous_next_state(payload).get("step_cursor")
+        if prev_cursor and normalize_value(response.get("last_tutor_task")):
+            response["next_state"]["step_cursor"] = prev_cursor
     response["task_id"] = (
         response["next_state"].get("task_id")
         or response["next_state"].get("completed_task_id")
@@ -6012,6 +6469,20 @@ def _finalize_response(prep: dict, answer: str) -> dict:
     response["wrong_attempt_count"] = response["next_state"].get("wrong_attempt_count", 0)
     response["hint_count"] = response["next_state"].get("hint_count", 0)
 
+    # Phase 1 (Engine V2): emit the durable TaskDefinition mirror (additive).
+    # Runs after the exam block, so it reflects the FINAL active task.
+    try:
+        _attach_task_definition(payload, response)
+    except Exception:
+        log.exception("ai_tutor: engine_v2 task_definition failed")
+
+    # Phase 0 (Engine V2 shadow): read-only reducer beside the legacy flow.
+    # Runs after ALL legacy fields are final; never alters response/state.
+    try:
+        _attach_engine_v2_shadow(payload, response)
+    except Exception:
+        log.exception("ai_tutor: engine_v2 shadow failed")
+
     # Phase 5: minimalni activity log — greška NIKAD ne ruši tutor odgovor.
     try:
         log_student_activity(payload, response)
@@ -6023,6 +6494,111 @@ def _finalize_response(prep: dict, answer: str) -> dict:
         except Exception:
             pass
 
+    return response
+
+
+def _raw_prev_exam(payload: dict) -> Any:
+    """RAW previous exam_state (not legacy-normalized) — the v2 Exam Engine keeps
+    its own shape (with ``engine: "v2"``), so it must read the untouched dict."""
+    prev = payload.get("previous_next_state") or payload.get("tutor_state") or {}
+    if not isinstance(prev, dict):
+        return None
+    return prev.get("exam_state")
+
+
+def _strip_stale_v2_exam(data: dict) -> dict:
+    """Rollback safety: when the V2 Exam Engine will NOT handle this turn but the
+    client still carries a V2 ``exam_state``, remove it before the legacy pipeline
+    sees it. The legacy normalizer does not understand the V2 shape, so passing it
+    through could corrupt or REOPEN a finished exam. Stripping is explicit and
+    lossless for the student (a new kontrolni can be started normally)."""
+    if not isinstance(data, dict):
+        return data
+    prev = data.get("previous_next_state") or data.get("tutor_state")
+    if not isinstance(prev, dict) or not exam_engine.is_v2_exam(prev.get("exam_state")):
+        return data
+    out = dict(data)
+    prev_copy = dict(prev)
+    prev_copy["exam_state"] = None
+    prev_copy["active_task_kind"] = None
+    if "previous_next_state" in out:
+        out["previous_next_state"] = prev_copy
+    if "tutor_state" in out:
+        out["tutor_state"] = prev_copy
+    out["_v2_exam_state_discarded"] = True
+    return out
+
+
+def _exam_engine_should_handle(payload: dict, *, has_image: bool = False) -> bool:
+    return exam_engine.should_handle(
+        prev_exam=_raw_prev_exam(payload),
+        mode=payload.get("mode"),
+        has_active_image=has_image,
+    )
+
+
+def _exam_engine_response(payload: dict) -> dict:
+    """Phase 4: build a FULL deterministic response for an Exam-Engine-owned turn.
+    No model is called; the exam state machine produces both text and state."""
+    message = normalize_value(payload.get("student_message") or payload.get("message"))
+    seed = (
+        normalize_value(payload.get("session_id"))
+        or normalize_value(payload.get("exam_seed"))
+        or uuid.uuid4().hex
+    )
+    result = exam_engine.process(
+        prev_exam=_raw_prev_exam(payload),
+        mode=payload.get("mode"),
+        message=message,
+        seed=seed,
+        grade=payload.get("grade"),
+        oblast=normalize_value(payload.get("selected_oblast")),
+        tema=normalize_value(payload.get("selected_topic") or payload.get("lesson_title")),
+    )
+    prev_ns = _previous_next_state(payload)
+    released = result.exam_state is None          # V2 state released (drain rollback)
+    completed = result.exam_status == "completed"
+    exam_id = (result.exam_state or {}).get("exam_id")
+
+    ns = _empty_next_state()
+    ns.update({
+        "expected_user_action": result.expected_user_action,
+        "active_task_kind": None if released else "exam",
+        "exam_state": result.exam_state,          # None → next turn goes to legacy
+        "correct_streak": int(prev_ns.get("correct_streak", 0) or 0),
+        "task_id": None if (completed or released) else exam_id,
+        "task_status": None if released else ("completed" if completed else "active"),
+        "completed_task_id": exam_id if (completed and not released) else None,
+    })
+
+    response = {
+        "answer": to_ijekavica(result.answer),
+        "final_topic": None, "opened_lesson_topic": None, "effective_topic": None,
+        "entry_source_used": "exam", "topic_conflict": False,
+        "recommended_mode": "exam", "recommend_video": False,
+        "video_title": "", "video_url": "",
+        "parent_report_signal": "needs_work",
+        "status": "ready", "mode": "exam", "session_mode": "exam",
+        "answer_verdict": result.verdict,
+        "answer_verdict_detail": result.verdict_detail,
+        "gpt_check_used": False, "gpt_check_confidence": None,
+        "last_tutor_task": "",
+        "exam_state": result.exam_state,
+        "next_state": ns,
+        "task_id": ns.get("task_id") or ns.get("completed_task_id"),
+        "task_status": ns.get("task_status"),
+        "attempt_number": 0, "total_attempt_count": 0,
+        "wrong_attempt_count": 0, "hint_count": 0,
+        "engine": "exam_v2",
+    }
+    try:
+        log_student_activity(payload, response)
+    except Exception:
+        pass
+    try:
+        log_transcript_to_sheet(payload, response)
+    except Exception:
+        pass
     return response
 
 
@@ -6044,6 +6620,16 @@ def handle_chat(
     ``openai_chat`` mora imati potpis ``(model, messages, timeout=...)`` i vratiti
     objekt sa ``choices[0].message.content`` (tj. postojeći ``app._openai_chat``).
     """
+    # Phase 4 (Engine V2, flag-gated): a deterministic Exam Engine turn short-
+    # circuits the ENTIRE legacy pipeline (and the Practice Step Engine) — no model
+    # call, no double-fire. Flag off → this is skipped and legacy exam runs.
+    _payload = dict(data or {})
+    _payload["grade"] = normalize_grade(_payload.get("grade") or DEFAULT_GRADE)
+    if _exam_engine_should_handle(_payload, has_image=bool(image_bytes or image_data_url)):
+        return _exam_engine_response(_payload)
+    # Rollback safety: legacy must never parse a V2 exam_state.
+    data = _strip_stale_v2_exam(data)
+
     prep = _prepare_chat(
         data, openai_chat, master, tmap,
         model=model, timeout=timeout,
@@ -6119,6 +6705,19 @@ def handle_chat_stream(
     Napomena: retry-na-prazan-odgovor iz sync puta ovdje NE postoji (deltas su
     već poslani klijentu); prazan stream vraća prijateljsku poruku u done.
     """
+    # Phase 4: deterministic Exam Engine turn — emit the buffered answer as deltas
+    # then done (no model call). Mirrors handle_chat's short-circuit.
+    _payload = dict(data or {})
+    _payload["grade"] = normalize_grade(_payload.get("grade") or DEFAULT_GRADE)
+    if _exam_engine_should_handle(_payload, has_image=False):
+        done = _exam_engine_response(_payload)
+        for chunk in _chunk_for_stream(done.get("answer") or ""):
+            yield {"event": "delta", "data": {"delta": chunk}}
+        yield {"event": "done", "data": done}
+        return
+    # Rollback safety: legacy must never parse a V2 exam_state.
+    data = _strip_stale_v2_exam(data)
+
     prep = _prepare_chat(
         data, openai_chat, master, tmap,
         model=model, timeout=timeout,

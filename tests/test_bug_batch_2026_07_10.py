@@ -32,6 +32,8 @@ FR_TOPIC = "6-04-031"
 @pytest.fixture(autouse=True)
 def _tmp_activity_db(monkeypatch, tmp_path):
     monkeypatch.setenv("MATBOT_DB_PATH", str(tmp_path / "activity.sqlite3"))
+    # Legacy exam path is exercised here; the v2 Exam Engine has its own test file.
+    monkeypatch.setenv("MATBOT_ENGINE_V2_EXAM", "off")
     yield
 
 

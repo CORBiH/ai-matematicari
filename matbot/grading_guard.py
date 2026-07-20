@@ -531,6 +531,38 @@ _HEDGE_OPENER_RE = re.compile(
 )
 
 
+_PRAISE_ONLY_RE = re.compile(
+    r"^(odlicno|bravo|super|sjajno|svaka\s+cast|odlican\s+posao|tako\s+je|"
+    r"bas\s+lijepo|perfektno)\b[^.!?]*[.!?]*$"
+)
+
+
+def _drop_praise_sentences(text: str) -> str:
+    """Ukloni rečenice koje su ČISTA pohvala (bez matematičkog sadržaja).
+
+    Poslije autoritativnog "Netačno." zaostala pohvala ("Odlično si to uradio.")
+    direktno protivrječi ocjeni — mora otpasti (Phase 7 nalaz)."""
+    parts = re.split(r"(?<=[.!?])\s+", text)
+    kept = [
+        p for p in parts
+        if not (_PRAISE_ONLY_RE.match(fold_diacritics(p).strip()) and not re.search(r"\d", p))
+    ]
+    return _cleanup(" ".join(kept)) if kept else ""
+
+
+def _drop_dangling_fragment(text: str) -> str:
+    """Poslije brisanja fraze ocjene može ostati besmislen ostatak ("Si.").
+
+    Konzervativno: odbaci SAMO vrlo kratak ostatak bez brojeva/matematike."""
+    body = text.strip()
+    if not body:
+        return ""
+    words = re.findall(r"\w+", body)
+    if len(words) <= 2 and len(body) <= 14 and not re.search(r"[\d=+\-*/<>]", body):
+        return ""
+    return body
+
+
 def _make_positive(answer: str) -> str:
     """Autoritativno TAČNO: skini lažno negativne ocjene i garantuj potvrdan,
     prirodan uvod ("Tačno. …"), bez uvodnog "Pogledajmo zajedno …".
@@ -541,6 +573,7 @@ def _make_positive(answer: str) -> str:
     out, _changed = _remove_negative_verdicts(answer)
     out = _remove_soft_negatives(out)
     out = _remove_partial_labels(out).strip()
+    out = _drop_dangling_fragment(out)          # "Tačno. Si." → "Tačno. …"
     if not out:
         return "Tačno. Tvoj odgovor je tačan."
     # skini uvodni hedge samo ako sam po sebi ne nosi potvrdu tačnosti
@@ -640,6 +673,10 @@ def _make_incorrect(answer: str) -> str:
     if stripped == answer:
         stripped = _strip_positive_label(answer)
     if stripped != answer and stripped:
+        # Phase 7: zaostala pohvala protivrječi "Netačno." — ukloni je.
+        stripped = _drop_dangling_fragment(_drop_praise_sentences(stripped))
+        if not stripped:
+            return "Netačno. Hajde da provjerimo postupak korak po korak."
         return _prepend("Netačno.", stripped)
     folded = fold_diacritics(answer)
     spans = _neg_spans(folded)
