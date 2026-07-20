@@ -36,6 +36,7 @@ from matbot.grading_guard import (
     enforce_grading_consistency,
     has_grade_contradiction,
     neutralize_non_answer_grade,
+    strip_false_absence_claims,
 )
 from matbot import engine_v2
 from matbot import task_model
@@ -43,6 +44,9 @@ from matbot import solution_plan
 from matbot import exam_engine
 from matbot import task_templates
 from matbot import topic_resolver
+from matbot import task_activation
+from matbot import turn_intent
+from matbot import render
 from matbot.content_loader import (
     get_master,
     get_thinkific_map,
@@ -1561,8 +1565,9 @@ def _empty_next_state() -> dict:
         "just_hinted": False,
         # N9 (2026-07-14): mikro-zadatak iz OBJAŠNJENJA ("Probaj ti: 3/8 + 2/8?").
         # NAMJERNO odvojen od last_tutor_task — Objašnjenje ne smije postati mod
-        # koji prati zadatke (to je bio izvor BUG 3/9 i N8).
-        "micro_task": "",
+        # koji prati zadatke (to je bio izvor BUG 3/9 i N8). Od 2026-07-20 nosi
+        # PUNU strukturu (task_id, shema, tema roditelja, help_count).
+        "micro_task": None,
         # Phase 1 (Engine V2): durable, server-authoritative TaskDefinition mirror
         # of the active task. None = no active task. Legacy last_tutor_task remains
         # authoritative for behavior; this is an additive record (emitted only when
@@ -2289,8 +2294,10 @@ def _normalize_next_state(raw: Any) -> dict:
         "task_validation": _normalize_task_validation(raw.get("task_validation")),
         # CLASS 1: marker da je prethodni potez bio hint (pod-korak)
         "just_hinted": bool(raw.get("just_hinted")),
-        # N9: mikro-zadatak iz objašnjenja (odvojen od last_tutor_task)
-        "micro_task": normalize_value(raw.get("micro_task"))[:300],
+        # N9: mikro-zadatak iz objašnjenja (odvojen od last_tutor_task).
+        # Sada STRUKTURA (id + shema + roditeljska tema), ne goli string — proza
+        # bez životnog ciklusa je bila uzrok "Nije jasno šta treba riješiti".
+        "micro_task": _normalize_micro_task(raw.get("micro_task")),
         # Phase 1 (Engine V2): round-trip the durable TaskDefinition unchanged.
         "task": task_model.normalize_task_definition(raw.get("task")),
         # Phase 3 (Engine V2): round-trip the Practice Step Engine cursor.
@@ -2726,35 +2733,53 @@ def _maybe_generate_practice_task(payload: dict) -> None:
     if normalize_value(payload.get("mode")).lower() in ("exam", "kontrolni"):
         return
     grade = payload.get("grade")
-    oblast = normalize_value(payload.get("selected_oblast"))
-    raw_topic = normalize_value(payload.get("selected_topic"))
-    # A RUNTIME topic id (e.g. "12880") is canonicalized to "<npp_id> <tema>" so
-    # exact tema identity drives selection; unresolved values pass through.
-    resolved = topic_resolver.resolve_topic(grade, raw_topic)
-    tema = topic_resolver.canonical_tema_probe(
-        grade, raw_topic, normalize_value(payload.get("lesson_title")))
-    if task_templates.has_coverage(grade, oblast, tema):
-        pass                                # exact tema is covered
-    elif resolved is None and raw_topic and task_templates.has_coverage(grade, oblast, ""):
-        # The tema id could not be resolved at all. Falling through to free model
+    identity = _topic_identity(payload)
+    oblast = identity.oblast or normalize_value(payload.get("selected_oblast"))
+    tema = identity.probe
+    if identity.covered:
+        pass                                # exact tema has deterministic coverage
+    elif not identity.resolved and identity.runtime_id \
+            and task_templates.has_coverage(grade, oblast, ""):
+        # The runtime id resolved to nothing at all. Falling through to free model
         # generation produced an OFF-TOPIC task (an equation under Razlomci), so
         # stay inside the selected OBLAST — same topic, validated.
         tema = ""
         payload["_generation_topic_fallback"] = "oblast"
     else:
+        # An EXACT tema that is resolved but uncovered does NOT widen to its
+        # oblast. It falls through to the model path, which is now itself gated
+        # on topic identity at activation — so a gradeable-but-off-topic task
+        # (the arc-length task under "Odnos dvije kružnice") is refused there
+        # rather than being silently substituted here.
+        if identity.resolved and identity.is_exact_tema:
+            payload["_topic_uncovered"] = identity.tema
         return                              # explicit: no deterministic coverage
+    # Recent-task avoidance: "daj mi teži" repeated the identical task with the
+    # identical values in production, so history is part of the request.
     avoid = {
         normalize_value(t)
         for t in ([payload.get("last_tutor_task")] + list(payload.get("recent_tasks") or []))
         if normalize_value(t)
     }
     seed = "-".join(str(x) for x in (
-        payload.get("session_id"), payload.get("message_index"), uuid.uuid4().hex[:8]
+        payload.get("session_id"), payload.get("message_index"),
+        normalize_value(payload.get("difficulty_request")), uuid.uuid4().hex[:8]
     ))
     task = task_templates.generate_one(grade, oblast, tema, seed=seed, avoid=avoid)
     if task is None:
         return
+    # Even a template task passes the ONE activation gate, so topic identity and
+    # duplicate avoidance are enforced in exactly one place for every source.
+    decision = task_activation.activate(
+        question=task.question, source=task_activation.SOURCE_TEMPLATE,
+        topic=identity, mode="practice", recent=avoid,
+        validator=lambda q: _validate_task_activation(q, mode="practice"),
+    )
+    if not decision.activated:
+        payload["_activation_refused"] = decision.reason
+        return
     payload["_generated_practice_task"] = task.to_dict()
+    payload["_task_activation"] = decision.to_dict()
     payload["_direct_answer"] = f"Zadatak: {task.question}"
 
 
@@ -4061,30 +4086,147 @@ def _soften_micro_task_answer(answer: Any, check: Any) -> str:
     return f"{opener} {stripped}"
 
 
+def _topic_identity(payload: dict) -> topic_resolver.TopicIdentity:
+    """The ONE canonical topic object for this turn.
+
+    Practice, Exam, template selection, activation and telemetry all read this,
+    so runtime id / canonical id / oblast / tema can no longer drift apart in
+    different branches.
+    """
+    cached = payload.get("_topic_identity")
+    if isinstance(cached, topic_resolver.TopicIdentity):
+        return cached
+    identity = topic_resolver.identify(
+        payload.get("grade"),
+        raw_topic=normalize_value(payload.get("selected_topic")),
+        oblast=normalize_value(payload.get("selected_oblast")),
+        fallback_name=normalize_value(payload.get("lesson_title")),
+    )
+    payload["_topic_identity"] = identity
+    return identity
+
+
+def _normalize_micro_task(raw: Any) -> dict | None:
+    """Round-trip the structured micro-task.
+
+    Accepts the LEGACY bare string so a session that was mid-explanation across
+    a deploy keeps its question (it simply has no id until the next turn).
+    """
+    if isinstance(raw, str):
+        text = normalize_value(raw)[:300]
+        if not text:
+            return None
+        raw = {"question": text}
+    if not isinstance(raw, dict):
+        return None
+    question = normalize_value(raw.get("question"))[:300]
+    if not question:
+        return None
+    topic = raw.get("topic") if isinstance(raw.get("topic"), dict) else {}
+    return {
+        "task_id": normalize_value(raw.get("task_id"))[:40] or uuid.uuid4().hex[:12],
+        "question": question,
+        "kind": "micro",
+        # The explanation that created it — a micro-task is never orphaned.
+        "parent_task_id": normalize_value(raw.get("parent_task_id"))[:40],
+        "parent_mode": normalize_value(raw.get("parent_mode"))[:20] or "explain",
+        "topic": {
+            "npp_id": normalize_value(topic.get("npp_id"))[:40],
+            "oblast": normalize_value(topic.get("oblast"))[:120],
+            "tema": normalize_value(topic.get("tema"))[:120],
+        },
+        "expects_boolean": bool(raw.get("expects_boolean")),
+        "checkable": bool(raw.get("checkable")),
+        "help_count": max(0, min(int(raw.get("help_count") or 0), 9)),
+    }
+
+
+def _build_micro_task(question: Any, payload: dict) -> dict | None:
+    """Structure an explicitly created "Probaj ti:" question.
+
+    Goes through the SINGLE activation gate, so a micro-task cannot activate on
+    looser terms than any other task. Arbitrary explanation prose has no marker
+    and therefore never reaches this function.
+    """
+    text = normalize_value(question)[:300]
+    if not text:
+        return None
+    identity = _topic_identity(payload)
+    # A micro-task's STRUCTURE is the explicit "Probaj ti:" marker (already
+    # required by ``extract_micro_task``, which also demands a mathematical
+    # signal). Gradeability is recorded honestly as ``checkable`` rather than
+    # gating activation: plain yes/no questions have no ``Expected`` deriver but
+    # are still perfectly answerable, and refusing them is what stranded the
+    # student. Unmarked prose never reaches this function.
+    decision = task_activation.activate(
+        question=text, source=task_activation.SOURCE_MICRO, kind="micro",
+        topic=identity, mode="explain",
+        validator=lambda q: {"validation_status": "validated"},
+    )
+    if not decision.activated:
+        return None
+    exp = derive_expected(text)
+    expects_bool = (getattr(exp, "expected_boolean", None) is not None
+                    or bool(_YES_NO_TASK_RE.search(fold_diacritics(text))))
+    return _normalize_micro_task({
+        "task_id": decision.task_id,
+        "question": text,
+        "parent_mode": normalize_value(payload.get("mode")) or "explain",
+        "topic": {"npp_id": identity.npp_id, "oblast": identity.oblast,
+                  "tema": identity.tema} if identity else {},
+        "expects_boolean": expects_bool,
+        "checkable": exp is not None or expects_bool,
+    })
+
+
 def _apply_micro_task_contract(payload: dict) -> None:
-    """Učenik odgovara na mikro-zadatak iz prethodnog OBJAŠNJENJA."""
+    """Učenik se obraća mikro-zadatku iz prethodnog OBJAŠNJENJA.
+
+    The micro-task is durable structured state, so short turns ("ne", "ne znam",
+    "zašto?") are ATTRIBUTED to it instead of being read as a brand-new request
+    with no context — which is what produced "Nije jasno šta treba riješiti".
+    """
     if payload.get("_direct_answer") is not None or payload.get("_skip_answer_check"):
         return
     if normalize_value(payload.get("intent")):
         return
     if normalize_value(payload.get("interaction_phase")).lower() == "answering_practice_task":
         return                              # pravi practice odgovor ima prednost
-    micro = normalize_value(_previous_next_state(payload).get("micro_task"))
+    micro = _normalize_micro_task(_previous_next_state(payload).get("micro_task"))
     if not micro:
         return
     message = normalize_value(payload.get("student_message") or payload.get("message"))
     if not message:
         return
-    # Samo POKUŠAJ ODGOVORA preuzima tok; pitanje/novi zahtjev ide normalno.
-    mode_parsed, _answers = parse_student_answers(message)
-    if mode_parsed == "none":
+
+    ti = turn_intent.classify(message, expects_boolean=micro["expects_boolean"])
+    # Only an ANSWER, or support clearly ABOUT the pending question, belongs to
+    # the micro-task. A substantive new question ("a šta ako su nazivnici
+    # različiti?") is its own turn and takes the normal route — the micro-task
+    # simply persists.
+    if ti.intent not in (turn_intent.Intent.ANSWER, turn_intent.Intent.HELP,
+                         turn_intent.Intent.HINT, turn_intent.Intent.FOLLOW_UP,
+                         turn_intent.Intent.CONFIRMATION):
         return
-    if detect_new_task_request(message) or _PRACTICE_EXPLAIN_RE.search(fold_diacritics(message)):
-        return
-    result = check_practice_answer(micro, message)
-    payload["_micro_task"] = micro
+
+    payload["_micro_task"] = micro["question"]
+    payload["_micro_task_state"] = micro
     payload["_micro_task_reply"] = True
     payload["_skip_answer_check"] = True    # nije grading potez → bez tvrde labele
+    # The turn belongs to the explanation that owns the micro-task, so topic
+    # resolution must not restart from a two-letter message.
+    payload["_micro_task_topic"] = micro.get("topic") or {}
+
+    if ti.intent in (turn_intent.Intent.HELP, turn_intent.Intent.HINT,
+                     turn_intent.Intent.FOLLOW_UP):
+        # Support keeps the question ALIVE — it is not an attempt.
+        payload["_micro_task_intent"] = ti.intent.value
+        payload["_micro_task_keep"] = True
+        micro["help_count"] = min(micro.get("help_count", 0) + 1, 9)
+        return
+
+    payload["_micro_task_intent"] = "answer"
+    result = check_practice_answer(micro["question"], message)
     if result is not None and result.checkable:
         payload["_micro_task_check"] = result
         # izloži presudu i u response-u (telemetrija/testovi); _skip_answer_check
@@ -4108,7 +4250,8 @@ def _apply_pending_context_question_contract(payload: dict) -> None:
     if not _PENDING_CONTEXT_QUESTION_RE.search(message):
         return
     prev = _previous_next_state(payload)
-    micro = normalize_value(prev.get("micro_task"))
+    micro_state = _normalize_micro_task(prev.get("micro_task"))
+    micro = micro_state["question"] if micro_state else ""
     if micro:
         payload["_direct_answer"] = (
             f"Mislim na ovaj mali zadatak: {micro} "
@@ -4675,6 +4818,20 @@ def _prepare_chat(
     else:
         lookup_result = get_final_topic(payload, master, tmap)
 
+        # A turn that answers (or asks about) a PENDING micro-task belongs to the
+        # explanation that created it. Without this, "ne" carried no topic, the
+        # lookup returned "unknown", and the student got "Nije jasno šta treba
+        # riješiti" for a question the tutor itself had just asked.
+        if payload.get("_micro_task_reply") and lookup_result.get("status") != "ready":
+            micro_topic = payload.get("_micro_task_topic") or {}
+            inherited = normalize_value(micro_topic.get("npp_id"))
+            if inherited:
+                lookup_result = {
+                    "status": "ready", "source": "micro_task_parent",
+                    "final_topic": inherited, "message": "", "matches": [],
+                }
+            payload["_micro_task_topic_inherited"] = True
+
         # --- Phase 7: kontrolni za CIJELU OBLAST (selected_oblast bez teme) -----
         exam_oblast_prompt = None
         if lookup_result["status"] == "unknown":
@@ -4738,6 +4895,15 @@ def _prepare_chat(
 
     mode = prompt_result["mode"]
     status = prompt_result["status"]
+    # A pending micro-task means the turn IS in context: the tutor asked the
+    # question itself. The prompt already carries the micro-task block, so only
+    # the deterministic "I don't know your topic" fallback needs suppressing —
+    # that fallback is what produced "Nije jasno šta treba riješiti" in reply to
+    # a one-word answer.
+    if payload.get("_micro_task_reply") and status != "ready":
+        status = "ready"
+        prompt_result["status"] = "ready"
+        payload["_micro_task_status_promoted"] = True
     effective_topic = prompt_result.get("effective_topic") or prompt_result.get(
         "final_topic", "unknown"
     )
@@ -6222,6 +6388,11 @@ def _finalize_response(prep: dict, answer: str) -> dict:
     ):
         answer = enforce_grading_consistency(answer, payload.get("answer_check"))
 
+    # Feedback must never assert something about the student's text that the
+    # text itself refutes ("nedostaje π" for an answer that reads "4pi cm").
+    answer = strip_false_absence_claims(
+        answer, normalize_value(payload.get("student_message") or payload.get("message")))
+
     answer = _apply_math_result_verification(payload, answer, mode=mode, status=status)
 
     _apply_gpt_fallback_verdict(payload, answer)
@@ -6411,11 +6582,34 @@ def _finalize_response(prep: dict, answer: str) -> dict:
         prev_task_text = normalize_value(payload.get("last_tutor_task"))[:600]
         new_generated_task = bool(task_text and task_text != prev_task_text and not _is_grading_turn(payload))
         validation = _validate_task_activation(task_text, mode=mode)
+        # A MODEL-generated task must also belong to the selected exact tema.
+        # Numeric validity alone let an arc-length task activate under "Odnos
+        # dvije kružnice": gradeable, but about a different topic.
+        # Behind the practice flag — with V2 off, legacy activation is unchanged.
+        if (engine_v2.practice_engine_enabled()
+                and new_generated_task
+                and validation.get("validation_status") == "validated"):
+            identity = _topic_identity(payload)
+            ok, why = task_activation.on_topic(task_text, identity)
+            if not ok:
+                validation = {"validation_status": "rejected", "reason": why}
+                payload["_off_topic_rejected"] = why
         if validation.get("validation_status") != "validated" and new_generated_task:
             fallback_task = _fallback_valid_task(
                 payload, mode=mode, reason=normalize_value(validation.get("reason"))
             )
             fallback_validation = _validate_task_activation(fallback_task, mode=mode)
+            # The substitute must clear the SAME topic gate. Otherwise refusing an
+            # off-topic task only to replace it with another off-topic task moves
+            # the defect rather than fixing it (the generic circle fallback is an
+            # arc/tangent task, which is exactly what we just rejected).
+            if fallback_validation.get("validation_status") == "validated" \
+                    and payload.get("_off_topic_rejected"):
+                fb_ok, fb_why = task_activation.on_topic(
+                    fallback_task, _topic_identity(payload))
+                if not fb_ok:
+                    fallback_validation = {"validation_status": "rejected",
+                                           "reason": fb_why}
             if fallback_validation.get("validation_status") == "validated":
                 task_text = fallback_task[:600]
                 validation = fallback_validation
@@ -6423,11 +6617,22 @@ def _finalize_response(prep: dict, answer: str) -> dict:
                 response["answer"] = answer
             else:
                 task_text = ""
-                answer = (
-                    "Ovaj zadatak nije imao dovoljno jasne podatke za jednoznačan "
-                    "odgovor, pa ga neću aktivirati. Pošalji mi novi zadatak ili "
-                    "izaberi temu za vježbu."
-                )
+                uncovered = normalize_value(payload.get("_topic_uncovered"))
+                if payload.get("_off_topic_rejected") and uncovered:
+                    # Honest about coverage rather than substituting a topic the
+                    # student did not choose.
+                    answer = (
+                        f"Za temu „{uncovered}” još nemam zadatke koje mogu "
+                        "pouzdano provjeriti, a ne želim ti dati zadatak iz "
+                        "druge teme. Mogu ti ovu temu objasniti korak po korak, "
+                        "ili izaberi drugu temu za vježbu."
+                    )
+                else:
+                    answer = (
+                        "Ovaj zadatak nije imao dovoljno jasne podatke za jednoznačan "
+                        "odgovor, pa ga neću aktivirati. Pošalji mi novi zadatak ili "
+                        "izaberi temu za vježbu."
+                    )
                 response["answer"] = answer
         payload["_task_validation"] = validation
     # Server je jedini izvor istine za aktivni zadatak: polje se šalje UVIJEK
@@ -6485,11 +6690,22 @@ def _finalize_response(prep: dict, answer: str) -> dict:
     # N9: mikro-zadatak iz OBJAŠNJENJA živi u vlastitom polju (ne last_tutor_task),
     # da Objašnjenje ostane mod koji ne prati zadatke. Persistira dok učenik ne
     # odgovori (ili dok objašnjenje ne ponudi novi).
-    if status == "ready" and mode == "explain" and not payload.get("_image_test"):
-        micro = extract_micro_task(answer)
-        if not micro and payload.get("_micro_task_reply"):
-            micro = ""                      # odgovorio je — mikro-zadatak potrošen
-        response["next_state"]["micro_task"] = micro
+    if mode == "explain" and not payload.get("_image_test"):
+        new_micro = _build_micro_task(extract_micro_task(answer), payload) \
+            if status == "ready" else None
+        if new_micro is not None:
+            micro_state = new_micro         # the explanation offered a fresh one
+        elif payload.get("_micro_task_keep"):
+            # Help / "ne znam" / "zašto?" do NOT consume the question.
+            micro_state = payload.get("_micro_task_state")
+        elif payload.get("_micro_task_reply"):
+            micro_state = None              # answered → consumed
+        else:
+            micro_state = _normalize_micro_task(
+                _previous_next_state(payload).get("micro_task"))
+        response["next_state"]["micro_task"] = micro_state
+        if micro_state:
+            response["micro_task_id"] = micro_state["task_id"]
     # BUG 12: stanje višestavkovnog zadatka (labels + graded) putuje naprijed.
     task_items = _task_items_for_response(payload, task_text)
     if task_items:

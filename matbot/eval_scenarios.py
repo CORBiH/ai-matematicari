@@ -402,6 +402,121 @@ SCENARIOS: list[Scenario] = [
         turns=[Turn("32", phase="answer", reply="Tačno.", expect={})],
     ),
 
+    # ---------------- prod round 4: micro-task / π / topic / exam voice ------
+    Scenario(
+        id="prod-micro-task-keeps-context", category="micro_task",
+        payload={"grade": 6, "mode": "explain", "selected_topic": "6-04-031"},
+        regression_of=("explanation asked „Probaj ti: da li je broj 24 djeljiv "
+                       "sa 4?" "; the answer „ne” got „Nije jasno šta treba riješiti”"),
+        turns=[
+            Turn("objasni mi djeljivost sa 4",
+                 reply=("Broj je djeljiv sa 4 ako su posljednje dvije cifre "
+                        "djeljive sa 4.\nProbaj ti: da li je broj 24 djeljiv sa 4?"),
+                 expect={"mode": "explain"}),
+            Turn("ne", reply="Pogledajmo zajedno.",
+                 expect={"mode": "explain",
+                         "answer_not_contains": ["nije jasno", "konkretan zadatak"]}),
+        ],
+    ),
+    Scenario(
+        id="prod-micro-task-help-preserves", category="micro_task",
+        payload={"grade": 6, "mode": "explain", "selected_topic": "6-04-031"},
+        regression_of="„ne znam” must not discard the tutor's own micro-task",
+        turns=[
+            Turn("objasni mi djeljivost sa 4",
+                 reply=("Pravilo je jednostavno.\n"
+                        "Probaj ti: da li je broj 24 djeljiv sa 4?")),
+            Turn("ne znam", reply="Nema problema.",
+                 expect={"mode": "explain",
+                         "answer_not_contains": ["nije jasno", "konkretan zadatak"]}),
+        ],
+    ),
+    Scenario(
+        id="prod-pi-answer-is-correct", category="symbolic", payload=_G6,
+        regression_of="4pi cm marked incorrect for an arc length of 4π cm",
+        seed_task=("Poluprečnik kružnice je 8 cm, centralni ugao je 90°. "
+                   "Izračunaj dužinu kružnog luka."),
+        turns=[Turn("4pi cm", phase="answer", reply="Tačno.",
+                    expect={"verdict": "correct",
+                            "answer_not_contains": ["nedostaje π", "nedostaje pi"]})],
+    ),
+    Scenario(
+        id="prod-pi-unicode-form-is-correct", category="symbolic", payload=_G6,
+        regression_of="π equivalence must cover every written form",
+        seed_task=("Poluprečnik kružnice je 8 cm, centralni ugao je 90°. "
+                   "Izračunaj dužinu kružnog luka."),
+        turns=[Turn("4π cm", phase="answer", reply="Tačno.",
+                    expect={"verdict": "correct"})],
+    ),
+    Scenario(
+        id="prod-pi-decimal-within-tolerance", category="symbolic", payload=_G6,
+        regression_of="a correctly rounded decimal is also correct",
+        seed_task=("Poluprečnik kružnice je 8 cm, centralni ugao je 90°. "
+                   "Izračunaj dužinu kružnog luka."),
+        turns=[Turn("12.57 cm", phase="answer", reply="Tačno.",
+                    expect={"verdict": "correct"})],
+    ),
+    Scenario(
+        id="prod-pi-wrong-coefficient-stays-incorrect", category="symbolic", payload=_G6,
+        regression_of="8π must not pass as 4π just because both are symbolic",
+        seed_task=("Poluprečnik kružnice je 8 cm, centralni ugao je 90°. "
+                   "Izračunaj dužinu kružnog luka."),
+        turns=[Turn("8π cm", phase="answer", reply="Nije tačno.",
+                    expect={"verdict_not": "correct"})],
+    ),
+    Scenario(
+        id="prod-circles-tema-rejects-arc-task", category="topic_identity",
+        payload={"grade": 6, "mode": "practice",
+                 "selected_oblast": "Skupovi tačaka, kružnica i krug",
+                 "selected_topic": "6-08-079"},
+        regression_of=("tema „Odnos dvije kružnice” produced an arc-length task "
+                       "(gradeable but off-topic)"),
+        applies_to=PRACTICE,
+        turns=[Turn("daj mi zadatak",
+                    reply=("Zadatak: Poluprečnik kružnice je 8 cm, centralni ugao "
+                           "je 90°. Izračunaj dužinu kružnog luka."),
+                    expect={"last_task_not_contains": ["luka", "luk"]})],
+    ),
+    Scenario(
+        id="prod-harder-task-is-not-a-repeat", category="topic_identity",
+        payload={"grade": 6, "mode": "practice", "selected_oblast": "Razlomci",
+                 "selected_topic": "6-04-035"},
+        regression_of="„daj mi teži zadatak” returned the identical task",
+        applies_to=PRACTICE,
+        turns=[
+            Turn("daj mi zadatak", reply="Zadatak: LEGACY-MODEL",
+                 expect={"answer_contains": ["proširi"]}),
+            Turn("Daj mi teži zadatak", reply="Zadatak: LEGACY-MODEL",
+                 expect={"answer_contains": ["proširi"]}),
+        ],
+    ),
+    Scenario(
+        id="prod-exam-transitions-vary", category="exam", payload=_EXAM,
+        regression_of=("exam repeated „Netačno. Sada riješi N. zadatak.” every "
+                       "single turn"),
+        applies_to=EXAM,
+        turns=[
+            Turn("daj mi kontrolni", reply="Krećemo."),
+            Turn("999", reply="U redu.", expect={"exam_status": "active"}),
+            Turn("999", reply="U redu.", expect={"exam_status": "active"}),
+        ],
+    ),
+    Scenario(
+        id="prod-exam-help-never-reveals", category="exam", payload=_EXAM,
+        regression_of="progressive help must escalate without revealing",
+        applies_to=EXAM,
+        turns=[
+            Turn("daj mi kontrolni", reply="Krećemo."),
+            Turn("ne znam", reply="U redu.",
+                 expect={"exam_status": "active", "exam_index": 0}),
+            Turn("ne znam", reply="U redu.",
+                 expect={"exam_status": "active", "exam_index": 0}),
+            Turn("ne znam", reply="U redu.",
+                 expect={"exam_status": "active", "exam_index": 0,
+                         "answer_contains": ["preskoč"]}),
+        ],
+    ),
+
     # ---------------- language ----------------------------------------------
     Scenario(
         id="language-engine-output", category="language", payload=_G6,

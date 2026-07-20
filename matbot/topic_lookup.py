@@ -79,6 +79,21 @@ def _result(
     }
 
 
+def _resolve_runtime_topic(grade: Any, raw: Any) -> str:
+    """Canonical NPP id for a runtime topic identifier, or "".
+
+    Imported lazily: ``topic_resolver`` reads the content loader, and this module
+    is imported very early. Never raises — an unresolvable id simply stays
+    unresolved, exactly as before.
+    """
+    try:
+        from matbot import topic_resolver
+        found = topic_resolver.resolve_topic(grade, raw)
+        return found.npp_id if found else ""
+    except Exception:
+        return ""
+
+
 def _norm(val: Any) -> str:
     """Payload vrijednosti normalizuj isto kao ćelije u fajlu (npr. int order → str)."""
     return normalize_value(val)
@@ -306,6 +321,14 @@ def get_final_topic(
     if selected:
         if selected in master["topic_ids"]:
             return _result(selected, "found", "selected_topic", MSG_SELECTED_OK, [])
+        # A RUNTIME topic id (e.g. "29073") is not an NPP id, but it names a real
+        # tema. Resolving it through the SAME canonical resolver the rest of the
+        # pipeline uses keeps topic identity in one model — otherwise the lookup
+        # rejects a topic the generator considers perfectly valid.
+        canonical = _resolve_runtime_topic(payload.get("grade"), selected)
+        if canonical and canonical in master["topic_ids"]:
+            return _result(canonical, "found", "selected_topic_runtime_id",
+                           MSG_SELECTED_OK, [])
         invalid_msgs.append(MSG_SELECTED_INVALID.format(topic=selected))
 
     detected = _norm(payload.get("detected_topic"))

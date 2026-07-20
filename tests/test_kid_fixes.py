@@ -687,13 +687,21 @@ def test_micro_task_lives_outside_last_tutor_task(master, tmap):
          "student_message": "objasni sabiranje razlomaka istih nazivnika"},
         _chat(_EXPL), master, tmap, model="m", timeout=1)
     assert out["last_tutor_task"] == ""                       # i dalje prazno
-    assert out["next_state"]["micro_task"] == "koliko je 3/8 + 2/8?"
+    # Mikro-zadatak je STRUKTURA (id + shema + tema roditelja), ne goli string.
+    micro = out["next_state"]["micro_task"]
+    assert micro["question"] == "koliko je 3/8 + 2/8?"
+    assert micro["task_id"] and micro["kind"] == "micro"
 
 
 def test_micro_task_survives_state_normalization():
+    # LEGACY oblik (goli string) mora i dalje da se učita — sesija zatečena
+    # usred objašnjenja preko deploya ne smije izgubiti pitanje.
     ns = svc._normalize_next_state({"micro_task": "koliko je 3/8 + 2/8?"})
-    assert ns["micro_task"] == "koliko je 3/8 + 2/8?"
-    assert svc._empty_next_state()["micro_task"] == ""
+    assert ns["micro_task"]["question"] == "koliko je 3/8 + 2/8?"
+    assert ns["micro_task"]["task_id"]
+    structured = svc._normalize_next_state({"micro_task": ns["micro_task"]})
+    assert structured["micro_task"]["task_id"] == ns["micro_task"]["task_id"]
+    assert svc._empty_next_state()["micro_task"] is None
 
 
 def test_micro_task_reply_is_checked_and_consumed(master, tmap):
@@ -705,7 +713,7 @@ def test_micro_task_reply_is_checked_and_consumed(master, tmap):
         _chat("Tako je, bravo!"), master, tmap, model="m", timeout=1)
     chk = out["answer_check"] or {}
     assert [i["verdict"] for i in chk.get("items", [])] == ["correct"]
-    assert out["next_state"]["micro_task"] == ""              # potrošen
+    assert out["next_state"]["micro_task"] is None            # potrošen
     assert out["last_tutor_task"] == ""                       # nikad ne curi
 
 

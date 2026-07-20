@@ -360,9 +360,57 @@ def generate_one(grade: Any, oblast: Any = "", tema: Any = "", *,
     return None
 
 
+def _numbers(question: str) -> list[int]:
+    return [int(n) for n in re.findall(r"\d+", question)][:6]
+
+
+def _too_similar(candidate: GeneratedTask, accepted: list[GeneratedTask]) -> bool:
+    """Near-duplicate guard for items of the SAME skill.
+
+    An exam of "2x + 5 = 7", "6x + 4 = 28", "2x + 9 = 21" is three valid items
+    that read as one. Exact-string dedup cannot see that, so compare the numeric
+    fingerprint: sharing most parameters, or landing in the same narrow
+    magnitude band, means the child is re-doing the same exercise.
+    """
+    cand_nums = _numbers(candidate.question)
+    if not cand_nums:
+        return False
+    for other in accepted:
+        if other.skill_id != candidate.skill_id:
+            continue
+        nums = _numbers(other.question)
+        if not nums:
+            continue
+        shared = len(set(cand_nums) & set(nums))
+        if shared >= max(1, min(len(cand_nums), len(nums)) - 1):
+            return True                     # same parameters but for one
+        # Same difficulty band on every parameter → mechanically identical feel.
+        if len(nums) == len(cand_nums) and all(
+                _band(a) == _band(b) for a, b in zip(sorted(nums), sorted(cand_nums))):
+            return True
+    return False
+
+
+def _band(n: int) -> int:
+    """Coarse magnitude band, so difficulty varies rather than just digits."""
+    if n <= 5:
+        return 0
+    if n <= 12:
+        return 1
+    if n <= 30:
+        return 2
+    if n <= 100:
+        return 3
+    return 4
+
+
 def generate_batch(grade: Any, oblast: Any = "", tema: Any = "", *,
                    count: int, seed: Any = "") -> list[GeneratedTask]:
-    """Up to ``count`` validated, DISTINCT tasks. Empty list = no coverage."""
+    """Up to ``count`` validated, DISTINCT, non-near-duplicate tasks.
+
+    Empty list = no coverage. Variety is only ever sought WITHIN the templates
+    that match the selected topic — never by widening the topic.
+    """
     templates = select_templates(grade, oblast, tema)
     if not templates:
         return []
@@ -371,13 +419,18 @@ def generate_batch(grade: Any, oblast: Any = "", tema: Any = "", *,
     # Cycle through matching skills for variety; draw fresh params per attempt.
     attempts = 0
     i = 0
-    while len(tasks) < count and attempts < count * 12:
+    budget = count * 40
+    while len(tasks) < count and attempts < budget:
         template = templates[i % len(templates)]
         rng = random.Random(hash(("matbot-tt-batch", str(seed), attempts)))
         task = _generate_from(template, rng, grade=grade, oblast=oblast, tema=tema)
         attempts += 1
         i += 1
         if task is None or task.question in seen:
+            continue
+        # Relax the similarity guard once the budget is nearly spent: a valid
+        # item the child can still solve beats returning a short exam.
+        if attempts < budget * 0.75 and _too_similar(task, tasks):
             continue
         seen.add(task.question)
         tasks.append(task)

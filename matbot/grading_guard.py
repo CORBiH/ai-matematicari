@@ -918,3 +918,58 @@ def enforce_grading_consistency(answer: Any, check_result: Any = None) -> str:
         return answer
     except Exception:
         return answer
+
+
+# --------------------------------------------------------------------------- #
+# Feedback must not contradict the student's own text                          #
+# --------------------------------------------------------------------------- #
+class _PiPresence:
+    """Adapter so the guard reuses ``symbolic.mentions_pi`` verbatim."""
+
+    def search(self, text: Any):
+        from matbot import symbolic
+        return symbolic.mentions_pi(text) or None
+
+
+#: Notation a claim can be made about. Each entry maps a detector for "the
+#: student wrote it" to the phrases that assert they did not. The presence
+#: detector is the SAME one the checker uses, so the guard and the grade can
+#: never disagree about whether the student wrote π.
+_ABSENCE_CLAIMS: tuple[tuple[str, Any, "re.Pattern"], ...] = (
+    (
+        "pi",
+        _PiPresence(),
+        re.compile(
+            r"(?:[^.!?\n]*\b(?:nedostaje|nisi\s+(?:napisao|naveo|uklju[cčć]io)|"
+            r"izostavio\s+si|fali|bez)\b[^.!?\n]*(?:π|\bpi\b)[^.!?\n]*[.!?]?)"
+            r"|(?:[^.!?\n]*(?:π|\bpi\b)[^.!?\n]*\b(?:nedostaje|fali|nije\s+"
+            r"napisan\w*|nije\s+naveden\w*)\b[^.!?\n]*[.!?]?)",
+            re.IGNORECASE),
+    ),
+)
+
+
+def strip_false_absence_claims(answer: Any, student_text: Any) -> str:
+    """Remove "you didn't write X" when the student demonstrably did.
+
+    Production told a student π was missing from "4pi cm". A verdict guard cannot
+    catch that: the sentence is not a grade, it is a false statement about the
+    student's own text. Only claims proven false by that text are removed;
+    everything else is left untouched.
+    """
+    if not isinstance(answer, str) or not answer.strip():
+        return answer
+    student = str(student_text or "")
+    if not student.strip():
+        return answer
+    try:
+        out = answer
+        for _name, present_re, claim_re in _ABSENCE_CLAIMS:
+            if not present_re.search(student):
+                continue                    # the claim may well be true
+            out = claim_re.sub("", out)
+        out = re.sub(r"[ \t]{2,}", " ", out)
+        out = re.sub(r"\n{3,}", "\n\n", out).strip()
+        return out or answer
+    except Exception:
+        return answer

@@ -26,6 +26,8 @@ import re
 from dataclasses import dataclass, field
 from fractions import Fraction
 
+from matbot import symbolic
+
 __all__ = [
     "check_practice_answer",
     "derive_conceptual_rubric",
@@ -314,6 +316,10 @@ class Expected:
     # rastavlja; prihvataju se ekvivalentni zapisi (2²·3·5 == 2*2*3*5 == 5·3·2·2).
     expected_factors: tuple = ()
     target_number: int | None = None
+    # EXACT symbolic value (a·pi + b) when the task has one. ``value`` remains a
+    # decimal approximation for the rational core; this is what a symbolic answer
+    # is judged against, so "4pi" and "12.57" are both correct for 4*pi.
+    expected_symbolic: symbolic.SymbolicValue | None = None
 
 
 _COMPLEMENT_SIGNAL_RE = re.compile(
@@ -707,8 +713,11 @@ def _try_arc_length(folded: str, norm_text: str) -> Expected | None:
         return None
     if not re.search(r"\b(duzin\w*|duljin\w*|izracunaj|odredi|kolik\w*)\b", folded):
         return None
-    radius_m = _RADIUS_RE.search(norm_text)
-    angle_m = _CENTRAL_ANGLE_RE.search(norm_text) or _DEGREE_VALUE_RE.search(norm_text)
+    # Search the FOLDED text: the patterns are written without diacritics, so
+    # matching against the raw text silently failed on "Poluprečnik" / "ugao" —
+    # which is why a valid arc-length task derived no expected value at all.
+    radius_m = _RADIUS_RE.search(folded)
+    angle_m = _CENTRAL_ANGLE_RE.search(folded) or _DEGREE_VALUE_RE.search(folded)
     if not (radius_m and angle_m):
         return None
     try:
@@ -736,6 +745,10 @@ def _try_arc_length(folded: str, norm_text: str) -> Expected | None:
         unit_policy="required",
         tolerance=Fraction(2, 100),
         confidence="high",
+        # The EXACT value. ``value`` stays a decimal for the rational core, but a
+        # \u03c0 answer must be judged against the exact form \u2014 comparing "4\u03c0" to
+        # 12.57 as plain numbers is what marked a correct answer wrong.
+        expected_symbolic=symbolic.SymbolicValue(pi_coeff=pi_coeff),
     )
 
 
@@ -2793,11 +2806,55 @@ def _check_set_task(
     return CheckResult(checkable=True, items=checks)
 
 
+_UNIT_TOKEN_RE = re.compile(r"\b(mm|cm|dm|km|m)\b", re.IGNORECASE)
+
+
+def _check_symbolic(task_text: str, student_text: str) -> "CheckResult | None":
+    """Judge a task whose exact answer contains π.
+
+    Runs before the tokenized numeric path, which can only see "4" in "4π cm"
+    and therefore judged a correct symbolic answer as wrong — then told the
+    student π was missing from text that plainly contained it.
+    """
+    expected = derive_expected(task_text)
+    exp_sym = getattr(expected, "expected_symbolic", None) if expected else None
+    if exp_sym is None:
+        return None
+    given = symbolic.parse(student_text)
+    if given is None:
+        return None
+
+    value_ok = exp_sym.equals(given)
+
+    # Unit policy stays owned by the existing rules; only apply it here.
+    verdict = "correct"
+    unit_expected = (expected.unit or "").lower()
+    if unit_expected and (expected.unit_policy or "") == "required":
+        units = [u.lower() for u in _UNIT_TOKEN_RE.findall(student_text or "")]
+        if not units:
+            verdict = "correct_missing_unit" if value_ok else "incorrect"
+        elif units[-1] != unit_expected:
+            verdict = "wrong_unit" if value_ok else "incorrect"
+        elif not value_ok:
+            verdict = "incorrect"
+    elif not value_ok:
+        verdict = "incorrect"
+
+    return CheckResult(checkable=True, items=[ItemCheck(
+        n=1, task=(task_text or "").strip()[:200], expected=expected,
+        given=None, verdict=verdict,
+    )])
+
+
 def _check(
     task_text: str,
     student_text: str,
     pending_items: list[int] | None = None,
 ) -> CheckResult:
+    # π-valued tasks first: the numeric tokenizer cannot represent them.
+    sym = _check_symbolic(task_text, student_text)
+    if sym is not None:
+        return sym
     # Skupovne operacije prve — presuda je jednakost skupova, ne brojevni token.
     set_result = _check_set_task(task_text, student_text, pending_items)
     if set_result is not None:

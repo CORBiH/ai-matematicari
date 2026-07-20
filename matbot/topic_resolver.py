@@ -56,6 +56,71 @@ class CanonicalTopic:
         return f"{self.npp_id} {self.tema}".strip()
 
 
+@dataclass(frozen=True)
+class TopicIdentity:
+    """The ONE topic object Practice, Exam, template selection, validation and
+    telemetry all consume.
+
+    Keeping the runtime id, the canonical NPP id and the human titles as separate
+    explicit fields is deliberate: production conflated them, so an unresolved
+    runtime id ("29073") was indistinguishable from "no topic selected" and the
+    request silently widened to the whole oblast.
+    """
+    grade: Any
+    runtime_id: str = ""            # exactly what the client sent
+    npp_id: str = ""                # canonical curriculum id, "" when unresolved
+    oblast: str = ""
+    tema: str = ""
+    skill_ids: tuple[str, ...] = () # deterministic templates covering this tema
+    resolved: bool = False          # runtime_id mapped to a canonical tema
+    covered: bool = False           # a deterministic template exists for it
+
+    @property
+    def probe(self) -> str:
+        return f"{self.npp_id} {self.tema}".strip()
+
+    @property
+    def is_exact_tema(self) -> bool:
+        """A specific tema was selected (as opposed to a bare oblast)."""
+        return bool(self.npp_id or self.tema)
+
+    def to_dict(self) -> dict:
+        return {
+            "grade": self.grade, "runtime_id": self.runtime_id,
+            "npp_id": self.npp_id, "oblast": self.oblast, "tema": self.tema,
+            "skill_ids": list(self.skill_ids), "resolved": self.resolved,
+            "covered": self.covered,
+        }
+
+
+def identify(grade: Any, raw_topic: Any = "", oblast: Any = "",
+             fallback_name: Any = "") -> TopicIdentity:
+    """Build the canonical identity for a selected topic.
+
+    Imported lazily from ``task_templates`` to keep this module dependency-light
+    and cycle-free.
+    """
+    from matbot import task_templates
+
+    runtime = str(raw_topic or "").strip()
+    resolved = resolve_topic(grade, runtime) if runtime else None
+    if resolved is None and fallback_name:
+        resolved = resolve_topic(grade, fallback_name)
+    npp = resolved.npp_id if resolved else ""
+    tema = resolved.tema if resolved else ""
+    obl = (resolved.oblast if resolved else "") or str(oblast or "").strip()
+    probe = f"{npp} {tema}".strip()
+    # ``select_templates`` already implements the tema-first precedence: with an
+    # empty probe it falls back to the OBLAST, which is exactly right for an
+    # oblast-only selection. Computing coverage only when a tema exists silently
+    # broke that path, so always ask it.
+    skills = tuple(t.skill_id for t in task_templates.select_templates(grade, obl, probe))
+    return TopicIdentity(
+        grade=grade, runtime_id=runtime, npp_id=npp, oblast=obl, tema=tema,
+        skill_ids=skills, resolved=resolved is not None, covered=bool(skills),
+    )
+
+
 def _build_index(grade: Any) -> dict[str, CanonicalTopic]:
     master = load_master_content(grade=grade)
     index: dict[str, CanonicalTopic] = {}

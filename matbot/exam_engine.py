@@ -31,7 +31,7 @@ from typing import Any
 
 from matbot.answer_checker import check_practice_answer, derive_expected, _fmt_expected
 from matbot.grading_guard import authoritative_verdict
-from matbot import task_templates
+from matbot import render, task_templates, turn_intent
 
 ENGINE = "v2"
 DEFAULT_ITEM_COUNT = 3
@@ -71,18 +71,9 @@ def _fold(text: Any) -> str:
     return s.lower().strip()
 
 
-# Traženje pomoći / ne-odgovor: NIKAD se ne pamti kao odgovor i NE pomjera kursor.
-_HELP_RE = re.compile(
-    r"\b(ne\s*znam|nemam\s+pojma|pomo[cčć]\w*|pomozi|hint|ne\s+razumijem|ne\s+kapiram|"
-    r"daj\s+mi\s+savjet|zapeo\s+sam|objasni\w*|obrazlo[zž]\w*|daj\s+pravilo|"
-    r"koje\s+je\s+pravilo|kako\s+se\s+radi|kako\s+da|reci\s+mi|rijesi\s+ti|"
-    r"uradi\s+ti|daj\s+odgovor|ne\s+umijem|ne\s+mogu)\b"
-)
-# SAMO eksplicitno preskakanje smije pomjeriti kursor (bez ocjene).
-_SKIP_RE = re.compile(r"\b(preskoc\w*|preskac\w*|dalje\s+molim|sljedec\w*\s+zadatak)\b")
-# Odgovor mora sadržavati nešto što uopšte liči na matematički sadržaj.
-_ANSWER_SIGNAL_RE = re.compile(r"\d|[=<>+\-/*]|\b(da|ne|jeste|nije|jest)\b")
-_SUBMIT_RE = re.compile(r"\b(predaj\w*|gotov\w*|zavr[sš]i\w*|to\s+je\s+to|nemam\s+vi[sš]e)\b")
+# Help / skip / submit / answer-signal detection now lives in ``turn_intent`` —
+# the exam used to keep private copies of all four, which is exactly how it came
+# to disagree with the practice flow about the same sentence.
 _NEW_EXAM_RE = re.compile(r"\bnov\w*\s+(kontroln\w*|test\w*|ispit\w*)\b|\bjo[sš]\s+jedan\s+kontroln\w*")
 _EXPLAIN_RE = re.compile(
     r"\b(objasn\w*|obrazlo\w*|za[sš]to|gdje\s+sam\s+pogrije[sš]|gdje\s+je\s+gre[sš]|poka[zž]i\s+rje[sš])\w*"
@@ -167,6 +158,8 @@ class ExamState:
     oblast: str = ""
     tema: str = ""
     topic_covered: bool = True          # False = generic fallback for a requested topic
+    seed: str = ""                      # stable wording seed (never a secret)
+    grade: Any = 6
 
     @property
     def total(self) -> int:
@@ -187,6 +180,8 @@ class ExamState:
             "oblast": self.oblast,
             "tema": self.tema,
             "topic_covered": self.topic_covered,
+            "seed": self.seed,
+            "grade": self.grade,
             "items": [it.to_dict() for it in self.items],
         }
 
@@ -232,6 +227,8 @@ def load_state(raw: Any) -> ExamState | None:
         oblast=str(raw.get("oblast") or "")[:120],
         tema=str(raw.get("tema") or "")[:120],
         topic_covered=bool(raw.get("topic_covered", True)),
+        seed=str(raw.get("seed") or "")[:64],
+        grade=raw.get("grade", 6),
     )
 
 
@@ -353,54 +350,114 @@ def start_exam(seed: str, count: int = DEFAULT_ITEM_COUNT, *,
 
     return ExamState(exam_id=f"exam_{uuid.uuid4().hex}", exam_status="active",
                      current_index=0, items=items, oblast=oblast_s[:120],
-                     tema=tema_s[:120], topic_covered=covered)
+                     tema=tema_s[:120], topic_covered=covered,
+                     seed=str(seed)[:64], grade=grade)
+
+
+#: Topic-specific first-tier support. Keyed by a marker in the QUESTION, so the
+#: child gets the actual rule rather than "sjeti se pravila". Never the answer.
+_HELP_CUES: tuple[tuple[str, str], ...] = (
+    ("djeljiv sa 6", "Podsjeti se pravila djeljivosti sa 6: broj mora biti "
+                     "djeljiv i sa 2 i sa 3."),
+    ("djeljiv sa 4", "Kod djeljivosti sa 4 gledaš samo posljednje dvije cifre."),
+    ("djeljiv sa 3", "Kod djeljivosti sa 3 sabereš cifre pa gledaš je li zbir "
+                     "djeljiv sa 3."),
+    ("djeljiv sa 9", "Kod djeljivosti sa 9 sabereš cifre i gledaš je li zbir "
+                     "djeljiv sa 9."),
+    ("djeljiv sa 5", "Kod djeljivosti sa 5 gledaš samo posljednju cifru."),
+    ("djeljiv sa 2", "Kod djeljivosti sa 2 gledaš je li posljednja cifra parna."),
+    ("proste faktore", "Rastavljanje počinje od najmanjeg prostog broja: probaj "
+                       "redom 2, 3, 5, 7."),
+    ("nzd", "NZD je najveći broj kojim se OBA broja dijele bez ostatka."),
+    ("nzs", "NZS je najmanji broj koji je djeljiv sa OBA broja."),
+    ("prosiri", "Proširivanje znači da i brojnik i nazivnik množiš ISTIM brojem."),
+    ("skrati", "Skraćivanje znači da i brojnik i nazivnik dijeliš ISTIM brojem."),
+)
+
+#: Second tier: where to look, still without doing the work.
+_HELP_TIER2 = ("Zapiši šta ti je poznato, pa primijeni pravilo na prvi dio "
+               "zadatka. Ne moraš odmah do kraja.")
+
+
+def _expects_boolean(it: "ExamItem") -> bool:
+    """True when the item asks a yes/no question, so a bare „ne” is an ANSWER."""
+    exp = derive_expected(it.question)
+    return exp is not None and getattr(exp, "expected_boolean", None) is not None
+
+
+def _help_cue(question: str, tier: int) -> str:
+    """Progressive support text for the exam's own topic."""
+    if tier >= 3:
+        return ("Suzi na jedan detalj i provjeri samo njega. Možeš i preskočiti "
+                "ovaj zadatak ili predati kontrolni.")
+    if tier == 2:
+        return _HELP_TIER2
+    folded = _fold(question)
+    for marker, cue in _HELP_CUES:
+        if marker in folded:
+            return cue
+    return "Sjeti se pravila koje vrijedi za ovaj tip zadatka."
 
 
 def _help_reply(state: ExamState, it: ExamItem) -> str:
-    """Progresivna, NE-otkrivajuća podrška — ne ponavlja isti robotski tekst."""
+    """Progressive, NON-revealing support, rendered through the shared layer."""
     n = state.current_index + 1
-    tier = min(it.help_count, 3)
-    if tier <= 1:
-        cue = ("Sjeti se pravila za ovaj tip zadatka i pažljivo izračunaj korak po korak.")
-    elif tier == 2:
-        cue = ("Probaj ovako: zapiši šta ti je poznato, pa primijeni pravilo na "
-               "prvi dio zadatka. Ne moraš odmah do kraja.")
+    tier = min(max(it.help_count, 1), 3)
+    ctx = render.RenderContext(
+        mode="exam", intent="help", grade=state.grade,
+        seed=f"{state.seed}|help|{n}|{tier}", help_level=tier,
+        help_text=_help_cue(it.question, tier), may_reveal=False)
+    return f"{render.help_phrase(ctx)}\nZadatak {n}: {it.question}"
+
+
+def _advance(state: ExamState, verdict: str, detail: str,
+             seed_salt: str) -> ExamTurnResult:
+    """Move to the next unanswered item (or finish) and render the transition.
+
+    Every exam transition funnels through here, so wording, state advance and
+    the completion check can no longer disagree.
+    """
+    remaining = [i for i, x in enumerate(state.items) if x.status == "unanswered"]
+    finished = not remaining
+    if remaining:
+        state.current_index = remaining[0]
+        nxt = state.items[state.current_index]
+        next_q, next_i = nxt.question, state.current_index + 1
     else:
-        cue = ("Ako ti ovaj baš ne ide, možeš napisati „preskoči” pa se vratiti "
-               "kasnije, ili „predaj” kad želiš završiti.")
-    return (f"Ovo je kontrolni, pa ti ne mogu dati rješenje. {cue}\n"
-            f"Zadatak {n}: {it.question}")
+        state.exam_status = "completed"
+        state.current_index = None
+        next_q, next_i = "", None
+    ctx = render.RenderContext(
+        mode="exam", verdict=verdict, grade=state.grade,
+        seed=f"{state.seed}|{seed_salt}", next_question=next_q,
+        next_index=next_i, exam_finished=finished, may_reveal=finished,
+        summary=_summary(state) if finished else "")
+    return ExamTurnResult(
+        answer=render.exam_transition(ctx), exam_state=state.to_dict(),
+        verdict=(verdict if verdict in ("correct", "incorrect") else None),
+        verdict_detail=detail,
+        exam_status="completed" if finished else "active",
+        expected_user_action="none" if finished else "answer_task")
 
 
 def _handle_active(state: ExamState, message: str) -> ExamTurnResult:
-    folded = _fold(message)
     it = state.items[state.current_index]
+    # ONE classification for the whole turn — the exam no longer keeps its own
+    # private notion of what "ne znam" or "predaj" means.
+    ti = turn_intent.classify(message, expects_boolean=_expects_boolean(it))
 
     # Explicit SKIP — the ONLY non-answer that may advance. Recorded as skipped,
     # never as the student's answer.
-    if _SKIP_RE.search(folded):
+    if ti.intent == turn_intent.Intent.SKIP:
         it.status = "skipped"
         it.verdict = "skipped"
         it.correct = False
         it.student_answer = None
-        remaining = [i for i, x in enumerate(state.items) if x.status == "unanswered"]
-        if remaining:
-            state.current_index = remaining[0]
-            return ExamTurnResult(
-                answer=f"U redu, preskačemo taj zadatak.\n{_next_prompt(state)}",
-                exam_state=state.to_dict(), verdict=None,
-                verdict_detail="exam_skipped", exam_status="active",
-                expected_user_action="answer_task")
-        state.exam_status = "completed"
-        state.current_index = None
-        return ExamTurnResult(answer=_summary(state), exam_state=state.to_dict(),
-                              verdict=None, verdict_detail="exam_skipped",
-                              exam_status="completed", expected_user_action="none")
+        return _advance(state, "skipped", "exam_skipped",
+                        f"skip|{state.current_index}")
 
     # Explicit submit — grade what we have, remaining stay unanswered (incorrect).
-    # Checked BEFORE the help/non-answer guards: „predaj” is a control intent and
-    # carries no answer signal, so a later check would never be reached.
-    if _SUBMIT_RE.search(folded) and not re.search(r"\d", folded):
+    if ti.intent == turn_intent.Intent.SUBMIT:
         for rem in state.items:
             if rem.status == "unanswered":
                 rem.status = "graded"
@@ -412,24 +469,21 @@ def _handle_active(state: ExamState, message: str) -> ExamTurnResult:
                               verdict=None, verdict_detail="exam_submitted",
                               exam_status="completed", expected_user_action="none")
 
-    # Help / non-answer intent — NEVER stored as an answer, NEVER advances.
-    if _HELP_RE.search(folded):
+    # Help / explanation / non-answer — NEVER stored as an answer, NEVER advances.
+    if ti.is_non_answer:
         it.help_count += 1
+        if ti.intent == turn_intent.Intent.UNKNOWN:
+            n = state.current_index + 1
+            return ExamTurnResult(
+                answer=("Nisam siguran da je to odgovor na zadatak. Napiši svoj "
+                        "odgovor, možeš preskočiti zadatak ili predati kontrolni.\n"
+                        f"Zadatak {n}: {it.question}"),
+                exam_state=state.to_dict(), verdict=None,
+                verdict_detail="exam_needs_answer", exam_status="active",
+                expected_user_action="answer_task")
         return ExamTurnResult(answer=_help_reply(state, it), exam_state=state.to_dict(),
                               verdict=None, verdict_detail="exam_help",
                               exam_status="active", expected_user_action="answer_task")
-
-    # Unparseable / non-answer text must NOT silently become "unverified" and
-    # advance the exam (production: "objasni ti" was stored as the answer).
-    if not _ANSWER_SIGNAL_RE.search(folded):
-        it.help_count += 1
-        return ExamTurnResult(
-            answer=("Nisam siguran da je to odgovor na zadatak. Napiši svoj odgovor, "
-                    "ili „preskoči” za sljedeći zadatak, ili „predaj” za završetak.\n"
-                    f"Zadatak {state.current_index + 1}: {it.question}"),
-            exam_state=state.to_dict(), verdict=None,
-            verdict_detail="exam_needs_answer", exam_status="active",
-            expected_user_action="answer_task")
 
     # Grade the CURRENT item only (one answer -> one item).
     verdict, correct = _grade(it.question, message)
@@ -437,26 +491,10 @@ def _handle_active(state: ExamState, message: str) -> ExamTurnResult:
     it.student_answer = message[:200]
     it.verdict = verdict
     it.correct = correct
-    feedback = "Tačno." if correct else ("Netačno." if correct is False else "Zabilježeno.")
-
-    remaining = [i for i, x in enumerate(state.items) if x.status == "unanswered"]
-    if remaining:
-        state.current_index = remaining[0]
-        answer = f"{feedback}\n{_next_prompt(state)}"
-        status_out = "active"
-        expected = "answer_task"
-    else:
-        state.exam_status = "completed"
-        state.current_index = None
-        answer = f"{feedback}\n\n{_summary(state)}"
-        status_out = "completed"
-        expected = "none"
-    return ExamTurnResult(
-        answer=answer, exam_state=state.to_dict(),
-        verdict=("correct" if correct else "incorrect" if correct is False else None),
-        verdict_detail=f"exam_{verdict}",
-        exam_status=status_out, expected_user_action=expected,
-    )
+    return _advance(
+        state,
+        "correct" if correct else "incorrect" if correct is False else "partial",
+        f"exam_{verdict}", f"grade|{state.current_index}|{verdict}")
 
 
 def _explain_item(state: ExamState, index0: int) -> str:
