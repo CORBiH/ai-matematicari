@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Sequence
 
 from matbot.bosnian import to_ijekavica
-from matbot.minimal import concept_facts, solution_facts
+from matbot.minimal import concept_facts, mathfmt, solution_facts
 from matbot.minimal.grading import GradingResult
 from matbot.minimal.intent import fold as _fold
 from matbot.minimal.state import ActiveTask, SessionState
@@ -196,7 +196,7 @@ def present_task(ctx: RenderContext) -> str:
         # otherwise is what made "Daj mi lakši zadatak" return a harder task.
         opener = ("Za ovu temu još ne mogu birati težinu, pa evo novog zadatka "
                   "iste težine:")
-    return f"{opener}\n\n{task.question}"
+    return f"{opener}\n\n{mathfmt.format_question(task.question)}"
 
 
 def feedback(ctx: RenderContext) -> str:
@@ -225,9 +225,9 @@ def feedback(ctx: RenderContext) -> str:
     task = ctx.task
     if task is not None and not ctx.may_reveal:
         nudge = _hint_text(task.skill_id, task.hints_given, task.question)
-        return f"{head} {nudge}"
+        return f"{head} {mathfmt.format_math_tokens(nudge)}"
     if ctx.may_reveal and task is not None and task.expected_display:
-        return f"{head} Tačan odgovor je {task.expected_display}."
+        return f"{head} Tačan odgovor je {mathfmt.inline(task.expected_display)}."
     return head
 
 
@@ -257,7 +257,8 @@ def help_reply(ctx: RenderContext) -> str:
     opener = _pick(("Nema problema.", "U redu, idemo polako.", "Hajde zajedno."),
                    ctx.seed, "help")
     hint = _hint_text(task.skill_id, task.hints_given, task.question)
-    return f"{opener} {hint}\n\nZadatak je i dalje:\n{task.question}"
+    return (f"{opener} {mathfmt.format_math_tokens(hint)}"
+            f"\n\nZadatak je i dalje:\n{mathfmt.format_question(task.question)}")
 
 
 _CONCEPT_SYSTEM = (
@@ -317,9 +318,10 @@ def concept_answer(ctx: RenderContext, *, openai_chat: Callable | None,
             # ``phrase_with_model`` rejects any candidate introducing a number
             # that is not already in the text, so a fabricated result cannot
             # survive the rephrase.
-            return phrase_with_model(
+            phrased = phrase_with_model(
                 text, openai_chat=openai_chat, model=model, timeout=timeout,
                 allow_verdict_words=False, require_same_numbers=True)
+            return mathfmt.format_math_tokens(phrased)
 
     if openai_chat is None:
         return _CONCEPT_FALLBACK
@@ -362,7 +364,8 @@ def clarification(ctx: RenderContext) -> str:
         # "Nisam siguran" is gender-marked; the policy forbids that even when the
         # TUTOR is the subject, so the clarification is phrased impersonally.
         return ("Nije mi jasno šta želiš. Možeš odgovoriti na zadatak, tražiti "
-                "pomoć ili novi zadatak.\n\nZadatak je:\n" + ctx.task.question)
+                "pomoć ili novi zadatak.\n\nZadatak je:\n"
+                + mathfmt.format_question(ctx.task.question))
     return "Nije mi jasno šta želiš. Da li želiš novi zadatak ili objašnjenje?"
 
 
@@ -382,10 +385,14 @@ def solution_reply(ctx: RenderContext) -> str:
     if facts is None:
         if not task.expected_display:
             return "Za ovaj zadatak ti ne mogu pokazati postupak korak po korak."
-        return ("Evo rješenja:\n\n" + f"{task.question}\n= "
-                f"{task.expected_display}\n\n"
-                "Pokušaj sada sam jedan sličan zadatak — reci „daj mi zadatak”.")
-    return ("Evo cijelog postupka:\n\n" + solution_facts.add_solution(facts)
+        return ("Evo rješenja:\n\n"
+                + mathfmt.block([task.question.split(":", 1)[-1].strip(" ."),
+                                 f"= {task.expected_display}"])
+                + "\n\nPokušaj sada jedan sličan zadatak — reci "
+                "„daj mi zadatak”.")
+    # Multi-step work is BLOCK math, so the steps align on the equals sign.
+    return ("Evo cijelog postupka:\n\n"
+            + mathfmt.block(solution_facts.solution_steps(facts))
             + "\n\nSada probaj ti jedan sličan zadatak — reci "
             "„daj mi zadatak”.")
 
@@ -403,7 +410,7 @@ def other_turn(ctx: RenderContext) -> str:
     if task is not None:
         return ("Ovo ne prepoznajem kao odgovor na zadatak. Napiši svoj odgovor, "
                 "ili reci „pomozi” ako ti treba pomoć.\n\nZadatak je:\n"
-                f"{task.question}")
+                f"{mathfmt.format_question(task.question)}")
     return ("Reci „daj mi zadatak” pa ću ti dati zadatak iz izabrane teme.")
 
 
@@ -506,7 +513,8 @@ def render(ctx: RenderContext, *, openai_chat: Callable | None = None,
                               timeout=timeout)
         if ctx.task is not None:
             # Brief reminder of the open task — never its answer.
-            text = f"{text}\n\nZadatak je i dalje:\n{ctx.task.question}"
+            text = (f"{text}\n\nZadatak je i dalje:\n"
+                    f"{mathfmt.format_question(ctx.task.question)}")
         return _finish(text)
     if ctx.intent == "declined":
         return _finish("U redu. Kad poželiš, reci „daj mi zadatak”.")

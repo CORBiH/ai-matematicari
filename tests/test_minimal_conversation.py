@@ -235,8 +235,10 @@ def test_concept_question_with_an_active_task_preserves_everything(client, fake_
     assert after["hints_given"] == before["hints_given"]
     assert minimal_state(body)["correct_streak"] == \
         minimal_state(first)["correct_streak"]
-    # the reply reminds the student of the task without revealing the answer
-    assert question in body["answer"]
+    # the reply reminds the student of the task (rendered as LaTeX) without
+    # revealing the answer
+    from matbot.minimal import mathfmt
+    assert mathfmt.format_question(question) in body["answer"]
     from matbot.answer_checker import derive_expected, _fmt_expected
     exp = derive_expected(question)
     expected = getattr(exp, "expected_display", "") or _fmt_expected(exp)

@@ -135,7 +135,8 @@ def test_prod_question_never_produces_48_over_24(client, fake_openai):
     answer = body["answer"]
     assert "48/24" not in answer, answer
     assert "48" not in answer, answer
-    assert "2/13" in answer
+    # rendered for the student: 2/13 becomes a LaTeX fraction
+    assert r"\frac{2}{13}" in answer, answer
     assert "24" in answer
     # nothing was created or graded
     assert body["last_tutor_task"] == ""
@@ -153,14 +154,14 @@ def test_valid_expansion_question_is_answered_correctly(client, fake_openai):
     fake_openai.state["reply"] = "Neka parafraza."
     body = sse(client, prod_payload(
         student_message="sta ako imamo 2/13 i treba prosiriti na nazivnik 26"))
-    assert "4/26" in body["answer"], body["answer"]
+    assert r"\frac{4}{26}" in body["answer"], body["answer"]
 
 
 def test_same_numerator_question_end_to_end(client, fake_openai):
     fake_openai.state["reply"] = "Neka parafraza."
     body = sse(client, prod_payload(
         student_message="sta ako imamo isti brojnik i nazivnik i prosirimo sa 10"))
-    assert "50/50" in body["answer"], body["answer"]
+    assert r"\frac{50}{50}" in body["answer"], body["answer"]
     assert "1" in body["answer"]
 
 
@@ -168,7 +169,7 @@ def test_model_may_rephrase_but_not_change_numbers(client, fake_openai):
     fake_openai.state["reply"] = "Nazivnik 5 pomnožiš sa 7, pa je 3 · 7 = 21, dakle 21/35."
     body = sse(client, prod_payload(
         student_message="sta ako imamo 3/5 i prosirimo sa 7"))
-    assert "21/35" in body["answer"]
+    assert r"\frac{21}{35}" in body["answer"]
 
 
 @pytest.mark.parametrize("reply", [

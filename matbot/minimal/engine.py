@@ -174,7 +174,8 @@ def handle_turn(
         trace["intent_source"] = "confirmation"
     else:
         decided = classify_turn(student_raw, openai_chat=openai_chat,
-                                model=model, timeout=timeout)
+                                model=model, timeout=timeout,
+                                has_active_task=state.active_task is not None)
         intent = decided.intent
         trace["intent_source"] = ("model" if decided.matched == "model_classifier"
                                   else "deterministic")

@@ -17,6 +17,8 @@ from fractions import Fraction
 from math import gcd
 from typing import Any
 
+from matbot.minimal import mathfmt
+
 #: "Izračunaj: 1/3 + 4/5." — the only shape ``fraction_add_sub`` generates.
 _ADD_SUB_RE = re.compile(
     r"(\d+)\s*/\s*(\d+)\s*([+\-−])\s*(\d+)\s*/\s*(\d+)")
@@ -128,8 +130,11 @@ def add_hint(facts: AddFacts, level: int) -> str:
         return (f"Zajednički nazivnik za {facts.den_a} i {facts.den_b} je "
                 f"{facts.common}.")
     if step == 2:
-        return (f"Proširi razlomke: {facts.left} = {facts.over_common_a}, a "
-                f"{facts.right} = {facts.over_common_b}.")
+        # Each equality is ONE inline formula, so the student sees
+        # \frac{1}{3}=\frac{5}{15} rather than two spans around a bare "=".
+        left = mathfmt.inline(f"{facts.left} = {facts.over_common_a}")
+        right = mathfmt.inline(f"{facts.right} = {facts.over_common_b}")
+        return f"Proširi razlomke: {left}, a {right}."
     verb = "saberi" if facts.operator == "+" else "oduzmi"
     if step == 3:
         return (f"Sada {verb} brojnike {facts.expanded_a} "
@@ -142,16 +147,25 @@ def add_hint(facts: AddFacts, level: int) -> str:
             "napiši „uradi i objasni postupak”.")
 
 
-def add_solution(facts: AddFacts) -> str:
-    """The full worked solution, shown only on an explicit request."""
+def solution_steps(facts: AddFacts) -> list[str]:
+    """The worked steps as PLAIN structured strings (no LaTeX).
+
+    Kept plain so the same facts can feed both the rendered formula and any
+    machine-readable use; ``mathfmt`` adds the formatting.
+    """
     sign = "+" if facts.operator == "+" else "-"
-    lines = [
+    steps = [
         f"{facts.left} {sign} {facts.right}",
         f"= {facts.over_common_a} {sign} {facts.over_common_b}",
         f"= {facts.raw_result}",
     ]
     if facts.simplified != facts.raw_result:
-        lines.append(f"= {facts.simplified}")
+        steps.append(f"= {facts.simplified}")
     if facts.mixed:
-        lines.append(f"= {facts.mixed}")
-    return "\n".join(lines)
+        steps.append(f"= {facts.mixed}")
+    return steps
+
+
+def add_solution(facts: AddFacts) -> str:
+    """The full worked solution, shown only on an explicit request."""
+    return "\n".join(solution_steps(facts))

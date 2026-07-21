@@ -106,7 +106,9 @@ def test_hint_ladder_progresses_over_the_wire(client):
         hints.append(body["answer"])
 
     assert "15" in hints[0]                       # common denominator
-    assert "5/15" in hints[1] and "12/15" in hints[1]
+    # hint 2 shows both expansions as rendered fractions
+    assert r"\frac{1}{3}=\frac{5}{15}" in hints[1], hints[1]
+    assert r"\frac{4}{5}=\frac{12}{15}" in hints[1], hints[1]
     assert "5 + 12" in hints[2]
     assert len(set(hints)) == 3, hints             # genuinely different
 
@@ -144,6 +146,7 @@ def test_hints_never_reveal_the_final_answer(client):
         body = turn(client, state, question, "ne znam")
         state = body["next_state"]
         assert "17/15" not in body["answer"], body["answer"]
+        assert r"\frac{17}{15}" not in body["answer"], body["answer"]
 
 
 def test_hint_facts_are_computed_from_the_task():
@@ -180,8 +183,9 @@ def test_solution_request_shows_the_full_procedure(client):
     state, question = seeded(client)
     body = turn(client, state, question, "NE ZNAM URADI I OBJASNI POSTUPAK")
     answer = body["answer"]
-    for line in ("1/3 + 4/5", "5/15 + 12/15", "17/15", "1 2/15"):
-        assert line in answer, (line, answer)
+    for part in (r"\frac{1}{3}+\frac{4}{5}", r"\frac{5}{15}+\frac{12}{15}",
+                 r"\frac{17}{15}", r"1\frac{2}{15}"):
+        assert part in answer, (part, answer)
 
 
 def test_solution_request_does_not_count_as_solved(client):

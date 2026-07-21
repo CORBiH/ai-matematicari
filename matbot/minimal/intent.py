@@ -79,6 +79,41 @@ def confirmation_choice(message: Any) -> str:
     return ""
 
 
+#: HELP phrases a typo may mangle. Matched by closeness ONLY, and only while a
+#: task is active — production sent "ne znmam" after two hints and got OTHER.
+_HELP_TYPO_TARGETS = (
+    "ne znam", "neznam", "ne razumijem", "nerazumijem", "pomozi", "pomoc",
+)
+#: Anything mathematical disqualifies a message from being a typo of "ne znam".
+_ANSWERISH_RE = re.compile(r"[0-9=<>+\-/*^]")
+_MAX_TYPO_WORDS = 3
+_MAX_TYPO_CHARS = 22
+#: 0.78 accepts "ne znmam"/"nezanm" and rejects unrelated short words.
+_TYPO_RATIO = 0.78
+
+
+def is_help_typo(message: Any) -> bool:
+    """A short message that is clearly a mangled HELP phrase.
+
+    Deliberately conservative: short, non-mathematical text only, compared by
+    similarity against a fixed list. This is NOT general fuzzy classification —
+    it never runs unless an ActiveTask exists.
+    """
+    import difflib
+
+    text = fold(message)
+    if not text or _ANSWERISH_RE.search(text):
+        return False
+    if len(text) > _MAX_TYPO_CHARS or len(text.split()) > _MAX_TYPO_WORDS:
+        return False
+    squeezed = text.replace(" ", "")
+    for target in _HELP_TYPO_TARGETS:
+        goal = target.replace(" ", "")
+        if difflib.SequenceMatcher(None, squeezed, goal).ratio() >= _TYPO_RATIO:
+            return True
+    return False
+
+
 #: An explicit request for the WORKED SOLUTION, not a nudge. Checked before
 #: HELP: "ne znam uradi ti" is both, and the stronger request wins.
 _SOLUTION_REQUEST_RE = re.compile(
@@ -145,7 +180,7 @@ class Classification:
     matched: str = ""
 
 
-def classify(raw_message: Any) -> Classification:
+def classify(raw_message: Any, *, has_active_task: bool = False) -> Classification:
     """Classify one turn. ``raw_message`` is never modified."""
     text = fold(raw_message)
     if not text:
@@ -178,6 +213,9 @@ def classify(raw_message: Any) -> Classification:
         return Classification(TurnIntent.NEW_TASK, "new_task")
     if _MATH_RE.search(text) or _BARE_BOOL_RE.match(text):
         return Classification(TurnIntent.ANSWER, "answer")
+    # LAST resort, and only with a task open: a mistyped cry for help.
+    if has_active_task and is_help_typo(text):
+        return Classification(TurnIntent.HELP, "help_typo")
     return Classification(TurnIntent.OTHER, "no_signal")
 
 
@@ -229,13 +267,14 @@ def classify_with_model(raw_message: Any, *, openai_chat, model: str = "",
 
 
 def classify_turn(raw_message: Any, *, openai_chat=None, model: str = "",
-                  timeout: float | None = None) -> Classification:
+                  timeout: float | None = None,
+                  has_active_task: bool = False) -> Classification:
     """Deterministic rules first; the model only breaks a genuine tie.
 
     The classifier is consulted ONLY when the deterministic pass returns OTHER,
     so a recognised message never costs an API call.
     """
-    decided = classify(raw_message)
+    decided = classify(raw_message, has_active_task=has_active_task)
     if decided.intent is not TurnIntent.OTHER:
         return decided
     guessed = classify_with_model(raw_message, openai_chat=openai_chat,

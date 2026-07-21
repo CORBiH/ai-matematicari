@@ -499,4 +499,8 @@ def test_wrong_answers_eventually_close_the_task_with_the_answer():
                                      selected_topic=EXPAND_TOPIC)
         state = result.state
     assert state.active_task is None
-    assert result.task.expected_display in result.answer
+    # the revealed answer is rendered for the student; the stored value
+    # itself stays plain text
+    from matbot.minimal import mathfmt
+    assert mathfmt.to_latex(result.task.expected_display) in result.answer
+    assert r"\frac" not in result.task.expected_display
