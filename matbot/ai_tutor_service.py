@@ -46,6 +46,8 @@ from matbot import exam_engine
 from matbot import task_templates
 from matbot import topic_resolver
 from matbot import task_activation
+from matbot.minimal.adapter import handle_chat_minimal, minimal_engine_enabled
+from matbot.minimal.skills import resolve_topic as minimal_resolve_topic
 from matbot import turn_intent
 from matbot import render
 from matbot.content_loader import (
@@ -7090,6 +7092,52 @@ def _exam_engine_response(payload: dict) -> dict:
     return response
 
 
+#: Modes and inputs the minimal engine does not claim. Everything here falls
+#: through to the legacy pipeline via the explicit boundary below.
+_MINIMAL_MODES = {"practice", "vjezba"}
+
+
+def _try_minimal_engine(
+    data: dict,
+    openai_chat: Callable,
+    *,
+    model: str,
+    timeout: float | None,
+    image_bytes: bytes | None,
+    image_data_url: str | None,
+) -> dict | None:
+    """Hand the turn to the minimal engine, or return None to fall back.
+
+    The fallback boundary is EXPLICIT: the minimal engine claims a turn only
+    when it is Practice, grade 6, no image, and the selected topic maps to one
+    of its five supported skills. It never widens to a neighbouring topic.
+    """
+    payload = dict(data or {})
+    mode = normalize_value(payload.get("mode")).lower()
+    if mode not in _MINIMAL_MODES:
+        return None
+    if image_bytes or image_data_url or payload.get("image_ocr_text"):
+        return None                       # image flows stay on the legacy path
+    try:
+        grade = normalize_grade(payload.get("grade") or DEFAULT_GRADE)
+        topic = minimal_resolve_topic(grade, payload.get("selected_topic"),
+                                      payload.get("selected_oblast"))
+        if not topic.supported:
+            return None                   # honest fallback, not a substitution
+        response = handle_chat_minimal(payload, openai_chat, model=model,
+                                       timeout=timeout)
+    except Exception:
+        # The minimal engine must never take the tutor down; on any failure the
+        # legacy pipeline answers as it always did.
+        log.exception("minimal_engine: failed, falling back to legacy")
+        return None
+    try:
+        log_transcript_to_sheet(payload, response)
+    except Exception:
+        log.exception("minimal_engine: sheets logging failed")
+    return response
+
+
 def handle_chat(
     data: dict,
     openai_chat: Callable,
@@ -7108,6 +7156,18 @@ def handle_chat(
     ``openai_chat`` mora imati potpis ``(model, messages, timeout=...)`` i vratiti
     objekt sa ``choices[0].message.content`` (tj. postojeći ``app._openai_chat``).
     """
+    # MINIMAL ENGINE (MATBOT_MINIMAL_ENGINE=on): a separate, small tutoring core
+    # handles the turn end-to-end. It owns Practice for the five deterministic
+    # grade-6 skills; anything else it refuses honestly, and the caller may fall
+    # back here explicitly. Flag off (default) → this block is skipped entirely
+    # and the legacy/V2 pipeline below is untouched.
+    if minimal_engine_enabled():
+        minimal_result = _try_minimal_engine(
+            data, openai_chat, model=model, timeout=timeout,
+            image_bytes=image_bytes, image_data_url=image_data_url)
+        if minimal_result is not None:
+            return minimal_result
+
     # Phase 4 (Engine V2, flag-gated): a deterministic Exam Engine turn short-
     # circuits the ENTIRE legacy pipeline (and the Practice Step Engine) — no model
     # call, no double-fire. Flag off → this is skipped and legacy exam runs.

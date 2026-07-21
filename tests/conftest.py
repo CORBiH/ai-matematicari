@@ -41,6 +41,12 @@ def _isolate(monkeypatch):
     except Exception:
         pass
 
+    # Engine selection is explicit per test. The legacy/V2 pipeline is the
+    # default subject; the minimal engine's own tests opt in by setting this to
+    # "on". Without this, an ambient MATBOT_MINIMAL_ENGINE=on would silently
+    # re-route Practice turns and make V2 assertions test the wrong engine.
+    monkeypatch.setenv("MATBOT_MINIMAL_ENGINE", "off")
+
     # Sigurnosna mreža: nijedan test ne smije napraviti stvaran HTTP poziv.
     def _blocked(*args, **kwargs):
         raise AssertionError("Test je pokušao stvarni mrežni poziv (requests).")
