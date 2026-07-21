@@ -478,9 +478,11 @@ def test_declared_scope_is_honest():
     assert skills.selftest() == []
 
 
-def test_all_five_skills_produce_gradeable_tasks():
+def test_all_skills_produce_gradeable_tasks():
+    """Six skills since fraction_equation_additive was added for tema 6-07-064,
+    which the generic linear_equation skill was serving with the wrong shape."""
     from matbot.answer_checker import derive_expected
-    assert len(skills.SKILLS) == 5
+    assert len(skills.SKILLS) == 6
     for skill in skills.SKILLS:
         for seed in range(25):
             made = skills.generate_question(skill.skill_id, seed=seed)

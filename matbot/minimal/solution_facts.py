@@ -169,3 +169,168 @@ def solution_steps(facts: AddFacts) -> list[str]:
 def add_solution(facts: AddFacts) -> str:
     """The full worked solution, shown only on an explicit request."""
     return "\n".join(solution_steps(facts))
+
+
+# --------------------------------------------------------------------------- #
+# Linear equations: a·x ± b = c, and the fraction forms x ± a = b / a ± x = b  #
+# --------------------------------------------------------------------------- #
+#: "2x - 3 = 9", "x + 1/3 = 5/6"  → coefficient, constant on the left, right side.
+_EQ_COEF_RE = re.compile(
+    r"(?:^|:)\s*(\d+(?:\s*/\s*\d+)?)?\s*\*?\s*x\s*([+\-−])\s*"
+    r"(\d+(?:\s*/\s*\d+)?)\s*=\s*(\d+(?:\s*/\s*\d+)?)")
+#: "2/5 + x = 3/4"  → the constant comes first.
+_EQ_LEAD_RE = re.compile(
+    r"(?:^|:)\s*(\d+(?:\s*/\s*\d+)?)\s*([+\-−])\s*x\s*=\s*(\d+(?:\s*/\s*\d+)?)")
+
+
+def _as_fraction(token: Any) -> Fraction | None:
+    text = str(token or "").replace(" ", "")
+    if not text:
+        return None
+    try:
+        return Fraction(text)
+    except (ValueError, ZeroDivisionError):
+        return None
+
+
+@dataclass(frozen=True)
+class EquationFacts:
+    """Every number needed to guide or solve a one-step / two-step equation."""
+    coefficient: Fraction           # a in a·x
+    constant: Fraction              # b, WITH its sign as it appears on the left
+    right: Fraction                 # c
+    solution: Fraction              # x
+    leading_constant: bool = False  # the "a + x = b" shape
+
+    @property
+    def removes_by_adding(self) -> bool:
+        """A negative constant is removed by ADDING its absolute value."""
+        return self.constant < 0
+
+    @property
+    def move_amount(self) -> Fraction:
+        return abs(self.constant)
+
+    @property
+    def intermediate_right(self) -> Fraction:
+        """c - b: the right side once the constant has moved."""
+        return self.right - self.constant
+
+    @property
+    def needs_division(self) -> bool:
+        return self.coefficient != 1
+
+    def _text(self, value: Fraction) -> str:
+        return _fraction_text(value)
+
+    @property
+    def coefficient_text(self) -> str:
+        return "" if self.coefficient == 1 else self._text(self.coefficient)
+
+    @property
+    def original_equation(self) -> str:
+        sign = "-" if self.constant < 0 else "+"
+        if self.leading_constant:
+            return f"{self._text(abs(self.constant))} {sign} x = {self._text(self.right)}"
+        return (f"{self.coefficient_text}x {sign} "
+                f"{self._text(abs(self.constant))} = {self._text(self.right)}")
+
+    @property
+    def intermediate_equation(self) -> str:
+        return f"{self.coefficient_text}x = {self._text(self.intermediate_right)}"
+
+    @property
+    def solution_equation(self) -> str:
+        return f"x = {self._text(self.solution)}"
+
+    def to_dict(self) -> dict:
+        return {
+            "coefficient": self._text(self.coefficient),
+            "constant": self._text(self.constant),
+            "right": self._text(self.right),
+            "operation": ("add" if self.removes_by_adding else "subtract"),
+            "move_amount": self._text(self.move_amount),
+            "intermediate": self.intermediate_equation,
+            "needs_division": self.needs_division,
+            "solution": self._text(self.solution),
+        }
+
+
+def resolve_equation_facts(question: Any) -> EquationFacts | None:
+    """Facts for a supported linear equation, or None.
+
+    Handles ``a·x ± b = c`` (a may be absent, meaning 1) and the fraction lesson
+    shapes ``x ± a = b`` and ``a ± x = b``. Every value is a ``Fraction``, so the
+    integer and fraction cases share one implementation.
+    """
+    text = str(question or "")
+
+    lead = _EQ_LEAD_RE.search(text)
+    if lead is not None:
+        constant = _as_fraction(lead.group(1))
+        right = _as_fraction(lead.group(3))
+        if constant is None or right is None:
+            return None
+        if lead.group(2) in "-−":
+            # a - x = c  →  x = a - c
+            return EquationFacts(coefficient=Fraction(1), constant=-constant,
+                                 right=right, solution=constant - right,
+                                 leading_constant=True)
+        return EquationFacts(coefficient=Fraction(1), constant=constant,
+                             right=right, solution=right - constant,
+                             leading_constant=True)
+
+    match = _EQ_COEF_RE.search(text)
+    if match is None:
+        return None
+    coefficient = _as_fraction(match.group(1)) if match.group(1) else Fraction(1)
+    magnitude = _as_fraction(match.group(3))
+    right = _as_fraction(match.group(4))
+    if not coefficient or magnitude is None or right is None:
+        return None
+    constant = -magnitude if match.group(2) in "-−" else magnitude
+    return EquationFacts(coefficient=coefficient, constant=constant, right=right,
+                         solution=(right - constant) / coefficient)
+
+
+#: Genuinely new rungs before the ladder starts repeating.
+EQUATION_HINT_LEVELS = 3
+
+
+def equation_hint(facts: EquationFacts, level: int) -> str:
+    """One rung. Never reveals the solution before the last rung."""
+    step = max(1, int(level or 1))
+    amount = _fraction_text(facts.move_amount)
+    signed = ("-" if facts.constant < 0 else "+") + amount
+
+    if step == 1:
+        verb = "Dodaj" if facts.removes_by_adding else "Oduzmi"
+        tail = "na obje strane" if facts.removes_by_adding else "s obje strane"
+        return f"{verb} {amount} {tail} da ukloniš {signed}."
+    if step == 2:
+        if facts.needs_division:
+            return f"Tada dobijaš {mathfmt.inline(facts.intermediate_equation)}."
+        # a == 1: naming the intermediate WOULD be the answer, so name the
+        # calculation instead.
+        return ("Sada izračunaj "
+                + mathfmt.inline(f"{_fraction_text(facts.right)} "
+                                 f"{'+' if facts.removes_by_adding else '-'} "
+                                 f"{amount}") + ".")
+    if step == 3:
+        if facts.needs_division:
+            coefficient = _fraction_text(facts.coefficient)
+            return f"Podijeli obje strane sa {coefficient} da dobiješ x."
+        return ("Ako su nazivnici različiti, prvo ih izjednači, pa tek onda "
+                "oduzmi brojnike.")
+    return ("Isti korak kao maloprije. Ako želiš cijeli postupak, napiši "
+            "„uradi i objasni postupak”.")
+
+
+def equation_solution_steps(facts: EquationFacts) -> list[str]:
+    """The worked steps as PLAIN equations; ``mathfmt`` adds the formatting."""
+    steps = [facts.original_equation]
+    if facts.needs_division or facts.intermediate_equation != facts.solution_equation:
+        steps.append(facts.intermediate_equation)
+    if steps[-1] != facts.solution_equation:
+        steps.append(facts.solution_equation)
+    return steps

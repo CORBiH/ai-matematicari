@@ -44,6 +44,14 @@ SKILLS: tuple[Skill, ...] = (
     Skill("fraction_add_unlike", "Sabiranje razlomaka različitih nazivnika",
           "fraction_add_sub", ("6-04-040",),
           ("sabiranje razlomaka", "oduzimanje razlomaka", "razlicitih nazivnika")),
+    # Bound to the exact NPP tema. The generic linear_equation skill below
+    # matches the keyword "jednacin" in this tema title, so WITHOUT this
+    # explicit binding a generic ax+b=c generator serves a lesson that is
+    # specifically about fractions.
+    Skill("fraction_equation_additive",
+          "Jednačine s razlomcima oblika x ± a = b i a ± x = b", "",
+          ("6-07-064",),
+          ("jednacine s razlomcima", "razlomcima oblika")),
     Skill("linear_equation", "Jednostavne linearne jednačine", "linear_equation",
           (), ("linearn", "jednacin")),
     Skill("divisibility", "Djeljivost brojeva", "divisibility_by_6",
@@ -234,12 +242,65 @@ def _generate_add_unlike(rng: random.Random, level: int) -> tuple[str, str]:
     return f"Izračunaj: {num_a}/{den_a} + {num_b}/{den_b}.", text
 
 
+#: Denominator pairs per band: like → nested → coprime.
+EQUATION_BANDS: dict[int, tuple[tuple[int, int], ...]] = {
+    1: ((5, 5), (4, 4), (8, 8), (6, 6)),
+    2: ((3, 6), (4, 8), (5, 10), (2, 6)),
+    3: ((5, 4), (3, 4), (2, 5), (3, 5)),
+}
+
+
+def equation_band_for(level: Any) -> tuple[tuple[int, int], ...]:
+    try:
+        band = int(level)
+    except (TypeError, ValueError):
+        band = DEFAULT_DIFFICULTY
+    return EQUATION_BANDS.get(min(max(band, MIN_DIFFICULTY), MAX_DIFFICULTY),
+                              EQUATION_BANDS[DEFAULT_DIFFICULTY])
+
+
+def _generate_fraction_equation(rng: random.Random,
+                                level: int) -> tuple[str, str]:
+    """x + a/b = c/d, a/b + x = c/d, x - a/b = c/d — the selected lesson.
+
+    The solution is computed with Fraction, never by a template, and is
+    always a POSITIVE rational because the tema lives in Q+.
+    """
+    from fractions import Fraction
+
+    pairs = equation_band_for(level)
+    den_a, den_b = rng.choice(pairs)
+    form = rng.choice(("x_plus", "lead_plus", "x_minus"))
+    for _ in range(60):
+        num_a = rng.randint(1, den_a - 1)
+        num_b = rng.randint(1, den_b - 1)
+        known, right = Fraction(num_a, den_a), Fraction(num_b, den_b)
+        if form == "x_minus":
+            solution = known + right          # x - a = b  →  x = a + b
+        else:
+            solution = right - known          # x + a = b  →  x = b - a
+            if solution <= 0:
+                continue
+        if solution == known or solution == right:
+            continue                          # too easy to read off
+        left = {
+            "x_plus": f"x + {num_a}/{den_a}",
+            "lead_plus": f"{num_a}/{den_a} + x",
+            "x_minus": f"x - {num_a}/{den_a}",
+        }[form]
+        text = (f"{solution.numerator}/{solution.denominator}"
+                if solution.denominator != 1 else str(solution.numerator))
+        return f"Riješi jednačinu: {left} = {num_b}/{den_b}.", text
+    return "Riješi jednačinu: x + 1/3 = 5/6.", "1/2"
+
+
 #: Skills with a real difficulty model. Others accept and store a level but
 #: generate from the shared template — so nothing is ever CLAIMED to be harder
 #: than it is.
 _DIFFICULTY_AWARE = {
     "fraction_expand": _generate_expand,
     "fraction_add_unlike": _generate_add_unlike,
+    "fraction_equation_additive": _generate_fraction_equation,
 }
 
 

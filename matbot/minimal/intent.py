@@ -121,7 +121,12 @@ _SOLUTION_REQUEST_RE = re.compile(
     r"|\bpoka[zž]i\s+(cijel\w*\s+)?(rje[sš]enj\w*|postup\w*)"
     r"|\bobjasni\s+(cijel\w*\s+)?postup\w*|\buradi\s+i\s+objasni\b"
     r"|\bkompletno\s+rje[sš]enj\w*|\bcijeli\s+postup\w*"
-    r"|\bdaj\s+mi\s+odgovor\b|\breci\s+mi\s+rje[sš]enj\w*")
+    r"|\bdaj\s+mi\s+odgovor\b|\breci\s+mi\s+rje[sš]enj\w*"
+    # "hajde ga TI URADI": the pronoun comes FIRST, so the "uradi ti" branch
+    # above cannot match it. Production read this as HELP and repeated a hint.
+    r"|\bti\s+(ga\s+|to\s+)?(uradi|rije[sš]i|izra[cč]unaj)\b"
+    r"|\bhajde\s+(ga\s+|to\s+)?ti\b"
+    r"|\bmo[zž]e[sš]\s+li\s+(ga\s+|to\s+)?ti\s+rije[sš]iti\b")
 
 #: "I am stuck on THIS task." Note that bare "zašto" is NOT here — a substantive
 #: "zašto…?" is a question about the maths, which is a CONCEPT_QUESTION.

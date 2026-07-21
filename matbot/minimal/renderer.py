@@ -134,6 +134,9 @@ _NEXT_INVITE = ("Želiš li novi zadatak?", "Želiš li još jedan zadatak?",
                 "Hoćeš još jedan zadatak?")
 
 #: First-line, non-revealing help per skill. Never contains the answer.
+#: Skills whose hints and solutions are COMPUTED from the equation itself.
+_EQUATION_SKILLS = ("linear_equation", "fraction_equation_additive")
+
 _HINTS: dict[str, tuple[str, ...]] = {
     "fraction_expand": (
         "Proširivanje znači da brojnik i nazivnik množiš ISTIM brojem.",
@@ -143,9 +146,17 @@ _HINTS: dict[str, tuple[str, ...]] = {
         "Kad su nazivnici različiti, prvo im nađi zajednički nazivnik.",
         "Svaki razlomak proširi do zajedničkog nazivnika, pa saberi samo brojnike.",
     ),
+    # Fallback only, for an equation the facts resolver cannot parse. It must
+    # not name an operation, because the correct one depends on the SIGN of
+    # the constant — asserting "oduzmi" is what misled the student.
     "linear_equation": (
         "Prvo prebaci slobodan broj na drugu stranu, pa tek onda dijeli.",
-        "Šta moraš oduzeti s obje strane da x ostane sam?",
+        "Suprotnom računskom operacijom ukloni slobodan broj s lijeve strane.",
+    ),
+    "fraction_equation_additive": (
+        "Nepoznatu x izdvoji tako što slobodan razlomak prebaciš na drugu "
+        "stranu suprotnom operacijom.",
+        "Kad su nazivnici različiti, prvo im nađi zajednički nazivnik.",
     ),
     "divisibility": (
         "Broj je djeljiv sa 6 ako je djeljiv i sa 2 i sa 3.",
@@ -238,6 +249,10 @@ def _hint_text(skill_id: str, level: int, question: str = "") -> str:
     task's own numbers. The static pool is only a fallback: clamping to its
     last entry is what produced five identical hints in production.
     """
+    if skill_id in _EQUATION_SKILLS and question:
+        facts = solution_facts.resolve_equation_facts(question)
+        if facts is not None:
+            return solution_facts.equation_hint(facts, level)
     if skill_id == "fraction_add_unlike" and question:
         facts = solution_facts.resolve_add_facts(question)
         if facts is not None:
@@ -380,6 +395,14 @@ def solution_reply(ctx: RenderContext) -> str:
     if task is None:
         return ("Trenutno nemamo aktivan zadatak. Reci „daj mi zadatak” pa "
                 "krećemo.")
+    if task.skill_id in _EQUATION_SKILLS:
+        equation = solution_facts.resolve_equation_facts(task.question)
+        if equation is not None:
+            return ("Evo cijelog postupka:\n\n"
+                    + mathfmt.block_equations(
+                        solution_facts.equation_solution_steps(equation))
+                    + "\n\nSada probaj ti jedan sličan zadatak — reci "
+                    "„daj mi zadatak”.")
     facts = solution_facts.resolve_add_facts(task.question) \
         if task.skill_id == "fraction_add_unlike" else None
     if facts is None:

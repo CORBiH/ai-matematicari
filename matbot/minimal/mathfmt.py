@@ -104,6 +104,28 @@ def block(steps: Iterable[Any]) -> str:
             f"\\end{{aligned}}{BLOCK_CLOSE}")
 
 
+def block_equations(rows):
+    """Aligned display math for a chain of EQUATIONS.
+
+    Each row is a full "lhs = rhs" equation, aligned on the equals sign.
+    Emitted on ONE physical line: the frontend joins lines with <br>, which
+    would otherwise land inside the formula.
+    """
+    lines = []
+    for row in rows:
+        text = str(row or "").strip()
+        if not text:
+            continue
+        left, sep, right = text.partition("=")
+        lines.append(f"{to_latex(left.strip())}&={to_latex(right.strip())}"
+                     if sep else to_latex(text))
+    if not lines:
+        return ""
+    body = (" \\\\ ").join(lines)
+    return (f"{BLOCK_OPEN}\\begin{{aligned}} {body} "
+            f"\\end{{aligned}}{BLOCK_CLOSE}")
+
+
 def format_math_tokens(text: Any) -> str:
     """Wrap standalone fraction / mixed-number tokens of ENGINE text in inline math.
 
