@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Sequence
 
 from matbot.bosnian import to_ijekavica
+from matbot.minimal import concept_facts
 from matbot.minimal.grading import GradingResult
 from matbot.minimal.intent import fold as _fold
 from matbot.minimal.state import ActiveTask, SessionState
@@ -252,6 +253,18 @@ _CONCEPT_FALLBACK = (
     "dati zadatak iz ove teme ili objasniti korak po korak kroz primjer."
 )
 
+#: Used when the model produced arithmetic for a question whose numbers could
+#: NOT be verified. States the rule without computing anything.
+_CONCEPT_NO_NUMBERS = (
+    "Nisam mogao pouzdano pročitati brojeve iz tvog pitanja, pa ne bih računao "
+    "napamet. Pravilo je ovo: proširivanje znači da brojnik i nazivnik množiš "
+    "istim cijelim brojem, pa se vrijednost razlomka ne mijenja. Napiši mi "
+    "razlomak i nazivnik koji te zanimaju, pa ćemo to zajedno provjeriti."
+)
+
+#: Arithmetic in free-form model text: a fraction, an equation, or a product.
+_CALCULATION_RE = re.compile(r"\d+\s*/\s*\d+|=\s*\d|\d\s*[·*x×]\s*\d")
+
 
 def concept_answer(ctx: RenderContext, *, openai_chat: Callable | None,
                    model: str, timeout: float | None) -> str:
@@ -263,7 +276,25 @@ def concept_answer(ctx: RenderContext, *, openai_chat: Callable | None,
     deterministic fallback is used.
     """
     question = (ctx.concept_question or "").strip()
-    if openai_chat is None or not question:
+    if not question:
+        return _CONCEPT_FALLBACK
+
+    # VERIFIED ARITHMETIC FIRST. When the question is a concrete
+    # fraction-expansion case, the numbers come from the deterministic resolver
+    # and the model may only rephrase them — production invented
+    # "2 · (24/13) = 48/24" when it was free to calculate.
+    if (ctx.state.topic.skill_id or "") == "fraction_expand":
+        facts = concept_facts.resolve_expand_question(question)
+        if facts is not None:
+            text = concept_facts.explain(facts)
+            # ``phrase_with_model`` rejects any candidate introducing a number
+            # that is not already in the text, so a fabricated result cannot
+            # survive the rephrase.
+            return phrase_with_model(
+                text, openai_chat=openai_chat, model=model, timeout=timeout,
+                allow_verdict_words=False, require_same_numbers=True)
+
+    if openai_chat is None:
         return _CONCEPT_FALLBACK
     topic = ctx.state.topic
     context = [
@@ -290,6 +321,11 @@ def concept_answer(ctx: RenderContext, *, openai_chat: Callable | None,
     text = to_latin(text)
     if is_gendered(text):
         return _CONCEPT_FALLBACK
+    # No verified facts were available for this question, so the model must not
+    # CALCULATE. Any arithmetic in a free-form answer is unverifiable and is
+    # rejected outright — that is how "2 · (24/13) = 48/24" reached a student.
+    if _CALCULATION_RE.search(text):
+        return _CONCEPT_NO_NUMBERS
     return text[:900]
 
 
@@ -343,7 +379,8 @@ _PHRASING_SYSTEM = (
 
 
 def phrase_with_model(text: str, *, openai_chat: Callable | None, model: str,
-                      timeout: float | None, allow_verdict_words: bool) -> str:
+                      timeout: float | None, allow_verdict_words: bool,
+                      require_same_numbers: bool = False) -> str:
     """Let the model rephrase ``text``. Returns ``text`` unchanged on any doubt.
 
     The decision is already frozen; this only changes wording. Every failure
@@ -382,7 +419,13 @@ def phrase_with_model(text: str, *, openai_chat: Callable | None, model: str,
         return text
     if _BAD_OPENER_RE.match(candidate):
         return text
-    if set(re.findall(r"\d+", candidate)) - set(re.findall(r"\d+", text)):
+    original_numbers = set(re.findall(r"\d+", text))
+    candidate_numbers = set(re.findall(r"\d+", candidate))
+    if candidate_numbers - original_numbers:
+        return text                     # invented a number
+    if require_same_numbers and original_numbers - candidate_numbers:
+        # Dropped a VERIFIED fact. For a conceptual explanation the numbers are
+        # the answer, so a rephrase that loses them is worse than no rephrase.
         return text
     return to_ijekavica(candidate)
 

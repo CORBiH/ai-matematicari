@@ -542,14 +542,120 @@ def _retry_backoff_seconds(attempt: int) -> float:
 SHEETS_VALUE_INPUT_OPTION = "RAW"
 
 
+#: Temporary write diagnostic. OFF by default so normal logs are not flooded.
+SHEETS_DIAGNOSTIC_ENV = "MATBOT_SHEETS_DIAGNOSTIC"
+
+
+def _diagnostic_enabled() -> bool:
+    return _env_flag(SHEETS_DIAGNOSTIC_ENV, "0")
+
+
+def _describe_row(values: list[Any]) -> list[dict[str, Any]]:
+    """Indexed header/type/repr view of a row, for the write diagnostic."""
+    out: list[dict[str, Any]] = []
+    for idx, header in enumerate(SHEET_HEADERS):
+        value = values[idx] if idx < len(values) else "<MISSING>"
+        out.append({
+            "index": idx,
+            "header": header,
+            "type": type(value).__name__,
+            "repr": repr(value)[:120],
+        })
+    return out
+
+
+def _log_pre_write(row: list[Any]) -> None:
+    log.info("SHEETS_DIAG pre_write cells=%d payload=%s", len(row),
+             json.dumps(_describe_row(row), ensure_ascii=False))
+
+
+def _read_back(ws: Any, updated_range: str) -> list[Any] | None:
+    """Read the exact range back with UNFORMATTED values, or None."""
+    spreadsheet = getattr(ws, "spreadsheet", None)
+    values_get = getattr(spreadsheet, "values_get", None)
+    if not callable(values_get):
+        return None
+    try:
+        result = values_get(updated_range, params={
+            "valueRenderOption": "UNFORMATTED_VALUE",
+            "dateTimeRenderOption": "FORMATTED_STRING",
+        })
+    except Exception:
+        log.exception("SHEETS_DIAG read_back failed range=%s", updated_range)
+        return None
+    rows = (result or {}).get("values") or []
+    return list(rows[0]) if rows else []
+
+
+def _log_read_back(ws: Any, response: Any, sent: list[Any]) -> None:
+    """Read the written range back and report the FIRST mismatching cell."""
+    updates = (response or {}).get("updates") or {}
+    updated_range = updates.get("updatedRange") or ""
+    log.info("SHEETS_DIAG api_response updatedRange=%s updatedColumns=%s "
+             "updatedCells=%s", updated_range, updates.get("updatedColumns"),
+             updates.get("updatedCells"))
+    if not updated_range:
+        return
+    got = _read_back(ws, updated_range)
+    if got is None:
+        log.info("SHEETS_DIAG read_back unavailable (no values_get)")
+        return
+    log.info("SHEETS_DIAG read_back cells=%d payload=%s", len(got),
+             json.dumps(_describe_row(got), ensure_ascii=False))
+
+    first = None
+    for idx in range(len(SHEET_HEADERS)):
+        sent_v = sent[idx] if idx < len(sent) else "<MISSING>"
+        got_v = got[idx] if idx < len(got) else "<MISSING>"
+        # Sheets returns "" for a blank cell; treat blank/missing as equal.
+        if (sent_v in ("", None) and got_v in ("", None, "<MISSING>")):
+            continue
+        if str(sent_v) != str(got_v):
+            first = {"index": idx, "header": SHEET_HEADERS[idx],
+                     "sent_type": type(sent_v).__name__, "sent": repr(sent_v)[:120],
+                     "got_type": type(got_v).__name__, "got": repr(got_v)[:120]}
+            break
+    log.info("SHEETS_DIAG first_mismatch=%s",
+             json.dumps(first, ensure_ascii=False) if first else "none")
+
+
+def _log_target_row_before_append(ws: Any) -> None:
+    """Does the row we are about to append into already hold data?"""
+    try:
+        row_count = len(ws.get_all_values()) if hasattr(ws, "get_all_values") else None
+    except Exception:
+        row_count = None
+    next_row = (row_count + 1) if isinstance(row_count, int) else None
+    log.info("SHEETS_DIAG target rows_with_data=%s next_row=%s col_count=%s",
+             row_count, next_row, getattr(ws, "col_count", None))
+    if next_row is None:
+        return
+    try:
+        existing = ws.row_values(next_row) if hasattr(ws, "row_values") else None
+    except Exception:
+        existing = None
+    log.info("SHEETS_DIAG target_row_before_append non_empty=%s sample=%s",
+             bool(existing), json.dumps((existing or [])[:20], ensure_ascii=False))
+
+
 def _append_row_once(values: list[Any]) -> None:
     with _append_lock:
         ws = _init_sheets()
         if not ws:
             raise _SheetsPermanentError("sheets_not_configured")
         _ensure_sheet_layout(ws)
-        ws.append_row(_sheets_safe_row(values),
-                      value_input_option=SHEETS_VALUE_INPUT_OPTION)
+        row = _sheets_safe_row(values)
+        diagnostic = _diagnostic_enabled()
+        if diagnostic:
+            _log_pre_write(row)
+            _log_target_row_before_append(ws)
+        response = ws.append_row(row,
+                                 value_input_option=SHEETS_VALUE_INPUT_OPTION)
+        if diagnostic:
+            try:
+                _log_read_back(ws, response, row)
+            except Exception:
+                log.exception("SHEETS_DIAG read-back stage failed")
 
 
 def _deliver_event(event: dict[str, Any]) -> bool:
