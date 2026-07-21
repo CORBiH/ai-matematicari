@@ -187,10 +187,60 @@ def _generate_expand(rng: random.Random, level: int) -> tuple[str, str]:
     return f"Proširi {a}/{b} na nazivnik {b * k}.", f"{a * k}/{b * k}"
 
 
+#: Bands for unlike-denominator addition. Difficulty is a property of the
+#: NUMBERS: bigger denominators, a larger LCM, and results that go past 1 (so
+#: the answer needs simplifying or a mixed form).
+_ADD_BANDS: dict[int, tuple[tuple[tuple[int, int], ...], bool]] = {
+    # (denominator pairs, allow improper result)
+    1: (((2, 3), (2, 5), (3, 4), (2, 4), (3, 6)), False),
+    2: (((3, 5), (4, 6), (3, 8), (4, 5), (5, 6)), True),
+    3: (((5, 8), (6, 9), (7, 8), (8, 12), (9, 12)), True),
+}
+
+
+def add_band_for(level: int) -> tuple[tuple[tuple[int, int], ...], bool]:
+    return _ADD_BANDS[clamp_difficulty(level)]
+
+
+def add_params(question: str) -> tuple[int, int, int, int] | None:
+    """``(num_a, den_a, num_b, den_b)`` parsed back out of an addition task."""
+    m = re.search(r"(\d+)\s*/\s*(\d+)\s*\+\s*(\d+)\s*/\s*(\d+)", question or "")
+    if not m:
+        return None
+    return tuple(int(m.group(i)) for i in (1, 2, 3, 4))
+
+
+def _generate_add_unlike(rng: random.Random, level: int) -> tuple[str, str]:
+    """Addition of unlike denominators at an explicit difficulty band."""
+    from fractions import Fraction
+
+    pairs, allow_improper = add_band_for(level)
+    den_a, den_b = rng.choice(pairs)
+    for _ in range(40):
+        num_a = rng.randint(1, den_a - 1)
+        num_b = rng.randint(1, den_b - 1)
+        total = Fraction(num_a, den_a) + Fraction(num_b, den_b)
+        if not allow_improper and total > 1:
+            continue
+        if allow_improper and level >= 3 and total <= 1:
+            continue            # level 3 should genuinely go past 1
+        text = (f"{total.numerator}/{total.denominator}"
+                if total.denominator != 1 else str(total.numerator))
+        return f"Izračunaj: {num_a}/{den_a} + {num_b}/{den_b}.", text
+    num_a, num_b = 1, 1
+    total = Fraction(num_a, den_a) + Fraction(num_b, den_b)
+    text = (f"{total.numerator}/{total.denominator}"
+            if total.denominator != 1 else str(total.numerator))
+    return f"Izračunaj: {num_a}/{den_a} + {num_b}/{den_b}.", text
+
+
 #: Skills with a real difficulty model. Others accept and store a level but
 #: generate from the shared template — so nothing is ever CLAIMED to be harder
 #: than it is.
-_DIFFICULTY_AWARE = {"fraction_expand": _generate_expand}
+_DIFFICULTY_AWARE = {
+    "fraction_expand": _generate_expand,
+    "fraction_add_unlike": _generate_add_unlike,
+}
 
 
 def supports_difficulty(skill_id: str) -> bool:

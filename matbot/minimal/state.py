@@ -35,6 +35,9 @@ class ActiveTask:
     wrong_attempts: int = 0
     hints_given: int = 0
     solved: bool = False
+    #: The worked solution was shown on request. The task is finished, but
+    #: it was NOT solved independently, so it must not count as progress.
+    solution_revealed: bool = False
 
     def to_dict(self) -> dict:
         return {
@@ -43,6 +46,7 @@ class ActiveTask:
             "npp_id": self.npp_id, "tema_title": self.tema_title,
             "attempts": self.attempts, "wrong_attempts": self.wrong_attempts,
             "hints_given": self.hints_given, "solved": self.solved,
+            "solution_revealed": self.solution_revealed,
         }
 
     @classmethod
@@ -68,6 +72,7 @@ class ActiveTask:
             tema_title=str(raw.get("tema_title") or "")[:120],
             attempts=_int("attempts"), wrong_attempts=_int("wrong_attempts"),
             hints_given=_int("hints_given"), solved=bool(raw.get("solved")),
+            solution_revealed=bool(raw.get("solution_revealed")),
         )
 
 

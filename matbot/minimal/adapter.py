@@ -53,6 +53,7 @@ def response_from_result(result: TurnResult, payload: dict) -> dict:
     task = result.state.active_task
     audit = task or result.task
     completed = task is None and result.task is not None and result.task.solved
+    revealed = bool(result.task is not None and result.task.solution_revealed)
     state_dict = result.state.to_dict()
     next_state = {
         # The core's own state travels in ONE namespaced key; the fields beside
@@ -62,8 +63,10 @@ def response_from_result(result: TurnResult, payload: dict) -> dict:
         # Audit fields describe the task THIS turn concerned, so a completion
         # row stays fully auditable after active_task becomes null.
         "task_id": audit.task_id if audit else None,
-        "task_status": ("active" if task else "completed" if completed else None),
+        "task_status": ("active" if task else "revealed" if revealed
+                        else "completed" if completed else None),
         "completed_task_id": audit.task_id if completed else None,
+        "solution_revealed": revealed,
         "active_task_kind": "practice" if task else None,
         "correct_streak": result.state.correct_streak,
         "difficulty_level": result.state.difficulty_level,
@@ -97,7 +100,7 @@ def response_from_result(result: TurnResult, payload: dict) -> dict:
                 "answer_type": grading.answer_type,
                 "expected_answer": grading.expected_display,
                 "normalized_expected": grading.normalized_expected,
-                "student_answer": grading.student_raw,
+                "student_answer": grading.graded_answer,
                 "normalized_student": grading.normalized_student,
                 "deterministic_check": dict(grading.evidence),
             }],
@@ -113,7 +116,9 @@ def response_from_result(result: TurnResult, payload: dict) -> dict:
         "answer_verdict_detail": (result.grading.detail if result.grading else None),
         "answer_check": answer_check,
         "task_id": audit.task_id if audit else None,
-        "task_status": ("active" if task else "completed" if completed else None),
+        "task_status": ("active" if task else "revealed" if revealed
+                        else "completed" if completed else None),
+        "solution_revealed": revealed,
         "attempt_number": audit.attempts if audit else None,
         "total_attempt_count": audit.attempts if audit else None,
         "wrong_attempt_count": audit.wrong_attempts if audit else None,

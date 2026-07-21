@@ -774,8 +774,13 @@ def _build_transcript_row(payload: dict, response: dict) -> list[Any]:
         # ONLY on a grading turn. The old fallback to the raw message filled
         # student_answer on every turn — a hint or a concept question is not an
         # answer, and logging one as if it were corrupts the audit.
-        _clean_cell(item.get("student_answer") or item.get("given")
-                    or (_raw_student_message(payload) if item else "")),
+        # An item that SETS the key (even to "") is authoritative: the minimal
+        # engine leaves it empty when no final answer could be identified, and
+        # falling back to the prose would record it as if it had been submitted.
+        _clean_cell(
+            item["student_answer"] if "student_answer" in item
+            else (item.get("given")
+                  or (_raw_student_message(payload) if item else ""))),
         _clean_cell(item.get("normalized_student")),
         _json_cell(item.get("deterministic_check")),
         _clean_cell(math_verification.get("math_verification_used")),

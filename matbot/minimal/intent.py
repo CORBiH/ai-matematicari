@@ -25,12 +25,13 @@ class TurnIntent(str, Enum):
     HARDER = "harder"                   # a new task, one band up
     EASIER = "easier"                   # a new task, one band down
     CONCEPT_QUESTION = "concept_question"   # a real question about the maths
+    SOLUTION_REQUEST = "solution_request"   # "uradi ti", "daj rjesenje"
     OTHER = "other"
 
 
 #: The only labels the OpenAI fallback classifier may return.
 CLASSIFIER_LABELS = ("ANSWER", "HELP", "NEW_TASK", "HARDER", "EASIER",
-                     "CONCEPT_QUESTION", "OTHER")
+                     "CONCEPT_QUESTION", "SOLUTION_REQUEST", "OTHER")
 
 
 #: HARDER/EASIER are NEW_TASK with a direction — callers that only care about
@@ -77,6 +78,15 @@ def confirmation_choice(message: Any) -> str:
         return "task"
     return ""
 
+
+#: An explicit request for the WORKED SOLUTION, not a nudge. Checked before
+#: HELP: "ne znam uradi ti" is both, and the stronger request wins.
+_SOLUTION_REQUEST_RE = re.compile(
+    r"\buradi\s+(ti|mi)\b|\brije[sš]i\s+(ti|mi)\b|\bdaj\s+rje[sš]enj\w*"
+    r"|\bpoka[zž]i\s+(cijel\w*\s+)?(rje[sš]enj\w*|postup\w*)"
+    r"|\bobjasni\s+(cijel\w*\s+)?postup\w*|\buradi\s+i\s+objasni\b"
+    r"|\bkompletno\s+rje[sš]enj\w*|\bcijeli\s+postup\w*"
+    r"|\bdaj\s+mi\s+odgovor\b|\breci\s+mi\s+rje[sš]enj\w*")
 
 #: "I am stuck on THIS task." Note that bare "zašto" is NOT here — a substantive
 #: "zašto…?" is a question about the maths, which is a CONCEPT_QUESTION.
@@ -140,7 +150,11 @@ def classify(raw_message: Any) -> Classification:
     text = fold(raw_message)
     if not text:
         return Classification(TurnIntent.OTHER, "empty")
-    # HELP first: "ne znam" must never be read as the answer "ne".
+    # A request for the WHOLE solution outranks a plain "ne znam" — the
+    # production message was "NE ZNAM URADI I OBJASNI POSTUPAK".
+    if _SOLUTION_REQUEST_RE.search(text):
+        return Classification(TurnIntent.SOLUTION_REQUEST, "solution_request")
+    # HELP: "ne znam" must never be read as the answer "ne".
     if _HELP_RE.search(text):
         return Classification(TurnIntent.HELP, "help")
     # A question ABOUT the maths, before the answer/new-task checks — otherwise
@@ -177,6 +191,7 @@ _CLASSIFIER_SYSTEM = (
     "EASIER — učenik traži lakši zadatak.\n"
     "CONCEPT_QUESTION — učenik postavlja pitanje o samoj matematici "
     "(pojam, pravilo, „šta ako”, „zašto”).\n"
+    "SOLUTION_REQUEST — učenik traži da mu se zadatak riješi i objasni.\n"
     "OTHER — ništa od navedenog ili nejasno.\n"
     "Ne rješavaj zadatak. Ne ocjenjuj. Vrati samo oznaku."
 )

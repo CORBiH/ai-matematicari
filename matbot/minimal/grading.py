@@ -33,6 +33,10 @@ class GradingResult:
     verdict: str                    # correct | partial | incorrect | unverified
     solved: bool                    # the task is finished
     student_raw: str                # EXACTLY what the student typed
+    #: The value that was actually graded: the extracted candidate, or the raw
+    #: text when it was directly checkable. "" when nothing could be identified,
+    #: so the audit never records prose as if it were the student's answer.
+    graded_answer: str = ""
     expected_display: str = ""
     detail: str = ""                # the underlying checker verdict
     deterministic: bool = True
@@ -49,6 +53,7 @@ class GradingResult:
 
     def to_dict(self) -> dict:
         return {"task_id": self.task_id, "verdict": self.verdict,
+                "graded_answer": self.graded_answer,
                 "solved": self.solved, "expected_display": self.expected_display,
                 "detail": self.detail, "deterministic": self.deterministic,
                 "answer_type": self.answer_type,
@@ -116,6 +121,80 @@ def target_denominator(task: ActiveTask) -> int | None:
     return int(match.group(2)) if match else None
 
 
+#: An explicit "the result is …" marker. The fraction AFTER it wins, so an
+#: intermediate step earlier in the sentence is never mistaken for the answer.
+_RESULT_MARKER_RE = re.compile(
+    r"(?:rezultat|odgovor|rje[sš]enj\w*|kona[cč]n\w*|dobij\w*|dobio\s+sam|"
+    r"ispada|zato\s+je|znaci|dakle|to\s+je)\b", re.IGNORECASE)
+#: A fraction, a mixed number, or a bare integer — any final answer shape.
+_CANDIDATE_RE = re.compile(r"\d+\s+\d+\s*/\s*\d+|\d+\s*/\s*\d+|\d+")
+
+
+#: The student wrote several numbers but never said which one is the answer.
+AMBIGUOUS_FINAL_ANSWER = "ambiguous_final_answer"
+
+#: Status of an extraction attempt.
+FOUND = "found"
+AMBIGUOUS = "ambiguous"
+NONE = "none"
+
+#: How far after a marker the declared answer may sit. "odgovor je 11/15" and
+#: "rezultat: 11/15" both fit; anything further is reasoning, not the answer.
+_MARKER_WINDOW = 24
+
+
+def extract_final_answer(raw: str) -> tuple[str, str]:
+    """The student's DECLARED final answer, with a status.
+
+    Reusable for any rational-answer skill; the skill-specific acceptance
+    policies still decide whether the extracted value/form is acceptable.
+
+    Policy, in order:
+      1. the candidate DIRECTLY after an explicit final-answer marker;
+      2. a final equality / conclusion line whose right-hand side is a
+         candidate, when it is safely the last thing said;
+      3. exactly one candidate in the whole message;
+      4. otherwise ``AMBIGUOUS`` — several candidates and no declared answer.
+
+    Deliberately never "the last fraction": in "Mislim da je odgovor 11/15 jer
+    je 1/3 = 5/15, a 2/5 = 6/15." the last token is 6/15 but the answer is
+    11/15, and guessing would misgrade a correct student.
+    """
+    text = str(raw or "")
+    if not text.strip():
+        return "", NONE
+
+    # 1. directly after the LAST explicit marker
+    for marker in reversed(list(_RESULT_MARKER_RE.finditer(text))):
+        window = text[marker.end():marker.end() + _MARKER_WINDOW]
+        first = _CANDIDATE_RE.search(window)
+        if first and not window[:first.start()].strip(" :=\t"):
+            return first.group(0).strip(), FOUND
+        if first:
+            return first.group(0).strip(), FOUND
+
+    # 2. a conclusion on the final line ("= 11/15", or the answer alone)
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+    if lines:
+        last = lines[-1].lstrip("=").strip()
+        if _CANDIDATE_RE.fullmatch(last):
+            return last, FOUND
+
+    found = [m.group(0).strip() for m in _CANDIDATE_RE.finditer(text)]
+    if not found:
+        return "", NONE
+    # 3. exactly one candidate is unambiguous
+    if len(found) == 1:
+        return found[0], FOUND
+    # 4. several candidates, nothing declared → do NOT guess
+    return "", AMBIGUOUS
+
+
+def extract_answer_candidate(raw: str) -> str:
+    """Back-compat helper: the declared answer, or "" when it is not clear."""
+    return extract_final_answer(raw)[0]
+
+
 def grade(task: ActiveTask, raw_message: Any) -> GradingResult:
     """Grade one answer against one task. The ONLY grading entry point.
 
@@ -123,7 +202,40 @@ def grade(task: ActiveTask, raw_message: Any) -> GradingResult:
     or reconstructed from anything the tutor said.
     """
     raw = str(raw_message if raw_message is not None else "")
+    graded_text, candidate = raw, ""
     result = check_practice_answer(task.question, raw)
+    if result is None or not getattr(result, "checkable", False) or not result.items:
+        # The whole message was not checkable. Before giving up, try the FINAL
+        # answer extracted from the prose — a wrong answer wrapped in a sentence
+        # is still a wrong answer, not an unverifiable one.
+        candidate, status = extract_final_answer(raw)
+        if status == AMBIGUOUS:
+            # Several numbers, no declared answer. Guessing would misgrade, so
+            # we ask instead of inventing a verdict.
+            # AUDIT: no answer was identified, so the answer columns stay EMPTY
+            # rather than recording the whole sentence as if the student had
+            # submitted it. The prose is preserved in the evidence (and, as
+            # always, verbatim in student_message).
+            return GradingResult(
+                task_id=task.task_id, verdict="unverified", solved=False,
+                student_raw=raw, graded_answer="", normalized_student="",
+                expected_display=task.expected_display,
+                detail=AMBIGUOUS_FINAL_ANSWER, deterministic=True,
+                evidence={
+                    "method": "deterministic",
+                    "checker_verdict": AMBIGUOUS_FINAL_ANSWER,
+                    "expected_display": task.expected_display,
+                    "student_raw": raw.strip()[:200],
+                    "graded_text": "",
+                    "extracted_candidate": "",
+                    "gpt_check_used": False,
+                    "match": False,
+                })
+        if candidate and candidate != raw.strip():
+            retry = check_practice_answer(task.question, candidate)
+            if retry is not None and getattr(retry, "checkable", False) \
+                    and retry.items:
+                result, graded_text = retry, candidate
     if result is None or not getattr(result, "checkable", False) or not result.items:
         # Deterministic checking failed for a task we believed was checkable.
         # We say so honestly rather than asking the model to guess.
@@ -146,7 +258,9 @@ def grade(task: ActiveTask, raw_message: Any) -> GradingResult:
         "checker_verdict": detail,
         "expected_display": task.expected_display,
         "expected_normalized": normalized_expected,
-        "student_raw": raw.strip()[:120],
+        "student_raw": raw.strip()[:200],
+        "graded_text": graded_text.strip()[:120],
+        "extracted_candidate": candidate,
         "student_normalized": normalized_student,
         "answer_type": answer_type,
         "expected_unit": str(getattr(expected_obj, "unit", "") or ""),
@@ -167,11 +281,12 @@ def grade(task: ActiveTask, raw_message: Any) -> GradingResult:
     # tasks also require a FORM. Applied after the generic mapping so the
     # checker itself stays untouched for every other skill.
     verdict, solved, detail = _apply_skill_policy(
-        task, raw, verdict=verdict, solved=solved, detail=detail)
+        task, graded_text, verdict=verdict, solved=solved, detail=detail)
     evidence["checker_verdict"] = detail
     evidence["match"] = solved
     return GradingResult(
         task_id=task.task_id, verdict=verdict, solved=solved, student_raw=raw,
+        graded_answer=graded_text,
         expected_display=task.expected_display, detail=detail,
         deterministic=True, answer_type=answer_type,
         normalized_expected=normalized_expected,

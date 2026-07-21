@@ -19,12 +19,15 @@ from dataclasses import dataclass
 from typing import Any, Callable, Sequence
 
 from matbot.bosnian import to_ijekavica
-from matbot.minimal import concept_facts
+from matbot.minimal import concept_facts, solution_facts
 from matbot.minimal.grading import GradingResult
 from matbot.minimal.intent import fold as _fold
 from matbot.minimal.state import ActiveTask, SessionState
 
 MAX_PHRASED_CHARS = 400
+
+#: Skills whose concept questions are about fraction expansion.
+_FRACTION_SKILLS = frozenset({"fraction_expand", "fraction_add_unlike"})
 
 
 # --------------------------------------------------------------------------- #
@@ -170,6 +173,9 @@ class RenderContext:
     concept_question: str = ""
     #: The denominator a fraction_expand task requires, for precise feedback.
     target_denominator: int | None = None
+    #: True when the student asked for harder/easier on a skill that has no
+    #: objective bands. We say so rather than implying the task changed.
+    difficulty_unsupported: bool = False
 
     @property
     def seed(self) -> str:
@@ -185,6 +191,11 @@ def present_task(ctx: RenderContext) -> str:
         return ""
     opener = _pick(("Evo zadatka:", "Idemo na zadatak:", "Riješi ovaj zadatak:"),
                    ctx.seed, "present")
+    if ctx.difficulty_unsupported:
+        # Honest: this IS a new task, but not a harder or easier one. Claiming
+        # otherwise is what made "Daj mi lakši zadatak" return a harder task.
+        opener = ("Za ovu temu još ne mogu birati težinu, pa evo novog zadatka "
+                  "iste težine:")
     return f"{opener}\n\n{task.question}"
 
 
@@ -196,6 +207,8 @@ def feedback(ctx: RenderContext) -> str:
     if g.verdict == "correct":
         head = _pick(_CORRECT, ctx.seed, "correct")
         return f"{head} {_pick(_NEXT_INVITE, ctx.seed, 'invite')}"
+    if g.detail == "ambiguous_final_answer":
+        return ("U poruci vidim više brojeva. Koji je tvoj konačan odgovor?")
     if g.detail == "incorrect_target_denominator":
         # Name the requirement the answer missed, not a generic "not yet".
         needed = ctx.target_denominator
@@ -211,14 +224,24 @@ def feedback(ctx: RenderContext) -> str:
 
     task = ctx.task
     if task is not None and not ctx.may_reveal:
-        nudge = _hint_text(task.skill_id, task.hints_given)
+        nudge = _hint_text(task.skill_id, task.hints_given, task.question)
         return f"{head} {nudge}"
     if ctx.may_reveal and task is not None and task.expected_display:
         return f"{head} Tačan odgovor je {task.expected_display}."
     return head
 
 
-def _hint_text(skill_id: str, level: int) -> str:
+def _hint_text(skill_id: str, level: int, question: str = "") -> str:
+    """One rung of the hint ladder.
+
+    For skills with a deterministic ladder the rung is COMPUTED from the
+    task's own numbers. The static pool is only a fallback: clamping to its
+    last entry is what produced five identical hints in production.
+    """
+    if skill_id == "fraction_add_unlike" and question:
+        facts = solution_facts.resolve_add_facts(question)
+        if facts is not None:
+            return solution_facts.add_hint(facts, level)
     pool = _HINTS.get(skill_id) or ()
     if not pool:
         return "Pogledaj ponovo šta je dato, a šta se traži."
@@ -233,7 +256,7 @@ def help_reply(ctx: RenderContext) -> str:
                 "krećemo.")
     opener = _pick(("Nema problema.", "U redu, idemo polako.", "Hajde zajedno."),
                    ctx.seed, "help")
-    hint = _hint_text(task.skill_id, task.hints_given)
+    hint = _hint_text(task.skill_id, task.hints_given, task.question)
     return f"{opener} {hint}\n\nZadatak je i dalje:\n{task.question}"
 
 
@@ -285,7 +308,9 @@ def concept_answer(ctx: RenderContext, *, openai_chat: Callable | None,
     # fraction-expansion case, the numbers come from the deterministic resolver
     # and the model may only rephrase them — production invented
     # "2 · (24/13) = 48/24" when it was free to calculate.
-    if (ctx.state.topic.skill_id or "") == "fraction_expand":
+    # The expansion rule underlies BOTH fraction skills, so a concept
+    # question about it is answered from verified facts either way.
+    if (ctx.state.topic.skill_id or "") in _FRACTION_SKILLS:
         facts = concept_facts.resolve_expand_question(question)
         if facts is not None:
             text = concept_facts.explain(facts)
@@ -339,6 +364,30 @@ def clarification(ctx: RenderContext) -> str:
         return ("Nije mi jasno šta želiš. Možeš odgovoriti na zadatak, tražiti "
                 "pomoć ili novi zadatak.\n\nZadatak je:\n" + ctx.task.question)
     return "Nije mi jasno šta želiš. Da li želiš novi zadatak ili objašnjenje?"
+
+
+def solution_reply(ctx: RenderContext) -> str:
+    """The full worked solution, on explicit request only.
+
+    Deterministic end to end: the model never sees this, so it cannot
+    fabricate a step. Ends by inviting an INDEPENDENT next task, because
+    this one no longer measures the student.
+    """
+    task = ctx.task
+    if task is None:
+        return ("Trenutno nemamo aktivan zadatak. Reci „daj mi zadatak” pa "
+                "krećemo.")
+    facts = solution_facts.resolve_add_facts(task.question) \
+        if task.skill_id == "fraction_add_unlike" else None
+    if facts is None:
+        if not task.expected_display:
+            return "Za ovaj zadatak ti ne mogu pokazati postupak korak po korak."
+        return ("Evo rješenja:\n\n" + f"{task.question}\n= "
+                f"{task.expected_display}\n\n"
+                "Pokušaj sada sam jedan sličan zadatak — reci „daj mi zadatak”.")
+    return ("Evo cijelog postupka:\n\n" + solution_facts.add_solution(facts)
+            + "\n\nSada probaj ti jedan sličan zadatak — reci "
+            "„daj mi zadatak”.")
 
 
 def unsupported_topic(ctx: RenderContext) -> str:
@@ -450,6 +499,8 @@ def render(ctx: RenderContext, *, openai_chat: Callable | None = None,
         return _finish(present_task(ctx))
     if ctx.intent == TurnIntent.HELP.value:
         return _finish(help_reply(ctx))
+    if ctx.intent == TurnIntent.SOLUTION_REQUEST.value:
+        return _finish(solution_reply(ctx))
     if ctx.intent == TurnIntent.CONCEPT_QUESTION.value:
         text = concept_answer(ctx, openai_chat=openai_chat, model=model,
                               timeout=timeout)

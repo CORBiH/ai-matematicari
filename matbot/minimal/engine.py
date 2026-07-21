@@ -20,7 +20,12 @@ from dataclasses import dataclass, field
 from typing import Any, Callable
 
 from matbot.minimal import concept_facts, skills
-from matbot.minimal.grading import GradingResult, grade, target_denominator
+from matbot.minimal.grading import (
+    AMBIGUOUS_FINAL_ANSWER,
+    GradingResult,
+    grade,
+    target_denominator,
+)
 from matbot.minimal.intent import (
     NEW_TASK_INTENTS,
     TurnIntent,
@@ -38,6 +43,9 @@ from matbot.minimal.state import ActiveTask, SessionState, new_task
 #: How many wrong attempts before the answer is shown and the task closed, so a
 #: child is never trapped on one task.
 MAX_WRONG_ATTEMPTS = 3
+
+#: Skills whose concept questions are about fraction expansion.
+_FRACTION_SKILLS = frozenset({"fraction_expand", "fraction_add_unlike"})
 
 
 @dataclass(frozen=True)
@@ -188,8 +196,10 @@ def handle_turn(
     # "Proširi 2/4 na nazivnik 20." in reply to "šta ako imamo isti brojnik…"
     # and never answered the student.
     if intent is TurnIntent.CONCEPT_QUESTION:
+        # The expansion rule underlies BOTH fraction skills, so a concept
+        # question about it resolves to verified facts either way.
         facts = concept_facts.resolve_expand_question(student_raw) \
-            if state.topic.skill_id == "fraction_expand" else None
+            if state.topic.skill_id in _FRACTION_SKILLS else None
         trace["concept_facts_resolved"] = facts is not None
         trace["concept_fact_kind"] = facts.kind if facts is not None else ""
         trace["pending_confirmation_after"] = state.pending_confirmation
@@ -228,10 +238,32 @@ def handle_turn(
             return TurnResult(answer=render(ctx), state=state,
                               intent=intent.value, topic_supported=False,
                               student_raw=student_raw, telemetry=dict(trace))
-        ctx = RenderContext(state=state, intent=TurnIntent.NEW_TASK.value, task=task)
+        ctx = RenderContext(
+            state=state, intent=TurnIntent.NEW_TASK.value, task=task,
+            difficulty_unsupported=(
+                intent in (TurnIntent.HARDER, TurnIntent.EASIER)
+                and not skills.supports_difficulty(state.topic.skill_id)))
         trace["pending_confirmation_after"] = state.pending_confirmation
         return TurnResult(answer=render(ctx), state=state,
                           intent=intent.value, task=task,
+                          student_raw=student_raw, telemetry=dict(trace))
+
+    # ---- SOLUTION REQUEST: reveal, but never credit it as progress ---------
+    if intent is TurnIntent.SOLUTION_REQUEST and task is not None:
+        revealed = ActiveTask(**{**task.to_dict(),
+                                 "solved": True, "solution_revealed": True})
+        # The task is CLOSED but not solved by the student: no solved_count and
+        # no streak increment. The streak is left EXACTLY as it was — asking for
+        # the worked solution is not a wrong mathematical attempt, so it must
+        # not reset earlier progress either. Attempts and wrong_attempts are
+        # untouched, so an immediate request records 0/0.
+        state = state.with_updated_task(revealed).cleared_task()
+        state = state.awaiting("new_task")
+        ctx = RenderContext(state=state, intent=intent.value, task=revealed,
+                            may_reveal=True)
+        trace["pending_confirmation_after"] = state.pending_confirmation
+        return TurnResult(answer=render(ctx), state=state,
+                          intent=intent.value, task=revealed,
                           student_raw=student_raw, telemetry=dict(trace))
 
     # ---- HELP: never consumes or replaces the task -------------------------
@@ -255,7 +287,11 @@ def handle_turn(
     # ---- ANSWER: exactly one GradingResult ---------------------------------
     if intent is TurnIntent.ANSWER and task is not None:
         result = grade(task, student_raw)
-        counted = ActiveTask(**{
+        # An AMBIGUOUS message was never graded, so it is not an attempt. Left
+        # counting, three lines of working would have tripped MAX_WRONG_ATTEMPTS
+        # and revealed the answer to a student who had made no mistake.
+        ambiguous = result.detail == AMBIGUOUS_FINAL_ANSWER
+        counted = task if ambiguous else ActiveTask(**{
             **task.to_dict(),
             "attempts": task.attempts + 1,
             "wrong_attempts": task.wrong_attempts + (0 if result.solved else 1),
@@ -273,8 +309,9 @@ def handle_turn(
                               state=state, intent=intent.value, grading=result,
                               task=counted, student_raw=student_raw,
                               telemetry=dict(trace))
-        give_up = counted.wrong_attempts >= MAX_WRONG_ATTEMPTS
-        state = state.broke_streak()
+        give_up = (not ambiguous) and counted.wrong_attempts >= MAX_WRONG_ATTEMPTS
+        # An ambiguous message is not a wrong answer, so the streak survives it.
+        state = state if ambiguous else state.broke_streak()
         state = state.cleared_task() if give_up else state.with_updated_task(counted)
         ctx = RenderContext(state=state, intent=intent.value, grading=result,
                             task=counted, may_reveal=give_up,
