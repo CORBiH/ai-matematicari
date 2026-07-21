@@ -352,11 +352,12 @@ def test_neutral_model_wording_is_accepted():
         def __init__(self, text):
             self.choices = [type("C", (), {"message": type("M", (), {"content": text})()})()]
 
+    # "Idemo dalje?" is no longer acceptable: feedback never starts a task.
     original = "Tačno. Želiš li još jedan zadatak?"
     out = renderer.phrase_with_model(
-        original, openai_chat=lambda *a, **kw: _Resp("Tačno je. Idemo dalje?"),
+        original, openai_chat=lambda *a, **kw: _Resp("Tačno je. Hoćeš li još jedan?"),
         model="m", timeout=1, allow_verdict_words=True)
-    assert out == "Tačno je. Idemo dalje?"
+    assert out == "Tačno je. Hoćeš li još jedan?"
 
 
 def test_every_literal_in_the_renderer_is_policy_clean():

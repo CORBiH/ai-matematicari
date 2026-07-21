@@ -70,6 +70,26 @@ def response_from_result(result: TurnResult, payload: dict) -> dict:
         } if task else None,
     }
     topic = result.state.topic
+    # Sheets reads its audit columns from answer_check.items[0] (see
+    # sheets_log._first_answer_check_item). Emitting it here is what fills
+    # expected_answer / normalized_* / deterministic_check, which were blank
+    # even though the evidence already existed inside the GradingResult.
+    answer_check = None
+    grading = result.grading
+    if grading is not None:
+        answer_check = {
+            "checkable": grading.deterministic,
+            "items": [{
+                "n": 1,
+                "verdict": grading.detail or grading.verdict,
+                "answer_type": grading.answer_type,
+                "expected_answer": grading.expected_display,
+                "normalized_expected": grading.normalized_expected,
+                "student_answer": grading.student_raw,
+                "normalized_student": grading.normalized_student,
+                "deterministic_check": dict(grading.evidence),
+            }],
+        }
     return {
         "status": "ready" if result.topic_supported else "unsupported_topic",
         "answer": result.answer,
@@ -79,6 +99,9 @@ def response_from_result(result: TurnResult, payload: dict) -> dict:
         "last_tutor_task": task.question if task else "",
         "answer_verdict": result.verdict,
         "answer_verdict_detail": (result.grading.detail if result.grading else None),
+        "answer_check": answer_check,
+        # The minimal engine never asks the model for a verdict.
+        "gpt_check_used": False if result.grading else None,
         "final_topic": topic.npp_id or "unknown",
         "effective_topic": topic.npp_id or "",
         "selected_oblast": str(payload.get("selected_oblast") or ""),

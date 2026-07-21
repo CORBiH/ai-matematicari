@@ -58,6 +58,17 @@ _GENDERED_RE = re.compile(
 #: Openers that read as sycophantic or odd after a routine correct answer.
 _BAD_OPENER_RE = re.compile(r"^\s*(naravno|svakako|apsolutno)\b[,!.]?", re.IGNORECASE)
 
+#: Praise. Rejected in model wording ALWAYS — a routine correct answer does not
+#: deserve "Odlično!", and ``allow_verdict_words`` must not smuggle it through.
+_PRAISE_RE = re.compile(r"\b(bravo|odlicno|super|savrseno|fantasticno|genijalno)\b")
+
+#: Claims that the next task is under way. Feedback never creates a task, so a
+#: phrase like "Idemo na sljedeći!" is simply false — production emitted exactly
+#: that while the active task became null.
+_IMPLIES_NEXT_TASK_RE = re.compile(
+    r"\bidemo\s+(na\s+)?(sljedec\w*|dalje)\b|\bevo\s+(novog|sljedeceg)\b"
+    r"|\bslijedi\s+(novi|sljedeci)\b|\bnastavljamo\s+sa\b|\bprelazimo\s+na\b")
+
 #: Math must survive language normalization untouched.
 _MATH_SPAN_RE = re.compile(r"\d+\s*/\s*\d+|[a-zA-Z]\s*=\s*[^\s,.;]+|\d+")
 
@@ -110,7 +121,10 @@ _INCORRECT = ("Nije još tačno.", "Ovaj odgovor nije tačan.", "Nije tačno.")
 #: "Nisam siguran" is masculine even though the TUTOR is speaking — the policy
 #: is no gender marking anywhere, so this is phrased impersonally.
 _UNVERIFIED = ("Ovo ne prepoznajem kao odgovor na zadatak.",)
-_NEXT_INVITE = ("Želiš li još jedan zadatak?", "Idemo na sljedeći?",
+#: A correct answer COMPLETES the task; it does not start the next one. So the
+#: invite must be a question, never "Idemo na sljedeći!" — production said that
+#: while active_task became null and no new task was sent.
+_NEXT_INVITE = ("Želiš li novi zadatak?", "Želiš li još jedan zadatak?",
                 "Hoćeš još jedan zadatak?")
 
 #: First-line, non-revealing help per skill. Never contains the answer.
@@ -273,7 +287,14 @@ def phrase_with_model(text: str, *, openai_chat: Callable | None, model: str,
         return text
     # The model must not introduce a verdict where the engine did not state one,
     # and must not invent numbers (a smuggled answer or a new task).
-    if not allow_verdict_words and _BANNED_IN_PHRASING.search(_fold(candidate)):
+    folded_candidate = _fold(candidate)
+    if not allow_verdict_words and _BANNED_IN_PHRASING.search(folded_candidate):
+        return text
+    # These two hold even when verdict words are allowed: praise is never
+    # warranted for a routine answer, and feedback never starts a task.
+    if _PRAISE_RE.search(folded_candidate):
+        return text
+    if _IMPLIES_NEXT_TASK_RE.search(folded_candidate):
         return text
     # Language policy is enforced by REJECTION here, not by rewriting: a model
     # reply that guesses the student's gender ("riješio", "potrudila") or slips

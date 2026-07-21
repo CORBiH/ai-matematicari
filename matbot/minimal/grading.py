@@ -11,7 +11,7 @@ choose words for it; it cannot change it.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from matbot.answer_checker import check_practice_answer
@@ -35,6 +35,12 @@ class GradingResult:
     expected_display: str = ""
     detail: str = ""                # the underlying checker verdict
     deterministic: bool = True
+    # Audit evidence: what was compared, and what it normalized to. Produced
+    # HERE because this is the grading owner — nothing downstream re-derives it.
+    answer_type: str = ""
+    normalized_expected: str = ""
+    normalized_student: str = ""
+    evidence: dict = field(default_factory=dict)
 
     @property
     def is_correct(self) -> bool:
@@ -43,7 +49,22 @@ class GradingResult:
     def to_dict(self) -> dict:
         return {"task_id": self.task_id, "verdict": self.verdict,
                 "solved": self.solved, "expected_display": self.expected_display,
-                "detail": self.detail, "deterministic": self.deterministic}
+                "detail": self.detail, "deterministic": self.deterministic,
+                "answer_type": self.answer_type,
+                "normalized_expected": self.normalized_expected,
+                "normalized_student": self.normalized_student,
+                "evidence": dict(self.evidence)}
+
+
+def _normalized(value: Any) -> str:
+    """Canonical form of a checker value, or "".
+
+    ``Fraction`` reduces automatically, so 16/48 normalizes to 1/3 — which is
+    exactly the evidence that explains why 4/48 (1/12) was rejected.
+    """
+    if value is None:
+        return ""
+    return str(value)
 
 
 def grade(task: ActiveTask, raw_message: Any) -> GradingResult:
@@ -62,7 +83,27 @@ def grade(task: ActiveTask, raw_message: Any) -> GradingResult:
                              expected_display=task.expected_display,
                              detail="not_checkable", deterministic=False)
 
-    detail = str(result.items[0].verdict or "")
+    item = result.items[0]
+    detail = str(item.verdict or "")
+
+    # Deterministic evidence, straight off the checker's own objects.
+    expected_obj = getattr(item, "expected", None)
+    given_obj = getattr(item, "given", None)
+    answer_type = str(getattr(expected_obj, "answer_type", "") or "")
+    normalized_expected = _normalized(getattr(expected_obj, "value", None))
+    normalized_student = _normalized(getattr(given_obj, "value", None))
+    evidence = {
+        "method": "deterministic",
+        "checker_verdict": detail,
+        "expected_display": task.expected_display,
+        "expected_normalized": normalized_expected,
+        "student_raw": raw.strip()[:120],
+        "student_normalized": normalized_student,
+        "answer_type": answer_type,
+        "expected_unit": str(getattr(expected_obj, "unit", "") or ""),
+        "gpt_check_used": False,
+    }
+
     if detail in _SOLVED or detail in _SOLVED_WITH_NOTE:
         verdict, solved = "correct", True
     elif detail in _PARTIAL:
@@ -73,8 +114,11 @@ def grade(task: ActiveTask, raw_message: Any) -> GradingResult:
     else:
         verdict, solved = "incorrect", False
 
+    evidence["match"] = solved
     return GradingResult(
         task_id=task.task_id, verdict=verdict, solved=solved, student_raw=raw,
         expected_display=task.expected_display, detail=detail,
-        deterministic=True,
+        deterministic=True, answer_type=answer_type,
+        normalized_expected=normalized_expected,
+        normalized_student=normalized_student, evidence=evidence,
     )
