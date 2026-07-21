@@ -7240,6 +7240,9 @@ def _try_minimal_engine(
         routing["runtime_topic"] = (state.get("origin_runtime_id")
                                     or routing["runtime_topic"])
         routing["difficulty_level"] = state.get("difficulty_level")
+        # Conversation decision trace (turn_intent, intent_source,
+        # concept_fact_kind, pending_confirmation_before/after, ...).
+        routing.update(response.get("minimal_telemetry") or {})
     except Exception:
         # The minimal engine must never take the tutor down; on any failure the
         # legacy pipeline answers as it always did.

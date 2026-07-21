@@ -50,7 +50,9 @@ _CYRILLIC_RE = re.compile(r"[Ѐ-ӿ]")
 _GENDERED_RE = re.compile(
     r"\b\w+(?:io|ao|la)\s*/\s*\w+(?:la|ila|ao|io)\b"          # riješio/riješila
     r"|\b(?:rije[sš]i|uradi|napravi|postavi|poku[sš]a|potrudi|"
-    r"nau[cč]i|zapo[cč]e|zavr[sš]i|po[cč]e|misli|shvati)(?:o|la)\b"
+    r"nau[cč]i|zapo[cč]e|zavr[sš]i|po[cč]e|misli|shvati|"
+    # added 2026-07-21: these slipped past the first version of this list
+    r"(?:po)?mno[zž]i|dob[i]|vid[i]|rad[i]|ra[cč]una|gleda|prova)(?:o|la)\b"
     # želio/željela and volio/voljela do not share a single stem
     r"|\b[zž]eli?o\b|\b[zž]eljela\b|\bvolio\b|\bvoljela\b"
     r"|\b(?:bio|bila|siguran|sigurna|spreman|spremna)\b",
@@ -256,7 +258,7 @@ _CONCEPT_FALLBACK = (
 #: Used when the model produced arithmetic for a question whose numbers could
 #: NOT be verified. States the rule without computing anything.
 _CONCEPT_NO_NUMBERS = (
-    "Nisam mogao pouzdano pročitati brojeve iz tvog pitanja, pa ne bih računao "
+    "Ne mogu pouzdano pročitati brojeve iz tvog pitanja, pa neću računati "
     "napamet. Pravilo je ovo: proširivanje znači da brojnik i nazivnik množiš "
     "istim cijelim brojem, pa se vrijednost razlomka ne mijenja. Napiši mi "
     "razlomak i nazivnik koji te zanimaju, pa ćemo to zajedno provjeriti."

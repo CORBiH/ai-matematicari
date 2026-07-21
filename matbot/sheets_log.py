@@ -759,7 +759,10 @@ def _build_transcript_row(payload: dict, response: dict) -> list[Any]:
         _clean_cell(response.get("topic_conflict")),
         _clean_cell(payload.get("selected_oblast")),
         _clean_cell(response.get("last_tutor_task")),
-        _clean_cell(_raw_student_message(payload)),
+        # NOT _clean_cell: this column is the student's message verbatim, and
+        # _clean_cell strips whitespace. Leading/trailing spaces are part of
+        # what was actually typed.
+        _raw_student_message(payload),
         _clean_cell(response.get("answer")),
         _json_cell(response.get("answer_check")),
         _json_cell(response.get("next_state")),
@@ -768,7 +771,11 @@ def _build_transcript_row(payload: dict, response: dict) -> list[Any]:
         _clean_cell(item.get("answer_type")),
         _clean_cell(item.get("expected_answer") or item.get("expected")),
         _clean_cell(item.get("normalized_expected")),
-        _clean_cell(item.get("student_answer") or item.get("given") or _raw_student_message(payload)),
+        # ONLY on a grading turn. The old fallback to the raw message filled
+        # student_answer on every turn — a hint or a concept question is not an
+        # answer, and logging one as if it were corrupts the audit.
+        _clean_cell(item.get("student_answer") or item.get("given")
+                    or (_raw_student_message(payload) if item else "")),
         _clean_cell(item.get("normalized_student")),
         _json_cell(item.get("deterministic_check")),
         _clean_cell(math_verification.get("math_verification_used")),

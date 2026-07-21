@@ -16,10 +16,10 @@ through untouched.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Callable
 
-from matbot.minimal import skills
+from matbot.minimal import concept_facts, skills
 from matbot.minimal.grading import GradingResult, grade, target_denominator
 from matbot.minimal.intent import (
     NEW_TASK_INTENTS,
@@ -27,7 +27,11 @@ from matbot.minimal.intent import (
     classify_turn,
 )
 from matbot.minimal.intent import fold as intent_fold
-from matbot.minimal.intent import is_affirmation, is_decline
+from matbot.minimal.intent import (
+    confirmation_choice,
+    is_affirmation,
+    is_decline,
+)
 from matbot.minimal.renderer import RenderContext, render
 from matbot.minimal.state import ActiveTask, SessionState, new_task
 
@@ -46,6 +50,8 @@ class TurnResult:
     task: ActiveTask | None = None
     topic_supported: bool = True
     student_raw: str = ""
+    #: Decision trace for telemetry ONLY. Never read back to drive behavior.
+    telemetry: dict = field(default_factory=dict)
 
     @property
     def verdict(self) -> str | None:
@@ -101,6 +107,13 @@ def handle_turn(
 ) -> TurnResult:
     """Run exactly one Practice turn."""
     student_raw = str(raw_message if raw_message is not None else "")
+    # Decision trace. Written as decisions happen, never read back.
+    trace: dict = {
+        "turn_intent": "", "intent_source": "", "concept_fact_kind": "",
+        "concept_facts_resolved": False,
+        "pending_confirmation_before": state.pending_confirmation,
+        "pending_confirmation_after": "", "confirmation_choice": "",
+    }
     state = state.next_turn()
 
     # The SELECTED topic is authoritative and is re-resolved every turn, so the
@@ -127,21 +140,37 @@ def handle_turn(
         state = state.confirmation_consumed()
         if pending == "new_task" and is_affirmation(student_raw):
             forced_intent = TurnIntent.NEW_TASK
+            trace["confirmation_choice"] = "task"
         elif pending == "new_task" and is_decline(student_raw):
+            trace["confirmation_choice"] = "decline"
+            trace.update(turn_intent="DECLINED", intent_source="deterministic",
+                         pending_confirmation_after=state.pending_confirmation)
             ctx = RenderContext(state=state, intent="declined",
                                 task=state.active_task)
             return TurnResult(answer=render(ctx), state=state,
                               intent="declined", task=state.active_task,
-                              student_raw=student_raw)
+                              student_raw=student_raw, telemetry=dict(trace))
+        elif pending == "task_or_explanation":
+            choice = confirmation_choice(student_raw)
+            trace["confirmation_choice"] = choice
+            if choice == "task":
+                forced_intent = TurnIntent.NEW_TASK
+            elif choice == "explanation":
+                forced_intent = TurnIntent.CONCEPT_QUESTION
         # anything else: the confirmation is dropped and the turn is classified
         # normally, so an unrelated message is never swallowed by it.
 
     # Deterministic rules decide; the model is consulted only for a genuine tie.
     if forced_intent is not None:
         intent = forced_intent           # no model call for a plain "da"
+        trace["intent_source"] = "confirmation"
     else:
-        intent = classify_turn(student_raw, openai_chat=openai_chat, model=model,
-                               timeout=timeout).intent
+        decided = classify_turn(student_raw, openai_chat=openai_chat,
+                                model=model, timeout=timeout)
+        intent = decided.intent
+        trace["intent_source"] = ("model" if decided.matched == "model_classifier"
+                                  else "deterministic")
+    trace["turn_intent"] = intent.name
     task = state.active_task
 
     if not topic.supported:
@@ -149,21 +178,29 @@ def handle_turn(
         # decides whether to hand the turn to the legacy system.
         ctx = RenderContext(state=state, intent=intent.value,
                             unsupported_topic=topic.title or topic.runtime_id)
+        trace["pending_confirmation_after"] = state.pending_confirmation
         return TurnResult(answer=render(ctx), state=state, intent=intent.value,
-                          topic_supported=False, student_raw=student_raw)
+                          topic_supported=False, student_raw=student_raw,
+                          telemetry=dict(trace))
 
     # ---- CONCEPT QUESTION: answer it, change NOTHING ------------------------
     # A question about the maths is not a task request. Production created
     # "Proširi 2/4 na nazivnik 20." in reply to "šta ako imamo isti brojnik…"
     # and never answered the student.
     if intent is TurnIntent.CONCEPT_QUESTION:
+        facts = concept_facts.resolve_expand_question(student_raw) \
+            if state.topic.skill_id == "fraction_expand" else None
+        trace["concept_facts_resolved"] = facts is not None
+        trace["concept_fact_kind"] = facts.kind if facts is not None else ""
+        trace["pending_confirmation_after"] = state.pending_confirmation
         ctx = RenderContext(state=state, intent=intent.value, task=task,
                             concept_question=student_raw)
         return TurnResult(
             answer=render(ctx, openai_chat=openai_chat, model=model,
                           timeout=timeout),
             state=state,                 # streak, attempts, task all untouched
-            intent=intent.value, task=task, student_raw=student_raw)
+            intent=intent.value, task=task, student_raw=student_raw,
+            telemetry=dict(trace))
 
     # ---- NEW TASK ----------------------------------------------------------
     # ONLY an explicit new-task intent may create a task. Previously any
@@ -177,36 +214,43 @@ def handle_turn(
         if (task is not None and intent is TurnIntent.NEW_TASK
                 and signature and signature == state.last_request_signature):
             ctx = RenderContext(state=state, intent=intent.value, task=task)
+            trace["pending_confirmation_after"] = state.pending_confirmation
             return TurnResult(answer=render(ctx), state=state,
                               intent=intent.value, task=task,
-                              student_raw=student_raw)
+                              student_raw=student_raw, telemetry=dict(trace))
         state = state.with_request_signature(signature)
         state = _apply_difficulty(state, intent)
         state, task = _offer_task(state)
         if task is None:
             ctx = RenderContext(state=state, intent=intent.value,
                                 unsupported_topic=topic.title)
+            trace["pending_confirmation_after"] = state.pending_confirmation
             return TurnResult(answer=render(ctx), state=state,
                               intent=intent.value, topic_supported=False,
-                              student_raw=student_raw)
+                              student_raw=student_raw, telemetry=dict(trace))
         ctx = RenderContext(state=state, intent=TurnIntent.NEW_TASK.value, task=task)
+        trace["pending_confirmation_after"] = state.pending_confirmation
         return TurnResult(answer=render(ctx), state=state,
                           intent=intent.value, task=task,
-                          student_raw=student_raw)
+                          student_raw=student_raw, telemetry=dict(trace))
 
     # ---- HELP: never consumes or replaces the task -------------------------
     if intent is TurnIntent.HELP:
         if task is None:
             ctx = RenderContext(state=state, intent=intent.value)
+            trace["pending_confirmation_after"] = state.pending_confirmation
             return TurnResult(answer=render(ctx), state=state,
-                              intent=intent.value, student_raw=student_raw)
+                              intent=intent.value, student_raw=student_raw,
+                              telemetry=dict(trace))
         updated = ActiveTask(**{**task.to_dict(),
                                 "hints_given": task.hints_given + 1})
         state = state.with_updated_task(updated)
         ctx = RenderContext(state=state, intent=intent.value, task=updated,
                             hint_level=updated.hints_given)
+        trace["pending_confirmation_after"] = state.pending_confirmation
         return TurnResult(answer=render(ctx), state=state, intent=intent.value,
-                          task=updated, student_raw=student_raw)
+                          task=updated, student_raw=student_raw,
+                          telemetry=dict(trace))
 
     # ---- ANSWER: exactly one GradingResult ---------------------------------
     if intent is TurnIntent.ANSWER and task is not None:
@@ -223,20 +267,30 @@ def handle_turn(
             state = state.with_updated_task(counted).completed_task().awaiting("new_task")
             ctx = RenderContext(state=state, intent=intent.value, grading=result,
                                 task=counted, may_reveal=True)
+            trace["pending_confirmation_after"] = state.pending_confirmation
             return TurnResult(answer=render(ctx, openai_chat=openai_chat,
                                             model=model, timeout=timeout),
                               state=state, intent=intent.value, grading=result,
-                              task=counted, student_raw=student_raw)
+                              task=counted, student_raw=student_raw,
+                              telemetry=dict(trace))
         give_up = counted.wrong_attempts >= MAX_WRONG_ATTEMPTS
         state = state.broke_streak()
         state = state.cleared_task() if give_up else state.with_updated_task(counted)
         ctx = RenderContext(state=state, intent=intent.value, grading=result,
                             task=counted, may_reveal=give_up,
                             target_denominator=target_denominator(counted))
+        trace["pending_confirmation_after"] = state.pending_confirmation
         return TurnResult(answer=render(ctx), state=state, intent=intent.value,
-                          grading=result, task=counted, student_raw=student_raw)
+                          grading=result, task=counted, student_raw=student_raw,
+                          telemetry=dict(trace))
 
     # ---- anything else: ask what was meant; never touch task state ---------
+    # The clarification ASKS "novi zadatak ili objašnjenje?", so the reply to
+    # that question must be understood on the next turn.
+    if task is None:
+        state = state.awaiting("task_or_explanation")
     ctx = RenderContext(state=state, intent=TurnIntent.OTHER.value, task=task)
+    trace["pending_confirmation_after"] = state.pending_confirmation
     return TurnResult(answer=render(ctx), state=state, intent=intent.value,
-                      task=task, student_raw=student_raw)
+                      task=task, student_raw=student_raw,
+                      telemetry=dict(trace))

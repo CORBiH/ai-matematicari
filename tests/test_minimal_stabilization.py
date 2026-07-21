@@ -367,7 +367,16 @@ def test_every_literal_in_the_renderer_is_policy_clean():
     ("Nisam siguran…") survived the pool check.
     """
     import ast
-    tree = ast.parse(open(renderer.__file__, encoding="utf-8").read())
+    from matbot.minimal import concept_facts
+    checked_total = 0
+    for module in (renderer, concept_facts):
+        checked_total += _sweep_module(ast, module)
+    assert checked_total > 15, "sweep found too few literals to be meaningful"
+
+
+def _sweep_module(ast, module):
+    """Policy-check every student-facing literal in one module."""
+    tree = ast.parse(open(module.__file__, encoding="utf-8").read())
     # Strings assigned to *_SYSTEM are INSTRUCTIONS to the model, not output —
     # they legitimately quote gendered forms as counter-examples.
     prompt_strings = set()
@@ -391,9 +400,9 @@ def test_every_literal_in_the_renderer_is_policy_clean():
         if not any(ch in text.lower() for ch in "čćžšđ") and " " not in text:
             continue
         checked += 1
-        assert not renderer.has_cyrillic(text), text
-        assert not renderer.is_gendered(text), text
-    assert checked > 15, "sweep found too few literals to be meaningful"
+        assert not renderer.has_cyrillic(text), (module.__name__, text)
+        assert not renderer.is_gendered(text), (module.__name__, text)
+    return checked
 
 
 def test_deterministic_pools_are_policy_clean():

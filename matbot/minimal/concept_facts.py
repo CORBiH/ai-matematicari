@@ -48,7 +48,10 @@ class ExpandFacts:
     expanded_numerator: int | None = None
     expanded_denominator: int | None = None
     value_is_one: bool = False
-    kind: str = "expand"            # expand | same_numerator_denominator
+    #: Telemetry-grade classification of WHICH concept question this was:
+    #: explicit_factor | target_denominator | target_not_multiple |
+    #: same_numerator_denominator | why_same_factor
+    kind: str = "expand"
 
     @property
     def original(self) -> str:
@@ -72,6 +75,19 @@ class ExpandFacts:
         }
 
 
+#: "zašto množimo i brojnik i nazivnik (istim brojem)" — a question about the
+#: RULE rather than about specific numbers. It has a verified answer that needs
+#: no arithmetic, so it must not fall through to free-form model text.
+_WHY_SAME_RE = re.compile(
+    r"(za[sš]to|zbog\s+[cč]ega).{0,40}"
+    r"(mno[zž]|pro[sš]ir|dijel).{0,40}(brojnik|nazivnik|oba|obje|isti)"
+    r"|(za[sš]to).{0,30}isti[m]?\s+broj")
+
+
+def _why_same_factor_facts() -> ExpandFacts:
+    return ExpandFacts(possible=True, kind="why_same_factor")
+
+
 def resolve_expand_question(raw_question: Any) -> ExpandFacts | None:
     """Facts for a fraction-expansion question, or ``None`` when unparseable.
 
@@ -81,6 +97,11 @@ def resolve_expand_question(raw_question: Any) -> ExpandFacts | None:
     text = fold(raw_question)
     if not text:
         return None
+
+    # A rule question ("zašto množimo i brojnik i nazivnik?") has a verified
+    # answer that involves no arithmetic at all.
+    if _WHY_SAME_RE.search(text) and _FRACTION_RE.search(text) is None:
+        return _why_same_factor_facts()
 
     fraction = _FRACTION_RE.search(text)
     target_match = _TARGET_RE.search(text)
@@ -111,12 +132,14 @@ def resolve_expand_question(raw_question: Any) -> ExpandFacts | None:
         if target <= 0 or target % den != 0:
             return ExpandFacts(
                 possible=False, reason="target_denominator_not_multiple",
+                kind="target_not_multiple",
                 original_numerator=num, original_denominator=den,
                 target_denominator=target,
             )
         k = target // den
         return ExpandFacts(
-            possible=True, original_numerator=num, original_denominator=den,
+            possible=True, kind="target_denominator",
+            original_numerator=num, original_denominator=den,
             target_denominator=target, factor=k,
             expanded_numerator=num * k, expanded_denominator=target,
             value_is_one=(num == den),
@@ -125,7 +148,8 @@ def resolve_expand_question(raw_question: Any) -> ExpandFacts | None:
     # An explicit factor was named instead.
     if factor is not None and factor > 0:
         return ExpandFacts(
-            possible=True, original_numerator=num, original_denominator=den,
+            possible=True, kind="explicit_factor",
+            original_numerator=num, original_denominator=den,
             factor=factor, target_denominator=den * factor,
             expanded_numerator=num * factor, expanded_denominator=den * factor,
             value_is_one=(num == den),
@@ -151,6 +175,15 @@ def explain(facts: ExpandFacts) -> str:
             )
         return ("Ovo pitanje ne mogu pouzdano izračunati, ali mogu ti objasniti "
                 "pravilo proširivanja.")
+
+    if facts.kind == "why_same_factor":
+        return (
+            "Razlomak pokazuje odnos brojnika i nazivnika. Ako oba pomnožiš "
+            "istim brojem, taj odnos ostaje isti, pa se vrijednost razlomka ne "
+            "mijenja — dobiješ isti dio, samo zapisan sitnijim dijelovima. "
+            "Ako se pomnoži samo brojnik, dobije se veći dio, a to više nije "
+            "isti razlomak."
+        )
 
     if facts.kind == "same_numerator_denominator":
         return (

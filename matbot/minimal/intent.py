@@ -62,6 +62,22 @@ def is_decline(message: Any) -> bool:
     return bool(_DECLINE_RE.match(fold(message)))
 
 
+#: Replies to "Da li želiš novi zadatak ili objašnjenje?" — matched only when
+#: that confirmation is pending.
+_WANTS_EXPLANATION_RE = re.compile(r"\bobja[sš]nj\w*|\bobjasni\w*|\bpravilo\b")
+_WANTS_TASK_RE = re.compile(r"\bzadat\w*|\bvjezb\w*|\bprimjer\w*")
+
+
+def confirmation_choice(message: Any) -> str:
+    """"task" | "explanation" | "" for a task-or-explanation clarification."""
+    text = fold(message)
+    if _WANTS_EXPLANATION_RE.search(text):
+        return "explanation"
+    if _WANTS_TASK_RE.search(text):
+        return "task"
+    return ""
+
+
 #: "I am stuck on THIS task." Note that bare "zašto" is NOT here — a substantive
 #: "zašto…?" is a question about the maths, which is a CONCEPT_QUESTION.
 _HELP_RE = re.compile(
@@ -79,6 +95,11 @@ _CONCEPT_RE = re.compile(
     r"|\bda\s+li\s+(mogu|moze|se|je|treba|uvijek|ikad)\b|\bje\s+li\s+(tacno|uvijek|to)\b"
     r"|\bkako\s+(to|se\s+de[sš]ava|zna[sš]|funkcioni[sš]e|bi)\b"
     r"|\b[sš]ta\s+bi\s+bilo\b|\bkoja\s+je\s+razlika\b|\bvrijedi\s+li\b")
+
+#: "Proširi 3/5 brojem 7." — an instruction to DEMONSTRATE, not an answer to an
+#: active task (an answer is a bare value like "21/35", never an imperative).
+_EXPAND_INSTRUCTION_RE = re.compile(
+    r"\bpro[sš]ir\w*\s+\d+\s*/\s*\d+\s*(?:brojem|sa|s|na\s+nazivnik|puta)\s*\d+")
 
 #: Words that mean the message is ABOUT the subject matter, used to decide that
 #: a trailing "?" is a real question rather than noise.
@@ -125,6 +146,8 @@ def classify(raw_message: Any) -> Classification:
     # A question ABOUT the maths, before the answer/new-task checks — otherwise
     # "šta ako … proširiti brojem 7" reads as a task request because it contains
     # both a topic word and a digit.
+    if _EXPAND_INSTRUCTION_RE.search(text):
+        return Classification(TurnIntent.CONCEPT_QUESTION, "expand_instruction")
     if _CONCEPT_RE.search(text):
         return Classification(TurnIntent.CONCEPT_QUESTION, "concept")
     if text.rstrip().endswith("?") and len(text.split()) >= 4 \

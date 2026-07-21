@@ -124,6 +124,9 @@ def response_from_result(result: TurnResult, payload: dict) -> dict:
         "effective_topic": topic.npp_id or "",
         "selected_oblast": str(payload.get("selected_oblast") or ""),
         "engine": "minimal",
+        # Decision trace, merged into minimal_routing by the service. Telemetry
+        # only — no existing Sheets column moves.
+        "minimal_telemetry": dict(result.telemetry or {}),
         "next_state": next_state,
     }
 
