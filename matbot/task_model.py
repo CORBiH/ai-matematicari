@@ -29,7 +29,8 @@ MAX_SCHEMA_ITEMS = 20
 
 _VALIDATION_STATES = ("validated", "rejected", "unvalidated")
 _SOURCES = ("template", "gpt_generated", "gpt_rubric", "fallback_template",
-            "student_task", "unknown")
+            "student_task", "image_task", "exam_item", "micro_task", "followup",
+            "unknown")
 
 
 def _s(value: Any, limit: int = 120) -> str:

@@ -31,7 +31,7 @@ from typing import Any
 
 from matbot.answer_checker import check_practice_answer, derive_expected, _fmt_expected
 from matbot.grading_guard import authoritative_verdict
-from matbot import render, task_templates, turn_intent
+from matbot import render, task_activation, task_templates, topic_resolver, turn_intent
 
 ENGINE = "v2"
 DEFAULT_ITEM_COUNT = 3
@@ -139,6 +139,7 @@ class ExamItem:
     verdict: str | None = None          # correct | incorrect | unverified | skipped
     correct: bool | None = None
     help_count: int = 0                 # progressive, non-revealing support
+    task_id: str = ""                   # assigned by the shared activation gate
 
     def to_dict(self) -> dict:
         return {
@@ -146,6 +147,7 @@ class ExamItem:
             "expected_display": self.expected_display, "status": self.status,
             "student_answer": self.student_answer, "verdict": self.verdict,
             "correct": self.correct, "help_count": self.help_count,
+            "task_id": self.task_id,
         }
 
 
@@ -209,6 +211,7 @@ def load_state(raw: Any) -> ExamState | None:
             verdict=(str(it.get("verdict")) if it.get("verdict") else None),
             correct=(bool(it.get("correct")) if it.get("correct") is not None else None),
             help_count=int(it.get("help_count") or 0),
+            task_id=str(it.get("task_id") or "")[:40],
         ))
     if not items:
         return None
@@ -321,6 +324,24 @@ def _next_prompt(state: ExamState) -> str:
 # --------------------------------------------------------------------------- #
 # Transitions                                                                  #
 # --------------------------------------------------------------------------- #
+def _activate_item(question: str, grade: Any, oblast: str, tema: str) -> str:
+    """Route an exam item through the SHARED activation gate.
+
+    The exam no longer decides on its own what may become a task: an item is
+    only usable if ``task_activation`` activates it, exactly like a practice
+    task. Returns the durable task_id, or "" when the item is refused.
+    """
+    identity = topic_resolver.identify(grade, tema, oblast=oblast)
+    decision = task_activation.activate(
+        question=question, source=task_activation.SOURCE_EXAM,
+        topic=identity, mode="exam",
+        validator=lambda q: {"validation_status": "validated"}
+        if derive_expected(q) is not None
+        else {"validation_status": "rejected", "reason": "ungradeable"},
+    )
+    return decision.task_id if decision.activated else ""
+
+
 def start_exam(seed: str, count: int = DEFAULT_ITEM_COUNT, *,
                grade: Any = 6, oblast: Any = "", tema: Any = "") -> ExamState:
     """Build a topic-aware exam. If templates cover the selected grade/oblast/tema,
@@ -335,7 +356,8 @@ def start_exam(seed: str, count: int = DEFAULT_ITEM_COUNT, *,
     if generated:
         items = [
             ExamItem(item_id=f"item_{i+1}", question=g.question,
-                     expected_display=g.expected_display)
+                     expected_display=g.expected_display,
+                     task_id=_activate_item(g.question, grade, oblast_s, tema_s))
             for i, g in enumerate(generated)
         ]
         covered = True
@@ -343,10 +365,14 @@ def start_exam(seed: str, count: int = DEFAULT_ITEM_COUNT, *,
         # No template for the requested topic → explicit generic fallback.
         questions = _select_items(seed, count)
         items = [
-            ExamItem(item_id=f"item_{i+1}", question=q, expected_display=_expected_display(q))
+            ExamItem(item_id=f"item_{i+1}", question=q,
+                     expected_display=_expected_display(q),
+                     task_id=_activate_item(q, grade, oblast_s, tema_s))
             for i, q in enumerate(questions)
         ]
         covered = not topic_requested        # generic is on-target only if none requested
+    # An item that could not be ACTIVATED is not a valid exam item.
+    items = [it for it in items if it.task_id]
 
     return ExamState(exam_id=f"exam_{uuid.uuid4().hex}", exam_status="active",
                      current_index=0, items=items, oblast=oblast_s[:120],

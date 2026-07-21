@@ -15,6 +15,7 @@ import logging
 import json
 import re
 import uuid
+from dataclasses import replace
 from fractions import Fraction
 from typing import Any, Callable
 
@@ -6167,6 +6168,145 @@ def _answer_verdict_detail_for_response(payload: dict) -> str | None:
     return None
 
 
+def _task_candidate(payload: dict, answer: str, response: dict, *,
+                    mode: str, status: str) -> tuple[task_activation.TaskCandidate, str]:
+    """Produce the task CANDIDATE this turn proposes — it activates nothing.
+
+    This is the former 13-branch ``task_text`` ladder, unchanged in behavior but
+    demoted: every branch now yields a labelled candidate, and the activation
+    decision belongs to ``task_activation`` alone (V2) or to the legacy
+    validation blocks below (flag-off rollback).
+
+    Returns ``(candidate, answer)`` — two branches legitimately rewrite the
+    visible answer, so the possibly-updated text travels with the candidate.
+    """
+    TC = task_activation.TaskCandidate
+    _img_state = payload.get("_image_test") or {}
+    last_task = normalize_value(payload.get("last_tutor_task"))[:600]
+
+    if payload.get("_generated_practice_task"):
+        # Phase 5: the deterministically generated task IS the active task (it was
+        # presented via a direct answer). It is validated + guidable next turn.
+        return TC(
+            question=normalize_value(payload["_generated_practice_task"].get("question"))[:600],
+            source=task_activation.SOURCE_TEMPLATE), answer
+    if _img_state.get("style") == "practice" and normalize_value(_img_state.get("current_task")):
+        # AUD-01: kod image_test "practice" stila TEKUĆA stavka sa slike JESTE
+        # aktivni zadatak — postavi je kao last_tutor_task da se učenikov naredni
+        # odgovor deterministički provjeri protiv OCR teksta (ne protiv izmišljenog).
+        return TC(question=normalize_value(_img_state.get("current_task"))[:600],
+                  source=task_activation.SOURCE_IMAGE), answer
+    if (
+        payload.get("_student_task")
+        and status == "ready"
+        and mode in ("practice", "exam")
+        and not payload.get("_image_test")
+    ):
+        # N1: učenikov vlastiti zadatak iz poruke JESTE aktivni zadatak.
+        return TC(question=normalize_value(payload["_student_task"])[:600],
+                  source=task_activation.SOURCE_STUDENT), answer
+    if payload.get("_image_practice_answer") is not None:
+        # N3: odgovor na stavku sa slike — SLJEDEĆA ponuđena stavka postaje
+        # aktivni zadatak (persist; prazno kad su sve riješene). Model ne smije
+        # izmišljati zadatke usred image toka, pa se proza ne ekstrahuje.
+        return TC(question=normalize_value(payload.get("_image_next_task_text"))[:600],
+                  source=task_activation.SOURCE_IMAGE), answer
+    if payload.get("_adaptive_followup_required"):
+        # Full solution reveal consumes the parent task as assisted practice and
+        # immediately tracks a clean independent follow-up task.
+        text = extract_marked_task(answer) or \
+            normalize_value(payload.get("_adaptive_followup_task"))[:600]
+        if text and "Zadatak:" not in answer:
+            answer = (answer.rstrip() + f"\n\nZadatak: {text}").strip()
+            response["answer"] = answer
+        return TC(question=text, source=task_activation.SOURCE_FOLLOWUP,
+                  parent_task_id=normalize_value(_previous_task_id(payload))), answer
+    if payload.get("_adaptive_preserve_active_task") and last_task:
+        return TC(question=last_task, source=task_activation.SOURCE_LEGACY,
+                  continuation=True), answer
+    if (
+        normalize_value(payload.get("_practice_help_intent")).lower() == "hint"
+        and last_task
+    ):
+        return TC(question=last_task, source=task_activation.SOURCE_LEGACY,
+                  continuation=True), answer
+    if payload.get("_explicit_hint_request") and last_task:
+        # Hint ne troši i ne mijenja aktivni zadatak.
+        return TC(question=last_task, source=task_activation.SOURCE_LEGACY,
+                  continuation=True), answer
+    if (
+        payload.get("_direct_answer") is not None
+        or payload.get("_image_test")
+        or payload.get("_solution_revealed")
+        or payload.get("_post_hint_reply")
+        or status != "ready"
+        or mode not in ("practice", "exam")
+    ):
+        # BUG 3/9: samo Vježba/Kontrolni prate aktivni zadatak; explain/quick
+        # nikad (proza objašnjenja ne smije postati last_tutor_task).
+        # CLASS 1: post-hint vođeni potez ne mijenja zadatak — original persistira.
+        return TC(), answer
+    if _is_grading_turn(payload):
+        # BUG 1: na ocjenjivačkom potezu SAMO eksplicitni "Zadatak:" marker —
+        # riješeni izraz iz objašnjenja ne smije postati "novi zadatak".
+        text = extract_marked_task(answer)
+        keep_active = _grading_should_keep_active_task(payload)
+        outcome = _grading_outcome(payload)
+        # AUD-04 (B2) + lifecycle guard: grading turns do not auto-start a
+        # model-invented next task. The current task either stays active
+        # (retry/form/ambiguous) or completes; a fresh task starts on the
+        # student's explicit next-task turn or confirmation.
+        if text and (keep_active or outcome in ("correct", "partial")):
+            text = ""
+            # Zabranjeni zadatak se briše i iz VIDLJIVOG teksta —
+            # učenik ne smije dobiti zadatak koji sistem ne prati.
+            stripped = _remove_marked_task_paragraph(answer)
+            if stripped:
+                answer = stripped
+                response["answer"] = answer
+        if not text and keep_active:
+            return TC(question=last_task, source=task_activation.SOURCE_LEGACY,
+                      continuation=True), answer
+        return TC(question=text, source=task_activation.SOURCE_LEGACY), answer
+    return TC(question=extract_practice_task(answer, mode=mode),
+              source=task_activation.SOURCE_LEGACY), answer
+
+
+def _activate_v2_task(payload: dict, candidate: task_activation.TaskCandidate, *,
+                      mode: str, validator) -> task_activation.ActivationDecision:
+    """THE single V2 activation authority.
+
+    Every candidate — template, student task, micro-task, exam item, image task,
+    model prose, follow-up — reaches active state only through here. The legacy
+    ladder produces candidates; it no longer decides.
+    """
+    identity = _topic_identity(payload)
+    prev_id = normalize_value(_previous_task_id(payload))
+    prev_task = normalize_value(payload.get("last_tutor_task"))[:600]
+
+    # A candidate identical to the ACTIVE task is the same task carried forward
+    # (a hint turn, a retry, or the image flow re-presenting its current item).
+    # It keeps its task_id and is exempt from duplicate rejection — being
+    # identical to itself is the point.
+    continuation = candidate.continuation or (
+        bool(prev_task) and normalize_value(candidate.question)[:600] == prev_task)
+    if continuation and not candidate.continuation:
+        candidate = replace(candidate, continuation=True)
+
+    recent = () if continuation else {
+        normalize_value(t)
+        for t in list(payload.get("recent_tasks") or [])
+        if normalize_value(t)
+    }
+    decision = task_activation.activate_candidate(
+        candidate, validator=validator, topic=identity, mode=mode,
+        task_id=(prev_id if continuation else None), recent=recent,
+        validation_hint=payload.get("_task_validation"),
+    )
+    payload["_activation"] = decision
+    return decision
+
+
 def _attach_task_definition(payload: dict, response: dict) -> None:
     """Phase 1 (Engine V2): emit a durable, server-authoritative TaskDefinition
     mirror of the active task into ``next_state.task`` and ``response.task``.
@@ -6192,8 +6332,23 @@ def _attach_task_definition(payload: dict, response: dict) -> None:
         # derive the schema now (same validator the legacy gate uses).
         validation = _validate_task_activation(question, mode=mode)
     generated = payload.get("_generated_practice_task") or {}
+    # The activated decision is authoritative for identity when V2 owns
+    # activation — the TaskDefinition mirrors it rather than re-deriving from
+    # prose, so the two can never disagree about source or topic.
+    decision = payload.get("_activation")
+    activated = (decision if isinstance(decision, task_activation.ActivationDecision)
+                 and decision.activated else None)
     source = ("template" if generated
               else ("student_task" if payload.get("_student_task") else None))
+    if activated is not None and source is None:
+        if activated.continuation:
+            # The SAME task carried forward keeps the source it was activated
+            # with; reporting a hint turn as "gpt_generated" would misdescribe
+            # where the task came from.
+            prev_task = _previous_next_state(payload).get("task") or {}
+            source = normalize_value(prev_task.get("source")) or None
+        elif activated.source in task_model._SOURCES:
+            source = activated.source
     td = task_model.build_task_definition(
         task_id=next_state.get("task_id"),
         grade=payload.get("grade"),
@@ -6466,80 +6621,9 @@ def _finalize_response(prep: dict, answer: str) -> dict:
         response["practice_task_state"] = "solution_revealed"
     # Tokom image_test toka odgovor NIKAD ne postaje last_tutor_task — aktivni
     # "zadatak" je stavka sa slike i živi u next_state.image_test, ne u prozi.
-    _img_state = payload.get("_image_test") or {}
-    if payload.get("_generated_practice_task"):
-        # Phase 5: the deterministically generated task IS the active task (it was
-        # presented via a direct answer). It is validated + guidable next turn.
-        task_text = normalize_value(payload["_generated_practice_task"].get("question"))[:600]
-    elif _img_state.get("style") == "practice" and normalize_value(_img_state.get("current_task")):
-        # AUD-01: kod image_test "practice" stila TEKUĆA stavka sa slike JESTE
-        # aktivni zadatak — postavi je kao last_tutor_task da se učenikov naredni
-        # odgovor deterministički provjeri protiv OCR teksta (ne protiv izmišljenog).
-        task_text = normalize_value(_img_state.get("current_task"))[:600]
-    elif (
-        payload.get("_student_task")
-        and status == "ready"
-        and mode in ("practice", "exam")
-        and not payload.get("_image_test")
-    ):
-        # N1: učenikov vlastiti zadatak iz poruke JESTE aktivni zadatak.
-        task_text = normalize_value(payload["_student_task"])[:600]
-    elif payload.get("_image_practice_answer") is not None:
-        # N3: odgovor na stavku sa slike — SLJEDEĆA ponuđena stavka postaje
-        # aktivni zadatak (persist; prazno kad su sve riješene). Model ne smije
-        # izmišljati zadatke usred image toka, pa se proza ne ekstrahuje.
-        task_text = normalize_value(payload.get("_image_next_task_text"))[:600]
-    elif payload.get("_adaptive_followup_required"):
-        # Full solution reveal consumes the parent task as assisted practice and
-        # immediately tracks a clean independent follow-up task.
-        task_text = extract_marked_task(answer) or normalize_value(payload.get("_adaptive_followup_task"))[:600]
-        if task_text and "Zadatak:" not in answer:
-            answer = (answer.rstrip() + f"\n\nZadatak: {task_text}").strip()
-            response["answer"] = answer
-    elif payload.get("_adaptive_preserve_active_task") and normalize_value(payload.get("last_tutor_task")):
-        task_text = normalize_value(payload.get("last_tutor_task"))[:600]
-    elif (
-        normalize_value(payload.get("_practice_help_intent")).lower() == "hint"
-        and normalize_value(payload.get("last_tutor_task"))
-    ):
-        task_text = normalize_value(payload.get("last_tutor_task"))[:600]
-    elif payload.get("_explicit_hint_request") and normalize_value(payload.get("last_tutor_task")):
-        # Hint ne troši i ne mijenja aktivni zadatak.
-        task_text = normalize_value(payload.get("last_tutor_task"))[:600]
-    elif (
-        payload.get("_direct_answer") is not None
-        or payload.get("_image_test")
-        or payload.get("_solution_revealed")
-        or payload.get("_post_hint_reply")
-        or status != "ready"
-        or mode not in ("practice", "exam")
-    ):
-        # BUG 3/9: samo Vježba/Kontrolni prate aktivni zadatak; explain/quick
-        # nikad (proza objašnjenja ne smije postati last_tutor_task).
-        # CLASS 1: post-hint vođeni potez ne mijenja zadatak — original persistira.
-        task_text = ""
-    elif _is_grading_turn(payload):
-        # BUG 1: na ocjenjivačkom potezu SAMO eksplicitni "Zadatak:" marker —
-        # riješeni izraz iz objašnjenja ne smije postati "novi zadatak".
-        task_text = extract_marked_task(answer)
-        keep_active = _grading_should_keep_active_task(payload)
-        outcome = _grading_outcome(payload)
-        # AUD-04 (B2) + lifecycle guard: grading turns do not auto-start a
-        # model-invented next task. The current task either stays active
-        # (retry/form/ambiguous) or completes; a fresh task starts on the
-        # student's explicit next-task turn or confirmation.
-        if task_text and (keep_active or outcome in ("correct", "partial")):
-            task_text = ""
-            # Zabranjeni zadatak se briše i iz VIDLJIVOG teksta —
-            # učenik ne smije dobiti zadatak koji sistem ne prati.
-            stripped = _remove_marked_task_paragraph(answer)
-            if stripped:
-                answer = stripped
-                response["answer"] = answer
-        if not task_text and keep_active:
-            task_text = normalize_value(payload.get("last_tutor_task"))[:600]
-    else:
-        task_text = extract_practice_task(answer, mode=mode)
+    candidate, answer = _task_candidate(payload, answer, response,
+                                        mode=mode, status=status)
+    task_text = candidate.question
     # Kontrolni IZ OBLASTI (selected_oblast, bez pojedinačne teme): validiraj po
     # TEMI (oblasti), ne po numeričkoj izračunljivosti — inače validni razlomci/
     # vektori padnu na trougao-ugao fallback (prijavljeni bug).
@@ -6635,6 +6719,31 @@ def _finalize_response(prep: dict, answer: str) -> dict:
                     )
                 response["answer"] = answer
         payload["_task_validation"] = validation
+
+    # ---- Engine V2: ONE activation authority -------------------------------
+    # Everything above only PROPOSES. With V2 enabled, nothing becomes the active
+    # task until ``task_activation`` says so: it owns topic identity, topic
+    # compatibility, gradeability, the prose gate, duplicate rejection, task_id
+    # continuity and the final active/inactive decision. With the flag off the
+    # legacy ladder decision stands unchanged (rollback path).
+    if engine_v2.practice_engine_enabled() and task_text:
+        v2_candidate = task_activation.TaskCandidate(
+            question=task_text, source=candidate.source, kind=candidate.kind,
+            parent_task_id=candidate.parent_task_id,
+            continuation=candidate.continuation,
+            # The legacy blocks above already ran the mode's real validator; a
+            # second run would only re-derive the same answer schema.
+            prevalidated=bool(payload.get("_task_validation")),
+        )
+        decision = _activate_v2_task(
+            payload, v2_candidate, mode=mode,
+            validator=lambda q: _validate_task_activation(q, mode=mode))
+        if decision.activated:
+            task_text = decision.question
+        else:
+            task_text = ""
+            payload["_v2_activation_refused"] = decision.reason
+
     # Server je jedini izvor istine za aktivni zadatak: polje se šalje UVIJEK
     # (i prazno), da klijent ne izvodi vlastitu heuristiku nad prozom.
     response["last_tutor_task"] = task_text

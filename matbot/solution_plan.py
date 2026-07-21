@@ -28,6 +28,7 @@ from math import gcd
 from typing import Any
 
 from matbot.answer_checker import check_practice_answer, split_numbered_items
+from matbot import turn_intent
 
 # Turn classifications produced by ``classify_turn``.
 CORRECT_STEP = "correct_step"
@@ -52,10 +53,16 @@ def _fold(text: Any) -> str:
 
 _YES_RE = re.compile(r"\b(da|jest|jeste|jesu|tacn\w*|djeljiv\w*|dijeli\s+se|moze|moguce)\b")
 _NO_RE = re.compile(r"\b(ne|nije|nisu|nedjeljiv\w*|ne\s+dijeli|nemoguce)\b")
-_HELP_RE = re.compile(
-    r"\b(ne\s*znam|nemam\s+pojma|pomo[cz]\w*|hint|kako|ne\s+razumijem|ne\s+kapiram|"
-    r"objasni|daj\s+mi\s+savjet|zapeo\s+sam|help|savjet)\b"
-)
+# Help detection is NOT redefined here — the Practice Step Engine consumes the
+# shared ``turn_intent`` classifier, so it cannot disagree with the exam or the
+# explanation flow about what "ne znam" means.
+
+
+def _is_help(message: Any) -> bool:
+    """``include_follow_up=False`` preserves the pre-migration verdict for
+    "zašto?" (UNCLEAR, not HELP) — flipping it is a pedagogical change, not part
+    of this consolidation."""
+    return turn_intent.wants_support(message, include_follow_up=False)
 
 
 def _digit_sum(n: int) -> int:
@@ -341,7 +348,7 @@ def check_step(step: Step, message: Any) -> str:
     """Deterministic per-step verdict: correct_step | wrong_step | help | unclear.
     NEVER consults tutor prose — only the student's message and step params."""
     folded = _fold(message)
-    if _HELP_RE.search(folded):
+    if _is_help(message):
         return HELP
     if step.kind in ("div_by", "final_divisible_by"):
         ans = _yes_no(folded)
@@ -387,7 +394,7 @@ def classify_turn(plan: SolutionPlan, cursor: StepCursor, message: Any) -> str:
     # intermediate answers are indistinguishable from the conclusion.
     final = plan.steps[-1] if plan.steps else None
     if (final is not None and final.kind == "final_delegate" and step.id != final.id
-            and _HELP_RE.search(_fold(message)) is None
+            and not _is_help(message)
             and check_step(final, message) == CORRECT_STEP):
         return FINAL_CORRECT
     verdict = check_step(step, message)

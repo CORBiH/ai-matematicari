@@ -72,9 +72,9 @@ _SKIP_RE = re.compile(
     r"idemo\s+dalje|next)\b")
 _HELP_RE = re.compile(
     r"\b(ne\s*znam|nemam\s+pojma|pomo[cčć]\w*|pomozi|ne\s+razumijem|ne\s+kapiram|"
-    r"ne\s+kontam|daj\s+mi\s+savjet|zapeo\s+sam|zapela\s+sam|rijesi\s+ti|"
+    r"ne\s+kontam|daj\s+mi\s+savjet|savjet\w*|zapeo\s+sam|zapela\s+sam|rijesi\s+ti|"
     r"uradi\s+ti|daj\s+odgovor|reci\s+mi\s+odgovor|ne\s+umijem|ne\s+mogu|"
-    r"tesko\s+mi\s+je)\b")
+    r"tesko\s+mi\s+je|help)\b")
 _HINT_RE = re.compile(r"\b(hint|nagovjest\w*|mala\s+pomo[cčć]|navedi\s+me|daj\s+mi\s+trag)\b")
 _EXPLANATION_RE = re.compile(
     r"\bobrazloz\w*|\bobjasn\w*|\bprovjeri\b|\bdokazi\b|\bkorak\s+po\s+korak\b"
@@ -178,3 +178,26 @@ def classify(message: Any, *, has_image: bool = False,
 def is_help(message: Any) -> bool:
     """Back-compat helper for callers that only need the boolean."""
     return classify(message).intent in (Intent.HELP, Intent.HINT)
+
+
+#: Bare "kako" ("how?") is a support request in a step/exam context, but far too
+#: generic to be one everywhere, so it is scoped to ``wants_support`` rather than
+#: to the classifier.
+_BARE_HOW_RE = re.compile(r"\bkako\b")
+
+
+def wants_support(message: Any, *, include_follow_up: bool = False,
+                  include_bare_how: bool = True) -> bool:
+    """Does this turn ask for help rather than answer?
+
+    The single predicate for engines that only need "is this a help turn?".
+    ``include_follow_up`` is opt-in: "zašto?" is a support request pedagogically,
+    but treating it as one changes step-engine verdicts, so each caller opts in
+    deliberately rather than inheriting it.
+    """
+    intent = classify(message).intent
+    if intent in (Intent.HELP, Intent.HINT, Intent.EXPLANATION):
+        return True
+    if include_follow_up and intent is Intent.FOLLOW_UP:
+        return True
+    return bool(include_bare_how and _BARE_HOW_RE.search(fold(message)))
