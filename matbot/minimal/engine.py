@@ -20,13 +20,14 @@ from dataclasses import dataclass
 from typing import Any, Callable
 
 from matbot.minimal import skills
-from matbot.minimal.grading import GradingResult, grade
+from matbot.minimal.grading import GradingResult, grade, target_denominator
 from matbot.minimal.intent import (
     NEW_TASK_INTENTS,
     TurnIntent,
     classify_turn,
 )
 from matbot.minimal.intent import fold as intent_fold
+from matbot.minimal.intent import is_affirmation, is_decline
 from matbot.minimal.renderer import RenderContext, render
 from matbot.minimal.state import ActiveTask, SessionState, new_task
 
@@ -116,9 +117,31 @@ def handle_turn(
     if incoming and not state.origin_runtime_id:
         state = state.with_origin_runtime_id(incoming)
 
+    # ---- a pending yes/no the TUTOR asked -----------------------------------
+    # Consumed BEFORE classification and always cleared, so a stale "da" can
+    # never leak into a later turn. Production asked "Da li želiš novi zadatak?"
+    # and then answered "da" with "Nije mi jasno šta želiš."
+    pending = state.pending_confirmation
+    forced_intent: TurnIntent | None = None
+    if pending:
+        state = state.confirmation_consumed()
+        if pending == "new_task" and is_affirmation(student_raw):
+            forced_intent = TurnIntent.NEW_TASK
+        elif pending == "new_task" and is_decline(student_raw):
+            ctx = RenderContext(state=state, intent="declined",
+                                task=state.active_task)
+            return TurnResult(answer=render(ctx), state=state,
+                              intent="declined", task=state.active_task,
+                              student_raw=student_raw)
+        # anything else: the confirmation is dropped and the turn is classified
+        # normally, so an unrelated message is never swallowed by it.
+
     # Deterministic rules decide; the model is consulted only for a genuine tie.
-    intent = classify_turn(student_raw, openai_chat=openai_chat, model=model,
-                           timeout=timeout).intent
+    if forced_intent is not None:
+        intent = forced_intent           # no model call for a plain "da"
+    else:
+        intent = classify_turn(student_raw, openai_chat=openai_chat, model=model,
+                               timeout=timeout).intent
     task = state.active_task
 
     if not topic.supported:
@@ -195,7 +218,9 @@ def handle_turn(
             "solved": result.solved,
         })
         if result.solved:
-            state = state.with_updated_task(counted).completed_task()
+            # The feedback ASKS whether to continue, so the answer to that
+            # question must be understood on the next turn.
+            state = state.with_updated_task(counted).completed_task().awaiting("new_task")
             ctx = RenderContext(state=state, intent=intent.value, grading=result,
                                 task=counted, may_reveal=True)
             return TurnResult(answer=render(ctx, openai_chat=openai_chat,
@@ -206,7 +231,8 @@ def handle_turn(
         state = state.broke_streak()
         state = state.cleared_task() if give_up else state.with_updated_task(counted)
         ctx = RenderContext(state=state, intent=intent.value, grading=result,
-                            task=counted, may_reveal=give_up)
+                            task=counted, may_reveal=give_up,
+                            target_denominator=target_denominator(counted))
         return TurnResult(answer=render(ctx), state=state, intent=intent.value,
                           grading=result, task=counted, student_raw=student_raw)
 

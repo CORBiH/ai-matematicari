@@ -100,8 +100,10 @@ def test_correct_feedback_does_not_claim_a_next_task_started(client):
     first = sse(client, prod_payload())
     body = _answer_correctly(client, first)
     assert body["answer_verdict"] == "correct"
-    # nothing was created…
-    assert body["next_state"]["task_id"] is None
+    # nothing new was created — the id that remains is the COMPLETED task's,
+    # kept for audit (task_status=completed, nothing active)
+    assert body["next_state"]["task_status"] == "completed"
+    assert body["next_state"]["active_task_kind"] is None
     assert body["last_tutor_task"] == ""
     # …so the wording must not say otherwise
     folded = renderer._fold(body["answer"])

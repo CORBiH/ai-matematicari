@@ -46,21 +46,32 @@ def state_from_payload(payload: dict) -> SessionState:
 
 def response_from_result(result: TurnResult, payload: dict) -> dict:
     """Translate a TurnResult into the response shape the frontend consumes."""
+    # The ACTIVE task drives forward-looking fields; ``audit`` is the task this
+    # turn actually concerned. On a correct completion the active task is
+    # already null, so reading counters from it produced task_id="",
+    # task_status="", attempts=0 on exactly the row that mattered most.
     task = result.state.active_task
+    audit = task or result.task
+    completed = task is None and result.task is not None and result.task.solved
     state_dict = result.state.to_dict()
     next_state = {
         # The core's own state travels in ONE namespaced key; the fields beside
         # it exist only because the current frontend reads them.
         "minimal_state": state_dict,
         "engine": "minimal",
-        "task_id": task.task_id if task else None,
-        "task_status": "active" if task else None,
+        # Audit fields describe the task THIS turn concerned, so a completion
+        # row stays fully auditable after active_task becomes null.
+        "task_id": audit.task_id if audit else None,
+        "task_status": ("active" if task else "completed" if completed else None),
+        "completed_task_id": audit.task_id if completed else None,
         "active_task_kind": "practice" if task else None,
         "correct_streak": result.state.correct_streak,
         "difficulty_level": result.state.difficulty_level,
-        "attempt_count": task.attempts if task else 0,
-        "wrong_attempt_count": task.wrong_attempts if task else 0,
-        "hint_count": task.hints_given if task else 0,
+        "attempt_number": audit.attempts if audit else 0,
+        "attempt_count": audit.attempts if audit else 0,
+        "total_attempt_count": audit.attempts if audit else 0,
+        "wrong_attempt_count": audit.wrong_attempts if audit else 0,
+        "hint_count": audit.hints_given if audit else 0,
         "expected_user_action": "answer_task" if task else "none",
         "task": {
             "task_id": task.task_id, "question": task.question,
@@ -68,6 +79,7 @@ def response_from_result(result: TurnResult, payload: dict) -> dict:
             "tema_title": task.tema_title, "source": "minimal_template",
             "validation_status": "validated",
         } if task else None,
+        "pending_confirmation": result.state.pending_confirmation,
     }
     topic = result.state.topic
     # Sheets reads its audit columns from answer_check.items[0] (see
@@ -100,6 +112,12 @@ def response_from_result(result: TurnResult, payload: dict) -> dict:
         "answer_verdict": result.verdict,
         "answer_verdict_detail": (result.grading.detail if result.grading else None),
         "answer_check": answer_check,
+        "task_id": audit.task_id if audit else None,
+        "task_status": ("active" if task else "completed" if completed else None),
+        "attempt_number": audit.attempts if audit else None,
+        "total_attempt_count": audit.attempts if audit else None,
+        "wrong_attempt_count": audit.wrong_attempts if audit else None,
+        "hint_count": audit.hints_given if audit else None,
         # The minimal engine never asks the model for a verdict.
         "gpt_check_used": False if result.grading else None,
         "final_topic": topic.npp_id or "unknown",

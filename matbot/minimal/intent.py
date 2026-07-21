@@ -45,6 +45,23 @@ def fold(text: Any) -> str:
     return s.lower().strip()
 
 
+#: Replies to a yes/no question the TUTOR asked. Matched only when a
+#: confirmation is actually pending — never used to guess intent otherwise.
+_AFFIRM_RE = re.compile(
+    r"^\s*(da|moze|mo[zž]e|ho[cčć]u|hajde|va[zž]i|ok|okej|naravno|jeste|"
+    r"idemo|daj|moze\s+moze|da\s+molim)\s*[.!]?\s*$")
+_DECLINE_RE = re.compile(
+    r"^\s*(ne|ne[cčć]u|nemoj|ne\s+hvala|ne\s+treba|dosta|stani)\s*[.!]?\s*$")
+
+
+def is_affirmation(message: Any) -> bool:
+    return bool(_AFFIRM_RE.match(fold(message)))
+
+
+def is_decline(message: Any) -> bool:
+    return bool(_DECLINE_RE.match(fold(message)))
+
+
 #: "I am stuck on THIS task." Note that bare "zašto" is NOT here — a substantive
 #: "zašto…?" is a question about the maths, which is a CONCEPT_QUESTION.
 _HELP_RE = re.compile(

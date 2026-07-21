@@ -364,6 +364,59 @@ def _init_sheets():
     return sheet
 
 
+def _ensure_width(ws: Any, needed: int) -> None:
+    """Widen the sheet if it has fewer columns than the header row."""
+    try:
+        current = int(getattr(ws, "col_count", 0) or 0)
+    except (TypeError, ValueError):
+        return
+    if not current or current >= needed:
+        return
+    resize = getattr(ws, "resize", None)
+    if callable(resize):
+        try:
+            resize(cols=needed)
+        except Exception:
+            log.debug("Sheets: resize na %d kolona nije uspio", needed, exc_info=True)
+
+
+def _update_range(ws: Any, range_name: str, values: list) -> None:
+    """``ws.update`` across gspread 5 and 6 argument orders."""
+    try:
+        ws.update(values=values, range_name=range_name)
+    except TypeError:
+        ws.update(range_name, values)          # gspread 5.x positional order
+
+
+def _sheets_safe(value: Any) -> Any:
+    """Coerce one cell to something the API stores verbatim.
+
+    With ``RAW`` every value is written exactly as given, so anything that is
+    not a plain scalar must be flattened HERE rather than left for the client
+    library to guess at. ``None`` becomes an empty string — never a sentinel.
+    """
+    if value is None:
+        return ""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value
+    if isinstance(value, str):
+        return value
+    try:
+        return json.dumps(value, ensure_ascii=False, sort_keys=True, default=str)
+    except Exception:
+        return str(value)
+
+
+def _sheets_safe_row(values: list[Any]) -> list[Any]:
+    """Exactly ``len(SHEET_HEADERS)`` sanitized cells — never more, never fewer."""
+    row = [_sheets_safe(v) for v in list(values)[: len(SHEET_HEADERS)]]
+    while len(row) < len(SHEET_HEADERS):
+        row.append("")
+    return row
+
+
 def _ensure_sheet_layout(ws: Any) -> None:
     """Best-effort header/format setup. Never raises."""
     global _sheet_layout_prepared
@@ -376,9 +429,15 @@ def _ensure_sheet_layout(ws: Any) -> None:
                 existing = list(ws.row_values(1) or [])
             except Exception:
                 existing = []
+        # The grid must be at least as wide as the header row. Appending columns
+        # to SHEET_HEADERS without widening an existing sheet leaves data rows
+        # wider than the grid, which the API can truncate or shift.
+        _ensure_width(ws, len(SHEET_HEADERS))
         if existing[: len(SHEET_HEADERS)] != SHEET_HEADERS and hasattr(ws, "update"):
             end_col = _sheet_col(len(SHEET_HEADERS))
-            ws.update(f"A1:{end_col}1", [SHEET_HEADERS])
+            # gspread >= 6 takes VALUES first, range second. The old order still
+            # works via a deprecation shim, but relying on it is fragile.
+            _update_range(ws, f"A1:{end_col}1", [SHEET_HEADERS])
         for method_name, args in (
             ("freeze", {"rows": 1}),
             ("set_basic_filter", {"name": f"A1:{_sheet_col(len(SHEET_HEADERS))}1"}),
@@ -489,7 +548,8 @@ def _append_row_once(values: list[Any]) -> None:
         if not ws:
             raise _SheetsPermanentError("sheets_not_configured")
         _ensure_sheet_layout(ws)
-        ws.append_row(values, value_input_option=SHEETS_VALUE_INPUT_OPTION)
+        ws.append_row(_sheets_safe_row(values),
+                      value_input_option=SHEETS_VALUE_INPUT_OPTION)
 
 
 def _deliver_event(event: dict[str, Any]) -> bool:

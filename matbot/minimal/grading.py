@@ -11,6 +11,7 @@ choose words for it; it cannot change it.
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -67,6 +68,54 @@ def _normalized(value: Any) -> str:
     return str(value)
 
 
+#: Verdict for "right value, wrong required form" on a form-bound skill.
+WRONG_TARGET_DENOMINATOR = "incorrect_target_denominator"
+
+_FRACTION_RE = re.compile(r"(-?\d+)\s*/\s*(\d+)")
+
+
+def _apply_skill_policy(task: ActiveTask, raw: str, *, verdict: str,
+                        solved: bool, detail: str) -> tuple[str, bool, str]:
+    """Tighten acceptance where the TASK demands a specific form.
+
+    ``fraction_expand`` names the target denominator in the question, so an
+    answer is only complete when it uses it. Production accepted 4/8 for
+    "Proširi 1/2 na nazivnik 4" (equivalent value, wrong denominator) and even
+    2/4 for "Proširi 2/4 na nazivnik 20" (the unexpanded original), because the
+    generic checker reports ``correct_value_wrong_form``, which mapped to
+    "correct".
+
+    Every other skill is returned unchanged — equivalent forms stay acceptable.
+    """
+    if task.skill_id != "fraction_expand":
+        return verdict, solved, detail
+
+    expected = _FRACTION_RE.search(task.expected_display or "")
+    student = _FRACTION_RE.search(raw or "")
+    if expected is None or student is None:
+        return verdict, solved, detail
+
+    exp_num, exp_den = int(expected.group(1)), int(expected.group(2))
+    stu_num, stu_den = int(student.group(1)), int(student.group(2))
+    if stu_num == exp_num and stu_den == exp_den:
+        return verdict, solved, detail          # exactly the required form
+
+    # Equivalent value but not the requested denominator → real progress, not a
+    # solved task. The task stays active and the streak must not advance.
+    if stu_den and exp_den and stu_num * exp_den == exp_num * stu_den:
+        return "partial", False, WRONG_TARGET_DENOMINATOR
+    return "incorrect", False, ("incorrect" if detail.startswith("correct")
+                                else detail)
+
+
+def target_denominator(task: ActiveTask) -> int | None:
+    """The denominator a fraction_expand task explicitly requires."""
+    if task.skill_id != "fraction_expand":
+        return None
+    match = _FRACTION_RE.search(task.expected_display or "")
+    return int(match.group(2)) if match else None
+
+
 def grade(task: ActiveTask, raw_message: Any) -> GradingResult:
     """Grade one answer against one task. The ONLY grading entry point.
 
@@ -114,6 +163,12 @@ def grade(task: ActiveTask, raw_message: Any) -> GradingResult:
     else:
         verdict, solved = "incorrect", False
 
+    # Skill-specific acceptance: the general checker judges VALUE, but some
+    # tasks also require a FORM. Applied after the generic mapping so the
+    # checker itself stays untouched for every other skill.
+    verdict, solved, detail = _apply_skill_policy(
+        task, raw, verdict=verdict, solved=solved, detail=detail)
+    evidence["checker_verdict"] = detail
     evidence["match"] = solved
     return GradingResult(
         task_id=task.task_id, verdict=verdict, solved=solved, student_raw=raw,

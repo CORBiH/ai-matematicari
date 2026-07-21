@@ -90,6 +90,10 @@ class SessionState:
     #: Signature of the last NEW-TASK request. Bounded to one entry on purpose:
     #: it only answers "is this the same request repeated?", nothing more.
     last_request_signature: str = ""
+    #: A yes/no question the tutor asked, awaiting the student's reply.
+    #: Only ever set by the engine, never inferred from prose. "" = nothing
+    #: pending. Currently the single value is "new_task".
+    pending_confirmation: str = ""
 
     # -- transitions: each returns a NEW state --------------------------------
     def with_task(self, task: ActiveTask) -> "SessionState":
@@ -125,6 +129,12 @@ class SessionState:
     def with_request_signature(self, signature: str) -> "SessionState":
         return replace(self, last_request_signature=str(signature or "")[:80])
 
+    def awaiting(self, what: str) -> "SessionState":
+        return replace(self, pending_confirmation=str(what or "")[:40])
+
+    def confirmation_consumed(self) -> "SessionState":
+        return replace(self, pending_confirmation="")
+
     # -- serialization: the ONLY representation crossing the wire -------------
     def to_dict(self) -> dict:
         return {
@@ -140,6 +150,7 @@ class SessionState:
             "difficulty_level": self.difficulty_level,
             "origin_runtime_id": self.origin_runtime_id,
             "last_request_signature": self.last_request_signature,
+            "pending_confirmation": self.pending_confirmation,
         }
 
     @classmethod
@@ -169,6 +180,7 @@ class SessionState:
             difficulty_level=max(1, min(_int("difficulty_level") or 1, 3)),
             origin_runtime_id=str(raw.get("origin_runtime_id") or "")[:80],
             last_request_signature=str(raw.get("last_request_signature") or "")[:80],
+            pending_confirmation=str(raw.get("pending_confirmation") or "")[:40],
         )
 
 

@@ -195,7 +195,12 @@ def test_one_task_id_until_completion(browser):
         assert _task_id(body) == tid, msg
     body = browser.send(_expected_for(first["last_tutor_task"]))
     assert body["answer_verdict"] == "correct"
-    assert _task_id(body) is None                      # completed, not reused
+    # task_id is PRESERVED on the completion row for audit (2026-07-21); the
+    # task is marked finished rather than erased.
+    assert _task_id(body) == tid
+    assert body["next_state"]["task_status"] == "completed"
+    assert body["next_state"]["active_task_kind"] is None
+    assert body["last_tutor_task"] == ""               # nothing active
 
 
 def test_help_never_loses_the_task_or_reveals(browser):

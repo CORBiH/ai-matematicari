@@ -165,6 +165,8 @@ class RenderContext:
     unsupported_topic: str = ""
     #: The student's EXACT raw question, for CONCEPT_QUESTION turns.
     concept_question: str = ""
+    #: The denominator a fraction_expand task requires, for precise feedback.
+    target_denominator: int | None = None
 
     @property
     def seed(self) -> str:
@@ -191,6 +193,12 @@ def feedback(ctx: RenderContext) -> str:
     if g.verdict == "correct":
         head = _pick(_CORRECT, ctx.seed, "correct")
         return f"{head} {_pick(_NEXT_INVITE, ctx.seed, 'invite')}"
+    if g.detail == "incorrect_target_denominator":
+        # Name the requirement the answer missed, not a generic "not yet".
+        needed = ctx.target_denominator
+        target = f" nazivnik {needed}" if needed else " zadani nazivnik"
+        return (f"Vrijednost razlomka je ista, ali zadatak traži{target}. "
+                "Pomnoži brojnik i nazivnik istim brojem.")
     if g.verdict == "partial":
         head = _pick(_PARTIAL, ctx.seed, "partial")
     elif g.verdict == "unverified":
@@ -404,6 +412,8 @@ def render(ctx: RenderContext, *, openai_chat: Callable | None = None,
             # Brief reminder of the open task — never its answer.
             text = f"{text}\n\nZadatak je i dalje:\n{ctx.task.question}"
         return _finish(text)
+    if ctx.intent == "declined":
+        return _finish("U redu. Kad poželiš, reci „daj mi zadatak”.")
     if ctx.intent == TurnIntent.OTHER.value:
         return _finish(clarification(ctx))
     if ctx.grading is not None:
