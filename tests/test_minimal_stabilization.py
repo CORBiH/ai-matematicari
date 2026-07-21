@@ -368,11 +368,23 @@ def test_every_literal_in_the_renderer_is_policy_clean():
     """
     import ast
     tree = ast.parse(open(renderer.__file__, encoding="utf-8").read())
+    # Strings assigned to *_SYSTEM are INSTRUCTIONS to the model, not output —
+    # they legitimately quote gendered forms as counter-examples.
+    prompt_strings = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign) and any(
+                isinstance(t, ast.Name) and t.id.endswith("_SYSTEM")
+                for t in node.targets):
+            for sub in ast.walk(node.value):
+                if isinstance(sub, ast.Constant) and isinstance(sub.value, str):
+                    prompt_strings.add(sub.value)
     checked = 0
     for node in ast.walk(tree):
         if not isinstance(node, ast.Constant) or not isinstance(node.value, str):
             continue
         text = node.value
+        if text in prompt_strings:
+            continue
         # only student-facing Bosnian prose, not regexes/keys/docstrings
         if len(text) < 12 or "\\b" in text or text.strip().startswith(("http", "{")):
             continue

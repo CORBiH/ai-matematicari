@@ -220,9 +220,16 @@ def test_child_friendly_feedback_is_natural_and_varied(browser):
 
 
 def test_new_task_avoids_repeating_recent_questions(browser):
+    """Distinct requests must yield distinct tasks.
+
+    The phrasings differ on purpose: since 2026-07-21 an IDENTICAL repeated
+    request returns the existing task instead of replacing it (see
+    test_minimal_conversation.py), which is a separate contract.
+    """
     seen = []
-    for _ in range(4):
-        body = browser.send("daj mi novi zadatak")
+    for message in ("daj mi zadatak", "daj mi novi zadatak",
+                    "hoću još jedan zadatak", "daj mi drugi zadatak"):
+        body = browser.send(message)
         seen.append(body["last_tutor_task"])
     assert len(set(seen)) == len(seen), seen
 

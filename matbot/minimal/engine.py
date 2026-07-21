@@ -21,7 +21,12 @@ from typing import Any, Callable
 
 from matbot.minimal import skills
 from matbot.minimal.grading import GradingResult, grade
-from matbot.minimal.intent import NEW_TASK_INTENTS, TurnIntent, classify
+from matbot.minimal.intent import (
+    NEW_TASK_INTENTS,
+    TurnIntent,
+    classify_turn,
+)
+from matbot.minimal.intent import fold as intent_fold
 from matbot.minimal.renderer import RenderContext, render
 from matbot.minimal.state import ActiveTask, SessionState, new_task
 
@@ -60,6 +65,13 @@ def _offer_task(state: SessionState) -> tuple[SessionState, ActiveTask | None]:
     task = new_task(skill_id=topic.skill_id, question=question,
                     expected_display=expected, topic=topic)
     return state.with_task(task), task
+
+
+def _request_signature(raw_message: Any) -> str:
+    """Compact signature of a new-task REQUEST, for immediate-repeat detection."""
+    import re as _re
+    folded = _re.sub(r"[^a-z0-9 ]+", " ", intent_fold(raw_message))
+    return " ".join(folded.split())[:80]
 
 
 def _apply_difficulty(state: SessionState, intent: TurnIntent) -> SessionState:
@@ -104,7 +116,9 @@ def handle_turn(
     if incoming and not state.origin_runtime_id:
         state = state.with_origin_runtime_id(incoming)
 
-    intent = classify(student_raw).intent
+    # Deterministic rules decide; the model is consulted only for a genuine tie.
+    intent = classify_turn(student_raw, openai_chat=openai_chat, model=model,
+                           timeout=timeout).intent
     task = state.active_task
 
     if not topic.supported:
@@ -115,8 +129,35 @@ def handle_turn(
         return TurnResult(answer=render(ctx), state=state, intent=intent.value,
                           topic_supported=False, student_raw=student_raw)
 
-    # ---- NEW TASK ---------------------------------------------------------
-    if intent in NEW_TASK_INTENTS or (task is None and intent is not TurnIntent.HELP):
+    # ---- CONCEPT QUESTION: answer it, change NOTHING ------------------------
+    # A question about the maths is not a task request. Production created
+    # "Proširi 2/4 na nazivnik 20." in reply to "šta ako imamo isti brojnik…"
+    # and never answered the student.
+    if intent is TurnIntent.CONCEPT_QUESTION:
+        ctx = RenderContext(state=state, intent=intent.value, task=task,
+                            concept_question=student_raw)
+        return TurnResult(
+            answer=render(ctx, openai_chat=openai_chat, model=model,
+                          timeout=timeout),
+            state=state,                 # streak, attempts, task all untouched
+            intent=intent.value, task=task, student_raw=student_raw)
+
+    # ---- NEW TASK ----------------------------------------------------------
+    # ONLY an explicit new-task intent may create a task. Previously any
+    # non-HELP intent did so whenever no task was active, which is how an
+    # unrecognised message silently produced one.
+    if intent in NEW_TASK_INTENTS:
+        # A repeated identical request while a task is already active returns
+        # THAT task instead of replacing it (production issued two ids for the
+        # same generated task ten seconds apart).
+        signature = _request_signature(student_raw)
+        if (task is not None and intent is TurnIntent.NEW_TASK
+                and signature and signature == state.last_request_signature):
+            ctx = RenderContext(state=state, intent=intent.value, task=task)
+            return TurnResult(answer=render(ctx), state=state,
+                              intent=intent.value, task=task,
+                              student_raw=student_raw)
+        state = state.with_request_signature(signature)
         state = _apply_difficulty(state, intent)
         state, task = _offer_task(state)
         if task is None:
@@ -169,7 +210,7 @@ def handle_turn(
         return TurnResult(answer=render(ctx), state=state, intent=intent.value,
                           grading=result, task=counted, student_raw=student_raw)
 
-    # ---- anything else -----------------------------------------------------
-    ctx = RenderContext(state=state, intent=intent.value, task=task)
+    # ---- anything else: ask what was meant; never touch task state ---------
+    ctx = RenderContext(state=state, intent=TurnIntent.OTHER.value, task=task)
     return TurnResult(answer=render(ctx), state=state, intent=intent.value,
                       task=task, student_raw=student_raw)

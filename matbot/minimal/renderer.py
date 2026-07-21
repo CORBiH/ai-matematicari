@@ -163,6 +163,8 @@ class RenderContext:
     #: True only when the task is finished and the answer may be shown.
     may_reveal: bool = False
     unsupported_topic: str = ""
+    #: The student's EXACT raw question, for CONCEPT_QUESTION turns.
+    concept_question: str = ""
 
     @property
     def seed(self) -> str:
@@ -222,6 +224,75 @@ def help_reply(ctx: RenderContext) -> str:
                    ctx.seed, "help")
     hint = _hint_text(task.skill_id, task.hints_given)
     return f"{opener} {hint}\n\nZadatak je i dalje:\n{task.question}"
+
+
+_CONCEPT_SYSTEM = (
+    "Ti si tutor matematike za učenika 6. razreda u Bosni i Hercegovini.\n"
+    "Odgovori KRATKO i jasno na pitanje učenika o gradivu.\n"
+    "PRAVILA:\n"
+    "- Piši bosanskom latinicom, ijekavicom.\n"
+    "- Najviše 3–4 kratke rečenice.\n"
+    "- Daj jedan konkretan primjer s brojevima.\n"
+    "- NE postavljaj novi zadatak i NE traži od učenika da nešto riješi.\n"
+    "- NE koristi rodno označene oblike (npr. „riješio”, „željela”).\n"
+    "- Ne hvali pretjerano."
+)
+
+#: Said when a concept question arrives and no model is available.
+_CONCEPT_FALLBACK = (
+    "Dobro pitanje. Za sada ti na to ne mogu odgovoriti detaljno, ali mogu ti "
+    "dati zadatak iz ove teme ili objasniti korak po korak kroz primjer."
+)
+
+
+def concept_answer(ctx: RenderContext, *, openai_chat: Callable | None,
+                   model: str, timeout: float | None) -> str:
+    """Answer a question ABOUT the maths. Creates nothing, grades nothing.
+
+    The model is given the canonical topic, the resolved skill, the student's
+    exact raw question and (when present) the active task — and its reply is put
+    through the same language policy as every other string. On any failure the
+    deterministic fallback is used.
+    """
+    question = (ctx.concept_question or "").strip()
+    if openai_chat is None or not question:
+        return _CONCEPT_FALLBACK
+    topic = ctx.state.topic
+    context = [
+        f"Tema: {topic.title or topic.npp_id or 'nepoznata'}",
+        f"Vještina: {topic.skill_id or 'nepoznata'}",
+    ]
+    if ctx.task is not None:
+        # Present so the answer can stay relevant — the ANSWER is never included.
+        context.append(f"Trenutni zadatak učenika: {ctx.task.question}")
+    context.append(f"Pitanje učenika: {question}")
+    try:
+        response = openai_chat(
+            model,
+            [{"role": "system", "content": _CONCEPT_SYSTEM},
+             {"role": "user", "content": "\n".join(context)}],
+            timeout=timeout, max_tokens=320,
+        )
+        text = (response.choices[0].message.content or "").strip()
+    except Exception:
+        return _CONCEPT_FALLBACK
+    if not text:
+        return _CONCEPT_FALLBACK
+    # Same policy as everything else: no Cyrillic, no gendered wording.
+    text = to_latin(text)
+    if is_gendered(text):
+        return _CONCEPT_FALLBACK
+    return text[:900]
+
+
+def clarification(ctx: RenderContext) -> str:
+    """An unrecognised message NEVER creates a task; it asks what was meant."""
+    if ctx.task is not None:
+        # "Nisam siguran" is gender-marked; the policy forbids that even when the
+        # TUTOR is the subject, so the clarification is phrased impersonally.
+        return ("Nije mi jasno šta želiš. Možeš odgovoriti na zadatak, tražiti "
+                "pomoć ili novi zadatak.\n\nZadatak je:\n" + ctx.task.question)
+    return "Nije mi jasno šta želiš. Da li želiš novi zadatak ili objašnjenje?"
 
 
 def unsupported_topic(ctx: RenderContext) -> str:
@@ -320,12 +391,21 @@ def render(ctx: RenderContext, *, openai_chat: Callable | None = None,
     _NEW_TASK_INTENT_VALUES = {i.value for i in NEW_TASK_INTENTS}
 
     if ctx.unsupported_topic:
-        return to_ijekavica(unsupported_topic(ctx))
-    if ctx.intent == TurnIntent.NEW_TASK.value and ctx.task is not None \
+        return _finish(unsupported_topic(ctx))
+    if ctx.intent in _NEW_TASK_INTENT_VALUES and ctx.task is not None \
             and ctx.grading is None:
-        return to_ijekavica(present_task(ctx))
+        return _finish(present_task(ctx))
     if ctx.intent == TurnIntent.HELP.value:
-        return to_ijekavica(help_reply(ctx))
+        return _finish(help_reply(ctx))
+    if ctx.intent == TurnIntent.CONCEPT_QUESTION.value:
+        text = concept_answer(ctx, openai_chat=openai_chat, model=model,
+                              timeout=timeout)
+        if ctx.task is not None:
+            # Brief reminder of the open task — never its answer.
+            text = f"{text}\n\nZadatak je i dalje:\n{ctx.task.question}"
+        return _finish(text)
+    if ctx.intent == TurnIntent.OTHER.value:
+        return _finish(clarification(ctx))
     if ctx.grading is not None:
         text = feedback(ctx)
         # Only the short feedback line is ever handed to the model, and only
@@ -334,5 +414,5 @@ def render(ctx: RenderContext, *, openai_chat: Callable | None = None,
         if ctx.grading.verdict == "correct":
             text = phrase_with_model(text, openai_chat=openai_chat, model=model,
                                      timeout=timeout, allow_verdict_words=True)
-        return to_ijekavica(text)
-    return to_ijekavica(other_turn(ctx))
+        return _finish(text)
+    return _finish(other_turn(ctx))
