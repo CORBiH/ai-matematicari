@@ -26,6 +26,71 @@ from matbot.minimal.state import ActiveTask, SessionState
 MAX_PHRASED_CHARS = 400
 
 
+# --------------------------------------------------------------------------- #
+# Language policy — ONE place, applied to every rendered string                 #
+# --------------------------------------------------------------------------- #
+#: Serbian Cyrillic → Bosnian Latin. Digraphs first so "њ" → "nj", not "n"+"j".
+_CYRILLIC_MAP = {
+    "Љ": "Lj", "Њ": "Nj", "Џ": "Dž", "љ": "lj", "њ": "nj", "џ": "dž",
+    "А": "A", "Б": "B", "В": "V", "Г": "G", "Д": "D", "Ђ": "Đ", "Е": "E",
+    "Ж": "Ž", "З": "Z", "И": "I", "Ј": "J", "К": "K", "Л": "L", "М": "M",
+    "Н": "N", "О": "O", "П": "P", "Р": "R", "С": "S", "Т": "T", "Ћ": "Ć",
+    "У": "U", "Ф": "F", "Х": "H", "Ц": "C", "Ч": "Č", "Ш": "Š",
+    "а": "a", "б": "b", "в": "v", "г": "g", "д": "d", "ђ": "đ", "е": "e",
+    "ж": "ž", "з": "z", "и": "i", "ј": "j", "к": "k", "л": "l", "м": "m",
+    "н": "n", "о": "o", "п": "p", "р": "r", "с": "s", "т": "t", "ћ": "ć",
+    "у": "u", "ф": "f", "х": "h", "ц": "c", "ч": "č", "ш": "š",
+}
+_CYRILLIC_RE = re.compile(r"[Ѐ-ӿ]")
+
+#: Gender-marked wording. Bosnian past participles carry gender, so any of these
+#: means the text is guessing who the student is. Slash forms are equally bad —
+#: they are still gender-marked, just twice.
+_GENDERED_RE = re.compile(
+    r"\b\w+(?:io|ao|la)\s*/\s*\w+(?:la|ila|ao|io)\b"          # riješio/riješila
+    r"|\b(?:rije[sš]i|uradi|napravi|postavi|poku[sš]a|potrudi|"
+    r"nau[cč]i|zapo[cč]e|zavr[sš]i|po[cč]e|misli|shvati)(?:o|la)\b"
+    # želio/željela and volio/voljela do not share a single stem
+    r"|\b[zž]eli?o\b|\b[zž]eljela\b|\bvolio\b|\bvoljela\b"
+    r"|\b(?:bio|bila|siguran|sigurna|spreman|spremna)\b",
+    re.IGNORECASE)
+
+#: Openers that read as sycophantic or odd after a routine correct answer.
+_BAD_OPENER_RE = re.compile(r"^\s*(naravno|svakako|apsolutno)\b[,!.]?", re.IGNORECASE)
+
+#: Math must survive language normalization untouched.
+_MATH_SPAN_RE = re.compile(r"\d+\s*/\s*\d+|[a-zA-Z]\s*=\s*[^\s,.;]+|\d+")
+
+
+def to_latin(text: str) -> str:
+    """Transliterate any Cyrillic to Bosnian Latin. Latin text is unchanged."""
+    if not _CYRILLIC_RE.search(text or ""):
+        return text
+    return "".join(_CYRILLIC_MAP.get(ch, ch) for ch in text)
+
+
+def has_cyrillic(text: Any) -> bool:
+    return bool(_CYRILLIC_RE.search(str(text or "")))
+
+
+def is_gendered(text: Any) -> bool:
+    return bool(_GENDERED_RE.search(str(text or "")))
+
+
+def enforce_language(text: str) -> str:
+    """The single language gate every rendered string passes through.
+
+    Transliterates Cyrillic and strips a sycophantic opener. It does NOT try to
+    de-gender text — that is unreliable — so callers that accept model wording
+    must reject gendered candidates outright (see ``phrase_with_model``).
+    Mathematical spans are never altered: transliteration touches only Cyrillic
+    letters, and the opener strip is anchored to the start of the string.
+    """
+    out = to_latin(str(text or ""))
+    out = _BAD_OPENER_RE.sub("", out).lstrip()
+    return out
+
+
 def _pick(pool: Sequence[str], seed: Any, salt: str = "") -> str:
     """Deterministic variety: stable for a turn, different across turns."""
     if not pool:
@@ -34,11 +99,17 @@ def _pick(pool: Sequence[str], seed: Any, salt: str = "") -> str:
     return pool[int(hashlib.sha256(key).hexdigest(), 16) % len(pool)]
 
 
-_CORRECT = ("Tačno.", "Tako je.", "Tačno, dobro si to uradio.")
+#: LANGUAGE POLICY (see ``enforce_language``): Bosnian Latin script only, and
+#: never a gendered form. Bosnian marks gender on past participles ("uradio" /
+#: "uradila"), so every phrase here is written to avoid them entirely — no
+#: slash forms, no guessing. "Postupak je dobar." replaces "Dobro si postavio".
+_CORRECT = ("Tačno.", "Tako je.", "Tačno, postupak je dobar.")
 _PARTIAL = ("Dio je dobar, ali nije sve.", "Na dobrom si putu — još nije potpuno.",
             "Blizu si, nedostaje još jedan korak.")
 _INCORRECT = ("Nije još tačno.", "Ovaj odgovor nije tačan.", "Nije tačno.")
-_UNVERIFIED = ("Nisam siguran da sam dobro razumio tvoj odgovor.",)
+#: "Nisam siguran" is masculine even though the TUTOR is speaking — the policy
+#: is no gender marking anywhere, so this is phrased impersonally.
+_UNVERIFIED = ("Ovo ne prepoznajem kao odgovor na zadatak.",)
 _NEXT_INVITE = ("Želiš li još jedan zadatak?", "Idemo na sljedeći?",
                 "Hoćeš još jedan zadatak?")
 
@@ -150,7 +221,7 @@ def unsupported_topic(ctx: RenderContext) -> str:
 def other_turn(ctx: RenderContext) -> str:
     task = ctx.task
     if task is not None:
-        return ("Nisam siguran da je to odgovor na zadatak. Napiši svoj odgovor, "
+        return ("Ovo ne prepoznajem kao odgovor na zadatak. Napiši svoj odgovor, "
                 "ili reci „pomozi” ako ti treba pomoć.\n\nZadatak je:\n"
                 f"{task.question}")
     return ("Reci „daj mi zadatak” pa ću ti dati zadatak iz izabrane teme.")
@@ -204,15 +275,28 @@ def phrase_with_model(text: str, *, openai_chat: Callable | None, model: str,
     # and must not invent numbers (a smuggled answer or a new task).
     if not allow_verdict_words and _BANNED_IN_PHRASING.search(_fold(candidate)):
         return text
+    # Language policy is enforced by REJECTION here, not by rewriting: a model
+    # reply that guesses the student's gender ("riješio", "potrudila") or slips
+    # into Cyrillic is discarded in favour of the deterministic text.
+    if is_gendered(candidate) or has_cyrillic(candidate):
+        return text
+    if _BAD_OPENER_RE.match(candidate):
+        return text
     if set(re.findall(r"\d+", candidate)) - set(re.findall(r"\d+", text)):
         return text
     return to_ijekavica(candidate)
 
 
+def _finish(text: str) -> str:
+    """ijekavica + the language gate. The LAST thing every string passes."""
+    return enforce_language(to_ijekavica(text))
+
+
 def render(ctx: RenderContext, *, openai_chat: Callable | None = None,
            model: str = "", timeout: float | None = None) -> str:
     """Produce the student-facing message for this turn."""
-    from matbot.minimal.intent import TurnIntent
+    from matbot.minimal.intent import NEW_TASK_INTENTS, TurnIntent
+    _NEW_TASK_INTENT_VALUES = {i.value for i in NEW_TASK_INTENTS}
 
     if ctx.unsupported_topic:
         return to_ijekavica(unsupported_topic(ctx))

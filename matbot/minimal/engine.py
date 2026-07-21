@@ -21,7 +21,7 @@ from typing import Any, Callable
 
 from matbot.minimal import skills
 from matbot.minimal.grading import GradingResult, grade
-from matbot.minimal.intent import TurnIntent, classify
+from matbot.minimal.intent import NEW_TASK_INTENTS, TurnIntent, classify
 from matbot.minimal.renderer import RenderContext, render
 from matbot.minimal.state import ActiveTask, SessionState, new_task
 
@@ -53,13 +53,27 @@ def _offer_task(state: SessionState) -> tuple[SessionState, ActiveTask | None]:
         return state, None
     made = skills.generate_question(
         topic.skill_id, seed=f"{state.session_id}|{state.turn_index}",
-        avoid=state.recent_questions)
+        avoid=state.recent_questions, difficulty=state.difficulty_level)
     if made is None:
         return state, None
     question, expected = made
     task = new_task(skill_id=topic.skill_id, question=question,
                     expected_display=expected, topic=topic)
     return state.with_task(task), task
+
+
+def _apply_difficulty(state: SessionState, intent: TurnIntent) -> SessionState:
+    """HARDER/EASIER move the level by one, bounded; NEW_TASK keeps it.
+
+    The level only changes for skills that actually implement bands, so the
+    engine never records a difficulty change it cannot deliver.
+    """
+    if intent not in (TurnIntent.HARDER, TurnIntent.EASIER):
+        return state
+    if not skills.supports_difficulty(state.topic.skill_id):
+        return state
+    step = 1 if intent is TurnIntent.HARDER else -1
+    return state.with_difficulty(state.difficulty_level + step)
 
 
 def handle_turn(
@@ -83,6 +97,13 @@ def handle_turn(
         topic = state.topic          # nothing new selected → keep the session's
     state = state.with_topic(topic)
 
+    # The client echoes the CANONICAL id back on later turns (index.html's
+    # adoptResponseTopic overwrites state.topic with effective_topic), so the
+    # ORIGINAL runtime id is recorded once and then never overwritten.
+    incoming = str(selected_topic or "").strip()
+    if incoming and not state.origin_runtime_id:
+        state = state.with_origin_runtime_id(incoming)
+
     intent = classify(student_raw).intent
     task = state.active_task
 
@@ -95,7 +116,8 @@ def handle_turn(
                           topic_supported=False, student_raw=student_raw)
 
     # ---- NEW TASK ---------------------------------------------------------
-    if intent is TurnIntent.NEW_TASK or (task is None and intent is not TurnIntent.HELP):
+    if intent in NEW_TASK_INTENTS or (task is None and intent is not TurnIntent.HELP):
+        state = _apply_difficulty(state, intent)
         state, task = _offer_task(state)
         if task is None:
             ctx = RenderContext(state=state, intent=intent.value,
@@ -105,7 +127,7 @@ def handle_turn(
                               student_raw=student_raw)
         ctx = RenderContext(state=state, intent=TurnIntent.NEW_TASK.value, task=task)
         return TurnResult(answer=render(ctx), state=state,
-                          intent=TurnIntent.NEW_TASK.value, task=task,
+                          intent=intent.value, task=task,
                           student_raw=student_raw)
 
     # ---- HELP: never consumes or replaces the task -------------------------

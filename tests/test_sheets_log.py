@@ -215,7 +215,9 @@ def test_log_transcript_appends_expected_row(monkeypatch):
     assert mapped["answer"] == "4"
     assert mapped["task_origin"] == ""
     assert mapped["hint_level"] == ""
-    assert option == "USER_ENTERED"
+    # RAW since 2026-07-21: USER_ENTERED made Sheets parse "4/12" as a date
+    # serial (46360), destroying correctly-graded fraction answers.
+    assert option == "RAW"
 
 
 def test_transcript_row_includes_adaptive_hint_telemetry():
@@ -364,7 +366,9 @@ def test_log_feedback_appends_verdict_row(monkeypatch):
     assert mapped["entry_source"] == "feedback"
     assert mapped["status"] == "ready"
     assert mapped["feedback_verdict"] == "down"
-    assert option == "USER_ENTERED"
+    # RAW since 2026-07-21: USER_ENTERED made Sheets parse "4/12" as a date
+    # serial (46360), destroying correctly-graded fraction answers.
+    assert option == "RAW"
 
 
 def test_log_feedback_invalid_verdict_noop(monkeypatch):

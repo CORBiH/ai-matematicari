@@ -22,7 +22,15 @@ class TurnIntent(str, Enum):
     ANSWER = "answer"
     HELP = "help"
     NEW_TASK = "new_task"
+    HARDER = "harder"                   # a new task, one band up
+    EASIER = "easier"                   # a new task, one band down
     OTHER = "other"
+
+
+#: HARDER/EASIER are NEW_TASK with a direction — callers that only care about
+#: "does this ask for a new task?" should use this set.
+NEW_TASK_INTENTS = frozenset({TurnIntent.NEW_TASK, TurnIntent.HARDER,
+                              TurnIntent.EASIER})
 
 
 def fold(text: Any) -> str:
@@ -45,6 +53,10 @@ _HELP_RE = re.compile(
 #: scope, so such a request yields a normal new task rather than a wrong one.
 _NEW_TASK_RE = re.compile(
     r"\b(zadat\w*|vjezb\w*|primjer\w*|jos\s+jedan|idemo\s+dalje|dalje)\b")
+
+#: Direction words. They modify a NEW_TASK request; they are never a mode.
+_HARDER_RE = re.compile(r"\btez\w*|\bteski\w*|\bkomplikovanij\w*|\bizazovnij\w*")
+_EASIER_RE = re.compile(r"\blaks\w*|\bjednostavnij\w*|\blagan\w*")
 
 #: Something to compute or decide. A message with no mathematical content is
 #: not an answer, however confident it sounds.
@@ -71,6 +83,11 @@ def classify(raw_message: Any) -> Classification:
     # A task REQUEST carries no mathematical content; "zadatak 5/20" is an
     # answer that happens to name the task, so math wins.
     if _NEW_TASK_RE.search(text) and not _MATH_RE.search(text):
+        # Direction is part of the request, not a separate mode.
+        if _HARDER_RE.search(text):
+            return Classification(TurnIntent.HARDER, "harder")
+        if _EASIER_RE.search(text):
+            return Classification(TurnIntent.EASIER, "easier")
         return Classification(TurnIntent.NEW_TASK, "new_task")
     if _MATH_RE.search(text) or _BARE_BOOL_RE.match(text):
         return Classification(TurnIntent.ANSWER, "answer")

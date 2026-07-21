@@ -475,13 +475,21 @@ def _retry_backoff_seconds(attempt: int) -> float:
     return min(5.0, base * (2 ** max(0, attempt - 1)))
 
 
+#: This is a LOG, not a spreadsheet a human edits. ``USER_ENTERED`` made Sheets
+#: parse every cell as if typed by a user, so a correct answer of "4/12" became
+#: the date serial 46360 and "5/10" became 46300 — the graded value was right,
+#: the stored value was destroyed. ``RAW`` writes each cell literally: strings
+#: stay strings, numbers stay numbers, and nothing is re-interpreted.
+SHEETS_VALUE_INPUT_OPTION = "RAW"
+
+
 def _append_row_once(values: list[Any]) -> None:
     with _append_lock:
         ws = _init_sheets()
         if not ws:
             raise _SheetsPermanentError("sheets_not_configured")
         _ensure_sheet_layout(ws)
-        ws.append_row(values, value_input_option="USER_ENTERED")
+        ws.append_row(values, value_input_option=SHEETS_VALUE_INPUT_OPTION)
 
 
 def _deliver_event(event: dict[str, Any]) -> bool:

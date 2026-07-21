@@ -57,6 +57,7 @@ def response_from_result(result: TurnResult, payload: dict) -> dict:
         "task_status": "active" if task else None,
         "active_task_kind": "practice" if task else None,
         "correct_streak": result.state.correct_streak,
+        "difficulty_level": result.state.difficulty_level,
         "attempt_count": task.attempts if task else 0,
         "wrong_attempt_count": task.wrong_attempts if task else 0,
         "hint_count": task.hints_given if task else 0,

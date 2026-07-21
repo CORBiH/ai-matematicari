@@ -82,6 +82,11 @@ class SessionState:
     correct_streak: int = 0
     solved_count: int = 0
     recent_questions: tuple[str, ...] = ()      # avoid re-serving these
+    #: Bounded 1..3. Only "teži"/"lakši" move it; a plain new task keeps it.
+    difficulty_level: int = 1
+    #: The runtime topic id as FIRST seen this session. The client later echoes
+    #: back the canonical id, which would otherwise erase the original.
+    origin_runtime_id: str = ""
 
     # -- transitions: each returns a NEW state --------------------------------
     def with_task(self, task: ActiveTask) -> "SessionState":
@@ -108,6 +113,12 @@ class SessionState:
     def with_topic(self, topic: Topic) -> "SessionState":
         return replace(self, topic=topic)
 
+    def with_difficulty(self, level: int) -> "SessionState":
+        return replace(self, difficulty_level=max(1, min(int(level), 3)))
+
+    def with_origin_runtime_id(self, runtime_id: str) -> "SessionState":
+        return replace(self, origin_runtime_id=str(runtime_id or "")[:80])
+
     # -- serialization: the ONLY representation crossing the wire -------------
     def to_dict(self) -> dict:
         return {
@@ -120,6 +131,8 @@ class SessionState:
             "correct_streak": self.correct_streak,
             "solved_count": self.solved_count,
             "recent_questions": list(self.recent_questions),
+            "difficulty_level": self.difficulty_level,
+            "origin_runtime_id": self.origin_runtime_id,
         }
 
     @classmethod
@@ -146,6 +159,8 @@ class SessionState:
             correct_streak=_int("correct_streak"),
             solved_count=_int("solved_count"),
             recent_questions=recent_t,
+            difficulty_level=max(1, min(_int("difficulty_level") or 1, 3)),
+            origin_runtime_id=str(raw.get("origin_runtime_id") or "")[:80],
         )
 
 

@@ -17,6 +17,7 @@ handling) is deliberately not imported.
 from __future__ import annotations
 
 import random
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -134,7 +135,70 @@ def resolve_topic(grade: Any, selected_topic: Any, selected_oblast: Any = "") ->
                  skill_id=skill_id)
 
 
-def generate_question(skill_id: str, seed: Any, avoid: Any = ()) -> tuple[str, str] | None:
+MIN_DIFFICULTY = 1
+MAX_DIFFICULTY = 3
+DEFAULT_DIFFICULTY = 1
+
+
+def clamp_difficulty(level: Any) -> int:
+    try:
+        value = int(level)
+    except (TypeError, ValueError):
+        return DEFAULT_DIFFICULTY
+    return max(MIN_DIFFICULTY, min(value, MAX_DIFFICULTY))
+
+
+#: Objective parameter bands per level: (denominators, expansion factors).
+#: Difficulty is a property of the NUMBERS, not of the wording — "teži" only
+#: means anything if the generated task is measurably harder.
+_EXPAND_BANDS: dict[int, tuple[tuple[int, ...], tuple[int, int]]] = {
+    1: ((2, 3, 4), (2, 4)),
+    2: ((4, 5, 6, 8), (4, 7)),
+    3: ((6, 8, 9, 10, 12), (6, 12)),
+}
+
+
+def expand_params(question: str) -> tuple[int, int, int] | None:
+    """``(numerator, denominator, factor)`` parsed back out of a task.
+
+    Lets tests assert that a generated task really belongs to its band, rather
+    than trusting the generator's own claim.
+    """
+    m = re.search(r"prosiri\s+(\d+)\s*/\s*(\d+)\s+na\s+nazivnik\s+(\d+)",
+                  _fold(question))
+    if not m:
+        return None
+    a, b, target = int(m.group(1)), int(m.group(2)), int(m.group(3))
+    if b == 0 or target % b != 0:
+        return None
+    return a, b, target // b
+
+
+def band_for(level: int) -> tuple[tuple[int, ...], tuple[int, int]]:
+    return _EXPAND_BANDS[clamp_difficulty(level)]
+
+
+def _generate_expand(rng: random.Random, level: int) -> tuple[str, str]:
+    """Fraction expansion at an explicit difficulty band."""
+    denominators, (k_lo, k_hi) = band_for(level)
+    b = rng.choice(denominators)
+    a = rng.randint(1, b - 1)
+    k = rng.randint(k_lo, k_hi)
+    return f"Proširi {a}/{b} na nazivnik {b * k}.", f"{a * k}/{b * k}"
+
+
+#: Skills with a real difficulty model. Others accept and store a level but
+#: generate from the shared template — so nothing is ever CLAIMED to be harder
+#: than it is.
+_DIFFICULTY_AWARE = {"fraction_expand": _generate_expand}
+
+
+def supports_difficulty(skill_id: str) -> bool:
+    return skill_id in _DIFFICULTY_AWARE
+
+
+def generate_question(skill_id: str, seed: Any, avoid: Any = (),
+                      difficulty: Any = DEFAULT_DIFFICULTY) -> tuple[str, str] | None:
     """A validated (question, expected_display) pair, or None.
 
     Every candidate must derive an expected value — a task this engine cannot
@@ -143,13 +207,18 @@ def generate_question(skill_id: str, seed: Any, avoid: Any = ()) -> tuple[str, s
     skill = _BY_ID.get(skill_id)
     if skill is None:
         return None
+    level = clamp_difficulty(difficulty)
+    generator = _DIFFICULTY_AWARE.get(skill_id)
     template = task_templates._BY_ID.get(skill.template_id)
-    if template is None:
+    if generator is None and template is None:
         return None
     avoid_folded = {_fold(a) for a in (avoid or ()) if str(a or "").strip()}
-    for attempt in range(40):
-        rng = random.Random(f"minimal|{skill_id}|{seed}|{attempt}")
-        question, expected = template.generate(rng)
+    for attempt in range(60):
+        rng = random.Random(f"minimal|{skill_id}|{level}|{seed}|{attempt}")
+        if generator is not None:
+            question, expected = generator(rng, level)
+        else:
+            question, expected = template.generate(rng)
         if not question or _fold(question) in avoid_folded:
             continue
         if derive_expected(question) is None:

@@ -7193,6 +7193,7 @@ def _try_minimal_engine(
         "runtime_topic": normalize_value(payload.get("selected_topic")),
         "canonical_topic": "",
         "resolved_skill": "",
+        "difficulty_level": None,
     }
 
     def _decline(reason: str) -> None:
@@ -7233,6 +7234,12 @@ def _try_minimal_engine(
             return None
         response = handle_chat_minimal(payload, openai_chat, model=model,
                                        timeout=timeout)
+        state = (response.get("next_state") or {}).get("minimal_state") or {}
+        # The ORIGINAL runtime id survives even after the client starts echoing
+        # the canonical id back (index.html adopts effective_topic).
+        routing["runtime_topic"] = (state.get("origin_runtime_id")
+                                    or routing["runtime_topic"])
+        routing["difficulty_level"] = state.get("difficulty_level")
     except Exception:
         # The minimal engine must never take the tutor down; on any failure the
         # legacy pipeline answers as it always did.
