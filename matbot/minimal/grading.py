@@ -253,6 +253,14 @@ def grade(task: ActiveTask, raw_message: Any) -> GradingResult:
     answer_type = str(getattr(expected_obj, "answer_type", "") or "")
     normalized_expected = _normalized(getattr(expected_obj, "value", None))
     normalized_student = _normalized(getattr(given_obj, "value", None))
+    # AUDIT: what was ACTUALLY graded. The generic rational checker parses a
+    # single token straight out of prose ("ja mislim da je 9/10" → 9/10), so the
+    # extraction retry never runs and ``graded_text`` would otherwise be the
+    # whole sentence. ``given.raw`` is the token the checker itself used, which
+    # is true for every rational skill and for mixed numbers ("1 2/15").
+    parsed_token = str(getattr(given_obj, "raw", "") or "").strip()
+    graded_text = candidate or parsed_token or graded_text
+
     evidence = {
         "method": "deterministic",
         "checker_verdict": detail,
