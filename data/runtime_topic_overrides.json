@@ -1,0 +1,25 @@
+{
+  "_README": [
+    "Runtime topic id -> canonical NPP topic id, per grade.",
+    "",
+    "WHY THIS FILE EXISTS: the embed sends a Thinkific lesson id in",
+    "`selected_topic` (e.g. 12880). The workbook is designed to carry that",
+    "mapping in VIDEO_LINKS.thinkific_lesson_id and",
+    "THINKIFIC_RESOURCES.thinkific_lesson_id, but BOTH columns are currently",
+    "empty in every shipped grade workbook, so nothing can resolve.",
+    "",
+    "Entries here are operator-supplied facts, not code. Resolution logic reads",
+    "this file generically - adding an id never requires a code change.",
+    "",
+    "DURABLE FIX: populate thinkific_lesson_id in the workbook. Once a runtime",
+    "id resolves from the sheet, its entry here becomes redundant (the sheet is",
+    "consulted first) and can be deleted.",
+    "",
+    "PROVENANCE: 12880 -> 6-04-035 was observed in production on 2026-07-21",
+    "(grade 6, Practice, selected_oblast=Razlomci) and confirmed as",
+    "'Prosirivanje razlomaka'. It is NOT derivable from the shipped data."
+  ],
+  "6": {
+    "12880": "6-04-035"
+  }
+}

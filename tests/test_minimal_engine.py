@@ -244,14 +244,21 @@ def test_one_sheets_row_per_turn(browser, sheets):
 # =========================================================================== #
 # Topic honesty and the fallback boundary                                     #
 # =========================================================================== #
-def test_unsupported_topic_falls_back_to_legacy_not_another_topic(client, fake_openai):
-    """The minimal engine declines; legacy answers. Never a substituted topic."""
+def test_unsupported_topic_is_refused_not_substituted(client, fake_openai):
+    """An EXPLICITLY selected but unsupported topic is refused honestly.
+
+    Changed 2026-07-21 after production: falling through to legacy free
+    generation put an equation under "Proširivanje razlomaka", so a grade-6
+    Practice turn with an explicit topic must never silently fall through.
+    """
     fake_openai.state["reply"] = "Zadatak: Riješi jednačinu: 3x + 2 = 14."
     b = Browser(client, topic=UNSUPPORTED_TOPIC,
                 oblast="Skupovi tačaka, kružnica i krug")
     body = b.send("daj mi zadatak")
-    assert body.get("engine") != "minimal"            # explicit fallback happened
-    assert "kružnog luka" not in (body.get("last_tutor_task") or "")
+    assert body["engine"] == "minimal"                # refused, not delegated
+    assert body["last_tutor_task"] == ""              # no task activated
+    assert body["minimal_routing"]["decline_reason"] == "topic_not_supported"
+    assert fake_openai.calls.messages == []           # model never consulted
 
 
 def test_unsupported_topic_is_refused_honestly_by_the_core():

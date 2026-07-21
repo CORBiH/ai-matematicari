@@ -129,7 +129,37 @@ SHEET_HEADERS = [
     # Phase 7 canary cohort marker ("1"/"0"). Telemetry ONLY — never affects
     # grading, state, counters or the student-visible response.
     "engine_canary",
+    # Append-only. ``student_message`` is ALWAYS the raw student text; anything
+    # the pipeline rewrote internally (hint prompts, adaptive instructions) is
+    # recorded here instead, so the two can never be confused in analysis.
+    "internal_instruction",
+    # Minimal-engine routing trace: enabled / handled / decline_reason /
+    # runtime_topic / canonical_topic / resolved_skill.
+    "minimal_routing",
 ]
+
+
+def _raw_student_message(payload: dict) -> str:
+    """What the student ACTUALLY typed.
+
+    The legacy pipeline overwrites ``student_message`` with internal
+    instructions in ~10 places, so the raw text is captured at entry into
+    ``raw_student_message`` and is authoritative here when present.
+    """
+    raw = payload.get("raw_student_message")
+    if isinstance(raw, str) and raw.strip():
+        return raw
+    return payload.get("student_message") or ""
+
+
+def _internal_instruction(payload: dict) -> str:
+    """The rewritten instruction, when it differs from the raw message."""
+    raw = payload.get("raw_student_message")
+    current = payload.get("student_message")
+    if isinstance(raw, str) and isinstance(current, str) and raw.strip() \
+            and current.strip() and raw != current:
+        return current
+    return ""
 
 
 def _env_flag(name: str, default: str = "0") -> bool:
@@ -555,7 +585,7 @@ def _build_transcript_row(payload: dict, response: dict) -> list[Any]:
         _clean_cell(response.get("topic_conflict")),
         _clean_cell(payload.get("selected_oblast")),
         _clean_cell(response.get("last_tutor_task")),
-        _clean_cell(payload.get("student_message")),
+        _clean_cell(_raw_student_message(payload)),
         _clean_cell(response.get("answer")),
         _json_cell(response.get("answer_check")),
         _json_cell(response.get("next_state")),
@@ -564,7 +594,7 @@ def _build_transcript_row(payload: dict, response: dict) -> list[Any]:
         _clean_cell(item.get("answer_type")),
         _clean_cell(item.get("expected_answer") or item.get("expected")),
         _clean_cell(item.get("normalized_expected")),
-        _clean_cell(item.get("student_answer") or item.get("given") or payload.get("student_message")),
+        _clean_cell(item.get("student_answer") or item.get("given") or _raw_student_message(payload)),
         _clean_cell(item.get("normalized_student")),
         _json_cell(item.get("deterministic_check")),
         _clean_cell(math_verification.get("math_verification_used")),
@@ -599,6 +629,8 @@ def _build_transcript_row(payload: dict, response: dict) -> list[Any]:
         "",  # sheets_event_id (populated by _set_row_event_id)
         _json_cell(response.get("shadow_grading")),
         _canary_marker(),
+        _clean_cell(_internal_instruction(payload)),
+        _json_cell(response.get("minimal_routing")),
     ]
 
 

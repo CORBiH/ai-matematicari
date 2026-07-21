@@ -394,7 +394,10 @@ def test_sheets_columns_are_append_only():
     # never move, because it is written by positional lookup.
     assert headers.index("sheets_event_id") == 57
     # every column added since is strictly appended, in order
-    assert headers[57:] == ["sheets_event_id", "shadow_telemetry", "engine_canary"]
+    assert headers[57:] == ["sheets_event_id", "shadow_telemetry", "engine_canary",
+                            # appended 2026-07-21: raw vs rewritten message, and
+                            # the minimal-engine routing trace
+                            "internal_instruction", "minimal_routing"]
 
 
 def test_sheets_row_length_matches_headers(monkeypatch, master, tmap):

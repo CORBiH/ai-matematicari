@@ -159,7 +159,75 @@ def _build_index(grade: Any) -> dict[str, CanonicalTopic]:
                 _add(video.get(field), topic)
             for field in _VIDEO_NAME_FIELDS:
                 _add(video.get(field), topic)
+
+    # THINKIFIC_RESOURCES maps a runtime lesson id to the NPP temas it serves
+    # (``linked_npp_topic_ids`` may list several; the first that exists wins).
+    for row in (master.get("thinkific_resources") or []):
+        if not isinstance(row, dict):
+            continue
+        linked = _keys(row.get("linked_npp_topic_ids"))
+        target = next((by_npp[c] for c in
+                       (l.strip().upper() for l in linked) if c in by_npp), None)
+        if target is None:
+            # ids are folded to lowercase by _keys; match case-insensitively
+            for cand in linked:
+                for npp_key, topic_obj in by_npp.items():
+                    if npp_key.lower() == cand:
+                        target = topic_obj
+                        break
+                if target is not None:
+                    break
+        if target is None:
+            continue
+        for field in ("thinkific_lesson_id", "lesson_url", "old_ai_topic_id"):
+            _add(row.get(field), target)
+        _add(row.get("lesson_title"), target)
+
+    # Operator-maintained overrides for runtime ids the workbook does not (yet)
+    # carry. Data, not logic: adding an id never requires a code change.
+    for runtime_id, npp in _load_overrides(grade).items():
+        topic = by_npp.get(npp)
+        if topic is not None:
+            index[_fold(runtime_id)] = topic
     return index
+
+
+#: ``{"<grade>": {"<runtime_id>": "<npp_topic_id>"}}`` — see the file's own note.
+_OVERRIDES_ENV = "MATBOT_RUNTIME_TOPIC_MAP"
+_OVERRIDES_FILENAME = "runtime_topic_overrides.json"
+
+
+def _load_overrides(grade: Any) -> dict[str, str]:
+    """Runtime-id → NPP id overrides for this grade, or {}.
+
+    Sourced from ``$MATBOT_RUNTIME_TOPIC_MAP`` if set, else
+    ``data/runtime_topic_overrides.json``. Never raises: a missing or malformed
+    file simply means no overrides.
+    """
+    import json
+    import os
+    from pathlib import Path
+
+    path = os.getenv(_OVERRIDES_ENV) or str(
+        Path(__file__).resolve().parent.parent / "data" / _OVERRIDES_FILENAME)
+    try:
+        with open(path, encoding="utf-8") as handle:
+            raw = json.load(handle)
+    except (OSError, ValueError):
+        return {}
+    if not isinstance(raw, dict):
+        return {}
+    section = raw.get(str(grade)) or raw.get(str(normalize_grade_safe(grade))) or {}
+    if not isinstance(section, dict):
+        return {}
+    return {str(k): str(v) for k, v in section.items() if k and v}
+
+
+def normalize_grade_safe(grade: Any) -> Any:
+    try:
+        return int(grade)
+    except (TypeError, ValueError):
+        return grade
 
 
 def _index(grade: Any) -> dict[str, CanonicalTopic]:

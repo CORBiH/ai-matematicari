@@ -211,6 +211,24 @@ def _build_areas(topics: list[dict[str, str]]) -> list[dict[str, Any]]:
     )
 
 
+THINKIFIC_RESOURCES_SHEET = "THINKIFIC_RESOURCES"
+
+
+def _read_thinkific_resources(wb) -> list[dict[str, str]]:
+    """Rows of THINKIFIC_RESOURCES, or [] when the sheet is absent.
+
+    Read defensively: this sheet is optional and its columns differ between
+    grade variants, so a missing sheet or column must never break loading.
+    """
+    if THINKIFIC_RESOURCES_SHEET not in wb.sheetnames:
+        return []
+    try:
+        _cols, rows = _read_sheet(wb, THINKIFIC_RESOURCES_SHEET)
+    except Exception:
+        return []
+    return [r for r in rows if any((v or "").strip() for v in r.values())]
+
+
 def load_master_content(
     path: str | Path | None = None, grade: Any = DEFAULT_GRADE
 ) -> dict[str, Any]:
@@ -236,6 +254,7 @@ def load_master_content(
 
         videos_by_topic = _build_videos_by_topic(wb)
         areas = _build_areas(topics)
+        thinkific_resources = _read_thinkific_resources(wb)
     finally:
         wb.close()
 
@@ -244,6 +263,11 @@ def load_master_content(
         "topics_by_id": topics_by_id,
         "topic_ids": set(topics_by_id),
         "videos_by_topic": videos_by_topic,
+        # THINKIFIC_RESOURCES carries ``thinkific_lesson_id`` →
+        # ``linked_npp_topic_ids``: the workbook's own runtime-id mapping. It was
+        # never exposed, so a runtime lesson id could not be resolved even where
+        # the sheet is populated.
+        "thinkific_resources": thinkific_resources,
         "areas": areas,
         "columns": columns,
         "source_path": str(path),

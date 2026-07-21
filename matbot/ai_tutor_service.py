@@ -46,7 +46,11 @@ from matbot import exam_engine
 from matbot import task_templates
 from matbot import topic_resolver
 from matbot import task_activation
-from matbot.minimal.adapter import handle_chat_minimal, minimal_engine_enabled
+from matbot.minimal.adapter import (
+    handle_chat_minimal,
+    minimal_engine_enabled,
+    unresolved_response as minimal_unresolved_response,
+)
 from matbot.minimal.skills import resolve_topic as minimal_resolve_topic
 from matbot import turn_intent
 from matbot import render
@@ -7095,6 +7099,8 @@ def _exam_engine_response(payload: dict) -> dict:
 #: Modes and inputs the minimal engine does not claim. Everything here falls
 #: through to the legacy pipeline via the explicit boundary below.
 _MINIMAL_MODES = {"practice", "vjezba"}
+#: Grades where an explicitly selected topic must never silently fall through.
+MINIMAL_GRADES = {6}
 
 
 def _try_minimal_engine(
@@ -7113,29 +7119,71 @@ def _try_minimal_engine(
     of its five supported skills. It never widens to a neighbouring topic.
     """
     payload = dict(data or {})
+    routing = {
+        "minimal_engine_enabled": True,
+        "handled": False,
+        "decline_reason": "",
+        "runtime_topic": normalize_value(payload.get("selected_topic")),
+        "canonical_topic": "",
+        "resolved_skill": "",
+    }
+
+    def _decline(reason: str) -> None:
+        """Fall through to legacy, but leave a trace of WHY."""
+        routing["decline_reason"] = reason
+        log.info("minimal_engine: declined (%s) runtime_topic=%r",
+                 reason, routing["runtime_topic"])
+
     mode = normalize_value(payload.get("mode")).lower()
     if mode not in _MINIMAL_MODES:
+        _decline("mode_not_practice")
         return None
     if image_bytes or image_data_url or payload.get("image_ocr_text"):
-        return None                       # image flows stay on the legacy path
+        _decline("image_turn")            # image flows stay on the legacy path
+        return None
     try:
         grade = normalize_grade(payload.get("grade") or DEFAULT_GRADE)
         topic = minimal_resolve_topic(grade, payload.get("selected_topic"),
                                       payload.get("selected_oblast"))
+        routing["canonical_topic"] = topic.npp_id
+        routing["resolved_skill"] = topic.skill_id
         if not topic.supported:
-            return None                   # honest fallback, not a substitution
+            has_explicit_topic = bool(routing["runtime_topic"])
+            if has_explicit_topic and grade in MINIMAL_GRADES:
+                # REQUIREMENT: a grade-6 Practice turn with an EXPLICITLY selected
+                # topic must never fall through to free legacy generation — that
+                # is how "Riješi jednačinu: 3x + 2 = 14." appeared under
+                # "Proširivanje razlomaka". Answer honestly instead.
+                reason = ("unresolved_runtime_topic" if not topic.npp_id
+                          else "topic_not_supported")
+                routing["decline_reason"] = reason
+                routing["handled"] = True
+                response = minimal_unresolved_response(payload, topic, reason)
+                response["minimal_routing"] = dict(routing)
+                _log_minimal_turn(payload, response)
+                return response
+            _decline("topic_not_supported")
+            return None
         response = handle_chat_minimal(payload, openai_chat, model=model,
                                        timeout=timeout)
     except Exception:
         # The minimal engine must never take the tutor down; on any failure the
         # legacy pipeline answers as it always did.
         log.exception("minimal_engine: failed, falling back to legacy")
+        _decline("engine_error")
         return None
+    routing["handled"] = True
+    response["minimal_routing"] = dict(routing)
+    _log_minimal_turn(payload, response)
+    return response
+
+
+def _log_minimal_turn(payload: dict, response: dict) -> None:
+    """Sheets logging for a minimal-engine turn. Never raises."""
     try:
         log_transcript_to_sheet(payload, response)
     except Exception:
         log.exception("minimal_engine: sheets logging failed")
-    return response
 
 
 def handle_chat(
@@ -7156,6 +7204,18 @@ def handle_chat(
     ``openai_chat`` mora imati potpis ``(model, messages, timeout=...)`` i vratiti
     objekt sa ``choices[0].message.content`` (tj. postojeći ``app._openai_chat``).
     """
+    # The raw student text is captured HERE, before any contract can rewrite
+    # ``student_message`` with an internal instruction. Sheets logs this field as
+    # the authoritative student message; the rewritten text goes to a separate
+    # ``internal_instruction`` column.
+    if isinstance(data, dict) and data.get("raw_student_message") is None:
+        _raw = data.get("student_message")
+        if _raw is None:
+            _raw = data.get("message")
+        if isinstance(_raw, str):
+            data = dict(data)
+            data["raw_student_message"] = _raw
+
     # MINIMAL ENGINE (MATBOT_MINIMAL_ENGINE=on): a separate, small tutoring core
     # handles the turn end-to-end. It owns Practice for the five deterministic
     # grade-6 skills; anything else it refuses honestly, and the caller may fall

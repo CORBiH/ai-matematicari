@@ -80,7 +80,8 @@ def test_canary_flag_parsing(monkeypatch, val, expected):
 
 
 def test_sheets_row_carries_canary_marker(monkeypatch, master, tmap):
-    assert sheets_log.SHEET_HEADERS[-1] == "engine_canary"
+    # engine_canary keeps its index; later columns are appended after it.
+    assert sheets_log.SHEET_HEADERS.index("engine_canary") == 59
     monkeypatch.setenv("ENGINE_CANARY", "1")
     out = svc.handle_chat({"grade": 6, "mode": "practice",
                            "interaction_phase": "answering_practice_task",

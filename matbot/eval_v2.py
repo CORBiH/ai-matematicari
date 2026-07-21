@@ -206,11 +206,21 @@ def _universal_invariants(out: dict, sheets_writes: int) -> dict[str, list[str]]
 # --------------------------------------------------------------------------- #
 # Runner                                                                       #
 # --------------------------------------------------------------------------- #
+#: This harness evaluates the LEGACY/V2 pipeline. The minimal engine would
+#: intercept Practice turns for its supported topics and answer them with a
+#: different (correct, but different) contract, so it is pinned off for the
+#: duration of a run — otherwise an ambient MATBOT_MINIMAL_ENGINE=on silently
+#: makes every V2 expectation evaluate the wrong engine.
+_MINIMAL_FLAG = "MATBOT_MINIMAL_ENGINE"
+_MANAGED_FLAGS = V2_FLAGS + (_MINIMAL_FLAG,)
+
+
 def _apply_flags(config: dict[str, str]) -> dict[str, str | None]:
-    prev = {k: os.environ.get(k) for k in V2_FLAGS}
-    for k in V2_FLAGS:
+    prev = {k: os.environ.get(k) for k in _MANAGED_FLAGS}
+    for k in _MANAGED_FLAGS:
         os.environ.pop(k, None)
     os.environ.update(config)
+    os.environ[_MINIMAL_FLAG] = "off"
     return prev
 
 

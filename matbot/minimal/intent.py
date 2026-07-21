@@ -37,10 +37,14 @@ _HELP_RE = re.compile(
     r"objasni\w*|obrazloz\w*|kako\s+se\s+radi|kako\s+da|odakle\s+da\s+krenem|"
     r"ne\s+umijem|ne\s+mogu|zasto)\b")
 
+#: Any mention of wanting a task. Deliberately broad on the NOUN rather than
+#: enumerating verb+adjective combinations: production sent "Daj mi teži zadatak
+#: iz iste teme", which no adjacency pattern matched, so it was read as a
+#: non-answer and the student got the same task back.
+#: Difficulty words are matched but NOT honoured — harder/easier is out of
+#: scope, so such a request yields a normal new task rather than a wrong one.
 _NEW_TASK_RE = re.compile(
-    r"\b(nov\w*\s+zadat\w*|drugi\s+zadat\w*|jos\s+jedan|daj\s+mi\s+zadat\w*|"
-    r"daj\s+zadat\w*|hocu\s+zadat\w*|zelim\s+zadat\w*|sljedec\w*\s+zadat\w*|"
-    r"idemo\s+dalje|dalje)\b")
+    r"\b(zadat\w*|vjezb\w*|primjer\w*|jos\s+jedan|idemo\s+dalje|dalje)\b")
 
 #: Something to compute or decide. A message with no mathematical content is
 #: not an answer, however confident it sounds.
@@ -64,7 +68,9 @@ def classify(raw_message: Any) -> Classification:
     # HELP first: "ne znam" must never be read as the answer "ne".
     if _HELP_RE.search(text):
         return Classification(TurnIntent.HELP, "help")
-    if _NEW_TASK_RE.search(text):
+    # A task REQUEST carries no mathematical content; "zadatak 5/20" is an
+    # answer that happens to name the task, so math wins.
+    if _NEW_TASK_RE.search(text) and not _MATH_RE.search(text):
         return Classification(TurnIntent.NEW_TASK, "new_task")
     if _MATH_RE.search(text) or _BARE_BOOL_RE.match(text):
         return Classification(TurnIntent.ANSWER, "answer")

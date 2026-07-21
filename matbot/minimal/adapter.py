@@ -91,6 +91,48 @@ def supported_topics_message() -> str:
     return f"Za sada podržavam ove teme: {names}."
 
 
+def unresolved_response(payload: dict, topic: Any, reason: str) -> dict:
+    """Honest answer when an explicitly selected topic cannot be served.
+
+    Returned INSTEAD of falling through to free legacy generation: a task from
+    another topic is worse than no task, because the student cannot tell the
+    difference. Never invents a task and never names a substitute topic.
+    """
+    named = getattr(topic, "title", "") or ""
+    if reason == "unresolved_runtime_topic":
+        body = ("Ne mogu pouzdano prepoznati koja je tema izabrana, pa ti ne bih "
+                "dao zadatak iz pogrešne teme. Izaberi temu iz liste pa nastavljamo.")
+    elif named:
+        body = (f"Za temu „{named}” još nemam zadatke koje mogu pouzdano "
+                "provjeriti, pa ti ne bih dao zadatak iz druge teme.")
+    else:
+        body = ("Za tu temu još nemam zadatke koje mogu pouzdano provjeriti, "
+                "pa ti ne bih dao zadatak iz druge teme.")
+    return {
+        "status": "unsupported_topic",
+        "answer": f"{body}\n\n{supported_topics_message()}",
+        "mode": "practice",
+        "session_mode": "practice",
+        "last_tutor_task": "",           # nothing activated — nothing to answer
+        "answer_verdict": None,
+        "answer_verdict_detail": None,
+        "final_topic": getattr(topic, "npp_id", "") or "unknown",
+        "effective_topic": getattr(topic, "npp_id", "") or "",
+        "selected_oblast": str(payload.get("selected_oblast") or ""),
+        "engine": "minimal",
+        "next_state": {
+            "minimal_state": None,
+            "engine": "minimal",
+            "task_id": None,
+            "task_status": None,
+            "active_task_kind": None,
+            "correct_streak": 0,
+            "expected_user_action": "select_topic",
+            "task": None,
+        },
+    }
+
+
 def handle_chat_minimal(
     payload: dict,
     openai_chat: Callable | None = None,
