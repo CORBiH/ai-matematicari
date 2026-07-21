@@ -568,6 +568,10 @@ def ai_tutor_chat():
         data = request.get_json(silent=True)
         if not isinstance(data, dict):
             return jsonify({"error": "invalid_json", "detail": "Očekivan je JSON objekt sa poljima zahtjeva."}), 400
+    data = ai_tutor_service.capture_raw_student_message(data)
+    log.info("endpoint=/api/ai-tutor/chat grade=%r mode=%r topic=%r minimal_flag=%s",
+             data.get("grade"), data.get("mode"), data.get("selected_topic"),
+             (os.getenv("MATBOT_MINIMAL_ENGINE") or "off").strip().lower())
     try:
         result = ai_tutor_service.handle_chat(
             data, openai_chat=_tutor_openai_chat, model=MODEL_TEXT, timeout=AI_TUTOR_TIMEOUT,
@@ -668,6 +672,11 @@ def ai_tutor_chat_stream():
     if not isinstance(data, dict):
         return jsonify({"error": "invalid_json",
                         "detail": "Očekivan je JSON objekt sa poljima zahtjeva."}), 400
+    # Pin the raw student text at the OUTERMOST entry, before any handler runs.
+    data = ai_tutor_service.capture_raw_student_message(data)
+    log.info("endpoint=/api/ai-tutor/chat/stream grade=%r mode=%r topic=%r minimal_flag=%s",
+             data.get("grade"), data.get("mode"), data.get("selected_topic"),
+             (os.getenv("MATBOT_MINIMAL_ENGINE") or "off").strip().lower())
 
     def _sse():
         try:

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 import json
+import os
 import re
 import uuid
 from dataclasses import replace
@@ -7103,6 +7104,71 @@ _MINIMAL_MODES = {"practice", "vjezba"}
 MINIMAL_GRADES = {6}
 
 
+def capture_raw_student_message(data: Any) -> dict:
+    """Pin the student's ACTUAL text before anything can rewrite it.
+
+    Called at the outermost HTTP endpoints (both routes) and again defensively
+    here, so ``raw_student_message`` is set no matter which entry point is used.
+    Idempotent: once set it is never overwritten.
+    """
+    if not isinstance(data, dict):
+        return data
+    if data.get("raw_student_message") is not None:
+        return data
+    raw = data.get("student_message")
+    if raw is None:
+        raw = data.get("message")
+    if not isinstance(raw, str):
+        return data
+    out = dict(data)
+    out["raw_student_message"] = raw
+    return out
+
+
+def minimal_dispatch(
+    data: Any,
+    openai_chat: Callable,
+    *,
+    model: str,
+    timeout: float | None,
+    image_bytes: bytes | None = None,
+    image_data_url: str | None = None,
+    endpoint: str = "",
+) -> dict | None:
+    """THE minimal-engine entry point for every transport.
+
+    Production incident 2026-07-21 (commit d89468c): the browser calls the
+    STREAMING route first, and the dispatch existed only in ``handle_chat`` — so
+    a real browser turn never reached the minimal engine at all and was handled
+    by the legacy pipeline (which rewrote the mode to "explain" and replaced the
+    student's "ne znam" with an ADAPTIVNI_HINT_NIVO instruction).
+
+    Every transport MUST call this before any legacy preprocessing.
+    """
+    flag = (os.getenv("MATBOT_MINIMAL_ENGINE") or "off").strip().lower()
+    payload = data if isinstance(data, dict) else {}
+    log.info(
+        "minimal_dispatch: endpoint=%s grade=%r mode=%r topic=%r flag=%s reached=1",
+        endpoint, payload.get("grade"), payload.get("mode"),
+        payload.get("selected_topic"), flag,
+    )
+    if not minimal_engine_enabled():
+        return None
+    result = _try_minimal_engine(
+        data, openai_chat, model=model, timeout=timeout,
+        image_bytes=image_bytes, image_data_url=image_data_url,
+        endpoint=endpoint)
+    routing = (result or {}).get("minimal_routing") or {}
+    log.info(
+        "minimal_dispatch: endpoint=%s handled=%s decline_reason=%s "
+        "runtime_topic=%r canonical_topic=%r resolved_skill=%r",
+        endpoint, bool(result), routing.get("decline_reason") or "",
+        routing.get("runtime_topic"), routing.get("canonical_topic"),
+        routing.get("resolved_skill"),
+    )
+    return result
+
+
 def _try_minimal_engine(
     data: dict,
     openai_chat: Callable,
@@ -7111,6 +7177,7 @@ def _try_minimal_engine(
     timeout: float | None,
     image_bytes: bytes | None,
     image_data_url: str | None,
+    endpoint: str = "",
 ) -> dict | None:
     """Hand the turn to the minimal engine, or return None to fall back.
 
@@ -7204,29 +7271,17 @@ def handle_chat(
     ``openai_chat`` mora imati potpis ``(model, messages, timeout=...)`` i vratiti
     objekt sa ``choices[0].message.content`` (tj. postojeći ``app._openai_chat``).
     """
-    # The raw student text is captured HERE, before any contract can rewrite
-    # ``student_message`` with an internal instruction. Sheets logs this field as
-    # the authoritative student message; the rewritten text goes to a separate
-    # ``internal_instruction`` column.
-    if isinstance(data, dict) and data.get("raw_student_message") is None:
-        _raw = data.get("student_message")
-        if _raw is None:
-            _raw = data.get("message")
-        if isinstance(_raw, str):
-            data = dict(data)
-            data["raw_student_message"] = _raw
+    data = capture_raw_student_message(data)
 
-    # MINIMAL ENGINE (MATBOT_MINIMAL_ENGINE=on): a separate, small tutoring core
-    # handles the turn end-to-end. It owns Practice for the five deterministic
-    # grade-6 skills; anything else it refuses honestly, and the caller may fall
-    # back here explicitly. Flag off (default) → this block is skipped entirely
-    # and the legacy/V2 pipeline below is untouched.
-    if minimal_engine_enabled():
-        minimal_result = _try_minimal_engine(
-            data, openai_chat, model=model, timeout=timeout,
-            image_bytes=image_bytes, image_data_url=image_data_url)
-        if minimal_result is not None:
-            return minimal_result
+    # MINIMAL ENGINE — dispatched FIRST, before the exam short-circuit, before
+    # _prepare_chat, and therefore before every legacy contract that rewrites the
+    # mode or the student message. See ``minimal_dispatch``.
+    minimal_result = minimal_dispatch(
+        data, openai_chat, model=model, timeout=timeout,
+        image_bytes=image_bytes, image_data_url=image_data_url,
+        endpoint="handle_chat")
+    if minimal_result is not None:
+        return minimal_result
 
     # Phase 4 (Engine V2, flag-gated): a deterministic Exam Engine turn short-
     # circuits the ENTIRE legacy pipeline (and the Practice Step Engine) — no model
@@ -7313,6 +7368,21 @@ def handle_chat_stream(
     Napomena: retry-na-prazan-odgovor iz sync puta ovdje NE postoji (deltas su
     već poslani klijentu); prazan stream vraća prijateljsku poruku u done.
     """
+    data = capture_raw_student_message(data)
+
+    # MINIMAL ENGINE — the browser calls THIS route first, so the dispatch must
+    # live here too and must run before every legacy branch below. Its answer is
+    # already complete (no model call), so it is emitted as deltas then done,
+    # exactly like the Exam Engine short-circuit.
+    minimal_done = minimal_dispatch(
+        data, openai_chat, model=model, timeout=timeout,
+        endpoint="handle_chat_stream")
+    if minimal_done is not None:
+        for chunk in _chunk_for_stream(minimal_done.get("answer") or ""):
+            yield {"event": "delta", "data": {"delta": chunk}}
+        yield {"event": "done", "data": minimal_done}
+        return
+
     # Phase 4: deterministic Exam Engine turn — emit the buffered answer as deltas
     # then done (no model call). Mirrors handle_chat's short-circuit.
     _payload = dict(data or {})
