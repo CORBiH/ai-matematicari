@@ -307,14 +307,14 @@ def quality_ok(skill_id: str, question: str, answer: str) -> bool:
             return False                            # identični operandi
     if skill_id == "fraction_mul":
         # x/y · 1/1 i slično ne provjerava množenje
-        if re.search(r"1\s*/\s*1", question):
+        if re.search(r"\b1\s*/\s*1\b", question):
             return False
     if skill_id == "fraction_expand":
         # "proširi a/b na nazivnik b" nije proširivanje
         m = re.search(r"(\d+)\s*/\s*(\d+)\s+na\s+nazivnik\s+(\d+)", question)
         if m and m.group(2) == m.group(3):
             return False
-    if skill_id == "percent_of" and re.search(r"100\s*%", question):
+    if skill_id == "percent_of" and re.search(r"\b100\s*%", question):
         return False
     return True
 
