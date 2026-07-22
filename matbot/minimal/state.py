@@ -92,9 +92,6 @@ class SessionState:
     #: The runtime topic id as FIRST seen this session. The client later echoes
     #: back the canonical id, which would otherwise erase the original.
     origin_runtime_id: str = ""
-    #: Signature of the last NEW-TASK request. Bounded to one entry on purpose:
-    #: it only answers "is this the same request repeated?", nothing more.
-    last_request_signature: str = ""
     #: A yes/no question the tutor asked, awaiting the student's reply.
     #: Only ever set by the engine, never inferred from prose. "" = nothing
     #: pending. Currently the single value is "new_task".
@@ -131,9 +128,6 @@ class SessionState:
     def with_origin_runtime_id(self, runtime_id: str) -> "SessionState":
         return replace(self, origin_runtime_id=str(runtime_id or "")[:80])
 
-    def with_request_signature(self, signature: str) -> "SessionState":
-        return replace(self, last_request_signature=str(signature or "")[:80])
-
     def awaiting(self, what: str) -> "SessionState":
         return replace(self, pending_confirmation=str(what or "")[:40])
 
@@ -154,7 +148,6 @@ class SessionState:
             "recent_questions": list(self.recent_questions),
             "difficulty_level": self.difficulty_level,
             "origin_runtime_id": self.origin_runtime_id,
-            "last_request_signature": self.last_request_signature,
             "pending_confirmation": self.pending_confirmation,
         }
 
@@ -184,7 +177,6 @@ class SessionState:
             recent_questions=recent_t,
             difficulty_level=max(1, min(_int("difficulty_level") or 1, 3)),
             origin_runtime_id=str(raw.get("origin_runtime_id") or "")[:80],
-            last_request_signature=str(raw.get("last_request_signature") or "")[:80],
             pending_confirmation=str(raw.get("pending_confirmation") or "")[:40],
         )
 

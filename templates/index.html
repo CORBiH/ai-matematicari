@@ -1639,8 +1639,16 @@ document.addEventListener('DOMContentLoaded', () => {
       const selectedTopicForPayload = resultMode ? '' : ((examMode && state.oblast) ? '' : state.topic);
       const selectedOblastForPayload = resultMode ? ''
         : (selectedTopicForPayload ? state.topicOblast : (examMode ? state.oblast : ''));
+      /* Jedan client_turn_id po korisničkom slanju — generisan JEDNOM, prije
+         SSE pokušaja, i ponovo korišten za JSON fallback ISTOG slanja (isti
+         `payload` objekat se šalje na oba). Backend njime prepoznaje da su
+         SSE pokušaj i fallback JEDAN logički potez, a ne dva različita zahtjeva
+         za novi zadatak — tekst poruke se za to više ne koristi. */
+      const clientTurnId = (crypto.randomUUID) ? crypto.randomUUID()
+                                               : (Date.now() + '_' + Math.random());
       const payload = {
         session_id: sessionId,
+        client_turn_id: clientTurnId,
         grade: parseInt(state.grade, 10) || 6,
         mode: state.mode,
         entry_source: resultMode ? 'free_chat'

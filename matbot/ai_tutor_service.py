@@ -52,6 +52,7 @@ from matbot.minimal.adapter import (
     minimal_engine_enabled,
     unresolved_response as minimal_unresolved_response,
 )
+from matbot.minimal import idempotency as minimal_idempotency
 from matbot.minimal.skills import resolve_topic as minimal_resolve_topic
 from matbot import turn_intent
 from matbot import render
@@ -7154,10 +7155,50 @@ def minimal_dispatch(
     )
     if not minimal_engine_enabled():
         return None
-    result = _try_minimal_engine(
-        data, openai_chat, model=model, timeout=timeout,
-        image_bytes=image_bytes, image_data_url=image_data_url,
-        endpoint=endpoint)
+
+    session_id = str(payload.get("session_id") or "").strip()
+    client_turn_id = str(payload.get("client_turn_id") or "").strip()
+
+    # TRANSPORT REPLAY, sequential case: an earlier call for this EXACT
+    # (session, turn) already finished and was recorded. Keyed by
+    # (session_id, client_turn_id) — NEVER by message text, which conflates a
+    # resent HTTP delivery with a student deliberately repeating a phrase.
+    cached = minimal_idempotency.recall(session_id, client_turn_id)
+    if cached is not None:
+        result = minimal_idempotency.mark_replay(cached, client_turn_id)
+        log.info("minimal_dispatch: replayed (cached) client_turn_id=%r session=%r",
+                 client_turn_id, session_id)
+        return result
+
+    # TRANSPORT REPLAY, concurrent case: two calls for the SAME (session, turn)
+    # arriving close enough together that neither has stored a result yet — an
+    # SSE attempt and a near-simultaneous JSON fallback, not just a later
+    # retry. ``claim`` makes exactly one of them the owner; any other becomes a
+    # waiter that never touches the cache or the engine itself.
+    is_owner, waiter = minimal_idempotency.claim(session_id, client_turn_id)
+    if not is_owner:
+        if waiter.event.wait(timeout=30) and waiter.result is not None:
+            result = minimal_idempotency.mark_replay(waiter.result, client_turn_id)
+            log.info("minimal_dispatch: replayed (waited) client_turn_id=%r "
+                     "session=%r", client_turn_id, session_id)
+            return result
+        # The owner declined (nothing cacheable), timed out, or the slot was
+        # abandoned — process independently rather than wait forever or
+        # fabricate a result. is_owner stays False, so this call releases
+        # nothing it never claimed.
+
+    result = None
+    try:
+        result = _try_minimal_engine(
+            data, openai_chat, model=model, timeout=timeout,
+            image_bytes=image_bytes, image_data_url=image_data_url,
+            endpoint=endpoint)
+    finally:
+        if is_owner:
+            minimal_idempotency.release(session_id, client_turn_id, result)
+    if isinstance(result, dict) and (result.get("minimal_routing") or {}).get("handled"):
+        minimal_idempotency.remember(session_id, client_turn_id, result)
+
     routing = (result or {}).get("minimal_routing") or {}
     log.info(
         "minimal_dispatch: endpoint=%s handled=%s decline_reason=%s "
@@ -7184,6 +7225,10 @@ def _try_minimal_engine(
     The fallback boundary is EXPLICIT: the minimal engine claims a turn only
     when it is Practice, grade 6, no image, and the selected topic maps to one
     of its five supported skills. It never widens to a neighbouring topic.
+
+    Idempotency (replay and single-flight) is entirely the CALLER's concern —
+    see ``minimal_dispatch`` — so this function always performs a real
+    attempt and never consults or writes the replay cache itself.
     """
     payload = dict(data or {})
     routing = {

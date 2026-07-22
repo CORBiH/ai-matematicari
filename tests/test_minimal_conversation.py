@@ -272,21 +272,30 @@ def test_ambiguous_message_with_an_active_task_keeps_it(client, fake_openai):
 
 
 # =========================================================================== #
-# Case 4: repeated identical new-task request                                 #
+# Case 4: a genuinely repeated new-task request now REPLACES the task         #
 # =========================================================================== #
-def test_repeated_identical_request_returns_the_same_task(client):
-    """The 12:53:10 / 12:53:20 pair: identical task, two different ids."""
+# Production regression, 2026-07-22: "Daj mi novi zadatak." sent again while a
+# task was active kept returning the SAME task, because a signature built from
+# the normalized message text was compared across turns — text equality cannot
+# tell "the same browser request delivered twice" from "the student typed the
+# same phrase again". That transport question is now answered by
+# ``client_turn_id`` (see test_minimal_idempotency.py); a genuinely distinct
+# turn — even with identical wording — must always create a new task.
+def test_repeated_identical_text_creates_a_new_task(client):
     first = sse(client, prod_payload(student_message="daj mi zadatak"))
-    question, tid = first["last_tutor_task"], first["next_state"]["task_id"]
+    tid = first["next_state"]["task_id"]
 
     second = sse(client, prod_payload(
         student_message="daj mi zadatak",
         previous_next_state=first["next_state"]))
-    assert second["next_state"]["task_id"] == tid        # not replaced
-    assert second["last_tutor_task"] == question
+    assert second["next_state"]["task_id"] != tid
+    assert second["minimal_routing"]["task_transition"] == "replaced"
+    assert second["minimal_routing"]["previous_task_id"] == tid
+    assert second["minimal_routing"]["current_task_id"] == \
+        second["next_state"]["task_id"]
 
 
-def test_repeated_request_does_not_reset_progress(client):
+def test_repeated_request_does_not_count_the_old_task_wrong(client):
     first = sse(client, prod_payload(student_message="daj mi zadatak"))
     question = first["last_tutor_task"]
     hinted = sse(client, prod_payload(
@@ -295,8 +304,12 @@ def test_repeated_request_does_not_reset_progress(client):
     repeated = sse(client, prod_payload(
         student_message="daj mi zadatak",
         previous_next_state=hinted["next_state"]))
-    assert repeated["next_state"]["task_id"] == first["next_state"]["task_id"]
-    assert repeated["next_state"]["hint_count"] == 1     # progress preserved
+    # a NEW task, and the streak/attempt counters show no penalty for the old one
+    assert repeated["next_state"]["task_id"] != first["next_state"]["task_id"]
+    assert repeated["next_state"]["hint_count"] == 0      # a fresh task's own count
+    assert repeated["next_state"]["correct_streak"] == 0
+    assert repeated["wrong_attempt_count"] == 0
+    assert repeated["next_state"]["minimal_state"]["solved_count"] == 0
 
 
 def test_a_different_new_task_request_does_replace_the_task(client):
@@ -331,16 +344,19 @@ def test_new_task_after_completion_differs_from_the_previous(client):
     assert nxt["next_state"]["task_id"] != first["next_state"]["task_id"]
 
 
-def test_recent_signature_list_stays_bounded(client):
+def test_recent_questions_list_stays_bounded(client):
     body = sse(client, prod_payload(student_message="daj mi zadatak"))
     state = body["next_state"]
+    seen_ids = {state["task_id"]}
     for message in ("daj mi novi zadatak", "hoću još jedan zadatak",
                     "daj mi drugi zadatak", "daj mi zadatak za vježbu"):
         body = sse(client, prod_payload(student_message=message,
                                         previous_next_state=state))
         state = body["next_state"]
+        seen_ids.add(state["task_id"])
     assert len(minimal_state(body)["recent_questions"]) <= 8
-    assert isinstance(minimal_state(body)["last_request_signature"], str)
+    # every one of the five requests produced its OWN task
+    assert len(seen_ids) == 5
 
 
 # =========================================================================== #

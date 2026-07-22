@@ -204,6 +204,7 @@ def handle_chat_minimal(
         state=state_from_payload(payload),
         selected_topic=payload.get("selected_topic"),
         selected_oblast=payload.get("selected_oblast"),
+        client_turn_id=payload.get("client_turn_id"),
         openai_chat=openai_chat, model=model, timeout=timeout,
     )
     response = response_from_result(result, payload)

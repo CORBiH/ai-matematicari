@@ -31,7 +31,6 @@ from matbot.minimal.intent import (
     TurnIntent,
     classify_turn,
 )
-from matbot.minimal.intent import fold as intent_fold
 from matbot.minimal.intent import (
     confirmation_choice,
     is_affirmation,
@@ -81,13 +80,6 @@ def _offer_task(state: SessionState) -> tuple[SessionState, ActiveTask | None]:
     return state.with_task(task), task
 
 
-def _request_signature(raw_message: Any) -> str:
-    """Compact signature of a new-task REQUEST, for immediate-repeat detection."""
-    import re as _re
-    folded = _re.sub(r"[^a-z0-9 ]+", " ", intent_fold(raw_message))
-    return " ".join(folded.split())[:80]
-
-
 def _apply_difficulty(state: SessionState, intent: TurnIntent) -> SessionState:
     """HARDER/EASIER move the level by one, bounded; NEW_TASK keeps it.
 
@@ -108,11 +100,19 @@ def handle_turn(
     state: SessionState,
     selected_topic: Any = "",
     selected_oblast: Any = "",
+    client_turn_id: Any = "",
     openai_chat: Callable | None = None,
     model: str = "",
     timeout: float | None = None,
 ) -> TurnResult:
-    """Run exactly one Practice turn."""
+    """Run exactly one Practice turn.
+
+    ``client_turn_id`` is carried through to telemetry only. Whether a PHYSICAL
+    request is a replay of an earlier one (same browser turn retried over a
+    transport fallback) is decided at the boundary, before this function is
+    ever called — this function has no memory of previous calls and always
+    performs a real transition for the turn it is given.
+    """
     student_raw = str(raw_message if raw_message is not None else "")
     # Decision trace. Written as decisions happen, never read back.
     trace: dict = {
@@ -120,6 +120,9 @@ def handle_turn(
         "concept_facts_resolved": False,
         "pending_confirmation_before": state.pending_confirmation,
         "pending_confirmation_after": "", "confirmation_choice": "",
+        "client_turn_id": str(client_turn_id or ""),
+        "idempotency_replay": False,
+        "task_transition": "", "previous_task_id": "", "current_task_id": "",
     }
     state = state.next_turn()
 
@@ -219,28 +222,35 @@ def handle_turn(
     # ONLY an explicit new-task intent may create a task. Previously any
     # non-HELP intent did so whenever no task was active, which is how an
     # unrecognised message silently produced one.
+    #
+    # EVERY distinct call that reaches here creates a fresh task, even when the
+    # student's wording is identical to an earlier turn and even when a task is
+    # already active — a repeated message is a repeated REQUEST, not a repeated
+    # HTTP delivery of the same one. Production kept returning the existing
+    # task for "Daj mi novi zadatak." sent again because it treated identical
+    # NORMALIZED TEXT as proof of a duplicate transport request; the two are
+    # unrelated; the actual transport case (SSE falling back to JSON for the
+    # SAME physical submission) is handled above this function, keyed by
+    # ``client_turn_id``, before ``handle_turn`` is ever invoked.
     if intent in NEW_TASK_INTENTS:
-        # A repeated identical request while a task is already active returns
-        # THAT task instead of replacing it (production issued two ids for the
-        # same generated task ten seconds apart).
-        signature = _request_signature(student_raw)
-        if (task is not None and intent is TurnIntent.NEW_TASK
-                and signature and signature == state.last_request_signature):
-            ctx = RenderContext(state=state, intent=intent.value, task=task)
-            trace["pending_confirmation_after"] = state.pending_confirmation
-            return TurnResult(answer=render(ctx), state=state,
-                              intent=intent.value, task=task,
-                              student_raw=student_raw, telemetry=dict(trace))
-        state = state.with_request_signature(signature)
+        previous_task_id = task.task_id if task is not None else ""
         state = _apply_difficulty(state, intent)
         state, task = _offer_task(state)
         if task is None:
+            trace["task_transition"] = ""
             ctx = RenderContext(state=state, intent=intent.value,
                                 unsupported_topic=topic.title)
             trace["pending_confirmation_after"] = state.pending_confirmation
             return TurnResult(answer=render(ctx), state=state,
                               intent=intent.value, topic_supported=False,
                               student_raw=student_raw, telemetry=dict(trace))
+        # The OLD task is neither solved nor wrong — it is simply no longer
+        # being asked. No verdict, no attempt, no streak or solved_count change;
+        # its identity is preserved here for audit, since active_task already
+        # points at the new one.
+        trace["task_transition"] = "replaced" if previous_task_id else "created"
+        trace["previous_task_id"] = previous_task_id
+        trace["current_task_id"] = task.task_id
         ctx = RenderContext(
             state=state, intent=TurnIntent.NEW_TASK.value, task=task,
             difficulty_unsupported=(
