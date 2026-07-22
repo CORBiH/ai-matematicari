@@ -133,6 +133,12 @@ _CANDIDATE_RE = re.compile(r"\d+\s+\d+\s*/\s*\d+|\d+\s*/\s*\d+|\d+")
 #: The student wrote several numbers but never said which one is the answer.
 AMBIGUOUS_FINAL_ANSWER = "ambiguous_final_answer"
 
+#: Nothing in the message could be matched to any recognised answer form at
+#: all — not even a candidate number to retry. Like ``AMBIGUOUS_FINAL_ANSWER``,
+#: no ``graded_answer`` was ever identified, so this must not count as an
+#: attempt either (engine.py treats both identically for that reason).
+NOT_CHECKABLE = "not_checkable"
+
 #: Status of an extraction attempt.
 FOUND = "found"
 AMBIGUOUS = "ambiguous"
@@ -242,7 +248,7 @@ def grade(task: ActiveTask, raw_message: Any) -> GradingResult:
         return GradingResult(task_id=task.task_id, verdict="unverified",
                              solved=False, student_raw=raw,
                              expected_display=task.expected_display,
-                             detail="not_checkable", deterministic=False)
+                             detail=NOT_CHECKABLE, deterministic=False)
 
     item = result.items[0]
     detail = str(item.verdict or "")

@@ -194,6 +194,102 @@ _TOPIC_WORDS_RE = re.compile(
 _NEW_TASK_RE = re.compile(
     r"\b(zadat\w*|vjezb\w*|primjer\w*|jos\s+jedan|idemo\s+dalje|dalje)\b")
 
+# --------------------------------------------------------------------------- #
+# Task-SHAPE requests: "daj mi zadatak oblika a-x=b" describes a whole         #
+# EQUATION SHAPE, never a computed value, so it is never a valid ANSWER.      #
+#                                                                              #
+# Two structurally different things must NOT be conflated:                    #
+#  * a LITERAL PLACEHOLDER shape ("a-x=b", using the letters a/x/b) has no    #
+#    other reading — it identifies a requested shape on its own.             #
+#  * a CONCRETE NUMERIC equation ("5/6 - x = 1/3") is exactly what a student  #
+#    mid-task might submit as a transformed equation or intermediate working #
+#    step. Earlier this module treated any such equation as a shape request  #
+#    outright, which would have misrouted a genuine working step during an   #
+#    active task. A concrete equation is now a requested shape ONLY when the #
+#    message ALSO contains an explicit task-request cue ("daj mi primjer",   #
+#    "zelim probati", "u ovom obliku", ...); bare, it identifies only as a   #
+#    RECOGNISED EQUATION STATEMENT (see ``is_bare_equation_statement``),      #
+#    which the caller may route to a clarification when no task is active,  #
+#    or leave for the ordinary answer/working-step path when one is.         #
+# --------------------------------------------------------------------------- #
+_NUM = r"\d+(?:\s*/\s*\d+)?"
+#: Literal placeholder shapes: "x-a=b", "a+x=b", accepting the Unicode minus.
+_SHAPE_X_LITERAL_RE = re.compile(r"\bx\s*([+\-−])\s*a\s*=\s*b\b")
+_SHAPE_A_LITERAL_RE = re.compile(r"\ba\s*([+\-−])\s*x\s*=\s*b\b")
+#: Concrete numeric equations of the same two shapes, x still unresolved.
+_SHAPE_X_NUMERIC_RE = re.compile(
+    rf"\bx\s*([+\-−])\s*{_NUM}\s*=\s*{_NUM}\b")
+_SHAPE_A_NUMERIC_RE = re.compile(
+    rf"\b{_NUM}\s*([+\-−])\s*x\s*=\s*{_NUM}\b")
+#: "razlomak minus x", or bare "minus x" — names the a - x = b shape in prose.
+#: Prose-only, so it carries no risk of matching a restated equation.
+_SHAPE_PHRASE_RE = re.compile(r"\bminus\s+x\b")
+
+#: An explicit REQUEST for a task/example — the cue that turns a concrete
+#: equation into a shape request rather than working the student submitted.
+_TASK_REQUEST_CUE_RE = re.compile(
+    r"\bdaj\s+mi\s+(zadat\w*|primjer\w*)\b|\b[zž]elim\s+(probat\w*|jednacin\w*|"
+    r"jednadzb\w*)\b|\bho[cč]u\s+zadat\w*\b|\bnapravi\s+zadat\w*\b"
+    r"|\bu\s+ovom\s+obliku\b|\bove\s+forme\b|\boblika\b|\bu\s+formi\b")
+
+#: Public shape vocabulary. Kept distinct from the generator's internal form
+#: names (see ``skills.EQUATION_FORMS``) so this module stays skill-agnostic.
+SHAPE_X_PLUS_A = "x_plus_a"
+SHAPE_A_PLUS_X = "a_plus_x"
+SHAPE_X_MINUS_A = "x_minus_a"
+SHAPE_A_MINUS_X = "a_minus_x"
+
+
+def _numeric_shape(text: str) -> str | None:
+    match = _SHAPE_A_NUMERIC_RE.search(text)
+    if match:
+        return SHAPE_A_MINUS_X if match.group(1) in "-−" else SHAPE_A_PLUS_X
+    match = _SHAPE_X_NUMERIC_RE.search(text)
+    if match:
+        return SHAPE_X_MINUS_A if match.group(1) in "-−" else SHAPE_X_PLUS_A
+    return None
+
+
+def parse_shape_request(raw_message: Any) -> str | None:
+    """One of the four public shape names, or ``None``.
+
+    Shared, skill-agnostic parsing: this function knows nothing about
+    ``fraction_equation_additive`` or any other skill. Whether a requested
+    shape is honoured or politely declined is the caller's decision.
+    """
+    text = fold(raw_message)
+    if not text:
+        return None
+    match = _SHAPE_A_LITERAL_RE.search(text)
+    if match:
+        return SHAPE_A_MINUS_X if match.group(1) in "-−" else SHAPE_A_PLUS_X
+    match = _SHAPE_X_LITERAL_RE.search(text)
+    if match:
+        return SHAPE_X_MINUS_A if match.group(1) in "-−" else SHAPE_X_PLUS_A
+    # A CONCRETE equation only counts as a request with an explicit cue —
+    # bare, it is indistinguishable from a transformed working step.
+    if _TASK_REQUEST_CUE_RE.search(text):
+        shape = _numeric_shape(text)
+        if shape is not None:
+            return shape
+    if _SHAPE_PHRASE_RE.search(text):
+        return SHAPE_A_MINUS_X
+    return None
+
+
+def is_bare_equation_statement(raw_message: Any) -> bool:
+    """True for a concrete numeric equation with NO task-request cue.
+
+    Used only to distinguish "the student stated an equation" from "no
+    mathematical content at all" — what to DO with that (leave it for the
+    ordinary answer route while a task is active; offer a clarification when
+    none is) is entirely the caller's decision.
+    """
+    text = fold(raw_message)
+    if not text or _TASK_REQUEST_CUE_RE.search(text):
+        return False           # a cued message is a request, not a statement
+    return _numeric_shape(text) is not None
+
 #: Direction words. They modify a NEW_TASK request; they are never a mode.
 _HARDER_RE = re.compile(r"\btez\w*|\bteski\w*|\bkomplikovanij\w*|\bizazovnij\w*")
 _EASIER_RE = re.compile(r"\blaks\w*|\bjednostavnij\w*|\blagan\w*")
@@ -245,6 +341,12 @@ def classify(raw_message: Any, *, has_active_task: bool = False) -> Classificati
         if _EASIER_RE.search(text):
             return Classification(TurnIntent.EASIER, "easier")
         return Classification(TurnIntent.NEW_TASK, "new_task")
+    # A message describing a whole EQUATION SHAPE ("a-x=b", "5/6 - x = 1/3")
+    # is full of digits and operators, which would otherwise fall to ANSWER
+    # below — that is exactly how two production shape requests were graded
+    # as wrong answers. Checked before the math gate for that reason.
+    if parse_shape_request(text) is not None:
+        return Classification(TurnIntent.NEW_TASK, "shape_request")
     if _MATH_RE.search(text) or _BARE_BOOL_RE.match(text):
         return Classification(TurnIntent.ANSWER, "answer")
     # LAST resort, and only with a task open: a mistyped cry for help.

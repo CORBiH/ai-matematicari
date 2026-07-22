@@ -192,6 +192,9 @@ class RenderContext:
     #: True when the student asked for harder/easier on a skill that has no
     #: objective bands. We say so rather than implying the task changed.
     difficulty_unsupported: bool = False
+    #: A requested equation shape ("a_minus_x", ...) that the CURRENT skill
+    #: does not support — set only when we decline it, never on success.
+    unsupported_shape: str = ""
 
     @property
     def seed(self) -> str:
@@ -448,6 +451,20 @@ def unsupported_topic(ctx: RenderContext) -> str:
             "za sada podržavam.")
 
 
+def unsupported_shape_request(ctx: RenderContext) -> str:
+    """A shape request the CURRENT skill has no other form for.
+
+    Never silently substitutes an unrelated task — states the limit and, if a
+    task is already active, reminds the student it is still there.
+    """
+    text = ("Ovaj oblik jednačine nije dostupan za trenutnu vježbu. Reci „daj "
+            "mi zadatak” za novi zadatak iz ove teme.")
+    if ctx.task is not None:
+        text += ("\n\nZadatak je i dalje:\n"
+                + mathfmt.format_question(ctx.task.question))
+    return text
+
+
 def other_turn(ctx: RenderContext) -> str:
     task = ctx.task
     if task is not None:
@@ -544,6 +561,8 @@ def render(ctx: RenderContext, *, openai_chat: Callable | None = None,
 
     if ctx.unsupported_topic:
         return _finish(unsupported_topic(ctx))
+    if ctx.unsupported_shape:
+        return _finish(unsupported_shape_request(ctx))
     if ctx.intent in _NEW_TASK_INTENT_VALUES and ctx.task is not None \
             and ctx.grading is None:
         return _finish(present_task(ctx))

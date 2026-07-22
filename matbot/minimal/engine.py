@@ -22,6 +22,7 @@ from typing import Any, Callable
 from matbot.minimal import concept_facts, skills, solution_facts
 from matbot.minimal.grading import (
     AMBIGUOUS_FINAL_ANSWER,
+    NOT_CHECKABLE,
     GradingResult,
     grade,
     target_denominator,
@@ -30,6 +31,7 @@ from matbot.minimal.intent import (
     NEW_TASK_INTENTS,
     TurnIntent,
     classify_turn,
+    parse_shape_request,
 )
 from matbot.minimal.intent import (
     confirmation_choice,
@@ -64,14 +66,21 @@ class TurnResult:
         return self.grading.verdict if self.grading else None
 
 
-def _offer_task(state: SessionState) -> tuple[SessionState, ActiveTask | None]:
-    """Create and activate a task for the selected topic, or nothing."""
+def _offer_task(state: SessionState,
+                shape: str | None = None) -> tuple[SessionState, ActiveTask | None]:
+    """Create and activate a task for the selected topic, or nothing.
+
+    ``shape`` is a hint only — ``skills.generate_question`` itself decides
+    whether the resolved skill supports it (only ``fraction_equation_additive``
+    does), so passing one for an unrelated skill is harmless.
+    """
     topic = state.topic
     if not topic.supported:
         return state, None
     made = skills.generate_question(
         topic.skill_id, seed=f"{state.session_id}|{state.turn_index}",
-        avoid=state.recent_questions, difficulty=state.difficulty_level)
+        avoid=state.recent_questions, difficulty=state.difficulty_level,
+        shape=shape)
     if made is None:
         return state, None
     question, expected = made
@@ -123,6 +132,7 @@ def handle_turn(
         "client_turn_id": str(client_turn_id or ""),
         "idempotency_replay": False,
         "task_transition": "", "previous_task_id": "", "current_task_id": "",
+        "requested_task_shape": "",
     }
     state = state.next_turn()
 
@@ -234,8 +244,25 @@ def handle_turn(
     # ``client_turn_id``, before ``handle_turn`` is ever invoked.
     if intent in NEW_TASK_INTENTS:
         previous_task_id = task.task_id if task is not None else ""
+        # A message describing a whole equation SHAPE ("a-x=b", "5/6 - x =
+        # 1/3") is a task-shape request, detected deterministically — never by
+        # OpenAI. Shared, skill-agnostic parsing; only ``fraction_equation_
+        # additive`` currently has more than one shape to honour. A shape
+        # named under any other skill gets an honest decline rather than a
+        # silently unrelated task or, worse, being graded as a wrong answer
+        # (the exact production defect this closes).
+        requested_shape = parse_shape_request(student_raw)
+        trace["requested_task_shape"] = requested_shape or ""
+        if requested_shape and state.topic.skill_id != "fraction_equation_additive":
+            trace["task_transition"] = ""
+            trace["pending_confirmation_after"] = state.pending_confirmation
+            ctx = RenderContext(state=state, intent=intent.value, task=task,
+                                unsupported_shape=requested_shape)
+            return TurnResult(answer=render(ctx), state=state,
+                              intent=intent.value, task=task,
+                              student_raw=student_raw, telemetry=dict(trace))
         state = _apply_difficulty(state, intent)
-        state, task = _offer_task(state)
+        state, task = _offer_task(state, shape=requested_shape)
         if task is None:
             trace["task_transition"] = ""
             ctx = RenderContext(state=state, intent=intent.value,
@@ -300,11 +327,15 @@ def handle_turn(
     # ---- ANSWER: exactly one GradingResult ---------------------------------
     if intent is TurnIntent.ANSWER and task is not None:
         result = grade(task, student_raw)
-        # An AMBIGUOUS message was never graded, so it is not an attempt. Left
-        # counting, three lines of working would have tripped MAX_WRONG_ATTEMPTS
-        # and revealed the answer to a student who had made no mistake.
-        ambiguous = result.detail == AMBIGUOUS_FINAL_ANSWER
-        counted = task if ambiguous else ActiveTask(**{
+        # AMBIGUOUS ("several numbers, no declared answer") and NOT_CHECKABLE
+        # ("nothing recognisable as any answer form") both mean no candidate
+        # answer was ever identified — ``graded_answer`` is empty for either.
+        # Neither is an attempt: left counting, three lines of working (or a
+        # task-shape request the intent classifier failed to recognise) would
+        # have tripped MAX_WRONG_ATTEMPTS and revealed the answer to a student
+        # who never actually answered wrong.
+        not_an_attempt = result.detail in (AMBIGUOUS_FINAL_ANSWER, NOT_CHECKABLE)
+        counted = task if not_an_attempt else ActiveTask(**{
             **task.to_dict(),
             "attempts": task.attempts + 1,
             "wrong_attempts": task.wrong_attempts + (0 if result.solved else 1),
@@ -322,9 +353,10 @@ def handle_turn(
                               state=state, intent=intent.value, grading=result,
                               task=counted, student_raw=student_raw,
                               telemetry=dict(trace))
-        give_up = (not ambiguous) and counted.wrong_attempts >= MAX_WRONG_ATTEMPTS
-        # An ambiguous message is not a wrong answer, so the streak survives it.
-        state = state if ambiguous else state.broke_streak()
+        give_up = (not not_an_attempt) and counted.wrong_attempts >= MAX_WRONG_ATTEMPTS
+        # Neither an ambiguous nor an uncheckable message is a wrong answer,
+        # so the streak survives either.
+        state = state if not_an_attempt else state.broke_streak()
         state = state.cleared_task() if give_up else state.with_updated_task(counted)
         ctx = RenderContext(state=state, intent=intent.value, grading=result,
                             task=counted, may_reveal=give_up,

@@ -259,24 +259,45 @@ def equation_band_for(level: Any) -> tuple[tuple[int, int], ...]:
                               EQUATION_BANDS[DEFAULT_DIFFICULTY])
 
 
-def _generate_fraction_equation(rng: random.Random,
-                                level: int) -> tuple[str, str]:
-    """x + a/b = c/d, a/b + x = c/d, x - a/b = c/d — the selected lesson.
+#: The four shapes the selected lesson names explicitly. Bug fixed here:
+#: this tuple previously had only three entries — "a_minus_x" (a - x = b) was
+#: never a candidate for ``rng.choice`` at all, so no seed, however many
+#: turns were generated, could ever produce it. 19 real production turns
+#: produced 9/6/4/0 across the other three shapes for exactly that reason.
+EQUATION_FORMS = ("x_plus", "lead_plus", "x_minus", "a_minus_x")
+
+#: A requested shape, as used by explicit task-shape requests (see
+#: ``intent.parse_shape_request``), mapped to the internal form name above.
+SHAPE_REQUEST_TO_FORM = {
+    "x_plus_a": "x_plus", "a_plus_x": "lead_plus",
+    "x_minus_a": "x_minus", "a_minus_x": "a_minus_x",
+}
+
+
+def _generate_fraction_equation(rng: random.Random, level: int,
+                                form: str | None = None) -> tuple[str, str]:
+    """x + a/b = c/d, a/b + x = c/d, x - a/b = c/d, a/b - x = c/d.
 
     The solution is computed with Fraction, never by a template, and is
-    always a POSITIVE rational because the tema lives in Q+.
+    always a POSITIVE rational because the tema lives in Q+. ``form`` forces
+    one specific shape (used by explicit shape requests); ``None`` picks
+    uniformly among all four, as ordinary task generation always has.
     """
     from fractions import Fraction
 
     pairs = equation_band_for(level)
     den_a, den_b = rng.choice(pairs)
-    form = rng.choice(("x_plus", "lead_plus", "x_minus"))
+    chosen = form if form in EQUATION_FORMS else rng.choice(EQUATION_FORMS)
     for _ in range(60):
         num_a = rng.randint(1, den_a - 1)
         num_b = rng.randint(1, den_b - 1)
         known, right = Fraction(num_a, den_a), Fraction(num_b, den_b)
-        if form == "x_minus":
+        if chosen == "x_minus":
             solution = known + right          # x - a = b  →  x = a + b
+        elif chosen == "a_minus_x":
+            solution = known - right          # a - x = b  →  x = a - b
+            if solution <= 0:
+                continue                      # Q+ only: a must exceed b
         else:
             solution = right - known          # x + a = b  →  x = b - a
             if solution <= 0:
@@ -287,7 +308,8 @@ def _generate_fraction_equation(rng: random.Random,
             "x_plus": f"x + {num_a}/{den_a}",
             "lead_plus": f"{num_a}/{den_a} + x",
             "x_minus": f"x - {num_a}/{den_a}",
-        }[form]
+            "a_minus_x": f"{num_a}/{den_a} - x",
+        }[chosen]
         text = (f"{solution.numerator}/{solution.denominator}"
                 if solution.denominator != 1 else str(solution.numerator))
         return f"Riješi jednačinu: {left} = {num_b}/{den_b}.", text
@@ -309,11 +331,17 @@ def supports_difficulty(skill_id: str) -> bool:
 
 
 def generate_question(skill_id: str, seed: Any, avoid: Any = (),
-                      difficulty: Any = DEFAULT_DIFFICULTY) -> tuple[str, str] | None:
+                      difficulty: Any = DEFAULT_DIFFICULTY,
+                      shape: Any = None) -> tuple[str, str] | None:
     """A validated (question, expected_display) pair, or None.
 
     Every candidate must derive an expected value — a task this engine cannot
     check is a task it will not ask.
+
+    ``shape`` forces one specific equation form (one of ``SHAPE_REQUEST_TO_FORM``)
+    and is honoured ONLY for ``fraction_equation_additive`` — the only skill
+    with more than one lesson shape. It is silently ignored everywhere else,
+    so a stray shape hint can never redirect an unrelated skill's generator.
     """
     skill = _BY_ID.get(skill_id)
     if skill is None:
@@ -323,11 +351,14 @@ def generate_question(skill_id: str, seed: Any, avoid: Any = (),
     template = task_templates._BY_ID.get(skill.template_id)
     if generator is None and template is None:
         return None
+    form = (SHAPE_REQUEST_TO_FORM.get(str(shape or ""))
+           if skill_id == "fraction_equation_additive" else None)
     avoid_folded = {_fold(a) for a in (avoid or ()) if str(a or "").strip()}
     for attempt in range(60):
         rng = random.Random(f"minimal|{skill_id}|{level}|{seed}|{attempt}")
         if generator is not None:
-            question, expected = generator(rng, level)
+            question, expected = (generator(rng, level, form=form) if form
+                                  else generator(rng, level))
         else:
             question, expected = template.generate(rng)
         if not question or _fold(question) in avoid_folded:
