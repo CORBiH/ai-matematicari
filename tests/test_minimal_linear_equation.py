@@ -180,9 +180,11 @@ def test_facts_for_the_production_equation():
     ("Riješi jednačinu: 2x + 5 = 11.", "subtract", "2x = 6", "3"),
     ("Riješi jednačinu: 2x - 5 = 11.", "add", "2x = 16", "8"),
     ("Riješi jednačinu: 4x - 1 = 15.", "add", "4x = 16", "4"),
-    ("Riješi jednačinu: x + 1/3 = 5/6.", "subtract", "x = 1/2", "1/2"),
-    ("Riješi jednačinu: 2/5 + x = 3/4.", "subtract", "x = 7/20", "7/20"),
-    ("Riješi jednačinu: x - 1/4 = 1/2.", "add", "x = 3/4", "3/4"),
+    # For a coefficient of 1 the intermediate stays UNEVALUATED — naming its
+    # value would hand the student the answer one rung early.
+    ("Riješi jednačinu: x + 1/3 = 5/6.", "subtract", "x = 5/6 - 1/3", "1/2"),
+    ("Riješi jednačinu: 2/5 + x = 3/4.", "subtract", "x = 3/4 - 2/5", "7/20"),
+    ("Riješi jednačinu: x - 1/4 = 1/2.", "add", "x = 1/2 + 1/4", "3/4"),
 ])
 def test_facts_are_correct_for_every_supported_form(
         question, operation, intermediate, solution):

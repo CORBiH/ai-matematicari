@@ -195,31 +195,102 @@ def _as_fraction(token: Any) -> Fraction | None:
 
 @dataclass(frozen=True)
 class EquationFacts:
-    """Every number needed to guide or solve a one-step / two-step equation."""
-    coefficient: Fraction           # a in a·x
+    """Every number needed to guide or solve a supported equation.
+
+    Four lesson shapes, distinguished explicitly rather than by sign alone:
+
+    ====================  ===============  ==========================
+    shape                 flags            x equals
+    ====================  ===============  ==========================
+    ``x + a = b``         --               ``b - a``
+    ``a + x = b``         leading          ``b - a``
+    ``x - a = b``         --               ``b + a``
+    ``a - x = b``         leading+subtr.   ``a - b``
+    ====================  ===============  ==========================
+
+    The last row is the trap: the unknown is the SUBTRAHEND, so it is not the
+    ``x - a = b`` transformation with a different sign.
+    """
+    coefficient: Fraction           # a in a*x
     constant: Fraction              # b, WITH its sign as it appears on the left
     right: Fraction                 # c
     solution: Fraction              # x
-    leading_constant: bool = False  # the "a + x = b" shape
+    leading_constant: bool = False  # the "a + x = b" / "a - x = b" shape
+    subtracted_unknown: bool = False    # the "a - x = b" shape specifically
 
+    # ---- basic shape -----------------------------------------------------
     @property
     def removes_by_adding(self) -> bool:
-        """A negative constant is removed by ADDING its absolute value."""
-        return self.constant < 0
+        """A negative constant is removed by ADDING its absolute value.
+
+        Meaningless for ``a - x = b``, where nothing is moved to isolate x.
+        """
+        return self.constant < 0 and not self.subtracted_unknown
 
     @property
     def move_amount(self) -> Fraction:
         return abs(self.constant)
 
     @property
+    def needs_division(self) -> bool:
+        return self.coefficient != 1
+
+    @property
     def intermediate_right(self) -> Fraction:
         """c - b: the right side once the constant has moved."""
         return self.right - self.constant
 
+    # ---- the one-step isolation, kept UNEVALUATED -------------------------
     @property
-    def needs_division(self) -> bool:
-        return self.coefficient != 1
+    def operands(self) -> tuple[Fraction, Fraction, str]:
+        """(first, second, operator) of the expression x is equal to."""
+        if self.subtracted_unknown:
+            return abs(self.constant), self.right, "-"
+        return self.right, self.move_amount, ("+" if self.constant < 0 else "-")
 
+    @property
+    def isolate_expression(self) -> str:
+        first, second, operator = self.operands
+        return (f"{_fraction_text(first)} {operator} "
+                f"{_fraction_text(second)}")
+
+    @property
+    def common_denominator(self) -> int:
+        """LCM of the two operands, or 0 when they already agree."""
+        first, second, _ = self.operands
+        if first.denominator == second.denominator:
+            return 0
+        return _lcm(first.denominator, second.denominator)
+
+    @property
+    def common_expression(self) -> str:
+        """"6/10 - 5/10" â empty when the denominators already agree."""
+        common = self.common_denominator
+        if not common:
+            return ""
+        first, second, operator = self.operands
+        left = first.numerator * (common // first.denominator)
+        right = second.numerator * (common // second.denominator)
+        return f"{left}/{common} {operator} {right}/{common}"
+
+    def equalised_pairs(self) -> list[tuple[str, str]]:
+        """[("3/5", "6/10"), ("1/2", "5/10")] for the equalisation rung.
+
+        A fraction already standing on the common denominator is omitted —
+        showing "5/6 = 5/6" reads as a mistake to a child.
+        """
+        common = self.common_denominator
+        if not common:
+            return []
+        pairs = []
+        for value in self.operands[:2]:
+            if value.denominator == common:
+                continue
+            scaled = value.numerator * (common // value.denominator)
+            pairs.append((_fraction_text(value), f"{scaled}/{common}"))
+        return pairs
+
+    # ---- rendered equations (PLAIN text; mathfmt adds the LaTeX) ----------
     def _text(self, value: Fraction) -> str:
         return _fraction_text(value)
 
@@ -231,13 +302,19 @@ class EquationFacts:
     def original_equation(self) -> str:
         sign = "-" if self.constant < 0 else "+"
         if self.leading_constant:
-            return f"{self._text(abs(self.constant))} {sign} x = {self._text(self.right)}"
+            return (f"{self._text(abs(self.constant))} {sign} x = "
+                    f"{self._text(self.right)}")
         return (f"{self.coefficient_text}x {sign} "
                 f"{self._text(abs(self.constant))} = {self._text(self.right)}")
 
     @property
     def intermediate_equation(self) -> str:
-        return f"{self.coefficient_text}x = {self._text(self.intermediate_right)}"
+        """``2x = 12`` for a real coefficient; the UNEVALUATED isolation
+        otherwise, so it never leaks the answer."""
+        if self.needs_division:
+            return (f"{self.coefficient_text}x = "
+                    f"{self._text(self.intermediate_right)}")
+        return f"x = {self.isolate_expression}"
 
     @property
     def solution_equation(self) -> str:
@@ -248,20 +325,37 @@ class EquationFacts:
             "coefficient": self._text(self.coefficient),
             "constant": self._text(self.constant),
             "right": self._text(self.right),
-            "operation": ("add" if self.removes_by_adding else "subtract"),
+            "shape": self.shape,
+            "operation": self.operation,
             "move_amount": self._text(self.move_amount),
+            "isolate": self.isolate_expression,
+            "common": self.common_expression,
             "intermediate": self.intermediate_equation,
             "needs_division": self.needs_division,
             "solution": self._text(self.solution),
         }
 
+    @property
+    def shape(self) -> str:
+        if self.subtracted_unknown:
+            return "a-x=b"
+        if self.leading_constant:
+            return "a+x=b"
+        return "x-a=b" if self.constant < 0 else "x+a=b"
+
+    @property
+    def operation(self) -> str:
+        if self.subtracted_unknown:
+            return "isolate_subtrahend"
+        return "add" if self.removes_by_adding else "subtract"
+
 
 def resolve_equation_facts(question: Any) -> EquationFacts | None:
     """Facts for a supported linear equation, or None.
 
-    Handles ``a·x ± b = c`` (a may be absent, meaning 1) and the fraction lesson
-    shapes ``x ± a = b`` and ``a ± x = b``. Every value is a ``Fraction``, so the
-    integer and fraction cases share one implementation.
+    Handles ``a*x +/- b = c`` (a may be absent, meaning 1) and the fraction
+    lesson shapes ``x +/- a = b`` and ``a +/- x = b``. Every value is a
+    ``Fraction``, so the integer and fraction cases share one implementation.
     """
     text = str(question or "")
 
@@ -272,10 +366,11 @@ def resolve_equation_facts(question: Any) -> EquationFacts | None:
         if constant is None or right is None:
             return None
         if lead.group(2) in "-−":
-            # a - x = c  →  x = a - c
+            # a - x = c  ->  x = a - c. The unknown is the SUBTRAHEND: this is
+            # NOT the "x - a = b" move with a flipped sign.
             return EquationFacts(coefficient=Fraction(1), constant=-constant,
                                  right=right, solution=constant - right,
-                                 leading_constant=True)
+                                 leading_constant=True, subtracted_unknown=True)
         return EquationFacts(coefficient=Fraction(1), constant=constant,
                              right=right, solution=right - constant,
                              leading_constant=True)
@@ -293,44 +388,80 @@ def resolve_equation_facts(question: Any) -> EquationFacts | None:
                          solution=(right - constant) / coefficient)
 
 
-#: Genuinely new rungs before the ladder starts repeating.
-EQUATION_HINT_LEVELS = 3
+#: Said once the ladder runs out, instead of dressing up a repeat as new help.
+EQUATION_LADDER_EXHAUSTED = (
+    "Isti korak kao maloprije. Ako želiš cijeli postupak, napiši "
+    "„uradi i objasni postupak”.")
+
+
+def equation_rungs(facts: EquationFacts) -> list[str]:
+    """The genuinely distinct rungs for THIS equation, in order.
+
+    The length varies by shape: an integer equation needs a division rung, a
+    fraction equation needs an equalisation rung only when the denominators
+    actually differ. No rung states the solution.
+    """
+    amount = _fraction_text(facts.move_amount)
+
+    if facts.needs_division:
+        verb = "Dodaj" if facts.removes_by_adding else "Oduzmi"
+        tail = "na obje strane" if facts.removes_by_adding else "s obje strane"
+        signed = ("-" if facts.constant < 0 else "+") + amount
+        return [
+            f"{verb} {amount} {tail} da ukloniš {signed}.",
+            f"Tada dobijaš {mathfmt.inline(facts.intermediate_equation)}.",
+            f"Podijeli obje strane sa {_fraction_text(facts.coefficient)} "
+            "da dobiješ x.",
+        ]
+
+    if facts.subtracted_unknown:
+        first = mathfmt.inline(_fraction_text(abs(facts.constant)))
+        opening = (f"Pazi: ovdje se x oduzima od {first}, pa se ne prebacuje "
+                   "isto kao kad je x umanjenik.")
+    elif facts.removes_by_adding:
+        opening = f"Dodaj {mathfmt.inline(amount)} na obje strane."
+    else:
+        opening = f"Oduzmi {mathfmt.inline(amount)} s obje strane."
+
+    rungs = [opening,
+             f"Tada dobijaš {mathfmt.inline(facts.intermediate_equation)}."]
+
+    pairs = facts.equalised_pairs()
+    if pairs:
+        shown = " i ".join(mathfmt.inline(f"{plain}={scaled}")
+                           for plain, scaled in pairs)
+        rungs.append(f"Izjednači nazivnike: {shown}.")
+        rungs.append("Sada izračunaj "
+                     + mathfmt.inline(facts.common_expression) + ".")
+    else:
+        # Denominators already agree, so repeating the same expression would
+        # not be a new rung — name the operation on the numerators instead.
+        verb = "saberi" if facts.operands[2] == "+" else "oduzmi"
+        rungs.append(f"Sada {verb} brojnike, a nazivnik ostaje "
+                     f"{facts.operands[0].denominator}.")
+    return rungs
 
 
 def equation_hint(facts: EquationFacts, level: int) -> str:
-    """One rung. Never reveals the solution before the last rung."""
+    """One rung. Never reveals the solution, at any level."""
+    rungs = equation_rungs(facts)
     step = max(1, int(level or 1))
-    amount = _fraction_text(facts.move_amount)
-    signed = ("-" if facts.constant < 0 else "+") + amount
-
-    if step == 1:
-        verb = "Dodaj" if facts.removes_by_adding else "Oduzmi"
-        tail = "na obje strane" if facts.removes_by_adding else "s obje strane"
-        return f"{verb} {amount} {tail} da ukloniš {signed}."
-    if step == 2:
-        if facts.needs_division:
-            return f"Tada dobijaš {mathfmt.inline(facts.intermediate_equation)}."
-        # a == 1: naming the intermediate WOULD be the answer, so name the
-        # calculation instead.
-        return ("Sada izračunaj "
-                + mathfmt.inline(f"{_fraction_text(facts.right)} "
-                                 f"{'+' if facts.removes_by_adding else '-'} "
-                                 f"{amount}") + ".")
-    if step == 3:
-        if facts.needs_division:
-            coefficient = _fraction_text(facts.coefficient)
-            return f"Podijeli obje strane sa {coefficient} da dobiješ x."
-        return ("Ako su nazivnici različiti, prvo ih izjednači, pa tek onda "
-                "oduzmi brojnike.")
-    return ("Isti korak kao maloprije. Ako želiš cijeli postupak, napiši "
-            "„uradi i objasni postupak”.")
+    if step > len(rungs):
+        return EQUATION_LADDER_EXHAUSTED
+    return rungs[step - 1]
 
 
 def equation_solution_steps(facts: EquationFacts) -> list[str]:
     """The worked steps as PLAIN equations; ``mathfmt`` adds the formatting."""
-    steps = [facts.original_equation]
-    if facts.needs_division or facts.intermediate_equation != facts.solution_equation:
-        steps.append(facts.intermediate_equation)
+    steps = [facts.original_equation, facts.intermediate_equation]
+    common = facts.common_expression
+    if common and not facts.needs_division:
+        steps.append(f"x = {common}")
     if steps[-1] != facts.solution_equation:
         steps.append(facts.solution_equation)
-    return steps
+    # A one-step integer equation can produce "x = 6" twice.
+    deduped = [steps[0]]
+    for step in steps[1:]:
+        if step != deduped[-1]:
+            deduped.append(step)
+    return deduped

@@ -146,6 +146,33 @@ _CONCEPT_RE = re.compile(
     r"|\bkako\s+(to|se\s+de[sš]ava|zna[sš]|funkcioni[sš]e|bi)\b"
     r"|\b[sš]ta\s+bi\s+bilo\b|\bkoja\s+je\s+razlika\b|\bvrijedi\s+li\b")
 
+#: Deliberately narrow: only the FIRST word of an interrogative message is
+#: tested, only against "zasto", and never when the message carries arithmetic.
+#: Production sent "DZašto moramo uraditi istu operaciju na obje strane
+#: jednačine?" and the leading typo pushed it out of CONCEPT_QUESTION.
+_WHY_TARGET = "zasto"
+_WHY_TYPO_RATIO = 0.75
+
+
+def is_why_typo(message: Any) -> bool:
+    """True for a mistyped "zašto" opening a short interrogative question."""
+    import difflib
+
+    text = " ".join(fold(message).split())
+    if not text or _ANSWERISH_RE.search(text):
+        return False              # never reinterpret a numeric answer
+    words = text.split()
+    if len(words) < 3 or len(words) > 14:
+        return False              # not a bare token, not an essay
+    if not text.rstrip().endswith("?"):
+        return False              # interrogative only
+    head = words[0].strip("?!.,")
+    if head == _WHY_TARGET or len(head) > len(_WHY_TARGET) + 3:
+        return False              # exact match is already handled by _CONCEPT_RE
+    return difflib.SequenceMatcher(
+        None, head, _WHY_TARGET).ratio() >= _WHY_TYPO_RATIO
+
+
 #: "Proširi 3/5 brojem 7." — an instruction to DEMONSTRATE, not an answer to an
 #: active task (an answer is a bare value like "21/35", never an imperative).
 _EXPAND_INSTRUCTION_RE = re.compile(
@@ -204,6 +231,8 @@ def classify(raw_message: Any, *, has_active_task: bool = False) -> Classificati
         return Classification(TurnIntent.CONCEPT_QUESTION, "expand_instruction")
     if _CONCEPT_RE.search(text):
         return Classification(TurnIntent.CONCEPT_QUESTION, "concept")
+    if is_why_typo(raw_message):
+        return Classification(TurnIntent.CONCEPT_QUESTION, "concept_why_typo")
     if text.rstrip().endswith("?") and len(text.split()) >= 4 \
             and _TOPIC_WORDS_RE.search(text):
         return Classification(TurnIntent.CONCEPT_QUESTION, "concept_question_mark")

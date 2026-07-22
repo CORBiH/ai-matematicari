@@ -19,7 +19,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
-from matbot.minimal import concept_facts, skills
+from matbot.minimal import concept_facts, skills, solution_facts
 from matbot.minimal.grading import (
     AMBIGUOUS_FINAL_ANSWER,
     GradingResult,
@@ -44,8 +44,7 @@ from matbot.minimal.state import ActiveTask, SessionState, new_task
 #: child is never trapped on one task.
 MAX_WRONG_ATTEMPTS = 3
 
-#: Skills whose concept questions are about fraction expansion.
-_FRACTION_SKILLS = frozenset({"fraction_expand", "fraction_add_unlike"})
+#: Concept families now live in concept_facts, keyed by resolved skill.
 
 
 @dataclass(frozen=True)
@@ -197,10 +196,13 @@ def handle_turn(
     # "Proširi 2/4 na nazivnik 20." in reply to "šta ako imamo isti brojnik…"
     # and never answered the student.
     if intent is TurnIntent.CONCEPT_QUESTION:
-        # The expansion rule underlies BOTH fraction skills, so a concept
-        # question about it resolves to verified facts either way.
-        facts = concept_facts.resolve_expand_question(student_raw) \
-            if state.topic.skill_id in _FRACTION_SKILLS else None
+        # Facts are chosen by the RESOLVED SKILL first. Selecting them by
+        # question shape alone is what let an equation lesson be answered with
+        # fraction-expansion prose.
+        equation = solution_facts.resolve_equation_facts(task.question) \
+            if task is not None else None
+        facts = concept_facts.resolve_for_skill(
+            state.topic.skill_id, student_raw, equation)
         trace["concept_facts_resolved"] = facts is not None
         trace["concept_fact_kind"] = facts.kind if facts is not None else ""
         trace["pending_confirmation_after"] = state.pending_confirmation

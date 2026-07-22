@@ -137,6 +137,11 @@ _NEXT_INVITE = ("Želiš li novi zadatak?", "Želiš li još jedan zadatak?",
 #: Skills whose hints and solutions are COMPUTED from the equation itself.
 _EQUATION_SKILLS = ("linear_equation", "fraction_equation_additive")
 
+#: Policy B: orientation only, never a ladder rung. Keeping incorrect feedback
+#: free of specific guidance is what guarantees the next explicit HELP turn is
+#: genuinely new — no "already shown" state has to be tracked or inferred.
+_EQUATION_NUDGE = "Pokušaj prvo izdvojiti x."
+
 _HINTS: dict[str, tuple[str, ...]] = {
     "fraction_expand": (
         "Proširivanje znači da brojnik i nazivnik množiš ISTIM brojem.",
@@ -235,6 +240,12 @@ def feedback(ctx: RenderContext) -> str:
 
     task = ctx.task
     if task is not None and not ctx.may_reveal:
+        if task.skill_id in _EQUATION_SKILLS:
+            # POLICY B. Incorrect feedback stays deliberately non-specific so
+            # the deterministic ladder still owns rung 1. Production showed the
+            # student "Oduzmi 1/2 s obje strane…" as feedback and then repeated
+            # that exact sentence when they explicitly asked for help.
+            return f"{head} {_EQUATION_NUDGE}"
         nudge = _hint_text(task.skill_id, task.hints_given, task.question)
         return f"{head} {mathfmt.format_math_tokens(nudge)}"
     if ctx.may_reveal and task is not None and task.expected_display:
@@ -326,17 +337,26 @@ def concept_answer(ctx: RenderContext, *, openai_chat: Callable | None,
     # "2 · (24/13) = 48/24" when it was free to calculate.
     # The expansion rule underlies BOTH fraction skills, so a concept
     # question about it is answered from verified facts either way.
-    if (ctx.state.topic.skill_id or "") in _FRACTION_SKILLS:
-        facts = concept_facts.resolve_expand_question(question)
-        if facts is not None:
-            text = concept_facts.explain(facts)
-            # ``phrase_with_model`` rejects any candidate introducing a number
-            # that is not already in the text, so a fabricated result cannot
-            # survive the rephrase.
-            phrased = phrase_with_model(
-                text, openai_chat=openai_chat, model=model, timeout=timeout,
-                allow_verdict_words=False, require_same_numbers=True)
-            return mathfmt.format_math_tokens(phrased)
+    skill_id = ctx.state.topic.skill_id or ""
+    family = concept_facts.concept_family(skill_id)
+    equation = solution_facts.resolve_equation_facts(ctx.task.question) \
+        if (family == "equation" and ctx.task is not None) else None
+    facts = concept_facts.resolve_for_skill(skill_id, question, equation)
+    if facts is not None:
+        text = concept_facts.explain_for(facts)
+        # ``phrase_with_model`` rejects any candidate introducing a number
+        # that is not already in the text, so a fabricated result cannot
+        # survive the rephrase.
+        phrased = phrase_with_model(
+            text, openai_chat=openai_chat, model=model, timeout=timeout,
+            allow_verdict_words=False, require_same_numbers=True)
+        return mathfmt.format_math_tokens(phrased)
+
+    # No verified facts for THIS skill. An equation lesson gets an equation
+    # clarification — never the expansion fallback, which is what production
+    # showed a student mid-way through 1/2 + x = 3/5.
+    if family == "equation":
+        return concept_facts.EQUATION_CONCEPT_FALLBACK
 
     if openai_chat is None:
         return _CONCEPT_FALLBACK
