@@ -2441,20 +2441,26 @@ def divisibility_coverage(expected: Expected, student_text: str) -> list[dict]:
     out: list[dict] = []
     for idx, k in enumerate(divisors):
         want = flags[idx] if idx < len(flags) else None
-        # "obrađen" = djelilac je spomenut (npr. "sa 3", "sa 5", "3", "5")
-        mentioned = bool(re.search(rf"(?<!\d){k}(?!\d)", folded))
-        # segment oko spomena nosi obrazloženje (ili ga cijela poruka nosi kad je
-        # samo jedan djelilac)
-        seg = folded
-        if len(divisors) > 1 and mentioned:
-            pos = re.search(rf"(?<!\d){k}(?!\d)", folded)
-            seg = folded[max(0, pos.start() - 90): pos.end() + 90]
+        factors = _COMPOUND_DIVISORS.get(k)
+        if factors is not None:
+            mentioned, justified, seg = _compound_coverage(folded, k, factors, want)
+        else:
+            # "obrađen" = djelilac je spomenut (npr. "sa 3", "sa 5", "3", "5")
+            mentioned = bool(re.search(rf"(?<!\d){k}(?!\d)", folded))
+            # segment oko spomena nosi obrazloženje (ili ga cijela poruka nosi
+            # kad je samo jedan djelilac)
+            seg = folded
+            if len(divisors) > 1 and mentioned:
+                pos = re.search(rf"(?<!\d){k}(?!\d)", folded)
+                seg = folded[max(0, pos.start() - 90): pos.end() + 90]
+            rule = concepts[idx] if idx < len(concepts) else ()
+            # Za djelioce sa pravilom zbira cifara (3, 9) traži se BAŠ to
+            # pravilo — opšti razlog ("jer se dijeli") nije dovoljan (zadržava
+            # raniju strogost).
+            digit_rule = k in _DIGIT_SUM_RULE_DIVISORS
+            evidence_re = _DIV_RULE_EVIDENCE_RE if digit_rule else _DIV_ANY_REASON_RE
+            justified = bool(mentioned and evidence_re.search(seg))
         rule = concepts[idx] if idx < len(concepts) else ()
-        # Za djelioce sa pravilom zbira cifara (3, 9) traži se BAŠ to pravilo —
-        # opšti razlog ("jer se dijeli") nije dovoljan (zadržava raniju strogost).
-        digit_rule = k in _DIGIT_SUM_RULE_DIVISORS
-        evidence_re = _DIV_RULE_EVIDENCE_RE if digit_rule else _DIV_ANY_REASON_RE
-        justified = bool(mentioned and evidence_re.search(seg))
         # negacija u segmentu → učenik tvrdi da NIJE djeljiv tim brojem
         claim = None
         if mentioned:
@@ -2466,6 +2472,47 @@ def divisibility_coverage(expected: Expected, student_text: str) -> list[dict]:
             "required_concepts": tuple(rule),
         })
     return out
+
+
+def _compound_coverage(folded: str, divisor: int, factors: tuple[int, int],
+                       want: bool | None) -> tuple[bool, bool, str]:
+    """Coverage for a COMPOUND divisor (6 = 2×3, 15 = 3×5).
+
+    A factor is ADDRESSED by its literal digit ("sa 2") OR by paraphrased
+    evidence alone ("nije paran" names the divisor-2 condition without ever
+    writing the digit "2").
+
+    JUSTIFICATION depends on ``want`` — the expected truth for this divisor:
+      * divisible (``want`` True): mathematically requires BOTH factors, so
+        both must be individually justified.
+      * NOT divisible (``want`` False): failing even ONE factor is already a
+        complete, correct reason — a student who names and justifies that one
+        failing condition ("nije paran") need not also address the other.
+
+    A bare "djeljiv sa 2 i sa 3" mentions both digits but proves neither, so
+    the compound divisor is addressed without being justified — the same
+    standard already applied to the digit-sum rule for 3/9 alone.
+    """
+    whole_mentioned = bool(re.search(rf"(?<!\d){divisor}(?!\d)", folded))
+    factor_hits = []
+    for f in factors:
+        digit = re.search(rf"(?<!\d){f}(?!\d)", folded)
+        evidence = _FACTOR_EVIDENCE_RE[f].search(folded)
+        factor_hits.append((digit, evidence))
+    any_factor_addressed = any(digit or evidence for digit, evidence in factor_hits)
+    all_factors_addressed = all(digit or evidence for digit, evidence in factor_hits)
+    if not (whole_mentioned or any_factor_addressed):
+        return False, False, folded
+    if want is False:
+        justified = any(evidence for _digit, evidence in factor_hits)
+    else:
+        justified = all_factors_addressed and \
+            all(evidence for _digit, evidence in factor_hits)
+    positions = [m.start() for digit, evidence in factor_hits
+                for m in (digit, evidence) if m is not None]
+    seg = folded[max(0, min(positions) - 90): max(positions) + 90] \
+        if positions else folded
+    return True, justified, seg
 
 
 def divisibility_missing_summary(expected: Expected, student_text: str) -> dict:
@@ -2500,6 +2547,22 @@ _DIV_RULE_EVIDENCE_RE = re.compile(
     r"\d\s*\+\s*\d|zbir\s+cifar\w*|zbir\s+znamen\w*|suma\s+cifar\w*|zbroj\s+cifar\w*"
 )
 
+#: 6 and 15 are COMPOUND rules (divisible by 2 AND 3; by 3 AND 5). A student who
+#: reasons about the FACTORS ("djeljiv i sa 2 i sa 3") is reasoning correctly
+#: even though the digit "6"/"15" itself never appears in their answer — the
+#: coverage check below must not require that literal digit for these two.
+_COMPOUND_DIVISORS = {6: (2, 3), 15: (3, 5)}
+
+#: Per-factor evidence. Reuses the SAME phrases already trusted elsewhere in
+#: this module (digit-sum evidence for 3, "paran"/"zadnja cifra" for 2, "zadnja
+#: cifra ... 0/5" for 5) — never a weaker bar than the existing single-divisor
+#: rules.
+_FACTOR_EVIDENCE_RE = {
+    2: re.compile(r"\bparn\w*|\bparan\b|\bposljednj\w*\s+cifr\w*|\bzadnj\w*\s+cifr\w*"),
+    3: _DIV_RULE_EVIDENCE_RE,
+    5: re.compile(r"\bposljednj\w*\s+cifr\w*|\bzadnj\w*\s+cifr\w*|\bnula\s+ili\s+pet\b"),
+}
+
 
 def _check_divisibility_explanation(task_text: str, student_text: str) -> "CheckResult | None":
     """"Da li je 144 djeljiv sa 3? Objasni." — "da"/"ne" je determinsitička istina;
@@ -2519,7 +2582,15 @@ def _check_divisibility_explanation(task_text: str, student_text: str) -> "Check
     elif _DIV_BOOL_NO_RE.match(folded):
         said = False
     else:
-        return None                        # nije jasan da/ne — opšti tok / GPT
+        # No recognisable decision (da/ne/jeste/nije/djeljiv je/nije djeljiv).
+        # Returning None here used to fall through to the GENERIC single-item
+        # branch in ``_check``, which extracts ANY bare number out of the
+        # student's prose and compares it to the expected boolean's numeric
+        # value (1/0) — "sto me pitas samo za 6" was graded against "6" this
+        # way and came back "incorrect". A boolean-only task has no numeric
+        # value to extract in the first place, so this is explicitly
+        # UNCHECKABLE rather than a fall-through: it stops here.
+        return CheckResult(checkable=False)
 
     given = NumberToken(
         value=Fraction(1 if said else 0), form="boolean",

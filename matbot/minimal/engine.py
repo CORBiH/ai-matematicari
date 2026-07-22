@@ -37,6 +37,7 @@ from matbot.minimal.intent import (
     confirmation_choice,
     is_affirmation,
     is_decline,
+    is_pushback_insistence,
 )
 from matbot.minimal.renderer import RenderContext, render
 from matbot.minimal.state import ActiveTask, SessionState, new_task
@@ -335,12 +336,35 @@ def handle_turn(
         # have tripped MAX_WRONG_ATTEMPTS and revealed the answer to a student
         # who never actually answered wrong.
         not_an_attempt = result.detail in (AMBIGUOUS_FINAL_ANSWER, NOT_CHECKABLE)
-        counted = task if not_an_attempt else ActiveTask(**{
-            **task.to_dict(),
-            "attempts": task.attempts + 1,
-            "wrong_attempts": task.wrong_attempts + (0 if result.solved else 1),
-            "solved": result.solved,
-        })
+        # DIVISIBILITY-SPECIFIC: "partially_correct"/"incomplete" from
+        # ``_check_divisibility_explanation`` ALWAYS means the yes/no DECISION
+        # was correct — that checker only reaches these two verdicts when
+        # ``wrong_claim`` is false, i.e. only the supporting EVIDENCE is
+        # missing. Production incremented wrong_attempts and broke the streak
+        # for exactly this ("da jer je djeljiv i sa 2 i sa 3"). Scoped to this
+        # skill and these two literal details — NOT a blanket exemption for
+        # every skill's "partial" verdict: fraction_expand's
+        # WRONG_TARGET_DENOMINATOR is a genuinely wrong form and must keep
+        # counting as wrong.
+        decision_correct_incomplete = (
+            task.skill_id == "divisibility"
+            and result.detail in ("incomplete", "partially_correct"))
+        if not_an_attempt:
+            counted = task
+        elif decision_correct_incomplete:
+            # The attempt itself may count; the WRONG counter must not. The
+            # flag lets a later "pa to sam i rekao" get a tailored reply from
+            # structured state, never from re-parsing this turn's own prose.
+            counted = ActiveTask(**{**task.to_dict(), "attempts": task.attempts + 1,
+                                    "pending_evidence_prompt": True})
+        else:
+            counted = ActiveTask(**{
+                **task.to_dict(),
+                "attempts": task.attempts + 1,
+                "wrong_attempts": task.wrong_attempts + (0 if result.solved else 1),
+                "solved": result.solved,
+                "pending_evidence_prompt": False,
+            })
         if result.solved:
             # The feedback ASKS whether to continue, so the answer to that
             # question must be understood on the next turn.
@@ -353,10 +377,13 @@ def handle_turn(
                               state=state, intent=intent.value, grading=result,
                               task=counted, student_raw=student_raw,
                               telemetry=dict(trace))
-        give_up = (not not_an_attempt) and counted.wrong_attempts >= MAX_WRONG_ATTEMPTS
-        # Neither an ambiguous nor an uncheckable message is a wrong answer,
-        # so the streak survives either.
-        state = state if not_an_attempt else state.broke_streak()
+        give_up = (not not_an_attempt and not decision_correct_incomplete) \
+            and counted.wrong_attempts >= MAX_WRONG_ATTEMPTS
+        # Neither an ambiguous/uncheckable message, nor a correct decision
+        # with incomplete evidence, is a wrong answer — the streak survives all
+        # three.
+        state = state if (not_an_attempt or decision_correct_incomplete) \
+            else state.broke_streak()
         state = state.cleared_task() if give_up else state.with_updated_task(counted)
         ctx = RenderContext(state=state, intent=intent.value, grading=result,
                             task=counted, may_reveal=give_up,
@@ -364,6 +391,21 @@ def handle_turn(
         trace["pending_confirmation_after"] = state.pending_confirmation
         return TurnResult(answer=render(ctx), state=state, intent=intent.value,
                           grading=result, task=counted, student_raw=student_raw,
+                          telemetry=dict(trace))
+
+    # ---- CONTEXTUAL FOLLOW-UP: "pa to sam i rekao" ------------------------
+    # Only fires when STRUCTURED state (the task's own flag) confirms the
+    # previous turn asked for missing evidence — never by parsing the tutor's
+    # earlier prose. State and progress are untouched either way; this only
+    # changes the WORDING from a generic clarification to an acknowledgement.
+    if (task is not None and task.pending_evidence_prompt
+            and parse_shape_request(student_raw) is None
+            and is_pushback_insistence(student_raw)):
+        ctx = RenderContext(state=state, intent=TurnIntent.OTHER.value, task=task,
+                            evidence_pushback=True)
+        trace["pending_confirmation_after"] = state.pending_confirmation
+        return TurnResult(answer=render(ctx), state=state, intent=intent.value,
+                          task=task, student_raw=student_raw,
                           telemetry=dict(trace))
 
     # ---- anything else: ask what was meant; never touch task state ---------

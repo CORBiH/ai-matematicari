@@ -190,7 +190,15 @@ SCENARIOS: list[Scenario] = [
         regression_of="one exam answer grades exactly one item", applies_to=EXAM,
         turns=[
             Turn("kontrolni"),
-            Turn("potpuno pogrešan odgovor 999",
+            # The pinned oblast makes item 1 a divisibility EXPLANATION task
+            # (boolean_with_explanation): "potpuno pogrešan odgovor 999" is
+            # arbitrary prose, not a da/ne DECISION, and the checker now
+            # correctly refuses to grade it (see
+            # ``_check_divisibility_explanation``'s explicit
+            # ``checkable=False``) rather than coercing the bare "999" into a
+            # wrong numeric guess. A genuinely wrong boolean DECISION is what
+            # this scenario means to exercise.
+            Turn("ne",
                  expect={"exam_index": 1,
                          "graded_flags": [False, None, None]}),
         ],

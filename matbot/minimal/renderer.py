@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Sequence
 
 from matbot.bosnian import to_ijekavica
-from matbot.minimal import concept_facts, mathfmt, solution_facts
+from matbot.minimal import concept_facts, divisibility_facts, mathfmt, solution_facts
 from matbot.minimal.grading import GradingResult
 from matbot.minimal.intent import fold as _fold
 from matbot.minimal.state import ActiveTask, SessionState
@@ -195,6 +195,9 @@ class RenderContext:
     #: A requested equation shape ("a_minus_x", ...) that the CURRENT skill
     #: does not support — set only when we decline it, never on success.
     unsupported_shape: str = ""
+    #: True for a "pa to sam i rekao"-style follow-up to an incomplete-rule
+    #: explanation. Set only from ``ActiveTask.pending_evidence_prompt``.
+    evidence_pushback: bool = False
 
     @property
     def seed(self) -> str:
@@ -243,6 +246,20 @@ def feedback(ctx: RenderContext) -> str:
 
     task = ctx.task
     if task is not None and not ctx.may_reveal:
+        if (task.skill_id == "divisibility"
+                and g.detail in ("incomplete", "partially_correct")):
+            # POLICY B ("correct-rule-missing-evidence"): the DECISION is
+            # right and the RULE is correctly named, but nothing ties it to
+            # THIS number yet. Repeating the rule the student already said
+            # ("Broj je djeljiv sa 6 ako je djeljiv i sa 2 i sa 3.") is not
+            # new information — production did exactly that. Ask for the
+            # missing evidence instead, using only the STRUCTURED facts (the
+            # number and divisor), never the student's or the bot's own prose.
+            facts = divisibility_facts.resolve_divisibility_facts(task.question)
+            if facts is not None:
+                ask = (f"sa {facts.factors[0]} i sa {facts.factors[1]}"
+                      if facts.is_compound else f"sa {facts.divisor}")
+                return f"{head} Kako znaš da je {facts.n} djeljiv {ask}?"
         if task.skill_id in _EQUATION_SKILLS:
             # POLICY B. Incorrect feedback stays deliberately non-specific so
             # the deterministic ladder still owns rung 1. Production showed the
@@ -271,6 +288,10 @@ def _hint_text(skill_id: str, level: int, question: str = "") -> str:
         facts = solution_facts.resolve_add_facts(question)
         if facts is not None:
             return solution_facts.add_hint(facts, level)
+    if skill_id == "divisibility" and question:
+        facts = divisibility_facts.resolve_divisibility_facts(question)
+        if facts is not None:
+            return divisibility_facts.divisibility_hint(facts, level)
     pool = _HINTS.get(skill_id) or ()
     if not pool:
         return "Pogledaj ponovo šta je dato, a šta se traži."
@@ -426,6 +447,12 @@ def solution_reply(ctx: RenderContext) -> str:
                         solution_facts.equation_solution_steps(equation))
                     + "\n\nSada probaj ti jedan sličan zadatak — reci "
                     "„daj mi zadatak”.")
+    if task.skill_id == "divisibility":
+        div_facts = divisibility_facts.resolve_divisibility_facts(task.question)
+        if div_facts is not None:
+            return (divisibility_facts.divisibility_solution(div_facts)
+                    + "\n\nSada probaj ti jedan sličan zadatak — reci "
+                    "„daj mi zadatak”.")
     facts = solution_facts.resolve_add_facts(task.question) \
         if task.skill_id == "fraction_add_unlike" else None
     if facts is None:
@@ -449,6 +476,27 @@ def unsupported_topic(ctx: RenderContext) -> str:
     return (f"Za temu „{name}” još nemam zadatke koje mogu pouzdano provjeriti, "
             "pa ti ne bih dao zadatak iz druge teme. Izaberi neku od tema koje "
             "za sada podržavam.")
+
+
+def evidence_pushback_reply(ctx: RenderContext) -> str:
+    """"Pa to sam i rekao" after an incomplete-rule explanation.
+
+    Acknowledges the rule was correctly named, then asks for the ONE thing
+    still missing — tied to the STRUCTURED facts (number, divisor), never to
+    the earlier turn's own prose.
+    """
+    task = ctx.task
+    if task is None:
+        return "Nije mi jasno šta želiš. Da li želiš novi zadatak ili objašnjenje?"
+    facts = (divisibility_facts.resolve_divisibility_facts(task.question)
+            if task.skill_id == "divisibility" else None)
+    if facts is None:
+        return ("U pravu si — naveo si pravilo. Još pokaži kako to važi baš za "
+                "ovaj zadatak.")
+    ask = (f"sa {facts.factors[0]} i sa {facts.factors[1]}" if facts.is_compound
+          else f"sa {facts.divisor}")
+    return (f"U pravu si — naveo si pravilo. Još pokaži kako znaš da je broj "
+            f"{facts.n} djeljiv {ask}.")
 
 
 def unsupported_shape_request(ctx: RenderContext) -> str:
@@ -563,6 +611,8 @@ def render(ctx: RenderContext, *, openai_chat: Callable | None = None,
         return _finish(unsupported_topic(ctx))
     if ctx.unsupported_shape:
         return _finish(unsupported_shape_request(ctx))
+    if ctx.evidence_pushback:
+        return _finish(evidence_pushback_reply(ctx))
     if ctx.intent in _NEW_TASK_INTENT_VALUES and ctx.task is not None \
             and ctx.grading is None:
         return _finish(present_task(ctx))

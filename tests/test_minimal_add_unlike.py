@@ -370,13 +370,19 @@ def test_easier_never_produces_a_harder_task(client):
 
 
 def test_skill_without_bands_says_so_honestly(client):
-    """divisibility has no bands: a new task, described as the same difficulty."""
+    """prime_factorization has no bands: a new task, same difficulty, and an
+    honest reply rather than a silently ignored HARDER request.
+
+    divisibility is NOT this case any more — it gained real difficulty bands
+    (2/5/10 -> 3/4/9/25 -> 6/15 near-miss) when its generator was fixed to
+    cover every divisor the lesson promises instead of only 6 (see
+    ``skills.DIVISIBILITY_BANDS``, ``test_minimal_divisibility.py``)."""
     body = sse(client, prod_payload(
-        selected_topic="", selected_oblast="Djeljivost brojeva",
+        selected_topic="", selected_oblast="Rastavljanje na proste faktore",
         student_message="daj mi zadatak"))
     assert body["last_tutor_task"]
     harder = sse(client, prod_payload(
-        selected_topic="", selected_oblast="Djeljivost brojeva",
+        selected_topic="", selected_oblast="Rastavljanje na proste faktore",
         student_message="daj mi teži zadatak",
         previous_next_state=body["next_state"]))
     assert "ne mogu birati težinu" in harder["answer"].lower(), harder["answer"]

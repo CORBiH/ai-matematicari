@@ -72,12 +72,23 @@ _UNLIKE_DENOMS = [(2, 3), (3, 4), (2, 5), (3, 5), (4, 5), (2, 7), (3, 7), (5, 6)
 
 def _g_divisibility6(rng: random.Random) -> tuple[str, str]:
     """Zadatak traži OBRAZLOŽENJE, pa kanonski odgovor mora sadržavati i pravilo
-    (golo "da" je nepotpun odgovor — vidi multi-condition grading)."""
+    (golo "da" je nepotpun odgovor — vidi multi-condition grading).
+
+    6 je SLOŽENO pravilo (djeljivo i sa 2 i sa 3) — otkad ``divisibility_coverage``
+    zahtijeva pravi dokaz PO FAKTORU (ne samo generičku frazu), kanonski odgovor
+    mora imenovati stvarni razlog za svaki uslov, inače ne prolazi sopstvenu
+    provjeru. Za "ne" slučaj identifikuje se KOJI uslov (2 ili 3) zapravo ne važi.
+    """
     n = 6 * rng.randint(3, 45) if rng.random() < 0.65 else rng.randint(20, 260)
     q = f"Provjeri da li je broj {n} djeljiv sa 6. Obrazloži svoj odgovor."
+    digit_sum = sum(int(d) for d in str(n))
     if n % 6 == 0:
-        return q, f"da, {n} je djeljiv sa 6 jer je paran i zbir cifara mu je djeljiv sa 3"
-    return q, f"ne, {n} nije djeljiv sa 6 jer ne ispunjava oba uslova (2 i 3)"
+        return q, (f"da, {n} je djeljiv sa 6 jer je paran (zadnja cifra "
+                   f"{n % 10}), a zbir cifara mu je {digit_sum} što je djeljivo sa 3")
+    if n % 2 != 0:
+        return q, f"ne, {n} nije djeljiv sa 6 jer nije paran"
+    return q, (f"ne, {n} nije djeljiv sa 6 jer je zbir cifara {digit_sum}, "
+              "što nije djeljivo sa 3")
 
 
 def _g_prime_factorization(rng: random.Random) -> tuple[str, str]:

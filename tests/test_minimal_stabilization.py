@@ -239,7 +239,11 @@ def test_difficulty_appears_in_routing_telemetry(client):
 
 def test_skills_without_bands_do_not_claim_difficulty():
     assert skills.supports_difficulty("fraction_expand") is True
-    assert skills.supports_difficulty("divisibility") is False
+    # divisibility gained real bands (2/5/10 -> 3/4/9/25 -> 6/15 near-miss)
+    # when its generator was fixed to cover every promised divisor instead of
+    # only 6 — see skills.DIVISIBILITY_BANDS, test_minimal_divisibility.py.
+    assert skills.supports_difficulty("divisibility") is True
+    assert skills.supports_difficulty("prime_factorization") is False
 
 
 # =========================================================================== #

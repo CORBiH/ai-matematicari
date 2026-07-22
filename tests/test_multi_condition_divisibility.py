@@ -112,7 +112,13 @@ def test_task_definition_metadata_preserves_conditions():
     (T30, R30_BOTH, "correct"),                      # 3 — both explained
     (T240, "jeste djeljivo", "incomplete"),          # 4 — bare yes
     (T240, R240_10, "partial"),                      # 5 — only 10 explained
-    (T240, R240_BOTH, "correct"),                    # 6 — both explained
+    # 6 — 15 is now recognised as COMPOUND (3x5): "se dijeli bez ostatka" is a
+    # generic phrase, not evidence for EITHER factor, so this is no longer
+    # "both explained". Tightened for the same reason a generic reason was
+    # already rejected for 3/9 alone — see _compound_coverage / _COMPOUND_DIVISORS.
+    (T240, R240_BOTH, "partial"),
+    (T240, "da, sa 10 jer je zadnja cifra 0, i sa 15 jer je zbir cifara 6 djeljiv "
+          "sa 3 i zadnja cifra 0", "correct"),        # 6b — 15 genuinely justified
     (TREV, "da, sa 3 jer je zbir cifara 3, i sa 5 jer zavrsava nulom", "correct"),  # 8
     (T3, "da, sa 2 jer je paran, sa 3 jer je zbir cifara 3, i sa 5 jer zavrsava nulom",
      "correct"),                                     # 9 — three divisors

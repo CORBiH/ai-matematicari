@@ -63,6 +63,21 @@ def is_decline(message: Any) -> bool:
     return bool(_DECLINE_RE.match(fold(message)))
 
 
+#: "pa to sam i rekao", "pa sam to rekao", "to sam vec rekao/napisao" — the
+#: student insisting they already gave the (rule-only) answer. Narrow on
+#: purpose: only fires when the CALLER also confirms the previous turn asked
+#: for missing evidence (``ActiveTask.pending_evidence_prompt``) — never used
+#: to guess intent on its own.
+_PUSHBACK_INSISTENCE_RE = re.compile(
+    r"\bpa\s+(to\s+)?sam\s+(to\s+)?(i\s+)?(vec\s+)?(rekao|rekla|napisao|napisala)\b"
+    r"|\b(to\s+)?sam\s+vec\s+(rekao|rekla|napisao|napisala)\b"
+    r"|\brekao\s+sam\s+(to|vec)\b")
+
+
+def is_pushback_insistence(message: Any) -> bool:
+    return bool(_PUSHBACK_INSISTENCE_RE.search(fold(message)))
+
+
 #: Replies to "Da li želiš novi zadatak ili objašnjenje?" — matched only when
 #: that confirmation is pending.
 _WANTS_EXPLANATION_RE = re.compile(r"\bobja[sš]nj\w*|\bobjasni\w*|\bpravilo\b")
@@ -300,6 +315,15 @@ _MATH_RE = re.compile(r"\d|[=<>+\-/*^]|π|\bpi\b|\{|\}")
 #: A bare yes/no is an answer only when it stands alone — embedded, "da" is an
 #: ordinary Bosnian conjunction ("šta DA probam").
 _BARE_BOOL_RE = re.compile(r"^(da|ne|jeste|nije|jest|tacno|netacno)\s*[.!]?$")
+#: A yes/no DECISION opening an EXPLANATION ("ne, jer nije paran") has no
+#: digits at all, so ``_MATH_RE`` never catches it — with an active task, this
+#: is still a genuine ANSWER, mirroring the same decision words
+#: ``answer_checker._DIV_BOOL_YES_RE``/``_DIV_BOOL_NO_RE`` already recognise
+#: at the grading layer. Checked only when a task is open, and only AFTER
+#: ``_HELP_RE`` above, so "ne znam" is still read as HELP, never as "ne".
+_BOOL_DECISION_RE = re.compile(
+    r"^\s*(?:da|jeste|jest|tacno|je\s+djeljiv\w*|djeljiv\w*\s+je"
+    r"|ne|nije|netacno|nije\s+djeljiv\w*)\b")
 
 
 @dataclass(frozen=True)
@@ -347,11 +371,14 @@ def classify(raw_message: Any, *, has_active_task: bool = False) -> Classificati
     # as wrong answers. Checked before the math gate for that reason.
     if parse_shape_request(text) is not None:
         return Classification(TurnIntent.NEW_TASK, "shape_request")
-    if _MATH_RE.search(text) or _BARE_BOOL_RE.match(text):
-        return Classification(TurnIntent.ANSWER, "answer")
-    # LAST resort, and only with a task open: a mistyped cry for help.
+    # A mistyped cry for help ("ne znmam") starts with "ne", which would
+    # otherwise satisfy ``_BOOL_DECISION_RE`` below — checked first so a typo
+    # is never misread as the decision "ne".
     if has_active_task and is_help_typo(text):
         return Classification(TurnIntent.HELP, "help_typo")
+    if (_MATH_RE.search(text) or _BARE_BOOL_RE.match(text)
+            or (has_active_task and _BOOL_DECISION_RE.match(text))):
+        return Classification(TurnIntent.ANSWER, "answer")
     return Classification(TurnIntent.OTHER, "no_signal")
 
 

@@ -316,6 +316,57 @@ def _generate_fraction_equation(rng: random.Random, level: int,
     return "Riješi jednačinu: x + 1/3 = 5/6.", "1/2"
 
 
+#: Difficulty bands aligned with objective RULE COMPLEXITY, not divisor size:
+#: single last-digit rules, then digit-sum/last-two-digit rules, then compound
+#: (two-condition) rules — the two hardest, 6 and 15, also get near-miss cases.
+DIVISIBILITY_BANDS: dict[int, tuple[int, ...]] = {
+    1: (2, 5, 10),
+    2: (3, 4, 9, 25),
+    3: (6, 15),
+}
+
+
+def divisibility_band_for(level: Any) -> tuple[int, ...]:
+    try:
+        band = int(level)
+    except (TypeError, ValueError):
+        band = DEFAULT_DIFFICULTY
+    return DIVISIBILITY_BANDS.get(min(max(band, MIN_DIFFICULTY), MAX_DIFFICULTY),
+                                  DIVISIBILITY_BANDS[DEFAULT_DIFFICULTY])
+
+
+def _generate_divisibility(rng: random.Random, level: int) -> tuple[str, str]:
+    """Every divisor the selected lesson promises, not just 6.
+
+    Production generated 19 consecutive tasks, all divisor 6 — the legacy
+    template this skill used before (``task_templates._g_divisibility6``) is a
+    FIXED generator that never varied the divisor at all. This picks the
+    divisor uniformly from the level's band, generates both yes and no cases,
+    and — for the two COMPOUND divisors (6, 15) — sometimes a NEAR-MISS: a
+    number satisfying only ONE of the two required conditions.
+    """
+    from matbot.minimal import divisibility_facts as df
+
+    divisors = divisibility_band_for(level)
+    k = rng.choice(divisors)
+    want_yes = rng.random() < 0.5
+    want_near_miss = (not want_yes and k in df.COMPOUND_RULES
+                      and rng.random() < 0.5)
+    for _ in range(80):
+        n = rng.randint(10, 300)
+        holds = df.satisfies(n, k)
+        if want_near_miss:
+            f1, f2 = df.COMPOUND_RULES[k]
+            if holds or df.satisfies(n, f1) == df.satisfies(n, f2):
+                continue                # not a near-miss: same on both factors
+        elif holds != want_yes:
+            continue
+        question = f"Provjeri da li je broj {n} djeljiv sa {k}. Obrazloži svoj odgovor."
+        return question, df.canonical_explanation(n, k)
+    return ("Provjeri da li je broj 42 djeljiv sa 6. Obrazloži svoj odgovor.",
+           df.canonical_explanation(42, 6))
+
+
 #: Skills with a real difficulty model. Others accept and store a level but
 #: generate from the shared template — so nothing is ever CLAIMED to be harder
 #: than it is.
@@ -323,6 +374,7 @@ _DIFFICULTY_AWARE = {
     "fraction_expand": _generate_expand,
     "fraction_add_unlike": _generate_add_unlike,
     "fraction_equation_additive": _generate_fraction_equation,
+    "divisibility": _generate_divisibility,
 }
 
 

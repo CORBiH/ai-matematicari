@@ -38,6 +38,12 @@ class ActiveTask:
     #: The worked solution was shown on request. The task is finished, but
     #: it was NOT solved independently, so it must not count as progress.
     solution_revealed: bool = False
+    #: Set when the LAST grading turn on this task asked the student to
+    #: verify a correctly-stated rule against the actual number ("Kako znaš
+    #: da je 252 djeljiv sa 2 i sa 3?"). Lets a follow-up like "pa to sam i
+    #: rekao" get a tailored reply from STRUCTURED state — never by parsing
+    #: the tutor's own previous prose.
+    pending_evidence_prompt: bool = False
 
     def to_dict(self) -> dict:
         return {
@@ -47,6 +53,7 @@ class ActiveTask:
             "attempts": self.attempts, "wrong_attempts": self.wrong_attempts,
             "hints_given": self.hints_given, "solved": self.solved,
             "solution_revealed": self.solution_revealed,
+            "pending_evidence_prompt": self.pending_evidence_prompt,
         }
 
     @classmethod
@@ -73,6 +80,7 @@ class ActiveTask:
             attempts=_int("attempts"), wrong_attempts=_int("wrong_attempts"),
             hints_given=_int("hints_given"), solved=bool(raw.get("solved")),
             solution_revealed=bool(raw.get("solution_revealed")),
+            pending_evidence_prompt=bool(raw.get("pending_evidence_prompt")),
         )
 
 

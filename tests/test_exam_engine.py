@@ -168,9 +168,18 @@ def test_full_exam_completes_and_scores(monkeypatch, master, tmap):
 
 
 def test_wrong_answer_scored_incorrect(monkeypatch, master, tmap):
+    """The random first item for this session is a divisibility-EXPLANATION
+    task ("Provjeri da li je broj N djeljiv sa 6..."). "netačno999" is not a
+    real da/ne DECISION for a boolean_with_explanation task — it is exactly
+    the kind of arbitrary prose the checker must now refuse to grade rather
+    than coerce into a number (see ``_check_divisibility_explanation``'s
+    explicit ``checkable=False``). A genuinely wrong DECISION is what this
+    test means to exercise; bare "ne" is what ``turn_intent.classify``'s
+    ``expects_boolean`` fast path (a literal da/ne fullmatch) recognises as
+    an answer for a yes/no item."""
     monkeypatch.setenv("MATBOT_ENGINE_V2_EXAM", "on")
     ns = _exam_turn(master, tmap, "kontrolni", None)["next_state"]
-    out = _exam_turn(master, tmap, "netačno999", ns)
+    out = _exam_turn(master, tmap, "ne", ns)
     assert out["answer_verdict"] == "incorrect"
     assert out["exam_state"]["items"][0]["correct"] is False
 
