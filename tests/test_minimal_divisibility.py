@@ -214,9 +214,21 @@ def test_repeated_new_task_over_the_wire_reaches_multiple_divisors(client):
 # =========================================================================== #
 # 2. Correct compound-rule explanation must not be rejected                   #
 # =========================================================================== #
-def test_bare_rule_statement_is_partial_not_wrong(client):
+def test_full_rule_level_explanation_is_fully_correct(client):
+    """Policy (revised): naming BOTH required factors is a mathematically
+    sufficient explanation on its own — the student is not required to also
+    compute the digit sum/parity. Only naming ONE of the two, or none at all,
+    remains incomplete."""
     state = seeded(client)
     body = turn(client, state, "da jer je djeljiv i sa 2 i sa 3", turn_id="p1")
+    assert body["answer_verdict"] == "correct"
+    assert body["answer_verdict_detail"] == "correct"
+    assert body["task_status"] == "completed"
+
+
+def test_one_factor_named_is_still_partial_not_wrong(client):
+    state = seeded(client)
+    body = turn(client, state, "da jer je djeljiv sa 2", turn_id="p1b")
     assert body["answer_verdict"] == "partial"
     assert body["answer_verdict_detail"] == "partially_correct"
     assert body["wrong_attempt_count"] == 0
@@ -225,9 +237,9 @@ def test_bare_rule_statement_is_partial_not_wrong(client):
 
 def test_feedback_asks_for_evidence_not_a_repeated_rule(client):
     state = seeded(client)
-    body = turn(client, state, "da jer je djeljiv i sa 2 i sa 3", turn_id="p2")
+    body = turn(client, state, "da jer je djeljiv sa 2", turn_id="p2")
     answer = body["answer"]
-    assert "252" in answer and "2" in answer and "3" in answer
+    assert "252" in answer
     # the production defect: verbatim repeat of the rule the student just said
     assert "Broj je djeljiv sa 6 ako je djeljiv i sa 2 i sa 3" not in answer
 
@@ -383,7 +395,7 @@ def test_pushback_phrase_detector():
 
 def test_pushback_after_incomplete_gets_tailored_reply(client, no_model):
     state = seeded(client)
-    first = turn(client, state, "da jer je djeljiv i sa 2 i sa 3", turn_id="pb1")
+    first = turn(client, state, "da jer je djeljiv sa 2", turn_id="pb1")
     assert first["next_state"]["minimal_state"]["active_task"][
         "pending_evidence_prompt"] is True
 

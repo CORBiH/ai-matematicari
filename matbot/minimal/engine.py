@@ -20,8 +20,10 @@ from dataclasses import dataclass, field
 from typing import Any, Callable
 
 from matbot.minimal import concept_facts, skills, solution_facts
+from matbot.minimal.semantic_grading import NEEDS_CONFIRMATION
 from matbot.minimal.grading import (
     AMBIGUOUS_FINAL_ANSWER,
+    DECISION_CORRECT_INCOMPLETE_DETAILS,
     NOT_CHECKABLE,
     GradingResult,
     grade,
@@ -327,7 +329,18 @@ def handle_turn(
 
     # ---- ANSWER: exactly one GradingResult ---------------------------------
     if intent is TurnIntent.ANSWER and task is not None:
-        result = grade(task, student_raw)
+        result = grade(task, student_raw, openai_chat=openai_chat, model=model,
+                      timeout=timeout)
+        # SemanticAnswerJudge telemetry (present only when the deterministic
+        # checker could not understand the message and MATBOT_SEMANTIC_GRADING
+        # was shadow/on) — structured classification only, never prose.
+        for key in ("semantic_judge_used", "semantic_judge_model",
+                    "semantic_judge_confidence", "semantic_response_kind",
+                    "semantic_decision", "semantic_claims",
+                    "semantic_fallback_reason",
+                    "deterministic_claim_verification"):
+            if key in result.evidence:
+                trace[key] = result.evidence[key]
         # AMBIGUOUS ("several numbers, no declared answer") and NOT_CHECKABLE
         # ("nothing recognisable as any answer form") both mean no candidate
         # answer was ever identified — ``graded_answer`` is empty for either.
@@ -346,9 +359,15 @@ def handle_turn(
         # every skill's "partial" verdict: fraction_expand's
         # WRONG_TARGET_DENOMINATOR is a genuinely wrong form and must keep
         # counting as wrong.
+        # NEEDS_CONFIRMATION ("otprilike pola" for an exact task: the VALUE
+        # matches but the language was hedged) is a semantic-only detail no
+        # deterministic skill ever produces, so gating on the literal string
+        # alone is safe across every skill — the student is not wrong, just
+        # not yet committing to an exact answer.
         decision_correct_incomplete = (
-            task.skill_id == "divisibility"
-            and result.detail in ("incomplete", "partially_correct"))
+            (task.skill_id == "divisibility"
+             and result.detail in DECISION_CORRECT_INCOMPLETE_DETAILS)
+            or result.detail == NEEDS_CONFIRMATION)
         if not_an_attempt:
             counted = task
         elif decision_correct_incomplete:

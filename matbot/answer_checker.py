@@ -2482,16 +2482,23 @@ def _compound_coverage(folded: str, divisor: int, factors: tuple[int, int],
     evidence alone ("nije paran" names the divisor-2 condition without ever
     writing the digit "2").
 
-    JUSTIFICATION depends on ``want`` — the expected truth for this divisor:
-      * divisible (``want`` True): mathematically requires BOTH factors, so
-        both must be individually justified.
+    JUSTIFICATION depends on ``want`` — the expected truth for this divisor —
+    and asks for exactly what the RULE requires, no more:
+      * divisible (``want`` True): the rule is "both conditions hold", so
+        naming BOTH factors is a mathematically sufficient explanation on its
+        own — "da jer je djeljiv sa 2 i sa 3" is COMPLETE. Actually computing
+        the parity/digit-sum is welcome but not required, matching how a
+        digit-sum rule for 3/9 alone was already accepted without a stated
+        computation.
       * NOT divisible (``want`` False): failing even ONE factor is already a
-        complete, correct reason — a student who names and justifies that one
-        failing condition ("nije paran") need not also address the other.
+        complete, correct reason — naming that one failing condition
+        ("nije paran") is enough; the other need not be addressed at all.
 
-    A bare "djeljiv sa 2 i sa 3" mentions both digits but proves neither, so
-    the compound divisor is addressed without being justified — the same
-    standard already applied to the digit-sum rule for 3/9 alone.
+    A bare digit mention ("2", "3") counts exactly the same as a worked
+    evidence phrase for THIS purpose — the compound rule does not demand
+    arithmetic, only correct identification of which conditions apply.
+    Contradicting a factor by name (caught separately via the surrounding
+    negation check in ``divisibility_coverage``) still fails the claim.
     """
     whole_mentioned = bool(re.search(rf"(?<!\d){divisor}(?!\d)", folded))
     factor_hits = []
@@ -2504,10 +2511,9 @@ def _compound_coverage(folded: str, divisor: int, factors: tuple[int, int],
     if not (whole_mentioned or any_factor_addressed):
         return False, False, folded
     if want is False:
-        justified = any(evidence for _digit, evidence in factor_hits)
+        justified = any_factor_addressed
     else:
-        justified = all_factors_addressed and \
-            all(evidence for _digit, evidence in factor_hits)
+        justified = all_factors_addressed
     positions = [m.start() for digit, evidence in factor_hits
                 for m in (digit, evidence) if m is not None]
     seg = folded[max(0, min(positions) - 90): max(positions) + 90] \

@@ -324,6 +324,13 @@ _BARE_BOOL_RE = re.compile(r"^(da|ne|jeste|nije|jest|tacno|netacno)\s*[.!]?$")
 _BOOL_DECISION_RE = re.compile(
     r"^\s*(?:da|jeste|jest|tacno|je\s+djeljiv\w*|djeljiv\w*\s+je"
     r"|ne|nije|netacno|nije\s+djeljiv\w*)\b")
+#: An IMPLICIT decision — a bare reason clause with no "da"/"ne" at all
+#: ("jer je broj paran"). Never resolved into yes/no HERE (that stays the
+#: SemanticAnswerJudge's job, deterministically verified) — this only stops
+#: the message being misrouted as a concept question or a stray comment
+#: before ``grade()`` gets a chance to interpret it. Active-task-gated, same
+#: as ``_BOOL_DECISION_RE``.
+_IMPLICIT_REASON_RE = re.compile(r"^\s*(?:jer|zato\s+sto|posto)\b")
 
 
 @dataclass(frozen=True)
@@ -377,7 +384,8 @@ def classify(raw_message: Any, *, has_active_task: bool = False) -> Classificati
     if has_active_task and is_help_typo(text):
         return Classification(TurnIntent.HELP, "help_typo")
     if (_MATH_RE.search(text) or _BARE_BOOL_RE.match(text)
-            or (has_active_task and _BOOL_DECISION_RE.match(text))):
+            or (has_active_task and _BOOL_DECISION_RE.match(text))
+            or (has_active_task and _IMPLICIT_REASON_RE.match(text))):
         return Classification(TurnIntent.ANSWER, "answer")
     return Classification(TurnIntent.OTHER, "no_signal")
 

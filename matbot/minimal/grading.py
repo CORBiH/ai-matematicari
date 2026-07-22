@@ -2,9 +2,16 @@
 """Concept 4: **GradingResult** — and the single component that produces it.
 
 One turn produces at most one ``GradingResult``. It is created here and nowhere
-else, from the student's raw text and the ``ActiveTask``'s question. The model
-is never consulted: for the five supported skills deterministic evidence always
-exists, so there is nothing for it to decide.
+else, from the student's raw text and the ``ActiveTask``'s question.
+
+The deterministic checker is ALWAYS tried first and, when it produces a
+confident checkable result, ITS verdict is what ships — the model is never
+even called. Only when that path cannot safely understand the message (see
+``semantic_grading.py``) may a bounded, schema-validated SemanticAnswerJudge
+interpret it into CLAIMS, which a deterministic verifier then checks against
+verified facts. The model never returns a verdict, a streak, or a task
+transition — only ``engine.py`` (via this module's return value) ever changes
+state.
 
 ``GradingResult`` is FROZEN once returned. The renderer receives it and may
 choose words for it; it cannot change it.
@@ -12,7 +19,7 @@ choose words for it; it cannot change it.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from matbot.answer_checker import check_practice_answer
@@ -201,11 +208,16 @@ def extract_answer_candidate(raw: str) -> str:
     return extract_final_answer(raw)[0]
 
 
-def grade(task: ActiveTask, raw_message: Any) -> GradingResult:
+def grade(task: ActiveTask, raw_message: Any, *, openai_chat: Any = None,
+         model: str = "", timeout: float | None = None) -> GradingResult:
     """Grade one answer against one task. The ONLY grading entry point.
 
     ``raw_message`` is stored verbatim — never normalized, trimmed into meaning,
     or reconstructed from anything the tutor said.
+
+    ``openai_chat``/``model``/``timeout`` are used ONLY as the last resort,
+    when the deterministic checker cannot produce a checkable result at all —
+    see ``_semantic_fallback`` and ``MATBOT_SEMANTIC_GRADING``.
     """
     raw = str(raw_message if raw_message is not None else "")
     graded_text, candidate = raw, ""
@@ -244,11 +256,15 @@ def grade(task: ActiveTask, raw_message: Any) -> GradingResult:
                 result, graded_text = retry, candidate
     if result is None or not getattr(result, "checkable", False) or not result.items:
         # Deterministic checking failed for a task we believed was checkable.
-        # We say so honestly rather than asking the model to guess.
-        return GradingResult(task_id=task.task_id, verdict="unverified",
+        # Before giving up, the SemanticAnswerJudge may INTERPRET the message
+        # (never grade it) — see ``_semantic_fallback``. Off by default; a
+        # model failure or low confidence still lands here unchanged.
+        base = GradingResult(task_id=task.task_id, verdict="unverified",
                              solved=False, student_raw=raw,
                              expected_display=task.expected_display,
                              detail=NOT_CHECKABLE, deterministic=False)
+        return _semantic_fallback(task, raw, base, openai_chat=openai_chat,
+                                  model=model, timeout=timeout)
 
     item = result.items[0]
     detail = str(item.verdict or "")
@@ -298,7 +314,7 @@ def grade(task: ActiveTask, raw_message: Any) -> GradingResult:
         task, graded_text, verdict=verdict, solved=solved, detail=detail)
     evidence["checker_verdict"] = detail
     evidence["match"] = solved
-    return GradingResult(
+    final = GradingResult(
         task_id=task.task_id, verdict=verdict, solved=solved, student_raw=raw,
         graded_answer=graded_text,
         expected_display=task.expected_display, detail=detail,
@@ -306,3 +322,278 @@ def grade(task: ActiveTask, raw_message: Any) -> GradingResult:
         normalized_expected=normalized_expected,
         normalized_student=normalized_student, evidence=evidence,
     )
+    # The deterministic checker's own "incomplete"/"partially_correct" for a
+    # boolean_with_explanation task is a REGEX GUESS about evidence
+    # sufficiency ("mentioned = the divisor's literal digit appears") — the
+    # exact class of judgment free-form child language breaks ("da jer je
+    # zadnja cifra 0" never says "10"). Give the SemanticAnswerJudge a chance
+    # to do better; the deterministic verdict remains authoritative unless
+    # "on" mode AND the judge safely disagrees (see ``_semantic_fallback``).
+    # A BARE decision ("da", "ne") with no explanatory text at all has
+    # nothing for the judge to interpret — the deterministic "incomplete" is
+    # already the right answer, so it is never worth a model call.
+    from matbot.minimal import semantic_grading as _sg
+    if (answer_type == "boolean_with_explanation" and _sg.is_prose_like(raw)
+            and detail in ("incomplete", "partially_correct")):
+        return _semantic_fallback(task, raw, final, openai_chat=openai_chat,
+                                  model=model, timeout=timeout)
+    # SHADOW AUDIT (never overrides): a confident "incorrect" is exactly where
+    # a deterministic parser can silently misextract a token from prose (a
+    # number that happens to appear in an unrelated sentence) and never get a
+    # second look, because NOT_CHECKABLE/incomplete were the only paths that
+    # ever reached the judge. This runs the judge PURELY to log whether it
+    # would have disagreed — it can never flip a confident deterministic
+    # verdict, in shadow OR "on" mode; that stays a deliberate safety
+    # boundary until the audit data itself justifies loosening it.
+    if verdict == "incorrect" and _sg.is_prose_like(raw):
+        return _shadow_audit_incorrect(task, raw, final, openai_chat=openai_chat,
+                                       model=model, timeout=timeout)
+    # HEDGE CHECK: an EXACT rational/equation task's deterministic extractor
+    # finds the VALUE anywhere in the prose ("oko 0.5") and grades it
+    # confidently "correct" without ever noticing the surrounding hedge word —
+    # detecting "otprilike"/"možda"/"oko" is a LANGUAGE judgment the model
+    # makes (never a new Python regex list here); the deterministic policy
+    # in ``_verify_rational_like`` decides what that costs.
+    if (verdict == "correct" and answer_type in ("rational", "equation_solution")
+            and _sg.is_prose_like(raw)):
+        return _semantic_hedge_check(task, raw, final, openai_chat=openai_chat,
+                                     model=model, timeout=timeout)
+    return final
+
+
+#: Divisibility-specific detail values meaning "the yes/no DECISION was
+#: correct, only the evidence is incomplete or factually off for this
+#: number" — never a wrong attempt. ``incorrect_evidence`` is the semantic
+#: verifier's counterpart to the deterministic checker's own
+#: ``partially_correct``/``incomplete``.
+DECISION_CORRECT_INCOMPLETE_DETAILS = (
+    "incomplete", "partially_correct", "incorrect_evidence")
+
+
+def _semantic_evidence(result: GradingResult, telemetry: dict) -> GradingResult:
+    """Attach semantic telemetry to an EXISTING result without changing its
+    verdict — used for shadow mode and every failure-to-interpret case."""
+    evidence = dict(result.evidence)
+    evidence.update(telemetry)
+    return replace(result, evidence=evidence)
+
+
+def _base_semantic_telemetry() -> dict:
+    return {
+        "semantic_judge_used": False, "semantic_judge_model": "",
+        "semantic_judge_confidence": None, "semantic_response_kind": "",
+        "semantic_decision": "", "semantic_claims": [],
+        "semantic_fallback_reason": "", "deterministic_claim_verification": "",
+        "semantic_certainty": "", "semantic_precision": "",
+        "semantic_latency_ms": None, "semantic_prompt_tokens": None,
+        "semantic_completion_tokens": None,
+    }
+
+
+def _shadow_audit_dict(sg: Any, base_verdict: str, candidate: str,
+                       judgment: Any, outcome: Any) -> dict:
+    """The comparison object requirement 1 asks for — built the SAME way
+    regardless of which trigger reached the judge, so a shadow evaluator sees
+    one consistent shape whether the deterministic path landed on
+    NOT_CHECKABLE, incomplete, or a confident "incorrect"."""
+    return {
+        "deterministic_verdict": base_verdict,
+        "deterministic_candidate": candidate,
+        "semantic_response_kind": judgment.response_kind if judgment else "",
+        "semantic_decision": judgment.decision if judgment else "",
+        "semantic_verified_outcome": outcome.detail if outcome else "",
+        "shadow_disagreement_type": sg.classify_shadow_disagreement(
+            base_verdict, judgment, outcome),
+    }
+
+
+def _semantic_fallback(task: ActiveTask, raw: str, base_result: GradingResult,
+                       *, openai_chat: Any, model: str,
+                       timeout: float | None) -> GradingResult:
+    """The ONLY bridge between deterministic grading and the
+    SemanticAnswerJudge. Returns ``base_result`` (the deterministic
+    NOT_CHECKABLE outcome), untouched except for telemetry, unless
+    ``MATBOT_SEMANTIC_GRADING=on`` AND the judge produced a confidently
+    verified, checkable outcome.
+    """
+    from matbot.minimal import semantic_grading as sg
+
+    mode = sg.semantic_mode()
+    telemetry = _base_semantic_telemetry()
+    if mode == "off":
+        return base_result                     # NO model call at all
+
+    context = sg.build_context(task, raw)
+    if context is None:
+        telemetry["semantic_fallback_reason"] = "unsupported_skill"
+        telemetry["shadow_audit"] = _shadow_audit_dict(
+            sg, base_result.verdict, base_result.graded_answer, None, None)
+        return _semantic_evidence(base_result, telemetry)
+
+    telemetry["semantic_judge_model"] = model or ""
+    judgment, reason, metrics = sg.judge(context, openai_chat=openai_chat,
+                                        model=model, timeout=timeout)
+    telemetry.update(metrics.to_telemetry())
+    telemetry["semantic_judge_used"] = True     # the call WAS attempted
+    if judgment is None:
+        telemetry["semantic_fallback_reason"] = reason
+        telemetry["shadow_audit"] = _shadow_audit_dict(
+            sg, base_result.verdict, base_result.graded_answer, None, None)
+        return _semantic_evidence(base_result, telemetry)
+
+    telemetry.update(
+        semantic_judge_confidence=judgment.confidence,
+        semantic_response_kind=judgment.response_kind,
+        semantic_decision=judgment.decision,
+        semantic_certainty=judgment.certainty,
+        semantic_precision=judgment.precision,
+        semantic_claims=[{"type": c.type, "value": c.value,
+                          "polarity": c.polarity} for c in judgment.claims])
+    outcome = sg.verify_claims(context, judgment)
+    telemetry["deterministic_claim_verification"] = outcome.detail
+    telemetry["shadow_audit"] = _shadow_audit_dict(
+        sg, base_result.verdict, base_result.graded_answer, judgment, outcome)
+
+    if mode == "shadow" or not outcome.checkable:
+        # shadow: log only, verdict unchanged. "on" but still not checkable:
+        # the judge could not safely understand it either — same honest
+        # NOT_CHECKABLE result, just with the attempt visible in telemetry.
+        return _semantic_evidence(base_result, telemetry)
+
+    # mode == "on" AND the judge + deterministic verifier agreed on a
+    # checkable outcome — THIS function never invents the verdict itself,
+    # it only carries what ``verify_claims`` (pure arithmetic) decided.
+    evidence = dict(base_result.evidence)
+    evidence.update(telemetry)
+    evidence["method"] = "semantic"
+    evidence["checker_verdict"] = outcome.detail
+    evidence["graded_text"] = outcome.graded_answer
+    evidence["match"] = outcome.verdict == "correct"
+    return GradingResult(
+        task_id=task.task_id, verdict=outcome.verdict,
+        solved=(outcome.verdict == "correct"), student_raw=raw,
+        graded_answer=outcome.graded_answer,
+        expected_display=task.expected_display, detail=outcome.detail,
+        deterministic=False, answer_type=context.answer_type,
+        normalized_expected=str(context.expected_answer),
+        normalized_student=outcome.graded_answer, evidence=evidence,
+    )
+
+
+def _shadow_audit_incorrect(task: ActiveTask, raw: str, base_result: GradingResult,
+                            *, openai_chat: Any, model: str,
+                            timeout: float | None) -> GradingResult:
+    """Audit a CONFIDENT deterministic "incorrect" against the semantic judge.
+
+    Requirement 1: a regex/token-based parser can silently misextract a
+    number out of prose ("sto me pitas samo za 6" grabbing the bare "6") and
+    land on a confident wrong verdict that NEVER reaches the judge under the
+    ordinary NOT_CHECKABLE/incomplete fallback — shadow evaluation would have
+    no way to discover that false negative. This runs the SAME judge purely
+    to LOG a comparison; it never changes ``base_result``'s verdict, detail,
+    counters, or graded_answer, in shadow OR "on" mode. Overriding a confident
+    deterministic verdict is a deliberate line this round does not cross.
+    """
+    from matbot.minimal import semantic_grading as sg
+
+    mode = sg.semantic_mode()
+    telemetry = _base_semantic_telemetry()
+    if mode not in ("shadow", "on"):
+        return base_result
+
+    context = sg.build_context(task, raw)
+    if context is None:
+        telemetry["semantic_fallback_reason"] = "unsupported_skill"
+        telemetry["shadow_audit"] = _shadow_audit_dict(
+            sg, base_result.verdict, base_result.graded_answer, None, None)
+        return _semantic_evidence(base_result, telemetry)
+
+    telemetry["semantic_judge_model"] = model or ""
+    judgment, reason, metrics = sg.judge(context, openai_chat=openai_chat,
+                                        model=model, timeout=timeout)
+    telemetry.update(metrics.to_telemetry())
+    telemetry["semantic_judge_used"] = True     # the call WAS attempted
+
+    outcome = None
+    if judgment is None:
+        telemetry["semantic_fallback_reason"] = reason
+    else:
+        telemetry.update(
+            semantic_judge_confidence=judgment.confidence,
+            semantic_response_kind=judgment.response_kind,
+            semantic_decision=judgment.decision,
+            semantic_certainty=judgment.certainty,
+            semantic_precision=judgment.precision,
+            semantic_claims=[{"type": c.type, "value": c.value,
+                              "polarity": c.polarity} for c in judgment.claims])
+        outcome = sg.verify_claims(context, judgment)
+        telemetry["deterministic_claim_verification"] = outcome.detail
+
+    telemetry["shadow_audit"] = _shadow_audit_dict(
+        sg, base_result.verdict, base_result.graded_answer, judgment, outcome)
+    # AUDIT ONLY: base_result is returned exactly as graded — verdict, detail,
+    # counters and response are never touched by this function, regardless of
+    # mode or of what the judge concluded.
+    return _semantic_evidence(base_result, telemetry)
+
+
+def _semantic_hedge_check(task: ActiveTask, raw: str, base_result: GradingResult,
+                          *, openai_chat: Any, model: str,
+                          timeout: float | None) -> GradingResult:
+    """A rational/equation answer the deterministic extractor already graded
+    "correct" — but the message is prose, so a hedge word ("otprilike",
+    "oko") could be sitting right next to the value without the extractor
+    ever noticing. Recognising the hedge is the model's job; whether it costs
+    full credit is ``_verify_rational_like``'s policy, reused unchanged here.
+    Shadow mode only ever logs; "on" mode may downgrade to
+    ``NEEDS_CONFIRMATION``, never invent a NEW wrong verdict.
+    """
+    from matbot.minimal import semantic_grading as sg
+
+    mode = sg.semantic_mode()
+    telemetry = _base_semantic_telemetry()
+    if mode == "off":
+        return base_result
+
+    context = sg.build_context(task, raw)
+    if context is None:
+        return base_result                      # unsupported family, no call
+
+    telemetry["semantic_judge_model"] = model or ""
+    judgment, reason, metrics = sg.judge(context, openai_chat=openai_chat,
+                                        model=model, timeout=timeout)
+    telemetry.update(metrics.to_telemetry())
+    telemetry["semantic_judge_used"] = True     # the call WAS attempted
+    if judgment is None:
+        telemetry["semantic_fallback_reason"] = reason
+        telemetry["shadow_audit"] = _shadow_audit_dict(
+            sg, base_result.verdict, base_result.graded_answer, None, None)
+        return _semantic_evidence(base_result, telemetry)
+
+    telemetry.update(
+        semantic_judge_confidence=judgment.confidence,
+        semantic_response_kind=judgment.response_kind,
+        semantic_decision=judgment.decision,
+        semantic_certainty=judgment.certainty,
+        semantic_precision=judgment.precision,
+        semantic_claims=[{"type": c.type, "value": c.value,
+                          "polarity": c.polarity} for c in judgment.claims])
+    outcome = sg.verify_claims(context, judgment)
+    telemetry["deterministic_claim_verification"] = outcome.detail
+    telemetry["shadow_audit"] = _shadow_audit_dict(
+        sg, base_result.verdict, base_result.graded_answer, judgment, outcome)
+
+    if mode == "shadow":
+        return _semantic_evidence(base_result, telemetry)
+
+    # mode == "on": only ever DOWNGRADE a confident "correct" to
+    # needs_confirmation when the judge safely established hedging on the
+    # SAME value — a failed/uncheckable judge call leaves the deterministic
+    # "correct" exactly as it was.
+    if outcome.checkable and outcome.detail == sg.NEEDS_CONFIRMATION:
+        evidence = dict(base_result.evidence)
+        evidence.update(telemetry)
+        evidence["checker_verdict"] = outcome.detail
+        return replace(base_result, verdict="partial", solved=False,
+                      detail=outcome.detail, evidence=evidence)
+    return _semantic_evidence(base_result, telemetry)
