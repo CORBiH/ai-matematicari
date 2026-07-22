@@ -175,12 +175,15 @@ def _clean_cell(value: Any) -> Any:
 
 
 def _canary_marker() -> str:
-    """Sanitized canary cohort flag for every row (telemetry only)."""
-    try:
-        from matbot.engine_v2 import canary_marker
-        return canary_marker()
-    except Exception:
-        return "0"
+    """Sanitized canary cohort flag for every row (telemetry only).
+
+    Reads ``ENGINE_CANARY`` directly instead of calling ``engine_v2.canary_marker``:
+    this module is retained infrastructure and must not depend on the frozen
+    engine, which is deleted once the modes are cut over. ``_env_flag`` accepts
+    the same truthy set (``1``/``true``/``yes``/``on``) and the same ``"0"``
+    default, so the emitted value is unchanged.
+    """
+    return "1" if _env_flag("ENGINE_CANARY") else "0"
 
 
 def _json_cell(value: Any) -> str:

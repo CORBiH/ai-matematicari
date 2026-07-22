@@ -12,10 +12,11 @@ exposes is indexed, so new runtime ids work as soon as the sheet carries them.
 """
 from __future__ import annotations
 
+import importlib.util
 import re
 import unicodedata
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Callable
 
 from matbot.content_loader import load_master_content
 
@@ -93,15 +94,41 @@ class TopicIdentity:
         }
 
 
+#: Signature of a template-coverage lookup: ``(grade, oblast, probe) -> skill ids``.
+SkillProvider = Callable[[Any, str, str], "tuple[str, ...]"]
+
+
+def _legacy_skill_provider(grade: Any, oblast: str, probe: str) -> tuple[str, ...]:
+    """Template coverage from the frozen legacy generator set.
+
+    Distinguishes two different failure shapes on purpose:
+
+      * ``task_templates`` itself does not exist — the intended state once it is
+        deleted after the modes are cut over. That means "no known deterministic
+        coverage", an honest, already-supported state (see ``TopicIdentity.covered``),
+        so it is suppressed here.
+      * ``task_templates`` exists but fails to import or execute (e.g. one of ITS
+        OWN dependencies is broken). That is a real bug in retained code, unrelated
+        to this module's deliberate decoupling, and must not be swallowed.
+
+    ``importlib.util.find_spec`` answers "does this module exist" WITHOUT
+    executing it, which is exactly the distinction needed: only genuine absence
+    is caught; a broken import raises normally.
+    """
+    if importlib.util.find_spec("matbot.task_templates") is None:
+        return ()
+    from matbot import task_templates
+    return tuple(t.skill_id for t in task_templates.select_templates(grade, oblast, probe))
+
+
 def identify(grade: Any, raw_topic: Any = "", oblast: Any = "",
-             fallback_name: Any = "") -> TopicIdentity:
+             fallback_name: Any = "",
+             skill_provider: SkillProvider | None = None) -> TopicIdentity:
     """Build the canonical identity for a selected topic.
 
-    Imported lazily from ``task_templates`` to keep this module dependency-light
-    and cycle-free.
+    ``skill_provider`` is injected so this module never *requires* the frozen
+    ``task_templates``; omitting it keeps the existing legacy behavior exactly.
     """
-    from matbot import task_templates
-
     runtime = str(raw_topic or "").strip()
     resolved = resolve_topic(grade, runtime) if runtime else None
     if resolved is None and fallback_name:
@@ -114,7 +141,7 @@ def identify(grade: Any, raw_topic: Any = "", oblast: Any = "",
     # empty probe it falls back to the OBLAST, which is exactly right for an
     # oblast-only selection. Computing coverage only when a tema exists silently
     # broke that path, so always ask it.
-    skills = tuple(t.skill_id for t in task_templates.select_templates(grade, obl, probe))
+    skills = (skill_provider or _legacy_skill_provider)(grade, obl, probe)
     return TopicIdentity(
         grade=grade, runtime_id=runtime, npp_id=npp, oblast=obl, tema=tema,
         skill_ids=skills, resolved=resolved is not None, covered=bool(skills),
