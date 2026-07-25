@@ -333,6 +333,6 @@ def test_checker_still_grades_the_plain_task(client):
 
 def test_sheets_columns_unchanged():
     headers = sheets_log.SHEET_HEADERS
-    assert len(headers) == 62
+    assert len(headers) == 63
     assert headers.index("student_message") == 16
     assert headers.index("student_answer") == 25

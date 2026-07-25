@@ -219,7 +219,7 @@ def test_attempts_and_columns_are_untouched(client, sheets):
     assert body["next_state"]["total_attempt_count"] == 1
     assert body["next_state"]["correct_streak"] == 1
     headers = sheets_log.SHEET_HEADERS
-    assert len(headers) == 62
+    assert len(headers) == 63
     assert headers.index("student_message") == 16
     assert headers.index("student_answer") == 25
     assert headers.index("normalized_student") == 26

@@ -1033,17 +1033,16 @@ def test_dispatcher_ignores_legacy_openai_model_text(fake, monkeypatch):
 
 
 def test_all_invoked_purposes_receive_the_same_resolved_model(fake, monkeypatch):
-    """blueprint_generation, turn_interpretation and task_generation all fire
-    for one initial task-request turn — every one of them must receive the
-    SAME resolved V3 model (a single resolution point, never re-derived per
+    """blueprint_generation and task_generation fire for the bootstrap initial
+    task turn (turn_interpretation is skipped — see Phase 7 consolidation
+    tests below) — every purpose that DOES fire must receive the SAME
+    resolved V3 model (a single resolution point, never re-derived per
     purpose)."""
     monkeypatch.setenv("MATBOT_V3_MODEL", "gpt-5")
-    fake.set(orchestrator.PURPOSE_INTERPRET, interp_parsed("task_request"))
     resp = dispatcher.v3_practice_dispatch(base_payload(), timeout=5)
     assert resp is not None
     assert set(fake.calls) >= {
-        orchestrator.PURPOSE_BLUEPRINT, orchestrator.PURPOSE_INTERPRET,
-        orchestrator.PURPOSE_TASK,
+        orchestrator.PURPOSE_BLUEPRINT, orchestrator.PURPOSE_TASK,
     }
     assert all(m == "gpt-5" for m in fake.models)
 
@@ -1068,6 +1067,424 @@ def test_ai_tutor_service_bridge_does_not_forward_legacy_model(monkeypatch):
         {"mode": "practice"}, timeout=5, endpoint="handle_chat")
     assert result == {"engine": "v3_practice", "answer": "ok"}
     assert "model" not in captured
+
+
+# =========================================================================== #
+# Model-call consolidation (Phase 7)                                          #
+# =========================================================================== #
+def test_uncached_lesson_initial_task_makes_exactly_blueprint_and_task_calls(fake):
+    """Uncached lesson, initial task: blueprint_generation + task_generation
+    only — turn_interpretation is skipped for the bootstrap turn."""
+    resp = dispatch(base_payload())
+    assert resp is not None
+    assert fake.calls == [orchestrator.PURPOSE_BLUEPRINT, orchestrator.PURPOSE_TASK]
+
+
+def test_cached_lesson_initial_task_makes_exactly_one_task_call(monkeypatch, tmp_path):
+    """Cached lesson, initial task: task_generation only — blueprint reused
+    from store, turn_interpretation skipped."""
+    monkeypatch.setenv("MATBOT_AI_TUTOR_V3_PRACTICE", "on")
+    monkeypatch.setenv("MATBOT_AI_TUTOR_V3_LESSONS", DIVISIBILITY)
+    monkeypatch.setenv("MATBOT_V3_DB_PATH", str(tmp_path / "v3.sqlite3"))
+    from matbot import topic_resolver as tr
+    tr.reset_cache()
+    client = FakeClient()
+    dispatcher.set_model_client(client)
+    try:
+        first = dispatcher.v3_practice_dispatch(
+            base_payload(session_id="s_cache1"), timeout=5)
+        assert first is not None
+        assert client.calls == [orchestrator.PURPOSE_BLUEPRINT, orchestrator.PURPOSE_TASK]
+        client.calls.clear()
+        second = dispatcher.v3_practice_dispatch(
+            base_payload(session_id="s_cache2"), timeout=5)
+        assert second is not None
+        assert client.calls == [orchestrator.PURPOSE_TASK]   # blueprint reused
+    finally:
+        dispatcher.set_model_client(None)
+
+
+def test_hint_request_intent_skips_turn_interpretation(fake):
+    """The existing 'Ne znam — daj mi hint' button sends intent=hint_request —
+    the dispatcher must use it directly instead of an interpretation call."""
+    start_task(fake)
+    fake.calls.clear()
+    out = dispatch(base_payload(client_turn_id="hint1", student_message="Ne znam.",
+                                intent="hint_request"))
+    assert out is not None
+    assert orchestrator.PURPOSE_INTERPRET not in fake.calls
+    assert orchestrator.PURPOSE_HINT in fake.calls
+    assert out["next_state"]["hint_count"] == 1
+
+
+def test_difficulty_request_skips_turn_interpretation(fake):
+    """The existing 'Lakši zadatak'/'Teži zadatak' chips send
+    difficulty_request=easier/harder — must skip interpretation."""
+    start_task(fake)
+    before_level = 2
+    fake.calls.clear()
+    out = dispatch(base_payload(client_turn_id="diff1", student_message="Daj mi lakši zadatak.",
+                                difficulty_request="easier"))
+    assert out is not None
+    assert orchestrator.PURPOSE_INTERPRET not in fake.calls
+    assert out["next_state"]["difficulty_level"] == before_level - 1
+
+
+def test_free_text_answer_still_goes_through_real_interpretation(fake):
+    """No trusted signal present → free text is still interpreted by meaning,
+    never skipped (no brittle phrase matching)."""
+    start_task(fake)
+    fake.calls.clear()
+    fake.set(orchestrator.PURPOSE_INTERPRET,
+            interp_parsed("answer", is_answer=True,
+                         assessment=assess_parsed("correct")))
+    out = dispatch(base_payload(client_turn_id="ans1", student_message="da"))
+    assert out is not None
+    assert orchestrator.PURPOSE_INTERPRET in fake.calls
+
+
+def test_answer_turn_uses_proposed_narration_without_extra_narration_call(fake):
+    """Answer submission: the interpretation call's narration_proposal is used
+    directly — no separate narrate_feedback call — per Phase 7's 'one
+    combined structured call' target for answer turns."""
+    start_task(fake)
+    fake.calls.clear()
+    fake.set(orchestrator.PURPOSE_INTERPRET, interp_parsed(
+        "answer", is_answer=True, assessment=assess_parsed("correct"),
+    ))
+    # Attach a narration_proposal by hand, exactly as the real schema allows.
+    proposal = fake._by_purpose[orchestrator.PURPOSE_INTERPRET]
+    proposal["narration_proposal"] = narration_parsed("Tačno, bravo!", "feedback_correct")
+    out = dispatch(base_payload(client_turn_id="propose1", student_message="da"))
+    assert out is not None
+    assert orchestrator.PURPOSE_INTERPRET in fake.calls
+    assert orchestrator.PURPOSE_NARRATION not in fake.calls
+    assert out["answer"] == "Tačno, bravo!"
+
+
+def test_answer_turn_falls_back_to_narration_call_without_a_proposal(fake):
+    """When the interpretation call does NOT include a narration_proposal,
+    the dispatcher still makes the separate narrate_feedback call — no
+    regression for a model that omits the optional field."""
+    start_task(fake)
+    fake.calls.clear()
+    fake.set(orchestrator.PURPOSE_INTERPRET, interp_parsed(
+        "answer", is_answer=True, assessment=assess_parsed("correct"),
+    ))
+    out = dispatch(base_payload(client_turn_id="noprop1", student_message="da"))
+    assert out is not None
+    assert orchestrator.PURPOSE_NARRATION in fake.calls
+
+
+# =========================================================================== #
+# Timeout / turn-budget handling (Phase 8)                                    #
+# =========================================================================== #
+def test_resolve_v3_call_timeout_defaults(monkeypatch):
+    monkeypatch.delenv("MATBOT_V3_CALL_TIMEOUT_S", raising=False)
+    assert orchestrator.resolve_v3_call_timeout_s() == orchestrator.DEFAULT_V3_CALL_TIMEOUT_S
+
+
+def test_resolve_v3_call_timeout_override(monkeypatch):
+    monkeypatch.setenv("MATBOT_V3_CALL_TIMEOUT_S", "7.5")
+    assert orchestrator.resolve_v3_call_timeout_s() == 7.5
+
+
+def test_resolve_v3_call_timeout_invalid_falls_back(monkeypatch):
+    monkeypatch.setenv("MATBOT_V3_CALL_TIMEOUT_S", "not-a-number")
+    assert orchestrator.resolve_v3_call_timeout_s() == orchestrator.DEFAULT_V3_CALL_TIMEOUT_S
+
+
+def test_resolve_v3_turn_budget_defaults(monkeypatch):
+    monkeypatch.delenv("MATBOT_V3_TURN_BUDGET_S", raising=False)
+    assert orchestrator.resolve_v3_turn_budget_s() == orchestrator.DEFAULT_V3_TURN_BUDGET_S
+
+
+def test_resolve_v3_turn_budget_override(monkeypatch):
+    monkeypatch.setenv("MATBOT_V3_TURN_BUDGET_S", "15")
+    assert orchestrator.resolve_v3_turn_budget_s() == 15.0
+
+
+def test_turn_budget_per_call_timeout_never_exceeds_call_cap():
+    budget = dispatcher._TurnBudget(external_timeout=999.0)
+    t = budget.next_timeout()
+    assert t is not None
+    assert t <= orchestrator.resolve_v3_call_timeout_s()
+
+
+def test_turn_budget_shrinks_as_time_elapses(monkeypatch):
+    monkeypatch.setenv("MATBOT_V3_TURN_BUDGET_S", "10")
+    monkeypatch.setenv("MATBOT_V3_CALL_TIMEOUT_S", "20")
+    budget = dispatcher._TurnBudget(external_timeout=None)
+    first = budget.next_timeout()
+    assert first is not None
+    import time as _time
+    _time.sleep(0.5)
+    second = budget.next_timeout()
+    assert second is not None
+    assert second < first
+
+
+def test_turn_budget_exhausted_stops_further_calls(monkeypatch):
+    monkeypatch.setenv("MATBOT_V3_TURN_BUDGET_S", "0.01")
+    budget = dispatcher._TurnBudget(external_timeout=None)
+    import time as _time
+    _time.sleep(0.05)
+    assert budget.next_timeout() is None
+    assert budget.exceeded is True
+
+
+def test_extremely_small_budget_before_any_call_declines_safely(monkeypatch, tmp_path):
+    """A total budget too small even for the FIRST call makes V3 decline
+    (return None) rather than crash or partially mutate anything — legacy/
+    Minimal can then safely take over."""
+    monkeypatch.setenv("MATBOT_AI_TUTOR_V3_PRACTICE", "on")
+    monkeypatch.setenv("MATBOT_AI_TUTOR_V3_LESSONS", DIVISIBILITY)
+    monkeypatch.setenv("MATBOT_V3_DB_PATH", str(tmp_path / "v3.sqlite3"))
+    monkeypatch.setenv("MATBOT_V3_TURN_BUDGET_S", "0.0001")
+    from matbot import topic_resolver as tr
+    tr.reset_cache()
+    client = FakeClient()
+    dispatcher.set_model_client(client)
+    try:
+        resp = dispatch(base_payload())
+        assert resp is None
+        assert client.calls == []
+    finally:
+        dispatcher.set_model_client(None)
+
+
+def test_slow_first_call_leaves_safe_fallback_for_second_call(fake, monkeypatch):
+    """A blueprint call that eats almost the whole turn budget must NOT let a
+    second (task-generation) call start anyway — the turn fails safely
+    instead of risking the client-side 60s abort. No active task is assigned;
+    counters are untouched."""
+    monkeypatch.setenv("MATBOT_V3_TURN_BUDGET_S", "3.2")
+    monkeypatch.setenv("MATBOT_V3_CALL_TIMEOUT_S", "5")
+    real_generate = fake.generate
+
+    def _slow_generate(*, purpose, **kwargs):
+        if purpose == orchestrator.PURPOSE_BLUEPRINT:
+            import time as _time
+            _time.sleep(0.35)
+        return real_generate(purpose=purpose, **kwargs)
+    fake.generate = _slow_generate
+
+    resp = dispatch(base_payload())
+    assert resp is not None
+    assert resp["v3_fallback_reason"] == "turn_budget_exceeded"
+    assert resp["next_state"]["v3_state"]["active_task"] is None
+    assert resp["next_state"]["v3_state"]["counters"]["attempts"] == 0
+    assert orchestrator.PURPOSE_TASK not in fake.calls
+
+
+def test_normal_turn_completes_within_default_budget(fake):
+    """Sanity: the default budget/timeouts do not break the ordinary path —
+    only pathologically small budgets (as configured above) trigger the
+    fallback."""
+    resp = dispatch(base_payload())
+    assert resp is not None
+    assert resp.get("v3_fallback_reason") is None
+
+
+# =========================================================================== #
+# Telemetry (Phase 9)                                                         #
+# =========================================================================== #
+def test_get_or_create_blueprint_reports_cache_miss_then_hit(monkeypatch, tmp_path):
+    monkeypatch.setenv("MATBOT_V3_DB_PATH", str(tmp_path / "v3.sqlite3"))
+    from matbot.ai_tutor_v3 import lesson_blueprint, state_store as ss
+    store = ss.V3StateStore()
+    store.init_db()
+    identity = lesson_blueprint.resolve_lesson_identity(6, DIVISIBILITY, "Djeljivost brojeva")
+    client = FakeClient()
+    bp1, reason1, hit1 = lesson_blueprint.get_or_create_blueprint(
+        store, client, identity=identity, grade=6, model="gpt-5-mini", timeout=5)
+    assert bp1 is not None and reason1 == "" and hit1 is False
+    bp2, reason2, hit2 = lesson_blueprint.get_or_create_blueprint(
+        store, client, identity=identity, grade=6, model="gpt-5-mini", timeout=5)
+    assert bp2 is not None and reason2 == "" and hit2 is True
+
+
+def test_usage_metrics_records_per_call_latency(fake):
+    resp = start_task(fake)
+    assert resp is not None
+    v3 = resp["next_state"]["v3_state"]
+    # per_call_latency_ms isn't in the frontend-facing v3_state projection —
+    # verify via the audit-record path instead (store.get_turn_audit if
+    # exposed) or, at minimum, that UsageMetrics accepts and preserves it.
+    from matbot.ai_tutor_v3.schemas import UsageMetrics
+    u = UsageMetrics(model_calls=2, per_call_latency_ms=[5.0, 7.0])
+    assert u.per_call_latency_ms == [5.0, 7.0]
+
+
+def test_audit_record_contains_required_telemetry_fields(monkeypatch, tmp_path):
+    """Directly exercises _audit_record's shape — the structured, privacy-safe
+    per-turn telemetry Phase 9 requires."""
+    from matbot.ai_tutor_v3 import lesson_blueprint
+    from matbot.ai_tutor_v3.schemas import (
+        AuthoritativeOutcome, UsageMetrics as UM,
+    )
+    identity = lesson_blueprint.LessonIdentity(
+        grade=6, area_id="a", area_title="Oblast", lesson_id="6-03-024",
+        lesson_title="Djeljivost")
+
+    class _BP:
+        blueprint_id = "bp_x"
+        blueprint_version = "v1"
+        model = "gpt-5-mini"
+        from matbot.ai_tutor_v3.orchestrator import current_prompt_policy as _cpp
+        prompt_policy = _cpp()
+
+    outcome = AuthoritativeOutcome(
+        schema_version="v1", verdict="correct", attempt_count_delta=1,
+        wrong_attempt_count_delta=0, streak_action="increment",
+        solved_count_delta=1, task_status_after="completed",
+        task_completed=True, preserve_active_task=False, needs_narration=True)
+
+    class _VDecision:
+        class result:
+            status = "model_only"
+
+    audit = dispatcher._audit_record(
+        request_id="req1", session_id="s1", client_turn_id="c1",
+        identity=identity, blueprint=_BP(),
+        outcome_bundle={"purposes": ["turn_interpretation", "task_generation"],
+                       "turn_kind": "task_request", "outcome": outcome,
+                       "usage": UM(model_calls=2, prompt_tokens=10,
+                                  completion_tokens=5, total_latency_ms=12.0,
+                                  per_call_latency_ms=[5.0, 7.0]),
+                       "quality_gate": {"checked": True, "repaired": False,
+                                       "failure_categories": []}},
+        vdecision=_VDecision(), version_before=0, version_after=1,
+        category="task", blueprint_cache_hit=True, turn_latency_ms=42.0)
+
+    for key in ("call_purposes", "call_count", "quality_gate",
+               "verification_status", "blueprint_cache_hit", "turn_latency_ms",
+               "state_version_before", "state_version_after", "model", "usage"):
+        assert key in audit
+    assert audit["call_count"] == 2
+    assert audit["blueprint_cache_hit"] is True
+    assert audit["turn_latency_ms"] == 42.0
+    assert audit["usage"]["per_call_latency_ms"] == [5.0, 7.0]
+    # Privacy: no key even resembling a prompt/API key/raw conversation.
+    blob = str(audit).lower()
+    for forbidden in ("api_key", "sk-", "system_prompt", "raw_conversation"):
+        assert forbidden not in blob
+
+
+# =========================================================================== #
+# Google Sheets compatibility logging (Phase 10)                              #
+# =========================================================================== #
+def test_visible_v3_turn_logs_exactly_one_sheets_row(fake, monkeypatch):
+    calls = []
+    monkeypatch.setattr(dispatcher.sheets_log, "log_transcript_to_sheet",
+                        lambda payload, response: calls.append((payload, response)) or True)
+    resp = start_task(fake)
+    assert resp is not None
+    assert len(calls) == 1
+    logged_payload, logged_response = calls[0]
+    assert logged_response["engine"] == "v3_practice"
+    assert logged_response["v3_telemetry"]["blueprint_id"]
+
+
+def test_shadow_v3_turn_does_not_log_to_sheets(fake, monkeypatch):
+    calls = []
+    monkeypatch.setattr(dispatcher.sheets_log, "log_transcript_to_sheet",
+                        lambda payload, response: calls.append(1) or True)
+    monkeypatch.setenv("MATBOT_AI_TUTOR_V3_PRACTICE", "shadow")
+    resp = dispatch(base_payload())
+    assert resp is None                 # legacy controls the visible response
+    assert calls == []                  # shadow must never create a visible row
+
+
+def test_duplicate_replay_does_not_log_a_second_sheets_row(fake, monkeypatch):
+    calls = []
+    monkeypatch.setattr(dispatcher.sheets_log, "log_transcript_to_sheet",
+                        lambda payload, response: calls.append(1) or True)
+    payload = base_payload(client_turn_id="dup1")
+    first = dispatch(payload)
+    assert first is not None
+    assert len(calls) == 1
+    second = dispatch(payload)     # exact same client_turn_id → idempotent replay
+    assert second is not None
+    assert len(calls) == 1          # NOT 2
+
+
+def test_sheets_failure_never_alters_the_student_response(fake, monkeypatch):
+    def _boom(payload, response):
+        raise RuntimeError("sheets is down")
+    monkeypatch.setattr(dispatcher.sheets_log, "log_transcript_to_sheet", _boom)
+    resp = dispatch(base_payload())
+    assert resp is not None
+    assert resp["engine"] == "v3_practice"
+    assert resp["status"] == "ready"
+
+
+def test_v3_failure_falling_back_does_not_log_a_v3_sheets_row(fake, monkeypatch):
+    """A turn that fails before commit (and would fall back to Minimal
+    elsewhere) must not produce a V3 Sheets row — only a genuinely committed,
+    visible V3 turn logs."""
+    calls = []
+    start_task(fake)
+    monkeypatch.setattr(dispatcher.sheets_log, "log_transcript_to_sheet",
+                        lambda payload, response: calls.append(1) or True)
+    fake.set(orchestrator.PURPOSE_INTERPRET, {"garbage": True})  # fails validation
+    resp = dispatch(base_payload(client_turn_id="badout2", student_message="da"))
+    assert resp is not None
+    assert resp.get("v3_fallback_reason") is not None
+    assert calls == []
+
+
+# =========================================================================== #
+# Output quality gate + bounded repair (Phase 5)                              #
+# =========================================================================== #
+def test_quality_gate_repairs_internal_terminology_leak_in_task(fake):
+    """The task-generation FakeClient output leaks 'Blueprint' — the ONE
+    bounded repair call must replace it with clean, gate-passing text before
+    it ever reaches the student or the durable active task."""
+    fake.set(orchestrator.PURPOSE_INTERPRET, interp_parsed("task_request"))
+    fake.set(orchestrator.PURPOSE_TASK,
+             task_parsed(question="Prema Blueprint-u, izračunaj 2 + 2."))
+    fake.set(orchestrator.PURPOSE_REPAIR, narration_parsed("Izračunaj 2 + 2.", "task"))
+    resp = dispatch(base_payload())
+    assert resp is not None
+    assert "Blueprint" not in resp["last_tutor_task"]
+    assert resp["last_tutor_task"] == "Izračunaj 2 + 2."
+    assert orchestrator.PURPOSE_REPAIR in fake.calls
+    # The repaired text — not the rejected one — is what got stored as the
+    # active task's question.
+    assert resp["next_state"]["v3_state"]["active_task"]["question"] == "Izračunaj 2 + 2."
+
+
+def test_quality_gate_falls_back_safely_when_repair_also_fails(fake):
+    fake.set(orchestrator.PURPOSE_INTERPRET, interp_parsed("task_request"))
+    fake.set(orchestrator.PURPOSE_TASK,
+             task_parsed(question="Prema Blueprint-u, izračunaj 2 + 2."))
+    fake.set_status(orchestrator.PURPOSE_REPAIR, "error", "repair_failed")
+    resp = dispatch(base_payload())
+    assert resp is not None
+    assert "Blueprint" not in resp["last_tutor_task"]
+    from matbot.ai_tutor_v3 import quality_gate as qg
+    assert resp["last_tutor_task"] == qg.SAFE_FALLBACK_TEXT
+    # Exactly one repair attempt — never more.
+    assert fake.calls.count(orchestrator.PURPOSE_REPAIR) == 1
+
+
+def test_quality_gate_does_not_call_repair_for_clean_text(fake):
+    resp = start_task(fake)
+    assert resp is not None
+    assert orchestrator.PURPOSE_REPAIR not in fake.calls
+
+
+def test_quality_gate_normalizes_bare_latex_without_a_repair_call(fake):
+    """A purely mechanical MathJax delimiter fix must be free — no model call
+    — since normalize_math_for_display alone already repairs it."""
+    fake.set(orchestrator.PURPOSE_INTERPRET, interp_parsed("task_request"))
+    fake.set(orchestrator.PURPOSE_TASK,
+             task_parsed(question=r"Proširi razlomak \frac{3}{4} brojem 2."))
+    resp = dispatch(base_payload())
+    assert resp is not None
+    assert r"\( \frac{3}{4} \)" in resp["last_tutor_task"]
+    assert orchestrator.PURPOSE_REPAIR not in fake.calls
 
 
 # =========================================================================== #

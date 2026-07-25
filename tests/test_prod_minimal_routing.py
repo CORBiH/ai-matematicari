@@ -305,7 +305,9 @@ def test_sheets_columns_are_append_only():
     from matbot.sheets_log import SHEET_HEADERS
     assert SHEET_HEADERS.index("student_message") == 16
     assert SHEET_HEADERS.index("engine_canary") == 59
-    assert SHEET_HEADERS[-2:] == ["internal_instruction", "minimal_routing"]
+    # v3_telemetry (Phase 10) is appended strictly AFTER both pre-existing
+    # columns — neither one moved.
+    assert SHEET_HEADERS[-3:] == ["internal_instruction", "minimal_routing", "v3_telemetry"]
 
 
 def test_one_sheets_row_per_turn(client, sheets):

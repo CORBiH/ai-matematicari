@@ -219,24 +219,25 @@ def get_or_create_blueprint(
     store: V3StateStore, client: orchestrator.StructuredModelClient, *,
     identity: LessonIdentity, grade: int, model: str = orchestrator.DEFAULT_MODEL,
     timeout: Optional[float] = None,
-) -> tuple[Optional[LessonBlueprint], str]:
+) -> tuple[Optional[LessonBlueprint], str, bool]:
     """The lifecycle entry point: reuse a stored blueprint for this (lesson,
     source hash), else generate, validate and store one. Returns
-    (blueprint|None, reason)."""
+    (blueprint|None, reason, cache_hit) — ``cache_hit`` is telemetry (Phase 9):
+    True iff a stored blueprint was reused, never triggering a model call."""
     metadata = source_metadata(identity, grade)
     source_hash = compute_source_hash(metadata)
 
     stored = store.find_blueprint(identity.lesson_id, source_hash)
     if stored is not None:
         try:
-            return LessonBlueprint.model_validate_json(stored), ""
+            return LessonBlueprint.model_validate_json(stored), "", True
         except Exception:
             pass  # corrupt stored row → regenerate
 
     blueprint, reason = generate_blueprint(
         client, identity=identity, grade=grade, model=model, timeout=timeout)
     if blueprint is None:
-        return None, reason
+        return None, reason, False
     store.store_blueprint(
         blueprint_id=blueprint.blueprint_id, lesson_id=blueprint.lesson_identity.lesson_id,
         blueprint_version=blueprint.blueprint_version, source_hash=blueprint.source_hash,
@@ -244,7 +245,7 @@ def get_or_create_blueprint(
         validation_status=blueprint.validation_status, model=blueprint.model,
         prompt_versions_json=blueprint.prompt_policy.model_dump_json(),
         created_at=blueprint.created_at.isoformat())
-    return blueprint, ""
+    return blueprint, "", False
 
 
 def _slug(text: str) -> str:

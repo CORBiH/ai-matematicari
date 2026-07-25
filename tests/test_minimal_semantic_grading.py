@@ -313,7 +313,7 @@ def test_sheets_columns_unchanged_with_semantic_grading_on(client, monkeypatch,
         {"type": "last_digit", "value": "0", "polarity": "positive", "confidence": 0.9}]))
     state = seeded(client, TASK_110_10, "da")
     turn(client, state, "da jer je zadnja cifra 0", question=TASK_110_10)
-    assert len(sheets_log.SHEET_HEADERS) == 62
+    assert len(sheets_log.SHEET_HEADERS) == 63
     row = sheets_log._build_transcript_row(*sheets[-1])
     assert row[sheets_log.SHEET_HEADERS.index("student_message")] == \
         "da jer je zadnja cifra 0"

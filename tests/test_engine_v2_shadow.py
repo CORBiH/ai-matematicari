@@ -397,7 +397,9 @@ def test_sheets_columns_are_append_only():
     assert headers[57:] == ["sheets_event_id", "shadow_telemetry", "engine_canary",
                             # appended 2026-07-21: raw vs rewritten message, and
                             # the minimal-engine routing trace
-                            "internal_instruction", "minimal_routing"]
+                            "internal_instruction", "minimal_routing",
+                            # appended for V3 Practice telemetry (Phase 10)
+                            "v3_telemetry"]
 
 
 def test_sheets_row_length_matches_headers(monkeypatch, master, tmap):

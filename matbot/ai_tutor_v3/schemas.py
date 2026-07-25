@@ -617,12 +617,19 @@ class PracticeModelAssessment(V3StrictModel):
 
 class PracticeTurnInterpretation(V3StrictModel):
     """The combined structured output of the interpretation call: the language
-    interpretation PLUS an optional provisional assessment. Two typed halves in
-    one call, but the authority boundary holds — neither half can carry a
-    verdict the reducer must honour."""
+    interpretation PLUS an optional provisional assessment PLUS an optional
+    proposed narration. Three typed parts in one call, but the authority
+    boundary holds — none of them can carry a verdict the reducer must
+    honour. ``narration_proposal`` is ONLY a proposed student-facing text for
+    an answer turn's feedback — the reducer's authoritative verdict (computed
+    from ``AuthoritativeOutcome``, never from this proposal) decides what
+    actually happened; the dispatcher may use this text as-is (through the
+    same quality gate every other narration goes through) instead of making a
+    SEPARATE narration call, which is the whole point of proposing it here."""
 
     interpretation: StudentTurnInterpretation
     assessment: Optional[PracticeModelAssessment] = None
+    narration_proposal: Optional[NarrationResult] = None
 
 
 # --------------------------------------------------------------------------- #
@@ -767,6 +774,9 @@ class UsageMetrics(V3StrictModel):
     completion_tokens: int = Field(default=0, ge=0)
     model_calls: int = Field(default=0, ge=0)
     total_latency_ms: float = Field(default=0.0, ge=0.0)
+    #: Per-call latency, same order as the audit record's ``call_purposes`` —
+    #: Phase 9 telemetry ("latency per call"), privacy-safe (numbers only).
+    per_call_latency_ms: list[float] = Field(default_factory=list)
 
 
 class TurnAuditRecord(V3StrictModel):

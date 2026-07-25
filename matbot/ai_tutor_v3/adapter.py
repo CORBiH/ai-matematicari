@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from typing import Optional
 
+from matbot.ai_tutor_v3.rendering import normalize_math_for_display
 from matbot.ai_tutor_v3.schemas import AuthoritativeOutcome, TutorSessionState
 
 # Maps an authoritative verdict to the legacy ``answer_verdict`` vocabulary the
@@ -33,6 +34,11 @@ def build_response(
     """Translate a committed V3 turn into the frontend response dict."""
     task = state.active_task
     verdict = outcome.verdict if outcome else None
+    answer = normalize_math_for_display(answer)
+    task_question = normalize_math_for_display(task.question) if task else ""
+    clarification_seed = (
+        normalize_math_for_display(state.pending_clarification.prompt_seed)
+        if state.pending_clarification else None)
     next_state = {
         # The V3 core's own durable state travels in ONE namespaced key.
         "v3_state": state.model_dump(mode="json"),
@@ -48,14 +54,12 @@ def build_response(
         "hint_count": task.hints_given if task else 0,
         "expected_user_action": "answer_task" if task else "none",
         "task": {
-            "task_id": task.task_id, "question": task.question,
+            "task_id": task.task_id, "question": task_question,
             "concept_id": task.concept_id, "target_id": task.target_id,
             "answer_kind": task.answer_kind, "source": "v3_model",
             "validation_status": "validated",
         } if task else None,
-        "pending_clarification": (
-            state.pending_clarification.prompt_seed
-            if state.pending_clarification else None),
+        "pending_clarification": clarification_seed,
         "verification_status": verification_status,
     }
     return {
@@ -63,7 +67,7 @@ def build_response(
         "answer": answer,
         "mode": "practice",
         "session_mode": "practice",
-        "last_tutor_task": task.question if task else "",
+        "last_tutor_task": task_question if task else "",
         "answer_verdict": _VERDICT_WIRE.get(verdict) if verdict else None,
         "answer_verdict_detail": verdict,
         "task_id": task.task_id if task else None,

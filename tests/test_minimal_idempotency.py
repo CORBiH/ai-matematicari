@@ -470,8 +470,10 @@ def test_student_message_stays_verbatim_on_new_task_and_replay(client, sheets):
 
 
 def test_sheet_still_has_62_columns():
+    # Now 63: one V3 telemetry column appended (Phase 10), strictly after —
+    # never moving — every pre-existing column this test name commemorates.
     from matbot import sheets_log
-    assert len(sheets_log.SHEET_HEADERS) == 62
+    assert len(sheets_log.SHEET_HEADERS) == 63
 
 
 def test_recent_task_signature_prevention_still_works_independently(client):

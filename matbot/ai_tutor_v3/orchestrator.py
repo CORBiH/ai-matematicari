@@ -39,6 +39,48 @@ DEFAULT_MODEL = "gpt-5-mini"
 OFF_TOPIC_FALLBACK = "Postavi mi pitanje ili zadatak iz matematike."
 
 
+def _resolve_positive_float(env_name: str, default: float) -> float:
+    """A positive float from an env var, or ``default`` when unset, blank,
+    non-numeric, or <= 0 — the same fail-safe-to-default shape as
+    ``resolve_v3_model``."""
+    raw = (os.getenv(env_name) or "").strip()
+    try:
+        value = float(raw) if raw else 0.0
+    except ValueError:
+        value = 0.0
+    return value if value > 0 else default
+
+
+#: Per-call timeout default (Phase 8). Smaller than the legacy/general
+#: ``AI_TUTOR_TIMEOUT`` (45s) DELIBERATELY: the frontend's own client-side
+#: abort fires at a fixed 60s (see templates/index.html) regardless of what
+#: the backend does, and a V3 turn can involve more than one sequential model
+#: call — so each individual call must leave room for a possible second one.
+DEFAULT_V3_CALL_TIMEOUT_S = 20.0
+
+#: Total wall-clock budget for ALL of a turn's model calls combined (Phase 8).
+#: Kept under the frontend's fixed 60s abort with margin for the rest of the
+#: turn's non-model work (DB commit, rendering, quality gate).
+DEFAULT_V3_TURN_BUDGET_S = 40.0
+
+#: Below this many remaining seconds, a further model call is not attempted at
+#: all — a call started with only a sliver of budget left is overwhelmingly
+#: likely to be aborted anyway, wasting the attempt instead of failing safely.
+MIN_V3_CALL_TIMEOUT_S = 3.0
+
+
+def resolve_v3_call_timeout_s() -> float:
+    """Per-call timeout ceiling: ``MATBOT_V3_CALL_TIMEOUT_S`` if a positive
+    number, else ``DEFAULT_V3_CALL_TIMEOUT_S``."""
+    return _resolve_positive_float("MATBOT_V3_CALL_TIMEOUT_S", DEFAULT_V3_CALL_TIMEOUT_S)
+
+
+def resolve_v3_turn_budget_s() -> float:
+    """Total per-turn model-call budget: ``MATBOT_V3_TURN_BUDGET_S`` if a
+    positive number, else ``DEFAULT_V3_TURN_BUDGET_S``."""
+    return _resolve_positive_float("MATBOT_V3_TURN_BUDGET_S", DEFAULT_V3_TURN_BUDGET_S)
+
+
 def resolve_v3_model() -> str:
     """The model V3 Practice uses for ALL SEVEN call purposes.
 
@@ -58,12 +100,12 @@ def resolve_v3_model() -> str:
 #: Bump a version string when the corresponding layer's TEXT changes. The active
 #: versions are recorded in the blueprint, the session state and every audit row.
 PROMPT_POLICY_VERSIONS = {
-    "constitution_version": "constitution@2026-07-25",
-    "bosnian_language_policy_version": "bs-lang@2026-07-25",
-    "math_notation_policy_version": "math-notation@2026-07-25",
-    "grade_policy_version": "grade@2026-07-25",
-    "mode_policy_version": "practice-mode@2026-07-25",
-    "lesson_blueprint_version": "blueprint-policy@2026-07-25",
+    "constitution_version": "constitution@2026-07-25-v2",
+    "bosnian_language_policy_version": "bs-lang@2026-07-25-v2",
+    "math_notation_policy_version": "math-notation@2026-07-25-v2",
+    "grade_policy_version": "grade@2026-07-25-v2",
+    "mode_policy_version": "practice-mode@2026-07-25-v2",
+    "lesson_blueprint_version": "blueprint-policy@2026-07-25-v2",
 }
 
 
@@ -79,47 +121,75 @@ def current_prompt_policy(blueprint_version: str = "") -> PromptPolicyReference:
 TUTOR_CONSTITUTION = (
     "Ti si asistent za matematiku za učenike osnovne škole u Bosni i Hercegovini. "
     "Odgovaraš samo na pitanja i zadatke iz osnovnoškolske matematike. "
-    "Govoriš prirodnim bosanskim jezikom, latinicom, ijekavicom. "
-    "Jasan si, strpljiv i nikoga ne posramljuješ. Objašnjenja prilagođavaš razredu. "
-    "Pratiš izabrani razred i lekciju. Razlikuješ internu kanonsku vrijednost od "
+    "Govoriš prirodnim bosanskim jezikom, latinicom, ijekavicom, kao dobar "
+    "nastavnik u učionici — nikad kao priručnik ili tehnički dokument. Jasan si, "
+    "strpljiv i nikoga ne posramljuješ. Objašnjenja prilagođavaš razredu. Pratiš "
+    "izabrani razred i lekciju. Razlikuješ internu kanonsku vrijednost od "
     "prikazane notacije. Ne izmišljaš činjenice o lekciji koje Blueprint ne "
     "podržava. Tokom aktivnog zadatka, ako učenik pita o konceptu, odgovaraš na "
     "pitanje ali čuvaš aktivni zadatak. Kad je poruka nejasna, tražiš pojašnjenje "
     "umjesto da kažnjavaš. Za jasno nematematički zahtjev odgovaraš tačno: "
     f"'{OFF_TOPIC_FALLBACK}'. Taj odgovor NE koristiš za pozdrave, pitanja o "
-    "korištenju tutora, pojašnjenja aktivnog zadatka ni frustraciju oko zadatka."
+    "korištenju tutora, pojašnjenja aktivnog zadatka ni frustraciju oko zadatka.\n"
+    "Nikad ne koristiš i ne spominješ interne pojmove sistema pred učenikom: "
+    "'shema', 'JSON', 'Blueprint', 'verifikator', 'reducer', 'model', "
+    "'pouzdanost'/'confidence', 'stanje'/'state', 'verifikacija', 'schema', "
+    "'promt'. Ne tvrdiš da je nešto matematički dokazano ili sigurno "
+    "provjereno — govoriš prirodno, kao nastavnik koji gleda rad učenika, ne "
+    "kao sistem koji izvještava o statusu provjere. Ne dodaješ nepotreban uvod "
+    "ili pozdrav prije svakog zadatka ili savjeta. Ne ponavljaš cijelu "
+    "definiciju koncepta u svakom zadatku. Izbjegavaj uvijek istu formulaciju "
+    "pohvale — variraj je i veži je za ono što je učenik konkretno uradio. "
+    "Koristiš jednu jasnu uputu po rečenici kad god je to prirodno."
 )
 
 BOSNIAN_LANGUAGE_POLICY = (
-    "Koristi bosanske ijekavske oblike, jednostavan školski jezik i ispravnu "
-    "matematičku terminologiju. Razumij izostavljene dijakritike, pravopisne "
-    "greške, nepotpunu gramatiku, kolokvijalni dječiji jezik, implicitne "
-    "odgovore, promijenjene odgovore, nesigurnost (možda, valjda, otprilike) i "
-    "pitanja koja sadrže brojeve a nisu predani odgovori. Ne traži tačne fraze. "
-    "Preferiraj: jednakokraki trougao, zbir, stepenovanje."
+    "Koristi bosanske ijekavske oblike, jednostavan i prirodan školski jezik i "
+    "ispravnu matematičku terminologiju — ni djetinjast, ni birokratski, ni "
+    "akademski kad obična školska riječ dovoljno kaže. Razumij izostavljene "
+    "dijakritike, pravopisne greške, nepotpunu gramatiku, kolokvijalni dječiji "
+    "jezik, implicitne odgovore, promijenjene odgovore, nesigurnost (možda, "
+    "valjda, otprilike) i pitanja koja sadrže brojeve a nisu predani odgovori. "
+    "Ne traži tačne fraze. Preferiraj: jednakokraki trougao, zbir, stepenovanje."
 )
 
 MATH_NOTATION_POLICY = (
     "Interne kanonske vrijednosti i prikaz su odvojeni. Interno: egzaktni "
-    "razlomci kao '1/2'. Prikaz učeniku: koristi MathJax/LaTeX za razlomke "
-    "(\\frac{1}{2}), decimalni zarez, · za množenje, : za dijeljenje, √ ili "
-    "MathJax za korijene, eksponente/MathJax za stepene. Ne prikazuj sirovo "
-    "* ili ^. Svaki smisleni korak rješenja u novom redu. Mješoviti broj bez "
-    "riječi 'i'."
+    "razlomci kao '1/2'. Prikaz učeniku: SVAKU matematičku formulu, razlomak, "
+    "korijen, stepen ili jednačinu piši u LaTeX obliku UNUTAR MathJax "
+    "graničnika \\( ... \\) za formulu u rečenici (npr. 'Proširi razlomak "
+    "\\( \\frac{3}{4} \\) brojem 2.') ili \\[ ... \\] za izdvojen prikaz "
+    "rješenja. Razlomak nikad ne pišeš kao goli '\\frac{3}{4}' bez tih "
+    "graničnika — bez njih se formula ne prikazuje ispravno. Koristi "
+    "decimalni zarez, · za množenje, : za dijeljenje. Ne prikazuj sirovo "
+    "* ili ^ van LaTeX graničnika. Svaki smisleni korak rješenja u novom redu. "
+    "Mješoviti broj bez riječi 'i'."
 )
 
-# Grade policy is provided per active grade only.
+# Grade policy is provided per active grade only. Each entry encodes both the
+# curriculum scope AND the expected sentence complexity/tone for that grade —
+# the same clarity standard applies to every mathematical area (divisibility,
+# fractions, equations, percentages, geometry, roots, powers, functions,
+# polynomials, systems, …), never hardcoded per topic.
 GRADE_POLICIES = {
     6: ("6. razred: cijeli brojevi i razlomci primjereni programu; jednačine "
         "kroz odnose operacija gdje se traži; školski NZD/NZS; bez naprednih "
-        "algebarskih metoda."),
+        "algebarskih metoda. Jezik: kratke, direktne rečenice; obično jedna "
+        "ili dvije upute po zadatku; poznate školske riječi; konkretan "
+        "sljedeći korak; minimalna apstrakcija osim ako lekcija traži više."),
     7: ("7. razred: prebacivanje članova uz promjenu znaka gdje je programski "
-        "primjereno."),
+        "primjereno. Jezik: sažet, uz malo više matematičkog objašnjenja; "
+        "algebarske pojmove uvodi samo gdje ih program traži; rečenice drži "
+        "jednostavnim."),
     8: ("8. razred: Pitagorina teorema, proporcije i procenti; školsko "
-        "proporcionalno rasuđivanje i pravilo trojno."),
+        "proporcionalno rasuđivanje i pravilo trojno. Jezik: dozvoljeno "
+        "višekoračno rasuđivanje; objasni vezu između pravila; svaki korak "
+        "vizuelno odvoji (novi red)."),
     9: ("9. razred: funkcije, polinomi i sistemi; biraj najjednostavniju "
         "programski odobrenu metodu; koordinatna geometrija po odobrenoj "
-        "politici."),
+        "politici. Jezik: precizna algebarska i funkcijska terminologija, ali "
+        "bez nepotrebno formalnog, fakultetskog izraza; uvijek biraj "
+        "najjednostavniju odobrenu školsku metodu."),
 }
 
 PRACTICE_MODE_POLICY = (
@@ -131,6 +201,19 @@ PRACTICE_MODE_POLICY = (
     "potpomognutog; prilagodi težinu na osnovu dokaza; s vremenom pokrij cijelu "
     "lekciju; ne ponavljaj stalno jednu podtemu; sljedeći koncept biraj po "
     "Blueprint pokrivenosti i mastery stanju."
+)
+
+#: The task-writing standard (Phase 3.A): normally one or two SHORT sentences,
+#: state exactly what to do, never embed the full concept definition, never a
+#: hidden/expected answer, never several unrelated asks in one task. Generic —
+#: the same standard applies to every lesson, not hardcoded per topic.
+TASK_WRITING_STANDARD = (
+    "Zadatak piši kratko: obično jedna do dvije kratke rečenice. Reci tačno "
+    "šta učenik treba da uradi. Ne ugrađuj punu definiciju koncepta kad je "
+    "dovoljna kratka uputa. Ne otkrivaj očekivani odgovor. Ne traži nekoliko "
+    "nepovezanih stvari u jednom zadatku. Ne koristi formalnu frazu samo zato "
+    "što zvuči matematički sofisticirano — piši onako kako bi nastavnik "
+    "prirodno rekao učeniku u razredu."
 )
 
 
@@ -174,6 +257,9 @@ PURPOSE_HINT = "hint_generation"
 PURPOSE_CONCEPT = "concept_explanation"
 PURPOSE_NARRATION = "narration"
 PURPOSE_REVEAL = "solution_reveal"
+#: The ONE bounded quality-gate repair call (Phase 5) — never more than one
+#: per rejected text; see ``matbot.ai_tutor_v3.quality_gate.MAX_REPAIR_ATTEMPTS``.
+PURPOSE_REPAIR = "quality_repair"
 
 
 class StrictSchemaError(ValueError):
@@ -613,7 +699,17 @@ def interpret_turn(
         "kratko normalizovano značenje, tvrdnje (claims), sigurnost i preciznost. "
         "Ako je pokušaj odgovora, dodaj provizornu procjenu (assessment): "
         "predloženi verdikt, pedagoška akcija, eventualne misconception kodove, "
-        "da li je riješeno samostalno. NE odlučuješ konačan ishod."
+        "da li je riješeno samostalno. NE odlučuješ konačan ishod. Ako poruka "
+        "nije jasna, clarification_question neka bude prirodno i konkretno "
+        "pitanje o TOME šta je nejasno — ne generička fraza. Ako je ovo pokušaj "
+        "odgovora, dodaj i narration_proposal: prijedlog kratke povratne "
+        "informacije primjerene TVOM predloženom verdiktu (server možda "
+        "odluči drugačije — ipak piši povratnu informaciju kao da je tvoj "
+        "predloženi verdikt konačan). Prati standard: tačno=koncizno bez "
+        "ponavljanja iste fraze; netačno=prvo prizanj tvrdnju pa objasni "
+        "problem pa sljedeći korak, zadatak ostaje; djelimično=navedi šta je "
+        "tačno pa šta nedostaje. Nikad ne otkrivaj konačan odgovor ako zadatak "
+        "ostaje aktivan."
     )
     result = client.generate(
         purpose=PURPOSE_INTERPRET, system=system, user=user,
@@ -643,7 +739,9 @@ def generate_task(
         "Generiši JEDAN zadatak za vježbu vjeran ovoj lekciji i ovom targetu. "
         "Vrati TaskSpecification: concept_id, target_id (iz Blueprint coverage), "
         "pitanje, answer_kind, internu očekivanu vrijednost ako je poznata, "
-        "nivo težine. Zadatak mora pripadati izabranoj lekciji."
+        "nivo težine. Zadatak mora pripadati izabranoj lekciji. " + TASK_WRITING_STANDARD
+        + " Pogledaj nedavne zadatke (recent_turns) i izbjegavaj skoro identičan "
+        "zadatak — variraj brojeve, formulaciju ili podkoncept unutar lekcije."
     )
     result = client.generate(
         purpose=PURPOSE_TASK, system=system, user=user,
@@ -682,13 +780,32 @@ def _narration_call(
     return parsed, result
 
 
+#: Verdict-specific feedback standard (Phase 3.D/E/H) — the SAME generic
+#: instruction set for every lesson; nothing here names a specific topic.
+_FEEDBACK_STANDARD_BY_VERDICT = {
+    "correct": (
+        "Odgovor je tačan. Budi koncizan. Kad je korisno, kratko objasni ZAŠTO "
+        "rješenje funkcioniše. Ne piši dugo predavanje poslije jednostavnog "
+        "tačnog odgovora. Ne koristi uvijek istu formulaciju pohvale — veži je "
+        "za ono što je učenik konkretno uradio."),
+    "incorrect": (
+        "Odgovor NIJE tačan. Prvo priznaj šta je učenik konkretno tvrdio, zatim "
+        "objasni tačno šta je problem, pa daj sljedeći koristan korak. Zadatak "
+        "ostaje aktivan. Ne ponavljaj odmah cijelo rješenje."),
+    "partial": (
+        "Odgovor je djelimično tačan. Eksplicitno navedi šta je tačno, pa reci "
+        "šta još nedostaje. Ne tretiraj djelimično tačno rasuđivanje kao potpuno "
+        "pogrešno. Zadatak ostaje aktivan."),
+}
+
+
 def narrate_feedback(client, *, grade, blueprint, state, verdict, model, timeout):
+    standard = _FEEDBACK_STANDARD_BY_VERDICT.get(verdict, (
+        "Napiši kratku, prirodnu bosansku povratnu informaciju primjerenu "
+        "ishodu. Ne otkrivaj konačan odgovor ako zadatak nije riješen."))
     instruction = (
         f"Autoritativni ishod je '{verdict}' (server je odlučio; ti NE mijenjaš "
-        "ishod ni brojače). Napiši kratku, prirodnu bosansku povratnu "
-        "informaciju primjerenu ishodu. Za netačno/djelimično: reci šta nedostaje "
-        "bez ponavljanja cijelog rješenja. Ne otkrivaj konačan odgovor ako "
-        "zadatak nije riješen.")
+        f"ishod ni brojače). {standard}")
     return _narration_call(client, purpose=PURPOSE_NARRATION, grade=grade,
                            blueprint=blueprint, state=state,
                            instruction=instruction, model=model, timeout=timeout)
@@ -696,10 +813,21 @@ def narrate_feedback(client, *, grade, blueprint, state, verdict, model, timeout
 
 def generate_hint(client, *, grade, blueprint, state, model, timeout):
     level = state.hint.current_level
+    if level <= 1:
+        standard = (
+            "Ovo je PRVI savjet za ovaj zadatak. Daj SAMO jedan sljedeći korak — "
+            "zatraži od učenika da primijeti ili izračuna nešto konkretno "
+            "korisno. Ne otkrivaj postupak niti konačan odgovor.")
+    else:
+        standard = (
+            f"Ovo je savjet nivoa {level} — učenik je već dobio raniji savjet i "
+            "još nije riješio zadatak. Budi KONKRETNIJI nego prošli put — možeš "
+            "pokazati dio postupka — ali ostavi učeniku da sam završi zadnji "
+            "korak. Ne daj konačan odgovor.")
     instruction = (
-        f"Učenik traži pomoć. Daj JEDAN progresivan savjet (nivo {level}) za "
-        "aktivni zadatak, prema hint_strategy iz Blueprinta. Ne otkrivaj konačan "
-        "odgovor. Na kraju podsjeti na aktivni zadatak.")
+        f"Učenik traži pomoć. Daj JEDAN progresivan savjet za aktivni zadatak, "
+        f"prema hint_strategy iz Blueprinta. {standard} Na kraju podsjeti na "
+        "aktivni zadatak.")
     return _narration_call(client, purpose=PURPOSE_HINT, grade=grade,
                            blueprint=blueprint, state=state,
                            instruction=instruction, model=model, timeout=timeout)
@@ -708,9 +836,10 @@ def generate_hint(client, *, grade, blueprint, state, model, timeout):
 def explain_concept(client, *, grade, blueprint, state, student_message, model, timeout):
     instruction = (
         "Učenik je postavio pitanje o konceptu tokom aktivnog zadatka: "
-        f"'{student_message}'. Objasni koncept kratko i primjereno razredu, "
-        "koristeći Blueprint. Zatim PODSJETI učenika na trenutni aktivni zadatak "
-        "(ne mijenjaj ga).")
+        f"'{student_message}'. Odgovori na TO pitanje, koristeći Blueprint. "
+        "Objasni u malim logičkim koracima primjerenim razredu; kad je korisno, "
+        "dodaj jednostavan primjer. Zatim KRATKO podsjeti učenika na trenutni "
+        "aktivni zadatak (ne mijenjaj ga, ne otkrivaj mu odgovor).")
     return _narration_call(client, purpose=PURPOSE_CONCEPT, grade=grade,
                            blueprint=blueprint, state=state,
                            instruction=instruction, model=model, timeout=timeout)
@@ -719,8 +848,10 @@ def explain_concept(client, *, grade, blueprint, state, student_message, model, 
 def reveal_solution(client, *, grade, blueprint, state, model, timeout):
     instruction = (
         "Učenik traži rješenje. Prikaži jasno, školski formatirano rješenje "
-        "aktivnog zadatka, korak po korak, svaki korak u novom redu. Ovo se NE "
-        "računa kao samostalno rješavanje.")
+        "aktivnog zadatka odobrenom školskom metodom, korak po korak, svaki "
+        "smisleni korak u novom redu, s kratkim objašnjenjem ZAŠTO se taj korak "
+        "radi. Ovo je potpomognut rad, NE samostalno rješavanje — ne predstavljaj "
+        "ga kao učenikov vlastiti uspjeh.")
     return _narration_call(client, purpose=PURPOSE_REVEAL, grade=grade,
                            blueprint=blueprint, state=state,
                            instruction=instruction, model=model, timeout=timeout)
@@ -734,3 +865,54 @@ def acknowledge(client, *, grade, blueprint, state, student_message, model, time
     return _narration_call(client, purpose=PURPOSE_NARRATION, grade=grade,
                            blueprint=blueprint, state=state,
                            instruction=instruction, model=model, timeout=timeout)
+
+
+# --------------------------------------------------------------------------- #
+# Bounded quality-gate repair (Phase 5) — ONE call, minimal context            #
+# --------------------------------------------------------------------------- #
+def _compact_blueprint_constraints(blueprint) -> str:
+    """A SMALL constraint summary for the repair call — never the full
+    Blueprint dump and never raw conversation history, per the bounded-repair
+    contract."""
+    return json.dumps({
+        "allowed_methods": blueprint.allowed_methods,
+        "language_register": blueprint.language_guidance.language_register,
+    }, ensure_ascii=False)
+
+
+def repair_student_text(
+    client: StructuredModelClient, *, grade: int, rejected_text: str,
+    failure_categories: list[str], response_type: str, blueprint, model: str,
+    timeout: Optional[float],
+) -> tuple[Optional[NarrationResult], ModelCallResult]:
+    """The ONE allowed bounded repair call for text that failed the quality
+    gate. Deliberately minimal context: the rejected text, why it failed, the
+    grade, the response type, and a compact Blueprint constraint summary —
+    never the full session/conversation history."""
+    system = "\n\n".join([
+        TUTOR_CONSTITUTION, BOSNIAN_LANGUAGE_POLICY, MATH_NOTATION_POLICY,
+        grade_policy(grade),
+    ])
+    user = (
+        f"Sljedeći tekst za učenika je ODBIJEN iz razloga: "
+        f"{', '.join(failure_categories)}.\n"
+        f"Vrsta odgovora: {response_type}.\n"
+        f"Ograničenja lekcije: {_compact_blueprint_constraints(blueprint)}\n\n"
+        f"ODBIJENI TEKST:\n{rejected_text}\n\n"
+        "Napiši ISPRAVLJENU verziju koja rješava navedene probleme, poštujući "
+        "sva pravila jezika i notacije iznad. Ne dodaj informacije van "
+        "navedenih ograničenja."
+    )
+    result = client.generate(
+        purpose=PURPOSE_REPAIR, system=system, user=user,
+        schema_name="NarrationResult", schema=export_json_schema(NarrationResult),
+        model=model, timeout=timeout)
+    if result.status != "ok":
+        return None, result
+    parsed = _validate_into(NarrationResult, result.parsed)
+    if parsed is None:
+        return None, ModelCallResult(
+            status="invalid_output", usage=result.usage,
+            latency_ms=result.latency_ms, model=result.model,
+            purpose=result.purpose, error_code="schema_validation_failed")
+    return parsed, result

@@ -417,10 +417,10 @@ def test_concept_questions_still_work(client, fake_openai):
 
 def test_sheets_columns_unchanged():
     headers = sheets_log.SHEET_HEADERS
-    assert len(headers) == 62
+    assert len(headers) == 63
     assert headers.index("student_message") == 16
     assert headers.index("student_answer") == 25
-    assert headers[-2:] == ["internal_instruction", "minimal_routing"]
+    assert headers[-3:] == ["internal_instruction", "minimal_routing", "v3_telemetry"]
 
 
 # =========================================================================== #

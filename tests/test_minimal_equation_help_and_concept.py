@@ -489,4 +489,6 @@ def test_help_and_concept_turns_are_not_graded_in_audit(client, sheets, message)
 
 
 def test_sheet_still_has_62_columns():
-    assert len(sheets_log.SHEET_HEADERS) == 62
+    # Now 63: one V3 telemetry column appended (Phase 10), strictly after —
+    # never moving — every pre-existing column this test name commemorates.
+    assert len(sheets_log.SHEET_HEADERS) == 63

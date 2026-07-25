@@ -136,6 +136,11 @@ SHEET_HEADERS = [
     # Minimal-engine routing trace: enabled / handled / decline_reason /
     # runtime_topic / canonical_topic / resolved_skill.
     "minimal_routing",
+    # V3 Practice telemetry: blueprint id/version/cache-hit, model, call
+    # purposes/count, per-turn latency, token usage, quality-gate outcome —
+    # privacy-safe, never a prompt or raw conversation. See
+    # matbot.ai_tutor_v3.dispatcher._audit_record (same dict, reused as-is).
+    "v3_telemetry",
 ]
 
 
@@ -820,6 +825,7 @@ def _build_transcript_row(payload: dict, response: dict) -> list[Any]:
         _canary_marker(),
         _clean_cell(_internal_instruction(payload)),
         _json_cell(response.get("minimal_routing")),
+        _json_cell(response.get("v3_telemetry")),
     ]
 
 

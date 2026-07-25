@@ -14,21 +14,29 @@ OpenAI call is ever made from a test.
 """
 from __future__ import annotations
 
+import logging
 import os
+import time
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from matbot.ai_tutor_v3 import adapter, lesson_blueprint, orchestrator, reducer, verifier
+from matbot import sheets_log
+from matbot.ai_tutor_v3 import adapter, lesson_blueprint, orchestrator, quality_gate, reducer, verifier
 from matbot.ai_tutor_v3.orchestrator import StructuredModelClient
+from matbot.ai_tutor_v3.rendering import normalize_math_for_display
 from matbot.ai_tutor_v3.schemas import (
     ActiveTask,
     CoverageState,
+    PracticeModelAssessment,
     SessionCounters,
+    StudentTurnInterpretation,
     TutorSessionState,
     UsageMetrics,
 )
 from matbot.ai_tutor_v3.state_store import V3StateStore, VersionConflict, now_iso
+
+log = logging.getLogger("matbot.ai_tutor_v3.dispatcher")
 
 _SCHEMA_VERSION = "v3.1"
 _PRACTICE_MODES = {"practice", "vjezba", "vježba"}
@@ -191,14 +199,62 @@ def v3_practice_dispatch(
 
 
 # --------------------------------------------------------------------------- #
+# Turn timing (Phase 8): a total wall-clock BUDGET across all of a turn's     #
+# model calls, separate from each individual call's own timeout.             #
+# --------------------------------------------------------------------------- #
+class _TurnBudget:
+    """Root cause of the live '⏳ Odgovor traje duže nego obično' timeout:
+    the frontend's OWN client-side AbortController fires at a FIXED 60s
+    (see templates/index.html) regardless of the backend, while a V3 turn can
+    make more than one sequential model call, each previously given the full
+    legacy per-call timeout (45s) — two such calls could take up to 90s,
+    comfortably exceeding the client's abort window.
+
+    This tracks ONE deadline across every model call in a turn. Each call
+    gets ``min(per-call cap, remaining budget)`` — never more than what's
+    actually left — and once the remaining budget drops below
+    ``MIN_V3_CALL_TIMEOUT_S``, no further call is attempted at all: better to
+    fail safely and fast than to start a call almost certain to be aborted
+    anyway.
+    """
+
+    def __init__(self, external_timeout: Optional[float]):
+        call_cap = orchestrator.resolve_v3_call_timeout_s()
+        if external_timeout is not None:
+            try:
+                call_cap = min(call_cap, float(external_timeout))
+            except (TypeError, ValueError):
+                pass
+        self._call_cap = call_cap
+        self._deadline = time.monotonic() + orchestrator.resolve_v3_turn_budget_s()
+        self.exceeded = False
+
+    def next_timeout(self) -> Optional[float]:
+        """The timeout for the NEXT model call, or ``None`` if the turn's
+        total budget is already too low to safely attempt one — the caller
+        must not make the call in that case."""
+        remaining = self._deadline - time.monotonic()
+        if remaining <= orchestrator.MIN_V3_CALL_TIMEOUT_S:
+            self.exceeded = True
+            return None
+        return min(self._call_cap, remaining)
+
+
+# --------------------------------------------------------------------------- #
 # Turn execution                                                              #
 # --------------------------------------------------------------------------- #
 def _run_v3_turn(payload, *, identity, grade, model, timeout, shadow):
+    turn_started = time.monotonic()
     store = _get_store()
     client = _model_client()
+    budget = _TurnBudget(timeout)
 
-    blueprint, reason = lesson_blueprint.get_or_create_blueprint(
-        store, client, identity=identity, grade=grade, model=model, timeout=timeout)
+    call_timeout = budget.next_timeout()
+    if call_timeout is None:
+        return None  # budget exhausted before any call — nothing mutated yet
+    blueprint, reason, blueprint_cache_hit = lesson_blueprint.get_or_create_blueprint(
+        store, client, identity=identity, grade=grade, model=model,
+        timeout=call_timeout)
     if blueprint is None:
         # No session mutated yet → safe to fall back to legacy.
         return None
@@ -212,6 +268,7 @@ def _run_v3_turn(payload, *, identity, grade, model, timeout, shadow):
 
     # Load or bootstrap the durable session (bootstrap = first V3 mutation).
     loaded = store.load_session(session_id)
+    is_bootstrap = loaded is None
     if loaded is None:
         state = _bootstrap_state(session_id, grade, identity, blueprint)
         store.create_session(
@@ -253,8 +310,10 @@ def _run_v3_turn(payload, *, identity, grade, model, timeout, shadow):
     # Model calls happen here with NO db transaction open.
     outcome_bundle = _execute_turn(
         client, blueprint=blueprint, state=state, grade=grade,
-        student_message=student_message, model=model, timeout=timeout,
-        verification=vdecision)
+        student_message=student_message, model=model, budget=budget,
+        verification=vdecision, is_bootstrap=is_bootstrap,
+        intent=str(payload.get("intent") or "").strip().lower(),
+        difficulty_request=str(payload.get("difficulty_request") or "").strip().lower())
     if outcome_bundle.get("error"):
         store.fail_turn(turn_id=turn_id, error_code=outcome_bundle["error"],
                         completed_at=now_iso())
@@ -281,7 +340,12 @@ def _run_v3_turn(payload, *, identity, grade, model, timeout, shadow):
         request_id=request_id, session_id=session_id,
         client_turn_id=client_turn_id, identity=identity, blueprint=blueprint,
         outcome_bundle=outcome_bundle, vdecision=vdecision,
-        version_before=version, version_after=version + 1, category=category)
+        version_before=version, version_after=version + 1, category=category,
+        blueprint_cache_hit=blueprint_cache_hit,
+        turn_latency_ms=(time.monotonic() - turn_started) * 1000.0)
+    # The SAME privacy-safe audit dict IS the compact V3 telemetry Phase 10
+    # asks for in the Sheets row — no second telemetry shape to maintain.
+    response["v3_telemetry"] = audit
 
     import json as _json
     try:
@@ -304,35 +368,113 @@ def _run_v3_turn(payload, *, identity, grade, model, timeout, shadow):
                         completed_at=now_iso())
         return _fallback_response(state, version, identity, "version_conflict",
                                   vdecision)
+
+    # Sheets logging (Phase 10): ONLY after the authoritative commit above,
+    # ONLY for a visible (non-shadow) turn — never blocks the student response
+    # (the existing logger enqueues onto its own async worker by default) and
+    # never alters it (log_transcript_to_sheet never raises). A duplicate
+    # replay never reaches this line at all — it returns earlier from the
+    # ``reservation.status == "completed"`` branch above.
+    if not shadow:
+        try:
+            sheets_log.log_transcript_to_sheet(payload, response)
+        except Exception:
+            log.exception("V3 Sheets transcript log failed; response already committed")
     return response
 
 
+#: Trusted, EXISTING wire-contract signals the frontend already sends for a
+#: specific UI button click (never inferred from free-text phrase matching) —
+#: reading them lets the dispatcher skip a generic turn_interpretation call
+#: for a turn whose kind is already known with certainty. See templates/
+#: index.html: the "Ne znam — daj mi hint" chip sends intent=hint_request; the
+#: "Lakši/Teži zadatak" chips send difficulty_request=easier/harder.
+_TRUSTED_DIFFICULTY_REQUESTS = {"easier", "harder"}
+
+
+def _synthetic_interpretation(turn_kind: str, *, meaning: str) -> StudentTurnInterpretation:
+    """A deterministic, server-built interpretation for a turn whose kind is
+    ALREADY known with certainty from request context — no model call, no
+    guessing. Only ever used for turn kinds the reducer treats as strictly
+    no-progress-mutation (task_request, help_request, difficulty_change), so
+    a wrong guess here can never mis-grade an answer."""
+    return StudentTurnInterpretation(
+        schema_version=_SCHEMA_VERSION, turn_kind=turn_kind, is_answer_attempt=False,
+        normalized_meaning=meaning, claims=[], certainty="certain",
+        precision="unspecified", confidence=1.0)
+
+
+def _synthetic_difficulty_assessment(direction: str) -> PracticeModelAssessment:
+    return PracticeModelAssessment(
+        schema_version=_SCHEMA_VERSION, is_answer_attempt=False,
+        proposed_verdict="not_checkable", proposed_pedagogical_action="continue",
+        difficulty_suggestion=direction, confidence=1.0)
+
+
 def _execute_turn(client, *, blueprint, state, grade, student_message, model,
-                  timeout, verification):
-    """Interpret → reduce → render. Never mutates the store."""
+                  budget, verification, is_bootstrap=False, intent="",
+                  difficulty_request=""):
+    """Interpret → reduce → render. Never mutates the store.
+
+    Three trusted, request-context-derived shortcuts skip the generic
+    turn_interpretation model call entirely (Phase 7 consolidation) — never a
+    brittle free-text phrase match:
+      * ``is_bootstrap``: the very first V3 turn of a brand new session. The
+        existing frontend auto-sends the Practice-entry trigger message the
+        instant this mode is chosen, so "start practice" is what this turn
+        structurally IS — and even if it weren't, task_request mutates no
+        progress, so a wrong guess here is harmless.
+      * ``intent == "hint_request"``: sent by the existing "Ne znam — daj mi
+        hint" button, only honoured while a task is active.
+      * ``difficulty_request in {"easier","harder"}``: sent by the existing
+        difficulty chips.
+    Free-form typed text always goes through the real interpretation call.
+
+    ``budget`` is a ``_TurnBudget`` — every model call in this turn draws its
+    own timeout from it (Phase 8), so a slow first call leaves a shrinking,
+    never negative, window for any further one.
+    """
     usage = UsageMetrics()
     purposes: list[str] = []
+    narration_proposal = None
 
-    interp_bundle, call = orchestrator.interpret_turn(
-        client, grade=grade, blueprint=blueprint, state=state,
-        student_message=student_message, model=model, timeout=timeout)
-    _accumulate(usage, call)
-    purposes.append(call.purpose)
-    if interp_bundle is None:
-        return {"error": call.error_code or call.status}
+    if is_bootstrap:
+        interpretation = _synthetic_interpretation(
+            "task_request", meaning="Početak vježbe.")
+        assessment = None
+    elif intent == "hint_request" and state.active_task is not None:
+        interpretation = _synthetic_interpretation(
+            "help_request", meaning="Traži pomoć oko aktivnog zadatka.")
+        assessment = None
+    elif difficulty_request in _TRUSTED_DIFFICULTY_REQUESTS:
+        interpretation = _synthetic_interpretation(
+            "difficulty_change", meaning=f"Traži {difficulty_request} zadatak.")
+        assessment = _synthetic_difficulty_assessment(difficulty_request)
+    else:
+        call_timeout = budget.next_timeout()
+        if call_timeout is None:
+            return {"error": "turn_budget_exceeded"}
+        interp_bundle, call = orchestrator.interpret_turn(
+            client, grade=grade, blueprint=blueprint, state=state,
+            student_message=student_message, model=model, timeout=call_timeout)
+        _accumulate(usage, call)
+        purposes.append(call.purpose)
+        if interp_bundle is None:
+            return {"error": call.error_code or call.status}
+        interpretation = interp_bundle.interpretation
+        assessment = interp_bundle.assessment
+        narration_proposal = interp_bundle.narration_proposal
 
-    interpretation = interp_bundle.interpretation
-    assessment = interp_bundle.assessment
     result = reducer.reduce_turn(
         state=state, interpretation=interpretation, assessment=assessment,
         verification=verification)
 
-    answer, category, err = _render(
+    answer, category, err, gate_info = _render(
         client, action=result.next_action, blueprint=blueprint,
         state=result.new_state, outcome=result.outcome,
         interpretation=interpretation, grade=grade,
-        student_message=student_message, model=model, timeout=timeout,
-        usage=usage, purposes=purposes)
+        student_message=student_message, model=model, budget=budget,
+        usage=usage, purposes=purposes, narration_proposal=narration_proposal)
     if err:
         return {"error": err}
 
@@ -340,85 +482,172 @@ def _execute_turn(client, *, blueprint, state, grade, student_message, model,
         "new_state": result.new_state, "outcome": result.outcome,
         "answer": answer, "category": category or result.response_category,
         "turn_kind": interpretation.turn_kind, "usage": usage,
-        "purposes": purposes,
+        "purposes": purposes, "quality_gate": gate_info,
         "interpretation": interpretation.model_dump(mode="json"),
         "assessment": assessment.model_dump(mode="json") if assessment else None,
     }
 
 
+#: A response never gated (fixed, already-known-safe deterministic strings) —
+#: cheap and unambiguous telemetry rather than running the gate for nothing.
+_NO_GATE_INFO = {"checked": False, "repaired": False, "failure_categories": []}
+
+
+def _apply_quality_gate(client, text, *, response_type, grade, blueprint, model,
+                        budget, usage, purposes, previous_text=None,
+                        forbidden_reveal=None):
+    """Phase 5: deterministic checks, then at most ONE bounded model repair.
+
+    Never mutates session/task state itself — callers decide what (if
+    anything) to do with the returned text. Purely mechanical MathJax
+    delimiter issues are fixed by ``normalize_math_for_display`` alone, with
+    NO model call — the gate only escalates to a repair call for a failure
+    that survives normalization. The repair call draws its timeout from the
+    SAME turn ``budget`` as every other call (Phase 8) — if the budget is
+    already exhausted, the safe fallback text is used instead of attempting
+    one more call certain to be cut short.
+    """
+    normalized = normalize_math_for_display(text)
+    result = quality_gate.check(
+        normalized, response_type=response_type, grade=grade,
+        previous_text=previous_text, forbidden_reveal=forbidden_reveal)
+    if result.ok:
+        return normalized, {"checked": True, "repaired": False, "failure_categories": []}
+
+    call_timeout = budget.next_timeout()
+    if call_timeout is None:
+        return quality_gate.SAFE_FALLBACK_TEXT, {
+            "checked": True, "repaired": False,
+            "failure_categories": result.failure_categories,
+            "gate_failed_final": True, "reason": "turn_budget_exceeded"}
+
+    repaired, call = orchestrator.repair_student_text(
+        client, grade=grade, rejected_text=normalized,
+        failure_categories=result.failure_categories, response_type=response_type,
+        blueprint=blueprint, model=model, timeout=call_timeout)
+    _accumulate(usage, call)
+    purposes.append(call.purpose)
+    if repaired is not None:
+        renormalized = normalize_math_for_display(repaired.student_text)
+        result2 = quality_gate.check(
+            renormalized, response_type=response_type, grade=grade,
+            previous_text=previous_text, forbidden_reveal=forbidden_reveal)
+        if result2.ok:
+            return renormalized, {
+                "checked": True, "repaired": True,
+                "failure_categories": result.failure_categories, "gate_failed_final": False}
+    return quality_gate.SAFE_FALLBACK_TEXT, {
+        "checked": True, "repaired": True,
+        "failure_categories": result.failure_categories, "gate_failed_final": True}
+
+
 def _render(client, *, action, blueprint, state, outcome, interpretation, grade,
-            student_message, model, timeout, usage, purposes):
+            student_message, model, budget, usage, purposes, narration_proposal=None):
     """Produce the student-facing text for the reducer's chosen action. Narration
     can never change the already-decided outcome — it only writes language."""
     if action == reducer.OFF_TOPIC:
-        return orchestrator.OFF_TOPIC_FALLBACK, "off_topic", ""
+        return orchestrator.OFF_TOPIC_FALLBACK, "off_topic", "", dict(_NO_GATE_INFO)
     if action == reducer.CLARIFY:
         seed = (outcome.clarification_prompt_seed
                 or interpretation.clarification_question
                 or "Možeš li pojasniti?")
-        return seed, "clarification", ""
+        text, gate_info = _apply_quality_gate(
+            client, seed, response_type="clarification", grade=grade,
+            blueprint=blueprint, model=model, budget=budget,
+            usage=usage, purposes=purposes)
+        return text, "clarification", "", gate_info
     if action == reducer.GENERATE_TASK:
         return _render_new_task(client, blueprint=blueprint, state=state,
                                 interpretation=interpretation, grade=grade,
-                                model=model, timeout=timeout, usage=usage,
+                                model=model, budget=budget, usage=usage,
                                 purposes=purposes)
+    if action == reducer.NARRATE_FEEDBACK and narration_proposal is not None:
+        # Phase 7 consolidation: the interpretation call already proposed
+        # feedback text for this answer turn — use it (through the SAME
+        # quality gate every other narration goes through) instead of an
+        # extra narrate_feedback model call. The reducer's already-decided
+        # ``outcome.verdict`` is what actually happened; this text only
+        # supplies the WORDING, exactly like a real narrate_feedback call.
+        text, gate_info = _apply_quality_gate(
+            client, narration_proposal.student_text,
+            response_type=narration_proposal.response_category or "feedback",
+            grade=grade, blueprint=blueprint, model=model, budget=budget,
+            usage=usage, purposes=purposes)
+        return text, narration_proposal.response_category, "", gate_info
 
+    call_timeout = budget.next_timeout()
+    if call_timeout is None:
+        return "", "", "turn_budget_exceeded", dict(_NO_GATE_INFO)
     call_map = {
         reducer.NARRATE_FEEDBACK: lambda: orchestrator.narrate_feedback(
             client, grade=grade, blueprint=blueprint, state=state,
-            verdict=outcome.verdict, model=model, timeout=timeout),
+            verdict=outcome.verdict, model=model, timeout=call_timeout),
         reducer.GIVE_HINT: lambda: orchestrator.generate_hint(
             client, grade=grade, blueprint=blueprint, state=state,
-            model=model, timeout=timeout),
+            model=model, timeout=call_timeout),
         reducer.EXPLAIN_CONCEPT: lambda: orchestrator.explain_concept(
             client, grade=grade, blueprint=blueprint, state=state,
-            student_message=student_message, model=model, timeout=timeout),
+            student_message=student_message, model=model, timeout=call_timeout),
         reducer.REVEAL_SOLUTION: lambda: orchestrator.reveal_solution(
             client, grade=grade, blueprint=blueprint, state=state,
-            model=model, timeout=timeout),
+            model=model, timeout=call_timeout),
         reducer.ACKNOWLEDGE: lambda: orchestrator.acknowledge(
             client, grade=grade, blueprint=blueprint, state=state,
-            student_message=student_message, model=model, timeout=timeout),
+            student_message=student_message, model=model, timeout=call_timeout),
     }
     fn = call_map.get(action)
     if fn is None:
-        return _FALLBACK_TEXT, "fallback", ""
+        return _FALLBACK_TEXT, "fallback", "", dict(_NO_GATE_INFO)
     narration, call = fn()
     _accumulate(usage, call)
     purposes.append(call.purpose)
     if narration is None:
-        return "", "", (call.error_code or call.status)
-    return narration.student_text, narration.response_category, ""
+        return "", "", (call.error_code or call.status), dict(_NO_GATE_INFO)
+    text, gate_info = _apply_quality_gate(
+        client, narration.student_text, response_type=narration.response_category,
+        grade=grade, blueprint=blueprint, model=model, budget=budget,
+        usage=usage, purposes=purposes)
+    return text, narration.response_category, "", gate_info
 
 
 def _render_new_task(client, *, blueprint, state, interpretation, grade, model,
-                     timeout, usage, purposes):
-    """Generate, validate-against-lesson, and activate one task. A rejected task
-    leaves NO corrupt active task (the reducer already cleared it)."""
+                     budget, usage, purposes):
+    """Generate, validate-against-lesson, gate, and activate one task. A
+    rejected task leaves NO corrupt active task (the reducer already cleared
+    it); the quality gate runs and repairs BEFORE the task is assigned to
+    ``state.active_task``, so a rejected/repaired question never leaks into
+    durable state ahead of the text the student actually sees."""
+    call_timeout = budget.next_timeout()
+    if call_timeout is None:
+        return "", "", "turn_budget_exceeded", dict(_NO_GATE_INFO)
     target = _requested_target(interpretation, blueprint) \
         or reducer.next_uncovered_target(state)
     spec, call = orchestrator.generate_task(
         client, grade=grade, blueprint=blueprint, state=state,
-        target_id=target, model=model, timeout=timeout)
+        target_id=target, model=model, timeout=call_timeout)
     _accumulate(usage, call)
     purposes.append(call.purpose)
     if spec is None:
-        return "", "", (call.error_code or call.status)
+        return "", "", (call.error_code or call.status), dict(_NO_GATE_INFO)
     # Task must belong to THIS lesson's blueprint (target OR concept known).
     known_targets = {t.target_id for t in blueprint.coverage_targets}
     known_concepts = {c.concept_id for c in blueprint.concepts}
     if spec.target_id not in known_targets and spec.concept_id not in known_concepts:
-        return "", "", "task_off_lesson"
+        return "", "", "task_off_lesson", dict(_NO_GATE_INFO)
+    question, gate_info = _apply_quality_gate(
+        client, spec.question, response_type="task", grade=grade,
+        blueprint=blueprint, model=model, budget=budget,
+        usage=usage, purposes=purposes, forbidden_reveal=spec.expected_internal)
     task = ActiveTask(
         task_id=reducer.new_task_id(), concept_id=spec.concept_id,
-        target_id=spec.target_id, question=spec.question,
+        target_id=spec.target_id, question=question,
         answer_kind=spec.answer_kind, expected_internal=spec.expected_internal,
         difficulty_level=spec.difficulty_level,
         planned_verification_type=spec.planned_verification_type)
     state.active_task = task
     if spec.target_id and spec.target_id not in state.coverage.attempts_per_target:
         state.coverage.attempts_per_target.setdefault(spec.target_id, 0)
-    return task.question, "task", ""
+    return task.question, "task", "", gate_info
 
 
 # --------------------------------------------------------------------------- #
@@ -488,7 +717,9 @@ def _requested_target(interpretation, blueprint) -> Optional[str]:
 
 def _accumulate(usage: UsageMetrics, call) -> None:
     usage.model_calls += 1
-    usage.total_latency_ms += getattr(call, "latency_ms", 0.0) or 0.0
+    latency = getattr(call, "latency_ms", 0.0) or 0.0
+    usage.total_latency_ms += latency
+    usage.per_call_latency_ms.append(latency)
     u = getattr(call, "usage", {}) or {}
     usage.prompt_tokens += int(u.get("prompt_tokens", 0) or 0)
     usage.completion_tokens += int(u.get("completion_tokens", 0) or 0)
@@ -501,17 +732,27 @@ def _input_summary(student_message: str) -> str:
 
 def _audit_record(*, request_id, session_id, client_turn_id, identity, blueprint,
                   outcome_bundle, vdecision, version_before, version_after,
-                  category) -> dict:
+                  category, blueprint_cache_hit=None, turn_latency_ms=None) -> dict:
+    """Structured, privacy-safe per-turn telemetry (Phase 9).
+
+    Never includes: API keys, complete prompts, hidden chain-of-thought,
+    parent contact information, or the raw conversation — only identifiers,
+    counts, timings, categories and the already-committed outcome/verdict.
+    """
     interp = outcome_bundle.get("interpretation") or {}
+    usage = outcome_bundle["usage"]
     return {
         "schema_version": _SCHEMA_VERSION, "request_id": request_id,
         "session_id": session_id, "client_turn_id": client_turn_id,
         "lesson_id": identity.lesson_id, "mode": "practice",
         "blueprint_id": blueprint.blueprint_id,
         "blueprint_version": blueprint.blueprint_version,
+        "blueprint_cache_hit": bool(blueprint_cache_hit),
         "prompt_policy": blueprint.prompt_policy.model_dump(mode="json"),
         "model": blueprint.model,
         "call_purposes": outcome_bundle.get("purposes") or [],
+        "call_count": len(outcome_bundle.get("purposes") or []),
+        "quality_gate": outcome_bundle.get("quality_gate") or {},
         "verification_status": vdecision.result.status,
         "turn_kind": outcome_bundle.get("turn_kind"),
         "interpretation_summary": interp.get("normalized_meaning"),
@@ -521,7 +762,8 @@ def _audit_record(*, request_id, session_id, client_turn_id, identity, blueprint
         "state_version_before": version_before,
         "state_version_after": version_after,
         "schema_validation_ok": True,
-        "usage": outcome_bundle["usage"].model_dump(mode="json"),
+        "turn_latency_ms": turn_latency_ms,
+        "usage": usage.model_dump(mode="json"),
     }
 
 

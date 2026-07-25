@@ -299,7 +299,7 @@ def test_diagnostic_reports_no_mismatch_on_a_faithful_write(diag, monkeypatch):
     monkeypatch.setattr(sheets_log, "_init_sheets", lambda: ws)
     sheets_log._append_row_once(_row())
     text = diag.text
-    assert "SHEETS_DIAG pre_write cells=62" in text
+    assert "SHEETS_DIAG pre_write cells=63" in text
     assert "first_mismatch=none" in text
 
 
@@ -319,6 +319,10 @@ def test_diagnostic_logs_the_updated_range_and_target_row(diag, monkeypatch):
     ws = _FakeWorksheet()
     monkeypatch.setattr(sheets_log, "_init_sheets", lambda: ws)
     sheets_log._append_row_once(_row())
+    # _FakeWorksheet.append_row returns a hardcoded fake API response
+    # ("Sheet1!A3:BJ3") independent of the real SHEET_HEADERS length — this
+    # test verifies the diagnostic logs whatever the API actually returns,
+    # not that it matches the current header count.
     assert "updatedRange=Sheet1!A3:BJ3" in diag.text
     assert "target rows_with_data=2 next_row=3" in diag.text
     assert "target_row_before_append non_empty=False" in diag.text
@@ -330,9 +334,10 @@ def test_diagnostic_describes_every_column(diag, monkeypatch):
     sheets_log._append_row_once(_row())
     line = [ln for ln in diag.text.splitlines() if "pre_write" in ln][-1]
     described = json.loads(line.split("payload=", 1)[1])
-    assert len(described) == 62
+    assert len(described) == 63
     assert described[0]["header"] == "timestamp_iso"
     assert described[61]["header"] == "minimal_routing"
+    assert described[62]["header"] == "v3_telemetry"
     assert all({"index", "header", "type", "repr"} <= set(d) for d in described)
 
 
@@ -341,6 +346,6 @@ def test_the_written_row_still_has_no_local_sentinel(monkeypatch):
     monkeypatch.setattr(sheets_log, "_init_sheets", lambda: ws)
     monkeypatch.setattr(sheets_log, "_ensure_sheet_layout", lambda w: None)
     sheets_log._append_row_once(_row())
-    assert len(ws.sent) == 62
+    assert len(ws.sent) == 63
     assert all(str(v) != "511" for v in ws.sent)
     assert ws.sent[16] == "4/12"             # literal fraction survives RAW

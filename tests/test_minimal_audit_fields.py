@@ -243,7 +243,7 @@ def test_audit_columns_did_not_move():
     assert headers.index("normalized_student") == 26
     assert headers.index("deterministic_check") == 27
     assert headers.index("engine_canary") == 59
-    assert headers[-2:] == ["internal_instruction", "minimal_routing"]
+    assert headers[-3:] == ["internal_instruction", "minimal_routing", "v3_telemetry"]
 
 
 def test_non_grading_turns_carry_no_answer_check(client):

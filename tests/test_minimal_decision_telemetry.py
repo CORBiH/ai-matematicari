@@ -241,11 +241,11 @@ def test_trace_reaches_the_minimal_routing_column(client, fake_openai, sheets):
 
 def test_no_sheets_column_moved():
     headers = sheets_log.SHEET_HEADERS
-    assert len(headers) == 62
+    assert len(headers) == 63
     assert headers.index("student_message") == 16
     assert headers.index("student_answer") == 25
     assert headers.index("engine_canary") == 59
-    assert headers[-2:] == ["internal_instruction", "minimal_routing"]
+    assert headers[-3:] == ["internal_instruction", "minimal_routing", "v3_telemetry"]
 
 
 # =========================================================================== #
