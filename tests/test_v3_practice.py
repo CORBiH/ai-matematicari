@@ -256,6 +256,179 @@ def test_shadow_mode_returns_none_but_still_computes(fake, monkeypatch):
     assert fake.calls                       # V3 still ran (shadow session)
 
 
+def test_multiple_comma_separated_ids_work(monkeypatch, tmp_path):
+    monkeypatch.setenv("MATBOT_AI_TUTOR_V3_PRACTICE", "on")
+    monkeypatch.setenv("MATBOT_AI_TUTOR_V3_LESSONS", "6-99-999, " + DIVISIBILITY)
+    monkeypatch.setenv("MATBOT_V3_DB_PATH", str(tmp_path / "v3.sqlite3"))
+    from matbot import topic_resolver as tr
+    tr.reset_cache()
+    client = FakeClient()
+    dispatcher.set_model_client(client)
+    try:
+        resp = dispatch(base_payload())
+        assert resp is not None and resp["engine"] == "v3_practice"
+    finally:
+        dispatcher.set_model_client(None)
+
+
+# =========================================================================== #
+# Wildcard lesson eligibility (MATBOT_AI_TUTOR_V3_LESSONS=*)                   #
+# =========================================================================== #
+def test_wildcard_enables_a_valid_resolved_practice_lesson(fake, monkeypatch):
+    monkeypatch.setenv("MATBOT_AI_TUTOR_V3_LESSONS", "*")
+    resp = start_task(fake)
+    assert resp is not None
+    assert resp["engine"] == "v3_practice"
+
+
+def test_wildcard_enables_a_different_ordinary_lesson_with_no_python_changes(
+    monkeypatch, tmp_path,
+):
+    """Same code path as the explicit-whitelist fifth-lesson test, but under
+    the wildcard: an entirely different lesson (fractions, not divisibility)
+    works with zero new Python — only fake curriculum-shaped model output."""
+    monkeypatch.setenv("MATBOT_AI_TUTOR_V3_PRACTICE", "on")
+    monkeypatch.setenv("MATBOT_AI_TUTOR_V3_LESSONS", "*")
+    monkeypatch.setenv("MATBOT_V3_DB_PATH", str(tmp_path / "v3.sqlite3"))
+    from matbot import topic_resolver as tr
+    tr.reset_cache()
+    client = FakeClient()
+    client.set(orchestrator.PURPOSE_BLUEPRINT, blueprint_parsed(targets=["frac"]))
+    client.set(orchestrator.PURPOSE_INTERPRET, interp_parsed("task_request"))
+    client.set(orchestrator.PURPOSE_TASK,
+              task_parsed(target="frac", concept="div-compound-6",
+                          question="Proširi 1/2 na nazivnik 8."))
+    dispatcher.set_model_client(client)
+    try:
+        resp = dispatch(base_payload(selected_topic="6-04-035",
+                                     selected_oblast="Razlomci"))
+        assert resp is not None
+        assert resp["engine"] == "v3_practice"
+        assert "Proširi" in resp["last_tutor_task"]
+    finally:
+        dispatcher.set_model_client(None)
+
+
+def test_wildcard_does_not_enable_grade_5(monkeypatch, tmp_path):
+    monkeypatch.setenv("MATBOT_AI_TUTOR_V3_PRACTICE", "on")
+    monkeypatch.setenv("MATBOT_AI_TUTOR_V3_LESSONS", "*")
+    monkeypatch.setenv("MATBOT_V3_DB_PATH", str(tmp_path / "v3.sqlite3"))
+    from matbot import topic_resolver as tr
+    tr.reset_cache()
+    client = FakeClient()
+    dispatcher.set_model_client(client)
+    try:
+        resp = dispatch(base_payload(grade=5))
+        assert resp is None
+        assert client.calls == []            # rejected before any model call
+    finally:
+        dispatcher.set_model_client(None)
+
+
+def test_wildcard_does_not_enable_an_unresolved_lesson(monkeypatch, tmp_path):
+    monkeypatch.setenv("MATBOT_AI_TUTOR_V3_PRACTICE", "on")
+    monkeypatch.setenv("MATBOT_AI_TUTOR_V3_LESSONS", "*")
+    monkeypatch.setenv("MATBOT_V3_DB_PATH", str(tmp_path / "v3.sqlite3"))
+    from matbot import topic_resolver as tr
+    tr.reset_cache()
+    client = FakeClient()
+    dispatcher.set_model_client(client)
+    try:
+        resp = dispatch(base_payload(selected_topic="999999999", selected_oblast=""))
+        assert resp is None
+        assert client.calls == []
+    finally:
+        dispatcher.set_model_client(None)
+
+
+@pytest.mark.parametrize("mode", ["explain", "quick", "exam"])
+def test_wildcard_does_not_enable_explain_quick_or_exam(monkeypatch, tmp_path, mode):
+    monkeypatch.setenv("MATBOT_AI_TUTOR_V3_PRACTICE", "on")
+    monkeypatch.setenv("MATBOT_AI_TUTOR_V3_LESSONS", "*")
+    monkeypatch.setenv("MATBOT_V3_DB_PATH", str(tmp_path / "v3.sqlite3"))
+    from matbot import topic_resolver as tr
+    tr.reset_cache()
+    client = FakeClient()
+    dispatcher.set_model_client(client)
+    try:
+        resp = dispatch(base_payload(mode=mode))
+        assert resp is None
+        assert client.calls == []
+    finally:
+        dispatcher.set_model_client(None)
+
+
+def test_v3_off_makes_zero_calls_even_with_wildcard_set(monkeypatch, tmp_path):
+    monkeypatch.setenv("MATBOT_AI_TUTOR_V3_PRACTICE", "off")
+    monkeypatch.setenv("MATBOT_AI_TUTOR_V3_LESSONS", "*")
+    monkeypatch.setenv("MATBOT_V3_DB_PATH", str(tmp_path / "v3.sqlite3"))
+    client = FakeClient()
+    dispatcher.set_model_client(client)
+    try:
+        assert dispatch(base_payload()) is None
+        assert client.calls == []
+    finally:
+        dispatcher.set_model_client(None)
+
+
+@pytest.mark.parametrize("value", ["*,6-03-024", "6-03-024,*", "*, 6-99-999",
+                                   "*,*,6-03-024"])
+def test_invalid_mixed_wildcard_combinations_fail_safely(monkeypatch, tmp_path, value):
+    """Documented deterministic policy: mixing '*' with any explicit id is
+    treated exactly like an empty whitelist — nothing eligible — never
+    silently upgraded to 'all'."""
+    monkeypatch.setenv("MATBOT_AI_TUTOR_V3_PRACTICE", "on")
+    monkeypatch.setenv("MATBOT_AI_TUTOR_V3_LESSONS", value)
+    monkeypatch.setenv("MATBOT_V3_DB_PATH", str(tmp_path / "v3.sqlite3"))
+    from matbot import topic_resolver as tr
+    tr.reset_cache()
+    assert dispatcher.lesson_whitelist_mode() == ("none", frozenset())
+    client = FakeClient()
+    dispatcher.set_model_client(client)
+    try:
+        resp = dispatch(base_payload(selected_topic=DIVISIBILITY,
+                                     selected_oblast="Djeljivost brojeva"))
+        assert resp is None
+        assert client.calls == []
+    finally:
+        dispatcher.set_model_client(None)
+
+
+@pytest.mark.parametrize("value,expected", [
+    ("", ("none", frozenset())),
+    ("   ", ("none", frozenset())),
+    (DIVISIBILITY, ("explicit", frozenset({DIVISIBILITY}))),
+    (f" {DIVISIBILITY} , 6-04-035 ", ("explicit", frozenset({DIVISIBILITY, "6-04-035"}))),
+    ("*", ("all", frozenset())),
+    (" * ", ("all", frozenset())),
+    ("*,*", ("all", frozenset())),
+])
+def test_lesson_whitelist_mode_parsing(monkeypatch, value, expected):
+    monkeypatch.setenv("MATBOT_AI_TUTOR_V3_LESSONS", value)
+    assert dispatcher.lesson_whitelist_mode() == expected
+
+
+def test_real_stream_route_with_wildcard_reaches_v3(client, monkeypatch, tmp_path):
+    from tests.test_prod_stream_route import sse_post, done_payload
+    monkeypatch.setenv("MATBOT_AI_TUTOR_V3_PRACTICE", "on")
+    monkeypatch.setenv("MATBOT_AI_TUTOR_V3_LESSONS", "*")
+    monkeypatch.setenv("MATBOT_V3_VERIFICATION", "off")
+    monkeypatch.setenv("MATBOT_V3_DB_PATH", str(tmp_path / "v3.sqlite3"))
+    monkeypatch.setenv("MATBOT_MINIMAL_ENGINE", "off")
+    from matbot import topic_resolver as tr
+    tr.reset_cache()
+    fake_client = FakeClient()
+    fake_client.set(orchestrator.PURPOSE_INTERPRET, interp_parsed("task_request"))
+    dispatcher.set_model_client(fake_client)
+    try:
+        events = sse_post(client, base_payload(client_turn_id="wc-route1"))
+        body = done_payload(events)
+        assert body["engine"] == "v3_practice"
+        assert body["last_tutor_task"] == "Da li je 252 djeljiv sa 6?"
+    finally:
+        dispatcher.set_model_client(None)
+
+
 # =========================================================================== #
 # Blueprint                                                                    #
 # =========================================================================== #

@@ -60,11 +60,55 @@ def practice_flag() -> str:
     return value if value in _VALID_FLAG else "off"
 
 
-def lesson_whitelist() -> frozenset[str]:
-    """Canonical lesson IDs eligible for V3. An EMPTY whitelist means NO lessons
-    are eligible (fail-safe) — tests and explicit config must name lessons."""
+#: The single wildcard token. Anything else is an explicit canonical lesson id.
+_WILDCARD = "*"
+
+
+def lesson_whitelist_mode() -> tuple[str, frozenset[str]]:
+    """Parse ``MATBOT_AI_TUTOR_V3_LESSONS`` into ``(mode, explicit_ids)``.
+
+    ``mode`` is one of:
+      "none"     — nothing eligible (default; empty or unparseable value)
+      "explicit" — only the ids in ``explicit_ids`` are eligible
+      "all"      — every lesson that resolves through retained curriculum
+                   infrastructure, for an already-checked grade 6-9 Practice
+                   turn, is eligible
+
+    Whitespace around the whole value and around each comma-separated token is
+    stripped. An empty value (or one with no non-empty tokens) means NO lessons
+    are eligible — fail-safe, unchanged from before wildcard support.
+
+    A bare ``*`` (optionally repeated, e.g. ``"*,*"``) means EVERY lesson that
+    resolves through retained curriculum infrastructure is eligible, for a turn
+    that has ALREADY passed the grade (6-9) and mode ("practice") checks in
+    ``v3_practice_dispatch`` — the wildcard widens WHICH lesson, never which
+    grade or mode.
+
+    Mixed forms such as ``"*,6-03-024"`` are deliberately AMBIGUOUS — is the
+    explicit id redundant, or is the wildcard a typo for a narrower intent? —
+    so the documented, deterministic policy is to fail closed: mixing the
+    wildcard with any explicit id is treated exactly like an empty whitelist
+    (nothing eligible), never silently upgraded to "all".
+    """
     raw = os.getenv("MATBOT_AI_TUTOR_V3_LESSONS") or ""
-    return frozenset(x.strip() for x in raw.split(",") if x.strip())
+    tokens = [t.strip() for t in raw.split(",") if t.strip()]
+    if not tokens:
+        return "none", frozenset()
+    has_wildcard = any(t == _WILDCARD for t in tokens)
+    if has_wildcard:
+        if all(t == _WILDCARD for t in tokens):
+            return "all", frozenset()
+        return "none", frozenset()   # mixed wildcard + explicit id(s): fail closed
+    return "explicit", frozenset(tokens)
+
+
+def lesson_whitelist() -> frozenset[str]:
+    """Explicit canonical lesson IDs eligible for V3 (empty under wildcard or
+    "none" mode). Kept for callers that only care about the explicit set;
+    ``v3_practice_dispatch`` uses ``lesson_whitelist_mode`` directly so it can
+    also see the wildcard."""
+    mode, ids = lesson_whitelist_mode()
+    return ids if mode == "explicit" else frozenset()
 
 
 def _grade_ok(value) -> Optional[int]:
@@ -108,9 +152,18 @@ def v3_practice_dispatch(
         str(payload.get("selected_oblast") or ""))
     if identity is None:
         return None  # unresolved lesson → legacy decides (no V3 mutation)
-    whitelist = lesson_whitelist()
-    if identity.lesson_id not in whitelist:
-        return None  # not eligible; empty whitelist ⇒ nothing eligible
+
+    # Eligibility. By this point grade is already 6-9 and mode is already
+    # "practice" (checked above), and ``identity`` already proves this lesson
+    # resolved through retained curriculum infrastructure — so under wildcard
+    # ("all") every one of them is eligible. This function is Practice-only;
+    # Explain/Quick/Exam have no dispatcher and are structurally unreachable
+    # here regardless of the wildcard.
+    whitelist_mode, explicit_ids = lesson_whitelist_mode()
+    if whitelist_mode == "none":
+        return None                                   # nothing eligible
+    if whitelist_mode == "explicit" and identity.lesson_id not in explicit_ids:
+        return None                                   # not on the explicit list
 
     # Eligible. In shadow mode we compute against an ISOLATED session and always
     # return None so the legacy response stays visible.
