@@ -21,8 +21,10 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from matbot import sheets_log
-from matbot.ai_tutor_v3 import adapter, lesson_blueprint, orchestrator, quality_gate, reducer, verifier
+from matbot.ai_tutor_v3 import (
+    adapter, lesson_blueprint, orchestrator, quality_gate, reducer,
+    sheets_outbox, verifier,
+)
 from matbot.ai_tutor_v3.orchestrator import StructuredModelClient
 from matbot.ai_tutor_v3.rendering import normalize_math_for_display
 from matbot.ai_tutor_v3.schemas import (
@@ -369,17 +371,24 @@ def _run_v3_turn(payload, *, identity, grade, model, timeout, shadow):
         return _fallback_response(state, version, identity, "version_conflict",
                                   vdecision)
 
-    # Sheets logging (Phase 10): ONLY after the authoritative commit above,
-    # ONLY for a visible (non-shadow) turn — never blocks the student response
-    # (the existing logger enqueues onto its own async worker by default) and
-    # never alters it (log_transcript_to_sheet never raises). A duplicate
-    # replay never reaches this line at all — it returns earlier from the
+    # Sheets logging: ONLY after the authoritative commit above, ONLY for a
+    # visible (non-shadow) turn. ``sheets_outbox.enqueue`` does exactly one
+    # thing synchronously here — a local SQLite insert into the durable
+    # ``v3_sheets_outbox`` table — so the response is NEVER blocked on Google
+    # Sheets, regardless of Sheets health or any Sheets config. Actual
+    # delivery happens on a separate, reused background worker (never a
+    # thread spawned per request); anything it cannot deliver stays
+    # retryable and durable across a process restart — see
+    # ``matbot.ai_tutor_v3.sheets_outbox``. A duplicate replay never reaches
+    # this line at all — it returns earlier from the
     # ``reservation.status == "completed"`` branch above.
     if not shadow:
         try:
-            sheets_log.log_transcript_to_sheet(payload, response)
+            sheets_outbox.enqueue(
+                store, client_turn_id=client_turn_id, session_id=session_id,
+                payload=payload, response=response)
         except Exception:
-            log.exception("V3 Sheets transcript log failed; response already committed")
+            log.exception("V3 Sheets outbox enqueue failed; response already committed")
     return response
 
 

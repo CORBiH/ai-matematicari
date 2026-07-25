@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import threading
 from pathlib import Path
 
 import pytest
@@ -148,15 +149,18 @@ class FakeClient:
 @pytest.fixture()
 def v3_env(monkeypatch, tmp_path):
     from matbot import topic_resolver as tr
+    from matbot.ai_tutor_v3 import sheets_outbox
     monkeypatch.setenv("MATBOT_AI_TUTOR_V3_PRACTICE", "on")
     monkeypatch.setenv("MATBOT_AI_TUTOR_V3_LESSONS", DIVISIBILITY)
     monkeypatch.setenv("MATBOT_V3_VERIFICATION", "off")
     monkeypatch.setenv("MATBOT_V3_DB_PATH", str(tmp_path / "v3.sqlite3"))
     monkeypatch.setenv("MATBOT_MINIMAL_ENGINE", "off")
     tr.reset_cache()
+    sheets_outbox._reset_for_tests()   # fresh worker thread bound to THIS test's DB
     yield
     dispatcher.set_model_client(None)
     tr.reset_cache()
+    sheets_outbox._reset_for_tests()
 
 
 @pytest.fixture()
@@ -1372,66 +1376,128 @@ def test_audit_record_contains_required_telemetry_fields(monkeypatch, tmp_path):
 
 
 # =========================================================================== #
-# Google Sheets compatibility logging (Phase 10)                              #
+# Google Sheets compatibility logging (Phase 10, corrected)                    #
 # =========================================================================== #
-def test_visible_v3_turn_logs_exactly_one_sheets_row(fake, monkeypatch):
-    calls = []
-    monkeypatch.setattr(dispatcher.sheets_log, "log_transcript_to_sheet",
-                        lambda payload, response: calls.append((payload, response)) or True)
+#
+# Correction: the request path now ONLY performs a durable, LOCAL SQLite write
+# (matbot.ai_tutor_v3.state_store.enqueue_sheets_event, via sheets_outbox.
+# enqueue) — it never calls anything in matbot.sheets_log directly anymore.
+# Actual delivery happens on a separate, reused background worker thread
+# (matbot.ai_tutor_v3.sheets_outbox), never inline. These tests inspect the
+# durable v3_sheets_outbox table directly (the authoritative record) rather
+# than mocking sheets_log, since that IS the new contract.
+def _outbox_store():
+    from matbot.ai_tutor_v3 import state_store as ss
+    return ss.V3StateStore()
+
+
+def test_visible_v3_turn_enqueues_exactly_one_durable_sheets_row(fake):
     resp = start_task(fake)
     assert resp is not None
-    assert len(calls) == 1
-    logged_payload, logged_response = calls[0]
-    assert logged_response["engine"] == "v3_practice"
-    assert logged_response["v3_telemetry"]["blueprint_id"]
+    store = _outbox_store()
+    row = _find_delivered(store, "s1-A")   # queries by status-agnostic raw SQL
+    assert row is not None
+    payload = json.loads(row["payload_json"])
+    response = json.loads(row["response_json"])
+    assert payload["client_turn_id"] == "s1-A"
+    assert response["engine"] == "v3_practice"
+    assert response["v3_telemetry"]["blueprint_id"]
 
 
-def test_shadow_v3_turn_does_not_log_to_sheets(fake, monkeypatch):
-    calls = []
-    monkeypatch.setattr(dispatcher.sheets_log, "log_transcript_to_sheet",
-                        lambda payload, response: calls.append(1) or True)
+def _find_delivered(store, client_turn_id):
+    """Helper: the background worker may have already delivered (and thus
+    cleared pending-status on) the row by the time the test inspects it —
+    query it directly regardless of delivered state."""
+    conn = store._connect()
+    try:
+        row = conn.execute(
+            "SELECT * FROM v3_sheets_outbox WHERE client_turn_id=?",
+            (client_turn_id,)).fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+def test_shadow_v3_turn_does_not_enqueue_a_sheets_row(fake, monkeypatch):
     monkeypatch.setenv("MATBOT_AI_TUTOR_V3_PRACTICE", "shadow")
-    resp = dispatch(base_payload())
+    resp = dispatch(base_payload(client_turn_id="shadow1"))
     assert resp is None                 # legacy controls the visible response
-    assert calls == []                  # shadow must never create a visible row
+    store = _outbox_store()
+    assert _find_delivered(store, "shadow1") is None
 
 
-def test_duplicate_replay_does_not_log_a_second_sheets_row(fake, monkeypatch):
-    calls = []
-    monkeypatch.setattr(dispatcher.sheets_log, "log_transcript_to_sheet",
-                        lambda payload, response: calls.append(1) or True)
+def test_duplicate_replay_does_not_enqueue_a_second_sheets_row(fake):
     payload = base_payload(client_turn_id="dup1")
     first = dispatch(payload)
     assert first is not None
-    assert len(calls) == 1
     second = dispatch(payload)     # exact same client_turn_id → idempotent replay
     assert second is not None
-    assert len(calls) == 1          # NOT 2
+    store = _outbox_store()
+    conn = store._connect()
+    try:
+        count = conn.execute(
+            "SELECT COUNT(*) FROM v3_sheets_outbox WHERE client_turn_id=?",
+            ("dup1",)).fetchone()[0]
+    finally:
+        conn.close()
+    assert count == 1          # NOT 2 — client_turn_id is the primary key
 
 
-def test_sheets_failure_never_alters_the_student_response(fake, monkeypatch):
-    def _boom(payload, response):
-        raise RuntimeError("sheets is down")
-    monkeypatch.setattr(dispatcher.sheets_log, "log_transcript_to_sheet", _boom)
+def test_sheets_outbox_enqueue_failure_never_alters_the_student_response(fake, monkeypatch):
+    from matbot.ai_tutor_v3 import sheets_outbox
+
+    def _boom(store, **kwargs):
+        raise RuntimeError("sheets outbox is down")
+    monkeypatch.setattr(sheets_outbox, "enqueue", _boom)
     resp = dispatch(base_payload())
     assert resp is not None
     assert resp["engine"] == "v3_practice"
     assert resp["status"] == "ready"
 
 
-def test_v3_failure_falling_back_does_not_log_a_v3_sheets_row(fake, monkeypatch):
+def test_v3_failure_falling_back_does_not_enqueue_a_sheets_row(fake):
     """A turn that fails before commit (and would fall back to Minimal
     elsewhere) must not produce a V3 Sheets row — only a genuinely committed,
-    visible V3 turn logs."""
-    calls = []
+    visible V3 turn enqueues one."""
     start_task(fake)
-    monkeypatch.setattr(dispatcher.sheets_log, "log_transcript_to_sheet",
-                        lambda payload, response: calls.append(1) or True)
     fake.set(orchestrator.PURPOSE_INTERPRET, {"garbage": True})  # fails validation
     resp = dispatch(base_payload(client_turn_id="badout2", student_message="da"))
     assert resp is not None
     assert resp.get("v3_fallback_reason") is not None
-    assert calls == []
+    store = _outbox_store()
+    assert _find_delivered(store, "badout2") is None
+
+
+def test_response_returns_before_a_slow_fake_sheets_append_completes(fake, monkeypatch):
+    """The hard non-blocking guarantee: even if the actual Sheets append call
+    is SLOW (simulating real network latency), the student response must
+    still return almost immediately — because the request path only ever
+    does a local, synchronous SQLite insert; delivery happens entirely on a
+    separate background worker thread."""
+    import time as _time
+    from matbot import sheets_log as real_sheets_log
+
+    release = threading.Event()
+    started = threading.Event()
+
+    def _slow_append(row):
+        started.set()
+        release.wait(timeout=5)   # blocks the WORKER thread, never the request
+        return True
+    monkeypatch.setattr(real_sheets_log, "sheets_append_row_safe", _slow_append)
+
+    t0 = _time.monotonic()
+    resp = dispatch(base_payload(client_turn_id="slow1"))
+    elapsed = _time.monotonic() - t0
+
+    assert resp is not None
+    assert elapsed < 1.0, f"dispatch took {elapsed:.3f}s — Sheets delivery is on the critical path"
+
+    # Prove the slow call really was invoked (in the background) before
+    # releasing it, so this test would fail loudly if delivery silently
+    # stopped happening at all.
+    assert started.wait(timeout=2.0), "background worker never attempted delivery"
+    release.set()
 
 
 # =========================================================================== #

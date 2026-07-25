@@ -480,6 +480,23 @@ def sheets_status():
     return jsonify({"ok": True, "stats": get_sheets_delivery_stats()}), 200
 
 
+def _flush_v3_sheets_outbox(limit: int) -> dict:
+    """Bounded V3 durable-outbox drain, reusing the SAME claim primitive the
+    background worker and startup recovery use — never called from the
+    student request path, only from this manual/ops-triggered endpoint.
+    Cheap and V3-isolation-safe when V3 has never run: importing the module
+    opens no DB connection until a method is actually called."""
+    try:
+        from matbot.ai_tutor_v3 import sheets_outbox as v3_sheets_outbox
+        from matbot.ai_tutor_v3 import state_store as v3_state_store
+        delivered = v3_sheets_outbox.drain_pending_sheets_events(
+            v3_state_store.V3StateStore(), limit=limit)
+        return {"delivered": delivered}
+    except Exception:
+        log.exception("V3 Sheets outbox drain failed during /sheets/flush")
+        return {"delivered": 0, "error": "v3_drain_failed"}
+
+
 @app.post("/sheets/flush")
 @limiter.limit(_diag_rate_limit)
 def sheets_flush():
@@ -491,8 +508,15 @@ def sheets_flush():
     except (TypeError, ValueError):
         timeout = 10.0
     timeout = max(0.0, min(timeout, 30.0))
+    try:
+        v3_limit = int((data or {}).get("v3_limit", 50))
+    except (TypeError, ValueError):
+        v3_limit = 50
+    v3_limit = max(0, min(v3_limit, 200))
     ok = flush_sheets_log(timeout=timeout)
-    return jsonify({"ok": bool(ok), "stats": get_sheets_delivery_stats()}), 200
+    v3_result = _flush_v3_sheets_outbox(v3_limit) if v3_limit else {"delivered": 0}
+    return jsonify({"ok": bool(ok), "stats": get_sheets_delivery_stats(),
+                    "v3_outbox": v3_result}), 200
 
 
 @app.get("/diag/engine-v2")
@@ -758,6 +782,32 @@ def _startup_env_sanity():
 
 
 _startup_env_sanity()
+
+
+def _kick_v3_sheets_startup_recovery() -> None:
+    """Bounded, one-shot, non-blocking recovery sweep for any durable V3
+    Sheets outbox rows a PRIOR process crashed before delivering.
+
+    Never blocks app startup (runs on a daemon thread, see
+    ``sheets_outbox.kick_startup_drain``) and never touches V3 storage at all
+    when V3 Practice is off — a default or test deployment (flag unset)
+    imports nothing here, exactly like the existing 'cheap when off' pattern
+    ``matbot.ai_tutor_service._v3_practice_dispatch`` already uses. Safe to
+    run in every Gunicorn worker process: delivery goes through the same
+    atomic SQLite claim as every other drain entry point, so concurrent
+    startup sweeps across workers cannot double-deliver a row.
+    """
+    flag = (os.getenv("MATBOT_AI_TUTOR_V3_PRACTICE") or "off").strip().lower()
+    if flag not in ("shadow", "on"):
+        return
+    try:
+        from matbot.ai_tutor_v3 import sheets_outbox as v3_sheets_outbox
+        v3_sheets_outbox.kick_startup_drain()
+    except Exception:
+        log.exception("V3 Sheets outbox startup recovery failed to start")
+
+
+_kick_v3_sheets_startup_recovery()
 
 
 if __name__ == "__main__":

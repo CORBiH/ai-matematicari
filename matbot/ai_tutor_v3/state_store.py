@@ -99,8 +99,30 @@ CREATE TABLE IF NOT EXISTS v3_activity_outbox (
     FOREIGN KEY (session_id) REFERENCES v3_sessions(session_id)
 );
 
+CREATE TABLE IF NOT EXISTS v3_sheets_outbox (
+    client_turn_id      TEXT PRIMARY KEY,
+    session_id          TEXT NOT NULL,
+    payload_json        TEXT NOT NULL,
+    response_json       TEXT NOT NULL,
+    created_at          TEXT NOT NULL,
+    -- 'pending' | 'in_progress' | 'delivered'. A row only ever moves
+    -- pending -> in_progress -> delivered, or back pending on failure/stale
+    -- claim — never delivered -> anything (delivery is terminal).
+    status              TEXT NOT NULL DEFAULT 'pending',
+    claimed_at          TEXT,
+    claimed_by          TEXT,
+    -- Eligible for (re)claim once now >= next_attempt_at. Set to created_at
+    -- at insert (immediately eligible); pushed forward on failure (backoff).
+    next_attempt_at     TEXT NOT NULL,
+    delivered_at        TEXT,
+    attempts            INTEGER NOT NULL DEFAULT 0,
+    last_error          TEXT
+);
+
 CREATE INDEX IF NOT EXISTS idx_v3_turns_session ON v3_turns(session_id);
 CREATE INDEX IF NOT EXISTS idx_v3_outbox_session ON v3_activity_outbox(session_id);
+CREATE INDEX IF NOT EXISTS idx_v3_sheets_outbox_claim
+    ON v3_sheets_outbox(status, next_attempt_at);
 """
 
 #: Only these event types may ever enter the outbox (privacy scope).
@@ -400,6 +422,146 @@ class V3StateStore:
         finally:
             conn.close()
 
+    # -- Sheets delivery outbox (durable, crash-safe) --------------------- #
+    #
+    # Distinct from ``v3_activity_outbox`` above: that one is a privacy-scoped
+    # student-activity feed (image_upload/sos/test_completed/session_end only).
+    # This one is Sheets-transcript delivery telemetry for EVERY visible V3
+    # turn — same privacy shape ``matbot.sheets_log`` already trusts (payload +
+    # adapter response dicts; never a raw system/user model prompt, which
+    # neither dict ever contains).
+    def enqueue_sheets_event(
+        self, *, client_turn_id: str, session_id: str, payload_json: str,
+        response_json: str, created_at: str,
+    ) -> None:
+        """Durable, LOCAL-ONLY write (no network) — this is what lets the
+        student response return without ever waiting on Google Sheets.
+        ``client_turn_id`` is the primary key: a duplicate enqueue (e.g. a
+        defensive double-call, or a retried request already handled by turn-
+        level idempotency upstream) is a no-op, never a second row.
+        Immediately eligible for claim: ``next_attempt_at = created_at``."""
+        self._ensure()
+        conn = self._connect()
+        try:
+            with conn:
+                conn.execute(
+                    "INSERT OR IGNORE INTO v3_sheets_outbox "
+                    "(client_turn_id, session_id, payload_json, response_json, "
+                    " created_at, status, next_attempt_at) "
+                    "VALUES (?,?,?,?,?,'pending',?)",
+                    (client_turn_id, session_id, payload_json, response_json,
+                     created_at, created_at))
+        finally:
+            conn.close()
+
+    def claim_sheets_events(
+        self, *, limit: int, claimed_by: str, now: str, lease_seconds: float,
+    ) -> list[dict]:
+        """Atomically claim up to ``limit`` deliverable rows for THIS caller.
+
+        A row is claimable when it is ``pending`` (or an ``in_progress`` claim
+        has exceeded ``lease_seconds`` — a crashed/killed drainer's claim
+        eventually becomes retryable) AND ``next_attempt_at <= now`` (the
+        backoff window has elapsed).
+
+        Safe under concurrent callers (multiple threads in one process, or
+        multiple Gunicorn worker processes sharing the same SQLite file):
+        candidates are read, then EACH is claimed with its own single-row
+        ``UPDATE ... WHERE client_turn_id=? AND <still claimable>`` and the
+        claim only counts if ``cur.rowcount == 1`` — SQLite serializes writes,
+        so at most one caller ever wins a given row, exactly like the
+        existing optimistic-version check in ``commit_turn``.
+        """
+        self._ensure()
+        conn = self._connect()
+        claimed: list[dict] = []
+        try:
+            candidates = conn.execute(
+                "SELECT client_turn_id, claimed_at FROM v3_sheets_outbox "
+                "WHERE next_attempt_at <= ? "
+                "AND (status='pending' OR (status='in_progress' AND claimed_at <= ?)) "
+                "ORDER BY created_at LIMIT ?",
+                (now, _lease_cutoff(now, lease_seconds), max(0, int(limit)),
+                 ),
+            ).fetchall()
+            for cand in candidates:
+                with conn:
+                    cur = conn.execute(
+                        "UPDATE v3_sheets_outbox SET status='in_progress', "
+                        "claimed_at=?, claimed_by=? "
+                        "WHERE client_turn_id=? AND next_attempt_at <= ? "
+                        "AND (status='pending' OR "
+                        "     (status='in_progress' AND claimed_at <= ?))",
+                        (now, claimed_by, cand["client_turn_id"], now,
+                         _lease_cutoff(now, lease_seconds)))
+                    if cur.rowcount == 1:
+                        row = conn.execute(
+                            "SELECT * FROM v3_sheets_outbox WHERE client_turn_id=?",
+                            (cand["client_turn_id"],)).fetchone()
+                        if row is not None:
+                            claimed.append(dict(row))
+            return claimed
+        finally:
+            conn.close()
+
+    def mark_sheets_event_delivered(self, client_turn_id: str, delivered_at: str) -> None:
+        """Terminal: a delivered row is never reclaimed or retried again."""
+        self._ensure()
+        conn = self._connect()
+        try:
+            with conn:
+                conn.execute(
+                    "UPDATE v3_sheets_outbox SET status='delivered', "
+                    "delivered_at=? WHERE client_turn_id=?",
+                    (delivered_at, client_turn_id))
+        finally:
+            conn.close()
+
+    def mark_sheets_event_failed(
+        self, client_turn_id: str, error: str, *, next_attempt_at: str,
+    ) -> None:
+        """Back to ``pending`` (never stuck ``in_progress``) with
+        ``attempts`` incremented and a bounded ``next_attempt_at`` backoff —
+        durable and retryable, never a tight retry loop."""
+        self._ensure()
+        conn = self._connect()
+        try:
+            with conn:
+                conn.execute(
+                    "UPDATE v3_sheets_outbox SET status='pending', "
+                    "attempts=attempts+1, last_error=?, next_attempt_at=? "
+                    "WHERE client_turn_id=?",
+                    (error, next_attempt_at, client_turn_id))
+        finally:
+            conn.close()
+
+    def get_sheets_event(self, client_turn_id: str) -> Optional[dict]:
+        """Diagnostic/test lookup — the row regardless of status, or None."""
+        self._ensure()
+        conn = self._connect()
+        try:
+            row = conn.execute(
+                "SELECT * FROM v3_sheets_outbox WHERE client_turn_id=?",
+                (client_turn_id,)).fetchone()
+            return dict(row) if row else None
+        finally:
+            conn.close()
+
+    def count_sheets_events(self, *, status: Optional[str] = None) -> int:
+        """Diagnostic/test count, optionally filtered by ``status``."""
+        self._ensure()
+        conn = self._connect()
+        try:
+            if status is None:
+                row = conn.execute("SELECT COUNT(*) FROM v3_sheets_outbox").fetchone()
+            else:
+                row = conn.execute(
+                    "SELECT COUNT(*) FROM v3_sheets_outbox WHERE status=?",
+                    (status,)).fetchone()
+            return int(row[0]) if row else 0
+        finally:
+            conn.close()
+
     # -- introspection (tests / diagnostics) ------------------------------ #
     def pragma(self, name: str):
         conn = self._connect()
@@ -418,3 +580,30 @@ def now_iso() -> str:
 
 def monotonic_ms() -> float:
     return time.monotonic() * 1000.0
+
+
+def _lease_cutoff(now: str, lease_seconds: float) -> str:
+    """``now`` minus ``lease_seconds``, as an ISO-8601 string — a stale
+    ``in_progress`` claim's ``claimed_at`` at or before this cutoff is treated
+    as abandoned (the drainer that claimed it crashed or hung) and becomes
+    reclaimable. ISO-8601 strings compare lexicographically the same as
+    chronologically, so this stays a plain string comparison in SQL."""
+    from datetime import datetime, timedelta
+
+    dt = datetime.fromisoformat(now)
+    return (dt - timedelta(seconds=max(0.0, float(lease_seconds)))).isoformat()
+
+
+def backoff_seconds(attempts: int, *, base: float = 5.0, cap: float = 300.0) -> float:
+    """Bounded exponential backoff: 5s, 10s, 20s, 40s, ... capped at 5 minutes.
+    ``attempts`` is the count AFTER the failure being backed off from (i.e.
+    the first failure uses ``attempts=1``)."""
+    return min(cap, base * (2 ** max(0, attempts - 1)))
+
+
+def next_attempt_at(now: str, attempts: int) -> str:
+    """``now`` plus the bounded backoff for ``attempts`` failures, as ISO-8601."""
+    from datetime import datetime, timedelta
+
+    dt = datetime.fromisoformat(now)
+    return (dt + timedelta(seconds=backoff_seconds(attempts))).isoformat()
