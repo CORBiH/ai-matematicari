@@ -110,6 +110,7 @@ class FakeClient:
 
     def __init__(self):
         self.calls: list[str] = []
+        self.models: list[str] = []
         self._by_purpose: dict[str, object] = {
             orchestrator.PURPOSE_BLUEPRINT: blueprint_parsed(),
             orchestrator.PURPOSE_INTERPRET: interp_parsed("task_request"),
@@ -130,6 +131,7 @@ class FakeClient:
 
     def generate(self, *, purpose, system, user, schema_name, schema, model, timeout):
         self.calls.append(purpose)
+        self.models.append(model)
         if purpose in self._status:
             status, err = self._status[purpose]
             return ModelCallResult(status=status, model=model, purpose=purpose,
@@ -996,6 +998,76 @@ def test_student_id_is_opaque(fake):
     sid = resp["next_state"]["v3_state"]["student_id"]
     assert sid.startswith("stu_")
     assert "@" not in sid
+
+
+# =========================================================================== #
+# V3 model configuration — independent of legacy OPENAI_MODEL_TEXT            #
+# =========================================================================== #
+def test_dispatcher_resolves_default_v3_model_when_not_passed(fake, monkeypatch):
+    monkeypatch.delenv("MATBOT_V3_MODEL", raising=False)
+    resp = dispatcher.v3_practice_dispatch(base_payload(), timeout=5)
+    assert resp is not None
+    assert fake.models and all(m == "gpt-5-mini" for m in fake.models)
+
+
+def test_dispatcher_honours_matbot_v3_model_override(fake, monkeypatch):
+    monkeypatch.setenv("MATBOT_V3_MODEL", "gpt-5")
+    resp = dispatcher.v3_practice_dispatch(base_payload(), timeout=5)
+    assert resp is not None
+    assert fake.models and all(m == "gpt-5" for m in fake.models)
+
+
+def test_dispatcher_blank_matbot_v3_model_falls_back_to_default(fake, monkeypatch):
+    monkeypatch.setenv("MATBOT_V3_MODEL", "   ")
+    resp = dispatcher.v3_practice_dispatch(base_payload(), timeout=5)
+    assert resp is not None
+    assert fake.models and all(m == "gpt-5-mini" for m in fake.models)
+
+
+def test_dispatcher_ignores_legacy_openai_model_text(fake, monkeypatch):
+    monkeypatch.delenv("MATBOT_V3_MODEL", raising=False)
+    monkeypatch.setenv("OPENAI_MODEL_TEXT", "gpt-4o-mini")
+    resp = dispatcher.v3_practice_dispatch(base_payload(), timeout=5)
+    assert resp is not None
+    assert fake.models and all(m == "gpt-5-mini" for m in fake.models)
+
+
+def test_all_invoked_purposes_receive_the_same_resolved_model(fake, monkeypatch):
+    """blueprint_generation, turn_interpretation and task_generation all fire
+    for one initial task-request turn — every one of them must receive the
+    SAME resolved V3 model (a single resolution point, never re-derived per
+    purpose)."""
+    monkeypatch.setenv("MATBOT_V3_MODEL", "gpt-5")
+    fake.set(orchestrator.PURPOSE_INTERPRET, interp_parsed("task_request"))
+    resp = dispatcher.v3_practice_dispatch(base_payload(), timeout=5)
+    assert resp is not None
+    assert set(fake.calls) >= {
+        orchestrator.PURPOSE_BLUEPRINT, orchestrator.PURPOSE_INTERPRET,
+        orchestrator.PURPOSE_TASK,
+    }
+    assert all(m == "gpt-5" for m in fake.models)
+
+
+def test_ai_tutor_service_bridge_does_not_forward_legacy_model(monkeypatch):
+    """Both V3 bridge call sites in ai_tutor_service.py (handle_chat and
+    handle_chat_stream) go through this one shared bridge function — proving
+    it never forwards a ``model`` kwarg proves neither call site can leak the
+    legacy/general OPENAI_MODEL_TEXT model into V3."""
+    from matbot import ai_tutor_service
+    from matbot.ai_tutor_v3 import dispatcher as v3_dispatcher
+
+    monkeypatch.setenv("MATBOT_AI_TUTOR_V3_PRACTICE", "on")
+    captured = {}
+
+    def _spy(payload, **kwargs):
+        captured.update(kwargs)
+        return {"engine": "v3_practice", "answer": "ok"}
+    monkeypatch.setattr(v3_dispatcher, "v3_practice_dispatch", _spy)
+
+    result = ai_tutor_service._v3_practice_dispatch(
+        {"mode": "practice"}, timeout=5, endpoint="handle_chat")
+    assert result == {"engine": "v3_practice", "answer": "ok"}
+    assert "model" not in captured
 
 
 # =========================================================================== #

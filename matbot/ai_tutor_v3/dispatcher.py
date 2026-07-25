@@ -129,10 +129,19 @@ def _get_store() -> V3StateStore:
 # Public entry point                                                          #
 # --------------------------------------------------------------------------- #
 def v3_practice_dispatch(
-    payload: dict, *, model: str = orchestrator.DEFAULT_MODEL,
+    payload: dict, *, model: str = "",
     timeout: Optional[float] = None, endpoint: str = "",
 ) -> Optional[dict]:
-    """Handle one Practice turn under V3, or return None to fall back to legacy."""
+    """Handle one Practice turn under V3, or return None to fall back to legacy.
+
+    ``model`` is resolved HERE, once, via ``orchestrator.resolve_v3_model()``
+    when the caller does not explicitly pass one (production callers in
+    ``ai_tutor_service.py`` do not — V3 must not inherit the legacy
+    ``OPENAI_MODEL_TEXT`` model argument). All seven V3 call purposes receive
+    the SAME resolved model, since every downstream call threads this one
+    value through.
+    """
+    model = model.strip() if isinstance(model, str) and model.strip() else orchestrator.resolve_v3_model()
     flag = practice_flag()
     if flag == "off":
         return None

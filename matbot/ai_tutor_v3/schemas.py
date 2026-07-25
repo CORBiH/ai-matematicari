@@ -528,6 +528,38 @@ class LessonBlueprint(V3StrictModel):
     created_at: datetime
 
 
+class LessonBlueprintProposal(V3StrictModel):
+    """What the model is ALLOWED to propose for a Lesson Blueprint — pedagogical
+    content only. This is the schema actually sent to OpenAI for
+    ``blueprint_generation``; ``LessonBlueprint`` itself never is.
+
+    Deliberately excludes every server-owned ``LessonBlueprint`` field:
+    ``schema_version``, ``blueprint_id``, ``blueprint_version``,
+    ``lesson_identity``, ``source_hash``, ``source_metadata``, ``model``,
+    ``prompt_policy``, ``created_at``, ``validation_status``. The model must
+    never be asked to invent authoritative server metadata — the server
+    injects all of the above afterward (see
+    ``lesson_blueprint._new_blueprint_from_model``). This also sidesteps
+    ``source_metadata``'s free-form ``dict[str, str]`` shape, which an
+    arbitrary-key map is never asked of the model in the first place.
+    """
+
+    learning_objectives: list[str] = Field(default_factory=list)
+    prerequisites: list[str] = Field(default_factory=list)
+    concepts: list[ConceptBlueprint] = Field(default_factory=list)
+    coverage_targets: list[CoverageTarget] = Field(default_factory=list)
+    key_rules: list[KeyRule] = Field(default_factory=list)
+    allowed_methods: list[str] = Field(default_factory=list)
+    common_misconceptions: list[CommonMisconception] = Field(default_factory=list)
+    task_families: list[TaskFamily] = Field(default_factory=list)
+    difficulty_dimensions: list[DifficultyDimension] = Field(default_factory=list)
+    hint_strategy: list[HintStrategyStep] = Field(default_factory=list)
+    mastery_requirements: MasteryRequirement
+    language_guidance: LanguageGuidance
+    supported_verification_types: list[VerificationType] = Field(default_factory=list)
+    generation_confidence: float = Field(ge=0.0, le=1.0)
+
+
 # --------------------------------------------------------------------------- #
 # Task + provisional model assessment                                         #
 # --------------------------------------------------------------------------- #

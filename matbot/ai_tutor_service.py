@@ -7131,7 +7131,6 @@ def _v3_practice_dispatch(
     *,
     image_bytes: bytes | None = None,
     image_data_url: str | None = None,
-    model: str,
     timeout: float | None,
     endpoint: str = "",
 ) -> dict | None:
@@ -7140,6 +7139,12 @@ def _v3_practice_dispatch(
     Kept CHEAP when the flag is off: the flag is read from the environment
     directly and the V3 package is imported ONLY when V3 might actually run, so
     a default deployment (flag unset) pays nothing and never imports V3.
+
+    Deliberately does NOT accept or forward a ``model`` argument: V3 must not
+    inherit the legacy/general ``OPENAI_MODEL_TEXT`` model (the ``model``
+    variable in scope at the call sites below). The V3 dispatcher resolves its
+    own model via ``orchestrator.resolve_v3_model()`` (``MATBOT_V3_MODEL``,
+    default ``gpt-5-mini``) — a single resolution point, not duplicated here.
     """
     flag = (os.getenv("MATBOT_AI_TUTOR_V3_PRACTICE") or "off").strip().lower()
     if flag not in ("shadow", "on"):
@@ -7150,7 +7155,7 @@ def _v3_practice_dispatch(
         from matbot.ai_tutor_v3 import dispatcher as _v3_dispatcher
         return _v3_dispatcher.v3_practice_dispatch(
             data if isinstance(data, dict) else {},
-            model=model, timeout=timeout, endpoint=endpoint)
+            timeout=timeout, endpoint=endpoint)
     except Exception:
         log.exception("v3_practice_dispatch failed; falling back to legacy")
         return None
@@ -7363,7 +7368,7 @@ def handle_chat(
     # whitelisted, resolvable Practice lesson. See ``v3_practice_dispatch``.
     v3_result = _v3_practice_dispatch(
         data, image_bytes=image_bytes, image_data_url=image_data_url,
-        model=model, timeout=timeout, endpoint="handle_chat")
+        timeout=timeout, endpoint="handle_chat")
     if v3_result is not None:
         return v3_result
 
@@ -7473,7 +7478,7 @@ def handle_chat_stream(
     # complete (buffered), so it is emitted as deltas then done.
     v3_done = _v3_practice_dispatch(
         data, image_bytes=None, image_data_url=None,
-        model=model, timeout=timeout, endpoint="handle_chat_stream")
+        timeout=timeout, endpoint="handle_chat_stream")
     if v3_done is not None:
         for chunk in _chunk_for_stream(v3_done.get("answer") or ""):
             yield {"event": "delta", "data": {"delta": chunk}}

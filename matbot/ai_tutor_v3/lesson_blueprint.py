@@ -25,6 +25,7 @@ from matbot import content_loader, topic_resolver
 from matbot.ai_tutor_v3 import orchestrator
 from matbot.ai_tutor_v3.schemas import (
     LessonBlueprint,
+    LessonBlueprintProposal,
     LessonIdentity,
     export_json_schema,
 )
@@ -192,14 +193,19 @@ def generate_blueprint(
     )
     result = client.generate(
         purpose=orchestrator.PURPOSE_BLUEPRINT, system=system, user=user,
-        schema_name="LessonBlueprint",
-        schema=export_json_schema(LessonBlueprint),
+        schema_name="LessonBlueprintProposal",
+        schema=export_json_schema(LessonBlueprintProposal),
         model=model, timeout=timeout)
     if result.status != "ok":
         return None, f"model_{result.status}:{result.error_code}"
 
+    try:
+        proposal = LessonBlueprintProposal.model_validate(result.parsed)
+    except Exception:
+        return None, "schema_validation_failed"
+
     blueprint = _new_blueprint_from_model(
-        result.parsed, identity=identity, source_hash=source_hash,
+        proposal.model_dump(mode="json"), identity=identity, source_hash=source_hash,
         metadata=metadata, model=result.model or model)
     if blueprint is None:
         return None, "schema_validation_failed"

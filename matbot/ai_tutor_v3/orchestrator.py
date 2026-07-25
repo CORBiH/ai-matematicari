@@ -15,6 +15,7 @@ from __future__ import annotations
 import copy
 import json
 import logging
+import os
 import re
 import time
 from dataclasses import dataclass, field
@@ -36,6 +37,20 @@ DEFAULT_MODEL = "gpt-5-mini"
 
 # The exact off-topic fallback the constitution mandates, verbatim.
 OFF_TOPIC_FALLBACK = "Postavi mi pitanje ili zadatak iz matematike."
+
+
+def resolve_v3_model() -> str:
+    """The model V3 Practice uses for ALL SEVEN call purposes.
+
+    Deliberately independent of the legacy/general ``OPENAI_MODEL_TEXT``
+    configuration: that value is chosen for the old engine and must never
+    silently override V3's own default. ``MATBOT_V3_MODEL`` overrides
+    ``DEFAULT_MODEL`` when non-empty; unset or blank/whitespace-only falls
+    back to ``DEFAULT_MODEL``. This is the single resolution point — callers
+    must not re-implement this fallback logic elsewhere.
+    """
+    value = os.getenv("MATBOT_V3_MODEL", "").strip()
+    return value or DEFAULT_MODEL
 
 # --------------------------------------------------------------------------- #
 # Versioned prompt policy                                                      #
@@ -321,6 +336,118 @@ def _strictify(node: Any, root: dict) -> Any:
     return node
 
 
+class StrictSchemaInvariantError(StrictSchemaError):
+    """Raised by ``validate_openai_strict_schema`` when a FINAL, supposedly-
+    prepared schema still violates OpenAI's strict Structured Outputs
+    invariant. This is the gate that catches an ordering bug that
+    ``prepare_openai_strict_schema`` alone cannot: e.g. code that projects
+    (removes) a property from a schema AFTER strict preparation, without also
+    removing it from ``required`` — exactly the shape of the production
+    incident where 'source_metadata' remained in ``required`` after being
+    dropped from ``properties``. Always raised BEFORE any network call, with a
+    diagnostic naming the purpose, schema name, JSON path, and the exact extra
+    / missing required keys — never prompt or student content.
+    """
+
+
+def _invariant_violation(purpose: str, schema_name: str, path: str, detail: str) -> "StrictSchemaInvariantError":
+    return StrictSchemaInvariantError(
+        f"[{purpose}/{schema_name}] {detail} at {path!r}")
+
+
+def _walk_strict_invariant(node: Any, path: str, *, purpose: str, schema_name: str,
+                           root: dict) -> None:
+    if isinstance(node, bool):
+        raise _invariant_violation(purpose, schema_name, path, "boolean schema node")
+    if not isinstance(node, dict):
+        raise _invariant_violation(
+            purpose, schema_name, path,
+            f"expected an object schema node, got {type(node).__name__}")
+
+    ref = node.get("$ref")
+    if ref is not None:
+        resolved = _resolve_ref(root, ref)
+        if len(node) > 1:
+            merged = {**resolved, **{k: v for k, v in node.items() if k != "$ref"}}
+            _walk_strict_invariant(merged, path, purpose=purpose,
+                                   schema_name=schema_name, root=root)
+        return
+
+    for defs_key in ("$defs", "definitions"):
+        defs = node.get(defs_key)
+        if isinstance(defs, dict):
+            for name, sub in defs.items():
+                _walk_strict_invariant(sub, f"{path}/{defs_key}/{name}",
+                                       purpose=purpose, schema_name=schema_name, root=root)
+
+    properties = node.get("properties")
+    if isinstance(properties, dict):
+        prop_keys = set(properties.keys())
+        required = node.get("required")
+        if not isinstance(required, list) or any(not isinstance(r, str) for r in required):
+            raise _invariant_violation(
+                purpose, schema_name, path, f"malformed 'required' value: {required!r}")
+        required_keys = set(required)
+        extra_required = sorted(required_keys - prop_keys)
+        missing_required = sorted(prop_keys - required_keys)
+        if extra_required or missing_required:
+            raise _invariant_violation(
+                purpose, schema_name, path,
+                "required != properties "
+                f"(extra_required={extra_required}, missing_required={missing_required})")
+        if node.get("additionalProperties") is not False:
+            raise _invariant_violation(
+                purpose, schema_name, path,
+                f"additionalProperties must be false, got {node.get('additionalProperties')!r}")
+        for key, val in properties.items():
+            _walk_strict_invariant(val, f"{path}/properties/{key}", purpose=purpose,
+                                   schema_name=schema_name, root=root)
+    elif node.get("type") == "object":
+        if node.get("additionalProperties") is not False:
+            raise _invariant_violation(
+                purpose, schema_name, path,
+                "object without 'properties' must have additionalProperties=false "
+                f"(a free-form map is not supported), got {node.get('additionalProperties')!r}")
+
+    items = node.get("items")
+    if items is not None:
+        _walk_strict_invariant(items, f"{path}/items", purpose=purpose,
+                               schema_name=schema_name, root=root)
+
+    if "oneOf" in node:
+        raise _invariant_violation(purpose, schema_name, path, "unconverted 'oneOf' remains")
+
+    for key in ("anyOf", "allOf"):
+        branches = node.get(key)
+        if branches is not None:
+            for i, branch in enumerate(branches):
+                _walk_strict_invariant(branch, f"{path}/{key}/{i}", purpose=purpose,
+                                       schema_name=schema_name, root=root)
+
+
+def validate_openai_strict_schema(schema: dict, *, purpose: str, schema_name: str) -> None:
+    """Final recursive invariant gate — run AFTER ``prepare_openai_strict_schema``
+    (and after any server-side projection of model-owned fields) and BEFORE any
+    network call.
+
+    Recursively asserts, for every object schema node reachable from ``schema``
+    (via ``$defs``/``definitions``, ``properties``, ``items``, ``anyOf``,
+    ``allOf``, and resolved ``$ref``\\ s):
+
+      * ``set(required) == set(properties.keys())`` — no extra, no missing key
+      * ``additionalProperties is False``
+      * every local ``$ref`` resolves
+      * no residual ``oneOf`` (must already be converted to ``anyOf``)
+      * no boolean schema node
+
+    Raises ``StrictSchemaInvariantError`` locally — never lets a malformed
+    schema reach the API and come back as a 400. The diagnostic names the
+    purpose, schema_name, and exact JSON path, plus the extra/missing required
+    key names — never prompt or student content.
+    """
+    _walk_strict_invariant(schema, "$", purpose=purpose, schema_name=schema_name, root=schema)
+
+
 # --------------------------------------------------------------------------- #
 # Safe error diagnostics — server-side log only, never in the response         #
 # --------------------------------------------------------------------------- #
@@ -383,6 +510,7 @@ class OpenAIResponsesClient:
         started = time.monotonic()
         try:
             strict_schema = prepare_openai_strict_schema(schema)
+            validate_openai_strict_schema(strict_schema, purpose=purpose, schema_name=schema_name)
         except StrictSchemaError as exc:
             # Fails LOCALLY — no network call — for a construct we cannot
             # safely transform. Sanitized: only the exception message (schema
