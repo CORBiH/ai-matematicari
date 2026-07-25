@@ -12,10 +12,13 @@ imported lazily inside the production client only when it actually runs.
 """
 from __future__ import annotations
 
+import copy
 import json
+import logging
+import re
 import time
 from dataclasses import dataclass, field
-from typing import Optional, Protocol
+from typing import Any, Optional, Protocol
 
 from pydantic import BaseModel, ValidationError
 
@@ -26,6 +29,8 @@ from matbot.ai_tutor_v3.schemas import (
     TaskSpecification,
     export_json_schema,
 )
+
+log = logging.getLogger("matbot.ai_tutor_v3.orchestrator")
 
 DEFAULT_MODEL = "gpt-5-mini"
 
@@ -156,6 +161,211 @@ PURPOSE_NARRATION = "narration"
 PURPOSE_REVEAL = "solution_reveal"
 
 
+class StrictSchemaError(ValueError):
+    """A Pydantic-exported schema cannot be safely prepared for OpenAI's strict
+    Structured Outputs mode without silently discarding a real constraint.
+
+    Raised BEFORE any network call — an unsupported schema construct must fail
+    locally, not as a 400 from the API."""
+
+
+#: Sentinel distinguishing "no default key present" from "default is exactly
+#: the value None" (a bare ``None`` default is a legitimate dict value).
+_NO_DEFAULT = object()
+
+
+def prepare_openai_strict_schema(schema: dict) -> dict:
+    """Transform a Pydantic-exported JSON Schema into OpenAI strict Structured
+    Outputs form, WITHOUT mutating the caller's schema.
+
+    Grounded in the installed SDK's OWN reference conversion
+    (``openai.lib._pydantic._ensure_strict_json_schema``, verified by reading
+    ``.venv/Lib/site-packages/openai/lib/_pydantic.py``) rather than guessed:
+    every object gets ``additionalProperties: false``; every property name is
+    added to ``required`` (a formerly-optional field stays semantically
+    optional because Pydantic already exported its type as nullable —
+    ``anyOf: [<type>, {"type": "null"}]`` — this only changes what OpenAI is
+    told to always INCLUDE in the response, never what our OWN re-validation
+    of that response, via the untouched Pydantic model, still treats as
+    optional); ``$defs``/``definitions`` are processed recursively; a ``$ref``
+    with sibling keys is inlined; a bare ``default: null`` is dropped (matching
+    the SDK exactly — a non-null default, e.g. ``require_reduced_form: false``,
+    is left as-is, since the reference implementation does not strip it either).
+
+    Beyond the SDK's own transform, this also converts a discriminated union
+    (Pydantic's ``oneOf`` + ``discriminator``, used by ``VerificationRequest``)
+    into a plain ``anyOf`` and drops the non-standard ``discriminator`` key —
+    but ONLY after confirming the variants are mutually exclusive by their own
+    literal discriminator value, so nothing is actually lost: at-most-one can
+    ever match either way, so "exactly one must match" (``oneOf``) and "at
+    least one must match" (``anyOf``) are behaviourally identical here.
+
+    Raises ``StrictSchemaError`` — before any API call — for a construct this
+    function cannot safely transform (e.g. an explicit
+    ``additionalProperties: true``, ``patternProperties``, or a discriminated
+    union whose variants are not provably disjoint).
+    """
+    root = copy.deepcopy(schema)
+    return _strictify(root, root)
+
+
+def _resolve_ref(root: dict, ref: str) -> Any:
+    if not isinstance(ref, str) or not ref.startswith("#/"):
+        raise StrictSchemaError(f"unsupported $ref format: {ref!r}")
+    node: Any = root
+    for key in ref[2:].split("/"):
+        if not isinstance(node, dict) or key not in node:
+            raise StrictSchemaError(f"could not resolve $ref {ref!r}")
+        node = node[key]
+    return node
+
+
+def _check_disjoint_discriminated_variants(
+    variants: list, discriminator: Any, root: dict,
+) -> None:
+    prop_name = discriminator.get("propertyName") if isinstance(discriminator, dict) else None
+    if not prop_name:
+        raise StrictSchemaError(
+            "oneOf without a usable discriminator.propertyName cannot be "
+            "safely converted to anyOf")
+    seen_consts: list = []
+    for variant in variants:
+        resolved = variant
+        if isinstance(variant, dict) and "$ref" in variant and len(variant) == 1:
+            resolved = _resolve_ref(root, variant["$ref"])
+        if not isinstance(resolved, dict):
+            raise StrictSchemaError("oneOf variant is not an object schema")
+        props = resolved.get("properties") or {}
+        field_schema = props.get(prop_name) or {}
+        const = field_schema.get("const", _NO_DEFAULT)
+        if const is _NO_DEFAULT:
+            raise StrictSchemaError(
+                f"oneOf variant lacks a literal const for discriminator "
+                f"property {prop_name!r}; cannot prove mutual exclusivity")
+        seen_consts.append(const)
+    if len(set(seen_consts)) != len(seen_consts):
+        raise StrictSchemaError(
+            "oneOf/discriminator variants are not mutually exclusive "
+            f"(duplicate discriminator values: {seen_consts!r})")
+
+
+def _strictify(node: Any, root: dict) -> Any:
+    if isinstance(node, bool):
+        raise StrictSchemaError(f"boolean schema node is not supported: {node!r}")
+    if not isinstance(node, dict):
+        raise StrictSchemaError(
+            f"expected an object schema node, got {type(node).__name__}")
+
+    for defs_key in ("$defs", "definitions"):
+        defs = node.get(defs_key)
+        if isinstance(defs, dict):
+            for name, sub in list(defs.items()):
+                defs[name] = _strictify(sub, root)
+
+    # A $ref alongside sibling keys (e.g. a field-level description attached to
+    # a referenced type) is inlined, then reprocessed as a plain object.
+    ref = node.get("$ref")
+    if ref is not None and len(node) > 1:
+        resolved = _resolve_ref(root, ref)
+        if not isinstance(resolved, dict):
+            raise StrictSchemaError(f"$ref {ref!r} did not resolve to an object")
+        merged = {**resolved, **{k: v for k, v in node.items() if k != "$ref"}}
+        return _strictify(merged, root)
+
+    if "patternProperties" in node:
+        raise StrictSchemaError(
+            "patternProperties is not supported in strict Structured Outputs schemas")
+
+    properties = node.get("properties")
+    if isinstance(properties, dict):
+        if node.get("additionalProperties") is True:
+            raise StrictSchemaError(
+                "additionalProperties=True is not allowed for OpenAI strict "
+                "Structured Outputs; the object schema must stay explicitly closed")
+        node["additionalProperties"] = False
+        node["required"] = list(properties.keys())
+        node["properties"] = {
+            key: _strictify(val, root) for key, val in properties.items()}
+    elif node.get("type") == "object" and "additionalProperties" not in node:
+        node["additionalProperties"] = False
+
+    items = node.get("items")
+    if items is not None:
+        node["items"] = _strictify(items, root)
+
+    any_of = node.get("anyOf")
+    one_of = node.get("oneOf")
+    if any_of is not None and one_of is not None:
+        raise StrictSchemaError("a schema node cannot mix anyOf and oneOf")
+    if one_of is not None:
+        _check_disjoint_discriminated_variants(
+            one_of, node.get("discriminator"), root)
+        node["anyOf"] = [_strictify(v, root) for v in one_of]
+        del node["oneOf"]
+        node.pop("discriminator", None)
+    elif any_of is not None:
+        node["anyOf"] = [_strictify(v, root) for v in any_of]
+
+    all_of = node.get("allOf")
+    if all_of is not None:
+        if len(all_of) == 1:
+            merged = _strictify(all_of[0], root)
+            node.update(merged)
+            del node["allOf"]
+        else:
+            node["allOf"] = [_strictify(v, root) for v in all_of]
+
+    if node.get("default", _NO_DEFAULT) is None:
+        node.pop("default", None)
+
+    return node
+
+
+# --------------------------------------------------------------------------- #
+# Safe error diagnostics — server-side log only, never in the response         #
+# --------------------------------------------------------------------------- #
+_MAX_LOGGED_MESSAGE_CHARS = 300
+_KEY_PATTERN = re.compile(r"sk-[A-Za-z0-9_-]{10,}")
+_EMAIL_PATTERN = re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}")
+
+
+def _sanitize_error_message(message: Any) -> str:
+    """Bound and scrub an upstream error message before it is EVER logged.
+
+    OpenAI Structured Outputs schema-validation errors describe SCHEMA
+    problems (e.g. "'required' is required to include every key in
+    properties") — never prompt or student content — but this still never
+    trusts that: any API-key- or email-shaped substring is redacted and the
+    result is length-capped regardless.
+    """
+    text = _KEY_PATTERN.sub("[redacted-key]", str(message or ""))
+    text = _EMAIL_PATTERN.sub("[redacted-email]", text)
+    return text[:_MAX_LOGGED_MESSAGE_CHARS]
+
+
+def _log_openai_call_failure(exc: BaseException, *, purpose: str, model: str,
+                             schema_name: str) -> None:
+    """Structured, SANITIZED diagnostic — server-side log only.
+
+    Fields come directly from the installed SDK's own exception attributes
+    (verified in ``openai/_exceptions.py``: ``APIError.message``/``.code``,
+    ``APIStatusError.status_code``/``.request_id``) — never from re-parsing a
+    raw response body, and never including the system/user prompt, an API key,
+    request headers, or any student/parent identifying text.
+    """
+    diagnostic = {
+        "exception_class": type(exc).__name__,
+        "http_status": getattr(exc, "status_code", None),
+        "openai_error_code": getattr(exc, "code", None),
+        "request_id": getattr(exc, "request_id", None),
+        "message": _sanitize_error_message(getattr(exc, "message", None) or str(exc)),
+        "model": model,
+        "purpose": purpose,
+        "schema_name": schema_name,
+    }
+    log.error("v3 openai call failed: %s", json.dumps(diagnostic, ensure_ascii=False))
+
+
 class OpenAIResponsesClient:
     """Production client: OpenAI Responses API + strict Structured Outputs.
 
@@ -172,15 +382,30 @@ class OpenAIResponsesClient:
     ) -> ModelCallResult:
         started = time.monotonic()
         try:
+            strict_schema = prepare_openai_strict_schema(schema)
+        except StrictSchemaError as exc:
+            # Fails LOCALLY — no network call — for a construct we cannot
+            # safely transform. Sanitized: only the exception message (schema
+            # shape only, never prompt/student content) is logged.
+            log.error(
+                "v3 strict schema preparation failed: purpose=%s schema_name=%s "
+                "model=%s error=%s", purpose, schema_name, model,
+                _sanitize_error_message(str(exc)))
+            return ModelCallResult(
+                status="error", model=model, purpose=purpose,
+                error_code="strict_schema_incompatible")
+        try:
             resp = self._client.responses.create(
                 model=model,
                 input=[{"role": "system", "content": system},
                        {"role": "user", "content": user}],
                 text={"format": {"type": "json_schema", "name": schema_name,
-                                 "schema": schema, "strict": True}},
+                                 "schema": strict_schema, "strict": True}},
                 timeout=timeout,
             )
         except Exception as exc:  # timeout, SDK error, network — fail safe
+            _log_openai_call_failure(exc, purpose=purpose, model=model,
+                                     schema_name=schema_name)
             return ModelCallResult(
                 status="error", latency_ms=(time.monotonic() - started) * 1000.0,
                 model=model, purpose=purpose,

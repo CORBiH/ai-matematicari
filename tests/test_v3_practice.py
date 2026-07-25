@@ -1009,6 +1009,50 @@ def test_invalid_schema_output_preserves_task(fake):
     assert out["next_state"]["v3_state"]["counters"]["attempts"] == 0
 
 
+def test_fake_bad_request_error_does_not_corrupt_session_state(fake, monkeypatch):
+    """The production incident, reproduced end-to-end: the REAL production
+    client class (OpenAIResponsesClient) has its underlying SDK call replaced
+    with one that raises a genuine ``openai.BadRequestError`` — exactly what a
+    strict-schema-rejecting 400 looks like — and the dispatcher/reducer/state
+    layer must come out unharmed: task preserved, zero counter mutation, a safe
+    Bosnian fallback text, no exception escaping to the caller."""
+    import httpx
+    import openai
+
+    from matbot.ai_tutor_v3 import orchestrator as orch
+
+    start_task(fake)  # bootstrap the session with a FakeClient first
+
+    real_client = orch.OpenAIResponsesClient(api_key="sk-test-not-real")
+    message = ("Invalid schema for response_format 'PracticeTurnInterpretation': "
+              "'required' is required to include every key in properties.")
+    req = httpx.Request("POST", "https://api.openai.com/v1/responses")
+    resp = httpx.Response(400, request=req, headers={"x-request-id": "req_prod123"},
+                          json={"error": {"message": message,
+                                          "type": "invalid_request_error",
+                                          "code": "invalid_json_schema"}})
+    bad_request = openai.BadRequestError(
+        message, response=resp,
+        body={"message": message, "type": "invalid_request_error",
+             "code": "invalid_json_schema"})
+
+    def _raise(*args, **kwargs):
+        raise bad_request
+    monkeypatch.setattr(real_client._client.responses, "create", _raise)
+    dispatcher.set_model_client(real_client)
+
+    out = dispatch(base_payload(client_turn_id="bre1", student_message="da"))
+
+    assert out is not None                                     # safe fallback, not a crash
+    assert out["last_tutor_task"] == "Da li je 252 djeljiv sa 6?"  # task preserved
+    v3 = out["next_state"]["v3_state"]
+    assert v3["counters"]["attempts"] == 0
+    assert v3["counters"]["wrong_attempts"] == 0
+    assert v3["counters"]["solved_independent"] == 0
+    assert v3["active_task"] is not None
+    assert out["v3_fallback_reason"] == "BadRequestError"
+
+
 # =========================================================================== #
 # Real route + SSE                                                            #
 # =========================================================================== #
