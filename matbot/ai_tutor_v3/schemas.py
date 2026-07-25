@@ -393,6 +393,385 @@ class NarrationResult(V3StrictModel):
     confidence: float = Field(ge=0.0, le=1.0)
 
 
+# ═══════════════════════════════════════════════════════════════════════════ #
+# FUNCTIONAL PRACTICE CONTRACTS                                                 #
+#                                                                               #
+# Everything below is the vertical slice's runtime data. The five authority     #
+# layers stay strictly separated by TYPE, so no layer can express another's     #
+# decision:                                                                     #
+#   1. model interpretation        StudentTurnInterpretation (above)            #
+#   2. provisional model assessment PracticeModelAssessment  — a PROPOSAL       #
+#   3. authoritative outcome        AuthoritativeOutcome (above) — server only  #
+#   4. student-facing narration     NarrationResult (above)                     #
+#   5. durable server state         TutorSessionState                           #
+# ═══════════════════════════════════════════════════════════════════════════ #
+
+VerificationStatus = Literal["model_only", "deterministic", "unavailable"]
+
+#: Closed set of pedagogical actions the model may PROPOSE. The reducer decides
+#: which (if any) is actually applied — this is a suggestion, never a command.
+PedagogicalAction = Literal[
+    "continue", "give_hint", "repeat_concept", "easier", "harder", "advance",
+    "reveal_solution", "answer_concept_question", "new_task", "clarify",
+    "off_topic", "confirm_answer",
+]
+
+DifficultySuggestion = Literal["easier", "harder", "same"]
+
+#: What a task expects, at the level THIS stage can express. No deterministic
+#: verifier exists yet, so ``planned_verification_type`` only RESERVES which
+#: typed VerificationRequest family a later stage will build for this task.
+AnswerKind = Literal[
+    "boolean_with_reason", "rational_value", "integer_value",
+    "equation_solution", "set_value", "free_text",
+]
+
+
+# --------------------------------------------------------------------------- #
+# Lesson identity + blueprint                                                  #
+# --------------------------------------------------------------------------- #
+class LessonIdentity(V3StrictModel):
+    """Canonical curriculum identity — the resolver's output, curriculum-sourced,
+    never invented by the model."""
+
+    grade: Literal[6, 7, 8, 9]
+    area_id: NonEmptyStr
+    area_title: NonEmptyStr
+    lesson_id: NonEmptyStr
+    lesson_title: NonEmptyStr
+    language: Literal["bs-Latn"] = "bs-Latn"
+
+
+class ConceptBlueprint(V3StrictModel):
+    concept_id: NonEmptyStr
+    name: NonEmptyStr
+    importance: Literal["core", "supporting", "enrichment"] = "core"
+    prerequisites: list[str] = Field(default_factory=list)
+    example_task_types: list[str] = Field(default_factory=list)
+    evidence_of_understanding: list[str] = Field(default_factory=list)
+    typical_errors: list[str] = Field(default_factory=list)
+    progression_criteria: NonEmptyStr
+
+
+class CoverageTarget(V3StrictModel):
+    target_id: NonEmptyStr
+    name: NonEmptyStr
+    concept_id: Optional[str] = None
+
+
+class KeyRule(V3StrictModel):
+    rule_id: NonEmptyStr
+    statement: NonEmptyStr
+
+
+class CommonMisconception(V3StrictModel):
+    code: NonEmptyStr
+    description: NonEmptyStr
+
+
+class TaskFamily(V3StrictModel):
+    family_id: NonEmptyStr
+    description: NonEmptyStr
+    answer_kind: AnswerKind
+
+
+class DifficultyDimension(V3StrictModel):
+    dimension_id: NonEmptyStr
+    description: NonEmptyStr
+
+
+class HintStrategyStep(V3StrictModel):
+    level: int = Field(ge=1)
+    guidance: NonEmptyStr
+
+
+class MasteryRequirement(V3StrictModel):
+    min_concepts_mastered: int = Field(ge=0)
+    min_independent_solves: int = Field(ge=0)
+
+
+class LanguageGuidance(V3StrictModel):
+    language_register: NonEmptyStr
+    avoid: list[str] = Field(default_factory=list)
+    preferred_terms: list[str] = Field(default_factory=list)
+
+
+class LessonBlueprint(V3StrictModel):
+    """The instructional essence of one lesson, generated once by the model and
+    reused across sessions. The lesson TITLE is instructional data — its
+    coverage targets must survive into ``coverage_targets`` (validated, not
+    trusted: see ``lesson_blueprint.validate_blueprint``)."""
+
+    schema_version: NonEmptyStr
+    blueprint_id: NonEmptyStr
+    blueprint_version: NonEmptyStr
+    lesson_identity: LessonIdentity
+    source_hash: NonEmptyStr
+    source_metadata: dict[str, str] = Field(default_factory=dict)
+    learning_objectives: list[str] = Field(default_factory=list)
+    prerequisites: list[str] = Field(default_factory=list)
+    concepts: list[ConceptBlueprint] = Field(default_factory=list)
+    coverage_targets: list[CoverageTarget] = Field(default_factory=list)
+    key_rules: list[KeyRule] = Field(default_factory=list)
+    allowed_methods: list[str] = Field(default_factory=list)
+    common_misconceptions: list[CommonMisconception] = Field(default_factory=list)
+    task_families: list[TaskFamily] = Field(default_factory=list)
+    difficulty_dimensions: list[DifficultyDimension] = Field(default_factory=list)
+    hint_strategy: list[HintStrategyStep] = Field(default_factory=list)
+    mastery_requirements: MasteryRequirement
+    language_guidance: LanguageGuidance
+    supported_verification_types: list[VerificationType] = Field(default_factory=list)
+    generation_confidence: float = Field(ge=0.0, le=1.0)
+    validation_status: Literal["draft", "needs_review", "validated"] = "draft"
+    model: NonEmptyStr
+    prompt_policy: "PromptPolicyReference"
+    created_at: datetime
+
+
+# --------------------------------------------------------------------------- #
+# Task + provisional model assessment                                         #
+# --------------------------------------------------------------------------- #
+class TaskSpecification(V3StrictModel):
+    """A task the model PROPOSES. The server validates it against the blueprint
+    and only then activates it (``ActiveTask``)."""
+
+    concept_id: NonEmptyStr
+    target_id: NonEmptyStr
+    question: NonEmptyStr
+    answer_kind: AnswerKind
+    expected_internal: Optional[str] = None
+    difficulty_level: int = Field(ge=1, le=5)
+    planned_verification_type: Optional[VerificationType] = None
+    rationale: Optional[str] = None
+
+
+class ActiveTask(V3StrictModel):
+    """The single live task. Server-owned counters live here, never on any model
+    output."""
+
+    task_id: NonEmptyStr
+    concept_id: NonEmptyStr
+    target_id: NonEmptyStr
+    question: NonEmptyStr
+    answer_kind: AnswerKind
+    expected_internal: Optional[str] = None
+    difficulty_level: int = Field(ge=1, le=5)
+    planned_verification_type: Optional[VerificationType] = None
+    attempts: int = Field(default=0, ge=0)
+    wrong_attempts: int = Field(default=0, ge=0)
+    hints_given: int = Field(default=0, ge=0)
+    solution_revealed: bool = False
+
+
+class PracticeModelAssessment(V3StrictModel):
+    """The model's PROVISIONAL grading proposal — never authoritative.
+
+    The reducer reads this as a suggestion and decides the real
+    ``AuthoritativeOutcome``. Deliberately cannot express a counter delta, a
+    streak result, or a task-status change: it proposes, the server disposes.
+    """
+
+    schema_version: NonEmptyStr
+    is_answer_attempt: bool
+    proposed_verdict: Verdict
+    proposed_pedagogical_action: PedagogicalAction
+    misconception_codes: list[str] = Field(default_factory=list)
+    suggested_next_concept: Optional[str] = None
+    difficulty_suggestion: Optional[DifficultySuggestion] = None
+    solved_independently: bool = False
+    used_assistance: bool = False
+    confidence: float = Field(ge=0.0, le=1.0)
+
+
+class PracticeTurnInterpretation(V3StrictModel):
+    """The combined structured output of the interpretation call: the language
+    interpretation PLUS an optional provisional assessment. Two typed halves in
+    one call, but the authority boundary holds — neither half can carry a
+    verdict the reducer must honour."""
+
+    interpretation: StudentTurnInterpretation
+    assessment: Optional[PracticeModelAssessment] = None
+
+
+# --------------------------------------------------------------------------- #
+# Verification boundary (model-only in this stage)                            #
+# --------------------------------------------------------------------------- #
+class VerificationBatchResult(V3StrictModel):
+    """Result of verifying a turn's claims. In this stage ``status`` is always
+    ``model_only`` — there are no deterministic handlers yet, and this must
+    never be labelled 'verified' or 'proven'."""
+
+    status: VerificationStatus
+    verified_facts: list[VerifiedFact] = Field(default_factory=list)
+    note: Optional[str] = None
+
+
+# --------------------------------------------------------------------------- #
+# Durable session state (5)                                                    #
+# --------------------------------------------------------------------------- #
+class SessionCounters(V3StrictModel):
+    attempts: int = Field(default=0, ge=0)
+    wrong_attempts: int = Field(default=0, ge=0)
+    solved_independent: int = Field(default=0, ge=0)
+    solved_assisted: int = Field(default=0, ge=0)
+    revealed: int = Field(default=0, ge=0)
+    tasks_completed: int = Field(default=0, ge=0)
+    correct_streak: int = Field(default=0, ge=0)
+
+
+class CoverageState(V3StrictModel):
+    targets: list[str] = Field(default_factory=list)
+    covered: list[str] = Field(default_factory=list)
+    attempts_per_target: dict[str, int] = Field(default_factory=dict)
+
+
+class MasteryState(V3StrictModel):
+    #: concept_id -> provisional mastery label; always provisional while
+    #: verification is model_only.
+    per_concept: dict[str, str] = Field(default_factory=dict)
+    provisional: bool = True
+
+
+class DifficultyState(V3StrictModel):
+    level: int = Field(default=2, ge=1, le=5)
+
+
+class HintState(V3StrictModel):
+    current_level: int = Field(default=0, ge=0)
+    max_level_reached: int = Field(default=0, ge=0)
+
+
+class PendingClarification(V3StrictModel):
+    prompt_seed: NonEmptyStr
+    raised_at_turn: int = Field(ge=0)
+
+
+class RecentTurn(V3StrictModel):
+    turn_index: int = Field(ge=0)
+    role: Literal["student", "tutor"]
+    text: str
+    turn_kind: Optional[str] = None
+    verdict: Optional[str] = None
+
+
+class StructuredConversationSummary(V3StrictModel):
+    text: str
+    as_of_turn: int = Field(ge=0)
+    source: Literal["server_derived"] = "server_derived"
+
+
+class CompletedTaskSummary(V3StrictModel):
+    task_id: NonEmptyStr
+    concept_id: NonEmptyStr
+    target_id: NonEmptyStr
+    verdict: Verdict
+    independent: bool
+
+
+class TutorSessionState(V3StrictModel):
+    """The durable, server-owned truth for a Practice session. Privacy-safe:
+    ``student_id`` is opaque, and there is NO parent/student email or credential
+    field for one to be stored in."""
+
+    schema_version: NonEmptyStr
+    session_id: NonEmptyStr
+    student_id: NonEmptyStr
+    grade: Literal[6, 7, 8, 9]
+    mode: Literal["practice"]
+    lesson_id: NonEmptyStr
+    blueprint_id: NonEmptyStr
+    blueprint_version: NonEmptyStr
+    prompt_policy: "PromptPolicyReference"
+    turn_index: int = Field(default=0, ge=0)
+    active_task: Optional[ActiveTask] = None
+    counters: SessionCounters = Field(default_factory=SessionCounters)
+    coverage: CoverageState = Field(default_factory=CoverageState)
+    mastery: MasteryState = Field(default_factory=MasteryState)
+    difficulty: DifficultyState = Field(default_factory=DifficultyState)
+    hint: HintState = Field(default_factory=HintState)
+    pending_clarification: Optional[PendingClarification] = None
+    recent_turns: list[RecentTurn] = Field(default_factory=list)
+    summary: Optional[StructuredConversationSummary] = None
+    completed_tasks: list[CompletedTaskSummary] = Field(default_factory=list)
+    created_at: datetime
+    updated_at: datetime
+
+
+# --------------------------------------------------------------------------- #
+# Reporting / audit (privacy-safe; NO raw transcript)                          #
+# --------------------------------------------------------------------------- #
+ActivityEventType = Literal["image_upload", "sos", "test_completed", "session_end"]
+
+
+class SessionLearningSummary(V3StrictModel):
+    """Structured, transcript-free summary for an activity/reporting event."""
+
+    lesson_id: NonEmptyStr
+    concepts_practiced: list[str] = Field(default_factory=list)
+    tasks_completed: int = Field(default=0, ge=0)
+    solved_independent: int = Field(default=0, ge=0)
+    solved_assisted: int = Field(default=0, ge=0)
+    ai_note: Optional[str] = None
+
+
+class StudentActivityEvent(V3StrictModel):
+    """A privacy-safe activity-outbox record. Contains identity + structured
+    summary ONLY — never a raw chat transcript, never an email."""
+
+    event_id: NonEmptyStr
+    event_type: ActivityEventType
+    student_id: NonEmptyStr
+    session_id: NonEmptyStr
+    grade: Literal[6, 7, 8, 9]
+    mode: Literal["practice"]
+    lesson_id: NonEmptyStr
+    created_at: datetime
+    learning_summary: SessionLearningSummary
+    ai_note: Optional[str] = None
+
+
+class UsageMetrics(V3StrictModel):
+    prompt_tokens: int = Field(default=0, ge=0)
+    completion_tokens: int = Field(default=0, ge=0)
+    model_calls: int = Field(default=0, ge=0)
+    total_latency_ms: float = Field(default=0.0, ge=0.0)
+
+
+class TurnAuditRecord(V3StrictModel):
+    """Structured audit of one turn. No chain-of-thought, no raw prompts —
+    ``interpretation_summary`` is a short restatement, not hidden reasoning."""
+
+    schema_version: NonEmptyStr
+    request_id: NonEmptyStr
+    session_id: NonEmptyStr
+    client_turn_id: NonEmptyStr
+    lesson_id: NonEmptyStr
+    mode: Literal["practice"]
+    blueprint_id: str = ""
+    blueprint_version: str = ""
+    prompt_policy: "PromptPolicyReference"
+    model: str = ""
+    call_purposes: list[str] = Field(default_factory=list)
+    verification_status: VerificationStatus = "model_only"
+    turn_kind: Optional[str] = None
+    interpretation_summary: Optional[str] = None
+    proposed_verdict: Optional[str] = None
+    applied_verdict: Optional[str] = None
+    response_category: Optional[str] = None
+    state_version_before: Optional[int] = None
+    state_version_after: Optional[int] = None
+    fallback_reason: Optional[str] = None
+    schema_validation_ok: bool = True
+    error_code: Optional[str] = None
+    usage: UsageMetrics = Field(default_factory=UsageMetrics)
+
+
+# Resolve forward references to PromptPolicyReference (defined earlier).
+LessonBlueprint.model_rebuild()
+TutorSessionState.model_rebuild()
+TurnAuditRecord.model_rebuild()
+
+
 # --------------------------------------------------------------------------- #
 # Schema export                                                                #
 # --------------------------------------------------------------------------- #

@@ -7126,6 +7126,36 @@ def capture_raw_student_message(data: Any) -> dict:
     return out
 
 
+def _v3_practice_dispatch(
+    data: Any,
+    *,
+    image_bytes: bytes | None = None,
+    image_data_url: str | None = None,
+    model: str,
+    timeout: float | None,
+    endpoint: str = "",
+) -> dict | None:
+    """Thin bridge to the isolated V3 Practice package.
+
+    Kept CHEAP when the flag is off: the flag is read from the environment
+    directly and the V3 package is imported ONLY when V3 might actually run, so
+    a default deployment (flag unset) pays nothing and never imports V3.
+    """
+    flag = (os.getenv("MATBOT_AI_TUTOR_V3_PRACTICE") or "off").strip().lower()
+    if flag not in ("shadow", "on"):
+        return None
+    if image_bytes or image_data_url:
+        return None  # V3 Practice does not handle images yet
+    try:
+        from matbot.ai_tutor_v3 import dispatcher as _v3_dispatcher
+        return _v3_dispatcher.v3_practice_dispatch(
+            data if isinstance(data, dict) else {},
+            model=model, timeout=timeout, endpoint=endpoint)
+    except Exception:
+        log.exception("v3_practice_dispatch failed; falling back to legacy")
+        return None
+
+
 def minimal_dispatch(
     data: Any,
     openai_chat: Callable,
@@ -7328,6 +7358,15 @@ def handle_chat(
     """
     data = capture_raw_student_message(data)
 
+    # V3 PRACTICE (flag-gated, isolated package) — dispatched before EVERYTHING
+    # legacy. Returns None unless MATBOT_AI_TUTOR_V3_PRACTICE=on for a
+    # whitelisted, resolvable Practice lesson. See ``v3_practice_dispatch``.
+    v3_result = _v3_practice_dispatch(
+        data, image_bytes=image_bytes, image_data_url=image_data_url,
+        model=model, timeout=timeout, endpoint="handle_chat")
+    if v3_result is not None:
+        return v3_result
+
     # MINIMAL ENGINE — dispatched FIRST, before the exam short-circuit, before
     # _prepare_chat, and therefore before every legacy contract that rewrites the
     # mode or the student message. See ``minimal_dispatch``.
@@ -7429,6 +7468,18 @@ def handle_chat_stream(
     # live here too and must run before every legacy branch below. Its answer is
     # already complete (no model call), so it is emitted as deltas then done,
     # exactly like the Exam Engine short-circuit.
+    # V3 PRACTICE — the browser hits THIS route first, so the dispatch lives
+    # here too and runs before every legacy branch. Its answer is already
+    # complete (buffered), so it is emitted as deltas then done.
+    v3_done = _v3_practice_dispatch(
+        data, image_bytes=None, image_data_url=None,
+        model=model, timeout=timeout, endpoint="handle_chat_stream")
+    if v3_done is not None:
+        for chunk in _chunk_for_stream(v3_done.get("answer") or ""):
+            yield {"event": "delta", "data": {"delta": chunk}}
+        yield {"event": "done", "data": v3_done}
+        return
+
     minimal_done = minimal_dispatch(
         data, openai_chat, model=model, timeout=timeout,
         endpoint="handle_chat_stream")
