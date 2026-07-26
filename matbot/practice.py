@@ -67,8 +67,13 @@ def run_practice_turn(store, llm, turn):
     # Server je izvor istine za zadatak; klijentski last_tutor_task koristimo
     # SAMO da preživimo restart servera (tekst zadatka nije interno rješenje —
     # expected_answer_summary ostaje prazan i model tada sam ponovo računa).
+    # Sanitizovan ISTO kao svaki tekst iz modela: klijent je nepouzdan izvor
+    # (mogao je ranije primiti isti neispravan LaTeX prije nego što je ova
+    # zaštita uvedena), i ovaj tekst se odmah šalje modelu u AKTIVNI ZADATAK.
     if not session["current_task"] and turn["last_tutor_task"]:
-        session["current_task"] = turn["last_tutor_task"][: config.MAX_TASK_CHARS]
+        session["current_task"] = sanitize_math_text(
+            turn["last_tutor_task"][: config.MAX_TASK_CHARS]
+        )
 
     # Snimljeno PRIJE AI poziva: ako bilo šta ispod (AI poziv, validacija,
     # primjena rezultata, upis) baci grešku, ovo je jedina istina koju smijemo

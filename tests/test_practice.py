@@ -518,3 +518,84 @@ def test_one_llm_call_per_turn_still_holds_after_hardening():
     fake.queue(make_output(reply="Puno rješenje: $\\frac{16}{60}$.", gave_hint=True, new_task=None))
     run_practice_turn(store, fake, turn_payload(msg="uradi ga ti"))
     assert fake.call_count == 2
+
+
+# ---------------------------------------------------------------------------
+# JSON dvostruko-escape bug (form feed umjesto \frac, itd.) — dokaz da je ista
+# očišćena vrijednost jedini izvor istine na svim mjestima gdje se tekst
+# zadatka pojavljuje, i da klijentski last_tutor_task fallback prolazi kroz
+# istu sanitizaciju.
+# ---------------------------------------------------------------------------
+
+def _has_control_chars(s):
+    return any(ord(ch) < 0x20 and ch not in ("\n", "\t") for ch in s)
+
+
+def test_new_task_with_control_char_bug_is_identical_everywhere():
+    store, fake = SessionStore(), FakeLLM()
+    broken_task = "Izračunaj $\x0crac{3}{5} : 2$."
+    expected_clean = "Izračunaj $\\frac{3}{5} : 2$."
+    fake.queue(make_output(reply="Evo zadatka.", new_task=make_task(text=broken_task, expected="6/5")))
+    r = run_practice_turn(store, fake, turn_payload())
+
+    assert expected_clean in r["answer"]
+    assert r["last_tutor_task"] == expected_clean
+    assert r["next_state"]["task"]["question"] == expected_clean
+    assert store.peek("sess-1")["current_task"] == expected_clean
+
+    # niko od njih ne smije sadržavati sirov kontrolni znak
+    for value in (r["answer"], r["last_tutor_task"], r["next_state"]["task"]["question"],
+                  store.peek("sess-1")["current_task"]):
+        assert not _has_control_chars(value)
+
+
+def test_reply_control_char_bug_sanitized_in_answer():
+    store, fake = SessionStore(), FakeLLM()
+    start_session(store, fake, task_text=TASK_4_15, expected="16/60")
+    fake.queue(make_output(
+        reply="Računamo $60\x08egin{}: 15$.",  # namjerno slomljen primjer sa backspace znakom
+        evaluation=None, gave_hint=True, new_task=None,
+    ))
+    r = run_practice_turn(store, fake, turn_payload(msg="uradi ga ti"))
+    assert not _has_control_chars(r["answer"])
+
+
+def test_client_last_tutor_task_fallback_is_sanitized():
+    """Klijent (localStorage) šalje last_tutor_task iz VREMENA PRIJE nego što
+    je ova zaštita uvedena — može sadržavati isti neispravan LaTeX. Server ga
+    mora očistiti prije nego što uđe u AKTIVNI ZADATAK i ode nazad modelu."""
+    store, fake = SessionStore(), FakeLLM()
+    broken_client_task = "Prošireni razlomak: $16\x0crac{60}: 2$."  # simulira stari bug u klijentskom stanju
+    fake.queue(make_output(reply="Tačno!", evaluation="correct"))
+    r = run_practice_turn(store, fake, turn_payload(
+        msg="16/60", last_tutor_task=broken_client_task,
+        interaction_phase="answering_practice_task",
+    ))
+    assert not _has_control_chars(r["last_tutor_task"])
+    prompt_sent = fake.calls[0][1]
+    assert not _has_control_chars(prompt_sent)
+    assert "\\frac" in r["last_tutor_task"] or "\\frac" in prompt_sent
+
+
+def test_http_response_never_contains_raw_control_chars():
+    """Puna JSON serijalizacija odgovora ne smije sadržavati ASCII kontrolne
+    znakove U+0000–U+001F, osim normalnih \\n i \\t koji mogu legalno postojati
+    u običnom (ne-matematičkom) tekstu odgovora."""
+    store, fake = SessionStore(), FakeLLM()
+    broken_task = "Izračunaj $\x0crac{3}{5} : 2$."
+    fake.queue(make_output(reply="Evo zadatka.\nDrugi red teksta.",
+                           new_task=make_task(text=broken_task, expected="6/5")))
+    r = run_practice_turn(store, fake, turn_payload())
+    raw = json.dumps(r, ensure_ascii=False)
+    # json.dumps escapeuje \n i \t kao \\n / \\t u samom JSON tekstu, pa
+    # provjeravamo dekodiranu (parsed) formu svake string vrijednosti
+    def walk(node):
+        if isinstance(node, str):
+            assert not _has_control_chars(node), repr(node)
+        elif isinstance(node, dict):
+            for v in node.values():
+                walk(v)
+        elif isinstance(node, list):
+            for v in node:
+                walk(v)
+    walk(json.loads(raw))

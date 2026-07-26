@@ -71,3 +71,64 @@ def test_sanitizer_never_raises_on_garbage_input():
         out = sanitize_math_text(g)
         assert isinstance(out, str)
         assert _dollar_count(out) % 2 == 0
+
+
+def _has_control_chars(s):
+    return any(ord(ch) < 0x20 and ch not in ("\n", "\t") for ch in s)
+
+
+# ---------------------------------------------------------------------------
+# JSON dvostruko-escape bug: model piše "\frac" u JSON stringu bez ispravnog
+# escape-a backslasha; JSON parser to dekodira kao poznat escape (\f, \b, \t,
+# \r, \n) i rezultat je STVARAN kontrolni znak umjesto backslasha, praćen
+# ostatkom LaTeX komande kao običnim slovima. Ovi testovi simuliraju TAČNO to
+# stanje (kao da je Python string već prošao kroz json.loads/pydantic parsing).
+# ---------------------------------------------------------------------------
+
+def test_form_feed_reconstructs_frac():
+    broken = "Izračunaj $\x0crac{3}{5} : 2$."
+    out = sanitize_math_text(broken)
+    assert "$\\frac{3}{5} : 2$" in out
+    assert not _has_control_chars(out)
+
+
+def test_tab_reconstructs_times():
+    broken = "Rezultat je $4\t" + "imes 5$."  # \t je STVARNI tab znak + "imes"
+    out = sanitize_math_text(broken)
+    assert "$4\\times 5$" in out
+    assert not _has_control_chars(out)
+
+
+def test_newline_reconstructs_neq():
+    broken = "Provjeri: $a\n" + "eq b$."  # \n je stvarni newline + "eq"
+    out = sanitize_math_text(broken)
+    assert "$a\\neq b$" in out
+    assert not _has_control_chars(out)
+
+
+def test_carriage_return_reconstructs_right():
+    broken = "Zagrada: $\\left(3\r" + "ight)$."  # \r je stvarni CR + "ight"
+    out = sanitize_math_text(broken)
+    assert "$\\left(3\\right)$" in out
+    assert not _has_control_chars(out)
+
+
+def test_backspace_reconstructs_begin():
+    broken = "Sistem: $\x08egin{cases}x=1\\end{cases}$."  # \b je stvarni backspace + "egin"
+    out = sanitize_math_text(broken)
+    assert "$\\begin{cases}x=1\\end{cases}$" in out
+    assert not _has_control_chars(out)
+
+
+def test_normal_newlines_outside_math_are_untouched():
+    text = "Prvi red.\nDrugi red sa formulom $\\frac{1}{2}$.\nTreći red.\tSa tabom."
+    out = sanitize_math_text(text)
+    assert out == text  # van $...$ se ništa ne dira, uključujući normalne \n i \t
+
+
+def test_control_char_repair_runs_before_brace_balance_check():
+    # nakon popravke kontrolnog znaka, zagrade MORAJU ostati balansirane i
+    # segment se MORA zadržati kao ispravan matematički izraz (ne stripovan)
+    broken = "Izračunaj $\x0crac{3}{5} : 2$."
+    out = sanitize_math_text(broken)
+    assert out == "Izračunaj $\\frac{3}{5} : 2$."
