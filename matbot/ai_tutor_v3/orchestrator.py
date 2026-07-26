@@ -86,13 +86,27 @@ def resolve_v3_turn_budget_s() -> float:
 
 
 #: Bounded output-token budget for the compact active-task interpretation call
-#: (Section 6). Sized for the SMALL ``ActiveTaskTurnDecision`` schema: a
-#: handful of short typed fields plus one short Bosnian narration sentence or
-#: two — not the 1500-2000 tokens a generic unbounded call could wander into
-#: for a one-sentence student answer. Configurable only because token needs
-#: can shift if the schema grows; the default is a deliberate, small ceiling,
-#: not a guess — see the measured baseline in tests/test_v3_latency.py.
-DEFAULT_V3_ACTIVE_TASK_MAX_OUTPUT_TOKENS = 500
+#: (Section 6/latency follow-up).
+#:
+#: Revised from the original 500: production evidence showed 500 AND a
+#: temporary 1200 both left the call ``status="incomplete"`` with
+#: ``incomplete_reason="max_output_tokens"`` — reasoning tokens (the model was
+#: reasoning at its UNCONFIGURED default effort, "medium" for gpt-5-mini —
+#: see ``resolve_v3_active_task_reasoning_effort`` below) alone consumed the
+#: whole budget before the structured JSON answer was ever produced.
+#:
+#: Two changes together address this:
+#:   1. ``reasoning_effort`` is now explicitly set to "minimal" for this call
+#:      (the lowest value gpt-5-mini actually supports — confirmed from the
+#:      installed SDK, see the resolver below), which should sharply reduce
+#:      reasoning-token consumption versus the previous unconfigured default.
+#:   2. This ceiling is raised to 2000 — comfortably above the previously-
+#:      insufficient 1200 — as a safety margin while (1) takes effect, since
+#:      the exact reasoning-token cost under "minimal" cannot be measured
+#:      without a live call (explicitly out of scope here). This is a
+#:      REASONED, conservative default, not a measured one; see the final
+#:      report for the expectation this rests on.
+DEFAULT_V3_ACTIVE_TASK_MAX_OUTPUT_TOKENS = 2000
 
 
 def resolve_v3_active_task_max_output_tokens() -> int:
@@ -102,6 +116,35 @@ def resolve_v3_active_task_max_output_tokens() -> int:
     except ValueError:
         value = 0
     return value if value > 0 else DEFAULT_V3_ACTIVE_TASK_MAX_OUTPUT_TOKENS
+
+
+#: The ``reasoning.effort`` values gpt-5-mini (a pre-gpt-5.1 model) actually
+#: supports — confirmed by reading the INSTALLED SDK's own type definition
+#: (``openai.types.shared_params.reasoning.Reasoning.effort`` docstring,
+#: openai==2.41.1): "Currently supported values are none, minimal, low,
+#: medium, high, and xhigh ... All models before gpt-5.1 default to medium
+#: reasoning effort, and do not support none." gpt-5-mini is a pre-gpt-5.1
+#: model, so "none" is deliberately EXCLUDED from the accepted set below —
+#: sending it would be an unsupported value for this specific model, not a
+#: generically-invalid one, and the resolver must never forward it.
+_GPT5_MINI_SUPPORTED_REASONING_EFFORTS = ("minimal", "low", "medium", "high", "xhigh")
+
+#: The lowest value gpt-5-mini actually supports (see above) — chosen as the
+#: safe default specifically to cut reasoning-token consumption on the
+#: compact active-task interpretation call.
+DEFAULT_V3_ACTIVE_TASK_REASONING_EFFORT = "minimal"
+
+
+def resolve_v3_active_task_reasoning_effort() -> str:
+    """``MATBOT_V3_ACTIVE_TASK_REASONING_EFFORT`` if it is one of the values
+    gpt-5-mini actually supports (whitespace/case-normalized), else
+    ``DEFAULT_V3_ACTIVE_TASK_REASONING_EFFORT`` — an unset, blank, or
+    unsupported value (including the real-but-unsupported-for-this-model
+    "none") fails closed to the safe default. Pure and side-effect-free."""
+    raw = (os.getenv("MATBOT_V3_ACTIVE_TASK_REASONING_EFFORT") or "").strip().lower()
+    if raw in _GPT5_MINI_SUPPORTED_REASONING_EFFORTS:
+        return raw
+    return DEFAULT_V3_ACTIVE_TASK_REASONING_EFFORT
 
 
 def resolve_v3_model() -> str:
@@ -251,7 +294,15 @@ def grade_policy(grade: int) -> str:
 class ModelCallResult:
     """The outcome of one structured model call. Never raises for content
     problems — a timeout/SDK error/invalid output is reported via ``status`` so
-    the caller can fail safe."""
+    the caller can fail safe.
+
+    ``reasoning_effort``/``max_output_tokens`` echo back what was actually
+    REQUESTED for this call (empty/``0`` when not applicable to the purpose);
+    ``response_status``/``incomplete_reason`` reflect the classified HTTP-200
+    result when one occurred. All four are safe structural telemetry only —
+    never a prompt, student text, or raw model output — used to compare
+    before/after behavior for the active-task latency work.
+    """
     status: str            # "ok" | "invalid_output" | "error"
     parsed: dict = field(default_factory=dict)
     usage: dict = field(default_factory=dict)
@@ -259,6 +310,10 @@ class ModelCallResult:
     model: str = ""
     purpose: str = ""
     error_code: str = ""
+    reasoning_effort: str = ""
+    max_output_tokens: int = 0
+    response_status: str = ""
+    incomplete_reason: str = ""
 
 
 class StructuredModelClient(Protocol):
@@ -269,6 +324,7 @@ class StructuredModelClient(Protocol):
         self, *, purpose: str, system: str, user: str, schema_name: str,
         schema: dict, model: str, timeout: Optional[float],
         response_model: type[BaseModel], max_output_tokens: Optional[int] = None,
+        reasoning_effort: Optional[str] = None,
     ) -> ModelCallResult:
         ...
 
@@ -762,6 +818,7 @@ class OpenAIResponsesClient:
     def generate(
         self, *, purpose, system, user, schema_name, schema, model, timeout,
         response_model: type[BaseModel], max_output_tokens: Optional[int] = None,
+        reasoning_effort: Optional[str] = None,
     ) -> ModelCallResult:
         started = time.monotonic()
         try:
@@ -788,6 +845,15 @@ class OpenAIResponsesClient:
         )
         if max_output_tokens is not None:
             create_kwargs["max_output_tokens"] = max_output_tokens
+        # ``reasoning`` is the exact shape the installed SDK's own request
+        # params define (openai.types.shared_params.reasoning.Reasoning, a
+        # plain TypedDict — verified by reading the installed package, not
+        # guessed): {"effort": <one of none|minimal|low|medium|high|xhigh>}.
+        # Only ever set when a caller explicitly resolves one (today: just
+        # the compact active-task interpretation path) — every other purpose
+        # passes ``reasoning_effort=None`` and gets the model's own default.
+        if reasoning_effort is not None:
+            create_kwargs["reasoning"] = {"effort": reasoning_effort}
         try:
             resp = self._client.responses.create(**create_kwargs)
         except Exception as exc:  # timeout, SDK error, network — fail safe
@@ -796,7 +862,9 @@ class OpenAIResponsesClient:
             return ModelCallResult(
                 status="error", latency_ms=(time.monotonic() - started) * 1000.0,
                 model=model, purpose=purpose,
-                error_code=type(exc).__name__)
+                error_code=type(exc).__name__,
+                reasoning_effort=reasoning_effort or "",
+                max_output_tokens=max_output_tokens or 0)
         latency = (time.monotonic() - started) * 1000.0
         usage = {}
         u = getattr(resp, "usage", None)
@@ -811,6 +879,12 @@ class OpenAIResponsesClient:
         # below is checked BEFORE ever attempting json.loads.
         classification = classify_responses_output(resp)
         request_id = getattr(resp, "id", None)
+        telemetry = dict(
+            reasoning_effort=reasoning_effort or "",
+            max_output_tokens=max_output_tokens or 0,
+            response_status=classification.response_status or "",
+            incomplete_reason=classification.incomplete_reason or "",
+        )
 
         def _invalid(error_code: str, *, validation_summary: Optional[list] = None) -> ModelCallResult:
             _log_invalid_output(
@@ -819,7 +893,7 @@ class OpenAIResponsesClient:
                 validation_summary=validation_summary)
             return ModelCallResult(status="invalid_output", usage=usage,
                                    latency_ms=latency, model=model,
-                                   purpose=purpose, error_code=error_code)
+                                   purpose=purpose, error_code=error_code, **telemetry)
 
         if classification.response_status == "incomplete":
             return _invalid("incomplete_output")
@@ -839,7 +913,8 @@ class OpenAIResponsesClient:
             return _invalid("schema_validation_error",
                            validation_summary=_validation_error_summary(exc))
         return ModelCallResult(status="ok", parsed=validated.model_dump(mode="json"),
-                               usage=usage, latency_ms=latency, model=model, purpose=purpose)
+                               usage=usage, latency_ms=latency, model=model,
+                               purpose=purpose, **telemetry)
 
 
 # --------------------------------------------------------------------------- #
@@ -1009,7 +1084,8 @@ def interpret_active_task_turn(
         schema_name="ActiveTaskTurnDecision",
         schema=export_json_schema(ActiveTaskTurnDecision),
         model=model, timeout=timeout, response_model=ActiveTaskTurnDecision,
-        max_output_tokens=resolve_v3_active_task_max_output_tokens())
+        max_output_tokens=resolve_v3_active_task_max_output_tokens(),
+        reasoning_effort=resolve_v3_active_task_reasoning_effort())
     if result.status != "ok":
         return None, result
     parsed = _validate_into(ActiveTaskTurnDecision, result.parsed)

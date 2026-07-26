@@ -330,6 +330,7 @@ def _run_v3_turn(payload, *, identity, grade, model, timeout, shadow):
             "call_purposes": outcome_bundle.get("purposes") or [],
             "call_count": len(outcome_bundle.get("purposes") or []),
             "error_code": outcome_bundle["error"],
+            "active_task_telemetry": outcome_bundle.get("active_task_telemetry"),
         }, ensure_ascii=False) if outcome_bundle.get("purposes") else ""
         store.fail_turn(turn_id=turn_id, error_code=outcome_bundle["error"],
                         completed_at=now_iso(), usage_json=usage_json,
@@ -461,6 +462,7 @@ def _execute_turn(client, *, blueprint, state, grade, student_message, model,
     usage = UsageMetrics()
     purposes: list[str] = []
     narration_proposal = None
+    active_task_telemetry = None
 
     if is_bootstrap:
         interpretation = _synthetic_interpretation(
@@ -487,8 +489,18 @@ def _execute_turn(client, *, blueprint, state, grade, student_message, model,
             student_message=student_message, model=model, timeout=call_timeout)
         _accumulate(usage, call)
         purposes.append(call.purpose)
+        # Structural telemetry only (Section 6) — never a prompt, student
+        # text, or raw model output — to compare reasoning-effort/token-cap
+        # behavior before and after this latency pass.
+        active_task_telemetry = {
+            "reasoning_effort": call.reasoning_effort,
+            "max_output_tokens": call.max_output_tokens,
+            "response_status": call.response_status,
+            "incomplete_reason": call.incomplete_reason,
+        }
         if decision is None:
-            return {"error": call.error_code or call.status, "usage": usage, "purposes": purposes}
+            return {"error": call.error_code or call.status, "usage": usage,
+                   "purposes": purposes, "active_task_telemetry": active_task_telemetry}
         interpretation, assessment = orchestrator.decision_to_interpretation_and_assessment(decision)
         narration_proposal = decision.narration_proposal
     else:
@@ -519,13 +531,15 @@ def _execute_turn(client, *, blueprint, state, grade, student_message, model,
         student_message=student_message, model=model, budget=budget,
         usage=usage, purposes=purposes, narration_proposal=narration_proposal)
     if err:
-        return {"error": err, "usage": usage, "purposes": purposes}
+        return {"error": err, "usage": usage, "purposes": purposes,
+               "active_task_telemetry": active_task_telemetry}
 
     return {
         "new_state": result.new_state, "outcome": result.outcome,
         "answer": answer, "category": category or result.response_category,
         "turn_kind": interpretation.turn_kind, "usage": usage,
         "purposes": purposes, "quality_gate": gate_info,
+        "active_task_telemetry": active_task_telemetry,
         "interpretation": interpretation.model_dump(mode="json"),
         "assessment": assessment.model_dump(mode="json") if assessment else None,
     }
@@ -807,6 +821,7 @@ def _audit_record(*, request_id, session_id, client_turn_id, identity, blueprint
         "schema_validation_ok": True,
         "turn_latency_ms": turn_latency_ms,
         "usage": usage.model_dump(mode="json"),
+        "active_task_telemetry": outcome_bundle.get("active_task_telemetry"),
     }
 
 

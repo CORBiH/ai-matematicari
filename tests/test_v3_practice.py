@@ -132,11 +132,13 @@ class FakeClient:
         self._status[purpose] = (status, error_code)
 
     def generate(self, *, purpose, system, user, schema_name, schema, model, timeout,
-                response_model=None, max_output_tokens=None):
+                response_model=None, max_output_tokens=None, reasoning_effort=None):
         self.calls.append(purpose)
         self.models.append(model)
         self.max_output_tokens_seen = getattr(self, "max_output_tokens_seen", [])
         self.max_output_tokens_seen.append(max_output_tokens)
+        self.reasoning_effort_seen = getattr(self, "reasoning_effort_seen", [])
+        self.reasoning_effort_seen.append(reasoning_effort)
         if purpose in self._status:
             status, err = self._status[purpose]
             return ModelCallResult(status=status, model=model, purpose=purpose,

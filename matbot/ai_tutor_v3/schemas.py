@@ -672,18 +672,24 @@ class ActiveTaskTurnContext(V3StrictModel):
     student_message: NonEmptyStr
 
 
+# A SMALLER, purpose-specific structured output for interpreting one turn
+# while a Practice task is already active. Contains only the fields the
+# reducer/dispatcher actually consume for this path (verified by direct
+# inspection of reducer.py/dispatcher.py, not guessed) plus one narration
+# proposal — never an authoritative counter, streak, mastery, coverage
+# value, a model-chosen task ID, a state patch, a session version, or a
+# completion mutation. The reducer computes every one of those from ITS OWN
+# state; this model only proposes turn meaning, a provisional verdict, and
+# wording.
+#
+# Deliberately a plain code comment, NOT a class docstring: Pydantic embeds
+# a model's docstring verbatim as the exported JSON Schema's "description"
+# — sent to OpenAI on EVERY active-task interpretation call (confirmed by
+# inspecting ``export_json_schema(ActiveTaskTurnDecision)``'s actual output).
+# A one-line docstring keeps that recurring cost small while this comment
+# still documents the design for future readers.
 class ActiveTaskTurnDecision(V3StrictModel):
-    """A SMALLER, purpose-specific structured output for interpreting one
-    turn while a Practice task is already active.
-
-    Contains only the fields the reducer/dispatcher actually consume for this
-    path (verified by direct inspection of ``reducer.py``/``dispatcher.py``,
-    not guessed) plus one narration proposal — never an authoritative
-    counter, streak, mastery, coverage value, a model-chosen task ID, a state
-    patch, a session version, or a completion mutation. The reducer computes
-    every one of those from ITS OWN state; this model only proposes turn
-    meaning, a provisional verdict, and wording.
-    """
+    """Compact, non-authoritative interpretation of one active-task turn."""
 
     schema_version: NonEmptyStr
     turn_kind: TurnKind

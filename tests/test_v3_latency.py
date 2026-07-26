@@ -472,9 +472,15 @@ def test_max_output_tokens_omitted_when_none(monkeypatch):
 
 
 def test_default_active_task_max_output_tokens_is_bounded(monkeypatch):
+    """Revised bound: production evidence showed BOTH 500 and 1200 were
+    insufficient (incomplete_output, reasoning tokens ate the budget at the
+    model's unconfigured default effort) — see orchestrator.py's
+    DEFAULT_V3_ACTIVE_TASK_MAX_OUTPUT_TOKENS docstring. 2000 is the new,
+    evidence-justified default; this still bounds it well below an
+    unbounded/runaway value."""
     monkeypatch.delenv("MATBOT_V3_ACTIVE_TASK_MAX_OUTPUT_TOKENS", raising=False)
     value = orch.resolve_v3_active_task_max_output_tokens()
-    assert 0 < value <= 1000   # nowhere near the 1500-2000 the task warns against
+    assert 0 < value <= 3000
 
 
 def test_active_task_max_output_tokens_configurable(monkeypatch):
