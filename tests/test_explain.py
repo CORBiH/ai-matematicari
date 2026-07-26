@@ -8,7 +8,7 @@ to dokazuje samo live eval (plan u završnom izvještaju).
 """
 import json
 
-from matbot import auth
+from matbot import auth, prompts
 from matbot.explain import run_explain_turn
 from matbot.practice import SAFE_ERROR_MESSAGE
 from matbot.llm import LLMTimeout
@@ -105,6 +105,52 @@ def test_no_practice_fields_leak_into_prompt():
     assert "INTERNI OČEKIVANI ODGOVOR" not in input_text
     assert "HINT NIVO" not in input_text
     assert "NEDAVNI ZADACI" not in input_text
+
+
+def test_prompt_keeps_lesson_name_and_forbids_renaming_topic():
+    instructions = prompts.build_explain_instructions(6)
+    assert "NAZIV LEKCIJE" in instructions
+    assert "NE preimenuj temu" in instructions
+    assert "usputni primjer" in instructions
+
+
+def test_prompt_requires_consecutive_step_numbering():
+    instructions = prompts.build_explain_instructions(6)
+    assert "UZASTOPNO" in instructions
+    assert "bez ponavljanja" in instructions
+    assert "preskakanja" in instructions
+
+
+def test_prompt_forbids_empty_closing_phrases_and_requires_math_conclusion():
+    instructions = prompts.build_explain_instructions(6)
+    assert "Tu stajemo" in instructions          # navedeno kao ZABRANJENA fraza
+    assert "MATEMATIČKIM zaključkom" in instructions
+
+
+def test_instructions_do_not_themselves_contain_the_banned_closing_phrasing():
+    """Ranije je pravilo o prvom objašnjenju doslovno sadržavalo „i tu stani“,
+    što je model mogao pokupiti kao stil završetka („Tu stajemo“). Ta
+    formulacija se više ne smije pojaviti kao UPUTA — jedino spominjanje smije
+    biti u zabrani."""
+    instructions = prompts.build_explain_instructions(6)
+    assert "i tu stani" not in instructions
+    assert instructions.count("Tu stajemo") == 1   # samo u zabrani
+
+
+def test_prompt_limits_followup_length_but_allows_full_procedure():
+    instructions = prompts.build_explain_instructions(6)
+    assert "140 riječi" in instructions
+    assert "osim prvog" in instructions
+    assert "cijeli postupak" in instructions
+
+
+def test_new_style_rules_present_for_every_grade():
+    for grade in (6, 7, 8, 9):
+        instructions = prompts.build_explain_instructions(grade)
+        assert "NAZIV LEKCIJE" in instructions
+        assert "UZASTOPNO" in instructions
+        assert "MATEMATIČKIM zaključkom" in instructions
+        assert "140 riječi" in instructions
 
 
 def test_first_turn_prompt_says_give_initial_explanation():
