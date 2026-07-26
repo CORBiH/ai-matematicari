@@ -130,17 +130,55 @@ class FakeClient:
         """Force a non-ok result for a purpose (timeout/invalid output)."""
         self._status[purpose] = (status, error_code)
 
-    def generate(self, *, purpose, system, user, schema_name, schema, model, timeout):
+    def generate(self, *, purpose, system, user, schema_name, schema, model, timeout,
+                max_output_tokens=None):
         self.calls.append(purpose)
         self.models.append(model)
+        self.max_output_tokens_seen = getattr(self, "max_output_tokens_seen", [])
+        self.max_output_tokens_seen.append(max_output_tokens)
         if purpose in self._status:
             status, err = self._status[purpose]
             return ModelCallResult(status=status, model=model, purpose=purpose,
                                    error_code=err or status)
         parsed = self._by_purpose.get(purpose, {})
+        # turn_interpretation is shared by TWO real schemas (PracticeTurnInterpretation
+        # when no task is active, ActiveTaskTurnDecision — the compact latency-pass
+        # schema — when one is) — this test double stores ONE canned nested shape and
+        # flattens it on the fly for the compact schema, so every existing
+        # interp_parsed()/fake.set(...) call site keeps working unchanged.
+        if schema_name == "ActiveTaskTurnDecision" and isinstance(parsed, dict) \
+                and "interpretation" in parsed:
+            parsed = _flatten_to_active_task_decision(parsed)
         return ModelCallResult(status="ok", parsed=parsed,
                                usage={"prompt_tokens": 120, "completion_tokens": 44},
                                latency_ms=7.0, model=model, purpose=purpose)
+
+
+def _flatten_to_active_task_decision(nested: dict) -> dict:
+    """Test-only adapter: the nested PracticeTurnInterpretation-shaped canned
+    fixture -> the flat ActiveTaskTurnDecision shape, so existing
+    interp_parsed()/assess_parsed() fixtures serve both real schemas."""
+    interp = nested.get("interpretation") or {}
+    assessment = nested.get("assessment") or {}
+    out = {
+        "schema_version": interp.get("schema_version", "v1"),
+        "turn_kind": interp["turn_kind"],
+        "is_answer_attempt": bool(interp.get("is_answer_attempt", False)),
+        "confidence": interp.get("confidence", 0.9),
+    }
+    if interp.get("normalized_meaning"):
+        out["issue_summary"] = interp["normalized_meaning"]
+    if "clarification_question" in interp:
+        out["clarification_question"] = interp["clarification_question"]
+    if "requested_action" in interp:
+        out["requested_action"] = interp["requested_action"]
+    if assessment.get("proposed_verdict") is not None:
+        out["proposed_verdict"] = assessment["proposed_verdict"]
+    if assessment.get("difficulty_suggestion") is not None:
+        out["difficulty_suggestion"] = assessment["difficulty_suggestion"]
+    if "narration_proposal" in nested:
+        out["narration_proposal"] = nested["narration_proposal"]
+    return out
 
 
 # --------------------------------------------------------------------------- #

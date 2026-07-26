@@ -24,9 +24,13 @@ from typing import Any, Optional, Protocol
 from pydantic import BaseModel, ValidationError
 
 from matbot.ai_tutor_v3.schemas import (
+    ActiveTaskTurnContext,
+    ActiveTaskTurnDecision,
     NarrationResult,
+    PracticeModelAssessment,
     PracticeTurnInterpretation,
     PromptPolicyReference,
+    StudentTurnInterpretation,
     TaskSpecification,
     export_json_schema,
 )
@@ -79,6 +83,25 @@ def resolve_v3_turn_budget_s() -> float:
     """Total per-turn model-call budget: ``MATBOT_V3_TURN_BUDGET_S`` if a
     positive number, else ``DEFAULT_V3_TURN_BUDGET_S``."""
     return _resolve_positive_float("MATBOT_V3_TURN_BUDGET_S", DEFAULT_V3_TURN_BUDGET_S)
+
+
+#: Bounded output-token budget for the compact active-task interpretation call
+#: (Section 6). Sized for the SMALL ``ActiveTaskTurnDecision`` schema: a
+#: handful of short typed fields plus one short Bosnian narration sentence or
+#: two — not the 1500-2000 tokens a generic unbounded call could wander into
+#: for a one-sentence student answer. Configurable only because token needs
+#: can shift if the schema grows; the default is a deliberate, small ceiling,
+#: not a guess — see the measured baseline in tests/test_v3_latency.py.
+DEFAULT_V3_ACTIVE_TASK_MAX_OUTPUT_TOKENS = 500
+
+
+def resolve_v3_active_task_max_output_tokens() -> int:
+    raw = (os.getenv("MATBOT_V3_ACTIVE_TASK_MAX_OUTPUT_TOKENS") or "").strip()
+    try:
+        value = int(raw) if raw else 0
+    except ValueError:
+        value = 0
+    return value if value > 0 else DEFAULT_V3_ACTIVE_TASK_MAX_OUTPUT_TOKENS
 
 
 def resolve_v3_model() -> str:
@@ -245,6 +268,7 @@ class StructuredModelClient(Protocol):
     def generate(
         self, *, purpose: str, system: str, user: str, schema_name: str,
         schema: dict, model: str, timeout: Optional[float],
+        max_output_tokens: Optional[int] = None,
     ) -> ModelCallResult:
         ...
 
@@ -584,14 +608,31 @@ class OpenAIResponsesClient:
 
     Never constructed at import time. The SDK is imported inside ``__init__`` so
     that merely importing the V3 package (isolation test #3) starts no client.
+
+    ``max_retries=0`` is DELIBERATE and load-bearing, not an oversight: the
+    installed SDK's own default (``openai._constants.DEFAULT_MAX_RETRIES``,
+    confirmed by reading the installed package: 2) means an unconfigured
+    client silently retries a slow/timed-out request up to twice MORE inside
+    the SDK before ever raising — exactly the production symptom ("Retrying
+    request to /responses ..." followed eventually by ``APITimeoutError``).
+    Each retry re-spends up to the same per-call timeout, so what looks like
+    one bounded V3 model call could actually take up to 3x as long — blowing
+    through the turn budget (Phase 8) and the frontend's fixed ~60s abort
+    without ever showing up as "3 calls" in our own audit. V3 has its own
+    turn-budget/no-retry-loop discipline (dispatcher._TurnBudget); a hidden
+    SDK-level retry defeats it. One V3 model call must be one network
+    attempt — this is scoped to the V3 client ONLY, never the legacy/general
+    OpenAI client in app.py, which keeps its own (unrelated) retry policy.
     """
 
     def __init__(self, api_key: Optional[str] = None) -> None:
         from openai import OpenAI  # lazy: no import-time SDK dependency
-        self._client = OpenAI(api_key=api_key) if api_key else OpenAI()
+        kwargs = {"api_key": api_key} if api_key else {}
+        self._client = OpenAI(max_retries=0, **kwargs)
 
     def generate(
         self, *, purpose, system, user, schema_name, schema, model, timeout,
+        max_output_tokens: Optional[int] = None,
     ) -> ModelCallResult:
         started = time.monotonic()
         try:
@@ -608,15 +649,18 @@ class OpenAIResponsesClient:
             return ModelCallResult(
                 status="error", model=model, purpose=purpose,
                 error_code="strict_schema_incompatible")
+        create_kwargs: dict[str, Any] = dict(
+            model=model,
+            input=[{"role": "system", "content": system},
+                   {"role": "user", "content": user}],
+            text={"format": {"type": "json_schema", "name": schema_name,
+                             "schema": strict_schema, "strict": True}},
+            timeout=timeout,
+        )
+        if max_output_tokens is not None:
+            create_kwargs["max_output_tokens"] = max_output_tokens
         try:
-            resp = self._client.responses.create(
-                model=model,
-                input=[{"role": "system", "content": system},
-                       {"role": "user", "content": user}],
-                text={"format": {"type": "json_schema", "name": schema_name,
-                                 "schema": strict_schema, "strict": True}},
-                timeout=timeout,
-            )
+            resp = self._client.responses.create(**create_kwargs)
         except Exception as exc:  # timeout, SDK error, network — fail safe
             _log_openai_call_failure(exc, purpose=purpose, model=model,
                                      schema_name=schema_name)
@@ -725,6 +769,150 @@ def interpret_turn(
             latency_ms=result.latency_ms, model=result.model,
             purpose=result.purpose, error_code="schema_validation_failed")
     return parsed, result
+
+
+# --------------------------------------------------------------------------- #
+# Compact active-task interpretation (latency pass)                          #
+#                                                                              #
+# The DOMINANT V3 Practice turn: a free-form student message while a task is  #
+# already active. ``interpret_turn``/``PracticeTurnInterpretation`` above     #
+# remain for the rarer no-active-task path, which genuinely needs the fuller  #
+# session/Blueprint picture. This path never sends the full Blueprint or the  #
+# full durable session — see ``build_active_task_context``.                  #
+# --------------------------------------------------------------------------- #
+#: A single compact paragraph replacing the five full policy layers + full
+#: Blueprint dump for THIS purpose only. Every rule here is still traceable to
+#: the full versioned policies above (bumping THOSE bumps behavior for every
+#: purpose; this is a deliberately narrower excerpt, not a fork of the rules).
+ACTIVE_TASK_INTERPRETATION_POLICY = (
+    "Ti si nastavnik matematike za bosanske osnovce, {grade}. razred. Tumačiš "
+    "JEDNU poruku učenika tokom aktivnog zadatka u vježbi. Razumij prirodni "
+    "bosanski: izostavljene dijakritike, kolokvijalni jezik, implicitne i "
+    "promijenjene odgovore, nesigurnost, i brojeve u komentaru koji NISU "
+    "predani odgovor. Razlikuj: odgovor na zadatak / pitanje o konceptu / "
+    "traženje pomoći / komentar / traženje novog zadatka / promjenu težine / "
+    "traženje rješenja / potvrdu / nejasnu poruku. Nejasna poruka NIJE "
+    "pogrešan odgovor — traži pojašnjenje, nikad kazna. Pitanje o konceptu ili "
+    "traženje pomoći NE mijenja aktivni zadatak. Tvoja procjena odgovora je "
+    "SAMO prijedlog — server odlučuje konačno. Ako je ovo pokušaj odgovora, "
+    "predloži i kratku, prirodnu, djetinjastu ali ne infantilnu bosansku "
+    "povratnu poruku (narration_proposal): tačno=koncizno, ne uvijek ista "
+    "fraza; netačno=prizanaj tvrdnju pa objasni problem pa sljedeći korak, "
+    "zadatak ostaje; djelimično=šta je tačno pa šta nedostaje. Ne otkrivaj "
+    "konačan odgovor ako zadatak ostaje aktivan. Nikad ne koristiš internu "
+    "terminologiju (shema, JSON, Blueprint, model, pouzdanost, stanje) niti "
+    "pišeš razmišljanje naglas — samo traženi strukturisani izlaz."
+)
+
+
+def build_active_task_context(
+    *, grade: int, blueprint, state, student_message: str,
+) -> ActiveTaskTurnContext:
+    """Only what the model needs for ONE active-task turn — never the full
+    Blueprint, never the full durable session. ``state.active_task`` must be
+    set; callers only use this path when it is."""
+    task = state.active_task
+    recent = state.recent_turns[-2:] if state.recent_turns else []
+    recent_lines = [f"{t.role}: {t.text[:200]}" for t in recent]
+    return ActiveTaskTurnContext(
+        grade=grade,
+        lesson_id=blueprint.lesson_identity.lesson_id,
+        lesson_title=blueprint.lesson_identity.lesson_title,
+        concept_id=task.concept_id,
+        target_id=task.target_id,
+        task_id=task.task_id,
+        task_text=task.question,
+        answer_kind=task.answer_kind,
+        expected_internal=task.expected_internal,
+        planned_verification_type=task.planned_verification_type,
+        key_rules=[r.statement for r in blueprint.key_rules[:2]],
+        allowed_methods=list(blueprint.allowed_methods[:3]),
+        relevant_misconceptions=[
+            m.description for m in blueprint.common_misconceptions[:2]],
+        hint_level=state.hint.current_level,
+        solution_revealed=task.solution_revealed,
+        difficulty_level=state.difficulty.level,
+        recent_turns=recent_lines,
+        student_message=student_message,
+    )
+
+
+def interpret_active_task_turn(
+    client: StructuredModelClient, *, grade: int, blueprint, state,
+    student_message: str, model: str, timeout: Optional[float],
+) -> tuple[Optional[ActiveTaskTurnDecision], ModelCallResult]:
+    """The compact counterpart to ``interpret_turn`` for the dominant case: a
+    free-form message while a task is already active. Smaller system prompt,
+    smaller context, smaller output schema, bounded output tokens."""
+    context = build_active_task_context(
+        grade=grade, blueprint=blueprint, state=state,
+        student_message=student_message)
+    system = ACTIVE_TASK_INTERPRETATION_POLICY.format(grade=grade)
+    user = context.model_dump_json()
+    result = client.generate(
+        purpose=PURPOSE_INTERPRET, system=system, user=user,
+        schema_name="ActiveTaskTurnDecision",
+        schema=export_json_schema(ActiveTaskTurnDecision),
+        model=model, timeout=timeout,
+        max_output_tokens=resolve_v3_active_task_max_output_tokens())
+    if result.status != "ok":
+        return None, result
+    parsed = _validate_into(ActiveTaskTurnDecision, result.parsed)
+    if parsed is None:
+        return None, ModelCallResult(
+            status="invalid_output", usage=result.usage,
+            latency_ms=result.latency_ms, model=result.model,
+            purpose=result.purpose, error_code="schema_validation_failed")
+    return parsed, result
+
+
+def decision_to_interpretation_and_assessment(
+    decision: ActiveTaskTurnDecision,
+) -> tuple[StudentTurnInterpretation, Optional[PracticeModelAssessment]]:
+    """Adapts the compact ``ActiveTaskTurnDecision`` into the existing
+    ``StudentTurnInterpretation``/``PracticeModelAssessment`` shape the
+    reducer already consumes — the reducer itself is UNCHANGED by this
+    latency pass; only what is asked of the model got smaller. Fields the
+    reducer never reads (claims, stated_reasoning_components,
+    visible_misconception_codes, precision, proposed_pedagogical_action,
+    suggested_next_concept, solved_independently, used_assistance — verified
+    by direct inspection of reducer.py/dispatcher.py) get safe, inert
+    defaults, never invented model content.
+    """
+    interpretation = StudentTurnInterpretation(
+        schema_version=decision.schema_version,
+        turn_kind=decision.turn_kind,
+        is_answer_attempt=decision.is_answer_attempt,
+        normalized_meaning=decision.issue_summary or decision.turn_kind,
+        claims=[],
+        certainty="certain" if decision.confidence >= 0.5 else "uncertain",
+        precision="unspecified",
+        confidence=decision.confidence,
+        clarification_question=decision.clarification_question,
+        requested_action=decision.requested_action,
+    )
+    assessment = None
+    if decision.is_answer_attempt and decision.proposed_verdict is not None:
+        assessment = PracticeModelAssessment(
+            schema_version=decision.schema_version,
+            is_answer_attempt=True,
+            proposed_verdict=decision.proposed_verdict,
+            proposed_pedagogical_action="continue",
+            confidence=decision.confidence,
+            difficulty_suggestion=decision.difficulty_suggestion,
+        )
+    elif decision.difficulty_suggestion is not None:
+        # difficulty_change carries no verdict but still needs an assessment
+        # object for the reducer's _apply_difficulty to read the suggestion.
+        assessment = PracticeModelAssessment(
+            schema_version=decision.schema_version,
+            is_answer_attempt=False,
+            proposed_verdict="not_checkable",
+            proposed_pedagogical_action="continue",
+            confidence=decision.confidence,
+            difficulty_suggestion=decision.difficulty_suggestion,
+        )
+    return interpretation, assessment
 
 
 def generate_task(

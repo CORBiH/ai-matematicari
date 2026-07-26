@@ -459,7 +459,26 @@ def _execute_turn(client, *, blueprint, state, grade, student_message, model,
         interpretation = _synthetic_interpretation(
             "difficulty_change", meaning=f"Traži {difficulty_request} zadatak.")
         assessment = _synthetic_difficulty_assessment(difficulty_request)
+    elif state.active_task is not None:
+        # The DOMINANT case: free-form message, task already active — the
+        # compact path (Section 3-6 latency pass). Smaller context, smaller
+        # schema, bounded output tokens; the reducer receives the SAME
+        # StudentTurnInterpretation/PracticeModelAssessment shape either way.
+        call_timeout = budget.next_timeout()
+        if call_timeout is None:
+            return {"error": "turn_budget_exceeded"}
+        decision, call = orchestrator.interpret_active_task_turn(
+            client, grade=grade, blueprint=blueprint, state=state,
+            student_message=student_message, model=model, timeout=call_timeout)
+        _accumulate(usage, call)
+        purposes.append(call.purpose)
+        if decision is None:
+            return {"error": call.error_code or call.status}
+        interpretation, assessment = orchestrator.decision_to_interpretation_and_assessment(decision)
+        narration_proposal = decision.narration_proposal
     else:
+        # No active task yet (rare outside bootstrap/trusted-intent paths) —
+        # genuinely needs the fuller session/Blueprint picture.
         call_timeout = budget.next_timeout()
         if call_timeout is None:
             return {"error": "turn_budget_exceeded"}

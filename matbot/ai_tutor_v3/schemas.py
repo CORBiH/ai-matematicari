@@ -633,6 +633,71 @@ class PracticeTurnInterpretation(V3StrictModel):
 
 
 # --------------------------------------------------------------------------- #
+# Compact active-task turn context + decision (latency pass)                  #
+#                                                                               #
+# ``PracticeTurnInterpretation`` (above) stays the schema used when there is   #
+# NO active task yet (bootstrap-adjacent/rare path) — that case genuinely      #
+# needs the fuller context. For the DOMINANT case — a free-form student        #
+# message while a Practice task is already active — these two compact models  #
+# replace it: a typed, minimal INPUT context (never sent as a schema; it is   #
+# serialized into the user message text) and a typed, minimal OUTPUT schema.  #
+# --------------------------------------------------------------------------- #
+class ActiveTaskTurnContext(V3StrictModel):
+    """Only what the model needs to interpret and provisionally assess ONE
+    message while a task is already active — never the full durable session,
+    never the full LessonBlueprint. Built by
+    ``orchestrator.build_active_task_context`` from server-side data the
+    student never sees directly (blueprint + session state), so it carries no
+    new privacy surface: no raw parent/student contact data, no full
+    conversation history (only the last couple of turns), no reporting/outbox
+    data, no unrelated concepts, no coverage/mastery/completed-task history."""
+
+    grade: Literal[6, 7, 8, 9]
+    lesson_id: NonEmptyStr
+    lesson_title: NonEmptyStr
+    concept_id: NonEmptyStr
+    target_id: NonEmptyStr
+    task_id: NonEmptyStr
+    task_text: NonEmptyStr
+    answer_kind: AnswerKind
+    expected_internal: Optional[str] = None
+    planned_verification_type: Optional[VerificationType] = None
+    key_rules: list[str] = Field(default_factory=list)
+    allowed_methods: list[str] = Field(default_factory=list)
+    relevant_misconceptions: list[str] = Field(default_factory=list)
+    hint_level: int = Field(ge=0)
+    solution_revealed: bool
+    difficulty_level: int = Field(ge=1, le=5)
+    recent_turns: list[str] = Field(default_factory=list)
+    student_message: NonEmptyStr
+
+
+class ActiveTaskTurnDecision(V3StrictModel):
+    """A SMALLER, purpose-specific structured output for interpreting one
+    turn while a Practice task is already active.
+
+    Contains only the fields the reducer/dispatcher actually consume for this
+    path (verified by direct inspection of ``reducer.py``/``dispatcher.py``,
+    not guessed) plus one narration proposal — never an authoritative
+    counter, streak, mastery, coverage value, a model-chosen task ID, a state
+    patch, a session version, or a completion mutation. The reducer computes
+    every one of those from ITS OWN state; this model only proposes turn
+    meaning, a provisional verdict, and wording.
+    """
+
+    schema_version: NonEmptyStr
+    turn_kind: TurnKind
+    is_answer_attempt: bool
+    confidence: float = Field(ge=0.0, le=1.0)
+    clarification_question: Optional[str] = None
+    requested_action: Optional[str] = None
+    proposed_verdict: Optional[Verdict] = None
+    difficulty_suggestion: Optional[DifficultySuggestion] = None
+    issue_summary: Optional[str] = None
+    narration_proposal: Optional[NarrationResult] = None
+
+
+# --------------------------------------------------------------------------- #
 # Verification boundary (model-only in this stage)                            #
 # --------------------------------------------------------------------------- #
 class VerificationBatchResult(V3StrictModel):
