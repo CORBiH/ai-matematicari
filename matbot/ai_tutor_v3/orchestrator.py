@@ -167,10 +167,10 @@ def resolve_v3_model() -> str:
 #: versions are recorded in the blueprint, the session state and every audit row.
 PROMPT_POLICY_VERSIONS = {
     "constitution_version": "constitution@2026-07-25-v2",
-    "bosnian_language_policy_version": "bs-lang@2026-07-25-v2",
+    "bosnian_language_policy_version": "bs-lang@2026-07-26-v3",
     "math_notation_policy_version": "math-notation@2026-07-25-v2",
-    "grade_policy_version": "grade@2026-07-25-v2",
-    "mode_policy_version": "practice-mode@2026-07-25-v2",
+    "grade_policy_version": "grade@2026-07-26-v3",
+    "mode_policy_version": "practice-mode@2026-07-26-v3",
     "lesson_blueprint_version": "blueprint-policy@2026-07-25-v2",
 }
 
@@ -216,7 +216,12 @@ BOSNIAN_LANGUAGE_POLICY = (
     "dijakritike, pravopisne greške, nepotpunu gramatiku, kolokvijalni dječiji "
     "jezik, implicitne odgovore, promijenjene odgovore, nesigurnost (možda, "
     "valjda, otprilike) i pitanja koja sadrže brojeve a nisu predani odgovori. "
-    "Ne traži tačne fraze. Preferiraj: jednakokraki trougao, zbir, stepenovanje."
+    "Ne traži tačne fraze. Preferiraj: jednakokraki trougao, zbir, stepenovanje, "
+    "brojnik i nazivnik (NIKAD brojilac/imenilac), uglomjer (NIKAD kutomjer), "
+    "linijar ili lenjir. Nikad ne piši povratnu informaciju koja samo ponavlja "
+    "učenikovu rečenicu drugim redoslijedom riječi — svaka povratna informacija "
+    "mora ili potvrditi/ispraviti tvrdnju, ili dodati konkretan sljedeći korak, "
+    "nikad samo prepričati šta je učenik već napisao."
 )
 
 MATH_NOTATION_POLICY = (
@@ -239,10 +244,15 @@ MATH_NOTATION_POLICY = (
 # polynomials, systems, …), never hardcoded per topic.
 GRADE_POLICIES = {
     6: ("6. razred: cijeli brojevi i razlomci primjereni programu; jednačine "
-        "kroz odnose operacija gdje se traži; školski NZD/NZS; bez naprednih "
-        "algebarskih metoda. Jezik: kratke, direktne rečenice; obično jedna "
-        "ili dvije upute po zadatku; poznate školske riječi; konkretan "
-        "sljedeći korak; minimalna apstrakcija osim ako lekcija traži više."),
+        "RJEŠAVAJ ISKLJUČIVO kroz odnose operacija (npr. nepoznati sabirak = "
+        "zbir - poznati sabirak; nepoznati činilac = proizvod : poznati "
+        "činilac) — NIKAD kroz 'prebacivanje' člana na drugu stranu uz "
+        "promjenu znaka i NIKAD množenjem/dijeljenjem cijele jednačine "
+        "negativnim brojem (te metode uči tek 7. razred); školski NZD/NZS; "
+        "bez naprednih algebarskih metoda. Jezik: kratke, direktne rečenice; "
+        "obično jedna ili dvije upute po zadatku; poznate školske riječi; "
+        "konkretan sljedeći korak; minimalna apstrakcija osim ako lekcija "
+        "traži više."),
     7: ("7. razred: prebacivanje članova uz promjenu znaka gdje je programski "
         "primjereno. Jezik: sažet, uz malo više matematičkog objašnjenja; "
         "algebarske pojmove uvodi samo gdje ih program traži; rečenice drži "
@@ -340,6 +350,14 @@ PURPOSE_REVEAL = "solution_reveal"
 #: The ONE bounded quality-gate repair call (Phase 5) — never more than one
 #: per rejected text; see ``matbot.ai_tutor_v3.quality_gate.MAX_REPAIR_ATTEMPTS``.
 PURPOSE_REPAIR = "quality_repair"
+#: The ONE bounded feedback-value repair call (pedagogy pass) — never more
+#: than one per rejected feedback text; see
+#: ``matbot.ai_tutor_v3.feedback_value_gate.MAX_REPAIR_ATTEMPTS``.
+PURPOSE_FEEDBACK_REPAIR = "feedback_value_repair"
+#: The ONE bounded task-coherence repair call (pedagogy pass) — never more
+#: than one per rejected task proposal; see
+#: ``matbot.ai_tutor_v3.task_coherence.MAX_REPAIR_ATTEMPTS``.
+PURPOSE_TASK_REPAIR = "task_coherence_repair"
 
 
 class StrictSchemaError(ValueError):
@@ -979,11 +997,13 @@ def interpret_turn(
         "odgovora, dodaj i narration_proposal: prijedlog kratke povratne "
         "informacije primjerene TVOM predloženom verdiktu (server možda "
         "odluči drugačije — ipak piši povratnu informaciju kao da je tvoj "
-        "predloženi verdikt konačan). Prati standard: tačno=koncizno bez "
+        "predloženi verdikt konačan). Prije predloga verdikta, sam u sebi "
+        "provjeri račun/rasuđivanje. Prati standard: tačno=koncizno bez "
         "ponavljanja iste fraze; netačno=prvo prizanj tvrdnju pa objasni "
         "problem pa sljedeći korak, zadatak ostaje; djelimično=navedi šta je "
-        "tačno pa šta nedostaje. Nikad ne otkrivaj konačan odgovor ako zadatak "
-        "ostaje aktivan."
+        "tačno pa šta nedostaje. NIKAD ne piši povratnu informaciju koja samo "
+        "prepričava učenikovu rečenicu drugim riječima. Nikad ne otkrivaj "
+        "konačan odgovor ako zadatak ostaje aktivan."
     )
     result = client.generate(
         purpose=PURPOSE_INTERPRET, system=system, user=user,
@@ -1024,14 +1044,18 @@ ACTIVE_TASK_INTERPRETATION_POLICY = (
     "traženje rješenja / potvrdu / nejasnu poruku. Nejasna poruka NIJE "
     "pogrešan odgovor — traži pojašnjenje, nikad kazna. Pitanje o konceptu ili "
     "traženje pomoći NE mijenja aktivni zadatak. Tvoja procjena odgovora je "
-    "SAMO prijedlog — server odlučuje konačno. Ako je ovo pokušaj odgovora, "
-    "predloži i kratku, prirodnu, djetinjastu ali ne infantilnu bosansku "
-    "povratnu poruku (narration_proposal): tačno=koncizno, ne uvijek ista "
-    "fraza; netačno=prizanaj tvrdnju pa objasni problem pa sljedeći korak, "
-    "zadatak ostaje; djelimično=šta je tačno pa šta nedostaje. Ne otkrivaj "
-    "konačan odgovor ako zadatak ostaje aktivan. Nikad ne koristiš internu "
-    "terminologiju (shema, JSON, Blueprint, model, pouzdanost, stanje) niti "
-    "pišeš razmišljanje naglas — samo traženi strukturisani izlaz."
+    "SAMO prijedlog — server odlučuje konačno. Prije nego predložiš verdikt, "
+    "sam u sebi provjeri račun/rasuđivanje — ne pretpostavljaj. Ako je ovo "
+    "pokušaj odgovora, predloži i kratku, prirodnu, djetinjastu ali ne "
+    "infantilnu bosansku povratnu poruku (narration_proposal): tačno=koncizno, "
+    "ne uvijek ista fraza; netačno=prizanaj tvrdnju pa objasni problem pa "
+    "sljedeći korak, zadatak ostaje; djelimično=šta je tačno pa šta "
+    "nedostaje. NIKAD ne piši povratnu poruku koja samo prepričava učenikovu "
+    "rečenicu drugim riječima — mora ili potvrditi/ispraviti tvrdnju ili "
+    "dodati konkretan sljedeći korak. Ne otkrivaj konačan odgovor ako zadatak "
+    "ostaje aktivan. Nikad ne koristiš internu terminologiju (shema, JSON, "
+    "Blueprint, model, pouzdanost, stanje) niti pišeš razmišljanje naglas — "
+    "samo traženi strukturisani izlaz."
 )
 
 
@@ -1146,11 +1170,54 @@ def decision_to_interpretation_and_assessment(
     return interpretation, assessment
 
 
+#: Instructs the model to fill the coherence/difficulty metadata added by this
+#: pass (Section 5/6/8 of the pedagogy audit). Generic — the SAME instruction
+#: for every lesson/grade/domain, never a lesson-specific example beyond the
+#: single illustrative one below (kept abstract, not a hardcoded phrase).
+TASK_COHERENCE_METADATA_INSTRUCTION = (
+    "Popuni i polja za koherentnost zadatka: task_family_id (id iz Blueprint "
+    "task_families, ako postoji odgovarajuća porodica), pedagogical_goal "
+    "(jednom rečenicom, ZAŠTO ovaj zadatak postoji — nikad ne prikazuje se "
+    "učeniku), required_student_operations (lista operacija iz zatvorenog "
+    "skupa: identify/expand/reduce/simplify/compare/add/subtract/multiply/"
+    "divide/substitute/solve_for_unknown/convert_unit/estimate/verify/"
+    "apply_theorem/construct/classify/other — tačan redoslijed koraka koje "
+    "učenik treba uraditi), expected_reasoning_steps (broj koraka, >= broja "
+    "operacija), i difficulty_signature (procjena po dimenzijama: "
+    "numeric_magnitude, operation_count, reasoning_steps, concept_count, "
+    "representation_complexity, distractor_similarity, verbal_complexity, "
+    "requires_multi_step_justification, nonstandard_form, "
+    "requires_recall_only). AKO zadatak traži DVIJE operacije koje se "
+    "međusobno poništavaju (npr. expand pa odmah reduce, ili add pa odmah "
+    "subtract, ili multiply pa odmah divide) — to je dozvoljeno SAMO ako "
+    "postoji stvarna pedagoška svrha (npr. poređenje dva razlomka, provjera "
+    "invarijante); tu svrhu MORAŠ upisati u comparison_or_invariance_goal i "
+    "coherence_claim, inače takav par operacija NE koristi. Nikad ne pravi "
+    "zadatak koji samo 'radi pa poništi' bez razloga koji je učeniku koristan."
+)
+
+
 def generate_task(
     client: StructuredModelClient, *, grade: int, blueprint, state,
     target_id: Optional[str], model: str, timeout: Optional[float],
+    expected_difficulty_direction: Optional[str] = None,
 ) -> tuple[Optional[TaskSpecification], ModelCallResult]:
     system = build_system_prompt(grade, blueprint)
+    direction_clause = ""
+    if expected_difficulty_direction == "easier":
+        direction_clause = (
+            "\n\nUčenik je tražio LAKŠI zadatak. Novi zadatak MORA biti "
+            "stvarno lakši u difficulty_signature (manji numeric_magnitude "
+            "i/ili manje operation_count/reasoning_steps i/ili jednostavnija "
+            "representation_complexity) — ne samo niži difficulty_level broj "
+            "bez stvarne razlike u sadržaju.")
+    elif expected_difficulty_direction == "harder":
+        direction_clause = (
+            "\n\nUčenik je tražio TEŽI zadatak. Novi zadatak MORA biti "
+            "stvarno teži u difficulty_signature (veći numeric_magnitude i/ili "
+            "više operation_count/reasoning_steps i/ili složenija "
+            "representation_complexity) — ne samo viši difficulty_level broj "
+            "bez stvarne razlike u sadržaju.")
     user = (
         "STANJE SESIJE:\n" + _session_projection(state) + "\n\n"
         + (f"Traženi coverage target: {target_id}\n" if target_id else "")
@@ -1160,7 +1227,8 @@ def generate_task(
         "pitanje, answer_kind, internu očekivanu vrijednost ako je poznata, "
         "nivo težine. Zadatak mora pripadati izabranoj lekciji. " + TASK_WRITING_STANDARD
         + " Pogledaj nedavne zadatke (recent_turns) i izbjegavaj skoro identičan "
-        "zadatak — variraj brojeve, formulaciju ili podkoncept unutar lekcije."
+        "zadatak — variraj brojeve, formulaciju ili podkoncept unutar lekcije.\n\n"
+        + TASK_COHERENCE_METADATA_INSTRUCTION + direction_clause
     )
     result = client.generate(
         purpose=PURPOSE_TASK, system=system, user=user,
@@ -1201,17 +1269,27 @@ def _narration_call(
 
 #: Verdict-specific feedback standard (Phase 3.D/E/H) — the SAME generic
 #: instruction set for every lesson; nothing here names a specific topic.
+#: Shared by every verdict below — the anti-echo rule this audit exists to fix
+#: applies identically regardless of outcome.
+_ANTI_ECHO_CLAUSE = (
+    "NIKAD ne piši povratnu informaciju koja samo prepričava učenikovu "
+    "rečenicu drugim riječima bez ijedne nove riječi/tvrdnje — mora ili "
+    "potvrditi/ispraviti tvrdnju ili dodati konkretan sljedeći korak. ")
+
 _FEEDBACK_STANDARD_BY_VERDICT = {
     "correct": (
+        _ANTI_ECHO_CLAUSE +
         "Odgovor je tačan. Budi koncizan. Kad je korisno, kratko objasni ZAŠTO "
         "rješenje funkcioniše. Ne piši dugo predavanje poslije jednostavnog "
         "tačnog odgovora. Ne koristi uvijek istu formulaciju pohvale — veži je "
         "za ono što je učenik konkretno uradio."),
     "incorrect": (
+        _ANTI_ECHO_CLAUSE +
         "Odgovor NIJE tačan. Prvo priznaj šta je učenik konkretno tvrdio, zatim "
         "objasni tačno šta je problem, pa daj sljedeći koristan korak. Zadatak "
         "ostaje aktivan. Ne ponavljaj odmah cijelo rješenje."),
     "partial": (
+        _ANTI_ECHO_CLAUSE +
         "Odgovor je djelimično tačan. Eksplicitno navedi šta je tačno, pa reci "
         "šta još nedostaje. Ne tretiraj djelimično tačno rasuđivanje kao potpuno "
         "pogrešno. Zadatak ostaje aktivan."),
@@ -1242,11 +1320,14 @@ def generate_hint(client, *, grade, blueprint, state, model, timeout):
             f"Ovo je savjet nivoa {level} — učenik je već dobio raniji savjet i "
             "još nije riješio zadatak. Budi KONKRETNIJI nego prošli put — možeš "
             "pokazati dio postupka — ali ostavi učeniku da sam završi zadnji "
-            "korak. Ne daj konačan odgovor.")
+            "korak. Ne daj konačan odgovor. NE ponavljaj cijeli originalni "
+            "tekst zadatka iznova — učenik ga i dalje vidi na ekranu. Referenciraj "
+            "samo NOVI dio savjeta (npr. 'Sad probaj i ...'), nikad cijelu "
+            "postavku zadatka ponovo od početka.")
     instruction = (
         f"Učenik traži pomoć. Daj JEDAN progresivan savjet za aktivni zadatak, "
-        f"prema hint_strategy iz Blueprinta. {standard} Na kraju podsjeti na "
-        "aktivni zadatak.")
+        f"prema hint_strategy iz Blueprinta. {standard} Na kraju kratko "
+        "podsjeti na aktivni zadatak JEDNOM rečenicom — ne prepisuj ga cijelog.")
     return _narration_call(client, purpose=PURPOSE_HINT, grade=grade,
                            blueprint=blueprint, state=state,
                            instruction=instruction, model=model, timeout=timeout)
@@ -1329,6 +1410,90 @@ def repair_student_text(
     if result.status != "ok":
         return None, result
     parsed = _validate_into(NarrationResult, result.parsed)
+    if parsed is None:
+        return None, ModelCallResult(
+            status="invalid_output", usage=result.usage,
+            latency_ms=result.latency_ms, model=result.model,
+            purpose=result.purpose, error_code="schema_validation_error")
+    return parsed, result
+
+
+# --------------------------------------------------------------------------- #
+# Bounded feedback-value repair (pedagogy pass) — ONE call, minimal context    #
+# --------------------------------------------------------------------------- #
+def repair_feedback_value(
+    client: StructuredModelClient, *, grade: int, rejected_text: str,
+    student_message: str, verdict: str, failure_categories: list[str],
+    model: str, timeout: Optional[float],
+) -> tuple[Optional[NarrationResult], ModelCallResult]:
+    """The ONE allowed bounded repair call for feedback text that failed
+    ``feedback_value_gate`` (echo / no added value / inconsistent with the
+    authoritative verdict). Deliberately minimal context: the rejected text,
+    the student's own message (so the model can see what NOT to just repeat),
+    the authoritative verdict, why it failed, and the grade — never the full
+    session/conversation history."""
+    system = "\n\n".join([TUTOR_CONSTITUTION, BOSNIAN_LANGUAGE_POLICY, grade_policy(grade)])
+    user = (
+        f"Sljedeća povratna informacija za učenika je ODBIJENA iz razloga: "
+        f"{', '.join(failure_categories)}.\n"
+        f"Autoritativni ishod (ne mijenjaš ga): {verdict}.\n"
+        f"UČENIKOVA PORUKA (ne prepričavaj je): {student_message}\n\n"
+        f"ODBIJENA POVRATNA INFORMACIJA:\n{rejected_text}\n\n"
+        "Napiši ISPRAVLJENU verziju koja: (1) NE ponavlja učenikovu rečenicu "
+        "drugim riječima, (2) jasno potvrđuje ili ispravlja tvrdnju u skladu s "
+        f"ishodom '{verdict}', (3) dodaje konkretan sljedeći korak ili kratko "
+        "objašnjenje ZAŠTO. Kratko i prirodno, bez interne terminologije."
+    )
+    result = client.generate(
+        purpose=PURPOSE_FEEDBACK_REPAIR, system=system, user=user,
+        schema_name="NarrationResult", schema=export_json_schema(NarrationResult),
+        model=model, timeout=timeout, response_model=NarrationResult)
+    if result.status != "ok":
+        return None, result
+    parsed = _validate_into(NarrationResult, result.parsed)
+    if parsed is None:
+        return None, ModelCallResult(
+            status="invalid_output", usage=result.usage,
+            latency_ms=result.latency_ms, model=result.model,
+            purpose=result.purpose, error_code="schema_validation_error")
+    return parsed, result
+
+
+# --------------------------------------------------------------------------- #
+# Bounded task-coherence repair (pedagogy pass) — ONE call, minimal context    #
+# --------------------------------------------------------------------------- #
+def repair_task_specification(
+    client: StructuredModelClient, *, grade: int, blueprint,
+    rejected_spec: TaskSpecification, failure_categories: list[str],
+    model: str, timeout: Optional[float],
+) -> tuple[Optional[TaskSpecification], ModelCallResult]:
+    """The ONE allowed bounded repair call for a ``TaskSpecification`` that
+    failed ``task_coherence.check_task_coherence``. Sent the rejected
+    proposal AND the named failure categories (never a fix hardcoded to one
+    lesson) so the model can correct ITS OWN metadata/content."""
+    system = build_system_prompt(grade, blueprint)
+    user = (
+        f"Sljedeći predloženi zadatak je ODBIJEN iz razloga: "
+        f"{', '.join(failure_categories)}.\n\n"
+        f"ODBIJENI PRIJEDLOG (TaskSpecification):\n"
+        f"{rejected_spec.model_dump_json()}\n\n"
+        "Vrati ISPRAVLJENU verziju istog zadatka (ili blisko srodnog unutar "
+        "iste lekcije) koja rješava SVE navedene probleme: koristi ispravan "
+        "task_family_id/target_id/concept_id/answer_kind/"
+        "planned_verification_type iz Blueprinta, popuni "
+        "pedagogical_goal/required_student_operations/expected_reasoning_steps/"
+        "difficulty_signature dosljedno, i izbjegavaj operacije koje se "
+        "međusobno poništavaju bez stvarne pedagoške svrhe (comparison_or_"
+        "invariance_goal) navedene u coherence_claim.\n\n"
+        + TASK_COHERENCE_METADATA_INSTRUCTION
+    )
+    result = client.generate(
+        purpose=PURPOSE_TASK_REPAIR, system=system, user=user,
+        schema_name="TaskSpecification", schema=export_json_schema(TaskSpecification),
+        model=model, timeout=timeout, response_model=TaskSpecification)
+    if result.status != "ok":
+        return None, result
+    parsed = _validate_into(TaskSpecification, result.parsed)
     if parsed is None:
         return None, ModelCallResult(
             status="invalid_output", usage=result.usage,

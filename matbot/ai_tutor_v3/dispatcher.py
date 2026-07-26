@@ -22,8 +22,8 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from matbot.ai_tutor_v3 import (
-    adapter, lesson_blueprint, orchestrator, quality_gate, reducer,
-    sheets_outbox, verifier,
+    adapter, feedback_value_gate, lesson_blueprint, orchestrator, quality_gate,
+    reducer, sheets_outbox, task_coherence, verifier,
 )
 from matbot.ai_tutor_v3.orchestrator import StructuredModelClient
 from matbot.ai_tutor_v3.rendering import normalize_math_for_display
@@ -463,6 +463,12 @@ def _execute_turn(client, *, blueprint, state, grade, student_message, model,
     purposes: list[str] = []
     narration_proposal = None
     active_task_telemetry = None
+    # Captured BEFORE the reducer clears ``state.active_task`` (task_request/
+    # difficulty_change both replace it) — the only place the OLD task's
+    # difficulty signature is still available for a later comparison against
+    # the NEW task (task_coherence.compare_difficulty).
+    previous_task_signature = (
+        state.active_task.difficulty_signature if state.active_task else None)
 
     if is_bootstrap:
         interpretation = _synthetic_interpretation(
@@ -529,7 +535,8 @@ def _execute_turn(client, *, blueprint, state, grade, student_message, model,
         state=result.new_state, outcome=result.outcome,
         interpretation=interpretation, grade=grade,
         student_message=student_message, model=model, budget=budget,
-        usage=usage, purposes=purposes, narration_proposal=narration_proposal)
+        usage=usage, purposes=purposes, narration_proposal=narration_proposal,
+        assessment=assessment, previous_task_signature=previous_task_signature)
     if err:
         return {"error": err, "usage": usage, "purposes": purposes,
                "active_task_telemetry": active_task_telemetry}
@@ -599,9 +606,17 @@ def _apply_quality_gate(client, text, *, response_type, grade, blueprint, model,
 
 
 def _render(client, *, action, blueprint, state, outcome, interpretation, grade,
-            student_message, model, budget, usage, purposes, narration_proposal=None):
+            student_message, model, budget, usage, purposes, narration_proposal=None,
+            assessment=None, previous_task_signature=None):
     """Produce the student-facing text for the reducer's chosen action. Narration
-    can never change the already-decided outcome — it only writes language."""
+    can never change the already-decided outcome — it only writes language.
+
+    Gate ordering for a feedback (NARRATE_FEEDBACK) response: quality_gate
+    (format/language safety) runs FIRST, then feedback_value_gate (anti-echo +
+    pedagogical value) — a text must be well-formed before it is worth asking
+    whether it adds value. Hints/concept explanations/off-topic never go
+    through feedback_value_gate (different pragmatics — see its docstring).
+    """
     if action == reducer.OFF_TOPIC:
         return orchestrator.OFF_TOPIC_FALLBACK, "off_topic", "", dict(_NO_GATE_INFO)
     if action == reducer.CLARIFY:
@@ -614,10 +629,15 @@ def _render(client, *, action, blueprint, state, outcome, interpretation, grade,
             usage=usage, purposes=purposes)
         return text, "clarification", "", gate_info
     if action == reducer.GENERATE_TASK:
+        difficulty_direction = None
+        if interpretation.turn_kind == "difficulty_change" and assessment is not None:
+            difficulty_direction = assessment.difficulty_suggestion
         return _render_new_task(client, blueprint=blueprint, state=state,
                                 interpretation=interpretation, grade=grade,
                                 model=model, budget=budget, usage=usage,
-                                purposes=purposes)
+                                purposes=purposes,
+                                expected_difficulty_direction=difficulty_direction,
+                                previous_task_signature=previous_task_signature)
     if action == reducer.NARRATE_FEEDBACK and narration_proposal is not None:
         # Phase 7 consolidation: the interpretation call already proposed
         # feedback text for this answer turn — use it (through the SAME
@@ -630,6 +650,10 @@ def _render(client, *, action, blueprint, state, outcome, interpretation, grade,
             response_type=narration_proposal.response_category or "feedback",
             grade=grade, blueprint=blueprint, model=model, budget=budget,
             usage=usage, purposes=purposes)
+        text, value_gate_info = _apply_feedback_value_gate(
+            client, text, student_message=student_message, verdict=outcome.verdict,
+            grade=grade, model=model, budget=budget, usage=usage, purposes=purposes)
+        gate_info["feedback_value_gate"] = value_gate_info
         return text, narration_proposal.response_category, "", gate_info
 
     call_timeout = budget.next_timeout()
@@ -664,16 +688,70 @@ def _render(client, *, action, blueprint, state, outcome, interpretation, grade,
         client, narration.student_text, response_type=narration.response_category,
         grade=grade, blueprint=blueprint, model=model, budget=budget,
         usage=usage, purposes=purposes)
+    if action == reducer.NARRATE_FEEDBACK:
+        text, value_gate_info = _apply_feedback_value_gate(
+            client, text, student_message=student_message, verdict=outcome.verdict,
+            grade=grade, model=model, budget=budget, usage=usage, purposes=purposes)
+        gate_info["feedback_value_gate"] = value_gate_info
     return text, narration.response_category, "", gate_info
 
 
+def _apply_feedback_value_gate(client, text, *, student_message, verdict, grade,
+                               model, budget, usage, purposes):
+    """Anti-echo + pedagogical-value gate for answer feedback ONLY (never
+    hints/concept explanations). Deterministic check, then at most ONE
+    bounded model repair (``feedback_value_gate.MAX_REPAIR_ATTEMPTS``), then a
+    verdict-specific generic deterministic fallback — the SAME bounded-repair-
+    then-fallback shape as ``_apply_quality_gate``."""
+    result = feedback_value_gate.check_feedback_value(
+        text, student_message=student_message, verdict=verdict)
+    if result.passed:
+        return text, {"checked": True, "repaired": False, "failure_categories": [],
+                      "similarity_metrics": result.similarity_metrics}
+
+    call_timeout = budget.next_timeout()
+    if call_timeout is None:
+        return feedback_value_gate.safe_fallback_text(verdict), {
+            "checked": True, "repaired": False,
+            "failure_categories": result.categories,
+            "gate_failed_final": True, "reason": "turn_budget_exceeded"}
+
+    repaired, call = orchestrator.repair_feedback_value(
+        client, grade=grade, rejected_text=text, student_message=student_message,
+        verdict=verdict, failure_categories=result.categories,
+        model=model, timeout=call_timeout)
+    _accumulate(usage, call)
+    purposes.append(call.purpose)
+    if repaired is not None:
+        renormalized = normalize_math_for_display(repaired.student_text)
+        qresult = quality_gate.check(renormalized, response_type="feedback", grade=grade)
+        if qresult.ok:
+            vresult2 = feedback_value_gate.check_feedback_value(
+                renormalized, student_message=student_message, verdict=verdict)
+            if vresult2.passed:
+                return renormalized, {
+                    "checked": True, "repaired": True,
+                    "failure_categories": result.categories, "gate_failed_final": False}
+    return feedback_value_gate.safe_fallback_text(verdict), {
+        "checked": True, "repaired": True,
+        "failure_categories": result.categories, "gate_failed_final": True}
+
+
 def _render_new_task(client, *, blueprint, state, interpretation, grade, model,
-                     budget, usage, purposes):
+                     budget, usage, purposes, expected_difficulty_direction=None,
+                     previous_task_signature=None):
     """Generate, validate-against-lesson, gate, and activate one task. A
     rejected task leaves NO corrupt active task (the reducer already cleared
-    it); the quality gate runs and repairs BEFORE the task is assigned to
+    it); every gate runs and repairs BEFORE the task is assigned to
     ``state.active_task``, so a rejected/repaired question never leaks into
-    durable state ahead of the text the student actually sees."""
+    durable state ahead of the text the student actually sees.
+
+    Gate ordering: (1) off-lesson check (existing, unchanged — target/concept
+    must belong to THIS blueprint), (2) task_coherence (metadata/invariant
+    consistency, with its own bounded repair), (3) quality_gate (student-
+    facing text format/safety, with its own bounded repair) on the — possibly
+    repaired — task's question text.
+    """
     call_timeout = budget.next_timeout()
     if call_timeout is None:
         return "", "", "turn_budget_exceeded", dict(_NO_GATE_INFO)
@@ -681,7 +759,8 @@ def _render_new_task(client, *, blueprint, state, interpretation, grade, model,
         or reducer.next_uncovered_target(state)
     spec, call = orchestrator.generate_task(
         client, grade=grade, blueprint=blueprint, state=state,
-        target_id=target, model=model, timeout=call_timeout)
+        target_id=target, model=model, timeout=call_timeout,
+        expected_difficulty_direction=expected_difficulty_direction)
     _accumulate(usage, call)
     purposes.append(call.purpose)
     if spec is None:
@@ -691,20 +770,117 @@ def _render_new_task(client, *, blueprint, state, interpretation, grade, model,
     known_concepts = {c.concept_id for c in blueprint.concepts}
     if spec.target_id not in known_targets and spec.concept_id not in known_concepts:
         return "", "", "task_off_lesson", dict(_NO_GATE_INFO)
+
+    spec, coherence_gate_info, coherence_error = _apply_task_coherence_gate(
+        client, spec, blueprint=blueprint, grade=grade, model=model, budget=budget,
+        usage=usage, purposes=purposes,
+        expected_difficulty_direction=expected_difficulty_direction,
+        previous_task_signature=previous_task_signature)
+    if coherence_error:
+        err_gate_info = dict(_NO_GATE_INFO)
+        err_gate_info["task_coherence_gate"] = coherence_gate_info
+        return "", "", coherence_error, err_gate_info
+
     question, gate_info = _apply_quality_gate(
         client, spec.question, response_type="task", grade=grade,
         blueprint=blueprint, model=model, budget=budget,
         usage=usage, purposes=purposes, forbidden_reveal=spec.expected_internal)
+    gate_info["task_coherence_gate"] = coherence_gate_info
     task = ActiveTask(
         task_id=reducer.new_task_id(), concept_id=spec.concept_id,
         target_id=spec.target_id, question=question,
         answer_kind=spec.answer_kind, expected_internal=spec.expected_internal,
         difficulty_level=spec.difficulty_level,
-        planned_verification_type=spec.planned_verification_type)
+        planned_verification_type=spec.planned_verification_type,
+        task_family_id=spec.task_family_id,
+        difficulty_signature=spec.difficulty_signature)
     state.active_task = task
     if spec.target_id and spec.target_id not in state.coverage.attempts_per_target:
         state.coverage.attempts_per_target.setdefault(spec.target_id, 0)
     return task.question, "task", "", gate_info
+
+
+def _apply_task_coherence_gate(client, spec, *, blueprint, grade, model, budget,
+                               usage, purposes, expected_difficulty_direction,
+                               previous_task_signature):
+    """``task_coherence.check_task_coherence``, then at most ONE bounded model
+    repair, re-running the SAME gate (plus an off-lesson re-check, since a
+    repair could in principle propose a different target/concept) on the
+    repaired proposal.
+
+    Returns ``(spec_to_use, gate_info, hard_error_code)``. ``hard_error_code``
+    is only set when a HARD failure category (see
+    ``task_coherence.HARD_FAILURE_CATEGORIES``) survives the one repair
+    attempt — the caller then fails the turn safely (no task committed),
+    exactly like the existing ``task_off_lesson`` short-circuit. A SOFT-only
+    failure is accepted with a telemetry flag instead of blocking the
+    student's turn, matching this codebase's established
+    accept-with-telemetry-flag pattern (``quality_gate``'s bounded
+    repair-then-fallback).
+    """
+    result = task_coherence.check_task_coherence(
+        spec, blueprint=blueprint, grade=grade,
+        expected_difficulty_direction=expected_difficulty_direction,
+        previous_signature=previous_task_signature)
+    if result.passed:
+        return spec, {"checked": True, "repaired": False,
+                      "failure_categories": [], "hard_failure_categories": [],
+                      "deterministic_metrics": result.deterministic_metrics}, None
+
+    # Metadata-only absence (no task_family_id/pedagogical_goal/required
+    # operations declared at all) is NOT worth spending the one bounded
+    # repair call on by itself — a Blueprint/task predating this pass
+    # legitimately has none of it every time. Accept with a telemetry flag,
+    # no extra model call. Any OTHER category (hard, or a soft category that
+    # reflects an actual content inconsistency) still goes through repair.
+    if not result.hard_failure_categories and not (
+            set(result.failure_categories) - task_coherence.METADATA_ONLY_CATEGORIES):
+        return spec, {"checked": True, "repaired": False,
+                      "failure_categories": result.failure_categories,
+                      "hard_failure_categories": [], "gate_failed_final": True,
+                      "reason": "metadata_only_not_repaired"}, None
+
+    call_timeout = budget.next_timeout()
+    if call_timeout is None:
+        info = {"checked": True, "repaired": False,
+                "failure_categories": result.failure_categories,
+                "hard_failure_categories": result.hard_failure_categories,
+                "gate_failed_final": True, "reason": "turn_budget_exceeded"}
+        return (None if result.hard_failure_categories else spec), info, (
+            "task_incoherent" if result.hard_failure_categories else None)
+
+    repaired_spec, call = orchestrator.repair_task_specification(
+        client, grade=grade, blueprint=blueprint, rejected_spec=spec,
+        failure_categories=result.failure_categories, model=model, timeout=call_timeout)
+    _accumulate(usage, call)
+    purposes.append(call.purpose)
+
+    if repaired_spec is not None:
+        known_targets = {t.target_id for t in blueprint.coverage_targets}
+        known_concepts = {c.concept_id for c in blueprint.concepts}
+        off_lesson = (repaired_spec.target_id not in known_targets
+                      and repaired_spec.concept_id not in known_concepts)
+        if not off_lesson:
+            result2 = task_coherence.check_task_coherence(
+                repaired_spec, blueprint=blueprint, grade=grade,
+                expected_difficulty_direction=expected_difficulty_direction,
+                previous_signature=previous_task_signature)
+            if result2.passed or not result2.hard_failure_categories:
+                return repaired_spec, {
+                    "checked": True, "repaired": True,
+                    "failure_categories": result2.failure_categories,
+                    "hard_failure_categories": [],
+                    "gate_failed_final": not result2.passed,
+                    "deterministic_metrics": result2.deterministic_metrics}, None
+
+    if not result.hard_failure_categories:
+        return spec, {"checked": True, "repaired": repaired_spec is not None,
+                      "failure_categories": result.failure_categories,
+                      "hard_failure_categories": [], "gate_failed_final": True}, None
+    return None, {"checked": True, "repaired": True,
+                  "failure_categories": result.failure_categories,
+                  "hard_failure_categories": result.hard_failure_categories,
+                  "gate_failed_final": True}, "task_incoherent"
 
 
 # --------------------------------------------------------------------------- #
@@ -809,6 +985,12 @@ def _audit_record(*, request_id, session_id, client_turn_id, identity, blueprint
         "model": blueprint.model,
         "call_purposes": outcome_bundle.get("purposes") or [],
         "call_count": len(outcome_bundle.get("purposes") or []),
+        # ``quality_gate`` also nests two pedagogy-pass sub-gates when they
+        # ran: "feedback_value_gate" (anti-echo/value, only for a feedback
+        # response) and "task_coherence_gate" (only for a generated task) —
+        # see ``_apply_feedback_value_gate``/``_apply_task_coherence_gate``.
+        # Both are safe/bounded: category NAMES and numeric similarity
+        # metrics only, never raw student/model text.
         "quality_gate": outcome_bundle.get("quality_gate") or {},
         "verification_status": vdecision.result.status,
         "turn_kind": outcome_bundle.get("turn_kind"),

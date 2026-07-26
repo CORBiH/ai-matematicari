@@ -122,6 +122,23 @@ _NO_PROGRESS_VERDICTS = frozenset({"no_attempt", "needs_clarification"})
 #: ``VerifiedFact.verification_type``, so the two can never drift apart.
 VerificationType = Literal["rational_equality", "divisibility", "equation_substitution"]
 
+#: A small, CLOSED vocabulary of atomic student operations — deliberately not
+#: free text. A deterministic coherence check (``task_coherence.py``) can only
+#: reason about "does this task ask the student to expand a fraction and then
+#: reduce it right back with no stated purpose" if "expand"/"reduce" are typed
+#: values from a fixed set, never an arbitrary model-written phrase. Generic
+#: across every grade 6-9 lesson/domain — nothing here names a specific topic.
+StudentOperationKind = Literal[
+    "identify", "expand", "reduce", "simplify", "compare", "add", "subtract",
+    "multiply", "divide", "substitute", "solve_for_unknown", "convert_unit",
+    "estimate", "verify", "apply_theorem", "construct", "classify", "other",
+]
+
+#: Ordinal, per-dimension difficulty vocabularies — see ``DifficultySignature``.
+RepresentationComplexity = Literal["single", "mixed", "abstract"]
+DistractorSimilarity = Literal["low", "medium", "high"]
+VerbalComplexity = Literal["short", "medium", "long"]
+
 
 # --------------------------------------------------------------------------- #
 # Lesson context                                                               #
@@ -469,15 +486,65 @@ class CommonMisconception(V3StrictModel):
     description: NonEmptyStr
 
 
+# One atomic step, from the closed StudentOperationKind vocabulary — never
+# free text. Nested inside TaskSpecification (see the comment above it).
+class RequiredOperation(V3StrictModel):
+    """One required student operation. ``detail`` is an optional short label,
+    never a full sentence."""
+
+    kind: StudentOperationKind
+    detail: Optional[str] = None
+
+
 class TaskFamily(V3StrictModel):
+    """A reusable task shape declared ONCE per lesson Blueprint. The new fields
+    below are OPTIONAL with safe defaults so an already-stored Blueprint
+    (generated before this pass) still validates unchanged — see
+    ``task_coherence.py`` module docstring for the compatibility policy this
+    relies on."""
+
     family_id: NonEmptyStr
     description: NonEmptyStr
     answer_kind: AnswerKind
+    #: Why tasks in this family exist pedagogically (e.g. "uporediti razlomke
+    #: svođenjem na zajednički nazivnik") — never shown to the student.
+    pedagogical_goal: Optional[str] = None
+    #: The operations tasks in this family typically require.
+    typical_required_operations: list[RequiredOperation] = Field(default_factory=list)
+    #: If this family is about comparing two values or showing an invariant
+    #: (e.g. expanding a fraction preserves its value), name that purpose here.
+    #: Required by ``task_coherence`` whenever a generated task in this family
+    #: pairs two self-cancelling operations (e.g. expand + reduce) — see
+    #: ``_SELF_CANCELLING_PAIRS`` in task_coherence.py.
+    comparison_or_invariance_goal: Optional[str] = None
+    typical_difficulty_min: Optional[int] = Field(default=None, ge=1, le=5)
+    typical_difficulty_max: Optional[int] = Field(default=None, ge=1, le=5)
 
 
 class DifficultyDimension(V3StrictModel):
     dimension_id: NonEmptyStr
     description: NonEmptyStr
+
+
+# Ten independently-orderable dimensions (of the larger candidate set
+# considered), self-declared by the model without lesson-specific knowledge —
+# see task_coherence.compare_difficulty for how these combine into an
+# easier/harder/same/ambiguous verdict. Nested inside TaskSpecification, so
+# this docstring is deliberately short (see the comment above
+# TaskSpecification for why it matters here too).
+class DifficultySignature(V3StrictModel):
+    """A typed, per-task difficulty profile. Never shown to the student."""
+
+    numeric_magnitude: int = Field(ge=1, le=5)
+    operation_count: int = Field(ge=1, le=10)
+    reasoning_steps: int = Field(ge=1, le=10)
+    concept_count: int = Field(ge=1, le=5)
+    representation_complexity: RepresentationComplexity = "single"
+    distractor_similarity: DistractorSimilarity = "low"
+    verbal_complexity: VerbalComplexity = "short"
+    requires_multi_step_justification: bool = False
+    nonstandard_form: bool = False
+    requires_recall_only: bool = False
 
 
 class HintStrategyStep(V3StrictModel):
@@ -563,9 +630,17 @@ class LessonBlueprintProposal(V3StrictModel):
 # --------------------------------------------------------------------------- #
 # Task + provisional model assessment                                         #
 # --------------------------------------------------------------------------- #
+# Deliberately a short docstring, not a long rationale: Pydantic embeds a
+# model's docstring verbatim into the exported JSON Schema "description" —
+# sent to OpenAI on EVERY task_generation AND task_coherence_repair call (see
+# ActiveTaskTurnDecision's comment above for how this was confirmed). The
+# coherence/difficulty fields below are all OPTIONAL (default None/empty) so
+# a caller or fixture that predates this pass keeps validating — see
+# task_coherence.py for how a missing field degrades the gate rather than
+# crashing it.
 class TaskSpecification(V3StrictModel):
-    """A task the model PROPOSES. The server validates it against the blueprint
-    and only then activates it (``ActiveTask``)."""
+    """A task the model PROPOSES; the server validates it against the
+    blueprint before activating it."""
 
     concept_id: NonEmptyStr
     target_id: NonEmptyStr
@@ -575,6 +650,17 @@ class TaskSpecification(V3StrictModel):
     difficulty_level: int = Field(ge=1, le=5)
     planned_verification_type: Optional[VerificationType] = None
     rationale: Optional[str] = None
+    #: Which Blueprint ``TaskFamily`` this task belongs to, if any.
+    task_family_id: Optional[str] = None
+    pedagogical_goal: Optional[str] = None
+    required_student_operations: list[RequiredOperation] = Field(default_factory=list)
+    comparison_or_invariance_goal: Optional[str] = None
+    #: A one-sentence, model-authored justification for why this task's
+    #: operation sequence is pedagogically coherent — e.g. why an
+    #: expand-then-reduce pair is not pointless. Never shown to the student.
+    coherence_claim: Optional[str] = None
+    expected_reasoning_steps: int = Field(default=1, ge=1, le=10)
+    difficulty_signature: Optional["DifficultySignature"] = None
 
 
 class ActiveTask(V3StrictModel):
@@ -593,6 +679,11 @@ class ActiveTask(V3StrictModel):
     wrong_attempts: int = Field(default=0, ge=0)
     hints_given: int = Field(default=0, ge=0)
     solution_revealed: bool = False
+    #: Carried forward from the ``TaskSpecification`` that created this task so
+    #: a LATER difficulty-change turn can compare the new task's signature
+    #: against this one (``task_coherence.compare_difficulty``).
+    task_family_id: Optional[str] = None
+    difficulty_signature: Optional["DifficultySignature"] = None
 
 
 class PracticeModelAssessment(V3StrictModel):
