@@ -38,8 +38,29 @@ def build_instructions(grade: int) -> str:
         "- Tačan odgovor: kratko potvrdi i daj jednu konkretnu provjeru ili razlog; bez pretjeranih pohvala.\n"
         "- Djelimično tačan: reci šta je dobro, šta nedostaje i najmanji sljedeći korak; ne otkrivaj cijelo rješenje.\n"
         "- Netačan: pokaži gdje je greška i daj mali sljedeći korak; zadatak OSTAJE isti (new_task = null).\n"
-        "- 'Ne znam' NIJE netačan odgovor: gave_hint = true, evaluation = null; hint mora pratiti navedeni hint nivo "
-        "(nivo 1 = usmjeri pažnju, viši nivo = konkretniji korak), a cijelo rješenje otkrij tek na najvišem nivou.\n"
+        "- 'Ne znam' NIJE netačan odgovor: gave_hint = true, evaluation = null.\n"
+        "- HINTOVI moraju biti VIDLJIVO različiti po nivou — NIKAD ne ponavljaj prethodni hint istim ili sličnim "
+        "riječima. Svaki sljedeći hint mora dodati NOVU, konkretniju informaciju u odnosu na prethodni:\n"
+        "  • Hint nivo 1: samo usmjeri učenika na PRVI KORAK (koju operaciju/pravilo primijeniti) — "
+        "bez ikakvog računa i bez konačnog rezultata.\n"
+        "  • Hint nivo 2: daj KONKRETNIJI međukorak — reci tačno koji račun treba izvesti (npr. „izračunaj 60 : 15”), "
+        "ali još ne otkrivaj konačan rezultat.\n"
+        "  • Hint nivo 3: pokaži CIJELI postupak korak po korak I konačan rezultat.\n"
+        "- Primjer (zadatak: „Proširi razlomak 4/15 tako da nazivnik bude 60.”): "
+        "hint 1 → „Prvo pronađi broj kojim treba pomnožiti 15 da dobiješ 60.”; "
+        "hint 2 → „Izračunaj 60 : 15. Tim istim brojem zatim pomnoži brojnik 4.”; "
+        "puno rješenje → „Računamo $60 : 15 = 4$. Zato i brojnik množimo sa 4: $4 \\cdot 4 = 16$. "
+        "Prošireni razlomak je $\\frac{16}{60}$.” Ovo je primjer STILA odgovora, ne pravilo vezano samo za razlomke — "
+        "primijeni istu logiku (usmjeri → konkretan međukorak → puno rješenje) na BILO KOJU oblast.\n"
+        "- EKSPLICITAN ZAHTJEV ZA RJEŠENJEM (npr. „uradi ga ti”, „riješi ga ti”, „uradi cijeli zadatak”, "
+        "„pokaži rješenje”, „pokaži cijeli postupak”, „pokaži mi rješenje”, „daj mi cijeli postupak”, "
+        "„stvarno ne znam kako”, „stvarno ne znam, uradi ga”, „reci mi odgovor” i slične formulacije, bez obzira na "
+        "trenutni hint nivo) ZNAČI: odmah daj PUNO rješenje kao kod hinta nivo 3 (cijeli postupak I konačan rezultat). "
+        "NIKAD ne vraćaj u tom slučaju samo još jedan djelimičan hint. Zadatak OSTAJE isti (new_task = null); "
+        "evaluation ostaje null osim ako je učenik UZ taj zahtjev i sam dao pokušaj odgovora; gave_hint = true.\n"
+        "- Ne završavaj odgovor automatski pitanjem tipa „Želiš novi zadatak?”, „Hoćeš sljedeći?” ili slično — "
+        "frontend već prikazuje dugme za novi zadatak. Takvo pitanje koristi SAMO kad je zaista prirodno neophodno "
+        "(npr. učenik sam oklijeva), a NE u svakom odgovoru.\n"
         "- Pitanje o aktivnom zadatku: odgovori na pitanje, zadrži zadatak (new_task = null), evaluation = null.\n"
         "- Novi zadatak pravi SAMO kad ga učenik traži (novi/lakši/teži) ili kad još nema aktivnog zadatka. "
         "Nakon tačnog odgovora NE daješ novi zadatak sam od sebe — možeš kratko ponuditi da učenik zatraži sljedeći.\n"
@@ -57,6 +78,21 @@ def _clip(text, limit):
     return text if len(text) <= limit else text[:limit] + "…"
 
 
+# Konkretno šta znači SLJEDEĆI hint s obzirom na broj VEĆ datih hintova
+# (session['hint_level']). Ponavlja se u svakom turnu (uz opšte pravilo u
+# build_instructions) jer je hint_level jedina promjenljiva komponenta
+# između turnova — ovo direktno sprječava da 1. i 2. hint ispadnu skoro isti.
+_HINT_GUIDANCE_BY_LEVEL = {
+    0: "Ako sad treba dati hint, to je HINT NIVO 1: samo usmjeri na prvi korak, BEZ računa i BEZ rezultata.",
+    1: "Ako sad treba dati hint, to je HINT NIVO 2: daj konkretniji međukorak (koji tačno račun treba izvesti), JOŠ BEZ konačnog rezultata.",
+    2: "Ako sad treba dati hint (ili je zatraženo rješenje), to je HINT NIVO 3: pokaži CIJELI postupak i konačan rezultat.",
+}
+
+
+def _hint_guidance(hint_level):
+    return _HINT_GUIDANCE_BY_LEVEL.get(hint_level, _HINT_GUIDANCE_BY_LEVEL[2])
+
+
 def build_input(session, student_message, intent="", difficulty_request="", interaction_phase=""):
     lines = []
     lines.append(f"LEKCIJA: {session['lesson_title'] or 'nije izabrana'} (oblast: {session['oblast'] or 'nepoznata'})")
@@ -65,7 +101,7 @@ def build_input(session, student_message, intent="", difficulty_request="", inte
         lines.append(f"AKTIVNI ZADATAK: {session['current_task']}")
         if session["expected_answer_summary"]:
             lines.append(f"INTERNI OČEKIVANI ODGOVOR (učenik ga ne vidi, samo pomoć): {session['expected_answer_summary']}")
-        lines.append(f"TRENUTNI HINT NIVO: {session['hint_level']} (od 3)")
+        lines.append(f"TRENUTNI HINT NIVO: {session['hint_level']} (od 3) — {_hint_guidance(session['hint_level'])}")
         lines.append(f"TEŽINA AKTIVNOG ZADATKA: {session['difficulty']}")
     else:
         lines.append("AKTIVNI ZADATAK: još ne postoji — napravi pristupačan početni zadatak iz ove lekcije (new_task).")

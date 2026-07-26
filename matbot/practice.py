@@ -13,6 +13,7 @@ import uuid
 
 from matbot import config, prompts
 from matbot.llm import LLMError
+from matbot.mathsafe import sanitize_math_text
 from matbot.schema import InvalidOutputError, validate_output
 from matbot.topics import lesson_info
 
@@ -98,8 +99,12 @@ def run_practice_turn(store, llm, turn):
         if out.gave_hint and out.new_task is None:
             session["hint_level"] = min(session["hint_level"] + 1, config.MAX_HINT_LEVEL)
 
+        # sanitize_math_text: deterministička (ne-AI) zaštita — model povremeno
+        # vrati nebalansirane $ ili \frac{ zagrade, što MathJax prikazuje kao
+        # "Math input error". Ne mijenja ispravan LaTeX; dira samo pokvarene
+        # segmente tako da učenik dobije čitljiv obični tekst umjesto greške.
         if out.new_task is not None:
-            task_text = out.new_task.text.strip()
+            task_text = sanitize_math_text(out.new_task.text.strip())
             session["current_task"] = task_text
             session["expected_answer_summary"] = out.new_task.expected_answer.strip()
             session["difficulty"] = out.new_task.difficulty
@@ -107,9 +112,9 @@ def run_practice_turn(store, llm, turn):
             session["recent_tasks"].append(task_text)
 
         # vidljivi odgovor: reply + (novi zadatak, ako postoji i nije već u replyju)
-        reply = out.reply.strip()
-        if out.new_task is not None and out.new_task.text.strip() not in reply:
-            answer = reply + "\n\nZadatak: " + out.new_task.text.strip()
+        reply = sanitize_math_text(out.reply.strip())
+        if out.new_task is not None and task_text not in reply:
+            answer = reply + "\n\nZadatak: " + task_text
         else:
             answer = reply
 
