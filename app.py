@@ -1,4 +1,6 @@
-from flask import Flask, render_template
+from flask import Flask, jsonify, render_template, request
+
+from matbot.topics import topics_response
 
 app = Flask(__name__)
 
@@ -16,6 +18,12 @@ def healthz():
 @app.route("/_healthz")
 def _healthz():
     return {"ok": True}, 200
+
+
+@app.route("/api/ai-tutor/topics")
+def ai_tutor_topics():
+    grade = request.args.get("grade", "")
+    return jsonify(topics_response(grade))
 
 
 if __name__ == "__main__":
