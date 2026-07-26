@@ -15,6 +15,7 @@ import threading
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from matbot.ai_tutor_v3 import dispatcher, lesson_blueprint, reducer, verifier
 from matbot.ai_tutor_v3 import state_store as ss
@@ -131,7 +132,7 @@ class FakeClient:
         self._status[purpose] = (status, error_code)
 
     def generate(self, *, purpose, system, user, schema_name, schema, model, timeout,
-                max_output_tokens=None):
+                response_model=None, max_output_tokens=None):
         self.calls.append(purpose)
         self.models.append(model)
         self.max_output_tokens_seen = getattr(self, "max_output_tokens_seen", [])
@@ -149,8 +150,20 @@ class FakeClient:
         if schema_name == "ActiveTaskTurnDecision" and isinstance(parsed, dict) \
                 and "interpretation" in parsed:
             parsed = _flatten_to_active_task_decision(parsed)
-        return ModelCallResult(status="ok", parsed=parsed,
-                               usage={"prompt_tokens": 120, "completion_tokens": 44},
+        usage = {"prompt_tokens": 120, "completion_tokens": 44}
+        # Mirrors production OpenAIResponsesClient.generate(): validate against
+        # the SAME response_model every real call site now passes, so a fake
+        # canned dict that doesn't actually satisfy the schema is caught here
+        # too — not just in production.
+        if response_model is not None:
+            try:
+                validated = response_model.model_validate(parsed)
+            except ValidationError:
+                return ModelCallResult(status="invalid_output", usage=usage,
+                                       latency_ms=7.0, model=model, purpose=purpose,
+                                       error_code="schema_validation_error")
+            parsed = validated.model_dump(mode="json")
+        return ModelCallResult(status="ok", parsed=parsed, usage=usage,
                                latency_ms=7.0, model=model, purpose=purpose)
 
 

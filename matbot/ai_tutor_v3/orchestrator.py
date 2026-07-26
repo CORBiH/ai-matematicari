@@ -268,7 +268,7 @@ class StructuredModelClient(Protocol):
     def generate(
         self, *, purpose: str, system: str, user: str, schema_name: str,
         schema: dict, model: str, timeout: Optional[float],
-        max_output_tokens: Optional[int] = None,
+        response_model: type[BaseModel], max_output_tokens: Optional[int] = None,
     ) -> ModelCallResult:
         ...
 
@@ -603,6 +603,135 @@ def _log_openai_call_failure(exc: BaseException, *, purpose: str, model: str,
     log.error("v3 openai call failed: %s", json.dumps(diagnostic, ensure_ascii=False))
 
 
+# --------------------------------------------------------------------------- #
+# Responses API output classification (safe structural inspection only)       #
+# --------------------------------------------------------------------------- #
+#: Bound on how many item-type strings get logged/carried — never an
+#: unbounded list, even for a pathological response.
+_MAX_LOGGED_ITEM_TYPES = 20
+
+
+def _attr(obj: Any, name: str, default: Any = None) -> Any:
+    """``getattr``/``dict.get`` uniformly — the SAME classification code must
+    work against real installed-SDK objects AND dict-style fakes used in
+    tests, without guessing which shape it received."""
+    if isinstance(obj, dict):
+        return obj.get(name, default)
+    return getattr(obj, name, default)
+
+
+@dataclass(frozen=True)
+class ResponsesOutputClassification:
+    """Only safe, structural metadata extracted from a completed HTTP 200
+    Responses API result — never the actual output text content beyond its
+    length, never a prompt, never student text. See ``classify_responses_output``.
+    """
+    response_status: Optional[str] = None
+    incomplete_reason: Optional[str] = None
+    output_text: str = ""
+    output_text_len: int = 0
+    output_item_types: list = field(default_factory=list)
+    content_item_types: list = field(default_factory=list)
+    has_refusal: bool = False
+
+
+def classify_responses_output(resp: Any) -> ResponsesOutputClassification:
+    """Extract only safe structural metadata from a Responses API result.
+
+    Grounded in the installed SDK's own real types (verified by reading
+    ``openai/types/responses/response.py``): ``Response.status`` is
+    ``Optional[Literal["completed","failed","in_progress","cancelled",
+    "queued","incomplete"]]``; ``Response.incomplete_details.reason`` is
+    ``Optional[Literal["max_output_tokens","content_filter"]]`` — these are
+    the ONLY two reasons the installed SDK defines, never invented here.
+    ``Response.output`` is a list of typed items; a ``message`` item's
+    ``content`` list holds ``ResponseOutputText`` (``type="output_text"``) or
+    ``ResponseOutputRefusal`` (``type="refusal"``) entries — a refusal is a
+    CONTENT item, not a separate output item type.
+
+    Works against real SDK objects (attribute access), dict-style fakes
+    (``.get``), missing optional attributes, and unknown/future item types
+    (recorded by name, never raising) — never touches private SDK internals.
+    """
+    response_status = _attr(resp, "status")
+    incomplete_details = _attr(resp, "incomplete_details")
+    incomplete_reason = _attr(incomplete_details, "reason") if incomplete_details is not None else None
+
+    output_item_types: list = []
+    content_item_types: list = []
+    has_refusal = False
+    for item in (_attr(resp, "output") or []):
+        item_type = _attr(item, "type")
+        if item_type is not None:
+            output_item_types.append(str(item_type))
+        for content in (_attr(item, "content") or []):
+            content_type = _attr(content, "type")
+            if content_type is not None:
+                content_item_types.append(str(content_type))
+            if content_type == "refusal":
+                has_refusal = True
+
+    output_text = _attr(resp, "output_text", "") or ""
+    if not isinstance(output_text, str):
+        output_text = ""
+
+    return ResponsesOutputClassification(
+        response_status=str(response_status) if response_status is not None else None,
+        incomplete_reason=str(incomplete_reason) if incomplete_reason is not None else None,
+        output_text=output_text,
+        output_text_len=len(output_text),
+        output_item_types=output_item_types[:_MAX_LOGGED_ITEM_TYPES],
+        content_item_types=content_item_types[:_MAX_LOGGED_ITEM_TYPES],
+        has_refusal=has_refusal,
+    )
+
+
+def _validation_error_summary(exc: "ValidationError") -> list:
+    """A SANITIZED summary of a Pydantic validation failure: field paths and
+    error types only — never the invalid value itself (which could echo
+    student-adjacent model output), capped to a small count."""
+    out = []
+    for err in exc.errors()[:5]:
+        loc = ".".join(str(p) for p in err.get("loc", ()) or ())
+        out.append({"loc": loc, "type": err.get("type")})
+    return out
+
+
+def _log_invalid_output(
+    classification: ResponsesOutputClassification, *, purpose: str, model: str,
+    schema_name: str, error_code: str, request_id: Optional[str] = None,
+    validation_summary: Optional[list] = None,
+) -> None:
+    """Structured, SANITIZED diagnostic for an invalid-but-HTTP-200 output —
+    server-side log only. Never the raw output_text, never a prompt, never
+    student text, never a full response dump, never a stack trace (this is
+    an expected/classified case, not an unhandled exception)."""
+    diagnostic = {
+        "purpose": purpose,
+        "schema_name": schema_name,
+        "model": model,
+        "response_status": classification.response_status,
+        "incomplete_reason": classification.incomplete_reason,
+        "output_text_len": classification.output_text_len,
+        "output_item_types": classification.output_item_types,
+        "content_item_types": classification.content_item_types,
+        "error_code": error_code,
+        "request_id": request_id,
+    }
+    if validation_summary is not None:
+        diagnostic["validation_summary"] = validation_summary
+    # NOT ``_sanitize_error_message``: that helper's 300-char cap is sized for
+    # a raw, unstructured exception message. This diagnostic is already
+    # bounded field-by-field (item-type lists and validation_summary are each
+    # capped above) and a blind length slice here would risk truncating
+    # structured JSON mid-field. Still redact key/email-shaped substrings —
+    # defense in depth — but only length-cap generously (pathological input
+    # only), never in a way that could cut a normal diagnostic in half.
+    text = _KEY_PATTERN.sub("[redacted-key]", json.dumps(diagnostic, ensure_ascii=False))
+    text = _EMAIL_PATTERN.sub("[redacted-email]", text)
+    log.warning("v3 openai output invalid: %s", text[:2000])
+
+
 class OpenAIResponsesClient:
     """Production client: OpenAI Responses API + strict Structured Outputs.
 
@@ -632,7 +761,7 @@ class OpenAIResponsesClient:
 
     def generate(
         self, *, purpose, system, user, schema_name, schema, model, timeout,
-        max_output_tokens: Optional[int] = None,
+        response_model: type[BaseModel], max_output_tokens: Optional[int] = None,
     ) -> ModelCallResult:
         started = time.monotonic()
         try:
@@ -669,22 +798,48 @@ class OpenAIResponsesClient:
                 model=model, purpose=purpose,
                 error_code=type(exc).__name__)
         latency = (time.monotonic() - started) * 1000.0
-        text = getattr(resp, "output_text", "") or ""
         usage = {}
         u = getattr(resp, "usage", None)
         if u is not None:
             usage = {"prompt_tokens": getattr(u, "input_tokens", 0) or 0,
                      "completion_tokens": getattr(u, "output_tokens", 0) or 0}
+
+        # A successful HTTP response is NOT automatically a usable one — the
+        # production incident this classification fixes: an HTTP 200 whose
+        # output was incomplete/refused/empty/malformed/schema-invalid used
+        # to collapse into one undifferentiated "invalid_json". Every branch
+        # below is checked BEFORE ever attempting json.loads.
+        classification = classify_responses_output(resp)
+        request_id = getattr(resp, "id", None)
+
+        def _invalid(error_code: str, *, validation_summary: Optional[list] = None) -> ModelCallResult:
+            _log_invalid_output(
+                classification, purpose=purpose, model=model, schema_name=schema_name,
+                error_code=error_code, request_id=request_id,
+                validation_summary=validation_summary)
+            return ModelCallResult(status="invalid_output", usage=usage,
+                                   latency_ms=latency, model=model,
+                                   purpose=purpose, error_code=error_code)
+
+        if classification.response_status == "incomplete":
+            return _invalid("incomplete_output")
+        if classification.has_refusal:
+            return _invalid("model_refusal")
+        if not classification.output_text.strip():
+            return _invalid("empty_output")
         try:
             # A strict json_schema response is guaranteed valid JSON — this is a
             # structured parse, not regex/brace extraction of free-form text.
-            parsed = json.loads(text)
+            parsed = json.loads(classification.output_text)
         except (ValueError, TypeError):
-            return ModelCallResult(status="invalid_output", usage=usage,
-                                   latency_ms=latency, model=model,
-                                   purpose=purpose, error_code="invalid_json")
-        return ModelCallResult(status="ok", parsed=parsed, usage=usage,
-                               latency_ms=latency, model=model, purpose=purpose)
+            return _invalid("json_decode_error")
+        try:
+            validated = response_model.model_validate(parsed)
+        except ValidationError as exc:
+            return _invalid("schema_validation_error",
+                           validation_summary=_validation_error_summary(exc))
+        return ModelCallResult(status="ok", parsed=validated.model_dump(mode="json"),
+                               usage=usage, latency_ms=latency, model=model, purpose=purpose)
 
 
 # --------------------------------------------------------------------------- #
@@ -759,7 +914,7 @@ def interpret_turn(
         purpose=PURPOSE_INTERPRET, system=system, user=user,
         schema_name="PracticeTurnInterpretation",
         schema=export_json_schema(PracticeTurnInterpretation),
-        model=model, timeout=timeout)
+        model=model, timeout=timeout, response_model=PracticeTurnInterpretation)
     if result.status != "ok":
         return None, result
     parsed = _validate_into(PracticeTurnInterpretation, result.parsed)
@@ -767,7 +922,7 @@ def interpret_turn(
         return None, ModelCallResult(
             status="invalid_output", usage=result.usage,
             latency_ms=result.latency_ms, model=result.model,
-            purpose=result.purpose, error_code="schema_validation_failed")
+            purpose=result.purpose, error_code="schema_validation_error")
     return parsed, result
 
 
@@ -853,7 +1008,7 @@ def interpret_active_task_turn(
         purpose=PURPOSE_INTERPRET, system=system, user=user,
         schema_name="ActiveTaskTurnDecision",
         schema=export_json_schema(ActiveTaskTurnDecision),
-        model=model, timeout=timeout,
+        model=model, timeout=timeout, response_model=ActiveTaskTurnDecision,
         max_output_tokens=resolve_v3_active_task_max_output_tokens())
     if result.status != "ok":
         return None, result
@@ -862,7 +1017,7 @@ def interpret_active_task_turn(
         return None, ModelCallResult(
             status="invalid_output", usage=result.usage,
             latency_ms=result.latency_ms, model=result.model,
-            purpose=result.purpose, error_code="schema_validation_failed")
+            purpose=result.purpose, error_code="schema_validation_error")
     return parsed, result
 
 
@@ -935,7 +1090,7 @@ def generate_task(
         purpose=PURPOSE_TASK, system=system, user=user,
         schema_name="TaskSpecification",
         schema=export_json_schema(TaskSpecification),
-        model=model, timeout=timeout)
+        model=model, timeout=timeout, response_model=TaskSpecification)
     if result.status != "ok":
         return None, result
     parsed = _validate_into(TaskSpecification, result.parsed)
@@ -943,7 +1098,7 @@ def generate_task(
         return None, ModelCallResult(
             status="invalid_output", usage=result.usage,
             latency_ms=result.latency_ms, model=result.model,
-            purpose=result.purpose, error_code="schema_validation_failed")
+            purpose=result.purpose, error_code="schema_validation_error")
     return parsed, result
 
 
@@ -956,7 +1111,7 @@ def _narration_call(
         purpose=purpose, system=system, user=user,
         schema_name="NarrationResult",
         schema=export_json_schema(NarrationResult),
-        model=model, timeout=timeout)
+        model=model, timeout=timeout, response_model=NarrationResult)
     if result.status != "ok":
         return None, result
     parsed = _validate_into(NarrationResult, result.parsed)
@@ -964,7 +1119,7 @@ def _narration_call(
         return None, ModelCallResult(
             status="invalid_output", usage=result.usage,
             latency_ms=result.latency_ms, model=result.model,
-            purpose=result.purpose, error_code="schema_validation_failed")
+            purpose=result.purpose, error_code="schema_validation_error")
     return parsed, result
 
 
@@ -1094,7 +1249,7 @@ def repair_student_text(
     result = client.generate(
         purpose=PURPOSE_REPAIR, system=system, user=user,
         schema_name="NarrationResult", schema=export_json_schema(NarrationResult),
-        model=model, timeout=timeout)
+        model=model, timeout=timeout, response_model=NarrationResult)
     if result.status != "ok":
         return None, result
     parsed = _validate_into(NarrationResult, result.parsed)
@@ -1102,5 +1257,5 @@ def repair_student_text(
         return None, ModelCallResult(
             status="invalid_output", usage=result.usage,
             latency_ms=result.latency_ms, model=result.model,
-            purpose=result.purpose, error_code="schema_validation_failed")
+            purpose=result.purpose, error_code="schema_validation_error")
     return parsed, result

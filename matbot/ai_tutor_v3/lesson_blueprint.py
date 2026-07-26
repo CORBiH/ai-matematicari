@@ -195,7 +195,7 @@ def generate_blueprint(
         purpose=orchestrator.PURPOSE_BLUEPRINT, system=system, user=user,
         schema_name="LessonBlueprintProposal",
         schema=export_json_schema(LessonBlueprintProposal),
-        model=model, timeout=timeout)
+        model=model, timeout=timeout, response_model=LessonBlueprintProposal)
     if result.status != "ok":
         return None, f"model_{result.status}:{result.error_code}"
 

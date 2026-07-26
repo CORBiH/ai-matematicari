@@ -129,13 +129,16 @@ class _RepairFakeClient:
         self.repaired_text = repaired_text
         self.status = status
 
-    def generate(self, *, purpose, system, user, schema_name, schema, model, timeout):
+    def generate(self, *, purpose, system, user, schema_name, schema, model, timeout,
+                response_model=None, max_output_tokens=None):
         self.calls.append(purpose)
         if self.status != "ok":
             return orchestrator.ModelCallResult(status=self.status, model=model,
                                                 purpose=purpose, error_code=self.status)
         parsed = {"schema_version": "v1", "student_text": self.repaired_text,
                  "response_category": "feedback", "confidence": 0.9}
+        if response_model is not None:
+            parsed = response_model.model_validate(parsed).model_dump(mode="json")
         return orchestrator.ModelCallResult(status="ok", parsed=parsed, model=model,
                                             purpose=purpose)
 
@@ -168,12 +171,15 @@ def test_repair_prompt_does_not_include_full_blueprint_dump():
     captured = {}
 
     class _CapturingClient(_RepairFakeClient):
-        def generate(self, *, purpose, system, user, schema_name, schema, model, timeout):
+        def generate(self, *, purpose, system, user, schema_name, schema, model, timeout,
+                    response_model=None, max_output_tokens=None):
             captured["system"] = system
             captured["user"] = user
             return super().generate(purpose=purpose, system=system, user=user,
                                     schema_name=schema_name, schema=schema,
-                                    model=model, timeout=timeout)
+                                    model=model, timeout=timeout,
+                                    response_model=response_model,
+                                    max_output_tokens=max_output_tokens)
 
     orchestrator.repair_student_text(
         _CapturingClient(), grade=6, rejected_text="tekst",

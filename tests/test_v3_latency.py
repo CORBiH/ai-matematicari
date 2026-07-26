@@ -152,7 +152,7 @@ def test_fake_timeout_produces_exactly_one_network_attempt(monkeypatch):
         purpose="turn_interpretation", system="s", user="u",
         schema_name="ActiveTaskTurnDecision",
         schema=export_json_schema(ActiveTaskTurnDecision),
-        model="gpt-5-mini", timeout=2)
+        model="gpt-5-mini", timeout=2, response_model=ActiveTaskTurnDecision)
 
     assert attempts["n"] == 1, "max_retries=0 must mean exactly one network attempt"
     assert result.status == "error"
@@ -443,7 +443,7 @@ def test_max_output_tokens_reaches_responses_create(monkeypatch):
         purpose="turn_interpretation", system="s", user="u",
         schema_name="ActiveTaskTurnDecision",
         schema=export_json_schema(ActiveTaskTurnDecision),
-        model="gpt-5-mini", timeout=5,
+        model="gpt-5-mini", timeout=5, response_model=ActiveTaskTurnDecision,
         max_output_tokens=orch.resolve_v3_active_task_max_output_tokens())
 
     assert captured.get("max_output_tokens") == orch.DEFAULT_V3_ACTIVE_TASK_MAX_OUTPUT_TOKENS
@@ -467,7 +467,7 @@ def test_max_output_tokens_omitted_when_none(monkeypatch):
     client.generate(
         purpose="task_generation", system="s", user="u",
         schema_name="X", schema={"type": "object", "properties": {}},
-        model="gpt-5-mini", timeout=5)
+        model="gpt-5-mini", timeout=5, response_model=ActiveTaskTurnDecision)
     assert "max_output_tokens" not in captured
 
 

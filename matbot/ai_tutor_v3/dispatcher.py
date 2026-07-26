@@ -317,8 +317,23 @@ def _run_v3_turn(payload, *, identity, grade, model, timeout, shadow):
         intent=str(payload.get("intent") or "").strip().lower(),
         difficulty_request=str(payload.get("difficulty_request") or "").strip().lower())
     if outcome_bundle.get("error"):
+        # A real, billed model call may have happened here (HTTP 200 with an
+        # invalid output — incomplete/refused/empty/malformed/schema-invalid
+        # — is still one real call) — its usage/latency and structural
+        # diagnostics must not be lost just because the OUTPUT was unusable.
+        # Never the model output itself, only counts/purposes/error_code.
+        import json as _json
+        failed_usage = outcome_bundle.get("usage")
+        usage_json = failed_usage.model_dump_json() if failed_usage is not None else ""
+        audit_json = _json.dumps({
+            "schema_version": _SCHEMA_VERSION,
+            "call_purposes": outcome_bundle.get("purposes") or [],
+            "call_count": len(outcome_bundle.get("purposes") or []),
+            "error_code": outcome_bundle["error"],
+        }, ensure_ascii=False) if outcome_bundle.get("purposes") else ""
         store.fail_turn(turn_id=turn_id, error_code=outcome_bundle["error"],
-                        completed_at=now_iso())
+                        completed_at=now_iso(), usage_json=usage_json,
+                        audit_json=audit_json)
         # Session state was NOT mutated → active task preserved.
         return _fallback_response(state, version, identity,
                                   outcome_bundle["error"], vdecision)
@@ -466,14 +481,14 @@ def _execute_turn(client, *, blueprint, state, grade, student_message, model,
         # StudentTurnInterpretation/PracticeModelAssessment shape either way.
         call_timeout = budget.next_timeout()
         if call_timeout is None:
-            return {"error": "turn_budget_exceeded"}
+            return {"error": "turn_budget_exceeded", "usage": usage, "purposes": purposes}
         decision, call = orchestrator.interpret_active_task_turn(
             client, grade=grade, blueprint=blueprint, state=state,
             student_message=student_message, model=model, timeout=call_timeout)
         _accumulate(usage, call)
         purposes.append(call.purpose)
         if decision is None:
-            return {"error": call.error_code or call.status}
+            return {"error": call.error_code or call.status, "usage": usage, "purposes": purposes}
         interpretation, assessment = orchestrator.decision_to_interpretation_and_assessment(decision)
         narration_proposal = decision.narration_proposal
     else:
@@ -481,14 +496,14 @@ def _execute_turn(client, *, blueprint, state, grade, student_message, model,
         # genuinely needs the fuller session/Blueprint picture.
         call_timeout = budget.next_timeout()
         if call_timeout is None:
-            return {"error": "turn_budget_exceeded"}
+            return {"error": "turn_budget_exceeded", "usage": usage, "purposes": purposes}
         interp_bundle, call = orchestrator.interpret_turn(
             client, grade=grade, blueprint=blueprint, state=state,
             student_message=student_message, model=model, timeout=call_timeout)
         _accumulate(usage, call)
         purposes.append(call.purpose)
         if interp_bundle is None:
-            return {"error": call.error_code or call.status}
+            return {"error": call.error_code or call.status, "usage": usage, "purposes": purposes}
         interpretation = interp_bundle.interpretation
         assessment = interp_bundle.assessment
         narration_proposal = interp_bundle.narration_proposal
@@ -504,7 +519,7 @@ def _execute_turn(client, *, blueprint, state, grade, student_message, model,
         student_message=student_message, model=model, budget=budget,
         usage=usage, purposes=purposes, narration_proposal=narration_proposal)
     if err:
-        return {"error": err}
+        return {"error": err, "usage": usage, "purposes": purposes}
 
     return {
         "new_state": result.new_state, "outcome": result.outcome,

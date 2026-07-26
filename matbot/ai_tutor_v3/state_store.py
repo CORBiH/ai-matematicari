@@ -360,17 +360,27 @@ class V3StateStore:
             conn.close()
 
     def fail_turn(self, *, turn_id: str, error_code: str,
-                  completed_at: str = "") -> None:
+                  completed_at: str = "", usage_json: str = "",
+                  audit_json: str = "") -> None:
         """Mark a turn failed WITHOUT touching session state — the active task
-        and counters are preserved, and the turn can be retried later."""
+        and counters are preserved, and the turn can be retried later.
+
+        ``usage_json``/``audit_json`` let a caller preserve real usage/latency
+        and structural diagnostics for a turn whose OpenAI call actually
+        happened (HTTP 200) but whose OUTPUT was invalid (incomplete,
+        refused, empty, malformed, or schema-invalid) — that is still one
+        real, billed model call and must not read as if nothing happened."""
         self._ensure()
         conn = self._connect()
         try:
             with conn:
                 conn.execute(
                     "UPDATE v3_turns SET status='failed', error_code=?, "
-                    "completed_at=? WHERE turn_id=?",
-                    (error_code, completed_at, turn_id))
+                    "completed_at=?, "
+                    "usage_json=COALESCE(NULLIF(?, ''), usage_json), "
+                    "audit_json=COALESCE(NULLIF(?, ''), audit_json) "
+                    "WHERE turn_id=?",
+                    (error_code, completed_at, usage_json, audit_json, turn_id))
         finally:
             conn.close()
 

@@ -254,7 +254,8 @@ def test_unsupported_construct_fails_before_any_api_call(monkeypatch):
                      "additionalProperties": True}
     result = client.generate(
         purpose="turn_interpretation", system="s", user="u",
-        schema_name="Broken", schema=broken_schema, model="gpt-5-mini", timeout=5)
+        schema_name="Broken", schema=broken_schema, model="gpt-5-mini", timeout=5,
+        response_model=NarrationResult)  # never reached — schema prep fails first
     assert result.status == "error"
     assert result.error_code == "strict_schema_incompatible"
 
@@ -343,7 +344,7 @@ def test_generate_logs_sanitized_diagnostic_on_api_error(monkeypatch, caplog):
             purpose="turn_interpretation", system="SISTEM_PROMPT_TEKST", user="UCENIK_PORUKA",
             schema_name="PracticeTurnInterpretation",
             schema=export_json_schema(PracticeTurnInterpretation),
-            model="gpt-5-mini", timeout=5)
+            model="gpt-5-mini", timeout=5, response_model=PracticeTurnInterpretation)
 
     assert result.status == "error"
     assert result.error_code == "BadRequestError"     # stable, unchanged shape
@@ -544,7 +545,8 @@ def test_generate_runs_final_validator_before_any_network_call(monkeypatch):
     result = client.generate(
         purpose="blueprint_generation", system="s", user="u",
         schema_name="LessonBlueprint", schema=schema_with_free_form_map,
-        model="gpt-5-mini", timeout=5)
+        model="gpt-5-mini", timeout=5,
+        response_model=NarrationResult)  # never reached — invariant gate fails first
     assert result.status == "error"
     assert result.error_code == "strict_schema_incompatible"
 
