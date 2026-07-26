@@ -8,5 +8,15 @@ def index():
     return render_template("index.html")
 
 
+@app.route("/healthz")
+def healthz():
+    return {"ok": True}, 200
+
+
+@app.route("/_healthz")
+def _healthz():
+    return {"ok": True}, 200
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
