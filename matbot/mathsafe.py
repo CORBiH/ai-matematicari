@@ -25,13 +25,19 @@ _DOLLAR_SPLIT = re.compile(r"(?<!\\)\$")
 
 # JSON escape sekvence čije se dekodirane kontrolne znakove najčešće brka sa
 # backslash-om ispred LaTeX komande (\frac, \begin, \times, \neq, \right, ...).
-# Mapiranje ide OBRNUTO od JSON dekodera: kontrolni znak → literalna dva znaka.
+# Mapiranje ide OBRNUTO od JSON dekodera: kontrolni znak → JEDAN literalni
+# backslash + slovo (dva Python znaka: '\' i slovo — NE dva backslasha).
+# Namjerno raw string literali (r"\f") da izbjegnemo bilo kakvu zabunu oko
+# broja backslasheva: r"\f" i "\\f" su identični (jedan backslash + 'f'), ali
+# raw zapis je nedvosmislen na prvi pogled. json.dumps() će kasnije SAM
+# prikazati taj jedan Python backslash kao "\\f" u JSON tekstu — to je ispravno
+# JSON escapovanje jednog backslasha, NE dupliranje.
 _CONTROL_TO_LATEX_ESCAPE = {
-    "\x0c": "\\f",  # form feed   (JSON \f)  — npr. \frac
-    "\x08": "\\b",  # backspace   (JSON \b)  — npr. \begin
-    "\t":   "\\t",  # tab         (JSON \t)  — npr. \times
-    "\r":   "\\r",  # carriage return (JSON \r) — npr. \right
-    "\n":   "\\n",  # newline     (JSON \n)  — npr. \neq, \newcommand
+    "\x0c": r"\f",  # form feed   (JSON \f)  — npr. \frac
+    "\x08": r"\b",  # backspace   (JSON \b)  — npr. \begin
+    "\t":   r"\t",  # tab         (JSON \t)  — npr. \times
+    "\r":   r"\r",  # carriage return (JSON \r) — npr. \right
+    "\n":   r"\n",  # newline     (JSON \n)  — npr. \neq, \newcommand
 }
 
 

@@ -599,3 +599,46 @@ def test_http_response_never_contains_raw_control_chars():
             for v in node:
                 walk(v)
     walk(json.loads(raw))
+
+
+def test_full_practice_response_has_exactly_one_backslash_everywhere():
+    """Regresija za konkretan live bug: rekonstrukcija kontrolnog znaka je
+    (po hipotezi) mogla proizvesti DVA backslasha umjesto jednog, zbog čega bi
+    MathJax prikazao "frac34cdot8" umjesto formule. Provjerava SVA četiri
+    mjesta gdje se tekst zadatka pojavljuje: answer, last_tutor_task,
+    next_state.task.question i server session state (recent_tasks)."""
+    store, fake = SessionStore(), FakeLLM()
+    broken_task = "Izračunaj $\x0crac{3}{4}$ i pomnoži sa 8."
+    expected_clean_fragment = "$\\frac{3}{4}$"   # JEDAN backslash u Python stringu
+
+    fake.queue(make_output(reply="Evo zadatka.", new_task=make_task(text=broken_task, expected="6")))
+    r = run_practice_turn(store, fake, turn_payload())
+
+    answer = r["answer"]
+    last_tutor_task = r["last_tutor_task"]
+    next_state_question = r["next_state"]["task"]["question"]
+    session_recent_tasks = store.peek("sess-1")["recent_tasks"]
+
+    for label, value in (
+        ("answer", answer),
+        ("last_tutor_task", last_tutor_task),
+        ("next_state.task.question", next_state_question),
+    ):
+        assert expected_clean_fragment in value, f"{label}: {value!r}"
+        assert _backslash_run_length(value, "frac") == 1, f"{label}: {value!r}"
+        wire = json.dumps(value)
+        assert r"\\frac" in wire, f"{label} wire: {wire!r}"
+        assert r"\\\\frac" not in wire, f"{label} wire (DUPLIRAN backslash — BUG): {wire!r}"
+
+    assert any(expected_clean_fragment in t for t in session_recent_tasks)
+    for t in session_recent_tasks:
+        if "frac" in t:
+            assert _backslash_run_length(t, "frac") == 1, repr(t)
+
+
+def _backslash_run_length(s, marker):
+    idx = s.index(marker)
+    count = 0
+    while idx - count - 1 >= 0 and s[idx - count - 1] == "\\":
+        count += 1
+    return count
