@@ -1,8 +1,10 @@
 from flask import Flask, jsonify, render_template, request
 
+from matbot.api import ai_tutor_bp
 from matbot.topics import topics_response
 
 app = Flask(__name__)
+app.register_blueprint(ai_tutor_bp)
 
 
 @app.route("/")

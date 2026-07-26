@@ -1,3 +1,5 @@
 Flask>=3.0
 gunicorn>=23.0
+openai>=2.41
+pydantic>=2.7
 openpyxl>=3.1  # samo za scripts/build_topics_json.py (dev-time konverzija Excela)

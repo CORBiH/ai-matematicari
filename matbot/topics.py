@@ -16,6 +16,17 @@ def _load():
     return _cache
 
 
+def lesson_info(grade, topic_id):
+    """Vrati {'id','title','oblast'} za lekciju ili None ako ne postoji."""
+    grade_data = _load().get("grades", {}).get(str(grade).strip())
+    if not grade_data or not topic_id:
+        return None
+    for lesson in grade_data.get("lessons", []):
+        if lesson["id"] == topic_id:
+            return {"id": lesson["id"], "title": lesson["title"], "oblast": lesson["oblast"]}
+    return None
+
+
 def topics_response(grade):
     """Vraća {grouped, oblast_order} za dati razred (string ili int).
 
