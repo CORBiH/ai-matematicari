@@ -27,6 +27,8 @@ from matbot.ai_tutor_v3.schemas import (
     ActiveTaskTurnContext,
     ActiveTaskTurnDecision,
     NarrationResult,
+    PracticeConversationContext,
+    PracticeConversationTurnProposal,
     PracticeModelAssessment,
     PracticeTurnInterpretation,
     PromptPolicyReference,
@@ -358,6 +360,11 @@ PURPOSE_FEEDBACK_REPAIR = "feedback_value_repair"
 #: than one per rejected task proposal; see
 #: ``matbot.ai_tutor_v3.task_coherence.MAX_REPAIR_ATTEMPTS``.
 PURPOSE_TASK_REPAIR = "task_coherence_repair"
+#: The single unified conversational-Practice-engine call — one purpose for
+#: every action (assess/hint/explain/reveal/new-task/…), since the whole
+#: point of this engine is exactly one call per normal turn. See
+#: ``run_conversation_turn``.
+PURPOSE_CONVERSATION = "practice_conversation_turn"
 
 
 class StrictSchemaError(ValueError):
@@ -1195,6 +1202,206 @@ TASK_COHERENCE_METADATA_INSTRUCTION = (
     "coherence_claim, inače takav par operacija NE koristi. Nikad ne pravi "
     "zadatak koji samo 'radi pa poništi' bez razloga koji je učeniku koristan."
 )
+
+
+# =============================================================================#
+# Simplified conversational Practice engine — ONE call per normal turn        #
+#                                                                              #
+# Deliberately independent of the legacy multi-schema path above (interpret_ #
+# turn / interpret_active_task_turn / generate_task / narrate_feedback /     #
+# generate_hint / explain_concept / reveal_solution / repair_*): those       #
+# functions and their schemas are UNCHANGED and still used by the legacy V3  #
+# Practice dispatcher path (see dispatcher.practice_engine()). This section  #
+# is used ONLY when MATBOT_V3_PRACTICE_ENGINE=conversation.                  #
+# =============================================================================#
+#: One short paragraph — a Blueprint is NOT required to build this prompt.
+#: The lesson TITLE (+ optional short description) is the primary scope
+#: signal; grade sets vocabulary/complexity. Generic across every grade 6-9
+#: lesson/domain — nothing here names a specific topic.
+CONVERSATION_TURN_POLICY = (
+    "Ti si nastavnik matematike za bosanske osnovce, {grade}. razred, u "
+    "prirodnom razgovoru o JEDNOJ lekciji: '{lesson_title}'. Drži se ove "
+    "lekcije i predznanja primjerenog razredu; ne skreni na drugu lekciju "
+    "osim kratkog podsjećanja na preduslov. Ako je naslov lekcije nejasan, "
+    "izaberi najsigurnije standardno tumačenje umjesto da stalno pitaš. "
+    "Razumij prirodni bosanski: izostavljene dijakritike, kolokvijalni jezik, "
+    "brojeve/razlomke/izraze/rečenice kao odgovor, nesiguran odgovor, "
+    "djelimično tačno rasuđivanje, konceptualno pitanje, 'ne znam', traženje "
+    "savjeta/novog/lakšeg/težeg zadatka. Prirodno-jezičko objašnjenje NIKAD "
+    "ne ocjenjuj isključivo brojčanim poređenjem — ocijeni značenje. Tvoja "
+    "procjena je SAMO prijedlog — server odlučuje konačno. Prije procjene, "
+    "sam u sebi provjeri račun/rasuđivanje. NIKAD ne piši povratnu informaciju "
+    "koja samo prepričava učenikovu rečenicu — potvrdi/ispravi i dodaj razlog, "
+    "provjeru ili sljedeći koristan korak. Ne otkrivaj konačan odgovor dok je "
+    "zadatak aktivan. Kasniji savjet ne ponavlja cijeli zadatak — samo novi "
+    "korak. Zadatak treba biti rješiv, matematički ispravan, bez otkrivanja "
+    "odgovora, i bez operacije koja se sama poništava osim ako je svrha "
+    "izričito poređenje/invarijantnost/provjera/analiza greške — u tom "
+    "slučaju postavi has_stated_purpose=true. 'Lakši'/'teži' zadatak mora "
+    "stvarno biti lakši/teži (manji/veći brojevi, manje/više koraka, manje/"
+    "više apstrakcije) — ne samo drugi broj težine. Varirati brojeve/"
+    "formulaciju u odnosu na nedavne zadatke. Nikad ne koristiš internu "
+    "terminologiju (shema, JSON, Blueprint, model, pouzdanost, stanje) niti "
+    "pišeš razmišljanje naglas — samo traženi strukturisani izlaz."
+)
+
+
+def build_conversation_context(
+    *, grade: int, lesson_id: str, lesson_title: str,
+    short_lesson_description: Optional[str], state, student_message: str,
+    trusted_ui_action: Optional[str] = None,
+) -> PracticeConversationContext:
+    """Only what the model needs for ONE conversational Practice turn — never
+    the full Blueprint, never the full durable session. Bounded to the last
+    ``PRACTICE_CONVERSATION_RECENT_WINDOW`` (3) tasks/turns."""
+    from matbot.ai_tutor_v3.schemas import PerformanceSummary, RecentTaskSummary
+
+    window = 3
+    task = state.active_task
+    recent_completed = state.completed_tasks[-window:] if state.completed_tasks else []
+    recent_tasks = [
+        RecentTaskSummary(
+            displayed_task=(c.task_id or "zadatak"), difficulty_level=2,
+            answer_kind="free_text", outcome=c.verdict,
+            concept_summary=c.concept_id or "koncept")
+        for c in recent_completed
+    ]
+    recent_lines = [f"{t.role}: {t.text[:200]}" for t in state.recent_turns[-window:]]
+    counters = state.counters
+    performance = PerformanceSummary(
+        recent_correct=counters.solved_independent + counters.solved_assisted,
+        recent_incorrect=counters.wrong_attempts,
+        recent_partial=0, correct_streak=counters.correct_streak)
+    return PracticeConversationContext(
+        schema_version=_CONVERSATION_SCHEMA_VERSION,
+        grade=grade, lesson_id=lesson_id, lesson_title=lesson_title,
+        short_lesson_description=short_lesson_description,
+        current_task=task.question if task else None,
+        current_task_expected_answer_summary=task.expected_internal if task else None,
+        current_task_answer_kind=task.answer_kind if task else None,
+        current_task_requires_explanation=False,
+        current_hint_level=state.hint.current_level,
+        current_difficulty=state.difficulty.level,
+        recent_tasks=recent_tasks, recent_turns=recent_lines,
+        performance_summary=performance,
+        current_student_message=student_message,
+        trusted_ui_action=trusted_ui_action,
+    )
+
+
+_CONVERSATION_SCHEMA_VERSION = "v1"
+
+
+def run_conversation_turn(
+    client: StructuredModelClient, *, context: PracticeConversationContext,
+    model: str, timeout: Optional[float],
+) -> tuple[Optional[PracticeConversationTurnProposal], ModelCallResult]:
+    """The ONE model call for a normal conversational-Practice turn.
+
+    Purpose-specific low-latency settings (Section 15): reuses the SAME
+    resolvers already verified (by production evidence, in an earlier pass)
+    to cut reasoning-token consumption for a compact active-task-shaped call
+    — ``resolve_v3_active_task_reasoning_effort``/``_max_output_tokens`` —
+    rather than duplicating that logic for a second, functionally identical,
+    purpose. Scoped to THIS call only; every other V3 purpose is unaffected.
+    """
+    system = CONVERSATION_TURN_POLICY.format(
+        grade=context.grade, lesson_title=context.lesson_title)
+    user = context.model_dump_json()
+    result = client.generate(
+        purpose=PURPOSE_CONVERSATION, system=system, user=user,
+        schema_name="PracticeConversationTurnProposal",
+        schema=export_json_schema(PracticeConversationTurnProposal),
+        model=model, timeout=timeout, response_model=PracticeConversationTurnProposal,
+        max_output_tokens=resolve_v3_active_task_max_output_tokens(),
+        reasoning_effort=resolve_v3_active_task_reasoning_effort())
+    if result.status != "ok":
+        return None, result
+    parsed = _validate_into(PracticeConversationTurnProposal, result.parsed)
+    if parsed is None:
+        return None, ModelCallResult(
+            status="invalid_output", usage=result.usage,
+            latency_ms=result.latency_ms, model=result.model,
+            purpose=result.purpose, error_code="schema_validation_error")
+    return parsed, result
+
+
+#: Maps a proposal ``action`` to the reducer's ``TurnKind`` — the ONLY place
+#: this mapping is defined, so dispatcher/tests never have to re-derive it.
+_ACTION_TO_TURN_KIND = {
+    "answer_question": "question",
+    "give_hint": "help_request",
+    "give_solution": "solution_request",
+    "create_initial_task": "task_request",
+    "create_new_task": "task_request",
+    "create_easier_task": "difficulty_change",
+    "create_harder_task": "difficulty_change",
+    "ask_clarification": "ambiguous",
+    "continue_conversation": "comment",
+}
+
+#: Maps the model's own (non-authoritative) answer self-assessment to the
+#: reducer's authoritative-candidate ``Verdict`` vocabulary — only used when
+#: ``is_answer_attempt`` is True (i.e. the assessment was actually gradeable).
+_ASSESSMENT_TO_VERDICT = {
+    "correct": "correct", "partially_correct": "partial", "incorrect": "incorrect",
+}
+
+
+def conversation_action_to_turn_kind(proposal: PracticeConversationTurnProposal) -> str:
+    """The reducer's ``TurnKind`` for this proposal — see the module-level
+    comment above this section for why the reducer itself never changes.
+
+    ``assess_answer`` splits three ways on the model's OWN assessment: a
+    truly gradeable verdict → "answer"; "unclear" → "ambiguous" (asks for
+    clarification, never guesses); "not_an_answer"/"not_applicable" (the
+    model looked and decided this wasn't actually an answer) → "comment"
+    (no grading, task preserved) — never forced through "answer" just
+    because the model chose the ``assess_answer`` action.
+    """
+    if proposal.action == "assess_answer":
+        if proposal.assessment in _ASSESSMENT_TO_VERDICT:
+            return "answer"
+        if proposal.assessment == "unclear":
+            return "ambiguous"
+        return "comment"
+    return _ACTION_TO_TURN_KIND[proposal.action]
+
+
+def conversation_proposal_to_interpretation_and_assessment(
+    proposal: PracticeConversationTurnProposal,
+) -> tuple[StudentTurnInterpretation, Optional[PracticeModelAssessment]]:
+    """Adapts the unified ``PracticeConversationTurnProposal`` into the
+    EXISTING ``StudentTurnInterpretation``/``PracticeModelAssessment`` shape
+    the (unchanged) reducer already consumes — mirrors
+    ``decision_to_interpretation_and_assessment`` exactly for the same reason:
+    the reducer stays the single, unmoved authority boundary. Fields the
+    reducer never reads get safe, inert defaults, never invented content.
+    """
+    turn_kind = conversation_action_to_turn_kind(proposal)
+    is_answer_attempt = turn_kind == "answer"
+    interpretation = StudentTurnInterpretation(
+        schema_version=proposal.schema_version, turn_kind=turn_kind,
+        is_answer_attempt=is_answer_attempt,
+        normalized_meaning=proposal.understood_student_intent,
+        claims=[], certainty="certain" if proposal.confidence >= 0.5 else "uncertain",
+        precision="unspecified", confidence=proposal.confidence,
+        clarification_question=proposal.clarification_question)
+
+    assessment = None
+    if is_answer_attempt:
+        assessment = PracticeModelAssessment(
+            schema_version=proposal.schema_version, is_answer_attempt=True,
+            proposed_verdict=_ASSESSMENT_TO_VERDICT[proposal.assessment],
+            proposed_pedagogical_action="continue", confidence=proposal.confidence,
+            difficulty_suggestion=proposal.proposed_difficulty)
+    elif turn_kind == "difficulty_change":
+        direction = "easier" if proposal.action == "create_easier_task" else "harder"
+        assessment = PracticeModelAssessment(
+            schema_version=proposal.schema_version, is_answer_attempt=False,
+            proposed_verdict="not_checkable", proposed_pedagogical_action="continue",
+            confidence=proposal.confidence, difficulty_suggestion=direction)
+    return interpretation, assessment
 
 
 def generate_task(

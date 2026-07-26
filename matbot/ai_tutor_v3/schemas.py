@@ -795,6 +795,177 @@ class ActiveTaskTurnDecision(V3StrictModel):
 
 
 # --------------------------------------------------------------------------- #
+# Practice conversation engine — compact context + ONE unified turn proposal  #
+#                                                                              #
+# Replaces, for the simplified conversational Practice engine ONLY (never    #
+# the legacy engine, never Explain/Exam/Quick/Minimal): the combined         #
+# interpretation + task-generation + narration + task-repair contracts above #
+# with ONE compact input context and ONE compact strict output schema, so a  #
+# normal turn needs exactly one Responses API call. The five authority       #
+# layers still hold: this schema cannot express a counter delta, a streak    #
+# result, a mastery/coverage mutation, a session version, a model-chosen     #
+# task/DB id, or a completion flag — the (unchanged) reducer computes every  #
+# one of those from ITS OWN state via the adapter in orchestrator.py         #
+# (``conversation_proposal_to_interpretation_and_assessment``).              #
+# --------------------------------------------------------------------------- #
+class RecentTaskSummary(V3StrictModel):
+    """A COMPACT record of one recent task — never the full ``ActiveTask``,
+    never raw model output history."""
+
+    displayed_task: NonEmptyStr
+    difficulty_level: int = Field(ge=1, le=5)
+    answer_kind: AnswerKind
+    outcome: Verdict
+    concept_summary: NonEmptyStr
+
+
+class PerformanceSummary(V3StrictModel):
+    """A compact rollup — never the full session counters/mastery/coverage."""
+
+    recent_correct: int = Field(default=0, ge=0)
+    recent_incorrect: int = Field(default=0, ge=0)
+    recent_partial: int = Field(default=0, ge=0)
+    correct_streak: int = Field(default=0, ge=0)
+
+
+#: Recent-window size shared by both list fields below and by the dispatcher
+#: code that BUILDS this context — a single source of truth for "2-3".
+PRACTICE_CONVERSATION_RECENT_WINDOW = 3
+
+
+class PracticeConversationContext(V3StrictModel):
+    """Only what the model needs for ONE conversational Practice turn.
+
+    Never sent to OpenAI as a schema — serialized into the user message text
+    (mirrors ``ActiveTaskTurnContext``). Deliberately excludes: full session
+    history, full Blueprint, full mastery/coverage trees, complete
+    completed-task history, Sheets/outbox data, reporting metadata, every
+    misconception, every task family, old rejected model outputs.
+    """
+
+    schema_version: NonEmptyStr
+    grade: Literal[6, 7, 8, 9]
+    lesson_id: NonEmptyStr
+    lesson_title: NonEmptyStr
+    short_lesson_description: Optional[str] = None
+    current_task: Optional[str] = None
+    current_task_expected_answer_summary: Optional[str] = None
+    current_task_answer_kind: Optional[AnswerKind] = None
+    current_task_requires_explanation: bool = False
+    current_hint_level: int = Field(default=0, ge=0)
+    current_difficulty: int = Field(default=2, ge=1, le=5)
+    recent_tasks: list[RecentTaskSummary] = Field(default_factory=list)
+    recent_turns: list[str] = Field(default_factory=list)
+    performance_summary: PerformanceSummary = Field(default_factory=PerformanceSummary)
+    current_student_message: NonEmptyStr
+    trusted_ui_action: Optional[str] = None
+
+    @field_validator("recent_tasks")
+    @classmethod
+    def _bounded_recent_tasks(cls, value: list) -> list:
+        if len(value) > PRACTICE_CONVERSATION_RECENT_WINDOW:
+            raise ValueError(
+                f"recent_tasks must have at most {PRACTICE_CONVERSATION_RECENT_WINDOW} "
+                f"entries, got {len(value)}")
+        return value
+
+    @field_validator("recent_turns")
+    @classmethod
+    def _bounded_recent_turns(cls, value: list) -> list:
+        if len(value) > PRACTICE_CONVERSATION_RECENT_WINDOW:
+            raise ValueError(
+                f"recent_turns must have at most {PRACTICE_CONVERSATION_RECENT_WINDOW} "
+                f"entries, got {len(value)}")
+        return value
+
+
+#: Closed action vocabulary for the unified proposal — see the docstring
+#: above ``PracticeConversationTurnProposal`` for the per-action field
+#: requirements this schema's validator enforces.
+ConversationAction = Literal[
+    "assess_answer", "answer_question", "give_hint", "give_solution",
+    "create_initial_task", "create_new_task", "create_easier_task",
+    "create_harder_task", "ask_clarification", "continue_conversation",
+]
+
+#: A model self-assessment of an answer attempt — NOT the authoritative
+#: verdict (that stays ``Verdict``/``AuthoritativeOutcome``, server-only).
+#: "not_an_answer"/"not_applicable" let the model say "I looked, this wasn't
+#: actually an answer to grade" without forcing a wrong verdict.
+ConversationAnswerAssessment = Literal[
+    "correct", "partially_correct", "incorrect", "unclear",
+    "not_an_answer", "not_applicable",
+]
+
+#: The task-creating actions — share the same "proposed_next_task required"
+#: constraint below.
+_TASK_CREATING_ACTIONS = frozenset({
+    "create_initial_task", "create_new_task", "create_easier_task", "create_harder_task",
+})
+
+
+class ProposedTask(V3StrictModel):
+    """A task the model proposes within the SAME unified call — the reducer
+    still decides whether it is actually activated."""
+
+    text: NonEmptyStr
+    answer_kind: AnswerKind
+    expected_answer_summary: Optional[str] = None
+    requires_explanation: bool = False
+    difficulty_level: int = Field(ge=1, le=5)
+    #: Self-declared: true only when a self-cancelling-looking operation pair
+    #: (e.g. "proširi pa skrati") has an explicit, stated purpose (comparison,
+    #: invariance, reversibility, checking, or error analysis) — see
+    #: ``conversation_dispatcher._looks_self_cancelling_without_purpose``.
+    has_stated_purpose: bool = False
+
+
+# Deliberately a short docstring (see the comment above ActiveTaskTurnDecision
+# for why): this schema is sent on EVERY normal conversational Practice call.
+class PracticeConversationTurnProposal(V3StrictModel):
+    """One unified, non-authoritative proposal for one conversational
+    Practice turn."""
+
+    schema_version: NonEmptyStr
+    action: ConversationAction
+    understood_student_intent: NonEmptyStr
+    assessment: Optional[ConversationAnswerAssessment] = None
+    student_feedback: Optional[str] = None
+    clarification_question: Optional[str] = None
+    hint: Optional[str] = None
+    explanation: Optional[str] = None
+    proposed_next_task: Optional[ProposedTask] = None
+    proposed_difficulty: Optional[DifficultySuggestion] = None
+    keep_current_task: bool = True
+    answer_evidence_summary: Optional[str] = None
+    confidence: float = Field(ge=0.0, le=1.0)
+
+    @model_validator(mode="after")
+    def _action_requires_matching_fields(self) -> "PracticeConversationTurnProposal":
+        action = self.action
+        if action == "assess_answer":
+            if self.assessment is None or not self.student_feedback:
+                raise ValueError(
+                    "assess_answer requires both assessment and student_feedback")
+        elif action == "answer_question":
+            if not self.explanation:
+                raise ValueError("answer_question requires explanation")
+        elif action == "give_hint":
+            if not self.hint:
+                raise ValueError("give_hint requires hint")
+        elif action == "give_solution":
+            if not self.explanation:
+                raise ValueError("give_solution requires explanation (the solution text)")
+        elif action in _TASK_CREATING_ACTIONS:
+            if self.proposed_next_task is None:
+                raise ValueError(f"{action} requires proposed_next_task")
+        elif action == "ask_clarification":
+            if not self.clarification_question:
+                raise ValueError("ask_clarification requires clarification_question")
+        return self
+
+
+# --------------------------------------------------------------------------- #
 # Verification boundary (model-only in this stage)                            #
 # --------------------------------------------------------------------------- #
 class VerificationBatchResult(V3StrictModel):

@@ -215,6 +215,51 @@ def generate_blueprint(
     return blueprint.model_copy(update={"validation_status": "validated"}), ""
 
 
+def try_get_cached_blueprint(
+    store: V3StateStore, *, identity: LessonIdentity, grade: int,
+) -> Optional[LessonBlueprint]:
+    """Cache-only lookup for the simplified conversational Practice engine
+    (Section 8): looks up a stored, validated Blueprint for this exact
+    (lesson, source hash) and returns it, or ``None``.
+
+    Deliberately NEVER calls ``generate_blueprint`` — no model call, no
+    network access, no latency added to the user's turn. A ``None`` result
+    is a completely normal, expected outcome (no Blueprint has been
+    generated yet for this lesson) and callers must proceed without one,
+    using only the lesson identity (grade/title) — never fall back to
+    Minimal and never block on this lookup.
+    """
+    metadata = source_metadata(identity, grade)
+    source_hash = compute_source_hash(metadata)
+    stored = store.find_blueprint(identity.lesson_id, source_hash)
+    if stored is None:
+        return None
+    try:
+        return LessonBlueprint.model_validate_json(stored)
+    except Exception:
+        return None
+
+
+#: Bound the enrichment summary's size — a compact HELPFUL note, never a
+#: Blueprint dump (Section 8: "extract only a compact helpful lesson summary").
+_MAX_LESSON_SUMMARY_CHARS = 300
+
+
+def compact_lesson_summary(blueprint: Optional[LessonBlueprint]) -> Optional[str]:
+    """A short, plain-text enrichment summary from a validated Blueprint, or
+    ``None`` when no Blueprint is available — callers must treat both cases
+    as equally normal (Blueprint is enrichment only, never required)."""
+    if blueprint is None:
+        return None
+    parts = list(blueprint.learning_objectives[:2])
+    if not parts and blueprint.concepts:
+        parts = [c.name for c in blueprint.concepts[:2]]
+    if not parts:
+        return None
+    summary = "; ".join(parts)
+    return summary[:_MAX_LESSON_SUMMARY_CHARS]
+
+
 def get_or_create_blueprint(
     store: V3StateStore, client: orchestrator.StructuredModelClient, *,
     identity: LessonIdentity, grade: int, model: str = orchestrator.DEFAULT_MODEL,

@@ -70,6 +70,20 @@ def practice_flag() -> str:
     return value if value in _VALID_FLAG else "off"
 
 
+_VALID_ENGINES = {"legacy", "conversation"}
+
+
+def practice_engine() -> str:
+    """``MATBOT_V3_PRACTICE_ENGINE``: ``legacy`` (default, unchanged production
+    behavior) or ``conversation`` (the simplified conversational engine).
+    Unset/blank/unrecognized → ``legacy`` — a safe, explicit opt-in only,
+    never a silent behavior change. Both engines share the SAME store,
+    adapter, rendering, idempotency, and outbox — they are two strategies for
+    computing one turn's response, never two parallel tutor packages."""
+    value = (os.getenv("MATBOT_V3_PRACTICE_ENGINE") or "legacy").strip().lower()
+    return value if value in _VALID_ENGINES else "legacy"
+
+
 #: The single wildcard token. Anything else is an explicit canonical lesson id.
 _WILDCARD = "*"
 
@@ -187,10 +201,11 @@ def v3_practice_dispatch(
     # Eligible. In shadow mode we compute against an ISOLATED session and always
     # return None so the legacy response stays visible.
     shadow = flag == "shadow"
+    engine = practice_engine()
     try:
         response = _run_v3_turn(
             payload, identity=identity, grade=grade, model=model,
-            timeout=timeout, shadow=shadow)
+            timeout=timeout, shadow=shadow, engine=engine)
     except Exception:
         # Never let a V3 defect break the turn: before any commit we can fall
         # back to legacy; the store transaction guarantees no partial state.
@@ -245,21 +260,30 @@ class _TurnBudget:
 # --------------------------------------------------------------------------- #
 # Turn execution                                                              #
 # --------------------------------------------------------------------------- #
-def _run_v3_turn(payload, *, identity, grade, model, timeout, shadow):
+def _run_v3_turn(payload, *, identity, grade, model, timeout, shadow, engine="legacy"):
     turn_started = time.monotonic()
     store = _get_store()
     client = _model_client()
     budget = _TurnBudget(timeout)
 
-    call_timeout = budget.next_timeout()
-    if call_timeout is None:
-        return None  # budget exhausted before any call — nothing mutated yet
-    blueprint, reason, blueprint_cache_hit = lesson_blueprint.get_or_create_blueprint(
-        store, client, identity=identity, grade=grade, model=model,
-        timeout=call_timeout)
-    if blueprint is None:
-        # No session mutated yet → safe to fall back to legacy.
-        return None
+    blueprint_cache_hit = None
+    if engine == "conversation":
+        # Section 8: Blueprint is optional enrichment ONLY for this engine —
+        # a cache-only lookup, NEVER a synchronous generation call, so a
+        # missing Blueprint adds no latency and never blocks the turn.
+        blueprint = lesson_blueprint.try_get_cached_blueprint(
+            store, identity=identity, grade=grade)
+        blueprint_cache_hit = blueprint is not None
+    else:
+        call_timeout = budget.next_timeout()
+        if call_timeout is None:
+            return None  # budget exhausted before any call — nothing mutated yet
+        blueprint, reason, blueprint_cache_hit = lesson_blueprint.get_or_create_blueprint(
+            store, client, identity=identity, grade=grade, model=model,
+            timeout=call_timeout)
+        if blueprint is None:
+            # No session mutated yet → safe to fall back to legacy.
+            return None
 
     session_id = str(payload.get("session_id") or ("sess_" + uuid.uuid4().hex[:12]))
     if shadow:
@@ -276,8 +300,8 @@ def _run_v3_turn(payload, *, identity, grade, model, timeout, shadow):
         store.create_session(
             session_id=session_id, student_id=state.student_id, grade=grade,
             mode="practice", lesson_id=identity.lesson_id,
-            blueprint_id=blueprint.blueprint_id,
-            blueprint_version=blueprint.blueprint_version,
+            blueprint_id=blueprint.blueprint_id if blueprint else "",
+            blueprint_version=blueprint.blueprint_version if blueprint else "",
             state_json=state.model_dump_json(),
             created_at=state.created_at.isoformat(),
             updated_at=state.updated_at.isoformat())
@@ -310,12 +334,20 @@ def _run_v3_turn(payload, *, identity, grade, model, timeout, shadow):
         return _refusal_response(state, version, identity, vdecision.refusal_reason)
 
     # Model calls happen here with NO db transaction open.
-    outcome_bundle = _execute_turn(
-        client, blueprint=blueprint, state=state, grade=grade,
-        student_message=student_message, model=model, budget=budget,
-        verification=vdecision, is_bootstrap=is_bootstrap,
-        intent=str(payload.get("intent") or "").strip().lower(),
-        difficulty_request=str(payload.get("difficulty_request") or "").strip().lower())
+    intent = str(payload.get("intent") or "").strip().lower()
+    difficulty_request = str(payload.get("difficulty_request") or "").strip().lower()
+    if engine == "conversation":
+        outcome_bundle = _execute_conversation_turn(
+            client, blueprint=blueprint, state=state, grade=grade,
+            identity=identity, student_message=student_message, model=model,
+            budget=budget, verification=vdecision, is_bootstrap=is_bootstrap,
+            intent=intent, difficulty_request=difficulty_request)
+    else:
+        outcome_bundle = _execute_turn(
+            client, blueprint=blueprint, state=state, grade=grade,
+            student_message=student_message, model=model, budget=budget,
+            verification=vdecision, is_bootstrap=is_bootstrap,
+            intent=intent, difficulty_request=difficulty_request)
     if outcome_bundle.get("error"):
         # A real, billed model call may have happened here (HTTP 200 with an
         # invalid output — incomplete/refused/empty/malformed/schema-invalid
@@ -331,6 +363,7 @@ def _run_v3_turn(payload, *, identity, grade, model, timeout, shadow):
             "call_count": len(outcome_bundle.get("purposes") or []),
             "error_code": outcome_bundle["error"],
             "active_task_telemetry": outcome_bundle.get("active_task_telemetry"),
+            "conversation_telemetry": outcome_bundle.get("conversation_telemetry"),
         }, ensure_ascii=False) if outcome_bundle.get("purposes") else ""
         store.fail_turn(turn_id=turn_id, error_code=outcome_bundle["error"],
                         completed_at=now_iso(), usage_json=usage_json,
@@ -360,7 +393,7 @@ def _run_v3_turn(payload, *, identity, grade, model, timeout, shadow):
         outcome_bundle=outcome_bundle, vdecision=vdecision,
         version_before=version, version_after=version + 1, category=category,
         blueprint_cache_hit=blueprint_cache_hit,
-        turn_latency_ms=(time.monotonic() - turn_started) * 1000.0)
+        turn_latency_ms=(time.monotonic() - turn_started) * 1000.0, engine=engine)
     # The SAME privacy-safe audit dict IS the compact V3 telemetry Phase 10
     # asks for in the Sheets row — no second telemetry shape to maintain.
     response["v3_telemetry"] = audit
@@ -883,18 +916,288 @@ def _apply_task_coherence_gate(client, spec, *, blueprint, grade, model, budget,
                   "gate_failed_final": True}, "task_incoherent"
 
 
+# =============================================================================#
+# Simplified conversational Practice engine — ONE model call per normal turn  #
+#                                                                              #
+# Activated only when ``practice_engine() == "conversation"``. Reuses the     #
+# SAME store/adapter/rendering/reducer/verifier/idempotency machinery as the  #
+# legacy engine above — this is a second STRATEGY for computing one turn's    #
+# response, never a second tutor package. No repair model call is ever made  #
+# here (Sections 10/11): a failed lightweight/deterministic check produces    #
+# either a deterministic fallback (feedback text) or a safe turn rejection    #
+# that preserves state (a proposed task) — never a second paid model call.   #
+# =============================================================================#
+#: A small, CLOSED set of GENERIC Bosnian math-verb ROOT pairs whose presence
+#: together (as substrings of normalized tokens) suggests a "do X then undo
+#: X" task with no stated point — the SAME generic idea task_coherence.py
+#: uses (self-cancelling operation pairs), expressed as text roots here
+#: because this engine's compact ``ProposedTask`` has no typed operation list.
+#: Applies to ANY lesson using these verbs — no lesson-specific phrase here.
+_SELF_CANCELLING_VERB_ROOTS = (
+    frozenset({"prosir", "skrat"}), frozenset({"saber", "oduz"}),
+    frozenset({"pomnoz", "podijel"}), frozenset({"uveca", "umanj"}),
+)
+
+#: Answer kinds implying a checkable result should exist internally — reused
+#: verbatim from task_coherence.py's own definition to avoid a second,
+#: possibly-drifting copy of the same closed set.
+_CONVERSATION_CHECKABLE_ANSWER_KINDS = frozenset({
+    "boolean_with_reason", "rational_value", "integer_value",
+    "equation_solution", "set_value",
+})
+
+
+def _looks_self_cancelling_without_purpose(text: str, has_stated_purpose: bool) -> bool:
+    if has_stated_purpose:
+        return False
+    folded = feedback_value_gate.normalize_for_comparison(text)
+    for pair in _SELF_CANCELLING_VERB_ROOTS:
+        a, b = tuple(pair)
+        if a in folded and b in folded:
+            return True
+    return False
+
+
+def _check_proposed_task_lightweight(task, *, previous_task_text: Optional[str]) -> Optional[str]:
+    """Deterministic-only checks (Section 11) — returns a short failure
+    reason, or ``None`` if the task passes. NEVER triggers a model call."""
+    text = (task.text or "").strip()
+    if not text:
+        return "task_empty"
+    if (task.answer_kind in _CONVERSATION_CHECKABLE_ANSWER_KINDS
+            and not task.expected_answer_summary and not task.requires_explanation):
+        return "task_missing_expected_answer"
+    summary = (task.expected_answer_summary or "").strip()
+    if len(summary) >= 4:
+        import re as _re
+        if _re.search(rf"(?<!\w){_re.escape(summary.lower())}(?!\w)", text.lower()):
+            return "task_reveals_answer"
+    if _looks_self_cancelling_without_purpose(text, task.has_stated_purpose):
+        return "task_self_cancelling_without_purpose"
+    if previous_task_text:
+        if (feedback_value_gate.normalize_for_comparison(text)
+                == feedback_value_gate.normalize_for_comparison(previous_task_text)):
+            return "task_duplicate_of_recent"
+    return None
+
+
+def _apply_lightweight_text_gate(text: Optional[str], *, response_type: str, grade: int,
+                                 fallback: str) -> tuple[str, dict]:
+    """``quality_gate.check`` only — NO repair model call. A failure uses the
+    supplied deterministic ``fallback`` text directly (Section 10)."""
+    normalized = normalize_math_for_display(text or "")
+    if not normalized.strip():
+        return fallback, {"checked": True, "repaired": False,
+                          "failure_categories": ["empty_text"], "gate_failed_final": True}
+    result = quality_gate.check(normalized, response_type=response_type, grade=grade)
+    if result.ok:
+        return normalized, {"checked": True, "repaired": False, "failure_categories": []}
+    return fallback, {"checked": True, "repaired": False,
+                      "failure_categories": result.failure_categories,
+                      "gate_failed_final": True, "reason": "deterministic_fallback_no_repair"}
+
+
+def _apply_lightweight_feedback_gate(text: Optional[str], *, student_message: str,
+                                     verdict: str, grade: int) -> tuple[str, dict]:
+    """``quality_gate`` + ``feedback_value_gate`` — NO repair model call
+    (Section 10: "Retain FeedbackValueGate as a lightweight display check.
+    Do not automatically call a repair model when FeedbackValueGate
+    fails."). A failure of EITHER gate uses the verdict-specific
+    deterministic fallback directly."""
+    fallback = feedback_value_gate.safe_fallback_text(verdict)
+    normalized = normalize_math_for_display(text or "")
+    if not normalized.strip():
+        return fallback, {"checked": True, "repaired": False,
+                          "failure_categories": ["empty_text"], "gate_failed_final": True}
+    qresult = quality_gate.check(normalized, response_type="feedback", grade=grade)
+    if not qresult.ok:
+        return fallback, {"checked": True, "repaired": False,
+                          "failure_categories": qresult.failure_categories,
+                          "gate_failed_final": True, "reason": "deterministic_fallback_no_repair"}
+    vresult = feedback_value_gate.check_feedback_value(
+        normalized, student_message=student_message, verdict=verdict)
+    if vresult.passed:
+        return normalized, {"checked": True, "repaired": False, "failure_categories": [],
+                            "similarity_metrics": vresult.similarity_metrics}
+    return fallback, {"checked": True, "repaired": False,
+                      "failure_categories": vresult.categories, "gate_failed_final": True,
+                      "reason": "deterministic_fallback_no_repair"}
+
+
+def _render_conversation_result(proposal, *, action, outcome, state, grade,
+                                student_message, previous_task_text):
+    """Extract the already-generated content from the ONE proposal for the
+    reducer's chosen action — never a second model call. Mirrors the shape
+    of ``_render``/``_render_new_task`` above but reads text straight out of
+    ``proposal`` instead of making another orchestrator call."""
+    if action == reducer.OFF_TOPIC:
+        return orchestrator.OFF_TOPIC_FALLBACK, "off_topic", "", dict(_NO_GATE_INFO)
+    if action == reducer.CLARIFY:
+        seed = proposal.clarification_question or "Možeš li pojasniti?"
+        text, gate_info = _apply_lightweight_text_gate(
+            seed, response_type="clarification", grade=grade,
+            fallback=quality_gate.SAFE_FALLBACK_TEXT)
+        return text, "clarification", "", gate_info
+    if action == reducer.ACKNOWLEDGE:
+        text, gate_info = _apply_lightweight_text_gate(
+            proposal.student_feedback or proposal.explanation,
+            response_type="comment", grade=grade, fallback=quality_gate.SAFE_FALLBACK_TEXT)
+        return text, "comment", "", gate_info
+    if action == reducer.EXPLAIN_CONCEPT:
+        text, gate_info = _apply_lightweight_text_gate(
+            proposal.explanation, response_type="concept", grade=grade,
+            fallback=quality_gate.SAFE_FALLBACK_TEXT)
+        return text, "concept", "", gate_info
+    if action == reducer.GIVE_HINT:
+        text, gate_info = _apply_lightweight_text_gate(
+            proposal.hint, response_type="hint", grade=grade,
+            fallback=quality_gate.SAFE_FALLBACK_TEXT)
+        return text, "hint", "", gate_info
+    if action == reducer.REVEAL_SOLUTION:
+        text, gate_info = _apply_lightweight_text_gate(
+            proposal.explanation, response_type="reveal", grade=grade,
+            fallback=quality_gate.SAFE_FALLBACK_TEXT)
+        return text, "reveal", "", gate_info
+    if action == reducer.NARRATE_FEEDBACK:
+        text, gate_info = _apply_lightweight_feedback_gate(
+            proposal.student_feedback, student_message=student_message,
+            verdict=outcome.verdict, grade=grade)
+        return text, f"feedback_{outcome.verdict}", "", gate_info
+    if action == reducer.GENERATE_TASK:
+        return _render_conversation_task(
+            proposal, state=state, grade=grade, previous_task_text=previous_task_text)
+    return _FALLBACK_TEXT, "fallback", "", dict(_NO_GATE_INFO)
+
+
+def _render_conversation_task(proposal, *, state, grade, previous_task_text):
+    task_spec = proposal.proposed_next_task
+    if task_spec is None:
+        return "", "", "task_missing", dict(_NO_GATE_INFO)
+    reject_reason = _check_proposed_task_lightweight(
+        task_spec, previous_task_text=previous_task_text)
+    if reject_reason:
+        return "", "", f"task_rejected_{reject_reason}", dict(_NO_GATE_INFO)
+
+    normalized = normalize_math_for_display(task_spec.text)
+    result = quality_gate.check(normalized, response_type="task", grade=grade,
+                                previous_text=previous_task_text,
+                                forbidden_reveal=task_spec.expected_answer_summary)
+    if not result.ok:
+        # No repair call for a rejected TASK (Section 11) — a "safe generic
+        # fallback task" cannot be lesson-appropriate by construction, so the
+        # turn fails safely instead (state preserved, student can retry).
+        return "", "", "task_rejected_quality_gate", dict(_NO_GATE_INFO)
+
+    task = ActiveTask(
+        task_id=reducer.new_task_id(), concept_id=state.lesson_id or "lesson",
+        target_id=state.lesson_id or "lesson", question=normalized,
+        answer_kind=task_spec.answer_kind,
+        expected_internal=task_spec.expected_answer_summary,
+        difficulty_level=task_spec.difficulty_level)
+    state.active_task = task
+    return task.question, "task", "", {"checked": True, "repaired": False,
+                                       "failure_categories": []}
+
+
+def _execute_conversation_turn(client, *, blueprint, state, grade, identity,
+                               student_message, model, budget, verification,
+                               is_bootstrap=False, intent="", difficulty_request=""):
+    """The simplified engine's turn executor: ONE model call
+    (``orchestrator.run_conversation_turn``) handles interpretation AND
+    response content together; the (unchanged) reducer still computes the
+    authoritative outcome. Mirrors ``_execute_turn``'s shape/contract exactly
+    (same return dict keys) so ``_run_v3_turn`` needs only ONE extra branch,
+    never a duplicated transaction/commit path."""
+    usage = UsageMetrics()
+    purposes: list[str] = []
+    previous_task_text = state.active_task.question if state.active_task else None
+
+    trusted_action = None
+    if is_bootstrap:
+        trusted_action = "initial_task"
+    elif intent == "hint_request" and state.active_task is not None:
+        trusted_action = "hint"
+    elif difficulty_request in _TRUSTED_DIFFICULTY_REQUESTS:
+        trusted_action = f"difficulty_{difficulty_request}"
+
+    call_timeout = budget.next_timeout()
+    if call_timeout is None:
+        return {"error": "turn_budget_exceeded", "usage": usage, "purposes": purposes}
+
+    effective_message = student_message or (
+        "Daj mi jedan zadatak za vježbu iz ove lekcije." if is_bootstrap else "")
+    if not effective_message:
+        return {"error": "empty_student_message", "usage": usage, "purposes": purposes}
+
+    short_desc = lesson_blueprint.compact_lesson_summary(blueprint)
+    context = orchestrator.build_conversation_context(
+        grade=grade, lesson_id=identity.lesson_id, lesson_title=identity.lesson_title,
+        short_lesson_description=short_desc, state=state,
+        student_message=effective_message, trusted_ui_action=trusted_action)
+
+    proposal, call = orchestrator.run_conversation_turn(
+        client, context=context, model=model, timeout=call_timeout)
+    _accumulate(usage, call)
+    purposes.append(call.purpose)
+    conversation_telemetry = {
+        "reasoning_effort": call.reasoning_effort,
+        "max_output_tokens": call.max_output_tokens,
+        "response_status": call.response_status,
+        "incomplete_reason": call.incomplete_reason,
+        "action": proposal.action if proposal else None,
+        "trusted_ui_action": trusted_action,
+    }
+    if proposal is None:
+        return {"error": call.error_code or call.status, "usage": usage,
+               "purposes": purposes, "conversation_telemetry": conversation_telemetry}
+
+    interpretation, assessment = orchestrator.conversation_proposal_to_interpretation_and_assessment(
+        proposal)
+    result = reducer.reduce_turn(
+        state=state, interpretation=interpretation, assessment=assessment,
+        verification=verification)
+
+    answer, category, err, gate_info = _render_conversation_result(
+        proposal, action=result.next_action, outcome=result.outcome,
+        state=result.new_state, grade=grade, student_message=student_message,
+        previous_task_text=previous_task_text)
+    conversation_telemetry["deterministic_verifier_used"] = False
+    conversation_telemetry["verifier_disagreement"] = False
+    if err:
+        return {"error": err, "usage": usage, "purposes": purposes,
+               "conversation_telemetry": conversation_telemetry}
+
+    return {
+        "new_state": result.new_state, "outcome": result.outcome,
+        "answer": answer, "category": category or result.response_category,
+        "turn_kind": interpretation.turn_kind, "usage": usage,
+        "purposes": purposes, "quality_gate": gate_info,
+        "conversation_telemetry": conversation_telemetry,
+        "interpretation": interpretation.model_dump(mode="json"),
+        "assessment": assessment.model_dump(mode="json") if assessment else None,
+    }
+
+
 # --------------------------------------------------------------------------- #
 # State + bookkeeping helpers                                                 #
 # --------------------------------------------------------------------------- #
 def _bootstrap_state(session_id, grade, identity, blueprint) -> TutorSessionState:
+    """``blueprint`` may be ``None`` under the conversation engine (Section 8:
+    Blueprint is optional enrichment, never required to start a session) —
+    every Blueprint-derived field then falls back to a safe empty default."""
     now = datetime.now(timezone.utc)
-    targets = [t.target_id for t in blueprint.coverage_targets]
+    targets = [t.target_id for t in blueprint.coverage_targets] if blueprint else []
+    # TutorSessionState.blueprint_id/blueprint_version are NonEmptyStr — "none"
+    # is an explicit, non-empty placeholder for "no Blueprint exists yet"
+    # (Section 8: Blueprint is optional enrichment, never required).
+    blueprint_id = blueprint.blueprint_id if blueprint else "none"
+    blueprint_version = blueprint.blueprint_version if blueprint else "none"
     return TutorSessionState(
         schema_version=_SCHEMA_VERSION, session_id=session_id,
         student_id=_opaque_student_id(session_id), grade=grade, mode="practice",
-        lesson_id=identity.lesson_id, blueprint_id=blueprint.blueprint_id,
-        blueprint_version=blueprint.blueprint_version,
-        prompt_policy=orchestrator.current_prompt_policy(blueprint.blueprint_version),
+        lesson_id=identity.lesson_id, blueprint_id=blueprint_id,
+        blueprint_version=blueprint_version,
+        prompt_policy=orchestrator.current_prompt_policy(blueprint_version),
         counters=SessionCounters(),
         coverage=CoverageState(targets=targets),
         created_at=now, updated_at=now)
@@ -965,12 +1268,16 @@ def _input_summary(student_message: str) -> str:
 
 def _audit_record(*, request_id, session_id, client_turn_id, identity, blueprint,
                   outcome_bundle, vdecision, version_before, version_after,
-                  category, blueprint_cache_hit=None, turn_latency_ms=None) -> dict:
+                  category, blueprint_cache_hit=None, turn_latency_ms=None,
+                  engine="legacy") -> dict:
     """Structured, privacy-safe per-turn telemetry (Phase 9).
 
     Never includes: API keys, complete prompts, hidden chain-of-thought,
     parent contact information, or the raw conversation — only identifiers,
     counts, timings, categories and the already-committed outcome/verdict.
+
+    ``blueprint`` may be ``None`` under the conversation engine (Blueprint is
+    optional there) — every Blueprint-derived field falls back safely.
     """
     interp = outcome_bundle.get("interpretation") or {}
     usage = outcome_bundle["usage"]
@@ -978,11 +1285,13 @@ def _audit_record(*, request_id, session_id, client_turn_id, identity, blueprint
         "schema_version": _SCHEMA_VERSION, "request_id": request_id,
         "session_id": session_id, "client_turn_id": client_turn_id,
         "lesson_id": identity.lesson_id, "mode": "practice",
-        "blueprint_id": blueprint.blueprint_id,
-        "blueprint_version": blueprint.blueprint_version,
+        "engine": engine,
+        "blueprint_id": blueprint.blueprint_id if blueprint else "",
+        "blueprint_version": blueprint.blueprint_version if blueprint else "",
         "blueprint_cache_hit": bool(blueprint_cache_hit),
-        "prompt_policy": blueprint.prompt_policy.model_dump(mode="json"),
-        "model": blueprint.model,
+        "prompt_policy": (blueprint.prompt_policy.model_dump(mode="json")
+                         if blueprint else None),
+        "model": blueprint.model if blueprint else "",
         "call_purposes": outcome_bundle.get("purposes") or [],
         "call_count": len(outcome_bundle.get("purposes") or []),
         # ``quality_gate`` also nests two pedagogy-pass sub-gates when they
@@ -1004,6 +1313,9 @@ def _audit_record(*, request_id, session_id, client_turn_id, identity, blueprint
         "turn_latency_ms": turn_latency_ms,
         "usage": usage.model_dump(mode="json"),
         "active_task_telemetry": outcome_bundle.get("active_task_telemetry"),
+        # Conversation-engine-only telemetry (Section 17): action, trusted UI
+        # action, and safe/bounded gate results — never raw student/model text.
+        "conversation_telemetry": outcome_bundle.get("conversation_telemetry"),
     }
 
 
