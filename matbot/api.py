@@ -1,14 +1,22 @@
 """Flask blueprint za /api/ai-tutor/* — prevod stvarnog frontend ugovora
 (templates/index.html) u čisti 'turn' dict i nazad. Bez pedagogije ovdje.
+
+Sigurnosni gejt (token → IP rate limit → validacija → session rate limit →
+per-session lock) postoji SAMO na endpointima koji troše OpenAI kredit ili
+mijenjaju stanje: /chat, /chat/stream, /feedback. GET /topics ostaje javan —
+ne troši OpenAI kredit i sadrži samo javne podatke o kurikulumu (obrazloženje
+u završnom izvještaju security hardeninga).
 """
 import json
 import logging
 
 from flask import Blueprint, Response, current_app, jsonify, request
 
-from matbot import config
+from matbot import auth, config, validation
 from matbot.practice import SAFE_ERROR_MESSAGE, run_practice_turn
+from matbot.ratelimit import RateLimiter
 from matbot.session_store import SessionStore
+from matbot.turnlock import TurnLockRegistry
 
 logger = logging.getLogger("matbot.api")
 
@@ -23,6 +31,9 @@ IMAGE_NOT_SUPPORTED_MESSAGE = (
 )
 EMPTY_MESSAGE_PROMPT = "Upiši poruku ili zadatak pa pokušaj ponovo."
 TOO_LONG_MESSAGE = "Poruka je preduga. Skrati je pa pošalji ponovo."
+AUTH_FRIENDLY_MESSAGE = "Sesija je istekla ili nije prepoznata. Osvježi stranicu i pokušaj ponovo."
+RATE_LIMIT_MESSAGE = "Poslao si previše poruka u kratkom periodu. Sačekaj malo pa pokušaj ponovo."
+TURN_IN_PROGRESS_MESSAGE = "Prethodni zahtjev za ovaj razgovor još nije završen. Sačekaj trenutak."
 
 
 def _get_store():
@@ -41,6 +52,50 @@ def _get_llm():
         llm = OpenAIPracticeLLM()
         current_app.config["MATBOT_LLM"] = llm
     return llm
+
+
+def _get_session_limiter():
+    limiter = current_app.config.get("MATBOT_SESSION_LIMITER")
+    if limiter is None:
+        limiter = RateLimiter(config.SESSION_LIMIT_PER_MINUTE, config.SESSION_LIMIT_PER_HOUR)
+        current_app.config["MATBOT_SESSION_LIMITER"] = limiter
+    return limiter
+
+
+def _get_ip_limiter():
+    limiter = current_app.config.get("MATBOT_IP_LIMITER")
+    if limiter is None:
+        limiter = RateLimiter(config.IP_LIMIT_PER_MINUTE, config.IP_LIMIT_PER_HOUR)
+        current_app.config["MATBOT_IP_LIMITER"] = limiter
+    return limiter
+
+
+def _get_turn_locks():
+    locks = current_app.config.get("MATBOT_TURN_LOCKS")
+    if locks is None:
+        locks = TurnLockRegistry()
+        current_app.config["MATBOT_TURN_LOCKS"] = locks
+    return locks
+
+
+def _client_ip():
+    # Produkcijski VPS potvrđen: Nginx je JEDINI reverse proxy ispred ove
+    # aplikacije i postavlja X-Forwarded-For. app.py omotava app.wsgi_app u
+    # ProxyFix(x_for=1, x_proto=1) (vidi app.py), koji PRIJE nego što zahtjev
+    # uopšte stigne ovdje prepisuje request.remote_addr u stvarnu klijentsku
+    # adresu (uzima tačno JEDNU, najdesniju vrijednost iz X-Forwarded-For —
+    # onu koju je dodao nginx, ne ono što je klijent sam ubacio). Zato je
+    # request.remote_addr ovdje i dalje ispravan izvor, bez direktnog čitanja
+    # headera i bez rizika da klijent lažira dodatne hopove.
+    return request.remote_addr or "unknown"
+
+
+def _auth_error():
+    return {"error": "AUTH_REQUIRED", "detail": AUTH_FRIENDLY_MESSAGE}
+
+
+def _rate_limit_error(retry_after):
+    return {"error": "RATE_LIMITED", "detail": RATE_LIMIT_MESSAGE, "retry_after": retry_after}
 
 
 def _str_field(payload, key, limit):
@@ -98,51 +153,116 @@ def _simple_response(answer, mode):
     }
 
 
-def _chat_turn():
-    """Zajednička logika za /chat i /chat/stream. Uvijek vraća JSON-spreman dict."""
+def _guarded_chat_turn():
+    """Zajednička logika za /chat i /chat/stream. Vraća (status_code, dict).
+
+    Redoslijed provjera (najjeftinije prvo):
+      1) token (header, bez potrebe za parsiranjem tijela)          → 401
+      2) IP rate limit (širi, flood-zaštita cijelog endpointa)      → 429
+      3) parsiranje payloada + postojeće meke provjere (nepromijenjeno)
+      4) strukturna validacija (grade/mode/history/id-jevi/topic)   → 400
+      5) session rate limit (SAMO za stvarne practice/AI turnove)   → 429
+      6) per-session concurrency lock (SAMO za practice turnove)    → 409
+      7) run_practice_turn (nepromijenjeno, uvijek u finally otpušta lock)
+    """
+    token = request.headers.get(auth.TOKEN_HEADER, "")
+    try:
+        auth.verify_token(token)
+    except auth.TokenError as e:
+        logger.info("auth_failed category=%s", e.code)
+        return 401, _auth_error()
+
+    ip_allowed, ip_retry_after = _get_ip_limiter().check("ip:" + _client_ip())
+    if not ip_allowed:
+        logger.info("rate_limited bucket=ip retry_after=%s", ip_retry_after)
+        return 429, _rate_limit_error(ip_retry_after)
+
     payload, has_image = _parse_chat_request()
     if payload is None:
-        return {"answer": EMPTY_MESSAGE_PROMPT, "last_tutor_task": ""}
+        return 200, {"answer": EMPTY_MESSAGE_PROMPT, "last_tutor_task": ""}
 
     mode = _str_field(payload, "mode", 20) or "practice"
     raw_message = payload.get("student_message")
     if isinstance(raw_message, str) and len(raw_message) > config.MAX_MESSAGE_CHARS:
-        return {"answer": TOO_LONG_MESSAGE, "last_tutor_task": ""}
+        return 200, {"answer": TOO_LONG_MESSAGE, "last_tutor_task": ""}
 
     if has_image:
-        return {"answer": IMAGE_NOT_SUPPORTED_MESSAGE, "last_tutor_task": ""}
+        return 200, {"answer": IMAGE_NOT_SUPPORTED_MESSAGE, "last_tutor_task": ""}
+
+    try:
+        validation.validate_chat_payload(payload)
+    except validation.ValidationError as e:
+        logger.info("validation_failed code=%s", e.code)
+        return 400, {"error": e.code, "detail": e.detail}
 
     if mode != "practice":
-        return _simple_response(NON_PRACTICE_MESSAGE, mode)
+        return 200, _simple_response(NON_PRACTICE_MESSAGE, mode)
 
     turn = _build_turn(payload)
     if not turn["student_message"]:
-        return {"answer": EMPTY_MESSAGE_PROMPT, "last_tutor_task": ""}
+        return 200, {"answer": EMPTY_MESSAGE_PROMPT, "last_tutor_task": ""}
+
+    # Od ovdje nadalje je stvarni (skupi) practice/AI turn — session limit i
+    # concurrency lock štite baš ovaj put, ne canned odgovore iznad.
+    session_id = turn["session_id"]
+    sess_allowed, sess_retry_after = _get_session_limiter().check("sess:" + session_id)
+    if not sess_allowed:
+        logger.info("rate_limited bucket=session retry_after=%s", sess_retry_after)
+        return 429, _rate_limit_error(sess_retry_after)
+
+    turn_locks = _get_turn_locks()
+    if not turn_locks.try_acquire(session_id):
+        logger.info("turn_in_progress")
+        return 409, {"error": "TURN_IN_PROGRESS", "detail": TURN_IN_PROGRESS_MESSAGE}
 
     try:
-        return run_practice_turn(_get_store(), _get_llm(), turn)
+        return 200, run_practice_turn(_get_store(), _get_llm(), turn)
     except Exception:
         # Zadnja linija odbrane: interni exception NIKAD ne ide učeniku.
         logger.exception("chat_turn unexpected_error")
-        return {"answer": SAFE_ERROR_MESSAGE, "last_tutor_task": ""}
+        return 200, {"answer": SAFE_ERROR_MESSAGE, "last_tutor_task": ""}
+    finally:
+        turn_locks.release(session_id)
 
 
 @ai_tutor_bp.route("/chat", methods=["POST"])
 def chat():
-    return jsonify(_chat_turn())
+    status_code, result = _guarded_chat_turn()
+    response = jsonify(result)
+    if status_code == 429 and "retry_after" in result:
+        response.headers["Retry-After"] = str(result["retry_after"])
+    return response, status_code
 
 
 @ai_tutor_bp.route("/chat/stream", methods=["POST"])
 def chat_stream():
     """Faza 1: bez token-po-token delta događaja — jedan AI poziv pa jedan
-    kompletan 'done' event u SSE formatu koji frontend već parsira."""
-    result = _chat_turn()
+    kompletan 'done' event u SSE formatu koji frontend već parsira.
+
+    Bezbjednosne provjere (token/rate-limit/validacija/lock) NIKAD ne smiju
+    proći kao SSE 200 — na blokadi vraćamo običan JSON sa pravim HTTP statusom,
+    a frontend to prepoznaje po content-type/status i sam pada nazad na
+    /chat (isti guard tamo ponovo blokira na isti način, sigurno)."""
+    status_code, result = _guarded_chat_turn()
+    if status_code != 200:
+        response = jsonify(result)
+        if status_code == 429 and "retry_after" in result:
+            response.headers["Retry-After"] = str(result["retry_after"])
+        return response, status_code
     body = "event: done\ndata: " + json.dumps(result, ensure_ascii=False) + "\n\n"
     return Response(body, mimetype="text/event-stream")
 
 
 @ai_tutor_bp.route("/feedback", methods=["POST"])
 def feedback():
+    # Feedback ne zove OpenAI, pa dobija samo token provjeru (bez posebnog
+    # rate limita) — najmanja dovoljna zaštita za ovaj endpoint.
+    try:
+        auth.verify_token(request.headers.get(auth.TOKEN_HEADER, ""))
+    except auth.TokenError as e:
+        logger.info("auth_failed category=%s endpoint=feedback", e.code)
+        return jsonify(_auth_error()), 401
+
     payload = request.get_json(silent=True)
     if not isinstance(payload, dict):
         return jsonify({"ok": False}), 400

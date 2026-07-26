@@ -1715,7 +1715,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (result && result.errorShown){
           /* stream je već ispisao prijateljsku grešku u bubble */
         } else if (result && result.j){
-          applyTutorResponse(result.j, { fromTyped, answerPhase, rendered: true });
+          /* rendered prati ono što je streamTutorRequest stvarno uradio: SSE
+             uspjeh je već ispisao bubble (rendered:true), a poznata blokada
+             (401/429/409/...) NIJE ništa ispisala pa applyTutorResponse mora
+             sam kreirati bubble (rendered:false) — isto kao normalan JSON put. */
+          applyTutorResponse(result.j, { fromTyped, answerPhase, rendered: !!result.rendered });
         } else {
           const j = await jsonTutorRequest(payload, ac, imgFile);
           applyTutorResponse(j, { fromTyped, answerPhase, rendered: false });
@@ -1758,6 +1762,17 @@ document.addEventListener('DOMContentLoaded', () => {
       return await r.json().catch(()=>({}));
     }
 
+    /* Status kodovi kojima server SVJESNO blokira zahtjev PRIJE ijednog AI
+       poziva (token/rate-limit/validacija/concurrent-lock) — vidi matbot/api.py.
+       Za njih se NIKAD ne smije tiho pasti nazad na /chat: to bi poslalo DRUGI
+       identičan zahtjev (nepotreban za 401/429, a za 409 bi mogao izazvati
+       trku sa upravo završenim turnom). Čista, deterministički testabilna
+       funkcija — namjerno odvojena od fetch logike ispod. */
+    var KNOWN_BLOCKING_STATUSES = [400, 401, 403, 409, 413, 429];
+    function isKnownBlockingStatus(status){
+      return KNOWN_BLOCKING_STATUSES.indexOf(status) !== -1;
+    }
+
     /* Phase 2: SSE klijent — progresivan tekst u bubble, MathJax TEK na kraju.
        Vraća {j, rendered} | {errorShown} | null (null → pozivalac ide na JSON). */
     async function streamTutorRequest(payload, ac){
@@ -1769,6 +1784,19 @@ document.addEventListener('DOMContentLoaded', () => {
         signal: ac.signal
       });
       const ct = r.headers.get('content-type') || '';
+
+      /* Poznata blokada: JSON tijelo (bez status/next_state polja) ide kroz
+         ISTU obradu odgovora kao normalan JSON put (rendered:false → bubble
+         se tek sad kreira). applyTutorResponse već bezbjedno ignoriše
+         status/next_state kad nedostaju, pa aktivni zadatak/streak ostaju
+         netaknuti — bez ijednog drugog fetch poziva. */
+      if (!r.ok && isKnownBlockingStatus(r.status)){
+        const data = await r.json().catch(()=>({}));
+        return { j: data, rendered: false };
+      }
+
+      /* Sve ostalo (network hiccup, 5xx, endpoint nedostupan, stream koji
+         pukne prije validnog odgovora) i dalje pada nazad na /chat kao i do sada. */
       if (!r.ok || ct.indexOf('text/event-stream') === -1 || !r.body) return null;
 
       const made = createTutorBubble('bot');

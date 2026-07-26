@@ -23,13 +23,51 @@ AI_TIMEOUT_S = _float_env("AI_TUTOR_TIMEOUT", 30.0)
 MAX_OUTPUT_TOKENS = _int_env("MATBOT_MAX_OUTPUT_TOKENS", 1200)
 
 # Ograničenja ulaza (server odbija prevelike poruke prije AI poziva)
-MAX_MESSAGE_CHARS = 4000
+MAX_MESSAGE_CHARS = _int_env("MATBOT_MAX_MESSAGE_CHARS", 4000)
 MAX_TASK_CHARS = 600
 MAX_REPLY_CHARS = 2500
 MAX_EXPECTED_ANSWER_CHARS = 400
+MAX_HISTORY_ITEMS = _int_env("MATBOT_MAX_HISTORY_ITEMS", 6)
+MAX_HISTORY_CHARS_PER_ITEM = _int_env("MATBOT_MAX_HISTORY_CHARS_PER_ITEM", 3000)
 
 # Session store
 MAX_RECENT_TASKS = 3
 MAX_RECENT_TURNS = 3
 MAX_HINT_LEVEL = 3
 MAX_SESSIONS_IN_MEMORY = 2000
+
+# --- Security hardening (Faza: token + rate limit + concurrency lock) ------
+# FLASK_SECRET_KEY je primarni naziv (novi security kod). SECRET_KEY je
+# kompatibilni alias — produkcijski VPS ga već ima postavljenog iz ranije faze.
+# Ako postoje OBA, FLASK_SECRET_KEY ima prednost. OBAVEZAN u produkciji —
+# app.py odbija start ako nijedan nije postavljen (vidi require_secret_key niže).
+# Testovi eksplicitno postavljaju jasno označen nesiguran test secret
+# (tests/conftest.py) — jedino mjesto gdje je to dozvoljeno.
+def _resolve_secret_key():
+    return os.environ.get("FLASK_SECRET_KEY") or os.environ.get("SECRET_KEY") or ""
+
+
+SECRET_KEY = _resolve_secret_key()
+
+
+def require_secret_key(secret):
+    """Baca RuntimeError ako je secret prazan. Nikad ne uključuje vrijednost
+    secreta (ni tuđu ni ničiju) u poruku greške."""
+    if not secret:
+        raise RuntimeError(
+            "FLASK_SECRET_KEY (ili kompatibilni alias SECRET_KEY) nije postavljen. "
+            "Postavi jedan od njih u .env prije pokretanja (npr. `openssl rand -hex 32`) "
+            "— bez njega se embed_token ne može bezbjedno potpisati, pa aplikacija "
+            "namjerno ne starta."
+        )
+    return secret
+
+# Kratkotrajni potpisani frontend token (anonimna zaštita, NE Thinkific identitet).
+TOKEN_TTL_SECONDS = _int_env("MATBOT_TOKEN_TTL_SECONDS", 7200)
+
+# Rate limiting — dva nivoa, oba podesiva. Brojači se gube na restart (OK za
+# ovu fazu). Vidi matbot/ratelimit.py.
+SESSION_LIMIT_PER_MINUTE = _int_env("MATBOT_SESSION_LIMIT_PER_MINUTE", 15)
+SESSION_LIMIT_PER_HOUR = _int_env("MATBOT_SESSION_LIMIT_PER_HOUR", 150)
+IP_LIMIT_PER_MINUTE = _int_env("MATBOT_IP_LIMIT_PER_MINUTE", 120)
+IP_LIMIT_PER_HOUR = _int_env("MATBOT_IP_LIMIT_PER_HOUR", 1000)
