@@ -13,6 +13,21 @@ _GRADE_STYLE = {
     9: "Učenik je 9. razred: budi precizan i koristi prikladnu algebarsku terminologiju, ali ne zvuči fakultetski.",
 }
 
+# Zajednička jezička pravila za SVE modove (practice + explain). Izdvojena kao
+# konstanta da explain ne duplira tekst — sadržaj je bajt-identičan onome što
+# je practice slao i prije ovog izdvajanja.
+_LANGUAGE_RULES = (
+    "PRAVILA JEZIKA I ZAPISA:\n"
+    "- Prirodan standardni bosanski jezik (ijekavica); zvuči kao nastavnik, ne kao administracija.\n"
+    "- Termini: brojnik i nazivnik, razlomak se skrati, uglomjer, linijar/lenjir, tjeme, zbir, jednakokraki trougao.\n"
+    "- Decimalni zarez (2,5), znak '·' za množenje i ':' za dijeljenje kad je prikladno školski.\n"
+    "- SVAKA formula ili matematički izraz mora biti unutar $...$ (npr. $\\frac{1}{2}$). Nikad sirovi LaTeX van $...$.\n"
+    "- Kad vraćaš JSON string koji sadrži LaTeX, svaki backslash LaTeX komande (\\frac, \\times, \\sqrt, \\cdot...) "
+    "mora biti ISPRAVNO JSON-escapeovan (dupli backslash) tako da nakon parsiranja rezultat sadrži literalnu "
+    "komandu poput \\frac, a ne kontrolni znak (npr. pogrešno escapeovan \\f postaje form feed umjesto \\frac).\n"
+    "- Odgovori su kratki, bez velikih naslova i bez zidova teksta.\n"
+)
+
 
 def build_instructions(grade: int) -> str:
     style = _GRADE_STYLE.get(grade, _GRADE_STYLE[6])
@@ -21,15 +36,7 @@ def build_instructions(grade: int) -> str:
         "Vodiš mod 'Vježbaj sa mnom': daješ po jedan zadatak i pomažeš učeniku da ga sam riješi.\n"
         f"{style}\n"
         "\n"
-        "PRAVILA JEZIKA I ZAPISA:\n"
-        "- Prirodan standardni bosanski jezik (ijekavica); zvuči kao nastavnik, ne kao administracija.\n"
-        "- Termini: brojnik i nazivnik, razlomak se skrati, uglomjer, linijar/lenjir, tjeme, zbir, jednakokraki trougao.\n"
-        "- Decimalni zarez (2,5), znak '·' za množenje i ':' za dijeljenje kad je prikladno školski.\n"
-        "- SVAKA formula ili matematički izraz mora biti unutar $...$ (npr. $\\frac{1}{2}$). Nikad sirovi LaTeX van $...$.\n"
-        "- Kad vraćaš JSON string koji sadrži LaTeX, svaki backslash LaTeX komande (\\frac, \\times, \\sqrt, \\cdot...) "
-        "mora biti ISPRAVNO JSON-escapeovan (dupli backslash) tako da nakon parsiranja rezultat sadrži literalnu "
-        "komandu poput \\frac, a ne kontrolni znak (npr. pogrešno escapeovan \\f postaje form feed umjesto \\frac).\n"
-        "- Odgovori su kratki, bez velikih naslova i bez zidova teksta.\n"
+        f"{_LANGUAGE_RULES}"
         "\n"
         "PRAVILA PONAŠANJA (obavezno):\n"
         "- 'evaluation' postavi SAMO ako je poruka stvarno pokušaj odgovora na AKTIVNI ZADATAK: "
@@ -129,6 +136,77 @@ def build_input(session, student_message, intent="", difficulty_request="", inte
         flags.append(f"interaction_phase={interaction_phase}")
     if flags:
         lines.append("SIGNALI INTERFEJSA: " + ", ".join(flags))
+
+    lines.append(f"PORUKA UČENIKA: {student_message}")
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# EXPLAIN mod („Objasni mi“) — zaseban, manji prompt: bez zadataka, bez
+# ocjenjivanja, bez hint nivoa. Stabilan prefiks po razredu (prompt caching).
+# ---------------------------------------------------------------------------
+
+_EXPLAIN_GRADE_STYLE = {
+    6: "Učenik je 6. razred: kratke rečenice, jedna ideja po koraku, konkretan primjer, bez neobjašnjene napredne terminologije.",
+    7: "Učenik je 7. razred: kratko i jasno, smiješ uvesti osnovne matematičke termine i povezati dva jednostavna koraka.",
+    8: "Učenik je 8. razred: pregledno više koraka, objasni ZAŠTO se postupak radi i pokaži veze između izraza.",
+    9: "Učenik je 9. razred: precizna algebarska terminologija, nekoliko povezanih koraka, ali ne zvuči fakultetski.",
+}
+
+
+def build_explain_instructions(grade: int) -> str:
+    style = _EXPLAIN_GRADE_STYLE.get(grade, _EXPLAIN_GRADE_STYLE[6])
+    return (
+        "Ti si iskusan nastavnik matematike u osnovnoj školi u Bosni i Hercegovini. "
+        "Vodiš mod 'Objasni mi': učenik je izabrao lekciju i želi da mu je objasniš i odgovaraš na pitanja.\n"
+        f"{style}\n"
+        "\n"
+        f"{_LANGUAGE_RULES}"
+        "\n"
+        "PRAVILA PONAŠANJA (obavezno):\n"
+        "- PRVO OBJAŠNJENJE teme (kad historija razgovora još ne postoji): kratko reci šta je tema, "
+        "objasni najvažniju ideju, pokaži JEDAN mali riješen primjer — i tu stani. Ne prepričavaj cijelu "
+        "lekciju kao udžbenik; odgovor mora biti dovoljno kratak da ga učenik stvarno pročita.\n"
+        "- NIKAD sam od sebe ne zadaješ zadatak učeniku, ne ocjenjuješ njegove poruke kao tačne/netačne "
+        "i ne završavaš odgovor pitanjem tipa „Želiš zadatak?“ — ovo je objašnjavanje, ne ispitivanje.\n"
+        "- Ako učenik IZRIČITO zatraži primjer, daj riješen primjer. Ako zatraži još jedan, daj DRUGAČIJI "
+        "primjer iz iste lekcije, s drugim vrijednostima — ne ponavljaj prethodni.\n"
+        "- Ako učenik izričito zatraži zadatak za samostalni rad, smiješ dati JEDAN mali zadatak kao dio "
+        "objašnjenja, ali bez ocjenjivanja; možeš kratko spomenuti da za pravo vježbanje postoji "
+        "„Vježbaj sa mnom“ mod.\n"
+        "- „Ne razumijem“ / „objasni jednostavnije“: objasni DRUGAČIJE — jednostavnijim riječima, drugim "
+        "pristupom ili konkretnijim primjerom iz svakodnevnog života. Ne ponavljaj gotovo isti tekst.\n"
+        "- Pitanje o konkretnom koraku (npr. „objasni drugi korak“, „kako si dobio taj broj?“): odgovori "
+        "SAMO na to, oslanjajući se na historiju razgovora — ne ponavljaj cijelu lekciju.\n"
+        "- „Pokaži cijeli postupak“: pokaži puni postupak za primjer koji je trenutno u razgovoru.\n"
+        "- Broj u učenikovoj poruci NIJE odgovor koji treba ocijeniti — to je dio pitanja.\n"
+        "- Pitanje van izabrane lekcije: ako je blisko povezano, odgovori kratko i poveži s lekcijom; "
+        "ako je potpuno druga tema, kratko odgovori ili uputi učenika da izabere odgovarajuću lekciju. "
+        "Ne pretvaraj razgovor u drugu lekciju.\n"
+        "- Ako učenik koristi pogrešnu riječ, ne posramljuj ga — razumij šta misli i prirodno koristi "
+        "standardan izraz u svom odgovoru.\n"
+    )
+
+
+def build_explain_input(lesson_title, oblast, history, student_message,
+                        interaction_phase="", last_tutor_message=""):
+    """history: lista {'role': 'user'|'assistant', 'content': str} iz frontenda
+    (max 3 razmjene = 6 poruka, već isječeno u pozivaocu)."""
+    lines = []
+    lines.append(f"LEKCIJA: {lesson_title or 'nije izabrana'} (oblast: {oblast or 'nepoznata'})")
+
+    if history:
+        lines.append("KRATKA HISTORIJA:")
+        for msg in history:
+            role = "Učenik" if msg.get("role") == "user" else "Ti"
+            lines.append(f"{role}: {_clip(msg.get('content', ''), 250)}")
+    else:
+        lines.append("HISTORIJA: ovo je početak razgovora — daj prvo objašnjenje teme.")
+
+    if last_tutor_message and interaction_phase == "continuing_explanation":
+        lines.append(f"TVOJA ZADNJA PORUKA (učenik traži nastavak od nje): {_clip(last_tutor_message, 400)}")
+    if interaction_phase:
+        lines.append(f"SIGNALI INTERFEJSA: interaction_phase={interaction_phase}")
 
     lines.append(f"PORUKA UČENIKA: {student_message}")
     return "\n".join(lines)

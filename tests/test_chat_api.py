@@ -62,8 +62,10 @@ def test_multipart_with_image_controlled_no_llm(client, fake_llm):
     assert fake_llm.call_count == 0
 
 
-def test_non_practice_modes_do_not_call_llm(client, fake_llm):
-    for mode in ("explain", "quick", "exam"):
+def test_non_ai_modes_do_not_call_llm(client, fake_llm):
+    # explain je od Explain faze STVARNI AI mod (ima svoje testove u
+    # tests/test_explain.py) — ovdje ostaju samo modovi bez AI poziva
+    for mode in ("quick", "exam"):
         r = client.post("/api/ai-tutor/chat", json=chat_payload(mode=mode))
         assert r.status_code == 200
         j = r.get_json()
@@ -95,7 +97,7 @@ def test_last_tutor_task_always_present(client, fake_llm):
     j1 = client.post("/api/ai-tutor/chat", json=chat_payload()).get_json()
     assert "last_tutor_task" in j1
     # ne-practice mod
-    j2 = client.post("/api/ai-tutor/chat", json=chat_payload(mode="explain")).get_json()
+    j2 = client.post("/api/ai-tutor/chat", json=chat_payload(mode="exam")).get_json()
     assert j2["last_tutor_task"] == ""
     # greška LLM-a
     from matbot.llm import LLMTimeout

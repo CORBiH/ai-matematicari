@@ -27,6 +27,17 @@ class PracticeTurnOutput(BaseModel):
     new_task: Optional[NewTask]
 
 
+class ExplainTurnOutput(BaseModel):
+    """Explain mod: namjerno NAJMANJA moguća šema — samo vidljivi tekst.
+    Bez evaluation/gave_hint/new_task: Explain ništa ne ocjenjuje, ne daje
+    hintove po nivou i ne mijenja nikakav aktivni zadatak, pa svako dodatno
+    polje samo otvara prostor za kontradikciju."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    reply: str
+
+
 class InvalidOutputError(ValueError):
     """AI odgovor je strukturno validan JSON, ali sadržajno neupotrebljiv."""
 
@@ -57,3 +68,11 @@ def validate_output(out: PracticeTurnOutput) -> None:
             raise InvalidOutputError("novi zadatak bez očekivanog odgovora")
         if len(out.new_task.expected_answer) > config.MAX_EXPECTED_ANSWER_CHARS:
             raise InvalidOutputError("predug očekivani odgovor")
+
+
+def validate_explain_output(out: ExplainTurnOutput) -> None:
+    """Server-side provjere Explain outputa povrh strict šeme."""
+    if not (out.reply or "").strip():
+        raise InvalidOutputError("prazan reply")
+    if len(out.reply) > config.MAX_EXPLAIN_REPLY_CHARS:
+        raise InvalidOutputError("predug reply")

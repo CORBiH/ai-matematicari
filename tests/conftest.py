@@ -15,7 +15,7 @@ os.environ.setdefault("FLASK_SECRET_KEY", "test-only-insecure-secret-DO-NOT-USE-
 from matbot import auth  # noqa: E402
 from matbot.llm import LLMResult, LLMTimeout, LLMUnavailable  # noqa: E402
 from matbot.ratelimit import RateLimiter  # noqa: E402
-from matbot.schema import NewTask, PracticeTurnOutput  # noqa: E402
+from matbot.schema import ExplainTurnOutput, NewTask, PracticeTurnOutput  # noqa: E402
 from matbot.session_store import SessionStore  # noqa: E402
 from matbot.turnlock import TurnLockRegistry  # noqa: E402
 
@@ -26,17 +26,24 @@ def make_output(reply="U redu.", evaluation=None, gave_hint=False, new_task=None
     )
 
 
+def make_explain_output(reply="Evo objašnjenja."):
+    return ExplainTurnOutput(reply=reply)
+
+
 def make_task(text="Skrati razlomak $\\frac{20}{32}$.", expected="5/8", difficulty="standard"):
     return NewTask(text=text, expected_answer=expected, difficulty=difficulty)
 
 
 class FakeLLM:
     """Deterministički LLM za testove: redom vraća pripremljene odgovore ili
-    baca pripremljene izuzetke; broji pozive i pamti promptove."""
+    baca pripremljene izuzetke; broji pozive i pamti promptove.
+    call_count broji SVE pozive (practice + explain) — testovi „tačno jedan
+    LLM poziv po turnu“ time hvataju i eventualni skriveni poziv drugog moda."""
 
     def __init__(self, results=None):
         self.results = list(results or [])
-        self.calls = []  # (instructions, input_text)
+        self.calls = []           # (instructions, input_text) — svi pozivi redom
+        self.explain_calls = []   # samo explain pozivi (podskup calls)
 
     def queue(self, item):
         self.results.append(item)
@@ -45,7 +52,7 @@ class FakeLLM:
     def call_count(self):
         return len(self.calls)
 
-    def practice_turn(self, instructions, input_text):
+    def _next(self, instructions, input_text):
         self.calls.append((instructions, input_text))
         if not self.results:
             raise AssertionError("FakeLLM: nije pripremljen odgovor za ovaj poziv")
@@ -53,6 +60,13 @@ class FakeLLM:
         if isinstance(item, Exception):
             raise item
         return LLMResult(output=item, latency_ms=5, usage={"input_tokens": 100, "output_tokens": 50})
+
+    def practice_turn(self, instructions, input_text):
+        return self._next(instructions, input_text)
+
+    def explain_turn(self, instructions, input_text):
+        self.explain_calls.append((instructions, input_text))
+        return self._next(instructions, input_text)
 
 
 @pytest.fixture

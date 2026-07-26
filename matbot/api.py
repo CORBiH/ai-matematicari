@@ -13,6 +13,7 @@ import logging
 from flask import Blueprint, Response, current_app, jsonify, request
 
 from matbot import auth, config, validation
+from matbot.explain import run_explain_turn
 from matbot.practice import SAFE_ERROR_MESSAGE, run_practice_turn
 from matbot.ratelimit import RateLimiter
 from matbot.session_store import SessionStore
@@ -137,6 +138,10 @@ def _build_turn(payload):
         "difficulty_request": _str_field(payload, "difficulty_request", 20),
         "interaction_phase": _str_field(payload, "interaction_phase", 40),
         "last_tutor_task": _str_field(payload, "last_tutor_task", config.MAX_TASK_CHARS),
+        # Explain-only kontekst (practice ih ignoriše): historija je već
+        # strukturno ograničena u validation.validate_chat_payload.
+        "last_tutor_message": _str_field(payload, "last_tutor_message", 600),
+        "conversation_history": payload.get("conversation_history"),
     }
 
 
@@ -161,9 +166,9 @@ def _guarded_chat_turn():
       2) IP rate limit (širi, flood-zaštita cijelog endpointa)      → 429
       3) parsiranje payloada + postojeće meke provjere (nepromijenjeno)
       4) strukturna validacija (grade/mode/history/id-jevi/topic)   → 400
-      5) session rate limit (SAMO za stvarne practice/AI turnove)   → 429
-      6) per-session concurrency lock (SAMO za practice turnove)    → 409
-      7) run_practice_turn (nepromijenjeno, uvijek u finally otpušta lock)
+      5) session rate limit (SAMO za stvarne AI turnove: practice i explain) → 429
+      6) per-session concurrency lock (isti AI turnovi)             → 409
+      7) run_practice_turn / run_explain_turn (uvijek finally otpušta lock)
     """
     token = request.headers.get(auth.TOKEN_HEADER, "")
     try:
@@ -195,15 +200,15 @@ def _guarded_chat_turn():
         logger.info("validation_failed code=%s", e.code)
         return 400, {"error": e.code, "detail": e.detail}
 
-    if mode != "practice":
+    if mode not in ("practice", "explain"):
         return 200, _simple_response(NON_PRACTICE_MESSAGE, mode)
 
     turn = _build_turn(payload)
     if not turn["student_message"]:
         return 200, {"answer": EMPTY_MESSAGE_PROMPT, "last_tutor_task": ""}
 
-    # Od ovdje nadalje je stvarni (skupi) practice/AI turn — session limit i
-    # concurrency lock štite baš ovaj put, ne canned odgovore iznad.
+    # Od ovdje nadalje je stvarni (skupi) AI turn (practice ILI explain) —
+    # session limit i concurrency lock štite baš ovaj put, ne canned odgovore.
     session_id = turn["session_id"]
     sess_allowed, sess_retry_after = _get_session_limiter().check("sess:" + session_id)
     if not sess_allowed:
@@ -216,6 +221,8 @@ def _guarded_chat_turn():
         return 409, {"error": "TURN_IN_PROGRESS", "detail": TURN_IN_PROGRESS_MESSAGE}
 
     try:
+        if mode == "explain":
+            return 200, run_explain_turn(_get_llm(), turn)
         return 200, run_practice_turn(_get_store(), _get_llm(), turn)
     except Exception:
         # Zadnja linija odbrane: interni exception NIKAD ne ide učeniku.

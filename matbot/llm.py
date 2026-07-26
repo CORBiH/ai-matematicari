@@ -7,7 +7,7 @@ import time
 from dataclasses import dataclass, field
 
 from matbot import config
-from matbot.schema import PracticeTurnOutput
+from matbot.schema import ExplainTurnOutput, PracticeTurnOutput
 
 
 class LLMError(Exception):
@@ -59,6 +59,12 @@ class OpenAIPracticeLLM:
         return self._client
 
     def practice_turn(self, instructions: str, input_text: str) -> LLMResult:
+        return self._structured_turn(instructions, input_text, PracticeTurnOutput)
+
+    def explain_turn(self, instructions: str, input_text: str) -> LLMResult:
+        return self._structured_turn(instructions, input_text, ExplainTurnOutput)
+
+    def _structured_turn(self, instructions: str, input_text: str, text_format) -> LLMResult:
         import openai
 
         client = self._get_client()
@@ -68,7 +74,7 @@ class OpenAIPracticeLLM:
                 model=self.model,
                 instructions=instructions,
                 input=input_text,
-                text_format=PracticeTurnOutput,
+                text_format=text_format,
                 reasoning={"effort": self.reasoning_effort},
                 max_output_tokens=self.max_output_tokens,
                 # Svaki turn šalje kompletan prompt iznova (instructions+input);
