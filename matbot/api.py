@@ -138,6 +138,9 @@ def _build_turn(payload):
         "difficulty_request": _str_field(payload, "difficulty_request", 20),
         "interaction_phase": _str_field(payload, "interaction_phase", 40),
         "last_tutor_task": _str_field(payload, "last_tutor_task", config.MAX_TASK_CHARS),
+        "interaction_type": _str_field(payload, "interaction_type", 20),
+        "selected_option_id": _str_field(payload, "selected_option_id", 4),
+        "client_turn_id": _str_field(payload, "client_turn_id", 128),
         # Explain-only kontekst (practice ih ignoriše): historija je već
         # strukturno ograničena u validation.validate_chat_payload.
         "last_tutor_message": _str_field(payload, "last_tutor_message", 600),

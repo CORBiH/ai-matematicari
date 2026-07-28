@@ -12,7 +12,9 @@ from matbot.topics import lesson_info
 
 ALLOWED_GRADES = (6, 7, 8, 9)
 ALLOWED_MODES = {"practice", "explain", "quick", "exam"}
+ALLOWED_INTERACTION_TYPES = {"choice_answer", "student_question"}
 _ID_RE = re.compile(r"^[A-Za-z0-9_\-]{1,128}$")
+_OPTION_ID_RE = re.compile(r"^[a-d]$")
 
 
 class ValidationError(Exception):
@@ -64,6 +66,14 @@ def validate_chat_payload(payload):
     _check_id_format(payload, "session_id")
     _check_id_format(payload, "client_turn_id")
     _check_history(payload)
+
+    interaction_type = payload.get("interaction_type")
+    if interaction_type is not None and interaction_type != "" and interaction_type not in ALLOWED_INTERACTION_TYPES:
+        raise ValidationError("INVALID_INTERACTION_TYPE", "Nepoznat tip interakcije.")
+    if interaction_type == "choice_answer":
+        selected_option_id = payload.get("selected_option_id")
+        if not isinstance(selected_option_id, str) or not _OPTION_ID_RE.match(selected_option_id):
+            raise ValidationError("INVALID_OPTION_ID", "Izbor nije prepoznat. Osvježi stranicu i pokušaj ponovo.")
 
     selected_topic = payload.get("selected_topic")
     if selected_topic:

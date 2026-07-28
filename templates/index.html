@@ -251,6 +251,27 @@
   .chip-btn:hover{border-color:var(--accent-bot);background:#16281f;}
   .chip-btn:active{transform:translateY(1px);}
 
+  /* Practice multiple-choice: 4 velike tapabilne kartice, 1 kolona na mobilnom,
+     2 kolone na širem ekranu. Min. 44px touch zona (WCAG). */
+  .mc-options{display:grid;grid-template-columns:1fr;gap:.5rem;margin:.2rem 0 .5rem;flex:0 0 auto;}
+  .mc-options[hidden]{display:none;}
+  @media (min-width:640px){ .mc-options{grid-template-columns:1fr 1fr;} }
+  .mc-option-card{
+    display:flex;align-items:center;min-height:44px;width:100%;text-align:left;
+    background:#12211c;border:1.5px solid rgba(86,200,143,.35);color:#eef6f3;
+    border-radius:12px;padding:.6rem .85rem;font-size:1rem;line-height:1.4;cursor:pointer;
+    transition:border-color .15s ease,background .15s ease,transform .05s ease,opacity .15s ease;
+  }
+  .mc-option-card:hover:not(:disabled){border-color:var(--accent-bot);background:#16281f;}
+  .mc-option-card:active:not(:disabled){transform:translateY(1px);}
+  .mc-option-card:focus-visible{outline:2px solid var(--accent-bot);outline-offset:2px;}
+  .mc-option-card:disabled{cursor:not-allowed;}
+  .mc-option-card:disabled:not(.correct):not(.incorrect):not(.loading){opacity:.55;}
+  .mc-option-card.loading{opacity:.7;position:relative;}
+  .mc-option-card.correct{background:#123a1f;border-color:#3fbf6f;box-shadow:0 0 0 1px #3fbf6f inset;}
+  .mc-option-card.incorrect{background:#3a1414;border-color:#c9564f;box-shadow:0 0 0 1px #c9564f inset;}
+  .mc-option-card mjx-container{margin:0 !important;}
+
   /* Phase 2: mala preporuka video lekcije unutar transcripta */
   .tutor-video-hint{align-self:flex-start;color:var(--muted);font-size:.85rem;
     padding:.15rem .35rem;max-width:94%;}
@@ -383,6 +404,9 @@
         <div id="tutorEmptyState" class="tutor-empty muted">Upiši zadatak ili pitanje, ili dodaj sliku preko +.</div>
         <div id="tutorTyping" class="tutor-typing hidden">🤖 Tutor razmišlja<span class="dots"></span></div>
       </div>
+
+      <!-- Practice multiple-choice: 4 ponuđene opcije aktivnog zadatka -->
+      <div id="tutorOptions" class="mc-options" hidden></div>
 
       <!-- Phase 2: brzi odgovori (chips) — pune se iz JS-a prema zadnjem odgovoru -->
       <div id="tutorChips" class="tutor-chips" hidden></div>
@@ -568,6 +592,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const tutorImgName = document.getElementById('tutorImageName');
     const tutorImgRemove = document.getElementById('tutorImageRemove');
     const chipsBox = document.getElementById('tutorChips');
+    const optionsBox = document.getElementById('tutorOptions');
 
     /* Phase 2: potpisani token iz <meta> — šalje se u headeru na tutor API */
     const EMBED_TOKEN = (document.querySelector('meta[name="matbot-embed-token"]') || {}).content || '';
@@ -1114,6 +1139,7 @@ document.addEventListener('DOMContentLoaded', () => {
       try { localStorage.removeItem(LASTIMAGECTX_KEY); } catch(_){}
       try { localStorage.removeItem(RECENTTASKS_KEY); } catch(_){}
       clearNextState();
+      clearOptions();
       resetSessionStats();
       clearStoredActiveTopic();
       clearTutorImage();
@@ -1308,6 +1334,7 @@ document.addEventListener('DOMContentLoaded', () => {
       interactionPhase = null;
       try { localStorage.removeItem(LASTTASK_KEY); } catch(_){}
       clearNextState();
+      clearOptions();
       clearTutorImage();
       msgBox.placeholder = DEFAULT_PLACEHOLDER;
       fbBox.classList.add('hidden');
@@ -1436,6 +1463,118 @@ document.addEventListener('DOMContentLoaded', () => {
     handleTutorImageChange(tutorCameraImg);
     if (tutorImgRemove) tutorImgRemove.addEventListener('click', clearTutorImage);
 
+    /* ===== Practice multiple-choice: 4 opcije aktivnog zadatka ===== */
+    function clearOptions(){
+      if (!optionsBox) return;
+      optionsBox.hidden = true;
+      optionsBox.innerHTML = '';
+      optionsBox.dataset.taskText = '';
+    }
+    function lockAllOptionCards(){
+      if (!optionsBox) return;
+      optionsBox.querySelectorAll('.mc-option-card').forEach(b=>{ b.disabled = true; });
+    }
+    function buildOptionCards(options, questionText){
+      if (!optionsBox) return;
+      optionsBox.innerHTML = '';
+      optionsBox.dataset.taskText = questionText || '';
+      options.forEach(opt=>{
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'mc-option-card';
+        b.dataset.optionId = opt.id;
+        b.innerHTML = escapeHtml(opt.text || '');
+        b.addEventListener('click', ()=>{ sendChoiceAnswer(opt.id); });
+        optionsBox.appendChild(b);
+      });
+      optionsBox.hidden = false;
+      if (window.MathJax && MathJax.typesetPromise){
+        MathJax.typesetPromise([optionsBox]).catch(()=>{});
+      }
+    }
+    /* Pozvano iz applyTutorResponse za SVAKI 'ready' odgovor u practice modu
+       (bootstrap/novi zadatak/hint/pitanje/klik) — jedino mjesto koje odlučuje
+       da li treba potpuno nov set kartica (nov zadatak) ili samo primijeniti
+       eksplicitan reveal (npr. "uradi ga ti") na POSTOJEĆE kartice. */
+    function renderOptionsFromResponse(j){
+      if (!optionsBox) return;
+      if (!j || j.status !== 'ready' || state.mode !== 'practice'){ clearOptions(); return; }
+      const task = j.next_state && j.next_state.task;
+      const options = task && task.options;
+      if (!options || options.length !== 4){ clearOptions(); return; }
+      const questionText = task.question || '';
+      if (optionsBox.dataset.taskText !== questionText){
+        buildOptionCards(options, questionText);   // nov zadatak: stare kartice se u potpunosti zamjenjuju
+        return;
+      }
+      if (j.revealed_correct_option_id){
+        const btn = optionsBox.querySelector('.mc-option-card[data-option-id="' + j.revealed_correct_option_id + '"]');
+        if (btn) btn.classList.add('correct');
+        lockAllOptionCards();
+      }
+    }
+
+    let choiceBusy = false;
+    async function sendChoiceAnswer(optionId){
+      if (choiceBusy || tutorBusy || !optionsBox) return;
+      const btn = optionsBox.querySelector('.mc-option-card[data-option-id="' + optionId + '"]');
+      if (!btn || btn.disabled) return;
+      choiceBusy = true; tutorBusy = true;
+      optionsBox.querySelectorAll('.mc-option-card').forEach(b=>{ b.disabled = true; });
+      btn.classList.add('loading');
+      hideChips();
+      showTutorTyping();
+      setTutorBusy(true);
+      const clientTurnId = (crypto.randomUUID) ? crypto.randomUUID() : (Date.now() + '_' + Math.random());
+      const payload = {
+        session_id: sessionId,
+        client_turn_id: clientTurnId,
+        grade: parseInt(state.grade, 10) || 6,
+        mode: 'practice',
+        entry_source: state.topic ? (state.topicSource || 'manual_topic_choice') : 'free_chat',
+        selected_topic: state.topic,
+        selected_oblast: state.topic ? state.topicOblast : '',
+        student_message: 'Izabrana opcija ' + optionId.toUpperCase() + '.',
+        interaction_type: 'choice_answer',
+        selected_option_id: optionId,
+        conversation_history: tutorHistory()
+      };
+      const ac = new AbortController();
+      const abortTimer = setTimeout(()=>{ try { ac.abort(); } catch(_){} }, 60000);
+      try{
+        const j = await jsonTutorRequest(payload, ac, null);
+        if (j && j.status === 'ready'){
+          if (j.answer_verdict === 'correct'){
+            btn.classList.add('correct');
+            lockAllOptionCards();
+          } else if (j.answer_verdict === 'incorrect'){
+            btn.classList.add('incorrect');
+            if (j.revealed_correct_option_id){
+              lockAllOptionCards();   // renderOptionsFromResponse boji tačnu opciju zeleno
+            } else {
+              // prvi pogrešan klik: ostale opcije se ponovo omogućavaju, kliknuta ostaje onemogućena
+              optionsBox.querySelectorAll('.mc-option-card').forEach(b=>{ if (b !== btn) b.disabled = false; });
+            }
+          }
+          applyTutorResponse(j, { fromTyped: false, answerPhase: true, rendered: false });
+        } else {
+          // deterministički blok (nevažeći ID / nema aktivnog zadatka / već završen) ili greška:
+          // ne boji ništa, vrati kartice u prethodno stanje
+          optionsBox.querySelectorAll('.mc-option-card').forEach(b=>{ b.disabled = false; });
+        }
+      }catch(err){
+        optionsBox.querySelectorAll('.mc-option-card').forEach(b=>{ b.disabled = false; });
+        appendTutorMsg('bot', '<em>Greška pri slanju zahtjeva. Pokušaj ponovo.</em>');
+      }finally{
+        btn.classList.remove('loading');
+        clearTimeout(abortTimer);
+        hideTutorTyping();
+        setTutorBusy(false);
+        tutorBusy = false;
+        choiceBusy = false;
+      }
+    }
+
     /* ===== Phase 2: quick-reply chips (S5) + preporuka videa (S6) ===== */
     function hideChips(){
       if (!chipsBox) return;
@@ -1453,6 +1592,7 @@ document.addEventListener('DOMContentLoaded', () => {
            je hint + novi zadatak. */
         const out = [
           { label: '🙋 Ne znam — daj mi hint', msg: 'Ne znam.', intent: 'hint_request' },
+          { label: '👉 Uradi ga ti', msg: 'Uradi ga ti.', intent: 'solution_request' },
           { label: '➕ Novi zadatak', msg: 'Daj mi novi zadatak.' }
         ];
         if (lastTurnWasGraded){
@@ -1927,6 +2067,7 @@ document.addEventListener('DOMContentLoaded', () => {
       updateSessionStatsFromResponse(j);
       lastTurnWasGraded = !!(opts.answerPhase && j && j.answer_verdict);
       renderChips(j);                            // Phase 2 (S5): brzi odgovori
+      renderOptionsFromResponse(j);               // Practice multiple-choice opcije
       maybeVideoHint(j);                         // Phase 2 (S6): preporuka videa
     }
 

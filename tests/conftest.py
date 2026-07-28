@@ -15,7 +15,7 @@ os.environ.setdefault("FLASK_SECRET_KEY", "test-only-insecure-secret-DO-NOT-USE-
 from matbot import auth  # noqa: E402
 from matbot.llm import LLMResult, LLMTimeout, LLMUnavailable  # noqa: E402
 from matbot.ratelimit import RateLimiter  # noqa: E402
-from matbot.schema import ExplainTurnOutput, NewTask, PracticeTurnOutput  # noqa: E402
+from matbot.schema import ExplainTurnOutput, NewTask, Option, PracticeTurnOutput  # noqa: E402
 from matbot.session_store import SessionStore  # noqa: E402
 from matbot.turnlock import TurnLockRegistry  # noqa: E402
 
@@ -30,8 +30,18 @@ def make_explain_output(reply="Evo objašnjenja."):
     return ExplainTurnOutput(reply=reply)
 
 
-def make_task(text="Skrati razlomak $\\frac{20}{32}$.", expected="5/8", difficulty="standard"):
-    return NewTask(text=text, expected_answer=expected, difficulty=difficulty)
+def make_options(*texts):
+    return [Option(text=t) for t in texts]
+
+
+def make_task(text="Skrati razlomak $\\frac{20}{32}$.", expected="5/8", difficulty="standard",
+              options=None, correct_option_index=0):
+    if options is None:
+        options = make_options("5/8", "10/16", "5/4", "4/5")
+    return NewTask(
+        text=text, expected_answer=expected, difficulty=difficulty,
+        options=options, correct_option_index=correct_option_index,
+    )
 
 
 class FakeLLM:
@@ -113,4 +123,4 @@ def client(flask_app):
 
 
 # eksporti za testove
-__all__ = ["FakeLLM", "make_output", "make_task", "LLMTimeout", "LLMUnavailable"]
+__all__ = ["FakeLLM", "make_output", "make_task", "make_options", "LLMTimeout", "LLMUnavailable"]

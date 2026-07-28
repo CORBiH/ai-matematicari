@@ -80,6 +80,31 @@ def build_instructions(grade: int) -> str:
         "- Lakši zadatak: manji/pogodniji brojevi, manje koraka, direktnija formulacija, dodatni oslonac. "
         "Teži: dodatni smisleni korak, manje očigledna metoda, veći brojevi, kratko obrazloženje ili primjena — ali ista lekcija.\n"
         "- Ne pravi besmislene zadatke u kojima jedan korak bez cilja poništava prethodni.\n"
+        "\n"
+        "PRAVILA ZA new_task.options (OBAVEZNO, svaki new_task je multiple-choice):\n"
+        "- new_task.options mora imati TAČNO 4 stavke; new_task.correct_option_index je indeks (0-3) TAČNE "
+        "opcije u toj listi PRIJE bilo kakvog premještanja — server kasnije sam miješa redoslijed.\n"
+        "- Tačno JEDNA opcija je matematički tačna; preostale tri su REALNI distraktori koji predstavljaju "
+        "tipične učeničke greške za ovaj zadatak (npr. sabiranje nazivnika umjesto zajedničkog nazivnika, "
+        "pogrešan predznak, pogrešan redoslijed operacija, množenje samo brojnika, pogrešno premještanje člana "
+        "jednačine, pogrešna recipročna vrijednost, pogrešna formula, zaboravljeno skraćivanje, pogrešna jedinica, "
+        "pogrešan naredni korak) — NIKAD besmisleni ili očigledno apsurdni brojevi.\n"
+        "- Ako tačan odgovor ima više ekvivalentnih zapisa (npr. $\\frac{1}{2}$ i $\\frac{2}{4}$), tekst zadatka "
+        "MORA eksplicitno tražiti jedan konkretan oblik (npr. „u najjednostavnijem obliku”, „bez zagrada”, "
+        "„s pozitivnim nazivnikom”, „zaokruženo na dvije decimale”) tako da opcije ne mogu biti dvije različito "
+        "zapisane, a matematički jednake vrijednosti.\n"
+        "- Ako lekcija po prirodi traži objašnjenje/dokaz/konstrukciju/crtanje (npr. „Nacrtaj simetralu duži.”), "
+        "PRETVORI zadatak u oblik izbora umjesto crtanja/pisanja: „Koji niz koraka pravilno opisuje konstrukciju "
+        "simetrale duži?”, „Koje objašnjenje pravilno pokazuje da su uglovi jednaki?”, „Koja tvrdnja pravilno opisuje "
+        "nagib pravca?” — opcije tada nude tačan i pogrešne opise/tvrdnje/postupke, ne brojeve.\n"
+        "- Svaki tekst opcije mora biti jedinstven (bez identičnih formulacija) i sam po sebi razumljiv.\n"
+        "\n"
+        "SERVER VERDIKT (kad je priložen u ulazu, vidi 'SERVER JE VEĆ UTVRDIO VERDIKT'):\n"
+        "- Server je DETERMINISTIČKI, van tvoje kontrole, već utvrdio je li klik učenika tačan ili netačan. "
+        "Tvoj 'reply' MORA biti dosljedan tom verdiktu — ti NE ocjenjuješ i ne smiješ tvrditi suprotno, samo "
+        "objašnjavaš zašto je odabrana opcija tačna/netačna i, ako je netačna i nije zadnji pokušaj, daš mali hint "
+        "bez otkrivanja tačne opcije. new_task u ovom odgovoru MORA biti null (zadatak i opcije se ne mijenjaju "
+        "na klik).\n"
     )
 
 
@@ -103,7 +128,12 @@ def _hint_guidance(hint_level):
     return _HINT_GUIDANCE_BY_LEVEL.get(hint_level, _HINT_GUIDANCE_BY_LEVEL[2])
 
 
-def build_input(session, student_message, intent="", difficulty_request="", interaction_phase=""):
+def build_input(session, student_message, intent="", difficulty_request="", interaction_phase="",
+                 trusted_choice_verdict=None):
+    """trusted_choice_verdict (samo za choice_answer turnove): dict sa
+    'selected_text' (tekst opcije koju je učenik kliknuo), 'is_correct' (bool,
+    SERVER-utvrđen, deterministički) i 'wrong_attempts' (broj PRETHODNIH
+    pogrešnih klikova na ovaj zadatak, prije ovog klika)."""
     lines = []
     lines.append(f"LEKCIJA: {session['lesson_title'] or 'nije izabrana'} (oblast: {session['oblast'] or 'nepoznata'})")
 
@@ -136,6 +166,14 @@ def build_input(session, student_message, intent="", difficulty_request="", inte
         flags.append(f"interaction_phase={interaction_phase}")
     if flags:
         lines.append("SIGNALI INTERFEJSA: " + ", ".join(flags))
+
+    if trusted_choice_verdict:
+        lines.append(f"UČENIK JE IZABRAO OPCIJU: {trusted_choice_verdict['selected_text']}")
+        verdict_word = "TAČNO" if trusted_choice_verdict["is_correct"] else "NETAČNO"
+        lines.append(f"SERVER JE VEĆ UTVRDIO VERDIKT (ne smiješ tvrditi suprotno): {verdict_word}")
+        lines.append(
+            f"BROJ PRETHODNIH POGREŠNIH KLIKOVA NA OVAJ ZADATAK: {trusted_choice_verdict['wrong_attempts']}"
+        )
 
     lines.append(f"PORUKA UČENIKA: {student_message}")
     return "\n".join(lines)

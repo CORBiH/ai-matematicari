@@ -10,12 +10,20 @@ from pydantic import BaseModel, ConfigDict
 from matbot import config
 
 
+class Option(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    text: str
+
+
 class NewTask(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     text: str
     expected_answer: str
     difficulty: Literal["easy", "standard", "hard"]
+    options: list[Option]
+    correct_option_index: int
 
 
 class PracticeTurnOutput(BaseModel):
@@ -68,6 +76,26 @@ def validate_output(out: PracticeTurnOutput) -> None:
             raise InvalidOutputError("novi zadatak bez očekivanog odgovora")
         if len(out.new_task.expected_answer) > config.MAX_EXPECTED_ANSWER_CHARS:
             raise InvalidOutputError("predug očekivani odgovor")
+        _validate_options(out.new_task.options, out.new_task.correct_option_index)
+
+
+def _validate_options(options, correct_index) -> None:
+    """Deterministička provjera 4 ponuđene opcije (bez novog AI poziva)."""
+    if len(options) != 4:
+        raise InvalidOutputError("mora postojati tačno 4 opcije")
+    if not (0 <= correct_index < 4):
+        raise InvalidOutputError("correct_option_index van opsega")
+    seen = set()
+    for opt in options:
+        text = (opt.text or "").strip()
+        if not text:
+            raise InvalidOutputError("prazna opcija")
+        if len(text) > config.MAX_OPTION_TEXT_CHARS:
+            raise InvalidOutputError("preduga opcija")
+        normalized = " ".join(text.lower().split())
+        if normalized in seen:
+            raise InvalidOutputError("duple opcije")
+        seen.add(normalized)
 
 
 def validate_explain_output(out: ExplainTurnOutput) -> None:

@@ -52,37 +52,42 @@ def test_one_llm_call_per_normal_turn():
     assert fake.call_count == 2  # tačno 1 poziv po turnu, 2 turna
 
 
-def test_correct_answer_keeps_task_and_increments_streak():
+def test_text_answer_is_never_graded_even_when_model_says_correct():
+    """Novi ugovor: tekst NIJE pokušaj odgovora, čak i kad model (pogrešno)
+    postavi evaluation='correct' — grading ide isključivo kroz choice_answer
+    (vidi test_choice_answer.py). Model 'evaluation' se ignoriše."""
     store, fake = SessionStore(), FakeLLM()
     start_session(store, fake)
     fake.queue(make_output(reply="Tačno! $20:4=5$, $32:4=8$.", evaluation="correct"))
     r = run_practice_turn(store, fake, turn_payload(msg="20/32 = 5/8"))
-    assert r["answer_verdict"] == "correct"
+    assert r["answer_verdict"] is None
     assert r["last_tutor_task"] == "Skrati razlomak $\\frac{20}{32}$."  # nema auto novog zadatka
-    assert r["next_state"]["correct_streak"] == 1
+    assert r["next_state"]["correct_streak"] == 0
     sess = store.peek("sess-1")
     assert sess["current_task"] == "Skrati razlomak $\\frac{20}{32}$."
 
 
-def test_fraction_and_sentence_answers_pass_through_verdicts():
+def test_fraction_and_sentence_text_messages_are_never_graded():
     store, fake = SessionStore(), FakeLLM()
     start_session(store, fake)
     fake.queue(make_output(reply="Da, upravo tako — oba se skrate na $\\frac{5}{8}$.", evaluation="correct"))
     r1 = run_practice_turn(store, fake, turn_payload(msg="da, jer se oba skrate na isti razlomak"))
-    assert r1["answer_verdict"] == "correct"
+    assert r1["answer_verdict"] is None
     fake.queue(make_output(reply="Blizu — brojnik je dobar, nazivnik nije.", evaluation="partially_correct"))
     r2 = run_practice_turn(store, fake, turn_payload(msg="mislim da je 5/6"))
-    assert r2["answer_verdict"] == "partially_correct"
+    assert r2["answer_verdict"] is None
 
 
-def test_partial_and_incorrect_keep_task_and_reset_streak():
+def test_incorrect_text_message_does_not_reset_streak():
+    """correct_streak se sada mijenja ISKLJUČIVO kroz choice_answer — tekstualna
+    poruka (čak i ona koja liči na netačan pokušaj) je ne dira."""
     store, fake = SessionStore(), FakeLLM()
     start_session(store, fake)
     fake.queue(make_output(reply="Tačno!", evaluation="correct"))
     run_practice_turn(store, fake, turn_payload(msg="5/8"))
     fake.queue(make_output(reply="Nije — pogledaj nazivnik.", evaluation="incorrect"))
     r = run_practice_turn(store, fake, turn_payload(msg="mozda 6"))
-    assert r["answer_verdict"] == "incorrect"
+    assert r["answer_verdict"] is None
     assert r["next_state"]["correct_streak"] == 0
     assert r["last_tutor_task"] == "Skrati razlomak $\\frac{20}{32}$."
 
@@ -170,7 +175,7 @@ def test_easier_and_harder_requests_flow_to_prompt():
     assert r1["last_tutor_task"] != r2["last_tutor_task"]
 
 
-def test_expected_answer_is_aid_sent_to_prompt_not_authority():
+def test_expected_answer_is_aid_sent_to_prompt_but_text_never_graded():
     store, fake = SessionStore(), FakeLLM()
     start_session(store, fake)
     fake.queue(make_output(reply="Zapravo si u pravu — provjerio sam ponovo.", evaluation="correct"))
@@ -178,8 +183,8 @@ def test_expected_answer_is_aid_sent_to_prompt_not_authority():
     # prompt sadrži interni očekivani odgovor kao POMOĆ...
     assert "INTERNI OČEKIVANI ODGOVOR" in fake.calls[1][1]
     assert "5/8" in fake.calls[1][1]
-    # ...ali konačna presuda je modelova (server je ne mijenja)
-    assert r["answer_verdict"] == "correct"
+    # ...ali tekstualna poruka se NIKAD ne ocjenjuje (grading ide kroz choice_answer)
+    assert r["answer_verdict"] is None
 
 
 def test_timeout_does_not_change_state():
@@ -219,7 +224,11 @@ def test_invalid_output_task_without_expected_answer_rejected():
     before = store.peek("sess-1")
     bad = PracticeTurnOutput(
         reply="Evo novog.", evaluation=None, gave_hint=False,
-        new_task={"text": "Novi zadatak.", "expected_answer": "  ", "difficulty": "easy"},
+        new_task={
+            "text": "Novi zadatak.", "expected_answer": "  ", "difficulty": "easy",
+            "options": [{"text": "1"}, {"text": "2"}, {"text": "3"}, {"text": "4"}],
+            "correct_option_index": 0,
+        },
     )
     fake.queue(bad)
     r = run_practice_turn(store, fake, turn_payload(msg="daj novi"))
@@ -248,7 +257,7 @@ def test_server_restart_survival_uses_client_task_text_without_expected_answer()
     r = run_practice_turn(store, fake, turn_payload(
         msg="5/8", last_tutor_task="Skrati razlomak $\\frac{20}{32}$.",
         interaction_phase="answering_practice_task"))
-    assert r["answer_verdict"] == "correct"
+    assert r["answer_verdict"] is None  # tekst se nikad ne ocjenjuje
     prompt_in = fake.calls[0][1]
     assert "Skrati razlomak" in prompt_in
     # interno rješenje NE dolazi od klijenta — model računa sam

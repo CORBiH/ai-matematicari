@@ -24,6 +24,12 @@ def _fresh_session(session_id, context_key, grade, lesson_id, lesson_title, obla
         "correct_streak": 0,
         "recent_tasks": [],   # max MAX_RECENT_TASKS tekstova prethodnih zadataka
         "recent_turns": [],   # max MAX_RECENT_TURNS parova {"student":..., "tutor":...}
+        "current_options": [],       # [{"id": "a", "text": "..."}, ...] POST-shuffle
+        "correct_option_id": "",     # npr. "b" — nikad se ne šalje browseru prije reveala
+        "wrong_option_ids": [],      # ids kliknuti i pogrešni, redoslijedom
+        "task_completed": False,     # True nakon tačnog klika / 2. pogrešnog / "uradi ga ti"
+        "last_choice_turn_id": "",   # client_turn_id zadnjeg obrađenog choice_answer
+        "last_choice_response": None,  # cache odgovora za idempotentan retry
     }
 
 
