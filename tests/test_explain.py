@@ -439,3 +439,73 @@ def test_explain_turn_off_topic_answer_text_is_in_instructions():
     run_explain_turn(fake, explain_turn_payload(msg="Ko je pobijedio prvenstvo?"))
     instructions, _ = fake.calls[0]
     assert OFF_TOPIC_ANSWER in instructions
+
+
+# ---------------------------------------------------------------------------
+# Konsolidacijski nalaz: Explain sada koristi ISTI centralni safety boundary
+# (matbot.mathsafe.sanitize_and_validate_math_text) kao Practice — prije ove
+# izmjene Explain je koristio stariji sanitize_math_text koji ne dotiče
+# sadržaj bez ijednog $ (isti arhitekturni gap kao u 3 Practice live baga).
+# ---------------------------------------------------------------------------
+
+def test_explain_raw_frac_in_reply_is_repaired_not_rejected():
+    fake = FakeLLM()
+    fake.queue(make_explain_output(reply="Razlomak je \\frac{5}{6}."))
+    r = run_explain_turn(fake, explain_turn_payload())
+    assert r["status"] == "ready"
+    assert r["answer"] == "Razlomak je $\\frac{5}{6}$."
+
+
+def test_explain_literal_newline_escape_does_not_remain_visible():
+    fake = FakeLLM()
+    fake.queue(make_explain_output(reply="Prvi dio.\\nDrugi dio nakon preloma."))
+    r = run_explain_turn(fake, explain_turn_payload())
+    assert r["status"] == "ready"
+    assert "\\n" not in r["answer"]
+    assert "\n" in r["answer"]
+
+
+def test_explain_valid_sqrt_survives_unchanged():
+    fake = FakeLLM()
+    fake.queue(make_explain_output(reply="Uprošćeno: $2\\sqrt{5}$."))
+    r = run_explain_turn(fake, explain_turn_payload())
+    assert r["status"] == "ready"
+    assert r["answer"] == "Uprošćeno: $2\\sqrt{5}$."
+
+
+def test_explain_ambiguous_damaged_form_never_reaches_answer():
+    fake = FakeLLM()
+    fake.queue(make_explain_output(reply="Rezultat je 2sqrt5 otprilike."))
+    r = run_explain_turn(fake, explain_turn_payload())
+    assert "status" not in r
+    assert r["answer"] == SAFE_ERROR_MESSAGE
+    assert "sqrt" not in r["answer"]
+
+
+def test_explain_unsafe_output_returns_safe_error_message_exact_contract():
+    fake = FakeLLM()
+    fake.queue(make_explain_output(reply="Jedinica je \\text{cm}."))
+    r = run_explain_turn(fake, explain_turn_payload())
+    assert r == {"answer": SAFE_ERROR_MESSAGE, "last_tutor_task": ""}
+    assert "status" not in r
+    assert "next_state" not in r
+
+
+def test_explain_unsafe_output_uses_exactly_one_llm_call_no_repair_call():
+    fake = FakeLLM()
+    fake.queue(make_explain_output(reply="\\begin{cases}x=1\\end{cases}"))
+    run_explain_turn(fake, explain_turn_payload())
+    assert fake.call_count == 1
+    assert len(fake.explain_calls) == 1
+
+
+def test_explain_unsafe_output_creates_no_practice_state(flask_app, fake_llm, store):
+    from tests.conftest import make_explain_output as meo
+    fake_llm.queue(meo(reply="Rezultat je \\sqrt{20}."))
+    c = flask_app.test_client()
+    c.environ_base["HTTP_X_TUTOR_TOKEN"] = auth.issue_token()
+    r = c.post("/api/ai-tutor/chat", json=http_payload())
+    assert r.status_code == 200
+    j = r.get_json()
+    assert j == {"answer": SAFE_ERROR_MESSAGE, "last_tutor_task": ""}
+    assert store.peek("exp-http-sess") is None

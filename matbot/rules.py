@@ -90,6 +90,15 @@ _MATH_NOTATION_RULES = (
     "backslash) tako da nakon parsiranja rezultat sadrži literalnu komandu poput "
     "\\frac, a ne kontrolni znak (npr. pogrešno escapeovan \\f postaje form feed "
     "umjesto \\frac).\n"
+    "- NIKAD ne ostavljaj \\frac, \\sqrt, \\text, \\cdot, \\begin ili \\end IZVAN "
+    "$...$ — cijeli matematički izraz (uključujući uređeni par i jedinicu mjere) "
+    "mora biti u JEDNOM $...$ bloku: $(0,\\frac{8}{3})$, $54\\sqrt{3}\\,\\text{cm}^3$, "
+    "NIKAD samo dio izraza u $...$ a ostatak (zagrade, jedinica, broj) van njega.\n"
+    "- Prijelom pasusa piši kao STVARAN novi red u tekstu — NIKAD kao vidljiva dva "
+    "znaka backslash+n (\\n) unutar teksta koji učenik čita.\n"
+    "- Izbjegavaj \\begin{cases}...\\end{cases} (nepouzdano kroz JSON strukturirani "
+    "izlaz) — sistem jednačina piši kao odvojene $...$ linije, npr. $2x+3y=8$ pa u "
+    "novom redu $4x-y=2$, umjesto jednog cases bloka.\n"
     "- Odgovori su kratki, bez velikih naslova i bez zidova teksta.\n"
 )
 
@@ -233,6 +242,10 @@ _TOPIC_METHOD_RULES = {
         "jednačine, 3) riješi dobijenu jednačinu, 4) izračunaj drugu nepoznatu, "
         "5) provjeri uređeni par.\n"
         "- Grafička metoda samo ako je tražena ili je tema lekcije.\n"
+        "- Sistem NIKAD ne piši kroz \\begin{cases}...\\end{cases} — napiši svaku "
+        "jednačinu u SVOM $...$ na posebnom redu (npr. $2x+3y=8$ novi red $4x-y=2$). "
+        "Uređeni par rješenja piši kao JEDAN cio izraz u $...$, npr. $(0,\\frac{8}{3})$ "
+        "ili $(x,y)=(2,3)$ — nikad razdvojen na dio unutar i dio izvan $...$.\n"
     ),
     "proporcije": (
         "OBLAST — PROPORCIJE I RAZMJERE:\n"

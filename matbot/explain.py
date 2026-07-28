@@ -12,7 +12,7 @@ import uuid
 
 from matbot import config, prompts
 from matbot.llm import LLMError
-from matbot.mathsafe import sanitize_math_text
+from matbot.mathsafe import sanitize_and_validate_math_text
 from matbot.practice import SAFE_ERROR_MESSAGE
 from matbot.schema import InvalidOutputError, validate_explain_output
 from matbot.topics import lesson_info
@@ -76,7 +76,16 @@ def run_explain_turn(llm, turn):
         logger.exception("explain_turn request_id=%s unexpected_error", request_id)
         return {"answer": SAFE_ERROR_MESSAGE, "last_tutor_task": ""}
 
-    answer = sanitize_math_text(result.output.reply.strip())
+    # Isti centralni safety boundary kao Practice (matbot/mathsafe.py) —
+    # allow_whole_expression_wrap ostaje False: Explain je proza, nikad se ne
+    # umata cio odgovor u $...$, samo se pokušava usko/sigurno popraviti
+    # (izolovan \frac{a}{b}, doslovni "\n"). Ako i dalje nebezbjedno nakon
+    # toga → odbij CIO odgovor, isti sigurni fallback kao za LLMError/
+    # InvalidOutputError iznad, bez drugog AI poziva.
+    answer, is_safe = sanitize_and_validate_math_text(result.output.reply.strip())
+    if not is_safe:
+        logger.warning("explain_turn request_id=%s category=unsafe_math_output", request_id)
+        return {"answer": SAFE_ERROR_MESSAGE, "last_tutor_task": ""}
 
     logger.info(
         "explain_turn request_id=%s ok latency_ms=%s usage=%s",

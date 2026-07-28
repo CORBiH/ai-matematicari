@@ -30,7 +30,7 @@ import uuid
 
 from matbot import config, prompts
 from matbot.llm import LLMError
-from matbot.mathsafe import sanitize_math_text
+from matbot.mathsafe import sanitize_and_validate_math_text, sanitize_math_text
 from matbot.schema import InvalidOutputError, validate_output
 from matbot.topics import lesson_info
 
@@ -87,9 +87,29 @@ def _shuffle_options(texts, correct_index):
 def _apply_new_task(session, new_task):
     """Sanitizuje tekst zadatka i sve 4 opcije, promiješa opcije i primjenjuje
     svježe stanje na sesiju (server je jedini koji dodjeljuje ID-jeve opcijama
-    i pamti koji je tačan). Vraća sanitizovan tekst zadatka."""
-    task_text = sanitize_math_text(new_task.text.strip())
-    sanitized_texts = [sanitize_math_text(opt.text.strip()) for opt in new_task.options]
+    i pamti koji je tačan). Vraća sanitizovan tekst zadatka.
+
+    Svaki dio (pitanje, svaka opcija) prolazi kroz
+    sanitize_and_validate_math_text — ako BILO KOJI dio ostane nebezbjedan
+    (sirov \\frac/\\sqrt/\\text/\\cdot/\\begin/\\end izvan $...$, vidljiv "\\n",
+    zabranjen kontrolni znak ili prepoznat oštećen LaTeX oblik i nakon
+    pokušaja sigurne reparacije), CIO zadatak se odbija — baca se
+    InvalidOutputError koju pozivalac (run_practice_turn) već hvata i vraća
+    postojeći sigurni fallback, BEZ mutacije sesije i BEZ drugog AI poziva.
+    """
+    task_text, task_safe = sanitize_and_validate_math_text(new_task.text.strip())
+    if not task_safe:
+        raise InvalidOutputError("nebezbjedan matematički zapis u tekstu zadatka")
+
+    sanitized_texts = []
+    for opt in new_task.options:
+        opt_text, opt_safe = sanitize_and_validate_math_text(
+            opt.text.strip(), allow_whole_expression_wrap=True
+        )
+        if not opt_safe:
+            raise InvalidOutputError("nebezbjedan matematički zapis u opciji zadatka")
+        sanitized_texts.append(opt_text)
+
     current_options, correct_option_id = _shuffle_options(sanitized_texts, new_task.correct_option_index)
 
     session["current_task"] = task_text
@@ -175,7 +195,9 @@ def _handle_text_turn(store, llm, session, turn, lesson_id, request_id):
             task_text = _apply_new_task(session, out.new_task)
 
         # vidljivi odgovor: reply + (novi zadatak, ako postoji i nije već u replyju)
-        reply = sanitize_math_text(out.reply.strip())
+        reply, reply_safe = sanitize_and_validate_math_text(out.reply.strip())
+        if not reply_safe:
+            raise InvalidOutputError("nebezbjedan matematički zapis u odgovoru")
         if out.new_task is not None and task_text not in reply:
             answer = reply + "\n\nZadatak: " + task_text
         else:
@@ -296,7 +318,9 @@ def _handle_choice_answer(store, llm, session, turn, lesson_id, request_id):
         if out.evaluation is not None and out.evaluation != expected_word:
             logger.warning("practice_choice request_id=%s verdict_mismatch", request_id)
 
-        reply = sanitize_math_text(out.reply.strip())
+        reply, reply_safe = sanitize_and_validate_math_text(out.reply.strip())
+        if not reply_safe:
+            raise InvalidOutputError("nebezbjedan matematički zapis u odgovoru")
 
         session["recent_turns"].append({
             "student": f"[izabrao opciju: {selected_text}]"[:300],

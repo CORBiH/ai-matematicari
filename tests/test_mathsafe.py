@@ -194,3 +194,244 @@ def test_json_dumps_of_repaired_begin_has_single_escaped_backslash():
     wire = json.dumps(out)
     assert r"\\begin" in wire
     assert r"\\\\begin" not in wire
+
+
+# ---------------------------------------------------------------------------
+# PROŠIRENJE (live produkcijski nalaz — 3 stvarna bagova): sanitize_math_text
+# gore rješava SAMO ono što je VEĆ unutar $...$. Ovi testovi pokrivaju novi
+# sanitize_and_validate_math_text + pomoćne funkcije za sadržaj koji stigne
+# BEZ (ili s djelimičnim) $...$ omotom — svaki od tačno tri prijavljena
+# live slučaja ima svoj test niže.
+# ---------------------------------------------------------------------------
+
+from matbot.mathsafe import (  # noqa: E402
+    find_unsafe_math_issues,
+    replace_literal_newline_escapes,
+    sanitize_and_validate_math_text,
+    wrap_isolated_frac_tokens,
+)
+
+
+# --- Failure 1: sirov \frac u feedbacku (bez ijednog $) -------------------
+
+def test_failure1_raw_frac_in_feedback_gets_wrapped_safely():
+    text, is_safe = sanitize_and_validate_math_text("Izabrao si \\frac{3}{24}.")
+    assert is_safe
+    assert text == "Izabrao si $\\frac{3}{24}$."
+
+
+def test_isolated_frac_token_wrap_does_not_touch_surrounding_prose():
+    out = wrap_isolated_frac_tokens("Izabrao si \\frac{3}{24}. Tačno!")
+    assert out == "Izabrao si $\\frac{3}{24}$. Tačno!"
+
+
+def test_frac_already_inside_dollar_is_not_double_wrapped():
+    out = wrap_isolated_frac_tokens("Rezultat je $\\frac{3}{24}$.")
+    assert out == "Rezultat je $\\frac{3}{24}$."
+
+
+# --- Failure 2: literalni "\n" + neomotan uređeni par u opciji -------------
+
+def test_failure2_literal_newline_escape_becomes_real_newline():
+    text, is_safe = sanitize_and_validate_math_text(
+        "\\nKoji je tačan uređeni par $(x,y)$?"
+    )
+    assert is_safe
+    assert "\\n" not in text
+    assert text.startswith("\n")
+    assert "$(x,y)$" in text
+
+
+def test_literal_newline_inside_math_is_not_touched_neq_stays_intact():
+    # "\n" na početku \neq NE smije postati stvaran newline usred formule
+    out = replace_literal_newline_escapes("Provjeri: $a\\neq b$ i onda\\nnastavi.")
+    assert "$a\\neq b$" in out
+    assert "\\neq" in out  # \neq unutar $...$ netaknut
+    assert out.endswith("\nnastavi.")  # \n IZVAN $...$ postaje stvaran newline
+
+
+def test_failure2_unwrapped_ordered_pair_option_gets_whole_wrapped():
+    text, is_safe = sanitize_and_validate_math_text(
+        "(0,\\frac{8}{3})", allow_whole_expression_wrap=True
+    )
+    assert is_safe
+    assert text == "$(0,\\frac{8}{3})$"
+
+
+def test_plain_numeric_option_without_latex_is_unaffected_by_whole_wrap():
+    """Regresija: obična opcija '5/8' (bez ijedne LaTeX komande) mora ostati
+    netaknuta kao i prije — whole-wrap se aktivira SAMO uz prisustvo poznate
+    komande (frac/sqrt/text/cdot/begin/end), ne bilo kojeg broja/razlomka."""
+    text, is_safe = sanitize_and_validate_math_text("5/8", allow_whole_expression_wrap=True)
+    assert is_safe
+    assert text == "5/8"
+
+
+def test_prose_option_without_math_is_unaffected_by_whole_wrap():
+    text, is_safe = sanitize_and_validate_math_text(
+        "Povučem paralelu s prvim krakom.", allow_whole_expression_wrap=True
+    )
+    assert is_safe
+    assert text == "Povučem paralelu s prvim krakom."
+
+
+# --- Failure 3: oštećen sqrt/text (izgubljeni backslash/zagrade) -----------
+
+def test_failure3_damaged_sqrt_and_units_form_is_rejected_not_guessed():
+    text, is_safe = sanitize_and_validate_math_text(
+        "54sqrt3,textcm^3", allow_whole_expression_wrap=True
+    )
+    assert not is_safe  # NE smije se pokušati pogoditi ispravan LaTeX
+
+
+def test_valid_sqrt_and_units_expression_survives_unchanged():
+    original = "$54\\sqrt{3}\\,\\text{cm}^3$"
+    text, is_safe = sanitize_and_validate_math_text(original, allow_whole_expression_wrap=True)
+    assert is_safe
+    assert text == original
+
+
+def test_raw_sqrt_outside_math_without_frac_is_rejected():
+    """\\sqrt (za razliku od \\frac) nema uzak siguran repair — mora biti odbijen."""
+    text, is_safe = sanitize_and_validate_math_text("Rezultat je \\sqrt{20}.")
+    assert not is_safe
+
+
+def test_raw_text_command_outside_math_is_rejected():
+    text, is_safe = sanitize_and_validate_math_text("Jedinica je \\text{cm}.")
+    assert not is_safe
+
+
+def test_raw_begin_end_outside_math_is_rejected():
+    text, is_safe = sanitize_and_validate_math_text("\\begin{cases}x=1\\end{cases}")
+    assert not is_safe
+
+
+# --- find_unsafe_math_issues direktne provjere -----------------------------
+
+def test_find_unsafe_math_issues_empty_for_clean_text():
+    assert find_unsafe_math_issues("Tačno! Rezultat je $\\frac{1}{2}$.") == []
+
+
+def test_find_unsafe_math_issues_detects_raw_command_outside_math():
+    issues = find_unsafe_math_issues("Rezultat: \\sqrt{9} je 3.")
+    assert "raw_latex_command_outside_math" in issues
+
+
+def test_find_unsafe_math_issues_detects_damaged_form():
+    issues = find_unsafe_math_issues("180sqrt3,textcm^3")
+    assert "damaged_latex_form" in issues
+
+
+def test_find_unsafe_math_issues_ignores_commands_inside_valid_math():
+    assert find_unsafe_math_issues("$\\sqrt{9}\\,\\text{cm}$") == []
+
+
+def test_damaged_form_detects_digit_before_sqrt_too():
+    """'2sqrt5' (cifra ODMAH prije 'sqrt', bez word-boundary-a) mora se
+    prepoznati kao oštećen oblik, ne samo 'sqrt3' (cifra poslije)."""
+    issues = find_unsafe_math_issues("Rezultat je 2sqrt5 otprilike.")
+    assert "damaged_latex_form" in issues
+
+
+# ---------------------------------------------------------------------------
+# Pooštravanje whole-expression whitelist-a (konsolidacijski nalaz): prazan
+# whitelist charset (cifre/slova/backslash/zagrade) SAM PO SEBI ne razlikuje
+# proznu bosansku rečenicu BEZ dijakritika od pravog matematičkog izraza —
+# obje koriste isti skup znakova. Ove rečenice NIKAD ne smiju biti umotane
+# kao jedan veliki matematički izraz.
+# ---------------------------------------------------------------------------
+
+def test_prose_with_frac_is_not_whole_wrapped():
+    text, is_safe = sanitize_and_validate_math_text(
+        "Rezultat je \\frac{3}{4}", allow_whole_expression_wrap=True
+    )
+    assert text != "$Rezultat je \\frac{3}{4}$"
+    # usko umotavanje ipak popravlja izolovan \frac token (ostaje bezbjedno)
+    assert text == "Rezultat je $\\frac{3}{4}$"
+    assert is_safe
+
+
+def test_prose_with_sqrt_is_not_whole_wrapped():
+    text, is_safe = sanitize_and_validate_math_text(
+        "Izaberi \\sqrt{5}", allow_whole_expression_wrap=True
+    )
+    assert text != "$Izaberi \\sqrt{5}$"
+    # \sqrt izvan $...$ nema uzak siguran repair (samo \frac ima) → odbijeno
+    assert not is_safe
+
+
+def test_prose_with_text_and_diacritics_is_not_whole_wrapped():
+    text, is_safe = sanitize_and_validate_math_text(
+        "Površina je 20 \\text{ cm}^2", allow_whole_expression_wrap=True
+    )
+    assert text != "$Površina je 20 \\text{ cm}^2$"
+    assert not is_safe
+
+
+def test_pure_ordered_pair_with_frac_is_still_whole_wrapped():
+    """Regresija: pooštravanje ne smije pokvariti stvarni Failure-2 slučaj."""
+    text, is_safe = sanitize_and_validate_math_text(
+        "(0,\\frac{8}{3})", allow_whole_expression_wrap=True
+    )
+    assert is_safe
+    assert text == "$(0,\\frac{8}{3})$"
+
+
+def test_pure_sqrt_units_expression_still_whole_wrapped():
+    text, is_safe = sanitize_and_validate_math_text(
+        "54\\sqrt{3}\\,\\text{cm}^3", allow_whole_expression_wrap=True
+    )
+    assert is_safe
+    assert text == "$54\\sqrt{3}\\,\\text{cm}^3$"
+
+
+# ---------------------------------------------------------------------------
+# Cross-mode invarijante: Practice, Explain i Quick dijele JEDNU centralnu
+# funkciju; samo Practice MC opcije koriste allow_whole_expression_wrap=True.
+# ---------------------------------------------------------------------------
+
+def test_all_three_modes_import_the_same_central_function():
+    import inspect
+
+    from matbot import explain, practice, quick
+
+    for module in (practice, explain, quick):
+        assert "sanitize_and_validate_math_text" in inspect.getsource(module)
+
+
+def test_only_practice_options_use_whole_expression_wrap():
+    import inspect
+
+    from matbot import explain, practice, quick
+
+    assert "allow_whole_expression_wrap=True" in inspect.getsource(practice)
+    assert "allow_whole_expression_wrap=True" not in inspect.getsource(explain)
+    assert "allow_whole_expression_wrap=True" not in inspect.getsource(quick)
+
+
+def test_raw_commands_never_survive_outside_math_in_default_mode():
+    for command in ("\\frac{1}{2}", "\\sqrt{5}", "\\text{cm}", "\\begin{cases}x=1\\end{cases}"):
+        text, is_safe = sanitize_and_validate_math_text(f"Prefix {command} suffix")
+        if is_safe:
+            assert not _RAW_LATEX_COMMAND_RE_TEST_HELPER(text)
+
+
+def _RAW_LATEX_COMMAND_RE_TEST_HELPER(text):
+    """Pomoćna provjera za test iznad: da li IZVAN $...$ i dalje postoji
+    sirova zabranjena komanda (koristi isti regex kao produkcijski kod)."""
+    from matbot.mathsafe import _outside_math_parts, _RAW_LATEX_COMMAND_RE
+
+    return any(_RAW_LATEX_COMMAND_RE.search(part) for part in _outside_math_parts(text))
+
+
+def test_literal_newline_never_reaches_safe_output_in_any_scenario():
+    scenarios = [
+        "Prvi dio.\\nDrugi dio.",
+        "$a=1$\\nNovi red.",
+        "\\nPočetak teksta $x=1$.",
+    ]
+    for scenario in scenarios:
+        text, is_safe = sanitize_and_validate_math_text(scenario)
+        if is_safe:
+            assert "\\n" not in text

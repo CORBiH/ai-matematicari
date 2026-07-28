@@ -406,3 +406,69 @@ def test_quick_turn_off_topic_answer_text_is_in_instructions():
     run_quick_turn(fake, quick_turn_payload(msg="Ko je pobijedio prvenstvo?"))
     instructions, _ = fake.calls[0]
     assert OFF_TOPIC_ANSWER in instructions
+
+
+# ---------------------------------------------------------------------------
+# Konsolidacijski nalaz: Quick sada koristi ISTI centralni safety boundary
+# (matbot.mathsafe.sanitize_and_validate_math_text) kao Practice/Explain.
+# ---------------------------------------------------------------------------
+
+def test_quick_raw_frac_reply_is_repaired_safely():
+    fake = FakeLLM()
+    fake.queue(make_quick_output(reply="\\frac{5}{6}"))
+    r = run_quick_turn(fake, quick_turn_payload())
+    assert r["status"] == "ready"
+    assert r["answer"] == "$\\frac{5}{6}$"
+
+
+def test_quick_valid_sqrt_and_units_survive_unchanged():
+    fake = FakeLLM()
+    fake.queue(make_quick_output(reply="$54\\sqrt{3}\\,\\text{cm}^3$"))
+    r = run_quick_turn(fake, quick_turn_payload())
+    assert r["status"] == "ready"
+    assert r["answer"] == "$54\\sqrt{3}\\,\\text{cm}^3$"
+
+
+def test_quick_literal_newline_escape_not_visible():
+    fake = FakeLLM()
+    fake.queue(make_quick_output(reply="Rezultat: $5$.\\nNapomena: zaokruženo."))
+    r = run_quick_turn(fake, quick_turn_payload())
+    assert r["status"] == "ready"
+    assert "\\n" not in r["answer"]
+    assert "\n" in r["answer"]
+
+
+def test_quick_ambiguous_damaged_form_is_rejected():
+    fake = FakeLLM()
+    fake.queue(make_quick_output(reply="54sqrt3,textcm3"))
+    r = run_quick_turn(fake, quick_turn_payload())
+    assert "status" not in r
+    assert r["answer"] == SAFE_ERROR_MESSAGE
+
+
+def test_quick_unsafe_output_returns_safe_error_message_exact_contract():
+    fake = FakeLLM()
+    fake.queue(make_quick_output(reply="Vrijednost je \\sqrt{9}."))
+    r = run_quick_turn(fake, quick_turn_payload())
+    assert r == {"answer": SAFE_ERROR_MESSAGE, "last_tutor_task": ""}
+    assert "next_state" not in r
+
+
+def test_quick_unsafe_output_uses_exactly_one_llm_call():
+    fake = FakeLLM()
+    fake.queue(make_quick_output(reply="\\begin{cases}x=1\\end{cases}"))
+    run_quick_turn(fake, quick_turn_payload())
+    assert fake.call_count == 1
+    assert len(fake.quick_calls) == 1
+
+
+def test_quick_unsafe_output_leaks_no_practice_state(flask_app, fake_llm, store):
+    from tests.conftest import make_quick_output as mqo
+    fake_llm.queue(mqo(reply="Jedinica je \\text{cm}."))
+    c = flask_app.test_client()
+    c.environ_base["HTTP_X_TUTOR_TOKEN"] = auth.issue_token()
+    r = c.post("/api/ai-tutor/chat", json=http_payload())
+    assert r.status_code == 200
+    j = r.get_json()
+    assert j == {"answer": SAFE_ERROR_MESSAGE, "last_tutor_task": ""}
+    assert store.peek("quick-http-sess") is None

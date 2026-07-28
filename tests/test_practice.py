@@ -2,7 +2,7 @@
 import copy
 import json
 
-from tests.conftest import FakeLLM, make_output, make_task
+from tests.conftest import FakeLLM, make_options, make_output, make_task
 from matbot import prompts
 from matbot.llm import LLMTimeout, LLMUnavailable
 from matbot.practice import SAFE_ERROR_MESSAGE, run_practice_turn
@@ -675,3 +675,128 @@ def test_practice_turn_off_topic_answer_text_is_in_instructions():
     run_practice_turn(store, fake, turn_payload(msg="Ko je pobijedio prvenstvo?"))
     instructions, _ = fake.calls[0]
     assert OFF_TOPIC_ANSWER in instructions
+
+
+# ---------------------------------------------------------------------------
+# Live produkcijski nalaz (3 stvarna formatting bagova u Practice MC izlazu):
+# full-path regresija kroz run_practice_turn — schema → sanitize/validate →
+# session store → browser-safe next_state.
+# ---------------------------------------------------------------------------
+
+def test_failure1_full_path_raw_frac_feedback_is_repaired_not_rejected():
+    """Choice-answer feedback sa sirovim \\frac (bez $) mora stići do browsera
+    VEĆ ispravljeno ($...$), ne odbijeno — narrow-wrap je bezbjedan repair."""
+    from tests.conftest import make_options as _mk_opts
+
+    store, fake = SessionStore(), FakeLLM()
+    fake.queue(make_output(
+        reply="Evo zadatka.",
+        new_task=make_task(text="Koliko je $\\frac{3}{24}$ skraćeno?", expected="1/8",
+                            options=_mk_opts("1/8", "3/24", "1/4", "3/8"), correct_option_index=0),
+    ))
+    r0 = run_practice_turn(store, fake, turn_payload())
+    correct_id = r0["next_state"]["task"]["options"][0]["id"]  # placeholder, prava provjera niže
+
+    # pronađi stvarni correct_option_id iz store-a (server-truth, ne iz responsa)
+    sess = store.peek("sess-1")
+    real_correct_id = sess["correct_option_id"]
+
+    fake.queue(make_output(reply="Izabrao si \\frac{3}{24}. Tačno!", evaluation="correct"))
+    r = run_practice_turn(store, fake, turn_payload(
+        interaction_type="choice_answer", selected_option_id=real_correct_id, client_turn_id="t1",
+    ))
+    assert r.get("status") == "ready"
+    assert r["answer"] == "Izabrao si $\\frac{3}{24}$. Tačno!"
+    assert "\\frac{3}{24}" not in r["answer"].replace("$\\frac{3}{24}$", "")  # nema goli \frac izvan $
+    assert fake.call_count == 2  # tačno 1 poziv po turnu, 2 turna — bez drugog/repair poziva
+
+
+def test_failure2_full_path_option_ordered_pair_and_newline_repaired():
+    """Nov zadatak sa doslovnim '\\n' na početku pitanja i neomotanim uređenim
+    parom u opciji mora biti PRIHVAĆEN uz reparaciju, ne odbijen."""
+    options = make_options("(0,\\frac{8}{3})", "(0,2)", "(1,3)", "(2,5)")
+    store, fake = SessionStore(), FakeLLM()
+    fake.queue(make_output(
+        reply="Evo sistema.",
+        new_task=make_task(
+            text="\\nKoji je tačan uređeni par $(x,y)$?",
+            expected="(0,8/3)", options=options, correct_option_index=0,
+        ),
+    ))
+    r = run_practice_turn(store, fake, turn_payload())
+    assert r["status"] == "ready"
+    question = r["next_state"]["task"]["question"]
+    assert "\\n" not in question
+    assert question.startswith("\n")
+    assert "$(x,y)$" in question
+
+    opts = r["next_state"]["task"]["options"]
+    assert len(opts) == 4
+    texts = [o["text"] for o in opts]
+    assert "$(0,\\frac{8}{3})$" in texts
+    assert not any("\\frac" in t and not t.startswith("$") for t in texts)  # nema sirov \frac izvan $
+
+    # correct-option identitet ostaje ispravan NAKON reparacije: server-truth
+    # correct_option_id mora pokazivati baš na repariranu $(0,\frac{8}{3})$ opciju
+    sess = store.peek("sess-1")
+    correct_text = next(o["text"] for o in sess["current_options"] if o["id"] == sess["correct_option_id"])
+    assert correct_text == "$(0,\\frac{8}{3})$"
+
+    # browser-safe: expected_answer/correct_option_id se NIKAD ne šalju
+    assert "correct_option_id" not in r
+    assert "expected_answer" not in r
+    assert "expected_answer_summary" not in json.dumps(r)
+    assert fake.call_count == 1  # jedan poziv, bez drugog/repair poziva
+
+
+def test_failure3_full_path_damaged_sqrt_units_option_rejected_safely():
+    """Oštećena opcija (izgubljen backslash/zagrade) mora odbiti CIO zadatak —
+    bez pokušaja pogađanja LaTeX-a, bez mutacije sesije, bez drugog poziva."""
+    options = make_options("54sqrt3,textcm^3", "180sqrt3,textcm^3", "90sqrt3,textcm^3", "30sqrt3,textcm^3")
+    store, fake = SessionStore(), FakeLLM()
+    fake.queue(make_output(
+        reply="Evo zadatka.",
+        new_task=make_task(text="Izračunaj zapreminu.", expected="$54\\sqrt{3}\\,\\text{cm}^3$",
+                            options=options, correct_option_index=0),
+    ))
+    r = run_practice_turn(store, fake, turn_payload())
+    assert "status" not in r
+    assert r["answer"] == SAFE_ERROR_MESSAGE
+    assert fake.call_count == 1  # odbijeno bez drugog/repair poziva
+
+    # sesija NIJE mutirana — nema aktivnog zadatka/opcija
+    sess = store.peek("sess-1")
+    assert sess is None or not sess.get("current_task")
+
+
+def test_raw_sqrt_in_feedback_without_dollar_rejected_safely_no_second_call():
+    """\\sqrt (za razliku od \\frac) nema uzak siguran repair u prozi — mora
+    biti odbijen bez pokušaja da server sam izmisli $...$ omot."""
+    store, fake = SessionStore(), FakeLLM()
+    fake.queue(make_output(reply="Evo zadatka.", new_task=make_task()))
+    run_practice_turn(store, fake, turn_payload())
+
+    sess = store.peek("sess-1")
+    correct_id = sess["correct_option_id"]
+
+    fake.queue(make_output(reply="Rezultat je \\sqrt{20}.", evaluation="correct"))
+    r = run_practice_turn(store, fake, turn_payload(
+        interaction_type="choice_answer", selected_option_id=correct_id, client_turn_id="t2",
+    ))
+    assert "status" not in r
+    assert r["answer"] == SAFE_ERROR_MESSAGE
+    assert fake.call_count == 2  # 2 turna, i dalje tačno 1 poziv PO turnu (bez drugog)
+
+
+def test_explain_and_quick_also_use_central_safety_boundary():
+    """Konsolidacijska izmjena: sva tri moda dijele ISTU centralnu funkciju
+    (matbot.mathsafe.sanitize_and_validate_math_text) — vidi
+    tests/test_mathsafe.py i tests/test_explain.py/test_quick.py za pune
+    provjere ponašanja po modu."""
+    import inspect
+
+    from matbot import explain, practice, quick
+
+    assert "sanitize_and_validate_math_text" in inspect.getsource(explain)
+    assert "sanitize_and_validate_math_text" in inspect.getsource(quick)
+    assert "sanitize_and_validate_math_text" in inspect.getsource(practice)
