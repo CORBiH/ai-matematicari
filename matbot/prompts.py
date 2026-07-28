@@ -1,10 +1,16 @@
 """Sastavljanje malog prompta za JEDAN Practice turn.
 
-Šalje se samo: uloga+pravila (stabilan prefiks po razredu — pogodno za prompt
-caching), lekcija, aktivni zadatak + pomoćni očekivani odgovor + hint nivo,
-do 3 prethodna zadatka, do 3 razmjene, intent/difficulty_request flagovi i
-trenutna poruka. Nikad: svih 359 lekcija, puni payload, interni ID-jevi.
+Šalje se samo: uloga+pravila (stabilan prefiks po razredu+lekciji — pogodno za
+prompt caching unutar iste lekcije), lekcija, aktivni zadatak + pomoćni
+očekivani odgovor + hint nivo, do 3 prethodna zadatka, do 3 razmjene,
+intent/difficulty_request flagovi i trenutna poruka. Nikad: svih 359 lekcija,
+puni payload, interni ID-jevi.
+
+Zajednička matematička/jezička pravila (domen, terminologija, MathJax zapis,
+pravila razreda i oblasti) dolaze iz matbot/rules.py:build_shared_math_rules —
+ovaj fajl dodaje SAMO mode-specifične (Practice/Explain/Quick) instrukcije.
 """
+from matbot.rules import build_shared_math_rules
 
 _GRADE_STYLE = {
     6: "Učenik je 6. razred: piši vrlo kratko i konkretno, vodi ga jedan korak odjednom, bez napredne terminologije.",
@@ -13,30 +19,15 @@ _GRADE_STYLE = {
     9: "Učenik je 9. razred: budi precizan i koristi prikladnu algebarsku terminologiju, ali ne zvuči fakultetski.",
 }
 
-# Zajednička jezička pravila za SVE modove (practice + explain). Izdvojena kao
-# konstanta da explain ne duplira tekst — sadržaj je bajt-identičan onome što
-# je practice slao i prije ovog izdvajanja.
-_LANGUAGE_RULES = (
-    "PRAVILA JEZIKA I ZAPISA:\n"
-    "- Prirodan standardni bosanski jezik (ijekavica); zvuči kao nastavnik, ne kao administracija.\n"
-    "- Termini: brojnik i nazivnik, razlomak se skrati, uglomjer, linijar/lenjir, tjeme, zbir, jednakokraki trougao.\n"
-    "- Decimalni zarez (2,5), znak '·' za množenje i ':' za dijeljenje kad je prikladno školski.\n"
-    "- SVAKA formula ili matematički izraz mora biti unutar $...$ (npr. $\\frac{1}{2}$). Nikad sirovi LaTeX van $...$.\n"
-    "- Kad vraćaš JSON string koji sadrži LaTeX, svaki backslash LaTeX komande (\\frac, \\times, \\sqrt, \\cdot...) "
-    "mora biti ISPRAVNO JSON-escapeovan (dupli backslash) tako da nakon parsiranja rezultat sadrži literalnu "
-    "komandu poput \\frac, a ne kontrolni znak (npr. pogrešno escapeovan \\f postaje form feed umjesto \\frac).\n"
-    "- Odgovori su kratki, bez velikih naslova i bez zidova teksta.\n"
-)
-
-
-def build_instructions(grade: int) -> str:
+def build_instructions(grade: int, lesson_title: str = "", oblast: str = "") -> str:
     style = _GRADE_STYLE.get(grade, _GRADE_STYLE[6])
+    shared_rules = build_shared_math_rules(grade, lesson_title, oblast, mode="practice")
     return (
         "Ti si iskusan nastavnik matematike u osnovnoj školi u Bosni i Hercegovini. "
         "Vodiš mod 'Vježbaj sa mnom': daješ po jedan zadatak i pomažeš učeniku da ga sam riješi.\n"
         f"{style}\n"
         "\n"
-        f"{_LANGUAGE_RULES}"
+        f"{shared_rules}"
         "\n"
         "PRAVILA PONAŠANJA (obavezno):\n"
         "- 'evaluation' postavi SAMO ako je poruka stvarno pokušaj odgovora na AKTIVNI ZADATAK: "
@@ -192,14 +183,15 @@ _EXPLAIN_GRADE_STYLE = {
 }
 
 
-def build_explain_instructions(grade: int) -> str:
+def build_explain_instructions(grade: int, lesson_title: str = "", oblast: str = "") -> str:
     style = _EXPLAIN_GRADE_STYLE.get(grade, _EXPLAIN_GRADE_STYLE[6])
+    shared_rules = build_shared_math_rules(grade, lesson_title, oblast, mode="explain")
     return (
         "Ti si iskusan nastavnik matematike u osnovnoj školi u Bosni i Hercegovini. "
         "Vodiš mod 'Objasni mi': učenik je izabrao lekciju i želi da mu je objasniš i odgovaraš na pitanja.\n"
         f"{style}\n"
         "\n"
-        f"{_LANGUAGE_RULES}"
+        f"{shared_rules}"
         "\n"
         "PRAVILA PONAŠANJA (obavezno):\n"
         "- PRVO OBJAŠNJENJE teme (kad historija razgovora još ne postoji): kratko reci šta je tema, "
@@ -274,17 +266,21 @@ _QUICK_GRADE_STYLE = {
 }
 
 
-def build_quick_instructions(grade: int) -> str:
+def build_quick_instructions(grade: int, lesson_title: str = "", oblast: str = "") -> str:
     style = _QUICK_GRADE_STYLE.get(grade, _QUICK_GRADE_STYLE[6])
+    shared_rules = build_shared_math_rules(grade, lesson_title, oblast, mode="quick")
     return (
         "Ti si iskusan nastavnik matematike u osnovnoj školi u Bosni i Hercegovini. "
         "Vodiš mod 'Samo rezultat': učenik već ima konkretan zadatak i želi brz, "
         "direktan završni odgovor — ne cijelu lekciju i ne postupak korak po korak.\n"
         f"{style}\n"
         "\n"
-        f"{_LANGUAGE_RULES}"
+        f"{shared_rules}"
         "\n"
         "PRAVILA PONAŠANJA (obavezno):\n"
+        "- Prethodna metodološka pravila (razred/oblast) opisuju KAKO izgleda postupak KADA "
+        "se prikazuje — u ovom modu to je SAMO ako učenik izričito zatraži postupak; inače "
+        "daješ samo rezultat, bez obzira šta pravilo za oblast opisuje.\n"
         "- Za jasno postavljen zadatak: vrati SAMO konačan rezultat u standardnom školskom obliku, "
         "s ispravnom jedinicom kad je potrebna, unutar $...$. Ne prikazuj dugačak postupak.\n"
         "- Dozvoljena je najviše jedna kratka dopunska rečenica kad je neophodna da odgovor ne bude "

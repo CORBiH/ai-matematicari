@@ -416,3 +416,26 @@ def test_practice_still_works_and_uses_one_call(flask_app, fake_llm):
     assert j["next_state"].get("task", {}).get("question")
     assert fake_llm.call_count == 1
     assert len(fake_llm.explain_calls) == 0           # practice NIJE išao kroz explain put
+
+
+# ---------------------------------------------------------------------------
+# matbot/rules.py integracija
+# ---------------------------------------------------------------------------
+
+def test_explain_turn_instructions_include_topic_rules_for_real_lesson():
+    fake = FakeLLM()
+    fake.queue(make_explain_output(reply="Evo objašnjenja."))
+    run_explain_turn(fake, explain_turn_payload(selected_topic="6-04-031"))  # Razlomci lekcija
+    instructions, _ = fake.calls[0]
+    assert "OBLAST — RAZLOMCI" in instructions
+    assert "DOMEN I SIGURNOST" in instructions
+
+
+def test_explain_turn_off_topic_answer_text_is_in_instructions():
+    from matbot.rules import OFF_TOPIC_ANSWER
+
+    fake = FakeLLM()
+    fake.queue(make_explain_output(reply="Ovo je van matematike."))
+    run_explain_turn(fake, explain_turn_payload(msg="Ko je pobijedio prvenstvo?"))
+    instructions, _ = fake.calls[0]
+    assert OFF_TOPIC_ANSWER in instructions

@@ -147,7 +147,9 @@ def _handle_text_turn(store, llm, session, turn, lesson_id, request_id):
     # commituje (store.save) osim na uspješnom kraju ove funkcije.
     active_task_before_llm = session["current_task"]
 
-    instructions = prompts.build_instructions(turn["grade"])
+    instructions = prompts.build_instructions(
+        turn["grade"], lesson_title=session["lesson_title"], oblast=session["oblast"]
+    )
     input_text = prompts.build_input(
         session,
         student_message=turn["student_message"],

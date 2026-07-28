@@ -383,3 +383,26 @@ def test_explain_still_works_and_is_not_routed_through_quick(flask_app, fake_llm
     assert j["session_mode"] == "explain"
     assert fake_llm.call_count == 1
     assert len(fake_llm.quick_calls) == 0
+
+
+# ---------------------------------------------------------------------------
+# matbot/rules.py integracija
+# ---------------------------------------------------------------------------
+
+def test_quick_turn_instructions_include_topic_rules_for_real_lesson():
+    fake = FakeLLM()
+    fake.queue(make_quick_output(reply="$x=5$."))
+    run_quick_turn(fake, quick_turn_payload(selected_topic="6-04-031"))  # Razlomci lekcija
+    instructions, _ = fake.calls[0]
+    assert "OBLAST — RAZLOMCI" in instructions
+    assert "DOMEN I SIGURNOST" in instructions
+
+
+def test_quick_turn_off_topic_answer_text_is_in_instructions():
+    from matbot.rules import OFF_TOPIC_ANSWER
+
+    fake = FakeLLM()
+    fake.queue(make_quick_output(reply="Ovo je van matematike."))
+    run_quick_turn(fake, quick_turn_payload(msg="Ko je pobijedio prvenstvo?"))
+    instructions, _ = fake.calls[0]
+    assert OFF_TOPIC_ANSWER in instructions

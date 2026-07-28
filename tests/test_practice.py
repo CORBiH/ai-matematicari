@@ -651,3 +651,27 @@ def _backslash_run_length(s, marker):
     while idx - count - 1 >= 0 and s[idx - count - 1] == "\\":
         count += 1
     return count
+
+
+# ---------------------------------------------------------------------------
+# matbot/rules.py integracija: run_practice_turn stvarno prosljeđuje canonical
+# lesson_title/oblast do instrukcija (ne samo direktan poziv prompts.build_instructions).
+# ---------------------------------------------------------------------------
+
+def test_practice_turn_instructions_include_topic_rules_for_real_lesson():
+    store, fake = SessionStore(), FakeLLM()
+    fake.queue(make_output(reply="Evo zadatka.", new_task=make_task()))
+    run_practice_turn(store, fake, turn_payload(selected_topic="6-04-031"))  # Razlomci lekcija
+    instructions, _ = fake.calls[0]
+    assert "OBLAST — RAZLOMCI" in instructions
+    assert "DOMEN I SIGURNOST" in instructions
+
+
+def test_practice_turn_off_topic_answer_text_is_in_instructions():
+    from matbot.rules import OFF_TOPIC_ANSWER
+
+    store, fake = SessionStore(), FakeLLM()
+    fake.queue(make_output(reply="Ovo je van matematike."))
+    run_practice_turn(store, fake, turn_payload(msg="Ko je pobijedio prvenstvo?"))
+    instructions, _ = fake.calls[0]
+    assert OFF_TOPIC_ANSWER in instructions

@@ -51,7 +51,9 @@ def run_explain_turn(llm, turn):
     lesson_title = lesson["title"] if lesson else ""
     oblast = lesson["oblast"] if lesson else (turn["selected_oblast"] or "")
 
-    instructions = prompts.build_explain_instructions(turn["grade"])
+    instructions = prompts.build_explain_instructions(
+        turn["grade"], lesson_title=lesson_title, oblast=oblast
+    )
     input_text = prompts.build_explain_input(
         lesson_title=lesson_title,
         oblast=oblast,
