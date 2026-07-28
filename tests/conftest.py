@@ -15,7 +15,7 @@ os.environ.setdefault("FLASK_SECRET_KEY", "test-only-insecure-secret-DO-NOT-USE-
 from matbot import auth  # noqa: E402
 from matbot.llm import LLMResult, LLMTimeout, LLMUnavailable  # noqa: E402
 from matbot.ratelimit import RateLimiter  # noqa: E402
-from matbot.schema import ExplainTurnOutput, NewTask, Option, PracticeTurnOutput  # noqa: E402
+from matbot.schema import ExplainTurnOutput, NewTask, Option, PracticeTurnOutput, QuickTurnOutput  # noqa: E402
 from matbot.session_store import SessionStore  # noqa: E402
 from matbot.turnlock import TurnLockRegistry  # noqa: E402
 
@@ -28,6 +28,10 @@ def make_output(reply="U redu.", evaluation=None, gave_hint=False, new_task=None
 
 def make_explain_output(reply="Evo objašnjenja."):
     return ExplainTurnOutput(reply=reply)
+
+
+def make_quick_output(reply="Rezultat je $x=5$."):
+    return QuickTurnOutput(reply=reply)
 
 
 def make_options(*texts):
@@ -54,6 +58,7 @@ class FakeLLM:
         self.results = list(results or [])
         self.calls = []           # (instructions, input_text) — svi pozivi redom
         self.explain_calls = []   # samo explain pozivi (podskup calls)
+        self.quick_calls = []     # samo quick pozivi (podskup calls)
 
     def queue(self, item):
         self.results.append(item)
@@ -76,6 +81,10 @@ class FakeLLM:
 
     def explain_turn(self, instructions, input_text):
         self.explain_calls.append((instructions, input_text))
+        return self._next(instructions, input_text)
+
+    def quick_turn(self, instructions, input_text):
+        self.quick_calls.append((instructions, input_text))
         return self._next(instructions, input_text)
 
 
@@ -123,4 +132,7 @@ def client(flask_app):
 
 
 # eksporti za testove
-__all__ = ["FakeLLM", "make_output", "make_task", "make_options", "LLMTimeout", "LLMUnavailable"]
+__all__ = [
+    "FakeLLM", "make_output", "make_task", "make_options",
+    "make_explain_output", "make_quick_output", "LLMTimeout", "LLMUnavailable",
+]

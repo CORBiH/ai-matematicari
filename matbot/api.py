@@ -15,6 +15,7 @@ from flask import Blueprint, Response, current_app, jsonify, request
 from matbot import auth, config, validation
 from matbot.explain import run_explain_turn
 from matbot.practice import SAFE_ERROR_MESSAGE, run_practice_turn
+from matbot.quick import run_quick_turn
 from matbot.ratelimit import RateLimiter
 from matbot.session_store import SessionStore
 from matbot.turnlock import TurnLockRegistry
@@ -203,7 +204,7 @@ def _guarded_chat_turn():
         logger.info("validation_failed code=%s", e.code)
         return 400, {"error": e.code, "detail": e.detail}
 
-    if mode not in ("practice", "explain"):
+    if mode not in ("practice", "explain", "quick"):
         return 200, _simple_response(NON_PRACTICE_MESSAGE, mode)
 
     turn = _build_turn(payload)
@@ -226,6 +227,8 @@ def _guarded_chat_turn():
     try:
         if mode == "explain":
             return 200, run_explain_turn(_get_llm(), turn)
+        if mode == "quick":
+            return 200, run_quick_turn(_get_llm(), turn)
         return 200, run_practice_turn(_get_store(), _get_llm(), turn)
     except Exception:
         # Zadnja linija odbrane: interni exception NIKAD ne ide učeniku.

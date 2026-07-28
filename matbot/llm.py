@@ -7,7 +7,7 @@ import time
 from dataclasses import dataclass, field
 
 from matbot import config
-from matbot.schema import ExplainTurnOutput, PracticeTurnOutput
+from matbot.schema import ExplainTurnOutput, PracticeTurnOutput, QuickTurnOutput
 
 
 class LLMError(Exception):
@@ -63,6 +63,9 @@ class OpenAIPracticeLLM:
 
     def explain_turn(self, instructions: str, input_text: str) -> LLMResult:
         return self._structured_turn(instructions, input_text, ExplainTurnOutput)
+
+    def quick_turn(self, instructions: str, input_text: str) -> LLMResult:
+        return self._structured_turn(instructions, input_text, QuickTurnOutput)
 
     def _structured_turn(self, instructions: str, input_text: str, text_format) -> LLMResult:
         import openai

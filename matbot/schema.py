@@ -46,6 +46,17 @@ class ExplainTurnOutput(BaseModel):
     reply: str
 
 
+class QuickTurnOutput(BaseModel):
+    """Quick mod ("Samo rezultat"): namjerno NAJMANJA moguća šema — samo
+    vidljivi tekst. Bez evaluation/gave_hint/new_task/options: Quick ništa
+    ne ocjenjuje, ne daje hintove po nivou, ne stvara Practice zadatak i ne
+    nudi opcije, pa svako dodatno polje samo otvara prostor za kontradikciju."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    reply: str
+
+
 class InvalidOutputError(ValueError):
     """AI odgovor je strukturno validan JSON, ali sadržajno neupotrebljiv."""
 
@@ -103,4 +114,12 @@ def validate_explain_output(out: ExplainTurnOutput) -> None:
     if not (out.reply or "").strip():
         raise InvalidOutputError("prazan reply")
     if len(out.reply) > config.MAX_EXPLAIN_REPLY_CHARS:
+        raise InvalidOutputError("predug reply")
+
+
+def validate_quick_output(out: QuickTurnOutput) -> None:
+    """Server-side provjere Quick outputa povrh strict šeme."""
+    if not (out.reply or "").strip():
+        raise InvalidOutputError("prazan reply")
+    if len(out.reply) > config.MAX_QUICK_REPLY_CHARS:
         raise InvalidOutputError("predug reply")

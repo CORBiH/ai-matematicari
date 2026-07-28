@@ -63,9 +63,10 @@ def test_multipart_with_image_controlled_no_llm(client, fake_llm):
 
 
 def test_non_ai_modes_do_not_call_llm(client, fake_llm):
-    # explain je od Explain faze STVARNI AI mod (ima svoje testove u
-    # tests/test_explain.py) — ovdje ostaju samo modovi bez AI poziva
-    for mode in ("quick", "exam"):
+    # explain i quick su STVARNI AI modovi (imaju svoje testove u
+    # tests/test_explain.py i tests/test_quick.py) — ovdje ostaju samo
+    # modovi bez AI poziva.
+    for mode in ("exam",):
         r = client.post("/api/ai-tutor/chat", json=chat_payload(mode=mode))
         assert r.status_code == 200
         j = r.get_json()
