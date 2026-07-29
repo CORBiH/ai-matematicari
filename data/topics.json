@@ -12,6 +12,7 @@
         "Skupovi tačaka, kružnica i krug",
         "Uglovi",
         "Relacije, preslikavanja i koordinatni sistem",
+        "Vektori",
         "Izometrijske transformacije i konstrukcije",
         "Mjerenje, mjerne jedinice i podaci"
       ],
@@ -72,512 +73,542 @@
           "title": "Direktni/Dekartov proizvod skupova"
         },
         {
-          "id": "6-02-012",
+          "id": "6-02-001",
           "oblast": "Prirodni brojevi i skupovi N/N0",
           "title": "Skupovi N i N0"
         },
         {
-          "id": "6-02-013",
+          "id": "6-02-002",
           "oblast": "Prirodni brojevi i skupovi N/N0",
           "title": "Čitanje, zapisivanje i upoređivanje prirodnih brojeva"
         },
         {
-          "id": "6-02-014",
+          "id": "6-02-003",
           "oblast": "Prirodni brojevi i skupovi N/N0",
           "title": "Sabiranje i oduzimanje u skupu N0"
         },
         {
-          "id": "6-02-015",
+          "id": "6-02-004",
           "oblast": "Prirodni brojevi i skupovi N/N0",
           "title": "Množenje i dijeljenje u skupu N0"
         },
         {
-          "id": "6-02-016",
+          "id": "6-02-005",
           "oblast": "Prirodni brojevi i skupovi N/N0",
           "title": "Dijeljenje s ostatkom: a = bq + r"
         },
         {
-          "id": "6-02-017",
+          "id": "6-02-006",
           "oblast": "Prirodni brojevi i skupovi N/N0",
           "title": "Svojstva računskih operacija: komutativnost, asocijativnost, distributivnost"
         },
         {
-          "id": "6-02-018",
+          "id": "6-02-007",
           "oblast": "Prirodni brojevi i skupovi N/N0",
           "title": "Redoslijed računskih operacija i zagrade"
         },
         {
-          "id": "6-02-019",
+          "id": "6-02-008",
           "oblast": "Prirodni brojevi i skupovi N/N0",
           "title": "Izrazi s promjenljivim i brojna vrijednost izraza"
         },
         {
-          "id": "6-02-020",
+          "id": "6-02-009",
           "oblast": "Prirodni brojevi i skupovi N/N0",
           "title": "Pridruživanje brojeva po datom pravilu"
         },
         {
-          "id": "6-03-021",
+          "id": "6-03-001",
           "oblast": "Djeljivost brojeva",
           "title": "Djelilac/faktor i sadržilac/višekratnik prirodnog broja"
         },
         {
-          "id": "6-03-022",
+          "id": "6-03-002",
           "oblast": "Djeljivost brojeva",
           "title": "Djeljivost zbira, razlike i proizvoda"
         },
         {
-          "id": "6-03-023",
+          "id": "6-03-003",
           "oblast": "Djeljivost brojeva",
           "title": "Djeljivost dekadskim jedinicama"
         },
         {
-          "id": "6-03-024",
+          "id": "6-03-004",
           "oblast": "Djeljivost brojeva",
           "title": "Pravila djeljivosti sa 2, 3, 4, 5, 6, 9, 10, 15 i 25"
         },
         {
-          "id": "6-03-025",
+          "id": "6-03-005",
           "oblast": "Djeljivost brojeva",
           "title": "Prosti i složeni brojevi"
         },
         {
-          "id": "6-03-026",
+          "id": "6-03-006",
           "oblast": "Djeljivost brojeva",
           "title": "Relativno prosti brojevi"
         },
         {
-          "id": "6-03-027",
+          "id": "6-03-007",
           "oblast": "Djeljivost brojeva",
           "title": "Rastavljanje složenih brojeva na proste faktore"
         },
         {
-          "id": "6-03-028",
+          "id": "6-03-008",
           "oblast": "Djeljivost brojeva",
           "title": "Zajednički djelioci i najveći zajednički djelilac / NZD"
         },
         {
-          "id": "6-03-029",
+          "id": "6-03-009",
           "oblast": "Djeljivost brojeva",
           "title": "Zajednički sadržioci i najmanji zajednički sadržilac / NZS"
         },
         {
-          "id": "6-03-030",
+          "id": "6-03-010",
           "oblast": "Djeljivost brojeva",
           "title": "Tekstualni zadaci iz djeljivosti"
         },
         {
-          "id": "6-04-031",
+          "id": "6-04-001",
           "oblast": "Razlomci",
           "title": "Pojam razlomka, brojnik/brojilac i nazivnik/imenilac"
         },
         {
-          "id": "6-04-032",
+          "id": "6-04-002",
           "oblast": "Razlomci",
           "title": "Razlomak kao dio cjeline i kao količnik"
         },
         {
-          "id": "6-04-033",
+          "id": "6-04-003",
           "oblast": "Razlomci",
           "title": "Pravi, nepravi i prividni razlomci; mješoviti brojevi"
         },
         {
-          "id": "6-04-034",
+          "id": "6-04-004",
           "oblast": "Razlomci",
           "title": "Prikaz razlomka na brojevnoj polupravoj/osi"
         },
         {
-          "id": "6-04-035",
+          "id": "6-04-005",
           "oblast": "Razlomci",
           "title": "Proširivanje razlomaka"
         },
         {
-          "id": "6-04-036",
+          "id": "6-04-006",
           "oblast": "Razlomci",
           "title": "Skraćivanje i nesvodivi razlomak"
         },
         {
-          "id": "6-04-037",
+          "id": "6-04-007",
           "oblast": "Razlomci",
           "title": "Svođenje razlomaka na zajednički nazivnik/imenilac"
         },
         {
-          "id": "6-04-038",
+          "id": "6-04-008",
           "oblast": "Razlomci",
           "title": "Upoređivanje razlomaka"
         },
         {
-          "id": "6-04-039",
+          "id": "6-04-009",
           "oblast": "Razlomci",
           "title": "Sabiranje i oduzimanje razlomaka jednakih imenilaca"
         },
         {
-          "id": "6-04-040",
+          "id": "6-04-010",
           "oblast": "Razlomci",
           "title": "Sabiranje i oduzimanje razlomaka različitih imenilaca"
         },
         {
-          "id": "6-04-041",
+          "id": "6-04-011",
           "oblast": "Razlomci",
           "title": "Množenje razlomka prirodnim brojem i razlomkom"
         },
         {
-          "id": "6-04-042",
+          "id": "6-04-012",
           "oblast": "Razlomci",
           "title": "Dijeljenje razlomka prirodnim brojem i razlomkom"
         },
         {
-          "id": "6-04-043",
-          "oblast": "Razlomci",
-          "title": "Dvojni razlomci"
-        },
-        {
-          "id": "6-04-044",
+          "id": "6-04-013",
           "oblast": "Razlomci",
           "title": "Svojstva računskih operacija s razlomcima"
         },
         {
-          "id": "6-04-045",
+          "id": "6-04-014",
           "oblast": "Razlomci",
           "title": "Brojevni izrazi s razlomcima"
         },
         {
-          "id": "6-04-046",
+          "id": "6-04-015",
           "oblast": "Razlomci",
           "title": "Tekstualni zadaci s razlomcima"
         },
         {
-          "id": "6-05-047",
+          "id": "6-05-001",
           "oblast": "Razlomci u decimalnom obliku i decimalni brojevi",
           "title": "Decimalni zapis razlomka"
         },
         {
-          "id": "6-05-048",
+          "id": "6-05-002",
           "oblast": "Razlomci u decimalnom obliku i decimalni brojevi",
           "title": "Decimalni broj: cijeli dio, decimalni dio i decimalna mjesta"
         },
         {
-          "id": "6-05-049",
+          "id": "6-05-003",
           "oblast": "Razlomci u decimalnom obliku i decimalni brojevi",
           "title": "Pretvaranje razlomka u decimalni broj i obratno"
         },
         {
-          "id": "6-05-050",
+          "id": "6-05-004",
           "oblast": "Razlomci u decimalnom obliku i decimalni brojevi",
           "title": "Konačni i beskonačni/periodični decimalni brojevi"
         },
         {
-          "id": "6-05-051",
+          "id": "6-05-005",
           "oblast": "Razlomci u decimalnom obliku i decimalni brojevi",
           "title": "Pridruživanje decimalnih brojeva tačkama brojevne poluprave/osi"
         },
         {
-          "id": "6-05-052",
+          "id": "6-05-006",
           "oblast": "Razlomci u decimalnom obliku i decimalni brojevi",
           "title": "Upoređivanje decimalnih brojeva"
         },
         {
-          "id": "6-05-053",
+          "id": "6-05-007",
           "oblast": "Razlomci u decimalnom obliku i decimalni brojevi",
           "title": "Zaokruživanje decimalnih brojeva"
         },
         {
-          "id": "6-05-054",
+          "id": "6-05-008",
           "oblast": "Razlomci u decimalnom obliku i decimalni brojevi",
           "title": "Sabiranje i oduzimanje decimalnih brojeva"
         },
         {
-          "id": "6-05-055",
+          "id": "6-05-009",
           "oblast": "Razlomci u decimalnom obliku i decimalni brojevi",
           "title": "Množenje decimalnih brojeva"
         },
         {
-          "id": "6-05-056",
+          "id": "6-05-010",
           "oblast": "Razlomci u decimalnom obliku i decimalni brojevi",
           "title": "Dijeljenje decimalnih brojeva"
         },
         {
-          "id": "6-05-057",
+          "id": "6-05-011",
           "oblast": "Razlomci u decimalnom obliku i decimalni brojevi",
           "title": "Brojevni izrazi i tekstualni zadaci s decimalnim brojevima"
         },
         {
-          "id": "6-06-059",
+          "id": "6-06-001",
           "oblast": "Postotak, razmjera i aritmetička sredina",
           "title": "Postotni zapis razlomka"
         },
         {
-          "id": "6-06-060",
+          "id": "6-06-002",
           "oblast": "Postotak, razmjera i aritmetička sredina",
           "title": "Postotak/procenat i procenat broja"
         },
         {
-          "id": "6-06-061",
+          "id": "6-06-003",
           "oblast": "Postotak, razmjera i aritmetička sredina",
           "title": "Razmjera/omjer"
         },
         {
-          "id": "6-06-062",
+          "id": "6-06-004",
           "oblast": "Postotak, razmjera i aritmetička sredina",
           "title": "Aritmetička sredina danih brojeva / dva broja"
         },
         {
-          "id": "6-07-063",
+          "id": "6-07-001",
           "oblast": "Jednačine, nejednačine i izrazi u Q+",
           "title": "Jednakost, jednačina, nejednakost i nejednačina"
         },
         {
-          "id": "6-07-064",
+          "id": "6-07-002",
           "oblast": "Jednačine, nejednačine i izrazi u Q+",
           "title": "Jednačine s razlomcima oblika x ± a = b i a ± x = b"
         },
         {
-          "id": "6-07-065",
+          "id": "6-07-003",
           "oblast": "Jednačine, nejednačine i izrazi u Q+",
-          "title": "Nejednačine s razlomcima oblika x ± a < b / > b"
+          "title": "Nejednačine s razlomcima oblika x ± a < b / > b i a ± x < b / > b"
         },
         {
-          "id": "6-07-066",
+          "id": "6-07-004",
           "oblast": "Jednačine, nejednačine i izrazi u Q+",
           "title": "Jednačine s množenjem i dijeljenjem razlomaka"
         },
         {
-          "id": "6-07-067",
+          "id": "6-07-005",
           "oblast": "Jednačine, nejednačine i izrazi u Q+",
           "title": "Nejednačine s množenjem i dijeljenjem razlomaka"
         },
         {
-          "id": "6-07-068",
+          "id": "6-07-006",
           "oblast": "Jednačine, nejednačine i izrazi u Q+",
           "title": "Jednačine i nejednačine s decimalnim brojevima"
         },
         {
-          "id": "6-07-069",
+          "id": "6-07-007",
           "oblast": "Jednačine, nejednačine i izrazi u Q+",
           "title": "Predstavljanje rješenja nejednačine na brojevnoj polupravoj/osi"
         },
         {
-          "id": "6-08-070",
+          "id": "6-08-001",
           "oblast": "Skupovi tačaka, kružnica i krug",
           "title": "Tačka, prava, ravan, poluprava i duž"
         },
         {
-          "id": "6-08-071",
+          "id": "6-08-002",
           "oblast": "Skupovi tačaka, kružnica i krug",
           "title": "Geometrijske figure kao skupovi tačaka"
         },
         {
-          "id": "6-08-072",
+          "id": "6-08-003",
           "oblast": "Skupovi tačaka, kružnica i krug",
           "title": "Izlomljena linija"
         },
         {
-          "id": "6-08-073",
+          "id": "6-08-004",
           "oblast": "Skupovi tačaka, kružnica i krug",
           "title": "Mnogougao/mnogokut"
         },
         {
-          "id": "6-08-074",
+          "id": "6-08-005",
           "oblast": "Skupovi tačaka, kružnica i krug",
           "title": "Kružnica i krug"
         },
         {
-          "id": "6-08-075",
+          "id": "6-08-006",
           "oblast": "Skupovi tačaka, kružnica i krug",
           "title": "Centar, poluprečnik/polumjer i prečnik/promjer"
         },
         {
-          "id": "6-08-076",
+          "id": "6-08-007",
           "oblast": "Skupovi tačaka, kružnica i krug",
           "title": "Kružni luk i tetiva"
         },
         {
-          "id": "6-08-077",
+          "id": "6-08-008",
           "oblast": "Skupovi tačaka, kružnica i krug",
           "title": "Odnos prave i kružnice: sječica/sekanta i tangenta"
         },
         {
-          "id": "6-08-078",
+          "id": "6-08-009",
           "oblast": "Skupovi tačaka, kružnica i krug",
           "title": "Konstrukcija tangente na kružnicu"
         },
         {
-          "id": "6-08-079",
+          "id": "6-08-010",
           "oblast": "Skupovi tačaka, kružnica i krug",
           "title": "Odnos dvije kružnice"
         },
         {
-          "id": "6-09-080",
+          "id": "6-08-011",
+          "oblast": "Skupovi tačaka, kružnica i krug",
+          "title": "Kružni isječak, odsječak i prsten"
+        },
+        {
+          "id": "6-09-001",
           "oblast": "Uglovi",
           "title": "Pojam ugla, elementi i označavanje"
         },
         {
-          "id": "6-09-081",
+          "id": "6-09-002",
           "oblast": "Uglovi",
           "title": "Konveksni i nekonveksni uglovi"
         },
         {
-          "id": "6-09-082",
+          "id": "6-09-003",
           "oblast": "Uglovi",
           "title": "Vrste uglova: nula, oštri, pravi, tupi, opruženi i puni ugao"
         },
         {
-          "id": "6-09-083",
+          "id": "6-09-004",
           "oblast": "Uglovi",
           "title": "Centralni/središnji ugao"
         },
         {
-          "id": "6-09-084",
+          "id": "6-09-005",
           "oblast": "Uglovi",
           "title": "Periferijski/obodni ugao i odnos sa centralnim uglom"
         },
         {
-          "id": "6-09-085",
+          "id": "6-09-006",
           "oblast": "Uglovi",
           "title": "Prenošenje i konstrukcija jednakog ugla"
         },
         {
-          "id": "6-09-086",
+          "id": "6-09-007",
           "oblast": "Uglovi",
           "title": "Upoređivanje uglova"
         },
         {
-          "id": "6-09-087",
+          "id": "6-09-008",
           "oblast": "Uglovi",
           "title": "Grafičko sabiranje i oduzimanje uglova"
         },
         {
-          "id": "6-09-088",
+          "id": "6-09-009",
           "oblast": "Uglovi",
           "title": "Mjerenje uglova uglomjerom"
         },
         {
-          "id": "6-09-089",
+          "id": "6-09-010",
           "oblast": "Uglovi",
           "title": "Ugaone jedinice: stepen, minuta, sekunda"
         },
         {
-          "id": "6-09-090",
+          "id": "6-09-011",
           "oblast": "Uglovi",
           "title": "Sabiranje i oduzimanje mjernih brojeva za uglove"
         },
         {
-          "id": "6-09-091",
+          "id": "6-09-012",
           "oblast": "Uglovi",
           "title": "Množenje i dijeljenje uglova prirodnim brojem"
         },
         {
-          "id": "6-09-092",
+          "id": "6-09-013",
           "oblast": "Uglovi",
           "title": "Susjedni, uporedni i unakrsni uglovi"
         },
         {
-          "id": "6-09-093",
+          "id": "6-09-014",
           "oblast": "Uglovi",
           "title": "Komplementni i suplementni uglovi"
         },
         {
-          "id": "6-09-094",
+          "id": "6-09-015",
           "oblast": "Uglovi",
           "title": "Uglovi uz transverzalu paralelnih pravih"
         },
         {
-          "id": "6-09-095",
+          "id": "6-09-016",
           "oblast": "Uglovi",
           "title": "Uglovi s paralelnim i normalnim kracima"
         },
         {
-          "id": "6-10-096",
+          "id": "6-10-001",
           "oblast": "Relacije, preslikavanja i koordinatni sistem",
           "title": "Koordinatni polupravac"
         },
         {
-          "id": "6-10-097",
+          "id": "6-10-002",
           "oblast": "Relacije, preslikavanja i koordinatni sistem",
           "title": "Brojevna osa i koordinate tačaka"
         },
         {
-          "id": "6-10-098",
+          "id": "6-10-003",
           "oblast": "Relacije, preslikavanja i koordinatni sistem",
           "title": "Pravougli koordinatni sistem u ravni"
         },
         {
-          "id": "6-10-099",
+          "id": "6-10-004",
           "oblast": "Relacije, preslikavanja i koordinatni sistem",
           "title": "Crtanje i očitavanje tačaka u koordinatnom sistemu"
         },
         {
-          "id": "6-10-100",
+          "id": "6-10-005",
           "oblast": "Relacije, preslikavanja i koordinatni sistem",
           "title": "Relacije"
         },
         {
-          "id": "6-10-101",
+          "id": "6-10-006",
           "oblast": "Relacije, preslikavanja i koordinatni sistem",
           "title": "Funkcije/preslikavanja: domen, kodomen i pravilo"
         },
         {
-          "id": "6-10-102",
+          "id": "6-10-007",
           "oblast": "Relacije, preslikavanja i koordinatni sistem",
           "title": "Prikaz funkcije tabelom i grafički"
         },
         {
-          "id": "6-11-103",
+          "id": "6-10-008",
+          "oblast": "Relacije, preslikavanja i koordinatni sistem",
+          "title": "Tabele, stupčasti i kružni dijagrami"
+        },
+        {
+          "id": "6-11-001",
+          "oblast": "Vektori",
+          "title": "Vektor kao orijentisana duž"
+        },
+        {
+          "id": "6-11-002",
+          "oblast": "Vektori",
+          "title": "Operacije s vektorima: sabiranje, oduzimanje i množenje prirodnim brojem"
+        },
+        {
+          "id": "6-12-001",
           "oblast": "Izometrijske transformacije i konstrukcije",
           "title": "Osna simetrija u ravni"
         },
         {
-          "id": "6-11-104",
+          "id": "6-12-002",
           "oblast": "Izometrijske transformacije i konstrukcije",
           "title": "Osno simetrične tačke i figure"
         },
         {
-          "id": "6-11-105",
+          "id": "6-12-003",
           "oblast": "Izometrijske transformacije i konstrukcije",
           "title": "Simetrala duži i konstrukcija"
         },
         {
-          "id": "6-11-106",
+          "id": "6-12-004",
           "oblast": "Izometrijske transformacije i konstrukcije",
           "title": "Simetrala ugla i konstrukcija"
         },
         {
-          "id": "6-11-107",
+          "id": "6-12-005",
           "oblast": "Izometrijske transformacije i konstrukcije",
           "title": "Centralna simetrija"
         },
         {
-          "id": "6-11-108",
+          "id": "6-12-006",
           "oblast": "Izometrijske transformacije i konstrukcije",
           "title": "Centralno simetrične tačke i figure"
         },
         {
-          "id": "6-11-109",
-          "oblast": "Izometrijske transformacije i konstrukcije",
-          "title": "Vektor kao orijentisana duž"
-        },
-        {
-          "id": "6-11-110",
-          "oblast": "Izometrijske transformacije i konstrukcije",
-          "title": "Operacije s vektorima: sabiranje, oduzimanje i množenje brojem"
-        },
-        {
-          "id": "6-11-111",
+          "id": "6-12-007",
           "oblast": "Izometrijske transformacije i konstrukcije",
           "title": "Translacija"
         },
         {
-          "id": "6-11-112",
+          "id": "6-12-008",
           "oblast": "Izometrijske transformacije i konstrukcije",
           "title": "Rotacija"
         },
         {
-          "id": "6-12-118",
+          "id": "6-13-001",
+          "oblast": "Mjerenje, mjerne jedinice i podaci",
+          "title": "Mjerne jedinice za dužinu"
+        },
+        {
+          "id": "6-13-002",
+          "oblast": "Mjerenje, mjerne jedinice i podaci",
+          "title": "Mjerne jedinice za masu"
+        },
+        {
+          "id": "6-13-003",
+          "oblast": "Mjerenje, mjerne jedinice i podaci",
+          "title": "Mjerne jedinice za vrijeme"
+        },
+        {
+          "id": "6-13-004",
+          "oblast": "Mjerenje, mjerne jedinice i podaci",
+          "title": "Mjerne jedinice za površinu"
+        },
+        {
+          "id": "6-13-005",
+          "oblast": "Mjerenje, mjerne jedinice i podaci",
+          "title": "Preračunavanje mjernih jedinica"
+        },
+        {
+          "id": "6-13-006",
           "oblast": "Mjerenje, mjerne jedinice i podaci",
           "title": "Čitanje podataka iz tabela i dijagrama"
         },
         {
-          "id": "6-12-119",
+          "id": "6-13-007",
           "oblast": "Mjerenje, mjerne jedinice i podaci",
           "title": "Prezentovanje podataka tabelom, dijagramom ili koordinatnim sistemom"
         }
@@ -585,1277 +616,2117 @@
     },
     "7": {
       "oblast_order": [
+        "Vektori i izometrijska preslikavanja",
         "Cijeli brojevi",
         "Racionalni brojevi",
-        "Vektori",
-        "Izometrijska preslikavanja",
-        "Operacije sa uglovima",
-        "Trougao",
-        "Četverougao",
-        "Osnovne geometrijske konstrukcije i postupci"
+        "Ugao i trougao",
+        "Četverougao, obim i površina",
+        "Skupovi tačaka, kružnica i krug"
       ],
       "lessons": [
         {
           "id": "7-01-001",
-          "oblast": "Cijeli brojevi",
-          "title": "Pozitivni, negativni, suprotni i apsolutni brojevi"
+          "oblast": "Vektori i izometrijska preslikavanja",
+          "title": "Usmjerena duž i pojam vektora"
         },
         {
           "id": "7-01-002",
-          "oblast": "Cijeli brojevi",
-          "title": "Sabiranje i oduzimanje cijelih brojeva"
+          "oblast": "Vektori i izometrijska preslikavanja",
+          "title": "Pravac, smjer i intenzitet (dužina) vektora"
+        },
+        {
+          "id": "7-01-003",
+          "oblast": "Vektori i izometrijska preslikavanja",
+          "title": "Nula-vektor"
         },
         {
           "id": "7-01-004",
-          "oblast": "Cijeli brojevi",
-          "title": "Množenje i dijeljenje cijelih brojeva"
+          "oblast": "Vektori i izometrijska preslikavanja",
+          "title": "Jednaki vektori"
         },
         {
           "id": "7-01-005",
-          "oblast": "Cijeli brojevi",
-          "title": "Redoslijed računskih operacija sa cijelim brojevima"
+          "oblast": "Vektori i izometrijska preslikavanja",
+          "title": "Suprotni vektori"
         },
         {
           "id": "7-01-006",
-          "oblast": "Cijeli brojevi",
-          "title": "Jednačine sa cijelim brojevima"
+          "oblast": "Vektori i izometrijska preslikavanja",
+          "title": "Kolinearni vektori"
         },
         {
           "id": "7-01-007",
-          "oblast": "Cijeli brojevi",
-          "title": "Nejednačine sa cijelim brojevima"
+          "oblast": "Vektori i izometrijska preslikavanja",
+          "title": "Sabiranje vektora - metoda nadovezivanja (trougla) i metoda paralelograma"
         },
         {
           "id": "7-01-008",
+          "oblast": "Vektori i izometrijska preslikavanja",
+          "title": "Oduzimanje vektora"
+        },
+        {
+          "id": "7-01-009",
+          "oblast": "Vektori i izometrijska preslikavanja",
+          "title": "Množenje vektora prirodnim brojem"
+        },
+        {
+          "id": "7-01-010",
+          "oblast": "Vektori i izometrijska preslikavanja",
+          "title": "Zadaci sa različitim operacijama"
+        },
+        {
+          "id": "7-01-011",
+          "oblast": "Vektori i izometrijska preslikavanja",
+          "title": "Primjene vektora u kretanju i fizici"
+        },
+        {
+          "id": "7-01-012",
+          "oblast": "Vektori i izometrijska preslikavanja",
+          "title": "Translacija figure vektorom"
+        },
+        {
+          "id": "7-01-013",
+          "oblast": "Vektori i izometrijska preslikavanja",
+          "title": "Rotacija: centar i ugao rotacije"
+        },
+        {
+          "id": "7-01-014",
+          "oblast": "Vektori i izometrijska preslikavanja",
+          "title": "Osna simetrija"
+        },
+        {
+          "id": "7-01-015",
+          "oblast": "Vektori i izometrijska preslikavanja",
+          "title": "Centralna simetrija"
+        },
+        {
+          "id": "7-01-016",
+          "oblast": "Vektori i izometrijska preslikavanja",
+          "title": "Kompozicija izometrijskih preslikavanja"
+        },
+        {
+          "id": "7-01-017",
+          "oblast": "Vektori i izometrijska preslikavanja",
+          "title": "Osa i centar simetrije figure"
+        },
+        {
+          "id": "7-01-018",
+          "oblast": "Vektori i izometrijska preslikavanja",
+          "title": "Simetrala duži i konstrukcija"
+        },
+        {
+          "id": "7-01-019",
+          "oblast": "Vektori i izometrijska preslikavanja",
+          "title": "Simetrala ugla i konstrukcija"
+        },
+        {
+          "id": "7-02-001",
           "oblast": "Cijeli brojevi",
-          "title": "Skidanje zagrada i promjena znaka"
+          "title": "Potreba za negativnim cijelim brojevima"
+        },
+        {
+          "id": "7-02-002",
+          "oblast": "Cijeli brojevi",
+          "title": "Skup cijelih brojeva Z"
+        },
+        {
+          "id": "7-02-003",
+          "oblast": "Cijeli brojevi",
+          "title": "Prikaz na brojevnoj pravoj"
+        },
+        {
+          "id": "7-02-004",
+          "oblast": "Cijeli brojevi",
+          "title": "Suprotni cijeli brojevi"
+        },
+        {
+          "id": "7-02-005",
+          "oblast": "Cijeli brojevi",
+          "title": "Apsolutna vrijednost cijelog broja"
+        },
+        {
+          "id": "7-02-006",
+          "oblast": "Cijeli brojevi",
+          "title": "Upoređivanje i uređenje cijelih brojeva"
+        },
+        {
+          "id": "7-02-007",
+          "oblast": "Cijeli brojevi",
+          "title": "Sabiranje cijelih brojeva istih znakova"
+        },
+        {
+          "id": "7-02-008",
+          "oblast": "Cijeli brojevi",
+          "title": "Sabiranje cijelih brojeva različitih znakova"
+        },
+        {
+          "id": "7-02-009",
+          "oblast": "Cijeli brojevi",
+          "title": "Oduzimanje cijelih brojeva"
         },
         {
           "id": "7-02-010",
-          "oblast": "Racionalni brojevi",
-          "title": "Pretvaranje mješovitog i nepravog razlomka"
+          "oblast": "Cijeli brojevi",
+          "title": "Komutativnost i asocijativnost sabiranja"
         },
         {
           "id": "7-02-011",
-          "oblast": "Racionalni brojevi",
-          "title": "Proširivanje i skraćivanje razlomaka"
+          "oblast": "Cijeli brojevi",
+          "title": "Množenje cijelih brojeva i pravilo znakova"
         },
         {
           "id": "7-02-012",
-          "oblast": "Racionalni brojevi",
-          "title": "Svođenje razlomaka na jednake nazivnike"
+          "oblast": "Cijeli brojevi",
+          "title": "Dijeljenje cijelih brojeva i pravilo znakova"
         },
         {
           "id": "7-02-013",
-          "oblast": "Racionalni brojevi",
-          "title": "Sabiranje i oduzimanje razlomaka različitih nazivnika"
+          "oblast": "Cijeli brojevi",
+          "title": "Proizvod više cijelih faktora"
         },
         {
           "id": "7-02-014",
-          "oblast": "Racionalni brojevi",
-          "title": "Svojstva sabiranja racionalnih brojeva"
+          "oblast": "Cijeli brojevi",
+          "title": "Distributivnost u skupu Z"
         },
         {
           "id": "7-02-015",
-          "oblast": "Racionalni brojevi",
-          "title": "Množenje razlomaka i racionalnih brojeva"
+          "oblast": "Cijeli brojevi",
+          "title": "Brojevni izrazi sa cijelim brojevima"
         },
         {
           "id": "7-02-016",
-          "oblast": "Racionalni brojevi",
-          "title": "Dijeljenje razlomaka i racionalnih brojeva"
+          "oblast": "Cijeli brojevi",
+          "title": "Jednačine sa sabiranjem i oduzimanjem u Z"
         },
         {
           "id": "7-02-017",
+          "oblast": "Cijeli brojevi",
+          "title": "Jednačine sa množenjem i dijeljenjem u Z"
+        },
+        {
+          "id": "7-02-018",
+          "oblast": "Cijeli brojevi",
+          "title": "Jednačine sa apsolutnom vrijednošću"
+        },
+        {
+          "id": "7-02-019",
+          "oblast": "Cijeli brojevi",
+          "title": "Nejednačine sa sabiranjem i oduzimanjem u Z"
+        },
+        {
+          "id": "7-02-020",
+          "oblast": "Cijeli brojevi",
+          "title": "Nejednačine sa množenjem i dijeljenjem u Z"
+        },
+        {
+          "id": "7-02-021",
+          "oblast": "Cijeli brojevi",
+          "title": "Tekstualni zadaci s cijelim brojevima"
+        },
+        {
+          "id": "7-03-001",
+          "oblast": "Racionalni brojevi",
+          "title": "Skup racionalnih brojeva Q"
+        },
+        {
+          "id": "7-03-002",
+          "oblast": "Racionalni brojevi",
+          "title": "Pozitivni, negativni racionalni brojevi i nula"
+        },
+        {
+          "id": "7-03-003",
+          "oblast": "Racionalni brojevi",
+          "title": "Prikaz racionalnih brojeva na brojevnoj pravoj"
+        },
+        {
+          "id": "7-03-004",
+          "oblast": "Racionalni brojevi",
+          "title": "Suprotan racionalni broj"
+        },
+        {
+          "id": "7-03-005",
+          "oblast": "Racionalni brojevi",
+          "title": "Apsolutna vrijednost racionalnog broja"
+        },
+        {
+          "id": "7-03-006",
+          "oblast": "Racionalni brojevi",
+          "title": "Upoređivanje racionalnih brojeva"
+        },
+        {
+          "id": "7-03-007",
+          "oblast": "Racionalni brojevi",
+          "title": "Decimalni zapis racionalnog broja"
+        },
+        {
+          "id": "7-03-008",
+          "oblast": "Racionalni brojevi",
+          "title": "Pretvaranje decimalnog broja u razlomak"
+        },
+        {
+          "id": "7-03-009",
+          "oblast": "Racionalni brojevi",
+          "title": "Sabiranje racionalnih brojeva"
+        },
+        {
+          "id": "7-03-010",
+          "oblast": "Racionalni brojevi",
+          "title": "Oduzimanje racionalnih brojeva"
+        },
+        {
+          "id": "7-03-011",
+          "oblast": "Racionalni brojevi",
+          "title": "Množenje racionalnih brojeva"
+        },
+        {
+          "id": "7-03-012",
+          "oblast": "Racionalni brojevi",
+          "title": "Dijeljenje racionalnih brojeva"
+        },
+        {
+          "id": "7-03-013",
+          "oblast": "Racionalni brojevi",
+          "title": "Svojstva računskih operacija u Q"
+        },
+        {
+          "id": "7-03-014",
+          "oblast": "Racionalni brojevi",
+          "title": "Brojevni izrazi sa zagradama u Q"
+        },
+        {
+          "id": "7-03-015",
           "oblast": "Racionalni brojevi",
           "title": "Dvojni razlomci"
         },
         {
-          "id": "7-02-018",
+          "id": "7-03-016",
           "oblast": "Racionalni brojevi",
-          "title": "Decimalni razlomci"
+          "title": "Jednačine u Q sa sabiranjem i oduzimanjem"
         },
         {
-          "id": "7-02-019",
+          "id": "7-03-017",
           "oblast": "Racionalni brojevi",
-          "title": "Decimalni brojevi i razlomci"
+          "title": "Jednačine u Q sa množenjem i dijeljenjem"
         },
         {
-          "id": "7-02-020",
+          "id": "7-03-018",
           "oblast": "Racionalni brojevi",
-          "title": "Konačni i periodični decimalni zapis"
+          "title": "Jednačine sa zagradama i svođenjem sličnih članova"
         },
         {
-          "id": "7-02-021",
+          "id": "7-03-019",
           "oblast": "Racionalni brojevi",
-          "title": "Decimalni brojevi na brojevnoj polupravoj"
+          "title": "Nejednačine u Q"
         },
         {
-          "id": "7-02-022",
+          "id": "7-03-020",
           "oblast": "Racionalni brojevi",
-          "title": "Zaokruživanje decimalnih brojeva"
+          "title": "Primjena linearne jednačine u tekstualnom zadatku"
         },
         {
-          "id": "7-02-023",
+          "id": "7-03-021",
           "oblast": "Racionalni brojevi",
-          "title": "Sabiranje i oduzimanje decimalnih brojeva"
+          "title": "Procjena, zaokruživanje i približan račun"
         },
         {
-          "id": "7-02-024",
-          "oblast": "Racionalni brojevi",
-          "title": "Množenje decimalnih brojeva"
+          "id": "7-04-001",
+          "oblast": "Ugao i trougao",
+          "title": "Uglovi sa paralelnim kracima"
         },
         {
-          "id": "7-02-025",
-          "oblast": "Racionalni brojevi",
-          "title": "Dijeljenje decimalnog broja cijelim brojem"
+          "id": "7-04-002",
+          "oblast": "Ugao i trougao",
+          "title": "Uglovi sa normalnim kracima"
         },
         {
-          "id": "7-02-026",
-          "oblast": "Racionalni brojevi",
-          "title": "Dijeljenje decimalnog broja decimalnim brojem"
+          "id": "7-04-003",
+          "oblast": "Ugao i trougao",
+          "title": "Konstrukcije uglova 60°, 30°, 90° i 45°"
         },
         {
-          "id": "7-02-027",
-          "oblast": "Racionalni brojevi",
-          "title": "Zadaci sa razlomcima i decimalnim brojevima"
+          "id": "7-04-004",
+          "oblast": "Ugao i trougao",
+          "title": "Konstrukcije izvedenih uglova 15°, 75°, 105°, 120° i 135°"
         },
         {
-          "id": "7-02-028",
-          "oblast": "Racionalni brojevi",
-          "title": "Lakši zadaci sa racionalnim brojevima"
+          "id": "7-04-005",
+          "oblast": "Ugao i trougao",
+          "title": "Pojam i elementi trougla"
         },
         {
-          "id": "7-02-029",
-          "oblast": "Racionalni brojevi",
-          "title": "Zadaci srednje težine sa racionalnim brojevima"
+          "id": "7-04-006",
+          "oblast": "Ugao i trougao",
+          "title": "Vrste trouglova prema stranicama"
         },
         {
-          "id": "7-02-030",
-          "oblast": "Racionalni brojevi",
-          "title": "Izazovni zadaci sa racionalnim brojevima"
+          "id": "7-04-007",
+          "oblast": "Ugao i trougao",
+          "title": "Vrste trouglova prema uglovima"
         },
         {
-          "id": "7-02-031",
-          "oblast": "Racionalni brojevi",
-          "title": "Jednačine sa sabiranjem i oduzimanjem racionalnih brojeva"
+          "id": "7-04-008",
+          "oblast": "Ugao i trougao",
+          "title": "Zbir unutrašnjih uglova trougla"
         },
         {
-          "id": "7-02-032",
-          "oblast": "Racionalni brojevi",
-          "title": "Jednačine u kojima je nepoznata u zagradi"
+          "id": "7-04-009",
+          "oblast": "Ugao i trougao",
+          "title": "Vanjski ugao trougla"
         },
         {
-          "id": "7-02-033",
-          "oblast": "Racionalni brojevi",
-          "title": "Nejednačine sa sabiranjem i oduzimanjem racionalnih brojeva"
+          "id": "7-04-010",
+          "oblast": "Ugao i trougao",
+          "title": "Zbir vanjskih uglova trougla"
         },
         {
-          "id": "7-02-034",
-          "oblast": "Racionalni brojevi",
-          "title": "Jednačine sa množenjem i dijeljenjem racionalnih brojeva"
+          "id": "7-04-011",
+          "oblast": "Ugao i trougao",
+          "title": "Odnos stranica i naspramnih uglova"
         },
         {
-          "id": "7-02-035",
-          "oblast": "Racionalni brojevi",
-          "title": "Nejednačine sa množenjem i dijeljenjem racionalnih brojeva"
+          "id": "7-04-012",
+          "oblast": "Ugao i trougao",
+          "title": "Nejednakost trougla"
         },
         {
-          "id": "7-02-036",
-          "oblast": "Racionalni brojevi",
-          "title": "Tekstualni zadaci sa racionalnim brojevima"
+          "id": "7-04-013",
+          "oblast": "Ugao i trougao",
+          "title": "Podudarnost trouglova - SUS"
         },
         {
-          "id": "7-02-037",
-          "oblast": "Racionalni brojevi",
-          "title": "Procenti i procentni iznos"
+          "id": "7-04-014",
+          "oblast": "Ugao i trougao",
+          "title": "Podudarnost trouglova - USU"
         },
         {
-          "id": "7-03-038",
-          "oblast": "Vektori",
-          "title": "Pojam vektora, kolinearni i nula vektor"
+          "id": "7-04-015",
+          "oblast": "Ugao i trougao",
+          "title": "Podudarnost trouglova - SSS"
         },
         {
-          "id": "7-03-039",
-          "oblast": "Vektori",
-          "title": "Jednaki i suprotni vektori"
+          "id": "7-04-016",
+          "oblast": "Ugao i trougao",
+          "title": "Podudarnost trouglova - SSU"
         },
         {
-          "id": "7-03-040",
-          "oblast": "Vektori",
-          "title": "Sabiranje vektora - metode i pravila"
+          "id": "7-04-017",
+          "oblast": "Ugao i trougao",
+          "title": "Primjena podudarnosti u dokazivanju jednakosti elemenata"
         },
         {
-          "id": "7-03-042",
-          "oblast": "Vektori",
-          "title": "Grafičko sabiranje vektora - metoda nadovezivanja"
+          "id": "7-04-018",
+          "oblast": "Ugao i trougao",
+          "title": "Jednakokraki trougao - svojstva"
         },
         {
-          "id": "7-03-043",
-          "oblast": "Vektori",
-          "title": "Grafičko sabiranje vektora - metoda paralelograma"
+          "id": "7-04-019",
+          "oblast": "Ugao i trougao",
+          "title": "Pravougli trougao i posebni uglovi"
         },
         {
-          "id": "7-03-044",
-          "oblast": "Vektori",
-          "title": "Oduzimanje vektora"
+          "id": "7-04-020",
+          "oblast": "Ugao i trougao",
+          "title": "Osnovne konstrukcije trougla"
         },
         {
-          "id": "7-03-045",
-          "oblast": "Vektori",
-          "title": "Množenje vektora prirodnim brojem"
+          "id": "7-04-021",
+          "oblast": "Ugao i trougao",
+          "title": "Simetrale stranica i centar opisane kružnice"
         },
         {
-          "id": "7-03-046",
-          "oblast": "Vektori",
-          "title": "Tipični zadaci - kolinearni vektori"
+          "id": "7-04-022",
+          "oblast": "Ugao i trougao",
+          "title": "Simetrale uglova i centar upisane kružnice"
         },
         {
-          "id": "7-03-047",
-          "oblast": "Vektori",
-          "title": "Tipični zadaci - nekolinearni vektori"
+          "id": "7-04-023",
+          "oblast": "Ugao i trougao",
+          "title": "Visine trougla i ortocentar"
         },
         {
-          "id": "7-04-048",
-          "oblast": "Izometrijska preslikavanja",
-          "title": "Izometrijska preslikavanja - osnove"
+          "id": "7-04-024",
+          "oblast": "Ugao i trougao",
+          "title": "Težišne duži i težište"
         },
         {
-          "id": "7-04-049",
-          "oblast": "Izometrijska preslikavanja",
-          "title": "Osna simetrija"
+          "id": "7-04-025",
+          "oblast": "Ugao i trougao",
+          "title": "Srednja linija trougla"
         },
         {
-          "id": "7-04-050",
-          "oblast": "Izometrijska preslikavanja",
-          "title": "Centralna simetrija"
+          "id": "7-05-001",
+          "oblast": "Četverougao, obim i površina",
+          "title": "Pojam, elementi i vrste četverougla"
         },
         {
-          "id": "7-04-051",
-          "oblast": "Izometrijska preslikavanja",
-          "title": "Translacija"
+          "id": "7-05-002",
+          "oblast": "Četverougao, obim i površina",
+          "title": "Zbir unutrašnjih uglova četverougla"
         },
         {
-          "id": "7-04-052",
-          "oblast": "Izometrijska preslikavanja",
-          "title": "Rotacija"
+          "id": "7-05-003",
+          "oblast": "Četverougao, obim i površina",
+          "title": "Zbir vanjskih uglova četverougla"
         },
         {
-          "id": "7-05-054",
-          "oblast": "Operacije sa uglovima",
-          "title": "Sabiranje uglova u stepenima, minutama i sekundama"
+          "id": "7-05-004",
+          "oblast": "Četverougao, obim i površina",
+          "title": "Paralelogram - definicija i svojstva"
         },
         {
-          "id": "7-05-055",
-          "oblast": "Operacije sa uglovima",
-          "title": "Oduzimanje uglova u stepenima, minutama i sekundama"
+          "id": "7-05-005",
+          "oblast": "Četverougao, obim i površina",
+          "title": "Uslovi da je četverougao paralelogram"
         },
         {
-          "id": "7-05-056",
-          "oblast": "Operacije sa uglovima",
-          "title": "Množenje ugla prirodnim brojem"
+          "id": "7-05-006",
+          "oblast": "Četverougao, obim i površina",
+          "title": "Pravougaonik - svojstva"
         },
         {
-          "id": "7-05-057",
-          "oblast": "Operacije sa uglovima",
-          "title": "Dijeljenje ugla prirodnim brojem"
+          "id": "7-05-007",
+          "oblast": "Četverougao, obim i površina",
+          "title": "Romb - svojstva"
         },
         {
-          "id": "7-05-058",
-          "oblast": "Operacije sa uglovima",
-          "title": "Uglovi sa paralelnim i normalnim kracima"
+          "id": "7-05-008",
+          "oblast": "Četverougao, obim i površina",
+          "title": "Kvadrat - svojstva"
         },
         {
-          "id": "7-05-059",
-          "oblast": "Operacije sa uglovima",
-          "title": "Uglovi uz presječnicu paralelnih pravih"
+          "id": "7-05-009",
+          "oblast": "Četverougao, obim i površina",
+          "title": "Konstrukcije paralelograma"
         },
         {
-          "id": "7-06-060",
-          "oblast": "Trougao",
-          "title": "Elementi i vrste trougla"
+          "id": "7-05-010",
+          "oblast": "Četverougao, obim i površina",
+          "title": "Trapez i vrste trapeza"
         },
         {
-          "id": "7-06-061",
-          "oblast": "Trougao",
-          "title": "Unutrašnji i spoljašnji uglovi trougla"
+          "id": "7-05-011",
+          "oblast": "Četverougao, obim i površina",
+          "title": "Svojstva jednakokrakog trapeza"
         },
         {
-          "id": "7-06-062",
-          "oblast": "Trougao",
-          "title": "Nepoznati uglovi trougla"
+          "id": "7-05-012",
+          "oblast": "Četverougao, obim i površina",
+          "title": "Srednja linija trapeza"
         },
         {
-          "id": "7-06-063",
-          "oblast": "Trougao",
-          "title": "Odnos stranica i uglova u trouglu"
+          "id": "7-05-013",
+          "oblast": "Četverougao, obim i površina",
+          "title": "Konstrukcije trapeza"
         },
         {
-          "id": "7-06-064",
-          "oblast": "Trougao",
-          "title": "Odnos stranica u trouglu"
+          "id": "7-05-014",
+          "oblast": "Četverougao, obim i površina",
+          "title": "Deltoid - definicija i svojstva"
         },
         {
-          "id": "7-06-065",
-          "oblast": "Trougao",
-          "title": "Podudarnost trouglova - stavovi"
+          "id": "7-05-015",
+          "oblast": "Četverougao, obim i površina",
+          "title": "Konstrukcije deltoida"
         },
         {
-          "id": "7-06-066",
-          "oblast": "Trougao",
-          "title": "Prenošenje/kopiranje trougla"
+          "id": "7-05-016",
+          "oblast": "Četverougao, obim i površina",
+          "title": "Obim trougla"
         },
         {
-          "id": "7-06-067",
-          "oblast": "Trougao",
-          "title": "Konstrukcija jednakostraničnog trougla"
-        },
-        {
-          "id": "7-06-068",
-          "oblast": "Trougao",
-          "title": "Konstrukcija upisane kružnice trougla"
-        },
-        {
-          "id": "7-06-069",
-          "oblast": "Trougao",
-          "title": "Konstrukcija opisane kružnice trougla"
-        },
-        {
-          "id": "7-06-070",
-          "oblast": "Trougao",
-          "title": "Značajne tačke trougla"
-        },
-        {
-          "id": "7-06-073",
-          "oblast": "Trougao",
-          "title": "Centralni i periferijski ugao"
-        },
-        {
-          "id": "7-06-074",
-          "oblast": "Trougao",
-          "title": "Prava i kružnica - sekanta, tangenta, centralna udaljenost"
-        },
-        {
-          "id": "7-06-075",
-          "oblast": "Trougao",
-          "title": "Međusobni odnosi dvije kružnice"
-        },
-        {
-          "id": "7-06-078",
-          "oblast": "Trougao",
-          "title": "Površina trougla"
-        },
-        {
-          "id": "7-07-079",
-          "oblast": "Četverougao",
-          "title": "Osnovni elementi i vrste četverouglova"
-        },
-        {
-          "id": "7-07-080",
-          "oblast": "Četverougao",
-          "title": "Računanje uglova kod četverougla"
-        },
-        {
-          "id": "7-07-081",
-          "oblast": "Četverougao",
-          "title": "Paralelogram i njegova svojstva"
-        },
-        {
-          "id": "7-07-082",
-          "oblast": "Četverougao",
-          "title": "Pravougaonik, kvadrat i romb"
-        },
-        {
-          "id": "7-07-085",
-          "oblast": "Četverougao",
+          "id": "7-05-017",
+          "oblast": "Četverougao, obim i površina",
           "title": "Obim četverougla"
         },
         {
-          "id": "7-07-086",
-          "oblast": "Četverougao",
-          "title": "Formule i najvažnije o četverouglovima"
+          "id": "7-05-018",
+          "oblast": "Četverougao, obim i površina",
+          "title": "Mjerne jedinice za površinu"
         },
         {
-          "id": "7-07-087",
-          "oblast": "Četverougao",
-          "title": "Površina i obim pravougaonika"
+          "id": "7-05-019",
+          "oblast": "Četverougao, obim i površina",
+          "title": "Površina pravougaonika i kvadrata - obnova"
         },
         {
-          "id": "7-07-089",
-          "oblast": "Četverougao",
+          "id": "7-05-020",
+          "oblast": "Četverougao, obim i površina",
           "title": "Površina paralelograma"
         },
         {
-          "id": "7-07-090",
-          "oblast": "Četverougao",
-          "title": "Trapez, vrste i srednja linija trapeza"
+          "id": "7-05-021",
+          "oblast": "Četverougao, obim i površina",
+          "title": "Površina trougla"
         },
         {
-          "id": "7-07-091",
-          "oblast": "Četverougao",
+          "id": "7-05-022",
+          "oblast": "Četverougao, obim i površina",
           "title": "Površina trapeza"
         },
         {
-          "id": "7-07-092",
-          "oblast": "Četverougao",
-          "title": "Deltoid i njegova svojstva"
+          "id": "7-05-023",
+          "oblast": "Četverougao, obim i površina",
+          "title": "Površina romba i deltoida preko dijagonala"
         },
         {
-          "id": "7-07-093",
-          "oblast": "Četverougao",
-          "title": "Konstrukcije četverouglova"
-        },
-        {
-          "id": "7-07-094",
-          "oblast": "Četverougao",
+          "id": "7-05-024",
+          "oblast": "Četverougao, obim i površina",
           "title": "Površina četverougla sa normalnim dijagonalama"
         },
         {
-          "id": "7-08-096",
-          "oblast": "Osnovne geometrijske konstrukcije i postupci",
-          "title": "Kako povući normalu na pravu trouglom i linijarom"
+          "id": "7-05-025",
+          "oblast": "Četverougao, obim i površina",
+          "title": "Složene figure i primjena obima/površine"
         },
         {
-          "id": "7-08-097",
-          "oblast": "Osnovne geometrijske konstrukcije i postupci",
-          "title": "Kako konstruisati normalu na pravu šestarom i linijarom"
+          "id": "7-06-001",
+          "oblast": "Skupovi tačaka, kružnica i krug",
+          "title": "Tačka, prava, ravan, poluprava i duž"
         },
         {
-          "id": "7-08-098",
-          "oblast": "Osnovne geometrijske konstrukcije i postupci",
-          "title": "Normala na tačku na pravoj"
+          "id": "7-06-002",
+          "oblast": "Skupovi tačaka, kružnica i krug",
+          "title": "Geometrijske figure kao skupovi tačaka"
         },
         {
-          "id": "7-08-099",
-          "oblast": "Osnovne geometrijske konstrukcije i postupci",
-          "title": "Konstrukcija ugla od 60 stepeni"
+          "id": "7-06-003",
+          "oblast": "Skupovi tačaka, kružnica i krug",
+          "title": "Izlomljena linija"
         },
         {
-          "id": "7-08-100",
-          "oblast": "Osnovne geometrijske konstrukcije i postupci",
-          "title": "Konstrukcija ugla od 30 stepeni"
+          "id": "7-06-004",
+          "oblast": "Skupovi tačaka, kružnica i krug",
+          "title": "Mnogougao/mnogokut"
         },
         {
-          "id": "7-08-101",
-          "oblast": "Osnovne geometrijske konstrukcije i postupci",
-          "title": "Konstrukcija uglova 45°, 75°, 90°, 120° i 135°"
+          "id": "7-06-005",
+          "oblast": "Skupovi tačaka, kružnica i krug",
+          "title": "Kružnica i krug"
         },
         {
-          "id": "7-08-102",
-          "oblast": "Osnovne geometrijske konstrukcije i postupci",
-          "title": "Prenošenje ugla - konstrukcija jednakog ugla"
+          "id": "7-06-006",
+          "oblast": "Skupovi tačaka, kružnica i krug",
+          "title": "Centar, poluprečnik/polumjer i prečnik/promjer"
         },
         {
-          "id": "7-08-103",
-          "oblast": "Osnovne geometrijske konstrukcije i postupci",
-          "title": "Grafičko sabiranje uglova"
+          "id": "7-06-007",
+          "oblast": "Skupovi tačaka, kružnica i krug",
+          "title": "Kružni luk i tetiva"
         },
         {
-          "id": "7-08-104",
-          "oblast": "Osnovne geometrijske konstrukcije i postupci",
-          "title": "Grafičko oduzimanje uglova"
+          "id": "7-06-008",
+          "oblast": "Skupovi tačaka, kružnica i krug",
+          "title": "Odnos prave i kružnice: sječica/sekanta i tangenta"
         },
         {
-          "id": "7-08-105",
-          "oblast": "Osnovne geometrijske konstrukcije i postupci",
-          "title": "Konstrukcija simetrale duži"
+          "id": "7-06-009",
+          "oblast": "Skupovi tačaka, kružnica i krug",
+          "title": "Konstrukcija tangente na kružnicu"
         },
         {
-          "id": "7-08-106",
-          "oblast": "Osnovne geometrijske konstrukcije i postupci",
-          "title": "Konstrukcija simetrale ugla"
+          "id": "7-06-010",
+          "oblast": "Skupovi tačaka, kružnica i krug",
+          "title": "Odnos dvije kružnice"
+        },
+        {
+          "id": "7-06-011",
+          "oblast": "Skupovi tačaka, kružnica i krug",
+          "title": "Kružni isječak, odsječak i prsten"
         }
       ]
     },
     "8": {
       "oblast_order": [
-        "Stepeni",
-        "Vektori",
-        "Realni brojevi",
-        "Pitagorina teorema",
-        "Cijeli racionalni izrazi (polinomi)",
-        "Algebarski razlomci",
-        "Kružnica, krug",
-        "Talesova teorema i sličnost trouglova",
-        "Razmjere i proporcije",
-        "Pravougli koordinatni sistem i grafik linearne funkcije",
-        "Mnogougao",
-        "Geometrijska tijela"
+        "Realni brojevi, korijeni i stepeni",
+        "Koordinatni sistem i linearna funkcija",
+        "Proporcionalnost, Talesova teorema i sličnost",
+        "Pitagorina teorema i primjene u ravni",
+        "Prizme, piramide, površina i zapremina",
+        "Podaci i vjerovatnoća",
+        "Cijeli racionalni izrazi i polinomi",
+        "Mnogougao, kružnica i krug",
+        "Vektori"
       ],
       "lessons": [
         {
           "id": "8-01-001",
-          "oblast": "Stepeni",
-          "title": "Pravila i pojašnjenja stepeni"
+          "oblast": "Realni brojevi, korijeni i stepeni",
+          "title": "Skupovi N, Z, Q, I i R i odnosi među njima"
+        },
+        {
+          "id": "8-01-002",
+          "oblast": "Realni brojevi, korijeni i stepeni",
+          "title": "Iracionalni brojevi i beskonačni neperiodični decimalni zapis"
+        },
+        {
+          "id": "8-01-003",
+          "oblast": "Realni brojevi, korijeni i stepeni",
+          "title": "Realni brojevi i brojevna osa"
+        },
+        {
+          "id": "8-01-004",
+          "oblast": "Realni brojevi, korijeni i stepeni",
+          "title": "Uređenost i poređenje realnih brojeva"
+        },
+        {
+          "id": "8-01-005",
+          "oblast": "Realni brojevi, korijeni i stepeni",
+          "title": "Apsolutna vrijednost realnog broja"
+        },
+        {
+          "id": "8-01-006",
+          "oblast": "Realni brojevi, korijeni i stepeni",
+          "title": "Kvadrat racionalnog broja"
+        },
+        {
+          "id": "8-01-007",
+          "oblast": "Realni brojevi, korijeni i stepeni",
+          "title": "Savršeni kvadrati i procjena"
+        },
+        {
+          "id": "8-01-008",
+          "oblast": "Realni brojevi, korijeni i stepeni",
+          "title": "Kvadratni korijen nenegativnog racionalnog broja"
+        },
+        {
+          "id": "8-01-009",
+          "oblast": "Realni brojevi, korijeni i stepeni",
+          "title": "Jednačina x²=a, a≥0"
+        },
+        {
+          "id": "8-01-010",
+          "oblast": "Realni brojevi, korijeni i stepeni",
+          "title": "Korijen proizvoda i količnika"
+        },
+        {
+          "id": "8-01-011",
+          "oblast": "Realni brojevi, korijeni i stepeni",
+          "title": "Približne vrijednosti kvadratnog korijena"
+        },
+        {
+          "id": "8-01-012",
+          "oblast": "Realni brojevi, korijeni i stepeni",
+          "title": "Računske operacije u skupu R"
+        },
+        {
+          "id": "8-01-013",
+          "oblast": "Realni brojevi, korijeni i stepeni",
+          "title": "Stepen sa cijelim izložiocem"
+        },
+        {
+          "id": "8-01-014",
+          "oblast": "Realni brojevi, korijeni i stepeni",
+          "title": "Nulti i negativni eksponent"
+        },
+        {
+          "id": "8-01-015",
+          "oblast": "Realni brojevi, korijeni i stepeni",
+          "title": "Množenje i dijeljenje stepena jednakih osnova"
+        },
+        {
+          "id": "8-01-016",
+          "oblast": "Realni brojevi, korijeni i stepeni",
+          "title": "Stepen proizvoda, količnika i stepena"
+        },
+        {
+          "id": "8-01-017",
+          "oblast": "Realni brojevi, korijeni i stepeni",
+          "title": "Naučni zapis broja"
+        },
+        {
+          "id": "8-02-001",
+          "oblast": "Koordinatni sistem i linearna funkcija",
+          "title": "Pravougli koordinatni sistem, ose i kvadranti"
+        },
+        {
+          "id": "8-02-002",
+          "oblast": "Koordinatni sistem i linearna funkcija",
+          "title": "Koordinate tačke i uređeni par"
+        },
+        {
+          "id": "8-02-003",
+          "oblast": "Koordinatni sistem i linearna funkcija",
+          "title": "Crtanje i očitavanje tačaka"
         },
         {
           "id": "8-02-004",
-          "oblast": "Vektori",
-          "title": "O vektorima, kolinearni i nulti vektor"
+          "oblast": "Koordinatni sistem i linearna funkcija",
+          "title": "Udaljenost između dvije tačke"
         },
         {
           "id": "8-02-005",
-          "oblast": "Vektori",
-          "title": "Jednaki i suprotni vektori"
+          "oblast": "Koordinatni sistem i linearna funkcija",
+          "title": "Pojam linearne funkcije y=kx+n"
         },
         {
           "id": "8-02-006",
-          "oblast": "Vektori",
-          "title": "Sabiranje vektora - metode i pravila"
+          "oblast": "Koordinatni sistem i linearna funkcija",
+          "title": "Tabela vrijednosti linearne funkcije"
+        },
+        {
+          "id": "8-02-007",
+          "oblast": "Koordinatni sistem i linearna funkcija",
+          "title": "Grafik linearne funkcije"
         },
         {
           "id": "8-02-008",
-          "oblast": "Vektori",
-          "title": "Kako grafički sabrati dva vektora - Metoda nadovezivanja"
+          "oblast": "Koordinatni sistem i linearna funkcija",
+          "title": "Geometrijsko značenje koeficijenta k"
         },
         {
           "id": "8-02-009",
-          "oblast": "Vektori",
-          "title": "Kako grafički sabrati dva vektora - Metoda paralelograma"
+          "oblast": "Koordinatni sistem i linearna funkcija",
+          "title": "Geometrijsko značenje slobodnog člana n"
         },
         {
           "id": "8-02-010",
-          "oblast": "Vektori",
-          "title": "Oduzimanje vektora"
+          "oblast": "Koordinatni sistem i linearna funkcija",
+          "title": "Nula linearne funkcije"
         },
         {
           "id": "8-02-011",
-          "oblast": "Vektori",
-          "title": "Množenje vektora prirodnim brojem"
+          "oblast": "Koordinatni sistem i linearna funkcija",
+          "title": "Znak i tok linearne funkcije"
         },
         {
-          "id": "8-03-014",
-          "oblast": "Realni brojevi",
-          "title": "Iracionalni brojevi i skup realnih brojeva"
+          "id": "8-02-012",
+          "oblast": "Koordinatni sistem i linearna funkcija",
+          "title": "Eksplicitni i implicitni oblik prave"
         },
         {
-          "id": "8-03-015",
-          "oblast": "Realni brojevi",
-          "title": "Korijen iz a na kvadrat je apsolutno a"
+          "id": "8-02-013",
+          "oblast": "Koordinatni sistem i linearna funkcija",
+          "title": "Modeliranje problemske situacije linearnom funkcijom"
         },
         {
-          "id": "8-03-016",
-          "oblast": "Realni brojevi",
-          "title": "Operacije sa realnim brojevima – pravila"
+          "id": "8-02-014",
+          "oblast": "Koordinatni sistem i linearna funkcija",
+          "title": "Paralelne i presječne prave preko koeficijenta k"
         },
         {
-          "id": "8-03-017",
-          "oblast": "Realni brojevi",
-          "title": "Racionalni broj i kvadrat racionalnog broja"
+          "id": "8-03-001",
+          "oblast": "Proporcionalnost, Talesova teorema i sličnost",
+          "title": "Razmjera i omjer veličina"
         },
         {
-          "id": "8-03-018",
-          "oblast": "Realni brojevi",
-          "title": "KORIJENI - Pravila za računske operacije"
+          "id": "8-03-002",
+          "oblast": "Proporcionalnost, Talesova teorema i sličnost",
+          "title": "Proporcija i osnovno svojstvo"
         },
         {
-          "id": "8-03-019",
-          "oblast": "Realni brojevi",
-          "title": "Rješavanje jednačine x² = a i kvadratni korijen racionalnog broja"
+          "id": "8-03-003",
+          "oblast": "Proporcionalnost, Talesova teorema i sličnost",
+          "title": "Nepoznati član proporcije"
         },
         {
-          "id": "8-03-021",
-          "oblast": "Realni brojevi",
-          "title": "Uređenost u skupu realnih brojeva"
+          "id": "8-03-004",
+          "oblast": "Proporcionalnost, Talesova teorema i sličnost",
+          "title": "Prepoznavanje direktne proporcionalnosti"
         },
         {
-          "id": "8-03-022",
-          "oblast": "Realni brojevi",
-          "title": "Zaokruživanje - određivanje približne vrijednosti realnog broja"
+          "id": "8-03-005",
+          "oblast": "Proporcionalnost, Talesova teorema i sličnost",
+          "title": "Prepoznavanje obrnute proporcionalnosti"
         },
         {
-          "id": "8-03-023",
-          "oblast": "Realni brojevi",
-          "title": "Realni brojevi (izraz)"
+          "id": "8-03-006",
+          "oblast": "Proporcionalnost, Talesova teorema i sličnost",
+          "title": "Funkcija direktne proporcionalnosti y=kx"
         },
         {
-          "id": "8-04-025",
-          "oblast": "Pitagorina teorema",
-          "title": "Pitagorina teorema – osnovno"
+          "id": "8-03-007",
+          "oblast": "Proporcionalnost, Talesova teorema i sličnost",
+          "title": "Funkcija obrnute proporcionalnosti y=k/x"
         },
         {
-          "id": "8-04-026",
-          "oblast": "Pitagorina teorema",
-          "title": "FORMULE - Primjena Pitagorine teoreme"
+          "id": "8-03-008",
+          "oblast": "Proporcionalnost, Talesova teorema i sličnost",
+          "title": "Proporcionalne duži"
         },
         {
-          "id": "8-04-027",
-          "oblast": "Pitagorina teorema",
-          "title": "Primjena pitagorine teoreme kod kvadrata i pravougaonika"
-        },
-        {
-          "id": "8-04-029",
-          "oblast": "Pitagorina teorema",
-          "title": "Primjena pitagorine teoreme kod jednakostraničnog trougla"
-        },
-        {
-          "id": "8-04-030",
-          "oblast": "Pitagorina teorema",
-          "title": "Primjena pitagorine teoreme kod jednakokrakog trougla"
-        },
-        {
-          "id": "8-04-031",
-          "oblast": "Pitagorina teorema",
-          "title": "Primjena PITAGORINE TEOREME kod ROMBA"
-        },
-        {
-          "id": "8-04-033",
-          "oblast": "Pitagorina teorema",
-          "title": "Primjena pitagorine teoreme kod jednakokrakog trapeza"
-        },
-        {
-          "id": "8-04-034",
-          "oblast": "Pitagorina teorema",
-          "title": "Primjena pitagorine teoreme kod pravouglog trapeza"
-        },
-        {
-          "id": "8-04-036",
-          "oblast": "Pitagorina teorema",
-          "title": "Primjena PITAGORINE TEOREME kod KRUGA"
-        },
-        {
-          "id": "8-04-037",
-          "oblast": "Pitagorina teorema",
-          "title": "Primjena Pitagorine teoreme u KONSTRUKCIJAMA"
-        },
-        {
-          "id": "8-05-038",
-          "oblast": "Cijeli racionalni izrazi (polinomi)",
-          "title": "Šta je to POLINOM, a šta nije"
-        },
-        {
-          "id": "8-05-039",
-          "oblast": "Cijeli racionalni izrazi (polinomi)",
-          "title": "Slični monomi i stepen polinoma"
-        },
-        {
-          "id": "8-05-041",
-          "oblast": "Cijeli racionalni izrazi (polinomi)",
-          "title": "Kako se \"Riješiti zagrade\""
-        },
-        {
-          "id": "8-05-042",
-          "oblast": "Cijeli racionalni izrazi (polinomi)",
-          "title": "SABIRANJE POLINOMA (u 3 koraka)"
-        },
-        {
-          "id": "8-05-043",
-          "oblast": "Cijeli racionalni izrazi (polinomi)",
-          "title": "ODUZIMANJE POLINOMA (u 3 koraka)"
-        },
-        {
-          "id": "8-05-044",
-          "oblast": "Cijeli racionalni izrazi (polinomi)",
-          "title": "Množenje monoma sa polinomom"
-        },
-        {
-          "id": "8-05-045",
-          "oblast": "Cijeli racionalni izrazi (polinomi)",
-          "title": "Množenje polinoma sa polinomom"
-        },
-        {
-          "id": "8-05-047",
-          "oblast": "Cijeli racionalni izrazi (polinomi)",
-          "title": "Kvadrat binoma"
-        },
-        {
-          "id": "8-05-048",
-          "oblast": "Cijeli racionalni izrazi (polinomi)",
-          "title": "Razlika kvadrata"
-        },
-        {
-          "id": "8-05-049",
-          "oblast": "Cijeli racionalni izrazi (polinomi)",
-          "title": "Rastavljanje polinoma na faktore (činioce) primjenom zakona distributivnosti (izvlačenje zajedničkog faktora ispred zagrade)"
-        },
-        {
-          "id": "8-05-050",
-          "oblast": "Cijeli racionalni izrazi (polinomi)",
-          "title": "Rastavljanje polinoma na faktore (činioce) putem formula"
-        },
-        {
-          "id": "8-05-051",
-          "oblast": "Cijeli racionalni izrazi (polinomi)",
-          "title": "Rastavljanje polinoma na faktore (činioce) - metoda grupisanja članova"
-        },
-        {
-          "id": "8-05-052",
-          "oblast": "Cijeli racionalni izrazi (polinomi)",
-          "title": "Rastavljanje kvadratnog trinoma"
-        },
-        {
-          "id": "8-05-053",
-          "oblast": "Cijeli racionalni izrazi (polinomi)",
-          "title": "Rješavanje jednačina"
-        },
-        {
-          "id": "8-06-055",
-          "oblast": "Algebarski razlomci",
-          "title": "Definiciono područje (DOMENA) i nula razlomljene racionalne funkcije"
-        },
-        {
-          "id": "8-06-056",
-          "oblast": "Algebarski razlomci",
-          "title": "Definiciono područje (domena)"
-        },
-        {
-          "id": "8-06-058",
-          "oblast": "Algebarski razlomci",
-          "title": "Vrijednost izraza"
-        },
-        {
-          "id": "8-06-059",
-          "oblast": "Algebarski razlomci",
-          "title": "Proširivanje algebarskih razlomaka"
-        },
-        {
-          "id": "8-06-060",
-          "oblast": "Algebarski razlomci",
-          "title": "Skraćivanje algebarskih razlomaka (princip rada)"
-        },
-        {
-          "id": "8-06-062",
-          "oblast": "Algebarski razlomci",
-          "title": "Sabiranje i oduzimanje algebarskih razlomaka"
-        },
-        {
-          "id": "8-06-063",
-          "oblast": "Algebarski razlomci",
-          "title": "Množenje algebarskih razlomaka"
-        },
-        {
-          "id": "8-06-064",
-          "oblast": "Algebarski razlomci",
-          "title": "Dijeljenje algebarskih razlomaka"
-        },
-        {
-          "id": "8-06-065",
-          "oblast": "Algebarski razlomci",
-          "title": "Kako skraćivati algebarske razlomke"
-        },
-        {
-          "id": "8-06-066",
-          "oblast": "Algebarski razlomci",
-          "title": "Skraćivanje kod izraza"
-        },
-        {
-          "id": "8-07-067",
-          "oblast": "Kružnica, krug",
-          "title": "PRAVA I KRUŽNICA (centralna udaljenost prave, sekanta, tangenta)"
-        },
-        {
-          "id": "8-07-068",
-          "oblast": "Kružnica, krug",
-          "title": "Kako konstrusati tangentu na kružnicu (zadana tačka na kružnici)"
-        },
-        {
-          "id": "8-07-069",
-          "oblast": "Kružnica, krug",
-          "title": "Kako konstruisati tangentu na kružnicu (zadana tačka van kružnice)"
-        },
-        {
-          "id": "8-07-070",
-          "oblast": "Kružnica, krug",
-          "title": "Međusobni odnosi dvije kružnice"
-        },
-        {
-          "id": "8-07-071",
-          "oblast": "Kružnica, krug",
-          "title": "Rješavanje tipičnih zadataka TANGENTA NA KRUŽNICU"
-        },
-        {
-          "id": "8-08-075",
-          "oblast": "Talesova teorema i sličnost trouglova",
+          "id": "8-03-009",
+          "oblast": "Proporcionalnost, Talesova teorema i sličnost",
           "title": "Talesova teorema"
         },
         {
-          "id": "8-08-076",
-          "oblast": "Talesova teorema i sličnost trouglova",
-          "title": "Podjela duži na jednake dijelove ili u nekoj razmjeri"
+          "id": "8-03-010",
+          "oblast": "Proporcionalnost, Talesova teorema i sličnost",
+          "title": "Četvrta geometrijska proporcionala"
         },
         {
-          "id": "8-08-078",
-          "oblast": "Talesova teorema i sličnost trouglova",
-          "title": "SLIČNOST TROUGLOVA – osnove"
+          "id": "8-03-011",
+          "oblast": "Proporcionalnost, Talesova teorema i sličnost",
+          "title": "Dijeljenje duži na jednake dijelove"
         },
         {
-          "id": "8-08-079",
-          "oblast": "Talesova teorema i sličnost trouglova",
-          "title": "Stavovi o sličnosti trouglova"
+          "id": "8-03-012",
+          "oblast": "Proporcionalnost, Talesova teorema i sličnost",
+          "title": "Dijeljenje duži u datoj razmjeri"
         },
         {
-          "id": "8-08-080",
-          "oblast": "Talesova teorema i sličnost trouglova",
-          "title": "Obimi i površine sličnih geometrijskih likova"
+          "id": "8-03-013",
+          "oblast": "Proporcionalnost, Talesova teorema i sličnost",
+          "title": "Pojam sličnosti i koeficijent sličnosti"
         },
         {
-          "id": "8-09-082",
-          "oblast": "Razmjere i proporcije",
-          "title": "Razmjera (Omjer, Mjerilo)"
+          "id": "8-03-014",
+          "oblast": "Proporcionalnost, Talesova teorema i sličnost",
+          "title": "Stavovi sličnosti trouglova"
         },
         {
-          "id": "8-09-083",
-          "oblast": "Razmjere i proporcije",
-          "title": "Proporcije"
+          "id": "8-03-015",
+          "oblast": "Proporcionalnost, Talesova teorema i sličnost",
+          "title": "Dužine i obimi sličnih trouglova"
         },
         {
-          "id": "8-09-084",
-          "oblast": "Razmjere i proporcije",
-          "title": "Nepoznat član proporcije"
+          "id": "8-03-016",
+          "oblast": "Proporcionalnost, Talesova teorema i sličnost",
+          "title": "Površine sličnih trouglova"
         },
         {
-          "id": "8-09-085",
-          "oblast": "Razmjere i proporcije",
-          "title": "Direktna i obrnuta proporcionalnost"
+          "id": "8-03-017",
+          "oblast": "Proporcionalnost, Talesova teorema i sličnost",
+          "title": "Procentni iznos, osnovica i stopa"
         },
         {
-          "id": "8-09-088",
-          "oblast": "Razmjere i proporcije",
-          "title": "Produžena ili proširena proporcija"
+          "id": "8-03-018",
+          "oblast": "Proporcionalnost, Talesova teorema i sličnost",
+          "title": "Određivanje osnovice ili procentne stope"
         },
         {
-          "id": "8-09-089",
-          "oblast": "Razmjere i proporcije",
-          "title": "Procenat - postotak – procent"
+          "id": "8-03-019",
+          "oblast": "Proporcionalnost, Talesova teorema i sličnost",
+          "title": "Jednostavni kamatni račun"
         },
         {
-          "id": "8-09-090",
-          "oblast": "Razmjere i proporcije",
-          "title": "Procentni (postotni) račun"
+          "id": "8-03-020",
+          "oblast": "Proporcionalnost, Talesova teorema i sličnost",
+          "title": "Proporcionalna podjela"
         },
         {
-          "id": "8-09-091",
-          "oblast": "Razmjere i proporcije",
-          "title": "Račun podjele"
+          "id": "8-04-001",
+          "oblast": "Pitagorina teorema i primjene u ravni",
+          "title": "Pitagorina teorema - formulacija"
         },
         {
-          "id": "8-09-092",
-          "oblast": "Razmjere i proporcije",
-          "title": "Račun miješanja"
+          "id": "8-04-002",
+          "oblast": "Pitagorina teorema i primjene u ravni",
+          "title": "Obrat Pitagorine teoreme"
         },
         {
-          "id": "8-09-093",
-          "oblast": "Razmjere i proporcije",
-          "title": "Kamatni (interesni) račun"
+          "id": "8-04-003",
+          "oblast": "Pitagorina teorema i primjene u ravni",
+          "title": "Određivanje nepoznate katete"
         },
         {
-          "id": "8-10-094",
-          "oblast": "Pravougli koordinatni sistem i grafik linearne funkcije",
-          "title": "Pravougli (dekartov) koordinatni sistem"
+          "id": "8-04-004",
+          "oblast": "Pitagorina teorema i primjene u ravni",
+          "title": "Dijagonala kvadrata"
         },
         {
-          "id": "8-10-095",
-          "oblast": "Pravougli koordinatni sistem i grafik linearne funkcije",
-          "title": "Kvadranti"
+          "id": "8-04-005",
+          "oblast": "Pitagorina teorema i primjene u ravni",
+          "title": "Dijagonala pravougaonika"
         },
         {
-          "id": "8-10-096",
-          "oblast": "Pravougli koordinatni sistem i grafik linearne funkcije",
-          "title": "Izračunavanje udaljenosti između dvije tačke"
+          "id": "8-04-006",
+          "oblast": "Pitagorina teorema i primjene u ravni",
+          "title": "Visina jednakokrakog trougla"
         },
         {
-          "id": "8-10-097",
-          "oblast": "Pravougli koordinatni sistem i grafik linearne funkcije",
-          "title": "Prikazivanje podataka putem dijagrama"
+          "id": "8-04-007",
+          "oblast": "Pitagorina teorema i primjene u ravni",
+          "title": "Visina jednakostraničnog trougla"
         },
         {
-          "id": "8-10-098",
-          "oblast": "Pravougli koordinatni sistem i grafik linearne funkcije",
-          "title": "Eksplicitni i implicitni oblik linearne funkcije"
+          "id": "8-04-008",
+          "oblast": "Pitagorina teorema i primjene u ravni",
+          "title": "Površina jednakostraničnog trougla"
         },
         {
-          "id": "8-10-099",
-          "oblast": "Pravougli koordinatni sistem i grafik linearne funkcije",
-          "title": "Grafik linearne funkcije - direktna proporcionalnost"
+          "id": "8-04-009",
+          "oblast": "Pitagorina teorema i primjene u ravni",
+          "title": "Primjena na romb"
         },
         {
-          "id": "8-10-101",
-          "oblast": "Pravougli koordinatni sistem i grafik linearne funkcije",
-          "title": "ZAVISNOST GRAFOVA LINEARNIH FUNKCIJA OD KOEFICIJENTA k - opadajuća, rastuća, paralelna"
+          "id": "8-04-010",
+          "oblast": "Pitagorina teorema i primjene u ravni",
+          "title": "Primjena na jednakokraki trapez"
         },
         {
-          "id": "8-10-102",
-          "oblast": "Pravougli koordinatni sistem i grafik linearne funkcije",
-          "title": "Nula i znak linearne funkcije"
+          "id": "8-04-011",
+          "oblast": "Pitagorina teorema i primjene u ravni",
+          "title": "Primjena na pravougli trapez"
         },
         {
-          "id": "8-10-103",
-          "oblast": "Pravougli koordinatni sistem i grafik linearne funkcije",
-          "title": "Paralelne prave, Opadajuća i Rastuća funkcija"
+          "id": "8-04-012",
+          "oblast": "Pitagorina teorema i primjene u ravni",
+          "title": "Tetiva i udaljenost od centra"
         },
         {
-          "id": "8-10-104",
-          "oblast": "Pravougli koordinatni sistem i grafik linearne funkcije",
-          "title": "Nula funkcije; presjecanje x i y osa; tačka na grafu funkcije"
+          "id": "8-04-013",
+          "oblast": "Pitagorina teorema i primjene u ravni",
+          "title": "Udaljenost tačaka u koordinatnom sistemu"
         },
         {
-          "id": "8-10-105",
-          "oblast": "Pravougli koordinatni sistem i grafik linearne funkcije",
-          "title": "Grafik funkcije obrnute (indirektne) proporcionalnosti"
+          "id": "8-04-014",
+          "oblast": "Pitagorina teorema i primjene u ravni",
+          "title": "Konstrukcija iracionalnih tačaka na osi"
         },
         {
-          "id": "8-11-106",
-          "oblast": "Mnogougao",
-          "title": "Šta je MNOGOUGAO, a šta nije"
+          "id": "8-04-015",
+          "oblast": "Pitagorina teorema i primjene u ravni",
+          "title": "Konstruktivni zadaci sa površinama kvadrata"
         },
         {
-          "id": "8-11-107",
-          "oblast": "Mnogougao",
-          "title": "Koji su pravilni , a koji nepravilni mnogouglovi"
+          "id": "8-04-016",
+          "oblast": "Pitagorina teorema i primjene u ravni",
+          "title": "Praktični problemski zadaci"
         },
         {
-          "id": "8-11-108",
-          "oblast": "Mnogougao",
+          "id": "8-05-001",
+          "oblast": "Prizme, piramide, površina i zapremina",
+          "title": "Rogalj i njegovi elementi"
+        },
+        {
+          "id": "8-05-002",
+          "oblast": "Prizme, piramide, površina i zapremina",
+          "title": "Poliedar i osnovni elementi"
+        },
+        {
+          "id": "8-05-003",
+          "oblast": "Prizme, piramide, površina i zapremina",
+          "title": "Prizma - baze, omotač, ivice i visina"
+        },
+        {
+          "id": "8-05-004",
+          "oblast": "Prizme, piramide, površina i zapremina",
+          "title": "Piramida - baza, bočne strane, vrh i visina"
+        },
+        {
+          "id": "8-05-005",
+          "oblast": "Prizme, piramide, površina i zapremina",
+          "title": "Pravilna uspravna trostrana prizma"
+        },
+        {
+          "id": "8-05-006",
+          "oblast": "Prizme, piramide, površina i zapremina",
+          "title": "Pravilna uspravna četverostrana prizma"
+        },
+        {
+          "id": "8-05-007",
+          "oblast": "Prizme, piramide, površina i zapremina",
+          "title": "Pravilna uspravna trostrana piramida"
+        },
+        {
+          "id": "8-05-008",
+          "oblast": "Prizme, piramide, površina i zapremina",
+          "title": "Pravilna uspravna četverostrana piramida"
+        },
+        {
+          "id": "8-05-009",
+          "oblast": "Prizme, piramide, površina i zapremina",
+          "title": "Mreža trostrane prizme"
+        },
+        {
+          "id": "8-05-010",
+          "oblast": "Prizme, piramide, površina i zapremina",
+          "title": "Mreža četverostrane prizme"
+        },
+        {
+          "id": "8-05-011",
+          "oblast": "Prizme, piramide, površina i zapremina",
+          "title": "Mreža trostrane piramide"
+        },
+        {
+          "id": "8-05-012",
+          "oblast": "Prizme, piramide, površina i zapremina",
+          "title": "Mreža četverostrane piramide"
+        },
+        {
+          "id": "8-05-013",
+          "oblast": "Prizme, piramide, površina i zapremina",
+          "title": "Površina omotača pravilne prizme"
+        },
+        {
+          "id": "8-05-014",
+          "oblast": "Prizme, piramide, površina i zapremina",
+          "title": "Ukupna površina pravilne prizme"
+        },
+        {
+          "id": "8-05-015",
+          "oblast": "Prizme, piramide, površina i zapremina",
+          "title": "Zapremina pravilne prizme"
+        },
+        {
+          "id": "8-05-016",
+          "oblast": "Prizme, piramide, površina i zapremina",
+          "title": "Prostorna dijagonala pravilne četverostrane prizme"
+        },
+        {
+          "id": "8-05-017",
+          "oblast": "Prizme, piramide, površina i zapremina",
+          "title": "Apotema pravilne piramide"
+        },
+        {
+          "id": "8-05-018",
+          "oblast": "Prizme, piramide, površina i zapremina",
+          "title": "Površina omotača pravilne piramide"
+        },
+        {
+          "id": "8-05-019",
+          "oblast": "Prizme, piramide, površina i zapremina",
+          "title": "Ukupna površina pravilne piramide"
+        },
+        {
+          "id": "8-05-020",
+          "oblast": "Prizme, piramide, površina i zapremina",
+          "title": "Zapremina pravilne piramide"
+        },
+        {
+          "id": "8-05-021",
+          "oblast": "Prizme, piramide, površina i zapremina",
+          "title": "Složeni zadaci s prizmama i piramidama"
+        },
+        {
+          "id": "8-05-022",
+          "oblast": "Prizme, piramide, površina i zapremina",
+          "title": "Mjerne jedinice površine i zapremine"
+        },
+        {
+          "id": "8-06-001",
+          "oblast": "Podaci i vjerovatnoća",
+          "title": "Obilježje, podaci i skup posmatranja"
+        },
+        {
+          "id": "8-06-002",
+          "oblast": "Podaci i vjerovatnoća",
+          "title": "Frekvencija"
+        },
+        {
+          "id": "8-06-003",
+          "oblast": "Podaci i vjerovatnoća",
+          "title": "Relativna frekvencija"
+        },
+        {
+          "id": "8-06-004",
+          "oblast": "Podaci i vjerovatnoća",
+          "title": "Tabela frekvencija"
+        },
+        {
+          "id": "8-06-005",
+          "oblast": "Podaci i vjerovatnoća",
+          "title": "Stupčasti dijagram"
+        },
+        {
+          "id": "8-06-006",
+          "oblast": "Podaci i vjerovatnoća",
+          "title": "Kružni dijagram"
+        },
+        {
+          "id": "8-06-007",
+          "oblast": "Podaci i vjerovatnoća",
+          "title": "Linijski i tačkasti prikaz podataka"
+        },
+        {
+          "id": "8-06-008",
+          "oblast": "Podaci i vjerovatnoća",
+          "title": "Čitanje i kritičko tumačenje dijagrama"
+        },
+        {
+          "id": "8-06-009",
+          "oblast": "Podaci i vjerovatnoća",
+          "title": "Aritmetička sredina"
+        },
+        {
+          "id": "8-06-010",
+          "oblast": "Podaci i vjerovatnoća",
+          "title": "Elementarni ishod i slučajni događaj"
+        },
+        {
+          "id": "8-06-011",
+          "oblast": "Podaci i vjerovatnoća",
+          "title": "Siguran, nemoguć i slučajan događaj"
+        },
+        {
+          "id": "8-06-012",
+          "oblast": "Podaci i vjerovatnoća",
+          "title": "Povoljni ishodi i klasična vjerovatnoća"
+        },
+        {
+          "id": "8-06-013",
+          "oblast": "Podaci i vjerovatnoća",
+          "title": "Komplementarni događaj"
+        },
+        {
+          "id": "8-07-001",
+          "oblast": "Cijeli racionalni izrazi i polinomi",
+          "title": "Algebarski racionalni izraz i brojna vrijednost"
+        },
+        {
+          "id": "8-07-002",
+          "oblast": "Cijeli racionalni izrazi i polinomi",
+          "title": "Monom, koeficijent i stepen monoma"
+        },
+        {
+          "id": "8-07-003",
+          "oblast": "Cijeli racionalni izrazi i polinomi",
+          "title": "Slični monomi"
+        },
+        {
+          "id": "8-07-004",
+          "oblast": "Cijeli racionalni izrazi i polinomi",
+          "title": "Sabiranje i oduzimanje monoma"
+        },
+        {
+          "id": "8-07-005",
+          "oblast": "Cijeli racionalni izrazi i polinomi",
+          "title": "Množenje i dijeljenje monoma"
+        },
+        {
+          "id": "8-07-006",
+          "oblast": "Cijeli racionalni izrazi i polinomi",
+          "title": "Polinom i sređivanje polinoma"
+        },
+        {
+          "id": "8-07-007",
+          "oblast": "Cijeli racionalni izrazi i polinomi",
+          "title": "Sabiranje i oduzimanje polinoma"
+        },
+        {
+          "id": "8-07-008",
+          "oblast": "Cijeli racionalni izrazi i polinomi",
+          "title": "Množenje polinoma"
+        },
+        {
+          "id": "8-07-009",
+          "oblast": "Cijeli racionalni izrazi i polinomi",
+          "title": "Kvadrat zbira i razlike"
+        },
+        {
+          "id": "8-07-010",
+          "oblast": "Cijeli racionalni izrazi i polinomi",
+          "title": "Razlika kvadrata"
+        },
+        {
+          "id": "8-07-011",
+          "oblast": "Cijeli racionalni izrazi i polinomi",
+          "title": "Kub binoma, zbir i razlika kubova"
+        },
+        {
+          "id": "8-07-012",
+          "oblast": "Cijeli racionalni izrazi i polinomi",
+          "title": "Rastavljanje izdvajanjem zajedničkog faktora"
+        },
+        {
+          "id": "8-07-013",
+          "oblast": "Cijeli racionalni izrazi i polinomi",
+          "title": "Jednačine rješive faktorizacijom"
+        },
+        {
+          "id": "8-08-001",
+          "oblast": "Mnogougao, kružnica i krug",
+          "title": "Vrste mnogouglova"
+        },
+        {
+          "id": "8-08-002",
+          "oblast": "Mnogougao, kružnica i krug",
           "title": "Zbir unutrašnjih uglova mnogougla"
         },
         {
-          "id": "8-11-109",
-          "oblast": "Mnogougao",
-          "title": "Izračunavanje UNUTRAŠNJEG UGLA pravilnog mnogougla"
+          "id": "8-08-003",
+          "oblast": "Mnogougao, kružnica i krug",
+          "title": "Zbir vanjskih uglova konveksnog mnogougla"
         },
         {
-          "id": "8-11-110",
-          "oblast": "Mnogougao",
-          "title": "Vanjski (spoljašnji) uglovi mnogougla"
+          "id": "8-08-004",
+          "oblast": "Mnogougao, kružnica i krug",
+          "title": "Broj dijagonala mnogougla"
         },
         {
-          "id": "8-12-117",
-          "oblast": "Geometrijska tijela",
-          "title": "Prizme – osnove"
+          "id": "8-08-005",
+          "oblast": "Mnogougao, kružnica i krug",
+          "title": "Pravilni mnogougao"
         },
         {
-          "id": "8-12-124",
-          "oblast": "Geometrijska tijela",
-          "title": "Prizma sa rombom, jednakokrakim trouglom ili trapezom kao osnovom"
+          "id": "8-08-006",
+          "oblast": "Mnogougao, kružnica i krug",
+          "title": "Konstrukcija pravilnog mnogougla"
         },
         {
-          "id": "8-12-126",
-          "oblast": "Geometrijska tijela",
-          "title": "Piramide – osnove"
+          "id": "8-08-007",
+          "oblast": "Mnogougao, kružnica i krug",
+          "title": "Obim i površina mnogougla"
         },
         {
-          "id": "8-12-129",
-          "oblast": "Geometrijska tijela",
-          "title": "Četverostrana piramida - baza nije kvadrat"
+          "id": "8-08-008",
+          "oblast": "Mnogougao, kružnica i krug",
+          "title": "Dijelovi kružnice i kruga"
         },
         {
-          "id": "8-12-136",
-          "oblast": "Geometrijska tijela",
-          "title": "Valjak – osnove"
+          "id": "8-08-009",
+          "oblast": "Mnogougao, kružnica i krug",
+          "title": "Broj π i obim kruga"
         },
         {
-          "id": "8-12-140",
-          "oblast": "Geometrijska tijela",
-          "title": "Kupa – osnove"
+          "id": "8-08-010",
+          "oblast": "Mnogougao, kružnica i krug",
+          "title": "Dužina kružnog luka"
+        },
+        {
+          "id": "8-08-011",
+          "oblast": "Mnogougao, kružnica i krug",
+          "title": "Površina kruga"
+        },
+        {
+          "id": "8-08-012",
+          "oblast": "Mnogougao, kružnica i krug",
+          "title": "Kružni prsten i kružni isječak"
+        },
+        {
+          "id": "8-09-001",
+          "oblast": "Vektori",
+          "title": "Pojam, pravac, smjer i intenzitet vektora"
+        },
+        {
+          "id": "8-09-002",
+          "oblast": "Vektori",
+          "title": "Jednaki, suprotni i nula-vektor"
+        },
+        {
+          "id": "8-09-003",
+          "oblast": "Vektori",
+          "title": "Sabiranje i oduzimanje vektora"
+        },
+        {
+          "id": "8-09-004",
+          "oblast": "Vektori",
+          "title": "Množenje vektora brojem i primjene"
         }
       ]
     },
     "9": {
       "oblast_order": [
-        "Algebarski razlomci",
+        "Razlomljeni racionalni izrazi",
         "Tačka, prava i ravan",
-        "Linearna funkcija",
-        "Linearne jednačine sa jednom nepoznatom",
-        "Linearne nejednačine sa jednom nepoznatom",
-        "Sistem linearnih jednačina sa 2 nepoznate",
+        "Linearna funkcija i prava",
+        "Linearne jednačine i nejednačine",
+        "Sistemi linearnih jednačina",
+        "Polinomi, faktorizacija i jednostavne kvadratne jednačine",
         "Geometrijska tijela",
-        "Statistika i podaci"
+        "Podaci, vjerovatnoća, finansije i mjerne jedinice"
       ],
       "lessons": [
         {
           "id": "9-01-001",
-          "oblast": "Algebarski razlomci",
-          "title": "Definiciono područje (DOMENA) i nula razlomljene racionalne funkcije"
+          "oblast": "Razlomljeni racionalni izrazi",
+          "title": "Algebarski izraz: konstante, promjenljive i članovi"
+        },
+        {
+          "id": "9-01-002",
+          "oblast": "Razlomljeni racionalni izrazi",
+          "title": "Algebarski razlomak i uslov definiranosti"
+        },
+        {
+          "id": "9-01-003",
+          "oblast": "Razlomljeni racionalni izrazi",
+          "title": "Brojna vrijednost algebarskog razlomka"
+        },
+        {
+          "id": "9-01-004",
+          "oblast": "Razlomljeni racionalni izrazi",
+          "title": "Proširivanje algebarskog razlomka"
         },
         {
           "id": "9-01-005",
-          "oblast": "Algebarski razlomci",
-          "title": "Proširivanje algebarskih razlomaka"
+          "oblast": "Razlomljeni racionalni izrazi",
+          "title": "Skraćivanje algebarskog razlomka faktorizacijom"
         },
         {
           "id": "9-01-006",
-          "oblast": "Algebarski razlomci",
-          "title": "Skraćivanje algebarskih razlomaka (princip rada)"
+          "oblast": "Razlomljeni racionalni izrazi",
+          "title": "Jednaki algebarski razlomci"
+        },
+        {
+          "id": "9-01-007",
+          "oblast": "Razlomljeni racionalni izrazi",
+          "title": "Zajednički imenilac algebarskih razlomaka"
+        },
+        {
+          "id": "9-01-008",
+          "oblast": "Razlomljeni racionalni izrazi",
+          "title": "Sabiranje algebarskih razlomaka"
         },
         {
           "id": "9-01-009",
-          "oblast": "Algebarski razlomci",
-          "title": "Sabiranje i oduzimanje algebarskih razlomaka"
+          "oblast": "Razlomljeni racionalni izrazi",
+          "title": "Oduzimanje algebarskih razlomaka"
         },
         {
           "id": "9-01-010",
-          "oblast": "Algebarski razlomci",
+          "oblast": "Razlomljeni racionalni izrazi",
           "title": "Množenje algebarskih razlomaka"
         },
         {
           "id": "9-01-011",
-          "oblast": "Algebarski razlomci",
+          "oblast": "Razlomljeni racionalni izrazi",
           "title": "Dijeljenje algebarskih razlomaka"
         },
         {
           "id": "9-01-012",
-          "oblast": "Algebarski razlomci",
-          "title": "Kako skraćivati algebarske razlomke"
+          "oblast": "Razlomljeni racionalni izrazi",
+          "title": "Složeni razlomljeni racionalni izraz"
         },
         {
           "id": "9-01-013",
-          "oblast": "Algebarski razlomci",
-          "title": "Skraćivanje kod izraza"
+          "oblast": "Razlomljeni racionalni izrazi",
+          "title": "Sređivanje razlomljenog racionalnog izraza"
         },
         {
-          "id": "9-02-017",
+          "id": "9-01-014",
+          "oblast": "Razlomljeni racionalni izrazi",
+          "title": "Jednačine sa algebarskim razlomcima"
+        },
+        {
+          "id": "9-01-015",
+          "oblast": "Razlomljeni racionalni izrazi",
+          "title": "Tekstualni zadaci sa racionalnim izrazima"
+        },
+        {
+          "id": "9-01-016",
+          "oblast": "Razlomljeni racionalni izrazi",
+          "title": "Diskusija racionalnog izraza sa parametrom"
+        },
+        {
+          "id": "9-01-017",
+          "oblast": "Razlomljeni racionalni izrazi",
+          "title": "Dokaz identiteta sa algebarskim razlomcima"
+        },
+        {
+          "id": "9-02-001",
           "oblast": "Tačka, prava i ravan",
-          "title": "Teorija i pravila TAČKA, PRAVA I RAVAN"
+          "title": "Međusobni odnos tačke i prave"
         },
         {
-          "id": "9-02-018",
+          "id": "9-02-002",
           "oblast": "Tačka, prava i ravan",
-          "title": "Odnos tačke i prave"
+          "title": "Određenost prave"
         },
         {
-          "id": "9-02-019",
+          "id": "9-02-003",
           "oblast": "Tačka, prava i ravan",
-          "title": "Izračunavanje koliko n tačaka ODREĐUJE PRAVIH I RAVNI"
+          "title": "Međusobni odnos tačke i ravni"
         },
         {
-          "id": "9-02-020",
+          "id": "9-02-004",
           "oblast": "Tačka, prava i ravan",
-          "title": "DIEDAR kako rješavamo ZADATKE (Tačke na strani diedra)"
+          "title": "Određenost ravni"
         },
         {
-          "id": "9-02-021",
+          "id": "9-02-005",
           "oblast": "Tačka, prava i ravan",
-          "title": "DIEDAR kako rješavamo ZADATKE (Tačka unutar diedra)"
+          "title": "Međusobni položaj dvije prave u prostoru"
         },
         {
-          "id": "9-02-023",
+          "id": "9-02-006",
           "oblast": "Tačka, prava i ravan",
-          "title": "Ortogonalna projekcija"
+          "title": "Međusobni položaj prave i ravni"
         },
         {
-          "id": "9-02-024",
+          "id": "9-02-007",
           "oblast": "Tačka, prava i ravan",
-          "title": "ORTOGONALNA PROJEKCIJA - Zadatak Tačke sa iste strane ravni"
+          "title": "Međusobni položaj dvije ravni"
         },
         {
-          "id": "9-02-025",
+          "id": "9-02-008",
           "oblast": "Tačka, prava i ravan",
-          "title": "ORTOGONALNA PROJEKCIJA - Zadatak Tačke sa suprotnih strana ravni"
+          "title": "Normala na ravan"
         },
         {
-          "id": "9-02-105",
+          "id": "9-02-009",
           "oblast": "Tačka, prava i ravan",
-          "title": "Odnos tačke i ravni"
+          "title": "Rastojanje tačke od ravni"
         },
         {
-          "id": "9-02-106",
+          "id": "9-02-010",
           "oblast": "Tačka, prava i ravan",
-          "title": "Odnos prave i ravni"
+          "title": "Rastojanje paralelnih ravni"
         },
         {
-          "id": "9-02-107",
+          "id": "9-02-011",
           "oblast": "Tačka, prava i ravan",
-          "title": "Odnos dvije ravni"
+          "title": "Ortogonalna projekcija tačke na ravan"
         },
         {
-          "id": "9-02-108",
+          "id": "9-02-012",
+          "oblast": "Tačka, prava i ravan",
+          "title": "Ortogonalna projekcija duži na ravan"
+        },
+        {
+          "id": "9-02-013",
           "oblast": "Tačka, prava i ravan",
           "title": "Ugao između prave i ravni"
         },
         {
-          "id": "9-02-109",
+          "id": "9-02-014",
+          "oblast": "Tačka, prava i ravan",
+          "title": "Diedar i ugao između ravni"
+        },
+        {
+          "id": "9-02-015",
           "oblast": "Tačka, prava i ravan",
           "title": "Paralelna projekcija na ravan"
         },
         {
-          "id": "9-03-027",
-          "oblast": "Linearna funkcija",
-          "title": "Pravougli (dekartov) koordinatni sistem"
+          "id": "9-02-016",
+          "oblast": "Tačka, prava i ravan",
+          "title": "Rogalj i njegove strane"
         },
         {
-          "id": "9-03-028",
-          "oblast": "Linearna funkcija",
-          "title": "Izračunavanje udaljenosti između dvije tačke"
+          "id": "9-02-017",
+          "oblast": "Tačka, prava i ravan",
+          "title": "Skiciranje prostornih odnosa"
         },
         {
-          "id": "9-03-029",
-          "oblast": "Linearna funkcija",
+          "id": "9-03-001",
+          "oblast": "Linearna funkcija i prava",
+          "title": "Funkcija i vrijednost funkcije"
+        },
+        {
+          "id": "9-03-002",
+          "oblast": "Linearna funkcija i prava",
+          "title": "Linearna funkcija y = kx + n"
+        },
+        {
+          "id": "9-03-003",
+          "oblast": "Linearna funkcija i prava",
+          "title": "Tabela vrijednosti linearne funkcije"
+        },
+        {
+          "id": "9-03-004",
+          "oblast": "Linearna funkcija i prava",
           "title": "Grafik linearne funkcije"
         },
         {
-          "id": "9-03-031",
-          "oblast": "Linearna funkcija",
-          "title": "Nula i znak linearne funkcije"
+          "id": "9-03-005",
+          "oblast": "Linearna funkcija i prava",
+          "title": "Značenje koeficijenta k"
         },
         {
-          "id": "9-03-032",
-          "oblast": "Linearna funkcija",
-          "title": "ZAVISNOST GRAFOVA LINEARNIH FUNKCIJA OD KOEFICIJENTA k - opadajuća, rastuća, paralelna"
+          "id": "9-03-006",
+          "oblast": "Linearna funkcija i prava",
+          "title": "Značenje slobodnog člana n"
         },
         {
-          "id": "9-03-033",
-          "oblast": "Linearna funkcija",
-          "title": "Eksplicitni i implicitni oblik linearne funkcije"
+          "id": "9-03-007",
+          "oblast": "Linearna funkcija i prava",
+          "title": "Nula linearne funkcije"
         },
         {
-          "id": "9-03-036",
-          "oblast": "Linearna funkcija",
-          "title": "Grafik funkcije obrnute (indirektne) proporcionalnosti"
+          "id": "9-03-008",
+          "oblast": "Linearna funkcija i prava",
+          "title": "Rastuća i opadajuća linearna funkcija"
         },
         {
-          "id": "9-03-110",
-          "oblast": "Linearna funkcija",
-          "title": "Grafik direktne proporcionalnosti"
+          "id": "9-03-009",
+          "oblast": "Linearna funkcija i prava",
+          "title": "Znak linearne funkcije"
         },
         {
-          "id": "9-04-039",
-          "oblast": "Linearne jednačine sa jednom nepoznatom",
-          "title": "Grafičko rješavanje linearnih jednačina sa jednom nepoznatom"
+          "id": "9-03-010",
+          "oblast": "Linearna funkcija i prava",
+          "title": "Presjeci grafika sa koordinatnim osama"
         },
         {
-          "id": "9-04-040",
-          "oblast": "Linearne jednačine sa jednom nepoznatom",
-          "title": "Postupak kod algebarskog rješavanja linearnih jednačina"
+          "id": "9-03-011",
+          "oblast": "Linearna funkcija i prava",
+          "title": "Da li tačka pripada grafiku funkcije"
         },
         {
-          "id": "9-04-041",
-          "oblast": "Linearne jednačine sa jednom nepoznatom",
-          "title": "Algebarsko rješavanje linearnih jednačina sa jednom nepoznatom"
+          "id": "9-03-012",
+          "oblast": "Linearna funkcija i prava",
+          "title": "Eksplicitni i implicitni oblik jednačine prave"
         },
         {
-          "id": "9-04-042",
-          "oblast": "Linearne jednačine sa jednom nepoznatom",
-          "title": "Kako rješavati zadatke tipa ZAGRADA puta ZAGRADA = 0"
+          "id": "9-03-013",
+          "oblast": "Linearna funkcija i prava",
+          "title": "Prelazak iz implicitnog u eksplicitni oblik"
         },
         {
-          "id": "9-04-045",
-          "oblast": "Linearne jednačine sa jednom nepoznatom",
-          "title": "Tipični zadaci linearne jednačine"
+          "id": "9-03-014",
+          "oblast": "Linearna funkcija i prava",
+          "title": "Jednačina prave kroz dvije tačke"
         },
         {
-          "id": "9-04-046",
-          "oblast": "Linearne jednačine sa jednom nepoznatom",
-          "title": "Tekstualni zadatak NEPOZNATO a"
+          "id": "9-03-015",
+          "oblast": "Linearna funkcija i prava",
+          "title": "Paralelne i podudarne prave prema koeficijentima"
         },
         {
-          "id": "9-04-047",
-          "oblast": "Linearne jednačine sa jednom nepoznatom",
-          "title": "Tekstualni zadatak RAZLOMCI NEKOG BROJA"
+          "id": "9-03-016",
+          "oblast": "Linearna funkcija i prava",
+          "title": "Okomite prave u koordinatnoj ravni"
         },
         {
-          "id": "9-04-048",
-          "oblast": "Linearne jednačine sa jednom nepoznatom",
-          "title": "Tekstualni zadatak GODINE MAME I KĆERKE"
+          "id": "9-03-017",
+          "oblast": "Linearna funkcija i prava",
+          "title": "Presjek dvije prave"
         },
         {
-          "id": "9-04-049",
-          "oblast": "Linearne jednačine sa jednom nepoznatom",
-          "title": "Tekstualni zadatak UDALJENOST IZMEĐU GRADOVA"
+          "id": "9-03-018",
+          "oblast": "Linearna funkcija i prava",
+          "title": "Primjena linearne funkcije u problemu"
         },
         {
-          "id": "9-04-051",
-          "oblast": "Linearne jednačine sa jednom nepoznatom",
-          "title": "Tekstualni zadaci zbir uzastopnih brojeva i poznat obim - izračunaj površinu"
+          "id": "9-03-019",
+          "oblast": "Linearna funkcija i prava",
+          "title": "Grafik direktne proporcionalnosti y = kx"
         },
         {
-          "id": "9-05-054",
-          "oblast": "Linearne nejednačine sa jednom nepoznatom",
-          "title": "Kako se rješavaju nejednačine – postupak"
+          "id": "9-03-020",
+          "oblast": "Linearna funkcija i prava",
+          "title": "Grafik obrnute proporcionalnosti y = k/x"
         },
         {
-          "id": "9-05-055",
-          "oblast": "Linearne nejednačine sa jednom nepoznatom",
-          "title": "Kako rješavati nejednačinu ZAGRADA PUTA ZAGRADA"
+          "id": "9-03-021",
+          "oblast": "Linearna funkcija i prava",
+          "title": "Poređenje direktne, obrnute i linearne zavisnosti"
         },
         {
-          "id": "9-05-056",
-          "oblast": "Linearne nejednačine sa jednom nepoznatom",
-          "title": "Nejednačine sa APSOLUTNIM VRIJEDNOSTIMA"
+          "id": "9-03-022",
+          "oblast": "Linearna funkcija i prava",
+          "title": "Grafik jednostavne razlomljene funkcije"
         },
         {
-          "id": "9-05-058",
-          "oblast": "Linearne nejednačine sa jednom nepoznatom",
-          "title": "Sistem linearnih nejednačina sa jednom nepoznatom"
+          "id": "9-04-001",
+          "oblast": "Linearne jednačine i nejednačine",
+          "title": "Osnovni pojmovi linearne jednačine"
         },
         {
-          "id": "9-06-060",
-          "oblast": "Sistem linearnih jednačina sa 2 nepoznate",
-          "title": "Odnosi koeficijenata i grafičko rješavanje sistema jednačina"
+          "id": "9-04-002",
+          "oblast": "Linearne jednačine i nejednačine",
+          "title": "Ekvivalentne jednačine"
         },
         {
-          "id": "9-06-061",
-          "oblast": "Sistem linearnih jednačina sa 2 nepoznate",
-          "title": "Metoda zamjene ili supstitucije"
+          "id": "9-04-003",
+          "oblast": "Linearne jednačine i nejednačine",
+          "title": "Jednačina sa zagradama"
         },
         {
-          "id": "9-06-062",
-          "oblast": "Sistem linearnih jednačina sa 2 nepoznate",
-          "title": "Metoda suprotnih koeficijenata (gausova metoda)"
+          "id": "9-04-004",
+          "oblast": "Linearne jednačine i nejednačine",
+          "title": "Jednačina sa razlomcima"
         },
         {
-          "id": "9-06-065",
-          "oblast": "Sistem linearnih jednačina sa 2 nepoznate",
-          "title": "Osnove ponoviti za tekstualne zadatke"
+          "id": "9-04-005",
+          "oblast": "Linearne jednačine i nejednačine",
+          "title": "Jednačina sa algebarskim razlomcima"
         },
         {
-          "id": "9-06-066",
-          "oblast": "Sistem linearnih jednačina sa 2 nepoznate",
-          "title": "Kako se rješavaju tekstualni zadaci"
+          "id": "9-04-006",
+          "oblast": "Linearne jednačine i nejednačine",
+          "title": "Jednačina sa dvojnim razlomkom"
         },
         {
-          "id": "9-07-075",
+          "id": "9-04-007",
+          "oblast": "Linearne jednačine i nejednačine",
+          "title": "Jednačina sa promjenljivim koeficijentom"
+        },
+        {
+          "id": "9-04-008",
+          "oblast": "Linearne jednačine i nejednačine",
+          "title": "Jednačina bez rješenja"
+        },
+        {
+          "id": "9-04-009",
+          "oblast": "Linearne jednačine i nejednačine",
+          "title": "Identitet sa beskonačno mnogo rješenja"
+        },
+        {
+          "id": "9-04-010",
+          "oblast": "Linearne jednačine i nejednačine",
+          "title": "Grafičko rješavanje linearne jednačine"
+        },
+        {
+          "id": "9-04-011",
+          "oblast": "Linearne jednačine i nejednačine",
+          "title": "Tekstualni zadatak koji se svodi na linearnu jednačinu"
+        },
+        {
+          "id": "9-04-012",
+          "oblast": "Linearne jednačine i nejednačine",
+          "title": "Osnovni pojmovi linearne nejednačine"
+        },
+        {
+          "id": "9-04-013",
+          "oblast": "Linearne jednačine i nejednačine",
+          "title": "Ekvivalentne nejednačine"
+        },
+        {
+          "id": "9-04-014",
+          "oblast": "Linearne jednačine i nejednačine",
+          "title": "Nejednačina sa zagradama"
+        },
+        {
+          "id": "9-04-015",
+          "oblast": "Linearne jednačine i nejednačine",
+          "title": "Nejednačina sa razlomcima"
+        },
+        {
+          "id": "9-04-016",
+          "oblast": "Linearne jednačine i nejednačine",
+          "title": "Promjena znaka nejednakosti pri množenju ili dijeljenju negativnim brojem"
+        },
+        {
+          "id": "9-04-017",
+          "oblast": "Linearne jednačine i nejednačine",
+          "title": "Skup rješenja na brojevnoj pravoj"
+        },
+        {
+          "id": "9-04-018",
+          "oblast": "Linearne jednačine i nejednačine",
+          "title": "Skup rješenja intervalom"
+        },
+        {
+          "id": "9-04-019",
+          "oblast": "Linearne jednačine i nejednačine",
+          "title": "Provjera rješenja jednačine i nejednačine"
+        },
+        {
+          "id": "9-04-020",
+          "oblast": "Linearne jednačine i nejednačine",
+          "title": "Linearna jednačina sa apsolutnom vrijednošću"
+        },
+        {
+          "id": "9-04-021",
+          "oblast": "Linearne jednačine i nejednačine",
+          "title": "Linearna nejednačina sa apsolutnom vrijednošću"
+        },
+        {
+          "id": "9-04-022",
+          "oblast": "Linearne jednačine i nejednačine",
+          "title": "Diskusija linearne jednačine sa parametrom"
+        },
+        {
+          "id": "9-05-001",
+          "oblast": "Sistemi linearnih jednačina",
+          "title": "Linearna jednačina sa dvije nepoznate i njena rješenja"
+        },
+        {
+          "id": "9-05-002",
+          "oblast": "Sistemi linearnih jednačina",
+          "title": "Grafički prikaz linearne jednačine sa dvije nepoznate"
+        },
+        {
+          "id": "9-05-003",
+          "oblast": "Sistemi linearnih jednačina",
+          "title": "Pojam sistema dvije linearne jednačine"
+        },
+        {
+          "id": "9-05-004",
+          "oblast": "Sistemi linearnih jednačina",
+          "title": "Provjera uređenog para u sistemu"
+        },
+        {
+          "id": "9-05-005",
+          "oblast": "Sistemi linearnih jednačina",
+          "title": "Ekvivalentni sistemi"
+        },
+        {
+          "id": "9-05-006",
+          "oblast": "Sistemi linearnih jednačina",
+          "title": "Grafička metoda rješavanja sistema"
+        },
+        {
+          "id": "9-05-007",
+          "oblast": "Sistemi linearnih jednačina",
+          "title": "Metoda supstitucije"
+        },
+        {
+          "id": "9-05-008",
+          "oblast": "Sistemi linearnih jednačina",
+          "title": "Metoda suprotnih koeficijenata (Gausova metoda)"
+        },
+        {
+          "id": "9-05-009",
+          "oblast": "Sistemi linearnih jednačina",
+          "title": "Sistem sa jednim rješenjem"
+        },
+        {
+          "id": "9-05-010",
+          "oblast": "Sistemi linearnih jednačina",
+          "title": "Sistem bez rješenja"
+        },
+        {
+          "id": "9-05-011",
+          "oblast": "Sistemi linearnih jednačina",
+          "title": "Sistem sa beskonačno mnogo rješenja"
+        },
+        {
+          "id": "9-05-012",
+          "oblast": "Sistemi linearnih jednačina",
+          "title": "Odnos koeficijenata i broj rješenja sistema"
+        },
+        {
+          "id": "9-05-013",
+          "oblast": "Sistemi linearnih jednačina",
+          "title": "Tekstualni zadatak sa sistemom"
+        },
+        {
+          "id": "9-05-014",
+          "oblast": "Sistemi linearnih jednačina",
+          "title": "Geometrijsko tumačenje rješenja sistema"
+        },
+        {
+          "id": "9-05-015",
+          "oblast": "Sistemi linearnih jednačina",
+          "title": "Provjera rješenja sistema"
+        },
+        {
+          "id": "9-05-016",
+          "oblast": "Sistemi linearnih jednačina",
+          "title": "Sistem sa razlomljenim koeficijentima"
+        },
+        {
+          "id": "9-05-017",
+          "oblast": "Sistemi linearnih jednačina",
+          "title": "Sistem sa parametrom"
+        },
+        {
+          "id": "9-06-001",
+          "oblast": "Polinomi, faktorizacija i jednostavne kvadratne jednačine",
+          "title": "Monom i polinom u skupu realnih brojeva"
+        },
+        {
+          "id": "9-06-002",
+          "oblast": "Polinomi, faktorizacija i jednostavne kvadratne jednačine",
+          "title": "Sređivanje polinoma"
+        },
+        {
+          "id": "9-06-003",
+          "oblast": "Polinomi, faktorizacija i jednostavne kvadratne jednačine",
+          "title": "Sabiranje i oduzimanje polinoma"
+        },
+        {
+          "id": "9-06-004",
+          "oblast": "Polinomi, faktorizacija i jednostavne kvadratne jednačine",
+          "title": "Množenje polinoma"
+        },
+        {
+          "id": "9-06-005",
+          "oblast": "Polinomi, faktorizacija i jednostavne kvadratne jednačine",
+          "title": "Kvadrat binoma"
+        },
+        {
+          "id": "9-06-006",
+          "oblast": "Polinomi, faktorizacija i jednostavne kvadratne jednačine",
+          "title": "Razlika kvadrata"
+        },
+        {
+          "id": "9-06-007",
+          "oblast": "Polinomi, faktorizacija i jednostavne kvadratne jednačine",
+          "title": "Kub binoma"
+        },
+        {
+          "id": "9-06-008",
+          "oblast": "Polinomi, faktorizacija i jednostavne kvadratne jednačine",
+          "title": "Zbir i razlika kubova"
+        },
+        {
+          "id": "9-06-009",
+          "oblast": "Polinomi, faktorizacija i jednostavne kvadratne jednačine",
+          "title": "Izlučivanje zajedničkog faktora"
+        },
+        {
+          "id": "9-06-010",
+          "oblast": "Polinomi, faktorizacija i jednostavne kvadratne jednačine",
+          "title": "Rastavljanje grupisanjem"
+        },
+        {
+          "id": "9-06-011",
+          "oblast": "Polinomi, faktorizacija i jednostavne kvadratne jednačine",
+          "title": "Faktorizacija primjenom identiteta"
+        },
+        {
+          "id": "9-06-012",
+          "oblast": "Polinomi, faktorizacija i jednostavne kvadratne jednačine",
+          "title": "Domena algebarskog razlomka pomoću faktorizacije"
+        },
+        {
+          "id": "9-06-013",
+          "oblast": "Polinomi, faktorizacija i jednostavne kvadratne jednačine",
+          "title": "Jednostavna kvadratna jednačina ax² + bx = 0"
+        },
+        {
+          "id": "9-06-014",
+          "oblast": "Polinomi, faktorizacija i jednostavne kvadratne jednačine",
+          "title": "Jednostavna kvadratna jednačina x² - a = 0"
+        },
+        {
+          "id": "9-06-015",
+          "oblast": "Polinomi, faktorizacija i jednostavne kvadratne jednačine",
+          "title": "Kvadratna jednačina oblika x² ± 2ax + a² = 0"
+        },
+        {
+          "id": "9-06-016",
+          "oblast": "Polinomi, faktorizacija i jednostavne kvadratne jednačine",
+          "title": "Nula proizvoda i provjera rješenja"
+        },
+        {
+          "id": "9-07-001",
           "oblast": "Geometrijska tijela",
-          "title": "Prizme – osnove"
+          "title": "Pojam poliedra i njegovi elementi"
         },
         {
-          "id": "9-07-082",
+          "id": "9-07-002",
           "oblast": "Geometrijska tijela",
-          "title": "Prizma sa rombom, jednakokrakim trouglom ili trapezom kao osnovom"
+          "title": "Prizma i njeni elementi"
         },
         {
-          "id": "9-07-084",
+          "id": "9-07-003",
           "oblast": "Geometrijska tijela",
-          "title": "Piramide – osnove"
+          "title": "Mreža prizme"
         },
         {
-          "id": "9-07-087",
+          "id": "9-07-004",
           "oblast": "Geometrijska tijela",
-          "title": "Četverostrana piramida - baza nije kvadrat"
+          "title": "Površina uspravne prizme"
         },
         {
-          "id": "9-07-094",
+          "id": "9-07-005",
           "oblast": "Geometrijska tijela",
-          "title": "Valjak – osnove"
+          "title": "Zapremina prizme"
         },
         {
-          "id": "9-07-098",
+          "id": "9-07-006",
           "oblast": "Geometrijska tijela",
-          "title": "Kupa – osnove"
+          "title": "Dijagonalni presjek prizme"
         },
         {
-          "id": "9-07-114",
+          "id": "9-07-007",
           "oblast": "Geometrijska tijela",
-          "title": "Rogalj i poliedar"
+          "title": "Primjena Pitagorine teoreme na pravilnu prizmu"
         },
         {
-          "id": "9-07-115",
+          "id": "9-07-008",
           "oblast": "Geometrijska tijela",
-          "title": "Mreže i presjeci geometrijskih tijela"
+          "title": "Piramida i njeni elementi"
         },
         {
-          "id": "9-08-111",
-          "oblast": "Statistika i podaci",
+          "id": "9-07-009",
+          "oblast": "Geometrijska tijela",
+          "title": "Mreža piramide"
+        },
+        {
+          "id": "9-07-010",
+          "oblast": "Geometrijska tijela",
+          "title": "Površina pravilne piramide"
+        },
+        {
+          "id": "9-07-011",
+          "oblast": "Geometrijska tijela",
+          "title": "Zapremina pravilne piramide"
+        },
+        {
+          "id": "9-07-012",
+          "oblast": "Geometrijska tijela",
+          "title": "Apotema pravilne piramide"
+        },
+        {
+          "id": "9-07-013",
+          "oblast": "Geometrijska tijela",
+          "title": "Presjeci piramide"
+        },
+        {
+          "id": "9-07-014",
+          "oblast": "Geometrijska tijela",
+          "title": "Primjena Pitagorine teoreme na piramidu"
+        },
+        {
+          "id": "9-07-015",
+          "oblast": "Geometrijska tijela",
+          "title": "Valjak ili cilindar i njegovi elementi"
+        },
+        {
+          "id": "9-07-016",
+          "oblast": "Geometrijska tijela",
+          "title": "Mreža valjka"
+        },
+        {
+          "id": "9-07-017",
+          "oblast": "Geometrijska tijela",
+          "title": "Površina valjka"
+        },
+        {
+          "id": "9-07-018",
+          "oblast": "Geometrijska tijela",
+          "title": "Zapremina valjka"
+        },
+        {
+          "id": "9-07-019",
+          "oblast": "Geometrijska tijela",
+          "title": "Osni presjek valjka"
+        },
+        {
+          "id": "9-07-020",
+          "oblast": "Geometrijska tijela",
+          "title": "Kupa ili stožac i njeni elementi"
+        },
+        {
+          "id": "9-07-021",
+          "oblast": "Geometrijska tijela",
+          "title": "Mreža kupe"
+        },
+        {
+          "id": "9-07-022",
+          "oblast": "Geometrijska tijela",
+          "title": "Površina kupe"
+        },
+        {
+          "id": "9-07-023",
+          "oblast": "Geometrijska tijela",
+          "title": "Zapremina kupe"
+        },
+        {
+          "id": "9-07-024",
+          "oblast": "Geometrijska tijela",
+          "title": "Izvodnica kupe"
+        },
+        {
+          "id": "9-07-025",
+          "oblast": "Geometrijska tijela",
+          "title": "Osni presjek kupe"
+        },
+        {
+          "id": "9-07-026",
+          "oblast": "Geometrijska tijela",
+          "title": "Sfera i lopta ili kugla"
+        },
+        {
+          "id": "9-07-027",
+          "oblast": "Geometrijska tijela",
+          "title": "Površina sfere"
+        },
+        {
+          "id": "9-07-028",
+          "oblast": "Geometrijska tijela",
+          "title": "Zapremina lopte"
+        },
+        {
+          "id": "9-07-029",
+          "oblast": "Geometrijska tijela",
+          "title": "Presjek lopte ravni"
+        },
+        {
+          "id": "9-07-030",
+          "oblast": "Geometrijska tijela",
+          "title": "Odnos zapremina prizme i piramide"
+        },
+        {
+          "id": "9-07-031",
+          "oblast": "Geometrijska tijela",
+          "title": "Odnos zapremina valjka i kupe"
+        },
+        {
+          "id": "9-07-032",
+          "oblast": "Geometrijska tijela",
+          "title": "Složeno geometrijsko tijelo"
+        },
+        {
+          "id": "9-07-033",
+          "oblast": "Geometrijska tijela",
+          "title": "Tekstualni zadaci sa površinom i zapreminom"
+        },
+        {
+          "id": "9-07-034",
+          "oblast": "Geometrijska tijela",
+          "title": "Mjerne jedinice površine i zapremine u zadacima sa tijelima"
+        },
+        {
+          "id": "9-07-035",
+          "oblast": "Geometrijska tijela",
+          "title": "Zarubljena piramida"
+        },
+        {
+          "id": "9-07-036",
+          "oblast": "Geometrijska tijela",
+          "title": "Zarubljena kupa"
+        },
+        {
+          "id": "9-07-037",
+          "oblast": "Geometrijska tijela",
+          "title": "Platonova i Arhimedova tijela"
+        },
+        {
+          "id": "9-07-038",
+          "oblast": "Geometrijska tijela",
+          "title": "Masa tijela iz gustine i zapremine"
+        },
+        {
+          "id": "9-08-001",
+          "oblast": "Podaci, vjerovatnoća, finansije i mjerne jedinice",
+          "title": "Uvod u vjerovatnoću i skup elementarnih događaja"
+        },
+        {
+          "id": "9-08-002",
+          "oblast": "Podaci, vjerovatnoća, finansije i mjerne jedinice",
+          "title": "Vjerovatnoća slučajnog događaja"
+        },
+        {
+          "id": "9-08-003",
+          "oblast": "Podaci, vjerovatnoća, finansije i mjerne jedinice",
+          "title": "Donošenje odluke na osnovu vjerovatnoće"
+        },
+        {
+          "id": "9-08-004",
+          "oblast": "Podaci, vjerovatnoća, finansije i mjerne jedinice",
+          "title": "Preračunavanje valuta"
+        },
+        {
+          "id": "9-08-005",
+          "oblast": "Podaci, vjerovatnoća, finansije i mjerne jedinice",
+          "title": "Kamata na štednju"
+        },
+        {
+          "id": "9-08-006",
+          "oblast": "Podaci, vjerovatnoća, finansije i mjerne jedinice",
+          "title": "Kamata na kredit"
+        },
+        {
+          "id": "9-08-007",
+          "oblast": "Podaci, vjerovatnoća, finansije i mjerne jedinice",
+          "title": "Čitanje otplatnog plana"
+        },
+        {
+          "id": "9-08-008",
+          "oblast": "Podaci, vjerovatnoća, finansije i mjerne jedinice",
+          "title": "Lični finansijski budžet"
+        },
+        {
+          "id": "9-08-009",
+          "oblast": "Podaci, vjerovatnoća, finansije i mjerne jedinice",
           "title": "Populacija i uzorak"
         },
         {
-          "id": "9-08-112",
-          "oblast": "Statistika i podaci",
-          "title": "Srednje vrijednosti i primjena"
+          "id": "9-08-010",
+          "oblast": "Podaci, vjerovatnoća, finansije i mjerne jedinice",
+          "title": "Aritmetička sredina i interpretacija podataka"
         },
         {
-          "id": "9-08-113",
-          "oblast": "Statistika i podaci",
-          "title": "Prikazivanje i tumačenje podataka"
+          "id": "9-08-011",
+          "oblast": "Podaci, vjerovatnoća, finansije i mjerne jedinice",
+          "title": "Pretvaranje mjernih jedinica za dužinu, površinu i zapreminu"
+        },
+        {
+          "id": "9-08-012",
+          "oblast": "Podaci, vjerovatnoća, finansije i mjerne jedinice",
+          "title": "Prefiksi mjernih jedinica kao stepeni broja 10"
+        },
+        {
+          "id": "9-08-013",
+          "oblast": "Podaci, vjerovatnoća, finansije i mjerne jedinice",
+          "title": "Pretvaranje brzine m/s i km/h"
         }
       ]
     }

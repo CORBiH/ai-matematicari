@@ -63,6 +63,25 @@ def test_router_matches_uglovi():
     assert "uglovi" in route_topic_rules("Uglovi", "Ugaone jedinice: stepen, minuta, sekunda")
 
 
+def test_slicni_trouglovi_lesson_does_not_route_uglovi():
+    """Live nalaz iz novog kurikuluma: 'trouglova' sadrži 'ugao' kao goli
+    podstring pa je pogrešno povlačio 'uglovi' blok za lekcije o sličnosti
+    trouglova koje nemaju veze sa stepen/minuta/sekunda računom uglova."""
+    ids = route_topic_rules(
+        "Proporcionalnost, Talesova teorema i sličnost", "Površine sličnih trouglova"
+    )
+    assert "uglovi" not in ids
+
+
+def test_pravougaonik_lesson_does_not_route_uglovi():
+    ids = route_topic_rules("Pitagorina teorema i primjene u ravni", "Dijagonala pravougaonika")
+    assert "uglovi" not in ids
+
+
+def test_ugao_oblique_case_still_routes_uglovi():
+    assert "uglovi" in route_topic_rules("Uglovi", "Pojam ugla, elementi i označavanje")
+
+
 def test_router_matches_koordinatna_geometrija():
     assert "koordinatna_geometrija" in route_topic_rules(
         "Relacije, preslikavanja i koordinatni sistem", "Pravougli koordinatni sistem u ravni"

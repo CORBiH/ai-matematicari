@@ -4,7 +4,9 @@ import threading
 from matbot.session_store import SessionStore
 
 
-def _load(store, session_id="s1", grade=6, lesson="6-01-001", title="Unija skupova", oblast="Skupovi"):
+def _load(store, session_id="s1", grade=6, lesson="6-01-001",
+          title="Pojam skupa, elementi skupa i označavanje",
+          oblast="Skupovi i skupovne operacije"):
     return store.load(session_id=session_id, grade=grade, lesson_id=lesson,
                       lesson_title=title, oblast=oblast, mode="practice")
 
@@ -35,7 +37,7 @@ def test_lesson_change_resets_task():
     s["current_task"] = "Zadatak A"
     s["hint_level"] = 3
     store.save(s)
-    other = _load(store, lesson="6-01-002", title="Presjek skupova")
+    other = _load(store, lesson="6-01-002", title="Načini zadavanja skupa")
     assert other["current_task"] == ""
     assert other["hint_level"] == 0
 

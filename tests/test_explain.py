@@ -425,7 +425,7 @@ def test_practice_still_works_and_uses_one_call(flask_app, fake_llm):
 def test_explain_turn_instructions_include_topic_rules_for_real_lesson():
     fake = FakeLLM()
     fake.queue(make_explain_output(reply="Evo objašnjenja."))
-    run_explain_turn(fake, explain_turn_payload(selected_topic="6-04-031"))  # Razlomci lekcija
+    run_explain_turn(fake, explain_turn_payload(selected_topic="6-04-001"))  # Razlomci lekcija
     instructions, _ = fake.calls[0]
     assert "OBLAST — RAZLOMCI" in instructions
     assert "DOMEN I SIGURNOST" in instructions

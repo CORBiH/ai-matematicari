@@ -3,7 +3,7 @@
 Šalje se samo: uloga+pravila (stabilan prefiks po razredu+lekciji — pogodno za
 prompt caching unutar iste lekcije), lekcija, aktivni zadatak + pomoćni
 očekivani odgovor + hint nivo, do 3 prethodna zadatka, do 3 razmjene,
-intent/difficulty_request flagovi i trenutna poruka. Nikad: svih 359 lekcija,
+intent/difficulty_request flagovi i trenutna poruka. Nikad: svih 534 lekcije,
 puni payload, interni ID-jevi.
 
 Zajednička matematička/jezička pravila (domen, terminologija, MathJax zapis,

@@ -63,6 +63,19 @@ def test_non_numeric_grade_does_not_crash():
     assert data == {"grouped": {}, "oblast_order": []}
 
 
+def test_topics_endpoint_returns_all_four_grades_and_534_lessons():
+    expected_counts = {"6": 119, "7": 122, "8": 131, "9": 162}
+    total = 0
+    for grade, expected in expected_counts.items():
+        r = client().get(f"/api/ai-tutor/topics?grade={grade}")
+        assert r.status_code == 200
+        data = r.get_json()
+        count = sum(len(v) for v in data["grouped"].values())
+        assert count == expected, f"Razred {grade}: očekivano {expected}, dobijeno {count}"
+        total += count
+    assert total == 534
+
+
 def test_index_route_still_works():
     r = client().get("/")
     assert r.status_code == 200

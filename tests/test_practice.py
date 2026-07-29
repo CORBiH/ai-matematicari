@@ -661,7 +661,7 @@ def _backslash_run_length(s, marker):
 def test_practice_turn_instructions_include_topic_rules_for_real_lesson():
     store, fake = SessionStore(), FakeLLM()
     fake.queue(make_output(reply="Evo zadatka.", new_task=make_task()))
-    run_practice_turn(store, fake, turn_payload(selected_topic="6-04-031"))  # Razlomci lekcija
+    run_practice_turn(store, fake, turn_payload(selected_topic="6-04-001"))  # Razlomci lekcija
     instructions, _ = fake.calls[0]
     assert "OBLAST — RAZLOMCI" in instructions
     assert "DOMEN I SIGURNOST" in instructions

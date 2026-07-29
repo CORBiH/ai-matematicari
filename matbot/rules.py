@@ -279,6 +279,13 @@ _SISTEMI_RE = re.compile(
     r"|gausova metoda"
 )
 
+# "ugao"/"uglov" NE smiju se provjeravati kao goli substring — "trougao"/
+# "trouglovi" (trougao) i "pravougaonik" sadrže "ugao" kao podstring bez
+# stvarne veze s uglovima kao temom (npr. "Površine sličnih trouglova",
+# "Dijagonala pravougaonika"). \b osigurava da riječ POČINJE na "ugao"/
+# "uglov" (npr. "Uglovi", "ugla", "uglovima" i dalje pogađaju).
+_UGLOVI_RE = re.compile(r"\b(ugao|uglov)")
+
 # lowercase ključne riječi (bez akcenata gdje treba) → topic-rule ID.
 # Provjerava se protiv (oblast + " " + lesson_title).lower().
 _TOPIC_KEYWORDS = [
@@ -288,8 +295,6 @@ _TOPIC_KEYWORDS = [
     ("korijen", "korijeni"),
     ("koren", "korijeni"),
     ("stepen", "stepeni"),
-    ("ugao", "uglovi"),
-    ("uglov", "uglovi"),
     ("koordinat", "koordinatna_geometrija"),
     ("linearne funkcij", "linearna_funkcija"),
     ("linearna funkcij", "linearna_funkcija"),
@@ -316,6 +321,8 @@ def route_topic_rules(oblast, lesson_title):
         matched.append("jednacine")
     if _SISTEMI_RE.search(haystack):
         matched.append("sistemi")
+    if _UGLOVI_RE.search(haystack):
+        matched.append("uglovi")
     for keyword, rule_id in _TOPIC_KEYWORDS:
         if keyword in haystack and rule_id not in matched:
             matched.append(rule_id)
