@@ -28,10 +28,13 @@ import logging
 import random
 import uuid
 
-from matbot import config, prompts
+from matbot import config, feedback, prompts, task_families
 from matbot.llm import LLMError
 from matbot.mathsafe import sanitize_and_validate_math_text, sanitize_math_text
+from matbot.mathcheck import find_numeric_inconsistencies
 from matbot.schema import InvalidOutputError, validate_output
+from matbot.task_family_validation import FamilyContractError, question_numeric_policy, validate_task_family
+from matbot.terminology import normalize_terminology
 from matbot.topics import lesson_info
 
 logger = logging.getLogger("matbot.practice")
@@ -84,7 +87,20 @@ def _shuffle_options(texts, correct_index):
     return current_options, correct_option_id
 
 
-def _apply_new_task(session, new_task):
+def _reject_if_numerically_inconsistent(text, where):
+    """Odbij tekst u kojem je DOKAZANO nedosljedan numerički lanac jednakosti
+    (matbot/mathcheck.py). Živi nalaz: „$\\frac{3\\cdot16\\sqrt{3}}{2}=48\\sqrt{3}$“.
+
+    Provjera se poziva TEK NAKON sanitizacije, normalizacije terminologije i
+    popravke zalutale zagrade — dakle nad tačno onim tekstom koji bi učenik
+    vidio. Bez drugog AI poziva: nedosljednost = InvalidOutputError, koju
+    pozivalac već hvata i pretvara u postojeći SAFE_ERROR_MESSAGE."""
+    issues = find_numeric_inconsistencies(text)
+    if issues:
+        raise InvalidOutputError(f"{issues[0]} [{where}]")
+
+
+def _apply_new_task(session, new_task, task_family=""):
     """Sanitizuje tekst zadatka i sve 4 opcije, promiješa opcije i primjenjuje
     svježe stanje na sesiju (server je jedini koji dodjeljuje ID-jeve opcijama
     i pamti koji je tačan). Vraća sanitizovan tekst zadatka.
@@ -100,6 +116,16 @@ def _apply_new_task(session, new_task):
     task_text, task_safe = sanitize_and_validate_math_text(new_task.text.strip())
     if not task_safe:
         raise InvalidOutputError("nebezbjedan matematički zapis u tekstu zadatka")
+    task_text = normalize_terminology(task_text)
+
+    # Numerička dosljednost TEKSTA PITANJA: politika je po porodici (server-
+    # derived, matbot/task_family_validation.py). Većina porodica predstavlja
+    # pitanje kao ČINJENICU (provjerava se); porodice gdje je pitanje NAMJERNO
+    # pogrešan predmet ispitivanja („Učenik je napisao... Šta je pogriješio?“,
+    # „Da li uređeni par zadovoljava sistem?“ kad namjerno NE zadovoljava)
+    # preskaču ovu provjeru — vidi question_numeric_policy().
+    if question_numeric_policy(task_family) != "allow_intentional_mismatch":
+        _reject_if_numerically_inconsistent(task_text, "tekst zadatka")
 
     sanitized_texts = []
     for opt in new_task.options:
@@ -108,7 +134,61 @@ def _apply_new_task(session, new_task):
         )
         if not opt_safe:
             raise InvalidOutputError("nebezbjedan matematički zapis u opciji zadatka")
-        sanitized_texts.append(opt_text)
+        sanitized_texts.append(normalize_terminology(opt_text))
+
+    # Tačna opcija i interni očekivani odgovor predstavljaju PRAVU matematiku
+    # (ne izmišljen predmet ispitivanja) — UVIJEK se provjeravaju, bez obzira
+    # na porodicu. Pogrešne opcije (distraktori) se NIKAD numerički ne
+    # provjeravaju — namjerno su pogrešne po dizajnu multiple-choice zadatka
+    # (živi nalaz: distraktor „$3\cdot16/2=48$“ ne smije srušiti cio zadatak).
+    if 0 <= new_task.correct_option_index < len(sanitized_texts):
+        _reject_if_numerically_inconsistent(
+            sanitized_texts[new_task.correct_option_index], "tačna opcija"
+        )
+    _reject_if_numerically_inconsistent(new_task.expected_answer.strip(), "expected_answer")
+
+    # --- UGOVOR PORODICE (server-side, deterministički) --------------------
+    # Prompt je samo sugestija: uživo je potvrđeno da model za dodijeljenu
+    # porodicu ume vratiti zadatak DRUGE porodice. Ovdje se to odbija PRIJE
+    # ikakve mutacije sesije i bez drugog AI poziva. Provjerava se VIDLJIV
+    # tekst (nakon sanitizacije i normalizacije terminologije) — ne samo ono
+    # što je model deklarisao o sebi.
+    try:
+        validate_task_family(
+            task_family,
+            question=task_text,
+            option_texts=sanitized_texts,
+            correct_option_index=new_task.correct_option_index,
+            expected_answer=new_task.expected_answer,
+            difficulty=new_task.difficulty,
+            declared={
+                "task_family": new_task.task_family,
+                "student_must_find": new_task.student_must_find,
+                "answer_kind": new_task.answer_kind,
+                "task_form": new_task.task_form,
+            },
+        )
+    except FamilyContractError as e:
+        raise InvalidOutputError(f"family_contract_mismatch: {e}") from e
+
+    # Zaštita od ponavljanja — dva nezavisna sloja, oba PRIJE mutacije sesije:
+    #   1. doslovan tekst pitanja (hvata identičan zadatak)
+    #   2. pedagoški oblik bez brojeva (hvata „isti zadatak, drugi brojevi“
+    #      kad ga vrate DVIJE različite porodice — živi nalaz)
+    # Odbijeni zadatak ne mijenja napredovanje, a pozivalac vraća postojeći
+    # sigurni fallback bez 2. AI poziva.
+    signature = task_families.task_signature(
+        task_family, task_text, session["lesson_id"], new_task.difficulty
+    )
+    if task_families.is_duplicate_signature(signature, session["recent_task_signatures"]):
+        raise InvalidOutputError("ponovljen tekst zadatka u istoj sesiji")
+    if task_families.is_duplicate_shape(
+        signature, session["recent_task_signatures"],
+        retry_required=session["retry_required"],
+    ):
+        raise InvalidOutputError(
+            f"pedagogical_shape_repeat: {task_family or '(bez porodice)'}"
+        )
 
     current_options, correct_option_id = _shuffle_options(sanitized_texts, new_task.correct_option_index)
 
@@ -123,6 +203,13 @@ def _apply_new_task(session, new_task):
     session["task_completed"] = False
     session["last_choice_turn_id"] = ""
     session["last_choice_response"] = None
+
+    # Napredovanje: novi zadatak nosi porodicu koju je izabrao SERVER.
+    if task_family:
+        session["current_family"] = task_family
+        if not session["recently_used_families"] or session["recently_used_families"][-1] != task_family:
+            session["recently_used_families"].append(task_family)
+    session["recent_task_signatures"].append(signature)
     return task_text
 
 
@@ -167,6 +254,20 @@ def _handle_text_turn(store, llm, session, turn, lesson_id, request_id):
     # commituje (store.save) osim na uspješnom kraju ove funkcije.
     active_task_before_llm = session["current_task"]
 
+    # Porodicu zadatka bira SERVER, prije jedinog AI poziva u turnu — model je
+    # samo dobije kao obavezu. Time rotacija vrsta zadataka ne zavisi od toga
+    # hoće li se model „sjetiti“ da promijeni obrazac.
+    applicable = task_families.applicable_families(
+        turn["grade"], session["oblast"], session["lesson_title"]
+    )
+    selected_family = task_families.select_family(
+        applicable,
+        recently_used=session["recently_used_families"],
+        completed_families=session["correctly_completed_families"],
+        retry_required=session["retry_required"],
+        current_family=session["current_family"],
+    )
+
     instructions = prompts.build_instructions(
         turn["grade"], lesson_title=session["lesson_title"], oblast=session["oblast"]
     )
@@ -176,6 +277,8 @@ def _handle_text_turn(store, llm, session, turn, lesson_id, request_id):
         intent=turn["intent"],
         difficulty_request=turn["difficulty_request"],
         interaction_phase=turn["interaction_phase"],
+        task_family=selected_family,
+        task_family_description=task_families.describe(selected_family),
     )
 
     try:
@@ -192,12 +295,14 @@ def _handle_text_turn(store, llm, session, turn, lesson_id, request_id):
 
         task_text = active_task_before_llm
         if out.new_task is not None:
-            task_text = _apply_new_task(session, out.new_task)
+            task_text = _apply_new_task(session, out.new_task, task_family=selected_family)
 
         # vidljivi odgovor: reply + (novi zadatak, ako postoji i nije već u replyju)
         reply, reply_safe = sanitize_and_validate_math_text(out.reply.strip())
         if not reply_safe:
             raise InvalidOutputError("nebezbjedan matematički zapis u odgovoru")
+        reply = normalize_terminology(reply)
+        _reject_if_numerically_inconsistent(reply, "reply")
         if out.new_task is not None and task_text not in reply:
             answer = reply + "\n\nZadatak: " + task_text
         else:
@@ -283,9 +388,20 @@ def _handle_choice_answer(store, llm, session, turn, lesson_id, request_id):
     if is_correct:
         session["correct_streak"] += 1
         session["task_completed"] = True
+        # Napredovanje: porodica je savladana → sljedeći zadatak MORA biti druga
+        # porodica (select_family to garantuje), a eventualni retry se poništava.
+        session["last_result"] = "correct"
+        session["retry_required"] = False
+        current_family = session["current_family"]
+        if current_family and current_family not in session["correctly_completed_families"]:
+            session["correctly_completed_families"].append(current_family)
     else:
         session["correct_streak"] = 0
         session["wrong_option_ids"].append(selected_option_id)
+        # Netačno → ista porodica se ponavlja s drugim vrijednostima i istom
+        # težinom. Porodica se NE upisuje u savladane.
+        session["last_result"] = "incorrect"
+        session["retry_required"] = True
         if wrong_attempts_before >= 1:
             session["task_completed"] = True  # drugi pogrešan klik → kraj zadatka
 
@@ -303,9 +419,15 @@ def _handle_choice_answer(store, llm, session, turn, lesson_id, request_id):
         },
     )
 
+    # Prvi pogrešan klik: server SAM sastavlja vidljiv odgovor iz 'hint'
+    # („Netačno.“ + hint, vidi matbot/feedback.py) — prazan 'reply' je tu
+    # bezopasan dok god je 'hint' prisutan. Svaki drugi ishod (tačno, drugi
+    # pogrešan/reveal) i dalje zahtijeva neprazan 'reply' kao stvaran sadržaj.
+    first_wrong = (not is_correct) and (wrong_attempts_before == 0)
+
     try:
         result = llm.practice_turn(instructions, input_text)
-        validate_output(result.output)
+        validate_output(result.output, require_reply=not first_wrong)
         out = result.output
 
         # Server verdikt UVIJEK ima prednost. Model smije samo objašnjavati —
@@ -321,6 +443,32 @@ def _handle_choice_answer(store, llm, session, turn, lesson_id, request_id):
         reply, reply_safe = sanitize_and_validate_math_text(out.reply.strip())
         if not reply_safe:
             raise InvalidOutputError("nebezbjedan matematički zapis u odgovoru")
+        reply = normalize_terminology(reply)
+
+        # Netačan klik: server SAM oblikuje vidljivi tekst (vidi matbot/feedback.py).
+        # Prvi pogrešan → „Netačno.“ + jedan sažet hint, bez dokazivanja i bez
+        # otkrivanja tačne opcije. Drugi pogrešan → „Netačno.“ + postojeće
+        # otkrivanje rješenja. Hint prolazi ISTU math-safety granicu kao reply.
+        if not is_correct:
+            if wrong_attempts_before >= 1:
+                reply = feedback.shape_final_wrong_prefix(reply)
+            else:
+                hint_source = ""
+                if out.hint:
+                    hint_text, hint_safe = sanitize_and_validate_math_text(out.hint.strip())
+                    if hint_safe:
+                        hint_source = normalize_terminology(hint_text)
+                reply = feedback.shape_first_wrong_feedback(
+                    hint_source,
+                    reply,
+                    correct_option_text=options_by_id[session["correct_option_id"]]["text"],
+                    expected_answer=session["expected_answer_summary"],
+                )
+
+        # Provjera numeričke dosljednosti nad KONAČNIM vidljivim tekstom (nakon
+        # oblikovanja feedbacka/reveala) — pogrešan račun u otkrivenom rješenju
+        # jednako je štetan kao u zadatku.
+        _reject_if_numerically_inconsistent(reply, "choice_feedback")
 
         session["recent_turns"].append({
             "student": f"[izabrao opciju: {selected_text}]"[:300],

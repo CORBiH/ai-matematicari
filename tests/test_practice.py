@@ -137,16 +137,20 @@ def test_number_in_message_that_is_not_an_answer():
 def test_new_task_request_replaces_task_and_matches_last_tutor_task():
     store, fake = SessionStore(), FakeLLM()
     start_session(store, fake)
+    # Drugi zadatak mora imati DRUGAČIJI pedagoški oblik od prvog — server
+    # dodjeljuje drugu porodicu, pa „isto pitanje s drugim brojevima“ pada na
+    # pedagogical_shape zaštitu (vidi task_families.is_duplicate_shape).
     fake.queue(make_output(reply="Može, evo novog.",
-                           new_task=make_task(text="Skrati razlomak $\\frac{18}{24}$.", expected="3/4")))
+                           new_task=make_task(text="Dopuni: $7 + \\square = 15$.", expected="8",
+                                              options=make_options("8", "7", "9", "22"))))
     r = run_practice_turn(store, fake, turn_payload(msg="daj novi zadatak"))
-    assert r["last_tutor_task"] == "Skrati razlomak $\\frac{18}{24}$."
-    assert r["next_state"]["task"]["question"] == "Skrati razlomak $\\frac{18}{24}$."
-    assert "Skrati razlomak $\\frac{18}{24}$." in r["answer"]
+    assert r["last_tutor_task"] == "Dopuni: $7 + \\square = 15$."
+    assert r["next_state"]["task"]["question"] == "Dopuni: $7 + \\square = 15$."
+    assert "Dopuni: $7 + \\square = 15$." in r["answer"]
     sess = store.peek("sess-1")
-    assert sess["expected_answer_summary"] == "3/4"
+    assert sess["expected_answer_summary"] == "8"
     assert sess["hint_level"] == 0
-    assert sess["recent_tasks"][-1] == "Skrati razlomak $\\frac{18}{24}$."
+    assert sess["recent_tasks"][-1] == "Dopuni: $7 + \\square = 15$."
 
 
 def test_task_hidden_only_in_reply_does_not_change_active_task():
@@ -162,13 +166,25 @@ def test_task_hidden_only_in_reply_does_not_change_active_task():
 def test_easier_and_harder_requests_flow_to_prompt():
     store, fake = SessionStore(), FakeLLM()
     start_session(store, fake)
+    # Svaki naredni zadatak dolazi iz DRUGE porodice, pa mora imati i drugačiji
+    # pedagoški oblik (inače ga hvata is_duplicate_shape).
     fake.queue(make_output(reply="Evo lakšeg.",
-                           new_task=make_task(text="Skrati razlomak $\\frac{6}{8}$.", expected="3/4", difficulty="easy")))
+                           new_task=make_task(text="Dopuni: $4 + \\square = 9$.", expected="5",
+                                              options=make_options("5", "4", "6", "13"),
+                                              difficulty="easy")))
     r1 = run_practice_turn(store, fake, turn_payload(msg="Daj mi lakši zadatak.", difficulty_request="easier"))
     assert "difficulty_request=easier" in fake.calls[1][1]
     assert store.peek("sess-1")["difficulty"] == "easy"
     fake.queue(make_output(reply="Evo težeg.",
-                           new_task=make_task(text="Skrati $\\frac{84}{126}$ i objasni postupak.", expected="2/3", difficulty="hard")))
+                           new_task=make_task(
+                               text="Koja tvrdnja o skraćivanju razlomaka je tačna?",
+                               expected="Dijele se i brojnik i nazivnik.",
+                               options=make_options(
+                                   "Dijele se i brojnik i nazivnik istim brojem.",
+                                   "Dijeli se samo brojnik.",
+                                   "Dijeli se samo nazivnik.",
+                                   "Sabiraju se brojnik i nazivnik."),
+                               difficulty="hard")))
     r2 = run_practice_turn(store, fake, turn_payload(msg="Daj mi teži zadatak.", difficulty_request="harder"))
     assert "difficulty_request=harder" in fake.calls[2][1]
     assert store.peek("sess-1")["difficulty"] == "hard"

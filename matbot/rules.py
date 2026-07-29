@@ -19,6 +19,8 @@ data/topics.json — nema "5" ključa). Ne uvodi 5. razred u runtime prompt.
 """
 import re
 
+from matbot import geometry_rules
+
 # ---------------------------------------------------------------------------
 # 1) SIGURNOST I DOMEN
 # ---------------------------------------------------------------------------
@@ -57,7 +59,11 @@ _LANGUAGE_RULES = (
     "nazivnik, količnik, djeljenik, djelilac, tjeme (vrh, kad treba objasniti termin), "
     "linijar (lenjir, kad se prvi put spominje pribor).\n"
     "- Zabranjeni termini: kutomer, jednakokračni, zbroj, suma (za osnovnoškolski zbir), "
-    "potenciranje, samo „lenjir“ bez „linijar“ pri prvom spominjanju pribora.\n"
+    "potenciranje, čimbenik (u SVIM padežima), samo „lenjir“ bez „linijar“ pri prvom "
+    "spominjanju pribora.\n"
+    "- Za rastavljanje na činioce i množenje UVIJEK koristi riječ „faktor“ (faktora, "
+    "faktori, faktore, faktorom, faktorima) ili „činilac“ — NIKAD hrvatski „čimbenik“, "
+    "ni u jednom padežu, ni u zadatku, ni u opcijama, ni u hintu, ni u objašnjenju.\n"
     "- Za dvostruke nazive ne ponavljaj oba izraza u svakoj rečenici: prvi put "
     "„linijar (lenjir)“ / „tjeme (vrh)“, poslije u istom odgovoru samo „linijar“ / „tjeme“.\n"
     "- Ako učenik koristi pogrešnu riječ, ne posramljuj ga — razumij šta misli i "
@@ -85,6 +91,17 @@ _MATH_NOTATION_RULES = (
     "- Množenje: $\\cdot$. Školsko dijeljenje u običnom zapisu: „:“ (npr. $12:4$).\n"
     "- Stepen: $x^2$, $a^3$, $(2x)^2$. Korijen: $\\sqrt{20}$.\n"
     "- Decimalni separator u zapisu vidljivom učeniku je zarez: $2,5$, $0,75$ — nikad tačka.\n"
+    "\n"
+    "OBAVEZNA SAMOPROVJERA RAČUNA (prije nego pošalješ odgovor):\n"
+    "- PONOVO izračunaj svaku numeričku zamjenu koju si napisao i provjeri SVAKU "
+    "uzastopnu jednakost u lancu. Ako lanac glasi $A=B=C$, onda i $A=B$ i $B=C$ moraju "
+    "stvarno vrijediti — česta greška je „izgubiti“ dijeljenje ili množenje u jednom "
+    "koraku (npr. $\\frac{3\\cdot16\\sqrt{3}}{2}$ je $24\\sqrt{3}$, NIKAD $48\\sqrt{3}$).\n"
+    "- Zadrži TAČAN oblik s korijenom/π prije decimalne aproksimacije.\n"
+    "- Decimalnu aproksimaciju daj samo kad je stvarno korisna; kad je daš, provjeri je "
+    "u odnosu na tačan oblik (npr. $24\\sqrt{3}\\approx41,57$, a NE $\\approx83,14$).\n"
+    "- Server deterministički provjerava numeričku dosljednost i ODBACUJE cijeli odgovor "
+    "s nedosljednim lancem — učenik tada ne dobije ništa, pa je bolje računati pažljivo.\n"
     "- Kad vraćaš JSON string koji sadrži LaTeX, svaki backslash LaTeX komande "
     "(\\frac, \\times, \\sqrt, \\cdot, ...) mora biti ISPRAVNO JSON-escapeovan (dupli "
     "backslash) tako da nakon parsiranja rezultat sadrži literalnu komandu poput "
@@ -398,6 +415,13 @@ def build_shared_math_rules(grade, lesson_title, oblast, mode, student_message="
         block = _TOPIC_METHOD_RULES.get(topic_id)
         if block:
             parts.append(block)
+
+    # Geometrijske oznake i formule (kanonska BiH konvencija, vidi
+    # matbot/geometry_rules.py) — prazan string za negeometrijske lekcije, pa
+    # nijedna formula ne curi u lekciju kojoj ne pripada.
+    geometry = geometry_rules.build_geometry_rules(oblast, lesson_title, mode=mode)
+    if geometry:
+        parts.append(geometry)
 
     if _is_construction_topic(oblast, lesson_title):
         construction = _GEOMETRY_CONSTRUCTION_RULES

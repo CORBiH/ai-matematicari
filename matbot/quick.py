@@ -12,9 +12,11 @@ import uuid
 
 from matbot import prompts
 from matbot.llm import LLMError
+from matbot.mathcheck import find_numeric_inconsistencies
 from matbot.mathsafe import sanitize_and_validate_math_text
 from matbot.practice import SAFE_ERROR_MESSAGE
 from matbot.schema import InvalidOutputError, validate_quick_output
+from matbot.terminology import normalize_terminology
 from matbot.topics import lesson_info
 
 logger = logging.getLogger("matbot.quick")
@@ -81,6 +83,15 @@ def run_quick_turn(llm, turn):
     answer, is_safe = sanitize_and_validate_math_text(result.output.reply.strip())
     if not is_safe:
         logger.warning("quick_turn request_id=%s category=unsafe_math_output", request_id)
+        return {"answer": SAFE_ERROR_MESSAGE, "last_tutor_task": ""}
+    answer = normalize_terminology(answer)
+
+    # Numerička dosljednost lanca jednakosti (matbot/mathcheck.py). Quick vraća
+    # gotov rezultat, pa je pogrešan račun ovdje najvidljiviji učeniku.
+    numeric_issues = find_numeric_inconsistencies(answer)
+    if numeric_issues:
+        logger.warning("quick_turn request_id=%s category=invalid_output detail=%s",
+                       request_id, numeric_issues[0])
         return {"answer": SAFE_ERROR_MESSAGE, "last_tutor_task": ""}
 
     logger.info(

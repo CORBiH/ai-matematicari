@@ -25,6 +25,30 @@ class NewTask(BaseModel):
     options: list[Option]
     correct_option_index: int
 
+    # --- INTERNI metapodaci o pedagoškom obliku (server-only) ---------------
+    # Model ih deklariše, server ih UNAKRSNO provjerava s dodijeljenom
+    # porodicom I sa stvarnim vidljivim tekstom (matbot/task_family_validation.py).
+    # NIKAD ne idu u browser (vidi practice._next_state). Deklaracija sama po
+    # sebi NIJE dokaz — model može tvrditi ispravnu porodicu a generisati
+    # pogrešan zadatak, pa strukturna provjera ostaje obavezna.
+    # Opcionalni su radi kompatibilnosti sa starijim odgovorima; kad izostanu,
+    # preskače se samo unakrsna provjera metapodataka.
+    task_family: Optional[str] = None
+    student_must_find: Optional[Literal[
+        "expanded_fraction", "expansion_factor", "missing_numerator", "missing_denominator",
+        "equivalent_fraction", "incorrect_step", "variable_value", "ordered_pair",
+        "formula", "missing_dimension", "method", "number_of_solutions",
+        "value", "statement", "comparison", "unit_value", "next_step",
+    ]] = None
+    answer_kind: Optional[Literal[
+        "integer", "decimal", "fraction", "ordered_pair", "expression",
+        "formula", "option_label", "short_text",
+    ]] = None
+    task_form: Optional[Literal[
+        "direct_calculation", "missing_value", "recognition", "error_detection",
+        "method_selection", "interpretation", "word_problem", "construction_step",
+    ]] = None
+
 
 class PracticeTurnOutput(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -33,6 +57,11 @@ class PracticeTurnOutput(BaseModel):
     evaluation: Optional[Literal["correct", "partially_correct", "incorrect"]]
     gave_hint: bool
     new_task: Optional[NewTask]
+    # Sažet sljedeći korak, odvojen od 'reply'. Server ga koristi da SAM sastavi
+    # kratak feedback na prvi pogrešan klik („Netačno.“ + hint) — vidi
+    # matbot/feedback.py. Opcionalno: stari klijenti šeme i dalje prolaze, a
+    # kad izostane, server pada nazad na 'reply'. Nikad ne ide u browser sirov.
+    hint: Optional[str] = None
 
 
 class ExplainTurnOutput(BaseModel):
@@ -61,7 +90,7 @@ class InvalidOutputError(ValueError):
     """AI odgovor je strukturno validan JSON, ali sadržajno neupotrebljiv."""
 
 
-def validate_output(out: PracticeTurnOutput) -> None:
+def validate_output(out: PracticeTurnOutput, require_reply: bool = True) -> None:
     """Server-side provjere povrh strict JSON šeme. Baca InvalidOutputError.
 
     NAPOMENA O OBIMU: server ovdje provjerava SAMO strukturu (neprazna polja,
@@ -73,11 +102,26 @@ def validate_output(out: PracticeTurnOutput) -> None:
     "Novi zadatak ostaje u ISTOJ lekciji...") — fake testovi mogu dokazati samo
     da se prompt instrukcija ŠALJE modelu, ne da je model poštuje. Da li model
     stvarno ostaje u temi je pitanje za live eval set, ne za ovaj validator.
+
+    require_reply=False: SAMO za prvi pogrešan klik (vidi
+    practice._handle_choice_answer) — tamo server SAM sastavlja vidljiv
+    odgovor iz 'hint' („Netačno.“ + hint, matbot/feedback.py), pa je prazan
+    'reply' bezopasan DOK GOD je 'hint' prisutan i neprazan. Svaki drugi put
+    (novi zadatak, tačan odgovor, drugi pogrešan klik/reveal, obično pitanje)
+    poziva se s podrazumijevanim require_reply=True — tu reply nosi stvarni
+    sadržaj koji učenik čita, pa ostaje obavezan kao i prije.
     """
-    if not (out.reply or "").strip():
-        raise InvalidOutputError("prazan reply")
+    reply_present = bool((out.reply or "").strip())
+    hint_present = bool((out.hint or "").strip())
+    if not reply_present:
+        if require_reply:
+            raise InvalidOutputError("prazan reply")
+        if not hint_present:
+            raise InvalidOutputError("prazan reply i prazan hint")
     if len(out.reply) > config.MAX_REPLY_CHARS:
         raise InvalidOutputError("predug reply")
+    if out.hint is not None and len(out.hint) > config.MAX_REPLY_CHARS:
+        raise InvalidOutputError("predug hint")
     if out.new_task is not None:
         if not (out.new_task.text or "").strip():
             raise InvalidOutputError("novi zadatak bez teksta")

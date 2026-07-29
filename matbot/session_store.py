@@ -30,6 +30,15 @@ def _fresh_session(session_id, context_key, grade, lesson_id, lesson_title, obla
         "task_completed": False,     # True nakon tačnog klika / 2. pogrešnog / "uradi ga ti"
         "last_choice_turn_id": "",   # client_turn_id zadnjeg obrađenog choice_answer
         "last_choice_response": None,  # cache odgovora za idempotentan retry
+        # --- napredovanje kroz porodice zadataka (vidi matbot/task_families.py) ---
+        # Sva ova polja žive UNUTAR sesije, a context_key sadrži lesson_id — pa
+        # promjena lekcije automatski daje svježe napredovanje (izolacija po temi).
+        "current_family": "",            # porodica AKTIVNOG zadatka
+        "recently_used_families": [],    # hronološki, max MAX_RECENT_FAMILIES
+        "correctly_completed_families": [],  # porodice savladane tačnim odgovorom
+        "retry_required": False,         # True nakon netačnog → ista porodica ponovo
+        "last_result": "",               # "", "correct" ili "incorrect"
+        "recent_task_signatures": [],    # max MAX_RECENT_SIGNATURES potpisa zadataka
     }
 
 
@@ -61,6 +70,10 @@ class SessionStore:
         """Upisuje sesiju; primjenjuje limite historije i limit ukupnog broja sesija."""
         session["recent_tasks"] = session["recent_tasks"][-config.MAX_RECENT_TASKS:]
         session["recent_turns"] = session["recent_turns"][-config.MAX_RECENT_TURNS:]
+        session["recently_used_families"] = \
+            session["recently_used_families"][-config.MAX_RECENT_FAMILIES:]
+        session["recent_task_signatures"] = \
+            session["recent_task_signatures"][-config.MAX_RECENT_SIGNATURES:]
         with self._lock:
             self._sessions.pop(session["session_id"], None)
             self._sessions[session["session_id"]] = copy.deepcopy(session)

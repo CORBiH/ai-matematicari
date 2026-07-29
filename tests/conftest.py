@@ -20,9 +20,9 @@ from matbot.session_store import SessionStore  # noqa: E402
 from matbot.turnlock import TurnLockRegistry  # noqa: E402
 
 
-def make_output(reply="U redu.", evaluation=None, gave_hint=False, new_task=None):
+def make_output(reply="U redu.", evaluation=None, gave_hint=False, new_task=None, hint=None):
     return PracticeTurnOutput(
-        reply=reply, evaluation=evaluation, gave_hint=gave_hint, new_task=new_task
+        reply=reply, evaluation=evaluation, gave_hint=gave_hint, new_task=new_task, hint=hint
     )
 
 
@@ -38,13 +38,112 @@ def make_options(*texts):
     return [Option(text=t) for t in texts]
 
 
-def make_task(text="Skrati razlomak $\\frac{20}{32}$.", expected="5/8", difficulty="standard",
-              options=None, correct_option_index=0):
+# Default zadatak MORA zadovoljiti ugovor porodice (matbot/task_family_validation.py):
+# „proširi ... nazivnik“ + četiri razlomka = expand_to_given_denominator, a ujedno
+# ne pokreće nijedan zabranjeni oblik opštih (fallback) porodica. Raniji
+# placeholder („Zadatak.“ + opcije a/b/c/d) nije opisivao nikakvu stvarnu
+# pedagošku operaciju i sada ga server s pravom odbija.
+DEFAULT_TASK_TEXT = "Proširi razlomak $\\frac{3}{8}$ tako da nazivnik bude $24$."
+DEFAULT_TASK_OPTIONS = ("$\\frac{9}{24}$", "$\\frac{3}{24}$", "$\\frac{9}{8}$", "$\\frac{6}{24}$")
+
+
+def make_task(text=DEFAULT_TASK_TEXT, expected="$\\frac{9}{24}$", difficulty="standard",
+              options=None, correct_option_index=0, task_family=None,
+              student_must_find=None, answer_kind=None, task_form=None):
     if options is None:
-        options = make_options("5/8", "10/16", "5/4", "4/5")
+        options = make_options(*DEFAULT_TASK_OPTIONS)
     return NewTask(
         text=text, expected_answer=expected, difficulty=difficulty,
         options=options, correct_option_index=correct_option_index,
+        task_family=task_family, student_must_find=student_must_find,
+        answer_kind=answer_kind, task_form=task_form,
+    )
+
+
+# Zadaci koji zadovoljavaju ugovor SVAKE porodice — koriste ih integracijski
+# testovi koji generišu više zadataka zaredom (server svaki put dodijeli drugu
+# porodicu, pa svaki zadatak mora odgovarati SVOJOJ porodici).
+_FAMILY_TASK_TEMPLATES = {
+    # --- razlomci ---
+    "expand_to_given_denominator": (
+        "Proširi razlomak $\\frac{3}{8}$ tako da nazivnik bude $24$.",
+        ("$\\frac{9}{24}$", "$\\frac{3}{24}$", "$\\frac{9}{8}$", "$\\frac{6}{24}$"),
+    ),
+    "find_expansion_factor": (
+        "Razlomak $\\frac{2}{5}$ proširen je na $\\frac{8}{20}$. Kojim brojem je proširen?",
+        ("4", "2", "3", "5"),
+    ),
+    "find_missing_numerator": (
+        "Dopuni jednakost: $\\frac{3}{7} = \\frac{?}{35}$.",
+        ("15", "10", "12", "21"),
+    ),
+    "recognize_equivalent_fraction": (
+        "Koji od navedenih razlomaka je jednak razlomku $\\frac{4}{9}$?",
+        ("$\\frac{16}{36}$", "$\\frac{4}{36}$", "$\\frac{12}{36}$", "$\\frac{20}{36}$"),
+    ),
+    "fraction_operation": (
+        "Izračunaj $\\frac{2}{7} + \\frac{3}{7}$.",
+        ("$\\frac{5}{7}$", "$\\frac{5}{14}$", "$\\frac{6}{7}$", "$\\frac{1}{7}$"),
+    ),
+    "compare_fractions": (
+        "Koji je razlomak veći: $\\frac{3}{5}$ ili $\\frac{5}{8}$?",
+        ("$\\frac{5}{8}$", "$\\frac{3}{5}$", "$\\frac{4}{5}$", "$\\frac{2}{8}$"),
+    ),
+    "detect_student_error": (
+        "Učenik je napisao $\\frac{1}{2}+\\frac{1}{3}=\\frac{2}{5}$. Šta je pogriješio?",
+        ("Sabrao je brojnike i nazivnike odvojeno.",
+         "Pogrešno je skratio rezultat.",
+         "Zamijenio je brojnik i nazivnik.",
+         "Pomnožio je umjesto da sabere."),
+    ),
+    "fraction_word_problem": (
+        "Amar je pojeo $\\frac{2}{8}$ torte, a Lejla $\\frac{3}{8}$ torte. "
+        "Koliko su torte ukupno pojeli zajedno?",
+        ("$\\frac{5}{8}$", "$\\frac{5}{16}$", "$\\frac{6}{8}$", "$\\frac{1}{8}$"),
+    ),
+    # --- opšte (fallback) ---
+    "direct_computation": (
+        "Izračunaj $12 \\cdot 4$.",
+        ("48", "16", "36", "44"),
+    ),
+    "find_missing_value": (
+        "Dopuni: $7 + \\square = 15$.",
+        ("8", "7", "9", "22"),
+    ),
+    "recognize_correct_statement": (
+        "Koja tvrdnja o uniji skupova je tačna?",
+        ("Unija sadrži sve elemente oba skupa.",
+         "Unija sadrži samo zajedničke elemente.",
+         "Unija je uvijek prazan skup.",
+         "Unija sadrži samo elemente prvog skupa."),
+    ),
+    "compare_or_order": (
+        "Koji je broj veći: $-5$ ili $-3$?",
+        ("-3", "-5", "Jednaki su.", "Nije moguće odrediti."),
+    ),
+    "word_problem": (
+        "Amar ima 12 KM i kupi svesku za 5 KM u prodavnici. Koliko mu novca ostaje?",
+        ("7", "17", "5", "12"),
+    ),
+}
+
+
+def make_task_for_family(family_id, difficulty="standard", suffix=""):
+    """Vrati NewTask koji ZADOVOLJAVA ugovor date porodice.
+
+    `suffix` dopisuje kratak tekst da dva zadatka iste porodice ne budu
+    doslovno identična (duplicate-signature zaštita)."""
+    template = _FAMILY_TASK_TEMPLATES.get(family_id)
+    if template is None:
+        raise AssertionError(f"Nema test-template za porodicu {family_id!r}")
+    text, options = template
+    return make_task(
+        text=text + suffix,
+        expected="interno rješenje",
+        difficulty=difficulty,
+        options=make_options(*options),
+        correct_option_index=0,
+        task_family=family_id,
     )
 
 
@@ -133,6 +232,7 @@ def client(flask_app):
 
 # eksporti za testove
 __all__ = [
-    "FakeLLM", "make_output", "make_task", "make_options",
+    "FakeLLM", "make_output", "make_task", "make_options", "make_task_for_family",
     "make_explain_output", "make_quick_output", "LLMTimeout", "LLMUnavailable",
+    "DEFAULT_TASK_TEXT", "DEFAULT_TASK_OPTIONS",
 ]

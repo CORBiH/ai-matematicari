@@ -178,6 +178,53 @@ def wrap_isolated_frac_tokens(text: str) -> str:
     return "$".join(parts)
 
 
+def repair_stray_terminal_brace(text: str) -> str:
+    """Ukloni TAČNO JEDNU zalutalu zatvarajuću vitičastu zagradu „}“ na SAMOM
+    kraju vidljivog teksta (prije eventualnog praznog prostora), kad je
+    sigurno da je zalutala — živi nalaz: model je znao vratiti hint koji se
+    doslovno završava s „...$y=3$.}“ (višak „}“ bez ikakvog para).
+
+    Popravka se primjenjuje SAMO kad su ISPUNJENI svi uslovi:
+      1. Zagrada je IZVAN svakog $...$ segmenta (nikad se ne dira sadržaj
+         unutar $...$ — $x^{2}$, $\\frac{3}{4}$, $P_{DP}$ ostaju netaknuti).
+      2. Nalazi se na samom kraju teksta (dozvoljen prateći razmak).
+      3. Nije dio „}}“ (dvije ili više zaredom) — to je složeniji slučaj,
+         ostavlja se netaknut.
+      4. Brojanje „{“/„}“ preko CIJELOG teksta IZVAN $...$ pokazuje TAČNO
+         jednu višak zatvarajuću zagradu (tj. uklanjanjem ove jedne zagrade
+         cijeli tekst izvan $...$ postaje uravnotežen) — ako je bilo koji
+         drugi par u tekstu već neuravnotežen (npr. „Tekst {primjer“ bez
+         zatvaranja), ne pogađamo koja je „prava“ višak zagrada i ništa se
+         ne dira.
+
+    Balansirane proze zagrade (npr. „Tekst {primjer}“, „Skup je ${1,2,3}$“
+    gdje su zagrade unutar $...$) i sve zagrade unutar $...$ ostaju uvijek
+    netaknute — ova funkcija NIKAD ne modifikuje sadržaj unutar $...$.
+    """
+    if not text or "}" not in text:
+        return text or ""
+
+    parts = _DOLLAR_SPLIT.split(text)
+    if len(parts) % 2 == 0:
+        return text  # neparan broj '$' (nezatvoren segment) — nije naš posao
+
+    last = parts[-1]
+    stripped = last.rstrip()
+    if not stripped.endswith("}") or stripped.endswith("}}"):
+        return text
+
+    outside_text = "".join(parts[i] for i in range(0, len(parts), 2))
+    if outside_text.count("{") != outside_text.count("}") - 1:
+        return text  # ostatak teksta izvan $...$ već nebalansiran na drugi način — ne pogađaj
+
+    trailing_ws = last[len(stripped):]
+    new_last = stripped[:-1] + trailing_ws
+    if not new_last.strip():
+        return text  # uklanjanje bi ostavilo prazan tekst — ne diraj
+    parts[-1] = new_last
+    return "$".join(parts)
+
+
 def _looks_like_pure_math_expression(text: str) -> bool:
     """True SAMO kad je cio (stripovan) string sastavljen isključivo od
     znakova koji se očekuju u matematičkom izrazu (cifre, osnovni operatori,
@@ -243,5 +290,6 @@ def sanitize_and_validate_math_text(text: str, allow_whole_expression_wrap: bool
         cleaned = "$" + cleaned.strip() + "$"
     else:
         cleaned = wrap_isolated_frac_tokens(cleaned)
+    cleaned = repair_stray_terminal_brace(cleaned)
     issues = find_unsafe_math_issues(cleaned)
     return cleaned, (len(issues) == 0)

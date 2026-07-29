@@ -12,9 +12,11 @@ import uuid
 
 from matbot import config, prompts
 from matbot.llm import LLMError
+from matbot.mathcheck import find_numeric_inconsistencies
 from matbot.mathsafe import sanitize_and_validate_math_text
 from matbot.practice import SAFE_ERROR_MESSAGE
 from matbot.schema import InvalidOutputError, validate_explain_output
+from matbot.terminology import normalize_terminology
 from matbot.topics import lesson_info
 
 logger = logging.getLogger("matbot.explain")
@@ -85,6 +87,16 @@ def run_explain_turn(llm, turn):
     answer, is_safe = sanitize_and_validate_math_text(result.output.reply.strip())
     if not is_safe:
         logger.warning("explain_turn request_id=%s category=unsafe_math_output", request_id)
+        return {"answer": SAFE_ERROR_MESSAGE, "last_tutor_task": ""}
+    answer = normalize_terminology(answer)
+
+    # Numerička dosljednost lanca jednakosti (matbot/mathcheck.py) — živi nalaz
+    # je bio baš u Explain modu ($\frac{3\cdot16\sqrt{3}}{2}=48\sqrt{3}$).
+    # Bez drugog AI poziva: dokazana nedosljednost → isti sigurni fallback.
+    numeric_issues = find_numeric_inconsistencies(answer)
+    if numeric_issues:
+        logger.warning("explain_turn request_id=%s category=invalid_output detail=%s",
+                       request_id, numeric_issues[0])
         return {"answer": SAFE_ERROR_MESSAGE, "last_tutor_task": ""}
 
     logger.info(

@@ -10,6 +10,7 @@ Zajednička matematička/jezička pravila (domen, terminologija, MathJax zapis,
 pravila razreda i oblasti) dolaze iz matbot/rules.py:build_shared_math_rules —
 ovaj fajl dodaje SAMO mode-specifične (Practice/Explain/Quick) instrukcije.
 """
+from matbot import task_family_validation
 from matbot.rules import build_shared_math_rules
 
 _GRADE_STYLE = {
@@ -68,6 +69,21 @@ def build_instructions(grade: int, lesson_title: str = "", oblast: str = "") -> 
         "- Novi zadatak ide ISKLJUČIVO u new_task.text (učeniku se prikazuje automatski). U 'reply' NE ponavljaj tekst zadatka.\n"
         "- new_task.expected_answer: kratko interno rješenje ili kriterij tačnosti (učenik ga ne vidi).\n"
         "- Novi zadatak ostaje u ISTOJ lekciji i ne smije ponoviti obrazac ni brojeve iz nedavnih zadataka.\n"
+        "\n"
+        "PORODICA ZADATKA (obavezno kad je u ulazu navedena 'PORODICA ZADATKA'):\n"
+        "- Server je VEĆ izabrao pedagošku porodicu (vrstu operacije) za novi zadatak. "
+        "Napravi zadatak TAČNO te vrste. Ne biraj drugu porodicu, ne preimenuj je i ne "
+        "vraćaj njen naziv u odgovoru — ona je interna oznaka, učenik je ne vidi.\n"
+        "- Porodica opisuje ŠTA se vježba, ne koje brojeve koristiš. Zadatak s drugim "
+        "brojevima ali istom operacijom NIJE nova porodica — npr. „Proširi $\\frac{3}{8}$ "
+        "na nazivnik 24.“ i „Proširi $\\frac{5}{7}$ na nazivnik 28.“ su ISTA porodica i "
+        "ne smiju se smjenjivati kao da su različiti zadaci.\n"
+        "- 'NEDAVNO KORIŠTENE PORODICE' u ulazu su porodice koje si nedavno već obradio — "
+        "novi zadatak NE smije biti nijedna od njih osim kad je eksplicitno naveden "
+        "'PONOVNI POKUŠAJ'.\n"
+        "- PONOVNI POKUŠAJ (nakon netačnog odgovora): zadrži ISTU porodicu, ali napravi "
+        "zadatak s DRUGIM brojevima/kontekstom i drugim opcijama — ista vještina, nova "
+        "provjera. NE povećavaj težinu i ne ponavljaj doslovno prethodni tekst.\n"
         "- Lakši zadatak: manji/pogodniji brojevi, manje koraka, direktnija formulacija, dodatni oslonac. "
         "Teži: dodatni smisleni korak, manje očigledna metoda, veći brojevi, kratko obrazloženje ili primjena — ali ista lekcija.\n"
         "- Ne pravi besmislene zadatke u kojima jedan korak bez cilja poništava prethodni.\n"
@@ -100,6 +116,19 @@ def build_instructions(grade: int, lesson_title: str = "", oblast: str = "") -> 
         "objašnjavaš zašto je odabrana opcija tačna/netačna i, ako je netačna i nije zadnji pokušaj, daš mali hint "
         "bez otkrivanja tačne opcije. new_task u ovom odgovoru MORA biti null (zadatak i opcije se ne mijenjaju "
         "na klik).\n"
+        "\n"
+        "PRVI POGREŠAN ODGOVOR — KRATKO (verdikt NETAČNO, 0 prethodnih pogrešnih klikova):\n"
+        "- Popuni polje 'hint': JEDNA sažeta rečenica ili pitanje koje vodi na SLJEDEĆI korak. "
+        "Server sam sastavlja vidljivi odgovor („Netačno.“ + tvoj hint) — u 'reply' ne piši "
+        "ocjenu ni uvod.\n"
+        "- NE dokazuj naširoko zašto je izabrana opcija pogrešna, NE ponavljaj tekst izabrane "
+        "opcije, NE otkrivaj tačnu opciju ni interni očekivani odgovor, NE rješavaj cijeli "
+        "zadatak i NE piši više pasusa.\n"
+        "- Dobar hint: „Kojim brojem treba pomnožiti nazivnik 8 da dobiješ 24? Istim brojem "
+        "pomnoži i brojnik.“ — usmjerava na operaciju.\n"
+        "- Loš hint: „Izabrao si $\\frac{3}{24}$, ali to nije tačno zato što...“ — to je dokaz, ne hint.\n"
+        "- DRUGI pogrešan klik (1 prethodni pogrešan): tada smiješ pokazati postupak i rješenje, "
+        "ali i dalje bez dugačkog dokazivanja zašto je prvi izbor bio pogrešan.\n"
     )
 
 
@@ -124,11 +153,15 @@ def _hint_guidance(hint_level):
 
 
 def build_input(session, student_message, intent="", difficulty_request="", interaction_phase="",
-                 trusted_choice_verdict=None):
+                 trusted_choice_verdict=None, task_family="", task_family_description=""):
     """trusted_choice_verdict (samo za choice_answer turnove): dict sa
     'selected_text' (tekst opcije koju je učenik kliknuo), 'is_correct' (bool,
     SERVER-utvrđen, deterministički) i 'wrong_attempts' (broj PRETHODNIH
-    pogrešnih klikova na ovaj zadatak, prije ovog klika)."""
+    pogrešnih klikova na ovaj zadatak, prije ovog klika).
+
+    task_family / task_family_description: porodica koju je SERVER izabrao za
+    eventualni novi zadatak u ovom turnu (vidi matbot/task_families.py). Model
+    je ne bira i ne smije je preimenovati."""
     lines = []
     lines.append(f"LEKCIJA: {session['lesson_title'] or 'nije izabrana'} (oblast: {session['oblast'] or 'nepoznata'})")
 
@@ -140,6 +173,34 @@ def build_input(session, student_message, intent="", difficulty_request="", inte
         lines.append(f"TEŽINA AKTIVNOG ZADATKA: {session['difficulty']}")
     else:
         lines.append("AKTIVNI ZADATAK: još ne postoji — napravi pristupačan početni zadatak iz ove lekcije (new_task).")
+
+    if task_family:
+        label = f"{task_family} — {task_family_description}" if task_family_description else task_family
+        lines.append(f"PORODICA ZADATKA (obavezna za novi zadatak, ne mijenjaj je): {label}")
+        # Konkretan ugovor SAMO za dodijeljenu porodicu (nikad cijeli katalog):
+        # šta mora biti nepoznato, kakve opcije, jedan ispravan i jedan
+        # zabranjen primjer. Server istu stvar provjerava i deterministički —
+        # ovo samo povećava šansu da prvi pokušaj bude ispravan.
+        contract_block = task_family_validation.prompt_block(task_family)
+        if contract_block:
+            lines.append(contract_block)
+        lines.append(
+            "OBAVEZNO popuni i interna polja new_task.task_family "
+            f"(mora biti tačno „{task_family}“) i new_task.answer_kind — server ih "
+            "unakrsno provjerava sa stvarnim tekstom zadatka. new_task.student_must_find "
+            "i new_task.task_form popuni najprikladnijom vrijednošću po tvom nahođenju — "
+            "server ih koristi samo informativno, ne za odbijanje."
+        )
+        if session.get("retry_required"):
+            lines.append(
+                "PONOVNI POKUŠAJ: prethodni odgovor je bio netačan. Zadrži OVU istu porodicu, "
+                "napravi zadatak s drugim brojevima/kontekstom i drugim opcijama, "
+                f"i zadrži težinu '{session.get('difficulty') or 'standard'}' (NE povećavaj je)."
+            )
+        recent_families = [f for f in session.get("recently_used_families", []) if f != task_family]
+        if recent_families:
+            lines.append("NEDAVNO KORIŠTENE PORODICE (ne pravi zadatak nijedne od njih): "
+                         + ", ".join(recent_families))
 
     if session["recent_tasks"]:
         lines.append("NEDAVNI ZADACI (ne ponavljaj iste brojeve/obrazac):")

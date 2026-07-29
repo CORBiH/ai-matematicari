@@ -38,6 +38,13 @@ MAX_RECENT_TASKS = 3
 MAX_RECENT_TURNS = 3
 MAX_HINT_LEVEL = 3
 MAX_SESSIONS_IN_MEMORY = 2000
+MAX_RECENT_FAMILIES = 6      # historija porodica zadataka (LRU izbor + prompt)
+MAX_RECENT_SIGNATURES = 8    # potpisi zadataka za otkrivanje doslovnog ponavljanja
+
+# Gornja granica za OBIČAN feedback na PRVI pogrešan klik ("Netačno." + hint).
+# Nije tvrdo sječenje: shape_first_wrong_feedback skraćuje SAMO na sigurnoj
+# granici rečenice s uravnoteženim $...$ — validan MathJax se nikad ne lomi.
+MAX_FIRST_WRONG_FEEDBACK_CHARS = 320
 
 # --- Security hardening (Faza: token + rate limit + concurrency lock) ------
 # FLASK_SECRET_KEY je primarni naziv (novi security kod). SECRET_KEY je
