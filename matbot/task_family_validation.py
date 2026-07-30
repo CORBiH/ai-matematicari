@@ -119,7 +119,9 @@ _ASKS_ERROR_RE = re.compile(
     re.IGNORECASE,
 )
 _ASKS_FORMULA_RE = re.compile(
-    r"koj(?:a|om|u)\s+formul|formula\s+se\s+koristi|koj(?:i|im)\s+izraz\w*\s+ra[čc]una",
+    r"koj(?:a|om|u)\s+(?:je\s+)?(?:od\s+(?:navedenih|ponu[đd]enih)\s+)?formul"
+    r"|formula\s+se\s+koristi"
+    r"|koj(?:i|im)\s+izraz\w*\s+ra[čc]una",
     re.IGNORECASE,
 )
 _ASKS_NEXT_STEP_RE = re.compile(

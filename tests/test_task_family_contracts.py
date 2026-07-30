@@ -420,3 +420,64 @@ def test_task_signature_carries_both_signatures():
     assert signature["question"]
     assert signature["shape"]
     assert signature["question"] != signature["shape"]
+
+
+# ---------------------------------------------------------------------------
+# PHASE 6 — Defekt 3 (živi nalaz): "Daj mi teži zadatak." nakon "Dijagonala
+# kvadrata" (8. razred) rutira u choose_correct_formula, čiji je required
+# oblik "pita_koja_formula_ili_korak" oslanjao na _ASKS_FORMULA_RE. Taj regex
+# je bio uži od svog analognog _ASKS_STATEMENT_RE i nije prepoznavao prirodne
+# formulacije poput "Koja je formula..." — model je ispravno sastavio zadatak,
+# a server ga je lažno odbio. Kategorije 31-35.
+# ---------------------------------------------------------------------------
+
+def test_case31_asks_formula_re_matches_koja_je_formula():
+    formula_options = ("$P=a^2$", "$P=2a$", "$P=a+a$", "$P=4a$")
+    assert check("choose_correct_formula",
+                 "Koja je formula za površinu kvadrata tačna?",
+                 formula_options) is None
+
+
+def test_case32_asks_formula_re_matches_koja_od_navedenih_formula():
+    formula_options = ("$P=a^2$", "$P=2a$", "$P=a+a$", "$P=4a$")
+    assert check("choose_correct_formula",
+                 "Koja od navedenih formula tačno izražava površinu kvadrata?",
+                 formula_options) is None
+
+
+def test_case33_asks_formula_re_matches_koja_je_od_ponudjenih_formula():
+    formula_options = ("$P=a^2$", "$P=2a$", "$P=a+a$", "$P=4a$")
+    assert check("choose_correct_formula",
+                 "Koja je od ponuđenih formula ispravna za površinu kvadrata?",
+                 formula_options) is None
+
+
+def test_case34_asks_formula_re_still_matches_plain_koja_formula():
+    formula_options = ("$P=a^2$", "$P=2a$", "$P=a+a$", "$P=4a$")
+    assert check("choose_correct_formula",
+                 "Koja formula tačno izražava površinu kvadrata?",
+                 formula_options) is None
+
+
+def test_case35_full_path_harder_task_natural_phrasing_no_longer_rejected(monkeypatch):
+    """Puna reprodukcija Defekta 3: forsiraj choose_correct_formula (kako ga
+    stvarno dodijeli server nakon tačnog odgovora na "Dijagonala kvadrata") i
+    provjeri da prirodna formulacija VIŠE NIJE lažno odbijena."""
+    from matbot.practice import run_practice_turn
+    from matbot.session_store import SessionStore
+    from tests.conftest import FakeLLM, make_options, make_output, make_task
+    from tests.test_practice import turn_payload
+
+    monkeypatch.setattr(tf, "select_family", lambda *a, **kw: "choose_correct_formula")
+    options = make_options("$d=a\\sqrt{2}$", "$d=a^2$", "$d=2a$", "$d=\\frac{a}{2}$")
+    store, fake = SessionStore(), FakeLLM()
+    fake.queue(make_output(
+        reply="Evo zadatka.",
+        new_task=make_task(text="Koja je formula za dijagonalu kvadrata tačna?",
+                            expected="$d=a\\sqrt{2}$",
+                            options=options, correct_option_index=0,
+                            task_family="choose_correct_formula"),
+    ))
+    r = run_practice_turn(store, fake, turn_payload(selected_topic="8-04-004"))
+    assert r.get("status") == "ready"
+    assert fake.call_count == 1

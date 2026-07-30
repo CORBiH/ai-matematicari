@@ -277,11 +277,22 @@ def test_prose_option_without_math_is_unaffected_by_whole_wrap():
 
 # --- Failure 3: oštećen sqrt/text (izgubljeni backslash/zagrade) -----------
 
-def test_failure3_damaged_sqrt_and_units_form_is_rejected_not_guessed():
+def test_failure3_damaged_sqrt_and_units_form_is_repaired_when_unambiguous():
+    # Živi produkcijski nalaz (Defekt 1): "54sqrt3,textcm^3" ima NEDVOSMISLEN
+    # radikand ("3") i POZNATU jedinicu ("cm") s eksponentom — sada se
+    # deterministički popravlja umjesto da se cio zadatak odbaci.
     text, is_safe = sanitize_and_validate_math_text(
         "54sqrt3,textcm^3", allow_whole_expression_wrap=True
     )
-    assert not is_safe  # NE smije se pokušati pogoditi ispravan LaTeX
+    assert is_safe
+    assert text == "$54\\sqrt{3},\\text{cm}^3$"
+
+
+def test_ambiguous_sqrt_radicand_is_still_rejected_not_guessed():
+    # Kontrolni slučaj: "sqrtx" nema brojčani/braced/parenthesized radikand —
+    # NEJEDNOZNAČNO, pa se i dalje odbija umjesto da se pogodi.
+    text, is_safe = sanitize_and_validate_math_text("$d=sqrtx$")
+    assert not is_safe
 
 
 def test_valid_sqrt_and_units_expression_survives_unchanged():
@@ -435,3 +446,133 @@ def test_literal_newline_never_reaches_safe_output_in_any_scenario():
         text, is_safe = sanitize_and_validate_math_text(scenario)
         if is_safe:
             assert "\\n" not in text
+
+
+# ---------------------------------------------------------------------------
+# PHASE 6 — Defekti 1 i 2 (živi nalaz, "Dijagonala kvadrata"): bare sqrt/text
+# UNUTAR $...$ i doslovan "\n" UNUTAR $...$. Kategorije 1-15 iz zahtjeva.
+# ---------------------------------------------------------------------------
+
+# --- Kategorija 1-8: tačan screenshot-formatting -----------------------------
+
+def test_defect1_case01_bare_sqrt_and_text_no_dollar_at_all():
+    text, is_safe = sanitize_and_validate_math_text(
+        "4sqrt2,textcm", allow_whole_expression_wrap=True
+    )
+    assert is_safe
+    assert text == "$4\\sqrt{2},\\text{cm}$"
+
+
+def test_defect1_case02_bare_sqrt_and_text_inside_dollar():
+    text, is_safe = sanitize_and_validate_math_text("$8sqrt2\\,textcm$")
+    assert is_safe
+    assert text == "$8\\sqrt{2}\\,\\text{cm}$"
+
+
+def test_defect1_case03_bare_text_unit_only():
+    text, is_safe = sanitize_and_validate_math_text("$16,textcm$")
+    assert is_safe
+    assert text == "$16,\\text{cm}$"
+
+
+def test_defect1_case04_formula_option_a_times_sqrt2():
+    text, is_safe = sanitize_and_validate_math_text("$d=asqrt2$")
+    assert is_safe
+    assert text == "$d=a\\sqrt{2}$"
+
+
+def test_defect1_case05_formula_option_sqrt2_times_a():
+    text, is_safe = sanitize_and_validate_math_text("$d=sqrt2a$")
+    assert is_safe
+    assert text == "$d=\\sqrt{2}a$"
+
+
+def test_defect1_case06_ambiguous_radicand_rejected_not_guessed():
+    text, is_safe = sanitize_and_validate_math_text("$sqrtx$")
+    assert not is_safe
+
+
+def test_defect1_case07_bare_sqrt_and_unit_with_exponent():
+    text, is_safe = sanitize_and_validate_math_text(
+        "54sqrt3,textcm^3", allow_whole_expression_wrap=True
+    )
+    assert is_safe
+    assert text == "$54\\sqrt{3},\\text{cm}^3$"
+
+
+def test_defect1_case08_already_correct_latex_unaffected():
+    original = "$54\\sqrt{3}\\,\\text{cm}^3$"
+    text, is_safe = sanitize_and_validate_math_text(original, allow_whole_expression_wrap=True)
+    assert is_safe
+    assert text == original
+
+
+# --- Kategorija 9-15: doslovan "\n" -----------------------------------------
+
+def test_defect2_case09_literal_n_inside_math_removed():
+    text, is_safe = sanitize_and_validate_math_text(
+        "$d = \\n\\sqrt{128}=8\\sqrt{2}$"
+    )
+    assert is_safe
+    assert text == "$d = \\sqrt{128}=8\\sqrt{2}$"
+    assert "\\n" not in text.replace("\\neq", "").replace("\\nabla", "")
+
+
+def test_defect2_case10_neq_preserved_inside_math():
+    text, is_safe = sanitize_and_validate_math_text("$a\\neq b$")
+    assert is_safe
+    assert text == "$a\\neq b$"
+
+
+def test_defect2_case11_ne_preserved_inside_math():
+    text, is_safe = sanitize_and_validate_math_text("$a \\ne b$")
+    assert is_safe
+    assert "\\ne " in text or text.endswith("\\ne")
+
+
+def test_defect2_case12_not_preserved_inside_math():
+    text, is_safe = sanitize_and_validate_math_text("$A \\not\\subset B$")
+    assert is_safe
+    assert "\\not" in text
+
+
+def test_defect2_case13_nu_preserved_inside_math():
+    text, is_safe = sanitize_and_validate_math_text("$\\nu = 5$")
+    assert is_safe
+    assert "\\nu" in text
+
+
+def test_defect2_case14_literal_n_outside_math_becomes_real_newline():
+    text, is_safe = sanitize_and_validate_math_text("Prvi dio.\\nDrugi dio.")
+    assert is_safe
+    assert text == "Prvi dio.\nDrugi dio."
+
+
+def test_phase7_live_finding_doubled_backslash_before_sqrt_is_repaired():
+    """Živi nalaz (Phase 7 live test, 8-04-004 "Dijagonala kvadrata"): model je
+    stvarno vratio DVA backslash znaka neposredno ispred sqrt/text/zarez
+    (npr. doslovno "8\\\\sqrt{2}\\\\,\\\\text{cm}" — DVA backslasha, ne jedan).
+    _RAW_LATEX_COMMAND_RE/_BARE_COMMAND_RESIDUE_RE ovo ranije NISU hvatali
+    (znak neposredno ispred "sqrt" JESTE backslash), a MathJax "\\\\" tumači
+    kao prelom reda pa "sqrt{2}" ostaje neprevedeno — identičan vizuelni bag
+    kao bare sqrt. Otkriveno TEK u Phase 7 live pozivu, popravljeno lokalno."""
+    raw = "$8" + "\\\\" + "sqrt{2}" + "\\\\" + "," + "\\\\" + "text{cm}$"
+    text, is_safe = sanitize_and_validate_math_text(raw)
+    assert is_safe
+    assert text == "$8\\sqrt{2}\\,\\text{cm}$"
+
+
+def test_phase7_live_finding_doubled_backslash_formula_option_is_repaired():
+    raw = "$d=" + "\\\\" + "frac{a" + "\\\\" + "sqrt{2}}{2}$"
+    text, is_safe = sanitize_and_validate_math_text(raw)
+    assert is_safe
+    assert text == "$d=\\frac{a\\sqrt{2}}{2}$"
+
+
+def test_defect2_case15_literal_n_before_new_sentence_still_converted():
+    """Kontrolni slučaj za usko ograničenu zaštitu (eq/e/ot/u/abla): "\\n" ispred
+    OBIČNE riječi (npr. početak nove rečenice) NIJE \\neq/\\ne/\\not/\\nu/\\nabla
+    i mora se ispraviti u stvaran prelom reda, ne ostati doslovno "\\n"."""
+    text, is_safe = sanitize_and_validate_math_text("$a=1$\\nNovi red.")
+    assert is_safe
+    assert text == "$a=1$\nNovi red."

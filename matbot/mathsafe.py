@@ -113,8 +113,99 @@ def sanitize_math_text(text: str) -> str:
 _RAW_LATEX_COMMAND_RE = re.compile(r"\\(?:frac|sqrt|text|cdot|begin|end)\b")
 _DAMAGED_LATEX_FORM_RE = re.compile(r"\dsqrt|sqrt\d|\btext[a-zA-Z]")
 _LITERAL_NEWLINE_ESCAPE = "\\n"
+# Doslovan "\n" (backslash+n) je ambiguan: identičan je prefiksu \neq, \ne,
+# \not, \nu, \nabla i sličnih ISPRAVNIH LaTeX komandi. Popravlja se SAMO kad
+# NE nastavlja neku od tih POZNATIH komandi (provjereno kao CIJELA riječ —
+# nakon nastavka ne smije slijediti još jedno slovo). Obična riječ/rečenica
+# koja slijedi (npr. "\nDrugi", "\nNovi") NIJE ovaj slučaj i ispravno se
+# pretvara — provjera je usko ograničena na eq/e/ot/u/abla, ne na "bilo koje
+# slovo", jer bi to blokiralo svaki prelom pred novom rečenicom.
+_LITERAL_NEWLINE_ESCAPE_RE = re.compile(r"\\n(?!(?:eq|e|ot|u|abla)(?![A-Za-z]))")
 _FRAC_TOKEN_RE = re.compile(r"\\frac\{[^{}]*\}\{[^{}]*\}")
 _PURE_MATH_EXPRESSION_RE = re.compile(r"^[\d\s+\-*/=,.:;()\[\]{}^_°'\"\\a-zA-Z]+$")
+
+# Bare (bez backslasha) "sqrt" iza kojeg slijedi NEDVOSMISLEN radikand — jedan
+# brojčani token, ili sadržaj u {} ili (). Ambiguozni oblici (npr. "sqrtx" bez
+# brojčanog radikanda) namjerno NE prolaze ovaj regex i ostaju za
+# find_unsafe_math_issues da ih prijavi kao nebezbjedne, a ne pogode.
+_BARE_SQRT_RE = re.compile(r"(?<!\\)sqrt\s*(\{[^{}]*\}|\([^()]*\)|\d+)")
+
+# Bare (bez backslasha) "text" iza kojeg slijedi POZNATA (bijela lista)
+# mjerna jedinica, opciono u {}/() i opciono s eksponentom ^2/^3. Poredak je
+# namjerno od dužih ka kraćim skraćenicama (mm/km/kg/ml/kom PRIJE cm/dm/m/l/g/t)
+# da regex alternacija ne "pojede" samo prvo slovo duže jedinice (npr. da
+# "textmm" ne bi pogrešno stao na "m").
+_UNIT_WORDS_ORDERED = ("mm", "km", "kg", "ml", "kom", "cm", "dm", "m", "l", "g", "t")
+_BARE_TEXT_UNIT_RE = re.compile(
+    r"(?<!\\)text\s*\{?\s*(" + "|".join(_UNIT_WORDS_ORDERED) + r")\s*\}?"
+    r"(\^\s*\{?\s*[23]\s*\}?)?"
+)
+
+# Preostao bare "sqrt"/"text" (bez backslasha) NAKON pokušaja gornje reparacije
+# — znak da je radikand/jedinica bila nejednoznačna i NIJE popravljena.
+_BARE_COMMAND_RESIDUE_RE = re.compile(r"(?<!\\)(?:sqrt|text)")
+
+# Živi nalaz (Phase 7 live test, "Dijagonala kvadrata"): model je vratio
+# UDVOSTRUČEN backslash neposredno ispred poznate LaTeX komande — npr.
+# doslovno "\\\\sqrt{2}" (DVA backslash znaka, ne jedan) umjesto "\\sqrt{2}".
+# _RAW_LATEX_COMMAND_RE/_BARE_COMMAND_RESIDUE_RE ovo NE hvataju (znak
+# neposredno ispred "sqrt" JESTE backslash, provjera prolazi), a MathJax "\\"
+# (dva backslasha) tumači kao naredbu za prelom reda, pa "sqrt{2}" ostaje
+# neprevedeno kao goli tekst — identičan vizuelni bag kao bare sqrt/text.
+# Nedvosmisleno i sigurno: 2+ backslasha NEPOSREDNO ispred POZNATE komande se
+# uvijek svode na TAČNO jedan (nikad legitiman kao stvaran prelom reda usred
+# jedne kratke inline formule/opcije).
+_DOUBLED_BACKSLASH_COMMAND_RE = re.compile(
+    r"\\{2,}(?=(?:frac|sqrt|text|cdot|times|begin|end|pi|neq|ne|not|nu|nabla|"
+    r"le|ge|leq|geq|approx|circ|degree|div|pm|infty|left|right|square|dots|"
+    r"ldots|sum|int|lim|log|ln|sin|cos|tan)\b|[,;! ])"
+)
+
+
+def _repair_bare_sqrt_match(m):
+    radicand = m.group(1)
+    if radicand.startswith("("):
+        radicand = "{" + radicand[1:-1] + "}"
+    elif not radicand.startswith("{"):
+        radicand = "{" + radicand + "}"
+    return "\\sqrt" + radicand
+
+
+def _repair_bare_text_unit_match(m):
+    unit = m.group(1)
+    exp = m.group(2)
+    out = "\\text{" + unit + "}"
+    if exp:
+        digit_match = re.search(r"[23]", exp)
+        if digit_match:
+            out += "^" + digit_match.group(0)
+    return out
+
+
+def repair_malformed_math_inside(text: str) -> str:
+    """Popravlja bare \\sqrt i \\text{jedinica} zapise UNUTAR $...$ segmenata
+    (i, kad $ uopšte ne postoji, u cijelom stringu — npr. MC opcija prije
+    umotavanja) — jedini raspon koji ranije nijedna funkcija nije dirala
+    (živi produkcijski nalaz: "sqrt2", "textcm" stigli su do MathJax-a
+    nepromijenjeni jer je find_unsafe_math_issues provjeravao ISKLJUČIVO
+    tekst IZVAN $...$).
+
+    Primjenjuje se SAMO kad je radikand/jedinica nedvosmislen. Nejednoznačni
+    oblici (npr. "sqrtx" bez brojčanog radikanda) se NE pogađaju — ostaju
+    za find_unsafe_math_issues da ih prijavi kao nebezbjedne."""
+    if not text:
+        return text or ""
+    if "$" not in text:
+        fixed = _DOUBLED_BACKSLASH_COMMAND_RE.sub("\\\\", text)
+        fixed = _BARE_SQRT_RE.sub(_repair_bare_sqrt_match, fixed)
+        fixed = _BARE_TEXT_UNIT_RE.sub(_repair_bare_text_unit_match, fixed)
+        return fixed
+    parts = _DOLLAR_SPLIT.split(text)
+    for i in range(1, len(parts), 2):  # SAMO math segmenti (neparni indeksi)
+        parts[i] = _DOUBLED_BACKSLASH_COMMAND_RE.sub("\\\\", parts[i])
+        parts[i] = _BARE_SQRT_RE.sub(_repair_bare_sqrt_match, parts[i])
+        parts[i] = _BARE_TEXT_UNIT_RE.sub(_repair_bare_text_unit_match, parts[i])
+    return "$".join(parts)
 
 # Ukloni poznate LaTeX komande (SA njihovim argumentima) iz kopije stringa da
 # bismo provjerili šta OSTAJE — koristi se SAMO da otkrijemo da li je "ostatak"
@@ -147,17 +238,25 @@ def _outside_math_parts(text):
 
 
 def replace_literal_newline_escapes(text: str) -> str:
-    """Sigurna, nedvosmislena reparacija: doslovni "\\n" (dva vidljiva znaka,
-    backslash+n) IZVAN $...$ postaje stvaran newline. Nikad ne dira sadržaj
-    UNUTAR $...$, gdje bi isti prefiks legitimno mogao biti početak komande
-    poput \\neq ili \\nabla."""
+    """Popravlja doslovan "\\n" (dva vidljiva znaka, backslash+n) I VAN I
+    UNUTAR $...$ — provjerava se preko _LITERAL_NEWLINE_ESCAPE_RE, koja NIKAD
+    ne pogađa \\neq/\\ne/\\not/\\nu/\\nabla i slične ISPRAVNE komande (traži se
+    da 'n' NIJE praćeno drugim slovom).
+
+    Van $...$: pretvara se u stvaran prelom reda (prelom pasusa).
+    Unutar $...$: UKLANJA se (živi nalaz: „$d = \\n\\sqrt{128}$“ — stvaran
+    newline unutar inline matematike nema smisla i i dalje bi mogao lomiti
+    MathJax; brisanje daje čist „$d = \\sqrt{128}$“)."""
     if not text or _LITERAL_NEWLINE_ESCAPE not in text:
         return text or ""
     if "$" not in text:
-        return text.replace(_LITERAL_NEWLINE_ESCAPE, "\n")
+        return _LITERAL_NEWLINE_ESCAPE_RE.sub("\n", text)
     parts = _DOLLAR_SPLIT.split(text)
-    for i in range(0, len(parts), 2):  # samo NE-math dijelovi (parni indeksi)
-        parts[i] = parts[i].replace(_LITERAL_NEWLINE_ESCAPE, "\n")
+    for i, part in enumerate(parts):
+        if i % 2 == 0:  # van $...$
+            parts[i] = _LITERAL_NEWLINE_ESCAPE_RE.sub("\n", part)
+        else:  # unutar $...$
+            parts[i] = _LITERAL_NEWLINE_ESCAPE_RE.sub("", part)
     return "$".join(parts)
 
 
@@ -250,11 +349,22 @@ def _looks_like_pure_math_expression(text: str) -> bool:
     return not re.search(r"[A-Za-z]", residue)
 
 
+def _inside_math_parts(text):
+    """Dijelovi teksta UNUTAR $...$ parova (vidi _outside_math_parts za
+    pretpostavku o parnom broju '$')."""
+    if "$" not in text:
+        return []
+    parts = _DOLLAR_SPLIT.split(text)
+    return [part for i, part in enumerate(parts) if i % 2 == 1]
+
+
 def find_unsafe_math_issues(text: str) -> list:
     """Vraća listu razloga zašto TEKST (već propušten kroz sanitize_math_text
     + gornje repair korake) NIJE bezbjedan za prikaz učeniku. Prazna lista =
-    bezbjedno. Provjerava ISKLJUČIVO dijelove IZVAN $...$ — unutar $...$ su
-    ove komande obavezne i ispravne."""
+    bezbjedno. Provjerava dijelove IZVAN $...$ (sirove/oštećene LaTeX komande
+    tu NIKAD nisu ispravne) I dijelove UNUTAR $...$ (nakon pokušaja
+    repair_malformed_math_inside — preostao bare "sqrt"/"text" znači da je
+    radikand/jedinica bila nejednoznačna i namjerno NIJE pogođena)."""
     if not text:
         return []
     issues = []
@@ -263,10 +373,17 @@ def find_unsafe_math_issues(text: str) -> list:
             issues.append("raw_latex_command_outside_math")
         if _DAMAGED_LATEX_FORM_RE.search(part):
             issues.append("damaged_latex_form")
-        if _LITERAL_NEWLINE_ESCAPE in part:
+        if _LITERAL_NEWLINE_ESCAPE_RE.search(part):
             issues.append("literal_newline_escape")
         if any(ord(ch) < 0x20 and ch not in ("\n", "\t") for ch in part):
             issues.append("control_character")
+    for part in _inside_math_parts(text):
+        if _BARE_COMMAND_RESIDUE_RE.search(part):
+            issues.append("unrepaired_bare_command_in_math")
+        if _LITERAL_NEWLINE_ESCAPE_RE.search(part):
+            issues.append("literal_newline_escape_in_math")
+        if any(ord(ch) < 0x20 for ch in part):
+            issues.append("control_character_in_math")
     return issues
 
 
@@ -286,6 +403,7 @@ def sanitize_and_validate_math_text(text: str, allow_whole_expression_wrap: bool
     """
     cleaned = sanitize_math_text(text)
     cleaned = replace_literal_newline_escapes(cleaned)
+    cleaned = repair_malformed_math_inside(cleaned)
     if allow_whole_expression_wrap and "$" not in cleaned and _looks_like_pure_math_expression(cleaned):
         cleaned = "$" + cleaned.strip() + "$"
     else:

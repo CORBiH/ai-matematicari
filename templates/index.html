@@ -1732,6 +1732,7 @@ document.addEventListener('DOMContentLoaded', () => {
       pendingChipMeta = null;
       let text, fromTyped = false, answerPhase = null, continuation = false;
       let confirmationIntent = '', confirmationPending = null, confirmationPhase = '';
+      let isNewTaskRequest = false;
       const explicitHintRequest = chipMeta.intent === 'hint_request';
       if (autoMessage){
         text = autoMessage;                        // auto-poruka pri ulasku u chat
@@ -1745,6 +1746,7 @@ document.addEventListener('DOMContentLoaded', () => {
           updateTopbar();
         }
         const asksNewTask = isNewPracticeTaskRequest(typed);
+        isNewTaskRequest = asksNewTask;              // koristi se niže za retry-UX na neuspjeh generisanja
         if (!asksNewTask && previousNextState && previousNextState.expected_user_action === 'continue_confirmation' && isAffirmativeConfirmation(typed)){
           confirmationIntent = 'continue_confirmation';
           confirmationPending = confirmationPendingAction(previousNextState);
@@ -1859,10 +1861,54 @@ document.addEventListener('DOMContentLoaded', () => {
              uspjeh je već ispisao bubble (rendered:true), a poznata blokada
              (401/429/409/...) NIJE ništa ispisala pa applyTutorResponse mora
              sam kreirati bubble (rendered:false) — isto kao normalan JSON put. */
-          applyTutorResponse(result.j, { fromTyped, answerPhase, rendered: !!result.rendered });
+          applyTutorResponse(result.j, { fromTyped, answerPhase, rendered: !!result.rendered, isNewTaskRequest, retryPayload: payload });
         } else {
           const j = await jsonTutorRequest(payload, ac, imgFile);
-          applyTutorResponse(j, { fromTyped, answerPhase, rendered: false });
+          applyTutorResponse(j, { fromTyped, answerPhase, rendered: false, isNewTaskRequest, retryPayload: payload });
+        }
+      }catch(err){
+        if (err && err.name === 'AbortError'){
+          appendTutorMsg('bot', '<em>⏳ Odgovor traje duže nego obično. Pokušaj ponovo za koji trenutak.</em>');
+        } else {
+          appendTutorMsg('bot', '<em>Greška pri slanju zahtjeva. Pokušaj ponovo.</em>');
+        }
+      }finally{
+        clearTimeout(abortTimer);
+        hideTutorTyping();
+        setTutorBusy(false);
+        tutorBusy = false;
+      }
+    }
+
+    /* Defekt 3 (živi nalaz): neuspjelo generisanje NOVOG zadatka (npr. "Daj mi
+       teži zadatak.") vraćalo je generičku grešku bez ikakve akcije — učenik
+       je morao ručno prekucati istu poruku. Ovo šalje TAČNO ISTI payload (nov
+       client_turn_id) SAMO na eksplicitan klik na "Pokušaj ponovo" dugme —
+       NIKAD automatski, i NIKAD ne duplira balončić korisničke poruke (za
+       razliku od sendTutorMsg, ovdje se appendTutorMsg('user', ...)/pushTutor
+       namjerno NE pozivaju). */
+    async function retryNewTaskRequest(payload){
+      if (tutorBusy) return;
+      tutorBusy = true;
+      showTutorTyping();
+      setTutorBusy(true);
+      const ac = new AbortController();
+      const abortTimer = setTimeout(()=>{ try { ac.abort(); } catch(_){} }, 60000);
+      try{
+        let result = null;
+        try {
+          result = await streamTutorRequest(payload, ac);
+        } catch (streamErr){
+          if (streamErr && streamErr.name === 'AbortError') throw streamErr;
+          result = null;
+        }
+        if (result && result.errorShown){
+          /* stream je već ispisao prijateljsku grešku u bubble */
+        } else if (result && result.j){
+          applyTutorResponse(result.j, { rendered: !!result.rendered, isNewTaskRequest: true, retryPayload: payload });
+        } else {
+          const j = await jsonTutorRequest(payload, ac, null);
+          applyTutorResponse(j, { rendered: false, isNewTaskRequest: true, retryPayload: payload });
         }
       }catch(err){
         if (err && err.name === 'AbortError'){
@@ -1997,8 +2043,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /* zajednička obrada odgovora za streaming i non-streaming put */
     function applyTutorResponse(j, opts){
-      const answer = (j && j.answer) ? j.answer : ((j && j.detail) ? j.detail : 'Nema odgovora.');
       opts = opts || {};
+      /* Defekt 3 (živi nalaz): "Daj mi teži zadatak." je vratio generičku
+         SAFE_ERROR_MESSAGE poruku bez ikakve akcije za učenika. Prepoznaj
+         TAČNO ovaj slučaj — odgovor bez 'status' I bez 'next_state' (server
+         je odbio generisani zadatak PRIJE mutacije sesije, vidi
+         matbot/practice.py:_error_response) NA zahtjev za novim/lakšim/težim
+         zadatkom — i prikaži konkretniju poruku + "Pokušaj ponovo" dugme.
+         Svi OSTALI statusless odgovori (nevažeći klik, isteknuo zadatak, ...)
+         ostaju netaknuti — ovo se primjenjuje SAMO kad je opts.isNewTaskRequest. */
+      const isFailedNewTaskGeneration = !!(j && !j.status && !j.next_state && opts.isNewTaskRequest);
+      const answer = isFailedNewTaskGeneration
+        ? 'Nisam uspio sastaviti ispravan novi zadatak. Pokušaj ponovo.'
+        : ((j && j.answer) ? j.answer : ((j && j.detail) ? j.detail : 'Nema odgovora.'));
       /* image_test tok: aktivni "zadatak" je stavka sa slike (u next_state),
          proza odgovora se NE pretvara u last_tutor_task */
       const inImageTest = !!(j && j.next_state && j.next_state.active_task_kind === 'image_test');
@@ -2033,6 +2090,22 @@ document.addEventListener('DOMContentLoaded', () => {
       let renderedBot = null;
       if (!opts.rendered) renderedBot = appendTutorMsg('bot', renderTutorHTML(answer));
       else renderedBot = { row: lastBotMessage() };
+      if (isFailedNewTaskGeneration && opts.retryPayload && renderedBot && renderedBot.row){
+        const retryBtn = document.createElement('button');
+        retryBtn.type = 'button';
+        retryBtn.className = 'chip-btn';
+        retryBtn.textContent = '🔁 Pokušaj ponovo';
+        retryBtn.addEventListener('click', function onRetryClick(){
+          if (tutorBusy) return;
+          retryBtn.removeEventListener('click', onRetryClick);
+          retryBtn.remove();
+          const freshPayload = Object.assign({}, opts.retryPayload, {
+            client_turn_id: (crypto.randomUUID) ? crypto.randomUUID() : (Date.now() + '_' + Math.random())
+          });
+          retryNewTaskRequest(freshPayload);
+        });
+        renderedBot.row.appendChild(retryBtn);
+      }
       pushTutor('assistant', answer);
       if (j.status === 'ready') adoptResponseTopic(j);
       if (metaBox){                              // prijateljski meta red (bez sirovih id-eva)

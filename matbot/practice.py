@@ -32,6 +32,7 @@ from matbot import config, feedback, prompts, task_families
 from matbot.llm import LLMError
 from matbot.mathsafe import sanitize_and_validate_math_text, sanitize_math_text
 from matbot.mathcheck import find_numeric_inconsistencies
+from matbot.option_equivalence import find_equivalent_option_pairs
 from matbot.schema import InvalidOutputError, validate_output
 from matbot.task_family_validation import FamilyContractError, question_numeric_policy, validate_task_family
 from matbot.terminology import normalize_terminology
@@ -135,6 +136,17 @@ def _apply_new_task(session, new_task, task_family=""):
         if not opt_safe:
             raise InvalidOutputError("nebezbjedan matematički zapis u opciji zadatka")
         sanitized_texts.append(normalize_terminology(opt_text))
+
+    # Semantička (ne samo tekstualna) jednakost opcija (Defekt 4, živi nalaz):
+    # dvije vizuelno različite opcije mogu predstavljati ISTU vrijednost
+    # ("$8\sqrt{2}\,\text{cm}$" i "$11,3\,\text{cm}$") ili biti algebarski
+    # identične ("$d=a\sqrt{2}$" i "$d=\sqrt{2}a$") — takav zadatak nema
+    # tačno JEDAN tačan odgovor i mora se odbiti PRIJE mutacije sesije.
+    duplicate_pairs = find_equivalent_option_pairs(sanitized_texts)
+    if duplicate_pairs:
+        raise InvalidOutputError(
+            f"semantically_duplicate_options: parovi {duplicate_pairs}"
+        )
 
     # Tačna opcija i interni očekivani odgovor predstavljaju PRAVU matematiku
     # (ne izmišljen predmet ispitivanja) — UVIJEK se provjeravaju, bez obzira

@@ -40,7 +40,7 @@ def choice_payload(selected_option_id, client_turn_id="turn-1", **kw):
 def start_session(store, fake, task_text="Skrati razlomak $\\frac{20}{32}$.", expected="5/8",
                    options=None, correct_option_index=0):
     if options is None:
-        options = make_options("5/8", "10/16", "5/4", "4/5")
+        options = make_options("5/8", "3/16", "5/4", "4/5")
     fake.queue(make_output(
         reply="Evo zadatka za tebe.",
         new_task=make_task(text=task_text, expected=expected, options=options,
@@ -108,7 +108,7 @@ def test_mathjax_sanitized_per_option():
 
 def test_shuffle_changes_position_but_keeps_correct_identity():
     store, fake = SessionStore(), FakeLLM()
-    start_session(store, fake, options=make_options("5/8", "10/16", "5/4", "4/5"), correct_option_index=0)
+    start_session(store, fake, options=make_options("5/8", "3/16", "5/4", "4/5"), correct_option_index=0)
     sess = store.peek("sess-1")
     correct_id = sess["correct_option_id"]
     correct_text = next(o["text"] for o in sess["current_options"] if o["id"] == correct_id)
@@ -340,7 +340,7 @@ def test_new_task_clears_previous_reveal_and_options():
     fake.queue(make_output(
         reply="Evo novog zadatka.",
         new_task=make_task(text="Skrati $\\frac{18}{24}$.", expected="3/4",
-                            options=make_options("3/4", "6/8", "4/3", "1/2"), correct_option_index=0),
+                            options=make_options("3/4", "2/3", "4/3", "1/2"), correct_option_index=0),
     ))
     r_new = run_practice_turn(store, fake, turn_payload(msg="daj mi novi zadatak"))
     assert "revealed_correct_option_id" not in r_new

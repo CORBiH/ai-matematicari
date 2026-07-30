@@ -708,7 +708,7 @@ def test_failure1_full_path_raw_frac_feedback_is_repaired_not_rejected():
     fake.queue(make_output(
         reply="Evo zadatka.",
         new_task=make_task(text="Koliko je $\\frac{3}{24}$ skraćeno?", expected="1/8",
-                            options=_mk_opts("1/8", "3/24", "1/4", "3/8"), correct_option_index=0),
+                            options=_mk_opts("1/8", "3/16", "1/4", "3/8"), correct_option_index=0),
     ))
     r0 = run_practice_turn(store, fake, turn_payload())
     correct_id = r0["next_state"]["task"]["options"][0]["id"]  # placeholder, prava provjera niže
@@ -765,9 +765,10 @@ def test_failure2_full_path_option_ordered_pair_and_newline_repaired():
     assert fake.call_count == 1  # jedan poziv, bez drugog/repair poziva
 
 
-def test_failure3_full_path_damaged_sqrt_units_option_rejected_safely():
-    """Oštećena opcija (izgubljen backslash/zagrade) mora odbiti CIO zadatak —
-    bez pokušaja pogađanja LaTeX-a, bez mutacije sesije, bez drugog poziva."""
+def test_failure3_full_path_damaged_sqrt_units_option_is_repaired_when_unambiguous():
+    """Oštećena opcija s NEDVOSMISLENIM radikandom/jedinicom (Defekt 1, živi
+    nalaz) se popravlja deterministički — cio zadatak se više ne odbacuje
+    kad je popravka jednoznačna, bez drugog/repair AI poziva."""
     options = make_options("54sqrt3,textcm^3", "180sqrt3,textcm^3", "90sqrt3,textcm^3", "30sqrt3,textcm^3")
     store, fake = SessionStore(), FakeLLM()
     fake.queue(make_output(
@@ -776,11 +777,30 @@ def test_failure3_full_path_damaged_sqrt_units_option_rejected_safely():
                             options=options, correct_option_index=0),
     ))
     r = run_practice_turn(store, fake, turn_payload())
+    assert r.get("status") == "ready"
+    assert fake.call_count == 1
+    sess = store.peek("sess-1")
+    texts = [o["text"] for o in sess["current_options"]]
+    assert "$54\\sqrt{3},\\text{cm}^3$" in texts
+    import re as _re
+    assert not any(_re.search(r"(?<!\\)sqrt|(?<!\\)text", t) for t in texts)
+
+
+def test_ambiguous_damaged_sqrt_option_still_rejected_safely():
+    """Kontrolni slučaj: radikand koji NIJE brojčani token/({}/()) ostaje
+    nejednoznačan — i dalje se odbija cio zadatak, bez drugog poziva."""
+    options = make_options("$sqrtx$", "$sqrty$", "$sqrtz$", "$sqrtw$")
+    store, fake = SessionStore(), FakeLLM()
+    fake.queue(make_output(
+        reply="Evo zadatka.",
+        new_task=make_task(text="Izračunaj.", expected="$sqrtx$",
+                            options=options, correct_option_index=0),
+    ))
+    r = run_practice_turn(store, fake, turn_payload())
     assert "status" not in r
     assert r["answer"] == SAFE_ERROR_MESSAGE
-    assert fake.call_count == 1  # odbijeno bez drugog/repair poziva
+    assert fake.call_count == 1
 
-    # sesija NIJE mutirana — nema aktivnog zadatka/opcija
     sess = store.peek("sess-1")
     assert sess is None or not sess.get("current_task")
 
