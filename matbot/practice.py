@@ -28,8 +28,8 @@ import logging
 import random
 import uuid
 
-from matbot import config, feedback, prompts, task_families
-from matbot.llm import LLMError
+from matbot import config, feedback, option_equivalence, prompts, task_families
+from matbot.llm import LLMError, failure_diagnostics_kv
 from matbot.mathsafe import sanitize_and_validate_math_text, sanitize_math_text
 from matbot.mathcheck import find_numeric_inconsistencies
 from matbot.option_equivalence import find_equivalent_option_pairs
@@ -41,6 +41,35 @@ from matbot.topics import lesson_info
 logger = logging.getLogger("matbot.practice")
 
 SAFE_ERROR_MESSAGE = "Nešto je zapelo pri sastavljanju odgovora. Pošalji poruku ponovo za koji trenutak."
+
+
+_LOG_FIELD_LIMIT = 200
+
+
+def _clip_for_log(value, limit=_LOG_FIELD_LIMIT):
+    """Skrati vrijednost za strukturisani log — nikad ne šalji neograničeno
+    dug string u log (i nikad se ovo ne šalje u browser)."""
+    text = "" if value is None else str(value)
+    return text if len(text) <= limit else text[:limit] + "…"
+
+
+def _log_duplicate_options(request_id, topic, family, diagnostics):
+    """Strukturisan, pretraživ log red za semantically_duplicate_options
+    odbijanja (Defekt 4 dijagnostika) — SAMO sanitizovani interni podaci,
+    nikad API ključ/embed token/potpisan auth token, i nikad se ne šalje u
+    browser. Svaka vrijednost je dužinski ograničena."""
+    options_for_log = [_clip_for_log(o, 120) for o in diagnostics.get("options", [])]
+    logger.warning(
+        "practice_duplicate_options request_id=%s topic=%s family=%s pairs=%s "
+        "equivalence_types=%s correct_option_index=%s question=%s options=%s "
+        "expected_answer=%s",
+        request_id, topic or "", family or "",
+        diagnostics.get("pairs"), diagnostics.get("equivalence_types"),
+        diagnostics.get("correct_option_index"),
+        _clip_for_log(diagnostics.get("question")),
+        options_for_log,
+        _clip_for_log(diagnostics.get("expected_answer")),
+    )
 
 
 def _error_response(active_task=""):
@@ -144,9 +173,22 @@ def _apply_new_task(session, new_task, task_family=""):
     # tačno JEDAN tačan odgovor i mora se odbiti PRIJE mutacije sesije.
     duplicate_pairs = find_equivalent_option_pairs(sanitized_texts)
     if duplicate_pairs:
-        raise InvalidOutputError(
-            f"semantically_duplicate_options: parovi {duplicate_pairs}"
-        )
+        err = InvalidOutputError(f"semantically_duplicate_options: parovi {duplicate_pairs}")
+        # Dijagnostika za strukturisani log (vidi run_practice_turn) — NIKAD ne
+        # ide u browser, samo interni server log. Pozivalac dodaje request_id/
+        # topic/family (nema ih ovdje) prije logovanja.
+        err.duplicate_options_diagnostics = {
+            "question": task_text,
+            "options": list(sanitized_texts),
+            "pairs": duplicate_pairs,
+            "equivalence_types": [
+                option_equivalence.classify_equivalence(sanitized_texts[i], sanitized_texts[j])
+                for i, j in duplicate_pairs
+            ],
+            "correct_option_index": new_task.correct_option_index,
+            "expected_answer": new_task.expected_answer,
+        }
+        raise err
 
     # Tačna opcija i interni očekivani odgovor predstavljaju PRAVU matematiku
     # (ne izmišljen predmet ispitivanja) — UVIJEK se provjeravaju, bez obzira
@@ -350,10 +392,17 @@ def _handle_text_turn(store, llm, session, turn, lesson_id, request_id):
         )
         return response
     except LLMError as e:
-        logger.warning("practice_turn request_id=%s category=%s", request_id, e.category)
+        logger.warning(
+            "practice_turn request_id=%s category=%s topic=%s family=%s mode=practice %s",
+            request_id, e.category, lesson_id or "", selected_family or "",
+            failure_diagnostics_kv(e),
+        )
         return _error_response(active_task_before_llm)
     except InvalidOutputError as e:
         logger.warning("practice_turn request_id=%s category=invalid_output detail=%s", request_id, e)
+        diagnostics = getattr(e, "duplicate_options_diagnostics", None)
+        if diagnostics:
+            _log_duplicate_options(request_id, lesson_id, selected_family, diagnostics)
         return _error_response(active_task_before_llm)
     except Exception:
         # Zadnja linija odbrane za NEOČEKIVANE greške u obradi ovog turna
@@ -513,7 +562,10 @@ def _handle_choice_answer(store, llm, session, turn, lesson_id, request_id):
         )
         return response
     except LLMError as e:
-        logger.warning("practice_choice request_id=%s category=%s", request_id, e.category)
+        logger.warning(
+            "practice_choice request_id=%s category=%s topic=%s mode=practice %s",
+            request_id, e.category, lesson_id or "", failure_diagnostics_kv(e),
+        )
         return _error_response(active_task_before)
     except InvalidOutputError as e:
         logger.warning("practice_choice request_id=%s category=invalid_output detail=%s", request_id, e)

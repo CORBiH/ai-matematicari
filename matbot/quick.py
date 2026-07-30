@@ -11,7 +11,7 @@ import logging
 import uuid
 
 from matbot import prompts
-from matbot.llm import LLMError
+from matbot.llm import LLMError, failure_diagnostics_kv
 from matbot.mathcheck import find_numeric_inconsistencies
 from matbot.mathsafe import sanitize_and_validate_math_text
 from matbot.practice import SAFE_ERROR_MESSAGE
@@ -66,7 +66,10 @@ def run_quick_turn(llm, turn):
         result = llm.quick_turn(instructions, input_text)
         validate_quick_output(result.output)
     except LLMError as e:
-        logger.warning("quick_turn request_id=%s category=%s", request_id, e.category)
+        logger.warning(
+            "quick_turn request_id=%s category=%s mode=quick %s",
+            request_id, e.category, failure_diagnostics_kv(e),
+        )
         return {"answer": SAFE_ERROR_MESSAGE, "last_tutor_task": ""}
     except InvalidOutputError as e:
         logger.warning("quick_turn request_id=%s category=invalid_output detail=%s", request_id, e)

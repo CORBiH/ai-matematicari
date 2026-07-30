@@ -321,6 +321,7 @@ class FamilyContract:
     prompt_options_must_be: str = ""
     prompt_positive_example: str = ""
     prompt_forbidden_example: str = ""
+    prompt_option_uniqueness_note: str = ""
 
     def __post_init__(self):
         if not self.canonical_task_form and self.task_form:
@@ -419,6 +420,14 @@ _register(FamilyContract(
     prompt_options_must_be="četiri RAZLOMKA",
     prompt_positive_example="Proširi razlomak $\\frac{3}{8}$ tako da nazivnik bude $24$.",
     prompt_forbidden_example="Kojim brojem je proširen razlomak $\\frac{3}{8}$? (to je porodica find_expansion_factor)",
+    prompt_option_uniqueness_note=(
+        "PRIJE ODGOVORA skrati (ili unakrsno pomnoži) sve četiri opcije i uporedi svih šest parova. "
+        "Tačno JEDNA opcija smije biti jednaka zadanom razlomku i JEDINA smije imati traženi nazivnik uz "
+        "očuvanu vrijednost; nijedne dvije opcije ne smiju se skratiti na isti razlomak. Originalni razlomak "
+        "NIKAD nije opcija — jednak je tačnom odgovoru. Za $\\frac{5}{12}$ na nazivnik $36$: ISPRAVNO "
+        "$\\frac{15}{36}$ (tačno), $\\frac{10}{36}$, $\\frac{15}{24}$, $\\frac{17}{36}$; POGREŠNO "
+        "$\\frac{15}{36}$, $\\frac{5}{12}$, $\\frac{10}{24}$ — te tri su jednake."
+    ),
 ))
 
 _register(FamilyContract(
@@ -440,6 +449,10 @@ _register(FamilyContract(
     prompt_options_must_be="četiri BROJA (npr. 2, 3, 4, 5) — NIKAD razlomci",
     prompt_positive_example="Razlomak $\\frac{2}{5}$ proširen je na $\\frac{8}{20}$. Kojim brojem je proširen?",
     prompt_forbidden_example="Proširi razlomak $\\frac{2}{5}$ tako da nazivnik bude $20$. (to je porodica expand_to_given_denominator)",
+    prompt_option_uniqueness_note=(
+        "PRIJE ODGOVORA: provjeri da su sva četiri BROJA međusobno različita (npr. 2, 3, 4, 5 — nikad dva "
+        "ista broja kao dvije odvojene opcije, čak ni zapisana drugačije poput $4$ i $\\frac{8}{2}$)."
+    ),
 ))
 
 _register(FamilyContract(
@@ -462,6 +475,11 @@ _register(FamilyContract(
     prompt_options_must_be="četiri BROJA — NIKAD cijeli razlomci",
     prompt_positive_example="Dopuni jednakost: $\\frac{3}{7} = \\frac{?}{35}$.",
     prompt_forbidden_example="Proširi razlomak $\\frac{3}{7}$ tako da nazivnik bude $35$. (to je porodica expand_to_given_denominator)",
+    prompt_option_uniqueness_note=(
+        "PRIJE ODGOVORA: provjeri da su sva četiri BROJA (nedostajuće vrijednosti) međusobno različita — "
+        "tačno JEDAN broj ispravno dopunjuje jednakost, preostala tri su realne greške (npr. sabiranje umjesto "
+        "množenja, pogrešan faktor proširivanja), ne isti broj drugačije izračunat."
+    ),
 ))
 
 _register(FamilyContract(
@@ -484,6 +502,11 @@ _register(FamilyContract(
     prompt_options_must_be="četiri RAZLOMKA, od kojih je tačno jedan jednak zadanom",
     prompt_positive_example="Koji od navedenih razlomaka je jednak razlomku $\\frac{4}{9}$?",
     prompt_forbidden_example="Proširi razlomak $\\frac{4}{9}$ na nazivnik $36$. (to je porodica expand_to_given_denominator)",
+    prompt_option_uniqueness_note=(
+        "PRIJE ODGOVORA: skrati svaku od četiri ponuđene opcije. Tačno JEDNA smije biti jednaka zadanom "
+        "razlomku — preostale tri moraju biti MEĐUSOBNO različite vrijednosti (nikad dvije opcije koje se "
+        "skrate na isti razlomak, čak i ako izgledaju drugačije zapisane, npr. $\\frac{6}{8}$ i $\\frac{9}{12}$)."
+    ),
 ))
 
 _register(FamilyContract(
@@ -503,6 +526,10 @@ _register(FamilyContract(
     prompt_options_must_be="razlomci ili kratki opisi poretka",
     prompt_positive_example="Koji je razlomak veći: $\\frac{3}{5}$ ili $\\frac{5}{8}$?",
     prompt_forbidden_example="Proširi $\\frac{3}{5}$ na nazivnik $40$.",
+    prompt_option_uniqueness_note=(
+        "PRIJE ODGOVORA: ako su opcije razlomci/vrijednosti, skrati svaku i provjeri da nema dvije opcije "
+        "koje predstavljaju istu vrijednost — svaka mora biti STVARNO druga tačka u poretku."
+    ),
 ))
 
 _register(FamilyContract(
@@ -521,6 +548,11 @@ _register(FamilyContract(
     prompt_options_must_be="rezultati (razlomci ili brojevi)",
     prompt_positive_example="Izračunaj $\\frac{2}{7} + \\frac{3}{7}$.",
     prompt_forbidden_example="Kojim brojem je proširen $\\frac{2}{7}$?",
+    prompt_option_uniqueness_note=(
+        "PRIJE ODGOVORA: skrati rezultat svake opcije na najjednostavniji oblik i provjeri da nema dvije "
+        "opcije s istom skraćenom vrijednošću — tačan rezultat i njegov neskraćen/proširen zapis NE smiju "
+        "biti dvije odvojene opcije."
+    ),
 ))
 
 _register(FamilyContract(
@@ -1113,4 +1145,6 @@ def prompt_block(family_id):
         lines.append(f"ISPRAVAN PRIMJER: {contract.prompt_positive_example}")
     if contract.prompt_forbidden_example:
         lines.append(f"ZABRANJEN PRIMJER (to NIJE ova porodica): {contract.prompt_forbidden_example}")
+    if contract.prompt_option_uniqueness_note:
+        lines.append(f"JEDINSTVENOST OPCIJA: {contract.prompt_option_uniqueness_note}")
     return "\n".join(lines)

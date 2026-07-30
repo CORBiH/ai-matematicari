@@ -336,3 +336,62 @@ def find_equivalent_option_pairs(option_texts):
             if options_are_equivalent(option_texts[i], option_texts[j]):
                 pairs.append((i, j))
     return pairs
+
+
+# ---------------------------------------------------------------------------
+# DIJAGNOSTIKA (server-only logging) — KOJA vrsta ekvivalencije je dokazana,
+# za strukturisane logove pri odbijanju (nikad se ne šalje u browser).
+# ---------------------------------------------------------------------------
+
+_FRACTION_SHAPE_RE = re.compile(
+    r"^\\frac\s*\{[^{}]*\}\s*\{[^{}]*\}$|^-?\d+\s*/\s*-?\d+$"
+)
+
+
+def _looks_like_fraction_shape(expr):
+    return bool(_FRACTION_SHAPE_RE.match((expr or "").strip()))
+
+
+def _has_decimal_literal(expr):
+    return bool(re.search(r"\d[.,]\d", expr or ""))
+
+
+def classify_equivalence(text_a, text_b):
+    """Vrati string koji opisuje KOJU vrstu dokazane ekvivalencije objašnjava
+    options_are_equivalent(text_a, text_b) == True, ili None ako par NIJE
+    dokazano ekvivalentan (uključujući "nepoznato"). SAMO za dijagnostiku/log
+    — nikad ne utiče na samu odluku o odbijanju.
+
+    Moguće vrijednosti: "textual" (identičan tekst opcije), "equivalent_fraction"
+    (oba oblik razlomka, ista vrijednost), "numeric_exact_vs_rounded" (jedna
+    strana ima decimalni zapis koji zaokružuje drugu), "numeric_exact"
+    (obje strane brojčano jednake, bez razlike u zaokruživanju),
+    "symbolic_commutative" (dokazano preko kanonskog stabla, ne brojčano)."""
+    if not options_are_equivalent(text_a, text_b):
+        return None
+    if (text_a or "").strip() == (text_b or "").strip():
+        return "textual"
+
+    val_a = _value_expression(_strip_math_delimiters(text_a))
+    val_b = _value_expression(_strip_math_delimiters(text_b))
+
+    if _looks_like_fraction_shape(val_a) and _looks_like_fraction_shape(val_b):
+        return "equivalent_fraction"
+
+    cands_a = _numeric_candidates(val_a)
+    cands_b = _numeric_candidates(val_b)
+    if cands_a is not None and cands_b is not None and cands_a and cands_b:
+        if _has_decimal_literal(val_a) != _has_decimal_literal(val_b):
+            return "numeric_exact_vs_rounded"
+        return "numeric_exact"
+
+    return "symbolic_commutative"
+
+
+def find_equivalent_option_pairs_with_types(option_texts):
+    """Kao find_equivalent_option_pairs, ali svaki par nosi i klasifikaciju
+    (i, j, tip) — koristi se ISKLJUČIVO za interne strukturisane logove."""
+    result = []
+    for i, j in find_equivalent_option_pairs(option_texts):
+        result.append((i, j, classify_equivalence(option_texts[i], option_texts[j])))
+    return result

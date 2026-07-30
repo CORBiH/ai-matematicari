@@ -11,7 +11,7 @@ import logging
 import uuid
 
 from matbot import config, prompts
-from matbot.llm import LLMError
+from matbot.llm import LLMError, failure_diagnostics_kv
 from matbot.mathcheck import find_numeric_inconsistencies
 from matbot.mathsafe import sanitize_and_validate_math_text
 from matbot.practice import SAFE_ERROR_MESSAGE
@@ -69,7 +69,10 @@ def run_explain_turn(llm, turn):
         result = llm.explain_turn(instructions, input_text)
         validate_explain_output(result.output)
     except LLMError as e:
-        logger.warning("explain_turn request_id=%s category=%s", request_id, e.category)
+        logger.warning(
+            "explain_turn request_id=%s category=%s mode=explain %s",
+            request_id, e.category, failure_diagnostics_kv(e),
+        )
         return {"answer": SAFE_ERROR_MESSAGE, "last_tutor_task": ""}
     except InvalidOutputError as e:
         logger.warning("explain_turn request_id=%s category=invalid_output detail=%s", request_id, e)

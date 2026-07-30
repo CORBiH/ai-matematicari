@@ -22,6 +22,37 @@ REASONING_EFFORT = os.environ.get("MATBOT_REASONING_EFFORT", "low")
 AI_TIMEOUT_S = _float_env("AI_TUTOR_TIMEOUT", 30.0)
 MAX_OUTPUT_TOKENS = _int_env("MATBOT_MAX_OUTPUT_TOKENS", 1200)
 
+# --- Budžet izlaznih tokena SAMO za Practice generisanje zadatka -----------
+# ZAŠTO POSTOJI ODVOJEN BUDŽET (živi nalaz, 6 poziva na lekciji „Proširivanje
+# razlomaka“, 2 pala s `llm_invalid_output`):
+#
+# Kod reasoning modela (gpt-5-mini) `max_output_tokens` u Responses API-ju
+# pokriva ZBIR reasoning tokena i vidljivog izlaza. Izmjereno na 4 USPJEŠNA
+# poziva s identičnim ulazom (6774 ulaznih tokena):
+#
+#     output_tokens:    925   1018    616    809      (budžet je bio 1200)
+#     reasoning_tokens: 640    832    448    640
+#     vidljivi izlaz:   285    186    168    169
+#
+# Vidljivi strukturirani izlaz je stabilan (~170-285 tokena), ali reasoning
+# varira gotovo 2x (448 → 832) pri POTPUNO ISTOM ulazu. Najgori uspješan poziv
+# potrošio je 1018/1200 = 85% budžeta, tj. ostavio je samo ~15% rezerve za
+# varijaciju koja je izmjereno veća od toga. Kad zbir pređe budžet, odgovor se
+# vrati kao status="incomplete" / reason="max_output_tokens" BEZ `message`
+# stavke → output_parsed is None → upravo posmatrana greška.
+#
+# Zato Practice (jedini mod koji generiše pitanje + 4 opcije + interne
+# metapodatke) dobija veći budžet. Explain i Quick ostaju na MAX_OUTPUT_TOKENS
+# jer vraćaju samo `reply` i nemaju izmjeren problem.
+#
+# GORNJA GRANICA: tvrdo ograničeno na MAX_OUTPUT_TOKENS_HARD_CEILING da
+# pogrešno postavljena env varijabla ne može nekontrolisano podići trošak.
+MAX_OUTPUT_TOKENS_HARD_CEILING = 4000
+MAX_OUTPUT_TOKENS_PRACTICE = min(
+    _int_env("MATBOT_MAX_OUTPUT_TOKENS_PRACTICE", 2500),
+    MAX_OUTPUT_TOKENS_HARD_CEILING,
+)
+
 # Ograničenja ulaza (server odbija prevelike poruke prije AI poziva)
 MAX_MESSAGE_CHARS = _int_env("MATBOT_MAX_MESSAGE_CHARS", 4000)
 MAX_TASK_CHARS = 600
