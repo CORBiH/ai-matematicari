@@ -454,6 +454,22 @@ def route_geometry_topic(oblast, lesson_title):
     return "", []
 
 
+# Kratka završna provjera oznaka — DRUGA linija odbrane (prva je
+# deterministički matbot/geometrycheck.py). Živi nalaz koji je ovo iznudio:
+# model je vratio „Krug ima prečnik $D=10$“ uz tačan račun, jer prompt nigdje
+# nije IZRIČITO zabranio uobičajene alternativne oznake ($S$ za površinu,
+# $D$/$d$ za prečnik) koje dolaze iz drugih školskih tradicija.
+_SYMBOL_SELF_CHECK = (
+    "PROVJERA OZNAKA PRIJE SLANJA (obavezno):\n"
+    "- Koristi ISKLJUČIVO oznake iz ovog prompta. Uobičajene alternative iz drugih "
+    "udžbenika su ZABRANJENE: NIKAD $S$ za površinu (površina je $P$), "
+    "NIKAD $D$ ni $d$ za prečnik kruga (prečnik je $R$, poluprečnik je $r$, $R=2r$).\n"
+    "- Prije nego vratiš odgovor, pređi pogledom svaki simbol u tekstu zadatka, u "
+    "tačnoj opciji, u expected_answer i u objašnjenju i provjeri da svaki znači "
+    "tačno ono što piše u oznakama iznad.\n"
+)
+
+
 def build_geometry_rules(oblast, lesson_title, mode="practice"):
     """Sastavi SAMO geometrijske blokove relevantne za ovu lekciju.
 
@@ -471,4 +487,5 @@ def build_geometry_rules(oblast, lesson_title, mode="practice"):
         block = _FIGURE_RULES.get(figure_id)
         if block:
             parts.append(block)
+    parts.append(_SYMBOL_SELF_CHECK)
     return "".join(parts)

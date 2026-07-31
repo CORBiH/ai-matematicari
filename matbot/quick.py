@@ -10,7 +10,7 @@ mehanizam kao practice/explain).
 import logging
 import uuid
 
-from matbot import prompts
+from matbot import geometry_rules, geometrycheck, prompts
 from matbot.llm import LLMError, failure_diagnostics_kv
 from matbot.mathcheck import find_numeric_inconsistencies
 from matbot.mathsafe import sanitize_and_validate_math_text
@@ -95,6 +95,17 @@ def run_quick_turn(llm, turn):
     if numeric_issues:
         logger.warning("quick_turn request_id=%s category=invalid_output detail=%s",
                        request_id, numeric_issues[0])
+        return {"answer": SAFE_ERROR_MESSAGE, "last_tutor_task": ""}
+
+    # Geometrijska notacija (matbot/geometrycheck.py). Quick vraća GOTOV
+    # rezultat, pa je pogrešna oznaka ovdje najvidljivija učeniku. Opseg i
+    # figure dolaze iz CANONICAL lekcije — kad lekcija nije izabrana (Quick to
+    # dozvoljava), opseg je prazan i provjera se preskače umjesto da se pogađa.
+    geometry_scope, geometry_figures = geometry_rules.route_geometry_topic(oblast, lesson_title)
+    geometry_issues = geometrycheck.find_geometry_issues(answer, geometry_scope, geometry_figures)
+    if geometry_issues:
+        logger.warning("quick_turn request_id=%s category=invalid_output detail=geometry_notation:%s",
+                       request_id, ",".join(geometry_issues))
         return {"answer": SAFE_ERROR_MESSAGE, "last_tutor_task": ""}
 
     logger.info(

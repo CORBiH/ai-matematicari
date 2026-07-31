@@ -10,7 +10,7 @@ svoje stanje — isti mehanizam kao practice).
 import logging
 import uuid
 
-from matbot import config, prompts
+from matbot import config, geometry_rules, geometrycheck, prompts
 from matbot.llm import LLMError, failure_diagnostics_kv
 from matbot.mathcheck import find_numeric_inconsistencies
 from matbot.mathsafe import sanitize_and_validate_math_text
@@ -100,6 +100,17 @@ def run_explain_turn(llm, turn):
     if numeric_issues:
         logger.warning("explain_turn request_id=%s category=invalid_output detail=%s",
                        request_id, numeric_issues[0])
+        return {"answer": SAFE_ERROR_MESSAGE, "last_tutor_task": ""}
+
+    # Geometrijska notacija (matbot/geometrycheck.py). Explain odgovor je UVIJEK
+    # autoritativan (nema distraktora ni namjerno pogrešnih tvrdnji), pa se
+    # provjerava bez izuzetka. Opseg i figure dolaze iz CANONICAL lekcije, nikad
+    # iz učenikove poruke. Bez drugog AI poziva: povreda → isti sigurni fallback.
+    geometry_scope, geometry_figures = geometry_rules.route_geometry_topic(oblast, lesson_title)
+    geometry_issues = geometrycheck.find_geometry_issues(answer, geometry_scope, geometry_figures)
+    if geometry_issues:
+        logger.warning("explain_turn request_id=%s category=invalid_output detail=geometry_notation:%s",
+                       request_id, ",".join(geometry_issues))
         return {"answer": SAFE_ERROR_MESSAGE, "last_tutor_task": ""}
 
     logger.info(

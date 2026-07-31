@@ -135,22 +135,30 @@ def validate_output(out: PracticeTurnOutput, require_reply: bool = True) -> None
 
 
 def _validate_options(options, correct_index) -> None:
-    """Deterministička provjera 4 ponuđene opcije (bez novog AI poziva)."""
+    """Deterministička provjera OBLIKA 4 ponuđene opcije (bez novog AI poziva).
+
+    OBIM: ovdje se provjerava samo STRUKTURA (broj, praznina, dužina, indeks).
+    JEDINSTVENOST se NAMJERNO provjerava kasnije, u practice._apply_new_task,
+    nad SANITIZOVANIM tekstom — vidi tamo. Dva razloga:
+
+      1. Ovdje je tekst još SIROV; dvije različite sirove opcije mogu se nakon
+         sanitizacije svesti na isti vidljivi tekst („sqrt2“ i „\\sqrt{2}“), pa
+         bi provjera na ovom mjestu propustila stvarni duplikat u browseru.
+      2. Ranija provjera je radila `text.lower()` i time spajala `$R=2r$` i
+         `$r=2R$` u isti ključ — u ovom projektu veličina slova nosi značenje
+         (r/R, d/D, P/p, O/o, B/b, H/h), pa je to lažno odbijalo validne
+         zadatke (živi nalaz, poziv 12 fokusiranog testa).
+    """
     if len(options) != 4:
         raise InvalidOutputError("mora postojati tačno 4 opcije")
     if not (0 <= correct_index < 4):
         raise InvalidOutputError("correct_option_index van opsega")
-    seen = set()
     for opt in options:
         text = (opt.text or "").strip()
         if not text:
             raise InvalidOutputError("prazna opcija")
         if len(text) > config.MAX_OPTION_TEXT_CHARS:
             raise InvalidOutputError("preduga opcija")
-        normalized = " ".join(text.lower().split())
-        if normalized in seen:
-            raise InvalidOutputError("duple opcije")
-        seen.add(normalized)
 
 
 def validate_explain_output(out: ExplainTurnOutput) -> None:

@@ -27,6 +27,7 @@ zadatke i učenik bi prečesto dobio sigurnu poruku o grešci.
 import re
 from dataclasses import dataclass, field
 
+from matbot import systemcheck
 from matbot.task_families import FAMILY_DESCRIPTIONS
 
 
@@ -195,7 +196,23 @@ def is_numeric_option(text):
 
 
 def is_ordered_pair_option(text):
-    return bool(_ORDERED_PAIR_RE.match(_strip_math_wrapper(text)))
+    """Prepoznaj uređeni par u VIDLJIVOM tekstu opcije.
+
+    Stari `_ORDERED_PAIR_RE` je pokrivao SAMO parove cijelih brojeva, pa
+    `$\\left(\\frac{9}{7},\\frac{13}{7}\\right)$` NIJE bio prepoznat — zbog toga
+    je unakrsna provjera `answer_kind` na živom `solve_system` zadatku tiho
+    preskočena (detected_answer_kind je vratio None). Sada se dodatno koristi
+    isti parser koji radi i supstitucijsku provjeru (matbot/systemcheck.py), pa
+    su pokriveni i razlomci, `\\left(...\\right)`, `;` separator i `x=..., y=...`.
+
+    Stari uzorak se NAMJERNO zadržava kao prvi uslov — time nijedan raniji
+    prepoznati oblik ne može prestati da se prepoznaje."""
+    if _ORDERED_PAIR_RE.match(_strip_math_wrapper(text)):
+        return True
+    # STROGA varijanta: cijela opcija mora BITI par. Proza koja par samo
+    # spominje („Par $(2,1)$ zadovoljava obje jednačine.“) je TVRDNJA i mora
+    # ostati prepoznata kao takva — vidi tests/test_student_must_find_trust.py.
+    return systemcheck.is_bare_ordered_pair(text)
 
 
 def detected_answer_kind(text):
@@ -315,6 +332,17 @@ class FamilyContract:
     canonical_task_form: str = ""
     canonical_student_must_find: str = ""
     question_numeric_policy: str = "check"
+    # GEOMETRIJSKA NOTACIJA u TEKSTU PITANJA (matbot/geometrycheck.py) — ista
+    # logika kao question_numeric_policy, ali za oznake umjesto računa:
+    #   "check" (podrazumijevano): pitanje tvrdi ISPRAVNU notaciju, pa je
+    #     povreda konvencije ($D$ kao prečnik, $S$ kao površina) odbijanje.
+    #   "allow_intentional_violation": pitanje SMIJE namjerno prikazati pogrešnu
+    #     oznaku kao PREDMET koji učenik ispituje („Učenik je napisao
+    #     $O=\pi D$. Gdje je greška?“).
+    # Deklariše se ODVOJENO od question_numeric_policy iako se trenutno
+    # poklapaju — to su dvije nezavisne odluke i ne smiju tiho zajedno mutirati.
+    # NIKAD se ne izvodi iz metapodataka modela ni iz teksta pitanja.
+    question_geometry_policy: str = "check"
     required: tuple = ()
     forbidden: tuple = ()
     prompt_must_be_unknown: str = ""
@@ -322,6 +350,9 @@ class FamilyContract:
     prompt_positive_example: str = ""
     prompt_forbidden_example: str = ""
     prompt_option_uniqueness_note: str = ""
+    # Kratka OBAVEZNA samoprovjera prije slanja (druga linija odbrane —
+    # prva je deterministička provjera u matbot/systemcheck.py).
+    prompt_verification_note: str = ""
 
     def __post_init__(self):
         if not self.canonical_task_form and self.task_form:
@@ -593,6 +624,11 @@ _register(FamilyContract(
     prompt_options_must_be="četiri uređena para",
     prompt_positive_example="Riješi sistem: $x+y=7$ i $x-y=1$.",
     prompt_forbidden_example="Koja metoda je najprikladnija za ovaj sistem?",
+    prompt_verification_note=(
+        "uvrsti IZABRANI uređeni par u OBJE jednačine i provjeri da obje daju tačnu "
+        "jednakost; isto provjeri i za preostale tri opcije — tačno JEDNA smije "
+        "zadovoljiti obje jednačine. Ne vraćaj zadatak dok to ne potvrdiš."
+    ),
 ))
 
 _register(FamilyContract(
@@ -721,6 +757,7 @@ _register(FamilyContract(
 _register(FamilyContract(
     family_id="verify_solution",
     question_numeric_policy="allow_intentional_mismatch",
+    question_geometry_policy="allow_intentional_violation",
     objective="učenik provjerava da li je DATI broj rješenje",
     student_must_find=("statement", "variable_value"),
     canonical_student_must_find="verification_result",
@@ -742,6 +779,7 @@ _register(FamilyContract(
 _register(FamilyContract(
     family_id="identify_next_step",
     question_numeric_policy="allow_intentional_mismatch",
+    question_geometry_policy="allow_intentional_violation",
     objective="učenik bira SLJEDEĆI ispravan korak postupka",
     student_must_find=("next_step",),
     answer_kind=("short_text",),
@@ -832,6 +870,7 @@ _register(FamilyContract(
 _register(FamilyContract(
     family_id="choose_correct_formula",
     question_numeric_policy="allow_intentional_mismatch",
+    question_geometry_policy="allow_intentional_violation",
     objective="učenik bira ISPRAVNU FORMULU, ne računa rezultat",
     student_must_find=("formula",),
     answer_kind=("formula", "expression", "short_text"),
@@ -889,6 +928,7 @@ _register(FamilyContract(
 _register(FamilyContract(
     family_id="detect_formula_error",
     question_numeric_policy="allow_intentional_mismatch",
+    question_geometry_policy="allow_intentional_violation",
     objective="učenik pronalazi grešku u ponuđenom postupku/formuli",
     student_must_find=("incorrect_step",),
     answer_kind=("short_text",),
@@ -963,6 +1003,7 @@ _register(FamilyContract(
 _register(FamilyContract(
     family_id="recognize_correct_statement",
     question_numeric_policy="allow_intentional_mismatch",
+    question_geometry_policy="allow_intentional_violation",
     objective="učenik bira TAČNU TVRDNJU o pojmu iz lekcije",
     student_must_find=("statement",),
     answer_kind=("short_text",),
@@ -982,6 +1023,7 @@ _register(FamilyContract(
 _register(FamilyContract(
     family_id="detect_student_error",
     question_numeric_policy="allow_intentional_mismatch",
+    question_geometry_policy="allow_intentional_violation",
     objective="učenik pronalazi grešku u TUĐEM riješenom postupku",
     student_must_find=("incorrect_step",),
     answer_kind=("short_text",),
@@ -1057,6 +1099,19 @@ def question_numeric_policy(family_id):
     if contract is None:
         return "check"
     return contract.question_numeric_policy
+
+
+def question_geometry_policy(family_id):
+    """Server-derived politika GEOMETRIJSKE NOTACIJE za TEKST PITANJA date
+    porodice — "check" ili "allow_intentional_violation" (vidi FamilyContract).
+
+    Nepoznata/prazna porodica → "check" (sigurniji podrazumijevani izbor: bolje
+    odbiti sumnjivo nego pustiti pogrešnu oznaku učeniku). NIKAD se ne izvodi
+    iz metapodataka modela ni iz formulacije pitanja."""
+    contract = CONTRACTS.get(family_id)
+    if contract is None:
+        return "check"
+    return contract.question_geometry_policy
 
 
 def validate_task_family(family_id, question, option_texts, correct_option_index,
@@ -1147,4 +1202,6 @@ def prompt_block(family_id):
         lines.append(f"ZABRANJEN PRIMJER (to NIJE ova porodica): {contract.prompt_forbidden_example}")
     if contract.prompt_option_uniqueness_note:
         lines.append(f"JEDINSTVENOST OPCIJA: {contract.prompt_option_uniqueness_note}")
+    if contract.prompt_verification_note:
+        lines.append(f"OBAVEZNA PROVJERA PRIJE SLANJA: {contract.prompt_verification_note}")
     return "\n".join(lines)

@@ -28,13 +28,15 @@ import logging
 import random
 import uuid
 
-from matbot import config, feedback, option_equivalence, prompts, task_families
+from matbot import (config, feedback, geometry_rules, geometrycheck, option_equivalence,
+                    prompts, systemcheck, task_families)
 from matbot.llm import LLMError, failure_diagnostics_kv
 from matbot.mathsafe import sanitize_and_validate_math_text, sanitize_math_text
 from matbot.mathcheck import find_numeric_inconsistencies
 from matbot.option_equivalence import find_equivalent_option_pairs
 from matbot.schema import InvalidOutputError, validate_output
-from matbot.task_family_validation import FamilyContractError, question_numeric_policy, validate_task_family
+from matbot.task_family_validation import (FamilyContractError, question_geometry_policy,
+                                           question_numeric_policy, validate_task_family)
 from matbot.terminology import normalize_terminology
 from matbot.topics import lesson_info
 
@@ -69,6 +71,24 @@ def _log_duplicate_options(request_id, topic, family, diagnostics):
         _clip_for_log(diagnostics.get("question")),
         options_for_log,
         _clip_for_log(diagnostics.get("expected_answer")),
+    )
+
+
+def _log_system_verification(request_id, topic, family, diagnostics):
+    """Strukturisan log za odbijanje po supstitucijskoj provjeri sistema
+    (matbot/systemcheck.py). SAMO interni, dužinski ograničeni podaci —
+    nikad API ključ, auth/embed token ni neograničen izlaz modela, i NIKAD
+    se ne šalje u browser."""
+    logger.warning(
+        "practice_system_verification request_id=%s topic=%s family=%s issue_codes=%s "
+        "valid_option_indices=%s marked_option_index=%s equations=%s pairs=%s "
+        "question=%s options=%s",
+        request_id, topic or "", family or "",
+        diagnostics.get("issue_codes"), diagnostics.get("valid_option_indices"),
+        diagnostics.get("marked_option_index"), diagnostics.get("equations"),
+        diagnostics.get("pairs"),
+        _clip_for_log(diagnostics.get("question")),
+        [_clip_for_log(o, 120) for o in diagnostics.get("options", [])],
     )
 
 
@@ -117,6 +137,27 @@ def _shuffle_options(texts, correct_index):
     return current_options, correct_option_id
 
 
+def _geometry_context(session):
+    """(scope, figures) iz CANONICAL (oblast, lesson_title) sesije.
+
+    Nikad iz učenikove poruke i nikad iz metapodataka modela — isti trusted
+    izvor koji već bira geometrijske blokove za prompt (matbot/rules.py)."""
+    return geometry_rules.route_geometry_topic(session["oblast"], session["lesson_title"])
+
+
+def _reject_if_geometry_notation_invalid(text, scope, figures, where,
+                                          policy=geometrycheck.POLICY_CHECK):
+    """Odbij AUTORITATIVAN tekst koji krši projektnu geometrijsku konvenciju
+    (matbot/geometrycheck.py). Živi nalaz: „Krug ima prečnik $D=10$“ — račun
+    tačan, oznaka zabranjena ($R$ je prečnik, $D$ je prostorna dijagonala).
+
+    Interni kodovi idu SAMO u InvalidOutputError poruku (server log); učenik
+    uvijek vidi postojeći SAFE_ERROR_MESSAGE. Bez drugog AI poziva."""
+    issues = geometrycheck.find_geometry_issues(text, scope, figures, policy=policy)
+    if issues:
+        raise InvalidOutputError(f"geometry_notation: {','.join(issues)} [{where}]")
+
+
 def _reject_if_numerically_inconsistent(text, where):
     """Odbij tekst u kojem je DOKAZANO nedosljedan numerički lanac jednakosti
     (matbot/mathcheck.py). Živi nalaz: „$\\frac{3\\cdot16\\sqrt{3}}{2}=48\\sqrt{3}$“.
@@ -130,7 +171,7 @@ def _reject_if_numerically_inconsistent(text, where):
         raise InvalidOutputError(f"{issues[0]} [{where}]")
 
 
-def _apply_new_task(session, new_task, task_family=""):
+def _apply_new_task(session, new_task, task_family="", request_id=""):
     """Sanitizuje tekst zadatka i sve 4 opcije, promiješa opcije i primjenjuje
     svježe stanje na sesiju (server je jedini koji dodjeljuje ID-jeve opcijama
     i pamti koji je tačan). Vraća sanitizovan tekst zadatka.
@@ -157,6 +198,15 @@ def _apply_new_task(session, new_task, task_family=""):
     if question_numeric_policy(task_family) != "allow_intentional_mismatch":
         _reject_if_numerically_inconsistent(task_text, "tekst zadatka")
 
+    # Geometrijska notacija TEKSTA PITANJA — politika je po porodici, isto kao
+    # numerička: porodice čiji je predmet ispitivanja BAŠ pogrešna oznaka
+    # („Učenik je napisao $O=\pi D$. Gdje je greška?“) je smiju prikazati.
+    geometry_scope, geometry_figures = _geometry_context(session)
+    _reject_if_geometry_notation_invalid(
+        task_text, geometry_scope, geometry_figures, "tekst zadatka",
+        policy=question_geometry_policy(task_family),
+    )
+
     sanitized_texts = []
     for opt in new_task.options:
         opt_text, opt_safe = sanitize_and_validate_math_text(
@@ -165,6 +215,14 @@ def _apply_new_task(session, new_task, task_family=""):
         if not opt_safe:
             raise InvalidOutputError("nebezbjedan matematički zapis u opciji zadatka")
         sanitized_texts.append(normalize_terminology(opt_text))
+
+    # DOSLOVNA jedinstvenost — nad SANITIZOVANIM tekstom (tačno onim koji
+    # učenik vidi) i CASE-SENSITIVE. Ovdje, a ne u schema._validate_options,
+    # jer se tek nakon sanitizacije zna konačan vidljivi tekst. Hvata ono što
+    # semantička provjera ispod ne može: dvije identične PROZNE opcije.
+    textual_duplicates = option_equivalence.find_textual_duplicate_pairs(sanitized_texts)
+    if textual_duplicates:
+        raise InvalidOutputError(f"duple opcije: parovi {textual_duplicates}")
 
     # Semantička (ne samo tekstualna) jednakost opcija (Defekt 4, živi nalaz):
     # dvije vizuelno različite opcije mogu predstavljati ISTU vrijednost
@@ -199,7 +257,18 @@ def _apply_new_task(session, new_task, task_family=""):
         _reject_if_numerically_inconsistent(
             sanitized_texts[new_task.correct_option_index], "tačna opcija"
         )
+        # TAČNA opcija je AUTORITATIVNA i za notaciju — uvijek "check", bez
+        # obzira na porodicu. Pogrešne opcije (distraktori) se NAMJERNO ne
+        # provjeravaju: one po dizajnu smiju nositi pogrešnu formulu/oznaku
+        # (isti princip kao numerička provjera distraktora iznad).
+        _reject_if_geometry_notation_invalid(
+            sanitized_texts[new_task.correct_option_index],
+            geometry_scope, geometry_figures, "tačna opcija",
+        )
     _reject_if_numerically_inconsistent(new_task.expected_answer.strip(), "expected_answer")
+    _reject_if_geometry_notation_invalid(
+        new_task.expected_answer.strip(), geometry_scope, geometry_figures, "expected_answer",
+    )
 
     # --- UGOVOR PORODICE (server-side, deterministički) --------------------
     # Prompt je samo sugestija: uživo je potvrđeno da model za dodijeljenu
@@ -224,6 +293,44 @@ def _apply_new_task(session, new_task, task_family=""):
         )
     except FamilyContractError as e:
         raise InvalidOutputError(f"family_contract_mismatch: {e}") from e
+
+    # --- DETERMINISTIČKA PROVJERA SISTEMA (matbot/systemcheck.py) ----------
+    # Živi nalaz: model je prikazao jedan sistem, a riješio drugi, pa NIJEDNA
+    # od četiri opcije nije zadovoljavala obje prikazane jednačine — a
+    # `expected_answer` je ponovio istu grešku, pa se slaganje te dvije
+    # vrijednosti NE smije uzeti kao dokaz. Jedini dokaz je uvrštavanje svakog
+    # ponuđenog para u jednačine koje učenik STVARNO vidi.
+    # Radi se PRIJE miješanja opcija, dodjele ID-jeva i bilo kakve mutacije.
+    system_result = None
+    if task_family == "solve_system":
+        system_result = systemcheck.verify_solve_system(
+            task_text, sanitized_texts, new_task.correct_option_index,
+            expected_answer=new_task.expected_answer,
+        )
+        if system_result.status == systemcheck.STATUS_INVALID:
+            err = InvalidOutputError(
+                f"system_verification: {','.join(system_result.issue_codes)}"
+            )
+            # Dijagnostika za strukturisani log (nikad u browser) — pozivalac
+            # dodaje request_id/topic prije logovanja.
+            err.system_diagnostics = {
+                "issue_codes": list(system_result.issue_codes),
+                "valid_option_indices": list(system_result.valid_option_indices),
+                "marked_option_index": system_result.marked_option_index,
+                "question": task_text,
+                "options": list(sanitized_texts),
+                "equations": [[str(v) for v in eq] for eq in (system_result.parsed_equations or ())],
+                "pairs": [None if p is None else [str(p[0]), str(p[1])]
+                          for p in (system_result.parsed_options or ())],
+            }
+            raise err
+        # "unsupported" NIJE dokaz ispravnosti — zadatak prolazi kao i do sada
+        # (nepromijenjeno ponašanje), ali se u logu jasno razlikuje od
+        # "verified" da se u izvještajima ne bi računao kao nezavisno provjeren.
+        logger.info(
+            "practice_system_verification request_id=%s status=%s valid_option_indices=%s",
+            request_id, system_result.status, list(system_result.valid_option_indices),
+        )
 
     # Zaštita od ponavljanja — dva nezavisna sloja, oba PRIJE mutacije sesije:
     #   1. doslovan tekst pitanja (hvata identičan zadatak)
@@ -349,7 +456,8 @@ def _handle_text_turn(store, llm, session, turn, lesson_id, request_id):
 
         task_text = active_task_before_llm
         if out.new_task is not None:
-            task_text = _apply_new_task(session, out.new_task, task_family=selected_family)
+            task_text = _apply_new_task(session, out.new_task, task_family=selected_family,
+                                       request_id=request_id)
 
         # vidljivi odgovor: reply + (novi zadatak, ako postoji i nije već u replyju)
         reply, reply_safe = sanitize_and_validate_math_text(out.reply.strip())
@@ -357,6 +465,10 @@ def _handle_text_turn(store, llm, session, turn, lesson_id, request_id):
             raise InvalidOutputError("nebezbjedan matematički zapis u odgovoru")
         reply = normalize_terminology(reply)
         _reject_if_numerically_inconsistent(reply, "reply")
+        # Tutorov vidljivi tekst je AUTORITATIVAN (objašnjenje/odgovor na
+        # pitanje) — uvijek "check", nikad politika porodice.
+        _scope, _figures = _geometry_context(session)
+        _reject_if_geometry_notation_invalid(reply, _scope, _figures, "reply")
         if out.new_task is not None and task_text not in reply:
             answer = reply + "\n\nZadatak: " + task_text
         else:
@@ -403,6 +515,9 @@ def _handle_text_turn(store, llm, session, turn, lesson_id, request_id):
         diagnostics = getattr(e, "duplicate_options_diagnostics", None)
         if diagnostics:
             _log_duplicate_options(request_id, lesson_id, selected_family, diagnostics)
+        system_diagnostics = getattr(e, "system_diagnostics", None)
+        if system_diagnostics:
+            _log_system_verification(request_id, lesson_id, selected_family, system_diagnostics)
         return _error_response(active_task_before_llm)
     except Exception:
         # Zadnja linija odbrane za NEOČEKIVANE greške u obradi ovog turna
@@ -510,18 +625,36 @@ def _handle_choice_answer(store, llm, session, turn, lesson_id, request_id):
         # Prvi pogrešan → „Netačno.“ + jedan sažet hint, bez dokazivanja i bez
         # otkrivanja tačne opcije. Drugi pogrešan → „Netačno.“ + postojeće
         # otkrivanje rješenja. Hint prolazi ISTU math-safety granicu kao reply.
+        geo_scope, geo_figures = _geometry_context(session)
+
         if not is_correct:
             if wrong_attempts_before >= 1:
                 reply = feedback.shape_final_wrong_prefix(reply)
             else:
+                # PRVI pogrešan klik: hint s pogrešnom geometrijskom oznakom se
+                # NE odbija kao cio turn — tiho pada na siguran generički hint
+                # (isti mehanizam kao curenje odgovora / nedosljedan račun u
+                # matbot/feedback.py), bez drugog AI poziva. Isto važi i za
+                # 'reply' kao rezervni izvor hinta: ako i on krši konvenciju,
+                # oba izvora se prazne pa feedback.py koristi GENERIC_HINT.
                 hint_source = ""
                 if out.hint:
                     hint_text, hint_safe = sanitize_and_validate_math_text(out.hint.strip())
                     if hint_safe:
-                        hint_source = normalize_terminology(hint_text)
+                        candidate = normalize_terminology(hint_text)
+                        if geometrycheck.is_geometry_clean(candidate, geo_scope, geo_figures):
+                            hint_source = candidate
+                        else:
+                            logger.warning(
+                                "practice_choice request_id=%s geometry_notation_hint_replaced",
+                                request_id,
+                            )
+                reply_source = reply
+                if not geometrycheck.is_geometry_clean(reply, geo_scope, geo_figures):
+                    reply_source = ""
                 reply = feedback.shape_first_wrong_feedback(
                     hint_source,
-                    reply,
+                    reply_source,
                     correct_option_text=options_by_id[session["correct_option_id"]]["text"],
                     expected_answer=session["expected_answer_summary"],
                 )
@@ -530,6 +663,11 @@ def _handle_choice_answer(store, llm, session, turn, lesson_id, request_id):
         # oblikovanja feedbacka/reveala) — pogrešan račun u otkrivenom rješenju
         # jednako je štetan kao u zadatku.
         _reject_if_numerically_inconsistent(reply, "choice_feedback")
+        # Notacija KONAČNOG vidljivog teksta. Za prvi pogrešan klik je iznad već
+        # osiguran čist izvor (ili GENERIC_HINT), pa je ovo tu no-op; za TAČAN
+        # odgovor i za OTKRIVANJE rješenja (drugi pogrešan) ovo je autoritativno
+        # objašnjenje i pogrešna oznaka ga odbija u cijelosti.
+        _reject_if_geometry_notation_invalid(reply, geo_scope, geo_figures, "choice_feedback")
 
         session["recent_turns"].append({
             "student": f"[izabrao opciju: {selected_text}]"[:300],

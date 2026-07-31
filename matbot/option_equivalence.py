@@ -28,6 +28,7 @@ RAZLIČITIM — modul NIKAD ne "pogađa" da su dvije opcije iste; nedokazivost
 nije dokaz jednakosti (isti princip kao mathcheck.py: preskoči, ne pogađaj).
 """
 import re
+import unicodedata
 
 from matbot import mathcheck
 
@@ -53,6 +54,53 @@ class _Unknown(Exception):
     nejednakosti, samo signal da se pouzdano ne zna."""
 
 
+# ---------------------------------------------------------------------------
+# DOSLOVNA (tekstualna) JEDINSTVENOST — case-SENSITIVE
+#
+# ŽIVI NALAZ (poziv 12 fokusiranog live testa, lekcija „Centar, poluprečnik i
+# prečnik“): validan `choose_correct_formula` zadatak s opcijama
+#     $R=2r$   $r=2R$   $R=r^2$   $O=\pi r^2$
+# bio je ODBIJEN kao „duple opcije“ jer je stara provjera radila
+# `text.lower()` prije poređenja, pa su `$R=2r$` i `$r=2R$` oba postali
+# `$r=2r$`. U ovom projektu VELIČINA SLOVA NOSI ZNAČENJE:
+#     r/R (poluprečnik/prečnik), d/D (dijagonala strane/prostorna),
+#     P/p, O/o, B/b, H/h
+# pa se matematički tekst NIKAD ne smije spuštati u mala slova.
+#
+# Normalizacija koja OSTAJE (sigurna, ne mijenja značenje):
+#   • Unicode NFC (isti znak, isti zapis)
+#   • uklanjanje SVIH razmaka — dvije opcije koje se razlikuju samo po
+#     razmacima („$R = 2r$“ i „$R=2r$“) jesu ista opcija
+# Sve ostalo (velika/mala slova, simboli, MathJax struktura) ostaje netaknuto.
+# ---------------------------------------------------------------------------
+
+_ALL_WHITESPACE_RE = re.compile(r"\s+")
+
+
+def normalized_option_key(text):
+    """Ključ za DOSLOVNO poređenje dvije opcije. ČUVA veličinu slova."""
+    key = unicodedata.normalize("NFC", text or "").strip()
+    return _ALL_WHITESPACE_RE.sub("", key)
+
+
+def find_textual_duplicate_pairs(option_texts):
+    """Vrati [(i, j)] parove opcija koje su DOSLOVNO iste nakon sigurne
+    normalizacije. Ovo hvata ono što semantička provjera NE MOŽE — dvije
+    identične PROZNE opcije („Sabrao je brojnike.“), jer se proza ne može
+    numerički ni simbolički kanonikalizovati."""
+    seen = {}
+    pairs = []
+    for index, text in enumerate(option_texts):
+        key = normalized_option_key(text)
+        if not key:
+            continue
+        if key in seen:
+            pairs.append((seen[key], index))
+        else:
+            seen[key] = index
+    return pairs
+
+
 def _strip_math_delimiters(text):
     t = (text or "").strip()
     if len(t) >= 2 and t.startswith("$") and t.endswith("$"):
@@ -63,10 +111,29 @@ def _strip_math_delimiters(text):
 def _value_expression(expr):
     """Ako izraz ima oblik 'nešto=vrijednost' (npr. 'd=a\\sqrt2'), poredi se
     SAMO dio poslije POSLJEDNJEG '=' — to je stvarna formula/vrijednost koju
-    opcija predlaže; lijeva strana (ime tražene veličine) je ista u sve četiri
-    opcije i nije predmet poređenja."""
+    opcija predlaže."""
     idx = expr.rfind("=")
     return expr[idx + 1:].strip() if idx != -1 else expr.strip()
+
+
+def _defined_quantity(expr):
+    """Lijeva strana jednakosti — VELIČINA koju opcija definiše, ili None kad
+    opcija nije oblika 'nešto=vrijednost'.
+
+    ZAŠTO POSTOJI: raniji komentar uz _value_expression je pretpostavljao da je
+    „lijeva strana ista u sve četiri opcije, pa nije predmet poređenja“. Ta
+    pretpostavka PADA upravo kod zadataka o notaciji, gdje je lijeva strana ono
+    što se ispituje. Posljedica (izmjereno): `$D=a\\sqrt3$` i `$d=a\\sqrt3$`,
+    `$P=ab$` i `$p=ab$`, `$B=a^2$` i `$b=a^2$` bili su proglašeni ISTOM
+    opcijom jer im je desna strana identična — pa je validan zadatak odbijen.
+
+    Dvije opcije koje definišu RAZLIČITE veličine tvrde RAZLIČITE stvari, čak i
+    kad im se desne strane poklapaju. Poređenje čuva veličinu slova."""
+    idx = expr.rfind("=")
+    if idx == -1:
+        return None
+    left = expr[:idx].strip()
+    return _ALL_WHITESPACE_RE.sub("", left) or None
 
 
 _UNIT_CAPTURE_RE = re.compile(
@@ -300,8 +367,20 @@ def options_are_equivalent(text_a, text_b):
     istu vrijednost/izraz (numerički ili simbolički). Vraća False i kad su
     dokazano različite i kad se ne može dokazati — nikad se ne "pogađa"
     jednakost (isti princip nesigurnosti kao matbot/mathcheck.py)."""
-    val_a = _value_expression(_strip_math_delimiters(text_a))
-    val_b = _value_expression(_strip_math_delimiters(text_b))
+    bare_a = _strip_math_delimiters(text_a)
+    bare_b = _strip_math_delimiters(text_b)
+
+    # Različita DEFINISANA veličina → različite tvrdnje, bez obzira na to što
+    # im se desne strane poklapaju ($D=a\sqrt3$ vs $d=a\sqrt3$). Poređenje je
+    # case-sensitive jer u ovom projektu r/R, d/D, P/p, O/o, B/b, H/h nose
+    # različita značenja (vidi matbot/geometry_rules.py).
+    lhs_a = _defined_quantity(bare_a)
+    lhs_b = _defined_quantity(bare_b)
+    if lhs_a is not None and lhs_b is not None and lhs_a != lhs_b:
+        return False
+
+    val_a = _value_expression(bare_a)
+    val_b = _value_expression(bare_b)
     if not val_a or not val_b:
         return False
 
