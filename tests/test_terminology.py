@@ -105,7 +105,7 @@ def _practice_payload(msg="Daj zadatak.", **kw):
     return base
 
 
-def test_practice_reply_and_task_are_normalized():
+def test_practice_task_is_normalized_and_model_intro_is_ignored():
     store, fake = SessionStore(), FakeLLM()
     # Zadatak zadovoljava ugovor prve porodice (expand_to_given_denominator),
     # a namjerno sadrži zabranjeni termin u tekstu i u jednoj opciji.
@@ -120,7 +120,9 @@ def test_practice_reply_and_task_are_normalized():
     r = run_practice_turn(store, fake, _practice_payload())
 
     assert not terminology.contains_forbidden_term(r["answer"])
-    assert "faktore" in r["answer"]
+    assert r["answer"].startswith("Evo zadatka.\n\nZadatak: ")
+    assert "Rastavi" not in r["answer"]
+    assert "faktora" in r["answer"]
     assert not terminology.contains_forbidden_term(r["last_tutor_task"])
     for option in r["next_state"]["task"]["options"]:
         assert not terminology.contains_forbidden_term(option["text"])

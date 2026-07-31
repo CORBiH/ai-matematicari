@@ -44,6 +44,11 @@ logger = logging.getLogger("matbot.practice")
 
 SAFE_ERROR_MESSAGE = "Nešto je zapelo pri sastavljanju odgovora. Pošalji poruku ponovo za koji trenutak."
 
+_NEW_TASK_INTRO = "Evo zadatka."
+_HARDER_TASK_INTRO = "Evo težeg zadatka."
+_EASIER_TASK_INTRO = "Evo lakšeg zadatka."
+_SAME_FAMILY_RETRY_INTRO = "Evo novog zadatka za istu vještinu."
+
 
 _LOG_FIELD_LIMIT = 200
 
@@ -53,6 +58,18 @@ def _clip_for_log(value, limit=_LOG_FIELD_LIMIT):
     dug string u log (i nikad se ovo ne šalje u browser)."""
     text = "" if value is None else str(value)
     return text if len(text) <= limit else text[:limit] + "…"
+
+
+def _new_task_intro(turn, retry_required=False):
+    """Vrati kratak server-owned uvod; modelov ``reply`` se ne prikazuje."""
+    if retry_required:
+        return _SAME_FAMILY_RETRY_INTRO
+    difficulty_request = (turn.get("difficulty_request") or "").strip().lower()
+    if difficulty_request == "harder":
+        return _HARDER_TASK_INTRO
+    if difficulty_request == "easier":
+        return _EASIER_TASK_INTRO
+    return _NEW_TASK_INTRO
 
 
 def _log_duplicate_options(request_id, topic, family, diagnostics):
@@ -504,6 +521,7 @@ def _handle_text_turn(store, llm, session, turn, lesson_id, request_id):
     # istina koju smijemo vratiti — session je lokalna kopija i NIKAD se ne
     # commituje (store.save) osim na uspješnom kraju ove funkcije.
     active_task_before_llm = session["current_task"]
+    retry_required_before_llm = bool(session["retry_required"])
 
     # Porodicu zadatka bira SERVER, prije jedinog AI poziva u turnu — model je
     # samo dobije kao obavezu. Time rotacija vrsta zadataka ne zavisi od toga
@@ -549,19 +567,22 @@ def _handle_text_turn(store, llm, session, turn, lesson_id, request_id):
             task_text = _apply_new_task(session, out.new_task, task_family=selected_family,
                                        request_id=request_id)
 
-        # vidljivi odgovor: reply + (novi zadatak, ako postoji i nije već u replyju)
-        reply, reply_safe = sanitize_and_validate_math_text(out.reply.strip())
-        if not reply_safe:
-            raise InvalidOutputError("nebezbjedan matematički zapis u odgovoru")
-        reply = normalize_terminology(reply)
-        _reject_if_numerically_inconsistent(reply, "reply")
-        # Tutorov vidljivi tekst je AUTORITATIVAN (objašnjenje/odgovor na
-        # pitanje) — uvijek "check", nikad politika porodice.
-        _scope, _figures = _geometry_context(session)
-        _reject_if_geometry_notation_invalid(reply, _scope, _figures, "reply")
-        if out.new_task is not None and task_text not in reply:
+        # Novi zadatak uvijek dobija kratak server-owned uvod. Modelov slobodni
+        # `reply` se tada ne prikazuje i ne može prokrijumčariti hint prije prvog
+        # pokušaja; tekst zadatka ostaje zaseban i neizmijenjen ovim pravilom.
+        if out.new_task is not None:
+            reply = _new_task_intro(turn, retry_required_before_llm)
             answer = reply + "\n\nZadatak: " + task_text
         else:
+            reply, reply_safe = sanitize_and_validate_math_text(out.reply.strip())
+            if not reply_safe:
+                raise InvalidOutputError("nebezbjedan matematički zapis u odgovoru")
+            reply = normalize_terminology(reply)
+            _reject_if_numerically_inconsistent(reply, "reply")
+            # Tutorov vidljivi tekst je AUTORITATIVAN (objašnjenje/odgovor na
+            # pitanje) — uvijek "check", nikad politika porodice.
+            _scope, _figures = _geometry_context(session)
+            _reject_if_geometry_notation_invalid(reply, _scope, _figures, "reply")
             answer = reply
 
         session["recent_turns"].append(
