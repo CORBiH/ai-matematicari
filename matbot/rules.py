@@ -10,7 +10,8 @@ Hijerarhija (kad se pravila sukobe — primjenjuje AI čitajući prompt odozgo
 nadole, ali i mi je poštujemo u REDOSLIJEDU sastavljanja teksta):
   1. sigurnost i domen           (_DOMAIN_RULES)
   2. pravila konkretnog moda     (dodaje ih prompts.py NAKON ovog teksta)
-  3. pravila razreda             (_GRADE_RULES)
+  3. pravila razreda             (_GRADE_RULES; izostavljena u Quick modu,
+                                   gdje razred određuje samo stil iz prompts.py)
   4. pravila izabrane oblasti/lekcije (_TOPIC_METHOD_RULES + construction)
   5. univerzalna terminologija i zapis (_LANGUAGE_RULES, _MATH_NOTATION_RULES)
 
@@ -408,7 +409,12 @@ def build_shared_math_rules(grade, lesson_title, oblast, mode, student_message="
 
     parts = [_DOMAIN_RULES]
 
-    parts.append(_grade_rules(grade))
+    # Quick/Result dobija razredno prilagođen JEZIK iz prompts.py, ali ne i
+    # kurikularna ograničenja skupa brojeva iz ovog bloka. Jasan korisnički
+    # račun ostaje matematički isti bez obzira na izabrani razred (npr. rješenje
+    # x=-6 ne prestaje važiti zato što je UI postavljen na 6. razred).
+    if mode != "quick":
+        parts.append(_grade_rules(grade))
 
     topic_ids = route_topic_rules(oblast, lesson_title)
     for topic_id in topic_ids:

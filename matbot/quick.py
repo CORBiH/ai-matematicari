@@ -8,12 +8,14 @@ BEZ 'status' i BEZ 'next_state' (frontend tada čuva svoje stanje — isti
 mehanizam kao practice/explain).
 """
 import logging
+import re
+import unicodedata
 import uuid
 
 from matbot import geometry_rules, geometrycheck, prompts
 from matbot.llm import LLMError, failure_diagnostics_kv
 from matbot.mathcheck import find_numeric_inconsistencies
-from matbot.mathsafe import sanitize_and_validate_math_text
+from matbot.mathsafe import normalize_result_math_transport, sanitize_and_validate_math_text
 from matbot.practice import SAFE_ERROR_MESSAGE
 from matbot.schema import InvalidOutputError, validate_quick_output
 from matbot.terminology import normalize_terminology
@@ -22,6 +24,53 @@ from matbot.topics import lesson_info
 logger = logging.getLogger("matbot.quick")
 
 MAX_HISTORY_MESSAGES = 6  # 3 razmjene (učenik + tutor) — isto ograničenje kao Explain
+
+_REPAIR_MESSAGE_PREFIXES = (
+    "sta pricas",
+    "ne razumijem",
+    "nije mi jasno",
+    "kakve to veze ima",
+    "to nisam pitao",
+    "sta to znaci",
+)
+_REPAIR_STANDALONE_MESSAGES = ("pojasni", "pojasni mi")
+_REPAIR_ACKNOWLEDGEMENT_PREFIXES = (
+    "izvini",
+    "izvinjavam se",
+    "oprosti",
+    "zao mi je",
+    "u pravu si",
+    "nisam bio jasan",
+    "nisam bila jasna",
+    "nisam se jasno izrazio",
+    "nisam se jasno izrazila",
+)
+REPAIR_ACKNOWLEDGEMENT = "Izvini — prethodni odgovor nije bio dovoljno jasan. "
+
+
+def _normalized_conversation_phrase(value):
+    """Lowercase/diacritics/punctuation normalization for narrow prose intents."""
+    folded = unicodedata.normalize("NFKD", value or "")
+    without_marks = "".join(char for char in folded if not unicodedata.combining(char))
+    words_only = re.sub(r"[^\w\s]", " ", without_marks.lower(), flags=re.UNICODE)
+    return " ".join(words_only.split())
+
+
+def is_conversational_repair_message(message: str) -> bool:
+    """Recognize only a small allowlist of Bosnian confusion/repair messages."""
+    normalized = _normalized_conversation_phrase(message)
+    return normalized in _REPAIR_STANDALONE_MESSAGES or any(
+        normalized == phrase or normalized.startswith(phrase + " ")
+        for phrase in _REPAIR_MESSAGE_PREFIXES
+    )
+
+
+def _begins_with_repair_acknowledgement(reply: str) -> bool:
+    normalized = _normalized_conversation_phrase(reply)
+    return any(
+        normalized == phrase or normalized.startswith(phrase + " ")
+        for phrase in _REPAIR_ACKNOWLEDGEMENT_PREFIXES
+    )
 
 
 def _clean_history(raw_history):
@@ -52,8 +101,10 @@ def run_quick_turn(llm, turn):
     lesson_title = lesson["title"] if lesson else ""
     oblast = lesson["oblast"] if lesson else (turn["selected_oblast"] or "")
 
+    repair_intent = is_conversational_repair_message(turn["student_message"])
     instructions = prompts.build_quick_instructions(
-        turn["grade"], lesson_title=lesson_title, oblast=oblast
+        turn["grade"], lesson_title=lesson_title, oblast=oblast,
+        repair_intent=repair_intent,
     )
     input_text = prompts.build_quick_input(
         lesson_title=lesson_title,
@@ -83,8 +134,12 @@ def run_quick_turn(llm, turn):
     # proza, ne cio-odgovor-u-$...$. Nebezbjedno nakon uskog repaira → odbij
     # cio odgovor, isti sigurni fallback kao za LLMError/InvalidOutputError
     # iznad, bez drugog AI poziva.
-    answer, is_safe = sanitize_and_validate_math_text(result.output.reply.strip())
-    if not is_safe:
+    raw_reply = result.output.reply.strip()
+    if repair_intent and not _begins_with_repair_acknowledgement(raw_reply):
+        raw_reply = REPAIR_ACKNOWLEDGEMENT + raw_reply
+    transported, transport_safe = normalize_result_math_transport(raw_reply)
+    answer, is_safe = sanitize_and_validate_math_text(transported)
+    if not transport_safe or not is_safe:
         logger.warning("quick_turn request_id=%s category=unsafe_math_output", request_id)
         return {"answer": SAFE_ERROR_MESSAGE, "last_tutor_task": ""}
     answer = normalize_terminology(answer)

@@ -14,7 +14,18 @@
   <meta name="matbot-embed-token" content="{{ embed_token or '' }}">
 
   <script>
-    MathJax = { tex: { inlineMath: [["$", "$"], ["\\(", "\\)"]] }, svg: { fontCache: "global" } };
+    MathJax = {
+      tex: { inlineMath: [["$", "$"], ["\\(", "\\)"]] },
+      svg: { fontCache: "global" },
+      startup: {
+        ready: function(){
+          MathJax.startup.defaultReady();
+          MathJax.startup.promise.then(function(){
+            document.dispatchEvent(new Event('matbot-mathjax-ready'));
+          });
+        }
+      }
+    };
   </script>
   <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 
@@ -686,13 +697,21 @@ document.addEventListener('DOMContentLoaded', () => {
       requestAnimationFrame(function(){ tutorChat.scrollTop = tutorChat.scrollHeight; });
       setTimeout(function(){ tutorChat.scrollTop = tutorChat.scrollHeight; }, 180);
     }
+    function typesetTutorNode(node){
+      if (!node || node.dataset.mathjaxQueued === '1') return;
+      const run = function(){
+        if (!node.isConnected || !window.MathJax || !MathJax.typesetPromise) return;
+        node.dataset.mathjaxQueued = '1';
+        MathJax.typesetPromise([node]).then(scrollTutorToBottom).catch(()=>{});
+      };
+      if (window.MathJax && MathJax.typesetPromise) run();
+      else document.addEventListener('matbot-mathjax-ready', run, { once: true });
+    }
     function appendTutorMsg(role, html){
       const made = createTutorBubble(role);
       made.bubble.innerHTML = html || '<i>Nema odgovora.</i>';
       scrollTutorToBottom();
-      if (window.MathJax && MathJax.typesetPromise){
-        MathJax.typesetPromise([made.bubble]).then(scrollTutorToBottom).catch(()=>{});
-      }
+      typesetTutorNode(made.bubble);
       return made;
     }
     function lastBotMessage(){
@@ -2037,7 +2056,7 @@ document.addEventListener('DOMContentLoaded', () => {
       made.bubble.innerHTML = renderTutorHTML(finalAnswer);   // finalni render JEDNOM
       scrollTutorToBottom();
       /* scroll i poslije typeseta — MathJax naknadno mijenja visinu poruke */
-      if (window.MathJax && MathJax.typesetPromise) MathJax.typesetPromise([made.bubble]).then(scrollTutorToBottom).catch(()=>{});
+      typesetTutorNode(made.bubble);
       return { j: doneData, rendered: true };
     }
 

@@ -23,6 +23,79 @@ import re
 
 _DOLLAR_SPLIT = re.compile(r"(?<!\\)\$")
 
+# Result/Quick transport repair. Some structured model outputs over-escape the
+# MathJax delimiters themselves (``\$...\$``) or preserve two literal
+# backslashes before a command after JSON parsing. Those strings are valid
+# JSON, but ``\$`` means a literal dollar to MathJax and ``\\command`` means a
+# line break followed by raw text. This repair is called explicitly by Quick;
+# Practice keeps its existing behavior.
+_ESCAPED_DOLLAR_RE = re.compile(r"\\\$")
+_RESULT_MATH_COMMAND_RE = re.compile(
+    r"\\(?:frac|sqrt|text|cdot|times|mathbb|dots|ldots|neq|leq|geq|approx|"
+    r"infty|pi|left|right)\b|\\[{}]"
+)
+_RESULT_OVERESCAPED_COMMAND_RE = re.compile(
+    r"\\{2,}(?=(?:frac|sqrt|text|cdot|times|mathbb|dots|ldots|neq|ne|not|"
+    r"le|ge|leq|geq|approx|infty|pi|left|right)\b|[{}])"
+)
+
+
+def _clearly_enclosed_math(value):
+    r"""Usko prepoznaj sadržaj kojem ``\$...\$`` nedvosmisleno znači math."""
+    text = (value or "").strip()
+    if not text or "$" in text or "\n" in text or "\r" in text:
+        return False
+    if text.count("{") != text.count("}"):
+        return False
+
+    # Ukloni poznate komande prije provjere proznih riječi. Jednoslovne
+    # varijable/skupovi (x, y, N, R) su dozvoljeni; višeslovna proza nije.
+    residue = re.sub(r"\\text\{[^{}]*\}", "", text)
+    residue = re.sub(r"\\(?:[A-Za-z]+|[{}])", "", residue)
+    if any(len(word) > 1 for word in re.findall(r"[A-Za-z]+", residue)):
+        return False
+    has_command = bool(_RESULT_MATH_COMMAND_RE.search(text))
+    has_operator = bool(re.search(r"[=<>+\-*/^_]", residue))
+    return has_command or has_operator
+
+
+def normalize_result_math_transport(text):
+    """Normalize Result-only JSON/MathJax over-escaping.
+
+    Returns ``(normalized, safe)``. Escaped dollars are converted only in
+    balanced pairs whose content is clearly mathematical. Currency/plain
+    escaped dollars remain byte-for-byte unchanged. A math-like dangling or
+    nested escaped delimiter is rejected instead of guessed.
+    """
+    value = text or ""
+    matches = list(_ESCAPED_DOLLAR_RE.finditer(value))
+    if matches:
+        if len(matches) % 2:
+            tail = value[matches[-1].end():]
+            return (value, False) if _clearly_enclosed_math(tail) else (value, True)
+        out = []
+        cursor = 0
+        for index in range(0, len(matches), 2):
+            opening, closing = matches[index], matches[index + 1]
+            body = value[opening.end():closing.start()]
+            out.append(value[cursor:opening.start()])
+            if "$" in body:
+                return value, False
+            if _clearly_enclosed_math(body):
+                out.append("$" + body + "$")
+            else:
+                out.append(value[opening.start():closing.end()])
+            cursor = closing.end()
+        out.append(value[cursor:])
+        value = "".join(out)
+
+    # Samo unutar stvarnih $...$ segmenata: dva ili više backslasha pred
+    # poznatom komandom/kontrolnim simbolom svode se na tačno jedan.
+    parts = _DOLLAR_SPLIT.split(value)
+    for index in range(1, len(parts), 2):
+        parts[index] = _RESULT_OVERESCAPED_COMMAND_RE.sub("\\\\", parts[index])
+    return "$".join(parts), True
+
 # JSON escape sekvence čije se dekodirane kontrolne znakove najčešće brka sa
 # backslash-om ispred LaTeX komande (\frac, \begin, \times, \neq, \right, ...).
 # Mapiranje ide OBRNUTO od JSON dekodera: kontrolni znak → JEDAN literalni
