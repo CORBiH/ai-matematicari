@@ -118,6 +118,8 @@
   /* file chip */
   .file-chip{display:none;align-items:center;gap:.5rem;background:#13231f;border:1px dashed rgba(86,200,143,.45);color:#d8efe7;padding:.35rem .55rem;border-radius:999px;font-size:.88rem;}
   .file-chip.show{display:inline-flex;}
+  .composer-plus.is-disabled,.file-chip .remove.is-disabled{opacity:.45;pointer-events:none;}
+  .file-chip-thumb{width:34px;height:34px;object-fit:cover;border-radius:6px;border:1px solid rgba(255,255,255,.18);background:#0d1a17;}
   .file-chip .remove{display:grid;place-items:center;width:28px;height:28px;background:#203139;border:1px solid rgba(255,255,255,.16);border-radius:999px;font-size:1.15rem;cursor:pointer;color:#f3fbf8;line-height:1;padding:0;}
   .file-chip .remove:hover,.file-chip .remove:focus-visible{background:#2d4b43;border-color:rgba(86,200,143,.55);outline:none;}
 
@@ -422,11 +424,11 @@
       <!-- Phase 2: brzi odgovori (chips) — pune se iz JS-a prema zadnjem odgovoru -->
       <div id="tutorChips" class="tutor-chips" hidden></div>
 
-      <span id="tutorImageChip" class="file-chip tutor-chip"><span id="tutorImageName">Nije odabrana slika</span><button type="button" class="remove" id="tutorImageRemove" title="Ukloni sliku">×</button></span>
+      <span id="tutorImageChip" class="file-chip tutor-chip" role="status" aria-live="polite"><img id="tutorImageThumb" class="file-chip-thumb" alt="" hidden><span id="tutorImageName">Nije odabrana slika</span><button type="button" class="remove" id="tutorImageRemove" title="Ukloni sliku" aria-label="Ukloni priloženu sliku">×</button></span>
 
       <div class="composer" id="tutorComposer">
-        <input id="tutorImage" type="file" accept="image/*" style="display:none;">
-        <input id="tutorCameraImage" type="file" accept="image/*" capture="environment" style="display:none;">
+        <input id="tutorImage" type="file" accept="image/jpeg,image/png,image/webp" style="display:none;">
+        <input id="tutorCameraImage" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" style="display:none;">
         <label for="tutorImage" id="tutorImageBtn" class="composer-plus" title="Dodaj sliku zadatka" aria-label="Dodaj sliku zadatka"><span class="composer-plus-icon" aria-hidden="true">+</span></label>
         <label for="tutorCameraImage" id="tutorCameraBtn" class="composer-plus composer-camera" title="Otvori kameru" aria-label="Otvori kameru"><span aria-hidden="true">📷</span></label>
         <textarea id="tutorMessage" rows="1" placeholder="Upiši pitanje ili zadatak..."></textarea>
@@ -602,6 +604,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const tutorImgChip = document.getElementById('tutorImageChip');
     const tutorImgName = document.getElementById('tutorImageName');
     const tutorImgRemove = document.getElementById('tutorImageRemove');
+    const tutorImgThumb = document.getElementById('tutorImageThumb');
+    const tutorImgBtn = document.getElementById('tutorImageBtn');
+    const tutorCameraBtn = document.getElementById('tutorCameraBtn');
     const chipsBox = document.getElementById('tutorChips');
     const optionsBox = document.getElementById('tutorOptions');
 
@@ -935,23 +940,13 @@ document.addEventListener('DOMContentLoaded', () => {
       try { return (localStorage.getItem(LASTTASK_KEY) || '').trim(); }
       catch(_){ return ''; }
     }
-    function storedLastImageContext(){
-      try { return (localStorage.getItem(LASTIMAGECTX_KEY) || '').trim(); }
-      catch(_){ return ''; }
-    }
-    function setLastImageContext(t){
-      const s = (t || '').trim().slice(0, 2000);
-      if (!s) return;
-      try { localStorage.setItem(LASTIMAGECTX_KEY, s); } catch(_){}
-    }
-    function isImageFollowupMessage(t){
-      const s = foldTutorText(t).trim();
-      if (!s || s.length > 160) return false;
-      /* BUG 3 fix: pokriva i prezent ("uradi", "rijesi"), "korak po korak",
-         "nastavi/dalje/sljedeci/sve" — ranije je "uradi mi korak po korak"
-         promaklo pa follow-up nije nosio kontekst slike */
-      return /\b(slik\w*|zadat\w*|zadac\w*|pitanj\w*|rezultat\w*|postupak|prv\w*|drug\w*|trec\w*|cetvrt\w*|pet\w*|kako\s+si|urad\w*|rijesi\w*|dobio|dobila|objasni|ne\s+razumijem|korak|nastav\w*|dalje|sljedec\w*|sve)\b|\b\d{1,2}\s*[.)]/.test(s);
-    }
+    /* PRIVATNOST SLIKE: ne postoji nikakav lokalno pohranjen „kontekst slike“.
+       Slika važi SAMO za turn u kojem je poslana. U localStorage i historiju
+       razgovora ne ide base64, object URL, ime fajla, dimenzije, MIME ni bilo
+       kakav automatski opis/transkripcija slike — samo tekstualni marker
+       IMAGE_HISTORY_MARKER ispod. Ako kasniji odgovor ponovo treba sliku,
+       učenik je mora priložiti iznova. */
+    const IMAGE_HISTORY_MARKER = '[U ovom turnu je bila priložena slika.]';
     function storedRecentTasks(){
       try { const a = JSON.parse(localStorage.getItem(RECENTTASKS_KEY) || '[]'); return Array.isArray(a) ? a : []; }
       catch(_){ return []; }
@@ -1155,7 +1150,7 @@ document.addEventListener('DOMContentLoaded', () => {
       botMessageIndex = 0;
       try { localStorage.removeItem(TKEY); } catch(_){}
       try { localStorage.removeItem(LASTTASK_KEY); } catch(_){}
-      try { localStorage.removeItem(LASTIMAGECTX_KEY); } catch(_){}
+      try { localStorage.removeItem(LASTIMAGECTX_KEY); } catch(_){}  /* čišćenje zaostataka starije verzije */
       try { localStorage.removeItem(RECENTTASKS_KEY); } catch(_){}
       clearNextState();
       clearOptions();
@@ -1448,12 +1443,35 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     loadTopicsForGrade(state.grade);
 
-    /* Phase 6.2: slika zadatka u tutoru (opciono, sekundarno) */
+    /* ===== Prilog: JEDNA slika zadatka (samo mod „Samo rezultat“) =========
+       Životni ciklus: izbor → provjera (samo UX) → thumbnail → slanje →
+       čišćenje TEK nakon uspješnog odgovora servera ili izričitog uklanjanja.
+       Greška (klijentska ili serverska) NIKAD ne briše prilog — učenik ne
+       treba ponovo tražiti istu sliku.
+
+       Klijentska provjera tipa/veličine je SAMO prijateljski rani UX signal.
+       Jedini autoritet je backend (matbot/imageinput.py), koji odlučuje na
+       osnovu stvarno dekodiranih bajta. Zato prazan ili pogrešan `File.type`
+       ne blokira slanje — takvu sliku šaljemo i puštamo backend da presudi. */
+    const TUTOR_IMAGE_MAX_BYTES = 8 * 1024 * 1024;          /* isto kao config.MAX_IMAGE_BYTES */
+    const TUTOR_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    const TUTOR_IMAGE_BAD_EXT = /\.(svg|gif|heic|heif|pdf|bmp|tif|tiff|avif)$/i;
+    let tutorImageObjectUrl = '';                            /* jedini živi object URL */
+
+    function revokeTutorImagePreview(){
+      /* obavezno: bez revoke-a browser drži bafer slike u memoriji do reloada */
+      if (tutorImageObjectUrl){
+        try { URL.revokeObjectURL(tutorImageObjectUrl); } catch(_){}
+        tutorImageObjectUrl = '';
+      }
+      if (tutorImgThumb){ tutorImgThumb.removeAttribute('src'); tutorImgThumb.hidden = true; }
+    }
     function tutorImageFile(){
       if (tutorCameraImg && tutorCameraImg.files && tutorCameraImg.files[0]) return tutorCameraImg.files[0];
       return (tutorImg && tutorImg.files && tutorImg.files[0]) ? tutorImg.files[0] : null;
     }
     function clearTutorImage(){
+      revokeTutorImagePreview();
       if (tutorImg){
         try { const dt = new DataTransfer(); tutorImg.files = dt.files; } catch(_){}
         tutorImg.value = '';
@@ -1462,25 +1480,48 @@ document.addEventListener('DOMContentLoaded', () => {
         try { const dt = new DataTransfer(); tutorCameraImg.files = dt.files; } catch(_){}
         tutorCameraImg.value = '';
       }
+      if (tutorImgName) tutorImgName.textContent = 'Nije odabrana slika';
       if (tutorImgChip) tutorImgChip.classList.remove('show');
+    }
+    function showTutorImageChip(f){
+      revokeTutorImagePreview();                             /* prvo pusti prethodni URL */
+      if (tutorImgThumb){
+        try {
+          tutorImageObjectUrl = URL.createObjectURL(f);
+          tutorImgThumb.src = tutorImageObjectUrl;
+          tutorImgThumb.hidden = false;
+        } catch(_){ tutorImageObjectUrl = ''; }
+      }
+      if (tutorImgName) tutorImgName.textContent = '1 slika priložena: ' + f.name;
+      if (tutorImgChip) tutorImgChip.classList.add('show');
     }
     function handleTutorImageChange(input){
       if (!input) return;
       input.addEventListener('change', ()=>{
         const f = tutorImageFile();
         if (!f) { clearTutorImage(); return; }
-        if (!f.type || !f.type.startsWith('image/')){
+        /* Odbijamo unaprijed SAMO ono što backend sigurno ne prihvata i što se
+           vidi bez čitanja bajta: poznat nepodržan tip ili prevelik fajl. */
+        const typeKnown = !!(f.type && f.type.indexOf('image/') === 0);
+        if ((typeKnown && TUTOR_IMAGE_TYPES.indexOf(f.type.toLowerCase()) === -1) ||
+            (!typeKnown && TUTOR_IMAGE_BAD_EXT.test(f.name || ''))){
           clearTutorImage();
-          showToast('To nije slika. Pošalji JPG/PNG.', 'err');
+          showToast('Podržane su JPG, PNG i WebP slike.', 'err');
           return;
         }
-        if (tutorImgName) tutorImgName.textContent = f.name;
-        if (tutorImgChip) tutorImgChip.classList.add('show');
+        if (f.size > TUTOR_IMAGE_MAX_BYTES){
+          clearTutorImage();
+          showToast('Slika je prevelika (najviše 8 MB). Slikaj je u nižoj rezoluciji.', 'err');
+          return;
+        }
+        showTutorImageChip(f);
       });
     }
     handleTutorImageChange(tutorImg);
     handleTutorImageChange(tutorCameraImg);
     if (tutorImgRemove) tutorImgRemove.addEventListener('click', clearTutorImage);
+    /* posljednja odbrana od curenja memorije ako korisnik zatvori/osvježi tab */
+    window.addEventListener('pagehide', revokeTutorImagePreview);
 
     /* ===== Practice multiple-choice: 4 opcije aktivnog zadatka ===== */
     function clearOptions(){
@@ -1727,16 +1768,17 @@ document.addEventListener('DOMContentLoaded', () => {
       fbBox.classList.remove('hidden');
     }
 
-    /* slika bez teksta → default poruka po modu (slika je zadatak) */
-    const IMG_DEFAULTS = {
-      explain: 'Objasni mi zadatak sa slike.',
-      practice: 'Daj mi sličan zadatak za vježbu na osnovu slike.',
-      exam: 'Pripremi me za kontrolni koristeći zadatak sa slike kao kontekst.',
-      quick: 'Daj mi samo rezultat zadatka sa slike.'
-    };
-
     function setTutorBusy(on){
+      /* dok traje zahtjev: bez slanja i bez mijenjanja priloga (zaštita od
+         dvostrukog slanja iste slike i od zamjene fajla usred zahtjeva) */
       sendTutor.disabled = on;
+      [tutorImgBtn, tutorCameraBtn, tutorImgRemove].forEach(el=>{
+        if (!el) return;
+        el.setAttribute('aria-disabled', on ? 'true' : 'false');
+        el.classList.toggle('is-disabled', !!on);
+      });
+      if (tutorImg) tutorImg.disabled = on;
+      if (tutorCameraImg) tutorCameraImg.disabled = on;
     }
 
     let tutorBusy = false;
@@ -1745,7 +1787,6 @@ document.addEventListener('DOMContentLoaded', () => {
       const typed = (msgBox.value || '').trim();
       const imgFile = tutorImageFile();
       const savedTask = storedLastTask();
-      const savedImageContext = storedLastImageContext();
       const previousNextState = storedNextState();
       const chipMeta = pendingChipMeta || {};
       pendingChipMeta = null;
@@ -1780,7 +1821,11 @@ document.addEventListener('DOMContentLoaded', () => {
           continuation = true;                     // "može"/"nastavi" → nastavak, ne ponovno objašnjenje
         }
       } else if (imgFile){
-        text = IMG_DEFAULTS[state.mode] || IMG_DEFAULTS.explain;
+        /* Slika bez teksta: NE izmišljamo rečenicu u ime učenika. Šaljemo
+           praznu poruku — serversku podrazumijevanu instrukciju sastavlja
+           backend (matbot/prompts.py: QUICK_IMAGE_DEFAULT_INSTRUCTION) i tamo
+           je jasno označena kao aplikacijska, ne kao učenikov tekst. */
+        text = '';
       } else {                                     // validacija bez slanja
         fbMsg.textContent = (state.mode === 'quick')
           ? 'Unesi zadatak za koji želiš samo rezultat.'
@@ -1824,13 +1869,6 @@ document.addEventListener('DOMContentLoaded', () => {
       if (previousNextState && !freshExamPrep) payload.previous_next_state = previousNextState;
       const recentTasks = storedRecentTasks();
       if (recentTasks.length && !freshExamPrep) payload.recent_tasks = recentTasks;
-      /* BUG 3/6 fix: kontekst slike ide uz SVAKI nastavak image toka —
-         follow-up formulacije, potvrde ("da"/"nastavi") i aktivan image_test */
-      const imageTestActive = !!(previousNextState && previousNextState.active_task_kind === 'image_test');
-      if (!imgFile && savedImageContext &&
-          (isImageFollowupMessage(text) || confirmationIntent || imageTestActive)){
-        payload.last_image_context = savedImageContext.slice(0, 2000);
-      }
       if (explicitHintRequest && savedTask){
         payload.intent = 'hint_request';
         payload.interaction_phase = 'practice_help';
@@ -1849,9 +1887,13 @@ document.addEventListener('DOMContentLoaded', () => {
         payload.last_tutor_message = lastTutorMessage.slice(0, 600);
       }
       tutorBusy = true;
-      appendTutorMsg('user', escapeHtml(text) +
-        (imgFile ? '<br><strong>📷 ' + escapeHtml(imgFile.name) + '</strong>' : ''));
-      pushTutor('user', text);
+      /* U balončiću učenik vidi svoj tekst + neutralnu oznaku da je slika
+         priložena. U HISTORIJU (localStorage + sljedeći zahtjevi) ide SAMO
+         tekstualni marker — nikad base64, object URL, ime fajla, dimenzije,
+         MIME ni opis sadržaja slike. */
+      appendTutorMsg('user', (text ? escapeHtml(text) : '') +
+        (imgFile ? ((text ? '<br>' : '') + '<strong>📷 Priložena slika zadatka</strong>') : ''));
+      pushTutor('user', imgFile ? ((text ? text + ' ' : '') + IMAGE_HISTORY_MARKER) : text);
       fbBox.classList.add('hidden');
       hideChips();
       showTutorTyping();
@@ -1863,6 +1905,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const abortTimer = setTimeout(()=>{ try { ac.abort(); } catch(_){} }, 60000);
       try{
         let result = null;   // {j, rendered:true} | {errorShown:true} | null
+        /* TRANSPORT ZA SLIKU: TAČNO JEDAN put — multipart POST na /chat.
+           Namjerno BEZ SSE pokušaja i BEZ ikakvog SSE→JSON fallbacka: dvosmislen
+           mrežni prekid mogao bi poslati ISTU sliku (i isti model poziv) dva
+           puta. Tekstualni turnovi zadržavaju postojeće streaming ponašanje. */
         if (!imgFile){
           /* Phase 2: streaming (SSE) — tekstualne poruke; pad streama prije
              ijednog teksta pada nazad na non-streaming JSON put */
@@ -1947,7 +1993,11 @@ document.addEventListener('DOMContentLoaded', () => {
     async function jsonTutorRequest(payload, ac, imgFile){
       let r;
       if (imgFile){
-        // multipart: JSON payload + slika (backend radi OCR/Vision, ključevi ostaju na serveru)
+        /* multipart: JSON `payload` (sva postojeća validirana polja: session_id,
+           client_turn_id, grade, mode, selected_topic, selected_oblast,
+           student_message, conversation_history) + TAČNO JEDNO file polje
+           `image`. Ključevi i model ostaju na serveru; backend ne vjeruje ni
+           imenu fajla ni MIME tipu koji browser prijavi. */
         const fd = new FormData();
         fd.append('payload', JSON.stringify(payload));
         fd.append('image', imgFile, imgFile.name);
@@ -2145,8 +2195,11 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       if (opts.fromTyped){ msgBox.value = ''; autoGrow(); }  // očisti nakon uspješnog slanja
       if (j.status === 'ready'){
-        clearTutorImage();                       // slika je potrošena u ovom zahtjevu
-        if (j.image_context) setLastImageContext(j.image_context);
+        /* Prilog se briše SAMO nakon uspješnog odgovora servera. Greška
+           (400/413/429/mreža) namjerno zadržava sliku da je učenik ne mora
+           ponovo tražiti. Slika nigdje ne ostaje sačuvana — sljedeći turn koji
+           je treba zahtijeva novo prilaganje. */
+        clearTutorImage();
         lastTutorMessage = (answer || '').slice(0, 600);  // osnova za follow-up nastavak
         attachBotFeedback(renderedBot && renderedBot.row, j);
       }

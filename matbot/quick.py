@@ -91,8 +91,13 @@ def _clean_history(raw_history):
     return cleaned[-MAX_HISTORY_MESSAGES:]
 
 
-def run_quick_turn(llm, turn):
-    """turn: očišćeni dict iz api.py. Vraća JSON-spreman dict."""
+def run_quick_turn(llm, turn, image=None):
+    """turn: očišćeni dict iz api.py. Vraća JSON-spreman dict.
+
+    `image`: matbot.imageinput.ValidatedImage ili None. Slika VAŽI SAMO ZA OVAJ
+    turn — server je nigdje ne pamti, ne upisuje u historiju i ne šalje u
+    sljedećim pozivima. Ako kasnija poruka ponovo treba sliku, učenik je mora
+    priložiti iznova (frontend čisti prilog nakon uspješnog odgovora)."""
     request_id = uuid.uuid4().hex[:12]
 
     # Canonical podaci iz topics.json — samo kao mekan kontekst (ne ograničenje).
@@ -101,20 +106,35 @@ def run_quick_turn(llm, turn):
     lesson_title = lesson["title"] if lesson else ""
     oblast = lesson["oblast"] if lesson else (turn["selected_oblast"] or "")
 
-    repair_intent = is_conversational_repair_message(turn["student_message"])
+    # Slika bez teksta: instrukciju postavlja SERVER (vidi prompts). Klijent je
+    # ne diktira, i u promptu je jasno označena kao aplikacijska, ne kao
+    # rečenica učenika.
+    student_message = turn["student_message"]
+    server_default_instruction = bool(image is not None and not student_message)
+    if server_default_instruction:
+        student_message = prompts.QUICK_IMAGE_DEFAULT_INSTRUCTION
+
+    repair_intent = is_conversational_repair_message(student_message)
     instructions = prompts.build_quick_instructions(
         turn["grade"], lesson_title=lesson_title, oblast=oblast,
-        repair_intent=repair_intent,
+        repair_intent=repair_intent, image_present=image is not None,
     )
     input_text = prompts.build_quick_input(
         lesson_title=lesson_title,
         oblast=oblast,
         history=_clean_history(turn.get("conversation_history")),
-        student_message=turn["student_message"],
+        student_message=student_message,
+        image_present=image is not None,
+        server_default_instruction=server_default_instruction,
     )
 
+    if image is not None:
+        # Ograničeni metapodaci (ValidatedImage.log_metadata) — bez bajtova,
+        # bez base64, bez data URL-a, bez EXIF-a, bez imena fajla.
+        logger.info("quick_turn request_id=%s image_in %s", request_id, image.log_metadata())
+
     try:
-        result = llm.quick_turn(instructions, input_text)
+        result = llm.quick_turn(instructions, input_text, image=image)
         validate_quick_output(result.output)
     except LLMError as e:
         logger.warning(

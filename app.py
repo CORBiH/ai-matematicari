@@ -1,15 +1,32 @@
 from flask import Flask, jsonify, render_template, request
+from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from matbot import auth, config
-from matbot.api import ai_tutor_bp
+from matbot.api import REQUEST_TOO_LARGE_MESSAGE, ai_tutor_bp
+from matbot.request_limits import BoundedInMemoryRequest
 from matbot.topics import topics_response
 
 config.require_secret_key(config.SECRET_KEY)
 
 app = Flask(__name__)
 app.secret_key = config.SECRET_KEY
+
+# Tvrda granica veličine HTTP tijela + upload isključivo u memoriji (bez
+# Werkzeug spoolinga na disk) — vidi matbot/request_limits.py. Granica važi za
+# SVE endpointe; tekstualni zahtjevi su tri reda veličine manji, pa ih ne dira.
+app.request_class = BoundedInMemoryRequest
+app.config["MAX_CONTENT_LENGTH"] = config.MAX_REQUEST_BYTES
+
 app.register_blueprint(ai_tutor_bp)
+
+
+@app.errorhandler(RequestEntityTooLarge)
+def _request_too_large(_e):
+    """413 u POSTOJEĆEM JSON ugovoru grešaka ({"error","detail"}), koji
+    frontend već zna prikazati (applyTutorResponse čita `detail`). Odgovor
+    NEMA `status`, pa frontend zadržava priloženu sliku i svoje stanje."""
+    return jsonify({"error": "REQUEST_TOO_LARGE", "detail": REQUEST_TOO_LARGE_MESSAGE}), 413
 
 # Produkcijski VPS potvrđen (2026): Nginx je JEDINI reverse proxy ispred ove
 # aplikacije, vezane na 127.0.0.1:8080, i postavlja X-Forwarded-For te

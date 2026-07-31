@@ -158,6 +158,7 @@ class FakeLLM:
         self.calls = []           # (instructions, input_text) — svi pozivi redom
         self.explain_calls = []   # samo explain pozivi (podskup calls)
         self.quick_calls = []     # samo quick pozivi (podskup calls)
+        self.quick_images = []    # ValidatedImage | None po quick pozivu
 
     def queue(self, item):
         self.results.append(item)
@@ -182,8 +183,9 @@ class FakeLLM:
         self.explain_calls.append((instructions, input_text))
         return self._next(instructions, input_text)
 
-    def quick_turn(self, instructions, input_text):
+    def quick_turn(self, instructions, input_text, image=None):
         self.quick_calls.append((instructions, input_text))
+        self.quick_images.append(image)
         return self._next(instructions, input_text)
 
 

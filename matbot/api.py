@@ -12,7 +12,7 @@ import logging
 
 from flask import Blueprint, Response, current_app, jsonify, request
 
-from matbot import auth, config, validation
+from matbot import auth, config, imageinput, validation
 from matbot.explain import run_explain_turn
 from matbot.practice import SAFE_ERROR_MESSAGE, run_practice_turn
 from matbot.quick import run_quick_turn
@@ -29,7 +29,11 @@ NON_PRACTICE_MESSAGE = (
     "Vrati se preko dugmeta Nazad i izaberi „Vježbaj sa mnom“ — tu sam spreman za zadatke."
 )
 IMAGE_NOT_SUPPORTED_MESSAGE = (
-    "Slike još nisu podržane u ovoj verziji. Prepiši mi zadatak tekstom pa nastavljamo."
+    "Slike za sada radim samo u modu „Samo rezultat“. "
+    "Prebaci se na taj mod i pošalji sliku ponovo, ili mi zadatak prepiši tekstom."
+)
+REQUEST_TOO_LARGE_MESSAGE = (
+    "Poslani zahtjev je prevelik. Pošalji manju sliku (do 8 MB) ili kraću poruku."
 )
 EMPTY_MESSAGE_PROMPT = "Upiši poruku ili zadatak pa pokušaj ponovo."
 TOO_LONG_MESSAGE = "Poruka je preduga. Skrati je pa pošalji ponovo."
@@ -108,18 +112,24 @@ def _str_field(payload, key, limit):
 
 
 def _parse_chat_request():
-    """Vraća (payload dict | None, has_image bool). Podržava JSON i multipart
-    (polje 'payload' = JSON string, polje 'image' = fajl) — tačno kako frontend šalje."""
+    """Vraća (payload dict | None, file_count int). Podržava JSON i multipart
+    (polje 'payload' = JSON string, polje 'image' = fajl) — tačno kako frontend šalje.
+
+    `file_count` broji SVA file polja u zahtjevu, ne samo `image`: napadač
+    smije poslati proizvoljna imena polja, pa je jedini ispravan test „koliko
+    fajlova je uopšte stiglo“. Tijelo je već ograničeno na
+    config.MAX_REQUEST_BYTES (Flask MAX_CONTENT_LENGTH) i parsira se isključivo
+    u memoriju (matbot/request_limits.py) — ovdje se NIŠTA ne dekodira."""
     if request.content_type and request.content_type.startswith("multipart/"):
         raw = request.form.get("payload", "")
         try:
             payload = json.loads(raw) if raw else None
         except ValueError:
             payload = None
-        has_image = bool(request.files.get("image"))
-        return (payload if isinstance(payload, dict) else None), has_image
+        file_count = imageinput.count_uploaded_files(request.files)
+        return (payload if isinstance(payload, dict) else None), file_count
     payload = request.get_json(silent=True)
-    return (payload if isinstance(payload, dict) else None), False
+    return (payload if isinstance(payload, dict) else None), 0
 
 
 def _build_turn(payload):
@@ -165,14 +175,23 @@ def _simple_response(answer, mode):
 def _guarded_chat_turn():
     """Zajednička logika za /chat i /chat/stream. Vraća (status_code, dict).
 
-    Redoslijed provjera (najjeftinije prvo):
-      1) token (header, bez potrebe za parsiranjem tijela)          → 401
+    Redoslijed provjera (najjeftinije prvo; slika se DEKODIRA ZADNJA):
+      0) MAX_CONTENT_LENGTH na HTTP nivou (app.py)                  → 413
+      1) token (header — jedina provjera koja NE dira tijelo)       → 401
       2) IP rate limit (širi, flood-zaštita cijelog endpointa)      → 429
-      3) parsiranje payloada + postojeće meke provjere (nepromijenjeno)
+      3) parsiranje payloada (bounded, in-memory) + meke provjere
       4) strukturna validacija (grade/mode/history/id-jevi/topic)   → 400
-      5) session rate limit (SAMO za stvarne AI turnove: practice i explain) → 429
+      5) session rate limit (SAMO za stvarne AI turnove)            → 429
       6) per-session concurrency lock (isti AI turnovi)             → 409
-      7) run_practice_turn / run_explain_turn (uvijek finally otpušta lock)
+      7) validacija + normalizacija slike (Pillow)                  → 400/413
+      8) run_practice_turn / run_explain_turn / run_quick_turn — TAČNO JEDAN
+         poziv modela (uvijek finally otpušta lock)
+
+    Tačka 7 je namjerno POSLIJE 5 i 6: neautorizovan, prigušen ili paralelan
+    zahtjev nikad ne troši CPU na dekodiranje slike. Token provjera (1) ostaje
+    ispred parsiranja tijela (3) jer čita samo header — time neautentikovan
+    zahtjev ne plati ni parsiranje, a garancija „ništa se ne dekodira prije
+    rate limita“ ostaje netaknuta.
     """
     token = request.headers.get(auth.TOKEN_HEADER, "")
     try:
@@ -186,7 +205,7 @@ def _guarded_chat_turn():
         logger.info("rate_limited bucket=ip retry_after=%s", ip_retry_after)
         return 429, _rate_limit_error(ip_retry_after)
 
-    payload, has_image = _parse_chat_request()
+    payload, file_count = _parse_chat_request()
     if payload is None:
         return 200, {"answer": EMPTY_MESSAGE_PROMPT, "last_tutor_task": ""}
 
@@ -195,7 +214,10 @@ def _guarded_chat_turn():
     if isinstance(raw_message, str) and len(raw_message) > config.MAX_MESSAGE_CHARS:
         return 200, {"answer": TOO_LONG_MESSAGE, "last_tutor_task": ""}
 
-    if has_image:
+    # Slika je podržana ISKLJUČIVO u modu „Samo rezultat“ (quick). Vježbaj sa
+    # mnom i Objasni mi ostaju nepromijenjeni — kontrolisana poruka, bez
+    # dekodiranja slike i bez ijednog poziva modela.
+    if file_count and mode != "quick":
         return 200, {"answer": IMAGE_NOT_SUPPORTED_MESSAGE, "last_tutor_task": ""}
 
     try:
@@ -208,7 +230,13 @@ def _guarded_chat_turn():
         return 200, _simple_response(NON_PRACTICE_MESSAGE, mode)
 
     turn = _build_turn(payload)
-    if not turn["student_message"]:
+    # Prazna poruka je dozvoljena SAMO usko: mod „Samo rezultat“ + tačno jedan
+    # priložen fajl. Tada je slika sam zadatak, a serversku podrazumijevanu
+    # instrukciju sastavlja Quick tok (matbot/quick.py) — ne klijent i ne
+    # prikazuje se kao da ju je učenik napisao. Tekstualni zahtjev bez poruke
+    # ostaje odbijen kao i do sada.
+    image_only_allowed = (mode == "quick" and file_count == 1)
+    if not turn["student_message"] and not image_only_allowed:
         return 200, {"answer": EMPTY_MESSAGE_PROMPT, "last_tutor_task": ""}
 
     # Od ovdje nadalje je stvarni (skupi) AI turn (practice ILI explain) —
@@ -225,10 +253,21 @@ def _guarded_chat_turn():
         return 409, {"error": "TURN_IN_PROGRESS", "detail": TURN_IN_PROGRESS_MESSAGE}
 
     try:
+        # Tek OVDJE (iza auth-a, oba rate limita i locka) trošimo CPU na
+        # dekodiranje slike. Odbijen upload → 400/413 i NULA poziva modela.
+        image = None
+        if file_count:
+            try:
+                storage = imageinput.extract_single_image(request.files)
+                image = imageinput.validate_image_upload(storage)
+            except imageinput.ImageRejected as e:
+                logger.info("image_rejected category=%s detail=%s", e.category, e.detail)
+                return e.http_status, {"error": "IMAGE_REJECTED", "detail": e.message}
+
         if mode == "explain":
             return 200, run_explain_turn(_get_llm(), turn)
         if mode == "quick":
-            return 200, run_quick_turn(_get_llm(), turn)
+            return 200, run_quick_turn(_get_llm(), turn, image=image)
         return 200, run_practice_turn(_get_store(), _get_llm(), turn)
     except Exception:
         # Zadnja linija odbrane: interni exception NIKAD ne ide učeniku.

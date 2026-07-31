@@ -4,3 +4,4 @@ openai>=2.41
 pydantic>=2.7
 itsdangerous>=2.1  # već tranzitivna Flask zavisnost; eksplicitno navedena jer je matbot/auth.py direktno koristi
 openpyxl>=3.1  # samo za scripts/build_topics_json.py (dev-time konverzija Excela)
+Pillow==11.3.0  # dekodiranje/normalizacija slike zadatka u Rezultat modu (matbot/imageinput.py) — TAČAN pin, verzija stvarno instalirana i testirana u ovom repou

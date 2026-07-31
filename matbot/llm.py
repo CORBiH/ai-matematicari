@@ -66,6 +66,9 @@ _DIAG_LOG_ORDER = (
     "model", "reasoning_effort", "max_output_tokens", "status", "incomplete_reason",
     "response_error_code", "exception_class", "exception_summary", "refusal_summary",
     "instructions_chars", "input_chars", "output_text_chars", "has_message_item",
+    # Slika: SAMO ograničeni metapodaci (format/dimenzije/veličina nakon
+    # normalizacije). Nikad data URL, base64 ni bajtovi sadržaja.
+    "image_format", "image_width", "image_height", "image_normalized_bytes",
     "parsed_ok", "usage", "latency_ms",
 )
 
@@ -215,11 +218,35 @@ class OpenAIPracticeLLM:
     def explain_turn(self, instructions: str, input_text: str) -> LLMResult:
         return self._structured_turn(instructions, input_text, ExplainTurnOutput)
 
-    def quick_turn(self, instructions: str, input_text: str) -> LLMResult:
-        return self._structured_turn(instructions, input_text, QuickTurnOutput)
+    def quick_turn(self, instructions: str, input_text: str, image=None) -> LLMResult:
+        """`image`: matbot.imageinput.ValidatedImage ili None.
+
+        Slika je podržana SAMO na ovom (Quick/Rezultat) putu i mijenja
+        isključivo OBLIK `input` polja — model, reasoning effort, budžet
+        tokena, `store=False`, `max_retries=0` i strukturno parsiranje u
+        QuickTurnOutput ostaju identični tekstualnom pozivu, i dalje kao
+        TAČNO JEDAN poziv modela."""
+        return self._structured_turn(instructions, input_text, QuickTurnOutput, image=image)
+
+    def _build_input(self, input_text, image):
+        """Tekst → string (nepromijenjen put). Tekst + slika → jedna user
+        poruka sa tačno jednom `input_text` i tačno jednom `input_image`
+        stavkom (Responses API format, openai SDK 2.41.1).
+
+        `detail="high"` je izabran namjerno: sitan matematički tekst (indeksi,
+        eksponenti, razlomačke crte) se na `low` detalju gubi."""
+        if image is None:
+            return input_text
+        return [{
+            "role": "user",
+            "content": [
+                {"type": "input_text", "text": input_text},
+                {"type": "input_image", "image_url": image.data_url, "detail": "high"},
+            ],
+        }]
 
     def _structured_turn(self, instructions: str, input_text: str, text_format,
-                          max_output_tokens=None) -> LLMResult:
+                          max_output_tokens=None, image=None) -> LLMResult:
         import openai
         import pydantic
 
@@ -233,12 +260,21 @@ class OpenAIPracticeLLM:
             "input_chars": len(input_text or ""),
             "parsed_ok": False,
         }
+        if image is not None:
+            # SAMO ograničeni metapodaci. Nikad data URL, base64, dužina data
+            # URL-a ni ijedan bajt sadržaja — ni ovdje ni u logu grešaka.
+            diag.update({
+                "image_format": image.image_format,
+                "image_width": image.width,
+                "image_height": image.height,
+                "image_normalized_bytes": image.normalized_bytes,
+            })
         t0 = time.monotonic()
         try:
             resp = client.responses.parse(
                 model=self.model,
                 instructions=instructions,
-                input=input_text,
+                input=self._build_input(input_text, image),
                 text_format=text_format,
                 reasoning={"effort": self.reasoning_effort},
                 max_output_tokens=budget,

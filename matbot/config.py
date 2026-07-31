@@ -64,6 +64,33 @@ MAX_OPTION_TEXT_CHARS = 200
 MAX_HISTORY_ITEMS = _int_env("MATBOT_MAX_HISTORY_ITEMS", 6)
 MAX_HISTORY_CHARS_PER_ITEM = _int_env("MATBOT_MAX_HISTORY_CHARS_PER_ITEM", 3000)
 
+# --- Slika zadatka u modu „Samo rezultat“ (matbot/imageinput.py) -----------
+# Namjerno TVRDE konstante (bez env override-a): ovo su sigurnosne granice
+# koje štite memoriju i trošak, pa pogrešno postavljena env varijabla ne smije
+# moći da ih podigne. Svaka granica ima svoju ulogu:
+#
+#   MAX_IMAGE_BYTES        — koliko bajta upload-a uopšte smijemo pročitati
+#   MAX_REQUEST_BYTES      — HTTP nivo (Flask MAX_CONTENT_LENGTH): slika +
+#                            multipart metadata + JSON payload polje; 1 MiB
+#                            rezerve iznad slike je više nego dovoljno za
+#                            granice, headere i `payload` polje
+#   MAX_IMAGE_PIXELS       — zaštita od decompression bombe PRIJE dekodiranja
+#   MAX_IMAGE_DIMENSION    — gornja granica stranice nakon resizea; 2048 je
+#                            izabrano jer zadržava čitljiv sitan matematički
+#                            tekst (indeksi, razlomci) a ostaje daleko ispod
+#                            granica modela
+#   MAX_NORMALIZED_IMAGE_BYTES / MAX_IMAGE_DATA_URL_CHARS — granica NAKON
+#                            našeg re-enkodiranja; bez njih bi PNG izlaz mogao
+#                            biti veći od ulaza (npr. šum u fotografiji)
+MAX_IMAGE_BYTES = 8 * 1024 * 1024                  # 8 MiB upload
+MAX_REQUEST_BYTES = MAX_IMAGE_BYTES + 1024 * 1024  # 9 MiB cijeli HTTP body
+MAX_IMAGE_PIXELS = 20_000_000                      # 20 MP dekodiranih piksela
+MAX_IMAGE_DIMENSION = 2048
+MAX_NORMALIZED_IMAGE_BYTES = 4 * 1024 * 1024       # 4 MiB nakon normalizacije
+MAX_IMAGE_DATA_URL_CHARS = 6 * 1024 * 1024         # base64 je ~4/3 bajta
+MIN_IMAGE_DIMENSION = 8                            # ispod ovoga nema zadatka
+ALLOWED_IMAGE_FORMATS = ("JPEG", "PNG", "WEBP")
+
 # Session store
 MAX_RECENT_TASKS = 3
 MAX_RECENT_TURNS = 3
