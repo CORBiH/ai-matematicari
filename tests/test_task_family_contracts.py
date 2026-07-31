@@ -219,8 +219,9 @@ def test_declared_metadata_alone_cannot_rescue_a_wrong_task():
 def test_verify_ordered_pair_requires_a_pair_and_a_check_question():
     good = "Da li je par $(2,3)$ rješenje sistema $x+y=5$ i $x-y=-1$?"
     assert check("verify_ordered_pair", good,
-                 ["Jeste, zadovoljava obje jednačine.", "Nije, ne zadovoljava prvu.",
-                  "Nije, ne zadovoljava drugu.", "Nije moguće odrediti."]) is None
+                 ["Zadovoljava obje jednačine.", "Zadovoljava samo prvu jednačinu.",
+                  "Zadovoljava samo drugu jednačinu.",
+                  "Ne zadovoljava nijednu jednačinu."]) is None
 
 
 def test_verify_ordered_pair_rejects_plain_solve_task():

@@ -32,9 +32,9 @@ LIVE_PAIR_QUESTION = ("Provjeri da li je uređeni par $(2,1)$ rješenje sistema:
                      "$2x+y=5$\n$x-y=1$\nIzaberi jednu od ponuđenih opcija.")
 LIVE_PAIR_OPTIONS = [
     "Par $(2,1)$ zadovoljava obje jednačine.",
-    "Par $(2,1)$ ne zadovoljava prvu jednačinu, jer $2\\ne 5$.",
-    "Par $(2,1)$ ne zadovoljava drugu jednačinu, jer $2-1\\ne 1$.",
-    "Par $(2,1)$ ne zadovoljava sistem zato što rješenje treba biti $(1,2)$.",
+    "Par $(2,1)$ zadovoljava samo prvu jednačinu.",
+    "Par $(2,1)$ zadovoljava samo drugu jednačinu.",
+    "Par $(2,1)$ ne zadovoljava nijednu jednačinu.",
 ]
 
 
@@ -42,7 +42,7 @@ LIVE_PAIR_OPTIONS = [
 # 1. Exact live case now passes
 # ---------------------------------------------------------------------------
 
-def test_live_verify_ordered_pair_false_rejection_now_passes():
+def test_verify_ordered_pair_metadata_trust_with_canonical_options_passes():
     declared = {"task_family": "verify_ordered_pair", "student_must_find": "ordered_pair",
                "answer_kind": "option_label", "task_form": "recognition"}
     error = check("verify_ordered_pair", LIVE_PAIR_QUESTION, LIVE_PAIR_OPTIONS,

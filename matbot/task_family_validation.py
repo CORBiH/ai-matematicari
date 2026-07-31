@@ -135,6 +135,21 @@ _ASKS_STATEMENT_RE = re.compile(
     r"koja\s+od\s+navedenih\s+tvrdnj|[šs]ta\s+je\s+ta[čc]no",
     re.IGNORECASE,
 )
+
+# Dvosmislen opseg množenja u prevodu rečenice: „tri puta broj uvećan za 5“
+# može značiti 3x+5 ili 3(x+5). Ovo je namjerno USKA leksička zabrana samo za
+# translate_to_equation; ne pokušava razumjeti proizvoljan bosanski tekst.
+_AMBIGUOUS_TRANSLATION_SCOPE_RE = re.compile(
+    r"\b(?:dva|dvije|tri|[čc]etiri|pet|[šs]est|sedam|osam|devet|deset|\d+)\s+puta\s+"
+    r"broj(?:\s+je)?\s+(?:uve[ćc]an|pove[ćc]an|smanjen|umanjen)\s+za\b"
+    r"|\b(?:dvostruk|trostruk|[čc]etverostruk)(?:o|i|a)?\s+broj(?:\s+je)?\s+"
+    r"(?:uve[ćc]an|pove[ćc]an|smanjen|umanjen)\s+za\b",
+    re.IGNORECASE,
+)
+def has_ambiguous_translation_scope(question):
+    """True samo za poznati nescopirani multiplier-stem; eksplicitni scope prolazi."""
+    text = question or ""
+    return bool(_AMBIGUOUS_TRANSLATION_SCOPE_RE.search(text))
 _UNIT_RE = re.compile(
     r"\b(?:mm|cm|dm|km|m|mm²|cm²|dm²|m²|mm³|cm³|dm³|m³|litar|litr|ml|kg|g|t)\b"
     r"|\\text\{\s*(?:mm|cm|dm|km|m|l|ml|kg|g)\s*\}"
@@ -640,18 +655,31 @@ _register(FamilyContract(
     answer_kind=("short_text", "option_label"),
     task_form=("recognition",),
     required=(
-        ("nudi_par_na_provjeru", lambda t: bool(_ORDERED_PAIR_RE.search(_strip_math_wrapper(t.question))
-                                                or re.search(r"\(\s*-?\d+\s*,\s*-?\d+\s*\)", t.question))),
+        ("nudi_par_na_provjeru", lambda t: systemcheck.looks_like_ordered_pair(t.question)),
         ("pita_za_provjeru", _q(_ASKS_VERIFY_RE)),
+        ("opcije_su_medjusobno_iskljucivi_statusi",
+         lambda t: systemcheck.ordered_pair_options_are_mutually_exclusive(t.options)),
     ),
     forbidden=(
         ("pita_za_metodu", _q(_ASKS_METHOD_RE)),
         ("pita_broj_rjesenja", _q(_ASKS_SOLUTION_COUNT_RE)),
     ),
     prompt_must_be_unknown="da li KONKRETAN dati par zadovoljava sistem",
-    prompt_options_must_be="kratke tvrdnje (zadovoljava / ne zadovoljava i zašto)",
+    prompt_options_must_be=(
+        "tačno četiri međusobno isključive tvrdnje: zadovoljava OBJE; zadovoljava "
+        "SAMO PRVU; zadovoljava SAMO DRUGU; ne zadovoljava NIJEDNU jednačinu"
+    ),
     prompt_positive_example="Da li je par $(2,3)$ rješenje sistema $x+y=5$ i $x-y=-1$?",
     prompt_forbidden_example="Riješi sistem $x+y=5$ i $x-y=-1$.",
+    prompt_option_uniqueness_note=(
+        "NIKAD ne piši samo ‘ne zadovoljava prvu’ ili ‘ne zadovoljava drugu’ — "
+        "takve tvrdnje se preklapaju sa ‘ne zadovoljava nijednu’. Koristi riječ "
+        "SAMO za prvu/drugu i NIJEDNU za slučaj kada obje padaju."
+    ),
+    prompt_verification_note=(
+        "uvrsti dati par u obje jednačine, odredi jedan od četiri statusa "
+        "OBJE / SAMO PRVA / SAMO DRUGA / NIJEDNA i označi jedinu opciju tog statusa"
+    ),
 ))
 
 _register(FamilyContract(
@@ -805,11 +833,25 @@ _register(FamilyContract(
     forbidden=(
         ("pita_za_metodu", _q(_ASKS_METHOD_RE)),
         ("pita_za_gresku", _q(_ASKS_ERROR_RE)),
+        ("dvosmislen_opseg_mnozenja", lambda t: has_ambiguous_translation_scope(t.question)),
     ),
     prompt_must_be_unknown="koja jednačina opisuje opisanu situaciju",
     prompt_options_must_be="jednačine — NIKAD konačan broj",
-    prompt_positive_example="Koja jednačina opisuje: broj uvećan za 7 daje 19?",
+    prompt_positive_example=(
+        "Koja jednačina opisuje: Broj uvećaj za 5, pa rezultat pomnoži sa 3; "
+        "dobiješ 20?"
+    ),
     prompt_forbidden_example="Izračunaj taj broj.",
+    prompt_option_uniqueness_note=(
+        "Opseg operacija mora biti izričit. Za $3x+5$ piši ‘Trostrukom broju "
+        "dodaj 5’; za $3(x+5)$ piši ‘Broj uvećaj za 5, pa rezultat pomnoži sa 3’ "
+        "ili ‘Tri puta zbir broja i 5’."
+    ),
+    prompt_verification_note=(
+        "ne koristi dvosmislene oblike ‘N puta broj uvećan/smanjen za ...’; "
+        "redoslijed operacija mora biti izričito naveden riječima ‘zbir/razlika’ "
+        "ili ‘pa zatim/pa rezultat’"
+    ),
 ))
 
 

@@ -92,6 +92,32 @@ def _log_system_verification(request_id, topic, family, diagnostics):
     )
 
 
+def _log_equivalent_system_verification(request_id, topic, family, diagnostics):
+    """Ograničena interna dijagnostika uskog RREF verifiera."""
+    logger.warning(
+        "practice_equivalent_system_verification request_id=%s topic=%s family=%s "
+        "issue_codes=%s equivalent_option_indices=%s marked_option_index=%s "
+        "original_rref=%s option_rrefs=%s",
+        request_id, topic or "", family or "",
+        diagnostics.get("issue_codes"), diagnostics.get("equivalent_option_indices"),
+        diagnostics.get("marked_option_index"), diagnostics.get("original_rref"),
+        diagnostics.get("option_rrefs"),
+    )
+
+
+def _log_ordered_pair_verification(request_id, topic, family, diagnostics):
+    """Ograničena interna dijagnostika četverostatusnog pair verifiera."""
+    logger.warning(
+        "practice_ordered_pair_verification request_id=%s topic=%s family=%s "
+        "issue_codes=%s computed_status=%s matching_indices=%s marked_index=%s "
+        "truth_values=%s mapped_statuses=%s",
+        request_id, topic or "", family or "", diagnostics.get("issue_codes"),
+        diagnostics.get("computed_pair_status"), diagnostics.get("matching_option_indices"),
+        diagnostics.get("marked_option_index"), diagnostics.get("equation_truth_values"),
+        diagnostics.get("mapped_option_statuses"),
+    )
+
+
 def _error_response(active_task=""):
     # Namjerno BEZ 'status' i BEZ 'next_state': frontend čita last_tutor_task
     # SAMO kad je status === 'ready' (templates/index.html:1843-1846), pa je ova
@@ -331,6 +357,70 @@ def _apply_new_task(session, new_task, task_family="", request_id=""):
             "practice_system_verification request_id=%s status=%s valid_option_indices=%s",
             request_id, system_result.status, list(system_result.valid_option_indices),
         )
+    elif task_family == "identify_equivalent_system":
+        equivalent_result = systemcheck.verify_equivalent_system_options(
+            task_text, sanitized_texts, new_task.correct_option_index,
+        )
+        equivalent_diagnostics = {
+            "issue_codes": list(equivalent_result.issue_codes),
+            "equivalent_option_indices": list(equivalent_result.equivalent_option_indices),
+            "marked_option_index": equivalent_result.marked_option_index,
+            "original_rref": [[str(v) for v in row]
+                              for row in (equivalent_result.original_rref or ())],
+            "option_rrefs": [
+                None if matrix is None else [[str(v) for v in row] for row in matrix]
+                for matrix in (equivalent_result.option_rrefs or ())
+            ],
+        }
+        if equivalent_result.status == systemcheck.STATUS_INVALID:
+            err = InvalidOutputError(
+                f"equivalent_system_verification: {','.join(equivalent_result.issue_codes)}"
+            )
+            err.equivalent_system_diagnostics = equivalent_diagnostics
+            raise err
+        if (equivalent_result.status == systemcheck.STATUS_UNSUPPORTED
+                and equivalent_result.original_rref is not None):
+            # Ova porodica nudi ISKLJUČIVO četiri sistema. Kad je original
+            # dokazano parsabilan, ali makar jedna opcija nije, server ne može
+            # dokazati jedinstven ekvivalentan odgovor — zato fail closed prije
+            # potpisa, shufflea, ID-jeva i bilo kakve mutacije sesije.
+            err = InvalidOutputError(
+                f"equivalent_system_verification: {','.join(equivalent_result.issue_codes)}"
+            )
+            err.equivalent_system_diagnostics = equivalent_diagnostics
+            raise err
+        if equivalent_result.status == systemcheck.STATUS_UNSUPPORTED:
+            logger.info(
+                "practice_equivalent_system_verification request_id=%s status=%s "
+                "issue_codes=%s marked_option_index=%s",
+                request_id, equivalent_result.status,
+                list(equivalent_result.issue_codes), equivalent_result.marked_option_index,
+            )
+    elif task_family == "verify_ordered_pair":
+        ordered_pair_result = systemcheck.verify_ordered_pair_options(
+            task_text, sanitized_texts, new_task.correct_option_index,
+        )
+        ordered_pair_diagnostics = {
+            "issue_codes": list(ordered_pair_result.issue_codes),
+            "computed_pair_status": ordered_pair_result.computed_pair_status,
+            "matching_option_indices": list(ordered_pair_result.matching_option_indices),
+            "marked_option_index": ordered_pair_result.marked_option_index,
+            "equation_truth_values": list(ordered_pair_result.equation_truth_values or ()),
+            "mapped_option_statuses": list(ordered_pair_result.mapped_option_statuses or ()),
+        }
+        if ordered_pair_result.status == systemcheck.STATUS_INVALID:
+            err = InvalidOutputError(
+                f"ordered_pair_verification: {','.join(ordered_pair_result.issue_codes)}"
+            )
+            err.ordered_pair_diagnostics = ordered_pair_diagnostics
+            raise err
+        if ordered_pair_result.status == systemcheck.STATUS_UNSUPPORTED:
+            logger.info(
+                "practice_ordered_pair_verification request_id=%s status=%s "
+                "issue_codes=%s marked_option_index=%s",
+                request_id, ordered_pair_result.status,
+                list(ordered_pair_result.issue_codes), ordered_pair_result.marked_option_index,
+            )
 
     # Zaštita od ponavljanja — dva nezavisna sloja, oba PRIJE mutacije sesije:
     #   1. doslovan tekst pitanja (hvata identičan zadatak)
@@ -518,6 +608,16 @@ def _handle_text_turn(store, llm, session, turn, lesson_id, request_id):
         system_diagnostics = getattr(e, "system_diagnostics", None)
         if system_diagnostics:
             _log_system_verification(request_id, lesson_id, selected_family, system_diagnostics)
+        equivalent_diagnostics = getattr(e, "equivalent_system_diagnostics", None)
+        if equivalent_diagnostics:
+            _log_equivalent_system_verification(
+                request_id, lesson_id, selected_family, equivalent_diagnostics
+            )
+        ordered_pair_diagnostics = getattr(e, "ordered_pair_diagnostics", None)
+        if ordered_pair_diagnostics:
+            _log_ordered_pair_verification(
+                request_id, lesson_id, selected_family, ordered_pair_diagnostics
+            )
         return _error_response(active_task_before_llm)
     except Exception:
         # Zadnja linija odbrane za NEOČEKIVANE greške u obradi ovog turna

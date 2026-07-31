@@ -43,7 +43,7 @@ import re
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from fractions import Fraction
-from typing import Optional, Tuple
+from typing import Optional, Sequence, Tuple
 
 # --- interni kodovi (NIKAD u browser) --------------------------------------
 SYSTEM_QUESTION_PARSE_FAILED = "system_question_parse_failed"
@@ -55,10 +55,32 @@ EXPECTED_ANSWER_MISMATCH = "expected_answer_math_mismatch"
 UNSUPPORTED_NONLINEAR = "unsupported_nonlinear_system"
 UNSUPPORTED_SHAPE = "unsupported_system_shape"
 
+# `identify_equivalent_system` — uzak verifier nad tačno dva reda sistema.
+NO_EQUIVALENT_SYSTEM_OPTION = "no_equivalent_system_option"
+MULTIPLE_EQUIVALENT_SYSTEM_OPTIONS = "multiple_equivalent_system_options"
+MARKED_EQUIVALENT_SYSTEM_MISMATCH = "marked_equivalent_system_mismatch"
+ORIGINAL_SYSTEM_PARSE_FAILED = "original_system_parse_failed"
+OPTION_SYSTEM_PARSE_FAILED = "option_system_parse_failed"
+UNSUPPORTED_EQUIVALENT_SYSTEM_SHAPE = "unsupported_equivalent_system_shape"
+
+# `verify_ordered_pair` — četiri međusobno isključiva statusa.
+AMBIGUOUS_ORDERED_PAIR_OPTION = "ambiguous_ordered_pair_option"
+OVERLAPPING_ORDERED_PAIR_OPTIONS = "overlapping_ordered_pair_options"
+NO_MATCHING_ORDERED_PAIR_STATUS = "no_matching_ordered_pair_status"
+MULTIPLE_MATCHING_ORDERED_PAIR_STATUSES = "multiple_matching_ordered_pair_statuses"
+MARKED_ORDERED_PAIR_STATUS_MISMATCH = "marked_ordered_pair_status_mismatch"
+ORDERED_PAIR_QUESTION_PARSE_FAILED = "ordered_pair_question_parse_failed"
+
 ALL_ISSUE_CODES = (
     SYSTEM_QUESTION_PARSE_FAILED, ORDERED_PAIR_PARSE_FAILED, NO_CORRECT_OPTION,
     MULTIPLE_CORRECT_OPTIONS, MARKED_OPTION_MISMATCH, EXPECTED_ANSWER_MISMATCH,
     UNSUPPORTED_NONLINEAR, UNSUPPORTED_SHAPE,
+    NO_EQUIVALENT_SYSTEM_OPTION, MULTIPLE_EQUIVALENT_SYSTEM_OPTIONS,
+    MARKED_EQUIVALENT_SYSTEM_MISMATCH, ORIGINAL_SYSTEM_PARSE_FAILED,
+    OPTION_SYSTEM_PARSE_FAILED, UNSUPPORTED_EQUIVALENT_SYSTEM_SHAPE,
+    AMBIGUOUS_ORDERED_PAIR_OPTION, OVERLAPPING_ORDERED_PAIR_OPTIONS,
+    NO_MATCHING_ORDERED_PAIR_STATUS, MULTIPLE_MATCHING_ORDERED_PAIR_STATUSES,
+    MARKED_ORDERED_PAIR_STATUS_MISMATCH, ORDERED_PAIR_QUESTION_PARSE_FAILED,
 )
 
 STATUS_VERIFIED = "verified"
@@ -74,6 +96,27 @@ class SystemVerificationResult:
     marked_option_index: int = -1
     parsed_equations: Optional[tuple] = None   # ((a,b,c), (a,b,c))
     parsed_options: Optional[tuple] = None     # ((x,y) | None, ...)
+
+
+@dataclass(frozen=True)
+class EquivalentSystemVerificationResult:
+    status: str
+    issue_codes: tuple = ()
+    equivalent_option_indices: tuple = ()
+    marked_option_index: int = -1
+    original_rref: Optional[tuple] = None
+    option_rrefs: Optional[tuple] = None
+
+
+@dataclass(frozen=True)
+class OrderedPairVerificationResult:
+    status: str
+    issue_codes: tuple = ()
+    computed_pair_status: Optional[str] = None
+    matching_option_indices: tuple = ()
+    marked_option_index: int = -1
+    equation_truth_values: Optional[tuple] = None
+    mapped_option_statuses: Optional[tuple] = None
 
 
 class _Unsupported(Exception):
@@ -305,6 +348,220 @@ def parse_system(question):
 
 
 # ---------------------------------------------------------------------------
+# 3a) EKVIVALENTNI SISTEMI — TAČNO 2x2, egzaktni prošireni redovi
+# ---------------------------------------------------------------------------
+
+_OPTION_SEPARATOR_SPACING_RE = re.compile(
+    r"(?:\s+|\\;|\\,|\\!|\\quad|\\qquad|\\ )+"
+)
+
+
+def _strip_outer_system_wrapper(value):
+    """Ukloni samo jedan par bezazlenih omotača oko CIJELOG sistema."""
+    text = (value or "").strip()
+    if text.startswith(r"\left(") and text.endswith(r"\right)"):
+        return text[len(r"\left("):-len(r"\right)")].strip()
+    if not (text.startswith("(") and text.endswith(")")):
+        return text
+    depth = 0
+    for index, char in enumerate(text):
+        if char == "(":
+            depth += 1
+        elif char == ")":
+            depth -= 1
+            if depth == 0 and index != len(text) - 1:
+                return text
+        if depth < 0:
+            return text
+    return text[1:-1].strip() if depth == 0 else text
+
+
+def _candidate_option_separator_spans(value):
+    """Vrati top-level kandidate; decimalni zarez bez razmaka nije kandidat."""
+    spans = []
+    paren_depth = brace_depth = 0
+    index = 0
+    while index < len(value):
+        char = value[index]
+        if char == "(":
+            paren_depth += 1
+        elif char == ")":
+            paren_depth = max(0, paren_depth - 1)
+        elif char == "{":
+            brace_depth += 1
+        elif char == "}":
+            brace_depth = max(0, brace_depth - 1)
+        elif paren_depth == 0 and brace_depth == 0:
+            if char == ";":
+                match = _OPTION_SEPARATOR_SPACING_RE.match(value, index + 1)
+                spans.append((index, match.end() if match else index + 1))
+            elif char == ",":
+                match = _OPTION_SEPARATOR_SPACING_RE.match(value, index + 1)
+                if match:
+                    spans.append((index, match.end()))
+            elif char in "\r\n":
+                end = index + 1
+                while end < len(value) and value[end] in " \t\r\n":
+                    end += 1
+                spans.append((index, end))
+                index = end - 1
+        index += 1
+    return tuple(dict.fromkeys(spans))
+
+
+def _parse_unique_option_system_split(value):
+    """Prihvati samo kada TAČNO jedan kandidat daje dvije validne jednačine."""
+    content = _strip_outer_system_wrapper(value)
+    if content.count("=") != 2:
+        raise _Unsupported("očekivane tačno dvije jednačine u opciji")
+    valid = []
+    for start, end in _candidate_option_separator_spans(content):
+        left, right = content[:start].strip(), content[end:].strip()
+        if not left or not right or left.count("=") != 1 or right.count("=") != 1:
+            continue
+        try:
+            parsed = (parse_equation(left), parse_equation(right))
+        except _Unsupported:
+            continue
+        valid.append(((start, end), parsed))
+    if len(valid) != 1:
+        raise _Unsupported(f"broj validnih razdvajanja sistema: {len(valid)}")
+    return valid[0][1]
+
+
+def parse_option_system(text):
+    """Pročitaj TAČNO jedan sistem od dvije jednačine iz jedne opcije.
+
+    Podržava dva ``$...$`` bloka te jedan blok ili čisti tekst s dvije
+    jednačine. Separator se ne bira napamet: svaki top-level kandidat se
+    provjeri postojećim restriktivnim parserom, a prihvata se samo jedinstveno
+    validno razdvajanje. Zato decimalni zarez ostaje dio broja.
+    """
+    if not text:
+        raise _Unsupported("prazna opcija sistema")
+    parts = _DOLLAR_SPLIT.split(str(text))
+    if len(parts) % 2 == 0:
+        raise _Unsupported("neparan broj $ delimitera u opciji")
+    outside = " ".join(parts[0::2])
+    if re.search(r"\bili\b", outside, re.IGNORECASE):
+        raise _Unsupported("opcija sadrži više alternativa")
+    if "=" in outside and len(parts) > 1:
+        raise _Unsupported("jednačina izvan MathJax bloka čini opciju dvosmislenom")
+    math_segments = [part for i, part in enumerate(parts) if i % 2 == 1]
+
+    if len(math_segments) == 2 and all(segment.count("=") == 1 for segment in math_segments):
+        return tuple(parse_equation(_strip_outer_system_wrapper(equation))
+                     for equation in math_segments)
+    if len(math_segments) == 1:
+        return _parse_unique_option_system_split(math_segments[0])
+    if not math_segments:
+        return _parse_unique_option_system_split(str(text))
+    raise _Unsupported("očekivan tačno jedan sistem sa dvije jednačine")
+
+
+def rref_augmented_system(rows):
+    """Egzaktni RREF 2x3 proširene matrice koristeći samo ``Fraction``.
+
+    RREF poređenje znači poređenje tačne redne ekvivalencije. Zato se dva
+    proizvoljna kontradiktorna sistema NE proglašavaju jednakim samo zato što
+    oba imaju prazan skup rješenja.
+    """
+    if len(rows) != 2 or any(len(row) != 3 for row in rows):
+        raise _Unsupported("sistem mora dati proširenu matricu 2x3")
+    matrix = [[Fraction(value) for value in row] for row in rows]
+    pivot_row = 0
+    for column in range(3):
+        pivot = next(
+            (row for row in range(pivot_row, len(matrix)) if matrix[row][column] != 0),
+            None,
+        )
+        if pivot is None:
+            continue
+        matrix[pivot_row], matrix[pivot] = matrix[pivot], matrix[pivot_row]
+        scale = matrix[pivot_row][column]
+        matrix[pivot_row] = [value / scale for value in matrix[pivot_row]]
+        for row in range(len(matrix)):
+            if row == pivot_row:
+                continue
+            factor = matrix[row][column]
+            if factor != 0:
+                matrix[row] = [
+                    value - factor * base
+                    for value, base in zip(matrix[row], matrix[pivot_row])
+                ]
+        pivot_row += 1
+        if pivot_row == len(matrix):
+            break
+    return tuple(tuple(row) for row in matrix)
+
+
+def verify_equivalent_system_options(
+        question: str, option_texts: Sequence[str], marked_option_index: int
+):
+    """Provjeri opcije SAMO porodice ``identify_equivalent_system``.
+
+    Nepodržana sintaksa vraća ``unsupported``; matematički dokazano nula/više
+    ekvivalentnih opcija ili pogrešan označeni indeks vraća ``invalid``.
+    Funkcija nikad ne baca i ne rješava opštu simboličku algebru.
+    """
+    options = tuple(option_texts or ())
+    if len(options) != 4 or not (0 <= marked_option_index < len(options)):
+        return EquivalentSystemVerificationResult(
+            status=STATUS_UNSUPPORTED,
+            issue_codes=(UNSUPPORTED_EQUIVALENT_SYSTEM_SHAPE,),
+            marked_option_index=marked_option_index,
+        )
+    try:
+        original = parse_system(question)
+        original_rref = rref_augmented_system(original)
+    except _Unsupported:
+        return EquivalentSystemVerificationResult(
+            status=STATUS_UNSUPPORTED,
+            issue_codes=(ORIGINAL_SYSTEM_PARSE_FAILED, UNSUPPORTED_EQUIVALENT_SYSTEM_SHAPE),
+            marked_option_index=marked_option_index,
+        )
+
+    option_rrefs = []
+    parse_failed = False
+    for option in options:
+        try:
+            option_rrefs.append(rref_augmented_system(parse_option_system(option)))
+        except _Unsupported:
+            option_rrefs.append(None)
+            parse_failed = True
+    parsed_rrefs = tuple(option_rrefs)
+    if parse_failed:
+        return EquivalentSystemVerificationResult(
+            status=STATUS_UNSUPPORTED,
+            issue_codes=(OPTION_SYSTEM_PARSE_FAILED, UNSUPPORTED_EQUIVALENT_SYSTEM_SHAPE),
+            marked_option_index=marked_option_index,
+            original_rref=original_rref,
+            option_rrefs=parsed_rrefs,
+        )
+
+    equivalent = tuple(
+        index for index, option_rref in enumerate(parsed_rrefs)
+        if option_rref == original_rref
+    )
+    issues = []
+    if not equivalent:
+        issues.append(NO_EQUIVALENT_SYSTEM_OPTION)
+    elif len(equivalent) > 1:
+        issues.append(MULTIPLE_EQUIVALENT_SYSTEM_OPTIONS)
+    elif equivalent[0] != marked_option_index:
+        issues.append(MARKED_EQUIVALENT_SYSTEM_MISMATCH)
+
+    return EquivalentSystemVerificationResult(
+        status=STATUS_INVALID if issues else STATUS_VERIFIED,
+        issue_codes=tuple(issues),
+        equivalent_option_indices=equivalent,
+        marked_option_index=marked_option_index,
+        original_rref=original_rref,
+        option_rrefs=parsed_rrefs,
+    )
+
+
+# ---------------------------------------------------------------------------
 # 4) UREĐENI PAROVI
 # ---------------------------------------------------------------------------
 
@@ -428,6 +685,203 @@ def satisfies(equation, pair):
     a, b, c = equation
     x, y = pair
     return a * x + b * y == c
+
+
+PAIR_SATISFIES_BOTH = "satisfies_both"
+PAIR_SATISFIES_ONLY_FIRST = "satisfies_only_first"
+PAIR_SATISFIES_ONLY_SECOND = "satisfies_only_second"
+PAIR_SATISFIES_NEITHER = "satisfies_neither"
+PAIR_STATUS_UNSUPPORTED = "unsupported"
+ORDERED_PAIR_STATUSES = (
+    PAIR_SATISFIES_BOTH,
+    PAIR_SATISFIES_ONLY_FIRST,
+    PAIR_SATISFIES_ONLY_SECOND,
+    PAIR_SATISFIES_NEITHER,
+)
+_AMBIGUOUS_OPTION = "ambiguous"
+
+
+def _pair_from_question(question):
+    """Izdvoji jedan par koji se provjerava, bez miješanja sa jednačinama."""
+    parts = _DOLLAR_SPLIT.split(question or "")
+    if len(parts) % 2 == 1:
+        candidates = []
+        for index, segment in enumerate(parts):
+            if index % 2 == 0 or "=" in segment:
+                continue
+            pair = parse_ordered_pair(f"${segment}$")
+            if pair is not None:
+                candidates.append(pair)
+        if len(candidates) == 1:
+            return candidates[0]
+        if len(candidates) > 1:
+            return None
+    return parse_ordered_pair(question)
+
+
+def _ordered_pair_truth(question):
+    equations = parse_system(question)
+    pair = _pair_from_question(question)
+    if pair is None:
+        raise _Unsupported("nije pronađen tačno jedan uređeni par")
+    truth = tuple(satisfies(equation, pair) for equation in equations)
+    if len(truth) != 2:
+        raise _Unsupported("očekivane dvije istinitosne vrijednosti")
+    return equations, pair, truth
+
+
+def classify_ordered_pair_against_system(question):
+    """Vrati jedan od četiri statusa ili ``unsupported``; nikad ne baca."""
+    try:
+        _equations, _pair, truth = _ordered_pair_truth(question)
+    except _Unsupported:
+        return PAIR_STATUS_UNSUPPORTED
+    return {
+        (True, True): PAIR_SATISFIES_BOTH,
+        (True, False): PAIR_SATISFIES_ONLY_FIRST,
+        (False, True): PAIR_SATISFIES_ONLY_SECOND,
+        (False, False): PAIR_SATISFIES_NEITHER,
+    }[truth]
+
+
+_PAIR_WORD = r"jednačin(?:a|e|i|u|om|ama)?"
+_ONLY_FIRST_PATTERNS = (
+    re.compile(rf"\bzadovoljava\s+samo\s+(?:prvu|1\.)(?:\s+{_PAIR_WORD})?\b", re.IGNORECASE),
+    re.compile(rf"\bsamo\s+(?:prva|1\.)\s+{_PAIR_WORD}\s+(?:je\s+)?zadovoljena\b", re.IGNORECASE),
+    re.compile(r"\bzadovoljava\s+prvu\b.*\b(?:ali|a)\s+ne\s+(?:zadovoljava\s+)?drugu\b", re.IGNORECASE),
+    re.compile(r"\bprvu\s+zadovoljava\b.*\bdrugu\s+ne\b", re.IGNORECASE),
+)
+_ONLY_SECOND_PATTERNS = (
+    re.compile(rf"\bzadovoljava\s+samo\s+(?:drugu|2\.)(?:\s+{_PAIR_WORD})?\b", re.IGNORECASE),
+    re.compile(rf"\bsamo\s+(?:druga|2\.)\s+{_PAIR_WORD}\s+(?:je\s+)?zadovoljena\b", re.IGNORECASE),
+    re.compile(r"\bzadovoljava\s+drugu\b.*\b(?:ali|a)\s+ne\s+(?:zadovoljava\s+)?prvu\b", re.IGNORECASE),
+    re.compile(r"\bdrugu\s+zadovoljava\b.*\bprvu\s+ne\b", re.IGNORECASE),
+)
+_BOTH_PATTERNS = (
+    re.compile(rf"\bzadovoljava\s+(?:obje|obe|oba)\s+{_PAIR_WORD}\b", re.IGNORECASE),
+    re.compile(rf"\b(?:obje|obe|oba)\s+{_PAIR_WORD}\s+(?:su\s+)?zadovoljen", re.IGNORECASE),
+)
+_NEITHER_PATTERNS = (
+    re.compile(rf"\bne\s+zadovoljava\s+nijednu\s+{_PAIR_WORD}\b", re.IGNORECASE),
+    re.compile(rf"\bnijedna\s+{_PAIR_WORD}\s+(?:nije\s+)?zadovoljena\b", re.IGNORECASE),
+    re.compile(r"\bne\s+zadovoljava\s+ni\s+prvu\s+ni\s+drugu\b", re.IGNORECASE),
+)
+_AMBIGUOUS_PAIR_OPTION_PATTERNS = (
+    re.compile(rf"\bne\s+zadovoljava\s+(?:prvu|drugu)\s+{_PAIR_WORD}\b", re.IGNORECASE),
+    re.compile(rf"\b(?:prva|druga)\s+{_PAIR_WORD}\s+nije\s+zadovoljena\b", re.IGNORECASE),
+    re.compile(rf"\bu\s+(?:prvoj|drugoj)\s+{_PAIR_WORD}\b.*(?:\\neq|≠|nije|ne\s+vrijedi)", re.IGNORECASE),
+    re.compile(rf"\bne\s+zadovoljava\s+(?:obje|obe|oba)\s+{_PAIR_WORD}\b", re.IGNORECASE),
+)
+
+_PAIR_TEXT_WRAPPER_RE = re.compile(r"\\text\s*\{([^{}]*)\}")
+_PAIR_MATH_SPACING_RE = re.compile(r"\\(?:,|;|!|quad|qquad)|\\\s")
+
+
+def _normalize_ordered_pair_option_text(text):
+    """Spljošti samo bezazlene MathJax tekstualne omotače prije mapiranja."""
+    value = str(text or "").replace("$", " ")
+    previous = None
+    while value != previous:
+        previous = value
+        value = _PAIR_TEXT_WRAPPER_RE.sub(r"\1", value)
+    value = value.replace(r"\left", "").replace(r"\right", "")
+    value = _PAIR_MATH_SPACING_RE.sub(" ", value)
+    return re.sub(r"\s+", " ", value).strip()
+
+
+def map_ordered_pair_option_meaning(text):
+    """Usko mapiranje kanonske bosanske tvrdnje; proizvoljna proza → ``None``.
+
+    Povratna vrijednost ``ambiguous`` označava poznatu preklapajuću formulaciju
+    poput „ne zadovoljava prvu“, koja se mora odbiti, a ne tumačiti kao „samo
+    druga“.
+    """
+    value = _normalize_ordered_pair_option_text(text)
+    for status, patterns in (
+        (PAIR_SATISFIES_ONLY_FIRST, _ONLY_FIRST_PATTERNS),
+        (PAIR_SATISFIES_ONLY_SECOND, _ONLY_SECOND_PATTERNS),
+        (PAIR_SATISFIES_BOTH, _BOTH_PATTERNS),
+        (PAIR_SATISFIES_NEITHER, _NEITHER_PATTERNS),
+    ):
+        if any(pattern.search(value) for pattern in patterns):
+            return status
+    if any(pattern.search(value) for pattern in _AMBIGUOUS_PAIR_OPTION_PATTERNS):
+        return _AMBIGUOUS_OPTION
+    return None
+
+
+def ordered_pair_options_are_mutually_exclusive(option_texts):
+    """True samo za četiri prepoznata, međusobno različita kanonska statusa."""
+    mapped = tuple(map_ordered_pair_option_meaning(text) for text in (option_texts or ()))
+    return len(mapped) == 4 and set(mapped) == set(ORDERED_PAIR_STATUSES)
+
+
+def verify_ordered_pair_options(
+        question: str, option_texts: Sequence[str], marked_option_index: int
+):
+    """Provjeri četiri statusne opcije porodice ``verify_ordered_pair``."""
+    options = tuple(option_texts or ())
+    if len(options) != 4 or not (0 <= marked_option_index < len(options)):
+        return OrderedPairVerificationResult(
+            status=STATUS_UNSUPPORTED,
+            issue_codes=(ORDERED_PAIR_QUESTION_PARSE_FAILED,),
+            marked_option_index=marked_option_index,
+        )
+    try:
+        _equations, _pair, truth = _ordered_pair_truth(question)
+    except _Unsupported:
+        return OrderedPairVerificationResult(
+            status=STATUS_UNSUPPORTED,
+            issue_codes=(ORDERED_PAIR_QUESTION_PARSE_FAILED,),
+            marked_option_index=marked_option_index,
+        )
+
+    computed = {
+        (True, True): PAIR_SATISFIES_BOTH,
+        (True, False): PAIR_SATISFIES_ONLY_FIRST,
+        (False, True): PAIR_SATISFIES_ONLY_SECOND,
+        (False, False): PAIR_SATISFIES_NEITHER,
+    }[truth]
+    mapped = tuple(map_ordered_pair_option_meaning(text) for text in options)
+    if _AMBIGUOUS_OPTION in mapped:
+        return OrderedPairVerificationResult(
+            status=STATUS_INVALID,
+            issue_codes=(AMBIGUOUS_ORDERED_PAIR_OPTION,),
+            computed_pair_status=computed,
+            marked_option_index=marked_option_index,
+            equation_truth_values=truth,
+            mapped_option_statuses=mapped,
+        )
+    if any(status is None for status in mapped):
+        return OrderedPairVerificationResult(
+            status=STATUS_UNSUPPORTED,
+            issue_codes=(AMBIGUOUS_ORDERED_PAIR_OPTION,),
+            computed_pair_status=computed,
+            marked_option_index=marked_option_index,
+            equation_truth_values=truth,
+            mapped_option_statuses=mapped,
+        )
+
+    matching = tuple(index for index, status in enumerate(mapped) if status == computed)
+    issues = []
+    if len(set(mapped)) != len(mapped) or set(mapped) != set(ORDERED_PAIR_STATUSES):
+        issues.append(OVERLAPPING_ORDERED_PAIR_OPTIONS)
+    if not matching:
+        issues.append(NO_MATCHING_ORDERED_PAIR_STATUS)
+    elif len(matching) > 1:
+        issues.append(MULTIPLE_MATCHING_ORDERED_PAIR_STATUSES)
+    elif matching[0] != marked_option_index:
+        issues.append(MARKED_ORDERED_PAIR_STATUS_MISMATCH)
+
+    return OrderedPairVerificationResult(
+        status=STATUS_INVALID if issues else STATUS_VERIFIED,
+        issue_codes=tuple(issues),
+        computed_pair_status=computed,
+        matching_option_indices=matching,
+        marked_option_index=marked_option_index,
+        equation_truth_values=truth,
+        mapped_option_statuses=mapped,
+    )
 
 
 def verify_solve_system(question, option_texts, correct_option_index,
