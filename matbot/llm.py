@@ -209,14 +209,20 @@ class OpenAIPracticeLLM:
     def practice_turn(self, instructions: str, input_text: str) -> LLMResult:
         # Practice je JEDINI mod koji generiše strukturiran zadatak (pitanje +
         # 4 opcije + interni metapodaci) i zato ima VEĆI budžet izlaznih tokena
-        # od Explain/Quick — vidi config.MAX_OUTPUT_TOKENS_PRACTICE.
+        # od Quick — vidi config.MAX_OUTPUT_TOKENS_PRACTICE.
         return self._structured_turn(
             instructions, input_text, PracticeTurnOutput,
             max_output_tokens=config.MAX_OUTPUT_TOKENS_PRACTICE,
         )
 
     def explain_turn(self, instructions: str, input_text: str) -> LLMResult:
-        return self._structured_turn(instructions, input_text, ExplainTurnOutput)
+        # Explain dozvoljava odgovor do 3.3x duži od Quick-a (vidi
+        # config.MAX_OUTPUT_TOKENS_EXPLAIN, živi nalaz C-9) — zato NE dijeli
+        # Quick-ov manji budžet, nego ima svoj, isti kao Practice.
+        return self._structured_turn(
+            instructions, input_text, ExplainTurnOutput,
+            max_output_tokens=config.MAX_OUTPUT_TOKENS_EXPLAIN,
+        )
 
     def quick_turn(self, instructions: str, input_text: str, image=None) -> LLMResult:
         """`image`: matbot.imageinput.ValidatedImage ili None.

@@ -491,6 +491,52 @@ def test_explain_unsafe_output_returns_safe_error_message_exact_contract():
     assert "next_state" not in r
 
 
+# ---------------------------------------------------------------------------
+# Faza A3 (docs/CURRENT_STATE.md C-10): Explain sada poziva ISTI transport
+# normalizator kao Quick (normalize_result_math_transport) PRIJE centralnog
+# safety boundary-a — ranije je Explain isti oblik izlaza odbijao cio.
+# ---------------------------------------------------------------------------
+
+def test_case19_proper_inline_math_unchanged_through_transport_normalization():
+    fake = FakeLLM()
+    fake.queue(make_explain_output(reply="Rezultat je $\\frac{3}{4}$."))
+    r = run_explain_turn(fake, explain_turn_payload())
+    assert r["status"] == "ready"
+    assert r["answer"] == "Rezultat je $\\frac{3}{4}$."
+
+
+def test_case20_proper_display_math_unchanged_through_transport_normalization():
+    fake = FakeLLM()
+    fake.queue(make_explain_output(reply="Formula: $$P=\\frac{a\\cdot h}{2}$$ je površina."))
+    r = run_explain_turn(fake, explain_turn_payload())
+    assert r["status"] == "ready"
+    assert r["answer"] == "Formula: $$P=\\frac{a\\cdot h}{2}$$ je površina."
+
+
+def test_case21_clearly_mathematical_escaped_dollar_is_repaired():
+    fake = FakeLLM()
+    fake.queue(make_explain_output(reply="Rezultat je \\$\\frac{3}{4}\\$ ukupno."))
+    r = run_explain_turn(fake, explain_turn_payload())
+    assert r["status"] == "ready"
+    assert r["answer"] == "Rezultat je $\\frac{3}{4}$ ukupno."
+
+
+def test_case22_currency_is_not_converted():
+    fake = FakeLLM()
+    fake.queue(make_explain_output(reply="Cijena je \\$5, a ostatak je 12."))
+    r = run_explain_turn(fake, explain_turn_payload())
+    assert r["status"] == "ready"
+    assert r["answer"] == "Cijena je \\$5, a ostatak je 12."
+
+
+def test_case23_explain_uses_exactly_one_call_with_transport_repair():
+    fake = FakeLLM()
+    fake.queue(make_explain_output(reply="Rezultat je \\$\\frac{3}{4}\\$."))
+    run_explain_turn(fake, explain_turn_payload())
+    assert fake.call_count == 1
+    assert len(fake.explain_calls) == 1
+
+
 def test_explain_unsafe_output_uses_exactly_one_llm_call_no_repair_call():
     fake = FakeLLM()
     fake.queue(make_explain_output(reply="\\begin{cases}x=1\\end{cases}"))
@@ -509,3 +555,144 @@ def test_explain_unsafe_output_creates_no_practice_state(flask_app, fake_llm, st
     j = r.get_json()
     assert j == {"answer": SAFE_ERROR_MESSAGE, "last_tutor_task": ""}
     assert store.peek("exp-http-sess") is None
+
+
+# ---------------------------------------------------------------------------
+# Faza C (docs/CURRENT_STATE.md C-2): budžet historije po poziciji stavke —
+# najnoviji odgovor tutora (do 1200, čuva KRAJ), najnovija učenikova poruka
+# prije trenutne (do 600, čuva POČETAK), starije stavke (do 250, nepromijenjeno).
+# ---------------------------------------------------------------------------
+
+def _long_tutor_reply(tail_marker, filler_sentences=40):
+    filler = "Prvi korak objašnjava zašto tražimo zajednički nazivnik. " * filler_sentences
+    return filler + tail_marker
+
+
+def test_case30_latest_assistant_message_gets_larger_budget():
+    long_reply = _long_tutor_reply("KONAČAN REZULTAT je $\\frac{16}{60}$.")
+    history = [
+        {"role": "user", "content": "Objasni mi ovu temu."},
+        {"role": "assistant", "content": long_reply},
+    ]
+    text = prompts.build_explain_input("Lekcija", "Oblast", history, "Objasni zadnji dio.")
+    tutor_line = next(l for l in text.split("\n") if l.startswith("Ti:"))
+    assert len(long_reply) > 250          # sirov odgovor je duži od "starije" granice
+    assert "KONAČAN REZULTAT" in tutor_line
+    assert "$\\frac{16}{60}$" in tutor_line
+    assert len(tutor_line) <= len("Ti: ") + prompts.HISTORY_LATEST_ASSISTANT_CHARS + 1
+
+
+def test_case31_latest_prior_user_message_is_preserved():
+    history = [
+        {"role": "assistant", "content": "Prvo objašnjenje."},
+        {"role": "user", "content": "Zašto je to tako? " * 20},
+    ]
+    text = prompts.build_explain_input("Lekcija", "Oblast", history, "Nastavak pitanja.")
+    user_lines = [l for l in text.split("\n") if l.startswith("Učenik:")]
+    assert len(user_lines) == 1
+    assert "Zašto je to tako?" in user_lines[0]
+    assert len(user_lines[0]) <= len("Učenik: ") + prompts.HISTORY_LATEST_USER_CHARS + 1
+
+
+def test_case32_older_history_items_stay_bounded():
+    history = [
+        {"role": "user", "content": "Staro pitanje. " * 40},
+        {"role": "assistant", "content": "Stari odgovor. " * 40},
+        {"role": "user", "content": "Novije pitanje."},
+        {"role": "assistant", "content": "Najnoviji odgovor."},
+    ]
+    text = prompts.build_explain_input("Lekcija", "Oblast", history, "Poruka.")
+    lines = [l for l in text.split("\n") if l.startswith("Učenik:") or l.startswith("Ti:")]
+    # prve dvije stavke (starije) ostaju na ograničenju od 250 znakova sadržaja
+    assert len(lines[0]) <= len("Učenik: ") + prompts.HISTORY_OLDER_ITEM_CHARS + 1
+    assert len(lines[1]) <= len("Ti: ") + prompts.HISTORY_OLDER_ITEM_CHARS + 1
+
+
+def test_case33_total_history_section_stays_bounded():
+    history = [
+        {"role": "user", "content": "x" * 1200},
+        {"role": "assistant", "content": "y" * 1200},
+        {"role": "user", "content": "z" * 1200},
+        {"role": "assistant", "content": "w" * 1200},
+    ]
+    text = prompts.build_explain_input("Lekcija", "Oblast", history, "Poruka.")
+    history_start = text.index("KRATKA HISTORIJA:")
+    history_end = text.index("PORUKA UČENIKA:")
+    history_section = text[history_start:history_end]
+    # najgori realan zbir (vidi komentar iznad HISTORY_LATEST_ASSISTANT_CHARS
+    # u matbot/prompts.py): 1200 + 600 + 2*250 (uz role-prefikse) ostaje ispod
+    # 3000 znakova za CIJELU sekciju historije.
+    assert len(history_section) < 3000
+
+
+def test_case34_mathjax_never_cut_mid_delimiter():
+    long_reply = _long_tutor_reply(
+        "Rezultat: $$P=\\frac{a\\cdot h}{2}$$ i konkretno $x=5$ na kraju.")
+    history = [
+        {"role": "user", "content": "Objasni."},
+        {"role": "assistant", "content": long_reply},
+    ]
+    text = prompts.build_explain_input("Lekcija", "Oblast", history, "Nastavak.")
+    tutor_line = next(l for l in text.split("\n") if l.startswith("Ti:"))
+    assert tutor_line.count("$") % 2 == 0
+    assert "$$P=\\frac{a\\cdot h}{2}$$" in tutor_line
+    assert "$x=5$" in tutor_line
+
+
+def test_case34b_oversized_single_mathjax_block_is_omitted_whole():
+    """Ako je jedan blok veći od cijelog budžeta, nema sigurnog parcijalnog
+    reza: oznaka izostavljanja je bolja od neparnog '$' u promptu."""
+    huge_inline = "$" + ("1+" * 700) + "1$"
+    huge_display = "$$" + ("2+" * 700) + "2$$"
+
+    head = prompts._clip_head_preserving_math(huge_inline, 250)
+    tail = prompts._clip_tail_preserving_math(huge_display, 1200)
+
+    assert head == "…"
+    assert tail == "…"
+    assert head.count("$") % 2 == 0
+    assert tail.count("$") % 2 == 0
+
+
+def test_case35_followup_can_reference_late_step_of_prior_answer():
+    long_reply = _long_tutor_reply(
+        "Zadnji, TREĆI korak: dijelimo sa 3 da dobijemo konačan rezultat $x=4$.")
+    history = [
+        {"role": "user", "content": "Objasni mi ovu temu."},
+        {"role": "assistant", "content": long_reply},
+    ]
+    fake = FakeLLM()
+    fake.queue(make_explain_output(reply="U trećem koraku dijelimo sa 3 jer..."))
+    run_explain_turn(fake, explain_turn_payload(
+        msg="Zašto si u trećem koraku podijelio sa 3?", conversation_history=history))
+    _, input_text = fake.explain_calls[0]
+    assert "TREĆI korak" in input_text
+    assert "$x=4$" in input_text
+
+
+def test_case36_history_message_ordering_is_preserved():
+    history = [
+        {"role": "user", "content": "Prvo pitanje."},
+        {"role": "assistant", "content": "Prvi odgovor."},
+        {"role": "user", "content": "Drugo pitanje."},
+        {"role": "assistant", "content": "Drugi odgovor."},
+    ]
+    text = prompts.build_explain_input("Lekcija", "Oblast", history, "Treće pitanje.")
+    assert text.index("Prvo pitanje.") < text.index("Prvi odgovor.")
+    assert text.index("Prvi odgovor.") < text.index("Drugo pitanje.")
+    assert text.index("Drugo pitanje.") < text.index("Drugi odgovor.")
+    assert text.index("Drugi odgovor.") < text.index("PORUKA UČENIKA: Treće pitanje.")
+
+
+def test_case37_empty_and_malformed_history_stays_safe():
+    fake = FakeLLM()
+    fake.queue(make_explain_output())
+    run_explain_turn(fake, explain_turn_payload(conversation_history=[]))
+    _, input_text = fake.explain_calls[0]
+    assert "HISTORIJA: ovo je početak razgovora" in input_text
+
+    # build_explain_input samo direktno testira granični slučaj prazne liste
+    # (malformed stavke se već filtriraju u explain._clean_history — vidi
+    # test_malformed_history_items_are_skipped_safely iznad).
+    text = prompts.build_explain_input("Lekcija", "Oblast", [], "Poruka.")
+    assert "HISTORIJA: ovo je početak razgovora" in text

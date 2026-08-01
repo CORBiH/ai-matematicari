@@ -1088,6 +1088,16 @@ document.addEventListener('DOMContentLoaded', () => {
     function looksLikeTutorTask(t){
       return !!extractTutorTask(null, t);
     }
+    /* C-1 (Explain audit): Practice/exam su JEDINI modovi koji prate aktivni
+       zadatak. SVAKO mjesto koje čita/piše/ponovo naoružava LASTTASK_KEY ili
+       interactionPhase mora koristiti OVAJ isti uslov — inače stanje iz
+       "Vježbaj sa mnom" procuri u "Objasni mi"/"Samo rezultat" (npr. učenik
+       napiše "ne razumijem" u Objašnjenju, a stara sesija Vježbe ostavila je
+       zadatak u localStorage — bez ove provjere to bi se protumačilo kao
+       odgovor na zadatak). */
+    function modeTracksPracticeTask(mode){
+      return mode === 'practice' || mode === 'exam';
+    }
     function setAwaitingPracticeTask(taskText){
       interactionPhase = 'awaiting_practice_answer';
       msgBox.placeholder = ANSWER_PLACEHOLDER;
@@ -1185,7 +1195,7 @@ document.addEventListener('DOMContentLoaded', () => {
           break;
         }
       }
-      if (storedLastTask()){
+      if (modeTracksPracticeTask(state.mode) && storedLastTask()){
         interactionPhase = 'awaiting_practice_answer';
         msgBox.placeholder = ANSWER_PLACEHOLDER;
       }
@@ -1714,7 +1724,10 @@ document.addEventListener('DOMContentLoaded', () => {
           if (tutorBusy) return;
           if (c.mode && c.mode !== state.mode){
             state.mode = c.mode;
-            interactionPhase = null;
+            // C-1: čist prelaz moda — ne samo interactionPhase (in-memory),
+            // nego i LASTTASK_KEY (localStorage), inače sljedeća poruka u
+            // novom modu i dalje čita stari zadatak preko storedLastTask().
+            clearAwaitingPracticeTask();
             updateTopbar();
           }
           hideChips();
@@ -1802,7 +1815,10 @@ document.addEventListener('DOMContentLoaded', () => {
            (isti mehanizam kao chip; mod se vidljivo mijenja u meta redu) */
         if ((state.mode === 'explain' || state.mode === 'quick') && wantsPracticeTask(typed)){
           state.mode = 'practice';
-          interactionPhase = null;
+          // C-1: isti razlog kao chip-switch — ne ostavljaj stari zadatak
+          // (ako postoji iz RANIJE Vježbe) da se tiho naoruža za OVAJ,
+          // potpuno nov zahtjev za zadatkom.
+          clearAwaitingPracticeTask();
           updateTopbar();
         }
         const asksNewTask = isNewPracticeTaskRequest(typed);
@@ -1815,7 +1831,8 @@ document.addEventListener('DOMContentLoaded', () => {
           confirmationIntent = 'decline_confirmation';
           confirmationPending = confirmationPendingAction(previousNextState);
           confirmationPhase = 'confirmation_declined';
-        } else if (!explicitHintRequest && !asksNewTask && (interactionPhase === 'awaiting_practice_answer' || (savedTask && isShortPracticeAnswer(typed)))){
+        } else if (!explicitHintRequest && !asksNewTask && modeTracksPracticeTask(state.mode)
+                   && (interactionPhase === 'awaiting_practice_answer' || (savedTask && isShortPracticeAnswer(typed)))){
           answerPhase = 'answering_practice_task'; // odgovor na zadatak, ne novi zahtjev
         } else if (!asksNewTask && lastTutorMessage && isFollowupMessage(typed)){
           continuation = true;                     // "može"/"nastavi" → nastavak, ne ponovno objašnjenje
@@ -2133,7 +2150,7 @@ document.addEventListener('DOMContentLoaded', () => {
          explain/quick nikad ne ulaze u awaiting_practice_answer. Server je izvor
          istine za zadatak (šalje last_tutor_task i kad je prazan); JS heuristika
          je samo fallback za stare odgovore bez tog polja. */
-      const canTrackTask = (state.mode === 'practice' || state.mode === 'exam');
+      const canTrackTask = modeTracksPracticeTask(state.mode);
       const taskText = (j && j.status === 'ready' && !inImageTest && !solutionRevealed && canTrackTask)
         ? (('last_tutor_task' in j)
             ? ((j.last_tutor_task || '').toString().trim().slice(0, 600))
@@ -2206,7 +2223,10 @@ document.addEventListener('DOMContentLoaded', () => {
       /* practice stanje se ažurira tek NAKON primljenog feedbacka */
       if (j.status === 'ready'){
         const prevTask = storedLastTask();
-        if (!taskText && opts.answerPhase && prevTask && !solutionRevealed) setAwaitingPracticeTask(prevTask);
+        // C-1: ovaj re-arm je RANIJE nedostajao canTrackTask uslov — bez
+        // njega bi stari zadatak ostao "ljepljiv" (sticky) i van Vježbe/
+        // kontrolnog kroz ostatak razgovora.
+        if (!taskText && opts.answerPhase && prevTask && !solutionRevealed && canTrackTask) setAwaitingPracticeTask(prevTask);
       }
       if (j.status && j.status !== 'ready') showFallback(j.status);
       updateSessionStatsFromResponse(j);

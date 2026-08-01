@@ -10,7 +10,10 @@ Zajednička matematička/jezička pravila (domen, terminologija, MathJax zapis,
 pravila razreda i oblasti) dolaze iz matbot/rules.py:build_shared_math_rules —
 ovaj fajl dodaje SAMO mode-specifične (Practice/Explain/Quick) instrukcije.
 """
+import re
+
 from matbot import task_family_validation
+from matbot.mathsegments import DISPLAY, INLINE, TEXT, tokenize_math
 from matbot.rules import build_shared_math_rules
 
 _GRADE_STYLE = {
@@ -160,6 +163,108 @@ def build_instructions(grade: int, lesson_title: str = "", oblast: str = "") -> 
 def _clip(text, limit):
     text = (text or "").strip()
     return text if len(text) <= limit else text[:limit] + "…"
+
+
+# ---------------------------------------------------------------------------
+# Math-safe klipovanje SAMO za Explain historiju (Faza C, docs/CURRENT_STATE.md
+# C-2). _clip iznad ostaje NEPROMIJENJEN i i dalje se koristi svugdje drugo
+# (Practice recent_tasks/recent_turns, Explain "TVOJA ZADNJA PORUKA") — grubo
+# sječenje na tačan broj znakova bez pojma o matematici je za TE slučajeve
+# postojeće, testirano ponašanje koje se ovdje NE dira.
+#
+# Za KRATKU HISTORIJU u Explainu grubo sječenje je opasno na DVA načina:
+#   1. može presjeći $...$/$$...$$/\frac{...}{...} nasred izraza (slomljen
+#      MathJax u prompt-u, ne nužno vidljivo učeniku, ali besmisleno za model);
+#   2. za NAJNOVIJI odgovor tutora, baš dio koji follow-up pitanje traži
+#      (konačan rezultat, posljednji korak) obično je na KRAJU teksta — grubo
+#      sječenje s POČETKA (kao _clip) bi ga uvijek izbacilo prvo.
+# ---------------------------------------------------------------------------
+
+def _rendered_math_segments(text):
+    """tokenize_math() + odmah sastavljeni (kind, prikazan_string) parovi —
+    prikazan_string uključuje delimitere za matematiku, ništa za tekst."""
+    out = []
+    for kind, content in tokenize_math(text or ""):
+        if kind == INLINE:
+            out.append((kind, "$" + content + "$"))
+        elif kind == DISPLAY:
+            out.append((kind, "$$" + content + "$$"))
+        else:
+            out.append((kind, content))
+    return out
+
+
+def _head_cut_at_sentence_boundary(candidate):
+    """Unutar VEĆ odsječenog text komada, pokušaj završiti na kraju rečenice
+    (._!?) umjesto nasred nje. Ako granica ne postoji, vrati komad kako jeste."""
+    last_end = -1
+    for m in re.finditer(r"[.!?](?=\s|$)", candidate):
+        last_end = m.end()
+    return candidate[:last_end] if last_end != -1 else candidate
+
+
+def _tail_cut_at_sentence_boundary(candidate):
+    """Unutar VEĆ odsječenog text komada (zadnjih N znakova), pokušaj početi
+    ODMAH POSLIJE kraja neke rečenice umjesto nasred nje."""
+    m = re.search(r"[.!?]\s+", candidate)
+    return candidate[m.end():] if m else candidate
+
+
+def _clip_head_preserving_math(text, limit):
+    """Zadrži POČETAK teksta do `limit` znakova, nikad ne sječe nasred
+    matematičkog segmenta ($...$ ili $$...$$, uključujući \\frac{...}{...}
+    unutar njih) i pokušava stati na kraju rečenice kad god je to moguće u
+    okviru budžeta."""
+    text = (text or "").strip()
+    if len(text) <= limit:
+        return text
+    kept = []
+    total = 0
+    for kind, piece in _rendered_math_segments(text):
+        if total + len(piece) <= limit:
+            kept.append(piece)
+            total += len(piece)
+            continue
+        remaining = limit - total
+        if kind == TEXT and remaining > 0:
+            candidate = _head_cut_at_sentence_boundary(piece[:remaining])
+            if candidate:
+                kept.append(candidate)
+        break
+    result = "".join(kept).strip()
+    # Ako je PRVI segment jedan matematički blok duži od cijelog budžeta,
+    # nema sigurnog parcijalnog reza: vrati samo oznaku izostavljanja. Raniji
+    # fallback ``text[:limit]`` sjekao je baš takav blok nasred delimitera.
+    return (result + "…") if result and result != text else (result or "…")
+
+
+def _clip_tail_preserving_math(text, limit):
+    """Zadrži KRAJ teksta do `limit` znakova (umjesto početka) — za najnoviji
+    odgovor tutora, gdje je konačan rezultat i posljednji korak obično na
+    kraju objašnjenja, ne na početku. Isti matematički-sigurni princip kao
+    _clip_head_preserving_math, samo obrnut redoslijed obilaska segmenata."""
+    text = (text or "").strip()
+    if len(text) <= limit:
+        return text
+    rendered = _rendered_math_segments(text)
+    kept = []
+    total = 0
+    for kind, piece in reversed(rendered):
+        if total + len(piece) <= limit:
+            kept.append(piece)
+            total += len(piece)
+            continue
+        remaining = limit - total
+        if kind == TEXT and remaining > 0:
+            candidate = _tail_cut_at_sentence_boundary(piece[-remaining:])
+            if candidate:
+                kept.append(candidate)
+        break
+    kept.reverse()
+    result = "".join(kept).strip()
+    # Isti slučaj s kraja: jedan završni matematički blok duži od budžeta
+    # mora biti izostavljen kao cjelina, nikad odsječen nasred delimitera.
+    return ("…" + result) if result and result != text else (result or "…")
 
 
 # Konkretno šta znači SLJEDEĆI hint s obzirom na broj VEĆ datih hintova
@@ -318,18 +423,51 @@ def build_explain_instructions(grade: int, lesson_title: str = "", oblast: str =
     )
 
 
+# Faza C (docs/CURRENT_STATE.md C-2): budžet po POZICIJI stavke u historiji,
+# ne jedno univerzalno ograničenje za sve. NAJNOVIJI odgovor tutora dobija
+# najviše prostora (tu je obično konačan rezultat i posljednji korak koji
+# follow-up pitanje traži); NAJNOVIJA učenikova poruka prije trenutne dobija
+# srednji budžet; sve starije stavke ostaju na ranijem, nepromijenjenom
+# ograničenju od 250 znakova. Najgori realan zbir (MAX_HISTORY_MESSAGES=6 iz
+# matbot/explain.py: 1 najnoviji tutor + 1 najnoviji učenik + 4 starije) je
+# 1200+600+4*250=2800 znakova — unutar namjeravanog budžeta od otprilike
+# 2400-3000 znakova za CIJELU sekciju historije.
+HISTORY_LATEST_ASSISTANT_CHARS = 1200
+HISTORY_LATEST_USER_CHARS = 600
+HISTORY_OLDER_ITEM_CHARS = 250  # nepromijenjeno u odnosu na raniju verziju
+
+
 def build_explain_input(lesson_title, oblast, history, student_message,
                         interaction_phase="", last_tutor_message=""):
     """history: lista {'role': 'user'|'assistant', 'content': str} iz frontenda
-    (max 3 razmjene = 6 poruka, već isječeno u pozivaocu)."""
+    (max 3 razmjene = 6 poruka, već isječeno u pozivaocu — vidi
+    matbot/explain.py:_clean_history). Redoslijed je hronološki (najstarije
+    prvo, najnovije zadnje) — isto očekuje i logika ispod."""
     lines = []
     lines.append(f"LEKCIJA: {lesson_title or 'nije izabrana'} (oblast: {oblast or 'nepoznata'})")
 
     if history:
+        latest_assistant_idx = -1
+        latest_user_idx = -1
+        for i, msg in enumerate(history):
+            if msg.get("role") == "assistant":
+                latest_assistant_idx = i
+            elif msg.get("role") == "user":
+                latest_user_idx = i
+
         lines.append("KRATKA HISTORIJA:")
-        for msg in history:
+        for i, msg in enumerate(history):
             role = "Učenik" if msg.get("role") == "user" else "Ti"
-            lines.append(f"{role}: {_clip(msg.get('content', ''), 250)}")
+            content = msg.get("content", "")
+            if i == latest_assistant_idx:
+                # najnoviji odgovor tutora: čuvaj KRAJ (rezultat, posljednji
+                # korak), ne početak — vidi _clip_tail_preserving_math.
+                clipped = _clip_tail_preserving_math(content, HISTORY_LATEST_ASSISTANT_CHARS)
+            elif i == latest_user_idx:
+                clipped = _clip_head_preserving_math(content, HISTORY_LATEST_USER_CHARS)
+            else:
+                clipped = _clip_head_preserving_math(content, HISTORY_OLDER_ITEM_CHARS)
+            lines.append(f"{role}: {clipped}")
     else:
         lines.append("HISTORIJA: ovo je početak razgovora — daj prvo objašnjenje teme.")
 

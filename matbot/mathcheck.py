@@ -26,6 +26,8 @@ import ast
 import math
 import re
 
+from matbot.mathsegments import math_contents, tokenize_math
+
 # Ludolfov broj: škola u BiH računa s π ≈ 3,14 (vidi referentni PDF), pa svaki
 # izraz s π vrednujemo OBJEMA vrijednostima i prihvatamo ako se poklopi bilo
 # koja — inače bi „$9\\pi \\approx 28,26$“ (tačno uz 3,14) bilo lažno odbijeno.
@@ -49,20 +51,22 @@ class _MathError(Exception):
 
 
 # ---------------------------------------------------------------------------
-# 1) IZDVAJANJE $...$ SEGMENATA
+# 1) IZDVAJANJE MATEMATIČKIH SEGMENATA ($...$ I $$...$$)
 # ---------------------------------------------------------------------------
-
-_DOLLAR_SPLIT = re.compile(r"(?<!\\)\$")
+# Živi nalaz (Explain, docs/CURRENT_STATE.md C-5): stariji kod je dijelio
+# tekst naivnim alternating-splitom na SVAKI pojedinačan '$', pa je par
+# susjednih '$$' uvijek davao PARAN broj dijelova (dvije prazne "text"
+# granice), a ova funkcija je tad vraćala PRAZNU listu — numerička provjera
+# NIKAD nije ni pogledala sadržaj unutar $$...$$. Sada koristi zajednički
+# tokenizator (matbot/mathsegments.py) koji ispravno prepoznaje OBA oblika.
 
 
 def math_segments(text):
-    """Vrati sadržaj svakog $...$ segmenta (bez delimitera)."""
+    """Vrati sadržaj svakog matematičkog segmenta (inline $...$ ILI display
+    $$...$$), bez delimitera, redoslijedom pojavljivanja."""
     if not text or "$" not in text:
         return []
-    parts = _DOLLAR_SPLIT.split(text)
-    if len(parts) % 2 == 0:
-        return []  # neparan broj '$' — nije naš posao (mathsafe to već rješava)
-    return [parts[i] for i in range(1, len(parts), 2)]
+    return math_contents(tokenize_math(text))
 
 
 # ---------------------------------------------------------------------------
@@ -128,7 +132,14 @@ def _latex_to_python(expr):
     """Prevedi ograničen LaTeX podskup u Python izraz (string).
 
     Podržano: cijeli i decimalni brojevi (zarez ili tačka), zagrade, + - * /,
-    stepen `^`, \\frac{}{}, \\sqrt{}, \\cdot, \\times, \\pi, implicitno množenje.
+    stepen `^`, \\frac{}{}, \\sqrt{}, \\cdot, \\times, \\pi, implicitno množenje,
+    bosansko školsko dijeljenje `:` (npr. `60:15`, `(24+6):5`, `3,5:0,5`) — vidi
+    docs/CURRENT_STATE.md C-4: ovaj zapis je OBAVEZAN po projektnim pravilima
+    (matbot/rules.py: "Školsko dijeljenje u običnom zapisu: „:“"), a stariji kod
+    ga uopšte nije prepoznavao kao operator (svaki ':' je pao na charset
+    provjeri u evaluate_candidates → cio izraz tiho preskočen, nikad provjeren).
+    Prevodi se direktno u '/' — identična aritmetika, ista bezbjednosna
+    ograničenja (dijeljenje nulom i dalje baca _MathError, ne eval()).
     """
     expr = _strip_units_and_spacing(expr)
 
@@ -184,7 +195,23 @@ def _latex_to_python(expr):
                 i = j
             continue
         if ch == "{" or ch == "}":
+            # Vitičaste zagrade koje je već potrošio parser za \frac,
+            # \sqrt ili stepen jesu LaTeX argumenti. Svaka zagrada koja stigne
+            # dovde je SAMOSTALNO grupisanje. U njoj ':' ne prihvatamo: oblik
+            # ``{1:2}`` je ujedno Python dict sintaksa i prije podrške za
+            # školsko dijeljenje bio je namjerni adversarial test. Pretvaranje
+            # takvog oblika u ``(1/2)`` bi code-like sintaksu proglasilo
+            # aritmetikom. Sigurno je preskoči; legitimni oblici koriste
+            # ``(1:2)`` ili ':' unutar prepoznatog LaTeX argumenta.
+            if ch == "{":
+                content, _ = _extract_argument(expr, i)
+                if ":" in content:
+                    raise _Unsupported("dvotačka u samostalnim vitičastim zagradama")
             out.append("(" if ch == "{" else ")")
+            i += 1
+            continue
+        if ch == ":":
+            out.append("/")
             i += 1
             continue
         out.append(ch)

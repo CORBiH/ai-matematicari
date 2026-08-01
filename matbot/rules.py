@@ -73,14 +73,27 @@ _LANGUAGE_RULES = (
 
 
 # ---------------------------------------------------------------------------
-# 5) MATEMATIČKI ZAPIS (MathJax) — frontend podržava SAMO $...$ i \\(...\\),
-# NEMA $$...$$ (nije registrovan kao displayMath u templates/index.html).
+# 5) MATEMATIČKI ZAPIS (MathJax)
+# ---------------------------------------------------------------------------
+# Ispravka stare pretpostavke (C-11, docs/CURRENT_STATE.md): frontend
+# (templates/index.html) NE registruje samo $...$/\(...\) — MathJax v3
+# zadržava svoj podrazumijevani displayMath ([['$$','$$'], ['\[','\]']]) kad
+# konfiguracija ne postavi ništa drugo, a renderTutorHTML dodatno pretvara
+# KRATKE jednoredne $$...$$ blokove u inline \(...\). Ranija tvrdnja da
+# "frontend ga ne renderuje" bila je netačna.
+#
+# Pravilo ispod se i dalje zadržava (model i dalje MORA koristiti ISKLJUČIVO
+# $...$), ali iz PRAVOG razloga: svi deterministički provjeravači ovog
+# projekta (matbot/mathsafe.py, matbot/mathcheck.py, matbot/geometrycheck.py)
+# su najpouzdaniji nad JEDNIM dosljednim oblikom zapisa. Podrška za $$...$$ u
+# tim modulima (matbot/mathsegments.py) postoji SAMO kao odbrambena mreža za
+# slučaj da model ipak vrati $$, ne kao poziv modelu da ga koristi.
 # ---------------------------------------------------------------------------
 
 _MATH_NOTATION_RULES = (
     "PRAVILA MATEMATIČKOG ZAPISA (MathJax):\n"
     "- SVAKA formula ili matematički izraz mora biti unutar $...$ (inline delimiteri). "
-    "NIKAD $$...$$ — frontend ga ne renderuje kao formulu.\n"
+    "NIKAD $$...$$ — sistem dosljedno prati i provjerava samo $...$ zapis.\n"
     "- Svaki samostalan korak postupka može ići u posebnom redu, i dalje unutar $...$.\n"
     "- Unutar $...$ SMIJEŠ i TREBAŠ koristiti prave LaTeX komande \\frac, \\sqrt, "
     "^ (stepen), \\cdot — one su neophodne da MathJax prikaže pravi razlomak/korijen/"

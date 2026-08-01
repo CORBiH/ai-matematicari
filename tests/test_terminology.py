@@ -173,13 +173,20 @@ def test_quick_reply_is_normalized():
 # ---------------------------------------------------------------------------
 
 def test_forbidden_term_appears_only_as_an_explicit_prohibition():
-    """Repo-wide: jedini fajlovi koji smiju SPOMENUTI „čimbenik“ su oni koji ga
-    zabranjuju (rules.py prompt pravilo, terminology.py mapiranje) i ovi testovi.
-    Nigdje drugdje — ni u fixture-ima, ni u komentarima, ni u kurikulumu."""
+    """Repo-wide: jedini fajlovi koji smiju SPOMENUTI bilo koji od pet
+    pokrivenih zabranjenih termina su oni koji ih zabranjuju/dokumentuju
+    zabranu (rules.py prompt pravilo, terminology.py mapiranje, ova/te
+    dokumentacija koja OPISUJE zabranu — vidi Fazu E audita) i testovi koji
+    tu zabranu provjeravaju. Nigdje drugdje — ni u fixture-ima, ni u
+    komentarima, ni u kurikulumu."""
     allowed = {
-        Path("matbot/rules.py"),          # prompt pravilo: „NIKAD hrvatski čimbenik“
-        Path("matbot/terminology.py"),    # sama tabela zamjene
+        Path("matbot/rules.py"),          # prompt pravilo: „NIKAD hrvatski čimbenik“ i sl.
+        Path("matbot/terminology.py"),    # same tabele zamjene
         Path("tests/test_terminology.py"),
+        Path("tests/test_rules.py"),       # provjerava DA su termini deklarisani zabranjeni u promptu
+        Path("CLAUDE.md"),                 # dokumentuje ispravan/zabranjen par termina
+        Path("docs/CURRENT_STATE.md"),     # dokumentuje C-8 (koji termini NISU pokriveni)
+        Path("docs/ARCHITECTURE.md"),      # dokumentuje terminology.py mehanizam (koji termini SU pokriveni)
     }
     suffixes = {".py", ".html", ".md", ".txt", ".json", ".yml", ".yaml"}
     skip_dirs = {".git", ".venv", "__pycache__", "node_modules"}
@@ -219,3 +226,109 @@ def test_no_forbidden_term_in_prompts_or_rules_source():
         content = (ROOT / relative).read_text(encoding="utf-8")
         assert not terminology.contains_forbidden_term(content), \
             f"Zabranjeni termin pronađen u {relative}"
+
+
+# ---------------------------------------------------------------------------
+# Faza E (docs/CURRENT_STATE.md C-8): proširenje na 4 dodatna termina —
+# kutomer, jednakokračni, zbroj, potenciranje. „suma“ NAMJERNO ostaje
+# nepokrivena (vidi docstring matbot/terminology.py) — testirano ispod da
+# ostaje NETAKNUTA kad znači "iznos", ne "zbir".
+# ---------------------------------------------------------------------------
+
+def test_kutomer_all_forms_normalized():
+    cases = [
+        ("kutomer", "uglomjer"),
+        ("kutomera", "uglomjera"),
+        ("kutomeru", "uglomjeru"),
+        ("kutomerom", "uglomjerom"),
+        ("kutomeri", "uglomjeri"),
+        ("kutomere", "uglomjere"),
+        ("kutomerima", "uglomjerima"),
+    ]
+    for source, expected in cases:
+        assert terminology.normalize_terminology(source) == expected, source
+
+
+def test_jednakokracni_all_forms_normalized():
+    cases = [
+        ("jednakokračni", "jednakokraki"),
+        ("jednakokračna", "jednakokraka"),
+        ("jednakokračno", "jednakokrako"),
+        ("jednakokračnog", "jednakokrakog"),
+        ("jednakokračnom", "jednakokrakom"),
+        ("jednakokračnim", "jednakokrakim"),
+        ("jednakokračnih", "jednakokrakih"),
+    ]
+    for source, expected in cases:
+        assert terminology.normalize_terminology(source) == expected, source
+
+
+def test_zbroj_all_forms_normalized():
+    cases = [
+        ("zbroj", "zbir"),
+        ("zbroja", "zbira"),
+        ("zbroju", "zbiru"),
+        ("zbrojem", "zbirom"),
+        ("zbrojevi", "zbirovi"),
+        ("zbrojeva", "zbirova"),
+        ("zbrojevima", "zbirovima"),
+    ]
+    for source, expected in cases:
+        assert terminology.normalize_terminology(source) == expected, source
+
+
+def test_potenciranje_all_forms_normalized():
+    cases = [
+        ("potenciranje", "stepenovanje"),
+        ("potenciranja", "stepenovanja"),
+        ("potenciranju", "stepenovanju"),
+        ("potenciranjem", "stepenovanjem"),
+        ("potenciranjima", "stepenovanjima"),
+    ]
+    for source, expected in cases:
+        assert terminology.normalize_terminology(source) == expected, source
+
+
+def test_new_terms_capitalization_preserved():
+    assert terminology.normalize_terminology("Kutomer") == "Uglomjer"
+    assert terminology.normalize_terminology("KUTOMER") == "UGLOMJER"
+    assert terminology.normalize_terminology("Zbroj") == "Zbir"
+    assert terminology.normalize_terminology("Potenciranje") == "Stepenovanje"
+
+
+def test_new_terms_never_touched_inside_math_segments():
+    # $$...$$ i $...$ moraju ostati bajt-identični čak i kad bi njihov
+    # sadržaj (nerealno, ali provjereno) sadržavao neki od ovih oblika.
+    text = "Objašnjenje: kutomer je pogrešan. $kutomer=5$ i $$zbroj=10$$ ostaju."
+    out = terminology.normalize_terminology(text)
+    assert "$kutomer=5$" in out
+    assert "$$zbroj=10$$" in out
+    assert "Objašnjenje: uglomjer je pogrešan." in out
+
+
+def test_suma_meaning_amount_is_never_rewritten():
+    """C-8: „suma“ NIJE pokrivena — zamjena bi bila pogrešna kad riječ znači
+    „iznos novca“, ne matematički zbir. Dokumentovan, namjeran izuzetak."""
+    text = "Suma od 200 KM podijeljena je na tri dijela."
+    assert terminology.normalize_terminology(text) == text
+    assert not terminology.contains_forbidden_term("Suma je velika.")
+
+
+def test_all_five_covered_terms_detected_by_contains_forbidden_term():
+    for term in ("čimbenik", "kutomer", "jednakokračni", "zbroj", "potenciranje"):
+        assert terminology.contains_forbidden_term(term), term
+
+
+def test_new_terms_normalized_across_all_three_ai_modes(fake_llm, store):
+    """Isti mehanizam kao postojeći čimbenik-testovi ispod — provjerava da se
+    normalizacija stvarno primjenjuje na Practice/Explain/Quick izlaz, ne samo
+    na normalize_terminology() u izolaciji."""
+    fake_llm.queue(make_explain_output(reply="Ovo je kutomer, ne uglomjer."))
+    r = run_explain_turn(fake_llm, {
+        "session_id": "term-exp", "grade": 6, "selected_topic": "", "selected_oblast": "",
+        "student_message": "Objasni.", "intent": "", "difficulty_request": "",
+        "interaction_phase": "", "last_tutor_task": "", "last_tutor_message": "",
+        "conversation_history": [],
+    })
+    assert "kutomer" not in r["answer"].lower()
+    assert "uglomjer" in r["answer"].lower()

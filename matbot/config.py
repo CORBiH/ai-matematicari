@@ -42,14 +42,35 @@ MAX_OUTPUT_TOKENS = _int_env("MATBOT_MAX_OUTPUT_TOKENS", 1200)
 # stavke → output_parsed is None → upravo posmatrana greška.
 #
 # Zato Practice (jedini mod koji generiše pitanje + 4 opcije + interne
-# metapodatke) dobija veći budžet. Explain i Quick ostaju na MAX_OUTPUT_TOKENS
-# jer vraćaju samo `reply` i nemaju izmjeren problem.
+# metapodatke) dobija veći budžet. Quick ostaje na MAX_OUTPUT_TOKENS jer vraća
+# samo kratak `reply` (≤1200 znakova, MAX_QUICK_REPLY_CHARS) i nema izmjeren
+# problem.
 #
 # GORNJA GRANICA: tvrdo ograničeno na MAX_OUTPUT_TOKENS_HARD_CEILING da
 # pogrešno postavljena env varijabla ne može nekontrolisano podići trošak.
 MAX_OUTPUT_TOKENS_HARD_CEILING = 4000
 MAX_OUTPUT_TOKENS_PRACTICE = min(
     _int_env("MATBOT_MAX_OUTPUT_TOKENS_PRACTICE", 2500),
+    MAX_OUTPUT_TOKENS_HARD_CEILING,
+)
+
+# --- Budžet izlaznih tokena SAMO za Explain ("Objasni mi") -----------------
+# ŽIVI NALAZ C-9 (docs/CURRENT_STATE.md, audit 2026-08-01): Explain je RANIJE
+# dijelio budžet sa Quick-om (MAX_OUTPUT_TOKENS=1200), iako Explain dozvoljava
+# odgovor do MAX_EXPLAIN_REPLY_CHARS=4000 znakova (3.3x duže od Quick-ovog
+# MAX_QUICK_REPLY_CHARS=1200), a njegov prompt eksplicitno poziva na "cijeli
+# postupak" kad učenik to zatraži. Kod reasoning modela `max_output_tokens`
+# pokriva ZBIR reasoning + vidljivog izlaza (vidi mjerenje iznad za Practice —
+# reasoning sam varira 448-832 tokena pri identičnom ulazu); veći dozvoljen
+# vidljivi izlaz uz ISTI budžet od 1200 ostavlja manje rezerve za tu varijaciju
+# i povećava rizik od `llm_incomplete_max_output_tokens` (učenik dobije
+# generičku grešku umjesto objašnjenja). Zato Explain dobija ISTI veći budžet
+# kao Practice (2500) dok stvarno mjerenje na živim pozivima (planirano, još
+# NIJE izvršeno u ovoj izmjeni) ne pokaže da treba drugačiju vrijednost.
+#
+# GORNJA GRANICA: isti MAX_OUTPUT_TOKENS_HARD_CEILING kao Practice.
+MAX_OUTPUT_TOKENS_EXPLAIN = min(
+    _int_env("MATBOT_MAX_OUTPUT_TOKENS_EXPLAIN", 2500),
     MAX_OUTPUT_TOKENS_HARD_CEILING,
 )
 

@@ -147,9 +147,19 @@ def test_no_arbitrary_code_execution(payload):
 
 def test_evaluator_rejects_non_whitelisted_ast_nodes():
     from matbot.mathcheck import evaluate_candidates, _Unsupported
-    for expr in ["__import__", "open(1)", "[1,2]", "{1:2}", "a.b"]:
+    # Podrška za školsko dijeljenje ':' ne smije pretvoriti Python dict
+    # sintaksu "{1:2}" u aritmetiku "(1/2)". Samostalne vitičaste zagrade s
+    # dvotačkom ostaju nepodržane; obično matematičko grupisanje koristi ().
+    for expr in ["__import__", "open(1)", "[1,2]", "(1,2)", "{1:2}", "a.b"]:
         with pytest.raises(Exception):
             evaluate_candidates(expr)
+
+
+def test_colon_inside_recognized_latex_argument_still_works():
+    """Uska code-syntax zabrana ne smije blokirati pravi LaTeX argument."""
+    from matbot.mathcheck import evaluate_candidates
+
+    assert evaluate_candidates(r"\frac{60:15}{2}") == [2.0]
 
 
 # ---------------------------------------------------------------------------
@@ -327,3 +337,68 @@ def test_practice_valid_task_still_accepted_after_integration():
     r = run_practice_turn(store, fake, _practice_payload())
     assert r["status"] == "ready"
     assert fake.call_count == 1
+
+
+# ---------------------------------------------------------------------------
+# Faza A2 (docs/CURRENT_STATE.md C-4): bosansko školsko dijeljenje "a:b" —
+# ranije nije bilo podržano ("60:15=5" je bio tiho preskočen, ne provjeren).
+# ---------------------------------------------------------------------------
+
+def test_case11_simple_colon_division_correct_passes():
+    assert find_numeric_inconsistencies("$60:15=4$") == []
+
+
+def test_case12_simple_colon_division_wrong_rejects():
+    issues = find_numeric_inconsistencies("$60:15=5$")
+    assert issues
+    assert "60:15" in issues[0]
+
+
+def test_case13_another_colon_division_correct_passes():
+    assert find_numeric_inconsistencies("$72:9=8$") == []
+
+
+def test_case13b_another_colon_division_wrong_rejects():
+    assert find_numeric_inconsistencies("$72:9=7$")
+
+
+def test_case14_decimal_comma_colon_division_correct_passes():
+    assert find_numeric_inconsistencies("$3,5:0,5=7$") == []
+
+
+def test_case15_decimal_comma_colon_division_wrong_rejects():
+    assert find_numeric_inconsistencies("$3,5:0,5=8$")
+
+
+def test_case16_prose_time_outside_math_is_ignored():
+    # mathcheck SAMO ikad gleda sadržaj unutar $...$/$$...$$ (vidi
+    # math_segments) — "12:30" u običnoj prozi nikad i ne ulazi u provjeru.
+    assert find_numeric_inconsistencies("Sastanak je zakazan za 12:30 popodne.") == []
+
+
+def test_case17_colon_in_non_math_prose_is_ignored():
+    assert find_numeric_inconsistencies("Napomena: ovo je važno, provjeri dvaput.") == []
+
+
+def test_case18_no_unrestricted_eval_colon_division_by_zero_is_math_error_not_crash():
+    # dijeljenje nulom kroz ':' mora proći isti siguran put kao '/' — _MathError,
+    # NIKAD eval() i NIKAD nekontrolisan izuzetak koji izlazi iz check_segment.
+    issues = find_numeric_inconsistencies("$60:0=0$")
+    assert issues
+    assert "dijeljenje nulom" in issues[0]
+
+
+def test_colon_division_with_parentheses():
+    assert find_numeric_inconsistencies("$(24+6):5=6$") == []
+    assert find_numeric_inconsistencies("$(24+6):5=5$")
+
+
+def test_colon_ratio_without_equality_is_not_falsely_rejected():
+    # bez relacije (=/≈) nema šta da se uporedi — čist odnos ostaje neprovjeren,
+    # ne pogrešno odbijen.
+    assert find_numeric_inconsistencies("$3:4$ je razmjer.") == []
+
+
+def test_colon_equivalent_ratios_with_equality_checked_consistently():
+    assert find_numeric_inconsistencies("$3:4=6:8$") == []
+    assert find_numeric_inconsistencies("$3:4=6:9$")

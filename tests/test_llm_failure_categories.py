@@ -254,14 +254,62 @@ def test_practice_uses_dedicated_larger_output_budget():
     assert config.MAX_OUTPUT_TOKENS_PRACTICE <= config.MAX_OUTPUT_TOKENS_HARD_CEILING
 
 
-def test_explain_and_quick_budget_unchanged():
+def test_explain_uses_dedicated_output_budget():
+    """Faza D (docs/CURRENT_STATE.md C-9): Explain VIŠE ne dijeli Quick-ov
+    manji globalni budžet — dozvoljava odgovor 3.3x duži od Quick-a
+    (MAX_EXPLAIN_REPLY_CHARS=4000 naspram MAX_QUICK_REPLY_CHARS=1200) i mora
+    imati proporcionalno veći budžet izlaznih tokena, isto obrazloženje kao
+    Practice (reasoning + vidljivi izlaz dijele isti max_output_tokens kod
+    reasoning modela)."""
     from matbot.schema import ExplainTurnOutput
 
     resp = _FakeResponse(status="completed", output=[_Message([_Text("{}")])],
                          output_parsed=ExplainTurnOutput(reply="x"), output_text="{}")
     llm = _llm(resp)
     llm.explain_turn("i", "u")
+    assert llm._client.responses.last_kwargs["max_output_tokens"] == config.MAX_OUTPUT_TOKENS_EXPLAIN
+    assert config.MAX_OUTPUT_TOKENS_EXPLAIN > config.MAX_OUTPUT_TOKENS
+    assert config.MAX_OUTPUT_TOKENS_EXPLAIN <= config.MAX_OUTPUT_TOKENS_HARD_CEILING
+
+
+def test_quick_budget_unchanged():
+    """Quick vraća kratak rezultat (MAX_QUICK_REPLY_CHARS=1200) i nema
+    izmjeren problem — ostaje na globalnom MAX_OUTPUT_TOKENS, netaknut Fazom D."""
+    from matbot.schema import QuickTurnOutput
+
+    resp = _FakeResponse(status="completed", output=[_Message([_Text("{}")])],
+                         output_parsed=QuickTurnOutput(reply="x"), output_text="{}")
+    llm = _llm(resp)
+    llm.quick_turn("i", "u")
     assert llm._client.responses.last_kwargs["max_output_tokens"] == config.MAX_OUTPUT_TOKENS
+
+
+def test_practice_budget_unchanged_by_explain_dedicated_budget():
+    """Regresija: uvođenje MAX_OUTPUT_TOKENS_EXPLAIN ne smije dirati Practice."""
+    resp = _FakeResponse(status="completed", output=[_Message([_Text("{}")])],
+                         output_parsed=_valid_parsed(), output_text="{}")
+    llm = _llm(resp)
+    llm.practice_turn("i", "u")
+    assert llm._client.responses.last_kwargs["max_output_tokens"] == config.MAX_OUTPUT_TOKENS_PRACTICE
+
+
+def test_explain_budget_hard_ceiling_invariant():
+    """Statička provjera istog obrasca kao Practice: bez obzira na env
+    vrijednost, MAX_OUTPUT_TOKENS_EXPLAIN NIKAD ne smije biti veći od
+    MAX_OUTPUT_TOKENS_HARD_CEILING — vidi matbot/config.py
+    (MAX_OUTPUT_TOKENS_EXPLAIN = min(_int_env(...), MAX_OUTPUT_TOKENS_HARD_CEILING))."""
+    assert config.MAX_OUTPUT_TOKENS_EXPLAIN <= config.MAX_OUTPUT_TOKENS_HARD_CEILING
+
+
+def test_int_env_falls_back_safely_on_invalid_value(monkeypatch):
+    """Nevaljana env vrijednost (ne-broj) NIKAD ne smije srušiti aplikaciju —
+    _int_env pada nazad na dati default. Ovo je isti mehanizam koji
+    MAX_OUTPUT_TOKENS_EXPLAIN (i MAX_OUTPUT_TOKENS_PRACTICE) koriste, pa ova
+    provjera direktno pokriva "nevažeći override" zahtjev bez potrebe da se
+    cio matbot.config modul ponovo učitava (rizično dijeljeno stanje kroz
+    ostatak test sesije)."""
+    monkeypatch.setenv("MATBOT_MAX_OUTPUT_TOKENS_EXPLAIN", "nije-broj")
+    assert config._int_env("MATBOT_MAX_OUTPUT_TOKENS_EXPLAIN", 2500) == 2500
 
 
 def test_exactly_one_sdk_call_per_turn_on_failure():
