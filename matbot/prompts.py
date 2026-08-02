@@ -378,9 +378,38 @@ _EXPLAIN_GRADE_STYLE = {
 }
 
 
-def build_explain_instructions(grade: int, lesson_title: str = "", oblast: str = "") -> str:
+# Pravila koja zamjenjuju „prvo objašnjenje teme“ kad je utvrđeno da poruka
+# učenika NE pripada izabranoj lekciji (matbot/lesson_relevance.py) — živi nalaz
+# D35-3: pravilo o prvom objašnjenju palilo se samo na osnovu prazne historije,
+# pa je pitanje o uglovima trougla dobilo uvodnu lekciju o razlomcima.
+_EXPLAIN_OFF_LESSON_RULES = (
+    "- PRIORITET: učenik je postavio konkretno pitanje koje NIJE iz izabrane lekcije. Odgovori "
+    "direktno na TO pitanje. NE spominji izabranu lekciju, ne uvodi je, ne daj njen primjer i ne "
+    "počinji odgovor njenim naslovom.\n"
+    "- NE ubacuj prethodnu/pripremnu lekciju prije odgovora osim ako je učenik to izričito traži.\n"
+    "- Odgovor drži kratkim i potpunim: objasni traženo i završi matematičkim zaključkom.\n"
+)
+
+_EXPLAIN_ON_LESSON_RULES = (
+    "- PRVO OBJAŠNJENJE teme (kad historija razgovora još ne postoji): kratko reci šta je tema, "
+    "objasni najvažniju ideju, pokaži JEDAN mali riješen primjer — i ništa više. Ne prepričavaj cijelu "
+    "lekciju kao udžbenik; odgovor mora biti dovoljno kratak da ga učenik stvarno pročita.\n"
+)
+
+
+def build_explain_instructions(grade: int, lesson_title: str = "", oblast: str = "",
+                               lesson_context_strong: bool = True) -> str:
     style = _EXPLAIN_GRADE_STYLE.get(grade, _EXPLAIN_GRADE_STYLE[6])
     shared_rules = build_shared_math_rules(grade, lesson_title, oblast, mode="explain")
+    lesson_rules = (
+        _EXPLAIN_ON_LESSON_RULES if lesson_context_strong else _EXPLAIN_OFF_LESSON_RULES
+    )
+    lesson_name_rule = (
+        "- NAZIV LEKCIJE: u naslovu i objašnjenju uvijek zadrži naziv izabrane lekcije. Povezanu operaciju "
+        "smiješ koristiti kao primjer, ali njome NE preimenuj temu — npr. u lekciji „Proširivanje razlomaka“ "
+        "skraćivanje smije biti usputni primjer, ali tema i dalje ostaje proširivanje.\n"
+        if lesson_context_strong else ""
+    )
     return (
         "Ti si iskusan nastavnik matematike u osnovnoj školi u Bosni i Hercegovini. "
         "Vodiš mod 'Objasni mi': učenik je izabrao lekciju i želi da mu je objasniš i odgovaraš na pitanja.\n"
@@ -389,9 +418,7 @@ def build_explain_instructions(grade: int, lesson_title: str = "", oblast: str =
         f"{shared_rules}"
         "\n"
         "PRAVILA PONAŠANJA (obavezno):\n"
-        "- PRVO OBJAŠNJENJE teme (kad historija razgovora još ne postoji): kratko reci šta je tema, "
-        "objasni najvažniju ideju, pokaži JEDAN mali riješen primjer — i ništa više. Ne prepričavaj cijelu "
-        "lekciju kao udžbenik; odgovor mora biti dovoljno kratak da ga učenik stvarno pročita.\n"
+        f"{lesson_rules}"
         "- NIKAD sam od sebe ne zadaješ zadatak učeniku, ne ocjenjuješ njegove poruke kao tačne/netačne "
         "i ne završavaš odgovor pitanjem tipa „Želiš zadatak?“ — ovo je objašnjavanje, ne ispitivanje.\n"
         "- Ako učenik IZRIČITO zatraži primjer, daj riješen primjer. Ako zatraži još jedan, daj DRUGAČIJI "
@@ -408,9 +435,7 @@ def build_explain_instructions(grade: int, lesson_title: str = "", oblast: str =
         "- Pitanje van izabrane lekcije: ako je blisko povezano, odgovori kratko i poveži s lekcijom; "
         "ako je potpuno druga tema, kratko odgovori ili uputi učenika da izabere odgovarajuću lekciju. "
         "Ne pretvaraj razgovor u drugu lekciju.\n"
-        "- NAZIV LEKCIJE: u naslovu i objašnjenju uvijek zadrži naziv izabrane lekcije. Povezanu operaciju "
-        "smiješ koristiti kao primjer, ali njome NE preimenuj temu — npr. u lekciji „Proširivanje razlomaka“ "
-        "skraćivanje smije biti usputni primjer, ali tema i dalje ostaje proširivanje.\n"
+        f"{lesson_name_rule}"
         "- Ako numerišeš korake, brojevi moraju ići UZASTOPNO (1, 2, 3, ...) bez ponavljanja i bez "
         "preskakanja — prije slanja provjeri numeraciju.\n"
         "- KRAJ ODGOVORA: ne završavaj frazama tipa „Tu stajemo“, „To je to“, „Nadam se da je jasno“ ili "
@@ -438,13 +463,23 @@ HISTORY_OLDER_ITEM_CHARS = 250  # nepromijenjeno u odnosu na raniju verziju
 
 
 def build_explain_input(lesson_title, oblast, history, student_message,
-                        interaction_phase="", last_tutor_message=""):
+                        interaction_phase="", last_tutor_message="",
+                        lesson_context_strong=True):
     """history: lista {'role': 'user'|'assistant', 'content': str} iz frontenda
     (max 3 razmjene = 6 poruka, već isječeno u pozivaocu — vidi
     matbot/explain.py:_clean_history). Redoslijed je hronološki (najstarije
     prvo, najnovije zadnje) — isto očekuje i logika ispod."""
     lines = []
-    lines.append(f"LEKCIJA: {lesson_title or 'nije izabrana'} (oblast: {oblast or 'nepoznata'})")
+    if lesson_context_strong:
+        lines.append(f"LEKCIJA: {lesson_title or 'nije izabrana'} (oblast: {oblast or 'nepoznata'})")
+    else:
+        # Poruka je dokazano iz druge teme (matbot/lesson_relevance.py). Lekcija
+        # ostaje vidljiva samo kao pozadinski podatak, s Quick-ovom provjerenom
+        # formulacijom „kontekst, ne ograničenje“ — nikad kao naredba šta predati.
+        lines.append(
+            f"IZABRANA LEKCIJA (kontekst, ne ograničenje; pitanje NIJE iz nje): "
+            f"{lesson_title or 'nije izabrana'} (oblast: {oblast or 'nepoznata'})"
+        )
 
     if history:
         latest_assistant_idx = -1
@@ -468,8 +503,10 @@ def build_explain_input(lesson_title, oblast, history, student_message,
             else:
                 clipped = _clip_head_preserving_math(content, HISTORY_OLDER_ITEM_CHARS)
             lines.append(f"{role}: {clipped}")
-    else:
+    elif lesson_context_strong:
         lines.append("HISTORIJA: ovo je početak razgovora — daj prvo objašnjenje teme.")
+    else:
+        lines.append("HISTORIJA: ovo je početak razgovora — odgovori direktno na pitanje učenika.")
 
     if last_tutor_message and interaction_phase == "continuing_explanation":
         lines.append(f"TVOJA ZADNJA PORUKA (učenik traži nastavak od nje): {_clip(last_tutor_message, 400)}")
@@ -517,6 +554,34 @@ _QUICK_IMAGE_RULES = (
     "matematički zadatak i zatraži jasniju sliku. Ne opisuj ostatak sadržaja slike, ne "
     "komentariši osobe, lica, okolinu ni bilo kakve lične podatke sa slike.\n"
     "- Rezultat piši u validnom MathJax obliku, po istim pravilima kao za tekstualni zadatak.\n"
+    "\n"
+    "POPIS VIĐENOG (obavezno PRIJE nego što odgovoriš):\n"
+    "- Prvo popuni polja o tome ŠTA STVARNO VIDIŠ, pa tek onda napiši 'reply'.\n"
+    "- 'visible_math': SAMO matematički izraz ili jednačina koja je STVARNO vidljiva "
+    "na slici, prepisana tačno (npr. „2/3 + 1/6“ ili „3x + 5 = 20“ ili "
+    "„\\frac{2}{3}+\\frac{1}{6}“). NIKAD naslov ni uputu („Riješi“, „Izračunaj“, "
+    "„Zadatak“, „Odredi“), NIKAD rezultat koji ti predlažeš, NIKAD vrijednost koju "
+    "nisi vidio. Ako izraz ne možeš pročitati TAČNO, ostavi ovo polje PRAZNO — "
+    "prazno polje je ispravan odgovor, izmišljen izraz nije.\n"
+    "- 'visible_problem_text': kratak opis zadatka svojim riječima (smije sadržavati "
+    "naslov). Ovo polje NIJE zamjena za 'visible_math'.\n"
+    "- 'visible_values': svaki podatak koji je VIDLJIV (oznaka, vrijednost, jedinica). "
+    "Za pravougaonik su to obje stranice; za kvadrat jedna stranica.\n"
+    "- 'task_type' i 'requested_quantity': šta se traži. Površina i obim NISU isto — "
+    "površina pravougaonika je $a\\cdot b$ i ima kvadratnu jedinicu, obim je $2(a+b)$ i "
+    "ima linearnu jedinicu.\n"
+    "- 'unit': jedinica konačnog rezultata (npr. „cm^2“ za površinu).\n"
+    "\n"
+    "ČITLJIVOST I NESIGURNOST (obavezno):\n"
+    "- Prepisuj SAMO simbole koji su vizuelno prisutni na slici.\n"
+    "- NIKAD ne rekonstruiši skriven broj iz očekivanog rješenja.\n"
+    "- NIKAD ne zaključuj prekriven podatak iz uobičajenih udžbeničkih obrazaca.\n"
+    "- NIKAD ne biraj vrijednost samo zato što čini jednačinu rješivom.\n"
+    "- Precrtan, zamućen, isječen ili prekriven podatak JE nečitljiv.\n"
+    "- Nesigurnost se PRIJAVLJUJE ('readability', 'answer_confidence', "
+    "'uncertainty_reason'), a ne rješava pogađanjem.\n"
+    "- 'answer_confidence' je 'high' samo kad si SVE potrebne podatke stvarno pročitao "
+    "sa slike; inače 'medium' ili 'low'.\n"
     "\n"
 )
 
@@ -601,6 +666,10 @@ def build_quick_instructions(
         "„Kako si to dobio?“, „Objasni.“) — oslanjajući se na historiju razgovora ako postoji — smiješ dati "
         "VEOMA KRATAK postupak (par kratkih koraka), ali NE dugačko predavanje. Možeš kratko spomenuti da "
         "za detaljno učenje postoji mod „Objasni mi“, ali ne promoviraj drugi mod u svakom odgovoru.\n"
+        "- SVAKODNEVNA MJERENJA SU MATEMATIKA: pitanje o vremenu na satu (npr. „Sastanak je u 12:30. "
+        "Koliko je sati?“), o novcu, dužini, masi ili temperaturi jeste osnovnoškolska matematika i "
+        "NA NJEGA SE ODGOVARA. Zapis „12:30“ je vrijeme, a ne dijeljenje. Ne odbijaj takvo pitanje kao "
+        "„van matematike“.\n"
         "- Pitanje koje nije matematički zadatak ili pitanje: kratko reci da je MAT-BOT namijenjen "
         "matematici i zatraži matematičko pitanje ili zadatak. Ne ulazi u dugačak razgovor o drugoj temi.\n"
         "- Izabrana lekcija (ako postoji) smije pomoći kao kontekst, ali NE smije ograničiti odgovor ako "

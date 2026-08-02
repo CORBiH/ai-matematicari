@@ -27,11 +27,17 @@ Flask + a single-page frontend, one OpenAI call per turn, no database.
    No retries, no repair calls, no "second opinion" calls. If output is bad,
    reject it and return the canned safe message. See
    [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#the-one-call-invariant).
-5. **Do not re-run the full suite repeatedly.** It is ~1308 tests; run it once
+5. **Do not re-run the full suite repeatedly.** It is ~1465 tests; run it once
    at the end, and run a single file while iterating.
 6. **Never leak internal codes to the browser.** Validator issue codes
-   (`numeric_equality_mismatch`, `circle_diameter_uses_D`, `llm_schema_parse_error`, …)
-   go to logs only. The student sees `SAFE_ERROR_MESSAGE` or nothing.
+   (`numeric_equality_mismatch`, `circle_diameter_uses_D`, `llm_schema_parse_error`,
+   `unknown_mathjax_command:…`, `image_rectangle_value_mismatch`,
+   `image_math_source_missing`, …) go to logs only.
+   The student sees `SAFE_ERROR_MESSAGE` or nothing. The image turn's internal
+   fields (`readability`, `visible_math`, `visible_problem_text`,
+   `answer_confidence`, …) are the
+   same: server-only, never in the payload, history, `localStorage`, or a log line
+   carrying content.
 
 ## Conventions
 
@@ -39,17 +45,70 @@ Flask + a single-page frontend, one OpenAI call per turn, no database.
   *why*, usually citing the live finding that forced the code to exist. Keep that
   habit — it is the project's main institutional memory.
 - **Output language is Bosnian (ijekavica).** `matbot/terminology.py`
-  deterministically enforces five terms (all declined forms, outside math
+  deterministically enforces eight terms (all declined forms, outside math
   segments only): `faktor` not the Croatian variant, `uglomjer` not `kutomer`,
   `jednakokraki` not `jednakokračni`, `zbir` not `zbroj`, `stepenovanje` not
-  `potenciranje`. `suma`→`zbir` is **deliberately not enforced** — see
+  `potenciranje`, `trougao` not the Croatian variant, `tačan` not the Croatian
+  variant, `ugao` not the Croatian variant. `suma`→`zbir` is **deliberately not enforced** — see
   `docs/CURRENT_STATE.md` C-8: "suma" also means "amount of money" in word
   problems, and a blanket regex swap would corrupt that legitimate usage. A
-  repo-wide test forbids all five covered terms from appearing anywhere except
+  repo-wide test forbids all covered terms from appearing anywhere except
   the files that declare or document the ban (`matbot/rules.py`,
-  `matbot/terminology.py`, `tests/test_terminology.py`, `tests/test_rules.py`,
-  this file, `docs/CURRENT_STATE.md`) — so don't spell one out casually in a
-  new comment or doc without adding it to that allow-list too.
+  `matbot/terminology.py`, `matbot/lesson_relevance.py`,
+  `tests/test_terminology.py`, `tests/test_rules.py`,
+  `tests/test_lesson_relevance.py`, this file, `docs/CURRENT_STATE.md`,
+  `docs/ARCHITECTURE.md`) — so don't spell one out casually in a new comment or
+  doc without adding it to that allow-list too.
+
+- **Model-produced MathJax is allowlisted, not merely sanitized.** Only commands
+  in `mathsafe.MATHJAX_COMMAND_ALLOWLIST` may appear inside `$…$`. An unknown
+  control word (`\ty`) or a residual doubled backslash before a command fails
+  closed to `SAFE_ERROR_MESSAGE` — the intended command is **never** guessed.
+  If you introduce new notation, add the command to that frozenset; that is the
+  supported way to widen it. Student input is never rewritten by this layer.
+
+- **"Valid inside `$…$`" and "allowed outside `$…$`" are different questions.**
+  Do **not** reuse `MATHJAX_COMMAND_ALLOWLIST` as the outside-math reject list —
+  doing so once destroyed a fully correct answer because its prose read
+  `LEKCIJA: Broj \pi …` (D35T-1). Outside math there are three classes:
+  a **standalone symbol** (`mathsafe._STANDALONE_SYMBOL_COMMANDS`: `\pi`, Greek
+  letters, relations — no arguments) is narrowly wrapped into `$\pi$`; a
+  **structural** command (`\frac`, `\sqrt`, `\text`, `\mathbb`, `\cdot`,
+  `\begin`, `\end`) still fails closed, except the isolated `\frac{a}{b}` that
+  `wrap_isolated_frac_tokens` can safely wrap; an **unknown** command always
+  fails closed.
+
+- **π approximations must be internally consistent.** When an answer explicitly
+  declares a value (`π≈3,14`), `mathcheck` evaluates every π expression in that
+  answer with *only* the declared value. Without a declaration both `math.pi` and
+  `3.14` stay acceptable, as before.
+
+- **Explain does not force the selected lesson onto an unrelated question.**
+  `matbot/lesson_relevance.py` decides deterministically (no model call). It claims
+  weak context only when the message names a maths concept that does not overlap
+  the lesson's; deictic messages and unprovable cases keep the previous behaviour.
+
+- **Result mode answers direct clock-time questions.** A valid `HH:MM` plus a fixed
+  time phrase is in scope; `60:15` in a calculation stays division. If the model
+  still returns the generic off-topic refusal, the server substitutes a
+  deterministic answer **after** the single call — never a second call.
+
+- **Image turns use their own schema and fail closed.** See the image rows in
+  `docs/ARCHITECTURE.md`. Only a `clear` / all-symbols-visible / `high`-confidence /
+  no-uncertainty image may reach the browser, and only a short list of task families
+  gets independent verification (`matbot/imagecheck.py`). Image understanding is
+  **not** deterministic in general — do not describe it as such, and never claim the
+  model's transcription is independently known to be correct.
+
+- **For a supported image family, "the verifier did not engage" means FAIL CLOSED.**
+  `imagecheck.verify_image_answer` returns `ImageVerification(supported, engaged,
+  verified, code)` — never a bare list, because an empty list once meant both
+  "verified" and "had nothing to check" and let a wrong answer through (D35T-2).
+  Publication requires `supported ∧ engaged ∧ verified`. Deterministic ground truth
+  comes only from validated structured evidence (`visible_values`, `visible_math`) —
+  never from the model's public reply, its proposed answer, textbook patterns, or
+  "the value that makes the equation solvable". `visible_problem_text` is prose and
+  is **never** trusted as evidence for a supported family.
 - **Geometry notation is project-specific and deliberately non-standard:**
   `R` = prečnik (diameter), `r` = poluprečnik, `R = 2r`; `d`/`d_1`/`d_2` = dijagonala
   and **never** diameter; `r_o`/`r_u` = opisana/upisana kružnica radii; `P` = površina
@@ -75,7 +134,9 @@ Flask + a single-page frontend, one OpenAI call per turn, no database.
 | Mode-specific prompt assembly | `matbot/prompts.py` |
 | Geometry symbols, formulas, topic routing | `matbot/geometry_rules.py` |
 | The only OpenAI call site | `matbot/llm.py` |
-| Strict output schemas | `matbot/schema.py` |
+| Strict output schemas (incl. the image-only Quick schema) | `matbot/schema.py` |
+| Explain selected-lesson relevance | `matbot/lesson_relevance.py` |
+| Deterministic image-answer verifier | `matbot/imagecheck.py` |
 | Shared `$...$`/`$$...$$` tokenizer (text/inline/display segments) | `matbot/mathsegments.py` |
 | MathJax safety + repair | `matbot/mathsafe.py` |
 | Numeric-consistency verifier | `matbot/mathcheck.py` |

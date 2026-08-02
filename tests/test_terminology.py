@@ -173,7 +173,7 @@ def test_quick_reply_is_normalized():
 # ---------------------------------------------------------------------------
 
 def test_forbidden_term_appears_only_as_an_explicit_prohibition():
-    """Repo-wide: jedini fajlovi koji smiju SPOMENUTI bilo koji od pet
+    """Repo-wide: jedini fajlovi koji smiju SPOMENUTI bilo koji od sedam
     pokrivenih zabranjenih termina su oni koji ih zabranjuju/dokumentuju
     zabranu (rules.py prompt pravilo, terminology.py mapiranje, ova/te
     dokumentacija koja OPISUJE zabranu — vidi Fazu E audita) i testovi koji
@@ -182,8 +182,13 @@ def test_forbidden_term_appears_only_as_an_explicit_prohibition():
     allowed = {
         Path("matbot/rules.py"),          # prompt pravilo: „NIKAD hrvatski čimbenik“ i sl.
         Path("matbot/terminology.py"),    # same tabele zamjene
+        # Klasifikator relevantnosti lekcije mora PREPOZNATI i hrvatski oblik u
+        # PORUCI UČENIKA (ulaz se nikad ne normalizuje — normalizacija važi samo
+        # za izlaz modela), pa tu riječ nužno sadrži kao ulazni obrazac.
+        Path("matbot/lesson_relevance.py"),
         Path("tests/test_terminology.py"),
         Path("tests/test_rules.py"),       # provjerava DA su termini deklarisani zabranjeni u promptu
+        Path("tests/test_lesson_relevance.py"),  # ulazne poruke učenika s hrvatskim oblikom
         Path("CLAUDE.md"),                 # dokumentuje ispravan/zabranjen par termina
         Path("docs/CURRENT_STATE.md"),     # dokumentuje C-8 (koji termini NISU pokriveni)
         Path("docs/ARCHITECTURE.md"),      # dokumentuje terminology.py mehanizam (koji termini SU pokriveni)

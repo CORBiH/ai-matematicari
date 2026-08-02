@@ -2,7 +2,7 @@
 
 ## Baseline
 
-**1308 tests, all passing**, across 47 files in `tests/`. Every test runs offline:
+**1465 tests, all passing**, across 50 files in `tests/`. Every test runs offline:
 no test may reach the network.
 
 ```bash
@@ -125,6 +125,77 @@ design note, not implemented — see [CURRENT_STATE.md](CURRENT_STATE.md)):
   Useful for future regression coverage but not required to verify the
   confirmed-defect fixes above, which is why it wasn't built in this pass.
 
+## D35 fix-verification tests (implemented 2026-08-01)
+
+The six confirmed defects from the 35-call live campaign each shipped with tests.
+Regression cases are pinned to the **exact strings observed live** (a real TAB
+character from call 10, a doubled backslash before a digit from call 12, the π
+sentence from call 19), so a future refactor cannot quietly reopen them.
+
+- `tests/test_mathjax_commands.py` (new) — allowlisted commands pass; unknown
+  control words fail closed; the control-character reconstruction only fires for a
+  real command; doubled backslash before a digit is repaired, before an unknown
+  command rejected, and never globally stripped; braces/arguments survive; the same
+  protection is asserted in all three modes and at the HTTP payload boundary.
+- `tests/test_pi_consistency.py` (new) — no declaration keeps the permissive
+  behaviour; a declared value is enforced in both directions; declarations are
+  found in prose *and* math; a product like `2π≈6,28` is not misread as a
+  declaration; an implausible declared value is ignored rather than guessed;
+  exact symbolic `6π` is never rejected; negative coefficients and both decimal
+  separators; an AST-level assertion that no `eval`/`exec` was introduced.
+- `tests/test_lesson_relevance.py` (new) — classifier in both directions, prompt
+  assertions that the unrelated question drops the first-explanation and
+  lesson-name rules while a deictic message keeps them, history preserved in both
+  branches, and the new terminology pairs including the near-miss words that must
+  never be touched (the noun for a dot, the noun for a wheel, and an unrelated
+  adjective sharing the same stem).
+- `tests/test_clock_time.py` (new) — valid 12/24-hour and leading-zero times;
+  invalid hour/minute, division, ratio, URL colon and prose colon all excluded;
+  the server fallback only replaces the generic refusal, keeps a real model answer,
+  and uses exactly one model call.
+- `tests/test_image_contract.py` (new) — text-only schema unchanged; image schema
+  fields fixed; `llm.quick_turn` picks the schema by image presence; every gate
+  branch (partially unreadable, unreadable, missing symbol, medium/low confidence,
+  reported uncertainty, multiple tasks, non-math); internal fields absent from
+  payload, state and logs; all eight rectangle/square cases; fraction, arithmetic
+  and linear-equation verification in both directions; one-call and
+  no-state-persistence invariants.
+- `tests/test_result_image.py` (updated) — the existing image tests now queue the
+  dedicated schema via the new `make_quick_image_output` fixture, whose defaults
+  ("clear image, model confident") reproduce the previous behaviour exactly.
+- `tests/test_terminology.py` (extended) — the repo-wide forbidden-term guard now
+  also covers the two terms added in this pass (named in
+  [CURRENT_STATE.md](CURRENT_STATE.md) D35-3b); `matbot/lesson_relevance.py` and
+  `tests/test_lesson_relevance.py` are added to its allow-list because the
+  classifier must recognise the Croatian form in **student input**, which is never
+  normalized. Note this file is *not* on that allow-list, which is why the terms
+  are referenced here rather than spelled out — the guard enforces that.
+
+## D35T fix-verification tests (implemented 2026-08-02)
+
+The 14-call targeted campaign confirmed two defects; both fixes are pinned to the
+exact live strings.
+
+- `tests/test_mathjax_commands.py` (extended) — the outside-math policy is now
+  proven separate from the inside-math allowlist: a standalone `\pi` in prose is
+  wrapped into `$\pi$`, already-delimited `$\pi$` stays byte-identical, structural
+  commands (`\sqrt`, `	ext`, `\mathbb`, `egin`) and unknown commands still fail
+  closed outside math, the isolated `rac{a}{b}` is still wrapped, and the exact
+  call-3 reply is no longer falsely rejected. Plus the narrow degree normalization
+  and a structural assertion that student input never reaches the sanitizer.
+- `tests/test_image_contract.py` (extended) — every verification state is asserted
+  separately (`supported`/`engaged`/`verified`), including an explicit test that an
+  empty result can no longer mean both "skipped" and "verified"; heading-only and
+  missing/unparsable evidence are rejections; `visible_problem_text` is proven
+  unusable as evidence even when it happens to contain the right expression; and
+  the internal `visible_math` never reaches payload, state or logs.
+- `tests/test_lesson_relevance.py` / `tests/test_clock_time.py` (extended) — the
+  optional cleanups: the Croatian angle term normalizes while the near-miss words
+  (box, corner, scooter, and the protractor term that already has its own earlier
+  rule) stay untouched, and a bare `$12:30$` reply is replaced by plain prose while
+  a real explanation is left alone. This file is **not** on the forbidden-term
+  allow-list, which is why those words are described rather than spelled out.
+
 ## Explain focused live campaign (still not authorized)
 
 Layer 4, when explicitly authorized — **18 calls total**, unchanged from the
@@ -138,6 +209,19 @@ audit's recommendation, still not run:
 | Grade-appropriateness spot check (6 vs 9, same conceptual question) | 2 |
 | Geometry notation on a real circle lesson and a real solid lesson | 2 |
 | Off-topic question inside a selected lesson | 2 |
+
+## D35 targeted live validation (still not authorized)
+
+The deterministic halves of the D35 fixes are locked by the tests above. Three
+behaviours remain prompt-dependent and can only be confirmed with real calls:
+
+| Purpose | Why a fake test cannot prove it |
+|---|---|
+| The model actually populates the new image structured fields honestly — especially reporting `partially_unreadable` / non-`high` confidence for a deliberately obscured value instead of claiming `clear` | A fixture asserts only what its author typed. If the model lies in the structured fields, the gate passes a guess through. |
+| Explain respects the weak-lesson-context prompt when the question is from another topic | We can prove the rule text is sent; obedience is model behaviour. |
+| The clock-time bullet stops the generic refusal at the source, rather than relying on the server fallback | The fallback masks non-compliance; only live output shows whether the prompt fixed it. |
+
+Measure a **rate** over N runs, not a single green call — these are stochastic.
 
 ---
 

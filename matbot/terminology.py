@@ -1,10 +1,11 @@
 """Deterministička (ne-AI) normalizacija zabranjenih termina u tekstu VIDLJIVOM
 učeniku.
 
-Pokriva PET od šest zabranjenih termina navedenih u matbot/rules.py
+Pokriva SEDAM od osam zabranjenih termina navedenih u matbot/rules.py
 (_LANGUAGE_RULES): hrvatski „čimbenik“ (→ „faktor“), „kutomer“ (→ „uglomjer“),
-„jednakokračni“ (→ „jednakokraki“), „zbroj“ (→ „zbir“) i „potenciranje“
-(→ „stepenovanje“). Prompt pravilo (rules.py) modelu KAŽE da koristi ispravne
+„jednakokračni“ (→ „jednakokraki“), „zbroj“ (→ „zbir“), „potenciranje“
+(→ „stepenovanje“) i — od kampanje od 35 poziva — „trokut“ (→ „trougao“) i
+„točan“ (→ „tačan“). Prompt pravilo (rules.py) modelu KAŽE da koristi ispravne
 termine, ali prompt nije garancija: ovaj modul je deterministička zaštita
 izlaza koja se primjenjuje na svaki user-visible tekst (Practice reply/
 zadatak/opcije, Explain reply, Quick reply).
@@ -20,8 +21,8 @@ regex zamjena ne može pouzdano razlikovati ta dva značenja — širenje na „
 bi riskiralo kvarenje ispravnog teksta zadatka, što je gore od ostavljanja ovog
 jednog termina prompt-only. Ostaje dokumentovan, neriješen rizik (C-8).
 
-Namjerno USKO za preostalih pet: mijenjaju se SAMO padežni/rodni oblici tih
-tačno pet riječi, ništa drugo. Zamjena se NIKAD ne izvodi unutar matematičkih
+Namjerno USKO za pokrivenih sedam: mijenjaju se SAMO padežni/rodni oblici tih
+tačno sedam riječi, ništa drugo. Zamjena se NIKAD ne izvodi unutar matematičkih
 segmenata ($...$ ILI $$...$$) — tamo se ove riječi ne pojavljuju legitimno, a
 diranje matematike bi moglo oštetiti MathJax. Razdvajanje teksta ide preko
 zajedničkog tokenizatora (matbot/mathsegments.py) — stariji naivni
@@ -141,6 +142,83 @@ _POTENCIRANJE_RE = re.compile(r"potenciranj(ima|em|e|a|u)", re.IGNORECASE)
 
 
 # ---------------------------------------------------------------------------
+# 6) TROKUT → TROUGAO (živi nalaz D35-3, poziv 20 kampanje od 35)
+# ---------------------------------------------------------------------------
+# Model je u ispravnom odgovoru o zbiru uglova napisao „svaki trokut ima
+# unutrašnji zbir 180°“ — hrvatski oblik usred bosanskog teksta. Prompt pravilo
+# ga nije spriječilo, pa ide u determinističku normalizaciju kao i ostali.
+#
+# Deklinacija se NE poklapa nastavak-za-nastavak: „trokut“ ima pravilnu
+# o-osnovu, a „trougao“ ima nepostojano „a“ (trougao → trougla, trouglu) i
+# množinu na „-ovi“. Zato eksplicitna mapa. Negativan lookahead na slovo štiti
+# izvedenice koje NISU ista riječ (npr. „trokutni“) — njih radije ne diramo
+# nego da napravimo „trougaoni“.
+_TROKUT_SUFFIX_MAP = {
+    "": "trougao",
+    "a": "trougla",
+    "u": "trouglu",
+    "om": "trouglom",
+    "i": "trouglovi",
+    "e": "trouglove",
+    "ima": "trouglovima",
+    "ovi": "trouglovi",
+    "ova": "trouglova",
+    "ove": "trouglove",
+    "ovima": "trouglovima",
+}
+_TROKUT_RE = re.compile(
+    r"trokut(ovima|ovi|ova|ove|ima|om|a|u|e|i)?(?![A-Za-zčćžšđČĆŽŠĐ])",
+    re.IGNORECASE,
+)
+
+
+def _trokut_suffix(match):
+    return match.group(1) or ""
+
+
+# ---------------------------------------------------------------------------
+# 7) TOČAN → TAČAN (živi nalaz D35-2/D35-3, pozivi 19 i 20)
+# ---------------------------------------------------------------------------
+# Razlika je ISKLJUČIVO u samoglasniku osnove (toč- → tač-); svi nastavci su
+# identični, pa se prenose nepromijenjeni. Nastavak MORA biti „an“ (nepostojano
+# a: točan) ili počinjati na „n“ (točna, točno, točni, točnost) — to je ono što
+# ovo pravilo drži uskim: „točka“ i „točak“ (sasvim druge riječi) ne prolaze, a
+# granica riječi na početku štiti „potočni“ i slično.
+_TOCAN_RE = re.compile(r"\btoč(an|n[A-Za-zčćžšđČĆŽŠĐ]*)", re.IGNORECASE)
+
+
+# ---------------------------------------------------------------------------
+# 8) KUT → UGAO (živi nalaz kampanje od 14 poziva, poziv 5)
+# ---------------------------------------------------------------------------
+# Objašnjenje zbira uglova trougla je bilo tačno, ali je koristilo hrvatsko
+# „kut/kutovi/kuta“ umjesto bosanskog „ugao/uglovi/ugla“.
+#
+# Ovo je NAJUŽE moguće pravilo u modulu, jer je „kut“ kratak niz koji se
+# pojavljuje unutar sasvim drugih riječi: „kutija“, „kutak“, „skuter“, pa i
+# „kutomer“ (koji ima SVOJE pravilo iznad i izvršava se PRIJE ovog). Zato se
+# traži granica riječi i TAČNO poznat nastavak — ništa se ne pogađa. „Kutija“ i
+# „kutak“ nemaju nijedan od ovih nastavaka i nikad se ne diraju.
+_KUT_SUFFIX_MAP = {
+    "": "ugao",
+    "a": "ugla",
+    "u": "uglu",
+    "om": "uglom",
+    "ovi": "uglovi",
+    "ova": "uglova",
+    "ove": "uglove",
+    "ovima": "uglovima",
+}
+_KUT_RE = re.compile(
+    r"\bkut(ovima|ovi|ova|ove|om|a|u)?(?![A-Za-zčćžšđČĆŽŠĐ])",
+    re.IGNORECASE,
+)
+
+
+def _kut_suffix(match):
+    return match.group(1) or ""
+
+
+# ---------------------------------------------------------------------------
 # Zajednička primjena — svako pravilo je (regex, suffix_extractor, suffix_map
 # | None). suffix_map=None znači "osnova + isti nastavak kao izvor" (potpuno
 # dijeljena deklinacija, npr. potenciranje/stepenovanje).
@@ -151,12 +229,19 @@ _RULES = (
     (_JEDNAKOKRACNI_RE, _jednakokracni_suffix, _JEDNAKOKRACNI_SUFFIX_MAP, "jednakokraki"),
     (_ZBROJ_RE, _zbroj_suffix, _ZBROJ_SUFFIX_MAP, "zbir"),
     (_POTENCIRANJE_RE, lambda m: m.group(1), None, "stepenovanj"),
+    (_TROKUT_RE, _trokut_suffix, _TROKUT_SUFFIX_MAP, "trougao"),
+    (_TOCAN_RE, lambda m: m.group(1), None, "tač"),
+    # MORA ostati POSLIJE _KUTOMER_RE: „kutomer“ se prvo pretvori u „uglomjer“,
+    # pa ovo pravilo nema šta da dohvati unutar njega.
+    (_KUT_RE, _kut_suffix, _KUT_SUFFIX_MAP, "ugao"),
 )
 
 # Brzi predizlaz: bilo koja od ovih podniski MORA biti prisutna (case-fold)
-# da bi ijedno pravilo uopšte imalo šansu da se poklopi — izbjegava 5 regex
+# da bi ijedno pravilo uopšte imalo šansu da se poklopi — izbjegava 7 regex
 # pretraga na svakom pozivu kad ništa od ovoga nije u tekstu.
-_TRIGGER_SUBSTRINGS = ("čimbeni", "kutomer", "jednakokrač", "zbroj", "potenciranj")
+_TRIGGER_SUBSTRINGS = (
+    "čimbeni", "kut", "jednakokrač", "zbroj", "potenciranj", "trokut", "toč",
+)
 
 
 def _match_capitalization(source: str, replacement: str) -> str:
@@ -207,7 +292,7 @@ def normalize_terminology(text: str) -> str:
 
 
 def contains_forbidden_term(text: str) -> bool:
-    """True ako tekst SADRŽI bilo koji oblik BILO KOJEG od pet pokrivenih
+    """True ako tekst SADRŽI bilo koji oblik BILO KOJEG od sedam pokrivenih
     zabranjenih termina (case-insensitive). Koristi se u testovima i kao
     dijagnostika — ne u produkcijskom putu."""
     haystack = text or ""

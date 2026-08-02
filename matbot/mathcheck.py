@@ -25,6 +25,7 @@ aritmetika, `sqrt(...)` i konstanta `PI`). Sve ostalo → nepodržano → presko
 import ast
 import math
 import re
+from decimal import Decimal, InvalidOperation
 
 from matbot.mathsegments import math_contents, tokenize_math
 
@@ -32,6 +33,50 @@ from matbot.mathsegments import math_contents, tokenize_math
 # izraz s π vrednujemo OBJEMA vrijednostima i prihvatamo ako se poklopi bilo
 # koja — inače bi „$9\\pi \\approx 28,26$“ (tačno uz 3,14) bilo lažno odbijeno.
 _PI_VALUES = (math.pi, 3.14)
+
+# ---------------------------------------------------------------------------
+# DEKLARISANA APROKSIMACIJA π (živi nalaz D35-2, poziv 19 kampanje od 35)
+# ---------------------------------------------------------------------------
+# Model je u istom odgovoru NAJAVIO „π\approx3,14“ pa onda napisao
+# „$6\pi\approx18,85$“. Uz 3,14 tačan proizvod je 18,84; 18,85 dolazi od punog
+# π. Oba broja su „tačna“ svaki za svoju konvenciju — greška je što odgovor
+# MIJEŠA dvije konvencije u jednoj rečenici, i učenik koji ponovi račun s 3,14
+# dobije drugi broj nego bot.
+#
+# Provjera je zato dvodijelna: prvo se u CIJELOM tekstu (i proza i matematika —
+# deklaracija je u živom nalazu stajala baš u prozi, van svakog $...$) traži
+# izričita deklaracija vrijednosti π; kad ona postoji, svi izrazi s π vrednuju
+# se ISKLJUČIVO deklarisanom vrijednošću, a permisivno „prihvati bilo koju od
+# dvije“ se gasi.
+#
+# Lookbehind na „nije slovo/cifra“ je bitan: „$2\pi\approx6,28$“ NIJE
+# deklaracija vrijednosti π nego običan izračun, i ne smije pomjeriti konvenciju.
+_DECLARED_PI_RE = re.compile(
+    r"(?<![\w])(?:\\pi|π)\s*(?:\\approx|≈|=)\s*(\d+[.,]\d+)"
+)
+# Deklaracija se prihvata samo ako je stvarno aproksimacija π. Šire granice ne
+# pogađamo — nepoznata vrijednost se ignoriše, ne „ispravlja“.
+_PI_DECLARATION_MIN = Decimal("3.1")
+_PI_DECLARATION_MAX = Decimal("3.2")
+
+
+def declared_pi_values(text):
+    """Vrati sortiranu torku vrijednosti π koje tekst IZRIČITO deklariše.
+
+    Prazna torka = nema deklaracije, pa vrijedi ranije (permisivno) ponašanje.
+    Parsira se preko Decimal-a da „3,14“ ne bi prošao kroz binarni float prije
+    nego što uopšte znamo da je validna deklaracija."""
+    if not text:
+        return ()
+    values = set()
+    for match in _DECLARED_PI_RE.finditer(text):
+        try:
+            value = Decimal(match.group(1).replace(",", "."))
+        except InvalidOperation:
+            continue
+        if _PI_DECLARATION_MIN <= value <= _PI_DECLARATION_MAX:
+            values.add(float(value))
+    return tuple(sorted(values))
 
 # Relativna tolerancija za EGZAKTNO poređenje (oba dijela racionalna, bez
 # decimalnog literala) — samo da apsorbuje šum binarnog zapisa.
@@ -304,9 +349,12 @@ def _eval_node(node, pi_value):
     raise _Unsupported(f"nedozvoljen AST čvor: {type(node).__name__}")
 
 
-def evaluate_candidates(latex_expr):
+def evaluate_candidates(latex_expr, pi_values=()):
     """Vrati listu mogućih numeričkih vrijednosti izraza (jedna po vrijednosti
-    π kad se π pojavljuje, inače jedna). Baca _Unsupported ili _MathError."""
+    π kad se π pojavljuje, inače jedna). Baca _Unsupported ili _MathError.
+
+    `pi_values`: kad odgovor IZRIČITO deklariše vrijednost π (vidi
+    declared_pi_values), koriste se SAMO te vrijednosti — ne i puni math.pi."""
     if _UNSUPPORTED_RE.search(latex_expr) or _ORDERED_PAIR_RE.search(latex_expr):
         raise _Unsupported("nepodržana konstrukcija")
 
@@ -326,8 +374,11 @@ def evaluate_candidates(latex_expr):
         raise _Unsupported("neparsabilan izraz")
 
     uses_pi = "PI" in python_expr
-    pi_values = _PI_VALUES if uses_pi else (math.pi,)
-    return [_eval_node(tree, pi) for pi in pi_values]
+    if not uses_pi:
+        candidates = (math.pi,)
+    else:
+        candidates = tuple(pi_values) or _PI_VALUES
+    return [_eval_node(tree, pi) for pi in candidates]
 
 
 # ---------------------------------------------------------------------------
@@ -368,7 +419,7 @@ def _tolerance(left_expr, right_expr, relation, magnitude):
     return max(_EXACT_REL_TOL * abs(magnitude), 1e-9)
 
 
-def check_segment(segment):
+def check_segment(segment, pi_values=()):
     """Vrati listu poruka o nedosljednosti unutar JEDNOG $...$ segmenta."""
     tokens = _CHAIN_SPLIT.split(segment)
     if len(tokens) < 3:
@@ -382,7 +433,7 @@ def check_segment(segment):
         if not part.strip():
             continue
         try:
-            evaluated.append((index, evaluate_candidates(part), part))
+            evaluated.append((index, evaluate_candidates(part, pi_values), part))
         except _MathError as e:
             return [f"numeric_equality_mismatch: nevaljan izraz ({e})"]
         except _Unsupported:
@@ -406,8 +457,11 @@ def find_numeric_inconsistencies(text):
     """Glavna ulazna tačka. Vrati listu INTERNIH razloga (prazno = nema
     dokazane nedosljednosti). Nikad ne mijenja tekst i nikad ne poziva model."""
     issues = []
+    # Deklaracija se traži u CIJELOM tekstu, ne po segmentu: u živom nalazu je
+    # „π\approx3,14“ stajalo u prozi, a nedosljedan izraz u $...$ ispod nje.
+    pi_values = declared_pi_values(text or "")
     for segment in math_segments(text or ""):
-        issues.extend(check_segment(segment))
+        issues.extend(check_segment(segment, pi_values))
     return issues
 
 

@@ -63,8 +63,13 @@ convention:
 - `store=False` on every call — OpenAI keeps no server-side copy; we resend the
   full prompt each turn instead of using `previous_response_id`.
 - No orchestrator ever calls the model twice. Every rejection path (schema,
-  math-safety, numeric, geometry, family) returns the canned `SAFE_ERROR_MESSAGE`
-  **without a repair call**.
+  math-safety, numeric, geometry, family, image gate, image check) returns the
+  canned `SAFE_ERROR_MESSAGE` or a short server-owned message **without a repair
+  call**. Image turns in particular use **no OCR call and no second model call** —
+  an unreadable image is reported, never re-read.
+- The two deterministic server-owned answers added in the D35 pass (the clock-time
+  fallback and the image-unreadable message) are composed **after** the single call
+  from data the server already has; neither triggers another call.
 - The per-session turn lock blocks a parallel second call for the same session.
 - `FakeLLM.call_count` in tests asserts `== 1` for each mode's happy and unhappy paths.
 
@@ -129,7 +134,8 @@ only committed (`store.save`) on a fully successful turn.
 ### Explain (`matbot/explain.py`)
 
 ```
-payload → guard chain → lesson_info() → build_explain_instructions/_input
+payload → guard chain → lesson_info() → lesson_context_is_strong()
+        → build_explain_instructions/_input
         → ONE model call → ExplainTurnOutput{reply}
         → validate_explain_output → normalize_result_math_transport
         → sanitize_and_validate_math_text → normalize_terminology
@@ -143,6 +149,17 @@ The only context is `conversation_history` sent by the frontend each turn.
 Explain never grades (`answer_verdict` is always `null`) and never sets a task.
 `normalize_result_math_transport` (shared with Quick) repairs `\$...\$`
 over-escaping and doubled backslashes before the shared sanitizer runs.
+
+**Selected-topic relevance (D35-3).** `lesson_relevance.lesson_context_is_strong`
+decides deterministically — no model call — whether the selected lesson may shape
+the answer. It claims *weak* context **only** when the message names a maths
+concept and none of those concepts overlap the lesson's; deictic messages
+("objasni mi ovo", "ne razumijem") and every case it cannot prove keep the previous
+behaviour. Under weak context the prompt drops the "first explanation of the topic
++ one worked example" rule and the "keep the lesson name" rule, and the lesson
+header is relabelled to Quick's wording (`IZABRANA LEKCIJA (kontekst, ne
+ograničenje; pitanje NIJE iz nje)`). Conversation history is never dropped in
+either branch, so follow-ups keep working. Grade still controls depth only.
 
 History handling — frontend keeps the last 5 messages in `localStorage`;
 `validation` allows ≤6 items of ≤3000 chars; `_clean_history`'s raw per-item
@@ -193,13 +210,58 @@ multipart POST /chat  (payload=JSON string, image=file)
        EXIF orientation applied, downscale to ≤ 2048 px, flatten alpha on white
        re-encode; ≤ 4 MiB normalized, ≤ 6 M chars as data URL, ≥ 8 px per side
   → llm.quick_turn(..., image) — one user message with one input_text +
-    one input_image (detail="high"), same model/effort/budget/schema as text
+    one input_image (detail="high"), same model/effort/budget as text but the
+    DEDICATED QuickImageTurnOutput schema
+  → validate_quick_image_output  (bounded internal field sizes)
+  → readability gate             (clear + all symbols visible + high confidence
+                                  + no uncertainty, else server-owned message)
+  → imagecheck.verify_image_answer   (supported families: publish only on
+                                      supported ∧ engaged ∧ verified)
+  → the usual mathsafe → terminology → mathcheck → geometrycheck chain
 ```
 
 The image lives for that turn only: never stored, never written to history, never
 re-sent. Logs carry format/width/height/normalized-bytes only — never bytes,
 base64, data URL, EXIF, or filename. The prompt explicitly states that any text in
 the image is *task content, never an instruction*.
+
+**Dedicated image schema (D35-5/D35-6).** A text-only Quick turn still returns
+`QuickTurnOutput{reply}`, byte-compatible with before. An image turn returns
+`QuickImageTurnOutput`, which additionally carries `readability`,
+`all_required_symbols_visible`, `task_type`, `visible_problem_text`,
+`requested_quantity`, `visible_values[]`, `unit`, `answer_confidence` and
+`uncertainty_reason`. Those fields exist **only** so the server can decide whether
+to publish the answer and, where possible, recompute it independently. They are
+transient: never in the browser payload, never in conversation history, never in
+`localStorage`, and never logged alongside the transcription — only bounded status
+codes and the task-type slug reach the log.
+
+**Dedicated maths evidence (D35T-2).** `visible_math` carries **only** the expression
+or equation actually visible in the image — never a heading (`Riješi`, `Izračunaj`,
+`Zadatak`, `Odredi`), never a proposed answer, never an inferred value, and empty
+when it cannot be read exactly. `visible_problem_text` remains a free-form prose
+description for unsupported/general images and is **never** accepted as deterministic
+evidence: the live campaign showed the model filling it with the task heading, which
+made the expression and equation verifiers silently skip.
+
+**Explicit verification states.** `verify_image_answer` returns
+`ImageVerification(supported, engaged, verified, code)`. The four meaningful states
+are: family not supported; supported and verified; supported but the required
+evidence was missing/unparsable (**not engaged**); supported but mathematically
+wrong. For a supported family the answer is published only on
+`supported ∧ engaged ∧ verified` — **"the verifier did not engage" is a rejection,
+never a pass.** Ground truth is taken only from validated structured evidence
+(`visible_values`, `visible_math`), never from the public reply, the proposed
+answer, textbook patterns, or the value that would make an equation solvable.
+
+**What this does and does not buy.** The server never sees the image, only what the
+model reported seeing, so `imagecheck` proves the arithmetic is consistent with the
+*reported* values — it does **not** establish that the transcription itself is
+correct. Independent verification exists for `rectangle_area`, `rectangle_perimeter`,
+`square_area`, `square_perimeter`, `arithmetic`, `fraction_expression` and
+`linear_equation` (by substitution) only. Every other image task is left to the
+readability gate plus the generic checks. **Image understanding is not deterministic
+in general**, and there is still no OCR and no second model call.
 
 ---
 
@@ -240,14 +302,17 @@ All are pure functions, no model calls, and all follow the same discipline:
 |---|---|---|---|
 | `validation.py` | bad grade/mode/ids, oversized history, unknown topic | 400 before any call | all |
 | `schema.py` | empty / over-long reply, malformed `new_task`, wrong option count/index | reject turn | all |
-| `mathsafe.py` | unbalanced `$`/`$$`, unbalanced `{}`, JSON control chars (`\f`→`\frac`), literal `\n`, bare `sqrt`/`text`, doubled backslashes, stray terminal `}`, raw LaTeX outside math, a nested/dangling `$` inside an already-open math segment | repair if unambiguous, else strip delimiters and keep the surrounding text | all |
-| `mathcheck.py` | numerically inconsistent `=` / `\approx` chains inside `$...$` **or** `$$...$$`, including the `a:b` school-division notation (AST whitelist, never `eval`) | reject whole answer | all |
+| `mathsafe.py` | unbalanced `$`/`$$`, unbalanced `{}`, JSON control chars (`\f`→`\frac`), literal `\n`, bare `sqrt`/`text`, doubled backslashes, stray terminal `}`, a nested/dangling `$` inside an already-open math segment, **any command inside math that is not in `MATHJAX_COMMAND_ALLOWLIST`** (D35-1), and **structural or unknown commands outside math** (D35T-1) | repair if unambiguous (incl. wrapping a standalone `\pi` into `$\pi$`), else strip delimiters / reject the whole answer; the intended command is never guessed | all |
+| `mathcheck.py` | numerically inconsistent `=` / `\approx` chains inside `$...$` **or** `$$...$$`, including the `a:b` school-division notation, and π expressions that contradict a π value the same answer explicitly declared (D35-2) (AST whitelist, never `eval`) | reject whole answer | all |
+| `imagecheck.py` | image answers whose arithmetic contradicts the values the model reported as visible — rectangle/square area and perimeter, arithmetic and fraction expressions, linear equations by substitution (D35-5). Returns `ImageVerification(supported, engaged, verified, code)`; for a supported family anything short of all three is a rejection (D35T-2) | reject whole answer | quick (image only) |
 | `geometrycheck.py` | 11 notation violations (`D`/`d` as prečnik, `R` as poluprečnik, `R` as circumradius, `S` as površina, O/P swap, solid diagonal swap, base-area symbol, pyramid apothem vs edge, circle formula conflicts) | reject whole answer | all (scope from canonical lesson only) |
-| `terminology.py` | five forbidden terms and their declined forms — the Croatian variant of `faktor`, `kutomer`, `jednakokračni`, `zbroj`, `potenciranje` — outside math segments only. (`suma` is deliberately not covered — see [CURRENT_STATE.md](CURRENT_STATE.md) C-8.) | rewrite in place | all |
+| `terminology.py` | eight forbidden terms and their declined forms — the Croatian variant of `faktor`, `kutomer`, `jednakokračni`, `zbroj`, `potenciranje`, plus `trokut`→`trougao`, `točan`→`tačan` (D35-3b) and the Croatian word for angle→`ugao` — outside math segments only. (`suma` is deliberately not covered — see [CURRENT_STATE.md](CURRENT_STATE.md) C-8.) | rewrite in place | all |
+| `lesson_relevance.py` | the selected Explain lesson overriding a self-contained question from another topic (D35-3) | drop the "teach the lesson" prompt rules for that turn | explain |
 | `option_equivalence.py` | two options equal after simplification | reject task | practice |
 | `task_family_validation.py` | generated task does not match the server-assigned pedagogical family | reject task | practice |
 | `systemcheck.py` | ordered pair that does not solve the shown 2×2 system; non-equivalent "equivalent system" options | reject task | practice |
 | `imageinput.py` | oversized upload, decompression bomb, disallowed/spoofed format, degenerate size | 400/413 before any call | quick |
+| `quick.py` image gate | an image answer whose reported readability is not `clear`, whose required symbols are not all visible, whose confidence is not `high`, or which reports any uncertainty (D35-6) | discard the proposed maths, return a short server-owned message | quick (image only) |
 
 Internal issue codes are logged, never sent to the browser.
 

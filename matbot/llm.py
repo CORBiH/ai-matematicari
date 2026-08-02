@@ -32,7 +32,12 @@ import time
 from dataclasses import dataclass, field
 
 from matbot import config
-from matbot.schema import ExplainTurnOutput, PracticeTurnOutput, QuickTurnOutput
+from matbot.schema import (
+    ExplainTurnOutput,
+    PracticeTurnOutput,
+    QuickImageTurnOutput,
+    QuickTurnOutput,
+)
 
 # Maksimalna dužina bilo koje pojedinačne dijagnostičke vrijednosti u logu.
 _DIAG_FIELD_LIMIT = 200
@@ -227,12 +232,17 @@ class OpenAIPracticeLLM:
     def quick_turn(self, instructions: str, input_text: str, image=None) -> LLMResult:
         """`image`: matbot.imageinput.ValidatedImage ili None.
 
-        Slika je podržana SAMO na ovom (Quick/Rezultat) putu i mijenja
-        isključivo OBLIK `input` polja — model, reasoning effort, budžet
-        tokena, `store=False`, `max_retries=0` i strukturno parsiranje u
-        QuickTurnOutput ostaju identični tekstualnom pozivu, i dalje kao
-        TAČNO JEDAN poziv modela."""
-        return self._structured_turn(instructions, input_text, QuickTurnOutput, image=image)
+        Slika je podržana SAMO na ovom (Quick/Rezultat) putu i mijenja oblik
+        `input` polja i STRUKTURNU ŠEMU — model, reasoning effort, budžet
+        tokena, `store=False` i `max_retries=0` ostaju identični tekstualnom
+        pozivu, i dalje kao TAČNO JEDAN poziv modela.
+
+        Šema je QuickImageTurnOutput (matbot/schema.py): živi nalaz D35-5/D35-6
+        pokazao je da je gola `{reply}` šema činila sliku neprovjerljivom, pa
+        model uz odgovor mora prijaviti i šta je stvarno vidio. Tekstualni
+        poziv ostaje na QuickTurnOutput, bajt za bajt kao ranije."""
+        text_format = QuickImageTurnOutput if image is not None else QuickTurnOutput
+        return self._structured_turn(instructions, input_text, text_format, image=image)
 
     def _build_input(self, input_text, image):
         """Tekst → string (nepromijenjen put). Tekst + slika → jedna user

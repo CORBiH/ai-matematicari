@@ -43,6 +43,58 @@ from matbot.mathsegments import (
     tokenize_math,
 )
 
+# ---------------------------------------------------------------------------
+# BIJELA LISTA MathJax KOMANDI (živi nalaz D35-1, pozivi 10 i 12 kampanje od
+# 35 poziva). Do sada nijedna provjera nije gledala DA LI je komanda unutar
+# $...$ uopšte postojeća MathJax komanda — pa su „\ty“ i „\tdot“ (nastali u
+# _repair_control_chars, vidi tamo) i udvostručen „\\cdot“ stigli do browsera i
+# prikazali se kao crvena „Math input error“ / goli tekst.
+#
+# Lista je JEDAN izvor istine: iz nje se grade i regexi za skupljanje
+# udvostručenog backslasha i skener nepoznatih komandi. Sadrži samo ono što se
+# stvarno koristi u ovom projektu (osnovna škola 6-9) plus uobičajene školske
+# komande — namjerno NIJE potpun LaTeX. Nepoznata komanda se NE pogađa i NE
+# prepravlja: cio odgovor se odbija i vraća se postojeći sigurni fallback.
+MATHJAX_COMMAND_ALLOWLIST = frozenset({
+    # struktura i tekst
+    "frac", "dfrac", "tfrac", "sqrt", "text", "textbf", "textit",
+    "mathbb", "mathrm", "mathit", "mathbf", "left", "right",
+    "overline", "underline", "vec", "hat", "bar",
+    "begin", "end", "array", "cases", "aligned", "matrix", "pmatrix",
+    # operatori i relacije
+    "cdot", "times", "div", "pm", "mp", "approx", "neq", "ne", "not",
+    "le", "leq", "ge", "geq", "lt", "gt", "equiv", "sim", "propto",
+    "angle", "perp", "parallel", "cong", "colon",
+    # simboli
+    "pi", "Pi", "alpha", "beta", "gamma", "Gamma", "delta", "Delta",
+    "epsilon", "varepsilon", "zeta", "eta", "theta", "Theta", "iota",
+    "kappa", "lambda", "Lambda", "mu", "nu", "xi", "rho", "sigma", "Sigma",
+    "tau", "phi", "varphi", "Phi", "chi", "psi", "Psi", "omega", "Omega",
+    "nabla", "circ", "degree", "infty",
+    "dots", "ldots", "cdots", "vdots", "prime", "square", "triangle",
+    "in", "notin", "subset", "subseteq", "supset", "cup", "cap",
+    "emptyset", "varnothing", "forall", "exists",
+    "Rightarrow", "Leftarrow", "Leftrightarrow", "to", "rightarrow",
+    "leftarrow", "mapsto",
+    # funkcije i veliki operatori
+    "sum", "prod", "int", "lim", "log", "ln", "lg",
+    "sin", "cos", "tan", "cot", "sec", "csc", "min", "max", "gcd",
+    # razmaci
+    "quad", "qquad",
+})
+
+# Poredak od DUŽE ka KRAĆOJ komandi: regex alternacija inače „stane“ na kraćem
+# prefiksu (npr. „ne“ prije „neq“) i granica ispod se pogrešno ne poklopi.
+_ALLOWED_COMMAND_ALTERNATION = "|".join(
+    sorted(MATHJAX_COMMAND_ALLOWLIST, key=lambda w: (-len(w), w))
+)
+# Granica komande: NIJE \b nego „nije slovo“. \b se NIKAD ne aktivira između
+# dva word-znaka, a cifra JESTE word-znak — zato „\\cdot3“ (zapis bez razmaka
+# koji je u ovom projektu uobičajen: „$2\cdot3=6$“) nije prolazio ni kroz jedan
+# od donja dva regexa i udvostručen backslash je stizao do browsera netaknut
+# (živi nalaz D35-1, poziv 12).
+_COMMAND_BOUNDARY = r"(?![A-Za-z])"
+
 # Shared model-output math transport repair. Some structured model outputs
 # over-escape the MathJax delimiters themselves (``\$...\$``) or preserve two
 # literal backslashes before a command after JSON parsing. Those strings are
@@ -60,8 +112,7 @@ _RESULT_MATH_COMMAND_RE = re.compile(
     r"infty|pi|left|right)\b|\\[{}]"
 )
 _RESULT_OVERESCAPED_COMMAND_RE = re.compile(
-    r"\\{2,}(?=(?:frac|sqrt|text|cdot|times|mathbb|dots|ldots|neq|ne|not|"
-    r"le|ge|leq|geq|approx|infty|pi|left|right)\b|[{}])"
+    r"\\{2,}(?=(?:" + _ALLOWED_COMMAND_ALTERNATION + r")" + _COMMAND_BOUNDARY + r"|[{}])"
 )
 
 
@@ -139,15 +190,47 @@ _CONTROL_TO_LATEX_ESCAPE = {
 
 
 def _repair_control_chars(segment: str) -> str:
-    """Popravlja SAMO unutar jednog $...$ segmenta — ne dira tekst van njega."""
+    """Popravlja SAMO unutar jednog $...$ segmenta — ne dira tekst van njega.
+
+    Živi nalaz D35-1 (poziv 10): ranija verzija je SVAKI kontrolni znak slijepo
+    vraćala u literalni „\\t“/„\\f“/… bez gledanja šta iza njega slijedi. Model
+    je poslao JSON "x=3,\\ty=1" — pravi TAB kao obični razmak između dvije
+    vrijednosti — a mi smo od njega NAPRAVILI nepostojeću komandu „\\ty“ koja je
+    u browseru dala „Math input error“.
+
+    Sada se rekonstrukcija radi SAMO kad kontrolni znak + slova koja slijede
+    daju komandu iz MATHJAX_COMMAND_ALLOWLIST (TAB+„imes“ → „\\times“, form
+    feed+„rac“ → „\\frac“). Kad iza kontrolnog znaka NE slijedi slovo, on nije
+    mogao biti dio komande — tretira se kao razmak. Kad slijede slova koja ne
+    daju poznatu komandu, NE pogađamo koja je komanda trebala biti: ostavljamo
+    literalni escape, pa ga find_unknown_math_commands prijavi i cio odgovor
+    bude odbijen."""
     out = []
-    for ch in segment:
-        if ch in _CONTROL_TO_LATEX_ESCAPE:
-            out.append(_CONTROL_TO_LATEX_ESCAPE[ch])
-        elif ord(ch) < 0x20:
-            continue  # ostali rijetki kontrolni znakovi: ukloni, ne pogađaj slovo
-        else:
-            out.append(ch)
+    i = 0
+    length = len(segment)
+    while i < length:
+        ch = segment[i]
+        escape = _CONTROL_TO_LATEX_ESCAPE.get(ch)
+        if escape is not None:
+            end = i + 1
+            while end < length and segment[end].isalpha():
+                end += 1
+            command = escape[1] + segment[i + 1:end]
+            if command in MATHJAX_COMMAND_ALLOWLIST:
+                out.append("\\" + command)
+                i = end
+                continue
+            if end == i + 1:
+                out.append(" ")  # iza njega nema slova — nije mogao biti komanda
+            else:
+                out.append(escape)  # nepoznato: ne pogađaj, pusti skener da odbije
+            i += 1
+            continue
+        if ord(ch) < 0x20:
+            i += 1  # ostali rijetki kontrolni znakovi: ukloni, ne pogađaj slovo
+            continue
+        out.append(ch)
+        i += 1
     return "".join(out)
 
 
@@ -204,7 +287,76 @@ def sanitize_math_text(text: str) -> str:
 #      (bez drugog AI poziva).
 # ---------------------------------------------------------------------------
 
-_RAW_LATEX_COMMAND_RE = re.compile(r"\\(?:frac|sqrt|text|cdot|begin|end)\b")
+_RAW_LATEX_COMMAND_RE = re.compile(r"\\(?:frac|sqrt|text|mathbb|cdot|begin|end)\b")
+
+# ---------------------------------------------------------------------------
+# POLITIKA KOMANDI IZVAN MATEMATIKE (živi nalaz D35T-1, poziv 3 od 14)
+# ---------------------------------------------------------------------------
+# „Koje su komande VALIDNE unutar $...$“ i „šta smije stajati IZVAN $...$“ su
+# DVA RAZLIČITA pitanja. Prethodni prolaz ih je spojio: cijela
+# MATHJAX_COMMAND_ALLOWLIST je korištena i kao lista za odbijanje izvan
+# matematike, pa je odgovor koji je bio matematički POTPUNO TAČAN (deklarisao
+# π≈3,14 i izračunao 18,84 cm) odbijen samo zato što je u prozi pisalo
+# „LEKCIJA: Broj \pi i obim kruga“. To je ponovilo poznatu C-10 klasu lažnog
+# odbijanja: popravka je bolja od odbijanja kad je odgovor inače ispravan.
+#
+# Sada postoje tri jasno odvojene klase:
+#
+#   1. SAMOSTALNI SIMBOLI (bez argumenata) — „\pi“, grčka slova, relacije.
+#      Izvan matematike se NE odbijaju nego se USKO umotaju u $...$
+#      („Broj \pi i obim“ → „Broj $\pi$ i obim“). Simbol je jednoznačan, nema
+#      argumenata koje bi trebalo pogađati, i nikad ne smije ostati sirov u
+#      browseru.
+#   2. STRUKTURNE KOMANDE — „\frac“, „\sqrt“, „\text“, „\mathbb“, „\cdot“,
+#      „\begin“, „\end“. One nose argumente/operande; izvan matematike se NE
+#      pogađaju nego padaju zatvoreno (osim izolovanog \frac{a}{b} koji
+#      wrap_isolated_frac_tokens već umije sigurno umotati).
+#   3. NEPOZNATE KOMANDE — uvijek padaju zatvoreno, i unutar i izvan.
+#
+# NAPOMENA O OBIMU: sve u ovom modulu radi ISKLJUČIVO nad izlazom modela.
+# Poruka učenika ne prolazi kroz sanitizaciju i nikad se ne prepisuje.
+_STANDALONE_SYMBOL_COMMANDS = frozenset({
+    # grčka slova i konstante
+    "pi", "Pi", "alpha", "beta", "gamma", "Gamma", "delta", "Delta",
+    "epsilon", "varepsilon", "zeta", "eta", "theta", "Theta", "iota",
+    "kappa", "lambda", "Lambda", "mu", "nu", "xi", "rho", "sigma", "Sigma",
+    "tau", "phi", "varphi", "Phi", "chi", "psi", "Psi", "omega", "Omega",
+    "infty",
+    # relacije i jednoznačni operatorski simboli (bez argumenata)
+    "approx", "neq", "ne", "le", "leq", "ge", "geq", "equiv", "sim",
+    "pm", "mp", "times", "div", "circ", "degree",
+    # skupovni i strelice
+    "in", "notin", "subset", "subseteq", "supset", "cup", "cap",
+    "emptyset", "varnothing", "to", "rightarrow", "leftarrow", "mapsto",
+    "Rightarrow", "Leftarrow", "Leftrightarrow",
+    # tri tačke
+    "dots", "ldots", "cdots",
+})
+assert _STANDALONE_SYMBOL_COMMANDS <= MATHJAX_COMMAND_ALLOWLIST
+
+_STANDALONE_SYMBOL_RE = re.compile(
+    r"(?<!\\)\\(" + "|".join(
+        sorted(_STANDALONE_SYMBOL_COMMANDS, key=lambda w: (-len(w), w))
+    ) + r")" + _COMMAND_BOUNDARY
+)
+# Bilo koja komanda (poznata ili ne) koja je OSTALA izvan matematike nakon
+# uskog umotavanja iznad. Koristi se samo za prijavu, nikad za pogađanje.
+_ANY_COMMAND_OUTSIDE_MATH_RE = re.compile(r"(?<!\\)\\([A-Za-z]+)")
+
+
+def wrap_standalone_symbols_outside_math(text: str) -> str:
+    """Umota SAMOSTALAN simbol bez argumenata (npr. „\\pi“) koji stoji IZVAN
+    matematike u vlastiti $...$ par. Ne dira sadržaj unutar $...$/$$...$$, ne
+    umata okolnu prozu i ne dodaje ništa osim delimitera oko samog simbola."""
+    if not text or "\\" not in text:
+        return text or ""
+
+    def _wrap(match):
+        return "$\\" + match.group(1) + "$"
+
+    if "$" not in text:
+        return _STANDALONE_SYMBOL_RE.sub(_wrap, text)
+    return map_text_segments(text, lambda part: _STANDALONE_SYMBOL_RE.sub(_wrap, part))
 _DAMAGED_LATEX_FORM_RE = re.compile(r"\dsqrt|sqrt\d|\btext[a-zA-Z]")
 _LITERAL_NEWLINE_ESCAPE = "\\n"
 # Doslovan "\n" (backslash+n) je ambiguan: identičan je prefiksu \neq, \ne,
@@ -250,10 +402,31 @@ _BARE_COMMAND_RESIDUE_RE = re.compile(r"(?<!\\)(?:sqrt|text)")
 # uvijek svode na TAČNO jedan (nikad legitiman kao stvaran prelom reda usred
 # jedne kratke inline formule/opcije).
 _DOUBLED_BACKSLASH_COMMAND_RE = re.compile(
-    r"\\{2,}(?=(?:frac|sqrt|text|cdot|times|begin|end|pi|neq|ne|not|nu|nabla|"
-    r"le|ge|leq|geq|approx|circ|degree|div|pm|infty|left|right|square|dots|"
-    r"ldots|sum|int|lim|log|ln|sin|cos|tan)\b|[,;! ])"
+    r"\\{2,}(?=(?:" + _ALLOWED_COMMAND_ALTERNATION + r")" + _COMMAND_BOUNDARY + r"|[,;! ])"
 )
+
+# Preostao udvostručen backslash NEPOSREDNO ispred slova NAKON gornjeg
+# skupljanja znači da komanda iza njega nije poznata — ne pogađamo je.
+_RESIDUAL_DOUBLED_BACKSLASH_RE = re.compile(r"\\{2,}(?=[A-Za-z])")
+# Jedan backslash + slova = kandidat za komandu. Negativan lookbehind isključuje
+# udvostručene slučajeve (njih hvata regex iznad).
+_MATH_COMMAND_TOKEN_RE = re.compile(r"(?<!\\)\\([A-Za-z]+)")
+
+
+def find_unknown_math_commands(content: str) -> list:
+    """Vrati BOUNDED dijagnostičke kodove za komande unutar JEDNOG matematičkog
+    segmenta koje nisu u MATHJAX_COMMAND_ALLOWLIST. Kod sadrži ISKLJUČIVO ime
+    komande i kategoriju — nikad tekst učenika ni ostatak odgovora."""
+    issues = []
+    if not content:
+        return issues
+    if _RESIDUAL_DOUBLED_BACKSLASH_RE.search(content):
+        issues.append("doubled_backslash_before_command")
+    for match in _MATH_COMMAND_TOKEN_RE.finditer(content):
+        command = match.group(1)
+        if command not in MATHJAX_COMMAND_ALLOWLIST:
+            issues.append("unknown_mathjax_command:" + command[:24])
+    return issues
 
 
 def _repair_bare_sqrt_match(m):
@@ -276,10 +449,19 @@ def _repair_bare_text_unit_match(m):
     return out
 
 
+# Živi nalaz (kampanja od 14 poziva, poziv 5): model je napisao „$180\circ$“
+# umjesto „$180^\circ$“, pa se stepen renderuje kao prsten u liniji teksta
+# umjesto kao znak stepena. Popravka je jednoznačna i USKA: samo kad \circ
+# NEPOSREDNO slijedi cifru (i kad ispred već nije „^“). Validan „180^\circ“ se
+# time nikad ne dira.
+_DEGREE_WITHOUT_CARET_RE = re.compile(r"(?<!\^)(\d)\s*\\circ(?![A-Za-z])")
+
+
 def _repair_malformed_math_content(content):
     fixed = _DOUBLED_BACKSLASH_COMMAND_RE.sub("\\\\", content)
     fixed = _BARE_SQRT_RE.sub(_repair_bare_sqrt_match, fixed)
     fixed = _BARE_TEXT_UNIT_RE.sub(_repair_bare_text_unit_match, fixed)
+    fixed = _DEGREE_WITHOUT_CARET_RE.sub(r"\1^\\circ", fixed)
     return fixed
 
 
@@ -461,8 +643,17 @@ def find_unsafe_math_issues(text: str) -> list:
         return []
     issues = []
     for part in _outside_math_parts(text):
+        # Strukturne komande izvan matematike (nose argumente) — ne pogađaju se.
         if _RAW_LATEX_COMMAND_RE.search(part):
             issues.append("raw_latex_command_outside_math")
+        # Sve ostalo što je ostalo kao komanda izvan matematike NAKON umotavanja
+        # samostalnih simbola: nepoznato ili nije bezbjedno umotati → odbij.
+        for match in _ANY_COMMAND_OUTSIDE_MATH_RE.finditer(part):
+            command = match.group(1)
+            if command in MATHJAX_COMMAND_ALLOWLIST and command not in _STANDALONE_SYMBOL_COMMANDS:
+                continue  # već pokriveno _RAW_LATEX_COMMAND_RE provjerom iznad
+            if command not in MATHJAX_COMMAND_ALLOWLIST:
+                issues.append("unknown_mathjax_command_outside_math:" + command[:24])
         if _DAMAGED_LATEX_FORM_RE.search(part):
             issues.append("damaged_latex_form")
         if _LITERAL_NEWLINE_ESCAPE_RE.search(part):
@@ -470,6 +661,7 @@ def find_unsafe_math_issues(text: str) -> list:
         if any(ord(ch) < 0x20 and ch not in ("\n", "\t") for ch in part):
             issues.append("control_character")
     for part in _inside_math_parts(text):
+        issues.extend(find_unknown_math_commands(part))
         if _BARE_COMMAND_RESIDUE_RE.search(part):
             issues.append("unrepaired_bare_command_in_math")
         if _LITERAL_NEWLINE_ESCAPE_RE.search(part):
@@ -510,6 +702,9 @@ def sanitize_and_validate_math_text(text: str, allow_whole_expression_wrap: bool
         cleaned = "$" + cleaned.strip() + "$"
     else:
         cleaned = wrap_isolated_frac_tokens(cleaned)
+        # Uski popravak PRIJE provjere: samostalan simbol izvan matematike
+        # (npr. „\pi“ u prozi) dobije svoje $...$ umjesto da sruši cio odgovor.
+        cleaned = wrap_standalone_symbols_outside_math(cleaned)
     cleaned = repair_stray_terminal_brace(cleaned)
     issues = find_unsafe_math_issues(cleaned)
     return cleaned, (len(issues) == 0)

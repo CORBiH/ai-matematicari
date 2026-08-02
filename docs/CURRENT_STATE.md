@@ -1,6 +1,6 @@
 # MAT-BOT — current state
 
-Last updated: 2026-08-01 (Explain fix pass). Test baseline: **1308 passing**.
+Last updated: 2026-08-02 (D35T fix pass). Test baseline: **1465 passing**.
 Runtime model: `gpt-5-mini`, reasoning effort `low`.
 
 ## Maturity by area
@@ -13,6 +13,72 @@ Runtime model: `gpt-5-mini`, reasoning effort `low`.
 | Security / transport | Hardened. Signed token, two-tier rate limiting, per-session lock, ProxyFix, body-size cap, no secret ever logged. |
 | **Explain** | **Audited 2026-08-01; 8 of 11 confirmed defects fixed the same day.** See below — C-6 is a deferred design-only note, C-9's default is unmeasured live, C-7 is correct as-is. |
 | Exam ("Kontrolni") | Routed through the practice path; not separately audited. |
+
+---
+
+## D35 register — 35-call live campaign (2026-08-01)
+
+A 35-call production campaign against `bot.matematicari.com` (12 Practice, 8 Explain,
+15 Result/Quick incl. 5 images) confirmed six defects. All six are fixed below.
+Two of them turned out to be bugs in our own deterministic code, not model behaviour.
+
+| ID | Sev | Finding | Fix |
+|---|---|---|---|
+| D35-1 | P2 | Invalid/doubled MathJax reached the browser: `\ty`, `\tdot` (call 10) and doubled `\\cdot` (call 12). **Both were self-inflicted.** `mathsafe._repair_control_chars` rewrote *every* control char inside `$…$` back into a literal `\t`/`\f`/… with no lookahead, so a real TAB used as a plain separator (`"x=3,\ty=1"`) was *manufactured* into the non-existent command `\ty`. Separately, both doubled-backslash collapse regexes ended the command name with `\b`, which never fires between two word characters — so `\\cdot3` (this project's own no-space house style) was never collapsed and no rule flagged it. | `matbot/mathsafe.py`: new `MATHJAX_COMMAND_ALLOWLIST` as the single source of truth; command boundary changed from `\b` to `(?![A-Za-z])`; control chars reconstructed **only** when the result is an allowlisted command (TAB+`imes`→`\times` still works), dropped as whitespace when no letter follows, and otherwise left for the new `find_unknown_math_commands` scanner to reject. Applies to Practice, Explain and Result through the existing `sanitize_and_validate_math_text` boundary. |
+| D35-2 | **P1** | Response declared `π≈3,14` and then wrote `6π≈18,85` (18,84 is correct under the declared value). `mathcheck` missed it twice: the declaration sat in **prose**, which `math_segments` never reads, and `_PI_VALUES` accepted a segment if **either** π value matched. Raw `\approx` outside math also reached the browser. | `matbot/mathcheck.py`: new `declared_pi_values(text)` scans the whole text (prose *and* math) for an explicit π declaration, parsed via `Decimal` and accepted only in a plausible band. When a declaration exists, π candidates become exactly the declared values — `math.pi` is dropped. No declaration ⇒ previous permissive behaviour, unchanged. Separately `mathsafe` now also rejects any *known* command appearing outside math. |
+| D35-3 | P2 | A fractions lesson was selected but the student asked why triangle angles sum to 180°; the answer prepended a whole unrelated decimal-to-fraction lesson. The `PRVO OBJAŠNJENJE teme` rule fired purely on *empty history*, never checking whether the message was about the lesson, and the lesson entered the prompt unconditionally. | New `matbot/lesson_relevance.py` — deterministic, no model call. Weak context is claimed **only** when the message names a maths concept and none of them overlap the lesson's; deictic messages ("objasni mi ovo") and unprovable cases keep the previous behaviour. Weak context swaps the first-explanation rule for a priority rule, drops the lesson-name rule, and relabels the header to Quick's proven "kontekst, ne ograničenje". |
+| D35-3b | P3 | `trokut` and `točan` (Croatian) reached the student; neither had a terminology rule. | `matbot/terminology.py` extended to seven terms: `trokut`→`trougao` (own declension map — `trougao` has a fleeting *a*) and `točan`→`tačan` (stem-only swap). `točka`/`točak`/`potočni` are provably never touched. |
+| D35-4 | P2 | "Sastanak je u 12:30. Koliko je sati?" got a byte-exact `rules.OFF_TOPIC_ANSWER`. Not a colon/division bug and not a server guard — the model applied the shared off-maths rule to a clock question. | Quick-only prompt bullet declaring everyday measurement in scope, plus a deterministic `direct_clock_time_question` + server-owned answer applied **after** the single call when the model returns the generic refusal. Requires both a valid `HH:MM` and a fixed time phrase, so `60:15` stays division and `27:90` is not accepted. |
+| D35-5 | **P1** | Rectangle image (`a=8 cm`, `b=5 cm`, area requested) answered `$P=26\,\text{cm}$` — the perimeter value with a linear unit. | See D35-6: the shared root cause is that the image turn returned only `{reply}`. `matbot/imagecheck.py` now recomputes the answer from the reported visible values for supported families. |
+| D35-6 | **P1** | An image with a deliberately obscured value was answered `$x=5$` — a guess. | `matbot/schema.py::QuickImageTurnOutput`: image turns now use a **dedicated** structured schema (readability, symbol visibility, task type, visible values, confidence, uncertainty). `matbot/quick.py` publishes an image answer only when readability is `clear`, all required symbols are visible, confidence is `high` and no uncertainty is reported; otherwise the proposed maths is discarded for a short server-owned message. Still exactly one model call, no OCR, no repair call. |
+
+### D35 — deliberately not changed
+
+| ID | Status |
+|---|---|
+| Practice calls 5/6 | **Not a defect.** The family-contract rejection correctly protected session state: safe rejection, no state mutation, no hidden regeneration. Call 6 was a campaign scenario limitation (no valid task from call 5 to answer), not application behaviour. |
+| C-6 | Still unresolved — see below. Explicitly out of scope for this pass. |
+
+## D35T register — 14-call targeted validation (2026-08-02)
+
+A 14-call campaign against the **local working tree** (calls 441–454) confirmed the
+D35 fixes for images, topic relevance, clock time and MathJax, and found two
+defects. Both are fixed below.
+
+| ID | Sev | Finding | Fix |
+|---|---|---|---|
+| D35T-1 | P2 | A mathematically **correct** π explanation (declared 3,14, computed 18,84, zero numeric issues) was discarded because its prose read `LEKCIJA: Broj \pi i obim kruga`. The D35-1 pass had reused the whole `MATHJAX_COMMAND_ALLOWLIST` as the *outside-math* reject list, recreating the C-10 class of false rejection. | `matbot/mathsafe.py` now separates the two questions. `_STANDALONE_SYMBOL_COMMANDS` (symbols/relations with no arguments) are **narrowly wrapped** outside math — `Broj \pi` → `Broj $\pi$`. Structural commands (`\frac`, `\sqrt`, `\text`, `\mathbb`, `\cdot`, `\begin`, `\end`) still fail closed, except the isolated `\frac{a}{b}` that was already safely wrappable. Unknown commands fail closed everywhere. Nothing else about the D35-1 protections changed. |
+| D35T-2 | **P1** | For image calls 12 and 13 the model put the task **heading** (`Rijesi jednacinu:`) in `visible_problem_text`, so `_check_linear_equation` found no `=` and `_check_expression` found nothing parsable. Both returned an empty issue list, which the caller read as "verified". Replay proved `$x=99$` for `3x+5=20` would have been published. | Two changes. (1) A dedicated bounded schema field `visible_math` carries **only** the visible expression/equation — no heading, no proposed answer, no inferred value, empty when unreadable — and `visible_problem_text` is never accepted as evidence for a supported family. (2) `imagecheck.verify_image_answer` returns `ImageVerification(supported, engaged, verified, code)`; `matbot/quick.py` publishes a supported family only on `supported ∧ engaged ∧ verified`, so **"did not engage" is now a rejection**. |
+
+### D35T — narrow cleanups (same pass)
+
+| Observation | Fix |
+|---|---|
+| `$180\circ$` rendered as a baseline ring | `mathsafe` normalizes a digit immediately followed by `\circ` into `^\circ`; an already-correct `180^\circ` is untouched. |
+| Croatian `kut/kutovi` for angles | Added to `terminology.py` as the eighth term, with an explicit suffix table. `kutija`, `kutak`, `skuter` and `kutomer` are provably never touched (`kutomer` keeps its own earlier rule). |
+| Clock answer returned as `$12:30$`, where `:` is this project's division notation | If a clock question was detected and the whole reply is just the time wrapped in `$…$`, the server substitutes its plain-prose answer — still **after** the single call, still no second call. A real explanation is left alone. |
+
+### D35 — known limits of the image fixes
+
+- **Image understanding is not deterministic in general.** The server never sees the
+  image; it sees only what the model *reported* seeing. `imagecheck` therefore proves
+  only that the arithmetic is consistent with the reported values — a misread value
+  still yields a wrong answer. The readability gate, not `imagecheck`, is what guards
+  against that.
+- **Only these families receive independent verification:** `rectangle_area`,
+  `rectangle_perimeter`, `square_area`, `square_perimeter`, `arithmetic`,
+  `fraction_expression`, `linear_equation` (by substitution). For those, a verifier
+  that cannot engage is a **rejection**, not a pass (D35T-2). Everything else
+  (`other`, geometry beyond rectangles/squares, systems, word problems, tables,
+  multi-step constructions) is reported as `supported=False` and left to the strict
+  readability gate plus the generic `mathsafe`/`mathcheck`/`geometrycheck` chain —
+  unsupported is not evidence of correctness.
+- **The transcription itself is never independently verified.** `imagecheck` proves
+  the arithmetic is consistent with what the model *reported*; nothing proves the
+  report matches the picture. There is no OCR and no second model call.
+- Internal image fields are transient: never in the browser payload, conversation
+  history, `localStorage`, or any log line carrying content. Only bounded status codes
+  and the task-type slug are logged.
 
 ---
 
@@ -87,8 +153,10 @@ internal codes never leak to the browser · XSS (escape before every
 - **`geometrycheck` proves nothing about** whether a formula is mathematically
   right; it only checks that symbols mean what the project convention says they mean,
   and only inside geometry lessons (by design — see C-7).
-- **`terminology` normalizes five of six banned terms** — `suma` is deliberately
-  excluded (see C-8 residual, above); a repo-wide test forbids all six from
+- **`terminology` normalizes eight of nine banned terms** — the original five plus
+  `trokut`→`trougao`, `točan`→`tačan` (D35-3b) and the Croatian angle word→`ugao`
+  (D35T). `suma` is deliberately excluded
+  (see C-8 residual, above); a repo-wide test forbids all covered terms from
   appearing unexplained anywhere outside the files that declare or document
   the ban.
 - **`MAX_OUTPUT_TOKENS_EXPLAIN` default (2500) is unmeasured against live
@@ -99,23 +167,38 @@ internal codes never leak to the browser · XSS (escape before every
   lost on restart. There is no multi-process shared state.
 - **No token-by-token streaming.** `/chat/stream` returns one complete `done` frame.
 - **`π`** is accepted as both `math.pi` and `3.14` by the numeric verifier, because
-  BiH schools use `3,14`.
+  BiH schools use `3,14` — **unless** the same answer explicitly declares a value
+  (e.g. `π≈3,14`), in which case only the declared value is used (D35-2).
+- **Model-output MathJax is allowlisted.** Only commands in
+  `mathsafe.MATHJAX_COMMAND_ALLOWLIST` may appear inside `$…$`; an unknown control
+  word or a residual doubled backslash before a command fails closed to
+  `SAFE_ERROR_MESSAGE`. The intended command is never guessed. Widening the
+  allowlist is the supported way to add notation.
+- **Image answers are gated, not verified in general.** See the D35 register above
+  for the exact supported families and the readability gate.
 
 ---
 
 ## Prioritized next steps
 
-1. **Focused live campaign (not yet run)** — the smallest useful set from the
+1. **Targeted live validation of the D35 fixes (not yet run)** — the deterministic
+   halves are locked by tests, but three behaviours are prompt-dependent and can
+   only be confirmed live: whether the model actually populates the new image
+   structured fields honestly, whether Explain respects the weak-lesson-context
+   rule, and whether the clock-time bullet stops the generic refusal at the source
+   (rather than relying on the server fallback). Requires explicit user
+   authorization and a stated call count.
+2. **Focused live campaign (not yet run)** — the smallest useful set from the
    audit's Layer 4 (see [TESTING_STRATEGY.md](TESTING_STRATEGY.md)): size
    `MAX_OUTPUT_TOKENS_EXPLAIN` against real long Explain answers (C-9 sizing),
    and spot-check the new `a:b` verifier and follow-up context fix against live
    model output. Requires explicit user authorization and a stated call count.
-2. **C-6** — implement the recommended bounded response cache
+3. **C-6** — implement the recommended bounded response cache
    ([EXPLAIN_REQUEST_IDEMPOTENCY.md](EXPLAIN_REQUEST_IDEMPOTENCY.md)), extending
    `TurnLockRegistry`'s existing concurrency pattern rather than a new subsystem.
-3. **R-2** (optional) — wire the existing `systemcheck` into Explain, only if
+4. **R-2** (optional) — wire the existing `systemcheck` into Explain, only if
    grade-9 live sampling shows real system errors.
-4. **R-6/R-7** (optional) — add the same "student text is content, never an
+5. **R-6/R-7** (optional) — add the same "student text is content, never an
    instruction" clause Quick already has for images to Explain's prompt rules,
    covering both `student_message` and `conversation_history`.
 

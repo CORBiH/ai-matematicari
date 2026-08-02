@@ -10,7 +10,7 @@ svoje stanje — isti mehanizam kao practice).
 import logging
 import uuid
 
-from matbot import config, geometry_rules, geometrycheck, prompts
+from matbot import config, geometry_rules, geometrycheck, lesson_relevance, prompts
 from matbot.llm import LLMError, failure_diagnostics_kv
 from matbot.mathcheck import find_numeric_inconsistencies
 from matbot.mathsafe import normalize_result_math_transport, sanitize_and_validate_math_text
@@ -78,8 +78,17 @@ def run_explain_turn(llm, turn):
     lesson_title = lesson["title"] if lesson else ""
     oblast = lesson["oblast"] if lesson else (turn["selected_oblast"] or "")
 
+    # Živi nalaz D35-3: izabrana lekcija je ranije BEZUSLOVNO ulazila u prompt
+    # kao tema koju treba predati, pa je pitanje o uglovima trougla dobilo uvod
+    # iz lekcije o razlomcima. Odluka je determinističa i bez AI poziva; kad se
+    # ne može dokazati da je poruka iz druge teme, ostaje ranije ponašanje.
+    lesson_context_strong = lesson_relevance.lesson_context_is_strong(
+        turn["student_message"], lesson_title, oblast
+    )
+
     instructions = prompts.build_explain_instructions(
-        turn["grade"], lesson_title=lesson_title, oblast=oblast
+        turn["grade"], lesson_title=lesson_title, oblast=oblast,
+        lesson_context_strong=lesson_context_strong,
     )
     input_text = prompts.build_explain_input(
         lesson_title=lesson_title,
@@ -88,6 +97,7 @@ def run_explain_turn(llm, turn):
         student_message=turn["student_message"],
         interaction_phase=turn["interaction_phase"],
         last_tutor_message=turn.get("last_tutor_message", ""),
+        lesson_context_strong=lesson_context_strong,
     )
 
     try:

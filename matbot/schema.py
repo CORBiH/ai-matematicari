@@ -86,6 +86,86 @@ class QuickTurnOutput(BaseModel):
     reply: str
 
 
+# Granice INTERNIH polja slike (nikad vidljivih učeniku). Namjerno male: ova
+# polja služe serverskoj provjeri, ne prepisivanju cijelog zadatka.
+MAX_VISIBLE_PROBLEM_TEXT_CHARS = 300
+MAX_VISIBLE_MATH_CHARS = 120
+MAX_UNCERTAINTY_REASON_CHARS = 200
+MAX_VISIBLE_VALUE_FIELD_CHARS = 24
+MAX_VISIBLE_VALUES = 8
+
+
+class VisibleValue(BaseModel):
+    """JEDAN podatak koji je STVARNO vidljiv na slici."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    symbol: str   # npr. "a", "b", "x"
+    value: str    # npr. "8" — string da bi zapis ostao onakav kakav je na slici
+    unit: str     # npr. "cm"; prazno kad jedinice nema
+
+
+class QuickImageTurnOutput(BaseModel):
+    """Quick mod KAD JE PRILOŽENA SLIKA — jedina šema s internim poljima.
+
+    ZAŠTO POSTOJI (živi nalaz D35-5/D35-6, pozivi 33 i 35 kampanje od 35):
+    tekstualna šema je bila samo `{reply}`, pa je slika bila potpuno neprovjerljiva
+    crna kutija. Za pravougaonik s $a=8$ cm i $b=5$ cm model je vratio
+    „$P=26\\,\\text{cm}$“ (obim, s linearnom jedinicom, na zahtjev za površinu), a
+    za jednačinu s namjerno prekrivenom desnom stranom „$x=5$“ — pogodio je broj
+    koji na slici uopšte nije bio vidljiv. Nijedna postojeća provjera to nije
+    mogla uhvatiti: mathcheck.py provjerava lanac jednakosti (ovdje ga nema),
+    geometrycheck.py provjerava OZNAKE (a `P` je bila ispravna oznaka, samo s
+    pogrešnom vrijednošću), a istina sa slike nigdje ne postoji u tekstu.
+
+    Sada model MORA prijaviti šta je vidio prije nego što odgovori: čitljivost,
+    tip zadatka, vidljive vrijednosti i sopstvenu sigurnost. Server na osnovu
+    toga (matbot/quick.py + matbot/imagecheck.py) ili nezavisno provjeri račun
+    ili odbije odgovor. Deklaracija sama po sebi NIJE dokaz — zato se, gdje god
+    je moguće, nad prijavljenim vrijednostima radi nezavisan račun.
+
+    SVA polja osim `reply` su INTERNA: nikad ne idu u browser, u historiju
+    razgovora, u localStorage ni u log s punim sadržajem (vidi quick.py).
+    Tekstualni (bez slike) Quick put i dalje koristi QuickTurnOutput, bajt za
+    bajt kao ranije.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    reply: str
+    readability: Literal[
+        "clear", "partially_unreadable", "unreadable", "multiple_tasks", "non_math",
+    ]
+    all_required_symbols_visible: bool
+    task_type: Literal[
+        "arithmetic", "linear_equation", "fraction_expression",
+        "rectangle_area", "rectangle_perimeter",
+        "square_area", "square_perimeter", "other",
+    ]
+    # SAMO matematički izraz/jednačina koja je STVARNO vidljiva na slici —
+    # nikad naslov („Riješi“, „Izračunaj“, „Zadatak“, „Odredi“), nikad rezultat
+    # koji model predlaže, nikad pretpostavljena vrijednost. Prazno kad se izraz
+    # ne može pročitati TAČNO.
+    #
+    # ZAŠTO POSTOJI ODVOJENO OD visible_problem_text (živi nalaz D35T-2, pozivi
+    # 12 i 13 kampanje od 14): model je u visible_problem_text stavljao naslov
+    # zadatka („Rijesi jednacinu:“), pa deterministički provjeravači za izraz i
+    # jednačinu nisu imali šta parsirati i TIHO su preskakali. Prazna lista
+    # problema je tada značila i „provjereno“ i „preskočeno“, a pozivalac je to
+    # čitao kao „provjereno“ — pogrešan rezultat je mogao biti objavljen.
+    visible_math: str
+    # Slobodan opis zadatka. Koristi se SAMO za nepodržane/opšte slike i NIKAD
+    # kao deterministički dokaz za podržane porodice.
+    visible_problem_text: str
+    requested_quantity: Literal[
+        "area", "perimeter", "value_of_unknown", "numeric_result", "other",
+    ]
+    visible_values: list[VisibleValue]
+    unit: str
+    answer_confidence: Literal["high", "medium", "low"]
+    uncertainty_reason: str
+
+
 class InvalidOutputError(ValueError):
     """AI odgovor je strukturno validan JSON, ali sadržajno neupotrebljiv."""
 
@@ -169,9 +249,32 @@ def validate_explain_output(out: ExplainTurnOutput) -> None:
         raise InvalidOutputError("predug reply")
 
 
-def validate_quick_output(out: QuickTurnOutput) -> None:
-    """Server-side provjere Quick outputa povrh strict šeme."""
+def validate_quick_output(out) -> None:
+    """Server-side provjere Quick outputa povrh strict šeme.
+
+    Prima OBJE Quick šeme (tekstualnu i sliku) — zajedničko je samo `reply`;
+    interna polja slike provjerava validate_quick_image_output."""
     if not (out.reply or "").strip():
         raise InvalidOutputError("prazan reply")
     if len(out.reply) > config.MAX_QUICK_REPLY_CHARS:
         raise InvalidOutputError("predug reply")
+
+
+def validate_quick_image_output(out: QuickImageTurnOutput) -> None:
+    """Ograničenja INTERNIH polja slike. Ona nikad ne stižu do učenika, ali
+    ulaze u serversku logiku i log, pa moraju biti kratka i brojčano ograničena
+    (bez transkripcije cijele strane udžbenika)."""
+    validate_quick_output(out)
+    if len(out.visible_problem_text) > MAX_VISIBLE_PROBLEM_TEXT_CHARS:
+        raise InvalidOutputError("predug visible_problem_text")
+    if len(out.visible_math) > MAX_VISIBLE_MATH_CHARS:
+        raise InvalidOutputError("predug visible_math")
+    if len(out.uncertainty_reason) > MAX_UNCERTAINTY_REASON_CHARS:
+        raise InvalidOutputError("predug uncertainty_reason")
+    if len(out.unit) > MAX_VISIBLE_VALUE_FIELD_CHARS:
+        raise InvalidOutputError("preduga unit")
+    if len(out.visible_values) > MAX_VISIBLE_VALUES:
+        raise InvalidOutputError("previše visible_values")
+    for item in out.visible_values:
+        if max(len(item.symbol), len(item.value), len(item.unit)) > MAX_VISIBLE_VALUE_FIELD_CHARS:
+            raise InvalidOutputError("predugo polje u visible_values")

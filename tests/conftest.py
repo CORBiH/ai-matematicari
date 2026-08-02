@@ -15,7 +15,15 @@ os.environ.setdefault("FLASK_SECRET_KEY", "test-only-insecure-secret-DO-NOT-USE-
 from matbot import auth  # noqa: E402
 from matbot.llm import LLMResult, LLMTimeout, LLMUnavailable  # noqa: E402
 from matbot.ratelimit import RateLimiter  # noqa: E402
-from matbot.schema import ExplainTurnOutput, NewTask, Option, PracticeTurnOutput, QuickTurnOutput  # noqa: E402
+from matbot.schema import (  # noqa: E402
+    ExplainTurnOutput,
+    NewTask,
+    Option,
+    PracticeTurnOutput,
+    QuickImageTurnOutput,
+    QuickTurnOutput,
+    VisibleValue,
+)
 from matbot.session_store import SessionStore  # noqa: E402
 from matbot.turnlock import TurnLockRegistry  # noqa: E402
 
@@ -32,6 +40,42 @@ def make_explain_output(reply="Evo objašnjenja."):
 
 def make_quick_output(reply="Rezultat je $x=5$."):
     return QuickTurnOutput(reply=reply)
+
+
+def make_visible_values(*triples):
+    """(simbol, vrijednost, jedinica) → lista VisibleValue."""
+    return [VisibleValue(symbol=s, value=v, unit=u) for s, v, u in triples]
+
+
+def make_quick_image_output(
+    reply="Rezultat je $x=5$.",
+    readability="clear",
+    all_required_symbols_visible=True,
+    task_type="other",
+    visible_math="",
+    visible_problem_text="",
+    requested_quantity="numeric_result",
+    visible_values=None,
+    unit="",
+    answer_confidence="high",
+    uncertainty_reason="",
+):
+    """Default je „jasna slika, model siguran“ — tj. stanje u kojem odgovor
+    PROLAZI kapiju iz matbot/quick.py, pa postojeći testovi plumbinga slike
+    provjeravaju isto ponašanje kao ranije."""
+    return QuickImageTurnOutput(
+        reply=reply,
+        readability=readability,
+        all_required_symbols_visible=all_required_symbols_visible,
+        task_type=task_type,
+        visible_math=visible_math,
+        visible_problem_text=visible_problem_text,
+        requested_quantity=requested_quantity,
+        visible_values=visible_values or [],
+        unit=unit,
+        answer_confidence=answer_confidence,
+        uncertainty_reason=uncertainty_reason,
+    )
 
 
 def make_options(*texts):
