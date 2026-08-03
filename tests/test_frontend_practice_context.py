@@ -79,3 +79,38 @@ def test_explain_and_result_do_not_acquire_practice_task_state():
     fingerprint = _region(html, "function trackedTaskFingerprint", "function payloadPracticeFingerprint")
     assert "return '';" in fingerprint
 
+
+
+def test_frontend_abort_budget_exceeds_the_two_call_server_worst_case():
+    """DEPLOYMENT GUARD (dvopozivni put).
+
+    Practice radi DVA sekvencijalna modela poziva. Ako frontend prekine prije
+    nego što server stigne završiti oba, turn koji bi uspio biva odbačen — a
+    oba poziva su već plaćena. Zato granica prekida mora nadmašiti
+    2 × AI_TUTOR_TIMEOUT + serverska obrada, i ostati ISPOD GUNICORN_TIMEOUT
+    (inače gunicorn presijeca prvi).
+
+    Ranije je ovdje bilo 60s, iz vremena jednog poziva: izmjereno na 96 živih
+    poziva dvopozivni p95 je ≈60s, dakle tačno na staroj granici."""
+    import re
+
+    html = _html()
+    match = re.search(r"const TUTOR_ABORT_MS\s*=\s*(\d+);", html)
+    assert match, "TUTOR_ABORT_MS mora biti definisan na jednom mjestu"
+    abort_ms = int(match.group(1))
+
+    per_call_s = 45          # AI_TUTOR_TIMEOUT u produkciji (.env.example)
+    server_overhead_s = 5
+    gunicorn_s = 120         # GUNICORN_TIMEOUT u produkciji
+
+    worst_case_ms = (2 * per_call_s + server_overhead_s) * 1000
+    assert abort_ms >= worst_case_ms, (
+        f"granica prekida {abort_ms}ms ne pokriva dvopozivni najgori slučaj "
+        f"{worst_case_ms}ms"
+    )
+    assert abort_ms < gunicorn_s * 1000, (
+        "granica prekida ne smije preći GUNICORN_TIMEOUT"
+    )
+    # Svi prekidači koriste ISTU konstantu (nijedan zaostali literal).
+    assert "}, 60000);" not in html
+    assert html.count("TUTOR_ABORT_MS") >= 4

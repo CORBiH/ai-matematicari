@@ -471,6 +471,25 @@
   </div>
 
 <script>
+/* --- GRANICA ČEKANJA ZA TUTOR ZAHTJEV -------------------------------------
+   Practice od univerzalnog puta radi DVA SEKVENCIJALNA modela poziva
+   (Tutor pa Reviewer). Zato ova granica MORA nadmašiti serverski najgori
+   slučaj, inače frontend prekine turn koji bi uspio — a oba poziva su već
+   plaćena i učenik ipak vidi grešku.
+
+   Aritmetika (produkcija):
+     AI_TUTOR_TIMEOUT = 45s po pozivu  →  2 × 45s = 90s
+     + serverska obrada/mreža          →  ~5s
+     ------------------------------------------------
+     najgori slučaj                    ≈  95s   →  granica 100s
+     GUNICORN_TIMEOUT = 120s           →  i dalje iznad svega gore
+
+   Ranije je ovdje bilo 60s, iz vremena JEDNOG poziva. Sa dva poziva to je
+   presijecalo rep raspodjele: izmjereno na 96 živih poziva, p90 jednog poziva
+   je 27,9s, pa je dvopozivni p90 ≈ 56s, a p95 ≈ 60s — tačno na staroj granici.
+   Ne povećavati preko GUNICORN_TIMEOUT: tada bi gunicorn presjekao prvi. */
+const TUTOR_ABORT_MS = 100000;
+
 /* --- TIPKANJE: rotirajuće faze --- */
 let phaseTimer=null;
 function showTyping(){
@@ -1671,7 +1690,7 @@ document.addEventListener('DOMContentLoaded', () => {
         conversation_history: tutorHistory()
       };
       const ac = new AbortController();
-      const abortTimer = setTimeout(()=>{ try { ac.abort(); } catch(_){} }, 60000);
+      const abortTimer = setTimeout(()=>{ try { ac.abort(); } catch(_){} }, TUTOR_ABORT_MS);
       try{
         const j = await jsonTutorRequest(payload, ac, null);
         if (j && j.status === 'ready'){
@@ -1981,10 +2000,11 @@ document.addEventListener('DOMContentLoaded', () => {
       showTutorTyping();
       setTutorBusy(true);
 
-      /* Phase 1 (audit): frontend prekida zahtjev nakon 60s — učenik ne smije
-         zauvijek gledati "Tutor razmišlja..." (backend tutor timeout je 45s). */
+      /* Frontend prekida zahtjev nakon TUTOR_ABORT_MS — učenik ne smije
+         zauvijek gledati "Tutor razmišlja...". Vrijednost MORA nadmašiti
+         serverski najgori slučaj; vidi definiciju TUTOR_ABORT_MS. */
       const ac = new AbortController();
-      const abortTimer = setTimeout(()=>{ try { ac.abort(); } catch(_){} }, 60000);
+      const abortTimer = setTimeout(()=>{ try { ac.abort(); } catch(_){} }, TUTOR_ABORT_MS);
       try{
         let result = null;   // {j, rendered:true} | {errorShown:true} | null
         /* TRANSPORT ZA SLIKU: TAČNO JEDAN put — multipart POST na /chat.
@@ -2040,7 +2060,7 @@ document.addEventListener('DOMContentLoaded', () => {
       showTutorTyping();
       setTutorBusy(true);
       const ac = new AbortController();
-      const abortTimer = setTimeout(()=>{ try { ac.abort(); } catch(_){} }, 60000);
+      const abortTimer = setTimeout(()=>{ try { ac.abort(); } catch(_){} }, TUTOR_ABORT_MS);
       try{
         let result = null;
         try {

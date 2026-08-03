@@ -498,6 +498,46 @@ def test_reviewer_timeout_costs_two_calls_and_never_a_third():
     assert store.peek("uni-6-04-009") is None
 
 
+def test_successful_turn_records_exactly_two_distinguishable_sdk_entries(caplog):
+    """Računovodstvo troška: iz loga se mora moći prebrojati TAČNO dva poziva i
+    razlikovati koji je Tutor (call=1), a koji Reviewer (call=2)."""
+    store, fake = SessionStore(), FakeLLM()
+    queue_two_call(fake)
+    with caplog.at_level("INFO", logger="matbot.tutor"):
+        run_practice_turn(store, fake, turn_for("6-04-009", 6))
+
+    entries = [r.getMessage() for r in caplog.records if "tutor_sdk_call" in r.getMessage()]
+    assert len(entries) == 2, entries
+    assert "stage=tutor call=1" in entries[0]
+    assert "stage=reviewer call=2" in entries[1]
+    for entry in entries:
+        assert "latency_ms=" in entry and "usage=" in entry
+        # Nikad sadržaj — samo mjerni podaci.
+        assert "Izračunaj" not in entry
+
+
+def test_tutor_failure_records_one_or_zero_sdk_entries(caplog):
+    store, fake = SessionStore(), FakeLLM()
+    fake.queue(LLMTimeout("APITimeoutError"))
+    with caplog.at_level("INFO", logger="matbot.tutor"):
+        run_practice_turn(store, fake, turn_for("6-04-009", 6))
+    entries = [r.getMessage() for r in caplog.records if "tutor_sdk_call" in r.getMessage()]
+    assert entries == []          # poziv nije uspio → nema SDK zapisa
+    assert fake.call_count == 1
+
+    caplog.clear()
+    store2, fake2 = SessionStore(), FakeLLM()
+    fake2.queue(make_tutor_draft())
+    fake2.queue(LLMTimeout("APITimeoutError"))
+    with caplog.at_level("INFO", logger="matbot.tutor"):
+        response = run_practice_turn(store2, fake2, turn_for(
+            "6-04-009", 6, session_id="rev-timeout"))
+    entries = [r.getMessage() for r in caplog.records if "tutor_sdk_call" in r.getMessage()]
+    assert len(entries) == 1 and "stage=tutor" in entries[0]
+    assert response["answer"] == SAFE
+    assert store2.peek("rev-timeout") is None      # Reviewer timeout ne commituje
+
+
 def test_blocked_before_the_model_costs_zero_calls():
     store, fake = SessionStore(), FakeLLM()
     # nepostojeća lekcija

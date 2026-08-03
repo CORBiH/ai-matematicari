@@ -409,6 +409,20 @@ def _publish_task(session, context, final, request_id):
     return task_text
 
 
+def _log_sdk_entry(request_id, context, stage, call_index, result):
+    """JEDAN strukturisan red PO MODELSKOM POZIVU.
+
+    Postoji zbog računovodstva dvopozivnog puta: uspješan turn mora ostaviti
+    TAČNO DVA ovakva reda (stage=tutor call=1, stage=reviewer call=2), pa se
+    broj poziva i trošak mogu prebrojati iz loga bez pogađanja. Loguje se samo
+    latencija i usage — nikad prompt, izlaz modela ni ijedan sadržaj."""
+    logger.info(
+        "tutor_sdk_call request_id=%s topic=%s stage=%s call=%s latency_ms=%s usage=%s",
+        request_id, context.topic_id, stage, call_index,
+        getattr(result, "latency_ms", None), getattr(result, "usage", None),
+    )
+
+
 def _two_call(llm, context, session, student_message, request_id, trusted_verdict):
     """Tutor → Reviewer. Vraća (final_draft | None, broj_poziva).
 
@@ -420,9 +434,10 @@ def _two_call(llm, context, session, student_message, request_id, trusted_verdic
             llm, context, session, student_message, trusted_verdict
         )
         calls += 1
+        _log_sdk_entry(request_id, context, "tutor", calls, tutor_result)
     except LLMError as error:
         logger.warning(
-            "tutor_call request_id=%s topic=%s %s",
+            "tutor_call request_id=%s topic=%s stage=tutor call=1 %s",
             request_id, context.topic_id, failure_diagnostics_kv(error),
         )
         return None, calls
@@ -442,9 +457,10 @@ def _two_call(llm, context, session, student_message, request_id, trusted_verdic
             llm, context, session, student_message, draft, trusted_verdict
         )
         calls += 1
+        _log_sdk_entry(request_id, context, "reviewer", calls, reviewer_result)
     except LLMError as error:
         logger.warning(
-            "reviewer_call request_id=%s topic=%s %s",
+            "reviewer_call request_id=%s topic=%s stage=reviewer call=2 %s",
             request_id, context.topic_id, failure_diagnostics_kv(error),
         )
         return None, calls
