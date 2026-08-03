@@ -188,6 +188,9 @@ def test_forbidden_term_appears_only_as_an_explicit_prohibition():
         Path("matbot/lesson_relevance.py"),
         Path("tests/test_terminology.py"),
         Path("tests/test_rules.py"),       # provjerava DA su termini deklarisani zabranjeni u promptu
+        # Univerzalni put: hrvatski oblik je ULAZ testa (nacrt modela) kojim se
+        # dokazuje da normalizacija radi i na novom, dvopozivnom putu.
+        Path("tests/test_universal_tutor_pipeline.py"),
         Path("tests/test_lesson_relevance.py"),  # ulazne poruke učenika s hrvatskim oblikom
         Path("CLAUDE.md"),                 # dokumentuje ispravan/zabranjen par termina
         Path("docs/CURRENT_STATE.md"),     # dokumentuje C-8 (koji termini NISU pokriveni)

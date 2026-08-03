@@ -38,6 +38,7 @@ from matbot.schema import (
     QuickImageTurnOutput,
     QuickTurnOutput,
 )
+from matbot.tutor.schema import ReviewerFinal, TutorDraft
 
 # Maksimalna dužina bilo koje pojedinačne dijagnostičke vrijednosti u logu.
 _DIAG_FIELD_LIMIT = 200
@@ -220,6 +221,29 @@ class OpenAIPracticeLLM:
             max_output_tokens=config.MAX_OUTPUT_TOKENS_PRACTICE,
         )
 
+    def tutor_turn(self, instructions: str, input_text: str) -> LLMResult:
+        """PRVI od dva poziva univerzalnog Practice puta (nacrt).
+
+        Model, reasoning effort, `store=False` i `max_retries=0` su identični
+        ostalim putevima — razlikuje se samo strukturna šema."""
+        return self._structured_turn(
+            instructions, input_text, TutorDraft,
+            max_output_tokens=config.MAX_OUTPUT_TOKENS_PRACTICE,
+            model=config.TUTOR_MODEL,
+        )
+
+    def reviewer_turn(self, instructions: str, input_text: str) -> LLMResult:
+        """DRUGI (i posljednji) poziv: nezavisna provjera + konačan payload.
+
+        `config.REVIEWER_MODEL` je zaseban podesiv izbor da bi se recenzent
+        kasnije mogao spustiti na jeftiniji model BEZ ijedne izmjene Practice
+        logike. Podrazumijevano je isti model kao Tutor."""
+        return self._structured_turn(
+            instructions, input_text, ReviewerFinal,
+            max_output_tokens=config.MAX_OUTPUT_TOKENS_PRACTICE,
+            model=config.REVIEWER_MODEL,
+        )
+
     def explain_turn(self, instructions: str, input_text: str) -> LLMResult:
         # Explain dozvoljava odgovor do 3.3x duži od Quick-a (vidi
         # config.MAX_OUTPUT_TOKENS_EXPLAIN, živi nalaz C-9) — zato NE dijeli
@@ -262,14 +286,17 @@ class OpenAIPracticeLLM:
         }]
 
     def _structured_turn(self, instructions: str, input_text: str, text_format,
-                          max_output_tokens=None, image=None) -> LLMResult:
+                          max_output_tokens=None, image=None, model=None) -> LLMResult:
         import openai
         import pydantic
 
         budget = max_output_tokens or self.max_output_tokens
+        # `model` je per-poziv izbor (Tutor vs Reviewer). Kad izostane, važi
+        # model adaptera — svi zatečeni putevi se time ne mijenjaju.
+        active_model = model or self.model
         client = self._get_client()
         diag = {
-            "model": self.model,
+            "model": active_model,
             "reasoning_effort": self.reasoning_effort,
             "max_output_tokens": budget,
             "instructions_chars": len(instructions or ""),
@@ -288,7 +315,7 @@ class OpenAIPracticeLLM:
         t0 = time.monotonic()
         try:
             resp = client.responses.parse(
-                model=self.model,
+                model=active_model,
                 instructions=instructions,
                 input=self._build_input(input_text, image),
                 text_format=text_format,

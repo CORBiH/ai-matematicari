@@ -25,6 +25,7 @@ Pravila primjene (server, ne model):
 """
 import copy
 import logging
+import os
 import random
 import uuid
 
@@ -33,6 +34,7 @@ from matbot import (config, feedback, geometry_rules, geometrycheck,
 from matbot.contracts import archetypes as contract_archetypes
 from matbot.contracts import pipeline as contract_pipeline
 from matbot.contracts import registry as contract_registry
+from matbot.tutor import pipeline as tutor_pipeline
 from matbot.llm import LLMError, failure_diagnostics_kv
 from matbot.mathsafe import sanitize_and_validate_math_text
 from matbot.mathcheck import find_numeric_inconsistencies
@@ -588,7 +590,32 @@ def run_practice_turn(store, llm, turn):
     """turn: očišćeni dict iz api.py (session_id, grade, selected_topic,
     selected_oblast, student_message, intent, difficulty_request,
     interaction_phase, last_tutor_task, interaction_type, selected_option_id,
-    client_turn_id). Vraća JSON-spreman dict."""
+    client_turn_id). Vraća JSON-spreman dict.
+
+    JEDAN AKTIVAN PUT ZA SVIH 534 LEKCIJE: univerzalni dvopozivni Tutor+Reviewer
+    (matbot/tutor/pipeline.py). Ranija podjela na „6 lekcija kroz motor ugovora“
+    i „528 lekcija kroz legacy porodice“ VIŠE NE POSTOJI kao izvršna grana —
+    oba izvora metapodataka sada ulaze u isti prompt kao kontekst lekcije.
+
+    `MATBOT_PRACTICE_PIPELINE=legacy_single_call` vraća zatečeni jednopozivni
+    put (deterministički K1/K3 motor + legacy porodice). Postoji ISKLJUČIVO kao
+    rollback i za poređenje; nije podrazumijevan i mora nestati kad univerzalni
+    put bude potvrđen uživo."""
+    if not _universal_pipeline_enabled():
+        return _run_legacy_single_call_turn(store, llm, turn)
+    return tutor_pipeline.run_turn(store, llm, turn)
+
+
+def _universal_pipeline_enabled():
+    value = (os.environ.get("MATBOT_PRACTICE_PIPELINE", "universal") or "universal")
+    return value.strip().lower() != "legacy_single_call"
+
+
+def _run_legacy_single_call_turn(store, llm, turn):
+    """ZAMRZNUT zatečeni jednopozivni put (rollback).
+
+    Ne razvija se dalje. Deterministički K1/K3 generator koji ovaj put koristi
+    ostaje netaknut i pokriven testovima — vidi matbot/contracts/generator.py."""
     request_id = uuid.uuid4().hex[:12]
 
     lesson = lesson_info(turn["grade"], turn["selected_topic"])

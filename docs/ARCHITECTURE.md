@@ -52,26 +52,43 @@ Endpoints: `POST /chat`, `POST /chat/stream`, `POST /feedback` are guarded.
 
 ---
 
-## The one-call invariant
+## The two-call Practice boundary
 
-**Exactly one model call per application turn.** Enforced by construction, not by
-convention:
+**Explain and Quick: exactly one model call per turn. Practice: at most exactly
+two** (Tutor draft → independent Reviewer that finalizes). The Reviewer is a
+verification stage, not a retry: its payload **is** the published answer, and
+there is never a third call.
+
+Call accounting for a Practice turn:
+
+| Outcome | Calls |
+|---|---|
+| blocked before the model (unknown lesson, invalid/stale click, completed task) | **0** |
+| Tutor timeout / transport failure | **1** |
+| Tutor draft violates the per-intent field rule (nothing to review) | **1** |
+| approve, correct, fail_closed, or any server-side rejection afterwards | **2** |
+
+Enforced by construction, not by convention:
 
 - `matbot/llm.py` is the only module that imports `openai`.
 - The client is built with `OpenAI(max_retries=0, ...)` — the SDK never makes a
   hidden second attempt.
 - `store=False` on every call — OpenAI keeps no server-side copy; we resend the
   full prompt each turn instead of using `previous_response_id`.
-- No orchestrator ever calls the model twice. Every rejection path (schema,
-  math-safety, numeric, geometry, family, lesson contract, image gate, image check) returns the
-  canned `SAFE_ERROR_MESSAGE` or a short server-owned message **without a repair
-  call**. Image turns in particular use **no OCR call and no second model call** —
-  an unreadable image is reported, never re-read.
+- No orchestrator ever exceeds its budget. Every rejection path (schema,
+  math-safety, numeric, geometry, option uniqueness, reviewer fail-closed, image
+  gate, image check) returns the canned `SAFE_ERROR_MESSAGE` or a short
+  server-owned message **without a repair call**. Image turns in particular use
+  **no OCR call and no second model call** — an unreadable image is reported,
+  never re-read.
 - The two deterministic server-owned answers added in the D35 pass (the clock-time
   fallback and the image-unreadable message) are composed **after** the single call
   from data the server already has; neither triggers another call.
-- The per-session turn lock blocks a parallel second call for the same session.
-- `FakeLLM.call_count` in tests asserts `== 1` for each mode's happy and unhappy paths.
+- The per-session turn lock blocks a parallel call for the same session.
+- `FakeLLM.call_count` in tests asserts the exact budget for each mode's happy
+  and unhappy paths (`== 1` for Explain/Quick, `<= 2` for Practice), and
+  `tests/test_universal_tutor_pipeline.py::test_no_turn_ever_makes_a_third_call`
+  sweeps every Practice outcome.
 
 **Known exception:** the SSE→JSON fallback in the frontend can produce a *second*
 call for one user turn when `/chat/stream` fails **after** the model call (5xx or a
@@ -107,42 +124,42 @@ The prompt never contains: all 500+ lessons, the raw payload, session ids, or
 ### Practice (`matbot/practice.py`)
 
 ```
-payload → guard chain → lesson_info() → SessionStore.load(session_id+lesson)
-        → contracts.registry: "engine" | "legacy" | "unavailable"
-          ("unavailable" returns a clear message with NO model call)
-        → ENGINE:  contracts.pipeline.build_plan — student's explicit shape
-                   request (closed intent table) else rotation
-                   → contracts.generator BUILDS the task from the contract
-                     (operands, truth, distractors, marked index)
-                   → self-verify (constraints + difficulty + verifiers)
-                   → server renders ALL visible math   (never falls back;
-                     a failure here costs ZERO model calls)
-          LEGACY:  server picks a family (task_families.py)
-        → build_instructions + build_input (active task, internal expected
-          answer, hint level, recent tasks/turns, + the ALREADY BUILT task
-          for the engine, or the family block for legacy)
-        → ONE model call → PracticeTurnOutput (reply, evaluation, gave_hint,
-          new_task{text, expected_answer, options[4], correct_option_index})
-        → ENGINE:  the model's new_task CONTENT IS DISCARDED — it is only the
-                   "issue a new task now" signal; the server publishes its own
-                   skeleton. Model prose passes verify_prose_fidelity.
-          LEGACY:  validate_output → family cross-check
-                   (task_family_validation.py) → systemcheck (linear systems)
-        → mathsafe per field → option uniqueness (option_equivalence.py)
-          → mathcheck → geometrycheck   (both paths, identical rules)
-        → server shuffles options, commits session → next_state to browser
+payload → guard chain → tutor.lesson_context.build(grade, topic)   ← all 534
+          (None ⇒ untrusted curriculum context: safe message, ZERO calls)
+        → SessionStore.load(session_id+lesson)      [copy-on-write]
+        → click? server decides correctness DETERMINISTICALLY first
+          (idempotent retry / completed task / invalid id ⇒ ZERO calls)
+        → CALL 1 — Tutor draft (TutorDraft): picks one intent from a closed
+          enum, returns reply + only the fields that intent allows
+          → per-intent field rule (tutor.schema.validate_final)
+            violated ⇒ STOP at one call, nothing to review
+        → CALL 2 — Reviewer (ReviewerFinal): independently solves the task,
+          runs 10 checks, returns approve | correct | fail_closed.
+          A corrected payload IS the final answer — there is no third call.
+        → common server validation for every lesson: mathsafe → terminology
+          → mathcheck → geometrycheck → option uniqueness/equivalence
+        → server shuffles options, assigns ids, commits session (single
+          commit point) → next_state to browser
 ```
 
-The engine is data-driven: `data/contract_templates.json` +
-`data/lesson_contracts.json` describe the mathematics of a lesson, and
-`matbot/contracts/` contains no lesson name or topic ID. Phase 1 enables six
-grade-6 fraction lessons; the other 528 keep the unchanged legacy path.
+**One active pipeline for all 534 lessons.** `matbot/tutor/` contains no lesson
+name and no topic ID. What differs per lesson is *context*, not code path:
+`LessonContext` merges canonical identity (`data/topics.json`), the frozen
+528/528 family mapping (`task_families.py`) and — where one exists — the
+declarative contract row. A lesson without a contract is not a special case; it
+simply has fewer populated fields.
 
-**Generation direction (post-Live96): the server computes, the model writes.**
-The model no longer invents mathematics and no longer restates it in a
-structured "evidence" schema — that whole layer is gone. Correctness, lesson
-fidelity and the marked answer are true **by construction**. See
-[LESSON_CONTRACTS.md](LESSON_CONTRACTS.md).
+**Ownership.** The Tutor proposes and the Reviewer disposes; deterministic
+server checks then run on top of whatever the Reviewer returned and can still
+reject it. The server alone owns option shuffling, option ids, which option is
+correct in the browser, the deterministic verdict for a click, and session
+state.
+
+**Frozen rollback path.** `MATBOT_PRACTICE_PIPELINE=legacy_single_call` restores
+the previous single-call orchestration (deterministic K1/K3 generator + legacy
+families). It is not active, not the default, and must not become a second
+top-level branch. See [LESSON_CONTRACTS.md](LESSON_CONTRACTS.md) for the
+preserved deterministic engine.
 
 ```
 ```

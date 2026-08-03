@@ -358,8 +358,12 @@ def test_quick_llm_error_returns_safe_message_without_status(flask_app, fake_llm
 # REGRESIJA: Practice i Explain netaknuti (eksplicitni dokazi pored pune suite)
 # ---------------------------------------------------------------------------
 
-def test_practice_still_works_and_uses_one_call(flask_app, fake_llm):
-    fake_llm.queue(make_output(reply="Evo zadatka.", new_task=make_task()))
+def test_practice_still_works_and_uses_its_two_calls(flask_app, fake_llm):
+    """Practice od pivota koristi TAČNO DVA poziva; Quick ostaje jednopozivni
+    i njegov put se ne dodiruje."""
+    from tests.conftest import queue_two_call
+
+    queue_two_call(fake_llm)
     c = _authed(flask_app)
     payload = http_payload(
         mode="practice", msg="Daj mi jedan zadatak za vježbu iz ove teme.",
@@ -371,7 +375,7 @@ def test_practice_still_works_and_uses_one_call(flask_app, fake_llm):
     assert j["session_mode"] == "practice"
     assert j["last_tutor_task"]                       # Practice I DALJE prati zadatak
     assert j["next_state"].get("task", {}).get("question")
-    assert fake_llm.call_count == 1
+    assert fake_llm.call_count == 2
     assert len(fake_llm.quick_calls) == 0              # practice NIJE išao kroz quick put
 
 

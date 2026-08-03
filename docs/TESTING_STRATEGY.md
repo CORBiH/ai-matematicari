@@ -42,7 +42,18 @@ These prove **server behaviour only**:
   history, the specific rule text),
 - the response is parsed, sanitized and shaped into the frontend contract,
 - rejection paths return the canned safe message with no `status`/`next_state`,
-- `call_count == 1` on every path, happy and unhappy.
+- the exact call budget on every path, happy and unhappy: `== 1` for Explain and
+  Quick, `<= 2` for Practice (Tutor + Reviewer), `== 0` when the turn is blocked
+  before the model.
+
+**Which pipeline a Practice test exercises is explicit.** Practice has one
+active path (universal two-call). Test modules listed in
+`conftest._FROZEN_SINGLE_CALL_MODULES` are pinned to the frozen single-call path
+via an autouse fixture, because that is what they were written against — each
+encodes a live-found regression of that path. They prove nothing about the
+active path; active-path coverage lives in
+`tests/test_universal_tutor_pipeline.py`. When you add a Practice test, decide
+deliberately which of the two it belongs to.
 
 They **cannot** prove that the model obeys a rule. A test asserting "the answer
 stays under 140 words" against a `FakeLLM` asserts only that the fixture author

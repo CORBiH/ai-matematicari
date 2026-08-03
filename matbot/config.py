@@ -19,6 +19,13 @@ def _int_env(name, default):
 # Model i AI parametri (interaktivni Practice put)
 OPENAI_MODEL_TEXT = os.environ.get("OPENAI_MODEL_TEXT", "gpt-5-mini")
 REASONING_EFFORT = os.environ.get("MATBOT_REASONING_EFFORT", "low")
+
+# --- Univerzalni dvopozivni Practice put (Tutor + Reviewer) ----------------
+# Dva ODVOJENA izbora modela, oba podrazumijevano ista kao tekstualni model.
+# Postoje da bi se recenzent kasnije mogao spustiti na jeftiniji model BEZ
+# ijedne izmjene Practice logike — poslovna logika ne zna koji je model u igri.
+TUTOR_MODEL = os.environ.get("MATBOT_TUTOR_MODEL", OPENAI_MODEL_TEXT)
+REVIEWER_MODEL = os.environ.get("MATBOT_REVIEWER_MODEL", OPENAI_MODEL_TEXT)
 AI_TIMEOUT_S = _float_env("AI_TUTOR_TIMEOUT", 30.0)
 MAX_OUTPUT_TOKENS = _int_env("MATBOT_MAX_OUTPUT_TOKENS", 1200)
 

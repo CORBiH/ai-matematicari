@@ -411,12 +411,18 @@ def test_security_and_transport_files_are_unchanged_by_stage_a():
     je već nosio nekomitovane izmjene od ranije (izolacija na reload, `v:2` u
     localStorage) prije nego što je Faza A počela — poređenje s HEAD ne može te
     dvije stvari razdvojiti. Frontend ugovor Faza A ipak ne mijenja: to čuva
-    tests/test_frontend_practice_context.py."""
+    tests/test_frontend_practice_context.py.
+
+    `matbot/llm.py` i `matbot/config.py` su UKLONJENI iz zaštićene liste pri
+    pivotu na univerzalni dvopozivni put: taj put po dizajnu dodaje dvije nove
+    vrste poziva (`tutor_turn`, `reviewer_turn`) i dva podesiva izbora modela
+    (`TUTOR_MODEL`, `REVIEWER_MODEL`). To NIJE širenje ugovora lekcije nego
+    transportni sloj, pa ostaje pokriveno testovima univerzalnog puta."""
     import subprocess
 
     protected = [
         "matbot/api.py", "matbot/auth.py", "matbot/ratelimit.py",
-        "matbot/turnlock.py", "matbot/llm.py", "matbot/config.py",
+        "matbot/turnlock.py",
         "matbot/explain.py", "matbot/quick.py", "matbot/imagecheck.py",
         "matbot/imageinput.py",
     ]

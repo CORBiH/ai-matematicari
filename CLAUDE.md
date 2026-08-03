@@ -23,28 +23,38 @@ Flask + a single-page frontend, one OpenAI call per turn, no database.
    There is no staging environment.
 3. **Never read, write, print, or paste `.env` values, API keys, or secrets.**
    Refer to environment variables by *name* only.
-4. **One model call per application turn is an architectural invariant.**
-   No retries, no repair calls, no "second opinion" calls. If output is bad,
-   reject it and return the canned safe message. See
-   [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#the-one-call-invariant).
-5. **Practice difficulty never changes lesson identity.** Harder/easier requests
-   keep the lesson's primary shape and move only declared difficulty dimensions.
-   For a lesson with an **enabled contract** (`matbot/contracts/`, data in
-   `data/lesson_contracts.json`) the **server builds the task** from the
-   contract before the single call — operands, ground truth, distractors and the
-   marked index — and publishes only when its own deterministic self-check
-   reproduces the answer. The model's `new_task` content is **discarded** on
-   that path; it only signals "issue a new task". Anything unprovable fails
-   closed without a second generation call or state/progression mutation (and,
-   because the task is built *before* the call, such a rejection usually costs
-   zero model calls). An enabled contract **never** falls back to the legacy
-   family path — that would mask an engine defect. See
-   [docs/LESSON_CONTRACTS.md](docs/LESSON_CONTRACTS.md).
-5b. **On the contract path the server owns every visible number.** Question math,
-   all four options, the marked answer, units and MathJax are server-rendered.
-   The model may only write the surrounding Bosnian prose (reply/hint/feedback),
-   and `contracts.pipeline.verify_prose_fidelity` drops any prose carrying a
-   number that the task cannot explain.
+4. **Bounded model calls per application turn — the limit depends on the mode.**
+   - **Explain and Quick: exactly one call.** Unchanged.
+   - **Practice: at most exactly two** — Tutor draft, then an independent
+     Reviewer that finalizes. This replaced the former one-call rule in the
+     universal-pipeline pivot; the Reviewer is *not* a retry or a repair call,
+     it is a separate verification stage whose output **is** the published
+     answer.
+
+   In every mode: no retries, no repair loop, no third call, no SDK auto-retry,
+   no hidden replacement call. If output is bad, reject it and return the canned
+   safe message. A rejection never costs an extra call. See
+   [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#the-two-call-practice-boundary).
+5. **All 534 lessons use ONE active Practice pipeline** — the universal
+   two-call Tutor+Reviewer path (`matbot/tutor/`). There is no separate active
+   orchestration for "contracted" vs "legacy" lessons. Curriculum metadata and
+   the 528/528 family mapping are **lesson context fed into one prompt**, never
+   a second execution branch. No lesson-ID branching in `matbot/tutor/`.
+   See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+5b. **The Reviewer is the main semantic scope gate.** It independently solves
+   generated tasks before approving, and returns either the approved payload, a
+   corrected complete payload (which is final — no third call), or
+   `fail_closed`. Deterministic server checks still run on top of whatever the
+   Reviewer returns: math safety, terminology, numeric consistency, geometry
+   notation, and option uniqueness can reject a task the Reviewer approved.
+5c. **Practice difficulty never changes lesson identity.** Easier/harder keep
+   the lesson's skill and move only difficulty dimensions. The Tutor must report
+   which dimensions moved (`difficulty_diagnostics`) and the Reviewer verifies
+   the direction. Those diagnostics are **internal**: logged, never shown.
+5d. **The deterministic K1/K3 generator is preserved, not active.**
+   `matbot/contracts/generator.py` and its tests stay green and are reachable
+   through `MATBOT_PRACTICE_PIPELINE=legacy_single_call` (rollback only). Do not
+   expand it, and do not reintroduce it as a second active top-level branch.
 5a. **Adding a normal supported lesson must change data, not Python.** Do not add
    a per-lesson validator, a per-lesson family list, a topic-ID branch, or a
    lesson name inside `matbot/contracts/`. `tests/test_contract_architecture_gate.py`

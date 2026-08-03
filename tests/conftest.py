@@ -208,6 +208,107 @@ def make_task_for_family(family_id, difficulty="standard", suffix=""):
     )
 
 
+# --- UNIVERZALNI DVOPOZIVNI PUT (matbot/tutor/) -----------------------------
+# Pomoćne funkcije da testovi pišu Tutor nacrt i Reviewer odluku čitljivo.
+# Ne znaju nijednu lekciju — isti helperi opslužuju svih 534.
+
+DEFAULT_TUTOR_TASK_TEXT = "Izračunaj: $\\frac{2}{7} + \\frac{3}{7}$."
+DEFAULT_TUTOR_OPTIONS = ("$\\frac{5}{7}$", "$\\frac{5}{14}$", "$\\frac{6}{7}$", "$\\frac{1}{7}$")
+
+
+def make_task_payload(text=DEFAULT_TUTOR_TASK_TEXT, options=None,
+                      correct_option_index=0, expected="$\\frac{5}{7}$",
+                      difficulty="standard"):
+    from matbot.tutor.schema import TaskPayload, TutorOption
+
+    texts = options if options is not None else DEFAULT_TUTOR_OPTIONS
+    return TaskPayload(
+        text=text,
+        options=[TutorOption(text=t) for t in texts],
+        correct_option_index=correct_option_index,
+        expected_answer=expected,
+        difficulty=difficulty,
+    )
+
+
+def make_difficulty_diagnostics(direction="lower", rationale="Manji brojevi."):
+    """Sve dimenzije `same` osim veličine brojeva — najmanji validan pomak."""
+    from matbot.tutor.schema import DifficultyDiagnostics
+
+    return DifficultyDiagnostics(
+        number_magnitude=direction,
+        number_of_steps="same",
+        representation_complexity="same",
+        sign_complexity="same",
+        scaffolding="same",
+        distractor_closeness="same",
+        reasoning_depth="same",
+        rationale=rationale,
+    )
+
+
+def make_tutor_draft(intent="generate_task", reply="Evo zadatka.",
+                     lesson_focus="sabiranje razlomaka jednakih imenilaca",
+                     new_task=..., hint=None, worked_solution=None,
+                     grading=None, difficulty_diagnostics=None):
+    from matbot.tutor.schema import TutorDraft
+
+    from matbot.tutor.schema import TASK_INTENTS
+
+    if new_task is ...:
+        new_task = make_task_payload() if intent in TASK_INTENTS else None
+    return TutorDraft(
+        intent=intent, reply=reply, lesson_focus=lesson_focus,
+        new_task=new_task, hint=hint, worked_solution=worked_solution,
+        grading=grading, difficulty_diagnostics=difficulty_diagnostics,
+    )
+
+
+def make_reviewer_checks(independent_answer="$\\frac{5}{7}$", **overrides):
+    from matbot.tutor.schema import ReviewerChecks
+
+    values = {
+        "math_correct": True,
+        "marked_option_correct": True,
+        "inside_lesson": True,
+        "intent_handled": True,
+        "difficulty_direction_correct": True,
+        "response_addresses_student": True,
+        "task_solvable_and_unambiguous": True,
+        "mathjax_valid": True,
+        "language_age_appropriate": True,
+        "independently_solved": True,
+        "independent_answer": independent_answer,
+    }
+    values.update(overrides)
+    return ReviewerChecks(**values)
+
+
+def make_reviewer_final(decision="approve", final=..., checks=None,
+                        fail_reason_code=None, **draft_kwargs):
+    """Reviewer odluka. `final=...` znači „isti nacrt kakav bi Tutor dao“."""
+    from matbot.tutor.schema import ReviewerFinal
+
+    if final is ...:
+        final = None if decision == "fail_closed" else make_tutor_draft(**draft_kwargs)
+    return ReviewerFinal(
+        decision=decision,
+        checks=checks or make_reviewer_checks(),
+        fail_reason_code=fail_reason_code,
+        final=final,
+    )
+
+
+def queue_two_call(fake, draft=None, reviewer=None, **draft_kwargs):
+    """Pripremi TAČNO dva odgovora: Tutor nacrt pa Reviewer odluku."""
+    draft = draft if draft is not None else make_tutor_draft(**draft_kwargs)
+    if reviewer is None:
+        reviewer = make_reviewer_final(final=draft)
+    fake.queue(draft)
+    fake.queue(reviewer)
+    return draft, reviewer
+
+
 class FakeLLM:
     """Deterministički LLM za testove: redom vraća pripremljene odgovore ili
     baca pripremljene izuzetke; broji pozive i pamti promptove.
@@ -220,6 +321,8 @@ class FakeLLM:
         self.explain_calls = []   # samo explain pozivi (podskup calls)
         self.quick_calls = []     # samo quick pozivi (podskup calls)
         self.quick_images = []    # ValidatedImage | None po quick pozivu
+        self.tutor_calls = []     # samo Tutor pozivi (podskup calls)
+        self.reviewer_calls = []  # samo Reviewer pozivi (podskup calls)
 
     def queue(self, item):
         self.results.append(item)
@@ -240,6 +343,16 @@ class FakeLLM:
     def practice_turn(self, instructions, input_text):
         return self._next(instructions, input_text)
 
+    def tutor_turn(self, instructions, input_text):
+        """PRVI poziv univerzalnog Practice puta."""
+        self.tutor_calls.append((instructions, input_text))
+        return self._next(instructions, input_text)
+
+    def reviewer_turn(self, instructions, input_text):
+        """DRUGI (i posljednji) poziv univerzalnog Practice puta."""
+        self.reviewer_calls.append((instructions, input_text))
+        return self._next(instructions, input_text)
+
     def explain_turn(self, instructions, input_text):
         self.explain_calls.append((instructions, input_text))
         return self._next(instructions, input_text)
@@ -248,6 +361,65 @@ class FakeLLM:
         self.quick_calls.append((instructions, input_text))
         self.quick_images.append(image)
         return self._next(instructions, input_text)
+
+
+# ---------------------------------------------------------------------------
+# ZAMRZNUTI JEDNOPOZIVNI PUT — gdje žive zatečeni regresijski testovi
+# ---------------------------------------------------------------------------
+# Practice od pivota ima JEDAN AKTIVAN put: univerzalni dvopozivni Tutor+
+# Reviewer (matbot/tutor/). Moduli ispod su pisani protiv ZAMRZNUTOG
+# jednopozivnog puta i tamo i dalje pripadaju: svaki od njih nosi konkretan
+# živi nalaz (systemcheck, jedinstvenost opcija, geometrijska notacija,
+# porodični ugovori, kategorije grešaka LLM-a…) koji je taj put štitio.
+#
+# Zato se NE prepisuju u novu šemu: to bi izgubilo istorijski dokaz da je
+# ponašanje ikad bilo ispravno. Umjesto toga se izvršavaju s eksplicitno
+# uključenim zamrznutim putem.
+#
+# VAŽNO ZA ČITAOCA: ovi testovi NE dokazuju ništa o aktivnom univerzalnom putu.
+# Pokrivenost aktivnog puta živi u tests/test_universal_tutor_pipeline.py.
+_FROZEN_SINGLE_CALL_MODULES = frozenset({
+    "test_practice",
+    "test_practice_numeric_policy",
+    "test_choice_answer",
+    "test_practice_progression",
+    "test_empty_reply_valid_hint",
+    "test_option_uniqueness_case_sensitivity",
+    "test_option_equivalence_diagnostics",
+    "test_option_equivalence",
+    "test_practice_family_enforcement",
+    "test_llm_failure_categories",
+    "test_geometry_notation_enforcement",
+    "test_feedback",
+    "test_systemcheck",
+    "test_practice_task_intros",
+    "test_p1_narrow_verifiers",
+    "test_p1_common_syntax",
+    "test_contract_intent",
+    "test_contract_architecture_gate",
+    "test_practice_lesson_context",
+    "test_practice_lesson_semantic_contracts",
+    "test_legacy_routing_parity",
+    "test_mathcheck",
+    "test_terminology",
+    "test_student_must_find_trust",
+    "test_task_family_contracts",
+    "test_stray_brace_repair",
+    "test_mathjax_commands",
+})
+
+
+@pytest.fixture(autouse=True)
+def _practice_pipeline_selection(request, monkeypatch):
+    """Pripni put koji dati modul zaista testira.
+
+    Bez ovoga bi zatečeni regresijski testovi tiho gađali novi put i padali na
+    šemi, a ne na ponašanju koje provjeravaju."""
+    module = request.node.module.__name__.rsplit(".", 1)[-1]
+    if module in _FROZEN_SINGLE_CALL_MODULES:
+        monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", "legacy_single_call")
+    else:
+        monkeypatch.delenv("MATBOT_PRACTICE_PIPELINE", raising=False)
 
 
 @pytest.fixture
