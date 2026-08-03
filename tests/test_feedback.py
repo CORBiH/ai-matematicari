@@ -400,4 +400,4 @@ def test_first_wrong_makes_exactly_one_llm_call():
     sess = _start(store, fake)
     fake.queue(make_output(reply="x", hint="Hint."))
     _click(store, fake, _wrong_id(sess), "t1")
-    assert fake.call_count == 2  # 1 bootstrap + 1 klik
+    assert fake.practice_call_count == 2  # 1 bootstrap + 1 klik

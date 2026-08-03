@@ -358,9 +358,9 @@ def test_quick_llm_error_returns_safe_message_without_status(flask_app, fake_llm
 # REGRESIJA: Practice i Explain netaknuti (eksplicitni dokazi pored pune suite)
 # ---------------------------------------------------------------------------
 
-def test_practice_still_works_and_uses_one_call(flask_app, fake_llm):
-    """Practice koristi STABILAN jednopozivni put (podrazumijevano nakon
-    rollbacka); Quick ima svoj i ne dodiruje se."""
+def test_practice_still_works_and_is_not_routed_through_quick(flask_app, fake_llm):
+    """Practice koristi stabilan put: JEDAN tutor poziv + recenzent vjernosti
+    (jer ovaj turn pravi zadatak). Quick ima svoj put i ne dodiruje se."""
     fake_llm.queue(make_output(reply="Evo zadatka.", new_task=make_task()))
     c = _authed(flask_app)
     payload = http_payload(
@@ -373,7 +373,8 @@ def test_practice_still_works_and_uses_one_call(flask_app, fake_llm):
     assert j["session_mode"] == "practice"
     assert j["last_tutor_task"]                       # Practice I DALJE prati zadatak
     assert j["next_state"].get("task", {}).get("question")
-    assert fake_llm.call_count == 1
+    assert fake_llm.practice_call_count == 1           # jedan tutor poziv
+    assert len(fake_llm.fidelity_calls) == 1           # + recenzent (turn pravi zadatak)
     assert len(fake_llm.quick_calls) == 0              # practice NIJE išao kroz quick put
 
 

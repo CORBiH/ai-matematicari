@@ -51,7 +51,7 @@ def test_case7_equivalent_fraction_pair_still_rejected(caplog):
         r = run_practice_turn(store, fake, turn_payload())
     assert "status" not in r
     assert r["answer"] == SAFE_ERROR_MESSAGE
-    assert fake.call_count == 1
+    assert fake.practice_call_count == 1
 
 
 def test_case8_exact_vs_rounded_pair_still_rejected():
@@ -65,7 +65,7 @@ def test_case8_exact_vs_rounded_pair_still_rejected():
     r = run_practice_turn(store, fake, turn_payload())
     assert "status" not in r
     assert r["answer"] == SAFE_ERROR_MESSAGE
-    assert fake.call_count == 1
+    assert fake.practice_call_count == 1
 
 
 def test_case9_symbolically_reordered_pair_still_rejected(monkeypatch):
@@ -81,7 +81,7 @@ def test_case9_symbolically_reordered_pair_still_rejected(monkeypatch):
     r = run_practice_turn(store, fake, turn_payload())
     assert "status" not in r
     assert r["answer"] == SAFE_ERROR_MESSAGE
-    assert fake.call_count == 1
+    assert fake.practice_call_count == 1
 
 
 # --- Kategorija 10: četiri stvarno različite opcije prolaze ------------------
@@ -96,7 +96,7 @@ def test_case10_four_genuinely_distinct_fraction_options_accepted():
     ))
     r = run_practice_turn(store, fake, turn_payload())
     assert r.get("status") == "ready"
-    assert fake.call_count == 1
+    assert fake.practice_call_count == 1
 
 
 # --- Regresija: četiri STVARNO generisana skupa opcija iz živog testa -------
@@ -131,7 +131,7 @@ def test_previously_accepted_live_option_sets_pass_full_practice_path(label, opt
     ))
     r = run_practice_turn(store, fake, turn_payload())
     assert r.get("status") == "ready", label
-    assert fake.call_count == 1
+    assert fake.practice_call_count == 1
 
 
 # --- Kategorija 11-12: nema mutacije sesije, tačno jedan LLM poziv ----------
@@ -159,7 +159,7 @@ def test_case12_exactly_one_llm_call_on_rejection():
                             expected="$\\frac{15}{36}$", options=options, correct_option_index=0),
     ))
     run_practice_turn(store, fake, turn_payload())
-    assert fake.call_count == 1
+    assert fake.practice_call_count == 1
 
 
 # --- Kategorija 13: dijagnostika se NIKAD ne šalje u browser ----------------

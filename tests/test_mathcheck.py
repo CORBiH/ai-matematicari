@@ -285,7 +285,7 @@ def test_practice_task_with_inconsistent_arithmetic_is_rejected_without_state_ch
     before = store.peek("sess-mathcheck")
     r = run_practice_turn(store, fake, _practice_payload())
     assert r["answer"] == SAFE_ERROR_MESSAGE
-    assert fake.call_count == 1
+    assert fake.practice_call_count == 1
     assert store.peek("sess-mathcheck") == before  # oba None — ništa spremljeno
 
 
@@ -312,7 +312,7 @@ def test_practice_reveal_with_inconsistent_arithmetic_is_rejected():
         selected_option_id=second_wrong, client_turn_id="t2"))
 
     assert r["answer"] == SAFE_ERROR_MESSAGE
-    assert fake.call_count == 3  # bootstrap + 2 klika, bez popravnog poziva
+    assert fake.practice_call_count == 3  # bootstrap + 2 klika, bez popravnog poziva
     after = store.peek("sess-mathcheck")
     assert after["wrong_option_ids"] == before["wrong_option_ids"]
     assert after["task_completed"] == before["task_completed"]
@@ -336,7 +336,7 @@ def test_practice_valid_task_still_accepted_after_integration():
                             new_task=make_task_for_family("expand_to_given_denominator")))
     r = run_practice_turn(store, fake, _practice_payload())
     assert r["status"] == "ready"
-    assert fake.call_count == 1
+    assert fake.practice_call_count == 1
 
 
 # ---------------------------------------------------------------------------

@@ -13,7 +13,9 @@ Katalog NIJE po lekciji (534 lekcije) nego po prepoznatom domenu — routing se
 oslanja na isti pouzdan (oblast, lesson_title) izvor kao rules.py, plus
 geometrijski router. Lekcija dobije samo porodice koje za nju imaju smisla.
 """
+import json
 import re
+from pathlib import Path
 
 from matbot import geometry_rules
 from matbot.legacy import practice_routing as legacy_routing
@@ -21,6 +23,10 @@ from matbot.rules import route_topic_rules
 
 # Koliko zadnjih porodica pamtimo po sesiji (za LRU izbor i prompt kontekst).
 MAX_RECENT_FAMILIES = 6
+
+# Deklarativna tabela izuzetaka routinga (podaci, ne grana u kodu).
+_OVERRIDES_PATH = Path(__file__).resolve().parent.parent / "data" / "routing_overrides.json"
+_OVERRIDES_CACHE = None
 
 
 # ---------------------------------------------------------------------------
@@ -163,23 +169,127 @@ def applicable_families(grade, oblast, lesson_title, lesson_id=""):
     haystack = f"{oblast or ''} {lesson_title or ''}"
 
     if _CONSTRUCTION_RE.search(haystack):
-        return list(_CONSTRUCTION_FAMILIES)
+        return _apply_routing_override(list(_CONSTRUCTION_FAMILIES), lesson_id)
 
     topic_ids = route_topic_rules(oblast, lesson_title)
     geometry_scope, _ = geometry_rules.route_geometry_topic(oblast, lesson_title)
 
     if "sistemi" in topic_ids:
-        return list(_SYSTEM_FAMILIES)
-    if "razlomci" in topic_ids:
+        families = _promote_declared_task_form(list(_SYSTEM_FAMILIES), lesson_title)
+    elif "razlomci" in topic_ids:
         legacy_families = legacy_routing.grade6_fraction_families(grade, lesson_id)
-        if legacy_families is not None:
-            return legacy_families
-        return list(_FRACTION_FAMILIES)
-    if geometry_scope:
-        return list(_GEOMETRY_FAMILIES)
-    if "jednacine" in topic_ids or "nejednacine" in topic_ids:
-        return list(_EQUATION_FAMILIES)
-    return list(_GENERAL_FAMILIES)
+        if legacy_families is None:
+            legacy_families = list(_FRACTION_FAMILIES)
+        families = _promote_declared_task_form(legacy_families, lesson_title)
+    elif geometry_scope:
+        families = _promote_declared_task_form(list(_GEOMETRY_FAMILIES), lesson_title)
+    elif "jednacine" in topic_ids or "nejednacine" in topic_ids:
+        families = _promote_declared_task_form(list(_EQUATION_FAMILIES), lesson_title)
+    else:
+        families = _promote_declared_task_form(list(_GENERAL_FAMILIES), lesson_title)
+
+    # Tabela izuzetaka ide POSLJEDNJA: generičko pravilo iz naslova je dobra
+    # pretpostavka, ali za dvije dokazano pogrešne lekcije podaci imaju zadnju
+    # riječ (vidi data/routing_overrides.json).
+    return _apply_routing_override(families, lesson_id)
+
+
+# ---------------------------------------------------------------------------
+# KAD NASLOV LEKCIJE SAM IMENUJE OBLIK ZADATKA
+# ---------------------------------------------------------------------------
+# ISPRAVKA MAPIRANJA (živi nalaz, 5 prijavljenih slučajeva): routing bira
+# porodice po OBLASTI, pa je lekcija „Upoređivanje decimalnih brojeva“ dobijala
+# `fraction_operation` (izvedi računsku operaciju) kao PRVU porodicu, a
+# „Tekstualni zadatak sa sistemom“ je dobijao `solve_system` umjesto zadatka s
+# pričom. Naslov lekcije je pri tome doslovno imenovao traženi oblik.
+#
+# Ovo NIJE grananje po lekciji i NE uvodi nijednu novu porodicu: samo podiže
+# porodicu koja je VEĆ u listi te oblasti na prvo mjesto kad naslov eksplicitno
+# imenuje oblik. Lekcija bez takve porodice ostaje nepromijenjena.
+#
+# Namjerno usko: pokriva samo dva oblika koje naslovi u kurikulumu stvarno
+# imenuju (upoređivanje/uređivanje i tekstualni zadatak). Sve ostalo je posao
+# recenzenta vjernosti lekciji, ne routinga.
+_COMPARISON_TITLE_RE = re.compile(
+    r"upoređivanj|upoređiv|uporedi|poređenj|uređenost|uređenje", re.IGNORECASE
+)
+_WORD_PROBLEM_TITLE_RE = re.compile(r"tekstualn", re.IGNORECASE)
+
+_WORD_PROBLEM_FAMILIES_BY_PRIORITY = (
+    "system_word_problem", "fraction_word_problem", "word_problem",
+)
+
+# Koja je porodica poređenja ISPRAVNA zavisi od ZAPISA koji lekcija poredi:
+# `compare_fractions` ima validator specifičan za razlomke i odbija poređenje
+# decimalnih brojeva („Koji je broj veći: $0,7$ ili $0,68$?“), dok je
+# `compare_or_order` reprezentacijski neutralan. Zato lekcija o poređenju
+# RAZLOMAKA dobija prvu, a svaka druga lekcija o poređenju drugu.
+_FRACTION_TITLE_RE = re.compile(r"razlom", re.IGNORECASE)
+
+
+def _comparison_family_for(lesson_title):
+    return "compare_fractions" if _FRACTION_TITLE_RE.search(lesson_title or "") \
+        else "compare_or_order"
+
+
+def _routing_overrides():
+    """{topic_id: primary_family} iz `data/routing_overrides.json` (keširano).
+
+    Podaci, ne grana: ovaj modul ne zna nijedan ID lekcije — samo čita tabelu.
+    Vidi docstring u samom JSON-u za pravila i obrazloženja."""
+    global _OVERRIDES_CACHE
+    if _OVERRIDES_CACHE is None:
+        try:
+            with _OVERRIDES_PATH.open("r", encoding="utf-8") as handle:
+                payload = json.load(handle)
+        except (OSError, ValueError):
+            # Nedostupna/neispravna tabela ne smije oboriti Practice — bez
+            # override-a važi generičko pravilo, tačno kao i ranije.
+            _OVERRIDES_CACHE = {}
+        else:
+            _OVERRIDES_CACHE = {
+                str(row["canonical_topic_id"]): str(row["primary_family"])
+                for row in payload.get("overrides", [])
+                if row.get("canonical_topic_id") and row.get("primary_family")
+            }
+    return _OVERRIDES_CACHE
+
+
+def _apply_routing_override(families, lesson_id):
+    """Podigni porodicu koju tabela izuzetaka propisuje za OVU lekciju.
+
+    Override koji imenuje nepoznatu porodicu se IGNORIŠE (generičko pravilo
+    ostaje) — pogrešan red u podacima ne smije proizvesti porodicu koju katalog
+    ne poznaje."""
+    family = _routing_overrides().get(lesson_id or "")
+    if not family or family not in FAMILY_DESCRIPTIONS:
+        return families
+    remaining = [item for item in families if item != family]
+    return [family] + remaining
+
+
+def _promote_declared_task_form(families, lesson_title):
+    """Podigni na prvo mjesto porodicu koju NASLOV lekcije izričito imenuje.
+
+    Kod tekstualnih zadataka bira se porodica koja je VEĆ u listi te oblasti.
+    Kod poređenja se traži porodica koja odgovara ZAPISU lekcije; ako je nema u
+    listi (npr. lekcija o decimalnim brojevima je u „razlomci“ kanti), dodaje se
+    — inače bi lekcija dobila porodicu čiji validator odbija njen vlastiti
+    zapis, što je gore nego zatečeno stanje."""
+    title = lesson_title or ""
+    if _WORD_PROBLEM_TITLE_RE.search(title):
+        for family in _WORD_PROBLEM_FAMILIES_BY_PRIORITY:
+            if family in families:
+                families.remove(family)
+                return [family] + families
+        return families
+
+    if _COMPARISON_TITLE_RE.search(title):
+        family = _comparison_family_for(title)
+        if family in families:
+            families.remove(family)
+        return [family] + families
+    return families
 
 
 def _least_recently_used(candidates, recently_used):

@@ -141,7 +141,7 @@ def test_remaining_unparseable_option_fails_closed_before_mutation():
     response = run_practice_turn(store, fake, _turn(sid, grade, topic, lesson))
     assert response["answer"] == SAFE_ERROR_MESSAGE
     assert store.peek(sid) == before
-    assert fake.call_count == 1
+    assert fake.practice_call_count == 1
     assert "option_system_parse_failed" not in str(response)
 
 

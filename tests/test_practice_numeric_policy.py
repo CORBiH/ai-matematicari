@@ -402,7 +402,7 @@ def test_exactly_one_model_call_when_hint_is_replaced():
     run_practice_turn(store, fake, _payload(
         msg="[klik]", interaction_type="choice_answer",
         selected_option_id=_wrong_id(sess), client_turn_id="t1"))
-    assert fake.call_count == 2  # bootstrap + klik, bez popravnog poziva
+    assert fake.practice_call_count == 2  # bootstrap + klik, bez popravnog poziva
 
 
 def test_exactly_one_model_call_when_task_rejected():
@@ -412,7 +412,7 @@ def test_exactly_one_model_call_when_task_rejected():
         options=make_options("5", "15", "$\\sqrt{100}=20$", "25"),
         correct_option_index=2, task_family="direct_computation")))
     run_practice_turn(store, fake, _payload())
-    assert fake.call_count == 1
+    assert fake.practice_call_count == 1
 
 
 # ---------------------------------------------------------------------------
@@ -425,4 +425,4 @@ def test_practice_valid_task_still_accepted_end_to_end():
                             new_task=make_task_for_family("expand_to_given_denominator")))
     r = run_practice_turn(store, fake, _payload())
     assert r["status"] == "ready"
-    assert fake.call_count == 1
+    assert fake.practice_call_count == 1

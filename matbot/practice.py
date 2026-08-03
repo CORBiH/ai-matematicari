@@ -30,10 +30,12 @@ import random
 import uuid
 
 from matbot import (config, feedback, geometry_rules, geometrycheck,
-                    option_equivalence, prompts, systemcheck, task_families)
+                    lesson_fidelity, option_equivalence, prompts, systemcheck,
+                    task_families)
 from matbot.contracts import archetypes as contract_archetypes
 from matbot.contracts import pipeline as contract_pipeline
 from matbot.contracts import registry as contract_registry
+from matbot.tutor import lesson_context
 from matbot.tutor import pipeline as tutor_pipeline
 from matbot.llm import LLMError, failure_diagnostics_kv
 from matbot.mathsafe import sanitize_and_validate_math_text
@@ -242,6 +244,43 @@ def _log_contract_rejection(request_id, diagnostics):
         diagnostics.get("code"), diagnostics.get("engaged"),
         _clip_for_log(diagnostics.get("details"), 400),
     )
+
+
+def _review_lesson_fidelity(llm, session, turn, new_task, family="", request_id=""):
+    """DRUGI poziv — samo za turn koji pravi zadatak. Vrati zadatak za objavu.
+
+    Vraća originalni nacrt (`approve`) ili recenzentov ispravljen zadatak
+    (`correct`). `fail_closed` i svaka kontradikcija dižu InvalidOutputError, pa
+    pozivalac vraća postojeću sigurnu poruku BEZ mutacije stanja i BEZ trećeg
+    poziva."""
+    context = lesson_context.build(turn["grade"], session["lesson_id"])
+    if context is None:
+        # Nepouzdan kurikularni kontekst — ne recenziramo naslijepo.
+        raise InvalidOutputError("lesson_fidelity: nepouzdan kurikularni kontekst")
+
+    instructions = lesson_fidelity.build_instructions(turn["grade"])
+    input_text = lesson_fidelity.build_input(
+        context, new_task,
+        student_message=turn["student_message"],
+        family=family,
+        family_description=task_families.describe(family) if family else "",
+        prior_task=session["current_task"] or "",
+        difficulty_request=turn["difficulty_request"],
+    )
+    result = llm.lesson_fidelity_turn(instructions, input_text)
+    review = result.output
+    logger.info(
+        "lesson_fidelity request_id=%s topic=%s decision=%s reason=%s skill=%s",
+        request_id, context.topic_id, review.decision,
+        review.fail_reason_code or "-",
+        _clip_for_log(review.checks.lesson_skill_summary, 120),
+    )
+    try:
+        corrected = lesson_fidelity.resolve(
+            review, requested_difficulty=turn["difficulty_request"])
+    except lesson_fidelity.FidelityRejected as error:
+        raise InvalidOutputError(f"lesson_fidelity: {error}") from error
+    return corrected if corrected is not None else new_task
 
 
 def _task_from_skeleton(skeleton):
@@ -786,8 +825,16 @@ def _handle_text_turn(store, llm, session, turn, lesson_id, request_id):
                 contract=contract, archetype=selected_archetype,
             )
         elif out.new_task is not None:
+            # RECENZENT VJERNOSTI LEKCIJI — jedini dodatni poziv, i to SAMO na
+            # turnu koji pravi/mijenja zadatak. Odgovori, klikovi, hintovi,
+            # „Ne znam“, objašnjenja i obična konverzacija nikad ne dođu ovdje
+            # i zadržavaju zatečeni broj poziva (vidi matbot/lesson_fidelity.py).
+            reviewed_task = _review_lesson_fidelity(
+                llm, session, turn, out.new_task,
+                family=selected_shape, request_id=request_id,
+            )
             task_text = _apply_new_task(
-                session, out.new_task, task_family=selected_shape,
+                session, reviewed_task, task_family=selected_shape,
                 request_id=request_id, contract=contract, archetype=selected_archetype,
             )
 

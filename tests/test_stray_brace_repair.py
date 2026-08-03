@@ -212,7 +212,7 @@ def test_practice_wrong_answer_with_stray_brace_hint_makes_one_llm_call():
         "last_tutor_task": "", "interaction_type": "choice_answer",
         "selected_option_id": wrong, "client_turn_id": "t1",
     })
-    assert fake.call_count == 2  # bootstrap + klik, bez popravnog poziva
+    assert fake.practice_call_count == 2  # bootstrap + klik, bez popravnog poziva
     assert r["answer"].startswith("Netačno.")
     assert not r["answer"].endswith("}")
     assert LIVE_HINT_REPAIRED in r["answer"]

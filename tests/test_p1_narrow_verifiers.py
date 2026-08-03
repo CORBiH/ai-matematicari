@@ -224,7 +224,7 @@ def test_call156_rejected_before_mutation_with_one_call_and_no_code_leak():
     response = run_practice_turn(store, fake, _turn(sid, grade, topic, lesson))
     assert response["answer"] == SAFE_ERROR_MESSAGE
     assert store.peek(sid) == before
-    assert fake.call_count == 1
+    assert fake.practice_call_count == 1
     assert "multiple_equivalent_system_options" not in str(response)
 
 
@@ -242,7 +242,7 @@ def test_rejected_equivalent_system_task_cannot_receive_feedback():
         "client_turn_id": "p1-rejected-click",
     })
     assert response["answer"] == SAFE_ERROR_MESSAGE
-    assert fake.call_count == 1
+    assert fake.practice_call_count == 1
 
 
 # --- FIX A: verify_ordered_pair --------------------------------------------
@@ -348,7 +348,7 @@ def test_call32_rejected_before_mutation_one_call_and_no_leak():
     response = run_practice_turn(store, fake, _turn(sid, grade, topic, lesson))
     assert response["answer"] == SAFE_ERROR_MESSAGE
     assert store.peek(sid) == before
-    assert fake.call_count == 1
+    assert fake.practice_call_count == 1
     assert "ambiguous_ordered_pair_option" not in str(response)
 
 
@@ -374,7 +374,7 @@ def test_verified_pair_generation_can_follow_correct_feedback_path():
     })
     assert answered["answer_verdict"] == "correct"
     assert store.peek(sid)["task_completed"] is True
-    assert fake.call_count == 2  # exactly one call in each of two application turns
+    assert fake.practice_call_count == 2  # exactly one call in each of two application turns
 
 
 # --- FIX C: translate_to_equation ------------------------------------------
@@ -452,7 +452,7 @@ def test_ambiguous_translation_rejected_without_mutation_or_code_leak():
     response = run_practice_turn(store, fake, _turn(sid, grade, topic, lesson))
     assert response["answer"] == SAFE_ERROR_MESSAGE
     assert store.peek(sid) == before
-    assert fake.call_count == 1
+    assert fake.practice_call_count == 1
     assert "dvosmislen_opseg_mnozenja" not in str(response)
 
 

@@ -83,7 +83,7 @@ def test_1b_exact_live_option_set_accepted_through_full_practice_path():
     assert r["status"] == "ready", r["answer"]
     texts = [o["text"] for o in r["next_state"]["task"]["options"]]
     assert sorted(texts) == sorted(LIVE_CALL12_OPTIONS)
-    assert fake.call_count == 1
+    assert fake.practice_call_count == 1
 
 
 # ---------------------------------------------------------------------------
@@ -123,7 +123,7 @@ def test_duplicate_prose_rejected_through_full_path_without_mutation():
     assert r["answer"] == SAFE_ERROR_MESSAGE
     assert "status" not in r
     assert store.peek("uniq-sess") == before
-    assert fake.call_count == 1
+    assert fake.practice_call_count == 1
 
 
 # ---------------------------------------------------------------------------
@@ -147,7 +147,7 @@ def test_case_differing_pair_accepted_through_full_practice_path(a, b):
     r = run_practice_turn(store, fake, turn(msg="Daj mi zadatak."))
     # Zadatak smije pasti na drugom ugovoru, ali NIKAD zbog duplikata opcija.
     assert "duple opcije" not in (r.get("answer") or "")
-    assert fake.call_count == 1
+    assert fake.practice_call_count == 1
 
 
 def test_normalized_key_preserves_case_and_symbols():
@@ -186,7 +186,7 @@ def test_11b_semantic_duplicate_still_rejected_through_full_path():
     r = run_practice_turn(store, fake, turn(topic="8-04-004", grade=8))
     assert r["answer"] == SAFE_ERROR_MESSAGE
     assert store.peek("uniq-sess") == before
-    assert fake.call_count == 1
+    assert fake.practice_call_count == 1
 
 
 def test_units_still_prevent_false_equivalence():
@@ -242,7 +242,7 @@ def test_14_15_rejected_duplicate_does_not_mutate_state_and_one_call():
     r = run_practice_turn(store, fake, turn())
     assert r["answer"] == SAFE_ERROR_MESSAGE
     assert store.peek("uniq-sess") == before
-    assert fake.call_count == 1
+    assert fake.practice_call_count == 1
 
 
 # ---------------------------------------------------------------------------
@@ -279,7 +279,7 @@ def test_17_intentional_wrong_distractors_remain_allowed():
         answer_kind="short_text")))
     r = run_practice_turn(store, fake, turn(topic="7-05-021", grade=7))
     assert r["status"] == "ready", r["answer"]
-    assert fake.call_count == 1
+    assert fake.practice_call_count == 1
 
 
 def test_18_all_family_contracts_remain_registered():

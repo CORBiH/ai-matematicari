@@ -88,7 +88,7 @@ def test_6_7_8_live_task_blocked_end_to_end_without_state_change():
     assert r["answer"] == SAFE_ERROR_MESSAGE
     assert "status" not in r and "next_state" not in r          # 6: nothing browser-visible
     assert store.peek("sys-sess") == before                     # 7: no state mutation
-    assert fake.call_count == 1                                 # 8: exactly one LLM call
+    assert fake.practice_call_count == 1                                 # 8: exactly one LLM call
 
 
 def test_true_solution_verifies_against_the_live_system():
@@ -112,7 +112,7 @@ def test_9b_accepts_correct_system_end_to_end():
     store, fake = SessionStore(), FakeLLM()
     r = run_task(store, fake, SIMPLE_Q, SIMPLE_OPTS, 0, r'$(4,3)$')
     assert r["status"] == "ready", r["answer"]
-    assert fake.call_count == 1
+    assert fake.practice_call_count == 1
 
 
 def test_10_rejects_when_true_pair_present_but_wrong_option_marked():
@@ -215,7 +215,7 @@ def test_unsupported_task_still_passes_through_unchanged_behaviour():
     q = 'Riješi sistem: $x^2+y=5$ i $x-y=1$.'
     r = run_task(store, fake, q, [r'$(1,0)$', r'$(2,1)$', r'$(0,-1)$', r'$(3,2)$'], 0, r'$(1,0)$')
     assert r["status"] == "ready", r["answer"]
-    assert fake.call_count == 1
+    assert fake.practice_call_count == 1
 
 
 # ---------------------------------------------------------------------------
@@ -291,7 +291,7 @@ def test_32_rejection_preserves_full_progression_state():
                 "correctly_completed_families", "recent_task_signatures",
                 "current_options", "correct_option_id", "expected_answer_summary"):
         assert after[key] == before[key], key
-    assert fake.call_count == 2                       # one call per turn
+    assert fake.practice_call_count == 2                       # one call per turn
 
 
 def test_33_shuffle_preserves_independently_verified_correct_option():
@@ -339,7 +339,7 @@ def test_verifier_runs_only_for_solve_system():
     # server picks solve_system for a fresh systems session, so the declared
     # family mismatch is what rejects it — never the system verifier.
     r = run_practice_turn(store, fake, turn(sid="other-fam"))
-    assert fake.call_count == 1
+    assert fake.practice_call_count == 1
 
 
 def test_prompt_block_contains_verification_instruction():

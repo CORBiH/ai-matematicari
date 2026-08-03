@@ -62,7 +62,7 @@ def test_22_ordinary_practice_question_using_D_as_diameter_is_rejected():
     r = run_practice_turn(store, fake, turn())
     assert r["answer"] == SAFE_ERROR_MESSAGE
     assert "status" not in r
-    assert fake.call_count == 1                      # bez repair poziva
+    assert fake.practice_call_count == 1                      # bez repair poziva
     assert store.peek("geo-sess") is None            # nula mutacije stanja
 
 
@@ -76,7 +76,7 @@ def test_22b_canonical_R_question_is_accepted():
     r = run_practice_turn(store, fake, turn())
     assert r["status"] == "ready"
     assert "prečnik $R=10" in r["last_tutor_task"]
-    assert fake.call_count == 1
+    assert fake.practice_call_count == 1
 
 
 def test_27_expected_answer_using_D_as_diameter_is_rejected():
@@ -108,7 +108,7 @@ def test_25_incorrect_distractor_with_S_as_area_does_not_reject_task():
     assert r["status"] == "ready", r["answer"]
     texts = [o["text"] for o in r["next_state"]["task"]["options"]]
     assert any("S=24" in t for t in texts)   # namjerno pogrešan distraktor je prošao
-    assert fake.call_count == 1
+    assert fake.practice_call_count == 1
 
 
 def test_26_marked_correct_option_using_S_as_area_is_rejected():
@@ -153,7 +153,7 @@ def test_23_detect_formula_error_question_may_show_D_as_wrong_diameter():
     assert r["status"] == "ready", r["answer"]
     assert "$O=\\pi D$" in r["last_tutor_task"]
     assert store.peek("geo-sess")["current_family"] == "detect_formula_error"
-    assert fake.call_count == 1
+    assert fake.practice_call_count == 1
 
 
 def test_24_detect_formula_error_correct_option_must_use_canonical_R():
@@ -176,7 +176,7 @@ def test_24_detect_formula_error_correct_option_must_use_canonical_R():
     assert r["answer"] == SAFE_ERROR_MESSAGE
     sess = store.peek("geo-sess")
     assert sess["current_task"] == ""          # zadatak nije primijenjen
-    assert fake.call_count == 1
+    assert fake.practice_call_count == 1
 
 
 # ---------------------------------------------------------------------------
@@ -210,7 +210,7 @@ def test_28_first_wrong_hint_with_bad_notation_is_replaced_safely():
     assert r["answer"].startswith("Netačno.")
     assert GENERIC_HINT in r["answer"]                # loš hint zamijenjen sigurnim
     assert "$D$" not in r["answer"] and "\\pi D" not in r["answer"]
-    assert fake.call_count == 2                       # tačno jedan poziv po turnu
+    assert fake.practice_call_count == 2                       # tačno jedan poziv po turnu
     assert store.peek("geo-sess")["retry_required"] is True
 
 
@@ -238,7 +238,7 @@ def test_29_reveal_with_bad_notation_is_rejected():
     after = store.peek("geo-sess")
     assert after["wrong_option_ids"] == before["wrong_option_ids"]   # 30: bez mutacije
     assert after["task_completed"] == before["task_completed"]
-    assert fake.call_count == 3                                     # 31: 1 poziv po turnu
+    assert fake.practice_call_count == 3                                     # 31: 1 poziv po turnu
 
 
 def test_30_31_rejected_output_never_mutates_state_and_one_call_per_turn():
@@ -251,7 +251,7 @@ def test_30_31_rejected_output_never_mutates_state_and_one_call_per_turn():
     r = run_practice_turn(store, fake, turn())
     assert r["answer"] == SAFE_ERROR_MESSAGE
     assert store.peek("geo-sess") is None
-    assert fake.call_count == 1
+    assert fake.practice_call_count == 1
 
 
 # ---------------------------------------------------------------------------

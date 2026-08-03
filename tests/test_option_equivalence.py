@@ -90,7 +90,7 @@ def test_case29_full_path_semantically_duplicate_options_rejected_no_second_call
     r = run_practice_turn(store, fake, turn_payload())
     assert "status" not in r
     assert r["answer"] == SAFE_ERROR_MESSAGE
-    assert fake.call_count == 1
+    assert fake.practice_call_count == 1
     sess = store.peek("sess-1")
     assert sess is None or not sess.get("current_task")
 
@@ -110,4 +110,4 @@ def test_case30_full_path_distinct_formula_options_accepted(monkeypatch):
     ))
     r = run_practice_turn(store, fake, turn_payload())
     assert r.get("status") == "ready"
-    assert fake.call_count == 1
+    assert fake.practice_call_count == 1

@@ -179,7 +179,7 @@ def test_first_wrong_both_empty_makes_exactly_one_llm_call():
     sess = _start(store, fake)
     fake.queue(make_output(reply="", hint=""))
     _click(store, fake, _wrong_id(sess))
-    assert fake.call_count == 2  # bootstrap + ovaj klik
+    assert fake.practice_call_count == 2  # bootstrap + ovaj klik
 
 
 # ---------------------------------------------------------------------------
@@ -196,7 +196,7 @@ def test_empty_reply_with_leaking_hint_falls_back_to_generic():
     assert correct_text.strip("$") not in r["answer"]
     from matbot import feedback
     assert feedback.GENERIC_HINT in r["answer"]
-    assert fake.call_count == 2
+    assert fake.practice_call_count == 2
 
 
 # ---------------------------------------------------------------------------
@@ -301,4 +301,4 @@ def test_exact_live_hint_is_accepted_and_shaped_correctly():
     fake.queue(make_output(reply="", hint=LIVE_HINT))
     r = _click(store, fake, _wrong_id(sess))
     assert r["answer"] == f"Netačno.\n\nHint: {LIVE_HINT}"
-    assert fake.call_count == 2
+    assert fake.practice_call_count == 2

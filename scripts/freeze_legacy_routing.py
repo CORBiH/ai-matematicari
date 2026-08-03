@@ -29,6 +29,21 @@ import re                                              # noqa: E402
 
 FIXTURE = ROOT / "tests" / "fixtures" / "legacy_routing_baseline.json"
 TOPICS = ROOT / "data" / "topics.json"
+OVERRIDES = ROOT / "data" / "routing_overrides.json"
+
+
+def _overrides():
+    """Deklarativni izuzeci routinga po lekciji (isti podaci kao produkcija)."""
+    payload = json.loads(OVERRIDES.read_text(encoding="utf-8"))
+    return {row["canonical_topic_id"]: row["primary_family"]
+            for row in payload.get("overrides", [])}
+
+
+def _apply_override(families, lesson_id):
+    family = _overrides().get(lesson_id or "")
+    if not family:
+        return families
+    return [family] + [f for f in families if f != family]
 
 # --- ISTORIJSKO STANJE (prepisano iz repozitorija prije uvođenja motora) -----
 
@@ -77,27 +92,63 @@ H_GRADE6_NON_EXPANSION = ["fraction_operation", "compare_fractions",
 
 _CONSTRUCTION_RE = re.compile(r"konstruk", re.IGNORECASE)
 
+# NAMJERNA ISPRAVKA MAPIRANJA (2026-08-04, 14 lekcija) — vidi
+# `task_families._promote_declared_task_form` za obrazloženje.
+#
+# Ovaj skript NAMJERNO reimplementira routing da bi bio NEZAVISAN svjedok:
+# kad se produkcijski algoritam promijeni, ova kopija se mijenja SVJESNO i
+# zajedno s njom se regeneriše fixture. Time kapija parnosti i dalje znači
+# „nijedna NENAMJERNA promjena routinga“, a ne „ništa se nikad ne mijenja“.
+_H_COMPARISON_TITLE_RE = re.compile(
+    r"upoređivanj|upoređiv|uporedi|poređenj|uređenost|uređenje", re.IGNORECASE
+)
+_H_WORD_PROBLEM_TITLE_RE = re.compile(r"tekstualn", re.IGNORECASE)
+_H_WORD_PROBLEM = ("system_word_problem", "fraction_word_problem", "word_problem")
+_H_FRACTION_TITLE_RE = re.compile(r"razlom", re.IGNORECASE)
+
+
+def _historical_promote_declared_task_form(families, lesson_title):
+    title = lesson_title or ""
+    if _H_WORD_PROBLEM_TITLE_RE.search(title):
+        for family in _H_WORD_PROBLEM:
+            if family in families:
+                families.remove(family)
+                return [family] + families
+        return families
+    if _H_COMPARISON_TITLE_RE.search(title):
+        family = ("compare_fractions" if _H_FRACTION_TITLE_RE.search(title)
+                  else "compare_or_order")
+        if family in families:
+            families.remove(family)
+        return [family] + families
+    return families
+
 
 def historical_applicable_families(grade, oblast, lesson_title, lesson_id=""):
-    """Doslovno ponašanje `applicable_families` prije uvođenja motora ugovora."""
+    """Doslovno ponašanje `applicable_families` prije uvođenja motora ugovora,
+    plus namjerna ispravka mapiranja oblika zadatka (vidi iznad)."""
     haystack = f"{oblast or ''} {lesson_title or ''}"
     if _CONSTRUCTION_RE.search(haystack):
-        return list(H_CONSTRUCTION)
+        return _apply_override(list(H_CONSTRUCTION), lesson_id)
     topic_ids = route_topic_rules(oblast, lesson_title)
     geometry_scope, _ = geometry_rules.route_geometry_topic(oblast, lesson_title)
     if "sistemi" in topic_ids:
-        return list(H_SYSTEM)
-    if "razlomci" in topic_ids:
+        families = _historical_promote_declared_task_form(list(H_SYSTEM), lesson_title)
+    elif "razlomci" in topic_ids:
         if grade == 6 and lesson_id in H_GRADE6_BY_TOPIC:
-            return list(H_GRADE6_BY_TOPIC[lesson_id])
-        if grade == 6 and lesson_id:
-            return list(H_GRADE6_NON_EXPANSION)
-        return list(H_FRACTION)
-    if geometry_scope:
-        return list(H_GEOMETRY)
-    if "jednacine" in topic_ids or "nejednacine" in topic_ids:
-        return list(H_EQUATION)
-    return list(H_GENERAL)
+            base = list(H_GRADE6_BY_TOPIC[lesson_id])
+        elif grade == 6 and lesson_id:
+            base = list(H_GRADE6_NON_EXPANSION)
+        else:
+            base = list(H_FRACTION)
+        families = _historical_promote_declared_task_form(base, lesson_title)
+    elif geometry_scope:
+        families = _historical_promote_declared_task_form(list(H_GEOMETRY), lesson_title)
+    elif "jednacine" in topic_ids or "nejednacine" in topic_ids:
+        families = _historical_promote_declared_task_form(list(H_EQUATION), lesson_title)
+    else:
+        families = _historical_promote_declared_task_form(list(H_GENERAL), lesson_title)
+    return _apply_override(families, lesson_id)
 
 
 def build():

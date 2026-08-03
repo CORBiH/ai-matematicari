@@ -309,6 +309,45 @@ def queue_two_call(fake, draft=None, reviewer=None, **draft_kwargs):
     return draft, reviewer
 
 
+# --- RECENZENT VJERNOSTI LEKCIJI (matbot/lesson_fidelity.py) ----------------
+
+def make_fidelity_checks(skill="vještina iz naslova lekcije", **overrides):
+    from matbot.lesson_fidelity import FidelityChecks
+
+    values = {
+        "math_correct": True,
+        "tests_exact_lesson": True,
+        "required_task_form": True,
+        "grade_appropriate": True,
+        "solvable_and_unambiguous": True,
+        "answer_correct": True,
+        "marked_option_correct": True,
+        "options_unique": True,
+        "difficulty_direction_correct": True,
+        "lesson_skill_summary": skill,
+    }
+    values.update(overrides)
+    return FidelityChecks(**values)
+
+
+def make_fidelity_review(decision="approve", corrected_task=None,
+                         fail_reason_code=None, checks=None, **check_overrides):
+    from matbot.lesson_fidelity import LessonFidelityReview
+
+    return LessonFidelityReview(
+        decision=decision,
+        checks=checks or make_fidelity_checks(**check_overrides),
+        fail_reason_code=fail_reason_code,
+        corrected_task=corrected_task,
+    )
+
+
+def queue_generation(fake, new_task, review=None, reply="Evo zadatka."):
+    """Pripremi TAČNO dva odgovora: Tutor nacrt pa recenzent vjernosti."""
+    fake.queue(make_output(reply=reply, new_task=new_task))
+    fake.queue(review if review is not None else make_fidelity_review())
+
+
 class FakeLLM:
     """Deterministički LLM za testove: redom vraća pripremljene odgovore ili
     baca pripremljene izuzetke; broji pozive i pamti promptove.
@@ -323,13 +362,26 @@ class FakeLLM:
         self.quick_images = []    # ValidatedImage | None po quick pozivu
         self.tutor_calls = []     # samo Tutor pozivi (podskup calls)
         self.reviewer_calls = []  # samo Reviewer pozivi (podskup calls)
+        self.fidelity_calls = []  # samo recenzent vjernosti lekciji (podskup calls)
+        self.practice_calls = []  # samo Tutor pozivi stabilnog puta (podskup calls)
 
     def queue(self, item):
         self.results.append(item)
 
     @property
     def call_count(self):
+        """SVI modelski pozivi (uključujući recenzenta vjernosti)."""
         return len(self.calls)
+
+    @property
+    def practice_call_count(self):
+        """Samo TUTOROVI pozivi stabilnog Practice puta.
+
+        Zatečeni regresijski testovi ovim čuvaju ono zbog čega su i pisani:
+        „jedan tutor poziv po turnu, bez retryja i repair petlje“. Ukupan
+        trošak turna (tutor + recenzent) provjerava
+        tests/test_lesson_fidelity_reviewer.py."""
+        return len(self.practice_calls)
 
     def _next(self, instructions, input_text):
         self.calls.append((instructions, input_text))
@@ -341,6 +393,29 @@ class FakeLLM:
         return LLMResult(output=item, latency_ms=5, usage={"input_tokens": 100, "output_tokens": 50})
 
     def practice_turn(self, instructions, input_text):
+        """Tutor poziv stabilnog puta. Bilježi se i u `practice_calls` da testovi
+        koji ispituju TUTOROV prompt ne moraju pogađati indeks u `calls` — od
+        uvođenja recenzenta vjernosti zadnji poziv u turnu zna biti recenzentov."""
+        self.practice_calls.append((instructions, input_text))
+        return self._next(instructions, input_text)
+
+    def lesson_fidelity_turn(self, instructions, input_text):
+        """DRUGI poziv stabilnog puta — samo za turn koji pravi zadatak.
+
+        Kad test nije SAM pripremio recenziju, podrazumijeva se neutralno
+        `approve`. Razlog: većina zatečenih Practice testova ispituje obradu
+        TUTOROVOG nacrta, a ne recenzenta — ne smiju se rušiti na tuđem sloju.
+        Poziv se i dalje UREDNO BROJI (`call_count`, `fidelity_calls`), pa
+        nijedan test ne može slučajno previdjeti stvaran broj poziva; testovi
+        koji recenzenta stvarno ispituju pripremaju odgovor eksplicitno
+        (vidi tests/test_lesson_fidelity_reviewer.py)."""
+        from matbot.lesson_fidelity import LessonFidelityReview
+
+        self.fidelity_calls.append((instructions, input_text))
+        if not self.results or not isinstance(self.results[0], (LessonFidelityReview, Exception)):
+            self.calls.append((instructions, input_text))
+            return LLMResult(output=make_fidelity_review(), latency_ms=5,
+                             usage={"input_tokens": 100, "output_tokens": 50})
         return self._next(instructions, input_text)
 
     def tutor_turn(self, instructions, input_text):

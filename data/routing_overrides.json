@@ -1,0 +1,47 @@
+{
+  "_readme": [
+    "IZUZECI ROUTINGA PO LEKCIJI — deklarativni PODACI, nikad grana u Pythonu.",
+    "",
+    "ZAŠTO POSTOJI: generičko pravilo `task_families._promote_declared_task_form`",
+    "podiže porodicu koju NASLOV lekcije imenuje (upoređivanje / tekstualni",
+    "zadatak). Za dvije lekcije taj generički zaključak daje pogrešnu porodicu, a",
+    "komplikovanje regexa zbog dva slučaja bi pokvarilo pravilo za ostalih 532.",
+    "Zato se te dvije lekcije opisuju PODACIMA.",
+    "",
+    "PRAVILO: `primary_family` mora već postojati u katalogu porodica i njegov",
+    "ugovor mora prihvatati sadržaj te lekcije (provjereno u",
+    "tests/test_lesson_fidelity_reviewer.py). Override SAMO podiže porodicu na",
+    "prvo mjesto; ostatak liste ostaje netaknut.",
+    "",
+    "Ovdje se NE rješava vjernost lekciji općenito — to radi recenzent",
+    "(matbot/lesson_fidelity.py). Ovdje se ispravlja samo dokazano pogrešan",
+    "POLAZNI izbor porodice."
+  ],
+
+  "overrides": [
+    {
+      "canonical_topic_id": "6-05-011",
+      "lesson_title": "Brojevni izrazi i tekstualni zadaci s decimalnim brojevima",
+      "primary_family": "word_problem",
+      "reason": [
+        "Generičko pravilo je vidjelo „tekstualni zadaci“ i podiglo",
+        "`fraction_word_problem`, jer lekcija leži u kanti „razlomci“. Ali lekcija",
+        "je o DECIMALNIM brojevima — porodica s razlomcima nameće pogrešan zapis.",
+        "`word_problem` je reprezentacijski neutralan („tekstualni zadatak iz OVE",
+        "lekcije“) i njegov ugovor prihvata decimalni sadržaj."
+      ]
+    },
+    {
+      "canonical_topic_id": "9-03-021",
+      "lesson_title": "Poređenje direktne, obrnute i linearne zavisnosti",
+      "primary_family": "recognize_correct_statement",
+      "reason": [
+        "Generičko pravilo je vidjelo „Poređenje“ i podiglo `compare_or_order`,",
+        "koji poredi VRIJEDNOSTI po veličini. Ova lekcija poredi VRSTE zavisnosti",
+        "— to je pojmovno razlikovanje, ne uređivanje brojeva.",
+        "`recognize_correct_statement` („prepoznaj koja je tvrdnja o pojmu iz",
+        "lekcije tačna“) je postojeća porodica za baš takvo pojmovno pitanje."
+      ]
+    }
+  ]
+}

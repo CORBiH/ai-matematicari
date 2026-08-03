@@ -209,6 +209,6 @@ def test_structurally_invalid_task_still_rejected_with_safe_message_and_no_mutat
     before = store.peek("sess-still-rejected")
     r = run_practice_turn(store, fake, payload)
     assert r["answer"] == SAFE_ERROR_MESSAGE
-    assert fake.call_count == 1
+    assert fake.practice_call_count == 1
     after = store.peek("sess-still-rejected")
     assert after == before  # oba None — ništa nije spremljeno

@@ -83,7 +83,7 @@ def test_rejected_task_makes_exactly_one_llm_call():
         options=make_options("$\\frac{8}{20}$", "$\\frac{2}{20}$",
                               "$\\frac{6}{20}$", "$\\frac{4}{10}$"))))
     run_practice_turn(store, fake, payload())
-    assert fake.call_count == 2, "Odbijanje ne smije izazvati popravni AI poziv"
+    assert fake.practice_call_count == 2, "Odbijanje ne smije izazvati popravni AI poziv"
 
 
 def test_rejected_task_does_not_mutate_any_progression_state():
@@ -120,7 +120,7 @@ def test_declared_family_mismatch_is_rejected_end_to_end():
     r = run_practice_turn(store, fake, payload())
 
     assert r["answer"] == SAFE_ERROR_MESSAGE
-    assert fake.call_count == before_calls + 1
+    assert fake.practice_call_count == before_calls + 1
     assert store.peek(SESSION) is None  # ništa nije spremljeno
 
 

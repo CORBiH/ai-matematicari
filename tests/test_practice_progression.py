@@ -46,7 +46,7 @@ def choice_payload(option_id, client_turn_id, **kw):
 
 def family_sent_on_call(fake, index):
     """Porodica koju je server poslao modelu u datom pozivu."""
-    _, input_text = fake.calls[index]
+    _, input_text = fake.practice_calls[index]
     match = _FAMILY_RE.search(input_text)
     return match.group(1) if match else ""
 
@@ -122,11 +122,11 @@ def test_generated_task_records_its_family_in_session():
 def test_one_llm_call_per_turn_including_progression_logic():
     store, fake = SessionStore(), FakeLLM()
     give_task(store, fake, " (A)")
-    assert fake.call_count == 1
+    assert fake.practice_call_count == 1
     answer(store, fake, "sess-prog", correct=True, turn_id="t1")
-    assert fake.call_count == 2
+    assert fake.practice_call_count == 2
     give_task(store, fake, " (B)")
-    assert fake.call_count == 3
+    assert fake.practice_call_count == 3
 
 
 # ---------------------------------------------------------------------------
@@ -181,7 +181,7 @@ def test_retry_prompt_forbids_raising_difficulty():
     give_task(store, fake, " (A)")
     answer(store, fake, "sess-prog", correct=False, turn_id="t1")
     give_task(store, fake, " (A2)")
-    _, input_text = fake.calls[2]
+    _, input_text = fake.practice_calls[2]
     assert "PONOVNI POKUŠAJ" in input_text
     assert "NE povećavaj je" in input_text
 
@@ -200,7 +200,7 @@ def test_retry_with_identical_text_is_rejected_without_second_llm_call():
     ))
     r = run_practice_turn(store, fake, turn_payload(msg="Daj još jedan."))
 
-    assert fake.call_count == 2, "Odbijanje ne smije izazvati drugi AI poziv"
+    assert fake.practice_call_count == 2, "Odbijanje ne smije izazvati drugi AI poziv"
     assert "status" not in r  # sigurni fallback
     after = store.peek("sess-prog")
     assert after["current_task"] == before["current_task"]
@@ -335,7 +335,7 @@ def test_several_new_task_requests_without_answering_never_repeat_immediately():
     seen = []
     for i in range(5):
         give_task(store, fake, f" (broj {i})", msg="Daj mi novi zadatak.")
-        family = family_sent_on_call(fake, fake.call_count - 1)
+        family = family_sent_on_call(fake, len(fake.practice_calls) - 1)
         if seen:
             assert family != seen[-1], f"Ponovljena porodica na krugu {i}"
         seen.append(family)
@@ -355,13 +355,13 @@ def test_second_cycle_uses_least_recently_used_family():
     used = []
     for i, _ in enumerate(applicable):
         give_task(store, fake, f" (broj {i})")
-        used.append(family_sent_on_call(fake, fake.call_count - 1))
+        used.append(family_sent_on_call(fake, len(fake.practice_calls) - 1))
         answer(store, fake, "sess-prog", correct=True, turn_id=f"t{i}")
 
     sess = store.peek("sess-prog")
     assert set(sess["correctly_completed_families"]) == set(applicable)
 
     give_task(store, fake, " (novi ciklus)")
-    next_family = family_sent_on_call(fake, fake.call_count - 1)
+    next_family = family_sent_on_call(fake, len(fake.practice_calls) - 1)
     assert next_family != used[-1], "Drugi ciklus ne smije ponoviti zadnju porodicu"
     assert next_family in applicable

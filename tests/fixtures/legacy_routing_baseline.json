@@ -206,16 +206,16 @@
    "grade": 6,
    "oblast": "Prirodni brojevi i skupovi N/N0",
    "families": [
+    "compare_or_order",
     "direct_computation",
     "find_missing_value",
     "recognize_correct_statement",
     "detect_student_error",
-    "compare_or_order",
     "word_problem"
    ],
-   "first_family": "direct_computation",
-   "harder_family": "direct_computation",
-   "easier_family": "direct_computation"
+   "first_family": "compare_or_order",
+   "harder_family": "compare_or_order",
+   "easier_family": "compare_or_order"
   },
   {
    "topic_id": "6-02-003",
@@ -478,16 +478,16 @@
    "grade": 6,
    "oblast": "Djeljivost brojeva",
    "families": [
+    "word_problem",
     "direct_computation",
     "find_missing_value",
     "recognize_correct_statement",
     "detect_student_error",
-    "compare_or_order",
-    "word_problem"
+    "compare_or_order"
    ],
-   "first_family": "direct_computation",
-   "harder_family": "direct_computation",
-   "easier_family": "direct_computation"
+   "first_family": "word_problem",
+   "harder_family": "word_problem",
+   "easier_family": "word_problem"
   },
   {
    "topic_id": "6-04-001",
@@ -682,14 +682,15 @@
    "grade": 6,
    "oblast": "Razlomci u decimalnom obliku i decimalni brojevi",
    "families": [
+    "compare_or_order",
     "fraction_operation",
     "compare_fractions",
     "detect_student_error",
     "fraction_word_problem"
    ],
-   "first_family": "fraction_operation",
-   "harder_family": "fraction_operation",
-   "easier_family": "fraction_operation"
+   "first_family": "compare_or_order",
+   "harder_family": "compare_or_order",
+   "easier_family": "compare_or_order"
   },
   {
    "topic_id": "6-05-007",
@@ -752,14 +753,15 @@
    "grade": 6,
    "oblast": "Razlomci u decimalnom obliku i decimalni brojevi",
    "families": [
+    "word_problem",
+    "fraction_word_problem",
     "fraction_operation",
     "compare_fractions",
-    "detect_student_error",
-    "fraction_word_problem"
+    "detect_student_error"
    ],
-   "first_family": "fraction_operation",
-   "harder_family": "fraction_operation",
-   "easier_family": "fraction_operation"
+   "first_family": "word_problem",
+   "harder_family": "word_problem",
+   "easier_family": "word_problem"
   },
   {
    "topic_id": "6-06-001",
@@ -1218,16 +1220,16 @@
    "grade": 6,
    "oblast": "Uglovi",
    "families": [
+    "compare_or_order",
     "direct_computation",
     "find_missing_value",
     "recognize_correct_statement",
     "detect_student_error",
-    "compare_or_order",
     "word_problem"
    ],
-   "first_family": "direct_computation",
-   "harder_family": "direct_computation",
-   "easier_family": "direct_computation"
+   "first_family": "compare_or_order",
+   "harder_family": "compare_or_order",
+   "easier_family": "compare_or_order"
   },
   {
    "topic_id": "6-09-008",
@@ -2146,16 +2148,16 @@
    "grade": 7,
    "oblast": "Cijeli brojevi",
    "families": [
+    "compare_or_order",
     "direct_computation",
     "find_missing_value",
     "recognize_correct_statement",
     "detect_student_error",
-    "compare_or_order",
     "word_problem"
    ],
-   "first_family": "direct_computation",
-   "harder_family": "direct_computation",
-   "easier_family": "direct_computation"
+   "first_family": "compare_or_order",
+   "harder_family": "compare_or_order",
+   "easier_family": "compare_or_order"
   },
   {
    "topic_id": "7-02-007",
@@ -2386,16 +2388,16 @@
    "grade": 7,
    "oblast": "Cijeli brojevi",
    "families": [
+    "word_problem",
     "direct_computation",
     "find_missing_value",
     "recognize_correct_statement",
     "detect_student_error",
-    "compare_or_order",
-    "word_problem"
+    "compare_or_order"
    ],
-   "first_family": "direct_computation",
-   "harder_family": "direct_computation",
-   "easier_family": "direct_computation"
+   "first_family": "word_problem",
+   "harder_family": "word_problem",
+   "easier_family": "word_problem"
   },
   {
    "topic_id": "7-03-001",
@@ -2482,16 +2484,16 @@
    "grade": 7,
    "oblast": "Racionalni brojevi",
    "families": [
+    "compare_or_order",
     "direct_computation",
     "find_missing_value",
     "recognize_correct_statement",
     "detect_student_error",
-    "compare_or_order",
     "word_problem"
    ],
-   "first_family": "direct_computation",
-   "harder_family": "direct_computation",
-   "easier_family": "direct_computation"
+   "first_family": "compare_or_order",
+   "harder_family": "compare_or_order",
+   "easier_family": "compare_or_order"
   },
   {
    "topic_id": "7-03-007",
@@ -2710,16 +2712,16 @@
    "grade": 7,
    "oblast": "Racionalni brojevi",
    "families": [
+    "word_problem",
     "solve_equation",
     "verify_solution",
     "identify_next_step",
     "detect_student_error",
-    "translate_to_equation",
-    "word_problem"
+    "translate_to_equation"
    ],
-   "first_family": "solve_equation",
-   "harder_family": "solve_equation",
-   "easier_family": "solve_equation"
+   "first_family": "word_problem",
+   "harder_family": "word_problem",
+   "easier_family": "word_problem"
   },
   {
    "topic_id": "7-03-021",
@@ -3856,16 +3858,16 @@
    "grade": 8,
    "oblast": "Realni brojevi, korijeni i stepeni",
    "families": [
+    "compare_or_order",
     "direct_computation",
     "find_missing_value",
     "recognize_correct_statement",
     "detect_student_error",
-    "compare_or_order",
     "word_problem"
    ],
-   "first_family": "direct_computation",
-   "harder_family": "direct_computation",
-   "easier_family": "direct_computation"
+   "first_family": "compare_or_order",
+   "harder_family": "compare_or_order",
+   "easier_family": "compare_or_order"
   },
   {
    "topic_id": "8-01-005",
@@ -6272,16 +6274,16 @@
    "grade": 9,
    "oblast": "Razlomljeni racionalni izrazi",
    "families": [
+    "word_problem",
     "direct_computation",
     "find_missing_value",
     "recognize_correct_statement",
     "detect_student_error",
-    "compare_or_order",
-    "word_problem"
+    "compare_or_order"
    ],
-   "first_family": "direct_computation",
-   "harder_family": "direct_computation",
-   "easier_family": "direct_computation"
+   "first_family": "word_problem",
+   "harder_family": "word_problem",
+   "easier_family": "word_problem"
   },
   {
    "topic_id": "9-01-016",
@@ -6914,16 +6916,16 @@
    "grade": 9,
    "oblast": "Linearna funkcija i prava",
    "families": [
+    "recognize_correct_statement",
+    "compare_or_order",
     "direct_computation",
     "find_missing_value",
-    "recognize_correct_statement",
     "detect_student_error",
-    "compare_or_order",
     "word_problem"
    ],
-   "first_family": "direct_computation",
-   "harder_family": "direct_computation",
-   "easier_family": "direct_computation"
+   "first_family": "recognize_correct_statement",
+   "harder_family": "recognize_correct_statement",
+   "easier_family": "recognize_correct_statement"
   },
   {
    "topic_id": "9-03-022",
@@ -7110,16 +7112,16 @@
    "grade": 9,
    "oblast": "Linearne jednačine i nejednačine",
    "families": [
+    "word_problem",
     "solve_equation",
     "verify_solution",
     "identify_next_step",
     "detect_student_error",
-    "translate_to_equation",
-    "word_problem"
+    "translate_to_equation"
    ],
-   "first_family": "solve_equation",
-   "harder_family": "solve_equation",
-   "easier_family": "solve_equation"
+   "first_family": "word_problem",
+   "harder_family": "word_problem",
+   "easier_family": "word_problem"
   },
   {
    "topic_id": "9-04-012",
@@ -7508,17 +7510,17 @@
    "grade": 9,
    "oblast": "Sistemi linearnih jednačina",
    "families": [
+    "system_word_problem",
     "solve_system",
     "verify_ordered_pair",
     "choose_method",
     "determine_number_of_solutions",
     "identify_equivalent_system",
-    "detect_student_error",
-    "system_word_problem"
+    "detect_student_error"
    ],
-   "first_family": "solve_system",
-   "harder_family": "solve_system",
-   "easier_family": "solve_system"
+   "first_family": "system_word_problem",
+   "harder_family": "system_word_problem",
+   "easier_family": "system_word_problem"
   },
   {
    "topic_id": "9-05-014",

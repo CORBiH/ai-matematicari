@@ -37,7 +37,7 @@ def test_session_start_generates_one_task():
     store, fake = SessionStore(), FakeLLM()
     r = start_session(store, fake)
     assert r["status"] == "ready"
-    assert fake.call_count == 1
+    assert fake.practice_call_count == 1
     assert r["last_tutor_task"] == "Skrati razlomak $\\frac{20}{32}$."
     assert "Skrati razlomak" in r["answer"]
     assert r["session_mode"] == "practice"
@@ -49,7 +49,7 @@ def test_one_llm_call_per_normal_turn():
     start_session(store, fake)
     fake.queue(make_output(reply="Tačno!", evaluation="correct"))
     run_practice_turn(store, fake, turn_payload(msg="5/8"))
-    assert fake.call_count == 2  # tačno 1 poziv po turnu, 2 turna
+    assert fake.practice_call_count == 2  # tačno 1 poziv po turnu, 2 turna
 
 
 def test_text_answer_is_never_graded_even_when_model_says_correct():
@@ -111,7 +111,7 @@ def test_second_hint_is_progressive_and_prompt_carries_level():
     r = run_practice_turn(store, fake, turn_payload(msg="daj mi hint", intent="hint_request"))
     assert r["next_state"]["hint_level"] == 2
     # prompt za drugi hint nosi trenutni nivo 1 → model zna da bude konkretniji
-    assert "TRENUTNI HINT NIVO: 1" in fake.calls[2][1]
+    assert "TRENUTNI HINT NIVO: 1" in fake.practice_calls[2][1]
 
 
 def test_question_about_task_keeps_task_no_evaluation():
@@ -173,7 +173,7 @@ def test_easier_and_harder_requests_flow_to_prompt():
                                               options=make_options("9", "4", "5", "10"),
                                               difficulty="easy")))
     r1 = run_practice_turn(store, fake, turn_payload(msg="Daj mi lakši zadatak.", difficulty_request="easier"))
-    assert "difficulty_request=easier" in fake.calls[1][1]
+    assert "difficulty_request=easier" in fake.practice_calls[1][1]
     assert store.peek("sess-1")["difficulty"] == "easy"
     fake.queue(make_output(reply="Evo težeg.",
                            new_task=make_task(
@@ -181,7 +181,7 @@ def test_easier_and_harder_requests_flow_to_prompt():
                                options=make_options("117", "126", "108", "135"),
                                difficulty="hard")))
     r2 = run_practice_turn(store, fake, turn_payload(msg="Daj mi teži zadatak.", difficulty_request="harder"))
-    assert "difficulty_request=harder" in fake.calls[2][1]
+    assert "difficulty_request=harder" in fake.practice_calls[2][1]
     assert store.peek("sess-1")["difficulty"] == "hard"
     assert r1["last_tutor_task"] != r2["last_tutor_task"]
 
@@ -192,8 +192,8 @@ def test_expected_answer_is_aid_sent_to_prompt_but_text_never_graded():
     fake.queue(make_output(reply="Zapravo si u pravu — provjerio sam ponovo.", evaluation="correct"))
     r = run_practice_turn(store, fake, turn_payload(msg="5/8"))
     # prompt sadrži interni očekivani odgovor kao POMOĆ...
-    assert "INTERNI OČEKIVANI ODGOVOR" in fake.calls[1][1]
-    assert "5/8" in fake.calls[1][1]
+    assert "INTERNI OČEKIVANI ODGOVOR" in fake.practice_calls[1][1]
+    assert "5/8" in fake.practice_calls[1][1]
     # ...ali tekstualna poruka se NIKAD ne ocjenjuje (grading ide kroz choice_answer)
     assert r["answer_verdict"] is None
 
@@ -256,7 +256,7 @@ def test_recent_tasks_flow_into_prompt_for_anti_repeat():
     fake.queue(make_output(reply="Evo još jednog.",
                            new_task=make_task(text="Skrati $\\frac{45}{60}$.", expected="3/4")))
     run_practice_turn(store, fake, turn_payload(msg="daj novi zadatak"))
-    third_input = fake.calls[2][1]
+    third_input = fake.practice_calls[2][1]
     assert "NEDAVNI ZADACI" in third_input
     assert "\\frac{20}{32}" in third_input and "\\frac{18}{24}" in third_input
 
@@ -269,7 +269,7 @@ def test_server_restart_does_not_trust_client_task_text_without_server_state():
         msg="5/8", last_tutor_task="Skrati razlomak $\\frac{20}{32}$.",
         interaction_phase="answering_practice_task"))
     assert r["answer_verdict"] is None  # tekst se nikad ne ocjenjuje
-    prompt_in = fake.calls[0][1]
+    prompt_in = fake.practice_calls[0][1]
     assert "Skrati razlomak" not in prompt_in
     assert "AKTIVNI ZADATAK: još ne postoji" in prompt_in
     assert r["last_tutor_task"] == ""
@@ -298,7 +298,7 @@ def test_llm_timeout_full_session_snapshot_unchanged():
     store, fake = SessionStore(), FakeLLM()
     before = _rich_session_snapshot(store, fake)
     before_copy = copy.deepcopy(before)
-    calls_before = fake.call_count
+    calls_before = fake.practice_call_count
 
     fake.queue(LLMTimeout("timeout"))
     r = run_practice_turn(store, fake, turn_payload(msg="5/8"))
@@ -316,7 +316,7 @@ def test_llm_timeout_full_session_snapshot_unchanged():
     assert "status" not in r
     assert "next_state" not in r
     assert r["last_tutor_task"] == before["current_task"]     # ISTINIT zadatak, ne ""
-    assert fake.call_count == calls_before + 1                # tačno JEDAN (neuspješan) poziv, bez repair-a
+    assert fake.practice_call_count == calls_before + 1                # tačno JEDAN (neuspješan) poziv, bez repair-a
     raw = json.dumps(r, ensure_ascii=False)
     assert before["expected_answer_summary"] not in raw       # očekivani odgovor NIKAD ne izlazi
 
@@ -325,7 +325,7 @@ def test_invalid_structured_output_full_session_snapshot_unchanged():
     store, fake = SessionStore(), FakeLLM()
     before = _rich_session_snapshot(store, fake)
     before_copy = copy.deepcopy(before)
-    calls_before = fake.call_count
+    calls_before = fake.practice_call_count
 
     # strukturno validan JSON, ali sadržajno neupotrebljiv (prazan reply)
     fake.queue(make_output(reply="   "))
@@ -337,7 +337,7 @@ def test_invalid_structured_output_full_session_snapshot_unchanged():
     assert "status" not in r
     assert "next_state" not in r
     assert r["last_tutor_task"] == before["current_task"]
-    assert fake.call_count == calls_before + 1
+    assert fake.practice_call_count == calls_before + 1
     raw = json.dumps(r, ensure_ascii=False)
     assert before["expected_answer_summary"] not in raw
 
@@ -346,7 +346,7 @@ def test_unexpected_exception_full_session_snapshot_unchanged():
     store, fake = SessionStore(), FakeLLM()
     before = _rich_session_snapshot(store, fake)
     before_copy = copy.deepcopy(before)
-    calls_before = fake.call_count
+    calls_before = fake.practice_call_count
 
     class BoomInternalDetail(Exception):
         pass
@@ -360,7 +360,7 @@ def test_unexpected_exception_full_session_snapshot_unchanged():
     assert "status" not in r
     assert "next_state" not in r
     assert r["last_tutor_task"] == before["current_task"]
-    assert fake.call_count == calls_before + 1
+    assert fake.practice_call_count == calls_before + 1
     raw = json.dumps(r, ensure_ascii=False)
     assert "BoomInternalDetail" not in raw
     assert "stack trace" not in raw
@@ -423,7 +423,7 @@ def test_uradi_ga_ti_gives_full_procedure_and_result_keeps_task():
     assert "16" in r["answer"] and "60" in r["answer"]  # konačan rezultat prisutan
     assert "= 4" in r["answer"] or ": 15" in r["answer"] or "60 : 15" in r["answer"]  # postupak prisutan
     # prompt eksplicitno instruira model za ovu i slične formulacije
-    instructions = fake.calls[-1][0]
+    instructions = fake.practice_calls[-1][0]
     for phrase in ("uradi ga ti", "pokaži rješenje", "riješi ga ti"):
         assert phrase in instructions
 
@@ -447,10 +447,10 @@ def test_second_hint_prompt_guidance_more_concrete_than_first():
     start_session(store, fake, task_text=TASK_4_15, expected="16/60")   # calls[0]
     fake.queue(make_output(reply="Hint 1.", gave_hint=True))
     run_practice_turn(store, fake, turn_payload(msg="ne znam"))       # calls[1], hint_level 0 -> 1
-    first_hint_prompt = fake.calls[1][1]
+    first_hint_prompt = fake.practice_calls[1][1]
     fake.queue(make_output(reply="Hint 2.", gave_hint=True))
     run_practice_turn(store, fake, turn_payload(msg="daj mi hint", intent="hint_request"))  # calls[2], hint_level 1 -> 2
-    second_hint_prompt = fake.calls[2][1]
+    second_hint_prompt = fake.practice_calls[2][1]
     assert first_hint_prompt != second_hint_prompt
     assert "HINT NIVO 1" in first_hint_prompt
     assert "bez računa" in first_hint_prompt or "BEZ računa" in first_hint_prompt
@@ -470,7 +470,7 @@ def test_hint_level_3_prompt_allows_full_solution():
         gave_hint=True, new_task=None,
     ))
     r = run_practice_turn(store, fake, turn_payload(msg="daj mi hint"))  # calls[3], hint_level 2 -> 3 (cap)
-    third_prompt = fake.calls[3][1]
+    third_prompt = fake.practice_calls[3][1]
     assert "HINT NIVO 3" in third_prompt
     assert "cijeli postupak" in third_prompt.lower() or "konačan rezultat" in third_prompt
     assert "16" in r["answer"]
@@ -539,7 +539,7 @@ def test_one_llm_call_per_turn_still_holds_after_hardening():
     start_session(store, fake, task_text=TASK_4_15, expected="16/60")
     fake.queue(make_output(reply="Puno rješenje: $\\frac{16}{60}$.", gave_hint=True, new_task=None))
     run_practice_turn(store, fake, turn_payload(msg="uradi ga ti"))
-    assert fake.call_count == 2
+    assert fake.practice_call_count == 2
 
 
 # ---------------------------------------------------------------------------
@@ -592,7 +592,7 @@ def test_client_last_tutor_task_is_ignored_even_when_it_contains_broken_math():
         interaction_phase="answering_practice_task",
     ))
     assert not _has_control_chars(r["last_tutor_task"])
-    prompt_sent = fake.calls[0][1]
+    prompt_sent = fake.practice_calls[0][1]
     assert not _has_control_chars(prompt_sent)
     assert broken_client_task not in prompt_sent
     assert r["last_tutor_task"] == ""
@@ -674,7 +674,7 @@ def test_practice_turn_instructions_include_topic_rules_for_real_lesson():
     store, fake = SessionStore(), FakeLLM()
     fake.queue(make_output(reply="Evo zadatka.", new_task=make_task()))
     run_practice_turn(store, fake, turn_payload(selected_topic="6-04-001"))  # Razlomci lekcija
-    instructions, _ = fake.calls[0]
+    instructions, _ = fake.practice_calls[0]
     assert "OBLAST — RAZLOMCI" in instructions
     assert "DOMEN I SIGURNOST" in instructions
 
@@ -685,7 +685,7 @@ def test_practice_turn_off_topic_answer_text_is_in_instructions():
     store, fake = SessionStore(), FakeLLM()
     fake.queue(make_output(reply="Ovo je van matematike."))
     run_practice_turn(store, fake, turn_payload(msg="Ko je pobijedio prvenstvo?"))
-    instructions, _ = fake.calls[0]
+    instructions, _ = fake.practice_calls[0]
     assert OFF_TOPIC_ANSWER in instructions
 
 
@@ -720,7 +720,7 @@ def test_failure1_full_path_raw_frac_feedback_is_repaired_not_rejected():
     assert r.get("status") == "ready"
     assert r["answer"] == "Izabrao si $\\frac{3}{24}$. Tačno!"
     assert "\\frac{3}{24}" not in r["answer"].replace("$\\frac{3}{24}$", "")  # nema goli \frac izvan $
-    assert fake.call_count == 2  # tačno 1 poziv po turnu, 2 turna — bez drugog/repair poziva
+    assert fake.practice_call_count == 2  # tačno 1 poziv po turnu, 2 turna — bez drugog/repair poziva
 
 
 def test_failure2_full_path_option_ordered_pair_and_newline_repaired():
@@ -758,7 +758,7 @@ def test_failure2_full_path_option_ordered_pair_and_newline_repaired():
     assert "correct_option_id" not in r
     assert "expected_answer" not in r
     assert "expected_answer_summary" not in json.dumps(r)
-    assert fake.call_count == 1  # jedan poziv, bez drugog/repair poziva
+    assert fake.practice_call_count == 1  # jedan poziv, bez drugog/repair poziva
 
 
 def test_failure3_full_path_damaged_sqrt_units_option_is_repaired_when_unambiguous():
@@ -774,7 +774,7 @@ def test_failure3_full_path_damaged_sqrt_units_option_is_repaired_when_unambiguo
     ))
     r = run_practice_turn(store, fake, turn_payload())
     assert r.get("status") == "ready"
-    assert fake.call_count == 1
+    assert fake.practice_call_count == 1
     sess = store.peek("sess-1")
     texts = [o["text"] for o in sess["current_options"]]
     assert "$54\\sqrt{3},\\text{cm}^3$" in texts
@@ -795,7 +795,7 @@ def test_ambiguous_damaged_sqrt_option_still_rejected_safely():
     r = run_practice_turn(store, fake, turn_payload())
     assert "status" not in r
     assert r["answer"] == SAFE_ERROR_MESSAGE
-    assert fake.call_count == 1
+    assert fake.practice_call_count == 1
 
     sess = store.peek("sess-1")
     assert sess is None or not sess.get("current_task")
@@ -817,7 +817,7 @@ def test_raw_sqrt_in_feedback_without_dollar_rejected_safely_no_second_call():
     ))
     assert "status" not in r
     assert r["answer"] == SAFE_ERROR_MESSAGE
-    assert fake.call_count == 2  # 2 turna, i dalje tačno 1 poziv PO turnu (bez drugog)
+    assert fake.practice_call_count == 2  # 2 turna, i dalje tačno 1 poziv PO turnu (bez drugog)
 
 
 def test_explain_and_quick_also_use_central_safety_boundary():

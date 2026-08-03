@@ -416,7 +416,7 @@ def test_practice_still_works_and_uses_one_call(flask_app, fake_llm):
     assert j["session_mode"] == "practice"
     assert j["last_tutor_task"]                       # Practice I DALJE prati zadatak
     assert j["next_state"].get("task", {}).get("question")
-    assert fake_llm.call_count == 1
+    assert fake_llm.practice_call_count == 1
     assert len(fake_llm.tutor_calls) == 0   # univerzalni put nije aktivan
     assert len(fake_llm.explain_calls) == 0           # practice NIJE išao kroz explain put
 
