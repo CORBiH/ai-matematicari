@@ -246,7 +246,43 @@ def _log_contract_rejection(request_id, diagnostics):
     )
 
 
-def _review_lesson_fidelity(llm, session, turn, new_task, family="", request_id=""):
+def _family_contract_precheck(new_task, family):
+    """Lagana provjera SIROVOG (nesanitizovanog) Tutorovog nacrta protiv ugovora
+    dodijeljene porodice, PRIJE recenzenta vjernosti lekciji — vraća poruku
+    kršenja ili prazan string.
+
+    Ovo NIKAD ne odbija sam turn i NE zamjenjuje autoritativnu provjeru: ona
+    ostaje u _apply_new_task, poslije recenzenta, nad sanitizovanim tekstom.
+    Jedina svrha ovoga je da recenzent dobije TAČAN razlog kršenja umjesto da
+    nagađa — živi nalaz (VPS, lekcija „Tekstualni zadaci s razlomcima“):
+    recenzent je odobravao/ispravljao nacrt bez ove informacije, pa je
+    ispravljen zadatak i dalje padao na istom determinističkom ugovoru
+    (family_contract_mismatch: fraction_word_problem: nedostaje obavezan oblik
+    'ima_zivotni_kontekst'), dvaput zaredom u produkciji."""
+    if not family:
+        return ""
+    try:
+        validate_task_family(
+            family,
+            question=new_task.text or "",
+            option_texts=[opt.text for opt in new_task.options],
+            correct_option_index=new_task.correct_option_index,
+            expected_answer=new_task.expected_answer,
+            difficulty=new_task.difficulty,
+            declared={
+                "task_family": new_task.task_family,
+                "student_must_find": new_task.student_must_find,
+                "answer_kind": new_task.answer_kind,
+                "task_form": new_task.task_form,
+            },
+        )
+    except FamilyContractError as e:
+        return str(e)
+    return ""
+
+
+def _review_lesson_fidelity(llm, session, turn, new_task, family="", request_id="",
+                            family_contract_mismatch=""):
     """DRUGI poziv — samo za turn koji pravi zadatak. Vrati zadatak za objavu.
 
     Vraća originalni nacrt (`approve`) ili recenzentov ispravljen zadatak
@@ -266,6 +302,7 @@ def _review_lesson_fidelity(llm, session, turn, new_task, family="", request_id=
         family_description=task_families.describe(family) if family else "",
         prior_task=session["current_task"] or "",
         difficulty_request=turn["difficulty_request"],
+        family_contract_mismatch=family_contract_mismatch,
     )
     result = llm.lesson_fidelity_turn(instructions, input_text)
     review = result.output
@@ -829,9 +866,11 @@ def _handle_text_turn(store, llm, session, turn, lesson_id, request_id):
             # turnu koji pravi/mijenja zadatak. Odgovori, klikovi, hintovi,
             # „Ne znam“, objašnjenja i obična konverzacija nikad ne dođu ovdje
             # i zadržavaju zatečeni broj poziva (vidi matbot/lesson_fidelity.py).
+            mismatch_reason = _family_contract_precheck(out.new_task, selected_shape)
             reviewed_task = _review_lesson_fidelity(
                 llm, session, turn, out.new_task,
                 family=selected_shape, request_id=request_id,
+                family_contract_mismatch=mismatch_reason,
             )
             task_text = _apply_new_task(
                 session, reviewed_task, task_family=selected_shape,

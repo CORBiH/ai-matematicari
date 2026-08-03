@@ -749,6 +749,15 @@ _register(FamilyContract(
     prompt_options_must_be="moguće vrijednosti odgovora",
     prompt_positive_example="Amar je pojeo $\\frac{2}{8}$ torte, a Lejla $\\frac{3}{8}$. Koliko su pojeli zajedno?",
     prompt_forbidden_example="Proširi razlomak $\\frac{2}{8}$ na nazivnik $24$.",
+    prompt_verification_note=(
+        "PRIJE SLANJA provjeri: tekst MORA sadržavati stvarnu, uzrastu primjerenu "
+        "situaciju iz svakodnevice (imena, hranu, novac, vrijeme, mjere...) i "
+        "konkretno pitanje o razlomcima koje iz te situacije proizlazi. Gola "
+        "računska operacija (npr. samo „Izračunaj $\\frac{2}{8}+\\frac{3}{8}$.“) ili "
+        "četiri neobjašnjene brojčane/razlomačke opcije bez priče NISU dovoljne — "
+        "to je porodica fraction_operation, ne fraction_word_problem. Vidljiv tekst "
+        "zadatka mora sam nositi CIJELU priču i pitanje, nikad samo kratak uvod."
+    ),
 ))
 
 

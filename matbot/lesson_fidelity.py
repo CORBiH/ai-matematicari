@@ -121,7 +121,15 @@ ODLUKA:
 
 Kad ispravljaš, NE MIJENJAJ izabranu lekciju, razred ni oblast — popravi zadatak
 tako da odgovara TOJ lekciji. Ne postoji treći poziv: tvoja odluka je konačna.
-Ako nisi siguran u matematiku ili je zadatak dvosmislen, biraj `fail_closed`."""
+Ako nisi siguran u matematiku ili je zadatak dvosmislen, biraj `fail_closed`.
+
+Nacrt ponekad nosi napomenu „DETERMINISTIČKA PROVJERA UGOVORA JE ODBILA NACRT: ...“
+— to je serverski, nepregovorljiv ugovor dodijeljene porodice zadatka (npr. za
+tekstualni zadatak: mora postojati stvarna životna situacija, ne gola računska
+operacija). Kad ta napomena postoji, `corrected_task` MORA otkloniti TAČNO taj
+nedostatak — gola računska operacija, „Evo zadatka.“ bez priče, ili četiri
+neobjašnjene brojčane opcije NIKAD ne zadovoljavaju zahtjev za životni kontekst.
+Ako ne možeš popraviti zadatak tako da ugovor bude zadovoljen, biraj `fail_closed`."""
 
 
 def build_instructions(grade):
@@ -140,9 +148,20 @@ def _option_lines(new_task):
 
 
 def build_input(context, new_task, student_message, family="",
-                family_description="", prior_task="", difficulty_request=""):
+                family_description="", prior_task="", difficulty_request="",
+                family_contract_mismatch=""):
     """`context` je matbot.tutor.lesson_context.LessonContext (dijeli se s
-    univerzalnim putem — isti kanonski identitet, bez duplikata)."""
+    univerzalnim putem — isti kanonski identitet, bez duplikata).
+
+    `family_contract_mismatch`: poruka determinističke provjere ugovora
+    (matbot/task_family_validation.py) POKRENUTE na SIROVOM Tutorovom nacrtu
+    PRIJE ovog poziva — prazan string kad nacrt tu provjeru već zadovoljava.
+    Ovo NE zamjenjuje autoritativnu provjeru (ona se ponavlja NAD sanitizovanim
+    tekstom poslije ovog poziva, u practice._apply_new_task), nego recenzentu
+    daje TAČAN razlog kršenja da bi `corrected_task` mogao ciljano popraviti baš
+    taj nedostatak (živi nalaz: „fraction_word_problem: nedostaje obavezan oblik
+    'ima_zivotni_kontekst'“ dvaput odbijeno u produkciji jer recenzent nije znao
+    šta konkretno nedostaje)."""
     lines = [
         "IZABRANA LEKCIJA (nepromjenjiva):",
         f"- razred: {context.grade}",
@@ -159,6 +178,16 @@ def build_input(context, new_task, student_message, family="",
         lines.append(f"TRAŽENA PROMJENA TEŽINE: {difficulty_request}")
     if prior_task:
         lines.append(f"PRETHODNI ZADATAK (za poređenje težine): {prior_task}")
+    if family_contract_mismatch:
+        lines.append("")
+        lines.append(
+            f"DETERMINISTIČKA PROVJERA UGOVORA JE ODBILA NACRT: {family_contract_mismatch}"
+        )
+        lines.append(
+            "Ovaj nedostatak MORAŠ otkloniti u `corrected_task` (decision=`correct`) "
+            "ili odbiti (`fail_closed`) ako ne možeš — nacrt se NE SMIJE odobriti "
+            "(`approve`) dok ovaj nedostatak stoji."
+        )
     lines.append("")
     lines.append("NACRT ZADATKA (provjeri ga, ne vjeruj mu):")
     lines.append(f"- tekst: {new_task.text}")
