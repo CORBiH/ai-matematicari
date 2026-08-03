@@ -404,12 +404,10 @@ def test_explain_response_has_no_control_chars_anywhere():
 # REGRESIJA: Practice netaknut (eksplicitni dokazi pored pune suite)
 # ---------------------------------------------------------------------------
 
-def test_practice_still_works_and_uses_its_two_calls(flask_app, fake_llm):
-    """Practice od pivota koristi TAČNO DVA poziva (Tutor + Reviewer). Explain
-    ostaje jednopozivni i njegov put se ne dodiruje — to je ovdje i poenta."""
-    from tests.conftest import queue_two_call
-
-    queue_two_call(fake_llm)
+def test_practice_still_works_and_uses_one_call(flask_app, fake_llm):
+    """Practice koristi STABILAN jednopozivni put (podrazumijevano nakon
+    rollbacka); Explain ima svoj i ne dodiruje se — to je ovdje i poenta."""
+    fake_llm.queue(make_output(reply="Evo zadatka.", new_task=make_task()))
     c = _authed(flask_app)
     payload = http_payload(mode="practice", msg="Daj mi jedan zadatak za vježbu iz ove teme.")
     r = c.post("/api/ai-tutor/chat", json=payload)
@@ -418,8 +416,8 @@ def test_practice_still_works_and_uses_its_two_calls(flask_app, fake_llm):
     assert j["session_mode"] == "practice"
     assert j["last_tutor_task"]                       # Practice I DALJE prati zadatak
     assert j["next_state"].get("task", {}).get("question")
-    assert fake_llm.call_count == 2
-    assert len(fake_llm.tutor_calls) == 1 and len(fake_llm.reviewer_calls) == 1
+    assert fake_llm.call_count == 1
+    assert len(fake_llm.tutor_calls) == 0   # univerzalni put nije aktivan
     assert len(fake_llm.explain_calls) == 0           # practice NIJE išao kroz explain put
 
 

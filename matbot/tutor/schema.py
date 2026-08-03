@@ -161,6 +161,31 @@ def validate_task(task: TaskPayload) -> None:
         _require(len(text) <= config.MAX_OPTION_TEXT_CHARS, "preduga opcija")
 
 
+def normalize_for_intent(draft: TutorDraft) -> TutorDraft:
+    """Očisti polja koja IZABRANA NAMJERA ne koristi — umjesto da ih odbiješ.
+
+    ZAŠTO POSTOJI (ručni test, 2026-08-03): uredan `generate_task` je padao
+    zatvoreno jer je Reviewer u konačnom payloadu ostavio `grading`, a pravilo
+    polja je „višak“ tretiralo kao grešku. Matematika je bila ispravna, zadatak
+    upotrebljiv, a učenik nije dobio ništa.
+
+    Suvišno polje NE MOŽE proizvesti pogrešan odgovor — ono se ne čita. Prazan
+    turn može. Zato se višak TIHO BRIŠE, a odbijanje ostaje samo za polje koje
+    namjeri STVARNO nedostaje (to i dalje provjerava `validate_final`).
+
+    Nikad ne dodaje sadržaj i nikad ne mijenja namjeru — samo prazni."""
+    updates = {}
+    if draft.intent not in TASK_INTENTS and draft.new_task is not None:
+        updates["new_task"] = None
+    if draft.intent != "answer_attempt" and draft.grading is not None:
+        updates["grading"] = None
+    if draft.intent not in DIFFICULTY_SHIFT_INTENTS and draft.difficulty_diagnostics is not None:
+        updates["difficulty_diagnostics"] = None
+    if not updates:
+        return draft
+    return draft.model_copy(update=updates)
+
+
 def validate_final(draft: TutorDraft, has_active_task: bool) -> None:
     """PRAVILO POLJA PO NAMJERI — jedina tabela koja odlučuje šta smije postojati.
 
@@ -170,12 +195,11 @@ def validate_final(draft: TutorDraft, has_active_task: bool) -> None:
     _require((draft.reply or "").strip(), "prazan reply")
     _require(len(draft.reply) <= config.MAX_REPLY_CHARS, "predug reply")
 
+    # NAPOMENA: provjerava se samo ono što namjeri NEDOSTAJE. Višak polja je
+    # već obrisan u `normalize_for_intent` — vidi tamo zašto se ne odbija.
     if draft.intent in TASK_INTENTS:
         _require(draft.new_task is not None, f"namjera '{draft.intent}' traži new_task")
         validate_task(draft.new_task)
-    else:
-        _require(draft.new_task is None,
-                 f"namjera '{draft.intent}' ne smije nositi new_task")
 
     if draft.intent in DIFFICULTY_SHIFT_INTENTS:
         _require(draft.difficulty_diagnostics is not None,
@@ -187,9 +211,6 @@ def validate_final(draft: TutorDraft, has_active_task: bool) -> None:
                  "full_solution_request bez postupka")
     if draft.intent == "answer_attempt":
         _require(draft.grading is not None, "answer_attempt bez ocjene")
-    else:
-        _require(draft.grading is None,
-                 f"namjera '{draft.intent}' ne smije nositi ocjenu")
 
     # Namjere koje se oslanjaju na aktivan zadatak ne smiju se pojaviti bez njega.
     if draft.intent in ("answer_attempt", "hint_request", "full_solution_request"):

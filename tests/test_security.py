@@ -11,8 +11,7 @@ import pytest
 from matbot import auth
 from matbot.ratelimit import RateLimiter
 from matbot.turnlock import TurnLockRegistry
-from tests.conftest import (FakeLLM, make_output, make_task,
-                            queue_two_call)
+from tests.conftest import FakeLLM, make_output, make_task
 
 
 def chat_payload(msg="Daj mi jedan zadatak za vježbu iz ove teme.", mode="practice", **kw):
@@ -53,7 +52,7 @@ def test_index_route_issues_signed_embed_token(flask_app):
 
 def test_valid_token_passes(flask_app, fake_llm):
     c = _authed_client(flask_app)
-    queue_two_call(fake_llm)
+    fake_llm.queue(make_output(reply="Evo zadatka.", new_task=make_task()))
     r = c.post("/api/ai-tutor/chat", json=chat_payload())
     assert r.status_code == 200
     assert r.get_json()["status"] == "ready"
@@ -115,7 +114,7 @@ def test_token_never_appears_in_response_or_logs(flask_app, fake_llm, caplog):
     c = flask_app.test_client()
     token = auth.issue_token()
     c.environ_base["HTTP_X_TUTOR_TOKEN"] = token
-    queue_two_call(fake_llm)
+    fake_llm.queue(make_output(reply="Evo zadatka.", new_task=make_task()))
     with caplog.at_level("DEBUG"):
         r = c.post("/api/ai-tutor/chat", json=chat_payload())
     assert token not in r.get_data(as_text=True)
@@ -351,7 +350,7 @@ def test_selected_oblast_not_trusted_canonical_used_instead(flask_app, fake_llm)
     """selected_topic postoji u topics.json → server MORA koristiti canonical
     oblast iz topics.json, ne proizvoljan selected_oblast koji klijent pošalje."""
     c = _authed_client(flask_app)
-    queue_two_call(fake_llm)
+    fake_llm.queue(make_output(reply="Evo zadatka.", new_task=make_task()))
     r = c.post("/api/ai-tutor/chat", json=chat_payload(selected_oblast="Potpuno Izmisljena Oblast"))
     assert r.status_code == 200
     prompt_input = fake_llm.calls[-1][1]

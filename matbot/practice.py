@@ -592,30 +592,43 @@ def run_practice_turn(store, llm, turn):
     interaction_phase, last_tutor_task, interaction_type, selected_option_id,
     client_turn_id). Vraća JSON-spreman dict.
 
-    JEDAN AKTIVAN PUT ZA SVIH 534 LEKCIJE: univerzalni dvopozivni Tutor+Reviewer
-    (matbot/tutor/pipeline.py). Ranija podjela na „6 lekcija kroz motor ugovora“
-    i „528 lekcija kroz legacy porodice“ VIŠE NE POSTOJI kao izvršna grana —
-    oba izvora metapodataka sada ulaze u isti prompt kao kontekst lekcije.
+    AKTIVAN PUT: `legacy_single_call` — zatečeni STABILNI jednopozivni put
+    (deterministički K1/K3 motor za 6 lekcija s ugovorom + legacy porodice za
+    528). To je podrazumijevano ponašanje i ono što ide u produkciju.
 
-    `MATBOT_PRACTICE_PIPELINE=legacy_single_call` vraća zatečeni jednopozivni
-    put (deterministički K1/K3 motor + legacy porodice). Postoji ISKLJUČIVO kao
-    rollback i za poređenje; nije podrazumijevan i mora nestati kad univerzalni
-    put bude potvrđen uživo."""
-    if not _universal_pipeline_enabled():
-        return _run_legacy_single_call_turn(store, llm, turn)
-    return tutor_pipeline.run_turn(store, llm, turn)
+    ROLLBACK (2026-08-03): univerzalni dvopozivni Tutor+Reviewer je bio
+    nakratko podrazumijevan i pao je na ručnom testu — uredan zahtjev za
+    zadatak je pao zatvoreno, „Ne znam“ je najavljivalo hint bez hinta, a
+    uvodna lekcija je dobila prevelike brojeve. Zato je vraćen iza EKSPLICITNE
+    zastavice i ne aktivira se sam:
+
+        MATBOT_PRACTICE_PIPELINE=universal_two_call   → univerzalni put
+
+    Svaka druga vrijednost (i odsustvo varijable) daje stabilan jednopozivni
+    put. Implementacija univerzalnog puta se NE briše — dijagnostika i popravke
+    žive u matbot/tutor/ i pokrivene su testovima koje zastavica uključuje."""
+    if _universal_pipeline_enabled():
+        return tutor_pipeline.run_turn(store, llm, turn)
+    return _run_legacy_single_call_turn(store, llm, turn)
+
+
+# Jedina vrijednost koja uključuje univerzalni dvopozivni put. Namjerno
+# eksplicitna: „nije prazno“ ili „nije legacy“ bi značilo da tipfeler u
+# okruženju tiho uključi neprovjeren put u produkciji.
+UNIVERSAL_PIPELINE_FLAG = "universal_two_call"
 
 
 def _universal_pipeline_enabled():
-    value = (os.environ.get("MATBOT_PRACTICE_PIPELINE", "universal") or "universal")
-    return value.strip().lower() != "legacy_single_call"
+    """True SAMO uz eksplicitnu zastavicu. Podrazumijevano: stabilan put."""
+    value = (os.environ.get("MATBOT_PRACTICE_PIPELINE", "") or "").strip().lower()
+    return value == UNIVERSAL_PIPELINE_FLAG
 
 
 def _run_legacy_single_call_turn(store, llm, turn):
-    """ZAMRZNUT zatečeni jednopozivni put (rollback).
+    """STABILAN jednopozivni put — trenutno AKTIVAN i podrazumijevan.
 
-    Ne razvija se dalje. Deterministički K1/K3 generator koji ovaj put koristi
-    ostaje netaknut i pokriven testovima — vidi matbot/contracts/generator.py."""
+    Deterministički K1/K3 generator koji ovaj put koristi ostaje netaknut i
+    pokriven testovima — vidi matbot/contracts/generator.py."""
     request_id = uuid.uuid4().hex[:12]
 
     lesson = lesson_info(turn["grade"], turn["selected_topic"])

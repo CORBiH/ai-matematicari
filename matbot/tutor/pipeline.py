@@ -30,7 +30,8 @@ from matbot.terminology import normalize_terminology
 from matbot.tutor import lesson_context as lesson_context_module
 from matbot.tutor import prompts as tutor_prompts
 from matbot.tutor.schema import (TASK_INTENTS, UnifiedOutputError,
-                                 validate_final, validate_reviewer)
+                                 normalize_for_intent, validate_final,
+                                 validate_reviewer)
 
 logger = logging.getLogger("matbot.tutor")
 
@@ -342,7 +343,7 @@ def _run_text_turn(store, llm, session, turn, context, request_id):
             intro = _NEW_TASK_INTRO.get(final.intent, _NEW_TASK_INTRO["generate_task"])
             answer = intro + "\n\nZadatak: " + task_text
         else:
-            answer = reply
+            answer = _compose_visible_help(final, reply, context)
             if final.intent == "hint_request":
                 session["hint_level"] = min(
                     session["hint_level"] + 1, config.MAX_HINT_LEVEL
@@ -376,6 +377,34 @@ def _run_text_turn(store, llm, session, turn, context, request_id):
         request_id, context.topic_id, final.intent, calls,
     )
     return response
+
+
+def _compose_visible_help(final, reply, context):
+    """Sastavi ono što učenik STVARNO vidi za hint/rješenje.
+
+    ZAŠTO POSTOJI (ručni test, 2026-08-03): na „Ne znam“ je model najavu stavio
+    u `reply` („Evo ti uputa koja će ti pomoći.“), a KORISTAN sadržaj u zasebno
+    polje `hint`. Frontend prikazuje isključivo `answer`, pa je učenik dobio
+    obećanje hinta bez hinta. Isti rizik nosi `worked_solution`.
+
+    Zato se korisno polje PRIPAJA vidljivom tekstu kad ga tekst već ne sadrži.
+    Polja i dalje prolaze istu sanitizaciju kao svaki vidljivi tekst."""
+    extra = None
+    if final.intent == "hint_request":
+        extra = (final.hint or "").strip()
+    elif final.intent == "full_solution_request":
+        extra = (final.worked_solution or "").strip()
+    if not extra:
+        return reply
+
+    safe_extra = _safe_text(extra, final.intent)
+    _reject_if_inconsistent(safe_extra, final.intent)
+    _reject_if_geometry_invalid(safe_extra, context, final.intent)
+
+    # Model je ponekad već ugradio hint u reply — tada se ne duplira.
+    if safe_extra and safe_extra in reply:
+        return reply
+    return (reply.rstrip() + "\n\n" + safe_extra).strip() if reply.strip() else safe_extra
 
 
 def _publish_task(session, context, final, request_id):
@@ -442,7 +471,7 @@ def _two_call(llm, context, session, student_message, request_id, trusted_verdic
         )
         return None, calls
 
-    draft = tutor_result.output
+    draft = normalize_for_intent(tutor_result.output)
     has_active_task = bool(session["current_task"])
     try:
         validate_final(draft, has_active_task=has_active_task)
@@ -479,7 +508,7 @@ def _two_call(llm, context, session, student_message, request_id, trusted_verdic
         )
         return None, calls
 
-    final = reviewer.final
+    final = normalize_for_intent(reviewer.final)
     try:
         validate_final(final, has_active_task=has_active_task)
     except UnifiedOutputError as error:

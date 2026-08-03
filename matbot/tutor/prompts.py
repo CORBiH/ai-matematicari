@@ -24,6 +24,28 @@ def _clip(text, limit=_CLIP):
     return text if len(text) <= limit else text[:limit] + "…"
 
 
+# Šta SLJEDEĆI hint mora donijeti, s obzirom na broj već datih hintova.
+# ZAŠTO POSTOJI (ručni test, 2026-08-03): prompt je modelu slao samo BROJ
+# hintova, bez ijedne riječi o tome šta se na tom nivou očekuje — pa je
+# ponovljeno „Ne znam“ vraćalo istu neupotrebljivu najavu. Zatečeni
+# jednopozivni put je ovu ljestvicu imao (matbot/prompts.py); univerzalni ju je
+# pri pivotu izgubio.
+_HINT_LEVEL_GUIDANCE = {
+    0: ("SLJEDEĆI HINT JE NIVO 1: usmjeri na PRVI KORAK (koje pravilo ili "
+        "operacija se primjenjuje), BEZ računa i BEZ rezultata."),
+    1: ("SLJEDEĆI HINT JE NIVO 2: daj KONKRETAN međukorak — tačno koji račun "
+        "treba izvesti — ali JOŠ BEZ konačnog rezultata."),
+    2: ("SLJEDEĆI HINT JE NIVO 3: pokaži CIJELI postupak i konačan rezultat; "
+        "učenik je već dva puta zapeo."),
+}
+
+
+def _hint_level_guidance(hint_level):
+    guidance = _HINT_LEVEL_GUIDANCE.get(hint_level, _HINT_LEVEL_GUIDANCE[2])
+    return (guidance + " Svaki hint mora donijeti NOVU informaciju u odnosu na "
+            "prethodni — nikad ne ponavljaj raniji hint drugim riječima.")
+
+
 def _lesson_block(context):
     """Kanonski identitet + zatečeni metapodaci lekcije. Isti oblik za svih 534."""
     lines = [
@@ -61,6 +83,7 @@ def _state_block(session, student_message, trusted_verdict=None):
             )
         lines.append(f"- TEŽINA AKTIVNOG ZADATKA: {session['difficulty']}")
         lines.append(f"- BROJ VEĆ DATIH HINTOVA: {session['hint_level']}")
+        lines.append("- " + _hint_level_guidance(session["hint_level"]))
     else:
         lines.append("- AKTIVNI ZADATAK: ne postoji (učenik još nije dobio zadatak)")
 
@@ -111,7 +134,13 @@ _FIELD_RULE = """PRAVILO POLJA (server odbija payload koji ga prekrši):
 - easier_task / harder_task → `difficulty_diagnostics` OBAVEZNA
 - hint_request → `hint` obavezan; full_solution_request → `worked_solution` obavezan
 - answer_attempt → `grading` obavezan; svaka druga namjera → `grading` null
-- `lesson_focus` uvijek popuni: koju tačno vještinu izabrane lekcije ovaj turn cilja"""
+- `lesson_focus` uvijek popuni: koju tačno vještinu izabrane lekcije ovaj turn cilja
+
+KAKO SE HINT I RJEŠENJE PRIKAZUJU (bitno):
+`hint` i `worked_solution` su POLJA KOJA UČENIK ČITA — server ih dopisuje uz
+`reply`. Zato `hint` mora sadržavati STVARNU pomoć, a ne najavu. Ne piši
+„evo ti uputa“ i ne ostavljaj `hint` prazan kad je zatražena pomoć: napiši
+konkretnu uputu koja pomjera učenika za jedan korak."""
 
 _TASK_RULE = """KAD PRAVIŠ ZADATAK:
 - zadatak mora ispitivati BAŠ izabranu lekciju, ne samo istu oblast
@@ -120,6 +149,23 @@ _TASK_RULE = """KAD PRAVIŠ ZADATAK:
 - `expected_answer` je tačan odgovor, isti kao tekst tačne opcije
 - pogrešne opcije moraju biti uvjerljive greške, ne nasumični brojevi
 - NE otkrivaj koja je opcija tačna u tekstu `reply`"""
+
+# POLAZNA SLOŽENOST — namjerno kratko i apsolutno pravilo, ne sistem težine.
+# ZAŠTO POSTOJI (ručni test, 2026-08-03): prvi zadatak uvodne lekcije 6. razreda
+# dobio je nepotrebno velike brojeve. Relativna procjena recenzenta („je li teže
+# nego prije“) tu ne pomaže — na PRVOM zadatku nema s čim porediti. Zato prag
+# polazi apsolutno, a raste tek na zahtjev ili nakon uspjeha.
+_STARTING_COMPLEXITY_RULE = """POLAZNA SLOŽENOST (obavezno):
+- PRVI zadatak u lekciji i svaki `generate_task` bez tražene veće težine MORA
+  biti JEDNOSTAVAN ULAZNI primjer: mali, školski brojevi (po pravilu do 20, a
+  najviše do 100), jedan korak, bez nagomilanih uslova.
+- Uvodne lekcije („pojam“, „prepoznavanje“, prvi susret s pravilom) počinju od
+  najmanjih smislenih brojeva — cilj je da učenik prepozna pravilo, ne da računa
+  velike brojeve.
+- Složenost raste SAMO kad učenik izričito traži teže (`harder_task`) ili kad je
+  iz historije vidljivo da je prethodne zadatke riješio tačno.
+- Kad nisi siguran koliko veliko je previše — uzmi manje. Prejednostavan uvodni
+  zadatak je bezopasan; prevelik odbija učenika."""
 
 _DIFFICULTY_RULE = """KAD MIJENJAŠ TEŽINU (easier_task / harder_task):
 Uporedi s PRETHODNIM zadatkom i u `difficulty_diagnostics` označi svaku dimenziju
@@ -145,6 +191,7 @@ def build_tutor_instructions(context):
         f"{_INTENT_GUIDE}\n\n"
         f"{_FIELD_RULE}\n\n"
         f"{_TASK_RULE}\n\n"
+        f"{_STARTING_COMPLEXITY_RULE}\n\n"
         f"{_DIFFICULTY_RULE}\n\n"
         "TON: obraćaj se učeniku direktno, toplo i kratko. Nikad ne spominji "
         "interna polja, „namjeru“, recenzenta ni to da si model."

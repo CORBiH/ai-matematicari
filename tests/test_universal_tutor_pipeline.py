@@ -743,10 +743,14 @@ def test_deterministic_k1_k3_generator_is_preserved_and_still_works():
     assert ok, code
 
 
-def test_universal_pipeline_is_the_default_and_legacy_is_opt_in(monkeypatch):
+def test_universal_pipeline_is_opt_in_and_never_the_default(monkeypatch):
+    """ROLLBACK 2026-08-03: podrazumijevano je STABILAN jednopozivni put; ovaj
+    (univerzalni) put se uključuje SAMO eksplicitnom zastavicom. Puna kapija
+    živi u tests/test_practice_pipeline_selection.py."""
     from matbot import practice as practice_module
 
     monkeypatch.delenv("MATBOT_PRACTICE_PIPELINE", raising=False)
-    assert practice_module._universal_pipeline_enabled() is True
-    monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", "legacy_single_call")
     assert practice_module._universal_pipeline_enabled() is False
+    monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE",
+                       practice_module.UNIVERSAL_PIPELINE_FLAG)
+    assert practice_module._universal_pipeline_enabled() is True

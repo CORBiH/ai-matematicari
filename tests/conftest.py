@@ -364,48 +364,19 @@ class FakeLLM:
 
 
 # ---------------------------------------------------------------------------
-# ZAMRZNUTI JEDNOPOZIVNI PUT — gdje žive zatečeni regresijski testovi
+# IZBOR PRACTICE PUTA U TESTOVIMA
 # ---------------------------------------------------------------------------
-# Practice od pivota ima JEDAN AKTIVAN put: univerzalni dvopozivni Tutor+
-# Reviewer (matbot/tutor/). Moduli ispod su pisani protiv ZAMRZNUTOG
-# jednopozivnog puta i tamo i dalje pripadaju: svaki od njih nosi konkretan
-# živi nalaz (systemcheck, jedinstvenost opcija, geometrijska notacija,
-# porodični ugovori, kategorije grešaka LLM-a…) koji je taj put štitio.
+# Nakon rollbacka (2026-08-03) AKTIVAN i podrazumijevan je STABILAN jednopozivni
+# put. Univerzalni dvopozivni put postoji iza eksplicitne zastavice
+# `MATBOT_PRACTICE_PIPELINE=universal_two_call` i NIJE aktivan u produkciji.
 #
-# Zato se NE prepisuju u novu šemu: to bi izgubilo istorijski dokaz da je
-# ponašanje ikad bilo ispravno. Umjesto toga se izvršavaju s eksplicitno
-# uključenim zamrznutim putem.
-#
-# VAŽNO ZA ČITAOCA: ovi testovi NE dokazuju ništa o aktivnom univerzalnom putu.
-# Pokrivenost aktivnog puta živi u tests/test_universal_tutor_pipeline.py.
-_FROZEN_SINGLE_CALL_MODULES = frozenset({
-    "test_practice",
-    "test_practice_numeric_policy",
-    "test_choice_answer",
-    "test_practice_progression",
-    "test_empty_reply_valid_hint",
-    "test_option_uniqueness_case_sensitivity",
-    "test_option_equivalence_diagnostics",
-    "test_option_equivalence",
-    "test_practice_family_enforcement",
-    "test_llm_failure_categories",
-    "test_geometry_notation_enforcement",
-    "test_feedback",
-    "test_systemcheck",
-    "test_practice_task_intros",
-    "test_p1_narrow_verifiers",
-    "test_p1_common_syntax",
-    "test_contract_intent",
-    "test_contract_architecture_gate",
-    "test_practice_lesson_context",
-    "test_practice_lesson_semantic_contracts",
-    "test_legacy_routing_parity",
-    "test_mathcheck",
-    "test_terminology",
-    "test_student_must_find_trust",
-    "test_task_family_contracts",
-    "test_stray_brace_repair",
-    "test_mathjax_commands",
+# Zato je podrazumijevano stanje u testovima isto kao u produkciji (varijabla
+# obrisana → stabilan put), a moduli koji testiraju univerzalni put moraju se
+# EKSPLICITNO prijaviti ispod. Time nijedan test ne može slučajno tvrditi da je
+# neprovjeren put aktivan.
+_UNIVERSAL_TWO_CALL_MODULES = frozenset({
+    "test_universal_tutor_pipeline",
+    "test_universal_tutor_diagnosis",
 })
 
 
@@ -413,11 +384,11 @@ _FROZEN_SINGLE_CALL_MODULES = frozenset({
 def _practice_pipeline_selection(request, monkeypatch):
     """Pripni put koji dati modul zaista testira.
 
-    Bez ovoga bi zatečeni regresijski testovi tiho gađali novi put i padali na
-    šemi, a ne na ponašanju koje provjeravaju."""
+    Podrazumijevano se briše varijabla — test tada vidi TAČNO ono što vidi
+    produkcija."""
     module = request.node.module.__name__.rsplit(".", 1)[-1]
-    if module in _FROZEN_SINGLE_CALL_MODULES:
-        monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", "legacy_single_call")
+    if module in _UNIVERSAL_TWO_CALL_MODULES:
+        monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", "universal_two_call")
     else:
         monkeypatch.delenv("MATBOT_PRACTICE_PIPELINE", raising=False)
 
