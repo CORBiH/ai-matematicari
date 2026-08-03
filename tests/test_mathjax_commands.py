@@ -285,3 +285,125 @@ def test_escaped_dollar_currency_behaviour_unchanged():
     text, is_safe = sanitize_and_validate_math_text("Cijena je \\$5 ukupno")
     assert is_safe
     assert text == "Cijena je \\$5 ukupno"
+
+
+# ---------------------------------------------------------------------------
+# Produkcijski nalaz: "4ecdot2" / "2ecdot2 + 3ecdot3" stiglo je učeniku umjesto
+# "4 \\cdot 2" / "2 \\cdot 2 + 3 \\cdot 3". Praćenje puta pokazuje da model
+# (kroz client.responses.parse strict JSON šemu) legitimno šalje TAČNO jedan
+# backslash — "\\cdot" u Python stringu nakon parsiranja — nikad literalni
+# "ecdot". Do korupcije dolazi NA SERVERU, u matbot/mathsafe.py, kroz dva
+# nezavisna propusta koja ovaj blok testova pokriva:
+#
+#   1. `_RAW_LATEX_COMMAND_RE` je granicu iza komande provjeravao sa `\b`
+#      umjesto projektnim `_COMMAND_BOUNDARY` — \b se ne aktivira između
+#      slova i cifre, pa "\\cdot2" (bez razmaka, ovaj projekat ga baš tako
+#      piše) IZVAN $...$ nije bio prepoznat kao sirova komanda i prolazio je
+#      neomeđen (bez $...$, pa ga MathJax nikad ne typeset-uje).
+#   2. Bilo kojim mehanizmom da backslash ispred poznate komande nestane
+#      UNUTAR $...$ (nepoznat kontrolni znak koji _repair_control_chars ne
+#      zna rekonstruisati pa ga tiho ukloni, model koji ga jednostavno
+#      izostavi, ili bilo koji budući sličan bag), gola riječ "cdot" je
+#      prolazila NEOPAŽENO jer je stari `_BARE_COMMAND_RESIDUE_RE` provjeravao
+#      SAMO "sqrt"/"text".
+#
+# Popravka je GENERIČKA (cijela MATHJAX_COMMAND_ALLOWLIST, ne baš "cdot") i oba
+# propusta sada padaju zatvoreno — bez ijednog dodatnog/popravnog AI poziva.
+
+def test_4_cdot_2_minus_y_equals_5_stays_valid():
+    text, is_safe = sanitize_and_validate_math_text("$4 \\cdot 2 - y = 5$")
+    assert is_safe
+    assert text == "$4 \\cdot 2 - y = 5$"
+    assert "ecdot" not in text
+
+
+def test_two_cdot_two_plus_three_cdot_three_stays_valid():
+    text, is_safe = sanitize_and_validate_math_text("$2 \\cdot 2 + 3 \\cdot 3$")
+    assert is_safe
+    assert text == "$2 \\cdot 2 + 3 \\cdot 3$"
+    assert "ecdot" not in text
+
+
+def test_multiple_cdot_commands_in_one_segment_all_stay_valid():
+    text, is_safe = sanitize_and_validate_math_text(
+        "$2\\cdot2+3\\cdot3=4+9=13$ i $5\\cdot1\\cdot2=10$"
+    )
+    assert is_safe
+    assert text.count("\\cdot") == 4
+    assert "ecdot" not in text
+
+
+def test_cdot_survives_a_json_round_trip():
+    """Strukturisan model izlaz ide kroz JSON (client.responses.parse); ovaj
+    test dokazuje da json.dumps/json.loads sam po sebi ne dira '\\cdot' —
+    korupcija NIJE u transportnom sloju."""
+    import json
+
+    original = "4 \\cdot 2 - y = 5"
+    payload = json.dumps({"reply": original})
+    restored = json.loads(payload)["reply"]
+    assert restored == original
+    assert "ecdot" not in restored
+    text, is_safe = sanitize_and_validate_math_text("$" + restored + "$")
+    assert is_safe
+    assert text == "$4 \\cdot 2 - y = 5$"
+
+
+def test_bare_cdot_missing_backslash_inside_math_fails_closed():
+    """Jezgro nalaza: ako se backslash izgubi PRIJE ove provjere (bilo kojim
+    mehanizmom), gola "cdot" unutar $...$ mora odbiti CIO odgovor — nikad
+    tiho stići do učenika bez znaka množenja."""
+    for text in ("$4 cdot 2 - y = 5$", "$2cdot2 + 3cdot3$", "$5\\cdot2 cdot3$"):
+        assert not _safe(text), text
+
+
+def test_bare_cdot_is_reported_generically_not_only_for_cdot():
+    """Generička provjera pokriva CIJELU bijelu listu — probom drugom
+    komandom (times) dokazujemo da popravka nije zakrpa samo za 'cdot'."""
+    assert not _safe("$4 times 2 = 8$")
+
+
+def test_cdot_immediately_before_a_digit_outside_math_fails_closed():
+    """Prije popravke, '\\cdot2' (bez razmaka) IZVAN $...$ je prolazio
+    neomeđen jer se granica provjeravala sa \\b (koji ne radi između slova i
+    cifre) — sad pada zatvoreno kao i svaka druga sirova komanda van
+    matematike."""
+    assert not _safe("Rezultat: 4 \\cdot2 = 8, bez dolara.")
+    assert not _safe("Rezultat: 4 \\cdot 2 = 8, bez dolara.")  # already caught before too
+
+
+def test_ordinary_prose_containing_the_letters_cdot_is_unchanged():
+    """Ne smijemo slijepo zamjenjivati slova 'cdot' unutar običnih riječi —
+    provjera je ograničena na UNUTAR matematičkih segmenata, i traži granicu
+    ispred/iza (ne pogađa usred duže riječi)."""
+    prose = "Ovo uopšte nije skraćenica nego obična rečenica bez matematike."
+    text, is_safe = sanitize_and_validate_math_text(prose)
+    assert is_safe
+    assert text == prose
+
+
+def test_bare_cdot_never_reaches_the_browser_payload_end_to_end(client, fake_llm):
+    """Cijeli put do brauzera: gola 'cdot' (backslash izgubljen) mora izazvati
+    postojeći siguran fallback, nikad literalni 'cdot'/'ecdot' u payloadu, i
+    bez drugog/popravnog AI poziva."""
+    fake_llm.queue(make_quick_output(reply="Rezultat je $2cdot2 + 3cdot3 = 13$."))
+    body = client.post("/api/ai-tutor/chat", json={
+        "session_id": "cdot-sess", "grade": 7, "mode": "quick",
+        "selected_topic": "", "selected_oblast": "",
+        "student_message": "Izracunaj 2 puta 2 plus 3 puta 3.",
+        "conversation_history": [],
+    }).get_data(as_text=True)
+    assert "cdot" not in body
+    assert "ecdot" not in body
+
+
+def test_valid_cdot_reaches_the_browser_payload_end_to_end(client, fake_llm):
+    fake_llm.queue(make_quick_output(reply="Rezultat je $2\\cdot2 + 3\\cdot3 = 13$."))
+    body = client.post("/api/ai-tutor/chat", json={
+        "session_id": "cdot-sess-ok", "grade": 7, "mode": "quick",
+        "selected_topic": "", "selected_oblast": "",
+        "student_message": "Izracunaj 2 puta 2 plus 3 puta 3.",
+        "conversation_history": [],
+    }).get_data(as_text=True)
+    assert "\\\\cdot" in body  # JSON-escaped single backslash in the response body
+    assert "ecdot" not in body

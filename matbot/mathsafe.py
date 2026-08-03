@@ -287,7 +287,16 @@ def sanitize_math_text(text: str) -> str:
 #      (bez drugog AI poziva).
 # ---------------------------------------------------------------------------
 
-_RAW_LATEX_COMMAND_RE = re.compile(r"\\(?:frac|sqrt|text|mathbb|cdot|begin|end)\b")
+# NAPOMENA: granica MORA biti _COMMAND_BOUNDARY (ne \b) iz istog razloga kao
+# gore (D35-1) — \b se ne aktivira između backslash-komande i cifre koja
+# neposredno slijedi, pa je „\cdot2“ (bez razmaka, ovaj projekat ga piše baš
+# tako: „$2\cdot3=6$“) IZVAN $...$ prije prolazio kroz ovu provjeru nezapaženo
+# i stizao do browsera kao sirov, neomeđen tekst (backslash i sve) umjesto da
+# padne zatvoreno. \b je ovdje bio identičan propust kao onaj koji je D35-1
+# već ispravio za regexe udvostručenog backslasha.
+_RAW_LATEX_COMMAND_RE = re.compile(
+    r"\\(?:frac|sqrt|text|mathbb|cdot|begin|end)" + _COMMAND_BOUNDARY
+)
 
 # ---------------------------------------------------------------------------
 # POLITIKA KOMANDI IZVAN MATEMATIKE (živi nalaz D35T-1, poziv 3 od 14)
@@ -388,8 +397,35 @@ _BARE_TEXT_UNIT_RE = re.compile(
 )
 
 # Preostao bare "sqrt"/"text" (bez backslasha) NAKON pokušaja gornje reparacije
-# — znak da je radikand/jedinica bila nejednoznačna i NIJE popravljena.
+# — znak da je radikand/jedinica bila nejednoznačna i NIJE popravljena. NEMA
+# granicu iza namjerno: "sqrtx"/"textabc" (nejednoznačan radikand/jedinica —
+# repair iznad ih svjesno NE dira) mora ostati prijavljen čak i kad odmah iza
+# slijedi još jedno slovo.
 _BARE_COMMAND_RESIDUE_RE = re.compile(r"(?<!\\)(?:sqrt|text)")
+
+# GENERIČKA verzija za SVE OSTALE komande iz MATHJAX_COMMAND_ALLOWLIST (živi
+# nalaz: "4ecdot2"/"2ecdot2 + 3ecdot3" u produkciji — ispravan "$4 \\cdot 2$"
+# je učeniku stigao BEZ backslasha ispred "cdot"). Bez obzira KOJIM mehanizmom
+# backslash nestane (spori kontrolni znak koji _repair_control_chars ne zna
+# rekonstruisati pa ga tiho obriše, model koji jednostavno zaboravi "\",
+# bilo koji budući sličan bag), rezultat je uvijek isti oblik: poznata komanda
+# ostaje kao GOLA riječ unutar matematičkog segmenta. Prijašnja provjera je
+# gledala SAMO "sqrt"/"text" — "cdot", "times", "frac" i svaka druga komanda
+# je mogla proći NEOPAŽENO. Ovo NIJE zakrpa za baš "cdot": to je jedan
+# generički skener nad CIJELOM preostalom bijelom listom, nikad pogađanje koje
+# je komanda "trebala" biti.
+#
+# "sqrt"/"text" su namjerno izuzete iz OVE alternacije — imaju SVOJU provjeru
+# iznad, bez granice iza, iz istog razloga kao u tom komentaru. Granica ISPRED
+# (ni backslash ni slovo) sprječava pogodak usred duže riječi/identifikatora;
+# granica IZA je ista _COMMAND_BOUNDARY kao svuda u modulu (cifra iza JOŠ UVIJEK
+# broji kao granica — to je baš slučaj koji je propuštao, npr. "cdot2").
+_BARE_OTHER_COMMAND_ALTERNATION = "|".join(
+    sorted(MATHJAX_COMMAND_ALLOWLIST - {"sqrt", "text"}, key=lambda w: (-len(w), w))
+)
+_BARE_OTHER_COMMAND_RESIDUE_RE = re.compile(
+    r"(?<![\\A-Za-z])(?:" + _BARE_OTHER_COMMAND_ALTERNATION + r")" + _COMMAND_BOUNDARY
+)
 
 # Živi nalaz (Phase 7 live test, "Dijagonala kvadrata"): model je vratio
 # UDVOSTRUČEN backslash neposredno ispred poznate LaTeX komande — npr.
@@ -664,6 +700,9 @@ def find_unsafe_math_issues(text: str) -> list:
         issues.extend(find_unknown_math_commands(part))
         if _BARE_COMMAND_RESIDUE_RE.search(part):
             issues.append("unrepaired_bare_command_in_math")
+        bare_other = _BARE_OTHER_COMMAND_RESIDUE_RE.search(part)
+        if bare_other:
+            issues.append("bare_command_in_math:" + bare_other.group(0)[:24])
         if _LITERAL_NEWLINE_ESCAPE_RE.search(part):
             issues.append("literal_newline_escape_in_math")
         if any(ord(ch) < 0x20 for ch in part):
