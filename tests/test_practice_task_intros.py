@@ -7,7 +7,7 @@ from matbot.session_store import SessionStore
 from tests.conftest import FakeLLM, make_options, make_output, make_task, make_task_for_family
 
 
-TOPIC = "6-04-001"
+TOPIC = "6-04-007"
 QUESTION = "Proširi razlomak $\\frac{7}{10}$ tako da nazivnik bude $50$."
 GUIDED_REPLY = (
     "Evo zadatka. Prvo pronađi broj kojim treba pomnožiti nazivnik 10 da dobije 50."

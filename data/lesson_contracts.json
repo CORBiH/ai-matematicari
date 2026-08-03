@@ -1,0 +1,121 @@
+{
+  "_readme": [
+    "Per-lekcija OVERRIDE — sve ostalo dolazi iz data/contract_templates.json.",
+    "Faza A: šest pilot lekcija iz oblasti Razlomci (6. razred). Sve ostale",
+    "lekcije nemaju red ovdje i idu nepromijenjenim legacy putem",
+    "(izvještajna oznaka: legacy_uncontracted).",
+    "",
+    "Napomena o dokazu ispravnosti arhitekture: 6-04-009 i 6-04-010 razlikuju se",
+    "TAČNO u jednoj vrijednosti (denominator_relation), a 6-04-011 i 6-04-012 u",
+    "TAČNO jednoj (allowed_operations). Ta jedna vrijednost zamjenjuje cijeli",
+    "raniji Python switch po ID-ju lekcije.",
+    "",
+    "FAZA 1 SERVERSKOG GENERATORA: allowed_task_archetypes je u SVAKOM redu",
+    "PODACIMA sužen na oblike koje serverski generator stvarno konstruiše",
+    "(direct_computation, identify_equivalent). find_missing_value (K2) i",
+    "identify_error (K4) se vraćaju ISKLJUČIVO širenjem ovih redova kad njihovi",
+    "generatori budu implementirani — rotacija ni intent tabela tada ne mogu",
+    "izabrati oblik koji server ne umije napraviti. error_category_set ostaje:",
+    "to su podaci lekcije za K4 i ne smiju se izgubiti suženjem."
+  ],
+
+  "contracts": [
+    {
+      "canonical_topic_id": "6-04-005",
+      "grade": 6,
+      "status": "enabled",
+      "inherits": "rational.equivalence",
+      "allowed_task_archetypes": ["identify_equivalent"],
+      "skill": "expand_fraction",
+      "operand_constraints": {
+        "sign_policy": "non_negative",
+        "scaling_direction": "expand",
+        "integer_range": [1, 60]
+      },
+      "invariant_constraints": ["scaling_direction", "allowed_operations"],
+      "error_category_set": ["unequal_scaling", "wrong_operation"]
+    },
+    {
+      "canonical_topic_id": "6-04-006",
+      "grade": 6,
+      "status": "enabled",
+      "inherits": "rational.equivalence",
+      "allowed_task_archetypes": ["identify_equivalent"],
+      "skill": "reduce_fraction",
+      "operand_constraints": {
+        "sign_policy": "non_negative",
+        "scaling_direction": "reduce",
+        "integer_range": [1, 60]
+      },
+      "representation_constraints": {"answer_form": "irreducible"},
+      "invariant_constraints": ["scaling_direction", "allowed_operations"],
+      "_error_category_note": [
+        "Namjerno BEZ 'unequal_scaling': ta kategorija nosi smjer PROŠIRIVANJA.",
+        "Zadatak o grešci pri proširivanju zato ovdje pada zatvoreno, a zadatak o",
+        "grešci pri skraćivanju pada u lekciji 6-04-005 — bez ijedne grane po",
+        "lekciji u kodu (raniji 'expansion_error_direction_mismatch')."
+      ],
+      "error_category_set": ["wrong_reduction", "wrong_operation"]
+    },
+    {
+      "canonical_topic_id": "6-04-009",
+      "grade": 6,
+      "status": "enabled",
+      "inherits": "rational.add_sub",
+      "allowed_task_archetypes": ["direct_computation"],
+      "skill": "add_subtract_like_denominators",
+      "operand_constraints": {
+        "sign_policy": "non_negative",
+        "denominator_relation": "equal",
+        "integer_range": [1, 60]
+      },
+      "invariant_constraints": ["denominator_relation", "allowed_operations"],
+      "error_category_set": ["combined_denominators", "wrong_numerator", "wrong_operation"]
+    },
+    {
+      "canonical_topic_id": "6-04-010",
+      "grade": 6,
+      "status": "enabled",
+      "inherits": "rational.add_sub",
+      "allowed_task_archetypes": ["direct_computation"],
+      "skill": "add_subtract_unlike_denominators",
+      "operand_constraints": {
+        "sign_policy": "non_negative",
+        "denominator_relation": "different",
+        "integer_range": [1, 60]
+      },
+      "invariant_constraints": ["denominator_relation", "allowed_operations"],
+      "error_category_set": ["combined_denominators", "incorrect_conversion", "wrong_numerator"]
+    },
+    {
+      "canonical_topic_id": "6-04-011",
+      "grade": 6,
+      "status": "enabled",
+      "inherits": "rational.mul_div",
+      "allowed_task_archetypes": ["direct_computation"],
+      "skill": "multiply_fractions",
+      "allowed_operations": ["multiply"],
+      "operand_constraints": {
+        "sign_policy": "non_negative",
+        "integer_range": [1, 60]
+      },
+      "invariant_constraints": ["allowed_operations"],
+      "error_category_set": ["wrong_product", "combined_denominators", "wrong_operation"]
+    },
+    {
+      "canonical_topic_id": "6-04-012",
+      "grade": 6,
+      "status": "enabled",
+      "inherits": "rational.mul_div",
+      "allowed_task_archetypes": ["direct_computation"],
+      "skill": "divide_fractions",
+      "allowed_operations": ["divide"],
+      "operand_constraints": {
+        "sign_policy": "non_negative",
+        "integer_range": [1, 60]
+      },
+      "invariant_constraints": ["allowed_operations"],
+      "error_category_set": ["missed_reciprocal", "wrong_product", "wrong_operation"]
+    }
+  ]
+}

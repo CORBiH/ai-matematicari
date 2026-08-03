@@ -28,17 +28,23 @@ _MISMATCH_FAMILIES = {
 @pytest.fixture
 def force_family(monkeypatch):
     """Server bira porodicu deterministički iz lekcije (matbot/task_families.py)
-    — za testove koji provjeravaju SPECIFIČNU porodicu neveznu za lekciju
-    6-04-005 (uvijek daje expand_to_given_denominator prvo), prisiljavamo
-    select_family() da vrati traženu porodicu, isto kao kad bi je stvarna
-    lekcija prirodno dodijelila."""
+    — za testove koji provjeravaju SPECIFIČNU porodicu neveznu za izabranu
+    lekciju, prisiljavamo select_family() da vrati traženu porodicu, isto kao
+    kad bi je stvarna lekcija prirodno dodijelila."""
     def _apply(family_id):
         monkeypatch.setattr(tf, "select_family", lambda *a, **kw: family_id)
     return _apply
 
 
+# Lekcija iz oblasti Razlomci BEZ ugovora → nepromijenjen legacy put, tj. tačno
+# ono što ovaj fajl i testira (politika po PORODICI). Pilot lekcije s ugovorom
+# (6-04-005/006/009/010/011/012) ovdje se namjerno ne koriste: one više ne idu
+# kroz porodice nego kroz univerzalni motor (matbot/contracts/).
+LEGACY_FRACTION_TOPIC = "6-04-007"
+
+
 def _payload(msg="Daj zadatak.", **kw):
-    base = {"session_id": "sess-numpol", "grade": 6, "selected_topic": "6-04-005",
+    base = {"session_id": "sess-numpol", "grade": 6, "selected_topic": LEGACY_FRACTION_TOPIC,
             "selected_oblast": "", "student_message": msg, "intent": "",
             "difficulty_request": "", "interaction_phase": "", "last_tutor_task": "",
             "interaction_type": "", "selected_option_id": "", "client_turn_id": ""}
@@ -50,7 +56,7 @@ def _payload(msg="Daj zadatak.", **kw):
 # Global invariants: policy field exists and matches spec exactly
 # ---------------------------------------------------------------------------
 
-def test_all_31_families_have_an_explicit_question_numeric_policy():
+def test_all_families_have_an_explicit_question_numeric_policy():
     for family_id, contract in CONTRACTS.items():
         assert contract.question_numeric_policy in ("check", "allow_intentional_mismatch"), family_id
 

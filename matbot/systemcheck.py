@@ -601,6 +601,23 @@ def _parse_scalar(token):
     return -value if neg else value
 
 
+def parse_exact_scalar(text):
+    """Parse a bare integer/decimal/fraction as :class:`Fraction`.
+
+    Public, fail-closed facade over the exact scalar parser used by the system
+    verifier.  ``None`` means unsupported or ambiguous; callers must never
+    treat it as a valid value.  Math delimiters and harmless LaTeX spacing are
+    accepted, but prose and compound expressions are intentionally rejected.
+    """
+    value = (text or "").strip()
+    if len(value) >= 2 and value.startswith("$") and value.endswith("$"):
+        value = value[1:-1].strip()
+    try:
+        return _parse_scalar(value)
+    except (_Unsupported, ValueError, ZeroDivisionError):
+        return None
+
+
 def _split_pair_body(body):
     """Razdvoji sadržaj zagrade na dvije koordinate.
 

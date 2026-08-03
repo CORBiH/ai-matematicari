@@ -16,6 +16,7 @@ geometrijski router. Lekcija dobije samo porodice koje za nju imaju smisla.
 import re
 
 from matbot import geometry_rules
+from matbot.legacy import practice_routing as legacy_routing
 from matbot.rules import route_topic_rules
 
 # Koliko zadnjih porodica pamtimo po sesiji (za LRU izbor i prompt kontekst).
@@ -35,6 +36,16 @@ FAMILY_DESCRIPTIONS = {
     "recognize_equivalent_fraction": "prepoznaj koji je razlomak jednak zadanom",
     "compare_fractions": "uporedi ili poređaj razlomke po veličini",
     "fraction_operation": "izvedi računsku operaciju s razlomcima",
+    # Pet porodica ispod opslužuju SAMO legacy put (vidi matbot/legacy/).
+    # `fraction_expression` još ima nemigriranog potrošača; ostale četiri
+    # zadržane su da bi zatečeno routiranje ostalo doslovno isto. Koja lekcija
+    # koristi koju — vidi matbot/legacy/practice_routing.py i kapiju parnosti
+    # tests/test_legacy_routing_parity.py.
+    "fraction_add_subtract_equal": "saberi ili oduzmi razlomke jednakih imenilaca",
+    "fraction_add_subtract_unlike": "saberi ili oduzmi razlomke različitih imenilaca",
+    "fraction_multiplication": "pomnoži razlomke",
+    "fraction_division": "podijeli razlomke",
+    "fraction_expression": "izračunaj brojevni izraz s više operacija nad razlomcima",
     "fraction_word_problem": "tekstualni (životni) zadatak s razlomcima",
 
     # --- sistemi jednačina ---
@@ -135,14 +146,20 @@ _CONSTRUCTION_FAMILIES = [
 _CONSTRUCTION_RE = re.compile(r"konstruk", re.IGNORECASE)
 
 
-def applicable_families(grade, oblast, lesson_title):
+def applicable_families(grade, oblast, lesson_title, lesson_id=""):
     """Deterministički vrati listu porodica primjenjivih na ovu lekciju.
 
     Routing se oslanja na iste pouzdane server-side izvore kao ostatak sistema:
     route_topic_rules() (oblast/lekcija → topic-rule ID-jevi) i geometrijski
     router. Nikad ne gleda učenikovu poruku.
+
+    OVO JE LEGACY PUT. Koristi se SAMO za lekcije koje nemaju uključen ugovor
+    (matbot/contracts/). Ponašanje je NEPROMIJENJENO u odnosu na stanje prije
+    uvođenja motora — uključujući ručno određen redoslijed porodica za lekcije
+    razlomaka 6. razreda, koji sada živi u izolovanoj granici
+    `matbot/legacy/practice_routing.py`. Nova lekcija se NE dodaje tamo nego
+    ugovorom (vidi docs/LESSON_CONTRACTS.md).
     """
-    del grade  # trenutno ne mijenja skup porodica; zadržano radi budućih pravila
     haystack = f"{oblast or ''} {lesson_title or ''}"
 
     if _CONSTRUCTION_RE.search(haystack):
@@ -154,6 +171,9 @@ def applicable_families(grade, oblast, lesson_title):
     if "sistemi" in topic_ids:
         return list(_SYSTEM_FAMILIES)
     if "razlomci" in topic_ids:
+        legacy_families = legacy_routing.grade6_fraction_families(grade, lesson_id)
+        if legacy_families is not None:
+            return legacy_families
         return list(_FRACTION_FAMILIES)
     if geometry_scope:
         return list(_GEOMETRY_FAMILIES)
@@ -179,7 +199,7 @@ def _least_recently_used(candidates, recently_used):
 
 
 def select_family(applicable, recently_used=None, completed_families=None,
-                  retry_required=False, current_family=""):
+                  retry_required=False, current_family="", difficulty_request=""):
     """Izaberi porodicu za SLJEDEĆI generisani zadatak.
 
     Pravila (server je jedini koji ovo odlučuje, prije AI poziva):
@@ -195,6 +215,21 @@ def select_family(applicable, recently_used=None, completed_families=None,
 
     if retry_required and current_family in applicable:
         return current_family
+
+    # Teži/lakši je promjena nivoa ISTE izabrane lekcije, ne poziv da se pređe
+    # na sporednu zajedničku porodicu.
+    #
+    # NAMJERNO ZADRŽANO ZA LEGACY PUT. Ranije je ovo značilo „prva porodica iz
+    # ručno složene liste TE lekcije“, pa je težina zavisila od toga šta je neko
+    # slučajno napisao prvo; te liste po lekciji su uklonjene, pa je applicable[0]
+    # sada primarni oblik DOMENA (razlomci/sistemi/geometrija/…), što i dalje
+    # čuva identitet lekcije kod zahtjeva za težim/lakšim.
+    #
+    # Lekcije s uključenim ugovorom OVO NE KORISTE: tamo težinu nosi
+    # matbot/contracts/difficulty.py (deklarisane dimenzije i granice), pa
+    # „teže“ ne bira drugi zadatak nego druge brojeve iste vještine.
+    if difficulty_request in ("harder", "easier"):
+        return applicable[0]
 
     remaining = [f for f in applicable if f not in completed_families]
     if remaining:

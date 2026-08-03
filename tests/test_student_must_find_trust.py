@@ -140,7 +140,7 @@ def test_correct_answer_kind_for_solve_system_passes():
 # 7. Canonical server metadata never leaks to the browser
 # ---------------------------------------------------------------------------
 
-def test_all_31_families_have_canonical_student_must_find_and_task_form():
+def test_all_families_have_canonical_student_must_find_and_task_form():
     for family_id, contract in CONTRACTS.items():
         assert contract.canonical_student_must_find, f"{family_id} nema canonical_student_must_find"
         assert contract.canonical_task_form, f"{family_id} nema canonical_task_form"

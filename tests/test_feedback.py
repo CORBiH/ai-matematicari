@@ -279,7 +279,7 @@ def test_first_wrong_never_exceeds_bound_across_many_shapes():
 
 def _payload(msg="Daj zadatak.", **kw):
     base = {
-        "session_id": "sess-fb", "grade": 6, "selected_topic": "6-04-001",
+        "session_id": "sess-fb", "grade": 6, "selected_topic": "6-04-007",
         "selected_oblast": "", "student_message": msg, "intent": "",
         "difficulty_request": "", "interaction_phase": "", "last_tutor_task": "",
         "interaction_type": "", "selected_option_id": "", "client_turn_id": "",

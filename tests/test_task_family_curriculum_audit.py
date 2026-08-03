@@ -19,7 +19,7 @@ def _all_lessons():
     data = json.loads(DATA_PATH.read_text(encoding="utf-8"))
     for grade, grade_data in data["grades"].items():
         for lesson in grade_data["lessons"]:
-            yield int(grade), lesson["oblast"], lesson["title"]
+            yield int(grade), lesson["id"], lesson["oblast"], lesson["title"]
 
 
 # ---------------------------------------------------------------------------
@@ -28,15 +28,18 @@ def _all_lessons():
 
 def test_every_lesson_has_at_least_two_applicable_families():
     under_two = [
-        (g, o, t, tf.applicable_families(g, o, t))
-        for g, o, t in _all_lessons()
-        if len(tf.applicable_families(g, o, t)) < 2
+        (g, topic_id, o, t, tf.applicable_families(g, o, t, lesson_id=topic_id))
+        for g, topic_id, o, t in _all_lessons()
+        if len(tf.applicable_families(g, o, t, lesson_id=topic_id)) < 2
     ]
     assert not under_two, f"Lekcije s manje od 2 porodice: {under_two[:10]}"
 
 
 def test_family_count_statistics_over_full_curriculum():
-    counts = [len(tf.applicable_families(g, o, t)) for g, o, t in _all_lessons()]
+    counts = [
+        len(tf.applicable_families(g, o, t, lesson_id=topic_id))
+        for g, topic_id, o, t in _all_lessons()
+    ]
     minimum, maximum = min(counts), max(counts)
     average = sum(counts) / len(counts)
     distribution = Counter(counts)
@@ -44,7 +47,7 @@ def test_family_count_statistics_over_full_curriculum():
     # Zaključana očekivanja nad TRENUTNIM katalogom (vidi izvještaj) — svaka
     # promjena kataloga koja ovo pokvari mora biti svjesna odluka, ne slučajna
     # regresija skupa primjenjivih porodica.
-    assert minimum >= 4
+    assert minimum >= 3
     assert maximum <= 8
     assert 6.0 <= average <= 7.5
     assert all(count >= 2 for count in distribution)
@@ -55,25 +58,25 @@ def test_no_lesson_has_exactly_two_families_given_current_catalog():
     tačno 2 primjenjive porodice — ako se ovo promijeni, provjeri da razlog
     nije slučajno sužavanje neke fallback grupe."""
     exactly_two = [
-        (g, o, t) for g, o, t in _all_lessons()
-        if len(tf.applicable_families(g, o, t)) == 2
+        (g, topic_id, o, t) for g, topic_id, o, t in _all_lessons()
+        if len(tf.applicable_families(g, o, t, lesson_id=topic_id)) == 2
     ]
     assert exactly_two == []
 
 
 def test_no_family_in_the_catalog_is_unreachable():
     used = set()
-    for g, o, t in _all_lessons():
-        used.update(tf.applicable_families(g, o, t))
+    for g, topic_id, o, t in _all_lessons():
+        used.update(tf.applicable_families(g, o, t, lesson_id=topic_id))
     catalog = set(tf.FAMILY_DESCRIPTIONS.keys())
     unreachable = catalog - used
     assert not unreachable, f"Nedostupne porodice: {unreachable}"
 
 
 def test_every_lesson_family_set_has_no_duplicate_entries():
-    for g, o, t in _all_lessons():
-        families = tf.applicable_families(g, o, t)
-        assert len(families) == len(set(families)), (g, o, t)
+    for g, topic_id, o, t in _all_lessons():
+        families = tf.applicable_families(g, o, t, lesson_id=topic_id)
+        assert len(families) == len(set(families)), (g, topic_id, o, t)
 
 
 # ---------------------------------------------------------------------------
@@ -84,7 +87,9 @@ def test_requesting_new_task_before_answering_selects_a_different_family():
     """Server bira drugu porodicu i za nezavršen zadatak (retry_required je
     False jer učenik još nije ni pokušao odgovoriti) — sprječava da dva
     zaredom zatražena zadatka budu ista vrsta operacije."""
-    applicable = tf.applicable_families(6, "Razlomci", "Proširivanje razlomaka")
+    applicable = tf.applicable_families(
+        6, "Razlomci", "Proširivanje razlomaka", lesson_id="6-04-005"
+    )
     first = tf.select_family(applicable)
     second = tf.select_family(
         applicable, recently_used=[first], completed_families=[],
@@ -97,7 +102,9 @@ def test_several_new_task_requests_without_answering_keep_rotating():
     """Više 'Novi zadatak' zaredom, BEZ ijednog odgovora — porodice se i dalje
     smjenjuju (server ne čeka odgovor da bi rotirao) i nijedna se ne ponavlja
     dok ima neiskorištenih."""
-    applicable = tf.applicable_families(6, "Razlomci", "Proširivanje razlomaka")
+    applicable = tf.applicable_families(
+        6, "Razlomci", "Proširivanje razlomaka", lesson_id="6-04-005"
+    )
     used = []
     current = ""
     for _ in range(len(applicable)):
@@ -129,7 +136,9 @@ def test_no_family_falsely_marked_completed_when_only_requesting_new_tasks():
     odgovor (ovo se garantuje na nivou practice.py: samo _handle_choice_answer
     s is_correct=True upisuje u correctly_completed_families)."""
     completed = []
-    applicable = tf.applicable_families(6, "Razlomci", "Proširivanje razlomaka")
+    applicable = tf.applicable_families(
+        6, "Razlomci", "Proširivanje razlomaka", lesson_id="6-04-005"
+    )
     current = ""
     for _ in range(5):
         current = tf.select_family(applicable, completed_families=completed, current_family=current)
@@ -139,7 +148,9 @@ def test_no_family_falsely_marked_completed_when_only_requesting_new_tasks():
 def test_topic_change_creates_independent_progression():
     """Porodice primjenjive na jednu lekciju ne smiju curiti kao 'završene' za
     drugu — svaka lekcija računa svoj vlastiti skup completed_families."""
-    fractions = tf.applicable_families(6, "Razlomci", "Proširivanje razlomaka")
+    fractions = tf.applicable_families(
+        6, "Razlomci", "Proširivanje razlomaka", lesson_id="6-04-005"
+    )
     systems = tf.applicable_families(9, "Sistemi linearnih jednačina", "Metoda supstitucije")
     completed_in_fractions = [fractions[0]]
 

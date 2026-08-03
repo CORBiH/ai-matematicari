@@ -1,11 +1,19 @@
 """Učitava data/topics.json (generisan iz Excela, vidi scripts/build_topics_json.py)
 i servira ga u obliku koji frontend očekuje na GET /api/ai-tutor/topics."""
 import json
+import re
 from pathlib import Path
 
 DATA_PATH = Path(__file__).resolve().parent.parent / "data" / "topics.json"
 
 _cache = None
+_TOPIC_ID_RE = re.compile(r"^(?P<oblast_id>\d+-\d{2})-\d{3}$")
+
+
+def oblast_id_for_topic(topic_id):
+    """Vrati stabilni kanonski ID oblasti izveden iz kanonskog ID-ja lekcije."""
+    match = _TOPIC_ID_RE.fullmatch(str(topic_id or "").strip())
+    return match.group("oblast_id") if match else ""
 
 
 def _load():
@@ -17,13 +25,18 @@ def _load():
 
 
 def lesson_info(grade, topic_id):
-    """Vrati {'id','title','oblast'} za lekciju ili None ako ne postoji."""
+    """Vrati kanonske identifikatore i nazive lekcije ili None."""
     grade_data = _load().get("grades", {}).get(str(grade).strip())
     if not grade_data or not topic_id:
         return None
     for lesson in grade_data.get("lessons", []):
         if lesson["id"] == topic_id:
-            return {"id": lesson["id"], "title": lesson["title"], "oblast": lesson["oblast"]}
+            return {
+                "id": lesson["id"],
+                "title": lesson["title"],
+                "oblast_id": oblast_id_for_topic(lesson["id"]),
+                "oblast": lesson["oblast"],
+            }
     return None
 
 
@@ -43,7 +56,11 @@ def topics_response(grade):
         grouped[oblast] = []
     for lesson in grade_data.get("lessons", []):
         grouped.setdefault(lesson["oblast"], []).append(
-            {"topic": lesson["id"], "display_name": lesson["title"]}
+            {
+                "topic": lesson["id"],
+                "oblast_id": oblast_id_for_topic(lesson["id"]),
+                "display_name": lesson["title"],
+            }
         )
 
     return {"grouped": grouped, "oblast_order": grade_data.get("oblast_order", [])}

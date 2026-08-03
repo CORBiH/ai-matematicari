@@ -20,7 +20,7 @@ from tests.conftest import FakeLLM, make_options, make_output, make_task
 
 def turn_payload(msg="Daj zadatak.", **kw):
     base = {
-        "session_id": "sess-dup-diag", "grade": 6, "selected_topic": "6-04-005",
+        "session_id": "sess-dup-diag", "grade": 6, "selected_topic": "6-04-007",
         "selected_oblast": "", "student_message": msg, "intent": "",
         "difficulty_request": "", "interaction_phase": "", "last_tutor_task": "",
         "interaction_type": "", "selected_option_id": "", "client_turn_id": "",
@@ -195,7 +195,7 @@ def test_case14_structured_log_includes_sanitized_fields_and_equivalence_type(ca
     assert len(diag_records) == 1
     msg = diag_records[0].message
     assert "request_id=" in msg
-    assert "topic=6-04-005" in msg
+    assert "topic=6-04-007" in msg
     assert "pairs=[(0, 2)]" in msg
     assert "equivalence_types=['equivalent_fraction']" in msg
     assert "correct_option_index=0" in msg

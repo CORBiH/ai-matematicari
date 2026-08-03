@@ -1,13 +1,13 @@
 # MAT-BOT — current state
 
-Last updated: 2026-08-02 (D35T fix pass). Test baseline: **1465 passing**.
+Last updated: 2026-08-02 (Practice lesson-contract fix pass). Test baseline: **1505 passing**.
 Runtime model: `gpt-5-mini`, reasoning effort `low`.
 
 ## Maturity by area
 
 | Area | State |
 |---|---|
-| Practice | Hardened. Extensive deterministic validation: family contracts, option equivalence, ordered-pair and equivalent-system substitution, numeric and geometry checks, idempotent choice retry. |
+| Practice | Hardened. Family contracts are followed by fail-closed lesson-semantic contracts for the mapped grade-6 fraction lessons. Harder/easier prefers the primary lesson family; exact option ground truth/classified error uniqueness, ordered-pair/system substitution, numeric and geometry checks, and idempotent choice retry remain enforced. |
 | Result / Quick | Hardened for text and for secure image input. Transport-level MathJax over-escaping repair, conversational-repair handling, context-free by design. |
 | Image upload | Hardened. Bounded in-memory read, pixel-bomb guard, format sniffing, re-encode, strict metadata-only logging. Quick mode only. |
 | Security / transport | Hardened. Signed token, two-tier rate limiting, per-session lock, ProxyFix, body-size cap, no secret ever logged. |

@@ -76,6 +76,10 @@ def validate_chat_payload(payload):
             raise ValidationError("INVALID_OPTION_ID", "Izbor nije prepoznat. Osvježi stranicu i pokušaj ponovo.")
 
     selected_topic = payload.get("selected_topic")
+    if mode == "practice" and not selected_topic:
+        raise ValidationError(
+            "MISSING_TOPIC", "Izaberi lekciju prije pokretanja vježbe."
+        )
     if selected_topic:
         if not isinstance(selected_topic, str) or not lesson_info(grade, selected_topic):
             raise ValidationError("UNKNOWN_TOPIC", "Izabrana lekcija nije prepoznata za ovaj razred.")

@@ -82,6 +82,23 @@ def make_options(*texts):
     return [Option(text=t) for t in texts]
 
 
+# --- ČVOROVI SERVERSKOG KOSTURA (matbot/contracts/evidence.py) ---------------
+# Male pomoćne funkcije da testovi generatora/verifikatora pišu izraze čitljivo.
+# Namjerno ne znaju nijednu lekciju. (Modelov „dokaz“ više ne postoji — server
+# konstruiše kostur; ovi helperi grade INTERNE čvorove, ne izlaz modela.)
+
+def frac(numerator, denominator=1):
+    """Literal čvor `num/den` (necijeli znak ide uz brojnik)."""
+    from matbot.contracts import evidence as _ev
+    return _ev.Node(num=numerator, den=denominator)
+
+
+def node(op, left, right):
+    """Binarna operacija nad dva čvora."""
+    from matbot.contracts import evidence as _ev
+    return _ev.Node(op=op, args=(left, right))
+
+
 # Default zadatak MORA zadovoljiti ugovor porodice (matbot/task_family_validation.py):
 # „proširi ... nazivnik“ + četiri razlomka = expand_to_given_denominator, a ujedno
 # ne pokreće nijedan zabranjeni oblik opštih (fallback) porodica. Raniji
@@ -134,11 +151,11 @@ _FAMILY_TASK_TEMPLATES = {
         ("$\\frac{5}{8}$", "$\\frac{3}{5}$", "$\\frac{4}{5}$", "$\\frac{2}{8}$"),
     ),
     "detect_student_error": (
-        "Učenik je napisao $\\frac{1}{2}+\\frac{1}{3}=\\frac{2}{5}$. Šta je pogriješio?",
-        ("Sabrao je brojnike i nazivnike odvojeno.",
-         "Pogrešno je skratio rezultat.",
+        "Učenik je napisao $\\frac{3}{7}=\\frac{12}{21}$. Šta je pogriješio?",
+        ("Brojnik je pomnožio sa 4, a nazivnik sa 3; oba treba pomnožiti istim brojem.",
+         "Pogrešno je skratio tačan rezultat.",
          "Zamijenio je brojnik i nazivnik.",
-         "Pomnožio je umjesto da sabere."),
+         "Trebao je sabrati brojnik i nazivnik."),
     ),
     "fraction_word_problem": (
         "Amar je pojeo $\\frac{2}{8}$ torte, a Lejla $\\frac{3}{8}$ torte. "

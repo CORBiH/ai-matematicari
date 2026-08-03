@@ -28,13 +28,16 @@ import logging
 import random
 import uuid
 
-from matbot import (config, feedback, geometry_rules, geometrycheck, option_equivalence,
-                    prompts, systemcheck, task_families)
+from matbot import (config, feedback, geometry_rules, geometrycheck,
+                    option_equivalence, prompts, systemcheck, task_families)
+from matbot.contracts import archetypes as contract_archetypes
+from matbot.contracts import pipeline as contract_pipeline
+from matbot.contracts import registry as contract_registry
 from matbot.llm import LLMError, failure_diagnostics_kv
-from matbot.mathsafe import sanitize_and_validate_math_text, sanitize_math_text
+from matbot.mathsafe import sanitize_and_validate_math_text
 from matbot.mathcheck import find_numeric_inconsistencies
 from matbot.option_equivalence import find_equivalent_option_pairs
-from matbot.schema import InvalidOutputError, validate_output
+from matbot.schema import InvalidOutputError, NewTask, Option, validate_output
 from matbot.task_family_validation import (FamilyContractError, question_geometry_policy,
                                            question_numeric_policy, validate_task_family)
 from matbot.terminology import normalize_terminology
@@ -43,6 +46,15 @@ from matbot.topics import lesson_info
 logger = logging.getLogger("matbot.practice")
 
 SAFE_ERROR_MESSAGE = "Nešto je zapelo pri sastavljanju odgovora. Pošalji poruku ponovo za koji trenutak."
+
+# Lekcija čiji ugovor je izričito označen kao `unsupported`: nema sigurnog
+# načina da se za nju generiše provjerljiv zadatak. Poruka je JASNA i drukčija
+# od privremene greške — i vraća se BEZ ijednog AI poziva. Nikad se tiho ne
+# prelazi na legacy niti na zadatak druge lekcije.
+PRACTICE_UNAVAILABLE_MESSAGE = (
+    "Za ovu lekciju vježba trenutno nije dostupna. Izaberi drugu lekciju iz iste "
+    "oblasti ili pređi na „Objasni mi“."
+)
 
 _NEW_TASK_INTRO = "Evo zadatka."
 _HARDER_TASK_INTRO = "Evo težeg zadatka."
@@ -214,7 +226,47 @@ def _reject_if_numerically_inconsistent(text, where):
         raise InvalidOutputError(f"{issues[0]} [{where}]")
 
 
-def _apply_new_task(session, new_task, task_family="", request_id=""):
+def _log_contract_rejection(request_id, diagnostics):
+    """Strukturisan log odbijanja po ugovoru lekcije.
+
+    SAMO interni, dužinski ograničeni podaci — nikad API ključ, auth token ni
+    neograničen izlaz modela, i NIKAD se ne šalje u browser (učenik vidi
+    postojeći SAFE_ERROR_MESSAGE)."""
+    logger.warning(
+        "practice_contract_rejected request_id=%s topic=%s contract_version=%s skill=%s "
+        "archetype=%s stage=%s code=%s engaged=%s details=%s",
+        request_id, diagnostics.get("topic"), diagnostics.get("contract_version"),
+        diagnostics.get("skill"), diagnostics.get("archetype"), diagnostics.get("stage"),
+        diagnostics.get("code"), diagnostics.get("engaged"),
+        _clip_for_log(diagnostics.get("details"), 400),
+    )
+
+
+def _task_from_skeleton(skeleton):
+    """Serverski kostur (matbot/contracts/generator.py) → NewTask za
+    _apply_new_task. Jedina tačka na kojoj kostur postaje objavljiv zadatak —
+    model ovdje nema nikakav ulaz."""
+    return NewTask(
+        text=skeleton.question_text,
+        expected_answer=skeleton.expected_answer,
+        difficulty=skeleton.difficulty_label,
+        options=[Option(text=text) for text in skeleton.option_texts],
+        correct_option_index=skeleton.correct_index,
+    )
+
+
+def _active_task_texts(session):
+    """Server-owned tekstovi aktivnog zadatka — izvor dozvoljenih vrijednosti
+    za kapiju vjernosti proze (contract_pipeline.verify_prose_fidelity)."""
+    return [
+        session["current_task"] or "",
+        session["expected_answer_summary"] or "",
+        *[option["text"] for option in session["current_options"] or []],
+    ]
+
+
+def _apply_new_task(session, new_task, task_family="", request_id="",
+                    contract=None, archetype=""):
     """Sanitizuje tekst zadatka i sve 4 opcije, promiješa opcije i primjenjuje
     svježe stanje na sesiju (server je jedini koji dodjeljuje ID-jeve opcijama
     i pamti koji je tačan). Vraća sanitizovan tekst zadatka.
@@ -238,16 +290,35 @@ def _apply_new_task(session, new_task, task_family="", request_id=""):
     # pogrešan predmet ispitivanja („Učenik je napisao... Šta je pogriješio?“,
     # „Da li uređeni par zadovoljava sistem?“ kad namjerno NE zadovoljava)
     # preskaču ovu provjeru — vidi question_numeric_policy().
-    if question_numeric_policy(task_family) != "allow_intentional_mismatch":
+    # Politika je server-derived: za lekciju s ugovorom nosi je ARHETIP
+    # (matbot/contracts/archetypes.py), inače porodica — u oba slučaja nikad
+    # metapodatak modela ni formulacija pitanja.
+    contract_archetype = (
+        contract_archetypes.archetype_for(archetype) if contract is not None else None
+    )
+    if contract_archetype is not None:
+        numeric_policy = contract_archetype.question_numeric_policy
+        geometry_policy = contract_archetype.question_geometry_policy
+    else:
+        numeric_policy = question_numeric_policy(task_family)
+        geometry_policy = question_geometry_policy(task_family)
+
+    # Za lekciju s ugovorom je `new_task` SERVERSKI render kostura
+    # (matbot/contracts/generator.py) — model ga nije pisao. Sve provjere ispod
+    # ipak OSTAJU i za taj put: one su druga, jeftina odbrambena mreža protiv
+    # defekta samog generatora, i drže engine i legacy tekst pod identičnim
+    # pravilima (sanitizacija, terminologija, duplikati, potpis ponavljanja).
+
+    if numeric_policy != "allow_intentional_mismatch":
         _reject_if_numerically_inconsistent(task_text, "tekst zadatka")
 
-    # Geometrijska notacija TEKSTA PITANJA — politika je po porodici, isto kao
-    # numerička: porodice čiji je predmet ispitivanja BAŠ pogrešna oznaka
-    # („Učenik je napisao $O=\pi D$. Gdje je greška?“) je smiju prikazati.
+    # Geometrijska notacija TEKSTA PITANJA — ista logika kao numerička: oblik
+    # čiji je predmet ispitivanja BAŠ pogrešna oznaka („Učenik je napisao
+    # $O=\pi D$. Gdje je greška?“) je smije prikazati.
     geometry_scope, geometry_figures = _geometry_context(session)
     _reject_if_geometry_notation_invalid(
         task_text, geometry_scope, geometry_figures, "tekst zadatka",
-        policy=question_geometry_policy(task_family),
+        policy=geometry_policy,
     )
 
     sanitized_texts = []
@@ -319,23 +390,30 @@ def _apply_new_task(session, new_task, task_family="", request_id=""):
     # ikakve mutacije sesije i bez drugog AI poziva. Provjerava se VIDLJIV
     # tekst (nakon sanitizacije i normalizacije terminologije) — ne samo ono
     # što je model deklarisao o sebi.
-    try:
-        validate_task_family(
-            task_family,
-            question=task_text,
-            option_texts=sanitized_texts,
-            correct_option_index=new_task.correct_option_index,
-            expected_answer=new_task.expected_answer,
-            difficulty=new_task.difficulty,
-            declared={
-                "task_family": new_task.task_family,
-                "student_must_find": new_task.student_must_find,
-                "answer_kind": new_task.answer_kind,
-                "task_form": new_task.task_form,
-            },
-        )
-    except FamilyContractError as e:
-        raise InvalidOutputError(f"family_contract_mismatch: {e}") from e
+    # Za lekciju s ugovorom OVDJE nema dodatne provjere: zadatak je serverski
+    # kostur, konstruisan i verifikovan PRIJE jedinog AI poziva
+    # (contract_pipeline.prepare_task), a modelov new_task je odbačen u
+    # _handle_text_turn. UKLJUČEN ugovor i dalje NIKAD ne pada nazad na legacy
+    # — defekt generatora se vidi kao odbijanje, ne kao tihi povratak na staro.
+    if contract is None:
+        # --- LEGACY PUT (lekcije bez ugovora) — nepromijenjen ---------------
+        try:
+            validate_task_family(
+                task_family,
+                question=task_text,
+                option_texts=sanitized_texts,
+                correct_option_index=new_task.correct_option_index,
+                expected_answer=new_task.expected_answer,
+                difficulty=new_task.difficulty,
+                declared={
+                    "task_family": new_task.task_family,
+                    "student_must_find": new_task.student_must_find,
+                    "answer_kind": new_task.answer_kind,
+                    "task_form": new_task.task_form,
+                },
+            )
+        except FamilyContractError as e:
+            raise InvalidOutputError(f"family_contract_mismatch: {e}") from e
 
     # --- DETERMINISTIČKA PROVJERA SISTEMA (matbot/systemcheck.py) ----------
     # Živi nalaz: model je prikazao jedan sistem, a riješio drugi, pa NIJEDNA
@@ -489,15 +567,22 @@ def run_practice_turn(store, llm, turn):
     request_id = uuid.uuid4().hex[:12]
 
     lesson = lesson_info(turn["grade"], turn["selected_topic"])
-    lesson_id = lesson["id"] if lesson else (turn["selected_topic"] or "")
-    lesson_title = lesson["title"] if lesson else ""
-    oblast = lesson["oblast"] if lesson else (turn["selected_oblast"] or "")
+    if lesson is None:
+        # Direktni pozivaoci i zastarjeli/zlonamjerni klijenti ne smiju dobiti
+        # fallback porodicu niti zadržati zadatak prethodne lekcije.
+        logger.warning("practice_turn request_id=%s invalid_curriculum_context", request_id)
+        return _error_response()
+    lesson_id = lesson["id"]
+    lesson_title = lesson["title"]
+    oblast_id = lesson["oblast_id"]
+    oblast = lesson["oblast"]
 
     session = store.load(
         session_id=turn["session_id"],
         grade=turn["grade"],
         lesson_id=lesson_id,
         lesson_title=lesson_title,
+        oblast_id=oblast_id,
         oblast=oblast,
         mode="practice",
     )
@@ -508,14 +593,9 @@ def run_practice_turn(store, llm, turn):
 
 
 def _handle_text_turn(store, llm, session, turn, lesson_id, request_id):
-    # Server je izvor istine za zadatak; klijentski last_tutor_task koristimo
-    # SAMO da preživimo restart servera (tekst zadatka nije interno rješenje —
-    # expected_answer_summary/opcije ostaju prazni i model tada sam pravi novi
-    # zadatak s opcijama). Sanitizovan ISTO kao svaki tekst iz modela.
-    if not session["current_task"] and turn["last_tutor_task"]:
-        session["current_task"] = sanitize_math_text(
-            turn["last_tutor_task"][: config.MAX_TASK_CHARS]
-        )
+    # Browserov last_tutor_task je samo kompatibilno transportno polje. Nikad
+    # ne obnavlja serverski zadatak: bez očekivanog odgovora, opcija i otiska
+    # izvornog kurikuluma nije dokaz identiteta, posebno nakon promjene lekcije.
 
     # Snimljeno PRIJE AI poziva: ako bilo šta ispod baci grešku, ovo je jedina
     # istina koju smijemo vratiti — session je lokalna kopija i NIKAD se ne
@@ -523,19 +603,77 @@ def _handle_text_turn(store, llm, session, turn, lesson_id, request_id):
     active_task_before_llm = session["current_task"]
     retry_required_before_llm = bool(session["retry_required"])
 
-    # Porodicu zadatka bira SERVER, prije jedinog AI poziva u turnu — model je
-    # samo dobije kao obavezu. Time rotacija vrsta zadataka ne zavisi od toga
-    # hoće li se model „sjetiti“ da promijeni obrazac.
-    applicable = task_families.applicable_families(
-        turn["grade"], session["oblast"], session["lesson_title"]
-    )
-    selected_family = task_families.select_family(
-        applicable,
-        recently_used=session["recently_used_families"],
-        completed_families=session["correctly_completed_families"],
-        retry_required=session["retry_required"],
-        current_family=session["current_family"],
-    )
+    # Oblik sljedećeg zadatka bira SERVER, prije jedinog AI poziva. Dva puta,
+    # bez preklapanja i bez tihog fallbacka između njih:
+    #   • lekcija s UKLJUČENIM ugovorom → arhetip iz ugovora (motor)
+    #   • lekcija bez ugovora           → porodica (nepromijenjen legacy put)
+    contract = contract_registry.contract_for(session["lesson_id"])
+    contract_state = contract_registry.practice_state(contract)
+
+    if contract_state == contract_registry.STATE_UNAVAILABLE:
+        # Ugovor je izričito označen kao nepodržan: nema sigurnog načina da se
+        # generiše provjerljiv zadatak. Jasna poruka, BEZ AI poziva, bez
+        # prelaska na legacy i bez zadatka druge lekcije.
+        logger.info(
+            "practice_turn request_id=%s practice_unavailable topic=%s", request_id, lesson_id
+        )
+        return {"answer": PRACTICE_UNAVAILABLE_MESSAGE, "last_tutor_task": active_task_before_llm}
+
+    prepared_skeleton = None
+    if contract_state == contract_registry.STATE_ENGINE:
+        selected_family = ""
+        # Server-owned PLAN: učenikova izričita molba (zatvorena intent tabela)
+        # ima prednost kad je ugovor dozvoljava, inače rotacija. Kostur zadatka
+        # se konstruiše i verifikuje PRIJE jedinog AI poziva — pad pripreme na
+        # bootstrapu (nema aktivnog zadatka, zadatak je nužan) vraća sigurnu
+        # poruku BEZ ijednog potrošenog poziva i bez mutacije stanja.
+        plan = contract_pipeline.build_plan(
+            contract,
+            student_message=turn["student_message"],
+            recently_used=session["recently_used_families"],
+            current=session["current_family"],
+            retry_required=session["retry_required"],
+            difficulty_request=turn["difficulty_request"],
+        )
+        selected_archetype = plan.archetype_id
+        selected_shape = selected_archetype
+        prepared = contract_pipeline.prepare_task(
+            contract, plan,
+            difficulty_request=turn["difficulty_request"],
+            avoid_texts=session["recent_tasks"],
+        )
+        if prepared.ok:
+            prepared_skeleton = prepared.skeleton
+            logger.info(
+                "practice_plan request_id=%s archetype=%s source=%s requested=%s",
+                request_id, plan.archetype_id, plan.source, plan.requested or "-",
+            )
+        else:
+            _log_contract_rejection(
+                request_id,
+                contract_pipeline.diagnostics(contract, selected_archetype, prepared),
+            )
+            if not active_task_before_llm:
+                # Bootstrap bez kostura nema šta da objavi — odbij odmah.
+                return _error_response(active_task_before_llm)
+            # Aktivni zadatak postoji: turn smije nastaviti kao razgovor o
+            # njemu, ali novi zadatak se u ovom turnu NE može izdati.
+    else:
+        contract = None
+        selected_archetype = ""
+        applicable = task_families.applicable_families(
+            turn["grade"], session["oblast"], session["lesson_title"],
+            lesson_id=session["lesson_id"],
+        )
+        selected_family = task_families.select_family(
+            applicable,
+            recently_used=session["recently_used_families"],
+            completed_families=session["correctly_completed_families"],
+            retry_required=session["retry_required"],
+            current_family=session["current_family"],
+            difficulty_request=turn["difficulty_request"],
+        )
+        selected_shape = selected_family
 
     instructions = prompts.build_instructions(
         turn["grade"], lesson_title=session["lesson_title"], oblast=session["oblast"]
@@ -548,11 +686,18 @@ def _handle_text_turn(store, llm, session, turn, lesson_id, request_id):
         interaction_phase=turn["interaction_phase"],
         task_family=selected_family,
         task_family_description=task_families.describe(selected_family),
+        contract=contract,
+        archetype=selected_archetype,
+        skeleton=prepared_skeleton,
     )
 
     try:
         result = llm.practice_turn(instructions, input_text)
-        validate_output(result.output)
+        # Za lekciju s ugovorom modelov new_task SADRŽAJ ništa ne znači (server
+        # objavljuje vlastiti kostur), pa se ni ne provjerava — new_task je tada
+        # samo signal „u ovom turnu se izdaje novi zadatak“. Nesavršena kopija
+        # ne smije srušiti turn koji server ionako objavljuje iz svog kostura.
+        validate_output(result.output, ignore_new_task_content=contract is not None)
         out = result.output
 
         # NAPOMENA: out.evaluation se OVDJE NIKAD ne koristi. Tekstualna poruka
@@ -563,9 +708,23 @@ def _handle_text_turn(store, llm, session, turn, lesson_id, request_id):
             session["hint_level"] = min(session["hint_level"] + 1, config.MAX_HINT_LEVEL)
 
         task_text = active_task_before_llm
-        if out.new_task is not None:
-            task_text = _apply_new_task(session, out.new_task, task_family=selected_family,
-                                       request_id=request_id)
+        if out.new_task is not None and contract is not None:
+            # SERVERSKI KOSTUR JE JEDINA ISTINA: modelov new_task se odbacuje u
+            # cijelosti, a objavljuje se render pripremljen prije poziva. Ako
+            # priprema nije uspjela, novi zadatak se u ovom turnu ne može
+            # izdati — fail closed, bez mutacije i bez drugog poziva.
+            if prepared_skeleton is None:
+                raise InvalidOutputError("new_task_without_prepared_skeleton")
+            task_text = _apply_new_task(
+                session, _task_from_skeleton(prepared_skeleton),
+                task_family=selected_shape, request_id=request_id,
+                contract=contract, archetype=selected_archetype,
+            )
+        elif out.new_task is not None:
+            task_text = _apply_new_task(
+                session, out.new_task, task_family=selected_shape,
+                request_id=request_id, contract=contract, archetype=selected_archetype,
+            )
 
         # Novi zadatak uvijek dobija kratak server-owned uvod. Modelov slobodni
         # `reply` se tada ne prikazuje i ne može prokrijumčariti hint prije prvog
@@ -617,27 +776,30 @@ def _handle_text_turn(store, llm, session, turn, lesson_id, request_id):
     except LLMError as e:
         logger.warning(
             "practice_turn request_id=%s category=%s topic=%s family=%s mode=practice %s",
-            request_id, e.category, lesson_id or "", selected_family or "",
+            request_id, e.category, lesson_id or "", selected_shape or "",
             failure_diagnostics_kv(e),
         )
         return _error_response(active_task_before_llm)
     except InvalidOutputError as e:
         logger.warning("practice_turn request_id=%s category=invalid_output detail=%s", request_id, e)
+        contract_diagnostics = getattr(e, "contract_diagnostics", None)
+        if contract_diagnostics:
+            _log_contract_rejection(request_id, contract_diagnostics)
         diagnostics = getattr(e, "duplicate_options_diagnostics", None)
         if diagnostics:
-            _log_duplicate_options(request_id, lesson_id, selected_family, diagnostics)
+            _log_duplicate_options(request_id, lesson_id, selected_shape, diagnostics)
         system_diagnostics = getattr(e, "system_diagnostics", None)
         if system_diagnostics:
-            _log_system_verification(request_id, lesson_id, selected_family, system_diagnostics)
+            _log_system_verification(request_id, lesson_id, selected_shape, system_diagnostics)
         equivalent_diagnostics = getattr(e, "equivalent_system_diagnostics", None)
         if equivalent_diagnostics:
             _log_equivalent_system_verification(
-                request_id, lesson_id, selected_family, equivalent_diagnostics
+                request_id, lesson_id, selected_shape, equivalent_diagnostics
             )
         ordered_pair_diagnostics = getattr(e, "ordered_pair_diagnostics", None)
         if ordered_pair_diagnostics:
             _log_ordered_pair_verification(
-                request_id, lesson_id, selected_family, ordered_pair_diagnostics
+                request_id, lesson_id, selected_shape, ordered_pair_diagnostics
             )
         return _error_response(active_task_before_llm)
     except Exception:
@@ -758,20 +920,48 @@ def _handle_choice_answer(store, llm, session, turn, lesson_id, request_id):
                 # matbot/feedback.py), bez drugog AI poziva. Isto važi i za
                 # 'reply' kao rezervni izvor hinta: ako i on krši konvenciju,
                 # oba izvora se prazne pa feedback.py koristi GENERIC_HINT.
+                # KAPIJA VJERNOSTI PROZE (samo lekcija s ugovorom): hint o
+                # SERVERSKOM zadatku ne smije uvoditi brojeve koji se ne daju
+                # objasniti iz samog zadatka — takav hint se NE objavljuje nego
+                # tiho pada na siguran generički (isti mehanizam kao pogrešna
+                # geometrijska oznaka ispod), bez drugog AI poziva.
+                contract_session = (
+                    contract_registry.practice_state(
+                        contract_registry.contract_for(session["lesson_id"])
+                    ) == contract_registry.STATE_ENGINE
+                )
+                task_texts = _active_task_texts(session)
+
+                def _prose_faithful(candidate):
+                    if not contract_session:
+                        return True
+                    faithful, offending = contract_pipeline.verify_prose_fidelity(
+                        candidate, task_texts
+                    )
+                    if not faithful:
+                        logger.warning(
+                            "practice_choice request_id=%s prose_fidelity_hint_replaced "
+                            "offending=%s", request_id, list(offending)[:6],
+                        )
+                    return faithful
+
                 hint_source = ""
                 if out.hint:
                     hint_text, hint_safe = sanitize_and_validate_math_text(out.hint.strip())
                     if hint_safe:
                         candidate = normalize_terminology(hint_text)
-                        if geometrycheck.is_geometry_clean(candidate, geo_scope, geo_figures):
+                        if (geometrycheck.is_geometry_clean(candidate, geo_scope, geo_figures)
+                                and _prose_faithful(candidate)):
                             hint_source = candidate
-                        else:
+                        elif not geometrycheck.is_geometry_clean(candidate, geo_scope, geo_figures):
                             logger.warning(
                                 "practice_choice request_id=%s geometry_notation_hint_replaced",
                                 request_id,
                             )
                 reply_source = reply
                 if not geometrycheck.is_geometry_clean(reply, geo_scope, geo_figures):
+                    reply_source = ""
+                elif not _prose_faithful(reply):
                     reply_source = ""
                 reply = feedback.shape_first_wrong_feedback(
                     hint_source,

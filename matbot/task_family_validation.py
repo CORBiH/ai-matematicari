@@ -136,6 +136,11 @@ _ASKS_STATEMENT_RE = re.compile(
     re.IGNORECASE,
 )
 
+_VISIBLE_FRACTION_RE = re.compile(
+    r"\\frac\s*\{\s*(-?\d+)\s*\}\s*\{\s*(-?\d+)\s*\}"
+    r"|(?<![\d/])(-?\d+)\s*/\s*(-?\d+)(?![\d/])"
+)
+
 # Dvosmislen opseg množenja u prevodu rečenice: „tri puta broj uvećan za 5“
 # može značiti 3x+5 ili 3(x+5). Ovo je namjerno USKA leksička zabrana samo za
 # translate_to_equation; ne pokušava razumjeti proizvoljan bosanski tekst.
@@ -286,7 +291,7 @@ class FamilyContract:
 
       1. Pet ISPRAVNIH find_expansion_factor zadataka lažno odbijeno jer je
          model deklarisao task_form="direct_calculation" dok je ugovor
-         dozvoljavao samo "recognition"/"missing_value" (provjera svih 31
+         dozvoljavao samo "recognition"/"missing_value" (provjera svih porodica
          porodice pokazala je ≤2 od mogućih 8 vrijednosti task_form svuda —
          sistemski propust, ne izolovan slučaj).
       2. Ispravan verify_ordered_pair zadatak (konkretan par, pitanje da li
@@ -431,6 +436,58 @@ def _correct_is_prose(t):
 
 def _has_context(t):
     return bool(_CONTEXT_WORD_RE.search(t.question)) and len(t.question) >= 60
+
+
+
+# --- LEGACY: predikati za pet porodica koje opslužuju samo nemigrirane lekcije
+# (vidi matbot/legacy/practice_routing.py). Brišu se u Fazi D zajedno s njima.
+
+_FRACTION_ADD_SUBTRACT_RE = re.compile(
+    r"(?:\\frac\s*\{[^{}]+\}\s*\{[^{}]+\}|-?\d+\s*/\s*-?\d+)"
+    r"\s*[+-]\s*"
+    r"(?:\\frac\s*\{[^{}]+\}\s*\{[^{}]+\}|-?\d+\s*/\s*-?\d+)"
+)
+_FRACTION_MULTIPLY_RE = re.compile(
+    r"(?:\\frac\s*\{[^{}]+\}\s*\{[^{}]+\}|-?\d+\s*/\s*-?\d+)"
+    r"\s*(?:\\cdot|\\times|[·*])\s*"
+    r"(?:\\frac\s*\{[^{}]+\}\s*\{[^{}]+\}|-?\d+\s*/\s*-?\d+)"
+)
+_FRACTION_DIVIDE_RE = re.compile(
+    r"(?:\\frac\s*\{[^{}]+\}\s*\{[^{}]+\}|-?\d+\s*/\s*-?\d+)"
+    r"\s*(?::|\\div)\s*"
+    r"(?:\\frac\s*\{[^{}]+\}\s*\{[^{}]+\}|-?\d+\s*/\s*-?\d+)"
+)
+
+
+def _fraction_denominators(question):
+    denominators = []
+    for match in _VISIBLE_FRACTION_RE.finditer(question or ""):
+        denominator = match.group(2) if match.group(1) is not None else match.group(4)
+        denominators.append(int(denominator))
+    return denominators
+
+
+def _adds_or_subtracts_equal_denominators(t):
+    denominators = _fraction_denominators(t.question)
+    return bool(_FRACTION_ADD_SUBTRACT_RE.search(t.question))         and len(denominators) >= 2 and denominators[0] == denominators[1]
+
+
+def _adds_or_subtracts_unlike_denominators(t):
+    denominators = _fraction_denominators(t.question)
+    return bool(_FRACTION_ADD_SUBTRACT_RE.search(t.question))         and len(denominators) >= 2 and denominators[0] != denominators[1]
+
+
+def _multiplies_fractions(t):
+    return bool(_FRACTION_MULTIPLY_RE.search(t.question))
+
+
+def _divides_fractions(t):
+    return bool(_FRACTION_DIVIDE_RE.search(t.question))
+
+
+def _is_fraction_expression(t):
+    operation_count = len(re.findall(r"\\cdot|\\times|\\div|[+*:·]", t.question))
+    return len(_fraction_denominators(t.question)) >= 3 and operation_count >= 2
 
 
 # ---------------------------------------------------------------------------
@@ -599,6 +656,80 @@ _register(FamilyContract(
         "opcije s istom skraćenom vrijednošću — tačan rezultat i njegov neskraćen/proširen zapis NE smiju "
         "biti dvije odvojene opcije."
     ),
+))
+
+_SPECIFIC_FRACTION_OPERATION_FORBIDDEN = (
+    ("ima_direktivu_prosirivanja", _q(_EXPAND_DIRECTIVE_RE)),
+    ("pita_za_faktor", _q(_ASKS_FACTOR_RE)),
+    ("prazno_mjesto_u_jednakosti", _q(_MISSING_SLOT_RE)),
+    ("pita_za_gresku", _q(_ASKS_ERROR_RE)),
+)
+
+_register(FamilyContract(
+    family_id="fraction_add_subtract_equal",
+    objective="učenik sabira ili oduzima razlomke jednakih imenilaca",
+    student_must_find=("value",), answer_kind=("fraction", "integer"),
+    task_form=("direct_calculation",),
+    required=(("sabiranje_ili_oduzimanje_jednakih_imenilaca",
+               _adds_or_subtracts_equal_denominators),),
+    forbidden=_SPECIFIC_FRACTION_OPERATION_FORBIDDEN,
+    prompt_must_be_unknown="rezultat sabiranja ili oduzimanja razlomaka jednakih imenilaca",
+    prompt_options_must_be="četiri različita rezultata",
+    prompt_positive_example="Izračunaj $\\frac{2}{7} + \\frac{3}{7}$.",
+    prompt_forbidden_example="Proširi $\\frac{2}{7}$ na zadani imenilac.",
+))
+
+_register(FamilyContract(
+    family_id="fraction_add_subtract_unlike",
+    objective="učenik sabira ili oduzima razlomke različitih imenilaca",
+    student_must_find=("value",), answer_kind=("fraction", "integer"),
+    task_form=("direct_calculation",),
+    required=(("sabiranje_ili_oduzimanje_razlicitih_imenilaca",
+               _adds_or_subtracts_unlike_denominators),),
+    forbidden=_SPECIFIC_FRACTION_OPERATION_FORBIDDEN,
+    prompt_must_be_unknown="rezultat sabiranja ili oduzimanja razlomaka različitih imenilaca",
+    prompt_options_must_be="četiri različita rezultata",
+    prompt_positive_example="Izračunaj $\\frac{1}{3} + \\frac{1}{4}$.",
+    prompt_forbidden_example="Proširi $\\frac{1}{3}$ na zadani imenilac.",
+))
+
+_register(FamilyContract(
+    family_id="fraction_multiplication",
+    objective="učenik množi dva razlomka",
+    student_must_find=("value",), answer_kind=("fraction", "integer"),
+    task_form=("direct_calculation",),
+    required=(("mnozenje_dva_razlomka", _multiplies_fractions),),
+    forbidden=_SPECIFIC_FRACTION_OPERATION_FORBIDDEN,
+    prompt_must_be_unknown="proizvod dva razlomka",
+    prompt_options_must_be="četiri različita rezultata",
+    prompt_positive_example="Izračunaj $\\frac{2}{3} \\cdot \\frac{3}{5}$.",
+    prompt_forbidden_example="Saberi $\\frac{2}{3}$ i $\\frac{3}{5}$.",
+))
+
+_register(FamilyContract(
+    family_id="fraction_division",
+    objective="učenik dijeli dva razlomka",
+    student_must_find=("value",), answer_kind=("fraction", "integer"),
+    task_form=("direct_calculation",),
+    required=(("dijeljenje_dva_razlomka", _divides_fractions),),
+    forbidden=_SPECIFIC_FRACTION_OPERATION_FORBIDDEN,
+    prompt_must_be_unknown="količnik dva razlomka",
+    prompt_options_must_be="četiri različita rezultata",
+    prompt_positive_example="Izračunaj $\\frac{2}{3} : \\frac{4}{5}$.",
+    prompt_forbidden_example="Pomnoži $\\frac{2}{3}$ i $\\frac{4}{5}$.",
+))
+
+_register(FamilyContract(
+    family_id="fraction_expression",
+    objective="učenik računa brojevni izraz s najmanje dvije operacije nad razlomcima",
+    student_must_find=("value",), answer_kind=("fraction", "integer"),
+    task_form=("direct_calculation",),
+    required=(("izraz_sa_vise_operacija", _is_fraction_expression),),
+    forbidden=_SPECIFIC_FRACTION_OPERATION_FORBIDDEN,
+    prompt_must_be_unknown="vrijednost cijelog brojevnog izraza",
+    prompt_options_must_be="četiri različita rezultata",
+    prompt_positive_example="Izračunaj $\\frac{1}{2} + \\frac{1}{3} \\cdot \\frac{3}{4}$.",
+    prompt_forbidden_example="Proširi $\\frac{1}{2}$ na zadani imenilac.",
 ))
 
 _register(FamilyContract(

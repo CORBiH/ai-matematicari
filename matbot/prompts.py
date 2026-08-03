@@ -13,6 +13,8 @@ ovaj fajl dodaje SAMO mode-specifične (Practice/Explain/Quick) instrukcije.
 import re
 
 from matbot import task_family_validation
+from matbot.contracts import archetypes as contract_archetypes
+from matbot.contracts import prompting as contract_prompting
 from matbot.mathsegments import DISPLAY, INLINE, TEXT, tokenize_math
 from matbot.rules import build_shared_math_rules
 
@@ -283,7 +285,8 @@ def _hint_guidance(hint_level):
 
 
 def build_input(session, student_message, intent="", difficulty_request="", interaction_phase="",
-                 trusted_choice_verdict=None, task_family="", task_family_description=""):
+                 trusted_choice_verdict=None, task_family="", task_family_description="",
+                 contract=None, archetype="", skeleton=None):
     """trusted_choice_verdict (samo za choice_answer turnove): dict sa
     'selected_text' (tekst opcije koju je učenik kliknuo), 'is_correct' (bool,
     SERVER-utvrđen, deterministički) i 'wrong_attempts' (broj PRETHODNIH
@@ -291,7 +294,11 @@ def build_input(session, student_message, intent="", difficulty_request="", inte
 
     task_family / task_family_description: porodica koju je SERVER izabrao za
     eventualni novi zadatak u ovom turnu (vidi matbot/task_families.py). Model
-    je ne bira i ne smije je preimenovati."""
+    je ne bira i ne smije je preimenovati.
+
+    skeleton (samo lekcija s UKLJUČENIM ugovorom): serverski konstruisan i
+    verifikovan zadatak (matbot/contracts/generator.py) — model ga dobija
+    GOTOV i piše samo prozu oko njega."""
     lines = []
     lines.append(f"LEKCIJA: {session['lesson_title'] or 'nije izabrana'} (oblast: {session['oblast'] or 'nepoznata'})")
 
@@ -304,16 +311,32 @@ def build_input(session, student_message, intent="", difficulty_request="", inte
     else:
         lines.append("AKTIVNI ZADATAK: još ne postoji — napravi pristupačan početni zadatak iz ove lekcije (new_task).")
 
-    if task_family:
+    if contract is not None and archetype:
+        # Lekcija s ugovorom: server je zadatak VEĆ konstruisao i verifikovao
+        # (matbot/contracts/generator.py). Blok modelu prikazuje gotov zadatak
+        # i sužava njegov posao na bosansku prozu — sve što opisuje matematiku
+        # dolazi iz PODATAKA, pa nova lekcija ne traži novi tekst ovdje.
+        contract_block = contract_prompting.build_block(
+            contract, contract_archetypes.archetype_for(archetype), skeleton
+        )
+        if contract_block:
+            lines.append(contract_block)
+        if session.get("retry_required"):
+            lines.append(
+                "PONOVNI POKUŠAJ: prethodni odgovor je bio netačan. Server je "
+                "pripremio nov zadatak iste vještine — izdaj GA (new_task), bez "
+                "vlastitih izmjena."
+            )
+    elif task_family:
         label = f"{task_family} — {task_family_description}" if task_family_description else task_family
         lines.append(f"PORODICA ZADATKA (obavezna za novi zadatak, ne mijenjaj je): {label}")
         # Konkretan ugovor SAMO za dodijeljenu porodicu (nikad cijeli katalog):
         # šta mora biti nepoznato, kakve opcije, jedan ispravan i jedan
         # zabranjen primjer. Server istu stvar provjerava i deterministički —
         # ovo samo povećava šansu da prvi pokušaj bude ispravan.
-        contract_block = task_family_validation.prompt_block(task_family)
-        if contract_block:
-            lines.append(contract_block)
+        family_block = task_family_validation.prompt_block(task_family)
+        if family_block:
+            lines.append(family_block)
         lines.append(
             "OBAVEZNO popuni i interna polja new_task.task_family "
             f"(mora biti tačno „{task_family}“) i new_task.answer_kind — server ih "

@@ -361,7 +361,10 @@ def test_quick_llm_error_returns_safe_message_without_status(flask_app, fake_llm
 def test_practice_still_works_and_uses_one_call(flask_app, fake_llm):
     fake_llm.queue(make_output(reply="Evo zadatka.", new_task=make_task()))
     c = _authed(flask_app)
-    payload = http_payload(mode="practice", msg="Daj mi jedan zadatak za vježbu iz ove teme.")
+    payload = http_payload(
+        mode="practice", msg="Daj mi jedan zadatak za vježbu iz ove teme.",
+        selected_topic="6-04-007",
+    )
     r = c.post("/api/ai-tutor/chat", json=payload)
     assert r.status_code == 200
     j = r.get_json()

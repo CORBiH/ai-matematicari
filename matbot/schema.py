@@ -25,6 +25,11 @@ class NewTask(BaseModel):
     options: list[Option]
     correct_option_index: int
 
+    # NAPOMENA (poslije Live96): polja `archetype` i `evidence` su UKLONJENA.
+    # Za lekciju s uključenim ugovorom matematiku sada KONSTRUIŠE server
+    # (matbot/contracts/generator.py) i modelov new_task sadržaj se ionako
+    # ignoriše — model nema šta da dokazuje o zadatku koji nije njegov.
+
     # --- INTERNI metapodaci o pedagoškom obliku (server-only) ---------------
     # Model ih deklariše, server ih UNAKRSNO provjerava s dodijeljenom
     # porodicom I sa stvarnim vidljivim tekstom (matbot/task_family_validation.py).
@@ -170,7 +175,8 @@ class InvalidOutputError(ValueError):
     """AI odgovor je strukturno validan JSON, ali sadržajno neupotrebljiv."""
 
 
-def validate_output(out: PracticeTurnOutput, require_reply: bool = True) -> None:
+def validate_output(out: PracticeTurnOutput, require_reply: bool = True,
+                    ignore_new_task_content: bool = False) -> None:
     """Server-side provjere povrh strict JSON šeme. Baca InvalidOutputError.
 
     NAPOMENA O OBIMU: server ovdje provjerava SAMO strukturu (neprazna polja,
@@ -190,6 +196,13 @@ def validate_output(out: PracticeTurnOutput, require_reply: bool = True) -> None
     (novi zadatak, tačan odgovor, drugi pogrešan klik/reveal, obično pitanje)
     poziva se s podrazumijevanim require_reply=True — tu reply nosi stvarni
     sadržaj koji učenik čita, pa ostaje obavezan kao i prije.
+
+    ignore_new_task_content=True: SAMO za lekciju s UKLJUČENIM ugovorom —
+    server je zadatak već konstruisao i modelov new_task sadržaj u cijelosti
+    ODBACUJE (matbot/practice.py), pa se njegova struktura ne provjerava:
+    new_task tada služi isključivo kao signal „u ovom turnu se izdaje novi
+    zadatak“, a nesavršena kopija ne smije srušiti turn koji server ionako
+    objavljuje iz vlastitog kostura.
     """
     reply_present = bool((out.reply or "").strip())
     hint_present = bool((out.hint or "").strip())
@@ -203,6 +216,8 @@ def validate_output(out: PracticeTurnOutput, require_reply: bool = True) -> None
     if out.hint is not None and len(out.hint) > config.MAX_REPLY_CHARS:
         raise InvalidOutputError("predug hint")
     if out.new_task is not None:
+        if ignore_new_task_content:
+            return
         if not (out.new_task.text or "").strip():
             raise InvalidOutputError("novi zadatak bez teksta")
         if len(out.new_task.text) > config.MAX_TASK_CHARS:

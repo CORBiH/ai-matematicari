@@ -387,7 +387,7 @@ class _FailingLLM:
 
 
 def _payload(**kw):
-    base = {"session_id": "sess-llm-fail", "grade": 6, "selected_topic": "6-04-005",
+    base = {"session_id": "sess-llm-fail", "grade": 6, "selected_topic": "6-04-007",
             "selected_oblast": "", "student_message": "Daj zadatak.", "intent": "",
             "difficulty_request": "", "interaction_phase": "", "last_tutor_task": "",
             "interaction_type": "", "selected_option_id": "", "client_turn_id": ""}
@@ -455,7 +455,7 @@ def test_structured_failure_log_line_is_emitted_with_category_and_topic(caplog):
         run_practice_turn(store, llm, _payload())
     line = "\n".join(rec.message for rec in caplog.records)
     assert "category=llm_incomplete_max_output_tokens" in line
-    assert "topic=6-04-005" in line
+    assert "topic=6-04-007" in line
     assert "mode=practice" in line
     assert "incomplete_reason=max_output_tokens" in line
     assert "max_output_tokens=2500" in line

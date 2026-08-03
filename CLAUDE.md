@@ -27,9 +27,32 @@ Flask + a single-page frontend, one OpenAI call per turn, no database.
    No retries, no repair calls, no "second opinion" calls. If output is bad,
    reject it and return the canned safe message. See
    [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#the-one-call-invariant).
-5. **Do not re-run the full suite repeatedly.** It is ~1465 tests; run it once
+5. **Practice difficulty never changes lesson identity.** Harder/easier requests
+   keep the lesson's primary shape and move only declared difficulty dimensions.
+   For a lesson with an **enabled contract** (`matbot/contracts/`, data in
+   `data/lesson_contracts.json`) the **server builds the task** from the
+   contract before the single call — operands, ground truth, distractors and the
+   marked index — and publishes only when its own deterministic self-check
+   reproduces the answer. The model's `new_task` content is **discarded** on
+   that path; it only signals "issue a new task". Anything unprovable fails
+   closed without a second generation call or state/progression mutation (and,
+   because the task is built *before* the call, such a rejection usually costs
+   zero model calls). An enabled contract **never** falls back to the legacy
+   family path — that would mask an engine defect. See
+   [docs/LESSON_CONTRACTS.md](docs/LESSON_CONTRACTS.md).
+5b. **On the contract path the server owns every visible number.** Question math,
+   all four options, the marked answer, units and MathJax are server-rendered.
+   The model may only write the surrounding Bosnian prose (reply/hint/feedback),
+   and `contracts.pipeline.verify_prose_fidelity` drops any prose carrying a
+   number that the task cannot explain.
+5a. **Adding a normal supported lesson must change data, not Python.** Do not add
+   a per-lesson validator, a per-lesson family list, a topic-ID branch, or a
+   lesson name inside `matbot/contracts/`. `tests/test_contract_architecture_gate.py`
+   enforces this; genuine exceptions must be registered in
+   [docs/LESSON_CONTRACTS.md](docs/LESSON_CONTRACTS.md).
+6. **Do not re-run the full suite repeatedly.** It is ~1500 tests; run it once
    at the end, and run a single file while iterating.
-6. **Never leak internal codes to the browser.** Validator issue codes
+7. **Never leak internal codes to the browser.** Validator issue codes
    (`numeric_equality_mismatch`, `circle_diameter_uses_D`, `llm_schema_parse_error`,
    `unknown_mathjax_command:…`, `image_rectangle_value_mismatch`,
    `image_math_source_missing`, …) go to logs only.
@@ -45,11 +68,12 @@ Flask + a single-page frontend, one OpenAI call per turn, no database.
   *why*, usually citing the live finding that forced the code to exist. Keep that
   habit — it is the project's main institutional memory.
 - **Output language is Bosnian (ijekavica).** `matbot/terminology.py`
-  deterministically enforces eight terms (all declined forms, outside math
+  deterministically enforces nine terms (all declined forms, outside math
   segments only): `faktor` not the Croatian variant, `uglomjer` not `kutomer`,
   `jednakokraki` not `jednakokračni`, `zbir` not `zbroj`, `stepenovanje` not
   `potenciranje`, `trougao` not the Croatian variant, `tačan` not the Croatian
-  variant, `ugao` not the Croatian variant. `suma`→`zbir` is **deliberately not enforced** — see
+  variant, `ugao` not the Croatian variant, and `presjek` not the ekavian
+  variant (Live96 call 551). `suma`→`zbir` is **deliberately not enforced** — see
   `docs/CURRENT_STATE.md` C-8: "suma" also means "amount of money" in word
   problems, and a blanket regex swap would corrupt that legitimate usage. A
   repo-wide test forbids all covered terms from appearing anywhere except
@@ -132,6 +156,8 @@ Flask + a single-page frontend, one OpenAI call per turn, no database.
 | Result/Quick turn orchestration (stateless) | `matbot/quick.py` |
 | Shared maths/language/notation prompt rules | `matbot/rules.py` |
 | Mode-specific prompt assembly | `matbot/prompts.py` |
+| Universal lesson-contract engine (Practice) | `matbot/contracts/` |
+| Lesson contract data (no Python per lesson) | `data/contract_templates.json`, `data/lesson_contracts.json` |
 | Geometry symbols, formulas, topic routing | `matbot/geometry_rules.py` |
 | The only OpenAI call site | `matbot/llm.py` |
 | Strict output schemas (incl. the image-only Quick schema) | `matbot/schema.py` |

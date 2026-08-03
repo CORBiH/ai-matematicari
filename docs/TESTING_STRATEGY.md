@@ -52,7 +52,9 @@ typed a short string. Assert that the *rule text is sent*, and measure obedience
 
 Pure functions, no Flask, no LLM: `mathsafe`, `mathcheck`, `geometrycheck`,
 `geometry_rules`, `terminology`, `option_equivalence`, `systemcheck`,
-`task_family_validation`, `topics`, `ratelimit`, `turnlock`, `session_store`.
+`task_family_validation`, `contracts.{schema,evidence,verifiers,constraints,
+difficulty,generator,intent}`, `topics`, `ratelimit`,
+`turnlock`, `session_store`.
 
 Every verifier needs **both** directions:
 
@@ -61,6 +63,32 @@ Every verifier needs **both** directions:
   byte-identically.
 
 The second is the one that gets forgotten and the one that breaks production.
+
+Lesson-contract tests must cover both the primary and every shared family that
+can be selected for that lesson. Include exact live regressions, equal-vs-unlike
+operands, multiplication/division/expansion/reducing relevance,
+`engaged=False` fail-closed behavior, normalized multiple/no-correct answers,
+classified error ambiguity, and integration assertions that rejection mutates no
+state, progression, or task signature. Harder and easier
+tests must assert the curriculum fingerprint is unchanged and the primary family
+is preferred. `tests/test_practice_lesson_semantic_contracts.py` is the focused
+reference suite.
+
+Because the server now **generates** the contracted task, engine tests are
+**property + golden**, not fixture-echo:
+
+- *property* — for a range of seeds, every generated skeleton must satisfy its
+  own contract (operations, sign policy, ranges, denominator relation, scaling
+  direction, difficulty bounds), have exactly one option equal to the truth,
+  and carry pairwise-distinct option values and texts;
+- *golden* — one frozen seed per capability, so a generator change that alters
+  existing tasks shows up as an intentional diff
+  (`test_31_golden_skeleton_stays_stable`);
+- *fidelity gate* — model prose that invents a number is dropped without killing
+  the turn (`tests/test_contract_intent.py`).
+
+A fixture that hand-writes a task for a contracted lesson now proves nothing:
+that content is discarded. Assert on what the **server** produced.
 
 ### 3. API / SSE tests
 

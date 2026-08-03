@@ -627,7 +627,7 @@ document.addEventListener('DOMContentLoaded', () => {
        Quick must always be an explicit user choice. */
     const state = {
       grade: '6', mode: 'explain',
-      topic: '', topicName: '', topicOblast: '', topicSource: '',
+      topic: '', topicName: '', topicOblast: '', topicOblastId: '', topicSource: '',
       oblast: ''
     };
 
@@ -793,8 +793,23 @@ document.addEventListener('DOMContentLoaded', () => {
        Promjena konteksta BRIŠE staru historiju — stara tema ne smije "nevidljivo"
        curiti u novu konverzaciju. */
     const CTX_KEY = 'matbot_tutor_ctx_' + cid;
+    function trackedTaskFingerprint(){
+      if (state.mode === 'practice'){
+        return [state.grade, state.topicOblastId || '', state.topic || '', 'practice'].join('|');
+      }
+      if (state.mode === 'exam'){
+        return [state.grade, state.oblast || '', '', 'exam'].join('|');
+      }
+      return '';
+    }
+    function payloadPracticeFingerprint(payload){
+      if (!payload || payload.mode !== 'practice') return '';
+      return [String(payload.grade || ''), payload.selected_oblast || '',
+              payload.selected_topic || '', 'practice'].join('|');
+    }
     function tutorContextKey(){
-      return [state.grade, state.mode, state.topic || '', state.oblast || ''].join('|');
+      return [state.grade, state.mode, state.topic || '',
+              state.topicOblastId || state.oblast || ''].join('|');
     }
 
     /* Phase 5: session_id — automatski, šalje se u svakom zahtjevu, NE prikazuje se u UI */
@@ -837,7 +852,8 @@ document.addEventListener('DOMContentLoaded', () => {
       exam: 'Sutra imam kontrolni iz ove oblasti. Pripremi me.'
     };
     const topicNames = {};         // topic id → display_name (za prijateljski meta red)
-    const topicOblasti = {};       // topic id → oblast (za payload kada je tema detektovana)
+    const topicOblasti = {};       // topic id → naziv oblasti (samo prikaz/prompt)
+    const topicOblastIds = {};     // topic id → kanonski ID oblasti (identitet/payload)
     const topicsByOblast = {};     // oblast → lekcije u nastavnom redoslijedu
     let oblastOrderCache = [];
     let topicsLoadedGrade = null;
@@ -937,8 +953,22 @@ document.addEventListener('DOMContentLoaded', () => {
       return /^(ne|nemoj|stani|dosta|no)[\s.!?]*$/.test(s);
     }
     function storedLastTask(){
-      try { return (localStorage.getItem(LASTTASK_KEY) || '').trim(); }
-      catch(_){ return ''; }
+      try {
+        const raw = localStorage.getItem(LASTTASK_KEY) || '';
+        if (!raw) return '';
+        const saved = JSON.parse(raw);
+        const fingerprint = trackedTaskFingerprint();
+        if (!saved || saved.v !== 2 || !fingerprint || saved.fingerprint !== fingerprint){
+          localStorage.removeItem(LASTTASK_KEY);
+          return '';
+        }
+        return (saved.task || '').toString().trim().slice(0, 600);
+      } catch(_){
+        /* Stari format je bio samo tekst bez identiteta lekcije i ne smije se
+           vratiti pod novim zaglavljem nakon nadogradnje. */
+        try { localStorage.removeItem(LASTTASK_KEY); } catch(__){}
+        return '';
+      }
     }
     /* PRIVATNOST SLIKE: ne postoji nikakav lokalno pohranjen „kontekst slike“.
        Slika važi SAMO za turn u kojem je poslana. U localStorage i historiju
@@ -1101,12 +1131,28 @@ document.addEventListener('DOMContentLoaded', () => {
     function setAwaitingPracticeTask(taskText){
       interactionPhase = 'awaiting_practice_answer';
       msgBox.placeholder = ANSWER_PLACEHOLDER;
-      try { localStorage.setItem(LASTTASK_KEY, (taskText || '').slice(0, 600)); } catch(_){}
+      try {
+        localStorage.setItem(LASTTASK_KEY, JSON.stringify({
+          v: 2,
+          fingerprint: trackedTaskFingerprint(),
+          task: (taskText || '').slice(0, 600)
+        }));
+      } catch(_){}
     }
     function clearAwaitingPracticeTask(){
       interactionPhase = null;
       msgBox.placeholder = (state.mode === 'quick') ? QUICK_PLACEHOLDER : DEFAULT_PLACEHOLDER;
       try { localStorage.removeItem(LASTTASK_KEY); } catch(_){}
+    }
+    function invalidatePracticeCurriculumState(){
+      if (state.mode !== 'practice') return;
+      clearAwaitingPracticeTask();
+      clearNextState();
+      clearOptions();
+      hideChips();
+      lastTurnWasGraded = false;
+      pendingChipMeta = null;
+      try { localStorage.removeItem(RECENTTASKS_KEY); } catch(_){}
     }
     function clearStoredActiveTopic(){
       try { localStorage.removeItem(LASTTOPIC_KEY); } catch(_){}
@@ -1116,8 +1162,9 @@ document.addEventListener('DOMContentLoaded', () => {
       try {
         localStorage.setItem(LASTTOPIC_KEY, JSON.stringify({
           topic: state.topic,
-          topicName: state.topicName,
-          topicOblast: state.topicOblast,
+          topicName: topicNames[state.topic] || state.topicName,
+          topicOblast: topicOblasti[state.topic] || state.topicOblast,
+          topicOblastId: topicOblastIds[state.topic] || state.topicOblastId,
           topicSource: state.topicSource || 'detected_topic'
         }));
         localStorage.setItem(CTX_KEY, tutorContextKey());
@@ -1127,20 +1174,25 @@ document.addEventListener('DOMContentLoaded', () => {
       if (state.topic || !tutorHistory().length) return;
       try {
         const saved = JSON.parse(localStorage.getItem(LASTTOPIC_KEY) || '{}');
-        if (!saved || !saved.topic) return;
+        if (!saved || !saved.topic || !topicNames[saved.topic]){
+          clearStoredActiveTopic();
+          return;
+        }
         state.topic = saved.topic;
-        state.topicName = saved.topicName || topicNames[saved.topic] || saved.topic;
-        state.topicOblast = saved.topicOblast || topicOblasti[saved.topic] || '';
+        state.topicName = topicNames[saved.topic] || saved.topic;
+        state.topicOblast = topicOblasti[saved.topic] || '';
+        state.topicOblastId = topicOblastIds[saved.topic] || '';
         state.topicSource = saved.topicSource || 'detected_topic';
         state.oblast = '';
       } catch(_){}
     }
     function adoptResponseTopic(j){
       const tid = (j && (j.effective_topic || j.final_topic) || '').trim();
-      if (!tid || tid === 'unknown') return;
+      if (!tid || tid === 'unknown' || !topicNames[tid]) return;
       state.topic = tid;
-      state.topicName = topicNames[tid] || state.topicName || tid;
-      state.topicOblast = topicOblasti[tid] || state.topicOblast || '';
+      state.topicName = topicNames[tid] || tid;
+      state.topicOblast = topicOblasti[tid] || '';
+      state.topicOblastId = topicOblastIds[tid] || '';
       if (!state.topicSource || state.topicSource === 'free_chat'){
         state.topicSource = 'detected_topic';
       }
@@ -1221,6 +1273,7 @@ document.addEventListener('DOMContentLoaded', () => {
         opt.value = t.topic;
         opt.textContent = t.display_name || t.topic;
         opt.dataset.oblast = oblast;
+        opt.dataset.oblastId = t.oblast_id || topicOblastIds[t.topic] || '';
         topicSelect.appendChild(opt);
       });
       topicSelect.disabled = lessons.length === 0;
@@ -1250,7 +1303,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (state.mode === 'quick'){
           const resumeQuick = isStoredQuickContext();
           if (!resumeQuick){
-            state.topic = ''; state.topicName = ''; state.topicOblast = ''; state.topicSource = ''; state.oblast = '';
+            state.topic = ''; state.topicName = ''; state.topicOblast = ''; state.topicOblastId = ''; state.topicSource = ''; state.oblast = '';
             try { localStorage.removeItem(LASTTASK_KEY); } catch(_){} // bez starog practice stanja
             clearStoredActiveTopic();
           }
@@ -1263,8 +1316,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     gradeSel.addEventListener('change', ()=>{
+      invalidatePracticeCurriculumState();
       state.grade = gradeSel.value || '6';
-      state.topic = ''; state.topicName = ''; state.topicOblast = ''; state.topicSource = ''; state.oblast = '';
+      state.topic = ''; state.topicName = ''; state.topicOblast = ''; state.topicOblastId = ''; state.topicSource = ''; state.oblast = '';
       clearStoredActiveTopic();
       hidePicker();
       loadTopicsForGrade(state.grade);
@@ -1272,6 +1326,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     backBtn.addEventListener('click', hidePicker);
     oblastSelect.addEventListener('change', ()=>{
+      invalidatePracticeCurriculumState();
       const ob = oblastSelect.value || '';
       if (state.mode === 'exam'){
         state.oblast = ob;
@@ -1281,12 +1336,13 @@ document.addEventListener('DOMContentLoaded', () => {
         populateLessonOptions(ob);
       }
     });
+    topicSelect.addEventListener('change', invalidatePracticeCurriculumState);
 
     continueBtn.addEventListener('click', ()=>{
       if (state.mode === 'exam'){
         const ob = oblastSelect.value;
         if (!ob){ showToast('Prvo izaberi oblast.', 'err'); try{ oblastSelect.focus(); }catch(_){} return; }
-        state.oblast = ob; state.topic = ''; state.topicName = ''; state.topicOblast = ''; state.topicSource = '';
+        state.oblast = ob; state.topic = ''; state.topicName = ''; state.topicOblast = ''; state.topicOblastId = ''; state.topicSource = '';
         try { localStorage.removeItem(LASTTASK_KEY); } catch(_){} // nova oblast = svjež practice tok
         try { localStorage.removeItem(RECENTTASKS_KEY); } catch(_){}
         clearStoredActiveTopic();
@@ -1298,9 +1354,12 @@ document.addEventListener('DOMContentLoaded', () => {
       const t = topicSelect.value;
       if (!t){ showToast('Prvo izaberi lekciju.', 'err'); try{ topicSelect.focus(); }catch(_){} return; }
       const opt = topicSelect.options[topicSelect.selectedIndex];
+      invalidatePracticeCurriculumState();
       state.topic = t;
-      state.topicName = (opt && opt.textContent) || t;
-      state.topicOblast = (opt && opt.dataset && opt.dataset.oblast) || ob;
+      state.topicName = topicNames[t] || t;
+      state.topicOblast = topicOblasti[t] || ob;
+      state.topicOblastId = topicOblastIds[t]
+        || ((opt && opt.dataset && opt.dataset.oblastId) || '');
       state.topicSource = 'manual_topic_choice';
       state.oblast = '';
       try { localStorage.removeItem(LASTTASK_KEY); } catch(_){} // nova tema = svjež practice tok
@@ -1400,7 +1459,7 @@ document.addEventListener('DOMContentLoaded', () => {
        zadnji zadatak i fazu, pa vodi na početni ekran. Nije izložen kao topbar dugme. */
     function startFreshTutorConversation(){
       resetTutorConversation();
-      state.topic = ''; state.topicName = ''; state.topicOblast = ''; state.topicSource = ''; state.oblast = '';
+      state.topic = ''; state.topicName = ''; state.topicOblast = ''; state.topicOblastId = ''; state.topicSource = ''; state.oblast = '';
       try { localStorage.removeItem(CTX_KEY); } catch(_){}
       showHome();
     }
@@ -1411,6 +1470,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function resetTopicOptions(){
       Object.keys(topicNames).forEach(k=>{ delete topicNames[k]; });
       Object.keys(topicOblasti).forEach(k=>{ delete topicOblasti[k]; });
+      Object.keys(topicOblastIds).forEach(k=>{ delete topicOblastIds[k]; });
       Object.keys(topicsByOblast).forEach(k=>{ delete topicsByOblast[k]; });
       oblastOrderCache = [];
       resetLessonOptions();
@@ -1438,6 +1498,7 @@ document.addEventListener('DOMContentLoaded', () => {
           topicsByOblast[oblast].forEach(t=>{
             topicNames[t.topic] = t.display_name || t.topic;
             topicOblasti[t.topic] = oblast;
+            topicOblastIds[t.topic] = t.oblast_id || '';
           });
           const ob = document.createElement('option');
           ob.value = oblast;
@@ -1603,7 +1664,7 @@ document.addEventListener('DOMContentLoaded', () => {
         mode: 'practice',
         entry_source: state.topic ? (state.topicSource || 'manual_topic_choice') : 'free_chat',
         selected_topic: state.topic,
-        selected_oblast: state.topic ? state.topicOblast : '',
+        selected_oblast: state.topic ? state.topicOblastId : '',
         student_message: 'Izabrana opcija ' + optionId.toUpperCase() + '.',
         interaction_type: 'choice_answer',
         selected_option_id: optionId,
@@ -1626,7 +1687,11 @@ document.addEventListener('DOMContentLoaded', () => {
               optionsBox.querySelectorAll('.mc-option-card').forEach(b=>{ if (b !== btn) b.disabled = false; });
             }
           }
-          applyTutorResponse(j, { fromTyped: false, answerPhase: true, rendered: false });
+          applyTutorResponse(j, {
+            fromTyped: false, answerPhase: true, rendered: false,
+            requestFingerprint: payloadPracticeFingerprint(payload),
+            requestTopic: payload.selected_topic
+          });
         } else {
           // deterministički blok (nevažeći ID / nema aktivnog zadatka / već završen) ili greška:
           // ne boji ništa, vrati kartice u prethodno stanje
@@ -1861,7 +1926,7 @@ document.addEventListener('DOMContentLoaded', () => {
         && /\b(kontrolni|test|priprem)/.test(foldTutorText(text));
       const selectedTopicForPayload = resultMode ? '' : ((examMode && state.oblast) ? '' : state.topic);
       const selectedOblastForPayload = resultMode ? ''
-        : (selectedTopicForPayload ? state.topicOblast : (examMode ? state.oblast : ''));
+        : (selectedTopicForPayload ? state.topicOblastId : (examMode ? state.oblast : ''));
       /* Jedan client_turn_id po korisničkom slanju — generisan JEDNOM, prije
          SSE pokušaja, i ponovo korišten za JSON fallback ISTOG slanja (isti
          `payload` objekat se šalje na oba). Backend njime prepoznaje da su
@@ -1943,10 +2008,10 @@ document.addEventListener('DOMContentLoaded', () => {
              uspjeh je već ispisao bubble (rendered:true), a poznata blokada
              (401/429/409/...) NIJE ništa ispisala pa applyTutorResponse mora
              sam kreirati bubble (rendered:false) — isto kao normalan JSON put. */
-          applyTutorResponse(result.j, { fromTyped, answerPhase, rendered: !!result.rendered, isNewTaskRequest, retryPayload: payload });
+          applyTutorResponse(result.j, { fromTyped, answerPhase, rendered: !!result.rendered, isNewTaskRequest, retryPayload: payload, requestFingerprint: payloadPracticeFingerprint(payload), requestTopic: payload.selected_topic });
         } else {
           const j = await jsonTutorRequest(payload, ac, imgFile);
-          applyTutorResponse(j, { fromTyped, answerPhase, rendered: false, isNewTaskRequest, retryPayload: payload });
+          applyTutorResponse(j, { fromTyped, answerPhase, rendered: false, isNewTaskRequest, retryPayload: payload, requestFingerprint: payloadPracticeFingerprint(payload), requestTopic: payload.selected_topic });
         }
       }catch(err){
         if (err && err.name === 'AbortError'){
@@ -1987,10 +2052,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (result && result.errorShown){
           /* stream je već ispisao prijateljsku grešku u bubble */
         } else if (result && result.j){
-          applyTutorResponse(result.j, { rendered: !!result.rendered, isNewTaskRequest: true, retryPayload: payload });
+          applyTutorResponse(result.j, { rendered: !!result.rendered, isNewTaskRequest: true, retryPayload: payload, requestFingerprint: payloadPracticeFingerprint(payload), requestTopic: payload.selected_topic });
         } else {
           const j = await jsonTutorRequest(payload, ac, null);
-          applyTutorResponse(j, { rendered: false, isNewTaskRequest: true, retryPayload: payload });
+          applyTutorResponse(j, { rendered: false, isNewTaskRequest: true, retryPayload: payload, requestFingerprint: payloadPracticeFingerprint(payload), requestTopic: payload.selected_topic });
         }
       }catch(err){
         if (err && err.name === 'AbortError'){
@@ -2130,6 +2195,20 @@ document.addEventListener('DOMContentLoaded', () => {
     /* zajednička obrada odgovora za streaming i non-streaming put */
     function applyTutorResponse(j, opts){
       opts = opts || {};
+      const stalePracticeResponse = !!opts.requestFingerprint && (
+        opts.requestFingerprint !== trackedTaskFingerprint()
+        || (!!(j && j.effective_topic)
+            && j.effective_topic !== (opts.requestTopic || ''))
+      );
+      if (stalePracticeResponse){
+        /* Odgovor zahtjeva koji je krenuo prije promjene lekcije ne smije se
+           naknadno prikazati, pohraniti niti preimenovati kao nova lekcija. */
+        if (opts.rendered){
+          const staleRow = lastBotMessage();
+          if (staleRow) staleRow.remove();
+        }
+        return;
+      }
       /* Defekt 3 (živi nalaz): "Daj mi teži zadatak." je vratio generičku
          SAFE_ERROR_MESSAGE poruku bez ikakve akcije za učenika. Prepoznaj
          TAČNO ovaj slučaj — odgovor bez 'status' I bez 'next_state' (server

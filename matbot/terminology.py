@@ -219,6 +219,36 @@ def _kut_suffix(match):
 
 
 # ---------------------------------------------------------------------------
+# 9) PRESEK → PRESJEK (živi nalaz Live96, poziv 551)
+# ---------------------------------------------------------------------------
+# U objavljenom zadatku o skupovima model je napisao ekavsko „presek“ umjesto
+# ijekavskog „presjek“. Ista struktura kao „čimbenik“: dvije osnove — „presek-“
+# (jednina) i „presec-“ (množina, palatalizacija k→c) — s eksplicitnom mapom
+# nastavaka. Granica riječi na početku i lookahead na kraju drže pravilo uskim
+# (izvedenice se ne pogađaju).
+_PRESEK_SUFFIX_MAP = {
+    # osnova „presec“ (množina)
+    "ima": "presjecima",
+    "i": "presjeci",
+    "e": "presjeke",
+    # osnova „presek“ (jednina)
+    "": "presjek",
+    "a": "presjeka",
+    "u": "presjeku",
+    "om": "presjekom",
+}
+_PRESEK_RE = re.compile(
+    r"\bpresec(ima|i|e)(?![A-Za-zčćžšđČĆŽŠĐ])"
+    r"|\bpresek(om|a|u)?(?![A-Za-zčćžšđČĆŽŠĐ])",
+    re.IGNORECASE,
+)
+
+
+def _presek_suffix(match):
+    return (match.group(1) if match.group(1) is not None else match.group(2)) or ""
+
+
+# ---------------------------------------------------------------------------
 # Zajednička primjena — svako pravilo je (regex, suffix_extractor, suffix_map
 # | None). suffix_map=None znači "osnova + isti nastavak kao izvor" (potpuno
 # dijeljena deklinacija, npr. potenciranje/stepenovanje).
@@ -234,6 +264,7 @@ _RULES = (
     # MORA ostati POSLIJE _KUTOMER_RE: „kutomer“ se prvo pretvori u „uglomjer“,
     # pa ovo pravilo nema šta da dohvati unutar njega.
     (_KUT_RE, _kut_suffix, _KUT_SUFFIX_MAP, "ugao"),
+    (_PRESEK_RE, _presek_suffix, _PRESEK_SUFFIX_MAP, "presjek"),
 )
 
 # Brzi predizlaz: bilo koja od ovih podniski MORA biti prisutna (case-fold)
@@ -241,6 +272,7 @@ _RULES = (
 # pretraga na svakom pozivu kad ništa od ovoga nije u tekstu.
 _TRIGGER_SUBSTRINGS = (
     "čimbeni", "kut", "jednakokrač", "zbroj", "potenciranj", "trokut", "toč",
+    "presek", "presec",
 )
 
 

@@ -63,7 +63,7 @@ convention:
 - `store=False` on every call — OpenAI keeps no server-side copy; we resend the
   full prompt each turn instead of using `previous_response_id`.
 - No orchestrator ever calls the model twice. Every rejection path (schema,
-  math-safety, numeric, geometry, family, image gate, image check) returns the
+  math-safety, numeric, geometry, family, lesson contract, image gate, image check) returns the
   canned `SAFE_ERROR_MESSAGE` or a short server-owned message **without a repair
   call**. Image turns in particular use **no OCR call and no second model call** —
   an unreadable image is reported, never re-read.
@@ -108,15 +108,43 @@ The prompt never contains: all 500+ lessons, the raw payload, session ids, or
 
 ```
 payload → guard chain → lesson_info() → SessionStore.load(session_id+lesson)
-        → server picks the task family (task_families.py)
-        → build_instructions + build_input (task, internal expected answer,
-          hint level, recent tasks, recent turns, family contract)
+        → contracts.registry: "engine" | "legacy" | "unavailable"
+          ("unavailable" returns a clear message with NO model call)
+        → ENGINE:  contracts.pipeline.build_plan — student's explicit shape
+                   request (closed intent table) else rotation
+                   → contracts.generator BUILDS the task from the contract
+                     (operands, truth, distractors, marked index)
+                   → self-verify (constraints + difficulty + verifiers)
+                   → server renders ALL visible math   (never falls back;
+                     a failure here costs ZERO model calls)
+          LEGACY:  server picks a family (task_families.py)
+        → build_instructions + build_input (active task, internal expected
+          answer, hint level, recent tasks/turns, + the ALREADY BUILT task
+          for the engine, or the family block for legacy)
         → ONE model call → PracticeTurnOutput (reply, evaluation, gave_hint,
-          new_task{text, expected_answer, options[4], correct_option_index, meta})
-        → validate_output → family cross-check (task_family_validation.py)
+          new_task{text, expected_answer, options[4], correct_option_index})
+        → ENGINE:  the model's new_task CONTENT IS DISCARDED — it is only the
+                   "issue a new task now" signal; the server publishes its own
+                   skeleton. Model prose passes verify_prose_fidelity.
+          LEGACY:  validate_output → family cross-check
+                   (task_family_validation.py) → systemcheck (linear systems)
         → mathsafe per field → option uniqueness (option_equivalence.py)
-        → mathcheck → geometrycheck → systemcheck (linear systems)
+          → mathcheck → geometrycheck   (both paths, identical rules)
         → server shuffles options, commits session → next_state to browser
+```
+
+The engine is data-driven: `data/contract_templates.json` +
+`data/lesson_contracts.json` describe the mathematics of a lesson, and
+`matbot/contracts/` contains no lesson name or topic ID. Phase 1 enables six
+grade-6 fraction lessons; the other 528 keep the unchanged legacy path.
+
+**Generation direction (post-Live96): the server computes, the model writes.**
+The model no longer invents mathematics and no longer restates it in a
+structured "evidence" schema — that whole layer is gone. Correctness, lesson
+fidelity and the marked answer are true **by construction**. See
+[LESSON_CONTRACTS.md](LESSON_CONTRACTS.md).
+
+```
 ```
 
 Server state (`matbot/session_store.py`, in-memory, `context_key` includes the lesson
@@ -130,6 +158,19 @@ Key properties: the **server** decides correctness of a multiple-choice click an
 passes the verdict to the model as a fact it may not contradict; the correct option
 id is never sent to the browser before reveal; the session is a local copy and is
 only committed (`store.save`) on a fully successful turn.
+
+For mapped grade-6 fraction lessons, family identity is followed by a second,
+deterministic lesson-level proof. It uses exact `Fraction` arithmetic over the
+visible operands to distinguish equal-denominator addition/subtraction,
+unlike-denominator work, multiplication, division, expansion, and reducing.
+Shared error/word-problem families must engage the same lesson proof; "could not
+parse/classify" is an explicit rejection, never a successful empty result.
+Numeric answer options are independently normalized and must contain exactly one
+ground-truth value. Supported error chains must demonstrate one error category
+and exactly one matching explanation. Harder/easier requests select the lesson's
+primary family and may vary difficulty only inside that skill. Every rejection
+occurs before signatures, shuffle, progression, or session commit and never
+causes an automatic model retry.
 
 ### Explain (`matbot/explain.py`)
 

@@ -196,7 +196,7 @@ def test_practice_wrong_answer_with_stray_brace_hint_makes_one_llm_call():
     fake.queue(make_output(reply="Evo zadatka.",
                             new_task=make_task_for_family("expand_to_given_denominator")))
     r0 = run_practice_turn(store, fake, {
-        "session_id": "sess-brace", "grade": 6, "selected_topic": "6-04-005",
+        "session_id": "sess-brace", "grade": 6, "selected_topic": "6-04-007",
         "selected_oblast": "", "student_message": "Daj zadatak.", "intent": "",
         "difficulty_request": "", "interaction_phase": "", "last_tutor_task": "",
         "interaction_type": "", "selected_option_id": "", "client_turn_id": "",
@@ -206,7 +206,7 @@ def test_practice_wrong_answer_with_stray_brace_hint_makes_one_llm_call():
 
     fake.queue(make_output(reply="", hint=LIVE_HINT))
     r = run_practice_turn(store, fake, {
-        "session_id": "sess-brace", "grade": 6, "selected_topic": "6-04-005",
+        "session_id": "sess-brace", "grade": 6, "selected_topic": "6-04-007",
         "selected_oblast": "", "student_message": "[klik]", "intent": "",
         "difficulty_request": "", "interaction_phase": "",
         "last_tutor_task": "", "interaction_type": "choice_answer",

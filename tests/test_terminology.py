@@ -96,7 +96,7 @@ def test_contains_forbidden_term_detects_all_forms():
 
 def _practice_payload(msg="Daj zadatak.", **kw):
     base = {
-        "session_id": "sess-term", "grade": 6, "selected_topic": "6-04-001",
+        "session_id": "sess-term", "grade": 6, "selected_topic": "6-04-007",
         "selected_oblast": "", "student_message": msg, "intent": "",
         "difficulty_request": "", "interaction_phase": "", "last_tutor_task": "",
         "interaction_type": "", "selected_option_id": "", "client_turn_id": "",

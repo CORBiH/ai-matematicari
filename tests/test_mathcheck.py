@@ -267,7 +267,7 @@ def test_quick_consistent_equality_is_accepted():
 
 
 def _practice_payload(msg="Daj zadatak.", **kw):
-    base = {"session_id": "sess-mathcheck", "grade": 6, "selected_topic": "6-04-005",
+    base = {"session_id": "sess-mathcheck", "grade": 6, "selected_topic": "6-04-007",
             "selected_oblast": "", "student_message": msg, "intent": "",
             "difficulty_request": "", "interaction_phase": "", "last_tutor_task": "",
             "interaction_type": "", "selected_option_id": "", "client_turn_id": ""}

@@ -479,6 +479,6 @@ def test_case35_full_path_harder_task_natural_phrasing_no_longer_rejected(monkey
                             options=options, correct_option_index=0,
                             task_family="choose_correct_formula"),
     ))
-    r = run_practice_turn(store, fake, turn_payload(selected_topic="8-04-004"))
+    r = run_practice_turn(store, fake, turn_payload(grade=8, selected_topic="8-04-004"))
     assert r.get("status") == "ready"
     assert fake.call_count == 1

@@ -2,7 +2,7 @@
 
 Živi nalaz #1: pet ISPRAVNIH `find_expansion_factor` zadataka odbijeno jer je
 model deklarisao task_form="direct_calculation" dok je ugovor dozvoljavao samo
-2 od 8 mogućih vrijednosti (provjera svih 31 porodice: SVAKA ima ≤2 dozvoljene
+2 od 8 mogućih vrijednosti (provjera svih porodica: SVAKA ima ≤2 dozvoljene
 task_form vrijednosti — sistemski propust).
 
 Živi nalaz #2 (ista klasa propusta, druga runda testiranja): ispravan
@@ -166,13 +166,17 @@ def test_canonical_task_form_is_a_plain_string_not_exposed_by_default():
 
 
 # ---------------------------------------------------------------------------
-# 8. All 31 families remain registered and contract-covered
+# 8. Sve porodice ostaju registrovane i pokrivene ugovorom
 # ---------------------------------------------------------------------------
 
-def test_all_31_families_still_have_contracts():
+def test_all_families_still_have_contracts():
     from matbot.task_families import FAMILY_DESCRIPTIONS
-    assert len(FAMILY_DESCRIPTIONS) == 31
-    assert len(CONTRACTS) == 31
+    # 36 porodica: pet „fraction_*“ porodica opslužuje SAMO nemigrirane
+    # lekcije kroz legacy granicu (matbot/legacy/practice_routing.py).
+    # Brišu se tek kad njihovi potrošači dobiju ugovor — vidi
+    # tests/test_legacy_routing_parity.py.
+    assert len(FAMILY_DESCRIPTIONS) == 36
+    assert len(CONTRACTS) == 36
     assert set(FAMILY_DESCRIPTIONS) == set(CONTRACTS)
 
 
@@ -208,7 +212,7 @@ def test_detected_answer_kind_none_for_prose():
 # ---------------------------------------------------------------------------
 
 def test_no_family_rejects_solely_on_declared_task_form():
-    """Sistemska regresija svih 31 porodice: nijedna od 8 mogućih task_form
+    """Sistemska regresija svih porodica: nijedna od 8 mogućih task_form
     vrijednosti smije sama izazvati odbijanje kad je struktura ispravna."""
     from tests.conftest import _FAMILY_TASK_TEMPLATES, make_task_for_family
 

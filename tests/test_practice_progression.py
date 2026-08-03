@@ -14,8 +14,8 @@ from matbot.practice import run_practice_turn
 from matbot.session_store import SessionStore
 from matbot.topics import lesson_info
 
-FRACTION_TOPIC = "6-04-001"   # Razlomci — „Pojam razlomka…“ (stvarna lekcija)
-OTHER_TOPIC = "6-04-005"      # Razlomci — „Proširivanje razlomaka“ (druga lekcija)
+FRACTION_TOPIC = "6-04-007"   # Proširivanje razlomaka
+OTHER_TOPIC = "6-04-008"      # Sabiranje/oduzimanje s jednakim imeniocima
 
 _FAMILY_RE = re.compile(r"PORODICA ZADATKA \(obavezna za novi zadatak, ne mijenjaj je\): ([a-z_]+)")
 
@@ -65,7 +65,7 @@ def predicted_family(store, session_id, grade, topic_id):
     # na osnovu napretka koji je server upravo odbacio.
     if sess is not None and sess.get("lesson_id") != topic_id:
         sess = None
-    applicable = tf.applicable_families(grade, oblast, title)
+    applicable = tf.applicable_families(grade, oblast, title, lesson_id=topic_id)
     return tf.select_family(
         applicable,
         recently_used=sess["recently_used_families"] if sess else [],
@@ -349,7 +349,9 @@ def test_second_cycle_uses_least_recently_used_family():
     store, fake = SessionStore(), FakeLLM()
     from matbot import task_families as tf
 
-    applicable = tf.applicable_families(6, "Razlomci", "Pojam razlomka")
+    applicable = tf.applicable_families(
+        6, "Razlomci", "Proširivanje razlomaka", lesson_id=FRACTION_TOPIC
+    )
     used = []
     for i, _ in enumerate(applicable):
         give_task(store, fake, f" (broj {i})")

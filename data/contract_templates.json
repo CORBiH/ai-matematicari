@@ -1,0 +1,89 @@
+{
+  "_readme": [
+    "Predlošci ugovora lekcija. Lekcija se opisuje PODACIMA — nasljeđivanjem",
+    "jednog od ovih predložaka plus nekoliko linija override-a.",
+    "Nasljeđivanje SAMO SUŽAVA: dijete smije izbaciti operaciju/arhetip iz",
+    "roditeljskog skupa, ali ga nikad ne smije proširiti niti vratiti ograničenje",
+    "na 'any'. Vidi matbot/contracts/schema.py i docs/LESSON_CONTRACTS.md.",
+    "Ključevi koji počinju s '_' se ignorišu."
+  ],
+
+  "base": {
+    "contract_version": "1",
+    "progression_policy": "rotate_archetypes",
+    "terminology_profile": "bs_ijekavica_default",
+    "notation_profile": "arithmetic_default",
+    "difficulty_dimensions": {
+      "operand_magnitude": {"min": 1, "max": 3, "default": 1},
+      "distractor_similarity": {"min": 1, "max": 3, "default": 2}
+    }
+  },
+
+  "arithmetic": {
+    "inherits": "base",
+    "domain": "arithmetic",
+    "operand_types": ["natural", "integer"],
+    "answer_verifier": "exact_rational",
+    "_archetype_note": [
+        "Arhetip ovdje smije stajati SAMO ako za njega postoji serverski",
+        "generator (matbot/contracts/generator.py). Ugovor koji dopusti arhetip",
+        "bez generatora pada na UČITAVANJU (archetypes.assert_supported)."
+    ],
+    "allowed_task_archetypes": ["direct_computation", "find_missing_value", "identify_error"],
+    "operand_constraints": {"fraction_form": "any"},
+    "difficulty_dimensions": {
+      "operand_magnitude": {"min": 1, "max": 3, "default": 1},
+      "term_count": {"min": 2, "max": 3, "default": 2},
+      "distractor_similarity": {"min": 1, "max": 3, "default": 2}
+    }
+  },
+
+  "rational": {
+    "inherits": "base",
+    "domain": "rational_numbers",
+    "operand_types": ["fraction"],
+    "answer_verifier": "exact_rational",
+    "allowed_task_archetypes": [
+      "direct_computation", "find_missing_value", "identify_equivalent", "identify_error"
+    ],
+    "operand_constraints": {"fraction_form": "any"},
+    "difficulty_dimensions": {
+      "operand_magnitude": {"min": 1, "max": 3, "default": 1},
+      "term_count": {"min": 1, "max": 3, "default": 2},
+      "distractor_similarity": {"min": 1, "max": 3, "default": 2}
+    }
+  },
+
+  "rational.add_sub": {
+    "inherits": "rational",
+    "allowed_operations": ["add", "subtract"],
+    "allowed_task_archetypes": ["direct_computation", "find_missing_value", "identify_error"],
+    "difficulty_dimensions": {
+      "term_count": {"min": 2, "max": 3, "default": 2}
+    }
+  },
+
+  "rational.mul_div": {
+    "inherits": "rational",
+    "allowed_operations": ["multiply", "divide"],
+    "allowed_task_archetypes": ["direct_computation", "find_missing_value", "identify_error"],
+    "difficulty_dimensions": {
+      "term_count": {"min": 2, "max": 3, "default": 2}
+    }
+  },
+
+  "rational.equivalence": {
+    "inherits": "rational",
+    "allowed_operations": ["multiply", "divide"],
+    "allowed_task_archetypes": ["identify_equivalent", "find_missing_value", "identify_error"],
+    "difficulty_dimensions": {
+      "term_count": {"min": 1, "max": 2, "default": 1}
+    }
+  },
+
+  "_grade6_note": [
+    "Šesti razred radi u Q+ (nenegativni brojevi) — zato lekcije 6. razreda",
+    "postavljaju sign_policy='non_negative'. To je podatak lekcije, ne pravilo",
+    "motora: sedmi razred istu 'arithmetic' granu koristi s 'allow_negative'."
+  ]
+}

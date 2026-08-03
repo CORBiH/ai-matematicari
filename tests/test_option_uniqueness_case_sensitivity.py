@@ -282,10 +282,14 @@ def test_17_intentional_wrong_distractors_remain_allowed():
     assert fake.call_count == 1
 
 
-def test_18_all_31_family_contracts_remain_registered():
+def test_18_all_family_contracts_remain_registered():
     from matbot.task_family_validation import CONTRACTS, missing_contracts
     from matbot.task_families import FAMILY_DESCRIPTIONS
 
     assert missing_contracts() == []
-    assert len(FAMILY_DESCRIPTIONS) == 31
-    assert len(CONTRACTS) == 31
+    # 36 porodica: pet „fraction_*“ porodica opslužuje SAMO nemigrirane
+    # lekcije kroz legacy granicu (matbot/legacy/practice_routing.py).
+    # Brišu se tek kad njihovi potrošači dobiju ugovor — vidi
+    # tests/test_legacy_routing_parity.py.
+    assert len(FAMILY_DESCRIPTIONS) == 36
+    assert len(CONTRACTS) == 36

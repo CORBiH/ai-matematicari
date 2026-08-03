@@ -11,7 +11,7 @@ from tests.conftest import FakeLLM, make_options, make_output, make_task_for_fam
 from matbot.practice import run_practice_turn
 from matbot.session_store import SessionStore
 
-FRACTION_TOPIC = "6-04-005"
+FRACTION_TOPIC = "6-04-007"
 
 LIVE_HINT = "Prvo nađi kojim brojem treba pomnožiti nazivnik $6$ da postane $18$."
 

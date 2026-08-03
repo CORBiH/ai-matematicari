@@ -13,13 +13,15 @@ from matbot.practice import SAFE_ERROR_MESSAGE, run_practice_turn
 from matbot.session_store import SessionStore
 from matbot.topics import lesson_info
 
-FRACTION_TOPIC = "6-04-005"   # Razlomci — „Proširivanje razlomaka“ (živi nalaz)
+FRACTION_TOPIC = "7-03-008"   # Racionalni brojevi — koristi ZAJEDNIČKI skup
+GRADE = 7                     # porodica za razlomke (bez mape po lekciji),
+                              # pa je rotacija ista kao u živom nalazu.
 SESSION = "sess-enforce"
 
 
 def payload(msg="Daj mi novi zadatak.", **kw):
     base = {
-        "session_id": SESSION, "grade": 6, "selected_topic": FRACTION_TOPIC,
+        "session_id": SESSION, "grade": GRADE, "selected_topic": FRACTION_TOPIC,
         "selected_oblast": "", "student_message": msg, "intent": "",
         "difficulty_request": "", "interaction_phase": "", "last_tutor_task": "",
         "interaction_type": "", "selected_option_id": "", "client_turn_id": "",
@@ -29,10 +31,12 @@ def payload(msg="Daj mi novi zadatak.", **kw):
 
 
 def assigned_family(store, session_id=SESSION):
-    info = lesson_info(6, FRACTION_TOPIC)
+    info = lesson_info(GRADE, FRACTION_TOPIC)
     sess = store.peek(session_id)
     return tf.select_family(
-        tf.applicable_families(6, info["oblast"], info["title"]),
+        tf.applicable_families(
+            GRADE, info["oblast"], info["title"], lesson_id=FRACTION_TOPIC
+        ),
         recently_used=sess["recently_used_families"] if sess else [],
         completed_families=sess["correctly_completed_families"] if sess else [],
         retry_required=sess["retry_required"] if sess else False,
@@ -135,8 +139,10 @@ def test_long_rotation_never_rejects_a_compliant_task():
     porodica padne u 8 poteza: recently_used_families je namjerno ograničen na
     config.MAX_RECENT_FAMILIES (6), pa LRU ne garantuje savršen ciklus."""
     store, fake = SessionStore(), FakeLLM()
-    info = lesson_info(6, FRACTION_TOPIC)
-    applicable = tf.applicable_families(6, info["oblast"], info["title"])
+    info = lesson_info(GRADE, FRACTION_TOPIC)
+    applicable = tf.applicable_families(
+        6, info["oblast"], info["title"], lesson_id=FRACTION_TOPIC
+    )
 
     seen = []
     for index in range(len(applicable)):

@@ -169,21 +169,16 @@ def test_easier_and_harder_requests_flow_to_prompt():
     # Svaki naredni zadatak dolazi iz DRUGE porodice, pa mora imati i drugačiji
     # pedagoški oblik (inače ga hvata is_duplicate_shape).
     fake.queue(make_output(reply="Evo lakšeg.",
-                           new_task=make_task(text="Dopuni: $4 + \\square = 9$.", expected="5",
-                                              options=make_options("5", "4", "6", "13"),
+                           new_task=make_task(text="Izračunaj $4+5$.", expected="9",
+                                              options=make_options("9", "4", "5", "10"),
                                               difficulty="easy")))
     r1 = run_practice_turn(store, fake, turn_payload(msg="Daj mi lakši zadatak.", difficulty_request="easier"))
     assert "difficulty_request=easier" in fake.calls[1][1]
     assert store.peek("sess-1")["difficulty"] == "easy"
     fake.queue(make_output(reply="Evo težeg.",
                            new_task=make_task(
-                               text="Koja tvrdnja o skraćivanju razlomaka je tačna?",
-                               expected="Dijele se i brojnik i nazivnik.",
-                               options=make_options(
-                                   "Dijele se i brojnik i nazivnik istim brojem.",
-                                   "Dijeli se samo brojnik.",
-                                   "Dijeli se samo nazivnik.",
-                                   "Sabiraju se brojnik i nazivnik."),
+                               text="Izračunaj $18\\cdot7-9$.", expected="117",
+                               options=make_options("117", "126", "108", "135"),
                                difficulty="hard")))
     r2 = run_practice_turn(store, fake, turn_payload(msg="Daj mi teži zadatak.", difficulty_request="harder"))
     assert "difficulty_request=harder" in fake.calls[2][1]
@@ -266,7 +261,7 @@ def test_recent_tasks_flow_into_prompt_for_anti_repeat():
     assert "\\frac{20}{32}" in third_input and "\\frac{18}{24}" in third_input
 
 
-def test_server_restart_survival_uses_client_task_text_without_expected_answer():
+def test_server_restart_does_not_trust_client_task_text_without_server_state():
     store, fake = SessionStore(), FakeLLM()
     # nema sesije (kao poslije restarta), ali klijent šalje last_tutor_task
     fake.queue(make_output(reply="Tačno!", evaluation="correct"))
@@ -275,8 +270,10 @@ def test_server_restart_survival_uses_client_task_text_without_expected_answer()
         interaction_phase="answering_practice_task"))
     assert r["answer_verdict"] is None  # tekst se nikad ne ocjenjuje
     prompt_in = fake.calls[0][1]
-    assert "Skrati razlomak" in prompt_in
-    # interno rješenje NE dolazi od klijenta — model računa sam
+    assert "Skrati razlomak" not in prompt_in
+    assert "AKTIVNI ZADATAK: još ne postoji" in prompt_in
+    assert r["last_tutor_task"] == ""
+    # Interno rješenje i aktivni zadatak ne dolaze od klijenta.
     assert "INTERNI OČEKIVANI ODGOVOR" not in prompt_in
 
 
@@ -585,10 +582,8 @@ def test_reply_control_char_bug_sanitized_in_answer():
     assert not _has_control_chars(r["answer"])
 
 
-def test_client_last_tutor_task_fallback_is_sanitized():
-    """Klijent (localStorage) šalje last_tutor_task iz VREMENA PRIJE nego što
-    je ova zaštita uvedena — može sadržavati isti neispravan LaTeX. Server ga
-    mora očistiti prije nego što uđe u AKTIVNI ZADATAK i ode nazad modelu."""
+def test_client_last_tutor_task_is_ignored_even_when_it_contains_broken_math():
+    """Browserov tekst bez serverskog identiteta zadatka nije obnovljivo stanje."""
     store, fake = SessionStore(), FakeLLM()
     broken_client_task = "Prošireni razlomak: $16\x0crac{60}: 2$."  # simulira stari bug u klijentskom stanju
     fake.queue(make_output(reply="Tačno!", evaluation="correct"))
@@ -599,7 +594,8 @@ def test_client_last_tutor_task_fallback_is_sanitized():
     assert not _has_control_chars(r["last_tutor_task"])
     prompt_sent = fake.calls[0][1]
     assert not _has_control_chars(prompt_sent)
-    assert "\\frac" in r["last_tutor_task"] or "\\frac" in prompt_sent
+    assert broken_client_task not in prompt_sent
+    assert r["last_tutor_task"] == ""
 
 
 def test_http_response_never_contains_raw_control_chars():

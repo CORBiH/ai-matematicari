@@ -7,15 +7,21 @@ import copy
 import threading
 
 from matbot import config
+from matbot.contracts import registry
+from matbot.topics import oblast_id_for_topic
 
 
-def _fresh_session(session_id, context_key, grade, lesson_id, lesson_title, oblast):
+def _fresh_session(session_id, curriculum_fingerprint, grade, lesson_id,
+                   lesson_title, oblast_id, oblast, mode):
     return {
         "session_id": session_id,
-        "context_key": context_key,
+        "context_key": curriculum_fingerprint,
+        "curriculum_fingerprint": curriculum_fingerprint,
         "grade": grade,
+        "mode": mode,
         "lesson_id": lesson_id,
         "lesson_title": lesson_title,
+        "oblast_id": oblast_id,
         "oblast": oblast,
         "current_task": "",
         "expected_answer_summary": "",
@@ -47,7 +53,8 @@ class SessionStore:
         self._lock = threading.Lock()
         self._sessions = {}
 
-    def load(self, session_id, grade, lesson_id, lesson_title, oblast, mode):
+    def load(self, session_id, grade, lesson_id, lesson_title, oblast, mode,
+             oblast_id=""):
         """Vrati KOPIJU sesije za dati kontekst — NIKAD referencu na objekat
         koji živi u internom storeu. Promjena razreda/lekcije/moda resetuje
         Practice stanje (novi kontekst = svjež zadatak).
@@ -58,12 +65,34 @@ class SessionStore:
         vraćaju svježe izgrađene objekte: _fresh_session() pravi nov dict, a
         copy.deepcopy(existing) pravi potpuno nezavisnu kopiju (uključujući
         ugniježdene liste recent_tasks/recent_turns)."""
-        context_key = f"{grade}|{mode}|{lesson_id}|{oblast}"
+        oblast_id = oblast_id or oblast_id_for_topic(lesson_id)
+        # Verzija ugovora je dio otiska: izmjena ugovora lekcije mora poništiti
+        # aktivni zadatak i napredovanje kroz POSTOJEĆI mehanizam ispod, bez
+        # ijednog novog puta invalidacije. Prazno za lekcije bez ugovora.
+        contract_version = registry.contract_version_for(lesson_id)
+        curriculum_fingerprint = f"{grade}|{oblast_id}|{lesson_id}|{mode}|{contract_version}"
         with self._lock:
             existing = self._sessions.get(session_id)
-            if existing is None or existing["context_key"] != context_key:
-                fresh = _fresh_session(session_id, context_key, grade, lesson_id, lesson_title, oblast)
-                return fresh
+            if existing is None:
+                return _fresh_session(
+                    session_id, curriculum_fingerprint, grade, lesson_id,
+                    lesson_title, oblast_id, oblast, mode,
+                )
+            if (existing.get("curriculum_fingerprint", existing.get("context_key"))
+                    != curriculum_fingerprint):
+                fresh = _fresh_session(
+                    session_id, curriculum_fingerprint, grade, lesson_id,
+                    lesson_title, oblast_id, oblast, mode,
+                )
+                # Promjena kurikularnog konteksta je sama po sebi autoritativna
+                # invalidacija. Ne čekamo uspješan AI odgovor: inače bi povratak
+                # na staru lekciju mogao oživjeti njen zadatak i napredovanje.
+                self._sessions.pop(session_id, None)
+                self._sessions[session_id] = copy.deepcopy(fresh)
+                while len(self._sessions) > config.MAX_SESSIONS_IN_MEMORY:
+                    oldest = next(iter(self._sessions))
+                    del self._sessions[oldest]
+                return copy.deepcopy(fresh)
             return copy.deepcopy(existing)
 
     def save(self, session):

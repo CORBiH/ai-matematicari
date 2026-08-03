@@ -311,12 +311,16 @@ def test_33_shuffle_preserves_independently_verified_correct_option():
 # 34-39: postojeći invarijanti
 # ---------------------------------------------------------------------------
 
-def test_39_all_31_family_contracts_remain_covered():
+def test_39_all_family_contracts_remain_covered():
     from matbot.task_family_validation import CONTRACTS, missing_contracts
     from matbot.task_families import FAMILY_DESCRIPTIONS
 
     assert missing_contracts() == []
-    assert len(CONTRACTS) == len(FAMILY_DESCRIPTIONS) == 31
+    # 36 porodica: pet „fraction_*“ porodica opslužuje SAMO nemigrirane
+    # lekcije kroz legacy granicu (matbot/legacy/practice_routing.py).
+    # Brišu se tek kad njihovi potrošači dobiju ugovor — vidi
+    # tests/test_legacy_routing_parity.py.
+    assert len(CONTRACTS) == len(FAMILY_DESCRIPTIONS) == 36
 
 
 def test_verifier_runs_only_for_solve_system():
