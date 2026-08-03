@@ -306,18 +306,32 @@ def _review_lesson_fidelity(llm, session, turn, new_task, family="", request_id=
     )
     result = llm.lesson_fidelity_turn(instructions, input_text)
     review = result.output
+    failed_checks = lesson_fidelity.mandatory_checks_failed(review.checks)
+    try:
+        resolved = lesson_fidelity.resolve(
+            review, requested_difficulty=turn["difficulty_request"])
+    except lesson_fidelity.FidelityRejected as error:
+        # Koncizan, SAMO interni log (nikad prompt ni učenikov tekst): odluka
+        # recenzenta, koje su obavezne provjere oborene i faza na kojoj je
+        # konačno odbijeno. Ne šalje se u browser — pozivalac vraća postojeći
+        # SAFE_ERROR_MESSAGE bez mutacije sesije i bez trećeg poziva.
+        logger.warning(
+            "lesson_fidelity request_id=%s topic=%s decision=%s failed_checks=%s "
+            "normalized_to_correct=%s rejection_stage=lesson_fidelity_resolve reason=%s",
+            request_id, context.topic_id, review.decision,
+            ",".join(error.failed_checks or failed_checks) or "-",
+            False, review.fail_reason_code or "-",
+        )
+        raise InvalidOutputError(f"lesson_fidelity: {error}") from error
     logger.info(
-        "lesson_fidelity request_id=%s topic=%s decision=%s reason=%s skill=%s",
+        "lesson_fidelity request_id=%s topic=%s decision=%s reason=%s skill=%s "
+        "failed_checks=%s normalized_to_correct=%s",
         request_id, context.topic_id, review.decision,
         review.fail_reason_code or "-",
         _clip_for_log(review.checks.lesson_skill_summary, 120),
+        ",".join(failed_checks) or "-", resolved.normalized_from_approve,
     )
-    try:
-        corrected = lesson_fidelity.resolve(
-            review, requested_difficulty=turn["difficulty_request"])
-    except lesson_fidelity.FidelityRejected as error:
-        raise InvalidOutputError(f"lesson_fidelity: {error}") from error
-    return corrected if corrected is not None else new_task
+    return resolved.task if resolved.task is not None else new_task
 
 
 def _task_from_skeleton(skeleton):

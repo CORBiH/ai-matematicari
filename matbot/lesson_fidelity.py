@@ -21,6 +21,7 @@ Nijedan ID lekcije ne postoji u ovom modulu. Recenzent dobija TAČAN NASLOV
 lekcije, oblast, razred i porodicu kao podatke — konkretni primjeri iz nalaza
 žive u promptu (kao ilustracija principa) i u testovima.
 """
+from dataclasses import dataclass
 from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict
@@ -76,7 +77,16 @@ class LessonFidelityReview(BaseModel):
 
 
 class FidelityRejected(ValueError):
-    """Zadatak nije prošao recenziju vjernosti. Poruka je INTERNA (log)."""
+    """Zadatak nije prošao recenziju vjernosti. Poruka je INTERNA (log).
+
+    `failed_checks`: lista OBAVEZNIH provjera koje su bile oborene kad je do
+    odbijanja došlo baš zbog toga (prazno za fail_closed ili nedostajući
+    ispravljen zadatak — tamo razlog nije "oborena provjera"). Isključivo za
+    strukturisan interni log, nikad se ne šalje u browser."""
+
+    def __init__(self, message, failed_checks=()):
+        super().__init__(message)
+        self.failed_checks = tuple(failed_checks)
 
 
 def is_task_generating(new_task, difficulty_request=""):
@@ -118,6 +128,15 @@ ODLUKA:
   zadatak (tekst, 4 opcije, tačan indeks, očekivani odgovor). To je konačna
   verzija koju učenik vidi;
 - `fail_closed` — ne može se sigurno objaviti; navedi `fail_reason_code`.
+
+NIKAD ne vraćaj `approve` dok je ijedna od OBAVEZNIH provjera (`math_correct`,
+`tests_exact_lesson`, `answer_correct`, `marked_option_correct`,
+`solvable_and_unambiguous`, `options_unique`, `grade_appropriate`) oborena —
+to je kontradikcija koju server odbija bez obzira na tvoju odluku. Ako
+prepoznaš problem: ili ga POPRAVI i vrati `correct` s KOMPLETNIM zamjenskim
+zadatkom (nikad polovičan opis šta fali), ili — ako se ne može sigurno
+popraviti — vrati `fail_closed`. Sama dijagnoza problema bez popravke ili bez
+`fail_closed` nikad nije dovoljna.
 
 Kad ispravljaš, NE MIJENJAJ izabranu lekciju, razred ni oblast — popravi zadatak
 tako da odgovara TOJ lekciji. Ne postoji treći poziv: tvoja odluka je konačna.
@@ -199,31 +218,81 @@ def build_input(context, new_task, student_message, family="",
     return "\n".join(lines)
 
 
+# OBAVEZNE provjere za PUBLIKACIJU (živi nalaz VPS): "required_task_form" je
+# NAMJERNO izostavljen — isti princip kao task_family_validation.FamilyContract
+# (task_form je informativan, nikad razlog odbijanja, vidi taj docstring);
+# "difficulty_direction_correct" ostaje ODVOJENA, uslovna provjera ispod (samo
+# kad je učenik tražio lakše/teže), ne dio ovog fiksnog skupa.
 _MANDATORY_CHECKS = (
-    "math_correct", "tests_exact_lesson", "required_task_form",
-    "grade_appropriate", "solvable_and_unambiguous", "answer_correct",
-    "marked_option_correct", "options_unique",
+    "math_correct", "tests_exact_lesson", "answer_correct",
+    "marked_option_correct", "solvable_and_unambiguous",
+    "options_unique", "grade_appropriate",
 )
 
 
-def resolve(review, requested_difficulty=""):
-    """Vrati zadatak koji se objavljuje. Baca FidelityRejected — fail closed.
+def mandatory_checks_failed(checks):
+    """Imena obaveznih provjera koje su oborene (prazna lista = sve prošle)."""
+    return [name for name in _MANDATORY_CHECKS if not getattr(checks, name)]
 
-    Kontradiktoran payload (odobreno uz oborenu provjeru) je PAD, ne odobrenje:
-    inače bi „approve“ postalo prazna riječ."""
+
+@dataclass(frozen=True)
+class ResolvedReview:
+    """Ishod resolve(): `task` je None kad se objavljuje ORIGINALNI nacrt
+    (čist `approve`), ili konkretan NewTask kad se objavljuje ispravljen
+    zadatak (čist `correct`, ili `approve` PREKLOPLJEN u `correct` — vidi
+    `normalized_from_approve`). Isključivo za interni log, nikad u browser."""
+    task: object
+    normalized_from_approve: bool = False
+
+
+def resolve(review, requested_difficulty=""):
+    """Vrati ResolvedReview koji se objavljuje. Baca FidelityRejected — fail
+    closed, BEZ mutacije sesije i BEZ trećeg poziva.
+
+    ŽIVI NALAZ (VPS): recenzent je vratio `approve` dok su obavezne provjere
+    (`math_correct`, `tests_exact_lesson`, `answer_correct`,
+    `marked_option_correct`) bile OBORENE — kontradikcija koju je server
+    ispravno odbio, ali bez ijednog objavljenog zadatka iako su OBA poziva već
+    potrošena. Pravilo normalizacije:
+
+      • `approve` uz SVE obavezne provjere tačne → objavljuje se nacrt
+        (bez izmjene, `task=None`).
+      • `approve` uz BAREM JEDNU oborenu obaveznu provjeru:
+          - ako recenzent ipak nosi KOMPLETAN `corrected_task` → odluka se
+            PREKLAPA (normalizuje) u `correct` i ta zamjena se validira
+            potpuno isto kao svaki drugi `correct` (ista downstream provjera:
+            schema, mathsafe, mathcheck, ugovor porodice, jedinstvenost
+            opcija — vidi practice._apply_new_task, poziva se odmah poslije);
+          - inače (nema zamjenskog zadatka) → fail closed, ISTO kao dosad.
+      • `correct` (izvorno ili preklopljeno) zahtijeva SAMO da
+        `corrected_task` nije prazan — obavezne provjere iznad opisuju
+        NEDOSTATKE NACRTA koji su i doveli do ispravke, ne ispravljen zadatak,
+        pa se nad njim više ne provjeravaju ovdje (to radi downstream sloj).
+      • `fail_closed` uvijek odbija, bez obzira na provjere."""
     if review.decision == "fail_closed":
         raise FidelityRejected(f"fail_closed:{review.fail_reason_code or 'nepoznato'}")
 
-    failed = [name for name in _MANDATORY_CHECKS if not getattr(review.checks, name)]
-    if failed:
-        raise FidelityRejected(f"odobreno uprkos oborenim provjerama: {failed}")
+    decision = review.decision
+    normalized = False
+
+    if decision == "approve":
+        failed = mandatory_checks_failed(review.checks)
+        if failed:
+            if review.corrected_task is not None:
+                decision = "correct"
+                normalized = True
+            else:
+                raise FidelityRejected(
+                    f"odobreno uprkos oborenim provjerama: {failed}",
+                    failed_checks=failed,
+                )
 
     if (requested_difficulty or "").strip().lower() in ("easier", "harder"):
         if not review.checks.difficulty_direction_correct:
             raise FidelityRejected("smjer promjene težine nije potvrđen")
 
-    if review.decision == "correct":
+    if decision == "correct":
         if review.corrected_task is None:
             raise FidelityRejected("odluka 'correct' bez ispravljenog zadatka")
-        return review.corrected_task
-    return None          # approve → objavljuje se originalni nacrt
+        return ResolvedReview(review.corrected_task, normalized_from_approve=normalized)
+    return ResolvedReview(None, normalized_from_approve=False)
