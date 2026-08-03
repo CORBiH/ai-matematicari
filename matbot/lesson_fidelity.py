@@ -168,7 +168,8 @@ def _option_lines(new_task):
 
 def build_input(context, new_task, student_message, family="",
                 family_description="", prior_task="", difficulty_request="",
-                family_contract_mismatch=""):
+                family_contract_mismatch="", duplicate_reason="",
+                duplicate_task_text=""):
     """`context` je matbot.tutor.lesson_context.LessonContext (dijeli se s
     univerzalnim putem — isti kanonski identitet, bez duplikata).
 
@@ -180,7 +181,16 @@ def build_input(context, new_task, student_message, family="",
     daje TAČAN razlog kršenja da bi `corrected_task` mogao ciljano popraviti baš
     taj nedostatak (živi nalaz: „fraction_word_problem: nedostaje obavezan oblik
     'ima_zivotni_kontekst'“ dvaput odbijeno u produkciji jer recenzent nije znao
-    šta konkretno nedostaje)."""
+    šta konkretno nedostaje).
+
+    `duplicate_reason`/`duplicate_task_text`: ISTA logika kao gore, ali za
+    ponavljanje teksta u sesiji (matbot/task_families.py, PROVJERENO na
+    SIROVOM nacrtu prije ovog poziva) — prazno kad nacrt nije ponavljanje.
+    Autoritativna provjera se identično ponavlja NAD ispravljenim zadatkom u
+    practice._apply_new_task — ova zaštita se ovdje NIKAD ne slabi ni
+    zaobilazi, samo se recenzentu unaprijed kaže TAČNO koji tekst mora
+    izbjeći (živi nalaz: „ponovljen tekst zadatka u istoj sesiji“ odbijeno tek
+    NAKON Tutora i recenzenta, iako je recenzent mogao ispraviti da je znao)."""
     lines = [
         "IZABRANA LEKCIJA (nepromjenjiva):",
         f"- razred: {context.grade}",
@@ -206,6 +216,21 @@ def build_input(context, new_task, student_message, family="",
             "Ovaj nedostatak MORAŠ otkloniti u `corrected_task` (decision=`correct`) "
             "ili odbiti (`fail_closed`) ako ne možeš — nacrt se NE SMIJE odobriti "
             "(`approve`) dok ovaj nedostatak stoji."
+        )
+    if duplicate_reason:
+        lines.append("")
+        lines.append(f"DETERMINISTIČKA PROVJERA PONAVLJANJA JE ODBILA NACRT: {duplicate_reason}")
+        if duplicate_task_text:
+            lines.append(f"TEKST KOJI SE NE SMIJE PONOVITI: {duplicate_task_text}")
+        lines.append(
+            "Vrati `correct` s KOMPLETNIM zamjenskim zadatkom koji se ZNAČAJNO "
+            "razlikuje od gornjeg teksta — drugi brojevi, druga formulacija i, "
+            "gdje je primjenjivo, drugačiji odgovor/opcije — dok zadržavaš ISTU "
+            "izabranu lekciju, ISTU dodijeljenu porodicu i traženu težinu. "
+            "Promjena samo interpunkcije, razmaka ili redoslijeda riječi NIJE "
+            "dovoljna i i dalje se broji kao isti zadatak. Ako ne možeš "
+            "smisliti stvarno drugačiji zadatak, biraj `fail_closed` — nacrt "
+            "se NE SMIJE odobriti (`approve`) dok ponavljanje stoji."
         )
     lines.append("")
     lines.append("NACRT ZADATKA (provjeri ga, ne vjeruj mu):")

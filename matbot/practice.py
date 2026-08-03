@@ -281,8 +281,38 @@ def _family_contract_precheck(new_task, family):
     return ""
 
 
+def _duplicate_precheck(new_task, task_family, session):
+    """Lagana provjera SIROVOG (nesanitizovanog) Tutorovog nacrta protiv
+    ponavljanja teksta u istoj sesiji, PRIJE recenzenta vjernosti lekciji —
+    vraća (poruku kršenja, tekst posljednjeg zadatka) ili ("", "").
+
+    Ovo NIKAD ne odbija sam turn i NE zamjenjuje autoritativnu provjeru: ISTA
+    provjera (task_families.is_duplicate_signature/is_duplicate_shape) i dalje
+    obavezno ide u _apply_new_task, poslije recenzenta, nad sanitizovanim
+    tekstom — zaštita se ovdje NE slabi ni zaobilazi. Jedina svrha ovoga je da
+    recenzent dobije TAČAN razlog i tekst koji mora izbjeći, umjesto da nagađa
+    — živi nalaz (VPS): zadatak je odbijen tek NAKON Tutora i recenzenta jer
+    je doslovno ponovio raniji tekst iz iste sesije, iako je recenzent imao
+    priliku da ga ispravi da je znao za sudar."""
+    signature = task_families.task_signature(
+        task_family, new_task.text or "", session["lesson_id"], new_task.difficulty
+    )
+    recent = session["recent_task_signatures"]
+    if task_families.is_duplicate_signature(signature, recent):
+        return "ponovljen tekst zadatka u istoj sesiji", session["current_task"] or ""
+    if task_families.is_duplicate_shape(
+        signature, recent, retry_required=session["retry_required"]
+    ):
+        return (
+            f"pedagogical_shape_repeat: {task_family or '(bez porodice)'}",
+            session["current_task"] or "",
+        )
+    return "", ""
+
+
 def _review_lesson_fidelity(llm, session, turn, new_task, family="", request_id="",
-                            family_contract_mismatch=""):
+                            family_contract_mismatch="", duplicate_reason="",
+                            duplicate_task_text=""):
     """DRUGI poziv — samo za turn koji pravi zadatak. Vrati zadatak za objavu.
 
     Vraća originalni nacrt (`approve`) ili recenzentov ispravljen zadatak
@@ -303,6 +333,8 @@ def _review_lesson_fidelity(llm, session, turn, new_task, family="", request_id=
         prior_task=session["current_task"] or "",
         difficulty_request=turn["difficulty_request"],
         family_contract_mismatch=family_contract_mismatch,
+        duplicate_reason=duplicate_reason,
+        duplicate_task_text=duplicate_task_text,
     )
     result = llm.lesson_fidelity_turn(instructions, input_text)
     review = result.output
@@ -881,10 +913,15 @@ def _handle_text_turn(store, llm, session, turn, lesson_id, request_id):
             # „Ne znam“, objašnjenja i obična konverzacija nikad ne dođu ovdje
             # i zadržavaju zatečeni broj poziva (vidi matbot/lesson_fidelity.py).
             mismatch_reason = _family_contract_precheck(out.new_task, selected_shape)
+            duplicate_reason, duplicate_task_text = _duplicate_precheck(
+                out.new_task, selected_shape, session
+            )
             reviewed_task = _review_lesson_fidelity(
                 llm, session, turn, out.new_task,
                 family=selected_shape, request_id=request_id,
                 family_contract_mismatch=mismatch_reason,
+                duplicate_reason=duplicate_reason,
+                duplicate_task_text=duplicate_task_text,
             )
             task_text = _apply_new_task(
                 session, reviewed_task, task_family=selected_shape,
