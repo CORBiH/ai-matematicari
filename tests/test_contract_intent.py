@@ -8,12 +8,15 @@ Dvije nove serverske odluke poslije Live96:
      koji se ne da objasniti iz zadatka obara taj tekst (hint pada na siguran
      generički), nikad cio turn s mutacijom stanja.
 """
+import copy
+
 import pytest
 
 from matbot.contracts import generator, intent, pipeline, registry
-from matbot.practice import run_practice_turn
+from matbot.practice import SAFE_ERROR_MESSAGE, run_practice_turn
 from matbot.session_store import SessionStore
-from tests.conftest import FakeLLM, make_output, make_task
+from tests.conftest import (FakeLLM, make_output, make_task,
+                            make_task_for_family)
 
 CONTRACTS = registry.load_all()
 
@@ -148,6 +151,74 @@ def test_invented_hint_falls_back_to_the_generic_hint_without_killing_the_turn()
     assert response["answer_verdict"] == "incorrect"
     assert "999" not in response["answer"]
     assert response["answer"].startswith("Netačno.")
+
+
+def test_reply_that_invents_a_number_is_rejected_without_a_second_call():
+    """Živi nalaz post-push provjere: na pitanje „kako da riješim ovo?“ model je
+    vratio „Rezultat je $\\frac{47}{99}$“ — broj koji nije ni tačan odgovor, ni
+    ijedna opcija, ni izvediv iz zadatka. mathcheck ga NE hvata (nema
+    nedosljednog lanca), pa ga mora uhvatiti kapija vjernosti."""
+    store, fake = SessionStore(), FakeLLM()
+    turn = {
+        "session_id": "reply-gate", "grade": 6, "selected_topic": "6-04-009",
+        "selected_oblast": "", "student_message": "Daj mi zadatak.", "intent": "",
+        "difficulty_request": "", "interaction_phase": "", "last_tutor_task": "",
+        "interaction_type": "student_question", "selected_option_id": "",
+        "client_turn_id": "",
+    }
+    fake.queue(make_output(reply="Evo zadatka.", new_task=make_task()))
+    run_practice_turn(store, fake, turn)
+    before = copy.deepcopy(store.peek("reply-gate"))
+    calls_before = fake.call_count
+
+    fake.queue(make_output(reply=r"Rezultat je $\frac{47}{99}$."))
+    response = run_practice_turn(store, fake, dict(
+        turn, student_message="Kako da riješim ovo?"))
+
+    assert response["answer"] == SAFE_ERROR_MESSAGE
+    assert "status" not in response
+    assert fake.call_count == calls_before + 1     # bez drugog/repair poziva
+    assert store.peek("reply-gate") == before      # bez mutacije stanja
+
+
+def test_reply_that_stays_inside_the_task_is_published():
+    """Suprotan smjer: objašnjenje koje koristi SAMO brojeve iz zadatka prolazi
+    — kapija ne smije gušiti ispravnu pomoć."""
+    store, fake = SessionStore(), FakeLLM()
+    turn = {
+        "session_id": "reply-gate-ok", "grade": 6, "selected_topic": "6-04-009",
+        "selected_oblast": "", "student_message": "Daj mi zadatak.", "intent": "",
+        "difficulty_request": "", "interaction_phase": "", "last_tutor_task": "",
+        "interaction_type": "student_question", "selected_option_id": "",
+        "client_turn_id": "",
+    }
+    fake.queue(make_output(reply="Evo zadatka.", new_task=make_task()))
+    run_practice_turn(store, fake, turn)
+
+    explanation = "Imenilac ostaje isti — saberi samo brojnike."
+    fake.queue(make_output(reply=explanation))
+    response = run_practice_turn(store, fake, dict(turn, student_message="Kako?"))
+    assert response["status"] == "ready"
+    assert response["answer"] == explanation
+
+
+def test_reply_gate_does_not_touch_the_legacy_path():
+    """Lekcija bez ugovora zadržava zatečeno ponašanje — server tamo ne posjeduje
+    matematiku zadatka, pa nema čemu mjeriti vjernost."""
+    store, fake = SessionStore(), FakeLLM()
+    turn = {
+        "session_id": "reply-gate-legacy", "grade": 6, "selected_topic": "6-04-014",
+        "selected_oblast": "", "student_message": "Daj mi zadatak.", "intent": "",
+        "difficulty_request": "", "interaction_phase": "", "last_tutor_task": "",
+        "interaction_type": "student_question", "selected_option_id": "",
+        "client_turn_id": "",
+    }
+    fake.queue(make_output(reply="Evo zadatka.",
+                           new_task=make_task_for_family("fraction_operation")))
+    run_practice_turn(store, fake, turn)
+    fake.queue(make_output(reply=r"Pogledaj i $\frac{47}{99}$ kao primjer."))
+    response = run_practice_turn(store, fake, dict(turn, student_message="Kako?"))
+    assert response["status"] == "ready"
 
 
 def test_faithful_hint_is_published():

@@ -265,6 +265,31 @@ def _active_task_texts(session):
     ]
 
 
+def _reject_if_prose_invents_mathematics(text, session, contract, where):
+    """Odbij vidljiv tekst koji uvodi broj kojeg SERVERSKI zadatak ne objašnjava.
+
+    Živi nalaz (probni turn nad Fazom 1): kad učenik usred zadatka pita „kako da
+    riješim ovo?“, model je vratio „Rezultat je $\\frac{47}{99}$“ — broj koji nije
+    ni tačan odgovor, ni ijedna opcija, ni bilo šta izvedivo iz zadatka.
+    mathcheck to NE hvata (nema lanca jednakosti koji bi bio nedosljedan), a na
+    motoru ugovora matematiku posjeduje server — pa model nema pravo uvesti
+    vlastiti broj.
+
+    Primjenjuje se SAMO uz aktivan zadatak s uključenim ugovorom: bez zadatka
+    nema čemu biti vjeran, a legacy put zadržava zatečeno ponašanje. Odbijanje
+    je isto kao svako drugo na ovom nivou (numerička/geometrijska provjera):
+    sigurna poruka, bez mutacije sesije, bez drugog AI poziva."""
+    if contract is None or not session["current_task"]:
+        return
+    faithful, offending = contract_pipeline.verify_prose_fidelity(
+        text, _active_task_texts(session)
+    )
+    if not faithful:
+        raise InvalidOutputError(
+            f"prose_fidelity: nepoznate vrijednosti {list(offending)[:6]} [{where}]"
+        )
+
+
 def _apply_new_task(session, new_task, task_family="", request_id="",
                     contract=None, archetype=""):
     """Sanitizuje tekst zadatka i sve 4 opcije, promiješa opcije i primjenjuje
@@ -742,6 +767,9 @@ def _handle_text_turn(store, llm, session, turn, lesson_id, request_id):
             # pitanje) — uvijek "check", nikad politika porodice.
             _scope, _figures = _geometry_context(session)
             _reject_if_geometry_notation_invalid(reply, _scope, _figures, "reply")
+            # Na motoru ugovora matematiku posjeduje SERVER: proza o aktivnom
+            # zadatku ne smije uvesti vlastiti broj (vidi funkciju iznad).
+            _reject_if_prose_invents_mathematics(reply, session, contract, "reply")
             answer = reply
 
         session["recent_turns"].append(
