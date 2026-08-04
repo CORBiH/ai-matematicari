@@ -69,6 +69,7 @@ Puna lista imena: `tools/practice_eval/checks.py::known_check_names`.
 | validna response schema (oba smjera ugovora) | `response_schema` |
 | tehnički fallback predstavljen kao uspjeh | `not_safe_error`, `no_fallback_text` |
 | stvarno objavljen zadatak | `task_published`, `published` |
+| nerješiv / nepotpun zadatak (nalaz A25) | `task_self_contained` |
 | lesson/topic fidelity | `lesson_matches`, `stays_in_lesson` |
 | MCQ opcije i označena tačna opcija | `options_ok`, `package_clean` |
 | choice grading | `verdict_correct`, `verdict_incorrect`, `correct_option_stable` |
@@ -164,19 +165,45 @@ Ako neki turn potroši više od svog arhitektonskog budžeta (npr. klik koji
 proizvede novi zadatak → 2 poziva umjesto 1), plafon zaustavi kampanju ranije i
 to se vidi kao `calls_at_most:1` pad. Nastavak ide preko `--resume`.
 
-### Talas B — 60 ciljanih scenarija (namjerno NIJE unaprijed zaključan)
+### Talas B — 60 scenarija izvedenih iz nalaza Talasa A
 
-Piše se **tek nakon analize Talasa A**, po ovoj raspodjeli:
+Napisan **tek nakon** izvršenog Talasa A (commit `1d1e84a`, 100 poziva,
+30 REVIEW / 10 FAIL). Svaki red nosi obavezno polje
+`targets_wave_a_findings` — ID scenarija iz Talasa A i/ili root-cause
+kategoriju. Scenario bez te veze `--dry-run` odbija kao nasumičan uzorak.
 
-| Segment | Min. broj | Šta ispituje |
-|---|---|---|
-| Ponovljeni kvarovi | ≥ 30 | najčešće root cause kategorije iz Talasa A, na drugim lekcijama i razredima |
-| Kritične lekcije i granice ocjenjivanja | ≥ 15 | lekcije s najvećom upotrebom + granice: ekvivalentne opcije, dva rješenja, jedinice, znak |
-| Session / JSON / LaTeX / timeout / recovery | ≥ 10 | gubitak zadatka, idempotencija, `llm_schema_parse_error`, budžet tokena, oporavak nakon odbijenog turna |
-| Regresija osnovnih tokova | ≥ 5 | tokovi koji su u Talasu A prošli bez determinističkog pada |
+| Grupa | ID-evi | n | Šta potvrđuje |
+|---|---|---|---|
+| Stopa pada zbog dokaza težine na nivou 1 | B01–B22 | 22 | 8 od 10 FAIL-ova; iste lekcije se ponavljaju 2–3× jer je A10 pokazao da isti zahtjev jednom padne a jednom prođe |
+| Recenzent: nevidljiv `solution` i samoprotivrječnost | B23–B28 | 6 | A34 (`nebezbjedan zapis [solution]` tek u objavi), A37 (`correct` uz oborene vlastite provjere) |
+| Nerješiv zadatak i MCQ granice | B29–B36 | 8 | A25 (objavljen zadatak bez ijednog izraza), ekvivalentne opcije, dva rješenja |
+| Vjernost lekciji i primjerenost razredu | B37–B44 | 8 | A17 (Pitagora u 7. razredu), A20 (π u 7. razredu), A14, A38 |
+| Follow-up tokovi (odvojeni preduslovom) | B45–B54 | 10 | hint 1/2/3, pogrešan pa tačan klik, idempotencija, nivo 1→2→3, spust 2→1, promjena lekcije, slobodan tekst |
+| Kontrole i evaluator | B55–B60 | 6 | tokovi koji su u A prošli + provjera da je A10 bio test-design, ne bug |
 
-Zaključavanje Talasa B prije Talasa A značilo bi pogađanje kvarova umjesto
-mjerenja.
+Raspodjela: **45** scenarija cilja dokazane P0/P1 uzroke · **13** su kontrole ·
+**16** pokriva kritične lekcije i granice ocjenjivanja · **17** session / JSON /
+LaTeX / MCQ / recovery. Razred 9 dobija **26 od 60** (43 %), jer je u Talasu A
+imao samo 30 % determinističkog prolaza.
+
+**Trošak: min 84, tvrdi plafon 150** poziva. `--wave all` (A+B) ima plafon
+**250**; Talas A se time ponovo izvršava, pa ga pokreni samo kad to zaista želiš.
+
+#### `requires_active_task` — preduslov, ne očekivanje
+
+Talas A je pokazao da follow-up korak nakon neuspjelog generisanja proizvodi
+FAIL-ove koji **nisu** nezavisni kvarovi (A10, A31, A35). Korak s
+`requires_active_task: true` se preskače kad nema aktivnog zadatka: nula
+poziva, nijedna provjera se ne izvršava, scenario ne može završiti kao strogi
+PASS. Nijedno očekivanje se time ne ublažava — svaka provjera je identična za
+korak koji se stvarno izvrši.
+
+#### `topic_id` na koraku
+
+Korak smije promijeniti lekciju unutar iste sesije. To je jedini način da se
+testira serverska invalidacija napretka pri promjeni teme
+(`SessionStore.load` poredi `curriculum_fingerprint`). `--dry-run` provjerava i
+tu lekciju.
 
 ---
 
@@ -192,6 +219,7 @@ $env:MATBOT_PRACTICE_PIPELINE      = "universal_two_call"
 $env:MATBOT_PRACTICE_DIFFICULTY_LEVELS = "enabled"
 $env:AI_TUTOR_TIMEOUT              = "45"
 python tools/run_practice_eval.py --wave A --max-model-calls 100
+python tools/run_practice_eval.py --wave B --max-model-calls 150
 
 # Nastavak nakon prekida (preskače ID-eve koji su već u results.jsonl)
 python tools/run_practice_eval.py --wave A --resume --output-dir <isti dir>
@@ -200,7 +228,7 @@ python tools/run_practice_eval.py --wave A --resume --output-dir <isti dir>
 python tools/run_practice_eval.py --scenario A14 --scenario A24
 ```
 
-Zastavice: `--list`, `--scenario ID`, `--wave A|B`, `--resume`,
+Zastavice: `--list`, `--scenario ID`, `--wave A|B|all`, `--resume`,
 `--max-scenarios N`, `--max-model-calls N`, `--dry-run`, `--output-dir PATH`,
 `--concurrency N` (1–4, podrazumijevano 1), `--delay-ms N`.
 

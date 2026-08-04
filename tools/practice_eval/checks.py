@@ -311,6 +311,44 @@ def check_task_published(obs: TurnObservation) -> CheckResult:
     return CheckResult("task_published", PASS)
 
 
+_COMPUTE_IMPERATIVE_RE = re.compile(
+    r"(?i)\b(izra[čc]unaj|izra[čc]unajte|rije[šs]i|rije[šs]ite|odredi|odredite|"
+    r"sredi|skrati|pro[šs]iri|uprosti|napi[šs]i vrijednost)\b"
+)
+_DIGIT_RE = re.compile(r"\d")
+
+
+def check_task_self_contained(obs: TurnObservation) -> CheckResult:
+    """Objavljen zadatak mora sadržavati ono što traži da se izračuna.
+
+    ZAŠTO POSTOJI (Talas A, scenario A25, lekcija 8-01-014): objavljen je
+    zadatak čiji je CIJELI tekst glasio „Izračunaj vrijednost izraza:“ — bez
+    ijednog izraza, uz četiri numeričke opcije i označen tačan odgovor.
+    Recenzent je vratio `approve` uz `task_solvable_and_unambiguous=true`, a
+    nijedan serverski validator to nije mogao vidjeti: `mathsafe` nema šta da
+    sanitizuje, `mathcheck` nema jednakost, `option_equivalence` vidi četiri
+    različite vrijednosti, `mcq_integrity` nije primjenjiv.
+
+    Provjera je NAMJERNO uska i dokaziva iz vidljivog teksta:
+      1. tekst zadatka završava dvotačkom — rečenica obećava sadržaj koji nikad
+         ne dolazi;
+      2. imperativ za računanje postoji, a u tekstu nema NI matematičkog
+         segmenta NI ijedne cifre — nema se šta izračunati.
+    Sve ostalo se preskače: „koliko ima stranica trougao“ je legitiman zadatak
+    bez cifre i bez `$…$`."""
+    text = (obs.visible_task_text or obs.task_after or "").strip()
+    if not text:
+        return CheckResult("task_self_contained", SKIP, "no published task text on this turn")
+    if text.endswith(":"):
+        return CheckResult("task_self_contained", FAIL,
+                           f"task text ends with a colon and nothing follows: {text[-60:]!r}")
+    has_math = any(kind in (INLINE, DISPLAY) for kind, _ in tokenize_math(text))
+    if _COMPUTE_IMPERATIVE_RE.search(text) and not has_math and not _DIGIT_RE.search(text):
+        return CheckResult("task_self_contained", FAIL,
+                           "task asks for a calculation but shows no expression and no number")
+    return CheckResult("task_self_contained", PASS)
+
+
 def check_no_new_task(obs: TurnObservation) -> CheckResult:
     if obs.issued_new_task:
         return CheckResult("no_new_task", FAIL, "a new task was issued on a non-generation turn")
@@ -661,6 +699,7 @@ _CHECKS = {
     "free_text_grading_no_oracle": check_free_text_grading_no_oracle,
     "zero_calls": check_zero_calls,
     "task_published": check_task_published,
+    "task_self_contained": check_task_self_contained,
     "no_new_task": check_no_new_task,
     "task_preserved": check_task_preserved,
     "options_ok": check_options_ok,
@@ -747,6 +786,7 @@ def run_checks(names, obs: TurnObservation) -> list:
 _ROOT_CAUSE = {
     "published": "generation_or_publication_failure",
     "task_published": "generation_or_publication_failure",
+    "task_self_contained": "unsolvable_or_incomplete_task",
     "not_safe_error": "technical_fallback_as_success",
     "no_fallback_text": "technical_fallback_as_success",
     "response_schema": "response_contract",

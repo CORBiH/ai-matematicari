@@ -22,6 +22,18 @@ Jedan red = jedan scenario:
 `kind` ∈ {text, choice, repeat_choice}. `select` ∈ {correct, wrong,
 second_wrong, a|b|c|d}. `collect_help: true` znači da tekst ovog turna ulazi u
 historiju hintova (za provjeru `hint_differs`).
+
+`requires_active_task: true` je PREDUSLOV, ne očekivanje.
+
+ZAŠTO POSTOJI (Talas A, scenariji A10/A31/A35): kad prvi korak ne uspije
+objaviti zadatak, follow-up koraci (klik, hint, „uradi ga ti“, ocjena) više
+nemaju šta da testiraju — a ipak su se izvršavali i proizvodili FAIL-ove koji
+NISU nezavisni kvarovi, nego posljedica jednog ranijeg pada. Takav korak se
+sada preskače: nula poziva, nijedna provjera se ne izvršava, a scenario ne može
+završiti kao PASS jer je nešto ostalo nedokazano.
+
+To NIJE ublažavanje očekivanja: `calls_at_most:1` i ostale provjere ostaju
+identične za svaki korak koji se stvarno izvrši.
 """
 from __future__ import annotations
 
@@ -49,6 +61,10 @@ class Scenario:
     reason: str
     steps: tuple
     tags: tuple = ()
+    # Veza scenarija s konkretnim nalazom ranijeg talasa (ID scenarija ili
+    # root-cause kategorija). Obavezna za Talas B: scenario koji ne cilja
+    # nijedan dokazan nalaz je nasumican uzorak, ne dijagnostika.
+    targets_wave_a_findings: tuple = ()
 
     @property
     def session_id(self):
@@ -91,7 +107,17 @@ def _parse_scenario(raw, source, line_number) -> Scenario:
         if kind in ("choice", "repeat_choice"):
             _require(step.get("select", "correct") in SELECTS,
                      f"{step_where}: unknown select {step.get('select')!r}")
+        _require(isinstance(step.get("requires_active_task", False), bool),
+                 f"{step_where}: requires_active_task must be a boolean")
+        # Korak SMIJE promijeniti lekciju unutar iste sesije — to je jedini
+        # nacin da se testira serverska invalidacija napretka pri promjeni teme
+        # (`SessionStore.load` poredi curriculum_fingerprint). Postojanje te
+        # lekcije provjerava `--dry-run`.
+        step_topic = step.get("topic_id")
+        _require(step_topic is None or (isinstance(step_topic, str) and step_topic.strip()),
+                 f"{step_where}: topic_id override must be a non-empty string")
         normalized = dict(step)
+        normalized.setdefault("requires_active_task", False)
         normalized.setdefault("rubrics", [])
         normalized["checks"] = list(step["checks"])
         normalized["rubrics"] = list(normalized["rubrics"])
@@ -101,6 +127,7 @@ def _parse_scenario(raw, source, line_number) -> Scenario:
         id=str(raw["id"]), wave=raw["wave"], importance=raw["importance"],
         grade=raw["grade"], oblast=str(raw["oblast"]), topic_id=str(raw["topic_id"]),
         reason=str(raw["reason"]), steps=tuple(steps), tags=tuple(raw.get("tags", ())),
+        targets_wave_a_findings=tuple(raw.get("targets_wave_a_findings", ())),
     )
 
 
@@ -135,6 +162,8 @@ def validate_scenarios(scenarios) -> list:
         seen[scenario.id] = scenario
         if not any(step.get("expect_calls", 0) for step in scenario.steps):
             problems.append(f"{scenario.id}: no step ever reaches the model")
+        if scenario.wave == "B" and not scenario.targets_wave_a_findings:
+            problems.append(f"{scenario.id}: wave B scenario without targets_wave_a_findings")
     sessions = [scenario.session_id for scenario in scenarios]
     if len(set(sessions)) != len(sessions):
         problems.append("two scenarios share a session id — isolation would be broken")

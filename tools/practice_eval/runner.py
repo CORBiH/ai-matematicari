@@ -275,6 +275,12 @@ class TurnRecord:
     reviewer_decision: str = ""
     tutor_draft_issues: str = ""
     reviewer_final_issues: str = ""
+    # Recenzentov NEZAVISNO izračunat dokaz težine. Odvojen od
+    # `reviewer_final_issues` jer server prenosi baš njega u konačan paket:
+    # u Talasu A je paket izgledao čist dok je recenzentov vlastiti dokaz
+    # obarao isti prag (A28, A31, A35, A36).
+    reviewer_independent_evidence_errors: str = ""
+    precondition_unmet: str = ""
     log_lines: tuple = ()
     check_results: list = field(default_factory=list)
     session_after_summary: dict = field(default_factory=dict)
@@ -299,12 +305,22 @@ class ScenarioRecord:
     duration_s: float
     session_id: str
     turns: list
+    preconditions_unmet: list = field(default_factory=list)
 
 
 def _session_summary(session):
+    """Serverski internali koji ostaju u LOKALNOM dijagnostičkom fajlu.
+
+    `marked_option_text` i `expected_answer` se zapisuju jer je Talas A pokazao
+    da se bez njih ne može offline provjeriti je li server označio ISPRAVNU
+    opciju kad na tom zadatku nije bilo klika. Isto radi i postojeći live
+    release gate (`internal_correct_option_value`). Ovo nikad ne ide u browser."""
     if not session:
         return {}
     signature = session.get("current_task_signature") or {}
+    correct_id = session.get("correct_option_id") or ""
+    marked = next((option.get("text") for option in (session.get("current_options") or [])
+                   if isinstance(option, dict) and option.get("id") == correct_id), "")
     return {
         "lesson_id": session.get("lesson_id"),
         "difficulty_level": session.get("difficulty_level"),
@@ -315,6 +331,9 @@ def _session_summary(session):
         "wrong_option_ids": list(session.get("wrong_option_ids") or []),
         "current_task_chars": len(session.get("current_task") or ""),
         "task_signature_hash": signature.get("structured_signature_hash"),
+        "correct_option_id": correct_id,
+        "marked_option_text": marked,
+        "expected_answer": session.get("expected_answer_summary") or "",
     }
 
 
@@ -328,6 +347,26 @@ def _final_task_package(record):
             return task
     tutor = record.get("tutor_output")
     return getattr(tutor, "new_task", None)
+
+
+def _independent_evidence_errors(reviewer_output):
+    """Isti validator koji server pokreće nad recenzentovim VLASTITIM dokazom.
+
+    Ne uvodi novi prag — poziva `matbot.tutor.schema.difficulty_evidence_errors`,
+    tačno kao `validate_reviewer`. Postoji samo da se u izvještaju razlikuje
+    „paket nosi loš dokaz“ od „recenzent je sam izmjerio da paket nije na
+    traženom nivou pa ga ipak odobrio“."""
+    from matbot.tutor.schema import difficulty_evidence_errors
+
+    evidence = getattr(reviewer_output, "reviewed_difficulty_evidence", None)
+    final = getattr(reviewer_output, "final", None)
+    task = getattr(final, "new_task", None)
+    if evidence is None or task is None:
+        return ""
+    try:
+        return ",".join(difficulty_evidence_errors(evidence, task.target_difficulty_level))
+    except Exception:
+        return ""
 
 
 def _classify_transport(turn_records):
@@ -364,6 +403,20 @@ def run_scenario(flask_app, llm, capture, scenario: Scenario, token) -> Scenario
 
     for index, step in enumerate(scenario.steps):
         session_before = store.peek(session_id)
+
+        # PREDUSLOV, ne očekivanje: follow-up korak bez aktivnog zadatka nema
+        # šta da testira. Preskače se BEZ poziva i BEZ ijedne provjere — inače
+        # bi jedan raniji pad proizveo lanac lažno „nezavisnih“ kvarova
+        # (Talas A: A10, A31, A35).
+        if step.get("requires_active_task") and not (session_before or {}).get("current_task"):
+            turn_records.append(TurnRecord(
+                step_index=index, kind=step["kind"], request={}, http_status=0,
+                response={}, sdk_calls=0,
+                precondition_unmet="no active task — step skipped, 0 SDK calls spent",
+                session_after_summary=_session_summary(session_before),
+            ))
+            continue
+
         payload, client_turn_id = _build_payload(
             scenario, step, session_before, last_client_turn_id
         )
@@ -403,6 +456,7 @@ def run_scenario(flask_app, llm, capture, scenario: Scenario, token) -> Scenario
         reviewer_output = request_record.get("reviewer_output")
         if reviewer_output is not None:
             turn.reviewer_decision = getattr(reviewer_output, "decision", "") or ""
+            turn.reviewer_independent_evidence_errors = _independent_evidence_errors(reviewer_output)
         tutor_task = getattr(request_record.get("tutor_output"), "new_task", None)
         if tutor_task is not None:
             from matbot.tutor import package_preflight
@@ -417,7 +471,7 @@ def run_scenario(flask_app, llm, capture, scenario: Scenario, token) -> Scenario
             scenario_id=scenario.id,
             step_index=index,
             step_kind=step["kind"],
-            topic_id=scenario.topic_id,
+            topic_id=step.get("topic_id") or scenario.topic_id,
             grade=scenario.grade,
             request_payload=payload,
             http_status=http_status,
@@ -457,6 +511,8 @@ def run_scenario(flask_app, llm, capture, scenario: Scenario, token) -> Scenario
             break
 
     transport = _classify_transport(turn_records)
+    unmet = [{"step": turn.step_index, "reason": turn.precondition_unmet}
+             for turn in turn_records if turn.precondition_unmet]
     failed, skipped = [], []
     for turn in turn_records:
         for result in turn.check_results:
@@ -473,7 +529,9 @@ def run_scenario(flask_app, llm, capture, scenario: Scenario, token) -> Scenario
         status = transport
     elif failed:
         status = STATUS_FAIL
-    elif skipped or rubrics:
+    elif skipped or rubrics or unmet:
+        # Preskočen preduslov znači NEDOKAZANO, nikad „dobro“ — scenario s
+        # neizvršenim korakom ne smije završiti kao strogi PASS.
         status = STATUS_REVIEW
     else:
         status = STATUS_PASS
@@ -489,6 +547,7 @@ def run_scenario(flask_app, llm, capture, scenario: Scenario, token) -> Scenario
         duration_s=round(time.monotonic() - started, 2),
         session_id=session_id,
         turns=[asdict(turn) for turn in turn_records],
+        preconditions_unmet=unmet,
     )
 
 
@@ -501,7 +560,7 @@ def _build_payload(scenario: Scenario, step, session_before, last_client_turn_id
         "client_turn_id": client_turn_id,
         "grade": scenario.grade,
         "mode": "practice",
-        "selected_topic": scenario.topic_id,
+        "selected_topic": step.get("topic_id") or scenario.topic_id,
         "selected_oblast": "",
         "student_message": step.get("message", ""),
         "conversation_history": [],
@@ -677,6 +736,10 @@ def dry_run(scenarios, output_dir: Path):
             problems.append(f"{scenario.id}: declared oblast does not match topics.json "
                             f"({scenario.oblast!r} vs {lesson['oblast']!r})")
         for index, step in enumerate(scenario.steps):
+            step_topic = step.get("topic_id")
+            if step_topic and lesson_info(scenario.grade, step_topic) is None:
+                problems.append(f"{scenario.id} step{index}: topic {step_topic} does not exist "
+                                f"for grade {scenario.grade}")
             for name in step["checks"]:
                 if check_lib.resolve(name) is None:
                     problems.append(f"{scenario.id} step{index}: unknown check {name!r}")

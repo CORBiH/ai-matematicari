@@ -10,6 +10,7 @@ Zašto baš ovo: prethodna faza je pokazala da najveća zamka nije loš model, n
 ovdje ima svoj izričit test.
 """
 import json
+import sys
 
 import pytest
 
@@ -21,9 +22,12 @@ from tools.practice_eval import runner
 from tools.practice_eval.scenario import (Scenario, ScenarioError, load_scenarios,
                                           validate_scenarios)
 
-WAVE_A = runner.ROOT / "tools" / "practice_eval" / "scenarios" / "wave_a.jsonl"
+SCENARIO_DIR = runner.ROOT / "tools" / "practice_eval" / "scenarios"
+WAVE_A = SCENARIO_DIR / "wave_a.jsonl"
+WAVE_B = SCENARIO_DIR / "wave_b.jsonl"
 LESSON = "6-03-004"          # Pravila djeljivosti — postoji u data/topics.json
 WAVE_A_CALL_BUDGET = 100
+WAVE_B_CALL_BUDGET = 150
 
 
 @pytest.fixture(autouse=True)
@@ -434,3 +438,200 @@ def test_dry_run_refuses_to_call_the_model_at_all():
     fake = runner.RefusingLLM()
     with pytest.raises(AssertionError):
         fake.tutor_turn("instrukcije", "ulaz")
+
+
+# ---------------------------------------------------------------------------
+# TALAS B
+# ---------------------------------------------------------------------------
+
+def test_wave_b_has_sixty_scenarios_with_the_expected_id_range():
+    scenarios = load_scenarios(WAVE_B)
+    assert len(scenarios) == 60
+    assert [s.id for s in scenarios] == [f"B{n:02d}" for n in range(1, 61)]
+    assert all(s.wave == "B" for s in scenarios)
+    assert validate_scenarios(scenarios) == []
+
+
+def test_wave_a_and_wave_b_never_share_an_id_or_a_session():
+    every = load_scenarios(SCENARIO_DIR)
+    assert len(every) == 100
+    assert len({s.id for s in every}) == 100
+    # Izolacija sesija mora vrijediti KROZ oba talasa, ne samo unutar jednog.
+    assert len({s.session_id for s in every}) == 100
+
+
+def test_every_wave_b_scenario_targets_a_wave_a_finding():
+    """Scenario bez veze s dokazanim nalazom je nasumičan uzorak, ne dijagnostika."""
+    for scenario in load_scenarios(WAVE_B):
+        assert scenario.targets_wave_a_findings, scenario.id
+        assert scenario.reason.strip(), scenario.id
+
+
+def test_wave_b_stays_within_its_hundred_and_fifty_call_budget():
+    minimum, maximum = runner.estimate_calls(load_scenarios(WAVE_B))
+    assert maximum == WAVE_B_CALL_BUDGET
+    assert minimum <= maximum
+
+
+def test_every_topic_id_in_both_waves_exists_in_the_curriculum():
+    from matbot.topics import lesson_info
+
+    for scenario in load_scenarios(SCENARIO_DIR):
+        assert lesson_info(scenario.grade, scenario.topic_id), \
+            f"{scenario.id}: {scenario.topic_id}"
+        for index, step in enumerate(scenario.steps):
+            override = step.get("topic_id")
+            if override:
+                assert lesson_info(scenario.grade, override), f"{scenario.id} step{index}"
+
+
+def test_dry_run_of_all_hundred_scenarios_reports_no_problems_and_no_calls(tmp_path):
+    summary = runner.dry_run(load_scenarios(SCENARIO_DIR), tmp_path / "all")
+    assert summary["problems"] == []
+    assert summary["sdk_calls_made"] == 0
+    assert summary["scenarios"] == 100
+    assert summary["estimated_model_calls_max"] == WAVE_A_CALL_BUDGET + WAVE_B_CALL_BUDGET
+
+
+def test_wave_b_gives_grade_nine_the_largest_share():
+    """Talas A je u 9. razredu imao samo 30 % determinističkog prolaza."""
+    from collections import Counter
+
+    counts = Counter(s.grade for s in load_scenarios(WAVE_B))
+    assert counts[9] == max(counts.values())
+    assert counts[9] >= 20
+
+
+def test_wave_b_scenario_without_targets_is_refused(tmp_path):
+    bad = dict(_scenario("B99"), wave="B")
+    bad.pop("targets_wave_a_findings", None)
+    problems = validate_scenarios(_write(tmp_path, bad))
+    assert any("targets_wave_a_findings" in problem for problem in problems)
+
+
+def test_resume_works_for_wave_b_scenarios(tmp_path, fake_llm, monkeypatch):
+    monkeypatch.setattr(runner, "_real_llm", lambda: fake_llm)
+    row = dict(_scenario("B01"), wave="B", targets_wave_a_findings=["A31"])
+    scenarios = _write(tmp_path, row)
+    out = tmp_path / "outb"
+
+    queue_two_call(fake_llm)
+    _meta, first = runner.run_campaign(scenarios, out, 10, 1, 0, False)
+    assert [record.id for record in first] == ["B01"]
+
+    meta, second = runner.run_campaign(scenarios, out, 10, 1, 0, True)
+    assert second == []
+    assert meta["scenario_count_pending"] == 0
+
+
+# ---------------------------------------------------------------------------
+# EVALUATOR ISPRAVKE IZVEDENE IZ TALASA A
+# ---------------------------------------------------------------------------
+
+def test_follow_up_step_is_skipped_when_no_task_was_published(tmp_path, fake_llm, monkeypatch):
+    """Talas A: A10/A31/A35 su nakon pada generisanja i dalje izvršavali
+    follow-up korake i pravili FAIL-ove koji nisu nezavisni kvarovi."""
+    fake_llm.queue(make_tutor_draft(intent="generate_task", new_task=None))   # nema zadatka
+    row = _scenario(steps=[
+        {"kind": "text", "message": "Daj mi zadatak.", "expect_calls": 2,
+         "checks": ["published", "task_published"], "rubrics": []},
+        {"kind": "choice", "select": "correct", "expect_calls": 1,
+         "requires_active_task": True,
+         "checks": ["verdict_correct", "calls_at_most:1"], "rubrics": []},
+    ])
+    meta, records, _ = _run(tmp_path, _write(tmp_path, row), fake_llm, monkeypatch)
+
+    record = records[0]
+    assert record.status == runner.STATUS_FAIL          # prvi korak i dalje pada
+    assert record.preconditions_unmet == [
+        {"step": 1, "reason": "no active task — step skipped, 0 SDK calls spent"}]
+    # Preskočen korak ne troši poziv i ne proizvodi nijednu provjeru.
+    assert meta["actual_sdk_calls"] == 1
+    assert record.turns[1]["check_results"] == []
+    assert not any(entry["step"] == 1 for entry in record.failed_checks)
+
+
+def test_unmet_precondition_alone_prevents_a_strict_pass(tmp_path, fake_llm, monkeypatch):
+    fake_llm.queue(make_tutor_draft(intent="clarification", reply="Pitaj me nešto."))
+    row = _scenario(steps=[
+        {"kind": "text", "message": "Zdravo.", "expect_calls": 1,
+         "checks": ["published"], "rubrics": []},
+        {"kind": "text", "message": "Ne znam.", "expect_calls": 1,
+         "requires_active_task": True, "checks": ["published"], "rubrics": []},
+    ])
+    _, records, _ = _run(tmp_path, _write(tmp_path, row), fake_llm, monkeypatch)
+    assert records[0].status == runner.STATUS_REVIEW
+    assert records[0].preconditions_unmet
+
+
+def test_task_self_contained_rejects_the_exact_wave_a_finding():
+    """Regresija pinovana na A25: objavljen zadatak bez ijednog izraza."""
+    published = _observation(response={
+        "status": "ready", "answer": "Evo zadatka.\n\nZadatak: Izračunaj vrijednost izraza:",
+        "answer_verdict": None, "last_tutor_task": "", "next_state": {"v": 1},
+        "session_mode": "practice", "effective_topic": LESSON})
+    result = check_lib.check_task_self_contained(published)
+    assert result.outcome == check_lib.FAIL
+    assert "colon" in result.detail
+
+
+def test_task_self_contained_passes_a_normal_task_without_math_delimiters():
+    """Lažni pozitiv bi bio gori od promašaja: verbalni zadatak mora proći."""
+    ok = _observation(response={
+        "status": "ready",
+        "answer": "Evo zadatka.\n\nZadatak: Koji od sljedećih brojeva je djeljiv sa 5?",
+        "answer_verdict": None, "last_tutor_task": "", "next_state": {"v": 1},
+        "session_mode": "practice", "effective_topic": LESSON})
+    assert check_lib.check_task_self_contained(ok).outcome == check_lib.PASS
+
+    verbal = _observation(response={
+        "status": "ready", "answer": "Evo zadatka.\n\nZadatak: Šta je poluprečnik kružnice?",
+        "answer_verdict": None, "last_tutor_task": "", "next_state": {"v": 1},
+        "session_mode": "practice", "effective_topic": LESSON})
+    assert check_lib.check_task_self_contained(verbal).outcome == check_lib.PASS
+
+
+def test_a_step_may_switch_the_lesson_inside_one_session(tmp_path, fake_llm, monkeypatch):
+    """Bez ovoga se ne može testirati serverska invalidacija pri promjeni teme."""
+    for _ in range(2):
+        queue_two_call(fake_llm)
+    row = _scenario(steps=[
+        {"kind": "text", "message": "Daj mi zadatak.", "expect_calls": 2,
+         "checks": ["published"], "rubrics": []},
+        {"kind": "text", "message": "Daj mi zadatak.", "expect_calls": 2,
+         "topic_id": "6-03-005", "checks": ["published", "lesson_matches"], "rubrics": []},
+    ])
+    _, records, _ = _run(tmp_path, _write(tmp_path, row), fake_llm, monkeypatch)
+    turns = records[0].turns
+    assert turns[0]["request"]["selected_topic"] == LESSON
+    assert turns[1]["request"]["selected_topic"] == "6-03-005"
+    assert records[0].failed_checks == []
+
+
+def test_session_summary_records_the_marked_option_for_offline_audit(tmp_path, fake_llm, monkeypatch):
+    """Talas A nije mogao offline provjeriti je li označena opcija ispravna."""
+    queue_two_call(fake_llm)
+    _, records, _ = _run(tmp_path, _write(tmp_path, _scenario()), fake_llm, monkeypatch)
+    summary = records[0].turns[0]["session_after_summary"]
+    assert summary["correct_option_id"] in ("a", "b", "c", "d")
+    assert summary["marked_option_text"]
+    assert summary["expected_answer"]
+    assert summary["marked_option_text"] == summary["expected_answer"]
+
+
+def test_reviewer_independent_evidence_errors_are_recorded_separately(tmp_path, fake_llm,
+                                                                      monkeypatch):
+    """Talas A: paket je izgledao čist dok je recenzentov VLASTITI dokaz padao."""
+    queue_two_call(fake_llm)
+    _, records, _ = _run(tmp_path, _write(tmp_path, _scenario()), fake_llm, monkeypatch)
+    turn = records[0].turns[0]
+    assert "reviewer_independent_evidence_errors" in turn
+    assert turn["reviewer_independent_evidence_errors"] == ""      # ispravan fixture
+
+
+def test_console_streams_are_switched_to_utf8():
+    """Fajlovi Talasa A su bili ispravan UTF-8; konzola pod Windowsom nije."""
+    from tools import run_practice_eval
+
+    assert run_practice_eval.install_utf8_streams() is True
+    assert (sys.stdout.encoding or "").lower().replace("-", "") == "utf8"
