@@ -41,6 +41,9 @@ class LessonContext:
     skill: str = ""
     allowed_operations: tuple = ()
     operand_constraints: dict = field(default_factory=dict)
+    lesson_scope: str = ""
+    objectives: tuple = ()
+    exclusions: tuple = ()
 
     @property
     def canonical_label(self):
@@ -80,4 +83,7 @@ def build(grade, topic_id):
         skill=contract.skill if contract is not None else "",
         allowed_operations=tuple(contract.allowed_operations) if contract is not None else (),
         operand_constraints=dict(contract.operand_constraints) if contract is not None else {},
+        lesson_scope=str(lesson.get("lesson_scope", "") or ""),
+        objectives=tuple(lesson.get("objectives", []) or ()),
+        exclusions=tuple(lesson.get("exclusions", []) or ()),
     )

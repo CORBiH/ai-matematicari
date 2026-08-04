@@ -18,7 +18,14 @@ from typing import Iterable, Optional
 SUPPORTED_DIVISORS = frozenset({2, 3, 4, 5, 6, 9, 10, 15, 25})
 
 _DIVISIBILITY_WORD_RE = re.compile(r"\bdjeljiv\w*\b", re.IGNORECASE)
-_DIVISOR_RE = re.compile(r"\b(?:i\s+)?(?:sa|s)\s*\$?\s*(\d+)\b", re.IGNORECASE)
+_DIVISOR_LIST_START_RE = re.compile(
+    r"\s+(?:i\s+)?(?:sa|s)\s*\$?\s*(\d+)\s*\$?", re.IGNORECASE,
+)
+_DIVISOR_LIST_CONTINUATION_RE = re.compile(
+    r"(?:\s*,\s*(?:(?:i\s+)?(?:sa|s)\s*)?|\s*(?:i|ili)\s+(?:(?:sa|s)\s*)?)"
+    r"\$?\s*(\d+)\s*\$?",
+    re.IGNORECASE,
+)
 _INTEGER_RE = re.compile(r"^-?\d+$")
 _NEGATED_RE = re.compile(r"\b(?:nije|nisu|nije\s+li)\s+djeljiv", re.IGNORECASE)
 _OR_RE = re.compile(r"\bili\b", re.IGNORECASE)
@@ -81,28 +88,33 @@ def _bare_integer(value: str) -> Optional[int]:
 
 def _explicit_divisors(question: str) -> tuple[int, ...]:
     text = question or ""
-    divisible = _DIVISIBILITY_WORD_RE.search(text)
-    if not divisible:
-        return ()
-    # Read only the condition after the divisibility predicate.  This safely
-    # supports both ``sa 2 i sa 3`` and the common compact list ``sa 2, 3 i
-    # 5`` without accidentally treating the tested candidate number (which is
-    # normally before "djeljiv") as a divisor.
-    tail = text[divisible.end():]
-    if not re.match(r"\s+(?:i\s+)?(?:sa|s)\b", tail, re.IGNORECASE):
-        return ()
-    tail = re.split(r"[?.!\n]", tail, maxsplit=1)[0]
-    raw_values = re.findall(r"(?<!\d)(\d+)(?!\d)", tail)
-    if not raw_values:
-        return ()
-    found: list[int] = []
-    for raw in raw_values:
-        divisor = int(raw)
-        if divisor not in SUPPORTED_DIVISORS:
-            return ()
-        if divisor not in found:
-            found.append(divisor)
-    return tuple(found)
+    # A task can introduce the topic with ``pravila djeljivosti`` before its
+    # actual predicate.  Select the occurrence followed by a divisibility
+    # condition, rather than blindly using the first word-form match.
+    for divisible in _DIVISIBILITY_WORD_RE.finditer(text):
+        tail = text[divisible.end():]
+        first = _DIVISOR_LIST_START_RE.match(tail)
+        if first is None:
+            continue
+
+        # Read only syntactic members of the divisor list.  This supports both
+        # coordinated ``sa 6 i sa 25`` and compact ``sa 2, 3 i 5`` forms, but
+        # never treats the tested number or unrelated later numbers as rules.
+        raw_values = [first.group(1)]
+        position = first.end()
+        while continuation := _DIVISOR_LIST_CONTINUATION_RE.match(tail, position):
+            raw_values.append(continuation.group(1))
+            position = continuation.end()
+
+        found: list[int] = []
+        for raw in raw_values:
+            divisor = int(raw)
+            if divisor not in SUPPORTED_DIVISORS:
+                return ()
+            if divisor not in found:
+                found.append(divisor)
+        return tuple(found)
+    return ()
 
 
 def _condition_is_ambiguous(question: str, divisors: tuple[int, ...]) -> bool:

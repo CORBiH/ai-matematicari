@@ -25,6 +25,7 @@ def _fresh_session(session_id, curriculum_fingerprint, grade, lesson_id,
         "oblast": oblast,
         "current_task": "",
         "expected_answer_summary": "",
+        "solution_summary": "",
         "hint_level": 0,
         "difficulty": "standard",
         # Univerzalni troslojni kontroler težine (matbot/difficulty_level.py),
@@ -50,6 +51,8 @@ def _fresh_session(session_id, curriculum_fingerprint, grade, lesson_id,
         "correctly_completed_families": [],  # porodice savladane tačnim odgovorom
         "retry_required": False,         # True nakon netačnog → ista porodica ponovo
         "last_result": "",               # "", "correct" ili "incorrect"
+        "current_task_had_hint": False,
+        "current_task_signature": None,
         "recent_task_signatures": [],    # max MAX_RECENT_SIGNATURES potpisa zadataka
     }
 

@@ -926,6 +926,12 @@ def run_practice_turn(store, llm, turn):
     put. Implementacija univerzalnog puta se NE briše — dijagnostika i popravke
     žive u matbot/tutor/ i pokrivene su testovima koje zastavica uključuje."""
     if _universal_pipeline_enabled():
+        # The validated release runtime enables the shared level controller.
+        # In that runtime deterministic contracts keep their established
+        # one-call generator; all non-contract lessons use Tutor+Reviewer.
+        if (_difficulty_levels_enabled()
+                and contract_registry.contract_for(turn.get("selected_topic", "")) is not None):
+            return _run_legacy_single_call_turn(store, llm, turn)
         return tutor_pipeline.run_turn(store, llm, turn)
     return _run_legacy_single_call_turn(store, llm, turn)
 
@@ -947,7 +953,7 @@ def _universal_pipeline_enabled():
 # TAČNA vrijednost, ne "bilo šta neprazno" — "true"/"1"/"yes"/tipfeler ostaju
 # isključeni, da pogrešno postavljena env varijabla ne uključi neprovjeren
 # kontroler u produkciji.
-DIFFICULTY_LEVELS_FLAG = "enabled"
+DIFFICULTY_LEVELS_FLAG = config.PRACTICE_DIFFICULTY_LEVELS_FLAG
 
 
 def _difficulty_levels_enabled():
@@ -956,8 +962,7 @@ def _difficulty_levels_enabled():
     tada nijedan turn NE računa niti commituje novi difficulty_level (vidi
     _handle_text_turn/_apply_new_task), pa je ponašanje identično stanju
     prije uvođenja ovog kontrolera."""
-    value = (os.environ.get("MATBOT_PRACTICE_DIFFICULTY_LEVELS", "") or "").strip().lower()
-    return value == DIFFICULTY_LEVELS_FLAG
+    return config.practice_difficulty_levels_enabled()
 
 
 def _run_legacy_single_call_turn(store, llm, turn):

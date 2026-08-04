@@ -155,11 +155,16 @@ reject it. The server alone owns option shuffling, option ids, which option is
 correct in the browser, the deterministic verdict for a click, and session
 state.
 
-**Frozen rollback path.** `MATBOT_PRACTICE_PIPELINE=legacy_single_call` restores
-the previous single-call orchestration (deterministic K1/K3 generator + legacy
-families). It is not active, not the default, and must not become a second
-top-level branch. See [LESSON_CONTRACTS.md](LESSON_CONTRACTS.md) for the
-preserved deterministic engine.
+**Current production state and rollback.** With `MATBOT_PRACTICE_PIPELINE`
+unset (the current production configuration), `legacy_single_call` remains the
+default. `universal_two_call` is the candidate structured path; its mandatory
+local release gate must be run only with both
+`MATBOT_PRACTICE_PIPELINE=universal_two_call` and
+`MATBOT_PRACTICE_DIFFICULTY_LEVELS=enabled`. A passing local result does not
+activate production: activation happens explicitly only after push, deployment
+health verification, and a controlled configuration change. After activation,
+`legacy_single_call` remains the rollback path. See
+[LESSON_CONTRACTS.md](LESSON_CONTRACTS.md) for the preserved deterministic engine.
 
 ```
 ```

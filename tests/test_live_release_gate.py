@@ -1,6 +1,9 @@
 """Pure tests for the permanent live-release plan and offline verifier."""
 import copy
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
+
+import pytest
 
 from tools import check_live_release_gate as checker
 from tools import run_live_release_gate as runner
@@ -22,6 +25,8 @@ def _passing_document():
         "tested_commit_sha": SHA,
         "tested_tree_hash": TREE,
         "clean_worktree": True,
+        "practice_pipeline": "universal_two_call",
+        "difficulty_levels_enabled": True,
         "finished_at": datetime.now(timezone.utc).isoformat(),
         "scenario_count": 12,
         "required_scenario_count": 12,
@@ -77,6 +82,203 @@ def test_offline_result_checker_fails_closed_for_age_count_skip_and_infrastructu
     skipped["infrastructure_failures"] = ["timeout"]
     errors = checker.validate_result(skipped, expected_commit=SHA, expected_tree=TREE)
     assert {"scenario_failed_or_skipped", "wrong_sdk_call_count", "infrastructure_failure"} <= set(errors)
+
+
+@pytest.mark.parametrize("pipeline", [None, "legacy_single_call", "universal", "typo"])
+def test_gate_preconditions_accept_only_the_structured_pipeline(monkeypatch, pipeline):
+    monkeypatch.setattr(runner, "_git", lambda *args: "" if args[0] == "status" else SHA)
+    monkeypatch.setenv("OPENAI_API_KEY", "fake-offline-test-key")
+    monkeypatch.setenv("MATBOT_PRACTICE_DIFFICULTY_LEVELS", "enabled")
+    if pipeline is None:
+        monkeypatch.delenv("MATBOT_PRACTICE_PIPELINE", raising=False)
+    else:
+        monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", pipeline)
+    with pytest.raises(runner.GateRefusal):
+        runner._require_live_preconditions()
+
+
+@pytest.mark.parametrize("difficulty", [None, "disabled", "enable", "true", "ENABLED", " enabled "])
+def test_gate_preconditions_require_enabled_difficulty_controller(monkeypatch, difficulty):
+    monkeypatch.setattr(runner, "_git", lambda *args: "" if args[0] == "status" else SHA)
+    monkeypatch.setenv("OPENAI_API_KEY", "fake-offline-test-key")
+    monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", "universal_two_call")
+    if difficulty is None:
+        monkeypatch.delenv("MATBOT_PRACTICE_DIFFICULTY_LEVELS", raising=False)
+    else:
+        monkeypatch.setenv("MATBOT_PRACTICE_DIFFICULTY_LEVELS", difficulty)
+    with pytest.raises(runner.GateRefusal):
+        runner._require_live_preconditions()
+
+
+def test_gate_preconditions_accept_the_two_exact_runtime_flags(monkeypatch):
+    monkeypatch.setattr(runner, "_git", lambda *args: "" if args[0] == "status" else SHA)
+    monkeypatch.setenv("OPENAI_API_KEY", "fake-offline-test-key")
+    monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", "universal_two_call")
+    monkeypatch.setenv("MATBOT_PRACTICE_DIFFICULTY_LEVELS", "enabled")
+    assert runner._require_live_preconditions() == (SHA, SHA)
+
+
+def test_offline_checker_rejects_legacy_or_missing_structured_runtime_identity():
+    legacy = _passing_document()
+    legacy["practice_pipeline"] = "legacy_single_call"
+    assert "wrong_practice_pipeline" in checker.validate_result(
+        legacy, expected_commit=SHA, expected_tree=TREE)
+    missing = _passing_document()
+    missing.pop("practice_pipeline")
+    missing["difficulty_levels_enabled"] = False
+    errors = checker.validate_result(missing, expected_commit=SHA, expected_tree=TREE)
+    assert {"wrong_practice_pipeline", "difficulty_levels_not_enabled"} <= set(errors)
+
+
+def test_public_router_reaches_universal_pipeline_and_not_legacy(monkeypatch):
+    """Gate scenarios use the public Practice entrypoint; no private bypass."""
+    from matbot import practice
+    from matbot.session_store import SessionStore
+
+    monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", "universal_two_call")
+    called = []
+    monkeypatch.setattr(practice.tutor_pipeline, "run_turn",
+                        lambda store, llm, turn: called.append(turn) or {"status": "ready"})
+    monkeypatch.setattr(practice, "_run_legacy_single_call_turn",
+                        lambda *args: (_ for _ in ()).throw(AssertionError("legacy path invoked")))
+    response = practice.run_practice_turn(SessionStore(), object(), {
+        "session_id": "gate-route", "grade": 6, "selected_topic": "6-03-001",
+        "selected_oblast": "", "student_message": "Daj mi zadatak.", "intent": "",
+        "difficulty_request": "", "interaction_phase": "", "last_tutor_task": "",
+        "interaction_type": "student_question", "selected_option_id": "", "client_turn_id": "",
+    })
+    assert response == {"status": "ready"}
+    assert len(called) == 1
+
+
+def test_structured_release_runtime_preserves_deterministic_contract_call_budget(monkeypatch):
+    from matbot import practice
+    from matbot.session_store import SessionStore
+    from tests.conftest import FakeLLM, make_output
+
+    monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", "universal_two_call")
+    monkeypatch.setenv("MATBOT_PRACTICE_DIFFICULTY_LEVELS", "enabled")
+    store, fake = SessionStore(), FakeLLM()
+    fake.queue(make_output(reply="Evo zadatka."))
+    response = practice.run_practice_turn(store, fake, {
+        "session_id": "gate-contract", "grade": 6, "selected_topic": "6-04-009",
+        "selected_oblast": "", "student_message": "Daj mi zadatak.", "intent": "",
+        "difficulty_request": "", "interaction_phase": "", "last_tutor_task": "",
+        "interaction_type": "student_question", "selected_option_id": "", "client_turn_id": "",
+    })
+    assert response["status"] == "ready"
+    assert fake.call_count == 1
+
+
+def test_gate_harness_calls_the_public_practice_router(monkeypatch):
+    from scratchpad import run_difficulty_canary as canary
+    from matbot.session_store import SessionStore
+
+    calls = []
+    monkeypatch.setattr(canary.practice, "run_practice_turn", lambda store, llm, payload:
+                        calls.append(payload) or {"status": "ready", "answer": "Evo zadatka.\n\nZadatak: x",
+                                                    "effective_topic": payload["selected_topic"],
+                                                    "answer_verdict": None, "next_state": {"task": {"options": []}}})
+
+    class Capture:
+        messages = []
+        def reset(self): pass
+        def safe_diagnostics(self): return []
+    class LLM:
+        ceiling = 19
+        call_count = 0
+        last_tutor_output = None
+        last_reviewer_output = None
+    scenario = canary.Scenario("public-route", "6-03-001", 6, "non_contract", "",
+                                "public-route", "Daj mi zadatak.")
+    report = canary.CanaryReport(campaign="release-gate", started_at="now", sdk_call_ceiling=19)
+    canary._run_one_turn(SessionStore(), LLM(), Capture(), report, scenario, "release-gate")
+    assert len(calls) == 1
+
+
+def _gate(role):
+    return next(item for item in runner.build_release_gate_plan("0123456789abcdef" * 4)
+                if item.role == role)
+
+
+def _structured_result(previous, target, *, final_target=None, valid=True, signature="new"):
+    return SimpleNamespace(
+        previous_level=previous, target_level=target, session_level_before=previous,
+        session_level_after=target, reviewer_final_target_level=target if final_target is None else final_target,
+        structured_package_validation_passed=valid,
+        structured_package_validation_errors=[] if valid else ["difficulty evidence: insufficient"],
+        reviewer_checks={"task_package_consistent": valid, "difficulty_evidence_valid": valid,
+                         "task_signature_consistent": valid},
+        committed_task_signature_matches_final=valid,
+        final_task_signature_canonical=signature,
+        final_structured_package_source="reviewer_final_task",
+    )
+
+
+def test_structured_harder_easier_and_new_task_gate_checks_use_final_package(monkeypatch):
+    monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", "universal_two_call")
+    assert runner._structured_transition_errors(_gate("harder_level2"),
+                                                 _structured_result(1, 2)) == []
+    assert runner._structured_transition_errors(_gate("easier_level1"),
+                                                 _structured_result(2, 1)) == []
+    assert runner._structured_transition_errors(_gate("same_level_new"),
+                                                 _structured_result(1, 1, signature="new"),
+                                                 {"structured_signature": "old"}) == []
+
+
+def test_structured_gate_rejects_bad_evidence_target_or_reused_signature(monkeypatch):
+    monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", "universal_two_call")
+    assert "structured_package_validation_failed" in runner._structured_transition_errors(
+        _gate("harder_level2"), _structured_result(1, 2, valid=False))
+    assert "wrong_reviewer_final_target_level" in runner._structured_transition_errors(
+        _gate("harder_level2"), _structured_result(1, 2, final_target=1))
+    assert "same_level_task_reused_signature" in runner._structured_transition_errors(
+        _gate("same_level_new"), _structured_result(1, 1, signature="same"),
+        {"structured_signature": "same"})
+
+
+def test_universal_gate_never_uses_prose_difficulty_parser(monkeypatch):
+    monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", "universal_two_call")
+    monkeypatch.setattr(runner.mcq_integrity, "difficulty_profile",
+                        lambda *args: (_ for _ in ()).throw(AssertionError("prose parser called")))
+    gate = _gate("harder_level2")
+    result = _structured_result(1, 2)
+    result.published = True
+    result.sdk_calls_this_turn = 2
+    result.lesson_id = gate.scenario.lesson_id
+    result.effective_topic = gate.scenario.lesson_id
+    result.session_lesson_id_after = gate.scenario.lesson_id
+    result.published_task_text = "Izračunaj $2+2$."
+    result.answer_text = "Evo težeg zadatka.\n\nZadatak: Izračunaj $2+2$."
+    result.next_state_options = [{"id": key, "text": value}
+                                 for key, value in zip("abcd", ("$4$", "$3$", "$5$", "$6$"))]
+    result.next_state_options_match_session = True
+    result.internal_correct_option_id_after = "a"
+    result.expected_answer = "$4$"
+    result.model_marked_option_value = "$4$"
+    result.visible_correct_option_value = "$4$"
+    result.intro_actual = result.intro_expected = "Evo težeg zadatka."
+    assert "difficulty_direction_not_measurable" not in runner._scenario_errors(gate, result, "", [], {})
+
+
+def test_canary_records_reviewer_final_task_as_the_final_package_source():
+    from scratchpad import run_difficulty_canary as canary
+    from tests.conftest import make_reviewer_final, make_task_payload, make_tutor_draft
+
+    task = make_task_payload()
+    draft = make_tutor_draft(new_task=task)
+    reviewer = make_reviewer_final(final=draft)
+    result = canary.TurnResult("source", "6-04-009", "lesson", "non_contract", 6, "",
+                               target_level=1)
+    options = [{"id": option.id, "text": option.text} for option in task.options]
+    canary._record_answer_metadata(
+        result,
+        {"next_state": {"task": {"options": options}}},
+        {"current_options": options, "correct_option_id": "a", "current_task_signature": {}},
+        SimpleNamespace(last_tutor_output=draft, last_reviewer_output=reviewer),
+    )
+    assert result.final_task_answer_kind_source == "reviewer_final_task"
+    assert result.final_structured_package_source == "reviewer_final_task"
 
 
 def test_offline_checker_has_no_sdk_or_counting_llm_dependency():

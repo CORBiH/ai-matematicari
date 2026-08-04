@@ -110,7 +110,6 @@ def _ask_hint(store, fake, hint, reply="Naravno, evo pomoći.", session_id="diag
     draft = make_tutor_draft(intent="hint_request", reply=reply, hint=hint,
                              new_task=None)
     fake.queue(draft)
-    fake.queue(make_reviewer_final(decision="approve", final=draft))
     return run_practice_turn(store, fake, _turn(
         session_id=session_id, student_message="Ne znam"))
 

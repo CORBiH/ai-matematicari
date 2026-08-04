@@ -26,6 +26,8 @@ CORE_DIVISIBILITY = ("6-03-004", 6)
 CORE_CONTRACT = ("6-04-009", 6)
 REQUIRED_SCENARIO_COUNT = 12
 SDK_CALL_CEILING = 19
+REQUIRED_PIPELINE = "universal_two_call"
+REQUIRED_DIFFICULTY_LEVELS = "enabled"
 
 sys.path.insert(0, str(ROOT))
 
@@ -74,10 +76,11 @@ def _require_live_preconditions() -> tuple[str, str]:
         raise GateRefusal("Worktree is dirty; commit or stash changes before the live release gate.")
     if not bool((os.environ.get("OPENAI_API_KEY", "") or "").strip()):
         raise GateRefusal("OPENAI_API_KEY is not present in this shell environment.")
-    if (os.environ.get("MATBOT_PRACTICE_DIFFICULTY_LEVELS", "") or "").strip().lower() != "enabled":
+    pipeline = (os.environ.get("MATBOT_PRACTICE_PIPELINE", "") or "").strip().lower()
+    if pipeline != REQUIRED_PIPELINE:
+        raise GateRefusal("MATBOT_PRACTICE_PIPELINE must be exactly universal_two_call.")
+    if not config.practice_difficulty_levels_enabled():
         raise GateRefusal("MATBOT_PRACTICE_DIFFICULTY_LEVELS must be exactly enabled.")
-    if (os.environ.get("MATBOT_PRACTICE_PIPELINE", "") or "").strip().lower() == "universal_two_call":
-        raise GateRefusal("MATBOT_PRACTICE_PIPELINE=universal_two_call is not a valid release-gate runtime.")
     if not isinstance(config.AI_TIMEOUT_S, (int, float)) or config.AI_TIMEOUT_S <= 0:
         raise GateRefusal("AI_TUTOR_TIMEOUT runtime configuration is invalid.")
     return _head_metadata()
@@ -213,7 +216,44 @@ def _transition_errors(role: str, result) -> list[str]:
     return [] if actual == expected else [f"incorrect_transition:{actual!r}"]
 
 
-def _scenario_errors(gate: GateScenario, result, prior_task: str, prior_options: Iterable[dict]) -> list[str]:
+def _structured_transition_errors(gate: GateScenario, result, prior_signature=None) -> list[str]:
+    """Validate the production-validated structured package, never task prose."""
+    if gate.scenario.path == "contract":
+        return []
+    role = gate.role
+    if role not in {"harder_level2", "easier_level1", "same_level_new"}:
+        return []
+    errors = []
+    expected = 2 if role == "harder_level2" else 1 if role == "easier_level1" else result.session_level_before
+    if result.previous_level != (1 if role == "harder_level2" else 2 if role == "easier_level1" else result.session_level_before):
+        errors.append("unexpected_previous_committed_level")
+    if result.target_level != expected:
+        errors.append("wrong_server_target_level")
+    if result.reviewer_final_target_level != expected:
+        errors.append("wrong_reviewer_final_target_level")
+    if result.final_structured_package_source not in {"reviewer_final_task", "reviewer_corrected_task"}:
+        errors.append("final_package_is_not_reviewer_owned")
+    if result.structured_package_validation_passed is not True:
+        errors.append("structured_package_validation_failed")
+    if result.structured_package_validation_errors:
+        errors.append("structured_package_validation_errors_present")
+    checks = result.reviewer_checks or {}
+    if (checks.get("task_package_consistent") is not True
+            or checks.get("difficulty_evidence_valid") is not True
+            or checks.get("task_signature_consistent") is not True):
+        errors.append("reviewer_structured_checks_not_all_true")
+    if result.committed_task_signature_matches_final is not True:
+        errors.append("committed_signature_does_not_match_final_package")
+    if role == "same_level_new":
+        if result.session_level_after != result.session_level_before:
+            errors.append("same_level_task_changed_level")
+        if not prior_signature or result.final_task_signature_canonical == prior_signature.get("structured_signature"):
+            errors.append("same_level_task_reused_signature")
+    return errors
+
+
+def _scenario_errors(gate: GateScenario, result, prior_task: str, prior_options: Iterable[dict],
+                     prior_signature=None) -> list[str]:
     errors = []
     if not result.published:
         errors.append(result.failure_class or "turn_not_published")
@@ -226,12 +266,22 @@ def _scenario_errors(gate: GateScenario, result, prior_task: str, prior_options:
             or result.session_lesson_id_after != gate.scenario.lesson_id:
         errors.append("wrong_lesson")
     errors.extend(_transition_errors(gate.role, result))
+    if (os.environ.get("MATBOT_PRACTICE_PIPELINE", "") or "").strip().lower() == REQUIRED_PIPELINE:
+        errors.extend(_structured_transition_errors(gate, result, prior_signature))
     if gate.role in {"fresh_level1", "harder_level2", "easier_level1", "same_level_new",
                      "contract_fresh", "contract_harder", "grade7", "grade8", "grade9"}:
         errors.extend(_task_output_errors(result))
         if result.intro_actual != result.intro_expected:
             errors.append("untruthful_intro")
-    if gate.role == "harder_level2":
+    # The candidate structured runtime supplies Reviewer-validated generic
+    # difficulty evidence.  Do not reconstruct semantic difficulty from
+    # Bosnian task prose in that runtime; the legacy parser remains only for
+    # the rollback path's independently provable divisibility MCQs.
+    use_legacy_difficulty_parser = (
+        (os.environ.get("MATBOT_PRACTICE_PIPELINE", "") or "").strip().lower()
+        != REQUIRED_PIPELINE
+    )
+    if gate.role == "harder_level2" and use_legacy_difficulty_parser:
         before = mcq_integrity.difficulty_profile(
             prior_task, [option.get("text", "") for option in prior_options]
         )
@@ -240,7 +290,7 @@ def _scenario_errors(gate: GateScenario, result, prior_task: str, prior_options:
         )
         if not before.measurable or not after.measurable or after.level <= before.level:
             errors.append("difficulty_direction_not_measurable")
-    if gate.role == "easier_level1":
+    if gate.role == "easier_level1" and use_legacy_difficulty_parser:
         before = mcq_integrity.difficulty_profile(
             prior_task, [option.get("text", "") for option in prior_options]
         )
@@ -336,7 +386,8 @@ def run_live_release_gate() -> int:
             before = store.peek(gate.scenario.session_id) or {}
             result, stop = _run_one_turn(store, llm, capture, report, gate.scenario, "release-gate")
             errors = _scenario_errors(gate, result, before.get("current_task", ""),
-                                      before.get("current_options", []))
+                                      before.get("current_options", []),
+                                      before.get("current_task_signature"))
             scenario_rows.append({"role": gate.role, "expected_sdk_calls": gate.expected_calls,
                                   "errors": errors, "result": asdict(result)})
             if result.failure_is_infrastructure:
@@ -374,6 +425,8 @@ def run_live_release_gate() -> int:
         "model": config.OPENAI_MODEL_TEXT,
         "reasoning_effort": config.REASONING_EFFORT,
         "timeout_seconds": config.AI_TIMEOUT_S,
+        "practice_pipeline": REQUIRED_PIPELINE,
+        "difficulty_levels_enabled": True,
         "selected_lessons": _selected_lessons(plan),
         "scenario_count": len(scenario_rows),
         "required_scenario_count": REQUIRED_SCENARIO_COUNT,

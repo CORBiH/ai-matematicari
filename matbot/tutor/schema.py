@@ -11,7 +11,9 @@ zadatak bez zadatka“ pada na serveru, a ne pred učenikom.
 Nijedno interno polje (dijagnostika težine, nezavisno rješenje recenzenta,
 `lesson_focus`) NIKAD ne ide u browser — vidi matbot/tutor/pipeline.py.
 """
-from typing import Literal, Optional
+import hashlib
+import json
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict
 
@@ -56,7 +58,40 @@ FAIL_REASON_CODES = (
 class TutorOption(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    id: Literal["a", "b", "c", "d"]
     text: str
+
+
+class DifficultyEvidence(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    reasoning_steps: int
+    condition_count: int
+    operation_count: int
+    representation_change_count: int
+    requires_explanation: bool
+    requires_comparison: bool
+    requires_construction: bool
+    requires_proof_or_justification: bool
+    combines_concepts: bool
+
+
+class TaskSignature(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    task_family: str
+    operation_or_relation: str
+    normalized_parameters: dict[str, Any]
+    required_conditions: list[str]
+    relevant_objects: list[str]
+    answer_type: str
+
+    def canonical_json(self) -> str:
+        return json.dumps(self.model_dump(), ensure_ascii=True, sort_keys=True,
+                          separators=(",", ":"))
+
+    def digest(self) -> str:
+        return hashlib.sha256(self.canonical_json().encode("utf-8")).hexdigest()
 
 
 class DifficultyDiagnostics(BaseModel):
@@ -83,11 +118,19 @@ class TaskPayload(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    selected_lesson_id: str
+    selected_lesson_title: str
+    target_difficulty_level: Literal[1, 2, 3]
     text: str
+    task_type: str
     options: list[TutorOption]
     correct_option_index: int
+    correct_option_id: Literal["a", "b", "c", "d"]
     expected_answer: str
+    solution: str
     difficulty: Literal["easy", "standard", "hard"]
+    difficulty_evidence: DifficultyEvidence
+    task_signature: TaskSignature
 
 
 class TutorDraft(BaseModel):
@@ -124,6 +167,9 @@ class ReviewerChecks(BaseModel):
     # Nezavisno rješenje: recenzent MORA sam riješiti zadatak prije odobrenja.
     independently_solved: bool
     independent_answer: str
+    task_package_consistent: bool
+    difficulty_evidence_valid: bool
+    task_signature_consistent: bool
 
 
 class ReviewerFinal(BaseModel):
@@ -142,19 +188,77 @@ class UnifiedOutputError(ValueError):
     """Konačan payload je strukturno validan, ali sadržajno neupotrebljiv."""
 
 
+def difficulty_evidence_errors(evidence: DifficultyEvidence, target_level: int) -> tuple[str, ...]:
+    """Shared, lesson-independent meaning of the structured 1--3 rubric."""
+    errors = []
+    numeric = ("reasoning_steps", "condition_count", "operation_count",
+               "representation_change_count")
+    for field in numeric:
+        if getattr(evidence, field) < 0:
+            errors.append(f"negative_{field}")
+    if target_level == 1:
+        if (evidence.reasoning_steps > 1 or evidence.condition_count > 1
+                # operation_count counts meaningful connected mathematical
+                # operations, not every token or arithmetic symbol.
+                or evidence.operation_count > 1
+                or evidence.representation_change_count > 0
+                or evidence.requires_explanation or evidence.requires_comparison
+                or evidence.requires_construction or evidence.requires_proof_or_justification
+                or evidence.combines_concepts):
+            errors.append("level_1_is_not_direct_introductory_application")
+    elif target_level == 2:
+        if not (evidence.reasoning_steps >= 2 or evidence.condition_count >= 2
+                or evidence.operation_count >= 2
+                or evidence.representation_change_count >= 1
+                or evidence.requires_explanation):
+            errors.append("level_2_lacks_connected_reasoning_or_explanation")
+        if (evidence.requires_comparison or evidence.requires_construction
+                or evidence.requires_proof_or_justification or evidence.combines_concepts):
+            errors.append("level_2_contains_level_3_requirement")
+    elif target_level == 3:
+        if not (evidence.requires_construction or evidence.requires_comparison
+                or evidence.requires_proof_or_justification or evidence.combines_concepts
+                or evidence.condition_count >= 3 or evidence.reasoning_steps >= 3):
+            errors.append("level_3_lacks_advanced_requirement")
+    else:
+        errors.append("invalid_target_difficulty_level")
+    return tuple(errors)
+
+
+def validate_difficulty_evidence(task: TaskPayload) -> None:
+    errors = difficulty_evidence_errors(task.difficulty_evidence, task.target_difficulty_level)
+    _require(not errors, "difficulty evidence: " + ",".join(errors))
+
+
 def _require(condition, message):
     if not condition:
         raise UnifiedOutputError(message)
 
 
 def validate_task(task: TaskPayload) -> None:
+    _require((task.selected_lesson_id or "").strip(), "task without lesson ID")
+    _require((task.selected_lesson_title or "").strip(), "task without lesson title")
     _require((task.text or "").strip(), "zadatak bez teksta")
+    _require((task.task_type or "").strip(), "task without type")
     _require(len(task.text) <= config.MAX_TASK_CHARS, "predug tekst zadatka")
     _require((task.expected_answer or "").strip(), "zadatak bez očekivanog odgovora")
     _require(len(task.expected_answer) <= config.MAX_EXPECTED_ANSWER_CHARS,
              "predug očekivani odgovor")
     _require(len(task.options) == 4, "mora postojati tačno 4 opcije")
     _require(0 <= task.correct_option_index < 4, "correct_option_index van opsega")
+    option_ids = [option.id for option in task.options]
+    _require(len(set(option_ids)) == len(option_ids), "duplicate option IDs")
+    _require(task.correct_option_id in option_ids, "marked option does not exist")
+    _require(task.options[task.correct_option_index].id == task.correct_option_id,
+             "correct option ID/index mismatch")
+    _require((task.solution or "").strip(), "task without solution")
+    _require(bool((task.task_signature.task_family or "").strip()), "empty task family signature")
+    _require(bool((task.task_signature.operation_or_relation or "").strip()),
+             "empty operation signature")
+    for field in ("reasoning_steps", "condition_count", "operation_count",
+                  "representation_change_count"):
+        _require(getattr(task.difficulty_evidence, field) >= 0,
+                 f"negative difficulty evidence: {field}")
     for option in task.options:
         text = (option.text or "").strip()
         _require(text, "prazna opcija")
@@ -199,7 +303,6 @@ def validate_final(draft: TutorDraft, has_active_task: bool) -> None:
     # već obrisan u `normalize_for_intent` — vidi tamo zašto se ne odbija.
     if draft.intent in TASK_INTENTS:
         _require(draft.new_task is not None, f"namjera '{draft.intent}' traži new_task")
-        validate_task(draft.new_task)
 
     if draft.intent in DIFFICULTY_SHIFT_INTENTS:
         _require(draft.difficulty_diagnostics is not None,
@@ -241,6 +344,8 @@ def validate_reviewer(reviewer: ReviewerFinal) -> None:
             "math_correct", "marked_option_correct", "inside_lesson",
             "intent_handled", "task_solvable_and_unambiguous", "mathjax_valid",
             "language_age_appropriate", "response_addresses_student",
+            "task_package_consistent", "difficulty_evidence_valid",
+            "task_signature_consistent",
         )
         if not getattr(checks, name)
     ]

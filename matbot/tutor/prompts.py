@@ -65,6 +65,14 @@ def _lesson_block(context):
             lines.append("- dozvoljene operacije: " + ", ".join(context.allowed_operations))
         for key, value in sorted(context.operand_constraints.items()):
             lines.append(f"- ograničenje: {key} = {value}")
+    if context.lesson_scope:
+        lines.append(f"- lesson scope/objectives: {context.lesson_scope}")
+    elif context.objectives:
+        lines.append("- lesson objectives: " + "; ".join(context.objectives))
+    else:
+        lines.append("- scope note: title-only lesson; grade, area and exact title are the minimum semantic anchor. Do not broaden to the entire area.")
+    if context.exclusions:
+        lines.append("- exclusions: " + "; ".join(context.exclusions))
     return "\n".join(lines)
 
 
@@ -86,6 +94,8 @@ def _state_block(session, student_message, trusted_verdict=None):
         lines.append("- " + _hint_level_guidance(session["hint_level"]))
     else:
         lines.append("- AKTIVNI ZADATAK: ne postoji (učenik još nije dobio zadatak)")
+
+    lines.append(f"- SERVER COMMITTED DIFFICULTY LEVEL: {session.get('difficulty_level', 1)}")
 
     if session["recent_tasks"]:
         lines.append("- NEDAVNI ZADACI (ne ponavljaj iste brojeve ni isti obrazac):")
@@ -178,6 +188,16 @@ sign_complexity, scaffolding, distractor_closeness, reasoning_depth.
 Ova dijagnostika je INTERNA: učenik je ne vidi."""
 
 
+_STRUCTURED_TASK_RULE = """STRUCTURED TASK PACKAGE (required for every `new_task`):
+- selected_lesson_id and selected_lesson_title exactly match the canonical lesson;
+- target_difficulty_level is 1 for the first task, shifts one bounded step for easier/harder, and otherwise stays at the committed level;
+- options use unique IDs a, b, c, d; correct_option_id identifies the correct visible option and agrees with correct_option_index;
+- for a multiple-choice task, expected_answer is an exact copy of that marked option's text. Put explanation, derivation, unit commentary, and reasoning only in solution;
+- provide task_type, expected_answer, complete solution, difficulty_evidence, and task_signature;
+- difficulty_evidence describes the actual task: steps, conditions, operations, representation changes, and flags for explanation, comparison, construction, proof/justification, and combined concepts;
+- task_signature describes mathematical structure (family, operation/relation, normalized parameters, conditions, objects, answer type), not wording. Rewording or option order must not change it."""
+
+
 def build_tutor_instructions(context):
     """Sistemski prompt prvog poziva — isti za svih 534 lekcije."""
     shared = build_shared_math_rules(
@@ -191,6 +211,7 @@ def build_tutor_instructions(context):
         f"{_INTENT_GUIDE}\n\n"
         f"{_FIELD_RULE}\n\n"
         f"{_TASK_RULE}\n\n"
+        f"{_STRUCTURED_TASK_RULE}\n\n"
         f"{_STARTING_COMPLEXITY_RULE}\n\n"
         f"{_DIFFICULTY_RULE}\n\n"
         "TON: obraćaj se učeniku direktno, toplo i kratko. Nikad ne spominji "
@@ -233,6 +254,7 @@ def build_reviewer_instructions(context):
         "8. da je zadatak rješiv i jednoznačan;\n"
         "9. da je MathJax ispravan (samo $...$, poznate komande);\n"
         "10. da je bosanski prirodan i primjeren uzrastu.\n\n"
+        "11. verify that lesson identity, level, text, options, marked answer, solution, difficulty evidence, and signature describe one task. For multiple choice, correct_option_id and correct_option_index must select the same visible option and expected_answer must be an exact copy of its text; explanation belongs only in solution. When correcting, update options, correct option ID/index, expected answer, and solution together, then return the complete fresh package. Set `task_package_consistent`, `difficulty_evidence_valid`, and `task_signature_consistent` accordingly.\n\n"
         "ODLUKA:\n"
         "- `approve` — nacrt je ispravan; prepiši ga nepromijenjen u `final`;\n"
         "- `correct` — nacrt je popravljiv; u `final` vrati KOMPLETAN ispravljen "

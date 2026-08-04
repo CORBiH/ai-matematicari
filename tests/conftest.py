@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -219,15 +220,33 @@ DEFAULT_TUTOR_OPTIONS = ("$\\frac{5}{7}$", "$\\frac{5}{14}$", "$\\frac{6}{7}$", 
 def make_task_payload(text=DEFAULT_TUTOR_TASK_TEXT, options=None,
                       correct_option_index=0, expected="$\\frac{5}{7}$",
                       difficulty="standard"):
-    from matbot.tutor.schema import TaskPayload, TutorOption
+    from matbot.tutor.schema import (DifficultyEvidence, TaskPayload, TaskSignature,
+                                     TutorOption)
 
     texts = options if options is not None else DEFAULT_TUTOR_OPTIONS
     return TaskPayload(
+        selected_lesson_id="__fixture__",
+        selected_lesson_title="__fixture__",
+        target_difficulty_level=1,
         text=text,
-        options=[TutorOption(text=t) for t in texts],
+        task_type="multiple_choice",
+        options=[TutorOption(id="abcd"[index], text=t) for index, t in enumerate(texts)],
         correct_option_index=correct_option_index,
+        correct_option_id="abcd"[correct_option_index],
         expected_answer=expected,
+        solution=expected,
         difficulty=difficulty,
+        difficulty_evidence=DifficultyEvidence(
+            reasoning_steps=1, condition_count=1, operation_count=1,
+            representation_change_count=0, requires_explanation=False,
+            requires_comparison=False, requires_construction=False,
+            requires_proof_or_justification=False, combines_concepts=False,
+        ),
+        task_signature=TaskSignature(
+            task_family="fixture", operation_or_relation="fixture_operation",
+            normalized_parameters={}, required_conditions=[], relevant_objects=[],
+            answer_type="multiple_choice",
+        ),
     )
 
 
@@ -279,6 +298,9 @@ def make_reviewer_checks(independent_answer="$\\frac{5}{7}$", **overrides):
         "language_age_appropriate": True,
         "independently_solved": True,
         "independent_answer": independent_answer,
+        "task_package_consistent": True,
+        "difficulty_evidence_valid": True,
+        "task_signature_consistent": True,
     }
     values.update(overrides)
     return ReviewerChecks(**values)
@@ -305,7 +327,11 @@ def queue_two_call(fake, draft=None, reviewer=None, **draft_kwargs):
     if reviewer is None:
         reviewer = make_reviewer_final(final=draft)
     fake.queue(draft)
-    fake.queue(reviewer)
+    # Ordinary Tutor-only turns deliberately consume one call.  Task
+    # publication is the only universal path that reaches the Reviewer.
+    from matbot.tutor.schema import TASK_INTENTS
+    if draft.intent in TASK_INTENTS:
+        fake.queue(reviewer)
     return draft, reviewer
 
 
@@ -422,12 +448,66 @@ class FakeLLM:
     def tutor_turn(self, instructions, input_text):
         """PRVI poziv univerzalnog Practice puta."""
         self.tutor_calls.append((instructions, input_text))
-        return self._next(instructions, input_text)
+        result = self._next(instructions, input_text)
+        self._bind_universal_fixture_metadata(result.output, input_text)
+        return result
 
     def reviewer_turn(self, instructions, input_text):
         """DRUGI (i posljednji) poziv univerzalnog Practice puta."""
         self.reviewer_calls.append((instructions, input_text))
-        return self._next(instructions, input_text)
+        result = self._next(instructions, input_text)
+        self._bind_universal_fixture_metadata(result.output, input_text)
+        return result
+
+    @staticmethod
+    def _bind_universal_fixture_metadata(output, input_text):
+        """Keep old fixture builders concise while exercising the strict package.
+
+        This is test-double plumbing only: real structured model output has no
+        placeholders and production validation always checks exact values.
+        """
+        match = re.search(r"- lekcija: (.+) \((\d-\d{2}-\d{3})\)", input_text)
+        if not match:
+            return
+        title, lesson_id = match.group(1), match.group(2)
+        level_match = re.search(r"SERVER COMMITTED DIFFICULTY LEVEL: (\d)", input_text)
+        level = int(level_match.group(1)) if level_match else 1
+
+        def bind(draft):
+            if draft is None or getattr(draft, "new_task", None) is None:
+                return
+            task = draft.new_task
+            if task.selected_lesson_id != "__fixture__":
+                return
+            target = level
+            if draft.intent == "harder_task":
+                target = min(level + 1, 3)
+            elif draft.intent == "easier_task":
+                target = max(level - 1, 1)
+            elif "AKTIVNI ZADATAK: ne postoji" in input_text:
+                target = 1
+            evidence = task.difficulty_evidence.model_copy(update=(
+                {"reasoning_steps": 2, "condition_count": 2}
+                if target == 2 else
+                {"reasoning_steps": 3, "condition_count": 3,
+                 "requires_proof_or_justification": True, "combines_concepts": True}
+                if target == 3 else {}
+            ))
+            draft.new_task = task.model_copy(update={
+                "selected_lesson_id": lesson_id,
+                "selected_lesson_title": title,
+                "target_difficulty_level": target,
+                "difficulty_evidence": evidence,
+                "task_signature": task.task_signature.model_copy(update={
+                    "task_family": "fixture_" + lesson_id,
+                    "normalized_parameters": {"text": task.text},
+                }),
+            })
+
+        if hasattr(output, "final"):
+            bind(output.final)
+        else:
+            bind(output)
 
     def explain_turn(self, instructions, input_text):
         self.explain_calls.append((instructions, input_text))
@@ -453,6 +533,7 @@ class FakeLLM:
 _UNIVERSAL_TWO_CALL_MODULES = frozenset({
     "test_universal_tutor_pipeline",
     "test_universal_tutor_diagnosis",
+    "test_structured_practice_packages",
 })
 
 

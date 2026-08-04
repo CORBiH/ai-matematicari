@@ -22,7 +22,7 @@ import logging
 import random
 import uuid
 
-from matbot import config, geometrycheck, option_equivalence
+from matbot import config, difficulty_level, geometrycheck, option_equivalence
 from matbot.llm import LLMError, failure_diagnostics_kv
 from matbot.mathcheck import find_numeric_inconsistencies
 from matbot.mathsafe import sanitize_and_validate_math_text
@@ -30,8 +30,8 @@ from matbot.terminology import normalize_terminology
 from matbot.tutor import lesson_context as lesson_context_module
 from matbot.tutor import prompts as tutor_prompts
 from matbot.tutor.schema import (TASK_INTENTS, UnifiedOutputError,
-                                 normalize_for_intent, validate_final,
-                                 validate_reviewer)
+                                 normalize_for_intent, validate_final, validate_task,
+                                 validate_difficulty_evidence, validate_reviewer)
 
 logger = logging.getLogger("matbot.tutor")
 
@@ -45,6 +45,60 @@ _NEW_TASK_INTRO = {
     "next_task": "Evo sljedećeg zadatka.",
     "generate_task": "Evo zadatka.",
 }
+
+
+def _target_level_for(session, intent):
+    """One lesson-independent progression policy owned by the server."""
+    current = min(max(int(session.get("difficulty_level", 1)), 1), 3)
+    if not session.get("current_task"):
+        return 1
+    if intent == "harder_task":
+        return min(current + 1, 3)
+    if intent == "easier_task":
+        return max(current - 1, 1)
+    if intent == "next_task":
+        if session.get("last_result") == "full_solution":
+            return max(current - 1, 1)
+        if session.get("correct_streak", 0) >= 2 and not session.get("current_task_had_hint"):
+            return min(current + 1, 3)
+    return current
+
+
+def _difficulty_levels_enabled():
+    """Use the shared opt-in controller flag without importing Practice."""
+    return config.practice_difficulty_levels_enabled()
+
+
+def validate_task_package(task, context, target_level=None):
+    """Universal package invariants; semantic lesson judgement stays with Reviewer."""
+    validate_task(task)
+    if task.selected_lesson_id != context.topic_id:
+        raise UnifiedOutputError("task lesson ID does not match selected lesson")
+    if task.selected_lesson_title != context.title:
+        raise UnifiedOutputError("task lesson title does not match selected lesson")
+    # Structured generation always requires a complete package, but only the
+    # explicitly enabled controller owns target validation and rubric policy.
+    if target_level is not None:
+        if task.target_difficulty_level != target_level:
+            raise UnifiedOutputError("task target difficulty does not match server target")
+        validate_difficulty_evidence(task)
+
+
+def _structured_signature_record(task, context):
+    canonical = task.task_signature.canonical_json()
+    return {
+        "lesson_id": context.topic_id,
+        "structured_signature": canonical,
+        "structured_signature_hash": task.task_signature.digest(),
+    }
+
+
+def _is_duplicate_structured_signature(record, prior_records):
+    return any(
+        previous.get("lesson_id") == record["lesson_id"]
+        and previous.get("structured_signature_hash") == record["structured_signature_hash"]
+        for previous in (prior_records or [])
+    )
 
 _LOG_LIMIT = 200
 
@@ -142,8 +196,12 @@ def _validate_task_server_side(task, context):
     _reject_if_geometry_invalid(correct_text, context, "tačna opcija")
     expected = _safe_text(task.expected_answer, "expected_answer", allow_wrap=True)
     _reject_if_inconsistent(expected, "expected_answer")
+    if expected.strip() != correct_text.strip():
+        raise UnifiedOutputError("expected answer does not match marked option")
+    solution = _safe_text(task.solution, "solution")
+    _reject_if_inconsistent(solution, "solution")
 
-    return task_text, option_texts, expected
+    return task_text, option_texts, expected, solution
 
 
 # ---------------------------------------------------------------------------
@@ -262,7 +320,9 @@ def _run_choice_turn(store, llm, session, turn, context, request_id):
 
     # Napredovanje se računa na KOPIJI; commit ide tek na kraju.
     if is_correct:
-        session["correct_streak"] += 1
+        session["correct_streak"] = (
+            session["correct_streak"] + 1 if not session.get("current_task_had_hint") else 0
+        )
         session["task_completed"] = True
         session["last_result"] = "correct"
         session["retry_required"] = False
@@ -339,8 +399,12 @@ def _run_text_turn(store, llm, session, turn, context, request_id):
 
         task_text = active_task_before
         if final.intent in TASK_INTENTS:
-            task_text = _publish_task(session, context, final, request_id)
-            intro = _NEW_TASK_INTRO.get(final.intent, _NEW_TASK_INTRO["generate_task"])
+            target_level = (_target_level_for(session, final.intent)
+                            if _difficulty_levels_enabled() else None)
+            validate_task_package(final.new_task, context, target_level)
+            task_text = _publish_task(session, context, final, request_id, target_level)
+            intro_intent = final.intent if target_level is not None else "generate_task"
+            intro = _NEW_TASK_INTRO.get(intro_intent, _NEW_TASK_INTRO["generate_task"])
             answer = intro + "\n\nZadatak: " + task_text
         else:
             answer = _compose_visible_help(final, reply, context)
@@ -348,6 +412,9 @@ def _run_text_turn(store, llm, session, turn, context, request_id):
                 session["hint_level"] = min(
                     session["hint_level"] + 1, config.MAX_HINT_LEVEL
                 )
+                session["current_task_had_hint"] = True
+            elif final.intent == "full_solution_request":
+                session["last_result"] = "full_solution"
     except UnifiedOutputError as error:
         _log_rejection(request_id, context, "publication", error, final.intent)
         return _error_response(active_task_before)
@@ -407,23 +474,30 @@ def _compose_visible_help(final, reply, context):
     return (reply.rstrip() + "\n\n" + safe_extra).strip() if reply.strip() else safe_extra
 
 
-def _publish_task(session, context, final, request_id):
+def _publish_task(session, context, final, request_id, target_level=None):
     """Provjeri i primijeni nov zadatak. Baca UnifiedOutputError (fail closed)."""
     task = final.new_task
-    task_text, option_texts, expected = _validate_task_server_side(task, context)
+    task_text, option_texts, expected, solution = _validate_task_server_side(task, context)
 
     current_options, correct_option_id = _shuffle_options(
         option_texts, task.correct_option_index
     )
+    signature_record = _structured_signature_record(task, context)
+    if _is_duplicate_structured_signature(signature_record, session["recent_task_signatures"]):
+        raise UnifiedOutputError("duplicate structured task signature")
     session["current_task"] = task_text
     session["expected_answer_summary"] = expected
-    session["difficulty"] = task.difficulty
+    session["solution_summary"] = solution
+    if target_level is not None:
+        session["difficulty"] = difficulty_level.LEVEL_TO_LABEL[target_level]
+        session["difficulty_level"] = target_level
     session["hint_level"] = 0
     session["recent_tasks"].append(task_text)
     session["current_options"] = current_options
     session["correct_option_id"] = correct_option_id
     session["wrong_option_ids"] = []
     session["task_completed"] = False
+    session["current_task_had_hint"] = False
     session["last_choice_turn_id"] = ""
     session["last_choice_response"] = None
 
@@ -434,6 +508,8 @@ def _publish_task(session, context, final, request_id):
         recent = session["recently_used_families"]
         if not recent or recent[-1] != family:
             recent.append(family)
+    session["current_task_signature"] = signature_record
+    session["recent_task_signatures"].append(signature_record)
     _log_difficulty(request_id, context, final)
     return task_text
 
@@ -480,6 +556,12 @@ def _two_call(llm, context, session, student_message, request_id, trusted_verdic
         # pa turn staje na jednom pozivu.
         _log_rejection(request_id, context, "tutor_draft", error, draft.intent)
         return None, calls
+
+    # Only task publication needs the independent generation Reviewer.  A
+    # normal answer, hint, explanation, or full-solution turn is complete
+    # after Tutor semantically interpreted the free-form student message.
+    if draft.intent not in TASK_INTENTS:
+        return draft, calls
 
     try:
         reviewer_result = _call_reviewer(

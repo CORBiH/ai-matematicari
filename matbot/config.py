@@ -2,6 +2,24 @@
 import os
 
 
+PRACTICE_DIFFICULTY_LEVELS_FLAG = "enabled"
+
+
+def exact_env_flag(name, expected):
+    """Return true only when an environment value matches exactly.
+
+    Feature switches use this instead of truthiness so a typo cannot activate a
+    candidate controller in production.
+    """
+    return (os.environ.get(name, "") or "") == expected
+
+
+def practice_difficulty_levels_enabled():
+    """The sole authority for MATBOT's opt-in difficulty controller."""
+    return exact_env_flag("MATBOT_PRACTICE_DIFFICULTY_LEVELS",
+                          PRACTICE_DIFFICULTY_LEVELS_FLAG)
+
+
 def _float_env(name, default):
     try:
         return float(os.environ.get(name, "") or default)

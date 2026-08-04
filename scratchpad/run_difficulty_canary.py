@@ -229,6 +229,8 @@ from matbot.task_family_validation import (  # noqa: E402
     canonical_answer_kind, detected_answer_kind,
 )
 from matbot.topics import lesson_info  # noqa: E402
+from matbot.tutor import lesson_context as tutor_lesson_context  # noqa: E402
+from matbot.tutor import pipeline as tutor_pipeline  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -374,6 +376,8 @@ class CountingLLM:
     # Defensive pass-throughs for the inactive universal_two_call path —
     # unreachable (refused at precondition check), counted anyway so the
     # ceiling can never be silently bypassed if that ever changes.
+    # Candidate structured Tutor/Reviewer calls are counted inside the same
+    # hard ceiling when the release gate explicitly selects that runtime.
     def tutor_turn(self, instructions, input_text):
         self._count("tutor_turn")
         return self._inner.tutor_turn(instructions, input_text)
@@ -460,6 +464,15 @@ class TurnResult:
     reviewer_checks: Optional[dict] = None
     reviewer_corrected_task_answer_kind: Optional[str] = None
     final_task_answer_kind_source: Optional[str] = None
+    tutor_proposed_target_level: Optional[int] = None
+    reviewer_final_target_level: Optional[int] = None
+    final_structured_package_source: Optional[str] = None
+    final_difficulty_evidence: Optional[dict] = None
+    final_task_signature: Optional[dict] = None
+    final_task_signature_canonical: Optional[str] = None
+    structured_package_validation_passed: Optional[bool] = None
+    structured_package_validation_errors: list = field(default_factory=list)
+    committed_task_signature_matches_final: Optional[bool] = None
     final_declared_answer_kind: Optional[str] = None
     final_canonical_answer_kind: Optional[str] = None
     final_detected_answer_kind: Optional[str] = None
@@ -732,15 +745,37 @@ def _record_answer_metadata(result: TurnResult, response, after_session, llm) ->
     tutor_task = getattr(getattr(llm, "last_tutor_output", None), "new_task", None)
     reviewer_output = getattr(llm, "last_reviewer_output", None)
     corrected_task = getattr(reviewer_output, "corrected_task", None)
-    final_task = corrected_task or tutor_task
+    reviewer_final_task = getattr(getattr(reviewer_output, "final", None), "new_task", None)
+    final_task = corrected_task or reviewer_final_task or tutor_task
 
     if tutor_task is not None:
-        result.tutor_declared_answer_kind = tutor_task.answer_kind
+        result.tutor_declared_answer_kind = getattr(tutor_task, "answer_kind", None)
+        result.tutor_proposed_target_level = getattr(tutor_task, "target_difficulty_level", None)
     if corrected_task is not None:
-        result.reviewer_corrected_task_answer_kind = corrected_task.answer_kind
+        result.reviewer_corrected_task_answer_kind = getattr(corrected_task, "answer_kind", None)
         result.final_task_answer_kind_source = "reviewer_corrected_task"
+        result.final_structured_package_source = "reviewer_corrected_task"
+    elif reviewer_final_task is not None:
+        result.final_task_answer_kind_source = "reviewer_final_task"
+        result.final_structured_package_source = "reviewer_final_task"
     elif final_task is not None:
         result.final_task_answer_kind_source = "tutor_task"
+        result.final_structured_package_source = "tutor_task"
+
+    if reviewer_final_task is not None:
+        result.reviewer_final_target_level = getattr(reviewer_final_task, "target_difficulty_level", None)
+    if final_task is not None and hasattr(final_task, "difficulty_evidence"):
+        result.final_difficulty_evidence = final_task.difficulty_evidence.model_dump()
+        result.final_task_signature = final_task.task_signature.model_dump()
+        result.final_task_signature_canonical = final_task.task_signature.canonical_json()
+        context = tutor_lesson_context.build(result.grade, result.lesson_id)
+        try:
+            tutor_pipeline.validate_task_package(final_task, context, result.target_level)
+        except Exception as exc:  # records the same production gate without publishing anything
+            result.structured_package_validation_passed = False
+            result.structured_package_validation_errors = [str(exc)]
+        else:
+            result.structured_package_validation_passed = True
 
     next_state = response.get("next_state") or {}
     task_state = next_state.get("task") or {}
@@ -758,11 +793,17 @@ def _record_answer_metadata(result: TurnResult, response, after_session, llm) ->
         if isinstance(option, dict)
     }
     result.visible_correct_option_value = visible_by_id.get(correct_id)
+    if final_task is not None and hasattr(final_task, "task_signature"):
+        committed = (after_session or {}).get("current_task_signature") or {}
+        result.committed_task_signature_matches_final = (
+            committed.get("structured_signature") == result.final_task_signature_canonical
+            and committed.get("structured_signature_hash") == final_task.task_signature.digest()
+        )
 
     if final_task is not None and 0 <= final_task.correct_option_index < len(final_task.options):
         result.model_marked_option_value = final_task.options[final_task.correct_option_index].text
 
-    declared = final_task.answer_kind if final_task is not None else None
+    declared = getattr(final_task, "answer_kind", None) if final_task is not None else None
     result.final_declared_answer_kind = declared
     canonical, _normalized = canonical_answer_kind(
         declared, result.visible_correct_option_value or ""
@@ -1696,22 +1737,29 @@ def _run_one_turn(store, llm, capture, report, scenario: Scenario, campaign: str
         checks = reviewer_out.checks
         result.reviewer_decision = reviewer_out.decision
         result.reviewer_checks = {
-            "math_correct": checks.math_correct,
-            "tests_exact_lesson": checks.tests_exact_lesson,
-            "answer_correct": checks.answer_correct,
-            "marked_option_correct": checks.marked_option_correct,
-            "options_unique": checks.options_unique,
-            "grade_appropriate": checks.grade_appropriate,
-            "solvable_and_unambiguous": checks.solvable_and_unambiguous,
-            "difficulty_level_appropriate": checks.difficulty_level_appropriate,
-            "difficulty_direction_correct": checks.difficulty_direction_correct,
+            "math_correct": getattr(checks, "math_correct", None),
+            "tests_exact_lesson": getattr(checks, "tests_exact_lesson",
+                                            getattr(checks, "inside_lesson", None)),
+            "answer_correct": getattr(checks, "answer_correct",
+                                        getattr(checks, "marked_option_correct", None)),
+            "marked_option_correct": getattr(checks, "marked_option_correct", None),
+            "options_unique": getattr(checks, "options_unique", None),
+            "grade_appropriate": getattr(checks, "grade_appropriate", None),
+            "solvable_and_unambiguous": getattr(checks, "solvable_and_unambiguous",
+                                                  getattr(checks, "task_solvable_and_unambiguous", None)),
+            "difficulty_level_appropriate": getattr(checks, "difficulty_level_appropriate",
+                                                      getattr(checks, "difficulty_evidence_valid", None)),
+            "difficulty_direction_correct": getattr(checks, "difficulty_direction_correct", None),
+            "task_package_consistent": getattr(checks, "task_package_consistent", None),
+            "difficulty_evidence_valid": getattr(checks, "difficulty_evidence_valid", None),
+            "task_signature_consistent": getattr(checks, "task_signature_consistent", None),
         }
         result.lesson_preserved_signal = (
-            f"reviewer_self_reported={checks.tests_exact_lesson} (not independently proven)")
+            f"reviewer_self_reported={result.reviewer_checks['tests_exact_lesson']} (not independently proven)")
         result.level_appropriate_signal = (
-            f"reviewer_self_reported={checks.difficulty_level_appropriate} (not independently proven)")
+            f"reviewer_self_reported={result.reviewer_checks['difficulty_level_appropriate']} (not independently proven)")
         result.direction_correct_signal = (
-            f"reviewer_self_reported={checks.difficulty_direction_correct}"
+            f"reviewer_self_reported={result.reviewer_checks['difficulty_direction_correct']}"
             if transition.level_changed and scenario.request_type in ("harder", "easier")
             else "not_required_for_this_transition")
     elif scenario.path == "contract":

@@ -18,6 +18,7 @@ ROOT = Path(__file__).resolve().parent.parent
 REQUIRED_SCENARIOS = 12
 REQUIRED_CALLS = 19
 MAX_AGE = timedelta(hours=24)
+REQUIRED_PIPELINE = "universal_two_call"
 
 
 def _git(*args: str) -> str:
@@ -56,6 +57,10 @@ def validate_result(document: dict, *, expected_commit: str | None = None,
         errors.append("tree_hash_mismatch")
     if document.get("clean_worktree") is not True:
         errors.append("clean_worktree_not_confirmed")
+    if document.get("practice_pipeline") != REQUIRED_PIPELINE:
+        errors.append("wrong_practice_pipeline")
+    if document.get("difficulty_levels_enabled") is not True:
+        errors.append("difficulty_levels_not_enabled")
     if document.get("scenario_count") != REQUIRED_SCENARIOS:
         errors.append("wrong_scenario_count")
     if document.get("required_scenario_count") != REQUIRED_SCENARIOS:

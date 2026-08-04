@@ -36,6 +36,10 @@ def lesson_info(grade, topic_id):
                 "title": lesson["title"],
                 "oblast_id": oblast_id_for_topic(lesson["id"]),
                 "oblast": lesson["oblast"],
+                # Optional curriculum metadata: old title-only topic files remain valid.
+                "lesson_scope": lesson.get("lesson_scope", lesson.get("scope", "")),
+                "objectives": lesson.get("objectives", []),
+                "exclusions": lesson.get("exclusions", []),
             }
     return None
 

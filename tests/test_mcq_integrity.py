@@ -2,6 +2,7 @@
 import copy
 
 from matbot import mcq_integrity
+from matbot.lesson_fidelity import deterministic_difficulty_failure
 from matbot.practice import SAFE_ERROR_MESSAGE, run_practice_turn
 from matbot.session_store import SessionStore
 from tests.conftest import (FakeLLM, make_fidelity_review, make_options, make_output,
@@ -195,6 +196,107 @@ def test_measurable_divisibility_profiles_are_strictly_ordered():
         ("0", "1", "2", "3"),
     )
     assert (level_one.level, level_two.level, level_three.level) == (1, 2, 3)
+
+
+def test_difficulty_profile_skips_topic_heading_and_reads_coordinated_divisors():
+    failed_text = (
+        "Primijeni pravila djeljivosti: Da li je broj $1350$ djeljiv i sa $6$ "
+        "i sa $25$? Odaberi jednu opciju."
+    )
+    direct_variant = "Da li je broj $1350$ djeljiv sa $6$ i sa $25$?"
+    one_rule = "Da li je broj $430$ djeljiv sa $5$?"
+
+    for text in (failed_text, direct_variant):
+        profile = mcq_integrity.difficulty_profile(text, ("Da", "Ne"))
+        assert profile.measurable
+        assert (profile.level, profile.divisors) == (2, (6, 25))
+        assert 1350 not in profile.divisors
+        assert mcq_integrity._explicit_divisors(text) == (6, 25)
+
+    one_rule_profile = mcq_integrity.difficulty_profile(one_rule, ("Da", "Ne"))
+    assert (one_rule_profile.level, one_rule_profile.divisors) == (1, (5,))
+    assert 430 not in one_rule_profile.divisors
+    assert mcq_integrity.difficulty_profile(
+        "Da li je broj $430$ djeljiv sa $5$ uz napomenu da je $12$ broj bodova?",
+        ("Da", "Ne"),
+    ).divisors == (5,)
+    assert mcq_integrity._explicit_divisors(
+        "Da li je broj $1350$ djeljiv sa $6$ i sa $6$ i sa $25$?",
+    ) == (6, 25)
+
+
+def test_coordinated_divisors_allow_measurable_level_one_to_two_transition():
+    failed_text = (
+        "Primijeni pravila djeljivosti: Da li je broj $1350$ djeljiv i sa $6$ "
+        "i sa $25$? Odaberi jednu opciju."
+    )
+    assert deterministic_difficulty_failure(
+        "Pravila djeljivosti sa 2, 3, 4, 5, 6, 9, 10, 15 i 25",
+        failed_text,
+        ("Da", "Ne"),
+        target_level=2,
+        requested_difficulty="harder",
+        level_changed=True,
+        prior_task="Da li je broj $430$ djeljiv sa $5$?",
+        prior_option_texts=("Da", "Ne"),
+    ) is None
+
+
+def test_pipeline_publishes_coordinated_divisibility_harder_task_without_retry(monkeypatch, caplog):
+    monkeypatch.setenv("MATBOT_PRACTICE_DIFFICULTY_LEVELS", "enabled")
+    store, fake = SessionStore(), FakeLLM()
+    session_id = "coordinated-divisors-harder"
+    level_one = _direct_task("Da li je broj $430$ djeljiv sa $5$?")
+    level_two_text = (
+        "Primijeni pravila djeljivosti: Da li je broj $1350$ djeljiv i sa $6$ "
+        "i sa $25$? Odaberi jednu opciju."
+    )
+    level_two = _direct_task(level_two_text)
+
+    queue_generation(fake, level_one)
+    assert run_practice_turn(store, fake, _turn(session_id))["status"] == "ready"
+    assert store.peek(session_id)["difficulty_level"] == 1
+    calls_before_harder = fake.call_count
+
+    queue_generation(fake, level_two, review=make_fidelity_review(
+        decision="approve", difficulty_level_appropriate=True, difficulty_direction_correct=True,
+    ))
+    with caplog.at_level("WARNING", logger="matbot.practice"):
+        response = run_practice_turn(store, fake, _turn(
+            session_id, student_message="Daj mi teÅ¾i zadatak.", difficulty_request="harder",
+        ))
+
+    assert response["status"] == "ready"
+    assert store.peek(session_id)["difficulty_level"] == 2
+    assert store.peek(session_id)["current_task"] == level_two_text
+    assert fake.call_count - calls_before_harder == 2
+    assert fake.call_count == 4
+    assert "difficulty_direction_not_measurable" not in "\n".join(
+        record.getMessage() for record in caplog.records
+    )
+
+
+def test_nonmeasurable_harder_task_preserves_committed_divisibility_state(monkeypatch):
+    monkeypatch.setenv("MATBOT_PRACTICE_DIFFICULTY_LEVELS", "enabled")
+    store, fake = SessionStore(), FakeLLM()
+    session_id = "nonmeasurable-divisors-harder"
+    level_one = _direct_task("Da li je broj $430$ djeljiv sa $5$?")
+    queue_generation(fake, level_one)
+    assert run_practice_turn(store, fake, _turn(session_id))["status"] == "ready"
+    before = copy.deepcopy(store.peek(session_id))
+    calls_before_harder = fake.call_count
+
+    queue_generation(fake, _direct_task("Da li je broj $1350$ djeljiv?"), review=make_fidelity_review(
+        decision="approve", difficulty_level_appropriate=True, difficulty_direction_correct=True,
+    ))
+    response = run_practice_turn(store, fake, _turn(
+        session_id, student_message="Daj mi teÅ¾i zadatak.", difficulty_request="harder",
+    ))
+
+    assert response["answer"] == SAFE_ERROR_MESSAGE
+    assert store.peek(session_id) == before
+    assert store.peek(session_id)["difficulty_level"] == 1
+    assert fake.call_count - calls_before_harder == 2
 
 
 def test_explicit_expected_answer_option_references_must_match_committed_shuffle():

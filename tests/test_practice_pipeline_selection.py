@@ -50,6 +50,20 @@ def test_only_the_exact_flag_value_enables_the_universal_path(monkeypatch, value
 def test_exact_flag_value_enables_the_universal_path(monkeypatch):
     monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", practice.UNIVERSAL_PIPELINE_FLAG)
     assert practice._universal_pipeline_enabled() is True
+
+
+@pytest.mark.parametrize("value", [
+    None, "", "true", "1", "yes", "enable", "typo", "ENABLED", " enabled ",
+])
+def test_difficulty_controller_requires_only_its_exact_shared_flag(monkeypatch, value):
+    if value is None:
+        monkeypatch.delenv("MATBOT_PRACTICE_DIFFICULTY_LEVELS", raising=False)
+    else:
+        monkeypatch.setenv("MATBOT_PRACTICE_DIFFICULTY_LEVELS", value)
+    assert practice._difficulty_levels_enabled() is False
+
+    monkeypatch.setenv("MATBOT_PRACTICE_DIFFICULTY_LEVELS", "enabled")
+    assert practice._difficulty_levels_enabled() is True
     monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", "  Universal_Two_Call  ")
     assert practice._universal_pipeline_enabled() is True
 
