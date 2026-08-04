@@ -10,6 +10,7 @@ from matbot.tutor.schema import (DifficultyEvidence, ReviewerChecks, ReviewerFin
                                  SignatureParameter, TaskPayload, TaskSignature, TutorDraft, TutorOption,
                                  difficulty_evidence_errors)
 from matbot.tutor import pipeline as tutor_pipeline
+from matbot.tutor import prompts as tutor_prompts
 from matbot.tutor.pipeline import SAFE_ERROR_MESSAGE
 from tests.conftest import FakeLLM, make_difficulty_diagnostics
 
@@ -244,6 +245,87 @@ def test_difficulty_evidence_counts_only_meaningful_connected_operations():
     level_two_direct = level_one_too_complex.model_copy(update={"operation_count": 1})
     assert "level_2_lacks_connected_reasoning_or_explanation" in difficulty_evidence_errors(
         level_two_direct, 2)
+
+
+def _direct_level_one_evidence(**updates):
+    values = dict(
+        reasoning_steps=1, condition_count=1, operation_count=1,
+        representation_change_count=0, requires_explanation=False,
+        requires_comparison=False, requires_construction=False,
+        requires_proof_or_justification=False, combines_concepts=False,
+    )
+    values.update(updates)
+    return DifficultyEvidence(**values)
+
+
+@pytest.mark.parametrize("form", [
+    "yes/no one-rule check", "matching-value selection", "one-operation arithmetic MCQ",
+    "one-value substitution", "property recognition/classification",
+])
+def test_level_one_accepts_every_direct_introductory_form(form):
+    # Grammar is intentionally absent from DifficultyEvidence; the same direct
+    # mathematical structure permits every listed visible form.
+    assert difficulty_evidence_errors(_direct_level_one_evidence(), 1) == (), form
+
+
+@pytest.mark.parametrize("updates", [
+    {"condition_count": 2},
+    {"operation_count": 2},
+    {"requires_explanation": True},
+    {"requires_comparison": True},
+    {"requires_construction": True},
+    {"requires_proof_or_justification": True},
+    {"representation_change_count": 1},
+    {"combines_concepts": True},
+])
+def test_level_one_does_not_absorb_combined_or_advanced_evidence(updates):
+    assert "level_1_is_not_direct_introductory_application" in difficulty_evidence_errors(
+        _direct_level_one_evidence(**updates), 1)
+
+
+def test_exact_live_divisibility_selection_publishes_as_level_one(monkeypatch):
+    monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", "universal_two_call")
+    monkeypatch.setenv("MATBOT_PRACTICE_DIFFICULTY_LEVELS", "enabled")
+    context, store, fake = build(6, "6-03-004"), SessionStore(), FakeLLM()
+    task = task_for(
+        context, signature="one-rule-selection",
+        text="Koji od sljedećih brojeva je djeljiv sa 25?",
+        options=("$125$", "$126$", "$127$", "$128$"),
+    )
+    queue_generation(fake, task)
+
+    response = run_practice_turn(store, fake, turn(6, context.topic_id))
+    session = store.peek("structured")
+    assert response["status"] == "ready"
+    assert fake.call_count == 2
+    assert session["difficulty_level"] == 1
+    assert session["current_task_signature"]["structured_signature_hash"]
+
+
+def test_rejected_level_one_evidence_preserves_prior_session(monkeypatch):
+    monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", "universal_two_call")
+    monkeypatch.setenv("MATBOT_PRACTICE_DIFFICULTY_LEVELS", "enabled")
+    context, store, fake = build(6, "6-03-004"), SessionStore(), FakeLLM()
+    queue_generation(fake, task_for(context, signature="committed"))
+    assert run_practice_turn(store, fake, turn(6, context.topic_id))["status"] == "ready"
+    before = copy.deepcopy(store.peek("structured"))
+    rejected = task_for(context, signature="two-operations").model_copy(update={
+        "difficulty_evidence": _direct_level_one_evidence(operation_count=2),
+    })
+    queue_generation(fake, rejected)
+
+    assert run_practice_turn(store, fake, turn(6, context.topic_id))["answer"] == SAFE_ERROR_MESSAGE
+    assert store.peek("structured") == before
+    assert fake.call_count == 4
+
+
+def test_tutor_and_reviewer_prompts_define_level_one_selection_without_yes_no_requirement():
+    context = build(6, "6-03-004")
+    tutor = tutor_prompts.build_tutor_instructions(context)
+    reviewer = tutor_prompts.build_reviewer_instructions(context)
+    assert "selection" in tutor.lower()
+    assert "choosing a visible option" in tutor.lower()
+    assert "one-rule selection" in reviewer.lower()
 
 
 @pytest.mark.parametrize("difficulty_flag", [

@@ -412,3 +412,29 @@ def test_gate_identity_diagnostics_record_only_safe_title_match_facts():
     assert result.tutor_title_matched_canonical is False
     assert result.reviewer_final_title_matched_canonical is False
     assert result.title_canonicalized is True
+
+
+def test_rejected_package_diagnostics_include_closed_difficulty_evidence_and_codes():
+    from scratchpad import run_difficulty_canary as canary
+    from tests.conftest import make_reviewer_final, make_task_payload, make_tutor_draft
+
+    task = make_task_payload().model_copy(update={
+        "selected_lesson_id": "6-03-004",
+        "selected_lesson_title": "Pravila djeljivosti sa 2, 3, 4, 5, 6, 9, 10, 15 i 25",
+    })
+    task = task.model_copy(update={
+        "difficulty_evidence": task.difficulty_evidence.model_copy(update={"operation_count": 2}),
+    })
+    draft = make_tutor_draft(new_task=task)
+    reviewer = make_reviewer_final(final=draft)
+    result = canary.TurnResult("difficulty", "6-03-004",
+                               "Pravila djeljivosti sa 2, 3, 4, 5, 6, 9, 10, 15 i 25",
+                               "non_contract", 6, "")
+    canary._record_rejected_generation_diagnostics(
+        result, SimpleNamespace(last_tutor_output=draft, last_reviewer_output=reviewer))
+
+    assert result.final_difficulty_target_level == 1
+    assert result.final_difficulty_evidence["operation_count"] == 2
+    assert result.final_difficulty_validator_errors == [
+        "level_1_is_not_direct_introductory_application"
+    ]

@@ -15,7 +15,7 @@ import hashlib
 import json
 from typing import Literal, Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from matbot import config
 
@@ -65,12 +65,21 @@ class TutorOption(BaseModel):
 class DifficultyEvidence(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    reasoning_steps: int
-    condition_count: int
-    operation_count: int
-    representation_change_count: int
-    requires_explanation: bool
-    requires_comparison: bool
+    reasoning_steps: int = Field(description=(
+        "Meaningful connected mathematical inferences. Applying one stated rule and "
+        "selecting its matching visible option is one direct step, not two."))
+    condition_count: int = Field(description=(
+        "Independent mathematical conditions that must all be used; answer options "
+        "are not separate conditions."))
+    operation_count: int = Field(description=(
+        "Meaningful connected mathematical operations, not token count or every symbol."))
+    representation_change_count: int = Field(description=(
+        "Meaningful changes of representation required before answering."))
+    requires_explanation: bool = Field(description=(
+        "True only when the student must explain or justify, not when solution stores reasoning."))
+    requires_comparison: bool = Field(description=(
+        "True only for comparing mathematical results or properties; false for choosing "
+        "one option by one directly stated rule."))
     requires_construction: bool
     requires_proof_or_justification: bool
     combines_concepts: bool
@@ -218,7 +227,12 @@ class UnifiedOutputError(ValueError):
 
 
 def difficulty_evidence_errors(evidence: DifficultyEvidence, target_level: int) -> tuple[str, ...]:
-    """Shared, lesson-independent meaning of the structured 1--3 rubric."""
+    """Shared, lesson-independent meaning of the structured 1--3 rubric.
+
+    Level 1 deliberately examines mathematical evidence only: yes/no wording,
+    recognition, classification, direct calculation, substitution, and selecting
+    one option by one stated rule are equivalent direct introductory forms.
+    """
     errors = []
     numeric = ("reasoning_steps", "condition_count", "operation_count",
                "representation_change_count")

@@ -137,11 +137,12 @@ _DIVISIBILITY_RULES_REQUIREMENT = SemanticTaskRequirement(
         "- Naslov obećava pravila djeljivosti: vidljivi tekst mora direktno tražiti "
         "primjenu jednog ili više pravila djeljivosti.\n"
         "- Valjano je provjeriti djeljivost sa 6, sa 10 i sa 25, izabrati broj koji "
-        "ispunjava dva uslova djeljivosti ili obrazložiti pravilo koje dokazuje odgovor.\n"
+        "ispunjava jedno ili više navedenih pravila ili obrazložiti pravilo koje dokazuje odgovor.\n"
         "- Ne pravi računanje količnika, ostatka ili obično dijeljenje kao glavni cilj; "
         "takav korak smije biti samo pomoćni dok pitanje vidljivo ispituje djeljivost.\n"
-        "- Kad je zadat ciljani nivo: nivo 1 je jedno izričito pravilo i direktno "
-        "da/ne pitanje; nivo 2 kombinuje dva pravila ili traži izbor/obrazloženje; "
+        "- Kad je zadat ciljani nivo: nivo 1 je jedno izričito pravilo i direktna "
+        "da/ne provjera, prepoznavanje ili izbor; nivo 2 kombinuje dva pravila ili traži "
+        "obrazloženje/poređenje; "
         "nivo 3 traži konstrukciju, poređenje ili više povezanih uslova."
     ),
     reviewer_instruction=(

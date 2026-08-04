@@ -98,7 +98,7 @@ _LEVEL_TITLES = {1: "uvodni", 2: "standardna primjena", 3: "napredna primjena"}
 
 _LEVEL_ANCHORS = {
     1: (
-        "tačno jedan korak rezonovanja, bez uzastopnih međukoraka",
+        "jedna direktna primjena: da/ne, prepoznavanje, klasifikacija, izbor, račun ili zamjena vrijednosti; bez povezanih međukoraka",
         "mali, jednostavni brojevi/simboli — direktno prepoznatljivi",
         "najjednostavniji uobičajeni zapis te vještine, bez ugniježdenih izraza",
         "konkretan, opipljiv primjer — bez uopštavanja",
