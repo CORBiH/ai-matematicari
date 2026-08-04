@@ -293,6 +293,28 @@ def validate_difficulty_evidence(task: TaskPayload) -> None:
     _require(not errors, "difficulty evidence: " + ",".join(errors))
 
 
+# Bounded, sigurna dijagnostika kontradiktorne recenzentove odluke. Sadrži SAMO
+# strukturisane brojeve i kodove validatora — nikad prompt, tekst zadatka,
+# skriveno rezonovanje ni sirov izlaz modela (vidi CLAUDE.md, pravilo 7).
+REVIEWER_EVIDENCE_OUTSIDE_TARGET = "reviewer_approved_difficulty_evidence_outside_target"
+
+
+def _evidence_diagnostics(evidence: DifficultyEvidence) -> str:
+    """Kratak, ograničen opis dokaza — staje u granicu reda u logu."""
+    flags = ",".join(name for name, value in (
+        ("explanation", evidence.requires_explanation),
+        ("comparison", evidence.requires_comparison),
+        ("construction", evidence.requires_construction),
+        ("proof", evidence.requires_proof_or_justification),
+        ("combines", evidence.combines_concepts),
+    ) if value) or "-"
+    return (f"steps={evidence.reasoning_steps} "
+            f"conditions={evidence.condition_count} "
+            f"operations={evidence.operation_count} "
+            f"representation_changes={evidence.representation_change_count} "
+            f"flags={flags}")
+
+
 def _require(condition, message):
     if not condition:
         raise UnifiedOutputError(message)
@@ -423,6 +445,33 @@ def validate_reviewer(reviewer: ReviewerFinal) -> None:
         if not getattr(checks, name)
     ]
     _require(not failed, f"odobreno uprkos oborenim provjerama: {failed}")
+
+    # ------------------------------------------------------------------
+    # DOSLJEDNOST ODLUKE S VLASTITIM MJERODAVNIM DOKAZOM (živi gate cb80b92)
+    # ------------------------------------------------------------------
+    # Živi pad: recenzent je NEZAVISNO izračunao dokaz (steps=3, operations=4,
+    # representation_changes=1) za zadatak čiji je traženi nivo 1, pa ipak
+    # vratio `approve` uz `difficulty_evidence_valid=true`. Payload je bio
+    # interno kontradiktoran, a server ga je hvatao TEK u objavi
+    # (stage=publication) — dakle prekasno da recenzent upotrijebi ono što već
+    # umije: `correct` s kompletnim zamjenskim zadatkom u ISTOM drugom pozivu.
+    #
+    # Zato se ovdje pokreće ISTI zajednički validator (`difficulty_evidence_errors`)
+    # nad recenzentovim vlastitim mjerodavnim dokazom i nivoom koji je sam
+    # deklarisao na konačnom zadatku. Prag težine se NE mijenja — mijenja se
+    # samo trenutak kad se kontradikcija otkrije. Pravilo je univerzalno: nema
+    # ni lekcije, ni oblasti, ni geometrije u njemu.
+    if has_final_task:
+        target_level = reviewer.final.new_task.target_difficulty_level
+        evidence_errors = difficulty_evidence_errors(
+            reviewer.reviewed_difficulty_evidence, target_level
+        )
+        _require(not evidence_errors, (
+            f"{REVIEWER_EVIDENCE_OUTSIDE_TARGET}: decision={reviewer.decision} "
+            f"target_level={target_level} errors={','.join(evidence_errors)} "
+            f"evidence_valid={checks.difficulty_evidence_valid} "
+            + _evidence_diagnostics(reviewer.reviewed_difficulty_evidence)
+        ))
 
     if reviewer.final.intent in TASK_INTENTS:
         _require(checks.independently_solved,

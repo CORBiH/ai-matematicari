@@ -390,6 +390,31 @@ def test_publication_rejection_is_never_classified_as_unknown():
     assert canary._classify_failure([message]) == "publication_validation_rejection"
 
 
+def test_contradictory_reviewer_approval_is_classified_as_reviewer_payload_rejection():
+    """Živi gate cb80b92 je ovu kontradikciju prijavio kao publication rejection.
+
+    Recenzent je odobrio zadatak čiji je NJEGOV VLASTITI dokaz van traženog
+    nivoa; server je to hvatao tek u objavi, pa je gate pogrešno optuživao
+    završnu validaciju umjesto recenzentovog payloada. Sada se odbija na
+    recenzentu i klasa mora biti `reviewer_payload_rejection`."""
+    from scratchpad import run_difficulty_canary as canary
+    from matbot.tutor.schema import REVIEWER_EVIDENCE_OUTSIDE_TARGET
+
+    message = (
+        "tutor_rejected request_id=abc topic=7-04-021 stage=reviewer_payload "
+        f"intent=generate_task detail={REVIEWER_EVIDENCE_OUTSIDE_TARGET}: "
+        "decision=approve target_level=1 "
+        "errors=level_1_is_not_direct_introductory_application"
+    )
+    assert canary._classify_failure([message]) == "reviewer_payload_rejection"
+    # Zatečena klasifikacija objave ostaje netaknuta.
+    assert canary._classify_failure([
+        "tutor_rejected request_id=abc topic=7-04-021 stage=publication "
+        "intent=generate_task detail=difficulty evidence: "
+        "level_1_is_not_direct_introductory_application"
+    ]) == "publication_validation_rejection"
+
+
 def test_gate_identity_diagnostics_record_only_safe_title_match_facts():
     from scratchpad import run_difficulty_canary as canary
     from tests.conftest import make_reviewer_final, make_task_payload, make_tutor_draft

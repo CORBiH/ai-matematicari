@@ -198,6 +198,35 @@ _STRUCTURED_TASK_RULE = """STRUCTURED TASK PACKAGE (required for every `new_task
 - task_signature describes mathematical structure (family, operation/relation, normalized parameters, conditions, objects, answer type), not wording. normalized_parameters is a list of entries with exactly name and value; values are canonical strings, never arbitrary metadata. Rewording, option order, or parameter-list order must not change it."""
 
 
+# CILJANI NIVO — univerzalno pravilo, isto za svih 534 lekcije.
+# ZAŠTO POSTOJI (živi gate cb80b92): za traženi nivo 1 model je napravio zadatak
+# koji iz tri zadate stranice izvodi poluprečnik opisane kružnice — višekorakan
+# račun koji je samo OZNAČEN kao nivo 1. Recenzent je nezavisno izračunao
+# steps=3/operations=4 i ipak vratio `approve`, pa je turn propao. Pravilo je
+# zato apsolutno i bez ijedne riječi o konkretnoj lekciji, figuri ili oblasti:
+# nivo 1 je DIREKTNA primjena, a izvedeni višekorakan račun tu ne spada.
+_TARGET_LEVEL_RULE = """TARGET DIFFICULTY LEVEL (universal; identical for every lesson):
+Level 1 must be a GENUINELY DIRECT introductory task built on the selected lesson:
+recognizing a definition, identifying a named object or property, applying one
+directly stated fact, one simple calculation, or a one-rule classification or
+selection. One reasoning step, one condition, one operation, no representation change.
+- Never derive a multi-step result and label it Level 1. When a task needs a chain
+  of rules or formulas, several intermediate quantities, or a value computed from
+  other computed values, it is NOT Level 1: replace it with a direct application of
+  this lesson, or place it at the level it truly belongs to.
+- A lesson whose title is conceptual is still introduced directly — ask what the
+  named object or property IS, or apply the single stated fact once, instead of
+  computing something derived from it.
+Level 2 is a bounded combination of up to two related rules, conditions, operations,
+or one manageable representation change.
+Level 3 requires construction, proof or justification, three or more connected
+requirements/operations, or an advanced representation change.
+`difficulty_evidence` must honestly describe the task you actually wrote. An
+independent reviewer recomputes it from the visible task and the server rejects the
+turn when that evidence does not satisfy the requested level — writing above the
+requested level loses the turn, it is not a shortcut."""
+
+
 def build_tutor_instructions(context):
     """Sistemski prompt prvog poziva — isti za svih 534 lekcije."""
     shared = build_shared_math_rules(
@@ -212,6 +241,7 @@ def build_tutor_instructions(context):
         f"{_FIELD_RULE}\n\n"
         f"{_TASK_RULE}\n\n"
         f"{_STRUCTURED_TASK_RULE}\n\n"
+        f"{_TARGET_LEVEL_RULE}\n\n"
         f"{_STARTING_COMPLEXITY_RULE}\n\n"
         f"{_DIFFICULTY_RULE}\n\n"
         "TON: obraćaj se učeniku direktno, toplo i kratko. Nikad ne spominji "
@@ -225,6 +255,32 @@ def build_tutor_input(context, session, student_message, trusted_verdict=None):
         _state_block(session, student_message, trusted_verdict),
         "Vrati strukturisan odgovor prema šemi.",
     ])
+
+
+# ODLUKA MORA PRATITI VLASTITI DOKAZ (živi gate cb80b92).
+# Recenzent je nezavisno izračunao dokaz koji NE zadovoljava traženi nivo, pa
+# ipak vratio `approve` — server je to morao odbiti i turn je propao iako je
+# recenzent već imao sve što treba da vrati `correct` sa zamjenskim zadatkom u
+# ISTOM (drugom i posljednjem) pozivu. Ovaj blok mu to izričito nalaže.
+_REVIEWER_TARGET_LEVEL_RULE = """TARGET LEVEL DECISION RULE (the server enforces this deterministically):
+- First independently calculate `reviewed_difficulty_evidence` from the visible task alone.
+- Then compare it with the exact requested target difficulty level of the final task.
+- NEVER return `approve` when your own evidence does not satisfy that target level. The
+  server runs the same validator on your evidence and rejects a contradictory approval,
+  so approving a task you measured as outside the target only loses the turn.
+- When the wording is usable but the task difficulty is wrong for the requested level,
+  return `correct`. `correct` may REPLACE THE WHOLE TASK, not only fix a typo: put a
+  complete replacement task in `final.new_task`.
+- The replacement must keep the exact selected lesson, hit the requested target level,
+  keep the four-option MCQ contract (unique IDs, exactly one correct option,
+  correct_option_id agreeing with correct_option_index, expected_answer an exact copy of
+  the marked option's text), be mathematically correct, and carry a fresh task_signature
+  describing the replacement task.
+- Recompute `reviewed_difficulty_evidence` for the REPLACEMENT task you actually return.
+- Do not merely relabel the same task, and never lower reasoning_steps, condition_count
+  or operation_count below what the visible task truly requires. Dishonest counts are a
+  worse failure than a rejected turn.
+- If you cannot produce a safe, complete corrected package, return `fail_closed`."""
 
 
 def build_reviewer_instructions(context):
@@ -255,10 +311,12 @@ def build_reviewer_instructions(context):
         "9. da je MathJax ispravan (samo $...$, poznate komande);\n"
         "10. da je bosanski prirodan i primjeren uzrastu.\n\n"
         "11. verify that lesson identity, level, text, options, marked answer, solution, difficulty evidence, and signature describe one task. Independently recompute `reviewed_difficulty_evidence` from only the visible task, answer requirements, options, and solution: ignore Tutor numerical counts. Count only actions the student must perform; four MCQ options are not four conditions or operations, selecting one option with one rule is one direct application, a solution explanation is not a student explanation requirement, and `combines_concepts` is true only when the student must combine distinct mathematical concepts. Return your independently calculated evidence even if the wording needs no textual correction. Level 1 may be a direct yes/no, recognition, calculation, classification, substitution, or one-rule selection; choosing a visible option is not by itself mathematical comparison or a second reasoning step. Level 2 permits a bounded pair of related rules/concepts, conditions, or operations, straightforward explanation/comparison, or one manageable representation change; `combines_concepts` alone is not Level 3. Level 3 requires construction, proof, three-or-more connected requirements/operations, advanced representation change, or comparable depth. For multiple choice, correct_option_id and correct_option_index must select the same visible option and expected_answer must be an exact copy of its text; explanation belongs only in solution. Signature parameters are only closed name/value entries with canonical string values: no arbitrary metadata, and order alone is never a new task. When correcting, update options, correct option ID/index, expected answer, solution, and the complete signature together, then return the complete fresh package. Set `task_package_consistent`, `difficulty_evidence_valid`, and `task_signature_consistent` accordingly.\n\n"
+        f"{_REVIEWER_TARGET_LEVEL_RULE}\n\n"
         "ODLUKA:\n"
         "- `approve` — nacrt je ispravan; prepiši ga nepromijenjen u `final`;\n"
         "- `correct` — nacrt je popravljiv; u `final` vrati KOMPLETAN ispravljen "
-        "payload (to je konačan odgovor koji učenik vidi);\n"
+        "payload (to je konačan odgovor koji učenik vidi). To uključuje i "
+        "KOMPLETNU ZAMJENU zadatka kad je težina pogrešna za traženi nivo;\n"
         "- `fail_closed` — ne može se sigurno objaviti; navedi `fail_reason_code`.\n\n"
         "Ako matematika nije sigurna ili je zadatak dvosmislen, biraj "
         "`fail_closed`. Bolje bez odgovora nego pogrešan odgovor.\n"

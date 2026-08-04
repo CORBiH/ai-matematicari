@@ -64,6 +64,31 @@ def _next_task():
     return _task(f"Izračunaj $2+2+0\\cdot{n}$.", ("$4$", "$3$", "$5$", "$6$"))
 
 
+@pytest.fixture(autouse=True)
+def _deterministic_task_generation():
+    """Fiksiraj globalni RNG za SVAKI test u ovom modulu.
+
+    ZAŠTO POSTOJI: za šest lekcija S UGOVOROM modelov `new_task` se namjerno
+    ODBACUJE i tekst zadatka pravi deterministički K1/K3 generator, koji vuče
+    iz globalnog `random`. Zato `_next_task()` iznad — koji jedinstvenost
+    postiže rastućim brojem u tekstu — na ugovorne lekcije uopšte ne utiče:
+    tamo jedinstvenost zavisi isključivo od zatečenog stanja RNG-a.
+
+    Posljedica je bila latentna nestabilnost: kad generator dva puta zaredom
+    izvuče isti zadatak, čuvar duplikata ga ISPRAVNO odbije, taj turn ne
+    pomjeri nivo i očekivani niz nivoa se pomjeri. Mjereno nad ovim modulom:
+    1 od 40 stanja RNG-a obara `test_contract_lesson_shares_the_same_state_
+    machine_as_a_528_lesson`, a koje stanje zatekne zavisi od toga koliko su
+    random poziva potrošili testovi PRIJE njega — dakle od redoslijeda
+    pokretanja, ne od ponašanja koje se ovdje ispituje.
+
+    Sjeme je zato dio fiksture, a ne popravka produkcije: čuvar duplikata
+    ostaje netaknut i i dalje odbija stvarno ponovljen zadatak."""
+    import random
+
+    random.seed(20260804)
+
+
 # ===========================================================================
 # 528 lekcija BEZ ugovora — preko Recenzenta
 # ===========================================================================
