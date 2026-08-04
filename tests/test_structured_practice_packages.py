@@ -665,3 +665,97 @@ def test_reviewer_option_change_without_expected_answer_update_fails(monkeypatch
 
     assert run_practice_turn(store, fake, turn(6, context.topic_id))["answer"] == SAFE_ERROR_MESSAGE
     assert store.peek("structured") is None
+
+
+# ---------------------------------------------------------------------------
+# ANOTACIJA ZBIRA CIFARA KROZ CIJEO DVOPOZIVNI PUT (živi gate b7025e4)
+# ---------------------------------------------------------------------------
+# Živi pad: lekcija 6-03-004, zadatak „Koji od sljedećih brojeva je djeljiv sa
+# 9?“. Sve je prošlo (struktura, identitet lekcije, Tutor, nezavisan Reviewer,
+# dokaz nivoa 1, MCQ paket, broj poziva) osim numeričke provjere `solution`
+# polja: `numeric_equality_mismatch: '12:\\;1+2' (14) != '3' (3) [solution]`.
+
+_LIVE_DIVISIBILITY_TEXT = "Koji od sljedećih brojeva je djeljiv sa 9?"
+_LIVE_DIVISIBILITY_OPTIONS = ("$135$", "$12$", "$121$", "$142$")
+
+
+def _digit_sum_task(context, solution, signature="digit-sum"):
+    """MCQ paket lekcije o djeljivosti čije `solution` nosi zbirove cifara."""
+    return task_for(
+        context, signature=signature, text=_LIVE_DIVISIBILITY_TEXT,
+        options=_LIVE_DIVISIBILITY_OPTIONS, correct=0,
+    ).model_copy(update={"solution": solution})
+
+
+def test_live_digit_sum_annotation_solution_publishes_in_exactly_two_calls(monkeypatch):
+    """Tačno anotirano rješenje mora se objaviti — i to u TAČNO dva poziva."""
+    monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", "universal_two_call")
+    context, store, fake = build(6, "6-03-004"), SessionStore(), FakeLLM()
+    solution = (
+        "Zbir cifara broja $135$ je $135:\\;1+3+5=9$, pa je djeljiv sa $9$. "
+        "Za $12$ je $12:\\;1+2=3$, a $3$ nije djeljivo sa $9$."
+    )
+    queue_generation(fake, _digit_sum_task(context, solution))
+
+    response = run_practice_turn(store, fake, turn(6, context.topic_id))
+    session = store.peek("structured")
+
+    assert response["status"] == "ready"
+    assert fake.call_count == 2
+    assert len(fake.tutor_calls) == 1 and len(fake.reviewer_calls) == 1
+    assert session["lesson_id"] == "6-03-004"
+    assert session["solution_summary"] == solution
+    # Interna dijagnostika i rješenje NIKAD ne izlaze u browser.
+    assert "1+3+5" not in response["answer"]
+
+
+def test_incorrect_digit_sum_annotation_rejects_transactionally(monkeypatch):
+    """Stvarno pogrešna anotirana jednakost i dalje pada — bez mutacije stanja.
+
+    Prvi turn objavi ispravan zadatak, drugi donese `$135:\\;1+3+5=8$`
+    (zbir je 9). Turn se odbija, prethodna sesija ostaje netaknuta, i drugi
+    turn i dalje troši TAČNO dva poziva (ukupno četiri) — bez retryja."""
+    monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", "universal_two_call")
+    context, store, fake = build(6, "6-03-004"), SessionStore(), FakeLLM()
+    queue_generation(fake, _digit_sum_task(
+        context, "Zbir cifara: $135:\\;1+3+5=9$.", signature="valid-first"))
+    assert run_practice_turn(store, fake, turn(6, context.topic_id))["status"] == "ready"
+    before = copy.deepcopy(store.peek("structured"))
+
+    queue_generation(fake, _digit_sum_task(
+        context, "Zbir cifara: $135:\\;1+3+5=8$.", signature="wrong-second"))
+    response = run_practice_turn(store, fake, turn(6, context.topic_id))
+
+    assert response["answer"] == SAFE_ERROR_MESSAGE
+    assert store.peek("structured") == before
+    assert fake.call_count == 4
+
+
+def test_digit_sum_that_is_not_the_prefix_digits_still_rejects(monkeypatch):
+    """`1+3` nisu cifre broja $12$ → dvotačka ostaje dijeljenje i paket pada.
+
+    Ovim se dokazuje da popravka NIJE „obriši sve prije dvotačke“: takva bi
+    izmjena pustila `12:1+3=4` kroz samo zato što je 1+3=4."""
+    monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", "universal_two_call")
+    context, store, fake = build(6, "6-03-004"), SessionStore(), FakeLLM()
+    queue_generation(fake, _digit_sum_task(context, "Zbir cifara: $12:\\;1+3=4$."))
+
+    assert run_practice_turn(store, fake, turn(6, context.topic_id))["answer"] == SAFE_ERROR_MESSAGE
+    assert store.peek("structured") is None
+    assert fake.call_count == 2
+
+
+def test_genuine_colon_division_in_solution_still_publishes_and_still_rejects(monkeypatch):
+    """Školsko dijeljenje kroz isti put: tačno prolazi, netačno pada."""
+    monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", "universal_two_call")
+    context, store, fake = build(6, "6-03-004"), SessionStore(), FakeLLM()
+    queue_generation(fake, _digit_sum_task(
+        context, "Provjera dijeljenjem: $135:9=15$.", signature="division-ok"))
+    assert run_practice_turn(store, fake, turn(6, context.topic_id))["status"] == "ready"
+    before = copy.deepcopy(store.peek("structured"))
+
+    queue_generation(fake, _digit_sum_task(
+        context, "Provjera dijeljenjem: $135:9=16$.", signature="division-wrong"))
+    assert run_practice_turn(store, fake, turn(6, context.topic_id))["answer"] == SAFE_ERROR_MESSAGE
+    assert store.peek("structured") == before
+    assert fake.call_count == 4

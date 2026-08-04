@@ -268,6 +268,57 @@ def _latex_to_python(expr):
     return text
 
 
+# ---------------------------------------------------------------------------
+# ANOTACIJA „broj: zbir njegovih cifara“ (živi nalaz, release gate b7025e4,
+# zadatak o pravilima djeljivosti)
+# ---------------------------------------------------------------------------
+# Ovo NIJE pravilo neke lekcije nego oblik ZAPISA: model je zbir cifara pisao
+# tako da dvotačka OZNAČAVA broj o kojem je riječ:
+#
+#     $12:\\;1+2=3$        $135:\\;1+3+5=9$        $405:\\;4+0+5=9$
+#
+# Tu dvotačka nije dijeljenje nego „za broj 12 vrijedi:“. Kako je stariji kod
+# SVAKU dvotačku bezuslovno prevodio u '/', lijeva strana je računata kao
+# 12/1+2 = 14, pa je TAČAN odgovor odbijen porukom
+# `numeric_equality_mismatch: '12:\\;1+2' (14) != '3' (3) [solution]`.
+#
+# Anotacija se priznaje samo kad je DOKAZIVA, nikad po lekciji ni po nagađanju:
+# prefiks je cio broj, iza dvotačke stoji zbir čiji su sabirci TAČNO cifre tog
+# broja — svaka zasebno i istim redom. Tada je jedino moguće čitanje „zbir
+# cifara“, pa se vrednuje samo zbir. Jednakost se i dalje provjerava do kraja:
+# `12:1+2=4` pada jer je 1+2=3, a `12:1+3=4` uopšte nije anotacija (cifre broja
+# 12 nisu 1 i 3) pa ostaje dijeljenje i takođe pada.
+#
+# ZAŠTO BAR DVIJE CIFRE: jednocifren prefiks bi progutao ispravno dijeljenje
+# „$5:5=1$“ (cifre `[5]` == sabirci `[5]`) i pretvorio ga u zbir 5 ≠ 1. Uz prag
+# od dvije cifre iza dvotačke mora stajati BAR DVA sabirka, pa nijedan oblik
+# „a:b“ — `12:3`, `20:5`, `60:15`, `(24+6):5`, `3,5:0,5`, `3:4=6:8` — ne može
+# ni ući u ovu granu i školsko dijeljenje ostaje provjereno kao i dosad.
+_DIGIT_SUM_ANNOTATION_RE = re.compile(r"^\s*(\d{2,})\s*:\s*(\d(?:\s*\+\s*\d)+)\s*$")
+
+
+def _strip_digit_sum_annotation(expr):
+    """Vrati SAMO zbir kad je `expr` cio oblika „broj: cifra+cifra(+…)“ i kad su
+    sabirci baš cifre tog broja. Inače vrati `expr` NEPROMIJENJEN — dvotačka
+    tada ostaje školsko dijeljenje.
+
+    `_strip_units_and_spacing` se koristi isključivo kao SONDA za prepoznavanje
+    (`\\;` stoji baš između oznake i zbira) i njen rezultat nikad ne izlazi iz
+    ove funkcije. Zato izraz koji nije anotacija stiže u `_latex_to_python`
+    doslovno onakav kakav je i dosad stizao: nijedan zatečeni put se ne mijenja,
+    pa ni onaj koji na zaostaloj dvostrukoj kosoj crti mora pasti kao ranije.
+    Kad anotacija JESTE prepoznata, vraćeni zbir su same cifre i `+` — bez
+    ijedne LaTeX komande."""
+    match = _DIGIT_SUM_ANNOTATION_RE.match(_strip_units_and_spacing(expr))
+    if not match:
+        return expr
+    number, digit_sum = match.group(1), match.group(2)
+    addends = [addend.strip() for addend in digit_sum.split("+")]
+    if addends != list(number):
+        return expr
+    return digit_sum
+
+
 _IMPLICIT_PATTERNS = (
     (re.compile(r"(\d)\s*\("), r"\1*("),
     (re.compile(r"\)\s*\("), r")*("),
@@ -358,7 +409,7 @@ def evaluate_candidates(latex_expr, pi_values=()):
     if _UNSUPPORTED_RE.search(latex_expr) or _ORDERED_PAIR_RE.search(latex_expr):
         raise _Unsupported("nepodržana konstrukcija")
 
-    python_expr = _latex_to_python(latex_expr)
+    python_expr = _latex_to_python(_strip_digit_sum_annotation(latex_expr))
     python_expr = _insert_implicit_multiplication(python_expr).strip()
     if not python_expr:
         raise _Unsupported("prazan izraz")

@@ -402,3 +402,124 @@ def test_colon_ratio_without_equality_is_not_falsely_rejected():
 def test_colon_equivalent_ratios_with_equality_checked_consistently():
     assert find_numeric_inconsistencies("$3:4=6:8$") == []
     assert find_numeric_inconsistencies("$3:4=6:9$")
+
+
+# ---------------------------------------------------------------------------
+# ANOTACIJA „broj: zbir njegovih cifara“ (živi gate b7025e4, lekcija 6-03-004
+# „Pravila djeljivosti…“). Dvotačka je tu OZNAKA broja, ne dijeljenje: tačan
+# odgovor `$12:\;1+2=3$` je bio odbijen jer je lijeva strana računata kao
+# 12/1+2 = 14.
+# ---------------------------------------------------------------------------
+
+def test_live_digit_sum_annotation_is_not_read_as_division():
+    """Tačan živi string koji je pao na gateu mora proći."""
+    assert find_numeric_inconsistencies("$12:\\;1+2=3$") == []
+
+
+@pytest.mark.parametrize("text", [
+    "$12:\\;1+2=3$",
+    "$135:\\;1+3+5=9$",
+    "$405:\\;4+0+5=9$",
+    "$10:\\;1+0=1$",            # cifra 0 među sabircima
+    "$999:\\;9+9+9=27$",        # ponovljene cifre
+    "$12: 1+2=3$",              # bez LaTeX razmaka
+    "$12:1+2=3$",               # bez ijednog razmaka
+    "$12:\\,1+2=3$",            # druga LaTeX komanda za razmak
+    "$12:\\quad 1+2=3$",
+])
+def test_valid_digit_sum_annotation_passes(text):
+    assert find_numeric_inconsistencies(text) == []
+
+
+@pytest.mark.parametrize("text", [
+    "$12:\\;1+2=4$",            # zbir cifara je 3, ne 4
+    "$135:\\;1+3+5=10$",        # zbir cifara je 9, ne 10
+    "$405:\\;4+0+5=10$",
+])
+def test_wrong_digit_sum_annotation_is_still_rejected(text):
+    assert find_numeric_inconsistencies(text)
+
+
+def test_sum_that_is_not_the_prefix_digits_stays_division():
+    """`1+3` NISU cifre broja 12 → nema anotacije, dvotačka ostaje dijeljenje.
+
+    Bez ovoga bi „obriši sve prije dvotačke“ proglasilo `12:1+3=4` tačnim samo
+    zato što je 1+3=4."""
+    issues = find_numeric_inconsistencies("$12:\\;1+3=4$")
+    assert issues
+    assert "(15)" in issues[0]   # 12/1+3 — stvarno pročitano kao dijeljenje
+
+
+def test_same_digits_in_wrong_order_stay_division():
+    """Redoslijed cifara je dio dokaza: `2+1` nije dekompozicija broja 12."""
+    assert find_numeric_inconsistencies("$12:\\;2+1=3$")
+
+
+def test_single_digit_prefix_stays_division():
+    """`$5:5=1$` je ispravno dijeljenje — prag od dvije cifre ga čuva.
+
+    Da je prag jedna cifra, cifre `[5]` bi se poklopile sa sabircima `[5]`,
+    izraz bi postao zbir 5 i tačno dijeljenje bi bilo lažno odbijeno."""
+    assert find_numeric_inconsistencies("$5:5=1$") == []
+    assert find_numeric_inconsistencies("$5:5=2$")
+
+
+@pytest.mark.parametrize("text,expected_ok", [
+    ("$12:3=4$", True), ("$12:3=5$", False),
+    ("$12 : 3 = 4$", True), ("$12 : 3 = 5$", False),
+    ("$20:5=4$", True), ("$20:5=5$", False),
+    ("$60:15=4$", True), ("$60:15=5$", False),
+    ("$3,5:0,5=7$", True), ("$3,5:0,5=8$", False),
+    ("$(24+6):5=6$", True), ("$(24+6):5=5$", False),
+])
+def test_genuine_colon_division_is_unaffected(text, expected_ok):
+    assert (find_numeric_inconsistencies(text) == []) is expected_ok
+
+
+def test_annotation_inside_surrounding_prose():
+    text = ("Broj $12$ nije djeljiv sa $9$ jer je zbir cifara "
+            "$12:\\;1+2=3$, a $3$ nije djeljivo sa $9$.")
+    assert find_numeric_inconsistencies(text) == []
+
+
+def test_multiple_annotated_checks_in_one_solution_all_pass():
+    text = ("Provjeri zbirove cifara: $135:\\;1+3+5=9$, zatim $405:\\;4+0+5=9$ "
+            "i na kraju $12:\\;1+2=3$.")
+    assert find_numeric_inconsistencies(text) == []
+
+
+def test_one_wrong_equality_among_several_valid_annotations_is_caught():
+    text = ("Provjeri: $135:\\;1+3+5=9$, pa $405:\\;4+0+5=8$, pa $12:\\;1+2=3$.")
+    issues = find_numeric_inconsistencies(text)
+    assert len(issues) == 1
+    assert "405" in issues[0]
+
+
+@pytest.mark.parametrize("text", [
+    "$12:\\\\;1+2=3$",     # ZAOSTALA dvostruka kosa crta prije komande
+    "$12\\\\quad+3=15$",
+    "$12:\\ty 1+2=3$",     # nepoznata kontrolna riječ
+])
+def test_unknown_or_doubled_backslash_still_skips_as_before(text):
+    """Prepoznavanje anotacije NE SMIJE nikom drugom promijeniti put.
+
+    Sonda za razmake radi samo unutar `_strip_digit_sum_annotation`; izraz koji
+    nije anotacija stiže u `_latex_to_python` doslovno kakav je i dosad stizao,
+    pa zaostala dvostruka kosa crta i nepoznata komanda ostaju „nepodržano“ i
+    tiho se preskaču (a u produkciji ih `mathsafe` odbije prije ove provjere).
+    Ranija verzija ove popravke je razmake skidala PRIJE poziva i time je
+    `\\\\quad` postajao običan razmak — tihi gubitak zatečenog ponašanja."""
+    assert find_numeric_inconsistencies(text) == []
+
+
+def test_annotation_does_not_disturb_ordinary_arithmetic():
+    """Ostale operacije moraju ostati tačno onakve kakve su bile."""
+    for ok in ("$2+3=5$", "$7-4=3$", "$6\\cdot7=42$", "$\\frac{3}{4}=0,75$",
+               "$2^3=8$", "$1,5+2,5=4$", "$-3+(-4)=-7$", "$\\sqrt{16}=4$"):
+        assert find_numeric_inconsistencies(ok) == [], ok
+    # `$\frac{3}{4}=0,9$`, ne `0,8`: tolerancija se izvodi iz preciznosti
+    # decimalnog literala, pa je 0,8 legitimno zaokruženje broja 0,75 na jednu
+    # decimalu (zatečeno ponašanje `_tolerance`, nedirnuto ovom izmjenom).
+    for bad in ("$2+3=6$", "$7-4=4$", "$6\\cdot7=41$", "$\\frac{3}{4}=0,9$",
+                "$2^3=9$", "$1,5+2,5=5$", "$-3+(-4)=-1$", "$\\sqrt{16}=5$"):
+        assert find_numeric_inconsistencies(bad), bad
