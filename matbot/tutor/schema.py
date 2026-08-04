@@ -256,15 +256,32 @@ def difficulty_evidence_errors(evidence: DifficultyEvidence, target_level: int) 
         if not (evidence.reasoning_steps >= 2 or evidence.condition_count >= 2
                 or evidence.operation_count >= 2
                 or evidence.representation_change_count >= 1
-                or evidence.requires_explanation):
+                or evidence.requires_explanation or evidence.requires_comparison
+                or (evidence.combines_concepts and (
+                    evidence.reasoning_steps >= 2 or evidence.condition_count >= 2
+                    or evidence.operation_count >= 2))):
             errors.append("level_2_lacks_connected_reasoning_or_explanation")
-        if (evidence.requires_comparison or evidence.requires_construction
-                or evidence.requires_proof_or_justification or evidence.combines_concepts):
-            errors.append("level_2_contains_level_3_requirement")
+        # Level 2 accepts a bounded pair of related rules/concepts, simple
+        # comparison, and one manageable representation change. Advanced
+        # depth is identified by a specific dimension rather than by the
+        # generic combines_concepts flag.
+        if evidence.requires_construction:
+            errors.append("level_2_requires_construction")
+        if evidence.requires_proof_or_justification:
+            errors.append("level_2_requires_proof")
+        if evidence.reasoning_steps > 2:
+            errors.append("level_2_has_too_many_reasoning_steps")
+        if evidence.condition_count > 2:
+            errors.append("level_2_has_too_many_conditions")
+        if evidence.operation_count > 2:
+            errors.append("level_2_has_too_many_operations")
+        if evidence.representation_change_count > 1:
+            errors.append("level_2_has_advanced_representation_change")
     elif target_level == 3:
-        if not (evidence.requires_construction or evidence.requires_comparison
-                or evidence.requires_proof_or_justification or evidence.combines_concepts
-                or evidence.condition_count >= 3 or evidence.reasoning_steps >= 3):
+        if not (evidence.requires_construction or evidence.requires_proof_or_justification
+                or evidence.condition_count >= 3 or evidence.operation_count >= 3
+                or evidence.reasoning_steps >= 3
+                or evidence.representation_change_count >= 2):
             errors.append("level_3_lacks_advanced_requirement")
     else:
         errors.append("invalid_target_difficulty_level")

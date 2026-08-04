@@ -338,6 +338,92 @@ def test_exact_live_divisibility_selection_publishes_as_level_one(monkeypatch):
     assert session["current_task_signature"]["structured_signature_hash"]
 
 
+def test_exact_live_divisibility_by_fifteen_publishes_as_bounded_level_two(monkeypatch):
+    monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", "universal_two_call")
+    monkeypatch.setenv("MATBOT_PRACTICE_DIFFICULTY_LEVELS", "enabled")
+    context, store, fake = build(6, "6-03-004"), SessionStore(), FakeLLM()
+    queue_generation(fake, task_for(
+        context, signature="divisibility-25-level-one",
+        text="Koji od sljedećih brojeva je djeljiv sa 25?",
+        options=("$125$", "$126$", "$127$", "$128$"),
+    ))
+    assert run_practice_turn(store, fake, turn(6, context.topic_id))["status"] == "ready"
+
+    reviewed = task_for(
+        context, level=2, signature="divisibility-15-level-two",
+        text="Koji od sljedećih brojeva je djeljiv sa 15?",
+        options=("$15$", "$18$", "$22$", "$26$"),
+    ).model_copy(update={
+        "difficulty_evidence": DifficultyEvidence(
+            reasoning_steps=2, condition_count=2, operation_count=2,
+            representation_change_count=0, requires_explanation=False,
+            requires_comparison=False, requires_construction=False,
+            requires_proof_or_justification=False, combines_concepts=True,
+        ),
+    })
+    draft = TutorDraft(
+        intent="harder_task", reply="Evo zadatka.", lesson_focus="tačna lekcija",
+        new_task=reviewed,
+        difficulty_diagnostics=make_difficulty_diagnostics("higher"),
+    )
+    reviewer = ReviewerFinal(
+        decision="approve", checks=checks(), final=draft,
+        reviewed_difficulty_evidence=reviewed.difficulty_evidence,
+    )
+    fake.queue(draft)
+    fake.queue(reviewer)
+
+    response = run_practice_turn(
+        store, fake, turn(6, context.topic_id, "Daj mi teži zadatak."))
+    session = store.peek("structured")
+    assert response["status"] == "ready"
+    assert response["answer"].startswith("Evo težeg zadatka.")
+    assert fake.call_count == 4
+    assert session["difficulty_level"] == 2
+    assert session["current_task_difficulty_evidence"] == reviewer.reviewed_difficulty_evidence.model_dump()
+
+
+def test_advanced_harder_task_preserves_completed_level_one_state(monkeypatch):
+    monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", "universal_two_call")
+    monkeypatch.setenv("MATBOT_PRACTICE_DIFFICULTY_LEVELS", "enabled")
+    context, store, fake = build(6, "6-03-004"), SessionStore(), FakeLLM()
+    queue_generation(fake, task_for(context, signature="completed-level-one"))
+    assert run_practice_turn(store, fake, turn(6, context.topic_id))["status"] == "ready"
+    completed = store.peek("structured")
+    completed["task_completed"] = True
+    store.save(completed)
+    before = copy.deepcopy(store.peek("structured"))
+
+    advanced = task_for(context, level=2, signature="construction-at-level-two").model_copy(
+        update={"difficulty_evidence": _direct_level_one_evidence(
+            reasoning_steps=2, condition_count=2, operation_count=2,
+            requires_construction=True,
+        )})
+    queue_generation(fake, advanced, "harder_task")
+
+    assert run_practice_turn(
+        store, fake, turn(6, context.topic_id, "Daj mi teži zadatak."))["answer"] == SAFE_ERROR_MESSAGE
+    assert store.peek("structured") == before
+    assert fake.call_count == 4
+
+
+def test_level_three_package_still_publishes_after_two_bounded_transitions(monkeypatch):
+    monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", "universal_two_call")
+    monkeypatch.setenv("MATBOT_PRACTICE_DIFFICULTY_LEVELS", "enabled")
+    context, store, fake = build(6, "6-03-004"), SessionStore(), FakeLLM()
+    queue_generation(fake, task_for(context, signature="level-one"))
+    assert run_practice_turn(store, fake, turn(6, context.topic_id))["status"] == "ready"
+    queue_generation(fake, task_for(context, 2, "level-two"), "harder_task")
+    assert run_practice_turn(store, fake, turn(6, context.topic_id, "teži"))["status"] == "ready"
+    queue_generation(fake, task_for(context, 3, "level-three"), "harder_task")
+
+    response = run_practice_turn(store, fake, turn(6, context.topic_id, "još teži"))
+    assert response["status"] == "ready"
+    assert response["answer"].startswith("Evo težeg zadatka.")
+    assert store.peek("structured")["difficulty_level"] == 3
+    assert fake.call_count == 6
+
+
 def test_reviewer_independently_repairs_exact_live_level_one_evidence(monkeypatch):
     """The second call may approve wording while correcting Tutor metadata."""
     monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", "universal_two_call")
@@ -491,6 +577,8 @@ def test_tutor_and_reviewer_prompts_define_level_one_selection_without_yes_no_re
     assert "one-rule selection" in reviewer.lower()
     assert "reviewed_difficulty_evidence" in reviewer
     assert "ignore tutor numerical counts" in reviewer.lower()
+    assert "combines_concepts` alone is not level 3" in tutor.lower()
+    assert "combines_concepts` alone is not level 3" in reviewer.lower()
 
 
 @pytest.mark.parametrize("difficulty_flag", [
