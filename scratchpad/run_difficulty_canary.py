@@ -256,6 +256,7 @@ FAILURE_CLASSES = (
     "llm_invalid_output_unknown",
     "tutor_payload_rejection",
     "reviewer_payload_rejection",
+    "reviewer_final_mcq_integrity_rejection",
     "reviewer_fail_closed_rejection",
     "publication_validation_rejection",
     "reviewer_rejection",
@@ -275,6 +276,10 @@ _SAFE_LOG_PREFIXES = (
     "lesson_fidelity ", "practice_plan ", "practice_duplicate_options ",
     "practice_system_verification ", "practice_difficulty_label_mismatch ",
     "tutor_rejected ",
+    # Serverski nalazi o Tutorovom nacrtu: samo kodovi i ID-jevi opcija, nikad
+    # tekst zadatka, opcije ni rješenje. Vidljivi su i kad turn USPIJE, pa se u
+    # izvještaju vidi je li recenzent stvarno popravio prijavljeni defekt.
+    "tutor_draft_preflight ",
 )
 _MAX_DIAGNOSTIC_CHARS = 400
 
@@ -329,6 +334,12 @@ def _classify_failure(messages: list[str]) -> str:
         return "duplicate_rejection"
     if "lesson_fidelity:" in blob:
         return "reviewer_rejection"
+    # Recenzentov KONAČAN paket je i dalje nosio dokazan MCQ defekt. Mora se
+    # razlikovati od obične završne validacije: krivac je drugi poziv, ne objava.
+    # Provjerava se PRIJE `stage=publication`, jer objava ostaje odbrana u dubini
+    # i isti turn može ostaviti oba reda u logu.
+    if "reviewer_final_mcq_integrity_rejection" in blob:
+        return "reviewer_final_mcq_integrity_rejection"
     if "stage=publication" in blob:
         return "publication_validation_rejection"
     if "stage=reviewer_fail_closed" in blob:

@@ -283,6 +283,28 @@ _REVIEWER_TARGET_LEVEL_RULE = """TARGET LEVEL DECISION RULE (the server enforces
 - If you cannot produce a safe, complete corrected package, return `fail_closed`."""
 
 
+# SERVERSKI NALAZI O NACRTU (živi gate 00bbd45).
+# Dvije vidljive opcije bile su različiti stringovi a ista vrijednost; server je
+# to dokazao TEK u objavi, poslije oba poziva, pa recenzent nikad nije ni saznao
+# šta treba popraviti. Sada nalaz stiže u ulazu drugog poziva — pravilo je
+# univerzalno i govori samo o MCQ paketu, bez ijedne riječi o lekciji ili figuri.
+_REVIEWER_PREFLIGHT_RULE = """SERVER-DETECTED DRAFT ISSUES (when that block is present in your input):
+- Those findings are DETERMINISTIC SERVER FACTS, already proven by the server's own
+  validators. They are not suggestions and you may not argue with them.
+- `approve` is FORBIDDEN while any reported issue remains in the package.
+- Return `correct` with a complete corrected package. For duplicate or semantically
+  equivalent options, REPLACE the offending distractor(s) with genuinely different
+  mathematical values so all four options are semantically distinct — never just
+  reformat, re-round, or rewrite an equivalent value in another notation.
+- Exactly one visible option stays correct. Recompute correct_option_id,
+  correct_option_index, expected_answer (an exact copy of the marked option's text),
+  solution, and task_signature where structural parameters changed.
+- Do not change parts of the task that are already valid.
+- The server re-runs those same validators on YOUR final package: an unchanged package
+  or a new equivalent pair is rejected and the turn is lost.
+- If you cannot correct the package safely, return `fail_closed`."""
+
+
 def build_reviewer_instructions(context):
     """Sistemski prompt drugog poziva.
 
@@ -312,6 +334,7 @@ def build_reviewer_instructions(context):
         "10. da je bosanski prirodan i primjeren uzrastu.\n\n"
         "11. verify that lesson identity, level, text, options, marked answer, solution, difficulty evidence, and signature describe one task. Independently recompute `reviewed_difficulty_evidence` from only the visible task, answer requirements, options, and solution: ignore Tutor numerical counts. Count only actions the student must perform; four MCQ options are not four conditions or operations, selecting one option with one rule is one direct application, a solution explanation is not a student explanation requirement, and `combines_concepts` is true only when the student must combine distinct mathematical concepts. Return your independently calculated evidence even if the wording needs no textual correction. Level 1 may be a direct yes/no, recognition, calculation, classification, substitution, or one-rule selection; choosing a visible option is not by itself mathematical comparison or a second reasoning step. Level 2 permits a bounded pair of related rules/concepts, conditions, or operations, straightforward explanation/comparison, or one manageable representation change; `combines_concepts` alone is not Level 3. Level 3 requires construction, proof, three-or-more connected requirements/operations, advanced representation change, or comparable depth. For multiple choice, correct_option_id and correct_option_index must select the same visible option and expected_answer must be an exact copy of its text; explanation belongs only in solution. Signature parameters are only closed name/value entries with canonical string values: no arbitrary metadata, and order alone is never a new task. When correcting, update options, correct option ID/index, expected answer, solution, and the complete signature together, then return the complete fresh package. Set `task_package_consistent`, `difficulty_evidence_valid`, and `task_signature_consistent` accordingly.\n\n"
         f"{_REVIEWER_TARGET_LEVEL_RULE}\n\n"
+        f"{_REVIEWER_PREFLIGHT_RULE}\n\n"
         "ODLUKA:\n"
         "- `approve` — nacrt je ispravan; prepiši ga nepromijenjen u `final`;\n"
         "- `correct` — nacrt je popravljiv; u `final` vrati KOMPLETAN ispravljen "
@@ -325,13 +348,20 @@ def build_reviewer_instructions(context):
 
 
 def build_reviewer_input(context, session, student_message, draft_json,
-                         trusted_verdict=None):
-    return "\n\n".join([
+                         trusted_verdict=None, preflight_block=""):
+    """`preflight_block` su DETERMINISTIČKI serverski nalazi o nacrtu.
+
+    Prazan string kad server nije dokazao nijedan defekt — tada se ulaz ne
+    mijenja ni za jedan znak u odnosu na raniji oblik."""
+    blocks = [
         _lesson_block(context),
         _state_block(session, student_message, trusted_verdict),
         "NACRT DRUGOG NASTAVNIKA (provjeri ga, ne vjeruj mu):\n" + draft_json,
-        "Vrati strukturisanu odluku prema šemi.",
-    ])
+    ]
+    if preflight_block:
+        blocks.append(preflight_block)
+    blocks.append("Vrati strukturisanu odluku prema šemi.")
+    return "\n\n".join(blocks)
 
 
 def intent_vocabulary():

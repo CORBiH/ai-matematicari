@@ -1,0 +1,206 @@
+"""Deterministički NALAZI o MCQ paketu — isti skup provjera, dva trenutka.
+
+ZAŠTO POSTOJI (živi release gate 00bbd45, scenario 11 od 12, rotirajuća lekcija
+8. razreda, traženi nivo 1):
+
+    Tutor:      valjan zadatak nivoa 1, dokaz težine uredan
+    Recenzent:  approve, math_correct=true, task_package_consistent=true
+    Objava:     ODBIJENO → `semantically_duplicate_options: [(0, 2)]`
+
+Dvije vidljive opcije bile su različiti stringovi, a ista matematička
+vrijednost. `option_equivalence.find_equivalent_option_pairs` je to ISPRAVNO
+uhvatio — ali TEK u objavi, poslije oba poziva. Recenzent nikad nije saznao za
+nalaz, pa ga nije mogao popraviti, iako `correct` upravo to omogućava.
+
+OVAJ MODUL NE UVODI NOVU PROVJERU. On samo SAKUPLJA nalaze postojećih
+determinističkih validatora u zatvorenu, ograničenu strukturu, da bi isti skup
+mogao biti upotrijebljen dvaput:
+
+  1. PRIJE drugog poziva — kao serverski nalaz koji recenzent dobije u ulazu i
+     mora popraviti u ISTOM (drugom i posljednjem) pozivu;
+  2. POSLIJE drugog poziva — kao invarijanta nad recenzentovim konačnim
+     paketom, prije ijedne mutacije sesije.
+
+Nikad ne baca izuzetak i nikad ne odbija Tutorov nacrt: nacrt s nalazom je
+upravo ono što recenzent treba da vidi. Odluku o odbijanju donosi pozivalac.
+
+BEZBJEDNOST DIJAGNOSTIKE: nalaz nosi SAMO kod, ID-jeve opcija i kratak
+ograničen detalj — nikad tekst zadatka, opcije, rješenje, prompt ni sirov izlaz
+modela (CLAUDE.md, pravilo 7).
+"""
+from dataclasses import dataclass
+
+from matbot import mcq_integrity, option_equivalence
+from matbot.mathcheck import find_numeric_inconsistencies
+from matbot.mathsafe import sanitize_and_validate_math_text
+from matbot.terminology import normalize_terminology
+from matbot.tutor.schema import UnifiedOutputError, validate_task
+
+# Ograničenja da dijagnostika i prompt blok ostanu mali i predvidivi.
+MAX_ISSUES = 8
+_MAX_DETAIL_CHARS = 120
+
+# Kod koji objava već koristi za isti nalaz — namjerno ISTI string, da se
+# dijagnostika prije i poslije drugog poziva poklapa u logovima.
+SEMANTIC_DUPLICATE_CODE = "semantically_duplicate_options"
+
+
+@dataclass(frozen=True)
+class PackageIssue:
+    """Jedan zatvoren deterministički nalaz o paketu."""
+
+    code: str
+    option_ids: tuple = ()
+    option_indexes: tuple = ()
+    detail: str = ""
+
+    def describe(self):
+        """`code: option IDs a and c (numeric_exact)` — ograničeno i bez sadržaja."""
+        parts = []
+        if self.option_ids:
+            parts.append("option IDs " + " and ".join(self.option_ids))
+        elif self.option_indexes:
+            parts.append("option indexes " + " and ".join(
+                str(index) for index in self.option_indexes))
+        if self.detail:
+            parts.append(f"({self.detail[:_MAX_DETAIL_CHARS]})")
+        return self.code if not parts else f"{self.code}: {' '.join(parts)}"
+
+
+def safe_visible_text(raw, allow_wrap=False):
+    """Sanitizacija + terminologija, BEZ izuzetka. Vrati (tekst, sigurno).
+
+    Jedina implementacija tog niza u projektu — `pipeline._safe_text` je koristi
+    i samo pretvara `sigurno=False` u UnifiedOutputError."""
+    cleaned, safe = sanitize_and_validate_math_text(
+        (raw or "").strip(), allow_whole_expression_wrap=allow_wrap
+    )
+    if not safe:
+        return "", False
+    return normalize_terminology(cleaned), True
+
+
+def _option_id(task, index):
+    """Stabilan ID opcije; indeks je rezerva kad paket nema ispravne ID-jeve."""
+    try:
+        return task.options[index].id
+    except (AttributeError, IndexError, TypeError):
+        return str(index)
+
+
+def collect_package_issues(task):
+    """Vrati zatvorenu torku nalaza postojećih validatora nad JEDNIM paketom.
+
+    Prazna torka = nijedan deterministički validator ne može dokazati defekt.
+    To NIJE dokaz ispravnosti (semantiku i dalje drži recenzent), nego odsustvo
+    dokazane greške — isti princip kao mathcheck i option_equivalence."""
+    if task is None:
+        return ()
+    issues = []
+
+    # 1) STRUKTURA PAKETA — postojeći `validate_task` (broj opcija, jedinstveni
+    #    ID-jevi, slaganje correct_option_id/index, prazna/preduga polja...).
+    try:
+        validate_task(task)
+    except UnifiedOutputError as error:
+        issues.append(PackageIssue("task_structure_invalid", detail=str(error)))
+    except Exception:  # nikad ne ruši turn zbog dijagnostike
+        issues.append(PackageIssue("task_structure_invalid", detail="nepoznata struktura"))
+
+    options = list(getattr(task, "options", None) or ())
+    option_texts, unsafe_ids = [], []
+    for index, option in enumerate(options):
+        text, safe = safe_visible_text(getattr(option, "text", ""), allow_wrap=True)
+        option_texts.append(text)
+        if not safe:
+            unsafe_ids.append(_option_id(task, index))
+    if unsafe_ids:
+        issues.append(PackageIssue("unsafe_option_notation", option_ids=tuple(unsafe_ids)))
+
+    # 2) DOSLOVNI I SEMANTIČKI DUPLIKATI — postojeći option_equivalence.
+    if option_texts and all(option_texts):
+        for i, j in option_equivalence.find_textual_duplicate_pairs(option_texts):
+            issues.append(PackageIssue(
+                "duplicate_option_text",
+                option_ids=(_option_id(task, i), _option_id(task, j)),
+                option_indexes=(i, j)))
+        for i, j, kind in option_equivalence.find_equivalent_option_pairs_with_types(
+                option_texts):
+            issues.append(PackageIssue(
+                SEMANTIC_DUPLICATE_CODE,
+                option_ids=(_option_id(task, i), _option_id(task, j)),
+                option_indexes=(i, j),
+                detail=kind or ""))
+
+    # 3) OZNAČEN ODGOVOR I `expected_answer` — ista pravila kao u objavi.
+    marked_index = getattr(task, "correct_option_index", None)
+    marked_text = ""
+    if isinstance(marked_index, int) and 0 <= marked_index < len(option_texts):
+        marked_text = option_texts[marked_index]
+    expected, expected_safe = safe_visible_text(
+        getattr(task, "expected_answer", ""), allow_wrap=True)
+    if not expected_safe:
+        issues.append(PackageIssue("unsafe_expected_answer_notation"))
+    elif marked_text and expected.strip() != marked_text.strip():
+        issues.append(PackageIssue(
+            "expected_answer_not_marked_option",
+            option_ids=(_option_id(task, marked_index),)))
+
+    # 4) DOKAZIVO VIŠE TAČNIH OPCIJA — postojeći uski mcq_integrity oracle.
+    task_text, task_text_safe = safe_visible_text(getattr(task, "text", ""))
+    if task_text_safe and option_texts and all(option_texts) and isinstance(marked_index, int):
+        try:
+            failure, _result = mcq_integrity.publication_failure(
+                task_text, option_texts, marked_index, expected)
+        except Exception:
+            failure = ""
+        if failure:
+            issues.append(PackageIssue(failure))
+
+    # 5) NUMERIČKA PROTIVRJEČNOST u vidljivom tekstu i rješenju — postojeći
+    #    mathcheck. Distraktori se NIKAD ne provjeravaju (namjerno su pogrešni).
+    for label, raw, allow_wrap in (
+        ("task_text", getattr(task, "text", ""), False),
+        ("marked_option", getattr(task, "expected_answer", ""), True),
+        ("solution", getattr(task, "solution", ""), False),
+    ):
+        text, safe = safe_visible_text(raw, allow_wrap=allow_wrap)
+        if not safe:
+            continue
+        found = find_numeric_inconsistencies(text)
+        if found:
+            issues.append(PackageIssue(
+                "numeric_inconsistency", detail=f"{label} {found[0].split(':')[0]}"))
+
+    return tuple(issues[:MAX_ISSUES])
+
+
+def semantic_duplicate_index_pairs(issues):
+    """Parovi indeksa dokazanih semantičkih duplikata — za invarijantu poslije
+    drugog poziva (isti par ne smije preživjeti recenzentovu ispravku)."""
+    return tuple(issue.option_indexes for issue in issues
+                 if issue.code == SEMANTIC_DUPLICATE_CODE and issue.option_indexes)
+
+
+def format_for_reviewer(issues):
+    """Deterministički blok za ULAZ recenzenta. Prazno = nema nalaza."""
+    if not issues:
+        return ""
+    lines = ["SERVER-DETECTED DRAFT ISSUES (deterministic server findings, not suggestions):"]
+    lines.extend("- " + issue.describe() for issue in issues)
+    lines.append(
+        "You MUST NOT return `approve` while any issue above remains. Return `correct` "
+        "with a COMPLETE corrected package: replace the offending distractor(s) so all "
+        "four options are semantically distinct, then recompute correct_option_id, "
+        "correct_option_index, expected_answer (an exact copy of the marked option's "
+        "text), solution, and task_signature where structural parameters changed. Keep "
+        "exactly one correct visible option. Do not merely reformat an equivalent value "
+        "and do not change parts of the task that are already valid. If you cannot "
+        "correct it safely, return `fail_closed`."
+    )
+    return "\n".join(lines)
+
+
+def describe_issues(issues):
+    """Kratak, ograničen zapis za log — bez ijednog vidljivog sadržaja."""
+    return "; ".join(issue.describe() for issue in issues)[:300]

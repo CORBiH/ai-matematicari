@@ -25,9 +25,8 @@ import uuid
 from matbot import config, difficulty_level, geometrycheck, option_equivalence
 from matbot.llm import LLMError, failure_diagnostics_kv
 from matbot.mathcheck import find_numeric_inconsistencies
-from matbot.mathsafe import sanitize_and_validate_math_text
-from matbot.terminology import normalize_terminology
 from matbot.tutor import lesson_context as lesson_context_module
+from matbot.tutor import package_preflight
 from matbot.tutor import prompts as tutor_prompts
 from matbot.tutor.schema import (TASK_INTENTS, UnifiedOutputError,
                                  normalize_for_intent, validate_final, validate_task,
@@ -38,6 +37,10 @@ logger = logging.getLogger("matbot.tutor")
 SAFE_ERROR_MESSAGE = (
     "Nešto je zapelo pri sastavljanju odgovora. Pošalji poruku ponovo za koji trenutak."
 )
+
+# Recenzentov KONAČAN paket i dalje nosi dokazan deterministički defekt. Zaseban
+# kod da gate ovo razlikuje od obične završne validacije i od pada šeme.
+REVIEWER_FINAL_INTEGRITY_CODE = "reviewer_final_mcq_integrity_rejection"
 
 _NEW_TASK_INTRO = {
     "easier_task": "Evo lakšeg zadatka.",
@@ -168,13 +171,14 @@ def _shuffle_options(texts, correct_index):
 # ---------------------------------------------------------------------------
 
 def _safe_text(raw, where, allow_wrap=False):
-    """Sanitizacija + terminologija + math-safety. Baca UnifiedOutputError."""
-    cleaned, safe = sanitize_and_validate_math_text(
-        (raw or "").strip(), allow_whole_expression_wrap=allow_wrap
-    )
+    """Sanitizacija + terminologija + math-safety. Baca UnifiedOutputError.
+
+    Sam niz koraka živi u `package_preflight.safe_visible_text` — JEDNA
+    implementacija, koju preflight koristi bez izuzetka, a objava uz izuzetak."""
+    cleaned, safe = package_preflight.safe_visible_text(raw, allow_wrap=allow_wrap)
     if not safe:
         raise UnifiedOutputError(f"nebezbjedan matematički zapis [{where}]")
-    return normalize_terminology(cleaned)
+    return cleaned
 
 
 def _reject_if_inconsistent(text, where):
@@ -237,11 +241,13 @@ def _call_tutor(llm, context, session, student_message, trusted_verdict):
     return llm.tutor_turn(instructions, input_text)
 
 
-def _call_reviewer(llm, context, session, student_message, draft, trusted_verdict):
+def _call_reviewer(llm, context, session, student_message, draft, trusted_verdict,
+                   preflight_block=""):
     instructions = tutor_prompts.build_reviewer_instructions(context)
     draft_json = draft.model_dump_json(indent=None, exclude_none=True)
     input_text = tutor_prompts.build_reviewer_input(
-        context, session, student_message, draft_json, trusted_verdict
+        context, session, student_message, draft_json, trusted_verdict,
+        preflight_block,
     )
     return llm.reviewer_turn(instructions, input_text)
 
@@ -591,9 +597,25 @@ def _two_call(llm, context, session, student_message, request_id, trusted_verdic
     if draft.intent not in TASK_INTENTS:
         return draft, calls
 
+    # ------------------------------------------------------------------
+    # PREFLIGHT NAD TUTOROVIM NACRTOM (živi gate 00bbd45)
+    # ------------------------------------------------------------------
+    # Isti deterministički validatori koje objava ionako pokreće, ali SADA —
+    # dok drugi poziv još nije napravljen. Nalaz se NE koristi za odbijanje
+    # nacrta (nacrt s nalazom je upravo ono što recenzent treba da popravi),
+    # nego ulazi u recenzentov ulaz kao serverska činjenica.
+    draft_issues = package_preflight.collect_package_issues(draft.new_task)
+    if draft_issues:
+        logger.info(
+            "tutor_draft_preflight request_id=%s topic=%s intent=%s issues=%s",
+            request_id, context.topic_id, draft.intent,
+            package_preflight.describe_issues(draft_issues),
+        )
+
     try:
         reviewer_result = _call_reviewer(
-            llm, context, session, student_message, draft, trusted_verdict
+            llm, context, session, student_message, draft, trusted_verdict,
+            package_preflight.format_for_reviewer(draft_issues),
         )
         calls += 1
         _log_sdk_entry(request_id, context, "reviewer", calls, reviewer_result)
@@ -635,6 +657,30 @@ def _two_call(llm, context, session, student_message, request_id, trusted_verdic
 
     # Defense in depth for a Reviewer-provided final package title.
     final = _canonicalize_draft_lesson_title(final, context)
+
+    # ------------------------------------------------------------------
+    # INVARIJANTA NAD RECENZENTOVIM KONAČNIM PAKETOM (živi gate 00bbd45)
+    # ------------------------------------------------------------------
+    # Isti skup provjera, sad nad onim što bi se STVARNO objavilo. Odbija se
+    # PRIJE ijedne mutacije sesije, i to sa specifičnim kodom — da se u gateu
+    # razlikuje od obične završne validacije. Provjera u objavi OSTAJE
+    # (odbrana u dubini): ovo je raniji, precizniji sloj, ne zamjena.
+    if final.new_task is not None:
+        final_issues = package_preflight.collect_package_issues(final.new_task)
+        if final_issues:
+            # `unchanged=True` znači: recenzent je vidio nalaz i vratio paket s
+            # POTPUNO ISTIM nalazima — dakle nije ni pokušao ispravku.
+            unchanged = bool(draft_issues) and (
+                package_preflight.describe_issues(final_issues)
+                == package_preflight.describe_issues(draft_issues))
+            _log_rejection(
+                request_id, context, "reviewer_final_mcq",
+                f"{REVIEWER_FINAL_INTEGRITY_CODE}: decision={reviewer.decision} "
+                f"in_tutor_preflight={bool(draft_issues)} unchanged={unchanged} "
+                f"{package_preflight.describe_issues(final_issues)}",
+                final.intent,
+            )
+            return None, calls
 
     if reviewer.decision == "correct":
         logger.info(
