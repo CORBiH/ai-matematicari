@@ -9,9 +9,9 @@ import pytest
 
 from matbot import task_families as tf
 from matbot.task_family_validation import (
-    CONTRACTS, FamilyContractError, contract_for, is_fraction_option,
-    is_integer_option, is_prose_option, missing_contracts, prompt_block,
-    validate_task_family,
+    CONTRACTS, FamilyContractError, canonical_answer_kind, contract_for,
+    is_fraction_option, is_integer_option, is_prose_option, missing_contracts,
+    prompt_block, validate_task_family,
 )
 
 
@@ -175,10 +175,38 @@ def test_matching_declared_family_passes():
                  declared={"task_family": "expand_to_given_denominator"}) is None
 
 
-def test_declared_answer_kind_must_be_allowed_for_family():
-    error = check("expand_to_given_denominator", LIVE_EXPAND_QUESTION, LIVE_EXPAND_OPTIONS,
-                  declared={"answer_kind": "method"})
-    assert error is not None
+def test_declared_answer_kind_is_canonicalized_not_rejected():
+    """PROMIJENJENO POSLIJE CANARY NALAZA (v. matbot/task_family_validation.py
+    ::canonical_answer_kind): deklarisan `answer_kind` više NE odbija zadatak.
+
+    Ranije je ovaj test tvrdio suprotno — ali dvije stvari su ga činile
+    pogrešnim testom:
+      1. „method“ NIJE u strict `Literal` skupu `NewTask.answer_kind`, pa
+         takva deklaracija u produkciji NIKAD ne stigne do validatora (padne
+         ranije, kao llm_schema_parse_error). Test je opisivao nedostižno
+         stanje.
+      2. Uživo je isti mehanizam srušio POTPUNO ISPRAVAN zadatak (tačna
+         opcija „138“ deklarisana kao „option_label“), trošeći oba poziva.
+
+    Tip vrijednosti server sada izvodi sam iz tačne opcije; deklaracija nema
+    moć odbijanja. Struktura i vidljivi ugovor ostaju nepromijenjeni."""
+    assert check("expand_to_given_denominator", LIVE_EXPAND_QUESTION, LIVE_EXPAND_OPTIONS,
+                 declared={"answer_kind": "method"}) is None
+    # Kanonska vrijednost dolazi iz STVARNE tačne opcije, ne iz deklaracije.
+    assert canonical_answer_kind("method", LIVE_EXPAND_OPTIONS[0]) == ("fraction", True)
+
+
+def test_out_of_enum_answer_kind_cannot_reach_the_validator_in_production():
+    """Dokaz uz test iznad: strict šema odbija vrijednost izvan enum-a prije
+    nego što ijedan validator porodice dođe na red."""
+    import pydantic
+
+    from matbot.schema import NewTask, Option
+
+    with pytest.raises(pydantic.ValidationError):
+        NewTask(text="t", expected_answer="e", difficulty="standard",
+                options=[Option(text=str(i)) for i in range(4)],
+                correct_option_index=0, answer_kind="method")
 
 
 def test_declared_student_must_find_is_informational_only():

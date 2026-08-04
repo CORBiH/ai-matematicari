@@ -1,0 +1,195 @@
+{
+  "campaign": "divisibility-final",
+  "started_at": "2026-08-04T11:55:18",
+  "finished_at": "2026-08-04T11:56:27",
+  "model": "gpt-5-mini",
+  "reasoning_effort": "low",
+  "timeout_seconds": 45.0,
+  "sdk_call_ceiling": 4,
+  "total_sdk_calls": 4,
+  "total_task_turns_attempted": 2,
+  "published_count": 2,
+  "rejected_count": 0,
+  "skipped_unmet_prerequisite": 0,
+  "utf8_streams_ok": true,
+  "stopped_early": false,
+  "stop_reason": null,
+  "turns": [
+    {
+      "scenario": "divisibility_final_fresh_level1",
+      "lesson_id": "6-03-004",
+      "lesson_title": "Pravila djeljivosti sa 2, 3, 4, 5, 6, 9, 10, 15 i 25",
+      "path": "non_contract",
+      "grade": 6,
+      "request_type": "",
+      "attempted": true,
+      "previous_level": 1,
+      "target_level": 1,
+      "level_changed": false,
+      "boundary_reason": null,
+      "generation_changed": null,
+      "tutor_declared_label": "easy",
+      "tutor_declared_answer_kind": "option_label",
+      "effective_server_label": "easy",
+      "reviewer_decision": "approve",
+      "reviewer_checks": {
+        "math_correct": true,
+        "tests_exact_lesson": true,
+        "answer_correct": true,
+        "marked_option_correct": true,
+        "options_unique": true,
+        "grade_appropriate": true,
+        "solvable_and_unambiguous": true,
+        "difficulty_level_appropriate": true,
+        "difficulty_direction_correct": true
+      },
+      "reviewer_corrected_task_answer_kind": null,
+      "final_task_answer_kind_source": "tutor_task",
+      "final_declared_answer_kind": "option_label",
+      "final_canonical_answer_kind": "option_label",
+      "final_detected_answer_kind": null,
+      "answer_metadata_consistent": true,
+      "answer_kind_diagnostics": [
+        "canonicalization_not_required_not_derivable"
+      ],
+      "sdk_calls_before_turn": 0,
+      "sdk_calls_after_turn": 2,
+      "sdk_calls_this_turn": 2,
+      "published": true,
+      "answer_text": "Evo zadatka.\n\nZadatak: Je li broj 340 djeljiv sa 10? Izaberi tačan odgovor.",
+      "published_task_text": "Je li broj 340 djeljiv sa 10? Izaberi tačan odgovor.",
+      "expected_answer": "Prva opcija: broj je djeljiv sa 10.",
+      "next_state_options": [
+        {
+          "id": "a",
+          "text": "Da — broj je djeljiv sa 10."
+        },
+        {
+          "id": "b",
+          "text": "Da — djeljiv je sa 5, ali ne sa 10."
+        },
+        {
+          "id": "c",
+          "text": "Ne — broj nije djeljiv sa 10."
+        },
+        {
+          "id": "d",
+          "text": "Da — djeljiv je sa 2, ali ne sa 10."
+        }
+      ],
+      "next_state_options_match_session": true,
+      "visible_correct_option_value": "Da — broj je djeljiv sa 10.",
+      "model_marked_option_value": "Da — broj je djeljiv sa 10.",
+      "effective_topic": "6-03-004",
+      "session_lesson_id_after": "6-03-004",
+      "lesson_preserved_signal": "reviewer_self_reported=True (not independently proven)",
+      "level_appropriate_signal": "reviewer_self_reported=True (not independently proven)",
+      "direction_correct_signal": "not_required_for_this_transition",
+      "intro_actual": "Evo zadatka.",
+      "intro_expected": "Evo zadatka.",
+      "intro_truthful": true,
+      "session_level_before": 1,
+      "session_level_after": 1,
+      "session_unchanged_after_rejection": null,
+      "failure_class": null,
+      "failure_is_infrastructure": null,
+      "student_facing_response": "Evo zadatka.\n\nZadatak: Je li broj 340 djeljiv sa 10? Izaberi tačan odgovor.",
+      "diagnostics": [
+        "lesson_fidelity request_id=88634e3f4624 topic=6-03-004 decision=approve reason=- skill=Primjena pravila djeljivosti sa 10: provjeri posljednju cifru broja (0 => djeljiv sa 10). Zadatak traži tačno tu provjer… failed_checks=- normalized_to_correct=False target_difficulty_level=1",
+        "practice_turn request_id=88634e3f4624 ok latency_ms=17922 usage={'input_tokens': 6650, 'output_tokens': 871, 'reasoning_tokens': 640}"
+      ],
+      "content_flags": [],
+      "strict_validation_errors": [],
+      "prerequisite": null,
+      "stop_triggered": null
+    },
+    {
+      "scenario": "divisibility_final_harder_level1_to_2",
+      "lesson_id": "6-03-004",
+      "lesson_title": "Pravila djeljivosti sa 2, 3, 4, 5, 6, 9, 10, 15 i 25",
+      "path": "non_contract",
+      "grade": 6,
+      "request_type": "harder",
+      "attempted": true,
+      "previous_level": 1,
+      "target_level": 2,
+      "level_changed": true,
+      "boundary_reason": null,
+      "generation_changed": null,
+      "tutor_declared_label": "hard",
+      "tutor_declared_answer_kind": "short_text",
+      "effective_server_label": "standard",
+      "reviewer_decision": "correct",
+      "reviewer_checks": {
+        "math_correct": true,
+        "tests_exact_lesson": true,
+        "answer_correct": true,
+        "marked_option_correct": true,
+        "options_unique": true,
+        "grade_appropriate": true,
+        "solvable_and_unambiguous": true,
+        "difficulty_level_appropriate": true,
+        "difficulty_direction_correct": true
+      },
+      "reviewer_corrected_task_answer_kind": "option_label",
+      "final_task_answer_kind_source": "reviewer_corrected_task",
+      "final_declared_answer_kind": "option_label",
+      "final_canonical_answer_kind": "option_label",
+      "final_detected_answer_kind": null,
+      "answer_metadata_consistent": true,
+      "answer_kind_diagnostics": [
+        "canonicalization_not_required_not_derivable"
+      ],
+      "sdk_calls_before_turn": 2,
+      "sdk_calls_after_turn": 4,
+      "sdk_calls_this_turn": 2,
+      "published": true,
+      "answer_text": "Evo težeg zadatka.\n\nZadatak: Je li broj 12350 djeljiv i sa 10 i sa 25? Izaberi tačan odgovor.",
+      "published_task_text": "Je li broj 12350 djeljiv i sa 10 i sa 25? Izaberi tačan odgovor.",
+      "expected_answer": "Da — broj je djeljiv i sa 10 (završava cifrom 0) i sa 25 (posljednje dvije cifre su 50, a 50 je djeljivo sa 25).",
+      "next_state_options": [
+        {
+          "id": "a",
+          "text": "Djeljiv je sa 10, ali ne i sa 25."
+        },
+        {
+          "id": "b",
+          "text": "Da, djeljiv je i sa 10 i sa 25."
+        },
+        {
+          "id": "c",
+          "text": "Djeljiv je sa 25, ali ne i sa 10."
+        },
+        {
+          "id": "d",
+          "text": "Niti sa 10 niti sa 25."
+        }
+      ],
+      "next_state_options_match_session": true,
+      "visible_correct_option_value": "Da, djeljiv je i sa 10 i sa 25.",
+      "model_marked_option_value": "Da, djeljiv je i sa 10 i sa 25.",
+      "effective_topic": "6-03-004",
+      "session_lesson_id_after": "6-03-004",
+      "lesson_preserved_signal": "reviewer_self_reported=True (not independently proven)",
+      "level_appropriate_signal": "reviewer_self_reported=True (not independently proven)",
+      "direction_correct_signal": "reviewer_self_reported=True",
+      "intro_actual": "Evo težeg zadatka.",
+      "intro_expected": "Evo težeg zadatka.",
+      "intro_truthful": true,
+      "session_level_before": 1,
+      "session_level_after": 2,
+      "session_unchanged_after_rejection": null,
+      "failure_class": null,
+      "failure_is_infrastructure": null,
+      "student_facing_response": "Evo težeg zadatka.\n\nZadatak: Je li broj 12350 djeljiv i sa 10 i sa 25? Izaberi tačan odgovor.",
+      "diagnostics": [
+        "lesson_fidelity request_id=86310915504c topic=6-03-004 decision=correct reason=- skill=Zadatak traži primjenu pravila djeljivosti za 10 (zadnja cifra 0) i 25 (posljednje dvije cifre djeljive sa 25). To je di… failed_checks=- normalized_to_correct=False target_difficulty_level=2",
+        "practice_turn request_id=86310915504c ok latency_ms=13907 usage={'input_tokens': 6836, 'output_tokens': 848, 'reasoning_tokens': 640}"
+      ],
+      "content_flags": [],
+      "strict_validation_errors": [],
+      "prerequisite": null,
+      "stop_triggered": null
+    }
+  ]
+}

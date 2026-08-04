@@ -43,7 +43,8 @@ from matbot.mathsafe import sanitize_and_validate_math_text
 from matbot.mathcheck import find_numeric_inconsistencies
 from matbot.option_equivalence import find_equivalent_option_pairs
 from matbot.schema import InvalidOutputError, NewTask, Option, validate_output
-from matbot.task_family_validation import (FamilyContractError, question_geometry_policy,
+from matbot.task_family_validation import (FamilyContractError, canonical_answer_kind,
+                                           question_geometry_policy,
                                            question_numeric_policy, validate_task_family)
 from matbot.terminology import normalize_terminology
 from matbot.topics import lesson_info
@@ -601,6 +602,26 @@ def _apply_new_task(session, new_task, task_family="", request_id="",
     # — defekt generatora se vidi kao odbijanje, ne kao tihi povratak na staro.
     if contract is None:
         # --- LEGACY PUT (lekcije bez ugovora) — nepromijenjen ---------------
+        # KANONIZACIJA answer_kind PRIJE konačne provjere porodice: kad server
+        # tip vrijednosti može objektivno izmjeriti iz teksta tačne opcije, ta
+        # izmjerena vrijednost ima prednost nad modelovom deklaracijom (živi
+        # nalaz canary-ja: ispravan zadatak s tačnom opcijom „138“ deklarisan
+        # kao „option_label“ pao je zatvoreno iako su sve stvarne provjere bile
+        # tačne — vidi task_family_validation.canonical_answer_kind).
+        # Kanonizuje se SAMO nedvosmislen slučaj; sve ostalo prolazi kroz
+        # identične postojeće provjere kao i do sada.
+        declared_kind = new_task.answer_kind
+        canonical_kind = declared_kind
+        if 0 <= new_task.correct_option_index < len(sanitized_texts):
+            canonical_kind, kind_normalized = canonical_answer_kind(
+                declared_kind, sanitized_texts[new_task.correct_option_index]
+            )
+            if kind_normalized:
+                logger.info(
+                    "practice_answer_kind_normalized request_id=%s family=%s "
+                    "declared=%s canonical=%s",
+                    request_id, task_family or "-", declared_kind, canonical_kind,
+                )
         try:
             validate_task_family(
                 task_family,
@@ -612,7 +633,7 @@ def _apply_new_task(session, new_task, task_family="", request_id="",
                 declared={
                     "task_family": new_task.task_family,
                     "student_must_find": new_task.student_must_find,
-                    "answer_kind": new_task.answer_kind,
+                    "answer_kind": canonical_kind,
                     "task_form": new_task.task_form,
                 },
             )

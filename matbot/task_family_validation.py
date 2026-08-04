@@ -255,6 +255,44 @@ def detected_answer_kind(text):
     return None
 
 
+def canonical_answer_kind(declared_answer_kind, correct_option_text):
+    """SERVER-DERIVED `answer_kind` — vraća (canonical, normalized).
+
+    ŽIVI NALAZ (canary s pravim modelom, lekcija o pravilima djeljivosti,
+    prelaz Nivo 1→2): recenzent je vratio ISPRAVAN zadatak — tačna opcija
+    „138“, i sve njegove provjere tačne (math_correct, answer_correct,
+    marked_option_correct, tests_exact_lesson, difficulty_level_appropriate) —
+    ali ga je deklarisao kao `answer_kind="option_label"`, misleći na to da
+    učenik bira ponuđenu opciju. Zadatak je pao zatvoreno iako mu matematički
+    ni pedagoški ništa nije falilo, potrošivši oba poziva.
+
+    To je TREĆI slučaj iste klase propusta (prva dva su `task_form` i
+    `student_must_find`, vidi FamilyContract docstring): opisna oznaka modela
+    korištena kao dokaz. Pouka je sada dosljedno primijenjena: kad server tip
+    može OBJEKTIVNO izmjeriti iz stvarnog teksta tačne opcije
+    (`detected_answer_kind`), ta izmjerena vrijednost je JEDINA istina i
+    deklaracija se tiho zamjenjuje — deklaracija ne nosi nijednu informaciju
+    koju server već nema, pa može samo proizvesti lažno odbijanje.
+
+    Kad tip NIJE mehanički prepoznatljiv (proza, formula, izraz, prava oznaka
+    opcije poput „A“), kanonizacija se NE izvodi i deklaracija ostaje
+    netaknuta — ali tada ionako nema objektivne osnove ni za odbijanje.
+
+    Ovo NIKAD ne može sakriti pogrešan odgovor: tip vrijednosti nije tvrdnja
+    o tačnosti. Ispravnost tačne opcije i dalje dokazuju nepromijenjeni
+    slojevi — mathcheck nad tačnom opcijom i `expected_answer`, jedinstvenost
+    i semantička ekvivalencija opcija, vidljivi ugovor porodice
+    (required/forbidden), geometrijska notacija, systemcheck i nezavisno
+    rješavanje recenzenta."""
+    declared = (declared_answer_kind or "").strip()
+    detected = detected_answer_kind(correct_option_text)
+    if not detected:
+        return declared, False
+    if declared and declared != detected:
+        return detected, True
+    return detected, False
+
+
 def is_prose_option(text):
     """Opcija koja NIJE gola vrijednost — opisuje metodu, tvrdnju, korak ili
     grešku. Prepoznaje se po tome što sadrži bar dvije riječi od slova."""
@@ -301,18 +339,29 @@ class FamilyContract:
          je interpretativna oznaka (predmet provjere JESTE uređeni par, čak i
          kad je forma odgovora tvrdnja), ne objektivno mjerljiva činjenica.
 
-    Konačna hijerarhija povjerenja (nakon oba nalaza):
+      3. TREĆI slučaj (canary s PRAVIM modelom, lekcija o pravilima
+         djeljivosti, prelaz Nivo 1→2): recenzent je vratio ispravan zadatak
+         s tačnom opcijom „138“ i SVIM svojim provjerama tačnim, ali ga je
+         deklarisao kao answer_kind="option_label" (misleći na to da učenik
+         bira ponuđenu opciju). Objava je pala zatvoreno uz oba potrošena
+         poziva, a zadatku matematički ni pedagoški ništa nije falilo —
+         ISTA klasa propusta po treći put.
+
+    Konačna hijerarhija povjerenja (nakon sva tri nalaza):
 
       • task_family: STROGO — dodijeljena porodica je autoritet servera, pa
         deklarisano neslaganje je uvijek odbijanje. Ovo se NIKAD ne slabi.
+        JEDINI deklarisani metapodatak koji je ostao autoritativan.
       • VIDLJIV ugovor (required/forbidden nad stvarnim tekstom pitanja/
         opcija/tačnog odgovora): AUTORITATIVAN — jedini stvarni dokaz da
         zadatak pripada dodijeljenoj porodici.
-      • answer_kind: strogo SAMO kad je objektivno mehanički prepoznatljivo iz
-        stvarnog tačnog odgovora (detected_answer_kind) — fraction/integer/
-        decimal/ordered_pair. Kontradikcija (npr. deklarisano "integer" dok je
-        tačna opcija razlomak ili uređeni par) je odbijanje; kad tip nije
-        mehanički prepoznatljiv (proza/formula/izraz), provjera se preskače.
+      • answer_kind: SERVER-DERIVED, nikad razlog odbijanja. Kad je tip
+        objektivno mjerljiv iz tačne opcije (detected_answer_kind →
+        fraction/integer/decimal/ordered_pair), server ga KANONIZUJE i
+        deklaraciju zanemaruje (`canonical_answer_kind`); kad nije mjerljiv
+        (proza/formula/izraz/prava oznaka opcije), deklaracija ostaje ali
+        nema nikakvu moć. Deklaracija ne nosi nijednu informaciju koju server
+        već nema — može samo proizvesti lažno odbijanje.
       • student_must_find: SAMO INFORMATIVNO — više NIKAD ne odbija sam po
         sebi. `canonical_student_must_find` je server-derived vrijednost
         (iz ugovora, ne od modela) — dostupna za interno logovanje/dijagnostiku,
@@ -1334,8 +1383,11 @@ def validate_task_family(family_id, question, option_texts, correct_option_index
     #    — task_form="direct_calculation" umjesto "recognition", i
     #    student_must_find="ordered_pair" umjesto "statement") i NIKAD ne
     #    smiju same odbiti zadatak koji je već prošao strukturnu (vidljivu)
-    #    provjeru ispod. Samo TASK_FAMILY (identitet) i ANSWER_KIND (objektivno
-    #    provjerljivo) ostaju autoritativni.
+    #    provjeru ispod. Nakon trećeg slučaja iste klase (vidi
+    #    `canonical_answer_kind`) ni ANSWER_KIND više ne odbija: server ga
+    #    KANONIZUJE iz stvarnog teksta tačne opcije. Jedini deklarisani
+    #    metapodatak koji ostaje autoritativan je TASK_FAMILY (identitet
+    #    porodice koju je dodijelio server, ne opisna oznaka).
     if declared:
         declared_family = (declared.get("task_family") or "").strip()
         if declared_family and declared_family != family_id:
@@ -1343,18 +1395,12 @@ def validate_task_family(family_id, question, option_texts, correct_option_index
                 f"{family_id}: model deklarisao drugu porodicu ({declared_family})"
             )
 
-        # answer_kind: STROGO samo kad je stvarno kontradiktorno objektivno
-        # prepoznatom tipu tačnog odgovora — ne protiv statične liste po
-        # porodici (ista klasa propusta kao stari task_form/student_must_find
-        # ugovor bi se ponovila da smo ovdje samo provjeravali članstvo u tuple-u).
-        declared_ak = (declared.get("answer_kind") or "").strip()
-        if declared_ak:
-            actual_kind = detected_answer_kind(view.correct_option_text)
-            if actual_kind and declared_ak != actual_kind:
-                raise FamilyContractError(
-                    f"{family_id}: answer_kind={declared_ak} u suprotnosti sa stvarnim "
-                    f"tipom tačnog odgovora ({actual_kind})"
-                )
+        # answer_kind se OVDJE NAMJERNO ne provjerava: kad je tip objektivno
+        # mjerljiv, server ga izvodi sam (`canonical_answer_kind`, koju zove
+        # matbot/practice.py prije objave i koja je jedini izvor tog pravila);
+        # kad nije mjerljiv, deklaracija je puka oznaka bez dokazne vrijednosti.
+        # U oba slučaja deklaracija ne smije odbiti zadatak koji je prošao
+        # vidljivi ugovor ispod — vidi docstring `canonical_answer_kind`.
 
     # 2) Zabranjeni oblici — nijedan ne smije biti prisutan.
     for name, predicate in contract.forbidden:

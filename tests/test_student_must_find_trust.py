@@ -5,12 +5,18 @@ pitanje da li zadovoljava sistem, opcije su tvrdnje o provjeri) lažno odbijen
 jer je model deklarisao student_must_find="ordered_pair" dok je ugovor
 dozvoljavao samo "statement". Ista klasa propusta kao raniji task_form nalaz —
 rješenje je isto: metapodatak postaje informativan, vidljivi ugovor ostaje
-jedini autoritet, task_family i answer_kind (objektivno) ostaju strogi.
+jedini autoritet.
+
+NAKNADNO (živi nalaz #3, canary s pravim modelom): ni `answer_kind` više nije
+strog — server ga KANONIZUJE iz stvarne tačne opcije
+(matbot/task_family_validation.py::canonical_answer_kind). Jedini deklarisani
+metapodatak koji je ostao autoritativan je `task_family` (identitet).
 """
 import json
 
+from matbot import systemcheck
 from matbot.task_family_validation import (
-    CONTRACTS, FamilyContractError, validate_task_family,
+    CONTRACTS, FamilyContractError, canonical_answer_kind, validate_task_family,
 )
 from matbot.schema import InvalidOutputError
 from matbot.practice import SAFE_ERROR_MESSAGE, run_practice_turn
@@ -117,15 +123,37 @@ def test_verify_ordered_pair_rejects_task_without_a_concrete_pair():
 # 6. Objectively wrong answer_kind still fails
 # ---------------------------------------------------------------------------
 
-def test_objectively_wrong_answer_kind_still_fails_for_solve_system():
-    """Tačna opcija je uređeni par, deklarisano answer_kind='integer' —
-    stvarna kontradikcija, mora pasti."""
+def test_wrong_answer_kind_is_canonicalized_and_the_math_guard_still_holds():
+    """PROMIJENJENO POSLIJE CANARY NALAZA (v. matbot/task_family_validation.py
+    ::canonical_answer_kind): deklarisan `answer_kind` više ne odbija zadatak.
+
+    Ranije je ovaj test tvrdio da nesklad „integer“ vs. uređeni par MORA
+    pasti. Uživo je isti mehanizam srušio ispravan zadatak o djeljivosti
+    (tačna opcija „138“ deklarisana kao „option_label“) uz oba potrošena
+    poziva, a da matematici ništa nije falilo.
+
+    Ključno: ukidanjem te oznake NIJE izgubljen nijedan matematički dokaz —
+    za `solve_system` istinu i dalje dokazuje supstitucija svake opcije u
+    VIDLJIVE jednačine (matbot/systemcheck.py), što je neuporedivo jače od
+    opisne oznake. Ovaj test to i pokazuje: kanonizacija prolazi, a pogrešno
+    označena opcija i dalje pada."""
     question = "Riješi sistem: $2x+y=8$ i $x-y=1$."
     options = ["$(3,2)$", "$(2,3)$", "$(3,-2)$", "$(4,0)$"]
-    error = check("solve_system", question, options, correct_index=0,
-                  declared={"answer_kind": "integer"})
-    assert error is not None
-    assert "suprotnosti sa stvarnim" in error
+
+    # 1) Oznaka se kanonizuje iz stvarne tačne opcije i NE odbija zadatak.
+    assert check("solve_system", question, options, correct_index=0,
+                 declared={"answer_kind": "integer"}) is None
+    assert canonical_answer_kind("integer", options[0]) == ("ordered_pair", True)
+
+    # 2) STVARNA matematička zaštita je netaknuta: ispravno označena opcija je
+    #    nezavisno verifikovana, a pogrešno označena i dalje pada zatvoreno.
+    verified = systemcheck.verify_solve_system(question, options, 0,
+                                               expected_answer=options[0])
+    assert verified.status == systemcheck.STATUS_VERIFIED
+    wrong = systemcheck.verify_solve_system(question, options, 1,
+                                            expected_answer=options[1])
+    assert wrong.status == systemcheck.STATUS_INVALID
+    assert "marked_correct_option_math_mismatch" in wrong.issue_codes
 
 
 def test_correct_answer_kind_for_solve_system_passes():

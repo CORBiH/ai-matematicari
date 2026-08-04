@@ -9,16 +9,23 @@ task_form vrijednosti — sistemski propust).
 `verify_ordered_pair` zadatak odbijen jer je model deklarisao
 student_must_find="ordered_pair" dok je ugovor dozvoljavao samo "statement".
 
-Rješenje: i task_form i student_must_find su SAMO INFORMATIVNI — nijedan više
-ne odbija zadatak samostalno. Autoritativni ostaju: task_family (strogo,
-identitet) i answer_kind (strogo, ali samo kad je OBJEKTIVNO prepoznatljivo iz
-stvarnog tačnog odgovora — ne protiv statične liste po porodici, isti razlog
-zašto su prethodna dva propusta uopšte bila moguća).
+Živi nalaz #3 (ista klasa, treći put — canary s PRAVIM modelom, lekcija o
+pravilima djeljivosti, prelaz Nivo 1→2): recenzent je vratio ispravan zadatak
+s tačnom opcijom „138“ i svim svojim provjerama tačnim, ali deklarisan kao
+answer_kind="option_label" — objava je pala zatvoreno uz oba potrošena poziva.
+
+Rješenje (dosljedno primijenjeno na sva tri nalaza): task_form,
+student_must_find i answer_kind NE odbijaju zadatak. Prva dva su SAMO
+INFORMATIVNA; answer_kind je SERVER-DERIVED — kad je tip objektivno mjerljiv
+iz tačne opcije, server ga kanonizuje (`canonical_answer_kind`) i deklaraciju
+zanemaruje. Jedini deklarisani metapodatak koji je ostao autoritativan je
+task_family (identitet porodice koju je dodijelio server).
 """
 import pytest
 
 from matbot.task_family_validation import (
-    CONTRACTS, FamilyContractError, detected_answer_kind, validate_task_family,
+    CONTRACTS, FamilyContractError, canonical_answer_kind, detected_answer_kind,
+    validate_task_family,
 )
 
 
@@ -102,17 +109,36 @@ def test_false_task_family_declaration_still_fails():
 
 
 # ---------------------------------------------------------------------------
-# 5. Wrong answer_kind still fails when OBJECTIVELY contradicted
+# 5. Wrong answer_kind is CANONICALIZED (živi nalaz #3), never a rejection
 # ---------------------------------------------------------------------------
 
-def test_answer_kind_integer_declared_but_correct_option_is_fraction_fails():
-    """Deklarisano „integer“ dok je tačna opcija razlomak — stvarna
-    kontradikcija, mora pasti čak i kad je struktura inače u redu."""
-    error = check("fraction_operation", "Izračunaj $\\frac{2}{7} + \\frac{3}{7}$.",
-                  ["$\\frac{5}{7}$", "$\\frac{5}{14}$", "$\\frac{6}{7}$", "$\\frac{1}{7}$"],
+def test_answer_kind_integer_declared_but_correct_option_is_fraction_is_canonicalized():
+    """PROMIJENJENO POSLIJE ŽIVOG NALAZA #3 (canary s pravim modelom).
+
+    Ranije je ovaj test tvrdio da nesklad „integer“ vs. razlomak MORA pasti.
+    Uživo je taj isti mehanizam srušio potpuno ispravan zadatak o djeljivosti
+    (tačna opcija „138“, deklarisana kao „option_label“) uz oba potrošena
+    poziva — treći put ista klasa propusta.
+
+    Tip vrijednosti server sada izvodi iz STVARNE tačne opcije; deklaracija
+    nema moć odbijanja. Ispravnost i dalje dokazuju nepromijenjeni slojevi
+    (mathcheck nad tačnom opcijom i expected_answer, jedinstvenost opcija,
+    vidljivi ugovor porodice) — vidi test ispod."""
+    options = ["$\\frac{5}{7}$", "$\\frac{5}{14}$", "$\\frac{6}{7}$", "$\\frac{1}{7}$"]
+    assert check("fraction_operation", "Izračunaj $\\frac{2}{7} + \\frac{3}{7}$.",
+                 options, declared={"answer_kind": "integer"}) is None
+    assert canonical_answer_kind("integer", options[0]) == ("fraction", True)
+
+
+def test_canonicalization_does_not_disable_the_visible_family_contract():
+    """Dokaz da kanonizacija metapodatka NIJE olabavila stvarni ugovor:
+    zabranjeni oblik iste porodice i dalje pada, bez obzira na deklaraciju."""
+    error = check("fraction_operation",
+                  "Kojim brojem je proširen razlomak $\\frac{2}{7}$?",
+                  ["$2$", "$3$", "$4$", "$5$"],
                   declared={"answer_kind": "integer"})
     assert error is not None
-    assert "suprotnosti sa stvarnim" in error
+    assert "pita_za_faktor" in error
 
 
 def test_answer_kind_matching_actual_type_passes():
