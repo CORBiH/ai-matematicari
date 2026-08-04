@@ -117,6 +117,7 @@ from typing import Optional
 
 ROOT = Path(__file__).resolve().parent.parent
 RESULTS_PATH = Path(__file__).resolve().parent / "difficulty_canary_results.json"
+RECHECKED_RESULTS_PATH = Path(__file__).resolve().parent / "difficulty_canary_results_rechecked.json"
 
 MAX_NON_CONTRACT_CALLS_PER_TURN = 2   # Tutor + selective Lesson Fidelity Reviewer
 MAX_CONTRACT_CALLS_PER_TURN = 1       # deterministic skeleton + one prose call
@@ -216,10 +217,11 @@ def _check_preconditions() -> None:
 # Safe to import the application — none of this makes a model call.
 sys.path.insert(0, str(ROOT))
 
-from matbot import config, difficulty_level, mathsafe, practice  # noqa: E402
+from matbot import config, difficulty_level, feedback, lesson_fidelity, mathsafe, practice  # noqa: E402
 from matbot.contracts import difficulty as contract_difficulty  # noqa: E402
 from matbot.contracts import registry as contract_registry  # noqa: E402
 from matbot.llm import LLMError, OpenAIPracticeLLM  # noqa: E402
+from matbot.mathcheck import find_numeric_inconsistencies  # noqa: E402
 from matbot.mathsegments import DISPLAY, INLINE, TEXT, tokenize_math  # noqa: E402
 from matbot.session_store import SessionStore  # noqa: E402
 from matbot.task_family_validation import (  # noqa: E402
@@ -462,6 +464,10 @@ class TurnResult:
     final_detected_answer_kind: Optional[str] = None
     answer_metadata_consistent: Optional[bool] = None
     answer_kind_diagnostics: list = field(default_factory=list)
+    tutor_proposed_task_text: Optional[str] = None
+    reviewer_corrected_task_text: Optional[str] = None
+    derived_semantic_requirement: Optional[str] = None
+    deterministic_semantic_rejection_reason: Optional[str] = None
     sdk_calls_before_turn: int = 0
     sdk_calls_after_turn: int = 0
     sdk_calls_this_turn: int = 0
@@ -473,6 +479,12 @@ class TurnResult:
     next_state_options_match_session: Optional[bool] = None
     visible_correct_option_value: Optional[str] = None
     model_marked_option_value: Optional[str] = None
+    answer_verdict: Optional[str] = None
+    internal_correct_option_id_before: Optional[str] = None
+    internal_correct_option_id_after: Optional[str] = None
+    internal_correct_option_value: Optional[str] = None
+    task_completed_after: Optional[bool] = None
+    revealed_correct_option_id: Optional[str] = None
     effective_topic: Optional[str] = None
     session_lesson_id_after: Optional[str] = None
     lesson_preserved_signal: Optional[str] = None
@@ -528,6 +540,10 @@ class Scenario:
     # unmet_prerequisite and consumes ZERO SDK calls. The scenario NAME never
     # overrides the actual stored state.
     requires_committed_level: Optional[int] = None
+    # Non-generation interactions use the same real entrypoint, but have the
+    # legacy pipeline's one-call budget instead of Tutor + Reviewer.
+    interaction_kind: str = "task_generation"
+    intent: str = ""
 
 
 # ---------------------------------------------------------------------------
@@ -542,9 +558,10 @@ SYSTEM_WORD = ("9-05-013", 9)           # equation / system
 CONTRACT_LESSON = ("6-04-009", 6)       # deterministic contract fraction lesson
 
 
-def _non_contract(name, lesson, request_type, session_id, message, requires=None):
+def _non_contract(name, lesson, request_type, session_id, message, requires=None,
+                  *, interaction_kind="task_generation", intent=""):
     return Scenario(name, lesson[0], lesson[1], "non_contract", request_type,
-                    session_id, message, requires)
+                    session_id, message, requires, interaction_kind, intent)
 
 
 def _contract(name, lesson, request_type, session_id, message, requires=None):
@@ -603,6 +620,27 @@ DIVISIBILITY_FINAL_CAMPAIGN = (
 )
 DIVISIBILITY_FINAL_CEILING = 4
 
+# PRODUCTION SMOKE FINAL -- the exact five-step production trace.  All turns
+# use the real legacy Practice pipeline and one shared session.  Generation
+# turns receive its two-call Tutor + Reviewer budget; the correct click, hint,
+# and full-solution frontend interactions each receive their normal one call.
+PRODUCTION_SMOKE_FINAL_CAMPAIGN = (
+    _non_contract("production_smoke_final_fresh_level1", DIVISIBILITY, "",
+                  "production-smoke-final-session", "Daj mi zadatak."),
+    _non_contract("production_smoke_final_correct_choice", DIVISIBILITY, "",
+                  "production-smoke-final-session", "", requires=1,
+                  interaction_kind="correct_choice"),
+    _non_contract("production_smoke_final_harder_level1_to_2", DIVISIBILITY, "harder",
+                  "production-smoke-final-session", "Daj mi teži zadatak.", requires=1),
+    _non_contract("production_smoke_final_first_hint", DIVISIBILITY, "",
+                  "production-smoke-final-session", "Ne znam.", requires=2,
+                  interaction_kind="hint", intent="hint_request"),
+    _non_contract("production_smoke_final_full_solution", DIVISIBILITY, "",
+                  "production-smoke-final-session", "Uradi ga ti.", requires=2,
+                  interaction_kind="full_solution", intent="solution_request"),
+)
+PRODUCTION_SMOKE_FINAL_CEILING = 7
+
 # The original 14-call campaign, kept for reference/repeatability.
 INITIAL_CAMPAIGN = (
     _non_contract("fresh_divisibility_level1", DIVISIBILITY, "", "div-session", "Daj mi zadatak."),
@@ -621,17 +659,35 @@ CAMPAIGNS = {
     "followup": (FOLLOWUP_CAMPAIGN, FOLLOWUP_CEILING),
     "initial": (INITIAL_CAMPAIGN, INITIAL_CEILING),
     "divisibility-final": (DIVISIBILITY_FINAL_CAMPAIGN, DIVISIBILITY_FINAL_CEILING),
+    "production-smoke-final": (
+        PRODUCTION_SMOKE_FINAL_CAMPAIGN, PRODUCTION_SMOKE_FINAL_CEILING,
+    ),
 }
 
 
-def _turn_payload(scenario: Scenario):
+def _turn_payload(scenario: Scenario, *, selected_option_id: str = "",
+                  last_tutor_task: str = ""):
+    student_message = scenario.student_message
+    if scenario.interaction_kind == "correct_choice":
+        student_message = f"Izabrana opcija {selected_option_id.upper()}."
     return {
         "session_id": scenario.session_id, "grade": scenario.grade,
         "selected_topic": scenario.lesson_id, "selected_oblast": "",
-        "student_message": scenario.student_message, "intent": "",
-        "difficulty_request": scenario.request_type, "interaction_phase": "",
-        "last_tutor_task": "", "interaction_type": "student_question",
-        "selected_option_id": "", "client_turn_id": "",
+        "student_message": student_message, "intent": scenario.intent,
+        "difficulty_request": scenario.request_type,
+        "interaction_phase": (
+            "practice_help" if scenario.intent == "hint_request" else ""
+        ),
+        "last_tutor_task": last_tutor_task,
+        "interaction_type": (
+            "choice_answer" if scenario.interaction_kind == "correct_choice"
+            else "student_question"
+        ),
+        "selected_option_id": selected_option_id,
+        "client_turn_id": (
+            "production-smoke-final-correct-choice"
+            if scenario.interaction_kind == "correct_choice" else ""
+        ),
     }
 
 
@@ -743,6 +799,31 @@ def _record_answer_metadata(result: TurnResult, response, after_session, llm) ->
              or result.final_canonical_answer_kind == result.final_detected_answer_kind)
         and result.model_marked_option_value == result.visible_correct_option_value
     )
+
+
+def _record_rejected_generation_diagnostics(result: TurnResult, llm) -> None:
+    """Capture safe scratchpad-only task diagnostics after a rejected draft.
+
+    These values are never returned by Practice to a student.  They use the
+    same title-derived semantic requirement as production publication so a
+    manual canary explains a rejection without guessing from its log text.
+    """
+    tutor_task = getattr(getattr(llm, "last_tutor_output", None), "new_task", None)
+    reviewer_output = getattr(llm, "last_reviewer_output", None)
+    corrected_task = getattr(reviewer_output, "corrected_task", None)
+    requirement = lesson_fidelity.semantic_task_requirement(result.lesson_title)
+
+    if tutor_task is not None:
+        result.tutor_proposed_task_text = tutor_task.text
+    if corrected_task is not None:
+        result.reviewer_corrected_task_text = corrected_task.text
+    if requirement is not None:
+        result.derived_semantic_requirement = requirement.prompt_block
+        published_candidate = corrected_task or tutor_task
+        if published_candidate is not None:
+            result.deterministic_semantic_rejection_reason = requirement.failure_for(
+                published_candidate.text
+            )
 
 
 def _validate_divisibility_final_turn(result: TurnResult) -> list[str]:
@@ -932,6 +1013,451 @@ def _run_divisibility_final_static_checks() -> None:
     )
 
 
+_SMOKE_DIVISIBILITY_RULE_RE = re.compile(
+    r"\b(?:djeljiv\w*|pravil\w*\s+djeljiv\w*)\b[^?]{0,160}"
+    r"\bsa\s+\$?\s*(?:2|3|4|5|6|9|10|15|25)\b",
+    re.IGNORECASE,
+)
+_ALLOWED_RESPONSE_CONTROLS = frozenset({"\n", "\r", "\t"})
+
+
+def _uses_listed_divisibility_rule(result: TurnResult) -> bool:
+    """True only for a visible application of one listed lesson rule.
+
+    The production semantic gate rules out a remainder-only task generically;
+    this focused smoke campaign additionally verifies that the exact selected
+    lesson names one of its listed divisors in the visible task.
+    """
+    text = result.published_task_text or ""
+    return (
+        lesson_fidelity.exact_lesson_skill_failure(result.lesson_title, text) is None
+        and bool(_SMOKE_DIVISIBILITY_RULE_RE.search(text))
+    )
+
+
+def _divisibility_25_and_10_solution_errors(task_text: Optional[str], solution: Optional[str]) -> list[str]:
+    """Check the visible proof structure for a 25-and-10 divisibility task.
+
+    This deliberately evaluates mathematical evidence instead of requiring a
+    near-literal copy of the server's internal expected-answer wording.  It is
+    scoped to the exact two-rule task shape used by this smoke campaign.
+    """
+    task = task_text or ""
+    text = solution or ""
+    errors: list[str] = []
+    task_numbers = re.findall(r"\d+", task)
+    tested_numbers = [number for number in task_numbers if number not in {"10", "25"}]
+    tested_number = tested_numbers[0] if tested_numbers else ""
+    if not tested_number:
+        return ["full_solution_missing_tested_number_in_task"]
+    if not re.search(r"\bdjeljiv\w*\b", task, re.IGNORECASE) \
+            or not re.search(r"\b25\b", task) or not re.search(r"\b10\b", task):
+        return ["full_solution_task_is_not_a_two_rule_25_and_10_divisibility_task"]
+
+    if not re.search(rf"(?<!\d){re.escape(tested_number)}(?!\d)", text):
+        errors.append("full_solution_does_not_state_tested_number")
+
+    has_25_check = bool(re.search(
+        r"(?:provjer\w*|pravil\w*|djeljiv\w*)[^\n.]{0,100}\b25\b",
+        text, re.IGNORECASE,
+    ))
+    has_25_evidence = bool(re.search(
+        r"(?:zadnj\w*\s+dvije\s+cifr\w*|posljednj\w*\s+dvije\s+cifr\w*)"
+        r"[^\n.]{0,80}\b50\b|\b50\s*=\s*25(?:\s*\\cdot|\s*\*)?\s*\d+",
+        text, re.IGNORECASE,
+    ))
+    if not has_25_check:
+        errors.append("full_solution_omits_divisibility_check_for_25")
+    if not has_25_evidence:
+        errors.append("full_solution_missing_valid_25_rule_evidence")
+
+    has_10_check = bool(re.search(
+        r"(?:provjer\w*|pravil\w*|djeljiv\w*)[^\n.]{0,100}\b10\b",
+        text, re.IGNORECASE,
+    ))
+    has_10_evidence = bool(re.search(
+        r"(?:zadnj\w*\s+cifr\w*|posljednj\w*\s+cifr\w*)[^\n.]{0,80}\b0\b",
+        text, re.IGNORECASE,
+    ))
+    if not has_10_check:
+        errors.append("full_solution_omits_divisibility_check_for_10")
+    if not has_10_evidence:
+        errors.append("full_solution_missing_valid_10_rule_evidence")
+
+    conclusion_start = max(text.lower().rfind("zaklju"), text.lower().rfind("dakle"))
+    conclusion = text[conclusion_start:] if conclusion_start >= 0 else text[-260:]
+    positive_both = bool(re.search(
+        r"\bda\b[^\n.]{0,120}\bdjeljiv\w*\b[^\n.]{0,120}\b25\b[^\n.]{0,120}\b10\b"
+        r"|\bdjeljiv\w*\b[^\n.]{0,120}\b25\b[^\n.]{0,120}\b10\b",
+        conclusion, re.IGNORECASE,
+    ))
+    negative_conclusion = bool(re.search(r"\b(?:ne|nije)\s+djeljiv\w*\b", conclusion, re.IGNORECASE))
+    if not positive_both or negative_conclusion:
+        errors.append("full_solution_missing_affirmative_both_divisors_conclusion")
+    return errors
+
+
+def _has_disallowed_control_character(text: Optional[str]) -> bool:
+    return any(ord(char) < 32 and char not in _ALLOWED_RESPONSE_CONTROLS
+               for char in (text or ""))
+
+
+def _validate_production_smoke_final_turn(result: TurnResult) -> list[str]:
+    """Fail-closed validator for the exact seven-call production smoke trace."""
+    errors: list[str] = []
+    kind = {
+        "production_smoke_final_fresh_level1": "fresh",
+        "production_smoke_final_correct_choice": "correct_choice",
+        "production_smoke_final_harder_level1_to_2": "harder",
+        "production_smoke_final_first_hint": "hint",
+        "production_smoke_final_full_solution": "full_solution",
+    }.get(result.scenario)
+    if kind is None:
+        return ["unexpected_production_smoke_final_scenario"]
+
+    expected_calls = 2 if kind in {"fresh", "harder"} else 1
+    if result.sdk_calls_this_turn != expected_calls:
+        errors.append(f"expected_exactly_{expected_calls}_sdk_calls")
+
+    if not result.published:
+        errors.append(result.failure_class or "turn_did_not_publish")
+        if result.failure_class == "family_contract_rejection":
+            errors.append("family_contract_rejection")
+        if result.session_unchanged_after_rejection is not True:
+            errors.append("state_mutation_after_rejection")
+        return errors
+
+    if result.lesson_id != DIVISIBILITY[0] or result.effective_topic != DIVISIBILITY[0] \
+            or result.session_lesson_id_after != DIVISIBILITY[0]:
+        errors.append("wrong_lesson")
+
+    # Transition fields describe a generation request; session fields describe
+    # the committed state around every turn.  In particular, a successful
+    # harder generation is 1 -> 2, not a fictional 2 -> 2 transition merely
+    # because the later hint/full-solution turns run at committed Level 2.
+    if kind == "fresh":
+        if result.session_level_before != 1:
+            errors.append(f"fresh_session_before_is_{result.session_level_before}_not_1")
+        if result.previous_level != 1:
+            errors.append(f"fresh_transition_previous_is_{result.previous_level}_not_1")
+        if result.target_level != 1:
+            errors.append(f"fresh_transition_target_is_{result.target_level}_not_1")
+        if result.session_level_after != 1:
+            errors.append(f"fresh_session_after_is_{result.session_level_after}_not_1")
+    elif kind == "correct_choice":
+        if result.session_level_before != 1:
+            errors.append(f"correct_choice_session_before_is_{result.session_level_before}_not_1")
+        if result.session_level_after != 1:
+            errors.append(f"correct_choice_session_after_is_{result.session_level_after}_not_1")
+    elif kind == "harder":
+        if result.session_level_before != 1:
+            errors.append(f"harder_session_before_is_{result.session_level_before}_not_1")
+        if result.previous_level != 1:
+            errors.append(f"harder_transition_previous_is_{result.previous_level}_not_1")
+        if result.target_level != 2:
+            errors.append(f"harder_transition_target_is_{result.target_level}_not_2")
+        if result.session_level_after != 2:
+            errors.append(f"harder_session_after_is_{result.session_level_after}_not_2")
+    else:  # hint and full_solution: current committed state only, no transition
+        if result.session_level_before != 2:
+            errors.append(f"{kind}_session_before_is_{result.session_level_before}_not_2")
+        if result.session_level_after != 2:
+            errors.append(f"{kind}_session_after_is_{result.session_level_after}_not_2")
+
+    if kind in {"fresh", "harder"}:
+        if not result.published_task_text:
+            errors.append("missing_published_task_text")
+        if not result.expected_answer:
+            errors.append("missing_expected_answer")
+        if not _uses_listed_divisibility_rule(result):
+            errors.append("remainder_only_or_not_listed_divisibility_rule_task")
+        if len(result.next_state_options) != 4:
+            errors.append("missing_multiple_choice_options_in_next_state")
+        option_ids = [option.get("id") for option in result.next_state_options
+                      if isinstance(option, dict)]
+        option_values = [option.get("text") for option in result.next_state_options
+                         if isinstance(option, dict)]
+        if len(option_ids) != 4 or len(set(option_ids)) != 4 \
+                or any(not value for value in option_values) or len(set(option_values)) != 4:
+            errors.append("ambiguous_option_structure")
+        if result.next_state_options_match_session is not True:
+            errors.append("next_state_options_do_not_match_committed_options")
+        if not result.visible_correct_option_value or \
+                result.visible_correct_option_value not in option_values:
+            errors.append("invalid_visible_correct_option_mapping")
+        if result.model_marked_option_value != result.visible_correct_option_value:
+            errors.append("wrong_marked_option_or_answer")
+        if result.final_declared_answer_kind not in VALID_ANSWER_KINDS \
+                or result.final_canonical_answer_kind not in VALID_ANSWER_KINDS:
+            errors.append("invalid_answer_kind_enum")
+        if result.final_detected_answer_kind is None:
+            if result.final_canonical_answer_kind != result.final_declared_answer_kind:
+                errors.append("canonical_metadata_mismatch")
+            if "canonicalization_not_required_not_derivable" \
+                    not in result.answer_kind_diagnostics:
+                errors.append("missing_non_derivable_canonicalization_diagnostic")
+        else:
+            if result.final_canonical_answer_kind != result.final_detected_answer_kind:
+                errors.append("canonical_metadata_mismatch")
+            if result.final_declared_answer_kind != result.final_detected_answer_kind \
+                    and "canonicalized_from_declared_metadata" \
+                    not in result.answer_kind_diagnostics:
+                errors.append("canonicalization_evidence_missing")
+        if "canonical_metadata_mismatch" in result.answer_kind_diagnostics:
+            errors.append("canonical_metadata_mismatch")
+        if result.answer_metadata_consistent is not True:
+            errors.append("answer_metadata_inconsistency")
+        if any("answer_kind=" in message and "u suprotnosti" in message
+               for message in result.diagnostics):
+            errors.append("answer_kind_mismatch")
+
+        checks = result.reviewer_checks or {}
+        for check_name in (
+            "math_correct", "tests_exact_lesson", "answer_correct",
+            "marked_option_correct", "options_unique", "grade_appropriate",
+            "solvable_and_unambiguous", "difficulty_level_appropriate",
+        ):
+            if checks.get(check_name) is not True:
+                errors.append(f"reviewer_{check_name}_not_true")
+        if kind == "fresh":
+            if result.level_changed is not False:
+                errors.append("fresh_level1_unexpected_level_change")
+            if result.effective_server_label != "easy":
+                errors.append("level1_effective_server_label_is_not_easy")
+            if result.intro_actual == practice._ANOTHER_ADVANCED_TASK_INTRO:
+                errors.append("advanced_task_at_level1")
+        else:
+            if result.level_changed is not True:
+                errors.append("harder_turn_level_did_not_change")
+            if result.effective_server_label != "standard":
+                errors.append("level2_effective_server_label_is_not_standard")
+            if result.intro_actual != "Evo težeg zadatka.":
+                errors.append("harder_turn_intro_is_not_exact")
+            if checks.get("difficulty_direction_correct") is not True:
+                errors.append("missing_or_false_difficulty_direction_confirmation")
+        return errors
+
+    if kind == "correct_choice":
+        if result.answer_verdict != "correct":
+            errors.append("correct_student_answer_not_recognized")
+        if not result.internal_correct_option_id_before \
+                or result.internal_correct_option_id_before != result.internal_correct_option_id_after:
+            errors.append("internal_correct_option_mapping_changed_or_missing")
+        if result.task_completed_after is not True:
+            errors.append("correct_choice_did_not_complete_task")
+        return errors
+
+    if kind == "hint":
+        text = (result.answer_text or "").strip()
+        if not text or text == practice.SAFE_ERROR_MESSAGE:
+            errors.append("mathematically_useless_hint")
+        if not re.search(r"(?i)\b(djeljiv|pravilo|zbir\s+cifara|paran|posljednj)", text):
+            errors.append("hint_does_not_make_divisibility_progress")
+        if feedback.ensure_hint_makes_progress(result.published_task_text or "", text) != text:
+            errors.append("hint_only_checks_proper_factor_of_composite_divisor")
+        if feedback.leaks_answer(
+                text, result.internal_correct_option_value or "", result.expected_answer or ""):
+            errors.append("hint_reveals_complete_final_answer")
+        return errors
+
+    # full_solution
+    text = (result.answer_text or "").strip()
+    if not text or text == practice.SAFE_ERROR_MESSAGE:
+        errors.append("generic_or_missing_full_solution")
+    if _has_disallowed_control_character(text):
+        errors.append("full_solution_contains_control_character")
+    if text.endswith("\\"):
+        errors.append("full_solution_has_dangling_terminal_backslash")
+    if mathsafe.find_unsafe_math_issues(text):
+        errors.append("full_solution_has_malformed_latex")
+    if find_numeric_inconsistencies(text):
+        errors.append("full_solution_has_numeric_inconsistency")
+    if text.endswith(("=", "+", "-", "*", "/", "(")):
+        errors.append("full_solution_has_truncated_expression")
+    errors.extend(_divisibility_25_and_10_solution_errors(
+        result.published_task_text, text,
+    ))
+    if result.revealed_correct_option_id != result.internal_correct_option_id_after:
+        errors.append("full_solution_did_not_reveal_committed_correct_option")
+    if result.task_completed_after is not True:
+        errors.append("full_solution_did_not_complete_task")
+    return errors
+
+
+def _run_production_smoke_final_static_checks() -> None:
+    """Pure campaign-shape checks; no session, model, API, or environment I/O."""
+    assert PRODUCTION_SMOKE_FINAL_CEILING == 7
+    assert [scenario.name for scenario in PRODUCTION_SMOKE_FINAL_CAMPAIGN] == [
+        "production_smoke_final_fresh_level1",
+        "production_smoke_final_correct_choice",
+        "production_smoke_final_harder_level1_to_2",
+        "production_smoke_final_first_hint",
+        "production_smoke_final_full_solution",
+    ]
+    assert [scenario.interaction_kind for scenario in PRODUCTION_SMOKE_FINAL_CAMPAIGN] == [
+        "task_generation", "correct_choice", "task_generation", "hint", "full_solution",
+    ]
+    assert [scenario.intent for scenario in PRODUCTION_SMOKE_FINAL_CAMPAIGN] == [
+        "", "", "", "hint_request", "solution_request",
+    ]
+    assert [scenario.session_id for scenario in PRODUCTION_SMOKE_FINAL_CAMPAIGN] == [
+        "production-smoke-final-session",
+    ] * 5
+    choice_payload = _turn_payload(
+        PRODUCTION_SMOKE_FINAL_CAMPAIGN[1], selected_option_id="b"
+    )
+    assert choice_payload["interaction_type"] == "choice_answer"
+    assert choice_payload["student_message"] == "Izabrana opcija B."
+    assert choice_payload["selected_option_id"] == "b"
+    hint_payload = _turn_payload(PRODUCTION_SMOKE_FINAL_CAMPAIGN[3])
+    assert hint_payload["student_message"] == "Ne znam."
+    assert hint_payload["intent"] == "hint_request"
+    assert hint_payload["interaction_phase"] == "practice_help"
+
+    # Completed successful prefix: fresh 1 -> 1, a correct click while still
+    # committed at 1, then the real harder transition 1 -> 2.  This guards
+    # against accidentally comparing the harder turn's previous level with
+    # the later committed level used by hint/full-solution turns.
+    reviewer_checks = {
+        "math_correct": True,
+        "tests_exact_lesson": True,
+        "answer_correct": True,
+        "marked_option_correct": True,
+        "options_unique": True,
+        "grade_appropriate": True,
+        "solvable_and_unambiguous": True,
+        "difficulty_level_appropriate": True,
+        "difficulty_direction_correct": True,
+    }
+    options = [
+        {"id": "a", "text": "Da"},
+        {"id": "b", "text": "Ne"},
+        {"id": "c", "text": "Samo sa 2"},
+        {"id": "d", "text": "Ne može se odrediti"},
+    ]
+
+    def generation_result(scenario, *, previous, target, session_before, session_after):
+        harder = scenario == "production_smoke_final_harder_level1_to_2"
+        return TurnResult(
+            scenario=scenario, lesson_id=DIVISIBILITY[0],
+            lesson_title="Pravila djeljivosti sa 2, 3, 4, 5, 6, 9, 10, 15 i 25",
+            path="non_contract", grade=DIVISIBILITY[1],
+            request_type="harder" if harder else "", attempted=True,
+            previous_level=previous, target_level=target,
+            level_changed=harder, session_level_before=session_before,
+            session_level_after=session_after, sdk_calls_this_turn=2,
+            published=True,
+            published_task_text=(
+                "Je li 12350 djeljiv i sa 10 i sa 25?" if harder
+                else "Je li 340 djeljiv sa 10?"
+            ),
+            expected_answer="Da", next_state_options=list(options),
+            next_state_options_match_session=True,
+            visible_correct_option_value="Da", model_marked_option_value="Da",
+            effective_topic=DIVISIBILITY[0], session_lesson_id_after=DIVISIBILITY[0],
+            effective_server_label="standard" if harder else "easy",
+            intro_actual=practice._HARDER_TASK_INTRO if harder else practice._NEW_TASK_INTRO,
+            reviewer_checks=dict(reviewer_checks), tutor_declared_answer_kind="short_text",
+            final_declared_answer_kind="short_text",
+            final_canonical_answer_kind="short_text", final_detected_answer_kind=None,
+            answer_metadata_consistent=True,
+            answer_kind_diagnostics=["canonicalization_not_required_not_derivable"],
+        )
+
+    fresh = generation_result(
+        "production_smoke_final_fresh_level1",
+        previous=1, target=1, session_before=1, session_after=1,
+    )
+    correct_choice = TurnResult(
+        scenario="production_smoke_final_correct_choice", lesson_id=DIVISIBILITY[0],
+        lesson_title=fresh.lesson_title, path="non_contract", grade=DIVISIBILITY[1],
+        request_type="", attempted=True, session_level_before=1, session_level_after=1,
+        sdk_calls_this_turn=1, published=True, effective_topic=DIVISIBILITY[0],
+        session_lesson_id_after=DIVISIBILITY[0], answer_verdict="correct",
+        internal_correct_option_id_before="a", internal_correct_option_id_after="a",
+        task_completed_after=True,
+    )
+    harder = generation_result(
+        "production_smoke_final_harder_level1_to_2",
+        previous=1, target=2, session_before=1, session_after=2,
+    )
+    assert not _validate_production_smoke_final_turn(fresh)
+    assert not _validate_production_smoke_final_turn(correct_choice)
+    assert not _validate_production_smoke_final_turn(harder)
+
+    wrong_harder_transition = generation_result(
+        "production_smoke_final_harder_level1_to_2",
+        previous=2, target=2, session_before=2, session_after=2,
+    )
+    wrong_harder_commit = generation_result(
+        "production_smoke_final_harder_level1_to_2",
+        previous=1, target=2, session_before=1, session_after=1,
+    )
+    assert "harder_transition_previous_is_2_not_1" in \
+        _validate_production_smoke_final_turn(wrong_harder_transition)
+    assert "harder_transition_target_is_2_not_2" not in \
+        _validate_production_smoke_final_turn(wrong_harder_transition)
+    assert "harder_session_after_is_1_not_2" in \
+        _validate_production_smoke_final_turn(wrong_harder_commit)
+
+    two_rule_task = (
+        "Provjeri da li je broj 12650 djeljiv sa 25 i sa 10 koristeći pravila djeljivosti."
+    )
+    captured_solution = (
+        "Uradio sam zadatak.\n"
+        "Provjera za $25$: zadnje dvije cifre su $50$. $50=25\\cdot2$, zato je broj djeljiv sa $25$.\n"
+        "Provjera za $10$: zadnja cifra je $0$, zato je broj djeljiv sa $10$.\n"
+        "Zaključak: Da — $12650$ je djeljiv i sa $25$ i sa $10$."
+    )
+
+    def full_solution_result(answer):
+        return TurnResult(
+            scenario="production_smoke_final_full_solution", lesson_id=DIVISIBILITY[0],
+            lesson_title=fresh.lesson_title, path="non_contract", grade=DIVISIBILITY[1],
+            request_type="", attempted=True, session_level_before=2, session_level_after=2,
+            sdk_calls_this_turn=1, published=True, answer_text=answer,
+            published_task_text=two_rule_task, expected_answer="Djeljiv je i sa 25 i sa 10.",
+            effective_topic=DIVISIBILITY[0], session_lesson_id_after=DIVISIBILITY[0],
+            internal_correct_option_id_after="c",
+            internal_correct_option_value="Djeljiv je i sa 25 i sa 10.",
+            revealed_correct_option_id="c", task_completed_after=True,
+        )
+
+    assert not _validate_production_smoke_final_turn(full_solution_result(captured_solution))
+    assert "full_solution_omits_divisibility_check_for_10" in \
+        _validate_production_smoke_final_turn(full_solution_result(
+            "12650 je djeljiv sa 25: zadnje dvije cifre su 50. "
+            "Zaključak: Da, djeljiv je sa 25."
+        ))
+    assert "full_solution_missing_valid_25_rule_evidence" in \
+        _validate_production_smoke_final_turn(full_solution_result(
+            "12650 je djeljiv sa 25 i sa 10. "
+            "Zaključak: Da, djeljiv je i sa 25 i sa 10."
+        ))
+    assert "full_solution_missing_affirmative_both_divisors_conclusion" in \
+        _validate_production_smoke_final_turn(full_solution_result(
+            "Provjera za 25: zadnje dvije cifre su 50. 50=25\\cdot2, zato je broj djeljiv sa 25. "
+            "Provjera za 10: zadnja cifra je 0, zato je broj djeljiv sa 10. "
+            "Zaključak: Ne, 12650 nije djeljiv i sa 25 i sa 10."
+        ))
+    assert "full_solution_has_dangling_terminal_backslash" in \
+        _validate_production_smoke_final_turn(full_solution_result(captured_solution + "\\"))
+    assert "CountingLLM" not in _offline_recheck_results.__code__.co_names
+    assert "OpenAIPracticeLLM" not in _offline_recheck_results.__code__.co_names
+
+    # The wrapper's eighth attempted invocation is rejected before delegation
+    # to an SDK adapter.  Calling its counter directly is deliberately inert.
+    counter = CountingLLM(object(), PRODUCTION_SMOKE_FINAL_CEILING)
+    for _ in range(PRODUCTION_SMOKE_FINAL_CEILING):
+        counter._count("static")
+    try:
+        counter._count("static-eighth")
+    except SDKCallBudgetExceeded:
+        pass
+    else:
+        raise AssertionError("eighth SDK call was not refused before delegation")
+
+
 def _run_one_turn(store, llm, capture, report, scenario: Scenario, campaign: str):
     lesson = lesson_info(scenario.grade, scenario.lesson_id)
     result = TurnResult(
@@ -944,6 +1470,13 @@ def _run_one_turn(store, llm, capture, report, scenario: Scenario, campaign: str
     before_session = store.peek(scenario.session_id)
     committed_level = (before_session or {}).get("difficulty_level", 1)
     result.session_level_before = committed_level
+    selected_option_id = ""
+    if scenario.interaction_kind == "correct_choice":
+        # Deliberately take the selected ID from server-owned session state.
+        # It is never read from the browser-safe response and is only used to
+        # reproduce a real correct click in this isolated canary.
+        selected_option_id = (before_session or {}).get("correct_option_id") or ""
+        result.internal_correct_option_id_before = selected_option_id
 
     transition = difficulty_level.transition(committed_level, scenario.request_type)
     result.previous_level = transition.previous_level
@@ -965,6 +1498,17 @@ def _run_one_turn(store, llm, capture, report, scenario: Scenario, campaign: str
         report.skipped_unmet_prerequisite += 1
         return result, False
 
+    if scenario.interaction_kind == "correct_choice" and not selected_option_id:
+        result.failure_class = "unmet_prerequisite"
+        result.failure_is_infrastructure = False
+        result.prerequisite = "active server-owned correct_option_id is missing, 0 SDK calls spent"
+        result.sdk_calls_before_turn = llm.call_count
+        result.sdk_calls_after_turn = llm.call_count
+        result.stop_triggered = "missing_internal_correct_option_id"
+        report.turns.append(result)
+        report.skipped_unmet_prerequisite += 1
+        return result, True
+
     generation_changed = True
     if scenario.path == "contract":
         contract = contract_registry.contract_for(scenario.lesson_id)
@@ -980,8 +1524,11 @@ def _run_one_turn(store, llm, capture, report, scenario: Scenario, campaign: str
         transition=transition, generation_changed=generation_changed,
     )
 
-    turn_cap = (MAX_CONTRACT_CALLS_PER_TURN if scenario.path == "contract"
-                else MAX_NON_CONTRACT_CALLS_PER_TURN)
+    if scenario.interaction_kind in {"correct_choice", "hint", "full_solution"}:
+        turn_cap = 1
+    else:
+        turn_cap = (MAX_CONTRACT_CALLS_PER_TURN if scenario.path == "contract"
+                    else MAX_NON_CONTRACT_CALLS_PER_TURN)
     remaining = llm.ceiling - llm.call_count
     if remaining < turn_cap:
         result.failure_class = "unmet_prerequisite"
@@ -1005,7 +1552,13 @@ def _run_one_turn(store, llm, capture, report, scenario: Scenario, campaign: str
     capture.reset()
 
     try:
-        response = practice.run_practice_turn(store, llm, _turn_payload(scenario))
+        response = practice.run_practice_turn(
+            store, llm, _turn_payload(
+                scenario,
+                selected_option_id=selected_option_id,
+                last_tutor_task=(before_session or {}).get("current_task") or "",
+            )
+        )
     except SDKCallBudgetExceeded as exc:
         result.failure_class = "reporting_error"
         result.failure_is_infrastructure = True
@@ -1031,7 +1584,7 @@ def _run_one_turn(store, llm, capture, report, scenario: Scenario, campaign: str
     result.diagnostics = capture.safe_diagnostics()
 
     if result.sdk_calls_this_turn > turn_cap:
-        result.stop_triggered = f"more_than_{turn_cap}_calls_on_{scenario.path}_generation_turn"
+        result.stop_triggered = f"more_than_{turn_cap}_calls_on_{scenario.interaction_kind}_turn"
 
     after_session = store.peek(scenario.session_id)
     result.session_level_after = (after_session or {}).get("difficulty_level", committed_level)
@@ -1040,26 +1593,43 @@ def _run_one_turn(store, llm, capture, report, scenario: Scenario, campaign: str
     result.answer_text = response.get("answer")
     result.student_facing_response = response.get("answer")
     result.effective_topic = response.get("effective_topic")
+    result.answer_verdict = response.get("answer_verdict")
+    result.revealed_correct_option_id = response.get("revealed_correct_option_id")
+    result.internal_correct_option_id_after = (after_session or {}).get("correct_option_id") or ""
+    result.task_completed_after = (after_session or {}).get("task_completed")
+    options_after = (after_session or {}).get("current_options") or []
+    result.internal_correct_option_value = next(
+        (option.get("text") for option in options_after
+         if isinstance(option, dict)
+         and option.get("id") == result.internal_correct_option_id_after),
+        None,
+    )
 
     if result.published:
-        result.intro_actual = _actual_intro(result.answer_text)
-        result.intro_truthful = (result.intro_actual == result.intro_expected)
-        result.published_task_text = _published_task_text(result.answer_text)
+        if scenario.interaction_kind == "task_generation":
+            result.intro_actual = _actual_intro(result.answer_text)
+            result.intro_truthful = (result.intro_actual == result.intro_expected)
+            result.published_task_text = _published_task_text(result.answer_text)
+        else:
+            result.published_task_text = (after_session or {}).get("current_task")
         # Only meaningful for a PUBLISHED turn: on a rejection these session
         # fields still hold the PREVIOUS task's values (a reporting defect in
         # the first campaign — a stale label looked like a real mismatch).
         if after_session:
             result.effective_server_label = after_session.get("difficulty")
             result.expected_answer = after_session.get("expected_answer_summary")
-        result.content_flags = _content_quality_flags(
-            result.published_task_text or "", result.expected_answer)
-        _record_answer_metadata(result, response, after_session, llm)
+        if scenario.interaction_kind == "task_generation":
+            result.content_flags = _content_quality_flags(
+                result.published_task_text or "", result.expected_answer)
+            _record_answer_metadata(result, response, after_session, llm)
     else:
         result.failure_class = _classify_failure(capture.messages)
         result.failure_is_infrastructure = result.failure_class in _INFRASTRUCTURE_CLASSES
         result.effective_server_label = None   # explicitly unchanged
         result.expected_answer = None
         result.session_unchanged_after_rejection = (after_session == before_session)
+        if scenario.interaction_kind == "task_generation":
+            _record_rejected_generation_diagnostics(result, llm)
         if not result.session_unchanged_after_rejection:
             result.stop_triggered = "state_mutated_after_rejection"
 
@@ -1104,6 +1674,10 @@ def _run_one_turn(store, llm, capture, report, scenario: Scenario, campaign: str
             # replacement turn or retry: the two configured attempts are the
             # complete experiment.
             result.stop_triggered = result.strict_validation_errors[0]
+    elif campaign == "production-smoke-final":
+        result.strict_validation_errors = _validate_production_smoke_final_turn(result)
+        if result.strict_validation_errors:
+            result.stop_triggered = result.strict_validation_errors[0]
 
     report.turns.append(result)
     report.total_task_turns_attempted += 1
@@ -1147,6 +1721,39 @@ def _verdict(report: CanaryReport) -> tuple[str, dict]:
             )
             return "DIVISIBILITY FINAL CANARY FAILED — KEEP FEATURE OFF", buckets
         return "DIVISIBILITY FINAL CANARY PASS — FIX VERIFIED", buckets
+
+    if report.campaign == "production-smoke-final":
+        timeout_turns = [turn for turn in report.turns if turn.failure_class == "api_timeout"]
+        failures = []
+        for turn in report.turns:
+            if turn.failure_class != "api_timeout":
+                failures.extend(f"{turn.scenario}: {error}"
+                                for error in turn.strict_validation_errors)
+                if turn.stop_triggered and not turn.strict_validation_errors:
+                    failures.append(f"{turn.scenario}: {turn.stop_triggered}")
+        if len(report.turns) != len(PRODUCTION_SMOKE_FINAL_CAMPAIGN) and not timeout_turns:
+            failures.append("did_not_complete_exact_five_turn_sequence")
+        if report.total_sdk_calls > PRODUCTION_SMOKE_FINAL_CEILING:
+            failures.append("sdk_call_ceiling_exceeded")
+
+        buckets = {
+            "lesson_failures": [],
+            "difficulty_failures": [],
+            "state_or_call_budget_failures": failures,
+            "infrastructure_failures": [f"{turn.scenario}: api_timeout"
+                                        for turn in timeout_turns],
+            "controller_rejections": [],
+        }
+        if timeout_turns and not failures:
+            return "PRODUCTION SMOKE FINAL PARTIAL — INFRASTRUCTURE FAILURE", buckets
+        if failures or timeout_turns:
+            return "PRODUCTION SMOKE FINAL FAILED — KEEP FEATURE OFF", buckets
+        if report.total_sdk_calls != PRODUCTION_SMOKE_FINAL_CEILING:
+            buckets["state_or_call_budget_failures"].append(
+                "successful campaign did not use exactly seven calls"
+            )
+            return "PRODUCTION SMOKE FINAL FAILED — KEEP FEATURE OFF", buckets
+        return "PRODUCTION SMOKE FINAL PASS — ACTIVATION VERIFIED", buckets
 
     """Verdict + the failure buckets it was derived from. Infrastructure
     failures (timeout / transport / schema) are reported but do NOT condemn
@@ -1197,17 +1804,134 @@ def _verdict(report: CanaryReport) -> tuple[str, dict]:
     return "DIFFICULTY CANARY PASS — READY FOR CONTROLLED PRODUCTION ACTIVATION", buckets
 
 
+def _turn_result_from_captured_record(record: dict) -> TurnResult:
+    """Rebuild only the runner record; never creates a session, LLM, or SDK client."""
+    if not isinstance(record, dict):
+        raise ValueError("turn_record_is_not_an_object")
+    required = ("scenario", "lesson_id", "lesson_title", "path", "grade", "request_type")
+    missing = [name for name in required if name not in record]
+    if missing:
+        raise ValueError("turn_record_missing_" + ",".join(missing))
+    fields = TurnResult.__dataclass_fields__
+    return TurnResult(**{name: record[name] for name in fields if name in record})
+
+
+def _adjudicate_production_smoke_results(raw: dict) -> tuple[dict, bool, list[str]]:
+    """Purely re-evaluate captured runner data after a runner-only fix."""
+    adjudicated = json.loads(json.dumps(raw, ensure_ascii=False))
+    failures: list[str] = []
+    if raw.get("campaign") != "production-smoke-final":
+        failures.append("wrong_campaign")
+    if raw.get("total_sdk_calls") != PRODUCTION_SMOKE_FINAL_CEILING:
+        failures.append("total_sdk_calls_is_not_exactly_7")
+    if raw.get("total_task_turns_attempted") != 5:
+        failures.append("total_task_turns_attempted_is_not_5")
+    if raw.get("published_count") != 5 or raw.get("rejected_count") != 0:
+        failures.append("published_and_rejected_counts_do_not_prove_all_five_turns")
+    if raw.get("skipped_unmet_prerequisite") != 0:
+        failures.append("unmet_prerequisite_recorded")
+
+    turn_records = adjudicated.get("turns")
+    if not isinstance(turn_records, list) or len(turn_records) != 5:
+        failures.append("missing_exact_five_raw_turn_records")
+        turn_records = []
+
+    false_positive_recorded = False
+    expected_spans = ((0, 2), (2, 3), (3, 5), (5, 6), (6, 7))
+    for index, record in enumerate(turn_records):
+        try:
+            turn = _turn_result_from_captured_record(record)
+        except ValueError as error:
+            failures.append(f"turn_{index}:{error}")
+            continue
+        errors = _validate_production_smoke_final_turn(turn)
+        record["offline_recomputed_strict_validation_errors"] = errors
+        record["offline_recheck_sdk_calls_made"] = 0
+
+        if not turn.attempted or not turn.published:
+            failures.append(f"{turn.scenario}:not_attempted_or_not_published")
+        if turn.failure_class or turn.failure_is_infrastructure:
+            failures.append(f"{turn.scenario}:captured_failure_class")
+        if errors:
+            failures.extend(f"{turn.scenario}:{error}" for error in errors)
+        if index < len(expected_spans) and (
+                turn.sdk_calls_before_turn, turn.sdk_calls_after_turn) != expected_spans[index]:
+            failures.append(f"{turn.scenario}:unexpected_sdk_call_span")
+
+        old_errors = record.get("strict_validation_errors")
+        if not isinstance(old_errors, list):
+            failures.append(f"{turn.scenario}:missing_raw_strict_validation_errors")
+            continue
+        allowed_old_error = "full_solution_does_not_state_internal_correct_answer"
+        unexpected_old_errors = [error for error in old_errors if error != allowed_old_error]
+        if unexpected_old_errors:
+            failures.append(f"{turn.scenario}:preexisting_strict_failure")
+        if allowed_old_error in old_errors:
+            if turn.scenario != "production_smoke_final_full_solution" or errors:
+                failures.append(f"{turn.scenario}:unresolved_full_solution_failure")
+            else:
+                record["offline_runner_false_positive"] = allowed_old_error
+                false_positive_recorded = True
+
+    if not false_positive_recorded:
+        failures.append("prior_full_solution_false_positive_not_proven")
+    allowed_stop = "full_solution_does_not_state_internal_correct_answer"
+    if raw.get("stop_reason") not in (None, allowed_stop):
+        failures.append("unexpected_prior_stop_reason")
+    if raw.get("stopped_early") and raw.get("stop_reason") != allowed_stop:
+        failures.append("unexpected_prior_early_stop")
+
+    adjudicated["offline_recheck"] = {
+        "source": "captured_results_only",
+        "sdk_calls_made": 0,
+        "prior_runner_false_positive": (
+            "full_solution_does_not_state_internal_correct_answer"
+            if false_positive_recorded else None
+        ),
+        "passed": not failures,
+        "failures": failures,
+    }
+    return adjudicated, not failures, failures
+
+
+def _offline_recheck_results(input_path: Path) -> int:
+    """Offline-only entrypoint: JSON in, adjudicated JSON out, zero SDK calls."""
+    try:
+        raw = json.loads(input_path.read_text(encoding="utf-8"))
+        if not isinstance(raw, dict):
+            raise ValueError("results_root_is_not_an_object")
+        adjudicated, passed, failures = _adjudicate_production_smoke_results(raw)
+        RECHECKED_RESULTS_PATH.write_text(
+            json.dumps(adjudicated, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
+    except Exception as error:
+        _safe_print(f"PRODUCTION SMOKE FINAL FAILED — KEEP FEATURE OFF ({type(error).__name__})")
+        return 1
+
+    if passed:
+        _safe_print("PRODUCTION SMOKE FINAL PASS — ACTIVATION VERIFIED")
+        return 0
+    _safe_print("PRODUCTION SMOKE FINAL FAILED — KEEP FEATURE OFF")
+    _safe_print(f"Offline recheck failures: {failures}")
+    return 1
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="Universal Difficulty real-model canary")
     parser.add_argument("--campaign", choices=sorted(CAMPAIGNS), default="followup",
                         help="which scenario campaign to run (default: followup, 10 SDK calls)")
     parser.add_argument("--static-checks", action="store_true",
-                        help="run pure divisibility-final metadata regression checks; no model calls")
+                        help="run pure final-canary regression checks; no model calls")
+    parser.add_argument("--recheck-results", type=Path, metavar="PATH",
+                        help="offline-only adjudication of captured production-smoke-final JSON")
     args = parser.parse_args(argv)
     if args.static_checks:
         _run_divisibility_final_static_checks()
-        _safe_print("DIVISIBILITY FINAL STATIC CHECKS PASS — ZERO SDK CALLS")
+        _run_production_smoke_final_static_checks()
+        _safe_print("FINAL CANARY STATIC CHECKS PASS — ZERO SDK CALLS")
         return 0
+    if args.recheck_results is not None:
+        return _offline_recheck_results(args.recheck_results)
     scenarios, ceiling = CAMPAIGNS[args.campaign]
 
     _safe_print(f"Campaign: {args.campaign}   SDK call ceiling: {ceiling}")
@@ -1339,6 +2063,10 @@ if __name__ == "__main__":
     if "--static-checks" in sys.argv:
         # This path constructs only in-memory TurnResult values. It does not
         # need an API key or feature flag and must stay usable in CI/offline.
+        sys.exit(main())
+    if "--recheck-results" in sys.argv:
+        # Offline adjudication reads a captured JSON file only; it never needs
+        # an API key, feature flag, session store, LLM wrapper, or SDK client.
         sys.exit(main())
     try:
         _check_preconditions()

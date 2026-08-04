@@ -85,7 +85,10 @@ _FRESH_SESSION_TASK_BY_TOPIC = {
         "Amar i Lejla zajedno imaju $10$ KM. Amar ima $2$ KM više od Lejle. "
         "Koliko KM ima svako?",
         ("$(6,4)$", "$(4,6)$", "$(5,5)$", "$(8,2)$")),
-    DIVISIBILITY[0]: _task,
+    DIVISIBILITY[0]: lambda: _task(
+        "Je li broj $24$ djeljiv sa $3$?",
+        ("Da", "Ne", "Samo sa $2$", "Ne može se odrediti."),
+    ),
 }
 
 

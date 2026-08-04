@@ -21,6 +21,7 @@ Nijedan ID lekcije ne postoji u ovom modulu. Recenzent dobija TAČAN NASLOV
 lekcije, oblast, razred i porodicu kao podatke — konkretni primjeri iz nalaza
 žive u promptu (kao ilustracija principa) i u testovima.
 """
+import re
 from dataclasses import dataclass
 from typing import Literal, Optional
 
@@ -93,6 +94,80 @@ class FidelityRejected(ValueError):
     def __init__(self, message, failed_checks=()):
         super().__init__(message)
         self.failed_checks = tuple(failed_checks)
+
+
+@dataclass(frozen=True)
+class SemanticTaskRequirement:
+    """A deterministic, title-derived requirement shared by every stage.
+
+    The same object guides Tutor generation, guides the Lesson Fidelity
+    Reviewer, and makes the final fail-closed publication decision.  It is
+    intentionally independent of lesson ID, family, and grade.
+    """
+
+    code: str
+    title_pattern: re.Pattern
+    visible_task_pattern: re.Pattern
+    prompt_block: str
+    reviewer_instruction: str
+
+    def applies_to(self, lesson_title):
+        return bool(self.title_pattern.search(lesson_title or ""))
+
+    def failure_for(self, task_text):
+        if self.visible_task_pattern.search(task_text or ""):
+            return None
+        return self.code
+
+
+# A title that promises divisibility rules has an unambiguous semantic target:
+# the visible student task must make the student apply such a rule.  The
+# patterns live only here; prompts and publication call the same requirement.
+_DIVISIBILITY_RULES_REQUIREMENT = SemanticTaskRequirement(
+    code="divisibility_rules_not_required_by_visible_task",
+    title_pattern=re.compile(r"\bpravil\w*\s+djeljiv", re.IGNORECASE),
+    visible_task_pattern=re.compile(
+        r"\b(?:djeljiv\w*|pravil\w*\s+djeljiv\w*)\b[^?.!]{0,160}"
+        r"\b(?:sa|s)\s+\$?\s*\d+",
+        re.IGNORECASE,
+    ),
+    prompt_block=(
+        "SEMANTIČKI ZAHTJEV NOVOG ZADATKA (obavezan):\n"
+        "- Naslov obećava pravila djeljivosti: vidljivi tekst mora direktno tražiti "
+        "primjenu jednog ili više pravila djeljivosti.\n"
+        "- Valjano je provjeriti djeljivost sa 6, sa 10 i sa 25, izabrati broj koji "
+        "ispunjava dva uslova djeljivosti ili obrazložiti pravilo koje dokazuje odgovor.\n"
+        "- Ne pravi računanje količnika, ostatka ili obično dijeljenje kao glavni cilj; "
+        "takav korak smije biti samo pomoćni dok pitanje vidljivo ispituje djeljivost."
+    ),
+    reviewer_instruction=(
+        "RECENZENT: ako vidljivi nacrt ne zadovoljava gornji semantički zahtjev, "
+        "postavi tests_exact_lesson=false i ne odobravaj ga bez potpune ispravke."
+    ),
+)
+
+
+def semantic_task_requirement(lesson_title):
+    """Return the one deterministic requirement implied by a lesson title."""
+    if _DIVISIBILITY_RULES_REQUIREMENT.applies_to(lesson_title):
+        return _DIVISIBILITY_RULES_REQUIREMENT
+    return None
+
+
+def semantic_task_requirement_block(lesson_title):
+    """Prompt text for generation/review, derived from the shared requirement."""
+    requirement = semantic_task_requirement(lesson_title)
+    return requirement.prompt_block if requirement is not None else ""
+
+
+def exact_lesson_skill_failure(lesson_title, task_text):
+    """Return a deterministic exact-skill failure, or ``None``.
+
+    This final gate is authoritative: guidance in the Tutor/Reviewer prompts
+    cannot override a requirement that the visible task still fails.
+    """
+    requirement = semantic_task_requirement(lesson_title)
+    return requirement.failure_for(task_text) if requirement is not None else None
 
 
 def is_task_generating(new_task, difficulty_request=""):
@@ -220,6 +295,9 @@ def build_input(context, new_task, student_message, family="",
         f"- kanonski ID lekcije: {context.topic_id}",
         f"- TAČAN NASLOV LEKCIJE: {context.title}",
     ]
+    requirement = semantic_task_requirement(context.title)
+    if requirement:
+        lines.extend(("", requirement.prompt_block, requirement.reviewer_instruction))
     if family:
         label = f"{family} — {family_description}" if family_description else family
         lines.append(f"- dodijeljena porodica zadatka: {label}")
@@ -292,6 +370,27 @@ def mandatory_checks_failed(checks):
     return [name for name in _MANDATORY_CHECKS if not getattr(checks, name)]
 
 
+def required_difficulty_checks_failed(checks, requested_difficulty="",
+                                      require_difficulty_check=False,
+                                      level_changed=True):
+    """Return the conditional difficulty failures that gate publication.
+
+    `difficulty_level_appropriate` is required whenever the server-owned
+    difficulty controller is active. `difficulty_direction_correct` is
+    additionally required only for an actual easier/harder transition; a
+    boundary request has no relative direction to confirm. Keeping this
+    calculation shared by `resolve()` and its caller prevents logs from saying
+    `failed_checks=-` when the final fail-closed direction gate rejects.
+    """
+    failed = []
+    if require_difficulty_check and checks.difficulty_level_appropriate is not True:
+        failed.append("difficulty_level_appropriate")
+    if ((requested_difficulty or "").strip().lower() in ("easier", "harder")
+            and level_changed and checks.difficulty_direction_correct is not True):
+        failed.append("difficulty_direction_correct")
+    return failed
+
+
 @dataclass(frozen=True)
 class ResolvedReview:
     """Ishod resolve(): `task` je None kad se objavljuje ORIGINALNI nacrt
@@ -356,12 +455,19 @@ def resolve(review, requested_difficulty="", require_difficulty_check=False,
     normalized = False
 
     mandatory_failed = mandatory_checks_failed(review.checks)
-    difficulty_failed = require_difficulty_check and review.checks.difficulty_level_appropriate is not True
+    difficulty_failed = required_difficulty_checks_failed(
+        review.checks,
+        requested_difficulty=requested_difficulty,
+        require_difficulty_check=require_difficulty_check,
+        level_changed=level_changed,
+    )
+    approval_failed = [name for name in difficulty_failed
+                       if name != "difficulty_direction_correct"]
 
     if decision == "approve":
         failed = list(mandatory_failed)
-        if difficulty_failed:
-            failed = failed + ["difficulty_level_appropriate"]
+        if approval_failed:
+            failed = failed + approval_failed
         if failed:
             if review.corrected_task is not None:
                 decision = "correct"
@@ -372,9 +478,11 @@ def resolve(review, requested_difficulty="", require_difficulty_check=False,
                     failed_checks=failed,
                 )
 
-    if (requested_difficulty or "").strip().lower() in ("easier", "harder") and level_changed:
-        if not review.checks.difficulty_direction_correct:
-            raise FidelityRejected("smjer promjene težine nije potvrđen")
+    if "difficulty_direction_correct" in difficulty_failed:
+        raise FidelityRejected(
+            "smjer promjene težine nije potvrđen",
+            failed_checks=("difficulty_direction_correct",),
+        )
 
     if decision == "correct":
         if review.corrected_task is None:

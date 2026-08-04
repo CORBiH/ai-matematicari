@@ -111,7 +111,9 @@
       "content_flags": [],
       "strict_validation_errors": [],
       "prerequisite": null,
-      "stop_triggered": null
+      "stop_triggered": null,
+      "offline_recomputed_strict_validation_errors": [],
+      "offline_recheck_sdk_calls_made": 0
     },
     {
       "scenario": "production_smoke_final_correct_choice",
@@ -179,7 +181,9 @@
       "content_flags": [],
       "strict_validation_errors": [],
       "prerequisite": null,
-      "stop_triggered": null
+      "stop_triggered": null,
+      "offline_recomputed_strict_validation_errors": [],
+      "offline_recheck_sdk_calls_made": 0
     },
     {
       "scenario": "production_smoke_final_harder_level1_to_2",
@@ -277,7 +281,9 @@
       "content_flags": [],
       "strict_validation_errors": [],
       "prerequisite": null,
-      "stop_triggered": null
+      "stop_triggered": null,
+      "offline_recomputed_strict_validation_errors": [],
+      "offline_recheck_sdk_calls_made": 0
     },
     {
       "scenario": "production_smoke_final_first_hint",
@@ -345,7 +351,9 @@
       "content_flags": [],
       "strict_validation_errors": [],
       "prerequisite": null,
-      "stop_triggered": null
+      "stop_triggered": null,
+      "offline_recomputed_strict_validation_errors": [],
+      "offline_recheck_sdk_calls_made": 0
     },
     {
       "scenario": "production_smoke_final_full_solution",
@@ -415,7 +423,17 @@
         "full_solution_does_not_state_internal_correct_answer"
       ],
       "prerequisite": null,
-      "stop_triggered": "full_solution_does_not_state_internal_correct_answer"
+      "stop_triggered": "full_solution_does_not_state_internal_correct_answer",
+      "offline_recomputed_strict_validation_errors": [],
+      "offline_recheck_sdk_calls_made": 0,
+      "offline_runner_false_positive": "full_solution_does_not_state_internal_correct_answer"
     }
-  ]
+  ],
+  "offline_recheck": {
+    "source": "captured_results_only",
+    "sdk_calls_made": 0,
+    "prior_runner_false_positive": "full_solution_does_not_state_internal_correct_answer",
+    "passed": true,
+    "failures": []
+  }
 }

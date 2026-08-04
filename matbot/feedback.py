@@ -45,6 +45,16 @@ _WHITESPACE_RE = re.compile(r"\s+")
 _SENTENCE_END_RE = re.compile(r"[.!?](?:\s|$)")
 _WORD_BOUNDARY_RE = re.compile(r"\s+")
 
+# A small deterministic quality floor for a common non-contract task shape.
+# It is keyed by the visible mathematical form, never a lesson ID: a hint for
+# a remainder modulo a composite divisor cannot stop at one proper factor and
+# pretend that this determines the requested remainder.
+_REMAINDER_TASK_RE = re.compile(
+    r"ostatak\s+pri\s+dijeljenju\s+(?:broja\s+)?\$?\s*(\d+)\s*\$?\s+sa\s+\$?\s*(\d+)",
+    re.IGNORECASE,
+)
+_DIVISOR_MENTION_RE = re.compile(r"\bsa\s+\$?\s*(\d+)\b", re.IGNORECASE)
+
 
 def _balanced_math(text):
     """True kad su svi $...$ delimiteri upareni (paran broj neescaped '$')."""
@@ -61,6 +71,34 @@ def strip_leading_verdict(text):
         cleaned = _LEADING_VERDICT_RE.sub("", cleaned, count=1).strip()
     cleaned = _LEADING_HINT_LABEL_RE.sub("", cleaned, count=1).strip()
     return cleaned
+
+
+def ensure_hint_makes_progress(task_text, hint):
+    """Replace a provably insufficient composite-remainder hint.
+
+    This is intentionally narrow. It leaves ordinary hints untouched, but if
+    the active task asks for a remainder modulo a composite divisor and the
+    proposed hint names only a proper factor (for example, modulo 5 for modulo
+    15), the student receives a valid next step for the actual requested
+    divisor. No answer is revealed and no model call is made.
+    """
+    candidate = (hint or "").strip()
+    match = _REMAINDER_TASK_RE.search(task_text or "")
+    if not candidate or match is None:
+        return candidate
+    dividend, divisor = (int(match.group(1)), int(match.group(2)))
+    if divisor <= 1:
+        return candidate
+    mentioned = {int(value) for value in _DIVISOR_MENTION_RE.findall(candidate)}
+    proper_factor_only = any(1 < value < divisor and divisor % value == 0
+                             for value in mentioned)
+    if divisor in mentioned or not proper_factor_only:
+        return candidate
+    return (
+        "Za ostatak pri dijeljenju broja $" + str(dividend) + "$ sa $" + str(divisor)
+        + "$, pronađi najveći višekratnik broja $" + str(divisor)
+        + "$ koji nije veći od $" + str(dividend) + "$, pa ga oduzmi od broja."
+    )
 
 
 def _sentence_boundary_clip(text, limit):

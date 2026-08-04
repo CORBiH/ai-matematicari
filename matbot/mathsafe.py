@@ -678,6 +678,12 @@ def find_unsafe_math_issues(text: str) -> list:
     if not text:
         return []
     issues = []
+    # A terminal backslash cannot form a complete LaTex command or an escaped
+    # character. It is a concrete truncation signal (for example, a response
+    # ending in ``... 15\\``) and must never reach the student as a partial
+    # worked solution.
+    if text.rstrip().endswith("\\"):
+        issues.append("dangling_terminal_backslash")
     for part in _outside_math_parts(text):
         # Strukturne komande izvan matematike (nose argumente) — ne pogađaju se.
         if _RAW_LATEX_COMMAND_RE.search(part):

@@ -381,12 +381,26 @@ def _review_lesson_fidelity(llm, session, turn, new_task, family="", request_id=
     result = llm.lesson_fidelity_turn(instructions, input_text)
     review = result.output
     failed_checks = lesson_fidelity.mandatory_checks_failed(review.checks)
+    failed_checks += lesson_fidelity.required_difficulty_checks_failed(
+        review.checks,
+        requested_difficulty=turn["difficulty_request"],
+        require_difficulty_check=require_difficulty_check,
+        level_changed=level_changed,
+    )
     try:
         resolved = lesson_fidelity.resolve(
             review, requested_difficulty=turn["difficulty_request"],
             require_difficulty_check=require_difficulty_check,
             level_changed=level_changed,
         )
+        published_task = resolved.task if resolved.task is not None else new_task
+        exact_skill_failure = lesson_fidelity.exact_lesson_skill_failure(
+            context.title, published_task.text,
+        )
+        if exact_skill_failure:
+            raise lesson_fidelity.FidelityRejected(
+                exact_skill_failure, failed_checks=("tests_exact_lesson",),
+            )
     except lesson_fidelity.FidelityRejected as error:
         # Koncizan, SAMO interni log (nikad prompt ni učenikov tekst): odluka
         # recenzenta, koje su obavezne provjere oborene i faza na kojoj je
@@ -398,7 +412,7 @@ def _review_lesson_fidelity(llm, session, turn, new_task, family="", request_id=
             "target_difficulty_level=%s",
             request_id, context.topic_id, review.decision,
             ",".join(error.failed_checks or failed_checks) or "-",
-            False, review.fail_reason_code or "-", target_difficulty_level or "-",
+            False, review.fail_reason_code or str(error), target_difficulty_level or "-",
         )
         raise InvalidOutputError(f"lesson_fidelity: {error}") from error
     logger.info(
@@ -410,7 +424,7 @@ def _review_lesson_fidelity(llm, session, turn, new_task, family="", request_id=
         ",".join(failed_checks) or "-", resolved.normalized_from_approve,
         target_difficulty_level or "-",
     )
-    return resolved.task if resolved.task is not None else new_task
+    return published_task
 
 
 def _task_from_skeleton(skeleton):
@@ -1083,6 +1097,10 @@ def _handle_text_turn(store, llm, session, turn, lesson_id, request_id):
             if not reply_safe:
                 raise InvalidOutputError("nebezbjedan matematički zapis u odgovoru")
             reply = normalize_terminology(reply)
+            if out.gave_hint:
+                reply = feedback.ensure_hint_makes_progress(
+                    session["current_task"], reply,
+                )
             _reject_if_numerically_inconsistent(reply, "reply")
             # Tutorov vidljivi tekst je AUTORITATIVAN (objašnjenje/odgovor na
             # pitanje) — uvijek "check", nikad politika porodice.
@@ -1299,6 +1317,9 @@ def _handle_choice_answer(store, llm, session, turn, lesson_id, request_id):
                     hint_text, hint_safe = sanitize_and_validate_math_text(out.hint.strip())
                     if hint_safe:
                         candidate = normalize_terminology(hint_text)
+                        candidate = feedback.ensure_hint_makes_progress(
+                            session["current_task"], candidate,
+                        )
                         if (geometrycheck.is_geometry_clean(candidate, geo_scope, geo_figures)
                                 and _prose_faithful(candidate)):
                             hint_source = candidate
@@ -1307,7 +1328,9 @@ def _handle_choice_answer(store, llm, session, turn, lesson_id, request_id):
                                 "practice_choice request_id=%s geometry_notation_hint_replaced",
                                 request_id,
                             )
-                reply_source = reply
+                reply_source = feedback.ensure_hint_makes_progress(
+                    session["current_task"], reply,
+                )
                 if not geometrycheck.is_geometry_clean(reply, geo_scope, geo_figures):
                     reply_source = ""
                 elif not _prose_faithful(reply):

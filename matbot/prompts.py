@@ -308,6 +308,15 @@ def build_input(session, student_message, intent="", difficulty_request="", inte
     lines = []
     lines.append(f"LEKCIJA: {session['lesson_title'] or 'nije izabrana'} (oblast: {session['oblast'] or 'nepoznata'})")
 
+    # This is the same deterministic, title-derived requirement used by the
+    # Reviewer and final publication gate.  It is present before the first
+    # Tutor call so the model does not waste the two-call generation budget on
+    # adjacent skills such as ordinary division.
+    from matbot.lesson_fidelity import semantic_task_requirement
+    semantic_requirement = semantic_task_requirement(session["lesson_title"])
+    if semantic_requirement:
+        lines.append(semantic_requirement.prompt_block)
+
     if session["current_task"]:
         lines.append(f"AKTIVNI ZADATAK: {session['current_task']}")
         if session["expected_answer_summary"]:
