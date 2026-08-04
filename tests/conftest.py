@@ -220,8 +220,8 @@ DEFAULT_TUTOR_OPTIONS = ("$\\frac{5}{7}$", "$\\frac{5}{14}$", "$\\frac{6}{7}$", 
 def make_task_payload(text=DEFAULT_TUTOR_TASK_TEXT, options=None,
                       correct_option_index=0, expected="$\\frac{5}{7}$",
                       difficulty="standard"):
-    from matbot.tutor.schema import (DifficultyEvidence, TaskPayload, TaskSignature,
-                                     TutorOption)
+    from matbot.tutor.schema import (DifficultyEvidence, SignatureParameter, TaskPayload,
+                                     TaskSignature, TutorOption)
 
     texts = options if options is not None else DEFAULT_TUTOR_OPTIONS
     return TaskPayload(
@@ -244,7 +244,7 @@ def make_task_payload(text=DEFAULT_TUTOR_TASK_TEXT, options=None,
         ),
         task_signature=TaskSignature(
             task_family="fixture", operation_or_relation="fixture_operation",
-            normalized_parameters={}, required_conditions=[], relevant_objects=[],
+            normalized_parameters=[], required_conditions=[], relevant_objects=[],
             answer_type="multiple_choice",
         ),
     )
@@ -466,6 +466,8 @@ class FakeLLM:
         This is test-double plumbing only: real structured model output has no
         placeholders and production validation always checks exact values.
         """
+        from matbot.tutor.schema import SignatureParameter
+
         match = re.search(r"- lekcija: (.+) \((\d-\d{2}-\d{3})\)", input_text)
         if not match:
             return
@@ -500,7 +502,7 @@ class FakeLLM:
                 "difficulty_evidence": evidence,
                 "task_signature": task.task_signature.model_copy(update={
                     "task_family": "fixture_" + lesson_id,
-                    "normalized_parameters": {"text": task.text},
+                    "normalized_parameters": [SignatureParameter(name="text", value=task.text)],
                 }),
             })
 

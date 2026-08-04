@@ -318,3 +318,63 @@ def test_failed_live_gate_console_summary_is_informative_and_does_not_echo_hidde
     assert "SDK CALLS: 9/19" in report
     assert "STATE PRESERVED: true" in report
     assert "SECRET" not in report
+
+
+@pytest.mark.parametrize(
+    ("error_type", "category", "infrastructure"),
+    [
+        ("LLMSchemaParseError", "llm_schema_parse_error", False),
+        ("LLMTimeout", "llm_timeout", True),
+        ("LLMUnavailable", "llm_sdk_error", True),
+    ],
+)
+def test_gate_harness_preserves_safe_first_call_llm_failure_details(
+        monkeypatch, error_type, category, infrastructure):
+    """A first-call adapter failure is counted once and stays diagnosable offline."""
+    from matbot.llm import LLMSchemaParseError, LLMTimeout, LLMUnavailable
+    from matbot.session_store import SessionStore
+    from scratchpad import run_difficulty_canary as canary
+
+    errors = {
+        "LLMSchemaParseError": LLMSchemaParseError,
+        "LLMTimeout": LLMTimeout,
+        "LLMUnavailable": LLMUnavailable,
+    }
+
+    class FirstCallFailure:
+        def __init__(self):
+            self.calls = []
+
+        def tutor_turn(self, instructions, input_text):
+            self.calls.append((instructions, input_text))
+            raise errors[error_type](
+                "adapter failure", diagnostics={
+                    "status": "failed", "exception_summary": "Authorization: secret-value",
+                    "unapproved_detail": "must not be persisted",
+                })
+
+        def reviewer_turn(self, instructions, input_text):
+            raise AssertionError("Reviewer must not run after first Tutor failure")
+
+    monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", "universal_two_call")
+    monkeypatch.setenv("MATBOT_PRACTICE_DIFFICULTY_LEVELS", "enabled")
+    inner = FirstCallFailure()
+    counter = canary.CountingLLM(inner, ceiling=19)
+    report = canary.CanaryReport(campaign="release-gate", started_at="now", sdk_call_ceiling=19)
+    scenario = canary.Scenario("first-failure", "6-03-001", 6, "non_contract", "",
+                                "first-failure", "Daj mi zadatak.")
+    result, stop = canary._run_one_turn(
+        SessionStore(), counter, canary._LogCapture(), report, scenario, "release-gate")
+
+    assert stop is False
+    assert len(inner.calls) == counter.call_count == result.sdk_calls_this_turn == 1
+    assert result.llm_failure_stage == "tutor"
+    assert result.llm_failure_category == category
+    assert result.failure_class == category
+    assert result.failure_class != "unknown_rejection"
+    assert result.failure_is_infrastructure is infrastructure
+    assert result.session_unchanged_after_rejection is True
+    assert result.llm_failure_diagnostics["status"] == "failed"
+    assert result.llm_failure_diagnostics["exception_summary"] == "[REDACTED]"
+    assert "unapproved_detail" not in result.llm_failure_diagnostics
+    assert "secret-value" not in str(result.llm_failure_diagnostics)

@@ -7,7 +7,7 @@ from matbot.practice import run_practice_turn
 from matbot.session_store import SessionStore
 from matbot.tutor.lesson_context import build
 from matbot.tutor.schema import (DifficultyEvidence, ReviewerChecks, ReviewerFinal,
-                                 TaskPayload, TaskSignature, TutorDraft, TutorOption,
+                                 SignatureParameter, TaskPayload, TaskSignature, TutorDraft, TutorOption,
                                  difficulty_evidence_errors)
 from matbot.tutor.pipeline import SAFE_ERROR_MESSAGE
 from tests.conftest import FakeLLM, make_difficulty_diagnostics
@@ -48,7 +48,8 @@ def task_for(context, level=1, signature="one", text="Izračunaj $2+2$.",
         ),
         task_signature=TaskSignature(
             task_family="generic", operation_or_relation="calculation",
-            normalized_parameters={"case": signature}, required_conditions=["valid"],
+            normalized_parameters=[SignatureParameter(name="case", value=signature)],
+            required_conditions=["valid"],
             relevant_objects=["numbers"], answer_type="multiple_choice",
         ),
     )

@@ -97,6 +97,20 @@ def failure_diagnostics_kv(err):
     return " ".join(parts)
 
 
+def safe_failure_diagnostics(err):
+    """JSON-safe allow-listed diagnostics for offline operational reports.
+
+    Unlike the log formatter, this deliberately excludes unknown keys so a
+    future SDK field cannot accidentally become persisted report content.
+    """
+    diagnostics = getattr(err, "diagnostics", None) or {}
+    return {
+        key: _scrub(diagnostics[key])
+        for key in _DIAG_LOG_ORDER
+        if key in diagnostics and diagnostics[key] is not None
+    }
+
+
 class LLMError(Exception):
     """Bazna greška AI poziva; category ide u tehnički log.
 

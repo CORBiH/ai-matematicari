@@ -195,7 +195,7 @@ _STRUCTURED_TASK_RULE = """STRUCTURED TASK PACKAGE (required for every `new_task
 - for a multiple-choice task, expected_answer is an exact copy of that marked option's text. Put explanation, derivation, unit commentary, and reasoning only in solution;
 - provide task_type, expected_answer, complete solution, difficulty_evidence, and task_signature;
 - difficulty_evidence describes the actual task: steps, conditions, operations, representation changes, and flags for explanation, comparison, construction, proof/justification, and combined concepts;
-- task_signature describes mathematical structure (family, operation/relation, normalized parameters, conditions, objects, answer type), not wording. Rewording or option order must not change it."""
+- task_signature describes mathematical structure (family, operation/relation, normalized parameters, conditions, objects, answer type), not wording. normalized_parameters is a list of entries with exactly name and value; values are canonical strings, never arbitrary metadata. Rewording, option order, or parameter-list order must not change it."""
 
 
 def build_tutor_instructions(context):
@@ -254,7 +254,7 @@ def build_reviewer_instructions(context):
         "8. da je zadatak rješiv i jednoznačan;\n"
         "9. da je MathJax ispravan (samo $...$, poznate komande);\n"
         "10. da je bosanski prirodan i primjeren uzrastu.\n\n"
-        "11. verify that lesson identity, level, text, options, marked answer, solution, difficulty evidence, and signature describe one task. For multiple choice, correct_option_id and correct_option_index must select the same visible option and expected_answer must be an exact copy of its text; explanation belongs only in solution. When correcting, update options, correct option ID/index, expected answer, and solution together, then return the complete fresh package. Set `task_package_consistent`, `difficulty_evidence_valid`, and `task_signature_consistent` accordingly.\n\n"
+        "11. verify that lesson identity, level, text, options, marked answer, solution, difficulty evidence, and signature describe one task. For multiple choice, correct_option_id and correct_option_index must select the same visible option and expected_answer must be an exact copy of its text; explanation belongs only in solution. Signature parameters are only closed name/value entries with canonical string values: no arbitrary metadata, and order alone is never a new task. When correcting, update options, correct option ID/index, expected answer, solution, and the complete signature together, then return the complete fresh package. Set `task_package_consistent`, `difficulty_evidence_valid`, and `task_signature_consistent` accordingly.\n\n"
         "ODLUKA:\n"
         "- `approve` — nacrt je ispravan; prepiši ga nepromijenjen u `final`;\n"
         "- `correct` — nacrt je popravljiv; u `final` vrati KOMPLETAN ispravljen "

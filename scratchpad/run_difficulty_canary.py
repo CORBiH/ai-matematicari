@@ -221,7 +221,7 @@ from matbot import (config, difficulty_level, feedback, lesson_fidelity, mathsaf
                     mcq_integrity, practice)  # noqa: E402
 from matbot.contracts import difficulty as contract_difficulty  # noqa: E402
 from matbot.contracts import registry as contract_registry  # noqa: E402
-from matbot.llm import LLMError, OpenAIPracticeLLM  # noqa: E402
+from matbot.llm import LLMError, OpenAIPracticeLLM, safe_failure_diagnostics  # noqa: E402
 from matbot.mathcheck import find_numeric_inconsistencies  # noqa: E402
 from matbot.mathsegments import DISPLAY, INLINE, TEXT, tokenize_math  # noqa: E402
 from matbot.session_store import SessionStore  # noqa: E402
@@ -248,6 +248,13 @@ FAILURE_CLASSES = (
     "api_timeout",
     "api_error",
     "schema_or_parse_error",
+    "llm_schema_parse_error",
+    "llm_empty_output",
+    "llm_incomplete_max_output_tokens",
+    "llm_refusal",
+    "llm_invalid_output_unknown",
+    "tutor_payload_rejection",
+    "reviewer_payload_rejection",
     "reviewer_rejection",
     "deterministic_validation_rejection",
     "target_profile_rejection",
@@ -264,6 +271,7 @@ _SAFE_LOG_PREFIXES = (
     "practice_turn ", "practice_choice ", "practice_contract_rejected ",
     "lesson_fidelity ", "practice_plan ", "practice_duplicate_options ",
     "practice_system_verification ", "practice_difficulty_label_mismatch ",
+    "tutor_rejected ",
 )
 _MAX_DIAGNOSTIC_CHARS = 400
 
@@ -320,12 +328,21 @@ def _classify_failure(messages: list[str]) -> str:
         return "reviewer_rejection"
     if "category=invalid_output" in blob:
         return "deterministic_validation_rejection"
+    if "stage=tutor_draft" in blob:
+        return "tutor_payload_rejection"
+    if "stage=reviewer_" in blob:
+        return "reviewer_payload_rejection"
     return "unknown_rejection"
+
+
+def _classify_llm_failure(category: Optional[str]) -> str:
+    """Keep adapter categories visible instead of collapsing them to unknown."""
+    return category or "unknown_rejection"
 
 
 # Classes that are INFRASTRUCTURE, not difficulty-controller behaviour. These
 # are reported separately and never counted as controller defects.
-_INFRASTRUCTURE_CLASSES = frozenset({"api_timeout", "api_error", "schema_or_parse_error"})
+_INFRASTRUCTURE_CLASSES = frozenset({"api_timeout", "api_error", "llm_timeout", "llm_sdk_error"})
 
 
 class SDKCallBudgetExceeded(RuntimeError):
@@ -351,6 +368,7 @@ class CountingLLM:
         self.call_log: list[str] = []
         self.last_tutor_output = None
         self.last_reviewer_output = None
+        self.last_failure = None
 
     def _count(self, method_name: str) -> None:
         if self.call_count + 1 > self.ceiling:
@@ -363,13 +381,13 @@ class CountingLLM:
 
     def practice_turn(self, instructions, input_text):
         self._count("practice_turn")
-        result = self._inner.practice_turn(instructions, input_text)
+        result = self._call("tutor", self._inner.practice_turn, instructions, input_text)
         self.last_tutor_output = result.output
         return result
 
     def lesson_fidelity_turn(self, instructions, input_text):
         self._count("lesson_fidelity_turn")
-        result = self._inner.lesson_fidelity_turn(instructions, input_text)
+        result = self._call("reviewer", self._inner.lesson_fidelity_turn, instructions, input_text)
         self.last_reviewer_output = result.output
         return result
 
@@ -380,11 +398,29 @@ class CountingLLM:
     # hard ceiling when the release gate explicitly selects that runtime.
     def tutor_turn(self, instructions, input_text):
         self._count("tutor_turn")
-        return self._inner.tutor_turn(instructions, input_text)
+        result = self._call("tutor", self._inner.tutor_turn, instructions, input_text)
+        self.last_tutor_output = result.output
+        return result
 
     def reviewer_turn(self, instructions, input_text):
         self._count("reviewer_turn")
-        return self._inner.reviewer_turn(instructions, input_text)
+        result = self._call("reviewer", self._inner.reviewer_turn, instructions, input_text)
+        self.last_reviewer_output = result.output
+        return result
+
+    def _call(self, stage, method, instructions, input_text):
+        try:
+            return method(instructions, input_text)
+        except LLMError as error:
+            # The adapter already owns the scrubbed allow-list.  Retain only
+            # that data so a rejected turn can be classified after Practice
+            # deliberately hides the implementation error from the student.
+            self.last_failure = {
+                "stage": stage,
+                "category": getattr(error, "category", "llm_error"),
+                "diagnostics": safe_failure_diagnostics(error),
+            }
+            raise
 
 
 # ---------------------------------------------------------------------------
@@ -512,6 +548,9 @@ class TurnResult:
     session_unchanged_after_rejection: Optional[bool] = None
     failure_class: Optional[str] = None
     failure_is_infrastructure: Optional[bool] = None
+    llm_failure_stage: Optional[str] = None
+    llm_failure_category: Optional[str] = None
+    llm_failure_diagnostics: dict = field(default_factory=dict)
     student_facing_response: Optional[str] = None
     diagnostics: list = field(default_factory=list)
     content_flags: list = field(default_factory=list)
@@ -1644,6 +1683,7 @@ def _run_one_turn(store, llm, capture, report, scenario: Scenario, campaign: str
     result.attempted = True
     llm.last_tutor_output = None
     llm.last_reviewer_output = None
+    llm.last_failure = None
     capture.reset()
 
     try:
@@ -1718,7 +1758,12 @@ def _run_one_turn(store, llm, capture, report, scenario: Scenario, campaign: str
                 result.published_task_text or "", result.expected_answer)
             _record_answer_metadata(result, response, after_session, llm)
     else:
-        result.failure_class = _classify_failure(capture.messages)
+        failure = getattr(llm, "last_failure", None) or {}
+        result.llm_failure_stage = failure.get("stage")
+        result.llm_failure_category = failure.get("category")
+        result.llm_failure_diagnostics = failure.get("diagnostics") or {}
+        result.failure_class = _classify_llm_failure(result.llm_failure_category) \
+            if result.llm_failure_category else _classify_failure(capture.messages)
         result.failure_is_infrastructure = result.failure_class in _INFRASTRUCTURE_CLASSES
         result.effective_server_label = None   # explicitly unchanged
         result.expected_answer = None

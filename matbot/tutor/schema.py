@@ -13,7 +13,7 @@ Nijedno interno polje (dijagnostika težine, nezavisno rješenje recenzenta,
 """
 import hashlib
 import json
-from typing import Any, Literal, Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict
 
@@ -76,18 +76,47 @@ class DifficultyEvidence(BaseModel):
     combines_concepts: bool
 
 
+class SignatureParameter(BaseModel):
+    """One closed, lesson-independent mathematical signature parameter."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    value: str
+
+
 class TaskSignature(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     task_family: str
     operation_or_relation: str
-    normalized_parameters: dict[str, Any]
+    normalized_parameters: list[SignatureParameter]
     required_conditions: list[str]
     relevant_objects: list[str]
     answer_type: str
 
     def canonical_json(self) -> str:
-        return json.dumps(self.model_dump(), ensure_ascii=True, sort_keys=True,
+        """Stable duplicate fingerprint, independent of model list ordering.
+
+        Parameter, condition, and object order is presentation metadata here;
+        repeated values are retained so meaningful multiplicity is never lost.
+        A mathematically ordered sequence must encode that order in a parameter
+        value or role instead of relying on this transport list's position.
+        """
+        canonical = {
+            "task_family": self.task_family.strip(),
+            "operation_or_relation": self.operation_or_relation.strip(),
+            "normalized_parameters": sorted(
+                ({"name": parameter.name.strip(), "value": parameter.value.strip()}
+                 for parameter in self.normalized_parameters),
+                key=lambda parameter: (parameter["name"], parameter["value"]),
+            ),
+            "required_conditions": sorted(condition.strip()
+                                          for condition in self.required_conditions),
+            "relevant_objects": sorted(obj.strip() for obj in self.relevant_objects),
+            "answer_type": self.answer_type.strip(),
+        }
+        return json.dumps(canonical, ensure_ascii=True, sort_keys=True,
                           separators=(",", ":"))
 
     def digest(self) -> str:
