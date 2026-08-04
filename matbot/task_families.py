@@ -470,3 +470,21 @@ def is_duplicate_shape(signature, recent_signatures, retry_required=False):
             continue
         return True
     return False
+
+
+def is_duplicate_mathematical_task(signature, recent_signatures):
+    """True for a repeated server-derived mathematical MCQ fingerprint.
+
+    The normal text/shape safeguards stay in force.  This third, optional
+    signal exists only when a narrow deterministic oracle could derive a
+    fingerprint (currently parseable divisibility MCQs), so blank values never
+    turn ordinary creative tasks into false duplicates.
+    """
+    fingerprint = signature.get("mathematical_fingerprint") or ""
+    if not fingerprint:
+        return False
+    return any(
+        previous.get("lesson_id") == signature.get("lesson_id")
+        and previous.get("mathematical_fingerprint") == fingerprint
+        for previous in (recent_signatures or [])
+    )

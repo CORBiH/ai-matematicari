@@ -217,7 +217,8 @@ def _check_preconditions() -> None:
 # Safe to import the application — none of this makes a model call.
 sys.path.insert(0, str(ROOT))
 
-from matbot import config, difficulty_level, feedback, lesson_fidelity, mathsafe, practice  # noqa: E402
+from matbot import (config, difficulty_level, feedback, lesson_fidelity, mathsafe,
+                    mcq_integrity, practice)  # noqa: E402
 from matbot.contracts import difficulty as contract_difficulty  # noqa: E402
 from matbot.contracts import registry as contract_registry  # noqa: E402
 from matbot.llm import LLMError, OpenAIPracticeLLM  # noqa: E402
@@ -826,6 +827,45 @@ def _record_rejected_generation_diagnostics(result: TurnResult, llm) -> None:
             )
 
 
+def _supported_divisibility_mcq_errors(result: TurnResult) -> list[str]:
+    """Independently prove a supported visible divisibility MCQ is sound.
+
+    The live runner must not mistake the server's committed marked option for
+    a mathematical proof.  This is intentionally the same narrow oracle used
+    by publication: only explicit divisibility conditions with bare integer
+    options are evaluated; prose choices remain outside its claimed scope.
+    """
+    options = result.next_state_options or []
+    if not options:
+        return []
+    texts = [option.get("text", "") for option in options if isinstance(option, dict)]
+    evaluation = mcq_integrity.evaluate_divisibility_mcq(
+        result.published_task_text or "", texts,
+    )
+    if not evaluation.applicable:
+        return []
+    ids = [option.get("id") for option in options if isinstance(option, dict)]
+    if len(ids) != len(options) or len(set(ids)) != len(ids):
+        return ["duplicate_or_missing_option_ids"]
+    if len(set(texts)) != len(texts):
+        return ["duplicate_visible_option_texts"]
+    marked_id = result.internal_correct_option_id_after or ""
+    if marked_id not in ids:
+        return ["marked_option_id_missing_from_committed_options"]
+    marked_index = ids.index(marked_id)
+    failure, evaluation = mcq_integrity.publication_failure(
+        result.published_task_text or "", texts, marked_index, result.expected_answer or "",
+    )
+    if failure:
+        return [failure]
+    if evaluation.applicable:
+        if result.visible_correct_option_value != texts[evaluation.correct_index]:
+            return ["marked_option_math_mismatch"]
+        if result.model_marked_option_value != result.visible_correct_option_value:
+            return ["explanation_answer_mismatch"]
+    return []
+
+
 def _validate_divisibility_final_turn(result: TurnResult) -> list[str]:
     """Return every fail-closed condition for the focused final campaign."""
     errors: list[str] = []
@@ -897,6 +937,7 @@ def _validate_divisibility_final_turn(result: TurnResult) -> list[str]:
     if any("answer_kind=" in message and "u suprotnosti" in message
            for message in result.diagnostics):
         errors.append("answer_kind_mismatch")
+    errors.extend(_supported_divisibility_mcq_errors(result))
 
     checks = result.reviewer_checks or {}
     for check_name in (
@@ -1011,6 +1052,18 @@ def _run_divisibility_final_static_checks() -> None:
     assert "canonicalization_evidence_missing" in _validate_divisibility_final_turn(
         missing_evidence
     )
+
+    invalid_options = TurnResult(
+        scenario="divisibility_final_fresh_level1", lesson_id=DIVISIBILITY[0],
+        lesson_title="static check", path="non_contract", grade=DIVISIBILITY[1], request_type="",
+        published_task_text="Koji od sljedećih brojeva je djeljiv sa 25?",
+        expected_answer="725", next_state_options=[
+            {"id": "a", "text": "725"}, {"id": "b", "text": "550"},
+            {"id": "c", "text": "600"}, {"id": "d", "text": "375"},
+        ], internal_correct_option_id_after="a", visible_correct_option_value="725",
+        model_marked_option_value="725",
+    )
+    assert _supported_divisibility_mcq_errors(invalid_options) == ["multiple_correct_options"]
 
 
 _SMOKE_DIVISIBILITY_RULE_RE = re.compile(
@@ -1210,6 +1263,7 @@ def _validate_production_smoke_final_turn(result: TurnResult) -> list[str]:
         if any("answer_kind=" in message and "u suprotnosti" in message
                for message in result.diagnostics):
             errors.append("answer_kind_mismatch")
+        errors.extend(_supported_divisibility_mcq_errors(result))
 
         checks = result.reviewer_checks or {}
         for check_name in (

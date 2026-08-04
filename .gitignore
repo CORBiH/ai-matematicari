@@ -8,3 +8,4 @@ __pycache__/
 venv/
 .pytest_cache/
 storage/
+scratchpad/live_release_gate/

@@ -160,6 +160,11 @@ _FRESH_L1 = ("Je li broj 47 djeljiv sa 5?", ("Ne", "Da", "Samo sa 2", "Ne može 
 # nesklad koji je uživo srušio objavu.
 _HARDER_L2 = ("Koji od ponuđenih brojeva je djeljiv i sa 2 i sa 3?",
               ("138", "139", "140", "141"))
+# These tests exercise metadata and API option transport on a fresh session,
+# so they deliberately use a measurable Level-1 one-rule task.  The two-rule
+# fixture above remains the Level-2 transition fixture.
+_NUMERIC_SINGLE_RULE_L1 = ("Koji od ponuđenih brojeva je djeljiv sa 6?",
+                           ("138", "139", "140", "141"))
 
 
 def _mc_task(text, options, answer_kind, correct_index=0):
@@ -219,14 +224,14 @@ def test_canary_reproduction_keeps_options_in_the_api_response(monkeypatch):
     session_id = "ak-options"
     _enable_levels(monkeypatch)
     store, fake = SessionStore(), FakeLLM()
-    queue_generation(fake, _mc_task(*_HARDER_L2, answer_kind="option_label"))
+    queue_generation(fake, _mc_task(*_NUMERIC_SINGLE_RULE_L1, answer_kind="option_label"))
     response = run_practice_turn(store, fake, _turn(topic, grade, session_id))
 
     assert response["status"] == "ready"
     task = response["next_state"]["task"]
     # Sve četiri opcije su STVARNO u API odgovoru (redoslijed je promiješan,
     # pa se poredi skup, ne lista).
-    assert {o["text"] for o in task["options"]} == set(_HARDER_L2[1])
+    assert {o["text"] for o in task["options"]} == set(_NUMERIC_SINGLE_RULE_L1[1])
     assert len(task["options"]) == 4
     assert {o["id"] for o in task["options"]} == {"a", "b", "c", "d"}
     # `answer` nosi samo uvod + pitanje — zato je canary terminal, koji je
@@ -260,7 +265,7 @@ def test_already_consistent_numeric_declaration_is_not_normalized(monkeypatch):
     session_id = "ak-consistent"
     _enable_levels(monkeypatch)
     store, fake = SessionStore(), FakeLLM()
-    queue_generation(fake, _mc_task(*_HARDER_L2, answer_kind="integer"))
+    queue_generation(fake, _mc_task(*_NUMERIC_SINGLE_RULE_L1, answer_kind="integer"))
     response = run_practice_turn(store, fake, _turn(topic, grade, session_id))
     assert response["status"] == "ready"
     assert canonical_answer_kind("integer", "138") == ("integer", False)
@@ -271,7 +276,7 @@ def test_normalization_is_logged_with_declared_and_canonical(monkeypatch, caplog
     session_id = "ak-log"
     _enable_levels(monkeypatch)
     store, fake = SessionStore(), FakeLLM()
-    queue_generation(fake, _mc_task(*_HARDER_L2, answer_kind="option_label"))
+    queue_generation(fake, _mc_task(*_NUMERIC_SINGLE_RULE_L1, answer_kind="option_label"))
     with caplog.at_level("INFO", logger="matbot.practice"):
         response = run_practice_turn(store, fake, _turn(topic, grade, session_id))
     assert response["status"] == "ready"

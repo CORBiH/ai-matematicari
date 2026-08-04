@@ -30,7 +30,7 @@ import random
 import uuid
 
 from matbot import (config, difficulty_level, feedback, geometry_rules,
-                    geometrycheck, lesson_fidelity, option_equivalence,
+                    geometrycheck, lesson_fidelity, mcq_integrity, option_equivalence,
                     prompts, systemcheck, task_families)
 from matbot.contracts import archetypes as contract_archetypes
 from matbot.contracts import difficulty as contract_difficulty
@@ -181,6 +181,17 @@ def _log_ordered_pair_verification(request_id, topic, family, diagnostics):
         diagnostics.get("computed_pair_status"), diagnostics.get("matching_option_indices"),
         diagnostics.get("marked_option_index"), diagnostics.get("equation_truth_values"),
         diagnostics.get("mapped_option_statuses"),
+    )
+
+
+def _log_mcq_integrity_rejection(request_id, topic, family, diagnostics):
+    """Log only server-derived MCQ integrity facts, never raw model output."""
+    logger.warning(
+        "practice_mcq_integrity request_id=%s topic=%s family=%s reason=%s "
+        "option_count=%s correct_count=%s marked_option_index=%s math_fingerprint=%s",
+        request_id, topic or "", family or "", diagnostics.get("reason_code", ""),
+        diagnostics.get("option_count", 0), diagnostics.get("correct_count", 0),
+        diagnostics.get("marked_option_index"), diagnostics.get("math_fingerprint", ""),
     )
 
 
@@ -401,6 +412,20 @@ def _review_lesson_fidelity(llm, session, turn, new_task, family="", request_id=
             raise lesson_fidelity.FidelityRejected(
                 exact_skill_failure, failed_checks=("tests_exact_lesson",),
             )
+        direction_failure = lesson_fidelity.deterministic_difficulty_failure(
+            context.title,
+            published_task.text,
+            [option.text for option in published_task.options],
+            target_level=target_difficulty_level,
+            requested_difficulty=turn["difficulty_request"],
+            level_changed=level_changed,
+            prior_task=session["current_task"],
+            prior_option_texts=[option["text"] for option in session["current_options"]],
+        )
+        if direction_failure:
+            raise lesson_fidelity.FidelityRejected(
+                direction_failure, failed_checks=(direction_failure,),
+            )
     except lesson_fidelity.FidelityRejected as error:
         # Koncizan, SAMO interni log (nikad prompt ni učenikov tekst): odluka
         # recenzenta, koje su obavezne provjere oborene i faza na kojoj je
@@ -498,6 +523,7 @@ def _apply_new_task(session, new_task, task_family="", request_id="",
     InvalidOutputError koju pozivalac (run_practice_turn) već hvata i vraća
     postojeći sigurni fallback, BEZ mutacije sesije i BEZ drugog AI poziva.
     """
+    difficulty_level_before = session.get("difficulty_level", 1)
     task_text, task_safe = sanitize_and_validate_math_text(new_task.text.strip())
     if not task_safe:
         raise InvalidOutputError("nebezbjedan matematički zapis u tekstu zadatka")
@@ -578,6 +604,27 @@ def _apply_new_task(session, new_task, task_family="", request_id="",
             ],
             "correct_option_index": new_task.correct_option_index,
             "expected_answer": new_task.expected_answer,
+        }
+        raise err
+
+    # A narrow mathematical oracle protects the class of MCQs for which the
+    # server can prove the answer independently: explicit divisibility rules
+    # and four bare integer options.  It intentionally says nothing about
+    # prose choices or any other kind of mathematics.  This happens before
+    # IDs, shuffle, signatures and every session mutation.
+    mcq_failure, mcq_result = mcq_integrity.publication_failure(
+        task_text, sanitized_texts, new_task.correct_option_index,
+        new_task.expected_answer,
+    )
+    mcq_fingerprint = mcq_integrity.mathematical_fingerprint(mcq_result, task_family)
+    if mcq_failure:
+        err = InvalidOutputError(f"mcq_integrity: {mcq_failure}")
+        err.mcq_integrity_diagnostics = {
+            "reason_code": mcq_failure,
+            "option_count": len(sanitized_texts),
+            "correct_count": len(mcq_result.correct_indices),
+            "marked_option_index": new_task.correct_option_index,
+            "math_fingerprint": mcq_fingerprint,
         }
         raise err
 
@@ -776,6 +823,8 @@ def _apply_new_task(session, new_task, task_family="", request_id="",
     signature = task_families.task_signature(
         task_family, task_text, session["lesson_id"], effective_difficulty_label
     )
+    if mcq_fingerprint:
+        signature["mathematical_fingerprint"] = mcq_fingerprint
     if task_families.is_duplicate_signature(signature, session["recent_task_signatures"]):
         raise InvalidOutputError("ponovljen tekst zadatka u istoj sesiji")
     if task_families.is_duplicate_shape(
@@ -785,6 +834,17 @@ def _apply_new_task(session, new_task, task_family="", request_id="",
         raise InvalidOutputError(
             f"pedagogical_shape_repeat: {task_family or '(bez porodice)'}"
         )
+    if task_families.is_duplicate_mathematical_task(
+            signature, session["recent_task_signatures"]):
+        err = InvalidOutputError("duplicate_mathematical_task")
+        err.mcq_integrity_diagnostics = {
+            "reason_code": "duplicate_mathematical_task",
+            "option_count": len(sanitized_texts),
+            "correct_count": len(mcq_result.correct_indices),
+            "marked_option_index": new_task.correct_option_index,
+            "math_fingerprint": mcq_fingerprint,
+        }
+        raise err
 
     current_options, correct_option_id = _shuffle_options(sanitized_texts, new_task.correct_option_index)
 
@@ -808,6 +868,22 @@ def _apply_new_task(session, new_task, task_family="", request_id="",
         if not session["recently_used_families"] or session["recently_used_families"][-1] != task_family:
             session["recently_used_families"].append(task_family)
     session["recent_task_signatures"].append(signature)
+    logger.info(
+        "practice_task_publication request_id=%s topic=%s family=%s "
+        "difficulty_level_before=%s target_difficulty_level=%s difficulty_level_after=%s "
+        "effective_difficulty_label=%s option_count=%s mcq_supported=%s "
+        "detected_correct_option_count=%s marked_option_math_match=%s "
+        "math_fingerprint=%s duplicate_mathematical_task_detected=%s "
+        "publication_result=%s reason_code=%s",
+        request_id, session["lesson_id"], task_family or "", difficulty_level_before,
+        target_difficulty_level if target_difficulty_level is not None else "-",
+        session.get("difficulty_level", difficulty_level_before), effective_difficulty_label,
+        len(sanitized_texts), mcq_result.applicable, len(mcq_result.correct_indices),
+        (not mcq_result.applicable or mcq_result.correct_index == new_task.correct_option_index),
+        mcq_fingerprint, False,
+        "published_valid_unique_option" if mcq_result.applicable else "published",
+        "-",
+    )
     return task_text
 
 
@@ -1168,6 +1244,9 @@ def _handle_text_turn(store, llm, session, turn, lesson_id, request_id):
             _log_ordered_pair_verification(
                 request_id, lesson_id, selected_shape, ordered_pair_diagnostics
             )
+        mcq_diagnostics = getattr(e, "mcq_integrity_diagnostics", None)
+        if mcq_diagnostics:
+            _log_mcq_integrity_rejection(request_id, lesson_id, selected_shape, mcq_diagnostics)
         return _error_response(active_task_before_llm)
     except Exception:
         # Zadnja linija odbrane za NEOČEKIVANE greške u obradi ovog turna
@@ -1351,6 +1430,12 @@ def _handle_choice_answer(store, llm, session, turn, lesson_id, request_id):
         # odgovor i za OTKRIVANJE rješenja (drugi pogrešan) ovo je autoritativno
         # objašnjenje i pogrešna oznaka ga odbija u cijelosti.
         _reject_if_geometry_notation_invalid(reply, geo_scope, geo_figures, "choice_feedback")
+        feedback_failure = mcq_integrity.feedback_failure(
+            session["current_task"], session["current_options"],
+            session["correct_option_id"], reply,
+        )
+        if feedback_failure:
+            raise InvalidOutputError(f"mcq_integrity_feedback: {feedback_failure}")
 
         session["recent_turns"].append({
             "student": f"[izabrao opciju: {selected_text}]"[:300],

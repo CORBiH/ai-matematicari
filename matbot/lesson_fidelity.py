@@ -27,6 +27,7 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict
 
+from matbot import mcq_integrity
 from matbot.schema import NewTask
 
 # Namjere turna koje SMIJU platiti recenzenta. Sve ostalo ide zatečenim putem.
@@ -138,7 +139,10 @@ _DIVISIBILITY_RULES_REQUIREMENT = SemanticTaskRequirement(
         "- Valjano je provjeriti djeljivost sa 6, sa 10 i sa 25, izabrati broj koji "
         "ispunjava dva uslova djeljivosti ili obrazložiti pravilo koje dokazuje odgovor.\n"
         "- Ne pravi računanje količnika, ostatka ili obično dijeljenje kao glavni cilj; "
-        "takav korak smije biti samo pomoćni dok pitanje vidljivo ispituje djeljivost."
+        "takav korak smije biti samo pomoćni dok pitanje vidljivo ispituje djeljivost.\n"
+        "- Kad je zadat ciljani nivo: nivo 1 je jedno izričito pravilo i direktno "
+        "da/ne pitanje; nivo 2 kombinuje dva pravila ili traži izbor/obrazloženje; "
+        "nivo 3 traži konstrukciju, poređenje ili više povezanih uslova."
     ),
     reviewer_instruction=(
         "RECENZENT: ako vidljivi nacrt ne zadovoljava gornji semantički zahtjev, "
@@ -168,6 +172,41 @@ def exact_lesson_skill_failure(lesson_title, task_text):
     """
     requirement = semantic_task_requirement(lesson_title)
     return requirement.failure_for(task_text) if requirement is not None else None
+
+
+def deterministic_difficulty_failure(lesson_title, task_text, option_texts,
+                                     target_level=0, requested_difficulty="",
+                                     level_changed=True, prior_task="",
+                                     prior_option_texts=()):
+    """Return the fail-closed code for a measurable divisibility transition.
+
+    This rule is selected solely from the lesson title.  It intentionally
+    checks only visible shapes the server can derive, while the Reviewer keeps
+    its existing role for broader pedagogical judgment.
+    """
+    if not target_level or semantic_task_requirement(lesson_title) is None:
+        return None
+    profile = mcq_integrity.difficulty_profile(task_text, option_texts)
+    request = (requested_difficulty or "").strip().lower()
+    # A fresh/same-level task that is outside the deliberately narrow
+    # measurable shape remains on the established Reviewer + publication path.
+    # A requested *change*, however, cannot truthfully claim harder/easier
+    # unless both sides are independently measurable.
+    if not profile.measurable:
+        return "difficulty_direction_not_measurable" \
+            if request in ("harder", "easier") and level_changed else None
+    if profile.level != target_level:
+        return "difficulty_direction_not_measurable"
+    if request not in ("harder", "easier") or not level_changed:
+        return None
+    prior = mcq_integrity.difficulty_profile(prior_task, prior_option_texts)
+    if not prior.measurable:
+        return "difficulty_direction_not_measurable"
+    if request == "harder" and not profile.level > prior.level:
+        return "difficulty_direction_not_measurable"
+    if request == "easier" and not profile.level < prior.level:
+        return "difficulty_direction_not_measurable"
+    return None
 
 
 def is_task_generating(new_task, difficulty_request=""):

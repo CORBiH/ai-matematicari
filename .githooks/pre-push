@@ -1,0 +1,85 @@
+#!/bin/sh
+# Commit-bound MAT-BOT behavior gate.  This hook never runs paid tests; it
+# only validates an already completed local release-gate result for each local
+# commit being pushed.  No environment-variable bypass exists.
+
+set -u
+
+ZERO_SHA="0000000000000000000000000000000000000000"
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || {
+  echo "LIVE RELEASE GATE FAILED — PUSH BLOCKED"
+  echo "Cannot resolve the Git repository root."
+  exit 1
+}
+cd "$ROOT" || exit 1
+
+if [ -f .venv/Scripts/python.exe ]; then
+  PYTHON=".venv/Scripts/python.exe"
+elif [ -x .venv/bin/python ]; then
+  PYTHON=".venv/bin/python"
+elif command -v python3 >/dev/null 2>&1; then
+  PYTHON="$(command -v python3)"
+elif command -v python >/dev/null 2>&1; then
+  PYTHON="$(command -v python)"
+else
+  echo "LIVE RELEASE GATE FAILED — PUSH BLOCKED"
+  echo "No usable Python interpreter was found for the offline release-gate checker."
+  exit 1
+fi
+
+needs_gate_for_paths() {
+  while IFS= read -r path; do
+    case "$path" in
+      docs/*.md|README.md|LICENSE|LICENSE.*) ;;
+      matbot/*|app.py|templates/*|static/*|data/*|contracts/*|requirements*.txt|pyproject.toml|poetry.lock|Pipfile*|Dockerfile*|docker-compose*|docker/*|tools/*|scratchpad/run_difficulty_canary.py|tests/*|.githooks/*)
+        return 0 ;;
+      *) return 0 ;;
+    esac
+  done
+  return 1
+}
+
+blocked=0
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ -n "${local_sha:-}" ] || continue
+  # A deleted local ref has no local commit to validate.
+  [ "$local_sha" = "$ZERO_SHA" ] && continue
+
+  if [ "${remote_sha:-$ZERO_SHA}" = "$ZERO_SHA" ]; then
+    pushed_commits="$(git rev-list "$local_sha" --not --remotes 2>/dev/null)" || {
+      echo "LIVE RELEASE GATE FAILED — PUSH BLOCKED"
+      echo "Cannot determine commits being pushed for $local_sha."
+      exit 1
+    }
+  else
+    pushed_commits="$(git rev-list "$remote_sha..$local_sha" 2>/dev/null)" || {
+      echo "LIVE RELEASE GATE FAILED — PUSH BLOCKED"
+      echo "Cannot determine commits being pushed for $local_sha."
+      exit 1
+    }
+  fi
+
+  [ -n "$pushed_commits" ] || pushed_commits="$local_sha"
+  for pushed_sha in $pushed_commits; do
+    changed_paths="$(git diff-tree --no-commit-id --name-only -r "$pushed_sha" 2>/dev/null)" || {
+      echo "LIVE RELEASE GATE FAILED — PUSH BLOCKED"
+      echo "Cannot determine changed paths for $pushed_sha."
+      exit 1
+    }
+    if ! printf '%s\n' "$changed_paths" | needs_gate_for_paths; then
+      continue
+    fi
+
+    result="scratchpad/live_release_gate/$pushed_sha.json"
+    if ! "$PYTHON" tools/check_live_release_gate.py "$result" --expected-commit "$pushed_sha" \
+        --expected-tree "$(git rev-parse "$pushed_sha^{tree}" 2>/dev/null)"; then
+      echo ""
+      echo "Push blocked: behavior-affecting commit $pushed_sha lacks a fresh passing release-gate result."
+      echo "Run exactly:"
+      echo "  & .\.venv\Scripts\python.exe .\tools\run_live_release_gate.py"
+      blocked=1
+    fi
+  done
+done
+
+exit "$blocked"
