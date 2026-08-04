@@ -312,10 +312,19 @@ def build_input(session, student_message, intent="", difficulty_request="", inte
     # Reviewer and final publication gate.  It is present before the first
     # Tutor call so the model does not waste the two-call generation budget on
     # adjacent skills such as ordinary division.
-    from matbot.lesson_fidelity import semantic_task_requirement
+    from matbot.lesson_fidelity import (semantic_task_requirement,
+                                        target_profile_prompt_block)
     semantic_requirement = semantic_task_requirement(session["lesson_title"])
     if semantic_requirement:
         lines.append(semantic_requirement.prompt_block)
+    target_profile_block = target_profile_prompt_block(
+        session["lesson_title"], target_difficulty_level,
+        session.get("current_task", ""),
+        [option.get("text", "") for option in session.get("current_options", [])],
+        task_family,
+    )
+    if target_profile_block:
+        lines.append(target_profile_block)
 
     if session["current_task"]:
         lines.append(f"AKTIVNI ZADATAK: {session['current_task']}")

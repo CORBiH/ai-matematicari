@@ -197,6 +197,61 @@ def test_measurable_divisibility_profiles_are_strictly_ordered():
     assert (level_one.level, level_two.level, level_three.level) == (1, 2, 3)
 
 
+def test_explicit_expected_answer_option_references_must_match_committed_shuffle():
+    options = [
+        {"id": "a", "text": "330"}, {"id": "b", "text": "275"},
+        {"id": "c", "text": "470"}, {"id": "d", "text": "182"},
+    ]
+    assert mcq_integrity.option_reference_failure(
+        "Treća opcija (broj 275).", options, "b",
+    ) == "expected_answer_option_reference_mismatch"
+    assert mcq_integrity.option_reference_failure("Druga opcija (broj 275).", options, "b") == ""
+    assert mcq_integrity.option_reference_failure("Opcija B, broj 275.", options, "b") == ""
+    assert mcq_integrity.option_reference_failure("275", options, "b") == ""
+    assert mcq_integrity.option_reference_failure(
+        "Druga opcija (broj 470).", options, "b",
+    ) == "expected_answer_option_reference_mismatch"
+    assert mcq_integrity.option_reference_failure(
+        "Opcija C, broj 275.", options, "b",
+    ) == "expected_answer_option_reference_mismatch"
+
+
+def test_publication_rejects_expected_answer_ordinal_mismatch_after_server_shuffle(monkeypatch, caplog):
+    # Freeze the server shuffle only for this regression so positions map to
+    # a/b/c/d exactly as the captured live failure documented.
+    monkeypatch.setattr("matbot.practice.random.shuffle", lambda items: None)
+    store, fake = SessionStore(), FakeLLM()
+    task = _task(
+        "Koji broj je djeljiv sa 25?", ("330", "275", "470", "182"),
+        correct_index=1, expected="Treća opcija (broj 275).",
+    )
+    queue_generation(fake, task)
+    with caplog.at_level("WARNING", logger="matbot.practice"):
+        response = run_practice_turn(store, fake, _turn("ordinal-mismatch"))
+    assert response["answer"] == SAFE_ERROR_MESSAGE
+    assert store.peek("ordinal-mismatch") is None
+    assert "expected_answer_option_reference_mismatch" in "\n".join(
+        record.getMessage() for record in caplog.records
+    )
+
+
+def test_correct_click_feedback_rejects_a_stale_expected_answer_ordinal(monkeypatch):
+    monkeypatch.setattr("matbot.practice.random.shuffle", lambda items: None)
+    store, fake = SessionStore(), FakeLLM()
+    task = _task("Koji broj je djeljiv sa 25?", ("330", "275", "470", "182"),
+                 correct_index=1, expected="Druga opcija (broj 275).")
+    queue_generation(fake, task)
+    assert run_practice_turn(store, fake, _turn("ordinal-feedback"))["status"] == "ready"
+    before = copy.deepcopy(store.peek("ordinal-feedback"))
+    fake.queue(make_output(reply="Tačno. Treća opcija (broj 275) je ispravna."))
+    response = run_practice_turn(store, fake, _turn(
+        "ordinal-feedback", interaction_type="choice_answer", selected_option_id="b",
+        student_message="[klik]", client_turn_id="ordinal-feedback-click",
+    ))
+    assert response["answer"] == SAFE_ERROR_MESSAGE
+    assert store.peek("ordinal-feedback") == before
+
+
 def test_easier_divisibility_transition_requires_a_measurable_decrease(monkeypatch):
     monkeypatch.setenv("MATBOT_PRACTICE_DIFFICULTY_LEVELS", "enabled")
     store, fake = SessionStore(), FakeLLM()
@@ -233,3 +288,71 @@ def test_easier_divisibility_transition_requires_a_measurable_decrease(monkeypat
     ))
     assert published["status"] == "ready"
     assert store.peek(session_id)["difficulty_level"] == 1
+
+
+def test_easier_target_profile_is_shared_with_tutor_and_reviewer_and_rejects_wording_only_fix(monkeypatch):
+    monkeypatch.setenv("MATBOT_PRACTICE_DIFFICULTY_LEVELS", "enabled")
+    store, fake = SessionStore(), FakeLLM()
+    session_id = "live-easier-reproduction"
+    level_one = _direct_task("Je li broj 47 djeljiv sa 5?")
+    level_two = _task(
+        "Koji od ovih brojeva je djeljiv i sa 25 i sa 10?",
+        ("12650", "12640", "12560", "12345"),
+    )
+    wording_only_correction = _task(
+        "Izaberite broj koji je djeljiv i sa 10 i sa 25:",
+        ("12650", "12640", "12560", "12345"),
+    )
+    queue_generation(fake, level_one)
+    assert run_practice_turn(store, fake, _turn(session_id))["status"] == "ready"
+    queue_generation(fake, level_two, review=make_fidelity_review(
+        decision="approve", difficulty_level_appropriate=True, difficulty_direction_correct=True,
+    ))
+    assert run_practice_turn(store, fake, _turn(
+        session_id, difficulty_request="harder", student_message="Teži.",
+    ))["status"] == "ready"
+    before = copy.deepcopy(store.peek(session_id))
+
+    queue_generation(fake, level_two, review=make_fidelity_review(
+        decision="correct", corrected_task=wording_only_correction,
+        difficulty_level_appropriate=True, difficulty_direction_correct=True,
+    ))
+    rejected = run_practice_turn(store, fake, _turn(
+        session_id, difficulty_request="easier", student_message="Lakši.",
+    ))
+    tutor_prompt = fake.practice_calls[-1][1]
+    reviewer_prompt = fake.fidelity_calls[-1][1]
+    for prompt in (tutor_prompt, reviewer_prompt):
+        assert "CILJ PROFILA 1" in prompt
+        assert "profil=2; djelitelji=[25, 10]" in prompt
+        assert "otisak=" in prompt
+        assert "NE SMIJE ponoviti" in prompt
+    assert rejected["answer"] == SAFE_ERROR_MESSAGE
+    assert store.peek(session_id) == before
+    assert fake.call_count == 6  # Tutor + Reviewer only; no retry/third call.
+
+    genuine_level_one = _task(
+        "Koji od ovih brojeva je djeljiv sa 9?", ("126", "127", "128", "130"),
+    )
+    queue_generation(fake, genuine_level_one, review=make_fidelity_review(
+        decision="correct", corrected_task=genuine_level_one,
+        difficulty_level_appropriate=True, difficulty_direction_correct=True,
+    ))
+    published = run_practice_turn(store, fake, _turn(
+        session_id, difficulty_request="easier", student_message="Lakši.",
+    ))
+    assert published["status"] == "ready"
+    after = store.peek(session_id)
+    assert after["difficulty_level"] == 1
+    previous_fingerprint = mcq_integrity.mathematical_fingerprint(
+        mcq_integrity.evaluate_divisibility_mcq(level_two.text, [option.text for option in level_two.options]),
+        "direct_computation",
+    )
+    new_fingerprint = mcq_integrity.mathematical_fingerprint(
+        mcq_integrity.evaluate_divisibility_mcq(
+            after["current_task"], [option["text"] for option in after["current_options"]],
+        ),
+        after["current_family"],
+    )
+    assert new_fingerprint and new_fingerprint != previous_fingerprint
+    assert fake.call_count == 8  # Four generation turns, exactly Tutor + Reviewer each.

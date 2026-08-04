@@ -388,6 +388,7 @@ def _review_lesson_fidelity(llm, session, turn, new_task, family="", request_id=
         duplicate_reason=duplicate_reason,
         duplicate_task_text=duplicate_task_text,
         target_difficulty_level=target_difficulty_level,
+        prior_option_texts=[option["text"] for option in session["current_options"]],
     )
     result = llm.lesson_fidelity_turn(instructions, input_text)
     review = result.output
@@ -612,9 +613,8 @@ def _apply_new_task(session, new_task, task_family="", request_id="",
     # and four bare integer options.  It intentionally says nothing about
     # prose choices or any other kind of mathematics.  This happens before
     # IDs, shuffle, signatures and every session mutation.
-    mcq_failure, mcq_result = mcq_integrity.publication_failure(
+    mcq_failure, mcq_result = mcq_integrity.mathematical_publication_failure(
         task_text, sanitized_texts, new_task.correct_option_index,
-        new_task.expected_answer,
     )
     mcq_fingerprint = mcq_integrity.mathematical_fingerprint(mcq_result, task_family)
     if mcq_failure:
@@ -847,6 +847,23 @@ def _apply_new_task(session, new_task, task_family="", request_id="",
         raise err
 
     current_options, correct_option_id = _shuffle_options(sanitized_texts, new_task.correct_option_index)
+    option_reference_failure = mcq_integrity.option_reference_failure(
+        new_task.expected_answer, current_options, correct_option_id,
+    )
+    if (not option_reference_failure and mcq_result.applicable
+            and not mcq_integrity.expected_answer_matches_correct_option(
+                new_task.expected_answer, mcq_result)):
+        option_reference_failure = "explanation_answer_mismatch"
+    if option_reference_failure:
+        err = InvalidOutputError(f"mcq_integrity: {option_reference_failure}")
+        err.mcq_integrity_diagnostics = {
+            "reason_code": option_reference_failure,
+            "option_count": len(sanitized_texts),
+            "correct_count": len(mcq_result.correct_indices),
+            "marked_option_index": new_task.correct_option_index,
+            "math_fingerprint": mcq_fingerprint,
+        }
+        raise err
 
     session["current_task"] = task_text
     session["expected_answer_summary"] = new_task.expected_answer.strip()
@@ -1436,6 +1453,18 @@ def _handle_choice_answer(store, llm, session, turn, lesson_id, request_id):
         )
         if feedback_failure:
             raise InvalidOutputError(f"mcq_integrity_feedback: {feedback_failure}")
+        # Correct-answer feedback and final revealed explanations must not
+        # repeat an ordinal/letter that conflicts with the committed shuffle.
+        # A first wrong-answer hint is intentionally excluded: it may mention
+        # the student's selected position without claiming it is correct.
+        if is_correct or wrong_attempts_before >= 1:
+            option_reference_failure = mcq_integrity.option_reference_failure(
+                reply, session["current_options"], session["correct_option_id"],
+            )
+            if option_reference_failure:
+                raise InvalidOutputError(
+                    f"mcq_integrity_feedback: {option_reference_failure}"
+                )
 
         session["recent_turns"].append({
             "student": f"[izabrao opciju: {selected_text}]"[:300],

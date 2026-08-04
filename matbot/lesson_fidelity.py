@@ -164,6 +164,71 @@ def semantic_task_requirement_block(lesson_title):
     return requirement.prompt_block if requirement is not None else ""
 
 
+def target_profile_prompt_block(lesson_title, target_level=0, prior_task="",
+                                prior_option_texts=(), task_family=""):
+    """Shared, compact Tutor/Reviewer contract for measurable divisibility.
+
+    The text contains only server-derived visible task structure.  In
+    particular, it does not expose hidden expected answers, student history,
+    or raw prompts, and it is selected by title semantics rather than lesson
+    ID.  The final deterministic gate below remains authoritative.
+    """
+    if not target_level or semantic_task_requirement(lesson_title) is None:
+        return ""
+
+    target_rules = {
+        1: (
+            "CILJ PROFILA 1 (obavezan): tačno JEDAN izričito imenovan djelilac; "
+            "direktno da/ne, prepoznavanje ili izbor po JEDNOM pravilu. NEMA drugog "
+            "uslova djeljivosti, konstrukcije ni poređenja koje kombinuje pravila."
+        ),
+        2: (
+            "CILJ PROFILA 2 (obavezan): tačno mjerljiva standardna primjena — "
+            "dva istovremena uslova djeljivosti ILI jedno pravilo uz jasno dodatno "
+            "obrazloženje/korak."
+        ),
+        3: (
+            "CILJ PROFILA 3 (obavezan): mjerljivo napredna konstrukcija, višefazno "
+            "poređenje/obrazloženje ili najmanje tri međusobno povezana pravila."
+        ),
+    }.get(int(target_level))
+    if not target_rules:
+        return ""
+
+    prior_profile = mcq_integrity.difficulty_profile(prior_task, prior_option_texts)
+    prior_evaluation = mcq_integrity.evaluate_divisibility_mcq(
+        prior_task, prior_option_texts,
+    )
+    prior_fingerprint = mcq_integrity.mathematical_fingerprint(
+        prior_evaluation, task_family,
+    )
+    if prior_profile.measurable:
+        profile_summary = f"profil={prior_profile.level}; djelitelji={list(prior_profile.divisors)}"
+    else:
+        profile_summary = "profil=nedokaziv"
+    if prior_evaluation.applicable:
+        options_summary = list(prior_evaluation.option_values)
+        correct_summary = prior_evaluation.correct_value
+    else:
+        options_summary = []
+        correct_summary = None
+
+    return "\n".join((
+        "SERVER-ODREĐENI PROFIL NOVOG ZADATKA (ne pregovaraj):",
+        target_rules,
+        "PRETHODNA VIDLJIVA MATEMATIČKA STRUKTURA: "
+        f"{profile_summary}; opcije={options_summary}; tačna_vrijednost={correct_summary}; "
+        f"otisak={prior_fingerprint or '-'}.",
+        "NOVI/TEŽI/LAKŠI ZADATAK NE SMIJE ponoviti prethodni skup djelilaca i puni skup "
+        "opcija niti isti matematički otisak, čak ni parafrazom. Ispravka mora promijeniti "
+        "vidljivu matematičku strukturu, ne samo formulaciju.",
+        "RECENZENT: corrected_task smije biti odobren samo ako TAČNO zadovoljava ciljni "
+        "profil. Kod lakšeg zahtjeva dva izričita djelitelja, isti otisak ili isti puni "
+        "skup opcija nisu ispravka: postavi difficulty_direction_correct=false ili vrati "
+        "stvarno izmijenjen corrected_task.",
+    ))
+
+
 def exact_lesson_skill_failure(lesson_title, task_text):
     """Return a deterministic exact-skill failure, or ``None``.
 
@@ -299,7 +364,8 @@ def _option_lines(new_task):
 def build_input(context, new_task, student_message, family="",
                 family_description="", prior_task="", difficulty_request="",
                 family_contract_mismatch="", duplicate_reason="",
-                duplicate_task_text="", target_difficulty_level=0):
+                duplicate_task_text="", target_difficulty_level=0,
+                prior_option_texts=()):
     """`context` je matbot.tutor.lesson_context.LessonContext (dijeli se s
     univerzalnim putem — isti kanonski identitet, bez duplikata).
 
@@ -337,6 +403,11 @@ def build_input(context, new_task, student_message, family="",
     requirement = semantic_task_requirement(context.title)
     if requirement:
         lines.extend(("", requirement.prompt_block, requirement.reviewer_instruction))
+    target_profile_block = target_profile_prompt_block(
+        context.title, target_difficulty_level, prior_task, prior_option_texts, family,
+    )
+    if target_profile_block:
+        lines.extend(("", target_profile_block))
     if family:
         label = f"{family} — {family_description}" if family_description else family
         lines.append(f"- dodijeljena porodica zadatka: {label}")

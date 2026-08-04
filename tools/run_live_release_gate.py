@@ -282,6 +282,32 @@ def _selected_lessons(plan: Iterable[GateScenario]) -> list[dict]:
     return rows
 
 
+def _failure_console_lines(document: dict, result_path: Path) -> list[str]:
+    """Return concise, safe diagnostics for a persisted failed gate result."""
+    scenarios = document.get("scenarios") or []
+    failed = next((row for row in scenarios if row.get("errors")), None)
+    if failed is None and scenarios:
+        failed = scenarios[-1]
+    failed = failed or {}
+    result = failed.get("result") if isinstance(failed.get("result"), dict) else {}
+    reasons = failed.get("errors") or document.get("validation_failures") or ["unknown_failure"]
+    relative_path = result_path.relative_to(ROOT).as_posix()
+    return [
+        f"FAILED SCENARIO: {failed.get('role', 'unknown')}",
+        f"COMPLETED SCENARIOS: {document.get('scenario_count', 0)}/{REQUIRED_SCENARIO_COUNT}",
+        f"REASON: {reasons[0]}",
+        "LEVELS: previous={previous} target={target} committed={committed}".format(
+            previous=result.get("previous_level", "-"), target=result.get("target_level", "-"),
+            committed=result.get("session_level_after", "-"),
+        ),
+        f"SDK CALLS: {document.get('actual_sdk_calls', 0)}/{SDK_CALL_CEILING}",
+        "STATE PRESERVED: " + str(
+            result.get("session_unchanged_after_rejection") is True
+        ).lower(),
+        f"RESULT: {relative_path}",
+    ]
+
+
 def run_live_release_gate() -> int:
     commit_sha, tree_hash = _require_live_preconditions()
     plan = build_release_gate_plan(commit_sha)
@@ -362,8 +388,12 @@ def run_live_release_gate() -> int:
     }
     RESULT_DIR.mkdir(parents=True, exist_ok=True)
     encoded = json.dumps(document, ensure_ascii=False, indent=2)
-    (RESULT_DIR / f"{commit_sha}.json").write_text(encoded, encoding="utf-8")
+    result_path = RESULT_DIR / f"{commit_sha}.json"
+    result_path.write_text(encoded, encoding="utf-8")
     (RESULT_DIR / "latest.json").write_text(encoded, encoding="utf-8")
+    if not passed:
+        for line in _failure_console_lines(document, result_path):
+            print(line)
     print(document["final_verdict"])
     return 0 if passed else 1
 

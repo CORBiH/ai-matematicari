@@ -93,3 +93,26 @@ def test_all_required_scenarios_are_required_for_pass():
     errors = checker.validate_result(shortened, expected_commit=SHA, expected_tree=TREE)
     assert "wrong_scenario_count" in errors
     assert "required_scenarios_missing" in errors
+
+
+def test_failed_live_gate_console_summary_is_informative_and_does_not_echo_hidden_content():
+    document = _passing_document()
+    document.update({"verdict": "FAIL", "scenario_count": 6, "actual_sdk_calls": 9})
+    document["scenarios"] = [{
+        "role": "easier_level1", "errors": ["difficulty_direction_not_measurable"],
+        "result": {
+            "previous_level": 2, "target_level": 1, "session_level_after": 2,
+            "session_unchanged_after_rejection": True,
+            "expected_answer": "SECRET/hidden answer must never be printed",
+        },
+    }]
+    lines = runner._failure_console_lines(
+        document, runner.RESULT_DIR / f"{SHA}.json",
+    )
+    report = "\n".join(lines)
+    assert "FAILED SCENARIO: easier_level1" in report
+    assert "REASON: difficulty_direction_not_measurable" in report
+    assert "LEVELS: previous=2 target=1 committed=2" in report
+    assert "SDK CALLS: 9/19" in report
+    assert "STATE PRESERVED: true" in report
+    assert "SECRET" not in report

@@ -25,6 +25,13 @@ _OR_RE = re.compile(r"\bili\b", re.IGNORECASE)
 _ANSWER_NUMBER_RE = re.compile(r"(?<!\d)-?\d+(?!\d)")
 _AFFIRMATIVE_RE = re.compile(r"\b(?:da|jeste|jest|ta[čc]no|djeljiv\w*)\b", re.IGNORECASE)
 _NEGATIVE_RE = re.compile(r"\b(?:ne|nije|nisu|neta[čc]no)\b", re.IGNORECASE)
+_OPTION_ORDINAL_PATTERNS = (
+    (0, re.compile(r"\b(?:prva|prvi|first|1\.)\s+(?:opcija|option)\b", re.IGNORECASE)),
+    (1, re.compile(r"\b(?:druga|drugi|second|2\.)\s+(?:opcija|option)\b", re.IGNORECASE)),
+    (2, re.compile(r"\b(?:treća|treci|treći|third|3\.)\s+(?:opcija|option)\b", re.IGNORECASE)),
+    (3, re.compile(r"\b(?:četvrta|cetvrta|četvrti|fourth|4\.)\s+(?:opcija|option)\b", re.IGNORECASE)),
+)
+_OPTION_LABEL_RE = re.compile(r"\b(?:opcija|option)\s*([a-d])\b", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -163,9 +170,9 @@ def expected_answer_matches_correct_option(expected_answer: str, result: Divisib
     return not bool(numbers & alternatives)
 
 
-def publication_failure(question: str, option_texts: Iterable[str], marked_index: int,
-                        expected_answer: str) -> tuple[str, DivisibilityMCQResult]:
-    """Return a narrow publication failure code, or ``""`` when in scope and sound."""
+def mathematical_publication_failure(question: str, option_texts: Iterable[str],
+                                     marked_index: int) -> tuple[str, DivisibilityMCQResult]:
+    """Return the server-provable MCQ math failure, before metadata checks."""
     result = evaluate_divisibility_mcq(question, option_texts)
     if not result.applicable:
         return "", result
@@ -173,9 +180,53 @@ def publication_failure(question: str, option_texts: Iterable[str], marked_index
         return result.reason_code, result
     if marked_index != result.correct_index:
         return "marked_option_math_mismatch", result
+    return "", result
+
+
+def publication_failure(question: str, option_texts: Iterable[str], marked_index: int,
+                        expected_answer: str) -> tuple[str, DivisibilityMCQResult]:
+    """Return a narrow publication failure code, including expected-answer value checks."""
+    failure, result = mathematical_publication_failure(question, option_texts, marked_index)
+    if failure:
+        return failure, result
     if not expected_answer_matches_correct_option(expected_answer, result):
         return "marked_option_math_mismatch", result
     return "", result
+
+
+def option_reference_failure(text: str, current_options: Iterable[dict],
+                             correct_option_id: str) -> str:
+    """Validate explicit option ordinals/labels against committed UI state.
+
+    A bare correct value is intentionally allowed.  The gate activates only
+    when prose explicitly claims an ordinal (``treća opcija``) or option label
+    (``opcija B``), and compares that claim with the post-shuffle visible
+    position and server-owned correct ID.  It therefore cannot trust a
+    Tutor/Reviewer ordinal that was written before server shuffling.
+    """
+    options = tuple(current_options or ())
+    ids = [str(option.get("id", "")) for option in options if isinstance(option, dict)]
+    if len(ids) != len(options) or correct_option_id not in ids:
+        return "expected_answer_option_reference_mismatch"
+    correct_position = ids.index(correct_option_id)
+    for position, pattern in _OPTION_ORDINAL_PATTERNS:
+        if pattern.search(text or "") and position != correct_position:
+            return "expected_answer_option_reference_mismatch"
+    for match in _OPTION_LABEL_RE.finditer(text or ""):
+        if match.group(1).lower() != correct_option_id.lower():
+            return "expected_answer_option_reference_mismatch"
+
+    # If prose both identifies an option and names one of the displayed bare
+    # integer values, that value must be the value at the committed correct
+    # option.  Other mathematical numbers (for example a divisor 25) are not
+    # visible-option values and remain harmless.
+    values = [_bare_integer(str(option.get("text", ""))) for option in options]
+    correct_value = values[correct_position]
+    mentioned_values = {int(value) for value in _ANSWER_NUMBER_RE.findall(text or "")}
+    visible_alternatives = {value for value in values if value is not None and value != correct_value}
+    if mentioned_values & visible_alternatives:
+        return "expected_answer_option_reference_mismatch"
+    return ""
 
 
 def mathematical_fingerprint(result: DivisibilityMCQResult, task_family: str,
