@@ -299,8 +299,12 @@ def validate_difficulty_evidence(task: TaskPayload) -> None:
 REVIEWER_EVIDENCE_OUTSIDE_TARGET = "reviewer_approved_difficulty_evidence_outside_target"
 
 
-def _evidence_diagnostics(evidence: DifficultyEvidence) -> str:
-    """Kratak, ograničen opis dokaza — staje u granicu reda u logu."""
+def evidence_diagnostics(evidence: DifficultyEvidence) -> str:
+    """Kratak, ograničen opis dokaza — staje u granicu reda u logu.
+
+    JAVNA je da bi je i preflight nad Tutorovim nacrtom koristio doslovno istu
+    (matbot/tutor/package_preflight.py): jedan format dokaza u cijelom projektu,
+    pa se nalaz prije i poslije drugog poziva poredi bez prevođenja."""
     flags = ",".join(name for name, value in (
         ("explanation", evidence.requires_explanation),
         ("comparison", evidence.requires_comparison),
@@ -470,7 +474,7 @@ def validate_reviewer(reviewer: ReviewerFinal) -> None:
             f"{REVIEWER_EVIDENCE_OUTSIDE_TARGET}: decision={reviewer.decision} "
             f"target_level={target_level} errors={','.join(evidence_errors)} "
             f"evidence_valid={checks.difficulty_evidence_valid} "
-            + _evidence_diagnostics(reviewer.reviewed_difficulty_evidence)
+            + evidence_diagnostics(reviewer.reviewed_difficulty_evidence)
         ))
 
     if reviewer.final.intent in TASK_INTENTS:

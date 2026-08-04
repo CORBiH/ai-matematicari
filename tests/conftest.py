@@ -543,6 +543,7 @@ _UNIVERSAL_TWO_CALL_MODULES = frozenset({
     "test_structured_practice_packages",
     "test_reviewer_target_level_consistency",
     "test_reviewer_mcq_preflight",
+    "test_reviewer_difficulty_preflight",
 })
 
 

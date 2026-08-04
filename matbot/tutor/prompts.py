@@ -296,6 +296,15 @@ _REVIEWER_PREFLIGHT_RULE = """SERVER-DETECTED DRAFT ISSUES (when that block is p
   equivalent options, REPLACE the offending distractor(s) with genuinely different
   mathematical values so all four options are semantically distinct — never just
   reformat, re-round, or rewrite an equivalent value in another notation.
+- For `difficulty_evidence_outside_target`, the server has already proven with its own
+  shared validator that the draft does not belong at the requested level. REPLACE THE
+  TASK with one that genuinely belongs there — for a target of Level 1 that means a
+  single directly stated rule applied once, not a task that combines two rules or
+  conditions. Never fix this by lowering the reported counts, clearing a flag, or
+  relabelling the level while the task stays the same: the server recomputes the
+  evidence you return and rejects a dishonest package.
+- Keep the exact selected lesson in every correction, and recompute the difficulty
+  evidence so it honestly describes the task you actually return.
 - Exactly one visible option stays correct. Recompute correct_option_id,
   correct_option_index, expected_answer (an exact copy of the marked option's text),
   solution, and task_signature where structural parameters changed.

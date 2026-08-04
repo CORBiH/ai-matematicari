@@ -34,15 +34,21 @@ from matbot import mcq_integrity, option_equivalence
 from matbot.mathcheck import find_numeric_inconsistencies
 from matbot.mathsafe import sanitize_and_validate_math_text
 from matbot.terminology import normalize_terminology
-from matbot.tutor.schema import UnifiedOutputError, validate_task
+from matbot.tutor.schema import (UnifiedOutputError, difficulty_evidence_errors,
+                                 evidence_diagnostics, validate_task)
 
 # Ograničenja da dijagnostika i prompt blok ostanu mali i predvidivi.
 MAX_ISSUES = 8
-_MAX_DETAIL_CHARS = 120
+# Dovoljno za `target Level 1; <kod validatora>; steps=… flags=…`, i dalje tvrda
+# granica. Ovo je granica DIJAGNOSTIKE, ne prag težine.
+_MAX_DETAIL_CHARS = 200
 
 # Kod koji objava već koristi za isti nalaz — namjerno ISTI string, da se
 # dijagnostika prije i poslije drugog poziva poklapa u logovima.
 SEMANTIC_DUPLICATE_CODE = "semantically_duplicate_options"
+
+# Dokaz težine nacrta ne zadovoljava nivo koji je nacrt SAM deklarisao.
+DIFFICULTY_OUTSIDE_TARGET_CODE = "difficulty_evidence_outside_target"
 
 
 @dataclass(frozen=True)
@@ -172,6 +178,27 @@ def collect_package_issues(task):
             issues.append(PackageIssue(
                 "numeric_inconsistency", detail=f"{label} {found[0].split(':')[0]}"))
 
+    # 6) DOKAZ TEŽINE VS DEKLARISAN NIVO (živi gate b8a0f7b)
+    #    Živi pad: Tutor je za traženi nivo 1 sam prijavio `combines_concepts=true`,
+    #    pa je ZAJEDNIČKI validator već tada mogao dokazati da nacrt nije nivo 1.
+    #    Taj nalaz nije stizao recenzentu, pa je recenzent morao sam primijetiti
+    #    neslaganje — i pogrešno je odobrio. Prag se NE mijenja: poziva se isti
+    #    `difficulty_evidence_errors` koji već koriste i recenzentska invarijanta
+    #    i objava. Poredi se s nivoom koji paket SAM deklariše — isto pitanje
+    #    interne dosljednosti koje `validate_reviewer` postavlja konačnom paketu.
+    evidence = getattr(task, "difficulty_evidence", None)
+    target_level = getattr(task, "target_difficulty_level", None)
+    if evidence is not None and isinstance(target_level, int):
+        try:
+            evidence_errors = difficulty_evidence_errors(evidence, target_level)
+        except Exception:
+            evidence_errors = ()
+        if evidence_errors:
+            issues.append(PackageIssue(
+                DIFFICULTY_OUTSIDE_TARGET_CODE,
+                detail=(f"target Level {target_level}; {','.join(evidence_errors)}; "
+                        f"{evidence_diagnostics(evidence)}")))
+
     return tuple(issues[:MAX_ISSUES])
 
 
@@ -191,10 +218,15 @@ def format_for_reviewer(issues):
     lines.append(
         "You MUST NOT return `approve` while any issue above remains. Return `correct` "
         "with a COMPLETE corrected package: replace the offending distractor(s) so all "
-        "four options are semantically distinct, then recompute correct_option_id, "
+        "four options are semantically distinct, and when the difficulty evidence is "
+        "outside the target level REPLACE THE TASK with one that genuinely belongs at "
+        "that level. Then recompute correct_option_id, "
         "correct_option_index, expected_answer (an exact copy of the marked option's "
-        "text), solution, and task_signature where structural parameters changed. Keep "
-        "exactly one correct visible option. Do not merely reformat an equivalent value "
+        "text), solution, difficulty evidence for the task you actually return, and "
+        "task_signature where structural parameters changed. Keep "
+        "exactly one correct visible option, and keep the exact selected lesson. Do not "
+        "merely reformat an equivalent value, do not merely lower the reported counts, "
+        "do not merely relabel the level, "
         "and do not change parts of the task that are already valid. If you cannot "
         "correct it safely, return `fail_closed`."
     )
