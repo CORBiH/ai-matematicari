@@ -544,6 +544,10 @@ _UNIVERSAL_TWO_CALL_MODULES = frozenset({
     "test_reviewer_target_level_consistency",
     "test_reviewer_mcq_preflight",
     "test_reviewer_difficulty_preflight",
+    # Runner live dijagnostike (tools/practice_eval) se testira u TAČNO onoj
+    # konfiguraciji u kojoj se i pokreće — inače bi unit test tvrdio nešto o
+    # putu koji kampanja nikad ne vozi.
+    "test_practice_eval_runner",
 })
 
 
