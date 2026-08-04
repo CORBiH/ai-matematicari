@@ -286,7 +286,7 @@ def _hint_guidance(hint_level):
 
 def build_input(session, student_message, intent="", difficulty_request="", interaction_phase="",
                  trusted_choice_verdict=None, task_family="", task_family_description="",
-                 contract=None, archetype="", skeleton=None):
+                 contract=None, archetype="", skeleton=None, target_difficulty_level=0):
     """trusted_choice_verdict (samo za choice_answer turnove): dict sa
     'selected_text' (tekst opcije koju je učenik kliknuo), 'is_correct' (bool,
     SERVER-utvrđen, deterministički) i 'wrong_attempts' (broj PRETHODNIH
@@ -298,7 +298,13 @@ def build_input(session, student_message, intent="", difficulty_request="", inte
 
     skeleton (samo lekcija s UKLJUČENIM ugovorom): serverski konstruisan i
     verifikovan zadatak (matbot/contracts/generator.py) — model ga dobija
-    GOTOV i piše samo prozu oko njega."""
+    GOTOV i piše samo prozu oko njega.
+
+    target_difficulty_level: 0 kad je univerzalni kontroler težine
+    (matbot/difficulty_level.py) isključen ili se ne primjenjuje — tada se
+    NIŠTA ne dodaje (postojeći prompt ostaje bajt za bajt isti). 1/2/3 SAMO
+    za lekciju BEZ ugovora (server drži matematiku lekcija s ugovorom, pa im
+    ovaj blok nije potreban) — server-owned cilj, model ga ne bira."""
     lines = []
     lines.append(f"LEKCIJA: {session['lesson_title'] or 'nije izabrana'} (oblast: {session['oblast'] or 'nepoznata'})")
 
@@ -337,6 +343,10 @@ def build_input(session, student_message, intent="", difficulty_request="", inte
         family_block = task_family_validation.prompt_block(task_family)
         if family_block:
             lines.append(family_block)
+        if target_difficulty_level:
+            from matbot import difficulty_level
+
+            lines.append(difficulty_level.prompt_block(target_difficulty_level))
         lines.append(
             "OBAVEZNO popuni i interna polja new_task.task_family "
             f"(mora biti tačno „{task_family}“) i new_task.answer_kind — server ih "

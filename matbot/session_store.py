@@ -27,6 +27,12 @@ def _fresh_session(session_id, curriculum_fingerprint, grade, lesson_id,
         "expected_answer_summary": "",
         "hint_level": 0,
         "difficulty": "standard",
+        # Univerzalni troslojni kontroler težine (matbot/difficulty_level.py),
+        # 1/2/3 — server-owned, dijeli ga SVIH 534 lekcija. Polje postoji i
+        # kad je MATBOT_PRACTICE_DIFFICULTY_LEVELS isključen (podrazumijevano):
+        # dok je isključen, nijedan turn ga ne mijenja niti čita za odluku —
+        # vidi matbot/practice.py.
+        "difficulty_level": 1,
         "correct_streak": 0,
         "recent_tasks": [],   # max MAX_RECENT_TASKS tekstova prethodnih zadataka
         "recent_turns": [],   # max MAX_RECENT_TURNS parova {"student":..., "tutor":...}

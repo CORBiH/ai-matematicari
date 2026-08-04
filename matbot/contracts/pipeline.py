@@ -130,11 +130,15 @@ def build_plan(contract, student_message="", recently_used=(), current="",
     return GenerationPlan(rotated, source, requested)
 
 
-def prepare_task(contract, plan, difficulty_request="", rng=None, avoid_texts=()):
+def prepare_task(contract, plan, difficulty_request="", target_level=None,
+                 rng=None, avoid_texts=()):
     """Konstruiši, samoprovjeri i renderuj kostur zadatka — SVE prije poziva.
 
     Odbijanje ovdje znači: sigurna poruka, bez mutacije stanja i bez ijednog
-    potrošenog AI poziva (kostur se pravi prije jedinog poziva)."""
+    potrošenog AI poziva (kostur se pravi prije jedinog poziva).
+
+    `target_level`: čist pass-through u generator.generate() (vidi tamo) —
+    None zadržava postojeći relativni put bajt za bajt."""
     stages = []
 
     if contract is None:
@@ -163,7 +167,7 @@ def prepare_task(contract, plan, difficulty_request="", rng=None, avoid_texts=()
     try:
         skeleton = generator.generate(
             contract, archetype_id, difficulty_request=difficulty_request,
-            rng=rng, avoid_texts=avoid_texts,
+            target_level=target_level, rng=rng, avoid_texts=avoid_texts,
         )
     except generator.GenerationError as error:
         stages.append(_reject("skeleton_generated", "generation_failed",

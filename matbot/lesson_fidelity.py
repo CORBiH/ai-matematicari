@@ -62,6 +62,12 @@ class FidelityChecks(BaseModel):
     marked_option_correct: bool
     options_unique: bool
     difficulty_direction_correct: bool
+    # Univerzalni troslojni kontroler težine (matbot/difficulty_level.py).
+    # Optional/None radi kompatibilnosti — SAMO kad je resolve() pozvan sa
+    # require_difficulty_check=True (aktivan kontroler) None/False znače
+    # NEISPUNJENO (nikad se tiho ne preskače, vidi resolve()). Kad kontroler
+    # nije aktivan, ovo polje se ne provjerava.
+    difficulty_level_appropriate: Optional[bool] = None
     # Kratko obrazloženje ZA LOG (nikad se ne prikazuje učeniku).
     lesson_skill_summary: str
 
@@ -148,7 +154,17 @@ tekstualni zadatak: mora postojati stvarna životna situacija, ne gola računska
 operacija). Kad ta napomena postoji, `corrected_task` MORA otkloniti TAČNO taj
 nedostatak — gola računska operacija, „Evo zadatka.“ bez priče, ili četiri
 neobjašnjene brojčane opcije NIKAD ne zadovoljavaju zahtjev za životni kontekst.
-Ako ne možeš popraviti zadatak tako da ugovor bude zadovoljen, biraj `fail_closed`."""
+Ako ne možeš popraviti zadatak tako da ugovor bude zadovoljen, biraj `fail_closed`.
+
+Nacrt ponekad nosi blok „CILJANI NIVO TEŽINE“ (matbot/difficulty_level.py) —
+tada MORAŠ nezavisno procijeniti da li nacrt/ispravka STVARNO odgovara tom
+nivou po navedenim dimenzijama (`difficulty_level_appropriate`), ne samo da
+li ispituje tačnu lekciju. „Djeluje otprilike u redu“ nije dovoljno: procijeni
+svaku dimenziju posebno. Kad je uz to zatražena promjena smjera (lakše/teže) i
+nivo se STVARNO pomjerio u odnosu na prethodni zadatak, potvrdi to i kroz
+`difficulty_direction_correct`. Podizanje ili spuštanje nivoa NIKAD ne smije
+promijeniti vještinu, porodicu ni oblik zadatka (razlomak ostaje razlomak,
+tekstualni zadatak ostaje tekstualni zadatak) — samo dimenzije iz bloka."""
 
 
 def build_instructions(grade):
@@ -169,7 +185,7 @@ def _option_lines(new_task):
 def build_input(context, new_task, student_message, family="",
                 family_description="", prior_task="", difficulty_request="",
                 family_contract_mismatch="", duplicate_reason="",
-                duplicate_task_text=""):
+                duplicate_task_text="", target_difficulty_level=0):
     """`context` je matbot.tutor.lesson_context.LessonContext (dijeli se s
     univerzalnim putem — isti kanonski identitet, bez duplikata).
 
@@ -190,7 +206,13 @@ def build_input(context, new_task, student_message, family="",
     practice._apply_new_task — ova zaštita se ovdje NIKAD ne slabi ni
     zaobilazi, samo se recenzentu unaprijed kaže TAČNO koji tekst mora
     izbjeći (živi nalaz: „ponovljen tekst zadatka u istoj sesiji“ odbijeno tek
-    NAKON Tutora i recenzenta, iako je recenzent mogao ispraviti da je znao)."""
+    NAKON Tutora i recenzenta, iako je recenzent mogao ispraviti da je znao).
+
+    `target_difficulty_level`: 0 kad je univerzalni kontroler težine
+    isključen ili se ne primjenjuje na ovaj turn (ne prikazuje se ništa —
+    postojeći prompt ostaje bajt za bajt isti); 1/2/3 kad je aktivan — ISTI
+    server-owned cilj poslat i Tutoru (matbot/prompts.py), tako da recenzent
+    zna prema čemu procjenjuje `difficulty_level_appropriate`."""
     lines = [
         "IZABRANA LEKCIJA (nepromjenjiva):",
         f"- razred: {context.grade}",
@@ -232,6 +254,16 @@ def build_input(context, new_task, student_message, family="",
             "smisliti stvarno drugačiji zadatak, biraj `fail_closed` — nacrt "
             "se NE SMIJE odobriti (`approve`) dok ponavljanje stoji."
         )
+    if target_difficulty_level:
+        from matbot import difficulty_level
+
+        lines.append("")
+        lines.append(difficulty_level.prompt_block(target_difficulty_level))
+        lines.append(
+            "Ocijeni `difficulty_level_appropriate` NEZAVISNO za nacrt ILI "
+            "tvoju ispravku (šta god se objavljuje) — nikad samo pretpostavi "
+            "da odgovara traženom nivou."
+        )
     lines.append("")
     lines.append("NACRT ZADATKA (provjeri ga, ne vjeruj mu):")
     lines.append(f"- tekst: {new_task.text}")
@@ -270,9 +302,12 @@ class ResolvedReview:
     normalized_from_approve: bool = False
 
 
-def resolve(review, requested_difficulty=""):
+def resolve(review, requested_difficulty="", require_difficulty_check=False,
+            level_changed=True):
     """Vrati ResolvedReview koji se objavljuje. Baca FidelityRejected — fail
-    closed, BEZ mutacije sesije i BEZ trećeg poziva.
+    closed, BEZ mutacije sesije i BEZ trećeg poziva. Čista funkcija — NIKAD
+    ne čita environment (matbot/practice.py jednom pročita
+    MATBOT_PRACTICE_DIFFICULTY_LEVELS i prosljeđuje eksplicitne argumente).
 
     ŽIVI NALAZ (VPS): recenzent je vratio `approve` dok su obavezne provjere
     (`math_correct`, `tests_exact_lesson`, `answer_correct`,
@@ -293,15 +328,40 @@ def resolve(review, requested_difficulty=""):
         `corrected_task` nije prazan — obavezne provjere iznad opisuju
         NEDOSTATKE NACRTA koji su i doveli do ispravke, ne ispravljen zadatak,
         pa se nad njim više ne provjeravaju ovdje (to radi downstream sloj).
-      • `fail_closed` uvijek odbija, bez obzira na provjere."""
+      • `fail_closed` uvijek odbija, bez obzira na provjere.
+
+    `require_difficulty_check`: True SAMO kad je univerzalni kontroler težine
+    aktivan ZA OVAJ TURN (matbot/difficulty_level.py). Tada
+    `checks.difficulty_level_appropriate` MORA biti eksplicitno `True` —
+    `None` (recenzent ga nije popunio) i `False` OBOJE se tretiraju kao
+    neispunjeno, nikad se tiho ne preskaču. ISTI tretman kao 7 fiksnih
+    obaveznih provjera: gate je na `approve` (oborena provjera → normalizacija
+    u `correct` ako postoji zamjenski zadatak, inače fail closed); jednom
+    preklopljena (ili izvorna) `correct` odluka se, kao i za ostalih 7
+    provjera, više ovdje ne provjerava — pretpostavka je da je RECENZENTOV
+    zamjenski zadatak ono što je ispravio, a downstream sloj (matbot/practice.py)
+    je taj koji potvrđuje da je stvarno objavljiv.
+
+    `level_changed`: prosljeđuje se iz matbot.difficulty_level.DifficultyTransition
+    — na PRAVOJ granici (već na nivou 3 pa zatraženo teže, ili već na nivou 1
+    pa zatraženo lakše) server NE traži potvrdu smjera (ništa se stvarno nije
+    pomjerilo da bi se smjer provjeravao), ali `difficulty_level_appropriate`
+    OSTAJE obavezan na `approve` gate-u iznad. Podrazumijevano `True` da bi
+    svaki pozivalac koji ovaj argument ne prosljeđuje zadržao tačno dosadašnje
+    ponašanje."""
     if review.decision == "fail_closed":
         raise FidelityRejected(f"fail_closed:{review.fail_reason_code or 'nepoznato'}")
 
     decision = review.decision
     normalized = False
 
+    mandatory_failed = mandatory_checks_failed(review.checks)
+    difficulty_failed = require_difficulty_check and review.checks.difficulty_level_appropriate is not True
+
     if decision == "approve":
-        failed = mandatory_checks_failed(review.checks)
+        failed = list(mandatory_failed)
+        if difficulty_failed:
+            failed = failed + ["difficulty_level_appropriate"]
         if failed:
             if review.corrected_task is not None:
                 decision = "correct"
@@ -312,7 +372,7 @@ def resolve(review, requested_difficulty=""):
                     failed_checks=failed,
                 )
 
-    if (requested_difficulty or "").strip().lower() in ("easier", "harder"):
+    if (requested_difficulty or "").strip().lower() in ("easier", "harder") and level_changed:
         if not review.checks.difficulty_direction_correct:
             raise FidelityRejected("smjer promjene težine nije potvrđen")
 

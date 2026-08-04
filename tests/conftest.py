@@ -324,6 +324,7 @@ def make_fidelity_checks(skill="vještina iz naslova lekcije", **overrides):
         "marked_option_correct": True,
         "options_unique": True,
         "difficulty_direction_correct": True,
+        "difficulty_level_appropriate": True,
         "lesson_skill_summary": skill,
     }
     values.update(overrides)

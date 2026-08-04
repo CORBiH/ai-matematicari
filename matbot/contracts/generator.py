@@ -419,10 +419,20 @@ def self_verify(contract, skeleton):
     return True, "ok"
 
 
-def generate(contract, archetype_id, difficulty_request="", rng=None,
-             avoid_texts=()):
+def generate(contract, archetype_id, difficulty_request="", target_level=None,
+             rng=None, avoid_texts=()):
     """Konstruiši i verifikuj kostur zadatka. Baca GenerationError — nikad ne
-    pogađa i nikad ne vraća djelimičan/neprovjeren kostur."""
+    pogađa i nikad ne vraća djelimičan/neprovjeren kostur.
+
+    `target_level`: None (podrazumijevano — univerzalni kontroler težine
+    isključen ili se ne primjenjuje) zadržava POSTOJEĆI relativni put bajt za
+    bajt: `difficulty.target_levels(contract, difficulty_request)` + oznaka
+    izvedena iz zahtjeva. Kad je 1/2/3, koristi se APSOLUTNI, kapabilnošću
+    svjestan cilj (`difficulty.target_levels_for_level`, matbot/difficulty_level
+    ::LEVEL_TO_LABEL) — server-owned nivo, isti dijeljen sa svih 534 lekcija
+    — i generisan kostur se DODATNO provjerava da STVARNO pogađa taj cilj
+    (`difficulty.verify_matches_target`), ne samo da je unutar granica
+    (check_within_bounds i dalje radi identično, nepromijenjeno)."""
     if rng is None:
         import random as _random
         rng = _random.Random()
@@ -430,9 +440,15 @@ def generate(contract, archetype_id, difficulty_request="", rng=None,
     if build is None:
         raise GenerationError(f"arhetip '{archetype_id}' nema generator")
 
-    levels = difficulty.target_levels(contract, difficulty_request)
-    request = (difficulty_request or "").strip().lower()
-    label = {"harder": "hard", "easier": "easy"}.get(request, "standard")
+    if target_level is None:
+        levels = difficulty.target_levels(contract, difficulty_request)
+        request = (difficulty_request or "").strip().lower()
+        label = {"harder": "hard", "easier": "easy"}.get(request, "standard")
+    else:
+        from matbot.difficulty_level import LEVEL_TO_LABEL
+
+        levels = difficulty.target_levels_for_level(contract, target_level)
+        label = LEVEL_TO_LABEL[target_level]
     avoid = {(text or "").strip() for text in avoid_texts}
 
     last_code = "generation_exhausted"
@@ -449,6 +465,16 @@ def generate(contract, archetype_id, difficulty_request="", rng=None,
             # NE popravlja pogađanjem — pokušaj se odbacuje.
             last_code = code
             continue
+        if target_level is not None:
+            # Ne samo "unutar granica" nego "stvarno pogađa TRAŽENI cilj" —
+            # spriječi da napredni-nivo zahtjev tiho objavi zadatak identičan
+            # uvodnom (živi rizik uočen pri reviziji ovog plana).
+            profile = difficulty.verify_matches_target(
+                contract, ev.facts_for(skeleton.primary_nodes), levels
+            )
+            if not profile.valid:
+                last_code = profile.code
+                continue
         return TaskSkeleton(
             archetype_id=skeleton.archetype_id,
             question_text=skeleton.question_text,

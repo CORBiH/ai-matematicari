@@ -29,10 +29,11 @@ import os
 import random
 import uuid
 
-from matbot import (config, feedback, geometry_rules, geometrycheck,
-                    lesson_fidelity, option_equivalence, prompts, systemcheck,
-                    task_families)
+from matbot import (config, difficulty_level, feedback, geometry_rules,
+                    geometrycheck, lesson_fidelity, option_equivalence,
+                    prompts, systemcheck, task_families)
 from matbot.contracts import archetypes as contract_archetypes
+from matbot.contracts import difficulty as contract_difficulty
 from matbot.contracts import pipeline as contract_pipeline
 from matbot.contracts import registry as contract_registry
 from matbot.tutor import lesson_context
@@ -64,6 +65,17 @@ _NEW_TASK_INTRO = "Evo zadatka."
 _HARDER_TASK_INTRO = "Evo težeg zadatka."
 _EASIER_TASK_INTRO = "Evo lakšeg zadatka."
 _SAME_FAMILY_RETRY_INTRO = "Evo novog zadatka za istu vještinu."
+# Univerzalni kontroler težine (matbot/difficulty_level.py) — koristi se
+# TAČNO kad se sesijski nivo pomjerio, ali objavljen zadatak NE MOŽE dokazati
+# da se stvarno razlikuje (kapabilnost ugovora ograničena, vidi
+# matbot/contracts/difficulty.py::capability_for). Nikad ne tvrdi "teže" ni
+# "lakše" niti nagađa "napredni"/"uvodni" kad to nije dokazivo iz kostura.
+_SAME_SUPPORTED_DIFFICULTY_INTRO = "Evo još jednog zadatka slične težine."
+# Prava granica (već na nivou 3/1, dalje se ne može) — ovdje JESTE poznato da
+# je cilj napredan/uvodan (target_levels_for_level uvijek sidri pravi
+# minimum/maximum), pa je imenovanje tačno, ne nagađanje.
+_ANOTHER_ADVANCED_TASK_INTRO = "Evo još jednog naprednog zadatka."
+_ANOTHER_INTRO_TASK_INTRO = "Evo još jednog uvodnog zadatka."
 
 
 _LOG_FIELD_LIMIT = 200
@@ -76,10 +88,30 @@ def _clip_for_log(value, limit=_LOG_FIELD_LIMIT):
     return text if len(text) <= limit else text[:limit] + "…"
 
 
-def _new_task_intro(turn, retry_required=False):
-    """Vrati kratak server-owned uvod; modelov ``reply`` se ne prikazuje."""
+def _new_task_intro(turn, retry_required=False, transition=None, generation_changed=True):
+    """Vrati kratak server-owned uvod; modelov ``reply`` se ne prikazuje.
+
+    `transition` (matbot.difficulty_level.DifficultyTransition) je None kad
+    je univerzalni kontroler težine isključen ili se ne primjenjuje — tada je
+    ponašanje bajt za bajt identično dosadašnjem. `generation_changed`
+    (SAMO za lekciju s ugovorom — matbot/contracts/difficulty.py) kaže da li
+    generisan zadatak STVARNO odražava pomjeren nivo; podrazumijevano True,
+    jer put bez ugovora (Reviewerov difficulty_level_appropriate/
+    difficulty_direction_correct) već garantuje da objavljen zadatak
+    odgovara traženom nivou."""
     if retry_required:
         return _SAME_FAMILY_RETRY_INTRO
+    if transition is not None:
+        if transition.level_changed and not generation_changed:
+            # Nivo sesije se pomjerio, ali kapabilnošću ograničen generator to
+            # ne može dokazati u samom zadatku — nikad ne tvrdi promjenu koja
+            # se ne vidi, i ne pogađaj "napredni"/"uvodni".
+            return _SAME_SUPPORTED_DIFFICULTY_INTRO
+        if not transition.level_changed and transition.boundary_reason:
+            # Prava granica: cilj JE poznat (uvijek sidren na pravi
+            # minimum/maximum), pa je imenovanje tačno.
+            return (_ANOTHER_ADVANCED_TASK_INTRO if transition.boundary_reason == "at_maximum"
+                    else _ANOTHER_INTRO_TASK_INTRO)
     difficulty_request = (turn.get("difficulty_request") or "").strip().lower()
     if difficulty_request == "harder":
         return _HARDER_TASK_INTRO
@@ -312,17 +344,25 @@ def _duplicate_precheck(new_task, task_family, session):
 
 def _review_lesson_fidelity(llm, session, turn, new_task, family="", request_id="",
                             family_contract_mismatch="", duplicate_reason="",
-                            duplicate_task_text=""):
+                            duplicate_task_text="", target_difficulty_level=0,
+                            level_changed=True):
     """DRUGI poziv — samo za turn koji pravi zadatak. Vrati zadatak za objavu.
 
     Vraća originalni nacrt (`approve`) ili recenzentov ispravljen zadatak
     (`correct`). `fail_closed` i svaka kontradikcija dižu InvalidOutputError, pa
     pozivalac vraća postojeću sigurnu poruku BEZ mutacije stanja i BEZ trećeg
-    poziva."""
+    poziva.
+
+    `target_difficulty_level`: 0 kad je univerzalni kontroler težine
+    isključen — tada se ni prompt ni resolve() obaveza ne mijenjaju (bajt za
+    bajt dosadašnje ponašanje). 1/2/3 kad je aktivan: šalje se u Recenzentov
+    prompt I čini `difficulty_level_appropriate` OBAVEZNIM u resolve()."""
     context = lesson_context.build(turn["grade"], session["lesson_id"])
     if context is None:
         # Nepouzdan kurikularni kontekst — ne recenziramo naslijepo.
         raise InvalidOutputError("lesson_fidelity: nepouzdan kurikularni kontekst")
+
+    require_difficulty_check = bool(target_difficulty_level)
 
     instructions = lesson_fidelity.build_instructions(turn["grade"])
     input_text = lesson_fidelity.build_input(
@@ -335,13 +375,17 @@ def _review_lesson_fidelity(llm, session, turn, new_task, family="", request_id=
         family_contract_mismatch=family_contract_mismatch,
         duplicate_reason=duplicate_reason,
         duplicate_task_text=duplicate_task_text,
+        target_difficulty_level=target_difficulty_level,
     )
     result = llm.lesson_fidelity_turn(instructions, input_text)
     review = result.output
     failed_checks = lesson_fidelity.mandatory_checks_failed(review.checks)
     try:
         resolved = lesson_fidelity.resolve(
-            review, requested_difficulty=turn["difficulty_request"])
+            review, requested_difficulty=turn["difficulty_request"],
+            require_difficulty_check=require_difficulty_check,
+            level_changed=level_changed,
+        )
     except lesson_fidelity.FidelityRejected as error:
         # Koncizan, SAMO interni log (nikad prompt ni učenikov tekst): odluka
         # recenzenta, koje su obavezne provjere oborene i faza na kojoj je
@@ -349,19 +393,21 @@ def _review_lesson_fidelity(llm, session, turn, new_task, family="", request_id=
         # SAFE_ERROR_MESSAGE bez mutacije sesije i bez trećeg poziva.
         logger.warning(
             "lesson_fidelity request_id=%s topic=%s decision=%s failed_checks=%s "
-            "normalized_to_correct=%s rejection_stage=lesson_fidelity_resolve reason=%s",
+            "normalized_to_correct=%s rejection_stage=lesson_fidelity_resolve reason=%s "
+            "target_difficulty_level=%s",
             request_id, context.topic_id, review.decision,
             ",".join(error.failed_checks or failed_checks) or "-",
-            False, review.fail_reason_code or "-",
+            False, review.fail_reason_code or "-", target_difficulty_level or "-",
         )
         raise InvalidOutputError(f"lesson_fidelity: {error}") from error
     logger.info(
         "lesson_fidelity request_id=%s topic=%s decision=%s reason=%s skill=%s "
-        "failed_checks=%s normalized_to_correct=%s",
+        "failed_checks=%s normalized_to_correct=%s target_difficulty_level=%s",
         request_id, context.topic_id, review.decision,
         review.fail_reason_code or "-",
         _clip_for_log(review.checks.lesson_skill_summary, 120),
         ",".join(failed_checks) or "-", resolved.normalized_from_approve,
+        target_difficulty_level or "-",
     )
     return resolved.task if resolved.task is not None else new_task
 
@@ -415,10 +461,19 @@ def _reject_if_prose_invents_mathematics(text, session, contract, where):
 
 
 def _apply_new_task(session, new_task, task_family="", request_id="",
-                    contract=None, archetype=""):
+                    contract=None, archetype="", target_difficulty_level=None):
     """Sanitizuje tekst zadatka i sve 4 opcije, promiješa opcije i primjenjuje
     svježe stanje na sesiju (server je jedini koji dodjeljuje ID-jeve opcijama
     i pamti koji je tačan). Vraća sanitizovan tekst zadatka.
+
+    `target_difficulty_level`: None kad je univerzalni kontroler težine
+    isključen ili se ne primjenjuje na ovaj turn — tada je ponašanje bajt za
+    bajt identično dosadašnjem (koristi se new_task.difficulty kao dosad,
+    session["difficulty_level"] se NE piše). 1/2/3 kad je aktivan — SERVER
+    tada UVIJEK prepisuje sačuvanu oznaku težine sa
+    matbot.difficulty_level.LEVEL_TO_LABEL[target_difficulty_level], nikad sa
+    modelovom deklarisanom new_task.difficulty (model ne smije moći promijeniti
+    ciljani nivo vraćanjem druge oznake) — neslaganje se samo loguje.
 
     Svaki dio (pitanje, svaka opcija) prolazi kroz
     sanitize_and_validate_math_text — ako BILO KOJI dio ostane nebezbjedan
@@ -672,8 +727,19 @@ def _apply_new_task(session, new_task, task_family="", request_id="",
     #      kad ga vrate DVIJE različite porodice — živi nalaz)
     # Odbijeni zadatak ne mijenja napredovanje, a pozivalac vraća postojeći
     # sigurni fallback bez 2. AI poziva.
+    effective_difficulty_label = new_task.difficulty
+    if target_difficulty_level is not None:
+        effective_difficulty_label = difficulty_level.LEVEL_TO_LABEL[target_difficulty_level]
+        if new_task.difficulty != effective_difficulty_label:
+            # Neslaganje je SAMO signal za log — server-owned nivo je
+            # jedini izvor istine i modelova oznaka ga NIKAD ne mijenja.
+            logger.info(
+                "practice_difficulty_label_mismatch request_id=%s declared=%s effective=%s target_level=%s",
+                request_id, new_task.difficulty, effective_difficulty_label, target_difficulty_level,
+            )
+
     signature = task_families.task_signature(
-        task_family, task_text, session["lesson_id"], new_task.difficulty
+        task_family, task_text, session["lesson_id"], effective_difficulty_label
     )
     if task_families.is_duplicate_signature(signature, session["recent_task_signatures"]):
         raise InvalidOutputError("ponovljen tekst zadatka u istoj sesiji")
@@ -689,7 +755,9 @@ def _apply_new_task(session, new_task, task_family="", request_id="",
 
     session["current_task"] = task_text
     session["expected_answer_summary"] = new_task.expected_answer.strip()
-    session["difficulty"] = new_task.difficulty
+    session["difficulty"] = effective_difficulty_label
+    if target_difficulty_level is not None:
+        session["difficulty_level"] = target_difficulty_level
     session["hint_level"] = 0
     session["recent_tasks"].append(task_text)
     session["current_options"] = current_options
@@ -746,6 +814,24 @@ def _universal_pipeline_enabled():
     return value == UNIVERSAL_PIPELINE_FLAG
 
 
+# Isti obrazac tačnog poklapanja kao UNIVERSAL_PIPELINE_FLAG iznad, NEZAVISNA
+# zastavica (ne dira MATBOT_PRACTICE_PIPELINE ni na koji način). Namjerno
+# TAČNA vrijednost, ne "bilo šta neprazno" — "true"/"1"/"yes"/tipfeler ostaju
+# isključeni, da pogrešno postavljena env varijabla ne uključi neprovjeren
+# kontroler u produkciji.
+DIFFICULTY_LEVELS_FLAG = "enabled"
+
+
+def _difficulty_levels_enabled():
+    """True SAMO uz eksplicitnu zastavicu MATBOT_PRACTICE_DIFFICULTY_LEVELS=enabled.
+    Podrazumijevano (odsustvo/prazno/bilo koja druga vrijednost): isključen —
+    tada nijedan turn NE računa niti commituje novi difficulty_level (vidi
+    _handle_text_turn/_apply_new_task), pa je ponašanje identično stanju
+    prije uvođenja ovog kontrolera."""
+    value = (os.environ.get("MATBOT_PRACTICE_DIFFICULTY_LEVELS", "") or "").strip().lower()
+    return value == DIFFICULTY_LEVELS_FLAG
+
+
 def _run_legacy_single_call_turn(store, llm, turn):
     """STABILAN jednopozivni put — trenutno AKTIVAN i podrazumijevan.
 
@@ -797,6 +883,24 @@ def _handle_text_turn(store, llm, session, turn, lesson_id, request_id):
     contract = contract_registry.contract_for(session["lesson_id"])
     contract_state = contract_registry.practice_state(contract)
 
+    # Univerzalni troslojni kontroler težine (matbot/difficulty_level.py) —
+    # RAČUNA SE JEDNOM, PRIJE grananja ugovor/legacy, i dijeli ga OBA puta.
+    # Kad je isključen (podrazumijevano), `transition` ostaje None i nijedan
+    # dalji kod ga ne čita — ponašanje je bajt za bajt kao prije uvođenja
+    # ovog kontrolera (vidi _difficulty_levels_enabled).
+    transition = None
+    if _difficulty_levels_enabled():
+        transition = difficulty_level.transition(
+            session.get("difficulty_level", 1), turn["difficulty_request"]
+        )
+    # SAMO za lekciju s ugovorom (postavlja se ispod): da li generisan
+    # zadatak STVARNO odražava pomjeren nivo (matbot/contracts/difficulty.py
+    # ::measurable_target_profile) — vidi _new_task_intro. Put bez ugovora
+    # ovo ne treba: Recenzentov difficulty_level_appropriate/
+    # difficulty_direction_correct već garantuje da objavljen zadatak
+    # odgovara traženom nivou.
+    generation_changed = True
+
     if contract_state == contract_registry.STATE_UNAVAILABLE:
         # Ugovor je izričito označen kao nepodržan: nema sigurnog načina da se
         # generiše provjerljiv zadatak. Jasna poruka, BEZ AI poziva, bez
@@ -824,9 +928,20 @@ def _handle_text_turn(store, llm, session, turn, lesson_id, request_id):
         )
         selected_archetype = plan.archetype_id
         selected_shape = selected_archetype
+        if transition is not None:
+            # Samo MJERLJIVE (DERIVABLE ∩ adjustable) dimenzije — nikad
+            # nemjerljive poput distractor_similarity, koja NA STVARNIM
+            # podacima danas ima tri različite vrijednosti a da to nijedan
+            # generisan kostur ne može nezavisno dokazati (vidi audit u
+            # matbot/contracts/difficulty.py).
+            generation_changed = (
+                contract_difficulty.measurable_target_profile(contract, transition.previous_level)
+                != contract_difficulty.measurable_target_profile(contract, transition.target_level)
+            )
         prepared = contract_pipeline.prepare_task(
             contract, plan,
             difficulty_request=turn["difficulty_request"],
+            target_level=(transition.target_level if transition is not None else None),
             avoid_texts=session["recent_tasks"],
         )
         if prepared.ok:
@@ -876,6 +991,7 @@ def _handle_text_turn(store, llm, session, turn, lesson_id, request_id):
         contract=contract,
         archetype=selected_archetype,
         skeleton=prepared_skeleton,
+        target_difficulty_level=(transition.target_level if transition is not None else 0),
     )
 
     try:
@@ -906,6 +1022,7 @@ def _handle_text_turn(store, llm, session, turn, lesson_id, request_id):
                 session, _task_from_skeleton(prepared_skeleton),
                 task_family=selected_shape, request_id=request_id,
                 contract=contract, archetype=selected_archetype,
+                target_difficulty_level=(transition.target_level if transition is not None else None),
             )
         elif out.new_task is not None:
             # RECENZENT VJERNOSTI LEKCIJI — jedini dodatni poziv, i to SAMO na
@@ -922,17 +1039,23 @@ def _handle_text_turn(store, llm, session, turn, lesson_id, request_id):
                 family_contract_mismatch=mismatch_reason,
                 duplicate_reason=duplicate_reason,
                 duplicate_task_text=duplicate_task_text,
+                target_difficulty_level=(transition.target_level if transition is not None else 0),
+                level_changed=(transition.level_changed if transition is not None else True),
             )
             task_text = _apply_new_task(
                 session, reviewed_task, task_family=selected_shape,
                 request_id=request_id, contract=contract, archetype=selected_archetype,
+                target_difficulty_level=(transition.target_level if transition is not None else None),
             )
 
         # Novi zadatak uvijek dobija kratak server-owned uvod. Modelov slobodni
         # `reply` se tada ne prikazuje i ne može prokrijumčariti hint prije prvog
         # pokušaja; tekst zadatka ostaje zaseban i neizmijenjen ovim pravilom.
         if out.new_task is not None:
-            reply = _new_task_intro(turn, retry_required_before_llm)
+            reply = _new_task_intro(
+                turn, retry_required_before_llm,
+                transition=transition, generation_changed=generation_changed,
+            )
             answer = reply + "\n\nZadatak: " + task_text
         else:
             reply, reply_safe = sanitize_and_validate_math_text(out.reply.strip())
