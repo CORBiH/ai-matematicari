@@ -44,6 +44,15 @@ def test_openai_strict_schema_has_only_closed_objects(model):
     assert set(parameter["properties"]) == {"name", "value"}
 
 
+def test_reviewer_independent_evidence_references_closed_difficulty_schema():
+    schema = to_strict_json_schema(ReviewerFinal)
+    field = schema["properties"]["reviewed_difficulty_evidence"]
+    refs = [fragment.get("$ref") for fragment in _walk_schema(field)]
+    assert "#/$defs/DifficultyEvidence" in refs
+    difficulty = schema["$defs"]["DifficultyEvidence"]
+    assert difficulty["additionalProperties"] is False
+
+
 def _signature(parameters=(), conditions=(), objects=()):
     return TaskSignature(
         task_family="  generic  ", operation_or_relation=" calculation ",

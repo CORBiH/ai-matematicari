@@ -519,6 +519,12 @@ class TurnResult:
     publication_validation_category: Optional[str] = None
     final_structured_package_source: Optional[str] = None
     final_difficulty_evidence: Optional[dict] = None
+    tutor_difficulty_evidence: Optional[dict] = None
+    reviewer_difficulty_evidence: Optional[dict] = None
+    difficulty_evidence_matched: Optional[bool] = None
+    difficulty_evidence_differing_fields: list = field(default_factory=list)
+    difficulty_evidence_corrected: Optional[bool] = None
+    final_difficulty_evidence_source: Optional[str] = None
     final_difficulty_target_level: Optional[int] = None
     final_difficulty_validator_errors: list = field(default_factory=list)
     final_task_signature: Optional[dict] = None
@@ -819,15 +825,41 @@ def _record_lesson_identity_diagnostics(result: TurnResult, llm) -> None:
     result.title_canonicalized = canonicalized
 
 
-def _record_difficulty_evidence_diagnostics(result: TurnResult, task) -> None:
+def _record_difficulty_evidence_diagnostics(result: TurnResult, task, evidence=None,
+                                            source: Optional[str] = None) -> None:
     """Persist only closed DifficultyEvidence fields and shared validator codes."""
     if task is None or not hasattr(task, "difficulty_evidence"):
         return
-    result.final_difficulty_evidence = task.difficulty_evidence.model_dump()
+    evidence = evidence or task.difficulty_evidence
+    result.final_difficulty_evidence = evidence.model_dump()
+    result.final_difficulty_evidence_source = source
     result.final_difficulty_target_level = task.target_difficulty_level
     result.final_difficulty_validator_errors = list(difficulty_evidence_errors(
-        task.difficulty_evidence, task.target_difficulty_level,
+        evidence, task.target_difficulty_level,
     ))
+
+
+def _record_cross_evidence_diagnostics(result: TurnResult, llm) -> object:
+    """Record only closed evidence models and their bounded field differences."""
+    tutor_task = getattr(getattr(llm, "last_tutor_output", None), "new_task", None)
+    reviewer_output = getattr(llm, "last_reviewer_output", None)
+    tutor_evidence = getattr(tutor_task, "difficulty_evidence", None)
+    reviewer_evidence = getattr(reviewer_output, "reviewed_difficulty_evidence", None)
+    if tutor_evidence is not None:
+        result.tutor_difficulty_evidence = tutor_evidence.model_dump()
+    if reviewer_evidence is not None:
+        result.reviewer_difficulty_evidence = reviewer_evidence.model_dump()
+        result.final_difficulty_evidence_source = "reviewer"
+    if tutor_evidence is not None and reviewer_evidence is not None:
+        tutor_data = tutor_evidence.model_dump()
+        reviewer_data = reviewer_evidence.model_dump()
+        differing = sorted(
+            name for name in tutor_data if tutor_data[name] != reviewer_data[name]
+        )
+        result.difficulty_evidence_differing_fields = differing
+        result.difficulty_evidence_matched = not differing
+        result.difficulty_evidence_corrected = bool(differing)
+    return reviewer_evidence
 
 
 def _record_answer_metadata(result: TurnResult, response, after_session, llm) -> None:
@@ -844,6 +876,11 @@ def _record_answer_metadata(result: TurnResult, response, after_session, llm) ->
     corrected_task = getattr(reviewer_output, "corrected_task", None)
     reviewer_final_task = getattr(getattr(reviewer_output, "final", None), "new_task", None)
     final_task = corrected_task or reviewer_final_task or tutor_task
+    reviewer_evidence = _record_cross_evidence_diagnostics(result, llm)
+    if final_task is not None and reviewer_evidence is not None:
+        final_task = final_task.model_copy(update={
+            "difficulty_evidence": reviewer_evidence,
+        })
     _record_lesson_identity_diagnostics(result, llm)
 
     if tutor_task is not None:
@@ -863,7 +900,9 @@ def _record_answer_metadata(result: TurnResult, response, after_session, llm) ->
     if reviewer_final_task is not None:
         result.reviewer_final_target_level = getattr(reviewer_final_task, "target_difficulty_level", None)
     if final_task is not None and hasattr(final_task, "difficulty_evidence"):
-        _record_difficulty_evidence_diagnostics(result, final_task)
+        _record_difficulty_evidence_diagnostics(
+            result, final_task, source=("reviewer" if reviewer_evidence is not None else None),
+        )
         result.final_task_signature = final_task.task_signature.model_dump()
         result.final_task_signature_canonical = final_task.task_signature.canonical_json()
         context = tutor_lesson_context.build(result.grade, result.lesson_id)
@@ -956,7 +995,14 @@ def _record_rejected_generation_diagnostics(result: TurnResult, llm) -> None:
 
     reviewer_final_task = getattr(getattr(reviewer_output, "final", None), "new_task", None)
     final_task = corrected_task or reviewer_final_task or tutor_task
-    _record_difficulty_evidence_diagnostics(result, final_task)
+    reviewer_evidence = _record_cross_evidence_diagnostics(result, llm)
+    if final_task is not None and reviewer_evidence is not None:
+        final_task = final_task.model_copy(update={
+            "difficulty_evidence": reviewer_evidence,
+        })
+    _record_difficulty_evidence_diagnostics(
+        result, final_task, source=("reviewer" if reviewer_evidence is not None else None),
+    )
     if tutor_task is not None:
         result.tutor_proposed_task_text = tutor_task.text
     if corrected_task is not None:

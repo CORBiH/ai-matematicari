@@ -53,6 +53,10 @@ def _fresh_session(session_id, curriculum_fingerprint, grade, lesson_id,
         "last_result": "",               # "", "correct" ili "incorrect"
         "current_task_had_hint": False,
         "current_task_signature": None,
+        # Closed, server-validated evidence used for the published task. It is
+        # never sent to the student, but keeps the authoritative package
+        # auditable across the active session.
+        "current_task_difficulty_evidence": None,
         "recent_task_signatures": [],    # max MAX_RECENT_SIGNATURES potpisa zadataka
     }
 

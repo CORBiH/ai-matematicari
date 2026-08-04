@@ -532,6 +532,7 @@ def _publish_task(session, context, final, request_id, target_level=None):
         if not recent or recent[-1] != family:
             recent.append(family)
     session["current_task_signature"] = signature_record
+    session["current_task_difficulty_evidence"] = task.difficulty_evidence.model_dump()
     session["recent_task_signatures"].append(signature_record)
     _log_difficulty(request_id, context, final)
     return task_text
@@ -618,6 +619,14 @@ def _two_call(llm, context, session, student_message, request_id, trusted_verdic
         return None, calls
 
     final = normalize_for_intent(reviewer.final)
+    if final.new_task is not None:
+        # The first-call wrapper retains the Tutor's self-description. Only
+        # the independently returned Reviewer evidence becomes authoritative.
+        final = final.model_copy(update={
+            "new_task": final.new_task.model_copy(update={
+                "difficulty_evidence": reviewer.reviewed_difficulty_evidence,
+            }),
+        })
     try:
         validate_final(final, has_active_task=has_active_task)
     except UnifiedOutputError as error:

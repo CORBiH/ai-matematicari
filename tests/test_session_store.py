@@ -35,10 +35,14 @@ def test_lesson_change_resets_task():
     store = SessionStore()
     s = _load(store)
     s["current_task"] = "Zadatak A"
+    s["current_task_signature"] = {"structured_signature_hash": "old"}
+    s["current_task_difficulty_evidence"] = {"reasoning_steps": 1}
     s["hint_level"] = 3
     store.save(s)
     other = _load(store, lesson="6-01-002", title="Načini zadavanja skupa")
     assert other["current_task"] == ""
+    assert other["current_task_signature"] is None
+    assert other["current_task_difficulty_evidence"] is None
     assert other["hint_level"] == 0
 
 

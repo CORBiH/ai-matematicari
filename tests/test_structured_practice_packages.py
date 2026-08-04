@@ -12,7 +12,7 @@ from matbot.tutor.schema import (DifficultyEvidence, ReviewerChecks, ReviewerFin
 from matbot.tutor import pipeline as tutor_pipeline
 from matbot.tutor import prompts as tutor_prompts
 from matbot.tutor.pipeline import SAFE_ERROR_MESSAGE
-from tests.conftest import FakeLLM, make_difficulty_diagnostics
+from tests.conftest import FakeLLM, make_difficulty_diagnostics, make_task_payload
 
 
 FAMILIES = [
@@ -76,7 +76,10 @@ def queue_generation(fake, task, intent="generate_task"):
                                                else make_difficulty_diagnostics(
                                                    "higher" if intent == "harder_task" else "lower")))
     fake.queue(draft)
-    fake.queue(ReviewerFinal(decision="approve", checks=checks(), final=draft))
+    fake.queue(ReviewerFinal(
+        decision="approve", checks=checks(), final=draft,
+        reviewed_difficulty_evidence=task.difficulty_evidence,
+    ))
 
 
 @pytest.mark.parametrize("grade,topic", FAMILIES)
@@ -196,6 +199,7 @@ def test_reviewer_cannot_replace_the_selected_lesson_id(monkeypatch):
     fake.queue(ReviewerFinal(
         decision="correct", checks=checks(),
         final=draft.model_copy(update={"new_task": reviewer_task}),
+        reviewed_difficulty_evidence=reviewer_task.difficulty_evidence,
     ))
 
     response = run_practice_turn(store, fake, turn(6, context.topic_id))
@@ -211,7 +215,10 @@ def test_reviewer_inside_lesson_check_remains_fail_closed(monkeypatch):
     draft = TutorDraft(intent="generate_task", reply="Evo zadatka.",
                        lesson_focus="tacna lekcija", new_task=task)
     fake.queue(draft)
-    fake.queue(ReviewerFinal(decision="approve", checks=checks(inside_lesson=False), final=draft))
+    fake.queue(ReviewerFinal(
+        decision="approve", checks=checks(inside_lesson=False), final=draft,
+        reviewed_difficulty_evidence=task.difficulty_evidence,
+    ))
 
     response = run_practice_turn(store, fake, turn(6, context.topic_id))
     assert response["answer"] == SAFE_ERROR_MESSAGE
@@ -258,6 +265,35 @@ def _direct_level_one_evidence(**updates):
     return DifficultyEvidence(**values)
 
 
+def test_fake_llm_preserves_explicit_reviewer_evidence_while_binding_fixture_metadata():
+    reviewed = _direct_level_one_evidence()
+    tutor_evidence = reviewed.model_copy(update={
+        "condition_count": 2, "operation_count": 2, "combines_concepts": True,
+    })
+    tutor_task = make_task_payload().model_copy(update={
+        "difficulty_evidence": tutor_evidence,
+    })
+    tutor = TutorDraft(intent="generate_task", reply="Evo zadatka.",
+                       lesson_focus="fixture", new_task=tutor_task)
+    reviewer = ReviewerFinal(
+        decision="approve", checks=checks(), final=tutor.model_copy(deep=True),
+        reviewed_difficulty_evidence=reviewed,
+    )
+    fake = FakeLLM([tutor, reviewer])
+    fixture_input = (
+        "- lekcija: Pravila djeljivosti (6-03-004)\n"
+        "SERVER COMMITTED DIFFICULTY LEVEL: 1"
+    )
+
+    fake.tutor_turn("fixture", fixture_input)
+    result = fake.reviewer_turn("fixture", fixture_input)
+
+    assert fake.call_count == 2
+    assert result.output.reviewed_difficulty_evidence == reviewed
+    assert reviewer.reviewed_difficulty_evidence == reviewed
+    assert reviewer.reviewed_difficulty_evidence != tutor_evidence
+
+
 @pytest.mark.parametrize("form", [
     "yes/no one-rule check", "matching-value selection", "one-operation arithmetic MCQ",
     "one-value substitution", "property recognition/classification",
@@ -302,6 +338,133 @@ def test_exact_live_divisibility_selection_publishes_as_level_one(monkeypatch):
     assert session["current_task_signature"]["structured_signature_hash"]
 
 
+def test_reviewer_independently_repairs_exact_live_level_one_evidence(monkeypatch):
+    """The second call may approve wording while correcting Tutor metadata."""
+    monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", "universal_two_call")
+    monkeypatch.setenv("MATBOT_PRACTICE_DIFFICULTY_LEVELS", "enabled")
+    context, store, fake = build(6, "6-03-004"), SessionStore(), FakeLLM()
+    reviewed = _direct_level_one_evidence()
+    tutor_evidence = reviewed.model_copy(update={
+        "condition_count": 2, "operation_count": 2, "combines_concepts": True,
+    })
+    task = task_for(
+        context, signature="reported-live-failure",
+        text="Koji od sljedećih brojeva je djeljiv sa 6?",
+        options=("$12$", "$15$", "$25$", "$35$"),
+    ).model_copy(update={"difficulty_evidence": tutor_evidence})
+    draft = TutorDraft(intent="generate_task", reply="Evo zadatka.",
+                       lesson_focus="tačna lekcija", new_task=task)
+    reviewer = ReviewerFinal(
+        decision="approve", checks=checks(), final=draft,
+        reviewed_difficulty_evidence=reviewed,
+    )
+    original_reviewer_evidence = reviewer.reviewed_difficulty_evidence.model_copy(deep=True)
+    assert tutor_evidence != original_reviewer_evidence
+    fake.queue(draft)
+    fake.queue(reviewer)
+
+    response = run_practice_turn(store, fake, turn(6, context.topic_id))
+    session = store.peek("structured")
+    assert response["status"] == "ready"
+    assert fake.call_count == 2
+    assert session["difficulty_level"] == 1
+    assert session["current_task_difficulty_evidence"] == reviewed.model_dump()
+    assert session["current_task_difficulty_evidence"] != tutor_evidence.model_dump()
+    assert draft.new_task.difficulty_evidence == tutor_evidence
+    assert reviewer.reviewed_difficulty_evidence == original_reviewer_evidence
+    assert reviewer.final.new_task.text == task.text
+    assert reviewer.final.new_task.options == task.options
+    assert reviewer.final.new_task.correct_option_id == task.correct_option_id
+    assert reviewer.final.new_task.expected_answer == task.expected_answer
+    assert reviewer.final.new_task.solution == task.solution
+    assert reviewer.final.new_task.task_signature == task.task_signature
+
+
+def test_reviewer_agreement_publishes_without_evidence_correction(monkeypatch):
+    monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", "universal_two_call")
+    context, store, fake = build(6, "6-03-004"), SessionStore(), FakeLLM()
+    task = task_for(context, signature="reviewer-agrees")
+    draft = TutorDraft(intent="generate_task", reply="Evo zadatka.",
+                       lesson_focus="tačna lekcija", new_task=task)
+    fake.queue(draft)
+    fake.queue(ReviewerFinal(
+        decision="approve", checks=checks(), final=draft,
+        reviewed_difficulty_evidence=task.difficulty_evidence,
+    ))
+
+    assert run_practice_turn(store, fake, turn(6, context.topic_id))["status"] == "ready"
+    assert store.peek("structured")["current_task_difficulty_evidence"] == task.difficulty_evidence.model_dump()
+    assert fake.call_count == 2
+
+
+@pytest.mark.parametrize("tutor_updates,reviewer_updates", [
+    ({"condition_count": 2, "operation_count": 2, "combines_concepts": True},
+     {"condition_count": 2, "operation_count": 2, "combines_concepts": True}),
+])
+def test_authoritative_reviewer_evidence_rejects_invalid_level_one_without_state_mutation(
+        monkeypatch, tutor_updates, reviewer_updates):
+    monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", "universal_two_call")
+    monkeypatch.setenv("MATBOT_PRACTICE_DIFFICULTY_LEVELS", "enabled")
+    context, store, fake = build(6, "6-03-004"), SessionStore(), FakeLLM()
+    task = task_for(context, signature=str(tutor_updates) + str(reviewer_updates)).model_copy(
+        update={"difficulty_evidence": _direct_level_one_evidence(**tutor_updates)})
+    draft = TutorDraft(intent="generate_task", reply="Evo zadatka.",
+                       lesson_focus="tačna lekcija", new_task=task)
+    fake.queue(draft)
+    fake.queue(ReviewerFinal(
+        decision="approve", checks=checks(), final=draft,
+        reviewed_difficulty_evidence=_direct_level_one_evidence(**reviewer_updates),
+    ))
+
+    assert run_practice_turn(store, fake, turn(6, context.topic_id))["answer"] == SAFE_ERROR_MESSAGE
+    assert store.peek("structured") is None
+    assert fake.call_count == 2
+
+
+def test_reviewer_level_two_disagreement_rejects_and_preserves_its_evidence(monkeypatch):
+    monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", "universal_two_call")
+    monkeypatch.setenv("MATBOT_PRACTICE_DIFFICULTY_LEVELS", "enabled")
+    context, store, fake = build(6, "6-03-004"), SessionStore(), FakeLLM()
+    tutor_evidence = _direct_level_one_evidence()
+    reviewer_evidence = _direct_level_one_evidence(
+        reasoning_steps=2, condition_count=2, operation_count=2,
+    )
+    task = task_for(context, signature="reviewer-finds-level-two").model_copy(
+        update={"difficulty_evidence": tutor_evidence})
+    draft = TutorDraft(intent="generate_task", reply="Evo zadatka.",
+                       lesson_focus="tačna lekcija", new_task=task)
+    reviewer = ReviewerFinal(
+        decision="approve", checks=checks(), final=draft,
+        reviewed_difficulty_evidence=reviewer_evidence,
+    )
+    assert tutor_evidence != reviewer_evidence
+    fake.queue(draft)
+    fake.queue(reviewer)
+
+    assert run_practice_turn(store, fake, turn(6, context.topic_id))["answer"] == SAFE_ERROR_MESSAGE
+    assert store.peek("structured") is None
+    assert fake.call_count == 2
+    assert reviewer.reviewed_difficulty_evidence == reviewer_evidence
+
+
+def test_reviewer_omitting_independent_evidence_rejects_before_publication(monkeypatch, caplog):
+    monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", "universal_two_call")
+    context, store, fake = build(6, "6-03-004"), SessionStore(), FakeLLM()
+    task = task_for(context, signature="reviewer-omits-evidence")
+    draft = TutorDraft(intent="generate_task", reply="Evo zadatka.",
+                       lesson_focus="tačna lekcija", new_task=task)
+    fake.queue(draft)
+    fake.queue(ReviewerFinal(
+        decision="approve", checks=checks(), final=draft,
+        reviewed_difficulty_evidence=None,
+    ))
+
+    assert run_practice_turn(store, fake, turn(6, context.topic_id))["answer"] == SAFE_ERROR_MESSAGE
+    assert store.peek("structured") is None
+    assert fake.call_count == 2
+    assert "stage=reviewer_payload" in caplog.text
+
+
 def test_rejected_level_one_evidence_preserves_prior_session(monkeypatch):
     monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", "universal_two_call")
     monkeypatch.setenv("MATBOT_PRACTICE_DIFFICULTY_LEVELS", "enabled")
@@ -326,6 +489,8 @@ def test_tutor_and_reviewer_prompts_define_level_one_selection_without_yes_no_re
     assert "selection" in tutor.lower()
     assert "choosing a visible option" in tutor.lower()
     assert "one-rule selection" in reviewer.lower()
+    assert "reviewed_difficulty_evidence" in reviewer
+    assert "ignore tutor numerical counts" in reviewer.lower()
 
 
 @pytest.mark.parametrize("difficulty_flag", [
@@ -405,7 +570,10 @@ def test_reviewer_option_change_without_expected_answer_update_fails(monkeypatch
                        lesson_focus="tacna lekcija", new_task=draft_task)
     reviewer_final = draft.model_copy(update={"new_task": corrected})
     fake.queue(draft)
-    fake.queue(ReviewerFinal(decision="correct", checks=checks(), final=reviewer_final))
+    fake.queue(ReviewerFinal(
+        decision="correct", checks=checks(), final=reviewer_final,
+        reviewed_difficulty_evidence=corrected.difficulty_evidence,
+    ))
 
     assert run_practice_turn(store, fake, turn(6, context.topic_id))["answer"] == SAFE_ERROR_MESSAGE
     assert store.peek("structured") is None

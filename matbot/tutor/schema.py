@@ -220,6 +220,9 @@ class ReviewerFinal(BaseModel):
     fail_reason_code: Optional[Literal[FAIL_REASON_CODES]] = None
     # Popunjen za approve/correct; kod 'correct' je to ISPRAVLJENA verzija.
     final: Optional[TutorDraft] = None
+    # Reviewer computes this independently; the server transfers it into the
+    # authoritative final task package.
+    reviewed_difficulty_evidence: Optional[DifficultyEvidence] = None
 
 
 class UnifiedOutputError(ValueError):
@@ -382,6 +385,16 @@ def validate_reviewer(reviewer: ReviewerFinal) -> None:
     _require(reviewer.final is not None,
              f"odluka '{reviewer.decision}' bez konačnog payloada")
     checks = reviewer.checks
+    has_final_task = reviewer.final.new_task is not None
+    if has_final_task:
+        _require(reviewer.reviewed_difficulty_evidence is not None,
+                 "approved task without independent reviewer difficulty evidence")
+    else:
+        _require(reviewer.reviewed_difficulty_evidence is None,
+                 "reviewer difficulty evidence without a new task")
+    if checks.difficulty_evidence_valid:
+        _require(reviewer.reviewed_difficulty_evidence is not None,
+                 "reviewer claims valid difficulty evidence without a result")
     failed = [
         name for name in (
             "math_correct", "marked_option_correct", "inside_lesson",

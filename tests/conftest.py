@@ -307,17 +307,23 @@ def make_reviewer_checks(independent_answer="$\\frac{5}{7}$", **overrides):
 
 
 def make_reviewer_final(decision="approve", final=..., checks=None,
-                        fail_reason_code=None, **draft_kwargs):
+                        fail_reason_code=None, reviewed_difficulty_evidence=..., **draft_kwargs):
     """Reviewer odluka. `final=...` znači „isti nacrt kakav bi Tutor dao“."""
     from matbot.tutor.schema import ReviewerFinal
 
     if final is ...:
         final = None if decision == "fail_closed" else make_tutor_draft(**draft_kwargs)
+    if reviewed_difficulty_evidence is ...:
+        task = getattr(final, "new_task", None)
+        reviewed_difficulty_evidence = (
+            task.difficulty_evidence if task is not None else None
+        )
     return ReviewerFinal(
         decision=decision,
         checks=checks or make_reviewer_checks(),
         fail_reason_code=fail_reason_code,
         final=final,
+        reviewed_difficulty_evidence=reviewed_difficulty_evidence,
     )
 
 
@@ -505,7 +511,6 @@ class FakeLLM:
                     "normalized_parameters": [SignatureParameter(name="text", value=task.text)],
                 }),
             })
-
         if hasattr(output, "final"):
             bind(output.final)
         else:

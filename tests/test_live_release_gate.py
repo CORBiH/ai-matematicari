@@ -438,3 +438,39 @@ def test_rejected_package_diagnostics_include_closed_difficulty_evidence_and_cod
     assert result.final_difficulty_validator_errors == [
         "level_1_is_not_direct_introductory_application"
     ]
+
+
+def test_canary_diagnostics_distinguish_tutor_reviewer_and_authoritative_evidence():
+    from scratchpad import run_difficulty_canary as canary
+    from tests.conftest import make_reviewer_final, make_task_payload, make_tutor_draft
+
+    tutor_task = make_task_payload().model_copy(update={
+        "selected_lesson_id": "6-03-004",
+        "selected_lesson_title": "Pravila djeljivosti sa 2, 3, 4, 5, 6, 9, 10, 15 i 25",
+    })
+    tutor_task = tutor_task.model_copy(update={
+        "difficulty_evidence": tutor_task.difficulty_evidence.model_copy(update={
+            "condition_count": 2, "operation_count": 2, "combines_concepts": True,
+        }),
+    })
+    draft = make_tutor_draft(new_task=tutor_task)
+    reviewer = make_reviewer_final(
+        final=draft,
+        reviewed_difficulty_evidence=make_task_payload().difficulty_evidence,
+    )
+    result = canary.TurnResult("cross-evidence", "6-03-004",
+                               "Pravila djeljivosti sa 2, 3, 4, 5, 6, 9, 10, 15 i 25",
+                               "non_contract", 6, "", target_level=1)
+    canary._record_rejected_generation_diagnostics(
+        result, SimpleNamespace(last_tutor_output=draft, last_reviewer_output=reviewer))
+
+    assert result.tutor_difficulty_evidence == tutor_task.difficulty_evidence.model_dump()
+    assert result.reviewer_difficulty_evidence == reviewer.reviewed_difficulty_evidence.model_dump()
+    assert result.difficulty_evidence_matched is False
+    assert result.difficulty_evidence_differing_fields == [
+        "combines_concepts", "condition_count", "operation_count",
+    ]
+    assert result.difficulty_evidence_corrected is True
+    assert result.final_difficulty_evidence_source == "reviewer"
+    assert result.final_difficulty_evidence == reviewer.reviewed_difficulty_evidence.model_dump()
+    assert result.final_difficulty_validator_errors == []
