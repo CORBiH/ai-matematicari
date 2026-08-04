@@ -189,7 +189,7 @@ Ova dijagnostika je INTERNA: učenik je ne vidi."""
 
 
 _STRUCTURED_TASK_RULE = """STRUCTURED TASK PACKAGE (required for every `new_task`):
-- selected_lesson_id and selected_lesson_title exactly match the canonical lesson;
+- selected_lesson_id exactly matches the canonical lesson; include selected_lesson_title for readability, but the server owns and canonicalizes that display copy;
 - target_difficulty_level is 1 for the first task, shifts one bounded step for easier/harder, and otherwise stays at the committed level;
 - options use unique IDs a, b, c, d; correct_option_id identifies the correct visible option and agrees with correct_option_index;
 - for a multiple-choice task, expected_answer is an exact copy of that marked option's text. Put explanation, derivation, unit commentary, and reasoning only in solution;

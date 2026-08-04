@@ -378,3 +378,37 @@ def test_gate_harness_preserves_safe_first_call_llm_failure_details(
     assert result.llm_failure_diagnostics["exception_summary"] == "[REDACTED]"
     assert "unapproved_detail" not in result.llm_failure_diagnostics
     assert "secret-value" not in str(result.llm_failure_diagnostics)
+
+
+def test_publication_rejection_is_never_classified_as_unknown():
+    from scratchpad import run_difficulty_canary as canary
+
+    message = (
+        "tutor_rejected request_id=abc topic=6-03-004 stage=publication "
+        "intent=generate_task detail=task lesson ID does not match selected lesson"
+    )
+    assert canary._classify_failure([message]) == "publication_validation_rejection"
+
+
+def test_gate_identity_diagnostics_record_only_safe_title_match_facts():
+    from scratchpad import run_difficulty_canary as canary
+    from tests.conftest import make_reviewer_final, make_task_payload, make_tutor_draft
+
+    task = make_task_payload().model_copy(update={
+        "selected_lesson_id": "6-03-004", "selected_lesson_title": "Drugi prikazni naslov",
+    })
+    draft = make_tutor_draft(new_task=task)
+    reviewer = make_reviewer_final(final=draft)
+    result = canary.TurnResult("identity", "6-03-004",
+                               "Pravila djeljivosti sa 2, 3, 4, 5, 6, 9, 10, 15 i 25",
+                               "non_contract", 6, "")
+    canary._record_rejected_generation_diagnostics(
+        result, SimpleNamespace(last_tutor_output=draft, last_reviewer_output=reviewer))
+
+    assert result.canonical_context_lesson_id == "6-03-004"
+    assert result.canonical_context_lesson_title == result.lesson_title
+    assert result.tutor_returned_lesson_id == "6-03-004"
+    assert result.reviewer_final_lesson_id == "6-03-004"
+    assert result.tutor_title_matched_canonical is False
+    assert result.reviewer_final_title_matched_canonical is False
+    assert result.title_canonicalized is True

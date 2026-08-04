@@ -255,6 +255,8 @@ FAILURE_CLASSES = (
     "llm_invalid_output_unknown",
     "tutor_payload_rejection",
     "reviewer_payload_rejection",
+    "reviewer_fail_closed_rejection",
+    "publication_validation_rejection",
     "reviewer_rejection",
     "deterministic_validation_rejection",
     "target_profile_rejection",
@@ -326,6 +328,10 @@ def _classify_failure(messages: list[str]) -> str:
         return "duplicate_rejection"
     if "lesson_fidelity:" in blob:
         return "reviewer_rejection"
+    if "stage=publication" in blob:
+        return "publication_validation_rejection"
+    if "stage=reviewer_fail_closed" in blob:
+        return "reviewer_fail_closed_rejection"
     if "category=invalid_output" in blob:
         return "deterministic_validation_rejection"
     if "stage=tutor_draft" in blob:
@@ -502,6 +508,14 @@ class TurnResult:
     final_task_answer_kind_source: Optional[str] = None
     tutor_proposed_target_level: Optional[int] = None
     reviewer_final_target_level: Optional[int] = None
+    canonical_context_lesson_id: Optional[str] = None
+    canonical_context_lesson_title: Optional[str] = None
+    tutor_returned_lesson_id: Optional[str] = None
+    tutor_title_matched_canonical: Optional[bool] = None
+    reviewer_final_lesson_id: Optional[str] = None
+    reviewer_final_title_matched_canonical: Optional[bool] = None
+    title_canonicalized: Optional[bool] = None
+    publication_validation_category: Optional[str] = None
     final_structured_package_source: Optional[str] = None
     final_difficulty_evidence: Optional[dict] = None
     final_task_signature: Optional[dict] = None
@@ -537,6 +551,7 @@ class TurnResult:
     revealed_correct_option_id: Optional[str] = None
     effective_topic: Optional[str] = None
     session_lesson_id_after: Optional[str] = None
+    session_lesson_title_after: Optional[str] = None
     lesson_preserved_signal: Optional[str] = None
     level_appropriate_signal: Optional[str] = None
     direction_correct_signal: Optional[str] = None
@@ -772,6 +787,35 @@ def _published_task_text(answer_text: Optional[str]) -> Optional[str]:
     return answer_text[index + len(marker):] if index >= 0 else None
 
 
+def _record_lesson_identity_diagnostics(result: TurnResult, llm) -> None:
+    """Persist only bounded identity facts, never task prose or prompts."""
+    context = tutor_lesson_context.build(result.grade, result.lesson_id)
+    if context is None:
+        return
+    result.canonical_context_lesson_id = context.topic_id
+    result.canonical_context_lesson_title = context.title
+    tutor_task = getattr(getattr(llm, "last_tutor_output", None), "new_task", None)
+    reviewer_output = getattr(llm, "last_reviewer_output", None)
+    reviewer_task = getattr(getattr(reviewer_output, "final", None), "new_task", None)
+
+    canonicalized = False
+    if tutor_task is not None:
+        result.tutor_returned_lesson_id = getattr(tutor_task, "selected_lesson_id", None)
+        result.tutor_title_matched_canonical = (
+            getattr(tutor_task, "selected_lesson_title", None) == context.title
+        )
+        canonicalized |= bool(result.tutor_returned_lesson_id == context.topic_id
+                              and result.tutor_title_matched_canonical is False)
+    if reviewer_task is not None:
+        result.reviewer_final_lesson_id = getattr(reviewer_task, "selected_lesson_id", None)
+        result.reviewer_final_title_matched_canonical = (
+            getattr(reviewer_task, "selected_lesson_title", None) == context.title
+        )
+        canonicalized |= bool(result.reviewer_final_lesson_id == context.topic_id
+                              and result.reviewer_final_title_matched_canonical is False)
+    result.title_canonicalized = canonicalized
+
+
 def _record_answer_metadata(result: TurnResult, response, after_session, llm) -> None:
     """Record the real pipeline's answer metadata without changing it.
 
@@ -786,6 +830,7 @@ def _record_answer_metadata(result: TurnResult, response, after_session, llm) ->
     corrected_task = getattr(reviewer_output, "corrected_task", None)
     reviewer_final_task = getattr(getattr(reviewer_output, "final", None), "new_task", None)
     final_task = corrected_task or reviewer_final_task or tutor_task
+    _record_lesson_identity_diagnostics(result, llm)
 
     if tutor_task is not None:
         result.tutor_declared_answer_kind = getattr(tutor_task, "answer_kind", None)
@@ -892,6 +937,7 @@ def _record_rejected_generation_diagnostics(result: TurnResult, llm) -> None:
     tutor_task = getattr(getattr(llm, "last_tutor_output", None), "new_task", None)
     reviewer_output = getattr(llm, "last_reviewer_output", None)
     corrected_task = getattr(reviewer_output, "corrected_task", None)
+    _record_lesson_identity_diagnostics(result, llm)
     requirement = lesson_fidelity.semantic_task_requirement(result.lesson_title)
 
     if tutor_task is not None:
@@ -1724,6 +1770,7 @@ def _run_one_turn(store, llm, capture, report, scenario: Scenario, campaign: str
     after_session = store.peek(scenario.session_id)
     result.session_level_after = (after_session or {}).get("difficulty_level", committed_level)
     result.session_lesson_id_after = (after_session or {}).get("lesson_id")
+    result.session_lesson_title_after = (after_session or {}).get("lesson_title")
     result.published = response.get("status") == "ready"
     result.answer_text = response.get("answer")
     result.student_facing_response = response.get("answer")
@@ -1764,6 +1811,8 @@ def _run_one_turn(store, llm, capture, report, scenario: Scenario, campaign: str
         result.llm_failure_diagnostics = failure.get("diagnostics") or {}
         result.failure_class = _classify_llm_failure(result.llm_failure_category) \
             if result.llm_failure_category else _classify_failure(capture.messages)
+        if result.failure_class == "publication_validation_rejection":
+            result.publication_validation_category = result.failure_class
         result.failure_is_infrastructure = result.failure_class in _INFRASTRUCTURE_CLASSES
         result.effective_server_label = None   # explicitly unchanged
         result.expected_answer = None

@@ -69,19 +69,40 @@ def _difficulty_levels_enabled():
     return config.practice_difficulty_levels_enabled()
 
 
+def canonicalize_task_lesson_title(task, context):
+    """Make the server-owned LessonContext the sole display-title authority.
+
+    The model must still provide the exact selected lesson ID.  Once that ID
+    is known to be correct, its repeated title is only a non-authoritative
+    display copy, so harmless spelling or formatting drift cannot reject an
+    otherwise Reviewer-approved package.
+    """
+    if task is None or task.selected_lesson_id != context.topic_id:
+        return task
+    if task.selected_lesson_title == context.title:
+        return task
+    return task.model_copy(update={"selected_lesson_title": context.title})
+
+
+def _canonicalize_draft_lesson_title(draft, context):
+    task = getattr(draft, "new_task", None)
+    canonical_task = canonicalize_task_lesson_title(task, context)
+    return draft if canonical_task is task else draft.model_copy(update={"new_task": canonical_task})
+
+
 def validate_task_package(task, context, target_level=None):
     """Universal package invariants; semantic lesson judgement stays with Reviewer."""
+    task = canonicalize_task_lesson_title(task, context)
     validate_task(task)
     if task.selected_lesson_id != context.topic_id:
         raise UnifiedOutputError("task lesson ID does not match selected lesson")
-    if task.selected_lesson_title != context.title:
-        raise UnifiedOutputError("task lesson title does not match selected lesson")
     # Structured generation always requires a complete package, but only the
     # explicitly enabled controller owns target validation and rubric policy.
     if target_level is not None:
         if task.target_difficulty_level != target_level:
             raise UnifiedOutputError("task target difficulty does not match server target")
         validate_difficulty_evidence(task)
+    return task
 
 
 def _structured_signature_record(task, context):
@@ -401,7 +422,9 @@ def _run_text_turn(store, llm, session, turn, context, request_id):
         if final.intent in TASK_INTENTS:
             target_level = (_target_level_for(session, final.intent)
                             if _difficulty_levels_enabled() else None)
-            validate_task_package(final.new_task, context, target_level)
+            canonical_task = validate_task_package(final.new_task, context, target_level)
+            if canonical_task is not final.new_task:
+                final = final.model_copy(update={"new_task": canonical_task})
             task_text = _publish_task(session, context, final, request_id, target_level)
             intro_intent = final.intent if target_level is not None else "generate_task"
             intro = _NEW_TASK_INTRO.get(intro_intent, _NEW_TASK_INTRO["generate_task"])
@@ -557,6 +580,10 @@ def _two_call(llm, context, session, student_message, request_id, trusted_verdic
         _log_rejection(request_id, context, "tutor_draft", error, draft.intent)
         return None, calls
 
+    # Reviewer sees the canonical server title; raw Tutor output remains on
+    # the wrapper for safe offline diagnostics only.
+    draft = _canonicalize_draft_lesson_title(draft, context)
+
     # Only task publication needs the independent generation Reviewer.  A
     # normal answer, hint, explanation, or full-solution turn is complete
     # after Tutor semantically interpreted the free-form student message.
@@ -596,6 +623,9 @@ def _two_call(llm, context, session, student_message, request_id, trusted_verdic
     except UnifiedOutputError as error:
         _log_rejection(request_id, context, "reviewer_final", error, final.intent)
         return None, calls
+
+    # Defense in depth for a Reviewer-provided final package title.
+    final = _canonicalize_draft_lesson_title(final, context)
 
     if reviewer.decision == "correct":
         logger.info(

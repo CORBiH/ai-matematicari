@@ -9,6 +9,7 @@ from matbot.tutor.lesson_context import build
 from matbot.tutor.schema import (DifficultyEvidence, ReviewerChecks, ReviewerFinal,
                                  SignatureParameter, TaskPayload, TaskSignature, TutorDraft, TutorOption,
                                  difficulty_evidence_errors)
+from matbot.tutor import pipeline as tutor_pipeline
 from matbot.tutor.pipeline import SAFE_ERROR_MESSAGE
 from tests.conftest import FakeLLM, make_difficulty_diagnostics
 
@@ -155,6 +156,66 @@ def test_proven_numeric_contradiction_still_rejects_but_parser_absence_is_not_a_
     queue_generation(fake, contradiction)
     assert run_practice_turn(store, fake, turn(6, context.topic_id))["answer"] == SAFE_ERROR_MESSAGE
     assert store.peek("structured") == before
+
+
+@pytest.mark.parametrize("returned_title", [
+    "Pravila djeljivosti sa 2, 3, 4, 5, 6, 9, 10, 15 i 25.",
+    "  Pravila djeljivosti  ",
+    "Potpuno nepovezan prikazni naslov",
+])
+def test_exact_lesson_id_makes_returned_title_non_authoritative(monkeypatch, returned_title):
+    """The title is a redundant display copy; ID and semantic review stay strict."""
+    monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", "universal_two_call")
+    context, store, fake = build(6, "6-03-004"), SessionStore(), FakeLLM()
+    task = task_for(
+        context, signature="live-divisibility-title", text="Koji od sljedećih brojeva je djeljiv sa 6?",
+        options=("$12$", "$15$", "$25$", "$35$"),
+    ).model_copy(update={"selected_lesson_title": returned_title})
+    queue_generation(fake, task)
+
+    response = run_practice_turn(store, fake, turn(6, context.topic_id))
+    canonical = tutor_pipeline.validate_task_package(task, context)
+    session = store.peek("structured")
+    assert response["status"] == "ready"
+    assert fake.call_count == 2
+    assert canonical.selected_lesson_title == context.title
+    assert session["lesson_id"] == context.topic_id
+    assert session["lesson_title"] == context.title
+
+
+def test_reviewer_cannot_replace_the_selected_lesson_id(monkeypatch):
+    monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", "universal_two_call")
+    context, store, fake = build(6, "6-03-004"), SessionStore(), FakeLLM()
+    draft_task = task_for(context, signature="tutor-valid")
+    reviewer_task = task_for(context, signature="reviewer-wrong").model_copy(
+        update={"selected_lesson_id": "6-03-005"})
+    draft = TutorDraft(intent="generate_task", reply="Evo zadatka.",
+                       lesson_focus="tacna lekcija", new_task=draft_task)
+    fake.queue(draft)
+    fake.queue(ReviewerFinal(
+        decision="correct", checks=checks(),
+        final=draft.model_copy(update={"new_task": reviewer_task}),
+    ))
+
+    response = run_practice_turn(store, fake, turn(6, context.topic_id))
+    assert response["answer"] == SAFE_ERROR_MESSAGE
+    assert store.peek("structured") is None
+    assert fake.call_count == 2
+
+
+def test_reviewer_inside_lesson_check_remains_fail_closed(monkeypatch):
+    monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", "universal_two_call")
+    context, store, fake = build(6, "6-03-004"), SessionStore(), FakeLLM()
+    task = task_for(context, signature="inside-lesson")
+    draft = TutorDraft(intent="generate_task", reply="Evo zadatka.",
+                       lesson_focus="tacna lekcija", new_task=task)
+    fake.queue(draft)
+    fake.queue(ReviewerFinal(decision="approve", checks=checks(inside_lesson=False), final=draft))
+
+    response = run_practice_turn(store, fake, turn(6, context.topic_id))
+    assert response["answer"] == SAFE_ERROR_MESSAGE
+    assert store.peek("structured") is None
+    assert fake.call_count == 2
 
 
 def test_production_difficulty_evidence_validator_rejects_false_level_two_claim():
