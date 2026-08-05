@@ -86,7 +86,10 @@ def _parse_scenario(raw, source, line_number) -> Scenario:
     _require(isinstance(raw, dict), f"{where}: not a JSON object")
     for key in ("id", "wave", "importance", "grade", "oblast", "topic_id", "reason", "steps"):
         _require(key in raw, f"{where}: missing field {key!r}")
-    _require(raw["wave"] in ("A", "B"), f"{where}: wave must be A or B")
+    # Talasi: A/B su zatečene kampanje; F* su ciljani talasi po PORODICI
+    # (Faza 4A). Novi talas se dodaje kao PODATAK, bez izmjene runnera.
+    _require(raw["wave"] in ("A", "B") or str(raw["wave"]).startswith("F"),
+             f"{where}: wave must be A, B or an F* family wave")
     _require(raw["importance"] in IMPORTANCE, f"{where}: unknown importance {raw['importance']!r}")
     _require(isinstance(raw["grade"], int) and raw["grade"] in (6, 7, 8, 9),
              f"{where}: grade must be 6..9")
