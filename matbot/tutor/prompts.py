@@ -152,6 +152,20 @@ KAKO SE HINT I RJEŠENJE PRIKAZUJU (bitno):
 „evo ti uputa“ i ne ostavljaj `hint` prazan kad je zatražena pomoć: napiši
 konkretnu uputu koja pomjera učenika za jedan korak."""
 
+# ŽIVI NALAZ B45 (lekcija o dijeljenju decimalnih brojeva, treći hint):
+# napisano je `$7,5\\cdot 10:5\\cdot 10 = 75:50$`. Po standardnom prioritetu to
+# je `((7,5·10):5)·10 = 150`, pa je numerički verifikator ispravno odbio objavu.
+# Model je mislio `(7,5·10):(5·10)`, ali to nije zapisao. Validator se ne dira —
+# zapis mora biti nedvosmislen.
+_SCALED_DIVISION_RULE = """WHEN YOU SCALE BOTH SIDES OF A DIVISION:
+If you scale both the dividend and the divisor by the same number to remove a decimal
+comma, write it with parentheses or as a fraction — never as a bare chain.
+  correct:   $(7,5\\cdot 10):(5\\cdot 10) = 75:50$   or   $\\frac{7,5\\cdot 10}{5\\cdot 10}$
+  rejected:  $7,5\\cdot 10:5\\cdot 10 = 75:50$
+Without the parentheses the expression means $((7,5\\cdot 10):5)\\cdot 10 = 150$, the
+server's numeric verifier reads exactly that, and the whole turn is discarded."""
+
+
 _TASK_RULE = """KAD PRAVIŠ ZADATAK:
 - zadatak mora ispitivati BAŠ izabranu lekciju, ne samo istu oblast
 - tačno 4 opcije; TAČNO JEDNA je tačna; nijedne dvije ne smiju značiti istu vrijednost
@@ -246,6 +260,7 @@ def build_tutor_instructions(context):
         f"{_INTENT_GUIDE}\n\n"
         f"{_FIELD_RULE}\n\n"
         f"{_TASK_RULE}\n\n"
+        f"{_SCALED_DIVISION_RULE}\n\n"
         f"{_STRUCTURED_TASK_RULE}\n\n"
         f"{_TARGET_LEVEL_RULE}\n\n"
         f"{_STARTING_COMPLEXITY_RULE}\n\n"
@@ -384,6 +399,7 @@ def build_reviewer_instructions(context):
         "9. da je MathJax ispravan (samo $...$, poznate komande);\n"
         "10. da je bosanski prirodan i primjeren uzrastu.\n\n"
         "11. verify that lesson identity, level, text, options, marked answer, solution, difficulty evidence, and signature describe one task. Independently recompute `reviewed_difficulty_evidence` from only the visible task, answer requirements, options, and solution: ignore Tutor numerical counts. Count only actions the student must perform; four MCQ options are not four conditions or operations, selecting one option with one rule is one direct application, a solution explanation is not a student explanation requirement, and `combines_concepts` is true only when the student must combine distinct mathematical concepts. Return your independently calculated evidence even if the wording needs no textual correction. Level 1 may be a direct yes/no, recognition, calculation, classification, substitution, or one-rule selection; choosing a visible option is not by itself mathematical comparison or a second reasoning step. Level 2 permits a bounded pair of related rules/concepts, conditions, or operations, straightforward explanation/comparison, or one manageable representation change; `combines_concepts` alone is not Level 3. Level 3 requires construction, proof, three-or-more connected requirements/operations, advanced representation change, or comparable depth. For multiple choice, correct_option_id and correct_option_index must select the same visible option and expected_answer must be an exact copy of its text; explanation belongs only in solution. Signature parameters are only closed name/value entries with canonical string values: no arbitrary metadata, and order alone is never a new task. When correcting, update options, correct option ID/index, expected answer, solution, and the complete signature together, then return the complete fresh package. Set `task_package_consistent`, `difficulty_evidence_valid`, and `task_signature_consistent` accordingly.\n\n"
+        f"{_SCALED_DIVISION_RULE}\n\n"
         f"{_REVIEWER_DECISION_RULE}\n\n"
         f"{_REVIEWER_TARGET_LEVEL_RULE}\n\n"
         f"{_REVIEWER_PREFLIGHT_RULE}\n\n"
