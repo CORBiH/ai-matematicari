@@ -53,11 +53,22 @@ def test_exactly_25_pilot_lessons(pilot):
 
 
 def test_every_pilot_phase2_row_has_a_verdict_and_none_extra(phase2, pilot):
+    """Ključ presude je (item, cilj, relacija) — otporan na renumeraciju
+    mapping_id-jeva koju je izazvala popravka Faze 2 (nalaz Faze 3)."""
     mapping_rows, _items = phase2
     _lessons, pilot_ids = pilot
-    pilot_row_ids = {r[0] for r in mapping_rows if r[8] in pilot_ids}
-    assert pilot_row_ids == set(rev.MAPPING_VERDICTS)
-    assert len(pilot_row_ids) == 62
+    pilot_keys = {rev.verdict_key(r) for r in mapping_rows if r[8] in pilot_ids}
+    assert pilot_keys == set(rev.MAPPING_VERDICTS)
+    assert len(pilot_keys) == 64
+
+
+def test_verdict_key_is_not_positional(phase2, pilot):
+    """mapping_id se NE smije koristiti kao ključ: pozicioni je."""
+    mapping_rows, _items = phase2
+    _lessons, pilot_ids = pilot
+    sample = next(r for r in mapping_rows if r[8] in pilot_ids)
+    assert rev.verdict_key(sample) == (sample[1], sample[8], sample[12])
+    assert not any(isinstance(k, str) for k in rev.MAPPING_VERDICTS)
 
 
 def test_verdicts_use_only_allowed_enum():
@@ -72,13 +83,13 @@ def test_verdicts_use_only_allowed_enum():
 
 def test_rejected_rows_keep_reason_and_exist_in_phase2(phase2):
     mapping_rows, _items = phase2
-    by_id = {r[0]: r for r in mapping_rows}
-    rejected = [mid for mid, v in rev.MAPPING_VERDICTS.items()
+    keys = {rev.verdict_key(r) for r in mapping_rows}
+    rejected = [k for k, v in rev.MAPPING_VERDICTS.items()
                 if v[0] in ("reject", "wrong_lesson", "wrong_grade")]
     assert rejected, "pregled mora imati bar jedno odbijanje"
-    for mid in rejected:
-        assert mid in by_id           # originalni red postoji (ništa obrisano)
-        assert rev.MAPPING_VERDICTS[mid][3].strip()   # razlog obavezan
+    for key in rejected:
+        assert key in keys            # originalni red postoji (ništa obrisano)
+        assert rev.MAPPING_VERDICTS[key][3].strip()   # razlog obavezan
 
 
 # ---------------------------------------------------------------------------
@@ -107,10 +118,61 @@ def test_recovered_page_quotes_exist_verbatim_modulo_whitespace():
             assert ws(quote) in ws(pages[(source, page)][1]), rid
 
 
-def test_formula_loss_flags_preserved():
+def test_formula_loss_flags_preserved_and_finding_recorded():
+    """Faza 3: zastavice ostaju, a nalaz provjere izvora je zapisan doslovno.
+
+    Blokada se smije ukinuti SAMO zato što lekcija ne zavisi od spornog tokena —
+    ne zato što je formula rekonstruisana."""
     flagged = [rec[0] for rec in rev.RECOVERED_EVIDENCE if "formula_loss" in rec[8]]
     assert "R25-008" in flagged and "R25-009" in flagged
-    assert rev.LESSON_SEMANTICS["6-03-003"]["status"] == "blocked_by_formula_loss"
+    rows = [r for r in rev.SOURCE_VERIFICATION if r[0] == "6-03-003"]
+    assert rows, "6-03-003 mora imati zapisanu provjeru izvora"
+    finding = " ".join(r[2] for r in rows)
+    assert "NIJE eksponent" in finding
+    assert "10^n" not in rev.LESSON_SEMANTICS["6-03-003"]["core_skill"]
+
+
+def test_source_verification_never_reconstructs_a_formula():
+    for lesson, topic, finding, method, impact in rev.SOURCE_VERIFICATION:
+        assert lesson in rev.LESSON_SEMANTICS
+        for field in (topic, finding, method, impact):
+            assert str(field).strip()
+
+
+# ---------------------------------------------------------------------------
+# Faza 3 — klasa aktivacije
+# ---------------------------------------------------------------------------
+
+def test_activation_covers_all_25_with_valid_classes(pilot):
+    _lessons, pilot_ids = pilot
+    assert set(rev.ACTIVATION) == pilot_ids
+    for klasa, why in rev.ACTIVATION.values():
+        assert klasa in rev.ACTIVATION_CLASSES
+        assert why.strip()
+
+
+def test_proven_detector_lessons_stay_ready(pilot):
+    """Dokazano blokiranje koje danas radi ne smije biti degradirano."""
+    assert "6-03-004" in rev.PROVEN_DETECTORS
+    for lesson_id in rev.PROVEN_DETECTORS:
+        assert rev.ACTIVATION[lesson_id][0] == "READY", lesson_id
+
+
+def test_advisory_only_lessons_have_no_proven_detector():
+    """ADVISORY_ONLY ne smije uvesti novo determinističko odbijanje."""
+    for lesson_id, (klasa, _why) in rev.ACTIVATION.items():
+        if klasa != "READY":
+            assert lesson_id not in rev.PROVEN_DETECTORS, lesson_id
+
+
+def test_no_lesson_is_ready_without_exact_evidence(phase2, pilot):
+    """READY se ne dodjeljuje radi pokrivenosti — traži izričit dokaz."""
+    mapping_rows, _items = phase2
+    _lessons, pilot_ids = pilot
+    per_lesson, _rej, _unres = rev.collect_final_evidence(pilot_ids, mapping_rows)
+    for lesson_id, (klasa, _why) in rev.ACTIVATION.items():
+        if klasa == "READY":
+            assert per_lesson.get(lesson_id, {}).get("exact"), lesson_id
 
 
 # ---------------------------------------------------------------------------
@@ -235,10 +297,12 @@ def test_examples_are_labeled_authored_never_official():
 def test_review_workbook_has_all_required_sheets():
     wb = openpyxl.load_workbook(REVIEW_PATH, read_only=True)
     assert wb.sheetnames == [
-        "README", "Lekcije_Pilot25", "Mapiranja_Pregled", "Dokazi_KS",
-        "Dokazi_RS", "Porodice_Pilot", "Granice_lekcija", "Primjeri_Pilot",
-        "Praznine", "Kvalitet_Mapiranja", "Kontrola",
+        "README", "Lekcije_Pilot25", "Aktivacija", "Provjera_izvora",
+        "Mapiranja_Pregled", "Dokazi_KS", "Dokazi_RS", "Porodice_Pilot",
+        "Granice_lekcija", "Primjeri_Pilot", "Praznine", "Kvalitet_Mapiranja",
+        "Kontrola",
     ]
+    assert len(list(wb["Aktivacija"].iter_rows(values_only=True))[1:]) == 25
     rows = list(wb["Lekcije_Pilot25"].iter_rows(values_only=True))[1:]
     assert len(rows) == 25
     kontrola = list(wb["Kontrola"].iter_rows(values_only=True))[1:]

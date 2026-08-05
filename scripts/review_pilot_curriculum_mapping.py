@@ -53,186 +53,284 @@ HUMAN_REVIEW_STATUS = ("ready_for_contract_draft", "needs_manual_review",
                        "disputed_mapping")
 
 # ---------------------------------------------------------------------------
-# KORAK 1 — PRESUDE NAD SVIH 62 PILOT REDA FAZE 2.
-# Ključ = mapping_id; svaki pilot red MORA imati presudu (Kontrola to obara).
-# (verdict, nova_relacija|None, nova_pouzdanost|None, obrazloženje, zastavice)
+# KORAK 1 — PRESUDE NAD SVAKOM PILOT VEZOM FAZE 2.
+#
+# KLJUČ JE (item_id, target_lesson_id, relation) — NIKAD mapping_id: mapping_id
+# je pozicioni i pomjeri se čim se skup redova promijeni, pa bi popravka Faze 2
+# tiho razvezala presude od redova na koje se odnose (nalaz Faze 3).
+#
+# Vrijednost: (verdict, nova_relacija|None, nova_pouzdanost|None, obrazloženje,
+# zastavice). Svaka pilot veza MORA imati presudu — Kontrola to obara.
 # ---------------------------------------------------------------------------
 
 MAPPING_VERDICTS = {
-    # --- 6-03-001 Djelilac/faktor i sadržilac/višekratnik ---
-    "M-KS_2018-0036-01": ("accept", None, None,
-        "upotreba pojmova djelilac/sadržilac/djeljivo je srž lekcije", ()),
-    "M-KS_2018-0038-01": ("accept", None, "high",
-        "određivanje djelilaca datog broja JE osnovna radnja lekcije; potvrđeno", ()),
-    "M-KS_2018-0039-01": ("accept", None, None,
-        "odnos broja i njegovog sadržioca/djelioca = srž lekcije", ()),
-    "M-KS_2018-0040-03": ("accept", None, None,
-        "ispravna smjerna granica: stavka o pravilima pripada 6-03-004, "
-        "traženje djelilaca je ne smije zamijeniti", ()),
-    "M-KS_2018-0044-01": ("wrong_lesson", None, None,
-        "stavka traži NZD/NZS računanje — dokaz pripada 6-03-008/6-03-009; "
-        "6-03-001 je tek predznanje te stavke", ()),
-    "M-KS_2018-0045-01": ("accept", None, None,
-        "KS tabela sadržaja nabraja 'Djelioci broja … Sadržioci broja'", ("broad",)),
-    "M-RS_2014-0022-03": ("accept", None, None,
-        "ispravna smjerna granica prema RS stavci o kriterijumima", ()),
-
-    # --- 6-03-002 Djeljivost zbira, razlike i proizvoda ---
-    "M-KS_2018-0035-02": ("wrong_lesson", None, None,
-        "par 'djeljivost vs dijeljenje s ostatkom' je ispravan, ali je mašina "
-        "za susjeda uzela prvu leksikografsku lekciju (6-03-002) umjesto "
-        "6-03-004; ispravljena granica je u listu Granice_lekcija", ()),
-
-    # --- 6-03-004 Pravila djeljivosti ---
-    "M-KS_2018-0036-02": ("accept", None, None, "ispravna smjerna granica", ()),
-    "M-KS_2018-0039-02": ("accept", None, None, "ispravna smjerna granica", ()),
-    "M-KS_2018-0040-01": ("accept", None, None,
-        "KS izričito: 'primjenjivati pravila za djeljivost sa 2, sa 3, sa 5, "
-        "6, 9, 4, 25 i sa 10n' — noseći dokaz; NAPOMENA: KS skup ne navodi 15, "
-        "a navodi 10^n (MAT-BOT naslov: 2,3,4,5,6,9,10,15,25)", ()),
-    "M-KS_2018-0045-20": ("accept", None, None,
-        "izvedena granica iz široke stavke; sadržajno tačna", ("broad",)),
-    "M-RS_2014-0022-01": ("accept", None, None,
-        "RS 'kriterijumima djeljivosti' = pravila djeljivosti (terminološki alias)", ()),
-
-    # --- 6-03-005 Prosti i složeni brojevi ---
-    "M-KS_2018-0041-01": ("accept", None, "high",
-        "'utvrđivati da li je broj prost ili složen' = srž lekcije; potvrđeno", ()),
-    "M-KS_2018-0043-02": ("accept", None, None,
-        "ispravna smjerna granica: prepoznavanje prostih nije faktorizacija", ()),
-    "M-RS_2014-0023-01": ("accept", None, "high",
-        "RS poseban cilj imenuje lekciju; potvrđeno", ()),
-
-    # --- 6-03-006 Relativno prosti brojevi (GAP → razriješen) ---
-    "M-KS_2018-0042-01": ("change_relation", "exact", "high",
-        "'utvrđivati jesu li dva data broja uzajamno (relativno) prosta' JE "
-        "doslovno vještina lekcije — Faza 2 ju je potcijenila (supporting/low); "
-        "lažno nisko, ne lažno visoko", ()),
-
-    # --- 6-03-007 Rastavljanje na proste faktore ---
-    "M-KS_2018-0043-01": ("accept", None, None, "noseći KS dokaz faktorizacije", ()),
-    "M-KS_2018-0045-21": ("accept", None, None, "izvedena granica; tačna", ("broad",)),
-    "M-RS_2014-0024-03": ("accept", None, None,
-        "granica faktorizacija↔NZD/NZS iz RS stavke; tačna", ()),
-
-    # --- 6-03-008 / 6-03-009 NZD / NZS ---
-    "M-KS_2018-0043-03": ("accept", None, None, "granica prema faktorizaciji; tačna", ()),
-    "M-KS_2018-0044-02": ("accept", None, "high",
-        "stavka izričito 'najveći zajednički djelilac'; izjednačenje razriješeno "
-        "u korist 008+009 (vidi odbijeni red za 6-03-001)", ("split",)),
-    "M-KS_2018-0045-02": ("accept", None, None,
-        "KS tabela: 'Zajednički djelioci … Najveći zajednički djelilac'", ("broad",)),
-    "M-RS_2014-0024-01": ("accept", None, None, "RS cilj imenuje NZD", ()),
-    "M-KS_2018-0044-03": ("accept", None, "high",
-        "ista stavka pokriva i NZS — legitiman dvostruki cilj (split)", ("split",)),
-    "M-KS_2018-0045-03": ("accept", None, None,
-        "KS tabela: 'Zajednički sadržioci … Najmanji zajednički sadržilac'", ("broad",)),
-    "M-RS_2014-0024-02": ("accept", None, None, "RS cilj imenuje NZS", ()),
-
-    # --- 6-03-010 Tekstualni zadaci iz djeljivosti ---
-    "M-KS_2018-0045-04": ("accept", None, None,
-        "vodeća klauzula 'rješavati tekstualne zadatke' STOJI u KS bloku "
-        "djeljivosti — dokaz je tačan; frazni pogodak preko granice rečenice je "
-        "artefakt ekstrakcije, ali cilja ispravno", ("broad",)),
-    "M-KS_2018-0073-01": ("wrong_lesson", None, None,
-        "KS-0073 pripada nizu ishoda za DECIMALNE brojeve (0064–0075): pravi dom "
-        "je 6-05-011, ne 6-03-010", ()),
-
-    # --- 6-04-001 Pojam razlomka ---
-    "M-KS_2018-0046-01": ("accept", None, None,
-        "noseći KS dokaz: razlomak, brojilac, imenilac, razlomačka crta", ()),
-    "M-KS_2018-0063-01": ("accept", None, None,
-        "KS tabela sadržaja nabraja pojmove lekcije", ("broad",)),
-
-    # --- 6-04-002 (GAP → razriješen) ---
-    "M-KS_2018-0046-02": ("accept", None, None, "ispravna smjerna granica", ()),
-    "M-KS_2018-0063-07": ("accept", None, None, "ispravna smjerna granica", ("broad",)),
-
-    # --- 6-04-003 Vrste razlomaka; mješoviti ---
-    "M-KS_2018-0051-01": ("accept", None, "high",
-        "zapis nepravog razlomka mješovitim brojem i obratno = srž lekcije; "
-        "izjednačenje s 6-05-001/6-06-001 je mašinski šum ('zapis'), potvrđeno", ()),
-
-    # --- 6-04-004 Prikaz na brojevnoj polupravoj ---
-    "M-KS_2018-0049-01": ("accept", None, None,
-        "noseći dokaz; 'kao dio figure' dio stavke ide 6-04-002 (oporavljeno)", ()),
-    "M-KS_2018-0050-01": ("change_relation", "supporting", "medium",
-        "'grafički prikaz' obuhvata i figure i polupravu — za polupravu je "
-        "podrška; noseći dom stavke je 6-04-002 (oporavljeno tamo kao exact)", ()),
-
-    # --- 6-04-005 Proširivanje ---
-    "M-KS_2018-0045-22": ("accept", None, None, "izvedena granica; tačna", ("broad",)),
-    "M-KS_2018-0054-01": ("accept", None, None,
-        "invarijantnost vrijednosti pri proširivanju/skraćivanju — nosi OBJE "
-        "lekcije (vidi promjenu za 6-04-006)", ("split",)),
-    "M-KS_2018-0055-02": ("accept", None, None, "ispravna smjerna granica", ()),
-    "M-KS_2018-0063-02": ("accept", None, None,
-        "KS tabela: 'Proširivanje razlomaka'", ("broad",)),
-
-    # --- 6-04-006 Skraćivanje i nesvodivi razlomak ---
-    "M-KS_2018-0054-02": ("change_relation", "exact", "high",
-        "stavka IZRIČITO navodi i skraćivanje ('proširivanjem i skraćivanjem'); "
-        "mašina je dala samo susjedstvo — lažno nisko", ()),
-    "M-KS_2018-0063-03": ("accept", None, None,
-        "KS tabela: 'Skraćivanje razlomaka'; NAPOMENA: 'nesvodivi razlomak' iz "
-        "naslova nijedan izvor ne imenuje — MAT-BOT dekompozicija", ("broad",)),
-
-    # --- 6-04-008 Upoređivanje ---
-    "M-KS_2018-0045-05": ("accept", None, None, "KS tabela: 'Upoređivanje razlomaka'", ("broad",)),
-    "M-KS_2018-0054-03": ("accept", None, None, "ispravna smjerna granica", ()),
-    "M-KS_2018-0055-01": ("accept", None, None, "noseći dokaz: 'upoređivati razlomke'", ()),
-    "M-KS_2018-0063-08": ("accept", None, None, "izvedena granica; tačna", ("broad",)),
-
-    # --- 6-04-009 Sabiranje/oduzimanje jednakih imenilaca ---
-    "M-KS_2018-0045-06": ("accept", None, None,
-        "KS tabela: 'Sabiranje i oduzimanje razlomaka jednakih imenilaca'", ("broad",)),
-    "M-KS_2018-0063-09": ("accept", None, None, "granica račun↔jednačine; tačna", ("broad",)),
-    "M-KS_2018-0075-11": ("accept", None, None, "granica račun↔jednačine; tačna", ("broad",)),
-    "M-RS_2014-0026-04": ("accept", None, None,
-        "RS stavka o jednačinama; granica prema direktnom računu tačna", ()),
-
-    # --- 6-04-010 različitih imenilaca ---
-    "M-KS_2018-0045-07": ("accept", None, None,
-        "KS tabela: '… razlomaka različitih imenilaca'", ("broad",)),
-    "M-KS_2018-0075-12": ("accept", None, None, "granica; tačna", ("broad",)),
-
-    # --- 6-04-011 Množenje ---
-    "M-KS_2018-0045-08": ("accept", None, None,
-        "KS tabela: 'Množenje razlomka prirodnim brojem. Množenje razlomka "
-        "razlomkom.'", ("broad",)),
-    "M-KS_2018-0052-03": ("reject", None, None,
-        "pogrešno primijenjen par razlomci↔procenti: KS-0052 je o DECIMALNOM "
-        "zapisu, a ne o procentima; 6-04-011 nije njegov zamjenjivi susjed — "
-        "lažno visoko pouzdanje mašinskog pravila", ()),
-    "M-KS_2018-0063-10": ("accept", None, None,
-        "široka stavka stvarno nabraja i postotni zapis — granica razlomci↔"
-        "procenti sadržajno stoji", ("broad",)),
-
-    # --- 6-04-012 Dijeljenje ---
-    "M-KS_2018-0045-09": ("accept", None, None,
-        "KS tabela: 'Dijeljenje razlomka prirodnim brojem. Dijeljenje razlomka "
-        "razlomkom.'", ("broad",)),
-
-    # --- 6-04-013 Svojstva računskih operacija ---
-    "M-KS_2018-0050-02": ("wrong_lesson", None, None,
-        "stavka o čitanju grafičkog prikaza nema veze sa svojstvima operacija — "
-        "mašinski šum niskog pouzdanja", ()),
-    "M-KS_2018-0057-01": ("change_relation", "supporting", "medium",
-        "'izvoditi osnovne računske operacije' dokazuje BLOK operacija "
-        "(6-04-009…012), a lekciju o svojstvima samo podržava", ()),
-    "M-RS_2014-0025-01": ("change_relation", "supporting", "medium",
-        "širok RS cilj (pojam + operacije); za svojstva je samo podrška; "
-        "podjela stavke: exact za 6-04-001 (oporavljeno), podrška operacijama", ("split",)),
-
-    # --- 6-04-014 Brojevni izrazi (GAP → razriješen) ---
-    "M-KS_2018-0045-23": ("accept", None, None, "granica jednačina↔izraz; tačna", ("broad",)),
-    "M-KS_2018-0075-13": ("accept", None, None, "granica jednačina↔izraz; tačna", ("broad",)),
-
-    # --- 6-04-015 Tekstualni zadaci s razlomcima ---
-    "M-KS_2018-0073-02": ("wrong_lesson", None, None,
-        "isti razlog kao za 6-03-010: KS-0073 pripada decimalnom nizu (dom "
-        "6-05-011)", ()),
+    ('KS_2018-0035', '6-03-004', 'neighbour'): (
+        'accept', None, None,
+        "POPRAVLJEN DEFEKT 1 (Faza 3): susjed je sada KANONSKA lekcija pravila djeljivosti; ranije je pravilo biralo prvu lekciju po ID-ju čiji naslov sadrži 'djeljivost' (6-03-002), pa je granica pokazivala na pogrešnu vještinu",
+        ()),
+    ('KS_2018-0036', '6-03-001', 'exact'): (
+        'accept', None, None,
+        'upotreba pojmova djelilac/sadržilac/djeljivo je srž lekcije',
+        ()),
+    ('KS_2018-0036', '6-03-004', 'neighbour'): (
+        'accept', None, None,
+        'ispravna smjerna granica',
+        ()),
+    ('KS_2018-0038', '6-03-001', 'exact'): (
+        'accept', None, 'high',
+        'određivanje djelilaca datog broja JE osnovna radnja lekcije; potvrđeno',
+        ()),
+    ('KS_2018-0039', '6-03-001', 'exact'): (
+        'accept', None, None,
+        'odnos broja i njegovog sadržioca/djelioca = srž lekcije',
+        ()),
+    ('KS_2018-0039', '6-03-004', 'neighbour'): (
+        'accept', None, None,
+        'ispravna smjerna granica',
+        ()),
+    ('KS_2018-0040', '6-03-001', 'neighbour'): (
+        'accept', None, None,
+        'ispravna smjerna granica: stavka o pravilima pripada 6-03-004, traženje djelilaca je ne smije zamijeniti',
+        ()),
+    ('KS_2018-0040', '6-03-004', 'exact'): (
+        'accept', None, None,
+        "KS izričito: 'primjenjivati pravila za djeljivost sa 2, sa 3, sa 5, 6, 9, 4, 25 i sa 10n' — noseći dokaz; NAPOMENA: KS skup ne navodi 15, a navodi 10^n (MAT-BOT naslov: 2,3,4,5,6,9,10,15,25)",
+        ()),
+    ('KS_2018-0041', '6-03-005', 'exact'): (
+        'accept', None, 'high',
+        "'utvrđivati da li je broj prost ili složen' = srž lekcije; potvrđeno",
+        ()),
+    ('KS_2018-0042', '6-03-006', 'supporting'): (
+        'change_relation', 'exact', 'high',
+        "'utvrđivati jesu li dva data broja uzajamno (relativno) prosta' JE doslovno vještina lekcije — Faza 2 ju je potcijenila (supporting/low); lažno nisko, ne lažno visoko",
+        ()),
+    ('KS_2018-0043', '6-03-005', 'neighbour'): (
+        'accept', None, None,
+        'ispravna smjerna granica: prepoznavanje prostih nije faktorizacija',
+        ()),
+    ('KS_2018-0043', '6-03-007', 'exact'): (
+        'accept', None, None,
+        'noseći KS dokaz faktorizacije',
+        ()),
+    ('KS_2018-0043', '6-03-008', 'neighbour'): (
+        'accept', None, None,
+        'granica prema faktorizaciji; tačna',
+        ()),
+    ('KS_2018-0044', '6-03-001', 'exact'): (
+        'wrong_lesson', None, None,
+        'stavka traži NZD/NZS računanje — dokaz pripada 6-03-008/6-03-009; 6-03-001 je tek predznanje te stavke',
+        ()),
+    ('KS_2018-0044', '6-03-008', 'exact'): (
+        'accept', None, 'high',
+        "stavka izričito 'najveći zajednički djelilac'; izjednačenje razriješeno u korist 008+009 (vidi odbijeni red za 6-03-001)",
+        ('split',)),
+    ('KS_2018-0044', '6-03-009', 'exact'): (
+        'accept', None, 'high',
+        'ista stavka pokriva i NZS — legitiman dvostruki cilj (split)',
+        ('split',)),
+    ('KS_2018-0045', '6-03-001', 'exact'): (
+        'accept', None, None,
+        "KS tabela sadržaja nabraja 'Djelioci broja … Sadržioci broja'",
+        ('broad',)),
+    ('KS_2018-0045', '6-03-004', 'neighbour'): (
+        'accept', None, None,
+        'izvedena granica iz široke stavke; sadržajno tačna',
+        ('broad',)),
+    ('KS_2018-0045', '6-03-007', 'neighbour'): (
+        'accept', None, None,
+        'izvedena granica; tačna',
+        ('broad',)),
+    ('KS_2018-0045', '6-03-008', 'exact'): (
+        'accept', None, None,
+        "KS tabela: 'Zajednički djelioci … Najveći zajednički djelilac'",
+        ('broad',)),
+    ('KS_2018-0045', '6-03-009', 'exact'): (
+        'accept', None, None,
+        "KS tabela: 'Zajednički sadržioci … Najmanji zajednički sadržilac'",
+        ('broad',)),
+    ('KS_2018-0045', '6-03-010', 'exact'): (
+        'accept', None, None,
+        "vodeća klauzula 'rješavati tekstualne zadatke' STOJI u KS bloku djeljivosti — dokaz je tačan; frazni pogodak preko granice rečenice je artefakt ekstrakcije, ali cilja ispravno",
+        ('broad',)),
+    ('KS_2018-0045', '6-04-005', 'neighbour'): (
+        'accept', None, None,
+        'izvedena granica; tačna',
+        ('broad',)),
+    ('KS_2018-0045', '6-04-008', 'exact'): (
+        'accept', None, None,
+        "KS tabela: 'Upoređivanje razlomaka'",
+        ('broad',)),
+    ('KS_2018-0045', '6-04-009', 'exact'): (
+        'accept', None, None,
+        "KS tabela: 'Sabiranje i oduzimanje razlomaka jednakih imenilaca'",
+        ('broad',)),
+    ('KS_2018-0045', '6-04-010', 'exact'): (
+        'accept', None, None,
+        "KS tabela: '… razlomaka različitih imenilaca'",
+        ('broad',)),
+    ('KS_2018-0045', '6-04-011', 'exact'): (
+        'accept', None, None,
+        "KS tabela: 'Množenje razlomka prirodnim brojem. Množenje razlomka razlomkom.'",
+        ('broad',)),
+    ('KS_2018-0045', '6-04-012', 'exact'): (
+        'accept', None, None,
+        "KS tabela: 'Dijeljenje razlomka prirodnim brojem. Dijeljenje razlomka razlomkom.'",
+        ('broad',)),
+    ('KS_2018-0045', '6-04-014', 'neighbour'): (
+        'accept', None, None,
+        'granica jednačina↔izraz; tačna',
+        ('broad',)),
+    ('KS_2018-0046', '6-04-001', 'exact'): (
+        'accept', None, None,
+        'noseći KS dokaz: razlomak, brojilac, imenilac, razlomačka crta',
+        ()),
+    ('KS_2018-0046', '6-04-002', 'neighbour'): (
+        'accept', None, None,
+        'ispravna smjerna granica',
+        ()),
+    ('KS_2018-0049', '6-04-004', 'exact'): (
+        'accept', None, None,
+        "noseći dokaz; 'kao dio figure' dio stavke ide 6-04-002 (oporavljeno)",
+        ()),
+    ('KS_2018-0050', '6-04-004', 'supporting'): (
+        'change_relation', 'supporting', 'medium',
+        "'grafički prikaz' obuhvata i figure i polupravu — za polupravu je podrška; noseći dom stavke je 6-04-002 (oporavljeno tamo kao exact)",
+        ()),
+    ('KS_2018-0050', '6-04-013', 'supporting'): (
+        'wrong_lesson', None, None,
+        'stavka o čitanju grafičkog prikaza nema veze sa svojstvima operacija — mašinski šum niskog pouzdanja',
+        ()),
+    ('KS_2018-0051', '6-04-003', 'exact'): (
+        'accept', None, 'high',
+        "zapis nepravog razlomka mješovitim brojem i obratno = srž lekcije; izjednačenje s 6-05-001/6-06-001 je mašinski šum ('zapis'), potvrđeno",
+        ()),
+    ('KS_2018-0054', '6-04-005', 'exact'): (
+        'accept', None, None,
+        'invarijantnost vrijednosti pri proširivanju/skraćivanju — nosi OBJE lekcije (vidi promjenu za 6-04-006)',
+        ('split',)),
+    ('KS_2018-0054', '6-04-006', 'neighbour'): (
+        'change_relation', 'exact', 'high',
+        "stavka IZRIČITO navodi i skraćivanje ('proširivanjem i skraćivanjem'); mašina je dala samo susjedstvo — lažno nisko",
+        ()),
+    ('KS_2018-0054', '6-04-008', 'neighbour'): (
+        'accept', None, None,
+        'ispravna smjerna granica',
+        ()),
+    ('KS_2018-0055', '6-04-005', 'neighbour'): (
+        'accept', None, None,
+        'ispravna smjerna granica',
+        ()),
+    ('KS_2018-0055', '6-04-008', 'exact'): (
+        'accept', None, None,
+        "noseći dokaz: 'upoređivati razlomke'",
+        ()),
+    ('KS_2018-0057', '6-04-013', 'exact'): (
+        'change_relation', 'supporting', 'medium',
+        "'izvoditi osnovne računske operacije' dokazuje BLOK operacija (6-04-009…012), a lekciju o svojstvima samo podržava",
+        ()),
+    ('KS_2018-0060', '6-04-014', 'neighbour'): (
+        'accept', None, None,
+        'granica jednačina↔vrijednost izraza; nakon popravke pokazuje na izraze s RAZLOMCIMA (6-04-014) umjesto na 6-02-008 (izrazi s promjenljivim u N)',
+        ()),
+    ('KS_2018-0063', '6-04-001', 'exact'): (
+        'accept', None, None,
+        'KS tabela sadržaja nabraja pojmove lekcije',
+        ('broad',)),
+    ('KS_2018-0063', '6-04-002', 'neighbour'): (
+        'accept', None, None,
+        'ispravna smjerna granica',
+        ('broad',)),
+    ('KS_2018-0063', '6-04-005', 'exact'): (
+        'accept', None, None,
+        "KS tabela: 'Proširivanje razlomaka'",
+        ('broad',)),
+    ('KS_2018-0063', '6-04-006', 'exact'): (
+        'accept', None, None,
+        "KS tabela: 'Skraćivanje razlomaka'; NAPOMENA: 'nesvodivi razlomak' iz naslova nijedan izvor ne imenuje — MAT-BOT dekompozicija",
+        ('broad',)),
+    ('KS_2018-0063', '6-04-008', 'neighbour'): (
+        'accept', None, None,
+        'izvedena granica; tačna',
+        ('broad',)),
+    ('KS_2018-0063', '6-04-009', 'neighbour'): (
+        'accept', None, None,
+        'granica račun↔jednačine; tačna',
+        ('broad',)),
+    ('KS_2018-0063', '6-04-011', 'neighbour'): (
+        'accept', None, None,
+        'široka stavka stvarno nabraja i postotni zapis — granica razlomci↔procenti sadržajno stoji',
+        ('broad',)),
+    ('KS_2018-0063', '6-04-014', 'neighbour'): (
+        'accept', None, None,
+        'ista granica iz široke KS stavke; cilj je sada lekcija iste jedinice',
+        ('broad',)),
+    ('KS_2018-0073', '6-03-010', 'exact'): (
+        'wrong_lesson', None, None,
+        'KS-0073 pripada nizu ishoda za DECIMALNE brojeve (0064–0075): pravi dom je 6-05-011, ne 6-03-010',
+        ()),
+    ('KS_2018-0073', '6-04-015', 'exact'): (
+        'wrong_lesson', None, None,
+        'isti razlog kao za 6-03-010: KS-0073 pripada decimalnom nizu (dom 6-05-011)',
+        ()),
+    ('KS_2018-0075', '6-04-009', 'neighbour'): (
+        'accept', None, None,
+        'granica račun↔jednačine; tačna',
+        ('broad',)),
+    ('KS_2018-0075', '6-04-010', 'neighbour'): (
+        'accept', None, None,
+        'granica; tačna',
+        ('broad',)),
+    ('KS_2018-0075', '6-04-014', 'neighbour'): (
+        'accept', None, None,
+        'granica jednačina↔izraz; tačna',
+        ('broad',)),
+    ('RS_2014-0022', '6-03-001', 'neighbour'): (
+        'accept', None, None,
+        'ispravna smjerna granica prema RS stavci o kriterijumima',
+        ()),
+    ('RS_2014-0022', '6-03-004', 'exact'): (
+        'accept', None, None,
+        "RS 'kriterijumima djeljivosti' = pravila djeljivosti (terminološki alias)",
+        ()),
+    ('RS_2014-0023', '6-03-005', 'exact'): (
+        'accept', None, 'high',
+        'RS poseban cilj imenuje lekciju; potvrđeno',
+        ()),
+    ('RS_2014-0024', '6-03-007', 'neighbour'): (
+        'accept', None, None,
+        'granica faktorizacija↔NZD/NZS iz RS stavke; tačna',
+        ()),
+    ('RS_2014-0024', '6-03-008', 'exact'): (
+        'accept', None, None,
+        'RS cilj imenuje NZD',
+        ()),
+    ('RS_2014-0024', '6-03-009', 'exact'): (
+        'accept', None, None,
+        'RS cilj imenuje NZS',
+        ()),
+    ('RS_2014-0025', '6-04-013', 'exact'): (
+        'change_relation', 'supporting', 'medium',
+        'širok RS cilj (pojam + operacije); za svojstva je samo podrška; podjela stavke: exact za 6-04-001 (oporavljeno), podrška operacijama',
+        ('split',)),
+    ('RS_2014-0026', '6-04-009', 'neighbour'): (
+        'accept', None, None,
+        'RS stavka o jednačinama; granica prema direktnom računu tačna',
+        ()),
+    ('RS_2014-0026', '6-04-014', 'neighbour'): (
+        'accept', None, None,
+        'ista granica iz RS cilja o jednačinama s razlomcima',
+        ()),
 }
+
+
+def verdict_key(row):
+    """Stabilan ključ presude iz reda Faze 2: (item_id, cilj, relacija)."""
+    return (row[1], row[8], row[12])
+
+
+def verdict_for(row):
+    return MAPPING_VERDICTS[verdict_key(row)]
+
 
 # ---------------------------------------------------------------------------
 # OPORAVLJENI DOKAZI — nalaz stručnog pregleda, NIKAD izlaz Faze 2.
@@ -308,11 +406,159 @@ RECOVERED_EVIDENCE = (
      "osnovne operacije s njima neophodno je", ()),
     ("R25-029", "stranica", "RS_2014", 341, "6-04-012", "supporting", "medium",
      "osnovne operacije s njima neophodno je", ()),
+
+    # --- FAZA 3: DOKAZI IZ KOLONE „SADRŽAJI PROGRAMA“ (KS str. 12) ----------
+    # Faza 1 je stranicu čuvala u cijelosti, ali je njena EKSTRAKCIJA STAVKI
+    # spljoštila tabelu u nečitljive blokove, pa mapiranje ove redove nikad
+    # nije vidjelo. Ponovna ekstrakcija originalnog PDF-a s očuvanjem kolona
+    # (`pdftotext -layout`) pokazuje da su ovo zasebni redovi SADRŽAJA jedinice
+    # Razlomci/Djeljivost. Citati se i dalje provjeravaju doslovno nad tekstom
+    # stranice iz Faze 1 — dokaz ostaje reproducibilan iz repozitorija.
+    ("R25-030", "stranica", "KS_2018", 12, "6-04-013", "exact", "high",
+     "Svojstva sabiranja razlomaka", ()),
+    ("R25-031", "stranica", "KS_2018", 12, "6-04-013", "exact", "high",
+     "Svojstva množenja", ()),
+    ("R25-032", "stranica", "KS_2018", 12, "6-04-014", "exact", "high",
+     "Brojevni izrazi sa zagradama", ()),
+    ("R25-033", "stranica", "KS_2018", 12, "6-04-015", "exact", "high",
+     "Tekstualni zadaci", ()),
+)
+
+# ---------------------------------------------------------------------------
+# FAZA 3 — OBAVEZNA PROVJERA IZVORA NAD ORIGINALNIM PDF-om (bez mreže).
+# Zapisuje se TAČNO ono što se na stranici vidi; ništa se ne rekonstruiše.
+# ---------------------------------------------------------------------------
+
+SOURCE_VERIFICATION = (
+    # lesson, tema provjere, nalaz, metod, posljedica
+    ("6-03-003", "zapis „10n“ (moguć izgubljen eksponent 10^n)",
+     "NIJE eksponent. Na obje pojave (KS str. 8 i str. 12) slovo „n“ je "
+     "iscrtano istom veličinom fonta i na ISTOJ osnovnoj liniji kao okolni "
+     "tekst — str. 12: „…25 i sa 10“ F3 10.08pt y=623.210, zatim „n“ F5 "
+     "10.08pt y=623.210; str. 8: „…sa 10“ F3 12.00pt y=502.940, zatim „n“ F5 "
+     "12.00pt y=502.940. Dokument nigdje ne koristi operator pomaka teksta "
+     "(Ts). Vidljiva notacija je dakle „10n“ (n u drugom fontu), NE „10^n“.",
+     "analiza toka sadržaja PDF-a (font, veličina, osnovna linija) — "
+     "renderovanje stranice u sliku nije bilo moguće bez instalacije alata, "
+     "a mreža je zabranjena",
+     "Lekcija 6-03-003 NE zavisi od ovog tokena: njen dokaz je zaseban red "
+     "sadržaja „Djeljivost dekadnim jedinicama…“ (KS str. 12). Blokada zbog "
+     "gubitka formule se ukida, a sam token ostaje zabilježen kao nerazriješena "
+     "notacija u ishodu koji pripada lekciji 6-03-004."),
+    ("6-03-003", "obim lekcije u izvoru",
+     "KS red sadržaja glasi „Djeljivost dekadnim jedinicama i brojevima: "
+     "2,3,4,6,9,25“ — dekadske jedinice i pojedinačna pravila su u JEDNOM redu.",
+     "pdftotext -layout, KS str. 12, kolona „Sadržaji programa“",
+     "Podjela na 6-03-003 i 6-03-004 je MAT-BOT dekompozicija, ne KS podjela; "
+     "granica GR (003↔004) mora ostati eksplicitna."),
+    ("6-04-013", "postoji li zaseban izvorni sadržaj",
+     "DA — kolona sadržaja jedinice Razlomci nosi dva zasebna reda: „Svojstva "
+     "sabiranja razlomaka“ i „Svojstva množenja razlomaka“.",
+     "pdftotext -layout, KS str. 12; citati potvrđeni i u tekstu stranice Faze 1",
+     "Dokaz je sada izričit (R25-030/031), a ne samo podržavajući. Ostaje "
+     "ograničenje ENFORCEMENTA: koje je svojstvo upotrijebljeno nije "
+     "deterministički provjerljivo, pa lekcija ide u ADVISORY_ONLY."),
+    ("6-04-014", "postoji li zaseban izvorni sadržaj",
+     "DA — red sadržaja „Brojevni izrazi sa zagradama“ u jedinici Razlomci; "
+     "uz ishod „izračunavati vrijednost brojevnog izraza…“.",
+     "pdftotext -layout, KS str. 12; citat potvrđen u tekstu stranice Faze 1",
+     "Dokaz podignut na exact/high (R25-032)."),
+    ("6-04-015", "postoji li zaseban izvorni sadržaj",
+     "DA — red sadržaja „Tekstualni zadaci“ u jedinici Razlomci (odvojen od "
+     "istoimenog ishoda u jedinici Djeljivost, koji pripada 6-03-010).",
+     "pdftotext -layout, KS str. 12; citat potvrđen u tekstu stranice Faze 1",
+     "Dokaz podignut na exact/high (R25-033); enforcement ostaje ograničen jer "
+     "kvalitet priče nije deterministički provjerljiv."),
 )
 
 # ---------------------------------------------------------------------------
 # KORAK 2 — RAZRJEŠENJE ŠEST PRAZNINA (slovo slučaja iz specifikacije).
 # ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# FAZA 3 — KLASA AKTIVACIJE. Dvije NEZAVISNE ose, namjerno razdvojene:
+#
+#   activation_class  — smije li lekcija uopšte dobiti blokirajuću semantiku
+#                       (READY / ADVISORY_ONLY / BLOCKED)
+#   enforcement_now   — postoji li DANAS dokazan deterministički detektor
+#
+# READY ne znači „uključi odmah“: znači „dokaz je izričit i vještina je
+# deterministički odlučiva, pa blokiranje SMIJE doći kad detektor bude
+# implementiran i dokazan“. Lekcija se NIKAD ne diže u READY radi pokrivenosti.
+# ---------------------------------------------------------------------------
+
+ACTIVATION_CLASSES = ("READY", "ADVISORY_ONLY", "BLOCKED")
+
+# Detektori koji danas STVARNO postoje i dokazano blokiraju u produkciji.
+PROVEN_DETECTORS = {
+    "6-03-004": "mcq_integrity divisibility oracle + lesson_fidelity "
+                "semantic_task_requirement (aktivno blokira u produkciji)",
+    "6-04-005": "contracts/verifiers.exact_rational + uključen ugovor lekcije",
+    "6-04-006": "contracts/verifiers.exact_rational + uključen ugovor lekcije",
+    "6-04-009": "contracts/verifiers.exact_rational + uključen ugovor lekcije",
+    "6-04-010": "contracts/verifiers.exact_rational + uključen ugovor lekcije",
+    "6-04-011": "contracts/verifiers.exact_rational + uključen ugovor lekcije",
+    "6-04-012": "contracts/verifiers.exact_rational + uključen ugovor lekcije",
+}
+
+ACTIVATION = {
+    "6-03-001": ("READY", "izričiti redovi sadržaja („Djelioci broja“, „Sadržioci "
+                 "broja“) i ishodi; pripadnost skupu djelilaca/sadržilaca je "
+                 "egzaktna cjelobrojna provjera"),
+    "6-03-002": ("READY", "izričit red sadržaja „Djeljivost zbira, razlike i "
+                 "proizvoda prirodnih brojeva“ (KS str. 12); djeljivost "
+                 "zbira/razlike/proizvoda je egzaktno provjerljiva"),
+    "6-03-003": ("READY", "izričit red sadržaja „Djeljivost dekadnim jedinicama…“; "
+                 "djeljivost sa 10^k je egzaktna (završne nule). NAPOMENA: KS taj "
+                 "red dijeli s pravilima za 2,3,4,6,9,25 — granica 003↔004 je "
+                 "MAT-BOT dekompozicija i mora ostati eksplicitna"),
+    "6-03-004": ("READY", "dokazano i VEĆ AKTIVNO blokiranje u produkciji; ovaj "
+                 "pregled ga ne mijenja — ponašanje mora ostati ekvivalentno"),
+    "6-03-005": ("READY", "izričit ishod „utvrđivati da li je broj prost ili "
+                 "složen“; prostost je egzaktno provjerljiva"),
+    "6-03-006": ("READY", "izričit ishod „utvrđivati jesu li dva data broja "
+                 "uzajamno (relativno) prosta“; NZD(a,b)==1 je egzaktan"),
+    "6-03-007": ("READY", "izričit ishod i red sadržaja; potpuna faktorizacija je "
+                 "egzaktno provjerljiva"),
+    "6-03-008": ("READY", "izričit red sadržaja i ishod; NZD je egzaktan"),
+    "6-03-009": ("READY", "izričit red sadržaja i ishod; NZS je egzaktan"),
+    "6-03-010": ("ADVISORY_ONLY", "izvorni ishod postoji („rješavati tekstualne "
+                 "zadatke“ u jedinici Djeljivost), ali KVALITET PRIČE nije "
+                 "deterministički provjerljiv — smije samo voditi prompt"),
+    "6-04-001": ("READY", "izričit ishod (razlomak, brojilac, imenilac, razlomačka "
+                 "crta); imenovanje dijelova zapisa je zatvoren skup"),
+    "6-04-002": ("READY", "obje polovine imaju izvor: „dijeliti cijelo na jednake "
+                 "djelove“ (KS) i „Razlomak se uvodi kao količnik dva prirodna "
+                 "broja“ (RS str. 341); konverzija količnik↔razlomak je egzaktna"),
+    "6-04-003": ("READY", "izričit ishod (nepravi ↔ mješoviti) i red sadržaja "
+                 "„Vrste razlomaka“; konverzija i klasifikacija su egzaktne. "
+                 "NAPOMENA: „prividni“ razlomci nisu izričito imenovani u KS"),
+    "6-04-004": ("READY", "izričit red sadržaja „Pridruživanje tačaka brojevne "
+                 "poluprave razlomcima“ i ishod; pozicija je egzaktna"),
+    "6-04-005": ("READY", "izričit red sadržaja; već postoji dokazan "
+                 "deterministički ugovor lekcije"),
+    "6-04-006": ("READY", "isti red sadržaja („Proširivanje i skraćivanje“); već "
+                 "postoji dokazan deterministički ugovor lekcije"),
+    "6-04-007": ("ADVISORY_ONLY", "jedini dokaz je METODIČKI tekst (KS str. 16), a "
+                 "KS ga vodi kao KORAK sabiranja različitih imenilaca, ne kao "
+                 "zasebnu lekciju; blokiranje granice svođenje↔sabiranje bi "
+                 "prejudiciralo odluku koju izvor ne donosi"),
+    "6-04-008": ("READY", "izričit red sadržaja i ishod „upoređivati razlomke“; "
+                 "poređenje racionalnih je egzaktno"),
+    "6-04-009": ("READY", "izričit red sadržaja; postoji dokazan ugovor lekcije"),
+    "6-04-010": ("READY", "izričit red sadržaja; postoji dokazan ugovor lekcije"),
+    "6-04-011": ("READY", "izričit red sadržaja; postoji dokazan ugovor lekcije"),
+    "6-04-012": ("READY", "izričit red sadržaja; postoji dokazan ugovor lekcije"),
+    "6-04-013": ("ADVISORY_ONLY", "dokaz je nakon provjere izvora IZRIČIT (dva reda "
+                 "sadržaja), ali KOJE je svojstvo upotrijebljeno nije "
+                 "deterministički provjerljivo — granica „svojstvo vs goli račun“ "
+                 "nije dokazana, pa nema blokiranja"),
+    "6-04-014": ("READY", "izričit red sadržaja „Brojevni izrazi sa zagradama“ u "
+                 "jedinici Razlomci; vrijednost izraza je egzaktno provjerljiva"),
+    "6-04-015": ("ADVISORY_ONLY", "izričit red sadržaja „Tekstualni zadaci“, ali "
+                 "kvalitet priče nije deterministički provjerljiv — isto kao "
+                 "6-03-010"),
+}
 
 GAP_RESOLUTIONS = {
     "6-03-002": ("B", "sadržaj postoji u tekstu KS stranica 10/12 (tabele sadržaja) "
@@ -377,8 +623,8 @@ LESSON_SEMANTICS = {
         "level3": "kombinacija stavova s obrazloženjem (npr. zašto je 6·k+12 "
                   "djeljivo sa 6)",
         "prerequisites": "pojam djeljivosti (6-03-001)",
-        "confidence": "medium", "status": "needs_manual_review",
-        "note": "Dokaz oporavljen isključivo iz teksta stranica (R25-003..005) — "
+        "confidence": "high", "status": "ready_for_contract_draft",
+        "note": "FAZA 3: potvrđen izričit red sadržaja „Dranica (R25-003..005) — "
                 "prije ugovora potvrditi obim (KS metodika pominje i teoreme).",
     },
     "6-03-003": {
@@ -393,8 +639,8 @@ LESSON_SEMANTICS = {
         "level2": "izbor među kandidatima za djeljivost sa 100/1000",
         "level3": "dopuna broja nulama da bude djeljiv sa 10^k uz još jedan uslov",
         "prerequisites": "mjesna vrijednost; 6-03-001",
-        "confidence": "medium", "status": "blocked_by_formula_loss",
-        "note": "Zapis 10^n u KS izvorima stigao kao '10n' (R25-008/009) — "
+        "confidence": "high", "status": "ready_for_contract_draft",
+        "note": "FAZA 3: provjereno u originalnom PDF-u —' (R25-008/009) — "
                 "eksponent tražiti vizuelno u PDF-u prije finalnog ugovora.",
     },
     "6-03-004": {
@@ -506,8 +752,8 @@ LESSON_SEMANTICS = {
         "level2": "priča koja traži NZD ili NZS",
         "level3": "priča s dva uslova (npr. NZS pa uslov opsega)",
         "prerequisites": "6-03-004; 6-03-008; 6-03-009",
-        "confidence": "medium", "status": "needs_manual_review",
-        "note": "Jedini exact dokaz je vodeća klauzula široke KS stavke — "
+        "confidence": "high", "status": "ready_for_contract_draft",
+        "note": "FAZA 3: potvrđeno — ishod „-rješavati teroke KS stavke — "
                 "potvrditi da KS zaista traži tekstualne zadatke bas u ovoj "
                 "jedinici (stranica 12).",
     },
@@ -712,9 +958,8 @@ LESSON_SEMANTICS = {
         "level2": "izbor pogodnog pregrupisavanja za lakši račun",
         "level3": "primjena distributivnosti s obrazloženjem",
         "prerequisites": "6-04-009; 6-04-011",
-        "confidence": "low", "status": "needs_manual_review",
-        "note": "Nijedan izvor lekciju ne imenuje izričito — samo podržavajući "
-                "dokazi (blok operacija). Prije ugovora ljudski definisati obim.",
+        "confidence": "low", "status": "ready_for_contract_draft",
+        "note": 'FAZA 3: izvor JE imenuje — kolona sadržaja nosi „Svojstva sabiranja razlomaka“ i „Svojstva množenja razlomaka“ (KS str. 12; R25-030/031). Obim: komutativnost i asocijativnost sabiranja i množenja; distributivnost KS ne imenuje za razlomke. Enforcement ostaje ADVISORY_ONLY.',
     },
     "6-04-014": {
         "family": "numeric_expressions_multi_step",
@@ -729,8 +974,8 @@ LESSON_SEMANTICS = {
         "level2": "zagrade + dvije-tri operacije",
         "level3": "ugniježđene zagrade ili greška u tuđem postupku",
         "prerequisites": "6-04-009; 6-04-010; 6-04-011; 6-04-012",
-        "confidence": "medium", "status": "needs_manual_review",
-        "note": "Exact dokaz iz KS tabele ('Brojevni izrazi sa zagradama' u "
+        "confidence": "high", "status": "ready_for_contract_draft",
+        "note": "FAZA 3: potvrđeno na KS str. 12 (ne 13):zi sa zagradama' u "
                 "jedinici razlomaka) — potvrditi na stranici 13 vizuelno.",
     },
     "6-04-015": {
@@ -745,8 +990,8 @@ LESSON_SEMANTICS = {
         "level2": "dvokoračna priča (ostatak; poređenje dijelova)",
         "level3": "cjelina iz dijela ili dva uslova",
         "prerequisites": "6-04-009…012",
-        "confidence": "medium", "status": "needs_manual_review",
-        "note": "Nakon odbijanja KS-0073 (pripada decimalnom nizu) exact dokaz "
+        "confidence": "high", "status": "ready_for_contract_draft",
+        "note": "FAZA 3: potvrđeno — „Tekstualni zadaci“ nom nizu) exact dokaz "
                 "je enumeracija 'Tekstualni zadaci' u KS tabeli razlomaka — "
                 "slabiji oblik dokaza, potvrditi vizuelno.",
     },
@@ -1383,13 +1628,13 @@ def collect_final_evidence(pilot_ids, mapping_rows):
     for r in mapping_rows:
         if r[8] not in pilot_ids:
             continue
-        mapping_id, item_id, relation = r[0], r[1], r[12]
-        verdict, new_rel, _newconf, _reason, _flags = MAPPING_VERDICTS[mapping_id]
+        item_id, relation = r[1], r[12]
+        verdict, new_rel, _newconf, _reason, _flags = verdict_for(r)
         final_rel = new_rel or relation
         if verdict in ("reject", "wrong_lesson", "wrong_grade", "duplicate_evidence"):
-            rejected[r[8]].append(mapping_id)
+            rejected[r[8]].append(r[0])
         elif verdict == "ambiguous":
-            unresolved[r[8]].append(mapping_id)
+            unresolved[r[8]].append(r[0])
         else:
             per_lesson[r[8]][final_rel].append((item_id, r[2]))
     for rec in RECOVERED_EVIDENCE:
@@ -1504,7 +1749,7 @@ def build(dry_run=False, out_path=OUTPUT_XLSX):
     # --- Mapiranja_Pregled: svih 62 originalna reda + presuda + oporavljeni ---
     review_rows = []
     for r in sorted(pilot_mapping_rows, key=lambda r: (r[8], r[0])):
-        verdict, new_rel, new_conf, reason, flags = MAPPING_VERDICTS[r[0]]
+        verdict, new_rel, new_conf, reason, flags = verdict_for(r)
         review_rows.append([
             r[0], r[1], r[2], r[3], r[8], r[11], r[12], r[13], r[14], r[17],
             verdict, new_rel or ("" if verdict in ("reject", "wrong_lesson") else r[12]),
@@ -1536,7 +1781,7 @@ def build(dry_run=False, out_path=OUTPUT_XLSX):
         rows = []
         seen = set()
         for r in sorted(pilot_mapping_rows, key=lambda r: (r[1], r[0])):
-            verdict = MAPPING_VERDICTS[r[0]][0]
+            verdict = verdict_for(r)[0]
             if not str(r[2]).startswith(source_prefix):
                 continue
             item = items_by_id.get(r[1])
@@ -1668,6 +1913,43 @@ def build(dry_run=False, out_path=OUTPUT_XLSX):
         gap_rows,
     )
 
+    # --- Provjera_izvora (Faza 3, obavezna provjera originalnog PDF-a) ---
+    sheets["Provjera_izvora"] = (
+        ("lesson_id", "tema_provjere", "nalaz_tacno_kako_se_vidi", "metod",
+         "posljedica_za_lekciju"),
+        [list(row) for row in SOURCE_VERIFICATION],
+    )
+
+    # --- Aktivacija (Faza 3) ---
+    activation_rows = []
+    for lesson in lessons:
+        klasa, why = ACTIVATION[lesson.lesson_id]
+        detector = PROVEN_DETECTORS.get(lesson.lesson_id, "")
+        ev = per_lesson.get(lesson.lesson_id, {})
+        unresolved_note = "; ".join(sorted(unresolved.get(lesson.lesson_id, []))) or "-"
+        activation_rows.append([
+            lesson.lesson_id, lesson.title,
+            LESSON_SEMANTICS[lesson.lesson_id]["status"], klasa,
+            "da" if (klasa == "READY" and detector) else "ne",
+            detector or "nema dokazanog detektora danas",
+            ("blokirajuća semantika dozvoljena tek kad detektor bude "
+             "implementiran i dokazan" if klasa == "READY" and not detector
+             else "samo kompaktno vođenje prompta; bez novog determinističkog "
+                  "odbijanja" if klasa == "ADVISORY_ONLY"
+             else "zadržava postojeće dokazano ponašanje"),
+            why,
+            len(ev.get("exact", ())), len(ev.get("supporting", ())),
+            unresolved_note,
+            "; ".join(sorted(rejected.get(lesson.lesson_id, []))) or "-",
+        ])
+    sheets["Aktivacija"] = (
+        ("lesson_id", "lesson_title", "human_review_status", "activation_class",
+         "enforcement_allowed_now", "proven_detector_today", "enforcement_policy",
+         "justification", "exact_evidence_count", "supporting_evidence_count",
+         "unresolved_notes", "rejected_mapping_ids"),
+        activation_rows,
+    )
+
     # --- Kvalitet_Mapiranja ---
     quality_rows = _quality_metrics(pilot_mapping_rows)
     sheets["Kvalitet_Mapiranja"] = (
@@ -1698,9 +1980,10 @@ def build(dry_run=False, out_path=OUTPUT_XLSX):
     wb.properties.created = bcm._FIXED_DOC_DATE
     wb.properties.modified = bcm._FIXED_DOC_DATE
     wb.properties.lastModifiedBy = "review_pilot_curriculum_mapping.py"
-    order = ("README", "Lekcije_Pilot25", "Mapiranja_Pregled", "Dokazi_KS",
-             "Dokazi_RS", "Porodice_Pilot", "Granice_lekcija", "Primjeri_Pilot",
-             "Praznine", "Kvalitet_Mapiranja", "Kontrola")
+    order = ("README", "Lekcije_Pilot25", "Aktivacija", "Provjera_izvora",
+             "Mapiranja_Pregled", "Dokazi_KS", "Dokazi_RS", "Porodice_Pilot",
+             "Granice_lekcija", "Primjeri_Pilot", "Praznine",
+             "Kvalitet_Mapiranja", "Kontrola")
     widths = {
         "README": {"A": 24, "B": 120},
         "Lekcije_Pilot25": {"D": 45, "F": 55, "G": 55, "J": 50, "M": 40,
@@ -1714,6 +1997,8 @@ def build(dry_run=False, out_path=OUTPUT_XLSX):
         "Praznine": {"B": 30, "D": 90},
         "Kvalitet_Mapiranja": {"A": 55, "C": 70},
         "Kontrola": {"A": 55, "B": 70},
+        "Aktivacija": {"B": 45, "F": 55, "G": 55, "H": 70},
+        "Provjera_izvora": {"B": 40, "C": 90, "D": 50, "E": 70},
     }
     for name in order:
         header, rows = sheets[name]
@@ -1746,31 +2031,31 @@ def _quality_metrics(pilot_mapping_rows):
     """Metrike kvaliteta Faze 2 nad pilotom — PILOT DOKAZ, ne statistika za 534."""
     rows = [("NAPOMENA", "", "pilot dokaz sa 25 lekcija — NIJE statistička "
              "preciznost za svih 534 lekcije")]
-    verdict_counter = Counter(MAPPING_VERDICTS[r[0]][0] for r in pilot_mapping_rows)
+    verdict_counter = Counter(verdict_for(r)[0] for r in pilot_mapping_rows)
     rows.append(("ukupno pilot redova Faze 2", len(pilot_mapping_rows), ""))
     for verdict in ("accept", "change_relation", "reject", "wrong_lesson",
                     "ambiguous", "duplicate_evidence"):
         rows.append((f"presuda: {verdict}", verdict_counter.get(verdict, 0), ""))
     exact_rows = [r for r in pilot_mapping_rows if r[12] == "exact"]
     exact_ok = sum(1 for r in exact_rows
-                   if MAPPING_VERDICTS[r[0]][0] in ("accept",))
+                   if verdict_for(r)[0] in ("accept",))
     exact_changed = sum(1 for r in exact_rows
-                        if MAPPING_VERDICTS[r[0]][0] == "change_relation")
+                        if verdict_for(r)[0] == "change_relation")
     exact_rejected = len(exact_rows) - exact_ok - exact_changed
     rows.append(("exact prihvaćeno / oslabljeno / odbijeno",
                  f"{exact_ok} / {exact_changed} / {exact_rejected}", ""))
     neighbour_rows = [r for r in pilot_mapping_rows if r[12] == "neighbour"]
-    n_ok = sum(1 for r in neighbour_rows if MAPPING_VERDICTS[r[0]][0] == "accept")
+    n_ok = sum(1 for r in neighbour_rows if verdict_for(r)[0] == "accept")
     rows.append(("neighbour prihvaćeno / odbijeno",
                  f"{n_ok} / {len(neighbour_rows) - n_ok}", ""))
     false_high = [r[0] for r in pilot_mapping_rows
                   if r[17] == "auto_high_confidence"
-                  and MAPPING_VERDICTS[r[0]][0] in ("reject", "wrong_lesson")]
+                  and verdict_for(r)[0] in ("reject", "wrong_lesson")]
     rows.append(("lažno visoko pouzdanje (auto_high → odbijeno)",
                  len(false_high), "; ".join(false_high)))
     false_low = [r[0] for r in pilot_mapping_rows
-                 if MAPPING_VERDICTS[r[0]][0] == "change_relation"
-                 and MAPPING_VERDICTS[r[0]][1] == "exact"]
+                 if verdict_for(r)[0] == "change_relation"
+                 and verdict_for(r)[1] == "exact"]
     rows.append(("lažno nisko (podignuto na exact pregledom)",
                  len(false_low), "; ".join(false_low)))
     rows.append(("oporavljeni dokazi (novi, iz pregleda)",
@@ -1781,7 +2066,7 @@ def _quality_metrics(pilot_mapping_rows):
     rows.append(("— PO METODI FAZE 2 (prihvaćeno+promijenjeno / ukupno) —", "", ""))
     by_method = defaultdict(lambda: [0, 0])
     for r in pilot_mapping_rows:
-        verdict = MAPPING_VERDICTS[r[0]][0]
+        verdict = verdict_for(r)[0]
         by_method[r[14]][1] += 1
         if verdict in ("accept", "change_relation"):
             by_method[r[14]][0] += 1
@@ -1800,7 +2085,7 @@ def _run_checks(pilot_mapping_rows, mapping_by_id, items_by_id, pages,
         checks.append((name, str(value), "PASS" if ok else "FAIL"))
 
     check("tačno 25 pilot lekcija", len(lessons) == 25, len(lessons))
-    pilot_ids = {r[0] for r in pilot_mapping_rows}
+    pilot_ids = {verdict_key(r) for r in pilot_mapping_rows}
     verdict_ids = set(MAPPING_VERDICTS)
     check("svaki pilot red Faze 2 ima presudu (nijedan tiho izostavljen)",
           pilot_ids == verdict_ids,
@@ -1858,10 +2143,23 @@ def _run_checks(pilot_mapping_rows, mapping_by_id, items_by_id, pages,
           any(not b[2] for b in BOUNDARIES),
           f"{sum(1 for b in BOUNDARIES if not b[2])} smjernih / {len(BOUNDARIES)}")
     formula_rows = [rec[0] for rec in RECOVERED_EVIDENCE if "formula_loss" in rec[8]]
-    check("formula_loss zastavice sačuvane (10^n slučaj)",
-          len(formula_rows) >= 2 and
-          LESSON_SEMANTICS["6-03-003"]["status"] == "blocked_by_formula_loss",
+    verified = {row[0] for row in SOURCE_VERIFICATION}
+    check("formula_loss zastavice sačuvane i nalaz zabilježen (10n slučaj)",
+          len(formula_rows) >= 2 and "6-03-003" in verified
+          and any("NIJE eksponent" in row[2] for row in SOURCE_VERIFICATION),
           formula_rows)
+    check("svaka pilot lekcija ima klasu aktivacije iz dozvoljenog skupa",
+          set(ACTIVATION) == {l.lesson_id for l in lessons}
+          and all(v[0] in ACTIVATION_CLASSES for v in ACTIVATION.values()),
+          len(ACTIVATION))
+    unproven = [lid for lid, (klasa, _why) in sorted(ACTIVATION.items())
+                if klasa != "READY" and lid in PROVEN_DETECTORS]
+    check("nijedna ne-READY lekcija ne nosi dokazan detektor kao dozvolu",
+          not unproven, unproven or "dosljedno")
+    still_enforced = [lid for lid in PROVEN_DETECTORS
+                      if ACTIVATION[lid][0] != "READY"]
+    check("postojeće dokazano blokiranje ostaje READY (nema regresije)",
+          not still_enforced, still_enforced or "6-03-004 + 6 ugovorenih lekcija")
     # Lekcija bez exact dokaza SMIJE postojati (to je upravo nalaz pregleda,
     # npr. 6-04-013 sa samo podržavajućim dokazima) — ali tada NE SMIJE nositi
     # status 'ready_for_contract_draft'.
