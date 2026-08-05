@@ -448,7 +448,7 @@ def test_rejected_package_diagnostics_include_closed_difficulty_evidence_and_cod
         "selected_lesson_title": "Pravila djeljivosti sa 2, 3, 4, 5, 6, 9, 10, 15 i 25",
     })
     task = task.model_copy(update={
-        "difficulty_evidence": task.difficulty_evidence.model_copy(update={"operation_count": 2}),
+        "difficulty_evidence": task.difficulty_evidence.model_copy(update={"operation_count": 3}),
     })
     draft = make_tutor_draft(new_task=task)
     reviewer = make_reviewer_final(final=draft)
@@ -459,7 +459,7 @@ def test_rejected_package_diagnostics_include_closed_difficulty_evidence_and_cod
         result, SimpleNamespace(last_tutor_output=draft, last_reviewer_output=reviewer))
 
     assert result.final_difficulty_target_level == 1
-    assert result.final_difficulty_evidence["operation_count"] == 2
+    assert result.final_difficulty_evidence["operation_count"] == 3
     assert result.final_difficulty_validator_errors == [
         "level_1_is_not_direct_introductory_application"
     ]

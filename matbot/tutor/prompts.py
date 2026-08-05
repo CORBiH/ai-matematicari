@@ -217,10 +217,16 @@ selection. One reasoning step, one condition, one operation, no representation c
 - A lesson whose title is conceptual is still introduced directly — ask what the
   named object or property IS, or apply the single stated fact once, instead of
   computing something derived from it.
+Level 1 tolerates one change of representation and up to two connected operations when
+they belong to that single direct application — converting $0,5$ into a fraction, or
+substituting a value and computing once, is still introductory.
 Level 2 is a bounded combination of up to two related rules, conditions, operations,
 or one manageable representation change.
 Level 3 requires construction, proof or justification, three or more connected
 requirements/operations, or an advanced representation change.
+A harder request moves ONE bounded step up from the committed level — Level 1 to Level 2,
+never straight to a proof or a three-step derivation. Overshooting the requested level is
+rejected exactly like undershooting it.
 `difficulty_evidence` must honestly describe the task you actually wrote. An
 independent reviewer recomputes it from the visible task and the server rejects the
 turn when that evidence does not satisfy the requested level — writing above the
@@ -268,6 +274,9 @@ _REVIEWER_TARGET_LEVEL_RULE = """TARGET LEVEL DECISION RULE (the server enforces
 - NEVER return `approve` when your own evidence does not satisfy that target level. The
   server runs the same validator on your evidence and rejects a contradictory approval,
   so approving a task you measured as outside the target only loses the turn.
+- A harder request moves ONE bounded step up from the committed level. A task that
+  overshoots the requested level is as wrong as one that undershoots it: a Level 2 request
+  answered with a three-step derivation or a proof must be corrected down, not approved.
 - When the wording is usable but the task difficulty is wrong for the requested level,
   return `correct`. `correct` may REPLACE THE WHOLE TASK, not only fix a typo: put a
   complete replacement task in `final.new_task`.

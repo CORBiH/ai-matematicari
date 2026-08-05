@@ -245,11 +245,23 @@ def difficulty_evidence_errors(evidence: DifficultyEvidence, target_level: int) 
         if getattr(evidence, field) < 0:
             errors.append(f"negative_{field}")
     if target_level == 1:
+        # KALIBRACIJA (tri žive kampanje, 110 pokušaja u posljednjoj): 22 od 24
+        # odbijanja bila su na nivou 1, a 18 od tih 22 imalo je najminimalniji
+        # mogući dokaz — jedan korak rezonovanja i jedan uslov, uz jednu promjenu
+        # zapisa (14x) ili dvije operacije (4x). „Koji razlomak je jednak $0,5$?“
+        # ima tačno jednu promjenu zapisa, a ta promjena JESTE vještina lekcije;
+        # „uvrsti pa izračunaj“ ima dvije operacije u jednom koraku.
+        #
+        # Zato se pomjeraju TAČNO DVA praga: `representation_change_count <= 1`
+        # (bilo `== 0`) i `operation_count <= 2` (bilo `<= 1`). Broj koraka
+        # rezonovanja i broj uslova ostaju na 1, i SVAKA zastavica i dalje
+        # diskvalifikuje nivo 1 — višekorakan, višeuslovni, dokazni i
+        # konstruktivni zadatak ostaju blokirani, kao i tri operacije.
         if (evidence.reasoning_steps > 1 or evidence.condition_count > 1
                 # operation_count counts meaningful connected mathematical
                 # operations, not every token or arithmetic symbol.
-                or evidence.operation_count > 1
-                or evidence.representation_change_count > 0
+                or evidence.operation_count > 2
+                or evidence.representation_change_count > 1
                 or evidence.requires_explanation or evidence.requires_comparison
                 or evidence.requires_construction or evidence.requires_proof_or_justification
                 or evidence.combines_concepts):
