@@ -174,6 +174,16 @@ def collect_package_issues(task):
 
     # 5) NUMERIČKA PROTIVRJEČNOST u vidljivom tekstu i rješenju — postojeći
     #    mathcheck. Distraktori se NIKAD ne provjeravaju (namjerno su pogrešni).
+    # ŽIVI NALAZ (A19, B04, B33, B42): nesiguran `text`/`solution` se ovdje TIHO
+    # preskakao, pa je turn potrošio oba poziva i pao tek u objavi porukom
+    # „nebezbjedan matematički zapis [solution]“. Recenzent za to nikad nije
+    # saznao, iako `correct` upravo omogućava da to prepiše. Opcije i
+    # `expected_answer` su svoj kod već imali; sada ga imaju i ova dva polja.
+    # `mathsafe` pravila se ne mijenjaju — mijenja se samo dijagnostika.
+    _UNSAFE_FIELD_CODES = {
+        "task_text": "unsafe_task_text_notation",
+        "solution": "unsafe_solution_notation",
+    }
     for label, raw, allow_wrap in (
         ("task_text", getattr(task, "text", ""), False),
         ("marked_option", getattr(task, "expected_answer", ""), True),
@@ -181,6 +191,9 @@ def collect_package_issues(task):
     ):
         text, safe = safe_visible_text(raw, allow_wrap=allow_wrap)
         if not safe:
+            code = _UNSAFE_FIELD_CODES.get(label)
+            if code:
+                issues.append(PackageIssue(code, detail=label))
             continue
         found = find_numeric_inconsistencies(text)
         if found:
@@ -232,7 +245,10 @@ def format_for_reviewer(issues):
         f"that level. For `{INCOMPLETE_TASK_TEXT_CODE}` the task text asks the student to "
         "compute or solve something that it never shows: write the missing expression, "
         "equation, or system into the task text itself, inside $...$, so the task is "
-        "solvable from its own text. Then recompute correct_option_id, "
+        "solvable from its own text. For any `unsafe_..._notation` issue the named "
+        "field carries MathJax the server cannot accept: REWRITE that exact field using "
+        "only plain $...$ notation and known commands, and change nothing else. "
+        "Then recompute correct_option_id, "
         "correct_option_index, expected_answer (an exact copy of the marked option's "
         "text), solution, difficulty evidence for the task you actually return, and "
         "task_signature where structural parameters changed. Keep "
