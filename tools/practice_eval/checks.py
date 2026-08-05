@@ -546,9 +546,9 @@ def _answer_leak_result(obs: TurnObservation, name: str) -> CheckResult:
     expected = obs.expected_answer
     if not correct and not expected:
         return CheckResult(name, SKIP, "no committed answer to compare against")
-    if not feedback.leaks_answer(obs.answer, correct, expected):
-        return CheckResult(name, PASS)
     task = obs.task_after or obs.task_before
+    if not feedback.leaks_answer(obs.answer, correct, expected, task_text=task):
+        return CheckResult(name, PASS)
     if task and feedback.leaks_answer(task, correct, expected):
         return CheckResult(name, SKIP,
                            "the value also appears in the task text itself — a leak cannot be proven")

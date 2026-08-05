@@ -552,6 +552,7 @@ _UNIVERSAL_TWO_CALL_MODULES = frozenset({
     # dvopozivnog puta — integracijski dio testa mora voziti taj put.
     "test_incomplete_task_text",
     "test_answer_leak_guard",
+    "test_answer_leak_semantic",
     "test_reviewer_package_consistency",
     "test_difficulty_progression_state",
 })

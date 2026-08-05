@@ -17,6 +17,7 @@ import re
 
 from matbot import config
 from matbot.mathcheck import find_numeric_inconsistencies
+from matbot.mathsegments import math_contents, tokenize_math
 
 VERDICT_PREFIX = "Netačno."
 HINT_PREFIX = "Hint: "
@@ -233,6 +234,55 @@ def _explicitly_reveals(hint, *candidates):
     return False
 
 
+# ---------------------------------------------------------------------------
+# SLOJ 3 — VRIJEDNOST UGRAĐENA U RAČUN (živi run postStabilityFixes, B53)
+# ---------------------------------------------------------------------------
+# Zadatak „Riješi jednačinu: $2(x)=8$“, committed odgovor `$x=4$`. Na pogrešan
+# pokušaj tutor je napisao:
+#
+#     „… Dakle, $x=\frac{8}{2}=4$. Možeš to provjeriti: $2\cdot4=8$.“
+#     „… Dakle $x=\frac{8}{2}=4$. Provjera: $2(4)=8$, što je tačno.“
+#
+# Nijedan postojeći sloj to nije vidio: sloj 1 traži DOSLOVAN niz „x=4“, a
+# između `x=` i `4` stoji `\frac{8}{2}`; sloj 2 poredi s kandidatom „x=4“, pa
+# gola vrijednost iza fraze („rješenje je 4“, „dobiješ 4“) nikad ne poklapa.
+#
+# Ovo NIJE CAS i ne rješava nikakvu matematiku. Radi samo ono što se može
+# dokazati: kad je committed odgovor GOL BROJ, taj broj ne smije se pojaviti
+# kao broj unutar `$…$` segmenta odgovora — jer se tamo može naći isključivo
+# ako ga je tutor izračunao ili uvrstio. Brojevi u PROZI se namjerno ne broje
+# („Korak 1: …“), a broj koji već stoji u samom zadatku ništa ne dokazuje.
+_NUMBER_TOKEN_RE = re.compile(r"-?\d+(?:[.,]\d+)?")
+
+
+def committed_numeric_value(candidate):
+    """Gola brojevna vrijednost committed odgovora, ili '' kad je nema.
+
+    `$x=4$` → `4` · `$40$` → `40` · `$\\frac{3}{5}$` → `''` (nije gol broj,
+    pa se sloj 3 preskače i vrijede samo doslovni slojevi)."""
+    value = _normalize_value(candidate)
+    if "=" in value:
+        value = value.rsplit("=", 1)[1]
+    value = value.strip()
+    return value if value and _NUMBER_TOKEN_RE.fullmatch(value) else ""
+
+
+def _math_numbers(text):
+    """Brojevi koji stoje UNUTAR $…$ / $$…$$ segmenata, decimalni zarez → tačka."""
+    return {number.replace(",", ".")
+            for content in math_contents(tokenize_math(text or ""))
+            for number in _NUMBER_TOKEN_RE.findall(content)}
+
+
+def _reveals_value_inside_math(text, task_text, *candidates):
+    needles = {committed_numeric_value(candidate) for candidate in candidates}
+    needles.discard("")
+    if not needles:
+        return False
+    provable = {needle.replace(",", ".") for needle in needles} - _math_numbers(task_text)
+    return bool(provable & _math_numbers(text))
+
+
 def _has_numeric_inconsistency(text):
     """True ako hint sadrži DOKAZANO nedosljedan lanac jednakosti
     (matbot/mathcheck.py) — npr. model napiše ispravnu formulu ali pogrešnu
@@ -243,18 +293,25 @@ def _has_numeric_inconsistency(text):
     return bool(find_numeric_inconsistencies(text))
 
 
-def leaks_answer(text, correct_option_text="", expected_answer=""):
-    """True ako tekst otkriva tačan odgovor — bilo doslovnim navođenjem duljeg
-    izraza, bilo eksplicitnom „otkrivajućom“ frazom oko kratke vrijednosti.
+def leaks_answer(text, correct_option_text="", expected_answer="", task_text=""):
+    """True ako tekst otkriva tačan odgovor.
 
-    Dva nezavisna sloja:
+    TRI nezavisna sloja:
     1. Doslovno navođenje DUŽE vrijednosti (>=3 znaka nakon normalizacije) bilo
        gdje u tekstu — pokriva izraze poput „$\\frac{9}{24}$“ ili „16/60“ koji
        se rijetko pojave slučajno u legitimnom hintu.
     2. Eksplicitna otkrivajuća fraza (vidi _explicitly_reveals) — pokriva
        KRATKE odgovore („2“, „-3“, „π“, „A“, „x=2“) koje sloj 1 namjerno
        preskače da ne bi blokirao legitimne hintove koji ponavljaju brojeve iz
-       samog zadatka (npr. „izračunaj $24:8$“ kad je odgovor „8“).
+       samog zadatka (npr. „izračunaj $24:8$“ kad je odgovor „8“). Uz sam
+       kandidat poredi se i njegova GOLA vrijednost, pa „rješenje je 4“ i
+       „dobiješ 4“ poklapaju committed `$x=4$` (živi nalaz B53).
+    3. Vrijednost ugrađena u račun unutar `$…$` (živi nalaz B53) — vidi
+       `_reveals_value_inside_math`. Traži `task_text` da bi broj koji već
+       stoji u zadatku bio izuzet; bez njega se sloj ponaša konzervativnije.
+
+    `task_text` je OPCIONI dodatak — legacy Practice put koji ga ne prosljeđuje
+    ponaša se kao i ranije.
     """
     haystack = _normalized(text)
     if not haystack:
@@ -265,7 +322,12 @@ def leaks_answer(text, correct_option_text="", expected_answer=""):
         if len(needle) >= 3 and needle in haystack.replace(" ", ""):
             return True
 
-    return _explicitly_reveals(text, correct_option_text, expected_answer)
+    bare_values = [committed_numeric_value(candidate)
+                   for candidate in (correct_option_text, expected_answer)]
+    if _explicitly_reveals(text, correct_option_text, expected_answer, *bare_values):
+        return True
+
+    return _reveals_value_inside_math(text, task_text, correct_option_text, expected_answer)
 
 
 def shape_first_wrong_feedback(model_hint, model_reply, correct_option_text="",

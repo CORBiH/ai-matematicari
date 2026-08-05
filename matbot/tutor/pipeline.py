@@ -564,11 +564,13 @@ def _reveals_committed_answer(session, text, student_message=""):
     marked, expected = _committed_answer(session)
     if not marked and not expected:
         return False
-    if not feedback.leaks_answer(text, marked, expected):
+    task = session.get("current_task") or ""
+    # `task` ide detektoru da broj koji već stoji u zadatku ne bi bio dokaz.
+    if not feedback.leaks_answer(text, marked, expected, task_text=task):
         return False
-    if feedback.leaks_answer(session.get("current_task") or "", marked, expected):
+    if feedback.leaks_answer(task, marked, expected):
         return False
-    return not feedback.leaks_answer(student_message or "", marked, expected)
+    return not feedback.leaks_answer(student_message or "", marked, expected, task_text=task)
 
 
 def _guard_answer_leak(session, request_id, context, intent, answer, *,
