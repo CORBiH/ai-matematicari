@@ -192,6 +192,12 @@ def test_forbidden_term_appears_only_as_an_explicit_prohibition():
         # dokazuje da normalizacija radi i na novom, dvopozivnom putu.
         Path("tests/test_universal_tutor_pipeline.py"),
         Path("tests/test_lesson_relevance.py"),  # ulazne poruke učenika s hrvatskim oblikom
+        # Kurikularno mapiranje (Faza 2): KS dokument SAM navodi aliase
+        # („ugao (kut)“, „mnogougao (mnogokut)“), pa ih alat za mapiranje mora
+        # PREPOZNATI kao ulazne obrasce — isti princip kao lesson_relevance.py.
+        # Nikad ne idu u izlaz modela ni u prompt.
+        Path("scripts/build_curriculum_mapping.py"),
+        Path("tests/test_curriculum_mapping.py"),
         Path("CLAUDE.md"),                 # dokumentuje ispravan/zabranjen par termina
         Path("docs/CURRENT_STATE.md"),     # dokumentuje C-8 (koji termini NISU pokriveni)
         Path("docs/ARCHITECTURE.md"),      # dokumentuje terminology.py mehanizam (koji termini SU pokriveni)
