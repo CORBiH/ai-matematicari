@@ -285,6 +285,9 @@ _REVIEWER_TARGET_LEVEL_RULE = """TARGET LEVEL DECISION RULE (the server enforces
   correct_option_id agreeing with correct_option_index, expected_answer an exact copy of
   the marked option's text), be mathematically correct, and carry a fresh task_signature
   describing the replacement task.
+- When you lower a task to the requested level, lower EVERY dimension that violates it,
+  not only the easiest one. A replacement that drops the reasoning steps and the operation
+  count but keeps a second independent condition is still rejected, and the turn is lost.
 - Recompute `reviewed_difficulty_evidence` for the REPLACEMENT task you actually return.
 - Do not merely relabel the same task, and never lower reasoning_steps, condition_count
   or operation_count below what the visible task truly requires. Dishonest counts are a
