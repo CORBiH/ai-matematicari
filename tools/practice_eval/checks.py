@@ -329,23 +329,25 @@ def check_task_self_contained(obs: TurnObservation) -> CheckResult:
     sanitizuje, `mathcheck` nema jednakost, `option_equivalence` vidi četiri
     različite vrijednosti, `mcq_integrity` nije primjenjiv.
 
-    Provjera je NAMJERNO uska i dokaziva iz vidljivog teksta:
-      1. tekst zadatka završava dvotačkom — rečenica obećava sadržaj koji nikad
-         ne dolazi;
-      2. imperativ za računanje postoji, a u tekstu nema NI matematičkog
-         segmenta NI ijedne cifre — nema se šta izračunati.
-    Sve ostalo se preskače: „koliko ima stranica trougao“ je legitiman zadatak
-    bez cifre i bez `$…$`."""
+    ISPRAVKA LAŽNOG POZITIVA (živi run postIncompleteFix, scenario B43):
+    „U trouglu $ABC$ centar opisane kružnice je tačka koja se dobije kao:“ je
+    oboren samo zato što završava dvotačkom — a njegove četiri opcije
+    („sjecište simetrala stranica“ …) gramatički i semantički DOVRŠAVAJU
+    pitanje. To je legitiman option-completed MCQ obrazac.
+
+    Zato evaluator više nema vlastito, šire pravilo o dvotački, nego poziva
+    ISTI uski produkcijski helper (`matbot.tutor.schema.incomplete_task_request`)
+    koji odbija samo tekst sastavljen ISKLJUČIVO od imperativa bez objekta.
+    Jedno pravilo za oba sloja: evaluator i server ne mogu se razići."""
+    from matbot.tutor.schema import incomplete_task_request
+
     text = (obs.visible_task_text or obs.task_after or "").strip()
     if not text:
         return CheckResult("task_self_contained", SKIP, "no published task text on this turn")
-    if text.endswith(":"):
+    missing = incomplete_task_request(text)
+    if missing:
         return CheckResult("task_self_contained", FAIL,
-                           f"task text ends with a colon and nothing follows: {text[-60:]!r}")
-    has_math = any(kind in (INLINE, DISPLAY) for kind, _ in tokenize_math(text))
-    if _COMPUTE_IMPERATIVE_RE.search(text) and not has_math and not _DIGIT_RE.search(text):
-        return CheckResult("task_self_contained", FAIL,
-                           "task asks for a calculation but shows no expression and no number")
+                           f"task asks for a mathematical object it never shows: {missing!r}")
     return CheckResult("task_self_contained", PASS)
 
 
@@ -616,20 +618,36 @@ def check_hint_differs(obs: TurnObservation) -> CheckResult:
 
 
 def check_task_differs(obs: TurnObservation) -> CheckResult:
+    """Duplikat se dokazuje STRUKTURNIM POTPISOM, ne sličnošću teksta.
+
+    ISPRAVKA LAŽNOG POZITIVA (živi run postIncompleteFix, scenario B52):
+    „$x+\\frac{1}{2}<2$“ i „$x+\\frac{1}{2}<1$“ daju rješenja $x<3/2$ i
+    $x<1/2$ — dva stvarno različita zadatka. Ranija Jaccard mjera nad SKUPOM
+    riječi dala im je preklapanje 1.00, jer se razlikuju samo u jednom broju
+    koji je u oba skupa već prisutan. Nijedna mjera tekstualne sličnosti ne
+    može razlikovati „razlikuje se u jednom broju“ od „identično“.
+
+    Zato se koristi isti dokaz koji i server koristi za svoju zaštitu od
+    duplikata (`_is_duplicate_structured_signature`): matematički potpis
+    zadatka. Doslovno ponovljen tekst i dalje pada, jer to server NIKAD ne
+    smije objaviti."""
     if not obs.issued_new_task:
         return CheckResult("task_differs", FAIL, "no new task was issued")
     if not obs.previous_task_texts:
         return CheckResult("task_differs", SKIP, "first task in this session")
+
     current = _normalized(obs.task_after)
     for previous in obs.previous_task_texts:
         if current == _normalized(previous):
-            return CheckResult("task_differs", FAIL, "the new task text is identical to an earlier one")
-        overlap = _token_overlap(obs.task_after, previous)
-        if overlap >= 0.90:
-            return CheckResult("task_differs", FAIL, f"the new task repeats an earlier one (overlap={overlap:.2f})")
+            return CheckResult("task_differs", FAIL,
+                               "the new task text is identical to an earlier one")
+
     signature = ((obs.session_after or {}).get("current_task_signature") or {})
     digest = signature.get("structured_signature_hash")
-    if digest and digest in obs.previous_task_signatures:
+    if not digest:
+        return CheckResult("task_differs", SKIP,
+                           "no structured signature — difference cannot be proven")
+    if digest in obs.previous_task_signatures:
         return CheckResult("task_differs", FAIL, "identical structured task signature")
     return CheckResult("task_differs", PASS)
 

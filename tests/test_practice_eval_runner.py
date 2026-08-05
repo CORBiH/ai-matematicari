@@ -572,7 +572,9 @@ def test_task_self_contained_rejects_the_exact_wave_a_finding():
         "session_mode": "practice", "effective_topic": LESSON})
     result = check_lib.check_task_self_contained(published)
     assert result.outcome == check_lib.FAIL
-    assert "colon" in result.detail
+    # Poruka imenuje ZATRAŽENI objekat, ne interpunkciju — evaluator od
+    # ispravke B43 koristi uski produkcijski helper, ne pravilo o dvotački.
+    assert "Izračunaj vrijednost izraza" in result.detail
 
 
 def test_task_self_contained_passes_a_normal_task_without_math_delimiters():
@@ -635,3 +637,95 @@ def test_console_streams_are_switched_to_utf8():
 
     assert run_practice_eval.install_utf8_streams() is True
     assert (sys.stdout.encoding or "").lower().replace("-", "") == "utf8"
+
+
+# ---------------------------------------------------------------------------
+# EVALUATOR FALSE POSITIVES IZ ŽIVOG RUNA postIncompleteFix
+# ---------------------------------------------------------------------------
+
+# B43 — validan MCQ kod kojeg ČETIRI OPCIJE gramatički dovršavaju pitanje.
+# Evaluator ga je oborio samo zato što tekst završava dvotačkom.
+OPTION_COMPLETED_PROMPTS = (
+    "U trouglu $ABC$ centar opisane kružnice je tačka koja se dobije kao:",
+    "Odaberi tačnu tvrdnju:",
+    "Centar opisane kružnice dobije se kao:",
+    "Tačan zapis je:",
+    "Koji je od ponuđenih odgovora tačan:",
+)
+
+# Dokazano nepotpuni imperativi — moraju i dalje padati.
+PROVEN_INCOMPLETE_PROMPTS = (
+    "Izračunaj vrijednost izraza:",
+    "Riješi jednačinu:",
+    "Riješi sistem linearnih jednačina:",
+)
+
+
+def _published(text):
+    return _observation(response={
+        "status": "ready", "answer": f"Evo zadatka.\n\nZadatak: {text}",
+        "answer_verdict": None, "last_tutor_task": "", "next_state": {"v": 1},
+        "session_mode": "practice", "effective_topic": LESSON})
+
+
+@pytest.mark.parametrize("text", OPTION_COMPLETED_PROMPTS)
+def test_option_completed_mcq_prompt_is_not_flagged_as_incomplete(text):
+    """B43: dvotačka nije dokaz nepotpunosti kad opcije dovršavaju pitanje."""
+    assert check_lib.check_task_self_contained(_published(text)).outcome != check_lib.FAIL
+
+
+@pytest.mark.parametrize("text", PROVEN_INCOMPLETE_PROMPTS)
+def test_proven_empty_imperative_still_fails(text):
+    assert check_lib.check_task_self_contained(_published(text)).outcome == check_lib.FAIL
+
+
+def test_evaluator_reuses_the_production_helper_instead_of_its_own_colon_rule():
+    """Jedno pravilo za oba sloja — evaluator ne smije imati vlastito, šire."""
+    from matbot.tutor.schema import incomplete_task_request
+
+    for text in OPTION_COMPLETED_PROMPTS + PROVEN_INCOMPLETE_PROMPTS:
+        production_says_incomplete = bool(incomplete_task_request(text))
+        evaluator_fails = check_lib.check_task_self_contained(
+            _published(text)).outcome == check_lib.FAIL
+        assert production_says_incomplete == evaluator_fails, text
+
+
+# B52 — dva STVARNO različita zadatka koja se razlikuju u jednom broju.
+# Set-Jaccard nad riječima im je dao preklapanje 1.00 i oborio `task_differs`.
+B52_FIRST = "Riješi nejednačinu: $x+\frac{1}{2}<2$. Odaberi tačan zaključak."
+B52_SECOND = "Riješi nejednačinu: $x+\frac{1}{2}<1$. Odaberi tačan zaključak."
+
+
+def _task_turn(text, signature, previous_texts=(), previous_signatures=()):
+    return check_lib.TurnObservation(
+        scenario_id="T", step_index=1, step_kind="text", topic_id=LESSON, grade=6,
+        request_payload={}, http_status=200,
+        response={"status": "ready", "answer": f"Evo zadatka.\n\nZadatak: {text}"},
+        session_before={"current_task": previous_texts[-1] if previous_texts else ""},
+        session_after={"current_task": text,
+                       "current_task_signature": {"structured_signature_hash": signature}},
+        sdk_calls=2, previous_task_texts=tuple(previous_texts),
+        previous_task_signatures=tuple(previous_signatures))
+
+
+def test_two_tasks_differing_only_in_one_number_are_not_duplicates():
+    """B52: x+1/2<2 daje x<3/2, a x+1/2<1 daje x<1/2 — različiti zadaci."""
+    result = check_lib.check_task_differs(
+        _task_turn(B52_SECOND, "sig-b", previous_texts=(B52_FIRST,),
+                   previous_signatures=("sig-a",)))
+    assert result.outcome == check_lib.PASS
+
+
+def test_a_repeated_structured_signature_is_still_a_duplicate():
+    result = check_lib.check_task_differs(
+        _task_turn(B52_SECOND, "sig-a", previous_texts=(B52_FIRST,),
+                   previous_signatures=("sig-a",)))
+    assert result.outcome == check_lib.FAIL
+
+
+def test_a_byte_identical_republished_task_is_still_a_duplicate():
+    """B51 iz Talasa B: isti tekst objavljen ponovo uz drugi potpis."""
+    result = check_lib.check_task_differs(
+        _task_turn(B52_FIRST, "sig-new", previous_texts=(B52_FIRST,),
+                   previous_signatures=("sig-a",)))
+    assert result.outcome == check_lib.FAIL
