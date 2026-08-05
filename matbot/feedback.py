@@ -274,13 +274,54 @@ def _math_numbers(text):
             for number in _NUMBER_TOKEN_RE.findall(content)}
 
 
+# OFFLINE AUDIT istog runa: prva verzija sloja 3 brojala je SVAKI broj u svakom
+# `$…$` segmentu, bez obzira na ulogu, pa je novo blokirala i dva odgovora koja
+# su prošla sve provjere (`failed_checks: []`):
+#   • B46 „…završava se sa $00$, $25$, $50$ ili $75$“ uz committed `75` —
+#     nabrajanje PRAVILA lekcije, ne tvrdnja o rješenju;
+#   • B59 „$25\\%=\\frac{25}{100}=\\frac{1}{4}$ … (ne izračunavaj još rezultat)“
+#     uz committed `$4$` — četvorka je NAZIVNIK.
+# Dvije determinističke razlike vraćaju sloj na ono što se može dokazati:
+#   1. broj u STRUKTURNOJ poziciji (eksponent, indeks, argument u vitičastim
+#      zagradama) je parametar zapisa, nikad tvrđena vrijednost;
+#   2. objavljen rezultat i provjera committed rješenja uvijek stoje u TVRĐENOJ
+#      JEDNAKOSTI (`x=\\frac{8}{2}=4`, `2\\cdot4=8`, `2(4)=8`). Segment bez `=`
+#      je operacija koju učenik tek treba izvesti (`$8:2$`) — ovaj modul je
+#      nikad ne računa.
+# B53 ostaje blokiran po obje tačke: četvorka tamo stoji izvan vitičastih
+# zagrada, u lancu jednakosti.
+_STRUCTURAL_RE = re.compile(r"[\^_]\s*\{[^{}]*\}|[\^_]\s*-?\d+|\{[^{}]*\}")
+
+
+def _strip_structural_positions(content):
+    """Ukloni eksponente, indekse i argumente u vitičastim zagradama."""
+    previous = None
+    while content != previous:
+        previous = content
+        content = _STRUCTURAL_RE.sub(" ", content)
+    return content
+
+
+def _asserted_numbers(text):
+    """Brojevi koje tekst TVRDI: samo iz math segmenata s jednakošću, i samo
+    izvan strukturnih pozicija."""
+    numbers = set()
+    for content in math_contents(tokenize_math(text or "")):
+        if "=" not in content:
+            continue
+        numbers.update(number.replace(",", ".") for number
+                       in _NUMBER_TOKEN_RE.findall(_strip_structural_positions(content)))
+    return numbers
+
+
 def _reveals_value_inside_math(text, task_text, *candidates):
     needles = {committed_numeric_value(candidate) for candidate in candidates}
     needles.discard("")
     if not needles:
         return False
+    # Zadatak se čita ŠIRE (svaki broj) — sve što učenik ionako vidi je izuzeto.
     provable = {needle.replace(",", ".") for needle in needles} - _math_numbers(task_text)
-    return bool(provable & _math_numbers(text))
+    return bool(provable & _asserted_numbers(text))
 
 
 def _has_numeric_inconsistency(text):
@@ -306,9 +347,11 @@ def leaks_answer(text, correct_option_text="", expected_answer="", task_text="")
        samog zadatka (npr. „izračunaj $24:8$“ kad je odgovor „8“). Uz sam
        kandidat poredi se i njegova GOLA vrijednost, pa „rješenje je 4“ i
        „dobiješ 4“ poklapaju committed `$x=4$` (živi nalaz B53).
-    3. Vrijednost ugrađena u račun unutar `$…$` (živi nalaz B53) — vidi
+    3. Vrijednost TVRĐENA u računu unutar `$…$` (živi nalaz B53) — vidi
        `_reveals_value_inside_math`. Traži `task_text` da bi broj koji već
        stoji u zadatku bio izuzet; bez njega se sloj ponaša konzervativnije.
+       Broj u operaciji bez jednakosti (`$8:2$`) i broj u strukturnoj poziciji
+       (eksponent, indeks, nazivnik) NISU tvrdnja o rješenju.
 
     `task_text` je OPCIONI dodatak — legacy Practice put koji ga ne prosljeđuje
     ponaša se kao i ranije.
