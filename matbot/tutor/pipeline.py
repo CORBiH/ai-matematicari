@@ -22,7 +22,7 @@ import logging
 import random
 import uuid
 
-from matbot import config, difficulty_level, geometrycheck, option_equivalence
+from matbot import config, difficulty_level, feedback, geometrycheck, option_equivalence
 from matbot.llm import LLMError, failure_diagnostics_kv
 from matbot.mathcheck import find_numeric_inconsistencies
 from matbot.tutor import lesson_context as lesson_context_module
@@ -378,6 +378,13 @@ def _run_choice_turn(store, llm, session, turn, context, request_id):
         _log_rejection(request_id, context, "choice_reply", error, final.intent)
         return _error_response(active_task_before)
 
+    # PRVI pogrešan klik ne smije otkriti odgovor — isto pravilo kao za slobodan
+    # tekst. Drugi pogrešan klik ga otkriva NAMJERNO (vidi niže), pa je gate
+    # aktivan samo dok otkrivanje još nije zasluženo.
+    if not is_correct and wrong_before < 1:
+        reply = _guard_answer_leak(session, request_id, context, "answer_attempt", reply,
+                                   student_message=turn["student_message"])
+
     session["recent_turns"].append({
         "student": f"[izabrao opciju: {verdict['selected_text']}]"[:300],
         "tutor": reply[:400],
@@ -437,6 +444,14 @@ def _run_text_turn(store, llm, session, turn, context, request_id):
             answer = intro + "\n\nZadatak: " + task_text
         else:
             answer = _compose_visible_help(final, reply, context)
+            # Treći hint po prompt ljestvici SMIJE pokazati cijeli postupak i
+            # rezultat; `hint_level` je ovdje još broj RANIJE datih hintova.
+            answer = _guard_answer_leak(
+                session, request_id, context, final.intent, answer,
+                student_message=turn["student_message"],
+                is_hint_ladder_top=(final.intent == "hint_request"
+                                    and session["hint_level"] >= config.MAX_HINT_LEVEL - 1),
+            )
             if final.intent == "hint_request":
                 session["hint_level"] = min(
                     session["hint_level"] + 1, config.MAX_HINT_LEVEL
@@ -501,6 +516,75 @@ def _compose_visible_help(final, reply, context):
     if safe_extra and safe_extra in reply:
         return reply
     return (reply.rstrip() + "\n\n" + safe_extra).strip() if reply.strip() else safe_extra
+
+
+# ---------------------------------------------------------------------------
+# ZAŠTITA OD CURENJA ODGOVORA (živi nalaz B53, dvije kampanje)
+# ---------------------------------------------------------------------------
+# Na pogrešan slobodan pokušaj („Mislim da je rješenje x=3.“) tutor je vratio
+# cijeli postupak i doslovno committed rješenje $x=7$ — koje je istovremeno bilo
+# i označena opcija na ekranu. Zadatak je ostao otvoren, pa je učeniku preostalo
+# samo da klikne ponuđeni odgovor. Ponovilo se i na drugi pokušaj.
+#
+# Legacy Practice put ovo hvata (`feedback.shape_first_wrong_feedback`), a
+# univerzalni put je pri pivotu ostao BEZ ijednog determinističkog anti-leak
+# sloja. Ovdje se koristi ISTI `feedback.leaks_answer`, ne novi detektor.
+#
+# Gate je namjerno uzak, jer treći korak istog scenarija (koristan hint bez
+# rezultata) NIJE procurio i mora ostati netaknut:
+#   • primjenjuje se samo uz AKTIVAN i NEZAVRŠEN zadatak,
+#   • nikad na `full_solution_request` (tamo je otkrivanje ispravno),
+#   • nikad na treći hint (prompt ljestvica ga izričito traži),
+#   • nikad kad ista vrijednost već stoji u tekstu zadatka — tada je to
+#     prepričavanje, ne curenje, i ne može se dokazati.
+# Na pozitivan nalaz NEMA drugog poziva modela: opasan tekst se zamjenjuje
+# sigurnim sljedećim korakom, a serverski verdikt i stanje ostaju netaknuti.
+_LEAK_GUARDED_INTENTS = frozenset({
+    "answer_attempt", "hint_request", "explanation_request", "clarification",
+})
+
+LEAK_BLOCKED_REPLY = "Hajde da to riješimo korak po korak.\n\n" + feedback.GENERIC_HINT
+
+
+def _committed_answer(session):
+    """Tačna opcija i očekivani odgovor — serverska istina, nikad modelova."""
+    correct_id = session.get("correct_option_id") or ""
+    marked = next((option.get("text", "") for option in (session.get("current_options") or [])
+                   if isinstance(option, dict) and option.get("id") == correct_id), "")
+    return marked, session.get("expected_answer_summary") or ""
+
+
+def _reveals_committed_answer(session, text, student_message=""):
+    """True samo kad se curenje MOŽE dokazati nad serverski committed odgovorom.
+
+    Dvije eksplicitne iznimke — u obje vrijednost NIJE došla od tutora:
+      • već stoji u tekstu samog zadatka (prepričavanje, ne otkrivanje),
+      • učenik ju je sam napisao (uključujući TAČAN pokušaj, koji se smije
+        potvrditi)."""
+    marked, expected = _committed_answer(session)
+    if not marked and not expected:
+        return False
+    if not feedback.leaks_answer(text, marked, expected):
+        return False
+    if feedback.leaks_answer(session.get("current_task") or "", marked, expected):
+        return False
+    return not feedback.leaks_answer(student_message or "", marked, expected)
+
+
+def _guard_answer_leak(session, request_id, context, intent, answer, *,
+                       student_message="", is_hint_ladder_top=False):
+    """Vrati bezbjedan tekst umjesto onog koji otkriva committed odgovor."""
+    if intent not in _LEAK_GUARDED_INTENTS or is_hint_ladder_top:
+        return answer
+    if not session.get("current_task") or session.get("task_completed"):
+        return answer
+    if not _reveals_committed_answer(session, answer, student_message):
+        return answer
+    logger.warning(
+        "tutor_answer_leak_blocked request_id=%s topic=%s intent=%s hint_level=%s",
+        request_id, context.topic_id, intent, session.get("hint_level"),
+    )
+    return LEAK_BLOCKED_REPLY
 
 
 def _publish_task(session, context, final, request_id, target_level=None):

@@ -551,6 +551,7 @@ _UNIVERSAL_TWO_CALL_MODULES = frozenset({
     # Nepotpun tekst zadatka (živi nalaz A25/B02/B30/B42) je defekt univerzalnog
     # dvopozivnog puta — integracijski dio testa mora voziti taj put.
     "test_incomplete_task_text",
+    "test_answer_leak_guard",
 })
 
 
