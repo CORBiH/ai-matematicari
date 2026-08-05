@@ -117,6 +117,33 @@ def _explicit_divisors(question: str) -> tuple[int, ...]:
     return ()
 
 
+# ŽIVI RELEASE GATE (commit baef3fd, scenario `harder_level2`, lekcija o
+# pravilima djeljivosti u 6. razredu):
+#     „Nađi cifru $x$ tako da je broj $3x5$ djeljiv sa 9. Koja cifra $x$ to
+#      zadovoljava?“
+# Ovaj oracle stoji na jednoj pretpostavci: OPCIJE su brojevi čija se djeljivost
+# tvrdi. Ovdje se djeljivost tvrdi za `3x5` — numerik s mjestodržačem — a opcije
+# su kandidati za cifru `x`. Nad potpuno ispravnim paketom (tačna cifra je $1$)
+# oracle je vratio `no_correct_option`, recenzent je tu lažnu primjedbu
+# „popravio“ uvođenjem broja djeljivog sa 9 (`18`) i tako pokvario paket, pa je
+# turn pao na `marked_option_math_mismatch`.
+# Granica, ne slabljenje: kad se u pitanju pojavi numerik koji miješa cifre i
+# slovo, server ne može izvesti istinu bez uvrštavanja — a ovaj modul namjerno
+# ništa ne rješava. Tada mora PRESKOČITI, ne pogađati (CLAUDE.md: guard koji ne
+# može dokazati mora skipovati). Podržani oblik („Koji od brojeva je djeljiv sa
+# 25?“) nema takav token i ostaje netaknut.
+_LATEX_COMMAND_RE = re.compile(r"\\[A-Za-z]+")
+_ALNUM_RUN_RE = re.compile(r"[A-Za-z0-9]+")
+
+
+def _has_placeholder_numeral(question: str) -> bool:
+    """True kad pitanje sadrži numerik s mjestodržačem (`3x5`, `47a`, `b24`)."""
+    stripped = _LATEX_COMMAND_RE.sub(" ", question or "")
+    return any(any(character.isdigit() for character in run)
+               and any(character.isalpha() for character in run)
+               for run in _ALNUM_RUN_RE.findall(stripped))
+
+
 def _condition_is_ambiguous(question: str, divisors: tuple[int, ...]) -> bool:
     text = question or ""
     if not divisors or _NEGATED_RE.search(text):
@@ -136,6 +163,10 @@ def evaluate_divisibility_mcq(question: str, option_texts: Iterable[str]) -> Div
     """
     options = tuple(option_texts or ())
     if not _DIVISIBILITY_WORD_RE.search(question or ""):
+        return DivisibilityMCQResult(False, False)
+    if _has_placeholder_numeral(question or ""):
+        # Tvrdnja se odnosi na broj koji server ne vidi kao literal — opcije
+        # nisu ono što se provjerava. Vidi komentar uz `_has_placeholder_numeral`.
         return DivisibilityMCQResult(False, False)
     values = tuple(_bare_integer(option) for option in options)
     if not options or any(value is None for value in values):
