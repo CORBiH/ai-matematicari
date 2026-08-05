@@ -562,6 +562,7 @@ _UNIVERSAL_TWO_CALL_MODULES = frozenset({
     "test_scaled_division_hint",
     "test_reviewer_package_consistency",
     "test_difficulty_progression_state",
+    "test_semantic_family_pipeline",
 })
 
 

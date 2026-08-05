@@ -31,6 +31,7 @@ modela (CLAUDE.md, pravilo 7).
 from dataclasses import dataclass
 
 from matbot import lesson_fidelity, mcq_integrity, option_equivalence
+from matbot.semantics import detectors as semantic_detectors
 from matbot.mathcheck import find_numeric_inconsistencies
 from matbot.mathsafe import sanitize_and_validate_math_text
 from matbot.terminology import normalize_terminology
@@ -95,12 +96,15 @@ def _option_id(task, index):
         return str(index)
 
 
-def collect_package_issues(task):
+def collect_package_issues(task, contract=None):
     """Vrati zatvorenu torku nalaza postojećih validatora nad JEDNIM paketom.
 
     Prazna torka = nijedan deterministički validator ne može dokazati defekt.
     To NIJE dokaz ispravnosti (semantiku i dalje drži recenzent), nego odsustvo
-    dokazane greške — isti princip kao mathcheck i option_equivalence."""
+    dokazane greške — isti princip kao mathcheck i option_equivalence.
+
+    `contract` je semantički ugovor porodice (Faza 4A) ili None. None znači
+    „lekcija ga nema“ i tada je rezultat bajt za bajt isti kao prije."""
     if task is None:
         return ()
     issues = []
@@ -179,6 +183,20 @@ def collect_package_issues(task):
                                           getattr(task, "text", ""))
         if failure:
             issues.append(PackageIssue(failure, detail=requirement.reviewer_instruction))
+
+    # 3c) SEMANTIČKI UGOVOR PORODICE (Faza 4A).
+    # Jedan višekratni parametarski detektor po PORODICI, nikad po lekciji:
+    # razlike među lekcijama nosе isključivo parametri ugovora. Blokira SAMO
+    # dokazani prekršaj (`fail`) i samo kad je lekcija izričito `blocking`;
+    # `unsupported` je eksplicitno „ne znam“ i nikad ne odbija paket.
+    if contract is not None and getattr(contract, "blocking", False):
+        visible, visible_safe = safe_visible_text(getattr(task, "text", ""))
+        detection = semantic_detectors.detect(
+            contract, visible if visible_safe else getattr(task, "text", ""))
+        if detection.status == semantic_detectors.STATUS_FAIL:
+            issues.append(PackageIssue(
+                detection.code,
+                detail=f"{detection.reason} [{contract.family_id}]"))
 
     # 4) DOKAZIVO VIŠE TAČNIH OPCIJA — postojeći uski mcq_integrity oracle.
     task_text, task_text_safe = safe_visible_text(getattr(task, "text", ""))

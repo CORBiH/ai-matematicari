@@ -265,6 +265,17 @@ def _semantic_requirement_block(context):
     return requirement.prompt_block + "\n\n" if requirement is not None else ""
 
 
+# UGOVOR PORODICE (Faza 4A). Tekst se NE sastavlja ovdje — dolazi gotov iz
+# kompajliranog artefakta, pa Tutor i Recenzent doslovno ne mogu dobiti dvije
+# različito formulisane verzije istog ugovora. Lekcija bez ugovora vraća prazan
+# string i prompt ostaje bajt za bajt kao prije.
+def _semantic_contract_block(context):
+    contract = getattr(context, "semantic_contract", None)
+    if contract is None:
+        return ""
+    return contract.prompt_block() + "\n\n"
+
+
 def build_tutor_instructions(context):
     """Sistemski prompt prvog poziva — isti za svih 534 lekcije."""
     shared = build_shared_math_rules(
@@ -276,6 +287,7 @@ def build_tutor_instructions(context):
         "ga sam riješi.\n\n"
         f"{shared}\n\n"
         f"{_semantic_requirement_block(context)}"
+        f"{_semantic_contract_block(context)}"
         f"{_INTENT_GUIDE}\n\n"
         f"{_FIELD_RULE}\n\n"
         f"{_TASK_RULE}\n\n"
@@ -418,6 +430,7 @@ def build_reviewer_instructions(context):
         "9. da je MathJax ispravan (samo $...$, poznate komande);\n"
         "10. da je bosanski prirodan i primjeren uzrastu.\n\n"
         "11. verify that lesson identity, level, text, options, marked answer, solution, difficulty evidence, and signature describe one task. Independently recompute `reviewed_difficulty_evidence` from only the visible task, answer requirements, options, and solution: ignore Tutor numerical counts. Count only actions the student must perform; four MCQ options are not four conditions or operations, selecting one option with one rule is one direct application, a solution explanation is not a student explanation requirement, and `combines_concepts` is true only when the student must combine distinct mathematical concepts. Return your independently calculated evidence even if the wording needs no textual correction. Level 1 may be a direct yes/no, recognition, calculation, classification, substitution, or one-rule selection; choosing a visible option is not by itself mathematical comparison or a second reasoning step. Level 2 permits a bounded pair of related rules/concepts, conditions, or operations, straightforward explanation/comparison, or one manageable representation change; `combines_concepts` alone is not Level 3. Level 3 requires construction, proof, three-or-more connected requirements/operations, advanced representation change, or comparable depth. For multiple choice, correct_option_id and correct_option_index must select the same visible option and expected_answer must be an exact copy of its text; explanation belongs only in solution. Signature parameters are only closed name/value entries with canonical string values: no arbitrary metadata, and order alone is never a new task. When correcting, update options, correct option ID/index, expected answer, solution, and the complete signature together, then return the complete fresh package. Set `task_package_consistent`, `difficulty_evidence_valid`, and `task_signature_consistent` accordingly.\n\n"
+        f"{_semantic_contract_block(context)}"
         f"{_SCALED_DIVISION_RULE}\n\n"
         f"{_REVIEWER_DECISION_RULE}\n\n"
         f"{_REVIEWER_TARGET_LEVEL_RULE}\n\n"

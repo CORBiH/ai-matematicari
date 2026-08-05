@@ -690,7 +690,8 @@ def _two_call(llm, context, session, student_message, request_id, trusted_verdic
     # dok drugi poziv još nije napravljen. Nalaz se NE koristi za odbijanje
     # nacrta (nacrt s nalazom je upravo ono što recenzent treba da popravi),
     # nego ulazi u recenzentov ulaz kao serverska činjenica.
-    draft_issues = package_preflight.collect_package_issues(draft.new_task)
+    draft_issues = package_preflight.collect_package_issues(
+        draft.new_task, contract=context.semantic_contract)
     if draft_issues:
         logger.info(
             "tutor_draft_preflight request_id=%s topic=%s intent=%s issues=%s",
@@ -752,7 +753,8 @@ def _two_call(llm, context, session, student_message, request_id, trusted_verdic
     # razlikuje od obične završne validacije. Provjera u objavi OSTAJE
     # (odbrana u dubini): ovo je raniji, precizniji sloj, ne zamjena.
     if final.new_task is not None:
-        final_issues = package_preflight.collect_package_issues(final.new_task)
+        final_issues = package_preflight.collect_package_issues(
+            final.new_task, contract=context.semantic_contract)
         if final_issues:
             # `unchanged=True` znači: recenzent je vidio nalaz i vratio paket s
             # POTPUNO ISTIM nalazima — dakle nije ni pokušao ispravku.

@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 
 from matbot import geometry_rules, task_families
 from matbot.contracts import registry as contract_registry
+from matbot.semantics import contracts as semantic_contracts
 from matbot.topics import lesson_info
 
 
@@ -44,6 +45,10 @@ class LessonContext:
     lesson_scope: str = ""
     objectives: tuple = ()
     exclusions: tuple = ()
+    # Semantički ugovor porodice (Faza 4A) — None za lekciju koja ga nema, i
+    # tada se cio sistem ponaša bajt za bajt kao prije. Nepromjenjiv je, pa
+    # Tutor i Recenzent dobiju DOSLOVNO isti razriješen ugovor.
+    semantic_contract: object = None
 
     @property
     def canonical_label(self):
@@ -86,4 +91,5 @@ def build(grade, topic_id):
         lesson_scope=str(lesson.get("lesson_scope", "") or ""),
         objectives=tuple(lesson.get("objectives", []) or ()),
         exclusions=tuple(lesson.get("exclusions", []) or ()),
+        semantic_contract=semantic_contracts.contract_for(lesson["id"]),
     )
