@@ -313,6 +313,10 @@ _REVIEWER_DECISION_RULE = """DECISION CONSISTENCY RULE (the server enforces this
   (`correct_option_id` and `correct_option_index` selecting the same visible option), the
   expected answer (an exact copy of that option's text), the solution, the task signature,
   the difficulty evidence for the task you actually return, and every mandatory check.
+- A correction must resolve EVERY reported issue and must not introduce a new defect.
+  Changing the package is not enough: the server re-runs every validator on what you
+  return, so a surviving equivalent option pair, a surviving numeric inconsistency, or
+  freshly broken MathJax in the options loses the turn exactly like no correction at all.
 - If you cannot produce a safe, complete, self-consistent package in this one call, return
   `fail_closed` with a `fail_reason_code`. There is no third call, and an honest
   `fail_closed` is strictly better than a contradictory approval."""
