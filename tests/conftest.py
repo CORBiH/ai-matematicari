@@ -553,6 +553,7 @@ _UNIVERSAL_TWO_CALL_MODULES = frozenset({
     "test_incomplete_task_text",
     "test_answer_leak_guard",
     "test_reviewer_package_consistency",
+    "test_difficulty_progression_state",
 })
 
 
