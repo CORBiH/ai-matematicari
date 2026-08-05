@@ -13,6 +13,8 @@ Nijedno interno polje (dijagnostika težine, nezavisno rješenje recenzenta,
 """
 import hashlib
 import json
+import re
+import unicodedata
 from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -324,12 +326,85 @@ def _require(condition, message):
         raise UnifiedOutputError(message)
 
 
+# ---------------------------------------------------------------------------
+# NEPOTPUN TEKST ZADATKA (živa kampanja Talas A + B)
+# ---------------------------------------------------------------------------
+# ŽIVI NALAZ — četiri OBJAVLJENA zadatka bez ijednog matematičkog objekta
+# (scenariji A25, B30, B02 i B42 dvije žive kampanje; lekcije se namjerno ne
+# navode jer ovaj modul ne smije poznavati nijednu):
+#
+#   „Izračunaj vrijednost izraza:“       recenzent: approve   (dva puta)
+#   „Riješi jednačinu:“                  recenzent: correct
+#   „Riješi sistem linearnih jednačina:“ recenzent: correct
+#
+# Svaki je imao četiri numeričke opcije i označenu tačnu — a učenik nije imao
+# šta da riješi. Nijedan postojeći sloj to nije mogao vidjeti: `mathsafe` nema
+# šta da sanitizuje, `mathcheck` nema jednakost, `option_equivalence` vidi
+# četiri različite vrijednosti, `mcq_integrity` nije primjenjiv, a recenzent je
+# vratio `task_solvable_and_unambiguous=true`.
+#
+# ZAŠTO NE „svaki tekst koji završava dvotačkom“: legitiman MCQ smije završiti
+# dvotačkom kad OPCIJE same dopunjuju pitanje — „Odaberi tačnu tvrdnju:“,
+# „Označi ispravan zapis:“, „Koji je od ponuđenih odgovora tačan:“. Široki
+# uslov bi odbio ispravne zadatke, a to je gore od promašaja.
+#
+# ZAŠTO NI „fraza + nema cifre i nema $…$ igdje u tekstu“: ni to nije dokaz.
+# Cifra, varijabla ili nevezan matematički segment mogu stajati u tekstu a da
+# traženi objekat i dalje NIJE prikazan — „Zadatak 2. Riješi jednačinu:“,
+# „Posmatraj $x$. Riješi jednačinu:“. Takav uslov bi te slučajeve tiho pustio,
+# pa bi pravilo tvrdilo više nego što može dokazati.
+#
+# Zato je pravilo ANKEROVANO NA CIJELI NORMALIZOVAN TEKST: odbija se samo kad
+# se cio tekst zadatka sastoji ISKLJUČIVO od imperativne fraze, uz najviše
+# završnu dvotačku ili tačku. Tada je nedostatak objekta dokazan strukturno,
+# bez ijedne pretpostavke o matematici.
+#
+# Tekstovi poput „Zadatak 2. Riješi jednačinu:“ ostaju semantički sumnjivi, ali
+# ih OVO pravilo namjerno ne dira — dokazivanje da duži tekst ne sadrži potpunu
+# jednačinu traži širu analizu koja nije predmet ove izmjene. Što se ne može
+# dokazati, preskače se; preskočeno nije dokaz ispravnosti.
+INCOMPLETE_TASK_TEXT_CODE = "incomplete_task_text"
+
+# Cio tekst = samo imperativ + eventualna završna interpunkcija. Ništa drugo.
+_INCOMPLETE_TASK_TEXT_RE = re.compile(
+    r"(?i)\A(?:"
+    r"izra[čc]unaj(?:te)?\s+(?:vrijednost\s+)?izraz\w*"
+    r"|rije[šs]i(?:te)?\s+(?:nejedna[čc]in\w*|jedna[čc]in\w*"
+    r"|sistem(?:\s+linearnih)?(?:\s+jedna[čc]in\w*)?)"
+    r"|pojednostavi(?:te)?\s+izraz\w*"
+    r"|uprosti(?:te)?\s+izraz\w*"
+    r")\s*[:.]?\s*\Z"
+)
+
+
+def _normalized_task_text(text) -> str:
+    """NFKC + sažimanje razmaka: model varira formatiranje, ne suštinu.
+
+    NFKC svodi kompatibilne oblike (široka dvotačka, nerazdvojni razmak) i
+    sastavlja dekomponovane dijakritike, pa „Riješi“ pisano na dva načina daje
+    isti rezultat."""
+    body = unicodedata.normalize("NFKC", text or "")
+    return re.sub(r"\s+", " ", body).strip()
+
+
+def incomplete_task_request(text) -> str:
+    """Vrati normalizovan tekst kad se zadatak sastoji SAMO od imperativa.
+
+    Prazan string znači „ne može se dokazati da nešto nedostaje“ — isti princip
+    kao svi ostali validatori u projektu: što se ne može dokazati, preskače se."""
+    body = _normalized_task_text(text)
+    return body if body and _INCOMPLETE_TASK_TEXT_RE.match(body) else ""
+
+
 def validate_task(task: TaskPayload) -> None:
     _require((task.selected_lesson_id or "").strip(), "task without lesson ID")
     _require((task.selected_lesson_title or "").strip(), "task without lesson title")
     _require((task.text or "").strip(), "zadatak bez teksta")
     _require((task.task_type or "").strip(), "task without type")
     _require(len(task.text) <= config.MAX_TASK_CHARS, "predug tekst zadatka")
+    missing = incomplete_task_request(task.text)
+    _require(not missing, f"{INCOMPLETE_TASK_TEXT_CODE}: tekst traži „{missing}“, "
+                          "a nijedan izraz, jednačina ni sistem nije prikazan")
     _require((task.expected_answer or "").strip(), "zadatak bez očekivanog odgovora")
     _require(len(task.expected_answer) <= config.MAX_EXPECTED_ANSWER_CHARS,
              "predug očekivani odgovor")

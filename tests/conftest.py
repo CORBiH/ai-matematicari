@@ -548,6 +548,9 @@ _UNIVERSAL_TWO_CALL_MODULES = frozenset({
     # konfiguraciji u kojoj se i pokreće — inače bi unit test tvrdio nešto o
     # putu koji kampanja nikad ne vozi.
     "test_practice_eval_runner",
+    # Nepotpun tekst zadatka (živi nalaz A25/B02/B30/B42) je defekt univerzalnog
+    # dvopozivnog puta — integracijski dio testa mora voziti taj put.
+    "test_incomplete_task_text",
 })
 
 

@@ -34,8 +34,9 @@ from matbot import mcq_integrity, option_equivalence
 from matbot.mathcheck import find_numeric_inconsistencies
 from matbot.mathsafe import sanitize_and_validate_math_text
 from matbot.terminology import normalize_terminology
-from matbot.tutor.schema import (UnifiedOutputError, difficulty_evidence_errors,
-                                 evidence_diagnostics, validate_task)
+from matbot.tutor.schema import (INCOMPLETE_TASK_TEXT_CODE, UnifiedOutputError,
+                                 difficulty_evidence_errors, evidence_diagnostics,
+                                 validate_task)
 
 # Ograničenja da dijagnostika i prompt blok ostanu mali i predvidivi.
 MAX_ISSUES = 8
@@ -106,10 +107,18 @@ def collect_package_issues(task):
 
     # 1) STRUKTURA PAKETA — postojeći `validate_task` (broj opcija, jedinstveni
     #    ID-jevi, slaganje correct_option_id/index, prazna/preduga polja...).
+    #
+    #    Nepotpun tekst zadatka dobija VLASTITI kod umjesto generičkog: recenzent
+    #    iz „task_structure_invalid“ ne može znati da mu nedostaje baš izraz ili
+    #    jednačina, a upravo to mora dopisati u ispravci (živi nalaz A25/B02/B30/B42).
     try:
         validate_task(task)
     except UnifiedOutputError as error:
-        issues.append(PackageIssue("task_structure_invalid", detail=str(error)))
+        message = str(error)
+        issues.append(PackageIssue(
+            INCOMPLETE_TASK_TEXT_CODE if message.startswith(INCOMPLETE_TASK_TEXT_CODE)
+            else "task_structure_invalid",
+            detail=message))
     except Exception:  # nikad ne ruši turn zbog dijagnostike
         issues.append(PackageIssue("task_structure_invalid", detail="nepoznata struktura"))
 
@@ -220,7 +229,10 @@ def format_for_reviewer(issues):
         "with a COMPLETE corrected package: replace the offending distractor(s) so all "
         "four options are semantically distinct, and when the difficulty evidence is "
         "outside the target level REPLACE THE TASK with one that genuinely belongs at "
-        "that level. Then recompute correct_option_id, "
+        f"that level. For `{INCOMPLETE_TASK_TEXT_CODE}` the task text asks the student to "
+        "compute or solve something that it never shows: write the missing expression, "
+        "equation, or system into the task text itself, inside $...$, so the task is "
+        "solvable from its own text. Then recompute correct_option_id, "
         "correct_option_index, expected_answer (an exact copy of the marked option's "
         "text), solution, difficulty evidence for the task you actually return, and "
         "task_signature where structural parameters changed. Keep "
