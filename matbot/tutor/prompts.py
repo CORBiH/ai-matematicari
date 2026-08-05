@@ -283,6 +283,32 @@ _REVIEWER_TARGET_LEVEL_RULE = """TARGET LEVEL DECISION RULE (the server enforces
 - If you cannot produce a safe, complete corrected package, return `fail_closed`."""
 
 
+# ODLUKA MORA PRATITI VLASTITE PROVJERE (živa kampanja postIncompleteFix).
+# U 100 scenarija recenzent je 9 puta vratio `approve`/`correct` iako je SAM
+# prijavio problem: 6 puta uz oborenu obaveznu provjeru (`task_package_consistent`,
+# `task_signature_consistent`, `marked_option_correct`, `mathjax_valid`), 3 puta
+# uz ispravku koja je nosila ISTI dokazani MCQ defekt. Server je svih 9 puta
+# ispravno pao zatvoreno — ali je učenik dobio tehničku poruku umjesto zadatka.
+#
+# Serverske invarijante se NE popuštaju. Ovaj blok samo recenzentu izričito
+# kaže ono što validator ionako radi, jer je isti pristup već izmjerivo
+# pomogao kod pravila o ciljanom nivou.
+_REVIEWER_DECISION_RULE = """DECISION CONSISTENCY RULE (the server enforces this deterministically):
+- `approve` is allowed ONLY when every mandatory check you report is true AND the draft
+  carries no unresolved server-detected issue. A single false check with `approve` is a
+  contradiction: the server rejects the whole turn and the student gets nothing.
+- `correct` is allowed ONLY when you return a NEW, complete, internally consistent package.
+  Returning the draft unchanged, or a package that still carries the same proven defect, is
+  rejected exactly like a contradictory approval.
+- After correcting anything, RECOMPUTE and return consistently: the correct option
+  (`correct_option_id` and `correct_option_index` selecting the same visible option), the
+  expected answer (an exact copy of that option's text), the solution, the task signature,
+  the difficulty evidence for the task you actually return, and every mandatory check.
+- If you cannot produce a safe, complete, self-consistent package in this one call, return
+  `fail_closed` with a `fail_reason_code`. There is no third call, and an honest
+  `fail_closed` is strictly better than a contradictory approval."""
+
+
 # SERVERSKI NALAZI O NACRTU (živi gate 00bbd45).
 # Dvije vidljive opcije bile su različiti stringovi a ista vrijednost; server je
 # to dokazao TEK u objavi, poslije oba poziva, pa recenzent nikad nije ni saznao
@@ -342,6 +368,7 @@ def build_reviewer_instructions(context):
         "9. da je MathJax ispravan (samo $...$, poznate komande);\n"
         "10. da je bosanski prirodan i primjeren uzrastu.\n\n"
         "11. verify that lesson identity, level, text, options, marked answer, solution, difficulty evidence, and signature describe one task. Independently recompute `reviewed_difficulty_evidence` from only the visible task, answer requirements, options, and solution: ignore Tutor numerical counts. Count only actions the student must perform; four MCQ options are not four conditions or operations, selecting one option with one rule is one direct application, a solution explanation is not a student explanation requirement, and `combines_concepts` is true only when the student must combine distinct mathematical concepts. Return your independently calculated evidence even if the wording needs no textual correction. Level 1 may be a direct yes/no, recognition, calculation, classification, substitution, or one-rule selection; choosing a visible option is not by itself mathematical comparison or a second reasoning step. Level 2 permits a bounded pair of related rules/concepts, conditions, or operations, straightforward explanation/comparison, or one manageable representation change; `combines_concepts` alone is not Level 3. Level 3 requires construction, proof, three-or-more connected requirements/operations, advanced representation change, or comparable depth. For multiple choice, correct_option_id and correct_option_index must select the same visible option and expected_answer must be an exact copy of its text; explanation belongs only in solution. Signature parameters are only closed name/value entries with canonical string values: no arbitrary metadata, and order alone is never a new task. When correcting, update options, correct option ID/index, expected answer, solution, and the complete signature together, then return the complete fresh package. Set `task_package_consistent`, `difficulty_evidence_valid`, and `task_signature_consistent` accordingly.\n\n"
+        f"{_REVIEWER_DECISION_RULE}\n\n"
         f"{_REVIEWER_TARGET_LEVEL_RULE}\n\n"
         f"{_REVIEWER_PREFLIGHT_RULE}\n\n"
         "ODLUKA:\n"
