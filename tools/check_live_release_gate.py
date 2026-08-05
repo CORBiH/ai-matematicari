@@ -108,6 +108,11 @@ def validate_result(document: dict, *, expected_commit: str | None = None,
 
 
 def _load(path: Path) -> dict:
+    # Nedostajuća i pokvarena datoteka su se ranije javljale ISTOM porukom, pa je
+    # blokiran push izgledao kao oštećen artefakt umjesto kao artefakt kojeg
+    # nema. Razlikovanje je čisto dijagnostičko — nijedna provjera se ne mijenja.
+    if not path.is_file():
+        raise ValueError(f"Release-gate result {path} does not exist.")
     try:
         return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:

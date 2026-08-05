@@ -60,26 +60,58 @@ while read -r local_ref local_sha remote_ref remote_sha; do
   fi
 
   [ -n "$pushed_commits" ] || pushed_commits="$local_sha"
+
+  # JEDINICA AUTORIZACIJE JE JEDAN TESTIRANI TREE, NE JEDAN ARTEFAKT PO PRETKU.
+  # Raniji oblik je petljao kroz SVAKI pushani commit i za svaki tražio vlastiti
+  # artefakt, pa je push od 28 commitova prvo ispisao PASS za HEAD i onda pao na
+  # prvom pretku bez artefakta. To je pogrešan model: prolazan gate nad
+  # testiranim stanjem već sadrži sve svoje pretke.
+  #
+  # `git rev-list` vraća najnovije prvo. Skupljamo kandidate od vrha naniže i
+  # stajemo na PRVOM behavior-affecting commitu — to je najnoviji takav commit.
+  # Kandidati su onda on sam i svi commitovi noviji od njega, a ti su nužno
+  # exempt (inače bi petlja stala ranije). Zato prolazan gate nad bilo kojim
+  # kandidatom dokazuje isto: da je testirano stanje koje sadrži svaku
+  # behavior promjenu u ovom pushu. Gate nad starijim pretkom NIKAD ne prolazi,
+  # jer se poslije njega pojavila nova behavior promjena.
+  required=""
+  candidates=""
   for pushed_sha in $pushed_commits; do
     changed_paths="$(git diff-tree --no-commit-id --name-only -r "$pushed_sha" 2>/dev/null)" || {
       echo "LIVE RELEASE GATE FAILED — PUSH BLOCKED"
       echo "Cannot determine changed paths for $pushed_sha."
       exit 1
     }
-    if ! printf '%s\n' "$changed_paths" | needs_gate_for_paths; then
-      continue
-    fi
-
-    result="scratchpad/live_release_gate/$pushed_sha.json"
-    if ! "$PYTHON" tools/check_live_release_gate.py "$result" --expected-commit "$pushed_sha" \
-        --expected-tree "$(git rev-parse "$pushed_sha^{tree}" 2>/dev/null)"; then
-      echo ""
-      echo "Push blocked: behavior-affecting commit $pushed_sha lacks a fresh passing release-gate result."
-      echo "Run exactly:"
-      echo "  & .\.venv\Scripts\python.exe .\tools\run_live_release_gate.py"
-      blocked=1
+    candidates="$candidates $pushed_sha"
+    if printf '%s\n' "$changed_paths" | needs_gate_for_paths; then
+      required="$pushed_sha"
+      break
     fi
   done
+
+  if [ -z "$required" ]; then
+    # Postojeća exemption politika, nepromijenjena: samo dokumentacija.
+    continue
+  fi
+
+  authorized=0
+  for candidate in $candidates; do
+    result="scratchpad/live_release_gate/$candidate.json"
+    [ -f "$result" ] || continue
+    if "$PYTHON" tools/check_live_release_gate.py "$result" --expected-commit "$candidate" \
+        --expected-tree "$(git rev-parse "$candidate^{tree}" 2>/dev/null)"; then
+      authorized=1
+      break
+    fi
+  done
+
+  if [ "$authorized" -ne 1 ]; then
+    echo ""
+    echo "Push blocked: newest behavior-affecting commit $required lacks a fresh passing release-gate result."
+    echo "Run exactly:"
+    echo "  & .\.venv\Scripts\python.exe .\tools\run_live_release_gate.py"
+    blocked=1
+  fi
 done
 
 exit "$blocked"
