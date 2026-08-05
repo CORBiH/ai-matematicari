@@ -30,7 +30,7 @@ modela (CLAUDE.md, pravilo 7).
 """
 from dataclasses import dataclass
 
-from matbot import mcq_integrity, option_equivalence
+from matbot import lesson_fidelity, mcq_integrity, option_equivalence
 from matbot.mathcheck import find_numeric_inconsistencies
 from matbot.mathsafe import sanitize_and_validate_math_text
 from matbot.terminology import normalize_terminology
@@ -160,6 +160,25 @@ def collect_package_issues(task):
         issues.append(PackageIssue(
             "expected_answer_not_marked_option",
             option_ids=(_option_id(task, marked_index),)))
+
+    # 3b) SEMANTIČKI ZAHTJEV KOJI NASLOV LEKCIJE DETERMINISTIČKI NAMEĆE.
+    # ŽIVI RELEASE GATE (commit 0883e8c, scenario `fresh_level1`): za lekciju o
+    # pravilima djeljivosti Tutor je predložio „Koji od ponuđenih brojeva je
+    # djelilac broja 84?“. „N je djelilac broja M“ nije „M je djeljiv sa N“ kao
+    # vidljivi zadatak: traži se primjena PRAVILA, ne traženje faktora.
+    # `lesson_fidelity.semantic_task_requirement` to već zna i izvodi iz
+    # NASLOVA (nikad iz ID-a lekcije), legacy put ga koristi, a i gate harness ga
+    # računa za dijagnostiku — univerzalni put ga pri pivotu nije preuzeo, pa je
+    # zadatak stizao do objave neprovjeren. Ovdje se poziva ISTI validator: bez
+    # duplikata, bez novog praga i bez grananja po lekciji.
+    requirement = lesson_fidelity.semantic_task_requirement(
+        getattr(task, "selected_lesson_title", ""))
+    if requirement is not None:
+        visible, visible_safe = safe_visible_text(getattr(task, "text", ""))
+        failure = requirement.failure_for(visible if visible_safe else
+                                          getattr(task, "text", ""))
+        if failure:
+            issues.append(PackageIssue(failure, detail=requirement.reviewer_instruction))
 
     # 4) DOKAZIVO VIŠE TAČNIH OPCIJA — postojeći uski mcq_integrity oracle.
     task_text, task_text_safe = safe_visible_text(getattr(task, "text", ""))

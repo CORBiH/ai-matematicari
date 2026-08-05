@@ -12,6 +12,7 @@ Dva prompta:
 Recenzent NAMJERNO ne dobija „odobri ako izgleda dobro“ ton: traži se da sam
 riješi zadatak prije nego što išta odobri.
 """
+from matbot.lesson_fidelity import semantic_task_requirement
 from matbot.rules import build_shared_math_rules
 from matbot.tutor.schema import INTENTS
 
@@ -247,6 +248,23 @@ turn when that evidence does not satisfy the requested level — writing above t
 requested level loses the turn, it is not a shortcut."""
 
 
+# ŽIVI RELEASE GATE (commit 0883e8c, scenario `fresh_level1`): za lekciju o
+# pravilima djeljivosti Tutor je predložio „Koji od ponuđenih brojeva je djelilac
+# broja 84?“ — traženje faktora umjesto primjene pravila. Zahtjev koji
+# `lesson_fidelity` deterministički izvodi iz NASLOVA lekcije (nikad iz ID-a)
+# legacy put je slao u prompt, a univerzalni ga pri pivotu nije preuzeo, pa Tutor
+# za njega nije ni znao. Ovdje ulazi kao KONTEKST lekcije, isto kao ostali
+# metapodaci — bez ijedne grane po lekciji.
+#
+# Recenzentov prompt NAMJERNO ostaje univerzalan: njemu isti zahtjev stiže samo
+# kad je stvarno prekršen, kao precizan nalaz iz `package_preflight`
+# (`divisibility_rules_not_required_by_visible_task` + objašnjenje). Tako se
+# lekcijska proza ne ubacuje u svaki drugi poziv, a nalaz je konkretan.
+def _semantic_requirement_block(context):
+    requirement = semantic_task_requirement(context.title)
+    return requirement.prompt_block + "\n\n" if requirement is not None else ""
+
+
 def build_tutor_instructions(context):
     """Sistemski prompt prvog poziva — isti za svih 534 lekcije."""
     shared = build_shared_math_rules(
@@ -257,6 +275,7 @@ def build_tutor_instructions(context):
         "Vodiš mod „Vježbaj sa mnom“: daješ po jedan zadatak i pomažeš učeniku da "
         "ga sam riješi.\n\n"
         f"{shared}\n\n"
+        f"{_semantic_requirement_block(context)}"
         f"{_INTENT_GUIDE}\n\n"
         f"{_FIELD_RULE}\n\n"
         f"{_TASK_RULE}\n\n"

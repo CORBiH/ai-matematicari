@@ -25,7 +25,7 @@ from tools.practice_eval.scenario import (Scenario, ScenarioError, load_scenario
 SCENARIO_DIR = runner.ROOT / "tools" / "practice_eval" / "scenarios"
 WAVE_A = SCENARIO_DIR / "wave_a.jsonl"
 WAVE_B = SCENARIO_DIR / "wave_b.jsonl"
-LESSON = "6-03-004"          # Pravila djeljivosti — postoji u data/topics.json
+LESSON = "6-04-013"          # Svojstva operacija s razlomcima — non-contract
 WAVE_A_CALL_BUDGET = 100
 WAVE_B_CALL_BUDGET = 150
 

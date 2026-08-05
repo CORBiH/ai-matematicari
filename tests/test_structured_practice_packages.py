@@ -33,7 +33,12 @@ def turn(grade, topic, message="Daj mi zadatak.", session_id="structured"):
     }
 
 
-def task_for(context, level=1, signature="one", text="Izračunaj $2+2$.",
+# Podrazumijevani tekst mora biti KOHERENTAN s lekcijom fixturea (pravila
+# djeljivosti): „Izračunaj $2+2$“ je generički placeholder koji od gate nalaza
+# 0883e8c pada na `divisibility_rules_not_required_by_visible_task`.
+# Opcije $4$,$3$,$5$,$6$ ostaju iste — sa djeliocem 4 tačna je tačno jedna.
+def task_for(context, level=1, signature="one",
+             text="Koji od ponuđenih brojeva je djeljiv sa 4?",
              options=("$4$", "$3$", "$5$", "$6$"), correct=0):
     return TaskPayload(
         selected_lesson_id=context.topic_id, selected_lesson_title=context.title,

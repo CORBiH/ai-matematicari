@@ -1921,7 +1921,23 @@ def _run_one_turn(store, llm, capture, report, scenario: Scenario, campaign: str
             "task_package_consistent": getattr(checks, "task_package_consistent", None),
             "difficulty_evidence_valid": getattr(checks, "difficulty_evidence_valid", None),
             "task_signature_consistent": getattr(checks, "task_signature_consistent", None),
+            # ŽIVI GATE 0883e8c: turn je pao na „odobreno uprkos oborenim
+            # provjerama: ['language_age_appropriate']“, a artefakt tu provjeru
+            # uopšte nije prikazivao — mapa je nosila samo legacy imena, pa je
+            # izgledalo kao da je kod izmišljen. Ova polja su čisto dijagnostička.
+            "intent_handled": getattr(checks, "intent_handled", None),
+            "mathjax_valid": getattr(checks, "mathjax_valid", None),
+            "language_age_appropriate": getattr(checks, "language_age_appropriate", None),
+            "response_addresses_student": getattr(checks, "response_addresses_student", None),
+            "independently_solved": getattr(checks, "independently_solved", None),
         }
+        # Univerzalni put nosi ispravku u `final.new_task`; legacy `corrected_task`
+        # tamo je uvijek None, pa je `reviewer_corrected_task_text` na živom gateu
+        # bio null iako je recenzent VRATIO kompletan paket.
+        if result.reviewer_corrected_task_text is None and reviewer_out.decision == "correct":
+            final_task = getattr(getattr(reviewer_out, "final", None), "new_task", None)
+            if final_task is not None:
+                result.reviewer_corrected_task_text = final_task.text
         result.lesson_preserved_signal = (
             f"reviewer_self_reported={result.reviewer_checks['tests_exact_lesson']} (not independently proven)")
         result.level_appropriate_signal = (
