@@ -536,62 +536,104 @@ def prepare_items(items: list[Item]) -> None:
 
 @dataclass(frozen=True)
 class ConfusionPair:
+    """Par lako zamjenjivih vještina. Svaka strana je UREĐENA torka obrazaca.
+
+    KONVENCIJA REDOSLIJEDA (nosi je popravka defekta 1, Faza 2.5): prvi obrazac
+    strane imenuje KANONSKU lekciju te strane, a kasniji su šire rezerve. Kad
+    više lekcija pogodi istu stranu, bira se ona koja pogađa NAJRANIJI obrazac —
+    ranije se biralo prvo po ID-ju lekcije, pa je za „dijeljenje s ostatkom“
+    susjed ispao 6-03-002 (prva lekcija čiji naslov sadrži „djeljivost“) umjesto
+    lekcije o PRAVILIMA djeljivosti. Redoslijed je podatak, ne grana po lekciji.
+    """
+
     name: str
-    side_a: str
-    side_b: str
+    side_a: tuple
+    side_b: tuple
     note: str
 
 
+def _side_rank(side, title_norm):
+    """Indeks prvog obrasca strane koji pogađa naslov, ili None."""
+    for index, pattern in enumerate(side):
+        if re.search(pattern, title_norm):
+            return index
+    return None
+
+
+def _canonical_neighbour(side, candidates):
+    """Kandidat koji pogađa najraniji (najkanonskiji) obrazac te strane.
+
+    Neriješeno se razrješava ID-jem lekcije — izbor ostaje determinističan."""
+    best = None
+    for lesson in candidates:
+        rank = _side_rank(side, lesson.title_norm)
+        if rank is None:
+            continue
+        key = (rank, lesson.lesson_id)
+        if best is None or key < best[0]:
+            best = (key, lesson)
+    return best[1] if best is not None else None
+
+
 CONFUSION_PAIRS = (
-    ConfusionPair("pravila_djeljivosti_vs_djelioci", r"pravila\s+djeljivosti",
-                  r"djelilac/faktor|djelilac.*sadržilac|faktor i sadržilac",
+    ConfusionPair("pravila_djeljivosti_vs_djelioci", (r"pravila\s+djeljivosti",),
+                  (r"djelilac/faktor", r"djelilac.*sadržilac", r"faktor i sadržilac"),
                   "primjena pravila djeljivosti nije traženje djelilaca/faktora"),
-    ConfusionPair("djeljivost_vs_dijeljenje_s_ostatkom", r"pravila\s+djeljivosti|djeljivost",
-                  r"dijeljenje s ostatkom",
+    ConfusionPair("djeljivost_vs_dijeljenje_s_ostatkom",
+                  (r"pravila\s+djeljivosti", r"djeljivost"),
+                  (r"dijeljenje s ostatkom",),
                   "djeljivost nije računanje količnika i ostatka"),
-    ConfusionPair("prosti_vs_faktorizacija", r"prosti i složeni",
-                  r"rastavljanje.*proste faktore",
+    ConfusionPair("prosti_vs_faktorizacija", (r"prosti i složeni",),
+                  (r"rastavljanje.*proste faktore",),
                   "prepoznavanje prostih brojeva nije faktorizacija"),
-    ConfusionPair("faktorizacija_vs_nzd_nzs", r"rastavljanje.*proste faktore",
-                  r"najveći zajednički djelilac|najmanji zajednički sadržilac|nzd|nzs",
+    ConfusionPair("faktorizacija_vs_nzd_nzs", (r"rastavljanje.*proste faktore",),
+                  (r"najveći zajednički djelilac", r"najmanji zajednički sadržilac",
+                   r"nzd", r"nzs"),
                   "faktorizacija je alat, NZD/NZS je zasebna vještina"),
-    ConfusionPair("pojam_razlomka_vs_kolicnik", r"pojam razlomka",
-                  r"razlomak kao dio cjeline i kao količnik",
+    ConfusionPair("pojam_razlomka_vs_kolicnik", (r"pojam razlomka",),
+                  (r"razlomak kao dio cjeline i kao količnik",),
                   "pojam razlomka nije interpretacija količnikom"),
-    ConfusionPair("vrste_razlomaka_vs_mjesoviti", r"pravi, nepravi",
-                  r"mješoviti broj",
+    ConfusionPair("vrste_razlomaka_vs_mjesoviti", (r"pravi, nepravi",),
+                  (r"mješoviti broj",),
                   "klasifikacija razlomaka nije zapis mješovitim brojem"),
-    ConfusionPair("prosirivanje_vs_skracivanje", r"proširivanje razlomaka",
-                  r"skraćivanje", "proširivanje i skraćivanje su suprotni smjerovi"),
-    ConfusionPair("ekvivalencija_vs_uporedjivanje", r"proširivanje razlomaka|skraćivanje",
-                  r"upoređivanje razlomaka",
+    ConfusionPair("prosirivanje_vs_skracivanje", (r"proširivanje razlomaka",),
+                  (r"skraćivanje",),
+                  "proširivanje i skraćivanje su suprotni smjerovi"),
+    ConfusionPair("ekvivalencija_vs_uporedjivanje",
+                  (r"proširivanje razlomaka", r"skraćivanje"),
+                  (r"upoređivanje razlomaka",),
                   "ekvivalentni zapis nije poređenje veličina"),
     ConfusionPair("jednaki_vs_razliciti_imenioci",
-                  r"sabiranje i oduzimanje razlomaka jednakih",
-                  r"sabiranje i oduzimanje razlomaka različitih",
+                  (r"sabiranje i oduzimanje razlomaka jednakih",),
+                  (r"sabiranje i oduzimanje razlomaka različitih",),
                   "jednaki i različiti imenioci su različite lekcije"),
-    ConfusionPair("razlomci_vs_procenti", r"množenje razlomka|dijeljenje razlomka",
-                  r"postotni zapis|postotak/procenat",
+    ConfusionPair("razlomci_vs_procenti",
+                  (r"množenje razlomka", r"dijeljenje razlomka"),
+                  (r"postotni zapis", r"postotak/procenat"),
                   "račun s razlomcima nije pretvaranje u procente"),
     ConfusionPair("racun_vs_jednacine_razlomci",
-                  r"sabiranje i oduzimanje razlomaka|množenje razlomka|dijeljenje razlomka",
-                  r"jednačine s razlomcima|jednačine s množenjem i dijeljenjem razlomaka",
+                  (r"sabiranje i oduzimanje razlomaka", r"množenje razlomka",
+                   r"dijeljenje razlomka"),
+                  (r"jednačine s razlomcima",
+                   r"jednačine s množenjem i dijeljenjem razlomaka"),
                   "direktan račun nije rješavanje jednačine"),
-    ConfusionPair("jednacina_vs_vrijednost_izraza", r"jednačin",
-                  r"izrazi s promjenljivim i brojna vrijednost|brojna vrijednost izraza|brojevni izrazi",
+    ConfusionPair("jednacina_vs_vrijednost_izraza", (r"jednačin",),
+                  (r"brojevni izrazi", r"brojna vrijednost izraza",
+                   r"izrazi s promjenljivim i brojna vrijednost"),
                   "rješavanje jednačine nije izračunavanje vrijednosti izraza"),
-    ConfusionPair("obim_vs_povrsina_kruga", r"broj π i obim kruga|obim kruga",
-                  r"površina kruga", "obim i površina kruga su različite formule"),
-    ConfusionPair("pitagora_vs_korijen", r"pitagorina teorema",
-                  r"kvadratni korijen", "Pitagorina teorema nije opšte korjenovanje"),
+    ConfusionPair("obim_vs_povrsina_kruga", (r"broj π i obim kruga", r"obim kruga"),
+                  (r"površina kruga",), "obim i površina kruga su različite formule"),
+    ConfusionPair("pitagora_vs_korijen", (r"pitagorina teorema",),
+                  (r"kvadratni korijen",), "Pitagorina teorema nije opšte korjenovanje"),
     ConfusionPair("prikupljanje_vs_citanje_podataka",
-                  r"prezentovanje podataka|prikazivanje.*podataka|tabela frekvencija",
-                  r"čitanje podataka|čitanje i kritičko",
+                  (r"prezentovanje podataka", r"tabela frekvencija",
+                   r"prikazivanje.*podataka"),
+                  (r"čitanje podataka", r"čitanje i kritičko"),
                   "prikupljanje/prikaz podataka nije čitanje i tumačenje dijagrama"),
-    ConfusionPair("vjerovatnoca_vs_frekvencija", r"vjerovatnoć",
-                  r"frekvencij", "vjerovatnoća nije statistička frekvencija"),
-    ConfusionPair("konstrukcija_vs_racun", r"konstrukcij",
-                  r"površina|obim|zapremin",
+    ConfusionPair("vjerovatnoca_vs_frekvencija", (r"vjerovatnoć",),
+                  (r"frekvencij",), "vjerovatnoća nije statistička frekvencija"),
+    ConfusionPair("konstrukcija_vs_racun", (r"konstrukcij",),
+                  (r"površina", r"obim", r"zapremin"),
                   "konstruktivni zadatak nije računski zadatak"),
 )
 
@@ -1007,39 +1049,20 @@ def build_mappings(items: list[Item], lessons: list[Lesson]):
                         "candidate_resolution": "razmotriti novu lekciju ili proširenje postojeće",
                     })
 
-            # 3) SUSJEDI IZ TABELE ZAMJENJIVIH VJEŠTINA — dokumentaciona zaštita:
-            #    po jednoj (stavka, par) vezi, i samo uz pouzdan exact izvor.
-            exact_lessons = [r[0] for r in rows
-                             if r[0] is not None and r[1] == "exact" and r[2] == "high"]
-            for lesson in exact_lessons:
-                for pair in CONFUSION_PAIRS:
-                    for own_side, other_side in ((pair.side_a, pair.side_b),
-                                                 (pair.side_b, pair.side_a)):
-                        if not re.search(own_side, lesson.title_norm):
-                            continue
-                        neighbour = next(
-                            (l for l in by_grade.get(lesson.grade, [])
-                             if l.lesson_id != lesson.lesson_id
-                             and l.lesson_id not in seen_targets
-                             and re.search(other_side, l.title_norm)), None)
-                        if neighbour is not None:
-                            seen_targets.add(neighbour.lesson_id)
-                            rows.append((
-                                neighbour, "neighbour", "high", "manual_rule",
-                                f"susjedna vještina ({pair.name}): {pair.note}; "
-                                f"stavka pripada lekciji {lesson.lesson_id}",
-                                "", "auto_high_confidence",
-                            ))
-                        break  # jedna strana para je dovoljna
-
-            # 4) KONFLIKT: uska stavka s POUZDANIM exact pogodcima u >1 oblasti
+            # 3) KONFLIKT: uska stavka s POUZDANIM exact pogodcima u >1 oblasti
             #    istog razreda — deterministe se protivrječe, čovjek odlučuje.
+            #    RAČUNA SE PRIJE SUSJEDA (popravka defekta 2, Faza 2.5): sporno
+            #    sidro ne smije izvesti nijedan susjed. Živi nalaz: KS stavka o
+            #    DECIMALNOM zapisu razlomka imala je sporna sidra u dvije
+            #    oblasti, pa je iz njih izveden susjed „množenje razlomaka“ —
+            #    lažno visoko pouzdanje nad paketom koji ni sam nije razriješen.
             conflict_areas = {
                 r[0].oblast for r in rows
                 if r[0] and r[1] == "exact" and r[2] == "high"
                 and r[0].grade == item.grade
             }
-            if not item.is_broad and len(conflict_areas) > 1:
+            disputed = not item.is_broad and len(conflict_areas) > 1
+            if disputed:
                 rows = [
                     (l, rel, conf, meth, ev, amb,
                      "conflict" if rel == "exact" and conf == "high" else st)
@@ -1052,6 +1075,34 @@ def build_mappings(items: list[Item], lessons: list[Lesson]):
                     "severity": "warning",
                     "candidate_resolution": "stručni pregled; zadržati samo ispravnu oblast",
                 })
+
+            # 4) SUSJEDI IZ TABELE ZAMJENJIVIH VJEŠTINA — dokumentaciona zaštita:
+            #    po jednoj (stavka, par) vezi, samo uz pouzdan i NESPORAN exact
+            #    izvor, i uz kanonski izbor susjeda (vidi `_canonical_neighbour`).
+            exact_lessons = [] if disputed else [
+                r[0] for r in rows
+                if r[0] is not None and r[1] == "exact" and r[2] == "high"
+            ]
+            for lesson in exact_lessons:
+                for pair in CONFUSION_PAIRS:
+                    for own_side, other_side in ((pair.side_a, pair.side_b),
+                                                 (pair.side_b, pair.side_a)):
+                        if _side_rank(own_side, lesson.title_norm) is None:
+                            continue
+                        neighbour = _canonical_neighbour(other_side, [
+                            l for l in by_grade.get(lesson.grade, [])
+                            if l.lesson_id != lesson.lesson_id
+                            and l.lesson_id not in seen_targets
+                        ])
+                        if neighbour is not None:
+                            seen_targets.add(neighbour.lesson_id)
+                            rows.append((
+                                neighbour, "neighbour", "high", "manual_rule",
+                                f"susjedna vještina ({pair.name}): {pair.note}; "
+                                f"stavka pripada lekciji {lesson.lesson_id}",
+                                "", "auto_high_confidence",
+                            ))
+                        break  # jedna strana para je dovoljna
             if item.is_broad:
                 broad_targets = [r[0].lesson_id for r in rows if r[0] and r[1] == "exact"]
                 if len(broad_targets) > 6:

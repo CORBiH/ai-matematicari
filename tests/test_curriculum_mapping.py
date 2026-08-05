@@ -14,6 +14,7 @@ nula mrežnih poziva, nula modela. Testovi štite:
 import hashlib
 import json
 import sys
+from collections import defaultdict
 from pathlib import Path
 
 import openpyxl
@@ -230,6 +231,46 @@ def test_substitution_item_does_not_map_to_graphical_method(pipeline):
     exact_targets = {m.lesson.lesson_id for m in rows if m.relation == "exact"}
     assert "9-05-007" in exact_targets
     assert "9-05-006" not in exact_targets
+
+
+# ---------------------------------------------------------------------------
+# REGRESIJE FAZE 2.5 — dva dokazana mehanička defekta susjedskog pravila
+# ---------------------------------------------------------------------------
+
+def test_neighbour_picks_the_canonical_lesson_not_the_first_by_id(pipeline):
+    """Defekt 1 (nalaz Faze 2.5, red M-KS_2018-0035-02).
+
+    „dijeliti prirodne brojeve s ostatkom“ ide na 6-02-005; njegov susjed po
+    paru djeljivost↔dijeljenje-s-ostatkom mora biti lekcija o PRAVILIMA
+    djeljivosti (6-03-004), a ne prva lekcija po ID-ju koja u naslovu ima
+    „djeljivost“ (6-03-002 Djeljivost zbira, razlike i proizvoda)."""
+    _l, _items, mappings, _i = pipeline
+    neighbours = {m.lesson.lesson_id for m in _rows_for(mappings, "KS_2018-0035")
+                  if m.relation == "neighbour"}
+    assert "6-03-004" in neighbours
+    assert "6-03-002" not in neighbours
+
+
+def test_disputed_anchor_never_spawns_neighbour_rows(pipeline):
+    """Defekt 2 (nalaz Faze 2.5, red M-KS_2018-0052-03).
+
+    KS-0052 je o DECIMALNOM zapisu razlomka; njegova exact sidra su sporna
+    (conflict) jer padaju u dvije oblasti. Iz spornog sidra se ne smije izvesti
+    nijedan susjed — konkretno ne 6-04-011 (množenje razlomaka) preko para
+    razlomci↔procenti."""
+    _l, _items, mappings, _i = pipeline
+    rows = _rows_for(mappings, "KS_2018-0052")
+    assert any(m.review_status == "conflict" for m in rows), "sidro mora biti sporno"
+    assert not [m for m in rows if m.relation == "neighbour"]
+
+    # Opšte pravilo, ne samo ovaj slučaj: nijedna stavka sa spornim sidrom
+    # ne smije nositi izvedene susjede.
+    by_item = defaultdict(list)
+    for m in mappings:
+        by_item[m.item.item_id].append(m)
+    for item_id, item_rows in by_item.items():
+        if any(m.review_status == "conflict" for m in item_rows):
+            assert not [m for m in item_rows if m.relation == "neighbour"], item_id
 
 
 # ---------------------------------------------------------------------------
