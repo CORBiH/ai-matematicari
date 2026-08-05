@@ -107,6 +107,10 @@ class TurnObservation:
                 and self.answer.strip() not in _FALLBACK_MESSAGES)
 
     @property
+    def student_message(self) -> str:
+        return (self.request_payload or {}).get("student_message") or ""
+
+    @property
     def task_after(self) -> str:
         return ((self.session_after or {}).get("current_task") or "")
 
@@ -530,6 +534,36 @@ def check_help_nonempty(obs: TurnObservation) -> CheckResult:
     return CheckResult("help_nonempty", PASS)
 
 
+def _student_stated_committed_answer(obs: TurnObservation) -> bool:
+    """True samo kad je UČENIK sam napisao committed odgovor.
+
+    Dva uslova, oba obavezna:
+      • produkcijsko pravilo — isti `feedback.leaks_answer` nad učenikovom
+        porukom, dakle evaluator ne izmišlja drugi kriterij;
+      • granica cifre — doslovni sloj u `leaks_answer` radi podnizom, pa bi
+        „Mislim da je x=30.“ pokrio committed `$x=3$` i tiho oslabio provjeru za
+        POGREŠAN pokušaj. Evaluator je zato namjerno uži od produkcije: mora
+        postojati pojava committed vrijednosti kojoj ni lijevo ni desno ne stoji
+        cifra.
+    """
+    message = obs.student_message
+    correct, expected = obs.correct_option_text, obs.expected_answer
+    task = obs.task_after or obs.task_before
+    if not message or not feedback.leaks_answer(message, correct, expected, task_text=task):
+        return False
+    haystack = _normalized(message).replace(" ", "")
+    for candidate in (correct, expected):
+        needle = _normalized(candidate).replace(" ", "").strip("$").rstrip(".,!?;:")
+        if not needle:
+            continue
+        for match in re.finditer(re.escape(needle), haystack):
+            before = haystack[match.start() - 1] if match.start() else ""
+            after = haystack[match.end()] if match.end() < len(haystack) else ""
+            if not before.isdigit() and not after.isdigit():
+                return True
+    return False
+
+
 def _answer_leak_result(obs: TurnObservation, name: str) -> CheckResult:
     """Curenje odgovora PRIJE izričitog `solution_request`.
 
@@ -538,10 +572,18 @@ def _answer_leak_result(obs: TurnObservation, name: str) -> CheckResult:
     U univerzalnom putu taj sloj na serveru NE POSTOJI (nalaz audita B), pa je
     ovo jedino mjesto gdje se mjeri.
 
-    KAD SE NE MOŽE DOKAZATI: ako ista vrijednost već stoji u tekstu SAMOG
-    zadatka (npr. „Koji je veći: $3/5$ ili $2/7$?“ s odgovorom $3/5$), ponavljanje
-    te vrijednosti nije curenje nego prepričavanje. Tada se vraća SKIP, nikad
-    FAIL — isto pravilo kao za validatore u `matbot/`."""
+    KAD SE NE MOŽE DOKAZATI: ako vrijednost nije došla od tutora, ponavljanje
+    nije curenje. Dva takva slučaja, oba SKIP i nikad FAIL — isto pravilo kao za
+    validatore u `matbot/`, i isti par izuzetaka koji produkcijski gate
+    (`tutor/pipeline.py::_reveals_committed_answer`) već primjenjuje:
+
+      • vrijednost stoji u tekstu SAMOG zadatka (npr. „Koji je veći: $3/5$ ili
+        $2/7$?“ s odgovorom $3/5$) — prepričavanje, ne otkrivanje;
+      • vrijednost je napisao UČENIK. ŽIVI RUN postFinalFixes, B53: zadatak
+        `$(x+2)=5$`, committed `$x=3$`, učenik „Mislim da je rješenje x=3.“ —
+        tutor je smio potvrditi i provjeriti uvrštavanjem, a check je to
+        prijavio kao curenje. Produkcija taj korak nije blokirala; nedostajao je
+        samo evaluatorov pandan tom izuzetku."""
     correct = obs.correct_option_text
     expected = obs.expected_answer
     if not correct and not expected:
@@ -552,6 +594,10 @@ def _answer_leak_result(obs: TurnObservation, name: str) -> CheckResult:
     if task and feedback.leaks_answer(task, correct, expected):
         return CheckResult(name, SKIP,
                            "the value also appears in the task text itself — a leak cannot be proven")
+    if _student_stated_committed_answer(obs):
+        return CheckResult(name, SKIP,
+                           "učenik je sam napisao committed odgovor — the student already "
+                           "stated this value, so the reply cannot be proven to disclose it")
     return CheckResult(name, FAIL, "the reply reveals the committed answer before a solution request")
 
 

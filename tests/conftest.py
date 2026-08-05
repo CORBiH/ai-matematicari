@@ -554,6 +554,7 @@ _UNIVERSAL_TWO_CALL_MODULES = frozenset({
     "test_answer_leak_guard",
     "test_answer_leak_semantic",
     "test_answer_leak_false_positives",
+    "test_eval_correct_attempt_not_leak",
     "test_unsafe_notation_preflight",
     "test_reviewer_correction_resolves_issues",
     "test_scaled_division_hint",
