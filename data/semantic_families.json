@@ -1,0 +1,94 @@
+{
+  "_readme": [
+    "VIŠEKRATNI SEMANTIČKI UGOVORI PORODICA (Faza 4A).",
+    "",
+    "Porodica opisuje ŠTA lekcija ispituje, i to PARAMETRIMA — nikad ID-jem",
+    "lekcije. Jedna porodica = jedan deterministički detektor; lekcije se",
+    "razlikuju isključivo vrijednostima parametara (vidi",
+    "data/lesson_semantic_assignments.json).",
+    "",
+    "Ovaj fajl je IZVOR koji uređuje čovjek. Kompajlira se u",
+    "data/lesson_semantics.compiled.json (scripts/build_lesson_semantics.py),",
+    "a runtime čita isključivo kompajlirani artefakt.",
+    "",
+    "GRANICA: `enforced_parameters` su jedini parametri koje detektor stvarno",
+    "dokazuje. Ostali su vođenje prompta i NIKAD ne proizvode odbijanje —",
+    "što se ne može dokazati, ne smije blokirati (isti princip kao svi",
+    "serverski validatori, vidi CLAUDE.md)."
+  ],
+
+  "schema_version": "1",
+
+  "families": {
+    "fraction_arithmetic_direct": {
+      "family_version": 1,
+      "family_name": "Direktan račun s razlomcima",
+      "detector": "fraction_arithmetic",
+      "core_skill": "izvesti jednu imenovanu računsku operaciju s razlomcima",
+
+      "parameter_schema": {
+        "allowed_operations": {
+          "kind": "enum_set",
+          "values": ["add", "subtract", "multiply", "divide"],
+          "required": true
+        },
+        "denominator_relation": {
+          "kind": "enum",
+          "values": ["any", "equal", "unlike"],
+          "required": true
+        },
+        "operand_kinds": {
+          "kind": "enum_set",
+          "values": ["fraction", "natural", "mixed_number"],
+          "required": true
+        },
+        "simplification_policy": {
+          "kind": "enum",
+          "values": ["any", "optional", "required"],
+          "required": false
+        },
+        "allowed_answer_kinds": {
+          "kind": "enum_set",
+          "values": ["fraction", "mixed_number", "integer"],
+          "required": true
+        },
+        "forbidden_directives": {
+          "kind": "enum_set",
+          "values": ["expand_reduce", "common_denominator", "solve_equation",
+                     "percent"],
+          "required": true
+        }
+      },
+
+      "enforced_parameters": ["allowed_operations", "denominator_relation",
+                              "forbidden_directives"],
+
+      "advisory_parameters": ["operand_kinds", "simplification_policy",
+                              "allowed_answer_kinds"],
+
+      "prompt_template": {
+        "header": "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "operations": "- glavna vidljiva operacija mora biti: {operations}",
+        "denominator_equal": "- oba razlomka moraju imati JEDNAKE imenioce",
+        "denominator_unlike": "- razlomci moraju imati RAZLIČITE imenioce (zadatak mora tražiti svođenje)",
+        "forbidden": "- zadatak NE SMIJE kao glavnu radnju tražiti: {forbidden}",
+        "supporting": "- skraćivanje i svođenje smiju biti POMOĆNI korak, ali ne glavna radnja",
+        "closing": "- ako prekršiš ovo, server odbija paket prije objave"
+      },
+
+      "operation_labels": {
+        "add": "sabiranje razlomaka",
+        "subtract": "oduzimanje razlomaka",
+        "multiply": "množenje razlomaka",
+        "divide": "dijeljenje razlomaka"
+      },
+
+      "directive_labels": {
+        "expand_reduce": "proširivanje ili skraćivanje razlomka",
+        "common_denominator": "svođenje na zajednički imenilac",
+        "solve_equation": "rješavanje jednačine ili nejednačine",
+        "percent": "pretvaranje u procente"
+      }
+    }
+  }
+}

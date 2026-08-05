@@ -1,0 +1,121 @@
+{
+  "_readme": [
+    "DODJELE PORODICA PO LEKCIJI (Faza 4A — samo pilot porodica).",
+    "",
+    "Dodavanje lekcije mijenja OVAJ FAJL, ne Python. Lekcije jedne porodice",
+    "razlikuju se isključivo vrijednostima parametara.",
+    "",
+    "`enforcement_mode`:",
+    "  blocking — deterministički dokazan prekršaj odbija paket prije objave",
+    "  advisory — nalaz se loguje i vodi prompt, ali NIKAD ne odbija",
+    "Samo lekcija koju je Faza 3 klasifikovala kao READY i koja ima dokazan",
+    "detektor smije nositi `blocking`.",
+    "",
+    "`evidence_ids` su porijeklo iz Faze 2/2.5/3 (stavke NPP i oporavljeni",
+    "dokazi). Ništa se ne aktivira bez zapisanog dokaza."
+  ],
+
+  "schema_version": "1",
+  "contract_version": "4A.1",
+
+  "assignments": [
+    {
+      "lesson_id": "6-04-009",
+      "family_id": "fraction_arithmetic_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": ["KS_2018-0045", "R25-021", "R25-026"],
+      "parameters": {
+        "allowed_operations": ["add", "subtract"],
+        "denominator_relation": "equal",
+        "operand_kinds": ["fraction"],
+        "simplification_policy": "optional",
+        "allowed_answer_kinds": ["fraction", "mixed_number", "integer"],
+        "forbidden_directives": ["expand_reduce", "common_denominator",
+                                 "solve_equation", "percent"]
+      },
+      "level_bounds": {
+        "1": "jedan zbir ili razlika, mali imenioci, bez skraćivanja",
+        "2": "rezultat traži skraćivanje ili mješoviti zapis",
+        "3": "tri člana ili nedostajući član jednakosti"
+      },
+      "forbidden_neighbour_skills": ["6-04-010", "6-04-011", "6-04-012",
+                                     "6-04-005", "6-04-006", "6-06-002",
+                                     "6-07-002"],
+      "reviewer_note": "Invarijanta: imenioci JEDNAKI. Odgovara postojećem determinističkom ugovoru lekcije (denominator_relation=equal)."
+    },
+    {
+      "lesson_id": "6-04-010",
+      "family_id": "fraction_arithmetic_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": ["KS_2018-0045", "R25-022", "R25-027"],
+      "parameters": {
+        "allowed_operations": ["add", "subtract"],
+        "denominator_relation": "unlike",
+        "operand_kinds": ["fraction"],
+        "simplification_policy": "optional",
+        "allowed_answer_kinds": ["fraction", "mixed_number", "integer"],
+        "forbidden_directives": ["expand_reduce", "common_denominator",
+                                 "solve_equation", "percent"]
+      },
+      "level_bounds": {
+        "1": "jedan imenilac dijeli drugi",
+        "2": "uzajamno prosti imenioci",
+        "3": "tri člana ili kombinacija s oduzimanjem i skraćivanjem"
+      },
+      "forbidden_neighbour_skills": ["6-04-009", "6-04-011", "6-04-012",
+                                     "6-04-007", "6-04-005", "6-04-006",
+                                     "6-07-002"],
+      "reviewer_note": "Invarijanta: imenioci RAZLIČITI. Svođenje je pomoćni korak, ne glavna radnja (glavna radnja 6-04-007)."
+    },
+    {
+      "lesson_id": "6-04-011",
+      "family_id": "fraction_arithmetic_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": ["KS_2018-0045", "R25-023", "R25-028"],
+      "parameters": {
+        "allowed_operations": ["multiply"],
+        "denominator_relation": "any",
+        "operand_kinds": ["fraction", "natural"],
+        "simplification_policy": "optional",
+        "allowed_answer_kinds": ["fraction", "mixed_number", "integer"],
+        "forbidden_directives": ["expand_reduce", "common_denominator",
+                                 "solve_equation", "percent"]
+      },
+      "level_bounds": {
+        "1": "razlomak puta prirodan broj, mali brojevi",
+        "2": "razlomak puta razlomak uz skraćivanje",
+        "3": "tri faktora ili nedostajući faktor"
+      },
+      "forbidden_neighbour_skills": ["6-04-009", "6-04-010", "6-04-012",
+                                     "6-06-002", "6-04-006"],
+      "reviewer_note": "Invarijanta: operacija MNOŽENJE. Nivo 2 i 3 traže razlomak puta razlomak, ne samo prirodan broj."
+    },
+    {
+      "lesson_id": "6-04-012",
+      "family_id": "fraction_arithmetic_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": ["KS_2018-0045", "R25-024", "R25-029"],
+      "parameters": {
+        "allowed_operations": ["divide"],
+        "denominator_relation": "any",
+        "operand_kinds": ["fraction", "natural"],
+        "simplification_policy": "optional",
+        "allowed_answer_kinds": ["fraction", "mixed_number", "integer"],
+        "forbidden_directives": ["expand_reduce", "common_denominator",
+                                 "solve_equation", "percent"]
+      },
+      "level_bounds": {
+        "1": "razlomak podijeljen prirodnim brojem, mali brojevi",
+        "2": "razlomak podijeljen razlomkom (recipročni)",
+        "3": "nedostajući djelilac ili kombinacija sa skraćivanjem"
+      },
+      "forbidden_neighbour_skills": ["6-04-009", "6-04-010", "6-04-011",
+                                     "6-04-006"],
+      "reviewer_note": "Invarijanta: operacija DIJELJENJE. Množenje bez recipročnog koraka ne ispituje ovu lekciju."
+    }
+  ]
+}

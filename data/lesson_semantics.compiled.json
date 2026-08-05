@@ -1,0 +1,275 @@
+{
+  "contract_version": "4A.1",
+  "lessons": {
+    "6-04-009": {
+      "activation_class": "READY",
+      "advisory_parameters": [
+        "allowed_answer_kinds",
+        "operand_kinds",
+        "simplification_policy"
+      ],
+      "contract_version": "4A.1",
+      "detector": "fraction_arithmetic",
+      "enforced_parameters": [
+        "allowed_operations",
+        "denominator_relation",
+        "forbidden_directives"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0045",
+        "R25-021",
+        "R25-026"
+      ],
+      "family_id": "fraction_arithmetic_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [
+        "6-04-005",
+        "6-04-006",
+        "6-04-010",
+        "6-04-011",
+        "6-04-012",
+        "6-06-002",
+        "6-07-002"
+      ],
+      "lesson_id": "6-04-009",
+      "level_bounds": {
+        "1": "jedan zbir ili razlika, mali imenioci, bez skraćivanja",
+        "2": "rezultat traži skraćivanje ili mješoviti zapis",
+        "3": "tri člana ili nedostajući član jednakosti"
+      },
+      "parameters": {
+        "allowed_answer_kinds": [
+          "fraction",
+          "integer",
+          "mixed_number"
+        ],
+        "allowed_operations": [
+          "add",
+          "subtract"
+        ],
+        "denominator_relation": "equal",
+        "forbidden_directives": [
+          "common_denominator",
+          "expand_reduce",
+          "percent",
+          "solve_equation"
+        ],
+        "operand_kinds": [
+          "fraction"
+        ],
+        "simplification_policy": "optional"
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva operacija mora biti: sabiranje razlomaka, oduzimanje razlomaka",
+        "- oba razlomka moraju imati JEDNAKE imenioce",
+        "- zadatak NE SMIJE kao glavnu radnju tražiti: svođenje na zajednički imenilac, proširivanje ili skraćivanje razlomka, pretvaranje u procente, rješavanje jednačine ili nejednačine",
+        "- skraćivanje i svođenje smiju biti POMOĆNI korak, ali ne glavna radnja",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: imenioci JEDNAKI. Odgovara postojećem determinističkom ugovoru lekcije (denominator_relation=equal)."
+    },
+    "6-04-010": {
+      "activation_class": "READY",
+      "advisory_parameters": [
+        "allowed_answer_kinds",
+        "operand_kinds",
+        "simplification_policy"
+      ],
+      "contract_version": "4A.1",
+      "detector": "fraction_arithmetic",
+      "enforced_parameters": [
+        "allowed_operations",
+        "denominator_relation",
+        "forbidden_directives"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0045",
+        "R25-022",
+        "R25-027"
+      ],
+      "family_id": "fraction_arithmetic_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [
+        "6-04-005",
+        "6-04-006",
+        "6-04-007",
+        "6-04-009",
+        "6-04-011",
+        "6-04-012",
+        "6-07-002"
+      ],
+      "lesson_id": "6-04-010",
+      "level_bounds": {
+        "1": "jedan imenilac dijeli drugi",
+        "2": "uzajamno prosti imenioci",
+        "3": "tri člana ili kombinacija s oduzimanjem i skraćivanjem"
+      },
+      "parameters": {
+        "allowed_answer_kinds": [
+          "fraction",
+          "integer",
+          "mixed_number"
+        ],
+        "allowed_operations": [
+          "add",
+          "subtract"
+        ],
+        "denominator_relation": "unlike",
+        "forbidden_directives": [
+          "common_denominator",
+          "expand_reduce",
+          "percent",
+          "solve_equation"
+        ],
+        "operand_kinds": [
+          "fraction"
+        ],
+        "simplification_policy": "optional"
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva operacija mora biti: sabiranje razlomaka, oduzimanje razlomaka",
+        "- razlomci moraju imati RAZLIČITE imenioce (zadatak mora tražiti svođenje)",
+        "- zadatak NE SMIJE kao glavnu radnju tražiti: svođenje na zajednički imenilac, proširivanje ili skraćivanje razlomka, pretvaranje u procente, rješavanje jednačine ili nejednačine",
+        "- skraćivanje i svođenje smiju biti POMOĆNI korak, ali ne glavna radnja",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: imenioci RAZLIČITI. Svođenje je pomoćni korak, ne glavna radnja (glavna radnja 6-04-007)."
+    },
+    "6-04-011": {
+      "activation_class": "READY",
+      "advisory_parameters": [
+        "allowed_answer_kinds",
+        "operand_kinds",
+        "simplification_policy"
+      ],
+      "contract_version": "4A.1",
+      "detector": "fraction_arithmetic",
+      "enforced_parameters": [
+        "allowed_operations",
+        "denominator_relation",
+        "forbidden_directives"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0045",
+        "R25-023",
+        "R25-028"
+      ],
+      "family_id": "fraction_arithmetic_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [
+        "6-04-006",
+        "6-04-009",
+        "6-04-010",
+        "6-04-012",
+        "6-06-002"
+      ],
+      "lesson_id": "6-04-011",
+      "level_bounds": {
+        "1": "razlomak puta prirodan broj, mali brojevi",
+        "2": "razlomak puta razlomak uz skraćivanje",
+        "3": "tri faktora ili nedostajući faktor"
+      },
+      "parameters": {
+        "allowed_answer_kinds": [
+          "fraction",
+          "integer",
+          "mixed_number"
+        ],
+        "allowed_operations": [
+          "multiply"
+        ],
+        "denominator_relation": "any",
+        "forbidden_directives": [
+          "common_denominator",
+          "expand_reduce",
+          "percent",
+          "solve_equation"
+        ],
+        "operand_kinds": [
+          "fraction",
+          "natural"
+        ],
+        "simplification_policy": "optional"
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva operacija mora biti: množenje razlomaka",
+        "- zadatak NE SMIJE kao glavnu radnju tražiti: svođenje na zajednički imenilac, proširivanje ili skraćivanje razlomka, pretvaranje u procente, rješavanje jednačine ili nejednačine",
+        "- skraćivanje i svođenje smiju biti POMOĆNI korak, ali ne glavna radnja",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: operacija MNOŽENJE. Nivo 2 i 3 traže razlomak puta razlomak, ne samo prirodan broj."
+    },
+    "6-04-012": {
+      "activation_class": "READY",
+      "advisory_parameters": [
+        "allowed_answer_kinds",
+        "operand_kinds",
+        "simplification_policy"
+      ],
+      "contract_version": "4A.1",
+      "detector": "fraction_arithmetic",
+      "enforced_parameters": [
+        "allowed_operations",
+        "denominator_relation",
+        "forbidden_directives"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0045",
+        "R25-024",
+        "R25-029"
+      ],
+      "family_id": "fraction_arithmetic_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [
+        "6-04-006",
+        "6-04-009",
+        "6-04-010",
+        "6-04-011"
+      ],
+      "lesson_id": "6-04-012",
+      "level_bounds": {
+        "1": "razlomak podijeljen prirodnim brojem, mali brojevi",
+        "2": "razlomak podijeljen razlomkom (recipročni)",
+        "3": "nedostajući djelilac ili kombinacija sa skraćivanjem"
+      },
+      "parameters": {
+        "allowed_answer_kinds": [
+          "fraction",
+          "integer",
+          "mixed_number"
+        ],
+        "allowed_operations": [
+          "divide"
+        ],
+        "denominator_relation": "any",
+        "forbidden_directives": [
+          "common_denominator",
+          "expand_reduce",
+          "percent",
+          "solve_equation"
+        ],
+        "operand_kinds": [
+          "fraction",
+          "natural"
+        ],
+        "simplification_policy": "optional"
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva operacija mora biti: dijeljenje razlomaka",
+        "- zadatak NE SMIJE kao glavnu radnju tražiti: svođenje na zajednički imenilac, proširivanje ili skraćivanje razlomka, pretvaranje u procente, rješavanje jednačine ili nejednačine",
+        "- skraćivanje i svođenje smiju biti POMOĆNI korak, ali ne glavna radnja",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: operacija DIJELJENJE. Množenje bez recipročnog koraka ne ispituje ovu lekciju."
+    }
+  },
+  "schema_version": "1"
+}
