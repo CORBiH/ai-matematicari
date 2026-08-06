@@ -3,7 +3,8 @@
 ZAŠTO POSTOJI (forenzika latencije, Faza 4H): svjež/nov/lakši/teži zadatak je
 kroz dvopozivni model-put trajao medijalno ~34 s (dva sekvencijalna poziva s
 ~1200–1650 izlaznih tokena po pozivu), uz ~2–3 % isteka na 45 s po pozivu.
-Za četiri lekcije direktnog računa s razlomcima server može SAM proizvesti
+Za lekcije direktnog računa s razlomcima (porodica iz
+data/lesson_semantic_assignments.json) server može SAM proizvesti
 cio paket — operande, egzaktan odgovor, distraktore iz poznatih učeničkih
 grešaka, ljestvicu nagovještaja i potpuno rješenje — i dokazati ga postojećim
 validatorima, bez ijednog poziva modela.
@@ -166,7 +167,7 @@ def _pick(rng, low, high):
 
 
 def _like_operands(rng, operation, level):
-    """Jednaki imenioci (6-04-009)."""
+    """Jednaki imenioci (skill add_subtract_like_denominators)."""
     if level == 1:
         for _ in range(200):
             den = _pick(rng, 5, 10)
@@ -211,7 +212,7 @@ def _like_operands(rng, operation, level):
 
 
 def _unlike_operands(rng, operation, level):
-    """Različiti imenioci (6-04-010) — nikad slučajno jednaki."""
+    """Različiti imenioci (skill add_subtract_unlike_denominators) — nikad slučajno jednaki."""
     if level == 1:
         for _ in range(300):
             d1 = _pick(rng, 2, 6)
@@ -255,7 +256,7 @@ def _unlike_operands(rng, operation, level):
 
 
 def _multiply_operands(rng, level):
-    """Množenje (6-04-011): nivo 1 prirodan broj puta razlomak, nivo 2 razlomak
+    """Množenje (skill multiply_fractions): nivo 1 prirodan broj puta razlomak, nivo 2 razlomak
     puta razlomak uz skraćivanje, nivo 3 tri faktora."""
     if level == 1:
         for _ in range(200):
@@ -287,7 +288,7 @@ def _multiply_operands(rng, level):
 
 
 def _divide_operands(rng, level):
-    """Dijeljenje (6-04-012): djelilac je uvijek strogo pozitivan."""
+    """Dijeljenje (skill divide_fractions): djelilac je uvijek strogo pozitivan."""
     if level == 1:
         for _ in range(200):
             den = _pick(rng, 2, 9)
