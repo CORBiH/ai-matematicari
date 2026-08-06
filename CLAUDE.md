@@ -41,6 +41,18 @@ Flask + a single-page frontend, one OpenAI call per turn, no database.
    the 528/528 family mapping are **lesson context fed into one prompt**, never
    a second execution branch. No lesson-ID branching in `matbot/tutor/`.
    See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+   *Amendment (Phase 4H):* the single orchestrator remains mandatory, but it
+   may select between **execution strategies** behind itself: the model-backed
+   Tutor+Reviewer strategy, and a **deterministic strategy**
+   (`matbot/deterministic/`) for structured actions on lessons whose blocking
+   semantic family has a complete server-owned generator. Strategy selection
+   uses only server-owned facts (lesson family, UI fields, a closed message
+   set) — never model prose and never lesson IDs. Deterministic packages pass
+   the byte-for-byte same validators and the same `_publish_task` as model
+   packages; there are **never** two competing session/publication pipelines.
+   Deterministic turns make **zero** model calls; model turns keep the exact
+   two-call bound of rule 4. Rollback: `MATBOT_DETERMINISTIC_PRACTICE=disabled`.
 5b. **The Reviewer is the main semantic scope gate.** It independently solves
    generated tasks before approving, and returns either the approved payload, a
    corrected complete payload (which is final — no third call), or
@@ -167,6 +179,7 @@ Flask + a single-page frontend, one OpenAI call per turn, no database.
 | Shared maths/language/notation prompt rules | `matbot/rules.py` |
 | Mode-specific prompt assembly | `matbot/prompts.py` |
 | Universal lesson-contract engine (Practice) | `matbot/contracts/` |
+| Deterministic execution strategy (family generators) | `matbot/deterministic/` |
 | Lesson contract data (no Python per lesson) | `data/contract_templates.json`, `data/lesson_contracts.json` |
 | Geometry symbols, formulas, topic routing | `matbot/geometry_rules.py` |
 | The only OpenAI call site | `matbot/llm.py` |
