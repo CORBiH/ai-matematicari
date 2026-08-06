@@ -31,6 +31,7 @@ CHECKER = ROOT / "tools" / "check_live_release_gate.py"
 REQUIRED_ROLES = (
     "fresh_level1", "correct_choice", "harder_level2", "first_hint", "full_solution",
     "easier_level1", "same_level_new", "contract_fresh", "contract_harder",
+    "semantic_fresh", "semantic_harder",
     "grade7", "grade8", "grade9",
 )
 
@@ -70,10 +71,10 @@ def passing_document(commit_sha, tree_hash):
         "clean_worktree": True,
         "practice_pipeline": "universal_two_call",
         "difficulty_levels_enabled": True,
-        "scenario_count": 12,
-        "required_scenario_count": 12,
-        "actual_sdk_calls": 19,
-        "sdk_call_ceiling": 19,
+        "scenario_count": 14,
+        "required_scenario_count": 14,
+        "actual_sdk_calls": 23,
+        "sdk_call_ceiling": 23,
         "twentieth_call_refused_before_sdk": True,
         "validation_failures": [],
         "infrastructure_failures": [],

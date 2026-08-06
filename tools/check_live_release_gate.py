@@ -15,8 +15,8 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent.parent
-REQUIRED_SCENARIOS = 12
-REQUIRED_CALLS = 19
+REQUIRED_SCENARIOS = 14
+REQUIRED_CALLS = 23
 MAX_AGE = timedelta(hours=24)
 REQUIRED_PIPELINE = "universal_two_call"
 
@@ -82,6 +82,7 @@ def validate_result(document: dict, *, expected_commit: str | None = None,
         required_roles = {
             "fresh_level1", "correct_choice", "harder_level2", "first_hint", "full_solution",
             "easier_level1", "same_level_new", "contract_fresh", "contract_harder",
+            "semantic_fresh", "semantic_harder",
             "grade7", "grade8", "grade9",
         }
         actual_roles = {row.get("role") for row in scenarios if isinstance(row, dict)}

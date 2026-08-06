@@ -25,6 +25,7 @@ import uuid
 from matbot import config, difficulty_level, feedback, geometrycheck, option_equivalence
 from matbot.llm import LLMError, failure_diagnostics_kv
 from matbot.mathcheck import find_numeric_inconsistencies
+from matbot.semantics import detectors as semantic_detectors
 from matbot.tutor import lesson_context as lesson_context_module
 from matbot.tutor import package_preflight
 from matbot.tutor import prompts as tutor_prompts
@@ -195,6 +196,22 @@ def _reject_if_geometry_invalid(text, context, where):
         raise UnifiedOutputError(f"geometry_notation: {','.join(issues)} [{where}]")
 
 
+def _reject_if_semantic_contract_violated(text, context, where):
+    """ODBRANA U DUBINI (Faza 4B): isti detektor koji je već pokrenut u
+    preflightu i u invarijanti nad recenzentovim paketom, sada i NEPOSREDNO
+    PRIJE OBJAVE — dakle prije ijedne mutacije sesije.
+
+    Ne uvodi novi prag: `unsupported` i dalje nikad ne odbija, a blokira samo
+    lekcija čiji ugovor je izričito `blocking`."""
+    contract = getattr(context, "semantic_contract", None)
+    if contract is None or not getattr(contract, "blocking", False):
+        return
+    detection = semantic_detectors.detect(contract, text)
+    if detection.status == semantic_detectors.STATUS_FAIL:
+        raise UnifiedOutputError(
+            f"{detection.code}: {detection.reason} [{where}]")
+
+
 def _validate_task_server_side(task, context):
     """Sve deterministe koje su i ranije štitile objavljen zadatak.
 
@@ -202,6 +219,7 @@ def _validate_task_server_side(task, context):
     task_text = _safe_text(task.text, "tekst zadatka")
     _reject_if_inconsistent(task_text, "tekst zadatka")
     _reject_if_geometry_invalid(task_text, context, "tekst zadatka")
+    _reject_if_semantic_contract_violated(task_text, context, "tekst zadatka")
 
     option_texts = [
         _safe_text(option.text, "opcija", allow_wrap=True) for option in task.options

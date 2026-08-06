@@ -36,6 +36,7 @@ from matbot.contracts import archetypes as contract_archetypes
 from matbot.contracts import difficulty as contract_difficulty
 from matbot.contracts import pipeline as contract_pipeline
 from matbot.contracts import registry as contract_registry
+from matbot.semantics import contracts as semantic_contracts
 from matbot.tutor import lesson_context
 from matbot.tutor import pipeline as tutor_pipeline
 from matbot.llm import LLMError, failure_diagnostics_kv
@@ -927,10 +928,20 @@ def run_practice_turn(store, llm, turn):
     žive u matbot/tutor/ i pokrivene su testovima koje zastavica uključuje."""
     if _universal_pipeline_enabled():
         # The validated release runtime enables the shared level controller.
-        # In that runtime deterministic contracts keep their established
-        # one-call generator; all non-contract lessons use Tutor+Reviewer.
+        # In that runtime deterministic K1/K3 contracts keep their established
+        # one-call generator; all other lessons use Tutor+Reviewer.
+        #
+        # AKTIVAN SEMANTIČKI UGOVOR IMA PREDNOST (Faza 4B). Ranije je uslov
+        # gledao samo „ima li lekcija K1/K3 red“, pa je lekcija koja je u
+        # međuvremenu dobila KOMPAJLIRAN semantički ugovor i dalje padala na
+        # legacy put i time zaobilazila SVOJ ugovor: Tutorov kontekst,
+        # recenzentovu ispravku i završnu semantičku revalidaciju. Odluka je
+        # podatak (postojanje ugovora), ne grana po ID-ju lekcije, i K1/K3
+        # lekcija bez semantičkog ugovora ostaje tačno na svom putu.
+        topic_id = turn.get("selected_topic", "")
         if (_difficulty_levels_enabled()
-                and contract_registry.contract_for(turn.get("selected_topic", "")) is not None):
+                and contract_registry.contract_for(topic_id) is not None
+                and semantic_contracts.contract_for(topic_id) is None):
             return _run_legacy_single_call_turn(store, llm, turn)
         return tutor_pipeline.run_turn(store, llm, turn)
     return _run_legacy_single_call_turn(store, llm, turn)

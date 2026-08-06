@@ -29,7 +29,7 @@ $env:AI_TUTOR_TIMEOUT = "45"
 
 The runner uses only this process environment. It does not load `.env`, never prints the API key, refuses a dirty worktree, and stores the result at `scratchpad/live_release_gate/<COMMIT_SHA>.json` plus `latest.json`. Generated result files are ignored and must not be committed.
 
-The required campaign contains 12 scenarios and exactly 19 actual SDK calls. A twentieth attempted SDK invocation is refused before delegation. A PASS is valid only for the exact tested commit and tree, and expires after 24 hours.
+The required campaign contains 14 scenarios and exactly 23 actual SDK calls. A twenty-fourth attempted SDK invocation is refused before delegation. Since Phase 4B the plan covers **both** Practice paths: `contract_fresh`/`contract_harder` exercise a lesson still served by the deterministic K1/K3 generator (1 call each), while `semantic_fresh`/`semantic_harder` exercise a lesson with an active compiled semantic contract on the universal two-call path (2 calls each). A PASS is valid only for the exact tested commit and tree, and expires after 24 hours.
 
 To check a completed result without any model or SDK activity:
 
@@ -39,6 +39,6 @@ To check a completed result without any model or SDK activity:
   .\scratchpad\live_release_gate\latest.json
 ```
 
-On a behavior-affecting push, `.githooks/pre-push` verifies the result for each pushed local commit: PASS verdict, matching commit and tree hash, age, all twelve completed scenarios, exactly 19 calls, the rejected twentieth call, and no hidden validation or infrastructure failure. It fails closed and prints the exact runner command when anything is absent or stale. Clearly documentation-only Markdown changes are exempt.
+On a behavior-affecting push, `.githooks/pre-push` verifies the result for each pushed local commit: PASS verdict, matching commit and tree hash, age, all fourteen completed scenarios, exactly 23 calls, the rejected twenty-fourth call, and no hidden validation or infrastructure failure. It fails closed and prints the exact runner command when anything is absent or stale. Clearly documentation-only Markdown changes are exempt.
 
 A passing live gate does not activate the production difficulty feature. It remains OFF until a separately authorized deployment and production smoke check.

@@ -17,6 +17,7 @@ def _passing_document():
     roles = [
         "fresh_level1", "correct_choice", "harder_level2", "first_hint", "full_solution",
         "easier_level1", "same_level_new", "contract_fresh", "contract_harder",
+        "semantic_fresh", "semantic_harder",
         "grade7", "grade8", "grade9",
     ]
     return {
@@ -28,10 +29,10 @@ def _passing_document():
         "practice_pipeline": "universal_two_call",
         "difficulty_levels_enabled": True,
         "finished_at": datetime.now(timezone.utc).isoformat(),
-        "scenario_count": 12,
-        "required_scenario_count": 12,
-        "sdk_call_ceiling": 19,
-        "actual_sdk_calls": 19,
+        "scenario_count": 14,
+        "required_scenario_count": 14,
+        "sdk_call_ceiling": 23,
+        "actual_sdk_calls": 23,
         "twentieth_call_refused_before_sdk": True,
         "validation_failures": [],
         "infrastructure_failures": [],
@@ -44,10 +45,17 @@ def _passing_document():
     }
 
 
-def test_release_gate_plan_is_exactly_twelve_scenarios_and_nineteen_calls():
+def test_release_gate_plan_is_exactly_fourteen_scenarios_and_twentythree_calls():
+    """Faza 4B: plan pokriva OBA puta — deterministicki K1/K3 (6-04-005, 1
+    poziv) i novi semanticki dvopozivni put (6-04-009, 2 poziva)."""
     plan = runner.build_release_gate_plan("0123456789abcdef" * 4)
-    assert len(plan) == 12
-    assert sum(item.expected_calls for item in plan) == 19
+    assert len(plan) == 14
+    assert sum(item.expected_calls for item in plan) == 23
+    by_role = {item.role: item for item in plan}
+    assert by_role["contract_fresh"].scenario.path == "contract"
+    assert by_role["contract_fresh"].expected_calls == 1
+    assert by_role["semantic_fresh"].scenario.path == "non_contract"
+    assert by_role["semantic_fresh"].expected_calls == 2
     assert [item.role for item in plan][:7] == [
         "fresh_level1", "correct_choice", "harder_level2", "first_hint", "full_solution",
         "easier_level1", "same_level_new",
@@ -160,8 +168,10 @@ def test_structured_release_runtime_preserves_deterministic_contract_call_budget
     monkeypatch.setenv("MATBOT_PRACTICE_DIFFICULTY_LEVELS", "enabled")
     store, fake = SessionStore(), FakeLLM()
     fake.queue(make_output(reply="Evo zadatka."))
+    # Faza 4B: 6-04-009 je presla na semanticki dvopozivni put, pa se budzet
+    # K1/K3 puta dokazuje na lekciji koja je JOS UVIJEK na njemu (6-04-005).
     response = practice.run_practice_turn(store, fake, {
-        "session_id": "gate-contract", "grade": 6, "selected_topic": "6-04-009",
+        "session_id": "gate-contract", "grade": 6, "selected_topic": "6-04-005",
         "selected_oblast": "", "student_message": "Daj mi zadatak.", "intent": "",
         "difficulty_request": "", "interaction_phase": "", "last_tutor_task": "",
         "interaction_type": "student_question", "selected_option_id": "", "client_turn_id": "",
@@ -315,7 +325,7 @@ def test_failed_live_gate_console_summary_is_informative_and_does_not_echo_hidde
     assert "FAILED SCENARIO: easier_level1" in report
     assert "REASON: difficulty_direction_not_measurable" in report
     assert "LEVELS: previous=2 target=1 committed=2" in report
-    assert "SDK CALLS: 9/19" in report
+    assert "SDK CALLS: 9/23" in report
     assert "STATE PRESERVED: true" in report
     assert "SECRET" not in report
 

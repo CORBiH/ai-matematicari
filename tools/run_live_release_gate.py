@@ -23,9 +23,14 @@ from typing import Iterable
 ROOT = Path(__file__).resolve().parent.parent
 RESULT_DIR = ROOT / "scratchpad" / "live_release_gate"
 CORE_DIVISIBILITY = ("6-03-004", 6)
-CORE_CONTRACT = ("6-04-009", 6)
-REQUIRED_SCENARIO_COUNT = 12
-SDK_CALL_CEILING = 19
+# Lekcija koja i dalje ide DETERMINISTIČKIM K1/K3 putem (nema semantički
+# ugovor). Ranije je ovdje stajala 6-04-009, ali ona od Faze 4B ide
+# semantičkim dvopozivnim putem — vidi CORE_SEMANTIC.
+CORE_CONTRACT = ("6-04-005", 6)
+# Lekcija s AKTIVNIM semantičkim ugovorom (porodica fraction_arithmetic_direct).
+CORE_SEMANTIC = ("6-04-009", 6)
+REQUIRED_SCENARIO_COUNT = 14
+SDK_CALL_CEILING = 23
 REQUIRED_PIPELINE = "universal_two_call"
 REQUIRED_DIFFICULTY_LEVELS = "enabled"
 
@@ -102,7 +107,7 @@ def _select_rotating_lesson(grade: int, commit_sha: str) -> tuple[str, int]:
     for row in _all_lessons_for_grade(grade):
         lesson_id = str(row["id"])
         title = str(row["title"])
-        if lesson_id in {CORE_DIVISIBILITY[0], CORE_CONTRACT[0]}:
+        if lesson_id in {CORE_DIVISIBILITY[0], CORE_CONTRACT[0], CORE_SEMANTIC[0]}:
             continue
         if contract_registry.contract_for(lesson_id) is not None:
             continue
@@ -151,6 +156,10 @@ def build_release_gate_plan(commit_sha: str) -> tuple[GateScenario, ...]:
                  path="contract", role="contract_fresh"),
         scenario("release_gate_contract_harder", CORE_CONTRACT, "harder", "release-contract",
                  "Daj mi teži zadatak.", 1, path="contract", requires=1, role="contract_harder"),
+        scenario("release_gate_semantic_fresh", CORE_SEMANTIC, "", "release-semantic",
+                 "Daj mi zadatak.", 2, role="semantic_fresh"),
+        scenario("release_gate_semantic_harder", CORE_SEMANTIC, "harder", "release-semantic",
+                 "Daj mi teži zadatak.", 2, requires=1, role="semantic_harder"),
         scenario("release_gate_grade7_rotating", grade7, "", "release-grade7", "Daj mi zadatak.", 2,
                  role="grade7"),
         scenario("release_gate_grade8_rotating", grade8, "", "release-grade8", "Daj mi zadatak.", 2,
@@ -459,6 +468,7 @@ def _run_static_checks() -> None:
     assert [item.role for item in plan] == [
         "fresh_level1", "correct_choice", "harder_level2", "first_hint", "full_solution",
         "easier_level1", "same_level_new", "contract_fresh", "contract_harder",
+        "semantic_fresh", "semantic_harder",
         "grade7", "grade8", "grade9",
     ]
     assert _selected_lessons(plan) == _selected_lessons(build_release_gate_plan("0123456789abcdef" * 4))
