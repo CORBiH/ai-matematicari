@@ -22,7 +22,8 @@ import logging
 import random
 import uuid
 
-from matbot import config, difficulty_level, feedback, geometrycheck, option_equivalence
+from matbot import (config, difficulty_level, feedback, geometrycheck, mcq_integrity,
+                    option_equivalence)
 from matbot.llm import LLMError, failure_diagnostics_kv
 from matbot.mathcheck import find_numeric_inconsistencies
 from matbot.semantics import detectors as semantic_detectors
@@ -244,6 +245,21 @@ def _validate_task_server_side(task, context):
         raise UnifiedOutputError("expected answer does not match marked option")
     solution = _safe_text(task.solution, "solution")
     _reject_if_inconsistent(solution, "solution")
+
+    # USKI MATEMATIČKI ORAKL NEPOSREDNO PRIJE OBJAVE (živi produkcijski nalaz,
+    # lekcija o pravilima djeljivosti): objavljen je MCQ bez ijednog tačnog
+    # odgovora — nijedna od četiri ponuđene opcije nije zadovoljavala uslov. Isti
+    # `mcq_integrity` nalaz preflight već računa i šalje recenzentu, ali je to
+    # bila JEDINA kapija na ovom putu — sve ostalo u ovoj funkciji provjerava
+    # zapis i međusobnu dosljednost polja, nikad samu matematiku ponuđenih
+    # opcija. Legacy put ovaj orakl odavno pokreće u `_apply_new_task`; ovdje
+    # nedostajao. Nalaz ovdje znači fail closed prije IJEDNE mutacije sesije i
+    # bez trećeg poziva; za neprimjenjiv oblik orakl i dalje ćuti.
+    mcq_failure, _mcq_result = mcq_integrity.publication_failure(
+        task_text, option_texts, task.correct_option_index, expected,
+    )
+    if mcq_failure:
+        raise UnifiedOutputError(f"mcq_integrity: {mcq_failure}")
 
     return task_text, option_texts, expected, solution
 

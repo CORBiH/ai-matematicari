@@ -96,7 +96,8 @@ def _bare_integer(value: str) -> Optional[int]:
         return None
 
 
-def _explicit_divisors(question: str) -> tuple[int, ...]:
+def _read_divisor_list(question: str) -> tuple[tuple[int, ...], str]:
+    """(pročitani djelioci, ostatak ISTE rečenice iza pročitane liste)."""
     text = question or ""
     # A task can introduce the topic with ``pravila djeljivosti`` before its
     # actual predicate.  Select the occurrence followed by a divisibility
@@ -120,11 +121,55 @@ def _explicit_divisors(question: str) -> tuple[int, ...]:
         for raw in raw_values:
             divisor = int(raw)
             if divisor not in SUPPORTED_DIVISORS:
-                return ()
+                return (), ""
             if divisor not in found:
                 found.append(divisor)
-        return tuple(found)
-    return ()
+        return tuple(found), _clause_remainder(tail[position:])
+    return (), ""
+
+
+def _explicit_divisors(question: str) -> tuple[int, ...]:
+    """Djelioci koje je parser uspio pročitati — BEZ tvrdnje da su svi.
+
+    Za odluku o tačnoj opciji NIJE dovoljno; tamo se koristi
+    `_divisor_condition`, koja uz listu vraća i dokaz da je uslov potpun."""
+    return _read_divisor_list(question)[0]
+
+
+# ŽIVI PRODUKCIJSKI NALAZ (ručni smoke, lekcija 6-03-004): objavljen je MCQ
+# „…koji od sljedećih brojeva je djeljiv i sa 6 i sa 25?“ s opcijama 8, 6, 7, 9
+# i označenom opcijom 6. Broj djeljiv i sa 6 i sa 25 djeljiv je sa NZS(6,25)=150,
+# pa zadatak nije imao NIJEDAN tačan odgovor.
+#
+# UZROK: `_read_divisor_list` je PARCIJALAN parser. Kad nastavak liste ne
+# odgovara nijednom priznatom obliku („…sa 6 i istovremeno sa 25“, „…sa 6 i sa
+# brojem 25“, „…sa 25, a ni sa 4“), on vrati ono što je do tada pročitao. Oracle
+# je taj KRNJI uslov uzimao kao istinu i onda AKTIVNO POTVRĐIVAO da je 6 jedini
+# tačan odgovor — dakle nije samo propustio grešku, nego ju je proizveo. To je
+# gore od preskakanja: guard koji uslov ne može dokazati ne smije ga izmisliti.
+#
+# GRANICA, NE SLABLJENJE: kad iza pročitane liste u ISTOJ rečenici ostane cifra,
+# uslov nije DOKAZANO potpun i oracle vraća `divisibility_condition_ambiguous` —
+# postojeći kod koji preflight već šalje recenzentu (pa ga on smije preformulisati
+# u istom drugom pozivu) i koji objavu odbija zatvoreno. Podržani oblici
+# („…djeljiv sa 25?“, „…i sa 6 i sa 25?“, „…sa 2, 3 i 5?“) nemaju nepročitan
+# broj u istoj rečenici i ostaju bajt za bajt netaknuti.
+#
+# Rečenica je namjerna granica: „…djeljiv sa 6 i sa 25? Odaberi jedan od 4
+# ponuđena.“ je potpun uslov, a broj iz sljedeće rečenice nije njegov dio.
+_CLAUSE_END_RE = re.compile(r"[.?!;:]")
+_DIGIT_RE = re.compile(r"\d")
+
+
+def _clause_remainder(tail: str) -> str:
+    end = _CLAUSE_END_RE.search(tail)
+    return tail if end is None else tail[:end.start()]
+
+
+def _divisor_condition(question: str) -> tuple[tuple[int, ...], bool]:
+    """(djelioci, uslov je DOKAZANO potpun) — jedini izvor za odluku o tačnosti."""
+    divisors, remainder = _read_divisor_list(question)
+    return divisors, not _DIGIT_RE.search(remainder)
 
 
 # ŽIVI RELEASE GATE (commit baef3fd, scenario `harder_level2`, lekcija o
@@ -214,8 +259,11 @@ def evaluate_divisibility_mcq(question: str, option_texts: Iterable[str]) -> Div
         # tvrdi. Vidi komentar uz `_asks_which_digit_is_missing`.
         return DivisibilityMCQResult(False, False)
 
-    divisors = _explicit_divisors(question)
-    if _condition_is_ambiguous(question, divisors):
+    divisors, condition_complete = _divisor_condition(question)
+    if not condition_complete or _condition_is_ambiguous(question, divisors):
+        # Nedokazano potpuna lista je ISTO što i nečitljiv uslov: server ne zna
+        # koje pravilo zadatak stvarno traži, pa ne smije proglasiti nijednu
+        # opciju tačnom. Vidi komentar uz `_divisor_condition`.
         return DivisibilityMCQResult(
             True, False, "divisibility_condition_ambiguous", divisors,
             tuple(int(value) for value in values),
