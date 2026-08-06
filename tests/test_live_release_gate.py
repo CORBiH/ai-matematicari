@@ -333,6 +333,66 @@ def test_failed_live_gate_console_summary_is_informative_and_does_not_echo_hidde
     assert "SECRET" not in report
 
 
+def test_gate_harness_records_a_compact_approve_as_reviewer_owned(monkeypatch):
+    """ŽIVI PAD PRVOG F4H GATEA (harder_level2, wrong_reviewer_final_target_level):
+    kompaktno odobrenje ne vraća eho paketa, pa je harness čitao
+    reviewer_final_target_level=None iako je objavljeni (odobreni) nacrt bio na
+    tačnom nivou. Harness sada, kao i produkcija, na `approve` uzima NACRT kao
+    recenzentov konačan paket."""
+    from matbot.llm import LLMResult
+    from matbot.session_store import SessionStore
+    from scratchpad import run_difficulty_canary as canary
+    from tests.conftest import (make_reviewer_final, make_task_payload,
+                                make_tutor_draft)
+
+    task = make_task_payload(
+        text="Koji od ponuđenih brojeva je djeljiv sa 25?",
+        options=("725", "714", "738", "741"), correct_option_index=0,
+        expected="725")
+    draft = make_tutor_draft(intent="generate_task", new_task=task)
+    compact = make_reviewer_final(final=draft).model_copy(update={"final": None})
+
+    class CompactApprove:
+        def __init__(self):
+            self.queue = [draft, compact]
+
+        def _result(self, output, input_text):
+            bound = output
+            try:
+                from tests.conftest import FakeLLM
+                FakeLLM._bind_universal_fixture_metadata(bound, input_text)
+            except Exception:
+                pass
+            return LLMResult(output=bound, latency_ms=5,
+                             usage={"input_tokens": 100, "output_tokens": 50})
+
+        def tutor_turn(self, instructions, input_text):
+            return self._result(self.queue.pop(0), input_text)
+
+        def reviewer_turn(self, instructions, input_text, timeout_s=None):
+            return self._result(self.queue.pop(0), input_text)
+
+    monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", "universal_two_call")
+    monkeypatch.setenv("MATBOT_PRACTICE_DIFFICULTY_LEVELS", "enabled")
+    monkeypatch.setenv("MATBOT_DETERMINISTIC_PRACTICE", "disabled")
+    counter = canary.CountingLLM(CompactApprove(), ceiling=19)
+    report = canary.CanaryReport(campaign="release-gate", started_at="now",
+                                 sdk_call_ceiling=19)
+    scenario = canary.Scenario("compact-approve", "6-03-004", 6, "non_contract",
+                               "", "compact-approve", "Daj mi zadatak.")
+    result, stop = canary._run_one_turn(
+        SessionStore(), counter, canary._LogCapture(), report, scenario,
+        "release-gate")
+
+    assert stop is False
+    assert result.published is True
+    assert result.sdk_calls_this_turn == 2
+    assert result.reviewer_decision == "approve"
+    assert result.reviewer_final_target_level == 1
+    assert result.final_structured_package_source == "reviewer_final_task"
+    assert result.structured_package_validation_passed is True
+
+
 def test_gate_harness_records_a_deterministic_scenario_with_zero_calls(monkeypatch):
     """Faza 4H: semantic_fresh sada ide determinističkom strategijom — harness
     mora zabilježiti attempted/published i TAČNO nula SDK poziva, jer pre-push

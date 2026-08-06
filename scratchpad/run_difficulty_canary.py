@@ -820,6 +820,11 @@ def _record_lesson_identity_diagnostics(result: TurnResult, llm) -> None:
     tutor_task = getattr(getattr(llm, "last_tutor_output", None), "new_task", None)
     reviewer_output = getattr(llm, "last_reviewer_output", None)
     reviewer_task = getattr(getattr(reviewer_output, "final", None), "new_task", None)
+    # Faza 4H (kompaktno odobrenje): vidi _record_answer_metadata — na `approve`
+    # bez eha recenzentov konačan paket je upravo odobreni nacrt.
+    if (reviewer_task is None
+            and getattr(reviewer_output, "decision", None) == "approve"):
+        reviewer_task = tutor_task
 
     canonicalized = False
     if tutor_task is not None:
@@ -889,6 +894,13 @@ def _record_answer_metadata(result: TurnResult, response, after_session, llm) ->
     reviewer_output = getattr(llm, "last_reviewer_output", None)
     corrected_task = getattr(reviewer_output, "corrected_task", None)
     reviewer_final_task = getattr(getattr(reviewer_output, "final", None), "new_task", None)
+    # Faza 4H (kompaktno odobrenje): na `approve` recenzent NE vraća eho
+    # paketa — server objavljuje UPRAVO odobreni nacrt. Recenzentov konačan
+    # paket za dijagnostiku je tada taj nacrt; stariji eho-oblik (final uz
+    # approve) ostaje podržan nepromijenjeno.
+    if (reviewer_final_task is None and corrected_task is None
+            and getattr(reviewer_output, "decision", None) == "approve"):
+        reviewer_final_task = tutor_task
     final_task = corrected_task or reviewer_final_task or tutor_task
     reviewer_evidence = _record_cross_evidence_diagnostics(result, llm)
     if final_task is not None and reviewer_evidence is not None:
