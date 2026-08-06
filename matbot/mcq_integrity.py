@@ -14,6 +14,9 @@ import re
 from dataclasses import dataclass
 from typing import Iterable, Optional
 
+from matbot.mathcheck import safe_numeric_value
+from matbot.mathsegments import TEXT, math_contents, tokenize_math
+
 
 SUPPORTED_DIVISORS = frozenset({2, 3, 4, 5, 6, 9, 10, 15, 25})
 
@@ -314,6 +317,125 @@ def expected_answer_matches_correct_option(expected_answer: str, result: Divisib
     return not bool(numbers & alternatives)
 
 
+# ---------------------------------------------------------------------------
+# USKI ORAKL DIREKTNOG RAČUNA (Faza 4G, Workstream E — lekcije o razlomcima)
+# ---------------------------------------------------------------------------
+# Produkcijski nalaz koji je otvorio cio program bio je MCQ bez ijedne tačne
+# opcije (djeljivost). Za lekcije direktnog računa (6-04-009…6-04-012) istu
+# klasu je dosad držao SAMO recenzent: nijedan deterministički validator nije
+# poredio VRIJEDNOST vidljivog izraza s ponuđenim opcijama, pa bi „Izračunaj
+# $\frac{2}{7}+\frac{3}{7}$“ s pogrešno označenom opcijom prošao sve serverske
+# kapije. Orakl je namjerno uzak (isti princip kao djeljivost):
+#   • proza mora IZRIČITO tražiti račun (zatvoren skup direktiva) — inače bi
+#     „Koji broj je suprotan broju $\frac{3}{4}$?“ bio lažno odbijen, jer
+#     vrijednost tačne opcije tu NIJE vrijednost prikazanog izraza;
+#   • TAČNO JEDAN segment je izračunljiv izraz s VIDLJIVIM operatorom — bez
+#     operatora nema računa (lekcije ekvivalencije!), a dva kandidata znače
+#     da server ne zna koji je zadatak;
+#   • sve opcije moraju biti izračunljive vrijednosti; prozna opcija
+#     isključuje cio orakl;
+#   • računa ISKLJUČIVO postojeći restricted-AST evaluator (mathcheck) —
+#     nikad eval(), nikad novi parser.
+_COMPUTE_DIRECTIVE_RE = re.compile(
+    r"\bizra[čc]unaj\w*\b|\bkoliko\s+je\b|\bkolika\s+je\s+vrijednost\b"
+    r"|\bkoliko\s+iznosi\b|\bkoji\s+je\s+rezultat\b"
+    r"|\bodredi\s+(?:vrijednost|rezultat)\b",
+    re.IGNORECASE,
+)
+# Vidljiv binarni operator; `-` samo kad je DOKAZANO binaran (iza cifre/`}`).
+_BINARY_OPERATOR_RE = re.compile(
+    r"\\cdot|\\times|\\div|[+:·÷]|(?<=[\d}])\s*[-−]\s*(?=[\d\\(])")
+# Dozvoljen zaostatak „= ?“ / „= \square“ na kraju izraza — mjesto rezultata.
+_TRAILING_RESULT_RE = re.compile(r"=\s*(?:\?|\\square|□|_+)?\s*$")
+_DECIMAL_PLACES_RE = re.compile(r"\d+[.,](\d+)")
+
+DIVISION_BY_ZERO_CODE = "division_by_zero_in_task"
+
+
+@dataclass(frozen=True)
+class DirectComputationMCQResult:
+    """Serverski izvedena činjenica o zadatku oblika „izračunaj izraz“."""
+
+    applicable: bool
+    valid: bool
+    reason_code: str = ""
+    computed_value: Optional[float] = None
+    option_values: tuple = ()
+    correct_indices: tuple = ()
+    # Kompatibilnost s dijagnostikom koja za djeljivost čita `divisors`.
+    divisors: tuple = ()
+
+    @property
+    def correct_index(self) -> Optional[int]:
+        return self.correct_indices[0] if len(self.correct_indices) == 1 else None
+
+
+def _option_numeric_value(option_text: str):
+    text = (option_text or "").strip()
+    if text.startswith("$") and text.endswith("$") and text.count("$") == 2:
+        text = text[1:-1].strip()
+    if not text:
+        return "unsupported", None, ""
+    status, value = safe_numeric_value(text)
+    return status, value, text
+
+
+def _option_tolerance(option_expr: str, value: float) -> float:
+    """Decimalna opcija se poredi s tolerancijom SVOJE preciznosti (isti
+    princip kao mathcheck._tolerance); egzaktan zapis egzaktno (šum float-a)."""
+    places = max((len(match.group(1)) for match in
+                  _DECIMAL_PLACES_RE.finditer(option_expr)), default=0)
+    if places:
+        return 0.5 * (10 ** -places) * 1.1
+    return max(1e-9 * abs(value), 1e-12)
+
+
+def evaluate_direct_computation_mcq(question: str,
+                                    option_texts: Iterable[str]) -> DirectComputationMCQResult:
+    """Ocijeni SAMO jednoznačan „izračunaj izraz“ MCQ; sve ostalo ćuti."""
+    options = tuple(option_texts or ())
+    prose = " ".join(content for kind, content in tokenize_math(question or "")
+                     if kind == TEXT)
+    if not options or not _COMPUTE_DIRECTIVE_RE.search(prose):
+        return DirectComputationMCQResult(False, False)
+
+    candidates = []  # (status, value) — samo segmenti s vidljivim operatorom
+    for segment in math_contents(tokenize_math(question or "")):
+        stripped = _TRAILING_RESULT_RE.sub("", segment).strip()
+        if not stripped or not _BINARY_OPERATOR_RE.search(stripped):
+            continue
+        status, value = safe_numeric_value(stripped)
+        if status == "unsupported":
+            continue
+        candidates.append((status, value))
+    if len(candidates) != 1:
+        return DirectComputationMCQResult(False, False)
+    status, computed = candidates[0]
+    if status == "invalid":
+        # Pod direktivom računa dokazano nevaljana aritmetika (u praksi:
+        # dijeljenje nulom) nema tačan odgovor — zadatak mora biti zamijenjen.
+        return DirectComputationMCQResult(True, False, DIVISION_BY_ZERO_CODE)
+
+    option_values = []
+    for option in options:
+        option_status, option_value, option_expr = _option_numeric_value(option)
+        if option_status != "value":
+            return DirectComputationMCQResult(False, False)
+        option_values.append((option_value, option_expr))
+
+    correct_indices = tuple(
+        index for index, (value, expr) in enumerate(option_values)
+        if abs(value - computed) <= _option_tolerance(expr, computed))
+    values = tuple(value for value, _expr in option_values)
+    if not correct_indices:
+        return DirectComputationMCQResult(
+            True, False, "no_correct_option", computed, values, correct_indices)
+    if len(correct_indices) != 1:
+        return DirectComputationMCQResult(
+            True, False, "multiple_correct_options", computed, values, correct_indices)
+    return DirectComputationMCQResult(True, True, "", computed, values, correct_indices)
+
+
 def mathematical_publication_failure(question: str, option_texts: Iterable[str],
                                      marked_index: int) -> tuple[str, DivisibilityMCQResult]:
     """Return the server-provable MCQ math failure, before metadata checks."""
@@ -335,6 +457,16 @@ def publication_failure(question: str, option_texts: Iterable[str], marked_index
         return failure, result
     if not expected_answer_matches_correct_option(expected_answer, result):
         return "marked_option_math_mismatch", result
+    if not result.applicable:
+        # Faza 4G: kad oblik NIJE djeljivost, isti poziv pita i uski orakl
+        # direktnog računa. `expected_answer` se ovdje ne poredi ponovo —
+        # jednakost s označenom opcijom već garantuju šema i preflight.
+        computation = evaluate_direct_computation_mcq(question, option_texts)
+        if computation.applicable:
+            if not computation.valid:
+                return computation.reason_code, computation
+            if marked_index != computation.correct_index:
+                return "marked_option_math_mismatch", computation
     return "", result
 
 

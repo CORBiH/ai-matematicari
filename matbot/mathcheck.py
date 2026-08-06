@@ -588,3 +588,22 @@ def find_numeric_inconsistencies(text):
 
 def is_numerically_consistent(text):
     return not find_numeric_inconsistencies(text)
+
+
+def safe_numeric_value(expression):
+    """Javna, sigurna vrijednost JEDNOG izraza za druge uske orakle (Faza 4G).
+
+    Vraća ("value", broj) kad je izraz jednoznačno izračunljiv postojećim
+    restricted-AST evaluatorom; ("invalid", None) kad je matematički nevaljan
+    (dijeljenje nulom i sl.); ("unsupported", None) za sve što se ne može
+    sigurno izračunati — uključujući izraze s π čije dvije konvencionalne
+    vrijednosti daju različit rezultat (jednoznačnost je uslov, ne pogađa se)."""
+    try:
+        values = evaluate_candidates(expression or "")
+    except _MathError:
+        return "invalid", None
+    except _Unsupported:
+        return "unsupported", None
+    if not values or max(values) - min(values) > 1e-12:
+        return "unsupported", None
+    return "value", values[0]

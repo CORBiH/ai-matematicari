@@ -163,8 +163,13 @@ def test_the_reviewer_message_names_the_semantic_code():
 
 
 def test_an_unrelated_lesson_is_not_judged_by_this_requirement():
+    # Faza 4G: orakl direktnog računa sada STVARNO računa „Izračunaj $7,5:5$“,
+    # pa opcije moraju sadržavati tačnu vrijednost 1,5 — ranije su naslijeđene
+    # djeljivostne opcije činile fixture matematički neispravnim, što test o
+    # naslovnom zahtjevu nije smio tvrditi da je čist paket.
     assert package_preflight.collect_package_issues(
-        _task(text="Izračunaj $7,5:5$", title="Dijeljenje decimalnih brojeva")) == ()
+        _task(text="Izračunaj $7,5:5$", options=(r"$1,5$", r"$2,5$", r"$0,5$", r"$3$"),
+              title="Dijeljenje decimalnih brojeva")) == ()
 
 
 # ---------------------------------------------------------------------------

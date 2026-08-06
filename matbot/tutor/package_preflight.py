@@ -246,11 +246,19 @@ def collect_package_issues(task, contract=None, previous_signature=""):
         except Exception:
             failure, result = "", None
         if failure:
-            read = ",".join(str(divisor) for divisor in (result.divisors if result else ()))
-            issues.append(PackageIssue(
-                failure,
-                detail=(f"server read divisors: {read}" if read
-                        else "server could not read any divisor")))
+            # Faza 4G: isti poziv sada pokriva i orakl direktnog računa —
+            # njegov nalaz nosi serverski IZRAČUNATU vrijednost izraza, ne
+            # listu djelilaca. Vrijednost je izveden podatak (pravilo 7).
+            if result is not None and hasattr(result, "computed_value"):
+                value = result.computed_value
+                detail = (f"server computed value {value:.6g}" if value is not None
+                          else "task arithmetic is invalid")
+            else:
+                read = ",".join(str(divisor)
+                                for divisor in (result.divisors if result else ()))
+                detail = (f"server read divisors: {read}" if read
+                          else "server could not read any divisor")
+            issues.append(PackageIssue(failure, detail=detail))
 
     # 4b) ISTI ZADATAK KAO AKTIVNI (produkcijski nalaz: „Daj mi novi zadatak.“
     # je vratio doslovno isti zadatak i iste opcije). Poredi se SERVERSKI izveden
@@ -363,7 +371,9 @@ def format_for_reviewer(issues):
         "3 i 5`). In that same sentence do not restate the condition as a product, do "
         "not put any other number after the divisor list, do not use `ili`, and do not "
         "use a negation such as `nije djeljiv`. "
-        # ŽIVI GATE 5ac723e (grade9, „Sistem bez rješenja“): za
+        # ŽIVI GATE 5ac723e (grade9, lekcija 9-05-010 o sistemu bez ijednog
+        # rješenja — naslov se ovdje NE ispisuje, motor ne smije nositi
+        # nazive lekcija): za
         # `numeric_inconsistency` nije postojao NIJEDAN lijek u ovom bloku, pa je
         # recenzent vraćao `correct` s istim nalazom. Lijek pokriva i namjernu
         # kontradikciju: bez markera lažnosti u ISTOJ rečenici server je ne može
@@ -374,7 +384,9 @@ def format_for_reviewer(issues):
         "of the lesson (a contradiction proof, a system with no solutions), keep it "
         "but state in the SAME sentence that it is false — for example `$3=5$, što "
         "nije tačno` — because a bare false equality is rejected as an arithmetic "
-        "error. For `no_correct_option` none of the four "
+        "error. For `division_by_zero_in_task` the visible expression divides by "
+        "zero, so no answer exists: REPLACE the task with one whose divisor is "
+        "nonzero and recompute every field. For `no_correct_option` none of the four "
         "options satisfies the stated condition: compute values FROM that condition and "
         "replace the options so that exactly one of them satisfies it. For "
         "`multiple_correct_options` keep exactly one satisfying value and replace every "
