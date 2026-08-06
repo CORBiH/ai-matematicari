@@ -17,9 +17,11 @@ zastario. `store.save` je jedina commit tačka.
 Ovaj modul NEMA nijednu granu po ID-ju lekcije. Sve što razlikuje lekcije
 dolazi iz LessonContext-a (podaci), a semantičku kapiju opsega drži recenzent.
 """
+import contextlib
 import copy
 import logging
 import random
+import time
 import uuid
 
 from matbot import (config, difficulty_level, feedback, geometrycheck, mcq_integrity,
@@ -231,6 +233,43 @@ def _error_response(active_task=""):
     }
 
 
+class _TurnTimer:
+    """Faza 4H (forenzika latencije): per-stage vrijeme JEDNOG turna.
+
+    Bilježi SAMO milisekunde po imenovanoj fazi — nikad sadržaj, prompt ni
+    poruku. Postoji jer se iz loga nije moglo pročitati gdje turn stvarno
+    troši vrijeme: mjerena je bila samo SDK latencija, pa je svako lokalno
+    vrijeme (prompt, validacija, objava, commit) bilo nevidljivo."""
+
+    def __init__(self):
+        self._start = time.perf_counter()
+        self.stages = {}
+
+    @contextlib.contextmanager
+    def stage(self, name):
+        begin = time.perf_counter()
+        try:
+            yield
+        finally:
+            self.stages[name] = self.stages.get(name, 0) + int(
+                (time.perf_counter() - begin) * 1000)
+
+    def note_ms(self, name, ms):
+        if ms is not None:
+            self.stages[name] = self.stages.get(name, 0) + int(ms)
+
+    def total_ms(self):
+        return int((time.perf_counter() - self._start) * 1000)
+
+    def describe(self):
+        return "|".join(f"{k}:{v}" for k, v in self.stages.items()) or "-"
+
+
+def _context_family(context):
+    contract = getattr(context, "semantic_contract", None)
+    return getattr(contract, "family_id", "") or "-"
+
+
 def _next_state(session):
     state = {
         "v": 1,
@@ -376,23 +415,36 @@ def _validate_task_server_side(task, context, previous_signature=""):
 # DVA POZIVA
 # ---------------------------------------------------------------------------
 
-def _call_tutor(llm, context, session, student_message, trusted_verdict, ui_action=""):
-    instructions = tutor_prompts.build_tutor_instructions(context)
-    input_text = tutor_prompts.build_tutor_input(
-        context, session, student_message, trusted_verdict, ui_action
-    )
-    return llm.tutor_turn(instructions, input_text)
+def _call_tutor(llm, context, session, student_message, trusted_verdict, ui_action="",
+                timer=None):
+    timer = timer or _TurnTimer()
+    with timer.stage("prompt_build"):
+        instructions = tutor_prompts.build_tutor_instructions(context)
+        input_text = tutor_prompts.build_tutor_input(
+            context, session, student_message, trusted_verdict, ui_action
+        )
+    with timer.stage("tutor_call"):
+        result = llm.tutor_turn(instructions, input_text)
+    # SDK-mjerena latencija zasebno: (tutor_call − tutor_api) je lokalni režijski
+    # trošak (konstrukcija zahtjeva + parsiranje odgovora u SDK-u).
+    timer.note_ms("tutor_api", getattr(result, "latency_ms", None))
+    return result
 
 
 def _call_reviewer(llm, context, session, student_message, draft, trusted_verdict,
-                   preflight_block="", ui_action=""):
-    instructions = tutor_prompts.build_reviewer_instructions(context)
-    draft_json = draft.model_dump_json(indent=None, exclude_none=True)
-    input_text = tutor_prompts.build_reviewer_input(
-        context, session, student_message, draft_json, trusted_verdict,
-        preflight_block, ui_action,
-    )
-    return llm.reviewer_turn(instructions, input_text)
+                   preflight_block="", ui_action="", timer=None):
+    timer = timer or _TurnTimer()
+    with timer.stage("prompt_build"):
+        instructions = tutor_prompts.build_reviewer_instructions(context)
+        draft_json = draft.model_dump_json(indent=None, exclude_none=True)
+        input_text = tutor_prompts.build_reviewer_input(
+            context, session, student_message, draft_json, trusted_verdict,
+            preflight_block, ui_action,
+        )
+    with timer.stage("reviewer_call"):
+        result = llm.reviewer_turn(instructions, input_text)
+    timer.note_ms("reviewer_api", getattr(result, "latency_ms", None))
+    return result
 
 
 def _log_rejection(request_id, context, stage, detail, intent=""):
@@ -479,6 +531,7 @@ def _resolve_choice(session, turn):
 
 def _run_choice_turn(store, llm, session, turn, context, request_id):
     active_task_before = session["current_task"]
+    timer = _TurnTimer()
     verdict, cached, blocked = _resolve_choice(session, turn)
     if cached is not None:
         return cached
@@ -508,7 +561,8 @@ def _run_choice_turn(store, llm, session, turn, context, request_id):
             session["task_completed"] = True
 
     final, calls = _two_call(
-        llm, context, session, turn["student_message"], request_id, verdict
+        llm, context, session, turn["student_message"], request_id, verdict,
+        timer=timer,
     )
     if final is None:
         return _error_response(active_task_before)
@@ -553,8 +607,11 @@ def _run_choice_turn(store, llm, session, turn, context, request_id):
 
     store.save(session)   # JEDINA commit tačka
     logger.info(
-        "tutor_choice request_id=%s topic=%s is_correct=%s calls=%s",
-        request_id, context.topic_id, is_correct, calls,
+        "tutor_choice request_id=%s topic=%s family=%s route=%s is_correct=%s "
+        "calls=%s total_ms=%s stage_ms=%s",
+        request_id, context.topic_id, _context_family(context),
+        "model_tutor_reviewer", is_correct, calls, timer.total_ms(),
+        timer.describe(),
     )
     return response
 
@@ -563,7 +620,8 @@ def _log_turn_diagnostics(request_id, context, turn, session, *, intent, calls,
                           published, task_preserved, state_mutated,
                           previous_identity, final_identity, rejection_code="",
                           reviewer_decision="", previous_level=None,
-                          target_level=None):
+                          target_level=None, route="model_tutor_reviewer",
+                          timer=None):
     """JEDAN strukturisan red po Practice turnu — zatvoren skup SIGURNIH polja.
 
     ZAŠTO POSTOJI: dijagnostika je do sada bila razasuta po nekoliko redova, pa
@@ -575,13 +633,18 @@ def _log_turn_diagnostics(request_id, context, turn, session, *, intent, calls,
     tekst opcija, učenikova poruka ni historija. Identiteti zadatka su hashevi
     (izvedeni iz onoga što učenik ionako vidi), a session_id se skraćuje."""
     session_id = (turn.get("session_id") or "")
+    # Faza 4H: ruta, porodica i per-stage vrijeme — SAMO kodovi i milisekunde,
+    # nikad sadržaj. `route` je serverska odluka o strategiji izvršenja
+    # (deterministic_* ili model_tutor_reviewer), ne modelova.
     logger.info(
-        "tutor_turn_diagnostics request_id=%s session=%s topic=%s client_turn_id=%s "
+        "tutor_turn_diagnostics request_id=%s session=%s topic=%s family=%s "
+        "route=%s client_turn_id=%s "
         "intent=%s interaction_phase=%s ui_intent=%s calls=%s published=%s "
         "task_preserved=%s state_mutated=%s previous_identity=%s final_identity=%s "
         "previous_level=%s target_level=%s committed_level=%s reviewer_decision=%s "
-        "rejection_code=%s",
+        "rejection_code=%s total_ms=%s stage_ms=%s",
         request_id, session_id[:8] or "-", context.topic_id,
+        _context_family(context), route,
         _clip(turn.get("client_turn_id") or "-", 64),
         intent or "-", _clip(turn.get("interaction_phase") or "-", 40),
         _clip(turn.get("intent") or "-", 40), calls, published,
@@ -591,6 +654,8 @@ def _log_turn_diagnostics(request_id, context, turn, session, *, intent, calls,
         target_level if target_level is not None else "-",
         session.get("difficulty_level", "-"), reviewer_decision or "-",
         rejection_code or "-",
+        timer.total_ms() if timer is not None else "-",
+        timer.describe() if timer is not None else "-",
     )
 
 
@@ -599,9 +664,11 @@ def _run_text_turn(store, llm, session, turn, context, request_id):
     had_active_task = bool(active_task_before)
     identity_before = session.get("current_task_identity") or ""
     ui_action = _explicit_ui_action(turn, session)
+    timer = _TurnTimer()
 
     final, calls = _two_call(
-        llm, context, session, turn["student_message"], request_id, None, ui_action
+        llm, context, session, turn["student_message"], request_id, None, ui_action,
+        timer=timer,
     )
     if final is None:
         # Odbijeno prije objave (nacrt, recenzent ili invarijanta nad konačnim
@@ -610,13 +677,15 @@ def _run_text_turn(store, llm, session, turn, context, request_id):
             request_id, context, turn, session, intent="", calls=calls,
             published=False, task_preserved=bool(active_task_before),
             state_mutated=False, previous_identity=identity_before,
-            final_identity=identity_before, rejection_code="rejected_before_publication")
+            final_identity=identity_before,
+            rejection_code="rejected_before_publication", timer=timer)
         return _error_response(active_task_before)
 
     try:
-        reply = _safe_text(final.reply, "reply")
-        _reject_if_inconsistent(reply, "reply")
-        _reject_if_geometry_invalid(reply, context, "reply")
+        with timer.stage("publish"):
+            reply = _safe_text(final.reply, "reply")
+            _reject_if_inconsistent(reply, "reply")
+            _reject_if_geometry_invalid(reply, context, "reply")
 
         task_text = active_task_before
         if final.intent in TASK_INTENTS:
@@ -626,15 +695,18 @@ def _run_text_turn(store, llm, session, turn, context, request_id):
             if ui_action:
                 raise UnifiedOutputError(
                     f"ui_action_forbids_new_task: {ui_action} vs {final.intent}")
-            target_level = (_target_level_for(session, final.intent,
-                                              turn["student_message"])
-                            if _difficulty_levels_enabled() else None)
-            canonical_task = validate_task_package(final.new_task, context, target_level)
-            if canonical_task is not final.new_task:
-                final = final.model_copy(update={"new_task": canonical_task})
-            previous_level = (session.get("difficulty_level")
-                              if target_level is not None else None)
-            task_text = _publish_task(session, context, final, request_id, target_level)
+            with timer.stage("publish"):
+                target_level = (_target_level_for(session, final.intent,
+                                                  turn["student_message"])
+                                if _difficulty_levels_enabled() else None)
+                canonical_task = validate_task_package(final.new_task, context,
+                                                       target_level)
+                if canonical_task is not final.new_task:
+                    final = final.model_copy(update={"new_task": canonical_task})
+                previous_level = (session.get("difficulty_level")
+                                  if target_level is not None else None)
+                task_text = _publish_task(session, context, final, request_id,
+                                          target_level)
             intro_intent = final.intent if target_level is not None else "generate_task"
             intro = _intro_for(intro_intent, previous_level, target_level)
             answer = intro + "\n\nZadatak: " + task_text
@@ -661,7 +733,8 @@ def _run_text_turn(store, llm, session, turn, context, request_id):
             request_id, context, turn, session, intent=final.intent, calls=calls,
             published=False, task_preserved=bool(active_task_before),
             state_mutated=False, previous_identity=identity_before,
-            final_identity=identity_before, rejection_code=str(error)[:60])
+            final_identity=identity_before, rejection_code=str(error)[:60],
+            timer=timer)
         return _error_response(active_task_before)
 
     session["recent_turns"].append(
@@ -683,7 +756,8 @@ def _run_text_turn(store, llm, session, turn, context, request_id):
         session["task_completed"] = True
         response["revealed_correct_option_id"] = session["correct_option_id"]
 
-    store.save(session)   # JEDINA commit tačka
+    with timer.stage("commit"):
+        store.save(session)   # JEDINA commit tačka
     logger.info(
         "tutor_turn request_id=%s topic=%s intent=%s calls=%s",
         request_id, context.topic_id, final.intent, calls,
@@ -692,7 +766,7 @@ def _run_text_turn(store, llm, session, turn, context, request_id):
         request_id, context, turn, session, intent=final.intent, calls=calls,
         published=final.intent in TASK_INTENTS, task_preserved=True,
         state_mutated=True, previous_identity=identity_before,
-        final_identity=session.get("current_task_identity") or "")
+        final_identity=session.get("current_task_identity") or "", timer=timer)
     return response
 
 
@@ -857,7 +931,7 @@ def _log_sdk_entry(request_id, context, stage, call_index, result):
 
 
 def _two_call(llm, context, session, student_message, request_id, trusted_verdict,
-              ui_action=""):
+              ui_action="", timer=None):
     """Tutor → Reviewer. Vraća (final_draft | None, broj_poziva).
 
     Nijedna grana ne pravi treći poziv. Kad Tutor nacrt ne može ni da se
@@ -868,9 +942,11 @@ def _two_call(llm, context, session, student_message, request_id, trusted_verdic
     turnu ne smije izdati — pa se nacrt s takvom namjerom odbija ODMAH, prije
     recenzenta: nema šta recenzirati kad paket ionako ne smije biti objavljen."""
     calls = 0
+    timer = timer or _TurnTimer()
     try:
         tutor_result = _call_tutor(
-            llm, context, session, student_message, trusted_verdict, ui_action
+            llm, context, session, student_message, trusted_verdict, ui_action,
+            timer=timer,
         )
         calls += 1
         _log_sdk_entry(request_id, context, "tutor", calls, tutor_result)
@@ -881,15 +957,16 @@ def _two_call(llm, context, session, student_message, request_id, trusted_verdic
         )
         return None, calls
 
-    draft = normalize_for_intent(tutor_result.output)
-    has_active_task = bool(session["current_task"])
-    try:
-        validate_final(draft, has_active_task=has_active_task)
-    except UnifiedOutputError as error:
-        # Neupotrebljiv nacrt: recenzent se NE poziva (nema validnog predmeta),
-        # pa turn staje na jednom pozivu.
-        _log_rejection(request_id, context, "tutor_draft", error, draft.intent)
-        return None, calls
+    with timer.stage("tutor_validate"):
+        draft = normalize_for_intent(tutor_result.output)
+        has_active_task = bool(session["current_task"])
+        try:
+            validate_final(draft, has_active_task=has_active_task)
+        except UnifiedOutputError as error:
+            # Neupotrebljiv nacrt: recenzent se NE poziva (nema validnog
+            # predmeta), pa turn staje na jednom pozivu.
+            _log_rejection(request_id, context, "tutor_draft", error, draft.intent)
+            return None, calls
 
     # Reviewer sees the canonical server title; raw Tutor output remains on
     # the wrapper for safe offline diagnostics only.
@@ -917,9 +994,10 @@ def _two_call(llm, context, session, student_message, request_id, trusted_verdic
     # nacrta (nacrt s nalazom je upravo ono što recenzent treba da popravi),
     # nego ulazi u recenzentov ulaz kao serverska činjenica.
     previous_signature = session.get("current_task_identity") or ""
-    draft_issues = package_preflight.collect_package_issues(
-        draft.new_task, contract=context.semantic_contract,
-        previous_signature=previous_signature)
+    with timer.stage("preflight"):
+        draft_issues = package_preflight.collect_package_issues(
+            draft.new_task, contract=context.semantic_contract,
+            previous_signature=previous_signature)
     if draft_issues:
         logger.info(
             "tutor_draft_preflight request_id=%s topic=%s intent=%s issues=%s",
@@ -930,7 +1008,7 @@ def _two_call(llm, context, session, student_message, request_id, trusted_verdic
     try:
         reviewer_result = _call_reviewer(
             llm, context, session, student_message, draft, trusted_verdict,
-            package_preflight.format_for_reviewer(draft_issues),
+            package_preflight.format_for_reviewer(draft_issues), timer=timer,
         )
         calls += 1
         _log_sdk_entry(request_id, context, "reviewer", calls, reviewer_result)
@@ -943,7 +1021,8 @@ def _two_call(llm, context, session, student_message, request_id, trusted_verdic
 
     reviewer = reviewer_result.output
     try:
-        validate_reviewer(reviewer)
+        with timer.stage("reviewer_validate"):
+            validate_reviewer(reviewer)
     except UnifiedOutputError as error:
         _log_rejection(request_id, context, "reviewer_payload", error, draft.intent)
         return None, calls

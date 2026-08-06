@@ -236,6 +236,12 @@ def _usage_dict(resp):
     details = getattr(u, "output_tokens_details", None)
     if details is not None:
         usage["reasoning_tokens"] = getattr(details, "reasoning_tokens", None)
+    # Faza 4H (forenzika latencije): stopa pogotka prompt keša je bila
+    # NEMJERLJIVA — `input_tokens_details.cached_tokens` se u potpunosti
+    # odbacivao. Samo broj, nikad sadržaj.
+    input_details = getattr(u, "input_tokens_details", None)
+    if input_details is not None:
+        usage["cached_input_tokens"] = getattr(input_details, "cached_tokens", None)
     return usage
 
 

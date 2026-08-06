@@ -9,6 +9,7 @@ u završnom izvještaju security hardeninga).
 """
 import json
 import logging
+import time
 
 from flask import Blueprint, Response, current_app, jsonify, request
 
@@ -279,10 +280,16 @@ def _guarded_chat_turn():
 
 @ai_tutor_bp.route("/chat", methods=["POST"])
 def chat():
+    # Faza 4H: ukupno HTTP vrijeme zahtjeva — samo status i milisekunde,
+    # nikad sadržaj. Razlika (chat_request_timing − tutor_turn_diagnostics
+    # total_ms) je mrežno/serijalizacijsko/guard vrijeme ovog sloja.
+    started = time.perf_counter()
     status_code, result = _guarded_chat_turn()
     response = jsonify(result)
     if status_code == 429 and "retry_after" in result:
         response.headers["Retry-After"] = str(result["retry_after"])
+    logger.info("chat_request_timing endpoint=chat status=%s total_ms=%s",
+                status_code, int((time.perf_counter() - started) * 1000))
     return response, status_code
 
 
@@ -295,6 +302,7 @@ def chat_stream():
     proći kao SSE 200 — na blokadi vraćamo običan JSON sa pravim HTTP statusom,
     a frontend to prepoznaje po content-type/status i sam pada nazad na
     /chat (isti guard tamo ponovo blokira na isti način, sigurno)."""
+    started = time.perf_counter()
     status_code, result = _guarded_chat_turn()
     if status_code != 200:
         response = jsonify(result)
@@ -302,6 +310,8 @@ def chat_stream():
             response.headers["Retry-After"] = str(result["retry_after"])
         return response, status_code
     body = "event: done\ndata: " + json.dumps(result, ensure_ascii=False) + "\n\n"
+    logger.info("chat_request_timing endpoint=stream status=200 total_ms=%s",
+                int((time.perf_counter() - started) * 1000))
     return Response(body, mimetype="text/event-stream")
 
 
