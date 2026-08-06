@@ -249,3 +249,63 @@ def test_the_reviewer_prompt_still_demands_a_complete_resolution():
         lesson_context_module.build(6, LESSON)).lower()
     assert "every reported issue" in text
     assert "must not introduce a new defect" in text
+
+
+# ===========================================================================
+# CILJANI TALAS F4D — ISTI KVAR, DRUGI MJESTODRŽAČ
+# ===========================================================================
+# Talas F4D (scenario D10, lekcija o pravilima djeljivosti) i dijagnostička
+# sonda nad istom porukom proizveli su:
+#
+#     „U broju 47? treba upisati jednu cifru (0–9) tako da cijeli broj bude
+#      djeljiv sa 9. Koja cifra nedostaje?“      opcije: 6, 7, 2, 9
+#
+# MATEMATIKA: 4+7+x djeljivo sa 9 → 11+x ≡ 0 (mod 9) → x = 7, i 477 = 9·53.
+# Označena opcija `7` je dakle TAČNA, a oracle je vratio
+# `marked_option_math_mismatch` jer je opcije shvatio kao brojeve čija se
+# djeljivost tvrdi i „našao“ da je 9 djeljivo sa 9.
+#
+# Granica iz commita baef3fd hvatala je mjestodržač po NOTACIJI (slovo u
+# numeriku, `3x5`). Model ovdje piše `47?`, pa slova nema i granica promašuje.
+# Ispravan kriterij nije notacija nego OBLIK ZADATKA: kad se traži CIFRA, a
+# opcije su kandidati za tu cifru (jednocifreni brojevi), pretpostavka oracla
+# ne vrijedi i on mora PRESKOČITI — nikad pogađati.
+
+F4D_TASK = ("U broju 47? treba upisati jednu cifru (0–9) tako da cijeli broj "
+            "bude djeljiv sa 9. Koja cifra nedostaje?")
+F4D_DIGIT_OPTIONS = ("6", "7", "2", "9")     # tačna je 7 (indeks 1)
+
+
+def test_question_mark_placeholder_is_outside_the_oracle_scope():
+    result = mcq_integrity.evaluate_divisibility_mcq(F4D_TASK, F4D_DIGIT_OPTIONS)
+    assert result.applicable is False
+    assert result.reason_code == ""
+
+
+def test_question_mark_placeholder_does_not_reject_a_correct_package():
+    failure, _result = mcq_integrity.publication_failure(
+        F4D_TASK, F4D_DIGIT_OPTIONS, 1, "7")
+    assert failure == ""      # 477 = 9·53 — označena opcija je tačna
+
+
+@pytest.mark.parametrize("numeral", ["47?", "47_", "4_7", "47□", "2?5"])
+def test_any_non_letter_placeholder_shape_also_skips(numeral):
+    task = (f"Koja cifra nedostaje da broj {numeral} bude djeljiv sa 9?")
+    result = mcq_integrity.evaluate_divisibility_mcq(task, ("1", "3", "6", "9"))
+    assert result.applicable is False
+
+
+def test_the_supported_shape_is_still_judged_after_the_widening():
+    """Uska granica se širi SAMO na zadatke koji traže cifru."""
+    result = mcq_integrity.evaluate_divisibility_mcq(SUPPORTED_TASK, SUPPORTED_OPTIONS)
+    assert result.applicable is True
+    assert result.valid is True
+    assert result.correct_value == 75
+
+
+def test_single_digit_options_without_a_digit_question_stay_in_scope():
+    """Jednocifrene opcije same po sebi ne isključuju oracle."""
+    result = mcq_integrity.evaluate_divisibility_mcq(
+        "Koji od sljedećih brojeva je djeljiv sa 3?", ("4", "7", "6", "8"))
+    assert result.applicable is True
+    assert result.correct_value == 6

@@ -154,6 +154,32 @@ def _has_placeholder_numeral(question: str) -> bool:
                for run in _ALNUM_RUN_RE.findall(stripped))
 
 
+# CILJANI TALAS F4D (scenario D10) — ISTI kvar kao baef3fd, drugi mjestodržač:
+#     „U broju 47? treba upisati jednu cifru … djeljiv sa 9. Koja cifra
+#      nedostaje?“   opcije 6, 7, 2, 9 · označeno 7 · 477 = 9·53, dakle TAČNO
+# Oracle je ipak vratio `marked_option_math_mismatch` jer je opcije shvatio kao
+# brojeve čija se djeljivost tvrdi i „našao“ da je 9 djeljivo sa 9.
+#
+# Granica iz baef3fd hvatala je mjestodržač po NOTACIJI (slovo u numeriku), pa
+# `47?`, `47_` i `47□` prolaze ispod nje. Notacija je pogrešan kriterij — model
+# bira znak slobodno. Mjerodavan je OBLIK ZADATKA: kad se traži CIFRA, a opcije
+# su kandidati za tu cifru (jednocifreni brojevi), pretpostavka oracla („opcije
+# su brojevi čija se djeljivost tvrdi“) ne vrijedi.
+#
+# Ovo je ISKLJUČIVO proširenje PRESKAKANJA: oracle tada ne tvrdi ništa, pa ne
+# može objaviti pogrešan paket. Ostali deterministički validatori i dalje rade.
+_DIGIT_REQUEST_RE = re.compile(r"\bcifr\w*", re.IGNORECASE)
+
+
+def _asks_which_digit_is_missing(question: str, values: Iterable[Optional[int]]) -> bool:
+    """True kad pitanje traži cifru, a sve opcije su kandidati za tu cifru."""
+    if not _DIGIT_REQUEST_RE.search(question or ""):
+        return False
+    candidates = list(values)
+    return bool(candidates) and all(
+        value is not None and 0 <= value <= 9 for value in candidates)
+
+
 def _condition_is_ambiguous(question: str, divisors: tuple[int, ...]) -> bool:
     text = question or ""
     if not divisors or _NEGATED_RE.search(text):
@@ -182,6 +208,10 @@ def evaluate_divisibility_mcq(question: str, option_texts: Iterable[str]) -> Div
     if not options or any(value is None for value in values):
         # A direct yes/no question is validly handled by the existing pipeline;
         # this oracle makes no claim about prose options.
+        return DivisibilityMCQResult(False, False)
+    if _asks_which_digit_is_missing(question or "", values):
+        # Opcije su kandidati za traženu cifru, ne brojevi čija se djeljivost
+        # tvrdi. Vidi komentar uz `_asks_which_digit_is_missing`.
         return DivisibilityMCQResult(False, False)
 
     divisors = _explicit_divisors(question)
