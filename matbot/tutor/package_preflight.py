@@ -199,15 +199,24 @@ def collect_package_issues(task, contract=None):
                 detail=f"{detection.reason} [{contract.family_id}]"))
 
     # 4) DOKAZIVO VIŠE TAČNIH OPCIJA — postojeći uski mcq_integrity oracle.
+    # Nalaz nosi i ono što je server STVARNO pročitao iz uslova. Živi talas F4E
+    # (E01): recenzent je dobio goli kod `divisibility_condition_ambiguous`,
+    # vratio `correct` i proizveo paket s POTPUNO ISTIM nalazom — nije mogao
+    # znati gdje je parser stao. Broj pročitanih djelilaca je serverski izveden
+    # podatak, ne sadržaj zadatka, pa smije u dijagnostiku (pravilo 7).
     task_text, task_text_safe = safe_visible_text(getattr(task, "text", ""))
     if task_text_safe and option_texts and all(option_texts) and isinstance(marked_index, int):
         try:
-            failure, _result = mcq_integrity.publication_failure(
+            failure, result = mcq_integrity.publication_failure(
                 task_text, option_texts, marked_index, expected)
         except Exception:
-            failure = ""
+            failure, result = "", None
         if failure:
-            issues.append(PackageIssue(failure))
+            read = ",".join(str(divisor) for divisor in (result.divisors if result else ()))
+            issues.append(PackageIssue(
+                failure,
+                detail=(f"server read divisors: {read}" if read
+                        else "server could not read any divisor")))
 
     # 5) NUMERIČKA PROTIVRJEČNOST u vidljivom tekstu i rješenju — postojeći
     #    mathcheck. Distraktori se NIKAD ne provjeravaju (namjerno su pogrešni).
@@ -285,6 +294,23 @@ def format_for_reviewer(issues):
         "solvable from its own text. For any `unsafe_..._notation` issue the named "
         "field carries MathJax the server cannot accept: REWRITE that exact field using "
         "only plain $...$ notation and known commands, and change nothing else. "
+        # ŽIVI TALAS F4E (E01, E12): za kodove uskog matematičkog orakla nije
+        # postojao nijedan lijek u ovom bloku, pa je recenzent dobijao goli kod
+        # i vraćao `correct` s istim nalazom. Uputstvo ne mijenja prag orakla —
+        # samo omogućava ispravku u ISTOM drugom pozivu, kako `correct` i služi.
+        "For `divisibility_condition_ambiguous` the server could not read the whole "
+        "divisibility condition out of the task text, so it cannot decide which option "
+        "is correct: REWRITE the question so the required divisors are stated once, "
+        "plainly and completely, in the form `djeljiv sa 6 i sa 25` (or `djeljiv sa 2, "
+        "3 i 5`). In that same sentence do not restate the condition as a product, do "
+        "not put any other number after the divisor list, do not use `ili`, and do not "
+        "use a negation such as `nije djeljiv`. For `no_correct_option` none of the four "
+        "options satisfies the stated condition: compute values FROM that condition and "
+        "replace the options so that exactly one of them satisfies it. For "
+        "`multiple_correct_options` keep exactly one satisfying value and replace every "
+        "other satisfying option. For `marked_option_math_mismatch` mark the option that "
+        "actually satisfies the condition and copy that option's text into "
+        "expected_answer. "
         "Then recompute correct_option_id, "
         "correct_option_index, expected_answer (an exact copy of the marked option's "
         "text), solution, difficulty evidence for the task you actually return, and "
