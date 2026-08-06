@@ -31,16 +31,20 @@ CORE_CONTRACT = ("6-04-005", 6)
 CORE_SEMANTIC = ("6-04-009", 6)
 REQUIRED_SCENARIO_COUNT = 14
 SDK_CALL_CEILING = 23
-REQUIRED_PIPELINE = "universal_two_call"
-REQUIRED_DIFFICULTY_LEVELS = "enabled"
-
 sys.path.insert(0, str(ROOT))
 
-from matbot import config, feedback, mathsafe, mcq_integrity, practice  # noqa: E402
+from matbot import config, release_config, feedback, mathsafe, mcq_integrity, practice  # noqa: E402
 from matbot.contracts import registry as contract_registry  # noqa: E402
 from matbot.llm import OpenAIPracticeLLM  # noqa: E402
 from matbot.session_store import SessionStore  # noqa: E402
 from matbot.topics import lesson_info  # noqa: E402
+
+# JEDAN izvor istine o release konfiguraciji — isti koji koristi i deploy
+# provjera (matbot/release_config.py). Produkcija je jednom tiho radila bez ove
+# dvije zastavice dok su gate-ovi mjerili obje uključene.
+REQUIRED_PIPELINE = release_config.REQUIRED_RELEASE_ENV["MATBOT_PRACTICE_PIPELINE"]
+REQUIRED_DIFFICULTY_LEVELS = release_config.REQUIRED_RELEASE_ENV["MATBOT_PRACTICE_DIFFICULTY_LEVELS"]
+
 from scratchpad.run_difficulty_canary import (  # noqa: E402
     CanaryReport, CountingLLM, SDKCallBudgetExceeded, Scenario, _LogCapture,
     _has_disallowed_control_character, _run_one_turn,

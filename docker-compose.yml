@@ -15,8 +15,20 @@ services:
     image: matbot:latest
     restart: unless-stopped
     env_file: .env            # kopiraj .env.example → .env i popuni
+    # OBAVEZNE RELEASE VARIJABLE — izričito proslijeđene.
+    # Produkcija je jednom tiho radila BEZ MATBOT_PRACTICE_PIPELINE i
+    # MATBOT_PRACTICE_DIFFICULTY_LEVELS, dok su release gate-ovi mjerili obje
+    # uključene: klik na MCQ opciju je proradio tek kad su dodane i kontejner
+    # ponovo kreiran. `env_file` ih prosljeđuje samo ako POSTOJE u .env, pa se
+    # ovdje navode poimence — vrijednost i dalje dolazi iz .env, nikad odavde.
+    # Očekivane vrijednosti drži matbot/release_config.py.
     environment:
       PORT: "8080"
+      MATBOT_PRACTICE_PIPELINE: ${MATBOT_PRACTICE_PIPELINE:-}
+      MATBOT_PRACTICE_DIFFICULTY_LEVELS: ${MATBOT_PRACTICE_DIFFICULTY_LEVELS:-}
+      AI_TUTOR_TIMEOUT: ${AI_TUTOR_TIMEOUT:-}
+      OPENAI_MODEL_TEXT: ${OPENAI_MODEL_TEXT:-}
+      MATBOT_REASONING_EFFORT: ${MATBOT_REASONING_EFFORT:-}
     ports:
       - "127.0.0.1:8080:8080" # samo lokalno; javni saobraćaj ide kroz nginx
     volumes:

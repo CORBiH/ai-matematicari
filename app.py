@@ -2,12 +2,30 @@ from flask import Flask, jsonify, render_template, request
 from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-from matbot import auth, config
+import logging
+
+from matbot import auth, config, release_config
 from matbot.api import REQUEST_TOO_LARGE_MESSAGE, ai_tutor_bp
 from matbot.request_limits import BoundedInMemoryRequest
 from matbot.topics import topics_response
 
 config.require_secret_key(config.SECRET_KEY)
+
+# JEDAN red na startu s EFEKTIVNOM konfiguracijom — nikad tajna.
+#
+# ZAŠTO POSTOJI: produkcija je radila bez MATBOT_PRACTICE_PIPELINE i
+# MATBOT_PRACTICE_DIFFICULTY_LEVELS, dok su release gate-ovi mjerili obje
+# uključene. Ništa u logu to nije pokazivalo, pa je odstupanje otkriveno tek
+# ručnim testom. Sadržaj reda je zatvorena lista ne-tajnih vrijednosti iz
+# matbot/release_config.py; odstupanje se dodatno prijavljuje kao WARNING, ali
+# NE ruši start — o padu zatvoreno odlučuje deploy provjera, ne uvoz modula.
+logging.getLogger("matbot.startup").info(
+    "matbot_effective_configuration %s", release_config.format_effective_configuration()
+)
+for _problem in release_config.release_configuration_problems():
+    logging.getLogger("matbot.startup").warning(
+        "matbot_release_configuration_mismatch %s", _problem
+    )
 
 app = Flask(__name__)
 app.secret_key = config.SECRET_KEY
