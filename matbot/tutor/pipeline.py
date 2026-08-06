@@ -53,6 +53,35 @@ _NEW_TASK_INTRO = {
     "generate_task": "Evo zadatka.",
 }
 
+# GRANICE NIVOA — uvod mora biti ISTINIT (produkcijski nalaz i živi talas F4F,
+# scenariji F09/F10): na nivou 1 je „Daj mi lakši zadatak.“ vraćalo „Evo lakšeg
+# zadatka.“, iako ispod nivoa 1 nema ničega i nivo je ostao 1. Server je znao
+# tačnu tranziciju (`_target_level_for` sidri na min/max), ali je uvod biran iz
+# modelove NAMJERE umjesto iz stvarne promjene.
+#
+# Na granici je cilj POZNAT (uvijek pravi minimum/maksimum), pa se smije
+# imenovati — isto rješenje koje legacy put ima odavno
+# (matbot/practice.py::_ANOTHER_INTRO_TASK_INTRO).
+INTRO_AT_EASIEST_LEVEL = "Ovo je već najlakši nivo, evo još jednog uvodnog zadatka."
+INTRO_AT_HARDEST_LEVEL = "Ovo je već najviši nivo, evo još jednog naprednog zadatka."
+
+
+def _intro_for(intent, previous_level, target_level):
+    """Uvod se bira iz STVARNE serverske tranzicije, nikad iz modelove namjere.
+
+    `previous_level`/`target_level` su None kad je univerzalni kontroler težine
+    isključen — tada je ponašanje bajt za bajt kao ranije."""
+    default = _NEW_TASK_INTRO.get(intent, _NEW_TASK_INTRO["generate_task"])
+    if previous_level is None or target_level is None:
+        return default
+    if target_level != previous_level:
+        return default                      # promjena se stvarno desila
+    if intent == "easier_task":
+        return INTRO_AT_EASIEST_LEVEL
+    if intent == "harder_task":
+        return INTRO_AT_HARDEST_LEVEL
+    return default
+
 
 def _target_level_for(session, intent):
     """One lesson-independent progression policy owned by the server."""
@@ -583,9 +612,11 @@ def _run_text_turn(store, llm, session, turn, context, request_id):
             canonical_task = validate_task_package(final.new_task, context, target_level)
             if canonical_task is not final.new_task:
                 final = final.model_copy(update={"new_task": canonical_task})
+            previous_level = (session.get("difficulty_level")
+                              if target_level is not None else None)
             task_text = _publish_task(session, context, final, request_id, target_level)
             intro_intent = final.intent if target_level is not None else "generate_task"
-            intro = _NEW_TASK_INTRO.get(intro_intent, _NEW_TASK_INTRO["generate_task"])
+            intro = _intro_for(intro_intent, previous_level, target_level)
             answer = intro + "\n\nZadatak: " + task_text
         else:
             answer = _compose_visible_help(final, reply, context)
