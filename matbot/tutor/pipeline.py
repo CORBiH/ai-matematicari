@@ -511,15 +511,58 @@ def _run_choice_turn(store, llm, session, turn, context, request_id):
     return response
 
 
+def _log_turn_diagnostics(request_id, context, turn, session, *, intent, calls,
+                          published, task_preserved, state_mutated,
+                          previous_identity, final_identity, rejection_code="",
+                          reviewer_decision="", previous_level=None,
+                          target_level=None):
+    """JEDAN strukturisan red po Practice turnu — zatvoren skup SIGURNIH polja.
+
+    ZAŠTO POSTOJI: dijagnostika je do sada bila razasuta po nekoliko redova, pa
+    se za jedan turn nije moglo iz loga pročitati šta je učenik tražio, koji je
+    zadatak bio aktivan, šta je objavljeno i da li je stanje mutirano. Ovdje su
+    sva ta polja na jednom mjestu.
+
+    NIKAD ne ulazi: API ključ, tajna, prompt, sirov izlaz modela, tekst zadatka,
+    tekst opcija, učenikova poruka ni historija. Identiteti zadatka su hashevi
+    (izvedeni iz onoga što učenik ionako vidi), a session_id se skraćuje."""
+    session_id = (turn.get("session_id") or "")
+    logger.info(
+        "tutor_turn_diagnostics request_id=%s session=%s topic=%s client_turn_id=%s "
+        "intent=%s interaction_phase=%s ui_intent=%s calls=%s published=%s "
+        "task_preserved=%s state_mutated=%s previous_identity=%s final_identity=%s "
+        "previous_level=%s target_level=%s committed_level=%s reviewer_decision=%s "
+        "rejection_code=%s",
+        request_id, session_id[:8] or "-", context.topic_id,
+        _clip(turn.get("client_turn_id") or "-", 64),
+        intent or "-", _clip(turn.get("interaction_phase") or "-", 40),
+        _clip(turn.get("intent") or "-", 40), calls, published,
+        task_preserved, state_mutated,
+        (previous_identity or "-")[:12], (final_identity or "-")[:12],
+        previous_level if previous_level is not None else "-",
+        target_level if target_level is not None else "-",
+        session.get("difficulty_level", "-"), reviewer_decision or "-",
+        rejection_code or "-",
+    )
+
+
 def _run_text_turn(store, llm, session, turn, context, request_id):
     active_task_before = session["current_task"]
     had_active_task = bool(active_task_before)
+    identity_before = session.get("current_task_identity") or ""
     ui_action = _explicit_ui_action(turn, session)
 
     final, calls = _two_call(
         llm, context, session, turn["student_message"], request_id, None, ui_action
     )
     if final is None:
+        # Odbijeno prije objave (nacrt, recenzent ili invarijanta nad konačnim
+        # paketom). Sesija je lokalna kopija i nije commitovana.
+        _log_turn_diagnostics(
+            request_id, context, turn, session, intent="", calls=calls,
+            published=False, task_preserved=bool(active_task_before),
+            state_mutated=False, previous_identity=identity_before,
+            final_identity=identity_before, rejection_code="rejected_before_publication")
         return _error_response(active_task_before)
 
     try:
@@ -563,6 +606,11 @@ def _run_text_turn(store, llm, session, turn, context, request_id):
                 session["last_result"] = "full_solution"
     except UnifiedOutputError as error:
         _log_rejection(request_id, context, "publication", error, final.intent)
+        _log_turn_diagnostics(
+            request_id, context, turn, session, intent=final.intent, calls=calls,
+            published=False, task_preserved=bool(active_task_before),
+            state_mutated=False, previous_identity=identity_before,
+            final_identity=identity_before, rejection_code=str(error)[:60])
         return _error_response(active_task_before)
 
     session["recent_turns"].append(
@@ -589,6 +637,11 @@ def _run_text_turn(store, llm, session, turn, context, request_id):
         "tutor_turn request_id=%s topic=%s intent=%s calls=%s",
         request_id, context.topic_id, final.intent, calls,
     )
+    _log_turn_diagnostics(
+        request_id, context, turn, session, intent=final.intent, calls=calls,
+        published=final.intent in TASK_INTENTS, task_preserved=True,
+        state_mutated=True, previous_identity=identity_before,
+        final_identity=session.get("current_task_identity") or "")
     return response
 
 
