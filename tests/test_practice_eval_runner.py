@@ -733,3 +733,47 @@ def test_a_byte_identical_republished_task_is_still_a_duplicate():
         _task_turn(B52_FIRST, "sig-new", previous_texts=(B52_FIRST,),
                    previous_signatures=("sig-a",)))
     assert result.outcome == check_lib.FAIL
+
+
+# ---------------------------------------------------------------------------
+# Faza 4G (živi F4G rerun, G03): isti TEKST pitanja s NOVIM opcijama je
+# legitiman nov zadatak — serverski kanonski identitet je pitanje+opcije
+# (matbot/tutor/task_identity.py), a harness je poredio SAMO tekst, pa je
+# ispravan turn („Koji od navedenih brojeva je djeljiv i sa 6 i sa 25?“ s
+# drugim brojevima) padao kao „no new task issued“.
+# ---------------------------------------------------------------------------
+
+GENERIC = "Koji od navedenih brojeva je djeljiv i sa 6 i sa 25?"
+
+
+def _identity_turn(identity_before, identity_after, signature,
+                   previous_identities=(), previous_signatures=()):
+    return check_lib.TurnObservation(
+        scenario_id="T", step_index=1, step_kind="text", topic_id=LESSON, grade=6,
+        request_payload={}, http_status=200,
+        response={"status": "ready", "answer": f"Evo zadatka.\n\nZadatak: {GENERIC}"},
+        session_before={"current_task": GENERIC,
+                        "current_task_identity": identity_before},
+        session_after={"current_task": GENERIC,
+                       "current_task_identity": identity_after,
+                       "current_task_signature": {"structured_signature_hash": signature}},
+        sdk_calls=2, previous_task_texts=(GENERIC,),
+        previous_task_identities=tuple(previous_identities),
+        previous_task_signatures=tuple(previous_signatures))
+
+
+def test_same_wording_with_new_options_is_a_new_task():
+    obs = _identity_turn("id-a", "id-b", "sig-b",
+                         previous_identities=("id-a",),
+                         previous_signatures=("sig-a",))
+    assert obs.issued_new_task
+    assert check_lib.check_task_published(obs).outcome == check_lib.PASS
+    assert check_lib.check_task_differs(obs).outcome == check_lib.PASS
+
+
+def test_a_repeated_canonical_identity_is_still_a_duplicate():
+    obs = _identity_turn("id-a", "id-a", "sig-b",
+                         previous_identities=("id-a",),
+                         previous_signatures=("sig-a",))
+    assert not obs.issued_new_task
+    assert check_lib.check_task_differs(obs).outcome == check_lib.FAIL

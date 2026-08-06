@@ -396,6 +396,7 @@ def run_scenario(flask_app, llm, capture, scenario: Scenario, token) -> Scenario
     turn_records = []
     previous_task_texts = []
     previous_task_signatures = []
+    previous_task_identities = []
     previous_help_texts = []
     last_response = None
     last_client_turn_id = ""
@@ -489,6 +490,7 @@ def run_scenario(flask_app, llm, capture, scenario: Scenario, token) -> Scenario
             final_task_package=package,
             previous_task_texts=tuple(previous_task_texts),
             previous_task_signatures=tuple(previous_task_signatures),
+            previous_task_identities=tuple(previous_task_identities),
             previous_help_texts=tuple(previous_help_texts),
             previous_response=copy.deepcopy(last_response) if step["kind"] == "repeat_choice" else None,
         )
@@ -502,6 +504,8 @@ def run_scenario(flask_app, llm, capture, scenario: Scenario, token) -> Scenario
             signature = (session_after or {}).get("current_task_signature") or {}
             if signature.get("structured_signature_hash"):
                 previous_task_signatures.append(signature["structured_signature_hash"])
+            if observation.identity_after:
+                previous_task_identities.append(observation.identity_after)
         if step.get("collect_help"):
             previous_help_texts.append(observation.answer)
         last_response = copy.deepcopy(body)

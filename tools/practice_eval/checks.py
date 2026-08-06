@@ -89,6 +89,7 @@ class TurnObservation:
     # Historija unutar iste sesije, koju pozivalac puni prije provjera.
     previous_task_texts: tuple = ()
     previous_task_signatures: tuple = ()
+    previous_task_identities: tuple = ()
     previous_help_texts: tuple = ()
     previous_response: Optional[dict] = None
 
@@ -135,7 +136,25 @@ class TurnObservation:
         return ((self.session_after or {}).get("expected_answer_summary") or "")
 
     @property
+    def identity_after(self) -> str:
+        return ((self.session_after or {}).get("current_task_identity") or "")
+
+    @property
+    def identity_before(self) -> str:
+        return ((self.session_before or {}).get("current_task_identity") or "")
+
+    @property
     def issued_new_task(self) -> bool:
+        """Nov zadatak po SERVERSKOM kanonskom identitetu (pitanje+opcije).
+
+        ŽIVI F4G RERUN (G03): isti tekst pitanja („Koji od navedenih brojeva je
+        djeljiv i sa 6 i sa 25?“) s NOVIM opcijama je legitiman nov zadatak —
+        matbot/tutor/task_identity.py identitet računa iz pitanja I opcija.
+        Harness je poredio samo tekst, pa je ispravan turn padao kao
+        „no new task issued“. Tekstualno poređenje ostaje SAMO kao rezerva za
+        starije zapise sesije bez identiteta."""
+        if self.identity_after or self.identity_before:
+            return bool(self.identity_after) and self.identity_after != self.identity_before
         return bool(self.task_after) and self.task_after != self.task_before
 
     @property
@@ -682,9 +701,23 @@ def check_task_differs(obs: TurnObservation) -> CheckResult:
     if not obs.previous_task_texts:
         return CheckResult("task_differs", SKIP, "first task in this session")
 
+    # Kanonski identitet (pitanje+opcije) je serverski dokaz duplikata — isti
+    # koji objava koristi (Faza 4G; vidi docstring `issued_new_task`).
+    if obs.identity_after and obs.previous_task_identities:
+        if obs.identity_after in obs.previous_task_identities:
+            return CheckResult("task_differs", FAIL,
+                               "identical canonical task identity")
+
     current = _normalized(obs.task_after)
+    identity_proves_different = bool(
+        obs.identity_after and obs.previous_task_identities
+        and obs.identity_after not in obs.previous_task_identities)
     for previous in obs.previous_task_texts:
         if current == _normalized(previous):
+            if identity_proves_different:
+                # Isti tekst pitanja, ali kanonski različit paket (druge
+                # opcije) — legitiman nov zadatak, ne duplikat.
+                continue
             return CheckResult("task_differs", FAIL,
                                "the new task text is identical to an earlier one")
 
