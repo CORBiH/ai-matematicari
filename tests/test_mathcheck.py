@@ -512,6 +512,61 @@ def test_unknown_or_doubled_backslash_still_skips_as_before(text):
     assert find_numeric_inconsistencies(text) == []
 
 
+# ---------------------------------------------------------------------------
+# NAMJERNO LAŽNA JEDNAKOST — dokaz kontradikcije (živi release gate 5ac723e,
+# scenario grade9, lekcija 9-05-010 „Sistem bez rješenja“)
+# ---------------------------------------------------------------------------
+# Rješenje sistema bez rješenja MORA prikazati lažnu jednakost ($3=5$, $0=2$)
+# da bi dokazalo kontradikciju. Validator je takav segment tretirao kao
+# aritmetičku grešku, recenzent nije imao ispravku koja zadržava smisao
+# lekcije, i CIJELA lekcija je postala neobjavljiva — fail closed na svakom
+# pokušaju. Lažna jednakost se priznaje SAMO kad je ISTA ili anaforična
+# rečenica izričito proglašava netačnom.
+
+@pytest.mark.parametrize("text", [
+    # marker u istoj rečenici, POSLIJE segmenta
+    "Iz obje jednačine izraz $x+y$ bi morao biti i $3$ i $5$, pa bi slijedilo "
+    "$3=5$, što nije tačno. Sistem nema rješenja.",
+    "Oduzimanjem jednačina dobijamo $0=2$, što je nemoguće, pa sistem nema rješenja.",
+    "Dobili bismo $3=5$, a to ne važi ni za jedan par brojeva.",
+    # marker u SLJEDEĆOJ rečenici koja počinje anaforom („To je…“)
+    "Kada oduzmemo prvu jednačinu od druge: $0 = 2$. To je kontradikcija, "
+    "pa sistem nema rješenja.",
+    # marker u istoj rečenici, PRIJE segmenta
+    "Slijedi netačna jednakost $3=5$, pa sistem nema rješenja.",
+    "Dobili bismo nemoguću jednakost $0=2$, pa sistem nema rješenja.",
+    # display oblik
+    "Oduzimanjem dobijamo $$0=2$$, što je nemoguće, pa sistem nema rješenja.",
+])
+def test_declared_false_contradiction_is_accepted(text):
+    assert not rejects(text), text
+
+
+@pytest.mark.parametrize("text", [
+    # bez ijednog markera lažnosti — ostaje odbijeno (konzervativno)
+    "Dobili bismo $3=5$.",
+    # marker u DRUGOJ rečenici BEZ anafore (stil ocjene odgovora) — pogrešan
+    # lanac modela mora ostati odbijen, „Netačno.“ se odnosi na učenika
+    "Netačno. Pravilan postupak: $17-9=7$.",
+    "Pravilan postupak: $17-9=7$. Tvoj odgovor je netačan.",
+    # aproksimativni lanac se NIKAD ne proglašava „namjerno lažnim“
+    "$24\\sqrt3\\approx83,14$, što nije tačno.",
+    # potvrdna riječ bez negacije nije marker
+    "Provjera: $2+3=6$, dakle tačno.",
+])
+def test_wrong_chains_near_unrelated_negation_stay_rejected(text):
+    assert rejects(text), text
+
+
+def test_declared_false_suppression_never_hides_other_segments():
+    """Lažna jednakost s markerom NE amnestira drugi, stvarno pogrešan segment."""
+    text = ("Dobijamo $3=5$, što nije tačno, pa sistem nema rješenja. "
+            "Provjera zbira: $2+3=6$.")
+    issues = find_numeric_inconsistencies(text)
+    assert len(issues) == 1
+    assert "2+3" in issues[0]
+
+
 def test_annotation_does_not_disturb_ordinary_arithmetic():
     """Ostale operacije moraju ostati tačno onakve kakve su bile."""
     for ok in ("$2+3=5$", "$7-4=3$", "$6\\cdot7=42$", "$\\frac{3}{4}=0,75$",

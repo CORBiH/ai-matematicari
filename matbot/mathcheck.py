@@ -27,7 +27,7 @@ import math
 import re
 from decimal import Decimal, InvalidOperation
 
-from matbot.mathsegments import math_contents, tokenize_math
+from matbot.mathsegments import INLINE, DISPLAY, TEXT, math_contents, tokenize_math
 
 # Ludolfov broj: škola u BiH računa s π ≈ 3,14 (vidi referentni PDF), pa svaki
 # izraz s π vrednujemo OBJEMA vrijednostima i prihvatamo ako se poklopi bilo
@@ -504,6 +504,63 @@ def check_segment(segment, pi_values=()):
     return issues
 
 
+# ---------------------------------------------------------------------------
+# NAMJERNO LAŽNA JEDNAKOST — dokaz kontradikcije (živi release gate 5ac723e,
+# scenario grade9, lekcija 9-05-010 „Sistem bez rješenja“)
+# ---------------------------------------------------------------------------
+# Rješenje sistema bez rješenja MORA prikazati lažnu jednakost da bi dokazalo
+# kontradikciju: „…pa bi slijedilo $3=5$, što nije tačno.“ Ovaj modul je takav
+# segment tretirao kao aritmetičku grešku (`numeric_equality_mismatch`), pa je
+# svaki vjeran odgovor te lekcije padao zatvoreno — i Tutorov nacrt i
+# recenzentova ispravka, jer NIJEDNA ispravka koja zadržava smisao lekcije ne
+# može ukloniti kontradikciju. Cijela lekcija je time postala neobjavljiva.
+#
+# Lažna jednakost se priznaje SAMO kad je vidljivi tekst IZRIČITO proglašava
+# netačnom, i to usko vezano uz sam segment:
+#   • marker u ISTOJ rečenici, prije ili poslije segmenta („…, što nije
+#     tačno“, „slijedi netačna jednakost $3=5$“), ili
+#   • marker u NEPOSREDNO sljedećoj rečenici koja počinje anaforom („To je
+#     kontradikcija…“) — anafora se odnosi na upravo prikazanu jednakost.
+#
+# Granica rečenice je bitna zbog OCJENE ODGOVORA: „Netačno. Pravilan postupak:
+# $17-9=7$.“ — „Netačno.“ je zasebna rečenica o UČENIKOVOM odgovoru, i pogrešan
+# lanac modela iza nje mora ostati odbijen. Zato marker iz druge rečenice bez
+# anafore nikad ne amnestira segment. Aproksimacije (`\approx`) se ne mogu
+# proglasiti „namjerno lažnim“ — pogrešno zaokruživanje ostaje greška — a
+# `nevaljan izraz` (dijeljenje nulom i sl.) nikad se ne amnestira.
+_FALSE_MARKER_RE = re.compile(
+    r"nije\s+tač\w*|netač\w*|nemogu[ćc]\w*|nije\s+mogu[ćc]\w*|kontradikcij\w*"
+    r"|protivrječ\w*|protivurječ\w*|protivriječ\w*|ne\s+važi|ne\s+vrijedi"
+    r"|apsurd\w*|nema\s+rješenj\w*|ne\s+može",
+    re.IGNORECASE)
+_ANAPHOR_START_RE = re.compile(r"^\s*(?:to|ovo|a\s+to)\b", re.IGNORECASE)
+_SENTENCE_BOUNDARY_RE = re.compile(r"[.!?\n]")
+# Ograničen prozor: marker mora stajati uz segment, ne bilo gdje u tekstu.
+_FALSE_CONTEXT_WINDOW = 140
+
+
+def _declares_false(before_text, after_text):
+    """True ako okolna proza izričito proglašava susjedni segment netačnim."""
+    tail = _SENTENCE_BOUNDARY_RE.split(before_text[-_FALSE_CONTEXT_WINDOW:])[-1]
+    if _FALSE_MARKER_RE.search(tail):
+        return True
+    sentences = _SENTENCE_BOUNDARY_RE.split(after_text[:_FALSE_CONTEXT_WINDOW])
+    if sentences and _FALSE_MARKER_RE.search(sentences[0]):
+        return True
+    if (len(sentences) > 1 and _ANAPHOR_START_RE.match(sentences[1])
+            and _FALSE_MARKER_RE.search(sentences[1])):
+        return True
+    return False
+
+
+def _segment_may_be_declared_false(segment, segment_issues):
+    """Segment smije biti amnestiran samo ako je čista (ne-approx) jednakost
+    čiji su svi nalazi obična vrijednosna neslaganja."""
+    if "\\approx" in segment or "≈" in segment:
+        return False
+    return all("nevaljan izraz" not in issue for issue in segment_issues)
+
+
 def find_numeric_inconsistencies(text):
     """Glavna ulazna tačka. Vrati listu INTERNIH razloga (prazno = nema
     dokazane nedosljednosti). Nikad ne mijenja tekst i nikad ne poziva model."""
@@ -511,8 +568,21 @@ def find_numeric_inconsistencies(text):
     # Deklaracija se traži u CIJELOM tekstu, ne po segmentu: u živom nalazu je
     # „π\approx3,14“ stajalo u prozi, a nedosljedan izraz u $...$ ispod nje.
     pi_values = declared_pi_values(text or "")
-    for segment in math_segments(text or ""):
-        issues.extend(check_segment(segment, pi_values))
+    tokens = tokenize_math(text or "")
+    for index, (kind, content) in enumerate(tokens):
+        if kind not in (INLINE, DISPLAY):
+            continue
+        found = check_segment(content, pi_values)
+        if not found:
+            continue
+        if _segment_may_be_declared_false(content, found):
+            before = tokens[index - 1][1] if (
+                index > 0 and tokens[index - 1][0] == TEXT) else ""
+            after = tokens[index + 1][1] if (
+                index + 1 < len(tokens) and tokens[index + 1][0] == TEXT) else ""
+            if _declares_false(before, after):
+                continue
+        issues.extend(found)
     return issues
 
 

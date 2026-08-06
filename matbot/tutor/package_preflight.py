@@ -28,6 +28,7 @@ BEZBJEDNOST DIJAGNOSTIKE: nalaz nosi SAMO kod, ID-jeve opcija i kratak
 ograničen detalj — nikad tekst zadatka, opcije, rješenje, prompt ni sirov izlaz
 modela (CLAUDE.md, pravilo 7).
 """
+import re
 from dataclasses import dataclass
 
 from matbot import lesson_fidelity, mcq_integrity, option_equivalence
@@ -49,6 +50,11 @@ _MAX_DETAIL_CHARS = 200
 # Kod koji objava već koristi za isti nalaz — namjerno ISTI string, da se
 # dijagnostika prije i poslije drugog poziva poklapa u logovima.
 SEMANTIC_DUPLICATE_CODE = "semantically_duplicate_options"
+
+# Serverski izračunate vrijednosti iz mathcheck poruke: hvata se ISKLJUČIVO
+# broj u zagradi neposredno iza zatvorenog navodnika izraza (`'…' (3)`), pa
+# zagrada unutar samog izraza (`'(24+6):5'`) nikad ne može biti pogođena.
+_MISMATCH_VALUES_RE = re.compile(r"' \(([-+0-9.eE]+)\)")
 
 # Dokaz težine nacrta ne zadovoljava nivo koji je nacrt SAM deklarisao.
 DIFFICULTY_OUTSIDE_TARGET_CODE = "difficulty_evidence_outside_target"
@@ -258,8 +264,16 @@ def collect_package_issues(task, contract=None, previous_signature=""):
             continue
         found = find_numeric_inconsistencies(text)
         if found:
-            issues.append(PackageIssue(
-                "numeric_inconsistency", detail=f"{label} {found[0].split(':')[0]}"))
+            # Recenzent je dobijao goli kod bez vrijednosti, pa nije mogao znati
+            # KOJI korak lanca je pao (živi gate 5ac723e, grade9). Vrijednosti su
+            # SERVERSKI izračunati brojevi (%.6g iz mathcheck poruke), nikad izraz
+            # ili tekst iz sadržaja — isti princip kao broj pročitanih djelilaca.
+            detail = f"{label} {found[0].split(':')[0]}"
+            values = _MISMATCH_VALUES_RE.findall(found[0])
+            if len(values) >= 2:
+                detail += (f" (server evaluated {values[0]} vs {values[1]},"
+                           " expected equal)")
+            issues.append(PackageIssue("numeric_inconsistency", detail=detail))
 
     # 6) DOKAZ TEŽINE VS DEKLARISAN NIVO (živi gate b8a0f7b)
     #    Živi pad: Tutor je za traženi nivo 1 sam prijavio `combines_concepts=true`,
@@ -319,7 +333,19 @@ def format_for_reviewer(issues):
         "plainly and completely, in the form `djeljiv sa 6 i sa 25` (or `djeljiv sa 2, "
         "3 i 5`). In that same sentence do not restate the condition as a product, do "
         "not put any other number after the divisor list, do not use `ili`, and do not "
-        "use a negation such as `nije djeljiv`. For `no_correct_option` none of the four "
+        "use a negation such as `nije djeljiv`. "
+        # ŽIVI GATE 5ac723e (grade9, „Sistem bez rješenja“): za
+        # `numeric_inconsistency` nije postojao NIJEDAN lijek u ovom bloku, pa je
+        # recenzent vraćao `correct` s istim nalazom. Lijek pokriva i namjernu
+        # kontradikciju: bez markera lažnosti u ISTOJ rečenici server je ne može
+        # razlikovati od aritmetičke greške.
+        "For `numeric_inconsistency` an equality chain inside $...$ in the named "
+        "field is numerically false: recompute every step and rewrite that field so "
+        "every shown equality holds. When a false equality is the DELIBERATE point "
+        "of the lesson (a contradiction proof, a system with no solutions), keep it "
+        "but state in the SAME sentence that it is false — for example `$3=5$, što "
+        "nije tačno` — because a bare false equality is rejected as an arithmetic "
+        "error. For `no_correct_option` none of the four "
         "options satisfies the stated condition: compute values FROM that condition and "
         "replace the options so that exactly one of them satisfies it. For "
         "`multiple_correct_options` keep exactly one satisfying value and replace every "
