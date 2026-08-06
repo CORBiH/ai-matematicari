@@ -163,7 +163,14 @@ def validate_scenarios(scenarios) -> list:
         if scenario.id in seen:
             problems.append(f"duplicate scenario id {scenario.id!r}")
         seen[scenario.id] = scenario
-        if not any(step.get("expect_calls", 0) for step in scenario.steps):
+        # Faza 4H: deterministički scenariji NAMJERNO nikad ne dosežu model —
+        # namjera mora biti izričita (`zero_calls` provjera na svakom koraku
+        # bez očekivanih poziva), inače je nula poziva i dalje greška plana.
+        zero_call_steps = [step for step in scenario.steps
+                           if not step.get("expect_calls", 0)]
+        if len(zero_call_steps) == len(scenario.steps) and not all(
+                "zero_calls" in (step.get("checks") or ())
+                for step in zero_call_steps):
             problems.append(f"{scenario.id}: no step ever reaches the model")
         if scenario.wave == "B" and not scenario.targets_wave_a_findings:
             problems.append(f"{scenario.id}: wave B scenario without targets_wave_a_findings")
