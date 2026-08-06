@@ -436,6 +436,129 @@ def evaluate_direct_computation_mcq(question: str,
     return DirectComputationMCQResult(True, True, "", computed, values, correct_indices)
 
 
+# ---------------------------------------------------------------------------
+# USKI ORAKL UPOREĐIVANJA (Faza 4G, Workstream F — lekcija 7-03-006)
+# ---------------------------------------------------------------------------
+# Lekcija upoređivanja racionalnih brojeva nema semantički ugovor porodice i
+# SAMU relaciju dosad nije provjeravao nijedan deterministički validator —
+# „Koji znak stoji između $\frac{2}{3}$ i $\frac{3}{4}$?“ s pogrešno označenim
+# znakom prolazio je sve serverske kapije. Dva dokaziva oblika:
+#   • ZNAK: opcije su isključivo simboli <, >, = (svaki najviše jednom; svaki
+#     drugi relacijski simbol, npr. ≥, diskvalifikuje cio orakl), pitanje ima
+#     TAČNO DVA izračunljiva broja i zatvorenu proznu direktivu poređenja;
+#   • SUPERLATIV: proza traži najveći ILI najmanji, sve opcije su izračunljive
+#     vrijednosti — tačna je jedinstvena ekstremna vrijednost.
+# „koliko“ bilo gdje u pitanju („Za koliko je veći…“) znači RAČUN razlike, ne
+# relaciju — orakl se tada NIKAD ne angažuje.
+_SIGN_QUESTION_RE = re.compile(
+    r"koji\s+znak|upi[šs]i\s+znak|umetni\s+znak|stoji\s+izme[đd]u|\buporedi\w*\b"
+    r"|\busporedi\w*\b",
+    re.IGNORECASE,
+)
+_QUANTITY_BLOCKER_RE = re.compile(r"\bkoliko\b", re.IGNORECASE)
+_SUPERLATIVE_MAX_RE = re.compile(r"\bnajve[ćc]\w*", re.IGNORECASE)
+_SUPERLATIVE_MIN_RE = re.compile(r"\bnajmanj\w*", re.IGNORECASE)
+_BASE_SIGNS = ("<", ">", "=")
+_DISQUALIFYING_SIGNS = ("≤", "≥", "≠", "\\le", "\\ge", "\\ne", "\\leq", "\\geq", "\\neq")
+
+
+@dataclass(frozen=True)
+class ComparisonMCQResult:
+    """Serverski izvedena relacija između dva vidljiva racionalna broja."""
+
+    applicable: bool
+    valid: bool
+    reason_code: str = ""
+    relation: str = ""            # "<" | ">" | "=" | "max" | "min"
+    option_values: tuple = ()
+    correct_indices: tuple = ()
+
+    @property
+    def correct_index(self) -> Optional[int]:
+        return self.correct_indices[0] if len(self.correct_indices) == 1 else None
+
+
+def _comparison_tolerance(*values: float) -> float:
+    return max(1e-9 * max((abs(value) for value in values), default=1.0), 1e-12)
+
+
+def _evaluate_sign_mcq(question, prose, options) -> ComparisonMCQResult:
+    if not _SIGN_QUESTION_RE.search(prose):
+        return ComparisonMCQResult(False, False)
+    normalized = []
+    for option in options:
+        text = (option or "").strip()
+        if text.startswith("$") and text.endswith("$") and text.count("$") == 2:
+            text = text[1:-1]
+        text = text.strip()
+        if any(sign in text for sign in _DISQUALIFYING_SIGNS):
+            return ComparisonMCQResult(False, False)
+        normalized.append(text if text in _BASE_SIGNS else None)
+    signs = [sign for sign in normalized if sign is not None]
+    if not signs or len(signs) != len(set(signs)):
+        return ComparisonMCQResult(False, False)
+
+    values = []
+    for segment in math_contents(tokenize_math(question or "")):
+        if not segment.strip():
+            continue
+        status, value = safe_numeric_value(segment)
+        if status != "value":
+            return ComparisonMCQResult(False, False)
+        values.append(value)
+    if len(values) != 2:
+        return ComparisonMCQResult(False, False)
+    left, right = values
+    if abs(left - right) <= _comparison_tolerance(left, right):
+        relation = "="
+    else:
+        relation = "<" if left < right else ">"
+    correct_indices = tuple(index for index, sign in enumerate(normalized)
+                            if sign == relation)
+    if not correct_indices:
+        return ComparisonMCQResult(True, False, "no_correct_option", relation,
+                                   tuple(values))
+    return ComparisonMCQResult(True, True, "", relation, tuple(values),
+                               correct_indices)
+
+
+def _evaluate_superlative_mcq(prose, options) -> ComparisonMCQResult:
+    wants_max = bool(_SUPERLATIVE_MAX_RE.search(prose))
+    wants_min = bool(_SUPERLATIVE_MIN_RE.search(prose))
+    if wants_max == wants_min:   # nijedan ili oba — nedokazivo
+        return ComparisonMCQResult(False, False)
+    values = []
+    for option in options:
+        status, value, _expr = _option_numeric_value(option)
+        if status != "value":
+            return ComparisonMCQResult(False, False)
+        values.append(value)
+    extreme = max(values) if wants_max else min(values)
+    tolerance = _comparison_tolerance(*values)
+    correct_indices = tuple(index for index, value in enumerate(values)
+                            if abs(value - extreme) <= tolerance)
+    relation = "max" if wants_max else "min"
+    if len(correct_indices) != 1:
+        return ComparisonMCQResult(True, False, "multiple_correct_options",
+                                   relation, tuple(values), correct_indices)
+    return ComparisonMCQResult(True, True, "", relation, tuple(values),
+                               correct_indices)
+
+
+def evaluate_comparison_mcq(question: str,
+                            option_texts: Iterable[str]) -> ComparisonMCQResult:
+    """Ocijeni SAMO jednoznačan MCQ poređenja; sve ostalo ćuti."""
+    options = tuple(option_texts or ())
+    if not options or _QUANTITY_BLOCKER_RE.search(question or ""):
+        return ComparisonMCQResult(False, False)
+    prose = " ".join(content for kind, content in tokenize_math(question or "")
+                     if kind == TEXT)
+    sign_result = _evaluate_sign_mcq(question, prose, options)
+    if sign_result.applicable or _SIGN_QUESTION_RE.search(prose):
+        return sign_result
+    return _evaluate_superlative_mcq(prose, options)
+
+
 def mathematical_publication_failure(question: str, option_texts: Iterable[str],
                                      marked_index: int) -> tuple[str, DivisibilityMCQResult]:
     """Return the server-provable MCQ math failure, before metadata checks."""
@@ -458,15 +581,22 @@ def publication_failure(question: str, option_texts: Iterable[str], marked_index
     if not expected_answer_matches_correct_option(expected_answer, result):
         return "marked_option_math_mismatch", result
     if not result.applicable:
-        # Faza 4G: kad oblik NIJE djeljivost, isti poziv pita i uski orakl
-        # direktnog računa. `expected_answer` se ovdje ne poredi ponovo —
-        # jednakost s označenom opcijom već garantuju šema i preflight.
+        # Faza 4G: kad oblik NIJE djeljivost, isti poziv pita i uske orakle
+        # direktnog računa i poređenja. `expected_answer` se ovdje ne poredi
+        # ponovo — jednakost s označenom opcijom već garantuju šema i preflight.
         computation = evaluate_direct_computation_mcq(question, option_texts)
         if computation.applicable:
             if not computation.valid:
                 return computation.reason_code, computation
             if marked_index != computation.correct_index:
                 return "marked_option_math_mismatch", computation
+        else:
+            comparison = evaluate_comparison_mcq(question, option_texts)
+            if comparison.applicable:
+                if not comparison.valid:
+                    return comparison.reason_code, comparison
+                if marked_index != comparison.correct_index:
+                    return "marked_option_math_mismatch", comparison
     return "", result
 
 

@@ -249,13 +249,16 @@ def collect_package_issues(task, contract=None, previous_signature=""):
             # Faza 4G: isti poziv sada pokriva i orakl direktnog računa —
             # njegov nalaz nosi serverski IZRAČUNATU vrijednost izraza, ne
             # listu djelilaca. Vrijednost je izveden podatak (pravilo 7).
-            if result is not None and hasattr(result, "computed_value"):
+            if result is not None and hasattr(result, "relation"):
+                detail = (f"server derived relation '{result.relation}'"
+                          if result.relation else "comparison values unproven")
+            elif result is not None and hasattr(result, "computed_value"):
                 value = result.computed_value
                 detail = (f"server computed value {value:.6g}" if value is not None
                           else "task arithmetic is invalid")
             else:
                 read = ",".join(str(divisor)
-                                for divisor in (result.divisors if result else ()))
+                                for divisor in getattr(result, "divisors", ()) or ())
                 detail = (f"server read divisors: {read}" if read
                           else "server could not read any divisor")
             issues.append(PackageIssue(failure, detail=detail))
@@ -371,9 +374,9 @@ def format_for_reviewer(issues):
         "3 i 5`). In that same sentence do not restate the condition as a product, do "
         "not put any other number after the divisor list, do not use `ili`, and do not "
         "use a negation such as `nije djeljiv`. "
-        # ŽIVI GATE 5ac723e (grade9, lekcija 9-05-010 o sistemu bez ijednog
-        # rješenja — naslov se ovdje NE ispisuje, motor ne smije nositi
-        # nazive lekcija): za
+        # ŽIVI GATE 5ac723e (scenario grade9, lekcija 9. razreda o sistemu
+        # bez ijednog rješenja — ni naslov ni ID lekcije se ovdje ne
+        # ispisuju, motor ih ne smije nositi): za
         # `numeric_inconsistency` nije postojao NIJEDAN lijek u ovom bloku, pa je
         # recenzent vraćao `correct` s istim nalazom. Lijek pokriva i namjernu
         # kontradikciju: bez markera lažnosti u ISTOJ rečenici server je ne može
