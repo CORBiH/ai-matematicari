@@ -20,6 +20,7 @@ from typing import Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 from matbot import config
+from matbot.tutor import reviewer_authority
 
 # Zatvoren skup namjera. Model bira TAČNO jednu; server iz nje izvodi šta smije
 # biti popunjeno i šta se smije desiti sa stanjem sesije.
@@ -190,8 +191,16 @@ class TutorDraft(BaseModel):
 
 
 class ReviewerChecks(BaseModel):
-    """Deset nezavisnih provjera iz specifikacije. Svaka je eksplicitna:
-    `false` uz `decision='approve'` je kontradikcija koju server odbija."""
+    """Nezavisne provjere recenzenta nad KONAČNIM paketom koji vraća.
+
+    SEMANTIKA (Faza 4C): svako polje opisuje paket u `final` — kod `correct`
+    dakle ISPRAVLJENI zadatak, nikad izvorni nacrt. Autoritet po polju je
+    izričit i živi u matbot/tutor/reviewer_authority.py:
+      • sigurnosno kritične tvrdnje bez determinističke zamjene blokiraju;
+      • gdje postoji serverski validator, ON je mjerodavan, a boolean je
+        dijagnostika;
+      • savjetodavne tvrdnje same nikad ne obaraju kompletan paket.
+    Netačna vrijednost NIKAD nije dokaz ispravnosti u suprotnom smjeru."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -257,12 +266,36 @@ def difficulty_evidence_errors(evidence: DifficultyEvidence, target_level: int) 
         # rezonovanja i broj uslova ostaju na 1, i SVAKA zastavica i dalje
         # diskvalifikuje nivo 1 — višekorakan, višeuslovni, dokazni i
         # konstruktivni zadatak ostaju blokirani, kao i tri operacije.
+        # POREĐENJE SAMO PO SEBI NE DISKVALIFIKUJE NIVO 1 (živi gate acd8f5c).
+        # Pad: lekcija 7. razreda o upoređivanju brojeva, zadatak oblika „koji
+        # je veći od dva razlomka s istim imeniocem“, dokaz steps=1 cond=1
+        # ops=1 repr=0 uz requires_comparison=true. To je udžbenički uvodni
+        # zadatak, ali je apsolutna zabrana poređenja činila nivo 1 NEDOSTIŽNIM
+        # za svaku lekciju čija je vještina upravo poređenje — model je
+        # odgovorio iskreno, a server ga je odbio.
+        #
+        # Prag se NE spušta: poređenje je dozvoljeno na nivou 1 samo dok su
+        # SVE ostale dimenzije minimalne. Poređenje uz drugi korak, drugi
+        # uslov, treću operaciju, dvije promjene zapisa, obrazloženje,
+        # konstrukciju, dokaz ili kombinovanje pojmova i dalje pada.
+        minimal_apart_from_comparison = (
+            evidence.reasoning_steps <= 1 and evidence.condition_count <= 1
+            and evidence.operation_count <= 1
+            and evidence.representation_change_count <= 1
+            and not evidence.requires_explanation
+            and not evidence.requires_construction
+            and not evidence.requires_proof_or_justification
+            and not evidence.combines_concepts
+        )
+        comparison_disqualifies = (
+            evidence.requires_comparison and not minimal_apart_from_comparison
+        )
         if (evidence.reasoning_steps > 1 or evidence.condition_count > 1
                 # operation_count counts meaningful connected mathematical
                 # operations, not every token or arithmetic symbol.
                 or evidence.operation_count > 2
                 or evidence.representation_change_count > 1
-                or evidence.requires_explanation or evidence.requires_comparison
+                or evidence.requires_explanation or comparison_disqualifies
                 or evidence.requires_construction or evidence.requires_proof_or_justification
                 or evidence.combines_concepts):
             errors.append("level_1_is_not_direct_introductory_application")
@@ -525,17 +558,18 @@ def validate_reviewer(reviewer: ReviewerFinal) -> None:
     if checks.difficulty_evidence_valid:
         _require(reviewer.reviewed_difficulty_evidence is not None,
                  "reviewer claims valid difficulty evidence without a result")
-    failed = [
-        name for name in (
-            "math_correct", "marked_option_correct", "inside_lesson",
-            "intent_handled", "task_solvable_and_unambiguous", "mathjax_valid",
-            "language_age_appropriate", "response_addresses_student",
-            "task_package_consistent", "difficulty_evidence_valid",
-            "task_signature_consistent",
-        )
-        if not getattr(checks, name)
-    ]
-    _require(not failed, f"odobreno uprkos oborenim provjerama: {failed}")
+    # ------------------------------------------------------------------
+    # AUTORITET PROVJERA (Faza 4C) — vidi matbot/tutor/reviewer_authority.py
+    # ------------------------------------------------------------------
+    # Ranije je svih jedanaest `checks.*` bilo smrtonosno, pa je kompletan i
+    # deterministički ispravan paket propadao zbog jedne samoprijavljene
+    # zastavice (živi nalazi F12: language_age_appropriate, B13:
+    # marked_option_correct). Te dvije tvrdnje nisu iste težine, pa blanket
+    # pravilo nije rješenje: blokiraju SAMO sigurnosno kritične provjere bez
+    # determinističke zamjene. Za ostale je mjerodavan serverski validator
+    # koji se ionako ponovo pokreće nad KONAČNIM paketom.
+    failed = reviewer_authority.blocking_failed_checks(checks)
+    _require(not failed, f"odobreno uprkos oborenim provjerama: {list(failed)}")
 
     # ------------------------------------------------------------------
     # DOSLJEDNOST ODLUKE S VLASTITIM MJERODAVNIM DOKAZOM (živi gate cb80b92)

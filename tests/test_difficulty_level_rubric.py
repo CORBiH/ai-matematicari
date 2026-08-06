@@ -17,8 +17,9 @@ je odbijala jer je nivo 1 tražio `representation_change_count == 0` i
 
 Kalibrišu se TAČNO DVA praga nivoa 1 (`repr <= 1`, `ops <= 2`). Sve ostalo
 ostaje: jedan korak rezonovanja, jedan uslov, i svaka zastavica (objašnjenje,
-poređenje, konstrukcija, dokaz, kombinovanje koncepata) i dalje diskvalifikuje
-nivo 1. Preostala 4 živa slučaja ostaju blokirana i to je namjerno.
+konstrukcija, dokaz, kombinovanje koncepata) i dalje diskvalifikuje nivo 1.
+Poređenje je od Faze 4C izuzetak: samo po sebi ne diskvalifikuje, ali uz bilo
+koji dodatni korak/uslov i dalje pada. Preostala 4 živa slučaja ostaju blokirana i to je namjerno.
 
 Nivoi 2 i 3 se NE diraju: A11 i B50 su na ciljanom nivou 2 prijavili
 steps=3/ops=3 — to su stvarni zadaci nivoa 3 pogrešno označeni kao 2, i guard
@@ -79,6 +80,7 @@ LEVEL1_ACCEPTS = {
     "osnovno uvrštavanje pa račun": ev(1, 1, 2, 0),
     "jednostavan MCQ s četiri opcije": ev(1, 1, 1, 0),
     "trivijalna promjena zapisa (0,5 → 1/2)": ev(1, 1, 1, 1),
+    "minimalno poređenje (živi gate acd8f5c)": ev(1, 1, 1, 0, comparison=True),
 }
 
 LEVEL1_REJECTS = {
@@ -86,7 +88,11 @@ LEVEL1_REJECTS = {
     "dokazivanje": ev(1, 1, 1, 0, proof=True),
     "konstrukcija": ev(1, 1, 1, 0, construction=True),
     "traži objašnjenje": ev(1, 1, 1, 0, explanation=True),
-    "traži poređenje": ev(1, 1, 1, 0, comparison=True),
+    # Faza 4C: SAMO poređenje više ne diskvalifikuje nivo 1 (lekcija čija je
+    # vještina upravo poređenje inače ne bi imala nijedan zadatak nivoa 1).
+    # Poređenje UZ dodatni korak i dalje pada.
+    "poređenje uz dodatni korak rezonovanja": ev(2, 1, 1, 0, comparison=True),
+    "poređenje uz drugi uslov": ev(1, 2, 1, 0, comparison=True),
     "višefazni problem": ev(3, 1, 1, 0),
     "više nezavisnih uslova": ev(1, 3, 1, 0),
     "napredna reprezentacijska transformacija": ev(1, 1, 1, 2),

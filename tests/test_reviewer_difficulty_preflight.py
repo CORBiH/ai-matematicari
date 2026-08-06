@@ -301,7 +301,8 @@ def test_lowering_counts_without_changing_the_task_is_not_blocked_by_preflight(m
                  "level_1_is_not_direct_introductory_application", id="two-representation-changes"),
     pytest.param({"requires_explanation": True},
                  "level_1_is_not_direct_introductory_application", id="explanation-flag"),
-    pytest.param({"requires_comparison": True},
+    # Faza 4C: samo poređenje je legitiman nivo 1; poređenje UZ dodatni korak nije.
+    pytest.param({"requires_comparison": True, "reasoning_steps": 2},
                  "level_1_is_not_direct_introductory_application", id="comparison-flag"),
 ])
 def test_level_one_underreporting_is_still_detected(updates, expected_code):

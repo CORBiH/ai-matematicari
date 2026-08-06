@@ -28,6 +28,7 @@ from matbot.mathcheck import find_numeric_inconsistencies
 from matbot.semantics import detectors as semantic_detectors
 from matbot.tutor import lesson_context as lesson_context_module
 from matbot.tutor import package_preflight
+from matbot.tutor import reviewer_authority
 from matbot.tutor import prompts as tutor_prompts
 from matbot.tutor.schema import (TASK_INTENTS, UnifiedOutputError,
                                  normalize_for_intent, validate_final, validate_task,
@@ -788,6 +789,14 @@ def _two_call(llm, context, session, student_message, request_id, trusted_verdic
             )
             return None, calls
 
+    # Netačne provjere koje po matrici autoriteta NE obaraju turn i dalje se
+    # LOGUJU — signal se ne smije izgubiti samo zato što ne blokira.
+    diagnostic = reviewer_authority.diagnostic_failed_checks(reviewer.checks)
+    if diagnostic:
+        logger.info(
+            "reviewer_non_blocking_checks request_id=%s topic=%s decision=%s checks=%s",
+            request_id, context.topic_id, reviewer.decision, ",".join(diagnostic),
+        )
     if reviewer.decision == "correct":
         logger.info(
             "tutor_corrected request_id=%s topic=%s intent=%s",

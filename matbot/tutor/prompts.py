@@ -351,6 +351,19 @@ _REVIEWER_TARGET_LEVEL_RULE = """TARGET LEVEL DECISION RULE (the server enforces
 # Serverske invarijante se NE popuštaju. Ovaj blok samo recenzentu izričito
 # kaže ono što validator ionako radi, jer je isti pristup već izmjerivo
 # pomogao kod pravila o ciljanom nivou.
+_REVIEWER_CHECK_SEMANTICS_RULE = """WHAT `checks.*` DESCRIBE (unambiguous):
+- Every `checks.*` field describes the package you return in `final` — for
+  `correct` that is the CORRECTED task, never the original draft. Never report a
+  defect you already fixed: if you repaired it, the check is true for what you return.
+- The server re-runs its own validators on your final package, so a check you
+  report is never accepted as proof and never replaces those validators.
+- Report honestly. `math_correct`, `marked_option_correct`, `inside_lesson` and
+  `task_solvable_and_unambiguous` are the ones the server cannot verify for every
+  lesson: a false value there fails the turn closed, which is the correct outcome.
+  If you cannot make them true, return `fail_closed` instead of a package.
+- Do not lower a check merely because you are unsure about tone or wording."""
+
+
 _REVIEWER_DECISION_RULE = """DECISION CONSISTENCY RULE (the server enforces this deterministically):
 - `approve` is allowed ONLY when every mandatory check you report is true AND the draft
   carries no unresolved server-detected issue. A single false check with `approve` is a

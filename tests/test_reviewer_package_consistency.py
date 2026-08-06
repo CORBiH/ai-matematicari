@@ -22,15 +22,19 @@ import pytest
 
 from matbot.tutor import prompts as tutor_prompts
 from matbot.tutor import pipeline as tutor_pipeline
+from matbot.tutor import reviewer_authority
 from matbot.tutor.schema import UnifiedOutputError, validate_reviewer
 from tests.conftest import (make_reviewer_checks, make_reviewer_final, make_task_payload,
                             make_tutor_draft, queue_two_call)
 
 LESSON = "9-04-003"
-MANDATORY = ("math_correct", "marked_option_correct", "inside_lesson", "intent_handled",
-             "task_solvable_and_unambiguous", "mathjax_valid", "language_age_appropriate",
-             "response_addresses_student", "task_package_consistent",
-             "difficulty_evidence_valid", "task_signature_consistent")
+# Faza 4C: autoritet po provjeri je sada izričit (matbot/tutor/reviewer_authority.py).
+# Blokiraju SAMO sigurnosno kritične tvrdnje bez determinističke zamjene; za
+# ostale je mjerodavan serverski validator koji se ionako ponovo pokreće nad
+# KONAČNIM paketom, pa netačan boolean sam ne obara turn.
+MANDATORY = tuple(sorted(reviewer_authority.MODEL_ONLY_BLOCKING_CHECKS))
+NON_BLOCKING = tuple(sorted(reviewer_authority.DETERMINISTIC_AUTHORITY_CHECKS
+                            | reviewer_authority.ADVISORY_CHECKS))
 
 
 @pytest.fixture(autouse=True)
@@ -59,14 +63,24 @@ def _task(text="Riješi jednačinu: $3x=12$", options=None, expected="$x=4$"):
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize("failing", MANDATORY)
-def test_approve_is_refused_when_any_mandatory_check_is_false(failing):
-    """A01/A26/A39/A40/B04/B31 — nijedna obavezna provjera ne smije biti false."""
+def test_approve_is_refused_when_a_safety_critical_check_is_false(failing):
+    """A01/A26/A39/A40/B04/B31 — sigurnosno kritična tvrdnja ostaje smrtonosna."""
     draft = make_tutor_draft(intent="generate_task", new_task=_task())
     reviewer = make_reviewer_final(decision="approve", final=draft,
                                    checks=make_reviewer_checks(**{failing: False}))
     with pytest.raises(UnifiedOutputError) as error:
         validate_reviewer(reviewer)
     assert failing in str(error.value)
+
+
+@pytest.mark.parametrize("failing", NON_BLOCKING)
+@pytest.mark.parametrize("decision", ["approve", "correct"])
+def test_non_blocking_check_alone_never_vetoes_a_complete_package(decision, failing):
+    """Faza 4C: deterministički pokrivena ili savjetodavna tvrdnja sama ne obara
+    paket — o njoj odlučuje serverski validator, koji i dalje radi."""
+    draft = make_tutor_draft(intent="generate_task", new_task=_task())
+    validate_reviewer(make_reviewer_final(decision=decision, final=draft,
+                                          checks=make_reviewer_checks(**{failing: False})))
 
 
 @pytest.mark.parametrize("decision", ["approve", "correct"])

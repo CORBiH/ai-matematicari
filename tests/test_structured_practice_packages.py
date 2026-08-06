@@ -317,7 +317,9 @@ def test_level_one_accepts_every_direct_introductory_form(form):
     {"condition_count": 2},
     {"operation_count": 3},
     {"requires_explanation": True},
-    {"requires_comparison": True},
+    # Faza 4C: poređenje samo po sebi je dozvoljeno na nivou 1; uz dodatni
+    # korak i dalje nije.
+    {"requires_comparison": True, "reasoning_steps": 2},
     {"requires_construction": True},
     {"requires_proof_or_justification": True},
     {"representation_change_count": 2},
