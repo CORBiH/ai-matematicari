@@ -232,6 +232,7 @@ function loadPage(options = {}) {
     'sendChoiceAnswer', 'sendTutorMsg', 'buildOptionCards', 'renderOptionsFromResponse',
     'applyTutorResponse', 'state', 'optionsBox', 'setAwaitingPracticeTask',
     'clearAwaitingPracticeTask', 'storedLastTask', 'storedNextState',
+    'currentRequestGeneration', 'invalidatePendingResponses', 'clearOptions',
   ];
   const probe = `\n;globalThis.__ui = {${exported.join(', ')},`
     + ' setChipMeta: (m) => { pendingChipMeta = m; },'

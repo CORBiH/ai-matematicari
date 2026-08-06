@@ -170,8 +170,17 @@ def _clip(value, limit=_LOG_LIMIT):
 
 def _error_response(active_task=""):
     """Namjerno BEZ 'status' i BEZ 'next_state' — frontend tada čuva svoje
-    stanje (isti ugovor kao i ranije)."""
-    return {"answer": SAFE_ERROR_MESSAGE, "last_tutor_task": active_task or ""}
+    stanje (isti ugovor kao i ranije).
+
+    `task_preserved` je EKSPLICITAN metapodatak, ne nagađanje iz teksta:
+    frontend je do sada brisao kartice opcija za SVAKI odgovor bez
+    `status:'ready'`, iako je server aktivan zadatak zadržao. Sada mu server
+    jasno kaže da zadatak i dalje stoji, pa učenik može nastaviti da odgovara."""
+    return {
+        "answer": SAFE_ERROR_MESSAGE,
+        "last_tutor_task": active_task or "",
+        "task_preserved": bool(active_task),
+    }
 
 
 def _next_state(session):

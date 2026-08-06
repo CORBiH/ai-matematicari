@@ -844,6 +844,17 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch(_){ sessionId = 'sess_' + Date.now(); }
 
     /* Phase 4.3: lagano stanje interakcije (practice tok: zadatak → odgovor → feedback) */
+    /* --- REDOSLIJED ODGOVORA (Faza 4F) --------------------------------
+       Monoton brojač prihvaćenih korisničkih akcija. Svaki poslani zahtjev
+       pamti vrijednost koju je zatekao; odgovor smije upisati vidljivo stanje
+       SAMO ako je ta vrijednost i dalje aktuelna. Time zakašnjeli odgovor
+       starijeg zahtjeva (spor turn, timeout pa retry, promjena teme, zatvaranje
+       vježbe) ne može pregaziti noviji prihvaćeni zadatak. Koristi se ZAJEDNO s
+       postojećim client_turn_id i provjerom teme — ne umjesto njih. */
+    let requestGeneration = 0;
+    function nextRequestGeneration(){ requestGeneration += 1; return requestGeneration; }
+    function currentRequestGeneration(){ return requestGeneration; }
+    function invalidatePendingResponses(){ requestGeneration += 1; }
     let interactionPhase = null;   // 'awaiting_practice_answer' | null
     /* Phase 7.2: zadnja poruka tutora (za follow-up nastavak: "može", "nastavi") */
     let lastTutorMessage = '';
@@ -1165,6 +1176,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     function invalidatePracticeCurriculumState(){
       if (state.mode !== 'practice') return;
+      invalidatePendingResponses();   // odgovor u letu više ne smije upisati stanje
       clearAwaitingPracticeTask();
       clearNextState();
       clearOptions();
@@ -1619,15 +1631,20 @@ document.addEventListener('DOMContentLoaded', () => {
       optionsBox.hidden = true;
       optionsBox.innerHTML = '';
       optionsBox.dataset.taskText = '';
+      optionsBox.dataset.taskIdentity = '';
     }
     function lockAllOptionCards(){
       if (!optionsBox) return;
       optionsBox.querySelectorAll('.mc-option-card').forEach(b=>{ b.disabled = true; });
     }
-    function buildOptionCards(options, questionText){
+    function buildOptionCards(options, questionText, taskIdentity){
       if (!optionsBox) return;
+      /* ATOMSKA ZAMJENA: tekst, opcije i identitet se postavljaju zajedno, a
+         innerHTML='' uklanja SVE prethodne kartice (pa s njima i crveno/zeleno,
+         disabled i svaki drugi po-zadatku vezan trag). */
       optionsBox.innerHTML = '';
       optionsBox.dataset.taskText = questionText || '';
+      optionsBox.dataset.taskIdentity = taskIdentity || '';
       options.forEach(opt=>{
         const b = document.createElement('button');
         b.type = 'button';
@@ -1648,13 +1665,29 @@ document.addEventListener('DOMContentLoaded', () => {
        eksplicitan reveal (npr. "uradi ga ti") na POSTOJEĆE kartice. */
     function renderOptionsFromResponse(j){
       if (!optionsBox) return;
-      if (!j || j.status !== 'ready' || state.mode !== 'practice'){ clearOptions(); return; }
+      if (!j || state.mode !== 'practice'){ clearOptions(); return; }
+      if (j.status !== 'ready'){
+        /* SIGURNA GREŠKA: server EKSPLICITNO kaže da li je aktivni zadatak
+           preživio (task_preserved). Ranije je svaki odgovor bez 'ready'
+           brisao kartice, pa je učenik gubio zadatak koji je server uredno
+           sačuvao. Bez tog metapodatka ostaje zatečeno ponašanje. */
+        if (!j.task_preserved) clearOptions();
+        return;
+      }
       const task = j.next_state && j.next_state.task;
       const options = task && task.options;
       if (!options || options.length !== 4){ clearOptions(); return; }
       const questionText = task.question || '';
-      if (optionsBox.dataset.taskText !== questionText){
-        buildOptionCards(options, questionText);   // nov zadatak: stare kartice se u potpunosti zamjenjuju
+      const identity = task.identity || '';
+      /* IDENTITET je mjerodavan kad ga server pošalje; tekst je rezerva za
+         starije odgovore. Živi nalaz: server je objavio ISTI tekst kao nov
+         zadatak, pa poređenje po tekstu nije prepoznalo promjenu i crvena
+         oznaka prethodnog pokušaja je ostala na ekranu. */
+      const changed = identity
+        ? (optionsBox.dataset.taskIdentity !== identity)
+        : (optionsBox.dataset.taskText !== questionText);
+      if (changed){
+        buildOptionCards(options, questionText, identity);   // nov zadatak: potpuna zamjena
         return;
       }
       if (j.revealed_correct_option_id){
@@ -1670,6 +1703,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const btn = optionsBox.querySelector('.mc-option-card[data-option-id="' + optionId + '"]');
       if (!btn || btn.disabled) return;
       choiceBusy = true; tutorBusy = true;
+      const choiceGeneration = nextRequestGeneration();
+      const choiceIdentity = optionsBox.dataset.taskIdentity || '';
       optionsBox.querySelectorAll('.mc-option-card').forEach(b=>{ b.disabled = true; });
       btn.classList.add('loading');
       hideChips();
@@ -1693,7 +1728,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const abortTimer = setTimeout(()=>{ try { ac.abort(); } catch(_){} }, TUTOR_ABORT_MS);
       try{
         const j = await jsonTutorRequest(payload, ac, null);
-        if (j && j.status === 'ready'){
+        /* Rezultat klika pripada TAČNO onom zadatku koji je bio na ekranu kad
+           je klik poslan. Ako se zadatak u međuvremenu promijenio, ništa se ne
+           boji — stanje zadatka A ne smije završiti na zadatku B. */
+        const sameTask = (optionsBox.dataset.taskIdentity || '') === choiceIdentity;
+        if (j && j.status === 'ready' && sameTask){
           if (j.answer_verdict === 'correct'){
             btn.classList.add('correct');
             lockAllOptionCards();
@@ -1709,7 +1748,8 @@ document.addEventListener('DOMContentLoaded', () => {
           applyTutorResponse(j, {
             fromTyped: false, answerPhase: true, rendered: false,
             requestFingerprint: payloadPracticeFingerprint(payload),
-            requestTopic: payload.selected_topic
+            requestTopic: payload.selected_topic,
+            requestGeneration: choiceGeneration
           });
         } else {
           // deterministički blok (nevažeći ID / nema aktivnog zadatka / već završen) ili greška:
@@ -2004,6 +2044,7 @@ document.addEventListener('DOMContentLoaded', () => {
         payload.last_tutor_message = lastTutorMessage.slice(0, 600);
       }
       tutorBusy = true;
+      const turnGeneration = nextRequestGeneration();
       /* U balončiću učenik vidi svoj tekst + neutralnu oznaku da je slika
          priložena. U HISTORIJU (localStorage + sljedeći zahtjevi) ide SAMO
          tekstualni marker — nikad base64, object URL, ime fajla, dimenzije,
@@ -2044,10 +2085,10 @@ document.addEventListener('DOMContentLoaded', () => {
              uspjeh je već ispisao bubble (rendered:true), a poznata blokada
              (401/429/409/...) NIJE ništa ispisala pa applyTutorResponse mora
              sam kreirati bubble (rendered:false) — isto kao normalan JSON put. */
-          applyTutorResponse(result.j, { fromTyped, answerPhase, rendered: !!result.rendered, isNewTaskRequest, retryPayload: payload, requestFingerprint: payloadPracticeFingerprint(payload), requestTopic: payload.selected_topic });
+          applyTutorResponse(result.j, { fromTyped, answerPhase, rendered: !!result.rendered, isNewTaskRequest, retryPayload: payload, requestFingerprint: payloadPracticeFingerprint(payload), requestTopic: payload.selected_topic, requestGeneration: turnGeneration });
         } else {
           const j = await jsonTutorRequest(payload, ac, imgFile);
-          applyTutorResponse(j, { fromTyped, answerPhase, rendered: false, isNewTaskRequest, retryPayload: payload, requestFingerprint: payloadPracticeFingerprint(payload), requestTopic: payload.selected_topic });
+          applyTutorResponse(j, { fromTyped, answerPhase, rendered: false, isNewTaskRequest, retryPayload: payload, requestFingerprint: payloadPracticeFingerprint(payload), requestTopic: payload.selected_topic, requestGeneration: turnGeneration });
         }
       }catch(err){
         if (err && err.name === 'AbortError'){
@@ -2231,11 +2272,26 @@ document.addEventListener('DOMContentLoaded', () => {
     /* zajednička obrada odgovora za streaming i non-streaming put */
     function applyTutorResponse(j, opts){
       opts = opts || {};
-      const stalePracticeResponse = !!opts.requestFingerprint && (
+      /* Zastarjela generacija: noviji prihvaćeni potez je već upisao stanje. */
+      if (opts.requestGeneration !== undefined
+          && opts.requestGeneration !== currentRequestGeneration()){
+        if (opts.rendered){
+          const staleRow = lastBotMessage();
+          if (staleRow) staleRow.remove();
+        }
+        return;
+      }
+      /* Tema zahtjeva se poredi i SAMOSTALNO: ranije je cijela provjera bila
+         uslovljena postojanjem requestFingerprint-a, pa je pozivalac koji ga ne
+         pošalje ostajao bez ijedne zaštite. Odgovor za temu A ne smije upisati
+         stanje nakon prelaska na temu B. */
+      const switchedTopic = !!opts.requestTopic && state.mode === 'practice'
+        && !!state.topic && opts.requestTopic !== state.topic;
+      const stalePracticeResponse = switchedTopic || (!!opts.requestFingerprint && (
         opts.requestFingerprint !== trackedTaskFingerprint()
         || (!!(j && j.effective_topic)
             && j.effective_topic !== (opts.requestTopic || ''))
-      );
+      ));
       if (stalePracticeResponse){
         /* Odgovor zahtjeva koji je krenuo prije promjene lekcije ne smije se
            naknadno prikazati, pohraniti niti preimenovati kao nova lekcija. */
@@ -2271,6 +2327,17 @@ document.addEventListener('DOMContentLoaded', () => {
             ? ((j.last_tutor_task || '').toString().trim().slice(0, 600))
             : extractTutorTask(j, answer))
         : '';
+      /* Otkrivanje/verdikt koji pripada DRUGOM zadatku ne smije se naslikati na
+         trenutni. Server šalje identitet aktivnog zadatka; kad se ne poklapa s
+         onim koji je na ekranu, po-zadatku vezana polja se ignorišu. */
+      const renderedIdentity = optionsBox ? (optionsBox.dataset.taskIdentity || '') : '';
+      const responseIdentity = (j && j.next_state && j.next_state.task
+        && j.next_state.task.identity) || '';
+      if (renderedIdentity && responseIdentity && renderedIdentity !== responseIdentity
+          && j.revealed_correct_option_id){
+        j = Object.assign({}, j);
+        delete j.revealed_correct_option_id;
+      }
       if (j && j.next_state) {
         setNextState(j.next_state);
         updateStreakPill(j.next_state.correct_streak, j.session_mode || state.mode);

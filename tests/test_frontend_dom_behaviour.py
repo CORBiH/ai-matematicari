@@ -21,7 +21,8 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
-SUITE = ROOT / "tests" / "frontend" / "practice_ui.test.js"
+SUITE_DIR = ROOT / "tests" / "frontend"
+SUITES = sorted(str(path) for path in SUITE_DIR.glob("*.test.js"))
 
 node = shutil.which("node")
 pytestmark = pytest.mark.skipif(
@@ -30,8 +31,9 @@ pytestmark = pytest.mark.skipif(
 
 
 def test_frontend_dom_suite_passes():
+    assert SUITES, "nema nijednog DOM testa u tests/frontend/"
     result = subprocess.run(
-        [node, "--test", str(SUITE)],
+        [node, "--test", *SUITES],
         cwd=str(ROOT), capture_output=True, text=True, encoding="utf-8", errors="replace",
         timeout=300,
     )

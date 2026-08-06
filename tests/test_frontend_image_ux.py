@@ -88,7 +88,11 @@ def test_case5_text_plus_image_submission_allowed():
 
 def test_case6_attachment_cleared_only_after_successful_response():
     html = _read()
-    body = _function_body(html, "function applyTutorResponse", 6000)
+    # Prozor prati rast funkcije: Faza 4F je u applyTutorResponse dodala
+    # provjeru generacije zahtjeva i kapiju identiteta zadatka. Provjeravana
+    # invarijanta je nepromijenjena — čišćenje priloga je i dalje UNUTAR grane
+    # uspjeha; mijenja se samo koliko teksta test mora obuhvatiti.
+    body = _function_body(html, "function applyTutorResponse", 8000)
     clear_at = body.index("clearTutorImage();")
     ready_at = body.index("if (j.status === 'ready'){")
     assert ready_at < clear_at            # čišćenje je UNUTAR grane uspjeha
