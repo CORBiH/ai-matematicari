@@ -74,12 +74,16 @@ def task_for(lesson_id, text=None, options=OPTIONS, correct_index=0, level=1,
     if evidence is not None:
         updates["difficulty_evidence"] = evidence
     if variant:
-        # Različit potpis po objavi — inače ispravno reaguje zaštita od
-        # ponavljanja („duplicate structured task signature“).
+        # Različita OBJAVA po pozivu — inače ispravno reaguje zaštita od
+        # ponavljanja. Od Faze 4F se mijenja i VIDLJIVI zadatak, ne samo
+        # deklarisani potpis: kanonski identitet se računa iz onoga što učenik
+        # vidi, pa je varijanta koja mijenja samo `task_signature` upravo
+        # produkcijski defekt koji je pustio isti zadatak dvaput.
         from matbot.tutor.schema import SignatureParameter
         updates["task_signature"] = payload.task_signature.model_copy(
             update={"normalized_parameters": [
                 SignatureParameter(name="variant", value=str(variant))]})
+        updates["text"] = f"{updates.get('text', payload.text)} (varijanta {variant})"
     return payload.model_copy(update=updates)
 
 

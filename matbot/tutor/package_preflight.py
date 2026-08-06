@@ -32,6 +32,7 @@ from dataclasses import dataclass
 
 from matbot import lesson_fidelity, mcq_integrity, option_equivalence
 from matbot.semantics import detectors as semantic_detectors
+from matbot.tutor import task_identity
 from matbot.mathcheck import find_numeric_inconsistencies
 from matbot.mathsafe import sanitize_and_validate_math_text
 from matbot.terminology import normalize_terminology
@@ -51,6 +52,9 @@ SEMANTIC_DUPLICATE_CODE = "semantically_duplicate_options"
 
 # Dokaz težine nacrta ne zadovoljava nivo koji je nacrt SAM deklarisao.
 DIFFICULTY_OUTSIDE_TARGET_CODE = "difficulty_evidence_outside_target"
+
+# Predloženi zadatak je kanonski ISTI kao aktivni (vidi task_identity).
+DUPLICATE_ACTIVE_TASK_CODE = "duplicate_active_task"
 
 
 @dataclass(frozen=True)
@@ -96,7 +100,7 @@ def _option_id(task, index):
         return str(index)
 
 
-def collect_package_issues(task, contract=None):
+def collect_package_issues(task, contract=None, previous_signature=""):
     """Vrati zatvorenu torku nalaza postojećih validatora nad JEDNIM paketom.
 
     Prazna torka = nijedan deterministički validator ne može dokazati defekt.
@@ -218,6 +222,17 @@ def collect_package_issues(task, contract=None):
                 detail=(f"server read divisors: {read}" if read
                         else "server could not read any divisor")))
 
+    # 4b) ISTI ZADATAK KAO AKTIVNI (produkcijski nalaz: „Daj mi novi zadatak.“
+    # je vratio doslovno isti zadatak i iste opcije). Poredi se SERVERSKI izveden
+    # kanonski potpis vidljivog paketa — nikad `task_signature` koju model
+    # deklariše o sebi. Vidi matbot/tutor/task_identity.py.
+    if previous_signature and task_text_safe and option_texts and all(option_texts):
+        proposed = task_identity.canonical_signature(task_text, option_texts)
+        if task_identity.is_same_task(previous_signature, proposed):
+            issues.append(PackageIssue(
+                DUPLICATE_ACTIVE_TASK_CODE,
+                detail="canonically identical to the active task"))
+
     # 5) NUMERIČKA PROTIVRJEČNOST u vidljivom tekstu i rješenju — postojeći
     #    mathcheck. Distraktori se NIKAD ne provjeravaju (namjerno su pogrešni).
     # ŽIVI NALAZ (A19, B04, B33, B42): nesiguran `text`/`solution` se ovdje TIHO
@@ -311,6 +326,14 @@ def format_for_reviewer(issues):
         "other satisfying option. For `marked_option_math_mismatch` mark the option that "
         "actually satisfies the condition and copy that option's text into "
         "expected_answer. "
+        # Produkcijski nalaz: „Daj mi novi zadatak.“ je vratio doslovno isti
+        # zadatak i iste opcije. Recenzent mora znati da kozmetika nije dovoljna.
+        f"For `{DUPLICATE_ACTIVE_TASK_CODE}` the proposed task is the SAME task the "
+        "student already has on screen: the server compares the visible question and "
+        "the set of option values, so reordering the options, renaming option IDs, "
+        "or rewording the sentence changes NOTHING. REPLACE it with a genuinely "
+        "different task for the same lesson skill — different numbers and a different "
+        "correct value — and recompute every field for that new task. "
         "Then recompute correct_option_id, "
         "correct_option_index, expected_answer (an exact copy of the marked option's "
         "text), solution, difficulty evidence for the task you actually return, and "

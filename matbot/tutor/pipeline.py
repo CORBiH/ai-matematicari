@@ -30,6 +30,7 @@ from matbot.semantics import detectors as semantic_detectors
 from matbot.tutor import lesson_context as lesson_context_module
 from matbot.tutor import package_preflight
 from matbot.tutor import reviewer_authority
+from matbot.tutor import task_identity
 from matbot.tutor import prompts as tutor_prompts
 from matbot.tutor.schema import (TASK_INTENTS, UnifiedOutputError,
                                  normalize_for_intent, validate_final, validate_task,
@@ -183,6 +184,12 @@ def _next_state(session):
         task = {"question": session["current_task"]}
         if session["current_options"]:
             task["options"] = session["current_options"]
+        # Serverski identitet aktivnog zadatka. Nije tajna (izveden je iz onoga
+        # što učenik ionako vidi) i frontend njime veže vizuelno stanje za
+        # KONKRETAN zadatak umjesto za njegov tekst.
+        identity = session.get("current_task_identity") or ""
+        if identity:
+            task["identity"] = identity
         state["task"] = task
     return state
 
@@ -246,10 +253,15 @@ def _reject_if_semantic_contract_violated(text, context, where):
             f"{detection.code}: {detection.reason} [{where}]")
 
 
-def _validate_task_server_side(task, context):
+def _validate_task_server_side(task, context, previous_signature=""):
     """Sve deterministe koje su i ranije štitile objavljen zadatak.
 
-    Vraća (tekst_zadatka, sanitizovani_tekstovi_opcija)."""
+    `previous_signature` je kanonski identitet AKTIVNOG zadatka; kad je zadat,
+    paket koji je kanonski isti pada zatvoreno TAČNO OVDJE — posljednja tačka
+    prije mutacije sesije (produkcijski nalaz: „Daj mi novi zadatak.“ je vratio
+    isti zadatak i iste opcije).
+
+    Vraća (tekst_zadatka, sanitizovani_tekstovi_opcija, expected, solution)."""
     task_text = _safe_text(task.text, "tekst zadatka")
     _reject_if_inconsistent(task_text, "tekst zadatka")
     _reject_if_geometry_invalid(task_text, context, "tekst zadatka")
@@ -292,6 +304,13 @@ def _validate_task_server_side(task, context):
     )
     if mcq_failure:
         raise UnifiedOutputError(f"mcq_integrity: {mcq_failure}")
+
+    # KANONSKI IDENTITET — posljednja kapija prije mutacije sesije. Poredi se
+    # ono što učenik VIDI, nikad `task_signature` koju model deklariše o sebi.
+    if task_identity.is_same_task(
+            previous_signature, task_identity.canonical_signature(task_text, option_texts)):
+        raise UnifiedOutputError(
+            f"{package_preflight.DUPLICATE_ACTIVE_TASK_CODE}: isti zadatak kao aktivni")
 
     return task_text, option_texts, expected, solution
 
@@ -666,7 +685,8 @@ def _guard_answer_leak(session, request_id, context, intent, answer, *,
 def _publish_task(session, context, final, request_id, target_level=None):
     """Provjeri i primijeni nov zadatak. Baca UnifiedOutputError (fail closed)."""
     task = final.new_task
-    task_text, option_texts, expected, solution = _validate_task_server_side(task, context)
+    task_text, option_texts, expected, solution = _validate_task_server_side(
+        task, context, previous_signature=session.get("current_task_identity") or "")
 
     current_options, correct_option_id = _shuffle_options(
         option_texts, task.correct_option_index
@@ -675,6 +695,11 @@ def _publish_task(session, context, final, request_id, target_level=None):
     if _is_duplicate_structured_signature(signature_record, session["recent_task_signatures"]):
         raise UnifiedOutputError("duplicate structured task signature")
     session["current_task"] = task_text
+    # Kanonski identitet ide u sesiju I u browser: UI stanje (crveno/zeleno,
+    # otkriven odgovor, hint) mora biti vezano za IDENTITET zadatka, ne za
+    # njegov tekst — vidi templates/index.html.
+    session["current_task_identity"] = task_identity.canonical_signature(
+        task_text, option_texts)
     session["expected_answer_summary"] = expected
     session["solution_summary"] = solution
     if target_level is not None:
@@ -778,8 +803,10 @@ def _two_call(llm, context, session, student_message, request_id, trusted_verdic
     # dok drugi poziv još nije napravljen. Nalaz se NE koristi za odbijanje
     # nacrta (nacrt s nalazom je upravo ono što recenzent treba da popravi),
     # nego ulazi u recenzentov ulaz kao serverska činjenica.
+    previous_signature = session.get("current_task_identity") or ""
     draft_issues = package_preflight.collect_package_issues(
-        draft.new_task, contract=context.semantic_contract)
+        draft.new_task, contract=context.semantic_contract,
+        previous_signature=previous_signature)
     if draft_issues:
         logger.info(
             "tutor_draft_preflight request_id=%s topic=%s intent=%s issues=%s",
@@ -842,7 +869,8 @@ def _two_call(llm, context, session, student_message, request_id, trusted_verdic
     # (odbrana u dubini): ovo je raniji, precizniji sloj, ne zamjena.
     if final.new_task is not None:
         final_issues = package_preflight.collect_package_issues(
-            final.new_task, contract=context.semantic_contract)
+            final.new_task, contract=context.semantic_contract,
+            previous_signature=previous_signature)
         if final_issues:
             # `unchanged=True` znači: recenzent je vidio nalaz i vratio paket s
             # POTPUNO ISTIM nalazima — dakle nije ni pokušao ispravku.

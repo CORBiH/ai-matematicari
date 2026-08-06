@@ -38,8 +38,13 @@ def turn(grade, topic, message="Daj mi zadatak.", session_id="structured"):
 # 0883e8c pada na `divisibility_rules_not_required_by_visible_task`.
 # Opcije $4$,$3$,$5$,$6$ ostaju iste — sa djeliocem 4 tačna je tačno jedna.
 def task_for(context, level=1, signature="one",
-             text="Koji od ponuđenih brojeva je djeljiv sa 4?",
-             options=("$4$", "$3$", "$5$", "$6$"), correct=0):
+             text=None, options=("$4$", "$3$", "$5$", "$6$"), correct=0):
+    # Od Faze 4F kanonski identitet zadatka dolazi iz VIDLJIVOG paketa, pa dvije
+    # objave u istoj sesiji moraju razlikovati tekst — ne samo deklarisani
+    # `task_signature`. Ranije je variranje samo potpisa prolazilo, a upravo to
+    # je produkcijski defekt koji je „Daj mi novi zadatak.“ vraćao isti zadatak.
+    if text is None:
+        text = f"Koji od ponuđenih brojeva je djeljiv sa 4? (slučaj {signature})"
     return TaskPayload(
         selected_lesson_id=context.topic_id, selected_lesson_title=context.title,
         target_difficulty_level=level, text=text, task_type="multiple_choice",
