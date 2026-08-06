@@ -321,6 +321,46 @@ test('a double new-task click while busy sends one request', async () => {
   assert.strictEqual(page.sent().filter(r => r.url === CHAT).length, 1);
 });
 
+test('a curriculum reset (grade/topic change) invalidates in-flight responses', async () => {
+  /* Faza 4G, Workstream G scenario 9: promjena razreda/lekcije zove
+     invalidatePracticeCurriculumState() (templates/index.html), pa odgovor
+     zahtjeva poslanog PRIJE reseta ne smije upisati ništa. */
+  const page = practicePage();
+  await publish(page, ready(TASK_A, OPTIONS_A, IDENTITY_A));
+  const generation = page.ui.currentRequestGeneration();
+
+  page.ui.invalidatePracticeCurriculumState();   // isto što radi gradeSel change
+
+  page.ui.applyTutorResponse(ready(TASK_B, OPTIONS_B, IDENTITY_B), {
+    fromTyped: false, rendered: false, requestGeneration: generation,
+  });
+  await settle();
+
+  assert.deepStrictEqual(cards(page).map(b => b.innerHTML), [],
+    'odgovor iz stare sesije je ponovo naslikao opcije poslije reseta');
+  assert.strictEqual(page.ui.storedLastTask(), '');
+});
+
+test('a malformed response leaves the controls usable and the next turn works', async () => {
+  /* Faza 4G, Workstream G scenario 11: server vrati parsabilan JSON bez
+     ijednog očekivanog polja. Ne smije biti izuzetka, busy zastavice moraju
+     pasti i SLJEDEĆI zahtjev mora normalno proći. */
+  const page = practicePage();
+  await publish(page, ready(TASK_A, OPTIONS_A, IDENTITY_A));
+
+  respond(page, {});                              // potpuno prazan odgovor
+  await sendChip(page, 'Daj mi novi zadatak.', null);
+
+  const flags = page.ui.flags();
+  assert.strictEqual(flags.tutorBusy, false, 'tutorBusy je ostao podignut');
+  assert.strictEqual(flags.choiceBusy, false, 'choiceBusy je ostao podignut');
+
+  // Oporavak: novi ispravan odgovor se normalno primjenjuje.
+  await publish(page, ready(TASK_B, OPTIONS_B, IDENTITY_B));
+  assert.deepStrictEqual(cards(page).map(b => b.innerHTML), ['41', '70', '33', '58']);
+  assert.strictEqual(page.ui.optionsBox.dataset.taskIdentity, IDENTITY_B);
+});
+
 test('an accepted new task updates text, options and identity together', async () => {
   const page = practicePage();
   await publish(page, ready(TASK_A, OPTIONS_A, IDENTITY_A));

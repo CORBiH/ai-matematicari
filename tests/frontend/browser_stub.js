@@ -233,6 +233,7 @@ function loadPage(options = {}) {
     'applyTutorResponse', 'state', 'optionsBox', 'setAwaitingPracticeTask',
     'clearAwaitingPracticeTask', 'storedLastTask', 'storedNextState',
     'currentRequestGeneration', 'invalidatePendingResponses', 'clearOptions',
+    'invalidatePracticeCurriculumState',
   ];
   const probe = `\n;globalThis.__ui = {${exported.join(', ')},`
     + ' setChipMeta: (m) => { pendingChipMeta = m; },'
