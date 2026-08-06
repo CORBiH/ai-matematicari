@@ -35,7 +35,8 @@ from matbot import lesson_fidelity, mcq_integrity, option_equivalence
 from matbot.semantics import detectors as semantic_detectors
 from matbot.tutor import task_identity
 from matbot.mathcheck import find_numeric_inconsistencies
-from matbot.mathsafe import sanitize_and_validate_math_text
+from matbot.mathsafe import (sanitize_and_validate_math_text,
+                             sanitize_and_validate_math_text_with_issues)
 from matbot.terminology import normalize_terminology
 from matbot.tutor.schema import (INCOMPLETE_TASK_TEXT_CODE, UnifiedOutputError,
                                  difficulty_evidence_errors, evidence_diagnostics,
@@ -98,6 +99,22 @@ def safe_visible_text(raw, allow_wrap=False):
     return normalize_terminology(cleaned), True
 
 
+def _notation_defect_codes(raw, allow_wrap):
+    """Interni kodovi mathsafe defekta za JEDNO polje — ograničeno, bez sadržaja.
+
+    ŽIVI A+B (ab-5ac723e): recenzent je za `unsafe_..._notation` dobijao samo
+    ime polja, ne i šta je u njemu odbijeno, pa je u 5 od 13 turnova vratio
+    ISTO polje (`unchanged=True`). Kodovi (`unknown_mathjax_command:\\ty`,
+    `damaged_latex_form`, …) su već sankcionisani log kodovi po CLAUDE.md
+    pravilu 7 — nose najviše ime komande, nikad rečenicu sadržaja."""
+    try:
+        _cleaned, codes = sanitize_and_validate_math_text_with_issues(
+            (raw or "").strip(), allow_whole_expression_wrap=allow_wrap)
+    except Exception:
+        return ""
+    return ";".join(codes[:3])[:100]
+
+
 def _option_id(task, index):
     """Stabilan ID opcije; indeks je rezerva kad paket nema ispravne ID-jeve."""
     try:
@@ -137,14 +154,19 @@ def collect_package_issues(task, contract=None, previous_signature=""):
         issues.append(PackageIssue("task_structure_invalid", detail="nepoznata struktura"))
 
     options = list(getattr(task, "options", None) or ())
-    option_texts, unsafe_ids = [], []
+    option_texts, unsafe_ids, first_unsafe_option_raw = [], [], None
     for index, option in enumerate(options):
-        text, safe = safe_visible_text(getattr(option, "text", ""), allow_wrap=True)
+        raw_option = getattr(option, "text", "")
+        text, safe = safe_visible_text(raw_option, allow_wrap=True)
         option_texts.append(text)
         if not safe:
             unsafe_ids.append(_option_id(task, index))
+            if first_unsafe_option_raw is None:
+                first_unsafe_option_raw = raw_option
     if unsafe_ids:
-        issues.append(PackageIssue("unsafe_option_notation", option_ids=tuple(unsafe_ids)))
+        issues.append(PackageIssue(
+            "unsafe_option_notation", option_ids=tuple(unsafe_ids),
+            detail=_notation_defect_codes(first_unsafe_option_raw, True)))
 
     # 2) DOSLOVNI I SEMANTIČKI DUPLIKATI — postojeći option_equivalence.
     if option_texts and all(option_texts):
@@ -169,7 +191,9 @@ def collect_package_issues(task, contract=None, previous_signature=""):
     expected, expected_safe = safe_visible_text(
         getattr(task, "expected_answer", ""), allow_wrap=True)
     if not expected_safe:
-        issues.append(PackageIssue("unsafe_expected_answer_notation"))
+        issues.append(PackageIssue(
+            "unsafe_expected_answer_notation",
+            detail=_notation_defect_codes(getattr(task, "expected_answer", ""), True)))
     elif marked_text and expected.strip() != marked_text.strip():
         issues.append(PackageIssue(
             "expected_answer_not_marked_option",
@@ -260,7 +284,9 @@ def collect_package_issues(task, contract=None, previous_signature=""):
         if not safe:
             code = _UNSAFE_FIELD_CODES.get(label)
             if code:
-                issues.append(PackageIssue(code, detail=label))
+                defects = _notation_defect_codes(raw, allow_wrap)
+                issues.append(PackageIssue(
+                    code, detail=f"{label} {defects}".strip()))
             continue
         found = find_numeric_inconsistencies(text)
         if found:
@@ -322,7 +348,10 @@ def format_for_reviewer(issues):
         "equation, or system into the task text itself, inside $...$, so the task is "
         "solvable from its own text. For any `unsafe_..._notation` issue the named "
         "field carries MathJax the server cannot accept: REWRITE that exact field using "
-        "only plain $...$ notation and known commands, and change nothing else. "
+        "only plain $...$ notation and known commands, and change nothing else. The "
+        "issue detail names the exact rejected command or defect (for example "
+        "`unknown_mathjax_command:\\ty` or `damaged_latex_form`): remove or replace "
+        "exactly that construct, do not return the field unchanged. "
         # ŽIVI TALAS F4E (E01, E12): za kodove uskog matematičkog orakla nije
         # postojao nijedan lijek u ovom bloku, pa je recenzent dobijao goli kod
         # i vraćao `correct` s istim nalazom. Uputstvo ne mijenja prag orakla —

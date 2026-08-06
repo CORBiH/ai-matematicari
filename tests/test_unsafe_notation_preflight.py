@@ -71,6 +71,59 @@ def test_reviewer_block_names_the_field_to_rewrite():
     assert "rewrite" in block.lower()
 
 
+# ---------------------------------------------------------------------------
+# TAČAN KOD DEFEKTA U DIJAGNOSTICI (živi A+B ab-5ac723e: 13 turnova s
+# `unsafe_solution_notation: (solution)`, od toga 5 s unchanged=True — recenzent
+# je dobijao samo ime polja, NE i šta je u njemu neprihvatljivo, pa je vraćao
+# isti tekst. Kod defekta (`unknown_mathjax_command:ty`) je već sankcionisan
+# log kod po CLAUDE.md pravilu 7 i nikad ne nosi rečenicu sadržaja.)
+# ---------------------------------------------------------------------------
+
+def _issue(task, code):
+    return next(i for i in package_preflight.collect_package_issues(task)
+                if i.code == code)
+
+
+def test_unsafe_solution_detail_names_the_exact_defect():
+    issue = _issue(_task(solution=UNSAFE), "unsafe_solution_notation")
+    assert "unknown_mathjax_command:ty" in issue.detail
+
+
+def test_unsafe_task_text_detail_names_the_exact_defect():
+    issue = _issue(_task(text=UNSAFE), "unsafe_task_text_notation")
+    assert "unknown_mathjax_command:ty" in issue.detail
+
+
+def test_unsafe_expected_answer_detail_names_the_exact_defect():
+    issue = _issue(_task(expected_answer=UNSAFE), "unsafe_expected_answer_notation")
+    assert "unknown_mathjax_command:ty" in issue.detail
+
+
+def test_unsafe_option_detail_names_the_exact_defect():
+    task = _task()
+    broken = list(task.options)
+    broken[1] = broken[1].model_copy(update={"text": UNSAFE})
+    issue = _issue(task.model_copy(update={"options": broken}),
+                   "unsafe_option_notation")
+    assert "unknown_mathjax_command:ty" in issue.detail
+
+
+def test_defect_codes_reach_the_reviewer_block():
+    issues = package_preflight.collect_package_issues(_task(solution=UNSAFE))
+    block = package_preflight.format_for_reviewer(issues)
+    assert "unknown_mathjax_command:ty" in block
+    # Lijek izričito kaže da detalj imenuje odbijenu komandu.
+    assert "names the exact rejected command" in block
+
+
+def test_defect_detail_stays_bounded_and_content_free():
+    """Više defekata u istom polju — detalj ostaje ograničen, bez sadržaja."""
+    messy = r"$x = \ty{5}$ i još \unknowncmd izvan i $\alpha \beta \gamma$"
+    issue = _issue(_task(solution=messy), "unsafe_solution_notation")
+    assert len(issue.detail) <= 120
+    assert "još" not in issue.detail
+
+
 def test_publication_stays_fail_closed_for_unsafe_notation(store, fake_llm, monkeypatch):
     """Prijava recenzentu ne smije oslabiti objavu."""
     from matbot.tutor import pipeline as tutor_pipeline

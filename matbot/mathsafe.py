@@ -740,6 +740,23 @@ def sanitize_and_validate_math_text(text: str, allow_whole_expression_wrap: bool
     i vratiti postojeći sigurni fallback, bez drugog AI poziva — ovaj modul
     namjerno ne izmišlja zagrade/operande za nejednoznačne slučajeve.
     """
+    cleaned, issues = sanitize_and_validate_math_text_with_issues(
+        text, allow_whole_expression_wrap=allow_whole_expression_wrap)
+    return cleaned, (len(issues) == 0)
+
+
+def sanitize_and_validate_math_text_with_issues(text: str, allow_whole_expression_wrap: bool = False):
+    """Isti niz koraka kao `sanitize_and_validate_math_text`, ali vraća i LISTU
+    internih kodova defekta umjesto samo boolean-a.
+
+    ZAŠTO POSTOJI (živi A+B ab-5ac723e: 13 turnova s
+    `unsafe_solution_notation: (solution)`, od toga 5 s `unchanged=True`):
+    recenzent je u dijagnostici dobijao SAMO ime polja, ne i KOJI zapis je
+    server odbio, pa je vraćao isto polje nepromijenjeno i turn je propadao.
+    Kodovi (`unknown_mathjax_command:\\ty`, `damaged_latex_form`, …) su već
+    sankcionisani log kodovi po CLAUDE.md pravilu 7 — nose najviše ime
+    komande, nikad rečenicu sadržaja. Pravila se NE mijenjaju: is_safe je i
+    dalje tačno `len(issues) == 0`."""
     cleaned = sanitize_math_text(text)
     cleaned = replace_literal_newline_escapes(cleaned)
     cleaned = repair_malformed_math_inside(cleaned)
@@ -751,5 +768,4 @@ def sanitize_and_validate_math_text(text: str, allow_whole_expression_wrap: bool
         # (npr. „\pi“ u prozi) dobije svoje $...$ umjesto da sruši cio odgovor.
         cleaned = wrap_standalone_symbols_outside_math(cleaned)
     cleaned = repair_stray_terminal_brace(cleaned)
-    issues = find_unsafe_math_issues(cleaned)
-    return cleaned, (len(issues) == 0)
+    return cleaned, find_unsafe_math_issues(cleaned)
