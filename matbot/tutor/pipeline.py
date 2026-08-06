@@ -538,6 +538,94 @@ def _deterministic_task_intent(turn, session):
     return ""
 
 
+def _deterministic_active_annex(session):
+    """Deterministički dodatak VAŽEĆI za aktivni zadatak, ili None.
+
+    Identitet se poredi izričito: dodatak tuđeg (starijeg) zadatka ne smije
+    ocijeniti, nagovijestiti ni riješiti aktivni — tada se pada na model-put."""
+    annex = session.get("deterministic_task") or None
+    if not annex:
+        return None
+    if annex.get("task_identity") != (session.get("current_task_identity") or ""):
+        return None
+    return annex
+
+
+def _deterministic_choice_reply(annex, is_correct, wrong_before):
+    """Kratka povratna poruka iz POHRANJENIH činjenica paketa — bez modela.
+
+    Prvi pogrešan klik dobija pravilo-nagovještaj (nikad rezultat); drugi
+    pogrešan klik otkriva rezultat NAMJERNO — isti ugovor kao model-put."""
+    answer_display = f"${annex['display_answer']}$"
+    if is_correct:
+        return f"Tačno — rezultat je {answer_display}. Bravo!"
+    if wrong_before >= 1:
+        return (f"Nije tačno. Tačan rezultat je {answer_display}. "
+                "Pogledaj označenu opciju, pa traži sljedeći zadatak.")
+    rule_hint = (annex.get("hints") or [""])[0]
+    return f"Nije tačno. {rule_hint}".strip()
+
+
+def _run_deterministic_help_turn(store, session, turn, context, request_id,
+                                 ui_action, annex):
+    """DETERMINISTIC_HINT / DETERMINISTIC_SOLUTION: pohranjena ljestvica
+    nagovještaja i potpuno rješenje aktivnog paketa — nula poziva modela."""
+    timer = _TurnTimer()
+    client_turn_id = turn.get("client_turn_id") or ""
+    if (client_turn_id and client_turn_id == session.get("last_help_turn_id")
+            and session.get("last_help_response") is not None):
+        # Idempotentan retry: identičan odgovor, bez mutacije i bez pomjeranja
+        # ljestvice nagovještaja.
+        return copy.deepcopy(session["last_help_response"])
+
+    reveal = False
+    if ui_action == "hint_request":
+        hints = list(annex.get("hints") or ())
+        if not hints:
+            return _error_response(session["current_task"])
+        index = min(session["hint_level"], len(hints) - 1)
+        answer = hints[index]
+        session["hint_level"] = min(session["hint_level"] + 1, config.MAX_HINT_LEVEL)
+        session["current_task_had_hint"] = True
+        route, intent = "deterministic_hint", "hint_request"
+    else:
+        answer = annex.get("solution") or ""
+        if not answer:
+            return _error_response(session["current_task"])
+        session["last_result"] = "full_solution"
+        if session["correct_option_id"]:
+            session["task_completed"] = True
+            reveal = True
+        route, intent = "deterministic_solution", "full_solution_request"
+
+    session["recent_turns"].append(
+        {"student": turn["student_message"][:300], "tutor": answer[:400]}
+    )
+    response = {
+        "status": "ready",
+        "answer": answer,
+        "answer_verdict": None,
+        "last_tutor_task": session["current_task"] or "",
+        "next_state": _next_state(session),
+        "session_mode": "practice",
+        "effective_topic": context.topic_id,
+    }
+    if reveal:
+        response["revealed_correct_option_id"] = session["correct_option_id"]
+    if client_turn_id:
+        session["last_help_turn_id"] = client_turn_id
+        session["last_help_response"] = copy.deepcopy(response)
+    with timer.stage("commit"):
+        store.save(session)
+    identity = session.get("current_task_identity") or ""
+    _log_turn_diagnostics(
+        request_id, context, turn, session, intent=intent, calls=0,
+        published=False, task_preserved=True, state_mutated=True,
+        previous_identity=identity, final_identity=identity,
+        route=route, timer=timer)
+    return response
+
+
 def _run_deterministic_task_turn(store, session, turn, context, request_id,
                                  intent, generator):
     """DETERMINISTIC_PACKAGE ruta: server generiše, dokaže i objavi paket —
@@ -722,27 +810,38 @@ def _run_choice_turn(store, llm, session, turn, context, request_id):
         if wrong_before >= 1:
             session["task_completed"] = True
 
-    final, calls = _two_call(
-        llm, context, session, turn["student_message"], request_id, verdict,
-        timer=timer,
-    )
-    if final is None:
-        return _error_response(active_task_before)
+    # Faza 4H: DETERMINISTIC_GRADING — verdikt je oduvijek serverska činjenica;
+    # za server-generisan zadatak i povratna poruka dolazi iz pohranjenih
+    # činjenica paketa, pa modela nema.
+    annex = _deterministic_active_annex(session)
+    if annex is not None:
+        reply = _deterministic_choice_reply(annex, is_correct, wrong_before)
+        calls = 0
+        route = "deterministic_grading"
+    else:
+        route = "model_tutor_reviewer"
+        final, calls = _two_call(
+            llm, context, session, turn["student_message"], request_id, verdict,
+            timer=timer,
+        )
+        if final is None:
+            return _error_response(active_task_before)
 
-    try:
-        reply = _safe_text(final.reply, "reply")
-        _reject_if_inconsistent(reply, "reply")
-        _reject_if_geometry_invalid(reply, context, "reply")
-    except UnifiedOutputError as error:
-        _log_rejection(request_id, context, "choice_reply", error, final.intent)
-        return _error_response(active_task_before)
+        try:
+            reply = _safe_text(final.reply, "reply")
+            _reject_if_inconsistent(reply, "reply")
+            _reject_if_geometry_invalid(reply, context, "reply")
+        except UnifiedOutputError as error:
+            _log_rejection(request_id, context, "choice_reply", error, final.intent)
+            return _error_response(active_task_before)
 
-    # PRVI pogrešan klik ne smije otkriti odgovor — isto pravilo kao za slobodan
-    # tekst. Drugi pogrešan klik ga otkriva NAMJERNO (vidi niže), pa je gate
-    # aktivan samo dok otkrivanje još nije zasluženo.
-    if not is_correct and wrong_before < 1:
-        reply = _guard_answer_leak(session, request_id, context, "answer_attempt", reply,
-                                   student_message=turn["student_message"])
+        # PRVI pogrešan klik ne smije otkriti odgovor — isto pravilo kao za
+        # slobodan tekst. Drugi pogrešan klik ga otkriva NAMJERNO (vidi niže),
+        # pa je gate aktivan samo dok otkrivanje još nije zasluženo.
+        if not is_correct and wrong_before < 1:
+            reply = _guard_answer_leak(session, request_id, context,
+                                       "answer_attempt", reply,
+                                       student_message=turn["student_message"])
 
     session["recent_turns"].append({
         "student": f"[izabrao opciju: {verdict['selected_text']}]"[:300],
@@ -772,7 +871,7 @@ def _run_choice_turn(store, llm, session, turn, context, request_id):
         "tutor_choice request_id=%s topic=%s family=%s route=%s is_correct=%s "
         "calls=%s total_ms=%s stage_ms=%s",
         request_id, context.topic_id, _context_family(context),
-        "model_tutor_reviewer", is_correct, calls, timer.total_ms(),
+        route, is_correct, calls, timer.total_ms(),
         timer.describe(),
     )
     return response
@@ -826,6 +925,14 @@ def _run_text_turn(store, llm, session, turn, context, request_id):
     had_active_task = bool(active_task_before)
     identity_before = session.get("current_task_identity") or ""
     ui_action = _explicit_ui_action(turn, session)
+
+    # Faza 4H: dugme pomoći nad aktivnim DETERMINISTIČKIM zadatkom — ljestvica
+    # nagovještaja i rješenje su pohranjene serverske činjenice paketa.
+    if ui_action:
+        annex = _deterministic_active_annex(session)
+        if annex is not None:
+            return _run_deterministic_help_turn(
+                store, session, turn, context, request_id, ui_action, annex)
 
     # Faza 4H: DETERMINISTIC_PACKAGE ruta — samo server-vlasničke činjenice
     # (lekcija s potpunim generatorom + UI polje ili zatvoren skup poruka).

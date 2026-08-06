@@ -57,6 +57,8 @@ def _fresh_session(session_id, curriculum_fingerprint, grade, lesson_id,
         # nagovještaja, potpuno rješenje, kanonski odgovor) — postoji samo kad
         # je paket server-generisan; model-objava ga uvijek briše.
         "deterministic_task": None,
+        "last_help_turn_id": "",     # idempotentan retry determinističke pomoći
+        "last_help_response": None,
         # Closed, server-validated evidence used for the published task. It is
         # never sent to the student, but keeps the authoritative package
         # auditable across the active session.
