@@ -75,6 +75,38 @@ def _difficulty_levels_enabled():
     return config.practice_difficulty_levels_enabled()
 
 
+# ---------------------------------------------------------------------------
+# EKSPLICITNA UI AKCIJA NAD AKTIVNIM ZADATKOM (živi produkcijski nalaz)
+# ---------------------------------------------------------------------------
+# Niz iz produkcije: objavljen zadatak → „Ne znam — daj mi hint“ (hint uredan)
+# → „Uradi ga ti“ → server je objavio POTPUNO NOV zadatak i pregazio aktivan.
+#
+# UZROK: ovaj put nikad nije čitao `turn["intent"]`. Frontend eksplicitno šalje
+# `intent=solution_request` kad učenik pritisne to dugme, ali je taj signal
+# ostajao neiskorišten — namjeru je odlučivao ISKLJUČIVO model iz slobodnog
+# teksta „Uradi ga ti.“, a kad vrati `next_task`, `_run_text_turn` objavi paket.
+#
+# ZAŠTO OVO NE KRŠI „klijentu se ne vjeruje“: vrijednost se koristi SAMO da
+# SUZI ono što server smije uraditi. Ona ne može odobriti nijednu objavu koja
+# inače ne bi prošla, ne bira lekciju, ne dira ocjenjivanje i ne otkriva
+# odgovor; lažna vrijednost može izazvati odbijanje, nikad publikaciju. Drugi
+# uslov je SERVERSKA činjenica: zabrana važi samo dok aktivan zadatak postoji.
+_UI_ACTION_INTENTS = {
+    "solution_request": "full_solution_request",
+    "hint_request": "hint_request",
+}
+
+
+def _explicit_ui_action(turn, session):
+    """Namjera iz šeme koju je učenik dugmetom izričito tražio, ili prazno.
+
+    Prazno znači „kucana poruka“ — tada se ništa ne mijenja u odnosu na raniji
+    tok i namjeru i dalje određuje model."""
+    if not session.get("current_task"):
+        return ""
+    return _UI_ACTION_INTENTS.get((turn.get("intent") or "").strip().lower(), "")
+
+
 def canonicalize_task_lesson_title(task, context):
     """Make the server-owned LessonContext the sole display-title authority.
 
@@ -268,21 +300,21 @@ def _validate_task_server_side(task, context):
 # DVA POZIVA
 # ---------------------------------------------------------------------------
 
-def _call_tutor(llm, context, session, student_message, trusted_verdict):
+def _call_tutor(llm, context, session, student_message, trusted_verdict, ui_action=""):
     instructions = tutor_prompts.build_tutor_instructions(context)
     input_text = tutor_prompts.build_tutor_input(
-        context, session, student_message, trusted_verdict
+        context, session, student_message, trusted_verdict, ui_action
     )
     return llm.tutor_turn(instructions, input_text)
 
 
 def _call_reviewer(llm, context, session, student_message, draft, trusted_verdict,
-                   preflight_block=""):
+                   preflight_block="", ui_action=""):
     instructions = tutor_prompts.build_reviewer_instructions(context)
     draft_json = draft.model_dump_json(indent=None, exclude_none=True)
     input_text = tutor_prompts.build_reviewer_input(
         context, session, student_message, draft_json, trusted_verdict,
-        preflight_block,
+        preflight_block, ui_action,
     )
     return llm.reviewer_turn(instructions, input_text)
 
@@ -454,9 +486,10 @@ def _run_choice_turn(store, llm, session, turn, context, request_id):
 def _run_text_turn(store, llm, session, turn, context, request_id):
     active_task_before = session["current_task"]
     had_active_task = bool(active_task_before)
+    ui_action = _explicit_ui_action(turn, session)
 
     final, calls = _two_call(
-        llm, context, session, turn["student_message"], request_id, None
+        llm, context, session, turn["student_message"], request_id, None, ui_action
     )
     if final is None:
         return _error_response(active_task_before)
@@ -468,6 +501,12 @@ def _run_text_turn(store, llm, session, turn, context, request_id):
 
         task_text = active_task_before
         if final.intent in TASK_INTENTS:
+            # ODBRANA U DUBINI: `_two_call` isti nacrt već odbija prije
+            # recenzenta, ali objava je posljednja tačka prije mutacije sesije
+            # i ne smije ovisiti o tome da je raniji sloj odradio svoje.
+            if ui_action:
+                raise UnifiedOutputError(
+                    f"ui_action_forbids_new_task: {ui_action} vs {final.intent}")
             target_level = (_target_level_for(session, final.intent)
                             if _difficulty_levels_enabled() else None)
             canonical_task = validate_task_package(final.new_task, context, target_level)
@@ -679,15 +718,21 @@ def _log_sdk_entry(request_id, context, stage, call_index, result):
     )
 
 
-def _two_call(llm, context, session, student_message, request_id, trusted_verdict):
+def _two_call(llm, context, session, student_message, request_id, trusted_verdict,
+              ui_action=""):
     """Tutor → Reviewer. Vraća (final_draft | None, broj_poziva).
 
     Nijedna grana ne pravi treći poziv. Kad Tutor nacrt ne može ni da se
-    isparsira, DRUGI POZIV SE NE DEŠAVA — nema šta da se recenzira."""
+    isparsira, DRUGI POZIV SE NE DEŠAVA — nema šta da se recenzira.
+
+    `ui_action` je namjera koju je učenik izričito tražio dugmetom nad AKTIVNIM
+    zadatkom (vidi `_explicit_ui_action`). Kad postoji, nov zadatak se u ovom
+    turnu ne smije izdati — pa se nacrt s takvom namjerom odbija ODMAH, prije
+    recenzenta: nema šta recenzirati kad paket ionako ne smije biti objavljen."""
     calls = 0
     try:
         tutor_result = _call_tutor(
-            llm, context, session, student_message, trusted_verdict
+            llm, context, session, student_message, trusted_verdict, ui_action
         )
         calls += 1
         _log_sdk_entry(request_id, context, "tutor", calls, tutor_result)
@@ -717,6 +762,14 @@ def _two_call(llm, context, session, student_message, request_id, trusted_verdic
     # after Tutor semantically interpreted the free-form student message.
     if draft.intent not in TASK_INTENTS:
         return draft, calls
+
+    # KONTINUITET AKTIVNOG ZADATKA JE SERVERSKA ODLUKA, NE MODELOVA.
+    if ui_action:
+        _log_rejection(
+            request_id, context, "ui_action_forbids_new_task",
+            f"ui_action={ui_action} draft_intent={draft.intent}", draft.intent,
+        )
+        return None, calls
 
     # ------------------------------------------------------------------
     # PREFLIGHT NAD TUTOROVIM NACRTOM (živi gate 00bbd45)

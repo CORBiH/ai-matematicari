@@ -1891,6 +1891,13 @@ document.addEventListener('DOMContentLoaded', () => {
       let confirmationIntent = '', confirmationPending = null, confirmationPhase = '';
       let isNewTaskRequest = false;
       const explicitHintRequest = chipMeta.intent === 'hint_request';
+      /* "Uradi ga ti" mora imati ISTI eksplicitni tretman kao hint chip.
+         Živi nalaz: chip je slao intent=solution_request, ali je padao u granu
+         odgovora na zadatak, pa je uz njega išao interaction_phase=
+         'answering_practice_task' — signal koji backendu kaže "ovo je pokušaj
+         odgovora". Namjeru je zato morao pogađati model iz teksta dugmeta, i
+         na produkciji je umjesto rješenja objavio POTPUNO NOV zadatak. */
+      const explicitSolutionRequest = chipMeta.intent === 'solution_request';
       if (autoMessage){
         text = autoMessage;                        // auto-poruka pri ulasku u chat
       } else if (typed){
@@ -1915,7 +1922,8 @@ document.addEventListener('DOMContentLoaded', () => {
           confirmationIntent = 'decline_confirmation';
           confirmationPending = confirmationPendingAction(previousNextState);
           confirmationPhase = 'confirmation_declined';
-        } else if (!explicitHintRequest && !asksNewTask && modeTracksPracticeTask(state.mode)
+        } else if (!explicitHintRequest && !explicitSolutionRequest && !asksNewTask
+                   && modeTracksPracticeTask(state.mode)
                    && (interactionPhase === 'awaiting_practice_answer' || (savedTask && isShortPracticeAnswer(typed)))){
           answerPhase = 'answering_practice_task'; // odgovor na zadatak, ne novi zahtjev
         } else if (!asksNewTask && lastTutorMessage && isFollowupMessage(typed)){
@@ -1972,6 +1980,14 @@ document.addEventListener('DOMContentLoaded', () => {
       if (recentTasks.length && !freshExamPrep) payload.recent_tasks = recentTasks;
       if (explicitHintRequest && savedTask){
         payload.intent = 'hint_request';
+        payload.interaction_phase = 'practice_help';
+        payload.mode = 'practice';
+        payload.last_tutor_task = savedTask.slice(0, 600);
+      } else if (explicitSolutionRequest && savedTask){
+        /* Isti eksplicitni ugovor kao hint: namjera + faza pomoći nad AKTIVNIM
+           zadatkom, nikad kao pokušaj odgovora. Server na osnovu ovoga
+           deterministički zabranjuje objavu novog zadatka u ovom turnu. */
+        payload.intent = 'solution_request';
         payload.interaction_phase = 'practice_help';
         payload.mode = 'practice';
         payload.last_tutor_task = savedTask.slice(0, 600);

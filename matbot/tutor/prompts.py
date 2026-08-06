@@ -77,8 +77,14 @@ def _lesson_block(context):
     return "\n".join(lines)
 
 
-def _state_block(session, student_message, trusted_verdict=None):
-    """Trenutno stanje vježbe — serverska istina, ne modelovo sjećanje."""
+def _state_block(session, student_message, trusted_verdict=None, ui_action=""):
+    """Trenutno stanje vježbe — serverska istina, ne modelovo sjećanje.
+
+    `ui_action` je namjera koju je učenik izričito tražio DUGMETOM nad aktivnim
+    zadatkom („Ne znam — daj mi hint“, „Uradi ga ti“). Prazno je za kucanu
+    poruku i tada se ulaz ne mijenja ni za jedan znak. Ovo je samo saopštenje
+    modelu — zabranu objave novog zadatka server ionako sprovodi deterministički
+    (matbot/tutor/pipeline.py), pa ne ovisi o tome hoće li je model poslušati."""
     lines = ["STANJE VJEŽBE:"]
     if session["current_task"]:
         lines.append(f"- AKTIVNI ZADATAK: {session['current_task']}")
@@ -119,6 +125,13 @@ def _state_block(session, student_message, trusted_verdict=None):
             f"{'TAČAN' if trusted_verdict['is_correct'] else 'NETAČAN'} "
             f"(ranijih pogrešnih pokušaja: {trusted_verdict['wrong_attempts']}). "
             f"Ovu činjenicu NE SMIJEŠ osporiti."
+        )
+    if ui_action:
+        lines.append(
+            f"- UČENIK JE PRITISNUO DUGME ČIJA JE NAMJERA: {ui_action}. To je "
+            "serverska činjenica i ne preispituje se: polje `intent` mora biti "
+            "tačno ta vrijednost. U ovom turnu se NE SMIJE izdati novi zadatak "
+            "— odgovaraj isključivo na AKTIVNI ZADATAK naveden iznad."
         )
     lines.append(f"- NOVA PORUKA UČENIKA: „{_clip(student_message, 400)}“")
     return "\n".join(lines)
@@ -301,10 +314,11 @@ def build_tutor_instructions(context):
     )
 
 
-def build_tutor_input(context, session, student_message, trusted_verdict=None):
+def build_tutor_input(context, session, student_message, trusted_verdict=None,
+                      ui_action=""):
     return "\n\n".join([
         _lesson_block(context),
-        _state_block(session, student_message, trusted_verdict),
+        _state_block(session, student_message, trusted_verdict, ui_action),
         "Vrati strukturisan odgovor prema šemi.",
     ])
 
@@ -461,14 +475,14 @@ def build_reviewer_instructions(context):
 
 
 def build_reviewer_input(context, session, student_message, draft_json,
-                         trusted_verdict=None, preflight_block=""):
+                         trusted_verdict=None, preflight_block="", ui_action=""):
     """`preflight_block` su DETERMINISTIČKI serverski nalazi o nacrtu.
 
     Prazan string kad server nije dokazao nijedan defekt — tada se ulaz ne
     mijenja ni za jedan znak u odnosu na raniji oblik."""
     blocks = [
         _lesson_block(context),
-        _state_block(session, student_message, trusted_verdict),
+        _state_block(session, student_message, trusted_verdict, ui_action),
         "NACRT DRUGOG NASTAVNIKA (provjeri ga, ne vjeruj mu):\n" + draft_json,
     ]
     if preflight_block:
