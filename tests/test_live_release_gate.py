@@ -31,8 +31,8 @@ def _passing_document():
         "finished_at": datetime.now(timezone.utc).isoformat(),
         "scenario_count": 14,
         "required_scenario_count": 14,
-        "sdk_call_ceiling": 23,
-        "actual_sdk_calls": 23,
+        "sdk_call_ceiling": 19,
+        "actual_sdk_calls": 19,
         "twentieth_call_refused_before_sdk": True,
         "validation_failures": [],
         "infrastructure_failures": [],
@@ -45,17 +45,20 @@ def _passing_document():
     }
 
 
-def test_release_gate_plan_is_exactly_fourteen_scenarios_and_twentythree_calls():
+def test_release_gate_plan_is_exactly_fourteen_scenarios_and_nineteen_calls():
     """Faza 4B: plan pokriva OBA puta — deterministicki K1/K3 (6-04-005, 1
-    poziv) i novi semanticki dvopozivni put (6-04-009, 2 poziva)."""
+    poziv) i semanticki put (6-04-009). Faza 4H: semanticka lekcija ima potpun
+    deterministicki generator, pa njeni scenariji IZRICITO dokazuju NULA
+    poziva; plafon pada 23 → 19."""
     plan = runner.build_release_gate_plan("0123456789abcdef" * 4)
     assert len(plan) == 14
-    assert sum(item.expected_calls for item in plan) == 23
+    assert sum(item.expected_calls for item in plan) == 19
     by_role = {item.role: item for item in plan}
     assert by_role["contract_fresh"].scenario.path == "contract"
     assert by_role["contract_fresh"].expected_calls == 1
     assert by_role["semantic_fresh"].scenario.path == "non_contract"
-    assert by_role["semantic_fresh"].expected_calls == 2
+    assert by_role["semantic_fresh"].expected_calls == 0
+    assert by_role["semantic_harder"].expected_calls == 0
     assert [item.role for item in plan][:7] == [
         "fresh_level1", "correct_choice", "harder_level2", "first_hint", "full_solution",
         "easier_level1", "same_level_new",
@@ -325,9 +328,43 @@ def test_failed_live_gate_console_summary_is_informative_and_does_not_echo_hidde
     assert "FAILED SCENARIO: easier_level1" in report
     assert "REASON: difficulty_direction_not_measurable" in report
     assert "LEVELS: previous=2 target=1 committed=2" in report
-    assert "SDK CALLS: 9/23" in report
+    assert "SDK CALLS: 9/19" in report
     assert "STATE PRESERVED: true" in report
     assert "SECRET" not in report
+
+
+def test_gate_harness_records_a_deterministic_scenario_with_zero_calls(monkeypatch):
+    """Faza 4H: semantic_fresh sada ide determinističkom strategijom — harness
+    mora zabilježiti attempted/published i TAČNO nula SDK poziva, jer pre-push
+    checker svaki red artefakta traži upravo u tom obliku."""
+    from matbot.session_store import SessionStore
+    from scratchpad import run_difficulty_canary as canary
+
+    class NeverCalled:
+        def tutor_turn(self, instructions, input_text):
+            raise AssertionError("deterministic scenario must not call the model")
+
+        def reviewer_turn(self, instructions, input_text, timeout_s=None):
+            raise AssertionError("deterministic scenario must not call the model")
+
+    monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", "universal_two_call")
+    monkeypatch.setenv("MATBOT_PRACTICE_DIFFICULTY_LEVELS", "enabled")
+    counter = canary.CountingLLM(NeverCalled(), ceiling=19)
+    report = canary.CanaryReport(campaign="release-gate", started_at="now",
+                                 sdk_call_ceiling=19)
+    scenario = canary.Scenario("semantic-det", "6-04-009", 6, "non_contract", "",
+                               "semantic-det", "Daj mi zadatak.")
+    result, stop = canary._run_one_turn(
+        SessionStore(), counter, canary._LogCapture(), report, scenario,
+        "release-gate")
+
+    assert stop is False
+    assert result.attempted is True
+    assert result.published is True
+    assert result.sdk_calls_this_turn == 0
+    assert counter.call_count == 0
+    assert result.published_task_text
+    assert len(result.next_state_options) == 4
 
 
 @pytest.mark.parametrize(

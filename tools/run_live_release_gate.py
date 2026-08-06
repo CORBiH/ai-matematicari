@@ -30,7 +30,11 @@ CORE_CONTRACT = ("6-04-005", 6)
 # Lekcija s AKTIVNIM semantičkim ugovorom (porodica fraction_arithmetic_direct).
 CORE_SEMANTIC = ("6-04-009", 6)
 REQUIRED_SCENARIO_COUNT = 14
-SDK_CALL_CEILING = 23
+# Faza 4H: semantic_fresh i semantic_harder (lekcija porodice
+# fraction_arithmetic_direct) sada idu DETERMINISTIČKOM strategijom — nula
+# SDK poziva po scenariju, i gate to IZRIČITO dokazuje (expected_calls=0,
+# stroga jednakost po scenariju). Plafon pada 23 → 19.
+SDK_CALL_CEILING = 19
 sys.path.insert(0, str(ROOT))
 
 from matbot import config, release_config, feedback, mathsafe, mcq_integrity, practice  # noqa: E402
@@ -127,7 +131,7 @@ def _select_rotating_lesson(grade: int, commit_sha: str) -> tuple[str, int]:
 
 
 def build_release_gate_plan(commit_sha: str) -> tuple[GateScenario, ...]:
-    """The exact 12-scenario / 19-call plan, pure except curriculum lookup."""
+    """The exact 14-scenario / 19-call plan, pure except curriculum lookup."""
     grade7 = _select_rotating_lesson(7, commit_sha)
     grade8 = _select_rotating_lesson(8, commit_sha)
     grade9 = _select_rotating_lesson(9, commit_sha)
@@ -160,10 +164,11 @@ def build_release_gate_plan(commit_sha: str) -> tuple[GateScenario, ...]:
                  path="contract", role="contract_fresh"),
         scenario("release_gate_contract_harder", CORE_CONTRACT, "harder", "release-contract",
                  "Daj mi teži zadatak.", 1, path="contract", requires=1, role="contract_harder"),
+        # Faza 4H: deterministička strategija — TAČNO nula poziva po scenariju.
         scenario("release_gate_semantic_fresh", CORE_SEMANTIC, "", "release-semantic",
-                 "Daj mi zadatak.", 2, role="semantic_fresh"),
+                 "Daj mi zadatak.", 0, role="semantic_fresh"),
         scenario("release_gate_semantic_harder", CORE_SEMANTIC, "harder", "release-semantic",
-                 "Daj mi teži zadatak.", 2, requires=1, role="semantic_harder"),
+                 "Daj mi teži zadatak.", 0, requires=1, role="semantic_harder"),
         scenario("release_gate_grade7_rotating", grade7, "", "release-grade7", "Daj mi zadatak.", 2,
                  role="grade7"),
         scenario("release_gate_grade8_rotating", grade8, "", "release-grade8", "Daj mi zadatak.", 2,
@@ -375,7 +380,7 @@ def run_live_release_gate() -> int:
     commit_sha, tree_hash = _require_live_preconditions()
     plan = build_release_gate_plan(commit_sha)
     if len(plan) != REQUIRED_SCENARIO_COUNT or sum(item.expected_calls for item in plan) != SDK_CALL_CEILING:
-        raise GateRefusal("The committed release-gate plan is not the required 12-scenario/19-call plan.")
+        raise GateRefusal("The committed release-gate plan is not the required 14-scenario/19-call plan.")
 
     started = datetime.now(timezone.utc)
     store = SessionStore()

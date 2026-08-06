@@ -16,7 +16,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 REQUIRED_SCENARIOS = 14
-REQUIRED_CALLS = 23
+# Faza 4H: semantic_fresh/semantic_harder idu deterministički (0 poziva) —
+# plafon i tačan broj poziva prolazne kampanje padaju 23 → 19.
+REQUIRED_CALLS = 19
 MAX_AGE = timedelta(hours=24)
 REQUIRED_PIPELINE = "universal_two_call"
 
