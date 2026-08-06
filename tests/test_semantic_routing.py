@@ -38,6 +38,18 @@ VALID_TEXT = {
     "6-04-012": "Izračunaj $\\frac{4}{5} : 2$.",
 }
 OPTIONS = ("$\\frac{5}{7}$", "$\\frac{5}{14}$", "$\\frac{6}{7}$", "$\\frac{1}{7}$")
+# Faza 4G: orakl direktnog računa sada STVARNO računa VALID_TEXT izraze, pa
+# fixture svake lekcije mora nuditi baš njenu tačnu vrijednost — zajedničke
+# opcije su tri od četiri lekcije činile paketom bez ijedne tačne opcije.
+OPTIONS_BY_LESSON = {
+    "6-04-009": OPTIONS,                                              # 5/7
+    "6-04-010": ("$\\frac{3}{4}$", "$\\frac{1}{4}$", "$\\frac{2}{3}$",
+                 "$\\frac{5}{8}$"),                                   # 3/4
+    "6-04-011": ("$\\frac{6}{5}$", "$\\frac{2}{15}$", "$\\frac{5}{6}$",
+                 "$\\frac{3}{5}$"),                                   # 6/5
+    "6-04-012": ("$\\frac{2}{5}$", "$\\frac{8}{5}$", "$\\frac{5}{8}$",
+                 "$\\frac{1}{5}$"),                                   # 2/5
+}
 
 
 @pytest.fixture
@@ -61,9 +73,11 @@ def turn_for(topic_id, grade=6, **changes):
     return payload
 
 
-def task_for(lesson_id, text=None, options=OPTIONS, correct_index=0, level=1,
+def task_for(lesson_id, text=None, options=None, correct_index=0, level=1,
              evidence=None, variant=""):
     context = lesson_context_module.build(6, lesson_id)
+    if options is None:
+        options = OPTIONS_BY_LESSON.get(lesson_id, OPTIONS)
     payload = make_task_payload(text=text or VALID_TEXT.get(lesson_id, "x"),
                                 options=list(options),
                                 correct_option_index=correct_index,

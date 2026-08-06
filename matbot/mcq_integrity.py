@@ -321,7 +321,7 @@ def expected_answer_matches_correct_option(expected_answer: str, result: Divisib
 # USKI ORAKL DIREKTNOG RAČUNA (Faza 4G, Workstream E — lekcije o razlomcima)
 # ---------------------------------------------------------------------------
 # Produkcijski nalaz koji je otvorio cio program bio je MCQ bez ijedne tačne
-# opcije (djeljivost). Za lekcije direktnog računa (6-04-009…6-04-012) istu
+# opcije (djeljivost). Za lekcije direktnog računa s razlomcima istu
 # klasu je dosad držao SAMO recenzent: nijedan deterministički validator nije
 # poredio VRIJEDNOST vidljivog izraza s ponuđenim opcijama, pa bi „Izračunaj
 # $\frac{2}{7}+\frac{3}{7}$“ s pogrešno označenom opcijom prošao sve serverske
@@ -437,7 +437,7 @@ def evaluate_direct_computation_mcq(question: str,
 
 
 # ---------------------------------------------------------------------------
-# USKI ORAKL UPOREĐIVANJA (Faza 4G, Workstream F — lekcija 7-03-006)
+# USKI ORAKL UPOREĐIVANJA (Faza 4G, Workstream F — upoređivanje racionalnih)
 # ---------------------------------------------------------------------------
 # Lekcija upoređivanja racionalnih brojeva nema semantički ugovor porodice i
 # SAMU relaciju dosad nije provjeravao nijedan deterministički validator —

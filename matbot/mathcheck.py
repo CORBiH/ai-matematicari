@@ -506,7 +506,8 @@ def check_segment(segment, pi_values=()):
 
 # ---------------------------------------------------------------------------
 # NAMJERNO LAŽNA JEDNAKOST — dokaz kontradikcije (živi release gate 5ac723e,
-# scenario grade9, lekcija 9-05-010 „Sistem bez rješenja“)
+# scenario grade9, lekcija 9. razreda o sistemu bez ijednog rješenja —
+# ID i naslov lekcije se namjerno ne ispisuju: validatori su univerzalni)
 # ---------------------------------------------------------------------------
 # Rješenje sistema bez rješenja MORA prikazati lažnu jednakost da bi dokazalo
 # kontradikciju: „…pa bi slijedilo $3=5$, što nije tačno.“ Ovaj modul je takav

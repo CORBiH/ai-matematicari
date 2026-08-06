@@ -356,8 +356,12 @@ def test_the_real_outgoing_range_resolves_to_a_single_required_commit():
         outgoing[0], _run(["git", "rev-parse", "origin/main"], ROOT).stdout.strip())
     result = _run_hook(HOOK, ROOT, stdin)
 
-    # Hook smije spomenuti samo kandidate od HEAD-a do najnovijeg behavior
-    # commita — nikad cijeli rep predaka.
+    # Hook smije imenovati NAJVIŠE JEDAN commit ispod HEAD-a — najnoviji
+    # behavior-affecting commit kao jedinicu autorizacije — nikad cijeli rep
+    # predaka (regresija: raniji hook je nabrajao svaki od 28 commitova).
+    # Faza 4G: raniji oblik `mentioned == []` je važio samo dok je sam HEAD
+    # behavior-affecting; docs/tests commit na vrhu legitimno pomjera
+    # zahtijevani commit jedan-dva mjesta niže, i hook ga tada smije imenovati.
     mentioned = [sha for sha in outgoing[1:] if sha in result.stdout]
-    assert mentioned == [], mentioned
+    assert len(mentioned) <= 1, mentioned
     assert result.stdout.count("PUSH ALLOWED") <= 1
