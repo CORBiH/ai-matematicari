@@ -156,7 +156,13 @@ def test_category_partial_structured_output_is_schema_parse_error():
 
 
 def test_category_invalid_json_schema_validation_error():
-    """(5) Nevalidan JSON/šema: SDK baca pydantic.ValidationError iz parse_text."""
+    """(5) Nevalidan JSON/šema: SDK baca pydantic.ValidationError iz parse_text.
+
+    MEHANIZAM je nepromijenjen; od Faze 4F je kategorija PRECIZNIJA. Neispravan
+    JSON i presječen JSON više ne dijele isti kod (vidi
+    llm.classify_validation_error i tests/test_reviewer_output_budget.py), pa
+    ovaj slučaj sada nosi `llm_malformed_json` — i dalje unutar porodice
+    LLMSchemaParseError, koju ovaj test i provjerava."""
     class _Bad(pydantic.BaseModel):
         x: int
 
@@ -167,8 +173,23 @@ def test_category_invalid_json_schema_validation_error():
 
     with pytest.raises(LLMSchemaParseError) as exc:
         _llm(validation_error).practice_turn("i", "u")
-    assert exc.value.category == "llm_schema_parse_error"
+    assert exc.value.category == "llm_malformed_json"
     assert exc.value.diagnostics["exception_class"] == "ValidationError"
+
+
+def test_category_schema_parse_error_still_exists_for_a_wrong_shape():
+    """Cjelovit JSON pogrešnog oblika zadržava izvornu kategoriju."""
+    class _Bad(pydantic.BaseModel):
+        x: int
+
+    try:
+        _Bad.model_validate_json(json.dumps({"x": "nije broj"}))
+    except pydantic.ValidationError as err:
+        validation_error = err
+
+    with pytest.raises(LLMSchemaParseError) as exc:
+        _llm(validation_error).practice_turn("i", "u")
+    assert exc.value.category == "llm_schema_parse_error"
 
 
 def test_category_refusal():

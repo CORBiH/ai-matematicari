@@ -75,6 +75,9 @@ _DIAG_LOG_ORDER = (
     # Slika: SAMO ograničeni metapodaci (format/dimenzije/veličina nakon
     # normalizacije). Nikad data URL, base64 ni bajtovi sadržaja.
     "image_format", "image_width", "image_height", "image_normalized_bytes",
+    # Klasifikacija neuspjeha izlaza: output_limit_truncated | malformed_json |
+    # schema_validation_failure. Kratak kod, nikad tekst modela.
+    "output_failure",
     "parsed_ok", "usage", "latency_ms",
 )
 
@@ -153,6 +156,62 @@ class LLMEmptyOutput(LLMInvalidOutput):
 
 class LLMSchemaParseError(LLMInvalidOutput):
     category = "llm_schema_parse_error"
+
+
+class LLMOutputLimitTruncated(LLMIncompleteMaxOutputTokens):
+    """Dokument je prekinut nasred JSON-a — potpis iscrpljenog budžeta izlaza.
+
+    ZAŠTO POSTOJI (živi release gate 458d12a): `client.responses.parse` u
+    openai 2.52.1 zove `parse_text` nad `output_text` BEZ obzira na
+    `response.status` (openai/lib/_parsing/_responses.py). Presječen odgovor
+    zato digne `pydantic.ValidationError` UNUTAR SDK poziva, prije nego što
+    server vidi `status`, `incomplete_details` ili `usage` — pa se iscrpljen
+    budžet prijavljivao kao „šema ne valja“ i artefakt gate-a nije imao nijedan
+    metapodatak o presjecanju.
+
+    Podklasa je od LLMIncompleteMaxOutputTokens namjerno: svaki postojeći
+    `except` na porodicu nepotpunog izlaza nastavlja da radi, a kategorija je
+    sada tačna."""
+
+    category = "llm_output_limit_truncated"
+
+
+class LLMMalformedJSON(LLMSchemaParseError):
+    """Cjelovit odgovor koji nije validan JSON — nije presjecanje budžeta."""
+
+    category = "llm_malformed_json"
+
+
+# `EOF while parsing …` i „prerani kraj“ oblici koje pydantic/serde vraćaju za
+# dokument koji je STAO usred sadržaja. Sve ostalo je obična neispravnost.
+_TRUNCATED_JSON_RE = re.compile(
+    r"eof while parsing|unexpected end of|premature end|incomplete input", re.IGNORECASE
+)
+
+
+def classify_validation_error(error):
+    """Vrati (klasa_izuzetka, kratak_kod) za pydantic ValidationError.
+
+    Odluka se donosi ISKLJUČIVO iz strukture greške — nikad iz teksta modela:
+      • bilo koja greška tipa `json_invalid` čija poruka kaže „prerani kraj“
+        → presječen izlaz (budžet),
+      • ostale `json_invalid` → neispravan JSON,
+      • sve ostalo (nedostaje polje, pogrešan tip) → dokument je bio cio, ali
+        ne odgovara šemi.
+    """
+    try:
+        errors = error.errors()
+    except Exception:                      # pragma: no cover — defanzivno
+        return LLMSchemaParseError, "schema_validation_failure"
+    json_invalid = [item for item in errors if item.get("type") == "json_invalid"]
+    if not json_invalid:
+        return LLMSchemaParseError, "schema_validation_failure"
+    for item in json_invalid:
+        context = item.get("ctx") or {}
+        message = f"{item.get('msg', '')} {context.get('error', '')}"
+        if _TRUNCATED_JSON_RE.search(message):
+            return LLMOutputLimitTruncated, "output_limit_truncated"
+    return LLMMalformedJSON, "malformed_json"
 
 
 class LLMRefusal(LLMInvalidOutput):
@@ -267,8 +326,12 @@ class OpenAIPracticeLLM:
         kasnije mogao spustiti na jeftiniji model BEZ ijedne izmjene Practice
         logike. Podrazumijevano je isti model kao Tutor."""
         return self._structured_turn(
+            # ZASEBAN, IZMJEREN BUDŽET (vidi config.MAX_OUTPUT_TOKENS_REVIEWER).
+            # Recenzentov `correct` vraća KOMPLETAN zamjenski paket uz vlastite
+            # provjere i dokaz težine, pa mu je izlaz sistematski veći od
+            # Tutorovog nacrta. Tutorov budžet se ovim NE mijenja.
             instructions, input_text, ReviewerFinal,
-            max_output_tokens=config.MAX_OUTPUT_TOKENS_PRACTICE,
+            max_output_tokens=config.MAX_OUTPUT_TOKENS_REVIEWER,
             model=config.REVIEWER_MODEL,
         )
 
@@ -361,11 +424,15 @@ class OpenAIPracticeLLM:
         except pydantic.ValidationError as e:
             # Tekst je stigao, ali ne odgovara strict šemi (parse_text →
             # model_validate_json baca ValidationError UNUTAR SDK poziva).
+            # Presječen dokument se ovdje razlikuje od neispravnog i od
+            # pogrešnog oblika — vidi classify_validation_error.
             diag["latency_ms"] = int((time.monotonic() - t0) * 1000)
             diag["exception_class"] = type(e).__name__
             diag["exception_summary"] = _scrub(e)
             diag["error_count"] = len(e.errors()) if hasattr(e, "errors") else None
-            raise LLMSchemaParseError(type(e).__name__, diagnostics=diag) from e
+            error_class, output_failure = classify_validation_error(e)
+            diag["output_failure"] = output_failure
+            raise error_class(type(e).__name__, diagnostics=diag) from e
         except openai.LengthFinishReasonError as e:
             # NAPOMENA: Responses API ovo NIKAD ne baca (vidi docstring modula).
             # Blok ostaje samo radi potpunosti ako SDK to jednom promijeni.

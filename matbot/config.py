@@ -34,6 +34,35 @@ def _int_env(name, default):
         return default
 
 
+class ConfigurationError(RuntimeError):
+    """Konfiguracija je prisutna ali neupotrebljiva — pada ODMAH, ne tiho.
+
+    Namjerno drukčije od `_int_env`, koji na neispravnu vrijednost tiho vrati
+    podrazumijevanu. Za budžet izlaznih tokena tiho vraćanje je opasno: pogrešno
+    postavljena varijabla bi vratila presijecanje odgovora u produkciju, a to se
+    vidi tek kao neuspio turn pred učenikom."""
+
+
+def _validated_token_budget(name, default, minimum, ceiling):
+    """Cio broj iz okruženja unutar [minimum, ceiling], ili ConfigurationError.
+
+    Prazna/odsutna vrijednost daje `default` (unazad kompatibilno). Nula,
+    negativna, decimalna, nenumerička i nerazumno velika vrijednost padaju
+    odmah — poruka nosi SAMO ime varijable i granice, nikad vrijednost tajne."""
+    raw = (os.environ.get(name, "") or "").strip()
+    if not raw:
+        return default
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        raise ConfigurationError(
+            f"{name} mora biti cio broj između {minimum} i {ceiling}") from None
+    if value < minimum or value > ceiling:
+        raise ConfigurationError(
+            f"{name} mora biti između {minimum} i {ceiling}")
+    return value
+
+
 # Model i AI parametri (interaktivni Practice put)
 OPENAI_MODEL_TEXT = os.environ.get("OPENAI_MODEL_TEXT", "gpt-5-mini")
 REASONING_EFFORT = os.environ.get("MATBOT_REASONING_EFFORT", "low")
@@ -98,6 +127,45 @@ MAX_OUTPUT_TOKENS_EXPLAIN = min(
     _int_env("MATBOT_MAX_OUTPUT_TOKENS_EXPLAIN", 2500),
     MAX_OUTPUT_TOKENS_HARD_CEILING,
 )
+
+# --- Budžet izlaznih tokena SAMO za RECENZENTA (drugi Practice poziv) ------
+# ŽIVI RELEASE GATE (commit 458d12a, scenario `harder_level2`): recenzentov
+# odgovor je presječen usred stringa („EOF while parsing a string at line 85“)
+# pri budžetu od 2500 tokena. Turn je pao zatvoreno — ispravno — ali je pao.
+#
+# MJERENJE nad 347 uspješnih poziva iz živih artefakata Faze 4E (dvije F4E
+# kampanje + A+B), izlazni tokeni po pozivu:
+#
+#     tutor      n=203  med=1190  p95=1671  MAX=1938   → 0 % blizu granice
+#     reviewer   n=144  med=1428  p95=1905  MAX=2395   → 95,8 % budžeta
+#       decision=correct  n=73  med=1572  p95=2033  MAX=2183
+#       decision=approve  n=69  med=1357  p95=1818  MAX=2395
+#
+# Tutor nikad nije prišao granici i zato ostaje NEPROMIJENJEN. Recenzent jeste:
+# najveći uspješan izlaz ostavio je 105 tokena rezerve, a uzorak je cenzurisan
+# (svaki poziv koji je htio više od 2500 je presječen i u uzorku ga nema).
+#
+# IZBOR 3200: pokriva izmjereni maksimum (2395) sa 34 % rezerve i p99 (2183) sa
+# 47 %, a ostaje ispod tvrde granice od 4000. Namjerno NIJE „koliko god treba“:
+# `max_output_tokens` kod reasoning modela pokriva i reasoning tokene, pa veći
+# budžet znači i duži najgori slučaj. Izmjereno je 25,6 s na ~2500 tokena, a
+# AI_TUTOR_TIMEOUT je 45 s po pozivu — 3200 ostaje unutar tog okvira, dok bi
+# 4000 prišlo timeoutu i samo premjestilo kvar iz presjecanja u istek vremena.
+MAX_OUTPUT_TOKENS_REVIEWER_MIN = 1500
+MAX_OUTPUT_TOKENS_REVIEWER_DEFAULT = 3200
+
+
+def reviewer_output_budget():
+    """Validiran budžet recenzenta — jedini izvor istine za drugi poziv."""
+    return _validated_token_budget(
+        "MATBOT_MAX_OUTPUT_TOKENS_REVIEWER",
+        MAX_OUTPUT_TOKENS_REVIEWER_DEFAULT,
+        MAX_OUTPUT_TOKENS_REVIEWER_MIN,
+        MAX_OUTPUT_TOKENS_HARD_CEILING,
+    )
+
+
+MAX_OUTPUT_TOKENS_REVIEWER = reviewer_output_budget()
 
 # Ograničenja ulaza (server odbija prevelike poruke prije AI poziva)
 MAX_MESSAGE_CHARS = _int_env("MATBOT_MAX_MESSAGE_CHARS", 4000)
