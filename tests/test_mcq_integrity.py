@@ -458,3 +458,47 @@ def test_easier_target_profile_is_shared_with_tutor_and_reviewer_and_rejects_wor
     )
     assert new_fingerprint and new_fingerprint != previous_fingerprint
     assert fake.call_count == 8  # Four generation turns, exactly Tutor + Reviewer each.
+
+
+# ---------------------------------------------------------------------------
+# ŽIVI GATE 93ad85c — pridjev između „djeljiv“ i liste djelilaca
+# ---------------------------------------------------------------------------
+# Recenzentova ISPRAVKA je glasila:
+#   „Koji od sljedećih brojeva je djeljiv istovremeno sa 25 i sa 6? …“
+# Uslov je za čovjeka potpuno jednoznačan (25 I 6), ali je parser tražio da
+# „sa N“ dođe ODMAH iza riječi „djeljiv“, pa je jedan prilog između njih dao
+# prazan skup djelilaca → `divisibility_condition_ambiguous` → gate pao na
+# ISPRAVNOM paketu. Oracle je bio u krivu, ne model.
+
+GATE_TEXT = ("Koji od sljedećih brojeva je djeljiv istovremeno sa 25 i sa 6? "
+             "Primijeni pravila djeljivosti za 25 i za 6 i izaberi tačnu opciju.")
+
+
+def test_live_gate_adverb_between_divisible_and_divisor_list():
+    assert mcq_integrity._explicit_divisors(GATE_TEXT) == (25, 6)
+    result = mcq_integrity.evaluate_divisibility_mcq(
+        GATE_TEXT, ["$150$", "$50$", "$75$", "$30$"])
+    assert result.applicable and result.valid
+    assert result.correct_value == 150          # 150 = 25·6, jedini djeljiv s oba
+
+
+def test_adverb_tolerance_does_not_swallow_a_disjunction():
+    """Prilog se tolerira, ali „ili“ i dalje znači dvosmisleno."""
+    text = "Koji broj je djeljiv istovremeno sa 25 ili sa 6?"
+    result = mcq_integrity.evaluate_divisibility_mcq(
+        text, ["$150$", "$50$", "$75$", "$30$"])
+    assert result.applicable and not result.valid
+    assert result.reason_code == "divisibility_condition_ambiguous"
+
+
+def test_adverb_tolerance_does_not_swallow_a_negation():
+    text = "Koji broj NIJE djeljiv istovremeno sa 25 i sa 6?"
+    result = mcq_integrity.evaluate_divisibility_mcq(
+        text, ["$150$", "$50$", "$75$", "$30$"])
+    assert result.applicable and not result.valid
+
+
+def test_unknown_filler_words_still_fail_closed():
+    """Samo zatvoren skup priloga se preskače — sve drugo ostaje nedokazivo."""
+    assert mcq_integrity._explicit_divisors(
+        "Koji broj je djeljiv nekim čudnim uslovom sa 25?") == ()

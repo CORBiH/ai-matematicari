@@ -18,8 +18,18 @@ from typing import Iterable, Optional
 SUPPORTED_DIVISORS = frozenset({2, 3, 4, 5, 6, 9, 10, 15, 25})
 
 _DIVISIBILITY_WORD_RE = re.compile(r"\bdjeljiv\w*\b", re.IGNORECASE)
+# ZATVOREN skup priloga koji smiju stajati IZMEĐU „djeljiv“ i liste djelilaca.
+# ŽIVI GATE 93ad85c: recenzentova ispravka „…je djeljiv ISTOVREMENO sa 25 i sa
+# 6?“ je za čovjeka jednoznačna, ali je parser tražio „sa N“ odmah iza riječi
+# „djeljiv“, pa je vratio prazan skup i cio ISPRAVAN paket je odbijen kao
+# `divisibility_condition_ambiguous`.
+# Skup je namjerno zatvoren i sitan: ovaj orakl odlučuje KOJA je opcija tačna,
+# pa svako šire tumačenje nosi rizik pogrešno izvedenog skupa djelilaca. Bilo
+# koja druga riječ između i dalje znači „ne mogu dokazati“ → fail closed.
+_DIVISOR_LIST_FILLER = r"(?:\s+(?:istovremeno|ujedno|i\s+istovremeno))?"
 _DIVISOR_LIST_START_RE = re.compile(
-    r"\s+(?:i\s+)?(?:sa|s)\s*\$?\s*(\d+)\s*\$?", re.IGNORECASE,
+    _DIVISOR_LIST_FILLER + r"\s+(?:i\s+)?(?:sa|s)\s*\$?\s*(\d+)\s*\$?",
+    re.IGNORECASE,
 )
 _DIVISOR_LIST_CONTINUATION_RE = re.compile(
     r"(?:\s*,\s*(?:(?:i\s+)?(?:sa|s)\s*)?|\s*(?:i|ili)\s+(?:(?:sa|s)\s*)?)"
