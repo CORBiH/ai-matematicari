@@ -83,21 +83,40 @@ def _intro_for(intent, previous_level, target_level):
     return default
 
 
-def _target_level_for(session, intent):
+def _message_level_floor(student_message, intent):
+    """Deterministički MINIMUM cilja izveden iz PORUKE učenika (Faza 4G).
+
+    ŽIVI F4G TALAS (G03/G05; isti oblik ranije F4F F13–F15): „Daj mi zadatak
+    gdje broj mora biti djeljiv i sa 6 i sa 25.“ na svježoj sesiji cilja nivo 1,
+    a zadatak s dva uslova je definiciono nivo 2 — pa je svaki takav izričit
+    zahtjev OBAVEZNO padao zatvoreno (recenzent: `fail_closed` ili izdaja
+    jedno-pravilnog zadatka koji ne odgovara zahtjevu). Kad učenikova VLASTITA
+    poruka deterministički traži složen uslov (zatvorena gramatika djeljivosti,
+    bez negacije i disjunkcije), cilj za NOVI zadatak je najmanje 2.
+
+    `easier_task`/`harder_task` ostaju čisti koraci progresije — floor se na
+    njih nikad ne primjenjuje."""
+    if intent not in ("generate_task", "next_task"):
+        return 1
+    return 2 if mcq_integrity.explicit_compound_divisor_request(student_message) else 1
+
+
+def _target_level_for(session, intent, student_message=""):
     """One lesson-independent progression policy owned by the server."""
     current = min(max(int(session.get("difficulty_level", 1)), 1), 3)
+    floor = _message_level_floor(student_message, intent)
     if not session.get("current_task"):
-        return 1
+        return max(1, floor)
     if intent == "harder_task":
         return min(current + 1, 3)
     if intent == "easier_task":
         return max(current - 1, 1)
     if intent == "next_task":
         if session.get("last_result") == "full_solution":
-            return max(current - 1, 1)
+            return max(current - 1, floor)
         if session.get("correct_streak", 0) >= 2 and not session.get("current_task_had_hint"):
-            return min(current + 1, 3)
-    return current
+            return max(min(current + 1, 3), floor)
+    return max(current, floor)
 
 
 def _difficulty_levels_enabled():
@@ -607,7 +626,8 @@ def _run_text_turn(store, llm, session, turn, context, request_id):
             if ui_action:
                 raise UnifiedOutputError(
                     f"ui_action_forbids_new_task: {ui_action} vs {final.intent}")
-            target_level = (_target_level_for(session, final.intent)
+            target_level = (_target_level_for(session, final.intent,
+                                              turn["student_message"])
                             if _difficulty_levels_enabled() else None)
             canonical_task = validate_task_package(final.new_task, context, target_level)
             if canonical_task is not final.new_task:

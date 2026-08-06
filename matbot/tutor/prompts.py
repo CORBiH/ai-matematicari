@@ -13,6 +13,7 @@ Recenzent NAMJERNO ne dobija „odobri ako izgleda dobro“ ton: traži se da sa
 riješi zadatak prije nego što išta odobri.
 """
 from matbot.lesson_fidelity import semantic_task_requirement
+from matbot.mcq_integrity import explicit_compound_divisor_request
 from matbot.rules import build_shared_math_rules
 from matbot.tutor.schema import INTENTS
 
@@ -103,6 +104,20 @@ def _state_block(session, student_message, trusted_verdict=None, ui_action=""):
         lines.append("- AKTIVNI ZADATAK: ne postoji (učenik još nije dobio zadatak)")
 
     lines.append(f"- SERVER COMMITTED DIFFICULTY LEVEL: {session.get('difficulty_level', 1)}")
+
+    # Faza 4G (živi F4G talas, G03/G05; ranije F4F F13–F15): poruka koja SAMA
+    # deterministički traži složen uslov djeljivosti definiciono je zadatak
+    # nivoa 2, a cilj na nivou 1 je takve turnove obavezno obarao. Server ovdje
+    # SAOPŠTAVA podignut cilj; isti floor deterministički sprovodi
+    # pipeline._target_level_for, pa je linija istinita — ne sugestija modelu.
+    if explicit_compound_divisor_request(student_message):
+        lines.append(
+            "- EXPLICIT REQUEST NOTICE: the student's own message asks for a task "
+            "combining SEVERAL divisibility conditions. For a NEW task in this turn "
+            "the server target difficulty level is 2 (never 1): generate exactly the "
+            "requested compound task, declare target_difficulty_level=2, and make the "
+            "difficulty evidence honestly measure that task."
+        )
 
     if session["recent_tasks"]:
         lines.append("- NEDAVNI ZADACI (ne ponavljaj iste brojeve ni isti obrazac):")

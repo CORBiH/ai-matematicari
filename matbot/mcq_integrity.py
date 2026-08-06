@@ -317,6 +317,26 @@ def expected_answer_matches_correct_option(expected_answer: str, result: Divisib
     return not bool(numbers & alternatives)
 
 
+def explicit_compound_divisor_request(message: str) -> bool:
+    """True SAMO kad PORUKA UČENIKA sama deterministički traži složen uslov
+    djeljivosti: čitljiva konjunktivna lista od najmanje dva podržana djelioca,
+    dokazano potpuna, bez negacije i bez disjunkcije.
+
+    ZAŠTO POSTOJI (živi F4G talas, G03/G05; ranije F4F F13–F15): server cilja
+    svjež zadatak na nivo 1, a zadatak s DVA uslova djeljivosti je definiciono
+    nivo 2 (`difficulty_profile` to već mjeri). Izričit zahtjev poput „djeljiv
+    i sa 6 i sa 25“ je zato OBAVEZNO padao zatvoreno: recenzent je mogao ili
+    vratiti `fail_closed` ili izdati jedno-pravilni zadatak koji ne odgovara
+    zahtjevu. Ova funkcija daje pipeline-u deterministički osnov da za takav
+    turn podigne cilj na nivo 2 — čita se ISKLJUČIVO učenikova poruka, istom
+    zatvorenom gramatikom kojom se čita i tekst zadatka."""
+    text = message or ""
+    divisors, complete = _divisor_condition(text)
+    if not complete or len(divisors) < 2:
+        return False
+    return not _condition_is_ambiguous(text, divisors)
+
+
 # ---------------------------------------------------------------------------
 # USKI ORAKL DIREKTNOG RAČUNA (Faza 4G, Workstream E — lekcije o razlomcima)
 # ---------------------------------------------------------------------------
