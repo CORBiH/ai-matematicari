@@ -420,15 +420,18 @@ class CountingLLM:
         self.last_tutor_output = result.output
         return result
 
-    def reviewer_turn(self, instructions, input_text):
+    def reviewer_turn(self, instructions, input_text, timeout_s=None):
+        # Faza 4H: pipeline prosljeđuje SUŽEN rok ostatka turna; brojanje i
+        # klasifikacija poziva se ne mijenjaju.
         self._count("reviewer_turn")
-        result = self._call("reviewer", self._inner.reviewer_turn, instructions, input_text)
+        result = self._call("reviewer", self._inner.reviewer_turn, instructions,
+                            input_text, timeout_s=timeout_s)
         self.last_reviewer_output = result.output
         return result
 
-    def _call(self, stage, method, instructions, input_text):
+    def _call(self, stage, method, instructions, input_text, **kwargs):
         try:
-            return method(instructions, input_text)
+            return method(instructions, input_text, **kwargs)
         except LLMError as error:
             # The adapter already owns the scrubbed allow-list.  Retain only
             # that data so a rejected turn can be classified after Practice

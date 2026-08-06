@@ -458,9 +458,14 @@ class FakeLLM:
         self._bind_universal_fixture_metadata(result.output, input_text)
         return result
 
-    def reviewer_turn(self, instructions, input_text):
-        """DRUGI (i posljednji) poziv univerzalnog Practice puta."""
+    def reviewer_turn(self, instructions, input_text, timeout_s=None):
+        """DRUGI (i posljednji) poziv univerzalnog Practice puta.
+
+        `timeout_s` (Faza 4H): pipeline sada prosljeđuje SUŽEN rok ostatka
+        turna — bilježi se radi testova rokova, ponašanje dvojnika je isto."""
         self.reviewer_calls.append((instructions, input_text))
+        self.reviewer_timeouts = getattr(self, "reviewer_timeouts", [])
+        self.reviewer_timeouts.append(timeout_s)
         result = self._next(instructions, input_text)
         self._bind_universal_fixture_metadata(result.output, input_text)
         return result

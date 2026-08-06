@@ -535,20 +535,31 @@ def validate_final(draft: TutorDraft, has_active_task: bool) -> None:
             _require(len(value) <= config.MAX_REPLY_CHARS, f"predug {field_name}")
 
 
-def validate_reviewer(reviewer: ReviewerFinal) -> None:
+def validate_reviewer(reviewer: ReviewerFinal, draft: "TutorDraft | None" = None) -> None:
     """Recenzentov ishod mora biti interno dosljedan.
 
     Odobrenje uz oborenu provjeru je kontradikcija — takav payload se tretira
-    kao pad, ne kao odobrenje."""
+    kao pad, ne kao odobrenje.
+
+    Faza 4H (kompaktno odobrenje): na `approve` recenzent NE vraća eho paketa —
+    server objavljuje upravo NACRT koji je odobren, pa se sve provjere
+    dosljednosti rade nad `draft`. Na `correct` je kompletan `final` i dalje
+    obavezan. Kad pozivalac ne proslijedi `draft` (stariji pozivi), `final`
+    ostaje obavezan kao i ranije."""
     if reviewer.decision == "fail_closed":
         _require(reviewer.fail_reason_code is not None,
                  "fail_closed bez razloga")
         return
 
-    _require(reviewer.final is not None,
-             f"odluka '{reviewer.decision}' bez konačnog payloada")
+    if reviewer.decision == "correct" or draft is None:
+        _require(reviewer.final is not None,
+                 f"odluka '{reviewer.decision}' bez konačnog payloada")
+        basis = reviewer.final
+    else:
+        # `approve`: objavljuje se nacrt; eventualni eho u `final` se ignoriše.
+        basis = draft
     checks = reviewer.checks
-    has_final_task = reviewer.final.new_task is not None
+    has_final_task = basis.new_task is not None
     if has_final_task:
         _require(reviewer.reviewed_difficulty_evidence is not None,
                  "approved task without independent reviewer difficulty evidence")
@@ -587,7 +598,7 @@ def validate_reviewer(reviewer: ReviewerFinal) -> None:
     # samo trenutak kad se kontradikcija otkrije. Pravilo je univerzalno: nema
     # ni lekcije, ni oblasti, ni geometrije u njemu.
     if has_final_task:
-        target_level = reviewer.final.new_task.target_difficulty_level
+        target_level = basis.new_task.target_difficulty_level
         evidence_errors = difficulty_evidence_errors(
             reviewer.reviewed_difficulty_evidence, target_level
         )
@@ -598,11 +609,11 @@ def validate_reviewer(reviewer: ReviewerFinal) -> None:
             + evidence_diagnostics(reviewer.reviewed_difficulty_evidence)
         ))
 
-    if reviewer.final.intent in TASK_INTENTS:
+    if basis.intent in TASK_INTENTS:
         _require(checks.independently_solved,
                  "zadatak odobren bez nezavisnog rješavanja")
         _require((checks.independent_answer or "").strip(),
                  "nezavisno rješenje je prazno")
-    if reviewer.final.intent in DIFFICULTY_SHIFT_INTENTS:
+    if basis.intent in DIFFICULTY_SHIFT_INTENTS:
         _require(checks.difficulty_direction_correct,
                  "promjena težine odobrena bez potvrđenog smjera")

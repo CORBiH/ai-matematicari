@@ -434,7 +434,7 @@ def _call_tutor(llm, context, session, student_message, trusted_verdict, ui_acti
 
 
 def _call_reviewer(llm, context, session, student_message, draft, trusted_verdict,
-                   preflight_block="", ui_action="", timer=None):
+                   preflight_block="", ui_action="", timer=None, timeout_s=None):
     timer = timer or _TurnTimer()
     with timer.stage("prompt_build"):
         instructions = tutor_prompts.build_reviewer_instructions(context)
@@ -444,7 +444,7 @@ def _call_reviewer(llm, context, session, student_message, draft, trusted_verdic
             preflight_block, ui_action,
         )
     with timer.stage("reviewer_call"):
-        result = llm.reviewer_turn(instructions, input_text)
+        result = llm.reviewer_turn(instructions, input_text, timeout_s=timeout_s)
     timer.note_ms("reviewer_api", getattr(result, "latency_ms", None))
     return result
 
@@ -1289,10 +1289,22 @@ def _two_call(llm, context, session, student_message, request_id, trusted_verdic
             package_preflight.describe_issues(draft_issues),
         )
 
+    # Faza 4H (Workstream L): eksplicitni rok CIJELOG turna. Skoro istekao
+    # Tutor poziv ne smije slijepo započeti dug recenzentski poziv — bolje
+    # siguran pad odmah nego 90-sekundno čekanje učenika. Podrazumijevani rok
+    # (2×AI_TIMEOUT_S) ne mijenja zatečeno ponašanje ni za milisekundu.
+    remaining_s = config.practice_turn_deadline_s() - timer.total_ms() / 1000.0
+    if remaining_s < config.MIN_STAGE_BUDGET_S:
+        _log_rejection(
+            request_id, context, "turn_deadline",
+            f"remaining={remaining_s:.1f}s before reviewer call", draft.intent)
+        return None, calls
+
     try:
         reviewer_result = _call_reviewer(
             llm, context, session, student_message, draft, trusted_verdict,
             package_preflight.format_for_reviewer(draft_issues), timer=timer,
+            timeout_s=min(config.AI_TIMEOUT_S, remaining_s),
         )
         calls += 1
         _log_sdk_entry(request_id, context, "reviewer", calls, reviewer_result)
@@ -1306,7 +1318,7 @@ def _two_call(llm, context, session, student_message, request_id, trusted_verdic
     reviewer = reviewer_result.output
     try:
         with timer.stage("reviewer_validate"):
-            validate_reviewer(reviewer)
+            validate_reviewer(reviewer, draft)
     except UnifiedOutputError as error:
         _log_rejection(request_id, context, "reviewer_payload", error, draft.intent)
         return None, calls
@@ -1318,7 +1330,21 @@ def _two_call(llm, context, session, student_message, request_id, trusted_verdic
         )
         return None, calls
 
-    final = normalize_for_intent(reviewer.final)
+    # Faza 4H (Workstream J): na `approve` se objavljuje UPRAVO odobreni nacrt.
+    # Recenzent na odobrenju više ne vraća eho paketa (medijalno ~1400 izlaznih
+    # tokena ≈ 15+ sekundi generisanja); eventualni poslani `final` se IGNORIŠE
+    # — recenzent nacrt na `approve` ne može tiho izmijeniti.
+    if reviewer.decision == "approve":
+        if reviewer.final is not None:
+            logger.info(
+                "reviewer_approve_echo_ignored request_id=%s topic=%s",
+                request_id, context.topic_id,
+            )
+        basis = draft
+    else:
+        basis = reviewer.final
+
+    final = normalize_for_intent(basis)
     if final.new_task is not None:
         # The first-call wrapper retains the Tutor's self-description. Only
         # the independently returned Reviewer evidence becomes authoritative.

@@ -151,12 +151,13 @@ class ObservingLLM:
             kinds = self._local.kinds = []
         kinds.append(method_name)
 
-    def _invoke(self, stage, method_name, method, instructions, input_text):
+    def _invoke(self, stage, method_name, method, instructions, input_text,
+                **kwargs):
         from matbot.llm import LLMError, safe_failure_diagnostics
 
         self._count(method_name)
         try:
-            result = method(instructions, input_text)
+            result = method(instructions, input_text, **kwargs)
         except LLMError as error:
             self._local.failure = {
                 "stage": stage,
@@ -188,9 +189,10 @@ class ObservingLLM:
         self._local.tutor_output = result.output
         return result
 
-    def reviewer_turn(self, instructions, input_text):
+    def reviewer_turn(self, instructions, input_text, timeout_s=None):
+        # Faza 4H: pipeline prosljeđuje sužen rok ostatka turna.
         result = self._invoke("reviewer", "reviewer_turn", self._inner.reviewer_turn,
-                              instructions, input_text)
+                              instructions, input_text, timeout_s=timeout_s)
         self._local.reviewer_output = result.output
         return result
 

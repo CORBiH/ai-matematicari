@@ -363,7 +363,7 @@ def test_gate_harness_preserves_safe_first_call_llm_failure_details(
                     "unapproved_detail": "must not be persisted",
                 })
 
-        def reviewer_turn(self, instructions, input_text):
+        def reviewer_turn(self, instructions, input_text, timeout_s=None):
             raise AssertionError("Reviewer must not run after first Tutor failure")
 
     monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", "universal_two_call")

@@ -325,12 +325,16 @@ class OpenAIPracticeLLM:
             model=config.TUTOR_MODEL,
         )
 
-    def reviewer_turn(self, instructions: str, input_text: str) -> LLMResult:
+    def reviewer_turn(self, instructions: str, input_text: str,
+                      timeout_s=None) -> LLMResult:
         """DRUGI (i posljednji) poziv: nezavisna provjera + konačan payload.
 
         `config.REVIEWER_MODEL` je zaseban podesiv izbor da bi se recenzent
         kasnije mogao spustiti na jeftiniji model BEZ ijedne izmjene Practice
-        logike. Podrazumijevano je isti model kao Tutor."""
+        logike. Podrazumijevano je isti model kao Tutor.
+
+        `timeout_s` (Faza 4H, Workstream L): pozivalac smije SUZITI rok ovog
+        poziva na ostatak roka cijelog turna — nikad ga proširiti."""
         return self._structured_turn(
             # ZASEBAN, IZMJEREN BUDŽET (vidi config.MAX_OUTPUT_TOKENS_REVIEWER).
             # Recenzentov `correct` vraća KOMPLETAN zamjenski paket uz vlastite
@@ -339,6 +343,7 @@ class OpenAIPracticeLLM:
             instructions, input_text, ReviewerFinal,
             max_output_tokens=config.MAX_OUTPUT_TOKENS_REVIEWER,
             model=config.REVIEWER_MODEL,
+            timeout_s=timeout_s,
         )
 
     def explain_turn(self, instructions: str, input_text: str) -> LLMResult:
@@ -383,7 +388,8 @@ class OpenAIPracticeLLM:
         }]
 
     def _structured_turn(self, instructions: str, input_text: str, text_format,
-                          max_output_tokens=None, image=None, model=None) -> LLMResult:
+                          max_output_tokens=None, image=None, model=None,
+                          timeout_s=None) -> LLMResult:
         import openai
         import pydantic
 
@@ -392,6 +398,10 @@ class OpenAIPracticeLLM:
         # model adaptera — svi zatečeni putevi se time ne mijenjaju.
         active_model = model or self.model
         client = self._get_client()
+        # Faza 4H: per-poziv rok smije samo SUZITI podrazumijevani (nikad
+        # produžiti). `with_options` dijeli isti HTTP pool — nema nove konekcije.
+        if timeout_s is not None and timeout_s < self.timeout_s:
+            client = client.with_options(timeout=max(float(timeout_s), 1.0))
         diag = {
             "model": active_model,
             "reasoning_effort": self.reasoning_effort,

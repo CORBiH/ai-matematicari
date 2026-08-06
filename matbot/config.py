@@ -83,6 +83,17 @@ REASONING_EFFORT = os.environ.get("MATBOT_REASONING_EFFORT", "low")
 TUTOR_MODEL = os.environ.get("MATBOT_TUTOR_MODEL", OPENAI_MODEL_TEXT)
 REVIEWER_MODEL = os.environ.get("MATBOT_REVIEWER_MODEL", OPENAI_MODEL_TEXT)
 AI_TIMEOUT_S = _float_env("AI_TUTOR_TIMEOUT", 30.0)
+
+# Faza 4H (Workstream L): rok CIJELOG Practice turna. Podrazumijevano tačno
+# 2×AI_TIMEOUT_S — dakle bajt za bajt zatečeno ponašanje — a produkcija ga
+# smije spustiti da skoro istekao Tutor poziv ne započne dug recenzentski.
+_PRACTICE_TURN_DEADLINE_S = _float_env("MATBOT_TURN_DEADLINE_S", 0.0)
+# Ispod ovog ostatka roka drugi poziv nema smisla ni pokušavati.
+MIN_STAGE_BUDGET_S = 5.0
+
+
+def practice_turn_deadline_s():
+    return _PRACTICE_TURN_DEADLINE_S or (2 * AI_TIMEOUT_S)
 MAX_OUTPUT_TOKENS = _int_env("MATBOT_MAX_OUTPUT_TOKENS", 1200)
 
 # --- Budžet izlaznih tokena SAMO za Practice generisanje zadatka -----------

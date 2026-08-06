@@ -306,7 +306,14 @@ def _semantic_contract_block(context):
 
 
 def build_tutor_instructions(context):
-    """Sistemski prompt prvog poziva — isti za svih 534 lekcije."""
+    """Sistemski prompt prvog poziva — isti za svih 534 lekcije.
+
+    Faza 4H (Workstream K): STABILAN, za sve lekcije IDENTIČAN prefiks stoji
+    PRVI (OpenAI prompt keš radi nad tačnim prefiksom — ranije je sadržaj
+    zavisan od razreda/lekcije stajao u drugom pasusu, pa je zajednički prefiks
+    među lekcijama bio svega ~1,3–2,2 K znakova). Sav sadržaj koji zavisi od
+    razreda/lekcije/oblasti dolazi TEK NA KRAJU instrukcija; sadržaj pravila se
+    ne mijenja ni za jedan znak."""
     shared = build_shared_math_rules(
         context.grade, context.title, context.oblast, mode="practice"
     )
@@ -314,9 +321,6 @@ def build_tutor_instructions(context):
         "Ti si iskusan nastavnik matematike u osnovnoj školi u Bosni i Hercegovini. "
         "Vodiš mod „Vježbaj sa mnom“: daješ po jedan zadatak i pomažeš učeniku da "
         "ga sam riješi.\n\n"
-        f"{shared}\n\n"
-        f"{_semantic_requirement_block(context)}"
-        f"{_semantic_contract_block(context)}"
         f"{_INTENT_GUIDE}\n\n"
         f"{_FIELD_RULE}\n\n"
         f"{_TASK_RULE}\n\n"
@@ -326,7 +330,11 @@ def build_tutor_instructions(context):
         f"{_STARTING_COMPLEXITY_RULE}\n\n"
         f"{_DIFFICULTY_RULE}\n\n"
         "TON: obraćaj se učeniku direktno, toplo i kratko. Nikad ne spominji "
-        "interna polja, „namjeru“, recenzenta ni to da si model."
+        "interna polja, „namjeru“, recenzenta ni to da si model.\n\n"
+        # --- dinamički (po lekciji) dio TEK OD OVE TAČKE (Workstream K) ---
+        f"{shared}\n\n"
+        f"{_semantic_requirement_block(context)}"
+        f"{_semantic_contract_block(context)}"
     )
 
 
@@ -451,6 +459,9 @@ def build_reviewer_instructions(context):
     Recenzent je GLAVNA semantička kapija opsega lekcije i jedini nezavisan
     provjeravač matematike. Zato mu se izričito traži da sam riješi zadatak —
     „izgleda tačno“ nije provjera."""
+    # Faza 4H (Workstream K): STABILAN, za sve lekcije IDENTIČAN prefiks stoji
+    # PRVI (OpenAI prompt keš radi nad tačnim prefiksom), a sav sadržaj koji
+    # zavisi od razreda/lekcije/oblasti dolazi TEK NA KRAJU instrukcija.
     shared = build_shared_math_rules(
         context.grade, context.title, context.oblast, mode="practice"
     )
@@ -458,7 +469,6 @@ def build_reviewer_instructions(context):
         "Ti si stroga nezavisna kontrola kvaliteta za nastavni odgovor iz "
         "matematike (osnovna škola, Bosna i Hercegovina). Dobijaš NACRT drugog "
         "nastavnika i moraš ga provjeriti prije nego što ga učenik vidi.\n\n"
-        f"{shared}\n\n"
         "OBAVEZNO PROVJERI, tim redom:\n"
         "1. matematičku tačnost — SAM riješi zadatak od nule i upiši svoje "
         "rješenje u `checks.independent_answer`; ne vjeruj nacrtu na riječ;\n"
@@ -473,20 +483,30 @@ def build_reviewer_instructions(context):
         "9. da je MathJax ispravan (samo $...$, poznate komande);\n"
         "10. da je bosanski prirodan i primjeren uzrastu.\n\n"
         "11. verify that lesson identity, level, text, options, marked answer, solution, difficulty evidence, and signature describe one task. Independently recompute `reviewed_difficulty_evidence` from only the visible task, answer requirements, options, and solution: ignore Tutor numerical counts. Count only actions the student must perform; four MCQ options are not four conditions or operations, selecting one option with one rule is one direct application, a solution explanation is not a student explanation requirement, and `combines_concepts` is true only when the student must combine distinct mathematical concepts. Return your independently calculated evidence even if the wording needs no textual correction. Level 1 may be a direct yes/no, recognition, calculation, classification, substitution, or one-rule selection; choosing a visible option is not by itself mathematical comparison or a second reasoning step. Level 2 permits a bounded pair of related rules/concepts, conditions, or operations, straightforward explanation/comparison, or one manageable representation change; `combines_concepts` alone is not Level 3. Level 3 requires construction, proof, three-or-more connected requirements/operations, advanced representation change, or comparable depth. For multiple choice, correct_option_id and correct_option_index must select the same visible option and expected_answer must be an exact copy of its text; explanation belongs only in solution. Signature parameters are only closed name/value entries with canonical string values: no arbitrary metadata, and order alone is never a new task. When correcting, update options, correct option ID/index, expected answer, solution, and the complete signature together, then return the complete fresh package. Set `task_package_consistent`, `difficulty_evidence_valid`, and `task_signature_consistent` accordingly.\n\n"
-        f"{_semantic_contract_block(context)}"
         f"{_SCALED_DIVISION_RULE}\n\n"
         f"{_REVIEWER_DECISION_RULE}\n\n"
         f"{_REVIEWER_TARGET_LEVEL_RULE}\n\n"
         f"{_REVIEWER_PREFLIGHT_RULE}\n\n"
+        # --- dinamički (po lekciji) dio TEK OD OVE TAČKE (Workstream K) ---
+        f"{shared}\n\n"
+        f"{_semantic_contract_block(context)}"
         "ODLUKA:\n"
-        "- `approve` — nacrt je ispravan; prepiši ga nepromijenjen u `final`;\n"
+        # Faza 4H (Workstream J): eho paketa na odobrenju je bio najveći
+        # pojedinačni trošak izlaza (medijalno ~1400 tokena ≈ 15+ s
+        # generisanja). Server na `approve` objavljuje UPRAVO odobreni nacrt,
+        # pa je eho i suvišan i nemoćan: eventualni poslani `final` se ignoriše.
+        "- `approve` — nacrt je ispravan; vrati SAMO `decision`, `checks` i "
+        "`reviewed_difficulty_evidence`, a polje `final` IZOSTAVI. Server "
+        "objavljuje tačno nacrt koji si odobrio, bajt za bajt — `final` uz "
+        "`approve` se ignoriše i ne može ništa izmijeniti;\n"
         "- `correct` — nacrt je popravljiv; u `final` vrati KOMPLETAN ispravljen "
         "payload (to je konačan odgovor koji učenik vidi). To uključuje i "
         "KOMPLETNU ZAMJENU zadatka kad je težina pogrešna za traženi nivo;\n"
         "- `fail_closed` — ne može se sigurno objaviti; navedi `fail_reason_code`.\n\n"
         "Ako matematika nije sigurna ili je zadatak dvosmislen, biraj "
         "`fail_closed`. Bolje bez odgovora nego pogrešan odgovor.\n"
-        "Ne postoji treći poziv: tvoj `final` je ono što se objavljuje."
+        "Ne postoji treći poziv: kod `correct` je tvoj `final` ono što se "
+        "objavljuje, a kod `approve` se objavljuje nepromijenjen nacrt."
     )
 
 
