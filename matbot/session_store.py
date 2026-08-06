@@ -53,6 +53,10 @@ def _fresh_session(session_id, curriculum_fingerprint, grade, lesson_id,
         "last_result": "",               # "", "correct" ili "incorrect"
         "current_task_had_hint": False,
         "current_task_signature": None,
+        # Faza 4H: deterministički dodatak AKTIVNOG zadatka (ljestvica
+        # nagovještaja, potpuno rješenje, kanonski odgovor) — postoji samo kad
+        # je paket server-generisan; model-objava ga uvijek briše.
+        "deterministic_task": None,
         # Closed, server-validated evidence used for the published task. It is
         # never sent to the student, but keeps the authoritative package
         # auditable across the active session.

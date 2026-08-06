@@ -20,6 +20,15 @@ def practice_difficulty_levels_enabled():
                           PRACTICE_DIFFICULTY_LEVELS_FLAG)
 
 
+def deterministic_practice_enabled():
+    """Faza 4H: deterministička strategija izvršenja unutar Practice
+    orkestratora. PODRAZUMIJEVANO UKLJUČENA — `disabled` je izričit produkcijski
+    rollback (i način da testovi model-strategije ispitaju model-put na lekciji
+    koju inače pokriva potpun deterministički generator)."""
+    value = (os.environ.get("MATBOT_DETERMINISTIC_PRACTICE", "") or "").strip().lower()
+    return value != "disabled"
+
+
 def _float_env(name, default):
     try:
         return float(os.environ.get(name, "") or default)

@@ -21,6 +21,7 @@ import contextlib
 import copy
 import logging
 import random
+import re
 import time
 import uuid
 
@@ -34,7 +35,8 @@ from matbot.tutor import package_preflight
 from matbot.tutor import reviewer_authority
 from matbot.tutor import task_identity
 from matbot.tutor import prompts as tutor_prompts
-from matbot.tutor.schema import (TASK_INTENTS, UnifiedOutputError,
+from matbot.deterministic import fractions as deterministic_fractions
+from matbot.tutor.schema import (TASK_INTENTS, TutorDraft, UnifiedOutputError,
                                  normalize_for_intent, validate_final, validate_task,
                                  validate_difficulty_evidence, validate_reviewer)
 
@@ -473,6 +475,166 @@ def _log_difficulty(request_id, context, final):
 
 
 # ---------------------------------------------------------------------------
+# DETERMINISTIČKA STRATEGIJA IZVRŠENJA (Faza 4H) — ISTI orkestrator, dvije
+# strategije iza njega. Ovo NIJE drugi pipeline: ruta se bira ovdje, a objava,
+# sesija i svi validatori ostaju zajednički.
+# ---------------------------------------------------------------------------
+# Registar po SEMANTIČKOJ PORODICI — nikad po lekciji. Lekcija je pokrivena
+# samo kad ima blocking ugovor čije parametre generator u potpunosti podržava.
+_DETERMINISTIC_GENERATORS = {
+    deterministic_fractions.FAMILY_ID: deterministic_fractions,
+}
+
+
+def _deterministic_generator_for(context):
+    """Modul generatora za lekciju, ili None kad lekcija nije POTPUNO pokrivena."""
+    if not config.deterministic_practice_enabled():
+        return None
+    contract = getattr(context, "semantic_contract", None)
+    if contract is None or not getattr(contract, "blocking", False):
+        return None
+    module = _DETERMINISTIC_GENERATORS.get(getattr(contract, "family_id", ""))
+    if module is None or not module.supports(getattr(contract, "parameters", None)):
+        return None
+    return module
+
+
+# ZATVOREN skup jednostavnih poruka za izradu zadatka. Sve što ne stane u ovaj
+# skup (dodatni uslovi, slobodna pitanja, specifični zahtjevi) ide model-putem —
+# ruta se NIKAD ne bira iz modelove proze.
+_SIMPLE_TASK_REQUEST_RE = re.compile(
+    r"(?:daj\s+mi\s+|hoću\s+|može\s+)?"
+    r"(?:jedan\s+|još\s+jedan\s+|novi\s+|sljedeći\s+|idući\s+)?"
+    r"zadatak(?:\s+za\s+vježbu)?(?:\s+iz\s+ove\s+(?:teme|lekcije|oblasti))?"
+    r"\s*[.!]?",
+    re.IGNORECASE,
+)
+_EASIER_MESSAGE_RE = re.compile(
+    r"(?:daj\s+mi\s+)?(?:jedan\s+)?lakši\s+zadatak\s*[.!]?", re.IGNORECASE)
+_HARDER_MESSAGE_RE = re.compile(
+    r"(?:daj\s+mi\s+)?(?:jedan\s+)?(?:još\s+)?teži\s+zadatak\s*[.!]?", re.IGNORECASE)
+
+
+def _deterministic_task_intent(turn, session):
+    """Server-vlasnička namjera za determinističku izradu zadatka, ili ''.
+
+    Izvodi se ISKLJUČIVO iz UI polja (`difficulty_request`) i zatvorenog skupa
+    jednostavnih poruka. Dugmad pomoći (intent=hint/solution) nikad nisu
+    izrada zadatka."""
+    if (turn.get("intent") or "").strip():
+        return ""
+    difficulty = (turn.get("difficulty_request") or "").strip().lower()
+    if difficulty == "easier":
+        return "easier_task"
+    if difficulty == "harder":
+        return "harder_task"
+    message = (turn.get("student_message") or "").strip()
+    if _EASIER_MESSAGE_RE.fullmatch(message):
+        return "easier_task"
+    if _HARDER_MESSAGE_RE.fullmatch(message):
+        return "harder_task"
+    if _SIMPLE_TASK_REQUEST_RE.fullmatch(message):
+        return "next_task" if session.get("current_task") else "generate_task"
+    return ""
+
+
+def _run_deterministic_task_turn(store, session, turn, context, request_id,
+                                 intent, generator):
+    """DETERMINISTIC_PACKAGE ruta: server generiše, dokaže i objavi paket —
+    nula poziva modela. Objava, validatori i mutacija sesije su DOSLOVNO isti
+    kod kao za model-paket (`validate_task_package` + `_publish_task`)."""
+    timer = _TurnTimer()
+    active_task_before = session["current_task"]
+    identity_before = session.get("current_task_identity") or ""
+    levels_enabled = _difficulty_levels_enabled()
+    generator_level = _target_level_for(session, intent, turn["student_message"])
+    target_level = generator_level if levels_enabled else None
+    previous_level = session.get("difficulty_level") if levels_enabled else None
+
+    package, task_text = None, ""
+    with timer.stage("generate"):
+        # Ograničeni pokušaji: kanonski/potpisni duplikat bira NOVE operande,
+        # nikad model. Svaki kandidat prolazi ISTU objavnu validaciju.
+        for _attempt in range(12):
+            try:
+                candidate = generator.generate_package(
+                    lesson_id=context.topic_id, lesson_title=context.title,
+                    parameters=context.semantic_contract.parameters,
+                    level=generator_level)
+            except deterministic_fractions.DeterministicGenerationError as error:
+                _log_rejection(request_id, context, "deterministic_generation",
+                               error, intent)
+                break
+            payload = candidate.task_payload()
+            final = TutorDraft(intent=intent, reply="",
+                               lesson_focus="deterministic generator",
+                               new_task=payload)
+            try:
+                with timer.stage("publish"):
+                    validate_task_package(payload, context, target_level)
+                    task_text = _publish_task(session, context, final,
+                                              request_id, target_level)
+            except UnifiedOutputError:
+                continue
+            package = candidate
+            break
+
+    if package is None:
+        _log_turn_diagnostics(
+            request_id, context, turn, session, intent=intent, calls=0,
+            published=False, task_preserved=bool(active_task_before),
+            state_mutated=False, previous_identity=identity_before,
+            final_identity=identity_before,
+            rejection_code="deterministic_generation_failed",
+            route="deterministic_package", timer=timer)
+        return _error_response(active_task_before)
+
+    # Deterministički dodatak sesije: ljestvica nagovještaja i potpuno rješenje
+    # su SERVERSKE činjenice objavljenog paketa — kasniji hint/rješenje/klik za
+    # OVAJ identitet ne treba nijedan poziv modela.
+    session["deterministic_task"] = {
+        "generator_version": package.generator_version,
+        "family_id": package.family_id,
+        "operation": package.operation,
+        "hints": list(package.hints),
+        "solution": package.solution,
+        "display_answer": package.display_answer,
+        "accepted_answers": list(package.accepted_answers),
+        "task_identity": session["current_task_identity"],
+    }
+
+    intro_intent = intent if target_level is not None else "generate_task"
+    intro = _intro_for(intro_intent, previous_level, target_level)
+    answer = intro + "\n\nZadatak: " + task_text
+    session["recent_turns"].append(
+        {"student": turn["student_message"][:300], "tutor": answer[:400]}
+    )
+
+    response = {
+        "status": "ready",
+        "answer": answer,
+        "answer_verdict": None,
+        "last_tutor_task": session["current_task"] or "",
+        "next_state": _next_state(session),
+        "session_mode": "practice",
+        "effective_topic": context.topic_id,
+    }
+    with timer.stage("commit"):
+        store.save(session)
+    logger.info(
+        "tutor_turn request_id=%s topic=%s intent=%s calls=0",
+        request_id, context.topic_id, intent,
+    )
+    _log_turn_diagnostics(
+        request_id, context, turn, session, intent=intent, calls=0,
+        published=True, task_preserved=True, state_mutated=True,
+        previous_identity=identity_before,
+        final_identity=session.get("current_task_identity") or "",
+        route="deterministic_package", timer=timer)
+    return response
+
+
+# ---------------------------------------------------------------------------
 # ULAZNA TAČKA
 # ---------------------------------------------------------------------------
 
@@ -664,6 +826,17 @@ def _run_text_turn(store, llm, session, turn, context, request_id):
     had_active_task = bool(active_task_before)
     identity_before = session.get("current_task_identity") or ""
     ui_action = _explicit_ui_action(turn, session)
+
+    # Faza 4H: DETERMINISTIC_PACKAGE ruta — samo server-vlasničke činjenice
+    # (lekcija s potpunim generatorom + UI polje ili zatvoren skup poruka).
+    generator = _deterministic_generator_for(context)
+    if generator is not None and not ui_action:
+        deterministic_intent = _deterministic_task_intent(turn, session)
+        if deterministic_intent:
+            return _run_deterministic_task_turn(
+                store, session, turn, context, request_id, deterministic_intent,
+                generator)
+
     timer = _TurnTimer()
 
     final, calls = _two_call(
@@ -882,6 +1055,10 @@ def _publish_task(session, context, final, request_id, target_level=None):
     if _is_duplicate_structured_signature(signature_record, session["recent_task_signatures"]):
         raise UnifiedOutputError("duplicate structured task signature")
     session["current_task"] = task_text
+    # Faza 4H: model-paket NIKAD ne nasljeđuje deterministički dodatak starog
+    # zadatka — hint/rješenje/ocjena tuđeg identiteta bi bila pogrešna
+    # matematika. Deterministička ruta ga ponovo postavlja POSLIJE objave.
+    session["deterministic_task"] = None
     # Kanonski identitet ide u sesiju I u browser: UI stanje (crveno/zeleno,
     # otkriven odgovor, hint) mora biti vezano za IDENTITET zadatka, ne za
     # njegov tekst — vidi templates/index.html.

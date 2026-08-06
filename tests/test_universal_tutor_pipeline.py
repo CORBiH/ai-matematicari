@@ -754,3 +754,18 @@ def test_universal_pipeline_is_opt_in_and_never_the_default(monkeypatch):
     monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE",
                        practice_module.UNIVERSAL_PIPELINE_FLAG)
     assert practice_module._universal_pipeline_enabled() is True
+
+
+# ---------------------------------------------------------------------------
+# Faza 4H: ovi testovi ispituju MODEL-strategiju (Tutor+Recenzent) i na
+# porodičnim lekcijama koje produkcija sada rutira deterministički. Izričito
+# isključenje je ISTI mehanizam koji služi i kao produkcijski rollback
+# (MATBOT_DETERMINISTIC_PRACTICE=disabled) — model-put time ostaje trajno
+# testiran, bajt za bajt kakav je i bio.
+# ---------------------------------------------------------------------------
+import pytest as _pytest_f4h
+
+
+@_pytest_f4h.fixture(autouse=True)
+def _model_route_only_f4h(monkeypatch):
+    monkeypatch.setenv("MATBOT_DETERMINISTIC_PRACTICE", "disabled")

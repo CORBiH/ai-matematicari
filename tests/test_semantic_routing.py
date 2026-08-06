@@ -324,3 +324,18 @@ def test_rejected_turn_still_costs_exactly_two_calls(release_gate_env, fake_llm,
     fake_llm.queue(make_reviewer_final(final=draft))
     practice.run_practice_turn(store, fake_llm, turn_for(lesson))
     assert fake_llm.call_count == 2
+
+
+# ---------------------------------------------------------------------------
+# Faza 4H: ovi testovi ispituju MODEL-strategiju (Tutor+Recenzent) i na
+# porodičnim lekcijama koje produkcija sada rutira deterministički. Izričito
+# isključenje je ISTI mehanizam koji služi i kao produkcijski rollback
+# (MATBOT_DETERMINISTIC_PRACTICE=disabled) — model-put time ostaje trajno
+# testiran, bajt za bajt kakav je i bio.
+# ---------------------------------------------------------------------------
+import pytest as _pytest_f4h
+
+
+@_pytest_f4h.fixture(autouse=True)
+def _model_route_only_f4h(monkeypatch):
+    monkeypatch.setenv("MATBOT_DETERMINISTIC_PRACTICE", "disabled")

@@ -775,3 +775,18 @@ def test_genuine_colon_division_in_solution_still_publishes_and_still_rejects(mo
     assert run_practice_turn(store, fake, turn(6, context.topic_id))["answer"] == SAFE_ERROR_MESSAGE
     assert store.peek("structured") == before
     assert fake.call_count == 4
+
+
+# ---------------------------------------------------------------------------
+# Faza 4H: ovi testovi ispituju MODEL-strategiju (Tutor+Recenzent) i na
+# porodičnim lekcijama koje produkcija sada rutira deterministički. Izričito
+# isključenje je ISTI mehanizam koji služi i kao produkcijski rollback
+# (MATBOT_DETERMINISTIC_PRACTICE=disabled) — model-put time ostaje trajno
+# testiran, bajt za bajt kakav je i bio.
+# ---------------------------------------------------------------------------
+import pytest as _pytest_f4h
+
+
+@_pytest_f4h.fixture(autouse=True)
+def _model_route_only_f4h(monkeypatch):
+    monkeypatch.setenv("MATBOT_DETERMINISTIC_PRACTICE", "disabled")

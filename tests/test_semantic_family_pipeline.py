@@ -266,3 +266,18 @@ def test_divisibility_blocking_behaviour_is_unchanged():
                     ("$12$", "$5$", "$9$", "$25$"))
     codes = [issue.code for issue in package_preflight.collect_package_issues(task)]
     assert "divisibility_rules_not_required_by_visible_task" in codes
+
+
+# ---------------------------------------------------------------------------
+# Faza 4H: ovi testovi ispituju MODEL-strategiju (Tutor+Recenzent) i na
+# porodičnim lekcijama koje produkcija sada rutira deterministički. Izričito
+# isključenje je ISTI mehanizam koji služi i kao produkcijski rollback
+# (MATBOT_DETERMINISTIC_PRACTICE=disabled) — model-put time ostaje trajno
+# testiran, bajt za bajt kakav je i bio.
+# ---------------------------------------------------------------------------
+import pytest as _pytest_f4h
+
+
+@_pytest_f4h.fixture(autouse=True)
+def _model_route_only_f4h(monkeypatch):
+    monkeypatch.setenv("MATBOT_DETERMINISTIC_PRACTICE", "disabled")
