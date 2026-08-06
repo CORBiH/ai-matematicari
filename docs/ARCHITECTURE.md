@@ -180,7 +180,8 @@ Key properties: the **server** decides correctness of a multiple-choice click an
 passes the verdict to the model as a fact it may not contradict; the correct option
 id is never sent to the browser before reveal; the session is a local copy and is
 only committed (`store.save`) on a fully successful turn.
-
+ 
+ 
 For mapped grade-6 fraction lessons, family identity is followed by a second,
 deterministic lesson-level proof. It uses exact `Fraction` arithmetic over the
 visible operands to distinguish equal-denominator addition/subtraction,
