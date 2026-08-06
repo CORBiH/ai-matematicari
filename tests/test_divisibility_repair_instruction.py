@@ -32,7 +32,11 @@ from matbot import mcq_integrity
 from matbot.tutor import package_preflight
 from tests.conftest import make_task_payload
 
-AMBIGUOUS = "Koji od sljedećih brojeva je djeljiv sa 6 i istovremeno sa 25?"
+# Faza 4G je „i istovremeno sa 25“ uvela u zatvoreni skup čitljivih veznika
+# (vidi test_divisibility_wording_variants.py), pa raniji primjer više nije
+# nečitljiv. „kao i“ NIJE imenovan veznik: server pročita samo „6“, u istoj
+# rečenici ostane nepročitan broj, i uslov je i dalje nedokazan → isti kod.
+AMBIGUOUS = "Koji od sljedećih brojeva je djeljiv sa 6 kao i sa 25?"
 ZERO_CORRECT = "Koji od sljedećih brojeva je djeljiv i sa 6 i sa 25?"
 BAD_OPTIONS = ("8", "6", "7", "9")
 

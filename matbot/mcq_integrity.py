@@ -27,12 +27,24 @@ _DIVISIBILITY_WORD_RE = re.compile(r"\bdjeljiv\w*\b", re.IGNORECASE)
 # pa svako šire tumačenje nosi rizik pogrešno izvedenog skupa djelilaca. Bilo
 # koja druga riječ između i dalje znači „ne mogu dokazati“ → fail closed.
 _DIVISOR_LIST_FILLER = r"(?:\s+(?:istovremeno|ujedno|i\s+istovremeno))?"
+# „sa brojem 25“ — imenica „brojem“ neposredno iza prijedloga je jednoznačno
+# ista tvrdnja kao „sa 25“ (Faza 4G: varijanta je padala kao nedokazan uslov).
+_DIVISOR_PREPOSITION = r"(?:sa|s)(?:\s+brojem)?"
 _DIVISOR_LIST_START_RE = re.compile(
-    _DIVISOR_LIST_FILLER + r"\s+(?:i\s+)?(?:sa|s)\s*\$?\s*(\d+)\s*\$?",
+    _DIVISOR_LIST_FILLER + r"\s+(?:i\s+)?" + _DIVISOR_PREPOSITION
+    + r"\s*\$?\s*(\d+)\s*\$?",
     re.IGNORECASE,
 )
+# Nastavak liste priznaje ISTI zatvoreni skup kao početak (Faza 4G): veznici
+# „i“/„te“, pojačivač „istovremeno“/„ujedno“ i „, ali i“ su konjunktivni i
+# jednoznačni. „ili“ se čita ali ga `_condition_is_ambiguous` odbija kao
+# disjunkciju; svaka NEIMENOVANA riječ i dalje prekida listu, pa nepročitan
+# broj u istoj rečenici znači nedokazan uslov → fail closed.
 _DIVISOR_LIST_CONTINUATION_RE = re.compile(
-    r"(?:\s*,\s*(?:(?:i\s+)?(?:sa|s)\s*)?|\s*(?:i|ili)\s+(?:(?:sa|s)\s*)?)"
+    r"(?:\s*,\s*(?:(?:ali\s+)?(?:i\s+)?(?:istovremeno\s+|ujedno\s+)?"
+    r"(?:" + _DIVISOR_PREPOSITION + r")\s*)?"
+    r"|\s*(?:i|ili|te)\s+(?:istovremeno\s+|ujedno\s+)?"
+    r"(?:(?:" + _DIVISOR_PREPOSITION + r")\s*)?)"
     r"\$?\s*(\d+)\s*\$?",
     re.IGNORECASE,
 )
