@@ -136,7 +136,8 @@ def _explicit_divisors(question: str) -> tuple[int, ...]:
     return _read_divisor_list(question)[0]
 
 
-# ŽIVI PRODUKCIJSKI NALAZ (ručni smoke, lekcija 6-03-004): objavljen je MCQ
+# ŽIVI PRODUKCIJSKI NALAZ (ručni smoke, lekcija o pravilima djeljivosti u 6.
+# razredu): objavljen je MCQ
 # „…koji od sljedećih brojeva je djeljiv i sa 6 i sa 25?“ s opcijama 8, 6, 7, 9
 # i označenom opcijom 6. Broj djeljiv i sa 6 i sa 25 djeljiv je sa NZS(6,25)=150,
 # pa zadatak nije imao NIJEDAN tačan odgovor.

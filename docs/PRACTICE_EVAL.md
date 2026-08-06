@@ -198,6 +198,41 @@ poziva, nijedna provjera se ne izvršava, scenario ne može završiti kao strogi
 PASS. Nijedno očekivanje se time ne ublažava — svaka provjera je identična za
 korak koji se stvarno izvrši.
 
+### Ciljani talasi po porodici (`scenarios/family/`)
+
+Fajlovi u `tools/practice_eval/scenarios/family/` **nisu** u podrazumijevanom
+direktoriju scenarija: `--wave A|B|all` ih ne pokreće. Pokreću se isključivo
+eksplicitnim `--scenarios <put>`, jer svaki cilja jednu dokazanu granicu, a ne
+široku dijagnostiku. Uz svaki `.jsonl` stoji generator `.jsonl.py` koji ga
+proizvodi i u docstringu nosi razlog postojanja.
+
+#### Talas F4E — dva P0 nalaza iz produkcije (18 scenarija, max 62 poziva)
+
+Napisan nakon ručnog produkcijskog smoke testa koji je dokazao dva defekta koje
+uzorkovani release gate nije uhvatio:
+
+- **P0-A** — objavljen MCQ „…koji od sljedećih brojeva je djeljiv i sa 6 i sa
+  25?“ s opcijama 8 · 6 · 7 · 9. Broj djeljiv i sa 6 i sa 25 djeljiv je sa
+  NZS(6,25)=150 — nijedna opcija nije bila tačna.
+- **P0-B** — „Uradi ga ti“ je objavio POTPUNO NOV zadatak umjesto rješenja
+  postojećeg.
+
+| Grupa | ID-evi | n | Šta potvrđuje |
+|---|---|---|---|
+| Doslovan produkcijski niz (zadatak → hint → rješenje) | E01–E03 | 3 | P0-B; 3× radi mjerenja stope, ne jednog uzorka |
+| Rješenje bez hinta, nov zadatak nakon rješenja, druga lekcija | E04–E06 | 3 | zabrana važi po UI akciji, ne po lekciji ni po redoslijedu |
+| Istovremena djeljivost sa 6 i 25 | E07–E09 | 3 | P0-A na tačnom paru djelilaca iz nalaza |
+| Drugi parovi/trojke djelilaca | E10–E12 | 3 | popravka je u parseru uslova, ne u brojevima 6 i 25 |
+| Jedan djelilac i cifra-mjestodržač | E13–E14 | 2 | kontrole: uslov se ne proširuje, orakl preskače |
+| Negacija i disjunkcija | E15–E16 | 2 | smiju samo sigurno pasti, nikad lažno dokazati |
+| Klik i kontinuitet sesije | E17–E18 | 2 | označena opcija stabilna; klik nakon rješenja blokiran, 0 poziva |
+
+Koraci „Ne znam“ i „Uradi ga ti“ šalju **tačan produkcijski payload** (`intent`,
+`interaction_phase`, `last_tutor_task`), ne samo tekst dugmeta — jer se upravo
+oslanjanje na tekst pokazalo kao uzrok P0-B.
+
+Strukturu talasa čuva `tests/test_targeted_wave_f4e.py` (0 poziva).
+
 #### `topic_id` na koraku
 
 Korak smije promijeniti lekciju unutar iste sesije. To je jedini način da se
@@ -226,6 +261,11 @@ python tools/run_practice_eval.py --wave A --resume --output-dir <isti dir>
 
 # Jedan scenario
 python tools/run_practice_eval.py --scenario A14 --scenario A24
+
+# Ciljani talas po porodici (nije u podrazumijevanom direktoriju)
+python tools/run_practice_eval.py `
+  --scenarios tools/practice_eval/scenarios/family/wave_f4e.jsonl `
+  --max-model-calls 62
 ```
 
 Zastavice: `--list`, `--scenario ID`, `--wave A|B|all`, `--resume`,
