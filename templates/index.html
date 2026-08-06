@@ -786,14 +786,46 @@ document.addEventListener('DOMContentLoaded', () => {
       row.appendChild(wrap);
     }
 
-    function showTutorTyping(){
+    /* Faza 4H (Workstream L): FAZNE statusne poruke — isključivo iz ZATVORENOG
+       skupa ispod, nikad matematički sadržaj i nikad nerecenziran tekst.
+       Faze su klijentska procjena toka (server i dalje objavljuje atomarno);
+       rotacija je vremenska jer backend ne emituje događaje po fazi. */
+    const TYPING_STAGE_MS = 8000;
+    let typingStageTimer = null;
+    function setTypingLabel(label){
+      tutorTyping.innerHTML = '🤖 ' + escapeHtml(label) + '<span class="dots"></span>';
+    }
+    function showTutorTyping(stages){
       tutorChat.classList.add('open');
       if (tutorEmpty) tutorEmpty.classList.add('hidden');
       tutorChat.appendChild(tutorTyping);       // uvijek na dno
       tutorTyping.classList.remove('hidden');
+      if (typingStageTimer){ clearInterval(typingStageTimer); typingStageTimer = null; }
+      const list = (stages && stages.length) ? stages : ['Tutor razmišlja'];
+      let stageIndex = 0;
+      setTypingLabel(list[0]);
+      if (list.length > 1){
+        typingStageTimer = setInterval(()=>{
+          stageIndex = Math.min(stageIndex + 1, list.length - 1);
+          setTypingLabel(list[stageIndex]);
+          if (stageIndex === list.length - 1){ clearInterval(typingStageTimer); typingStageTimer = null; }
+        }, TYPING_STAGE_MS);
+      }
       tutorChat.scrollTop = tutorChat.scrollHeight;
     }
-    function hideTutorTyping(){ tutorTyping.classList.add('hidden'); }
+    function hideTutorTyping(){
+      if (typingStageTimer){ clearInterval(typingStageTimer); typingStageTimer = null; }
+      tutorTyping.classList.add('hidden');
+    }
+    function practiceStagesFor(payload, isNewTaskRequest){
+      if (state.mode !== 'practice') return null;
+      if (payload && payload.intent === 'hint_request') return ['Sastavljam nagovještaj'];
+      if (payload && payload.intent === 'solution_request') return ['Pišem postupak'];
+      if (isNewTaskRequest || (payload && payload.difficulty_request)){
+        return ['Pripremam zadatak', 'Provjeravam zadatak', 'Skoro gotovo'];
+      }
+      return null;
+    }
 
     /* siguran localStorage ključ: nikad undefined (fallback "default") */
     let cid = 'default';
@@ -1708,7 +1740,7 @@ document.addEventListener('DOMContentLoaded', () => {
       optionsBox.querySelectorAll('.mc-option-card').forEach(b=>{ b.disabled = true; });
       btn.classList.add('loading');
       hideChips();
-      showTutorTyping();
+      showTutorTyping(['Provjeravam tvoj odgovor']);
       setTutorBusy(true);
       const clientTurnId = (crypto.randomUUID) ? crypto.randomUUID() : (Date.now() + '_' + Math.random());
       const payload = {
@@ -2054,7 +2086,7 @@ document.addEventListener('DOMContentLoaded', () => {
       pushTutor('user', imgFile ? ((text ? text + ' ' : '') + IMAGE_HISTORY_MARKER) : text);
       fbBox.classList.add('hidden');
       hideChips();
-      showTutorTyping();
+      showTutorTyping(practiceStagesFor(payload, isNewTaskRequest));
       setTutorBusy(true);
 
       /* Frontend prekida zahtjev nakon TUTOR_ABORT_MS — učenik ne smije
@@ -2114,7 +2146,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function retryNewTaskRequest(payload){
       if (tutorBusy) return;
       tutorBusy = true;
-      showTutorTyping();
+      showTutorTyping(practiceStagesFor(payload, true));
       setTutorBusy(true);
       const ac = new AbortController();
       const abortTimer = setTimeout(()=>{ try { ac.abort(); } catch(_){} }, TUTOR_ABORT_MS);

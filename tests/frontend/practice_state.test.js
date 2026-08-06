@@ -361,6 +361,58 @@ test('a malformed response leaves the controls usable and the next turn works', 
   assert.strictEqual(page.ui.optionsBox.dataset.taskIdentity, IDENTITY_B);
 });
 
+test('stage status shows a safe non-math label during a new-task request', async () => {
+  /* Faza 4H, Workstream L: fazne poruke su iz ZATVORENOG skupa i nikad ne
+     sadrže matematički niti nerecenziran sadržaj. */
+  const page = practicePage();
+  await publish(page, ready(TASK_A, OPTIONS_A, IDENTITY_A));
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  page.network.responder = async entry => {
+    if (entry.method === 'GET') return jsonResponse({ grades: {} });
+    if (entry.url === STREAM) return { ok: false, status: 500, headers: { get: () => '' }, json: async () => ({}) };
+    await gate;
+    return jsonResponse(ready(TASK_B, OPTIONS_B, IDENTITY_B));
+  };
+  page.doc.getElementById('tutorMessage').value = 'Daj mi novi zadatak.';
+  const pending = page.ui.sendTutorMsg();
+
+  const indicator = page.doc.getElementById('tutorTyping');
+  assert.ok(indicator.innerHTML.includes('Pripremam zadatak'),
+    'faza pripreme mora biti vidljiva: ' + indicator.innerHTML);
+  assert.ok(!indicator.innerHTML.includes('$'), 'bez matematičkog sadržaja');
+  assert.ok(!indicator.innerHTML.includes(TASK_B), 'bez nerecenziranog zadatka');
+
+  release();
+  await pending;
+  await settle();
+  assert.strictEqual(indicator.classList.contains('hidden'), true);
+});
+
+test('hint chip shows the hint stage label while pending', async () => {
+  const page = practicePage();
+  await publish(page, ready(TASK_A, OPTIONS_A, IDENTITY_A));
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  page.network.responder = async entry => {
+    if (entry.method === 'GET') return jsonResponse({ grades: {} });
+    if (entry.url === STREAM) return { ok: false, status: 500, headers: { get: () => '' }, json: async () => ({}) };
+    await gate;
+    return jsonResponse(safeErrorPreserved(TASK_A));
+  };
+  page.ui.setChipMeta({ intent: 'hint_request' });
+  page.doc.getElementById('tutorMessage').value = 'Ne znam.';
+  const pending = page.ui.sendTutorMsg();
+
+  const indicator = page.doc.getElementById('tutorTyping');
+  assert.ok(indicator.innerHTML.includes('Sastavljam nagovještaj'),
+    indicator.innerHTML);
+
+  release();
+  await pending;
+  await settle();
+});
+
 test('an accepted new task updates text, options and identity together', async () => {
   const page = practicePage();
   await publish(page, ready(TASK_A, OPTIONS_A, IDENTITY_A));
