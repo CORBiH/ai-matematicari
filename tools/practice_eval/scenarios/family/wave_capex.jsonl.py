@@ -1,4 +1,7 @@
-"""Generator ciljanog talasa CAPEX — deterministička kapacitetna ekspanzija.
+"""Generator ciljanog talasa F5C (kapacitetna ekspanzija).
+
+Ime talasa je F5C (Faza 5, Capability) jer šema scenarija prihvata samo
+A/B/F* imena talasa — vidi tools/practice_eval/scenario.py.
 
     python tools/practice_eval/scenarios/family/wave_capex.jsonl.py
 
@@ -124,7 +127,7 @@ def add(reason, tags, steps, lesson, importance="critical"):
     global n
     n += 1
     topic, grade, oblast = lesson
-    rows.append({"id": f"X{n:02d}", "wave": "CAPEX", "importance": importance,
+    rows.append({"id": f"X{n:02d}", "wave": "F5C", "importance": importance,
                  "grade": grade, "oblast": oblast, "topic_id": topic,
                  "reason": reason, "tags": list(tags), "steps": steps})
 
