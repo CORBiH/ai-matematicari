@@ -22,13 +22,13 @@ from typing import Iterable
 
 ROOT = Path(__file__).resolve().parent.parent
 RESULT_DIR = ROOT / "scratchpad" / "live_release_gate"
-# Kapacitetna ekspanzija: 6-03-004 (pravila djeljivosti) sada ima blocking
-# semantički ugovor i POTPUN deterministički generator, pa više ne može nositi
-# model-scenarije ove kapije. Sestrinska lekcija iste oblasti (djeljivost
-# zbira, razlike i proizvoda) ostaje na model-putu i preuzima tu ulogu —
-# deterministički put kapija i dalje izričito dokazuje kroz semantic_fresh /
-# semantic_harder (nula poziva).
-CORE_DIVISIBILITY = ("6-03-002", 6)
+# Kapacitetna ekspanzija: lekcije oblasti djeljivosti dobijaju blocking
+# semantičke ugovore u talasima (6-03-004 u prvom, 6-03-002 u Batch #2), pa
+# model-scenarije kapije nosi lekcija koja je KLASIFIKATOROM ostala na
+# model-putu (tekstualni zadaci iz djeljivosti). `_require_model_routed_plan`
+# ispod pada GLASNO pri gradnji plana — prije ijednog SDK poziva — ako neka
+# buduća aktivacija i ovu lekciju učini determinističkom.
+CORE_DIVISIBILITY = ("6-03-010", 6)
 # Lekcija koja i dalje ide DETERMINISTIČKIM K1/K3 putem (nema semantički
 # ugovor). Ranije je ovdje stajala 6-04-009, ali ona od Faze 4B ide
 # semantičkim dvopozivnim putem — vidi CORE_SEMANTIC.
@@ -142,6 +142,36 @@ def _select_rotating_lesson(grade: int, commit_sha: str) -> tuple[str, int]:
     return candidates[offset], grade
 
 
+def _routes_deterministically(lesson_id: str) -> bool:
+    """Server-vlasnička činjenica: da li strukturisana izrada zadatka ove
+    lekcije ide determinističkom strategijom (blocking ugovor + registrovan
+    generator koji parametre POTPUNO podržava)."""
+    from matbot import deterministic as deterministic_registry
+
+    contract = semantic_contracts.contract_for(lesson_id)
+    if contract is None or not contract.blocking:
+        return False
+    module = deterministic_registry.GENERATORS.get(contract.family_id)
+    return module is not None and module.supports(dict(contract.parameters))
+
+
+def _require_model_routed_plan(plan):
+    """Model-scenario na determinističkoj lekciji bi IZMJERIO pogrešan broj
+    poziva tek usred žive kapije. Zato se ruta svakog scenarija dokazuje PRIJE
+    ijednog SDK poziva: očekivani pozivi > 0 traže model-put, a tačno 0 poziva
+    traži deterministički put."""
+    for item in plan:
+        deterministic = _routes_deterministically(item.scenario.lesson_id)
+        if item.expected_calls > 0 and deterministic and                 item.scenario.path != "contract":
+            raise GateRefusal(
+                f"Gate scenario '{item.role}' expects model calls but its "
+                "lesson now routes deterministically; retarget the scenario.")
+        if item.expected_calls == 0 and not deterministic:
+            raise GateRefusal(
+                f"Gate scenario '{item.role}' expects zero calls but its "
+                "lesson no longer routes deterministically.")
+
+
 def build_release_gate_plan(commit_sha: str) -> tuple[GateScenario, ...]:
     """The exact 14-scenario / 19-call plan, pure except curriculum lookup."""
     grade7 = _select_rotating_lesson(7, commit_sha)
@@ -157,7 +187,7 @@ def build_release_gate_plan(commit_sha: str) -> tuple[GateScenario, ...]:
             calls,
         )
 
-    return (
+    plan = (
         scenario("release_gate_divisibility_fresh_level1", CORE_DIVISIBILITY, "", "release-core",
                  "Daj mi zadatak.", 2, role="fresh_level1"),
         scenario("release_gate_correct_committed_choice", CORE_DIVISIBILITY, "", "release-core", "", 1,
@@ -188,6 +218,8 @@ def build_release_gate_plan(commit_sha: str) -> tuple[GateScenario, ...]:
         scenario("release_gate_grade9_rotating", grade9, "", "release-grade9", "Daj mi zadatak.", 2,
                  role="grade9"),
     )
+    _require_model_routed_plan(plan)
+    return plan
 
 
 def _task_output_errors(result) -> list[str]:
