@@ -112,25 +112,50 @@ def _validate_parameters(raw, schema, lesson_id):
 
 
 def _prompt_lines(family, parameters):
-    """Sintetiši KOMPAKTAN blok ugovora — isti tekst za Tutora i Recenzenta."""
+    """Sintetiši KOMPAKTAN blok ugovora — isti tekst za Tutora i Recenzenta.
+
+    GENERIČKO RENDEROVANJE (kapacitetna ekspanzija): porodica opisuje svoje
+    linije PODACIMA, nikad granom u ovom kompajleru:
+      • "header"          — obavezna prva linija;
+      • "operations"      — linija s {operations}; renderuje se kad dodjela ima
+                            `allowed_operations` (etikete iz operation_labels);
+      • "concepts"        — isto, za porodice čiji parametar je `concepts`
+                            (etikete iz concept_labels);
+      • "parameter_lines" — {ime_parametra: {vrijednost: linija}}: linija se
+                            dodaje kad dodjela ima tačno tu vrijednost enum
+                            parametra (redoslijed = redoslijed u šablonu);
+      • "forbidden"       — linija s {forbidden} kad dodjela zabranjuje
+                            direktive (etikete iz directive_labels);
+      • "supporting"      — opciona fiksna linija;
+      • "closing"         — obavezna posljednja linija.
+    Nepoznata vrijednost u parameter_lines se NE renderuje tiho — provjeru
+    vrijednosti već garantuje _validate_parameters nad shemom porodice."""
     template = family["prompt_template"]
-    op_labels = family["operation_labels"]
-    directive_labels = family["directive_labels"]
 
-    operations = ", ".join(op_labels[op] for op in parameters["allowed_operations"])
-    lines = [template["header"], template["operations"].format(operations=operations)]
+    lines = [template["header"]]
+    if "operations" in template and parameters.get("allowed_operations"):
+        op_labels = family["operation_labels"]
+        operations = ", ".join(op_labels[op]
+                               for op in parameters["allowed_operations"])
+        lines.append(template["operations"].format(operations=operations))
+    if "concepts" in template and parameters.get("concepts"):
+        concept_labels = family["concept_labels"]
+        concepts = ", ".join(concept_labels[item]
+                             for item in parameters["concepts"])
+        lines.append(template["concepts"].format(concepts=concepts))
 
-    relation = parameters.get("denominator_relation", "any")
-    if relation == "equal":
-        lines.append(template["denominator_equal"])
-    elif relation == "unlike":
-        lines.append(template["denominator_unlike"])
+    for parameter_name, value_lines in (template.get("parameter_lines") or {}).items():
+        value = parameters.get(parameter_name)
+        if value is not None and value in value_lines:
+            lines.append(value_lines[value])
 
     forbidden = parameters.get("forbidden_directives") or ()
-    if forbidden:
+    if forbidden and "forbidden" in template:
+        directive_labels = family["directive_labels"]
         lines.append(template["forbidden"].format(
             forbidden=", ".join(directive_labels[item] for item in forbidden)))
-    lines.append(template["supporting"])
+    if "supporting" in template:
+        lines.append(template["supporting"])
     lines.append(template["closing"])
     return lines
 

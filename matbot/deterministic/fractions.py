@@ -23,6 +23,7 @@ from dataclasses import dataclass
 from fractions import Fraction
 from math import gcd, lcm
 
+from matbot.deterministic.core import DeterministicGenerationError
 from matbot.tutor.schema import (DifficultyEvidence, SignatureParameter, TaskPayload,
                                  TaskSignature, TutorOption)
 
@@ -34,10 +35,6 @@ _SUPPORTED_OPERATIONS = frozenset({"add", "subtract", "multiply", "divide"})
 # Simboli operacija po projektnim pravilima zapisa (matbot/rules.py):
 # množenje uvijek `\cdot`, školsko dijeljenje `:`.
 _OPERATOR_SYMBOL = {"add": "+", "subtract": "-", "multiply": "\\cdot", "divide": ":"}
-
-
-class DeterministicGenerationError(RuntimeError):
-    """Ni nakon ograničenog broja pokušaja nije nastao valjan paket."""
 
 
 def supports(parameters) -> bool:

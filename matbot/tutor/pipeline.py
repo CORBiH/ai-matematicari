@@ -35,7 +35,8 @@ from matbot.tutor import package_preflight
 from matbot.tutor import reviewer_authority
 from matbot.tutor import task_identity
 from matbot.tutor import prompts as tutor_prompts
-from matbot.deterministic import fractions as deterministic_fractions
+from matbot import deterministic as deterministic_generators
+from matbot.deterministic.core import DeterministicGenerationError
 from matbot.tutor.schema import (TASK_INTENTS, TutorDraft, UnifiedOutputError,
                                  normalize_for_intent, validate_final, validate_task,
                                  validate_difficulty_evidence, validate_reviewer)
@@ -481,9 +482,9 @@ def _log_difficulty(request_id, context, final):
 # ---------------------------------------------------------------------------
 # Registar po SEMANTIČKOJ PORODICI — nikad po lekciji. Lekcija je pokrivena
 # samo kad ima blocking ugovor čije parametre generator u potpunosti podržava.
-_DETERMINISTIC_GENERATORS = {
-    deterministic_fractions.FAMILY_ID: deterministic_fractions,
-}
+# Registar živi u matbot/deterministic/__init__.py da dodavanje novog
+# kapaciteta ne dira orkestrator (kapacitetna ekspanzija, poslije Faze 4H).
+_DETERMINISTIC_GENERATORS = deterministic_generators.GENERATORS
 
 
 def _deterministic_generator_for(context):
@@ -649,7 +650,7 @@ def _run_deterministic_task_turn(store, session, turn, context, request_id,
                     lesson_id=context.topic_id, lesson_title=context.title,
                     parameters=context.semantic_contract.parameters,
                     level=generator_level)
-            except deterministic_fractions.DeterministicGenerationError as error:
+            except DeterministicGenerationError as error:
                 _log_rejection(request_id, context, "deterministic_generation",
                                error, intent)
                 break
