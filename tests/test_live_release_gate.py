@@ -468,7 +468,10 @@ def test_gate_harness_preserves_safe_first_call_llm_failure_details(
     inner = FirstCallFailure()
     counter = canary.CountingLLM(inner, ceiling=19)
     report = canary.CanaryReport(campaign="release-gate", started_at="now", sdk_call_ceiling=19)
-    scenario = canary.Scenario("first-failure", "6-03-001", 6, "non_contract", "",
+    # Kapacitetna ekspanzija: 6-03-001 sada ide determinističkom strategijom
+    # (0 poziva), pa prvi poziv modela mora simulirati lekcija koja je OSTALA
+    # na model-putu.
+    scenario = canary.Scenario("first-failure", "6-03-010", 6, "non_contract", "",
                                 "first-failure", "Daj mi zadatak.")
     result, stop = canary._run_one_turn(
         SessionStore(), counter, canary._LogCapture(), report, scenario, "release-gate")

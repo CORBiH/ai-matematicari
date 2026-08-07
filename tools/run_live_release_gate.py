@@ -22,7 +22,13 @@ from typing import Iterable
 
 ROOT = Path(__file__).resolve().parent.parent
 RESULT_DIR = ROOT / "scratchpad" / "live_release_gate"
-CORE_DIVISIBILITY = ("6-03-004", 6)
+# Kapacitetna ekspanzija: 6-03-004 (pravila djeljivosti) sada ima blocking
+# semantički ugovor i POTPUN deterministički generator, pa više ne može nositi
+# model-scenarije ove kapije. Sestrinska lekcija iste oblasti (djeljivost
+# zbira, razlike i proizvoda) ostaje na model-putu i preuzima tu ulogu —
+# deterministički put kapija i dalje izričito dokazuje kroz semantic_fresh /
+# semantic_harder (nula poziva).
+CORE_DIVISIBILITY = ("6-03-002", 6)
 # Lekcija koja i dalje ide DETERMINISTIČKIM K1/K3 putem (nema semantički
 # ugovor). Ranije je ovdje stajala 6-04-009, ali ona od Faze 4B ide
 # semantičkim dvopozivnim putem — vidi CORE_SEMANTIC.
@@ -39,6 +45,7 @@ sys.path.insert(0, str(ROOT))
 
 from matbot import config, release_config, feedback, mathsafe, mcq_integrity, practice  # noqa: E402
 from matbot.contracts import registry as contract_registry  # noqa: E402
+from matbot.semantics import contracts as semantic_contracts  # noqa: E402
 from matbot.llm import OpenAIPracticeLLM  # noqa: E402
 from matbot.session_store import SessionStore  # noqa: E402
 from matbot.topics import lesson_info  # noqa: E402
@@ -118,6 +125,11 @@ def _select_rotating_lesson(grade: int, commit_sha: str) -> tuple[str, int]:
         if lesson_id in {CORE_DIVISIBILITY[0], CORE_CONTRACT[0], CORE_SEMANTIC[0]}:
             continue
         if contract_registry.contract_for(lesson_id) is not None:
+            continue
+        # Kapacitetna ekspanzija: lekcija s blocking semantičkim ugovorom ide
+        # determinističkom strategijom (0 poziva) — rotirajući scenario mora
+        # ostati STVARNI model-scenario s tačno 2 poziva.
+        if semantic_contracts.contract_for(lesson_id) is not None:
             continue
         if grade == 9 and not any(word in title.lower() for word in (
                 "jednačin", "jednacin", "sistem", "tekstual", "algebr")):
