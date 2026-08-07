@@ -163,11 +163,20 @@ def _package_from_spec(spec, family_id, lesson_id, lesson_title, level):
         # "2" u formuli "n(n-3)/2" ili odgovor "\pi" u formuli s π) — novi
         # pokušaj bira druge vrijednosti.
         raise DeterministicGenerationError("prikaz odgovora sadržan u prvoj uputi")
-    solution = (f"{spec.get('rule', 'Primijenimo formulu')}: ${formula}$. "
-                f"Računamo: ${chain} = {answer_display}$"
-                f"{unit_suffix}." if spec.get("append_answer", True) else
-                f"{spec.get('rule', 'Primijenimo formulu')}: ${formula}$. "
-                f"Računamo: ${chain}$.")
+    # Puni postupak = formula + uvrštavanje + račun (živi nalaz F5F F02/F03:
+    # bez koraka uvrštavanja postupak je imao <80 znakova, a lanac koji se već
+    # završava rezultatom dobijao je degenerisano „= X = X“ ponovnim dodavanjem
+    # prikaza odgovora).
+    intro = spec.get("rule", "Primijenimo formulu")
+    solution_parts = [f"{intro}: ${formula}$."]
+    if substitution.strip() != chain.strip():
+        solution_parts.append(f"Uvrstimo poznate vrijednosti: ${substitution}$.")
+    if (spec.get("append_answer", True)
+            and not chain.rstrip().endswith(answer_display)):
+        solution_parts.append(f"Računamo: ${chain} = {answer_display}${unit_suffix}.")
+    else:
+        solution_parts.append(f"Računamo: ${chain}${unit_suffix}.")
+    solution = " ".join(solution_parts)
     return core.build_package(
         lesson_id=lesson_id, lesson_title=lesson_title, family_id=family_id,
         operation=spec["operation"], level=level, question=spec["question"],
@@ -706,13 +715,18 @@ def _k_hypotenuse(rng, level):
         if c.is_rational:
             b += 1
             c = RadicalValue.sqrt_of(a * a + b * b)
+        # Kad je radikand već kvadratno slobodan, √s se NE pojednostavljuje,
+        # pa bi „= c.display()“ dalo degenerisano „√74 = √74“ (nalaz F5F).
+        root = f"\\sqrt{{{a * a + b * b}}}"
+        chain = (f"c = {root}" if c.display() == root
+                 else f"c = {root} = {c.display()}")
         return {
             "question": (f"Katete pravouglog trougla su $a = {a}$ cm i "
                          f"$b = {b}$ cm. Kolika je hipotenuza $c$?"),
             "answer": c, "unit": "cm",
             "formula": "c^2 = a^2 + b^2",
             "substitution": f"c^2 = {a}^2 + {b}^2 = {a * a + b * b}",
-            "chain": f"c = \\sqrt{{{a * a + b * b}}} = {c.display()}",
+            "chain": chain,
             "distractors": [RadicalValue.of(a + b), RadicalValue.sqrt_of(a * a + b * b + 1),
                             RadicalValue.of(Fraction(a * a + b * b))],
             "signature": [("a", str(a)), ("b", str(b))],
@@ -784,7 +798,7 @@ def _k_square_diagonal(rng, level):
         "question": f"Kvadrat ima stranicu $a = {a}$ cm. Kolika je dijagonala kvadrata?",
         "answer": d, "unit": "cm",
         "formula": "d = a\\sqrt{2}",
-        "substitution": f"d = {a}\\sqrt{{2}}",
+        "substitution": f"d = {a} \\cdot \\sqrt{{2}}",
         "chain": f"d = {d.display()}",
         "distractors": [RadicalValue.of(2 * a), RadicalValue.of(a, 3),
                         RadicalValue.of(Fraction(a, 2), 2)],
@@ -961,7 +975,7 @@ def _k_cube_space_diagonal(rng, level):
     return {
         "question": f"Ivica kocke je $a = {a}$ cm. Kolika je prostorna dijagonala kocke?",
         "answer": diag, "unit": "cm",
-        "formula": "D = a\\sqrt{3}", "substitution": f"D = {a}\\sqrt{{3}}",
+        "formula": "D = a\\sqrt{3}", "substitution": f"D = {a} \\cdot \\sqrt{{3}}",
         "chain": f"D = {diag.display()}",
         "distractors": [RadicalValue.of(a, 2), RadicalValue.of(3 * a),
                         RadicalValue.of(2 * a, 3)],
