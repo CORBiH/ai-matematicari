@@ -202,10 +202,12 @@ registered generator that fully `supports()` the contract parameters gets its
 structured actions (fresh/new/easier/harder task, MCQ grading, hints, full
 solution) served with **zero model calls**. The registry lives in
 `matbot/deterministic/__init__.py`; capability engines
-(`arithmetic`, `conversions`, `equations`, `fractions`, `functions`,
-`numbertheory`, `ordering`, `polynomials`, `powers`, `quantities`, `ratio`,
+(`anglework`, `arithmetic`, `conversions`, `equations`, `fractions`,
+`functions`, `geometry` — plane figures, Pythagoras and solids on an exact
+`RadicalValue`/`PiValue` number authority (`radicals.py`) —, `numbertheory`,
+`ordering`, `polynomials`, `powers`, `quantities`, `ratio`, `systems`,
 `units`) share one core (`matbot/deterministic/core.py`) and serve
-**25 semantic families covering 154 lessons across all four grades**
+**30 semantic families covering 272 lessons across all four grades**
 (source of truth: `data/lesson_semantic_assignments.json`, compiled by
 `scripts/build_lesson_semantics.py`; bulk activation table and coverage report:
 `scripts/bulk_onboard_deterministic.py` →
