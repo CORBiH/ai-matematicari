@@ -39,9 +39,14 @@ FAMILY_IDS = (
 GENERATOR_VERSION = "detarith-1"
 
 _SUPPORTED_OPERATIONS = frozenset({"add", "subtract", "multiply", "divide"})
-_SUPPORTED_DOMAINS = frozenset({"natural", "integer", "decimal", "rational_signed"})
+# `rational_nonneg` (Batch #2): pozitivni racionalni brojevi 6. razreda (Q+) —
+# isti račun kao rational_signed, ali SVAKI operand i SVAKI međurezultat mora
+# ostati nenegativan (kurikulum 6. razreda ne poznaje negativne razlomke).
+_SUPPORTED_DOMAINS = frozenset({"natural", "integer", "decimal",
+                                "rational_signed", "rational_nonneg"})
 _SUPPORTED_SHAPES = frozenset({"single_operation", "multi_factor",
-                               "order_of_operations"})
+                               "order_of_operations", "division_with_remainder",
+                               "complex_fraction"})
 _SUPPORTED_SIGN_SCOPES = frozenset({"any", "same_signs", "different_signs"})
 
 # Projektni zapis operacija (matbot/rules.py): množenje `\cdot`, dijeljenje `:`.
@@ -102,9 +107,15 @@ def supports(parameters) -> bool:
     if shape not in _SUPPORTED_SHAPES:
         return False
     if shape == "order_of_operations":
-        # Šabloni prioriteta su dokazani samo nad prirodnim brojevima.
-        if domain != "natural" or len(set(operations)) < 2:
+        # Batch #2: šabloni prioriteta pokrivaju i cijele, decimalne i
+        # racionalne domene — svaka jednakost u koracima ostaje egzaktna.
+        # Šabloni koriste sve četiri operacije, pa ih ugovor mora sve dozvoliti.
+        if set(operations) != set(_SUPPORTED_OPERATIONS):
             return False
+    if shape == "division_with_remainder" and domain != "natural":
+        return False
+    if shape == "complex_fraction" and domain != "rational_signed":
+        return False
     scope = parameters.get("sign_scope") or "any"
     if scope not in _SUPPORTED_SIGN_SCOPES:
         return False
@@ -154,8 +165,18 @@ def _signed_fraction(rng, level, _operation):
     return value
 
 
+def _nonneg_fraction(rng, level, operation):
+    return abs(_signed_fraction(rng, level, operation))
+
+
 _OPERAND_BUILDERS = {"natural": _natural, "integer": _integer,
-                     "decimal": _decimal, "rational_signed": _signed_fraction}
+                     "decimal": _decimal, "rational_signed": _signed_fraction,
+                     "rational_nonneg": _nonneg_fraction}
+
+
+def _hint_domain(domain):
+    """Q+ dijeli ista pravila i zamke kao predznačeni racionalni brojevi."""
+    return "rational_signed" if domain == "rational_nonneg" else domain
 
 
 def _operand(rng, domain, level, operation):
@@ -166,7 +187,7 @@ def _display(domain, value: Fraction) -> str:
     """Ravan zapis operanda/međurezultata (nikad mješovit broj)."""
     if domain == "decimal":
         return core.decimal_display(value)
-    if domain == "rational_signed":
+    if domain in ("rational_signed", "rational_nonneg"):
         return core.plain_fraction_display(value)
     return str(value.numerator)  # natural/integer su uvijek cijeli
 
@@ -175,7 +196,7 @@ def _final_display(domain, value: Fraction) -> str:
     """Kanonski zapis KONAČNOG rezultata (pozitivan razlomak smije biti mješovit)."""
     if domain == "decimal":
         return core.decimal_display(value)
-    if domain == "rational_signed":
+    if domain in ("rational_signed", "rational_nonneg"):
         return core.fraction_display(value)
     return str(value.numerator)
 
@@ -265,6 +286,9 @@ def _exact_in_domain(value: Fraction, domain) -> bool:
         return value.denominator == 1
     if domain == "decimal":
         return value >= 0 and core.is_terminating_decimal(value)
+    if domain == "rational_nonneg":
+        # Q+ (6. razred): nijedan međurezultat ne smije postati negativan.
+        return value >= 0
     return True
 
 
@@ -344,53 +368,112 @@ def _chain_solution_steps(domain, values, operations):
 # REDOSLIJED OPERACIJA — fiksni dokazivi šabloni nad prirodnim brojevima
 # ---------------------------------------------------------------------------
 
-def _order_template(rng, level):
-    """(display, koraci, rezultat, sjeme potpisa, broj operacija)."""
-    small = lambda: rng.randint(2, 9)
+def _order_operand(rng, domain):
+    """Mali operand za šablone prioriteta — svaka domena ostaje zatvorena."""
+    if domain == "natural":
+        return Fraction(rng.randint(2, 9))
+    if domain == "integer":
+        value = rng.randint(2, 9)
+        return Fraction(value if rng.random() < 0.5 else -value)
+    if domain == "decimal":
+        return Fraction(rng.randint(2, 99), 10)
+    den = rng.randint(2, 6)
+    value = Fraction(rng.randint(1, den + 2), den)
+    if domain == "rational_signed" and rng.random() < 0.4:
+        value = -value
+    return value
+
+
+def _order_term(domain, value):
+    return core.parenthesized(_display(domain, value))
+
+
+def _order_template(rng, level, domain):
+    """(display, koraci, rezultat, sjeme potpisa, broj operacija).
+
+    Šabloni su DOMENSKI generički (Batch #2): operandi dolaze iz domene, a
+    dijeljenje se uvijek konstruiše unazad pa je svaka jednakost u koracima
+    egzaktna i svaki međurezultat ostaje u domeni."""
+    def pick():
+        return _order_operand(rng, domain)
 
     if level == 1:
         # a ± b·c: jedna prioritetna odluka, dvije operacije.
-        b, c = small(), small()
+        b, c = pick(), pick()
         product = b * c
-        if rng.random() < 0.5:
-            a = rng.randint(2, 40)
-            display = f"{a} + {b} \\cdot {c}"
+        if rng.random() < 0.5 or domain == "rational_signed":
+            a = pick()
+            if domain in ("natural", "rational_nonneg", "decimal"):
+                a = abs(a) + abs(product)
+            display = f"{_display(domain, a)} + {_order_term(domain, b)} \\cdot {_order_term(domain, c)}"
             result = a + product
-            steps = [f"{a} + {product}", str(result)]
+            steps = [f"{_display(domain, a)} + {_order_term(domain, product)}",
+                     _display(domain, result)]
+            seeds = (a, b, c)
         else:
-            a = product + rng.randint(2, 40)
-            display = f"{a} - {b} \\cdot {c}"
+            a = abs(product) + abs(pick())
+            display = f"{_display(domain, a)} - {_order_term(domain, b)} \\cdot {_order_term(domain, c)}"
             result = a - product
-            steps = [f"{a} - {product}", str(result)]
-        return display, steps, Fraction(result), (a, b, c), 2
+            steps = [f"{_display(domain, a)} - {_order_term(domain, product)}",
+                     _display(domain, result)]
+            seeds = (a, b, c)
+        return display, steps, result, seeds, 2
 
     if level == 2:
         # (a ± b) : c — zagrada mijenja prirodni redoslijed, dijeljenje egzaktno.
-        c = small()
-        quotient = rng.randint(2, 12)
+        if domain in ("natural", "integer"):
+            c = Fraction(rng.randint(2, 9))
+            quotient = Fraction(rng.randint(2, 12))
+            if domain == "integer" and rng.random() < 0.5:
+                quotient = -quotient
+        elif domain == "decimal":
+            c = Fraction(rng.choice((2, 4, 5)))
+            quotient = Fraction(rng.randint(11, 99), 10)
+        else:
+            c = Fraction(rng.randint(2, 6))
+            quotient = _order_operand(rng, domain)
         total = quotient * c
-        b = rng.randint(1, total - 1)
+        b = abs(_order_operand(rng, domain))
+        if b == 0:
+            raise DeterministicGenerationError("prazan sabirak")
         if rng.random() < 0.5:
             a = total - b
-            display = f"({a} + {b}) : {c}"
+            if domain in ("natural", "rational_nonneg", "decimal") and a < 0:
+                raise DeterministicGenerationError("negativan član u Q+")
+            display = (f"({_display(domain, a)} + {_order_term(domain, b)}) "
+                       f": {_order_term(domain, c)}")
         else:
             a = total + b
-            display = f"({a} - {b}) : {c}"
-        steps = [f"{total} : {c}", str(quotient)]
-        return display, steps, Fraction(quotient), (a, b, c), 2
+            display = (f"({_display(domain, a)} - {_order_term(domain, b)}) "
+                       f": {_order_term(domain, c)}")
+        steps = [f"{_order_term(domain, total)} : {_order_term(domain, c)}",
+                 _display(domain, quotient)]
+        return display, steps, quotient, (a, b, c), 2
 
     if rng.random() < 0.5:
-        a, b, c, d = small(), small(), small(), small()
+        a, b, c, d = pick(), pick(), pick(), pick()
         p1, p2 = a * b, c * d
-        display = f"{a} \\cdot {b} + {c} \\cdot {d}"
-        steps = [f"{p1} + {c} \\cdot {d}", f"{p1} + {p2}", str(p1 + p2)]
-        return display, steps, Fraction(p1 + p2), (a, b, c, d), 3
-    a, b, c = small(), small(), small()
+        result = p1 + p2
+        if domain in ("natural", "rational_nonneg", "decimal") and result < 0:
+            raise DeterministicGenerationError("negativan zbir")
+        display = (f"{_order_term(domain, a)} \\cdot {_order_term(domain, b)} + "
+                   f"{_order_term(domain, c)} \\cdot {_order_term(domain, d)}")
+        steps = [f"{_order_term(domain, p1)} + {_order_term(domain, c)} \\cdot {_order_term(domain, d)}",
+                 f"{_order_term(domain, p1)} + {_order_term(domain, p2)}",
+                 _display(domain, result)]
+        return display, steps, result, (a, b, c, d), 3
+    a, b, c = abs(pick()), abs(pick()), pick()
     total = (a + b) * c
-    d = rng.randint(1, total - 1)
-    display = f"({a} + {b}) \\cdot {c} - {d}"
-    steps = [f"{a + b} \\cdot {c} - {d}", f"{total} - {d}", str(total - d)]
-    return display, steps, Fraction(total - d), (a, b, c, d), 3
+    d = abs(pick())
+    result = total - d
+    if domain in ("natural", "rational_nonneg", "decimal") and result < 0:
+        raise DeterministicGenerationError("negativna razlika")
+    display = (f"({_display(domain, a)} + {_order_term(domain, b)}) \\cdot "
+               f"{_order_term(domain, c)} - {_order_term(domain, d)}")
+    steps = [f"{_order_term(domain, a + b)} \\cdot {_order_term(domain, c)} - {_order_term(domain, d)}",
+             f"{_order_term(domain, total)} - {_order_term(domain, d)}",
+             _display(domain, result)]
+    return display, steps, result, (a, b, c, d), 3
 
 
 def _order_evidence(level, operation_count):
@@ -477,7 +560,13 @@ def generate_package(lesson_id, lesson_title, parameters, level, rng=None):
     for _ in range(60):
         try:
             if shape == "order_of_operations":
-                return _order_package(rng, lesson_id, lesson_title, level)
+                return _order_package(rng, lesson_id, lesson_title, level,
+                                      domain)
+            if shape == "division_with_remainder":
+                return _remainder_package(rng, lesson_id, lesson_title, level)
+            if shape == "complex_fraction":
+                return _complex_fraction_package(rng, lesson_id, lesson_title,
+                                                 level)
             return _chain_package(rng, lesson_id, lesson_title, domain,
                                   allowed, shape, sign_scope, level)
         except DeterministicGenerationError:
@@ -495,8 +584,8 @@ def _chain_package(rng, lesson_id, lesson_title, domain, allowed, shape,
     answer_text = _final_display(domain, answer)
     flat_answer = _display(domain, answer)
 
-    rule = _RULE_HINT[(domain, operations[0])]
-    pitfall = _PITFALL[(domain, operations[0])]
+    rule = _RULE_HINT[(_hint_domain(domain), operations[0])]
+    pitfall = _PITFALL[(_hint_domain(domain), operations[0])]
     if len(operations) > 1:
         hint2 = f"Kreni redom: prvi korak daje ${steps[0]}$."
         hint3 = (f"Dakle: ${expression} = {steps[-2]}$ — još samo završi račun.")
@@ -530,35 +619,170 @@ def _chain_package(rng, lesson_id, lesson_title, domain, allowed, shape,
         display_of=display_of, evidence=evidence)
 
 
-def _order_package(rng, lesson_id, lesson_title, level):
-    display, steps, answer, seeds, operation_count = _order_template(rng, level)
+def _order_package(rng, lesson_id, lesson_title, level, domain="natural"):
+    display, steps, answer, seeds, operation_count = _order_template(rng, level,
+                                                                     domain)
     question = f"Izračunaj: ${display}$"
-    answer_text = str(answer.numerator)
+    answer_text = _final_display(domain, answer)
+    flat_answer = _display(domain, answer)
     hint2 = f"Prvi korak: ${display} = {steps[0]}$."
     hint3 = (f"Dakle: ${display} = {steps[-2] if len(steps) > 1 else steps[-1]}$"
              " — još samo završi račun.")
     chain = " = ".join([display] + steps)
+    if answer_text != flat_answer:
+        chain += f" = {answer_text}"
     solution = f"{_ORDER_RULE} Računamo: ${chain}$. Rezultat je ${answer_text}$."
-    distractors = [answer + delta for delta in (1, -1, 2, -2, 3, 5, 10, -3)]
-    distractors = [value for value in distractors if value >= 0]
+    step_unit = Fraction(1) if domain in ("natural", "integer") else (
+        Fraction(1, 10) if domain == "decimal"
+        else Fraction(1, answer.denominator if answer.denominator > 1 else 2))
+    distractors = [answer + factor * step_unit
+                   for factor in (1, -1, 2, -2, 3, 5, 10, -3)]
+    if domain in ("natural", "decimal", "rational_nonneg"):
+        distractors = [value for value in distractors if value >= 0]
+    display_of = (core.decimal_display if domain == "decimal"
+                  else core.fraction_display)
     signature = [(f"seed_{index}", str(value))
                  for index, value in enumerate(seeds)]
     signature.append(("template", f"order_l{level}"))
     return core.build_package(
         lesson_id=lesson_id, lesson_title=lesson_title,
-        family_id="natural_arithmetic_direct", operation="order_of_operations",
+        family_id=_family_for(domain), operation="order_of_operations",
         level=level, question=question, answer_value=answer,
         answer_display=answer_text, distractor_values=distractors,
         hints=(_ORDER_RULE, hint2, hint3), solution=solution,
         signature_parameters=signature,
         required_conditions=["order_of_operations"],
-        relevant_objects=["natural"], generator_version=GENERATOR_VERSION,
-        display_of=core.fraction_display,
+        relevant_objects=[domain], generator_version=GENERATOR_VERSION,
+        display_of=display_of,
         evidence=_order_evidence(level, operation_count))
+
+
+# ---------------------------------------------------------------------------
+# DIJELJENJE S OSTATKOM: a = b·q + r  (Batch #2)
+# ---------------------------------------------------------------------------
+
+def _remainder_package(rng, lesson_id, lesson_title, level):
+    divisor = rng.randint(3, 9 if level == 1 else 12)
+    quotient = rng.randint(2, 12 if level < 3 else 40)
+    remainder = rng.randint(1, divisor - 1)
+    dividend = divisor * quotient + remainder
+    identity = f"{dividend} = {divisor} \\cdot {quotient} + {remainder}"
+
+    if level == 1:
+        question = (f"Koliki je ostatak pri dijeljenju broja ${dividend}$ "
+                    f"brojem ${divisor}$?")
+        answer = Fraction(remainder)
+        answer_text = str(remainder)
+        candidates = [Fraction(v) for v in
+                      (quotient, remainder + 1, remainder - 1, divisor,
+                       divisor - remainder, remainder + 2) if v >= 0]
+        operation = "remainder"
+    elif level == 2:
+        question = (f"Koliki je količnik pri dijeljenju broja ${dividend}$ "
+                    f"brojem ${divisor}$ (dijeljenje s ostatkom)?")
+        answer = Fraction(quotient)
+        answer_text = str(quotient)
+        candidates = [Fraction(v) for v in
+                      (quotient + 1, quotient - 1, remainder, dividend - divisor,
+                       quotient + 2) if v > 0]
+        operation = "quotient"
+    else:
+        question = (f"Koji broj pri dijeljenju brojem ${divisor}$ daje "
+                    f"količnik ${quotient}$ i ostatak ${remainder}$?")
+        answer = Fraction(dividend)
+        answer_text = str(dividend)
+        candidates = [Fraction(v) for v in
+                      (dividend + divisor, dividend - divisor,
+                       divisor * quotient, divisor * quotient - remainder,
+                       dividend + 1, dividend - 1) if v > 0]
+        operation = "missing_dividend"
+
+    hint1 = ("Dijeljenje s ostatkom zapisuje se kao a = b·q + r, gdje je "
+             "ostatak r manji od djelioca b.")
+    hint2 = (f"Potraži najveći sadržilac broja ${divisor}$ koji ne premašuje "
+             f"djeljenik, pa pogledaj šta ostane." if level < 3 else
+             f"Uvrsti u zapis a = b·q + r: $a = {divisor} \\cdot {quotient} + "
+             f"{remainder}$.")
+    hint3 = f"Provjeri zapisom: ${identity}$ — ostatak mora biti manji od djelioca."
+    solution = (f"Vrijedi ${identity}$, a ostatak ${remainder}$ je manji od "
+                f"djelioca ${divisor}$. Traženi odgovor je ${answer_text}$.")
+    return core.build_package(
+        lesson_id=lesson_id, lesson_title=lesson_title,
+        family_id="natural_arithmetic_direct", operation=operation,
+        level=level, question=question, answer_value=answer,
+        answer_display=answer_text, distractor_values=candidates,
+        hints=(hint1, hint2, hint3), solution=solution,
+        signature_parameters=[("dividend", str(dividend)),
+                              ("divisor", str(divisor))],
+        required_conditions=["division_with_remainder"],
+        relevant_objects=["natural"], generator_version=GENERATOR_VERSION,
+        display_of=core.fraction_display)
+
+
+# ---------------------------------------------------------------------------
+# DVOJNI RAZLOMAK  (Batch #2)
+# ---------------------------------------------------------------------------
+
+def _complex_fraction_package(rng, lesson_id, lesson_title, level):
+    def simple(signed=True):
+        den = rng.randint(2, 6)
+        num = rng.randint(1, den + (2 if level > 1 else 0))
+        value = Fraction(num, den)
+        if signed and level > 1 and rng.random() < 0.4:
+            value = -value
+        return value
+
+    numerator = simple()
+    denominator = simple(signed=False)
+    if level == 3:
+        extra = Fraction(rng.randint(1, numerator.denominator - 1)
+                         if numerator.denominator > 1 else 1,
+                         numerator.denominator)
+        numerator_display = (f"{core.plain_fraction_display(numerator)} + "
+                             f"{core.plain_fraction_display(extra)}")
+        numerator_value = numerator + extra
+    else:
+        numerator_display = core.plain_fraction_display(numerator)
+        numerator_value = numerator
+    if denominator == 0:
+        raise DeterministicGenerationError("nulti imenilac dvojnog razlomka")
+    answer = numerator_value / denominator
+    display = (f"\\frac{{{numerator_display}}}"
+               f"{{{core.plain_fraction_display(denominator)}}}")
+    question = f"Izračunaj vrijednost dvojnog razlomka: ${display}$"
+    answer_text = core.fraction_display(answer)
+    flat = core.plain_fraction_display(answer)
+    chain = (f"{display} = {core.plain_fraction_display(numerator_value)} : "
+             f"{core.parenthesized(core.plain_fraction_display(denominator))} = {flat}")
+    if answer_text != flat:
+        chain += f" = {answer_text}"
+    hint1 = ("Dvojni razlomak je dijeljenje: gornji razlomak se dijeli donjim, "
+             "a dijeljenje razlomkom je množenje recipročnom vrijednošću.")
+    hint2 = (f"Prepiši kao dijeljenje: "
+             f"${core.plain_fraction_display(numerator_value)} : "
+             f"{core.parenthesized(core.plain_fraction_display(denominator))}$.")
+    hint3 = "Pomnoži gornji razlomak recipročnom vrijednošću donjeg, pa skrati."
+    solution = (f"{hint1} Računamo: ${chain}$. Rezultat je ${answer_text}$.")
+    candidates = [numerator_value * denominator, -answer,
+                  denominator / numerator_value if numerator_value != 0 else answer + 1,
+                  answer + 1, answer - 1,
+                  answer + Fraction(1, answer.denominator if answer.denominator > 1 else 2)]
+    return core.build_package(
+        lesson_id=lesson_id, lesson_title=lesson_title,
+        family_id="rational_arithmetic_direct", operation="complex_fraction",
+        level=level, question=question, answer_value=answer,
+        answer_display=answer_text, distractor_values=candidates,
+        hints=(hint1, hint2, hint3), solution=solution,
+        signature_parameters=[("numerator", str(numerator_value)),
+                              ("denominator", str(denominator))],
+        required_conditions=["complex_fraction"],
+        relevant_objects=["rational_signed"], generator_version=GENERATOR_VERSION,
+        display_of=core.fraction_display)
 
 
 def _family_for(domain):
     return {"natural": "natural_arithmetic_direct",
             "integer": "integer_arithmetic_direct",
             "decimal": "decimal_arithmetic_direct",
-            "rational_signed": "rational_arithmetic_direct"}[domain]
+            "rational_signed": "rational_arithmetic_direct",
+            "rational_nonneg": "rational_arithmetic_direct"}[domain]

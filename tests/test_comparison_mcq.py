@@ -155,3 +155,12 @@ def test_publication_accepts_a_correct_gcd_package():
         "Koliki je najveći zajednički djelilac brojeva $25$ i $35$?",
         ("$5$", "$10$", "$15$", "$175$"), 0, "$5$")
     assert failure == ""
+
+
+def test_decade_unit_question_never_engages_the_superlative_oracle():
+    # Batch #2: „najveća dekadska jedinica kojom se broj dijeli“ imenuje
+    # uslovljen objekat, ne ekstrem među opcijama.
+    result = evaluate("Koja je najveća dekadska jedinica kojom se broj $340$ "
+                      "može podijeliti bez ostatka?",
+                      ("$10$", "$100$", "$1000$", "$10000$"))
+    assert not result.applicable

@@ -28,10 +28,20 @@ from matbot.deterministic import core
 from matbot.deterministic.core import DeterministicGenerationError
 
 FAMILY_IDS = ("percent_basic", "arithmetic_mean_direct",
-              "classical_probability_basic")
+              "classical_probability_basic",
+              # Batch #2: frekvencije malih skupova podataka i zaokruživanje.
+              "frequency_basic", "decimal_rounding")
 GENERATOR_VERSION = "detqty-1"
 
-_PERCENT_CONCEPTS = frozenset({"percent_of_number", "fraction_to_percent"})
+_PERCENT_CONCEPTS = frozenset({"percent_of_number", "fraction_to_percent",
+                               # Batch #2: iznos/osnovica/stopa.
+                               "percent_amount", "percent_rate"})
+_PROBABILITY_CONCEPTS = frozenset({"classical_probability",
+                                   "complement_probability",
+                                   "outcome_counting"})
+_FREQUENCY_CONCEPTS = frozenset({"frequency", "relative_frequency",
+                                 "frequency_table"})
+_ROUNDING_CONCEPTS = frozenset({"round_decimal", "round_then_estimate"})
 
 
 def supports(parameters) -> bool:
@@ -41,7 +51,9 @@ def supports(parameters) -> bool:
         return False
     return (concepts <= _PERCENT_CONCEPTS
             or concepts == {"mean"}
-            or concepts == {"classical_probability"})
+            or concepts <= _PROBABILITY_CONCEPTS
+            or concepts <= _FREQUENCY_CONCEPTS
+            or concepts <= _ROUNDING_CONCEPTS)
 
 
 def generate_package(lesson_id, lesson_title, parameters, level, rng=None):
@@ -54,14 +66,22 @@ def generate_package(lesson_id, lesson_title, parameters, level, rng=None):
             concepts = set(parameters["concepts"])
             if concepts == {"mean"}:
                 return _mean_package(rng, level, lesson_id, lesson_title)
-            if concepts == {"classical_probability"}:
-                return _probability_package(rng, level, lesson_id, lesson_title)
             concept = rng.choice(tuple(concepts))
-            if concept == "percent_of_number":
-                return _percent_of_number_package(rng, level, lesson_id,
-                                                  lesson_title)
-            return _fraction_to_percent_package(rng, level, lesson_id,
-                                                lesson_title)
+            builder = {
+                "classical_probability": _probability_package,
+                "complement_probability": _complement_probability_package,
+                "outcome_counting": _outcome_counting_package,
+                "percent_of_number": _percent_of_number_package,
+                "fraction_to_percent": _fraction_to_percent_package,
+                "percent_amount": _percent_amount_package,
+                "percent_rate": _percent_rate_package,
+                "frequency": _frequency_package,
+                "relative_frequency": _relative_frequency_package,
+                "frequency_table": _frequency_table_package,
+                "round_decimal": _round_decimal_package,
+                "round_then_estimate": _round_estimate_package,
+            }[concept]
+            return builder(rng, level, lesson_id, lesson_title)
         except DeterministicGenerationError:
             continue
     raise DeterministicGenerationError("paket nije nastao u ograničenom broju pokušaja")
@@ -341,3 +361,408 @@ def _probability_package(rng, level, lesson_id, lesson_title):
         required_conditions=["classical_probability"],
         relevant_objects=["rational"], generator_version=GENERATOR_VERSION,
         display_of=core.plain_fraction_display)
+
+
+# ---------------------------------------------------------------------------
+# KOMPLEMENTARAN DOGAĐAJ I BROJ ISHODA (Batch #2)
+# ---------------------------------------------------------------------------
+
+def _complement_probability_package(rng, level, lesson_id, lesson_title):
+    den = rng.randint(4, 10 if level == 1 else 20)
+    num = rng.randint(1, den - 1)
+    probability = Fraction(num, den)
+    complement = 1 - probability
+    display = core.plain_fraction_display(probability)
+    answer_display = core.plain_fraction_display(complement)
+    question = (f"Vjerovatnoća nekog događaja iznosi ${display}$. Kolika je "
+                "vjerovatnoća njemu suprotnog (komplementarnog) događaja?")
+    hint1 = ("Događaj i njemu suprotan događaj zajedno pokrivaju sve ishode: "
+             "zbir njihovih vjerovatnoća je $1$.")
+    hint2 = f"Izračunaj: $1 - {display}$."
+    hint3 = f"Svedi na zajednički imenilac: $\\frac{{{den}}}{{{den}}} - {display}$."
+    solution = (f"{hint1} Računamo: $1 - {display} = "
+                f"\\frac{{{den}}}{{{den}}} - {display} = {answer_display}$.")
+    candidates = [probability, complement + Fraction(1, den),
+                  complement - Fraction(1, den), Fraction(1, den),
+                  Fraction(num, den + 1)]
+    candidates = [value for value in candidates if 0 < value < 1]
+    return core.build_package(
+        lesson_id=lesson_id, lesson_title=lesson_title,
+        family_id="classical_probability_basic",
+        operation="complement_probability", level=level, question=question,
+        answer_value=complement, answer_display=answer_display,
+        distractor_values=candidates, hints=(hint1, hint2, hint3),
+        solution=solution,
+        signature_parameters=[("probability", str(probability))],
+        required_conditions=["complement"], relevant_objects=["rational"],
+        generator_version=GENERATOR_VERSION,
+        display_of=core.plain_fraction_display)
+
+
+_EXPERIMENTS = (
+    ("bacanje jedne igraće kocke", 6),
+    ("bacanje novčića", 2),
+    ("izvlačenje jedne karte iz špila od 32 karte", 32),
+    ("bacanje dva novčića (redoslijed se razlikuje)", 4),
+    ("bacanje dvije igraće kocke (redoslijed se razlikuje)", 36),
+)
+
+
+def _outcome_counting_package(rng, level, lesson_id, lesson_title):
+    if level == 1:
+        pool = _EXPERIMENTS[:2]
+    elif level == 2:
+        pool = _EXPERIMENTS[:4]
+    else:
+        pool = _EXPERIMENTS
+    description, count = pool[rng.randrange(len(pool))]
+    if level >= 2 and rng.random() < 0.4:
+        total = rng.randint(5, 12)
+        description = (f"izvlačenje jedne kuglice iz vreće u kojoj je "
+                       f"{total} različitih kuglica")
+        count = total
+    question = (f"Ogled je {description}. Koliko elementarnih ishoda ima "
+                "ovaj ogled?")
+    wrong = [count + 1, count - 1, count * 2, count + 2, max(1, count // 2)]
+    hint1 = ("Elementarni ishod je jedan pojedinačan mogući rezultat ogleda "
+             "— prebroji SVE različite rezultate.")
+    hint2 = "Nabroji (ili sistematski prebroji) sve mogućnosti, bez ponavljanja."
+    hint3 = ("Kod dva bacanja broj ishoda je proizvod broja ishoda "
+             "pojedinačnih bacanja.")
+    solution = (f"Ogled ({description}) ima tačno ${count}$ elementarnih "
+                "ishoda.")
+    candidates = [Fraction(v) for v in wrong if v > 0]
+    return core.build_package(
+        lesson_id=lesson_id, lesson_title=lesson_title,
+        family_id="classical_probability_basic", operation="outcome_counting",
+        level=level, question=question, answer_value=Fraction(count),
+        answer_display=str(count), distractor_values=candidates,
+        hints=(hint1, hint2, hint3), solution=solution,
+        signature_parameters=[("experiment", description[:40]),
+                              ("count", str(count))],
+        required_conditions=["outcome_counting"],
+        relevant_objects=["natural"], generator_version=GENERATOR_VERSION,
+        display_of=lambda value: str(value.numerator
+                                     if isinstance(value, Fraction) else value))
+
+
+# ---------------------------------------------------------------------------
+# PROCENTNI IZNOS / OSNOVICA / STOPA (Batch #2)
+# ---------------------------------------------------------------------------
+
+def _percent_amount_package(rng, level, lesson_id, lesson_title):
+    percent = rng.choice(_PERCENTS[level])
+    for _ in range(200):
+        base = rng.choice((200, 250, 300, 400, 500, 600, 800, 1200))
+        amount = Fraction(percent, 100) * base
+        if amount.denominator == 1:
+            break
+    else:
+        raise DeterministicGenerationError("nema cjelobrojnog iznosa")
+    question = (f"Osnovica iznosi ${base}$, a procentna stopa je {percent} %. "
+                "Koliki je procentni iznos?")
+    chain = (f"\\frac{{{percent}}}{{100}} \\cdot {base} = {amount.numerator}")
+    hint1 = "Procentni iznos je stopa (kao razlomak sa imeniocem 100) puta osnovica."
+    hint2 = f"Zapiši stopu kao razlomak: $\\frac{{{percent}}}{{100}}$, pa pomnoži sa ${base}$."
+    hint3 = f"Računaj: ${chain.split('=')[0].strip()}$."
+    solution = f"Procentni iznos je ${chain}$."
+    candidates = [Fraction(base) - amount, amount * 10, amount / 10,
+                  Fraction(base + percent), amount + 10, amount - 10]
+    candidates = [v for v in candidates if v > 0 and v.denominator == 1]
+    return core.build_package(
+        lesson_id=lesson_id, lesson_title=lesson_title,
+        family_id="percent_basic", operation="percent_amount", level=level,
+        question=question, answer_value=amount,
+        answer_display=str(amount.numerator), distractor_values=candidates,
+        hints=(hint1, hint2, hint3), solution=solution,
+        signature_parameters=[("percent", str(percent)), ("base", str(base))],
+        required_conditions=["percent"], relevant_objects=["rational"],
+        generator_version=GENERATOR_VERSION,
+        display_of=lambda value: str(value.numerator))
+
+
+def _percent_rate_package(rng, level, lesson_id, lesson_title):
+    percent = rng.choice(_PERCENTS[level])
+    for _ in range(200):
+        base = rng.choice((200, 250, 300, 400, 500, 600, 800))
+        amount = Fraction(percent, 100) * base
+        if amount.denominator == 1:
+            break
+    else:
+        raise DeterministicGenerationError("nema cjelobrojnog iznosa")
+    ask_base = level >= 2 and rng.random() < 0.5
+    if ask_base:
+        question = (f"Procentni iznos je ${amount.numerator}$, a stopa je "
+                    f"{percent} %. Kolika je osnovica?")
+        answer = Fraction(base)
+        answer_display = str(base)
+        chain = (f"{amount.numerator} : \\frac{{{percent}}}{{100}} = "
+                 f"{amount.numerator} \\cdot \\frac{{100}}{{{percent}}} = {base}")
+        hint2 = (f"Osnovica je iznos podijeljen stopom: "
+                 f"${amount.numerator} : \\frac{{{percent}}}{{100}}$.")
+        solution = f"Osnovica je ${chain}$."
+        operation = "percent_base"
+        option_texts = None
+        wrap = "$"
+        candidates = [amount, Fraction(base) * 2, Fraction(base) + 50,
+                      Fraction(base) - 50, amount * 2]
+        candidates = [v for v in candidates if v > 0 and v.denominator == 1]
+    else:
+        question = (f"Osnovica iznosi ${base}$, a procentni iznos je "
+                    f"${amount.numerator}$. Kolika je procentna stopa?")
+        answer = Fraction(percent)
+        answer_display = f"{percent} %"
+        chain = (f"\\frac{{{amount.numerator}}}{{{base}}} = "
+                 f"\\frac{{{percent}}}{{100}}")
+        hint2 = (f"Stopa je iznos kroz osnovicu, proširen na stotinke: "
+                 f"$\\frac{{{amount.numerator}}}{{{base}}}$.")
+        solution = (f"Vrijedi ${chain}$, pa je stopa {percent} %.")
+        operation = "percent_rate"
+        wrong = []
+        for candidate in (percent + 5, percent - 5, percent * 2,
+                          max(1, percent // 2), percent + 10):
+            if candidate > 0 and candidate != percent and candidate not in wrong:
+                wrong.append(candidate)
+        option_texts = (f"{percent} %", *(f"{w} %" for w in wrong[:3]))
+        wrap = ""
+        candidates = ()
+    hint1 = ("Iznos, osnovica i stopa su vezani: iznos = stopa · osnovica "
+             "(stopa kao razlomak sa imeniocem 100).")
+    hint3 = "Provjeri rezultat: stopa puta osnovica mora dati iznos."
+    return core.build_package(
+        lesson_id=lesson_id, lesson_title=lesson_title,
+        family_id="percent_basic", operation=operation, level=level,
+        question=question, answer_value=answer, answer_display=answer_display,
+        distractor_values=candidates, hints=(hint1, hint2, hint3),
+        solution=solution,
+        signature_parameters=[("percent", str(percent)), ("base", str(base)),
+                              ("form", operation)],
+        required_conditions=["percent"], relevant_objects=["rational"],
+        generator_version=GENERATOR_VERSION,
+        display_of=lambda value: str(value.numerator),
+        option_texts=option_texts, wrap=wrap)
+
+
+# ---------------------------------------------------------------------------
+# FREKVENCIJE MALOG SKUPA PODATAKA (Batch #2)
+# ---------------------------------------------------------------------------
+
+def _data_sample(rng, level):
+    """Mali niz ocjena/vrijednosti s poznatim frekvencijama."""
+    size = {1: 7, 2: 10, 3: 12}[level]
+    values = [rng.randint(1, 5) for _ in range(size)]
+    # Bar dvije različite vrijednosti, i bar jedna ponovljena.
+    if len(set(values)) < 2:
+        values[0] = 1 if values[0] != 1 else 2
+    values_sorted = sorted(set(values))
+    target = rng.choice([v for v in values_sorted
+                         if values.count(v) >= (2 if level > 1 else 1)]
+                        or values_sorted)
+    return values, target
+
+
+def _listing(values):
+    return ", ".join(f"${v}$" for v in values)
+
+
+def _frequency_package(rng, level, lesson_id, lesson_title):
+    values, target = _data_sample(rng, level)
+    frequency = values.count(target)
+    question = (f"Učenici su na testu dobili ocjene: {_listing(values)}. "
+                f"Kolika je frekvencija ocjene ${target}$?")
+    hint1 = "Frekvencija vrijednosti je broj njenih pojavljivanja u podacima."
+    hint2 = f"Prebroji koliko se puta ocjena ${target}$ pojavljuje u nizu."
+    hint3 = "Broji pažljivo redom, podatak po podatak — ništa ne preskači."
+    solution = (f"Ocjena ${target}$ se u nizu pojavljuje tačno "
+                f"${frequency}$ puta, pa je njena frekvencija ${frequency}$.")
+    candidates = [Fraction(v) for v in
+                  (frequency + 1, frequency - 1, len(values),
+                   len(values) - frequency, frequency + 2) if v > 0]
+    return core.build_package(
+        lesson_id=lesson_id, lesson_title=lesson_title,
+        family_id="frequency_basic", operation="frequency", level=level,
+        question=question, answer_value=Fraction(frequency),
+        answer_display=str(frequency), distractor_values=candidates,
+        hints=(hint1, hint2, hint3), solution=solution,
+        signature_parameters=[("data", "+".join(map(str, values))),
+                              ("target", str(target))],
+        required_conditions=["frequency"], relevant_objects=["natural"],
+        generator_version=GENERATOR_VERSION,
+        display_of=lambda value: str(value.numerator
+                                     if isinstance(value, Fraction) else value))
+
+
+def _relative_frequency_package(rng, level, lesson_id, lesson_title):
+    values, target = _data_sample(rng, level)
+    frequency = values.count(target)
+    total = len(values)
+    relative = Fraction(frequency, total)
+    answer_display = core.plain_fraction_display(relative)
+    question = (f"U uzorku su zabilježene vrijednosti: {_listing(values)}. "
+                f"Kolika je relativna frekvencija vrijednosti ${target}$?")
+    hint1 = ("Relativna frekvencija je frekvencija podijeljena ukupnim "
+             "brojem podataka.")
+    hint2 = (f"Frekvencija vrijednosti ${target}$ je ${frequency}$, a "
+             f"podataka je ukupno ${total}$.")
+    hint3 = f"Zapiši razlomak $\\frac{{{frequency}}}{{{total}}}$ i skrati ga ako se može."
+    reduced_note = ("" if relative == Fraction(frequency, total) and
+                    relative.denominator == total else
+                    f", skraćeno ${answer_display}$")
+    solution = (f"Relativna frekvencija je "
+                f"$\\frac{{{frequency}}}{{{total}}}$" + reduced_note + ".")
+    candidates = [Fraction(total - frequency, total), Fraction(frequency + 1, total),
+                  Fraction(max(frequency - 1, 1), total), Fraction(1, total),
+                  Fraction(frequency, max(total - 1, 1))]
+    candidates = [value for value in candidates if 0 < value <= 1]
+    return core.build_package(
+        lesson_id=lesson_id, lesson_title=lesson_title,
+        family_id="frequency_basic", operation="relative_frequency",
+        level=level, question=question, answer_value=relative,
+        answer_display=answer_display, distractor_values=candidates,
+        hints=(hint1, hint2, hint3), solution=solution,
+        signature_parameters=[("data", "+".join(map(str, values))),
+                              ("target", str(target))],
+        required_conditions=["relative_frequency"],
+        relevant_objects=["rational"], generator_version=GENERATOR_VERSION,
+        display_of=core.plain_fraction_display)
+
+
+def _frequency_table_package(rng, level, lesson_id, lesson_title):
+    values, target = _data_sample(rng, level)
+    distinct = sorted(set(values))
+    rows = "; ".join(f"vrijednost ${v}$ ima frekvenciju ${values.count(v)}$"
+                     for v in distinct)
+    total = len(values)
+    question = (f"Tabela frekvencija glasi: {rows}. Koliko podataka ukupno "
+                "sadrži ovaj uzorak?")
+    hint1 = "Ukupan broj podataka je ZBIR svih frekvencija iz tabele."
+    hint2 = ("Saberi frekvencije: $"
+             + " + ".join(str(values.count(v)) for v in distinct) + "$.")
+    hint3 = "Provjeri da nisi preskočio nijedan red tabele."
+    chain = (" + ".join(str(values.count(v)) for v in distinct)
+             + f" = {total}")
+    solution = f"Zbir svih frekvencija je ${chain}$ — uzorak ima ${total}$ podataka."
+    candidates = [Fraction(v) for v in
+                  (total + 1, total - 1, len(distinct),
+                   total - values.count(target), total + 2) if v > 0]
+    return core.build_package(
+        lesson_id=lesson_id, lesson_title=lesson_title,
+        family_id="frequency_basic", operation="frequency_table", level=level,
+        question=question, answer_value=Fraction(total),
+        answer_display=str(total), distractor_values=candidates,
+        hints=(hint1, hint2, hint3), solution=solution,
+        signature_parameters=[("data", "+".join(map(str, values)))],
+        required_conditions=["frequency_table"], relevant_objects=["natural"],
+        generator_version=GENERATOR_VERSION,
+        display_of=lambda value: str(value.numerator
+                                     if isinstance(value, Fraction) else value))
+
+
+# ---------------------------------------------------------------------------
+# ZAOKRUŽIVANJE DECIMALNIH BROJEVA (Batch #2)
+# ---------------------------------------------------------------------------
+# Politika zaokruživanja je ŠKOLSKA (half-up): cifra 5 i veće zaokružuju
+# naviše. Sve je egzaktan racionalan račun — nikad binarni float ni podrazumi-
+# jevano bankarsko zaokruživanje. Približenja se pišu znakom \approx, nikad
+# znakom jednakosti (lažna jednakost bi bila dokazano odbijena).
+
+_PLACE_NAMES = {0: "cio broj", 1: "jednu decimalu (desetinke)",
+                2: "dvije decimale (stotinke)", 3: "tri decimale (hiljaditke)"}
+
+
+def _round_half_up(value: Fraction, places: int) -> Fraction:
+    scale = Fraction(10) ** places
+    scaled = value * scale
+    whole = scaled.numerator // scaled.denominator
+    remainder = scaled - whole
+    if remainder >= Fraction(1, 2):
+        whole += 1
+    return Fraction(whole, 1) / scale
+
+
+def _rounding_value(rng, level):
+    places_pool = {1: (0, 1), 2: (1, 2), 3: (2, 3)}[
+        1 if level == 1 else (2 if level == 2 else 3)]
+    target_places = rng.choice(places_pool)
+    digits = target_places + rng.randint(1, 2)
+    scale = 10 ** digits
+    numerator = rng.randint(2 * scale // 10, 99 * scale // 10)
+    value = Fraction(numerator, scale)
+    if core.decimal_places(value) <= target_places:
+        raise DeterministicGenerationError("nema šta da se zaokruži")
+    return value, target_places
+
+
+def _round_decimal_package(rng, level, lesson_id, lesson_title):
+    value, places = _rounding_value(rng, level)
+    rounded = _round_half_up(value, places)
+    truncated = Fraction((value * 10 ** places).numerator
+                         // (value * 10 ** places).denominator,
+                         10 ** places)
+    display = core.decimal_display(value)
+    answer_display = core.decimal_display(rounded)
+    question = (f"Zaokruži broj ${display}$ na {_PLACE_NAMES[places]}.")
+    hint1 = ("Pogledaj PRVU cifru iza traženog mjesta: 0–4 zaokružuje "
+             "naniže, a 5–9 naviše.")
+    hint2 = f"Podvuci traženo mjesto u broju ${display}$ i pogledaj cifru odmah iza njega."
+    hint3 = ("Ako je cifra iza traženog mjesta 5 ili veća, uvećaj zadnju "
+             "zadržanu cifru za jedan; ostatak se odbacuje.")
+    # BEZ "$a \\approx b$" u JEDNOM segmentu: mathcheck approx toleranciju
+    # priznaje samo uz iracionalan izraz (\\sqrt/\\pi), a čisto decimalno
+    # "6,419 ≈ 6,4" bi dokazano pao kao numerička protivrječnost.
+    solution = (f"Cifra iza traženog mjesta odlučuje smjer: broj ${display}$ "
+                f"zaokružen na {_PLACE_NAMES[places]} iznosi ${answer_display}$.")
+    candidates = [truncated, rounded + Fraction(1, 10 ** places),
+                  rounded - Fraction(1, 10 ** places),
+                  _round_half_up(value, max(places - 1, 0)),
+                  rounded + Fraction(2, 10 ** places)]
+    candidates = [v for v in candidates
+                  if v > 0 and core.is_terminating_decimal(v)]
+    return core.build_package(
+        lesson_id=lesson_id, lesson_title=lesson_title,
+        family_id="decimal_rounding", operation="round_decimal", level=level,
+        question=question, answer_value=rounded, answer_display=answer_display,
+        distractor_values=candidates, hints=(hint1, hint2, hint3),
+        solution=solution,
+        signature_parameters=[("value", str(value)), ("places", str(places))],
+        required_conditions=["rounding"], relevant_objects=["decimal"],
+        generator_version=GENERATOR_VERSION,
+        display_of=core.decimal_display)
+
+
+def _round_estimate_package(rng, level, lesson_id, lesson_title):
+    # Procjena: zaokruži oba sabirka na cio broj pa saberi — egzaktno
+    # definisana procjena, pa je tačno jedna opcija ispravna procjena.
+    first = Fraction(rng.randint(21, 89 if level < 3 else 890), 10)
+    second = Fraction(rng.randint(21, 89 if level < 3 else 890), 10)
+    rounded_first = _round_half_up(first, 0)
+    rounded_second = _round_half_up(second, 0)
+    estimate = rounded_first + rounded_second
+    display_first = core.decimal_display(first)
+    display_second = core.decimal_display(second)
+    question = (f"Procijeni zbir ${display_first} + {display_second}$ tako "
+                "što oba sabirka prvo zaokružiš na cio broj.")
+    hint1 = "Procjena: zaokruži svaki sabirak na cio broj, pa saberi zaokružene vrijednosti."
+    hint2 = (f"Sabirak ${display_first}$ zaokruži na "
+             f"${rounded_first.numerator}$, a ${display_second}$ na "
+             f"${rounded_second.numerator}$.")
+    hint3 = f"Saberi zaokružene brojeve: ${rounded_first.numerator} + {rounded_second.numerator}$."
+    solution = (f"Sabirak ${display_first}$ zaokružujemo na "
+                f"${rounded_first.numerator}$, a ${display_second}$ na "
+                f"${rounded_second.numerator}$; procjena zbira je "
+                f"${rounded_first.numerator} + {rounded_second.numerator} = "
+                f"{estimate.numerator}$.")
+    exact = first + second
+    candidates = [estimate + 1, estimate - 1, estimate + 2,
+                  _round_half_up(exact, 0) + 3]
+    candidates = [v for v in candidates if v > 0 and v != estimate]
+    return core.build_package(
+        lesson_id=lesson_id, lesson_title=lesson_title,
+        family_id="decimal_rounding", operation="round_then_estimate",
+        level=level, question=question, answer_value=estimate,
+        answer_display=str(estimate.numerator), distractor_values=candidates,
+        hints=(hint1, hint2, hint3), solution=solution,
+        signature_parameters=[("first", str(first)), ("second", str(second))],
+        required_conditions=["estimation"], relevant_objects=["decimal"],
+        generator_version=GENERATOR_VERSION,
+        display_of=lambda value: str(value.numerator))

@@ -30,8 +30,13 @@ GENERATOR_VERSION = "detpow-1"
 _POWER_CONCEPTS = frozenset({
     "square_value", "power_value", "zero_negative_exponent",
     "same_base_product_quotient", "power_of_power_product",
+    # Batch #2: naučni zapis i prefiksi mjernih jedinica kao stepeni broja 10.
+    "scientific_notation", "unit_prefix_powers",
 })
-_ROOT_CONCEPTS = frozenset({"square_root_value", "perfect_square_recognition"})
+_ROOT_CONCEPTS = frozenset({"square_root_value", "perfect_square_recognition",
+                            # Batch #2: korijen proizvoda/količnika i procjena
+                            # između dva uzastopna prirodna broja.
+                            "root_product_quotient", "root_between_integers"})
 
 _SQUARES = [n * n for n in range(2, 21)]
 
@@ -60,6 +65,10 @@ def generate_package(lesson_id, lesson_title, parameters, level, rng=None):
                 "power_of_power_product": _power_law_package,
                 "square_root_value": _root_value_package,
                 "perfect_square_recognition": _perfect_square_package,
+                "scientific_notation": _scientific_notation_package,
+                "unit_prefix_powers": _unit_prefix_package,
+                "root_product_quotient": _root_product_package,
+                "root_between_integers": _root_between_package,
             }[concept]
             return builder(rng, level, lesson_id, lesson_title)
         except DeterministicGenerationError:
@@ -521,3 +530,217 @@ def _perfect_square_package(rng, level, lesson_id, lesson_title):
         signature_parameters=[("correct", str(correct))],
         required_conditions=["perfect_square"], relevant_objects=["natural"],
         generator_version=GENERATOR_VERSION, display_of=lambda value: str(value))
+
+
+# ---------------------------------------------------------------------------
+# NAUČNI ZAPIS BROJA (Batch #2) — a·10^n, 1 ≤ a < 10, egzaktno
+# ---------------------------------------------------------------------------
+
+def _scientific_notation_package(rng, level, lesson_id, lesson_title):
+    mantissa_tenths = rng.randint(11, 99)      # 1,1 – 9,9
+    if mantissa_tenths % 10 == 0:
+        mantissa_tenths += 1
+    mantissa = Fraction(mantissa_tenths, 10)
+    # SAMO pozitivni izložioci: opcija s 10^{-n} dokazano zbunjuje provjeru
+    # ekvivalencije opcija (sve četiri bi bile proglašene numerički jednakim),
+    # pa je generator ne smije ni ponuditi. Negativni izložioci ostaju na
+    # model-putu dok provjera ekvivalencije ne nauči taj zapis.
+    if level == 1:
+        exponent = rng.randint(2, 4)
+    elif level == 2:
+        exponent = rng.randint(3, 6)
+    else:
+        exponent = rng.randint(5, 8)
+    value = mantissa * Fraction(10) ** exponent
+
+    def sci(m, e):
+        return f"{core.decimal_display(m)} \\cdot 10^{{{e}}}"
+
+    plain = core.decimal_display(value)
+    reverse = level == 2 and rng.random() < 0.5
+    if reverse:
+        question = f"Koliko iznosi ${sci(mantissa, exponent)}$?"
+        answer_value, answer_display = value, plain
+        option_texts = [f"${plain}$"]
+        seen = {value}
+        for wrong_exp in (exponent + 1, exponent - 1, exponent + 2):
+            wrong = mantissa * Fraction(10) ** wrong_exp
+            if wrong in seen:
+                continue
+            seen.add(wrong)
+            option_texts.append(f"${core.decimal_display(wrong)}$")
+        option_texts = tuple(option_texts[:4])
+        operation = "scientific_to_plain"
+    else:
+        question = f"Zapiši broj ${plain}$ u naučnom zapisu."
+        answer_value, answer_display = value, sci(mantissa, exponent)
+        other_mantissa = Fraction(110 - mantissa_tenths, 10)
+        candidates = [(mantissa * Fraction(10) ** (exponent + 1),
+                       sci(mantissa, exponent + 1)),
+                      (mantissa * Fraction(10) ** (exponent - 1),
+                       sci(mantissa, exponent - 1)),
+                      (other_mantissa * Fraction(10) ** exponent,
+                       sci(other_mantissa, exponent))]
+        option_texts = [f"${answer_display}$"]
+        seen = {value}
+        for wrong_value, wrong_display in candidates:
+            if wrong_value in seen:
+                continue
+            seen.add(wrong_value)
+            option_texts.append(f"${wrong_display}$")
+        if len(option_texts) < 4:
+            raise DeterministicGenerationError("nedovoljno zapisa")
+        option_texts = tuple(option_texts[:4])
+        operation = "plain_to_scientific"
+    if len(option_texts) != 4:
+        raise DeterministicGenerationError("nedovoljno zapisa")
+    hint1 = ("Naučni zapis ima oblik a·10^n, gdje je 1 ≤ a < 10, a n cio "
+             "broj — pozitivan za velike, negativan za male brojeve.")
+    hint2 = "Pomjeri zarez tako da ispred njega ostane JEDNA cifra različita od nule."
+    hint3 = "Broj mjesta za koja si pomjerio zarez ulijevo je izložilac."
+    places_word = "mjesto" if abs(exponent) == 1 else "mjesta"
+    solution = (f"Vrijedi ${plain} = {sci(mantissa, exponent)}$ — zarez je "
+                f"pomjeren za ${abs(exponent)}$ {places_word}, pa je "
+                f"izložilac ${exponent}$.")
+    return core.build_package(
+        lesson_id=lesson_id, lesson_title=lesson_title,
+        family_id="power_arithmetic_direct", operation=operation, level=level,
+        question=question, answer_value=answer_value,
+        answer_display=answer_display, distractor_values=(),
+        hints=(hint1, hint2, hint3), solution=solution,
+        signature_parameters=[("mantissa", str(mantissa)),
+                              ("exponent", str(exponent))],
+        required_conditions=["scientific_notation"],
+        relevant_objects=["rational"], generator_version=GENERATOR_VERSION,
+        option_texts=option_texts, wrap="")
+
+
+# ---------------------------------------------------------------------------
+# PREFIKSI MJERNIH JEDINICA KAO STEPENI BROJA 10 (Batch #2)
+# ---------------------------------------------------------------------------
+
+_PREFIXES = (
+    ("kilo-", 3), ("hekto-", 2), ("deka-", 1),
+    ("deci-", -1), ("centi-", -2), ("mili-", -3),
+    ("mega-", 6), ("mikro-", -6),
+)
+
+
+def _unit_prefix_package(rng, level, lesson_id, lesson_title):
+    pool = _PREFIXES[:3] if level == 1 else (
+        _PREFIXES[:6] if level == 2 else _PREFIXES)
+    name, exponent = pool[rng.randrange(len(pool))]
+    wrong_exponents = [exponent + 1, exponent - 1, -exponent,
+                       exponent + 2, exponent - 2, exponent + 3]
+    option_values, option_texts = [exponent], [f"$10^{{{exponent}}}$"]
+    for wrong in wrong_exponents:
+        if wrong in option_values or wrong == 0:
+            continue
+        option_values.append(wrong)
+        option_texts.append(f"$10^{{{wrong}}}$")
+        if len(option_texts) == 4:
+            break
+    if len(option_texts) != 4:
+        raise DeterministicGenerationError("nedovoljno stepena")
+    question = (f"Koji stepen broja $10$ označava prefiks {name} u mjernim "
+                "jedinicama?")
+    hint1 = ("Prefiksi veći od osnovne jedinice imaju pozitivan izložilac, "
+             "a manji od nje negativan.")
+    hint2 = "Sjeti se: kilo- je hiljadu, centi- je stoti dio, mili- hiljaditi dio."
+    hint3 = ("Prebroji koliko puta po deset prefiks uvećava (ili umanjuje) "
+             "osnovnu jedinicu — to je izložilac.")
+    solution = f"Prefiks {name} označava množenje sa $10^{{{exponent}}}$."
+    return core.build_package(
+        lesson_id=lesson_id, lesson_title=lesson_title,
+        family_id="power_arithmetic_direct", operation="unit_prefix_powers",
+        level=level, question=question, answer_value=exponent,
+        answer_display=f"10^{{{exponent}}}", distractor_values=(),
+        hints=(hint1, hint2, hint3), solution=solution,
+        signature_parameters=[("prefix", name)],
+        required_conditions=["unit_prefix"],
+        relevant_objects=["natural"], generator_version=GENERATOR_VERSION,
+        option_texts=tuple(option_texts), wrap="")
+
+
+# ---------------------------------------------------------------------------
+# KORIJEN PROIZVODA I KOLIČNIKA (Batch #2) — savršeni kvadrati, egzaktno
+# ---------------------------------------------------------------------------
+
+def _root_product_package(rng, level, lesson_id, lesson_title):
+    a = rng.randint(2, 6 if level == 1 else 9)
+    b = rng.randint(2, 6 if level == 1 else 9)
+    quotient_form = level >= 2 and rng.random() < 0.5
+    if quotient_form:
+        expression = f"\\sqrt{{\\frac{{{(a * b) ** 2}}}{{{b * b}}}}}"
+        value = Fraction(a)
+        derivation = (f"{expression} = \\frac{{\\sqrt{{{(a * b) ** 2}}}}}"
+                      f"{{\\sqrt{{{b * b}}}}} = \\frac{{{a * b}}}{{{b}}} = {a}")
+        law = ("Korijen količnika je količnik korijena: korjenuj brojnik i "
+               "imenilac posebno.")
+        operation = "root_of_quotient"
+        signature = [("radicand", f"{(a * b) ** 2}/{b * b}")]
+    else:
+        expression = f"\\sqrt{{{a * a} \\cdot {b * b}}}"
+        value = Fraction(a * b)
+        derivation = (f"{expression} = \\sqrt{{{a * a}}} \\cdot "
+                      f"\\sqrt{{{b * b}}} = {a} \\cdot {b} = {a * b}")
+        law = ("Korijen proizvoda je proizvod korijena: korjenuj svaki "
+               "faktor posebno.")
+        operation = "root_of_product"
+        signature = [("radicand", f"{a * a}*{b * b}")]
+    question = f"Izračunaj: ${expression}$"
+    answer_text = core.fraction_display(value)
+    hint2 = "Rastavi potkorjenu vrijednost na faktore koji su savršeni kvadrati."
+    hint3 = f"Postupak: ${derivation}$."
+    solution = f"{law} Dakle: ${derivation}$. Rezultat je ${answer_text}$."
+    candidates = [value * 2, value + 1, value - 1, value * value, value + 2]
+    return core.build_package(
+        lesson_id=lesson_id, lesson_title=lesson_title,
+        family_id="square_root_direct", operation=operation, level=level,
+        question=question, answer_value=value, answer_display=answer_text,
+        distractor_values=candidates, hints=(law, hint2, hint3),
+        solution=solution, signature_parameters=signature,
+        required_conditions=["root_product_quotient"],
+        relevant_objects=["rational"], generator_version=GENERATOR_VERSION,
+        display_of=core.fraction_display)
+
+
+# ---------------------------------------------------------------------------
+# IZMEĐU KOJA DVA UZASTOPNA PRIRODNA BROJA JE KORIJEN (Batch #2)
+# ---------------------------------------------------------------------------
+
+def _root_between_package(rng, level, lesson_id, lesson_title):
+    low = rng.randint(2, 9 if level == 1 else (15 if level == 2 else 25))
+    radicand = rng.randint(low * low + 1, (low + 1) * (low + 1) - 1)
+    question = (f"Između koja dva uzastopna prirodna broja se nalazi "
+                f"$\\sqrt{{{radicand}}}$?")
+    correct_text = f"${low}$ i ${low + 1}$"
+    wrong_pairs = []
+    for delta in (1, -1, 2, -2, 3):
+        candidate = low + delta
+        if candidate >= 1 and candidate != low:
+            wrong_pairs.append(f"${candidate}$ i ${candidate + 1}$")
+        if len(wrong_pairs) == 3:
+            break
+    option_texts = (correct_text, *wrong_pairs)
+    hint1 = ("Potraži dva uzastopna savršena kvadrata između kojih se nalazi "
+             "potkorjena vrijednost.")
+    hint2 = (f"Uporedi ${radicand}$ s kvadratima: ${low}^{{2}} = {low * low}$ "
+             f"i ${low + 1}^{{2}} = {(low + 1) * (low + 1)}$.")
+    hint3 = (f"Vrijedi ${low * low} < {radicand} < {(low + 1) * (low + 1)}$ "
+             "— korijen je između korijena tih kvadrata.")
+    solution = (f"Kako je ${low}^{{2}} = {low * low}$ i "
+                f"${low + 1}^{{2}} = {(low + 1) * (low + 1)}$, a "
+                f"${low * low} < {radicand} < {(low + 1) * (low + 1)}$, "
+                f"korijen $\\sqrt{{{radicand}}}$ je između ${low}$ i ${low + 1}$.")
+    return core.build_package(
+        lesson_id=lesson_id, lesson_title=lesson_title,
+        family_id="square_root_direct", operation="root_between_integers",
+        level=level, question=question, answer_value=(low, low + 1),
+        answer_display=f"{low} i {low + 1}", distractor_values=(),
+        hints=(hint1, hint2, hint3), solution=solution,
+        signature_parameters=[("radicand", str(radicand))],
+        required_conditions=["root_between"],
+        relevant_objects=["natural"], generator_version=GENERATOR_VERSION,
+        option_texts=option_texts, wrap="",
+        accepted_answers=(f"{low} i {low + 1}",))

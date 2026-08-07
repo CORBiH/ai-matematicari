@@ -38,6 +38,9 @@ _FOREIGN_KEYS = frozenset({"allowed_operations", "expression_shape",
                            "denominator_relation"})
 
 
+_COMPARISON_FORMS = frozenset({"ordering", "place_value"})
+
+
 def supports(parameters) -> bool:
     parameters = parameters or {}
     if _FOREIGN_KEYS & set(parameters):
@@ -47,6 +50,12 @@ def supports(parameters) -> bool:
     if concepts:
         return (set(concepts) <= _ABS_CONCEPTS and bool(concepts)
                 and domain in _ABS_DOMAINS)
+    forms = set(parameters.get("forms") or ())
+    if forms and not forms <= _COMPARISON_FORMS:
+        return False
+    if "place_value" in forms and domain != "natural":
+        # Mjesna vrijednost je dokazana samo nad prirodnim brojevima.
+        return False
     return domain in _COMPARISON_DOMAINS
 
 
@@ -62,6 +71,9 @@ def generate_package(lesson_id, lesson_title, parameters, level, rng=None):
                 return _abs_package(rng, level, concept,
                                     parameters["number_domain"],
                                     lesson_id, lesson_title)
+            forms = tuple(parameters.get("forms") or ("ordering",))
+            if rng.choice(forms) == "place_value":
+                return _place_value_package(rng, level, lesson_id, lesson_title)
             return _comparison_package(rng, level, parameters["number_domain"],
                                        lesson_id, lesson_title)
         except DeterministicGenerationError:
@@ -374,3 +386,82 @@ def _abs_evidence(level):
             requires_comparison=False, requires_construction=False,
             requires_proof_or_justification=False, combines_concepts=False)
     return core.evidence_for_level(level)
+
+
+# ---------------------------------------------------------------------------
+# MJESNA VRIJEDNOST CIFRE (Batch #2) — čitanje i zapisivanje prirodnih brojeva
+# ---------------------------------------------------------------------------
+
+_PLACES = (("jedinica", 0), ("desetica", 1), ("stotica", 2),
+           ("hiljada", 3), ("desethiljada", 4))
+
+
+def _distinct_digit_number(rng, digit_count):
+    digits = rng.sample(range(10), digit_count)
+    if digits[0] == 0:
+        digits[0], digits[-1] = digits[-1], digits[0]
+    return int("".join(str(d) for d in digits))
+
+
+def _place_value_package(rng, level, lesson_id, lesson_title):
+    # Najmanje četiri RAZLIČITE cifre: tri pogrešne opcije nivoa 1/2 su
+    # upravo ostale cifre broja, pa ih mora biti dovoljno.
+    digit_count = {1: 4, 2: 5, 3: 5}[level]
+    number = _distinct_digit_number(rng, digit_count)
+    place_name, position = ((_PLACES[rng.randrange(min(digit_count, 3))]
+                             if level == 1 else
+                             _PLACES[rng.randrange(min(digit_count, 5))]))
+    digits = str(number)
+    correct_digit = int(digits[len(digits) - 1 - position])
+
+    if level < 3:
+        question = (f"Koja cifra se nalazi na mjestu {place_name} u broju "
+                    f"${number}$?")
+        others = [int(d) for d in digits if int(d) != correct_digit]
+        option_texts = tuple(f"${d}$" for d in [correct_digit] + others[:3])
+        if len(option_texts) < 4 or len(set(option_texts)) != 4:
+            raise DeterministicGenerationError("cifre nisu jedinstvene")
+        answer_value, answer_display = correct_digit, str(correct_digit)
+        explain = (f"U broju ${number}$ cifra ${correct_digit}$ stoji na "
+                   f"mjestu {place_name}.")
+        operation = "read_place_value"
+    else:
+        # Nivo 3: obratan smjer — koji broj ima datu cifru na datom mjestu.
+        wrong_numbers = []
+        for _ in range(300):
+            candidate = _distinct_digit_number(rng, digit_count)
+            candidate_digits = str(candidate)
+            if candidate == number:
+                continue
+            if int(candidate_digits[len(candidate_digits) - 1 - position]) == correct_digit:
+                continue
+            if candidate not in wrong_numbers:
+                wrong_numbers.append(candidate)
+            if len(wrong_numbers) == 3:
+                break
+        if len(wrong_numbers) < 3:
+            raise DeterministicGenerationError("nedovoljno brojeva")
+        question = (f"Koji od ponuđenih brojeva ima cifru ${correct_digit}$ "
+                    f"na mjestu {place_name}?")
+        option_texts = tuple(f"${v}$" for v in [number] + wrong_numbers)
+        answer_value, answer_display = number, str(number)
+        explain = (f"U broju ${number}$ na mjestu {place_name} stoji upravo "
+                   f"cifra ${correct_digit}$; kod ostalih brojeva tamo stoji "
+                   "druga cifra.")
+        operation = "find_number_by_place"
+
+    hint1 = ("Mjesne vrijednosti zdesna nalijevo su: jedinice, desetice, "
+             "stotice, hiljade, desethiljade.")
+    hint2 = "Kreni od posljednje cifre broja i broji mjesta zdesna nalijevo."
+    hint3 = f"Mjesto {place_name} je {position + 1}. po redu zdesna."
+    solution = explain
+    return core.build_package(
+        lesson_id=lesson_id, lesson_title=lesson_title,
+        family_id="number_comparison_order", operation=operation, level=level,
+        question=question, answer_value=answer_value,
+        answer_display=answer_display, distractor_values=(),
+        hints=(hint1, hint2, hint3), solution=solution,
+        signature_parameters=[("number", str(number)), ("place", place_name)],
+        required_conditions=["place_value"], relevant_objects=["natural"],
+        generator_version=GENERATOR_VERSION, option_texts=option_texts,
+        wrap="")

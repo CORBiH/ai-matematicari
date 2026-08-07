@@ -483,8 +483,11 @@ _SUPERLATIVE_MIN_RE = re.compile(r"\bnajmanj\w*", re.IGNORECASE)
 # ispred „zajednički“ zato diskvalifikuje cio superlativni orakl (kapacitetna
 # ekspanzija: deterministički NZD paket s numeričkim opcijama bio bi inače
 # dokazano POGREŠNO odbijen jer tačan NZD gotovo nikad nije najveća opcija).
+# Batch #2: isto važi za „najveća DEKADSKA JEDINICA kojom se broj dijeli“ —
+# superlativ imenuje USLOVLJEN objekat (najveću jedinicu koja dijeli broj),
+# a ne najveću ponuđenu opciju.
 _SUPERLATIVE_FUNCTION_RE = re.compile(
-    r"\b(?:najve[ćc]\w*|najmanj\w*)\s+zajedni[čc]k", re.IGNORECASE)
+    r"\b(?:najve[ćc]\w*|najmanj\w*)\s+(?:zajedni[čc]k|dekadsk)", re.IGNORECASE)
 _BASE_SIGNS = ("<", ">", "=")
 _DISQUALIFYING_SIGNS = ("≤", "≥", "≠", "\\le", "\\ge", "\\ne", "\\leq", "\\geq", "\\neq")
 

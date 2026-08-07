@@ -40,6 +40,9 @@ _SUPPORTED_DIVISORS = (2, 3, 4, 5, 6, 9, 10, 15, 25)
 _SUPPORTED_CONCEPTS = frozenset({
     "divisor_membership", "multiple_membership", "gcd", "lcm",
     "prime_classification", "coprime_pairs", "prime_factorization",
+    # Batch #2: djeljivost VRIJEDNOSTI izraza (zbir/razlika/proizvod) i
+    # najveća dekadska jedinica koja dijeli broj.
+    "expression_divisibility", "decade_unit_divisibility",
 })
 
 _PRIMES = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53,
@@ -92,6 +95,8 @@ def generate_package(lesson_id, lesson_title, parameters, level, rng=None):
                 "prime_classification": _prime_classification_package,
                 "coprime_pairs": _coprime_package,
                 "prime_factorization": _factorization_package,
+                "expression_divisibility": _expression_divisibility_package,
+                "decade_unit_divisibility": _decade_unit_package,
             }[concept]
             return builder(rng, level, **common)
         except DeterministicGenerationError:
@@ -571,3 +576,112 @@ def _factorization_package(rng, level, lesson_id, lesson_title):
         required_conditions=["prime_factorization"],
         relevant_objects=["natural"], generator_version=GENERATOR_VERSION,
         option_texts=tuple(option_displays), wrap="")
+
+
+# ---------------------------------------------------------------------------
+# DJELJIVOST VRIJEDNOSTI IZRAZA (zbir/razlika/proizvod) — Batch #2
+# ---------------------------------------------------------------------------
+# Riječ „djeljiv“ u pitanju je bezbjedna: uski orakl djeljivosti angažuje se
+# samo kad su SVE opcije goli cijeli brojevi, a ovdje su opcije izrazi.
+
+def _expression_divisibility_package(rng, level, lesson_id, lesson_title):
+    divisor = rng.choice((2, 3, 4, 5, 6, 9, 10))
+    symbol_by_kind = {"sum": "+", "difference": "-", "product": "\cdot"}
+    kinds = ("sum",) if level == 1 else tuple(symbol_by_kind)
+
+    def expression(divisible):
+        kind = rng.choice(kinds)
+        for _ in range(300):
+            if kind == "product":
+                a = rng.randint(2, 12)
+                b = rng.randint(2, 12)
+                value = a * b
+            else:
+                a = rng.randint(6, 60 if level < 3 else 200)
+                b = rng.randint(2, a - 1)
+                value = a + b if kind == "sum" else a - b
+            if value <= 0:
+                continue
+            if (value % divisor == 0) == divisible:
+                label = f"{a} {symbol_by_kind[kind]} {b}"
+                return label, value, kind
+        raise DeterministicGenerationError("nema izraza tražene djeljivosti")
+
+    correct_label, correct_value, correct_kind = expression(True)
+    wrong = []
+    seen_values = {correct_value}
+    for _ in range(200):
+        label, value, _kind = expression(False)
+        if value in seen_values:
+            continue
+        seen_values.add(value)
+        wrong.append(label)
+        if len(wrong) == 3:
+            break
+    if len(wrong) < 3:
+        raise DeterministicGenerationError("nedovoljno izraza")
+
+    option_texts = (f"${correct_label}$", *(f"${label}$" for label in wrong))
+    question = (f"Vrijednost kojeg od ponuđenih izraza je djeljiva "
+                f"sa ${divisor}$?")
+    kind_word = {"sum": "zbir", "difference": "razlika", "product": "proizvod"}
+    hint1 = ("Prvo izračunaj vrijednost svakog izraza, pa provjeri pravilo "
+             "djeljivosti na rezultatu.")
+    hint2 = (f"Za djeljivost sa ${divisor}$ primijeni odgovarajuće pravilo "
+             "na IZRAČUNATU vrijednost, ne na pojedinačne članove.")
+    hint3 = ("Samo jedna vrijednost prolazi pravilo — kod proizvoda je "
+             "dovoljno da jedan faktor bude djeljiv datim brojem.")
+    solution = (f"Vrijednost izraza ${correct_label}$ je ${correct_value}$: "
+                f"${correct_value} : {divisor} = {correct_value // divisor}$, "
+                f"bez ostatka — taj {kind_word[correct_kind]} je djeljiv sa "
+                f"${divisor}$. Vrijednosti ostalih izraza nisu.")
+    return core.build_package(
+        lesson_id=lesson_id, lesson_title=lesson_title,
+        family_id="divisibility_predicate_application",
+        operation="expression_divisibility", level=level, question=question,
+        answer_value=correct_value, answer_display=correct_label,
+        distractor_values=(), hints=(hint1, hint2, hint3), solution=solution,
+        signature_parameters=[("expression", correct_label),
+                              ("divisor", str(divisor))],
+        required_conditions=["expression_divisibility"],
+        relevant_objects=["natural"], generator_version=GENERATOR_VERSION,
+        option_texts=option_texts, wrap="")
+
+
+# ---------------------------------------------------------------------------
+# NAJVEĆA DEKADSKA JEDINICA — Batch #2
+# ---------------------------------------------------------------------------
+# Formulacija NAMJERNO izbjegava „djeljiv sa N“: uski orakl bi „sa 100“
+# pročitao kao nepodržan djelilac i oborio ispravan paket kao nedokaziv uslov.
+
+def _decade_unit_package(rng, level, lesson_id, lesson_title):
+    exponent = rng.randint(1, 2 if level == 1 else (3 if level == 2 else 4))
+    core_value = rng.randint(2, 90 if level < 3 else 900)
+    if core_value % 10 == 0:
+        core_value += rng.randint(1, 9)
+    number = core_value * 10 ** exponent
+    decade = 10 ** exponent
+    units = [10, 100, 1000, 10000]
+    option_values = [decade] + [u for u in units if u != decade][:3]
+    option_texts = tuple(f"${value}$" for value in option_values)
+    question = (f"Koja je najveća dekadska jedinica kojom se broj ${number}$ "
+                "može podijeliti bez ostatka?")
+    hint1 = ("Dekadske jedinice su 10, 100, 1000, ... — broj se njima dijeli "
+             "bez ostatka prema broju nula na kraju.")
+    hint2 = f"Prebroji nule na kraju broja ${number}$."
+    hint3 = (f"Broj ${number}$ završava tačno sa {exponent} "
+             f"{'nulom' if exponent == 1 else 'nule' if exponent < 5 else 'nula'}"
+             " — toliko nula ima i tražena dekadska jedinica.")
+    solution = (f"Broj ${number}$ se može zapisati kao "
+                f"${number} = {core_value} \cdot {decade}$, a ${core_value}$ "
+                f"se ne završava nulom — najveća dekadska jedinica je ${decade}$.")
+    return core.build_package(
+        lesson_id=lesson_id, lesson_title=lesson_title,
+        family_id="divisibility_predicate_application",
+        operation="decade_unit_divisibility", level=level, question=question,
+        answer_value=decade, answer_display=str(decade),
+        distractor_values=(), hints=(hint1, hint2, hint3), solution=solution,
+        signature_parameters=[("number", str(number))],
+        required_conditions=["decade_unit"],
+        relevant_objects=["natural"], generator_version=GENERATOR_VERSION,
+        option_texts=option_texts, wrap="")
