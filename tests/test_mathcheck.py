@@ -578,3 +578,44 @@ def test_annotation_does_not_disturb_ordinary_arithmetic():
     for bad in ("$2+3=6$", "$7-4=4$", "$6\\cdot7=41$", "$\\frac{3}{4}=0,9$",
                 "$2^3=9$", "$1,5+2,5=5$", "$-3+(-4)=-1$", "$\\sqrt{16}=5$"):
         assert find_numeric_inconsistencies(bad), bad
+
+
+# ---------------------------------------------------------------------------
+# JEDINICE U LANCU JEDNAKOSTI (živi F5D talas, scenario D23)
+# ---------------------------------------------------------------------------
+# Model je na slobodno pitanje o pretvaranju jedinica odgovorio matematički
+# TAČNOM jednakošću "$1\,\text{cm} = 10\,\text{mm}$", a mathcheck je jedinice
+# uklonio i uporedio gole brojeve 1 != 10 — ispravan odgovor je pao zatvoreno.
+# Pravilo: kad OBJE strane nose jedinice a skupovi se razlikuju, jednakost je
+# iskaz PRETVARANJA čiju istinitost modul ne može numerički dokazati →
+# preskače se (preskočeno nije dokaz ispravnosti). Jedinica samo uz REZULTAT
+# je anotacija i provjerava se kao i dosad.
+
+def test_unit_conversion_equality_is_skipped_not_rejected():
+    from matbot.mathcheck import find_numeric_inconsistencies
+    assert find_numeric_inconsistencies(
+        "Jedan centimetar ima deset milimetara: "
+        r"$1\,\text{cm} = 10\,\text{mm}$.") == []
+    assert find_numeric_inconsistencies(
+        r"$1\,\text{m}^2 = 10000\,\text{cm}^2$") == []
+    assert find_numeric_inconsistencies(
+        r"$1\,\mathrm{m} = 100\,\mathrm{cm}$") == []
+    # Ista jedinica, različit eksponent = različita jedinica → pretvaranje.
+    assert find_numeric_inconsistencies(
+        r"$1\,\text{m}^2 = 100\,\text{m}$") == []
+
+
+def test_same_unit_and_annotation_equalities_are_still_checked():
+    from matbot.mathcheck import find_numeric_inconsistencies
+    assert find_numeric_inconsistencies(
+        r"$2\,\text{cm} + 3\,\text{cm} = 5\,\text{cm}$") == []
+    assert find_numeric_inconsistencies(
+        r"$2\,\text{cm} + 3\,\text{cm} = 6\,\text{cm}$") != []
+    # Bez jedinica: gola lažna jednakost i dalje pada.
+    assert find_numeric_inconsistencies("$1 = 10$") != []
+    # Jedinica SAMO uz rezultat je anotacija — pogrešan račun i dalje pada
+    # (osnivački slučaj ovog modula).
+    assert find_numeric_inconsistencies(
+        r"$V=\frac{25\cdot9}{3}=70\,\text{cm}^3$") != []
+    assert find_numeric_inconsistencies(
+        r"$V=\frac{25\cdot9}{3}=75\,\text{cm}^3$") == []

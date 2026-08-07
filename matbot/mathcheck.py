@@ -470,6 +470,22 @@ def _tolerance(left_expr, right_expr, relation, magnitude):
     return max(_EXACT_REL_TOL * abs(magnitude), 1e-9)
 
 
+# Jedinica uz broj: `\text{cm}`, `\mathrm{m}^2`, ... — hvата se i eksponent,
+# jer je m i m^2 RAZLIČITA jedinica (kvadratni faktori pretvaranja).
+_UNIT_ANNOTATION_RE = re.compile(
+    r"\\(?:text|mathrm|mathit)\s*\{([^{}]*)\}\s*(?:\^\s*(\{[^{}]*\}|\w))?")
+
+
+def _unit_annotations(expr):
+    """Skup normalizovanih jedinica u izrazu ('cm', 'm^2', ...)."""
+    units = set()
+    for match in _UNIT_ANNOTATION_RE.finditer(expr or ""):
+        unit = match.group(1).strip()
+        exponent = (match.group(2) or "").strip("{} \t")
+        units.add(f"{unit}^{exponent}" if exponent else unit)
+    return units
+
+
 def check_segment(segment, pi_values=()):
     """Vrati listu poruka o nedosljednosti unutar JEDNOG $...$ segmenta."""
     tokens = _CHAIN_SPLIT.split(segment)
@@ -492,6 +508,19 @@ def check_segment(segment, pi_values=()):
 
     issues = []
     for (left_i, left_vals, left_expr), (right_i, right_vals, right_expr) in zip(evaluated, evaluated[1:]):
+        # ŽIVI F5D NALAZ (D23): "$1\,\text{cm} = 10\,\text{mm}$" je TAČNO
+        # pretvaranje jedinica, a uklanjanjem jedinica postaje "1 = 10" i
+        # ispravan odgovor pada zatvoreno. Kad OBJE strane nose jedinice, a
+        # skupovi se RAZLIKUJU, jednakost je iskaz PRETVARANJA čiju istinitost
+        # ovaj modul ne može dokazati golim brojevima → preskoči (preskočeno
+        # NIJE dokaz ispravnosti). Sve ostalo se provjerava kao i dosad:
+        # isti skup jedinica se krati, a jedinica SAMO uz rezultat
+        # ("$\frac{10\cdot6}{2}=30\,\text{cm}^2$") je anotacija, ne
+        # pretvaranje — upravo slučaj zbog kojeg ovaj modul postoji.
+        left_units = _unit_annotations(left_expr)
+        right_units = _unit_annotations(right_expr)
+        if left_units and right_units and left_units != right_units:
+            continue
         between = separators[left_i:right_i]
         relation = "approx" if any(s in ("\\approx", "≈") for s in between) else "eq"
         magnitude = max(abs(v) for v in left_vals + right_vals) or 1.0
