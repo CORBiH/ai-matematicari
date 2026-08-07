@@ -91,6 +91,14 @@ _EXPANSION_LESSONS = (
     (9, "9-06-013"),   # kvadratna jednačina izlučivanjem
     (8, "8-07-008"),   # množenje polinoma
     (8, "8-03-003"),   # nepoznati član proporcije
+    # Batch #3 — reprezentativne nove porodice.
+    (6, "6-09-014"),   # uglovi trougla
+    (7, "7-05-021"),   # površina trapeza
+    (8, "8-04-004"),   # Pitagorina teorema
+    (8, "8-05-006"),   # zapremina kvadra
+    (9, "9-07-023"),   # valjak
+    (9, "9-05-007"),   # sistem jednačina supstitucijom
+    (9, "9-06-006"),   # razlika kvadrata
 )
 
 

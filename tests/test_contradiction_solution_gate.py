@@ -34,6 +34,14 @@ from tests.conftest import FakeLLM
 SESSION = "contradiction"
 GRADE, TOPIC = 9, "9-05-010"
 
+
+@pytest.fixture(autouse=True)
+def _model_route(monkeypatch):
+    # Batch #3: 9-05-010 je postala deterministička, a ovaj modul ciljano
+    # ispituje MODEL put (recenzent popravlja golu netačnu jednakost). Isti
+    # mehanizam kao produkcijski rollback vraća lekciju na Tutor+Reviewer put.
+    monkeypatch.setenv("MATBOT_DETERMINISTIC_PRACTICE", "disabled")
+
 # Živi oblik zadatka iz artefakta (recenzentova verzija, bez „obrazloži“).
 LIVE_TASK_TEXT = ("Odredi koliko rješenja ima sljedeći sistem linearnih "
                   "jednačina:\n\n$x+y=3$\n\n$x+y=5$")

@@ -43,6 +43,14 @@ from tests.conftest import FakeLLM
 SESSION = "preflight"
 GRADE, TOPIC = 8, "8-04-008"
 
+
+@pytest.fixture(autouse=True)
+def _model_route(monkeypatch):
+    # Batch #3: 8-04-008 je postala deterministička, a ovaj modul ciljano
+    # ispituje MODEL put (recenzentov preflight). Isti mehanizam kao
+    # produkcijski rollback vraća lekciju na Tutor+Reviewer put.
+    monkeypatch.setenv("MATBOT_DETERMINISTIC_PRACTICE", "disabled")
+
 # Živi oblik zadatka (tekst JESTE sačuvan u artefaktu).
 LIVE_TASK_TEXT = (
     "Jednakostraničan trougao ima stranicu dužine $8\\,\\text{cm}$. "

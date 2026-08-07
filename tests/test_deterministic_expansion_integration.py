@@ -56,6 +56,17 @@ REPRESENTATIVES = [
     ("linear_equation_direct", 9, "9-04-016"),
     ("simple_quadratic_equation", 9, "9-06-013"),
     ("unit_conversion_direct", 9, "9-08-013"),
+    # Batch #3 — po jedna lekcija svake nove porodice / velikog proširenja.
+    ("angle_relationships_direct", 6, "6-09-014"),
+    ("angle_relationships_direct", 7, "7-04-008"),
+    ("geometry_formula_2d", 7, "7-05-021"),
+    ("geometry_formula_2d", 8, "8-08-011"),
+    ("pythagoras_direct", 8, "8-04-004"),
+    ("solid_geometry_direct", 8, "8-05-006"),
+    ("solid_geometry_direct", 9, "9-07-023"),
+    ("linear_system_direct", 9, "9-05-007"),
+    ("polynomial_basic", 8, "8-07-009"),
+    ("polynomial_basic", 9, "9-06-006"),
 ]
 
 

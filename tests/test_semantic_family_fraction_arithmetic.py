@@ -200,8 +200,9 @@ def test_the_four_pilot_lessons_keep_their_contract():
 def test_unmapped_lessons_have_no_contract():
     # Lekcije koje NISU u pregledanoj tabeli aktivacija ostaju bez ugovora.
     # Batch #2: 6-04-014 je aktivirana — zamjenjuje je i dalje nemapirana
-    # 6-04-015 (tekstualni zadaci).
-    for lesson_id in ("6-04-013", "6-04-015", "6-01-001", "9-05-007"):
+    # 6-04-015 (tekstualni zadaci). Batch #3: 9-05-007 (supstitucija) je
+    # aktivirana — zamjenjuje je 9-05-013 (tekstualni zadatak sa sistemom).
+    for lesson_id in ("6-04-013", "6-04-015", "6-01-001", "9-05-013"):
         assert sem_contracts.contract_for(lesson_id) is None, lesson_id
 
 
