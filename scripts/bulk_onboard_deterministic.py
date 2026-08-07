@@ -43,7 +43,7 @@ FAZA2_XLSX = ROOT / "reference" / "curriculum" / "semantics" / "MATBOT_Faza2_Map
 REPORT_PATH = (ROOT / "reference" / "curriculum" / "semantics"
                / "deterministic_coverage_report.json")
 
-CONTRACT_VERSION = "5D.1"
+CONTRACT_VERSION = "5E.1"
 
 _HEADER = "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):"
 _CLOSING = "- ako prekršiš ovo, server odbija paket prije objave"
@@ -275,6 +275,98 @@ NEW_FAMILIES = {
 }
 
 
+
+def _kinds_family(name, detector, core_skill, kind_values, fixed=()):
+    """Batch #3: porodica čiji ugovor nosi listu VRSTA zadataka (`kinds`)."""
+    return {
+        "family_version": 1,
+        "family_name": name,
+        "detector": detector,
+        "core_skill": core_skill,
+        "parameter_schema": {
+            "kinds": {"kind": "enum_set", "values": list(kind_values),
+                      "required": True},
+            "fraction_coefficients": {"kind": "enum",
+                                      "values": ["yes"], "required": False},
+        },
+        "enforced_parameters": ["kinds"],
+        "advisory_parameters": ["fraction_coefficients"],
+        "prompt_template": _template(
+            main_parameter="kinds",
+            main_text="- vidljivi zadatak mora pripadati vrstama: {values}",
+            fixed=fixed),
+        "value_labels": {},
+    }
+
+
+_GEO2D_KINDS = ["square_perimeter", "square_area", "rectangle_perimeter",
+                "rectangle_area", "triangle_perimeter", "triangle_area",
+                "parallelogram_area", "parallelogram_perimeter",
+                "trapezoid_area", "trapezoid_midline", "triangle_midline",
+                "rhombus_area_diagonals", "rhombus_perimeter", "deltoid_area",
+                "orthodiagonal_area", "quad_perimeter", "circle_circumference",
+                "circle_area", "arc_length", "sector_area", "annulus_area",
+                "polygon_interior_sum", "polygon_diagonals",
+                "regular_polygon_angle", "regular_polygon_perimeter"]
+_PYTH_KINDS = ["hypotenuse", "leg", "verify_triple", "square_diagonal",
+               "rectangle_diagonal", "isosceles_height", "equilateral_height",
+               "equilateral_area", "rhombus_side",
+               "isosceles_trapezoid_height", "right_trapezoid_leg",
+               "chord_distance"]
+_SOLID_KINDS = ["cube_surface", "cube_volume", "cube_space_diagonal",
+                "cuboid_surface", "cuboid_volume", "prism4_lateral",
+                "prism4_surface", "prism4_volume", "prism4_space_diagonal",
+                "prism3_volume", "prism3_lateral", "pyramid4_apothem",
+                "pyramid4_lateral", "pyramid4_surface", "pyramid4_volume",
+                "cylinder_surface", "cylinder_volume",
+                "cylinder_axial_section", "cone_slant", "cone_surface",
+                "cone_volume", "cone_axial_section", "sphere_surface",
+                "ball_volume", "prism_pyramid_ratio", "cylinder_cone_ratio",
+                "density_mass", "polyhedron_elements"]
+_ANGLE_KINDS = ["classify_angle", "central_peripheral", "central_fraction",
+                "compare_angles", "dms_add_sub", "angle_times_n",
+                "adjacent_vertical", "comp_supp", "transversal",
+                "parallel_normal_arms", "triangle_third_angle",
+                "exterior_angle", "exterior_from_interior",
+                "classify_triangle_sides", "classify_triangle_angles",
+                "side_angle_order", "triangle_inequality", "isosceles_angles",
+                "right_triangle_acute", "quad_fourth_angle", "quad_exterior"]
+_SYSTEM_KINDS = ["solve", "verify_pair", "single_equation", "classify",
+                 "equivalent_system"]
+
+NEW_FAMILIES["geometry_formula_2d"] = _kinds_family(
+    "Formula-geometrija u ravni", "geometry_formula_2d",
+    "izračunati obim/površinu/element ravne figure po kanonskoj formuli",
+    _GEO2D_KINDS,
+    fixed=["- sve tražene veličine su ZADATE brojevima — crtež nije potreban",
+           "- notacija: P površina, O obim, d dijagonala, r poluprečnik, "
+           "R prečnik (R = 2r)"])
+NEW_FAMILIES["pythagoras_direct"] = _kinds_family(
+    "Pitagorina teorema — direktne primjene", "pythagoras_direct",
+    "primijeniti Pitagorinu teoremu na zadate dužine",
+    _PYTH_KINDS,
+    fixed=["- sve dužine su zadate brojevima; rezultat je egzaktan "
+           "(cio broj ili korijen), nikad približna decimala"])
+NEW_FAMILIES["solid_geometry_direct"] = _kinds_family(
+    "Geometrijska tijela — formule", "solid_geometry_direct",
+    "izračunati M/P/V/element tijela po kanonskoj formuli",
+    _SOLID_KINDS,
+    fixed=["- notacija: B baza, M omotač, P ukupna površina, V zapremina, "
+           "H visina tijela, h_a apotema, D prostorna dijagonala",
+           "- π ostaje simbolički u rezultatu; korijeni ostaju egzaktni"])
+NEW_FAMILIES["angle_relationships_direct"] = _kinds_family(
+    "Brojevni odnosi među uglovima", "angle_relationships_direct",
+    "izračunati ili klasifikovati ugao iz zadatih brojevnih odnosa",
+    _ANGLE_KINDS,
+    fixed=["- svi uglovi su zadati mjerama — crtež nije potreban"])
+NEW_FAMILIES["linear_system_direct"] = _kinds_family(
+    "Sistem dvije linearne jednačine", "linear_system_direct",
+    "riješiti, provjeriti ili klasifikovati sistem dvije linearne jednačine",
+    _SYSTEM_KINDS,
+    fixed=["- sistem ima cjelobrojne (ili razlomljene, gdje ugovor kaže) "
+           "koeficijente; rješenje je uređeni par ili klasifikacija"])
+
+
 # Porodica poređenja ima JEDAN domen po lekciji — parametar je enum, ne skup.
 NEW_FAMILIES["number_comparison_order"]["parameter_schema"]["number_domain"]["kind"] = "enum"
 
@@ -442,8 +534,49 @@ NEW_FAMILIES.update({
         concept_parameter="shapes"),
 })
 
+# Batch #3: koncepti faktorizacije i algebarskih identiteta u polynomial_basic
+# (isti mehanizam kao proširenja _pow/_root iznad — porodica ostaje jedna).
+_poly = NEW_FAMILIES["polynomial_basic"]
+_poly["parameter_schema"]["concepts"]["values"] += [
+    "like_terms_select", "monomial_mul_div", "square_of_binomial",
+    "cube_of_binomial", "factor_difference_squares", "factor_common",
+    "factor_grouping", "factor_identity", "sum_diff_cubes", "zero_product",
+    "fraction_domain"]
+_poly["value_labels"].update({
+    "like_terms_select": "prepoznavanje sličnih monoma",
+    "monomial_mul_div": "množenje i dijeljenje monoma",
+    "square_of_binomial": "kvadrat binoma (a ± b)²",
+    "cube_of_binomial": "kub binoma (a ± b)³",
+    "factor_difference_squares": "faktorizacija razlike kvadrata",
+    "factor_common": "izlučivanje zajedničkog faktora",
+    "factor_grouping": "faktorizacija grupisanjem",
+    "factor_identity": "faktorizacija pomoću kvadrata binoma",
+    "sum_diff_cubes": "zbir i razlika kubova",
+    "zero_product": "jednačina data proizvodom faktora",
+    "fraction_domain": "uslov definisanosti algebarskog razlomka"})
+
 
 _LEVEL_BOUNDS = {
+    "geometry_formula_2d": {
+        "1": "direktna primjena jedne formule malim brojevima",
+        "2": "inverzni zadatak (traži se stranica/visina) ili veći brojevi",
+        "3": "dvokoračne veličine, koeficijenti i složeniji oblici"},
+    "pythagoras_direct": {
+        "1": "osnovne Pitagorine trojke",
+        "2": "veće trojke i primjene na figure",
+        "3": "egzaktni korijeni i složenije primjene"},
+    "solid_geometry_direct": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"},
+    "angle_relationships_direct": {
+        "1": "jedan imenovani odnos, male mjere",
+        "2": "dvokoračni odnosi i minute",
+        "3": "trokoračni odnosi i odnosi zadati razlikom"},
+    "linear_system_direct": {
+        "1": "izbor/provjera uređenog para",
+        "2": "direktna supstitucija (koeficijent 1)",
+        "3": "puno rješavanje i klasifikacija"},
     "natural_arithmetic_direct": {
         "1": "jedna operacija malim brojevima",
         "2": "dvije povezane operacije ili veći brojevi",
@@ -542,6 +675,11 @@ _LEVEL_BOUNDS.update({
 })
 
 _REVIEWER_NOTES = {
+    "geometry_formula_2d": "Invarijanta: kanonske formule i notacija (P/O/d/r/R=2r); egzaktan račun.",
+    "pythagoras_direct": "Invarijanta: c² = a² + b² egzaktno; rezultat cio broj ili korijen.",
+    "solid_geometry_direct": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni.",
+    "angle_relationships_direct": "Invarijanta: imenovani brojevni odnos uglova; zbirovi 90/180/360 egzaktni.",
+    "linear_system_direct": "Invarijanta: rješenje uvršteno u OBJE jednačine; klasifikacija po determinanti.",  
     "natural_arithmetic_direct": "Invarijanta: svi operandi i međurezultati prirodni.",
     "integer_arithmetic_direct": "Invarijanta: cjelobrojni operandi i rezultat; pravilo znakova.",
     "decimal_arithmetic_direct": "Invarijanta: konačan decimalan zapis svake vidljive vrijednosti.",
@@ -1039,11 +1177,299 @@ ACTIVATIONS = [
 ]
 
 
+
+_BATCH3_ACTIVATIONS = [
+    # --- uglovi (6. razred) ------------------------------------------------
+    ("6-09-003", "Vrste uglova: nula, oštri, pravi, tupi, opruženi i puni ugao",
+     "angle_relationships_direct", {"kinds": ["classify_angle"]}, "exact"),
+    ("6-09-004", "Centralni/središnji ugao",
+     "angle_relationships_direct", {"kinds": ["central_fraction"]}, "exact"),
+    ("6-09-005", "Periferijski/obodni ugao i odnos sa centralnim uglom",
+     "angle_relationships_direct", {"kinds": ["central_peripheral"]}, "exact"),
+    ("6-09-007", "Upoređivanje uglova",
+     "angle_relationships_direct", {"kinds": ["compare_angles"]}, "exact"),
+    ("6-09-011", "Sabiranje i oduzimanje mjernih brojeva za uglove",
+     "angle_relationships_direct", {"kinds": ["dms_add_sub"]}, "exact"),
+    ("6-09-012", "Množenje i dijeljenje uglova prirodnim brojem",
+     "angle_relationships_direct", {"kinds": ["angle_times_n"]}, "exact"),
+    ("6-09-013", "Susjedni, uporedni i unakrsni uglovi",
+     "angle_relationships_direct", {"kinds": ["adjacent_vertical"]}, "exact"),
+    ("6-09-014", "Komplementni i suplementni uglovi",
+     "angle_relationships_direct", {"kinds": ["comp_supp"]}, "exact"),
+    ("6-09-015", "Uglovi uz transverzalu paralelnih pravih",
+     "angle_relationships_direct", {"kinds": ["transversal"]}, "exact"),
+    ("6-09-016", "Uglovi s paralelnim i normalnim kracima",
+     "angle_relationships_direct", {"kinds": ["parallel_normal_arms"]},
+     "exact"),
+    # --- ugao i trougao (7. razred) ----------------------------------------
+    ("7-04-001", "Uglovi sa paralelnim kracima",
+     "angle_relationships_direct", {"kinds": ["parallel_normal_arms"]},
+     "exact"),
+    ("7-04-002", "Uglovi sa normalnim kracima",
+     "angle_relationships_direct", {"kinds": ["parallel_normal_arms"]},
+     "exact"),
+    ("7-04-006", "Vrste trouglova prema stranicama",
+     "angle_relationships_direct", {"kinds": ["classify_triangle_sides"]},
+     "exact"),
+    ("7-04-007", "Vrste trouglova prema uglovima",
+     "angle_relationships_direct", {"kinds": ["classify_triangle_angles"]},
+     "exact"),
+    ("7-04-008", "Zbir unutrašnjih uglova trougla",
+     "angle_relationships_direct", {"kinds": ["triangle_third_angle"]},
+     "exact"),
+    ("7-04-009", "Vanjski ugao trougla",
+     "angle_relationships_direct", {"kinds": ["exterior_angle"]}, "exact"),
+    ("7-04-010", "Zbir vanjskih uglova trougla",
+     "angle_relationships_direct", {"kinds": ["exterior_from_interior"]},
+     "exact"),
+    ("7-04-011", "Odnos stranica i naspramnih uglova",
+     "angle_relationships_direct", {"kinds": ["side_angle_order"]}, "exact"),
+    ("7-04-012", "Nejednakost trougla",
+     "angle_relationships_direct", {"kinds": ["triangle_inequality"]},
+     "exact"),
+    ("7-04-018", "Jednakokraki trougao - svojstva",
+     "angle_relationships_direct", {"kinds": ["isosceles_angles"]}, "exact"),
+    ("7-04-019", "Pravougli trougao i posebni uglovi",
+     "angle_relationships_direct", {"kinds": ["right_triangle_acute"]},
+     "exact"),
+    ("7-04-025", "Srednja linija trougla",
+     "geometry_formula_2d", {"kinds": ["triangle_midline"]}, "exact"),
+    # --- četverougao, obim i površina (7. razred) --------------------------
+    ("7-05-002", "Zbir unutrašnjih uglova četverougla",
+     "angle_relationships_direct", {"kinds": ["quad_fourth_angle"]}, "exact"),
+    ("7-05-003", "Zbir vanjskih uglova četverougla",
+     "angle_relationships_direct", {"kinds": ["quad_exterior"]}, "exact"),
+    ("7-05-012", "Srednja linija trapeza",
+     "geometry_formula_2d", {"kinds": ["trapezoid_midline"]}, "exact"),
+    ("7-05-016", "Obim trougla",
+     "geometry_formula_2d", {"kinds": ["triangle_perimeter"]}, "exact"),
+    ("7-05-017", "Obim četverougla",
+     "geometry_formula_2d", {"kinds": ["quad_perimeter"]}, "exact"),
+    ("7-05-019", "Površina pravougaonika i kvadrata - obnova",
+     "geometry_formula_2d",
+     {"kinds": ["square_area", "rectangle_area", "square_perimeter",
+                "rectangle_perimeter"]}, "exact"),
+    ("7-05-020", "Površina paralelograma",
+     "geometry_formula_2d",
+     {"kinds": ["parallelogram_area", "parallelogram_perimeter"]}, "exact"),
+    ("7-05-021", "Površina trougla",
+     "geometry_formula_2d", {"kinds": ["triangle_area"]}, "exact"),
+    ("7-05-022", "Površina trapeza",
+     "geometry_formula_2d", {"kinds": ["trapezoid_area"]}, "exact"),
+    ("7-05-023", "Površina romba i deltoida preko dijagonala",
+     "geometry_formula_2d",
+     {"kinds": ["rhombus_area_diagonals", "deltoid_area",
+                "rhombus_perimeter"]}, "exact"),
+    ("7-05-024", "Površina četverougla sa normalnim dijagonalama",
+     "geometry_formula_2d", {"kinds": ["orthodiagonal_area"]}, "exact"),
+    # --- mnogougao, kružnica i krug (8. razred) ----------------------------
+    ("8-08-002", "Zbir unutrašnjih uglova mnogougla",
+     "geometry_formula_2d", {"kinds": ["polygon_interior_sum"]}, "exact"),
+    ("8-08-004", "Broj dijagonala mnogougla",
+     "geometry_formula_2d", {"kinds": ["polygon_diagonals"]}, "exact"),
+    ("8-08-005", "Pravilni mnogougao",
+     "geometry_formula_2d",
+     {"kinds": ["regular_polygon_angle", "regular_polygon_perimeter"]},
+     "exact"),
+    ("8-08-007", "Obim i površina mnogougla",
+     "geometry_formula_2d",
+     {"kinds": ["regular_polygon_perimeter", "quad_perimeter"]}, "exact"),
+    ("8-08-009", "Broj π i obim kruga",
+     "geometry_formula_2d", {"kinds": ["circle_circumference"]}, "exact"),
+    ("8-08-010", "Dužina kružnog luka",
+     "geometry_formula_2d", {"kinds": ["arc_length"]}, "exact"),
+    ("8-08-011", "Površina kruga",
+     "geometry_formula_2d", {"kinds": ["circle_area"]}, "exact"),
+    ("8-08-012", "Kružni prsten i kružni isječak",
+     "geometry_formula_2d", {"kinds": ["annulus_area", "sector_area"]},
+     "exact"),
+    # --- Pitagorina teorema (8. razred) ------------------------------------
+    ("8-04-001", "Pitagorina teorema - formulacija",
+     "pythagoras_direct", {"kinds": ["hypotenuse", "verify_triple"]},
+     "exact"),
+    ("8-04-002", "Obrat Pitagorine teoreme",
+     "pythagoras_direct", {"kinds": ["verify_triple"]}, "exact"),
+    ("8-04-003", "Određivanje nepoznate katete",
+     "pythagoras_direct", {"kinds": ["leg"]}, "exact"),
+    ("8-04-004", "Dijagonala kvadrata",
+     "pythagoras_direct", {"kinds": ["square_diagonal"]}, "exact"),
+    ("8-04-005", "Dijagonala pravougaonika",
+     "pythagoras_direct", {"kinds": ["rectangle_diagonal"]}, "exact"),
+    ("8-04-006", "Visina jednakokrakog trougla",
+     "pythagoras_direct", {"kinds": ["isosceles_height"]}, "exact"),
+    ("8-04-007", "Visina jednakostraničnog trougla",
+     "pythagoras_direct", {"kinds": ["equilateral_height"]}, "exact"),
+    ("8-04-008", "Površina jednakostraničnog trougla",
+     "pythagoras_direct", {"kinds": ["equilateral_area"]}, "exact"),
+    ("8-04-009", "Primjena na romb",
+     "pythagoras_direct", {"kinds": ["rhombus_side"]}, "exact"),
+    ("8-04-010", "Primjena na jednakokraki trapez",
+     "pythagoras_direct", {"kinds": ["isosceles_trapezoid_height"]}, "exact"),
+    ("8-04-011", "Primjena na pravougli trapez",
+     "pythagoras_direct", {"kinds": ["right_trapezoid_leg"]}, "exact"),
+    ("8-04-012", "Tetiva i udaljenost od centra",
+     "pythagoras_direct", {"kinds": ["chord_distance"]}, "exact"),
+    # --- prizme i piramide (8. razred) -------------------------------------
+    ("8-05-002", "Poliedar i osnovni elementi",
+     "solid_geometry_direct", {"kinds": ["polyhedron_elements"]}, "exact"),
+    ("8-05-003", "Prizma - baze, omotač, ivice i visina",
+     "solid_geometry_direct", {"kinds": ["polyhedron_elements"]}, "exact"),
+    ("8-05-004", "Piramida - baza, bočne strane, vrh i visina",
+     "solid_geometry_direct", {"kinds": ["polyhedron_elements"]}, "exact"),
+    ("8-05-005", "Pravilna uspravna trostrana prizma",
+     "solid_geometry_direct", {"kinds": ["prism3_lateral", "prism3_volume"]},
+     "exact"),
+    ("8-05-006", "Pravilna uspravna četverostrana prizma",
+     "solid_geometry_direct",
+     {"kinds": ["prism4_lateral", "prism4_surface", "prism4_volume"]},
+     "exact"),
+    ("8-05-008", "Pravilna uspravna četverostrana piramida",
+     "solid_geometry_direct",
+     {"kinds": ["pyramid4_apothem", "pyramid4_lateral", "pyramid4_surface",
+                "pyramid4_volume"]}, "exact"),
+    ("8-05-013", "Površina omotača pravilne prizme",
+     "solid_geometry_direct", {"kinds": ["prism4_lateral", "prism3_lateral"]},
+     "exact"),
+    ("8-05-014", "Ukupna površina pravilne prizme",
+     "solid_geometry_direct", {"kinds": ["prism4_surface"]}, "exact"),
+    ("8-05-015", "Zapremina pravilne prizme",
+     "solid_geometry_direct", {"kinds": ["prism4_volume", "prism3_volume"]},
+     "exact"),
+    ("8-05-016", "Prostorna dijagonala pravilne četverostrane prizme",
+     "solid_geometry_direct", {"kinds": ["prism4_space_diagonal"]}, "exact"),
+    ("8-05-017", "Apotema pravilne piramide",
+     "solid_geometry_direct", {"kinds": ["pyramid4_apothem"]}, "exact"),
+    ("8-05-018", "Površina omotača pravilne piramide",
+     "solid_geometry_direct", {"kinds": ["pyramid4_lateral"]}, "exact"),
+    ("8-05-019", "Ukupna površina pravilne piramide",
+     "solid_geometry_direct", {"kinds": ["pyramid4_surface"]}, "exact"),
+    ("8-05-020", "Zapremina pravilne piramide",
+     "solid_geometry_direct", {"kinds": ["pyramid4_volume"]}, "exact"),
+    # --- geometrijska tijela (9. razred) -----------------------------------
+    ("9-07-001", "Pojam poliedra i njegovi elementi",
+     "solid_geometry_direct", {"kinds": ["polyhedron_elements"]}, "exact"),
+    ("9-07-002", "Prizma i njeni elementi",
+     "solid_geometry_direct", {"kinds": ["polyhedron_elements"]}, "exact"),
+    ("9-07-004", "Površina uspravne prizme",
+     "solid_geometry_direct", {"kinds": ["prism4_surface", "prism3_lateral"]},
+     "exact"),
+    ("9-07-005", "Zapremina prizme",
+     "solid_geometry_direct",
+     {"kinds": ["prism4_volume", "prism3_volume", "cuboid_volume",
+                "cube_volume"]}, "exact"),
+    ("9-07-007", "Primjena Pitagorine teoreme na pravilnu prizmu",
+     "solid_geometry_direct",
+     {"kinds": ["prism4_space_diagonal", "cube_space_diagonal"]}, "exact"),
+    ("9-07-008", "Piramida i njeni elementi",
+     "solid_geometry_direct", {"kinds": ["polyhedron_elements"]}, "exact"),
+    ("9-07-010", "Površina pravilne piramide",
+     "solid_geometry_direct",
+     {"kinds": ["pyramid4_surface", "pyramid4_lateral"]}, "exact"),
+    ("9-07-011", "Zapremina pravilne piramide",
+     "solid_geometry_direct", {"kinds": ["pyramid4_volume"]}, "exact"),
+    ("9-07-012", "Apotema pravilne piramide",
+     "solid_geometry_direct", {"kinds": ["pyramid4_apothem"]}, "exact"),
+    ("9-07-014", "Primjena Pitagorine teoreme na piramidu",
+     "solid_geometry_direct", {"kinds": ["pyramid4_apothem"]}, "exact"),
+    ("9-07-017", "Površina valjka",
+     "solid_geometry_direct", {"kinds": ["cylinder_surface"]}, "exact"),
+    ("9-07-018", "Zapremina valjka",
+     "solid_geometry_direct", {"kinds": ["cylinder_volume"]}, "exact"),
+    ("9-07-019", "Osni presjek valjka",
+     "solid_geometry_direct", {"kinds": ["cylinder_axial_section"]}, "exact"),
+    ("9-07-022", "Površina kupe",
+     "solid_geometry_direct", {"kinds": ["cone_surface"]}, "exact"),
+    ("9-07-023", "Zapremina kupe",
+     "solid_geometry_direct", {"kinds": ["cone_volume"]}, "exact"),
+    ("9-07-024", "Izvodnica kupe",
+     "solid_geometry_direct", {"kinds": ["cone_slant"]}, "exact"),
+    ("9-07-025", "Osni presjek kupe",
+     "solid_geometry_direct", {"kinds": ["cone_axial_section"]}, "exact"),
+    ("9-07-027", "Površina sfere",
+     "solid_geometry_direct", {"kinds": ["sphere_surface"]}, "exact"),
+    ("9-07-028", "Zapremina lopte",
+     "solid_geometry_direct", {"kinds": ["ball_volume"]}, "exact"),
+    ("9-07-030", "Odnos zapremina prizme i piramide",
+     "solid_geometry_direct", {"kinds": ["prism_pyramid_ratio"]}, "exact"),
+    ("9-07-031", "Odnos zapremina valjka i kupe",
+     "solid_geometry_direct", {"kinds": ["cylinder_cone_ratio"]}, "exact"),
+    ("9-07-038", "Masa tijela iz gustine i zapremine",
+     "solid_geometry_direct", {"kinds": ["density_mass"]}, "exact"),
+    # --- sistemi (9. razred) -----------------------------------------------
+    ("9-05-001", "Linearna jednačina sa dvije nepoznate i njena rješenja",
+     "linear_system_direct", {"kinds": ["single_equation"]}, "exact"),
+    ("9-05-003", "Pojam sistema dvije linearne jednačine",
+     "linear_system_direct", {"kinds": ["verify_pair"]}, "exact"),
+    ("9-05-004", "Provjera uređenog para u sistemu",
+     "linear_system_direct", {"kinds": ["verify_pair"]}, "exact"),
+    ("9-05-005", "Ekvivalentni sistemi",
+     "linear_system_direct", {"kinds": ["equivalent_system"]}, "exact"),
+    ("9-05-007", "Metoda supstitucije",
+     "linear_system_direct", {"kinds": ["solve"]}, "exact"),
+    ("9-05-008", "Metoda suprotnih koeficijenata (Gausova metoda)",
+     "linear_system_direct", {"kinds": ["solve"]}, "exact"),
+    ("9-05-009", "Sistem sa jednim rješenjem",
+     "linear_system_direct", {"kinds": ["solve", "classify"]}, "exact"),
+    ("9-05-010", "Sistem bez rješenja",
+     "linear_system_direct", {"kinds": ["classify"]}, "exact"),
+    ("9-05-011", "Sistem sa beskonačno mnogo rješenja",
+     "linear_system_direct", {"kinds": ["classify"]}, "exact"),
+    ("9-05-012", "Odnos koeficijenata i broj rješenja sistema",
+     "linear_system_direct", {"kinds": ["classify"]}, "exact"),
+    ("9-05-014", "Geometrijsko tumačenje rješenja sistema",
+     "linear_system_direct", {"kinds": ["classify"]}, "exact"),
+    ("9-05-015", "Provjera rješenja sistema",
+     "linear_system_direct", {"kinds": ["verify_pair"]}, "exact"),
+    ("9-05-016", "Sistem sa razlomljenim koeficijentima",
+     "linear_system_direct",
+     {"kinds": ["solve"], "fraction_coefficients": "yes"}, "exact"),
+    # --- polinomi (8. razred) ----------------------------------------------
+    ("8-07-003", "Slični monomi",
+     "polynomial_basic",
+     {"concepts": ["like_terms_select", "combine_like_terms"]}, "exact"),
+    ("8-07-004", "Sabiranje i oduzimanje monoma",
+     "polynomial_basic", {"concepts": ["combine_like_terms"]}, "exact"),
+    ("8-07-005", "Množenje i dijeljenje monoma",
+     "polynomial_basic", {"concepts": ["monomial_mul_div"]}, "exact"),
+    ("8-07-009", "Kvadrat zbira i razlike",
+     "polynomial_basic", {"concepts": ["square_of_binomial"]}, "exact"),
+    ("8-07-010", "Razlika kvadrata",
+     "polynomial_basic", {"concepts": ["factor_difference_squares"]},
+     "exact"),
+    ("8-07-011", "Kub binoma, zbir i razlika kubova",
+     "polynomial_basic",
+     {"concepts": ["cube_of_binomial", "sum_diff_cubes"]}, "exact"),
+    ("8-07-012", "Rastavljanje izdvajanjem zajedničkog faktora",
+     "polynomial_basic", {"concepts": ["factor_common"]}, "exact"),
+    # --- polinomi i kvadratne (9. razred) ----------------------------------
+    ("9-06-005", "Kvadrat binoma",
+     "polynomial_basic", {"concepts": ["square_of_binomial"]}, "exact"),
+    ("9-06-006", "Razlika kvadrata",
+     "polynomial_basic", {"concepts": ["factor_difference_squares"]},
+     "exact"),
+    ("9-06-007", "Kub binoma",
+     "polynomial_basic", {"concepts": ["cube_of_binomial"]}, "exact"),
+    ("9-06-008", "Zbir i razlika kubova",
+     "polynomial_basic", {"concepts": ["sum_diff_cubes"]}, "exact"),
+    ("9-06-009", "Izlučivanje zajedničkog faktora",
+     "polynomial_basic", {"concepts": ["factor_common"]}, "exact"),
+    ("9-06-010", "Rastavljanje grupisanjem",
+     "polynomial_basic", {"concepts": ["factor_grouping"]}, "exact"),
+    ("9-06-011", "Faktorizacija primjenom identiteta",
+     "polynomial_basic", {"concepts": ["factor_identity"]}, "exact"),
+    ("9-06-012", "Domena algebarskog razlomka pomoću faktorizacije",
+     "polynomial_basic", {"concepts": ["fraction_domain"]}, "exact"),
+    ("9-06-016", "Nula proizvoda i provjera rješenja",
+     "polynomial_basic", {"concepts": ["zero_product"]}, "exact"),
+]
+ACTIVATIONS = ACTIVATIONS + _BATCH3_ACTIVATIONS
+
 # ---------------------------------------------------------------------------
 # KLASIFIKACIJA PREOSTALIH LEKCIJA (izvještaj, bez uticaja na ponašanje)
 # ---------------------------------------------------------------------------
 
-_VISUAL_KEYWORDS = ("konstrukc", "crtanje", "crtež", "dijagram", "grafič",
+_VISUAL_KEYWORDS = ("na brojevnoj polupravoj",
+                    "konstrukc", "crtanje", "crtež", "dijagram", "grafič",
                     "prikaz", "koordinat", "simetri", "preslikav", "izometri",
                     "vektor", "mreža", "čitanje i kritičko")
 _WORD_PROBLEM_KEYWORDS = ("tekstualni", "primjena", "problemi")
@@ -1056,6 +1482,10 @@ _NEEDS_EXTENSION = {
     "9-04-007",   # promjenljivi koeficijent — treba parametarska varijanta
     "6-07-007",   # prikaz rješenja na brojevnoj osi — treba vizuelni format
 }
+# Batch #3, Priority A: 6-07-007 stvarno traži prikaz na brojevnoj
+# osi (vizuelno); 9-04-007 traži parametarsku diskusiju (nov
+# kapacitet — pada u NEEDS_NEW preko ključne riječi).
+_NEEDS_EXTENSION -= {"6-07-007", "9-04-007"}
 
 
 def _classify(lesson_id, title, activated):
@@ -1218,6 +1648,38 @@ def verify_generator_support():
         raise OnboardingError(f"generator ne pokriva: {unsupported}")
 
 
+_ANALYSIS_RULES = (
+    ("PROOF_REQUIRED", ("dokaz", "podudarnost", "teorema o", "talesova")),
+    ("CONSTRUCTION_REQUIRED", ("konstrukc",)),
+    ("VISUAL_REQUIRED", ("grafik", "dijagram", "crtanje", "prikaz",
+                         "koordinatn", "brojevnoj", "simetri", "preslikav",
+                         "čitanje")),
+    ("STRUCTURED_WORD_PROBLEM_CANDIDATE", ("tekstualni zadaci",
+                                           "tekstualni zadatak")),
+    ("OPEN_ENDED_WORD_PROBLEM", ("problemsk", "praktični", "primjena u",
+                                 "modeliranje")),
+    ("SYMBOLIC_ALGEBRA_CANDIDATE", ("razlomljen", "algebarsk", "polinom",
+                                    "izraz", "monom")),
+    ("FORMULA_GEOMETRY_CANDIDATE", ("površina", "obim", "zapremina",
+                                    "dijagonala", "visina", "presjek")),
+    ("FINANCIAL_MATH_CANDIDATE", ("kamata", "valut", "budžet", "otplatn")),
+    ("STATISTICS_CANDIDATE", ("frekvencij", "uzorak", "podataka", "sredina")),
+    ("CLOSED_FORM_DETERMINISTIC_CANDIDATE",
+     ("pretvaranje", "zaokruživanje", "vrijednost", "račun", "jednačin",
+      "nejednačin", "procjena", "korijen", "stepen")),
+    ("CONCEPTUAL_ONLY", ("pojam", "elementi", "svojstva", "vrste", "načini",
+                         "definicija", "odnos", "skup", "označavanje")),
+)
+
+
+def _analysis_bucket(title):
+    lowered = title.lower()
+    for bucket, keywords in _ANALYSIS_RULES:
+        if any(keyword in lowered for keyword in keywords):
+            return bucket
+    return "INSUFFICIENT_SEMANTIC_EVIDENCE"
+
+
 def build_report(lessons):
     activated = {row[0]: row[2] for row in ACTIVATIONS}
     activated["6-04-009"] = "fraction_arithmetic_direct"
@@ -1233,12 +1695,21 @@ def build_report(lessons):
             family = activated[lesson_id]
             by_family[family] = by_family.get(family, 0) + 1
             by_grade[grade] = by_grade.get(grade, 0) + 1
-        table.append({"lesson_id": lesson_id, "grade": grade, "oblast": oblast,
-                      "title": title, "class": classification,
-                      "family": activated.get(lesson_id, "")})
+        entry = {"lesson_id": lesson_id, "grade": grade, "oblast": oblast,
+                 "title": title, "class": classification,
+                 "family": activated.get(lesson_id, "")}
+        if classification == "MODEL_ONLY_FOR_NOW":
+            entry["analysis"] = _analysis_bucket(title)
+        table.append(entry)
     total = len(lessons)
     deterministic = classes.get("DETERMINISTIC_READY", 0)
+    analysis_totals = {}
+    for entry in table:
+        bucket = entry.get("analysis")
+        if bucket:
+            analysis_totals[bucket] = analysis_totals.get(bucket, 0) + 1
     return {
+        "model_only_analysis": dict(sorted(analysis_totals.items())),
         "contract_version": CONTRACT_VERSION,
         "total_lessons": total,
         "deterministic_lessons": deterministic,

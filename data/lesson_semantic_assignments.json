@@ -15,7 +15,7 @@
     "dokazi). Ništa se ne aktivira bez zapisanog dokaza."
   ],
   "schema_version": "1",
-  "contract_version": "5D.1",
+  "contract_version": "5E.1",
   "assignments": [
     {
       "lesson_id": "6-02-002",
@@ -1019,6 +1019,101 @@
       "reviewer_note": "Invarijanta: jedinstveno rješenje, provjera uvrštavanjem egzaktna."
     },
     {
+      "lesson_id": "6-09-003",
+      "family_id": "angle_relationships_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0026"
+      ],
+      "parameters": {
+        "kinds": [
+          "classify_angle"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedan imenovani odnos, male mjere",
+        "2": "dvokoračni odnosi i minute",
+        "3": "trokoračni odnosi i odnosi zadati razlikom"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: imenovani brojevni odnos uglova; zbirovi 90/180/360 egzaktni."
+    },
+    {
+      "lesson_id": "6-09-004",
+      "family_id": "angle_relationships_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0021",
+        "KS_2018-0022",
+        "KS_2018-0033",
+        "KS_2018-0300",
+        "RS_2014-0019",
+        "RS_2014-0021"
+      ],
+      "parameters": {
+        "kinds": [
+          "central_fraction"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedan imenovani odnos, male mjere",
+        "2": "dvokoračni odnosi i minute",
+        "3": "trokoračni odnosi i odnosi zadati razlikom"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: imenovani brojevni odnos uglova; zbirovi 90/180/360 egzaktni."
+    },
+    {
+      "lesson_id": "6-09-005",
+      "family_id": "angle_relationships_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0023",
+        "KS_2018-0024",
+        "KS_2018-0304",
+        "RS_2014-0093"
+      ],
+      "parameters": {
+        "kinds": [
+          "central_peripheral"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedan imenovani odnos, male mjere",
+        "2": "dvokoračni odnosi i minute",
+        "3": "trokoračni odnosi i odnosi zadati razlikom"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: imenovani brojevni odnos uglova; zbirovi 90/180/360 egzaktni."
+    },
+    {
+      "lesson_id": "6-09-007",
+      "family_id": "angle_relationships_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0012",
+        "KS_2018-0020",
+        "KS_2018-0029",
+        "RS_2014-0021"
+      ],
+      "parameters": {
+        "kinds": [
+          "compare_angles"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedan imenovani odnos, male mjere",
+        "2": "dvokoračni odnosi i minute",
+        "3": "trokoračni odnosi i odnosi zadati razlikom"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: imenovani brojevni odnos uglova; zbirovi 90/180/360 egzaktni."
+    },
+    {
       "lesson_id": "6-09-010",
       "family_id": "unit_conversion_direct",
       "enforcement_mode": "blocking",
@@ -1038,6 +1133,133 @@
       },
       "forbidden_neighbour_skills": [],
       "reviewer_note": "Invarijanta: faktori po dimenziji; kvadratni 100, kubni 1000 po koraku; bez miješanja dimenzija."
+    },
+    {
+      "lesson_id": "6-09-011",
+      "family_id": "angle_relationships_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0025"
+      ],
+      "parameters": {
+        "kinds": [
+          "dms_add_sub"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedan imenovani odnos, male mjere",
+        "2": "dvokoračni odnosi i minute",
+        "3": "trokoračni odnosi i odnosi zadati razlikom"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: imenovani brojevni odnos uglova; zbirovi 90/180/360 egzaktni."
+    },
+    {
+      "lesson_id": "6-09-012",
+      "family_id": "angle_relationships_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-6-09-012"
+      ],
+      "parameters": {
+        "kinds": [
+          "angle_times_n"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedan imenovani odnos, male mjere",
+        "2": "dvokoračni odnosi i minute",
+        "3": "trokoračni odnosi i odnosi zadati razlikom"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: imenovani brojevni odnos uglova; zbirovi 90/180/360 egzaktni."
+    },
+    {
+      "lesson_id": "6-09-013",
+      "family_id": "angle_relationships_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0028"
+      ],
+      "parameters": {
+        "kinds": [
+          "adjacent_vertical"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedan imenovani odnos, male mjere",
+        "2": "dvokoračni odnosi i minute",
+        "3": "trokoračni odnosi i odnosi zadati razlikom"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: imenovani brojevni odnos uglova; zbirovi 90/180/360 egzaktni."
+    },
+    {
+      "lesson_id": "6-09-014",
+      "family_id": "angle_relationships_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0012",
+        "KS_2018-0033"
+      ],
+      "parameters": {
+        "kinds": [
+          "comp_supp"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedan imenovani odnos, male mjere",
+        "2": "dvokoračni odnosi i minute",
+        "3": "trokoračni odnosi i odnosi zadati razlikom"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: imenovani brojevni odnos uglova; zbirovi 90/180/360 egzaktni."
+    },
+    {
+      "lesson_id": "6-09-015",
+      "family_id": "angle_relationships_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-6-09-015"
+      ],
+      "parameters": {
+        "kinds": [
+          "transversal"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedan imenovani odnos, male mjere",
+        "2": "dvokoračni odnosi i minute",
+        "3": "trokoračni odnosi i odnosi zadati razlikom"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: imenovani brojevni odnos uglova; zbirovi 90/180/360 egzaktni."
+    },
+    {
+      "lesson_id": "6-09-016",
+      "family_id": "angle_relationships_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-6-09-016"
+      ],
+      "parameters": {
+        "kinds": [
+          "parallel_normal_arms"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedan imenovani odnos, male mjere",
+        "2": "dvokoračni odnosi i minute",
+        "3": "trokoračni odnosi i odnosi zadati razlikom"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: imenovani brojevni odnos uglova; zbirovi 90/180/360 egzaktni."
     },
     {
       "lesson_id": "6-13-001",
@@ -1856,6 +2078,521 @@
       "reviewer_note": "Invarijanta: školsko half-up zaokruživanje nad egzaktnim razlomcima; bez a≈b jednakosti."
     },
     {
+      "lesson_id": "7-04-001",
+      "family_id": "angle_relationships_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0125",
+        "KS_2018-0126"
+      ],
+      "parameters": {
+        "kinds": [
+          "parallel_normal_arms"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedan imenovani odnos, male mjere",
+        "2": "dvokoračni odnosi i minute",
+        "3": "trokoračni odnosi i odnosi zadati razlikom"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: imenovani brojevni odnos uglova; zbirovi 90/180/360 egzaktni."
+    },
+    {
+      "lesson_id": "7-04-002",
+      "family_id": "angle_relationships_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0125",
+        "KS_2018-0126"
+      ],
+      "parameters": {
+        "kinds": [
+          "parallel_normal_arms"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedan imenovani odnos, male mjere",
+        "2": "dvokoračni odnosi i minute",
+        "3": "trokoračni odnosi i odnosi zadati razlikom"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: imenovani brojevni odnos uglova; zbirovi 90/180/360 egzaktni."
+    },
+    {
+      "lesson_id": "7-04-006",
+      "family_id": "angle_relationships_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0125",
+        "KS_2018-0129",
+        "KS_2018-0157",
+        "KS_2018-0291"
+      ],
+      "parameters": {
+        "kinds": [
+          "classify_triangle_sides"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedan imenovani odnos, male mjere",
+        "2": "dvokoračni odnosi i minute",
+        "3": "trokoračni odnosi i odnosi zadati razlikom"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: imenovani brojevni odnos uglova; zbirovi 90/180/360 egzaktni."
+    },
+    {
+      "lesson_id": "7-04-007",
+      "family_id": "angle_relationships_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0129"
+      ],
+      "parameters": {
+        "kinds": [
+          "classify_triangle_angles"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedan imenovani odnos, male mjere",
+        "2": "dvokoračni odnosi i minute",
+        "3": "trokoračni odnosi i odnosi zadati razlikom"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: imenovani brojevni odnos uglova; zbirovi 90/180/360 egzaktni."
+    },
+    {
+      "lesson_id": "7-04-008",
+      "family_id": "angle_relationships_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0125",
+        "KS_2018-0134",
+        "KS_2018-0135",
+        "KS_2018-0136"
+      ],
+      "parameters": {
+        "kinds": [
+          "triangle_third_angle"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedan imenovani odnos, male mjere",
+        "2": "dvokoračni odnosi i minute",
+        "3": "trokoračni odnosi i odnosi zadati razlikom"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: imenovani brojevni odnos uglova; zbirovi 90/180/360 egzaktni."
+    },
+    {
+      "lesson_id": "7-04-009",
+      "family_id": "angle_relationships_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0125"
+      ],
+      "parameters": {
+        "kinds": [
+          "exterior_angle"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedan imenovani odnos, male mjere",
+        "2": "dvokoračni odnosi i minute",
+        "3": "trokoračni odnosi i odnosi zadati razlikom"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: imenovani brojevni odnos uglova; zbirovi 90/180/360 egzaktni."
+    },
+    {
+      "lesson_id": "7-04-010",
+      "family_id": "angle_relationships_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0134",
+        "KS_2018-0135"
+      ],
+      "parameters": {
+        "kinds": [
+          "exterior_from_interior"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedan imenovani odnos, male mjere",
+        "2": "dvokoračni odnosi i minute",
+        "3": "trokoračni odnosi i odnosi zadati razlikom"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: imenovani brojevni odnos uglova; zbirovi 90/180/360 egzaktni."
+    },
+    {
+      "lesson_id": "7-04-011",
+      "family_id": "angle_relationships_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0137",
+        "RS_2014-0045"
+      ],
+      "parameters": {
+        "kinds": [
+          "side_angle_order"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedan imenovani odnos, male mjere",
+        "2": "dvokoračni odnosi i minute",
+        "3": "trokoračni odnosi i odnosi zadati razlikom"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: imenovani brojevni odnos uglova; zbirovi 90/180/360 egzaktni."
+    },
+    {
+      "lesson_id": "7-04-012",
+      "family_id": "angle_relationships_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-7-04-012"
+      ],
+      "parameters": {
+        "kinds": [
+          "triangle_inequality"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedan imenovani odnos, male mjere",
+        "2": "dvokoračni odnosi i minute",
+        "3": "trokoračni odnosi i odnosi zadati razlikom"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: imenovani brojevni odnos uglova; zbirovi 90/180/360 egzaktni."
+    },
+    {
+      "lesson_id": "7-04-018",
+      "family_id": "angle_relationships_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0125",
+        "KS_2018-0132",
+        "KS_2018-0133",
+        "KS_2018-0167",
+        "KS_2018-0209"
+      ],
+      "parameters": {
+        "kinds": [
+          "isosceles_angles"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedan imenovani odnos, male mjere",
+        "2": "dvokoračni odnosi i minute",
+        "3": "trokoračni odnosi i odnosi zadati razlikom"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: imenovani brojevni odnos uglova; zbirovi 90/180/360 egzaktni."
+    },
+    {
+      "lesson_id": "7-04-019",
+      "family_id": "angle_relationships_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0140"
+      ],
+      "parameters": {
+        "kinds": [
+          "right_triangle_acute"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedan imenovani odnos, male mjere",
+        "2": "dvokoračni odnosi i minute",
+        "3": "trokoračni odnosi i odnosi zadati razlikom"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: imenovani brojevni odnos uglova; zbirovi 90/180/360 egzaktni."
+    },
+    {
+      "lesson_id": "7-04-025",
+      "family_id": "geometry_formula_2d",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0155"
+      ],
+      "parameters": {
+        "kinds": [
+          "triangle_midline"
+        ]
+      },
+      "level_bounds": {
+        "1": "direktna primjena jedne formule malim brojevima",
+        "2": "inverzni zadatak (traži se stranica/visina) ili veći brojevi",
+        "3": "dvokoračne veličine, koeficijenti i složeniji oblici"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: kanonske formule i notacija (P/O/d/r/R=2r); egzaktan račun."
+    },
+    {
+      "lesson_id": "7-05-002",
+      "family_id": "angle_relationships_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0134",
+        "RS_2014-0055"
+      ],
+      "parameters": {
+        "kinds": [
+          "quad_fourth_angle"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedan imenovani odnos, male mjere",
+        "2": "dvokoračni odnosi i minute",
+        "3": "trokoračni odnosi i odnosi zadati razlikom"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: imenovani brojevni odnos uglova; zbirovi 90/180/360 egzaktni."
+    },
+    {
+      "lesson_id": "7-05-003",
+      "family_id": "angle_relationships_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "RS_2014-0055"
+      ],
+      "parameters": {
+        "kinds": [
+          "quad_exterior"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedan imenovani odnos, male mjere",
+        "2": "dvokoračni odnosi i minute",
+        "3": "trokoračni odnosi i odnosi zadati razlikom"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: imenovani brojevni odnos uglova; zbirovi 90/180/360 egzaktni."
+    },
+    {
+      "lesson_id": "7-05-012",
+      "family_id": "geometry_formula_2d",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0155",
+        "KS_2018-0162",
+        "KS_2018-0167",
+        "KS_2018-0212"
+      ],
+      "parameters": {
+        "kinds": [
+          "trapezoid_midline"
+        ]
+      },
+      "level_bounds": {
+        "1": "direktna primjena jedne formule malim brojevima",
+        "2": "inverzni zadatak (traži se stranica/visina) ili veći brojevi",
+        "3": "dvokoračne veličine, koeficijenti i složeniji oblici"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: kanonske formule i notacija (P/O/d/r/R=2r); egzaktan račun."
+    },
+    {
+      "lesson_id": "7-05-016",
+      "family_id": "geometry_formula_2d",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0155",
+        "KS_2018-0167"
+      ],
+      "parameters": {
+        "kinds": [
+          "triangle_perimeter"
+        ]
+      },
+      "level_bounds": {
+        "1": "direktna primjena jedne formule malim brojevima",
+        "2": "inverzni zadatak (traži se stranica/visina) ili veći brojevi",
+        "3": "dvokoračne veličine, koeficijenti i složeniji oblici"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: kanonske formule i notacija (P/O/d/r/R=2r); egzaktan račun."
+    },
+    {
+      "lesson_id": "7-05-017",
+      "family_id": "geometry_formula_2d",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0155",
+        "KS_2018-0167"
+      ],
+      "parameters": {
+        "kinds": [
+          "quad_perimeter"
+        ]
+      },
+      "level_bounds": {
+        "1": "direktna primjena jedne formule malim brojevima",
+        "2": "inverzni zadatak (traži se stranica/visina) ili veći brojevi",
+        "3": "dvokoračne veličine, koeficijenti i složeniji oblici"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: kanonske formule i notacija (P/O/d/r/R=2r); egzaktan račun."
+    },
+    {
+      "lesson_id": "7-05-019",
+      "family_id": "geometry_formula_2d",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0159",
+        "KS_2018-0167",
+        "RS_2014-0054",
+        "RS_2014-0057"
+      ],
+      "parameters": {
+        "kinds": [
+          "square_area",
+          "rectangle_area",
+          "square_perimeter",
+          "rectangle_perimeter"
+        ]
+      },
+      "level_bounds": {
+        "1": "direktna primjena jedne formule malim brojevima",
+        "2": "inverzni zadatak (traži se stranica/visina) ili veći brojevi",
+        "3": "dvokoračne veličine, koeficijenti i složeniji oblici"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: kanonske formule i notacija (P/O/d/r/R=2r); egzaktan račun."
+    },
+    {
+      "lesson_id": "7-05-020",
+      "family_id": "geometry_formula_2d",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0167"
+      ],
+      "parameters": {
+        "kinds": [
+          "parallelogram_area",
+          "parallelogram_perimeter"
+        ]
+      },
+      "level_bounds": {
+        "1": "direktna primjena jedne formule malim brojevima",
+        "2": "inverzni zadatak (traži se stranica/visina) ili veći brojevi",
+        "3": "dvokoračne veličine, koeficijenti i složeniji oblici"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: kanonske formule i notacija (P/O/d/r/R=2r); egzaktan račun."
+    },
+    {
+      "lesson_id": "7-05-021",
+      "family_id": "geometry_formula_2d",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0155",
+        "KS_2018-0166",
+        "KS_2018-0167",
+        "RS_2014-0056"
+      ],
+      "parameters": {
+        "kinds": [
+          "triangle_area"
+        ]
+      },
+      "level_bounds": {
+        "1": "direktna primjena jedne formule malim brojevima",
+        "2": "inverzni zadatak (traži se stranica/visina) ili veći brojevi",
+        "3": "dvokoračne veličine, koeficijenti i složeniji oblici"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: kanonske formule i notacija (P/O/d/r/R=2r); egzaktan račun."
+    },
+    {
+      "lesson_id": "7-05-022",
+      "family_id": "geometry_formula_2d",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0167"
+      ],
+      "parameters": {
+        "kinds": [
+          "trapezoid_area"
+        ]
+      },
+      "level_bounds": {
+        "1": "direktna primjena jedne formule malim brojevima",
+        "2": "inverzni zadatak (traži se stranica/visina) ili veći brojevi",
+        "3": "dvokoračne veličine, koeficijenti i složeniji oblici"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: kanonske formule i notacija (P/O/d/r/R=2r); egzaktan račun."
+    },
+    {
+      "lesson_id": "7-05-023",
+      "family_id": "geometry_formula_2d",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-7-05-023"
+      ],
+      "parameters": {
+        "kinds": [
+          "rhombus_area_diagonals",
+          "deltoid_area",
+          "rhombus_perimeter"
+        ]
+      },
+      "level_bounds": {
+        "1": "direktna primjena jedne formule malim brojevima",
+        "2": "inverzni zadatak (traži se stranica/visina) ili veći brojevi",
+        "3": "dvokoračne veličine, koeficijenti i složeniji oblici"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: kanonske formule i notacija (P/O/d/r/R=2r); egzaktan račun."
+    },
+    {
+      "lesson_id": "7-05-024",
+      "family_id": "geometry_formula_2d",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-7-05-024"
+      ],
+      "parameters": {
+        "kinds": [
+          "orthodiagonal_area"
+        ]
+      },
+      "level_bounds": {
+        "1": "direktna primjena jedne formule malim brojevima",
+        "2": "inverzni zadatak (traži se stranica/visina) ili veći brojevi",
+        "3": "dvokoračne veličine, koeficijenti i složeniji oblici"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: kanonske formule i notacija (P/O/d/r/R=2r); egzaktan račun."
+    },
+    {
       "lesson_id": "8-01-004",
       "family_id": "number_comparison_order",
       "enforcement_mode": "blocking",
@@ -2517,6 +3254,569 @@
       "reviewer_note": "Invarijanta: unakrsni proizvodi egzaktni; količnici opcija međusobno različiti."
     },
     {
+      "lesson_id": "8-04-001",
+      "family_id": "pythagoras_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0203",
+        "KS_2018-0204",
+        "KS_2018-0211"
+      ],
+      "parameters": {
+        "kinds": [
+          "hypotenuse",
+          "verify_triple"
+        ]
+      },
+      "level_bounds": {
+        "1": "osnovne Pitagorine trojke",
+        "2": "veće trojke i primjene na figure",
+        "3": "egzaktni korijeni i složenije primjene"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: c² = a² + b² egzaktno; rezultat cio broj ili korijen."
+    },
+    {
+      "lesson_id": "8-04-002",
+      "family_id": "pythagoras_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0212"
+      ],
+      "parameters": {
+        "kinds": [
+          "verify_triple"
+        ]
+      },
+      "level_bounds": {
+        "1": "osnovne Pitagorine trojke",
+        "2": "veće trojke i primjene na figure",
+        "3": "egzaktni korijeni i složenije primjene"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: c² = a² + b² egzaktno; rezultat cio broj ili korijen."
+    },
+    {
+      "lesson_id": "8-04-003",
+      "family_id": "pythagoras_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-8-04-003"
+      ],
+      "parameters": {
+        "kinds": [
+          "leg"
+        ]
+      },
+      "level_bounds": {
+        "1": "osnovne Pitagorine trojke",
+        "2": "veće trojke i primjene na figure",
+        "3": "egzaktni korijeni i složenije primjene"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: c² = a² + b² egzaktno; rezultat cio broj ili korijen."
+    },
+    {
+      "lesson_id": "8-04-004",
+      "family_id": "pythagoras_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0167",
+        "KS_2018-0212"
+      ],
+      "parameters": {
+        "kinds": [
+          "square_diagonal"
+        ]
+      },
+      "level_bounds": {
+        "1": "osnovne Pitagorine trojke",
+        "2": "veće trojke i primjene na figure",
+        "3": "egzaktni korijeni i složenije primjene"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: c² = a² + b² egzaktno; rezultat cio broj ili korijen."
+    },
+    {
+      "lesson_id": "8-04-005",
+      "family_id": "pythagoras_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0212"
+      ],
+      "parameters": {
+        "kinds": [
+          "rectangle_diagonal"
+        ]
+      },
+      "level_bounds": {
+        "1": "osnovne Pitagorine trojke",
+        "2": "veće trojke i primjene na figure",
+        "3": "egzaktni korijeni i složenije primjene"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: c² = a² + b² egzaktno; rezultat cio broj ili korijen."
+    },
+    {
+      "lesson_id": "8-04-006",
+      "family_id": "pythagoras_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0212"
+      ],
+      "parameters": {
+        "kinds": [
+          "isosceles_height"
+        ]
+      },
+      "level_bounds": {
+        "1": "osnovne Pitagorine trojke",
+        "2": "veće trojke i primjene na figure",
+        "3": "egzaktni korijeni i složenije primjene"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: c² = a² + b² egzaktno; rezultat cio broj ili korijen."
+    },
+    {
+      "lesson_id": "8-04-007",
+      "family_id": "pythagoras_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-8-04-007"
+      ],
+      "parameters": {
+        "kinds": [
+          "equilateral_height"
+        ]
+      },
+      "level_bounds": {
+        "1": "osnovne Pitagorine trojke",
+        "2": "veće trojke i primjene na figure",
+        "3": "egzaktni korijeni i složenije primjene"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: c² = a² + b² egzaktno; rezultat cio broj ili korijen."
+    },
+    {
+      "lesson_id": "8-04-008",
+      "family_id": "pythagoras_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-8-04-008"
+      ],
+      "parameters": {
+        "kinds": [
+          "equilateral_area"
+        ]
+      },
+      "level_bounds": {
+        "1": "osnovne Pitagorine trojke",
+        "2": "veće trojke i primjene na figure",
+        "3": "egzaktni korijeni i složenije primjene"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: c² = a² + b² egzaktno; rezultat cio broj ili korijen."
+    },
+    {
+      "lesson_id": "8-04-009",
+      "family_id": "pythagoras_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-8-04-009"
+      ],
+      "parameters": {
+        "kinds": [
+          "rhombus_side"
+        ]
+      },
+      "level_bounds": {
+        "1": "osnovne Pitagorine trojke",
+        "2": "veće trojke i primjene na figure",
+        "3": "egzaktni korijeni i složenije primjene"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: c² = a² + b² egzaktno; rezultat cio broj ili korijen."
+    },
+    {
+      "lesson_id": "8-04-010",
+      "family_id": "pythagoras_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0163",
+        "KS_2018-0167"
+      ],
+      "parameters": {
+        "kinds": [
+          "isosceles_trapezoid_height"
+        ]
+      },
+      "level_bounds": {
+        "1": "osnovne Pitagorine trojke",
+        "2": "veće trojke i primjene na figure",
+        "3": "egzaktni korijeni i složenije primjene"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: c² = a² + b² egzaktno; rezultat cio broj ili korijen."
+    },
+    {
+      "lesson_id": "8-04-011",
+      "family_id": "pythagoras_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0167",
+        "KS_2018-0209"
+      ],
+      "parameters": {
+        "kinds": [
+          "right_trapezoid_leg"
+        ]
+      },
+      "level_bounds": {
+        "1": "osnovne Pitagorine trojke",
+        "2": "veće trojke i primjene na figure",
+        "3": "egzaktni korijeni i složenije primjene"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: c² = a² + b² egzaktno; rezultat cio broj ili korijen."
+    },
+    {
+      "lesson_id": "8-04-012",
+      "family_id": "pythagoras_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-8-04-012"
+      ],
+      "parameters": {
+        "kinds": [
+          "chord_distance"
+        ]
+      },
+      "level_bounds": {
+        "1": "osnovne Pitagorine trojke",
+        "2": "veće trojke i primjene na figure",
+        "3": "egzaktni korijeni i složenije primjene"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: c² = a² + b² egzaktno; rezultat cio broj ili korijen."
+    },
+    {
+      "lesson_id": "8-05-002",
+      "family_id": "solid_geometry_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-8-05-002"
+      ],
+      "parameters": {
+        "kinds": [
+          "polyhedron_elements"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    {
+      "lesson_id": "8-05-003",
+      "family_id": "solid_geometry_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-8-05-003"
+      ],
+      "parameters": {
+        "kinds": [
+          "polyhedron_elements"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    {
+      "lesson_id": "8-05-004",
+      "family_id": "solid_geometry_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-8-05-004"
+      ],
+      "parameters": {
+        "kinds": [
+          "polyhedron_elements"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    {
+      "lesson_id": "8-05-005",
+      "family_id": "solid_geometry_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-8-05-005"
+      ],
+      "parameters": {
+        "kinds": [
+          "prism3_lateral",
+          "prism3_volume"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    {
+      "lesson_id": "8-05-006",
+      "family_id": "solid_geometry_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-8-05-006"
+      ],
+      "parameters": {
+        "kinds": [
+          "prism4_lateral",
+          "prism4_surface",
+          "prism4_volume"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    {
+      "lesson_id": "8-05-008",
+      "family_id": "solid_geometry_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-8-05-008"
+      ],
+      "parameters": {
+        "kinds": [
+          "pyramid4_apothem",
+          "pyramid4_lateral",
+          "pyramid4_surface",
+          "pyramid4_volume"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    {
+      "lesson_id": "8-05-013",
+      "family_id": "solid_geometry_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-8-05-013"
+      ],
+      "parameters": {
+        "kinds": [
+          "prism4_lateral",
+          "prism3_lateral"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    {
+      "lesson_id": "8-05-014",
+      "family_id": "solid_geometry_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-8-05-014"
+      ],
+      "parameters": {
+        "kinds": [
+          "prism4_surface"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    {
+      "lesson_id": "8-05-015",
+      "family_id": "solid_geometry_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0376",
+        "KS_2018-0386",
+        "KS_2018-0402",
+        "RS_2014-0124"
+      ],
+      "parameters": {
+        "kinds": [
+          "prism4_volume",
+          "prism3_volume"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    {
+      "lesson_id": "8-05-016",
+      "family_id": "solid_geometry_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-8-05-016"
+      ],
+      "parameters": {
+        "kinds": [
+          "prism4_space_diagonal"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    {
+      "lesson_id": "8-05-017",
+      "family_id": "solid_geometry_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-8-05-017"
+      ],
+      "parameters": {
+        "kinds": [
+          "pyramid4_apothem"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    {
+      "lesson_id": "8-05-018",
+      "family_id": "solid_geometry_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-8-05-018"
+      ],
+      "parameters": {
+        "kinds": [
+          "pyramid4_lateral"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    {
+      "lesson_id": "8-05-019",
+      "family_id": "solid_geometry_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-8-05-019"
+      ],
+      "parameters": {
+        "kinds": [
+          "pyramid4_surface"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    {
+      "lesson_id": "8-05-020",
+      "family_id": "solid_geometry_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-8-05-020"
+      ],
+      "parameters": {
+        "kinds": [
+          "pyramid4_volume"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    {
       "lesson_id": "8-06-002",
       "family_id": "frequency_basic",
       "enforcement_mode": "blocking",
@@ -2692,6 +3992,73 @@
       "reviewer_note": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja."
     },
     {
+      "lesson_id": "8-07-003",
+      "family_id": "polynomial_basic",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0264",
+        "KS_2018-0274",
+        "KS_2018-0289",
+        "RS_2014-0104"
+      ],
+      "parameters": {
+        "concepts": [
+          "like_terms_select",
+          "combine_like_terms"
+        ]
+      },
+      "level_bounds": {
+        "1": "dva-tri člana, mali koeficijenti",
+        "2": "četiri člana, negativni koeficijenti",
+        "3": "viši stepeni i pet članova"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja."
+    },
+    {
+      "lesson_id": "8-07-004",
+      "family_id": "polynomial_basic",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-8-07-004"
+      ],
+      "parameters": {
+        "concepts": [
+          "combine_like_terms"
+        ]
+      },
+      "level_bounds": {
+        "1": "dva-tri člana, mali koeficijenti",
+        "2": "četiri člana, negativni koeficijenti",
+        "3": "viši stepeni i pet članova"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja."
+    },
+    {
+      "lesson_id": "8-07-005",
+      "family_id": "polynomial_basic",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-8-07-005"
+      ],
+      "parameters": {
+        "concepts": [
+          "monomial_mul_div"
+        ]
+      },
+      "level_bounds": {
+        "1": "dva-tri člana, mali koeficijenti",
+        "2": "četiri člana, negativni koeficijenti",
+        "3": "viši stepeni i pet članova"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja."
+    },
+    {
       "lesson_id": "8-07-006",
       "family_id": "polynomial_basic",
       "enforcement_mode": "blocking",
@@ -2759,6 +4126,99 @@
       "reviewer_note": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja."
     },
     {
+      "lesson_id": "8-07-009",
+      "family_id": "polynomial_basic",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0212",
+        "KS_2018-0264",
+        "KS_2018-0284",
+        "KS_2018-0289"
+      ],
+      "parameters": {
+        "concepts": [
+          "square_of_binomial"
+        ]
+      },
+      "level_bounds": {
+        "1": "dva-tri člana, mali koeficijenti",
+        "2": "četiri člana, negativni koeficijenti",
+        "3": "viši stepeni i pet članova"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja."
+    },
+    {
+      "lesson_id": "8-07-010",
+      "family_id": "polynomial_basic",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0179",
+        "KS_2018-0181",
+        "KS_2018-0182",
+        "KS_2018-0280"
+      ],
+      "parameters": {
+        "concepts": [
+          "factor_difference_squares"
+        ]
+      },
+      "level_bounds": {
+        "1": "dva-tri člana, mali koeficijenti",
+        "2": "četiri člana, negativni koeficijenti",
+        "3": "viši stepeni i pet članova"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja."
+    },
+    {
+      "lesson_id": "8-07-011",
+      "family_id": "polynomial_basic",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0264",
+        "KS_2018-0281",
+        "KS_2018-0289"
+      ],
+      "parameters": {
+        "concepts": [
+          "cube_of_binomial",
+          "sum_diff_cubes"
+        ]
+      },
+      "level_bounds": {
+        "1": "dva-tri člana, mali koeficijenti",
+        "2": "četiri člana, negativni koeficijenti",
+        "3": "viši stepeni i pet članova"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja."
+    },
+    {
+      "lesson_id": "8-07-012",
+      "family_id": "polynomial_basic",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0282"
+      ],
+      "parameters": {
+        "concepts": [
+          "factor_common"
+        ]
+      },
+      "level_bounds": {
+        "1": "dva-tri člana, mali koeficijenti",
+        "2": "četiri člana, negativni koeficijenti",
+        "3": "viši stepeni i pet članova"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja."
+    },
+    {
       "lesson_id": "8-07-013",
       "family_id": "simple_quadratic_equation",
       "enforcement_mode": "blocking",
@@ -2778,6 +4238,192 @@
       },
       "forbidden_neighbour_skills": [],
       "reviewer_note": "Invarijanta: potpun skup rješenja, provjerljiv uvrštavanjem."
+    },
+    {
+      "lesson_id": "8-08-002",
+      "family_id": "geometry_formula_2d",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0292",
+        "KS_2018-0295"
+      ],
+      "parameters": {
+        "kinds": [
+          "polygon_interior_sum"
+        ]
+      },
+      "level_bounds": {
+        "1": "direktna primjena jedne formule malim brojevima",
+        "2": "inverzni zadatak (traži se stranica/visina) ili veći brojevi",
+        "3": "dvokoračne veličine, koeficijenti i složeniji oblici"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: kanonske formule i notacija (P/O/d/r/R=2r); egzaktan račun."
+    },
+    {
+      "lesson_id": "8-08-004",
+      "family_id": "geometry_formula_2d",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0294",
+        "KS_2018-0300",
+        "RS_2014-0088"
+      ],
+      "parameters": {
+        "kinds": [
+          "polygon_diagonals"
+        ]
+      },
+      "level_bounds": {
+        "1": "direktna primjena jedne formule malim brojevima",
+        "2": "inverzni zadatak (traži se stranica/visina) ili veći brojevi",
+        "3": "dvokoračne veličine, koeficijenti i složeniji oblici"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: kanonske formule i notacija (P/O/d/r/R=2r); egzaktan račun."
+    },
+    {
+      "lesson_id": "8-08-005",
+      "family_id": "geometry_formula_2d",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0297",
+        "KS_2018-0300"
+      ],
+      "parameters": {
+        "kinds": [
+          "regular_polygon_angle",
+          "regular_polygon_perimeter"
+        ]
+      },
+      "level_bounds": {
+        "1": "direktna primjena jedne formule malim brojevima",
+        "2": "inverzni zadatak (traži se stranica/visina) ili veći brojevi",
+        "3": "dvokoračne veličine, koeficijenti i složeniji oblici"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: kanonske formule i notacija (P/O/d/r/R=2r); egzaktan račun."
+    },
+    {
+      "lesson_id": "8-08-007",
+      "family_id": "geometry_formula_2d",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0298",
+        "KS_2018-0299",
+        "KS_2018-0300"
+      ],
+      "parameters": {
+        "kinds": [
+          "regular_polygon_perimeter",
+          "quad_perimeter"
+        ]
+      },
+      "level_bounds": {
+        "1": "direktna primjena jedne formule malim brojevima",
+        "2": "inverzni zadatak (traži se stranica/visina) ili veći brojevi",
+        "3": "dvokoračne veličine, koeficijenti i složeniji oblici"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: kanonske formule i notacija (P/O/d/r/R=2r); egzaktan račun."
+    },
+    {
+      "lesson_id": "8-08-009",
+      "family_id": "geometry_formula_2d",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0300",
+        "KS_2018-0306",
+        "KS_2018-0307",
+        "KS_2018-0312"
+      ],
+      "parameters": {
+        "kinds": [
+          "circle_circumference"
+        ]
+      },
+      "level_bounds": {
+        "1": "direktna primjena jedne formule malim brojevima",
+        "2": "inverzni zadatak (traži se stranica/visina) ili veći brojevi",
+        "3": "dvokoračne veličine, koeficijenti i složeniji oblici"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: kanonske formule i notacija (P/O/d/r/R=2r); egzaktan račun."
+    },
+    {
+      "lesson_id": "8-08-010",
+      "family_id": "geometry_formula_2d",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0300",
+        "KS_2018-0308",
+        "KS_2018-0312"
+      ],
+      "parameters": {
+        "kinds": [
+          "arc_length"
+        ]
+      },
+      "level_bounds": {
+        "1": "direktna primjena jedne formule malim brojevima",
+        "2": "inverzni zadatak (traži se stranica/visina) ili veći brojevi",
+        "3": "dvokoračne veličine, koeficijenti i složeniji oblici"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: kanonske formule i notacija (P/O/d/r/R=2r); egzaktan račun."
+    },
+    {
+      "lesson_id": "8-08-011",
+      "family_id": "geometry_formula_2d",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0300",
+        "KS_2018-0309",
+        "KS_2018-0310",
+        "KS_2018-0311",
+        "KS_2018-0312"
+      ],
+      "parameters": {
+        "kinds": [
+          "circle_area"
+        ]
+      },
+      "level_bounds": {
+        "1": "direktna primjena jedne formule malim brojevima",
+        "2": "inverzni zadatak (traži se stranica/visina) ili veći brojevi",
+        "3": "dvokoračne veličine, koeficijenti i složeniji oblici"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: kanonske formule i notacija (P/O/d/r/R=2r); egzaktan račun."
+    },
+    {
+      "lesson_id": "8-08-012",
+      "family_id": "geometry_formula_2d",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-8-08-012"
+      ],
+      "parameters": {
+        "kinds": [
+          "annulus_area",
+          "sector_area"
+        ]
+      },
+      "level_bounds": {
+        "1": "direktna primjena jedne formule malim brojevima",
+        "2": "inverzni zadatak (traži se stranica/visina) ili veći brojevi",
+        "3": "dvokoračne veličine, koeficijenti i složeniji oblici"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: kanonske formule i notacija (P/O/d/r/R=2r); egzaktan račun."
     },
     {
       "lesson_id": "9-01-001",
@@ -3305,6 +4951,296 @@
       "reviewer_note": "Invarijanta: jedinstveno rješenje, provjera uvrštavanjem egzaktna."
     },
     {
+      "lesson_id": "9-05-001",
+      "family_id": "linear_system_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0365"
+      ],
+      "parameters": {
+        "kinds": [
+          "single_equation"
+        ]
+      },
+      "level_bounds": {
+        "1": "izbor/provjera uređenog para",
+        "2": "direktna supstitucija (koeficijent 1)",
+        "3": "puno rješavanje i klasifikacija"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: rješenje uvršteno u OBJE jednačine; klasifikacija po determinanti."
+    },
+    {
+      "lesson_id": "9-05-003",
+      "family_id": "linear_system_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0354",
+        "KS_2018-0365",
+        "KS_2018-0366",
+        "KS_2018-0371",
+        "KS_2018-0375",
+        "KS_2018-0376",
+        "RS_2014-0138",
+        "RS_2014-0142"
+      ],
+      "parameters": {
+        "kinds": [
+          "verify_pair"
+        ]
+      },
+      "level_bounds": {
+        "1": "izbor/provjera uređenog para",
+        "2": "direktna supstitucija (koeficijent 1)",
+        "3": "puno rješavanje i klasifikacija"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: rješenje uvršteno u OBJE jednačine; klasifikacija po determinanti."
+    },
+    {
+      "lesson_id": "9-05-004",
+      "family_id": "linear_system_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-9-05-004"
+      ],
+      "parameters": {
+        "kinds": [
+          "verify_pair"
+        ]
+      },
+      "level_bounds": {
+        "1": "izbor/provjera uređenog para",
+        "2": "direktna supstitucija (koeficijent 1)",
+        "3": "puno rješavanje i klasifikacija"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: rješenje uvršteno u OBJE jednačine; klasifikacija po determinanti."
+    },
+    {
+      "lesson_id": "9-05-005",
+      "family_id": "linear_system_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0365",
+        "KS_2018-0368"
+      ],
+      "parameters": {
+        "kinds": [
+          "equivalent_system"
+        ]
+      },
+      "level_bounds": {
+        "1": "izbor/provjera uređenog para",
+        "2": "direktna supstitucija (koeficijent 1)",
+        "3": "puno rješavanje i klasifikacija"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: rješenje uvršteno u OBJE jednačine; klasifikacija po determinanti."
+    },
+    {
+      "lesson_id": "9-05-007",
+      "family_id": "linear_system_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0365",
+        "KS_2018-0372",
+        "KS_2018-0376",
+        "RS_2014-0141"
+      ],
+      "parameters": {
+        "kinds": [
+          "solve"
+        ]
+      },
+      "level_bounds": {
+        "1": "izbor/provjera uređenog para",
+        "2": "direktna supstitucija (koeficijent 1)",
+        "3": "puno rješavanje i klasifikacija"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: rješenje uvršteno u OBJE jednačine; klasifikacija po determinanti."
+    },
+    {
+      "lesson_id": "9-05-008",
+      "family_id": "linear_system_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0365",
+        "KS_2018-0373",
+        "KS_2018-0376",
+        "RS_2014-0140"
+      ],
+      "parameters": {
+        "kinds": [
+          "solve"
+        ]
+      },
+      "level_bounds": {
+        "1": "izbor/provjera uređenog para",
+        "2": "direktna supstitucija (koeficijent 1)",
+        "3": "puno rješavanje i klasifikacija"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: rješenje uvršteno u OBJE jednačine; klasifikacija po determinanti."
+    },
+    {
+      "lesson_id": "9-05-009",
+      "family_id": "linear_system_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-9-05-009"
+      ],
+      "parameters": {
+        "kinds": [
+          "solve",
+          "classify"
+        ]
+      },
+      "level_bounds": {
+        "1": "izbor/provjera uređenog para",
+        "2": "direktna supstitucija (koeficijent 1)",
+        "3": "puno rješavanje i klasifikacija"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: rješenje uvršteno u OBJE jednačine; klasifikacija po determinanti."
+    },
+    {
+      "lesson_id": "9-05-010",
+      "family_id": "linear_system_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-9-05-010"
+      ],
+      "parameters": {
+        "kinds": [
+          "classify"
+        ]
+      },
+      "level_bounds": {
+        "1": "izbor/provjera uređenog para",
+        "2": "direktna supstitucija (koeficijent 1)",
+        "3": "puno rješavanje i klasifikacija"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: rješenje uvršteno u OBJE jednačine; klasifikacija po determinanti."
+    },
+    {
+      "lesson_id": "9-05-011",
+      "family_id": "linear_system_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-9-05-011"
+      ],
+      "parameters": {
+        "kinds": [
+          "classify"
+        ]
+      },
+      "level_bounds": {
+        "1": "izbor/provjera uređenog para",
+        "2": "direktna supstitucija (koeficijent 1)",
+        "3": "puno rješavanje i klasifikacija"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: rješenje uvršteno u OBJE jednačine; klasifikacija po determinanti."
+    },
+    {
+      "lesson_id": "9-05-012",
+      "family_id": "linear_system_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0365"
+      ],
+      "parameters": {
+        "kinds": [
+          "classify"
+        ]
+      },
+      "level_bounds": {
+        "1": "izbor/provjera uređenog para",
+        "2": "direktna supstitucija (koeficijent 1)",
+        "3": "puno rješavanje i klasifikacija"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: rješenje uvršteno u OBJE jednačine; klasifikacija po determinanti."
+    },
+    {
+      "lesson_id": "9-05-014",
+      "family_id": "linear_system_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0369"
+      ],
+      "parameters": {
+        "kinds": [
+          "classify"
+        ]
+      },
+      "level_bounds": {
+        "1": "izbor/provjera uređenog para",
+        "2": "direktna supstitucija (koeficijent 1)",
+        "3": "puno rješavanje i klasifikacija"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: rješenje uvršteno u OBJE jednačine; klasifikacija po determinanti."
+    },
+    {
+      "lesson_id": "9-05-015",
+      "family_id": "linear_system_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0365",
+        "KS_2018-0376"
+      ],
+      "parameters": {
+        "kinds": [
+          "verify_pair"
+        ]
+      },
+      "level_bounds": {
+        "1": "izbor/provjera uređenog para",
+        "2": "direktna supstitucija (koeficijent 1)",
+        "3": "puno rješavanje i klasifikacija"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: rješenje uvršteno u OBJE jednačine; klasifikacija po determinanti."
+    },
+    {
+      "lesson_id": "9-05-016",
+      "family_id": "linear_system_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-9-05-016"
+      ],
+      "parameters": {
+        "kinds": [
+          "solve"
+        ],
+        "fraction_coefficients": "yes"
+      },
+      "level_bounds": {
+        "1": "izbor/provjera uređenog para",
+        "2": "direktna supstitucija (koeficijent 1)",
+        "3": "puno rješavanje i klasifikacija"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: rješenje uvršteno u OBJE jednačine; klasifikacija po determinanti."
+    },
+    {
       "lesson_id": "9-06-001",
       "family_id": "polynomial_basic",
       "enforcement_mode": "blocking",
@@ -3389,6 +5325,182 @@
       "reviewer_note": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja."
     },
     {
+      "lesson_id": "9-06-005",
+      "family_id": "polynomial_basic",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0264",
+        "KS_2018-0280",
+        "KS_2018-0281",
+        "KS_2018-0289",
+        "KS_2018-0323",
+        "RS_2014-0104"
+      ],
+      "parameters": {
+        "concepts": [
+          "square_of_binomial"
+        ]
+      },
+      "level_bounds": {
+        "1": "dva-tri člana, mali koeficijenti",
+        "2": "četiri člana, negativni koeficijenti",
+        "3": "viši stepeni i pet članova"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja."
+    },
+    {
+      "lesson_id": "9-06-006",
+      "family_id": "polynomial_basic",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-9-06-006"
+      ],
+      "parameters": {
+        "concepts": [
+          "factor_difference_squares"
+        ]
+      },
+      "level_bounds": {
+        "1": "dva-tri člana, mali koeficijenti",
+        "2": "četiri člana, negativni koeficijenti",
+        "3": "viši stepeni i pet članova"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja."
+    },
+    {
+      "lesson_id": "9-06-007",
+      "family_id": "polynomial_basic",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0281",
+        "KS_2018-0323"
+      ],
+      "parameters": {
+        "concepts": [
+          "cube_of_binomial"
+        ]
+      },
+      "level_bounds": {
+        "1": "dva-tri člana, mali koeficijenti",
+        "2": "četiri člana, negativni koeficijenti",
+        "3": "viši stepeni i pet članova"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja."
+    },
+    {
+      "lesson_id": "9-06-008",
+      "family_id": "polynomial_basic",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0281",
+        "KS_2018-0284",
+        "KS_2018-0323"
+      ],
+      "parameters": {
+        "concepts": [
+          "sum_diff_cubes"
+        ]
+      },
+      "level_bounds": {
+        "1": "dva-tri člana, mali koeficijenti",
+        "2": "četiri člana, negativni koeficijenti",
+        "3": "viši stepeni i pet članova"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja."
+    },
+    {
+      "lesson_id": "9-06-009",
+      "family_id": "polynomial_basic",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-9-06-009"
+      ],
+      "parameters": {
+        "concepts": [
+          "factor_common"
+        ]
+      },
+      "level_bounds": {
+        "1": "dva-tri člana, mali koeficijenti",
+        "2": "četiri člana, negativni koeficijenti",
+        "3": "viši stepeni i pet članova"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja."
+    },
+    {
+      "lesson_id": "9-06-010",
+      "family_id": "polynomial_basic",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-9-06-010"
+      ],
+      "parameters": {
+        "concepts": [
+          "factor_grouping"
+        ]
+      },
+      "level_bounds": {
+        "1": "dva-tri člana, mali koeficijenti",
+        "2": "četiri člana, negativni koeficijenti",
+        "3": "viši stepeni i pet članova"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja."
+    },
+    {
+      "lesson_id": "9-06-011",
+      "family_id": "polynomial_basic",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-9-06-011"
+      ],
+      "parameters": {
+        "concepts": [
+          "factor_identity"
+        ]
+      },
+      "level_bounds": {
+        "1": "dva-tri člana, mali koeficijenti",
+        "2": "četiri člana, negativni koeficijenti",
+        "3": "viši stepeni i pet članova"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja."
+    },
+    {
+      "lesson_id": "9-06-012",
+      "family_id": "polynomial_basic",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-9-06-012"
+      ],
+      "parameters": {
+        "concepts": [
+          "fraction_domain"
+        ]
+      },
+      "level_bounds": {
+        "1": "dva-tri člana, mali koeficijenti",
+        "2": "četiri člana, negativni koeficijenti",
+        "3": "viši stepeni i pet članova"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja."
+    },
+    {
       "lesson_id": "9-06-013",
       "family_id": "simple_quadratic_equation",
       "enforcement_mode": "blocking",
@@ -3450,6 +5562,516 @@
       },
       "forbidden_neighbour_skills": [],
       "reviewer_note": "Invarijanta: potpun skup rješenja, provjerljiv uvrštavanjem."
+    },
+    {
+      "lesson_id": "9-06-016",
+      "family_id": "polynomial_basic",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-9-06-016"
+      ],
+      "parameters": {
+        "concepts": [
+          "zero_product"
+        ]
+      },
+      "level_bounds": {
+        "1": "dva-tri člana, mali koeficijenti",
+        "2": "četiri člana, negativni koeficijenti",
+        "3": "viši stepeni i pet članova"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja."
+    },
+    {
+      "lesson_id": "9-07-001",
+      "family_id": "solid_geometry_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-9-07-001"
+      ],
+      "parameters": {
+        "kinds": [
+          "polyhedron_elements"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    {
+      "lesson_id": "9-07-002",
+      "family_id": "solid_geometry_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-9-07-002"
+      ],
+      "parameters": {
+        "kinds": [
+          "polyhedron_elements"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    {
+      "lesson_id": "9-07-004",
+      "family_id": "solid_geometry_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-9-07-004"
+      ],
+      "parameters": {
+        "kinds": [
+          "prism4_surface",
+          "prism3_lateral"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    {
+      "lesson_id": "9-07-005",
+      "family_id": "solid_geometry_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0376",
+        "KS_2018-0386",
+        "KS_2018-0402",
+        "RS_2014-0122",
+        "RS_2014-0124"
+      ],
+      "parameters": {
+        "kinds": [
+          "prism4_volume",
+          "prism3_volume",
+          "cuboid_volume",
+          "cube_volume"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    {
+      "lesson_id": "9-07-007",
+      "family_id": "solid_geometry_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "RS_2014-0122"
+      ],
+      "parameters": {
+        "kinds": [
+          "prism4_space_diagonal",
+          "cube_space_diagonal"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    {
+      "lesson_id": "9-07-008",
+      "family_id": "solid_geometry_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-9-07-008"
+      ],
+      "parameters": {
+        "kinds": [
+          "polyhedron_elements"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    {
+      "lesson_id": "9-07-010",
+      "family_id": "solid_geometry_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0402",
+        "RS_2014-0126",
+        "RS_2014-0128"
+      ],
+      "parameters": {
+        "kinds": [
+          "pyramid4_surface",
+          "pyramid4_lateral"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    {
+      "lesson_id": "9-07-011",
+      "family_id": "solid_geometry_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0390",
+        "KS_2018-0402",
+        "RS_2014-0126",
+        "RS_2014-0128"
+      ],
+      "parameters": {
+        "kinds": [
+          "pyramid4_volume"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    {
+      "lesson_id": "9-07-012",
+      "family_id": "solid_geometry_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-9-07-012"
+      ],
+      "parameters": {
+        "kinds": [
+          "pyramid4_apothem"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    {
+      "lesson_id": "9-07-014",
+      "family_id": "solid_geometry_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-9-07-014"
+      ],
+      "parameters": {
+        "kinds": [
+          "pyramid4_apothem"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    {
+      "lesson_id": "9-07-017",
+      "family_id": "solid_geometry_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0394",
+        "KS_2018-0402",
+        "RS_2014-0134",
+        "RS_2014-0136"
+      ],
+      "parameters": {
+        "kinds": [
+          "cylinder_surface"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    {
+      "lesson_id": "9-07-018",
+      "family_id": "solid_geometry_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0394",
+        "KS_2018-0402",
+        "RS_2014-0134",
+        "RS_2014-0136"
+      ],
+      "parameters": {
+        "kinds": [
+          "cylinder_volume"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    {
+      "lesson_id": "9-07-019",
+      "family_id": "solid_geometry_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-9-07-019"
+      ],
+      "parameters": {
+        "kinds": [
+          "cylinder_axial_section"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    {
+      "lesson_id": "9-07-022",
+      "family_id": "solid_geometry_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0402",
+        "RS_2014-0145"
+      ],
+      "parameters": {
+        "kinds": [
+          "cone_surface"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    {
+      "lesson_id": "9-07-023",
+      "family_id": "solid_geometry_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0398",
+        "KS_2018-0402",
+        "RS_2014-0145"
+      ],
+      "parameters": {
+        "kinds": [
+          "cone_volume"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    {
+      "lesson_id": "9-07-024",
+      "family_id": "solid_geometry_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0395",
+        "KS_2018-0402"
+      ],
+      "parameters": {
+        "kinds": [
+          "cone_slant"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    {
+      "lesson_id": "9-07-025",
+      "family_id": "solid_geometry_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-9-07-025"
+      ],
+      "parameters": {
+        "kinds": [
+          "cone_axial_section"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    {
+      "lesson_id": "9-07-027",
+      "family_id": "solid_geometry_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-9-07-027"
+      ],
+      "parameters": {
+        "kinds": [
+          "sphere_surface"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    {
+      "lesson_id": "9-07-028",
+      "family_id": "solid_geometry_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0401",
+        "KS_2018-0402",
+        "RS_2014-0149"
+      ],
+      "parameters": {
+        "kinds": [
+          "ball_volume"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    {
+      "lesson_id": "9-07-030",
+      "family_id": "solid_geometry_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-9-07-030"
+      ],
+      "parameters": {
+        "kinds": [
+          "prism_pyramid_ratio"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    {
+      "lesson_id": "9-07-031",
+      "family_id": "solid_geometry_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-9-07-031"
+      ],
+      "parameters": {
+        "kinds": [
+          "cylinder_cone_ratio"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    {
+      "lesson_id": "9-07-038",
+      "family_id": "solid_geometry_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-9-07-038"
+      ],
+      "parameters": {
+        "kinds": [
+          "density_mass"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
     },
     {
       "lesson_id": "9-08-001",

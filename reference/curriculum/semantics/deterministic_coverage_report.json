@@ -1,23 +1,37 @@
 {
-  "contract_version": "5D.1",
+  "model_only_analysis": {
+    "CLOSED_FORM_DETERMINISTIC_CANDIDATE": 6,
+    "CONCEPTUAL_ONLY": 40,
+    "FINANCIAL_MATH_CANDIDATE": 2,
+    "FORMULA_GEOMETRY_CANDIDATE": 7,
+    "INSUFFICIENT_SEMANTIC_EVIDENCE": 83,
+    "OPEN_ENDED_WORD_PROBLEM": 1,
+    "PROOF_REQUIRED": 7,
+    "STATISTICS_CANDIDATE": 1,
+    "STRUCTURED_WORD_PROBLEM_CANDIDATE": 8,
+    "SYMBOLIC_ALGEBRA_CANDIDATE": 11,
+    "VISUAL_REQUIRED": 2
+  },
+  "contract_version": "5E.1",
   "total_lessons": 534,
-  "deterministic_lessons": 154,
-  "deterministic_share": 0.2884,
+  "deterministic_lessons": 272,
+  "deterministic_share": 0.5094,
   "class_totals": {
-    "DETERMINISTIC_NEEDS_EXISTING_CAPABILITY_EXTENSION": 3,
-    "DETERMINISTIC_NEEDS_NEW_CAPABILITY": 18,
-    "DETERMINISTIC_READY": 154,
-    "MODEL_ONLY_FOR_NOW": 284,
-    "VISUAL_OR_CONSTRUCTION_REQUIRED": 75
+    "DETERMINISTIC_NEEDS_EXISTING_CAPABILITY_EXTENSION": 1,
+    "DETERMINISTIC_NEEDS_NEW_CAPABILITY": 17,
+    "DETERMINISTIC_READY": 272,
+    "MODEL_ONLY_FOR_NOW": 168,
+    "VISUAL_OR_CONSTRUCTION_REQUIRED": 76
   },
   "deterministic_by_grade": {
-    "6": 45,
-    "7": 31,
-    "8": 42,
-    "9": 36
+    "6": 55,
+    "7": 54,
+    "8": 83,
+    "9": 80
   },
   "deterministic_by_family": {
     "absolute_value_opposite": 5,
+    "angle_relationships_direct": 23,
     "arithmetic_mean_direct": 3,
     "classical_probability_basic": 4,
     "common_divisors_multiples": 3,
@@ -28,18 +42,22 @@
     "fraction_arithmetic_direct": 4,
     "fraction_decimal_conversion": 5,
     "frequency_basic": 3,
+    "geometry_formula_2d": 18,
     "integer_arithmetic_direct": 7,
     "linear_equation_direct": 27,
     "linear_function_direct": 16,
+    "linear_system_direct": 13,
     "natural_arithmetic_direct": 4,
     "number_comparison_order": 6,
     "percent_basic": 4,
-    "polynomial_basic": 11,
+    "polynomial_basic": 27,
     "power_arithmetic_direct": 7,
     "prime_structure": 3,
+    "pythagoras_direct": 12,
     "ratio_proportion_direct": 9,
     "rational_arithmetic_direct": 8,
     "simple_quadratic_equation": 5,
+    "solid_geometry_direct": 36,
     "square_root_direct": 4,
     "unit_conversion_direct": 8
   },
@@ -50,7 +68,8 @@
       "oblast": "Skupovi i skupovne operacije",
       "title": "Pojam skupa, elementi skupa i označavanje",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "CONCEPTUAL_ONLY"
     },
     {
       "lesson_id": "6-01-002",
@@ -58,7 +77,8 @@
       "oblast": "Skupovi i skupovne operacije",
       "title": "Načini zadavanja skupa",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "CONCEPTUAL_ONLY"
     },
     {
       "lesson_id": "6-01-003",
@@ -66,7 +86,8 @@
       "oblast": "Skupovi i skupovne operacije",
       "title": "Brojnost skupa i prazan skup",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "CONCEPTUAL_ONLY"
     },
     {
       "lesson_id": "6-01-004",
@@ -74,7 +95,8 @@
       "oblast": "Skupovi i skupovne operacije",
       "title": "Podskup i jednakost skupova",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "CONCEPTUAL_ONLY"
     },
     {
       "lesson_id": "6-01-005",
@@ -90,7 +112,8 @@
       "oblast": "Skupovi i skupovne operacije",
       "title": "Unija skupova",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "CONCEPTUAL_ONLY"
     },
     {
       "lesson_id": "6-01-007",
@@ -98,7 +121,8 @@
       "oblast": "Skupovi i skupovne operacije",
       "title": "Presjek skupova",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "FORMULA_GEOMETRY_CANDIDATE"
     },
     {
       "lesson_id": "6-01-008",
@@ -106,7 +130,8 @@
       "oblast": "Skupovi i skupovne operacije",
       "title": "Razlika skupova",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "CONCEPTUAL_ONLY"
     },
     {
       "lesson_id": "6-01-009",
@@ -114,7 +139,8 @@
       "oblast": "Skupovi i skupovne operacije",
       "title": "Komplement skupa",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "CONCEPTUAL_ONLY"
     },
     {
       "lesson_id": "6-01-010",
@@ -122,7 +148,8 @@
       "oblast": "Skupovi i skupovne operacije",
       "title": "Uređeni par",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "6-01-011",
@@ -130,7 +157,8 @@
       "oblast": "Skupovi i skupovne operacije",
       "title": "Direktni/Dekartov proizvod skupova",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "CONCEPTUAL_ONLY"
     },
     {
       "lesson_id": "6-02-001",
@@ -138,7 +166,8 @@
       "oblast": "Prirodni brojevi i skupovi N/N0",
       "title": "Skupovi N i N0",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "CONCEPTUAL_ONLY"
     },
     {
       "lesson_id": "6-02-002",
@@ -178,7 +207,8 @@
       "oblast": "Prirodni brojevi i skupovi N/N0",
       "title": "Svojstva računskih operacija: komutativnost, asocijativnost, distributivnost",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "CLOSED_FORM_DETERMINISTIC_CANDIDATE"
     },
     {
       "lesson_id": "6-02-007",
@@ -202,7 +232,8 @@
       "oblast": "Prirodni brojevi i skupovi N/N0",
       "title": "Pridruživanje brojeva po datom pravilu",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "6-03-001",
@@ -282,7 +313,8 @@
       "oblast": "Djeljivost brojeva",
       "title": "Tekstualni zadaci iz djeljivosti",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "STRUCTURED_WORD_PROBLEM_CANDIDATE"
     },
     {
       "lesson_id": "6-04-001",
@@ -290,7 +322,8 @@
       "oblast": "Razlomci",
       "title": "Pojam razlomka, brojnik/brojilac i nazivnik/imenilac",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "CONCEPTUAL_ONLY"
     },
     {
       "lesson_id": "6-04-002",
@@ -298,7 +331,8 @@
       "oblast": "Razlomci",
       "title": "Razlomak kao dio cjeline i kao količnik",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "6-04-003",
@@ -306,7 +340,8 @@
       "oblast": "Razlomci",
       "title": "Pravi, nepravi i prividni razlomci; mješoviti brojevi",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "6-04-004",
@@ -322,7 +357,8 @@
       "oblast": "Razlomci",
       "title": "Proširivanje razlomaka",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "6-04-006",
@@ -330,7 +366,8 @@
       "oblast": "Razlomci",
       "title": "Skraćivanje i nesvodivi razlomak",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "6-04-007",
@@ -338,7 +375,8 @@
       "oblast": "Razlomci",
       "title": "Svođenje razlomaka na zajednički nazivnik/imenilac",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "6-04-008",
@@ -386,7 +424,8 @@
       "oblast": "Razlomci",
       "title": "Svojstva računskih operacija s razlomcima",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "CLOSED_FORM_DETERMINISTIC_CANDIDATE"
     },
     {
       "lesson_id": "6-04-014",
@@ -402,7 +441,8 @@
       "oblast": "Razlomci",
       "title": "Tekstualni zadaci s razlomcima",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "STRUCTURED_WORD_PROBLEM_CANDIDATE"
     },
     {
       "lesson_id": "6-05-001",
@@ -434,7 +474,8 @@
       "oblast": "Razlomci u decimalnom obliku i decimalni brojevi",
       "title": "Konačni i beskonačni/periodični decimalni brojevi",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "6-05-005",
@@ -442,7 +483,8 @@
       "oblast": "Razlomci u decimalnom obliku i decimalni brojevi",
       "title": "Pridruživanje decimalnih brojeva tačkama brojevne poluprave/osi",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "6-05-006",
@@ -490,7 +532,8 @@
       "oblast": "Razlomci u decimalnom obliku i decimalni brojevi",
       "title": "Brojevni izrazi i tekstualni zadaci s decimalnim brojevima",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "STRUCTURED_WORD_PROBLEM_CANDIDATE"
     },
     {
       "lesson_id": "6-06-001",
@@ -577,7 +620,7 @@
       "grade": "6",
       "oblast": "Jednačine, nejednačine i izrazi u Q+",
       "title": "Predstavljanje rješenja nejednačine na brojevnoj polupravoj/osi",
-      "class": "DETERMINISTIC_NEEDS_EXISTING_CAPABILITY_EXTENSION",
+      "class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
       "family": ""
     },
     {
@@ -586,7 +629,8 @@
       "oblast": "Skupovi tačaka, kružnica i krug",
       "title": "Tačka, prava, ravan, poluprava i duž",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "6-08-002",
@@ -594,7 +638,8 @@
       "oblast": "Skupovi tačaka, kružnica i krug",
       "title": "Geometrijske figure kao skupovi tačaka",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "CONCEPTUAL_ONLY"
     },
     {
       "lesson_id": "6-08-003",
@@ -602,7 +647,8 @@
       "oblast": "Skupovi tačaka, kružnica i krug",
       "title": "Izlomljena linija",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "6-08-004",
@@ -610,7 +656,8 @@
       "oblast": "Skupovi tačaka, kružnica i krug",
       "title": "Mnogougao/mnogokut",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "6-08-005",
@@ -618,7 +665,8 @@
       "oblast": "Skupovi tačaka, kružnica i krug",
       "title": "Kružnica i krug",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "6-08-006",
@@ -626,7 +674,8 @@
       "oblast": "Skupovi tačaka, kružnica i krug",
       "title": "Centar, poluprečnik/polumjer i prečnik/promjer",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "6-08-007",
@@ -634,7 +683,8 @@
       "oblast": "Skupovi tačaka, kružnica i krug",
       "title": "Kružni luk i tetiva",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "6-08-008",
@@ -642,7 +692,8 @@
       "oblast": "Skupovi tačaka, kružnica i krug",
       "title": "Odnos prave i kružnice: sječica/sekanta i tangenta",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "CONCEPTUAL_ONLY"
     },
     {
       "lesson_id": "6-08-009",
@@ -658,7 +709,8 @@
       "oblast": "Skupovi tačaka, kružnica i krug",
       "title": "Odnos dvije kružnice",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "CONCEPTUAL_ONLY"
     },
     {
       "lesson_id": "6-08-011",
@@ -666,7 +718,8 @@
       "oblast": "Skupovi tačaka, kružnica i krug",
       "title": "Kružni isječak, odsječak i prsten",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "6-09-001",
@@ -674,7 +727,8 @@
       "oblast": "Uglovi",
       "title": "Pojam ugla, elementi i označavanje",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "CONCEPTUAL_ONLY"
     },
     {
       "lesson_id": "6-09-002",
@@ -682,31 +736,32 @@
       "oblast": "Uglovi",
       "title": "Konveksni i nekonveksni uglovi",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "6-09-003",
       "grade": "6",
       "oblast": "Uglovi",
       "title": "Vrste uglova: nula, oštri, pravi, tupi, opruženi i puni ugao",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "angle_relationships_direct"
     },
     {
       "lesson_id": "6-09-004",
       "grade": "6",
       "oblast": "Uglovi",
       "title": "Centralni/središnji ugao",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "angle_relationships_direct"
     },
     {
       "lesson_id": "6-09-005",
       "grade": "6",
       "oblast": "Uglovi",
       "title": "Periferijski/obodni ugao i odnos sa centralnim uglom",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "angle_relationships_direct"
     },
     {
       "lesson_id": "6-09-006",
@@ -721,8 +776,8 @@
       "grade": "6",
       "oblast": "Uglovi",
       "title": "Upoređivanje uglova",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "angle_relationships_direct"
     },
     {
       "lesson_id": "6-09-008",
@@ -738,7 +793,8 @@
       "oblast": "Uglovi",
       "title": "Mjerenje uglova uglomjerom",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "6-09-010",
@@ -753,48 +809,48 @@
       "grade": "6",
       "oblast": "Uglovi",
       "title": "Sabiranje i oduzimanje mjernih brojeva za uglove",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "angle_relationships_direct"
     },
     {
       "lesson_id": "6-09-012",
       "grade": "6",
       "oblast": "Uglovi",
       "title": "Množenje i dijeljenje uglova prirodnim brojem",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "angle_relationships_direct"
     },
     {
       "lesson_id": "6-09-013",
       "grade": "6",
       "oblast": "Uglovi",
       "title": "Susjedni, uporedni i unakrsni uglovi",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "angle_relationships_direct"
     },
     {
       "lesson_id": "6-09-014",
       "grade": "6",
       "oblast": "Uglovi",
       "title": "Komplementni i suplementni uglovi",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "angle_relationships_direct"
     },
     {
       "lesson_id": "6-09-015",
       "grade": "6",
       "oblast": "Uglovi",
       "title": "Uglovi uz transverzalu paralelnih pravih",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "angle_relationships_direct"
     },
     {
       "lesson_id": "6-09-016",
       "grade": "6",
       "oblast": "Uglovi",
       "title": "Uglovi s paralelnim i normalnim kracima",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "angle_relationships_direct"
     },
     {
       "lesson_id": "6-10-001",
@@ -834,7 +890,8 @@
       "oblast": "Relacije, preslikavanja i koordinatni sistem",
       "title": "Relacije",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "6-10-006",
@@ -930,7 +987,8 @@
       "oblast": "Izometrijske transformacije i konstrukcije",
       "title": "Translacija",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "6-12-008",
@@ -938,7 +996,8 @@
       "oblast": "Izometrijske transformacije i konstrukcije",
       "title": "Rotacija",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "6-13-001",
@@ -1074,7 +1133,8 @@
       "oblast": "Vektori i izometrijska preslikavanja",
       "title": "Zadaci sa različitim operacijama",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "7-01-011",
@@ -1098,7 +1158,8 @@
       "oblast": "Vektori i izometrijska preslikavanja",
       "title": "Rotacija: centar i ugao rotacije",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "7-01-014",
@@ -1154,7 +1215,8 @@
       "oblast": "Cijeli brojevi",
       "title": "Potreba za negativnim cijelim brojevima",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "7-02-002",
@@ -1162,7 +1224,8 @@
       "oblast": "Cijeli brojevi",
       "title": "Skup cijelih brojeva Z",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "CONCEPTUAL_ONLY"
     },
     {
       "lesson_id": "7-02-003",
@@ -1226,7 +1289,8 @@
       "oblast": "Cijeli brojevi",
       "title": "Komutativnost i asocijativnost sabiranja",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "7-02-011",
@@ -1258,7 +1322,8 @@
       "oblast": "Cijeli brojevi",
       "title": "Distributivnost u skupu Z",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "CONCEPTUAL_ONLY"
     },
     {
       "lesson_id": "7-02-015",
@@ -1314,7 +1379,8 @@
       "oblast": "Cijeli brojevi",
       "title": "Tekstualni zadaci s cijelim brojevima",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "STRUCTURED_WORD_PROBLEM_CANDIDATE"
     },
     {
       "lesson_id": "7-03-001",
@@ -1322,7 +1388,8 @@
       "oblast": "Racionalni brojevi",
       "title": "Skup racionalnih brojeva Q",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "CONCEPTUAL_ONLY"
     },
     {
       "lesson_id": "7-03-002",
@@ -1330,7 +1397,8 @@
       "oblast": "Racionalni brojevi",
       "title": "Pozitivni, negativni racionalni brojevi i nula",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "7-03-003",
@@ -1418,7 +1486,8 @@
       "oblast": "Racionalni brojevi",
       "title": "Svojstva računskih operacija u Q",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "CLOSED_FORM_DETERMINISTIC_CANDIDATE"
     },
     {
       "lesson_id": "7-03-014",
@@ -1474,7 +1543,8 @@
       "oblast": "Racionalni brojevi",
       "title": "Primjena linearne jednačine u tekstualnom zadatku",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "CLOSED_FORM_DETERMINISTIC_CANDIDATE"
     },
     {
       "lesson_id": "7-03-021",
@@ -1489,16 +1559,16 @@
       "grade": "7",
       "oblast": "Ugao i trougao",
       "title": "Uglovi sa paralelnim kracima",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "angle_relationships_direct"
     },
     {
       "lesson_id": "7-04-002",
       "grade": "7",
       "oblast": "Ugao i trougao",
       "title": "Uglovi sa normalnim kracima",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "angle_relationships_direct"
     },
     {
       "lesson_id": "7-04-003",
@@ -1522,63 +1592,64 @@
       "oblast": "Ugao i trougao",
       "title": "Pojam i elementi trougla",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "CONCEPTUAL_ONLY"
     },
     {
       "lesson_id": "7-04-006",
       "grade": "7",
       "oblast": "Ugao i trougao",
       "title": "Vrste trouglova prema stranicama",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "angle_relationships_direct"
     },
     {
       "lesson_id": "7-04-007",
       "grade": "7",
       "oblast": "Ugao i trougao",
       "title": "Vrste trouglova prema uglovima",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "angle_relationships_direct"
     },
     {
       "lesson_id": "7-04-008",
       "grade": "7",
       "oblast": "Ugao i trougao",
       "title": "Zbir unutrašnjih uglova trougla",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "angle_relationships_direct"
     },
     {
       "lesson_id": "7-04-009",
       "grade": "7",
       "oblast": "Ugao i trougao",
       "title": "Vanjski ugao trougla",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "angle_relationships_direct"
     },
     {
       "lesson_id": "7-04-010",
       "grade": "7",
       "oblast": "Ugao i trougao",
       "title": "Zbir vanjskih uglova trougla",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "angle_relationships_direct"
     },
     {
       "lesson_id": "7-04-011",
       "grade": "7",
       "oblast": "Ugao i trougao",
       "title": "Odnos stranica i naspramnih uglova",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "angle_relationships_direct"
     },
     {
       "lesson_id": "7-04-012",
       "grade": "7",
       "oblast": "Ugao i trougao",
       "title": "Nejednakost trougla",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "angle_relationships_direct"
     },
     {
       "lesson_id": "7-04-013",
@@ -1586,7 +1657,8 @@
       "oblast": "Ugao i trougao",
       "title": "Podudarnost trouglova - SUS",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "PROOF_REQUIRED"
     },
     {
       "lesson_id": "7-04-014",
@@ -1594,7 +1666,8 @@
       "oblast": "Ugao i trougao",
       "title": "Podudarnost trouglova - USU",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "PROOF_REQUIRED"
     },
     {
       "lesson_id": "7-04-015",
@@ -1602,7 +1675,8 @@
       "oblast": "Ugao i trougao",
       "title": "Podudarnost trouglova - SSS",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "PROOF_REQUIRED"
     },
     {
       "lesson_id": "7-04-016",
@@ -1610,7 +1684,8 @@
       "oblast": "Ugao i trougao",
       "title": "Podudarnost trouglova - SSU",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "PROOF_REQUIRED"
     },
     {
       "lesson_id": "7-04-017",
@@ -1618,23 +1693,24 @@
       "oblast": "Ugao i trougao",
       "title": "Primjena podudarnosti u dokazivanju jednakosti elemenata",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "PROOF_REQUIRED"
     },
     {
       "lesson_id": "7-04-018",
       "grade": "7",
       "oblast": "Ugao i trougao",
       "title": "Jednakokraki trougao - svojstva",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "angle_relationships_direct"
     },
     {
       "lesson_id": "7-04-019",
       "grade": "7",
       "oblast": "Ugao i trougao",
       "title": "Pravougli trougao i posebni uglovi",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "angle_relationships_direct"
     },
     {
       "lesson_id": "7-04-020",
@@ -1650,7 +1726,8 @@
       "oblast": "Ugao i trougao",
       "title": "Simetrale stranica i centar opisane kružnice",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "7-04-022",
@@ -1658,7 +1735,8 @@
       "oblast": "Ugao i trougao",
       "title": "Simetrale uglova i centar upisane kružnice",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "7-04-023",
@@ -1666,7 +1744,8 @@
       "oblast": "Ugao i trougao",
       "title": "Visine trougla i ortocentar",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "7-04-024",
@@ -1674,15 +1753,16 @@
       "oblast": "Ugao i trougao",
       "title": "Težišne duži i težište",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "7-04-025",
       "grade": "7",
       "oblast": "Ugao i trougao",
       "title": "Srednja linija trougla",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "geometry_formula_2d"
     },
     {
       "lesson_id": "7-05-001",
@@ -1690,23 +1770,24 @@
       "oblast": "Četverougao, obim i površina",
       "title": "Pojam, elementi i vrste četverougla",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "CONCEPTUAL_ONLY"
     },
     {
       "lesson_id": "7-05-002",
       "grade": "7",
       "oblast": "Četverougao, obim i površina",
       "title": "Zbir unutrašnjih uglova četverougla",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "angle_relationships_direct"
     },
     {
       "lesson_id": "7-05-003",
       "grade": "7",
       "oblast": "Četverougao, obim i površina",
       "title": "Zbir vanjskih uglova četverougla",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "angle_relationships_direct"
     },
     {
       "lesson_id": "7-05-004",
@@ -1714,7 +1795,8 @@
       "oblast": "Četverougao, obim i površina",
       "title": "Paralelogram - definicija i svojstva",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "CONCEPTUAL_ONLY"
     },
     {
       "lesson_id": "7-05-005",
@@ -1722,7 +1804,8 @@
       "oblast": "Četverougao, obim i površina",
       "title": "Uslovi da je četverougao paralelogram",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "7-05-006",
@@ -1730,7 +1813,8 @@
       "oblast": "Četverougao, obim i površina",
       "title": "Pravougaonik - svojstva",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "CONCEPTUAL_ONLY"
     },
     {
       "lesson_id": "7-05-007",
@@ -1738,7 +1822,8 @@
       "oblast": "Četverougao, obim i površina",
       "title": "Romb - svojstva",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "CONCEPTUAL_ONLY"
     },
     {
       "lesson_id": "7-05-008",
@@ -1746,7 +1831,8 @@
       "oblast": "Četverougao, obim i površina",
       "title": "Kvadrat - svojstva",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "CONCEPTUAL_ONLY"
     },
     {
       "lesson_id": "7-05-009",
@@ -1762,7 +1848,8 @@
       "oblast": "Četverougao, obim i površina",
       "title": "Trapez i vrste trapeza",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "CONCEPTUAL_ONLY"
     },
     {
       "lesson_id": "7-05-011",
@@ -1770,15 +1857,16 @@
       "oblast": "Četverougao, obim i površina",
       "title": "Svojstva jednakokrakog trapeza",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "CONCEPTUAL_ONLY"
     },
     {
       "lesson_id": "7-05-012",
       "grade": "7",
       "oblast": "Četverougao, obim i površina",
       "title": "Srednja linija trapeza",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "geometry_formula_2d"
     },
     {
       "lesson_id": "7-05-013",
@@ -1794,7 +1882,8 @@
       "oblast": "Četverougao, obim i površina",
       "title": "Deltoid - definicija i svojstva",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "CONCEPTUAL_ONLY"
     },
     {
       "lesson_id": "7-05-015",
@@ -1809,16 +1898,16 @@
       "grade": "7",
       "oblast": "Četverougao, obim i površina",
       "title": "Obim trougla",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "geometry_formula_2d"
     },
     {
       "lesson_id": "7-05-017",
       "grade": "7",
       "oblast": "Četverougao, obim i površina",
       "title": "Obim četverougla",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "geometry_formula_2d"
     },
     {
       "lesson_id": "7-05-018",
@@ -1826,55 +1915,56 @@
       "oblast": "Četverougao, obim i površina",
       "title": "Mjerne jedinice za površinu",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "7-05-019",
       "grade": "7",
       "oblast": "Četverougao, obim i površina",
       "title": "Površina pravougaonika i kvadrata - obnova",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "geometry_formula_2d"
     },
     {
       "lesson_id": "7-05-020",
       "grade": "7",
       "oblast": "Četverougao, obim i površina",
       "title": "Površina paralelograma",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "geometry_formula_2d"
     },
     {
       "lesson_id": "7-05-021",
       "grade": "7",
       "oblast": "Četverougao, obim i površina",
       "title": "Površina trougla",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "geometry_formula_2d"
     },
     {
       "lesson_id": "7-05-022",
       "grade": "7",
       "oblast": "Četverougao, obim i površina",
       "title": "Površina trapeza",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "geometry_formula_2d"
     },
     {
       "lesson_id": "7-05-023",
       "grade": "7",
       "oblast": "Četverougao, obim i površina",
       "title": "Površina romba i deltoida preko dijagonala",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "geometry_formula_2d"
     },
     {
       "lesson_id": "7-05-024",
       "grade": "7",
       "oblast": "Četverougao, obim i površina",
       "title": "Površina četverougla sa normalnim dijagonalama",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "geometry_formula_2d"
     },
     {
       "lesson_id": "7-05-025",
@@ -1882,7 +1972,8 @@
       "oblast": "Četverougao, obim i površina",
       "title": "Složene figure i primjena obima/površine",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "FORMULA_GEOMETRY_CANDIDATE"
     },
     {
       "lesson_id": "7-06-001",
@@ -1890,7 +1981,8 @@
       "oblast": "Skupovi tačaka, kružnica i krug",
       "title": "Tačka, prava, ravan, poluprava i duž",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "7-06-002",
@@ -1898,7 +1990,8 @@
       "oblast": "Skupovi tačaka, kružnica i krug",
       "title": "Geometrijske figure kao skupovi tačaka",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "CONCEPTUAL_ONLY"
     },
     {
       "lesson_id": "7-06-003",
@@ -1906,7 +1999,8 @@
       "oblast": "Skupovi tačaka, kružnica i krug",
       "title": "Izlomljena linija",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "7-06-004",
@@ -1914,7 +2008,8 @@
       "oblast": "Skupovi tačaka, kružnica i krug",
       "title": "Mnogougao/mnogokut",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "7-06-005",
@@ -1922,7 +2017,8 @@
       "oblast": "Skupovi tačaka, kružnica i krug",
       "title": "Kružnica i krug",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "7-06-006",
@@ -1930,7 +2026,8 @@
       "oblast": "Skupovi tačaka, kružnica i krug",
       "title": "Centar, poluprečnik/polumjer i prečnik/promjer",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "7-06-007",
@@ -1938,7 +2035,8 @@
       "oblast": "Skupovi tačaka, kružnica i krug",
       "title": "Kružni luk i tetiva",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "7-06-008",
@@ -1946,7 +2044,8 @@
       "oblast": "Skupovi tačaka, kružnica i krug",
       "title": "Odnos prave i kružnice: sječica/sekanta i tangenta",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "CONCEPTUAL_ONLY"
     },
     {
       "lesson_id": "7-06-009",
@@ -1962,7 +2061,8 @@
       "oblast": "Skupovi tačaka, kružnica i krug",
       "title": "Odnos dvije kružnice",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "CONCEPTUAL_ONLY"
     },
     {
       "lesson_id": "7-06-011",
@@ -1970,7 +2070,8 @@
       "oblast": "Skupovi tačaka, kružnica i krug",
       "title": "Kružni isječak, odsječak i prsten",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "8-01-001",
@@ -1978,7 +2079,8 @@
       "oblast": "Realni brojevi, korijeni i stepeni",
       "title": "Skupovi N, Z, Q, I i R i odnosi među njima",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "CONCEPTUAL_ONLY"
     },
     {
       "lesson_id": "8-01-002",
@@ -1986,7 +2088,8 @@
       "oblast": "Realni brojevi, korijeni i stepeni",
       "title": "Iracionalni brojevi i beskonačni neperiodični decimalni zapis",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "8-01-003",
@@ -1994,7 +2097,8 @@
       "oblast": "Realni brojevi, korijeni i stepeni",
       "title": "Realni brojevi i brojevna osa",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "8-01-004",
@@ -2138,7 +2242,8 @@
       "oblast": "Koordinatni sistem i linearna funkcija",
       "title": "Udaljenost između dvije tačke",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "8-02-005",
@@ -2170,7 +2275,8 @@
       "oblast": "Koordinatni sistem i linearna funkcija",
       "title": "Geometrijsko značenje koeficijenta k",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "8-02-009",
@@ -2178,7 +2284,8 @@
       "oblast": "Koordinatni sistem i linearna funkcija",
       "title": "Geometrijsko značenje slobodnog člana n",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "8-02-010",
@@ -2202,7 +2309,8 @@
       "oblast": "Koordinatni sistem i linearna funkcija",
       "title": "Eksplicitni i implicitni oblik prave",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "8-02-013",
@@ -2218,7 +2326,8 @@
       "oblast": "Koordinatni sistem i linearna funkcija",
       "title": "Paralelne i presječne prave preko koeficijenta k",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "8-03-001",
@@ -2290,7 +2399,8 @@
       "oblast": "Proporcionalnost, Talesova teorema i sličnost",
       "title": "Talesova teorema",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "PROOF_REQUIRED"
     },
     {
       "lesson_id": "8-03-010",
@@ -2306,7 +2416,8 @@
       "oblast": "Proporcionalnost, Talesova teorema i sličnost",
       "title": "Dijeljenje duži na jednake dijelove",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "8-03-012",
@@ -2322,7 +2433,8 @@
       "oblast": "Proporcionalnost, Talesova teorema i sličnost",
       "title": "Pojam sličnosti i koeficijent sličnosti",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "CONCEPTUAL_ONLY"
     },
     {
       "lesson_id": "8-03-014",
@@ -2330,7 +2442,8 @@
       "oblast": "Proporcionalnost, Talesova teorema i sličnost",
       "title": "Stavovi sličnosti trouglova",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "8-03-015",
@@ -2338,7 +2451,8 @@
       "oblast": "Proporcionalnost, Talesova teorema i sličnost",
       "title": "Dužine i obimi sličnih trouglova",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "FORMULA_GEOMETRY_CANDIDATE"
     },
     {
       "lesson_id": "8-03-016",
@@ -2346,7 +2460,8 @@
       "oblast": "Proporcionalnost, Talesova teorema i sličnost",
       "title": "Površine sličnih trouglova",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "8-03-017",
@@ -2370,7 +2485,8 @@
       "oblast": "Proporcionalnost, Talesova teorema i sličnost",
       "title": "Jednostavni kamatni račun",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "CLOSED_FORM_DETERMINISTIC_CANDIDATE"
     },
     {
       "lesson_id": "8-03-020",
@@ -2385,96 +2501,96 @@
       "grade": "8",
       "oblast": "Pitagorina teorema i primjene u ravni",
       "title": "Pitagorina teorema - formulacija",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "pythagoras_direct"
     },
     {
       "lesson_id": "8-04-002",
       "grade": "8",
       "oblast": "Pitagorina teorema i primjene u ravni",
       "title": "Obrat Pitagorine teoreme",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "pythagoras_direct"
     },
     {
       "lesson_id": "8-04-003",
       "grade": "8",
       "oblast": "Pitagorina teorema i primjene u ravni",
       "title": "Određivanje nepoznate katete",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "pythagoras_direct"
     },
     {
       "lesson_id": "8-04-004",
       "grade": "8",
       "oblast": "Pitagorina teorema i primjene u ravni",
       "title": "Dijagonala kvadrata",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "pythagoras_direct"
     },
     {
       "lesson_id": "8-04-005",
       "grade": "8",
       "oblast": "Pitagorina teorema i primjene u ravni",
       "title": "Dijagonala pravougaonika",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "pythagoras_direct"
     },
     {
       "lesson_id": "8-04-006",
       "grade": "8",
       "oblast": "Pitagorina teorema i primjene u ravni",
       "title": "Visina jednakokrakog trougla",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "pythagoras_direct"
     },
     {
       "lesson_id": "8-04-007",
       "grade": "8",
       "oblast": "Pitagorina teorema i primjene u ravni",
       "title": "Visina jednakostraničnog trougla",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "pythagoras_direct"
     },
     {
       "lesson_id": "8-04-008",
       "grade": "8",
       "oblast": "Pitagorina teorema i primjene u ravni",
       "title": "Površina jednakostraničnog trougla",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "pythagoras_direct"
     },
     {
       "lesson_id": "8-04-009",
       "grade": "8",
       "oblast": "Pitagorina teorema i primjene u ravni",
       "title": "Primjena na romb",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "pythagoras_direct"
     },
     {
       "lesson_id": "8-04-010",
       "grade": "8",
       "oblast": "Pitagorina teorema i primjene u ravni",
       "title": "Primjena na jednakokraki trapez",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "pythagoras_direct"
     },
     {
       "lesson_id": "8-04-011",
       "grade": "8",
       "oblast": "Pitagorina teorema i primjene u ravni",
       "title": "Primjena na pravougli trapez",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "pythagoras_direct"
     },
     {
       "lesson_id": "8-04-012",
       "grade": "8",
       "oblast": "Pitagorina teorema i primjene u ravni",
       "title": "Tetiva i udaljenost od centra",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "pythagoras_direct"
     },
     {
       "lesson_id": "8-04-013",
@@ -2498,7 +2614,8 @@
       "oblast": "Pitagorina teorema i primjene u ravni",
       "title": "Konstruktivni zadaci sa površinama kvadrata",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "FORMULA_GEOMETRY_CANDIDATE"
     },
     {
       "lesson_id": "8-04-016",
@@ -2506,7 +2623,8 @@
       "oblast": "Pitagorina teorema i primjene u ravni",
       "title": "Praktični problemski zadaci",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "OPEN_ENDED_WORD_PROBLEM"
     },
     {
       "lesson_id": "8-05-001",
@@ -2514,47 +2632,48 @@
       "oblast": "Prizme, piramide, površina i zapremina",
       "title": "Rogalj i njegovi elementi",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "CONCEPTUAL_ONLY"
     },
     {
       "lesson_id": "8-05-002",
       "grade": "8",
       "oblast": "Prizme, piramide, površina i zapremina",
       "title": "Poliedar i osnovni elementi",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "solid_geometry_direct"
     },
     {
       "lesson_id": "8-05-003",
       "grade": "8",
       "oblast": "Prizme, piramide, površina i zapremina",
       "title": "Prizma - baze, omotač, ivice i visina",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "solid_geometry_direct"
     },
     {
       "lesson_id": "8-05-004",
       "grade": "8",
       "oblast": "Prizme, piramide, površina i zapremina",
       "title": "Piramida - baza, bočne strane, vrh i visina",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "solid_geometry_direct"
     },
     {
       "lesson_id": "8-05-005",
       "grade": "8",
       "oblast": "Prizme, piramide, površina i zapremina",
       "title": "Pravilna uspravna trostrana prizma",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "solid_geometry_direct"
     },
     {
       "lesson_id": "8-05-006",
       "grade": "8",
       "oblast": "Prizme, piramide, površina i zapremina",
       "title": "Pravilna uspravna četverostrana prizma",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "solid_geometry_direct"
     },
     {
       "lesson_id": "8-05-007",
@@ -2562,15 +2681,16 @@
       "oblast": "Prizme, piramide, površina i zapremina",
       "title": "Pravilna uspravna trostrana piramida",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "8-05-008",
       "grade": "8",
       "oblast": "Prizme, piramide, površina i zapremina",
       "title": "Pravilna uspravna četverostrana piramida",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "solid_geometry_direct"
     },
     {
       "lesson_id": "8-05-009",
@@ -2609,64 +2729,64 @@
       "grade": "8",
       "oblast": "Prizme, piramide, površina i zapremina",
       "title": "Površina omotača pravilne prizme",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "solid_geometry_direct"
     },
     {
       "lesson_id": "8-05-014",
       "grade": "8",
       "oblast": "Prizme, piramide, površina i zapremina",
       "title": "Ukupna površina pravilne prizme",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "solid_geometry_direct"
     },
     {
       "lesson_id": "8-05-015",
       "grade": "8",
       "oblast": "Prizme, piramide, površina i zapremina",
       "title": "Zapremina pravilne prizme",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "solid_geometry_direct"
     },
     {
       "lesson_id": "8-05-016",
       "grade": "8",
       "oblast": "Prizme, piramide, površina i zapremina",
       "title": "Prostorna dijagonala pravilne četverostrane prizme",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "solid_geometry_direct"
     },
     {
       "lesson_id": "8-05-017",
       "grade": "8",
       "oblast": "Prizme, piramide, površina i zapremina",
       "title": "Apotema pravilne piramide",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "solid_geometry_direct"
     },
     {
       "lesson_id": "8-05-018",
       "grade": "8",
       "oblast": "Prizme, piramide, površina i zapremina",
       "title": "Površina omotača pravilne piramide",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "solid_geometry_direct"
     },
     {
       "lesson_id": "8-05-019",
       "grade": "8",
       "oblast": "Prizme, piramide, površina i zapremina",
       "title": "Ukupna površina pravilne piramide",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "solid_geometry_direct"
     },
     {
       "lesson_id": "8-05-020",
       "grade": "8",
       "oblast": "Prizme, piramide, površina i zapremina",
       "title": "Zapremina pravilne piramide",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "solid_geometry_direct"
     },
     {
       "lesson_id": "8-05-021",
@@ -2674,7 +2794,8 @@
       "oblast": "Prizme, piramide, površina i zapremina",
       "title": "Složeni zadaci s prizmama i piramidama",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "8-05-022",
@@ -2682,7 +2803,8 @@
       "oblast": "Prizme, piramide, površina i zapremina",
       "title": "Mjerne jedinice površine i zapremine",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "8-06-001",
@@ -2690,7 +2812,8 @@
       "oblast": "Podaci i vjerovatnoća",
       "title": "Obilježje, podaci i skup posmatranja",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "CONCEPTUAL_ONLY"
     },
     {
       "lesson_id": "8-06-002",
@@ -2762,7 +2885,8 @@
       "oblast": "Podaci i vjerovatnoća",
       "title": "Elementarni ishod i slučajni događaj",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "8-06-011",
@@ -2770,7 +2894,8 @@
       "oblast": "Podaci i vjerovatnoća",
       "title": "Siguran, nemoguć i slučajan događaj",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "8-06-012",
@@ -2809,24 +2934,24 @@
       "grade": "8",
       "oblast": "Cijeli racionalni izrazi i polinomi",
       "title": "Slični monomi",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "polynomial_basic"
     },
     {
       "lesson_id": "8-07-004",
       "grade": "8",
       "oblast": "Cijeli racionalni izrazi i polinomi",
       "title": "Sabiranje i oduzimanje monoma",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "polynomial_basic"
     },
     {
       "lesson_id": "8-07-005",
       "grade": "8",
       "oblast": "Cijeli racionalni izrazi i polinomi",
       "title": "Množenje i dijeljenje monoma",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "polynomial_basic"
     },
     {
       "lesson_id": "8-07-006",
@@ -2857,32 +2982,32 @@
       "grade": "8",
       "oblast": "Cijeli racionalni izrazi i polinomi",
       "title": "Kvadrat zbira i razlike",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "polynomial_basic"
     },
     {
       "lesson_id": "8-07-010",
       "grade": "8",
       "oblast": "Cijeli racionalni izrazi i polinomi",
       "title": "Razlika kvadrata",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "polynomial_basic"
     },
     {
       "lesson_id": "8-07-011",
       "grade": "8",
       "oblast": "Cijeli racionalni izrazi i polinomi",
       "title": "Kub binoma, zbir i razlika kubova",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "polynomial_basic"
     },
     {
       "lesson_id": "8-07-012",
       "grade": "8",
       "oblast": "Cijeli racionalni izrazi i polinomi",
       "title": "Rastavljanje izdvajanjem zajedničkog faktora",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "polynomial_basic"
     },
     {
       "lesson_id": "8-07-013",
@@ -2898,15 +3023,16 @@
       "oblast": "Mnogougao, kružnica i krug",
       "title": "Vrste mnogouglova",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "CONCEPTUAL_ONLY"
     },
     {
       "lesson_id": "8-08-002",
       "grade": "8",
       "oblast": "Mnogougao, kružnica i krug",
       "title": "Zbir unutrašnjih uglova mnogougla",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "geometry_formula_2d"
     },
     {
       "lesson_id": "8-08-003",
@@ -2914,23 +3040,24 @@
       "oblast": "Mnogougao, kružnica i krug",
       "title": "Zbir vanjskih uglova konveksnog mnogougla",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "8-08-004",
       "grade": "8",
       "oblast": "Mnogougao, kružnica i krug",
       "title": "Broj dijagonala mnogougla",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "geometry_formula_2d"
     },
     {
       "lesson_id": "8-08-005",
       "grade": "8",
       "oblast": "Mnogougao, kružnica i krug",
       "title": "Pravilni mnogougao",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "geometry_formula_2d"
     },
     {
       "lesson_id": "8-08-006",
@@ -2945,8 +3072,8 @@
       "grade": "8",
       "oblast": "Mnogougao, kružnica i krug",
       "title": "Obim i površina mnogougla",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "geometry_formula_2d"
     },
     {
       "lesson_id": "8-08-008",
@@ -2954,39 +3081,40 @@
       "oblast": "Mnogougao, kružnica i krug",
       "title": "Dijelovi kružnice i kruga",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "8-08-009",
       "grade": "8",
       "oblast": "Mnogougao, kružnica i krug",
       "title": "Broj π i obim kruga",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "geometry_formula_2d"
     },
     {
       "lesson_id": "8-08-010",
       "grade": "8",
       "oblast": "Mnogougao, kružnica i krug",
       "title": "Dužina kružnog luka",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "geometry_formula_2d"
     },
     {
       "lesson_id": "8-08-011",
       "grade": "8",
       "oblast": "Mnogougao, kružnica i krug",
       "title": "Površina kruga",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "geometry_formula_2d"
     },
     {
       "lesson_id": "8-08-012",
       "grade": "8",
       "oblast": "Mnogougao, kružnica i krug",
       "title": "Kružni prsten i kružni isječak",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "geometry_formula_2d"
     },
     {
       "lesson_id": "8-09-001",
@@ -3034,7 +3162,8 @@
       "oblast": "Razlomljeni racionalni izrazi",
       "title": "Algebarski razlomak i uslov definiranosti",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "SYMBOLIC_ALGEBRA_CANDIDATE"
     },
     {
       "lesson_id": "9-01-003",
@@ -3042,7 +3171,8 @@
       "oblast": "Razlomljeni racionalni izrazi",
       "title": "Brojna vrijednost algebarskog razlomka",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "SYMBOLIC_ALGEBRA_CANDIDATE"
     },
     {
       "lesson_id": "9-01-004",
@@ -3050,7 +3180,8 @@
       "oblast": "Razlomljeni racionalni izrazi",
       "title": "Proširivanje algebarskog razlomka",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "SYMBOLIC_ALGEBRA_CANDIDATE"
     },
     {
       "lesson_id": "9-01-005",
@@ -3058,7 +3189,8 @@
       "oblast": "Razlomljeni racionalni izrazi",
       "title": "Skraćivanje algebarskog razlomka faktorizacijom",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "SYMBOLIC_ALGEBRA_CANDIDATE"
     },
     {
       "lesson_id": "9-01-006",
@@ -3066,7 +3198,8 @@
       "oblast": "Razlomljeni racionalni izrazi",
       "title": "Jednaki algebarski razlomci",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "SYMBOLIC_ALGEBRA_CANDIDATE"
     },
     {
       "lesson_id": "9-01-007",
@@ -3074,7 +3207,8 @@
       "oblast": "Razlomljeni racionalni izrazi",
       "title": "Zajednički imenilac algebarskih razlomaka",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "SYMBOLIC_ALGEBRA_CANDIDATE"
     },
     {
       "lesson_id": "9-01-008",
@@ -3082,7 +3216,8 @@
       "oblast": "Razlomljeni racionalni izrazi",
       "title": "Sabiranje algebarskih razlomaka",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "SYMBOLIC_ALGEBRA_CANDIDATE"
     },
     {
       "lesson_id": "9-01-009",
@@ -3090,7 +3225,8 @@
       "oblast": "Razlomljeni racionalni izrazi",
       "title": "Oduzimanje algebarskih razlomaka",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "SYMBOLIC_ALGEBRA_CANDIDATE"
     },
     {
       "lesson_id": "9-01-010",
@@ -3098,7 +3234,8 @@
       "oblast": "Razlomljeni racionalni izrazi",
       "title": "Množenje algebarskih razlomaka",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "SYMBOLIC_ALGEBRA_CANDIDATE"
     },
     {
       "lesson_id": "9-01-011",
@@ -3106,7 +3243,8 @@
       "oblast": "Razlomljeni racionalni izrazi",
       "title": "Dijeljenje algebarskih razlomaka",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "SYMBOLIC_ALGEBRA_CANDIDATE"
     },
     {
       "lesson_id": "9-01-012",
@@ -3138,7 +3276,8 @@
       "oblast": "Razlomljeni racionalni izrazi",
       "title": "Tekstualni zadaci sa racionalnim izrazima",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "STRUCTURED_WORD_PROBLEM_CANDIDATE"
     },
     {
       "lesson_id": "9-01-016",
@@ -3146,7 +3285,8 @@
       "oblast": "Razlomljeni racionalni izrazi",
       "title": "Diskusija racionalnog izraza sa parametrom",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "SYMBOLIC_ALGEBRA_CANDIDATE"
     },
     {
       "lesson_id": "9-01-017",
@@ -3154,7 +3294,8 @@
       "oblast": "Razlomljeni racionalni izrazi",
       "title": "Dokaz identiteta sa algebarskim razlomcima",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "PROOF_REQUIRED"
     },
     {
       "lesson_id": "9-02-001",
@@ -3162,7 +3303,8 @@
       "oblast": "Tačka, prava i ravan",
       "title": "Međusobni odnos tačke i prave",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "CONCEPTUAL_ONLY"
     },
     {
       "lesson_id": "9-02-002",
@@ -3170,7 +3312,8 @@
       "oblast": "Tačka, prava i ravan",
       "title": "Određenost prave",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "9-02-003",
@@ -3178,7 +3321,8 @@
       "oblast": "Tačka, prava i ravan",
       "title": "Međusobni odnos tačke i ravni",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "CONCEPTUAL_ONLY"
     },
     {
       "lesson_id": "9-02-004",
@@ -3186,7 +3330,8 @@
       "oblast": "Tačka, prava i ravan",
       "title": "Određenost ravni",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "9-02-005",
@@ -3194,7 +3339,8 @@
       "oblast": "Tačka, prava i ravan",
       "title": "Međusobni položaj dvije prave u prostoru",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "9-02-006",
@@ -3202,7 +3348,8 @@
       "oblast": "Tačka, prava i ravan",
       "title": "Međusobni položaj prave i ravni",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "9-02-007",
@@ -3210,7 +3357,8 @@
       "oblast": "Tačka, prava i ravan",
       "title": "Međusobni položaj dvije ravni",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "9-02-008",
@@ -3218,7 +3366,8 @@
       "oblast": "Tačka, prava i ravan",
       "title": "Normala na ravan",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "9-02-009",
@@ -3226,7 +3375,8 @@
       "oblast": "Tačka, prava i ravan",
       "title": "Rastojanje tačke od ravni",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "9-02-010",
@@ -3234,7 +3384,8 @@
       "oblast": "Tačka, prava i ravan",
       "title": "Rastojanje paralelnih ravni",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "9-02-011",
@@ -3242,7 +3393,8 @@
       "oblast": "Tačka, prava i ravan",
       "title": "Ortogonalna projekcija tačke na ravan",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "9-02-012",
@@ -3250,7 +3402,8 @@
       "oblast": "Tačka, prava i ravan",
       "title": "Ortogonalna projekcija duži na ravan",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "9-02-013",
@@ -3258,7 +3411,8 @@
       "oblast": "Tačka, prava i ravan",
       "title": "Ugao između prave i ravni",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "9-02-014",
@@ -3266,7 +3420,8 @@
       "oblast": "Tačka, prava i ravan",
       "title": "Diedar i ugao između ravni",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "9-02-015",
@@ -3274,7 +3429,8 @@
       "oblast": "Tačka, prava i ravan",
       "title": "Paralelna projekcija na ravan",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "9-02-016",
@@ -3282,7 +3438,8 @@
       "oblast": "Tačka, prava i ravan",
       "title": "Rogalj i njegove strane",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "9-02-017",
@@ -3290,7 +3447,8 @@
       "oblast": "Tačka, prava i ravan",
       "title": "Skiciranje prostornih odnosa",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "CONCEPTUAL_ONLY"
     },
     {
       "lesson_id": "9-03-001",
@@ -3330,7 +3488,8 @@
       "oblast": "Linearna funkcija i prava",
       "title": "Značenje koeficijenta k",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "9-03-006",
@@ -3338,7 +3497,8 @@
       "oblast": "Linearna funkcija i prava",
       "title": "Značenje slobodnog člana n",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "9-03-007",
@@ -3410,7 +3570,8 @@
       "oblast": "Linearna funkcija i prava",
       "title": "Paralelne i podudarne prave prema koeficijentima",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "9-03-016",
@@ -3426,7 +3587,8 @@
       "oblast": "Linearna funkcija i prava",
       "title": "Presjek dvije prave",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "FORMULA_GEOMETRY_CANDIDATE"
     },
     {
       "lesson_id": "9-03-018",
@@ -3434,7 +3596,8 @@
       "oblast": "Linearna funkcija i prava",
       "title": "Primjena linearne funkcije u problemu",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "9-03-019",
@@ -3458,7 +3621,8 @@
       "oblast": "Linearna funkcija i prava",
       "title": "Poređenje direktne, obrnute i linearne zavisnosti",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "9-03-022",
@@ -3521,7 +3685,7 @@
       "grade": "9",
       "oblast": "Linearne jednačine i nejednačine",
       "title": "Jednačina sa promjenljivim koeficijentom",
-      "class": "DETERMINISTIC_NEEDS_EXISTING_CAPABILITY_EXTENSION",
+      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
       "family": ""
     },
     {
@@ -3554,7 +3718,8 @@
       "oblast": "Linearne jednačine i nejednačine",
       "title": "Tekstualni zadatak koji se svodi na linearnu jednačinu",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "STRUCTURED_WORD_PROBLEM_CANDIDATE"
     },
     {
       "lesson_id": "9-04-012",
@@ -3602,7 +3767,8 @@
       "oblast": "Linearne jednačine i nejednačine",
       "title": "Skup rješenja na brojevnoj pravoj",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "VISUAL_REQUIRED"
     },
     {
       "lesson_id": "9-04-018",
@@ -3610,7 +3776,8 @@
       "oblast": "Linearne jednačine i nejednačine",
       "title": "Skup rješenja intervalom",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "CONCEPTUAL_ONLY"
     },
     {
       "lesson_id": "9-04-019",
@@ -3642,15 +3809,16 @@
       "oblast": "Linearne jednačine i nejednačine",
       "title": "Diskusija linearne jednačine sa parametrom",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "CLOSED_FORM_DETERMINISTIC_CANDIDATE"
     },
     {
       "lesson_id": "9-05-001",
       "grade": "9",
       "oblast": "Sistemi linearnih jednačina",
       "title": "Linearna jednačina sa dvije nepoznate i njena rješenja",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "linear_system_direct"
     },
     {
       "lesson_id": "9-05-002",
@@ -3665,24 +3833,24 @@
       "grade": "9",
       "oblast": "Sistemi linearnih jednačina",
       "title": "Pojam sistema dvije linearne jednačine",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "linear_system_direct"
     },
     {
       "lesson_id": "9-05-004",
       "grade": "9",
       "oblast": "Sistemi linearnih jednačina",
       "title": "Provjera uređenog para u sistemu",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "linear_system_direct"
     },
     {
       "lesson_id": "9-05-005",
       "grade": "9",
       "oblast": "Sistemi linearnih jednačina",
       "title": "Ekvivalentni sistemi",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "linear_system_direct"
     },
     {
       "lesson_id": "9-05-006",
@@ -3697,48 +3865,48 @@
       "grade": "9",
       "oblast": "Sistemi linearnih jednačina",
       "title": "Metoda supstitucije",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "linear_system_direct"
     },
     {
       "lesson_id": "9-05-008",
       "grade": "9",
       "oblast": "Sistemi linearnih jednačina",
       "title": "Metoda suprotnih koeficijenata (Gausova metoda)",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "linear_system_direct"
     },
     {
       "lesson_id": "9-05-009",
       "grade": "9",
       "oblast": "Sistemi linearnih jednačina",
       "title": "Sistem sa jednim rješenjem",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "linear_system_direct"
     },
     {
       "lesson_id": "9-05-010",
       "grade": "9",
       "oblast": "Sistemi linearnih jednačina",
       "title": "Sistem bez rješenja",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "linear_system_direct"
     },
     {
       "lesson_id": "9-05-011",
       "grade": "9",
       "oblast": "Sistemi linearnih jednačina",
       "title": "Sistem sa beskonačno mnogo rješenja",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "linear_system_direct"
     },
     {
       "lesson_id": "9-05-012",
       "grade": "9",
       "oblast": "Sistemi linearnih jednačina",
       "title": "Odnos koeficijenata i broj rješenja sistema",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "linear_system_direct"
     },
     {
       "lesson_id": "9-05-013",
@@ -3746,31 +3914,32 @@
       "oblast": "Sistemi linearnih jednačina",
       "title": "Tekstualni zadatak sa sistemom",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "STRUCTURED_WORD_PROBLEM_CANDIDATE"
     },
     {
       "lesson_id": "9-05-014",
       "grade": "9",
       "oblast": "Sistemi linearnih jednačina",
       "title": "Geometrijsko tumačenje rješenja sistema",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "linear_system_direct"
     },
     {
       "lesson_id": "9-05-015",
       "grade": "9",
       "oblast": "Sistemi linearnih jednačina",
       "title": "Provjera rješenja sistema",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "linear_system_direct"
     },
     {
       "lesson_id": "9-05-016",
       "grade": "9",
       "oblast": "Sistemi linearnih jednačina",
       "title": "Sistem sa razlomljenim koeficijentima",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "linear_system_direct"
     },
     {
       "lesson_id": "9-05-017",
@@ -3778,7 +3947,8 @@
       "oblast": "Sistemi linearnih jednačina",
       "title": "Sistem sa parametrom",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "9-06-001",
@@ -3817,64 +3987,64 @@
       "grade": "9",
       "oblast": "Polinomi, faktorizacija i jednostavne kvadratne jednačine",
       "title": "Kvadrat binoma",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "polynomial_basic"
     },
     {
       "lesson_id": "9-06-006",
       "grade": "9",
       "oblast": "Polinomi, faktorizacija i jednostavne kvadratne jednačine",
       "title": "Razlika kvadrata",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "polynomial_basic"
     },
     {
       "lesson_id": "9-06-007",
       "grade": "9",
       "oblast": "Polinomi, faktorizacija i jednostavne kvadratne jednačine",
       "title": "Kub binoma",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "polynomial_basic"
     },
     {
       "lesson_id": "9-06-008",
       "grade": "9",
       "oblast": "Polinomi, faktorizacija i jednostavne kvadratne jednačine",
       "title": "Zbir i razlika kubova",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "polynomial_basic"
     },
     {
       "lesson_id": "9-06-009",
       "grade": "9",
       "oblast": "Polinomi, faktorizacija i jednostavne kvadratne jednačine",
       "title": "Izlučivanje zajedničkog faktora",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "polynomial_basic"
     },
     {
       "lesson_id": "9-06-010",
       "grade": "9",
       "oblast": "Polinomi, faktorizacija i jednostavne kvadratne jednačine",
       "title": "Rastavljanje grupisanjem",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "polynomial_basic"
     },
     {
       "lesson_id": "9-06-011",
       "grade": "9",
       "oblast": "Polinomi, faktorizacija i jednostavne kvadratne jednačine",
       "title": "Faktorizacija primjenom identiteta",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "polynomial_basic"
     },
     {
       "lesson_id": "9-06-012",
       "grade": "9",
       "oblast": "Polinomi, faktorizacija i jednostavne kvadratne jednačine",
       "title": "Domena algebarskog razlomka pomoću faktorizacije",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "polynomial_basic"
     },
     {
       "lesson_id": "9-06-013",
@@ -3905,24 +4075,24 @@
       "grade": "9",
       "oblast": "Polinomi, faktorizacija i jednostavne kvadratne jednačine",
       "title": "Nula proizvoda i provjera rješenja",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "polynomial_basic"
     },
     {
       "lesson_id": "9-07-001",
       "grade": "9",
       "oblast": "Geometrijska tijela",
       "title": "Pojam poliedra i njegovi elementi",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "solid_geometry_direct"
     },
     {
       "lesson_id": "9-07-002",
       "grade": "9",
       "oblast": "Geometrijska tijela",
       "title": "Prizma i njeni elementi",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "solid_geometry_direct"
     },
     {
       "lesson_id": "9-07-003",
@@ -3937,16 +4107,16 @@
       "grade": "9",
       "oblast": "Geometrijska tijela",
       "title": "Površina uspravne prizme",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "solid_geometry_direct"
     },
     {
       "lesson_id": "9-07-005",
       "grade": "9",
       "oblast": "Geometrijska tijela",
       "title": "Zapremina prizme",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "solid_geometry_direct"
     },
     {
       "lesson_id": "9-07-006",
@@ -3954,23 +4124,24 @@
       "oblast": "Geometrijska tijela",
       "title": "Dijagonalni presjek prizme",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "FORMULA_GEOMETRY_CANDIDATE"
     },
     {
       "lesson_id": "9-07-007",
       "grade": "9",
       "oblast": "Geometrijska tijela",
       "title": "Primjena Pitagorine teoreme na pravilnu prizmu",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "solid_geometry_direct"
     },
     {
       "lesson_id": "9-07-008",
       "grade": "9",
       "oblast": "Geometrijska tijela",
       "title": "Piramida i njeni elementi",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "solid_geometry_direct"
     },
     {
       "lesson_id": "9-07-009",
@@ -3985,24 +4156,24 @@
       "grade": "9",
       "oblast": "Geometrijska tijela",
       "title": "Površina pravilne piramide",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "solid_geometry_direct"
     },
     {
       "lesson_id": "9-07-011",
       "grade": "9",
       "oblast": "Geometrijska tijela",
       "title": "Zapremina pravilne piramide",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "solid_geometry_direct"
     },
     {
       "lesson_id": "9-07-012",
       "grade": "9",
       "oblast": "Geometrijska tijela",
       "title": "Apotema pravilne piramide",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "solid_geometry_direct"
     },
     {
       "lesson_id": "9-07-013",
@@ -4010,15 +4181,16 @@
       "oblast": "Geometrijska tijela",
       "title": "Presjeci piramide",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "9-07-014",
       "grade": "9",
       "oblast": "Geometrijska tijela",
       "title": "Primjena Pitagorine teoreme na piramidu",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "solid_geometry_direct"
     },
     {
       "lesson_id": "9-07-015",
@@ -4026,7 +4198,8 @@
       "oblast": "Geometrijska tijela",
       "title": "Valjak ili cilindar i njegovi elementi",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "CONCEPTUAL_ONLY"
     },
     {
       "lesson_id": "9-07-016",
@@ -4041,24 +4214,24 @@
       "grade": "9",
       "oblast": "Geometrijska tijela",
       "title": "Površina valjka",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "solid_geometry_direct"
     },
     {
       "lesson_id": "9-07-018",
       "grade": "9",
       "oblast": "Geometrijska tijela",
       "title": "Zapremina valjka",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "solid_geometry_direct"
     },
     {
       "lesson_id": "9-07-019",
       "grade": "9",
       "oblast": "Geometrijska tijela",
       "title": "Osni presjek valjka",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "solid_geometry_direct"
     },
     {
       "lesson_id": "9-07-020",
@@ -4066,7 +4239,8 @@
       "oblast": "Geometrijska tijela",
       "title": "Kupa ili stožac i njeni elementi",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "CONCEPTUAL_ONLY"
     },
     {
       "lesson_id": "9-07-021",
@@ -4081,32 +4255,32 @@
       "grade": "9",
       "oblast": "Geometrijska tijela",
       "title": "Površina kupe",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "solid_geometry_direct"
     },
     {
       "lesson_id": "9-07-023",
       "grade": "9",
       "oblast": "Geometrijska tijela",
       "title": "Zapremina kupe",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "solid_geometry_direct"
     },
     {
       "lesson_id": "9-07-024",
       "grade": "9",
       "oblast": "Geometrijska tijela",
       "title": "Izvodnica kupe",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "solid_geometry_direct"
     },
     {
       "lesson_id": "9-07-025",
       "grade": "9",
       "oblast": "Geometrijska tijela",
       "title": "Osni presjek kupe",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "solid_geometry_direct"
     },
     {
       "lesson_id": "9-07-026",
@@ -4114,23 +4288,24 @@
       "oblast": "Geometrijska tijela",
       "title": "Sfera i lopta ili kugla",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "9-07-027",
       "grade": "9",
       "oblast": "Geometrijska tijela",
       "title": "Površina sfere",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "solid_geometry_direct"
     },
     {
       "lesson_id": "9-07-028",
       "grade": "9",
       "oblast": "Geometrijska tijela",
       "title": "Zapremina lopte",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "solid_geometry_direct"
     },
     {
       "lesson_id": "9-07-029",
@@ -4138,23 +4313,24 @@
       "oblast": "Geometrijska tijela",
       "title": "Presjek lopte ravni",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "FORMULA_GEOMETRY_CANDIDATE"
     },
     {
       "lesson_id": "9-07-030",
       "grade": "9",
       "oblast": "Geometrijska tijela",
       "title": "Odnos zapremina prizme i piramide",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "solid_geometry_direct"
     },
     {
       "lesson_id": "9-07-031",
       "grade": "9",
       "oblast": "Geometrijska tijela",
       "title": "Odnos zapremina valjka i kupe",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "solid_geometry_direct"
     },
     {
       "lesson_id": "9-07-032",
@@ -4162,7 +4338,8 @@
       "oblast": "Geometrijska tijela",
       "title": "Složeno geometrijsko tijelo",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "9-07-033",
@@ -4170,7 +4347,8 @@
       "oblast": "Geometrijska tijela",
       "title": "Tekstualni zadaci sa površinom i zapreminom",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "STRUCTURED_WORD_PROBLEM_CANDIDATE"
     },
     {
       "lesson_id": "9-07-034",
@@ -4178,7 +4356,8 @@
       "oblast": "Geometrijska tijela",
       "title": "Mjerne jedinice površine i zapremine u zadacima sa tijelima",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "9-07-035",
@@ -4186,7 +4365,8 @@
       "oblast": "Geometrijska tijela",
       "title": "Zarubljena piramida",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "9-07-036",
@@ -4194,7 +4374,8 @@
       "oblast": "Geometrijska tijela",
       "title": "Zarubljena kupa",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "9-07-037",
@@ -4202,15 +4383,16 @@
       "oblast": "Geometrijska tijela",
       "title": "Platonova i Arhimedova tijela",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
     },
     {
       "lesson_id": "9-07-038",
       "grade": "9",
       "oblast": "Geometrijska tijela",
       "title": "Masa tijela iz gustine i zapremine",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "solid_geometry_direct"
     },
     {
       "lesson_id": "9-08-001",
@@ -4242,7 +4424,8 @@
       "oblast": "Podaci, vjerovatnoća, finansije i mjerne jedinice",
       "title": "Preračunavanje valuta",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "FINANCIAL_MATH_CANDIDATE"
     },
     {
       "lesson_id": "9-08-005",
@@ -4266,7 +4449,8 @@
       "oblast": "Podaci, vjerovatnoća, finansije i mjerne jedinice",
       "title": "Čitanje otplatnog plana",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "VISUAL_REQUIRED"
     },
     {
       "lesson_id": "9-08-008",
@@ -4274,7 +4458,8 @@
       "oblast": "Podaci, vjerovatnoća, finansije i mjerne jedinice",
       "title": "Lični finansijski budžet",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "FINANCIAL_MATH_CANDIDATE"
     },
     {
       "lesson_id": "9-08-009",
@@ -4282,7 +4467,8 @@
       "oblast": "Podaci, vjerovatnoća, finansije i mjerne jedinice",
       "title": "Populacija i uzorak",
       "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "family": "",
+      "analysis": "STATISTICS_CANDIDATE"
     },
     {
       "lesson_id": "9-08-010",

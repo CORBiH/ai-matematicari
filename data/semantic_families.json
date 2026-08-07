@@ -59,6 +59,66 @@
         "opposite": "suprotan broj"
       }
     },
+    "angle_relationships_direct": {
+      "family_version": 1,
+      "family_name": "Brojevni odnosi među uglovima",
+      "detector": "angle_relationships_direct",
+      "core_skill": "izračunati ili klasifikovati ugao iz zadatih brojevnih odnosa",
+      "parameter_schema": {
+        "kinds": {
+          "kind": "enum_set",
+          "values": [
+            "classify_angle",
+            "central_peripheral",
+            "central_fraction",
+            "compare_angles",
+            "dms_add_sub",
+            "angle_times_n",
+            "adjacent_vertical",
+            "comp_supp",
+            "transversal",
+            "parallel_normal_arms",
+            "triangle_third_angle",
+            "exterior_angle",
+            "exterior_from_interior",
+            "classify_triangle_sides",
+            "classify_triangle_angles",
+            "side_angle_order",
+            "triangle_inequality",
+            "isosceles_angles",
+            "right_triangle_acute",
+            "quad_fourth_angle",
+            "quad_exterior"
+          ],
+          "required": true
+        },
+        "fraction_coefficients": {
+          "kind": "enum",
+          "values": [
+            "yes"
+          ],
+          "required": false
+        }
+      },
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "advisory_parameters": [
+        "fraction_coefficients"
+      ],
+      "prompt_template": {
+        "header": "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "main_line": {
+          "parameter": "kinds",
+          "text": "- vidljivi zadatak mora pripadati vrstama: {values}"
+        },
+        "fixed_lines": [
+          "- svi uglovi su zadati mjerama — crtež nije potreban"
+        ],
+        "closing": "- ako prekršiš ovo, server odbija paket prije objave"
+      },
+      "value_labels": {}
+    },
     "arithmetic_mean_direct": {
       "family_version": 1,
       "family_name": "Aritmetička sredina",
@@ -502,6 +562,71 @@
         "frequency_table": "ukupan broj podataka iz tabele frekvencija"
       }
     },
+    "geometry_formula_2d": {
+      "family_version": 1,
+      "family_name": "Formula-geometrija u ravni",
+      "detector": "geometry_formula_2d",
+      "core_skill": "izračunati obim/površinu/element ravne figure po kanonskoj formuli",
+      "parameter_schema": {
+        "kinds": {
+          "kind": "enum_set",
+          "values": [
+            "square_perimeter",
+            "square_area",
+            "rectangle_perimeter",
+            "rectangle_area",
+            "triangle_perimeter",
+            "triangle_area",
+            "parallelogram_area",
+            "parallelogram_perimeter",
+            "trapezoid_area",
+            "trapezoid_midline",
+            "triangle_midline",
+            "rhombus_area_diagonals",
+            "rhombus_perimeter",
+            "deltoid_area",
+            "orthodiagonal_area",
+            "quad_perimeter",
+            "circle_circumference",
+            "circle_area",
+            "arc_length",
+            "sector_area",
+            "annulus_area",
+            "polygon_interior_sum",
+            "polygon_diagonals",
+            "regular_polygon_angle",
+            "regular_polygon_perimeter"
+          ],
+          "required": true
+        },
+        "fraction_coefficients": {
+          "kind": "enum",
+          "values": [
+            "yes"
+          ],
+          "required": false
+        }
+      },
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "advisory_parameters": [
+        "fraction_coefficients"
+      ],
+      "prompt_template": {
+        "header": "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "main_line": {
+          "parameter": "kinds",
+          "text": "- vidljivi zadatak mora pripadati vrstama: {values}"
+        },
+        "fixed_lines": [
+          "- sve tražene veličine su ZADATE brojevima — crtež nije potreban",
+          "- notacija: P površina, O obim, d dijagonala, r poluprečnik, R prečnik (R = 2r)"
+        ],
+        "closing": "- ako prekršiš ovo, server odbija paket prije objave"
+      },
+      "value_labels": {}
+    },
     "integer_arithmetic_direct": {
       "family_version": 1,
       "family_name": "Direktan račun — cijeli brojevi",
@@ -718,6 +843,50 @@
         "implicit_to_explicit": "prelazak u eksplicitni oblik"
       }
     },
+    "linear_system_direct": {
+      "family_version": 1,
+      "family_name": "Sistem dvije linearne jednačine",
+      "detector": "linear_system_direct",
+      "core_skill": "riješiti, provjeriti ili klasifikovati sistem dvije linearne jednačine",
+      "parameter_schema": {
+        "kinds": {
+          "kind": "enum_set",
+          "values": [
+            "solve",
+            "verify_pair",
+            "single_equation",
+            "classify",
+            "equivalent_system"
+          ],
+          "required": true
+        },
+        "fraction_coefficients": {
+          "kind": "enum",
+          "values": [
+            "yes"
+          ],
+          "required": false
+        }
+      },
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "advisory_parameters": [
+        "fraction_coefficients"
+      ],
+      "prompt_template": {
+        "header": "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "main_line": {
+          "parameter": "kinds",
+          "text": "- vidljivi zadatak mora pripadati vrstama: {values}"
+        },
+        "fixed_lines": [
+          "- sistem ima cjelobrojne (ili razlomljene, gdje ugovor kaže) koeficijente; rješenje je uređeni par ili klasifikacija"
+        ],
+        "closing": "- ako prekršiš ovo, server odbija paket prije objave"
+      },
+      "value_labels": {}
+    },
     "natural_arithmetic_direct": {
       "family_version": 1,
       "family_name": "Direktan račun — prirodni brojevi",
@@ -885,7 +1054,18 @@
             "monomial_structure",
             "combine_like_terms",
             "add_subtract",
-            "multiply"
+            "multiply",
+            "like_terms_select",
+            "monomial_mul_div",
+            "square_of_binomial",
+            "cube_of_binomial",
+            "factor_difference_squares",
+            "factor_common",
+            "factor_grouping",
+            "factor_identity",
+            "sum_diff_cubes",
+            "zero_product",
+            "fraction_domain"
           ],
           "required": true
         },
@@ -917,7 +1097,18 @@
         "monomial_structure": "koeficijent i stepen monoma",
         "combine_like_terms": "sređivanje polinoma",
         "add_subtract": "sabiranje i oduzimanje polinoma",
-        "multiply": "množenje polinoma"
+        "multiply": "množenje polinoma",
+        "like_terms_select": "prepoznavanje sličnih monoma",
+        "monomial_mul_div": "množenje i dijeljenje monoma",
+        "square_of_binomial": "kvadrat binoma (a ± b)²",
+        "cube_of_binomial": "kub binoma (a ± b)³",
+        "factor_difference_squares": "faktorizacija razlike kvadrata",
+        "factor_common": "izlučivanje zajedničkog faktora",
+        "factor_grouping": "faktorizacija grupisanjem",
+        "factor_identity": "faktorizacija pomoću kvadrata binoma",
+        "sum_diff_cubes": "zbir i razlika kubova",
+        "zero_product": "jednačina data proizvodom faktora",
+        "fraction_domain": "uslov definisanosti algebarskog razlomka"
       }
     },
     "power_arithmetic_direct": {
@@ -995,6 +1186,57 @@
         "coprime_pairs": "prepoznavanje relativno prostih brojeva",
         "prime_factorization": "rastavljanje na proste faktore"
       }
+    },
+    "pythagoras_direct": {
+      "family_version": 1,
+      "family_name": "Pitagorina teorema — direktne primjene",
+      "detector": "pythagoras_direct",
+      "core_skill": "primijeniti Pitagorinu teoremu na zadate dužine",
+      "parameter_schema": {
+        "kinds": {
+          "kind": "enum_set",
+          "values": [
+            "hypotenuse",
+            "leg",
+            "verify_triple",
+            "square_diagonal",
+            "rectangle_diagonal",
+            "isosceles_height",
+            "equilateral_height",
+            "equilateral_area",
+            "rhombus_side",
+            "isosceles_trapezoid_height",
+            "right_trapezoid_leg",
+            "chord_distance"
+          ],
+          "required": true
+        },
+        "fraction_coefficients": {
+          "kind": "enum",
+          "values": [
+            "yes"
+          ],
+          "required": false
+        }
+      },
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "advisory_parameters": [
+        "fraction_coefficients"
+      ],
+      "prompt_template": {
+        "header": "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "main_line": {
+          "parameter": "kinds",
+          "text": "- vidljivi zadatak mora pripadati vrstama: {values}"
+        },
+        "fixed_lines": [
+          "- sve dužine su zadate brojevima; rezultat je egzaktan (cio broj ili korijen), nikad približna decimala"
+        ],
+        "closing": "- ako prekršiš ovo, server odbija paket prije objave"
+      },
+      "value_labels": {}
     },
     "ratio_proportion_direct": {
       "family_version": 1,
@@ -1128,6 +1370,74 @@
         "factor_out_x": "jednačina rješiva izlučivanjem x",
         "perfect_square_trinomial": "potpun kvadrat x² ± 2ax + a² = 0"
       }
+    },
+    "solid_geometry_direct": {
+      "family_version": 1,
+      "family_name": "Geometrijska tijela — formule",
+      "detector": "solid_geometry_direct",
+      "core_skill": "izračunati M/P/V/element tijela po kanonskoj formuli",
+      "parameter_schema": {
+        "kinds": {
+          "kind": "enum_set",
+          "values": [
+            "cube_surface",
+            "cube_volume",
+            "cube_space_diagonal",
+            "cuboid_surface",
+            "cuboid_volume",
+            "prism4_lateral",
+            "prism4_surface",
+            "prism4_volume",
+            "prism4_space_diagonal",
+            "prism3_volume",
+            "prism3_lateral",
+            "pyramid4_apothem",
+            "pyramid4_lateral",
+            "pyramid4_surface",
+            "pyramid4_volume",
+            "cylinder_surface",
+            "cylinder_volume",
+            "cylinder_axial_section",
+            "cone_slant",
+            "cone_surface",
+            "cone_volume",
+            "cone_axial_section",
+            "sphere_surface",
+            "ball_volume",
+            "prism_pyramid_ratio",
+            "cylinder_cone_ratio",
+            "density_mass",
+            "polyhedron_elements"
+          ],
+          "required": true
+        },
+        "fraction_coefficients": {
+          "kind": "enum",
+          "values": [
+            "yes"
+          ],
+          "required": false
+        }
+      },
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "advisory_parameters": [
+        "fraction_coefficients"
+      ],
+      "prompt_template": {
+        "header": "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "main_line": {
+          "parameter": "kinds",
+          "text": "- vidljivi zadatak mora pripadati vrstama: {values}"
+        },
+        "fixed_lines": [
+          "- notacija: B baza, M omotač, P ukupna površina, V zapremina, H visina tijela, h_a apotema, D prostorna dijagonala",
+          "- π ostaje simbolički u rezultatu; korijeni ostaju egzaktni"
+        ],
+        "closing": "- ako prekršiš ovo, server odbija paket prije objave"
+      },
+      "value_labels": {}
     },
     "square_root_direct": {
       "family_version": 1,

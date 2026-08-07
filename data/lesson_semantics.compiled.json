@@ -1,12 +1,12 @@
 {
-  "contract_version": "5D.1",
+  "contract_version": "5E.1",
   "lessons": {
     "6-02-002": {
       "activation_class": "READY",
       "advisory_parameters": [
         "forms"
       ],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "number_ordering",
       "enforced_parameters": [
         "number_domain"
@@ -42,7 +42,7 @@
     "6-02-003": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "numeric_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -79,7 +79,7 @@
     "6-02-004": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "numeric_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -118,7 +118,7 @@
       "advisory_parameters": [
         "expression_shape"
       ],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "numeric_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -157,7 +157,7 @@
       "advisory_parameters": [
         "expression_shape"
       ],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "numeric_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -198,7 +198,7 @@
     "6-02-008": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "polynomial_basic",
       "enforced_parameters": [
         "concepts",
@@ -234,7 +234,7 @@
     "6-03-001": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "common_divisors_multiples",
       "enforced_parameters": [
         "concepts"
@@ -273,7 +273,7 @@
     "6-03-002": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "divisibility_value",
       "enforced_parameters": [
         "concepts"
@@ -306,7 +306,7 @@
     "6-03-003": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "divisibility_value",
       "enforced_parameters": [
         "concepts"
@@ -339,7 +339,7 @@
     "6-03-004": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "divisibility_predicate",
       "enforced_parameters": [
         "divisors"
@@ -383,7 +383,7 @@
     "6-03-005": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "prime_structure",
       "enforced_parameters": [
         "concepts"
@@ -418,7 +418,7 @@
     "6-03-006": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "prime_structure",
       "enforced_parameters": [
         "concepts"
@@ -451,7 +451,7 @@
     "6-03-007": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "prime_structure",
       "enforced_parameters": [
         "concepts"
@@ -485,7 +485,7 @@
     "6-03-008": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "common_divisors_multiples",
       "enforced_parameters": [
         "concepts"
@@ -521,7 +521,7 @@
     "6-03-009": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "common_divisors_multiples",
       "enforced_parameters": [
         "concepts"
@@ -557,7 +557,7 @@
     "6-04-008": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "number_ordering",
       "enforced_parameters": [
         "number_domain"
@@ -595,7 +595,7 @@
         "operand_kinds",
         "simplification_policy"
       ],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "fraction_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -664,7 +664,7 @@
         "operand_kinds",
         "simplification_policy"
       ],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "fraction_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -733,7 +733,7 @@
         "operand_kinds",
         "simplification_policy"
       ],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "fraction_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -799,7 +799,7 @@
         "operand_kinds",
         "simplification_policy"
       ],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "fraction_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -862,7 +862,7 @@
       "advisory_parameters": [
         "expression_shape"
       ],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "numeric_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -902,7 +902,7 @@
     "6-05-001": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "fraction_decimal",
       "enforced_parameters": [
         "concepts"
@@ -940,7 +940,7 @@
     "6-05-002": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "fraction_decimal",
       "enforced_parameters": [
         "concepts"
@@ -973,7 +973,7 @@
     "6-05-003": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "fraction_decimal",
       "enforced_parameters": [
         "concepts"
@@ -1007,7 +1007,7 @@
     "6-05-006": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "number_ordering",
       "enforced_parameters": [
         "number_domain"
@@ -1040,7 +1040,7 @@
     "6-05-007": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "decimal_rounding",
       "enforced_parameters": [
         "concepts"
@@ -1077,7 +1077,7 @@
     "6-05-008": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "numeric_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -1114,7 +1114,7 @@
     "6-05-009": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "numeric_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -1152,7 +1152,7 @@
     "6-05-010": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "numeric_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -1191,7 +1191,7 @@
     "6-06-001": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "percent_basic",
       "enforced_parameters": [
         "concepts"
@@ -1228,7 +1228,7 @@
     "6-06-002": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "percent_basic",
       "enforced_parameters": [
         "concepts"
@@ -1265,7 +1265,7 @@
     "6-06-003": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "ratio_proportion",
       "enforced_parameters": [
         "concepts"
@@ -1298,7 +1298,7 @@
     "6-06-004": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "arithmetic_mean",
       "enforced_parameters": [
         "concepts"
@@ -1331,7 +1331,7 @@
     "6-07-001": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "linear_equation",
       "enforced_parameters": [
         "number_domain",
@@ -1368,7 +1368,7 @@
     "6-07-002": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "linear_equation",
       "enforced_parameters": [
         "number_domain",
@@ -1407,7 +1407,7 @@
     "6-07-003": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "linear_equation",
       "enforced_parameters": [
         "number_domain",
@@ -1447,7 +1447,7 @@
     "6-07-004": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "linear_equation",
       "enforced_parameters": [
         "number_domain",
@@ -1484,7 +1484,7 @@
     "6-07-005": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "linear_equation",
       "enforced_parameters": [
         "number_domain",
@@ -1521,7 +1521,7 @@
     "6-07-006": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "linear_equation",
       "enforced_parameters": [
         "number_domain",
@@ -1556,10 +1556,157 @@
       ],
       "reviewer_note": "Invarijanta: jedinstveno rješenje, provjera uvrštavanjem egzaktna."
     },
+    "6-09-003": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "angle_relationships_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0026"
+      ],
+      "family_id": "angle_relationships_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "6-09-003",
+      "level_bounds": {
+        "1": "jedan imenovani odnos, male mjere",
+        "2": "dvokoračni odnosi i minute",
+        "3": "trokoračni odnosi i odnosi zadati razlikom"
+      },
+      "parameters": {
+        "kinds": [
+          "classify_angle"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: classify_angle",
+        "- svi uglovi su zadati mjerama — crtež nije potreban",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: imenovani brojevni odnos uglova; zbirovi 90/180/360 egzaktni."
+    },
+    "6-09-004": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "angle_relationships_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0021",
+        "KS_2018-0022",
+        "KS_2018-0033",
+        "KS_2018-0300",
+        "RS_2014-0019",
+        "RS_2014-0021"
+      ],
+      "family_id": "angle_relationships_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "6-09-004",
+      "level_bounds": {
+        "1": "jedan imenovani odnos, male mjere",
+        "2": "dvokoračni odnosi i minute",
+        "3": "trokoračni odnosi i odnosi zadati razlikom"
+      },
+      "parameters": {
+        "kinds": [
+          "central_fraction"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: central_fraction",
+        "- svi uglovi su zadati mjerama — crtež nije potreban",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: imenovani brojevni odnos uglova; zbirovi 90/180/360 egzaktni."
+    },
+    "6-09-005": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "angle_relationships_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0023",
+        "KS_2018-0024",
+        "KS_2018-0304",
+        "RS_2014-0093"
+      ],
+      "family_id": "angle_relationships_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "6-09-005",
+      "level_bounds": {
+        "1": "jedan imenovani odnos, male mjere",
+        "2": "dvokoračni odnosi i minute",
+        "3": "trokoračni odnosi i odnosi zadati razlikom"
+      },
+      "parameters": {
+        "kinds": [
+          "central_peripheral"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: central_peripheral",
+        "- svi uglovi su zadati mjerama — crtež nije potreban",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: imenovani brojevni odnos uglova; zbirovi 90/180/360 egzaktni."
+    },
+    "6-09-007": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "angle_relationships_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0012",
+        "KS_2018-0020",
+        "KS_2018-0029",
+        "RS_2014-0021"
+      ],
+      "family_id": "angle_relationships_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "6-09-007",
+      "level_bounds": {
+        "1": "jedan imenovani odnos, male mjere",
+        "2": "dvokoračni odnosi i minute",
+        "3": "trokoračni odnosi i odnosi zadati razlikom"
+      },
+      "parameters": {
+        "kinds": [
+          "compare_angles"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: compare_angles",
+        "- svi uglovi su zadati mjerama — crtež nije potreban",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: imenovani brojevni odnos uglova; zbirovi 90/180/360 egzaktni."
+    },
     "6-09-010": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "unit_conversion",
       "enforced_parameters": [
         "dimensions"
@@ -1591,10 +1738,215 @@
       ],
       "reviewer_note": "Invarijanta: faktori po dimenziji; kvadratni 100, kubni 1000 po koraku; bez miješanja dimenzija."
     },
+    "6-09-011": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "angle_relationships_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0025"
+      ],
+      "family_id": "angle_relationships_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "6-09-011",
+      "level_bounds": {
+        "1": "jedan imenovani odnos, male mjere",
+        "2": "dvokoračni odnosi i minute",
+        "3": "trokoračni odnosi i odnosi zadati razlikom"
+      },
+      "parameters": {
+        "kinds": [
+          "dms_add_sub"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: dms_add_sub",
+        "- svi uglovi su zadati mjerama — crtež nije potreban",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: imenovani brojevni odnos uglova; zbirovi 90/180/360 egzaktni."
+    },
+    "6-09-012": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "angle_relationships_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-6-09-012"
+      ],
+      "family_id": "angle_relationships_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "6-09-012",
+      "level_bounds": {
+        "1": "jedan imenovani odnos, male mjere",
+        "2": "dvokoračni odnosi i minute",
+        "3": "trokoračni odnosi i odnosi zadati razlikom"
+      },
+      "parameters": {
+        "kinds": [
+          "angle_times_n"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: angle_times_n",
+        "- svi uglovi su zadati mjerama — crtež nije potreban",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: imenovani brojevni odnos uglova; zbirovi 90/180/360 egzaktni."
+    },
+    "6-09-013": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "angle_relationships_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0028"
+      ],
+      "family_id": "angle_relationships_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "6-09-013",
+      "level_bounds": {
+        "1": "jedan imenovani odnos, male mjere",
+        "2": "dvokoračni odnosi i minute",
+        "3": "trokoračni odnosi i odnosi zadati razlikom"
+      },
+      "parameters": {
+        "kinds": [
+          "adjacent_vertical"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: adjacent_vertical",
+        "- svi uglovi su zadati mjerama — crtež nije potreban",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: imenovani brojevni odnos uglova; zbirovi 90/180/360 egzaktni."
+    },
+    "6-09-014": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "angle_relationships_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0012",
+        "KS_2018-0033"
+      ],
+      "family_id": "angle_relationships_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "6-09-014",
+      "level_bounds": {
+        "1": "jedan imenovani odnos, male mjere",
+        "2": "dvokoračni odnosi i minute",
+        "3": "trokoračni odnosi i odnosi zadati razlikom"
+      },
+      "parameters": {
+        "kinds": [
+          "comp_supp"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: comp_supp",
+        "- svi uglovi su zadati mjerama — crtež nije potreban",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: imenovani brojevni odnos uglova; zbirovi 90/180/360 egzaktni."
+    },
+    "6-09-015": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "angle_relationships_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-6-09-015"
+      ],
+      "family_id": "angle_relationships_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "6-09-015",
+      "level_bounds": {
+        "1": "jedan imenovani odnos, male mjere",
+        "2": "dvokoračni odnosi i minute",
+        "3": "trokoračni odnosi i odnosi zadati razlikom"
+      },
+      "parameters": {
+        "kinds": [
+          "transversal"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: transversal",
+        "- svi uglovi su zadati mjerama — crtež nije potreban",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: imenovani brojevni odnos uglova; zbirovi 90/180/360 egzaktni."
+    },
+    "6-09-016": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "angle_relationships_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-6-09-016"
+      ],
+      "family_id": "angle_relationships_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "6-09-016",
+      "level_bounds": {
+        "1": "jedan imenovani odnos, male mjere",
+        "2": "dvokoračni odnosi i minute",
+        "3": "trokoračni odnosi i odnosi zadati razlikom"
+      },
+      "parameters": {
+        "kinds": [
+          "parallel_normal_arms"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: parallel_normal_arms",
+        "- svi uglovi su zadati mjerama — crtež nije potreban",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: imenovani brojevni odnos uglova; zbirovi 90/180/360 egzaktni."
+    },
     "6-13-001": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "unit_conversion",
       "enforced_parameters": [
         "dimensions"
@@ -1629,7 +1981,7 @@
     "6-13-002": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "unit_conversion",
       "enforced_parameters": [
         "dimensions"
@@ -1664,7 +2016,7 @@
     "6-13-003": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "unit_conversion",
       "enforced_parameters": [
         "dimensions"
@@ -1699,7 +2051,7 @@
     "6-13-004": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "unit_conversion",
       "enforced_parameters": [
         "dimensions"
@@ -1734,7 +2086,7 @@
     "6-13-005": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "unit_conversion",
       "enforced_parameters": [
         "dimensions"
@@ -1772,7 +2124,7 @@
     "7-02-004": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "absolute_opposite",
       "enforced_parameters": [
         "concepts",
@@ -1809,7 +2161,7 @@
     "7-02-005": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "absolute_opposite",
       "enforced_parameters": [
         "concepts",
@@ -1847,7 +2199,7 @@
     "7-02-006": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "number_ordering",
       "enforced_parameters": [
         "number_domain"
@@ -1882,7 +2234,7 @@
       "advisory_parameters": [
         "sign_scope"
       ],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "numeric_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -1922,7 +2274,7 @@
       "advisory_parameters": [
         "sign_scope"
       ],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "numeric_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -1960,7 +2312,7 @@
     "7-02-009": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "numeric_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -1998,7 +2350,7 @@
     "7-02-011": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "numeric_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -2034,7 +2386,7 @@
     "7-02-012": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "numeric_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -2072,7 +2424,7 @@
       "advisory_parameters": [
         "expression_shape"
       ],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "numeric_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -2110,7 +2462,7 @@
     "7-02-015": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "numeric_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -2152,7 +2504,7 @@
     "7-02-016": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "linear_equation",
       "enforced_parameters": [
         "number_domain",
@@ -2189,7 +2541,7 @@
     "7-02-017": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "linear_equation",
       "enforced_parameters": [
         "number_domain",
@@ -2226,7 +2578,7 @@
     "7-02-018": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "linear_equation",
       "enforced_parameters": [
         "number_domain",
@@ -2263,7 +2615,7 @@
     "7-02-019": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "linear_equation",
       "enforced_parameters": [
         "number_domain",
@@ -2300,7 +2652,7 @@
     "7-02-020": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "linear_equation",
       "enforced_parameters": [
         "number_domain",
@@ -2338,7 +2690,7 @@
     "7-03-004": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "absolute_opposite",
       "enforced_parameters": [
         "concepts",
@@ -2374,7 +2726,7 @@
     "7-03-005": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "absolute_opposite",
       "enforced_parameters": [
         "concepts",
@@ -2411,7 +2763,7 @@
     "7-03-006": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "number_ordering",
       "enforced_parameters": [
         "number_domain"
@@ -2444,7 +2796,7 @@
     "7-03-007": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "fraction_decimal",
       "enforced_parameters": [
         "concepts",
@@ -2479,7 +2831,7 @@
     "7-03-008": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "fraction_decimal",
       "enforced_parameters": [
         "concepts",
@@ -2514,7 +2866,7 @@
     "7-03-009": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "numeric_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -2550,7 +2902,7 @@
     "7-03-010": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "numeric_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -2586,7 +2938,7 @@
     "7-03-011": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "numeric_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -2623,7 +2975,7 @@
     "7-03-012": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "numeric_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -2661,7 +3013,7 @@
       "advisory_parameters": [
         "expression_shape"
       ],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "numeric_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -2705,7 +3057,7 @@
       "advisory_parameters": [
         "expression_shape"
       ],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "numeric_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -2743,7 +3095,7 @@
     "7-03-016": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "linear_equation",
       "enforced_parameters": [
         "number_domain",
@@ -2780,7 +3132,7 @@
     "7-03-017": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "linear_equation",
       "enforced_parameters": [
         "number_domain",
@@ -2817,7 +3169,7 @@
     "7-03-018": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "linear_equation",
       "enforced_parameters": [
         "number_domain",
@@ -2854,7 +3206,7 @@
     "7-03-019": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "linear_equation",
       "enforced_parameters": [
         "number_domain",
@@ -2892,7 +3244,7 @@
     "7-03-021": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "decimal_rounding",
       "enforced_parameters": [
         "concepts"
@@ -2925,10 +3277,834 @@
       ],
       "reviewer_note": "Invarijanta: školsko half-up zaokruživanje nad egzaktnim razlomcima; bez a≈b jednakosti."
     },
+    "7-04-001": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "angle_relationships_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0125",
+        "KS_2018-0126"
+      ],
+      "family_id": "angle_relationships_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "7-04-001",
+      "level_bounds": {
+        "1": "jedan imenovani odnos, male mjere",
+        "2": "dvokoračni odnosi i minute",
+        "3": "trokoračni odnosi i odnosi zadati razlikom"
+      },
+      "parameters": {
+        "kinds": [
+          "parallel_normal_arms"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: parallel_normal_arms",
+        "- svi uglovi su zadati mjerama — crtež nije potreban",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: imenovani brojevni odnos uglova; zbirovi 90/180/360 egzaktni."
+    },
+    "7-04-002": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "angle_relationships_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0125",
+        "KS_2018-0126"
+      ],
+      "family_id": "angle_relationships_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "7-04-002",
+      "level_bounds": {
+        "1": "jedan imenovani odnos, male mjere",
+        "2": "dvokoračni odnosi i minute",
+        "3": "trokoračni odnosi i odnosi zadati razlikom"
+      },
+      "parameters": {
+        "kinds": [
+          "parallel_normal_arms"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: parallel_normal_arms",
+        "- svi uglovi su zadati mjerama — crtež nije potreban",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: imenovani brojevni odnos uglova; zbirovi 90/180/360 egzaktni."
+    },
+    "7-04-006": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "angle_relationships_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0125",
+        "KS_2018-0129",
+        "KS_2018-0157",
+        "KS_2018-0291"
+      ],
+      "family_id": "angle_relationships_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "7-04-006",
+      "level_bounds": {
+        "1": "jedan imenovani odnos, male mjere",
+        "2": "dvokoračni odnosi i minute",
+        "3": "trokoračni odnosi i odnosi zadati razlikom"
+      },
+      "parameters": {
+        "kinds": [
+          "classify_triangle_sides"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: classify_triangle_sides",
+        "- svi uglovi su zadati mjerama — crtež nije potreban",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: imenovani brojevni odnos uglova; zbirovi 90/180/360 egzaktni."
+    },
+    "7-04-007": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "angle_relationships_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0129"
+      ],
+      "family_id": "angle_relationships_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "7-04-007",
+      "level_bounds": {
+        "1": "jedan imenovani odnos, male mjere",
+        "2": "dvokoračni odnosi i minute",
+        "3": "trokoračni odnosi i odnosi zadati razlikom"
+      },
+      "parameters": {
+        "kinds": [
+          "classify_triangle_angles"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: classify_triangle_angles",
+        "- svi uglovi su zadati mjerama — crtež nije potreban",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: imenovani brojevni odnos uglova; zbirovi 90/180/360 egzaktni."
+    },
+    "7-04-008": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "angle_relationships_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0125",
+        "KS_2018-0134",
+        "KS_2018-0135",
+        "KS_2018-0136"
+      ],
+      "family_id": "angle_relationships_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "7-04-008",
+      "level_bounds": {
+        "1": "jedan imenovani odnos, male mjere",
+        "2": "dvokoračni odnosi i minute",
+        "3": "trokoračni odnosi i odnosi zadati razlikom"
+      },
+      "parameters": {
+        "kinds": [
+          "triangle_third_angle"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: triangle_third_angle",
+        "- svi uglovi su zadati mjerama — crtež nije potreban",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: imenovani brojevni odnos uglova; zbirovi 90/180/360 egzaktni."
+    },
+    "7-04-009": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "angle_relationships_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0125"
+      ],
+      "family_id": "angle_relationships_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "7-04-009",
+      "level_bounds": {
+        "1": "jedan imenovani odnos, male mjere",
+        "2": "dvokoračni odnosi i minute",
+        "3": "trokoračni odnosi i odnosi zadati razlikom"
+      },
+      "parameters": {
+        "kinds": [
+          "exterior_angle"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: exterior_angle",
+        "- svi uglovi su zadati mjerama — crtež nije potreban",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: imenovani brojevni odnos uglova; zbirovi 90/180/360 egzaktni."
+    },
+    "7-04-010": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "angle_relationships_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0134",
+        "KS_2018-0135"
+      ],
+      "family_id": "angle_relationships_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "7-04-010",
+      "level_bounds": {
+        "1": "jedan imenovani odnos, male mjere",
+        "2": "dvokoračni odnosi i minute",
+        "3": "trokoračni odnosi i odnosi zadati razlikom"
+      },
+      "parameters": {
+        "kinds": [
+          "exterior_from_interior"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: exterior_from_interior",
+        "- svi uglovi su zadati mjerama — crtež nije potreban",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: imenovani brojevni odnos uglova; zbirovi 90/180/360 egzaktni."
+    },
+    "7-04-011": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "angle_relationships_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0137",
+        "RS_2014-0045"
+      ],
+      "family_id": "angle_relationships_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "7-04-011",
+      "level_bounds": {
+        "1": "jedan imenovani odnos, male mjere",
+        "2": "dvokoračni odnosi i minute",
+        "3": "trokoračni odnosi i odnosi zadati razlikom"
+      },
+      "parameters": {
+        "kinds": [
+          "side_angle_order"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: side_angle_order",
+        "- svi uglovi su zadati mjerama — crtež nije potreban",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: imenovani brojevni odnos uglova; zbirovi 90/180/360 egzaktni."
+    },
+    "7-04-012": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "angle_relationships_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-7-04-012"
+      ],
+      "family_id": "angle_relationships_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "7-04-012",
+      "level_bounds": {
+        "1": "jedan imenovani odnos, male mjere",
+        "2": "dvokoračni odnosi i minute",
+        "3": "trokoračni odnosi i odnosi zadati razlikom"
+      },
+      "parameters": {
+        "kinds": [
+          "triangle_inequality"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: triangle_inequality",
+        "- svi uglovi su zadati mjerama — crtež nije potreban",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: imenovani brojevni odnos uglova; zbirovi 90/180/360 egzaktni."
+    },
+    "7-04-018": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "angle_relationships_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0125",
+        "KS_2018-0132",
+        "KS_2018-0133",
+        "KS_2018-0167",
+        "KS_2018-0209"
+      ],
+      "family_id": "angle_relationships_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "7-04-018",
+      "level_bounds": {
+        "1": "jedan imenovani odnos, male mjere",
+        "2": "dvokoračni odnosi i minute",
+        "3": "trokoračni odnosi i odnosi zadati razlikom"
+      },
+      "parameters": {
+        "kinds": [
+          "isosceles_angles"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: isosceles_angles",
+        "- svi uglovi su zadati mjerama — crtež nije potreban",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: imenovani brojevni odnos uglova; zbirovi 90/180/360 egzaktni."
+    },
+    "7-04-019": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "angle_relationships_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0140"
+      ],
+      "family_id": "angle_relationships_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "7-04-019",
+      "level_bounds": {
+        "1": "jedan imenovani odnos, male mjere",
+        "2": "dvokoračni odnosi i minute",
+        "3": "trokoračni odnosi i odnosi zadati razlikom"
+      },
+      "parameters": {
+        "kinds": [
+          "right_triangle_acute"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: right_triangle_acute",
+        "- svi uglovi su zadati mjerama — crtež nije potreban",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: imenovani brojevni odnos uglova; zbirovi 90/180/360 egzaktni."
+    },
+    "7-04-025": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "geometry_formula_2d",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0155"
+      ],
+      "family_id": "geometry_formula_2d",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "7-04-025",
+      "level_bounds": {
+        "1": "direktna primjena jedne formule malim brojevima",
+        "2": "inverzni zadatak (traži se stranica/visina) ili veći brojevi",
+        "3": "dvokoračne veličine, koeficijenti i složeniji oblici"
+      },
+      "parameters": {
+        "kinds": [
+          "triangle_midline"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: triangle_midline",
+        "- sve tražene veličine su ZADATE brojevima — crtež nije potreban",
+        "- notacija: P površina, O obim, d dijagonala, r poluprečnik, R prečnik (R = 2r)",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: kanonske formule i notacija (P/O/d/r/R=2r); egzaktan račun."
+    },
+    "7-05-002": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "angle_relationships_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0134",
+        "RS_2014-0055"
+      ],
+      "family_id": "angle_relationships_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "7-05-002",
+      "level_bounds": {
+        "1": "jedan imenovani odnos, male mjere",
+        "2": "dvokoračni odnosi i minute",
+        "3": "trokoračni odnosi i odnosi zadati razlikom"
+      },
+      "parameters": {
+        "kinds": [
+          "quad_fourth_angle"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: quad_fourth_angle",
+        "- svi uglovi su zadati mjerama — crtež nije potreban",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: imenovani brojevni odnos uglova; zbirovi 90/180/360 egzaktni."
+    },
+    "7-05-003": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "angle_relationships_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "RS_2014-0055"
+      ],
+      "family_id": "angle_relationships_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "7-05-003",
+      "level_bounds": {
+        "1": "jedan imenovani odnos, male mjere",
+        "2": "dvokoračni odnosi i minute",
+        "3": "trokoračni odnosi i odnosi zadati razlikom"
+      },
+      "parameters": {
+        "kinds": [
+          "quad_exterior"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: quad_exterior",
+        "- svi uglovi su zadati mjerama — crtež nije potreban",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: imenovani brojevni odnos uglova; zbirovi 90/180/360 egzaktni."
+    },
+    "7-05-012": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "geometry_formula_2d",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0155",
+        "KS_2018-0162",
+        "KS_2018-0167",
+        "KS_2018-0212"
+      ],
+      "family_id": "geometry_formula_2d",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "7-05-012",
+      "level_bounds": {
+        "1": "direktna primjena jedne formule malim brojevima",
+        "2": "inverzni zadatak (traži se stranica/visina) ili veći brojevi",
+        "3": "dvokoračne veličine, koeficijenti i složeniji oblici"
+      },
+      "parameters": {
+        "kinds": [
+          "trapezoid_midline"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: trapezoid_midline",
+        "- sve tražene veličine su ZADATE brojevima — crtež nije potreban",
+        "- notacija: P površina, O obim, d dijagonala, r poluprečnik, R prečnik (R = 2r)",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: kanonske formule i notacija (P/O/d/r/R=2r); egzaktan račun."
+    },
+    "7-05-016": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "geometry_formula_2d",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0155",
+        "KS_2018-0167"
+      ],
+      "family_id": "geometry_formula_2d",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "7-05-016",
+      "level_bounds": {
+        "1": "direktna primjena jedne formule malim brojevima",
+        "2": "inverzni zadatak (traži se stranica/visina) ili veći brojevi",
+        "3": "dvokoračne veličine, koeficijenti i složeniji oblici"
+      },
+      "parameters": {
+        "kinds": [
+          "triangle_perimeter"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: triangle_perimeter",
+        "- sve tražene veličine su ZADATE brojevima — crtež nije potreban",
+        "- notacija: P površina, O obim, d dijagonala, r poluprečnik, R prečnik (R = 2r)",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: kanonske formule i notacija (P/O/d/r/R=2r); egzaktan račun."
+    },
+    "7-05-017": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "geometry_formula_2d",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0155",
+        "KS_2018-0167"
+      ],
+      "family_id": "geometry_formula_2d",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "7-05-017",
+      "level_bounds": {
+        "1": "direktna primjena jedne formule malim brojevima",
+        "2": "inverzni zadatak (traži se stranica/visina) ili veći brojevi",
+        "3": "dvokoračne veličine, koeficijenti i složeniji oblici"
+      },
+      "parameters": {
+        "kinds": [
+          "quad_perimeter"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: quad_perimeter",
+        "- sve tražene veličine su ZADATE brojevima — crtež nije potreban",
+        "- notacija: P površina, O obim, d dijagonala, r poluprečnik, R prečnik (R = 2r)",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: kanonske formule i notacija (P/O/d/r/R=2r); egzaktan račun."
+    },
+    "7-05-019": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "geometry_formula_2d",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0159",
+        "KS_2018-0167",
+        "RS_2014-0054",
+        "RS_2014-0057"
+      ],
+      "family_id": "geometry_formula_2d",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "7-05-019",
+      "level_bounds": {
+        "1": "direktna primjena jedne formule malim brojevima",
+        "2": "inverzni zadatak (traži se stranica/visina) ili veći brojevi",
+        "3": "dvokoračne veličine, koeficijenti i složeniji oblici"
+      },
+      "parameters": {
+        "kinds": [
+          "rectangle_area",
+          "rectangle_perimeter",
+          "square_area",
+          "square_perimeter"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: rectangle_area, rectangle_perimeter, square_area, square_perimeter",
+        "- sve tražene veličine su ZADATE brojevima — crtež nije potreban",
+        "- notacija: P površina, O obim, d dijagonala, r poluprečnik, R prečnik (R = 2r)",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: kanonske formule i notacija (P/O/d/r/R=2r); egzaktan račun."
+    },
+    "7-05-020": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "geometry_formula_2d",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0167"
+      ],
+      "family_id": "geometry_formula_2d",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "7-05-020",
+      "level_bounds": {
+        "1": "direktna primjena jedne formule malim brojevima",
+        "2": "inverzni zadatak (traži se stranica/visina) ili veći brojevi",
+        "3": "dvokoračne veličine, koeficijenti i složeniji oblici"
+      },
+      "parameters": {
+        "kinds": [
+          "parallelogram_area",
+          "parallelogram_perimeter"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: parallelogram_area, parallelogram_perimeter",
+        "- sve tražene veličine su ZADATE brojevima — crtež nije potreban",
+        "- notacija: P površina, O obim, d dijagonala, r poluprečnik, R prečnik (R = 2r)",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: kanonske formule i notacija (P/O/d/r/R=2r); egzaktan račun."
+    },
+    "7-05-021": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "geometry_formula_2d",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0155",
+        "KS_2018-0166",
+        "KS_2018-0167",
+        "RS_2014-0056"
+      ],
+      "family_id": "geometry_formula_2d",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "7-05-021",
+      "level_bounds": {
+        "1": "direktna primjena jedne formule malim brojevima",
+        "2": "inverzni zadatak (traži se stranica/visina) ili veći brojevi",
+        "3": "dvokoračne veličine, koeficijenti i složeniji oblici"
+      },
+      "parameters": {
+        "kinds": [
+          "triangle_area"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: triangle_area",
+        "- sve tražene veličine su ZADATE brojevima — crtež nije potreban",
+        "- notacija: P površina, O obim, d dijagonala, r poluprečnik, R prečnik (R = 2r)",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: kanonske formule i notacija (P/O/d/r/R=2r); egzaktan račun."
+    },
+    "7-05-022": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "geometry_formula_2d",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0167"
+      ],
+      "family_id": "geometry_formula_2d",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "7-05-022",
+      "level_bounds": {
+        "1": "direktna primjena jedne formule malim brojevima",
+        "2": "inverzni zadatak (traži se stranica/visina) ili veći brojevi",
+        "3": "dvokoračne veličine, koeficijenti i složeniji oblici"
+      },
+      "parameters": {
+        "kinds": [
+          "trapezoid_area"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: trapezoid_area",
+        "- sve tražene veličine su ZADATE brojevima — crtež nije potreban",
+        "- notacija: P površina, O obim, d dijagonala, r poluprečnik, R prečnik (R = 2r)",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: kanonske formule i notacija (P/O/d/r/R=2r); egzaktan račun."
+    },
+    "7-05-023": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "geometry_formula_2d",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-7-05-023"
+      ],
+      "family_id": "geometry_formula_2d",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "7-05-023",
+      "level_bounds": {
+        "1": "direktna primjena jedne formule malim brojevima",
+        "2": "inverzni zadatak (traži se stranica/visina) ili veći brojevi",
+        "3": "dvokoračne veličine, koeficijenti i složeniji oblici"
+      },
+      "parameters": {
+        "kinds": [
+          "deltoid_area",
+          "rhombus_area_diagonals",
+          "rhombus_perimeter"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: deltoid_area, rhombus_area_diagonals, rhombus_perimeter",
+        "- sve tražene veličine su ZADATE brojevima — crtež nije potreban",
+        "- notacija: P površina, O obim, d dijagonala, r poluprečnik, R prečnik (R = 2r)",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: kanonske formule i notacija (P/O/d/r/R=2r); egzaktan račun."
+    },
+    "7-05-024": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "geometry_formula_2d",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-7-05-024"
+      ],
+      "family_id": "geometry_formula_2d",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "7-05-024",
+      "level_bounds": {
+        "1": "direktna primjena jedne formule malim brojevima",
+        "2": "inverzni zadatak (traži se stranica/visina) ili veći brojevi",
+        "3": "dvokoračne veličine, koeficijenti i složeniji oblici"
+      },
+      "parameters": {
+        "kinds": [
+          "orthodiagonal_area"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: orthodiagonal_area",
+        "- sve tražene veličine su ZADATE brojevima — crtež nije potreban",
+        "- notacija: P površina, O obim, d dijagonala, r poluprečnik, R prečnik (R = 2r)",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: kanonske formule i notacija (P/O/d/r/R=2r); egzaktan račun."
+    },
     "8-01-004": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "number_ordering",
       "enforced_parameters": [
         "number_domain"
@@ -2960,7 +4136,7 @@
     "8-01-005": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "absolute_opposite",
       "enforced_parameters": [
         "concepts",
@@ -2995,7 +4171,7 @@
     "8-01-006": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "power_arithmetic",
       "enforced_parameters": [
         "concepts"
@@ -3028,7 +4204,7 @@
     "8-01-007": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "square_root",
       "enforced_parameters": [
         "concepts"
@@ -3062,7 +4238,7 @@
     "8-01-008": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "square_root",
       "enforced_parameters": [
         "concepts"
@@ -3099,7 +4275,7 @@
     "8-01-009": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "simple_quadratic",
       "enforced_parameters": [
         "shapes"
@@ -3133,7 +4309,7 @@
     "8-01-010": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "square_root",
       "enforced_parameters": [
         "concepts"
@@ -3168,7 +4344,7 @@
     "8-01-011": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "square_root",
       "enforced_parameters": [
         "concepts"
@@ -3207,7 +4383,7 @@
       "advisory_parameters": [
         "expression_shape"
       ],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "numeric_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -3247,7 +4423,7 @@
     "8-01-013": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "power_arithmetic",
       "enforced_parameters": [
         "concepts"
@@ -3280,7 +4456,7 @@
     "8-01-014": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "power_arithmetic",
       "enforced_parameters": [
         "concepts"
@@ -3313,7 +4489,7 @@
     "8-01-015": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "power_arithmetic",
       "enforced_parameters": [
         "concepts"
@@ -3349,7 +4525,7 @@
     "8-01-016": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "power_arithmetic",
       "enforced_parameters": [
         "concepts"
@@ -3384,7 +4560,7 @@
     "8-01-017": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "power_arithmetic",
       "enforced_parameters": [
         "concepts"
@@ -3417,7 +4593,7 @@
     "8-02-005": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "linear_function",
       "enforced_parameters": [
         "concepts"
@@ -3454,7 +4630,7 @@
     "8-02-006": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "linear_function",
       "enforced_parameters": [
         "concepts"
@@ -3487,7 +4663,7 @@
     "8-02-010": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "linear_function",
       "enforced_parameters": [
         "concepts"
@@ -3520,7 +4696,7 @@
     "8-02-011": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "linear_function",
       "enforced_parameters": [
         "concepts"
@@ -3554,7 +4730,7 @@
     "8-03-001": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "ratio_proportion",
       "enforced_parameters": [
         "concepts"
@@ -3587,7 +4763,7 @@
     "8-03-002": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "ratio_proportion",
       "enforced_parameters": [
         "concepts"
@@ -3621,7 +4797,7 @@
     "8-03-003": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "ratio_proportion",
       "enforced_parameters": [
         "concepts"
@@ -3654,7 +4830,7 @@
     "8-03-004": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "ratio_proportion",
       "enforced_parameters": [
         "concepts"
@@ -3688,7 +4864,7 @@
     "8-03-005": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "ratio_proportion",
       "enforced_parameters": [
         "concepts"
@@ -3721,7 +4897,7 @@
     "8-03-006": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "linear_function",
       "enforced_parameters": [
         "concepts",
@@ -3758,7 +4934,7 @@
     "8-03-007": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "linear_function",
       "enforced_parameters": [
         "concepts",
@@ -3794,7 +4970,7 @@
     "8-03-010": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "ratio_proportion",
       "enforced_parameters": [
         "concepts"
@@ -3827,7 +5003,7 @@
     "8-03-012": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "ratio_proportion",
       "enforced_parameters": [
         "concepts"
@@ -3860,7 +5036,7 @@
     "8-03-017": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "percent_basic",
       "enforced_parameters": [
         "concepts"
@@ -3895,7 +5071,7 @@
     "8-03-018": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "percent_basic",
       "enforced_parameters": [
         "concepts"
@@ -3929,7 +5105,7 @@
     "8-03-020": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "ratio_proportion",
       "enforced_parameters": [
         "concepts"
@@ -3961,10 +5137,925 @@
       ],
       "reviewer_note": "Invarijanta: unakrsni proizvodi egzaktni; količnici opcija međusobno različiti."
     },
+    "8-04-001": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "pythagoras_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0203",
+        "KS_2018-0204",
+        "KS_2018-0211"
+      ],
+      "family_id": "pythagoras_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-04-001",
+      "level_bounds": {
+        "1": "osnovne Pitagorine trojke",
+        "2": "veće trojke i primjene na figure",
+        "3": "egzaktni korijeni i složenije primjene"
+      },
+      "parameters": {
+        "kinds": [
+          "hypotenuse",
+          "verify_triple"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: hypotenuse, verify_triple",
+        "- sve dužine su zadate brojevima; rezultat je egzaktan (cio broj ili korijen), nikad približna decimala",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: c² = a² + b² egzaktno; rezultat cio broj ili korijen."
+    },
+    "8-04-002": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "pythagoras_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0212"
+      ],
+      "family_id": "pythagoras_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-04-002",
+      "level_bounds": {
+        "1": "osnovne Pitagorine trojke",
+        "2": "veće trojke i primjene na figure",
+        "3": "egzaktni korijeni i složenije primjene"
+      },
+      "parameters": {
+        "kinds": [
+          "verify_triple"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: verify_triple",
+        "- sve dužine su zadate brojevima; rezultat je egzaktan (cio broj ili korijen), nikad približna decimala",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: c² = a² + b² egzaktno; rezultat cio broj ili korijen."
+    },
+    "8-04-003": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "pythagoras_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-8-04-003"
+      ],
+      "family_id": "pythagoras_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-04-003",
+      "level_bounds": {
+        "1": "osnovne Pitagorine trojke",
+        "2": "veće trojke i primjene na figure",
+        "3": "egzaktni korijeni i složenije primjene"
+      },
+      "parameters": {
+        "kinds": [
+          "leg"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: leg",
+        "- sve dužine su zadate brojevima; rezultat je egzaktan (cio broj ili korijen), nikad približna decimala",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: c² = a² + b² egzaktno; rezultat cio broj ili korijen."
+    },
+    "8-04-004": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "pythagoras_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0167",
+        "KS_2018-0212"
+      ],
+      "family_id": "pythagoras_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-04-004",
+      "level_bounds": {
+        "1": "osnovne Pitagorine trojke",
+        "2": "veće trojke i primjene na figure",
+        "3": "egzaktni korijeni i složenije primjene"
+      },
+      "parameters": {
+        "kinds": [
+          "square_diagonal"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: square_diagonal",
+        "- sve dužine su zadate brojevima; rezultat je egzaktan (cio broj ili korijen), nikad približna decimala",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: c² = a² + b² egzaktno; rezultat cio broj ili korijen."
+    },
+    "8-04-005": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "pythagoras_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0212"
+      ],
+      "family_id": "pythagoras_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-04-005",
+      "level_bounds": {
+        "1": "osnovne Pitagorine trojke",
+        "2": "veće trojke i primjene na figure",
+        "3": "egzaktni korijeni i složenije primjene"
+      },
+      "parameters": {
+        "kinds": [
+          "rectangle_diagonal"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: rectangle_diagonal",
+        "- sve dužine su zadate brojevima; rezultat je egzaktan (cio broj ili korijen), nikad približna decimala",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: c² = a² + b² egzaktno; rezultat cio broj ili korijen."
+    },
+    "8-04-006": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "pythagoras_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0212"
+      ],
+      "family_id": "pythagoras_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-04-006",
+      "level_bounds": {
+        "1": "osnovne Pitagorine trojke",
+        "2": "veće trojke i primjene na figure",
+        "3": "egzaktni korijeni i složenije primjene"
+      },
+      "parameters": {
+        "kinds": [
+          "isosceles_height"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: isosceles_height",
+        "- sve dužine su zadate brojevima; rezultat je egzaktan (cio broj ili korijen), nikad približna decimala",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: c² = a² + b² egzaktno; rezultat cio broj ili korijen."
+    },
+    "8-04-007": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "pythagoras_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-8-04-007"
+      ],
+      "family_id": "pythagoras_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-04-007",
+      "level_bounds": {
+        "1": "osnovne Pitagorine trojke",
+        "2": "veće trojke i primjene na figure",
+        "3": "egzaktni korijeni i složenije primjene"
+      },
+      "parameters": {
+        "kinds": [
+          "equilateral_height"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: equilateral_height",
+        "- sve dužine su zadate brojevima; rezultat je egzaktan (cio broj ili korijen), nikad približna decimala",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: c² = a² + b² egzaktno; rezultat cio broj ili korijen."
+    },
+    "8-04-008": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "pythagoras_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-8-04-008"
+      ],
+      "family_id": "pythagoras_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-04-008",
+      "level_bounds": {
+        "1": "osnovne Pitagorine trojke",
+        "2": "veće trojke i primjene na figure",
+        "3": "egzaktni korijeni i složenije primjene"
+      },
+      "parameters": {
+        "kinds": [
+          "equilateral_area"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: equilateral_area",
+        "- sve dužine su zadate brojevima; rezultat je egzaktan (cio broj ili korijen), nikad približna decimala",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: c² = a² + b² egzaktno; rezultat cio broj ili korijen."
+    },
+    "8-04-009": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "pythagoras_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-8-04-009"
+      ],
+      "family_id": "pythagoras_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-04-009",
+      "level_bounds": {
+        "1": "osnovne Pitagorine trojke",
+        "2": "veće trojke i primjene na figure",
+        "3": "egzaktni korijeni i složenije primjene"
+      },
+      "parameters": {
+        "kinds": [
+          "rhombus_side"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: rhombus_side",
+        "- sve dužine su zadate brojevima; rezultat je egzaktan (cio broj ili korijen), nikad približna decimala",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: c² = a² + b² egzaktno; rezultat cio broj ili korijen."
+    },
+    "8-04-010": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "pythagoras_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0163",
+        "KS_2018-0167"
+      ],
+      "family_id": "pythagoras_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-04-010",
+      "level_bounds": {
+        "1": "osnovne Pitagorine trojke",
+        "2": "veće trojke i primjene na figure",
+        "3": "egzaktni korijeni i složenije primjene"
+      },
+      "parameters": {
+        "kinds": [
+          "isosceles_trapezoid_height"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: isosceles_trapezoid_height",
+        "- sve dužine su zadate brojevima; rezultat je egzaktan (cio broj ili korijen), nikad približna decimala",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: c² = a² + b² egzaktno; rezultat cio broj ili korijen."
+    },
+    "8-04-011": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "pythagoras_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0167",
+        "KS_2018-0209"
+      ],
+      "family_id": "pythagoras_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-04-011",
+      "level_bounds": {
+        "1": "osnovne Pitagorine trojke",
+        "2": "veće trojke i primjene na figure",
+        "3": "egzaktni korijeni i složenije primjene"
+      },
+      "parameters": {
+        "kinds": [
+          "right_trapezoid_leg"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: right_trapezoid_leg",
+        "- sve dužine su zadate brojevima; rezultat je egzaktan (cio broj ili korijen), nikad približna decimala",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: c² = a² + b² egzaktno; rezultat cio broj ili korijen."
+    },
+    "8-04-012": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "pythagoras_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-8-04-012"
+      ],
+      "family_id": "pythagoras_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-04-012",
+      "level_bounds": {
+        "1": "osnovne Pitagorine trojke",
+        "2": "veće trojke i primjene na figure",
+        "3": "egzaktni korijeni i složenije primjene"
+      },
+      "parameters": {
+        "kinds": [
+          "chord_distance"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: chord_distance",
+        "- sve dužine su zadate brojevima; rezultat je egzaktan (cio broj ili korijen), nikad približna decimala",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: c² = a² + b² egzaktno; rezultat cio broj ili korijen."
+    },
+    "8-05-002": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "solid_geometry_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-8-05-002"
+      ],
+      "family_id": "solid_geometry_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-05-002",
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "parameters": {
+        "kinds": [
+          "polyhedron_elements"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: polyhedron_elements",
+        "- notacija: B baza, M omotač, P ukupna površina, V zapremina, H visina tijela, h_a apotema, D prostorna dijagonala",
+        "- π ostaje simbolički u rezultatu; korijeni ostaju egzaktni",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    "8-05-003": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "solid_geometry_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-8-05-003"
+      ],
+      "family_id": "solid_geometry_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-05-003",
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "parameters": {
+        "kinds": [
+          "polyhedron_elements"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: polyhedron_elements",
+        "- notacija: B baza, M omotač, P ukupna površina, V zapremina, H visina tijela, h_a apotema, D prostorna dijagonala",
+        "- π ostaje simbolički u rezultatu; korijeni ostaju egzaktni",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    "8-05-004": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "solid_geometry_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-8-05-004"
+      ],
+      "family_id": "solid_geometry_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-05-004",
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "parameters": {
+        "kinds": [
+          "polyhedron_elements"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: polyhedron_elements",
+        "- notacija: B baza, M omotač, P ukupna površina, V zapremina, H visina tijela, h_a apotema, D prostorna dijagonala",
+        "- π ostaje simbolički u rezultatu; korijeni ostaju egzaktni",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    "8-05-005": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "solid_geometry_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-8-05-005"
+      ],
+      "family_id": "solid_geometry_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-05-005",
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "parameters": {
+        "kinds": [
+          "prism3_lateral",
+          "prism3_volume"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: prism3_lateral, prism3_volume",
+        "- notacija: B baza, M omotač, P ukupna površina, V zapremina, H visina tijela, h_a apotema, D prostorna dijagonala",
+        "- π ostaje simbolički u rezultatu; korijeni ostaju egzaktni",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    "8-05-006": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "solid_geometry_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-8-05-006"
+      ],
+      "family_id": "solid_geometry_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-05-006",
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "parameters": {
+        "kinds": [
+          "prism4_lateral",
+          "prism4_surface",
+          "prism4_volume"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: prism4_lateral, prism4_surface, prism4_volume",
+        "- notacija: B baza, M omotač, P ukupna površina, V zapremina, H visina tijela, h_a apotema, D prostorna dijagonala",
+        "- π ostaje simbolički u rezultatu; korijeni ostaju egzaktni",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    "8-05-008": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "solid_geometry_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-8-05-008"
+      ],
+      "family_id": "solid_geometry_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-05-008",
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "parameters": {
+        "kinds": [
+          "pyramid4_apothem",
+          "pyramid4_lateral",
+          "pyramid4_surface",
+          "pyramid4_volume"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: pyramid4_apothem, pyramid4_lateral, pyramid4_surface, pyramid4_volume",
+        "- notacija: B baza, M omotač, P ukupna površina, V zapremina, H visina tijela, h_a apotema, D prostorna dijagonala",
+        "- π ostaje simbolički u rezultatu; korijeni ostaju egzaktni",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    "8-05-013": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "solid_geometry_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-8-05-013"
+      ],
+      "family_id": "solid_geometry_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-05-013",
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "parameters": {
+        "kinds": [
+          "prism3_lateral",
+          "prism4_lateral"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: prism3_lateral, prism4_lateral",
+        "- notacija: B baza, M omotač, P ukupna površina, V zapremina, H visina tijela, h_a apotema, D prostorna dijagonala",
+        "- π ostaje simbolički u rezultatu; korijeni ostaju egzaktni",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    "8-05-014": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "solid_geometry_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-8-05-014"
+      ],
+      "family_id": "solid_geometry_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-05-014",
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "parameters": {
+        "kinds": [
+          "prism4_surface"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: prism4_surface",
+        "- notacija: B baza, M omotač, P ukupna površina, V zapremina, H visina tijela, h_a apotema, D prostorna dijagonala",
+        "- π ostaje simbolički u rezultatu; korijeni ostaju egzaktni",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    "8-05-015": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "solid_geometry_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0376",
+        "KS_2018-0386",
+        "KS_2018-0402",
+        "RS_2014-0124"
+      ],
+      "family_id": "solid_geometry_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-05-015",
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "parameters": {
+        "kinds": [
+          "prism3_volume",
+          "prism4_volume"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: prism3_volume, prism4_volume",
+        "- notacija: B baza, M omotač, P ukupna površina, V zapremina, H visina tijela, h_a apotema, D prostorna dijagonala",
+        "- π ostaje simbolički u rezultatu; korijeni ostaju egzaktni",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    "8-05-016": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "solid_geometry_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-8-05-016"
+      ],
+      "family_id": "solid_geometry_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-05-016",
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "parameters": {
+        "kinds": [
+          "prism4_space_diagonal"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: prism4_space_diagonal",
+        "- notacija: B baza, M omotač, P ukupna površina, V zapremina, H visina tijela, h_a apotema, D prostorna dijagonala",
+        "- π ostaje simbolički u rezultatu; korijeni ostaju egzaktni",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    "8-05-017": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "solid_geometry_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-8-05-017"
+      ],
+      "family_id": "solid_geometry_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-05-017",
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "parameters": {
+        "kinds": [
+          "pyramid4_apothem"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: pyramid4_apothem",
+        "- notacija: B baza, M omotač, P ukupna površina, V zapremina, H visina tijela, h_a apotema, D prostorna dijagonala",
+        "- π ostaje simbolički u rezultatu; korijeni ostaju egzaktni",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    "8-05-018": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "solid_geometry_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-8-05-018"
+      ],
+      "family_id": "solid_geometry_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-05-018",
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "parameters": {
+        "kinds": [
+          "pyramid4_lateral"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: pyramid4_lateral",
+        "- notacija: B baza, M omotač, P ukupna površina, V zapremina, H visina tijela, h_a apotema, D prostorna dijagonala",
+        "- π ostaje simbolički u rezultatu; korijeni ostaju egzaktni",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    "8-05-019": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "solid_geometry_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-8-05-019"
+      ],
+      "family_id": "solid_geometry_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-05-019",
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "parameters": {
+        "kinds": [
+          "pyramid4_surface"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: pyramid4_surface",
+        "- notacija: B baza, M omotač, P ukupna površina, V zapremina, H visina tijela, h_a apotema, D prostorna dijagonala",
+        "- π ostaje simbolički u rezultatu; korijeni ostaju egzaktni",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    "8-05-020": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "solid_geometry_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-8-05-020"
+      ],
+      "family_id": "solid_geometry_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-05-020",
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "parameters": {
+        "kinds": [
+          "pyramid4_volume"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: pyramid4_volume",
+        "- notacija: B baza, M omotač, P ukupna površina, V zapremina, H visina tijela, h_a apotema, D prostorna dijagonala",
+        "- π ostaje simbolički u rezultatu; korijeni ostaju egzaktni",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
     "8-06-002": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "frequency_basic",
       "enforced_parameters": [
         "concepts"
@@ -3997,7 +6088,7 @@
     "8-06-003": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "frequency_basic",
       "enforced_parameters": [
         "concepts"
@@ -4031,7 +6122,7 @@
     "8-06-004": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "frequency_basic",
       "enforced_parameters": [
         "concepts"
@@ -4064,7 +6155,7 @@
     "8-06-009": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "arithmetic_mean",
       "enforced_parameters": [
         "concepts"
@@ -4100,7 +6191,7 @@
     "8-06-012": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "classical_probability",
       "enforced_parameters": [
         "concepts"
@@ -4134,7 +6225,7 @@
     "8-06-013": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "classical_probability",
       "enforced_parameters": [
         "concepts"
@@ -4168,7 +6259,7 @@
     "8-07-001": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "polynomial_basic",
       "enforced_parameters": [
         "concepts"
@@ -4204,7 +6295,7 @@
     "8-07-002": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "polynomial_basic",
       "enforced_parameters": [
         "concepts"
@@ -4234,10 +6325,113 @@
       ],
       "reviewer_note": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja."
     },
+    "8-07-003": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "polynomial_basic",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0264",
+        "KS_2018-0274",
+        "KS_2018-0289",
+        "RS_2014-0104"
+      ],
+      "family_id": "polynomial_basic",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-07-003",
+      "level_bounds": {
+        "1": "dva-tri člana, mali koeficijenti",
+        "2": "četiri člana, negativni koeficijenti",
+        "3": "viši stepeni i pet članova"
+      },
+      "parameters": {
+        "concepts": [
+          "combine_like_terms",
+          "like_terms_select"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: sređivanje polinoma, prepoznavanje sličnih monoma",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja."
+    },
+    "8-07-004": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "polynomial_basic",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-8-07-004"
+      ],
+      "family_id": "polynomial_basic",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-07-004",
+      "level_bounds": {
+        "1": "dva-tri člana, mali koeficijenti",
+        "2": "četiri člana, negativni koeficijenti",
+        "3": "viši stepeni i pet članova"
+      },
+      "parameters": {
+        "concepts": [
+          "combine_like_terms"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: sređivanje polinoma",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja."
+    },
+    "8-07-005": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "polynomial_basic",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-8-07-005"
+      ],
+      "family_id": "polynomial_basic",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-07-005",
+      "level_bounds": {
+        "1": "dva-tri člana, mali koeficijenti",
+        "2": "četiri člana, negativni koeficijenti",
+        "3": "viši stepeni i pet članova"
+      },
+      "parameters": {
+        "concepts": [
+          "monomial_mul_div"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: množenje i dijeljenje monoma",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja."
+    },
     "8-07-006": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "polynomial_basic",
       "enforced_parameters": [
         "concepts"
@@ -4271,7 +6465,7 @@
     "8-07-007": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "polynomial_basic",
       "enforced_parameters": [
         "concepts"
@@ -4304,7 +6498,7 @@
     "8-07-008": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "polynomial_basic",
       "enforced_parameters": [
         "concepts"
@@ -4337,10 +6531,151 @@
       ],
       "reviewer_note": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja."
     },
+    "8-07-009": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "polynomial_basic",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0212",
+        "KS_2018-0264",
+        "KS_2018-0284",
+        "KS_2018-0289"
+      ],
+      "family_id": "polynomial_basic",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-07-009",
+      "level_bounds": {
+        "1": "dva-tri člana, mali koeficijenti",
+        "2": "četiri člana, negativni koeficijenti",
+        "3": "viši stepeni i pet članova"
+      },
+      "parameters": {
+        "concepts": [
+          "square_of_binomial"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: kvadrat binoma (a ± b)²",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja."
+    },
+    "8-07-010": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "polynomial_basic",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0179",
+        "KS_2018-0181",
+        "KS_2018-0182",
+        "KS_2018-0280"
+      ],
+      "family_id": "polynomial_basic",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-07-010",
+      "level_bounds": {
+        "1": "dva-tri člana, mali koeficijenti",
+        "2": "četiri člana, negativni koeficijenti",
+        "3": "viši stepeni i pet članova"
+      },
+      "parameters": {
+        "concepts": [
+          "factor_difference_squares"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: faktorizacija razlike kvadrata",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja."
+    },
+    "8-07-011": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "polynomial_basic",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0264",
+        "KS_2018-0281",
+        "KS_2018-0289"
+      ],
+      "family_id": "polynomial_basic",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-07-011",
+      "level_bounds": {
+        "1": "dva-tri člana, mali koeficijenti",
+        "2": "četiri člana, negativni koeficijenti",
+        "3": "viši stepeni i pet članova"
+      },
+      "parameters": {
+        "concepts": [
+          "cube_of_binomial",
+          "sum_diff_cubes"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: kub binoma (a ± b)³, zbir i razlika kubova",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja."
+    },
+    "8-07-012": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "polynomial_basic",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0282"
+      ],
+      "family_id": "polynomial_basic",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-07-012",
+      "level_bounds": {
+        "1": "dva-tri člana, mali koeficijenti",
+        "2": "četiri člana, negativni koeficijenti",
+        "3": "viši stepeni i pet članova"
+      },
+      "parameters": {
+        "concepts": [
+          "factor_common"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: izlučivanje zajedničkog faktora",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja."
+    },
     "8-07-013": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "simple_quadratic",
       "enforced_parameters": [
         "shapes"
@@ -4371,10 +6706,308 @@
       ],
       "reviewer_note": "Invarijanta: potpun skup rješenja, provjerljiv uvrštavanjem."
     },
+    "8-08-002": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "geometry_formula_2d",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0292",
+        "KS_2018-0295"
+      ],
+      "family_id": "geometry_formula_2d",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-08-002",
+      "level_bounds": {
+        "1": "direktna primjena jedne formule malim brojevima",
+        "2": "inverzni zadatak (traži se stranica/visina) ili veći brojevi",
+        "3": "dvokoračne veličine, koeficijenti i složeniji oblici"
+      },
+      "parameters": {
+        "kinds": [
+          "polygon_interior_sum"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: polygon_interior_sum",
+        "- sve tražene veličine su ZADATE brojevima — crtež nije potreban",
+        "- notacija: P površina, O obim, d dijagonala, r poluprečnik, R prečnik (R = 2r)",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: kanonske formule i notacija (P/O/d/r/R=2r); egzaktan račun."
+    },
+    "8-08-004": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "geometry_formula_2d",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0294",
+        "KS_2018-0300",
+        "RS_2014-0088"
+      ],
+      "family_id": "geometry_formula_2d",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-08-004",
+      "level_bounds": {
+        "1": "direktna primjena jedne formule malim brojevima",
+        "2": "inverzni zadatak (traži se stranica/visina) ili veći brojevi",
+        "3": "dvokoračne veličine, koeficijenti i složeniji oblici"
+      },
+      "parameters": {
+        "kinds": [
+          "polygon_diagonals"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: polygon_diagonals",
+        "- sve tražene veličine su ZADATE brojevima — crtež nije potreban",
+        "- notacija: P površina, O obim, d dijagonala, r poluprečnik, R prečnik (R = 2r)",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: kanonske formule i notacija (P/O/d/r/R=2r); egzaktan račun."
+    },
+    "8-08-005": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "geometry_formula_2d",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0297",
+        "KS_2018-0300"
+      ],
+      "family_id": "geometry_formula_2d",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-08-005",
+      "level_bounds": {
+        "1": "direktna primjena jedne formule malim brojevima",
+        "2": "inverzni zadatak (traži se stranica/visina) ili veći brojevi",
+        "3": "dvokoračne veličine, koeficijenti i složeniji oblici"
+      },
+      "parameters": {
+        "kinds": [
+          "regular_polygon_angle",
+          "regular_polygon_perimeter"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: regular_polygon_angle, regular_polygon_perimeter",
+        "- sve tražene veličine su ZADATE brojevima — crtež nije potreban",
+        "- notacija: P površina, O obim, d dijagonala, r poluprečnik, R prečnik (R = 2r)",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: kanonske formule i notacija (P/O/d/r/R=2r); egzaktan račun."
+    },
+    "8-08-007": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "geometry_formula_2d",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0298",
+        "KS_2018-0299",
+        "KS_2018-0300"
+      ],
+      "family_id": "geometry_formula_2d",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-08-007",
+      "level_bounds": {
+        "1": "direktna primjena jedne formule malim brojevima",
+        "2": "inverzni zadatak (traži se stranica/visina) ili veći brojevi",
+        "3": "dvokoračne veličine, koeficijenti i složeniji oblici"
+      },
+      "parameters": {
+        "kinds": [
+          "quad_perimeter",
+          "regular_polygon_perimeter"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: quad_perimeter, regular_polygon_perimeter",
+        "- sve tražene veličine su ZADATE brojevima — crtež nije potreban",
+        "- notacija: P površina, O obim, d dijagonala, r poluprečnik, R prečnik (R = 2r)",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: kanonske formule i notacija (P/O/d/r/R=2r); egzaktan račun."
+    },
+    "8-08-009": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "geometry_formula_2d",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0300",
+        "KS_2018-0306",
+        "KS_2018-0307",
+        "KS_2018-0312"
+      ],
+      "family_id": "geometry_formula_2d",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-08-009",
+      "level_bounds": {
+        "1": "direktna primjena jedne formule malim brojevima",
+        "2": "inverzni zadatak (traži se stranica/visina) ili veći brojevi",
+        "3": "dvokoračne veličine, koeficijenti i složeniji oblici"
+      },
+      "parameters": {
+        "kinds": [
+          "circle_circumference"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: circle_circumference",
+        "- sve tražene veličine su ZADATE brojevima — crtež nije potreban",
+        "- notacija: P površina, O obim, d dijagonala, r poluprečnik, R prečnik (R = 2r)",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: kanonske formule i notacija (P/O/d/r/R=2r); egzaktan račun."
+    },
+    "8-08-010": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "geometry_formula_2d",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0300",
+        "KS_2018-0308",
+        "KS_2018-0312"
+      ],
+      "family_id": "geometry_formula_2d",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-08-010",
+      "level_bounds": {
+        "1": "direktna primjena jedne formule malim brojevima",
+        "2": "inverzni zadatak (traži se stranica/visina) ili veći brojevi",
+        "3": "dvokoračne veličine, koeficijenti i složeniji oblici"
+      },
+      "parameters": {
+        "kinds": [
+          "arc_length"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: arc_length",
+        "- sve tražene veličine su ZADATE brojevima — crtež nije potreban",
+        "- notacija: P površina, O obim, d dijagonala, r poluprečnik, R prečnik (R = 2r)",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: kanonske formule i notacija (P/O/d/r/R=2r); egzaktan račun."
+    },
+    "8-08-011": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "geometry_formula_2d",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0300",
+        "KS_2018-0309",
+        "KS_2018-0310",
+        "KS_2018-0311",
+        "KS_2018-0312"
+      ],
+      "family_id": "geometry_formula_2d",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-08-011",
+      "level_bounds": {
+        "1": "direktna primjena jedne formule malim brojevima",
+        "2": "inverzni zadatak (traži se stranica/visina) ili veći brojevi",
+        "3": "dvokoračne veličine, koeficijenti i složeniji oblici"
+      },
+      "parameters": {
+        "kinds": [
+          "circle_area"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: circle_area",
+        "- sve tražene veličine su ZADATE brojevima — crtež nije potreban",
+        "- notacija: P površina, O obim, d dijagonala, r poluprečnik, R prečnik (R = 2r)",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: kanonske formule i notacija (P/O/d/r/R=2r); egzaktan račun."
+    },
+    "8-08-012": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "geometry_formula_2d",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-8-08-012"
+      ],
+      "family_id": "geometry_formula_2d",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-08-012",
+      "level_bounds": {
+        "1": "direktna primjena jedne formule malim brojevima",
+        "2": "inverzni zadatak (traži se stranica/visina) ili veći brojevi",
+        "3": "dvokoračne veličine, koeficijenti i složeniji oblici"
+      },
+      "parameters": {
+        "kinds": [
+          "annulus_area",
+          "sector_area"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: annulus_area, sector_area",
+        "- sve tražene veličine su ZADATE brojevima — crtež nije potreban",
+        "- notacija: P površina, O obim, d dijagonala, r poluprečnik, R prečnik (R = 2r)",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: kanonske formule i notacija (P/O/d/r/R=2r); egzaktan račun."
+    },
     "9-01-001": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "polynomial_basic",
       "enforced_parameters": [
         "concepts"
@@ -4408,7 +7041,7 @@
     "9-03-001": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "linear_function",
       "enforced_parameters": [
         "concepts"
@@ -4441,7 +7074,7 @@
     "9-03-002": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "linear_function",
       "enforced_parameters": [
         "concepts"
@@ -4480,7 +7113,7 @@
     "9-03-003": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "linear_function",
       "enforced_parameters": [
         "concepts"
@@ -4513,7 +7146,7 @@
     "9-03-007": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "linear_function",
       "enforced_parameters": [
         "concepts"
@@ -4548,7 +7181,7 @@
     "9-03-008": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "linear_function",
       "enforced_parameters": [
         "concepts"
@@ -4581,7 +7214,7 @@
     "9-03-009": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "linear_function",
       "enforced_parameters": [
         "concepts"
@@ -4614,7 +7247,7 @@
     "9-03-011": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "linear_function",
       "enforced_parameters": [
         "concepts"
@@ -4647,7 +7280,7 @@
     "9-03-012": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "linear_function",
       "enforced_parameters": [
         "concepts"
@@ -4681,7 +7314,7 @@
     "9-03-013": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "linear_function",
       "enforced_parameters": [
         "concepts"
@@ -4714,7 +7347,7 @@
     "9-03-014": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "linear_function",
       "enforced_parameters": [
         "concepts"
@@ -4748,7 +7381,7 @@
     "9-04-001": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "linear_equation",
       "enforced_parameters": [
         "number_domain",
@@ -4795,7 +7428,7 @@
     "9-04-002": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "linear_equation",
       "enforced_parameters": [
         "number_domain",
@@ -4835,7 +7468,7 @@
     "9-04-003": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "linear_equation",
       "enforced_parameters": [
         "number_domain",
@@ -4872,7 +7505,7 @@
     "9-04-004": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "linear_equation",
       "enforced_parameters": [
         "number_domain",
@@ -4909,7 +7542,7 @@
     "9-04-008": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "linear_equation",
       "enforced_parameters": [
         "number_domain",
@@ -4946,7 +7579,7 @@
     "9-04-009": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "linear_equation",
       "enforced_parameters": [
         "number_domain",
@@ -4983,7 +7616,7 @@
     "9-04-012": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "linear_equation",
       "enforced_parameters": [
         "number_domain",
@@ -5024,7 +7657,7 @@
     "9-04-014": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "linear_equation",
       "enforced_parameters": [
         "number_domain",
@@ -5061,7 +7694,7 @@
     "9-04-016": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "linear_equation",
       "enforced_parameters": [
         "number_domain",
@@ -5098,7 +7731,7 @@
     "9-04-019": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "linear_equation",
       "enforced_parameters": [
         "number_domain",
@@ -5137,7 +7770,7 @@
     "9-04-020": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "linear_equation",
       "enforced_parameters": [
         "number_domain",
@@ -5174,7 +7807,7 @@
     "9-04-021": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "linear_equation",
       "enforced_parameters": [
         "number_domain",
@@ -5208,10 +7841,471 @@
       ],
       "reviewer_note": "Invarijanta: jedinstveno rješenje, provjera uvrštavanjem egzaktna."
     },
+    "9-05-001": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "linear_system_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0365"
+      ],
+      "family_id": "linear_system_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-05-001",
+      "level_bounds": {
+        "1": "izbor/provjera uređenog para",
+        "2": "direktna supstitucija (koeficijent 1)",
+        "3": "puno rješavanje i klasifikacija"
+      },
+      "parameters": {
+        "kinds": [
+          "single_equation"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: single_equation",
+        "- sistem ima cjelobrojne (ili razlomljene, gdje ugovor kaže) koeficijente; rješenje je uređeni par ili klasifikacija",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: rješenje uvršteno u OBJE jednačine; klasifikacija po determinanti."
+    },
+    "9-05-003": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "linear_system_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0354",
+        "KS_2018-0365",
+        "KS_2018-0366",
+        "KS_2018-0371",
+        "KS_2018-0375",
+        "KS_2018-0376",
+        "RS_2014-0138",
+        "RS_2014-0142"
+      ],
+      "family_id": "linear_system_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-05-003",
+      "level_bounds": {
+        "1": "izbor/provjera uređenog para",
+        "2": "direktna supstitucija (koeficijent 1)",
+        "3": "puno rješavanje i klasifikacija"
+      },
+      "parameters": {
+        "kinds": [
+          "verify_pair"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: verify_pair",
+        "- sistem ima cjelobrojne (ili razlomljene, gdje ugovor kaže) koeficijente; rješenje je uređeni par ili klasifikacija",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: rješenje uvršteno u OBJE jednačine; klasifikacija po determinanti."
+    },
+    "9-05-004": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "linear_system_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-9-05-004"
+      ],
+      "family_id": "linear_system_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-05-004",
+      "level_bounds": {
+        "1": "izbor/provjera uređenog para",
+        "2": "direktna supstitucija (koeficijent 1)",
+        "3": "puno rješavanje i klasifikacija"
+      },
+      "parameters": {
+        "kinds": [
+          "verify_pair"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: verify_pair",
+        "- sistem ima cjelobrojne (ili razlomljene, gdje ugovor kaže) koeficijente; rješenje je uređeni par ili klasifikacija",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: rješenje uvršteno u OBJE jednačine; klasifikacija po determinanti."
+    },
+    "9-05-005": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "linear_system_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0365",
+        "KS_2018-0368"
+      ],
+      "family_id": "linear_system_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-05-005",
+      "level_bounds": {
+        "1": "izbor/provjera uređenog para",
+        "2": "direktna supstitucija (koeficijent 1)",
+        "3": "puno rješavanje i klasifikacija"
+      },
+      "parameters": {
+        "kinds": [
+          "equivalent_system"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: equivalent_system",
+        "- sistem ima cjelobrojne (ili razlomljene, gdje ugovor kaže) koeficijente; rješenje je uređeni par ili klasifikacija",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: rješenje uvršteno u OBJE jednačine; klasifikacija po determinanti."
+    },
+    "9-05-007": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "linear_system_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0365",
+        "KS_2018-0372",
+        "KS_2018-0376",
+        "RS_2014-0141"
+      ],
+      "family_id": "linear_system_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-05-007",
+      "level_bounds": {
+        "1": "izbor/provjera uređenog para",
+        "2": "direktna supstitucija (koeficijent 1)",
+        "3": "puno rješavanje i klasifikacija"
+      },
+      "parameters": {
+        "kinds": [
+          "solve"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: solve",
+        "- sistem ima cjelobrojne (ili razlomljene, gdje ugovor kaže) koeficijente; rješenje je uređeni par ili klasifikacija",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: rješenje uvršteno u OBJE jednačine; klasifikacija po determinanti."
+    },
+    "9-05-008": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "linear_system_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0365",
+        "KS_2018-0373",
+        "KS_2018-0376",
+        "RS_2014-0140"
+      ],
+      "family_id": "linear_system_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-05-008",
+      "level_bounds": {
+        "1": "izbor/provjera uređenog para",
+        "2": "direktna supstitucija (koeficijent 1)",
+        "3": "puno rješavanje i klasifikacija"
+      },
+      "parameters": {
+        "kinds": [
+          "solve"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: solve",
+        "- sistem ima cjelobrojne (ili razlomljene, gdje ugovor kaže) koeficijente; rješenje je uređeni par ili klasifikacija",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: rješenje uvršteno u OBJE jednačine; klasifikacija po determinanti."
+    },
+    "9-05-009": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "linear_system_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-9-05-009"
+      ],
+      "family_id": "linear_system_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-05-009",
+      "level_bounds": {
+        "1": "izbor/provjera uređenog para",
+        "2": "direktna supstitucija (koeficijent 1)",
+        "3": "puno rješavanje i klasifikacija"
+      },
+      "parameters": {
+        "kinds": [
+          "classify",
+          "solve"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: classify, solve",
+        "- sistem ima cjelobrojne (ili razlomljene, gdje ugovor kaže) koeficijente; rješenje je uređeni par ili klasifikacija",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: rješenje uvršteno u OBJE jednačine; klasifikacija po determinanti."
+    },
+    "9-05-010": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "linear_system_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-9-05-010"
+      ],
+      "family_id": "linear_system_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-05-010",
+      "level_bounds": {
+        "1": "izbor/provjera uređenog para",
+        "2": "direktna supstitucija (koeficijent 1)",
+        "3": "puno rješavanje i klasifikacija"
+      },
+      "parameters": {
+        "kinds": [
+          "classify"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: classify",
+        "- sistem ima cjelobrojne (ili razlomljene, gdje ugovor kaže) koeficijente; rješenje je uređeni par ili klasifikacija",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: rješenje uvršteno u OBJE jednačine; klasifikacija po determinanti."
+    },
+    "9-05-011": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "linear_system_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-9-05-011"
+      ],
+      "family_id": "linear_system_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-05-011",
+      "level_bounds": {
+        "1": "izbor/provjera uređenog para",
+        "2": "direktna supstitucija (koeficijent 1)",
+        "3": "puno rješavanje i klasifikacija"
+      },
+      "parameters": {
+        "kinds": [
+          "classify"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: classify",
+        "- sistem ima cjelobrojne (ili razlomljene, gdje ugovor kaže) koeficijente; rješenje je uređeni par ili klasifikacija",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: rješenje uvršteno u OBJE jednačine; klasifikacija po determinanti."
+    },
+    "9-05-012": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "linear_system_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0365"
+      ],
+      "family_id": "linear_system_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-05-012",
+      "level_bounds": {
+        "1": "izbor/provjera uređenog para",
+        "2": "direktna supstitucija (koeficijent 1)",
+        "3": "puno rješavanje i klasifikacija"
+      },
+      "parameters": {
+        "kinds": [
+          "classify"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: classify",
+        "- sistem ima cjelobrojne (ili razlomljene, gdje ugovor kaže) koeficijente; rješenje je uređeni par ili klasifikacija",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: rješenje uvršteno u OBJE jednačine; klasifikacija po determinanti."
+    },
+    "9-05-014": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "linear_system_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0369"
+      ],
+      "family_id": "linear_system_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-05-014",
+      "level_bounds": {
+        "1": "izbor/provjera uređenog para",
+        "2": "direktna supstitucija (koeficijent 1)",
+        "3": "puno rješavanje i klasifikacija"
+      },
+      "parameters": {
+        "kinds": [
+          "classify"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: classify",
+        "- sistem ima cjelobrojne (ili razlomljene, gdje ugovor kaže) koeficijente; rješenje je uređeni par ili klasifikacija",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: rješenje uvršteno u OBJE jednačine; klasifikacija po determinanti."
+    },
+    "9-05-015": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "linear_system_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0365",
+        "KS_2018-0376"
+      ],
+      "family_id": "linear_system_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-05-015",
+      "level_bounds": {
+        "1": "izbor/provjera uređenog para",
+        "2": "direktna supstitucija (koeficijent 1)",
+        "3": "puno rješavanje i klasifikacija"
+      },
+      "parameters": {
+        "kinds": [
+          "verify_pair"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: verify_pair",
+        "- sistem ima cjelobrojne (ili razlomljene, gdje ugovor kaže) koeficijente; rješenje je uređeni par ili klasifikacija",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: rješenje uvršteno u OBJE jednačine; klasifikacija po determinanti."
+    },
+    "9-05-016": {
+      "activation_class": "READY",
+      "advisory_parameters": [
+        "fraction_coefficients"
+      ],
+      "contract_version": "5E.1",
+      "detector": "linear_system_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-9-05-016"
+      ],
+      "family_id": "linear_system_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-05-016",
+      "level_bounds": {
+        "1": "izbor/provjera uređenog para",
+        "2": "direktna supstitucija (koeficijent 1)",
+        "3": "puno rješavanje i klasifikacija"
+      },
+      "parameters": {
+        "fraction_coefficients": "yes",
+        "kinds": [
+          "solve"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: solve",
+        "- sistem ima cjelobrojne (ili razlomljene, gdje ugovor kaže) koeficijente; rješenje je uređeni par ili klasifikacija",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: rješenje uvršteno u OBJE jednačine; klasifikacija po determinanti."
+    },
     "9-06-001": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "polynomial_basic",
       "enforced_parameters": [
         "concepts"
@@ -5244,7 +8338,7 @@
     "9-06-002": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "polynomial_basic",
       "enforced_parameters": [
         "concepts"
@@ -5277,7 +8371,7 @@
     "9-06-003": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "polynomial_basic",
       "enforced_parameters": [
         "concepts"
@@ -5310,7 +8404,7 @@
     "9-06-004": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "polynomial_basic",
       "enforced_parameters": [
         "concepts"
@@ -5340,10 +8434,282 @@
       ],
       "reviewer_note": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja."
     },
+    "9-06-005": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "polynomial_basic",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0264",
+        "KS_2018-0280",
+        "KS_2018-0281",
+        "KS_2018-0289",
+        "KS_2018-0323",
+        "RS_2014-0104"
+      ],
+      "family_id": "polynomial_basic",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-06-005",
+      "level_bounds": {
+        "1": "dva-tri člana, mali koeficijenti",
+        "2": "četiri člana, negativni koeficijenti",
+        "3": "viši stepeni i pet članova"
+      },
+      "parameters": {
+        "concepts": [
+          "square_of_binomial"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: kvadrat binoma (a ± b)²",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja."
+    },
+    "9-06-006": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "polynomial_basic",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-9-06-006"
+      ],
+      "family_id": "polynomial_basic",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-06-006",
+      "level_bounds": {
+        "1": "dva-tri člana, mali koeficijenti",
+        "2": "četiri člana, negativni koeficijenti",
+        "3": "viši stepeni i pet članova"
+      },
+      "parameters": {
+        "concepts": [
+          "factor_difference_squares"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: faktorizacija razlike kvadrata",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja."
+    },
+    "9-06-007": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "polynomial_basic",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0281",
+        "KS_2018-0323"
+      ],
+      "family_id": "polynomial_basic",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-06-007",
+      "level_bounds": {
+        "1": "dva-tri člana, mali koeficijenti",
+        "2": "četiri člana, negativni koeficijenti",
+        "3": "viši stepeni i pet članova"
+      },
+      "parameters": {
+        "concepts": [
+          "cube_of_binomial"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: kub binoma (a ± b)³",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja."
+    },
+    "9-06-008": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "polynomial_basic",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0281",
+        "KS_2018-0284",
+        "KS_2018-0323"
+      ],
+      "family_id": "polynomial_basic",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-06-008",
+      "level_bounds": {
+        "1": "dva-tri člana, mali koeficijenti",
+        "2": "četiri člana, negativni koeficijenti",
+        "3": "viši stepeni i pet članova"
+      },
+      "parameters": {
+        "concepts": [
+          "sum_diff_cubes"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: zbir i razlika kubova",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja."
+    },
+    "9-06-009": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "polynomial_basic",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-9-06-009"
+      ],
+      "family_id": "polynomial_basic",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-06-009",
+      "level_bounds": {
+        "1": "dva-tri člana, mali koeficijenti",
+        "2": "četiri člana, negativni koeficijenti",
+        "3": "viši stepeni i pet članova"
+      },
+      "parameters": {
+        "concepts": [
+          "factor_common"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: izlučivanje zajedničkog faktora",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja."
+    },
+    "9-06-010": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "polynomial_basic",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-9-06-010"
+      ],
+      "family_id": "polynomial_basic",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-06-010",
+      "level_bounds": {
+        "1": "dva-tri člana, mali koeficijenti",
+        "2": "četiri člana, negativni koeficijenti",
+        "3": "viši stepeni i pet članova"
+      },
+      "parameters": {
+        "concepts": [
+          "factor_grouping"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: faktorizacija grupisanjem",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja."
+    },
+    "9-06-011": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "polynomial_basic",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-9-06-011"
+      ],
+      "family_id": "polynomial_basic",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-06-011",
+      "level_bounds": {
+        "1": "dva-tri člana, mali koeficijenti",
+        "2": "četiri člana, negativni koeficijenti",
+        "3": "viši stepeni i pet članova"
+      },
+      "parameters": {
+        "concepts": [
+          "factor_identity"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: faktorizacija pomoću kvadrata binoma",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja."
+    },
+    "9-06-012": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "polynomial_basic",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-9-06-012"
+      ],
+      "family_id": "polynomial_basic",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-06-012",
+      "level_bounds": {
+        "1": "dva-tri člana, mali koeficijenti",
+        "2": "četiri člana, negativni koeficijenti",
+        "3": "viši stepeni i pet članova"
+      },
+      "parameters": {
+        "concepts": [
+          "fraction_domain"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: uslov definisanosti algebarskog razlomka",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja."
+    },
     "9-06-013": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "simple_quadratic",
       "enforced_parameters": [
         "shapes"
@@ -5377,7 +8743,7 @@
     "9-06-014": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "simple_quadratic",
       "enforced_parameters": [
         "shapes"
@@ -5411,7 +8777,7 @@
     "9-06-015": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "simple_quadratic",
       "enforced_parameters": [
         "shapes"
@@ -5442,10 +8808,840 @@
       ],
       "reviewer_note": "Invarijanta: potpun skup rješenja, provjerljiv uvrštavanjem."
     },
+    "9-06-016": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "polynomial_basic",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-9-06-016"
+      ],
+      "family_id": "polynomial_basic",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-06-016",
+      "level_bounds": {
+        "1": "dva-tri člana, mali koeficijenti",
+        "2": "četiri člana, negativni koeficijenti",
+        "3": "viši stepeni i pet članova"
+      },
+      "parameters": {
+        "concepts": [
+          "zero_product"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: jednačina data proizvodom faktora",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja."
+    },
+    "9-07-001": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "solid_geometry_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-9-07-001"
+      ],
+      "family_id": "solid_geometry_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-07-001",
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "parameters": {
+        "kinds": [
+          "polyhedron_elements"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: polyhedron_elements",
+        "- notacija: B baza, M omotač, P ukupna površina, V zapremina, H visina tijela, h_a apotema, D prostorna dijagonala",
+        "- π ostaje simbolički u rezultatu; korijeni ostaju egzaktni",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    "9-07-002": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "solid_geometry_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-9-07-002"
+      ],
+      "family_id": "solid_geometry_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-07-002",
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "parameters": {
+        "kinds": [
+          "polyhedron_elements"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: polyhedron_elements",
+        "- notacija: B baza, M omotač, P ukupna površina, V zapremina, H visina tijela, h_a apotema, D prostorna dijagonala",
+        "- π ostaje simbolički u rezultatu; korijeni ostaju egzaktni",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    "9-07-004": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "solid_geometry_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-9-07-004"
+      ],
+      "family_id": "solid_geometry_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-07-004",
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "parameters": {
+        "kinds": [
+          "prism3_lateral",
+          "prism4_surface"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: prism3_lateral, prism4_surface",
+        "- notacija: B baza, M omotač, P ukupna površina, V zapremina, H visina tijela, h_a apotema, D prostorna dijagonala",
+        "- π ostaje simbolički u rezultatu; korijeni ostaju egzaktni",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    "9-07-005": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "solid_geometry_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0376",
+        "KS_2018-0386",
+        "KS_2018-0402",
+        "RS_2014-0122",
+        "RS_2014-0124"
+      ],
+      "family_id": "solid_geometry_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-07-005",
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "parameters": {
+        "kinds": [
+          "cube_volume",
+          "cuboid_volume",
+          "prism3_volume",
+          "prism4_volume"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: cube_volume, cuboid_volume, prism3_volume, prism4_volume",
+        "- notacija: B baza, M omotač, P ukupna površina, V zapremina, H visina tijela, h_a apotema, D prostorna dijagonala",
+        "- π ostaje simbolički u rezultatu; korijeni ostaju egzaktni",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    "9-07-007": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "solid_geometry_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "RS_2014-0122"
+      ],
+      "family_id": "solid_geometry_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-07-007",
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "parameters": {
+        "kinds": [
+          "cube_space_diagonal",
+          "prism4_space_diagonal"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: cube_space_diagonal, prism4_space_diagonal",
+        "- notacija: B baza, M omotač, P ukupna površina, V zapremina, H visina tijela, h_a apotema, D prostorna dijagonala",
+        "- π ostaje simbolički u rezultatu; korijeni ostaju egzaktni",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    "9-07-008": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "solid_geometry_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-9-07-008"
+      ],
+      "family_id": "solid_geometry_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-07-008",
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "parameters": {
+        "kinds": [
+          "polyhedron_elements"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: polyhedron_elements",
+        "- notacija: B baza, M omotač, P ukupna površina, V zapremina, H visina tijela, h_a apotema, D prostorna dijagonala",
+        "- π ostaje simbolički u rezultatu; korijeni ostaju egzaktni",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    "9-07-010": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "solid_geometry_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0402",
+        "RS_2014-0126",
+        "RS_2014-0128"
+      ],
+      "family_id": "solid_geometry_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-07-010",
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "parameters": {
+        "kinds": [
+          "pyramid4_lateral",
+          "pyramid4_surface"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: pyramid4_lateral, pyramid4_surface",
+        "- notacija: B baza, M omotač, P ukupna površina, V zapremina, H visina tijela, h_a apotema, D prostorna dijagonala",
+        "- π ostaje simbolički u rezultatu; korijeni ostaju egzaktni",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    "9-07-011": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "solid_geometry_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0390",
+        "KS_2018-0402",
+        "RS_2014-0126",
+        "RS_2014-0128"
+      ],
+      "family_id": "solid_geometry_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-07-011",
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "parameters": {
+        "kinds": [
+          "pyramid4_volume"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: pyramid4_volume",
+        "- notacija: B baza, M omotač, P ukupna površina, V zapremina, H visina tijela, h_a apotema, D prostorna dijagonala",
+        "- π ostaje simbolički u rezultatu; korijeni ostaju egzaktni",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    "9-07-012": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "solid_geometry_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-9-07-012"
+      ],
+      "family_id": "solid_geometry_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-07-012",
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "parameters": {
+        "kinds": [
+          "pyramid4_apothem"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: pyramid4_apothem",
+        "- notacija: B baza, M omotač, P ukupna površina, V zapremina, H visina tijela, h_a apotema, D prostorna dijagonala",
+        "- π ostaje simbolički u rezultatu; korijeni ostaju egzaktni",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    "9-07-014": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "solid_geometry_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-9-07-014"
+      ],
+      "family_id": "solid_geometry_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-07-014",
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "parameters": {
+        "kinds": [
+          "pyramid4_apothem"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: pyramid4_apothem",
+        "- notacija: B baza, M omotač, P ukupna površina, V zapremina, H visina tijela, h_a apotema, D prostorna dijagonala",
+        "- π ostaje simbolički u rezultatu; korijeni ostaju egzaktni",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    "9-07-017": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "solid_geometry_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0394",
+        "KS_2018-0402",
+        "RS_2014-0134",
+        "RS_2014-0136"
+      ],
+      "family_id": "solid_geometry_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-07-017",
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "parameters": {
+        "kinds": [
+          "cylinder_surface"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: cylinder_surface",
+        "- notacija: B baza, M omotač, P ukupna površina, V zapremina, H visina tijela, h_a apotema, D prostorna dijagonala",
+        "- π ostaje simbolički u rezultatu; korijeni ostaju egzaktni",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    "9-07-018": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "solid_geometry_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0394",
+        "KS_2018-0402",
+        "RS_2014-0134",
+        "RS_2014-0136"
+      ],
+      "family_id": "solid_geometry_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-07-018",
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "parameters": {
+        "kinds": [
+          "cylinder_volume"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: cylinder_volume",
+        "- notacija: B baza, M omotač, P ukupna površina, V zapremina, H visina tijela, h_a apotema, D prostorna dijagonala",
+        "- π ostaje simbolički u rezultatu; korijeni ostaju egzaktni",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    "9-07-019": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "solid_geometry_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-9-07-019"
+      ],
+      "family_id": "solid_geometry_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-07-019",
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "parameters": {
+        "kinds": [
+          "cylinder_axial_section"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: cylinder_axial_section",
+        "- notacija: B baza, M omotač, P ukupna površina, V zapremina, H visina tijela, h_a apotema, D prostorna dijagonala",
+        "- π ostaje simbolički u rezultatu; korijeni ostaju egzaktni",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    "9-07-022": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "solid_geometry_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0402",
+        "RS_2014-0145"
+      ],
+      "family_id": "solid_geometry_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-07-022",
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "parameters": {
+        "kinds": [
+          "cone_surface"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: cone_surface",
+        "- notacija: B baza, M omotač, P ukupna površina, V zapremina, H visina tijela, h_a apotema, D prostorna dijagonala",
+        "- π ostaje simbolički u rezultatu; korijeni ostaju egzaktni",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    "9-07-023": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "solid_geometry_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0398",
+        "KS_2018-0402",
+        "RS_2014-0145"
+      ],
+      "family_id": "solid_geometry_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-07-023",
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "parameters": {
+        "kinds": [
+          "cone_volume"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: cone_volume",
+        "- notacija: B baza, M omotač, P ukupna površina, V zapremina, H visina tijela, h_a apotema, D prostorna dijagonala",
+        "- π ostaje simbolički u rezultatu; korijeni ostaju egzaktni",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    "9-07-024": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "solid_geometry_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0395",
+        "KS_2018-0402"
+      ],
+      "family_id": "solid_geometry_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-07-024",
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "parameters": {
+        "kinds": [
+          "cone_slant"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: cone_slant",
+        "- notacija: B baza, M omotač, P ukupna površina, V zapremina, H visina tijela, h_a apotema, D prostorna dijagonala",
+        "- π ostaje simbolički u rezultatu; korijeni ostaju egzaktni",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    "9-07-025": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "solid_geometry_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-9-07-025"
+      ],
+      "family_id": "solid_geometry_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-07-025",
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "parameters": {
+        "kinds": [
+          "cone_axial_section"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: cone_axial_section",
+        "- notacija: B baza, M omotač, P ukupna površina, V zapremina, H visina tijela, h_a apotema, D prostorna dijagonala",
+        "- π ostaje simbolički u rezultatu; korijeni ostaju egzaktni",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    "9-07-027": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "solid_geometry_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-9-07-027"
+      ],
+      "family_id": "solid_geometry_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-07-027",
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "parameters": {
+        "kinds": [
+          "sphere_surface"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: sphere_surface",
+        "- notacija: B baza, M omotač, P ukupna površina, V zapremina, H visina tijela, h_a apotema, D prostorna dijagonala",
+        "- π ostaje simbolički u rezultatu; korijeni ostaju egzaktni",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    "9-07-028": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "solid_geometry_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0401",
+        "KS_2018-0402",
+        "RS_2014-0149"
+      ],
+      "family_id": "solid_geometry_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-07-028",
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "parameters": {
+        "kinds": [
+          "ball_volume"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: ball_volume",
+        "- notacija: B baza, M omotač, P ukupna površina, V zapremina, H visina tijela, h_a apotema, D prostorna dijagonala",
+        "- π ostaje simbolički u rezultatu; korijeni ostaju egzaktni",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    "9-07-030": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "solid_geometry_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-9-07-030"
+      ],
+      "family_id": "solid_geometry_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-07-030",
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "parameters": {
+        "kinds": [
+          "prism_pyramid_ratio"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: prism_pyramid_ratio",
+        "- notacija: B baza, M omotač, P ukupna površina, V zapremina, H visina tijela, h_a apotema, D prostorna dijagonala",
+        "- π ostaje simbolički u rezultatu; korijeni ostaju egzaktni",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    "9-07-031": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "solid_geometry_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-9-07-031"
+      ],
+      "family_id": "solid_geometry_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-07-031",
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "parameters": {
+        "kinds": [
+          "cylinder_cone_ratio"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: cylinder_cone_ratio",
+        "- notacija: B baza, M omotač, P ukupna površina, V zapremina, H visina tijela, h_a apotema, D prostorna dijagonala",
+        "- π ostaje simbolički u rezultatu; korijeni ostaju egzaktni",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
+    "9-07-038": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5E.1",
+      "detector": "solid_geometry_direct",
+      "enforced_parameters": [
+        "kinds"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-9-07-038"
+      ],
+      "family_id": "solid_geometry_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-07-038",
+      "level_bounds": {
+        "1": "jedna formula, male dimenzije",
+        "2": "kombinovane veličine (P = 2B + M) ili veće dimenzije",
+        "3": "dijagonale/apoteme preko Pitagorine teoreme, korijeni"
+      },
+      "parameters": {
+        "kinds": [
+          "density_mass"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- vidljivi zadatak mora pripadati vrstama: density_mass",
+        "- notacija: B baza, M omotač, P ukupna površina, V zapremina, H visina tijela, h_a apotema, D prostorna dijagonala",
+        "- π ostaje simbolički u rezultatu; korijeni ostaju egzaktni",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
+    },
     "9-08-001": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "classical_probability",
       "enforced_parameters": [
         "concepts"
@@ -5479,7 +9675,7 @@
     "9-08-002": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "classical_probability",
       "enforced_parameters": [
         "concepts"
@@ -5514,7 +9710,7 @@
     "9-08-010": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "arithmetic_mean",
       "enforced_parameters": [
         "concepts"
@@ -5547,7 +9743,7 @@
     "9-08-011": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "unit_conversion",
       "enforced_parameters": [
         "dimensions"
@@ -5584,7 +9780,7 @@
     "9-08-012": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "power_arithmetic",
       "enforced_parameters": [
         "concepts"
@@ -5617,7 +9813,7 @@
     "9-08-013": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5D.1",
+      "contract_version": "5E.1",
       "detector": "unit_conversion",
       "enforced_parameters": [
         "dimensions"
