@@ -175,11 +175,16 @@ def test_non_semantic_lessons_route_exactly_as_before(
     assert route_spy == [expected], (lesson_id, route_spy)
 
 
-def test_divisibility_lesson_has_no_semantic_contract_and_keeps_its_requirement():
+def test_divisibility_lesson_keeps_its_title_requirement_beside_its_contract():
+    # Kapacitetna ekspanzija: lekcija pravila djeljivosti SADA nosi blocking
+    # semantički ugovor (deterministički generator), a naslovni semantički
+    # zahtjev i dalje važi povrh njega — dva sloja se sabiraju, ne isključuju.
     from matbot import lesson_fidelity
 
     context = lesson_context_module.build(6, DIVISIBILITY)
-    assert context.semantic_contract is None
+    assert context.semantic_contract is not None
+    assert context.semantic_contract.blocking
+    assert context.semantic_contract.family_id == "divisibility_predicate_application"
     assert lesson_fidelity.semantic_task_requirement(context.title) is not None
 
 

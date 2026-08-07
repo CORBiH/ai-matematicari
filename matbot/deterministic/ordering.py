@@ -123,6 +123,31 @@ def _comparison_display(domain, value: Fraction) -> str:
     return core.plain_fraction_display(value)
 
 
+def _rounding_confusable(displays):
+    """True kad je razlomačka opcija unutar tolerancije ZAOKRUŽENJA decimalne.
+
+    Živi nalaz fuzz kampanje (lekcija racionalnog domena, 6000 paketa):
+    option_equivalence dokazano odbija par poput $\\frac{1}{3}$ i $0,3$ kao
+    `numeric_exact_vs_rounded` duplikate — egzaktna vrijednost i njeno
+    zaokruženje su ISTI odgovor u dva zapisa. Generator takav par ne smije ni
+    ponuditi, pa se ovdje primjenjuje ista tolerancija (pola posljednjeg
+    decimalnog mjesta, s istom rezervom kao mathcheck)."""
+    pairs = list(displays.items())
+    for index, (value, display) in enumerate(pairs):
+        for other_value, other_display in pairs[index + 1:]:
+            fraction_first = "\\frac" in display
+            fraction_second = "\\frac" in other_display
+            if fraction_first == fraction_second:
+                continue
+            decimal_display = other_display if fraction_first else display
+            digits = decimal_display.split(",")[1] if "," in decimal_display else ""
+            tolerance = Fraction(11, 20) * Fraction(1, 10 ** len(digits)) \
+                if digits else Fraction(11, 20)
+            if abs(value - other_value) <= tolerance:
+                return True
+    return False
+
+
 def _comparison_package(rng, level, domain, lesson_id, lesson_title):
     ordered = _comparison_values(rng, domain, level)
     between = level == 3 and domain in ("natural", "integer", "decimal") \
@@ -130,6 +155,8 @@ def _comparison_package(rng, level, domain, lesson_id, lesson_title):
     displays = {value: _comparison_display(domain, value) for value in ordered}
     if len(set(displays.values())) < 4:
         raise DeterministicGenerationError("prikazi nisu jedinstveni")
+    if domain == "rational" and _rounding_confusable(displays):
+        raise DeterministicGenerationError("razlomak i decimalno zaokruženje preblizu")
 
     if between:
         low, correct, high, outsider = ordered

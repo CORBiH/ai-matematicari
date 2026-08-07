@@ -253,11 +253,13 @@ def test_non_pilot_lesson_publishes_exactly_as_before(fake_llm, store):
 
 
 def test_divisibility_blocking_behaviour_is_unchanged():
-    """6-03-004 i dalje nosi svoj dokazani zahtjev — bez semantičkog ugovora."""
+    """6-03-004 i dalje nosi svoj naslovni dokazani zahtjev — kapacitetna
+    ekspanzija mu je DODALA blocking semantički ugovor, a stari sloj ostaje."""
     from matbot import lesson_fidelity
 
     context = lesson_context_module.build(6, DIVISIBILITY_LESSON)
-    assert context.semantic_contract is None
+    assert context.semantic_contract is not None
+    assert context.semantic_contract.blocking
     requirement = lesson_fidelity.semantic_task_requirement(context.title)
     assert requirement is not None
     assert requirement.failure_for("Koji od ponuđenih brojeva je djelilac broja 84?")

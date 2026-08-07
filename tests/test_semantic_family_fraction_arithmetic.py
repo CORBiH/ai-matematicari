@@ -187,12 +187,19 @@ def test_cross_lesson_matrix(owner, other, level):
 # 3) PODACI: kompilacija, nepromjenjivost, porijeklo
 # ---------------------------------------------------------------------------
 
-def test_exactly_the_four_pilot_lessons_have_a_contract():
-    assert sorted(sem_contracts.all_contracts()) == list(PILOT)
+def test_the_four_pilot_lessons_keep_their_contract():
+    # Kapacitetna ekspanzija je dodala nove porodice; četiri pilot lekcije
+    # razlomaka i dalje nose TAČNO svoj nepromijenjen ugovor.
+    all_ids = set(sem_contracts.all_contracts())
+    assert set(PILOT) <= all_ids
+    for lesson_id in PILOT:
+        assert sem_contracts.contract_for(lesson_id).family_id == \
+            "fraction_arithmetic_direct"
 
 
-def test_non_pilot_lessons_have_no_contract():
-    for lesson_id in ("6-03-004", "6-04-013", "6-04-014", "6-01-001", "9-05-007"):
+def test_unmapped_lessons_have_no_contract():
+    # Lekcije koje NISU u pregledanoj tabeli aktivacija ostaju bez ugovora.
+    for lesson_id in ("6-04-013", "6-04-014", "6-01-001", "9-05-007"):
         assert sem_contracts.contract_for(lesson_id) is None, lesson_id
 
 
