@@ -449,6 +449,37 @@ def _decimal_places(*expressions):
     return places
 
 
+_FULL_DECIMAL_LITERAL_RE = re.compile(r"(\d+)[.,](\d+)")
+# Gornja granica pojačanja: sitan literal ne smije toleranciju raširiti u
+# beskraj (inače bi jedan 0,001 u lancu amnestirao svaku grešku).
+_AMPLIFICATION_CAP = 100.0
+
+
+def _rounding_amplification(left_expr, right_expr, places, magnitude):
+    """ŽIVI RELEASE GATE 949e608 (rotirajuća lekcija 8. razreda): Tutor je
+    napisao `27\\sqrt{3} = 27 \\cdot 1,732`, recenzent ispravio na
+    `27 \\cdot 1,73205` — oba su školski TAČNA uvrštavanja približne
+    vrijednosti korijena, a oba su padala. Greška zaokruženog literala kao
+    FAKTORA množi se kofaktorom (27 · 5·10⁻⁵ premašuje apsolutnu toleranciju
+    mjesta), pa se tolerancija skalira omjerom veličine poređenih vrijednosti
+    i najmanjeg literala najveće preciznosti. Skaliranje važi SAMO uz
+    iracionalan izraz: kod čiste decimalne aritmetike (`0,3+0,25=0,54`)
+    nema šta da se aproksimira i greška ostaje greška. Kad je literal sam
+    REZULTAT (`24\\sqrt{3}\\approx83,14`), omjer je ~1 i ništa se ne mijenja
+    — osnivački slučaj modula i dalje pada."""
+    if not (_IRRATIONAL_RE.search(left_expr) or _IRRATIONAL_RE.search(right_expr)):
+        return 1.0
+    literals = []
+    for expr in (left_expr, right_expr):
+        for match in _FULL_DECIMAL_LITERAL_RE.finditer(expr):
+            if len(match.group(2)) == places:
+                literals.append(float(f"{match.group(1)}.{match.group(2)}"))
+    smallest = min((value for value in literals if value > 0), default=0.0)
+    if smallest <= 0:
+        return 1.0
+    return min(max(1.0, abs(magnitude) / smallest), _AMPLIFICATION_CAP)
+
+
 def _tolerance(left_expr, right_expr, relation, magnitude):
     """Tolerancija poređenja.
 
@@ -456,12 +487,15 @@ def _tolerance(left_expr, right_expr, relation, magnitude):
       (samo šum float-a). Tako „$7/2=3$“ pada, kako i treba.
     • Postoji decimalni literal → tolerancija zaokruživanja iz njegove
       preciznosti (npr. 2 decimale → 0,005). Tako „$\\sqrt{2}=1,41$“ prolazi,
-      a „$24\\sqrt{3}\\approx83,14$“ i dalje pada.
+      a „$24\\sqrt{3}\\approx83,14$“ i dalje pada. Uz IRACIONALAN izraz se
+      tolerancija skalira kofaktorom literala (vidi _rounding_amplification).
     • Iracionalno bez decimala uz „\\approx“ → mala relativna tolerancija.
     """
     places = _decimal_places(left_expr, right_expr)
     if places:
-        return 0.5 * (10 ** -places) * 1.1
+        return (0.5 * (10 ** -places) * 1.1
+                * _rounding_amplification(left_expr, right_expr, places,
+                                          magnitude))
     has_irrational = bool(_IRRATIONAL_RE.search(left_expr) or _IRRATIONAL_RE.search(right_expr))
     if relation == "approx":
         return max(_APPROX_REL_TOL * abs(magnitude), 1e-9)

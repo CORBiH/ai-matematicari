@@ -686,3 +686,29 @@ def test_remainder_division_with_inline_annotation_is_verified():
     # Anotacija ne amnestira pogrešan ostatak.
     assert find_numeric_inconsistencies(
         r"$47 : 6 = 7\text{ (punih paketa)}$. Ostaje $6$ čokoladica.") != []
+
+
+# ---------------------------------------------------------------------------
+# UVRŠTAVANJE PRIBLIŽNOG KORIJENA KAO FAKTORA (živi release gate 949e608,
+# rotirajuća lekcija 8. razreda — zapremina piramide)
+# ---------------------------------------------------------------------------
+
+def test_rounded_root_as_factor_is_accepted_scaled_by_the_cofactor():
+    from matbot.mathcheck import find_numeric_inconsistencies
+    # Tutorov zapis i recenzentova preciznija ispravka — oba školski tačna.
+    assert find_numeric_inconsistencies(r"$27\sqrt{3} = 27\cdot1,732$") == []
+    assert find_numeric_inconsistencies(r"$27\sqrt{3} = 27\cdot1,73205$") == []
+    assert find_numeric_inconsistencies(r"$27\sqrt{3} \approx 46,77$") == []
+
+
+def test_founding_irrational_failures_still_fail():
+    from matbot.mathcheck import find_numeric_inconsistencies
+    # Osnivački slučaj modula: pogrešan koeficijent uz korijen i dalje pada.
+    assert find_numeric_inconsistencies(r"$24\sqrt{3} \approx 83,14$") != []
+    # Čista decimalna aritmetika se NE skalira — greška ostaje greška.
+    assert find_numeric_inconsistencies("$0,3 + 0,25 = 0,54$") != []
+    # Deklarisana vrijednost π i dalje obavezuje (D35-2).
+    assert find_numeric_inconsistencies(
+        r"Uzmi $\pi \approx 3,14$. Tada je $6\pi \approx 18,85$.") != []
+    # Grubo pogrešno uvrštavanje korijena pada i sa skaliranjem.
+    assert find_numeric_inconsistencies(r"$27\sqrt{3} = 27\cdot1,8$") != []
