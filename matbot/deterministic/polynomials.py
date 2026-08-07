@@ -29,6 +29,10 @@ GENERATOR_VERSION = "detpoly-1"
 _SUPPORTED_CONCEPTS = frozenset({
     "expression_evaluation", "structure_count", "monomial_structure",
     "combine_like_terms", "add_subtract", "multiply",
+    # Batch #3 — identiteti i faktorizacija (dokaz: RAZVOJ kandidata nazad).
+    "square_of_binomial", "cube_of_binomial", "factor_difference_squares",
+    "factor_common", "factor_grouping", "factor_identity", "sum_diff_cubes",
+    "zero_product", "fraction_domain", "monomial_mul_div", "like_terms_select",
 })
 _SUPPORTED_DOMAINS = frozenset({"natural", "integer"})
 
@@ -58,6 +62,17 @@ def generate_package(lesson_id, lesson_title, parameters, level, rng=None):
                 "combine_like_terms": _combine_package,
                 "add_subtract": _add_subtract_package,
                 "multiply": _multiply_package,
+                "square_of_binomial": _square_binomial_package,
+                "cube_of_binomial": _cube_binomial_package,
+                "factor_difference_squares": _factor_diff_squares_package,
+                "factor_common": _factor_common_package,
+                "factor_grouping": _factor_grouping_package,
+                "factor_identity": _factor_identity_package,
+                "sum_diff_cubes": _sum_diff_cubes_package,
+                "zero_product": _zero_product_package,
+                "fraction_domain": _fraction_domain_package,
+                "monomial_mul_div": _monomial_mul_div_package,
+                "like_terms_select": _like_terms_select_package,
             }[concept]
             return builder(rng, level, domain, lesson_id, lesson_title)
         except DeterministicGenerationError:
@@ -461,3 +476,513 @@ def _multiply_package(rng, level, domain, lesson_id, lesson_title):
         required_conditions=["multiply"], relevant_objects=["expression"],
         generator_version=GENERATOR_VERSION, option_texts=option_texts,
         wrap="")
+
+
+# ---------------------------------------------------------------------------
+# BATCH #3 — IDENTITETI I FAKTORIZACIJA
+# ---------------------------------------------------------------------------
+# Autoritet: kanonski rječnik {stepen: koeficijent}. Svaka faktorizacija se
+# dokazuje RAZVOJEM kandidata nazad u polinom; dvije opcije nikad nemaju isti
+# razvoj (dedup po kanonskom rječniku razvoja, ne po tekstu).
+
+def _binom(sign, b, a=1):
+    """(ax + sign*b) kao rjecnik."""
+    return {1: a, 0: sign * b}
+
+
+def _binom_display(sign, b, a=1):
+    lead = "x" if a == 1 else f"{a}x"
+    return f"({lead} {'+' if sign > 0 else '-'} {b})"
+
+
+def _factored_options(original, candidates):
+    """Opcije su FAKTORISANI tekstovi; jednakost se sudi po RAZVOJU."""
+    expansions = [dict(original)]
+    texts = [candidates[0][0]]
+    for text_display, expansion in candidates[1:]:
+        cleaned = {d: c for d, c in expansion.items() if c != 0}
+        if any(cleaned == seen for seen in expansions):
+            continue
+        if text_display in texts:
+            continue
+        expansions.append(cleaned)
+        texts.append(text_display)
+        if len(texts) == 4:
+            break
+    if len(texts) != 4:
+        raise DeterministicGenerationError("nedovoljno faktorizacija")
+    return tuple(f"${display}$" for display in texts)
+
+
+def _ev_capped(level, cap=2):
+    return core.evidence_for_level(min(level, cap) if level < 3 else 3)
+
+
+def _square_binomial_package(rng, level, domain, lesson_id, lesson_title):
+    b = rng.randint(1, 6 if level == 1 else 9)
+    a = 1 if level < 3 else rng.randint(2, 3)
+    sign = 1 if rng.random() < 0.5 else -1
+    binom = _binom(sign, b, a)
+    correct = _poly_mul(binom, binom)
+    display = _binom_display(sign, b, a)
+    question = f"Kvadriraj binom: ${display}^2$"
+    wrong_no_middle = {2: a * a, 0: b * b}
+    wrong_sign = {2: correct.get(2, 0), 1: -correct.get(1, 0),
+                  0: correct.get(0, 0)}
+    wrong_half = {2: a * a, 1: sign * a * b, 0: b * b}
+    option_texts = _distinct_poly_options(
+        correct, [wrong_no_middle, wrong_sign, wrong_half,
+                  {2: a * a, 1: correct.get(1, 0), 0: 2 * b}])
+    lead = "x" if a == 1 else f"{a}x"
+    solution = (f"Kvadrat binoma: prvi kvadrat, dvostruki proizvod pa drugi "
+                f"kvadrat. Ovdje: ${display}^2 = {poly_display(correct)}$ — "
+                f"srednji clan je $2 \\cdot {lead} \\cdot {b}$ sa znakom "
+                "binoma.")
+    hints = ("Kvadrat binoma ima TRI clana: kvadrat prvog, dvostruki "
+             "proizvod i kvadrat drugog clana.",
+             f"Kvadrat prvog clana je ${poly_display({2: a * a})}$, a "
+             f"kvadrat drugog ${b * b}$ — nedostaje dvostruki proizvod.",
+             f"Dvostruki proizvod je $2 \\cdot {lead} \\cdot {b} = "
+             f"{poly_display({1: abs(correct.get(1, 0))})}$ sa znakom binoma.")
+    return core.build_package(
+        lesson_id=lesson_id, lesson_title=lesson_title,
+        family_id="polynomial_basic", operation="square_of_binomial",
+        level=level, question=question, answer_value=poly_display(correct),
+        answer_display=poly_display(correct), distractor_values=(),
+        hints=hints, solution=solution,
+        signature_parameters=[("binom", f"{a}|{sign}|{b}")],
+        required_conditions=["square_of_binomial"],
+        relevant_objects=["polynomial"], generator_version=GENERATOR_VERSION,
+        option_texts=option_texts, wrap="", evidence=_ev_capped(level))
+
+
+def _cube_binomial_package(rng, level, domain, lesson_id, lesson_title):
+    b = rng.randint(1, 4 if level < 3 else 6)
+    sign = 1 if rng.random() < 0.5 else -1
+    binom = _binom(sign, b)
+    square = _poly_mul(binom, binom)
+    correct = _poly_mul(square, binom)
+    display = _binom_display(sign, b)
+    question = f"Kubiraj binom: ${display}^3$"
+    wrong_cubes_only = {3: 1, 0: sign * b ** 3}
+    wrong_sign = {d: -c if d % 2 == 0 else c for d, c in correct.items()}
+    wrong_middle = {3: 1, 2: sign * 2 * b, 1: 2 * b * b, 0: sign * b ** 3}
+    option_texts = _distinct_poly_options(
+        correct, [wrong_cubes_only, wrong_sign, wrong_middle,
+                  {3: 1, 2: sign * 4 * b, 1: 4 * b * b, 0: sign * b ** 3}])
+    solution = (f"Kub binoma ima koeficijente 1, 3, 3, 1: ${display}^3 = "
+                f"{poly_display(correct)}$.")
+    hints = ("Kub binoma ima CETIRI clana s koeficijentima 1, 3, 3, 1.",
+             f"Prvi clan je $x^3$, posljednji je kub broja ${b}$ sa znakom "
+             "binoma — srednja dva nose trojku.",
+             f"Razvij: ${display}^2 = {poly_display(square)}$, pa pomnozi "
+             f"jos jednom sa ${display}$.")
+    return core.build_package(
+        lesson_id=lesson_id, lesson_title=lesson_title,
+        family_id="polynomial_basic", operation="cube_of_binomial",
+        level=level, question=question, answer_value=poly_display(correct),
+        answer_display=poly_display(correct), distractor_values=(),
+        hints=hints, solution=solution,
+        signature_parameters=[("binom", f"{sign}|{b}")],
+        required_conditions=["cube_of_binomial"],
+        relevant_objects=["polynomial"], generator_version=GENERATOR_VERSION,
+        option_texts=option_texts, wrap="",
+        evidence=_ev_capped(level))
+
+
+def _factor_diff_squares_package(rng, level, domain, lesson_id, lesson_title):
+    b = rng.randint(1, 6 if level == 1 else 9)
+    a = 1 if level < 3 else rng.randint(2, 3)
+    original = {2: a * a, 0: -b * b}
+    correct_display = f"{_binom_display(-1, b, a)}{_binom_display(1, b, a)}"
+    candidates = [
+        (correct_display, _poly_mul(_binom(-1, b, a), _binom(1, b, a))),
+        (f"{_binom_display(-1, b, a)}^2",
+         _poly_mul(_binom(-1, b, a), _binom(-1, b, a))),
+        (f"{_binom_display(1, b, a)}^2",
+         _poly_mul(_binom(1, b, a), _binom(1, b, a))),
+        # Za a = 1 varijanta s pomjerenim b: (x-(b+1))(x+(b+1)) — kandidat
+        # razlike kvadrata mora imati RAZLIČIT razvoj od tačnog.
+        (f"{_binom_display(-1, b + 1, a)}{_binom_display(1, b + 1, a)}",
+         _poly_mul(_binom(-1, b + 1, a), _binom(1, b + 1, a))),
+    ]
+    assert candidates[0][1] == original
+    option_texts = _factored_options(original, candidates)
+    lead = "x" if a == 1 else f"{a}x"
+    question = (f"Rastavi na faktore (razlika kvadrata): "
+                f"${poly_display(original)}$")
+    solution = (f"Razlika kvadrata se rastavlja kao proizvod razlike i "
+                f"zbira: ${poly_display(original)} = {correct_display}$ — "
+                "razvoj vraca polazni polinom.")
+    hints = ("Razlika kvadrata se rastavlja kao proizvod razlike i zbira.",
+             f"Prepoznaj kvadrate: prvi clan je kvadrat od ${lead}$, a "
+             f"drugi od ${b}$.",
+             f"Dakle: $({lead} - {b})({lead} + {b})$ — provjeri razvojem.")
+    return core.build_package(
+        lesson_id=lesson_id, lesson_title=lesson_title,
+        family_id="polynomial_basic", operation="factor_difference_squares",
+        level=level, question=question, answer_value=correct_display,
+        answer_display=correct_display, distractor_values=(),
+        hints=hints, solution=solution,
+        signature_parameters=[("a", str(a)), ("b", str(b))],
+        required_conditions=["factor_difference_squares"],
+        relevant_objects=["polynomial"], generator_version=GENERATOR_VERSION,
+        option_texts=option_texts, wrap="", evidence=_ev_capped(level))
+
+
+def _factor_common_package(rng, level, domain, lesson_id, lesson_title):
+    k = rng.randint(2, 5)
+    p = rng.randint(1, 5)
+    q = rng.randint(1, 6)
+    if p == q:
+        q += 1
+    if level == 3:
+        # Tri člana — tri izlučivanja, iskren dokaz nivoa 3.
+        r = rng.randint(1, 6)
+        while r in (p, q):
+            r += 1
+        original = {3: k * p, 2: k * q, 1: k * r}
+        inner = {2: p, 1: q, 0: r}
+    else:
+        original = {2: k * p, 1: k * q}
+        inner = {1: p, 0: q}
+    correct_display = f"{k}x({poly_display(inner)})"
+    assert _poly_mul({1: k}, inner) == original
+    candidates = [(correct_display, original)]
+    for delta in (1, 2, 3, 4):
+        variant_inner = {1: p, 0: q + delta}
+        candidates.append((f"{k}x({poly_display(variant_inner)})",
+                           _poly_mul({1: k}, variant_inner)))
+    candidates.append((f"{k}x({poly_display({1: p + 1, 0: q})})",
+                       _poly_mul({1: k}, {1: p + 1, 0: q})))
+    option_texts = _factored_options(original, candidates)
+    question = (f"Izluci najveci zajednicki faktor: ${poly_display(original)}$")
+    solution = (f"Najveci zajednicki faktor clanova je ${k}x$: "
+                f"${poly_display(original)} = {correct_display}$ — razvoj "
+                "vraca polazni izraz.")
+    hints = ("Nadji najveci broj i najveci stepen od x koji dijele SVE "
+             "clanove.",
+             f"Koeficijenti su djeljivi sa ${k}$, a svaki clan sadrzi $x$.",
+             f"Izluci ${k}x$ pa zapisi ostatak svakog clana u zagradi.")
+    return core.build_package(
+        lesson_id=lesson_id, lesson_title=lesson_title,
+        family_id="polynomial_basic", operation="factor_common",
+        level=level, question=question, answer_value=correct_display,
+        answer_display=correct_display, distractor_values=(),
+        hints=hints, solution=solution,
+        signature_parameters=[("k", str(k)), ("p", str(p)), ("q", str(q)),
+                              ("terms", str(len(original)))],
+        required_conditions=["factor_common"],
+        relevant_objects=["polynomial"], generator_version=GENERATOR_VERSION,
+        option_texts=option_texts, wrap="",
+        evidence=core.evidence_for_level(level if level == 3 else
+                                         min(level, 2)))
+
+
+def _factor_grouping_package(rng, level, domain, lesson_id, lesson_title):
+    b = rng.randint(1, 6)
+    c = rng.randint(1, 6)
+    if b == c:
+        c += 1
+    question_display = f"x^2 + {b}x + {c}x + {b * c}"
+    original = {2: 1, 1: b + c, 0: b * c}
+    correct_display = f"{_binom_display(1, b)}{_binom_display(1, c)}"
+    candidates = [
+        (correct_display, _poly_mul(_binom(1, b), _binom(1, c))),
+        (f"{_binom_display(1, b + c)}{_binom_display(1, 1)}",
+         _poly_mul(_binom(1, b + c), _binom(1, 1))),
+        (f"{_binom_display(-1, b)}{_binom_display(-1, c)}",
+         _poly_mul(_binom(-1, b), _binom(-1, c))),
+        (f"{_binom_display(1, b)}{_binom_display(1, c + 1)}",
+         _poly_mul(_binom(1, b), _binom(1, c + 1))),
+    ]
+    assert candidates[0][1] == original
+    option_texts = _factored_options(original, candidates)
+    question = f"Rastavi grupisanjem: ${question_display}$"
+    solution = (f"Grupisemo: $x(x + {b}) + {c}(x + {b}) = {correct_display}$ "
+                "— razvoj vraca polazni izraz.")
+    hints = ("Grupisi po dva clana tako da svaka grupa ima zajednicki "
+             "faktor.",
+             f"Iz prve grupe izluci $x$, a iz druge ${c}$ — u obje ostaje "
+             f"$(x + {b})$.",
+             f"Zajednicki binom $(x + {b})$ izluci ispred zagrade.")
+    return core.build_package(
+        lesson_id=lesson_id, lesson_title=lesson_title,
+        family_id="polynomial_basic", operation="factor_grouping",
+        level=level, question=question, answer_value=correct_display,
+        answer_display=correct_display, distractor_values=(),
+        hints=hints, solution=solution,
+        signature_parameters=[("b", str(b)), ("c", str(c))],
+        required_conditions=["factor_grouping"],
+        relevant_objects=["polynomial"], generator_version=GENERATOR_VERSION,
+        option_texts=option_texts, wrap="",
+        evidence=_ev_capped(level))
+
+
+def _factor_identity_package(rng, level, domain, lesson_id, lesson_title):
+    b = rng.randint(1, 6 if level == 1 else 9)
+    sign = 1 if rng.random() < 0.5 else -1
+    original = _poly_mul(_binom(sign, b), _binom(sign, b))
+    correct_display = f"{_binom_display(sign, b)}^2"
+    candidates = [
+        (correct_display, original),
+        (f"{_binom_display(-sign, b)}^2",
+         _poly_mul(_binom(-sign, b), _binom(-sign, b))),
+        (f"{_binom_display(-1, b)}{_binom_display(1, b)}",
+         _poly_mul(_binom(-1, b), _binom(1, b))),
+        (f"{_binom_display(sign, b + 1)}^2",
+         _poly_mul(_binom(sign, b + 1), _binom(sign, b + 1))),
+    ]
+    option_texts = _factored_options(original, candidates)
+    sign_word = "plus" if sign > 0 else "minus"
+    question = f"Rastavi primjenom identiteta: ${poly_display(original)}$"
+    solution = (f"Trinom je kvadrat binoma: ${poly_display(original)} = "
+                f"{correct_display}$ — razvoj vraca polazni polinom.")
+    hints = ("Provjeri da li je trinom kvadrat binoma: prvi i posljednji "
+             "clan su kvadrati, a srednji dvostruki proizvod.",
+             f"Kvadrati su $x^2$ i ${b * b}$; srednji clan je "
+             f"$2 \\cdot x \\cdot {b}$ sa znakom {sign_word}.",
+             f"Dakle: $(x {'+' if sign > 0 else '-'} {b})^2$ — provjeri "
+             "razvojem.")
+    return core.build_package(
+        lesson_id=lesson_id, lesson_title=lesson_title,
+        family_id="polynomial_basic", operation="factor_identity",
+        level=level, question=question, answer_value=correct_display,
+        answer_display=correct_display, distractor_values=(),
+        hints=hints, solution=solution,
+        signature_parameters=[("sign", str(sign)), ("b", str(b))],
+        required_conditions=["factor_identity"],
+        relevant_objects=["polynomial"], generator_version=GENERATOR_VERSION,
+        option_texts=option_texts, wrap="", evidence=_ev_capped(level))
+
+
+def _sum_diff_cubes_package(rng, level, domain, lesson_id, lesson_title):
+    b = rng.randint(1, 4)
+    sign = 1 if rng.random() < 0.5 else -1
+    original = {3: 1, 0: sign * b ** 3}
+    quad = {2: 1, 1: -sign * b, 0: b * b}
+    correct_display = f"{_binom_display(sign, b)}({poly_display(quad)})"
+    wrong_quad = {2: 1, 1: sign * b, 0: b * b}
+    candidates = [
+        (correct_display, _poly_mul(_binom(sign, b), quad)),
+        (f"{_binom_display(sign, b)}^3",
+         _poly_mul(_poly_mul(_binom(sign, b), _binom(sign, b)),
+                   _binom(sign, b))),
+        (f"{_binom_display(sign, b)}({poly_display(wrong_quad)})",
+         _poly_mul(_binom(sign, b), wrong_quad)),
+        (f"{_binom_display(-sign, b)}({poly_display(quad)})",
+         _poly_mul(_binom(-sign, b), quad)),
+    ]
+    assert candidates[0][1] == original
+    option_texts = _factored_options(original, candidates)
+    kind_word = "zbir" if sign > 0 else "razliku"
+    question = f"Rastavi {kind_word} kubova: ${poly_display(original)}$"
+    solution = (f"Zbir/razlika kubova: binom puta trinom bez dvojke — "
+                f"${poly_display(original)} = {correct_display}$.")
+    hints = ("Zbir/razlika kubova se rastavlja na binom i trinom.",
+             f"Kubovi su $x^3$ i ${b ** 3}$, pa je binom "
+             f"$(x {'+' if sign > 0 else '-'} {b})$.",
+             "U trinomu srednji clan mijenja znak binoma i nema dvojke.")
+    return core.build_package(
+        lesson_id=lesson_id, lesson_title=lesson_title,
+        family_id="polynomial_basic", operation="sum_diff_cubes",
+        level=level, question=question, answer_value=correct_display,
+        answer_display=correct_display, distractor_values=(),
+        hints=hints, solution=solution,
+        signature_parameters=[("sign", str(sign)), ("b", str(b))],
+        required_conditions=["sum_diff_cubes"],
+        relevant_objects=["polynomial"], generator_version=GENERATOR_VERSION,
+        option_texts=option_texts, wrap="",
+        evidence=_ev_capped(level))
+
+
+def _zero_product_package(rng, level, domain, lesson_id, lesson_title):
+    p = rng.randint(1, 8)
+    q = rng.randint(1, 8)
+    while q == p:
+        q = rng.randint(1, 8)
+    root_p = p if rng.random() < 0.5 else -p
+    root_q = -q if rng.random() < 0.5 else q
+    display = (f"(x {'-' if root_p > 0 else '+'} {abs(root_p)})"
+               f"(x {'-' if root_q > 0 else '+'} {abs(root_q)}) = 0")
+    correct = f"x = {root_p} ili x = {root_q}"
+    options = [correct,
+               f"x = {-root_p} ili x = {-root_q}",
+               f"x = {root_p} ili x = {-root_q}",
+               f"x = {root_p + 1} ili x = {root_q}"]
+    option_texts = tuple(f"${item}$" for item in options)
+    if len(set(option_texts)) != 4:
+        raise DeterministicGenerationError("opcije nisu jedinstvene")
+    question = f"Rijesi jednacinu: ${display}$"
+    solution = (f"Proizvod je nula kad je bar jedan faktor nula: prvi faktor "
+                f"daje $x = {root_p}$, a drugi $x = {root_q}$ — oba broja "
+                "ponistavaju po jedan faktor polazne jednacine.")
+    hints = ("Nula proizvoda: proizvod je nula tacno kad je neki faktor "
+             "nula.",
+             "Izjednaci SVAKI faktor s nulom i rijesi dvije male jednacine.",
+             f"Prvi faktor daje $x = {root_p}$ — nadji i drugu vrijednost.")
+    return core.build_package(
+        lesson_id=lesson_id, lesson_title=lesson_title,
+        family_id="polynomial_basic", operation="zero_product",
+        level=level, question=question, answer_value=correct,
+        answer_display=correct, distractor_values=(),
+        hints=hints, solution=solution,
+        signature_parameters=[("roots", f"{root_p}|{root_q}")],
+        required_conditions=["zero_product"],
+        relevant_objects=["polynomial"], generator_version=GENERATOR_VERSION,
+        option_texts=option_texts, wrap="", evidence=_ev_capped(level))
+
+
+def _fraction_domain_package(rng, level, domain, lesson_id, lesson_title):
+    p = rng.randint(1, 8)
+    q = rng.randint(1, 8)
+    while q == p:
+        q = rng.randint(1, 8)
+    numerator = rng.randint(1, 9)
+    factored = f"(x - {p})(x + {q})"
+    expansion = _poly_mul({1: 1, 0: -p}, {1: 1, 0: q})
+    denominator_display = factored if level == 1 else poly_display(expansion)
+    correct = f"x = {p} i x = {-q}"
+    options = [correct,
+               f"x = {-p} i x = {q}",
+               f"x = {p} i x = {q}",
+               f"x = {p * q} i x = {q - p}"]
+    option_texts = tuple(f"${item}$" for item in options)
+    if len(set(option_texts)) != 4:
+        raise DeterministicGenerationError("opcije nisu jedinstvene")
+    question = ("Za koje vrijednosti promjenljive $x$ razlomak "
+                f"$\\frac{{{numerator}}}{{{denominator_display}}}$ NIJE "
+                "definisan?")
+    solution = (f"Razlomak nije definisan kad je imenilac nula: "
+                f"${factored} = 0$ daje $x = {p}$ i $x = {-q}$.")
+    hint2 = ("Rastavi imenilac na faktore pa svaki faktor izjednaci s nulom."
+             if level > 1 else
+             "Izjednaci svaki faktor imenioca s nulom.")
+    hints = ("Razlomak nije definisan kad mu je imenilac jednak nuli.",
+             hint2,
+             f"Faktori su $(x - {p})$ i $(x + {q})$ — nule su njihova "
+             "rjesenja.")
+    return core.build_package(
+        lesson_id=lesson_id, lesson_title=lesson_title,
+        family_id="polynomial_basic", operation="fraction_domain",
+        level=level, question=question, answer_value=correct,
+        answer_display=correct, distractor_values=(),
+        hints=hints, solution=solution,
+        signature_parameters=[("p", str(p)), ("q", str(q))],
+        required_conditions=["fraction_domain"],
+        relevant_objects=["polynomial"], generator_version=GENERATOR_VERSION,
+        option_texts=option_texts, wrap="",
+        evidence=_ev_capped(level))
+
+
+def _monomial_mul_div_package(rng, level, domain, lesson_id, lesson_title):
+    c1 = rng.randint(2, 6)
+    c2 = rng.randint(2, 6)
+    d1 = rng.randint(1, 3 if level == 1 else 4)
+    d2 = rng.randint(1, 3 if level == 1 else 4)
+    multiply = rng.random() < 0.5 or level == 1
+    if level == 3:
+        c3 = rng.choice([c for c in (2, 3, 4, 6) if (c1 * c2) % c == 0])
+        d3 = rng.randint(1, min(d1 + d2 - 1, 3))
+        result = {d1 + d2 - d3: (c1 * c2) // c3}
+        question = (f"Izračunaj: ${poly_display({d1: c1})} \cdot "
+                    f"{poly_display({d2: c2})} : {poly_display({d3: c3})}$")
+        rule = ("Pri množenju monoma izložioci se sabiraju, a pri "
+                "dijeljenju oduzimaju")
+        work = (f"({c1} \cdot {c2} : {c3})x^{{{d1}+{d2}-{d3}}} = "
+                f"{poly_display(result)}")
+        wrong = [{d1 + d2 + d3: (c1 * c2) // c3},
+                 {d1 + d2 - d3: c1 * c2 * c3},
+                 {d1 + d2 - d3: (c1 * c2) // c3 + 1}]
+        operation = "monomial_chain"
+        option_texts = _distinct_poly_options(result, wrong)
+        solution = f"{rule}: ${work}$."
+        hints = (f"{rule}.",
+                 "Prvo sredi koeficijente, zatim stepene od $x$.",
+                 f"Postupak: ${work}$.")
+        return core.build_package(
+            lesson_id=lesson_id, lesson_title=lesson_title,
+            family_id="polynomial_basic", operation=operation, level=level,
+            question=question, answer_value=poly_display(result),
+            answer_display=poly_display(result), distractor_values=(),
+            hints=hints, solution=solution,
+            signature_parameters=[("c", f"{c1}|{c2}|{c3}"),
+                                  ("d", f"{d1}|{d2}|{d3}")],
+            required_conditions=[operation],
+            relevant_objects=["polynomial"],
+            generator_version=GENERATOR_VERSION, option_texts=option_texts,
+            wrap="", evidence=core.evidence_for_level(3))
+    if multiply:
+        result = {d1 + d2: c1 * c2}
+        question = (f"Pomnozi monome: ${poly_display({d1: c1})} \\cdot "
+                    f"{poly_display({d2: c2})}$")
+        rule = ("Monomi se mnoze tako da se pomnoze koeficijenti, a "
+                "izlozioci SABERU")
+        work = f"({c1} \\cdot {c2})x^{{{d1}+{d2}}} = {poly_display(result)}"
+        wrong = [{d1 * d2: c1 * c2}, {d1 + d2: c1 + c2},
+                 {d1 + d2: c1 * c2 + 1}]
+        operation = "monomial_multiply"
+    else:
+        big = {d1 + d2: c1 * c2}
+        result = {d2: c2}
+        question = (f"Podijeli monome: ${poly_display(big)} : "
+                    f"{poly_display({d1: c1})}$")
+        rule = ("Monomi se dijele tako da se podijele koeficijenti, a "
+                "izlozioci ODUZMU")
+        work = (f"({c1 * c2} : {c1})x^{{{d1 + d2}-{d1}}} = "
+                f"{poly_display(result)}")
+        wrong = [{d1 + d2 + d1: c2}, {d2: c1 * c2 - c1}, {d2 + 1: c2}]
+        operation = "monomial_divide"
+    option_texts = _distinct_poly_options(result, wrong)
+    solution = f"{rule}: ${work}$."
+    hints = (f"{rule}.",
+             "Prvo sredi koeficijente, zatim stepene od $x$.",
+             f"Postupak: ${work}$.")
+    return core.build_package(
+        lesson_id=lesson_id, lesson_title=lesson_title,
+        family_id="polynomial_basic", operation=operation, level=level,
+        question=question, answer_value=poly_display(result),
+        answer_display=poly_display(result), distractor_values=(),
+        hints=hints, solution=solution,
+        signature_parameters=[("c", f"{c1}|{c2}"), ("d", f"{d1}|{d2}"),
+                              ("op", operation)],
+        required_conditions=[operation], relevant_objects=["polynomial"],
+        generator_version=GENERATOR_VERSION, option_texts=option_texts,
+        wrap="", evidence=core.evidence_for_level(min(level, 2)))
+
+
+def _like_terms_select_package(rng, level, domain, lesson_id, lesson_title):
+    if level == 3:
+        raise DeterministicGenerationError(
+            "prepoznavanje sličnih monoma nema trostepenu varijantu — "
+            "nivo 3 nosi combine_like_terms")
+    degree = rng.randint(1, 4)
+    coefficient = rng.randint(2, 9)
+    target = poly_display({degree: coefficient})
+    like_coefficient = rng.choice([c for c in range(-9, 10)
+                                   if c not in (0, coefficient)])
+    like = poly_display({degree: like_coefficient})
+    unlike = [poly_display({degree + 1: coefficient}),
+              poly_display({max(degree - 1, 0): coefficient}),
+              poly_display({degree + 2: rng.randint(2, 9)})]
+    options = [f"${like}$"] + [f"${item}$" for item in unlike]
+    if len(set(options)) != 4:
+        raise DeterministicGenerationError("opcije nisu jedinstvene")
+    question = f"Koji je od ponudjenih monoma SLICAN monomu ${target}$?"
+    solution = (f"Slicni monomi imaju ISTU promjenljivu s ISTIM izloziocem — "
+                f"${like}$ ima isti stepen kao ${target}$, a koeficijent "
+                "smije biti razlicit.")
+    hints = ("Slicni monomi imaju istu promjenljivu s istim izloziocem.",
+             f"Trazi monom ciji je stepen uz $x$ jednak stepenu datog monoma.",
+             "Koeficijent NIJE bitan za slicnost — bitan je samo stepen.")
+    return core.build_package(
+        lesson_id=lesson_id, lesson_title=lesson_title,
+        family_id="polynomial_basic", operation="like_terms_select",
+        level=level, question=question, answer_value=options[0],
+        answer_display=like, distractor_values=(),
+        hints=hints, solution=solution,
+        signature_parameters=[("target", target)],
+        required_conditions=["like_terms_select"],
+        relevant_objects=["polynomial"], generator_version=GENERATOR_VERSION,
+        option_texts=tuple(options), wrap="",
+        evidence=core.evidence_for_level(min(level, 2)))
