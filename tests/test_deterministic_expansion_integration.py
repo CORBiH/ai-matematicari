@@ -34,6 +34,28 @@ REPRESENTATIVES = [
     ("classical_probability_basic", 8, "8-06-012"),
     ("linear_equation_direct", 9, "9-04-003"),
     ("arithmetic_mean_direct", 9, "9-08-010"),
+    # Batch #2 — po jedna lekcija svake nove porodice / velikog proširenja.
+    ("number_comparison_order", 6, "6-02-002"),
+    ("natural_arithmetic_direct", 6, "6-02-005"),
+    ("polynomial_basic", 6, "6-02-008"),
+    ("divisibility_value_properties", 6, "6-03-002"),
+    ("fraction_decimal_conversion", 6, "6-05-003"),
+    ("decimal_rounding", 6, "6-05-007"),
+    ("ratio_proportion_direct", 6, "6-06-003"),
+    ("linear_equation_direct", 6, "6-07-002"),
+    ("unit_conversion_direct", 6, "6-13-005"),
+    ("linear_equation_direct", 7, "7-02-020"),
+    ("rational_arithmetic_direct", 7, "7-03-015"),
+    ("simple_quadratic_equation", 8, "8-01-009"),
+    ("power_arithmetic_direct", 8, "8-01-017"),
+    ("linear_function_direct", 8, "8-02-005"),
+    ("ratio_proportion_direct", 8, "8-03-003"),
+    ("frequency_basic", 8, "8-06-002"),
+    ("polynomial_basic", 8, "8-07-008"),
+    ("linear_function_direct", 9, "9-03-014"),
+    ("linear_equation_direct", 9, "9-04-016"),
+    ("simple_quadratic_equation", 9, "9-06-013"),
+    ("unit_conversion_direct", 9, "9-08-013"),
 ]
 
 

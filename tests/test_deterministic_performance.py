@@ -83,6 +83,14 @@ _EXPANSION_LESSONS = (
     (7, "7-03-011"),   # množenje racionalnih
     (8, "8-01-015"),   # zakoni stepena
     (9, "9-04-003"),   # jednačina sa zagradama
+    # Batch #2 — reprezentativne nove porodice.
+    (6, "6-05-003"),   # pretvaranje razlomak-decimala
+    (6, "6-13-005"),   # mjerne jedinice
+    (7, "7-02-020"),   # rješavanje nejednačina
+    (8, "8-02-005"),   # linearna funkcija
+    (9, "9-06-013"),   # kvadratna jednačina izlučivanjem
+    (8, "8-07-008"),   # množenje polinoma
+    (8, "8-03-003"),   # nepoznati član proporcije
 )
 
 

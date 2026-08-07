@@ -462,7 +462,7 @@ def _percent_amount_package(rng, level, lesson_id, lesson_title):
     question = (f"Osnovica iznosi ${base}$, a procentna stopa je {percent} %. "
                 "Koliki je procentni iznos?")
     chain = (f"\\frac{{{percent}}}{{100}} \\cdot {base} = {amount.numerator}")
-    hint1 = "Procentni iznos je stopa (kao razlomak sa imeniocem 100) puta osnovica."
+    hint1 = "Procentni iznos je stopa (pretvorena u razlomak stotinki) puta osnovica."
     hint2 = f"Zapiši stopu kao razlomak: $\\frac{{{percent}}}{{100}}$, pa pomnoži sa ${base}$."
     hint3 = f"Računaj: ${chain.split('=')[0].strip()}$."
     solution = f"Procentni iznos je ${chain}$."
@@ -526,8 +526,8 @@ def _percent_rate_package(rng, level, lesson_id, lesson_title):
         option_texts = (f"{percent} %", *(f"{w} %" for w in wrong[:3]))
         wrap = ""
         candidates = ()
-    hint1 = ("Iznos, osnovica i stopa su vezani: iznos = stopa · osnovica "
-             "(stopa kao razlomak sa imeniocem 100).")
+    hint1 = ("Iznos, osnovica i stopa su vezani: iznos je stopa (pretvorena "
+             "u razlomak stotinki) puta osnovica.")
     hint3 = "Provjeri rezultat: stopa puta osnovica mora dati iznos."
     return core.build_package(
         lesson_id=lesson_id, lesson_title=lesson_title,
@@ -702,8 +702,10 @@ def _round_decimal_package(rng, level, lesson_id, lesson_title):
     display = core.decimal_display(value)
     answer_display = core.decimal_display(rounded)
     question = (f"Zaokruži broj ${display}$ na {_PLACE_NAMES[places]}.")
-    hint1 = ("Pogledaj PRVU cifru iza traženog mjesta: 0–4 zaokružuje "
-             "naniže, a 5–9 naviše.")
+    # Bez brojki u pravilu: kratki numerički odgovori bi se pojavili kao
+    # podniz raspona ("0-4") i nagovještaj bi izgledao kao otkrivanje.
+    hint1 = ("Pogledaj PRVU cifru iza traženog mjesta: cifre manje od pet "
+             "zaokružuju naniže, a pet i veće naviše.")
     hint2 = f"Podvuci traženo mjesto u broju ${display}$ i pogledaj cifru odmah iza njega."
     hint3 = ("Ako je cifra iza traženog mjesta 5 ili veća, uvećaj zadnju "
              "zadržanu cifru za jedan; ostatak se odbacuje.")

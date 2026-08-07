@@ -669,8 +669,10 @@ def _decade_unit_package(rng, level, lesson_id, lesson_title):
     option_texts = tuple(f"${value}$" for value in option_values)
     question = (f"Koja je najveća dekadska jedinica kojom se broj ${number}$ "
                 "može podijeliti bez ostatka?")
-    hint1 = ("Dekadske jedinice su 10, 100, 1000, ... — broj se njima dijeli "
-             "bez ostatka prema broju nula na kraju.")
+    # Bez nabrajanja brojki: svaka opcija je dekadska jedinica, pa bi
+    # nabrojane vrijednosti doslovno sadržavale i tačan odgovor.
+    hint1 = ("Dekadske jedinice su desetica, stotica, hiljada... — broj se "
+             "njima dijeli bez ostatka prema broju nula na svom kraju.")
     hint2 = f"Prebroji nule na kraju broja ${number}$."
     hint3 = (f"Broj ${number}$ završava tačno sa {exponent} "
              f"{'nulom' if exponent == 1 else 'nule' if exponent < 5 else 'nula'}"

@@ -40,12 +40,12 @@ CASES = [(lesson_id, family_id, level)
 
 
 def test_expansion_reached_the_intended_scale():
-    """57 determinističkih lekcija u 16 porodica, sva četiri razreda."""
-    assert len(_DETERMINISTIC_LESSONS) >= 57, len(_DETERMINISTIC_LESSONS)
+    """Batch #2: 154 determinističke lekcije u 25 porodica, sva četiri razreda."""
+    assert len(_DETERMINISTIC_LESSONS) >= 154, len(_DETERMINISTIC_LESSONS)
     grades = {lesson_id[0] for lesson_id, _family in _DETERMINISTIC_LESSONS}
     assert grades == {"6", "7", "8", "9"}, grades
     families = {family for _lesson, family in _DETERMINISTIC_LESSONS}
-    assert len(families) >= 15, sorted(families)
+    assert len(families) >= 25, sorted(families)
 
 
 def _context(lesson_id):

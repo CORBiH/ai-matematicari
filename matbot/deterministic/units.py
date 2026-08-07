@@ -248,7 +248,8 @@ def _speed_package(rng, level, lesson_id, lesson_title):
 
 def _angle_package(rng, level, lesson_id, lesson_title):
     if level == 1:
-        degrees = rng.randint(1, 9)
+        # Od DVA stepena: za jedan stepen bi samo pravilo doslovno bilo odgovor.
+        degrees = rng.randint(2, 9)
         minutes = 0
         total = degrees * 60
         question = (f"Koliko minuta ima ugao od ${degrees}^{{\\circ}}$?")
@@ -269,8 +270,8 @@ def _angle_package(rng, level, lesson_id, lesson_title):
         question = (f"Koliko sekundi ima ugao od ${minutes}' {seconds}''$?")
         chain = f"{minutes} \\cdot 60 + {seconds} = {total}"
         target_word = "sekundi"
-    hint1 = ("Ugaone jedinice idu po 60: jedan stepen ima 60 minuta, a "
-             "jedna minuta 60 sekundi.")
+    hint1 = ("Jedan stepen ima šezdeset minuta, a jedna minuta šezdeset "
+             "sekundi — pretvaraj množenjem po tom pravilu.")
     hint2 = f"Računaj: ${chain.split('=')[0].strip()}$."
     hint3 = "Prvo pretvori veću jedinicu, pa dodaj ostatak."
     solution = f"Računamo: ${chain}$ — ugao ima ${total}$ {target_word}."

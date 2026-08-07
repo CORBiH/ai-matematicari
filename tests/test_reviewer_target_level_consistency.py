@@ -511,3 +511,17 @@ def test_published_evidence_is_verbatim_the_reviewer_claim(monkeypatch):
     assert run_practice_turn(store, fake, turn(LIVE_GRADE, LIVE_TOPIC))["status"] == "ready"
     stored = store.peek(SESSION)["current_task_difficulty_evidence"]
     assert stored == reviewer_evidence.model_dump()
+
+
+# ---------------------------------------------------------------------------
+# Kapacitetna ekspanzija (Batch #2): unakrsno-domenski testovi ispituju
+# MODEL-strategiju i na lekcijama koje produkcija sada rutira deterministički.
+# Izričito isključenje je ISTI mehanizam kao produkcijski rollback
+# (MATBOT_DETERMINISTIC_PRACTICE=disabled) — model-put ostaje trajno testiran.
+# ---------------------------------------------------------------------------
+import pytest as _pytest_capex
+
+
+@_pytest_capex.fixture(autouse=True)
+def _model_route_only_capex(monkeypatch):
+    monkeypatch.setenv("MATBOT_DETERMINISTIC_PRACTICE", "disabled")

@@ -62,3 +62,24 @@ Na svakoj od njih: „Daj mi zadatak” traje duže (dva poziva modela) i log ka
 3. Postavi slobodno pitanje usred zadatka → model odgovara, zadatak ostaje
    aktivan i klik poslije toga i dalje radi deterministički.
 4. Prebaci lekciju pa se vrati → svjež zadatak, nivo kreće od 1.
+
+## Batch #2 — dodatne reprezentativne determinističke lekcije
+
+| # | Lekcija | Šta klikati | Očekivani zadatak | Invarijanta |
+|---|---------|-------------|-------------------|-------------|
+| 18 | 6.r → Prirodni brojevi → **Dijeljenje s ostatkom** (6-02-005) | novi → teži ×2 | ostatak/količnik; nivo 3 traži djeljenik | rješenje pokazuje zapis a = b·q + r |
+| 19 | 6.r → Decimalni → **Pretvaranje razlomka u decimalni broj i obratno** (6-05-003) | novi ×3 | oba smjera pretvaranja | opcije nikad ne miješaju zapise; razlomak uvijek skraćen |
+| 20 | 6.r → Decimalni → **Zaokruživanje decimalnih brojeva** (6-05-007) | novi → teži | zaokruži na dato mjesto | školsko half-up; nikad "a = zaokruženo" |
+| 21 | 6.r → Postotak → **Razmjera/omjer** (6-06-003) | novi | skrati razmjeru | opcije različitih količnika |
+| 22 | 6.r → Jednačine u Q+ → **x ± a = b i a ± x = b** (6-07-002) | novi → hint → rješenje | jednačina s razlomcima, pozitivna rješenja | provjera uvrštavanjem |
+| 23 | 6.r → Mjerenje → **Preračunavanje mjernih jedinica** (6-13-005) | novi ×3 | dužina/masa/vrijeme/površina | m² ide s faktorom 100 po koraku |
+| 24 | 7.r → Cijeli → **Nejednačine s množenjem i dijeljenjem u Z** (7-02-020) | novi ×3 | opcije su skupovi rješenja | negativan koeficijent OBRĆE znak |
+| 25 | 8.r → Realni → **Naučni zapis broja** (8-01-017) | novi → teži | a·10^n, 1 ≤ a < 10 | samo pozitivni izložioci u opcijama |
+| 26 | 8.r → Funkcija → **Pojam linearne funkcije y=kx+n** (8-02-005) | novi → teži | vrijednost/koeficijent | provjera uvrštavanjem u rješenju |
+| 27 | 8.r → Proporcionalnost → **Nepoznati član proporcije** (8-03-003) | novi → hint | a : b = c : x | unakrsni proizvodi jednaki |
+| 28 | 8.r → Podaci → **Frekvencija** (8-06-002) | novi | niz ocjena → frekvencija | prebrojano egzaktno iz niza |
+| 29 | 8.r → Polinomi → **Množenje polinoma** (8-07-008) | novi → rješenje | (x+a)(x+b) | provjera vrijednošću za x = 2 |
+| 30 | 9.r → Funkcija → **Jednačina prave kroz dvije tačke** (9-03-014) | novi → hint ×2 | T_1, T_2 → y = kx + n | k iz razlike koordinata, n uvrštavanjem |
+| 31 | 9.r → Jednačine → **Promjena znaka nejednakosti…** (9-04-016) | novi ×3 | negativan koeficijent | smjer se uvijek obrće |
+| 32 | 9.r → Kvadratne → **ax² + bx = 0** (9-06-013) | novi → rješenje | izlučivanje x | uvijek dva rješenja (jedno je 0) |
+| 33 | 9.r → Podaci → **Pretvaranje brzine m/s i km/h** (9-08-013) | novi → teži | množenje/dijeljenje sa 3,6 | egzaktan faktor 18/5 |

@@ -167,3 +167,45 @@ def test_registry_exposes_every_family_exactly_once():
         assert family_id in declared
         assert callable(module.supports)
         assert callable(module.generate_package)
+
+
+def test_no_lesson_identity_exists_anywhere_in_the_deterministic_engines():
+    """ARHITEKTONSKA KAPIJA (Batch #2): lekcija je PODATAK, kapacitet je KOD.
+
+    Nijedan ID lekcije (obrazac G-OO-NNN) i nijedan kanonski naslov ne smije
+    postojati u izvornom kodu determinističkih motora — razlike među lekcijama
+    nose isključivo parametri kompajliranog semantičkog ugovora."""
+    import json
+    import re
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parent.parent
+    engine_dir = root / "matbot" / "deterministic"
+    topic_re = re.compile(r"\b[6-9]-\d{2}-\d{3}\b")
+    offenders = []
+    blob_parts = []
+    for path in sorted(engine_dir.glob("*.py")):
+        source = path.read_text(encoding="utf-8")
+        blob_parts.append(source)
+        for number, line in enumerate(source.splitlines(), 1):
+            if topic_re.search(line):
+                offenders.append(f"{path.name}:{number}: {line.strip()}")
+    assert not offenders, offenders
+
+    # Naslovi: matematički TERMIN u pedagoškom tekstu („Aritmetička sredina je
+    # zbir...“) je legitiman i neizbježan — zabranjeno je GRANANJE po naslovu.
+    # Zato se naslov smatra prekršajem samo u liniji koja poredi ili grana.
+    topics = json.loads((root / "data" / "topics.json").read_text(encoding="utf-8"))
+    titles = {lesson["title"]
+              for grade in topics["grades"].values()
+              for lesson in grade["lessons"] if len(lesson["title"]) >= 12}
+    branch_re = re.compile(r"==|!=|\bif\b|\belif\b|\bmatch\b")
+    branching_leaks = []
+    for source in blob_parts:
+        for line in source.splitlines():
+            if not branch_re.search(line):
+                continue
+            for title in titles:
+                if title in line:
+                    branching_leaks.append(line.strip())
+    assert not branching_leaks, branching_leaks
