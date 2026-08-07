@@ -672,3 +672,17 @@ def test_remainder_stated_sentences_later_and_verb_forms_are_verified():
     # Pogrešan broj uz riječ ostatka i dalje ne amnestira.
     assert find_numeric_inconsistencies(
         "Podijelimo: $30 : 4 = 7$. Nakon toga ostaju joj $3$ čokoladice.") != []
+
+
+def test_remainder_division_with_inline_annotation_is_verified():
+    """ŽIVI F5E RERUN (E02): količnik s anotacijom — oba poziva su bila
+    matematički TAČNA (47:6=7 ost. 5; 53:7=7 ost. 4) i oba su padala."""
+    from matbot.mathcheck import find_numeric_inconsistencies
+    assert find_numeric_inconsistencies(
+        r"Podijelimo: $47 : 6 = 7\text{ (punih paketa)}$. "
+        r"Nakon punjenja ostaje $5$ čokoladica.") == []
+    assert find_numeric_inconsistencies(
+        r"$53 : 7 = 7\,\text{kutija}$, a preostaju $4$ olovke.") == []
+    # Anotacija ne amnestira pogrešan ostatak.
+    assert find_numeric_inconsistencies(
+        r"$47 : 6 = 7\text{ (punih paketa)}$. Ostaje $6$ čokoladica.") != []

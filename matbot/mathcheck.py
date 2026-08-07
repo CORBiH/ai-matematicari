@@ -627,7 +627,13 @@ def _verified_remainder_division(segment, stated_remainders):
     """True SAMO kad su i količnik i ostatak dokazano tačni."""
     if not stated_remainders:
         return False
-    match = _REMAINDER_DIVISION_RE.match(segment.strip())
+    # Živi F5E rerun: model uz količnik piše i anotaciju —
+    # „$47 : 6 = 7\text{ (punih paketa)}$“. Anotacija ne nosi vrijednost
+    # (ista normalizacija kao pri evaluaciji), pa se uklanja prije poklapanja
+    # čistog oblika a : b = q.
+    cleaned = re.sub(r"\\(?:text|mathrm|mathit)\s*\{[^{}]*\}", " ", segment)
+    cleaned = cleaned.replace("\\,", " ")
+    match = _REMAINDER_DIVISION_RE.match(cleaned.strip())
     if not match:
         return False
     dividend, divisor, quotient = (int(group) for group in match.groups())
