@@ -14,8 +14,10 @@ Lekcija je pokrivena SAMO kad njen blocking ugovor pripada registrovanoj
 porodici čije parametre modul u potpunosti podržava — sve ostalo ostaje na
 model-putu bez ijedne izmjene ponašanja.
 """
-from matbot.deterministic import (arithmetic, equations, fractions,
-                                  numbertheory, ordering, powers, quantities)
+from matbot.deterministic import (arithmetic, conversions, equations,
+                                  fractions, functions, numbertheory,
+                                  ordering, polynomials, powers, quantities,
+                                  ratio, units)
 from matbot.deterministic.core import DeterministicGenerationError  # noqa: F401
 
 
@@ -24,8 +26,9 @@ def _family_ids(module):
     return tuple(declared) if declared else (module.FAMILY_ID,)
 
 
-_MODULES = (arithmetic, equations, fractions, numbertheory, ordering,
-            powers, quantities)
+_MODULES = (arithmetic, conversions, equations, fractions, functions,
+            numbertheory, ordering, polynomials, powers, quantities,
+            ratio, units)
 
 GENERATORS = {family_id: module
               for module in _MODULES
