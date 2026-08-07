@@ -14,34 +14,320 @@
     "`evidence_ids` su porijeklo iz Faze 2/2.5/3 (stavke NPP i oporavljeni",
     "dokazi). Ništa se ne aktivira bez zapisanog dokaza."
   ],
-
   "schema_version": "1",
-  "contract_version": "4A.1",
-
+  "contract_version": "5C.1",
   "assignments": [
+    {
+      "lesson_id": "6-02-003",
+      "family_id": "natural_arithmetic_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-6-02-003"
+      ],
+      "parameters": {
+        "allowed_operations": [
+          "add",
+          "subtract"
+        ],
+        "number_domain": "natural"
+      },
+      "level_bounds": {
+        "1": "jedna operacija malim brojevima",
+        "2": "dvije povezane operacije ili veći brojevi",
+        "3": "tri povezane operacije (odnosno prioritet i zagrade)"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: svi operandi i međurezultati prirodni."
+    },
+    {
+      "lesson_id": "6-02-004",
+      "family_id": "natural_arithmetic_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-6-02-004"
+      ],
+      "parameters": {
+        "allowed_operations": [
+          "multiply",
+          "divide"
+        ],
+        "number_domain": "natural"
+      },
+      "level_bounds": {
+        "1": "jedna operacija malim brojevima",
+        "2": "dvije povezane operacije ili veći brojevi",
+        "3": "tri povezane operacije (odnosno prioritet i zagrade)"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: svi operandi i međurezultati prirodni."
+    },
+    {
+      "lesson_id": "6-02-007",
+      "family_id": "natural_arithmetic_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-6-02-007"
+      ],
+      "parameters": {
+        "allowed_operations": [
+          "add",
+          "subtract",
+          "multiply",
+          "divide"
+        ],
+        "number_domain": "natural",
+        "expression_shape": "order_of_operations"
+      },
+      "level_bounds": {
+        "1": "jedna operacija malim brojevima",
+        "2": "dvije povezane operacije ili veći brojevi",
+        "3": "tri povezane operacije (odnosno prioritet i zagrade)"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: svi operandi i međurezultati prirodni."
+    },
+    {
+      "lesson_id": "6-03-001",
+      "family_id": "common_divisors_multiples",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "F25-PILOT-READY",
+        "KS_2018-0036",
+        "KS_2018-0038",
+        "KS_2018-0039",
+        "KS_2018-0044",
+        "KS_2018-0045"
+      ],
+      "parameters": {
+        "concepts": [
+          "divisor_membership",
+          "multiple_membership"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedan dati broj, mali djelioci/sadržioci",
+        "2": "dva data broja (zajednički djelilac/sadržilac)",
+        "3": "veći brojevi ili tri data broja"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: NZD/NZS/djelilac/sadržilac dokazani dijeljenjem bez ostatka."
+    },
+    {
+      "lesson_id": "6-03-004",
+      "family_id": "divisibility_predicate_application",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "F25-PILOT-READY",
+        "KS_2018-0040",
+        "RS_2014-0022"
+      ],
+      "parameters": {
+        "divisors": [
+          2,
+          3,
+          4,
+          5,
+          6,
+          9,
+          10,
+          15,
+          25
+        ]
+      },
+      "level_bounds": {
+        "1": "jedno pravilo djeljivosti",
+        "2": "dva pravila istovremeno",
+        "3": "dva-tri pravila, veći brojevi"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: tačno jedna opcija zadovoljava SVA navedena pravila (uski orakl to nezavisno dokazuje)."
+    },
+    {
+      "lesson_id": "6-03-005",
+      "family_id": "prime_structure",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "F25-PILOT-READY",
+        "KS_2018-0041",
+        "RS_2014-0023"
+      ],
+      "parameters": {
+        "concepts": [
+          "prime_classification"
+        ]
+      },
+      "level_bounds": {
+        "1": "mali brojevi (< 50)",
+        "2": "brojevi do 100, „varljivi“ složeni brojevi",
+        "3": "faktorizacija s tri prosta faktora"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: tačno jedna opcija ima traženo svojstvo proste strukture."
+    },
+    {
+      "lesson_id": "6-03-006",
+      "family_id": "prime_structure",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "F25-PILOT-READY"
+      ],
+      "parameters": {
+        "concepts": [
+          "coprime_pairs"
+        ]
+      },
+      "level_bounds": {
+        "1": "mali brojevi (< 50)",
+        "2": "brojevi do 100, „varljivi“ složeni brojevi",
+        "3": "faktorizacija s tri prosta faktora"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: tačno jedna opcija ima traženo svojstvo proste strukture."
+    },
+    {
+      "lesson_id": "6-03-007",
+      "family_id": "prime_structure",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "F25-PILOT-READY",
+        "KS_2018-0043"
+      ],
+      "parameters": {
+        "concepts": [
+          "prime_factorization"
+        ]
+      },
+      "level_bounds": {
+        "1": "mali brojevi (< 50)",
+        "2": "brojevi do 100, „varljivi“ složeni brojevi",
+        "3": "faktorizacija s tri prosta faktora"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: tačno jedna opcija ima traženo svojstvo proste strukture."
+    },
+    {
+      "lesson_id": "6-03-008",
+      "family_id": "common_divisors_multiples",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "F25-PILOT-READY",
+        "KS_2018-0044",
+        "KS_2018-0045",
+        "RS_2014-0024"
+      ],
+      "parameters": {
+        "concepts": [
+          "gcd"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedan dati broj, mali djelioci/sadržioci",
+        "2": "dva data broja (zajednički djelilac/sadržilac)",
+        "3": "veći brojevi ili tri data broja"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: NZD/NZS/djelilac/sadržilac dokazani dijeljenjem bez ostatka."
+    },
+    {
+      "lesson_id": "6-03-009",
+      "family_id": "common_divisors_multiples",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "F25-PILOT-READY",
+        "KS_2018-0044",
+        "KS_2018-0045",
+        "RS_2014-0024"
+      ],
+      "parameters": {
+        "concepts": [
+          "lcm"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedan dati broj, mali djelioci/sadržioci",
+        "2": "dva data broja (zajednički djelilac/sadržilac)",
+        "3": "veći brojevi ili tri data broja"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: NZD/NZS/djelilac/sadržilac dokazani dijeljenjem bez ostatka."
+    },
+    {
+      "lesson_id": "6-04-008",
+      "family_id": "number_comparison_order",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "F25-PILOT-READY",
+        "KS_2018-0045",
+        "KS_2018-0055"
+      ],
+      "parameters": {
+        "number_domain": "fraction"
+      },
+      "level_bounds": {
+        "1": "male, jasno razdvojene vrijednosti",
+        "2": "bliže vrijednosti ili miješani zapisi",
+        "3": "vrlo bliske vrijednosti, položaj između"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: tačno jedna ekstremna/tražena vrijednost među opcijama."
+    },
     {
       "lesson_id": "6-04-009",
       "family_id": "fraction_arithmetic_direct",
       "enforcement_mode": "blocking",
       "activation_class": "READY",
-      "evidence_ids": ["KS_2018-0045", "R25-021", "R25-026"],
+      "evidence_ids": [
+        "KS_2018-0045",
+        "R25-021",
+        "R25-026"
+      ],
       "parameters": {
-        "allowed_operations": ["add", "subtract"],
+        "allowed_operations": [
+          "add",
+          "subtract"
+        ],
         "denominator_relation": "equal",
-        "operand_kinds": ["fraction"],
+        "operand_kinds": [
+          "fraction"
+        ],
         "simplification_policy": "optional",
-        "allowed_answer_kinds": ["fraction", "mixed_number", "integer"],
-        "forbidden_directives": ["expand_reduce", "common_denominator",
-                                 "solve_equation", "percent"]
+        "allowed_answer_kinds": [
+          "fraction",
+          "mixed_number",
+          "integer"
+        ],
+        "forbidden_directives": [
+          "expand_reduce",
+          "common_denominator",
+          "solve_equation",
+          "percent"
+        ]
       },
       "level_bounds": {
         "1": "jedan zbir ili razlika, mali imenioci, bez skraćivanja",
         "2": "rezultat traži skraćivanje ili mješoviti zapis",
         "3": "tri člana ili nedostajući član jednakosti"
       },
-      "forbidden_neighbour_skills": ["6-04-010", "6-04-011", "6-04-012",
-                                     "6-04-005", "6-04-006", "6-06-002",
-                                     "6-07-002"],
+      "forbidden_neighbour_skills": [
+        "6-04-010",
+        "6-04-011",
+        "6-04-012",
+        "6-04-005",
+        "6-04-006",
+        "6-06-002",
+        "6-07-002"
+      ],
       "reviewer_note": "Invarijanta: imenioci JEDNAKI. Odgovara postojećem determinističkom ugovoru lekcije (denominator_relation=equal)."
     },
     {
@@ -49,24 +335,47 @@
       "family_id": "fraction_arithmetic_direct",
       "enforcement_mode": "blocking",
       "activation_class": "READY",
-      "evidence_ids": ["KS_2018-0045", "R25-022", "R25-027"],
+      "evidence_ids": [
+        "KS_2018-0045",
+        "R25-022",
+        "R25-027"
+      ],
       "parameters": {
-        "allowed_operations": ["add", "subtract"],
+        "allowed_operations": [
+          "add",
+          "subtract"
+        ],
         "denominator_relation": "unlike",
-        "operand_kinds": ["fraction"],
+        "operand_kinds": [
+          "fraction"
+        ],
         "simplification_policy": "optional",
-        "allowed_answer_kinds": ["fraction", "mixed_number", "integer"],
-        "forbidden_directives": ["expand_reduce", "common_denominator",
-                                 "solve_equation", "percent"]
+        "allowed_answer_kinds": [
+          "fraction",
+          "mixed_number",
+          "integer"
+        ],
+        "forbidden_directives": [
+          "expand_reduce",
+          "common_denominator",
+          "solve_equation",
+          "percent"
+        ]
       },
       "level_bounds": {
         "1": "jedan imenilac dijeli drugi",
         "2": "uzajamno prosti imenioci",
         "3": "tri člana ili kombinacija s oduzimanjem i skraćivanjem"
       },
-      "forbidden_neighbour_skills": ["6-04-009", "6-04-011", "6-04-012",
-                                     "6-04-007", "6-04-005", "6-04-006",
-                                     "6-07-002"],
+      "forbidden_neighbour_skills": [
+        "6-04-009",
+        "6-04-011",
+        "6-04-012",
+        "6-04-007",
+        "6-04-005",
+        "6-04-006",
+        "6-07-002"
+      ],
       "reviewer_note": "Invarijanta: imenioci RAZLIČITI. Svođenje je pomoćni korak, ne glavna radnja (glavna radnja 6-04-007)."
     },
     {
@@ -74,23 +383,45 @@
       "family_id": "fraction_arithmetic_direct",
       "enforcement_mode": "blocking",
       "activation_class": "READY",
-      "evidence_ids": ["KS_2018-0045", "R25-023", "R25-028"],
+      "evidence_ids": [
+        "KS_2018-0045",
+        "R25-023",
+        "R25-028"
+      ],
       "parameters": {
-        "allowed_operations": ["multiply"],
+        "allowed_operations": [
+          "multiply"
+        ],
         "denominator_relation": "any",
-        "operand_kinds": ["fraction", "natural"],
+        "operand_kinds": [
+          "fraction",
+          "natural"
+        ],
         "simplification_policy": "optional",
-        "allowed_answer_kinds": ["fraction", "mixed_number", "integer"],
-        "forbidden_directives": ["expand_reduce", "common_denominator",
-                                 "solve_equation", "percent"]
+        "allowed_answer_kinds": [
+          "fraction",
+          "mixed_number",
+          "integer"
+        ],
+        "forbidden_directives": [
+          "expand_reduce",
+          "common_denominator",
+          "solve_equation",
+          "percent"
+        ]
       },
       "level_bounds": {
         "1": "razlomak puta prirodan broj, mali brojevi",
         "2": "razlomak puta razlomak uz skraćivanje",
         "3": "tri faktora ili nedostajući faktor"
       },
-      "forbidden_neighbour_skills": ["6-04-009", "6-04-010", "6-04-012",
-                                     "6-06-002", "6-04-006"],
+      "forbidden_neighbour_skills": [
+        "6-04-009",
+        "6-04-010",
+        "6-04-012",
+        "6-06-002",
+        "6-04-006"
+      ],
       "reviewer_note": "Invarijanta: operacija MNOŽENJE. Nivo 2 i 3 traže razlomak puta razlomak, ne samo prirodan broj."
     },
     {
@@ -98,24 +429,995 @@
       "family_id": "fraction_arithmetic_direct",
       "enforcement_mode": "blocking",
       "activation_class": "READY",
-      "evidence_ids": ["KS_2018-0045", "R25-024", "R25-029"],
+      "evidence_ids": [
+        "KS_2018-0045",
+        "R25-024",
+        "R25-029"
+      ],
       "parameters": {
-        "allowed_operations": ["divide"],
+        "allowed_operations": [
+          "divide"
+        ],
         "denominator_relation": "any",
-        "operand_kinds": ["fraction", "natural"],
+        "operand_kinds": [
+          "fraction",
+          "natural"
+        ],
         "simplification_policy": "optional",
-        "allowed_answer_kinds": ["fraction", "mixed_number", "integer"],
-        "forbidden_directives": ["expand_reduce", "common_denominator",
-                                 "solve_equation", "percent"]
+        "allowed_answer_kinds": [
+          "fraction",
+          "mixed_number",
+          "integer"
+        ],
+        "forbidden_directives": [
+          "expand_reduce",
+          "common_denominator",
+          "solve_equation",
+          "percent"
+        ]
       },
       "level_bounds": {
         "1": "razlomak podijeljen prirodnim brojem, mali brojevi",
         "2": "razlomak podijeljen razlomkom (recipročni)",
         "3": "nedostajući djelilac ili kombinacija sa skraćivanjem"
       },
-      "forbidden_neighbour_skills": ["6-04-009", "6-04-010", "6-04-011",
-                                     "6-04-006"],
+      "forbidden_neighbour_skills": [
+        "6-04-009",
+        "6-04-010",
+        "6-04-011",
+        "6-04-006"
+      ],
       "reviewer_note": "Invarijanta: operacija DIJELJENJE. Množenje bez recipročnog koraka ne ispituje ovu lekciju."
+    },
+    {
+      "lesson_id": "6-05-006",
+      "family_id": "number_comparison_order",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0069",
+        "KS_2018-0075"
+      ],
+      "parameters": {
+        "number_domain": "decimal"
+      },
+      "level_bounds": {
+        "1": "male, jasno razdvojene vrijednosti",
+        "2": "bliže vrijednosti ili miješani zapisi",
+        "3": "vrlo bliske vrijednosti, položaj između"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: tačno jedna ekstremna/tražena vrijednost među opcijama."
+    },
+    {
+      "lesson_id": "6-05-008",
+      "family_id": "decimal_arithmetic_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0075"
+      ],
+      "parameters": {
+        "allowed_operations": [
+          "add",
+          "subtract"
+        ],
+        "number_domain": "decimal"
+      },
+      "level_bounds": {
+        "1": "jedna operacija, jedno decimalno mjesto",
+        "2": "dvije povezane operacije ili dva decimalna mjesta",
+        "3": "tri povezane operacije"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: konačan decimalan zapis svake vidljive vrijednosti."
+    },
+    {
+      "lesson_id": "6-05-009",
+      "family_id": "decimal_arithmetic_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0069",
+        "KS_2018-0070",
+        "KS_2018-0075"
+      ],
+      "parameters": {
+        "allowed_operations": [
+          "multiply"
+        ],
+        "number_domain": "decimal"
+      },
+      "level_bounds": {
+        "1": "jedna operacija, jedno decimalno mjesto",
+        "2": "dvije povezane operacije ili dva decimalna mjesta",
+        "3": "tri povezane operacije"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: konačan decimalan zapis svake vidljive vrijednosti."
+    },
+    {
+      "lesson_id": "6-05-010",
+      "family_id": "decimal_arithmetic_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0070",
+        "KS_2018-0071",
+        "KS_2018-0072",
+        "KS_2018-0075"
+      ],
+      "parameters": {
+        "allowed_operations": [
+          "divide"
+        ],
+        "number_domain": "decimal"
+      },
+      "level_bounds": {
+        "1": "jedna operacija, jedno decimalno mjesto",
+        "2": "dvije povezane operacije ili dva decimalna mjesta",
+        "3": "tri povezane operacije"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: konačan decimalan zapis svake vidljive vrijednosti."
+    },
+    {
+      "lesson_id": "6-06-001",
+      "family_id": "percent_basic",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0045",
+        "KS_2018-0048",
+        "KS_2018-0051",
+        "KS_2018-0052"
+      ],
+      "parameters": {
+        "concepts": [
+          "fraction_to_percent"
+        ]
+      },
+      "level_bounds": {
+        "1": "osnovni procenti (10 %, 20 %, 25 %, 50 %)",
+        "2": "prošireni procenti (5 %, 15 %, 30 %, ...)",
+        "3": "necjelobrojni postoci ili traženje cjeline"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: procenat je stoti dio; znak % nikad u $...$."
+    },
+    {
+      "lesson_id": "6-06-002",
+      "family_id": "percent_basic",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0056",
+        "KS_2018-0063",
+        "KS_2018-0237"
+      ],
+      "parameters": {
+        "concepts": [
+          "percent_of_number",
+          "fraction_to_percent"
+        ]
+      },
+      "level_bounds": {
+        "1": "osnovni procenti (10 %, 20 %, 25 %, 50 %)",
+        "2": "prošireni procenti (5 %, 15 %, 30 %, ...)",
+        "3": "necjelobrojni postoci ili traženje cjeline"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: procenat je stoti dio; znak % nikad u $...$."
+    },
+    {
+      "lesson_id": "6-06-004",
+      "family_id": "arithmetic_mean_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "RS_2014-0027"
+      ],
+      "parameters": {
+        "concepts": [
+          "mean"
+        ]
+      },
+      "level_bounds": {
+        "1": "tri broja, cjelobrojna sredina",
+        "2": "četiri broja",
+        "3": "pet brojeva, decimalna sredina"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: sredina = zbir kroz broj podataka, egzaktno."
+    },
+    {
+      "lesson_id": "7-02-004",
+      "family_id": "absolute_value_opposite",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0096",
+        "KS_2018-0108",
+        "RS_2014-0042"
+      ],
+      "parameters": {
+        "concepts": [
+          "opposite"
+        ],
+        "number_domain": "integer"
+      },
+      "level_bounds": {
+        "1": "jedno direktno očitavanje",
+        "2": "dva člana ili dvostruka promjena predznaka",
+        "3": "tri člana izraza"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: apsolutna vrijednost nenegativna; suprotan broj mijenja samo predznak."
+    },
+    {
+      "lesson_id": "7-02-005",
+      "family_id": "absolute_value_opposite",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0095",
+        "KS_2018-0101",
+        "KS_2018-0102",
+        "KS_2018-0108"
+      ],
+      "parameters": {
+        "concepts": [
+          "absolute_value"
+        ],
+        "number_domain": "integer"
+      },
+      "level_bounds": {
+        "1": "jedno direktno očitavanje",
+        "2": "dva člana ili dvostruka promjena predznaka",
+        "3": "tri člana izraza"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: apsolutna vrijednost nenegativna; suprotan broj mijenja samo predznak."
+    },
+    {
+      "lesson_id": "7-02-006",
+      "family_id": "number_comparison_order",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0099",
+        "KS_2018-0108"
+      ],
+      "parameters": {
+        "number_domain": "integer"
+      },
+      "level_bounds": {
+        "1": "male, jasno razdvojene vrijednosti",
+        "2": "bliže vrijednosti ili miješani zapisi",
+        "3": "vrlo bliske vrijednosti, položaj između"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: tačno jedna ekstremna/tražena vrijednost među opcijama."
+    },
+    {
+      "lesson_id": "7-02-007",
+      "family_id": "integer_arithmetic_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0103"
+      ],
+      "parameters": {
+        "allowed_operations": [
+          "add"
+        ],
+        "number_domain": "integer",
+        "sign_scope": "same_signs"
+      },
+      "level_bounds": {
+        "1": "jedna operacija malim brojevima",
+        "2": "dvije povezane operacije ili strože pravilo znakova",
+        "3": "tri povezane operacije s miješanim predznacima"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: cjelobrojni operandi i rezultat; pravilo znakova."
+    },
+    {
+      "lesson_id": "7-02-008",
+      "family_id": "integer_arithmetic_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0103"
+      ],
+      "parameters": {
+        "allowed_operations": [
+          "add"
+        ],
+        "number_domain": "integer",
+        "sign_scope": "different_signs"
+      },
+      "level_bounds": {
+        "1": "jedna operacija malim brojevima",
+        "2": "dvije povezane operacije ili strože pravilo znakova",
+        "3": "tri povezane operacije s miješanim predznacima"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: cjelobrojni operandi i rezultat; pravilo znakova."
+    },
+    {
+      "lesson_id": "7-02-009",
+      "family_id": "integer_arithmetic_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0095",
+        "KS_2018-0104",
+        "KS_2018-0108"
+      ],
+      "parameters": {
+        "allowed_operations": [
+          "subtract"
+        ],
+        "number_domain": "integer"
+      },
+      "level_bounds": {
+        "1": "jedna operacija malim brojevima",
+        "2": "dvije povezane operacije ili strože pravilo znakova",
+        "3": "tri povezane operacije s miješanim predznacima"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: cjelobrojni operandi i rezultat; pravilo znakova."
+    },
+    {
+      "lesson_id": "7-02-011",
+      "family_id": "integer_arithmetic_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0105"
+      ],
+      "parameters": {
+        "allowed_operations": [
+          "multiply"
+        ],
+        "number_domain": "integer"
+      },
+      "level_bounds": {
+        "1": "jedna operacija malim brojevima",
+        "2": "dvije povezane operacije ili strože pravilo znakova",
+        "3": "tri povezane operacije s miješanim predznacima"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: cjelobrojni operandi i rezultat; pravilo znakova."
+    },
+    {
+      "lesson_id": "7-02-012",
+      "family_id": "integer_arithmetic_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0106"
+      ],
+      "parameters": {
+        "allowed_operations": [
+          "divide"
+        ],
+        "number_domain": "integer"
+      },
+      "level_bounds": {
+        "1": "jedna operacija malim brojevima",
+        "2": "dvije povezane operacije ili strože pravilo znakova",
+        "3": "tri povezane operacije s miješanim predznacima"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: cjelobrojni operandi i rezultat; pravilo znakova."
+    },
+    {
+      "lesson_id": "7-02-013",
+      "family_id": "integer_arithmetic_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-7-02-013"
+      ],
+      "parameters": {
+        "allowed_operations": [
+          "multiply"
+        ],
+        "number_domain": "integer",
+        "expression_shape": "multi_factor"
+      },
+      "level_bounds": {
+        "1": "jedna operacija malim brojevima",
+        "2": "dvije povezane operacije ili strože pravilo znakova",
+        "3": "tri povezane operacije s miješanim predznacima"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: cjelobrojni operandi i rezultat; pravilo znakova."
+    },
+    {
+      "lesson_id": "7-02-015",
+      "family_id": "integer_arithmetic_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0107",
+        "KS_2018-0108",
+        "KS_2018-0122",
+        "RS_2014-0041",
+        "RS_2014-0053"
+      ],
+      "parameters": {
+        "allowed_operations": [
+          "add",
+          "subtract",
+          "multiply"
+        ],
+        "number_domain": "integer"
+      },
+      "level_bounds": {
+        "1": "jedna operacija malim brojevima",
+        "2": "dvije povezane operacije ili strože pravilo znakova",
+        "3": "tri povezane operacije s miješanim predznacima"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: cjelobrojni operandi i rezultat; pravilo znakova."
+    },
+    {
+      "lesson_id": "7-02-016",
+      "family_id": "linear_equation_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0095"
+      ],
+      "parameters": {
+        "shapes": [
+          "one_step_additive"
+        ],
+        "number_domain": "integer"
+      },
+      "level_bounds": {
+        "1": "jedan računski korak do rješenja",
+        "2": "dva koraka ili negativni koeficijenti",
+        "3": "tri koraka (sređivanje pa rješavanje)"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: jedinstveno rješenje, provjera uvrštavanjem egzaktna."
+    },
+    {
+      "lesson_id": "7-02-017",
+      "family_id": "linear_equation_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0095"
+      ],
+      "parameters": {
+        "shapes": [
+          "one_step_multiplicative"
+        ],
+        "number_domain": "integer"
+      },
+      "level_bounds": {
+        "1": "jedan računski korak do rješenja",
+        "2": "dva koraka ili negativni koeficijenti",
+        "3": "tri koraka (sređivanje pa rješavanje)"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: jedinstveno rješenje, provjera uvrštavanjem egzaktna."
+    },
+    {
+      "lesson_id": "7-03-004",
+      "family_id": "absolute_value_opposite",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0100",
+        "KS_2018-0114"
+      ],
+      "parameters": {
+        "concepts": [
+          "opposite"
+        ],
+        "number_domain": "rational"
+      },
+      "level_bounds": {
+        "1": "jedno direktno očitavanje",
+        "2": "dva člana ili dvostruka promjena predznaka",
+        "3": "tri člana izraza"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: apsolutna vrijednost nenegativna; suprotan broj mijenja samo predznak."
+    },
+    {
+      "lesson_id": "7-03-005",
+      "family_id": "absolute_value_opposite",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0115",
+        "KS_2018-0116",
+        "KS_2018-0125"
+      ],
+      "parameters": {
+        "concepts": [
+          "absolute_value"
+        ],
+        "number_domain": "rational"
+      },
+      "level_bounds": {
+        "1": "jedno direktno očitavanje",
+        "2": "dva člana ili dvostruka promjena predznaka",
+        "3": "tri člana izraza"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: apsolutna vrijednost nenegativna; suprotan broj mijenja samo predznak."
+    },
+    {
+      "lesson_id": "7-03-006",
+      "family_id": "number_comparison_order",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0117",
+        "RS_2014-0049"
+      ],
+      "parameters": {
+        "number_domain": "rational"
+      },
+      "level_bounds": {
+        "1": "male, jasno razdvojene vrijednosti",
+        "2": "bliže vrijednosti ili miješani zapisi",
+        "3": "vrlo bliske vrijednosti, položaj između"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: tačno jedna ekstremna/tražena vrijednost među opcijama."
+    },
+    {
+      "lesson_id": "7-03-009",
+      "family_id": "rational_arithmetic_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0118"
+      ],
+      "parameters": {
+        "allowed_operations": [
+          "add"
+        ],
+        "number_domain": "rational_signed"
+      },
+      "level_bounds": {
+        "1": "jedna operacija jednostavnim razlomcima",
+        "2": "dvije operacije ili nejednaki imenioci s predznacima",
+        "3": "tri povezane operacije"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: egzaktan racionalan račun s predznacima."
+    },
+    {
+      "lesson_id": "7-03-010",
+      "family_id": "rational_arithmetic_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0119"
+      ],
+      "parameters": {
+        "allowed_operations": [
+          "subtract"
+        ],
+        "number_domain": "rational_signed"
+      },
+      "level_bounds": {
+        "1": "jedna operacija jednostavnim razlomcima",
+        "2": "dvije operacije ili nejednaki imenioci s predznacima",
+        "3": "tri povezane operacije"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: egzaktan racionalan račun s predznacima."
+    },
+    {
+      "lesson_id": "7-03-011",
+      "family_id": "rational_arithmetic_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0120",
+        "KS_2018-0125"
+      ],
+      "parameters": {
+        "allowed_operations": [
+          "multiply"
+        ],
+        "number_domain": "rational_signed"
+      },
+      "level_bounds": {
+        "1": "jedna operacija jednostavnim razlomcima",
+        "2": "dvije operacije ili nejednaki imenioci s predznacima",
+        "3": "tri povezane operacije"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: egzaktan racionalan račun s predznacima."
+    },
+    {
+      "lesson_id": "7-03-012",
+      "family_id": "rational_arithmetic_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0121"
+      ],
+      "parameters": {
+        "allowed_operations": [
+          "divide"
+        ],
+        "number_domain": "rational_signed"
+      },
+      "level_bounds": {
+        "1": "jedna operacija jednostavnim razlomcima",
+        "2": "dvije operacije ili nejednaki imenioci s predznacima",
+        "3": "tri povezane operacije"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: egzaktan racionalan račun s predznacima."
+    },
+    {
+      "lesson_id": "7-03-016",
+      "family_id": "linear_equation_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0095"
+      ],
+      "parameters": {
+        "shapes": [
+          "one_step_additive"
+        ],
+        "number_domain": "rational"
+      },
+      "level_bounds": {
+        "1": "jedan računski korak do rješenja",
+        "2": "dva koraka ili negativni koeficijenti",
+        "3": "tri koraka (sređivanje pa rješavanje)"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: jedinstveno rješenje, provjera uvrštavanjem egzaktna."
+    },
+    {
+      "lesson_id": "7-03-017",
+      "family_id": "linear_equation_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0095"
+      ],
+      "parameters": {
+        "shapes": [
+          "one_step_multiplicative"
+        ],
+        "number_domain": "rational"
+      },
+      "level_bounds": {
+        "1": "jedan računski korak do rješenja",
+        "2": "dva koraka ili negativni koeficijenti",
+        "3": "tri koraka (sređivanje pa rješavanje)"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: jedinstveno rješenje, provjera uvrštavanjem egzaktna."
+    },
+    {
+      "lesson_id": "8-01-005",
+      "family_id": "absolute_value_opposite",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-8-01-005"
+      ],
+      "parameters": {
+        "concepts": [
+          "absolute_value"
+        ],
+        "number_domain": "rational"
+      },
+      "level_bounds": {
+        "1": "jedno direktno očitavanje",
+        "2": "dva člana ili dvostruka promjena predznaka",
+        "3": "tri člana izraza"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: apsolutna vrijednost nenegativna; suprotan broj mijenja samo predznak."
+    },
+    {
+      "lesson_id": "8-01-006",
+      "family_id": "power_arithmetic_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0202"
+      ],
+      "parameters": {
+        "concepts": [
+          "square_value"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedan stepen/zakon malim brojevima",
+        "2": "negativna osnova, negativan izložilac ili količnik",
+        "3": "kombinovana dva zakona ili zbir stepena"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: zakoni stepena nad jednakim osnovama; opcije različitih vrijednosti."
+    },
+    {
+      "lesson_id": "8-01-007",
+      "family_id": "square_root_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-8-01-007"
+      ],
+      "parameters": {
+        "concepts": [
+          "perfect_square_recognition"
+        ]
+      },
+      "level_bounds": {
+        "1": "korijen malog savršenog kvadrata",
+        "2": "korijen razlomka ili decimalnog broja",
+        "3": "zbir dva korijena"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: korijen savršenog kvadrata, provjerljiv kvadriranjem."
+    },
+    {
+      "lesson_id": "8-01-008",
+      "family_id": "square_root_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0184",
+        "KS_2018-0185",
+        "KS_2018-0188",
+        "RS_2014-0075"
+      ],
+      "parameters": {
+        "concepts": [
+          "square_root_value"
+        ]
+      },
+      "level_bounds": {
+        "1": "korijen malog savršenog kvadrata",
+        "2": "korijen razlomka ili decimalnog broja",
+        "3": "zbir dva korijena"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: korijen savršenog kvadrata, provjerljiv kvadriranjem."
+    },
+    {
+      "lesson_id": "8-01-013",
+      "family_id": "power_arithmetic_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0264"
+      ],
+      "parameters": {
+        "concepts": [
+          "power_value"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedan stepen/zakon malim brojevima",
+        "2": "negativna osnova, negativan izložilac ili količnik",
+        "3": "kombinovana dva zakona ili zbir stepena"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: zakoni stepena nad jednakim osnovama; opcije različitih vrijednosti."
+    },
+    {
+      "lesson_id": "8-01-014",
+      "family_id": "power_arithmetic_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-8-01-014"
+      ],
+      "parameters": {
+        "concepts": [
+          "zero_negative_exponent"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedan stepen/zakon malim brojevima",
+        "2": "negativna osnova, negativan izložilac ili količnik",
+        "3": "kombinovana dva zakona ili zbir stepena"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: zakoni stepena nad jednakim osnovama; opcije različitih vrijednosti."
+    },
+    {
+      "lesson_id": "8-01-015",
+      "family_id": "power_arithmetic_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0264",
+        "KS_2018-0266",
+        "KS_2018-0270",
+        "KS_2018-0289"
+      ],
+      "parameters": {
+        "concepts": [
+          "same_base_product_quotient"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedan stepen/zakon malim brojevima",
+        "2": "negativna osnova, negativan izložilac ili količnik",
+        "3": "kombinovana dva zakona ili zbir stepena"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: zakoni stepena nad jednakim osnovama; opcije različitih vrijednosti."
+    },
+    {
+      "lesson_id": "8-01-016",
+      "family_id": "power_arithmetic_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0264",
+        "KS_2018-0289",
+        "RS_2014-0104"
+      ],
+      "parameters": {
+        "concepts": [
+          "power_of_power_product"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedan stepen/zakon malim brojevima",
+        "2": "negativna osnova, negativan izložilac ili količnik",
+        "3": "kombinovana dva zakona ili zbir stepena"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: zakoni stepena nad jednakim osnovama; opcije različitih vrijednosti."
+    },
+    {
+      "lesson_id": "8-06-009",
+      "family_id": "arithmetic_mean_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0248",
+        "KS_2018-0252",
+        "KS_2018-0253",
+        "RS_2014-0027"
+      ],
+      "parameters": {
+        "concepts": [
+          "mean"
+        ]
+      },
+      "level_bounds": {
+        "1": "tri broja, cjelobrojna sredina",
+        "2": "četiri broja",
+        "3": "pet brojeva, decimalna sredina"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: sredina = zbir kroz broj podataka, egzaktno."
+    },
+    {
+      "lesson_id": "8-06-012",
+      "family_id": "classical_probability_basic",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-8-06-012"
+      ],
+      "parameters": {
+        "concepts": [
+          "classical_probability"
+        ]
+      },
+      "level_bounds": {
+        "1": "dvije boje, direktan događaj",
+        "2": "tri boje",
+        "3": "komplementaran događaj"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: vjerovatnoća = povoljni/svi, u [0,1]."
+    },
+    {
+      "lesson_id": "9-04-003",
+      "family_id": "linear_equation_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-9-04-003"
+      ],
+      "parameters": {
+        "shapes": [
+          "parentheses"
+        ],
+        "number_domain": "integer"
+      },
+      "level_bounds": {
+        "1": "jedan računski korak do rješenja",
+        "2": "dva koraka ili negativni koeficijenti",
+        "3": "tri koraka (sređivanje pa rješavanje)"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: jedinstveno rješenje, provjera uvrštavanjem egzaktna."
+    },
+    {
+      "lesson_id": "9-04-019",
+      "family_id": "linear_equation_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0357",
+        "KS_2018-0359"
+      ],
+      "parameters": {
+        "shapes": [
+          "check_solution",
+          "check_inequality"
+        ],
+        "number_domain": "integer"
+      },
+      "level_bounds": {
+        "1": "jedan računski korak do rješenja",
+        "2": "dva koraka ili negativni koeficijenti",
+        "3": "tri koraka (sređivanje pa rješavanje)"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: jedinstveno rješenje, provjera uvrštavanjem egzaktna."
+    },
+    {
+      "lesson_id": "9-08-002",
+      "family_id": "classical_probability_basic",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0248",
+        "KS_2018-0253"
+      ],
+      "parameters": {
+        "concepts": [
+          "classical_probability"
+        ]
+      },
+      "level_bounds": {
+        "1": "dvije boje, direktan događaj",
+        "2": "tri boje",
+        "3": "komplementaran događaj"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: vjerovatnoća = povoljni/svi, u [0,1]."
+    },
+    {
+      "lesson_id": "9-08-010",
+      "family_id": "arithmetic_mean_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-9-08-010"
+      ],
+      "parameters": {
+        "concepts": [
+          "mean"
+        ]
+      },
+      "level_bounds": {
+        "1": "tri broja, cjelobrojna sredina",
+        "2": "četiri broja",
+        "3": "pet brojeva, decimalna sredina"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: sredina = zbir kroz broj podataka, egzaktno."
     }
   ]
 }

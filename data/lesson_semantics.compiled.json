@@ -1,6 +1,414 @@
 {
-  "contract_version": "4A.1",
+  "contract_version": "5C.1",
   "lessons": {
+    "6-02-003": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5C.1",
+      "detector": "numeric_arithmetic",
+      "enforced_parameters": [
+        "allowed_operations",
+        "number_domain"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-6-02-003"
+      ],
+      "family_id": "natural_arithmetic_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "6-02-003",
+      "level_bounds": {
+        "1": "jedna operacija malim brojevima",
+        "2": "dvije povezane operacije ili veći brojevi",
+        "3": "tri povezane operacije (odnosno prioritet i zagrade)"
+      },
+      "parameters": {
+        "allowed_operations": [
+          "add",
+          "subtract"
+        ],
+        "number_domain": "natural"
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva operacija mora biti: sabiranje prirodnih brojeva, oduzimanje prirodnih brojeva",
+        "- svi operandi i svi međurezultati moraju ostati prirodni brojevi (bez razlomaka i bez negativnih vrijednosti)",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: svi operandi i međurezultati prirodni."
+    },
+    "6-02-004": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5C.1",
+      "detector": "numeric_arithmetic",
+      "enforced_parameters": [
+        "allowed_operations",
+        "number_domain"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-6-02-004"
+      ],
+      "family_id": "natural_arithmetic_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "6-02-004",
+      "level_bounds": {
+        "1": "jedna operacija malim brojevima",
+        "2": "dvije povezane operacije ili veći brojevi",
+        "3": "tri povezane operacije (odnosno prioritet i zagrade)"
+      },
+      "parameters": {
+        "allowed_operations": [
+          "divide",
+          "multiply"
+        ],
+        "number_domain": "natural"
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva operacija mora biti: dijeljenje prirodnih brojeva, množenje prirodnih brojeva",
+        "- svi operandi i svi međurezultati moraju ostati prirodni brojevi (bez razlomaka i bez negativnih vrijednosti)",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: svi operandi i međurezultati prirodni."
+    },
+    "6-02-007": {
+      "activation_class": "READY",
+      "advisory_parameters": [
+        "expression_shape"
+      ],
+      "contract_version": "5C.1",
+      "detector": "numeric_arithmetic",
+      "enforced_parameters": [
+        "allowed_operations",
+        "number_domain"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-6-02-007"
+      ],
+      "family_id": "natural_arithmetic_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "6-02-007",
+      "level_bounds": {
+        "1": "jedna operacija malim brojevima",
+        "2": "dvije povezane operacije ili veći brojevi",
+        "3": "tri povezane operacije (odnosno prioritet i zagrade)"
+      },
+      "parameters": {
+        "allowed_operations": [
+          "add",
+          "divide",
+          "multiply",
+          "subtract"
+        ],
+        "expression_shape": "order_of_operations",
+        "number_domain": "natural"
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva operacija mora biti: sabiranje prirodnih brojeva, dijeljenje prirodnih brojeva, množenje prirodnih brojeva, oduzimanje prirodnih brojeva",
+        "- svi operandi i svi međurezultati moraju ostati prirodni brojevi (bez razlomaka i bez negativnih vrijednosti)",
+        "- izraz mora tražiti poštovanje redoslijeda operacija (i zagrade gdje su zadate)",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: svi operandi i međurezultati prirodni."
+    },
+    "6-03-001": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5C.1",
+      "detector": "common_divisors_multiples",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "F25-PILOT-READY",
+        "KS_2018-0036",
+        "KS_2018-0038",
+        "KS_2018-0039",
+        "KS_2018-0044",
+        "KS_2018-0045"
+      ],
+      "family_id": "common_divisors_multiples",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "6-03-001",
+      "level_bounds": {
+        "1": "jedan dati broj, mali djelioci/sadržioci",
+        "2": "dva data broja (zajednički djelilac/sadržilac)",
+        "3": "veći brojevi ili tri data broja"
+      },
+      "parameters": {
+        "concepts": [
+          "divisor_membership",
+          "multiple_membership"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: prepoznavanje djelioca datog broja, prepoznavanje sadržioca datog broja",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: NZD/NZS/djelilac/sadržilac dokazani dijeljenjem bez ostatka."
+    },
+    "6-03-004": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5C.1",
+      "detector": "divisibility_predicate",
+      "enforced_parameters": [
+        "divisors"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "F25-PILOT-READY",
+        "KS_2018-0040",
+        "RS_2014-0022"
+      ],
+      "family_id": "divisibility_predicate_application",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "6-03-004",
+      "level_bounds": {
+        "1": "jedno pravilo djeljivosti",
+        "2": "dva pravila istovremeno",
+        "3": "dva-tri pravila, veći brojevi"
+      },
+      "parameters": {
+        "divisors": [
+          2,
+          3,
+          4,
+          5,
+          6,
+          9,
+          10,
+          15,
+          25
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- zadatak mora tražiti primjenu pravila djeljivosti sa: 2, 3, 4, 5, 6, 9, 10, 15, 25",
+        "- pitanje glasi »djeljiv sa N« (bez negacije i bez ‘ili’); računanje količnika smije biti samo pomoćni korak",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: tačno jedna opcija zadovoljava SVA navedena pravila (uski orakl to nezavisno dokazuje)."
+    },
+    "6-03-005": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5C.1",
+      "detector": "prime_structure",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "F25-PILOT-READY",
+        "KS_2018-0041",
+        "RS_2014-0023"
+      ],
+      "family_id": "prime_structure",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "6-03-005",
+      "level_bounds": {
+        "1": "mali brojevi (< 50)",
+        "2": "brojevi do 100, „varljivi“ složeni brojevi",
+        "3": "faktorizacija s tri prosta faktora"
+      },
+      "parameters": {
+        "concepts": [
+          "prime_classification"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: prepoznavanje prostog i složenog broja",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: tačno jedna opcija ima traženo svojstvo proste strukture."
+    },
+    "6-03-006": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5C.1",
+      "detector": "prime_structure",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "F25-PILOT-READY"
+      ],
+      "family_id": "prime_structure",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "6-03-006",
+      "level_bounds": {
+        "1": "mali brojevi (< 50)",
+        "2": "brojevi do 100, „varljivi“ složeni brojevi",
+        "3": "faktorizacija s tri prosta faktora"
+      },
+      "parameters": {
+        "concepts": [
+          "coprime_pairs"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: prepoznavanje relativno prostih brojeva",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: tačno jedna opcija ima traženo svojstvo proste strukture."
+    },
+    "6-03-007": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5C.1",
+      "detector": "prime_structure",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "F25-PILOT-READY",
+        "KS_2018-0043"
+      ],
+      "family_id": "prime_structure",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "6-03-007",
+      "level_bounds": {
+        "1": "mali brojevi (< 50)",
+        "2": "brojevi do 100, „varljivi“ složeni brojevi",
+        "3": "faktorizacija s tri prosta faktora"
+      },
+      "parameters": {
+        "concepts": [
+          "prime_factorization"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: rastavljanje na proste faktore",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: tačno jedna opcija ima traženo svojstvo proste strukture."
+    },
+    "6-03-008": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5C.1",
+      "detector": "common_divisors_multiples",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "F25-PILOT-READY",
+        "KS_2018-0044",
+        "KS_2018-0045",
+        "RS_2014-0024"
+      ],
+      "family_id": "common_divisors_multiples",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "6-03-008",
+      "level_bounds": {
+        "1": "jedan dati broj, mali djelioci/sadržioci",
+        "2": "dva data broja (zajednički djelilac/sadržilac)",
+        "3": "veći brojevi ili tri data broja"
+      },
+      "parameters": {
+        "concepts": [
+          "gcd"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: najveći zajednički djelilac",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: NZD/NZS/djelilac/sadržilac dokazani dijeljenjem bez ostatka."
+    },
+    "6-03-009": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5C.1",
+      "detector": "common_divisors_multiples",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "F25-PILOT-READY",
+        "KS_2018-0044",
+        "KS_2018-0045",
+        "RS_2014-0024"
+      ],
+      "family_id": "common_divisors_multiples",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "6-03-009",
+      "level_bounds": {
+        "1": "jedan dati broj, mali djelioci/sadržioci",
+        "2": "dva data broja (zajednički djelilac/sadržilac)",
+        "3": "veći brojevi ili tri data broja"
+      },
+      "parameters": {
+        "concepts": [
+          "lcm"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: najmanji zajednički sadržilac",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: NZD/NZS/djelilac/sadržilac dokazani dijeljenjem bez ostatka."
+    },
+    "6-04-008": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5C.1",
+      "detector": "number_ordering",
+      "enforced_parameters": [
+        "number_domain"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "F25-PILOT-READY",
+        "KS_2018-0045",
+        "KS_2018-0055"
+      ],
+      "family_id": "number_comparison_order",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "6-04-008",
+      "level_bounds": {
+        "1": "male, jasno razdvojene vrijednosti",
+        "2": "bliže vrijednosti ili miješani zapisi",
+        "3": "vrlo bliske vrijednosti, položaj između"
+      },
+      "parameters": {
+        "number_domain": "fraction"
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti poređenje ili uređenje: razlomaka",
+        "- zadatak traži izbor najvećeg/najmanjeg, poredak ili položaj između datih brojeva — ne računanje nove vrijednosti",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: tačno jedna ekstremna/tražena vrijednost među opcijama."
+    },
     "6-04-009": {
       "activation_class": "READY",
       "advisory_parameters": [
@@ -8,7 +416,7 @@
         "operand_kinds",
         "simplification_policy"
       ],
-      "contract_version": "4A.1",
+      "contract_version": "5C.1",
       "detector": "fraction_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -77,7 +485,7 @@
         "operand_kinds",
         "simplification_policy"
       ],
-      "contract_version": "4A.1",
+      "contract_version": "5C.1",
       "detector": "fraction_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -146,7 +554,7 @@
         "operand_kinds",
         "simplification_policy"
       ],
-      "contract_version": "4A.1",
+      "contract_version": "5C.1",
       "detector": "fraction_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -212,7 +620,7 @@
         "operand_kinds",
         "simplification_policy"
       ],
-      "contract_version": "4A.1",
+      "contract_version": "5C.1",
       "detector": "fraction_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -269,6 +677,1529 @@
         "- ako prekršiš ovo, server odbija paket prije objave"
       ],
       "reviewer_note": "Invarijanta: operacija DIJELJENJE. Množenje bez recipročnog koraka ne ispituje ovu lekciju."
+    },
+    "6-05-006": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5C.1",
+      "detector": "number_ordering",
+      "enforced_parameters": [
+        "number_domain"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0069",
+        "KS_2018-0075"
+      ],
+      "family_id": "number_comparison_order",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "6-05-006",
+      "level_bounds": {
+        "1": "male, jasno razdvojene vrijednosti",
+        "2": "bliže vrijednosti ili miješani zapisi",
+        "3": "vrlo bliske vrijednosti, položaj između"
+      },
+      "parameters": {
+        "number_domain": "decimal"
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti poređenje ili uređenje: decimalnih brojeva",
+        "- zadatak traži izbor najvećeg/najmanjeg, poredak ili položaj između datih brojeva — ne računanje nove vrijednosti",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: tačno jedna ekstremna/tražena vrijednost među opcijama."
+    },
+    "6-05-008": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5C.1",
+      "detector": "numeric_arithmetic",
+      "enforced_parameters": [
+        "allowed_operations",
+        "number_domain"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0075"
+      ],
+      "family_id": "decimal_arithmetic_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "6-05-008",
+      "level_bounds": {
+        "1": "jedna operacija, jedno decimalno mjesto",
+        "2": "dvije povezane operacije ili dva decimalna mjesta",
+        "3": "tri povezane operacije"
+      },
+      "parameters": {
+        "allowed_operations": [
+          "add",
+          "subtract"
+        ],
+        "number_domain": "decimal"
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva operacija mora biti: sabiranje decimalnih brojeva, oduzimanje decimalnih brojeva",
+        "- operandi su decimalni brojevi i svaki vidljivi rezultat mora imati KONAČAN decimalan zapis",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: konačan decimalan zapis svake vidljive vrijednosti."
+    },
+    "6-05-009": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5C.1",
+      "detector": "numeric_arithmetic",
+      "enforced_parameters": [
+        "allowed_operations",
+        "number_domain"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0069",
+        "KS_2018-0070",
+        "KS_2018-0075"
+      ],
+      "family_id": "decimal_arithmetic_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "6-05-009",
+      "level_bounds": {
+        "1": "jedna operacija, jedno decimalno mjesto",
+        "2": "dvije povezane operacije ili dva decimalna mjesta",
+        "3": "tri povezane operacije"
+      },
+      "parameters": {
+        "allowed_operations": [
+          "multiply"
+        ],
+        "number_domain": "decimal"
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva operacija mora biti: množenje decimalnih brojeva",
+        "- operandi su decimalni brojevi i svaki vidljivi rezultat mora imati KONAČAN decimalan zapis",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: konačan decimalan zapis svake vidljive vrijednosti."
+    },
+    "6-05-010": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5C.1",
+      "detector": "numeric_arithmetic",
+      "enforced_parameters": [
+        "allowed_operations",
+        "number_domain"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0070",
+        "KS_2018-0071",
+        "KS_2018-0072",
+        "KS_2018-0075"
+      ],
+      "family_id": "decimal_arithmetic_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "6-05-010",
+      "level_bounds": {
+        "1": "jedna operacija, jedno decimalno mjesto",
+        "2": "dvije povezane operacije ili dva decimalna mjesta",
+        "3": "tri povezane operacije"
+      },
+      "parameters": {
+        "allowed_operations": [
+          "divide"
+        ],
+        "number_domain": "decimal"
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva operacija mora biti: dijeljenje decimalnih brojeva",
+        "- operandi su decimalni brojevi i svaki vidljivi rezultat mora imati KONAČAN decimalan zapis",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: konačan decimalan zapis svake vidljive vrijednosti."
+    },
+    "6-06-001": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5C.1",
+      "detector": "percent_basic",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0045",
+        "KS_2018-0048",
+        "KS_2018-0051",
+        "KS_2018-0052"
+      ],
+      "family_id": "percent_basic",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "6-06-001",
+      "level_bounds": {
+        "1": "osnovni procenti (10 %, 20 %, 25 %, 50 %)",
+        "2": "prošireni procenti (5 %, 15 %, 30 %, ...)",
+        "3": "necjelobrojni postoci ili traženje cjeline"
+      },
+      "parameters": {
+        "concepts": [
+          "fraction_to_percent"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: postotni zapis razlomka",
+        "- znak % piše se u prozi, nikad unutar $...$",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: procenat je stoti dio; znak % nikad u $...$."
+    },
+    "6-06-002": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5C.1",
+      "detector": "percent_basic",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0056",
+        "KS_2018-0063",
+        "KS_2018-0237"
+      ],
+      "family_id": "percent_basic",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "6-06-002",
+      "level_bounds": {
+        "1": "osnovni procenti (10 %, 20 %, 25 %, 50 %)",
+        "2": "prošireni procenti (5 %, 15 %, 30 %, ...)",
+        "3": "necjelobrojni postoci ili traženje cjeline"
+      },
+      "parameters": {
+        "concepts": [
+          "fraction_to_percent",
+          "percent_of_number"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: postotni zapis razlomka, procenat datog broja",
+        "- znak % piše se u prozi, nikad unutar $...$",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: procenat je stoti dio; znak % nikad u $...$."
+    },
+    "6-06-004": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5C.1",
+      "detector": "arithmetic_mean",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "RS_2014-0027"
+      ],
+      "family_id": "arithmetic_mean_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "6-06-004",
+      "level_bounds": {
+        "1": "tri broja, cjelobrojna sredina",
+        "2": "četiri broja",
+        "3": "pet brojeva, decimalna sredina"
+      },
+      "parameters": {
+        "concepts": [
+          "mean"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: aritmetička sredina datih brojeva",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: sredina = zbir kroz broj podataka, egzaktno."
+    },
+    "7-02-004": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5C.1",
+      "detector": "absolute_opposite",
+      "enforced_parameters": [
+        "concepts",
+        "number_domain"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0096",
+        "KS_2018-0108",
+        "RS_2014-0042"
+      ],
+      "family_id": "absolute_value_opposite",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "7-02-004",
+      "level_bounds": {
+        "1": "jedno direktno očitavanje",
+        "2": "dva člana ili dvostruka promjena predznaka",
+        "3": "tri člana izraza"
+      },
+      "parameters": {
+        "concepts": [
+          "opposite"
+        ],
+        "number_domain": "integer"
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: suprotan broj",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: apsolutna vrijednost nenegativna; suprotan broj mijenja samo predznak."
+    },
+    "7-02-005": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5C.1",
+      "detector": "absolute_opposite",
+      "enforced_parameters": [
+        "concepts",
+        "number_domain"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0095",
+        "KS_2018-0101",
+        "KS_2018-0102",
+        "KS_2018-0108"
+      ],
+      "family_id": "absolute_value_opposite",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "7-02-005",
+      "level_bounds": {
+        "1": "jedno direktno očitavanje",
+        "2": "dva člana ili dvostruka promjena predznaka",
+        "3": "tri člana izraza"
+      },
+      "parameters": {
+        "concepts": [
+          "absolute_value"
+        ],
+        "number_domain": "integer"
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: apsolutna vrijednost broja",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: apsolutna vrijednost nenegativna; suprotan broj mijenja samo predznak."
+    },
+    "7-02-006": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5C.1",
+      "detector": "number_ordering",
+      "enforced_parameters": [
+        "number_domain"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0099",
+        "KS_2018-0108"
+      ],
+      "family_id": "number_comparison_order",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "7-02-006",
+      "level_bounds": {
+        "1": "male, jasno razdvojene vrijednosti",
+        "2": "bliže vrijednosti ili miješani zapisi",
+        "3": "vrlo bliske vrijednosti, položaj između"
+      },
+      "parameters": {
+        "number_domain": "integer"
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti poređenje ili uređenje: cijelih brojeva",
+        "- zadatak traži izbor najvećeg/najmanjeg, poredak ili položaj između datih brojeva — ne računanje nove vrijednosti",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: tačno jedna ekstremna/tražena vrijednost među opcijama."
+    },
+    "7-02-007": {
+      "activation_class": "READY",
+      "advisory_parameters": [
+        "sign_scope"
+      ],
+      "contract_version": "5C.1",
+      "detector": "numeric_arithmetic",
+      "enforced_parameters": [
+        "allowed_operations",
+        "number_domain"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0103"
+      ],
+      "family_id": "integer_arithmetic_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "7-02-007",
+      "level_bounds": {
+        "1": "jedna operacija malim brojevima",
+        "2": "dvije povezane operacije ili strože pravilo znakova",
+        "3": "tri povezane operacije s miješanim predznacima"
+      },
+      "parameters": {
+        "allowed_operations": [
+          "add"
+        ],
+        "number_domain": "integer",
+        "sign_scope": "same_signs"
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva operacija mora biti: sabiranje cijelih brojeva",
+        "- operandi su cijeli brojevi (s negativnim vrijednostima gdje nivo traži) i rezultat je cio broj",
+        "- svi sabirci moraju imati ISTE predznake",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: cjelobrojni operandi i rezultat; pravilo znakova."
+    },
+    "7-02-008": {
+      "activation_class": "READY",
+      "advisory_parameters": [
+        "sign_scope"
+      ],
+      "contract_version": "5C.1",
+      "detector": "numeric_arithmetic",
+      "enforced_parameters": [
+        "allowed_operations",
+        "number_domain"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0103"
+      ],
+      "family_id": "integer_arithmetic_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "7-02-008",
+      "level_bounds": {
+        "1": "jedna operacija malim brojevima",
+        "2": "dvije povezane operacije ili strože pravilo znakova",
+        "3": "tri povezane operacije s miješanim predznacima"
+      },
+      "parameters": {
+        "allowed_operations": [
+          "add"
+        ],
+        "number_domain": "integer",
+        "sign_scope": "different_signs"
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva operacija mora biti: sabiranje cijelih brojeva",
+        "- operandi su cijeli brojevi (s negativnim vrijednostima gdje nivo traži) i rezultat je cio broj",
+        "- sabirci moraju imati RAZLIČITE predznake",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: cjelobrojni operandi i rezultat; pravilo znakova."
+    },
+    "7-02-009": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5C.1",
+      "detector": "numeric_arithmetic",
+      "enforced_parameters": [
+        "allowed_operations",
+        "number_domain"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0095",
+        "KS_2018-0104",
+        "KS_2018-0108"
+      ],
+      "family_id": "integer_arithmetic_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "7-02-009",
+      "level_bounds": {
+        "1": "jedna operacija malim brojevima",
+        "2": "dvije povezane operacije ili strože pravilo znakova",
+        "3": "tri povezane operacije s miješanim predznacima"
+      },
+      "parameters": {
+        "allowed_operations": [
+          "subtract"
+        ],
+        "number_domain": "integer"
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva operacija mora biti: oduzimanje cijelih brojeva",
+        "- operandi su cijeli brojevi (s negativnim vrijednostima gdje nivo traži) i rezultat je cio broj",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: cjelobrojni operandi i rezultat; pravilo znakova."
+    },
+    "7-02-011": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5C.1",
+      "detector": "numeric_arithmetic",
+      "enforced_parameters": [
+        "allowed_operations",
+        "number_domain"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0105"
+      ],
+      "family_id": "integer_arithmetic_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "7-02-011",
+      "level_bounds": {
+        "1": "jedna operacija malim brojevima",
+        "2": "dvije povezane operacije ili strože pravilo znakova",
+        "3": "tri povezane operacije s miješanim predznacima"
+      },
+      "parameters": {
+        "allowed_operations": [
+          "multiply"
+        ],
+        "number_domain": "integer"
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva operacija mora biti: množenje cijelih brojeva",
+        "- operandi su cijeli brojevi (s negativnim vrijednostima gdje nivo traži) i rezultat je cio broj",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: cjelobrojni operandi i rezultat; pravilo znakova."
+    },
+    "7-02-012": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5C.1",
+      "detector": "numeric_arithmetic",
+      "enforced_parameters": [
+        "allowed_operations",
+        "number_domain"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0106"
+      ],
+      "family_id": "integer_arithmetic_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "7-02-012",
+      "level_bounds": {
+        "1": "jedna operacija malim brojevima",
+        "2": "dvije povezane operacije ili strože pravilo znakova",
+        "3": "tri povezane operacije s miješanim predznacima"
+      },
+      "parameters": {
+        "allowed_operations": [
+          "divide"
+        ],
+        "number_domain": "integer"
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva operacija mora biti: dijeljenje cijelih brojeva",
+        "- operandi su cijeli brojevi (s negativnim vrijednostima gdje nivo traži) i rezultat je cio broj",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: cjelobrojni operandi i rezultat; pravilo znakova."
+    },
+    "7-02-013": {
+      "activation_class": "READY",
+      "advisory_parameters": [
+        "expression_shape"
+      ],
+      "contract_version": "5C.1",
+      "detector": "numeric_arithmetic",
+      "enforced_parameters": [
+        "allowed_operations",
+        "number_domain"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-7-02-013"
+      ],
+      "family_id": "integer_arithmetic_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "7-02-013",
+      "level_bounds": {
+        "1": "jedna operacija malim brojevima",
+        "2": "dvije povezane operacije ili strože pravilo znakova",
+        "3": "tri povezane operacije s miješanim predznacima"
+      },
+      "parameters": {
+        "allowed_operations": [
+          "multiply"
+        ],
+        "expression_shape": "multi_factor",
+        "number_domain": "integer"
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva operacija mora biti: množenje cijelih brojeva",
+        "- operandi su cijeli brojevi (s negativnim vrijednostima gdje nivo traži) i rezultat je cio broj",
+        "- izraz je proizvod više cijelih faktora",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: cjelobrojni operandi i rezultat; pravilo znakova."
+    },
+    "7-02-015": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5C.1",
+      "detector": "numeric_arithmetic",
+      "enforced_parameters": [
+        "allowed_operations",
+        "number_domain"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0107",
+        "KS_2018-0108",
+        "KS_2018-0122",
+        "RS_2014-0041",
+        "RS_2014-0053"
+      ],
+      "family_id": "integer_arithmetic_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "7-02-015",
+      "level_bounds": {
+        "1": "jedna operacija malim brojevima",
+        "2": "dvije povezane operacije ili strože pravilo znakova",
+        "3": "tri povezane operacije s miješanim predznacima"
+      },
+      "parameters": {
+        "allowed_operations": [
+          "add",
+          "multiply",
+          "subtract"
+        ],
+        "number_domain": "integer"
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva operacija mora biti: sabiranje cijelih brojeva, množenje cijelih brojeva, oduzimanje cijelih brojeva",
+        "- operandi su cijeli brojevi (s negativnim vrijednostima gdje nivo traži) i rezultat je cio broj",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: cjelobrojni operandi i rezultat; pravilo znakova."
+    },
+    "7-02-016": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5C.1",
+      "detector": "linear_equation",
+      "enforced_parameters": [
+        "number_domain",
+        "shapes"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0095"
+      ],
+      "family_id": "linear_equation_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "7-02-016",
+      "level_bounds": {
+        "1": "jedan računski korak do rješenja",
+        "2": "dva koraka ili negativni koeficijenti",
+        "3": "tri koraka (sređivanje pa rješavanje)"
+      },
+      "parameters": {
+        "number_domain": "integer",
+        "shapes": [
+          "one_step_additive"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: jednačina s jednim sabiranjem/oduzimanjem",
+        "- jedna nepoznata i tačno jedno rješenje",
+        "- koeficijenti i rješenje su cijeli brojevi",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: jedinstveno rješenje, provjera uvrštavanjem egzaktna."
+    },
+    "7-02-017": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5C.1",
+      "detector": "linear_equation",
+      "enforced_parameters": [
+        "number_domain",
+        "shapes"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0095"
+      ],
+      "family_id": "linear_equation_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "7-02-017",
+      "level_bounds": {
+        "1": "jedan računski korak do rješenja",
+        "2": "dva koraka ili negativni koeficijenti",
+        "3": "tri koraka (sređivanje pa rješavanje)"
+      },
+      "parameters": {
+        "number_domain": "integer",
+        "shapes": [
+          "one_step_multiplicative"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: jednačina s jednim množenjem/dijeljenjem",
+        "- jedna nepoznata i tačno jedno rješenje",
+        "- koeficijenti i rješenje su cijeli brojevi",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: jedinstveno rješenje, provjera uvrštavanjem egzaktna."
+    },
+    "7-03-004": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5C.1",
+      "detector": "absolute_opposite",
+      "enforced_parameters": [
+        "concepts",
+        "number_domain"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0100",
+        "KS_2018-0114"
+      ],
+      "family_id": "absolute_value_opposite",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "7-03-004",
+      "level_bounds": {
+        "1": "jedno direktno očitavanje",
+        "2": "dva člana ili dvostruka promjena predznaka",
+        "3": "tri člana izraza"
+      },
+      "parameters": {
+        "concepts": [
+          "opposite"
+        ],
+        "number_domain": "rational"
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: suprotan broj",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: apsolutna vrijednost nenegativna; suprotan broj mijenja samo predznak."
+    },
+    "7-03-005": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5C.1",
+      "detector": "absolute_opposite",
+      "enforced_parameters": [
+        "concepts",
+        "number_domain"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0115",
+        "KS_2018-0116",
+        "KS_2018-0125"
+      ],
+      "family_id": "absolute_value_opposite",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "7-03-005",
+      "level_bounds": {
+        "1": "jedno direktno očitavanje",
+        "2": "dva člana ili dvostruka promjena predznaka",
+        "3": "tri člana izraza"
+      },
+      "parameters": {
+        "concepts": [
+          "absolute_value"
+        ],
+        "number_domain": "rational"
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: apsolutna vrijednost broja",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: apsolutna vrijednost nenegativna; suprotan broj mijenja samo predznak."
+    },
+    "7-03-006": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5C.1",
+      "detector": "number_ordering",
+      "enforced_parameters": [
+        "number_domain"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0117",
+        "RS_2014-0049"
+      ],
+      "family_id": "number_comparison_order",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "7-03-006",
+      "level_bounds": {
+        "1": "male, jasno razdvojene vrijednosti",
+        "2": "bliže vrijednosti ili miješani zapisi",
+        "3": "vrlo bliske vrijednosti, položaj između"
+      },
+      "parameters": {
+        "number_domain": "rational"
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti poređenje ili uređenje: racionalnih brojeva",
+        "- zadatak traži izbor najvećeg/najmanjeg, poredak ili položaj između datih brojeva — ne računanje nove vrijednosti",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: tačno jedna ekstremna/tražena vrijednost među opcijama."
+    },
+    "7-03-009": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5C.1",
+      "detector": "numeric_arithmetic",
+      "enforced_parameters": [
+        "allowed_operations",
+        "number_domain"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0118"
+      ],
+      "family_id": "rational_arithmetic_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "7-03-009",
+      "level_bounds": {
+        "1": "jedna operacija jednostavnim razlomcima",
+        "2": "dvije operacije ili nejednaki imenioci s predznacima",
+        "3": "tri povezane operacije"
+      },
+      "parameters": {
+        "allowed_operations": [
+          "add"
+        ],
+        "number_domain": "rational_signed"
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva operacija mora biti: sabiranje racionalnih brojeva",
+        "- operandi su racionalni brojevi (razlomci s predznakom) i rezultat je racionalan broj",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: egzaktan racionalan račun s predznacima."
+    },
+    "7-03-010": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5C.1",
+      "detector": "numeric_arithmetic",
+      "enforced_parameters": [
+        "allowed_operations",
+        "number_domain"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0119"
+      ],
+      "family_id": "rational_arithmetic_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "7-03-010",
+      "level_bounds": {
+        "1": "jedna operacija jednostavnim razlomcima",
+        "2": "dvije operacije ili nejednaki imenioci s predznacima",
+        "3": "tri povezane operacije"
+      },
+      "parameters": {
+        "allowed_operations": [
+          "subtract"
+        ],
+        "number_domain": "rational_signed"
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva operacija mora biti: oduzimanje racionalnih brojeva",
+        "- operandi su racionalni brojevi (razlomci s predznakom) i rezultat je racionalan broj",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: egzaktan racionalan račun s predznacima."
+    },
+    "7-03-011": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5C.1",
+      "detector": "numeric_arithmetic",
+      "enforced_parameters": [
+        "allowed_operations",
+        "number_domain"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0120",
+        "KS_2018-0125"
+      ],
+      "family_id": "rational_arithmetic_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "7-03-011",
+      "level_bounds": {
+        "1": "jedna operacija jednostavnim razlomcima",
+        "2": "dvije operacije ili nejednaki imenioci s predznacima",
+        "3": "tri povezane operacije"
+      },
+      "parameters": {
+        "allowed_operations": [
+          "multiply"
+        ],
+        "number_domain": "rational_signed"
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva operacija mora biti: množenje racionalnih brojeva",
+        "- operandi su racionalni brojevi (razlomci s predznakom) i rezultat je racionalan broj",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: egzaktan racionalan račun s predznacima."
+    },
+    "7-03-012": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5C.1",
+      "detector": "numeric_arithmetic",
+      "enforced_parameters": [
+        "allowed_operations",
+        "number_domain"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0121"
+      ],
+      "family_id": "rational_arithmetic_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "7-03-012",
+      "level_bounds": {
+        "1": "jedna operacija jednostavnim razlomcima",
+        "2": "dvije operacije ili nejednaki imenioci s predznacima",
+        "3": "tri povezane operacije"
+      },
+      "parameters": {
+        "allowed_operations": [
+          "divide"
+        ],
+        "number_domain": "rational_signed"
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva operacija mora biti: dijeljenje racionalnih brojeva",
+        "- operandi su racionalni brojevi (razlomci s predznakom) i rezultat je racionalan broj",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: egzaktan racionalan račun s predznacima."
+    },
+    "7-03-016": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5C.1",
+      "detector": "linear_equation",
+      "enforced_parameters": [
+        "number_domain",
+        "shapes"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0095"
+      ],
+      "family_id": "linear_equation_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "7-03-016",
+      "level_bounds": {
+        "1": "jedan računski korak do rješenja",
+        "2": "dva koraka ili negativni koeficijenti",
+        "3": "tri koraka (sređivanje pa rješavanje)"
+      },
+      "parameters": {
+        "number_domain": "rational",
+        "shapes": [
+          "one_step_additive"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: jednačina s jednim sabiranjem/oduzimanjem",
+        "- jedna nepoznata i tačno jedno rješenje",
+        "- koeficijenti i rješenje smiju biti razlomci",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: jedinstveno rješenje, provjera uvrštavanjem egzaktna."
+    },
+    "7-03-017": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5C.1",
+      "detector": "linear_equation",
+      "enforced_parameters": [
+        "number_domain",
+        "shapes"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0095"
+      ],
+      "family_id": "linear_equation_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "7-03-017",
+      "level_bounds": {
+        "1": "jedan računski korak do rješenja",
+        "2": "dva koraka ili negativni koeficijenti",
+        "3": "tri koraka (sređivanje pa rješavanje)"
+      },
+      "parameters": {
+        "number_domain": "rational",
+        "shapes": [
+          "one_step_multiplicative"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: jednačina s jednim množenjem/dijeljenjem",
+        "- jedna nepoznata i tačno jedno rješenje",
+        "- koeficijenti i rješenje smiju biti razlomci",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: jedinstveno rješenje, provjera uvrštavanjem egzaktna."
+    },
+    "8-01-005": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5C.1",
+      "detector": "absolute_opposite",
+      "enforced_parameters": [
+        "concepts",
+        "number_domain"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-8-01-005"
+      ],
+      "family_id": "absolute_value_opposite",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-01-005",
+      "level_bounds": {
+        "1": "jedno direktno očitavanje",
+        "2": "dva člana ili dvostruka promjena predznaka",
+        "3": "tri člana izraza"
+      },
+      "parameters": {
+        "concepts": [
+          "absolute_value"
+        ],
+        "number_domain": "rational"
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: apsolutna vrijednost broja",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: apsolutna vrijednost nenegativna; suprotan broj mijenja samo predznak."
+    },
+    "8-01-006": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5C.1",
+      "detector": "power_arithmetic",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0202"
+      ],
+      "family_id": "power_arithmetic_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-01-006",
+      "level_bounds": {
+        "1": "jedan stepen/zakon malim brojevima",
+        "2": "negativna osnova, negativan izložilac ili količnik",
+        "3": "kombinovana dva zakona ili zbir stepena"
+      },
+      "parameters": {
+        "concepts": [
+          "square_value"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: kvadrat racionalnog broja",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: zakoni stepena nad jednakim osnovama; opcije različitih vrijednosti."
+    },
+    "8-01-007": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5C.1",
+      "detector": "square_root",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-8-01-007"
+      ],
+      "family_id": "square_root_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-01-007",
+      "level_bounds": {
+        "1": "korijen malog savršenog kvadrata",
+        "2": "korijen razlomka ili decimalnog broja",
+        "3": "zbir dva korijena"
+      },
+      "parameters": {
+        "concepts": [
+          "perfect_square_recognition"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: prepoznavanje savršenog kvadrata",
+        "- potkorjena vrijednost mora biti savršen kvadrat (prirodan broj, razlomak ili decimalni zapis) — bez približnih vrijednosti",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: korijen savršenog kvadrata, provjerljiv kvadriranjem."
+    },
+    "8-01-008": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5C.1",
+      "detector": "square_root",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0184",
+        "KS_2018-0185",
+        "KS_2018-0188",
+        "RS_2014-0075"
+      ],
+      "family_id": "square_root_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-01-008",
+      "level_bounds": {
+        "1": "korijen malog savršenog kvadrata",
+        "2": "korijen razlomka ili decimalnog broja",
+        "3": "zbir dva korijena"
+      },
+      "parameters": {
+        "concepts": [
+          "square_root_value"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: kvadratni korijen savršenog kvadrata",
+        "- potkorjena vrijednost mora biti savršen kvadrat (prirodan broj, razlomak ili decimalni zapis) — bez približnih vrijednosti",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: korijen savršenog kvadrata, provjerljiv kvadriranjem."
+    },
+    "8-01-013": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5C.1",
+      "detector": "power_arithmetic",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0264"
+      ],
+      "family_id": "power_arithmetic_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-01-013",
+      "level_bounds": {
+        "1": "jedan stepen/zakon malim brojevima",
+        "2": "negativna osnova, negativan izložilac ili količnik",
+        "3": "kombinovana dva zakona ili zbir stepena"
+      },
+      "parameters": {
+        "concepts": [
+          "power_value"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: vrijednost stepena s prirodnim izložiocem",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: zakoni stepena nad jednakim osnovama; opcije različitih vrijednosti."
+    },
+    "8-01-014": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5C.1",
+      "detector": "power_arithmetic",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-8-01-014"
+      ],
+      "family_id": "power_arithmetic_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-01-014",
+      "level_bounds": {
+        "1": "jedan stepen/zakon malim brojevima",
+        "2": "negativna osnova, negativan izložilac ili količnik",
+        "3": "kombinovana dva zakona ili zbir stepena"
+      },
+      "parameters": {
+        "concepts": [
+          "zero_negative_exponent"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: nulti i negativni izložilac",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: zakoni stepena nad jednakim osnovama; opcije različitih vrijednosti."
+    },
+    "8-01-015": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5C.1",
+      "detector": "power_arithmetic",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0264",
+        "KS_2018-0266",
+        "KS_2018-0270",
+        "KS_2018-0289"
+      ],
+      "family_id": "power_arithmetic_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-01-015",
+      "level_bounds": {
+        "1": "jedan stepen/zakon malim brojevima",
+        "2": "negativna osnova, negativan izložilac ili količnik",
+        "3": "kombinovana dva zakona ili zbir stepena"
+      },
+      "parameters": {
+        "concepts": [
+          "same_base_product_quotient"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: množenje i dijeljenje stepena jednakih osnova",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: zakoni stepena nad jednakim osnovama; opcije različitih vrijednosti."
+    },
+    "8-01-016": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5C.1",
+      "detector": "power_arithmetic",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0264",
+        "KS_2018-0289",
+        "RS_2014-0104"
+      ],
+      "family_id": "power_arithmetic_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-01-016",
+      "level_bounds": {
+        "1": "jedan stepen/zakon malim brojevima",
+        "2": "negativna osnova, negativan izložilac ili količnik",
+        "3": "kombinovana dva zakona ili zbir stepena"
+      },
+      "parameters": {
+        "concepts": [
+          "power_of_power_product"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: stepen stepena, proizvoda i količnika",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: zakoni stepena nad jednakim osnovama; opcije različitih vrijednosti."
+    },
+    "8-06-009": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5C.1",
+      "detector": "arithmetic_mean",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0248",
+        "KS_2018-0252",
+        "KS_2018-0253",
+        "RS_2014-0027"
+      ],
+      "family_id": "arithmetic_mean_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-06-009",
+      "level_bounds": {
+        "1": "tri broja, cjelobrojna sredina",
+        "2": "četiri broja",
+        "3": "pet brojeva, decimalna sredina"
+      },
+      "parameters": {
+        "concepts": [
+          "mean"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: aritmetička sredina datih brojeva",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: sredina = zbir kroz broj podataka, egzaktno."
+    },
+    "8-06-012": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5C.1",
+      "detector": "classical_probability",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-8-06-012"
+      ],
+      "family_id": "classical_probability_basic",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-06-012",
+      "level_bounds": {
+        "1": "dvije boje, direktan događaj",
+        "2": "tri boje",
+        "3": "komplementaran događaj"
+      },
+      "parameters": {
+        "concepts": [
+          "classical_probability"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: klasična vjerovatnoća: broj povoljnih kroz broj svih ishoda",
+        "- svi ishodi su konačni i jednako vjerovatni; vjerovatnoća se piše riječju, nikad simbolom P",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: vjerovatnoća = povoljni/svi, u [0,1]."
+    },
+    "9-04-003": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5C.1",
+      "detector": "linear_equation",
+      "enforced_parameters": [
+        "number_domain",
+        "shapes"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-9-04-003"
+      ],
+      "family_id": "linear_equation_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-04-003",
+      "level_bounds": {
+        "1": "jedan računski korak do rješenja",
+        "2": "dva koraka ili negativni koeficijenti",
+        "3": "tri koraka (sređivanje pa rješavanje)"
+      },
+      "parameters": {
+        "number_domain": "integer",
+        "shapes": [
+          "parentheses"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: jednačina sa zagradom",
+        "- jedna nepoznata i tačno jedno rješenje",
+        "- koeficijenti i rješenje su cijeli brojevi",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: jedinstveno rješenje, provjera uvrštavanjem egzaktna."
+    },
+    "9-04-019": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5C.1",
+      "detector": "linear_equation",
+      "enforced_parameters": [
+        "number_domain",
+        "shapes"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0357",
+        "KS_2018-0359"
+      ],
+      "family_id": "linear_equation_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-04-019",
+      "level_bounds": {
+        "1": "jedan računski korak do rješenja",
+        "2": "dva koraka ili negativni koeficijenti",
+        "3": "tri koraka (sređivanje pa rješavanje)"
+      },
+      "parameters": {
+        "number_domain": "integer",
+        "shapes": [
+          "check_inequality",
+          "check_solution"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: provjera ponuđenog rješenja nejednačine, provjera ponuđenog rješenja jednačine",
+        "- jedna nepoznata i tačno jedno rješenje",
+        "- koeficijenti i rješenje su cijeli brojevi",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: jedinstveno rješenje, provjera uvrštavanjem egzaktna."
+    },
+    "9-08-002": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5C.1",
+      "detector": "classical_probability",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0248",
+        "KS_2018-0253"
+      ],
+      "family_id": "classical_probability_basic",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-08-002",
+      "level_bounds": {
+        "1": "dvije boje, direktan događaj",
+        "2": "tri boje",
+        "3": "komplementaran događaj"
+      },
+      "parameters": {
+        "concepts": [
+          "classical_probability"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: klasična vjerovatnoća: broj povoljnih kroz broj svih ishoda",
+        "- svi ishodi su konačni i jednako vjerovatni; vjerovatnoća se piše riječju, nikad simbolom P",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: vjerovatnoća = povoljni/svi, u [0,1]."
+    },
+    "9-08-010": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5C.1",
+      "detector": "arithmetic_mean",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-9-08-010"
+      ],
+      "family_id": "arithmetic_mean_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-08-010",
+      "level_bounds": {
+        "1": "tri broja, cjelobrojna sredina",
+        "2": "četiri broja",
+        "3": "pet brojeva, decimalna sredina"
+      },
+      "parameters": {
+        "concepts": [
+          "mean"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: aritmetička sredina datih brojeva",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: sredina = zbir kroz broj podataka, egzaktno."
     }
   },
   "schema_version": "1"

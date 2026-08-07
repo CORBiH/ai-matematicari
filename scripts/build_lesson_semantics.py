@@ -119,11 +119,15 @@ def _prompt_lines(family, parameters):
       • "header"          — obavezna prva linija;
       • "operations"      — linija s {operations}; renderuje se kad dodjela ima
                             `allowed_operations` (etikete iz operation_labels);
-      • "concepts"        — isto, za porodice čiji parametar je `concepts`
-                            (etikete iz concept_labels);
+      • "main_line"       — {"parameter": ime, "text": "- ...: {values}"}:
+                            glavna radnja porodice iz BILO KOJEG enum/enum_set
+                            parametra (etikete iz value_labels; bez etikete
+                            ostaje sirova vrijednost — npr. djelioci);
+      • "fixed_lines"     — fiksne linije porodice, uvijek prisutne;
       • "parameter_lines" — {ime_parametra: {vrijednost: linija}}: linija se
                             dodaje kad dodjela ima tačno tu vrijednost enum
-                            parametra (redoslijed = redoslijed u šablonu);
+                            parametra (redoslijed = redoslijed u šablonu;
+                            enum_set liste se preskaču — nisu jedna vrijednost);
       • "forbidden"       — linija s {forbidden} kad dodjela zabranjuje
                             direktive (etikete iz directive_labels);
       • "supporting"      — opciona fiksna linija;
@@ -138,15 +142,22 @@ def _prompt_lines(family, parameters):
         operations = ", ".join(op_labels[op]
                                for op in parameters["allowed_operations"])
         lines.append(template["operations"].format(operations=operations))
-    if "concepts" in template and parameters.get("concepts"):
-        concept_labels = family["concept_labels"]
-        concepts = ", ".join(concept_labels[item]
-                             for item in parameters["concepts"])
-        lines.append(template["concepts"].format(concepts=concepts))
+
+    main = template.get("main_line")
+    if main:
+        labels = family.get("value_labels", {})
+        raw_values = parameters.get(main["parameter"])
+        if raw_values is not None:
+            values = raw_values if isinstance(raw_values, list) else [raw_values]
+            rendered = ", ".join(labels.get(str(item), str(item))
+                                 for item in values)
+            lines.append(main["text"].format(values=rendered))
+
+    lines.extend(template.get("fixed_lines") or ())
 
     for parameter_name, value_lines in (template.get("parameter_lines") or {}).items():
         value = parameters.get(parameter_name)
-        if value is not None and value in value_lines:
+        if isinstance(value, (str, int)) and value in value_lines:
             lines.append(value_lines[value])
 
     forbidden = parameters.get("forbidden_directives") or ()
