@@ -109,6 +109,8 @@ def _k_central_fraction(rng, level):
                      "centralni ugao?"),
         "answer": alpha, "unit": "°",
         "rule": "Puni ugao oko centra kružnice ima $360^\\circ$",
+        "rule_neutral": ("Centralni ugao je odgovarajući dio punog ugla oko "
+                         "centra kružnice"),
         "work": f"\\alpha = 360 : {n} = {core.fraction_display(alpha)}",
         "distractors": [Fraction(180, n), Fraction(360), Fraction(90)],
         "signature": [("n", str(n))], "operation": "central_fraction",
@@ -422,6 +424,8 @@ def _k_classify_triangle_sides(rng, level):
         "rule": ("Prema stranicama trougao je jednakostraničan (sve tri "
                  "jednake), jednakokraki (tačno dvije jednake) ili "
                  "raznostraničan (sve različite)"),
+        "rule_neutral": ("Prebroj koliko je stranica trougla međusobno "
+                         "jednakih dužina"),
         "work": f"a = {a},\\; b = {b},\\; c = {c}",
         "signature": [("sides", f"{a}+{b}+{c}")],
         "operation": "classify_triangle_sides",
@@ -452,6 +456,7 @@ def _k_classify_triangle_angles(rng, level):
         "option_texts": (kind, *others, "jednakostraničan")[:4],
         "rule": ("Prema uglovima trougao je oštrougli (svi uglovi oštri), "
                  "pravougli (jedan prav) ili tupougli (jedan tup)"),
+        "rule_neutral": "Uporedi najveći ugao trougla s pravim uglom",
         "work": f"\\alpha = {alpha},\\; \\beta = {beta},\\; \\gamma = {gamma}",
         "signature": [("angles", f"{alpha}+{beta}+{gamma}")],
         "operation": "classify_triangle_angles",
@@ -601,6 +606,8 @@ def _k_quad_fourth_angle(rng, level):
                      "Koliki je četvrti ugao $\\delta$?"),
         "answer": Fraction(delta), "unit": "°",
         "rule": "Zbir unutrašnjih uglova četverougla je $360^\\circ$",
+        "rule_neutral": ("Zbir unutrašnjih uglova četverougla jednak je "
+                         "zbiru uglova dva trougla"),
         "work": f"\\delta = 360 - {alpha} - {beta} - {gamma} = {delta}",
         "distractors": [Fraction(180 - delta) if delta < 180
                         else Fraction(delta - 90),
@@ -686,10 +693,27 @@ def generate_package(lesson_id, lesson_title, parameters, level, rng=None):
                  f"Primijeni pravilo na zadate vrijednosti: ${work.split('=')[0].strip()}$.",
                  f"Postupak: ${work}$ — još samo pročitaj rezultat.")
         solution = f"{rule}. Računamo: ${work}$."
+
+        def _leak_free_hints(display):
+            # Prva uputa ne smije sadržavati prikaz odgovora (curenje kroz
+            # konstantu pravila, npr. "60°" unutar "360°", ili kroz nabrajanje
+            # svih klasa). Strukturno curenje rješava neutralno pravilo iz
+            # speca; numerička kolizija se rješava novim pokušajem.
+            if display not in hints[0]:
+                return hints
+            neutral = spec.get("rule_neutral")
+            if neutral is None or display in neutral:
+                return None
+            return (f"{neutral}.",) + hints[1:]
+
         if "option_texts" in spec:
             option_texts = spec["option_texts"]
             if len(set(option_texts)) != 4:
                 continue
+            safe_hints = _leak_free_hints(option_texts[0])
+            if safe_hints is None:
+                continue
+            hints = safe_hints
             return core.build_package(
                 lesson_id=lesson_id, lesson_title=lesson_title,
                 family_id="angle_relationships_direct",
@@ -714,6 +738,10 @@ def generate_package(lesson_id, lesson_title, parameters, level, rng=None):
         answer_display = spec.get("display_override") or (
             core.fraction_display(answer))
         degree = "^\\circ" if unit else ""
+        safe_hints = _leak_free_hints(answer_display + degree)
+        if safe_hints is None:
+            continue
+        hints = safe_hints
         option_values = [answer]
         option_texts = ["$" + answer_display + degree + "$"]
         for candidate in spec["distractors"]:

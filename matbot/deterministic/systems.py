@@ -377,6 +377,10 @@ def generate_package(lesson_id, lesson_title, parameters, level, rng=None):
         if len(set(option_texts)) != 4:
             continue
         hints = (f"{spec['rule']}.", spec["hint2"], spec["hint3"])
+        if spec["answer_display"] in hints[0]:
+            # Prikaz odgovora ne smije procuriti kroz prvu uputu — novi
+            # pokušaj bira drugi zadatak (ista zaštita kao u geometry).
+            continue
         return core.build_package(
             lesson_id=lesson_id, lesson_title=lesson_title,
             family_id="linear_system_direct", operation=spec["operation"],

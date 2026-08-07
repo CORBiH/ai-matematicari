@@ -882,7 +882,10 @@ def _monomial_mul_div_package(rng, level, domain, lesson_id, lesson_title):
     d2 = rng.randint(1, 3 if level == 1 else 4)
     multiply = rng.random() < 0.5 or level == 1
     if level == 3:
-        c3 = rng.choice([c for c in (2, 3, 4, 6) if (c1 * c2) % c == 0])
+        # c1*c2 ne mora imati djelioca u (2,3,4,6) — npr. 5*5=25 — pa je c1
+        # uvijek siguran rezervni djelilac proizvoda (Batch #3 fuzz nalaz).
+        pool = [c for c in (2, 3, 4, 6) if (c1 * c2) % c == 0] or [c1]
+        c3 = rng.choice(pool)
         d3 = rng.randint(1, min(d1 + d2 - 1, 3))
         result = {d1 + d2 - d3: (c1 * c2) // c3}
         question = (f"Izračunaj: ${poly_display({d1: c1})} \cdot "

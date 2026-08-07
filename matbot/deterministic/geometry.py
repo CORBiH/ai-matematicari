@@ -158,6 +158,11 @@ def _package_from_spec(spec, family_id, lesson_id, lesson_title, level):
         f"Uvrsti poznate vrijednosti: ${substitution}$.",
         f"Dakle: ${chain}$ — još samo pročitaj rezultat i jedinicu.",
     )
+    if answer_display in hints[0]:
+        # Prikaz odgovora ne smije biti sadržan u prvoj uputi (npr. odgovor
+        # "2" u formuli "n(n-3)/2" ili odgovor "\pi" u formuli s π) — novi
+        # pokušaj bira druge vrijednosti.
+        raise DeterministicGenerationError("prikaz odgovora sadržan u prvoj uputi")
     solution = (f"{spec.get('rule', 'Primijenimo formulu')}: ${formula}$. "
                 f"Računamo: ${chain} = {answer_display}$"
                 f"{unit_suffix}." if spec.get("append_answer", True) else
@@ -1538,6 +1543,8 @@ def generate_package(lesson_id, lesson_title, parameters, level, rng=None):
             if "option_texts" in spec:
                 # Vrsta s tekstualnim opcijama (npr. provjera trojke).
                 answer = spec["answer"]
+                if spec["option_texts"][0] in f"Formula: ${spec['formula']}$.":
+                    continue
                 return core.build_package(
                     lesson_id=lesson_id, lesson_title=lesson_title,
                     family_id=family_id, operation=spec["operation"],
