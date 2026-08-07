@@ -478,6 +478,13 @@ _SIGN_QUESTION_RE = re.compile(
 _QUANTITY_BLOCKER_RE = re.compile(r"\bkoliko\b", re.IGNORECASE)
 _SUPERLATIVE_MAX_RE = re.compile(r"\bnajve[ćc]\w*", re.IGNORECASE)
 _SUPERLATIVE_MIN_RE = re.compile(r"\bnajmanj\w*", re.IGNORECASE)
+# „NAJVEĆI zajednički djelilac“ / „NAJMANJI zajednički sadržilac“ imenuju
+# FUNKCIJU (NZD/NZS), a ne ekstrem među ponuđenim opcijama — superlativ odmah
+# ispred „zajednički“ zato diskvalifikuje cio superlativni orakl (kapacitetna
+# ekspanzija: deterministički NZD paket s numeričkim opcijama bio bi inače
+# dokazano POGREŠNO odbijen jer tačan NZD gotovo nikad nije najveća opcija).
+_SUPERLATIVE_FUNCTION_RE = re.compile(
+    r"\b(?:najve[ćc]\w*|najmanj\w*)\s+zajedni[čc]k", re.IGNORECASE)
 _BASE_SIGNS = ("<", ">", "=")
 _DISQUALIFYING_SIGNS = ("≤", "≥", "≠", "\\le", "\\ge", "\\ne", "\\leq", "\\geq", "\\neq")
 
@@ -543,6 +550,9 @@ def _evaluate_sign_mcq(question, prose, options) -> ComparisonMCQResult:
 
 
 def _evaluate_superlative_mcq(prose, options) -> ComparisonMCQResult:
+    if _SUPERLATIVE_FUNCTION_RE.search(prose):
+        # NZD/NZS pitanje — superlativ je dio imena funkcije, ne relacija.
+        return ComparisonMCQResult(False, False)
     wants_max = bool(_SUPERLATIVE_MAX_RE.search(prose))
     wants_min = bool(_SUPERLATIVE_MIN_RE.search(prose))
     if wants_max == wants_min:   # nijedan ili oba — nedokazivo

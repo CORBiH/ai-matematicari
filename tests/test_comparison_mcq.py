@@ -128,3 +128,30 @@ def test_publication_failure_accepts_the_correct_sign():
         "Koji znak stoji između $\\frac{2}{3}$ i $\\frac{3}{4}$?",
         SIGN_OPTIONS, 0, SIGN_OPTIONS[0])
     assert failure == ""
+
+
+# ---------------------------------------------------------------------------
+# 5) SUPERLATIV KAO IME FUNKCIJE (NZD/NZS) — orakl se NE angažuje
+# ---------------------------------------------------------------------------
+# „NAJVEĆI zajednički djelilac“ imenuje funkciju, ne ekstrem među opcijama:
+# tačan NZD gotovo nikad nije najveća opcija, pa bi angažovan superlativni
+# orakl dokazano POGREŠNO odbijao ispravne deterministic pakete (kapacitetna
+# ekspanzija, porodica common_divisors_multiples).
+
+def test_gcd_question_never_engages_the_superlative_oracle():
+    result = evaluate("Koliki je najveći zajednički djelilac brojeva $25$ i $35$?",
+                      ("$5$", "$10$", "$15$", "$175$"))
+    assert not result.applicable
+
+
+def test_lcm_question_never_engages_the_superlative_oracle():
+    result = evaluate("Koliki je najmanji zajednički sadržilac brojeva $9$ i $6$?",
+                      ("$18$", "$54$", "$36$", "$9$"))
+    assert not result.applicable
+
+
+def test_publication_accepts_a_correct_gcd_package():
+    failure, _ = mcq_integrity.publication_failure(
+        "Koliki je najveći zajednički djelilac brojeva $25$ i $35$?",
+        ("$5$", "$10$", "$15$", "$175$"), 0, "$5$")
+    assert failure == ""
