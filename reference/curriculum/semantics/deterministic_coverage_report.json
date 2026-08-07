@@ -1,38 +1,47 @@
 {
-  "contract_version": "5C.1",
+  "contract_version": "5D.1",
   "total_lessons": 534,
-  "deterministic_lessons": 57,
-  "deterministic_share": 0.1067,
+  "deterministic_lessons": 154,
+  "deterministic_share": 0.2884,
   "class_totals": {
-    "DETERMINISTIC_NEEDS_EXISTING_CAPABILITY_EXTENSION": 26,
-    "DETERMINISTIC_NEEDS_NEW_CAPABILITY": 82,
-    "DETERMINISTIC_READY": 57,
-    "MODEL_ONLY_FOR_NOW": 294,
+    "DETERMINISTIC_NEEDS_EXISTING_CAPABILITY_EXTENSION": 3,
+    "DETERMINISTIC_NEEDS_NEW_CAPABILITY": 18,
+    "DETERMINISTIC_READY": 154,
+    "MODEL_ONLY_FOR_NOW": 284,
     "VISUAL_OR_CONSTRUCTION_REQUIRED": 75
   },
   "deterministic_by_grade": {
-    "6": 22,
-    "7": 21,
-    "8": 10,
-    "9": 4
+    "6": 45,
+    "7": 31,
+    "8": 42,
+    "9": 36
   },
   "deterministic_by_family": {
     "absolute_value_opposite": 5,
     "arithmetic_mean_direct": 3,
-    "classical_probability_basic": 2,
+    "classical_probability_basic": 4,
     "common_divisors_multiples": 3,
     "decimal_arithmetic_direct": 3,
+    "decimal_rounding": 2,
     "divisibility_predicate_application": 1,
+    "divisibility_value_properties": 2,
     "fraction_arithmetic_direct": 4,
+    "fraction_decimal_conversion": 5,
+    "frequency_basic": 3,
     "integer_arithmetic_direct": 7,
-    "linear_equation_direct": 6,
-    "natural_arithmetic_direct": 3,
-    "number_comparison_order": 4,
-    "percent_basic": 2,
-    "power_arithmetic_direct": 5,
+    "linear_equation_direct": 27,
+    "linear_function_direct": 16,
+    "natural_arithmetic_direct": 4,
+    "number_comparison_order": 6,
+    "percent_basic": 4,
+    "polynomial_basic": 11,
+    "power_arithmetic_direct": 7,
     "prime_structure": 3,
-    "rational_arithmetic_direct": 4,
-    "square_root_direct": 2
+    "ratio_proportion_direct": 9,
+    "rational_arithmetic_direct": 8,
+    "simple_quadratic_equation": 5,
+    "square_root_direct": 4,
+    "unit_conversion_direct": 8
   },
   "lessons": [
     {
@@ -136,8 +145,8 @@
       "grade": "6",
       "oblast": "Prirodni brojevi i skupovi N/N0",
       "title": "Čitanje, zapisivanje i upoređivanje prirodnih brojeva",
-      "class": "DETERMINISTIC_NEEDS_EXISTING_CAPABILITY_EXTENSION",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "number_comparison_order"
     },
     {
       "lesson_id": "6-02-003",
@@ -160,8 +169,8 @@
       "grade": "6",
       "oblast": "Prirodni brojevi i skupovi N/N0",
       "title": "Dijeljenje s ostatkom: a = bq + r",
-      "class": "DETERMINISTIC_NEEDS_EXISTING_CAPABILITY_EXTENSION",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "natural_arithmetic_direct"
     },
     {
       "lesson_id": "6-02-006",
@@ -184,8 +193,8 @@
       "grade": "6",
       "oblast": "Prirodni brojevi i skupovi N/N0",
       "title": "Izrazi s promjenljivim i brojna vrijednost izraza",
-      "class": "DETERMINISTIC_NEEDS_EXISTING_CAPABILITY_EXTENSION",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "polynomial_basic"
     },
     {
       "lesson_id": "6-02-009",
@@ -208,16 +217,16 @@
       "grade": "6",
       "oblast": "Djeljivost brojeva",
       "title": "Djeljivost zbira, razlike i proizvoda",
-      "class": "DETERMINISTIC_NEEDS_EXISTING_CAPABILITY_EXTENSION",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "divisibility_value_properties"
     },
     {
       "lesson_id": "6-03-003",
       "grade": "6",
       "oblast": "Djeljivost brojeva",
       "title": "Djeljivost dekadskim jedinicama",
-      "class": "DETERMINISTIC_NEEDS_EXISTING_CAPABILITY_EXTENSION",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "divisibility_value_properties"
     },
     {
       "lesson_id": "6-03-004",
@@ -384,8 +393,8 @@
       "grade": "6",
       "oblast": "Razlomci",
       "title": "Brojevni izrazi s razlomcima",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "rational_arithmetic_direct"
     },
     {
       "lesson_id": "6-04-015",
@@ -400,24 +409,24 @@
       "grade": "6",
       "oblast": "Razlomci u decimalnom obliku i decimalni brojevi",
       "title": "Decimalni zapis razlomka",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "fraction_decimal_conversion"
     },
     {
       "lesson_id": "6-05-002",
       "grade": "6",
       "oblast": "Razlomci u decimalnom obliku i decimalni brojevi",
       "title": "Decimalni broj: cijeli dio, decimalni dio i decimalna mjesta",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "fraction_decimal_conversion"
     },
     {
       "lesson_id": "6-05-003",
       "grade": "6",
       "oblast": "Razlomci u decimalnom obliku i decimalni brojevi",
       "title": "Pretvaranje razlomka u decimalni broj i obratno",
-      "class": "DETERMINISTIC_NEEDS_EXISTING_CAPABILITY_EXTENSION",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "fraction_decimal_conversion"
     },
     {
       "lesson_id": "6-05-004",
@@ -448,8 +457,8 @@
       "grade": "6",
       "oblast": "Razlomci u decimalnom obliku i decimalni brojevi",
       "title": "Zaokruživanje decimalnih brojeva",
-      "class": "DETERMINISTIC_NEEDS_EXISTING_CAPABILITY_EXTENSION",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "decimal_rounding"
     },
     {
       "lesson_id": "6-05-008",
@@ -504,8 +513,8 @@
       "grade": "6",
       "oblast": "Postotak, razmjera i aritmetička sredina",
       "title": "Razmjera/omjer",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "ratio_proportion_direct"
     },
     {
       "lesson_id": "6-06-004",
@@ -520,55 +529,55 @@
       "grade": "6",
       "oblast": "Jednačine, nejednačine i izrazi u Q+",
       "title": "Jednakost, jednačina, nejednakost i nejednačina",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "linear_equation_direct"
     },
     {
       "lesson_id": "6-07-002",
       "grade": "6",
       "oblast": "Jednačine, nejednačine i izrazi u Q+",
       "title": "Jednačine s razlomcima oblika x ± a = b i a ± x = b",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "linear_equation_direct"
     },
     {
       "lesson_id": "6-07-003",
       "grade": "6",
       "oblast": "Jednačine, nejednačine i izrazi u Q+",
       "title": "Nejednačine s razlomcima oblika x ± a < b / > b i a ± x < b / > b",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "linear_equation_direct"
     },
     {
       "lesson_id": "6-07-004",
       "grade": "6",
       "oblast": "Jednačine, nejednačine i izrazi u Q+",
       "title": "Jednačine s množenjem i dijeljenjem razlomaka",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "linear_equation_direct"
     },
     {
       "lesson_id": "6-07-005",
       "grade": "6",
       "oblast": "Jednačine, nejednačine i izrazi u Q+",
       "title": "Nejednačine s množenjem i dijeljenjem razlomaka",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "linear_equation_direct"
     },
     {
       "lesson_id": "6-07-006",
       "grade": "6",
       "oblast": "Jednačine, nejednačine i izrazi u Q+",
       "title": "Jednačine i nejednačine s decimalnim brojevima",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "linear_equation_direct"
     },
     {
       "lesson_id": "6-07-007",
       "grade": "6",
       "oblast": "Jednačine, nejednačine i izrazi u Q+",
       "title": "Predstavljanje rješenja nejednačine na brojevnoj polupravoj/osi",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
+      "class": "DETERMINISTIC_NEEDS_EXISTING_CAPABILITY_EXTENSION",
       "family": ""
     },
     {
@@ -736,8 +745,8 @@
       "grade": "6",
       "oblast": "Uglovi",
       "title": "Ugaone jedinice: stepen, minuta, sekunda",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "unit_conversion_direct"
     },
     {
       "lesson_id": "6-09-011",
@@ -936,40 +945,40 @@
       "grade": "6",
       "oblast": "Mjerenje, mjerne jedinice i podaci",
       "title": "Mjerne jedinice za dužinu",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "unit_conversion_direct"
     },
     {
       "lesson_id": "6-13-002",
       "grade": "6",
       "oblast": "Mjerenje, mjerne jedinice i podaci",
       "title": "Mjerne jedinice za masu",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "unit_conversion_direct"
     },
     {
       "lesson_id": "6-13-003",
       "grade": "6",
       "oblast": "Mjerenje, mjerne jedinice i podaci",
       "title": "Mjerne jedinice za vrijeme",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "unit_conversion_direct"
     },
     {
       "lesson_id": "6-13-004",
       "grade": "6",
       "oblast": "Mjerenje, mjerne jedinice i podaci",
       "title": "Mjerne jedinice za površinu",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "unit_conversion_direct"
     },
     {
       "lesson_id": "6-13-005",
       "grade": "6",
       "oblast": "Mjerenje, mjerne jedinice i podaci",
       "title": "Preračunavanje mjernih jedinica",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "unit_conversion_direct"
     },
     {
       "lesson_id": "6-13-006",
@@ -1280,24 +1289,24 @@
       "grade": "7",
       "oblast": "Cijeli brojevi",
       "title": "Jednačine sa apsolutnom vrijednošću",
-      "class": "DETERMINISTIC_NEEDS_EXISTING_CAPABILITY_EXTENSION",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "linear_equation_direct"
     },
     {
       "lesson_id": "7-02-019",
       "grade": "7",
       "oblast": "Cijeli brojevi",
       "title": "Nejednačine sa sabiranjem i oduzimanjem u Z",
-      "class": "DETERMINISTIC_NEEDS_EXISTING_CAPABILITY_EXTENSION",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "linear_equation_direct"
     },
     {
       "lesson_id": "7-02-020",
       "grade": "7",
       "oblast": "Cijeli brojevi",
       "title": "Nejednačine sa množenjem i dijeljenjem u Z",
-      "class": "DETERMINISTIC_NEEDS_EXISTING_CAPABILITY_EXTENSION",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "linear_equation_direct"
     },
     {
       "lesson_id": "7-02-021",
@@ -1360,16 +1369,16 @@
       "grade": "7",
       "oblast": "Racionalni brojevi",
       "title": "Decimalni zapis racionalnog broja",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "fraction_decimal_conversion"
     },
     {
       "lesson_id": "7-03-008",
       "grade": "7",
       "oblast": "Racionalni brojevi",
       "title": "Pretvaranje decimalnog broja u razlomak",
-      "class": "DETERMINISTIC_NEEDS_EXISTING_CAPABILITY_EXTENSION",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "fraction_decimal_conversion"
     },
     {
       "lesson_id": "7-03-009",
@@ -1416,16 +1425,16 @@
       "grade": "7",
       "oblast": "Racionalni brojevi",
       "title": "Brojevni izrazi sa zagradama u Q",
-      "class": "DETERMINISTIC_NEEDS_EXISTING_CAPABILITY_EXTENSION",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "rational_arithmetic_direct"
     },
     {
       "lesson_id": "7-03-015",
       "grade": "7",
       "oblast": "Racionalni brojevi",
       "title": "Dvojni razlomci",
-      "class": "DETERMINISTIC_NEEDS_EXISTING_CAPABILITY_EXTENSION",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "rational_arithmetic_direct"
     },
     {
       "lesson_id": "7-03-016",
@@ -1448,16 +1457,16 @@
       "grade": "7",
       "oblast": "Racionalni brojevi",
       "title": "Jednačine sa zagradama i svođenjem sličnih članova",
-      "class": "DETERMINISTIC_NEEDS_EXISTING_CAPABILITY_EXTENSION",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "linear_equation_direct"
     },
     {
       "lesson_id": "7-03-019",
       "grade": "7",
       "oblast": "Racionalni brojevi",
       "title": "Nejednačine u Q",
-      "class": "DETERMINISTIC_NEEDS_EXISTING_CAPABILITY_EXTENSION",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "linear_equation_direct"
     },
     {
       "lesson_id": "7-03-020",
@@ -1472,8 +1481,8 @@
       "grade": "7",
       "oblast": "Racionalni brojevi",
       "title": "Procjena, zaokruživanje i približan račun",
-      "class": "DETERMINISTIC_NEEDS_EXISTING_CAPABILITY_EXTENSION",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "decimal_rounding"
     },
     {
       "lesson_id": "7-04-001",
@@ -1992,8 +2001,8 @@
       "grade": "8",
       "oblast": "Realni brojevi, korijeni i stepeni",
       "title": "Uređenost i poređenje realnih brojeva",
-      "class": "DETERMINISTIC_NEEDS_EXISTING_CAPABILITY_EXTENSION",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "number_comparison_order"
     },
     {
       "lesson_id": "8-01-005",
@@ -2032,32 +2041,32 @@
       "grade": "8",
       "oblast": "Realni brojevi, korijeni i stepeni",
       "title": "Jednačina x²=a, a≥0",
-      "class": "DETERMINISTIC_NEEDS_EXISTING_CAPABILITY_EXTENSION",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "simple_quadratic_equation"
     },
     {
       "lesson_id": "8-01-010",
       "grade": "8",
       "oblast": "Realni brojevi, korijeni i stepeni",
       "title": "Korijen proizvoda i količnika",
-      "class": "DETERMINISTIC_NEEDS_EXISTING_CAPABILITY_EXTENSION",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "square_root_direct"
     },
     {
       "lesson_id": "8-01-011",
       "grade": "8",
       "oblast": "Realni brojevi, korijeni i stepeni",
       "title": "Približne vrijednosti kvadratnog korijena",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "square_root_direct"
     },
     {
       "lesson_id": "8-01-012",
       "grade": "8",
       "oblast": "Realni brojevi, korijeni i stepeni",
       "title": "Računske operacije u skupu R",
-      "class": "DETERMINISTIC_NEEDS_EXISTING_CAPABILITY_EXTENSION",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "rational_arithmetic_direct"
     },
     {
       "lesson_id": "8-01-013",
@@ -2096,8 +2105,8 @@
       "grade": "8",
       "oblast": "Realni brojevi, korijeni i stepeni",
       "title": "Naučni zapis broja",
-      "class": "DETERMINISTIC_NEEDS_EXISTING_CAPABILITY_EXTENSION",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "power_arithmetic_direct"
     },
     {
       "lesson_id": "8-02-001",
@@ -2136,16 +2145,16 @@
       "grade": "8",
       "oblast": "Koordinatni sistem i linearna funkcija",
       "title": "Pojam linearne funkcije y=kx+n",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "linear_function_direct"
     },
     {
       "lesson_id": "8-02-006",
       "grade": "8",
       "oblast": "Koordinatni sistem i linearna funkcija",
       "title": "Tabela vrijednosti linearne funkcije",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "linear_function_direct"
     },
     {
       "lesson_id": "8-02-007",
@@ -2176,16 +2185,16 @@
       "grade": "8",
       "oblast": "Koordinatni sistem i linearna funkcija",
       "title": "Nula linearne funkcije",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "linear_function_direct"
     },
     {
       "lesson_id": "8-02-011",
       "grade": "8",
       "oblast": "Koordinatni sistem i linearna funkcija",
       "title": "Znak i tok linearne funkcije",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "linear_function_direct"
     },
     {
       "lesson_id": "8-02-012",
@@ -2216,56 +2225,56 @@
       "grade": "8",
       "oblast": "Proporcionalnost, Talesova teorema i sličnost",
       "title": "Razmjera i omjer veličina",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "ratio_proportion_direct"
     },
     {
       "lesson_id": "8-03-002",
       "grade": "8",
       "oblast": "Proporcionalnost, Talesova teorema i sličnost",
       "title": "Proporcija i osnovno svojstvo",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "ratio_proportion_direct"
     },
     {
       "lesson_id": "8-03-003",
       "grade": "8",
       "oblast": "Proporcionalnost, Talesova teorema i sličnost",
       "title": "Nepoznati član proporcije",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "ratio_proportion_direct"
     },
     {
       "lesson_id": "8-03-004",
       "grade": "8",
       "oblast": "Proporcionalnost, Talesova teorema i sličnost",
       "title": "Prepoznavanje direktne proporcionalnosti",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "ratio_proportion_direct"
     },
     {
       "lesson_id": "8-03-005",
       "grade": "8",
       "oblast": "Proporcionalnost, Talesova teorema i sličnost",
       "title": "Prepoznavanje obrnute proporcionalnosti",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "ratio_proportion_direct"
     },
     {
       "lesson_id": "8-03-006",
       "grade": "8",
       "oblast": "Proporcionalnost, Talesova teorema i sličnost",
       "title": "Funkcija direktne proporcionalnosti y=kx",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "linear_function_direct"
     },
     {
       "lesson_id": "8-03-007",
       "grade": "8",
       "oblast": "Proporcionalnost, Talesova teorema i sličnost",
       "title": "Funkcija obrnute proporcionalnosti y=k/x",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "linear_function_direct"
     },
     {
       "lesson_id": "8-03-008",
@@ -2288,8 +2297,8 @@
       "grade": "8",
       "oblast": "Proporcionalnost, Talesova teorema i sličnost",
       "title": "Četvrta geometrijska proporcionala",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "ratio_proportion_direct"
     },
     {
       "lesson_id": "8-03-011",
@@ -2304,8 +2313,8 @@
       "grade": "8",
       "oblast": "Proporcionalnost, Talesova teorema i sličnost",
       "title": "Dijeljenje duži u datoj razmjeri",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "ratio_proportion_direct"
     },
     {
       "lesson_id": "8-03-013",
@@ -2344,16 +2353,16 @@
       "grade": "8",
       "oblast": "Proporcionalnost, Talesova teorema i sličnost",
       "title": "Procentni iznos, osnovica i stopa",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "percent_basic"
     },
     {
       "lesson_id": "8-03-018",
       "grade": "8",
       "oblast": "Proporcionalnost, Talesova teorema i sličnost",
       "title": "Određivanje osnovice ili procentne stope",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "percent_basic"
     },
     {
       "lesson_id": "8-03-019",
@@ -2368,8 +2377,8 @@
       "grade": "8",
       "oblast": "Proporcionalnost, Talesova teorema i sličnost",
       "title": "Proporcionalna podjela",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "ratio_proportion_direct"
     },
     {
       "lesson_id": "8-04-001",
@@ -2688,24 +2697,24 @@
       "grade": "8",
       "oblast": "Podaci i vjerovatnoća",
       "title": "Frekvencija",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "frequency_basic"
     },
     {
       "lesson_id": "8-06-003",
       "grade": "8",
       "oblast": "Podaci i vjerovatnoća",
       "title": "Relativna frekvencija",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "frequency_basic"
     },
     {
       "lesson_id": "8-06-004",
       "grade": "8",
       "oblast": "Podaci i vjerovatnoća",
       "title": "Tabela frekvencija",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "frequency_basic"
     },
     {
       "lesson_id": "8-06-005",
@@ -2776,24 +2785,24 @@
       "grade": "8",
       "oblast": "Podaci i vjerovatnoća",
       "title": "Komplementarni događaj",
-      "class": "DETERMINISTIC_NEEDS_EXISTING_CAPABILITY_EXTENSION",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "classical_probability_basic"
     },
     {
       "lesson_id": "8-07-001",
       "grade": "8",
       "oblast": "Cijeli racionalni izrazi i polinomi",
       "title": "Algebarski racionalni izraz i brojna vrijednost",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "polynomial_basic"
     },
     {
       "lesson_id": "8-07-002",
       "grade": "8",
       "oblast": "Cijeli racionalni izrazi i polinomi",
       "title": "Monom, koeficijent i stepen monoma",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "polynomial_basic"
     },
     {
       "lesson_id": "8-07-003",
@@ -2824,24 +2833,24 @@
       "grade": "8",
       "oblast": "Cijeli racionalni izrazi i polinomi",
       "title": "Polinom i sređivanje polinoma",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "polynomial_basic"
     },
     {
       "lesson_id": "8-07-007",
       "grade": "8",
       "oblast": "Cijeli racionalni izrazi i polinomi",
       "title": "Sabiranje i oduzimanje polinoma",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "polynomial_basic"
     },
     {
       "lesson_id": "8-07-008",
       "grade": "8",
       "oblast": "Cijeli racionalni izrazi i polinomi",
       "title": "Množenje polinoma",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "polynomial_basic"
     },
     {
       "lesson_id": "8-07-009",
@@ -2880,8 +2889,8 @@
       "grade": "8",
       "oblast": "Cijeli racionalni izrazi i polinomi",
       "title": "Jednačine rješive faktorizacijom",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "simple_quadratic_equation"
     },
     {
       "lesson_id": "8-08-001",
@@ -3016,8 +3025,8 @@
       "grade": "9",
       "oblast": "Razlomljeni racionalni izrazi",
       "title": "Algebarski izraz: konstante, promjenljive i članovi",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "polynomial_basic"
     },
     {
       "lesson_id": "9-01-002",
@@ -3288,24 +3297,24 @@
       "grade": "9",
       "oblast": "Linearna funkcija i prava",
       "title": "Funkcija i vrijednost funkcije",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "linear_function_direct"
     },
     {
       "lesson_id": "9-03-002",
       "grade": "9",
       "oblast": "Linearna funkcija i prava",
       "title": "Linearna funkcija y = kx + n",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "linear_function_direct"
     },
     {
       "lesson_id": "9-03-003",
       "grade": "9",
       "oblast": "Linearna funkcija i prava",
       "title": "Tabela vrijednosti linearne funkcije",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "linear_function_direct"
     },
     {
       "lesson_id": "9-03-004",
@@ -3336,24 +3345,24 @@
       "grade": "9",
       "oblast": "Linearna funkcija i prava",
       "title": "Nula linearne funkcije",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "linear_function_direct"
     },
     {
       "lesson_id": "9-03-008",
       "grade": "9",
       "oblast": "Linearna funkcija i prava",
       "title": "Rastuća i opadajuća linearna funkcija",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "linear_function_direct"
     },
     {
       "lesson_id": "9-03-009",
       "grade": "9",
       "oblast": "Linearna funkcija i prava",
       "title": "Znak linearne funkcije",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "linear_function_direct"
     },
     {
       "lesson_id": "9-03-010",
@@ -3368,32 +3377,32 @@
       "grade": "9",
       "oblast": "Linearna funkcija i prava",
       "title": "Da li tačka pripada grafiku funkcije",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "linear_function_direct"
     },
     {
       "lesson_id": "9-03-012",
       "grade": "9",
       "oblast": "Linearna funkcija i prava",
       "title": "Eksplicitni i implicitni oblik jednačine prave",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "linear_function_direct"
     },
     {
       "lesson_id": "9-03-013",
       "grade": "9",
       "oblast": "Linearna funkcija i prava",
       "title": "Prelazak iz implicitnog u eksplicitni oblik",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "linear_function_direct"
     },
     {
       "lesson_id": "9-03-014",
       "grade": "9",
       "oblast": "Linearna funkcija i prava",
       "title": "Jednačina prave kroz dvije tačke",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "linear_function_direct"
     },
     {
       "lesson_id": "9-03-015",
@@ -3464,16 +3473,16 @@
       "grade": "9",
       "oblast": "Linearne jednačine i nejednačine",
       "title": "Osnovni pojmovi linearne jednačine",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "linear_equation_direct"
     },
     {
       "lesson_id": "9-04-002",
       "grade": "9",
       "oblast": "Linearne jednačine i nejednačine",
       "title": "Ekvivalentne jednačine",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "linear_equation_direct"
     },
     {
       "lesson_id": "9-04-003",
@@ -3488,8 +3497,8 @@
       "grade": "9",
       "oblast": "Linearne jednačine i nejednačine",
       "title": "Jednačina sa razlomcima",
-      "class": "DETERMINISTIC_NEEDS_EXISTING_CAPABILITY_EXTENSION",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "linear_equation_direct"
     },
     {
       "lesson_id": "9-04-005",
@@ -3512,7 +3521,7 @@
       "grade": "9",
       "oblast": "Linearne jednačine i nejednačine",
       "title": "Jednačina sa promjenljivim koeficijentom",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
+      "class": "DETERMINISTIC_NEEDS_EXISTING_CAPABILITY_EXTENSION",
       "family": ""
     },
     {
@@ -3520,16 +3529,16 @@
       "grade": "9",
       "oblast": "Linearne jednačine i nejednačine",
       "title": "Jednačina bez rješenja",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "linear_equation_direct"
     },
     {
       "lesson_id": "9-04-009",
       "grade": "9",
       "oblast": "Linearne jednačine i nejednačine",
       "title": "Identitet sa beskonačno mnogo rješenja",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "linear_equation_direct"
     },
     {
       "lesson_id": "9-04-010",
@@ -3552,15 +3561,15 @@
       "grade": "9",
       "oblast": "Linearne jednačine i nejednačine",
       "title": "Osnovni pojmovi linearne nejednačine",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "linear_equation_direct"
     },
     {
       "lesson_id": "9-04-013",
       "grade": "9",
       "oblast": "Linearne jednačine i nejednačine",
       "title": "Ekvivalentne nejednačine",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
+      "class": "DETERMINISTIC_NEEDS_EXISTING_CAPABILITY_EXTENSION",
       "family": ""
     },
     {
@@ -3568,8 +3577,8 @@
       "grade": "9",
       "oblast": "Linearne jednačine i nejednačine",
       "title": "Nejednačina sa zagradama",
-      "class": "DETERMINISTIC_NEEDS_EXISTING_CAPABILITY_EXTENSION",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "linear_equation_direct"
     },
     {
       "lesson_id": "9-04-015",
@@ -3584,8 +3593,8 @@
       "grade": "9",
       "oblast": "Linearne jednačine i nejednačine",
       "title": "Promjena znaka nejednakosti pri množenju ili dijeljenju negativnim brojem",
-      "class": "DETERMINISTIC_NEEDS_EXISTING_CAPABILITY_EXTENSION",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "linear_equation_direct"
     },
     {
       "lesson_id": "9-04-017",
@@ -3616,16 +3625,16 @@
       "grade": "9",
       "oblast": "Linearne jednačine i nejednačine",
       "title": "Linearna jednačina sa apsolutnom vrijednošću",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "linear_equation_direct"
     },
     {
       "lesson_id": "9-04-021",
       "grade": "9",
       "oblast": "Linearne jednačine i nejednačine",
       "title": "Linearna nejednačina sa apsolutnom vrijednošću",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "linear_equation_direct"
     },
     {
       "lesson_id": "9-04-022",
@@ -3776,32 +3785,32 @@
       "grade": "9",
       "oblast": "Polinomi, faktorizacija i jednostavne kvadratne jednačine",
       "title": "Monom i polinom u skupu realnih brojeva",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "polynomial_basic"
     },
     {
       "lesson_id": "9-06-002",
       "grade": "9",
       "oblast": "Polinomi, faktorizacija i jednostavne kvadratne jednačine",
       "title": "Sređivanje polinoma",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "polynomial_basic"
     },
     {
       "lesson_id": "9-06-003",
       "grade": "9",
       "oblast": "Polinomi, faktorizacija i jednostavne kvadratne jednačine",
       "title": "Sabiranje i oduzimanje polinoma",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "polynomial_basic"
     },
     {
       "lesson_id": "9-06-004",
       "grade": "9",
       "oblast": "Polinomi, faktorizacija i jednostavne kvadratne jednačine",
       "title": "Množenje polinoma",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "polynomial_basic"
     },
     {
       "lesson_id": "9-06-005",
@@ -3872,24 +3881,24 @@
       "grade": "9",
       "oblast": "Polinomi, faktorizacija i jednostavne kvadratne jednačine",
       "title": "Jednostavna kvadratna jednačina ax² + bx = 0",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "simple_quadratic_equation"
     },
     {
       "lesson_id": "9-06-014",
       "grade": "9",
       "oblast": "Polinomi, faktorizacija i jednostavne kvadratne jednačine",
       "title": "Jednostavna kvadratna jednačina x² - a = 0",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "simple_quadratic_equation"
     },
     {
       "lesson_id": "9-06-015",
       "grade": "9",
       "oblast": "Polinomi, faktorizacija i jednostavne kvadratne jednačine",
       "title": "Kvadratna jednačina oblika x² ± 2ax + a² = 0",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "simple_quadratic_equation"
     },
     {
       "lesson_id": "9-06-016",
@@ -4208,8 +4217,8 @@
       "grade": "9",
       "oblast": "Podaci, vjerovatnoća, finansije i mjerne jedinice",
       "title": "Uvod u vjerovatnoću i skup elementarnih događaja",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "classical_probability_basic"
     },
     {
       "lesson_id": "9-08-002",
@@ -4288,24 +4297,24 @@
       "grade": "9",
       "oblast": "Podaci, vjerovatnoća, finansije i mjerne jedinice",
       "title": "Pretvaranje mjernih jedinica za dužinu, površinu i zapreminu",
-      "class": "DETERMINISTIC_NEEDS_EXISTING_CAPABILITY_EXTENSION",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "unit_conversion_direct"
     },
     {
       "lesson_id": "9-08-012",
       "grade": "9",
       "oblast": "Podaci, vjerovatnoća, finansije i mjerne jedinice",
       "title": "Prefiksi mjernih jedinica kao stepeni broja 10",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "power_arithmetic_direct"
     },
     {
       "lesson_id": "9-08-013",
       "grade": "9",
       "oblast": "Podaci, vjerovatnoća, finansije i mjerne jedinice",
       "title": "Pretvaranje brzine m/s i km/h",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "unit_conversion_direct"
     }
   ]
 }

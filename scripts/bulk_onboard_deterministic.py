@@ -43,7 +43,7 @@ FAZA2_XLSX = ROOT / "reference" / "curriculum" / "semantics" / "MATBOT_Faza2_Map
 REPORT_PATH = (ROOT / "reference" / "curriculum" / "semantics"
                / "deterministic_coverage_report.json")
 
-CONTRACT_VERSION = "5C.1"
+CONTRACT_VERSION = "5D.1"
 
 _HEADER = "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):"
 _CLOSING = "- ako prekršiš ovo, server odbija paket prije objave"
@@ -69,14 +69,17 @@ _ARITHMETIC_OPERATION_VALUES = ["add", "subtract", "multiply", "divide"]
 
 def _arithmetic_family(domain, domain_label, operation_labels, fixed,
                        extra_schema=None, parameter_lines=None):
+    domains = domain if isinstance(domain, list) else [domain]
     schema = {
         "allowed_operations": {"kind": "enum_set",
                                "values": _ARITHMETIC_OPERATION_VALUES,
                                "required": True},
-        "number_domain": {"kind": "enum", "values": [domain], "required": True},
+        "number_domain": {"kind": "enum", "values": domains, "required": True},
         "expression_shape": {"kind": "enum",
                              "values": ["single_operation", "multi_factor",
-                                        "order_of_operations"],
+                                        "order_of_operations",
+                                        "division_with_remainder",
+                                        "complex_fraction"],
                              "required": False},
     }
     schema.update(extra_schema or {})
@@ -158,7 +161,7 @@ NEW_FAMILIES = {
         ["- operandi su decimalni brojevi i svaki vidljivi rezultat mora imati "
          "KONAČAN decimalan zapis"]),
     "rational_arithmetic_direct": _arithmetic_family(
-        "rational_signed", "racionalni brojevi",
+        ["rational_signed", "rational_nonneg"], "racionalni brojevi",
         {"add": "sabiranje racionalnih brojeva",
          "subtract": "oduzimanje racionalnih brojeva",
          "multiply": "množenje racionalnih brojeva",
@@ -275,6 +278,170 @@ NEW_FAMILIES = {
 # Porodica poređenja ima JEDAN domen po lekciji — parametar je enum, ne skup.
 NEW_FAMILIES["number_comparison_order"]["parameter_schema"]["number_domain"]["kind"] = "enum"
 
+# ---------------------------------------------------------------------------
+# BATCH #2: prošireni koncepti postojećih porodica
+# ---------------------------------------------------------------------------
+NEW_FAMILIES["number_comparison_order"]["parameter_schema"]["forms"] = {
+    "kind": "enum_set", "values": ["ordering", "place_value"],
+    "required": False}
+NEW_FAMILIES["number_comparison_order"]["advisory_parameters"] = ["forms"]
+
+_pow = NEW_FAMILIES["power_arithmetic_direct"]
+_pow["parameter_schema"]["concepts"]["values"] += [
+    "scientific_notation", "unit_prefix_powers"]
+_pow["value_labels"].update({
+    "scientific_notation": "naučni zapis broja (a·10^n)",
+    "unit_prefix_powers": "prefiksi mjernih jedinica kao stepeni broja 10"})
+
+_root = NEW_FAMILIES["square_root_direct"]
+_root["parameter_schema"]["concepts"]["values"] += [
+    "root_product_quotient", "root_between_integers"]
+_root["value_labels"].update({
+    "root_product_quotient": "korijen proizvoda i količnika",
+    "root_between_integers": "između koja dva uzastopna prirodna broja je korijen"})
+
+_pct = NEW_FAMILIES["percent_basic"]
+_pct["parameter_schema"]["concepts"]["values"] += [
+    "percent_amount", "percent_rate"]
+_pct["value_labels"].update({
+    "percent_amount": "procentni iznos iz osnovice i stope",
+    "percent_rate": "procentna stopa ili osnovica iz preostala dva podatka"})
+
+_prob = NEW_FAMILIES["classical_probability_basic"]
+_prob["parameter_schema"]["concepts"]["values"] += [
+    "complement_probability", "outcome_counting"]
+_prob["value_labels"].update({
+    "complement_probability": "vjerovatnoća komplementarnog događaja",
+    "outcome_counting": "broj elementarnih ishoda ogleda"})
+
+_eq = NEW_FAMILIES["linear_equation_direct"]
+_eq["parameter_schema"]["shapes"]["values"] += [
+    "subtract_from", "fraction_form", "parentheses_combine",
+    "solve_inequality_additive", "solve_inequality_multiplicative",
+    "solve_inequality_sign_flip", "solve_inequality_parentheses",
+    "absolute_value_equation", "absolute_value_inequality",
+    "classification", "solution_count", "equivalence_choice"]
+_eq["parameter_schema"]["number_domain"]["values"] += [
+    "rational_nonneg", "decimal"]
+_eq["value_labels"].update({
+    "subtract_from": "jednačina oblika a - x = b",
+    "fraction_form": "jednačina s razlomkom uz nepoznatu",
+    "parentheses_combine": "jednačina sa zagradom i svođenjem sličnih članova",
+    "solve_inequality_additive": "rješavanje nejednačine sa sabiranjem/oduzimanjem",
+    "solve_inequality_multiplicative": "rješavanje nejednačine s množenjem/dijeljenjem",
+    "solve_inequality_sign_flip": "nejednačina s promjenom smjera uz negativan koeficijent",
+    "solve_inequality_parentheses": "rješavanje nejednačine sa zagradom",
+    "absolute_value_equation": "jednačina s apsolutnom vrijednošću",
+    "absolute_value_inequality": "nejednačina s apsolutnom vrijednošću",
+    "classification": "prepoznavanje vrste zapisa",
+    "solution_count": "broj rješenja jednačine",
+    "equivalence_choice": "izbor ekvivalentne jednačine"})
+_eq["prompt_template"]["parameter_lines"]["number_domain"].update({
+    "rational_nonneg": "- koeficijenti i rješenja su POZITIVNI racionalni brojevi (Q+)",
+    "decimal": "- koeficijenti i rješenja su decimalni brojevi s konačnim zapisom"})
+
+# ---------------------------------------------------------------------------
+# BATCH #2: nove porodice
+# ---------------------------------------------------------------------------
+NEW_FAMILIES.update({
+    "divisibility_value_properties": _concept_family(
+        "Djeljivost vrijednosti izraza i dekadske jedinice",
+        "divisibility_value", "primijeniti djeljivost na vrijednost izraza",
+        ["expression_divisibility", "decade_unit_divisibility"],
+        {"expression_divisibility": "djeljivost vrijednosti zbira, razlike i proizvoda",
+         "decade_unit_divisibility": "najveća dekadska jedinica koja dijeli broj"}),
+    "frequency_basic": _concept_family(
+        "Frekvencije malog skupa podataka", "frequency_basic",
+        "očitati frekvenciju i relativnu frekvenciju",
+        ["frequency", "relative_frequency", "frequency_table"],
+        {"frequency": "frekvencija vrijednosti u nizu podataka",
+         "relative_frequency": "relativna frekvencija kao razlomak",
+         "frequency_table": "ukupan broj podataka iz tabele frekvencija"}),
+    "decimal_rounding": _concept_family(
+        "Zaokruživanje decimalnih brojeva", "decimal_rounding",
+        "zaokružiti decimalni broj na dato mjesto",
+        ["round_decimal", "round_then_estimate"],
+        {"round_decimal": "zaokruživanje na dato decimalno mjesto",
+         "round_then_estimate": "procjena rezultata zaokruživanjem"},
+        fixed=["- školsko pravilo: cifra 5 i veće zaokružuju naviše",
+               "- približenja se NIKAD ne pišu znakom jednakosti"]),
+    "fraction_decimal_conversion": _concept_family(
+        "Pretvaranje razlomak ↔ decimalni zapis", "fraction_decimal",
+        "pretvoriti razlomak u decimalni zapis i obratno",
+        ["fraction_to_decimal", "decimal_to_fraction", "decimal_place_value"],
+        {"fraction_to_decimal": "razlomak u KONAČAN decimalni zapis",
+         "decimal_to_fraction": "decimalni broj u SKRAĆEN razlomak",
+         "decimal_place_value": "cifra na datom decimalnom mjestu"},
+        extra_schema={"number_scope": {"kind": "enum",
+                                       "values": ["nonneg", "signed"],
+                                       "required": False}}),
+    "linear_function_direct": _concept_family(
+        "Linearna funkcija", "linear_function",
+        "izračunati i protumačiti linearnu funkciju",
+        ["evaluate", "table", "find_coefficient", "zero", "membership",
+         "monotonicity", "sign_analysis", "from_two_points",
+         "implicit_to_explicit"],
+        {"evaluate": "vrijednost funkcije u tački",
+         "table": "tabela vrijednosti funkcije",
+         "find_coefficient": "koeficijent funkcije iz poznate tačke",
+         "zero": "nula funkcije",
+         "membership": "pripadnost tačke grafiku",
+         "monotonicity": "rastuća/opadajuća funkcija (znak koeficijenta)",
+         "sign_analysis": "znak funkcije",
+         "from_two_points": "jednačina prave kroz dvije tačke",
+         "implicit_to_explicit": "prelazak u eksplicitni oblik"},
+        extra_schema={"function_kind": {"kind": "enum",
+                                        "values": ["affine", "direct",
+                                                   "inverse"],
+                                        "required": False}}),
+    "ratio_proportion_direct": _concept_family(
+        "Razmjera i proporcija", "ratio_proportion",
+        "raditi s razmjerama i proporcijama egzaktno",
+        ["ratio_simplification", "proportion_property", "missing_term",
+         "proportionality_recognition", "proportional_division"],
+        {"ratio_simplification": "razmjera u najjednostavnijem obliku",
+         "proportion_property": "osnovno svojstvo proporcije",
+         "missing_term": "nepoznati član proporcije",
+         "proportionality_recognition": "prepoznavanje direktne/obrnute proporcionalnosti",
+         "proportional_division": "podjela veličine u datoj razmjeri"}),
+    "polynomial_basic": _concept_family(
+        "Polinomi i algebarski izrazi", "polynomial_basic",
+        "sređivati, sabirati i množiti polinome; brojna vrijednost izraza",
+        ["expression_evaluation", "structure_count", "monomial_structure",
+         "combine_like_terms", "add_subtract", "multiply"],
+        {"expression_evaluation": "brojna vrijednost izraza",
+         "structure_count": "broj članova izraza",
+         "monomial_structure": "koeficijent i stepen monoma",
+         "combine_like_terms": "sređivanje polinoma",
+         "add_subtract": "sabiranje i oduzimanje polinoma",
+         "multiply": "množenje polinoma"},
+        extra_schema={"number_domain": {"kind": "enum",
+                                        "values": ["natural", "integer"],
+                                        "required": False}}),
+    "unit_conversion_direct": _concept_family(
+        "Pretvaranje mjernih jedinica", "unit_conversion",
+        "pretvoriti mjerne jedinice unutar iste dimenzije",
+        ["length", "mass", "time", "area", "volume", "speed", "angle"],
+        {"length": "jedinice dužine", "mass": "jedinice mase",
+         "time": "jedinice vremena",
+         "area": "jedinice površine (kvadrirani faktori)",
+         "volume": "jedinice zapremine (kubirani faktori)",
+         "speed": "brzina m/s ↔ km/h", "angle": "ugaone jedinice (po 60)"},
+        fixed=["- pretvaranje NIKAD ne prelazi iz jedne fizičke dimenzije u drugu",
+               "- kvadratne jedinice nose kvadriran, a kubne kubiran faktor"],
+        concept_parameter="dimensions"),
+    "simple_quadratic_equation": _concept_family(
+        "Jednostavne kvadratne jednačine", "simple_quadratic",
+        "riješiti kvadratnu jednačinu bez formule",
+        ["x_squared_equals_a", "factor_out_x", "perfect_square_trinomial"],
+        {"x_squared_equals_a": "jednačina oblika x² = a",
+         "factor_out_x": "jednačina rješiva izlučivanjem x",
+         "perfect_square_trinomial": "potpun kvadrat x² ± 2ax + a² = 0"},
+        fixed=["- rješenja se navode kao POTPUN skup (oba rješenja, odnosno "
+               "dvostruko rješenje)"],
+        concept_parameter="shapes"),
+})
+
 
 _LEVEL_BOUNDS = {
     "natural_arithmetic_direct": {
@@ -339,6 +506,41 @@ _LEVEL_BOUNDS = {
         "3": "komplementaran događaj"},
 }
 
+_LEVEL_BOUNDS.update({
+    "divisibility_value_properties": {
+        "1": "zbir dva mala broja / jedna dekadska jedinica",
+        "2": "razlika i proizvod / veće dekadske jedinice",
+        "3": "veći brojevi, tri-četiri cifre"},
+    "frequency_basic": {
+        "1": "sedam podataka", "2": "deset podataka",
+        "3": "dvanaest podataka"},
+    "decimal_rounding": {
+        "1": "cio broj ili desetinke", "2": "desetinke ili stotinke",
+        "3": "stotinke/hiljaditke, procjena zbira"},
+    "fraction_decimal_conversion": {
+        "1": "polovine, četvrtine, desetinke",
+        "2": "osmine, dvadesetine, obje smjera",
+        "3": "tri decimale i mješovite vrijednosti"},
+    "linear_function_direct": {
+        "1": "mali cjelobrojni koeficijenti",
+        "2": "negativni koeficijenti", "3": "razlomljene vrijednosti"},
+    "ratio_proportion_direct": {
+        "1": "mali članovi razmjere", "2": "veći faktori",
+        "3": "veće vrijednosti, tri para u tabeli"},
+    "polynomial_basic": {
+        "1": "dva-tri člana, mali koeficijenti",
+        "2": "četiri člana, negativni koeficijenti",
+        "3": "viši stepeni i pet članova"},
+    "unit_conversion_direct": {
+        "1": "susjedne jedinice, cijeli brojevi",
+        "2": "decimalni iznosi, oba smjera",
+        "3": "preskok jedinice / složene jedinice"},
+    "simple_quadratic_equation": {
+        "1": "mali savršeni kvadrati",
+        "2": "negativna rješenja i izlučivanje",
+        "3": "veći koeficijenti"},
+})
+
 _REVIEWER_NOTES = {
     "natural_arithmetic_direct": "Invarijanta: svi operandi i međurezultati prirodni.",
     "integer_arithmetic_direct": "Invarijanta: cjelobrojni operandi i rezultat; pravilo znakova.",
@@ -355,6 +557,15 @@ _REVIEWER_NOTES = {
     "square_root_direct": "Invarijanta: korijen savršenog kvadrata, provjerljiv kvadriranjem.",
     "linear_equation_direct": "Invarijanta: jedinstveno rješenje, provjera uvrštavanjem egzaktna.",
     "classical_probability_basic": "Invarijanta: vjerovatnoća = povoljni/svi, u [0,1].",
+    "divisibility_value_properties": "Invarijanta: djeljivost se dokazuje nad IZRAČUNATOM vrijednošću izraza.",
+    "frequency_basic": "Invarijanta: frekvencije se broje egzaktno iz navedenog niza.",
+    "decimal_rounding": "Invarijanta: školsko half-up zaokruživanje nad egzaktnim razlomcima; bez a≈b jednakosti.",
+    "fraction_decimal_conversion": "Invarijanta: samo konačne decimale; razlomak uvijek skraćen; opcije ne miješaju zapise.",
+    "linear_function_direct": "Invarijanta: svaka tvrdnja o funkciji dokazana uvrštavanjem; tačke uvijek s imenom.",
+    "ratio_proportion_direct": "Invarijanta: unakrsni proizvodi egzaktni; količnici opcija međusobno različiti.",
+    "polynomial_basic": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja.",
+    "unit_conversion_direct": "Invarijanta: faktori po dimenziji; kvadratni 100, kubni 1000 po koraku; bez miješanja dimenzija.",
+    "simple_quadratic_equation": "Invarijanta: potpun skup rješenja, provjerljiv uvrštavanjem.",
 }
 
 
@@ -536,6 +747,295 @@ ACTIVATIONS = [
      "exact"),
     ("9-08-010", "Aritmetička sredina i interpretacija podataka",
      "arithmetic_mean_direct", {"concepts": ["mean"]}, "exact"),
+    # =====================================================================
+    # BATCH #2 — proširenja postojećih motora
+    # =====================================================================
+    ("6-02-002", "Čitanje, zapisivanje i upoređivanje prirodnih brojeva",
+     "number_comparison_order",
+     {"number_domain": "natural", "forms": ["ordering", "place_value"]},
+     "exact"),
+    ("6-02-005", "Dijeljenje s ostatkom: a = bq + r",
+     "natural_arithmetic_direct",
+     {"allowed_operations": ["divide"], "number_domain": "natural",
+      "expression_shape": "division_with_remainder"}, "exact"),
+    ("6-03-002", "Djeljivost zbira, razlike i proizvoda",
+     "divisibility_value_properties",
+     {"concepts": ["expression_divisibility"]}, "pilot"),
+    ("6-03-003", "Djeljivost dekadskim jedinicama",
+     "divisibility_value_properties",
+     {"concepts": ["decade_unit_divisibility"]}, "pilot"),
+    ("6-04-014", "Brojevni izrazi s razlomcima",
+     "rational_arithmetic_direct",
+     {"allowed_operations": ["add", "subtract", "multiply", "divide"],
+      "number_domain": "rational_nonneg",
+      "expression_shape": "order_of_operations"}, "exact"),
+    ("7-03-014", "Brojevni izrazi sa zagradama u Q",
+     "rational_arithmetic_direct",
+     {"allowed_operations": ["add", "subtract", "multiply", "divide"],
+      "number_domain": "rational_signed",
+      "expression_shape": "order_of_operations"}, "exact"),
+    ("7-03-015", "Dvojni razlomci", "rational_arithmetic_direct",
+     {"allowed_operations": ["divide"], "number_domain": "rational_signed",
+      "expression_shape": "complex_fraction"}, "title"),
+    ("8-01-004", "Uređenost i poređenje realnih brojeva",
+     "number_comparison_order", {"number_domain": "rational"}, "exact"),
+    ("8-01-010", "Korijen proizvoda i količnika", "square_root_direct",
+     {"concepts": ["root_product_quotient"]}, "exact"),
+    ("8-01-011", "Približne vrijednosti kvadratnog korijena",
+     "square_root_direct", {"concepts": ["root_between_integers"]}, "exact"),
+    ("8-01-012", "Računske operacije u skupu R", "rational_arithmetic_direct",
+     {"allowed_operations": ["add", "subtract", "multiply", "divide"],
+      "number_domain": "rational_signed",
+      "expression_shape": "order_of_operations"}, "exact"),
+    ("8-01-017", "Naučni zapis broja", "power_arithmetic_direct",
+     {"concepts": ["scientific_notation"]}, "exact"),
+    ("9-08-012", "Prefiksi mjernih jedinica kao stepeni broja 10",
+     "power_arithmetic_direct", {"concepts": ["unit_prefix_powers"]}, "title"),
+    ("8-06-013", "Komplementarni događaj", "classical_probability_basic",
+     {"concepts": ["complement_probability"]}, "exact"),
+    ("9-08-001", "Uvod u vjerovatnoću i skup elementarnih događaja",
+     "classical_probability_basic", {"concepts": ["outcome_counting"]},
+     "exact"),
+    ("8-03-017", "Procentni iznos, osnovica i stopa", "percent_basic",
+     {"concepts": ["percent_amount", "percent_rate"]}, "exact"),
+    ("8-03-018", "Određivanje osnovice ili procentne stope", "percent_basic",
+     {"concepts": ["percent_rate"]}, "exact"),
+    ("8-06-002", "Frekvencija", "frequency_basic",
+     {"concepts": ["frequency"]}, "exact"),
+    ("8-06-003", "Relativna frekvencija", "frequency_basic",
+     {"concepts": ["relative_frequency"]}, "exact"),
+    ("8-06-004", "Tabela frekvencija", "frequency_basic",
+     {"concepts": ["frequency_table"]}, "exact"),
+    ("6-05-007", "Zaokruživanje decimalnih brojeva", "decimal_rounding",
+     {"concepts": ["round_decimal"]}, "exact"),
+    ("7-03-021", "Procjena, zaokruživanje i približan račun",
+     "decimal_rounding", {"concepts": ["round_decimal",
+                                       "round_then_estimate"]}, "exact"),
+    # =====================================================================
+    # BATCH #2 — pretvaranje razlomak ↔ decimala
+    # =====================================================================
+    ("6-05-001", "Decimalni zapis razlomka", "fraction_decimal_conversion",
+     {"concepts": ["fraction_to_decimal"]}, "exact"),
+    ("6-05-002", "Decimalni broj: cijeli dio, decimalni dio i decimalna mjesta",
+     "fraction_decimal_conversion", {"concepts": ["decimal_place_value"]},
+     "exact"),
+    ("6-05-003", "Pretvaranje razlomka u decimalni broj i obratno",
+     "fraction_decimal_conversion",
+     {"concepts": ["fraction_to_decimal", "decimal_to_fraction"]}, "exact"),
+    ("7-03-007", "Decimalni zapis racionalnog broja",
+     "fraction_decimal_conversion",
+     {"concepts": ["fraction_to_decimal"], "number_scope": "signed"},
+     "exact"),
+    ("7-03-008", "Pretvaranje decimalnog broja u razlomak",
+     "fraction_decimal_conversion",
+     {"concepts": ["decimal_to_fraction"], "number_scope": "signed"},
+     "exact"),
+    # =====================================================================
+    # BATCH #2 — jednačine i nejednačine
+    # =====================================================================
+    ("6-07-001", "Jednakost, jednačina, nejednakost i nejednačina",
+     "linear_equation_direct",
+     {"shapes": ["classification"], "number_domain": "integer"}, "exact"),
+    ("6-07-002", "Jednačine s razlomcima oblika x ± a = b i a ± x = b",
+     "linear_equation_direct",
+     {"shapes": ["one_step_additive", "subtract_from"],
+      "number_domain": "rational_nonneg"}, "exact"),
+    ("6-07-003", "Nejednačine s razlomcima oblika x ± a < b / > b i a ± x < b / > b",
+     "linear_equation_direct",
+     {"shapes": ["solve_inequality_additive"],
+      "number_domain": "rational_nonneg"}, "exact"),
+    ("6-07-004", "Jednačine s množenjem i dijeljenjem razlomaka",
+     "linear_equation_direct",
+     {"shapes": ["one_step_multiplicative"],
+      "number_domain": "rational_nonneg"}, "exact"),
+    ("6-07-005", "Nejednačine s množenjem i dijeljenjem razlomaka",
+     "linear_equation_direct",
+     {"shapes": ["solve_inequality_multiplicative"],
+      "number_domain": "rational_nonneg"}, "exact"),
+    ("6-07-006", "Jednačine i nejednačine s decimalnim brojevima",
+     "linear_equation_direct",
+     {"shapes": ["one_step_additive", "one_step_multiplicative"],
+      "number_domain": "decimal"}, "exact"),
+    ("7-02-018", "Jednačine sa apsolutnom vrijednošću",
+     "linear_equation_direct",
+     {"shapes": ["absolute_value_equation"], "number_domain": "integer"},
+     "exact"),
+    ("7-02-019", "Nejednačine sa sabiranjem i oduzimanjem u Z",
+     "linear_equation_direct",
+     {"shapes": ["solve_inequality_additive"], "number_domain": "integer"},
+     "exact"),
+    ("7-02-020", "Nejednačine sa množenjem i dijeljenjem u Z",
+     "linear_equation_direct",
+     {"shapes": ["solve_inequality_multiplicative",
+                 "solve_inequality_sign_flip"],
+      "number_domain": "integer"}, "exact"),
+    ("7-03-018", "Jednačine sa zagradama i svođenjem sličnih članova",
+     "linear_equation_direct",
+     {"shapes": ["parentheses_combine"], "number_domain": "rational"},
+     "exact"),
+    ("7-03-019", "Nejednačine u Q", "linear_equation_direct",
+     {"shapes": ["solve_inequality_additive",
+                 "solve_inequality_multiplicative"],
+      "number_domain": "rational"}, "exact"),
+    ("9-04-001", "Osnovni pojmovi linearne jednačine",
+     "linear_equation_direct",
+     {"shapes": ["classification"], "number_domain": "integer"}, "exact"),
+    ("9-04-002", "Ekvivalentne jednačine", "linear_equation_direct",
+     {"shapes": ["equivalence_choice"], "number_domain": "integer"},
+     "exact"),
+    ("9-04-004", "Jednačina sa razlomcima", "linear_equation_direct",
+     {"shapes": ["fraction_form"], "number_domain": "rational"}, "exact"),
+    ("9-04-008", "Jednačina bez rješenja", "linear_equation_direct",
+     {"shapes": ["solution_count"], "number_domain": "integer"}, "exact"),
+    ("9-04-009", "Identitet sa beskonačno mnogo rješenja",
+     "linear_equation_direct",
+     {"shapes": ["solution_count"], "number_domain": "integer"}, "exact"),
+    ("9-04-012", "Osnovni pojmovi linearne nejednačine",
+     "linear_equation_direct",
+     {"shapes": ["classification"], "number_domain": "integer"}, "exact"),
+    ("9-04-014", "Nejednačina sa zagradama", "linear_equation_direct",
+     {"shapes": ["solve_inequality_parentheses"],
+      "number_domain": "integer"}, "exact"),
+    ("9-04-016", "Promjena znaka nejednakosti pri množenju ili dijeljenju negativnim brojem",
+     "linear_equation_direct",
+     {"shapes": ["solve_inequality_sign_flip"], "number_domain": "integer"},
+     "exact"),
+    ("9-04-020", "Linearna jednačina sa apsolutnom vrijednošću",
+     "linear_equation_direct",
+     {"shapes": ["absolute_value_equation"], "number_domain": "integer"},
+     "exact"),
+    ("9-04-021", "Linearna nejednačina sa apsolutnom vrijednošću",
+     "linear_equation_direct",
+     {"shapes": ["absolute_value_inequality"], "number_domain": "integer"},
+     "exact"),
+    # =====================================================================
+    # BATCH #2 — jednostavne kvadratne jednačine
+    # =====================================================================
+    ("8-01-009", "Jednačina x²=a, a≥0", "simple_quadratic_equation",
+     {"shapes": ["x_squared_equals_a"]}, "exact"),
+    ("8-07-013", "Jednačine rješive faktorizacijom",
+     "simple_quadratic_equation", {"shapes": ["factor_out_x"]}, "exact"),
+    ("9-06-013", "Jednostavna kvadratna jednačina ax² + bx = 0",
+     "simple_quadratic_equation", {"shapes": ["factor_out_x"]}, "exact"),
+    ("9-06-014", "Jednostavna kvadratna jednačina x² - a = 0",
+     "simple_quadratic_equation", {"shapes": ["x_squared_equals_a"]},
+     "exact"),
+    ("9-06-015", "Kvadratna jednačina oblika x² ± 2ax + a² = 0",
+     "simple_quadratic_equation", {"shapes": ["perfect_square_trinomial"]},
+     "exact"),
+    # =====================================================================
+    # BATCH #2 — linearna funkcija
+    # =====================================================================
+    ("8-02-005", "Pojam linearne funkcije y=kx+n", "linear_function_direct",
+     {"concepts": ["evaluate", "find_coefficient"]}, "exact"),
+    ("8-02-006", "Tabela vrijednosti linearne funkcije",
+     "linear_function_direct", {"concepts": ["table"]}, "exact"),
+    ("8-02-010", "Nula linearne funkcije", "linear_function_direct",
+     {"concepts": ["zero"]}, "exact"),
+    ("8-02-011", "Znak i tok linearne funkcije", "linear_function_direct",
+     {"concepts": ["monotonicity", "sign_analysis"]}, "exact"),
+    ("8-03-006", "Funkcija direktne proporcionalnosti y=kx",
+     "linear_function_direct",
+     {"concepts": ["evaluate", "find_coefficient"],
+      "function_kind": "direct"}, "exact"),
+    ("8-03-007", "Funkcija obrnute proporcionalnosti y=k/x",
+     "linear_function_direct",
+     {"concepts": ["evaluate", "find_coefficient"],
+      "function_kind": "inverse"}, "exact"),
+    ("9-03-001", "Funkcija i vrijednost funkcije", "linear_function_direct",
+     {"concepts": ["evaluate"]}, "exact"),
+    ("9-03-002", "Linearna funkcija y = kx + n", "linear_function_direct",
+     {"concepts": ["evaluate", "find_coefficient"]}, "exact"),
+    ("9-03-003", "Tabela vrijednosti linearne funkcije",
+     "linear_function_direct", {"concepts": ["table"]}, "exact"),
+    ("9-03-007", "Nula linearne funkcije", "linear_function_direct",
+     {"concepts": ["zero"]}, "exact"),
+    ("9-03-008", "Rastuća i opadajuća linearna funkcija",
+     "linear_function_direct", {"concepts": ["monotonicity"]}, "exact"),
+    ("9-03-009", "Znak linearne funkcije", "linear_function_direct",
+     {"concepts": ["sign_analysis"]}, "exact"),
+    ("9-03-011", "Da li tačka pripada grafiku funkcije",
+     "linear_function_direct", {"concepts": ["membership"]}, "exact"),
+    ("9-03-012", "Eksplicitni i implicitni oblik jednačine prave",
+     "linear_function_direct", {"concepts": ["implicit_to_explicit"]},
+     "exact"),
+    ("9-03-013", "Prelazak iz implicitnog u eksplicitni oblik",
+     "linear_function_direct", {"concepts": ["implicit_to_explicit"]},
+     "exact"),
+    ("9-03-014", "Jednačina prave kroz dvije tačke",
+     "linear_function_direct", {"concepts": ["from_two_points"]}, "exact"),
+    # =====================================================================
+    # BATCH #2 — razmjera i proporcija
+    # =====================================================================
+    ("6-06-003", "Razmjera/omjer", "ratio_proportion_direct",
+     {"concepts": ["ratio_simplification"]}, "exact"),
+    ("8-03-001", "Razmjera i omjer veličina", "ratio_proportion_direct",
+     {"concepts": ["ratio_simplification"]}, "exact"),
+    ("8-03-002", "Proporcija i osnovno svojstvo", "ratio_proportion_direct",
+     {"concepts": ["proportion_property"]}, "exact"),
+    ("8-03-003", "Nepoznati član proporcije", "ratio_proportion_direct",
+     {"concepts": ["missing_term"]}, "exact"),
+    ("8-03-004", "Prepoznavanje direktne proporcionalnosti",
+     "ratio_proportion_direct",
+     {"concepts": ["proportionality_recognition"]}, "exact"),
+    ("8-03-005", "Prepoznavanje obrnute proporcionalnosti",
+     "ratio_proportion_direct",
+     {"concepts": ["proportionality_recognition"]}, "exact"),
+    ("8-03-010", "Četvrta geometrijska proporcionala",
+     "ratio_proportion_direct", {"concepts": ["missing_term"]}, "exact"),
+    ("8-03-012", "Dijeljenje duži u datoj razmjeri",
+     "ratio_proportion_direct", {"concepts": ["proportional_division"]},
+     "exact"),
+    ("8-03-020", "Proporcionalna podjela", "ratio_proportion_direct",
+     {"concepts": ["proportional_division"]}, "exact"),
+    # =====================================================================
+    # BATCH #2 — polinomi i algebarski izrazi
+    # =====================================================================
+    ("6-02-008", "Izrazi s promjenljivim i brojna vrijednost izraza",
+     "polynomial_basic",
+     {"concepts": ["expression_evaluation"], "number_domain": "natural"},
+     "exact"),
+    ("8-07-001", "Algebarski racionalni izraz i brojna vrijednost",
+     "polynomial_basic", {"concepts": ["expression_evaluation"]}, "exact"),
+    ("8-07-002", "Monom, koeficijent i stepen monoma", "polynomial_basic",
+     {"concepts": ["monomial_structure"]}, "exact"),
+    ("8-07-006", "Polinom i sređivanje polinoma", "polynomial_basic",
+     {"concepts": ["combine_like_terms"]}, "exact"),
+    ("8-07-007", "Sabiranje i oduzimanje polinoma", "polynomial_basic",
+     {"concepts": ["add_subtract"]}, "exact"),
+    ("8-07-008", "Množenje polinoma", "polynomial_basic",
+     {"concepts": ["multiply"]}, "exact"),
+    ("9-01-001", "Algebarski izraz: konstante, promjenljive i članovi",
+     "polynomial_basic",
+     {"concepts": ["structure_count", "expression_evaluation"]}, "exact"),
+    ("9-06-001", "Monom i polinom u skupu realnih brojeva",
+     "polynomial_basic", {"concepts": ["monomial_structure"]}, "exact"),
+    ("9-06-002", "Sređivanje polinoma", "polynomial_basic",
+     {"concepts": ["combine_like_terms"]}, "exact"),
+    ("9-06-003", "Sabiranje i oduzimanje polinoma", "polynomial_basic",
+     {"concepts": ["add_subtract"]}, "exact"),
+    ("9-06-004", "Množenje polinoma", "polynomial_basic",
+     {"concepts": ["multiply"]}, "exact"),
+    # =====================================================================
+    # BATCH #2 — mjerne jedinice
+    # =====================================================================
+    ("6-13-001", "Mjerne jedinice za dužinu", "unit_conversion_direct",
+     {"dimensions": ["length"]}, "exact"),
+    ("6-13-002", "Mjerne jedinice za masu", "unit_conversion_direct",
+     {"dimensions": ["mass"]}, "exact"),
+    ("6-13-003", "Mjerne jedinice za vrijeme", "unit_conversion_direct",
+     {"dimensions": ["time"]}, "exact"),
+    ("6-13-004", "Mjerne jedinice za površinu", "unit_conversion_direct",
+     {"dimensions": ["area"]}, "exact"),
+    ("6-13-005", "Preračunavanje mjernih jedinica", "unit_conversion_direct",
+     {"dimensions": ["length", "mass", "time", "area"]}, "exact"),
+    ("6-09-010", "Ugaone jedinice: stepen, minuta, sekunda",
+     "unit_conversion_direct", {"dimensions": ["angle"]}, "exact"),
+    ("9-08-011", "Pretvaranje mjernih jedinica za dužinu, površinu i zapreminu",
+     "unit_conversion_direct",
+     {"dimensions": ["length", "area", "volume"]}, "exact"),
+    ("9-08-013", "Pretvaranje brzine m/s i km/h", "unit_conversion_direct",
+     {"dimensions": ["speed"]}, "exact"),
 ]
 
 
@@ -550,12 +1050,11 @@ _WORD_PROBLEM_KEYWORDS = ("tekstualni", "primjena", "problemi")
 _PROOF_KEYWORDS = ("dokaz", "teorema", "diskusija")
 _NEEDS_EXTENSION = {
     # Kandidati čiji bi zadaci stali u POSTOJEĆE motore uz proširenje
-    # parametara/oblika — namjerno NEaktivirani u ovoj fazi.
-    "6-02-002", "6-02-005", "6-02-008", "6-03-002", "6-03-003", "6-05-003",
-    "6-05-007", "7-02-018", "7-02-019", "7-02-020", "7-03-008", "7-03-014",
-    "7-03-015", "7-03-018", "7-03-019", "7-03-021", "8-01-004", "8-01-009",
-    "8-01-010", "8-01-012", "8-01-017", "9-04-004", "9-04-014", "9-04-016",
-    "8-06-013", "9-08-011",
+    # parametara/oblika — namjerno NEaktivirani u ovoj fazi (Batch #2 je
+    # aktivirao prethodnih 26; ovo je preostali rep).
+    "9-04-013",   # ekvivalentne NEJEDNAČINE — treba nejednačinska varijanta
+    "9-04-007",   # promjenljivi koeficijent — treba parametarska varijanta
+    "6-07-007",   # prikaz rješenja na brojevnoj osi — treba vizuelni format
 }
 
 

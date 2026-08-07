@@ -30,6 +30,9 @@ FAMILY_IDS = (
     "divisibility_predicate_application",
     "common_divisors_multiples",
     "prime_structure",
+    # Batch #2: djeljivost vrijednosti izraza i dekadske jedinice — ODVOJENA
+    # porodica, jer njen prompt NE nameće formulaciju »djeljiv sa N«.
+    "divisibility_value_properties",
 )
 GENERATOR_VERSION = "detnum-1"
 
@@ -637,7 +640,7 @@ def _expression_divisibility_package(rng, level, lesson_id, lesson_title):
                 f"${divisor}$. Vrijednosti ostalih izraza nisu.")
     return core.build_package(
         lesson_id=lesson_id, lesson_title=lesson_title,
-        family_id="divisibility_predicate_application",
+        family_id="divisibility_value_properties",
         operation="expression_divisibility", level=level, question=question,
         answer_value=correct_value, answer_display=correct_label,
         distractor_values=(), hints=(hint1, hint2, hint3), solution=solution,
@@ -677,7 +680,7 @@ def _decade_unit_package(rng, level, lesson_id, lesson_title):
                 f"se ne završava nulom — najveća dekadska jedinica je ${decade}$.")
     return core.build_package(
         lesson_id=lesson_id, lesson_title=lesson_title,
-        family_id="divisibility_predicate_application",
+        family_id="divisibility_value_properties",
         operation="decade_unit_divisibility", level=level, question=question,
         answer_value=decade, answer_display=str(decade),
         distractor_values=(), hints=(hint1, hint2, hint3), solution=solution,

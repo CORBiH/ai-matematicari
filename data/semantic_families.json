@@ -98,7 +98,9 @@
         "concepts": {
           "kind": "enum_set",
           "values": [
-            "classical_probability"
+            "classical_probability",
+            "complement_probability",
+            "outcome_counting"
           ],
           "required": true
         }
@@ -119,7 +121,9 @@
         "closing": "- ako prekršiš ovo, server odbija paket prije objave"
       },
       "value_labels": {
-        "classical_probability": "klasična vjerovatnoća: broj povoljnih kroz broj svih ishoda"
+        "classical_probability": "klasična vjerovatnoća: broj povoljnih kroz broj svih ishoda",
+        "complement_probability": "vjerovatnoća komplementarnog događaja",
+        "outcome_counting": "broj elementarnih ishoda ogleda"
       }
     },
     "common_divisors_multiples": {
@@ -186,7 +190,9 @@
           "values": [
             "single_operation",
             "multi_factor",
-            "order_of_operations"
+            "order_of_operations",
+            "division_with_remainder",
+            "complex_fraction"
           ],
           "required": false
         }
@@ -211,6 +217,42 @@
         "subtract": "oduzimanje decimalnih brojeva",
         "multiply": "množenje decimalnih brojeva",
         "divide": "dijeljenje decimalnih brojeva"
+      }
+    },
+    "decimal_rounding": {
+      "family_version": 1,
+      "family_name": "Zaokruživanje decimalnih brojeva",
+      "detector": "decimal_rounding",
+      "core_skill": "zaokružiti decimalni broj na dato mjesto",
+      "parameter_schema": {
+        "concepts": {
+          "kind": "enum_set",
+          "values": [
+            "round_decimal",
+            "round_then_estimate"
+          ],
+          "required": true
+        }
+      },
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "advisory_parameters": [],
+      "prompt_template": {
+        "header": "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "main_line": {
+          "parameter": "concepts",
+          "text": "- glavna vidljiva radnja mora biti: {values}"
+        },
+        "fixed_lines": [
+          "- školsko pravilo: cifra 5 i veće zaokružuju naviše",
+          "- približenja se NIKAD ne pišu znakom jednakosti"
+        ],
+        "closing": "- ako prekršiš ovo, server odbija paket prije objave"
+      },
+      "value_labels": {
+        "round_decimal": "zaokruživanje na dato decimalno mjesto",
+        "round_then_estimate": "procjena rezultata zaokruživanjem"
       }
     },
     "divisibility_predicate_application": {
@@ -251,6 +293,38 @@
         "closing": "- ako prekršiš ovo, server odbija paket prije objave"
       },
       "value_labels": {}
+    },
+    "divisibility_value_properties": {
+      "family_version": 1,
+      "family_name": "Djeljivost vrijednosti izraza i dekadske jedinice",
+      "detector": "divisibility_value",
+      "core_skill": "primijeniti djeljivost na vrijednost izraza",
+      "parameter_schema": {
+        "concepts": {
+          "kind": "enum_set",
+          "values": [
+            "expression_divisibility",
+            "decade_unit_divisibility"
+          ],
+          "required": true
+        }
+      },
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "advisory_parameters": [],
+      "prompt_template": {
+        "header": "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "main_line": {
+          "parameter": "concepts",
+          "text": "- glavna vidljiva radnja mora biti: {values}"
+        },
+        "closing": "- ako prekršiš ovo, server odbija paket prije objave"
+      },
+      "value_labels": {
+        "expression_divisibility": "djeljivost vrijednosti zbira, razlike i proizvoda",
+        "decade_unit_divisibility": "najveća dekadska jedinica koja dijeli broj"
+      }
     },
     "fraction_arithmetic_direct": {
       "family_version": 1,
@@ -351,6 +425,83 @@
         "percent": "pretvaranje u procente"
       }
     },
+    "fraction_decimal_conversion": {
+      "family_version": 1,
+      "family_name": "Pretvaranje razlomak ↔ decimalni zapis",
+      "detector": "fraction_decimal",
+      "core_skill": "pretvoriti razlomak u decimalni zapis i obratno",
+      "parameter_schema": {
+        "concepts": {
+          "kind": "enum_set",
+          "values": [
+            "fraction_to_decimal",
+            "decimal_to_fraction",
+            "decimal_place_value"
+          ],
+          "required": true
+        },
+        "number_scope": {
+          "kind": "enum",
+          "values": [
+            "nonneg",
+            "signed"
+          ],
+          "required": false
+        }
+      },
+      "enforced_parameters": [
+        "concepts",
+        "number_scope"
+      ],
+      "advisory_parameters": [],
+      "prompt_template": {
+        "header": "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "main_line": {
+          "parameter": "concepts",
+          "text": "- glavna vidljiva radnja mora biti: {values}"
+        },
+        "closing": "- ako prekršiš ovo, server odbija paket prije objave"
+      },
+      "value_labels": {
+        "fraction_to_decimal": "razlomak u KONAČAN decimalni zapis",
+        "decimal_to_fraction": "decimalni broj u SKRAĆEN razlomak",
+        "decimal_place_value": "cifra na datom decimalnom mjestu"
+      }
+    },
+    "frequency_basic": {
+      "family_version": 1,
+      "family_name": "Frekvencije malog skupa podataka",
+      "detector": "frequency_basic",
+      "core_skill": "očitati frekvenciju i relativnu frekvenciju",
+      "parameter_schema": {
+        "concepts": {
+          "kind": "enum_set",
+          "values": [
+            "frequency",
+            "relative_frequency",
+            "frequency_table"
+          ],
+          "required": true
+        }
+      },
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "advisory_parameters": [],
+      "prompt_template": {
+        "header": "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "main_line": {
+          "parameter": "concepts",
+          "text": "- glavna vidljiva radnja mora biti: {values}"
+        },
+        "closing": "- ako prekršiš ovo, server odbija paket prije objave"
+      },
+      "value_labels": {
+        "frequency": "frekvencija vrijednosti u nizu podataka",
+        "relative_frequency": "relativna frekvencija kao razlomak",
+        "frequency_table": "ukupan broj podataka iz tabele frekvencija"
+      }
+    },
     "integer_arithmetic_direct": {
       "family_version": 1,
       "family_name": "Direktan račun — cijeli brojevi",
@@ -379,7 +530,9 @@
           "values": [
             "single_operation",
             "multi_factor",
-            "order_of_operations"
+            "order_of_operations",
+            "division_with_remainder",
+            "complex_fraction"
           ],
           "required": false
         },
@@ -438,7 +591,19 @@
             "one_step_multiplicative",
             "parentheses",
             "check_solution",
-            "check_inequality"
+            "check_inequality",
+            "subtract_from",
+            "fraction_form",
+            "parentheses_combine",
+            "solve_inequality_additive",
+            "solve_inequality_multiplicative",
+            "solve_inequality_sign_flip",
+            "solve_inequality_parentheses",
+            "absolute_value_equation",
+            "absolute_value_inequality",
+            "classification",
+            "solution_count",
+            "equivalence_choice"
           ],
           "required": true
         },
@@ -446,7 +611,9 @@
           "kind": "enum",
           "values": [
             "integer",
-            "rational"
+            "rational",
+            "rational_nonneg",
+            "decimal"
           ],
           "required": true
         }
@@ -468,7 +635,9 @@
         "parameter_lines": {
           "number_domain": {
             "integer": "- koeficijenti i rješenje su cijeli brojevi",
-            "rational": "- koeficijenti i rješenje smiju biti razlomci"
+            "rational": "- koeficijenti i rješenje smiju biti razlomci",
+            "rational_nonneg": "- koeficijenti i rješenja su POZITIVNI racionalni brojevi (Q+)",
+            "decimal": "- koeficijenti i rješenja su decimalni brojevi s konačnim zapisom"
           }
         },
         "closing": "- ako prekršiš ovo, server odbija paket prije objave"
@@ -478,7 +647,75 @@
         "one_step_multiplicative": "jednačina s jednim množenjem/dijeljenjem",
         "parentheses": "jednačina sa zagradom",
         "check_solution": "provjera ponuđenog rješenja jednačine",
-        "check_inequality": "provjera ponuđenog rješenja nejednačine"
+        "check_inequality": "provjera ponuđenog rješenja nejednačine",
+        "subtract_from": "jednačina oblika a - x = b",
+        "fraction_form": "jednačina s razlomkom uz nepoznatu",
+        "parentheses_combine": "jednačina sa zagradom i svođenjem sličnih članova",
+        "solve_inequality_additive": "rješavanje nejednačine sa sabiranjem/oduzimanjem",
+        "solve_inequality_multiplicative": "rješavanje nejednačine s množenjem/dijeljenjem",
+        "solve_inequality_sign_flip": "nejednačina s promjenom smjera uz negativan koeficijent",
+        "solve_inequality_parentheses": "rješavanje nejednačine sa zagradom",
+        "absolute_value_equation": "jednačina s apsolutnom vrijednošću",
+        "absolute_value_inequality": "nejednačina s apsolutnom vrijednošću",
+        "classification": "prepoznavanje vrste zapisa",
+        "solution_count": "broj rješenja jednačine",
+        "equivalence_choice": "izbor ekvivalentne jednačine"
+      }
+    },
+    "linear_function_direct": {
+      "family_version": 1,
+      "family_name": "Linearna funkcija",
+      "detector": "linear_function",
+      "core_skill": "izračunati i protumačiti linearnu funkciju",
+      "parameter_schema": {
+        "concepts": {
+          "kind": "enum_set",
+          "values": [
+            "evaluate",
+            "table",
+            "find_coefficient",
+            "zero",
+            "membership",
+            "monotonicity",
+            "sign_analysis",
+            "from_two_points",
+            "implicit_to_explicit"
+          ],
+          "required": true
+        },
+        "function_kind": {
+          "kind": "enum",
+          "values": [
+            "affine",
+            "direct",
+            "inverse"
+          ],
+          "required": false
+        }
+      },
+      "enforced_parameters": [
+        "concepts",
+        "function_kind"
+      ],
+      "advisory_parameters": [],
+      "prompt_template": {
+        "header": "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "main_line": {
+          "parameter": "concepts",
+          "text": "- glavna vidljiva radnja mora biti: {values}"
+        },
+        "closing": "- ako prekršiš ovo, server odbija paket prije objave"
+      },
+      "value_labels": {
+        "evaluate": "vrijednost funkcije u tački",
+        "table": "tabela vrijednosti funkcije",
+        "find_coefficient": "koeficijent funkcije iz poznate tačke",
+        "zero": "nula funkcije",
+        "membership": "pripadnost tačke grafiku",
+        "monotonicity": "rastuća/opadajuća funkcija (znak koeficijenta)",
+        "sign_analysis": "znak funkcije",
+        "from_two_points": "jednačina prave kroz dvije tačke",
+        "implicit_to_explicit": "prelazak u eksplicitni oblik"
       }
     },
     "natural_arithmetic_direct": {
@@ -509,7 +746,9 @@
           "values": [
             "single_operation",
             "multi_factor",
-            "order_of_operations"
+            "order_of_operations",
+            "division_with_remainder",
+            "complex_fraction"
           ],
           "required": false
         }
@@ -558,12 +797,22 @@
             "rational"
           ],
           "required": true
+        },
+        "forms": {
+          "kind": "enum_set",
+          "values": [
+            "ordering",
+            "place_value"
+          ],
+          "required": false
         }
       },
       "enforced_parameters": [
         "number_domain"
       ],
-      "advisory_parameters": [],
+      "advisory_parameters": [
+        "forms"
+      ],
       "prompt_template": {
         "header": "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
         "main_line": {
@@ -593,7 +842,9 @@
           "kind": "enum_set",
           "values": [
             "percent_of_number",
-            "fraction_to_percent"
+            "fraction_to_percent",
+            "percent_amount",
+            "percent_rate"
           ],
           "required": true
         }
@@ -615,7 +866,58 @@
       },
       "value_labels": {
         "percent_of_number": "procenat datog broja",
-        "fraction_to_percent": "postotni zapis razlomka"
+        "fraction_to_percent": "postotni zapis razlomka",
+        "percent_amount": "procentni iznos iz osnovice i stope",
+        "percent_rate": "procentna stopa ili osnovica iz preostala dva podatka"
+      }
+    },
+    "polynomial_basic": {
+      "family_version": 1,
+      "family_name": "Polinomi i algebarski izrazi",
+      "detector": "polynomial_basic",
+      "core_skill": "sređivati, sabirati i množiti polinome; brojna vrijednost izraza",
+      "parameter_schema": {
+        "concepts": {
+          "kind": "enum_set",
+          "values": [
+            "expression_evaluation",
+            "structure_count",
+            "monomial_structure",
+            "combine_like_terms",
+            "add_subtract",
+            "multiply"
+          ],
+          "required": true
+        },
+        "number_domain": {
+          "kind": "enum",
+          "values": [
+            "natural",
+            "integer"
+          ],
+          "required": false
+        }
+      },
+      "enforced_parameters": [
+        "concepts",
+        "number_domain"
+      ],
+      "advisory_parameters": [],
+      "prompt_template": {
+        "header": "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "main_line": {
+          "parameter": "concepts",
+          "text": "- glavna vidljiva radnja mora biti: {values}"
+        },
+        "closing": "- ako prekršiš ovo, server odbija paket prije objave"
+      },
+      "value_labels": {
+        "expression_evaluation": "brojna vrijednost izraza",
+        "structure_count": "broj članova izraza",
+        "monomial_structure": "koeficijent i stepen monoma",
+        "combine_like_terms": "sređivanje polinoma",
+        "add_subtract": "sabiranje i oduzimanje polinoma",
+        "multiply": "množenje polinoma"
       }
     },
     "power_arithmetic_direct": {
@@ -631,7 +933,9 @@
             "power_value",
             "zero_negative_exponent",
             "same_base_product_quotient",
-            "power_of_power_product"
+            "power_of_power_product",
+            "scientific_notation",
+            "unit_prefix_powers"
           ],
           "required": true
         }
@@ -653,7 +957,9 @@
         "power_value": "vrijednost stepena s prirodnim izložiocem",
         "zero_negative_exponent": "nulti i negativni izložilac",
         "same_base_product_quotient": "množenje i dijeljenje stepena jednakih osnova",
-        "power_of_power_product": "stepen stepena, proizvoda i količnika"
+        "power_of_power_product": "stepen stepena, proizvoda i količnika",
+        "scientific_notation": "naučni zapis broja (a·10^n)",
+        "unit_prefix_powers": "prefiksi mjernih jedinica kao stepeni broja 10"
       }
     },
     "prime_structure": {
@@ -690,6 +996,44 @@
         "prime_factorization": "rastavljanje na proste faktore"
       }
     },
+    "ratio_proportion_direct": {
+      "family_version": 1,
+      "family_name": "Razmjera i proporcija",
+      "detector": "ratio_proportion",
+      "core_skill": "raditi s razmjerama i proporcijama egzaktno",
+      "parameter_schema": {
+        "concepts": {
+          "kind": "enum_set",
+          "values": [
+            "ratio_simplification",
+            "proportion_property",
+            "missing_term",
+            "proportionality_recognition",
+            "proportional_division"
+          ],
+          "required": true
+        }
+      },
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "advisory_parameters": [],
+      "prompt_template": {
+        "header": "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "main_line": {
+          "parameter": "concepts",
+          "text": "- glavna vidljiva radnja mora biti: {values}"
+        },
+        "closing": "- ako prekršiš ovo, server odbija paket prije objave"
+      },
+      "value_labels": {
+        "ratio_simplification": "razmjera u najjednostavnijem obliku",
+        "proportion_property": "osnovno svojstvo proporcije",
+        "missing_term": "nepoznati član proporcije",
+        "proportionality_recognition": "prepoznavanje direktne/obrnute proporcionalnosti",
+        "proportional_division": "podjela veličine u datoj razmjeri"
+      }
+    },
     "rational_arithmetic_direct": {
       "family_version": 1,
       "family_name": "Direktan račun — racionalni brojevi",
@@ -709,7 +1053,8 @@
         "number_domain": {
           "kind": "enum",
           "values": [
-            "rational_signed"
+            "rational_signed",
+            "rational_nonneg"
           ],
           "required": true
         },
@@ -718,7 +1063,9 @@
           "values": [
             "single_operation",
             "multi_factor",
-            "order_of_operations"
+            "order_of_operations",
+            "division_with_remainder",
+            "complex_fraction"
           ],
           "required": false
         }
@@ -745,6 +1092,43 @@
         "divide": "dijeljenje racionalnih brojeva"
       }
     },
+    "simple_quadratic_equation": {
+      "family_version": 1,
+      "family_name": "Jednostavne kvadratne jednačine",
+      "detector": "simple_quadratic",
+      "core_skill": "riješiti kvadratnu jednačinu bez formule",
+      "parameter_schema": {
+        "shapes": {
+          "kind": "enum_set",
+          "values": [
+            "x_squared_equals_a",
+            "factor_out_x",
+            "perfect_square_trinomial"
+          ],
+          "required": true
+        }
+      },
+      "enforced_parameters": [
+        "shapes"
+      ],
+      "advisory_parameters": [],
+      "prompt_template": {
+        "header": "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "main_line": {
+          "parameter": "shapes",
+          "text": "- glavna vidljiva radnja mora biti: {values}"
+        },
+        "fixed_lines": [
+          "- rješenja se navode kao POTPUN skup (oba rješenja, odnosno dvostruko rješenje)"
+        ],
+        "closing": "- ako prekršiš ovo, server odbija paket prije objave"
+      },
+      "value_labels": {
+        "x_squared_equals_a": "jednačina oblika x² = a",
+        "factor_out_x": "jednačina rješiva izlučivanjem x",
+        "perfect_square_trinomial": "potpun kvadrat x² ± 2ax + a² = 0"
+      }
+    },
     "square_root_direct": {
       "family_version": 1,
       "family_name": "Kvadratni korijen",
@@ -755,7 +1139,9 @@
           "kind": "enum_set",
           "values": [
             "square_root_value",
-            "perfect_square_recognition"
+            "perfect_square_recognition",
+            "root_product_quotient",
+            "root_between_integers"
           ],
           "required": true
         }
@@ -777,7 +1163,55 @@
       },
       "value_labels": {
         "square_root_value": "kvadratni korijen savršenog kvadrata",
-        "perfect_square_recognition": "prepoznavanje savršenog kvadrata"
+        "perfect_square_recognition": "prepoznavanje savršenog kvadrata",
+        "root_product_quotient": "korijen proizvoda i količnika",
+        "root_between_integers": "između koja dva uzastopna prirodna broja je korijen"
+      }
+    },
+    "unit_conversion_direct": {
+      "family_version": 1,
+      "family_name": "Pretvaranje mjernih jedinica",
+      "detector": "unit_conversion",
+      "core_skill": "pretvoriti mjerne jedinice unutar iste dimenzije",
+      "parameter_schema": {
+        "dimensions": {
+          "kind": "enum_set",
+          "values": [
+            "length",
+            "mass",
+            "time",
+            "area",
+            "volume",
+            "speed",
+            "angle"
+          ],
+          "required": true
+        }
+      },
+      "enforced_parameters": [
+        "dimensions"
+      ],
+      "advisory_parameters": [],
+      "prompt_template": {
+        "header": "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "main_line": {
+          "parameter": "dimensions",
+          "text": "- glavna vidljiva radnja mora biti: {values}"
+        },
+        "fixed_lines": [
+          "- pretvaranje NIKAD ne prelazi iz jedne fizičke dimenzije u drugu",
+          "- kvadratne jedinice nose kvadriran, a kubne kubiran faktor"
+        ],
+        "closing": "- ako prekršiš ovo, server odbija paket prije objave"
+      },
+      "value_labels": {
+        "length": "jedinice dužine",
+        "mass": "jedinice mase",
+        "time": "jedinice vremena",
+        "area": "jedinice površine (kvadrirani faktori)",
+        "volume": "jedinice zapremine (kubirani faktori)",
+        "speed": "brzina m/s ↔ km/h",
+        "angle": "ugaone jedinice (po 60)"
       }
     }
   }

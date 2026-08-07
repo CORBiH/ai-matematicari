@@ -15,8 +15,31 @@
     "dokazi). Ništa se ne aktivira bez zapisanog dokaza."
   ],
   "schema_version": "1",
-  "contract_version": "5C.1",
+  "contract_version": "5D.1",
   "assignments": [
+    {
+      "lesson_id": "6-02-002",
+      "family_id": "number_comparison_order",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-6-02-002"
+      ],
+      "parameters": {
+        "number_domain": "natural",
+        "forms": [
+          "ordering",
+          "place_value"
+        ]
+      },
+      "level_bounds": {
+        "1": "male, jasno razdvojene vrijednosti",
+        "2": "bliže vrijednosti ili miješani zapisi",
+        "3": "vrlo bliske vrijednosti, položaj između"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: tačno jedna ekstremna/tražena vrijednost među opcijama."
+    },
     {
       "lesson_id": "6-02-003",
       "family_id": "natural_arithmetic_direct",
@@ -64,6 +87,29 @@
       "reviewer_note": "Invarijanta: svi operandi i međurezultati prirodni."
     },
     {
+      "lesson_id": "6-02-005",
+      "family_id": "natural_arithmetic_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0035"
+      ],
+      "parameters": {
+        "allowed_operations": [
+          "divide"
+        ],
+        "number_domain": "natural",
+        "expression_shape": "division_with_remainder"
+      },
+      "level_bounds": {
+        "1": "jedna operacija malim brojevima",
+        "2": "dvije povezane operacije ili veći brojevi",
+        "3": "tri povezane operacije (odnosno prioritet i zagrade)"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: svi operandi i međurezultati prirodni."
+    },
+    {
       "lesson_id": "6-02-007",
       "family_id": "natural_arithmetic_direct",
       "enforcement_mode": "blocking",
@@ -88,6 +134,29 @@
       },
       "forbidden_neighbour_skills": [],
       "reviewer_note": "Invarijanta: svi operandi i međurezultati prirodni."
+    },
+    {
+      "lesson_id": "6-02-008",
+      "family_id": "polynomial_basic",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0059",
+        "KS_2018-0074"
+      ],
+      "parameters": {
+        "concepts": [
+          "expression_evaluation"
+        ],
+        "number_domain": "natural"
+      },
+      "level_bounds": {
+        "1": "dva-tri člana, mali koeficijenti",
+        "2": "četiri člana, negativni koeficijenti",
+        "3": "viši stepeni i pet članova"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja."
     },
     {
       "lesson_id": "6-03-001",
@@ -115,6 +184,48 @@
       },
       "forbidden_neighbour_skills": [],
       "reviewer_note": "Invarijanta: NZD/NZS/djelilac/sadržilac dokazani dijeljenjem bez ostatka."
+    },
+    {
+      "lesson_id": "6-03-002",
+      "family_id": "divisibility_value_properties",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "F25-PILOT-READY"
+      ],
+      "parameters": {
+        "concepts": [
+          "expression_divisibility"
+        ]
+      },
+      "level_bounds": {
+        "1": "zbir dva mala broja / jedna dekadska jedinica",
+        "2": "razlika i proizvod / veće dekadske jedinice",
+        "3": "veći brojevi, tri-četiri cifre"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: djeljivost se dokazuje nad IZRAČUNATOM vrijednošću izraza."
+    },
+    {
+      "lesson_id": "6-03-003",
+      "family_id": "divisibility_value_properties",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "F25-PILOT-READY"
+      ],
+      "parameters": {
+        "concepts": [
+          "decade_unit_divisibility"
+        ]
+      },
+      "level_bounds": {
+        "1": "zbir dva mala broja / jedna dekadska jedinica",
+        "2": "razlika i proizvod / veće dekadske jedinice",
+        "3": "veći brojevi, tri-četiri cifre"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: djeljivost se dokazuje nad IZRAČUNATOM vrijednošću izraza."
     },
     {
       "lesson_id": "6-03-004",
@@ -470,6 +581,101 @@
       "reviewer_note": "Invarijanta: operacija DIJELJENJE. Množenje bez recipročnog koraka ne ispituje ovu lekciju."
     },
     {
+      "lesson_id": "6-04-014",
+      "family_id": "rational_arithmetic_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-6-04-014"
+      ],
+      "parameters": {
+        "allowed_operations": [
+          "add",
+          "subtract",
+          "multiply",
+          "divide"
+        ],
+        "number_domain": "rational_nonneg",
+        "expression_shape": "order_of_operations"
+      },
+      "level_bounds": {
+        "1": "jedna operacija jednostavnim razlomcima",
+        "2": "dvije operacije ili nejednaki imenioci s predznacima",
+        "3": "tri povezane operacije"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: egzaktan racionalan račun s predznacima."
+    },
+    {
+      "lesson_id": "6-05-001",
+      "family_id": "fraction_decimal_conversion",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0045",
+        "KS_2018-0048",
+        "KS_2018-0051",
+        "KS_2018-0052",
+        "KS_2018-0065",
+        "KS_2018-0066"
+      ],
+      "parameters": {
+        "concepts": [
+          "fraction_to_decimal"
+        ]
+      },
+      "level_bounds": {
+        "1": "polovine, četvrtine, desetinke",
+        "2": "osmine, dvadesetine, obje smjera",
+        "3": "tri decimale i mješovite vrijednosti"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: samo konačne decimale; razlomak uvijek skraćen; opcije ne miješaju zapise."
+    },
+    {
+      "lesson_id": "6-05-002",
+      "family_id": "fraction_decimal_conversion",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0075"
+      ],
+      "parameters": {
+        "concepts": [
+          "decimal_place_value"
+        ]
+      },
+      "level_bounds": {
+        "1": "polovine, četvrtine, desetinke",
+        "2": "osmine, dvadesetine, obje smjera",
+        "3": "tri decimale i mješovite vrijednosti"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: samo konačne decimale; razlomak uvijek skraćen; opcije ne miješaju zapise."
+    },
+    {
+      "lesson_id": "6-05-003",
+      "family_id": "fraction_decimal_conversion",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0065"
+      ],
+      "parameters": {
+        "concepts": [
+          "fraction_to_decimal",
+          "decimal_to_fraction"
+        ]
+      },
+      "level_bounds": {
+        "1": "polovine, četvrtine, desetinke",
+        "2": "osmine, dvadesetine, obje smjera",
+        "3": "tri decimale i mješovite vrijednosti"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: samo konačne decimale; razlomak uvijek skraćen; opcije ne miješaju zapise."
+    },
+    {
       "lesson_id": "6-05-006",
       "family_id": "number_comparison_order",
       "enforcement_mode": "blocking",
@@ -488,6 +694,29 @@
       },
       "forbidden_neighbour_skills": [],
       "reviewer_note": "Invarijanta: tačno jedna ekstremna/tražena vrijednost među opcijama."
+    },
+    {
+      "lesson_id": "6-05-007",
+      "family_id": "decimal_rounding",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0067",
+        "KS_2018-0069",
+        "KS_2018-0075"
+      ],
+      "parameters": {
+        "concepts": [
+          "round_decimal"
+        ]
+      },
+      "level_bounds": {
+        "1": "cio broj ili desetinke",
+        "2": "desetinke ili stotinke",
+        "3": "stotinke/hiljaditke, procjena zbira"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: školsko half-up zaokruživanje nad egzaktnim razlomcima; bez a≈b jednakosti."
     },
     {
       "lesson_id": "6-05-008",
@@ -610,6 +839,27 @@
       "reviewer_note": "Invarijanta: procenat je stoti dio; znak % nikad u $...$."
     },
     {
+      "lesson_id": "6-06-003",
+      "family_id": "ratio_proportion_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-6-06-003"
+      ],
+      "parameters": {
+        "concepts": [
+          "ratio_simplification"
+        ]
+      },
+      "level_bounds": {
+        "1": "mali članovi razmjere",
+        "2": "veći faktori",
+        "3": "veće vrijednosti, tri para u tabeli"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: unakrsni proizvodi egzaktni; količnici opcija međusobno različiti."
+    },
+    {
       "lesson_id": "6-06-004",
       "family_id": "arithmetic_mean_direct",
       "enforcement_mode": "blocking",
@@ -629,6 +879,273 @@
       },
       "forbidden_neighbour_skills": [],
       "reviewer_note": "Invarijanta: sredina = zbir kroz broj podataka, egzaktno."
+    },
+    {
+      "lesson_id": "6-07-001",
+      "family_id": "linear_equation_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0060"
+      ],
+      "parameters": {
+        "shapes": [
+          "classification"
+        ],
+        "number_domain": "integer"
+      },
+      "level_bounds": {
+        "1": "jedan računski korak do rješenja",
+        "2": "dva koraka ili negativni koeficijenti",
+        "3": "tri koraka (sređivanje pa rješavanje)"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: jedinstveno rješenje, provjera uvrštavanjem egzaktna."
+    },
+    {
+      "lesson_id": "6-07-002",
+      "family_id": "linear_equation_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0045",
+        "KS_2018-0075"
+      ],
+      "parameters": {
+        "shapes": [
+          "one_step_additive",
+          "subtract_from"
+        ],
+        "number_domain": "rational_nonneg"
+      },
+      "level_bounds": {
+        "1": "jedan računski korak do rješenja",
+        "2": "dva koraka ili negativni koeficijenti",
+        "3": "tri koraka (sređivanje pa rješavanje)"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: jedinstveno rješenje, provjera uvrštavanjem egzaktna."
+    },
+    {
+      "lesson_id": "6-07-003",
+      "family_id": "linear_equation_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0045",
+        "KS_2018-0063",
+        "KS_2018-0075",
+        "RS_2014-0026"
+      ],
+      "parameters": {
+        "shapes": [
+          "solve_inequality_additive"
+        ],
+        "number_domain": "rational_nonneg"
+      },
+      "level_bounds": {
+        "1": "jedan računski korak do rješenja",
+        "2": "dva koraka ili negativni koeficijenti",
+        "3": "tri koraka (sređivanje pa rješavanje)"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: jedinstveno rješenje, provjera uvrštavanjem egzaktna."
+    },
+    {
+      "lesson_id": "6-07-004",
+      "family_id": "linear_equation_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-6-07-004"
+      ],
+      "parameters": {
+        "shapes": [
+          "one_step_multiplicative"
+        ],
+        "number_domain": "rational_nonneg"
+      },
+      "level_bounds": {
+        "1": "jedan računski korak do rješenja",
+        "2": "dva koraka ili negativni koeficijenti",
+        "3": "tri koraka (sređivanje pa rješavanje)"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: jedinstveno rješenje, provjera uvrštavanjem egzaktna."
+    },
+    {
+      "lesson_id": "6-07-005",
+      "family_id": "linear_equation_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-6-07-005"
+      ],
+      "parameters": {
+        "shapes": [
+          "solve_inequality_multiplicative"
+        ],
+        "number_domain": "rational_nonneg"
+      },
+      "level_bounds": {
+        "1": "jedan računski korak do rješenja",
+        "2": "dva koraka ili negativni koeficijenti",
+        "3": "tri koraka (sređivanje pa rješavanje)"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: jedinstveno rješenje, provjera uvrštavanjem egzaktna."
+    },
+    {
+      "lesson_id": "6-07-006",
+      "family_id": "linear_equation_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0075"
+      ],
+      "parameters": {
+        "shapes": [
+          "one_step_additive",
+          "one_step_multiplicative"
+        ],
+        "number_domain": "decimal"
+      },
+      "level_bounds": {
+        "1": "jedan računski korak do rješenja",
+        "2": "dva koraka ili negativni koeficijenti",
+        "3": "tri koraka (sređivanje pa rješavanje)"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: jedinstveno rješenje, provjera uvrštavanjem egzaktna."
+    },
+    {
+      "lesson_id": "6-09-010",
+      "family_id": "unit_conversion_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0032"
+      ],
+      "parameters": {
+        "dimensions": [
+          "angle"
+        ]
+      },
+      "level_bounds": {
+        "1": "susjedne jedinice, cijeli brojevi",
+        "2": "decimalni iznosi, oba smjera",
+        "3": "preskok jedinice / složene jedinice"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: faktori po dimenziji; kvadratni 100, kubni 1000 po koraku; bez miješanja dimenzija."
+    },
+    {
+      "lesson_id": "6-13-001",
+      "family_id": "unit_conversion_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-6-13-001"
+      ],
+      "parameters": {
+        "dimensions": [
+          "length"
+        ]
+      },
+      "level_bounds": {
+        "1": "susjedne jedinice, cijeli brojevi",
+        "2": "decimalni iznosi, oba smjera",
+        "3": "preskok jedinice / složene jedinice"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: faktori po dimenziji; kvadratni 100, kubni 1000 po koraku; bez miješanja dimenzija."
+    },
+    {
+      "lesson_id": "6-13-002",
+      "family_id": "unit_conversion_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-6-13-002"
+      ],
+      "parameters": {
+        "dimensions": [
+          "mass"
+        ]
+      },
+      "level_bounds": {
+        "1": "susjedne jedinice, cijeli brojevi",
+        "2": "decimalni iznosi, oba smjera",
+        "3": "preskok jedinice / složene jedinice"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: faktori po dimenziji; kvadratni 100, kubni 1000 po koraku; bez miješanja dimenzija."
+    },
+    {
+      "lesson_id": "6-13-003",
+      "family_id": "unit_conversion_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-6-13-003"
+      ],
+      "parameters": {
+        "dimensions": [
+          "time"
+        ]
+      },
+      "level_bounds": {
+        "1": "susjedne jedinice, cijeli brojevi",
+        "2": "decimalni iznosi, oba smjera",
+        "3": "preskok jedinice / složene jedinice"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: faktori po dimenziji; kvadratni 100, kubni 1000 po koraku; bez miješanja dimenzija."
+    },
+    {
+      "lesson_id": "6-13-004",
+      "family_id": "unit_conversion_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-6-13-004"
+      ],
+      "parameters": {
+        "dimensions": [
+          "area"
+        ]
+      },
+      "level_bounds": {
+        "1": "susjedne jedinice, cijeli brojevi",
+        "2": "decimalni iznosi, oba smjera",
+        "3": "preskok jedinice / složene jedinice"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: faktori po dimenziji; kvadratni 100, kubni 1000 po koraku; bez miješanja dimenzija."
+    },
+    {
+      "lesson_id": "6-13-005",
+      "family_id": "unit_conversion_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-6-13-005"
+      ],
+      "parameters": {
+        "dimensions": [
+          "length",
+          "mass",
+          "time",
+          "area"
+        ]
+      },
+      "level_bounds": {
+        "1": "susjedne jedinice, cijeli brojevi",
+        "2": "decimalni iznosi, oba smjera",
+        "3": "preskok jedinice / složene jedinice"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: faktori po dimenziji; kvadratni 100, kubni 1000 po koraku; bez miješanja dimenzija."
     },
     {
       "lesson_id": "7-02-004",
@@ -909,6 +1426,73 @@
       "reviewer_note": "Invarijanta: jedinstveno rješenje, provjera uvrštavanjem egzaktna."
     },
     {
+      "lesson_id": "7-02-018",
+      "family_id": "linear_equation_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-7-02-018"
+      ],
+      "parameters": {
+        "shapes": [
+          "absolute_value_equation"
+        ],
+        "number_domain": "integer"
+      },
+      "level_bounds": {
+        "1": "jedan računski korak do rješenja",
+        "2": "dva koraka ili negativni koeficijenti",
+        "3": "tri koraka (sređivanje pa rješavanje)"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: jedinstveno rješenje, provjera uvrštavanjem egzaktna."
+    },
+    {
+      "lesson_id": "7-02-019",
+      "family_id": "linear_equation_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0095"
+      ],
+      "parameters": {
+        "shapes": [
+          "solve_inequality_additive"
+        ],
+        "number_domain": "integer"
+      },
+      "level_bounds": {
+        "1": "jedan računski korak do rješenja",
+        "2": "dva koraka ili negativni koeficijenti",
+        "3": "tri koraka (sređivanje pa rješavanje)"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: jedinstveno rješenje, provjera uvrštavanjem egzaktna."
+    },
+    {
+      "lesson_id": "7-02-020",
+      "family_id": "linear_equation_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0095"
+      ],
+      "parameters": {
+        "shapes": [
+          "solve_inequality_multiplicative",
+          "solve_inequality_sign_flip"
+        ],
+        "number_domain": "integer"
+      },
+      "level_bounds": {
+        "1": "jedan računski korak do rješenja",
+        "2": "dva koraka ili negativni koeficijenti",
+        "3": "tri koraka (sređivanje pa rješavanje)"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: jedinstveno rješenje, provjera uvrštavanjem egzaktna."
+    },
+    {
       "lesson_id": "7-03-004",
       "family_id": "absolute_value_opposite",
       "enforcement_mode": "blocking",
@@ -974,6 +1558,50 @@
       },
       "forbidden_neighbour_skills": [],
       "reviewer_note": "Invarijanta: tačno jedna ekstremna/tražena vrijednost među opcijama."
+    },
+    {
+      "lesson_id": "7-03-007",
+      "family_id": "fraction_decimal_conversion",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0111"
+      ],
+      "parameters": {
+        "concepts": [
+          "fraction_to_decimal"
+        ],
+        "number_scope": "signed"
+      },
+      "level_bounds": {
+        "1": "polovine, četvrtine, desetinke",
+        "2": "osmine, dvadesetine, obje smjera",
+        "3": "tri decimale i mješovite vrijednosti"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: samo konačne decimale; razlomak uvijek skraćen; opcije ne miješaju zapise."
+    },
+    {
+      "lesson_id": "7-03-008",
+      "family_id": "fraction_decimal_conversion",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0111"
+      ],
+      "parameters": {
+        "concepts": [
+          "decimal_to_fraction"
+        ],
+        "number_scope": "signed"
+      },
+      "level_bounds": {
+        "1": "polovine, četvrtine, desetinke",
+        "2": "osmine, dvadesetine, obje smjera",
+        "3": "tri decimale i mješovite vrijednosti"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: samo konačne decimale; razlomak uvijek skraćen; opcije ne miješaju zapise."
     },
     {
       "lesson_id": "7-03-009",
@@ -1065,6 +1693,58 @@
       "reviewer_note": "Invarijanta: egzaktan racionalan račun s predznacima."
     },
     {
+      "lesson_id": "7-03-014",
+      "family_id": "rational_arithmetic_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0045",
+        "KS_2018-0122",
+        "RS_2014-0053"
+      ],
+      "parameters": {
+        "allowed_operations": [
+          "add",
+          "subtract",
+          "multiply",
+          "divide"
+        ],
+        "number_domain": "rational_signed",
+        "expression_shape": "order_of_operations"
+      },
+      "level_bounds": {
+        "1": "jedna operacija jednostavnim razlomcima",
+        "2": "dvije operacije ili nejednaki imenioci s predznacima",
+        "3": "tri povezane operacije"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: egzaktan racionalan račun s predznacima."
+    },
+    {
+      "lesson_id": "7-03-015",
+      "family_id": "rational_arithmetic_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0045",
+        "KS_2018-0123"
+      ],
+      "parameters": {
+        "allowed_operations": [
+          "divide"
+        ],
+        "number_domain": "rational_signed",
+        "expression_shape": "complex_fraction"
+      },
+      "level_bounds": {
+        "1": "jedna operacija jednostavnim razlomcima",
+        "2": "dvije operacije ili nejednaki imenioci s predznacima",
+        "3": "tri povezane operacije"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: egzaktan racionalan račun s predznacima."
+    },
+    {
       "lesson_id": "7-03-016",
       "family_id": "linear_equation_direct",
       "enforcement_mode": "blocking",
@@ -1107,6 +1787,92 @@
       },
       "forbidden_neighbour_skills": [],
       "reviewer_note": "Invarijanta: jedinstveno rješenje, provjera uvrštavanjem egzaktna."
+    },
+    {
+      "lesson_id": "7-03-018",
+      "family_id": "linear_equation_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-7-03-018"
+      ],
+      "parameters": {
+        "shapes": [
+          "parentheses_combine"
+        ],
+        "number_domain": "rational"
+      },
+      "level_bounds": {
+        "1": "jedan računski korak do rješenja",
+        "2": "dva koraka ili negativni koeficijenti",
+        "3": "tri koraka (sređivanje pa rješavanje)"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: jedinstveno rješenje, provjera uvrštavanjem egzaktna."
+    },
+    {
+      "lesson_id": "7-03-019",
+      "family_id": "linear_equation_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "RS_2014-0043"
+      ],
+      "parameters": {
+        "shapes": [
+          "solve_inequality_additive",
+          "solve_inequality_multiplicative"
+        ],
+        "number_domain": "rational"
+      },
+      "level_bounds": {
+        "1": "jedan računski korak do rješenja",
+        "2": "dva koraka ili negativni koeficijenti",
+        "3": "tri koraka (sređivanje pa rješavanje)"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: jedinstveno rješenje, provjera uvrštavanjem egzaktna."
+    },
+    {
+      "lesson_id": "7-03-021",
+      "family_id": "decimal_rounding",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-7-03-021"
+      ],
+      "parameters": {
+        "concepts": [
+          "round_decimal",
+          "round_then_estimate"
+        ]
+      },
+      "level_bounds": {
+        "1": "cio broj ili desetinke",
+        "2": "desetinke ili stotinke",
+        "3": "stotinke/hiljaditke, procjena zbira"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: školsko half-up zaokruživanje nad egzaktnim razlomcima; bez a≈b jednakosti."
+    },
+    {
+      "lesson_id": "8-01-004",
+      "family_id": "number_comparison_order",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-8-01-004"
+      ],
+      "parameters": {
+        "number_domain": "rational"
+      },
+      "level_bounds": {
+        "1": "male, jasno razdvojene vrijednosti",
+        "2": "bliže vrijednosti ili miješani zapisi",
+        "3": "vrlo bliske vrijednosti, položaj između"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: tačno jedna ekstremna/tražena vrijednost među opcijama."
     },
     {
       "lesson_id": "8-01-005",
@@ -1195,6 +1961,99 @@
       },
       "forbidden_neighbour_skills": [],
       "reviewer_note": "Invarijanta: korijen savršenog kvadrata, provjerljiv kvadriranjem."
+    },
+    {
+      "lesson_id": "8-01-009",
+      "family_id": "simple_quadratic_equation",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0183"
+      ],
+      "parameters": {
+        "shapes": [
+          "x_squared_equals_a"
+        ]
+      },
+      "level_bounds": {
+        "1": "mali savršeni kvadrati",
+        "2": "negativna rješenja i izlučivanje",
+        "3": "veći koeficijenti"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: potpun skup rješenja, provjerljiv uvrštavanjem."
+    },
+    {
+      "lesson_id": "8-01-010",
+      "family_id": "square_root_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0186",
+        "KS_2018-0187"
+      ],
+      "parameters": {
+        "concepts": [
+          "root_product_quotient"
+        ]
+      },
+      "level_bounds": {
+        "1": "korijen malog savršenog kvadrata",
+        "2": "korijen razlomka ili decimalnog broja",
+        "3": "zbir dva korijena"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: korijen savršenog kvadrata, provjerljiv kvadriranjem."
+    },
+    {
+      "lesson_id": "8-01-011",
+      "family_id": "square_root_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0184",
+        "KS_2018-0185",
+        "KS_2018-0188",
+        "RS_2014-0075"
+      ],
+      "parameters": {
+        "concepts": [
+          "root_between_integers"
+        ]
+      },
+      "level_bounds": {
+        "1": "korijen malog savršenog kvadrata",
+        "2": "korijen razlomka ili decimalnog broja",
+        "3": "zbir dva korijena"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: korijen savršenog kvadrata, provjerljiv kvadriranjem."
+    },
+    {
+      "lesson_id": "8-01-012",
+      "family_id": "rational_arithmetic_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-8-01-012"
+      ],
+      "parameters": {
+        "allowed_operations": [
+          "add",
+          "subtract",
+          "multiply",
+          "divide"
+        ],
+        "number_domain": "rational_signed",
+        "expression_shape": "order_of_operations"
+      },
+      "level_bounds": {
+        "1": "jedna operacija jednostavnim razlomcima",
+        "2": "dvije operacije ili nejednaki imenioci s predznacima",
+        "3": "tri povezane operacije"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: egzaktan racionalan račun s predznacima."
     },
     {
       "lesson_id": "8-01-013",
@@ -1286,6 +2145,442 @@
       "reviewer_note": "Invarijanta: zakoni stepena nad jednakim osnovama; opcije različitih vrijednosti."
     },
     {
+      "lesson_id": "8-01-017",
+      "family_id": "power_arithmetic_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-8-01-017"
+      ],
+      "parameters": {
+        "concepts": [
+          "scientific_notation"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedan stepen/zakon malim brojevima",
+        "2": "negativna osnova, negativan izložilac ili količnik",
+        "3": "kombinovana dva zakona ili zbir stepena"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: zakoni stepena nad jednakim osnovama; opcije različitih vrijednosti."
+    },
+    {
+      "lesson_id": "8-02-005",
+      "family_id": "linear_function_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0339",
+        "KS_2018-0343",
+        "KS_2018-0347",
+        "KS_2018-0348"
+      ],
+      "parameters": {
+        "concepts": [
+          "evaluate",
+          "find_coefficient"
+        ]
+      },
+      "level_bounds": {
+        "1": "mali cjelobrojni koeficijenti",
+        "2": "negativni koeficijenti",
+        "3": "razlomljene vrijednosti"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: svaka tvrdnja o funkciji dokazana uvrštavanjem; tačke uvijek s imenom."
+    },
+    {
+      "lesson_id": "8-02-006",
+      "family_id": "linear_function_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-8-02-006"
+      ],
+      "parameters": {
+        "concepts": [
+          "table"
+        ]
+      },
+      "level_bounds": {
+        "1": "mali cjelobrojni koeficijenti",
+        "2": "negativni koeficijenti",
+        "3": "razlomljene vrijednosti"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: svaka tvrdnja o funkciji dokazana uvrštavanjem; tačke uvijek s imenom."
+    },
+    {
+      "lesson_id": "8-02-010",
+      "family_id": "linear_function_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-8-02-010"
+      ],
+      "parameters": {
+        "concepts": [
+          "zero"
+        ]
+      },
+      "level_bounds": {
+        "1": "mali cjelobrojni koeficijenti",
+        "2": "negativni koeficijenti",
+        "3": "razlomljene vrijednosti"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: svaka tvrdnja o funkciji dokazana uvrštavanjem; tačke uvijek s imenom."
+    },
+    {
+      "lesson_id": "8-02-011",
+      "family_id": "linear_function_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-8-02-011"
+      ],
+      "parameters": {
+        "concepts": [
+          "monotonicity",
+          "sign_analysis"
+        ]
+      },
+      "level_bounds": {
+        "1": "mali cjelobrojni koeficijenti",
+        "2": "negativni koeficijenti",
+        "3": "razlomljene vrijednosti"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: svaka tvrdnja o funkciji dokazana uvrštavanjem; tačke uvijek s imenom."
+    },
+    {
+      "lesson_id": "8-03-001",
+      "family_id": "ratio_proportion_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-8-03-001"
+      ],
+      "parameters": {
+        "concepts": [
+          "ratio_simplification"
+        ]
+      },
+      "level_bounds": {
+        "1": "mali članovi razmjere",
+        "2": "veći faktori",
+        "3": "veće vrijednosti, tri para u tabeli"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: unakrsni proizvodi egzaktni; količnici opcija međusobno različiti."
+    },
+    {
+      "lesson_id": "8-03-002",
+      "family_id": "ratio_proportion_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0227",
+        "RS_2014-0099"
+      ],
+      "parameters": {
+        "concepts": [
+          "proportion_property"
+        ]
+      },
+      "level_bounds": {
+        "1": "mali članovi razmjere",
+        "2": "veći faktori",
+        "3": "veće vrijednosti, tri para u tabeli"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: unakrsni proizvodi egzaktni; količnici opcija međusobno različiti."
+    },
+    {
+      "lesson_id": "8-03-003",
+      "family_id": "ratio_proportion_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0228"
+      ],
+      "parameters": {
+        "concepts": [
+          "missing_term"
+        ]
+      },
+      "level_bounds": {
+        "1": "mali članovi razmjere",
+        "2": "veći faktori",
+        "3": "veće vrijednosti, tri para u tabeli"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: unakrsni proizvodi egzaktni; količnici opcija međusobno različiti."
+    },
+    {
+      "lesson_id": "8-03-004",
+      "family_id": "ratio_proportion_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0229",
+        "KS_2018-0233"
+      ],
+      "parameters": {
+        "concepts": [
+          "proportionality_recognition"
+        ]
+      },
+      "level_bounds": {
+        "1": "mali članovi razmjere",
+        "2": "veći faktori",
+        "3": "veće vrijednosti, tri para u tabeli"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: unakrsni proizvodi egzaktni; količnici opcija međusobno različiti."
+    },
+    {
+      "lesson_id": "8-03-005",
+      "family_id": "ratio_proportion_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-8-03-005"
+      ],
+      "parameters": {
+        "concepts": [
+          "proportionality_recognition"
+        ]
+      },
+      "level_bounds": {
+        "1": "mali članovi razmjere",
+        "2": "veći faktori",
+        "3": "veće vrijednosti, tri para u tabeli"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: unakrsni proizvodi egzaktni; količnici opcija međusobno različiti."
+    },
+    {
+      "lesson_id": "8-03-006",
+      "family_id": "linear_function_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0231",
+        "KS_2018-0237"
+      ],
+      "parameters": {
+        "concepts": [
+          "evaluate",
+          "find_coefficient"
+        ],
+        "function_kind": "direct"
+      },
+      "level_bounds": {
+        "1": "mali cjelobrojni koeficijenti",
+        "2": "negativni koeficijenti",
+        "3": "razlomljene vrijednosti"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: svaka tvrdnja o funkciji dokazana uvrštavanjem; tačke uvijek s imenom."
+    },
+    {
+      "lesson_id": "8-03-007",
+      "family_id": "linear_function_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-8-03-007"
+      ],
+      "parameters": {
+        "concepts": [
+          "evaluate",
+          "find_coefficient"
+        ],
+        "function_kind": "inverse"
+      },
+      "level_bounds": {
+        "1": "mali cjelobrojni koeficijenti",
+        "2": "negativni koeficijenti",
+        "3": "razlomljene vrijednosti"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: svaka tvrdnja o funkciji dokazana uvrštavanjem; tačke uvijek s imenom."
+    },
+    {
+      "lesson_id": "8-03-010",
+      "family_id": "ratio_proportion_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0220"
+      ],
+      "parameters": {
+        "concepts": [
+          "missing_term"
+        ]
+      },
+      "level_bounds": {
+        "1": "mali članovi razmjere",
+        "2": "veći faktori",
+        "3": "veće vrijednosti, tri para u tabeli"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: unakrsni proizvodi egzaktni; količnici opcija međusobno različiti."
+    },
+    {
+      "lesson_id": "8-03-012",
+      "family_id": "ratio_proportion_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0217"
+      ],
+      "parameters": {
+        "concepts": [
+          "proportional_division"
+        ]
+      },
+      "level_bounds": {
+        "1": "mali članovi razmjere",
+        "2": "veći faktori",
+        "3": "veće vrijednosti, tri para u tabeli"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: unakrsni proizvodi egzaktni; količnici opcija međusobno različiti."
+    },
+    {
+      "lesson_id": "8-03-017",
+      "family_id": "percent_basic",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-8-03-017"
+      ],
+      "parameters": {
+        "concepts": [
+          "percent_amount",
+          "percent_rate"
+        ]
+      },
+      "level_bounds": {
+        "1": "osnovni procenti (10 %, 20 %, 25 %, 50 %)",
+        "2": "prošireni procenti (5 %, 15 %, 30 %, ...)",
+        "3": "necjelobrojni postoci ili traženje cjeline"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: procenat je stoti dio; znak % nikad u $...$."
+    },
+    {
+      "lesson_id": "8-03-018",
+      "family_id": "percent_basic",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-8-03-018"
+      ],
+      "parameters": {
+        "concepts": [
+          "percent_rate"
+        ]
+      },
+      "level_bounds": {
+        "1": "osnovni procenti (10 %, 20 %, 25 %, 50 %)",
+        "2": "prošireni procenti (5 %, 15 %, 30 %, ...)",
+        "3": "necjelobrojni postoci ili traženje cjeline"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: procenat je stoti dio; znak % nikad u $...$."
+    },
+    {
+      "lesson_id": "8-03-020",
+      "family_id": "ratio_proportion_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0220",
+        "KS_2018-0232",
+        "KS_2018-0237"
+      ],
+      "parameters": {
+        "concepts": [
+          "proportional_division"
+        ]
+      },
+      "level_bounds": {
+        "1": "mali članovi razmjere",
+        "2": "veći faktori",
+        "3": "veće vrijednosti, tri para u tabeli"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: unakrsni proizvodi egzaktni; količnici opcija međusobno različiti."
+    },
+    {
+      "lesson_id": "8-06-002",
+      "family_id": "frequency_basic",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-8-06-002"
+      ],
+      "parameters": {
+        "concepts": [
+          "frequency"
+        ]
+      },
+      "level_bounds": {
+        "1": "sedam podataka",
+        "2": "deset podataka",
+        "3": "dvanaest podataka"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: frekvencije se broje egzaktno iz navedenog niza."
+    },
+    {
+      "lesson_id": "8-06-003",
+      "family_id": "frequency_basic",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0250",
+        "KS_2018-0253"
+      ],
+      "parameters": {
+        "concepts": [
+          "relative_frequency"
+        ]
+      },
+      "level_bounds": {
+        "1": "sedam podataka",
+        "2": "deset podataka",
+        "3": "dvanaest podataka"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: frekvencije se broje egzaktno iz navedenog niza."
+    },
+    {
+      "lesson_id": "8-06-004",
+      "family_id": "frequency_basic",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0250"
+      ],
+      "parameters": {
+        "concepts": [
+          "frequency_table"
+        ]
+      },
+      "level_bounds": {
+        "1": "sedam podataka",
+        "2": "deset podataka",
+        "3": "dvanaest podataka"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: frekvencije se broje egzaktno iz navedenog niza."
+    },
+    {
       "lesson_id": "8-06-009",
       "family_id": "arithmetic_mean_direct",
       "enforcement_mode": "blocking",
@@ -1331,6 +2626,459 @@
       "reviewer_note": "Invarijanta: vjerovatnoća = povoljni/svi, u [0,1]."
     },
     {
+      "lesson_id": "8-06-013",
+      "family_id": "classical_probability_basic",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-8-06-013"
+      ],
+      "parameters": {
+        "concepts": [
+          "complement_probability"
+        ]
+      },
+      "level_bounds": {
+        "1": "dvije boje, direktan događaj",
+        "2": "tri boje",
+        "3": "komplementaran događaj"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: vjerovatnoća = povoljni/svi, u [0,1]."
+    },
+    {
+      "lesson_id": "8-07-001",
+      "family_id": "polynomial_basic",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0264",
+        "KS_2018-0273",
+        "KS_2018-0289",
+        "RS_2014-0104"
+      ],
+      "parameters": {
+        "concepts": [
+          "expression_evaluation"
+        ]
+      },
+      "level_bounds": {
+        "1": "dva-tri člana, mali koeficijenti",
+        "2": "četiri člana, negativni koeficijenti",
+        "3": "viši stepeni i pet članova"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja."
+    },
+    {
+      "lesson_id": "8-07-002",
+      "family_id": "polynomial_basic",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-8-07-002"
+      ],
+      "parameters": {
+        "concepts": [
+          "monomial_structure"
+        ]
+      },
+      "level_bounds": {
+        "1": "dva-tri člana, mali koeficijenti",
+        "2": "četiri člana, negativni koeficijenti",
+        "3": "viši stepeni i pet članova"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja."
+    },
+    {
+      "lesson_id": "8-07-006",
+      "family_id": "polynomial_basic",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0277",
+        "KS_2018-0278"
+      ],
+      "parameters": {
+        "concepts": [
+          "combine_like_terms"
+        ]
+      },
+      "level_bounds": {
+        "1": "dva-tri člana, mali koeficijenti",
+        "2": "četiri člana, negativni koeficijenti",
+        "3": "viši stepeni i pet članova"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja."
+    },
+    {
+      "lesson_id": "8-07-007",
+      "family_id": "polynomial_basic",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0278"
+      ],
+      "parameters": {
+        "concepts": [
+          "add_subtract"
+        ]
+      },
+      "level_bounds": {
+        "1": "dva-tri člana, mali koeficijenti",
+        "2": "četiri člana, negativni koeficijenti",
+        "3": "viši stepeni i pet članova"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja."
+    },
+    {
+      "lesson_id": "8-07-008",
+      "family_id": "polynomial_basic",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0264",
+        "KS_2018-0278",
+        "KS_2018-0289",
+        "RS_2014-0104"
+      ],
+      "parameters": {
+        "concepts": [
+          "multiply"
+        ]
+      },
+      "level_bounds": {
+        "1": "dva-tri člana, mali koeficijenti",
+        "2": "četiri člana, negativni koeficijenti",
+        "3": "viši stepeni i pet članova"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja."
+    },
+    {
+      "lesson_id": "8-07-013",
+      "family_id": "simple_quadratic_equation",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-8-07-013"
+      ],
+      "parameters": {
+        "shapes": [
+          "factor_out_x"
+        ]
+      },
+      "level_bounds": {
+        "1": "mali savršeni kvadrati",
+        "2": "negativna rješenja i izlučivanje",
+        "3": "veći koeficijenti"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: potpun skup rješenja, provjerljiv uvrštavanjem."
+    },
+    {
+      "lesson_id": "9-01-001",
+      "family_id": "polynomial_basic",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-9-01-001"
+      ],
+      "parameters": {
+        "concepts": [
+          "structure_count",
+          "expression_evaluation"
+        ]
+      },
+      "level_bounds": {
+        "1": "dva-tri člana, mali koeficijenti",
+        "2": "četiri člana, negativni koeficijenti",
+        "3": "viši stepeni i pet članova"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja."
+    },
+    {
+      "lesson_id": "9-03-001",
+      "family_id": "linear_function_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0340"
+      ],
+      "parameters": {
+        "concepts": [
+          "evaluate"
+        ]
+      },
+      "level_bounds": {
+        "1": "mali cjelobrojni koeficijenti",
+        "2": "negativni koeficijenti",
+        "3": "razlomljene vrijednosti"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: svaka tvrdnja o funkciji dokazana uvrštavanjem; tačke uvijek s imenom."
+    },
+    {
+      "lesson_id": "9-03-002",
+      "family_id": "linear_function_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0339",
+        "KS_2018-0343",
+        "KS_2018-0347",
+        "KS_2018-0348",
+        "RS_2014-0130",
+        "RS_2014-0132"
+      ],
+      "parameters": {
+        "concepts": [
+          "evaluate",
+          "find_coefficient"
+        ]
+      },
+      "level_bounds": {
+        "1": "mali cjelobrojni koeficijenti",
+        "2": "negativni koeficijenti",
+        "3": "razlomljene vrijednosti"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: svaka tvrdnja o funkciji dokazana uvrštavanjem; tačke uvijek s imenom."
+    },
+    {
+      "lesson_id": "9-03-003",
+      "family_id": "linear_function_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0341"
+      ],
+      "parameters": {
+        "concepts": [
+          "table"
+        ]
+      },
+      "level_bounds": {
+        "1": "mali cjelobrojni koeficijenti",
+        "2": "negativni koeficijenti",
+        "3": "razlomljene vrijednosti"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: svaka tvrdnja o funkciji dokazana uvrštavanjem; tačke uvijek s imenom."
+    },
+    {
+      "lesson_id": "9-03-007",
+      "family_id": "linear_function_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0320",
+        "KS_2018-0343",
+        "KS_2018-0345"
+      ],
+      "parameters": {
+        "concepts": [
+          "zero"
+        ]
+      },
+      "level_bounds": {
+        "1": "mali cjelobrojni koeficijenti",
+        "2": "negativni koeficijenti",
+        "3": "razlomljene vrijednosti"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: svaka tvrdnja o funkciji dokazana uvrštavanjem; tačke uvijek s imenom."
+    },
+    {
+      "lesson_id": "9-03-008",
+      "family_id": "linear_function_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0348"
+      ],
+      "parameters": {
+        "concepts": [
+          "monotonicity"
+        ]
+      },
+      "level_bounds": {
+        "1": "mali cjelobrojni koeficijenti",
+        "2": "negativni koeficijenti",
+        "3": "razlomljene vrijednosti"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: svaka tvrdnja o funkciji dokazana uvrštavanjem; tačke uvijek s imenom."
+    },
+    {
+      "lesson_id": "9-03-009",
+      "family_id": "linear_function_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0343"
+      ],
+      "parameters": {
+        "concepts": [
+          "sign_analysis"
+        ]
+      },
+      "level_bounds": {
+        "1": "mali cjelobrojni koeficijenti",
+        "2": "negativni koeficijenti",
+        "3": "razlomljene vrijednosti"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: svaka tvrdnja o funkciji dokazana uvrštavanjem; tačke uvijek s imenom."
+    },
+    {
+      "lesson_id": "9-03-011",
+      "family_id": "linear_function_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0344"
+      ],
+      "parameters": {
+        "concepts": [
+          "membership"
+        ]
+      },
+      "level_bounds": {
+        "1": "mali cjelobrojni koeficijenti",
+        "2": "negativni koeficijenti",
+        "3": "razlomljene vrijednosti"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: svaka tvrdnja o funkciji dokazana uvrštavanjem; tačke uvijek s imenom."
+    },
+    {
+      "lesson_id": "9-03-012",
+      "family_id": "linear_function_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0353",
+        "KS_2018-0354"
+      ],
+      "parameters": {
+        "concepts": [
+          "implicit_to_explicit"
+        ]
+      },
+      "level_bounds": {
+        "1": "mali cjelobrojni koeficijenti",
+        "2": "negativni koeficijenti",
+        "3": "razlomljene vrijednosti"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: svaka tvrdnja o funkciji dokazana uvrštavanjem; tačke uvijek s imenom."
+    },
+    {
+      "lesson_id": "9-03-013",
+      "family_id": "linear_function_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0352"
+      ],
+      "parameters": {
+        "concepts": [
+          "implicit_to_explicit"
+        ]
+      },
+      "level_bounds": {
+        "1": "mali cjelobrojni koeficijenti",
+        "2": "negativni koeficijenti",
+        "3": "razlomljene vrijednosti"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: svaka tvrdnja o funkciji dokazana uvrštavanjem; tačke uvijek s imenom."
+    },
+    {
+      "lesson_id": "9-03-014",
+      "family_id": "linear_function_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0324",
+        "KS_2018-0330"
+      ],
+      "parameters": {
+        "concepts": [
+          "from_two_points"
+        ]
+      },
+      "level_bounds": {
+        "1": "mali cjelobrojni koeficijenti",
+        "2": "negativni koeficijenti",
+        "3": "razlomljene vrijednosti"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: svaka tvrdnja o funkciji dokazana uvrštavanjem; tačke uvijek s imenom."
+    },
+    {
+      "lesson_id": "9-04-001",
+      "family_id": "linear_equation_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0289",
+        "KS_2018-0323",
+        "KS_2018-0355",
+        "KS_2018-0361",
+        "KS_2018-0363",
+        "KS_2018-0375",
+        "RS_2014-0118",
+        "RS_2014-0119",
+        "RS_2014-0120",
+        "RS_2014-0138",
+        "RS_2014-0142"
+      ],
+      "parameters": {
+        "shapes": [
+          "classification"
+        ],
+        "number_domain": "integer"
+      },
+      "level_bounds": {
+        "1": "jedan računski korak do rješenja",
+        "2": "dva koraka ili negativni koeficijenti",
+        "3": "tri koraka (sređivanje pa rješavanje)"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: jedinstveno rješenje, provjera uvrštavanjem egzaktna."
+    },
+    {
+      "lesson_id": "9-04-002",
+      "family_id": "linear_equation_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0354",
+        "KS_2018-0355",
+        "KS_2018-0360",
+        "KS_2018-0363"
+      ],
+      "parameters": {
+        "shapes": [
+          "equivalence_choice"
+        ],
+        "number_domain": "integer"
+      },
+      "level_bounds": {
+        "1": "jedan računski korak do rješenja",
+        "2": "dva koraka ili negativni koeficijenti",
+        "3": "tri koraka (sređivanje pa rješavanje)"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: jedinstveno rješenje, provjera uvrštavanjem egzaktna."
+    },
+    {
       "lesson_id": "9-04-003",
       "family_id": "linear_equation_direct",
       "enforcement_mode": "blocking",
@@ -1341,6 +3089,142 @@
       "parameters": {
         "shapes": [
           "parentheses"
+        ],
+        "number_domain": "integer"
+      },
+      "level_bounds": {
+        "1": "jedan računski korak do rješenja",
+        "2": "dva koraka ili negativni koeficijenti",
+        "3": "tri koraka (sređivanje pa rješavanje)"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: jedinstveno rješenje, provjera uvrštavanjem egzaktna."
+    },
+    {
+      "lesson_id": "9-04-004",
+      "family_id": "linear_equation_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0045"
+      ],
+      "parameters": {
+        "shapes": [
+          "fraction_form"
+        ],
+        "number_domain": "rational"
+      },
+      "level_bounds": {
+        "1": "jedan računski korak do rješenja",
+        "2": "dva koraka ili negativni koeficijenti",
+        "3": "tri koraka (sređivanje pa rješavanje)"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: jedinstveno rješenje, provjera uvrštavanjem egzaktna."
+    },
+    {
+      "lesson_id": "9-04-008",
+      "family_id": "linear_equation_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-9-04-008"
+      ],
+      "parameters": {
+        "shapes": [
+          "solution_count"
+        ],
+        "number_domain": "integer"
+      },
+      "level_bounds": {
+        "1": "jedan računski korak do rješenja",
+        "2": "dva koraka ili negativni koeficijenti",
+        "3": "tri koraka (sređivanje pa rješavanje)"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: jedinstveno rješenje, provjera uvrštavanjem egzaktna."
+    },
+    {
+      "lesson_id": "9-04-009",
+      "family_id": "linear_equation_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-9-04-009"
+      ],
+      "parameters": {
+        "shapes": [
+          "solution_count"
+        ],
+        "number_domain": "integer"
+      },
+      "level_bounds": {
+        "1": "jedan računski korak do rješenja",
+        "2": "dva koraka ili negativni koeficijenti",
+        "3": "tri koraka (sređivanje pa rješavanje)"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: jedinstveno rješenje, provjera uvrštavanjem egzaktna."
+    },
+    {
+      "lesson_id": "9-04-012",
+      "family_id": "linear_equation_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0354",
+        "KS_2018-0355",
+        "KS_2018-0363",
+        "RS_2014-0118",
+        "RS_2014-0119"
+      ],
+      "parameters": {
+        "shapes": [
+          "classification"
+        ],
+        "number_domain": "integer"
+      },
+      "level_bounds": {
+        "1": "jedan računski korak do rješenja",
+        "2": "dva koraka ili negativni koeficijenti",
+        "3": "tri koraka (sređivanje pa rješavanje)"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: jedinstveno rješenje, provjera uvrštavanjem egzaktna."
+    },
+    {
+      "lesson_id": "9-04-014",
+      "family_id": "linear_equation_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-9-04-014"
+      ],
+      "parameters": {
+        "shapes": [
+          "solve_inequality_parentheses"
+        ],
+        "number_domain": "integer"
+      },
+      "level_bounds": {
+        "1": "jedan računski korak do rješenja",
+        "2": "dva koraka ili negativni koeficijenti",
+        "3": "tri koraka (sređivanje pa rješavanje)"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: jedinstveno rješenje, provjera uvrštavanjem egzaktna."
+    },
+    {
+      "lesson_id": "9-04-016",
+      "family_id": "linear_equation_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-9-04-016"
+      ],
+      "parameters": {
+        "shapes": [
+          "solve_inequality_sign_flip"
         ],
         "number_domain": "integer"
       },
@@ -1375,6 +3259,218 @@
       },
       "forbidden_neighbour_skills": [],
       "reviewer_note": "Invarijanta: jedinstveno rješenje, provjera uvrštavanjem egzaktna."
+    },
+    {
+      "lesson_id": "9-04-020",
+      "family_id": "linear_equation_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "RS_2014-0121"
+      ],
+      "parameters": {
+        "shapes": [
+          "absolute_value_equation"
+        ],
+        "number_domain": "integer"
+      },
+      "level_bounds": {
+        "1": "jedan računski korak do rješenja",
+        "2": "dva koraka ili negativni koeficijenti",
+        "3": "tri koraka (sređivanje pa rješavanje)"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: jedinstveno rješenje, provjera uvrštavanjem egzaktna."
+    },
+    {
+      "lesson_id": "9-04-021",
+      "family_id": "linear_equation_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "RS_2014-0121"
+      ],
+      "parameters": {
+        "shapes": [
+          "absolute_value_inequality"
+        ],
+        "number_domain": "integer"
+      },
+      "level_bounds": {
+        "1": "jedan računski korak do rješenja",
+        "2": "dva koraka ili negativni koeficijenti",
+        "3": "tri koraka (sređivanje pa rješavanje)"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: jedinstveno rješenje, provjera uvrštavanjem egzaktna."
+    },
+    {
+      "lesson_id": "9-06-001",
+      "family_id": "polynomial_basic",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-9-06-001"
+      ],
+      "parameters": {
+        "concepts": [
+          "monomial_structure"
+        ]
+      },
+      "level_bounds": {
+        "1": "dva-tri člana, mali koeficijenti",
+        "2": "četiri člana, negativni koeficijenti",
+        "3": "viši stepeni i pet članova"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja."
+    },
+    {
+      "lesson_id": "9-06-002",
+      "family_id": "polynomial_basic",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0322"
+      ],
+      "parameters": {
+        "concepts": [
+          "combine_like_terms"
+        ]
+      },
+      "level_bounds": {
+        "1": "dva-tri člana, mali koeficijenti",
+        "2": "četiri člana, negativni koeficijenti",
+        "3": "viši stepeni i pet članova"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja."
+    },
+    {
+      "lesson_id": "9-06-003",
+      "family_id": "polynomial_basic",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-9-06-003"
+      ],
+      "parameters": {
+        "concepts": [
+          "add_subtract"
+        ]
+      },
+      "level_bounds": {
+        "1": "dva-tri člana, mali koeficijenti",
+        "2": "četiri člana, negativni koeficijenti",
+        "3": "viši stepeni i pet članova"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja."
+    },
+    {
+      "lesson_id": "9-06-004",
+      "family_id": "polynomial_basic",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0322"
+      ],
+      "parameters": {
+        "concepts": [
+          "multiply"
+        ]
+      },
+      "level_bounds": {
+        "1": "dva-tri člana, mali koeficijenti",
+        "2": "četiri člana, negativni koeficijenti",
+        "3": "viši stepeni i pet članova"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja."
+    },
+    {
+      "lesson_id": "9-06-013",
+      "family_id": "simple_quadratic_equation",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0289"
+      ],
+      "parameters": {
+        "shapes": [
+          "factor_out_x"
+        ]
+      },
+      "level_bounds": {
+        "1": "mali savršeni kvadrati",
+        "2": "negativna rješenja i izlučivanje",
+        "3": "veći koeficijenti"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: potpun skup rješenja, provjerljiv uvrštavanjem."
+    },
+    {
+      "lesson_id": "9-06-014",
+      "family_id": "simple_quadratic_equation",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0289"
+      ],
+      "parameters": {
+        "shapes": [
+          "x_squared_equals_a"
+        ]
+      },
+      "level_bounds": {
+        "1": "mali savršeni kvadrati",
+        "2": "negativna rješenja i izlučivanje",
+        "3": "veći koeficijenti"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: potpun skup rješenja, provjerljiv uvrštavanjem."
+    },
+    {
+      "lesson_id": "9-06-015",
+      "family_id": "simple_quadratic_equation",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "KS_2018-0289"
+      ],
+      "parameters": {
+        "shapes": [
+          "perfect_square_trinomial"
+        ]
+      },
+      "level_bounds": {
+        "1": "mali savršeni kvadrati",
+        "2": "negativna rješenja i izlučivanje",
+        "3": "veći koeficijenti"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: potpun skup rješenja, provjerljiv uvrštavanjem."
+    },
+    {
+      "lesson_id": "9-08-001",
+      "family_id": "classical_probability_basic",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-9-08-001"
+      ],
+      "parameters": {
+        "concepts": [
+          "outcome_counting"
+        ]
+      },
+      "level_bounds": {
+        "1": "dvije boje, direktan događaj",
+        "2": "tri boje",
+        "3": "komplementaran događaj"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: vjerovatnoća = povoljni/svi, u [0,1]."
     },
     {
       "lesson_id": "9-08-002",
@@ -1418,6 +3514,71 @@
       },
       "forbidden_neighbour_skills": [],
       "reviewer_note": "Invarijanta: sredina = zbir kroz broj podataka, egzaktno."
+    },
+    {
+      "lesson_id": "9-08-011",
+      "family_id": "unit_conversion_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-9-08-011"
+      ],
+      "parameters": {
+        "dimensions": [
+          "length",
+          "area",
+          "volume"
+        ]
+      },
+      "level_bounds": {
+        "1": "susjedne jedinice, cijeli brojevi",
+        "2": "decimalni iznosi, oba smjera",
+        "3": "preskok jedinice / složene jedinice"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: faktori po dimenziji; kvadratni 100, kubni 1000 po koraku; bez miješanja dimenzija."
+    },
+    {
+      "lesson_id": "9-08-012",
+      "family_id": "power_arithmetic_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-9-08-012"
+      ],
+      "parameters": {
+        "concepts": [
+          "unit_prefix_powers"
+        ]
+      },
+      "level_bounds": {
+        "1": "jedan stepen/zakon malim brojevima",
+        "2": "negativna osnova, negativan izložilac ili količnik",
+        "3": "kombinovana dva zakona ili zbir stepena"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: zakoni stepena nad jednakim osnovama; opcije različitih vrijednosti."
+    },
+    {
+      "lesson_id": "9-08-013",
+      "family_id": "unit_conversion_direct",
+      "enforcement_mode": "blocking",
+      "activation_class": "READY",
+      "evidence_ids": [
+        "CANON-TITLE-9-08-013"
+      ],
+      "parameters": {
+        "dimensions": [
+          "speed"
+        ]
+      },
+      "level_bounds": {
+        "1": "susjedne jedinice, cijeli brojevi",
+        "2": "decimalni iznosi, oba smjera",
+        "3": "preskok jedinice / složene jedinice"
+      },
+      "forbidden_neighbour_skills": [],
+      "reviewer_note": "Invarijanta: faktori po dimenziji; kvadratni 100, kubni 1000 po koraku; bez miješanja dimenzija."
     }
   ]
 }
