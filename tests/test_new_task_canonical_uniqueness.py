@@ -232,3 +232,18 @@ def test_signature_is_exposed_to_the_client_for_the_published_task():
     response = _publish_first(store, fake, "dup-6")
     task_state = response["next_state"]["task"]
     assert task_state["identity"] == _sig(TASK, OPTIONS)
+
+
+# ---------------------------------------------------------------------------
+# Kapacitetna ekspanzija: ovi testovi ispituju MODEL-strategiju (Tutor +
+# Recenzent) i na lekcijama koje produkcija sada rutira deterministički
+# (blocking ugovor + potpun generator). Izričito isključenje je ISTI mehanizam
+# koji služi i kao produkcijski rollback (MATBOT_DETERMINISTIC_PRACTICE=
+# disabled) — model-put time ostaje trajno testiran, bajt za bajt kakav je bio.
+# ---------------------------------------------------------------------------
+import pytest as _pytest_capex
+
+
+@_pytest_capex.fixture(autouse=True)
+def _model_route_only_capex(monkeypatch):
+    monkeypatch.setenv("MATBOT_DETERMINISTIC_PRACTICE", "disabled")

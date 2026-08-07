@@ -196,3 +196,18 @@ def test_the_intro_is_derived_from_the_server_transition_not_the_model_intent():
     response = _publish(store, fake, "intro-8", TASK_2, "Daj mi lakši zadatak.",
                         intent_name="easier_task", difficulty_request="easier")
     assert "lakšeg" not in response["answer"].split("\n")[0]
+
+
+# ---------------------------------------------------------------------------
+# Kapacitetna ekspanzija: ovi testovi ispituju MODEL-strategiju (Tutor +
+# Recenzent) i na lekcijama koje produkcija sada rutira deterministički
+# (blocking ugovor + potpun generator). Izričito isključenje je ISTI mehanizam
+# koji služi i kao produkcijski rollback (MATBOT_DETERMINISTIC_PRACTICE=
+# disabled) — model-put time ostaje trajno testiran, bajt za bajt kakav je bio.
+# ---------------------------------------------------------------------------
+import pytest as _pytest_capex
+
+
+@_pytest_capex.fixture(autouse=True)
+def _model_route_only_capex(monkeypatch):
+    monkeypatch.setenv("MATBOT_DETERMINISTIC_PRACTICE", "disabled")

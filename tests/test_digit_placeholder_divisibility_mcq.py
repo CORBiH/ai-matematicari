@@ -309,3 +309,18 @@ def test_single_digit_options_without_a_digit_question_stay_in_scope():
         "Koji od sljedećih brojeva je djeljiv sa 3?", ("4", "7", "6", "8"))
     assert result.applicable is True
     assert result.correct_value == 6
+
+
+# ---------------------------------------------------------------------------
+# Kapacitetna ekspanzija: ovi testovi ispituju MODEL-strategiju (Tutor +
+# Recenzent) i na lekcijama koje produkcija sada rutira deterministički
+# (blocking ugovor + potpun generator). Izričito isključenje je ISTI mehanizam
+# koji služi i kao produkcijski rollback (MATBOT_DETERMINISTIC_PRACTICE=
+# disabled) — model-put time ostaje trajno testiran, bajt za bajt kakav je bio.
+# ---------------------------------------------------------------------------
+import pytest as _pytest_capex
+
+
+@_pytest_capex.fixture(autouse=True)
+def _model_route_only_capex(monkeypatch):
+    monkeypatch.setenv("MATBOT_DETERMINISTIC_PRACTICE", "disabled")

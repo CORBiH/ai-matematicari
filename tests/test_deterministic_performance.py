@@ -69,3 +69,44 @@ def test_every_deterministic_action_is_fast_and_free(universal):
     slow = {name: seconds for name, seconds in measurements.items()
             if seconds > BUDGET_S}
     assert not slow, f"akcije preko budžeta od {BUDGET_S}s: {slow}"
+
+
+# ---------------------------------------------------------------------------
+# KAPACITETNA EKSPANZIJA: benchmark preko REPREZENTATIVNIH novih porodica.
+# Mjeri se raspodjela (10 uzastopnih novih zadataka po lekciji), ne jedan
+# srećan uzorak — svaka akcija ostaje unutar istog budžeta od 200 ms.
+# ---------------------------------------------------------------------------
+
+_EXPANSION_LESSONS = (
+    (6, "6-02-007"),   # redoslijed operacija
+    (6, "6-03-004"),   # pravila djeljivosti
+    (7, "7-03-011"),   # množenje racionalnih
+    (8, "8-01-015"),   # zakoni stepena
+    (9, "9-04-003"),   # jednačina sa zagradama
+)
+
+
+@pytest.mark.parametrize("grade,lesson", _EXPANSION_LESSONS,
+                         ids=[lesson for _g, lesson in _EXPANSION_LESSONS])
+def test_expansion_lessons_meet_the_latency_budget(universal, grade, lesson):
+    store, fake = SessionStore(), FakeLLM()
+    session_id = f"det-perf-{lesson}"
+
+    def expansion_turn(message, **changes):
+        payload = turn(message, **changes)
+        payload["grade"] = grade
+        payload["selected_topic"] = lesson
+        payload["session_id"] = session_id
+        return payload
+
+    run_practice_turn(store, fake, expansion_turn(
+        "Daj mi jedan zadatak za vježbu iz ove teme."))   # zagrijavanje
+
+    slow = []
+    for attempt in range(10):
+        _response, elapsed = timed(store, fake, expansion_turn(
+            "Daj mi novi zadatak."))
+        if elapsed > BUDGET_S:
+            slow.append((attempt, round(elapsed, 3)))
+    assert fake.call_count == 0
+    assert not slow, f"{lesson}: nova zadatka preko {BUDGET_S}s: {slow}"

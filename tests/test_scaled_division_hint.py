@@ -106,3 +106,18 @@ def test_hint_level_does_not_move_when_publication_is_rejected(store, fake_llm, 
     assert response["answer"] == tutor_pipeline.SAFE_ERROR_MESSAGE
     assert store.peek("sd-1")["hint_level"] == before        # nivo hinta se ne pomjera
     assert fake_llm.call_count == 3                          # 2 + 1, bez trećeg na turnu
+
+
+# ---------------------------------------------------------------------------
+# Kapacitetna ekspanzija: ovi testovi ispituju MODEL-strategiju (Tutor +
+# Recenzent) i na lekcijama koje produkcija sada rutira deterministički
+# (blocking ugovor + potpun generator). Izričito isključenje je ISTI mehanizam
+# koji služi i kao produkcijski rollback (MATBOT_DETERMINISTIC_PRACTICE=
+# disabled) — model-put time ostaje trajno testiran, bajt za bajt kakav je bio.
+# ---------------------------------------------------------------------------
+import pytest as _pytest_capex
+
+
+@_pytest_capex.fixture(autouse=True)
+def _model_route_only_capex(monkeypatch):
+    monkeypatch.setenv("MATBOT_DETERMINISTIC_PRACTICE", "disabled")

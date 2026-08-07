@@ -143,3 +143,18 @@ def test_publication_stays_fail_closed_for_unsafe_notation(store, fake_llm, monk
     assert response.get("status") is None
     assert fake_llm.call_count == 2                 # bez trećeg poziva
     assert store.peek("uns-1") is None              # bez mutacije sesije
+
+
+# ---------------------------------------------------------------------------
+# Kapacitetna ekspanzija: ovi testovi ispituju MODEL-strategiju (Tutor +
+# Recenzent) i na lekcijama koje produkcija sada rutira deterministički
+# (blocking ugovor + potpun generator). Izričito isključenje je ISTI mehanizam
+# koji služi i kao produkcijski rollback (MATBOT_DETERMINISTIC_PRACTICE=
+# disabled) — model-put time ostaje trajno testiran, bajt za bajt kakav je bio.
+# ---------------------------------------------------------------------------
+import pytest as _pytest_capex
+
+
+@_pytest_capex.fixture(autouse=True)
+def _model_route_only_capex(monkeypatch):
+    monkeypatch.setenv("MATBOT_DETERMINISTIC_PRACTICE", "disabled")

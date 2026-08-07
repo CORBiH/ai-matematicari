@@ -262,3 +262,18 @@ def test_placeholder_digit_task_uses_digit_candidate_logic():
     # Paket s cifrom 7 mora proći objavu (oracle ćuti, ostali validatori rade).
     tutor_pipeline._validate_task_server_side(
         _payload(PLACEHOLDER_TASK, PLACEHOLDER_OPTIONS, 2), _context())
+
+
+# ---------------------------------------------------------------------------
+# Kapacitetna ekspanzija: ovi testovi ispituju MODEL-strategiju (Tutor +
+# Recenzent) i na lekcijama koje produkcija sada rutira deterministički
+# (blocking ugovor + potpun generator). Izričito isključenje je ISTI mehanizam
+# koji služi i kao produkcijski rollback (MATBOT_DETERMINISTIC_PRACTICE=
+# disabled) — model-put time ostaje trajno testiran, bajt za bajt kakav je bio.
+# ---------------------------------------------------------------------------
+import pytest as _pytest_capex
+
+
+@_pytest_capex.fixture(autouse=True)
+def _model_route_only_capex(monkeypatch):
+    monkeypatch.setenv("MATBOT_DETERMINISTIC_PRACTICE", "disabled")

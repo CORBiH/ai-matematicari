@@ -185,3 +185,17 @@ def test_reviewer_instructions_share_a_long_static_prefix_across_lessons():
 def test_reviewer_prompt_forbids_the_approve_echo():
     text = tutor_prompts.build_reviewer_instructions(build(GRADE, LESSON))
     assert "`final` IZOSTAVI" in text
+
+
+# ---------------------------------------------------------------------------
+# Kapacitetna ekspanzija: pipeline testovi ovog fajla ispituju MODEL-strategiju
+# na lekciji koju produkcija sada rutira deterministički; isključenje je isti
+# mehanizam kao produkcijski rollback (MATBOT_DETERMINISTIC_PRACTICE=disabled).
+# Testovi promptova ispod ne diraju rutiranje.
+# ---------------------------------------------------------------------------
+import pytest as _pytest_capex
+
+
+@_pytest_capex.fixture(autouse=True)
+def _model_route_only_capex(monkeypatch):
+    monkeypatch.setenv("MATBOT_DETERMINISTIC_PRACTICE", "disabled")

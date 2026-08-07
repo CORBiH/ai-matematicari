@@ -220,3 +220,18 @@ def test_evaluator_passes_the_safe_replacement():
 def test_evaluator_still_allows_checking_only_the_student_attempt():
     safe = r"Provjerimo: ako je $x=3$, onda je $2\cdot3=6$, što nije $8$."
     assert check_lib.check_no_answer_leak(_observation(safe)).outcome == check_lib.PASS
+
+
+# ---------------------------------------------------------------------------
+# Kapacitetna ekspanzija: ovi testovi ispituju MODEL-strategiju (Tutor +
+# Recenzent) i na lekcijama koje produkcija sada rutira deterministički
+# (blocking ugovor + potpun generator). Izričito isključenje je ISTI mehanizam
+# koji služi i kao produkcijski rollback (MATBOT_DETERMINISTIC_PRACTICE=
+# disabled) — model-put time ostaje trajno testiran, bajt za bajt kakav je bio.
+# ---------------------------------------------------------------------------
+import pytest as _pytest_capex
+
+
+@_pytest_capex.fixture(autouse=True)
+def _model_route_only_capex(monkeypatch):
+    monkeypatch.setenv("MATBOT_DETERMINISTIC_PRACTICE", "disabled")

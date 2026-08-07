@@ -472,9 +472,14 @@ def test_reviewer_instructions_cover_the_difficulty_finding():
     assert "never fix this by lowering the reported counts" in lowered
     assert "relabelling the level" in lowered
     assert "keep the exact selected lesson" in lowered
-    # Univerzalno: nijedne riječi o djeljivosti, djeliocu 6 ni ID-ju lekcije.
-    for word in ("djeljiv", "divisor 6", "6-03-004"):
+    # Univerzalno: MOTOR ne dodaje djelioce ni ID lekcije. Riječ „djeljiv“
+    # SMIJE postojati — dolazi iz KOMPAJLIRANOG semantičkog ugovora lekcije
+    # (podatak, kapacitetna ekspanzija), nikad iz koda motora; to dokazuje
+    # provjera na lekciji BEZ ugovora ispod.
+    for word in ("divisor 6", "6-03-004"):
         assert word not in instructions
+    uncontracted = tutor_prompts.build_reviewer_instructions(build(6, "6-01-001"))
+    assert "djeljiv" not in uncontracted
 
 
 def test_gate_classification_separates_the_two_rejection_layers():
@@ -521,3 +526,18 @@ def test_successful_turn_may_emit_a_safe_preflight_diagnostic(monkeypatch, caplo
     assert preflight_lines
     # Dijagnostika uspješnog turna se NE smije klasifikovati kao pad.
     assert canary._classify_failure(preflight_lines) == "unknown_rejection"
+
+
+# ---------------------------------------------------------------------------
+# Kapacitetna ekspanzija: ovi testovi ispituju MODEL-strategiju (Tutor +
+# Recenzent) i na lekcijama koje produkcija sada rutira deterministički
+# (blocking ugovor + potpun generator). Izričito isključenje je ISTI mehanizam
+# koji služi i kao produkcijski rollback (MATBOT_DETERMINISTIC_PRACTICE=
+# disabled) — model-put time ostaje trajno testiran, bajt za bajt kakav je bio.
+# ---------------------------------------------------------------------------
+import pytest as _pytest_capex
+
+
+@_pytest_capex.fixture(autouse=True)
+def _model_route_only_capex(monkeypatch):
+    monkeypatch.setenv("MATBOT_DETERMINISTIC_PRACTICE", "disabled")
