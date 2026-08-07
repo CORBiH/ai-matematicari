@@ -603,49 +603,37 @@ def _segment_may_be_declared_false(segment, segment_issues):
 #   • segment je čisto cjelobrojno dijeljenje `a : b = q` (ili `a \div b = q`);
 #   • dijeljenje NIJE egzaktno (a % b != 0 — inače obična jednakost i dalje
 #     važi) i q je TAČNO cjelobrojni količnik (q == a // b);
-#   • uz segment (ograničen prozor prije/poslije, i preko $...$ granica —
-#     ostatak se često piše kao „ostatak je $3$“) izričito stoji riječ
-#     ostatak/preostaje s brojem koji je TAČNO a - b·q.
+#   • u CIJELOM odgovoru (isti princip kao deklaracija π) izričito stoji
+#     riječ ostatka s brojem koji je TAČNO a - b·q. Živi F5E talas: model
+#     ostatak navodi i rečenicu-dvije POSLIJE dijeljenja, raznim glagolskim
+#     oblicima („ostatak je 2“, „ostaju 2“, „ostat će 2“, „preostane 2“) —
+#     stvarna zaštita od slučajnog poklapanja je egzaktna aritmetika
+#     (nekzaktno dijeljenje + tačan količnik + tačan ostatak), ne blizina.
 # Pogrešan količnik, pogrešan ostatak, egzaktno dijeljenje i `\approx` nikad
 # se ne priznaju ovim mehanizmom.
 _REMAINDER_DIVISION_RE = re.compile(
     r"^\s*(\d+)\s*(?::|\\div)\s*(\d+)\s*=\s*(\d+)\s*$")
 _REMAINDER_STATEMENT_RE = re.compile(
-    r"(?:ostat\w+|ostaje|preosta\w+)\D{0,30}?(\d+)", re.IGNORECASE)
-_REMAINDER_CONTEXT_WINDOW = 140
+    r"\b(?:osta|preosta)\w*\b\D{0,30}?(\d+)", re.IGNORECASE)
 
 
-def _context_window(tokens, index, direction):
-    """Ograničen prozor SIROVOG sadržaja oko segmenta, preko $...$ granica."""
-    parts = []
-    positions = (range(index - 1, -1, -1) if direction < 0
-                 else range(index + 1, len(tokens)))
-    total = 0
-    for position in positions:
-        parts.append(tokens[position][1])
-        total += len(tokens[position][1])
-        if total >= _REMAINDER_CONTEXT_WINDOW:
-            break
-    if direction < 0:
-        joined = "".join(reversed(parts))
-        return joined[-_REMAINDER_CONTEXT_WINDOW:]
-    return "".join(parts)[:_REMAINDER_CONTEXT_WINDOW]
+def _stated_remainders(text):
+    """Svi brojevi navedeni uz riječ ostatka, bilo gdje u odgovoru."""
+    return {int(match.group(1))
+            for match in _REMAINDER_STATEMENT_RE.finditer(text or "")}
 
 
-def _verified_remainder_division(segment, before_window, after_window):
+def _verified_remainder_division(segment, stated_remainders):
     """True SAMO kad su i količnik i ostatak dokazano tačni."""
+    if not stated_remainders:
+        return False
     match = _REMAINDER_DIVISION_RE.match(segment.strip())
     if not match:
         return False
     dividend, divisor, quotient = (int(group) for group in match.groups())
     if divisor == 0 or dividend % divisor == 0 or quotient != dividend // divisor:
         return False
-    expected_remainder = dividend - divisor * quotient
-    for window in (before_window, after_window):
-        for stated in _REMAINDER_STATEMENT_RE.finditer(window):
-            if int(stated.group(1)) == expected_remainder:
-                return True
-    return False
+    return (dividend - divisor * quotient) in stated_remainders
 
 
 def find_numeric_inconsistencies(text):
@@ -655,6 +643,7 @@ def find_numeric_inconsistencies(text):
     # Deklaracija se traži u CIJELOM tekstu, ne po segmentu: u živom nalazu je
     # „π\approx3,14“ stajalo u prozi, a nedosljedan izraz u $...$ ispod nje.
     pi_values = declared_pi_values(text or "")
+    stated_remainders = _stated_remainders(text or "")
     tokens = tokenize_math(text or "")
     for index, (kind, content) in enumerate(tokens):
         if kind not in (INLINE, DISPLAY):
@@ -664,10 +653,7 @@ def find_numeric_inconsistencies(text):
             continue
         if (len(found) == 1 and "nevaljan izraz" not in found[0]
                 and "\\approx" not in content and "≈" not in content
-                and _verified_remainder_division(
-                    content,
-                    _context_window(tokens, index, -1),
-                    _context_window(tokens, index, +1))):
+                and _verified_remainder_division(content, stated_remainders)):
             continue
         if _segment_may_be_declared_false(content, found):
             before = tokens[index - 1][1] if (

@@ -656,3 +656,19 @@ def test_unproven_or_false_remainder_division_still_fails():
     # Približenje se nikad ne amnestira ovim mehanizmom.
     assert find_numeric_inconsistencies(
         r"$23 : 5 \approx 4$, a ostatak je $3$.") != []
+
+
+def test_remainder_stated_sentences_later_and_verb_forms_are_verified():
+    """ŽIVI F5E TALAS: model ostatak navodi i dalje od samog dijeljenja, i
+    raznim glagolskim oblicima — egzaktan a - b·q je zaštita, ne blizina."""
+    from matbot.mathcheck import find_numeric_inconsistencies
+    assert find_numeric_inconsistencies(
+        "Podijelimo: $30 : 4 = 7$. Dakle, Ivana će napuniti $7$ kutija. "
+        "Nakon toga ostaju joj $2$ čokoladice.") == []
+    assert find_numeric_inconsistencies(
+        "Računamo $22 : 6 = 3$ pune kutije. Na kraju će ostati $4$ olovke.") == []
+    assert find_numeric_inconsistencies(
+        "Kad podijelimo, $23 : 5 = 4$ i preostane $3$.") == []
+    # Pogrešan broj uz riječ ostatka i dalje ne amnestira.
+    assert find_numeric_inconsistencies(
+        "Podijelimo: $30 : 4 = 7$. Nakon toga ostaju joj $3$ čokoladice.") != []
