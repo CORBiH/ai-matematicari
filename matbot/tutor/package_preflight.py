@@ -56,6 +56,8 @@ SEMANTIC_DUPLICATE_CODE = "semantically_duplicate_options"
 # broj u zagradi neposredno iza zatvorenog navodnika izraza (`'…' (3)`), pa
 # zagrada unutar samog izraza (`'(24+6):5'`) nikad ne može biti pogođena.
 _MISMATCH_VALUES_RE = re.compile(r"' \(([-+0-9.eE]+)\)")
+# Sporni par izraza iz iste mathcheck poruke: `'23 : 5' (4.6) != '4' (4)`.
+_MISMATCH_EXPR_RE = re.compile(r"'([^']{1,80})' \(")
 
 # Dokaz težine nacrta ne zadovoljava nivo koji je nacrt SAM deklarisao.
 DIFFICULTY_OUTSIDE_TARGET_CODE = "difficulty_evidence_outside_target"
@@ -307,9 +309,14 @@ def collect_package_issues(task, contract=None, previous_signature=""):
             # ili tekst iz sadržaja — isti princip kao broj pročitanih djelilaca.
             detail = f"{label} {found[0].split(':')[0]}"
             values = _MISMATCH_VALUES_RE.findall(found[0])
+            expressions = _MISMATCH_EXPR_RE.findall(found[0])
             if len(values) >= 2:
                 detail += (f" (server evaluated {values[0]} vs {values[1]},"
-                           " expected equal)")
+                           " expected equal")
+                if len(expressions) >= 2:
+                    detail += (f"; offending equality "
+                               f"'{expressions[0][:60]}' = '{expressions[1][:60]}'")
+                detail += ")"
             issues.append(PackageIssue("numeric_inconsistency", detail=detail))
 
     # 6) DOKAZ TEŽINE VS DEKLARISAN NIVO (živi gate b8a0f7b)
@@ -411,8 +418,18 @@ def format_for_reviewer(issues):
         "exactly one correct visible option, and keep the exact selected lesson. Do not "
         "merely reformat an equivalent value, do not merely lower the reported counts, "
         "do not merely relabel the level, "
-        "and do not change parts of the task that are already valid. If you cannot "
-        "correct it safely, return `fail_closed`."
+        "and do not change parts of the task that are already valid. "
+        # ŽIVI GATE 2a2a204 (harder_level2): recenzent je na dokazan numerički
+        # nalaz vratio `correct` s NEPROMIJENJENIM poljem. Zatvaranje nalaza
+        # je serverska invarijanta — recite mu to izričito.
+        "THE SERVER RE-RUNS THESE SAME DETERMINISTIC CHECKS ON THE PACKAGE YOU "
+        "RETURN: if any issue listed above is still present, your `correct` "
+        "decision is rejected automatically and nothing is published — "
+        "returning a listed field unchanged can never succeed. When a shown "
+        "division leaves a remainder, never write a bare `a : b = q`: either "
+        "state the remainder in the same sentence (`$23 : 5 = 4$, ostatak "
+        "$3$`) or write the check form `$23 = 5 \cdot 4 + 3$`. If you cannot "
+        "confidently repair every listed issue, return `fail_closed`."
     )
     return "\n".join(lines)
 

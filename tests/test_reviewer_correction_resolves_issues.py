@@ -190,3 +190,51 @@ import pytest as _pytest_capex
 @_pytest_capex.fixture(autouse=True)
 def _model_route_only_capex(monkeypatch):
     monkeypatch.setenv("MATBOT_DETERMINISTIC_PRACTICE", "disabled")
+
+
+# ---------------------------------------------------------------------------
+# ZATVARANJE NUMERIČKOG NALAZA (živi release gate 2a2a204, harder_level2)
+# ---------------------------------------------------------------------------
+# Recenzent je na dokazan numerički nalaz odgovorio decision=correct i vratio
+# polje NEPROMIJENJENO — server sam dokazuje da je nalaz nestao i odbija prije
+# objave kad nije. Stvarno popravljen paket se objavljuje.
+
+_BROKEN_SOLUTION = "Računamo: $3x = 12$, pa je $x = 12 : 3 = 5$."
+_REPAIRED_SOLUTION = "Računamo: $3x = 12$, pa je $x = 12 : 3 = 4$."
+
+
+def test_numeric_defect_returned_unchanged_by_correct_is_rejected(store, fake_llm):
+    broken = _task(solution=_BROKEN_SOLUTION)
+    response = _run(store, fake_llm, draft_task=broken, final_task=broken)
+    _assert_fail_closed(response, store, fake_llm)
+
+
+def test_numeric_defect_actually_repaired_by_correct_is_published(store, fake_llm):
+    broken = _task(solution=_BROKEN_SOLUTION)
+    repaired = _task(solution=_REPAIRED_SOLUTION)
+    response = _run(store, fake_llm, draft_task=broken, final_task=repaired)
+    assert response.get("status") == "ready", response
+    assert fake_llm.call_count == 2
+
+
+def test_numeric_issue_detail_names_the_offending_equality():
+    """Recenzent mora znati KOJA jednakost je pala, ne samo vrijednosti."""
+    from matbot.tutor import package_preflight
+
+    task = _task(solution="Računamo: $3x = 12$, pa je $x = 12 : 3 = 5$.")
+    issues = package_preflight.collect_package_issues(task)
+    numeric = [issue for issue in issues if issue.code == "numeric_inconsistency"]
+    assert numeric, issues
+    assert "offending equality" in numeric[0].detail
+    assert "server evaluated" in numeric[0].detail
+
+
+def test_reviewer_block_declares_the_closure_invariant():
+    from matbot.tutor import package_preflight
+
+    task = _task(solution="Računamo: $3x = 12$, pa je $x = 12 : 3 = 5$.")
+    issues = package_preflight.collect_package_issues(task)
+    block = package_preflight.format_for_reviewer(issues)
+    assert "RE-RUNS THESE SAME DETERMINISTIC CHECKS" in block
+    assert "fail_closed" in block
+    assert "ostatak" in block

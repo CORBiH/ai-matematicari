@@ -619,3 +619,40 @@ def test_same_unit_and_annotation_equalities_are_still_checked():
         r"$V=\frac{25\cdot9}{3}=70\,\text{cm}^3$") != []
     assert find_numeric_inconsistencies(
         r"$V=\frac{25\cdot9}{3}=75\,\text{cm}^3$") == []
+
+
+# ---------------------------------------------------------------------------
+# ŠKOLSKI ZAPIS DIJELJENJA S OSTATKOM (živi release gate 2a2a204, harder_level2)
+# ---------------------------------------------------------------------------
+# Tutor i Recenzent su za tekstualni zadatak napisali pedagoški ISPRAVNO
+# "$23 : 5 = 4$, a ostatak je $3$", a modul je pročitao golu lažnu jednakost
+# 23/5 = 4 i oborio oba poziva. Zapis se priznaje SAMO kad je POTPUNO DOKAZAN:
+# dijeljenje nije egzaktno, količnik je tačno cjelobrojni količnik, a ostatak
+# je naveden uz segment i tačno iznosi a - b·q. Sve ostalo i dalje pada.
+
+def test_verified_remainder_division_is_accepted():
+    from matbot.mathcheck import find_numeric_inconsistencies
+    assert find_numeric_inconsistencies(
+        "Podijelimo olovke: $23 : 5 = 4$, a ostatak je $3$.") == []
+    assert find_numeric_inconsistencies(
+        "Dakle $23 : 5 = 4$ (ostatak $3$), pa treba pet kutija.") == []
+    assert find_numeric_inconsistencies(
+        "Količnik: $23 : 5 = 4$. Ostatak je $3$ olovke.") == []
+
+
+def test_unproven_or_false_remainder_division_still_fails():
+    from matbot.mathcheck import find_numeric_inconsistencies
+    # Gola lažna jednakost bez ostatka u blizini.
+    assert find_numeric_inconsistencies("$23 : 5 = 4$") != []
+    # Pogrešan ostatak.
+    assert find_numeric_inconsistencies(
+        "$23 : 5 = 4$, a ostatak je $4$.") != []
+    # Pogrešan količnik (nije cjelobrojni količnik).
+    assert find_numeric_inconsistencies(
+        "$23 : 5 = 5$, a ostatak je $3$.") != []
+    # Egzaktno dijeljenje s "ostatkom" je i dalje greška.
+    assert find_numeric_inconsistencies(
+        "$20 : 5 = 3$, a ostatak je $5$.") != []
+    # Približenje se nikad ne amnestira ovim mehanizmom.
+    assert find_numeric_inconsistencies(
+        r"$23 : 5 \approx 4$, a ostatak je $3$.") != []

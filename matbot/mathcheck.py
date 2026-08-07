@@ -591,6 +591,63 @@ def _segment_may_be_declared_false(segment, segment_issues):
     return all("nevaljan izraz" not in issue for issue in segment_issues)
 
 
+# ---------------------------------------------------------------------------
+# ŠKOLSKI ZAPIS DIJELJENJA S OSTATKOM (živi release gate 2a2a204, harder_level2)
+# ---------------------------------------------------------------------------
+# Tekstualni zadatak dijeljenja s ostatkom školski se zapisuje
+# „$23 : 5 = 4$, a ostatak je $3$“ — i Tutor i Recenzent su ga tako napisali,
+# recenzent ga je nezavisno riješio kao TAČAN, a ovaj modul je pročitao golu
+# lažnu jednakost 23/5 = 4 i oborio oba poziva. Za razliku od amnestije
+# namjerno lažne jednakosti, ovdje se zapis priznaje samo kad je POTPUNO
+# DOKAZAN — dakle nije preskakanje nego verifikacija:
+#   • segment je čisto cjelobrojno dijeljenje `a : b = q` (ili `a \div b = q`);
+#   • dijeljenje NIJE egzaktno (a % b != 0 — inače obična jednakost i dalje
+#     važi) i q je TAČNO cjelobrojni količnik (q == a // b);
+#   • uz segment (ograničen prozor prije/poslije, i preko $...$ granica —
+#     ostatak se često piše kao „ostatak je $3$“) izričito stoji riječ
+#     ostatak/preostaje s brojem koji je TAČNO a - b·q.
+# Pogrešan količnik, pogrešan ostatak, egzaktno dijeljenje i `\approx` nikad
+# se ne priznaju ovim mehanizmom.
+_REMAINDER_DIVISION_RE = re.compile(
+    r"^\s*(\d+)\s*(?::|\\div)\s*(\d+)\s*=\s*(\d+)\s*$")
+_REMAINDER_STATEMENT_RE = re.compile(
+    r"(?:ostat\w+|ostaje|preosta\w+)\D{0,30}?(\d+)", re.IGNORECASE)
+_REMAINDER_CONTEXT_WINDOW = 140
+
+
+def _context_window(tokens, index, direction):
+    """Ograničen prozor SIROVOG sadržaja oko segmenta, preko $...$ granica."""
+    parts = []
+    positions = (range(index - 1, -1, -1) if direction < 0
+                 else range(index + 1, len(tokens)))
+    total = 0
+    for position in positions:
+        parts.append(tokens[position][1])
+        total += len(tokens[position][1])
+        if total >= _REMAINDER_CONTEXT_WINDOW:
+            break
+    if direction < 0:
+        joined = "".join(reversed(parts))
+        return joined[-_REMAINDER_CONTEXT_WINDOW:]
+    return "".join(parts)[:_REMAINDER_CONTEXT_WINDOW]
+
+
+def _verified_remainder_division(segment, before_window, after_window):
+    """True SAMO kad su i količnik i ostatak dokazano tačni."""
+    match = _REMAINDER_DIVISION_RE.match(segment.strip())
+    if not match:
+        return False
+    dividend, divisor, quotient = (int(group) for group in match.groups())
+    if divisor == 0 or dividend % divisor == 0 or quotient != dividend // divisor:
+        return False
+    expected_remainder = dividend - divisor * quotient
+    for window in (before_window, after_window):
+        for stated in _REMAINDER_STATEMENT_RE.finditer(window):
+            if int(stated.group(1)) == expected_remainder:
+                return True
+    return False
+
+
 def find_numeric_inconsistencies(text):
     """Glavna ulazna tačka. Vrati listu INTERNIH razloga (prazno = nema
     dokazane nedosljednosti). Nikad ne mijenja tekst i nikad ne poziva model."""
@@ -604,6 +661,13 @@ def find_numeric_inconsistencies(text):
             continue
         found = check_segment(content, pi_values)
         if not found:
+            continue
+        if (len(found) == 1 and "nevaljan izraz" not in found[0]
+                and "\\approx" not in content and "≈" not in content
+                and _verified_remainder_division(
+                    content,
+                    _context_window(tokens, index, -1),
+                    _context_window(tokens, index, +1))):
             continue
         if _segment_may_be_declared_false(content, found):
             before = tokens[index - 1][1] if (
