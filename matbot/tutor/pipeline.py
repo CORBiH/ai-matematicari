@@ -591,12 +591,51 @@ def _deterministic_active_annex(session):
     return annex
 
 
+def _deterministic_safe_help_texts(package, context, request_id, intent):
+    """Sanitizovana ljestvica nagovještaja paketa — ili UnifiedOutputError.
+
+    ZAŠTO POSTOJI (audit ovlašćenja pravila, PHASE A): `hints` nisu dio
+    `TaskPayload`-a, pa ih objavna validacija NIKAD nije vidjela. U sesiju je
+    išao SIROV string generatora, a help-turn ga je slao učeniku doslovno — bez
+    mathsafe provjere, bez normalizacije terminologije, bez ijednog validatora.
+    To je bila jedina učeniku vidljiva površina bez ijedne kapije.
+
+    Ovdje se NE UVODI novi sanitizer ni novi prag: poziva se ISTI
+    `_safe_text` + `_reject_if_inconsistent` + `_reject_if_geometry_invalid`
+    niz koji objava pokreće nad tekstom zadatka. Semantički detektor porodice
+    se NAMJERNO ne pokreće nad nagovještajem: on pita „radi li ovaj tekst ono
+    što lekcija ispituje“, a nagovještaj je uputa („prvo nađi zajednički
+    imenilac“), ne zadatak — to bi bio validator zadatka pušten nad prozom.
+
+    Zove se PRIJE `_publish_task`, dakle prije ijedne mutacije sesije: kandidat
+    s neupotrebljivim nagovještajem pada zatvoreno i petlja bira nove operande,
+    a kad nijedan pokušaj ne uspije, stanje ostaje netaknuto."""
+    try:
+        safe_hints = []
+        for index, hint in enumerate(package.hints):
+            where = f"deterministički nagovještaj {index + 1}"
+            text = _safe_text(hint, where)
+            _reject_if_inconsistent(text, where)
+            _reject_if_geometry_invalid(text, context, where)
+            safe_hints.append(text)
+    except UnifiedOutputError as error:
+        _log_rejection(request_id, context, "deterministic_help_text", error, intent)
+        raise
+    return tuple(safe_hints)
+
+
 def _deterministic_choice_reply(annex, is_correct, wrong_before):
     """Kratka povratna poruka iz POHRANJENIH činjenica paketa — bez modela.
 
     Prvi pogrešan klik dobija pravilo-nagovještaj (nikad rezultat); drugi
     pogrešan klik otkriva rezultat NAMJERNO — isti ugovor kao model-put."""
-    answer_display = f"${annex['display_answer']}$"
+    # `answer_reply` je OBJAVLJEN, sanitizovan tekst tačne opcije — doslovno
+    # ono što učenik vidi na kartici. Ranije se ovdje sirov `display_answer`
+    # slijepo umotavao u `$…$`, pa je za porodice koje već nose vlastite
+    # dolare nastajalo `$$13$ i $16$$` (pokvaren MathJax), a za mjerne
+    # jedinice nebezbjedan zapis tipa `$360 min$` — nijedan od ta dva nikad
+    # nije prošao ijedan validator (PHASE A).
+    answer_display = annex["answer_reply"]
     if is_correct:
         return f"Tačno — rezultat je {answer_display}. Bravo!"
     if wrong_before >= 1:
@@ -679,7 +718,7 @@ def _run_deterministic_task_turn(store, session, turn, context, request_id,
     target_level = generator_level if levels_enabled else None
     previous_level = session.get("difficulty_level") if levels_enabled else None
 
-    package, task_text = None, ""
+    package, task_text, safe_hints = None, "", ()
     with timer.stage("generate"):
         # Ograničeni pokušaji: kanonski/potpisni duplikat bira NOVE operande,
         # nikad model. Svaki kandidat prolazi ISTU objavnu validaciju.
@@ -700,6 +739,12 @@ def _run_deterministic_task_turn(store, session, turn, context, request_id,
             try:
                 with timer.stage("publish"):
                     validate_task_package(payload, context, target_level)
+                    # Pomoćni tekstovi prolaze kapiju PRIJE objave: nagovještaj
+                    # koji učeniku ne smije biti prikazan obara KANDIDATA, a ne
+                    # tek kasniji help-turn (tada bi zadatak već bio objavljen,
+                    # a pomoć nedostupna).
+                    safe_hints = _deterministic_safe_help_texts(
+                        candidate, context, request_id, intent)
                     task_text = _publish_task(session, context, final,
                                               request_id, target_level)
             except UnifiedOutputError:
@@ -720,13 +765,22 @@ def _run_deterministic_task_turn(store, session, turn, context, request_id,
     # Deterministički dodatak sesije: ljestvica nagovještaja i potpuno rješenje
     # su SERVERSKE činjenice objavljenog paketa — kasniji hint/rješenje/klik za
     # OVAJ identitet ne treba nijedan poziv modela.
+    #
+    # PHASE A: svaki OVDJE pohranjen učeniku vidljiv tekst je već prošao
+    # serversku kapiju. Nagovještaji nose `safe_hints` (sanitizovani iznad,
+    # prije objave), a rješenje i tačan odgovor se čitaju iz sesije — to su
+    # DOSLOVNO tekstovi koje je `_publish_task` prihvatio, pa je nemoguće da
+    # objava prihvati jednu kopiju, a help-turn kasnije pošalje drugu (sirovu).
+    # `display_answer`/`accepted_answers` ostaju kanonske VRIJEDNOSTI paketa i
+    # nikad se ne šalju učeniku.
     session["deterministic_task"] = {
         "generator_version": package.generator_version,
         "family_id": package.family_id,
         "operation": package.operation,
-        "hints": list(package.hints),
-        "solution": package.solution,
+        "hints": list(safe_hints),
+        "solution": session["solution_summary"],
         "display_answer": package.display_answer,
+        "answer_reply": session["expected_answer_summary"],
         "accepted_answers": list(package.accepted_answers),
         "task_identity": session["current_task_identity"],
     }
