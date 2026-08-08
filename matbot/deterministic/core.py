@@ -9,7 +9,7 @@ matematiku svoje vještine.
 
 MATEMATIČKI AUTORITET: isključivo egzaktna aritmetika (`fractions.Fraction`,
 cijeli brojevi). Binarni float se nigdje ne koristi kao izvor istine; decimalni
-prikaz se izvodi iz razlomka čiji imenilac dijeli dekadsku jedinicu, pa je
+prikaz se izvodi iz razlomka čiji nazivnik dijeli dekadsku jedinicu, pa je
 svaki prikaz egzaktan.
 
 GRANICA: nijedan generator ovdje ne bira rutu i ne poznaje nijednu lekciju.
@@ -92,7 +92,7 @@ def plain_fraction_display(value: Fraction) -> str:
 
 
 def is_terminating_decimal(value: Fraction) -> bool:
-    """Da li vrijednost ima KONAČAN decimalni zapis (imenilac oblika 2^a·5^b)."""
+    """Da li vrijednost ima KONAČAN decimalni zapis (nazivnik oblika 2^a·5^b)."""
     denominator = value.denominator
     for factor in (2, 5):
         while denominator % factor == 0:
@@ -205,6 +205,11 @@ class DeterministicPackage:
     generator_version: str
     evidence: DifficultyEvidence = None
     comparison_evidence: bool = field(default=False)
+    # PP-1 metodska provenijencija: KOJOM metodom su pisani hintovi/rješenje
+    # ("unknown_member", "transposition", "" = metodski neutralno). Server je
+    # poredi sa zabranjenim metodama razriješene politike — zabranjena metoda
+    # pada strukturno, i kad joj proza ne oda nijednu riječ.
+    method_id: str = ""
 
     def task_payload(self) -> TaskPayload:
         """Isti oblik paketa kao model-nacrt — objava i validatori ostaju
@@ -248,7 +253,7 @@ def build_package(*, lesson_id, lesson_title, family_id, operation, level,
                   hints, solution, signature_parameters, required_conditions,
                   relevant_objects, generator_version, display_of=None,
                   accepted_answers=(), wrap="$", comparison_evidence=False,
-                  option_texts=None, evidence=None):
+                  option_texts=None, evidence=None, method_id=""):
     """Jedina tačka sklapanja paketa — svaka porodica prolazi kroz ISTE provjere.
 
     `option_texts` smije doći gotov samo kad opcije nisu numeričke vrijednosti
@@ -275,4 +280,5 @@ def build_package(*, lesson_id, lesson_title, family_id, operation, level,
         relevant_objects=tuple(relevant_objects),
         generator_version=generator_version,
         evidence=evidence, comparison_evidence=comparison_evidence,
+        method_id=method_id,
     )

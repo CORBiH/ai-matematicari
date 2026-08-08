@@ -32,6 +32,7 @@ import re
 from dataclasses import dataclass
 
 from matbot import lesson_fidelity, mcq_integrity, option_equivalence
+from matbot import practice_policy as practice_policy_module
 from matbot.semantics import detectors as semantic_detectors
 from matbot.tutor import task_identity
 from matbot.mathcheck import find_numeric_inconsistencies
@@ -132,7 +133,8 @@ def _option_id(task, index):
 
 
 def collect_package_issues(task, contract=None, previous_signature="",
-                           difficulty_profile=None, practice_contract=None):
+                           difficulty_profile=None, practice_contract=None,
+                           practice_policy=None):
     """Vrati zatvorenu torku nalaza postojećih validatora nad JEDNIM paketom.
 
     Prazna torka = nijedan deterministički validator ne može dokazati defekt.
@@ -150,7 +152,12 @@ def collect_package_issues(task, contract=None, previous_signature="",
     lekcije ili None: dokazan prekršaj (zadatak ne radi ono što lekcija
     ispituje — npr. grafička lekcija bez ijednog grafičkog sadržaja) je
     blokirajući nalaz. Lažno pozivanje na nepostojeću sliku je globalan
-    nalaz i bez ugovora."""
+    nalaz i bez ugovora.
+
+    `practice_policy` (PP-1) je razriješena pedagoška politika lekcije ili
+    None: kurikularna metoda (npr. 6. razred bez prebacivanja), vidljivi
+    brojevni domen i granica naprednih operacija. Nalaz ide recenzentu da ga
+    popravi u ISTOM drugom pozivu — objava iste provjere svakako ponavlja."""
     if task is None:
         return ()
     issues = []
@@ -366,6 +373,23 @@ def collect_package_issues(task, contract=None, previous_signature="",
                 detail=(f"{practice_contract.requirement_type}: "
                         + ",".join(fidelity))))
 
+    # 6c) POLITIKA PP-1 (audit ovlašćenja pravila): metoda razreda, vidljivi
+    #     brojevni domen, napredne operacije — isti detektori koje objava
+    #     pokreće; ovdje SAMO kao nalaz da bi ispravka stala u drugi poziv.
+    if practice_policy is not None:
+        policy_surfaces = [("task_text", raw_task_text),
+                           ("solution", getattr(task, "solution", "") or "")]
+        policy_surfaces.extend(
+            ("option", getattr(option, "text", "") or "")
+            for option in (getattr(task, "options", None) or ()))
+        seen_policy_codes = set()
+        for label, surface in policy_surfaces:
+            for code in practice_policy_module.text_policy_failures(
+                    practice_policy, surface):
+                if code not in seen_policy_codes:
+                    seen_policy_codes.add(code)
+                    issues.append(PackageIssue(code, detail=label))
+
     evidence = getattr(task, "difficulty_evidence", None)
     target_level = getattr(task, "target_difficulty_level", None)
     if evidence is not None and isinstance(target_level, int):
@@ -443,6 +467,24 @@ def format_for_reviewer(issues):
         "exist in this text-only UI: rewrite the task so every needed object is "
         "stated in the text itself (coordinates, table, list of faces), or replace "
         "the task. "
+        # PP-1 (audit ovlašćenja pravila): kurikularna metoda, vidljivi domen
+        # i granica naprednih operacija imaju svoj lijek — bez njega bi
+        # recenzent vraćao `correct` s istim nalazom (obrazac F4E E01).
+        f"For `{practice_policy_module.FORBIDDEN_METHOD_CODE}` the named field "
+        "teaches a solving method this grade's curriculum forbids (moving terms "
+        "across the equals sign / operating on both sides): rewrite the "
+        "explanation using the unknown-member relations from the grade rules "
+        "block above (e.g. nepoznati sabirak = zbir minus poznati sabirak), and "
+        "never use words like `prebaci` or `obje strane`. "
+        f"For `{practice_policy_module.VISIBLE_DOMAIN_CODE}` the named field "
+        "shows a negative number in a lesson whose number domain has no "
+        "negatives: choose new values so every VISIBLE number (task, options, "
+        "solution steps) stays in the lesson's domain, and recompute every "
+        "field. "
+        f"For `{practice_policy_module.ADVANCED_SCOPE_CODE}` the named field "
+        "introduces an operation outside the primary-school curriculum "
+        "(sin/cos/tg/log): replace the task or rewrite the field using only "
+        "methods this lesson teaches. "
         "For `numeric_inconsistency` an equality chain inside $...$ in the named "
         "field is numerically false: recompute every step and rewrite that field so "
         "every shown equality holds. When a false equality is the DELIBERATE point "

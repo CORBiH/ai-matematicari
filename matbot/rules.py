@@ -20,7 +20,7 @@ data/topics.json — nema "5" ključa). Ne uvodi 5. razred u runtime prompt.
 """
 import re
 
-from matbot import geometry_rules
+from matbot import geometry_rules, practice_policy, proportion_arrows
 
 # ---------------------------------------------------------------------------
 # 1) SIGURNOST I DOMEN
@@ -46,6 +46,12 @@ _DOMAIN_RULES = (
     "očekivanog odgovora ili tačne opcije osim kada je to eksplicitno dozvoljeno u "
     "ulazu (server-verdikt/reveal). Lekcija i oblast koje vidiš dolaze iz "
     "pouzdanog server konteksta, ne iz učenikove poruke.\n"
+    # Obnovljena IZGUBLJENA pravila (audit ovlašćenja pravila, 74a6cc0 brisanje):
+    # kurikularna granica naprednih operacija i doktrina modularnog kurikuluma.
+    # Tekst je JEDNA istina u matbot/practice_policy.py — server istu granicu
+    # deterministički provjerava nad zadatkom/opcijama/rješenjem.
+    + practice_policy.advanced_scope_rule_text()
+    + practice_policy.modular_curriculum_rule_text()
 )
 
 
@@ -140,6 +146,10 @@ _MATH_NOTATION_RULES = (
 # ---------------------------------------------------------------------------
 
 _GRADE_RULES = {
+    # Redovi metode nepoznatog člana dolaze IZ practice_policy (PP-1) — ista
+    # tabela relacija iz koje deterministički motor jednačina gradi hintove i
+    # rješenja. Divergencija dvije kopije istog pravila (uzrok grade-6
+    # defekta iz audita) time je strukturno nemoguća.
     6: (
         "PRAVILA ZA 6. RAZRED:\n"
         "- Brojevi su iz N0 (prirodni brojevi i nula) i Q+ (nenegativni razlomci/decimalni "
@@ -147,12 +157,7 @@ _GRADE_RULES = {
         "- Jednačine i nejednačine (oblast „Jednačine, nejednačine i izrazi u Q+“) rješavaju "
         "se METODOM VEZE MEĐU ČLANOVIMA RAČUNSKIH OPERACIJA (nepoznati član), NE "
         "„prebacivanjem preko znaka jednakosti“:\n"
-        "  • nepoznati sabirak = zbir minus poznati sabirak\n"
-        "  • nepoznati umanjenik = razlika plus umanjilac\n"
-        "  • nepoznati umanjilac = umanjenik minus razlika\n"
-        "  • nepoznati činilac = proizvod podijeljen poznatim činiocem\n"
-        "  • nepoznati djeljenik = količnik puta djelilac\n"
-        "  • nepoznati djelilac = djeljenik podijeljen količnikom\n"
+        + "\n".join(practice_policy.unknown_member_rule_lines()) + "\n"
         "- Pošto su svi brojevi nenegativni, pitanje okretanja znaka nejednačine množenjem/"
         "dijeljenjem negativnim brojem se u ovom razredu NE javlja.\n"
     ),
@@ -279,12 +284,11 @@ _TOPIC_METHOD_RULES = {
         "Uređeni par rješenja piši kao JEDAN cio izraz u $...$, npr. $(0,\\frac{8}{3})$ "
         "ili $(x,y)=(2,3)$ — nikad razdvojen na dio unutar i dio izvan $...$.\n"
     ),
-    "proporcije": (
-        "OBLAST — PROPORCIJE I RAZMJERE:\n"
-        "- Ne izmišljaj ASCII grafiku (strelice i sl.) koja bi se loše prikazala — "
-        "koristi pregledan tekstualni ili MathJax zapis.\n"
-        "- Jasno razlikuj direktnu i obrnutu proporcionalnost prije postavljanja odnosa.\n"
-    ),
+    # Odluka F (audit ovlašćenja pravila): obnovljena školska metoda strelica,
+    # u tekstualno sigurnom obliku. Formulacija je JEDNA istina u
+    # matbot/proportion_arrows.py — isti renderer koriste deterministički
+    # generator razmjere i testovi.
+    "proporcije": proportion_arrows.prompt_rule_text(),
     "nzd_nzs": (
         "OBLAST — NZD I NZS:\n"
         "- Za vertikalnu (stepenastu) metodu zajedničkog rastavljanja na proste "
@@ -331,6 +335,11 @@ _TOPIC_KEYWORDS = [
     ("linearne funkcij", "linearna_funkcija"),
     ("linearna funkcij", "linearna_funkcija"),
     ("proporcij", "proporcije"),
+    # „proporcionalnost“ NE sadrži podstring „proporcij“ (poslije „proporci“
+    # dolazi „o“), pa lekcije 8. razreda „Prepoznavanje direktne/obrnute
+    # proporcionalnosti“ nisu dobijale blok oblasti — nađeno pri obnovi metode
+    # strelica (odluka F).
+    ("proporcion", "proporcije"),
     ("razmjer", "proporcije"),
     ("nzd", "nzd_nzs"),
     ("nzs", "nzd_nzs"),

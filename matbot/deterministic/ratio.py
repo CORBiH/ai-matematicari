@@ -21,6 +21,7 @@ import random
 from fractions import Fraction
 from math import gcd
 
+from matbot import proportion_arrows
 from matbot.deterministic import core
 from matbot.deterministic.core import DeterministicGenerationError
 
@@ -216,20 +217,30 @@ def _recognition_package(rng, level, lesson_id, lesson_title):
     neither_table = _table_text(xs, [k * x + rng.randint(1, 3) for x in xs])
     neither_table2 = _table_text(xs, [x * x for x in xs])
 
+    # Odluka F (audit ovlašćenja pravila): školska metoda strelica — smjer
+    # promjene veličina se imenuje PRIJE računa; količnik/proizvod je zatim
+    # dokazna provjera. Rečenice dolaze iz matbot/proportion_arrows.py (ista
+    # formulacija koju rules.py renderuje u oba prompta).
     if ask_direct:
         correct, kind_word = direct_table, "direktno proporcionalne"
         wrong = [inverse_table, neither_table, neither_table2]
-        rule = ("Kod direktne proporcionalnosti KOLIČNIK y : x je stalan "
-                "za svaki par.")
-        witness = (f"količnici su redom "
+        rule = (proportion_arrows.direction_sentence(
+                    proportion_arrows.KIND_DIRECT)
+                + " Provjera: KOLIČNIK y : x je stalan za svaki par.")
+        witness = (proportion_arrows.direction_sentence(
+                       proportion_arrows.KIND_DIRECT)
+                   + f" Količnici su redom "
                    + ", ".join(f"${k * x} : {x} = {k}$" for x in xs)
                    + " — stalno " + f"${k}$")
     else:
         correct, kind_word = inverse_table, "obrnuto proporcionalne"
         wrong = [direct_table, neither_table, neither_table2]
-        rule = ("Kod obrnute proporcionalnosti PROIZVOD x·y je stalan za "
-                "svaki par.")
-        witness = (f"proizvodi su redom "
+        rule = (proportion_arrows.direction_sentence(
+                    proportion_arrows.KIND_INVERSE)
+                + " Provjera: PROIZVOD x·y je stalan za svaki par.")
+        witness = (proportion_arrows.direction_sentence(
+                       proportion_arrows.KIND_INVERSE)
+                   + f" Proizvodi su redom "
                    + ", ".join(f"${x} \\cdot {base // x} = {base}$"
                                for x in inverse_xs)
                    + " — stalno " + f"${base}$")
@@ -241,8 +252,10 @@ def _recognition_package(rng, level, lesson_id, lesson_title):
     hint2 = ("Za svaku tabelu izračunaj količnike y : x i proizvode x·y — "
              "traži onu u kojoj je odgovarajuća vrijednost stalna.")
     hint3 = "Dovoljan je jedan par koji odstupa da tabela otpadne."
-    solution = (f"U tabeli ({correct}) {witness}, pa su veličine {kind_word}. "
-                "U ostalim tabelama ta vrijednost nije stalna.")
+    solution = (f"U tabeli ({correct}): kad prva veličina raste, druga "
+                f"{'raste' if ask_direct else 'opada'}. {witness}. Veličine "
+                f"su zato {kind_word}; u ostalim tabelama provjerena "
+                "vrijednost nije stalna.")
     return core.build_package(
         lesson_id=lesson_id, lesson_title=lesson_title,
         family_id="ratio_proportion_direct",

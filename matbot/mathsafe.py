@@ -85,6 +85,10 @@ MATHJAX_COMMAND_ALLOWLIST = frozenset({
     "emptyset", "varnothing", "forall", "exists",
     "Rightarrow", "Leftarrow", "Leftrightarrow", "to", "rightarrow",
     "leftarrow", "mapsto",
+    # Metoda strelica za proporcionalnost (audit ovlašćenja pravila, odluka
+    # F): smjer promjene veličina se zapisuje s \uparrow/\downarrow — vidi
+    # matbot/proportion_arrows.py.
+    "uparrow", "downarrow",
     # funkcije i veliki operatori
     "sum", "prod", "int", "lim", "log", "ln", "lg",
     "sin", "cos", "tan", "cot", "sec", "csc", "min", "max", "gcd",

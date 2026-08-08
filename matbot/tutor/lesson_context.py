@@ -13,7 +13,7 @@ samo ima manje popunjenih polja.
 """
 from dataclasses import dataclass, field
 
-from matbot import geometry_rules, semantic_practice, task_families
+from matbot import geometry_rules, practice_policy, semantic_practice, task_families
 from matbot.contracts import registry as contract_registry
 from matbot.semantics import contracts as semantic_contracts
 from matbot.topics import lesson_info
@@ -53,6 +53,10 @@ class LessonContext:
     # šta zadatak MORA raditi da bi ispitivao baš ovu lekciju. None = lekcija
     # bez blokirajućeg ugovora; ponašanje tada ostaje bajt za bajt kao prije.
     practice_contract: object = None
+    # Razriješena pedagoška politika (PP-1, matbot/practice_policy.py) —
+    # ISTA instanca ide u prompt, deterministički motor i validatore, pa
+    # nijedan put ne može konsumirati drukčiju verziju istog pravila.
+    practice_policy: object = None
 
     @property
     def canonical_label(self):
@@ -77,6 +81,7 @@ def build(grade, topic_id):
     )
 
     contract = contract_registry.contract_for(lesson["id"])
+    semantic_contract = semantic_contracts.contract_for(lesson["id"])
     return LessonContext(
         grade=grade,
         topic_id=lesson["id"],
@@ -95,6 +100,14 @@ def build(grade, topic_id):
         lesson_scope=str(lesson.get("lesson_scope", "") or ""),
         objectives=tuple(lesson.get("objectives", []) or ()),
         exclusions=tuple(lesson.get("exclusions", []) or ()),
-        semantic_contract=semantic_contracts.contract_for(lesson["id"]),
+        semantic_contract=semantic_contract,
         practice_contract=semantic_practice.contract_for(lesson["id"]),
+        practice_policy=practice_policy.resolve(
+            grade=grade,
+            lesson_id=lesson["id"],
+            family_id=getattr(semantic_contract, "family_id", ""),
+            parameters=getattr(semantic_contract, "parameters", None),
+            lesson_title=lesson["title"],
+            oblast=lesson["oblast"],
+        ),
     )

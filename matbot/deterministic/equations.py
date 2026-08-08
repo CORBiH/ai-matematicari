@@ -26,6 +26,9 @@ from fractions import Fraction
 
 from matbot.deterministic import core
 from matbot.deterministic.core import DeterministicGenerationError
+# PP-1: relacije nepoznatog člana — ISTE rečenice koje rules.py renderuje u
+# oba prompta (jedna istina, vidi matbot/practice_policy.py).
+from matbot.practice_policy import UNKNOWN_ROLE_RELATIONS as _ROLE_RELATIONS
 
 FAMILY_IDS = ("linear_equation_direct", "simple_quadratic_equation")
 GENERATOR_VERSION = "deteq-1"
@@ -62,7 +65,14 @@ def supports(parameters) -> bool:
     return parameters.get("number_domain") in _SUPPORTED_DOMAINS
 
 
-def generate_package(lesson_id, lesson_title, parameters, level, rng=None):
+def generate_package(lesson_id, lesson_title, parameters, level, rng=None,
+                     policy=None):
+    """`policy` je razriješena PP-1 politika (matbot/practice_policy.py) ili
+    None. Kad politika traži metodu nepoznatog člana (6. razred), oblici se
+    grade iz ULOGE nepoznatog člana — transpoziciona proza za te oblike NIKAD
+    ne nastaje. Oblik bez varijante nepoznatog člana pod tom politikom pada
+    zatvoreno (DET-G6: buduće vezivanje oblika na niži razred ne smije tiho
+    isporučiti pogrešnu metodu); model-put tada preuzima lekciju."""
     if not supports(parameters):
         raise DeterministicGenerationError("parametri ugovora nisu podržani")
     rng = rng or random.Random()
@@ -70,9 +80,14 @@ def generate_package(lesson_id, lesson_title, parameters, level, rng=None):
     shapes = tuple(parameters["shapes"])
     # Kvadratna porodica ne nosi number_domain — radi nad cijelim brojevima.
     domain = parameters.get("number_domain") or "integer"
+    unknown_member = (policy is not None and getattr(
+        policy, "equation_method", "") == "unknown_member")
     for _ in range(60):
         try:
             shape = rng.choice(shapes)
+            if unknown_member:
+                return _unknown_member_package(rng, level, domain, shape,
+                                               lesson_id, lesson_title)
             builder = {
                 "one_step_additive": _additive_package,
                 "one_step_multiplicative": _multiplicative_package,
@@ -313,18 +328,27 @@ def _parentheses_package(rng, level, domain, lesson_id, lesson_title):
 
 
 def _solving_package(rng, level, domain, lesson_id, lesson_title, operation,
-                     question, equation, solution, hints, solution_text, scale):
-    candidates = _distractor_pool(solution, scale)
+                     question, equation, solution, hints, solution_text, scale,
+                     method_id="transposition", distractors=None,
+                     evidence=None, answer_display=None, display_of=None):
+    """`method_id` je PP-1 provenijencija: zatečeni graditelji uče
+    prebacivanje/balansiranje ("transposition"), graditelji nepoznatog člana
+    prosljeđuju "unknown_member". Server je poredi sa zabranama politike."""
+    candidates = distractors if distractors is not None \
+        else _distractor_pool(solution, scale)
     return core.build_package(
         lesson_id=lesson_id, lesson_title=lesson_title,
         family_id="linear_equation_direct", operation=operation, level=level,
         question=question, answer_value=solution,
-        answer_display=_final(solution), distractor_values=candidates,
+        answer_display=answer_display or _final(solution),
+        distractor_values=candidates,
         hints=hints, solution=solution_text,
         signature_parameters=[("equation", equation)],
         required_conditions=["linear_equation"],
         relevant_objects=["equation", domain],
-        generator_version=GENERATOR_VERSION, display_of=core.fraction_display)
+        generator_version=GENERATOR_VERSION,
+        display_of=display_of or core.fraction_display,
+        method_id=method_id, evidence=evidence)
 
 
 # ---------------------------------------------------------------------------
@@ -473,7 +497,7 @@ def _fraction_form_package(rng, level, domain, lesson_id, lesson_title):
                  f"= {_show(solution)}")
         hint2 = f"Pomnoži obje strane sa ${divisor}$: ${step1.split('=')[0].strip()} = {_show(inner)}$."
     question = f"Riješi jednačinu: ${equation}$"
-    hint1 = ("Razlomak uz nepoznatu ukloni množenjem obje strane imeniocem, "
+    hint1 = ("Razlomak uz nepoznatu ukloni množenjem obje strane nazivnikom, "
              "a slobodne članove prebacuj sa suprotnim predznakom.")
     hint3 = f"Sljedeći korak: ${step2.split('=')[0].strip()} = {step2.split('=', 1)[1].strip()}$."
     solution_text = (f"Rješavamo korak po korak: ${step1}$, zatim ${step2}$. "
@@ -616,7 +640,10 @@ def _solve_inequality_package(rng, level, domain, shape, lesson_id,
         signature_parameters=[("inequality", inequality)],
         required_conditions=[shape], relevant_objects=["inequality", domain],
         generator_version=GENERATOR_VERSION, option_texts=option_texts,
-        wrap="", accepted_answers=(f"x {answer_symbol} {bound_display}",))
+        wrap="", accepted_answers=(f"x {answer_symbol} {bound_display}",),
+        # Zatečena proza uči prebacivanje/balansiranje — provenijencija to
+        # čini provjerljivim (u 7-9. razredu dozvoljeno, u 6. strukturno pada).
+        method_id="transposition")
 
 
 # ---------------------------------------------------------------------------
@@ -841,7 +868,10 @@ def _solution_count_package(rng, level, domain, lesson_id, lesson_title):
         signature_parameters=[("equation", equation), ("case", case)],
         required_conditions=["solution_count"],
         relevant_objects=["equation"], generator_version=GENERATOR_VERSION,
-        option_texts=tuple(option_texts[:4]), wrap="")
+        option_texts=tuple(option_texts[:4]), wrap="",
+        # „Oduzmi ax od obje strane“ — balansna metoda; legitimna u 9. razredu
+        # gdje ovaj oblik jedino živi, ali provenijencija to čini provjerljivim.
+        method_id="balance_both_sides")
 
 
 
@@ -893,7 +923,426 @@ def _equivalence_package(rng, level, domain, lesson_id, lesson_title):
         signature_parameters=[("base", base), ("chosen", correct_equation)],
         required_conditions=["equivalence"], relevant_objects=["equation"],
         generator_version=GENERATOR_VERSION, option_texts=option_texts,
-        wrap="")
+        wrap="", method_id="balance_both_sides")
+
+
+# ---------------------------------------------------------------------------
+# METODA NEPOZNATOG ČLANA (PP-1, 6. razred) — oblici se grade iz ULOGE
+# nepoznatog člana (sabirak/umanjenik/umanjilac/činilac/djeljenik/djelilac).
+#
+# ZAŠTO POSTOJI (audit ovlašćenja pravila): zatečeni graditelji uče
+# prebacivanje preko znaka jednakosti — metodu koju kurikulum 6. razreda
+# izričito ne poznaje (živi produkcijski slučaj: nejednačina s razlomcima u
+# Q+ s vidljivom negativnom desnom stranom). Ovi graditelji NE
+# preimenuju transpozicionu prozu: samo izvođenje ide kroz relaciju veze među
+# članovima, a SVAKA prikazana vrijednost se KONSTRUIŠE nenegativno (odgovor i
+# poznati članovi se biraju, prikazane strane se RAČUNAJU iz njih), pa klasa
+# `granica - pomak → negativna desna strana` ne može nastati.
+#
+# Relacije i formulacije dolaze iz matbot/practice_policy.UNKNOWN_ROLE_RELATIONS
+# — iste rečenice koje rules.py renderuje u oba prompta.
+# ---------------------------------------------------------------------------
+
+def _role_sentence(role):
+    """„nepoznati sabirak = zbir minus poznati sabirak“ — iz PP-1 tabele."""
+    return _ROLE_RELATIONS[role][1]
+
+
+def _role_value(rng, domain, level, small=False, nonzero=True):
+    """Nenegativna vrijednost domena; složenost raste s nivoom.
+
+    Nivo NE dodaje nove članove (oblik lekcije je x ± a = b) nego složenost
+    operanada: isti nazivnici → različiti nazivnici → mješoviti/dvodecimalni
+    zapis. Dokaz težine ispod to iskreno prati."""
+    if domain == "decimal":
+        places = 1 if level < 3 else 2
+        scale = 10 ** places
+        high = {1: 9, 2: 40, 3: 60}[level]
+        numerator = rng.randint(1 if nonzero else 0, high * scale)
+        if numerator and numerator % scale == 0:
+            numerator += rng.randint(1, scale - 1)
+        return Fraction(numerator, scale)
+    if domain in ("rational", "rational_nonneg"):
+        den = rng.randint(2, 6 if level == 1 else 9)
+        high = den - 1 if (small or level == 1) else den + den  # nivo 3: mješovit
+        return Fraction(rng.randint(1 if nonzero else 0, max(high, 1)), den)
+    magnitude = {1: 12, 2: 20, 3: 30}[level]
+    return Fraction(rng.randint(1 if nonzero else 0, 9 if small else magnitude))
+
+
+def _role_pair(rng, domain, level):
+    """(rješenje, poznati član) — na nivou 1 razlomci dijele nazivnik."""
+    solution = _role_value(rng, domain, level)
+    known = _role_value(rng, domain, level, small=True)
+    if domain in ("rational", "rational_nonneg"):
+        if level == 1:
+            den = solution.denominator
+            known = Fraction(rng.randint(1, max(den - 1, 1)), den)
+        elif known.denominator == solution.denominator:
+            known = Fraction(known.numerator,
+                             known.denominator + 1 + rng.randint(0, 2))
+    return solution, known
+
+
+def _role_distractors(solution, scale):
+    """Distraktori koji NIKAD ne napuštaju nenegativni vidljivi domen."""
+    step = scale if scale > 0 else Fraction(1)
+    pool = [solution + step, solution + 2 * step, solution * 2]
+    if solution - step > 0:
+        pool.insert(1, solution - step)
+    if solution - 2 * step > 0:
+        pool.append(solution - 2 * step)
+    if solution != 0:
+        pool.append(solution / 2)
+    pool.append(solution + 3 * step)
+    return pool
+
+
+def _role_scale(solution):
+    return (Fraction(1, solution.denominator)
+            if solution.denominator > 1 else Fraction(1))
+
+
+def _role_final(domain, value):
+    """Konačan prikaz PO DOMENU lekcije: decimalna lekcija prikazuje decimalu
+    (nikad mješovit broj $32\\frac{1}{10}$ za $32,1$)."""
+    if domain == "decimal" and core.is_terminating_decimal(value):
+        return core.decimal_display(value)
+    return core.fraction_display(value)
+
+
+def _role_display_of(domain):
+    return (core.decimal_display if domain == "decimal"
+            else core.fraction_display)
+
+
+def _unknown_member_package(rng, level, domain, shape, lesson_id,
+                            lesson_title):
+    """Ruta metode nepoznatog člana za JEDAN oblik ugovora, ili fail closed."""
+    builders = {
+        "one_step_additive": _role_additive_package,
+        "subtract_from": _role_subtract_from_package,
+        "one_step_multiplicative": _role_multiplicative_package,
+        "solve_inequality_additive": _role_inequality_additive_package,
+        "solve_inequality_multiplicative": _role_inequality_multiplicative_package,
+    }
+    builder = builders.get(shape)
+    if builder is not None:
+        return builder(rng, level, domain, lesson_id, lesson_title)
+    # Metodski NEUTRALNI oblici (uvrštavanje/prepoznavanje — bez postupka
+    # rješavanja u prozi) smiju proći nepromijenjeni i pod ovom politikom.
+    neutral = {
+        "check_solution": _check_solution_package,
+        "check_inequality": _check_inequality_package,
+        "classification": _classification_package,
+    }
+    builder = neutral.get(shape)
+    if builder is not None:
+        return builder(rng, level, domain, lesson_id, lesson_title)
+    # DET-G6: oblik bez varijante nepoznatog člana pod ovom politikom pada
+    # zatvoreno — nikad tiho s pogrešnom metodom. Model-put preuzima lekciju.
+    raise DeterministicGenerationError(
+        f"oblik {shape} nema varijantu metode nepoznatog člana")
+
+
+def _role_additive_package(rng, level, domain, lesson_id, lesson_title):
+    """x + a = b, a + x = b (sabirak) i x - a = b (umanjenik)."""
+    show = lambda v: _domain_show(domain, v)
+    solution, known = _role_pair(rng, domain, level)
+    if solution == 0 or known == 0:
+        raise DeterministicGenerationError("degenerisan član")
+    form = rng.choice(("x_plus", "a_plus_x", "x_minus"))
+    if form in ("x_plus", "a_plus_x"):
+        role = "unknown_addend"
+        total = solution + known
+        equation = (f"x + {show(known)} = {show(total)}" if form == "x_plus"
+                    else f"{show(known)} + x = {show(total)}")
+        role_line = (f"U ovoj jednačini $x$ je sabirak: {_role_sentence(role)}.")
+        compute = f"x = {show(total)} - {show(known)}"
+        result_chain = f"{compute} = {show(solution)}"
+        check = f"{show(solution)} + {show(known)} = {show(total)}"
+        hint2 = (f"Zbir je ${show(total)}$, poznati sabirak je ${show(known)}$: "
+                 f"dakle ${compute}$.")
+    else:
+        role = "unknown_minuend"
+        difference = _role_value(rng, domain, level, small=True)
+        if difference == 0:
+            raise DeterministicGenerationError("degenerisana razlika")
+        solution = known + difference          # umanjenik = razlika + umanjilac
+        equation = f"x - {show(known)} = {show(difference)}"
+        role_line = (f"U ovoj jednačini $x$ je umanjenik: {_role_sentence(role)}.")
+        compute = f"x = {show(difference)} + {show(known)}"
+        result_chain = f"{compute} = {show(solution)}"
+        check = f"{show(solution)} - {show(known)} = {show(difference)}"
+        hint2 = (f"Razlika je ${show(difference)}$, umanjilac je "
+                 f"${show(known)}$: dakle ${compute}$.")
+    fraction_note = (" (svedi na zajednički nazivnik)"
+                     if domain in ("rational", "rational_nonneg")
+                     and level > 1 else "")
+    hint3 = f"Izračunaj: ${result_chain.split('=')[1].strip()}$" \
+            f"{fraction_note} — to je vrijednost $x$."
+    solution_text = (f"{role_line} Računamo: ${result_chain}$. "
+                     f"Provjera uvrštavanjem: ${check}$ — tačno. "
+                     f"Rješenje je $x = {_role_final(domain, solution)}$.")
+    return _solving_package(
+        rng, level, domain, lesson_id, lesson_title, "one_step_additive",
+        f"Riješi jednačinu: ${equation}$", equation, solution,
+        (role_line, hint2, hint3), solution_text, _role_scale(solution),
+        method_id="unknown_member",
+        distractors=_role_distractors(solution, _role_scale(solution)),
+        evidence=core.evidence_for_level(level),
+        answer_display=_role_final(domain, solution),
+        display_of=_role_display_of(domain))
+
+
+def _role_subtract_from_package(rng, level, domain, lesson_id, lesson_title):
+    """a - x = b — nepoznati umanjilac: x = a - b."""
+    show = lambda v: _domain_show(domain, v)
+    solution, difference = _role_pair(rng, domain, level)
+    if solution == 0 or difference == 0:
+        raise DeterministicGenerationError("degenerisan član")
+    minuend = solution + difference           # umanjenik = umanjilac + razlika
+    equation = f"{show(minuend)} - x = {show(difference)}"
+    role = "unknown_subtrahend"
+    role_line = f"U ovoj jednačini $x$ je umanjilac: {_role_sentence(role)}."
+    compute = f"x = {show(minuend)} - {show(difference)}"
+    check = f"{show(minuend)} - {show(solution)} = {show(difference)}"
+    hint2 = (f"Umanjenik je ${show(minuend)}$, razlika je "
+             f"${show(difference)}$: dakle ${compute}$.")
+    hint3 = (f"Izračunaj razliku ${show(minuend)} - {show(difference)}$ — "
+             "to je vrijednost $x$.")
+    solution_text = (f"{role_line} Računamo: ${compute} = {show(solution)}$. "
+                     f"Provjera uvrštavanjem: ${check}$ — tačno. "
+                     f"Rješenje je $x = {_role_final(domain, solution)}$.")
+    return _solving_package(
+        rng, level, domain, lesson_id, lesson_title, "subtract_from",
+        f"Riješi jednačinu: ${equation}$", equation, solution,
+        (role_line, hint2, hint3), solution_text, _role_scale(solution),
+        method_id="unknown_member",
+        distractors=_role_distractors(solution, _role_scale(solution)),
+        evidence=core.evidence_for_level(level),
+        answer_display=_role_final(domain, solution),
+        display_of=_role_display_of(domain))
+
+
+def _role_multiplicative_package(rng, level, domain, lesson_id, lesson_title):
+    """a·x = b (činilac), x : a = b (djeljenik), a : x = b (djelilac)."""
+    show = lambda v: _domain_show(domain, v)
+    solution = _role_value(rng, domain, level)
+    if solution == 0:
+        raise DeterministicGenerationError("trivijalno rješenje")
+    forms = ["factor", "dividend"] if level < 3 else ["factor", "dividend",
+                                                      "divisor"]
+    form = rng.choice(forms)
+    if domain in ("rational", "rational_nonneg") and level >= 2:
+        multiplier = _role_value(rng, domain, 1, small=True)
+        if multiplier == 0:
+            raise DeterministicGenerationError("nula množilac")
+    else:
+        multiplier = Fraction(rng.randint(2, 9))
+    if form == "factor":
+        role = "unknown_factor"
+        product = multiplier * solution
+        coefficient_display = (show(multiplier) if multiplier.denominator > 1
+                               else show(multiplier))
+        equation = (f"{coefficient_display} \\cdot x = {show(product)}"
+                    if multiplier.denominator > 1
+                    else f"{show(multiplier)}x = {show(product)}")
+        role_line = f"U ovoj jednačini $x$ je činilac: {_role_sentence(role)}."
+        compute = f"x = {show(product)} : {core.parenthesized(show(multiplier))}"
+        check = (f"{show(multiplier)} \\cdot {show(solution)} = {show(product)}"
+                 if multiplier.denominator == 1 else
+                 f"{show(multiplier)} \\cdot {show(solution)} = {show(product)}")
+        hint2 = (f"Proizvod je ${show(product)}$, poznati činilac je "
+                 f"${show(multiplier)}$: dakle ${compute}$.")
+    elif form == "dividend":
+        role = "unknown_dividend"
+        quotient = _role_value(rng, domain, level, small=True)
+        if quotient == 0:
+            raise DeterministicGenerationError("nula količnik")
+        solution = quotient * multiplier      # djeljenik = količnik · djelilac
+        equation = f"x : {core.parenthesized(show(multiplier))} = {show(quotient)}"
+        role_line = f"U ovoj jednačini $x$ je djeljenik: {_role_sentence(role)}."
+        compute = f"x = {show(quotient)} \\cdot {core.parenthesized(show(multiplier))}"
+        check = f"{show(solution)} : {core.parenthesized(show(multiplier))} = {show(quotient)}"
+        hint2 = (f"Količnik je ${show(quotient)}$, djelilac je "
+                 f"${show(multiplier)}$: dakle ${compute}$.")
+    else:
+        role = "unknown_divisor"
+        quotient = _role_value(rng, domain, 1, small=True)
+        if quotient == 0:
+            raise DeterministicGenerationError("nula količnik")
+        dividend = quotient * solution        # djeljenik = količnik · djelilac
+        equation = f"{show(dividend)} : x = {show(quotient)}"
+        role_line = f"U ovoj jednačini $x$ je djelilac: {_role_sentence(role)}."
+        compute = f"x = {show(dividend)} : {core.parenthesized(show(quotient))}"
+        check = f"{show(dividend)} : {core.parenthesized(show(solution))} = {show(quotient)}"
+        hint2 = (f"Djeljenik je ${show(dividend)}$, količnik je "
+                 f"${show(quotient)}$: dakle ${compute}$.")
+    reciprocal_note = (" (dijeljenje razlomkom je množenje recipročnom "
+                       "vrijednošću)" if domain in ("rational",
+                                                    "rational_nonneg")
+                       and level >= 2 else "")
+    hint3 = f"Izračunaj{reciprocal_note}: ${compute.split('=', 1)[1].strip()}$."
+    solution_text = (f"{role_line} Računamo: ${compute} = {show(solution)}$. "
+                     f"Provjera uvrštavanjem: ${check}$ — tačno. "
+                     f"Rješenje je $x = {_role_final(domain, solution)}$.")
+    return _solving_package(
+        rng, level, domain, lesson_id, lesson_title, "one_step_multiplicative",
+        f"Riješi jednačinu: ${equation}$", equation, solution,
+        (role_line, hint2, hint3), solution_text, _role_scale(solution),
+        method_id="unknown_member",
+        distractors=_role_distractors(solution, _role_scale(solution)),
+        evidence=core.evidence_for_level(level),
+        answer_display=_role_final(domain, solution),
+        display_of=_role_display_of(domain))
+
+
+def _role_inequality_options(answer_symbol, bound_display, show, bound):
+    """Opcije-skupovi rješenja; pomak uvijek NAGORE (Q+ ostaje nenegativan)."""
+    correct = _inequality_text(answer_symbol, bound_display)
+    wrong_symbol = {"<": ">", ">": "<"}[answer_symbol]
+    shifted = bound + (Fraction(1) if bound.denominator == 1
+                       else Fraction(1, bound.denominator))
+    options = (correct,
+               _inequality_text(wrong_symbol, bound_display),
+               _inequality_text(answer_symbol, show(shifted)),
+               _inequality_text(wrong_symbol, show(shifted)))
+    if len(set(options)) != 4:
+        raise DeterministicGenerationError("skupovi rješenja nisu jedinstveni")
+    return correct, options
+
+
+def _role_inequality_additive_package(rng, level, domain, lesson_id,
+                                      lesson_title):
+    """x + a ≶ b i x - a > b — smjer se NE mijenja (sabiranje/oduzimanje)."""
+    show = lambda v: _domain_show(domain, v)
+    bound, known = _role_pair(rng, domain, level)
+    if bound == 0 or known == 0:
+        raise DeterministicGenerationError("degenerisan član")
+    symbol = "<" if rng.random() < 0.5 else ">"
+    form = rng.choice(("x_plus", "x_minus" if symbol == ">" else "x_plus"))
+    if form == "x_plus":
+        rhs = bound + known                   # granica se KONSTRUIŠE unaprijed
+        inequality = f"x + {show(known)} {symbol} {show(rhs)}"
+        role_line = ("Zamisli pridruženu jednačinu $x + "
+                     f"{show(known)} = {show(rhs)}$: $x$ je sabirak, pa je "
+                     f"granica {_role_sentence('unknown_addend').split('=')[1].strip()}"
+                     f" — ${show(rhs)} - {show(known)} = {show(bound)}$.")
+        steps = f"x {symbol} {show(rhs)} - {show(known)}"
+    else:
+        rhs = _role_value(rng, domain, level, small=True)
+        if rhs == 0:
+            raise DeterministicGenerationError("degenerisana desna strana")
+        bound = rhs + known                   # umanjenik = razlika + umanjilac
+        inequality = f"x - {show(known)} {symbol} {show(rhs)}"
+        role_line = ("Zamisli pridruženu jednačinu $x - "
+                     f"{show(known)} = {show(rhs)}$: $x$ je umanjenik, pa je "
+                     f"granica {_role_sentence('unknown_minuend').split('=')[1].strip()}"
+                     f" — ${show(rhs)} + {show(known)} = {show(bound)}$.")
+        steps = f"x {symbol} {show(rhs)} + {show(known)}"
+    answer_symbol = symbol                    # sabiranje/oduzimanje čuva smjer
+    bound_display = show(bound)
+    correct, options = _role_inequality_options(answer_symbol, bound_display,
+                                                show, bound)
+    hint2 = (f"Postupak: ${steps}$ — sabiranje i oduzimanje istog broja "
+             "ne mijenjaju smjer nejednakosti.")
+    hint3 = ("Rješenje čitaš kao skup: svi brojevi koji zadovoljavaju "
+             "dobijenu nejednakost.")
+    probe = bound + (Fraction(1) if answer_symbol == ">" else Fraction(0))
+    if answer_symbol == "<":
+        probe = bound / 2
+    solution_text = (f"{role_line} Smjer nejednakosti se ne mijenja, pa je "
+                     f"rješenje $x {answer_symbol} {bound_display}$. Probni "
+                     f"broj ${show(probe)}$ zadovoljava polaznu nejednačinu, "
+                     "što potvrđuje smjer.")
+    return core.build_package(
+        lesson_id=lesson_id, lesson_title=lesson_title,
+        family_id="linear_equation_direct",
+        operation="solve_inequality_additive", level=level,
+        question=f"Riješi nejednačinu: ${inequality}$",
+        answer_value=(answer_symbol, str(bound)),
+        answer_display=f"x {answer_symbol} {bound_display}",
+        distractor_values=(), hints=(role_line, hint2, hint3),
+        solution=solution_text,
+        signature_parameters=[("inequality", inequality)],
+        required_conditions=["solve_inequality_additive"],
+        relevant_objects=["inequality", domain],
+        generator_version=GENERATOR_VERSION, option_texts=options,
+        wrap="", accepted_answers=(f"x {answer_symbol} {bound_display}",),
+        method_id="unknown_member", evidence=core.evidence_for_level(level))
+
+
+def _role_inequality_multiplicative_package(rng, level, domain, lesson_id,
+                                            lesson_title):
+    """a·x ≶ b i x : a ≶ b s POZITIVNIM a — smjer se ne mijenja.
+
+    Matematički autoritet PP-1: smjer nejednakosti mijenja SAMO množenje/
+    dijeljenje negativnim brojem; u Q+ negativan množilac ne postoji, pa se
+    pitanje okretanja znaka u ovom razredu uopšte ne javlja (i to rješenje
+    izričito kaže)."""
+    show = lambda v: _domain_show(domain, v)
+    bound = _role_value(rng, domain, level)
+    if bound == 0:
+        raise DeterministicGenerationError("degenerisana granica")
+    if domain in ("rational", "rational_nonneg") and level >= 2:
+        multiplier = _role_value(rng, domain, 1, small=True)
+        if multiplier == 0:
+            raise DeterministicGenerationError("nula množilac")
+    else:
+        multiplier = Fraction(rng.randint(2, 9))
+    symbol = "<" if rng.random() < 0.5 else ">"
+    form = rng.choice(("factor", "dividend"))
+    if form == "factor":
+        rhs = multiplier * bound
+        coefficient = (f"{show(multiplier)} \\cdot x"
+                       if multiplier.denominator > 1
+                       else f"{show(multiplier)}x")
+        inequality = f"{coefficient} {symbol} {show(rhs)}"
+        role_line = (f"Zamisli pridruženu jednačinu: $x$ je činilac, pa je "
+                     f"granica {_role_sentence('unknown_factor').split('=')[1].strip()}"
+                     f" — ${show(rhs)} : {core.parenthesized(show(multiplier))} = {show(bound)}$.")
+        steps = f"x {symbol} {show(rhs)} : {core.parenthesized(show(multiplier))}"
+    else:
+        rhs = _role_value(rng, domain, level, small=True)
+        if rhs == 0:
+            raise DeterministicGenerationError("degenerisana desna strana")
+        bound = rhs * multiplier              # djeljenik = količnik · djelilac
+        inequality = (f"x : {core.parenthesized(show(multiplier))} {symbol} "
+                      f"{show(rhs)}")
+        role_line = (f"Zamisli pridruženu jednačinu: $x$ je djeljenik, pa je "
+                     f"granica {_role_sentence('unknown_dividend').split('=')[1].strip()}"
+                     f" — ${show(rhs)} \\cdot {core.parenthesized(show(multiplier))} = {show(bound)}$.")
+        steps = f"x {symbol} {show(rhs)} \\cdot {core.parenthesized(show(multiplier))}"
+    bound_display = show(bound)
+    correct, options = _role_inequality_options(symbol, bound_display, show,
+                                                bound)
+    hint2 = (f"Postupak: ${steps}$ — množimo/dijelimo POZITIVNIM brojem "
+             f"${show(multiplier)}$, pa se smjer nejednakosti NE mijenja.")
+    hint3 = ("Rješenje čitaš kao skup: svi brojevi koji zadovoljavaju "
+             "dobijenu nejednakost.")
+    probe = bound + Fraction(1) if symbol == ">" else bound / 2
+    # Q+ proza NE spominje negativne brojeve ni kontrast s njima — po pravilu
+    # razreda to pitanje se u 6. razredu uopšte ne javlja.
+    solution_text = (f"{role_line} Množenje i dijeljenje pozitivnim brojem "
+                     f"čuvaju smjer nejednakosti, pa je rješenje $x {symbol} "
+                     f"{bound_display}$. Probni broj ${show(probe)}$ "
+                     "zadovoljava polaznu nejednačinu, što potvrđuje smjer.")
+    return core.build_package(
+        lesson_id=lesson_id, lesson_title=lesson_title,
+        family_id="linear_equation_direct",
+        operation="solve_inequality_multiplicative", level=level,
+        question=f"Riješi nejednačinu: ${inequality}$",
+        answer_value=(symbol, str(bound)),
+        answer_display=f"x {symbol} {bound_display}",
+        distractor_values=(), hints=(role_line, hint2, hint3),
+        solution=solution_text,
+        signature_parameters=[("inequality", inequality)],
+        required_conditions=["solve_inequality_multiplicative"],
+        relevant_objects=["inequality", domain],
+        generator_version=GENERATOR_VERSION, option_texts=options,
+        wrap="", accepted_answers=(f"x {symbol} {bound_display}",),
+        method_id="unknown_member", evidence=core.evidence_for_level(level))
 
 
 # ---------------------------------------------------------------------------

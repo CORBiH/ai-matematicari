@@ -36,6 +36,13 @@ _PLANE_SYMBOLS = (
     "- Tjemena (vrhovi) su $A$, $B$, $C$, ...; stranice su $a$, $b$, $c$, ...; "
     "u trouglu stranica $a$ leži NASUPROT tjemenu $A$.\n"
     "- Unutrašnji uglovi su $\\alpha$, $\\beta$, $\\gamma$, ...\n"
+    # Obnovljena IZGUBLJENA konvencija (audit ovlašćenja pravila): motor
+    # uglova je već emitovao $\alpha_1$ oblike, ali nijedno pravilo ih nije
+    # propisivalo. Konvencija se primjenjuje samo tamo gdje zadatak stvarno
+    # imenuje spoljašnje uglove — ne nameće se drugim oznakama.
+    "- Spoljašnji (vanjski) uglovi se označavaju s indeksom 1: $\\alpha_1$, "
+    "$\\beta_1$, $\\gamma_1$, $\\delta_1$ — spoljašnji ugao uz unutrašnji "
+    "$\\alpha$ je UVIJEK $\\alpha_1$, nikad $\\alpha'$ ni druga oznaka.\n"
     "- $s$ = poluobim trougla, $s=\\frac{O}{2}$.\n"
     "- $h_a$, $h_b$, $h_c$ = visine na stranice $a$, $b$, $c$.\n"
     "- $t_a$, $t_b$, $t_c$ = težišnice (medijane).\n"

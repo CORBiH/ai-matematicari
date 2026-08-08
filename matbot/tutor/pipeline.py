@@ -19,6 +19,7 @@ dolazi iz LessonContext-a (podaci), a semantičku kapiju opsega drži recenzent.
 """
 import contextlib
 import copy
+import inspect
 import logging
 import random
 import re
@@ -26,7 +27,8 @@ import time
 import uuid
 
 from matbot import (config, difficulty_level, difficulty_profiles, feedback,
-                    geometrycheck, mcq_integrity, option_equivalence)
+                    geometrycheck, mcq_integrity, option_equivalence,
+                    practice_policy)
 from matbot.llm import LLMError, failure_diagnostics_kv
 from matbot.mathcheck import find_numeric_inconsistencies
 from matbot.semantics import detectors as semantic_detectors
@@ -428,6 +430,20 @@ def _validate_task_server_side(task, context, previous_signature=""):
     solution = _safe_text(task.solution, "solution")
     _reject_if_inconsistent(solution, "solution")
 
+    # POLITIKA PP-1 (audit ovlašćenja pravila): kurikularna metoda, vidljivi
+    # brojevni domen i granica naprednih operacija važe za OBA autora paketa —
+    # model i deterministički generator prolaze kroz OVU ISTU tačku. Uzorci su
+    # namjerno uski (vidi matbot/practice_policy.py), pa binarno oduzimanje i
+    # legitimna proza nikad nisu pogodak.
+    policy = getattr(context, "practice_policy", None)
+    if policy is not None:
+        for where, surface in (("tekst zadatka", task_text),
+                               ("solution", solution),
+                               *(("opcija", option) for option in option_texts)):
+            codes = practice_policy.text_policy_failures(policy, surface)
+            if codes:
+                raise UnifiedOutputError(f"{','.join(codes)} [{where}]")
+
     # USKI MATEMATIČKI ORAKL NEPOSREDNO PRIJE OBJAVE (živi produkcijski nalaz,
     # lekcija o pravilima djeljivosti): objavljen je MCQ bez ijednog tačnog
     # odgovora — nijedna od četiri ponuđene opcije nije zadovoljavala uslov. Isti
@@ -526,6 +542,26 @@ def _log_difficulty(request_id, context, final):
 _DETERMINISTIC_GENERATORS = deterministic_generators.GENERATORS
 
 
+def _generate_with_policy(generator, *, policy, **kwargs):
+    """Proslijedi razriješenu politiku generatoru koji je ZNA konsumirati.
+
+    PP-1 (audit ovlašćenja pravila): motori su do sada primali samo
+    lesson_id/naslov/parametre/nivo — bez razreda i bez politike. Umjesto
+    mehaničkog širenja potpisa svih 27 modula, ova JEDNA tačka prosljeđuje
+    `policy` isključivo modulima čiji je `generate_package` deklariše;
+    ostali rade bajt za bajt kao prije. Modul NIKAD ne izvodi razred iz
+    prefiksa lesson_id-ja — politika je jedini nosilac razredne odluke."""
+    if policy is not None:
+        try:
+            accepts = "policy" in inspect.signature(
+                generator.generate_package).parameters
+        except (TypeError, ValueError):
+            accepts = False
+        if accepts:
+            return generator.generate_package(policy=policy, **kwargs)
+    return generator.generate_package(**kwargs)
+
+
 def _deterministic_generator_for(context):
     """Modul generatora za lekciju, ili None kad lekcija nije POTPUNO pokrivena."""
     if not config.deterministic_practice_enabled():
@@ -605,7 +641,7 @@ def _deterministic_safe_help_texts(package, context, request_id, intent):
     niz koji objava pokreće nad tekstom zadatka. Semantički detektor porodice
     se NAMJERNO ne pokreće nad nagovještajem: on pita „radi li ovaj tekst ono
     što lekcija ispituje“, a nagovještaj je uputa („prvo nađi zajednički
-    imenilac“), ne zadatak — to bi bio validator zadatka pušten nad prozom.
+    nazivnik“), ne zadatak — to bi bio validator zadatka pušten nad prozom.
 
     Zove se PRIJE `_publish_task`, dakle prije ijedne mutacije sesije: kandidat
     s neupotrebljivim nagovještajem pada zatvoreno i petlja bira nove operande,
@@ -724,7 +760,8 @@ def _run_deterministic_task_turn(store, session, turn, context, request_id,
         # nikad model. Svaki kandidat prolazi ISTU objavnu validaciju.
         for _attempt in range(12):
             try:
-                candidate = generator.generate_package(
+                candidate = _generate_with_policy(
+                    generator, policy=getattr(context, "practice_policy", None),
                     lesson_id=context.topic_id, lesson_title=context.title,
                     parameters=context.semantic_contract.parameters,
                     level=generator_level)
@@ -732,6 +769,18 @@ def _run_deterministic_task_turn(store, session, turn, context, request_id,
                 _log_rejection(request_id, context, "deterministic_generation",
                                error, intent)
                 break
+            # POLITIKA PP-1 nad CIJELIM kandidatom (uklj. hintove i metodsku
+            # provenijenciju) — prije objave, unutar ograničene petlje: prekršaj
+            # bira NOVE operande, nikad ne stiže do učenika. Objava ispod ista
+            # polja provjerava JOŠ jednom (odbrana u dubini, isti kod za model).
+            policy_codes = practice_policy.package_policy_failures(
+                getattr(context, "practice_policy", None),
+                candidate.question, candidate.option_texts, candidate.hints,
+                candidate.solution, getattr(candidate, "method_id", ""))
+            if policy_codes:
+                _log_rejection(request_id, context, "deterministic_policy",
+                               ",".join(policy_codes), intent)
+                continue
             payload = candidate.task_payload()
             final = TutorDraft(intent=intent, reply="",
                                lesson_focus="deterministic generator",
@@ -1382,7 +1431,8 @@ def _two_call(llm, context, session, student_message, request_id, trusted_verdic
             draft.new_task, contract=context.semantic_contract,
             previous_signature=previous_signature,
             difficulty_profile=difficulty_profile,
-            practice_contract=context.practice_contract)
+            practice_contract=context.practice_contract,
+            practice_policy=getattr(context, "practice_policy", None))
     if draft_issues:
         logger.info(
             "tutor_draft_preflight request_id=%s topic=%s intent=%s issues=%s",
