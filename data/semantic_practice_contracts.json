@@ -1,0 +1,182 @@
+{
+  "schema_version": 1,
+  "contract_version": "SPC-1",
+  "_readme": [
+    "SEMANTIČKI UGOVORI VJEŽBE PO LEKCIJI (Vježbajmo V1, Faza F5K).",
+    "",
+    "ZAŠTO: 150-turn real-state audit — 14 P1 nalaza na 7 lekcija: model je",
+    "objavljivao matematički ispravne zadatke koji NE ispituju izabranu",
+    "lekciju (grafik → uvrštavanje; mreža → zapremina; tekstualni → goli",
+    "izraz; dokaz identiteta → brojevni razlomak; SSU → zahvaćeni ugao).",
+    "",
+    "LEKCIJA = PODACI. Tip zahtjeva definiše required/forbidden OSOBINE i",
+    "prompt linije; red po lekciji nosi kurikulumski dokaz (Faza-1/2 NPP",
+    "stavke ili jednoznačan kanonski naslov). Provjerivači osobina su",
+    "GENERIČKI kod (matbot/semantic_practice.py) — ograničeni, zatvoreni",
+    "obrasci nad vidljivim tekstom; nikad grana po ID-ju u ponašanju.",
+    "",
+    "enforcement: blocking — dokazan prekršaj obara paket PRIJE objave i",
+    "prije ijedne mutacije stanja; preskočena/nedokaziva osobina NIKAD nije",
+    "dokaz vjernosti (semantiku i dalje nezavisno sudi recenzent).",
+    "",
+    "visual_policy: textual_structured_equivalent — grafički/mrežni sadržaj",
+    "smije biti POTPUNO zadan strukturisanim tekstom (koordinate, tabela,",
+    "spisak strana s dimenzijama); conceptual_text — pojmovno prepoznavanje",
+    "bez crteža. Lekcije kojima je nužan stvarni crtež NEMAJU ugovor ovdje",
+    "i ostaju vizuelno-ograničene (vidi klasifikacioni izvještaj)."
+  ],
+  "requirement_types": {
+    "graph_semantics": {
+      "required_features": ["graph_semantics_present"],
+      "forbidden_features": [],
+      "visual_policy": "textual_structured_equivalent",
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR IZABRANE LEKCIJE (server ga deterministički provjerava prije objave):",
+        "- ovo je lekcija o GRAFIKU: zadatak mora raditi s grafičkim sadržajem — tačke $(x, y)$, pripadnost tačke grafiku, presjek s osama, čitanje vrijednosti iz tabele/grafika ili izbor ispravnog opisa grafika;",
+        "- ZABRANJENA zamjena: golo uvrštavanje u formulu ili obično rješavanje jednačine bez ijedne grafičke radnje — server takav paket odbija;",
+        "- grafički sadržaj mora STVARNO stajati u tekstu zadatka (koordinate, tabela vrijednosti, opis prave); NIKAD ne pominji sliku koja ne postoji."
+      ]
+    },
+    "net_semantics": {
+      "required_features": ["net_semantics_present"],
+      "forbidden_features": ["volume_request"],
+      "visual_policy": "textual_structured_equivalent",
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR IZABRANE LEKCIJE (server ga deterministički provjerava prije objave):",
+        "- ovo je lekcija o MREŽI geometrijskog tijela: zadatak mora rasuđivati o mreži — od kojih se figura sastoji, koliko ih je, koje su im dimenzije, kako su raspoređene, ili računati površinu IZ pobrojanih strana mreže;",
+        "- ZABRANJENA zamjena: formula zapremine (server je odbija na ovoj lekciji) i površina bez ijednog rasuđivanja o mreži;",
+        "- mreža mora biti opisana u samom tekstu (spisak strana i dimenzija); NIKAD ne pominji sliku koja ne postoji."
+      ]
+    },
+    "rational_word_problem": {
+      "required_features": ["story_context_present", "variables_present"],
+      "forbidden_features": [],
+      "visual_policy": "conceptual_text",
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR IZABRANE LEKCIJE (server ga deterministički provjerava prije objave):",
+        "- ovo je lekcija TEKSTUALNIH zadataka s racionalnim izrazima: zadatak mora imati stvaran kontekst (situaciju s imenovanim veličinama — put, vrijeme, radnici, cijena...) iz kojeg nastaje racionalni izraz s promjenljivom;",
+        "- ZABRANJENA zamjena: goli nalog „izračunaj vrijednost izraza za $x = ...$“ bez priče — server takav paket odbija."
+      ]
+    },
+    "algebraic_identity_proof": {
+      "required_features": ["variables_present", "variable_identity_present",
+                             "proof_request_present"],
+      "forbidden_features": [],
+      "visual_policy": "conceptual_text",
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR IZABRANE LEKCIJE (server ga deterministički provjerava prije objave):",
+        "- ovo je lekcija DOKAZA identiteta s ALGEBARSKIM razlomcima: zadatak mora sadržavati algebarske razlomke s promjenljivom, tvrdnju o jednakosti dva izraza i izričit zahtjev da se ona dokaže/pokaže (uz uslove definisanosti);",
+        "- ZABRANJENA zamjena: brojevni razlomci, proširivanje ili skraćivanje brojeva, golo računanje vrijednosti — server takav paket odbija."
+      ]
+    },
+    "congruence_criterion": {
+      "required_features": ["congruence_semantics_present"],
+      "forbidden_features": [],
+      "visual_policy": "conceptual_text",
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR IZABRANE LEKCIJE (server ga deterministički provjerava prije objave):",
+        "- ovo je lekcija o podudarnosti trouglova po TAČNO onom kriteriju koji stoji u naslovu lekcije — podaci u zadatku moraju odgovarati BAŠ tom kriteriju, ne susjednom;",
+        "- POLOŽAJ UGLA JE DIO KRITERIJA: ugao IZMEĐU dvije date stranice (zahvaćeni ugao) pripada SUS kriteriju; SSU koristi ugao NASPRAM jedne od datih stranica — nikad ih ne miješaj."
+      ]
+    },
+    "congruence_proof": {
+      "required_features": ["congruence_semantics_present",
+                             "proof_request_present"],
+      "forbidden_features": [],
+      "visual_policy": "conceptual_text",
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR IZABRANE LEKCIJE (server ga deterministički provjerava prije objave):",
+        "- ovo je lekcija PRIMJENE podudarnosti u DOKAZIVANJU: zadatak mora tražiti dokaz/obrazloženje jednakosti elemenata pomoću podudarnih trouglova (i kao izbor ispravnog dokaznog koraka), ne goli račun;",
+        "- ZABRANJENA zamjena: računski zadatak bez dokaznog zahtjeva — server takav paket odbija."
+      ]
+    }
+  },
+  "contracts": [
+    {"lesson_id": "8-02-007", "title": "Grafik linearne funkcije",
+     "requirement_type": "graph_semantics", "enforcement": "blocking",
+     "evidence": "NPP KS_2018-0342 (prikazivati grafički linearnu funkciju i iz nacrtanog grafika čitati vrijednosti), KS_2018-0346; audit P1 T117/T118 (uvrštavanje umjesto grafika)."},
+    {"lesson_id": "9-03-004", "title": "Grafik linearne funkcije",
+     "requirement_type": "graph_semantics", "enforcement": "blocking",
+     "evidence": "NPP KS_2018-0342/0346/0344 (grafik linearne funkcije je prava; iz grafa odrediti funkciju); audit P1 T119/T120."},
+    {"lesson_id": "9-03-019", "title": "Grafik direktne proporcionalnosti y = kx",
+     "requirement_type": "graph_semantics", "enforcement": "blocking",
+     "evidence": "NPP KS_2018-0351 (crtati grafike funkcija) + kanonski naslov imenuje grafik."},
+    {"lesson_id": "9-03-020", "title": "Grafik obrnute proporcionalnosti y = k/x",
+     "requirement_type": "graph_semantics", "enforcement": "blocking",
+     "evidence": "NPP RS_2014-0133 (nacrtati grafik razlomljene funkcije) + kanonski naslov imenuje grafik."},
+    {"lesson_id": "9-03-022", "title": "Grafik jednostavne razlomljene funkcije",
+     "requirement_type": "graph_semantics", "enforcement": "blocking",
+     "evidence": "NPP RS_2014-0133 (grafik razlomljene funkcije) + kanonski naslov imenuje grafik."},
+    {"lesson_id": "9-03-010", "title": "Presjeci grafika sa koordinatnim osama",
+     "requirement_type": "graph_semantics", "enforcement": "blocking",
+     "evidence": "Kanonski naslov imenuje presjeke grafika s osama (grafička radnja po definiciji); NPP KS_2018-0342."},
+    {"lesson_id": "9-04-010", "title": "Grafičko rješavanje linearne jednačine",
+     "requirement_type": "graph_semantics", "enforcement": "blocking",
+     "evidence": "Kanonski naslov imenuje grafičko rješavanje; NPP KS_2018-0342 (čitati vrijednosti iz grafika)."},
+    {"lesson_id": "9-05-002", "title": "Grafički prikaz linearne jednačine sa dvije nepoznate",
+     "requirement_type": "graph_semantics", "enforcement": "blocking",
+     "evidence": "Kanonski naslov imenuje grafički prikaz; NPP KS_2018-0342."},
+    {"lesson_id": "9-05-006", "title": "Grafička metoda rješavanja sistema",
+     "requirement_type": "graph_semantics", "enforcement": "blocking",
+     "evidence": "Kanonski naslov imenuje grafičku metodu (presjek pravih)."},
+    {"lesson_id": "6-10-007", "title": "Prikaz funkcije tabelom i grafički",
+     "requirement_type": "graph_semantics", "enforcement": "blocking",
+     "evidence": "NPP RS_2014-0131 (prikazati funkciju tabelarno i grafički) + kanonski naslov."},
+    {"lesson_id": "6-10-004", "title": "Crtanje i očitavanje tačaka u koordinatnom sistemu",
+     "requirement_type": "graph_semantics", "enforcement": "blocking",
+     "evidence": "Kanonski naslov imenuje crtanje/očitavanje tačaka u koordinatnom sistemu."},
+    {"lesson_id": "8-02-003", "title": "Crtanje i očitavanje tačaka",
+     "requirement_type": "graph_semantics", "enforcement": "blocking",
+     "evidence": "Kanonski naslov imenuje crtanje/očitavanje tačaka (koordinatni sadržaj obavezan)."},
+
+    {"lesson_id": "8-05-009", "title": "Mreža trostrane prizme",
+     "requirement_type": "net_semantics", "enforcement": "blocking",
+     "evidence": "NPP KS_2018-0402 (mreža prizme u sadržaju teme) + kanonski naslov imenuje mrežu."},
+    {"lesson_id": "8-05-010", "title": "Mreža četverostrane prizme",
+     "requirement_type": "net_semantics", "enforcement": "blocking",
+     "evidence": "NPP KS_2018-0402; audit P1 T141/T142 (zapremina umjesto mreže)."},
+    {"lesson_id": "8-05-011", "title": "Mreža trostrane piramide",
+     "requirement_type": "net_semantics", "enforcement": "blocking",
+     "evidence": "NPP KS_2018-0388 (crtati skice piramida i njihove mreže)."},
+    {"lesson_id": "8-05-012", "title": "Mreža četverostrane piramide",
+     "requirement_type": "net_semantics", "enforcement": "blocking",
+     "evidence": "NPP KS_2018-0388."},
+    {"lesson_id": "9-07-003", "title": "Mreža prizme",
+     "requirement_type": "net_semantics", "enforcement": "blocking",
+     "evidence": "NPP KS_2018-0402 + kanonski naslov imenuje mrežu."},
+    {"lesson_id": "9-07-009", "title": "Mreža piramide",
+     "requirement_type": "net_semantics", "enforcement": "blocking",
+     "evidence": "NPP RS_2014-0127 (nacrtati mrežu piramide), KS_2018-0388; audit P1 T107/T108 (površina bez mreže)."},
+    {"lesson_id": "9-07-016", "title": "Mreža valjka",
+     "requirement_type": "net_semantics", "enforcement": "blocking",
+     "evidence": "Kanonski naslov imenuje mrežu valjka (pravougaonik + dva kruga)."},
+    {"lesson_id": "9-07-021", "title": "Mreža kupe",
+     "requirement_type": "net_semantics", "enforcement": "blocking",
+     "evidence": "Kanonski naslov imenuje mrežu kupe (kružni isječak + krug)."},
+
+    {"lesson_id": "9-01-015", "title": "Tekstualni zadaci sa racionalnim izrazima",
+     "requirement_type": "rational_word_problem", "enforcement": "blocking",
+     "evidence": "Kanonski naslov imenuje tekstualne zadatke; audit P1 T123/T124 (goli izraz bez priče)."},
+
+    {"lesson_id": "9-01-017", "title": "Dokaz identiteta sa algebarskim razlomcima",
+     "requirement_type": "algebraic_identity_proof", "enforcement": "blocking",
+     "evidence": "Kanonski naslov imenuje dokaz identiteta s algebarskim razlomcima; audit P1 T147/T148 (brojevni razlomak bez promjenljive i dokaza)."},
+
+    {"lesson_id": "7-04-013", "title": "Podudarnost trouglova - SUS",
+     "requirement_type": "congruence_criterion", "enforcement": "blocking",
+     "evidence": "NPP KS_2018-0135 (podudarnost trouglova u temi); kanonski naslov imenuje SUS kriterij."},
+    {"lesson_id": "7-04-014", "title": "Podudarnost trouglova - USU",
+     "requirement_type": "congruence_criterion", "enforcement": "blocking",
+     "evidence": "NPP KS_2018-0135; kanonski naslov imenuje USU kriterij."},
+    {"lesson_id": "7-04-015", "title": "Podudarnost trouglova - SSS",
+     "requirement_type": "congruence_criterion", "enforcement": "blocking",
+     "evidence": "NPP KS_2018-0135; kanonski naslov imenuje SSS kriterij."},
+    {"lesson_id": "7-04-016", "title": "Podudarnost trouglova - SSU",
+     "requirement_type": "congruence_criterion", "enforcement": "blocking",
+     "extra_forbidden_features": ["included_angle_with_sides"],
+     "evidence": "NPP KS_2018-0135; kanonski naslov imenuje SSU. Audit P1 T139/T140: zadatak sa ZAHVAĆENIM uglom (SUS konfiguracija) označen kao SSU — položaj ugla je dio kriterija, pa je zahvaćeni ugao na ovoj lekciji dokazan prekršaj."},
+    {"lesson_id": "7-04-017", "title": "Primjena podudarnosti u dokazivanju jednakosti elemenata",
+     "requirement_type": "congruence_proof", "enforcement": "blocking",
+     "evidence": "Kanonski naslov imenuje primjenu podudarnosti u dokazivanju; klasifikator PROOF_REQUIRED."}
+  ]
+}

@@ -324,6 +324,17 @@ def _difficulty_profile_block(context):
     return profile.prompt_block() + "\n\n"
 
 
+# SEMANTIČKI UGOVOR VJEŽBE (Vježbajmo V1, F5K). Tekst dolazi GOTOV iz
+# data/semantic_practice_contracts.json i IDENTIČAN ide i Tutoru i
+# Recenzentu; server iste zahtjeve deterministički provjerava prije objave
+# (matbot/semantic_practice.py). Lekcija bez ugovora vraća prazan string.
+def _practice_contract_block(context):
+    contract = getattr(context, "practice_contract", None)
+    if contract is None:
+        return ""
+    return contract.prompt_block() + "\n\n"
+
+
 def build_tutor_instructions(context):
     """Sistemski prompt prvog poziva — isti za svih 534 lekcije.
 
@@ -356,6 +367,7 @@ def build_tutor_instructions(context):
         f"{_semantic_requirement_block(context)}"
         f"{_semantic_contract_block(context)}"
         f"{_difficulty_profile_block(context)}"
+        f"{_practice_contract_block(context)}"
     )
 
 
@@ -426,6 +438,25 @@ _REVIEWER_CHECK_SEMANTICS_RULE = """WHAT `checks.*` DESCRIBE (unambiguous):
   lesson: a false value there fails the turn closed, which is the correct outcome.
   If you cannot make them true, return `fail_closed` instead of a package.
 - Do not lower a check merely because you are unsure about tone or wording."""
+
+
+# VJEŽBAJMO V1 (F5K): `inside_lesson` više NIJE „zvuči srodno“. Živi audit:
+# 14 objavljenih, matematički ispravnih zadataka POGREŠNE lekcije (grafik →
+# uvrštavanje; mreža → zapremina; tekstualni → goli izraz; dokaz → brojevni
+# razlomak). Server sada deterministički provjerava semantički ugovor lekcije
+# i odbija prekršaj — ovaj blok recenzentu izričito kaže isto značenje.
+_REVIEWER_LESSON_FIDELITY_RULE = """WHAT `inside_lesson` MEANS (the server enforces the same contract deterministically):
+- `inside_lesson` is true ONLY when the task actually EXERCISES the selected
+  lesson's own skill — for lessons with a SEMANTIC CONTRACT block below, that
+  means satisfying that contract. "Same broad topic" is NOT enough.
+- A mathematically correct task that substitutes a neighbouring skill (plain
+  evaluation instead of a graph operation, a volume formula instead of net
+  reasoning, a bare expression instead of a word problem, numeric fractions
+  instead of an algebraic identity proof, a different congruence criterion)
+  makes `inside_lesson` FALSE and `approve` FORBIDDEN.
+- In that case return `correct` with a REPLACEMENT task that genuinely
+  performs the required lesson action, or `fail_closed` if you cannot do that
+  safely. Never reference a picture that does not exist in the task text."""
 
 
 _REVIEWER_DECISION_RULE = """DECISION CONSISTENCY RULE (the server enforces this deterministically):
@@ -511,6 +542,7 @@ def build_reviewer_instructions(context):
         "11. verify that lesson identity, level, text, options, marked answer, solution, difficulty evidence, and signature describe one task. Independently recompute `reviewed_difficulty_evidence` from only the visible task, answer requirements, options, and solution: ignore Tutor numerical counts. Count only actions the student must perform; four MCQ options are not four conditions or operations, selecting one option with one rule is one direct application, a solution explanation is not a student explanation requirement, and `combines_concepts` is true only when the student must combine distinct mathematical concepts. Return your independently calculated evidence even if the wording needs no textual correction. Level 1 may be a direct yes/no, recognition, calculation, classification, substitution, or one-rule selection; choosing a visible option is not by itself mathematical comparison or a second reasoning step. Level 2 permits a bounded pair of related rules/concepts, conditions, or operations, straightforward explanation/comparison, or one manageable representation change; `combines_concepts` alone is not Level 3. Level 3 requires construction, proof, three-or-more connected requirements/operations, advanced representation change, or comparable depth. For multiple choice, correct_option_id and correct_option_index must select the same visible option and expected_answer must be an exact copy of its text; explanation belongs only in solution. Signature parameters are only closed name/value entries with canonical string values: no arbitrary metadata, and order alone is never a new task. When correcting, update options, correct option ID/index, expected answer, solution, and the complete signature together, then return the complete fresh package. Set `task_package_consistent`, `difficulty_evidence_valid`, and `task_signature_consistent` accordingly.\n\n"
         f"{_SCALED_DIVISION_RULE}\n\n"
         f"{_SHARED_TARGET_BLOCK}\n\n"
+        f"{_REVIEWER_LESSON_FIDELITY_RULE}\n\n"
         f"{_REVIEWER_DECISION_RULE}\n\n"
         f"{_REVIEWER_TARGET_LEVEL_RULE}\n\n"
         f"{_REVIEWER_PREFLIGHT_RULE}\n\n"
@@ -518,6 +550,7 @@ def build_reviewer_instructions(context):
         f"{shared}\n\n"
         f"{_semantic_contract_block(context)}"
         f"{_difficulty_profile_block(context)}"
+        f"{_practice_contract_block(context)}"
         "ODLUKA:\n"
         # Faza 4H (Workstream J): eho paketa na odobrenju je bio najveći
         # pojedinačni trošak izlaza (medijalno ~1400 tokena ≈ 15+ s

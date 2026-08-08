@@ -65,6 +65,12 @@ DIFFICULTY_OUTSIDE_TARGET_CODE = "difficulty_evidence_outside_target"
 # Predloženi zadatak je kanonski ISTI kao aktivni (vidi task_identity).
 DUPLICATE_ACTIVE_TASK_CODE = "duplicate_active_task"
 
+# Zadatak ne ispituje izabranu lekciju (Vježbajmo V1, F5K) — vidi
+# matbot/semantic_practice.py. Kod je interni (samo logovi/recenzent).
+SEMANTIC_FIDELITY_CODE = "semantic_fidelity_violation"
+# Tekst se poziva na sliku/crtež koji u tekstualnom UI-ju ne postoji.
+FAKE_VISUAL_CODE = "fake_visual_reference"
+
 
 @dataclass(frozen=True)
 class PackageIssue:
@@ -126,7 +132,7 @@ def _option_id(task, index):
 
 
 def collect_package_issues(task, contract=None, previous_signature="",
-                           difficulty_profile=None):
+                           difficulty_profile=None, practice_contract=None):
     """Vrati zatvorenu torku nalaza postojećih validatora nad JEDNIM paketom.
 
     Prazna torka = nijedan deterministički validator ne može dokazati defekt.
@@ -138,7 +144,13 @@ def collect_package_issues(task, contract=None, previous_signature="",
 
     `difficulty_profile` (Faza F5G) je lekcijski-relativni profil težine ili
     None; provjera dokaza težine koristi iste granice kao recenzentska
-    invarijanta i objava. None = globalna rubrika, nepromijenjeno."""
+    invarijanta i objava. None = globalna rubrika, nepromijenjeno.
+
+    `practice_contract` (Vježbajmo V1, F5K) je semantički ugovor VJEŽBE
+    lekcije ili None: dokazan prekršaj (zadatak ne radi ono što lekcija
+    ispituje — npr. grafička lekcija bez ijednog grafičkog sadržaja) je
+    blokirajući nalaz. Lažno pozivanje na nepostojeću sliku je globalan
+    nalaz i bez ugovora."""
     if task is None:
         return ()
     issues = []
@@ -332,6 +344,28 @@ def collect_package_issues(task, contract=None, previous_signature="",
     #    `difficulty_evidence_errors` koji već koriste i recenzentska invarijanta
     #    i objava. Poredi se s nivoom koji paket SAM deklariše — isto pitanje
     #    interne dosljednosti koje `validate_reviewer` postavlja konačnom paketu.
+    # 6b) SEMANTIČKA VJERNOST LEKCIJI (Vježbajmo V1, F5K — audit: 14 P1)
+    #     Ugovor vježbe se provjerava nad VIDLJIVIM tekstom i opcijama —
+    #     matematički ispravan zadatak POGREŠNE lekcije je dokazan defekt.
+    #     Lažna slika je globalna zabrana i bez ugovora.
+    from matbot import semantic_practice as _semantic_practice
+
+    raw_task_text = getattr(task, "text", "") or ""
+    if _semantic_practice.fake_visual_reference(raw_task_text):
+        issues.append(PackageIssue(FAKE_VISUAL_CODE,
+                                   detail="task text references an absent picture"))
+    if practice_contract is not None:
+        options_joined = " ".join(
+            getattr(option, "text", "") for option in
+            (getattr(task, "options", None) or ()))
+        fidelity = _semantic_practice.fidelity_failures(
+            practice_contract, raw_task_text, options_joined)
+        if fidelity:
+            issues.append(PackageIssue(
+                SEMANTIC_FIDELITY_CODE,
+                detail=(f"{practice_contract.requirement_type}: "
+                        + ",".join(fidelity))))
+
     evidence = getattr(task, "difficulty_evidence", None)
     target_level = getattr(task, "target_difficulty_level", None)
     if evidence is not None and isinstance(target_level, int):
@@ -398,6 +432,17 @@ def format_for_reviewer(issues):
         # recenzent vraćao `correct` s istim nalazom. Lijek pokriva i namjernu
         # kontradikciju: bez markera lažnosti u ISTOJ rečenici server je ne može
         # razlikovati od aritmetičke greške.
+        # VJEŽBAJMO V1 (F5K): semantička vjernost lekciji ima svoj lijek —
+        # ZAMJENSKI zadatak koji stvarno ispituje lekciju, nikad prepričan isti.
+        f"For `{SEMANTIC_FIDELITY_CODE}` the task is mathematically fine but does "
+        "NOT exercise the selected lesson (the detail names the missing/forbidden "
+        "semantic feature): REPLACE THE TASK with one that genuinely performs the "
+        "lesson's required action described in the lesson's semantic contract "
+        "block — never just reword the same task. "
+        f"For `{FAKE_VISUAL_CODE}` the text references a picture that does not "
+        "exist in this text-only UI: rewrite the task so every needed object is "
+        "stated in the text itself (coordinates, table, list of faces), or replace "
+        "the task. "
         "For `numeric_inconsistency` an equality chain inside $...$ in the named "
         "field is numerically false: recompute every step and rewrite that field so "
         "every shown equality holds. When a false equality is the DELIBERATE point "

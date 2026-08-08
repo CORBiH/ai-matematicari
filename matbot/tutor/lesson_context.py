@@ -13,7 +13,7 @@ samo ima manje popunjenih polja.
 """
 from dataclasses import dataclass, field
 
-from matbot import geometry_rules, task_families
+from matbot import geometry_rules, semantic_practice, task_families
 from matbot.contracts import registry as contract_registry
 from matbot.semantics import contracts as semantic_contracts
 from matbot.topics import lesson_info
@@ -49,6 +49,10 @@ class LessonContext:
     # tada se cio sistem ponaša bajt za bajt kao prije. Nepromjenjiv je, pa
     # Tutor i Recenzent dobiju DOSLOVNO isti razriješen ugovor.
     semantic_contract: object = None
+    # Semantički ugovor VJEŽBE (Vježbajmo V1, F5K) — server-vlasnički zahtjev
+    # šta zadatak MORA raditi da bi ispitivao baš ovu lekciju. None = lekcija
+    # bez blokirajućeg ugovora; ponašanje tada ostaje bajt za bajt kao prije.
+    practice_contract: object = None
 
     @property
     def canonical_label(self):
@@ -92,4 +96,5 @@ def build(grade, topic_id):
         objectives=tuple(lesson.get("objectives", []) or ()),
         exclusions=tuple(lesson.get("exclusions", []) or ()),
         semantic_contract=semantic_contracts.contract_for(lesson["id"]),
+        practice_contract=semantic_practice.contract_for(lesson["id"]),
     )
