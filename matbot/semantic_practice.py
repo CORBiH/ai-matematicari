@@ -170,8 +170,38 @@ def _feature_volume_request(task_text, options_text):
     return bool(_VOLUME_RE.search(task_text or ""))
 
 
+_SIDE_EQUALITY_RE = re.compile(r"\b([A-Z]{2})\s*=")
+_ANGLE_TOKEN_RE = re.compile(r"\\angle\s*([A-Z]{3})")
+
+
+def _included_angle_by_notation(text):
+    """Zahvaćen ugao iskazan NOTACIJOM (živi F5K nalaz K07): kad su date
+    dvije stranice sa ZAJEDNIČKIM tjemenom (npr. $AB$ i $AC$), ugao čije je
+    srednje slovo upravo to tjeme ($\\angle BAC$) JESTE ugao između njih —
+    bez ijedne riječi „između“. Ugao naspram stranice ($\\angle ABC$ uz iste
+    podatke) ima drugo srednje slovo i ne pogađa se."""
+    segments = " ".join(_math_segments(text or ""))
+    sides = [side for side in _SIDE_EQUALITY_RE.findall(segments)]
+    shared_vertices = set()
+    for first, second in zip(sides, sides[1:]):
+        common = set(first) & set(second)
+        if len(common) == 1 and first != second:
+            shared_vertices.add(next(iter(common)))
+    if not shared_vertices:
+        return False
+    for angle in _ANGLE_TOKEN_RE.findall(segments):
+        if angle[1] in shared_vertices:
+            return True
+    return False
+
+
 def _feature_included_angle_with_sides(task_text, options_text):
-    return bool(_INCLUDED_ANGLE_RE.search(task_text or ""))
+    """Zabranjena zahvaćenost: frazom (tekst ILI opcije — živi K07 nalaz:
+    „ugao između njih … po SSU“ stajao je u OZNAČENOJ OPCIJI) ili notacijom."""
+    haystack = f"{task_text or ''} {options_text or ''}"
+    if _INCLUDED_ANGLE_RE.search(haystack):
+        return True
+    return _included_angle_by_notation(task_text)
 
 
 FEATURE_CHECKS = MappingProxyType({

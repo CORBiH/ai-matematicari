@@ -195,6 +195,37 @@ def test_ssu_near_miss_included_angle_language_fails():
     assert any("included_angle_with_sides" in f for f in failures)
 
 
+def test_ssu_live_notation_false_accept_is_now_rejected():
+    """ŽIVI F5K NALAZ (K07): zadatak je zahvaćeni ugao iskazao NOTACIJOM
+    ($\\angle BAC$ uz stranice $AB$ i $AC$ — zajedničko tjeme A), a označeni
+    odgovor doslovno kaže „ugao između njih, pa su podudarni po SSU“.
+    Fraza-regex nad samim tekstom to nije vidio. Sada se zahvaćenost
+    prepoznaje i iz notacije (tjeme ugla = zajednička tačka datih stranica)
+    i iz teksta OPCIJA."""
+    contract = contract_for("7-04-016")
+    live_task = ("U trouglovima $ABC$ i $DEF$ vrijedi: $AB=DE$, $AC=DF$, i "
+                 "ugao $\\beta=\\angle BAC$ je jednak uglu "
+                 "$\\delta=\\angle EDF$. Da li su trouglovi $ABC$ i $DEF$ "
+                 "podudarni po SSU kriteriju?")
+    live_option = ("Da — imaju dva para jednakih stranica i jednak ugao "
+                   "između njih, pa su podudarni po SSU.")
+    failures = fidelity_failures(contract, live_task, live_option)
+    assert any("included_angle_with_sides" in f for f in failures)
+    # I sama notacija (bez opcije) mora biti dovoljna.
+    assert any("included_angle_with_sides" in f
+               for f in fidelity_failures(contract, live_task))
+
+
+def test_ssu_opposite_angle_notation_stays_legal():
+    """Ugao NASPRAM stranice ($\\angle ACB$ uz date $AB$ i $AC$ — tjeme C
+    nije zajednička tačka) je legitimna SSU konfiguracija i NE smije pasti."""
+    contract = contract_for("7-04-016")
+    text = ("U trouglovima $ABC$ i $DEF$ vrijedi: $AB=DE$, $AC=DF$, i ugao "
+            "$\\angle ABC$ je jednak uglu $\\angle DEF$. Da li se po SSU "
+            "kriteriju može zaključiti da su trouglovi podudarni?")
+    assert fidelity_failures(contract, text) == ()
+
+
 def test_sus_lesson_allows_included_angle_language():
     """SUS kriterij UPRAVO koristi zahvaćeni ugao — susjedna lekcija ga
     smije opisivati; zabrana važi samo na SSU ugovoru."""
