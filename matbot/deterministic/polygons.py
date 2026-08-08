@@ -76,8 +76,11 @@ def _exterior_package(rng, level, lesson_id, lesson_title, concept):
         option_texts = _degree_options(
             answer, (360, (n - 2) * 180 // n, answer + 10, answer - 10,
                      answer * 2))
+        # Prvi hint bez cifara: ugao pravilnog šestougla („60°“) bio bi
+        # podniz zapisa „360°“ (živi 100-seed fuzz nalaz).
         hints = (
-            "Zbir SVIH vanjskih uglova konveksnog mnogougla je uvijek 360°.",
+            "Zbir SVIH vanjskih uglova konveksnog mnogougla jednak je punom "
+            "okretu.",
             f"Pravilan mnogougao ima ${n}$ jednakih vanjskih uglova.",
             f"Podijeli: $360 : {n}$.",
         )

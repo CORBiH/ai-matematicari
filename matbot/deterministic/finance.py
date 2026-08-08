@@ -149,11 +149,14 @@ def _interest_package(rng, level, lesson_id, lesson_title, concept):
     question = (f"Na štednju je uloženo ${_money(principal)}$ KM uz prostu "
                 f"godišnju kamatnu stopu od ${percent}$ %. Kolika je kamata "
                 f"poslije ${years}$ {year_word}?")
+    # Prvi hint bez ijedne cifre: iznos kamate (npr. „10“ ili „100“ KM) ne
+    # smije se pojaviti ni kao podniz formule (živi 100-seed fuzz nalaz).
     hints = (
-        "Prosta kamata: K = glavnica · stopa · vrijeme / 100.",
+        "Prosta kamata: pomnoži glavnicu, godišnju stopu i broj godina, pa "
+        "proizvod podijeli sa sto.",
         f"Uvrsti: $K = {_money(principal)} \\cdot {percent} \\cdot "
         f"{years} : 100$.",
-        "Prvo pomnoži, na kraju podijeli sa 100.",
+        "Prvo pomnoži sve tri vrijednosti, na kraju podijeli sa sto.",
     )
     solution = (f"$K = {_money(principal)} \\cdot {percent} \\cdot {years} "
                 f": 100 = {_money(interest)}$, pa kamata iznosi "
@@ -178,8 +181,10 @@ def _credit_package(rng, level, lesson_id, lesson_title, concept):
                 f"godišnju kamatnu stopu od ${percent}$ % na ${years}$ "
                 f"{year_word}. Koliko se UKUPNO vraća banci (glavnica plus "
                 "kamata)?")
+    # Prvi hint bez cifara — vidi bilješku u _interest_package.
     hints = (
-        "Prvo izračunaj kamatu: K = glavnica · stopa · vrijeme / 100.",
+        "Prvo izračunaj kamatu: pomnoži glavnicu, stopu i broj godina, pa "
+        "podijeli sa sto.",
         f"Kamata je ${_money(interest)}$ KM.",
         "Ukupan povrat je glavnica plus kamata.",
     )
@@ -255,8 +260,10 @@ def _percent_change_package(rng, level, lesson_id, lesson_title, concept):
     word = "SNIŽENA" if discount else "POVEĆANA"
     question = (f"Cijena artikla od ${_money(price)}$ KM {word.lower()} je "
                 f"za ${percent}$ %. Kolika je nova cijena?")
+    # Prvi hint bez cifara — nova cijena ne smije biti podniz (npr. „20“
+    # u „20 %“); vidi bilješku u _interest_package.
     hints = (
-        f"Prvo izračunaj {percent} % od cijene.",
+        "Prvo izračunaj navedeni procenat od stare cijene.",
         f"Promjena: ${_money(price)} \\cdot {percent} : 100 = "
         f"{_money(change)}$ KM.",
         ("Promjenu oduzmi od stare cijene." if discount

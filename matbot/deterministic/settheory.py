@@ -479,7 +479,23 @@ def _irrational_package(rng, level, lesson_id, lesson_title, concept):
     numerator = rng.randint(1, 9)
     while _gcd(numerator, denominator) != 1:
         numerator = rng.randint(1, 9)
-    decimal = f"{rng.randint(0, 9)},{rng.randint(1, 9)}{rng.randint(0, 9)}"
+    # Decimalni distraktor dokazano DALEKO i od razlomka i od korijena:
+    # „0,33“ uz 1/3, odnosno „1,40“ uz √2, zaokruženo su iste vrijednosti —
+    # dokazani duplikati (živi 100-seed i 200-seed fuzz nalazi). Udaljenost
+    # od korijena se dokazuje egzaktno preko kvadrata: |d² − n| ≥ 1 povlači
+    # |d − √n| ≥ 1/(d + √n), daleko iznad tolerancije zaokruživanja.
+    from fractions import Fraction as _Fraction
+    fraction_value = _Fraction(numerator, denominator)
+    for _ in range(60):
+        whole = rng.randint(0, 9)
+        cents = rng.choice((10, 20, 25, 40, 50, 60, 75, 80, 90))
+        decimal_value = _Fraction(whole * 100 + cents, 100)
+        if (abs(decimal_value - fraction_value) > _Fraction(1, 20)
+                and abs(decimal_value * decimal_value - non_square) >= 1):
+            break
+    else:
+        raise DeterministicGenerationError("nema sigurnog decimalnog distraktora")
+    decimal = core.decimal_display(decimal_value)
     correct = f"$\\sqrt{{{non_square}}}$"
     wrong = [f"$\\sqrt{{{square}}}$",
              f"$\\frac{{{numerator}}}{{{denominator}}}$",
