@@ -127,6 +127,8 @@ def test_tutor_and_reviewer_receive_the_selected_lesson():
     queue_two_call(fake)
     run_practice_turn(store, fake, turn_for("6-04-009", 6))
 
+    # Kanonski kurikularni naslov (data/topics.json) namjerno zadržava
+    # „imenilaca“ — normalizacija važi za PROIZVEDENI tekst, ne za naslove.
     title = "Sabiranje i oduzimanje razlomaka jednakih imenilaca"
     for _instructions, input_text in (fake.tutor_calls[0], fake.reviewer_calls[0]):
         assert title in input_text
@@ -202,7 +204,7 @@ def test_ne_znam_produces_help_and_is_never_graded_as_wrong():
     run_practice_turn(store, fake, turn_for("6-04-009", 6))
 
     draft = make_tutor_draft(
-        intent="hint_request", reply="Bez brige — imenilac ostaje isti.",
+        intent="hint_request", reply="Bez brige — nazivnik ostaje isti.",
         hint="Saberi samo brojnike.", new_task=None)
     queue_two_call(fake, draft=draft)
     response = run_practice_turn(store, fake, turn_for(
@@ -210,7 +212,7 @@ def test_ne_znam_produces_help_and_is_never_graded_as_wrong():
 
     assert response["status"] == "ready"
     assert response["answer_verdict"] is None      # nikad „netačno“
-    assert "imenilac" in response["answer"]
+    assert "nazivnik" in response["answer"]
     assert store.peek("uni-6-04-009")["hint_level"] == 1
 
 
@@ -230,7 +232,7 @@ def test_answer_attempt_is_graded_against_the_active_task():
     session = store.peek("uni-6-04-009")
 
     draft = make_tutor_draft(
-        intent="answer_attempt", reply="Tačno! Imenilac ostaje isti.",
+        intent="answer_attempt", reply="Tačno! Nazivnik ostaje isti.",
         grading="correct", new_task=None)
     queue_two_call(fake, draft=draft)
     response = run_practice_turn(store, fake, turn_for(
@@ -272,7 +274,7 @@ def test_full_solution_request_reveals_the_correct_option():
 
     draft = make_tutor_draft(
         intent="full_solution_request", reply="Evo cijelog postupka.",
-        worked_solution="Saberi brojnike: 2+3=5, imenilac ostaje 7.", new_task=None)
+        worked_solution="Saberi brojnike: 2+3=5, nazivnik ostaje 7.", new_task=None)
     queue_two_call(fake, draft=draft)
     response = run_practice_turn(store, fake, turn_for(
         "6-04-009", 6, student_message="Uradi ga ti."))
@@ -283,7 +285,7 @@ def test_full_solution_request_reveals_the_correct_option():
 def test_off_topic_and_clarification_do_not_create_a_task():
     store, fake = SessionStore(), FakeLLM()
     for intent, message in (("off_topic", "Voliš li fudbal?"),
-                            ("clarification", "Šta znači imenilac?")):
+                            ("clarification", "Šta znači nazivnik?")):
         draft = make_tutor_draft(
             intent=intent, reply="Vratimo se na zadatak iz ove lekcije.",
             new_task=None)

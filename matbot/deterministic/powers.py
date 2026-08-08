@@ -213,7 +213,7 @@ def _zero_negative_package(rng, level, lesson_id, lesson_title):
             value = Fraction(1, base)
             chain = f"{expression} = \\frac{{1}}{{{base}}}"
             law = ("Negativan izložilac znači recipročnu vrijednost: osnova "
-                   "odlazi u imenilac.")
+                   "odlazi u nazivnik.")
     elif level == 2:
         base = rng.randint(2, 5)
         exponent = rng.randint(2, 3)
@@ -449,7 +449,7 @@ def _root_value_package(rng, level, lesson_id, lesson_title):
             radicand = f"\\frac{{{p * p}}}{{{q * q}}}"
             expression = f"\\sqrt{{{radicand}}}"
             chain = f"{expression} = \\frac{{{p}}}{{{q}}}"
-            hint2 = (f"Korjenuj brojnik i imenilac posebno: "
+            hint2 = (f"Korjenuj brojnik i nazivnik posebno: "
                      f"$\\sqrt{{{p * p}}} = {p}$ i $\\sqrt{{{q * q}}} = {q}$.")
             candidates = [Fraction(p * p, q * q), Fraction(q, p),
                           value + 1, Fraction(p, q + 1)]
@@ -676,7 +676,7 @@ def _root_product_package(rng, level, lesson_id, lesson_title):
         derivation = (f"{expression} = \\frac{{\\sqrt{{{(a * b) ** 2}}}}}"
                       f"{{\\sqrt{{{b * b}}}}} = \\frac{{{a * b}}}{{{b}}} = {a}")
         law = ("Korijen količnika je količnik korijena: korjenuj brojnik i "
-               "imenilac posebno.")
+               "nazivnik posebno.")
         operation = "root_of_quotient"
         signature = [("radicand", f"{(a * b) ** 2}/{b * b}")]
     else:

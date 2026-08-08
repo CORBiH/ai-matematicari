@@ -119,7 +119,7 @@ def _comparison_values(rng, domain, level):
         raise DeterministicGenerationError("nema četiri različite vrijednosti")
     ordered = sorted(values)
     if level == 1 and domain == "fraction":
-        # Nivo 1: jednaki imenioci — različiti brojnici su već različite vrijednosti.
+        # Nivo 1: jednaki nazivnici — različiti brojnici su već različite vrijednosti.
         pass
     return ordered
 
@@ -196,7 +196,7 @@ def _comparison_package(rng, level, domain, lesson_id, lesson_title):
     if len(set(option_texts)) != 4:
         raise DeterministicGenerationError("opcije nisu jedinstvene")
     hint1 = _comparison_rule(domain)
-    hint2 = ("Svedi sve brojeve na isti oblik (isti imenilac ili decimalni "
+    hint2 = ("Svedi sve brojeve na isti oblik (isti nazivnik ili decimalni "
              "zapis), pa ih poredaj." if domain in ("fraction", "rational")
              else "Poredaj brojeve po veličini — na brojevnoj pravoj veći je desno.")
     hint3 = "Poredaj sve četiri vrijednosti od najmanje prema najvećoj, pa izaberi traženu."
@@ -216,7 +216,7 @@ def _comparison_package(rng, level, domain, lesson_id, lesson_title):
 
 def _comparison_rule(domain):
     if domain == "fraction":
-        return ("Razlomci se porede svođenjem na zajednički imenilac ili "
+        return ("Razlomci se porede svođenjem na zajednički nazivnik ili "
                 "pretvaranjem u decimalni zapis.")
     if domain == "decimal":
         return ("Decimalni brojevi se porede cifra po cifra: prvo cijeli dio, "

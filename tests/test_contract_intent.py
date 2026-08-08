@@ -109,14 +109,14 @@ TASK_TEXTS = [
 
 def test_prose_without_numbers_always_passes():
     ok, offending = pipeline.verify_prose_fidelity(
-        "Sjajno! Prvo svedi razlomke na zajednički imenilac.", TASK_TEXTS)
+        "Sjajno! Prvo svedi razlomke na zajednički nazivnik.", TASK_TEXTS)
     assert ok and offending == ()
 
 
 def test_prose_with_task_and_derived_values_passes():
-    # 12 = zajednički imenilac, 9 i 10 = prošireni brojnici, 19 = njihov zbir.
+    # 12 = zajednički nazivnik, 9 i 10 = prošireni brojnici, 19 = njihov zbir.
     ok, offending = pipeline.verify_prose_fidelity(
-        r"Zajednički imenilac je $12$: $\frac{3}{4}=\frac{9}{12}$, "
+        r"Zajednički nazivnik je $12$: $\frac{3}{4}=\frac{9}{12}$, "
         r"$\frac{5}{6}=\frac{10}{12}$, pa je zbir $\frac{19}{12}$.", TASK_TEXTS)
     assert ok, offending
 
@@ -195,7 +195,7 @@ def test_reply_that_stays_inside_the_task_is_published():
     fake.queue(make_output(reply="Evo zadatka.", new_task=make_task()))
     run_practice_turn(store, fake, turn)
 
-    explanation = "Imenilac ostaje isti — saberi samo brojnike."
+    explanation = "Nazivnik ostaje isti — saberi samo brojnike."
     fake.queue(make_output(reply=explanation))
     response = run_practice_turn(store, fake, dict(turn, student_message="Kako?"))
     assert response["status"] == "ready"
@@ -236,7 +236,7 @@ def test_faithful_hint_is_published():
     wrong = next(o["id"] for o in session["current_options"]
                  if o["id"] != session["correct_option_id"])
 
-    hint = "Imenilac ostaje isti — saberi samo brojnike."
+    hint = "Nazivnik ostaje isti — saberi samo brojnike."
     fake.queue(make_output(reply="", hint=hint))
     response = run_practice_turn(store, fake, dict(
         turn, interaction_type="choice_answer", selected_option_id=wrong,

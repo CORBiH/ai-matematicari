@@ -236,9 +236,9 @@ _DERIVERS = (
 # drugi vidljivi tekst.
 ERROR_CATEGORY_LABELS = {
     "combined_denominators":
-        "Sabrao je i imenioce, a imenilac je trebao ostati isti.",
+        "Sabrao je i nazivnike, a nazivnik je trebao ostati isti.",
     "wrong_numerator":
-        "Imenilac je zadržao ispravno, ali je brojnik pogrešno izračunao.",
+        "Nazivnik je zadržao ispravno, ali je brojnik pogrešno izračunao.",
     "missed_reciprocal":
         "Pri dijeljenju nije pomnožio recipročnom vrijednošću drugog razlomka.",
     "wrong_operation":
@@ -246,11 +246,11 @@ ERROR_CATEGORY_LABELS = {
     "wrong_product":
         "Proizvod razlomaka je pogrešno izračunao.",
     "unequal_scaling":
-        "Brojnik i imenilac nije pomnožio istim brojem.",
+        "Brojnik i nazivnik nije pomnožio istim brojem.",
     "wrong_reduction":
-        "Brojnik i imenilac nije podijelio istim brojem.",
+        "Brojnik i nazivnik nije podijelio istim brojem.",
     "incorrect_conversion":
-        "Razlomke je pogrešno sveo na zajednički imenilac.",
+        "Razlomke je pogrešno sveo na zajednički nazivnik.",
 }
 
 # Kategorije za koje POSTOJI strukturni izvođač I projektni tekst. Ugovor koji

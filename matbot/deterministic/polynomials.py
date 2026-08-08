@@ -536,11 +536,11 @@ def _square_binomial_package(rng, level, domain, lesson_id, lesson_title):
     lead = "x" if a == 1 else f"{a}x"
     solution = (f"Kvadrat binoma: prvi kvadrat, dvostruki proizvod pa drugi "
                 f"kvadrat. Ovdje: ${display}^2 = {poly_display(correct)}$ — "
-                f"srednji clan je $2 \\cdot {lead} \\cdot {b}$ sa znakom "
+                f"srednji član je $2 \\cdot {lead} \\cdot {b}$ sa znakom "
                 "binoma.")
-    hints = ("Kvadrat binoma ima TRI clana: kvadrat prvog, dvostruki "
-             "proizvod i kvadrat drugog clana.",
-             f"Kvadrat prvog clana je ${poly_display({2: a * a})}$, a "
+    hints = ("Kvadrat binoma ima TRI člana: kvadrat prvog, dvostruki "
+             "proizvod i kvadrat drugog člana.",
+             f"Kvadrat prvog člana je ${poly_display({2: a * a})}$, a "
              f"kvadrat drugog ${b * b}$ — nedostaje dvostruki proizvod.",
              f"Dvostruki proizvod je $2 \\cdot {lead} \\cdot {b} = "
              f"{poly_display({1: abs(correct.get(1, 0))})}$ sa znakom binoma.")
@@ -572,10 +572,10 @@ def _cube_binomial_package(rng, level, domain, lesson_id, lesson_title):
                   {3: 1, 2: sign * 4 * b, 1: 4 * b * b, 0: sign * b ** 3}])
     solution = (f"Kub binoma ima koeficijente 1, 3, 3, 1: ${display}^3 = "
                 f"{poly_display(correct)}$.")
-    hints = ("Kub binoma ima CETIRI clana s koeficijentima 1, 3, 3, 1.",
-             f"Prvi clan je $x^3$, posljednji je kub broja ${b}$ sa znakom "
+    hints = ("Kub binoma ima CETIRI člana s koeficijentima 1, 3, 3, 1.",
+             f"Prvi član je $x^3$, posljednji je kub broja ${b}$ sa znakom "
              "binoma — srednja dva nose trojku.",
-             f"Razvij: ${display}^2 = {poly_display(square)}$, pa pomnozi "
+             f"Razvij: ${display}^2 = {poly_display(square)}$, pa pomnoži "
              f"jos jednom sa ${display}$.")
     return core.build_package(
         lesson_id=lesson_id, lesson_title=lesson_title,
@@ -615,7 +615,7 @@ def _factor_diff_squares_package(rng, level, domain, lesson_id, lesson_title):
                 f"zbira: ${poly_display(original)} = {correct_display}$ — "
                 "razvoj vraca polazni polinom.")
     hints = ("Razlika kvadrata se rastavlja kao proizvod razlike i zbira.",
-             f"Prepoznaj kvadrate: prvi clan je kvadrat od ${lead}$, a "
+             f"Prepoznaj kvadrate: prvi član je kvadrat od ${lead}$, a "
              f"drugi od ${b}$.",
              f"Dakle: $({lead} - {b})({lead} + {b})$ — provjeri razvojem.")
     return core.build_package(
@@ -656,14 +656,14 @@ def _factor_common_package(rng, level, domain, lesson_id, lesson_title):
     candidates.append((f"{k}x({poly_display({1: p + 1, 0: q})})",
                        _poly_mul({1: k}, {1: p + 1, 0: q})))
     option_texts = _factored_options(original, candidates)
-    question = (f"Izluci najveci zajednicki faktor: ${poly_display(original)}$")
-    solution = (f"Najveci zajednicki faktor clanova je ${k}x$: "
+    question = (f"Izluči najveći zajednički faktor: ${poly_display(original)}$")
+    solution = (f"Najveći zajednički faktor članova je ${k}x$: "
                 f"${poly_display(original)} = {correct_display}$ — razvoj "
                 "vraca polazni izraz.")
-    hints = ("Nadji najveci broj i najveci stepen od x koji dijele SVE "
-             "clanove.",
-             f"Koeficijenti su djeljivi sa ${k}$, a svaki clan sadrzi $x$.",
-             f"Izluci ${k}x$ pa zapisi ostatak svakog clana u zagradi.")
+    hints = ("Nađi najveći broj i najveći stepen od x koji dijele SVE "
+             "članove.",
+             f"Koeficijenti su djeljivi sa ${k}$, a svaki član sadrži $x$.",
+             f"Izluči ${k}x$ pa zapiši ostatak svakog člana u zagradi.")
     return core.build_package(
         lesson_id=lesson_id, lesson_title=lesson_title,
         family_id="polynomial_basic", operation="factor_common",
@@ -701,11 +701,11 @@ def _factor_grouping_package(rng, level, domain, lesson_id, lesson_title):
     question = f"Rastavi grupisanjem: ${question_display}$"
     solution = (f"Grupisemo: $x(x + {b}) + {c}(x + {b}) = {correct_display}$ "
                 "— razvoj vraca polazni izraz.")
-    hints = ("Grupisi po dva clana tako da svaka grupa ima zajednicki "
+    hints = ("Grupiši po dva člana tako da svaka grupa ima zajednički "
              "faktor.",
-             f"Iz prve grupe izluci $x$, a iz druge ${c}$ — u obje ostaje "
+             f"Iz prve grupe izluči $x$, a iz druge ${c}$ — u obje ostaje "
              f"$(x + {b})$.",
-             f"Zajednicki binom $(x + {b})$ izluci ispred zagrade.")
+             f"Zajednički binom $(x + {b})$ izluči ispred zagrade.")
     return core.build_package(
         lesson_id=lesson_id, lesson_title=lesson_title,
         family_id="polynomial_basic", operation="factor_grouping",
@@ -739,8 +739,8 @@ def _factor_identity_package(rng, level, domain, lesson_id, lesson_title):
     solution = (f"Trinom je kvadrat binoma: ${poly_display(original)} = "
                 f"{correct_display}$ — razvoj vraca polazni polinom.")
     hints = ("Provjeri da li je trinom kvadrat binoma: prvi i posljednji "
-             "clan su kvadrati, a srednji dvostruki proizvod.",
-             f"Kvadrati su $x^2$ i ${b * b}$; srednji clan je "
+             "član su kvadrati, a srednji dvostruki proizvod.",
+             f"Kvadrati su $x^2$ i ${b * b}$; srednji član je "
              f"$2 \\cdot x \\cdot {b}$ sa znakom {sign_word}.",
              f"Dakle: $(x {'+' if sign > 0 else '-'} {b})^2$ — provjeri "
              "razvojem.")
@@ -782,7 +782,7 @@ def _sum_diff_cubes_package(rng, level, domain, lesson_id, lesson_title):
     hints = ("Zbir/razlika kubova se rastavlja na binom i trinom.",
              f"Kubovi su $x^3$ i ${b ** 3}$, pa je binom "
              f"$(x {'+' if sign > 0 else '-'} {b})$.",
-             "U trinomu srednji clan mijenja znak binoma i nema dvojke.")
+             "U trinomu srednji član mijenja znak binoma i nema dvojke.")
     return core.build_package(
         lesson_id=lesson_id, lesson_title=lesson_title,
         family_id="polynomial_basic", operation="sum_diff_cubes",
@@ -813,14 +813,14 @@ def _zero_product_package(rng, level, domain, lesson_id, lesson_title):
     option_texts = tuple(f"${item}$" for item in options)
     if len(set(option_texts)) != 4:
         raise DeterministicGenerationError("opcije nisu jedinstvene")
-    question = f"Rijesi jednacinu: ${display}$"
+    question = f"Riješi jednačinu: ${display}$"
     solution = (f"Proizvod je nula kad je bar jedan faktor nula: prvi faktor "
                 f"daje $x = {root_p}$, a drugi $x = {root_q}$ — oba broja "
-                "ponistavaju po jedan faktor polazne jednacine.")
-    hints = ("Nula proizvoda: proizvod je nula tacno kad je neki faktor "
+                "poništavaju po jedan faktor polazne jednačine.")
+    hints = ("Nula proizvoda: proizvod je nula tačno kad je neki faktor "
              "nula.",
-             "Izjednaci SVAKI faktor s nulom i rijesi dvije male jednacine.",
-             f"Prvi faktor daje $x = {root_p}$ — nadji i drugu vrijednost.")
+             "Izjednači SVAKI faktor s nulom i riješi dvije male jednačine.",
+             f"Prvi faktor daje $x = {root_p}$ — nađi i drugu vrijednost.")
     return core.build_package(
         lesson_id=lesson_id, lesson_title=lesson_title,
         family_id="polynomial_basic", operation="zero_product",
@@ -853,15 +853,15 @@ def _fraction_domain_package(rng, level, domain, lesson_id, lesson_title):
     question = ("Za koje vrijednosti promjenljive $x$ razlomak "
                 f"$\\frac{{{numerator}}}{{{denominator_display}}}$ NIJE "
                 "definisan?")
-    solution = (f"Razlomak nije definisan kad je imenilac nula: "
+    solution = (f"Razlomak nije definisan kad je nazivnik nula: "
                 f"${factored} = 0$ daje $x = {p}$ i $x = {-q}$.")
-    hint2 = ("Rastavi imenilac na faktore pa svaki faktor izjednaci s nulom."
+    hint2 = ("Rastavi nazivnik na faktore pa svaki faktor izjednači s nulom."
              if level > 1 else
-             "Izjednaci svaki faktor imenioca s nulom.")
-    hints = ("Razlomak nije definisan kad mu je imenilac jednak nuli.",
+             "Izjednači svaki faktor nazivnika s nulom.")
+    hints = ("Razlomak nije definisan kad mu je nazivnik jednak nuli.",
              hint2,
              f"Faktori su $(x - {p})$ i $(x + {q})$ — nule su njihova "
-             "rjesenja.")
+             "rješenja.")
     return core.build_package(
         lesson_id=lesson_id, lesson_title=lesson_title,
         family_id="polynomial_basic", operation="fraction_domain",

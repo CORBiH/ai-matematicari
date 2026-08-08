@@ -2,7 +2,7 @@
 
 JEDAN detektor po PORODICI, nikad po lekciji: `fraction_arithmetic` opslužuje
 sve četiri lekcije direktnog računa s razlomcima, a razlikuje ih isključivo
-parametrima ugovora (dozvoljene operacije, odnos imenilaca, zabranjene
+parametrima ugovora (dozvoljene operacije, odnos nazivnika, zabranjene
 direktive).
 
 TRI ISHODA I NIŠTA IZMEĐU:
@@ -309,13 +309,13 @@ def _detect_fraction_arithmetic(contract, text):
     if required_relation in ("equal", "unlike"):
         if len(denominators) < 2:
             return _result(STATUS_UNSUPPORTED,
-                           reason="manje od dva brojevna imenioca — odnos se ne može dokazati",
+                           reason="manje od dva brojevna nazivnika — odnos se ne može dokazati",
                            operation=tuple(sorted(operations)),
                            denominators=tuple(denominators))
         actual = "equal" if len(set(denominators)) == 1 else "unlike"
         if actual != required_relation:
             return _result(STATUS_FAIL, CODE_DENOMINATOR_MISMATCH,
-                           f"imenioci su „{actual}“, a lekcija traži „{required_relation}“",
+                           f"nazivnici su „{actual}“, a lekcija traži „{required_relation}“",
                            operation=tuple(sorted(operations)),
                            denominators=tuple(denominators),
                            denominator_relation=actual,

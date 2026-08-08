@@ -203,17 +203,17 @@ def _fraction_to_percent_package(rng, level, lesson_id, lesson_title):
         chain = (f"{display} = \\frac{{{p * scale}}}{{100}}")
         explain = (f"Proširimo razlomak na stotinke: ${chain}$, "
                    f"a $\\frac{{{p * scale}}}{{100}}$ iznosi {answer_text}.")
-        hint2 = (f"Proširi razlomak tako da imenilac bude $100$: "
-                 f"pomnoži brojnik i imenilac sa ${scale}$.")
+        hint2 = (f"Proširi razlomak tako da nazivnik bude $100$: "
+                 f"pomnoži brojnik i nazivnik sa ${scale}$.")
     else:
         decimal = core.decimal_display(value)
         chain = f"{display} = {decimal}"
         explain = (f"Pretvorimo u decimalni zapis: ${chain}$, "
                    f"a to je {answer_text}.")
-        hint2 = ("Podijeli brojnik imeniocem pa decimalni zapis pretvori u "
+        hint2 = ("Podijeli brojnik nazivnikom pa decimalni zapis pretvori u "
                  "procenat množenjem sa $100$.")
-    hint1 = "Procenat je razlomak sa imeniocem $100$: prevedi razlomak na stotinke."
-    hint3 = "Broj stotinki je broj procenata — pročitaj brojnik razlomka sa imeniocem $100$."
+    hint1 = "Procenat je razlomak sa nazivnikom $100$: prevedi razlomak na stotinke."
+    hint3 = "Broj stotinki je broj procenata — pročitaj brojnik razlomka sa nazivnikom $100$."
     solution = explain
     return core.build_package(
         lesson_id=lesson_id, lesson_title=lesson_title,
@@ -379,7 +379,7 @@ def _complement_probability_package(rng, level, lesson_id, lesson_title):
     hint1 = ("Događaj i njemu suprotan događaj zajedno pokrivaju sve ishode: "
              "zbir njihovih vjerovatnoća je $1$.")
     hint2 = f"Izračunaj: $1 - {display}$."
-    hint3 = f"Svedi na zajednički imenilac: $\\frac{{{den}}}{{{den}}} - {display}$."
+    hint3 = f"Svedi na zajednički nazivnik: $\\frac{{{den}}}{{{den}}} - {display}$."
     solution = (f"{hint1} Računamo: $1 - {display} = "
                 f"\\frac{{{den}}}{{{den}}} - {display} = {answer_display}$.")
     candidates = [probability, complement + Fraction(1, den),

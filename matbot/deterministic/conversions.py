@@ -8,7 +8,7 @@ nose parametri ugovora:
   • decimal_place_value — cifra na datom decimalnom mjestu.
 
 MATEMATIČKI AUTORITET: egzaktni `fractions.Fraction`; decimalni prikaz
-isključivo core.decimal_display (dekadski imenilac), nikad binarni float.
+isključivo core.decimal_display (dekadski nazivnik), nikad binarni float.
 Razlomak bez konačnog decimalnog zapisa NE ULAZI u zadatak pretvaranja —
 generator ga odbija pri konstrukciji.
 
@@ -19,7 +19,7 @@ duplikat. Iz istog razloga „neskraćeni ekvivalent“ ($\\frac{75}{100}$ uz
 $\\frac{3}{4}$) NE SMIJE biti distraktor: to je ista vrijednost u dva zapisa
 i objava bi paket odbila. Neskraćivanje se ispituje kroz rješenje i
 nagovještaje, a distraktori su uvijek DRUGE vrijednosti (pogrešno pomjeren
-zarez, zamijenjen brojnik/imenilac, pogrešan predznak).
+zarez, zamijenjen brojnik/nazivnik, pogrešan predznak).
 """
 import random
 from fractions import Fraction
@@ -34,7 +34,7 @@ _SUPPORTED_CONCEPTS = frozenset({"fraction_to_decimal", "decimal_to_fraction",
                                  "decimal_place_value"})
 _SUPPORTED_SCOPES = frozenset({"nonneg", "signed"})
 
-# Imenioci s konačnim decimalnim zapisom, po nivou složenosti.
+# Nazivnici s konačnim decimalnim zapisom, po nivou složenosti.
 _DENOMINATORS = {1: (2, 4, 5, 10), 2: (4, 5, 8, 20, 25, 50), 3: (8, 16, 40, 125)}
 
 
@@ -116,17 +116,17 @@ def _fraction_to_decimal_package(rng, level, scope, lesson_id, lesson_title):
                   value + Fraction(1, 10)]
     option_texts = _distinct_decimal_options(value, candidates)
     hint1 = ("Razlomak se pretvara u decimalni zapis proširivanjem na "
-             "dekadski imenilac (10, 100, 1000...) ili dijeljenjem brojnika "
-             "imeniocem.")
-    hint2 = (f"Proširi razlomak na imenilac ${scale}$: "
+             "dekadski nazivnik (10, 100, 1000...) ili dijeljenjem brojnika "
+             "nazivnikom.")
+    hint2 = (f"Proširi razlomak na nazivnik ${scale}$: "
              f"${fraction_display} = \\frac{{{expanded_numerator}}}{{{scale}}}$."
              if value > 0 else
              f"Radi s apsolutnom vrijednošću pa vrati predznak: proširi na "
-             f"imenilac ${scale}$.")
-    hint3 = (f"Brojnik proširenog razlomka čitaj kao decimale: imenilac "
+             f"nazivnik ${scale}$.")
+    hint3 = (f"Brojnik proširenog razlomka čitaj kao decimale: nazivnik "
              f"${scale}$ znači {core.decimal_places(value)} "
              f"decimalna mjesta.")
-    solution = (f"Proširimo na dekadski imenilac: ${fraction_display} = "
+    solution = (f"Proširimo na dekadski nazivnik: ${fraction_display} = "
                 f"\\frac{{{expanded_numerator}}}{{{scale}}} = {decimal_display}$.")
     return core.build_package(
         lesson_id=lesson_id, lesson_title=lesson_title,
@@ -166,13 +166,13 @@ def _decimal_to_fraction_package(rng, level, scope, lesson_id, lesson_title):
             break
     if len(option_texts) != 4:
         raise DeterministicGenerationError("nedovoljno razlomačkih opcija")
-    hint1 = ("Decimalni broj se piše kao razlomak s dekadskim imeniocem: "
-             "broj decimala određuje broj nula u imeniocu.")
+    hint1 = ("Decimalni broj se piše kao razlomak s dekadskim nazivnikom: "
+             "broj decimala određuje broj nula u nazivniku.")
     hint2 = (f"Zapiši: ${decimal_display} = "
              f"\\frac{{{raw_numerator}}}{{{scale}}}$, pa skrati.")
     hint3 = ("Skrati razlomak najvećim zajedničkim djeliocem brojnika i "
-             "imenioca — rezultat mora biti nesvodiv.")
-    solution = (f"Zapišemo preko dekadskog imenioca pa skratimo: "
+             "nazivnika — rezultat mora biti nesvodiv.")
+    solution = (f"Zapišemo preko dekadskog nazivnika pa skratimo: "
                 f"${decimal_display} = \\frac{{{raw_numerator}}}{{{scale}}} = "
                 f"{reduced_display}$.")
     return core.build_package(

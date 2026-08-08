@@ -295,7 +295,7 @@ def difficulty_evidence_errors(evidence: DifficultyEvidence, target_level: int,
         # konstruktivni zadatak ostaju blokirani, kao i tri operacije.
         # POREĐENJE SAMO PO SEBI NE DISKVALIFIKUJE NIVO 1 (živi gate acd8f5c).
         # Pad: lekcija 7. razreda o upoređivanju brojeva, zadatak oblika „koji
-        # je veći od dva razlomka s istim imeniocem“, dokaz steps=1 cond=1
+        # je veći od dva razlomka s istim nazivnikom“, dokaz steps=1 cond=1
         # ops=1 repr=0 uz requires_comparison=true. To je udžbenički uvodni
         # zadatak, ali je apsolutna zabrana poređenja činila nivo 1 NEDOSTIŽNIM
         # za svaku lekciju čija je vještina upravo poređenje — model je

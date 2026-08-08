@@ -3,7 +3,7 @@
 Dvije semantičke porodice (Batch #4, Prioritet 1):
 
   • ``rational_expression_direct`` — domen, brojna vrijednost, proširivanje,
-    skraćivanje, jednakost, zajednički imenilac, sabiranje, oduzimanje,
+    skraćivanje, jednakost, zajednički nazivnik, sabiranje, oduzimanje,
     množenje, dijeljenje, dvojni razlomak i sređivanje izraza;
   • ``rational_equation_direct``  — jednačine s algebarskim razlomcima i
     jednačine s dvojnim razlomkom, linearno rješive.
@@ -97,7 +97,7 @@ def _linear_factor(rng, level):
 
 
 def _denominator_for(rng, level):
-    """Imenilac po nivou: L1 monom, L2 binom, L3 proizvod/razlika kvadrata."""
+    """Nazivnik po nivou: L1 monom, L2 binom, L3 proizvod/razlika kvadrata."""
     if level == 1:
         c = rng.choice((1, 1, 2, 3))
         return Polynomial.monomial(c, 1)
@@ -141,7 +141,7 @@ def _distinct_expression_options(correct: RationalExpression, candidates,
     for candidate in candidates:
         if candidate.denominator.is_zero:
             continue
-        # Kanonski prikaz i za distraktore — bez ugniježdenih \frac u imeniocu.
+        # Kanonski prikaz i za distraktore — bez ugniježdenih \frac u nazivniku.
         candidate = candidate.canonical()
         if same(candidate, correct) or any(same(candidate, seen) for seen in chosen):
             continue
@@ -172,7 +172,7 @@ def _package(lesson_id, lesson_title, family_id, concept, level, question,
 
 
 # ---------------------------------------------------------------------------
-# 1) DOMEN — uslov definisanosti (nule imenioca)
+# 1) DOMEN — uslov definisanosti (nule nazivnika)
 # ---------------------------------------------------------------------------
 
 def _domain_package(rng, level, lesson_id, lesson_title, concept):
@@ -213,12 +213,12 @@ def _domain_package(rng, level, lesson_id, lesson_title, concept):
     question = (f"Za koje vrijednosti promjenljive izraz "
                 f"${_display(expression)}$ NIJE definisan?")
     hints = (
-        "Razlomak nije definisan tamo gdje je imenilac jednak nuli — "
+        "Razlomak nije definisan tamo gdje je nazivnik jednak nuli — "
         "brojnik na to ne utiče.",
         f"Riješi jednačinu ${denominator.display()} = 0$.",
-        "Svaka nula imenioca daje po jedan uslov oblika x ≠ vrijednost.",
+        "Svaka nula nazivnika daje po jedan uslov oblika x ≠ vrijednost.",
     )
-    solution = (f"Imenilac ${denominator.display()}$ jednak je nuli za "
+    solution = (f"Nazivnik ${denominator.display()}$ jednak je nuli za "
                 + ", ".join(f"$x = {core.fraction_display(v)}$" for v in excluded)
                 + f", pa izraz nije definisan upravo tamo: {correct}.")
     return _package(lesson_id, lesson_title, "rational_expression_direct",
@@ -252,14 +252,14 @@ def _numeric_value_package(rng, level, lesson_id, lesson_title, concept):
                 f"za $x = {core.fraction_display(x)}$.")
     hints = (
         "Uvrsti datu vrijednost promjenljive posebno u brojnik i posebno "
-        "u imenilac.",
+        "u nazivnik.",
         f"Brojnik: ${numerator.display()}$ za $x = {core.fraction_display(x)}$ "
         f"iznosi ${core.fraction_display(numerator_value)}$.",
-        f"Imenilac iznosi ${core.fraction_display(denominator_value)}$ — "
-        "podijeli brojnik imeniocem.",
+        f"Nazivnik iznosi ${core.fraction_display(denominator_value)}$ — "
+        "podijeli brojnik nazivnikom.",
     )
     solution = (f"Za $x = {core.fraction_display(x)}$: brojnik je "
-                f"${core.fraction_display(numerator_value)}$, imenilac "
+                f"${core.fraction_display(numerator_value)}$, nazivnik "
                 f"${core.fraction_display(denominator_value)}$, pa je "
                 f"vrijednost ${core.fraction_display(numerator_value)} : "
                 f"{core.parenthesized(core.fraction_display(denominator_value))}"
@@ -305,12 +305,12 @@ def _expand_package(rng, level, lesson_id, lesson_title, concept):
     question = (f"Proširi razlomak ${_display(base)}$ faktorom "
                 f"${factor_text}$.")
     hints = (
-        "Proširivanje množi ISTIM izrazom i brojnik i imenilac — vrijednost "
+        "Proširivanje množi ISTIM izrazom i brojnik i nazivnik — vrijednost "
         "razlomka se ne mijenja na zajedničkom domenu.",
         f"Pomnoži brojnik: $({base_num.display()}) \\cdot ({factor_text})$.",
-        f"Pomnoži i imenilac: $({base_den.display()}) \\cdot ({factor_text})$.",
+        f"Pomnoži i nazivnik: $({base_den.display()}) \\cdot ({factor_text})$.",
     )
-    solution = (f"Množimo brojnik i imenilac faktorom ${factor_text}$: "
+    solution = (f"Množimo brojnik i nazivnik faktorom ${factor_text}$: "
                 f"${_display(base)} = {_display(expanded)}$ "
                 "(vrijednost je ista za svaki $x$ iz zajedničkog domena).")
     return _package(lesson_id, lesson_title, "rational_expression_direct",
@@ -359,16 +359,16 @@ def _reduce_package(rng, level, lesson_id, lesson_title, concept):
     condition = _exclusion_text(original.excluded)
     question = f"Skrati razlomak ${_display(original)}$."
     hints = (
-        "Rastavi brojnik i imenilac na faktore pa potraži zajednički faktor.",
+        "Rastavi brojnik i nazivnik na faktore pa potraži zajednički faktor.",
         f"Zajednički faktor je ${common.display()}$.",
         "Prekriži zajednički faktor, ali zapiši uslov: on ne smije biti nula.",
     )
     solution = (f"Brojnik je $({reduced.numerator.display()}) \\cdot "
-                f"({common.display()})$, imenilac "
+                f"({common.display()})$, nazivnik "
                 f"$({reduced.denominator.display()}) \\cdot ({common.display()})$. "
                 f"Kraćenjem zajedničkog faktora ${common.display()}$ dobijamo "
                 f"${_display(reduced)}$, uz uslov {condition} "
-                "(vrijednosti za koje polazni imenilac nije definisan).")
+                "(vrijednosti za koje polazni nazivnik nije definisan).")
     return _package(lesson_id, lesson_title, "rational_expression_direct",
                     concept, level, question, option_texts, hints, solution,
                     _display(reduced),
@@ -424,7 +424,7 @@ def _equal_fractions_package(rng, level, lesson_id, lesson_title, concept):
 
 
 # ---------------------------------------------------------------------------
-# 6) ZAJEDNIČKI IMENILAC
+# 6) ZAJEDNIČKI NAZIVNIK
 # ---------------------------------------------------------------------------
 
 def _poly_content_lcm(d1: Polynomial, d2: Polynomial) -> Polynomial:
@@ -474,24 +474,24 @@ def _common_denominator_package(rng, level, lesson_id, lesson_title, concept):
             if not wrong.is_zero else (None, Polynomial.one())
         if text in texts_seen or wrong.is_zero:
             continue
-        # NZI mora biti djeljiv s OBA imenioca; distraktor smije i ne biti.
+        # NZI mora biti djeljiv s OBA nazivnika; distraktor smije i ne biti.
         texts_seen.add(text)
         candidates.append(text)
         if len(candidates) == 3:
             break
     if len(candidates) != 3:
-        raise DeterministicGenerationError("nedovoljno imenilaca")
+        raise DeterministicGenerationError("nedovoljno nazivnika")
     option_texts = (f"${lcd_text}$", *(f"${t}$" for t in candidates))
-    question = (f"Odredi najmanji zajednički imenilac razlomaka "
+    question = (f"Odredi najmanji zajednički nazivnik razlomaka "
                 f"${_display(left)}$ i ${_display(right)}$.")
     hints = (
-        "Najmanji zajednički imenilac sadrži svaki faktor oba imenioca u "
+        "Najmanji zajednički nazivnik sadrži svaki faktor oba nazivnika u "
         "najvećem stepenu u kojem se pojavljuje.",
-        f"Rastavi imenioce: ${d1.display()}$ i ${d2.display()}$.",
+        f"Rastavi nazivnike: ${d1.display()}$ i ${d2.display()}$.",
         "Pomnoži sve različite faktore — zajednički faktor uzmi samo jednom.",
     )
-    solution = (f"Imenioci su ${d1.display()}$ i ${d2.display()}$. Najmanji "
-                f"zajednički imenilac je ${lcd_text}$ — djeljiv je s oba, a "
+    solution = (f"Nazivnici su ${d1.display()}$ i ${d2.display()}$. Najmanji "
+                f"zajednički nazivnik je ${lcd_text}$ — djeljiv je s oba, a "
                 "nijedan manji izraz nije.")
     return _package(lesson_id, lesson_title, "rational_expression_direct",
                     concept, level, question, option_texts, hints, solution,
@@ -515,7 +515,7 @@ def _add_subtract_package(rng, level, lesson_id, lesson_title, concept):
         d1 = Polynomial.monomial(1, 1)
         d2 = _linear_factor(rng, 1)
         if d2.coefficient(0) == 0:
-            raise DeterministicGenerationError("imenioci nisu različiti")
+            raise DeterministicGenerationError("nazivnici nisu različiti")
     n1, n2 = _numerator_for(rng, level), _numerator_for(rng, level)
     left = RationalExpression.build(n1, d1)
     right = RationalExpression.build(n2, d2)
@@ -541,12 +541,12 @@ def _add_subtract_package(rng, level, lesson_id, lesson_title, concept):
                 f"{_display(right)}$.")
     lcd = left.lcd_with(right)
     hints = (
-        "Razlomci se sabiraju i oduzimaju tek kad imaju zajednički imenilac.",
-        f"Najmanji zajednički imenilac je ${lcd.display()}$ — proširi oba "
+        "Razlomci se sabiraju i oduzimaju tek kad imaju zajednički nazivnik.",
+        f"Najmanji zajednički nazivnik je ${lcd.display()}$ — proširi oba "
         "razlomka na njega.",
-        f"{'Oduzmi' if subtractive else 'Saberi'} brojnike, imenilac prepiši.",
+        f"{'Oduzmi' if subtractive else 'Saberi'} brojnike, nazivnik prepiši.",
     )
-    solution = (f"Zajednički imenilac je ${lcd.display()}$, pa je "
+    solution = (f"Zajednički nazivnik je ${lcd.display()}$, pa je "
                 f"${_display(left)} {sign} {_display(right)} = "
                 f"{_display(canonical)}$"
                 + (f", uz uslov {_exclusion_text(canonical.excluded)}."
@@ -598,10 +598,10 @@ def _multiply_divide_package(rng, level, lesson_id, lesson_title, concept):
     hints = (
         ("Dijeljenje razlomkom je množenje njegovom recipročnom vrijednošću."
          if division else
-         "Razlomci se množe: brojnik brojnikom, imenilac imeniocem."),
+         "Razlomci se množe: brojnik brojnikom, nazivnik nazivnikom."),
         (f"Zapiši: ${_display(left)} \\cdot "
          f"\\frac{{{shared.display()}}}{{{b}}}$." if division else
-         f"Pomnoži brojnike i imenioce pa potraži zajednički faktor."),
+         f"Pomnoži brojnike i nazivnike pa potraži zajednički faktor."),
         f"Zajednički faktor ${shared.display()}$ se krati.",
     )
     solution = ((f"${_display(left)} {sign} {_display(right)} = "
@@ -704,7 +704,7 @@ def _simplify_combined_package(rng, level, lesson_id, lesson_title, concept):
     hints = (
         "Sređivanje znači zapisati cio izraz kao JEDAN razlomak u "
         "najjednostavnijem obliku.",
-        f"Zajednički imenilac je ${lcd.display()}$.",
+        f"Zajednički nazivnik je ${lcd.display()}$.",
         "Poslije sabiranja provjeri može li se rezultat skratiti.",
     )
     solution = (f"$ {_display(left)} + {_display(right)} = "
@@ -791,15 +791,15 @@ def _fraction_equation_package(rng, level, lesson_id, lesson_title, concept):
 
     question = (f"Riješi jednačinu: ${equation_text}$.")
     hints = (
-        "Prvo zapiši uslove definisanosti — imenilac ne smije biti nula.",
-        f"Uslov: {domain_text}. Pomnoži obje strane zajedničkim imeniocem.",
+        "Prvo zapiši uslove definisanosti — nazivnik ne smije biti nula.",
+        f"Uslov: {domain_text}. Pomnoži obje strane zajedničkim nazivnikom.",
         "Riješi dobijenu linearnu jednačinu pa provjeri da rješenje ne "
         "upada u zabranjene vrijednosti.",
     )
     if outcome.status == "unique":
         check_left = left.evaluate(outcome.solution)
         solution = (f"Uslov definisanosti: {domain_text}. Množenjem "
-                    "zajedničkim imeniocem jednačina postaje linearna i "
+                    "zajedničkim nazivnikom jednačina postaje linearna i "
                     f"daje $x = {core.fraction_display(outcome.solution)}$. "
                     f"Provjera uvrštavanjem: obje strane iznose "
                     f"${core.fraction_display(check_left)}$, a rješenje ne "
@@ -817,7 +817,7 @@ def _fraction_equation_package(rng, level, lesson_id, lesson_title, concept):
             display_of=lambda value: f"x = {core.fraction_display(value)}")
     solution = (f"Uslov definisanosti: {domain_text}. Linearni postupak daje "
                 f"kandidata $x = {core.fraction_display(outcome.solution)}$, "
-                "ali ta vrijednost NIJE u domenu jednačine (imenilac bi bio "
+                "ali ta vrijednost NIJE u domenu jednačine (nazivnik bi bio "
                 "nula), pa jednačina nema rješenja.")
     return _package(lesson_id, lesson_title, "rational_equation_direct",
                     concept, level, question, option_texts, hints, solution,
@@ -841,7 +841,7 @@ def _double_fraction_equation_package(rng, level, lesson_id, lesson_title,
     question = f"Riješi jednačinu: ${equation_text}$."
     hints = (
         "Oslobodi se vanjskog razlomka: pomnoži obje strane njegovim "
-        "imeniocem.",
+        "nazivnikom.",
         f"Dobijaš $\\frac{{x}}{{{a}}} + {core.parenthesized(str(b))} = "
         f"{core.fraction_display(inner)}$.",
         f"Prebaci ${b}$ na desnu stranu pa pomnoži sa ${a}$.",

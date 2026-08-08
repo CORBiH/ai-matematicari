@@ -54,7 +54,7 @@ class FractionPackage:
     lesson_title: str
     family_id: str
     operation: str                 # add | subtract | multiply | divide
-    operands: tuple                # sirovi (brojnik, imenilac) parovi, redom prikaza
+    operands: tuple                # sirovi (brojnik, nazivnik) parovi, redom prikaza
     operand_displays: tuple        # MathJax zapisi operanada
     denominator_relation: str      # equal | unlike | any
     level: int
@@ -156,7 +156,7 @@ def _mixed_raw_display(whole, numerator, denominator):
 # ---------------------------------------------------------------------------
 # Nivoi su EKSPLICITNI parametarski rasponi — nikad prozna procjena:
 #   1: mali brojevi, pravi razlomci, bez skraćivanja rezultata;
-#   2: potrebno skraćivanje ili mješovit rezultat / uzajamno prosti imenioci;
+#   2: potrebno skraćivanje ili mješovit rezultat / uzajamno prosti nazivnici;
 #   3: mješoviti operandi (odnosno tri faktora kod množenja).
 
 def _pick(rng, low, high):
@@ -164,7 +164,7 @@ def _pick(rng, low, high):
 
 
 def _like_operands(rng, operation, level):
-    """Jednaki imenioci (skill add_subtract_like_denominators)."""
+    """Jednaki nazivnici (skill add_subtract_like_denominators)."""
     if level == 1:
         for _ in range(200):
             den = _pick(rng, 5, 10)
@@ -209,7 +209,7 @@ def _like_operands(rng, operation, level):
 
 
 def _unlike_operands(rng, operation, level):
-    """Različiti imenioci (skill add_subtract_unlike_denominators) — nikad slučajno jednaki."""
+    """Različiti nazivnici (skill add_subtract_unlike_denominators) — nikad slučajno jednaki."""
     if level == 1:
         for _ in range(300):
             d1 = _pick(rng, 2, 6)
@@ -331,7 +331,7 @@ def _distractor_values(operation, values, raw_pairs, answer):
     if operation in ("add", "subtract"):
         (a1, d1), (a2, d2) = raw_pairs[0], raw_pairs[1]
         if d1 + d2 > 0:
-            # „Sabrao/oduzeo i imenioce“ — najčešća greška.
+            # „Sabrao/oduzeo i nazivnike“ — najčešća greška.
             numerator = a1 + a2 if operation == "add" else a1 - a2
             if numerator > 0:
                 candidates.append(Fraction(numerator, d1 + d2))
@@ -403,17 +403,17 @@ def _question(operation, displays):
 
 
 _RULE_HINT = {
-    ("add", "equal"): "Imenioci su jednaki — sabiraju se samo brojnici, a imenilac ostaje isti.",
-    ("subtract", "equal"): "Imenioci su jednaki — oduzimaju se samo brojnici, a imenilac ostaje isti.",
-    ("add", "unlike"): "Imenioci su različiti — prvo nađi zajednički imenilac, pa tek onda sabiraj brojnike.",
-    ("subtract", "unlike"): "Imenioci su različiti — prvo nađi zajednički imenilac, pa tek onda oduzmi brojnike.",
-    ("multiply", "any"): "Razlomci se množe tako da se pomnože brojnik s brojnikom i imenilac s imeniocem.",
+    ("add", "equal"): "Nazivnici su jednaki — sabiraju se samo brojnici, a nazivnik ostaje isti.",
+    ("subtract", "equal"): "Nazivnici su jednaki — oduzimaju se samo brojnici, a nazivnik ostaje isti.",
+    ("add", "unlike"): "Nazivnici su različiti — prvo nađi zajednički nazivnik, pa tek onda sabiraj brojnike.",
+    ("subtract", "unlike"): "Nazivnici su različiti — prvo nađi zajednički nazivnik, pa tek onda oduzmi brojnike.",
+    ("multiply", "any"): "Razlomci se množe tako da se pomnože brojnik s brojnikom i nazivnik s nazivnikom.",
     ("divide", "any"): "Dijeljenje razlomkom je množenje njegovom recipročnom vrijednošću.",
 }
 
 
 def _sum_chain(operation, raw_pairs, answer):
-    """Lanac jednakosti za jednake imenioce — svaka jednakost je egzaktna."""
+    """Lanac jednakosti za jednake nazivnike — svaka jednakost je egzaktna."""
     (a1, den), (a2, _den) = raw_pairs
     symbol = "+" if operation == "add" else "-"
     total = a1 + a2 if operation == "add" else a1 - a2
@@ -445,7 +445,7 @@ def _build_texts(operation, relation, level, raw_pairs, displays, values, answer
 
     if operation in ("add", "subtract") and relation == "equal":
         chain = _sum_chain(operation, raw_pairs, answer)
-        hint2 = (f"Imenilac ostaje ${raw_pairs[0][1]}$ — "
+        hint2 = (f"Nazivnik ostaje ${raw_pairs[0][1]}$ — "
                  f"izračunaj ${raw_pairs[0][0]}{_OPERATOR_SYMBOL[operation]}"
                  f"{raw_pairs[1][0]}$ za novi brojnik.")
         hint3 = (f"Dakle: $\\frac{{{raw_pairs[0][0]}}}{{{raw_pairs[0][1]}}}"
@@ -462,7 +462,7 @@ def _build_texts(operation, relation, level, raw_pairs, displays, values, answer
             operation, raw_pairs, answer)
         e1, d1, a1 = first
         e2, d2, a2 = second
-        hint2 = (f"Zajednički imenilac je ${common}$: "
+        hint2 = (f"Zajednički nazivnik je ${common}$: "
                  f"$\\frac{{{a1}}}{{{d1}}}=\\frac{{{e1}}}{{{common}}}$ i "
                  f"$\\frac{{{a2}}}{{{d2}}}=\\frac{{{e2}}}{{{common}}}$.")
         hint3 = (f"Sada računaj: $\\frac{{{e1}}}{{{common}}}"
@@ -487,7 +487,7 @@ def _build_texts(operation, relation, level, raw_pairs, displays, values, answer
                  + f"=\\frac{{{product_num}}}{{{product_den}}}")
         if Fraction(product_num, product_den) != answer or answer.denominator == 1:
             chain += f"={answer_text}"
-        hint2 = (f"Pomnoži brojnike (${numerators}$) i imenioce "
+        hint2 = (f"Pomnoži brojnike (${numerators}$) i nazivnike "
                  f"(${denominators}$), pa skrati ako se može.")
         hint3 = (f"Dakle: $\\frac{{{numerators}}}{{{denominators}}}"
                  f"=\\frac{{{product_num}}}{{{product_den}}}$ — još samo skrati.")

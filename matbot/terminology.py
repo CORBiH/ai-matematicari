@@ -249,6 +249,42 @@ def _presek_suffix(match):
 
 
 # ---------------------------------------------------------------------------
+# 10) IMENILAC → NAZIVNIK (audit ovlašćenja pravila, odluka K — SAMO
+#     normalizacija, NE zabranjen termin)
+# ---------------------------------------------------------------------------
+# Kanonski termin projekta je „nazivnik“ (rules.py, obavezni termini), a audit
+# je našao ~120 determinističkih instrukcijskih stringova s „imenilac“. Par se
+# normalizuje u SVEM proizvedenom tekstu, ali NAMJERNO NIJE u `_RULES` (dakle
+# ni u `contains_forbidden_term`): kanonski KURIKULARNI podaci
+# (data/topics.json) sami sadrže „imenilaca“ u zvaničnim naslovima lekcija
+# („Sabiranje i oduzimanje razlomaka jednakih imenilaca“), pa bi tretiranje
+# termina kao zabranjenog oborilo repo-sken nad podacima koje ne smijemo
+# prepravljati — kurikulum je autoritet za NASLOVE, a projekat za VLASTITU
+# prozu. Dvije osnove: „imenilac/imenilaca“ (nepostojano a) i „imenioc-“.
+_IMENILAC_SUFFIX_MAP = {
+    # osnova „imenioc“
+    "ima": "nazivnicima",
+    "em": "nazivnikom",
+    "i": "nazivnici",
+    "e": "nazivnike",
+    "u": "nazivniku",
+    # zajedničko: imenioca/imenilaca → nazivnika
+    "a": "nazivnika",
+    # osnova „imenilac“
+    "": "nazivnik",
+}
+_IMENILAC_RE = re.compile(
+    r"\bimenilac(a)?(?![A-Za-zčćžšđČĆŽŠĐ])"
+    r"|\bimenioc(ima|em|e|i|a|u)(?![A-Za-zčćžšđČĆŽŠĐ])",
+    re.IGNORECASE,
+)
+
+
+def _imenilac_suffix(match):
+    return (match.group(1) if match.group(1) is not None else match.group(2)) or ""
+
+
+# ---------------------------------------------------------------------------
 # Zajednička primjena — svako pravilo je (regex, suffix_extractor, suffix_map
 # | None). suffix_map=None znači "osnova + isti nastavak kao izvor" (potpuno
 # dijeljena deklinacija, npr. potenciranje/stepenovanje).
@@ -267,6 +303,15 @@ _RULES = (
     (_PRESEK_RE, _presek_suffix, _PRESEK_SUFFIX_MAP, "presjek"),
 )
 
+# Pravila koja se PRIMJENJUJU pri normalizaciji, ali NE čine termin
+# „zabranjenim“ za repo-sken (`contains_forbidden_term`) — vidi obrazloženje
+# uz IMENILAC iznad (kurikularni naslovi legitimno sadrže izvornu riječ).
+_NORMALIZE_ONLY_RULES = (
+    (_IMENILAC_RE, _imenilac_suffix, _IMENILAC_SUFFIX_MAP, "nazivnik"),
+)
+
+_ALL_REPLACEMENT_RULES = _RULES + _NORMALIZE_ONLY_RULES
+
 # Brzi predizlaz: bilo koja od ovih podniski MORA biti prisutna (case-fold)
 # da bi ijedno pravilo uopšte imalo šansu da se poklopi — izbjegava 7 regex
 # pretraga na svakom pozivu kad ništa od ovoga nije u tekstu.
@@ -274,6 +319,9 @@ _TRIGGER_SUBSTRINGS = (
     "čimbeni", "kut", "jednakokrač", "zbroj", "potenciranj", "trokut", "toč",
     "presek", "presec",
 )
+
+# Okidači za CIJELU normalizaciju (uklj. normalize-only parove).
+_ALL_TRIGGER_SUBSTRINGS = _TRIGGER_SUBSTRINGS + ("imenil", "imenioc")
 
 
 def _match_capitalization(source: str, replacement: str) -> str:
@@ -287,7 +335,7 @@ def _match_capitalization(source: str, replacement: str) -> str:
 
 
 def _replace_in_plain_text(text: str) -> str:
-    for pattern, suffix_of, suffix_map, base_replacement in _RULES:
+    for pattern, suffix_of, suffix_map, base_replacement in _ALL_REPLACEMENT_RULES:
         if not pattern.search(text):
             continue
 
@@ -314,7 +362,7 @@ def normalize_terminology(text: str) -> str:
     if not text:
         return text or ""
     lowered = text.lower()
-    if not any(trigger in lowered for trigger in _TRIGGER_SUBSTRINGS):
+    if not any(trigger in lowered for trigger in _ALL_TRIGGER_SUBSTRINGS):
         return text  # brzi izlaz: ništa za mijenjati
 
     if "$" not in text:

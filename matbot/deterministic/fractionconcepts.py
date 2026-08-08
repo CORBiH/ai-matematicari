@@ -8,10 +8,10 @@ Jedna semantička porodica (Batch #4, Prioritet 7): ``fraction_concept_direct``.
   • ``common_denominator_numeric``— svođenje BROJEVNIH razlomaka na najmanji
     zajednički nazivnik;
   • ``decimal_type``              — konačan naspram beskonačnog periodičnog
-    decimalnog zapisa (imenilac oblika 2^a·5^b).
+    decimalnog zapisa (nazivnik oblika 2^a·5^b).
 
 MATEMATIČKI AUTORITET: egzaktni razlomci; klasifikacija zapisa se dokazuje
-faktorizacijom imenioca (core.is_terminating_decimal), nikad dijeljenjem
+faktorizacijom nazivnika (core.is_terminating_decimal), nikad dijeljenjem
 do „dovoljno“ decimala. Ne dira postojeće porodice razlomaka: ovo su
 POJMOVNE lekcije bez računskih operacija nad dva razlomka.
 """
@@ -82,13 +82,13 @@ def _part_package(rng, level, lesson_id, lesson_title, concept):
                     f"${numerator} : {denominator}$?")
         explanation = (f"Količnik ${numerator} : {denominator}$ zapisuje se "
                        f"razlomkom ${_frac_text(numerator, denominator)}$ — "
-                       "djeljenik je brojnik, djelilac je imenilac.")
+                       "djeljenik je brojnik, djelilac je nazivnik.")
     else:
         question = (f"Pica je podijeljena na ${denominator}$ jednakih "
                     f"dijelova i uzeto je ${numerator}$ dijelova. Koji "
                     "razlomak predstavlja uzeti dio?")
         explanation = (f"Cjelina ima ${denominator}$ jednakih dijelova "
-                       f"(imenilac), uzeto je ${numerator}$ (brojnik), pa je "
+                       f"(nazivnik), uzeto je ${numerator}$ (brojnik), pa je "
                        f"uzeti dio ${_frac_text(numerator, denominator)}$.")
     correct = f"${_frac_text(numerator, denominator)}$"
     wrong = [f"${_frac_text(denominator, numerator)}$",
@@ -98,10 +98,10 @@ def _part_package(rng, level, lesson_id, lesson_title, concept):
     if len(set(option_texts)) != 4:
         raise DeterministicGenerationError("opcije nisu jedinstvene")
     hints = (
-        "Imenilac kazuje na koliko je jednakih dijelova cjelina "
+        "Nazivnik kazuje na koliko je jednakih dijelova cjelina "
         "podijeljena, brojnik koliko se dijelova uzima.",
-        "Kod količnika: djeljenik ide u brojnik, djelilac u imenilac.",
-        "Pazi na poredak — zamijenjen brojnik i imenilac daju drugi broj.",
+        "Kod količnika: djeljenik ide u brojnik, djelilac u nazivnik.",
+        "Pazi na poredak — zamijenjen brojnik i nazivnik daju drugi broj.",
     )
     return _package(lesson_id, lesson_title, concept, level, question,
                     option_texts, hints, explanation, correct,
@@ -137,11 +137,11 @@ def _types_package(rng, level, lesson_id, lesson_title, concept):
         signature_kind = "mixed"
     else:
         kinds = {"proper": ("PRAVI", proper,
-                            "brojnik mu je manji od imenioca"),
+                            "brojnik mu je manji od nazivnika"),
                  "improper": ("NEPRAVI", improper,
-                              "brojnik mu je veći od imenioca (ili jednak)"),
+                              "brojnik mu je veći od nazivnika (ili jednak)"),
                  "apparent": ("PRIVIDNI", apparent,
-                              "brojnik je višekratnik imenioca, pa je "
+                              "brojnik je višekratnik nazivnika, pa je "
                               "vrijednost cio broj")}
         word, correct_body, rule = kinds[asked]
         pool = {proper, improper, apparent, another_proper} - {correct_body}
@@ -156,10 +156,10 @@ def _types_package(rng, level, lesson_id, lesson_title, concept):
     if len(set(option_texts)) != 4:
         raise DeterministicGenerationError("opcije nisu jedinstvene")
     hints = (
-        "Pravi razlomak: brojnik manji od imenioca. Nepravi: veći ili "
+        "Pravi razlomak: brojnik manji od nazivnika. Nepravi: veći ili "
         "jednak. Prividni: vrijednost je cio broj.",
-        "Uporedi brojnik i imenilac svakog ponuđenog razlomka.",
-        "Za mješoviti broj podijeli brojnik imeniocem — količnik je cijeli "
+        "Uporedi brojnik i nazivnik svakog ponuđenog razlomka.",
+        "Za mješoviti broj podijeli brojnik nazivnikom — količnik je cijeli "
         "dio, ostatak novi brojnik.",
     )
     return _package(lesson_id, lesson_title, concept, level, question,
@@ -195,12 +195,12 @@ def _common_denominator_package(rng, level, lesson_id, lesson_title, concept):
                 f"${_frac_text(n2, d2)}$ na NAJMANJI zajednički nazivnik.")
     hints = (
         "Najmanji zajednički nazivnik je najmanji zajednički sadržilac "
-        "oba imenioca.",
+        "oba nazivnika.",
         f"NZS(${d1}$, ${d2}$) $= {common}$.",
         f"Prvi razlomak proširi sa ${common // d1}$, drugi sa "
-        f"${common // d2}$ — i BROJNIK i imenilac.",
+        f"${common // d2}$ — i BROJNIK i nazivnik.",
     )
-    solution = (f"NZS imenilaca je ${common}$. Proširivanjem: "
+    solution = (f"NZS nazivnika je ${common}$. Proširivanjem: "
                 f"${_frac_text(n1, d1)} = {_frac_text(e1, common)}$ i "
                 f"${_frac_text(n2, d2)} = {_frac_text(e2, common)}$.")
     return _package(lesson_id, lesson_title, concept, level, question,
@@ -216,13 +216,13 @@ def _decimal_type_package(rng, level, lesson_id, lesson_title, concept):
         denominator = rng.choice(terminating_denominators)
         others = rng.sample(periodic_denominators, 3)
         word = "KONAČAN"
-        rule = ("konačan decimalni zapis ima razlomak čiji imenilac (poslije "
+        rule = ("konačan decimalni zapis ima razlomak čiji nazivnik (poslije "
                 "skraćivanja) sadrži samo faktore 2 i 5")
     else:
         denominator = rng.choice(periodic_denominators)
         others = rng.sample(terminating_denominators, 3)
         word = "BESKONAČAN PERIODIČAN"
-        rule = ("beskonačan periodičan zapis ima razlomak čiji imenilac "
+        rule = ("beskonačan periodičan zapis ima razlomak čiji nazivnik "
                 "poslije skraćivanja sadrži i neki faktor različit od 2 i 5")
 
     def coprime_numerator(den):
@@ -245,10 +245,10 @@ def _decimal_type_package(rng, level, lesson_id, lesson_title, concept):
     if verified != ask_terminating:
         raise DeterministicGenerationError("klasifikacija nije dosljedna")
     hints = (
-        "Rastavi imenilac skraćenog razlomka na proste faktore.",
+        "Rastavi nazivnik skraćenog razlomka na proste faktore.",
         "Samo faktori 2 i 5 daju konačan zapis; svaki drugi faktor donosi "
         "period.",
-        f"Provjeri imenilac ${denominator}$: koje proste faktore sadrži?",
+        f"Provjeri nazivnik ${denominator}$: koje proste faktore sadrži?",
     )
     solution = (f"Pravilo: {rule}. Razlomak "
                 f"${_frac_text(numerator, denominator)}$ zadovoljava upravo "

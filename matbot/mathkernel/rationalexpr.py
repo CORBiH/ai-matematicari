@@ -3,18 +3,18 @@
 KANONSKI IR (Batch #4, Prioritet 1):
 
     Polynomial          — koeficijenti su `Fraction`, indeks = stepen;
-    RationalExpression  — brojnik/imenilac polinomi + ISKLJUČENE VRIJEDNOSTI.
+    RationalExpression  — brojnik/nazivnik polinomi + ISKLJUČENE VRIJEDNOSTI.
 
 DOMEN JE DIO IDENTITETA: ``(x^2-1)/(x-1)`` i ``x+1`` su ekvivalentni SAMO na
 zajedničkom domenu bez ``x=1``. Skraćivanje zato NIKAD ne odbacuje isključene
 vrijednosti — kanonski oblik nosi i redukovan razlomak i kompletan skup
 isključenja, a ekvivalencija poredi OBOJE.
 
-POTPUNOST DOMENA: isključene vrijednosti su racionalne nule imenioca. Jezgro
-ih traži teoremom o racionalnim nulama s deflacijom; kad se imenilac NE
+POTPUNOST DOMENA: isključene vrijednosti su racionalne nule nazivnika. Jezgro
+ih traži teoremom o racionalnim nulama s deflacijom; kad se nazivnik NE
 raspada potpuno na linearne faktore nad Q, izraz nosi ``domain_complete=False``
 i ekvivalencija takva dva izraza ODBIJA da tvrdi bilo šta (fail-closed).
-Generatori grade imenioce isključivo iz linearnih faktora, pa je u praksi
+Generatori grade nazivnike isključivo iz linearnih faktora, pa je u praksi
 domen uvijek potpun — ali jezgro to dokazuje, ne pretpostavlja.
 
 Nijedan dio ovog modula ne poznaje lekciju, MCQ ni Practice.
@@ -27,7 +27,7 @@ from math import gcd, lcm
 
 
 class RationalExpressionError(ValueError):
-    """Matematički nedozvoljena konstrukcija (npr. nulti imenilac)."""
+    """Matematički nedozvoljena konstrukcija (npr. nulti nazivnik)."""
 
 
 def _fraction(value) -> Fraction:
@@ -297,12 +297,12 @@ def _term_display(coefficient: Fraction, degree: int, variable: str,
 
 @dataclass(frozen=True)
 class RationalExpression:
-    """Brojnik/imenilac + ISKLJUČENE VRIJEDNOSTI kao dio identiteta.
+    """Brojnik/nazivnik + ISKLJUČENE VRIJEDNOSTI kao dio identiteta.
 
-    ``excluded`` su SVE racionalne nule POLAZNOG imenioca (i eventualno
+    ``excluded`` su SVE racionalne nule POLAZNOG nazivnika (i eventualno
     naslijeđene iz ranijih koraka računa — npr. dijeljenje dodaje nule
     brojnika djelioca). ``domain_complete`` je False kad neka komponenta
-    imenioca nije potpuno rastavljena nad Q — tada se ekvivalencija odbija.
+    nazivnika nije potpuno rastavljena nad Q — tada se ekvivalencija odbija.
     """
 
     numerator: Polynomial
@@ -314,14 +314,14 @@ class RationalExpression:
     def build(numerator: Polynomial, denominator: Polynomial,
               extra_excluded=()) -> "RationalExpression":
         if denominator.is_zero:
-            raise RationalExpressionError("imenilac je nula-polinom")
+            raise RationalExpressionError("nazivnik je nula-polinom")
         roots, complete = denominator.rational_roots()
         excluded = tuple(sorted(set(roots) | {Fraction(v) for v in extra_excluded}))
         return RationalExpression(numerator=numerator, denominator=denominator,
                                   excluded=excluded, domain_complete=complete)
 
     # ------------------------------------------------------------------
-    # KANONSKI OBLIK — redukovan razlomak, primitivan imenilac, isti domen
+    # KANONSKI OBLIK — redukovan razlomak, primitivan nazivnik, isti domen
     # ------------------------------------------------------------------
 
     def canonical(self) -> "RationalExpression":
@@ -331,7 +331,7 @@ class RationalExpression:
         pravila „(x²-1)/(x-1) ≠ x+1 bez x≠1“."""
         common = Polynomial.gcd_of(self.numerator, self.denominator)
         if common.is_zero:
-            # brojnik i imenilac oba nula — nemoguće (imenilac != 0)
+            # brojnik i nazivnik oba nula — nemoguće (nazivnik != 0)
             raise RationalExpressionError("nedozvoljen NZD")
         numerator, remainder_n = self.numerator.divmod_by(common)
         denominator, remainder_d = self.denominator.divmod_by(common)
@@ -390,7 +390,7 @@ class RationalExpression:
         left_factor, r1 = lcd.divmod_by(self.denominator)
         right_factor, r2 = lcd.divmod_by(other.denominator)
         if not r1.is_zero or not r2.is_zero:
-            raise RationalExpressionError("zajednički imenilac nije egzaktan")
+            raise RationalExpressionError("zajednički nazivnik nije egzaktan")
         return RationalExpression(
             numerator=self.numerator * left_factor + other.numerator * right_factor,
             denominator=lcd,
@@ -404,7 +404,7 @@ class RationalExpression:
         return self.add(negated)
 
     def lcd_with(self, other: "RationalExpression") -> Polynomial:
-        """Najmanji zajednički imenilac: d1·d2 / NZD(d1, d2), primitivan."""
+        """Najmanji zajednički nazivnik: d1·d2 / NZD(d1, d2), primitivan."""
         common = Polynomial.gcd_of(self.denominator, other.denominator)
         quotient, remainder = self.denominator.divmod_by(common)
         if not remainder.is_zero:
@@ -420,7 +420,7 @@ class RationalExpression:
                 "vrijednost je isključena iz domena izraza")
         denominator_value = self.denominator.evaluate(x)
         if denominator_value == 0:
-            raise RationalExpressionError("imenilac je nula u datoj tački")
+            raise RationalExpressionError("nazivnik je nula u datoj tački")
         return self.numerator.evaluate(x) / denominator_value
 
     # ------------------------------------------------------------------
@@ -452,7 +452,7 @@ def solve_linear_rational_equation(left: RationalExpression,
                                    right: RationalExpression) -> RationalEquationSolution:
     """Riješi ``left = right`` kad se svodi na linearnu jednačinu.
 
-    Postupak: razlika svedena na zajednički imenilac; brojnik mora biti
+    Postupak: razlika svedena na zajednički nazivnik; brojnik mora biti
     stepena <= 1 (inače izraz nije u podržanom obliku i poziv PADA — nikad
     tiho pogrešan odgovor). Korijen koji upada u isključene vrijednosti
     vraća se kao ``excluded_root`` — jednačina tada NEMA rješenje, a

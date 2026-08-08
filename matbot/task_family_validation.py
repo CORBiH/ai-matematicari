@@ -716,30 +716,30 @@ _SPECIFIC_FRACTION_OPERATION_FORBIDDEN = (
 
 _register(FamilyContract(
     family_id="fraction_add_subtract_equal",
-    objective="učenik sabira ili oduzima razlomke jednakih imenilaca",
+    objective="učenik sabira ili oduzima razlomke jednakih nazivnika",
     student_must_find=("value",), answer_kind=("fraction", "integer"),
     task_form=("direct_calculation",),
     required=(("sabiranje_ili_oduzimanje_jednakih_imenilaca",
                _adds_or_subtracts_equal_denominators),),
     forbidden=_SPECIFIC_FRACTION_OPERATION_FORBIDDEN,
-    prompt_must_be_unknown="rezultat sabiranja ili oduzimanja razlomaka jednakih imenilaca",
+    prompt_must_be_unknown="rezultat sabiranja ili oduzimanja razlomaka jednakih nazivnika",
     prompt_options_must_be="četiri različita rezultata",
     prompt_positive_example="Izračunaj $\\frac{2}{7} + \\frac{3}{7}$.",
-    prompt_forbidden_example="Proširi $\\frac{2}{7}$ na zadani imenilac.",
+    prompt_forbidden_example="Proširi $\\frac{2}{7}$ na zadani nazivnik.",
 ))
 
 _register(FamilyContract(
     family_id="fraction_add_subtract_unlike",
-    objective="učenik sabira ili oduzima razlomke različitih imenilaca",
+    objective="učenik sabira ili oduzima razlomke različitih nazivnika",
     student_must_find=("value",), answer_kind=("fraction", "integer"),
     task_form=("direct_calculation",),
     required=(("sabiranje_ili_oduzimanje_razlicitih_imenilaca",
                _adds_or_subtracts_unlike_denominators),),
     forbidden=_SPECIFIC_FRACTION_OPERATION_FORBIDDEN,
-    prompt_must_be_unknown="rezultat sabiranja ili oduzimanja razlomaka različitih imenilaca",
+    prompt_must_be_unknown="rezultat sabiranja ili oduzimanja razlomaka različitih nazivnika",
     prompt_options_must_be="četiri različita rezultata",
     prompt_positive_example="Izračunaj $\\frac{1}{3} + \\frac{1}{4}$.",
-    prompt_forbidden_example="Proširi $\\frac{1}{3}$ na zadani imenilac.",
+    prompt_forbidden_example="Proširi $\\frac{1}{3}$ na zadani nazivnik.",
 ))
 
 _register(FamilyContract(
@@ -778,7 +778,7 @@ _register(FamilyContract(
     prompt_must_be_unknown="vrijednost cijelog brojevnog izraza",
     prompt_options_must_be="četiri različita rezultata",
     prompt_positive_example="Izračunaj $\\frac{1}{2} + \\frac{1}{3} \\cdot \\frac{3}{4}$.",
-    prompt_forbidden_example="Proširi $\\frac{1}{2}$ na zadani imenilac.",
+    prompt_forbidden_example="Proširi $\\frac{1}{2}$ na zadani nazivnik.",
 ))
 
 _register(FamilyContract(

@@ -47,8 +47,8 @@ FAMILY_DESCRIPTIONS = {
     # zadržane su da bi zatečeno routiranje ostalo doslovno isto. Koja lekcija
     # koristi koju — vidi matbot/legacy/practice_routing.py i kapiju parnosti
     # tests/test_legacy_routing_parity.py.
-    "fraction_add_subtract_equal": "saberi ili oduzmi razlomke jednakih imenilaca",
-    "fraction_add_subtract_unlike": "saberi ili oduzmi razlomke različitih imenilaca",
+    "fraction_add_subtract_equal": "saberi ili oduzmi razlomke jednakih nazivnika",
+    "fraction_add_subtract_unlike": "saberi ili oduzmi razlomke različitih nazivnika",
     "fraction_multiplication": "pomnoži razlomke",
     "fraction_division": "podijeli razlomke",
     "fraction_expression": "izračunaj brojevni izraz s više operacija nad razlomcima",

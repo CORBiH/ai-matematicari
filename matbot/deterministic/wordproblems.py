@@ -256,7 +256,7 @@ def _fraction_of_quantity(rng, level, lesson_id, lesson_title, problem_type):
     hints = (
         "Dio cjeline se računa množenjem razlomka i cjeline.",
         f"Izračunaj ${fraction_display} \\cdot {total}$.",
-        f"Podijeli ${total}$ imeniocem pa pomnoži brojnikom.",
+        f"Podijeli ${total}$ nazivnikom pa pomnoži brojnikom.",
     )
     solution = (f"${fraction_display} \\cdot {total} = "
                 f"{_int_display(answer)}$, pa je poklonjeno "

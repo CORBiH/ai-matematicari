@@ -7,7 +7,7 @@ razlike nose ISKLJUČIVO parametri kompajliranog ugovora (`number_domain`,
 nijedan naslov, nijedna grana po lekciji.
 
 MATEMATIČKI AUTORITET: sve vrijednosti su egzaktni `fractions.Fraction`;
-decimalni prikaz nastaje iz razlomka s dekadskim imeniocem
+decimalni prikaz nastaje iz razlomka s dekadskim nazivnikom
 (core.decimal_display), pa je svaka vidljiva jednakost egzaktno tačna i
 nezavisno je dokazuje postojeći mathcheck + orakl direktnog računa
 (mcq_integrity) nad objavljenim paketom.
@@ -65,18 +65,18 @@ _RULE_HINT = {
     ("decimal", "subtract"): "Potpiši decimalne brojeve tako da zarez bude ispod zareza, pa oduzmi mjesto po mjesto.",
     ("decimal", "multiply"): "Pomnoži brojeve kao prirodne, pa u rezultatu odvoji onoliko decimala koliko ih imaju oba faktora zajedno.",
     ("decimal", "divide"): "Pomjeri zarez i u djeljeniku i u djeliocu za isti broj mjesta dok djelilac ne postane prirodan broj, pa podijeli.",
-    ("rational_signed", "add"): "Racionalni brojevi se sabiraju kao razlomci: svedi na zajednički imenilac i pazi na znakove.",
-    ("rational_signed", "subtract"): "Oduzimanje racionalnog broja je sabiranje sa suprotnim brojem — svedi na zajednički imenilac i pazi na znakove.",
-    ("rational_signed", "multiply"): "Pomnoži brojnik s brojnikom i imenilac s imeniocem; različiti znakovi daju minus.",
+    ("rational_signed", "add"): "Racionalni brojevi se sabiraju kao razlomci: svedi na zajednički nazivnik i pazi na znakove.",
+    ("rational_signed", "subtract"): "Oduzimanje racionalnog broja je sabiranje sa suprotnim brojem — svedi na zajednički nazivnik i pazi na znakove.",
+    ("rational_signed", "multiply"): "Pomnoži brojnik s brojnikom i nazivnik s nazivnikom; različiti znakovi daju minus.",
     ("rational_signed", "divide"): "Dijeljenje racionalnim brojem je množenje njegovom recipročnom vrijednošću; pravilo znakova važi i ovdje.",
     # Q+ (6. razred) ima VLASTITA pravila, ne posuđena od predznačenih
     # racionalnih brojeva: u Q+ ne postoje suprotni brojevi, negativan
     # rezultat ni pravilo znakova, pa se nijedan od ta tri pojma ovdje ne
     # smije pojaviti (audit ovlašćenja pravila, PHASE A).
-    ("rational_nonneg", "add"): "Razlomke sabiramo tek kad imaju isti imenilac: svedi ih na zajednički imenilac, pa saberi brojnike.",
-    ("rational_nonneg", "subtract"): "Razlomke oduzimamo tek kad imaju isti imenilac: svedi ih na zajednički imenilac, pa oduzmi brojnike.",
-    ("rational_nonneg", "multiply"): "Pomnoži brojnik s brojnikom i imenilac s imeniocem, pa skrati ako se može.",
-    ("rational_nonneg", "divide"): "Dijeljenje razlomkom je množenje njegovom recipročnom vrijednošću: zamijeni brojnik i imenilac djelioca, pa pomnoži.",
+    ("rational_nonneg", "add"): "Razlomke sabiramo tek kad imaju isti nazivnik: svedi ih na zajednički nazivnik, pa saberi brojnike.",
+    ("rational_nonneg", "subtract"): "Razlomke oduzimamo tek kad imaju isti nazivnik: svedi ih na zajednički nazivnik, pa oduzmi brojnike.",
+    ("rational_nonneg", "multiply"): "Pomnoži brojnik s brojnikom i nazivnik s nazivnikom, pa skrati ako se može.",
+    ("rational_nonneg", "divide"): "Dijeljenje razlomkom je množenje njegovom recipročnom vrijednošću: zamijeni brojnik i nazivnik djelioca, pa pomnoži.",
 }
 
 _PITFALL = {
@@ -92,12 +92,12 @@ _PITFALL = {
     ("decimal", "subtract"): "zarez ispod zareza",
     ("decimal", "multiply"): "prebroj decimalna mjesta oba faktora",
     ("decimal", "divide"): "prvo ukloni zarez iz djelioca",
-    ("rational_signed", "add"): "prvo nađi zajednički imenilac",
-    ("rational_signed", "subtract"): "prvo nađi zajednički imenilac",
+    ("rational_signed", "add"): "prvo nađi zajednički nazivnik",
+    ("rational_signed", "subtract"): "prvo nađi zajednički nazivnik",
     ("rational_signed", "multiply"): "skrati prije množenja ako se može",
     ("rational_signed", "divide"): "pomnoži recipročnom vrijednošću djelioca",
-    ("rational_nonneg", "add"): "prvo nađi zajednički imenilac",
-    ("rational_nonneg", "subtract"): "prvo nađi zajednički imenilac",
+    ("rational_nonneg", "add"): "prvo nađi zajednički nazivnik",
+    ("rational_nonneg", "subtract"): "prvo nađi zajednički nazivnik",
     ("rational_nonneg", "multiply"): "skrati prije množenja ako se može",
     ("rational_nonneg", "divide"): "pomnoži recipročnom vrijednošću djelioca",
 }
@@ -761,7 +761,7 @@ def _complex_fraction_package(rng, lesson_id, lesson_title, level):
         numerator_display = core.plain_fraction_display(numerator)
         numerator_value = numerator
     if denominator == 0:
-        raise DeterministicGenerationError("nulti imenilac dvojnog razlomka")
+        raise DeterministicGenerationError("nulti nazivnik dvojnog razlomka")
     answer = numerator_value / denominator
     display = (f"\\frac{{{numerator_display}}}"
                f"{{{core.plain_fraction_display(denominator)}}}")
