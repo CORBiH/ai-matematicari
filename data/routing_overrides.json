@@ -32,6 +32,20 @@
       ]
     },
     {
+      "canonical_topic_id": "8-02-004",
+      "lesson_title": "Udaljenost između dvije tačke",
+      "primary_family": "direct_formula_application",
+      "reason": [
+        "Oblast „Koordinatni sistem i linearna funkcija“ nije geometrijska za",
+        "routing, pa je lekcija dobila opštu porodicu `direct_computation`. A",
+        "njen tipičan zadatak JESTE direktna primjena formule udaljenosti na",
+        "zadate koordinate — živa završna kapija (Faza F5G, 8a68ffe) je odbila",
+        "recenzentski odobren, matematički ispravan svjež zadatak nivoa 1 sa",
+        "iskrenim dokazom steps=1 cond=1 ops=3, jer bez ove porodice lekcija",
+        "ne dobija lekcijski-relativni profil težine."
+      ]
+    },
+    {
       "canonical_topic_id": "9-03-021",
       "lesson_title": "Poređenje direktne, obrnute i linearne zavisnosti",
       "primary_family": "recognize_correct_statement",

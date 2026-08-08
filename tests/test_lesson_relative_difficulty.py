@@ -52,6 +52,11 @@ DATA_PATH = ROOT / "data" / "difficulty_profiles.json"
 PYRAMID = (8, "8-05-007")
 PYTHAGORAS = (8, "8-04-016")
 SYSTEM_WORDS = (9, "9-05-013")
+# PETI živi sudar (svježa kapija na 8a68ffe): „Udaljenost između dvije tačke“
+# — formula udaljenosti (iskreno ops=3) u oblasti koju routing NE vidi kao
+# geometriju, pa je primarna porodica bila opšta i profil nije važio. Ispravka
+# je red u data/routing_overrides.json (podaci, ne Python).
+DISTANCE_PLANE = (8, "8-02-004")
 EASY_CONTROL = (6, "6-03-010")   # „Tekstualni zadaci iz djeljivosti“ — ostaje globalna rubrika
 
 SESSION = "lesson-relative-difficulty"
@@ -146,13 +151,21 @@ SYSTEM_OPTIONS = ("$x=8$, $y=4$", "$x=7$, $y=5$", "$x=9$, $y=3$", "$x=6$, $y=6$"
 # ---------------------------------------------------------------------------
 
 def test_collision_lessons_resolve_a_lesson_relative_profile():
-    for grade, topic in (PYRAMID, PYTHAGORAS):
+    for grade, topic in (PYRAMID, PYTHAGORAS, DISTANCE_PLANE):
         profile = profile_for(grade, topic)
         assert profile is not None, topic
         assert profile.profile_id == "direct_formula_application", topic
     profile = profile_for(*SYSTEM_WORDS)
     assert profile is not None
     assert profile.profile_id == "system_word_translation"
+
+
+def test_live_distance_gate_evidence_is_level_1_under_its_profile():
+    """Kapija na 8a68ffe: „Koliko iznosi rastojanje između tačaka A(1,2) i
+    B(5,5)?“ — recenzentov iskren dokaz (1,1,3,0), odobreno, server odbio.
+    S override-om porodice profil sada važi i dokaz je validan nivo 1."""
+    profile = profile_for(*DISTANCE_PLANE)
+    assert difficulty_evidence_errors(ev(1, 1, 3, 0), 1, profile=profile) == ()
 
 
 def test_easy_control_lesson_keeps_the_global_rubric():
@@ -183,9 +196,10 @@ def test_profile_resolution_uses_only_server_context():
 
 
 def test_model_only_profile_coverage_counts():
-    """Audit Koraka 9: 262 MODEL_ONLY lekcije; profil nosi TAČNO 76 (75
-    geometrijskih direct_formula_application + 1 system_word_problem), sve
-    ostale ostaju na podrazumijevanoj globalnoj rubrici (fail-closed)."""
+    """Audit Koraka 9: 262 MODEL_ONLY lekcije; profil nosi TAČNO 77 (75
+    geometrijskih + 1 override za udaljenost u koordinatnom sistemu u
+    direct_formula_application, plus 1 system_word_problem), sve ostale
+    ostaju na podrazumijevanoj globalnoj rubrici (fail-closed)."""
     compiled = json.loads(
         (ROOT / "data" / "lesson_semantics.compiled.json").read_text(encoding="utf-8"))
     det = set(compiled["lessons"].keys())
@@ -201,7 +215,9 @@ def test_model_only_profile_coverage_counts():
             if profile is not None:
                 profiled.setdefault(profile.profile_id, []).append(lesson["id"])
     assert model_only == 262
-    assert len(profiled.get("direct_formula_application", [])) == 75
+    # 75 geometrijskih + 1 routing override (udaljenost između dvije tačke).
+    assert len(profiled.get("direct_formula_application", [])) == 76
+    assert "8-02-004" in profiled["direct_formula_application"]
     assert profiled.get("system_word_translation", []) == ["9-05-013"]
 
 

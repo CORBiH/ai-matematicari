@@ -4130,6 +4130,7 @@
    "grade": 8,
    "oblast": "Koordinatni sistem i linearna funkcija",
    "families": [
+    "direct_formula_application",
     "direct_computation",
     "find_missing_value",
     "recognize_correct_statement",
@@ -4137,9 +4138,9 @@
     "compare_or_order",
     "word_problem"
    ],
-   "first_family": "direct_computation",
-   "harder_family": "direct_computation",
-   "easier_family": "direct_computation"
+   "first_family": "direct_formula_application",
+   "harder_family": "direct_formula_application",
+   "easier_family": "direct_formula_application"
   },
   {
    "topic_id": "8-02-005",

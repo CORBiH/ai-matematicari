@@ -458,11 +458,17 @@ def test_contract_lessons_do_not_pay_for_the_reviewer():
 
 DECIMAL_EXPR_WORD = ("6-05-011", 6, "Brojevni izrazi i tekstualni zadaci s decimalnim brojevima")
 DEPENDENCY_COMPARE = ("9-03-021", 9, "Poređenje direktne, obrnute i linearne zavisnosti")
+# Živa kapija na 8a68ffe (Faza F5G): lekcija o formuli udaljenosti leži u
+# oblasti koju routing ne vidi kao geometriju, pa je dobila opštu porodicu
+# `direct_computation` — a njen tipičan zadatak JESTE direktna primjena
+# formule (iskren dokaz ops=3 odbijen kao nivo 1). Podaci imaju zadnju riječ.
+COORDINATE_DISTANCE = ("8-02-004", 8, "Udaljenost između dvije tačke")
 
 
 @pytest.mark.parametrize("topic,grade,expected_first", [
     (DECIMAL_EXPR_WORD[0], DECIMAL_EXPR_WORD[1], "word_problem"),
     (DEPENDENCY_COMPARE[0], DEPENDENCY_COMPARE[1], "recognize_correct_statement"),
+    (COORDINATE_DISTANCE[0], COORDINATE_DISTANCE[1], "direct_formula_application"),
 ])
 def test_routing_override_wins_over_the_generic_title_rule(topic, grade, expected_first):
     """Generičko pravilo iz naslova je dobra pretpostavka; za ove dvije lekcije
