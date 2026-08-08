@@ -17,10 +17,11 @@ to dokazuje dobijaju PROFIL — deklarativne granice po nivou — iz
 porodici lekcije (matbot/task_families.py): to je server-vlasnički podatak
 izveden iz kurikuluma, nikad modelova proza i nikad ID lekcije u kodu.
 
-GRANICE VAŽENJA (namjerno uske):
-  • profil važi ISKLJUČIVO za lekciju BEZ semantičkog ugovora (modelska
-    ruta) — svih 272 determinističkih lekcija zadržava globalnu rubriku
-    bajt-za-bajt, pa se pokrivenost 272/534 ovim ne mijenja niti dira;
+GRANICE VAŽENJA:
+  • profil se razrješava ISKLJUČIVO po primarnoj porodici lekcije
+    (server-vlasnički zamrznut podatak) — važi za OBJE strategije
+    izvršenja, pa lekcija ima tačno jedan autoritet težine (Batch #4;
+    deterministički dokazi po nivou dokazano zadovoljavaju profile);
   • lekcija bez dodijeljenog profila zadržava globalnu rubriku — laka
     lekcija se NE popušta;
   • server je jedini autoritet: razrješenje čita samo LessonContext,
@@ -178,14 +179,19 @@ def resolve_for_context(context):
     """Profil za OVU lekciju, ili None → globalna rubrika ostaje mjerodavna.
 
     Čita ISKLJUČIVO server-vlasnički LessonContext: primarnu porodicu iz
-    zamrznutog mapiranja i činjenicu da lekcija nema semantički ugovor.
-    Nikad ne prima ništa iz modelovog payloada — model ne može izabrati
-    blažu rubriku."""
+    zamrznutog mapiranja (plus deklarativni izuzeci u
+    data/routing_overrides.json). Nikad ne prima ništa iz modelovog
+    payloada — model ne može izabrati blažu rubriku.
+
+    Batch #4: profil važi za SVAKU lekciju dodijeljene porodice, bez obzira
+    na strategiju izvršenja. U F5G je važio samo za lekcije bez semantičkog
+    ugovora (konzervativna zaštita tadašnjih 272 deterministički pokrivene
+    lekcije); aktivacijom profiliranih lekcija (praktična Pitagora, sistemske
+    priče, udaljenost tačaka) ta bi ograda VRATILA globalni sudar na
+    model-put istih lekcija, a deterministički dokazi po nivou dokazano
+    zadovoljavaju profile (tests/test_batch4_deterministic.py). Ista granica
+    za obje strategije = jedan autoritet težine po lekciji."""
     if context is None:
-        return None
-    # Deterministički pokrivene lekcije (semantički ugovor) zadržavaju
-    # postojeću globalnu rubriku — pokrivenost 272/534 se ne dira.
-    if getattr(context, "semantic_contract", None) is not None:
         return None
     primary = getattr(context, "primary_family", "") or ""
     if not primary:

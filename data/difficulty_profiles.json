@@ -38,7 +38,6 @@
           },
           "forbid_flags": [
             "requires_explanation",
-            "requires_comparison",
             "requires_construction",
             "requires_proof_or_justification",
             "combines_concepts"
@@ -50,7 +49,6 @@
             {"field": "condition_count", "min": 2},
             {"field": "operation_count", "min": 4},
             {"field": "representation_change_count", "min": 2},
-            {"flag": "requires_comparison"},
             {"flag": "requires_explanation"},
             {"flag": "combines_concepts"}
           ],
@@ -81,7 +79,7 @@
       "prompt_lines": [
         "LESSON-RELATIVE DIFFICULTY PROFILE (server authority for THIS lesson; for this lesson it REPLACES the universal level thresholds above):",
         "- This lesson's typical task is a DIRECT application of a canonical formula to given data. Its simplest legitimate task may honestly require up to THREE connected arithmetic operations — that is still Level 1 here.",
-        "- Level 1: ONE direct application of the lesson's canonical formula with ALL primary quantities given as simple values. One reasoning step, one condition, at most three connected operations, at most one representation change. No inverse solving, no unit conversion, no extra derivation, no comparison, explanation, construction, proof, or combining of concepts.",
+        "- Level 1: ONE direct application of the lesson's canonical formula with ALL primary quantities given as simple values. One reasoning step, one condition, at most three connected operations, at most one representation change. A direct comparison that IS the lesson's own skill stays Level 1; no inverse solving, no unit conversion, no extra derivation, no explanation, construction, proof, or combining of concepts.",
         "- Level 2: the direct application PLUS exactly one added complexity dimension — an inverse or missing quantity, a unit conversion, a second condition or relationship, a second reasoning step, or a required comparison/explanation. Never construction or proof.",
         "- Level 3: a genuinely multi-stage derivation: three or more reasoning steps or conditions, six or more connected operations, an advanced representation change, construction, or proof.",
         "- Report `difficulty_evidence` HONESTLY for the task you actually wrote; the server independently validates it against these lesson-relative targets and rejects dishonest counts."
