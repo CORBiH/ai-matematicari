@@ -430,7 +430,9 @@ def test_target_level_rules_are_byte_identical_for_every_lesson(grade, topic, _h
 def test_reviewer_instructions_forbid_relabeling_and_dishonest_counts():
     instructions = tutor_prompts.build_reviewer_instructions(build(LIVE_GRADE, LIVE_TOPIC))
     lowered = instructions.lower()
-    assert "never return `approve`" in lowered
+    # F5J: ista zabrana, pojačana formulacija uz izričite pragove cilja.
+    assert "you must not approve" in lowered
+    assert "active difficulty targets" in lowered
     assert "do not merely relabel the same task" in lowered
     assert "never lower reasoning_steps" in lowered
     assert "replace the whole task" in lowered

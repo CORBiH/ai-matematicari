@@ -512,10 +512,13 @@ def test_profiled_lessons_send_the_profile_block_to_both_calls():
 
 
 def test_unprofiled_lessons_keep_the_prompt_unchanged():
+    # F5J: globalni ACTIVE-TARGETS blok smije POMINJATI profil (kaže šta ga
+    # zamjenjuje kad postoji), ali sam profil-blok („server authority for
+    # THIS lesson“) ne smije postojati za neprofilisanu lekciju.
     context = build(*EASY_CONTROL)
     for text in (tutor_prompts.build_tutor_instructions(context),
                  tutor_prompts.build_reviewer_instructions(context)):
-        assert "LESSON-RELATIVE DIFFICULTY PROFILE" not in text
+        assert "server authority for THIS lesson" not in text
 
 
 # ---------------------------------------------------------------------------

@@ -240,6 +240,24 @@ class UnifiedOutputError(ValueError):
     """Konačan payload je strukturno validan, ali sadržajno neupotrebljiv."""
 
 
+# ---------------------------------------------------------------------------
+# JEDAN IZVOR PRAGOVA GLOBALNE RUBRIKE (Faza F5J — pouzdanost recenzentovog
+# dokaza). Iste konstante čita i deterministički validator ispod I renderer
+# aktivnog cilja koji ide u OBA prompta (matbot/difficulty_target.py) — pa
+# brojevi koje model vidi i brojevi kojima server sudi NE MOGU da se raziđu.
+# Promjena praga je i dalje kalibraciona odluka s živim dokazom, nikad usputna.
+# ---------------------------------------------------------------------------
+
+GLOBAL_LEVEL1_MAX = {"reasoning_steps": 1, "condition_count": 1,
+                     "operation_count": 2, "representation_change_count": 1}
+GLOBAL_LEVEL2_FLOORS = {"reasoning_steps": 2, "condition_count": 2,
+                        "operation_count": 2, "representation_change_count": 1}
+GLOBAL_LEVEL2_MAX = {"reasoning_steps": 2, "condition_count": 2,
+                     "operation_count": 2, "representation_change_count": 1}
+GLOBAL_LEVEL3_FLOORS = {"reasoning_steps": 3, "condition_count": 3,
+                        "operation_count": 3, "representation_change_count": 2}
+
+
 def difficulty_evidence_errors(evidence: DifficultyEvidence, target_level: int,
                                profile=None) -> tuple[str, ...]:
     """Shared, lesson-independent meaning of the structured 1--3 rubric.
@@ -299,23 +317,29 @@ def difficulty_evidence_errors(evidence: DifficultyEvidence, target_level: int,
         comparison_disqualifies = (
             evidence.requires_comparison and not minimal_apart_from_comparison
         )
-        if (evidence.reasoning_steps > 1 or evidence.condition_count > 1
+        if (evidence.reasoning_steps > GLOBAL_LEVEL1_MAX["reasoning_steps"]
+                or evidence.condition_count > GLOBAL_LEVEL1_MAX["condition_count"]
                 # operation_count counts meaningful connected mathematical
                 # operations, not every token or arithmetic symbol.
-                or evidence.operation_count > 2
-                or evidence.representation_change_count > 1
+                or evidence.operation_count > GLOBAL_LEVEL1_MAX["operation_count"]
+                or evidence.representation_change_count
+                > GLOBAL_LEVEL1_MAX["representation_change_count"]
                 or evidence.requires_explanation or comparison_disqualifies
                 or evidence.requires_construction or evidence.requires_proof_or_justification
                 or evidence.combines_concepts):
             errors.append("level_1_is_not_direct_introductory_application")
     elif target_level == 2:
-        if not (evidence.reasoning_steps >= 2 or evidence.condition_count >= 2
-                or evidence.operation_count >= 2
-                or evidence.representation_change_count >= 1
+        floors = GLOBAL_LEVEL2_FLOORS
+        if not (evidence.reasoning_steps >= floors["reasoning_steps"]
+                or evidence.condition_count >= floors["condition_count"]
+                or evidence.operation_count >= floors["operation_count"]
+                or evidence.representation_change_count
+                >= floors["representation_change_count"]
                 or evidence.requires_explanation or evidence.requires_comparison
                 or (evidence.combines_concepts and (
-                    evidence.reasoning_steps >= 2 or evidence.condition_count >= 2
-                    or evidence.operation_count >= 2))):
+                    evidence.reasoning_steps >= floors["reasoning_steps"]
+                    or evidence.condition_count >= floors["condition_count"]
+                    or evidence.operation_count >= floors["operation_count"]))):
             errors.append("level_2_lacks_connected_reasoning_or_explanation")
         # Level 2 accepts a bounded pair of related rules/concepts, simple
         # comparison, and one manageable representation change. Advanced
@@ -325,19 +349,23 @@ def difficulty_evidence_errors(evidence: DifficultyEvidence, target_level: int,
             errors.append("level_2_requires_construction")
         if evidence.requires_proof_or_justification:
             errors.append("level_2_requires_proof")
-        if evidence.reasoning_steps > 2:
+        if evidence.reasoning_steps > GLOBAL_LEVEL2_MAX["reasoning_steps"]:
             errors.append("level_2_has_too_many_reasoning_steps")
-        if evidence.condition_count > 2:
+        if evidence.condition_count > GLOBAL_LEVEL2_MAX["condition_count"]:
             errors.append("level_2_has_too_many_conditions")
-        if evidence.operation_count > 2:
+        if evidence.operation_count > GLOBAL_LEVEL2_MAX["operation_count"]:
             errors.append("level_2_has_too_many_operations")
-        if evidence.representation_change_count > 1:
+        if evidence.representation_change_count \
+                > GLOBAL_LEVEL2_MAX["representation_change_count"]:
             errors.append("level_2_has_advanced_representation_change")
     elif target_level == 3:
+        floors = GLOBAL_LEVEL3_FLOORS
         if not (evidence.requires_construction or evidence.requires_proof_or_justification
-                or evidence.condition_count >= 3 or evidence.operation_count >= 3
-                or evidence.reasoning_steps >= 3
-                or evidence.representation_change_count >= 2):
+                or evidence.condition_count >= floors["condition_count"]
+                or evidence.operation_count >= floors["operation_count"]
+                or evidence.reasoning_steps >= floors["reasoning_steps"]
+                or evidence.representation_change_count
+                >= floors["representation_change_count"]):
             errors.append("level_3_lacks_advanced_requirement")
     else:
         errors.append("invalid_target_difficulty_level")

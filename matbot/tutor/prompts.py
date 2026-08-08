@@ -12,11 +12,17 @@ Dva prompta:
 Recenzent NAMJERNO ne dobija „odobri ako izgleda dobro“ ton: traži se da sam
 riješi zadatak prije nego što išta odobri.
 """
-from matbot import difficulty_profiles
+from matbot import difficulty_profiles, difficulty_target
 from matbot.lesson_fidelity import semantic_task_requirement
 from matbot.mcq_integrity import explicit_compound_divisor_request
 from matbot.rules import build_shared_math_rules
 from matbot.tutor.schema import INTENTS
+
+# JEDAN server-vlasnički opis aktivnog cilja težine (F5J): numerički pragovi
+# renderovani iz ISTIH konstanti koje čita validator + kalibrisana semantika
+# brojanja. DOSLOVNO isti tekst ide i Tutoru i Recenzentu; lekcija se u njemu
+# ne pominje, pa smije stajati u stabilnom (keširanom) prefiksu oba prompta.
+_SHARED_TARGET_BLOCK = difficulty_target.shared_target_block()
 
 _MAX_HISTORY_TURNS = 3
 _CLIP = 220
@@ -340,6 +346,7 @@ def build_tutor_instructions(context):
         f"{_SCALED_DIVISION_RULE}\n\n"
         f"{_STRUCTURED_TASK_RULE}\n\n"
         f"{_TARGET_LEVEL_RULE}\n\n"
+        f"{_SHARED_TARGET_BLOCK}\n\n"
         f"{_STARTING_COMPLEXITY_RULE}\n\n"
         f"{_DIFFICULTY_RULE}\n\n"
         "TON: obraćaj se učeniku direktno, toplo i kratko. Nikad ne spominji "
@@ -367,11 +374,16 @@ def build_tutor_input(context, session, student_message, trusted_verdict=None,
 # recenzent već imao sve što treba da vrati `correct` sa zamjenskim zadatkom u
 # ISTOM (drugom i posljednjem) pozivu. Ovaj blok mu to izričito nalaže.
 _REVIEWER_TARGET_LEVEL_RULE = """TARGET LEVEL DECISION RULE (the server enforces this deterministically):
-- First independently calculate `reviewed_difficulty_evidence` from the visible task alone.
-- Then compare it with the exact requested target difficulty level of the final task.
-- NEVER return `approve` when your own evidence does not satisfy that target level. The
-  server runs the same validator on your evidence and rejects a contradictory approval,
-  so approving a task you measured as outside the target only loses the turn.
+- First independently calculate `reviewed_difficulty_evidence` from the visible task alone,
+  counting EXACTLY by the HOW TO COUNT rules above.
+- Then check your OWN numbers against the ACTIVE DIFFICULTY TARGETS above (or the
+  lesson-relative profile when one is present) for the requested level of the final task.
+- `approve` is permitted ONLY when the final package is valid AND your OWN evidence
+  satisfies that target. If your own count is outside the target, you MUST NOT approve:
+  return `correct` with a complete replacement that genuinely satisfies the target, or
+  `fail_closed` if you cannot do that safely. The server runs the same validator on your
+  evidence and rejects a contradictory approval, so approving a task you measured as
+  outside the target only loses the turn.
 - A harder request moves ONE bounded step up from the committed level. A task that
   overshoots the requested level is as wrong as one that undershoots it: a Level 2 request
   answered with a three-step derivation or a proof must be corrected down, not approved.
@@ -498,6 +510,7 @@ def build_reviewer_instructions(context):
         "10. da je bosanski prirodan i primjeren uzrastu.\n\n"
         "11. verify that lesson identity, level, text, options, marked answer, solution, difficulty evidence, and signature describe one task. Independently recompute `reviewed_difficulty_evidence` from only the visible task, answer requirements, options, and solution: ignore Tutor numerical counts. Count only actions the student must perform; four MCQ options are not four conditions or operations, selecting one option with one rule is one direct application, a solution explanation is not a student explanation requirement, and `combines_concepts` is true only when the student must combine distinct mathematical concepts. Return your independently calculated evidence even if the wording needs no textual correction. Level 1 may be a direct yes/no, recognition, calculation, classification, substitution, or one-rule selection; choosing a visible option is not by itself mathematical comparison or a second reasoning step. Level 2 permits a bounded pair of related rules/concepts, conditions, or operations, straightforward explanation/comparison, or one manageable representation change; `combines_concepts` alone is not Level 3. Level 3 requires construction, proof, three-or-more connected requirements/operations, advanced representation change, or comparable depth. For multiple choice, correct_option_id and correct_option_index must select the same visible option and expected_answer must be an exact copy of its text; explanation belongs only in solution. Signature parameters are only closed name/value entries with canonical string values: no arbitrary metadata, and order alone is never a new task. When correcting, update options, correct option ID/index, expected answer, solution, and the complete signature together, then return the complete fresh package. Set `task_package_consistent`, `difficulty_evidence_valid`, and `task_signature_consistent` accordingly.\n\n"
         f"{_SCALED_DIVISION_RULE}\n\n"
+        f"{_SHARED_TARGET_BLOCK}\n\n"
         f"{_REVIEWER_DECISION_RULE}\n\n"
         f"{_REVIEWER_TARGET_LEVEL_RULE}\n\n"
         f"{_REVIEWER_PREFLIGHT_RULE}\n\n"
