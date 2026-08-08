@@ -12,6 +12,7 @@ Dva prompta:
 Recenzent NAMJERNO ne dobija „odobri ako izgleda dobro“ ton: traži se da sam
 riješi zadatak prije nego što išta odobri.
 """
+from matbot import difficulty_profiles
 from matbot.lesson_fidelity import semantic_task_requirement
 from matbot.mcq_integrity import explicit_compound_divisor_request
 from matbot.rules import build_shared_math_rules
@@ -305,6 +306,18 @@ def _semantic_contract_block(context):
     return contract.prompt_block() + "\n\n"
 
 
+# LEKCIJSKI-RELATIVNI PROFIL TEŽINE (Faza F5G). Tekst dolazi GOTOV iz
+# data/difficulty_profiles.json — Tutor i Recenzent doslovno ne mogu dobiti
+# dvije različite verzije istih granica, a server te iste granice
+# deterministički sprovodi (matbot/difficulty_profiles.py). Lekcija bez
+# profila vraća prazan string i prompt ostaje bajt za bajt kao prije.
+def _difficulty_profile_block(context):
+    profile = difficulty_profiles.resolve_for_context(context)
+    if profile is None:
+        return ""
+    return profile.prompt_block() + "\n\n"
+
+
 def build_tutor_instructions(context):
     """Sistemski prompt prvog poziva — isti za svih 534 lekcije.
 
@@ -335,6 +348,7 @@ def build_tutor_instructions(context):
         f"{shared}\n\n"
         f"{_semantic_requirement_block(context)}"
         f"{_semantic_contract_block(context)}"
+        f"{_difficulty_profile_block(context)}"
     )
 
 
@@ -490,6 +504,7 @@ def build_reviewer_instructions(context):
         # --- dinamički (po lekciji) dio TEK OD OVE TAČKE (Workstream K) ---
         f"{shared}\n\n"
         f"{_semantic_contract_block(context)}"
+        f"{_difficulty_profile_block(context)}"
         "ODLUKA:\n"
         # Faza 4H (Workstream J): eho paketa na odobrenju je bio najveći
         # pojedinačni trošak izlaza (medijalno ~1400 tokena ≈ 15+ s

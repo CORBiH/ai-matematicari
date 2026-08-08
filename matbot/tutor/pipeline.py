@@ -25,8 +25,8 @@ import re
 import time
 import uuid
 
-from matbot import (config, difficulty_level, feedback, geometrycheck, mcq_integrity,
-                    option_equivalence)
+from matbot import (config, difficulty_level, difficulty_profiles, feedback,
+                    geometrycheck, mcq_integrity, option_equivalence)
 from matbot.llm import LLMError, failure_diagnostics_kv
 from matbot.mathcheck import find_numeric_inconsistencies
 from matbot.semantics import detectors as semantic_detectors
@@ -219,7 +219,11 @@ def validate_task_package(task, context, target_level=None):
     if target_level is not None:
         if task.target_difficulty_level != target_level:
             raise UnifiedOutputError("task target difficulty does not match server target")
-        validate_difficulty_evidence(task)
+        # Faza F5G: profil se razrješava ISKLJUČIVO iz server-vlasničkog
+        # konteksta (zamrznuta primarna porodica, lekcija bez semantičkog
+        # ugovora) — payload modela ne može izabrati blažu rubriku.
+        validate_difficulty_evidence(
+            task, profile=difficulty_profiles.resolve_for_context(context))
     return task
 
 
@@ -1305,10 +1309,16 @@ def _two_call(llm, context, session, student_message, request_id, trusted_verdic
     # nacrta (nacrt s nalazom je upravo ono što recenzent treba da popravi),
     # nego ulazi u recenzentov ulaz kao serverska činjenica.
     previous_signature = session.get("current_task_identity") or ""
+    # Faza F5G: lekcijski-relativni profil težine — jedno razrješenje po turnu,
+    # iz server-vlasničkog konteksta, pa ISTE granice vide preflight,
+    # recenzentska invarijanta i objava (validate_task_package ga razrješava
+    # sam iz istog konteksta).
+    difficulty_profile = difficulty_profiles.resolve_for_context(context)
     with timer.stage("preflight"):
         draft_issues = package_preflight.collect_package_issues(
             draft.new_task, contract=context.semantic_contract,
-            previous_signature=previous_signature)
+            previous_signature=previous_signature,
+            difficulty_profile=difficulty_profile)
     if draft_issues:
         logger.info(
             "tutor_draft_preflight request_id=%s topic=%s intent=%s issues=%s",
@@ -1345,7 +1355,7 @@ def _two_call(llm, context, session, student_message, request_id, trusted_verdic
     reviewer = reviewer_result.output
     try:
         with timer.stage("reviewer_validate"):
-            validate_reviewer(reviewer, draft)
+            validate_reviewer(reviewer, draft, difficulty_profile=difficulty_profile)
     except UnifiedOutputError as error:
         _log_rejection(request_id, context, "reviewer_payload", error, draft.intent)
         return None, calls
@@ -1399,7 +1409,8 @@ def _two_call(llm, context, session, student_message, request_id, trusted_verdic
     if final.new_task is not None:
         final_issues = package_preflight.collect_package_issues(
             final.new_task, contract=context.semantic_contract,
-            previous_signature=previous_signature)
+            previous_signature=previous_signature,
+            difficulty_profile=difficulty_profile)
         if final_issues:
             # `unchanged=True` znači: recenzent je vidio nalaz i vratio paket s
             # POTPUNO ISTIM nalazima — dakle nije ni pokušao ispravku.

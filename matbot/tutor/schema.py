@@ -19,7 +19,7 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from matbot import config
+from matbot import config, difficulty_profiles
 from matbot.tutor import reviewer_authority
 
 # Zatvoren skup namjera. Model bira TAČNO jednu; server iz nje izvodi šta smije
@@ -240,13 +240,22 @@ class UnifiedOutputError(ValueError):
     """Konačan payload je strukturno validan, ali sadržajno neupotrebljiv."""
 
 
-def difficulty_evidence_errors(evidence: DifficultyEvidence, target_level: int) -> tuple[str, ...]:
+def difficulty_evidence_errors(evidence: DifficultyEvidence, target_level: int,
+                               profile=None) -> tuple[str, ...]:
     """Shared, lesson-independent meaning of the structured 1--3 rubric.
 
     Level 1 deliberately examines mathematical evidence only: yes/no wording,
     recognition, classification, direct calculation, substitution, and selecting
     one option by one stated rule are equivalent direct introductory forms.
+
+    Faza F5G: `profile` je OPCIONI lekcijski-relativni profil težine
+    (matbot/difficulty_profiles.py), razriješen isključivo iz server-vlasničkog
+    LessonContexta. Kad postoji, granice nivoa dolaze iz podataka TE lekcije —
+    globalna rubrika ispod ostaje bajt-za-bajt ista za svaku lekciju bez
+    profila, pa se laka lekcija ovim NIKAD ne popušta.
     """
+    if profile is not None:
+        return difficulty_profiles.level_errors(profile, evidence, target_level)
     errors = []
     numeric = ("reasoning_steps", "condition_count", "operation_count",
                "representation_change_count")
@@ -335,8 +344,9 @@ def difficulty_evidence_errors(evidence: DifficultyEvidence, target_level: int) 
     return tuple(errors)
 
 
-def validate_difficulty_evidence(task: TaskPayload) -> None:
-    errors = difficulty_evidence_errors(task.difficulty_evidence, task.target_difficulty_level)
+def validate_difficulty_evidence(task: TaskPayload, profile=None) -> None:
+    errors = difficulty_evidence_errors(task.difficulty_evidence,
+                                        task.target_difficulty_level, profile=profile)
     _require(not errors, "difficulty evidence: " + ",".join(errors))
 
 
@@ -535,7 +545,8 @@ def validate_final(draft: TutorDraft, has_active_task: bool) -> None:
             _require(len(value) <= config.MAX_REPLY_CHARS, f"predug {field_name}")
 
 
-def validate_reviewer(reviewer: ReviewerFinal, draft: "TutorDraft | None" = None) -> None:
+def validate_reviewer(reviewer: ReviewerFinal, draft: "TutorDraft | None" = None,
+                      difficulty_profile=None) -> None:
     """Recenzentov ishod mora biti interno dosljedan.
 
     Odobrenje uz oborenu provjeru je kontradikcija — takav payload se tretira
@@ -545,7 +556,12 @@ def validate_reviewer(reviewer: ReviewerFinal, draft: "TutorDraft | None" = None
     server objavljuje upravo NACRT koji je odobren, pa se sve provjere
     dosljednosti rade nad `draft`. Na `correct` je kompletan `final` i dalje
     obavezan. Kad pozivalac ne proslijedi `draft` (stariji pozivi), `final`
-    ostaje obavezan kao i ranije."""
+    ostaje obavezan kao i ranije.
+
+    Faza F5G: `difficulty_profile` je lekcijski-relativni profil (razriješen
+    isključivo iz server-vlasničkog konteksta u pipeline-u) — invarijanta nad
+    recenzentovim vlastitim dokazom koristi iste granice kao preflight i
+    objava. Bez profila važi globalna rubrika, nepromijenjeno."""
     if reviewer.decision == "fail_closed":
         _require(reviewer.fail_reason_code is not None,
                  "fail_closed bez razloga")
@@ -600,7 +616,8 @@ def validate_reviewer(reviewer: ReviewerFinal, draft: "TutorDraft | None" = None
     if has_final_task:
         target_level = basis.new_task.target_difficulty_level
         evidence_errors = difficulty_evidence_errors(
-            reviewer.reviewed_difficulty_evidence, target_level
+            reviewer.reviewed_difficulty_evidence, target_level,
+            profile=difficulty_profile,
         )
         _require(not evidence_errors, (
             f"{REVIEWER_EVIDENCE_OUTSIDE_TARGET}: decision={reviewer.decision} "

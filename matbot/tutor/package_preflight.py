@@ -125,7 +125,8 @@ def _option_id(task, index):
         return str(index)
 
 
-def collect_package_issues(task, contract=None, previous_signature=""):
+def collect_package_issues(task, contract=None, previous_signature="",
+                           difficulty_profile=None):
     """Vrati zatvorenu torku nalaza postojećih validatora nad JEDNIM paketom.
 
     Prazna torka = nijedan deterministički validator ne može dokazati defekt.
@@ -133,7 +134,11 @@ def collect_package_issues(task, contract=None, previous_signature=""):
     dokazane greške — isti princip kao mathcheck i option_equivalence.
 
     `contract` je semantički ugovor porodice (Faza 4A) ili None. None znači
-    „lekcija ga nema“ i tada je rezultat bajt za bajt isti kao prije."""
+    „lekcija ga nema“ i tada je rezultat bajt za bajt isti kao prije.
+
+    `difficulty_profile` (Faza F5G) je lekcijski-relativni profil težine ili
+    None; provjera dokaza težine koristi iste granice kao recenzentska
+    invarijanta i objava. None = globalna rubrika, nepromijenjeno."""
     if task is None:
         return ()
     issues = []
@@ -331,14 +336,19 @@ def collect_package_issues(task, contract=None, previous_signature=""):
     target_level = getattr(task, "target_difficulty_level", None)
     if evidence is not None and isinstance(target_level, int):
         try:
-            evidence_errors = difficulty_evidence_errors(evidence, target_level)
+            evidence_errors = difficulty_evidence_errors(
+                evidence, target_level, profile=difficulty_profile)
         except Exception:
             evidence_errors = ()
         if evidence_errors:
+            # Ime profila u detalju: recenzent i logovi vide KOJE su granice
+            # bile mjerodavne (lekcijske ili globalne) — kod ostaje isti.
+            profile_note = (f"; profile={difficulty_profile.profile_id}"
+                            if difficulty_profile is not None else "")
             issues.append(PackageIssue(
                 DIFFICULTY_OUTSIDE_TARGET_CODE,
                 detail=(f"target Level {target_level}; {','.join(evidence_errors)}; "
-                        f"{evidence_diagnostics(evidence)}")))
+                        f"{evidence_diagnostics(evidence)}{profile_note}")))
 
     return tuple(issues[:MAX_ISSUES])
 

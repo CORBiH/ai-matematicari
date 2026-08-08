@@ -1,0 +1,164 @@
+{
+  "schema_version": 1,
+  "contract_version": "difficulty-profiles-1",
+  "_readme": [
+    "LEKCIJSKI-RELATIVNI PROFILI TEŽINE (modelska ruta, Faza F5G).",
+    "",
+    "ZAŠTO POSTOJE: globalna rubrika nivoa 1 (jedan uslov, najviše dvije",
+    "operacije) je za neke lekcije STRUKTURNO nedostižna — najjednostavniji",
+    "legitiman zadatak lekcije već prelazi globalne pragove. Živi dokazi:",
+    "direktno izračunavanje zapremine pravilne trostrane piramide iz zadatih",
+    "a i H iskreno nosi tri povezane operacije (završna kapija na 6e91db8);",
+    "tekstualni zadatak sa sistemom iskreno nosi dva uslova i jednu promjenu",
+    "zapisa jer su dva iskaza SAMA VJEŠTINA lekcije (dva nezavisna F5F pada).",
+    "",
+    "KLJUČ DODJELE JE ZAMRZNUTA PRIMARNA PORODICA LEKCIJE",
+    "(matbot/task_families.py, server-vlasništvo) — NIKAD ID lekcije, NIKAD",
+    "naslov, NIKAD modelova proza. Profil važi ISKLJUČIVO za lekcije BEZ",
+    "semantičkog ugovora (modelska ruta): svih 272 determinističkih lekcija",
+    "zadržava postojeću globalnu rubriku bajt-za-bajt.",
+    "",
+    "Nivoi: `max` su kapaciteti (dokaz iznad njih ne pripada nivou);",
+    "`forbid_flags` su zastavice koje nivo isključuju; `require_any` je POD",
+    "(bar jedan uslov mora važiti) — njime nivo 2 POČINJE iznad kapaciteta",
+    "nivoa 1, a nivo 3 iznad kapaciteta nivoa 2, pa teže ostaje mjerljivo",
+    "teže. Server (matbot/difficulty_profiles.py) je jedini autoritet;",
+    "recenzentove tvrdnje ostaju savjetodavne."
+  ],
+  "profiles": {
+    "direct_formula_application": {
+      "description": "Lekcije čiji je tipičan zadatak direktna primjena kanonske formule na zadate podatke (geometrijske formule s više veličina). Najjednostavniji legitiman zadatak iskreno nosi do tri povezane operacije.",
+      "levels": {
+        "1": {
+          "max": {
+            "reasoning_steps": 1,
+            "condition_count": 1,
+            "operation_count": 3,
+            "representation_change_count": 1
+          },
+          "forbid_flags": [
+            "requires_explanation",
+            "requires_comparison",
+            "requires_construction",
+            "requires_proof_or_justification",
+            "combines_concepts"
+          ]
+        },
+        "2": {
+          "require_any": [
+            {"field": "reasoning_steps", "min": 2},
+            {"field": "condition_count", "min": 2},
+            {"field": "operation_count", "min": 4},
+            {"field": "representation_change_count", "min": 2},
+            {"flag": "requires_comparison"},
+            {"flag": "requires_explanation"},
+            {"flag": "combines_concepts"}
+          ],
+          "max": {
+            "reasoning_steps": 2,
+            "condition_count": 2,
+            "operation_count": 5,
+            "representation_change_count": 2
+          },
+          "forbid_flags": [
+            "requires_construction",
+            "requires_proof_or_justification"
+          ]
+        },
+        "3": {
+          "require_any": [
+            {"field": "reasoning_steps", "min": 3},
+            {"field": "condition_count", "min": 3},
+            {"field": "operation_count", "min": 6},
+            {"field": "representation_change_count", "min": 3},
+            {"flag": "requires_construction"},
+            {"flag": "requires_proof_or_justification"}
+          ],
+          "max": {},
+          "forbid_flags": []
+        }
+      },
+      "prompt_lines": [
+        "LESSON-RELATIVE DIFFICULTY PROFILE (server authority for THIS lesson; for this lesson it REPLACES the universal level thresholds above):",
+        "- This lesson's typical task is a DIRECT application of a canonical formula to given data. Its simplest legitimate task may honestly require up to THREE connected arithmetic operations — that is still Level 1 here.",
+        "- Level 1: ONE direct application of the lesson's canonical formula with ALL primary quantities given as simple values. One reasoning step, one condition, at most three connected operations, at most one representation change. No inverse solving, no unit conversion, no extra derivation, no comparison, explanation, construction, proof, or combining of concepts.",
+        "- Level 2: the direct application PLUS exactly one added complexity dimension — an inverse or missing quantity, a unit conversion, a second condition or relationship, a second reasoning step, or a required comparison/explanation. Never construction or proof.",
+        "- Level 3: a genuinely multi-stage derivation: three or more reasoning steps or conditions, six or more connected operations, an advanced representation change, construction, or proof.",
+        "- Report `difficulty_evidence` HONESTLY for the task you actually wrote; the server independently validates it against these lesson-relative targets and rejects dishonest counts."
+      ]
+    },
+    "system_word_translation": {
+      "description": "Lekcije čiji je zadatak tekstualni problem koji se modelira sistemom dvije linearne jednačine. Najjednostavniji legitiman zadatak iskreno nosi dva uslova (dva iskaza) i jednu promjenu zapisa (tekst u sistem).",
+      "levels": {
+        "1": {
+          "max": {
+            "reasoning_steps": 2,
+            "condition_count": 2,
+            "operation_count": 3,
+            "representation_change_count": 1
+          },
+          "forbid_flags": [
+            "requires_explanation",
+            "requires_comparison",
+            "requires_construction",
+            "requires_proof_or_justification",
+            "combines_concepts"
+          ]
+        },
+        "2": {
+          "require_any": [
+            {"field": "reasoning_steps", "min": 3},
+            {"field": "condition_count", "min": 3},
+            {"field": "operation_count", "min": 4},
+            {"field": "representation_change_count", "min": 2},
+            {"flag": "requires_comparison"},
+            {"flag": "requires_explanation"},
+            {"flag": "combines_concepts"}
+          ],
+          "max": {
+            "reasoning_steps": 3,
+            "condition_count": 3,
+            "operation_count": 5,
+            "representation_change_count": 2
+          },
+          "forbid_flags": [
+            "requires_construction",
+            "requires_proof_or_justification"
+          ]
+        },
+        "3": {
+          "require_any": [
+            {"field": "reasoning_steps", "min": 4},
+            {"field": "condition_count", "min": 4},
+            {"field": "operation_count", "min": 6},
+            {"field": "representation_change_count", "min": 3},
+            {"flag": "requires_construction"},
+            {"flag": "requires_proof_or_justification"}
+          ],
+          "max": {},
+          "forbid_flags": []
+        }
+      },
+      "prompt_lines": [
+        "LESSON-RELATIVE DIFFICULTY PROFILE (server authority for THIS lesson; for this lesson it REPLACES the universal level thresholds above):",
+        "- This lesson's task is a WORD PROBLEM modelled by a system of two linear equations. Its simplest legitimate task honestly has TWO conditions (the two stated relationships) and ONE representation change (text into a system) — that is still Level 1 here.",
+        "- Level 1: direct translation of two SIMPLY stated relationships into a system and a straightforward solve: at most two reasoning steps, two conditions, three connected operations, one representation change. No extra concepts, no comparison, explanation, construction, or proof.",
+        "- Level 2: one added complexity dimension — a third relationship, four or more operations, an extra representation change, a combination with another concept (percentages, money, motion), or a required comparison/explanation. Never construction or proof.",
+        "- Level 3: a genuinely complex modelling task: four or more reasoning steps or conditions, six or more connected operations, three or more representation changes, construction, or proof.",
+        "- Report `difficulty_evidence` HONESTLY for the task you actually wrote; the server independently validates it against these lesson-relative targets and rejects dishonest counts."
+      ]
+    }
+  },
+  "assignments": [
+    {
+      "primary_family": "direct_formula_application",
+      "profile": "direct_formula_application",
+      "evidence": "Zamrznuto 528/528 mapiranje (matbot/task_families.py) za sve geometrijske lekcije deklariše 'direktna primjena formule na zadate podatke' kao tipičan oblik zadatka. Kanonske formule tih lekcija (Pitagorina teorema, površine i zapremine tijela) iskreno traže dvije do tri povezane operacije i u najjednostavnijoj direktnoj primjeni — dva živa pada svježeg nivoa 1 (praktična Pitagora u F5F talasu; zapremina pravilne trostrane piramide na završnoj kapiji), oba s iskrenim dokazom steps=1 cond=1 ops=3 repr=0."
+    },
+    {
+      "primary_family": "system_word_problem",
+      "profile": "system_word_translation",
+      "evidence": "Naslov lekcije u kurikulumu doslovno imenuje oblik (tekstualni zadatak sa sistemom), pa zamrznuti routing podiže system_word_problem na primarno mjesto. Sistem dvije jednačine po definiciji nosi dva uslova, a prevod teksta u sistem jednu promjenu zapisa — dva nezavisna živa F5F pada s recenzentovim iskrenim dokazom steps=1 cond=2 ops=1 repr=1."
+    }
+  ]
+}
