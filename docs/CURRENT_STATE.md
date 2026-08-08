@@ -1,7 +1,21 @@
 # MAT-BOT — current state
 
-Last updated: 2026-08-08 (Batch #4 deterministic expansion, offline).
-Test baseline: **6154 passing**. Runtime model: `gpt-5-mini`, reasoning effort `low`.
+Last updated: 2026-08-08 (Vježbajmo V1 semantic fidelity, Phase F5K).
+Test baseline: **6212 passing**. Runtime model: `gpt-5-mini`, reasoning effort `low`.
+
+**Phase F5K (2026-08-08):** the 150-turn real-state audit showed the last
+V1 blocker — mathematically correct tasks from the WRONG lesson (graph →
+plain evaluation, net → volume formula, word problem → naked expression,
+identity proof → numeric fraction, SSU → included angle). The server now owns
+**semantic practice contracts** (`data/semantic_practice_contracts.json`,
+27 blocking lessons across 6 requirement types, resolved into `LessonContext`
+and enforced by generic bounded feature checkers in
+`matbot/semantic_practice.py`) at draft preflight AND at the final-package
+gate before any state mutation; the identical contract text goes to Tutor and
+Reviewer, and `inside_lesson` now explicitly means "satisfies the contract".
+Fake references to absent pictures are globally rejected. All 14 captured P1
+packages are permanent failing fixtures with faithful positive counterparts;
+neighbouring lessons keep their own legitimate shapes.
 
 **Batch #4 (2026-08-08, offline — awaiting live validation):** deterministic
 coverage grew **272 → 352 lessons (65.9%), 30 → 44 families**, contract

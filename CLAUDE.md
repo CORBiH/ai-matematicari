@@ -182,6 +182,7 @@ Flask + a single-page frontend, one OpenAI call per turn, no database.
 | Deterministic execution strategy (family generators) | `matbot/deterministic/` |
 | Lesson-relative difficulty profiles (both strategies) | `matbot/difficulty_profiles.py`, `data/difficulty_profiles.json` |
 | Pure exact math kernel (no Practice knowledge; future Result-mode seam) | `matbot/mathkernel/` |
+| Semantic practice contracts (lesson fidelity, model route) | `matbot/semantic_practice.py`, `data/semantic_practice_contracts.json` |
 | Lesson contract data (no Python per lesson) | `data/contract_templates.json`, `data/lesson_contracts.json` |
 | Geometry symbols, formulas, topic routing | `matbot/geometry_rules.py` |
 | The only OpenAI call site | `matbot/llm.py` |
