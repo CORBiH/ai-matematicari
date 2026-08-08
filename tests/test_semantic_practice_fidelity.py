@@ -237,6 +237,91 @@ def test_sus_lesson_allows_included_angle_language():
 
 
 # ---------------------------------------------------------------------------
+# 3c) ŽIVI F5L NALAZI (produkcijski smoke 20260808T144302Z + lokalna forenzika)
+# ---------------------------------------------------------------------------
+
+def test_congruence_masculine_singular_podudaran_is_detected():
+    """ŽIVI F5L NALAZ (S01): muški rod jednine „podudaran“ nosi nepostojano
+    a, pa ga stariji stem „podudarn“ NIJE hvatao. Posljedica je bila fatalna
+    za vjeran zadatak: nacrt lažno označen kao semantic_missing, recenzentova
+    ispravka zadrži istu riječ, finalna kapija opet padne — zagarantovan
+    fail-close (u produkciji viđen kao 65s timeout) na najprirodnijoj
+    formulaciji svježeg SSU zadatka."""
+    contract = contract_for("7-04-016")
+    text = ("U trouglu $ABC$ date su stranice $AB=5\\,\\text{cm}$ i "
+            "$AC=7\\,\\text{cm}$ i ugao $\\angle B=40^\\circ$. Koji od "
+            "ponuđenih trouglova je sigurno podudaran trouglu $ABC$ po SSU "
+            "kriteriju?")
+    assert fidelity_failures(contract, text) == ()
+
+
+def test_ssu_single_letter_included_angle_notation_is_rejected():
+    """ŽIVI F5L NALAZ (S01 forenzika): stvarni nacrt modela dao je $AB=5$,
+    $AC=7$ i ugao $\\angle A=60^\\circ$ pa raspored proglasio „po kriteriju
+    SSU“. Tjeme A je zajednička tačka datih stranica, dakle $\\angle A$ je
+    zahvaćeni ugao (SUS raspored) iskazan JEDNIM slovom — K07 detektor je
+    tražio tačno tri slova i ova forma mu je promicala. Uz popravku
+    „podudaran“ stema ovaj nacrt bi inače prošao čist."""
+    contract = contract_for("7-04-016")
+    live_draft = ("U trouglu $ABC$ važi $AB=5\\,\\text{cm}$, "
+                  "$AC=7\\,\\text{cm}$ i ugao $\\angle A=60^\\circ$. Koji od "
+                  "donjih trouglova je podudaran sa trouglom $ABC$ po "
+                  "kriteriju SSU?")
+    failures = fidelity_failures(contract, live_draft)
+    assert any("included_angle_with_sides" in f for f in failures)
+    # Lažni „missing“ na „podudaran“ ne smije se vratiti:
+    assert not any("congruence_semantics_present" in f for f in failures)
+
+
+def test_ssu_single_letter_angle_at_non_shared_vertex_stays_legal():
+    """Kontra-fikstura uz F5L proširenje: $\\angle B$ uz stranice $AB$ i
+    $AC$ (zajedničko tjeme A) NIJE zahvaćeni ugao i ne smije pasti — to je
+    legitimna SSU konfiguracija jednim slovom."""
+    contract = contract_for("7-04-016")
+    text = ("U trouglu $ABC$ važi $AB=5\\,\\text{cm}$, $AC=7\\,\\text{cm}$ "
+            "i ugao $\\angle B=40^\\circ$. Da li je svaki trougao s istim "
+            "podacima podudaran trouglu $ABC$ po SSU kriteriju?")
+    assert fidelity_failures(contract, text) == ()
+
+
+def test_graph_g801_point_membership_choice_stays_valid():
+    """ŽIVI F5L SMOKE (G801, PASS): izbor ponuđene tačke koja pripada
+    grafiku — kanonski oblik pripadnosti, ostaje prihvaćen."""
+    contract = contract_for("8-02-007")
+    text = ("Koja od navedenih tačaka pripada grafiku linearne funkcije "
+            "$y=2x+1$?")
+    options = "Tačka $(0,0)$ Tačka $(1,4)$ Tačka $(2,5)$ Tačka $(2,4)$"
+    assert fidelity_failures(contract, text, options) == ()
+
+
+def test_graph_g802_membership_with_unknown_coordinate_stays_valid():
+    """ŽIVI F5L ADJUDIKACIJA (G802): „Za koju vrijednost $x$ tačka $(x,7)$
+    pripada grafiku...“ JESTE grafička semantika po SPC-1 i kurikulumu:
+    KS_2018-0342 („iz nacrtanog grafika čitati vrijednosti“) pokriva čitanje
+    u OBA smjera (za dato $y$ naći $x$), a pripadnost tačke grafiku je i
+    samostalna kurikularna lekcija (9-03-011 „Da li tačka pripada grafiku
+    funkcije“). Algebarski postupak ($7=2x+1$) je METODA rješavanja, ne
+    semantika zadatka — i G801 se rješava uvrštavanjem u sva četiri kandidata.
+    Ručna smoke oznaka POTENTIAL_SEMANTIC_FALSE_ACCEPT je ODBIJENA; ova
+    fikstura je trajni zapis da budući auditi G802 oblik ne broje kao P1."""
+    contract = contract_for("8-02-007")
+    text = ("Za koju vrijednost $x$ tačka $(x,7)$ pripada grafiku linearne "
+            "funkcije $y=2x+1$?")
+    options = "$x=3$ $x=4$ $x=5$ $x=2$"
+    assert fidelity_failures(contract, text, options) == ()
+
+
+def test_graph_naked_equation_solving_still_fails():
+    """Kontra-fikstura uz G802 adjudikaciju: golo rješavanje jednačine —
+    čak i „ukrašeno“ riječju grafik, bez ijedne tačke ili grafičke radnje —
+    i dalje pada. Granica ugovora se adjudikacijom NIJE pomjerila."""
+    contract = contract_for("8-02-007")
+    assert fidelity_failures(contract, "Riješi jednačinu $2x+1=7$.")
+    assert fidelity_failures(
+        contract, "Riješi jednačinu $2x+1=7$ koristeći grafik.")
+
+
+# ---------------------------------------------------------------------------
 # 4) SUSJEDNE LEKCIJE OSTAJU NETAKNUTE (kontrakti su TAČNO nabrojani podaci)
 # ---------------------------------------------------------------------------
 

@@ -576,3 +576,31 @@ def test_defect2_case15_literal_n_before_new_sentence_still_converted():
     text, is_safe = sanitize_and_validate_math_text("$a=1$\\nNovi red.")
     assert is_safe
     assert text == "$a=1$\nNovi red."
+
+
+def test_f5l_live_finding_displaystyle_and_boxed_are_allowed():
+    """ŽIVI F5L NALAZ (I03; ranija ponavljanja M06/M18): model u punim
+    rješenjima uobičajeno piše "$\\displaystyle \\frac{...}$" i
+    "\\boxed{...}". Obje su standardne, bezbjedne komande samo za prikaz;
+    dok ih allowlist nije znao, SVAKO takvo rješenje padalo je u objavi kao
+    „nebezbjedan matematički zapis“ bez dijagnoze. Kodovi
+    unknown_mathjax_command:displaystyle/boxed uhvaćeni su živo novim
+    logovanjem defekt-kodova u _safe_text."""
+    text, is_safe = sanitize_and_validate_math_text(
+        "$\\displaystyle \\frac{x^2-1}{x-1}=x+1$ za $x \\neq 1$, "
+        "dakle $\\boxed{x+1}$.")
+    assert is_safe
+    assert "\\displaystyle" in text
+    assert "\\boxed{x+1}" in text
+    # textstyle je simetrični par iste komande.
+    text, is_safe = sanitize_and_validate_math_text(
+        "$\\textstyle \\frac{1}{2}$")
+    assert is_safe
+
+
+def test_f5l_unknown_command_still_fails_closed():
+    """Kontrolni slučaj: širenje allowlista NIJE oslabilo kapiju — i dalje
+    nepoznata komanda (npr. \\cancel) zatvara cio odgovor."""
+    _text, is_safe = sanitize_and_validate_math_text(
+        "$\\frac{\\cancel{(x-1)}(x+1)}{\\cancel{x-1}}=x+1$")
+    assert not is_safe

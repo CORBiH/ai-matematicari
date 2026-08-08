@@ -117,7 +117,12 @@ _NET_STRUCTURE_RE = re.compile(
     r"stran[aei]|figur|oblik|dimenzij|susjedn|raspored", re.IGNORECASE)
 _PROOF_RE = re.compile(r"dokaži|dokazi\b|dokazati|dokaz\b|pokaži da|pokazi da|"
                        r"obrazloži|obrazlozi", re.IGNORECASE)
-_CONGRUENCE_RE = re.compile(r"podudarn", re.IGNORECASE)
+# Stem „podudar“, NE „podudarn“: muški rod jednine ima nepostojano a
+# („podudaran“), pa ga duži stem ne hvata. ŽIVI F5L NALAZ (S01 forenzika):
+# vjerni SSU zadatak „Koji trougao je podudaran sa...“ bio je lažno označen
+# kao semantic_missing i NIJE mogao biti objavljen ni nakon recenzentove
+# ispravke — zagarantovan fail-close na najprirodnijoj formulaciji.
+_CONGRUENCE_RE = re.compile(r"podudar", re.IGNORECASE)
 _VOLUME_RE = re.compile(r"zapremin|volumen", re.IGNORECASE)
 _INCLUDED_ANGLE_RE = re.compile(
     r"(?:ugao|ugla|uglu)[^.?!]{0,80}(?:između|izmedju|zahvaćen|zahvacen)|"
@@ -172,6 +177,7 @@ def _feature_volume_request(task_text, options_text):
 
 _SIDE_EQUALITY_RE = re.compile(r"\b([A-Z]{2})\s*=")
 _ANGLE_TOKEN_RE = re.compile(r"\\angle\s*([A-Z]{3})")
+_ANGLE_VERTEX_RE = re.compile(r"\\angle\s*([A-Z])(?![A-Z])")
 
 
 def _included_angle_by_notation(text):
@@ -179,7 +185,14 @@ def _included_angle_by_notation(text):
     dvije stranice sa ZAJEDNIČKIM tjemenom (npr. $AB$ i $AC$), ugao čije je
     srednje slovo upravo to tjeme ($\\angle BAC$) JESTE ugao između njih —
     bez ijedne riječi „između“. Ugao naspram stranice ($\\angle ABC$ uz iste
-    podatke) ima drugo srednje slovo i ne pogađa se."""
+    podatke) ima drugo srednje slovo i ne pogađa se.
+
+    ŽIVI F5L NALAZ (S01 forenzika): isti zahvaćeni ugao model piše i JEDNIM
+    slovom — $AB=5$, $AC=7$ i $\\angle A=60^\\circ$ — gdje je slovo upravo
+    zajedničko tjeme datih stranica. Ta forma je promicala K07 detektoru
+    (tražio je tačno tri slova) i SUS raspored proglašen „po SSU“ bio bi
+    objavljen. Ugao u tjemenu koje NIJE zajedničko ($\\angle B$ uz $AB$,
+    $AC$) i dalje se ne pogađa."""
     segments = " ".join(_math_segments(text or ""))
     sides = [side for side in _SIDE_EQUALITY_RE.findall(segments)]
     shared_vertices = set()
@@ -191,6 +204,9 @@ def _included_angle_by_notation(text):
         return False
     for angle in _ANGLE_TOKEN_RE.findall(segments):
         if angle[1] in shared_vertices:
+            return True
+    for vertex in _ANGLE_VERTEX_RE.findall(segments):
+        if vertex in shared_vertices:
             return True
     return False
 

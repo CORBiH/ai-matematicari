@@ -259,6 +259,115 @@ def test_tutor_prompt_carries_the_explicit_ui_action():
 
 
 # ---------------------------------------------------------------------------
+# 4. ŽIVI F5L NALAZ (I01–I03, produkcijski smoke 20260808T144302Z):
+#    identitetska lekcija 9-01-017 — svjež → hint → puno rješenje.
+#    Produkcija je objavila vjeran zadatak i hint, a rješenje odbila u objavi
+#    porukom „nebezbjedan matematički zapis [full_solution_request]“ BEZ koda
+#    defekta (help-turn nema preflight), pa je klasa (M06, M18, I03) bila
+#    nedijagnostikljiva. Lokalna reprodukcija na istom kodu objavila je čisto
+#    rješenje — validator NIJE lažno pozitivan; testovi pinuju oba ishoda.
+# ---------------------------------------------------------------------------
+
+IDENTITY_LESSON, IDENTITY_GRADE = "9-01-017", 9
+IDENTITY_TASK = ("Pokaži da je identitet istinit tako što ćeš pojednostaviti "
+                 "lijevu stranu i navesti uslov definisanosti: Pokaži da je "
+                 "$\\frac{x^2-1}{x-1}=x+1$ za sve vrijednosti $x$ za koje je "
+                 "izraz definisan.")
+IDENTITY_OPTIONS = ("$x+1$", "$x^2+1$", "$x-1$", "1")   # tačna je $x+1$
+IDENTITY_SOLUTION = ("Faktorišemo brojnik: $x^2-1=(x-1)(x+1)$, pa je "
+                     "$\\frac{x^2-1}{x-1}=\\frac{(x-1)(x+1)}{x-1}=x+1$ za "
+                     "svako $x \\neq 1$. Uslov definisanosti: $x \\neq 1$. "
+                     "Tačna opcija je $x+1$.")
+
+
+def _identity_turn(session_id, message, **changes):
+    turn = _turn(session_id, message, grade=IDENTITY_GRADE,
+                 selected_topic=IDENTITY_LESSON)
+    turn.update(changes)
+    return turn
+
+
+def _publish_identity_task(store, fake, session_id):
+    queue_two_call(fake, draft=make_tutor_draft(
+        intent="generate_task",
+        new_task=make_task_payload(text=IDENTITY_TASK,
+                                   options=IDENTITY_OPTIONS,
+                                   correct_option_index=0, expected="$x+1$")))
+    response = run_practice_turn(
+        store, fake, _identity_turn(session_id, "Daj mi zadatak."))
+    assert response["status"] == "ready", response.get("answer", "")
+    return response
+
+
+def test_identity_lifecycle_fresh_hint_solution_publishes_cleanly():
+    """Vjeran tok I01–I03: čisto rješenje s uslovom definisanosti $x \\neq 1$
+    MORA biti objavljeno, uz otkrivanje opcije i očuvano stanje."""
+    store, fake = SessionStore(), FakeLLM()
+    _publish_identity_task(store, fake, "f5l-id-1")
+
+    queue_two_call(fake, draft=make_tutor_draft(
+        intent="hint_request", new_task=None, reply="Idemo korak po korak.",
+        hint="Faktoriši brojnik $x^2-1$ kao razliku kvadrata."))
+    hint = run_practice_turn(
+        store, fake, _identity_turn("f5l-id-1", "Ne znam.",
+                                    intent="hint_request",
+                                    interaction_phase="practice_help"))
+    assert hint["status"] == "ready"
+    before = _task_state(store.peek("f5l-id-1"))
+
+    queue_two_call(fake, draft=make_tutor_draft(
+        intent="full_solution_request", new_task=None,
+        reply="Evo cijelog postupka.", worked_solution=IDENTITY_SOLUTION))
+    solution = run_practice_turn(
+        store, fake, _identity_turn("f5l-id-1", "Uradi ga ti.",
+                                    intent="solution_request",
+                                    interaction_phase="practice_help"))
+
+    assert solution["status"] == "ready"
+    assert "x+1" in solution["answer"]
+    assert "\\neq 1" in solution["answer"]          # uslov definisanosti
+    assert solution["revealed_correct_option_id"] == before["correct_option_id"]
+    session = store.peek("f5l-id-1")
+    assert _task_state(session) == before
+    assert session["task_completed"] is True
+
+
+def test_unsafe_solution_notation_rejection_logs_defect_codes(caplog):
+    """ŽIVI F5L NALAZ (I03): kad model u rješenju upotrijebi komandu van
+    allowlista (npr. \\cancel), objava i dalje pada zatvoreno i čuva zadatak
+    — ali log sada nosi ograničen kod defekta (ime komande, nikad sadržaj),
+    da produkcijska ponavljanja ove klase više ne budu nedijagnostikljiva."""
+    import logging
+
+    store, fake = SessionStore(), FakeLLM()
+    _publish_identity_task(store, fake, "f5l-id-2")
+    before = _task_state(store.peek("f5l-id-2"))
+
+    unsafe = ("Skratimo: $\\frac{x^2-1}{x-1}"
+              "=\\frac{\\cancel{(x-1)}(x+1)}{\\cancel{x-1}}=x+1$, "
+              "uz $x \\neq 1$.")
+    queue_two_call(fake, draft=make_tutor_draft(
+        intent="full_solution_request", new_task=None,
+        reply="Evo postupka.", worked_solution=unsafe))
+    with caplog.at_level(logging.WARNING, logger="matbot.tutor.pipeline"):
+        response = run_practice_turn(
+            store, fake, _identity_turn("f5l-id-2", "Uradi ga ti.",
+                                        intent="solution_request",
+                                        interaction_phase="practice_help"))
+
+    assert "status" not in response                  # sigurna poruka, ne objava
+    assert response["last_tutor_task"] == before["current_task"]
+    session = store.peek("f5l-id-2")
+    assert _task_state(session) == before
+    assert session["task_completed"] is False
+    assert "nebezbjedan matematički zapis [full_solution_request]" in caplog.text
+    assert "codes=" in caplog.text
+    assert "unknown_mathjax_command" in caplog.text
+    # Kod NIKAD ne nosi sadržaj rečenice — samo ime komande.
+    assert "Skratimo" not in caplog.text
+
+
+# ---------------------------------------------------------------------------
 # Kapacitetna ekspanzija: ovi testovi ispituju MODEL-strategiju (Tutor +
 # Recenzent) i na lekcijama koje produkcija sada rutira deterministički
 # (blocking ugovor + potpun generator). Izričito isključenje je ISTI mehanizam

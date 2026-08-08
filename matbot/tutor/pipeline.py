@@ -345,10 +345,19 @@ def _safe_text(raw, where, allow_wrap=False):
     """Sanitizacija + terminologija + math-safety. Baca UnifiedOutputError.
 
     Sam niz koraka živi u `package_preflight.safe_visible_text` — JEDNA
-    implementacija, koju preflight koristi bez izuzetka, a objava uz izuzetak."""
+    implementacija, koju preflight koristi bez izuzetka, a objava uz izuzetak.
+
+    ŽIVI F5L NALAZ (I03 forenzika): help-turn (hint/rješenje) je JEDAN poziv
+    bez preflighta, pa je produkcijsko odbijanje rješenja ostajalo bez ikakvog
+    koda defekta — ponavljajuća klasa (M06, M18, I03) bila je nedijagnostikljiva.
+    Kodovi su isti sankcionisani log kodovi kao u preflightu (CLAUDE.md pravilo
+    7): najviše ime komande, nikad sadržaj. Ponašanje prihvat/odbij se NE mijenja."""
     cleaned, safe = package_preflight.safe_visible_text(raw, allow_wrap=allow_wrap)
     if not safe:
-        raise UnifiedOutputError(f"nebezbjedan matematički zapis [{where}]")
+        codes = package_preflight._notation_defect_codes(raw, allow_wrap)
+        suffix = f" codes={codes}" if codes else ""
+        raise UnifiedOutputError(
+            f"nebezbjedan matematički zapis [{where}]{suffix}")
     return cleaned
 
 

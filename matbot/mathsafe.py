@@ -61,6 +61,15 @@ MATHJAX_COMMAND_ALLOWLIST = frozenset({
     "mathbb", "mathrm", "mathit", "mathbf", "left", "right",
     "overline", "underline", "vec", "hat", "bar",
     "begin", "end", "array", "cases", "aligned", "matrix", "pmatrix",
+    # ŽIVI F5L NALAZ (I03 + M06/M18 klasa): model u punim rješenjima
+    # uobičajeno piše "$\displaystyle \frac{...}$" i "\boxed{...}" — obje su
+    # standardne, bezbjedne komande samo za prikaz, a njihovo odsustvo je
+    # zatvaralo SVAKO takvo rješenje porukom „nebezbjedan matematički zapis
+    # [full_solution_request]“. Dokazano novim kodovima u logu objave:
+    # unknown_mathjax_command:displaystyle (dvaput u jednom živom rješenju),
+    # unknown_mathjax_command:boxed (u živom nacrtu zadatka). "textstyle" je
+    # simetrični par iste komande (isti rizik: nikakav) — dodan uz njih.
+    "displaystyle", "textstyle", "boxed",
     # operatori i relacije
     "cdot", "times", "div", "pm", "mp", "approx", "neq", "ne", "not",
     "le", "leq", "ge", "geq", "lt", "gt", "equiv", "sim", "propto",
