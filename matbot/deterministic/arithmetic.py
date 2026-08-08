@@ -69,6 +69,14 @@ _RULE_HINT = {
     ("rational_signed", "subtract"): "Oduzimanje racionalnog broja je sabiranje sa suprotnim brojem — svedi na zajednički imenilac i pazi na znakove.",
     ("rational_signed", "multiply"): "Pomnoži brojnik s brojnikom i imenilac s imeniocem; različiti znakovi daju minus.",
     ("rational_signed", "divide"): "Dijeljenje racionalnim brojem je množenje njegovom recipročnom vrijednošću; pravilo znakova važi i ovdje.",
+    # Q+ (6. razred) ima VLASTITA pravila, ne posuđena od predznačenih
+    # racionalnih brojeva: u Q+ ne postoje suprotni brojevi, negativan
+    # rezultat ni pravilo znakova, pa se nijedan od ta tri pojma ovdje ne
+    # smije pojaviti (audit ovlašćenja pravila, PHASE A).
+    ("rational_nonneg", "add"): "Razlomke sabiramo tek kad imaju isti imenilac: svedi ih na zajednički imenilac, pa saberi brojnike.",
+    ("rational_nonneg", "subtract"): "Razlomke oduzimamo tek kad imaju isti imenilac: svedi ih na zajednički imenilac, pa oduzmi brojnike.",
+    ("rational_nonneg", "multiply"): "Pomnoži brojnik s brojnikom i imenilac s imeniocem, pa skrati ako se može.",
+    ("rational_nonneg", "divide"): "Dijeljenje razlomkom je množenje njegovom recipročnom vrijednošću: zamijeni brojnik i imenilac djelioca, pa pomnoži.",
 }
 
 _PITFALL = {
@@ -88,6 +96,10 @@ _PITFALL = {
     ("rational_signed", "subtract"): "prvo nađi zajednički imenilac",
     ("rational_signed", "multiply"): "skrati prije množenja ako se može",
     ("rational_signed", "divide"): "pomnoži recipročnom vrijednošću djelioca",
+    ("rational_nonneg", "add"): "prvo nađi zajednički imenilac",
+    ("rational_nonneg", "subtract"): "prvo nađi zajednički imenilac",
+    ("rational_nonneg", "multiply"): "skrati prije množenja ako se može",
+    ("rational_nonneg", "divide"): "pomnoži recipročnom vrijednošću djelioca",
 }
 
 _ORDER_RULE = ("Redoslijed operacija: prvo zagrade, zatim množenje i dijeljenje, "
@@ -174,11 +186,6 @@ _OPERAND_BUILDERS = {"natural": _natural, "integer": _integer,
                      "rational_nonneg": _nonneg_fraction}
 
 
-def _hint_domain(domain):
-    """Q+ dijeli ista pravila i zamke kao predznačeni racionalni brojevi."""
-    return "rational_signed" if domain == "rational_nonneg" else domain
-
-
 def _operand(rng, domain, level, operation):
     return _OPERAND_BUILDERS[domain](rng, level, operation)
 
@@ -246,8 +253,13 @@ def _division_pair(rng, domain, level):
                            else rng.choice((2, 4, 5, 8, 25)),
                            10 if level == 3 and rng.random() < 0.5 else 1)
         return quotient * divisor, divisor
-    divisor = _signed_fraction(rng, level, "divide")
-    quotient = _signed_fraction(rng, level, "divide")
+    # Q+ nema negativnih razlomaka ni u OPERANDIMA, ne samo u međurezultatu:
+    # `_exact_in_domain` je provjeravao samo rezultat, pa je Q+ dijeljenje
+    # dobijalo predznačen djelilac i djeljenik (isti „posuđeno od
+    # rational_signed“ korijen kao nekadašnji `_hint_domain`). Graditelj
+    # operanada SVOG domena to rješava bez novog pravila.
+    divisor = _operand(rng, domain, level, "divide")
+    quotient = _operand(rng, domain, level, "divide")
     if divisor == 0:
         raise DeterministicGenerationError("djelilac nula")
     return quotient * divisor, divisor
@@ -268,7 +280,7 @@ def _later_divisor(rng, partial: Fraction, domain):
         return Fraction(divisor)
     if domain == "decimal":
         return Fraction(rng.choice((2, 4, 5)))
-    value = _signed_fraction(rng, 2, "divide")
+    value = _operand(rng, domain, 2, "divide")     # Q+ ostaje nenegativan
     return value if value != 0 else None
 
 
@@ -584,8 +596,12 @@ def _chain_package(rng, lesson_id, lesson_title, domain, allowed, shape,
     answer_text = _final_display(domain, answer)
     flat_answer = _display(domain, answer)
 
-    rule = _RULE_HINT[(_hint_domain(domain), operations[0])]
-    pitfall = _PITFALL[(_hint_domain(domain), operations[0])]
+    # Pravilo i zamka se čitaju po STVARNOM domenu lekcije. Ranije je Q+ ovdje
+    # bio preslikan u `rational_signed`, pa je zadatak 6. razreda dobijao uputu
+    # o suprotnim brojevima i pravilu znakova — pedagogija koju taj kurikulum
+    # još ne poznaje.
+    rule = _RULE_HINT[(domain, operations[0])]
+    pitfall = _PITFALL[(domain, operations[0])]
     if len(operations) > 1:
         hint2 = f"Kreni redom: prvi korak daje ${steps[0]}$."
         hint3 = (f"Dakle: ${expression} = {steps[-2]}$ — još samo završi račun.")
