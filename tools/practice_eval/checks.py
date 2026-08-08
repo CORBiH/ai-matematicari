@@ -746,10 +746,21 @@ def check_identical_response(obs: TurnObservation) -> CheckResult:
 
 
 def check_package_clean(obs: TurnObservation) -> CheckResult:
-    """Isti `package_preflight` koji server pokreće nad konačnim paketom."""
+    """Isti `package_preflight` koji server pokreće nad konačnim paketom.
+
+    Faza F5G: server dokaz težine mjeri lekcijski-relativnim profilom
+    razriješenim iz server-vlasničkog konteksta — evaluacija MORA mjeriti
+    isto, inače objavljen valjan paket lažno pada na globalnoj rubrici
+    (živi F5H nalaz: sva četiri profilirana scenarija)."""
     if obs.final_task_package is None:
         return CheckResult("package_clean", SKIP, "no structured package captured for this turn")
-    issues = package_preflight.collect_package_issues(obs.final_task_package)
+    from matbot import difficulty_profiles
+    from matbot.tutor import lesson_context as lesson_context_module
+
+    context = lesson_context_module.build(obs.grade, obs.topic_id)
+    profile = difficulty_profiles.resolve_for_context(context)
+    issues = package_preflight.collect_package_issues(
+        obs.final_task_package, difficulty_profile=profile)
     if issues:
         return CheckResult("package_clean", FAIL, package_preflight.describe_issues(issues))
     return CheckResult("package_clean", PASS)

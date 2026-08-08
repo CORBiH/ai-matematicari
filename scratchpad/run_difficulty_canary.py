@@ -846,15 +846,26 @@ def _record_lesson_identity_diagnostics(result: TurnResult, llm) -> None:
 
 def _record_difficulty_evidence_diagnostics(result: TurnResult, task, evidence=None,
                                             source: Optional[str] = None) -> None:
-    """Persist only closed DifficultyEvidence fields and shared validator codes."""
+    """Persist only closed DifficultyEvidence fields and shared validator codes.
+
+    Faza F5G: dijagnostika mora mjeriti ISTIM lekcijski-relativnim profilom
+    kojim server stvarno validira — inače artefakt lažno prijavljuje kodove
+    globalne rubrike za objavljen valjan paket."""
     if task is None or not hasattr(task, "difficulty_evidence"):
         return
+    from matbot import difficulty_profiles
+
+    try:
+        profile = difficulty_profiles.resolve_for_context(
+            tutor_lesson_context.build(result.grade, result.lesson_id))
+    except Exception:
+        profile = None
     evidence = evidence or task.difficulty_evidence
     result.final_difficulty_evidence = evidence.model_dump()
     result.final_difficulty_evidence_source = source
     result.final_difficulty_target_level = task.target_difficulty_level
     result.final_difficulty_validator_errors = list(difficulty_evidence_errors(
-        evidence, task.target_difficulty_level,
+        evidence, task.target_difficulty_level, profile=profile,
     ))
 
 

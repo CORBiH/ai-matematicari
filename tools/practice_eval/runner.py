@@ -351,13 +351,29 @@ def _final_task_package(record):
     return getattr(tutor, "new_task", None)
 
 
-def _independent_evidence_errors(reviewer_output):
+def _difficulty_profile_for(scenario):
+    """Isti lekcijski-relativni profil koji server razrješava (Faza F5G).
+
+    Evaluacija MORA mjeriti istim granicama kao server, inače objavljen valjan
+    paket lažno pada na globalnoj rubrici (živi F5H nalaz)."""
+    from matbot import difficulty_profiles
+    from matbot.tutor import lesson_context as lesson_context_module
+
+    try:
+        context = lesson_context_module.build(scenario.grade, scenario.topic_id)
+    except Exception:
+        return None
+    return difficulty_profiles.resolve_for_context(context)
+
+
+def _independent_evidence_errors(reviewer_output, difficulty_profile=None):
     """Isti validator koji server pokreće nad recenzentovim VLASTITIM dokazom.
 
     Ne uvodi novi prag — poziva `matbot.tutor.schema.difficulty_evidence_errors`,
-    tačno kao `validate_reviewer`. Postoji samo da se u izvještaju razlikuje
-    „paket nosi loš dokaz“ od „recenzent je sam izmjerio da paket nije na
-    traženom nivou pa ga ipak odobrio“."""
+    tačno kao `validate_reviewer` (uključujući lekcijski-relativni profil).
+    Postoji samo da se u izvještaju razlikuje „paket nosi loš dokaz“ od
+    „recenzent je sam izmjerio da paket nije na traženom nivou pa ga ipak
+    odobrio“."""
     from matbot.tutor.schema import difficulty_evidence_errors
 
     evidence = getattr(reviewer_output, "reviewed_difficulty_evidence", None)
@@ -366,7 +382,8 @@ def _independent_evidence_errors(reviewer_output):
     if evidence is None or task is None:
         return ""
     try:
-        return ",".join(difficulty_evidence_errors(evidence, task.target_difficulty_level))
+        return ",".join(difficulty_evidence_errors(
+            evidence, task.target_difficulty_level, profile=difficulty_profile))
     except Exception:
         return ""
 
@@ -457,18 +474,22 @@ def run_scenario(flask_app, llm, capture, scenario: Scenario, token) -> Scenario
 
         package = _final_task_package(request_record)
         reviewer_output = request_record.get("reviewer_output")
+        difficulty_profile = _difficulty_profile_for(scenario)
         if reviewer_output is not None:
             turn.reviewer_decision = getattr(reviewer_output, "decision", "") or ""
-            turn.reviewer_independent_evidence_errors = _independent_evidence_errors(reviewer_output)
+            turn.reviewer_independent_evidence_errors = _independent_evidence_errors(
+                reviewer_output, difficulty_profile)
         tutor_task = getattr(request_record.get("tutor_output"), "new_task", None)
         if tutor_task is not None:
             from matbot.tutor import package_preflight
             turn.tutor_draft_issues = package_preflight.describe_issues(
-                package_preflight.collect_package_issues(tutor_task))
+                package_preflight.collect_package_issues(
+                    tutor_task, difficulty_profile=difficulty_profile))
         if package is not None:
             from matbot.tutor import package_preflight
             turn.reviewer_final_issues = package_preflight.describe_issues(
-                package_preflight.collect_package_issues(package))
+                package_preflight.collect_package_issues(
+                    package, difficulty_profile=difficulty_profile))
 
         observation = check_lib.TurnObservation(
             scenario_id=scenario.id,

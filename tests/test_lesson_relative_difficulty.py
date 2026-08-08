@@ -482,3 +482,43 @@ def test_unprofiled_lessons_keep_the_prompt_unchanged():
     for text in (tutor_prompts.build_tutor_instructions(context),
                  tutor_prompts.build_reviewer_instructions(context)):
         assert "LESSON-RELATIVE DIFFICULTY PROFILE" not in text
+
+
+# ---------------------------------------------------------------------------
+# 7) EVALUACIONA PROVJERA MJERI ISTO ŠTO I SERVER (živi F5H nalaz)
+# ---------------------------------------------------------------------------
+# U F5H talasu je server ISPRAVNO objavio sva četiri profilirana paketa, a
+# `check_package_clean` ih je lažno oborio jer je pozivao preflight BEZ
+# profila — harness je mjerio globalnom rubrikom koju server više ne
+# primjenjuje na te lekcije.
+
+def _observation(grade, topic, package):
+    from tools.practice_eval import checks as eval_checks
+
+    return eval_checks.TurnObservation(
+        scenario_id="t", step_index=0, step_kind="text", topic_id=topic,
+        grade=grade, request_payload={}, http_status=200, response={},
+        session_before=None, session_after=None, sdk_calls=2,
+        final_task_package=package)
+
+
+def test_eval_package_clean_uses_the_lesson_relative_profile():
+    from tools.practice_eval import checks as eval_checks
+
+    context = build(*PYRAMID)
+    package = task(context, PYRAMID_TEXT, PYRAMID_OPTIONS,
+                   task_evidence=LIVE_PYRAMID_L1)
+    result = eval_checks.check_package_clean(_observation(*PYRAMID, package))
+    assert result.outcome == "pass", result.detail
+
+
+def test_eval_package_clean_keeps_the_global_rubric_for_easy_lessons():
+    from tools.practice_eval import checks as eval_checks
+
+    context = build(*EASY_CONTROL)
+    package = task(context, "Marko dijeli $15$ olovaka u $5$ grupa. Koliko u svakoj?",
+                   ("$3$", "$5$", "$2$", "$4$"),
+                   task_evidence=ev(1, 1, 3, 0))
+    result = eval_checks.check_package_clean(_observation(*EASY_CONTROL, package))
+    assert result.outcome == "fail"
+    assert "difficulty_evidence_outside_target" in result.detail
