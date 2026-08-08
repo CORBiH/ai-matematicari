@@ -180,6 +180,7 @@ Flask + a single-page frontend, one OpenAI call per turn, no database.
 | Mode-specific prompt assembly | `matbot/prompts.py` |
 | Universal lesson-contract engine (Practice) | `matbot/contracts/` |
 | Deterministic execution strategy (family generators) | `matbot/deterministic/` |
+| Lesson-relative difficulty profiles (model route) | `matbot/difficulty_profiles.py`, `data/difficulty_profiles.json` |
 | Lesson contract data (no Python per lesson) | `data/contract_templates.json`, `data/lesson_contracts.json` |
 | Geometry symbols, formulas, topic routing | `matbot/geometry_rules.py` |
 | The only OpenAI call site | `matbot/llm.py` |

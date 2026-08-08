@@ -217,6 +217,27 @@ Deterministic packages pass byte-for-byte the same validators and the same
 and all unmapped lessons keep the Tutor+Reviewer path unchanged. Rollback:
 `MATBOT_DETERMINISTIC_PRACTICE=disabled`.
 
+**Lesson-relative difficulty profiles (Phase F5G, model route only).** The
+1–3 difficulty rubric (`matbot/tutor/schema.py::difficulty_evidence_errors`)
+is global by default. Four repeated live collisions (two on the system word
+problem lesson, one each on practical Pythagoras and the triangular-pyramid
+volume lesson, including a final release gate) proved that for some lessons the
+*minimum legitimate task* honestly exceeds the global Level-1 thresholds: a
+direct multi-quantity geometry formula needs up to three connected operations,
+and a system word problem inherently carries two conditions plus one
+representation change. `data/difficulty_profiles.json` therefore declares
+**lesson-relative level bounds as data**, keyed by the lesson's **frozen
+primary task family** (`matbot/task_families.py`) — never by lesson ID and
+never by model prose. `matbot/difficulty_profiles.py` resolves a profile
+**only for lessons without a semantic contract** (model route; the 272
+deterministic lessons keep the global rubric byte-for-byte) and enforces it
+identically in draft preflight, the Reviewer's own-evidence invariant, and
+publication. The identical profile text is sent to both the Tutor and the
+Reviewer from the data artifact. Lessons without an assigned profile keep the
+global rubric unchanged — an easy lesson is never loosened, and Level 2/3
+floors start strictly above the profile's Level-1 caps so progression stays
+measurable.
+
 ### Explain (`matbot/explain.py`)
 
 ```

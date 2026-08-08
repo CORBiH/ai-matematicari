@@ -1,7 +1,16 @@
 # MAT-BOT — current state
 
-Last updated: 2026-08-02 (Practice lesson-contract fix pass). Test baseline: **1505 passing**.
-Runtime model: `gpt-5-mini`, reasoning effort `low`.
+Last updated: 2026-08-08 (lesson-relative difficulty calibration, Phase F5G).
+Test baseline: **5784 passing**. Runtime model: `gpt-5-mini`, reasoning effort `low`.
+
+**Phase F5G (2026-08-08):** the model-route 1–3 difficulty rubric gained
+lesson-relative profiles as data (`data/difficulty_profiles.json`, resolved by
+`matbot/difficulty_profiles.py`), keyed by the frozen primary task family and
+active only for lessons without a semantic contract. This fixed the systematic
+Level-1 collisions (system word problems: two conditions are the lesson's own
+skill; multi-quantity geometry formulas: three connected operations are the
+minimum legitimate direct application) without loosening any unprofiled lesson.
+See docs/ARCHITECTURE.md.
 
 ## Maturity by area
 
