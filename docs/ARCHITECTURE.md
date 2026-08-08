@@ -206,12 +206,30 @@ solution) served with **zero model calls**. The registry lives in
 `functions`, `geometry` — plane figures, Pythagoras and solids on an exact
 `RadicalValue`/`PiValue` number authority (`radicals.py`) —, `numbertheory`,
 `ordering`, `polynomials`, `powers`, `quantities`, `ratio`, `systems`,
-`units`) share one core (`matbot/deterministic/core.py`) and serve
-**30 semantic families covering 272 lessons across all four grades**
+`units`; Batch #4 added `algfractions` — symbolic rational expressions over
+the pure `matbot/mathkernel/` authority —, `wordproblems` (facts-before-prose
+structured word problems), `settheory`, `statsdata`, `finance`, `parametric`,
+`inequalities`, `properties`, `fractionconcepts`, `similarity`, `polygons`,
+`linefacts`) share one core (`matbot/deterministic/core.py`) and serve
+**44 semantic families covering 352 lessons (65.9%) across all four grades**
 (source of truth: `data/lesson_semantic_assignments.json`, compiled by
 `scripts/build_lesson_semantics.py`; bulk activation table and coverage report:
 `scripts/bulk_onboard_deterministic.py` →
 `reference/curriculum/semantics/deterministic_coverage_report.json`).
+
+**The math kernel (`matbot/mathkernel/`, Batch #4).** Pure exact solvers with
+**no** lesson, MCQ, session, or Practice knowledge — the intended seam for the
+future "Daj mi rezultat" mode: `rationalexpr.py` (single-variable polynomials
+and rational expressions over ℚ where **domain exclusions are part of
+identity** — `(x²-1)/(x-1)` is equivalent to `x+1` only with `x ≠ 1` recorded;
+equivalence compares canonical form AND exclusion set, fail-closed when a
+denominator does not fully split over ℚ), `wordfacts.py` (structured
+word-problem facts solved **before** any prose is rendered; the practice
+engine additionally render-audits that every number in the prose is an IR
+quantity), and `finiteset.py` (canonical finite-set algebra where {1,2,3} and
+{3,2,1} are one object). A permanent test
+(`tests/test_batch4_deterministic.py`) forbids the kernel from importing any
+Practice module, naming any lesson, or using float authority.
 Deterministic packages pass byte-for-byte the same validators and the same
 `_publish_task` as model packages; free-form messages, help on a model task,
 and all unmapped lessons keep the Tutor+Reviewer path unchanged. Rollback:

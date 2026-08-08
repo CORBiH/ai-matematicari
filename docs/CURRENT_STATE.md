@@ -1,7 +1,17 @@
 # MAT-BOT — current state
 
-Last updated: 2026-08-08 (lesson-relative difficulty calibration, Phase F5G).
-Test baseline: **5784 passing**. Runtime model: `gpt-5-mini`, reasoning effort `low`.
+Last updated: 2026-08-08 (Batch #4 deterministic expansion, offline).
+Test baseline: **6154 passing**. Runtime model: `gpt-5-mini`, reasoning effort `low`.
+
+**Batch #4 (2026-08-08, offline — awaiting live validation):** deterministic
+coverage grew **272 → 352 lessons (65.9%), 30 → 44 families**, contract
+version `5F.1`. New reusable exact authority lives in `matbot/mathkernel/`
+(rational expressions with domain-as-identity, structured word-problem facts,
+finite sets) — deliberately free of any Practice/lesson knowledge as the seam
+for the future "Daj mi rezultat" mode. Difficulty profiles are now resolved
+by primary family for BOTH execution strategies (one difficulty authority per
+lesson); the release gate's core model lesson moved to 6-04-001 because
+6-03-010 became deterministic. No push, no live calls in this phase.
 
 **Phase F5G (2026-08-08):** the model-route 1–3 difficulty rubric gained
 lesson-relative profiles as data (`data/difficulty_profiles.json`, resolved by
