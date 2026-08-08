@@ -759,8 +759,10 @@ def check_package_clean(obs: TurnObservation) -> CheckResult:
 
     context = lesson_context_module.build(obs.grade, obs.topic_id)
     profile = difficulty_profiles.resolve_for_context(context)
+    # F5K: i semantički ugovor vježbe — harness mjeri ISTO što i server.
     issues = package_preflight.collect_package_issues(
-        obs.final_task_package, difficulty_profile=profile)
+        obs.final_task_package, difficulty_profile=profile,
+        practice_contract=getattr(context, "practice_contract", None))
     if issues:
         return CheckResult("package_clean", FAIL, package_preflight.describe_issues(issues))
     return CheckResult("package_clean", PASS)

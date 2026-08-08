@@ -366,6 +366,17 @@ def _difficulty_profile_for(scenario):
     return difficulty_profiles.resolve_for_context(context)
 
 
+def _practice_contract_for(scenario):
+    """Semantički ugovor vježbe lekcije (F5K) — harness mjeri kao server."""
+    from matbot.tutor import lesson_context as lesson_context_module
+
+    try:
+        context = lesson_context_module.build(scenario.grade, scenario.topic_id)
+    except Exception:
+        return None
+    return getattr(context, "practice_contract", None)
+
+
 def _independent_evidence_errors(reviewer_output, difficulty_profile=None):
     """Isti validator koji server pokreće nad recenzentovim VLASTITIM dokazom.
 
@@ -475,6 +486,7 @@ def run_scenario(flask_app, llm, capture, scenario: Scenario, token) -> Scenario
         package = _final_task_package(request_record)
         reviewer_output = request_record.get("reviewer_output")
         difficulty_profile = _difficulty_profile_for(scenario)
+        practice_contract = _practice_contract_for(scenario)
         if reviewer_output is not None:
             turn.reviewer_decision = getattr(reviewer_output, "decision", "") or ""
             turn.reviewer_independent_evidence_errors = _independent_evidence_errors(
@@ -484,12 +496,14 @@ def run_scenario(flask_app, llm, capture, scenario: Scenario, token) -> Scenario
             from matbot.tutor import package_preflight
             turn.tutor_draft_issues = package_preflight.describe_issues(
                 package_preflight.collect_package_issues(
-                    tutor_task, difficulty_profile=difficulty_profile))
+                    tutor_task, difficulty_profile=difficulty_profile,
+                    practice_contract=practice_contract))
         if package is not None:
             from matbot.tutor import package_preflight
             turn.reviewer_final_issues = package_preflight.describe_issues(
                 package_preflight.collect_package_issues(
-                    package, difficulty_profile=difficulty_profile))
+                    package, difficulty_profile=difficulty_profile,
+                    practice_contract=practice_contract))
 
         observation = check_lib.TurnObservation(
             scenario_id=scenario.id,
