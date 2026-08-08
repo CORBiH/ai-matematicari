@@ -1,0 +1,106 @@
+{
+ "seed": 20260809,
+ "turns": 50,
+ "sdk_calls": 83,
+ "ceiling": 100,
+ "publish_rate": 0.9,
+ "useful_rate": 0.9,
+ "fidelity_failure_rate": 0.0,
+ "fail_closed_rate": 0.08,
+ "timeout_rate": 0.0,
+ "semantic_false_accepts": 0,
+ "wrong_math_published": 0,
+ "wrong_mcq_published": 0,
+ "state_corruption": 0,
+ "routing_errors": 0,
+ "latency_ms": {
+  "median": 21763,
+  "p95": 36811,
+  "max": 44639
+ },
+ "avg_calls_per_turn": 1.66,
+ "by_grade": {
+  "6": {
+   "turns": 10,
+   "useful": 10,
+   "fail_closed": 0
+  },
+  "7": {
+   "turns": 14,
+   "useful": 10,
+   "fail_closed": 3
+  },
+  "8": {
+   "turns": 8,
+   "useful": 8,
+   "fail_closed": 0
+  },
+  "9": {
+   "turns": 18,
+   "useful": 17,
+   "fail_closed": 1
+  }
+ },
+ "by_stratum": {
+  "CONCEPT_PROOF": {
+   "turns": 4,
+   "useful": 4,
+   "fail_closed": 0,
+   "semantic_violations": 0
+  },
+  "INSUFFICIENT": {
+   "turns": 14,
+   "useful": 13,
+   "fail_closed": 1,
+   "semantic_violations": 0
+  },
+  "VISUAL": {
+   "turns": 8,
+   "useful": 8,
+   "fail_closed": 0,
+   "semantic_violations": 0
+  },
+  "graph_semantics": {
+   "turns": 8,
+   "useful": 8,
+   "fail_closed": 0,
+   "semantic_violations": 0
+  },
+  "congruence_criterion": {
+   "turns": 2,
+   "useful": 0,
+   "fail_closed": 1,
+   "semantic_violations": 0
+  },
+  "congruence_proof": {
+   "turns": 2,
+   "useful": 1,
+   "fail_closed": 1,
+   "semantic_violations": 0
+  },
+  "NEEDS_NEW": {
+   "turns": 2,
+   "useful": 2,
+   "fail_closed": 0,
+   "semantic_violations": 0
+  },
+  "net_semantics": {
+   "turns": 6,
+   "useful": 6,
+   "fail_closed": 0,
+   "semantic_violations": 0
+  },
+  "rational_word_problem": {
+   "turns": 2,
+   "useful": 2,
+   "fail_closed": 0,
+   "semantic_violations": 0
+  },
+  "algebraic_identity_proof": {
+   "turns": 2,
+   "useful": 1,
+   "fail_closed": 1,
+   "semantic_violations": 0
+  }
+ }
+}

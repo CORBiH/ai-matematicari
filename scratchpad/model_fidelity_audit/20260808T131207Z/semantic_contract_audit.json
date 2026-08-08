@@ -1,0 +1,1835 @@
+{
+ "timestamp": "20260808T131207Z",
+ "total_lessons": 534,
+ "deterministic": 352,
+ "non_deterministic": 182,
+ "counts": {
+  "SEMANTIC_BLOCKING_READY": 27,
+  "SEMANTIC_ADVISORY_ONLY": 0,
+  "VISUAL_ESSENTIAL": 57,
+  "INSUFFICIENT_EVIDENCE": 90,
+  "NEEDS_NEW_REPRESENTATION": 8
+ },
+ "lessons": [
+  {
+   "lesson_id": "6-01-005",
+   "title": "Euler-Vennov/Vennov dijagram",
+   "grade": "6",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "NEEDS_NEW_REPRESENTATION",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "6-02-009",
+   "title": "Pridruživanje brojeva po datom pravilu",
+   "grade": "6",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "6-04-001",
+   "title": "Pojam razlomka, brojnik/brojilac i nazivnik/imenilac",
+   "grade": "6",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "CONCEPTUAL_ONLY",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "6-04-004",
+   "title": "Prikaz razlomka na brojevnoj polupravoj/osi",
+   "grade": "6",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "6-04-005",
+   "title": "Proširivanje razlomaka",
+   "grade": "6",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "6-04-006",
+   "title": "Skraćivanje i nesvodivi razlomak",
+   "grade": "6",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "6-05-005",
+   "title": "Pridruživanje decimalnih brojeva tačkama brojevne poluprave/osi",
+   "grade": "6",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "6-07-007",
+   "title": "Predstavljanje rješenja nejednačine na brojevnoj polupravoj/osi",
+   "grade": "6",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "6-08-001",
+   "title": "Tačka, prava, ravan, poluprava i duž",
+   "grade": "6",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "6-08-002",
+   "title": "Geometrijske figure kao skupovi tačaka",
+   "grade": "6",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "CONCEPTUAL_ONLY",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "6-08-003",
+   "title": "Izlomljena linija",
+   "grade": "6",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "6-08-004",
+   "title": "Mnogougao/mnogokut",
+   "grade": "6",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "6-08-005",
+   "title": "Kružnica i krug",
+   "grade": "6",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "6-08-006",
+   "title": "Centar, poluprečnik/polumjer i prečnik/promjer",
+   "grade": "6",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "6-08-007",
+   "title": "Kružni luk i tetiva",
+   "grade": "6",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "6-08-008",
+   "title": "Odnos prave i kružnice: sječica/sekanta i tangenta",
+   "grade": "6",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "CONCEPTUAL_ONLY",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "6-08-009",
+   "title": "Konstrukcija tangente na kružnicu",
+   "grade": "6",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "6-08-010",
+   "title": "Odnos dvije kružnice",
+   "grade": "6",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "CONCEPTUAL_ONLY",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "6-08-011",
+   "title": "Kružni isječak, odsječak i prsten",
+   "grade": "6",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "6-09-001",
+   "title": "Pojam ugla, elementi i označavanje",
+   "grade": "6",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "CONCEPTUAL_ONLY",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "6-09-002",
+   "title": "Konveksni i nekonveksni uglovi",
+   "grade": "6",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "6-09-006",
+   "title": "Prenošenje i konstrukcija jednakog ugla",
+   "grade": "6",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "6-09-008",
+   "title": "Grafičko sabiranje i oduzimanje uglova",
+   "grade": "6",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "6-09-009",
+   "title": "Mjerenje uglova uglomjerom",
+   "grade": "6",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "6-10-001",
+   "title": "Koordinatni polupravac",
+   "grade": "6",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "6-10-002",
+   "title": "Brojevna osa i koordinate tačaka",
+   "grade": "6",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "6-10-003",
+   "title": "Pravougli koordinatni sistem u ravni",
+   "grade": "6",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "6-10-004",
+   "title": "Crtanje i očitavanje tačaka u koordinatnom sistemu",
+   "grade": "6",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "SEMANTIC_BLOCKING_READY",
+   "contract_type": "graph_semantics",
+   "visual_policy": "textual_structured_equivalent"
+  },
+  {
+   "lesson_id": "6-10-005",
+   "title": "Relacije",
+   "grade": "6",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "6-10-006",
+   "title": "Funkcije/preslikavanja: domen, kodomen i pravilo",
+   "grade": "6",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "6-10-007",
+   "title": "Prikaz funkcije tabelom i grafički",
+   "grade": "6",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "SEMANTIC_BLOCKING_READY",
+   "contract_type": "graph_semantics",
+   "visual_policy": "textual_structured_equivalent"
+  },
+  {
+   "lesson_id": "6-10-008",
+   "title": "Tabele, stupčasti i kružni dijagrami",
+   "grade": "6",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "NEEDS_NEW_REPRESENTATION",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "6-11-001",
+   "title": "Vektor kao orijentisana duž",
+   "grade": "6",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "6-11-002",
+   "title": "Operacije s vektorima: sabiranje, oduzimanje i množenje prirodnim brojem",
+   "grade": "6",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "6-12-001",
+   "title": "Osna simetrija u ravni",
+   "grade": "6",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "6-12-002",
+   "title": "Osno simetrične tačke i figure",
+   "grade": "6",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "6-12-003",
+   "title": "Simetrala duži i konstrukcija",
+   "grade": "6",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "6-12-004",
+   "title": "Simetrala ugla i konstrukcija",
+   "grade": "6",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "6-12-005",
+   "title": "Centralna simetrija",
+   "grade": "6",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "6-12-006",
+   "title": "Centralno simetrične tačke i figure",
+   "grade": "6",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "6-12-007",
+   "title": "Translacija",
+   "grade": "6",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "6-12-008",
+   "title": "Rotacija",
+   "grade": "6",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "6-13-006",
+   "title": "Čitanje podataka iz tabela i dijagrama",
+   "grade": "6",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "NEEDS_NEW_REPRESENTATION",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "6-13-007",
+   "title": "Prezentovanje podataka tabelom, dijagramom ili koordinatnim sistemom",
+   "grade": "6",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "NEEDS_NEW_REPRESENTATION",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-01-001",
+   "title": "Usmjerena duž i pojam vektora",
+   "grade": "7",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-01-002",
+   "title": "Pravac, smjer i intenzitet (dužina) vektora",
+   "grade": "7",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-01-003",
+   "title": "Nula-vektor",
+   "grade": "7",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-01-004",
+   "title": "Jednaki vektori",
+   "grade": "7",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-01-005",
+   "title": "Suprotni vektori",
+   "grade": "7",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-01-006",
+   "title": "Kolinearni vektori",
+   "grade": "7",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-01-007",
+   "title": "Sabiranje vektora - metoda nadovezivanja (trougla) i metoda paralelograma",
+   "grade": "7",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-01-008",
+   "title": "Oduzimanje vektora",
+   "grade": "7",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-01-009",
+   "title": "Množenje vektora prirodnim brojem",
+   "grade": "7",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-01-010",
+   "title": "Zadaci sa različitim operacijama",
+   "grade": "7",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-01-011",
+   "title": "Primjene vektora u kretanju i fizici",
+   "grade": "7",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-01-012",
+   "title": "Translacija figure vektorom",
+   "grade": "7",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-01-013",
+   "title": "Rotacija: centar i ugao rotacije",
+   "grade": "7",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-01-014",
+   "title": "Osna simetrija",
+   "grade": "7",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-01-015",
+   "title": "Centralna simetrija",
+   "grade": "7",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-01-016",
+   "title": "Kompozicija izometrijskih preslikavanja",
+   "grade": "7",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-01-017",
+   "title": "Osa i centar simetrije figure",
+   "grade": "7",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-01-018",
+   "title": "Simetrala duži i konstrukcija",
+   "grade": "7",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-01-019",
+   "title": "Simetrala ugla i konstrukcija",
+   "grade": "7",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-02-001",
+   "title": "Potreba za negativnim cijelim brojevima",
+   "grade": "7",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-02-002",
+   "title": "Skup cijelih brojeva Z",
+   "grade": "7",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "CONCEPTUAL_ONLY",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-02-003",
+   "title": "Prikaz na brojevnoj pravoj",
+   "grade": "7",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-03-001",
+   "title": "Skup racionalnih brojeva Q",
+   "grade": "7",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "CONCEPTUAL_ONLY",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-03-002",
+   "title": "Pozitivni, negativni racionalni brojevi i nula",
+   "grade": "7",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-03-003",
+   "title": "Prikaz racionalnih brojeva na brojevnoj pravoj",
+   "grade": "7",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-04-003",
+   "title": "Konstrukcije uglova 60°, 30°, 90° i 45°",
+   "grade": "7",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-04-004",
+   "title": "Konstrukcije izvedenih uglova 15°, 75°, 105°, 120° i 135°",
+   "grade": "7",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-04-005",
+   "title": "Pojam i elementi trougla",
+   "grade": "7",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "CONCEPTUAL_ONLY",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-04-013",
+   "title": "Podudarnost trouglova - SUS",
+   "grade": "7",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "PROOF_REQUIRED",
+   "fidelity_bucket": "SEMANTIC_BLOCKING_READY",
+   "contract_type": "congruence_criterion",
+   "visual_policy": "conceptual_text"
+  },
+  {
+   "lesson_id": "7-04-014",
+   "title": "Podudarnost trouglova - USU",
+   "grade": "7",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "PROOF_REQUIRED",
+   "fidelity_bucket": "SEMANTIC_BLOCKING_READY",
+   "contract_type": "congruence_criterion",
+   "visual_policy": "conceptual_text"
+  },
+  {
+   "lesson_id": "7-04-015",
+   "title": "Podudarnost trouglova - SSS",
+   "grade": "7",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "PROOF_REQUIRED",
+   "fidelity_bucket": "SEMANTIC_BLOCKING_READY",
+   "contract_type": "congruence_criterion",
+   "visual_policy": "conceptual_text"
+  },
+  {
+   "lesson_id": "7-04-016",
+   "title": "Podudarnost trouglova - SSU",
+   "grade": "7",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "PROOF_REQUIRED",
+   "fidelity_bucket": "SEMANTIC_BLOCKING_READY",
+   "contract_type": "congruence_criterion",
+   "visual_policy": "conceptual_text"
+  },
+  {
+   "lesson_id": "7-04-017",
+   "title": "Primjena podudarnosti u dokazivanju jednakosti elemenata",
+   "grade": "7",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "PROOF_REQUIRED",
+   "fidelity_bucket": "SEMANTIC_BLOCKING_READY",
+   "contract_type": "congruence_proof",
+   "visual_policy": "conceptual_text"
+  },
+  {
+   "lesson_id": "7-04-020",
+   "title": "Osnovne konstrukcije trougla",
+   "grade": "7",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-04-021",
+   "title": "Simetrale stranica i centar opisane kružnice",
+   "grade": "7",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-04-022",
+   "title": "Simetrale uglova i centar upisane kružnice",
+   "grade": "7",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-04-023",
+   "title": "Visine trougla i ortocentar",
+   "grade": "7",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-04-024",
+   "title": "Težišne duži i težište",
+   "grade": "7",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-05-001",
+   "title": "Pojam, elementi i vrste četverougla",
+   "grade": "7",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "CONCEPTUAL_ONLY",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-05-004",
+   "title": "Paralelogram - definicija i svojstva",
+   "grade": "7",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "CONCEPTUAL_ONLY",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-05-005",
+   "title": "Uslovi da je četverougao paralelogram",
+   "grade": "7",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-05-006",
+   "title": "Pravougaonik - svojstva",
+   "grade": "7",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "CONCEPTUAL_ONLY",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-05-007",
+   "title": "Romb - svojstva",
+   "grade": "7",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "CONCEPTUAL_ONLY",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-05-008",
+   "title": "Kvadrat - svojstva",
+   "grade": "7",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "CONCEPTUAL_ONLY",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-05-009",
+   "title": "Konstrukcije paralelograma",
+   "grade": "7",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-05-010",
+   "title": "Trapez i vrste trapeza",
+   "grade": "7",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "CONCEPTUAL_ONLY",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-05-011",
+   "title": "Svojstva jednakokrakog trapeza",
+   "grade": "7",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "CONCEPTUAL_ONLY",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-05-013",
+   "title": "Konstrukcije trapeza",
+   "grade": "7",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-05-014",
+   "title": "Deltoid - definicija i svojstva",
+   "grade": "7",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "CONCEPTUAL_ONLY",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-05-015",
+   "title": "Konstrukcije deltoida",
+   "grade": "7",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-05-025",
+   "title": "Složene figure i primjena obima/površine",
+   "grade": "7",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "FORMULA_GEOMETRY_CANDIDATE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-06-001",
+   "title": "Tačka, prava, ravan, poluprava i duž",
+   "grade": "7",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-06-002",
+   "title": "Geometrijske figure kao skupovi tačaka",
+   "grade": "7",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "CONCEPTUAL_ONLY",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-06-003",
+   "title": "Izlomljena linija",
+   "grade": "7",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-06-004",
+   "title": "Mnogougao/mnogokut",
+   "grade": "7",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-06-005",
+   "title": "Kružnica i krug",
+   "grade": "7",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-06-006",
+   "title": "Centar, poluprečnik/polumjer i prečnik/promjer",
+   "grade": "7",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-06-007",
+   "title": "Kružni luk i tetiva",
+   "grade": "7",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-06-008",
+   "title": "Odnos prave i kružnice: sječica/sekanta i tangenta",
+   "grade": "7",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "CONCEPTUAL_ONLY",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-06-009",
+   "title": "Konstrukcija tangente na kružnicu",
+   "grade": "7",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-06-010",
+   "title": "Odnos dvije kružnice",
+   "grade": "7",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "CONCEPTUAL_ONLY",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "7-06-011",
+   "title": "Kružni isječak, odsječak i prsten",
+   "grade": "7",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "8-02-001",
+   "title": "Pravougli koordinatni sistem, ose i kvadranti",
+   "grade": "8",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "8-02-002",
+   "title": "Koordinate tačke i uređeni par",
+   "grade": "8",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "8-02-003",
+   "title": "Crtanje i očitavanje tačaka",
+   "grade": "8",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "SEMANTIC_BLOCKING_READY",
+   "contract_type": "graph_semantics",
+   "visual_policy": "textual_structured_equivalent"
+  },
+  {
+   "lesson_id": "8-02-007",
+   "title": "Grafik linearne funkcije",
+   "grade": "8",
+   "classifier_class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
+   "analysis": "",
+   "fidelity_bucket": "SEMANTIC_BLOCKING_READY",
+   "contract_type": "graph_semantics",
+   "visual_policy": "textual_structured_equivalent"
+  },
+  {
+   "lesson_id": "8-02-013",
+   "title": "Modeliranje problemske situacije linearnom funkcijom",
+   "grade": "8",
+   "classifier_class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
+   "analysis": "",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "8-03-009",
+   "title": "Talesova teorema",
+   "grade": "8",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "PROOF_REQUIRED",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "8-03-011",
+   "title": "Dijeljenje duži na jednake dijelove",
+   "grade": "8",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "8-03-014",
+   "title": "Stavovi sličnosti trouglova",
+   "grade": "8",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "8-04-013",
+   "title": "Udaljenost tačaka u koordinatnom sistemu",
+   "grade": "8",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "8-04-014",
+   "title": "Konstrukcija iracionalnih tačaka na osi",
+   "grade": "8",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "8-04-015",
+   "title": "Konstruktivni zadaci sa površinama kvadrata",
+   "grade": "8",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "FORMULA_GEOMETRY_CANDIDATE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "8-05-001",
+   "title": "Rogalj i njegovi elementi",
+   "grade": "8",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "CONCEPTUAL_ONLY",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "8-05-007",
+   "title": "Pravilna uspravna trostrana piramida",
+   "grade": "8",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "8-05-009",
+   "title": "Mreža trostrane prizme",
+   "grade": "8",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "SEMANTIC_BLOCKING_READY",
+   "contract_type": "net_semantics",
+   "visual_policy": "textual_structured_equivalent"
+  },
+  {
+   "lesson_id": "8-05-010",
+   "title": "Mreža četverostrane prizme",
+   "grade": "8",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "SEMANTIC_BLOCKING_READY",
+   "contract_type": "net_semantics",
+   "visual_policy": "textual_structured_equivalent"
+  },
+  {
+   "lesson_id": "8-05-011",
+   "title": "Mreža trostrane piramide",
+   "grade": "8",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "SEMANTIC_BLOCKING_READY",
+   "contract_type": "net_semantics",
+   "visual_policy": "textual_structured_equivalent"
+  },
+  {
+   "lesson_id": "8-05-012",
+   "title": "Mreža četverostrane piramide",
+   "grade": "8",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "SEMANTIC_BLOCKING_READY",
+   "contract_type": "net_semantics",
+   "visual_policy": "textual_structured_equivalent"
+  },
+  {
+   "lesson_id": "8-05-021",
+   "title": "Složeni zadaci s prizmama i piramidama",
+   "grade": "8",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "8-06-001",
+   "title": "Obilježje, podaci i skup posmatranja",
+   "grade": "8",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "CONCEPTUAL_ONLY",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "8-06-005",
+   "title": "Stupčasti dijagram",
+   "grade": "8",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "NEEDS_NEW_REPRESENTATION",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "8-06-006",
+   "title": "Kružni dijagram",
+   "grade": "8",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "NEEDS_NEW_REPRESENTATION",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "8-06-007",
+   "title": "Linijski i tačkasti prikaz podataka",
+   "grade": "8",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "8-06-008",
+   "title": "Čitanje i kritičko tumačenje dijagrama",
+   "grade": "8",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "NEEDS_NEW_REPRESENTATION",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "8-08-001",
+   "title": "Vrste mnogouglova",
+   "grade": "8",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "CONCEPTUAL_ONLY",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "8-08-006",
+   "title": "Konstrukcija pravilnog mnogougla",
+   "grade": "8",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "8-08-008",
+   "title": "Dijelovi kružnice i kruga",
+   "grade": "8",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "8-09-001",
+   "title": "Pojam, pravac, smjer i intenzitet vektora",
+   "grade": "8",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "8-09-002",
+   "title": "Jednaki, suprotni i nula-vektor",
+   "grade": "8",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "8-09-003",
+   "title": "Sabiranje i oduzimanje vektora",
+   "grade": "8",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "8-09-004",
+   "title": "Množenje vektora brojem i primjene",
+   "grade": "8",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "9-01-015",
+   "title": "Tekstualni zadaci sa racionalnim izrazima",
+   "grade": "9",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "STRUCTURED_WORD_PROBLEM_CANDIDATE",
+   "fidelity_bucket": "SEMANTIC_BLOCKING_READY",
+   "contract_type": "rational_word_problem",
+   "visual_policy": "conceptual_text"
+  },
+  {
+   "lesson_id": "9-01-016",
+   "title": "Diskusija racionalnog izraza sa parametrom",
+   "grade": "9",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "SYMBOLIC_ALGEBRA_CANDIDATE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "9-01-017",
+   "title": "Dokaz identiteta sa algebarskim razlomcima",
+   "grade": "9",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "PROOF_REQUIRED",
+   "fidelity_bucket": "SEMANTIC_BLOCKING_READY",
+   "contract_type": "algebraic_identity_proof",
+   "visual_policy": "conceptual_text"
+  },
+  {
+   "lesson_id": "9-02-001",
+   "title": "Međusobni odnos tačke i prave",
+   "grade": "9",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "CONCEPTUAL_ONLY",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "9-02-002",
+   "title": "Određenost prave",
+   "grade": "9",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "9-02-003",
+   "title": "Međusobni odnos tačke i ravni",
+   "grade": "9",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "CONCEPTUAL_ONLY",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "9-02-004",
+   "title": "Određenost ravni",
+   "grade": "9",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "9-02-005",
+   "title": "Međusobni položaj dvije prave u prostoru",
+   "grade": "9",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "9-02-006",
+   "title": "Međusobni položaj prave i ravni",
+   "grade": "9",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "9-02-007",
+   "title": "Međusobni položaj dvije ravni",
+   "grade": "9",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "9-02-008",
+   "title": "Normala na ravan",
+   "grade": "9",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "9-02-009",
+   "title": "Rastojanje tačke od ravni",
+   "grade": "9",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "9-02-010",
+   "title": "Rastojanje paralelnih ravni",
+   "grade": "9",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "9-02-011",
+   "title": "Ortogonalna projekcija tačke na ravan",
+   "grade": "9",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "9-02-012",
+   "title": "Ortogonalna projekcija duži na ravan",
+   "grade": "9",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "9-02-013",
+   "title": "Ugao između prave i ravni",
+   "grade": "9",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "9-02-014",
+   "title": "Diedar i ugao između ravni",
+   "grade": "9",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "9-02-015",
+   "title": "Paralelna projekcija na ravan",
+   "grade": "9",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "9-02-016",
+   "title": "Rogalj i njegove strane",
+   "grade": "9",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "9-02-017",
+   "title": "Skiciranje prostornih odnosa",
+   "grade": "9",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "CONCEPTUAL_ONLY",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "9-03-004",
+   "title": "Grafik linearne funkcije",
+   "grade": "9",
+   "classifier_class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
+   "analysis": "",
+   "fidelity_bucket": "SEMANTIC_BLOCKING_READY",
+   "contract_type": "graph_semantics",
+   "visual_policy": "textual_structured_equivalent"
+  },
+  {
+   "lesson_id": "9-03-010",
+   "title": "Presjeci grafika sa koordinatnim osama",
+   "grade": "9",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "SEMANTIC_BLOCKING_READY",
+   "contract_type": "graph_semantics",
+   "visual_policy": "textual_structured_equivalent"
+  },
+  {
+   "lesson_id": "9-03-016",
+   "title": "Okomite prave u koordinatnoj ravni",
+   "grade": "9",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "VISUAL_ESSENTIAL",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "9-03-018",
+   "title": "Primjena linearne funkcije u problemu",
+   "grade": "9",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "9-03-019",
+   "title": "Grafik direktne proporcionalnosti y = kx",
+   "grade": "9",
+   "classifier_class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
+   "analysis": "",
+   "fidelity_bucket": "SEMANTIC_BLOCKING_READY",
+   "contract_type": "graph_semantics",
+   "visual_policy": "textual_structured_equivalent"
+  },
+  {
+   "lesson_id": "9-03-020",
+   "title": "Grafik obrnute proporcionalnosti y = k/x",
+   "grade": "9",
+   "classifier_class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
+   "analysis": "",
+   "fidelity_bucket": "SEMANTIC_BLOCKING_READY",
+   "contract_type": "graph_semantics",
+   "visual_policy": "textual_structured_equivalent"
+  },
+  {
+   "lesson_id": "9-03-022",
+   "title": "Grafik jednostavne razlomljene funkcije",
+   "grade": "9",
+   "classifier_class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
+   "analysis": "",
+   "fidelity_bucket": "SEMANTIC_BLOCKING_READY",
+   "contract_type": "graph_semantics",
+   "visual_policy": "textual_structured_equivalent"
+  },
+  {
+   "lesson_id": "9-04-010",
+   "title": "Grafičko rješavanje linearne jednačine",
+   "grade": "9",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "SEMANTIC_BLOCKING_READY",
+   "contract_type": "graph_semantics",
+   "visual_policy": "textual_structured_equivalent"
+  },
+  {
+   "lesson_id": "9-04-017",
+   "title": "Skup rješenja na brojevnoj pravoj",
+   "grade": "9",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "VISUAL_REQUIRED",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "9-05-002",
+   "title": "Grafički prikaz linearne jednačine sa dvije nepoznate",
+   "grade": "9",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "SEMANTIC_BLOCKING_READY",
+   "contract_type": "graph_semantics",
+   "visual_policy": "textual_structured_equivalent"
+  },
+  {
+   "lesson_id": "9-05-006",
+   "title": "Grafička metoda rješavanja sistema",
+   "grade": "9",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "SEMANTIC_BLOCKING_READY",
+   "contract_type": "graph_semantics",
+   "visual_policy": "textual_structured_equivalent"
+  },
+  {
+   "lesson_id": "9-07-003",
+   "title": "Mreža prizme",
+   "grade": "9",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "SEMANTIC_BLOCKING_READY",
+   "contract_type": "net_semantics",
+   "visual_policy": "textual_structured_equivalent"
+  },
+  {
+   "lesson_id": "9-07-006",
+   "title": "Dijagonalni presjek prizme",
+   "grade": "9",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "FORMULA_GEOMETRY_CANDIDATE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "9-07-009",
+   "title": "Mreža piramide",
+   "grade": "9",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "SEMANTIC_BLOCKING_READY",
+   "contract_type": "net_semantics",
+   "visual_policy": "textual_structured_equivalent"
+  },
+  {
+   "lesson_id": "9-07-013",
+   "title": "Presjeci piramide",
+   "grade": "9",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "9-07-015",
+   "title": "Valjak ili cilindar i njegovi elementi",
+   "grade": "9",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "CONCEPTUAL_ONLY",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "9-07-016",
+   "title": "Mreža valjka",
+   "grade": "9",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "SEMANTIC_BLOCKING_READY",
+   "contract_type": "net_semantics",
+   "visual_policy": "textual_structured_equivalent"
+  },
+  {
+   "lesson_id": "9-07-020",
+   "title": "Kupa ili stožac i njeni elementi",
+   "grade": "9",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "CONCEPTUAL_ONLY",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "9-07-021",
+   "title": "Mreža kupe",
+   "grade": "9",
+   "classifier_class": "VISUAL_OR_CONSTRUCTION_REQUIRED",
+   "analysis": "",
+   "fidelity_bucket": "SEMANTIC_BLOCKING_READY",
+   "contract_type": "net_semantics",
+   "visual_policy": "textual_structured_equivalent"
+  },
+  {
+   "lesson_id": "9-07-026",
+   "title": "Sfera i lopta ili kugla",
+   "grade": "9",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "9-07-029",
+   "title": "Presjek lopte ravni",
+   "grade": "9",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "FORMULA_GEOMETRY_CANDIDATE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "9-07-032",
+   "title": "Složeno geometrijsko tijelo",
+   "grade": "9",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "9-07-035",
+   "title": "Zarubljena piramida",
+   "grade": "9",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "9-07-036",
+   "title": "Zarubljena kupa",
+   "grade": "9",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "9-07-037",
+   "title": "Platonova i Arhimedova tijela",
+   "grade": "9",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE",
+   "fidelity_bucket": "INSUFFICIENT_EVIDENCE",
+   "contract_type": "",
+   "visual_policy": ""
+  },
+  {
+   "lesson_id": "9-08-007",
+   "title": "Čitanje otplatnog plana",
+   "grade": "9",
+   "classifier_class": "MODEL_ONLY_FOR_NOW",
+   "analysis": "VISUAL_REQUIRED",
+   "fidelity_bucket": "NEEDS_NEW_REPRESENTATION",
+   "contract_type": "",
+   "visual_policy": ""
+  }
+ ]
+}

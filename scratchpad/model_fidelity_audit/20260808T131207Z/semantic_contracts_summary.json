@@ -1,0 +1,27 @@
+{
+ "contract_version": "SPC-1",
+ "blocking_contracts": 27,
+ "by_type": {
+  "graph_semantics": 12,
+  "net_semantics": 8,
+  "rational_word_problem": 1,
+  "algebraic_identity_proof": 1,
+  "congruence_criterion": 4,
+  "congruence_proof": 1
+ },
+ "by_visual_policy": {
+  "textual_structured_equivalent": 20,
+  "conceptual_text": 7
+ },
+ "features": [
+  "congruence_semantics_present",
+  "graph_semantics_present",
+  "included_angle_with_sides",
+  "net_semantics_present",
+  "proof_request_present",
+  "story_context_present",
+  "variable_identity_present",
+  "variables_present",
+  "volume_request"
+ ]
+}

@@ -1,0 +1,27 @@
+{
+  "dry_run": true,
+  "sdk_calls_made": 0,
+  "scenarios": 25,
+  "unique_ids_ok": true,
+  "unique_lessons": 25,
+  "curriculum_lessons_total": 534,
+  "lesson_coverage_percent": 4.68,
+  "unique_oblasti": 15,
+  "estimated_model_calls_min": 50,
+  "estimated_model_calls_max": 84,
+  "problems": [],
+  "runtime": {
+    "git_commit": "0afc289721c20b9b9aa7456e812eba1078fd13da",
+    "git_tree": "9aa8ccb3494a8e27ca0302ef2cd0011d1874da44",
+    "git_dirty": true,
+    "model_text": "gpt-5-mini",
+    "tutor_model": "gpt-5-mini",
+    "reviewer_model": "gpt-5-mini",
+    "reasoning_effort": "low",
+    "timeout_seconds": 30.0,
+    "max_output_tokens_practice": 2500,
+    "practice_pipeline": "(unset → legacy_single_call)",
+    "universal_pipeline_active": false,
+    "difficulty_levels_enabled": false
+  }
+}
