@@ -232,7 +232,7 @@ Ova dijagnostika je INTERNA: učenik je ne vidi."""
 
 
 _STRUCTURED_TASK_RULE = """STRUCTURED TASK PACKAGE (required for every `new_task`):
-- selected_lesson_id exactly matches the canonical lesson; include selected_lesson_title for readability, but the server owns and canonicalizes that display copy;
+- selected_lesson_id sadrži SAMO goli kanonski ID lekcije (tačno onaj ID iz reda "- lekcija:" u ulazu, bez naslova) — nikad "Naslov (ID)" i nikad naslov u tom polju; naslov ide isključivo u selected_lesson_title, but the server owns and canonicalizes that display copy;
 - target_difficulty_level is 1 for the first task, shifts one bounded step for easier/harder, and otherwise stays at the committed level;
 - options use unique IDs a, b, c, d; correct_option_id identifies the correct visible option and agrees with correct_option_index;
 - for a multiple-choice task, expected_answer is an exact copy of that marked option's text. Put explanation, derivation, unit commentary, and reasoning only in solution;
@@ -501,7 +501,9 @@ def build_reviewer_instructions(context):
         "`approve` se ignoriše i ne može ništa izmijeniti;\n"
         "- `correct` — nacrt je popravljiv; u `final` vrati KOMPLETAN ispravljen "
         "payload (to je konačan odgovor koji učenik vidi). To uključuje i "
-        "KOMPLETNU ZAMJENU zadatka kad je težina pogrešna za traženi nivo;\n"
+        "KOMPLETNU ZAMJENU zadatka kad je težina pogrešna za traženi nivo. "
+        "Polje `selected_lesson_id` sadrži SAMO goli kanonski ID lekcije, "
+        "nikad naslov i nikad \"Naslov (ID)\";\n"
         "- `fail_closed` — ne može se sigurno objaviti; navedi `fail_reason_code`.\n\n"
         "Ako matematika nije sigurna ili je zadatak dvosmislen, biraj "
         "`fail_closed`. Bolje bez odgovora nego pogrešan odgovor.\n"

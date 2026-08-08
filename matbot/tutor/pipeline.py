@@ -161,6 +161,30 @@ def _explicit_ui_action(turn, session):
     return _UI_ACTION_INTENTS.get((turn.get("intent") or "").strip().lower(), "")
 
 
+def canonicalize_task_lesson_id(task, context):
+    """Uska normalizacija REPREZENTACIJE identiteta lekcije (kapija na ebdccf0).
+
+    ŽIVI NALAZ: na završnoj kapiji su i Tutor i Recenzent u
+    `selected_lesson_id` vratili sastavljeni zapis „Naslov (ID)“ — eho
+    ulaznog reda „- lekcija: Naslov (ID)“ — pa je potpuno ispravan zadatak
+    odbijen samo zbog formata identiteta. Prihvataju se TAČNO dva zapisa:
+    goli kanonski ID, i kanonski naslov iza kojeg u zagradi stoji kanonski
+    ID, pri čemu OBA dijela moraju nezavisno odgovarati server-vlasničkom
+    LessonContext-u; sastavljeni zapis se tada svodi na goli ID. Ovo NIJE
+    fuzzy matching: bilo koji drugi oblik (pogrešan naslov, pogrešan ID,
+    proza oko ID-ja, više ID-jeva, samo naslov…) prolazi netaknut i pada na
+    postojećoj invarijanti u validate_task_package."""
+    if task is None or task.selected_lesson_id == context.topic_id:
+        return task
+    if task.selected_lesson_id == f"{context.title} ({context.topic_id})":
+        # Dijagnostika bez sadržaja: tip zapisa i kanonski ID, ništa učeniku.
+        logger.info(
+            "lesson_id_representation_normalized topic=%s form=title_parenthesized_id",
+            context.topic_id)
+        return task.model_copy(update={"selected_lesson_id": context.topic_id})
+    return task
+
+
 def canonicalize_task_lesson_title(task, context):
     """Make the server-owned LessonContext the sole display-title authority.
 
@@ -178,13 +202,15 @@ def canonicalize_task_lesson_title(task, context):
 
 def _canonicalize_draft_lesson_title(draft, context):
     task = getattr(draft, "new_task", None)
-    canonical_task = canonicalize_task_lesson_title(task, context)
+    canonical_task = canonicalize_task_lesson_title(
+        canonicalize_task_lesson_id(task, context), context)
     return draft if canonical_task is task else draft.model_copy(update={"new_task": canonical_task})
 
 
 def validate_task_package(task, context, target_level=None):
     """Universal package invariants; semantic lesson judgement stays with Reviewer."""
-    task = canonicalize_task_lesson_title(task, context)
+    task = canonicalize_task_lesson_title(
+        canonicalize_task_lesson_id(task, context), context)
     validate_task(task)
     if task.selected_lesson_id != context.topic_id:
         raise UnifiedOutputError("task lesson ID does not match selected lesson")
