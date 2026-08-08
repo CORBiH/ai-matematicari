@@ -222,6 +222,51 @@
         "lcm": "najmanji zajednički sadržilac"
       }
     },
+    "coordinate_line_direct": {
+      "family_version": 1,
+      "family_name": "Prava i linearna funkcija (tekstualno)",
+      "detector": "coordinate_line",
+      "core_skill": "izvesti imenovanu tekstualnu radnju o pravoj ili funkciji",
+      "parameter_schema": {
+        "concepts": {
+          "kind": "enum_set",
+          "values": [
+            "point_distance",
+            "slope_meaning",
+            "intercept_meaning",
+            "implicit_explicit",
+            "parallel_lines",
+            "line_intersection",
+            "dependency_type"
+          ],
+          "required": true
+        }
+      },
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "advisory_parameters": [],
+      "prompt_template": {
+        "header": "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "main_line": {
+          "parameter": "concepts",
+          "text": "- glavna vidljiva radnja mora biti: {values}"
+        },
+        "fixed_lines": [
+          "- svi podaci su zadati u tekstu (koordinate, jednačine); crtanje i čitanje grafika nisu dio zadatka"
+        ],
+        "closing": "- ako prekršiš ovo, server odbija paket prije objave"
+      },
+      "value_labels": {
+        "point_distance": "udaljenost tačaka zadatih koordinatama",
+        "slope_meaning": "značenje koeficijenta k",
+        "intercept_meaning": "značenje slobodnog člana n",
+        "implicit_explicit": "prevođenje implicitnog u eksplicitni oblik",
+        "parallel_lines": "paralelne i podudarne prave preko k i n",
+        "line_intersection": "presjek dvije prave računom",
+        "dependency_type": "direktna, obrnuta ili linearna zavisnost"
+      }
+    },
     "decimal_arithmetic_direct": {
       "family_version": 1,
       "family_name": "Direktan račun — decimalni brojevi",
@@ -386,6 +431,137 @@
         "decade_unit_divisibility": "najveća dekadska jedinica koja dijeli broj"
       }
     },
+    "event_probability_facts": {
+      "family_version": 1,
+      "family_name": "Događaji i vjerovatnosne odluke",
+      "detector": "event_probability",
+      "core_skill": "klasifikovati događaj ili uporediti egzaktne vjerovatnoće",
+      "parameter_schema": {
+        "concepts": {
+          "kind": "enum_set",
+          "values": [
+            "elementary_outcomes",
+            "event_classification",
+            "probability_decision",
+            "population_sample"
+          ],
+          "required": true
+        }
+      },
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "advisory_parameters": [],
+      "prompt_template": {
+        "header": "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "main_line": {
+          "parameter": "concepts",
+          "text": "- glavna vidljiva radnja mora biti: {values}"
+        },
+        "fixed_lines": [
+          "- sastav ogleda (kuglice, strane kockice) mora biti u potpunosti naveden u zadatku"
+        ],
+        "closing": "- ako prekršiš ovo, server odbija paket prije objave"
+      },
+      "value_labels": {
+        "elementary_outcomes": "broj elementarnih ishoda ogleda",
+        "event_classification": "siguran, nemoguć ili slučajan događaj",
+        "probability_decision": "odluka poređenjem egzaktnih vjerovatnoća",
+        "population_sample": "populacija naspram uzorka"
+      }
+    },
+    "financial_arithmetic_direct": {
+      "family_version": 1,
+      "family_name": "Finansijska aritmetika",
+      "detector": "financial_arithmetic",
+      "core_skill": "izvesti egzaktan novčani račun sa stopama navedenim u zadatku",
+      "parameter_schema": {
+        "concepts": {
+          "kind": "enum_set",
+          "values": [
+            "currency_conversion",
+            "simple_interest",
+            "credit_repayment",
+            "budget_balance",
+            "percent_change_price"
+          ],
+          "required": true
+        }
+      },
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "advisory_parameters": [],
+      "prompt_template": {
+        "header": "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "main_line": {
+          "parameter": "concepts",
+          "text": "- glavna vidljiva radnja mora biti: {values}"
+        },
+        "fixed_lines": [
+          "- svaki kurs i svaka stopa moraju biti navedeni u zadatku; stvarni bankarski uslovi i složena kamata nisu u obimu"
+        ],
+        "closing": "- ako prekršiš ovo, server odbija paket prije objave"
+      },
+      "value_labels": {
+        "currency_conversion": "preračunavanje valuta po navedenom kursu",
+        "simple_interest": "prosta kamata na štednju",
+        "credit_repayment": "ukupan povrat kredita (glavnica + kamata)",
+        "budget_balance": "stanje ličnog budžeta",
+        "percent_change_price": "sniženje ili poskupljenje za procenat"
+      }
+    },
+    "finite_set_direct": {
+      "family_version": 1,
+      "family_name": "Konačni skupovi i skupovne operacije",
+      "detector": "finite_set",
+      "core_skill": "izvesti imenovanu skupovnu radnju nad konačnim skupovima",
+      "parameter_schema": {
+        "concepts": {
+          "kind": "enum_set",
+          "values": [
+            "element_membership",
+            "set_builder_match",
+            "cardinality",
+            "subset_equality",
+            "union",
+            "intersection",
+            "difference",
+            "complement",
+            "ordered_pair",
+            "cartesian_product"
+          ],
+          "required": true
+        }
+      },
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "advisory_parameters": [],
+      "prompt_template": {
+        "header": "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "main_line": {
+          "parameter": "concepts",
+          "text": "- glavna vidljiva radnja mora biti: {values}"
+        },
+        "fixed_lines": [
+          "- skupovi se porede kao skupovi: poredak zapisivanja i ponovljeni elementi ne mijenjaju skup"
+        ],
+        "closing": "- ako prekršiš ovo, server odbija paket prije objave"
+      },
+      "value_labels": {
+        "element_membership": "pripadnost elementa skupu",
+        "set_builder_match": "zadavanje skupa nabrajanjem prema opisu",
+        "cardinality": "brojnost skupa (i prazan skup)",
+        "subset_equality": "podskup i jednakost skupova",
+        "union": "unija skupova",
+        "intersection": "presjek skupova",
+        "difference": "razlika skupova",
+        "complement": "komplement uz izričit univerzalni skup",
+        "ordered_pair": "uređeni par (poredak je bitan)",
+        "cartesian_product": "Dekartov proizvod skupova"
+      }
+    },
     "fraction_arithmetic_direct": {
       "family_version": 1,
       "family_name": "Direktan račun s razlomcima",
@@ -483,6 +659,45 @@
         "common_denominator": "svođenje na zajednički imenilac",
         "solve_equation": "rješavanje jednačine ili nejednačine",
         "percent": "pretvaranje u procente"
+      }
+    },
+    "fraction_concept_direct": {
+      "family_version": 1,
+      "family_name": "Pojmovi razlomaka i decimalnih zapisa",
+      "detector": "fraction_concept",
+      "core_skill": "primijeniti imenovani pojam razlomka",
+      "parameter_schema": {
+        "concepts": {
+          "kind": "enum_set",
+          "values": [
+            "part_of_whole",
+            "fraction_types",
+            "common_denominator_numeric",
+            "decimal_type"
+          ],
+          "required": true
+        }
+      },
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "advisory_parameters": [],
+      "prompt_template": {
+        "header": "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "main_line": {
+          "parameter": "concepts",
+          "text": "- glavna vidljiva radnja mora biti: {values}"
+        },
+        "fixed_lines": [
+          "- vrsta decimalnog zapisa dokazuje se faktorizacijom imenioca skraćenog razlomka (samo 2 i 5 daju konačan zapis)"
+        ],
+        "closing": "- ako prekršiš ovo, server odbija paket prije objave"
+      },
+      "value_labels": {
+        "part_of_whole": "razlomak kao dio cjeline i kao količnik",
+        "fraction_types": "pravi, nepravi i prividni razlomci; mješoviti brojevi",
+        "common_denominator_numeric": "svođenje na najmanji zajednički nazivnik",
+        "decimal_type": "konačan naspram periodičnog decimalnog zapisa"
       }
     },
     "fraction_decimal_conversion": {
@@ -843,6 +1058,43 @@
         "implicit_to_explicit": "prelazak u eksplicitni oblik"
       }
     },
+    "linear_inequality_direct": {
+      "family_version": 1,
+      "family_name": "Linearne nejednačine",
+      "detector": "linear_inequality",
+      "core_skill": "riješiti ili transformisati linearnu nejednačinu",
+      "parameter_schema": {
+        "concepts": {
+          "kind": "enum_set",
+          "values": [
+            "equivalent_inequality",
+            "fraction_inequality",
+            "interval_solution"
+          ],
+          "required": true
+        }
+      },
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "advisory_parameters": [],
+      "prompt_template": {
+        "header": "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "main_line": {
+          "parameter": "concepts",
+          "text": "- glavna vidljiva radnja mora biti: {values}"
+        },
+        "fixed_lines": [
+          "- množenje ili dijeljenje negativnim brojem OBRĆE znak nejednakosti; transformacija se provjerava probnom vrijednošću"
+        ],
+        "closing": "- ako prekršiš ovo, server odbija paket prije objave"
+      },
+      "value_labels": {
+        "equivalent_inequality": "ekvivalentne nejednačine",
+        "fraction_inequality": "nejednačina s razlomljenim koeficijentima",
+        "interval_solution": "skup rješenja zapisan intervalom"
+      }
+    },
     "linear_system_direct": {
       "family_version": 1,
       "family_name": "Sistem dvije linearne jednačine",
@@ -1001,6 +1253,133 @@
         "rational": "racionalnih brojeva"
       }
     },
+    "number_set_membership": {
+      "family_version": 1,
+      "family_name": "Brojevni skupovi i pripadnost",
+      "detector": "number_set_membership",
+      "core_skill": "klasifikovati broj prema brojevnim skupovima",
+      "parameter_schema": {
+        "concepts": {
+          "kind": "enum_set",
+          "values": [
+            "natural_sets",
+            "set_classification",
+            "irrational_recognition",
+            "sqrt_between"
+          ],
+          "required": true
+        }
+      },
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "advisory_parameters": [],
+      "prompt_template": {
+        "header": "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "main_line": {
+          "parameter": "concepts",
+          "text": "- glavna vidljiva radnja mora biti: {values}"
+        },
+        "fixed_lines": [
+          "- korijen prirodnog broja je racionalan SAMO za potpun kvadrat; svaka klasifikacija se obrazlaže"
+        ],
+        "closing": "- ako prekršiš ovo, server odbija paket prije objave"
+      },
+      "value_labels": {
+        "natural_sets": "skupovi N i N0",
+        "set_classification": "pripadnost skupovima N, Z, Q i R",
+        "irrational_recognition": "prepoznavanje iracionalnog broja",
+        "sqrt_between": "položaj korijena između uzastopnih cijelih brojeva"
+      }
+    },
+    "operation_property_recognition": {
+      "family_version": 1,
+      "family_name": "Svojstva računskih operacija",
+      "detector": "operation_property",
+      "core_skill": "prepoznati komutativnost, asocijativnost ili distributivnost",
+      "parameter_schema": {
+        "properties": {
+          "kind": "enum_set",
+          "values": [
+            "commutativity_add",
+            "commutativity_mul",
+            "associativity_add",
+            "associativity_mul",
+            "distributivity"
+          ],
+          "required": true
+        },
+        "number_domain": {
+          "kind": "enum",
+          "values": [
+            "natural",
+            "integer",
+            "fraction"
+          ],
+          "required": true
+        }
+      },
+      "enforced_parameters": [
+        "properties",
+        "number_domain"
+      ],
+      "advisory_parameters": [],
+      "prompt_template": {
+        "header": "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "main_line": {
+          "parameter": "properties",
+          "text": "- glavna vidljiva radnja mora biti: {values}"
+        },
+        "fixed_lines": [
+          "- svaka prikazana jednakost mora biti numerički tačna; opcije se razlikuju po svojstvu, ne po tačnosti"
+        ],
+        "closing": "- ako prekršiš ovo, server odbija paket prije objave"
+      },
+      "value_labels": {
+        "commutativity_add": "komutativnost sabiranja",
+        "commutativity_mul": "komutativnost množenja",
+        "associativity_add": "asocijativnost sabiranja",
+        "associativity_mul": "asocijativnost množenja",
+        "distributivity": "distributivnost množenja prema sabiranju"
+      }
+    },
+    "parametric_linear_discussion": {
+      "family_version": 1,
+      "family_name": "Diskusija jednačina s parametrom",
+      "detector": "parametric_linear",
+      "core_skill": "diskutovati linearnu jednačinu ili sistem s parametrom",
+      "parameter_schema": {
+        "concepts": {
+          "kind": "enum_set",
+          "values": [
+            "parameter_case",
+            "parameter_value_solve",
+            "parametric_system_classification"
+          ],
+          "required": true
+        }
+      },
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "advisory_parameters": [],
+      "prompt_template": {
+        "header": "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "main_line": {
+          "parameter": "concepts",
+          "text": "- glavna vidljiva radnja mora biti: {values}"
+        },
+        "fixed_lines": [
+          "- podjela slučajeva mora biti potpuna i međusobno isključiva (koeficijent nula naspram različit od nule)"
+        ],
+        "closing": "- ako prekršiš ovo, server odbija paket prije objave"
+      },
+      "value_labels": {
+        "parameter_case": "vrijednost parametra za traženi broj rješenja",
+        "parameter_value_solve": "rješavanje uz zadanu vrijednost parametra",
+        "parametric_system_classification": "broj rješenja sistema s parametrom"
+      }
+    },
     "percent_basic": {
       "family_version": 1,
       "family_name": "Osnovni procentni račun",
@@ -1038,6 +1417,41 @@
         "fraction_to_percent": "postotni zapis razlomka",
         "percent_amount": "procentni iznos iz osnovice i stope",
         "percent_rate": "procentna stopa ili osnovica iz preostala dva podatka"
+      }
+    },
+    "polygon_angle_direct": {
+      "family_version": 1,
+      "family_name": "Uglovi mnogougla",
+      "detector": "polygon_angle",
+      "core_skill": "primijeniti formule za zbirove uglova mnogougla",
+      "parameter_schema": {
+        "concepts": {
+          "kind": "enum_set",
+          "values": [
+            "exterior_sum",
+            "interior_sum"
+          ],
+          "required": true
+        }
+      },
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "advisory_parameters": [],
+      "prompt_template": {
+        "header": "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "main_line": {
+          "parameter": "concepts",
+          "text": "- glavna vidljiva radnja mora biti: {values}"
+        },
+        "fixed_lines": [
+          "- zbir vanjskih uglova konveksnog mnogougla ne zavisi od broja stranica"
+        ],
+        "closing": "- ako prekršiš ovo, server odbija paket prije objave"
+      },
+      "value_labels": {
+        "exterior_sum": "zbir vanjskih uglova (uvijek 360°)",
+        "interior_sum": "zbir unutrašnjih uglova (n-2)·180°"
       }
     },
     "polynomial_basic": {
@@ -1334,6 +1748,135 @@
         "divide": "dijeljenje racionalnih brojeva"
       }
     },
+    "rational_equation_direct": {
+      "family_version": 1,
+      "family_name": "Jednačine s algebarskim razlomcima",
+      "detector": "rational_equation",
+      "core_skill": "riješiti linearno rješivu razlomljenu jednačinu",
+      "parameter_schema": {
+        "concepts": {
+          "kind": "enum_set",
+          "values": [
+            "fraction_equation",
+            "double_fraction_equation"
+          ],
+          "required": true
+        }
+      },
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "advisory_parameters": [],
+      "prompt_template": {
+        "header": "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "main_line": {
+          "parameter": "concepts",
+          "text": "- glavna vidljiva radnja mora biti: {values}"
+        },
+        "fixed_lines": [
+          "- prije rješavanja se zapisuju uslovi definisanosti; kandidat koji upada u zabranjene vrijednosti NIJE rješenje"
+        ],
+        "closing": "- ako prekršiš ovo, server odbija paket prije objave"
+      },
+      "value_labels": {
+        "fraction_equation": "jednačina s algebarskim razlomcima",
+        "double_fraction_equation": "jednačina s dvojnim razlomkom"
+      }
+    },
+    "rational_expression_direct": {
+      "family_version": 1,
+      "family_name": "Razlomljeni racionalni izrazi",
+      "detector": "rational_expression",
+      "core_skill": "izvesti imenovanu radnju nad algebarskim razlomkom",
+      "parameter_schema": {
+        "concepts": {
+          "kind": "enum_set",
+          "values": [
+            "domain_condition",
+            "numeric_value",
+            "expand",
+            "reduce",
+            "equal_fractions",
+            "common_denominator",
+            "add",
+            "subtract",
+            "multiply",
+            "divide",
+            "compound_fraction",
+            "simplify_combined"
+          ],
+          "required": true
+        }
+      },
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "advisory_parameters": [],
+      "prompt_template": {
+        "header": "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "main_line": {
+          "parameter": "concepts",
+          "text": "- glavna vidljiva radnja mora biti: {values}"
+        },
+        "fixed_lines": [
+          "- domen je dio identiteta: faktor koji se krati zadržava svoj uslov x ≠ vrijednost i u konačnom odgovoru"
+        ],
+        "closing": "- ako prekršiš ovo, server odbija paket prije objave"
+      },
+      "value_labels": {
+        "domain_condition": "uslov definisanosti (nule imenioca)",
+        "numeric_value": "brojna vrijednost algebarskog razlomka",
+        "expand": "proširivanje algebarskog razlomka",
+        "reduce": "skraćivanje algebarskog razlomka faktorizacijom",
+        "equal_fractions": "prepoznavanje jednakih algebarskih razlomaka",
+        "common_denominator": "najmanji zajednički imenilac",
+        "add": "sabiranje algebarskih razlomaka",
+        "subtract": "oduzimanje algebarskih razlomaka",
+        "multiply": "množenje algebarskih razlomaka",
+        "divide": "dijeljenje algebarskih razlomaka",
+        "compound_fraction": "pojednostavljivanje dvojnog razlomka",
+        "simplify_combined": "sređivanje razlomljenog racionalnog izraza"
+      }
+    },
+    "similarity_direct": {
+      "family_version": 1,
+      "family_name": "Sličnost i proporcionalne duži",
+      "detector": "similarity",
+      "core_skill": "primijeniti koeficijent sličnosti na duži, obim ili površinu",
+      "parameter_schema": {
+        "concepts": {
+          "kind": "enum_set",
+          "values": [
+            "proportional_segments",
+            "similarity_coefficient",
+            "similar_perimeter",
+            "similar_area"
+          ],
+          "required": true
+        }
+      },
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "advisory_parameters": [],
+      "prompt_template": {
+        "header": "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "main_line": {
+          "parameter": "concepts",
+          "text": "- glavna vidljiva radnja mora biti: {values}"
+        },
+        "fixed_lines": [
+          "- obim se skalira koeficijentom k, a površina njegovim kvadratom; svaka tvrdnja se dokazuje množenjem"
+        ],
+        "closing": "- ako prekršiš ovo, server odbija paket prije objave"
+      },
+      "value_labels": {
+        "proportional_segments": "nepoznata duž iz proporcije",
+        "similarity_coefficient": "koeficijent sličnosti iz stranica",
+        "similar_perimeter": "obim slične figure (skalira se sa k)",
+        "similar_area": "površina slične figure (skalira se sa k²)"
+      }
+    },
     "simple_quadratic_equation": {
       "family_version": 1,
       "family_name": "Jednostavne kvadratne jednačine",
@@ -1476,6 +2019,65 @@
         "perfect_square_recognition": "prepoznavanje savršenog kvadrata",
         "root_product_quotient": "korijen proizvoda i količnika",
         "root_between_integers": "između koja dva uzastopna prirodna broja je korijen"
+      }
+    },
+    "structured_word_problem": {
+      "family_version": 1,
+      "family_name": "Strukturisani tekstualni zadaci",
+      "detector": "structured_word_problem",
+      "core_skill": "riješiti tekstualni zadatak zadatog semantičkog tipa",
+      "parameter_schema": {
+        "problem_types": {
+          "kind": "enum_set",
+          "values": [
+            "equal_sharing",
+            "sharing_remainder",
+            "fraction_of_quantity",
+            "fraction_remainder",
+            "money_total",
+            "money_change",
+            "signed_change",
+            "number_equation",
+            "sum_difference_system",
+            "sum_multiple_system",
+            "box_volume",
+            "cube_surface",
+            "pythagoras_distance",
+            "pythagoras_leg"
+          ],
+          "required": true
+        }
+      },
+      "enforced_parameters": [
+        "problem_types"
+      ],
+      "advisory_parameters": [],
+      "prompt_template": {
+        "header": "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "main_line": {
+          "parameter": "problem_types",
+          "text": "- glavna vidljiva radnja mora biti: {values}"
+        },
+        "fixed_lines": [
+          "- sve poznate veličine moraju biti izričito navedene u tekstu zadatka; odgovor slijedi isključivo iz njih"
+        ],
+        "closing": "- ako prekršiš ovo, server odbija paket prije objave"
+      },
+      "value_labels": {
+        "equal_sharing": "podjela na jednake dijelove",
+        "sharing_remainder": "dijeljenje s ostatkom u priči",
+        "fraction_of_quantity": "razlomak od date veličine",
+        "fraction_remainder": "ostatak poslije uzetog dijela",
+        "money_total": "ukupan iznos kupovine",
+        "money_change": "kusur pri plaćanju",
+        "signed_change": "promjene s predznakom (temperatura)",
+        "number_equation": "priča koja se svodi na linearnu jednačinu",
+        "sum_difference_system": "zbir i razlika dva broja (sistem)",
+        "sum_multiple_system": "zbir i višekratnik (sistem)",
+        "box_volume": "zapremina kvadra iz priče",
+        "cube_surface": "površina kocke iz priče",
+        "pythagoras_distance": "dijagonala/udaljenost Pitagorinom teoremom",
+        "pythagoras_leg": "kateta Pitagorinom teoremom (merdevine)"
       }
     },
     "unit_conversion_direct": {

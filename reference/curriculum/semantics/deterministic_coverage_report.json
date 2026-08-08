@@ -1,33 +1,28 @@
 {
   "model_only_analysis": {
-    "CLOSED_FORM_DETERMINISTIC_CANDIDATE": 6,
-    "CONCEPTUAL_ONLY": 40,
-    "FINANCIAL_MATH_CANDIDATE": 2,
-    "FORMULA_GEOMETRY_CANDIDATE": 7,
-    "INSUFFICIENT_SEMANTIC_EVIDENCE": 83,
-    "OPEN_ENDED_WORD_PROBLEM": 1,
+    "CONCEPTUAL_ONLY": 27,
+    "FORMULA_GEOMETRY_CANDIDATE": 4,
+    "INSUFFICIENT_SEMANTIC_EVIDENCE": 58,
     "PROOF_REQUIRED": 7,
-    "STATISTICS_CANDIDATE": 1,
-    "STRUCTURED_WORD_PROBLEM_CANDIDATE": 8,
-    "SYMBOLIC_ALGEBRA_CANDIDATE": 11,
+    "STRUCTURED_WORD_PROBLEM_CANDIDATE": 1,
+    "SYMBOLIC_ALGEBRA_CANDIDATE": 1,
     "VISUAL_REQUIRED": 2
   },
-  "contract_version": "5E.1",
+  "contract_version": "5F.1",
   "total_lessons": 534,
-  "deterministic_lessons": 272,
-  "deterministic_share": 0.5094,
+  "deterministic_lessons": 352,
+  "deterministic_share": 0.6592,
   "class_totals": {
-    "DETERMINISTIC_NEEDS_EXISTING_CAPABILITY_EXTENSION": 1,
-    "DETERMINISTIC_NEEDS_NEW_CAPABILITY": 17,
-    "DETERMINISTIC_READY": 272,
-    "MODEL_ONLY_FOR_NOW": 168,
+    "DETERMINISTIC_NEEDS_NEW_CAPABILITY": 6,
+    "DETERMINISTIC_READY": 352,
+    "MODEL_ONLY_FOR_NOW": 100,
     "VISUAL_OR_CONSTRUCTION_REQUIRED": 76
   },
   "deterministic_by_grade": {
-    "6": 55,
-    "7": 54,
-    "8": 83,
-    "9": 80
+    "6": 75,
+    "7": 60,
+    "8": 101,
+    "9": 116
   },
   "deterministic_by_family": {
     "absolute_value_opposite": 5,
@@ -35,31 +30,45 @@
     "arithmetic_mean_direct": 3,
     "classical_probability_basic": 4,
     "common_divisors_multiples": 3,
+    "coordinate_line_direct": 10,
     "decimal_arithmetic_direct": 3,
     "decimal_rounding": 2,
     "divisibility_predicate_application": 1,
     "divisibility_value_properties": 2,
+    "event_probability_facts": 4,
+    "financial_arithmetic_direct": 5,
+    "finite_set_direct": 10,
     "fraction_arithmetic_direct": 4,
+    "fraction_concept_direct": 4,
     "fraction_decimal_conversion": 5,
     "frequency_basic": 3,
     "geometry_formula_2d": 18,
     "integer_arithmetic_direct": 7,
     "linear_equation_direct": 27,
     "linear_function_direct": 16,
+    "linear_inequality_direct": 3,
     "linear_system_direct": 13,
     "natural_arithmetic_direct": 4,
     "number_comparison_order": 6,
+    "number_set_membership": 4,
+    "operation_property_recognition": 5,
+    "parametric_linear_discussion": 3,
     "percent_basic": 4,
+    "polygon_angle_direct": 1,
     "polynomial_basic": 27,
     "power_arithmetic_direct": 7,
     "prime_structure": 3,
     "pythagoras_direct": 12,
     "ratio_proportion_direct": 9,
     "rational_arithmetic_direct": 8,
+    "rational_equation_direct": 3,
+    "rational_expression_direct": 12,
+    "similarity_direct": 4,
     "simple_quadratic_equation": 5,
     "solid_geometry_direct": 36,
     "square_root_direct": 4,
-    "unit_conversion_direct": 8
+    "structured_word_problem": 9,
+    "unit_conversion_direct": 11
   },
   "lessons": [
     {
@@ -67,36 +76,32 @@
       "grade": "6",
       "oblast": "Skupovi i skupovne operacije",
       "title": "Pojam skupa, elementi skupa i označavanje",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "CONCEPTUAL_ONLY"
+      "class": "DETERMINISTIC_READY",
+      "family": "finite_set_direct"
     },
     {
       "lesson_id": "6-01-002",
       "grade": "6",
       "oblast": "Skupovi i skupovne operacije",
       "title": "Načini zadavanja skupa",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "CONCEPTUAL_ONLY"
+      "class": "DETERMINISTIC_READY",
+      "family": "finite_set_direct"
     },
     {
       "lesson_id": "6-01-003",
       "grade": "6",
       "oblast": "Skupovi i skupovne operacije",
       "title": "Brojnost skupa i prazan skup",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "CONCEPTUAL_ONLY"
+      "class": "DETERMINISTIC_READY",
+      "family": "finite_set_direct"
     },
     {
       "lesson_id": "6-01-004",
       "grade": "6",
       "oblast": "Skupovi i skupovne operacije",
       "title": "Podskup i jednakost skupova",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "CONCEPTUAL_ONLY"
+      "class": "DETERMINISTIC_READY",
+      "family": "finite_set_direct"
     },
     {
       "lesson_id": "6-01-005",
@@ -111,63 +116,56 @@
       "grade": "6",
       "oblast": "Skupovi i skupovne operacije",
       "title": "Unija skupova",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "CONCEPTUAL_ONLY"
+      "class": "DETERMINISTIC_READY",
+      "family": "finite_set_direct"
     },
     {
       "lesson_id": "6-01-007",
       "grade": "6",
       "oblast": "Skupovi i skupovne operacije",
       "title": "Presjek skupova",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "FORMULA_GEOMETRY_CANDIDATE"
+      "class": "DETERMINISTIC_READY",
+      "family": "finite_set_direct"
     },
     {
       "lesson_id": "6-01-008",
       "grade": "6",
       "oblast": "Skupovi i skupovne operacije",
       "title": "Razlika skupova",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "CONCEPTUAL_ONLY"
+      "class": "DETERMINISTIC_READY",
+      "family": "finite_set_direct"
     },
     {
       "lesson_id": "6-01-009",
       "grade": "6",
       "oblast": "Skupovi i skupovne operacije",
       "title": "Komplement skupa",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "CONCEPTUAL_ONLY"
+      "class": "DETERMINISTIC_READY",
+      "family": "finite_set_direct"
     },
     {
       "lesson_id": "6-01-010",
       "grade": "6",
       "oblast": "Skupovi i skupovne operacije",
       "title": "Uređeni par",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
+      "class": "DETERMINISTIC_READY",
+      "family": "finite_set_direct"
     },
     {
       "lesson_id": "6-01-011",
       "grade": "6",
       "oblast": "Skupovi i skupovne operacije",
       "title": "Direktni/Dekartov proizvod skupova",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "CONCEPTUAL_ONLY"
+      "class": "DETERMINISTIC_READY",
+      "family": "finite_set_direct"
     },
     {
       "lesson_id": "6-02-001",
       "grade": "6",
       "oblast": "Prirodni brojevi i skupovi N/N0",
       "title": "Skupovi N i N0",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "CONCEPTUAL_ONLY"
+      "class": "DETERMINISTIC_READY",
+      "family": "number_set_membership"
     },
     {
       "lesson_id": "6-02-002",
@@ -206,9 +204,8 @@
       "grade": "6",
       "oblast": "Prirodni brojevi i skupovi N/N0",
       "title": "Svojstva računskih operacija: komutativnost, asocijativnost, distributivnost",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "CLOSED_FORM_DETERMINISTIC_CANDIDATE"
+      "class": "DETERMINISTIC_READY",
+      "family": "operation_property_recognition"
     },
     {
       "lesson_id": "6-02-007",
@@ -312,9 +309,8 @@
       "grade": "6",
       "oblast": "Djeljivost brojeva",
       "title": "Tekstualni zadaci iz djeljivosti",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "STRUCTURED_WORD_PROBLEM_CANDIDATE"
+      "class": "DETERMINISTIC_READY",
+      "family": "structured_word_problem"
     },
     {
       "lesson_id": "6-04-001",
@@ -330,18 +326,16 @@
       "grade": "6",
       "oblast": "Razlomci",
       "title": "Razlomak kao dio cjeline i kao količnik",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
+      "class": "DETERMINISTIC_READY",
+      "family": "fraction_concept_direct"
     },
     {
       "lesson_id": "6-04-003",
       "grade": "6",
       "oblast": "Razlomci",
       "title": "Pravi, nepravi i prividni razlomci; mješoviti brojevi",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
+      "class": "DETERMINISTIC_READY",
+      "family": "fraction_concept_direct"
     },
     {
       "lesson_id": "6-04-004",
@@ -374,9 +368,8 @@
       "grade": "6",
       "oblast": "Razlomci",
       "title": "Svođenje razlomaka na zajednički nazivnik/imenilac",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
+      "class": "DETERMINISTIC_READY",
+      "family": "fraction_concept_direct"
     },
     {
       "lesson_id": "6-04-008",
@@ -423,9 +416,8 @@
       "grade": "6",
       "oblast": "Razlomci",
       "title": "Svojstva računskih operacija s razlomcima",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "CLOSED_FORM_DETERMINISTIC_CANDIDATE"
+      "class": "DETERMINISTIC_READY",
+      "family": "operation_property_recognition"
     },
     {
       "lesson_id": "6-04-014",
@@ -440,9 +432,8 @@
       "grade": "6",
       "oblast": "Razlomci",
       "title": "Tekstualni zadaci s razlomcima",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "STRUCTURED_WORD_PROBLEM_CANDIDATE"
+      "class": "DETERMINISTIC_READY",
+      "family": "structured_word_problem"
     },
     {
       "lesson_id": "6-05-001",
@@ -473,9 +464,8 @@
       "grade": "6",
       "oblast": "Razlomci u decimalnom obliku i decimalni brojevi",
       "title": "Konačni i beskonačni/periodični decimalni brojevi",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
+      "class": "DETERMINISTIC_READY",
+      "family": "fraction_concept_direct"
     },
     {
       "lesson_id": "6-05-005",
@@ -531,9 +521,8 @@
       "grade": "6",
       "oblast": "Razlomci u decimalnom obliku i decimalni brojevi",
       "title": "Brojevni izrazi i tekstualni zadaci s decimalnim brojevima",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "STRUCTURED_WORD_PROBLEM_CANDIDATE"
+      "class": "DETERMINISTIC_READY",
+      "family": "structured_word_problem"
     },
     {
       "lesson_id": "6-06-001",
@@ -1288,9 +1277,8 @@
       "grade": "7",
       "oblast": "Cijeli brojevi",
       "title": "Komutativnost i asocijativnost sabiranja",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
+      "class": "DETERMINISTIC_READY",
+      "family": "operation_property_recognition"
     },
     {
       "lesson_id": "7-02-011",
@@ -1321,9 +1309,8 @@
       "grade": "7",
       "oblast": "Cijeli brojevi",
       "title": "Distributivnost u skupu Z",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "CONCEPTUAL_ONLY"
+      "class": "DETERMINISTIC_READY",
+      "family": "operation_property_recognition"
     },
     {
       "lesson_id": "7-02-015",
@@ -1378,9 +1365,8 @@
       "grade": "7",
       "oblast": "Cijeli brojevi",
       "title": "Tekstualni zadaci s cijelim brojevima",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "STRUCTURED_WORD_PROBLEM_CANDIDATE"
+      "class": "DETERMINISTIC_READY",
+      "family": "structured_word_problem"
     },
     {
       "lesson_id": "7-03-001",
@@ -1485,9 +1471,8 @@
       "grade": "7",
       "oblast": "Racionalni brojevi",
       "title": "Svojstva računskih operacija u Q",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "CLOSED_FORM_DETERMINISTIC_CANDIDATE"
+      "class": "DETERMINISTIC_READY",
+      "family": "operation_property_recognition"
     },
     {
       "lesson_id": "7-03-014",
@@ -1542,9 +1527,8 @@
       "grade": "7",
       "oblast": "Racionalni brojevi",
       "title": "Primjena linearne jednačine u tekstualnom zadatku",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "CLOSED_FORM_DETERMINISTIC_CANDIDATE"
+      "class": "DETERMINISTIC_READY",
+      "family": "structured_word_problem"
     },
     {
       "lesson_id": "7-03-021",
@@ -1914,9 +1898,8 @@
       "grade": "7",
       "oblast": "Četverougao, obim i površina",
       "title": "Mjerne jedinice za površinu",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
+      "class": "DETERMINISTIC_READY",
+      "family": "unit_conversion_direct"
     },
     {
       "lesson_id": "7-05-019",
@@ -2078,27 +2061,24 @@
       "grade": "8",
       "oblast": "Realni brojevi, korijeni i stepeni",
       "title": "Skupovi N, Z, Q, I i R i odnosi među njima",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "CONCEPTUAL_ONLY"
+      "class": "DETERMINISTIC_READY",
+      "family": "number_set_membership"
     },
     {
       "lesson_id": "8-01-002",
       "grade": "8",
       "oblast": "Realni brojevi, korijeni i stepeni",
       "title": "Iracionalni brojevi i beskonačni neperiodični decimalni zapis",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
+      "class": "DETERMINISTIC_READY",
+      "family": "number_set_membership"
     },
     {
       "lesson_id": "8-01-003",
       "grade": "8",
       "oblast": "Realni brojevi, korijeni i stepeni",
       "title": "Realni brojevi i brojevna osa",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
+      "class": "DETERMINISTIC_READY",
+      "family": "number_set_membership"
     },
     {
       "lesson_id": "8-01-004",
@@ -2241,9 +2221,8 @@
       "grade": "8",
       "oblast": "Koordinatni sistem i linearna funkcija",
       "title": "Udaljenost između dvije tačke",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
+      "class": "DETERMINISTIC_READY",
+      "family": "coordinate_line_direct"
     },
     {
       "lesson_id": "8-02-005",
@@ -2274,18 +2253,16 @@
       "grade": "8",
       "oblast": "Koordinatni sistem i linearna funkcija",
       "title": "Geometrijsko značenje koeficijenta k",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
+      "class": "DETERMINISTIC_READY",
+      "family": "coordinate_line_direct"
     },
     {
       "lesson_id": "8-02-009",
       "grade": "8",
       "oblast": "Koordinatni sistem i linearna funkcija",
       "title": "Geometrijsko značenje slobodnog člana n",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
+      "class": "DETERMINISTIC_READY",
+      "family": "coordinate_line_direct"
     },
     {
       "lesson_id": "8-02-010",
@@ -2308,9 +2285,8 @@
       "grade": "8",
       "oblast": "Koordinatni sistem i linearna funkcija",
       "title": "Eksplicitni i implicitni oblik prave",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
+      "class": "DETERMINISTIC_READY",
+      "family": "coordinate_line_direct"
     },
     {
       "lesson_id": "8-02-013",
@@ -2325,9 +2301,8 @@
       "grade": "8",
       "oblast": "Koordinatni sistem i linearna funkcija",
       "title": "Paralelne i presječne prave preko koeficijenta k",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
+      "class": "DETERMINISTIC_READY",
+      "family": "coordinate_line_direct"
     },
     {
       "lesson_id": "8-03-001",
@@ -2390,8 +2365,8 @@
       "grade": "8",
       "oblast": "Proporcionalnost, Talesova teorema i sličnost",
       "title": "Proporcionalne duži",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "similarity_direct"
     },
     {
       "lesson_id": "8-03-009",
@@ -2432,9 +2407,8 @@
       "grade": "8",
       "oblast": "Proporcionalnost, Talesova teorema i sličnost",
       "title": "Pojam sličnosti i koeficijent sličnosti",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "CONCEPTUAL_ONLY"
+      "class": "DETERMINISTIC_READY",
+      "family": "similarity_direct"
     },
     {
       "lesson_id": "8-03-014",
@@ -2450,18 +2424,16 @@
       "grade": "8",
       "oblast": "Proporcionalnost, Talesova teorema i sličnost",
       "title": "Dužine i obimi sličnih trouglova",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "FORMULA_GEOMETRY_CANDIDATE"
+      "class": "DETERMINISTIC_READY",
+      "family": "similarity_direct"
     },
     {
       "lesson_id": "8-03-016",
       "grade": "8",
       "oblast": "Proporcionalnost, Talesova teorema i sličnost",
       "title": "Površine sličnih trouglova",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
+      "class": "DETERMINISTIC_READY",
+      "family": "similarity_direct"
     },
     {
       "lesson_id": "8-03-017",
@@ -2484,9 +2456,8 @@
       "grade": "8",
       "oblast": "Proporcionalnost, Talesova teorema i sličnost",
       "title": "Jednostavni kamatni račun",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "CLOSED_FORM_DETERMINISTIC_CANDIDATE"
+      "class": "DETERMINISTIC_READY",
+      "family": "financial_arithmetic_direct"
     },
     {
       "lesson_id": "8-03-020",
@@ -2622,9 +2593,8 @@
       "grade": "8",
       "oblast": "Pitagorina teorema i primjene u ravni",
       "title": "Praktični problemski zadaci",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "OPEN_ENDED_WORD_PROBLEM"
+      "class": "DETERMINISTIC_READY",
+      "family": "structured_word_problem"
     },
     {
       "lesson_id": "8-05-001",
@@ -2802,9 +2772,8 @@
       "grade": "8",
       "oblast": "Prizme, piramide, površina i zapremina",
       "title": "Mjerne jedinice površine i zapremine",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
+      "class": "DETERMINISTIC_READY",
+      "family": "unit_conversion_direct"
     },
     {
       "lesson_id": "8-06-001",
@@ -2884,18 +2853,16 @@
       "grade": "8",
       "oblast": "Podaci i vjerovatnoća",
       "title": "Elementarni ishod i slučajni događaj",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
+      "class": "DETERMINISTIC_READY",
+      "family": "event_probability_facts"
     },
     {
       "lesson_id": "8-06-011",
       "grade": "8",
       "oblast": "Podaci i vjerovatnoća",
       "title": "Siguran, nemoguć i slučajan događaj",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
+      "class": "DETERMINISTIC_READY",
+      "family": "event_probability_facts"
     },
     {
       "lesson_id": "8-06-012",
@@ -3039,9 +3006,8 @@
       "grade": "8",
       "oblast": "Mnogougao, kružnica i krug",
       "title": "Zbir vanjskih uglova konveksnog mnogougla",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
+      "class": "DETERMINISTIC_READY",
+      "family": "polygon_angle_direct"
     },
     {
       "lesson_id": "8-08-004",
@@ -3161,114 +3127,104 @@
       "grade": "9",
       "oblast": "Razlomljeni racionalni izrazi",
       "title": "Algebarski razlomak i uslov definiranosti",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "SYMBOLIC_ALGEBRA_CANDIDATE"
+      "class": "DETERMINISTIC_READY",
+      "family": "rational_expression_direct"
     },
     {
       "lesson_id": "9-01-003",
       "grade": "9",
       "oblast": "Razlomljeni racionalni izrazi",
       "title": "Brojna vrijednost algebarskog razlomka",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "SYMBOLIC_ALGEBRA_CANDIDATE"
+      "class": "DETERMINISTIC_READY",
+      "family": "rational_expression_direct"
     },
     {
       "lesson_id": "9-01-004",
       "grade": "9",
       "oblast": "Razlomljeni racionalni izrazi",
       "title": "Proširivanje algebarskog razlomka",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "SYMBOLIC_ALGEBRA_CANDIDATE"
+      "class": "DETERMINISTIC_READY",
+      "family": "rational_expression_direct"
     },
     {
       "lesson_id": "9-01-005",
       "grade": "9",
       "oblast": "Razlomljeni racionalni izrazi",
       "title": "Skraćivanje algebarskog razlomka faktorizacijom",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "SYMBOLIC_ALGEBRA_CANDIDATE"
+      "class": "DETERMINISTIC_READY",
+      "family": "rational_expression_direct"
     },
     {
       "lesson_id": "9-01-006",
       "grade": "9",
       "oblast": "Razlomljeni racionalni izrazi",
       "title": "Jednaki algebarski razlomci",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "SYMBOLIC_ALGEBRA_CANDIDATE"
+      "class": "DETERMINISTIC_READY",
+      "family": "rational_expression_direct"
     },
     {
       "lesson_id": "9-01-007",
       "grade": "9",
       "oblast": "Razlomljeni racionalni izrazi",
       "title": "Zajednički imenilac algebarskih razlomaka",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "SYMBOLIC_ALGEBRA_CANDIDATE"
+      "class": "DETERMINISTIC_READY",
+      "family": "rational_expression_direct"
     },
     {
       "lesson_id": "9-01-008",
       "grade": "9",
       "oblast": "Razlomljeni racionalni izrazi",
       "title": "Sabiranje algebarskih razlomaka",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "SYMBOLIC_ALGEBRA_CANDIDATE"
+      "class": "DETERMINISTIC_READY",
+      "family": "rational_expression_direct"
     },
     {
       "lesson_id": "9-01-009",
       "grade": "9",
       "oblast": "Razlomljeni racionalni izrazi",
       "title": "Oduzimanje algebarskih razlomaka",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "SYMBOLIC_ALGEBRA_CANDIDATE"
+      "class": "DETERMINISTIC_READY",
+      "family": "rational_expression_direct"
     },
     {
       "lesson_id": "9-01-010",
       "grade": "9",
       "oblast": "Razlomljeni racionalni izrazi",
       "title": "Množenje algebarskih razlomaka",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "SYMBOLIC_ALGEBRA_CANDIDATE"
+      "class": "DETERMINISTIC_READY",
+      "family": "rational_expression_direct"
     },
     {
       "lesson_id": "9-01-011",
       "grade": "9",
       "oblast": "Razlomljeni racionalni izrazi",
       "title": "Dijeljenje algebarskih razlomaka",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "SYMBOLIC_ALGEBRA_CANDIDATE"
+      "class": "DETERMINISTIC_READY",
+      "family": "rational_expression_direct"
     },
     {
       "lesson_id": "9-01-012",
       "grade": "9",
       "oblast": "Razlomljeni racionalni izrazi",
       "title": "Složeni razlomljeni racionalni izraz",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "rational_expression_direct"
     },
     {
       "lesson_id": "9-01-013",
       "grade": "9",
       "oblast": "Razlomljeni racionalni izrazi",
       "title": "Sređivanje razlomljenog racionalnog izraza",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "rational_expression_direct"
     },
     {
       "lesson_id": "9-01-014",
       "grade": "9",
       "oblast": "Razlomljeni racionalni izrazi",
       "title": "Jednačine sa algebarskim razlomcima",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "rational_equation_direct"
     },
     {
       "lesson_id": "9-01-015",
@@ -3487,18 +3443,16 @@
       "grade": "9",
       "oblast": "Linearna funkcija i prava",
       "title": "Značenje koeficijenta k",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
+      "class": "DETERMINISTIC_READY",
+      "family": "coordinate_line_direct"
     },
     {
       "lesson_id": "9-03-006",
       "grade": "9",
       "oblast": "Linearna funkcija i prava",
       "title": "Značenje slobodnog člana n",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
+      "class": "DETERMINISTIC_READY",
+      "family": "coordinate_line_direct"
     },
     {
       "lesson_id": "9-03-007",
@@ -3569,9 +3523,8 @@
       "grade": "9",
       "oblast": "Linearna funkcija i prava",
       "title": "Paralelne i podudarne prave prema koeficijentima",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
+      "class": "DETERMINISTIC_READY",
+      "family": "coordinate_line_direct"
     },
     {
       "lesson_id": "9-03-016",
@@ -3586,9 +3539,8 @@
       "grade": "9",
       "oblast": "Linearna funkcija i prava",
       "title": "Presjek dvije prave",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "FORMULA_GEOMETRY_CANDIDATE"
+      "class": "DETERMINISTIC_READY",
+      "family": "coordinate_line_direct"
     },
     {
       "lesson_id": "9-03-018",
@@ -3620,9 +3572,8 @@
       "grade": "9",
       "oblast": "Linearna funkcija i prava",
       "title": "Poređenje direktne, obrnute i linearne zavisnosti",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
+      "class": "DETERMINISTIC_READY",
+      "family": "coordinate_line_direct"
     },
     {
       "lesson_id": "9-03-022",
@@ -3669,24 +3620,24 @@
       "grade": "9",
       "oblast": "Linearne jednačine i nejednačine",
       "title": "Jednačina sa algebarskim razlomcima",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "rational_equation_direct"
     },
     {
       "lesson_id": "9-04-006",
       "grade": "9",
       "oblast": "Linearne jednačine i nejednačine",
       "title": "Jednačina sa dvojnim razlomkom",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "rational_equation_direct"
     },
     {
       "lesson_id": "9-04-007",
       "grade": "9",
       "oblast": "Linearne jednačine i nejednačine",
       "title": "Jednačina sa promjenljivim koeficijentom",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "parametric_linear_discussion"
     },
     {
       "lesson_id": "9-04-008",
@@ -3717,9 +3668,8 @@
       "grade": "9",
       "oblast": "Linearne jednačine i nejednačine",
       "title": "Tekstualni zadatak koji se svodi na linearnu jednačinu",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "STRUCTURED_WORD_PROBLEM_CANDIDATE"
+      "class": "DETERMINISTIC_READY",
+      "family": "structured_word_problem"
     },
     {
       "lesson_id": "9-04-012",
@@ -3734,8 +3684,8 @@
       "grade": "9",
       "oblast": "Linearne jednačine i nejednačine",
       "title": "Ekvivalentne nejednačine",
-      "class": "DETERMINISTIC_NEEDS_EXISTING_CAPABILITY_EXTENSION",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "linear_inequality_direct"
     },
     {
       "lesson_id": "9-04-014",
@@ -3750,8 +3700,8 @@
       "grade": "9",
       "oblast": "Linearne jednačine i nejednačine",
       "title": "Nejednačina sa razlomcima",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "linear_inequality_direct"
     },
     {
       "lesson_id": "9-04-016",
@@ -3775,9 +3725,8 @@
       "grade": "9",
       "oblast": "Linearne jednačine i nejednačine",
       "title": "Skup rješenja intervalom",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "CONCEPTUAL_ONLY"
+      "class": "DETERMINISTIC_READY",
+      "family": "linear_inequality_direct"
     },
     {
       "lesson_id": "9-04-019",
@@ -3808,9 +3757,8 @@
       "grade": "9",
       "oblast": "Linearne jednačine i nejednačine",
       "title": "Diskusija linearne jednačine sa parametrom",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "CLOSED_FORM_DETERMINISTIC_CANDIDATE"
+      "class": "DETERMINISTIC_READY",
+      "family": "parametric_linear_discussion"
     },
     {
       "lesson_id": "9-05-001",
@@ -3913,9 +3861,8 @@
       "grade": "9",
       "oblast": "Sistemi linearnih jednačina",
       "title": "Tekstualni zadatak sa sistemom",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "STRUCTURED_WORD_PROBLEM_CANDIDATE"
+      "class": "DETERMINISTIC_READY",
+      "family": "structured_word_problem"
     },
     {
       "lesson_id": "9-05-014",
@@ -3946,9 +3893,8 @@
       "grade": "9",
       "oblast": "Sistemi linearnih jednačina",
       "title": "Sistem sa parametrom",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
+      "class": "DETERMINISTIC_READY",
+      "family": "parametric_linear_discussion"
     },
     {
       "lesson_id": "9-06-001",
@@ -4346,18 +4292,16 @@
       "grade": "9",
       "oblast": "Geometrijska tijela",
       "title": "Tekstualni zadaci sa površinom i zapreminom",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "STRUCTURED_WORD_PROBLEM_CANDIDATE"
+      "class": "DETERMINISTIC_READY",
+      "family": "structured_word_problem"
     },
     {
       "lesson_id": "9-07-034",
       "grade": "9",
       "oblast": "Geometrijska tijela",
       "title": "Mjerne jedinice površine i zapremine u zadacima sa tijelima",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "INSUFFICIENT_SEMANTIC_EVIDENCE"
+      "class": "DETERMINISTIC_READY",
+      "family": "unit_conversion_direct"
     },
     {
       "lesson_id": "9-07-035",
@@ -4415,33 +4359,32 @@
       "grade": "9",
       "oblast": "Podaci, vjerovatnoća, finansije i mjerne jedinice",
       "title": "Donošenje odluke na osnovu vjerovatnoće",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "event_probability_facts"
     },
     {
       "lesson_id": "9-08-004",
       "grade": "9",
       "oblast": "Podaci, vjerovatnoća, finansije i mjerne jedinice",
       "title": "Preračunavanje valuta",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "FINANCIAL_MATH_CANDIDATE"
+      "class": "DETERMINISTIC_READY",
+      "family": "financial_arithmetic_direct"
     },
     {
       "lesson_id": "9-08-005",
       "grade": "9",
       "oblast": "Podaci, vjerovatnoća, finansije i mjerne jedinice",
       "title": "Kamata na štednju",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "financial_arithmetic_direct"
     },
     {
       "lesson_id": "9-08-006",
       "grade": "9",
       "oblast": "Podaci, vjerovatnoća, finansije i mjerne jedinice",
       "title": "Kamata na kredit",
-      "class": "DETERMINISTIC_NEEDS_NEW_CAPABILITY",
-      "family": ""
+      "class": "DETERMINISTIC_READY",
+      "family": "financial_arithmetic_direct"
     },
     {
       "lesson_id": "9-08-007",
@@ -4457,18 +4400,16 @@
       "grade": "9",
       "oblast": "Podaci, vjerovatnoća, finansije i mjerne jedinice",
       "title": "Lični finansijski budžet",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "FINANCIAL_MATH_CANDIDATE"
+      "class": "DETERMINISTIC_READY",
+      "family": "financial_arithmetic_direct"
     },
     {
       "lesson_id": "9-08-009",
       "grade": "9",
       "oblast": "Podaci, vjerovatnoća, finansije i mjerne jedinice",
       "title": "Populacija i uzorak",
-      "class": "MODEL_ONLY_FOR_NOW",
-      "family": "",
-      "analysis": "STATISTICS_CANDIDATE"
+      "class": "DETERMINISTIC_READY",
+      "family": "event_probability_facts"
     },
     {
       "lesson_id": "9-08-010",

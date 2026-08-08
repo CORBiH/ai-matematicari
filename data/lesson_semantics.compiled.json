@@ -1,12 +1,393 @@
 {
-  "contract_version": "5E.1",
+  "contract_version": "5F.1",
   "lessons": {
+    "6-01-001": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "finite_set",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-6-01-001"
+      ],
+      "family_id": "finite_set_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "6-01-001",
+      "level_bounds": {
+        "1": "skupovi do 4 elementa, jedna radnja",
+        "2": "skupovi do 5 elemenata, komplement/podskup",
+        "3": "veći skupovi, Dekartov proizvod"
+      },
+      "parameters": {
+        "concepts": [
+          "element_membership"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: pripadnost elementa skupu",
+        "- skupovi se porede kao skupovi: poredak zapisivanja i ponovljeni elementi ne mijenjaju skup",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: jednakost skupova je skupovna (poredak/duplikati nebitni); komplement traži izričit univerzum."
+    },
+    "6-01-002": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "finite_set",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-6-01-002"
+      ],
+      "family_id": "finite_set_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "6-01-002",
+      "level_bounds": {
+        "1": "skupovi do 4 elementa, jedna radnja",
+        "2": "skupovi do 5 elemenata, komplement/podskup",
+        "3": "veći skupovi, Dekartov proizvod"
+      },
+      "parameters": {
+        "concepts": [
+          "set_builder_match"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: zadavanje skupa nabrajanjem prema opisu",
+        "- skupovi se porede kao skupovi: poredak zapisivanja i ponovljeni elementi ne mijenjaju skup",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: jednakost skupova je skupovna (poredak/duplikati nebitni); komplement traži izričit univerzum."
+    },
+    "6-01-003": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "finite_set",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0012"
+      ],
+      "family_id": "finite_set_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "6-01-003",
+      "level_bounds": {
+        "1": "skupovi do 4 elementa, jedna radnja",
+        "2": "skupovi do 5 elemenata, komplement/podskup",
+        "3": "veći skupovi, Dekartov proizvod"
+      },
+      "parameters": {
+        "concepts": [
+          "cardinality"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: brojnost skupa (i prazan skup)",
+        "- skupovi se porede kao skupovi: poredak zapisivanja i ponovljeni elementi ne mijenjaju skup",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: jednakost skupova je skupovna (poredak/duplikati nebitni); komplement traži izričit univerzum."
+    },
+    "6-01-004": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "finite_set",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0007"
+      ],
+      "family_id": "finite_set_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "6-01-004",
+      "level_bounds": {
+        "1": "skupovi do 4 elementa, jedna radnja",
+        "2": "skupovi do 5 elemenata, komplement/podskup",
+        "3": "veći skupovi, Dekartov proizvod"
+      },
+      "parameters": {
+        "concepts": [
+          "subset_equality"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: podskup i jednakost skupova",
+        "- skupovi se porede kao skupovi: poredak zapisivanja i ponovljeni elementi ne mijenjaju skup",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: jednakost skupova je skupovna (poredak/duplikati nebitni); komplement traži izričit univerzum."
+    },
+    "6-01-006": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "finite_set",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0012",
+        "KS_2018-0195",
+        "RS_2014-0078"
+      ],
+      "family_id": "finite_set_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "6-01-006",
+      "level_bounds": {
+        "1": "skupovi do 4 elementa, jedna radnja",
+        "2": "skupovi do 5 elemenata, komplement/podskup",
+        "3": "veći skupovi, Dekartov proizvod"
+      },
+      "parameters": {
+        "concepts": [
+          "union"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: unija skupova",
+        "- skupovi se porede kao skupovi: poredak zapisivanja i ponovljeni elementi ne mijenjaju skup",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: jednakost skupova je skupovna (poredak/duplikati nebitni); komplement traži izričit univerzum."
+    },
+    "6-01-007": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "finite_set",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0012"
+      ],
+      "family_id": "finite_set_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "6-01-007",
+      "level_bounds": {
+        "1": "skupovi do 4 elementa, jedna radnja",
+        "2": "skupovi do 5 elemenata, komplement/podskup",
+        "3": "veći skupovi, Dekartov proizvod"
+      },
+      "parameters": {
+        "concepts": [
+          "intersection"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: presjek skupova",
+        "- skupovi se porede kao skupovi: poredak zapisivanja i ponovljeni elementi ne mijenjaju skup",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: jednakost skupova je skupovna (poredak/duplikati nebitni); komplement traži izričit univerzum."
+    },
+    "6-01-008": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "finite_set",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0005",
+        "KS_2018-0008",
+        "KS_2018-0011"
+      ],
+      "family_id": "finite_set_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "6-01-008",
+      "level_bounds": {
+        "1": "skupovi do 4 elementa, jedna radnja",
+        "2": "skupovi do 5 elemenata, komplement/podskup",
+        "3": "veći skupovi, Dekartov proizvod"
+      },
+      "parameters": {
+        "concepts": [
+          "difference"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: razlika skupova",
+        "- skupovi se porede kao skupovi: poredak zapisivanja i ponovljeni elementi ne mijenjaju skup",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: jednakost skupova je skupovna (poredak/duplikati nebitni); komplement traži izričit univerzum."
+    },
+    "6-01-009": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "finite_set",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-6-01-009"
+      ],
+      "family_id": "finite_set_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "6-01-009",
+      "level_bounds": {
+        "1": "skupovi do 4 elementa, jedna radnja",
+        "2": "skupovi do 5 elemenata, komplement/podskup",
+        "3": "veći skupovi, Dekartov proizvod"
+      },
+      "parameters": {
+        "concepts": [
+          "complement"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: komplement uz izričit univerzalni skup",
+        "- skupovi se porede kao skupovi: poredak zapisivanja i ponovljeni elementi ne mijenjaju skup",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: jednakost skupova je skupovna (poredak/duplikati nebitni); komplement traži izričit univerzum."
+    },
+    "6-01-010": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "finite_set",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0009",
+        "KS_2018-0237",
+        "KS_2018-0367"
+      ],
+      "family_id": "finite_set_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "6-01-010",
+      "level_bounds": {
+        "1": "skupovi do 4 elementa, jedna radnja",
+        "2": "skupovi do 5 elemenata, komplement/podskup",
+        "3": "veći skupovi, Dekartov proizvod"
+      },
+      "parameters": {
+        "concepts": [
+          "ordered_pair"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: uređeni par (poredak je bitan)",
+        "- skupovi se porede kao skupovi: poredak zapisivanja i ponovljeni elementi ne mijenjaju skup",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: jednakost skupova je skupovna (poredak/duplikati nebitni); komplement traži izričit univerzum."
+    },
+    "6-01-011": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "finite_set",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0012"
+      ],
+      "family_id": "finite_set_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "6-01-011",
+      "level_bounds": {
+        "1": "skupovi do 4 elementa, jedna radnja",
+        "2": "skupovi do 5 elemenata, komplement/podskup",
+        "3": "veći skupovi, Dekartov proizvod"
+      },
+      "parameters": {
+        "concepts": [
+          "cartesian_product"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: Dekartov proizvod skupova",
+        "- skupovi se porede kao skupovi: poredak zapisivanja i ponovljeni elementi ne mijenjaju skup",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: jednakost skupova je skupovna (poredak/duplikati nebitni); komplement traži izričit univerzum."
+    },
+    "6-02-001": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "number_set_membership",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0003",
+        "KS_2018-0004"
+      ],
+      "family_id": "number_set_membership",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "6-02-001",
+      "level_bounds": {
+        "1": "mali brojevi, direktna pripadnost",
+        "2": "klasifikacija s obrazloženjem",
+        "3": "veći korijeni i granični slučajevi"
+      },
+      "parameters": {
+        "concepts": [
+          "natural_sets"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: skupovi N i N0",
+        "- korijen prirodnog broja je racionalan SAMO za potpun kvadrat; svaka klasifikacija se obrazlaže",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: korijen je racionalan samo za potpun kvadrat; klasifikacija dokazana definicijom skupa."
+    },
     "6-02-002": {
       "activation_class": "READY",
       "advisory_parameters": [
         "forms"
       ],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "number_ordering",
       "enforced_parameters": [
         "number_domain"
@@ -42,7 +423,7 @@
     "6-02-003": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "numeric_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -79,7 +460,7 @@
     "6-02-004": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "numeric_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -118,7 +499,7 @@
       "advisory_parameters": [
         "expression_shape"
       ],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "numeric_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -152,12 +533,52 @@
       ],
       "reviewer_note": "Invarijanta: svi operandi i međurezultati prirodni."
     },
+    "6-02-006": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "operation_property",
+      "enforced_parameters": [
+        "number_domain",
+        "properties"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-6-02-006"
+      ],
+      "family_id": "operation_property_recognition",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "6-02-006",
+      "level_bounds": {
+        "1": "mali brojevi, jedno svojstvo",
+        "2": "negativni brojevi ili razlomci",
+        "3": "kombinovane jednakosti"
+      },
+      "parameters": {
+        "number_domain": "natural",
+        "properties": [
+          "associativity_add",
+          "associativity_mul",
+          "commutativity_add",
+          "commutativity_mul",
+          "distributivity"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: asocijativnost sabiranja, asocijativnost množenja, komutativnost sabiranja, komutativnost množenja, distributivnost množenja prema sabiranju",
+        "- svaka prikazana jednakost mora biti numerički tačna; opcije se razlikuju po svojstvu, ne po tačnosti",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: sve jednakosti numerički tačne; opcije se razlikuju po svojstvu."
+    },
     "6-02-007": {
       "activation_class": "READY",
       "advisory_parameters": [
         "expression_shape"
       ],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "numeric_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -198,7 +619,7 @@
     "6-02-008": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "polynomial_basic",
       "enforced_parameters": [
         "concepts",
@@ -234,7 +655,7 @@
     "6-03-001": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "common_divisors_multiples",
       "enforced_parameters": [
         "concepts"
@@ -273,7 +694,7 @@
     "6-03-002": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "divisibility_value",
       "enforced_parameters": [
         "concepts"
@@ -306,7 +727,7 @@
     "6-03-003": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "divisibility_value",
       "enforced_parameters": [
         "concepts"
@@ -339,7 +760,7 @@
     "6-03-004": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "divisibility_predicate",
       "enforced_parameters": [
         "divisors"
@@ -383,7 +804,7 @@
     "6-03-005": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "prime_structure",
       "enforced_parameters": [
         "concepts"
@@ -418,7 +839,7 @@
     "6-03-006": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "prime_structure",
       "enforced_parameters": [
         "concepts"
@@ -451,7 +872,7 @@
     "6-03-007": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "prime_structure",
       "enforced_parameters": [
         "concepts"
@@ -485,7 +906,7 @@
     "6-03-008": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "common_divisors_multiples",
       "enforced_parameters": [
         "concepts"
@@ -521,7 +942,7 @@
     "6-03-009": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "common_divisors_multiples",
       "enforced_parameters": [
         "concepts"
@@ -554,10 +975,148 @@
       ],
       "reviewer_note": "Invarijanta: NZD/NZS/djelilac/sadržilac dokazani dijeljenjem bez ostatka."
     },
+    "6-03-010": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "structured_word_problem",
+      "enforced_parameters": [
+        "problem_types"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0045",
+        "KS_2018-0073"
+      ],
+      "family_id": "structured_word_problem",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "6-03-010",
+      "level_bounds": {
+        "1": "jedna direktna relacija, mali brojevi",
+        "2": "jedan dodatni korak (ostatak, kusur, druga promjena)",
+        "3": "veće vrijednosti ili više povezanih relacija"
+      },
+      "parameters": {
+        "problem_types": [
+          "equal_sharing",
+          "sharing_remainder"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: podjela na jednake dijelove, dijeljenje s ostatkom u priči",
+        "- sve poznate veličine moraju biti izričito navedene u tekstu zadatka; odgovor slijedi isključivo iz njih",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: činjenice prije proze; svaki broj u tekstu odgovara IR veličini; odgovor izveden isključivo iz činjenica."
+    },
+    "6-04-002": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "fraction_concept",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-6-04-002"
+      ],
+      "family_id": "fraction_concept_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "6-04-002",
+      "level_bounds": {
+        "1": "mali imenioci, direktan pojam",
+        "2": "mješoviti brojevi i svođenje",
+        "3": "veći imenioci, periodični zapisi"
+      },
+      "parameters": {
+        "concepts": [
+          "part_of_whole"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: razlomak kao dio cjeline i kao količnik",
+        "- vrsta decimalnog zapisa dokazuje se faktorizacijom imenioca skraćenog razlomka (samo 2 i 5 daju konačan zapis)",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: vrsta decimalnog zapisa dokazana faktorizacijom imenioca (2^a·5^b)."
+    },
+    "6-04-003": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "fraction_concept",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0051"
+      ],
+      "family_id": "fraction_concept_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "6-04-003",
+      "level_bounds": {
+        "1": "mali imenioci, direktan pojam",
+        "2": "mješoviti brojevi i svođenje",
+        "3": "veći imenioci, periodični zapisi"
+      },
+      "parameters": {
+        "concepts": [
+          "fraction_types"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: pravi, nepravi i prividni razlomci; mješoviti brojevi",
+        "- vrsta decimalnog zapisa dokazuje se faktorizacijom imenioca skraćenog razlomka (samo 2 i 5 daju konačan zapis)",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: vrsta decimalnog zapisa dokazana faktorizacijom imenioca (2^a·5^b)."
+    },
+    "6-04-007": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "fraction_concept",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-6-04-007"
+      ],
+      "family_id": "fraction_concept_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "6-04-007",
+      "level_bounds": {
+        "1": "mali imenioci, direktan pojam",
+        "2": "mješoviti brojevi i svođenje",
+        "3": "veći imenioci, periodični zapisi"
+      },
+      "parameters": {
+        "concepts": [
+          "common_denominator_numeric"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: svođenje na najmanji zajednički nazivnik",
+        "- vrsta decimalnog zapisa dokazuje se faktorizacijom imenioca skraćenog razlomka (samo 2 i 5 daju konačan zapis)",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: vrsta decimalnog zapisa dokazana faktorizacijom imenioca (2^a·5^b)."
+    },
     "6-04-008": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "number_ordering",
       "enforced_parameters": [
         "number_domain"
@@ -595,7 +1154,7 @@
         "operand_kinds",
         "simplification_policy"
       ],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "fraction_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -664,7 +1223,7 @@
         "operand_kinds",
         "simplification_policy"
       ],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "fraction_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -733,7 +1292,7 @@
         "operand_kinds",
         "simplification_policy"
       ],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "fraction_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -799,7 +1358,7 @@
         "operand_kinds",
         "simplification_policy"
       ],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "fraction_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -857,12 +1416,53 @@
       ],
       "reviewer_note": "Invarijanta: operacija DIJELJENJE. Množenje bez recipročnog koraka ne ispituje ovu lekciju."
     },
+    "6-04-013": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "operation_property",
+      "enforced_parameters": [
+        "number_domain",
+        "properties"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0057",
+        "RS_2014-0025"
+      ],
+      "family_id": "operation_property_recognition",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "6-04-013",
+      "level_bounds": {
+        "1": "mali brojevi, jedno svojstvo",
+        "2": "negativni brojevi ili razlomci",
+        "3": "kombinovane jednakosti"
+      },
+      "parameters": {
+        "number_domain": "fraction",
+        "properties": [
+          "associativity_add",
+          "associativity_mul",
+          "commutativity_add",
+          "commutativity_mul",
+          "distributivity"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: asocijativnost sabiranja, asocijativnost množenja, komutativnost sabiranja, komutativnost množenja, distributivnost množenja prema sabiranju",
+        "- svaka prikazana jednakost mora biti numerički tačna; opcije se razlikuju po svojstvu, ne po tačnosti",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: sve jednakosti numerički tačne; opcije se razlikuju po svojstvu."
+    },
     "6-04-014": {
       "activation_class": "READY",
       "advisory_parameters": [
         "expression_shape"
       ],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "numeric_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -899,10 +1499,45 @@
       ],
       "reviewer_note": "Invarijanta: egzaktan racionalan račun s predznacima."
     },
+    "6-04-015": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "structured_word_problem",
+      "enforced_parameters": [
+        "problem_types"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0073"
+      ],
+      "family_id": "structured_word_problem",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "6-04-015",
+      "level_bounds": {
+        "1": "jedna direktna relacija, mali brojevi",
+        "2": "jedan dodatni korak (ostatak, kusur, druga promjena)",
+        "3": "veće vrijednosti ili više povezanih relacija"
+      },
+      "parameters": {
+        "problem_types": [
+          "fraction_of_quantity",
+          "fraction_remainder"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: razlomak od date veličine, ostatak poslije uzetog dijela",
+        "- sve poznate veličine moraju biti izričito navedene u tekstu zadatka; odgovor slijedi isključivo iz njih",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: činjenice prije proze; svaki broj u tekstu odgovara IR veličini; odgovor izveden isključivo iz činjenica."
+    },
     "6-05-001": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "fraction_decimal",
       "enforced_parameters": [
         "concepts"
@@ -940,7 +1575,7 @@
     "6-05-002": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "fraction_decimal",
       "enforced_parameters": [
         "concepts"
@@ -973,7 +1608,7 @@
     "6-05-003": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "fraction_decimal",
       "enforced_parameters": [
         "concepts"
@@ -1004,10 +1639,44 @@
       ],
       "reviewer_note": "Invarijanta: samo konačne decimale; razlomak uvijek skraćen; opcije ne miješaju zapise."
     },
+    "6-05-004": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "fraction_concept",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-6-05-004"
+      ],
+      "family_id": "fraction_concept_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "6-05-004",
+      "level_bounds": {
+        "1": "mali imenioci, direktan pojam",
+        "2": "mješoviti brojevi i svođenje",
+        "3": "veći imenioci, periodični zapisi"
+      },
+      "parameters": {
+        "concepts": [
+          "decimal_type"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: konačan naspram periodičnog decimalnog zapisa",
+        "- vrsta decimalnog zapisa dokazuje se faktorizacijom imenioca skraćenog razlomka (samo 2 i 5 daju konačan zapis)",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: vrsta decimalnog zapisa dokazana faktorizacijom imenioca (2^a·5^b)."
+    },
     "6-05-006": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "number_ordering",
       "enforced_parameters": [
         "number_domain"
@@ -1040,7 +1709,7 @@
     "6-05-007": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "decimal_rounding",
       "enforced_parameters": [
         "concepts"
@@ -1077,7 +1746,7 @@
     "6-05-008": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "numeric_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -1114,7 +1783,7 @@
     "6-05-009": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "numeric_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -1152,7 +1821,7 @@
     "6-05-010": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "numeric_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -1188,10 +1857,45 @@
       ],
       "reviewer_note": "Invarijanta: konačan decimalan zapis svake vidljive vrijednosti."
     },
+    "6-05-011": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "structured_word_problem",
+      "enforced_parameters": [
+        "problem_types"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-6-05-011"
+      ],
+      "family_id": "structured_word_problem",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "6-05-011",
+      "level_bounds": {
+        "1": "jedna direktna relacija, mali brojevi",
+        "2": "jedan dodatni korak (ostatak, kusur, druga promjena)",
+        "3": "veće vrijednosti ili više povezanih relacija"
+      },
+      "parameters": {
+        "problem_types": [
+          "money_change",
+          "money_total"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: kusur pri plaćanju, ukupan iznos kupovine",
+        "- sve poznate veličine moraju biti izričito navedene u tekstu zadatka; odgovor slijedi isključivo iz njih",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: činjenice prije proze; svaki broj u tekstu odgovara IR veličini; odgovor izveden isključivo iz činjenica."
+    },
     "6-06-001": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "percent_basic",
       "enforced_parameters": [
         "concepts"
@@ -1228,7 +1932,7 @@
     "6-06-002": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "percent_basic",
       "enforced_parameters": [
         "concepts"
@@ -1265,7 +1969,7 @@
     "6-06-003": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "ratio_proportion",
       "enforced_parameters": [
         "concepts"
@@ -1298,7 +2002,7 @@
     "6-06-004": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "arithmetic_mean",
       "enforced_parameters": [
         "concepts"
@@ -1331,7 +2035,7 @@
     "6-07-001": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_equation",
       "enforced_parameters": [
         "number_domain",
@@ -1368,7 +2072,7 @@
     "6-07-002": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_equation",
       "enforced_parameters": [
         "number_domain",
@@ -1407,7 +2111,7 @@
     "6-07-003": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_equation",
       "enforced_parameters": [
         "number_domain",
@@ -1447,7 +2151,7 @@
     "6-07-004": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_equation",
       "enforced_parameters": [
         "number_domain",
@@ -1484,7 +2188,7 @@
     "6-07-005": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_equation",
       "enforced_parameters": [
         "number_domain",
@@ -1521,7 +2225,7 @@
     "6-07-006": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_equation",
       "enforced_parameters": [
         "number_domain",
@@ -1559,7 +2263,7 @@
     "6-09-003": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "angle_relationships_direct",
       "enforced_parameters": [
         "kinds"
@@ -1593,7 +2297,7 @@
     "6-09-004": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "angle_relationships_direct",
       "enforced_parameters": [
         "kinds"
@@ -1632,7 +2336,7 @@
     "6-09-005": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "angle_relationships_direct",
       "enforced_parameters": [
         "kinds"
@@ -1669,7 +2373,7 @@
     "6-09-007": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "angle_relationships_direct",
       "enforced_parameters": [
         "kinds"
@@ -1706,7 +2410,7 @@
     "6-09-010": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "unit_conversion",
       "enforced_parameters": [
         "dimensions"
@@ -1741,7 +2445,7 @@
     "6-09-011": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "angle_relationships_direct",
       "enforced_parameters": [
         "kinds"
@@ -1775,7 +2479,7 @@
     "6-09-012": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "angle_relationships_direct",
       "enforced_parameters": [
         "kinds"
@@ -1809,7 +2513,7 @@
     "6-09-013": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "angle_relationships_direct",
       "enforced_parameters": [
         "kinds"
@@ -1843,7 +2547,7 @@
     "6-09-014": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "angle_relationships_direct",
       "enforced_parameters": [
         "kinds"
@@ -1878,7 +2582,7 @@
     "6-09-015": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "angle_relationships_direct",
       "enforced_parameters": [
         "kinds"
@@ -1912,7 +2616,7 @@
     "6-09-016": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "angle_relationships_direct",
       "enforced_parameters": [
         "kinds"
@@ -1946,7 +2650,7 @@
     "6-13-001": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "unit_conversion",
       "enforced_parameters": [
         "dimensions"
@@ -1981,7 +2685,7 @@
     "6-13-002": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "unit_conversion",
       "enforced_parameters": [
         "dimensions"
@@ -2016,7 +2720,7 @@
     "6-13-003": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "unit_conversion",
       "enforced_parameters": [
         "dimensions"
@@ -2051,7 +2755,7 @@
     "6-13-004": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "unit_conversion",
       "enforced_parameters": [
         "dimensions"
@@ -2086,7 +2790,7 @@
     "6-13-005": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "unit_conversion",
       "enforced_parameters": [
         "dimensions"
@@ -2124,7 +2828,7 @@
     "7-02-004": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "absolute_opposite",
       "enforced_parameters": [
         "concepts",
@@ -2161,7 +2865,7 @@
     "7-02-005": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "absolute_opposite",
       "enforced_parameters": [
         "concepts",
@@ -2199,7 +2903,7 @@
     "7-02-006": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "number_ordering",
       "enforced_parameters": [
         "number_domain"
@@ -2234,7 +2938,7 @@
       "advisory_parameters": [
         "sign_scope"
       ],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "numeric_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -2274,7 +2978,7 @@
       "advisory_parameters": [
         "sign_scope"
       ],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "numeric_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -2312,7 +3016,7 @@
     "7-02-009": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "numeric_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -2347,10 +3051,47 @@
       ],
       "reviewer_note": "Invarijanta: cjelobrojni operandi i rezultat; pravilo znakova."
     },
+    "7-02-010": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "operation_property",
+      "enforced_parameters": [
+        "number_domain",
+        "properties"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-7-02-010"
+      ],
+      "family_id": "operation_property_recognition",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "7-02-010",
+      "level_bounds": {
+        "1": "mali brojevi, jedno svojstvo",
+        "2": "negativni brojevi ili razlomci",
+        "3": "kombinovane jednakosti"
+      },
+      "parameters": {
+        "number_domain": "integer",
+        "properties": [
+          "associativity_add",
+          "commutativity_add"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: asocijativnost sabiranja, komutativnost sabiranja",
+        "- svaka prikazana jednakost mora biti numerički tačna; opcije se razlikuju po svojstvu, ne po tačnosti",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: sve jednakosti numerički tačne; opcije se razlikuju po svojstvu."
+    },
     "7-02-011": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "numeric_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -2386,7 +3127,7 @@
     "7-02-012": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "numeric_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -2424,7 +3165,7 @@
       "advisory_parameters": [
         "expression_shape"
       ],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "numeric_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -2459,10 +3200,46 @@
       ],
       "reviewer_note": "Invarijanta: cjelobrojni operandi i rezultat; pravilo znakova."
     },
+    "7-02-014": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "operation_property",
+      "enforced_parameters": [
+        "number_domain",
+        "properties"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-7-02-014"
+      ],
+      "family_id": "operation_property_recognition",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "7-02-014",
+      "level_bounds": {
+        "1": "mali brojevi, jedno svojstvo",
+        "2": "negativni brojevi ili razlomci",
+        "3": "kombinovane jednakosti"
+      },
+      "parameters": {
+        "number_domain": "integer",
+        "properties": [
+          "distributivity"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: distributivnost množenja prema sabiranju",
+        "- svaka prikazana jednakost mora biti numerički tačna; opcije se razlikuju po svojstvu, ne po tačnosti",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: sve jednakosti numerički tačne; opcije se razlikuju po svojstvu."
+    },
     "7-02-015": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "numeric_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -2504,7 +3281,7 @@
     "7-02-016": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_equation",
       "enforced_parameters": [
         "number_domain",
@@ -2541,7 +3318,7 @@
     "7-02-017": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_equation",
       "enforced_parameters": [
         "number_domain",
@@ -2578,7 +3355,7 @@
     "7-02-018": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_equation",
       "enforced_parameters": [
         "number_domain",
@@ -2615,7 +3392,7 @@
     "7-02-019": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_equation",
       "enforced_parameters": [
         "number_domain",
@@ -2652,7 +3429,7 @@
     "7-02-020": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_equation",
       "enforced_parameters": [
         "number_domain",
@@ -2687,10 +3464,44 @@
       ],
       "reviewer_note": "Invarijanta: jedinstveno rješenje, provjera uvrštavanjem egzaktna."
     },
+    "7-02-021": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "structured_word_problem",
+      "enforced_parameters": [
+        "problem_types"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-7-02-021"
+      ],
+      "family_id": "structured_word_problem",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "7-02-021",
+      "level_bounds": {
+        "1": "jedna direktna relacija, mali brojevi",
+        "2": "jedan dodatni korak (ostatak, kusur, druga promjena)",
+        "3": "veće vrijednosti ili više povezanih relacija"
+      },
+      "parameters": {
+        "problem_types": [
+          "signed_change"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: promjene s predznakom (temperatura)",
+        "- sve poznate veličine moraju biti izričito navedene u tekstu zadatka; odgovor slijedi isključivo iz njih",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: činjenice prije proze; svaki broj u tekstu odgovara IR veličini; odgovor izveden isključivo iz činjenica."
+    },
     "7-03-004": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "absolute_opposite",
       "enforced_parameters": [
         "concepts",
@@ -2726,7 +3537,7 @@
     "7-03-005": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "absolute_opposite",
       "enforced_parameters": [
         "concepts",
@@ -2763,7 +3574,7 @@
     "7-03-006": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "number_ordering",
       "enforced_parameters": [
         "number_domain"
@@ -2796,7 +3607,7 @@
     "7-03-007": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "fraction_decimal",
       "enforced_parameters": [
         "concepts",
@@ -2831,7 +3642,7 @@
     "7-03-008": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "fraction_decimal",
       "enforced_parameters": [
         "concepts",
@@ -2866,7 +3677,7 @@
     "7-03-009": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "numeric_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -2902,7 +3713,7 @@
     "7-03-010": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "numeric_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -2938,7 +3749,7 @@
     "7-03-011": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "numeric_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -2975,7 +3786,7 @@
     "7-03-012": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "numeric_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -3008,12 +3819,52 @@
       ],
       "reviewer_note": "Invarijanta: egzaktan racionalan račun s predznacima."
     },
+    "7-03-013": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "operation_property",
+      "enforced_parameters": [
+        "number_domain",
+        "properties"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-7-03-013"
+      ],
+      "family_id": "operation_property_recognition",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "7-03-013",
+      "level_bounds": {
+        "1": "mali brojevi, jedno svojstvo",
+        "2": "negativni brojevi ili razlomci",
+        "3": "kombinovane jednakosti"
+      },
+      "parameters": {
+        "number_domain": "fraction",
+        "properties": [
+          "associativity_add",
+          "associativity_mul",
+          "commutativity_add",
+          "commutativity_mul",
+          "distributivity"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: asocijativnost sabiranja, asocijativnost množenja, komutativnost sabiranja, komutativnost množenja, distributivnost množenja prema sabiranju",
+        "- svaka prikazana jednakost mora biti numerički tačna; opcije se razlikuju po svojstvu, ne po tačnosti",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: sve jednakosti numerički tačne; opcije se razlikuju po svojstvu."
+    },
     "7-03-014": {
       "activation_class": "READY",
       "advisory_parameters": [
         "expression_shape"
       ],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "numeric_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -3057,7 +3908,7 @@
       "advisory_parameters": [
         "expression_shape"
       ],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "numeric_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -3095,7 +3946,7 @@
     "7-03-016": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_equation",
       "enforced_parameters": [
         "number_domain",
@@ -3132,7 +3983,7 @@
     "7-03-017": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_equation",
       "enforced_parameters": [
         "number_domain",
@@ -3169,7 +4020,7 @@
     "7-03-018": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_equation",
       "enforced_parameters": [
         "number_domain",
@@ -3206,7 +4057,7 @@
     "7-03-019": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_equation",
       "enforced_parameters": [
         "number_domain",
@@ -3241,10 +4092,44 @@
       ],
       "reviewer_note": "Invarijanta: jedinstveno rješenje, provjera uvrštavanjem egzaktna."
     },
+    "7-03-020": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "structured_word_problem",
+      "enforced_parameters": [
+        "problem_types"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-7-03-020"
+      ],
+      "family_id": "structured_word_problem",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "7-03-020",
+      "level_bounds": {
+        "1": "jedna direktna relacija, mali brojevi",
+        "2": "jedan dodatni korak (ostatak, kusur, druga promjena)",
+        "3": "veće vrijednosti ili više povezanih relacija"
+      },
+      "parameters": {
+        "problem_types": [
+          "number_equation"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: priča koja se svodi na linearnu jednačinu",
+        "- sve poznate veličine moraju biti izričito navedene u tekstu zadatka; odgovor slijedi isključivo iz njih",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: činjenice prije proze; svaki broj u tekstu odgovara IR veličini; odgovor izveden isključivo iz činjenica."
+    },
     "7-03-021": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "decimal_rounding",
       "enforced_parameters": [
         "concepts"
@@ -3280,7 +4165,7 @@
     "7-04-001": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "angle_relationships_direct",
       "enforced_parameters": [
         "kinds"
@@ -3315,7 +4200,7 @@
     "7-04-002": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "angle_relationships_direct",
       "enforced_parameters": [
         "kinds"
@@ -3350,7 +4235,7 @@
     "7-04-006": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "angle_relationships_direct",
       "enforced_parameters": [
         "kinds"
@@ -3387,7 +4272,7 @@
     "7-04-007": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "angle_relationships_direct",
       "enforced_parameters": [
         "kinds"
@@ -3421,7 +4306,7 @@
     "7-04-008": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "angle_relationships_direct",
       "enforced_parameters": [
         "kinds"
@@ -3458,7 +4343,7 @@
     "7-04-009": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "angle_relationships_direct",
       "enforced_parameters": [
         "kinds"
@@ -3492,7 +4377,7 @@
     "7-04-010": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "angle_relationships_direct",
       "enforced_parameters": [
         "kinds"
@@ -3527,7 +4412,7 @@
     "7-04-011": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "angle_relationships_direct",
       "enforced_parameters": [
         "kinds"
@@ -3562,7 +4447,7 @@
     "7-04-012": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "angle_relationships_direct",
       "enforced_parameters": [
         "kinds"
@@ -3596,7 +4481,7 @@
     "7-04-018": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "angle_relationships_direct",
       "enforced_parameters": [
         "kinds"
@@ -3634,7 +4519,7 @@
     "7-04-019": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "angle_relationships_direct",
       "enforced_parameters": [
         "kinds"
@@ -3668,7 +4553,7 @@
     "7-04-025": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "geometry_formula_2d",
       "enforced_parameters": [
         "kinds"
@@ -3703,7 +4588,7 @@
     "7-05-002": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "angle_relationships_direct",
       "enforced_parameters": [
         "kinds"
@@ -3738,7 +4623,7 @@
     "7-05-003": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "angle_relationships_direct",
       "enforced_parameters": [
         "kinds"
@@ -3772,7 +4657,7 @@
     "7-05-012": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "geometry_formula_2d",
       "enforced_parameters": [
         "kinds"
@@ -3810,7 +4695,7 @@
     "7-05-016": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "geometry_formula_2d",
       "enforced_parameters": [
         "kinds"
@@ -3846,7 +4731,7 @@
     "7-05-017": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "geometry_formula_2d",
       "enforced_parameters": [
         "kinds"
@@ -3879,10 +4764,45 @@
       ],
       "reviewer_note": "Invarijanta: kanonske formule i notacija (P/O/d/r/R=2r); egzaktan račun."
     },
+    "7-05-018": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "unit_conversion",
+      "enforced_parameters": [
+        "dimensions"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-7-05-018"
+      ],
+      "family_id": "unit_conversion_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "7-05-018",
+      "level_bounds": {
+        "1": "susjedne jedinice, cijeli brojevi",
+        "2": "decimalni iznosi, oba smjera",
+        "3": "preskok jedinice / složene jedinice"
+      },
+      "parameters": {
+        "dimensions": [
+          "area"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: jedinice površine (kvadrirani faktori)",
+        "- pretvaranje NIKAD ne prelazi iz jedne fizičke dimenzije u drugu",
+        "- kvadratne jedinice nose kvadriran, a kubne kubiran faktor",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: faktori po dimenziji; kvadratni 100, kubni 1000 po koraku; bez miješanja dimenzija."
+    },
     "7-05-019": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "geometry_formula_2d",
       "enforced_parameters": [
         "kinds"
@@ -3923,7 +4843,7 @@
     "7-05-020": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "geometry_formula_2d",
       "enforced_parameters": [
         "kinds"
@@ -3959,7 +4879,7 @@
     "7-05-021": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "geometry_formula_2d",
       "enforced_parameters": [
         "kinds"
@@ -3997,7 +4917,7 @@
     "7-05-022": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "geometry_formula_2d",
       "enforced_parameters": [
         "kinds"
@@ -4032,7 +4952,7 @@
     "7-05-023": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "geometry_formula_2d",
       "enforced_parameters": [
         "kinds"
@@ -4069,7 +4989,7 @@
     "7-05-024": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "geometry_formula_2d",
       "enforced_parameters": [
         "kinds"
@@ -4101,10 +5021,112 @@
       ],
       "reviewer_note": "Invarijanta: kanonske formule i notacija (P/O/d/r/R=2r); egzaktan račun."
     },
+    "8-01-001": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "number_set_membership",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-8-01-001"
+      ],
+      "family_id": "number_set_membership",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-01-001",
+      "level_bounds": {
+        "1": "mali brojevi, direktna pripadnost",
+        "2": "klasifikacija s obrazloženjem",
+        "3": "veći korijeni i granični slučajevi"
+      },
+      "parameters": {
+        "concepts": [
+          "set_classification"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: pripadnost skupovima N, Z, Q i R",
+        "- korijen prirodnog broja je racionalan SAMO za potpun kvadrat; svaka klasifikacija se obrazlaže",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: korijen je racionalan samo za potpun kvadrat; klasifikacija dokazana definicijom skupa."
+    },
+    "8-01-002": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "number_set_membership",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0192"
+      ],
+      "family_id": "number_set_membership",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-01-002",
+      "level_bounds": {
+        "1": "mali brojevi, direktna pripadnost",
+        "2": "klasifikacija s obrazloženjem",
+        "3": "veći korijeni i granični slučajevi"
+      },
+      "parameters": {
+        "concepts": [
+          "irrational_recognition"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: prepoznavanje iracionalnog broja",
+        "- korijen prirodnog broja je racionalan SAMO za potpun kvadrat; svaka klasifikacija se obrazlaže",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: korijen je racionalan samo za potpun kvadrat; klasifikacija dokazana definicijom skupa."
+    },
+    "8-01-003": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "number_set_membership",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-8-01-003"
+      ],
+      "family_id": "number_set_membership",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-01-003",
+      "level_bounds": {
+        "1": "mali brojevi, direktna pripadnost",
+        "2": "klasifikacija s obrazloženjem",
+        "3": "veći korijeni i granični slučajevi"
+      },
+      "parameters": {
+        "concepts": [
+          "sqrt_between"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: položaj korijena između uzastopnih cijelih brojeva",
+        "- korijen prirodnog broja je racionalan SAMO za potpun kvadrat; svaka klasifikacija se obrazlaže",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: korijen je racionalan samo za potpun kvadrat; klasifikacija dokazana definicijom skupa."
+    },
     "8-01-004": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "number_ordering",
       "enforced_parameters": [
         "number_domain"
@@ -4136,7 +5158,7 @@
     "8-01-005": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "absolute_opposite",
       "enforced_parameters": [
         "concepts",
@@ -4171,7 +5193,7 @@
     "8-01-006": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "power_arithmetic",
       "enforced_parameters": [
         "concepts"
@@ -4204,7 +5226,7 @@
     "8-01-007": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "square_root",
       "enforced_parameters": [
         "concepts"
@@ -4238,7 +5260,7 @@
     "8-01-008": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "square_root",
       "enforced_parameters": [
         "concepts"
@@ -4275,7 +5297,7 @@
     "8-01-009": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "simple_quadratic",
       "enforced_parameters": [
         "shapes"
@@ -4309,7 +5331,7 @@
     "8-01-010": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "square_root",
       "enforced_parameters": [
         "concepts"
@@ -4344,7 +5366,7 @@
     "8-01-011": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "square_root",
       "enforced_parameters": [
         "concepts"
@@ -4383,7 +5405,7 @@
       "advisory_parameters": [
         "expression_shape"
       ],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "numeric_arithmetic",
       "enforced_parameters": [
         "allowed_operations",
@@ -4423,7 +5445,7 @@
     "8-01-013": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "power_arithmetic",
       "enforced_parameters": [
         "concepts"
@@ -4456,7 +5478,7 @@
     "8-01-014": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "power_arithmetic",
       "enforced_parameters": [
         "concepts"
@@ -4489,7 +5511,7 @@
     "8-01-015": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "power_arithmetic",
       "enforced_parameters": [
         "concepts"
@@ -4525,7 +5547,7 @@
     "8-01-016": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "power_arithmetic",
       "enforced_parameters": [
         "concepts"
@@ -4560,7 +5582,7 @@
     "8-01-017": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "power_arithmetic",
       "enforced_parameters": [
         "concepts"
@@ -4590,10 +5612,44 @@
       ],
       "reviewer_note": "Invarijanta: zakoni stepena nad jednakim osnovama; opcije različitih vrijednosti."
     },
+    "8-02-004": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "coordinate_line",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0224"
+      ],
+      "family_id": "coordinate_line_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-02-004",
+      "level_bounds": {
+        "1": "male Pitagorine trojke / direktno očitavanje",
+        "2": "negativni koeficijenti, podudarne prave",
+        "3": "razlomljeni koeficijenti i presjeci"
+      },
+      "parameters": {
+        "concepts": [
+          "point_distance"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: udaljenost tačaka zadatih koordinatama",
+        "- svi podaci su zadati u tekstu (koordinate, jednačine); crtanje i čitanje grafika nisu dio zadatka",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: sve tvrdnje dokazane uvrštavanjem; udaljenost preko Pitagorine teoreme egzaktno."
+    },
     "8-02-005": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_function",
       "enforced_parameters": [
         "concepts"
@@ -4630,7 +5686,7 @@
     "8-02-006": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_function",
       "enforced_parameters": [
         "concepts"
@@ -4660,10 +5716,78 @@
       ],
       "reviewer_note": "Invarijanta: svaka tvrdnja o funkciji dokazana uvrštavanjem; tačke uvijek s imenom."
     },
+    "8-02-008": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "coordinate_line",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-8-02-008"
+      ],
+      "family_id": "coordinate_line_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-02-008",
+      "level_bounds": {
+        "1": "male Pitagorine trojke / direktno očitavanje",
+        "2": "negativni koeficijenti, podudarne prave",
+        "3": "razlomljeni koeficijenti i presjeci"
+      },
+      "parameters": {
+        "concepts": [
+          "slope_meaning"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: značenje koeficijenta k",
+        "- svi podaci su zadati u tekstu (koordinate, jednačine); crtanje i čitanje grafika nisu dio zadatka",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: sve tvrdnje dokazane uvrštavanjem; udaljenost preko Pitagorine teoreme egzaktno."
+    },
+    "8-02-009": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "coordinate_line",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-8-02-009"
+      ],
+      "family_id": "coordinate_line_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-02-009",
+      "level_bounds": {
+        "1": "male Pitagorine trojke / direktno očitavanje",
+        "2": "negativni koeficijenti, podudarne prave",
+        "3": "razlomljeni koeficijenti i presjeci"
+      },
+      "parameters": {
+        "concepts": [
+          "intercept_meaning"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: značenje slobodnog člana n",
+        "- svi podaci su zadati u tekstu (koordinate, jednačine); crtanje i čitanje grafika nisu dio zadatka",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: sve tvrdnje dokazane uvrštavanjem; udaljenost preko Pitagorine teoreme egzaktno."
+    },
     "8-02-010": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_function",
       "enforced_parameters": [
         "concepts"
@@ -4696,7 +5820,7 @@
     "8-02-011": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_function",
       "enforced_parameters": [
         "concepts"
@@ -4727,10 +5851,78 @@
       ],
       "reviewer_note": "Invarijanta: svaka tvrdnja o funkciji dokazana uvrštavanjem; tačke uvijek s imenom."
     },
+    "8-02-012": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "coordinate_line",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-8-02-012"
+      ],
+      "family_id": "coordinate_line_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-02-012",
+      "level_bounds": {
+        "1": "male Pitagorine trojke / direktno očitavanje",
+        "2": "negativni koeficijenti, podudarne prave",
+        "3": "razlomljeni koeficijenti i presjeci"
+      },
+      "parameters": {
+        "concepts": [
+          "implicit_explicit"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: prevođenje implicitnog u eksplicitni oblik",
+        "- svi podaci su zadati u tekstu (koordinate, jednačine); crtanje i čitanje grafika nisu dio zadatka",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: sve tvrdnje dokazane uvrštavanjem; udaljenost preko Pitagorine teoreme egzaktno."
+    },
+    "8-02-014": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "coordinate_line",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-8-02-014"
+      ],
+      "family_id": "coordinate_line_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-02-014",
+      "level_bounds": {
+        "1": "male Pitagorine trojke / direktno očitavanje",
+        "2": "negativni koeficijenti, podudarne prave",
+        "3": "razlomljeni koeficijenti i presjeci"
+      },
+      "parameters": {
+        "concepts": [
+          "parallel_lines"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: paralelne i podudarne prave preko k i n",
+        "- svi podaci su zadati u tekstu (koordinate, jednačine); crtanje i čitanje grafika nisu dio zadatka",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: sve tvrdnje dokazane uvrštavanjem; udaljenost preko Pitagorine teoreme egzaktno."
+    },
     "8-03-001": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "ratio_proportion",
       "enforced_parameters": [
         "concepts"
@@ -4763,7 +5955,7 @@
     "8-03-002": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "ratio_proportion",
       "enforced_parameters": [
         "concepts"
@@ -4797,7 +5989,7 @@
     "8-03-003": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "ratio_proportion",
       "enforced_parameters": [
         "concepts"
@@ -4830,7 +6022,7 @@
     "8-03-004": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "ratio_proportion",
       "enforced_parameters": [
         "concepts"
@@ -4864,7 +6056,7 @@
     "8-03-005": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "ratio_proportion",
       "enforced_parameters": [
         "concepts"
@@ -4897,7 +6089,7 @@
     "8-03-006": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_function",
       "enforced_parameters": [
         "concepts",
@@ -4934,7 +6126,7 @@
     "8-03-007": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_function",
       "enforced_parameters": [
         "concepts",
@@ -4967,10 +6159,46 @@
       ],
       "reviewer_note": "Invarijanta: svaka tvrdnja o funkciji dokazana uvrštavanjem; tačke uvijek s imenom."
     },
+    "8-03-008": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "similarity",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0212",
+        "KS_2018-0214",
+        "KS_2018-0220"
+      ],
+      "family_id": "similarity_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-03-008",
+      "level_bounds": {
+        "1": "cjelobrojan koeficijent, male duži",
+        "2": "veći koeficijenti i obimi",
+        "3": "razlomljen koeficijent, površine (k²)"
+      },
+      "parameters": {
+        "concepts": [
+          "proportional_segments"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: nepoznata duž iz proporcije",
+        "- obim se skalira koeficijentom k, a površina njegovim kvadratom; svaka tvrdnja se dokazuje množenjem",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: obim ∝ k, površina ∝ k²; proporcije preko unakrsnih proizvoda."
+    },
     "8-03-010": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "ratio_proportion",
       "enforced_parameters": [
         "concepts"
@@ -5003,7 +6231,7 @@
     "8-03-012": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "ratio_proportion",
       "enforced_parameters": [
         "concepts"
@@ -5033,10 +6261,115 @@
       ],
       "reviewer_note": "Invarijanta: unakrsni proizvodi egzaktni; količnici opcija međusobno različiti."
     },
+    "8-03-013": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "similarity",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0220",
+        "RS_2014-0102"
+      ],
+      "family_id": "similarity_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-03-013",
+      "level_bounds": {
+        "1": "cjelobrojan koeficijent, male duži",
+        "2": "veći koeficijenti i obimi",
+        "3": "razlomljen koeficijent, površine (k²)"
+      },
+      "parameters": {
+        "concepts": [
+          "similarity_coefficient"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: koeficijent sličnosti iz stranica",
+        "- obim se skalira koeficijentom k, a površina njegovim kvadratom; svaka tvrdnja se dokazuje množenjem",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: obim ∝ k, površina ∝ k²; proporcije preko unakrsnih proizvoda."
+    },
+    "8-03-015": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "similarity",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0220"
+      ],
+      "family_id": "similarity_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-03-015",
+      "level_bounds": {
+        "1": "cjelobrojan koeficijent, male duži",
+        "2": "veći koeficijenti i obimi",
+        "3": "razlomljen koeficijent, površine (k²)"
+      },
+      "parameters": {
+        "concepts": [
+          "similar_perimeter",
+          "similarity_coefficient"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: obim slične figure (skalira se sa k), koeficijent sličnosti iz stranica",
+        "- obim se skalira koeficijentom k, a površina njegovim kvadratom; svaka tvrdnja se dokazuje množenjem",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: obim ∝ k, površina ∝ k²; proporcije preko unakrsnih proizvoda."
+    },
+    "8-03-016": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "similarity",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0218",
+        "KS_2018-0220"
+      ],
+      "family_id": "similarity_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-03-016",
+      "level_bounds": {
+        "1": "cjelobrojan koeficijent, male duži",
+        "2": "veći koeficijenti i obimi",
+        "3": "razlomljen koeficijent, površine (k²)"
+      },
+      "parameters": {
+        "concepts": [
+          "similar_area"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: površina slične figure (skalira se sa k²)",
+        "- obim se skalira koeficijentom k, a površina njegovim kvadratom; svaka tvrdnja se dokazuje množenjem",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: obim ∝ k, površina ∝ k²; proporcije preko unakrsnih proizvoda."
+    },
     "8-03-017": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "percent_basic",
       "enforced_parameters": [
         "concepts"
@@ -5071,7 +6404,7 @@
     "8-03-018": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "percent_basic",
       "enforced_parameters": [
         "concepts"
@@ -5102,10 +6435,44 @@
       ],
       "reviewer_note": "Invarijanta: procenat je stoti dio; znak % nikad u $...$."
     },
+    "8-03-019": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "financial_arithmetic",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-8-03-019"
+      ],
+      "family_id": "financial_arithmetic_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-03-019",
+      "level_bounds": {
+        "1": "mali iznosi, jedna godina, okrugle stope",
+        "2": "veći iznosi, dvije-tri godine",
+        "3": "necjelobrojni iznosi i više stavki"
+      },
+      "parameters": {
+        "concepts": [
+          "simple_interest"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: prosta kamata na štednju",
+        "- svaki kurs i svaka stopa moraju biti navedeni u zadatku; stvarni bankarski uslovi i složena kamata nisu u obimu",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: sve stope u zadatku; egzaktan decimalan račun (nikad float); prosta kamata K = G·p·t/100."
+    },
     "8-03-020": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "ratio_proportion",
       "enforced_parameters": [
         "concepts"
@@ -5140,7 +6507,7 @@
     "8-04-001": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "pythagoras_direct",
       "enforced_parameters": [
         "kinds"
@@ -5177,7 +6544,7 @@
     "8-04-002": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "pythagoras_direct",
       "enforced_parameters": [
         "kinds"
@@ -5211,7 +6578,7 @@
     "8-04-003": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "pythagoras_direct",
       "enforced_parameters": [
         "kinds"
@@ -5245,7 +6612,7 @@
     "8-04-004": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "pythagoras_direct",
       "enforced_parameters": [
         "kinds"
@@ -5280,7 +6647,7 @@
     "8-04-005": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "pythagoras_direct",
       "enforced_parameters": [
         "kinds"
@@ -5314,7 +6681,7 @@
     "8-04-006": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "pythagoras_direct",
       "enforced_parameters": [
         "kinds"
@@ -5348,7 +6715,7 @@
     "8-04-007": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "pythagoras_direct",
       "enforced_parameters": [
         "kinds"
@@ -5382,7 +6749,7 @@
     "8-04-008": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "pythagoras_direct",
       "enforced_parameters": [
         "kinds"
@@ -5416,7 +6783,7 @@
     "8-04-009": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "pythagoras_direct",
       "enforced_parameters": [
         "kinds"
@@ -5450,7 +6817,7 @@
     "8-04-010": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "pythagoras_direct",
       "enforced_parameters": [
         "kinds"
@@ -5485,7 +6852,7 @@
     "8-04-011": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "pythagoras_direct",
       "enforced_parameters": [
         "kinds"
@@ -5520,7 +6887,7 @@
     "8-04-012": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "pythagoras_direct",
       "enforced_parameters": [
         "kinds"
@@ -5551,10 +6918,45 @@
       ],
       "reviewer_note": "Invarijanta: c² = a² + b² egzaktno; rezultat cio broj ili korijen."
     },
+    "8-04-016": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "structured_word_problem",
+      "enforced_parameters": [
+        "problem_types"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-8-04-016"
+      ],
+      "family_id": "structured_word_problem",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-04-016",
+      "level_bounds": {
+        "1": "jedna direktna relacija, mali brojevi",
+        "2": "jedan dodatni korak (ostatak, kusur, druga promjena)",
+        "3": "veće vrijednosti ili više povezanih relacija"
+      },
+      "parameters": {
+        "problem_types": [
+          "pythagoras_distance",
+          "pythagoras_leg"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: dijagonala/udaljenost Pitagorinom teoremom, kateta Pitagorinom teoremom (merdevine)",
+        "- sve poznate veličine moraju biti izričito navedene u tekstu zadatka; odgovor slijedi isključivo iz njih",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: činjenice prije proze; svaki broj u tekstu odgovara IR veličini; odgovor izveden isključivo iz činjenica."
+    },
     "8-05-002": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "solid_geometry_direct",
       "enforced_parameters": [
         "kinds"
@@ -5589,7 +6991,7 @@
     "8-05-003": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "solid_geometry_direct",
       "enforced_parameters": [
         "kinds"
@@ -5624,7 +7026,7 @@
     "8-05-004": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "solid_geometry_direct",
       "enforced_parameters": [
         "kinds"
@@ -5659,7 +7061,7 @@
     "8-05-005": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "solid_geometry_direct",
       "enforced_parameters": [
         "kinds"
@@ -5695,7 +7097,7 @@
     "8-05-006": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "solid_geometry_direct",
       "enforced_parameters": [
         "kinds"
@@ -5732,7 +7134,7 @@
     "8-05-008": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "solid_geometry_direct",
       "enforced_parameters": [
         "kinds"
@@ -5770,7 +7172,7 @@
     "8-05-013": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "solid_geometry_direct",
       "enforced_parameters": [
         "kinds"
@@ -5806,7 +7208,7 @@
     "8-05-014": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "solid_geometry_direct",
       "enforced_parameters": [
         "kinds"
@@ -5841,7 +7243,7 @@
     "8-05-015": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "solid_geometry_direct",
       "enforced_parameters": [
         "kinds"
@@ -5880,7 +7282,7 @@
     "8-05-016": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "solid_geometry_direct",
       "enforced_parameters": [
         "kinds"
@@ -5915,7 +7317,7 @@
     "8-05-017": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "solid_geometry_direct",
       "enforced_parameters": [
         "kinds"
@@ -5950,7 +7352,7 @@
     "8-05-018": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "solid_geometry_direct",
       "enforced_parameters": [
         "kinds"
@@ -5985,7 +7387,7 @@
     "8-05-019": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "solid_geometry_direct",
       "enforced_parameters": [
         "kinds"
@@ -6020,7 +7422,7 @@
     "8-05-020": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "solid_geometry_direct",
       "enforced_parameters": [
         "kinds"
@@ -6052,10 +7454,46 @@
       ],
       "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
     },
+    "8-05-022": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "unit_conversion",
+      "enforced_parameters": [
+        "dimensions"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-8-05-022"
+      ],
+      "family_id": "unit_conversion_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-05-022",
+      "level_bounds": {
+        "1": "susjedne jedinice, cijeli brojevi",
+        "2": "decimalni iznosi, oba smjera",
+        "3": "preskok jedinice / složene jedinice"
+      },
+      "parameters": {
+        "dimensions": [
+          "area",
+          "volume"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: jedinice površine (kvadrirani faktori), jedinice zapremine (kubirani faktori)",
+        "- pretvaranje NIKAD ne prelazi iz jedne fizičke dimenzije u drugu",
+        "- kvadratne jedinice nose kvadriran, a kubne kubiran faktor",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: faktori po dimenziji; kvadratni 100, kubni 1000 po koraku; bez miješanja dimenzija."
+    },
     "8-06-002": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "frequency_basic",
       "enforced_parameters": [
         "concepts"
@@ -6088,7 +7526,7 @@
     "8-06-003": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "frequency_basic",
       "enforced_parameters": [
         "concepts"
@@ -6122,7 +7560,7 @@
     "8-06-004": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "frequency_basic",
       "enforced_parameters": [
         "concepts"
@@ -6155,7 +7593,7 @@
     "8-06-009": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "arithmetic_mean",
       "enforced_parameters": [
         "concepts"
@@ -6188,10 +7626,78 @@
       ],
       "reviewer_note": "Invarijanta: sredina = zbir kroz broj podataka, egzaktno."
     },
+    "8-06-010": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "event_probability",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0252"
+      ],
+      "family_id": "event_probability_facts",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-06-010",
+      "level_bounds": {
+        "1": "poznati ogledi (novčić, kockica)",
+        "2": "kutije zadanog sastava",
+        "3": "poređenje vjerovatnoća i uzorkovanje"
+      },
+      "parameters": {
+        "concepts": [
+          "elementary_outcomes"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: broj elementarnih ishoda ogleda",
+        "- sastav ogleda (kuglice, strane kockice) mora biti u potpunosti naveden u zadatku",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: sastav ogleda naveden u zadatku; vjerovatnoća = povoljni/svi, egzaktno."
+    },
+    "8-06-011": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "event_probability",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-8-06-011"
+      ],
+      "family_id": "event_probability_facts",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-06-011",
+      "level_bounds": {
+        "1": "poznati ogledi (novčić, kockica)",
+        "2": "kutije zadanog sastava",
+        "3": "poređenje vjerovatnoća i uzorkovanje"
+      },
+      "parameters": {
+        "concepts": [
+          "event_classification"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: siguran, nemoguć ili slučajan događaj",
+        "- sastav ogleda (kuglice, strane kockice) mora biti u potpunosti naveden u zadatku",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: sastav ogleda naveden u zadatku; vjerovatnoća = povoljni/svi, egzaktno."
+    },
     "8-06-012": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "classical_probability",
       "enforced_parameters": [
         "concepts"
@@ -6225,7 +7731,7 @@
     "8-06-013": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "classical_probability",
       "enforced_parameters": [
         "concepts"
@@ -6259,7 +7765,7 @@
     "8-07-001": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "polynomial_basic",
       "enforced_parameters": [
         "concepts"
@@ -6295,7 +7801,7 @@
     "8-07-002": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "polynomial_basic",
       "enforced_parameters": [
         "concepts"
@@ -6328,7 +7834,7 @@
     "8-07-003": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "polynomial_basic",
       "enforced_parameters": [
         "concepts"
@@ -6365,7 +7871,7 @@
     "8-07-004": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "polynomial_basic",
       "enforced_parameters": [
         "concepts"
@@ -6398,7 +7904,7 @@
     "8-07-005": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "polynomial_basic",
       "enforced_parameters": [
         "concepts"
@@ -6431,7 +7937,7 @@
     "8-07-006": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "polynomial_basic",
       "enforced_parameters": [
         "concepts"
@@ -6465,7 +7971,7 @@
     "8-07-007": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "polynomial_basic",
       "enforced_parameters": [
         "concepts"
@@ -6498,7 +8004,7 @@
     "8-07-008": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "polynomial_basic",
       "enforced_parameters": [
         "concepts"
@@ -6534,7 +8040,7 @@
     "8-07-009": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "polynomial_basic",
       "enforced_parameters": [
         "concepts"
@@ -6570,7 +8076,7 @@
     "8-07-010": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "polynomial_basic",
       "enforced_parameters": [
         "concepts"
@@ -6606,7 +8112,7 @@
     "8-07-011": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "polynomial_basic",
       "enforced_parameters": [
         "concepts"
@@ -6642,7 +8148,7 @@
     "8-07-012": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "polynomial_basic",
       "enforced_parameters": [
         "concepts"
@@ -6675,7 +8181,7 @@
     "8-07-013": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "simple_quadratic",
       "enforced_parameters": [
         "shapes"
@@ -6709,7 +8215,7 @@
     "8-08-002": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "geometry_formula_2d",
       "enforced_parameters": [
         "kinds"
@@ -6742,10 +8248,45 @@
       ],
       "reviewer_note": "Invarijanta: kanonske formule i notacija (P/O/d/r/R=2r); egzaktan račun."
     },
+    "8-08-003": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "polygon_angle",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0293"
+      ],
+      "family_id": "polygon_angle_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "8-08-003",
+      "level_bounds": {
+        "1": "trougao/četverougao/petougao",
+        "2": "pravilan mnogougao (vanjski ugao)",
+        "3": "mnogouglovi do dvanaest stranica"
+      },
+      "parameters": {
+        "concepts": [
+          "exterior_sum",
+          "interior_sum"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: zbir vanjskih uglova (uvijek 360°), zbir unutrašnjih uglova (n-2)·180°",
+        "- zbir vanjskih uglova konveksnog mnogougla ne zavisi od broja stranica",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: vanjski zbir 360°, unutrašnji (n-2)·180°; pravilan n-ugao samo za n | 360."
+    },
     "8-08-004": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "geometry_formula_2d",
       "enforced_parameters": [
         "kinds"
@@ -6782,7 +8323,7 @@
     "8-08-005": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "geometry_formula_2d",
       "enforced_parameters": [
         "kinds"
@@ -6819,7 +8360,7 @@
     "8-08-007": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "geometry_formula_2d",
       "enforced_parameters": [
         "kinds"
@@ -6857,7 +8398,7 @@
     "8-08-009": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "geometry_formula_2d",
       "enforced_parameters": [
         "kinds"
@@ -6895,7 +8436,7 @@
     "8-08-010": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "geometry_formula_2d",
       "enforced_parameters": [
         "kinds"
@@ -6932,7 +8473,7 @@
     "8-08-011": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "geometry_formula_2d",
       "enforced_parameters": [
         "kinds"
@@ -6971,7 +8512,7 @@
     "8-08-012": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "geometry_formula_2d",
       "enforced_parameters": [
         "kinds"
@@ -7007,7 +8548,7 @@
     "9-01-001": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "polynomial_basic",
       "enforced_parameters": [
         "concepts"
@@ -7038,10 +8579,457 @@
       ],
       "reviewer_note": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja."
     },
+    "9-01-002": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "rational_expression",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-9-01-002"
+      ],
+      "family_id": "rational_expression_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-01-002",
+      "level_bounds": {
+        "1": "monomski imenioci, jedna direktna radnja",
+        "2": "binomni (linearni) imenioci, jedno kraćenje",
+        "3": "razlika kvadrata / dva povezana koraka"
+      },
+      "parameters": {
+        "concepts": [
+          "domain_condition"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: uslov definisanosti (nule imenioca)",
+        "- domen je dio identiteta: faktor koji se krati zadržava svoj uslov x ≠ vrijednost i u konačnom odgovoru",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: domen je dio identiteta — skraćeni oblik zadržava uslove x ≠ nula imenioca; kanonsko poređenje simboličko."
+    },
+    "9-01-003": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "rational_expression",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0316",
+        "KS_2018-0318"
+      ],
+      "family_id": "rational_expression_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-01-003",
+      "level_bounds": {
+        "1": "monomski imenioci, jedna direktna radnja",
+        "2": "binomni (linearni) imenioci, jedno kraćenje",
+        "3": "razlika kvadrata / dva povezana koraka"
+      },
+      "parameters": {
+        "concepts": [
+          "numeric_value"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: brojna vrijednost algebarskog razlomka",
+        "- domen je dio identiteta: faktor koji se krati zadržava svoj uslov x ≠ vrijednost i u konačnom odgovoru",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: domen je dio identiteta — skraćeni oblik zadržava uslove x ≠ nula imenioca; kanonsko poređenje simboličko."
+    },
+    "9-01-004": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "rational_expression",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0323"
+      ],
+      "family_id": "rational_expression_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-01-004",
+      "level_bounds": {
+        "1": "monomski imenioci, jedna direktna radnja",
+        "2": "binomni (linearni) imenioci, jedno kraćenje",
+        "3": "razlika kvadrata / dva povezana koraka"
+      },
+      "parameters": {
+        "concepts": [
+          "expand"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: proširivanje algebarskog razlomka",
+        "- domen je dio identiteta: faktor koji se krati zadržava svoj uslov x ≠ vrijednost i u konačnom odgovoru",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: domen je dio identiteta — skraćeni oblik zadržava uslove x ≠ nula imenioca; kanonsko poređenje simboličko."
+    },
+    "9-01-005": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "rational_expression",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-9-01-005"
+      ],
+      "family_id": "rational_expression_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-01-005",
+      "level_bounds": {
+        "1": "monomski imenioci, jedna direktna radnja",
+        "2": "binomni (linearni) imenioci, jedno kraćenje",
+        "3": "razlika kvadrata / dva povezana koraka"
+      },
+      "parameters": {
+        "concepts": [
+          "reduce"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: skraćivanje algebarskog razlomka faktorizacijom",
+        "- domen je dio identiteta: faktor koji se krati zadržava svoj uslov x ≠ vrijednost i u konačnom odgovoru",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: domen je dio identiteta — skraćeni oblik zadržava uslove x ≠ nula imenioca; kanonsko poređenje simboličko."
+    },
+    "9-01-006": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "rational_expression",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0316",
+        "KS_2018-0318"
+      ],
+      "family_id": "rational_expression_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-01-006",
+      "level_bounds": {
+        "1": "monomski imenioci, jedna direktna radnja",
+        "2": "binomni (linearni) imenioci, jedno kraćenje",
+        "3": "razlika kvadrata / dva povezana koraka"
+      },
+      "parameters": {
+        "concepts": [
+          "equal_fractions"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: prepoznavanje jednakih algebarskih razlomaka",
+        "- domen je dio identiteta: faktor koji se krati zadržava svoj uslov x ≠ vrijednost i u konačnom odgovoru",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: domen je dio identiteta — skraćeni oblik zadržava uslove x ≠ nula imenioca; kanonsko poređenje simboličko."
+    },
+    "9-01-007": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "rational_expression",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-9-01-007"
+      ],
+      "family_id": "rational_expression_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-01-007",
+      "level_bounds": {
+        "1": "monomski imenioci, jedna direktna radnja",
+        "2": "binomni (linearni) imenioci, jedno kraćenje",
+        "3": "razlika kvadrata / dva povezana koraka"
+      },
+      "parameters": {
+        "concepts": [
+          "common_denominator"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: najmanji zajednički imenilac",
+        "- domen je dio identiteta: faktor koji se krati zadržava svoj uslov x ≠ vrijednost i u konačnom odgovoru",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: domen je dio identiteta — skraćeni oblik zadržava uslove x ≠ nula imenioca; kanonsko poređenje simboličko."
+    },
+    "9-01-008": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "rational_expression",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-9-01-008"
+      ],
+      "family_id": "rational_expression_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-01-008",
+      "level_bounds": {
+        "1": "monomski imenioci, jedna direktna radnja",
+        "2": "binomni (linearni) imenioci, jedno kraćenje",
+        "3": "razlika kvadrata / dva povezana koraka"
+      },
+      "parameters": {
+        "concepts": [
+          "add"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: sabiranje algebarskih razlomaka",
+        "- domen je dio identiteta: faktor koji se krati zadržava svoj uslov x ≠ vrijednost i u konačnom odgovoru",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: domen je dio identiteta — skraćeni oblik zadržava uslove x ≠ nula imenioca; kanonsko poređenje simboličko."
+    },
+    "9-01-009": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "rational_expression",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-9-01-009"
+      ],
+      "family_id": "rational_expression_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-01-009",
+      "level_bounds": {
+        "1": "monomski imenioci, jedna direktna radnja",
+        "2": "binomni (linearni) imenioci, jedno kraćenje",
+        "3": "razlika kvadrata / dva povezana koraka"
+      },
+      "parameters": {
+        "concepts": [
+          "subtract"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: oduzimanje algebarskih razlomaka",
+        "- domen je dio identiteta: faktor koji se krati zadržava svoj uslov x ≠ vrijednost i u konačnom odgovoru",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: domen je dio identiteta — skraćeni oblik zadržava uslove x ≠ nula imenioca; kanonsko poređenje simboličko."
+    },
+    "9-01-010": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "rational_expression",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0323"
+      ],
+      "family_id": "rational_expression_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-01-010",
+      "level_bounds": {
+        "1": "monomski imenioci, jedna direktna radnja",
+        "2": "binomni (linearni) imenioci, jedno kraćenje",
+        "3": "razlika kvadrata / dva povezana koraka"
+      },
+      "parameters": {
+        "concepts": [
+          "multiply"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: množenje algebarskih razlomaka",
+        "- domen je dio identiteta: faktor koji se krati zadržava svoj uslov x ≠ vrijednost i u konačnom odgovoru",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: domen je dio identiteta — skraćeni oblik zadržava uslove x ≠ nula imenioca; kanonsko poređenje simboličko."
+    },
+    "9-01-011": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "rational_expression",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0323"
+      ],
+      "family_id": "rational_expression_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-01-011",
+      "level_bounds": {
+        "1": "monomski imenioci, jedna direktna radnja",
+        "2": "binomni (linearni) imenioci, jedno kraćenje",
+        "3": "razlika kvadrata / dva povezana koraka"
+      },
+      "parameters": {
+        "concepts": [
+          "divide"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: dijeljenje algebarskih razlomaka",
+        "- domen je dio identiteta: faktor koji se krati zadržava svoj uslov x ≠ vrijednost i u konačnom odgovoru",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: domen je dio identiteta — skraćeni oblik zadržava uslove x ≠ nula imenioca; kanonsko poređenje simboličko."
+    },
+    "9-01-012": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "rational_expression",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0317",
+        "KS_2018-0320",
+        "KS_2018-0323"
+      ],
+      "family_id": "rational_expression_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-01-012",
+      "level_bounds": {
+        "1": "monomski imenioci, jedna direktna radnja",
+        "2": "binomni (linearni) imenioci, jedno kraćenje",
+        "3": "razlika kvadrata / dva povezana koraka"
+      },
+      "parameters": {
+        "concepts": [
+          "compound_fraction"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: pojednostavljivanje dvojnog razlomka",
+        "- domen je dio identiteta: faktor koji se krati zadržava svoj uslov x ≠ vrijednost i u konačnom odgovoru",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: domen je dio identiteta — skraćeni oblik zadržava uslove x ≠ nula imenioca; kanonsko poređenje simboličko."
+    },
+    "9-01-013": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "rational_expression",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0317",
+        "KS_2018-0323"
+      ],
+      "family_id": "rational_expression_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-01-013",
+      "level_bounds": {
+        "1": "monomski imenioci, jedna direktna radnja",
+        "2": "binomni (linearni) imenioci, jedno kraćenje",
+        "3": "razlika kvadrata / dva povezana koraka"
+      },
+      "parameters": {
+        "concepts": [
+          "simplify_combined"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: sređivanje razlomljenog racionalnog izraza",
+        "- domen je dio identiteta: faktor koji se krati zadržava svoj uslov x ≠ vrijednost i u konačnom odgovoru",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: domen je dio identiteta — skraćeni oblik zadržava uslove x ≠ nula imenioca; kanonsko poređenje simboličko."
+    },
+    "9-01-014": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "rational_equation",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-9-01-014"
+      ],
+      "family_id": "rational_equation_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-01-014",
+      "level_bounds": {
+        "1": "a/x = b, cjelobrojno rješenje",
+        "2": "(x+a)/(x+b) = c",
+        "3": "razlomak = razlomak, moguć isključen kandidat (nema rješenja)"
+      },
+      "parameters": {
+        "concepts": [
+          "fraction_equation"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: jednačina s algebarskim razlomcima",
+        "- prije rješavanja se zapisuju uslovi definisanosti; kandidat koji upada u zabranjene vrijednosti NIJE rješenje",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: uslovi definisanosti prije rješavanja; kandidat u zabranjenoj vrijednosti nije rješenje."
+    },
     "9-03-001": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_function",
       "enforced_parameters": [
         "concepts"
@@ -7074,7 +9062,7 @@
     "9-03-002": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_function",
       "enforced_parameters": [
         "concepts"
@@ -7113,7 +9101,7 @@
     "9-03-003": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_function",
       "enforced_parameters": [
         "concepts"
@@ -7143,10 +9131,78 @@
       ],
       "reviewer_note": "Invarijanta: svaka tvrdnja o funkciji dokazana uvrštavanjem; tačke uvijek s imenom."
     },
+    "9-03-005": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "coordinate_line",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-9-03-005"
+      ],
+      "family_id": "coordinate_line_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-03-005",
+      "level_bounds": {
+        "1": "male Pitagorine trojke / direktno očitavanje",
+        "2": "negativni koeficijenti, podudarne prave",
+        "3": "razlomljeni koeficijenti i presjeci"
+      },
+      "parameters": {
+        "concepts": [
+          "slope_meaning"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: značenje koeficijenta k",
+        "- svi podaci su zadati u tekstu (koordinate, jednačine); crtanje i čitanje grafika nisu dio zadatka",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: sve tvrdnje dokazane uvrštavanjem; udaljenost preko Pitagorine teoreme egzaktno."
+    },
+    "9-03-006": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "coordinate_line",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-9-03-006"
+      ],
+      "family_id": "coordinate_line_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-03-006",
+      "level_bounds": {
+        "1": "male Pitagorine trojke / direktno očitavanje",
+        "2": "negativni koeficijenti, podudarne prave",
+        "3": "razlomljeni koeficijenti i presjeci"
+      },
+      "parameters": {
+        "concepts": [
+          "intercept_meaning"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: značenje slobodnog člana n",
+        "- svi podaci su zadati u tekstu (koordinate, jednačine); crtanje i čitanje grafika nisu dio zadatka",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: sve tvrdnje dokazane uvrštavanjem; udaljenost preko Pitagorine teoreme egzaktno."
+    },
     "9-03-007": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_function",
       "enforced_parameters": [
         "concepts"
@@ -7181,7 +9237,7 @@
     "9-03-008": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_function",
       "enforced_parameters": [
         "concepts"
@@ -7214,7 +9270,7 @@
     "9-03-009": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_function",
       "enforced_parameters": [
         "concepts"
@@ -7247,7 +9303,7 @@
     "9-03-011": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_function",
       "enforced_parameters": [
         "concepts"
@@ -7280,7 +9336,7 @@
     "9-03-012": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_function",
       "enforced_parameters": [
         "concepts"
@@ -7314,7 +9370,7 @@
     "9-03-013": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_function",
       "enforced_parameters": [
         "concepts"
@@ -7347,7 +9403,7 @@
     "9-03-014": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_function",
       "enforced_parameters": [
         "concepts"
@@ -7378,10 +9434,112 @@
       ],
       "reviewer_note": "Invarijanta: svaka tvrdnja o funkciji dokazana uvrštavanjem; tačke uvijek s imenom."
     },
+    "9-03-015": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "coordinate_line",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-9-03-015"
+      ],
+      "family_id": "coordinate_line_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-03-015",
+      "level_bounds": {
+        "1": "male Pitagorine trojke / direktno očitavanje",
+        "2": "negativni koeficijenti, podudarne prave",
+        "3": "razlomljeni koeficijenti i presjeci"
+      },
+      "parameters": {
+        "concepts": [
+          "parallel_lines"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: paralelne i podudarne prave preko k i n",
+        "- svi podaci su zadati u tekstu (koordinate, jednačine); crtanje i čitanje grafika nisu dio zadatka",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: sve tvrdnje dokazane uvrštavanjem; udaljenost preko Pitagorine teoreme egzaktno."
+    },
+    "9-03-017": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "coordinate_line",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-9-03-017"
+      ],
+      "family_id": "coordinate_line_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-03-017",
+      "level_bounds": {
+        "1": "male Pitagorine trojke / direktno očitavanje",
+        "2": "negativni koeficijenti, podudarne prave",
+        "3": "razlomljeni koeficijenti i presjeci"
+      },
+      "parameters": {
+        "concepts": [
+          "line_intersection"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: presjek dvije prave računom",
+        "- svi podaci su zadati u tekstu (koordinate, jednačine); crtanje i čitanje grafika nisu dio zadatka",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: sve tvrdnje dokazane uvrštavanjem; udaljenost preko Pitagorine teoreme egzaktno."
+    },
+    "9-03-021": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "coordinate_line",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-9-03-021"
+      ],
+      "family_id": "coordinate_line_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-03-021",
+      "level_bounds": {
+        "1": "male Pitagorine trojke / direktno očitavanje",
+        "2": "negativni koeficijenti, podudarne prave",
+        "3": "razlomljeni koeficijenti i presjeci"
+      },
+      "parameters": {
+        "concepts": [
+          "dependency_type"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: direktna, obrnuta ili linearna zavisnost",
+        "- svi podaci su zadati u tekstu (koordinate, jednačine); crtanje i čitanje grafika nisu dio zadatka",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: sve tvrdnje dokazane uvrštavanjem; udaljenost preko Pitagorine teoreme egzaktno."
+    },
     "9-04-001": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_equation",
       "enforced_parameters": [
         "number_domain",
@@ -7428,7 +9586,7 @@
     "9-04-002": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_equation",
       "enforced_parameters": [
         "number_domain",
@@ -7468,7 +9626,7 @@
     "9-04-003": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_equation",
       "enforced_parameters": [
         "number_domain",
@@ -7505,7 +9663,7 @@
     "9-04-004": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_equation",
       "enforced_parameters": [
         "number_domain",
@@ -7539,10 +9697,112 @@
       ],
       "reviewer_note": "Invarijanta: jedinstveno rješenje, provjera uvrštavanjem egzaktna."
     },
+    "9-04-005": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "rational_equation",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-9-04-005"
+      ],
+      "family_id": "rational_equation_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-04-005",
+      "level_bounds": {
+        "1": "a/x = b, cjelobrojno rješenje",
+        "2": "(x+a)/(x+b) = c",
+        "3": "razlomak = razlomak, moguć isključen kandidat (nema rješenja)"
+      },
+      "parameters": {
+        "concepts": [
+          "fraction_equation"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: jednačina s algebarskim razlomcima",
+        "- prije rješavanja se zapisuju uslovi definisanosti; kandidat koji upada u zabranjene vrijednosti NIJE rješenje",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: uslovi definisanosti prije rješavanja; kandidat u zabranjenoj vrijednosti nije rješenje."
+    },
+    "9-04-006": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "rational_equation",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-9-04-006"
+      ],
+      "family_id": "rational_equation_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-04-006",
+      "level_bounds": {
+        "1": "a/x = b, cjelobrojno rješenje",
+        "2": "(x+a)/(x+b) = c",
+        "3": "razlomak = razlomak, moguć isključen kandidat (nema rješenja)"
+      },
+      "parameters": {
+        "concepts": [
+          "double_fraction_equation"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: jednačina s dvojnim razlomkom",
+        "- prije rješavanja se zapisuju uslovi definisanosti; kandidat koji upada u zabranjene vrijednosti NIJE rješenje",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: uslovi definisanosti prije rješavanja; kandidat u zabranjenoj vrijednosti nije rješenje."
+    },
+    "9-04-007": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "parametric_linear",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-9-04-007"
+      ],
+      "family_id": "parametric_linear_discussion",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-04-007",
+      "level_bounds": {
+        "1": "nema rješenja / beskonačno mnogo (direktan slučaj)",
+        "2": "rješavanje uz zadan parametar",
+        "3": "potpuna klasifikacija sva tri slučaja"
+      },
+      "parameters": {
+        "concepts": [
+          "parameter_value_solve"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: rješavanje uz zadanu vrijednost parametra",
+        "- podjela slučajeva mora biti potpuna i međusobno isključiva (koeficijent nula naspram različit od nule)",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: potpuna i međusobno isključiva podjela slučajeva po koeficijentu uz x."
+    },
     "9-04-008": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_equation",
       "enforced_parameters": [
         "number_domain",
@@ -7579,7 +9839,7 @@
     "9-04-009": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_equation",
       "enforced_parameters": [
         "number_domain",
@@ -7613,10 +9873,44 @@
       ],
       "reviewer_note": "Invarijanta: jedinstveno rješenje, provjera uvrštavanjem egzaktna."
     },
+    "9-04-011": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "structured_word_problem",
+      "enforced_parameters": [
+        "problem_types"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-9-04-011"
+      ],
+      "family_id": "structured_word_problem",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-04-011",
+      "level_bounds": {
+        "1": "jedna direktna relacija, mali brojevi",
+        "2": "jedan dodatni korak (ostatak, kusur, druga promjena)",
+        "3": "veće vrijednosti ili više povezanih relacija"
+      },
+      "parameters": {
+        "problem_types": [
+          "number_equation"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: priča koja se svodi na linearnu jednačinu",
+        "- sve poznate veličine moraju biti izričito navedene u tekstu zadatka; odgovor slijedi isključivo iz njih",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: činjenice prije proze; svaki broj u tekstu odgovara IR veličini; odgovor izveden isključivo iz činjenica."
+    },
     "9-04-012": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_equation",
       "enforced_parameters": [
         "number_domain",
@@ -7654,10 +9948,46 @@
       ],
       "reviewer_note": "Invarijanta: jedinstveno rješenje, provjera uvrštavanjem egzaktna."
     },
+    "9-04-013": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "linear_inequality",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0354",
+        "KS_2018-0355",
+        "KS_2018-0363"
+      ],
+      "family_id": "linear_inequality_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-04-013",
+      "level_bounds": {
+        "1": "jedan korak, pozitivni koeficijenti",
+        "2": "negativan koeficijent (okretanje znaka)",
+        "3": "nestroge nejednakosti i intervali"
+      },
+      "parameters": {
+        "concepts": [
+          "equivalent_inequality"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: ekvivalentne nejednačine",
+        "- množenje ili dijeljenje negativnim brojem OBRĆE znak nejednakosti; transformacija se provjerava probnom vrijednošću",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: negativan množilac obrće znak; rješenje potvrđeno probnom vrijednošću."
+    },
     "9-04-014": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_equation",
       "enforced_parameters": [
         "number_domain",
@@ -7691,10 +10021,45 @@
       ],
       "reviewer_note": "Invarijanta: jedinstveno rješenje, provjera uvrštavanjem egzaktna."
     },
+    "9-04-015": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "linear_inequality",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "KS_2018-0045",
+        "RS_2014-0026"
+      ],
+      "family_id": "linear_inequality_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-04-015",
+      "level_bounds": {
+        "1": "jedan korak, pozitivni koeficijenti",
+        "2": "negativan koeficijent (okretanje znaka)",
+        "3": "nestroge nejednakosti i intervali"
+      },
+      "parameters": {
+        "concepts": [
+          "fraction_inequality"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: nejednačina s razlomljenim koeficijentima",
+        "- množenje ili dijeljenje negativnim brojem OBRĆE znak nejednakosti; transformacija se provjerava probnom vrijednošću",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: negativan množilac obrće znak; rješenje potvrđeno probnom vrijednošću."
+    },
     "9-04-016": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_equation",
       "enforced_parameters": [
         "number_domain",
@@ -7728,10 +10093,44 @@
       ],
       "reviewer_note": "Invarijanta: jedinstveno rješenje, provjera uvrštavanjem egzaktna."
     },
+    "9-04-018": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "linear_inequality",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-9-04-018"
+      ],
+      "family_id": "linear_inequality_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-04-018",
+      "level_bounds": {
+        "1": "jedan korak, pozitivni koeficijenti",
+        "2": "negativan koeficijent (okretanje znaka)",
+        "3": "nestroge nejednakosti i intervali"
+      },
+      "parameters": {
+        "concepts": [
+          "interval_solution"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: skup rješenja zapisan intervalom",
+        "- množenje ili dijeljenje negativnim brojem OBRĆE znak nejednakosti; transformacija se provjerava probnom vrijednošću",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: negativan množilac obrće znak; rješenje potvrđeno probnom vrijednošću."
+    },
     "9-04-019": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_equation",
       "enforced_parameters": [
         "number_domain",
@@ -7770,7 +10169,7 @@
     "9-04-020": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_equation",
       "enforced_parameters": [
         "number_domain",
@@ -7807,7 +10206,7 @@
     "9-04-021": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_equation",
       "enforced_parameters": [
         "number_domain",
@@ -7841,10 +10240,44 @@
       ],
       "reviewer_note": "Invarijanta: jedinstveno rješenje, provjera uvrštavanjem egzaktna."
     },
+    "9-04-022": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "parametric_linear",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-9-04-022"
+      ],
+      "family_id": "parametric_linear_discussion",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-04-022",
+      "level_bounds": {
+        "1": "nema rješenja / beskonačno mnogo (direktan slučaj)",
+        "2": "rješavanje uz zadan parametar",
+        "3": "potpuna klasifikacija sva tri slučaja"
+      },
+      "parameters": {
+        "concepts": [
+          "parameter_case"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: vrijednost parametra za traženi broj rješenja",
+        "- podjela slučajeva mora biti potpuna i međusobno isključiva (koeficijent nula naspram različit od nule)",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: potpuna i međusobno isključiva podjela slučajeva po koeficijentu uz x."
+    },
     "9-05-001": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_system_direct",
       "enforced_parameters": [
         "kinds"
@@ -7878,7 +10311,7 @@
     "9-05-003": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_system_direct",
       "enforced_parameters": [
         "kinds"
@@ -7919,7 +10352,7 @@
     "9-05-004": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_system_direct",
       "enforced_parameters": [
         "kinds"
@@ -7953,7 +10386,7 @@
     "9-05-005": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_system_direct",
       "enforced_parameters": [
         "kinds"
@@ -7988,7 +10421,7 @@
     "9-05-007": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_system_direct",
       "enforced_parameters": [
         "kinds"
@@ -8025,7 +10458,7 @@
     "9-05-008": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_system_direct",
       "enforced_parameters": [
         "kinds"
@@ -8062,7 +10495,7 @@
     "9-05-009": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_system_direct",
       "enforced_parameters": [
         "kinds"
@@ -8097,7 +10530,7 @@
     "9-05-010": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_system_direct",
       "enforced_parameters": [
         "kinds"
@@ -8131,7 +10564,7 @@
     "9-05-011": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_system_direct",
       "enforced_parameters": [
         "kinds"
@@ -8165,7 +10598,7 @@
     "9-05-012": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_system_direct",
       "enforced_parameters": [
         "kinds"
@@ -8196,10 +10629,45 @@
       ],
       "reviewer_note": "Invarijanta: rješenje uvršteno u OBJE jednačine; klasifikacija po determinanti."
     },
+    "9-05-013": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "structured_word_problem",
+      "enforced_parameters": [
+        "problem_types"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-9-05-013"
+      ],
+      "family_id": "structured_word_problem",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-05-013",
+      "level_bounds": {
+        "1": "jedna direktna relacija, mali brojevi",
+        "2": "jedan dodatni korak (ostatak, kusur, druga promjena)",
+        "3": "veće vrijednosti ili više povezanih relacija"
+      },
+      "parameters": {
+        "problem_types": [
+          "sum_difference_system",
+          "sum_multiple_system"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: zbir i razlika dva broja (sistem), zbir i višekratnik (sistem)",
+        "- sve poznate veličine moraju biti izričito navedene u tekstu zadatka; odgovor slijedi isključivo iz njih",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: činjenice prije proze; svaki broj u tekstu odgovara IR veličini; odgovor izveden isključivo iz činjenica."
+    },
     "9-05-014": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_system_direct",
       "enforced_parameters": [
         "kinds"
@@ -8233,7 +10701,7 @@
     "9-05-015": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_system_direct",
       "enforced_parameters": [
         "kinds"
@@ -8270,7 +10738,7 @@
       "advisory_parameters": [
         "fraction_coefficients"
       ],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "linear_system_direct",
       "enforced_parameters": [
         "kinds"
@@ -8302,10 +10770,44 @@
       ],
       "reviewer_note": "Invarijanta: rješenje uvršteno u OBJE jednačine; klasifikacija po determinanti."
     },
+    "9-05-017": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "parametric_linear",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-9-05-017"
+      ],
+      "family_id": "parametric_linear_discussion",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-05-017",
+      "level_bounds": {
+        "1": "nema rješenja / beskonačno mnogo (direktan slučaj)",
+        "2": "rješavanje uz zadan parametar",
+        "3": "potpuna klasifikacija sva tri slučaja"
+      },
+      "parameters": {
+        "concepts": [
+          "parametric_system_classification"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: broj rješenja sistema s parametrom",
+        "- podjela slučajeva mora biti potpuna i međusobno isključiva (koeficijent nula naspram različit od nule)",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: potpuna i međusobno isključiva podjela slučajeva po koeficijentu uz x."
+    },
     "9-06-001": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "polynomial_basic",
       "enforced_parameters": [
         "concepts"
@@ -8338,7 +10840,7 @@
     "9-06-002": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "polynomial_basic",
       "enforced_parameters": [
         "concepts"
@@ -8371,7 +10873,7 @@
     "9-06-003": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "polynomial_basic",
       "enforced_parameters": [
         "concepts"
@@ -8404,7 +10906,7 @@
     "9-06-004": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "polynomial_basic",
       "enforced_parameters": [
         "concepts"
@@ -8437,7 +10939,7 @@
     "9-06-005": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "polynomial_basic",
       "enforced_parameters": [
         "concepts"
@@ -8475,7 +10977,7 @@
     "9-06-006": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "polynomial_basic",
       "enforced_parameters": [
         "concepts"
@@ -8508,7 +11010,7 @@
     "9-06-007": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "polynomial_basic",
       "enforced_parameters": [
         "concepts"
@@ -8542,7 +11044,7 @@
     "9-06-008": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "polynomial_basic",
       "enforced_parameters": [
         "concepts"
@@ -8577,7 +11079,7 @@
     "9-06-009": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "polynomial_basic",
       "enforced_parameters": [
         "concepts"
@@ -8610,7 +11112,7 @@
     "9-06-010": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "polynomial_basic",
       "enforced_parameters": [
         "concepts"
@@ -8643,7 +11145,7 @@
     "9-06-011": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "polynomial_basic",
       "enforced_parameters": [
         "concepts"
@@ -8676,7 +11178,7 @@
     "9-06-012": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "polynomial_basic",
       "enforced_parameters": [
         "concepts"
@@ -8709,7 +11211,7 @@
     "9-06-013": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "simple_quadratic",
       "enforced_parameters": [
         "shapes"
@@ -8743,7 +11245,7 @@
     "9-06-014": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "simple_quadratic",
       "enforced_parameters": [
         "shapes"
@@ -8777,7 +11279,7 @@
     "9-06-015": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "simple_quadratic",
       "enforced_parameters": [
         "shapes"
@@ -8811,7 +11313,7 @@
     "9-06-016": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "polynomial_basic",
       "enforced_parameters": [
         "concepts"
@@ -8844,7 +11346,7 @@
     "9-07-001": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "solid_geometry_direct",
       "enforced_parameters": [
         "kinds"
@@ -8879,7 +11381,7 @@
     "9-07-002": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "solid_geometry_direct",
       "enforced_parameters": [
         "kinds"
@@ -8914,7 +11416,7 @@
     "9-07-004": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "solid_geometry_direct",
       "enforced_parameters": [
         "kinds"
@@ -8950,7 +11452,7 @@
     "9-07-005": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "solid_geometry_direct",
       "enforced_parameters": [
         "kinds"
@@ -8992,7 +11494,7 @@
     "9-07-007": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "solid_geometry_direct",
       "enforced_parameters": [
         "kinds"
@@ -9028,7 +11530,7 @@
     "9-07-008": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "solid_geometry_direct",
       "enforced_parameters": [
         "kinds"
@@ -9063,7 +11565,7 @@
     "9-07-010": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "solid_geometry_direct",
       "enforced_parameters": [
         "kinds"
@@ -9101,7 +11603,7 @@
     "9-07-011": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "solid_geometry_direct",
       "enforced_parameters": [
         "kinds"
@@ -9139,7 +11641,7 @@
     "9-07-012": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "solid_geometry_direct",
       "enforced_parameters": [
         "kinds"
@@ -9174,7 +11676,7 @@
     "9-07-014": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "solid_geometry_direct",
       "enforced_parameters": [
         "kinds"
@@ -9209,7 +11711,7 @@
     "9-07-017": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "solid_geometry_direct",
       "enforced_parameters": [
         "kinds"
@@ -9247,7 +11749,7 @@
     "9-07-018": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "solid_geometry_direct",
       "enforced_parameters": [
         "kinds"
@@ -9285,7 +11787,7 @@
     "9-07-019": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "solid_geometry_direct",
       "enforced_parameters": [
         "kinds"
@@ -9320,7 +11822,7 @@
     "9-07-022": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "solid_geometry_direct",
       "enforced_parameters": [
         "kinds"
@@ -9356,7 +11858,7 @@
     "9-07-023": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "solid_geometry_direct",
       "enforced_parameters": [
         "kinds"
@@ -9393,7 +11895,7 @@
     "9-07-024": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "solid_geometry_direct",
       "enforced_parameters": [
         "kinds"
@@ -9429,7 +11931,7 @@
     "9-07-025": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "solid_geometry_direct",
       "enforced_parameters": [
         "kinds"
@@ -9464,7 +11966,7 @@
     "9-07-027": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "solid_geometry_direct",
       "enforced_parameters": [
         "kinds"
@@ -9499,7 +12001,7 @@
     "9-07-028": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "solid_geometry_direct",
       "enforced_parameters": [
         "kinds"
@@ -9536,7 +12038,7 @@
     "9-07-030": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "solid_geometry_direct",
       "enforced_parameters": [
         "kinds"
@@ -9571,7 +12073,7 @@
     "9-07-031": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "solid_geometry_direct",
       "enforced_parameters": [
         "kinds"
@@ -9603,10 +12105,81 @@
       ],
       "reviewer_note": "Invarijanta: kanonske formule tijela (B/M/P/V/H/h_a/D); π i korijeni egzaktni."
     },
+    "9-07-033": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "structured_word_problem",
+      "enforced_parameters": [
+        "problem_types"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-9-07-033"
+      ],
+      "family_id": "structured_word_problem",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-07-033",
+      "level_bounds": {
+        "1": "jedna direktna relacija, mali brojevi",
+        "2": "jedan dodatni korak (ostatak, kusur, druga promjena)",
+        "3": "veće vrijednosti ili više povezanih relacija"
+      },
+      "parameters": {
+        "problem_types": [
+          "box_volume",
+          "cube_surface"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: zapremina kvadra iz priče, površina kocke iz priče",
+        "- sve poznate veličine moraju biti izričito navedene u tekstu zadatka; odgovor slijedi isključivo iz njih",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: činjenice prije proze; svaki broj u tekstu odgovara IR veličini; odgovor izveden isključivo iz činjenica."
+    },
+    "9-07-034": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "unit_conversion",
+      "enforced_parameters": [
+        "dimensions"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-9-07-034"
+      ],
+      "family_id": "unit_conversion_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-07-034",
+      "level_bounds": {
+        "1": "susjedne jedinice, cijeli brojevi",
+        "2": "decimalni iznosi, oba smjera",
+        "3": "preskok jedinice / složene jedinice"
+      },
+      "parameters": {
+        "dimensions": [
+          "area",
+          "volume"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: jedinice površine (kvadrirani faktori), jedinice zapremine (kubirani faktori)",
+        "- pretvaranje NIKAD ne prelazi iz jedne fizičke dimenzije u drugu",
+        "- kvadratne jedinice nose kvadriran, a kubne kubiran faktor",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: faktori po dimenziji; kvadratni 100, kubni 1000 po koraku; bez miješanja dimenzija."
+    },
     "9-07-038": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "solid_geometry_direct",
       "enforced_parameters": [
         "kinds"
@@ -9641,7 +12214,7 @@
     "9-08-001": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "classical_probability",
       "enforced_parameters": [
         "concepts"
@@ -9675,7 +12248,7 @@
     "9-08-002": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "classical_probability",
       "enforced_parameters": [
         "concepts"
@@ -9707,10 +12280,215 @@
       ],
       "reviewer_note": "Invarijanta: vjerovatnoća = povoljni/svi, u [0,1]."
     },
+    "9-08-003": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "event_probability",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-9-08-003"
+      ],
+      "family_id": "event_probability_facts",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-08-003",
+      "level_bounds": {
+        "1": "poznati ogledi (novčić, kockica)",
+        "2": "kutije zadanog sastava",
+        "3": "poređenje vjerovatnoća i uzorkovanje"
+      },
+      "parameters": {
+        "concepts": [
+          "probability_decision"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: odluka poređenjem egzaktnih vjerovatnoća",
+        "- sastav ogleda (kuglice, strane kockice) mora biti u potpunosti naveden u zadatku",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: sastav ogleda naveden u zadatku; vjerovatnoća = povoljni/svi, egzaktno."
+    },
+    "9-08-004": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "financial_arithmetic",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-9-08-004"
+      ],
+      "family_id": "financial_arithmetic_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-08-004",
+      "level_bounds": {
+        "1": "mali iznosi, jedna godina, okrugle stope",
+        "2": "veći iznosi, dvije-tri godine",
+        "3": "necjelobrojni iznosi i više stavki"
+      },
+      "parameters": {
+        "concepts": [
+          "currency_conversion"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: preračunavanje valuta po navedenom kursu",
+        "- svaki kurs i svaka stopa moraju biti navedeni u zadatku; stvarni bankarski uslovi i složena kamata nisu u obimu",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: sve stope u zadatku; egzaktan decimalan račun (nikad float); prosta kamata K = G·p·t/100."
+    },
+    "9-08-005": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "financial_arithmetic",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-9-08-005"
+      ],
+      "family_id": "financial_arithmetic_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-08-005",
+      "level_bounds": {
+        "1": "mali iznosi, jedna godina, okrugle stope",
+        "2": "veći iznosi, dvije-tri godine",
+        "3": "necjelobrojni iznosi i više stavki"
+      },
+      "parameters": {
+        "concepts": [
+          "simple_interest"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: prosta kamata na štednju",
+        "- svaki kurs i svaka stopa moraju biti navedeni u zadatku; stvarni bankarski uslovi i složena kamata nisu u obimu",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: sve stope u zadatku; egzaktan decimalan račun (nikad float); prosta kamata K = G·p·t/100."
+    },
+    "9-08-006": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "financial_arithmetic",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-9-08-006"
+      ],
+      "family_id": "financial_arithmetic_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-08-006",
+      "level_bounds": {
+        "1": "mali iznosi, jedna godina, okrugle stope",
+        "2": "veći iznosi, dvije-tri godine",
+        "3": "necjelobrojni iznosi i više stavki"
+      },
+      "parameters": {
+        "concepts": [
+          "credit_repayment"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: ukupan povrat kredita (glavnica + kamata)",
+        "- svaki kurs i svaka stopa moraju biti navedeni u zadatku; stvarni bankarski uslovi i složena kamata nisu u obimu",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: sve stope u zadatku; egzaktan decimalan račun (nikad float); prosta kamata K = G·p·t/100."
+    },
+    "9-08-008": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "financial_arithmetic",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-9-08-008"
+      ],
+      "family_id": "financial_arithmetic_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-08-008",
+      "level_bounds": {
+        "1": "mali iznosi, jedna godina, okrugle stope",
+        "2": "veći iznosi, dvije-tri godine",
+        "3": "necjelobrojni iznosi i više stavki"
+      },
+      "parameters": {
+        "concepts": [
+          "budget_balance",
+          "percent_change_price"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: stanje ličnog budžeta, sniženje ili poskupljenje za procenat",
+        "- svaki kurs i svaka stopa moraju biti navedeni u zadatku; stvarni bankarski uslovi i složena kamata nisu u obimu",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: sve stope u zadatku; egzaktan decimalan račun (nikad float); prosta kamata K = G·p·t/100."
+    },
+    "9-08-009": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "event_probability",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-9-08-009"
+      ],
+      "family_id": "event_probability_facts",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "9-08-009",
+      "level_bounds": {
+        "1": "poznati ogledi (novčić, kockica)",
+        "2": "kutije zadanog sastava",
+        "3": "poređenje vjerovatnoća i uzorkovanje"
+      },
+      "parameters": {
+        "concepts": [
+          "population_sample"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: populacija naspram uzorka",
+        "- sastav ogleda (kuglice, strane kockice) mora biti u potpunosti naveden u zadatku",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: sastav ogleda naveden u zadatku; vjerovatnoća = povoljni/svi, egzaktno."
+    },
     "9-08-010": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "arithmetic_mean",
       "enforced_parameters": [
         "concepts"
@@ -9743,7 +12521,7 @@
     "9-08-011": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "unit_conversion",
       "enforced_parameters": [
         "dimensions"
@@ -9780,7 +12558,7 @@
     "9-08-012": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "power_arithmetic",
       "enforced_parameters": [
         "concepts"
@@ -9813,7 +12591,7 @@
     "9-08-013": {
       "activation_class": "READY",
       "advisory_parameters": [],
-      "contract_version": "5E.1",
+      "contract_version": "5F.1",
       "detector": "unit_conversion",
       "enforced_parameters": [
         "dimensions"
