@@ -172,17 +172,25 @@ def test_easy_control_lesson_keeps_the_global_rubric():
     assert profile_for(*EASY_CONTROL) is None
 
 
-def test_lessons_with_a_semantic_contract_never_resolve_a_profile():
-    """Deterministička pokrivenost (272) se NE dira: ugovorna lekcija ostaje
-    na globalnoj rubrici čak i kad joj je primarna porodica dodijeljena."""
+def test_profile_resolution_is_strategy_independent():
+    """Batch #4: profil se razrješava po primarnoj porodici za SVAKU lekciju
+    — i determinističku i model-only — pa lekcija ima tačno JEDAN autoritet
+    težine. (U F5G je važila konzervativna ograda „samo bez semantičkog
+    ugovora“; aktivacija profiliranih lekcija ju je učinila štetnom: vratila
+    bi globalni sudar na slobodne model-turnove istih lekcija.) Da SVAKI
+    deterministički paket zadovoljava razriješeni profil na svakom nivou
+    dokazuje tests/test_batch4_deterministic.py."""
     compiled = json.loads(
         (ROOT / "data" / "lesson_semantics.compiled.json").read_text(encoding="utf-8"))
-    lesson_ids = sorted(compiled["lessons"].keys())
-    assert len(lesson_ids) == 272
-    for lesson_id in lesson_ids:
+    assignments = difficulty_profiles.family_assignments()
+    for lesson_id in sorted(compiled["lessons"].keys()):
         context = build(int(lesson_id.split("-")[0]), lesson_id)
         assert context is not None, lesson_id
-        assert difficulty_profiles.resolve_for_context(context) is None, lesson_id
+        profile = difficulty_profiles.resolve_for_context(context)
+        if context.primary_family in assignments:
+            assert profile is not None, lesson_id
+        else:
+            assert profile is None, lesson_id
 
 
 def test_profile_resolution_uses_only_server_context():
@@ -195,30 +203,28 @@ def test_profile_resolution_uses_only_server_context():
     assert parameters == ["context"]
 
 
-def test_model_only_profile_coverage_counts():
-    """Audit Koraka 9: 262 MODEL_ONLY lekcije; profil nosi TAČNO 77 (75
-    geometrijskih + 1 override za udaljenost u koordinatnom sistemu u
-    direct_formula_application, plus 1 system_word_problem), sve ostale
-    ostaju na podrazumijevanoj globalnoj rubrici (fail-closed)."""
-    compiled = json.loads(
-        (ROOT / "data" / "lesson_semantics.compiled.json").read_text(encoding="utf-8"))
-    det = set(compiled["lessons"].keys())
+def test_profile_coverage_is_family_driven():
+    """Profil nose TAČNO lekcije čija je primarna porodica dodijeljena u
+    data/difficulty_profiles.json — ništa po ID-ju, ništa po naslovu. Skup
+    dodjela ostaje minimalan (dvije porodice iz živih F5G/F5H dokaza)."""
+    assignments = difficulty_profiles.family_assignments()
+    assert assignments == {
+        "direct_formula_application": "direct_formula_application",
+        "system_word_problem": "system_word_translation",
+    }
     topics = json.loads((ROOT / "data" / "topics.json").read_text(encoding="utf-8"))
-    profiled, model_only = {}, 0
+    profiled = {}
     for grade_key, grade_data in topics["grades"].items():
         for lesson in grade_data["lessons"]:
-            if lesson["id"] in det:
-                continue
-            model_only += 1
-            profile = difficulty_profiles.resolve_for_context(
-                build(int(grade_key), lesson["id"]))
+            context = build(int(grade_key), lesson["id"])
+            profile = difficulty_profiles.resolve_for_context(context)
+            expected = assignments.get(context.primary_family)
+            assert (profile.profile_id if profile else None) == expected, \
+                lesson["id"]
             if profile is not None:
                 profiled.setdefault(profile.profile_id, []).append(lesson["id"])
-    assert model_only == 262
-    # 75 geometrijskih + 1 routing override (udaljenost između dvije tačke).
-    assert len(profiled.get("direct_formula_application", [])) == 76
     assert "8-02-004" in profiled["direct_formula_application"]
-    assert profiled.get("system_word_translation", []) == ["9-05-013"]
+    assert "9-05-013" in profiled["system_word_translation"]
 
 
 # ---------------------------------------------------------------------------
@@ -427,13 +433,19 @@ def test_live_pyramid_fresh_level_1_now_publishes(monkeypatch):
 
 
 def test_live_system_fresh_level_1_now_publishes(monkeypatch):
+    """Batch #4: lekcija je aktivirana deterministički, pa se MODEL-ruta
+    (koju ovaj test dokazuje) simulira privremenim uklanjanjem semantičkog
+    ugovora — profil se od Batch #4 razrješava po porodici, ne po ugovoru."""
+    from matbot.semantics import contracts as semantic_contracts
+
     _enable(monkeypatch)
     context, store, fake = build(*SYSTEM_WORDS), SessionStore(), FakeLLM()
     queue(fake, context, task(context, SYSTEM_TEXT, SYSTEM_OPTIONS,
                               signature="system-direct",
                               task_evidence=LIVE_SYSTEM_L1))
 
-    response = run_practice_turn(store, fake, turn(*SYSTEM_WORDS))
+    with semantic_contracts.override_contracts({}):
+        response = run_practice_turn(store, fake, turn(*SYSTEM_WORDS))
     session = store.peek(SESSION)
 
     assert response["status"] == "ready"
@@ -459,7 +471,12 @@ def test_overcomplex_pyramid_level_1_still_fails_closed(monkeypatch):
 
 
 def test_easy_lesson_level_1_still_rejects_three_operations(monkeypatch):
-    """Kontrola: globalna rubrika lake lekcije NIJE popuštena kroz pipeline."""
+    """Kontrola: globalna rubrika lake lekcije NIJE popuštena kroz pipeline.
+
+    Batch #4: lekcija je deterministički aktivirana, pa se model-ruta (koju
+    ovaj test dokazuje) simulira privremenim uklanjanjem ugovora."""
+    from matbot.semantics import contracts as semantic_contracts
+
     _enable(monkeypatch)
     context, store, fake = build(*EASY_CONTROL), SessionStore(), FakeLLM()
     dishonest = ev(1, 1, 3, 0)
@@ -471,7 +488,8 @@ def test_easy_lesson_level_1_still_rejects_three_operations(monkeypatch):
                signature="easy-three-ops", task_evidence=dishonest),
           decision="approve", reviewed=dishonest)
 
-    response = run_practice_turn(store, fake, turn(*EASY_CONTROL))
+    with semantic_contracts.override_contracts({}):
+        response = run_practice_turn(store, fake, turn(*EASY_CONTROL))
 
     assert response["answer"] == SAFE_ERROR_MESSAGE
     assert store.peek(SESSION) is None

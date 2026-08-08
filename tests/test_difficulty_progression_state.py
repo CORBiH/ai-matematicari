@@ -26,7 +26,7 @@ from matbot.tutor import pipeline as tutor_pipeline
 from tests.conftest import (make_reviewer_final, make_task_payload, make_tutor_draft,
                             queue_two_call)
 
-LESSON = "6-04-013"
+LESSON = "6-04-001"
 SESSION = "prog-1"
 
 

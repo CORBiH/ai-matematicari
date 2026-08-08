@@ -471,7 +471,7 @@ def test_gate_harness_preserves_safe_first_call_llm_failure_details(
     # Kapacitetna ekspanzija: 6-03-001 sada ide determinističkom strategijom
     # (0 poziva), pa prvi poziv modela mora simulirati lekcija koja je OSTALA
     # na model-putu.
-    scenario = canary.Scenario("first-failure", "6-03-010", 6, "non_contract", "",
+    scenario = canary.Scenario("first-failure", "6-04-001", 6, "non_contract", "",
                                 "first-failure", "Daj mi zadatak.")
     result, stop = canary._run_one_turn(
         SessionStore(), counter, canary._LogCapture(), report, scenario, "release-gate")

@@ -27,7 +27,7 @@ from tests.conftest import (make_reviewer_final, make_task_payload,  # noqa: E40
 
 PILOT_LESSON = "6-04-009"          # sabiranje/oduzimanje JEDNAKIH imenilaca
 PILOT_GRADE = 6
-NON_PILOT_LESSON = "6-04-015"      # i dalje BEZ semantičkog ugovora (Batch #2)
+NON_PILOT_LESSON = "6-04-001"      # pojmovna — i dalje BEZ semantičkog ugovora (Batch #4)
 DIVISIBILITY_LESSON = "6-03-004"   # dokazano blokiranje koje mora ostati isto
 
 VALID_TEXT = "Izračunaj $\\frac{2}{7} + \\frac{3}{7}$."

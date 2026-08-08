@@ -22,7 +22,7 @@ from tests.conftest import (FakeLLM, make_reviewer_final, make_task_payload,
 
 GRADE = 6
 DET_LESSON = "6-04-009"          # porodica s potpunim generatorom
-MODEL_LESSON = "6-03-010"        # tekstualni zadaci — bez ugovora, model-put
+MODEL_LESSON = "6-04-001"        # pojmovna lekcija — bez ugovora, model-put
 SESSION = "det-route"
 
 

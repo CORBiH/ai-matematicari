@@ -15,7 +15,7 @@ import random
 import pytest
 
 from matbot import deterministic as registry
-from matbot import lesson_fidelity
+from matbot import difficulty_profiles, lesson_fidelity
 from matbot.mathcheck import find_numeric_inconsistencies
 from matbot.mathsafe import sanitize_and_validate_math_text
 from matbot.semantics import contracts as semantic_contracts
@@ -40,12 +40,14 @@ CASES = [(lesson_id, family_id, level)
 
 
 def test_expansion_reached_the_intended_scale():
-    """Batch #3: 272 determinističkih lekcija u 30 porodica, sva četiri razreda."""
-    assert len(_DETERMINISTIC_LESSONS) >= 272, len(_DETERMINISTIC_LESSONS)
+    """Batch #4: 352 determinističke lekcije u 44 porodice, sva četiri
+    razreda — i nijedna ranija (Batch ≤ 3) lekcija nije izgubila pokrivenost
+    (272 → 352 je čisto proširenje)."""
+    assert len(_DETERMINISTIC_LESSONS) == 352, len(_DETERMINISTIC_LESSONS)
     grades = {lesson_id[0] for lesson_id, _family in _DETERMINISTIC_LESSONS}
     assert grades == {"6", "7", "8", "9"}, grades
     families = {family for _lesson, family in _DETERMINISTIC_LESSONS}
-    assert len(families) >= 30, sorted(families)
+    assert len(families) == 44, sorted(families)
 
 
 def _context(lesson_id):
@@ -69,17 +71,26 @@ def test_every_compiled_lesson_produces_fully_valid_packages(
         lesson_id, family_id, level):
     context = _context(lesson_id)
     requirement = lesson_fidelity.semantic_task_requirement(context.title)
+    profile = difficulty_profiles.resolve_for_context(context)
     for seed in range(SEEDS):
         package = _generate(context, level, seed)
         payload = package.task_payload()
 
         validate_task(payload)
+        # Isti poziv kao server (pipeline prosljeđuje profil) — globalna
+        # rubrika bez profila bi lažno oborila iskren dokaz formulskih i
+        # sistemskih lekcija (živi F5G/F5H nalaz).
         issues = package_preflight.collect_package_issues(
-            payload, contract=context.semantic_contract)
+            payload, contract=context.semantic_contract,
+            difficulty_profile=profile)
         assert issues == (), (lesson_id, level, seed,
                               package_preflight.describe_issues(issues))
+        # Batch #4: dokaz težine se mjeri ISTIM autoritetom kao na serveru —
+        # lekcijski-relativni profil razriješen iz konteksta (ili globalna
+        # rubrika kad ga lekcija nema). Ovo je i formalan dokaz da SVAKI
+        # deterministički paket zadovoljava razriješeni profil na svakom nivou.
         assert difficulty_evidence_errors(
-            payload.difficulty_evidence, level) == ()
+            payload.difficulty_evidence, level, profile=profile) == ()
         assert payload.selected_lesson_id == lesson_id
         assert payload.target_difficulty_level == level
         # Tačno jedna označena opcija; identitet paketa je stabilan po sjemenu.

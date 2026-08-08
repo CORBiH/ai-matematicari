@@ -25,10 +25,15 @@ RESULT_DIR = ROOT / "scratchpad" / "live_release_gate"
 # Kapacitetna ekspanzija: lekcije oblasti djeljivosti dobijaju blocking
 # semantičke ugovore u talasima (6-03-004 u prvom, 6-03-002 u Batch #2), pa
 # model-scenarije kapije nosi lekcija koja je KLASIFIKATOROM ostala na
-# model-putu (tekstualni zadaci iz djeljivosti). `_require_model_routed_plan`
-# ispod pada GLASNO pri gradnji plana — prije ijednog SDK poziva — ako neka
-# buduća aktivacija i ovu lekciju učini determinističkom.
-CORE_DIVISIBILITY = ("6-03-010", 6)
+# model-putu. `_require_model_routed_plan` ispod pada GLASNO pri gradnji
+# plana — prije ijednog SDK poziva — ako neka buduća aktivacija i ovu
+# lekciju učini determinističkom.
+#
+# Batch #4: i „Tekstualni zadaci iz djeljivosti“ (6-03-010) je aktivirana
+# (structured_word_problem, nula poziva), pa model-scenarije kapije od ove
+# faze nosi POJMOVNA lekcija razlomaka — klasifikovana CONCEPTUAL_ONLY,
+# dakle trajno na model-putu, s punim tokom (svjež/teže/lakše/hint/rješenje).
+CORE_MODEL = ("6-04-001", 6)
 # Lekcija koja i dalje ide DETERMINISTIČKIM K1/K3 putem (nema semantički
 # ugovor). Ranije je ovdje stajala 6-04-009, ali ona od Faze 4B ide
 # semantičkim dvopozivnim putem — vidi CORE_SEMANTIC.
@@ -122,7 +127,7 @@ def _select_rotating_lesson(grade: int, commit_sha: str) -> tuple[str, int]:
     for row in _all_lessons_for_grade(grade):
         lesson_id = str(row["id"])
         title = str(row["title"])
-        if lesson_id in {CORE_DIVISIBILITY[0], CORE_CONTRACT[0], CORE_SEMANTIC[0]}:
+        if lesson_id in {CORE_MODEL[0], CORE_CONTRACT[0], CORE_SEMANTIC[0]}:
             continue
         if contract_registry.contract_for(lesson_id) is not None:
             continue
@@ -188,19 +193,19 @@ def build_release_gate_plan(commit_sha: str) -> tuple[GateScenario, ...]:
         )
 
     plan = (
-        scenario("release_gate_divisibility_fresh_level1", CORE_DIVISIBILITY, "", "release-core",
+        scenario("release_gate_core_fresh_level1", CORE_MODEL, "", "release-core",
                  "Daj mi zadatak.", 2, role="fresh_level1"),
-        scenario("release_gate_correct_committed_choice", CORE_DIVISIBILITY, "", "release-core", "", 1,
+        scenario("release_gate_correct_committed_choice", CORE_MODEL, "", "release-core", "", 1,
                  requires=1, interaction="correct_choice", role="correct_choice"),
-        scenario("release_gate_divisibility_harder_level1_to_2", CORE_DIVISIBILITY, "harder",
+        scenario("release_gate_core_harder_level1_to_2", CORE_MODEL, "harder",
                  "release-core", "Daj mi teži zadatak.", 2, requires=1, role="harder_level2"),
-        scenario("release_gate_first_hint", CORE_DIVISIBILITY, "", "release-core", "Ne znam.", 1,
+        scenario("release_gate_first_hint", CORE_MODEL, "", "release-core", "Ne znam.", 1,
                  requires=2, interaction="hint", intent="hint_request", role="first_hint"),
-        scenario("release_gate_full_solution", CORE_DIVISIBILITY, "", "release-core", "Uradi ga ti.", 1,
+        scenario("release_gate_full_solution", CORE_MODEL, "", "release-core", "Uradi ga ti.", 1,
                  requires=2, interaction="full_solution", intent="solution_request", role="full_solution"),
-        scenario("release_gate_divisibility_easier_level2_to_1", CORE_DIVISIBILITY, "easier",
+        scenario("release_gate_core_easier_level2_to_1", CORE_MODEL, "easier",
                  "release-core", "Daj mi lakši zadatak.", 2, requires=2, role="easier_level1"),
-        scenario("release_gate_divisibility_new_same_level", CORE_DIVISIBILITY, "", "release-core",
+        scenario("release_gate_core_new_same_level", CORE_MODEL, "", "release-core",
                  "Daj mi novi zadatak.", 2, requires=1, role="same_level_new"),
         scenario("release_gate_contract_fresh", CORE_CONTRACT, "", "release-contract", "Daj mi zadatak.", 1,
                  path="contract", role="contract_fresh"),

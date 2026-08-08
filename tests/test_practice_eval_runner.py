@@ -25,7 +25,7 @@ from tools.practice_eval.scenario import (Scenario, ScenarioError, load_scenario
 SCENARIO_DIR = runner.ROOT / "tools" / "practice_eval" / "scenarios"
 WAVE_A = SCENARIO_DIR / "wave_a.jsonl"
 WAVE_B = SCENARIO_DIR / "wave_b.jsonl"
-LESSON = "6-04-013"          # Svojstva operacija s razlomcima — non-contract
+LESSON = "6-04-001"          # Pojam razlomka — pojmovna, trajno non-contract
 # Faza 4C: tri koraka koji GENERISU zadatak u A06/A07 presla su na
 # semanticki dvopozivni put (jedan poziv vise po koraku), pa se najveci
 # procijenjeni budzet talasa A podigao sa 100 na 103. Hint koraci ostaju

@@ -67,6 +67,26 @@ REPRESENTATIVES = [
     ("linear_system_direct", 9, "9-05-007"),
     ("polynomial_basic", 8, "8-07-009"),
     ("polynomial_basic", 9, "9-06-006"),
+    # Batch #4 — po jedna lekcija svake nove porodice (i profilirane lekcije:
+    # praktična Pitagora, sistemska priča i udaljenost tačaka nose
+    # lekcijski-relativni profil težine, pa lifecycle dokazuje i tu granicu).
+    ("rational_expression_direct", 9, "9-01-005"),
+    ("rational_equation_direct", 9, "9-01-014"),
+    ("structured_word_problem", 6, "6-03-010"),
+    ("structured_word_problem", 8, "8-04-016"),
+    ("structured_word_problem", 9, "9-05-013"),
+    ("finite_set_direct", 6, "6-01-006"),
+    ("number_set_membership", 8, "8-01-002"),
+    ("event_probability_facts", 8, "8-06-011"),
+    ("financial_arithmetic_direct", 9, "9-08-005"),
+    ("parametric_linear_discussion", 9, "9-04-022"),
+    ("linear_inequality_direct", 9, "9-04-013"),
+    ("operation_property_recognition", 7, "7-02-014"),
+    ("fraction_concept_direct", 6, "6-04-003"),
+    ("similarity_direct", 8, "8-03-016"),
+    ("polygon_angle_direct", 8, "8-08-003"),
+    ("unit_conversion_direct", 7, "7-05-018"),
+    ("coordinate_line_direct", 8, "8-02-004"),
 ]
 
 
