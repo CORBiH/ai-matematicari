@@ -14,7 +14,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Optional
 
-from matbot import api, feedback, geometrycheck, mathsafe, option_equivalence
+from matbot import api, config, feedback, geometrycheck, mathsafe, option_equivalence
 from matbot.mathcheck import find_numeric_inconsistencies
 from matbot.mathsegments import DISPLAY, INLINE, tokenize_math
 from matbot.practice import PRACTICE_UNAVAILABLE_MESSAGE, SAFE_ERROR_MESSAGE
@@ -156,6 +156,26 @@ class TurnObservation:
         if self.identity_after or self.identity_before:
             return bool(self.identity_after) and self.identity_after != self.identity_before
         return bool(self.task_after) and self.task_after != self.task_before
+
+    @property
+    def hint_level_before(self) -> int:
+        """Broj RANIJE datih nagovještaja — isto značenje kao u sesiji servera."""
+        try:
+            return int((self.session_before or {}).get("hint_level") or 0)
+        except (TypeError, ValueError):
+            return 0
+
+    @property
+    def serves_hint_ladder_top(self) -> bool:
+        """True kad OVAJ turn služi POSLJEDNJI (treći) nagovještaj.
+
+        Ogledalo produkcijskog uslova `is_hint_ladder_top` u
+        matbot/tutor/pipeline.py: `hint_level` je broj ranije datih hintova, pa
+        vrh ljestvice počinje na `MAX_HINT_LEVEL - 1`. Čita se ISTA serverska
+        sesija koju gate koristi, nikad prozna procjena iz odgovora."""
+        payload = self.request_payload or {}
+        is_hint = (payload.get("intent") or "") == "hint_request"
+        return is_hint and self.hint_level_before >= config.MAX_HINT_LEVEL - 1
 
     @property
     def visible_task_text(self) -> str:
@@ -602,7 +622,20 @@ def _answer_leak_result(obs: TurnObservation, name: str) -> CheckResult:
         `$(x+2)=5$`, committed `$x=3$`, učenik „Mislim da je rješenje x=3.“ —
         tutor je smio potvrditi i provjeriti uvrštavanjem, a check je to
         prijavio kao curenje. Produkcija taj korak nije blokirala; nedostajao je
-        samo evaluatorov pandan tom izuzetku."""
+        samo evaluatorov pandan tom izuzetku.
+
+    NIVO 3 NIJE CURENJE (PP-1 LIVE-150, D004): proizvodna ljestvica je
+    trostepena i TREĆI nagovještaj po ugovoru daje cijeli postupak I konačan
+    rezultat — prompt to izričito traži (`_HINT_LEVEL_GUIDANCE[2]`), produkcijski
+    gate ga zato izuzima (`is_hint_ladder_top`), a deterministički put je na to
+    harmonizovan. Evaluator je taj sankcionisan vrh ljestvice prijavljivao kao
+    ANSWER_LEAK i time mjerio pravilo koje proizvod nema. Izuzetak je USKO
+    vezan za vrh ljestvice: nivoi 1 i 2 i dalje padaju, i svako curenje van
+    hint/solution puta i dalje pada."""
+    if obs.serves_hint_ladder_top:
+        return CheckResult(name, SKIP,
+                           "treći nagovještaj po ugovoru daje konačan rezultat — "
+                           "the third hint is contractually allowed to state the answer")
     correct = obs.correct_option_text
     expected = obs.expected_answer
     if not correct and not expected:
