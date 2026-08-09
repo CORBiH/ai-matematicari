@@ -33,6 +33,7 @@ from dataclasses import dataclass
 
 from matbot import lesson_fidelity, mcq_integrity, option_equivalence
 from matbot import practice_policy as practice_policy_module
+from matbot import request_fidelity as request_fidelity_module
 from matbot.semantics import detectors as semantic_detectors
 from matbot.tutor import task_identity
 from matbot.mathcheck import find_numeric_inconsistencies
@@ -134,7 +135,7 @@ def _option_id(task, index):
 
 def collect_package_issues(task, contract=None, previous_signature="",
                            difficulty_profile=None, practice_contract=None,
-                           practice_policy=None):
+                           practice_policy=None, student_message=""):
     """Vrati zatvorenu torku nalaza postojećih validatora nad JEDNIM paketom.
 
     Prazna torka = nijedan deterministički validator ne može dokazati defekt.
@@ -157,7 +158,12 @@ def collect_package_issues(task, contract=None, previous_signature="",
     `practice_policy` (PP-1) je razriješena pedagoška politika lekcije ili
     None: kurikularna metoda (npr. 6. razred bez prebacivanja), vidljivi
     brojevni domen i granica naprednih operacija. Nalaz ide recenzentu da ga
-    popravi u ISTOM drugom pozivu — objava iste provjere svakako ponavlja."""
+    popravi u ISTOM drugom pozivu — objava iste provjere svakako ponavlja.
+
+    `student_message` (Task 3) je poruka učenika iz TEKUĆEG turna ili prazno:
+    kad nosi IZRIČIT matematički uslov (domen, relaciju, vrstu zadatka),
+    objavljen zadatak ga mora sačuvati. Prazno ili nedokazivo = provjera se
+    preskače. Nema ljepljivog stanja: prethodni turnovi se ne čitaju."""
     if task is None:
         return ()
     issues = []
@@ -305,6 +311,19 @@ def collect_package_issues(task, contract=None, previous_signature="",
             issues.append(PackageIssue(
                 DUPLICATE_ACTIVE_TASK_CODE,
                 detail="canonically identical to the active task"))
+
+    # 4c) VJERNOST IZRIČITOM ZAHTJEVU UČENIKA (Task 3, živi DISC A009/A010/
+    # A020/A023). Učenik postavi jednoznačan uslov (domen, relaciju, vrstu),
+    # Tutor ga tiho promijeni, a paket ostane iznutra ispravan — pa ga nijedna
+    # postojeća kapija ne vidi. Najteži slučaj: traženo N={1,2,3,...},
+    # objavljeno Z, i označeni {0} je tačan nad Z a nad N skup je PRAZAN.
+    # Poredi se ISTOM zatvorenom gramatikom kojom se čita i sam zadatak
+    # (matbot/request_fidelity.py); nedokaziv zahtjev se preskače.
+    if task_text_safe and student_message:
+        for detail in request_fidelity_module.request_fidelity_failures(
+                student_message, task_text):
+            issues.append(PackageIssue(
+                request_fidelity_module.REQUEST_FIDELITY_CODE, detail=detail))
 
     # 5) NUMERIČKA PROTIVRJEČNOST u vidljivom tekstu i rješenju — postojeći
     #    mathcheck. Distraktori se NIKAD ne provjeravaju (namjerno su pogrešni).
@@ -473,6 +492,24 @@ def format_for_reviewer(issues):
         "exist in this text-only UI: rewrite the task so every needed object is "
         "stated in the text itself (coordinates, table, list of faces), or replace "
         "the task. "
+        # Task 3 (živi DISC A009/A010/A020/A023): recept MORA imenovati tačan
+        # traženi domen/relaciju. Generičko „neka bude relevantno“ je upravo
+        # ono što je pustilo N→Z drift da se objavi.
+        f"For `{request_fidelity_module.REQUEST_FIDELITY_CODE}` the task silently "
+        "changed an explicit mathematical constraint the student stated in THIS "
+        "message; the issue detail names the requested value and the one the task "
+        "actually used. For `domain_mismatch` REWRITE the task so it solves in "
+        "EXACTLY the requested number set and SAYS SO in the task text, then "
+        "recompute every option for that set: N is {1,2,3,...} and EXCLUDES 0, N0 "
+        "is {0,1,2,...}, and Z, Q, R are all different from both — never swap one "
+        "for another and never drop the domain sentence. For `relation_mismatch` "
+        "solve the EXACT equation or inequality the student wrote (an equivalent "
+        "rearrangement with the identical solution set is fine, a different "
+        "solution set is not) and recompute every option. For `task_type_mismatch` "
+        "keep the requested kind: an inequality request must stay an inequality "
+        "and an equation request must stay an equation. If honouring the request "
+        "would break the selected lesson's semantic contract, return "
+        "`fail_closed` — the lesson always wins over the request. "
         # PP-1 (audit ovlašćenja pravila): kurikularna metoda, vidljivi domen
         # i granica naprednih operacija imaju svoj lijek — bez njega bi
         # recenzent vraćao `correct` s istim nalazom (obrazac F4E E01).

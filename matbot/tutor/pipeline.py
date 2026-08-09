@@ -1462,7 +1462,8 @@ def _two_call(llm, context, session, student_message, request_id, trusted_verdic
             previous_signature=previous_signature,
             difficulty_profile=difficulty_profile,
             practice_contract=context.practice_contract,
-            practice_policy=getattr(context, "practice_policy", None))
+            practice_policy=getattr(context, "practice_policy", None),
+            student_message=student_message)
     if draft_issues:
         logger.info(
             "tutor_draft_preflight request_id=%s topic=%s intent=%s issues=%s",
@@ -1555,7 +1556,8 @@ def _two_call(llm, context, session, student_message, request_id, trusted_verdic
             final.new_task, contract=context.semantic_contract,
             previous_signature=previous_signature,
             difficulty_profile=difficulty_profile,
-            practice_contract=context.practice_contract)
+            practice_contract=context.practice_contract,
+            student_message=student_message)
         if final_issues:
             # `unchanged=True` znači: recenzent je vidio nalaz i vratio paket s
             # POTPUNO ISTIM nalazima — dakle nije ni pokušao ispravku.

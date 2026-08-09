@@ -1577,6 +1577,201 @@ def continuous_answer_set(option_text: str) -> Optional[tuple]:
     return _solve_relation_text(normalized)
 
 
+# ---------------------------------------------------------------------------
+# ČITANJE „RIJEŠI“ IZJAVE IZ SLOBODNOG TEKSTA (Task 3, DISC A009/A010/A020/A023)
+# ---------------------------------------------------------------------------
+# ZAŠTO POSTOJI: čuvar vjernosti zahtjevu (matbot/request_fidelity.py) mora
+# uporediti ono što je UČENIK izričito tražio s onim što je zadatak STVARNO
+# postavio. Da ne bi nastao DRUGI parser jednačina i domena, oba teksta čita
+# ISTA zatvorena gramatika koju Task 1 već koristi za orakl rješavanja
+# (`_normalize_solve_segment`, `_solve_relation_text`, `_resolve_solve_domain`,
+# `_segment_domain_declaration`). Ova funkcija NE odlučuje o tačnosti i NE
+# mijenja `evaluate_linear_solve_mcq` ni za bajt — ona samo ČITA izjavu.
+#
+# Razlika u odnosu na orakl je namjerna i ide u stranu OPREZA: orakl mora
+# ćutati na svaki nepročitan segment (jer presuđuje tačnost), dok čitač izjave
+# nepročitan segment preskače, ali proglašava izjavu NEJEDNOZNAČNOM čim vidi
+# dvije RAZLIČITE relacije ili dva RAZLIČITA domena — a nejednoznačno nikad ne
+# postaje nalaz.
+#
+# Učenikova poruka gotovo nikad ne nosi `$…$`: „riješi -2<x<2 u domenu Z“.
+# Zato se relacija traži i u golom tekstu, ali SAMO kao NEPREKINUT niz znakova
+# zatvorene abecede koji sadrži relacijski znak — proza se time ne može
+# slijepiti u izraz, a svaki takav kandidat i dalje mora proći kroz istu
+# gramatiku ili biti odbačen.
+_REQUEST_BARE_RUN_RE = re.compile(r"[0-9A-Za-z+\-*/:=<>≤≥.,()\\{}^_]+")
+_REQUEST_TRAILING_PUNCT = ".,;:!?"
+# Definicija domena nabrajanjem (`N={1,2,3,...}`) — TAČAN oblik iz živog
+# A020 zahtjeva. Prvi nabrojani član razlikuje N od N0, što je po konvenciji
+# ovog projekta suštinska razlika (N počinje od 1, N0 od 0).
+_REQUEST_DOMAIN_DEFINITION_RE = re.compile(
+    r"\b([NZQR])\s*=\s*\\?\{\s*(-?\d+)\s*(?:,[^{}]*)?\\?\}")
+# Goli simbol brojevnog skupa kao CIJELI matematički segment ($\mathbb{Z}$).
+# Orakl takav segment vidi kao nepročitan i ćuti (ispravno za presudu); čitač
+# izjave ga smije pročitati kao dokaz domena, jer ne presuđuje tačnost.
+_REQUEST_BARE_DOMAIN_SEGMENT_RE = re.compile(
+    r"^\s*(?:\\mathbb\s*\{\s*([NZQR])\s*\}|([ℕℤℚℝ]))\s*(_\{?0\}?|₀)?\s*$")
+# Izričita riječ za vrstu zadatka. „NEjednačina“ sadrži „jednačina“ kao
+# podniz, pa se negirani oblik MORA provjeriti prvi.
+_REQUEST_INEQUALITY_WORD_RE = re.compile(
+    r"\bnejedna[čc]\w*|\bnejednakost\w*", re.IGNORECASE)
+_REQUEST_EQUATION_WORD_RE = re.compile(r"\bjedna[čc]in\w*", re.IGNORECASE)
+
+RELATION_EQUATION = "equation"
+RELATION_INEQUALITY = "inequality"
+
+
+@dataclass(frozen=True)
+class SolveStatement:
+    """Šta jedan tekst DOKAZIVO tvrdi o „riješi“ zadatku.
+
+    `domain_status`: "none" (nije spomenut), "supported" (tačno jedan od
+    Q/R/Z/N/N0), "unsupported" (suženje postoji ali nije dokazivo jedan
+    podržan domen — uključujući protivrječne domene).
+    `solution` je KONTINUIRAN kanonski skup rješenja (prije diskretizacije)
+    ili None kad relacija nije dokazivo pročitana; `relation_ambiguous` je
+    True kad tekst nosi DVIJE različite relacije, pa se nijedna ne pripisuje."""
+
+    domain: str = ""
+    domain_status: str = "none"
+    solution: object = None
+    variable: str = ""
+    relation_kind: str = ""        # "" | "equation" | "inequality"
+    relation_ambiguous: bool = False
+    stated_kind: str = ""          # vrsta izričito imenovana riječju
+
+    @property
+    def has_relation(self) -> bool:
+        return self.solution is not None and not self.relation_ambiguous
+
+    def solution_display(self) -> str:
+        if self.solution is None:
+            return ""
+        return self.solution.display(self.variable or "x")
+
+
+def _request_relation_candidates(text: str) -> list:
+    """Nizovi znakova koji SMIJU biti relacija — iz $…$ i iz golog teksta."""
+    candidates = []
+    for kind, content in tokenize_math(text or ""):
+        if kind != TEXT:
+            candidates.append(content)
+            continue
+        for match in _REQUEST_BARE_RUN_RE.finditer(content):
+            run = match.group(0).strip()
+            while run and run[-1] in _REQUEST_TRAILING_PUNCT:
+                run = run[:-1]
+            # Rečenična zagrada oko izraza („(riješi x>3)“) nije dio izraza;
+            # skida se SAMO kad je nesparena, pa `2(x-3)=x+5` ostaje netaknut.
+            while run.endswith(")") and run.count(")") > run.count("("):
+                run = run[:-1]
+            while run.startswith("(") and run.count("(") > run.count(")"):
+                run = run[1:]
+            if run and _SOLVE_RELATION_TOKEN_RE.search(run):
+                candidates.append(run)
+    return candidates
+
+
+def read_solve_statement(text: str) -> SolveStatement:
+    """Pročitaj domen i relaciju iz slobodnog teksta zatvorenom gramatikom.
+
+    Nikad ne pogađa: nepročitan kandidat se preskače, a dvije RAZLIČITE
+    relacije/domena znače „nejednoznačno“ (nikad nalaz)."""
+    raw = text or ""
+    domains = set()
+    unsupported = False
+
+    # 1) DOMEN — ista prozna gramatika kao orakl, plus dva zapisa koja se u
+    #    zahtjevima stvarno pojavljuju (nabrajanje i goli simbol segmenta).
+    prose = " ".join(content for kind, content in tokenize_math(raw)
+                     if kind == TEXT)
+    status, domain, _declared = _resolve_solve_domain(prose)
+    if status == "supported":
+        domains.add(domain)
+    elif status == "unsupported":
+        unsupported = True
+    for match in _REQUEST_DOMAIN_DEFINITION_RE.finditer(raw):
+        letter, first_member = match.group(1), int(match.group(2))
+        if letter != "N":
+            domains.add(letter)
+        elif first_member == 1:
+            domains.add("N")
+        elif first_member == 0:
+            domains.add("N0")
+        else:
+            unsupported = True       # `N={2,3,...}` — ne pogađa se
+    for _kind, content in tokenize_math(raw):
+        if _kind == TEXT:
+            continue
+        declaration = _segment_domain_declaration(content)
+        if declaration is not None:
+            domains.add(declaration[1])
+            continue
+        bare = _REQUEST_BARE_DOMAIN_SEGMENT_RE.match(content)
+        if bare is not None:
+            letter = bare.group(1) or _SOLVE_DOMAIN_LETTER_MAP[bare.group(2)]
+            if bare.group(3):
+                if letter != "N":
+                    unsupported = True
+                    continue
+                letter = "N0"
+            domains.add(letter)
+    if unsupported or len(domains) > 1:
+        domain_status, resolved_domain = "unsupported", ""
+    elif domains:
+        domain_status, resolved_domain = "supported", next(iter(domains))
+    else:
+        domain_status, resolved_domain = "none", ""
+
+    # 2) RELACIJA — svaki kandidat kroz ISTU gramatiku; različiti kanonski
+    #    skupovi znače nejednoznačnost, isti skup zapisan dvaput ne znači.
+    seen = []
+    for candidate in _request_relation_candidates(raw):
+        normalized = _normalize_solve_segment(candidate)
+        if normalized is None or not _SOLVE_RELATION_TOKEN_RE.search(normalized):
+            continue
+        solved = _solve_relation_text(normalized)
+        if solved is None:
+            continue
+        kind = (RELATION_EQUATION if _SOLVE_RELATION_TOKEN_RE.findall(normalized) == ["="]
+                else RELATION_INEQUALITY)
+        entry = (solved[0], solved[1], kind)
+        if entry not in seen:
+            seen.append(entry)
+    if len(seen) == 1:
+        solution, variable, relation_kind = seen[0]
+        ambiguous = False
+    else:
+        solution, variable, relation_kind = None, "", ""
+        ambiguous = len(seen) > 1
+
+    # 3) IZRIČITO IMENOVANA VRSTA — „nejednačina“ se provjerava PRVA.
+    if _REQUEST_INEQUALITY_WORD_RE.search(prose):
+        stated_kind = RELATION_INEQUALITY
+    elif _REQUEST_EQUATION_WORD_RE.search(prose):
+        stated_kind = RELATION_EQUATION
+    else:
+        stated_kind = ""
+
+    return SolveStatement(
+        domain=resolved_domain, domain_status=domain_status,
+        solution=solution, variable=variable, relation_kind=relation_kind,
+        relation_ambiguous=ambiguous, stated_kind=stated_kind)
+
+
+def solution_sets_match(first, second, domain: str = "") -> bool:
+    """Isti skup rješenja: kontinuirano ili (uz dokazan diskretan domen) nakon
+    presjeka s tim domenom. Preformulacija koja daje ISTI skup NIJE drift
+    (globalni forenzički zaključak B003)."""
+    if first is None or second is None:
+        return False
+    if first == second:
+        return True
+    if domain in _SOLVE_DISCRETE_DOMAIN_MIN:
+        return _discretize(first, domain) == _discretize(second, domain)
+    return False
+
+
 def evaluate_linear_solve_mcq(question: str,
                               option_texts: Iterable[str]) -> LinearSolveMCQResult:
     """Ocijeni SAMO jednoznačan „riješi linearnu (ne)jednačinu“ MCQ; inače ćuti."""
