@@ -604,3 +604,38 @@ def test_f5l_unknown_command_still_fails_closed():
     _text, is_safe = sanitize_and_validate_math_text(
         "$\\frac{\\cancel{(x-1)}(x+1)}{\\cancel{x-1}}=x+1$")
     assert not is_safe
+
+
+def test_pp1_live150_vector_commands_are_allowed():
+    """ŽIVI PP-1 LIVE-150 NALAZ (E009/A029/A031, vektorske lekcije): model
+    standardno piše "\\overrightarrow{AB}" za vektor i veličinske zagrade
+    "\\bigl(...\\bigr)" oko parova koordinata. Sve tri su standardne prikazne
+    komande; dok ih allowlist nije znao, kodovi
+    unknown_mathjax_command:overrightarrow/bigl/bigr obarali su ispravne
+    pakete i turnovi su završavali kao tehnički fallback."""
+    text, is_safe = sanitize_and_validate_math_text(
+        "Vektor $\\overrightarrow{AB}$ ima suprotan vektor $\\overrightarrow{BA}$.")
+    assert is_safe
+    assert "\\overrightarrow{AB}" in text
+    text, is_safe = sanitize_and_validate_math_text(
+        "$\\bigl(x+1\\bigr)\\cdot 2$")
+    assert is_safe
+    assert "\\bigl(x+1\\bigr)" in text
+    # kombinacija obje komande unutar istih delimitera
+    text, is_safe = sanitize_and_validate_math_text(
+        "$\\overrightarrow{u}=\\bigl(3,-2\\bigr)$")
+    assert is_safe
+    assert "\\overrightarrow{u}" in text and "\\bigl(3,-2\\bigr)" in text
+
+
+def test_pp1_live150_widening_is_exactly_three_commands():
+    """Kontrolni slučajevi: dodane su TAČNO tri komande. Kapitalizovane i
+    ostale veličinske varijante NISU — nepoznata komanda i dalje pada
+    zatvoreno, a strukturna komanda van $...$ ostaje odbijena."""
+    _text, is_safe = sanitize_and_validate_math_text("$\\Bigl(x+1\\Bigr)$")
+    assert not is_safe
+    _text, is_safe = sanitize_and_validate_math_text("$\\bigg(x+1\\bigg)$")
+    assert not is_safe
+    # postojeći fail-closed za nepoznatu komandu ostaje netaknut
+    _text, is_safe = sanitize_and_validate_math_text("$\\ty 3$")
+    assert not is_safe

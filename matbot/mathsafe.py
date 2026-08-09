@@ -70,6 +70,14 @@ MATHJAX_COMMAND_ALLOWLIST = frozenset({
     # unknown_mathjax_command:boxed (u živom nacrtu zadatka). "textstyle" je
     # simetrični par iste komande (isti rizik: nikakav) — dodan uz njih.
     "displaystyle", "textstyle", "boxed",
+    # ŽIVI PP-1 LIVE-150 NALAZ (E009/A029/A031, vektorske lekcije): model
+    # standardno piše "\overrightarrow{AB}" za vektor i veličinske zagrade
+    # "\bigl(...\bigr)" oko parova koordinata. Sve tri su standardne, bezbjedne
+    # prikazne komande; dok ih allowlist nije znao, kodovi
+    # unknown_mathjax_command:overrightarrow/bigl/bigr obarali su ispravne
+    # pakete u preflight-u, gurali recenzenta u ispravke i završavali kao
+    # tehnički fallback umjesto zadatka.
+    "overrightarrow", "bigl", "bigr",
     # operatori i relacije
     "cdot", "times", "div", "pm", "mp", "approx", "neq", "ne", "not",
     "le", "leq", "ge", "geq", "lt", "gt", "equiv", "sim", "propto",

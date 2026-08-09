@@ -194,7 +194,13 @@ def test_reviewer_may_repair_an_incomplete_draft(store, fake_llm, monkeypatch):
     """Nacrt s nalazom ide recenzentu; njegov KOMPLETAN zadatak se objavljuje."""
     monkeypatch.setenv("MATBOT_PRACTICE_DIFFICULTY_LEVELS", "enabled")
     broken = make_task_payload(text="Riješi jednačinu:")
-    repaired = make_task_payload(text="Riješi jednačinu: $3x=12$")
+    # PP-1 LIVE-150 (F008): orakl rješavanja sada NEZAVISNO rješava „Riješi
+    # jednačinu: $3x=12$“ (x=4), pa popravljeni paket mora biti i matematički
+    # konzistentan — podrazumijevane fixture opcije (razlomci od 5/7) bile bi
+    # ispravno odbijene kao `no_correct_option`.
+    repaired = make_task_payload(text="Riješi jednačinu: $3x=12$",
+                                 options=("$4$", "$3$", "$12$", "$36$"),
+                                 expected="$4$")
     draft = make_tutor_draft(intent="generate_task", new_task=broken)
     fixed = make_tutor_draft(intent="generate_task", new_task=repaired)
     queue_two_call(fake_llm, draft=draft, reviewer=make_reviewer_final(decision="correct",

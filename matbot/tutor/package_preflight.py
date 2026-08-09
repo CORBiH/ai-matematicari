@@ -275,7 +275,13 @@ def collect_package_issues(task, contract=None, previous_signature="",
             # Faza 4G: isti poziv sada pokriva i orakl direktnog računa —
             # njegov nalaz nosi serverski IZRAČUNATU vrijednost izraza, ne
             # listu djelilaca. Vrijednost je izveden podatak (pravilo 7).
-            if result is not None and hasattr(result, "relation"):
+            if result is not None and hasattr(result, "solution_display"):
+                # Orakl rješavanja (PP-1 LIVE-150, F008): recenzent mora vidjeti
+                # SERVERSKI izveden skup rješenja, ne goli kod — isti razlog kao
+                # F4E nalaz iznad (goli kod → recenzent vrati isti defekt).
+                detail = (f"server solved: {result.solution_display}"
+                          if result.solution_display else "relation unproven")
+            elif result is not None and hasattr(result, "relation"):
                 detail = (f"server derived relation '{result.relation}'"
                           if result.relation else "comparison values unproven")
             elif result is not None and hasattr(result, "computed_value"):

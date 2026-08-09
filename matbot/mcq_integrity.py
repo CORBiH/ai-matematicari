@@ -12,6 +12,7 @@ import hashlib
 import json
 import re
 from dataclasses import dataclass
+from fractions import Fraction
 from typing import Iterable, Optional
 
 from matbot.mathcheck import safe_numeric_value
@@ -592,6 +593,351 @@ def evaluate_comparison_mcq(question: str,
     return _evaluate_superlative_mcq(prose, options)
 
 
+# ---------------------------------------------------------------------------
+# USKI ORAKL RJEŠAVANJA LINEARNE (NE)JEDNAČINE (PP-1 LIVE-150, nalaz F008)
+# ---------------------------------------------------------------------------
+# ŽIVI PRODUKCIJSKI NALAZ (PP1-F008, live talas od 150 scenarija): objavljen je MCQ
+#     „Riješi nejednačinu: $-3< x+1 < -1$“
+# s opcijama $x<-3$ / $x>-3$ / $x=-3$ / $x=-2$ i označenom opcijom $x=-3$.
+# Skup rješenja je $-4<x<-2$; $x=-3$ je samo JEDAN član tog skupa, ne rješenje.
+# Tutor je paket sastavio, recenzent ga je ODOBRIO, a nijedan deterministički
+# sloj nije ni pokušao matematiku — orakli iznad pokrivaju djeljivost, direktan
+# račun i poređenje, ali ne i „riješi (ne)jednačinu“.
+#
+# GRANICE (namjerno uske, isti princip kao svi orakli u modulu):
+#   • proza mora IZRIČITO tražiti rješavanje („Riješi…“, „…rješenje…“) — bez
+#     direktive orakl ćuti;
+#   • superlativ („najveće rješenje“), „koliko“, negacija („koja NIJE…“) i
+#     ograničenje domena („u skupu…“, prirodni/cijeli brojevi) isključuju cio
+#     orakl: tada tačan odgovor NIJE nužno cio skup rješenja nad Q;
+#   • SVAKI matematički segment pitanja mora biti pročitan zatvorenom
+#     gramatikom ispod, a TAČNO JEDAN smije sadržavati relaciju — nepročitan
+#     segment (npr. $x\in\mathbb{Z}$, $x^2>4$, $|x|<3$) znači ćutanje, nikad
+#     pogađanje;
+#   • podržana je isključivo LINEARNA relacija s jednom nepoznatom i egzaktno
+#     čitljivim racionalnim konstantama (cio broj, decimalni zapis, \frac);
+#     lančana nejednačina se rješava kao presjek dvaju linearnih uslova;
+#   • sve opcije moraju biti relacije u ISTOJ nepoznatoj (ili, SAMO kod
+#     jednačine, gole vrijednosti — tačka je jedina vrsta skupa koju gola
+#     vrijednost jednoznačno imenuje); prozna/nepročitljiva opcija isključuje
+#     cio orakl;
+#   • sva aritmetika je egzaktna (`Fraction`) — float nikad ne odlučuje istinu.
+#
+# Dvije relacije su „isti odgovor“ SAMO kad opisuju ISTI skup rješenja:
+# tačka ≠ zrak ≠ interval, a $x\le 4$ ≠ $x<5$ i nad Q i pedagoški.
+_SOLVE_DIRECTIVE_RE = re.compile(
+    r"\brije[šs]i\w*\b|\brje[šs]enj\w*", re.IGNORECASE)
+_SOLVE_NEGATION_RE = re.compile(r"\bnije\b|\bnisu\b", re.IGNORECASE)
+_SOLVE_DOMAIN_BLOCKER_RE = re.compile(
+    r"\bskup\w*|\bprirodn\w*|\bcijel\w*|\bnegativn\w*|\bpozitivn\w*",
+    re.IGNORECASE)
+_SOLVE_RELATION_TOKEN_RE = re.compile(r"<=|>=|<|>|=")
+# \frac s egzaktno čitljivim argumentima (broj ili jedno slovo); „§“ je interni
+# marker razlomačke crte — literal „/“ iz ulaza zadržava svoju dvosmislenost
+# („3/4x“ se NE tumači), dok je \frac{3}{4}x jednoznačno (3/4)·x.
+_SOLVE_FRAC_RE = re.compile(
+    r"\\[dt]?frac\{([+-]?(?:\d+(?:[.,]\d+)?|[A-Za-z]))\}"
+    r"\{([+-]?(?:\d+(?:[.,]\d+)?|[A-Za-z]))\}")
+_SOLVE_UNSUPPORTED_CHAR_RE = re.compile(r"[^0-9A-Za-z+\-*/=<>.,§]")
+_SOLVE_TERM_RE = re.compile(
+    r"(?P<sign>[+-]?)"
+    r"(?:(?P<num>\d+(?:[.,]\d+)?(?:§[+-]?\d+(?:[.,]\d+)?)?)(?:\*?(?P<var_after>[A-Za-z]))?"
+    r"|(?P<var>[A-Za-z]))"
+    r"(?:[/§](?P<den>[+-]?\d+(?:[.,]\d+)?))?")
+_SOLVE_REVERSED_OP = {"<": ">", "<=": ">=", ">": "<", ">=": "<="}
+
+
+@dataclass(frozen=True)
+class _SolutionSet:
+    """Kanonski zapis skupa rješenja; jednakost dataklasa = jednakost skupova.
+
+    Konstrukcija ide isključivo kroz classmethod-e, pa nekorištena polja uvijek
+    nose podrazumijevane vrijednosti i poređenje ostaje kanonsko."""
+
+    kind: str                      # "point" | "ray" | "interval"
+    op: str = ""                   # za ray: "<" | "<=" | ">" | ">="
+    value: Fraction = Fraction(0)  # tačka ili granica zraka
+    lower: Fraction = Fraction(0)
+    lower_included: bool = False
+    upper: Fraction = Fraction(0)
+    upper_included: bool = False
+
+    @classmethod
+    def point(cls, value):
+        return cls("point", value=value)
+
+    @classmethod
+    def ray(cls, op, bound):
+        return cls("ray", op=op, value=bound)
+
+    @classmethod
+    def interval(cls, lower, lower_included, upper, upper_included):
+        return cls("interval", lower=lower, lower_included=lower_included,
+                   upper=upper, upper_included=upper_included)
+
+    def display(self, variable: str) -> str:
+        if self.kind == "point":
+            return f"{variable} = {self.value}"
+        if self.kind == "ray":
+            return f"{variable} {self.op} {self.value}"
+        left = "<=" if self.lower_included else "<"
+        right = "<=" if self.upper_included else "<"
+        return f"{self.lower} {left} {variable} {right} {self.upper}"
+
+
+@dataclass(frozen=True)
+class LinearSolveMCQResult:
+    """Serverski izveden skup rješenja podržane linearne (ne)jednačine."""
+
+    applicable: bool
+    valid: bool
+    reason_code: str = ""
+    solution_display: str = ""     # kanonski prikaz izvedenog skupa (dijagnostika)
+    option_displays: tuple = ()    # kanonski prikazi pročitanih opcija
+    correct_indices: tuple = ()
+    # Kompatibilnost s dijagnostikom koja za djeljivost čita `divisors`.
+    divisors: tuple = ()
+
+    @property
+    def correct_index(self) -> Optional[int]:
+        return self.correct_indices[0] if len(self.correct_indices) == 1 else None
+
+
+def _solve_literal(text: str) -> Fraction:
+    """Egzaktna vrijednost literala; decimalni zapis ide kroz string (bez floata)."""
+    if "§" in text:
+        numerator, denominator = text.split("§", 1)
+        bottom = _solve_literal(denominator)
+        if bottom == 0:
+            raise ZeroDivisionError(text)
+        return _solve_literal(numerator) / bottom
+    return Fraction(text.replace(",", "."))
+
+
+def _normalize_solve_segment(segment: str) -> Optional[str]:
+    """Zatvorena normalizacija LaTeX segmenta, ili None kad išta ostane nepročitano."""
+    text = segment or ""
+    for old, new in (("\\left", ""), ("\\right", ""),
+                     ("\\leq", "<="), ("\\geq", ">="),
+                     ("\\le", "<="), ("\\ge", ">="),
+                     ("\\lt", "<"), ("\\gt", ">"),
+                     ("\\cdot", "*"), ("\\times", "*"),
+                     ("\\,", " "), ("\\;", " "), ("\\!", " "), ("\\ ", " ")):
+        text = text.replace(old, new)
+    text = (text.replace("·", "*").replace("−", "-")
+            .replace("≤", "<=").replace("≥", ">="))
+    while match := _SOLVE_FRAC_RE.search(text):
+        # MJEŠOVIT BROJ ($9\frac{4}{5}$ = 9 + 4/5) NIJE podržan: prosta zamjena
+        # bi nadovezala cifre (94§5 = 94/5 ≠ 49/5) i orakl bi POGREŠNO oborio
+        # ispravan paket (uhvaćeno na determinističkim bulk testovima). Cifra
+        # ili zatvorena zagrada neposredno prije/cifra neposredno poslije
+        # razlomka znači ćutanje cijelog orakla, nikad pogađanje vrijednosti.
+        before = text[match.start() - 1] if match.start() > 0 else ""
+        after = text[match.end()] if match.end() < len(text) else ""
+        if before.isdigit() or before == "}" or after.isdigit():
+            return None
+        text = (text[:match.start()] + match.group(1) + "§" + match.group(2)
+                + text[match.end():])
+    text = re.sub(r"\s+", "", text)
+    text = text.replace(":", "/")
+    if not text or _SOLVE_UNSUPPORTED_CHAR_RE.search(text):
+        return None
+    return text
+
+
+def _solve_side_terms(text: str, variables: set) -> Optional[tuple]:
+    """Jedna strana relacije kao (koeficijent uz nepoznatu, slobodni član)."""
+    if not text:
+        return None
+    coeff = Fraction(0)
+    constant = Fraction(0)
+    position = 0
+    first = True
+    while position < len(text):
+        match = _SOLVE_TERM_RE.match(text, position)
+        if match is None or match.end() == position:
+            return None
+        if not first and not match.group("sign"):
+            # „3/4x“ i slično: bez eksplicitnog +/- između članova zapis je
+            # dvosmislen i NE tumači se.
+            return None
+        try:
+            base = (_solve_literal(match.group("num"))
+                    if match.group("num") else Fraction(1))
+            den = (_solve_literal(match.group("den"))
+                   if match.group("den") else None)
+        except (ValueError, ZeroDivisionError):
+            return None
+        if den == 0:
+            return None
+        value = -base if match.group("sign") == "-" else base
+        if den is not None:
+            value /= den
+        letter = match.group("var_after") or match.group("var")
+        if letter:
+            variables.add(letter)
+            coeff += value
+        else:
+            constant += value
+        position = match.end()
+        first = False
+    return coeff, constant
+
+
+def _solve_simple_relation(left, right, op) -> Optional[_SolutionSet]:
+    """Riješi L op R po nepoznatoj; množenje negativnim obrće smjer."""
+    slope = left[0] - right[0]
+    if slope == 0:
+        return None                      # nepoznata se skratila — ne dokazujemo
+    bound = (right[1] - left[1]) / slope
+    if op == "=":
+        return _SolutionSet.point(bound)
+    if slope < 0:
+        op = _SOLVE_REVERSED_OP[op]
+    return _SolutionSet.ray(op, bound)
+
+
+def _solve_chain_relation(sides, ops) -> Optional[_SolutionSet]:
+    """Lančana nejednačina = presjek dvaju linearnih uslova (dva zraka)."""
+    first = _solve_simple_relation(sides[0], sides[1], ops[0])
+    second = _solve_simple_relation(sides[1], sides[2], ops[1])
+    if (first is None or second is None
+            or first.kind != "ray" or second.kind != "ray"):
+        return None
+    lower = upper = None
+    for ray in (first, second):
+        if ray.op in ("<", "<="):
+            if upper is not None:
+                return None              # dvije gornje granice — nije interval
+            upper = ray
+        else:
+            if lower is not None:
+                return None
+            lower = ray
+    if lower is None or upper is None or lower.value >= upper.value:
+        return None                      # prazan/degenerisan skup — ćutanje
+    return _SolutionSet.interval(lower.value, lower.op == ">=",
+                                 upper.value, upper.op == "<=")
+
+
+def _solve_relation_text(text: str) -> Optional[tuple]:
+    """(skup rješenja, nepoznata) za normalizovan relacijski zapis, ili None."""
+    parts = []
+    ops = []
+    position = 0
+    for match in _SOLVE_RELATION_TOKEN_RE.finditer(text):
+        parts.append(text[position:match.start()])
+        ops.append(match.group(0))
+        position = match.end()
+    parts.append(text[position:])
+    if len(ops) not in (1, 2) or any(not part for part in parts):
+        return None
+    variables: set = set()
+    sides = []
+    for part in parts:
+        side = _solve_side_terms(part, variables)
+        if side is None:
+            return None
+        sides.append(side)
+    if len(variables) != 1:
+        return None
+    if len(ops) == 1:
+        solution = _solve_simple_relation(sides[0], sides[1], ops[0])
+    else:
+        solution = _solve_chain_relation(sides, ops)
+    if solution is None:
+        return None
+    return solution, next(iter(variables))
+
+
+def _solve_option_set(option_text: str, variable: str,
+                      equation_task: bool) -> Optional[_SolutionSet]:
+    text = (option_text or "").strip()
+    if text.startswith("$") and text.endswith("$") and text.count("$") == 2:
+        text = text[1:-1].strip()
+    normalized = _normalize_solve_segment(text)
+    if normalized is None:
+        return None
+    if not _SOLVE_RELATION_TOKEN_RE.search(normalized):
+        # Gola vrijednost jednoznačno imenuje rješenje SAMO kod jednačine
+        # (tačke); skup rješenja nejednačine ne može biti opisan jednim brojem,
+        # a „koja vrijednost zadovoljava…“ zadatke orakl ne smije presuđivati.
+        if not equation_task:
+            return None
+        variables: set = set()
+        side = _solve_side_terms(normalized, variables)
+        if side is None or variables or side[0] != 0:
+            return None
+        return _SolutionSet.point(side[1])
+    solved = _solve_relation_text(normalized)
+    if solved is None:
+        return None
+    solution, option_variable = solved
+    if option_variable != variable:
+        return None
+    return solution
+
+
+def evaluate_linear_solve_mcq(question: str,
+                              option_texts: Iterable[str]) -> LinearSolveMCQResult:
+    """Ocijeni SAMO jednoznačan „riješi linearnu (ne)jednačinu“ MCQ; inače ćuti."""
+    options = tuple(option_texts or ())
+    if not options:
+        return LinearSolveMCQResult(False, False)
+    prose = " ".join(content for kind, content in tokenize_math(question or "")
+                     if kind == TEXT)
+    if not _SOLVE_DIRECTIVE_RE.search(prose):
+        return LinearSolveMCQResult(False, False)
+    if (_QUANTITY_BLOCKER_RE.search(prose) or _SOLVE_NEGATION_RE.search(prose)
+            or _SUPERLATIVE_MAX_RE.search(prose)
+            or _SUPERLATIVE_MIN_RE.search(prose)
+            or _SOLVE_DOMAIN_BLOCKER_RE.search(prose)):
+        # „najveće rješenje“, „koliko rješenja“, „koja NIJE rješenje“ i domen
+        # (N/Z…) mijenjaju šta je tačan odgovor — tada cio skup nad Q nije
+        # mjerilo i orakl ne smije presuđivati.
+        return LinearSolveMCQResult(False, False)
+
+    candidates = []
+    for segment in math_contents(tokenize_math(question or "")):
+        normalized = _normalize_solve_segment(segment)
+        if normalized is None:
+            # Nepročitan segment ($x\in\mathbb{Z}$, $x^2>4$…) može nositi
+            # uslov koji mijenja rješenje — cio orakl tada ćuti.
+            return LinearSolveMCQResult(False, False)
+        if _SOLVE_RELATION_TOKEN_RE.search(normalized):
+            candidates.append(normalized)
+    if len(candidates) != 1:
+        return LinearSolveMCQResult(False, False)
+    solved = _solve_relation_text(candidates[0])
+    if solved is None:
+        return LinearSolveMCQResult(False, False)
+    solution, variable = solved
+
+    option_sets = []
+    for option in options:
+        parsed = _solve_option_set(option, variable,
+                                   equation_task=solution.kind == "point")
+        if parsed is None:
+            return LinearSolveMCQResult(False, False)
+        option_sets.append(parsed)
+
+    solution_display = solution.display(variable)
+    option_displays = tuple(candidate.display(variable)
+                            for candidate in option_sets)
+    correct_indices = tuple(index for index, candidate in enumerate(option_sets)
+                            if candidate == solution)
+    if not correct_indices:
+        return LinearSolveMCQResult(True, False, "no_correct_option",
+                                    solution_display, option_displays,
+                                    correct_indices)
+    if len(correct_indices) != 1:
+        return LinearSolveMCQResult(True, False, "multiple_correct_options",
+                                    solution_display, option_displays,
+                                    correct_indices)
+    return LinearSolveMCQResult(True, True, "", solution_display,
+                                option_displays, correct_indices)
+
+
 def mathematical_publication_failure(question: str, option_texts: Iterable[str],
                                      marked_index: int) -> tuple[str, DivisibilityMCQResult]:
     """Return the server-provable MCQ math failure, before metadata checks."""
@@ -630,6 +976,18 @@ def publication_failure(question: str, option_texts: Iterable[str], marked_index
                     return comparison.reason_code, comparison
                 if marked_index != comparison.correct_index:
                     return "marked_option_math_mismatch", comparison
+            else:
+                # PP-1 LIVE-150 (F008): „riješi (ne)jednačinu“ MCQ dosad nije
+                # imao NIJEDAN matematički orakl, pa je pogrešno označeno
+                # $x=-3$ (član skupa umjesto skupa $-4<x<-2$) objavljeno.
+                # Redoslijed je namjeran: postojeći orakli zadržavaju prednost
+                # bajt za bajt; ovaj se pita tek kad svi ostali ćute.
+                solve = evaluate_linear_solve_mcq(question, option_texts)
+                if solve.applicable:
+                    if not solve.valid:
+                        return solve.reason_code, solve
+                    if marked_index != solve.correct_index:
+                        return "marked_option_math_mismatch", solve
     return "", result
 
 
