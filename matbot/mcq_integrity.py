@@ -1709,6 +1709,232 @@ def evaluate_linear_solve_mcq(question: str,
                                 option_displays, correct_indices)
 
 
+# ---------------------------------------------------------------------------
+# USKI ORAKL FUNKCIJE ZADANE TABELOM PAROVA (DISC-C008, Task 2)
+# ---------------------------------------------------------------------------
+# ŽIVI DISC NALAZ (C008, lekcija o prikazu funkcije tabelom): objavljen je MCQ
+#     „Funkcija $f$ je zadana tabelom parova: $\{(1,2),(2,3),(3,2),(4,5)\}$.
+#      Je li slika elementa $1$ jedinstvena?“
+# s OZNAČENOM opcijom „Ne — slika nije jedinstvena jer $f(1)=2$ i $f(3)=2$.“
+# To je matematički pogrešno: ulaz 1 se u tabeli javlja TAČNO JEDNOM, pa je
+# f(1)=2 jedinstveno određena. To što DVA RAZLIČITA ulaza dijele isti izlaz
+# (f(1)=f(3)=2) narušava INJEKTIVNOST, ne jedinstvenost slike ulaza 1 —
+# Tutor i recenzent su dijelili istu zabludu, a nijedan deterministički sloj
+# nije provjeravao ovu matematiku.
+#
+# GRANICE (namjerno uske, isti princip kao svi orakli u modulu):
+#   • angažuje se SAMO kad pitanje sadrži TAČNO JEDAN eksplicitan konačan
+#     skup uređenih parova ($\{(1,2),(2,3),...\}$) s CJELOBROJNIM članovima
+#     (decimalni zarez unutar para se NE pogađa — zarez je razdjelnik para);
+#   • zatvorene direktive: vrijednost/slika elementa (f(k), „slika elementa
+#     k“), jedinstvenost slike KONKRETNOG ulaza, „da li je ovo funkcija“;
+#     sva ostala proza (proizvoljna svojstva, injektivnost, domen/kodomen…)
+#     znači ćutanje;
+#   • negacija („koja NIJE…“) isključuje orakl;
+#   • verdikt-opcije se čitaju po zatvorenoj glavi „Da/Ne“; „Da“ opcija koja
+#     imenuje vrijednost slike mora imenovati BAŠ serverski izvedenu (uz
+#     toleranciju pominjanja samog ulaza k); kad NIJEDNA opcija nema čitljiv
+#     verdikt, oblik nije dokazano ova klasa → ćutanje; kad je dio opcija
+#     čitljiv a dio nije → zatvoreno padanje (Task 1 doktrina);
+#   • FUNKCIJA ≠ INJEKCIJA: skup {(1,2),(3,2)} JESTE funkcija (različiti
+#     ulazi smiju dijeliti izlaz); {(1,2),(1,3)} NIJE (jedan ulaz, dva
+#     izlaza). Ponovljen IDENTIČAN par ima skupovnu semantiku i ne kvari
+#     funkciju.
+_FUNC_PAIR_RE = re.compile(r"\(\s*([+-]?\d+)\s*,\s*([+-]?\d+)\s*\)")
+_FUNC_PAIR_SET_RE = re.compile(
+    r"^\s*\\?\{\s*\(\s*[+-]?\d+\s*,\s*[+-]?\d+\s*\)"
+    r"(?:\s*,\s*\(\s*[+-]?\d+\s*,\s*[+-]?\d+\s*\))*\s*,?\s*\\?\}\s*$")
+_FUNC_ELEMENT_REF_RE = re.compile(
+    r"\belement\w*\s+([+-]?\d+)\b|\bf\s*\(\s*([+-]?\d+)\s*\)")
+_FUNC_UNIQUE_DIRECTIVE_RE = re.compile(
+    r"\bjedinstven\w*", re.IGNORECASE)
+_FUNC_IMAGE_WORD_RE = re.compile(r"\bslik\w*", re.IGNORECASE)
+_FUNC_VALUE_DIRECTIVE_RE = re.compile(
+    r"\bkolik[aoi]?\s+je\b|\bkoja\s+je\s+slika\b|\bodredi\b|\bizra[čc]unaj\w*\b",
+    re.IGNORECASE)
+_FUNC_IS_FUNCTION_RE = re.compile(
+    r"(?:\bda\s+li\b|\bje\s+li\b|\bpredstavlja\s+li\b|\bjeste\s+li\b)"
+    r"[^.?!]{0,80}?funkcij\w*",
+    re.IGNORECASE)
+_FUNC_NEGATION_RE = re.compile(r"\bnije\b|\bnisu\b", re.IGNORECASE)
+_FUNC_VERDICT_RE = re.compile(r"^\s*(da|ne)\b", re.IGNORECASE)
+
+
+@dataclass(frozen=True)
+class FunctionTableMCQResult:
+    """Serverski izvedena činjenica o funkciji zadanoj tabelom parova."""
+
+    applicable: bool
+    valid: bool
+    reason_code: str = ""
+    solution_display: str = ""     # serverski izvedena istina (dijagnostika)
+    option_displays: tuple = ()
+    correct_indices: tuple = ()
+    # Kompatibilnost s dijagnostikom koja za djeljivost čita `divisors`.
+    divisors: tuple = ()
+
+    @property
+    def correct_index(self) -> Optional[int]:
+        return self.correct_indices[0] if len(self.correct_indices) == 1 else None
+
+
+def _function_pairs(question: str) -> Optional[tuple]:
+    """Parovi iz TAČNO JEDNOG eksplicitnog skupa parova, ili None."""
+    pair_segments = []
+    for segment in math_contents(tokenize_math(question or "")):
+        if _FUNC_PAIR_SET_RE.match(segment or ""):
+            pair_segments.append(segment)
+    if len(pair_segments) != 1:
+        return None
+    pairs = tuple((int(left), int(right))
+                  for left, right in _FUNC_PAIR_RE.findall(pair_segments[0]))
+    return pairs if pairs else None
+
+
+def _function_flat_text(question: str) -> str:
+    """Proza i matematika u jednom redu — element se pominje i kao proza
+    („slika elementa“) i kao matematički segment ($1$, $f(1)$)."""
+    return " ".join(content for _kind, content in tokenize_math(question or ""))
+
+
+def _function_element(flat: str) -> Optional[int]:
+    """TAČNO JEDAN pominjani element k, ili None (0 ili 2+ različita → None)."""
+    values = set()
+    for prose_number, call_number in _FUNC_ELEMENT_REF_RE.findall(flat):
+        values.add(int(prose_number or call_number))
+    return values.pop() if len(values) == 1 else None
+
+
+def _function_option_verdict(option_text: str) -> Optional[bool]:
+    """True=Da, False=Ne, None=verdikt nije čitljiv zatvorenom gramatikom."""
+    text = (option_text or "").strip()
+    if text.startswith("$") and text.endswith("$") and text.count("$") == 2:
+        text = text[1:-1].strip()
+    match = _FUNC_VERDICT_RE.match(text)
+    if match is None:
+        return None
+    return match.group(1).lower() == "da"
+
+
+def _adjudicate_verdict_options(options, correct_predicate,
+                                solution_display) -> FunctionTableMCQResult:
+    """Zajednička presuda za Da/Ne porodice (jedinstvenost, „je li funkcija“)."""
+    verdicts = [_function_option_verdict(option) for option in options]
+    if all(verdict is None for verdict in verdicts):
+        # Nijedna opcija nema čitljiv verdikt — oblik NIJE dokazano ova
+        # klasa (npr. opcije „jedinstvena“ / „nije jedinstvena“) → ćutanje.
+        return FunctionTableMCQResult(False, False)
+    option_displays = tuple("?" if verdict is None else ("da" if verdict else "ne")
+                            for verdict in verdicts)
+    if any(verdict is None for verdict in verdicts):
+        # Zadatak je dokazano u dometu, dio opcija nečitljiv → zatvoreno
+        # padanje (ista arhitektonska granica kao Task 1 solve orakl).
+        return FunctionTableMCQResult(
+            True, False, UNVERIFIABLE_SOLUTION_OPTION_CODE,
+            solution_display, option_displays, ())
+    correct_indices = tuple(index for index, verdict in enumerate(verdicts)
+                            if correct_predicate(index, verdict))
+    if not correct_indices:
+        return FunctionTableMCQResult(True, False, "no_correct_option",
+                                      solution_display, option_displays,
+                                      correct_indices)
+    if len(correct_indices) != 1:
+        return FunctionTableMCQResult(True, False, "multiple_correct_options",
+                                      solution_display, option_displays,
+                                      correct_indices)
+    return FunctionTableMCQResult(True, True, "", solution_display,
+                                  option_displays, correct_indices)
+
+
+def evaluate_function_table_mcq(question: str,
+                                option_texts: Iterable[str]) -> FunctionTableMCQResult:
+    """Ocijeni SAMO jednoznačan MCQ nad tabelom parova; sve ostalo ćuti."""
+    options = tuple(option_texts or ())
+    if not options:
+        return FunctionTableMCQResult(False, False)
+    prose = " ".join(content for kind, content in tokenize_math(question or "")
+                     if kind == TEXT)
+    if _FUNC_NEGATION_RE.search(prose):
+        # „Koja tvrdnja NIJE tačna…“ obrće šta je tačan odgovor — ćutanje.
+        return FunctionTableMCQResult(False, False)
+    pairs = _function_pairs(question)
+    if pairs is None:
+        return FunctionTableMCQResult(False, False)
+    outputs: dict = {}
+    for left, right in pairs:
+        outputs.setdefault(left, set()).add(right)
+
+    flat = _function_flat_text(question)
+    element = _function_element(flat)
+
+    # 1) JEDINSTVENOST SLIKE KONKRETNOG ULAZA (tačna C008 klasa).
+    if (_FUNC_UNIQUE_DIRECTIVE_RE.search(prose)
+            and _FUNC_IMAGE_WORD_RE.search(prose)):
+        if element is None or element not in outputs:
+            return FunctionTableMCQResult(False, False)
+        images = outputs[element]
+        unique = len(images) == 1
+        image_value = next(iter(images)) if unique else None
+        display = (f"slika({element}) jedinstvena = da, f({element}) = {image_value}"
+                   if unique else f"slika({element}) jedinstvena = ne")
+
+        def correct(index, verdict):
+            if not unique:
+                return not verdict
+            if not verdict:
+                return False
+            # „Da“ opcija koja imenuje vrijednost mora imenovati BAŠ izvedenu
+            # sliku; pominjanje samog ulaza k je dozvoljeno (npr. „slika
+            # elementa 1 iznosi 2“).
+            mentioned = {int(value) for value in
+                         _ANSWER_NUMBER_RE.findall(options[index] or "")}
+            extras = mentioned - {element}
+            return not extras or extras == {image_value}
+
+        return _adjudicate_verdict_options(options, correct, display)
+
+    # 2) VRIJEDNOST/SLIKA ELEMENTA — f(k) za ulaz koji se javlja tačno jednom.
+    if (element is not None
+            and (_FUNC_VALUE_DIRECTIVE_RE.search(prose)
+                 or _FUNC_IMAGE_WORD_RE.search(prose))
+            and element in outputs and len(outputs[element]) == 1):
+        image_value = next(iter(outputs[element]))
+        values = tuple(_bare_integer(option) for option in options)
+        if all(value is None for value in values):
+            return FunctionTableMCQResult(False, False)
+        option_displays = tuple("?" if value is None else str(value)
+                                for value in values)
+        display = f"f({element}) = {image_value}"
+        if any(value is None for value in values):
+            return FunctionTableMCQResult(
+                True, False, UNVERIFIABLE_SOLUTION_OPTION_CODE,
+                display, option_displays, ())
+        correct_indices = tuple(index for index, value in enumerate(values)
+                                if value == image_value)
+        if not correct_indices:
+            return FunctionTableMCQResult(True, False, "no_correct_option",
+                                          display, option_displays,
+                                          correct_indices)
+        if len(correct_indices) != 1:
+            return FunctionTableMCQResult(True, False, "multiple_correct_options",
+                                          display, option_displays,
+                                          correct_indices)
+        return FunctionTableMCQResult(True, True, "", display,
+                                      option_displays, correct_indices)
+
+    # 3) „DA LI JE OVO FUNKCIJA?“ — nijedan ulaz s dva različita izlaza.
+    if _FUNC_IS_FUNCTION_RE.search(prose):
+        is_function = all(len(images) == 1 for images in outputs.values())
+        display = f"funkcija = {'da' if is_function else 'ne'}"
+
+        def correct(_index, verdict):
+            return verdict == is_function
+
+        return _adjudicate_verdict_options(options, correct, display)
+
+    return FunctionTableMCQResult(False, False)
+
+
 def mathematical_publication_failure(question: str, option_texts: Iterable[str],
                                      marked_index: int) -> tuple[str, DivisibilityMCQResult]:
     """Return the server-provable MCQ math failure, before metadata checks."""
@@ -1759,6 +1985,17 @@ def publication_failure(question: str, option_texts: Iterable[str], marked_index
                         return solve.reason_code, solve
                     if marked_index != solve.correct_index:
                         return "marked_option_math_mismatch", solve
+                else:
+                    # DISC-C008 (Task 2): funkcija zadana tabelom parova —
+                    # jedinstvenost slike, f(k) i „je li funkcija“. Redoslijed
+                    # je namjeran: svi postojeći orakli zadržavaju prednost
+                    # bajt za bajt; ovaj se pita tek kad svi ostali ćute.
+                    table = evaluate_function_table_mcq(question, option_texts)
+                    if table.applicable:
+                        if not table.valid:
+                            return table.reason_code, table
+                        if marked_index != table.correct_index:
+                            return "marked_option_math_mismatch", table
     return "", result
 
 

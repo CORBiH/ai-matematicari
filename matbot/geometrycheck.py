@@ -57,13 +57,16 @@ SOLID_FACE_DIAGONAL_USES_D = "solid_face_diagonal_uses_D"
 SOLID_BASE_AREA_SYMBOL_MISMATCH = "solid_base_area_symbol_mismatch"
 PYRAMID_APOTHEM_EDGE_CONFUSION = "pyramid_apothem_edge_confusion"
 GEOMETRY_FORMULA_SYMBOL_CONFLICT = "geometry_formula_symbol_conflict"
+ANGLE_DIVIDER_VERTEX_MISMATCH = "angle_divider_vertex_mismatch"
+ANGLE_DIVIDER_BOUNDARY_RAY = "angle_divider_boundary_ray"
 
 ALL_ISSUE_CODES = (
     CIRCLE_DIAMETER_USES_D, CIRCLE_DIAMETER_USES_LOWER_D, CIRCLE_RADIUS_USES_R,
     CIRCUMRADIUS_USES_R, PLANE_AREA_USES_S, PLANE_PERIMETER_AREA_SYMBOL_SWAP,
     SOLID_SPACE_DIAGONAL_USES_D, SOLID_FACE_DIAGONAL_USES_D,
     SOLID_BASE_AREA_SYMBOL_MISMATCH, PYRAMID_APOTHEM_EDGE_CONFUSION,
-    GEOMETRY_FORMULA_SYMBOL_CONFLICT,
+    GEOMETRY_FORMULA_SYMBOL_CONFLICT, ANGLE_DIVIDER_VERTEX_MISMATCH,
+    ANGLE_DIVIDER_BOUNDARY_RAY,
 )
 
 # --- uloge sadržaja ---------------------------------------------------------
@@ -229,6 +232,64 @@ _PERIM_2PI_R = _rx(r"\bO\s*=\s*2\s*(?:\\cdot\s*)?\\?pi\s*(?:\\cdot\s*)?\bR\b")
 _AREA_PI_R2 = _rx(r"\bP\s*=\s*\\?pi\s*(?:\\cdot\s*)?\bR\s*\^\s*\{?\s*2\s*\}?")
 
 
+# ---------------------------------------------------------------------------
+# KOHERENTNOST TVRDNJE „KRAK DIJELI UGAO“ (DISC-D005, Task 2) — ČISTA NOTACIJA
+# ---------------------------------------------------------------------------
+# ŽIVI DISC NALAZ (D005, lekcija o pojmu ugla, 6. razred, dva objavljena
+# zadatka u istom lancu):
+#   • korak 2: tvrdnja „krak $\overrightarrow{BA}$ dijeli ugao $\angle BAC$“ —
+#     zrak BA POČINJE u B, a ugao BAC ima tjeme A. Zrak koji ne polazi iz
+#     tjemena ne može biti unutrašnji djelilac tog ugla. Nemoguće po notaciji.
+#   • korak 4: tvrdnje „$\overrightarrow{BC}$ dijeli $\angle ABC$“ i
+#     „$\overrightarrow{BD}$ dijeli $\angle ABD$“ — BC/BD su GRANIČNI kraci
+#     tih uglova (C odnosno D je krajnja tačka kraka ugla), pa ne mogu biti i
+#     NOVI unutrašnji djelilac istog ugla.
+#
+# Ovo NIJE geometrijski dokazivač: pravilo čita ISKLJUČIVO notaciju i pali se
+# SAMO kad proza izričito TVRDI odnos dijeljenja (zatvoren skup glagola).
+# Obična konstatacija „ugao ABC je određen kracima BA i BC“ NEMA glagol
+# dijeljenja i nikad ne okida. Kad je notacija saglasna (zrak iz tjemena ka
+# tački koja nije na granici), pravilo NE tvrdi da je tačka stvarno u
+# unutrašnjosti — to se ne može dokazati bez slike, pa se preskače.
+#
+# Provjera je NEZAVISNA OD SCOPE-a: lekcije o uglovima rutiraju scope "" (nisu
+# ni „plane“ ni „solid“ konvencija simbola), a kontradikcija je čisto
+# notacijska — zato se pokreće prije scope kapije u find_geometry_issues.
+_RAY_TOKEN = r"\\overrightarrow\s*\{\s*([A-Z])\s*([A-Z])\s*\}"
+_ANGLE_TOKEN = r"\\(?:angle|measuredangle)\s*\{?\s*([A-Z])\s*([A-Z])\s*([A-Z])\s*\}?"
+# Zatvoren skup glagola tvrdnje dijeljenja; „polovi/prepolavlja/raspolavlja“
+# (simetrala) su strožija tvrdnja istog tipa — unutrašnji djelilac.
+_DIVIDER_VERB = r"(?:dijeli\w*|podijel\w*|polovi\w*|prepolavlja\w*|raspolavlja\w*)"
+# Prozor tvrdnje ne prelazi granicu rečenice/klauze niti DRUGI zrak/ugao —
+# u D005 koraku 4 dvije tvrdnje stoje u istoj rečenici vezane veznikom „i“.
+_DIVIDER_GAP = r"(?:(?!\\overrightarrow|\\angle|\\measuredangle|[.?!;]).)"
+_DIVIDER_CLAIM_RE = re.compile(
+    _RAY_TOKEN
+    + r"(?P<gap>" + _DIVIDER_GAP + r"{0,80}?)"
+    + r"\b(?i:" + _DIVIDER_VERB + r")\b"
+    + _DIVIDER_GAP + r"{0,60}?"
+    + _ANGLE_TOKEN)
+_DIVIDER_NEGATION_RE = re.compile(r"(?i)\bne\s*$")
+
+
+def _divider_coherence_issues(flat):
+    """Kodovi dokazanih notacijskih kontradikcija tvrdnji o djeliocu ugla."""
+    issues = []
+    for match in _DIVIDER_CLAIM_RE.finditer(flat):
+        if _DIVIDER_NEGATION_RE.search(match.group("gap") or ""):
+            # „…NE dijeli…“ nije tvrdnja dijeljenja — preskoči.
+            continue
+        ray_start, ray_end = match.group(1), match.group(2)
+        first_arm, vertex, second_arm = match.group(4), match.group(5), match.group(6)
+        if ray_start == ray_end:
+            continue                     # degenerisan zapis — ne dokazuje se
+        if ray_start != vertex:
+            issues.append(ANGLE_DIVIDER_VERTEX_MISMATCH)
+        elif ray_end in (first_arm, second_arm):
+            issues.append(ANGLE_DIVIDER_BOUNDARY_RAY)
+    return issues
+
+
 def _circle_active(scope, figures):
     figs = set(figures or ())
     if scope == "plane" and "krug" in figs:
@@ -259,7 +320,7 @@ def find_geometry_issues(text, scope, figures=(), role=ROLE_AUTHORITATIVE,
 
     Nikad ne mijenja tekst, nikad ne poziva model.
     """
-    if not text or not scope:
+    if not text:
         return []
     if role == ROLE_DISTRACTOR:
         return []
@@ -271,6 +332,18 @@ def find_geometry_issues(text, scope, figures=(), role=ROLE_AUTHORITATIVE,
         return []
 
     issues = []
+    # DISC-D005: koherentnost tvrdnje „krak dijeli ugao“ je čisto notacijska i
+    # NE zavisi od scope-a (lekcije o uglovima rutiraju scope "") — pokreće se
+    # prije scope kapije, uz iste role/policy izuzetke iznad.
+    issues.extend(_divider_coherence_issues(flat))
+    if not scope:
+        # Bez scope-a nema konvencije simbola — ostale provjere se preskaču.
+        seen = []
+        for code in issues:
+            if code not in seen:
+                seen.append(code)
+        return seen
+
     circle = _circle_active(scope, figures)
 
     if circle:

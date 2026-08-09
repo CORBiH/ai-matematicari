@@ -89,6 +89,26 @@
         "- ovo je lekcija PRIMJENE podudarnosti u DOKAZIVANJU: zadatak mora tražiti dokaz/obrazloženje jednakosti elemenata pomoću podudarnih trouglova (i kao izbor ispravnog dokaznog koraka), ne goli račun;",
         "- ZABRANJENA zamjena: računski zadatak bez dokaznog zahtjeva — server takav paket odbija."
       ]
+    },
+    "altitude_orthocenter_semantics": {
+      "required_features": [],
+      "forbidden_features": ["construction_determination_request"],
+      "visual_policy": "conceptual_text",
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR IZABRANE LEKCIJE (server ga deterministički provjerava prije objave):",
+        "- ovo je lekcija o VISINAMA trougla i ortocentru: postavljaj direktna pitanja o visinama, njihovim podnožjima i položaju ortocentra (računanje, prepoznavanje, svojstva);",
+        "- ZABRANJEN arhetip: pitanje „koji skup podataka jednoznačno određuje / dovoljan je za konstrukciju trougla“ — više ponuđenih skupova podataka može istovremeno jednoznačno određivati trougao, pa takav MCQ lako dobije dvije tačne opcije; server takav paket odbija."
+      ]
+    },
+    "angle_bisector_incenter_semantics": {
+      "required_features": [],
+      "forbidden_features": ["congruence_semantics_present"],
+      "visual_policy": "conceptual_text",
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR IZABRANE LEKCIJE (server ga deterministički provjerava prije objave):",
+        "- ovo je lekcija o SIMETRALAMA UGLOVA trougla i CENTRU UPISANE KRUŽNICE: zadatak mora raditi sa simetralom ugla, presjekom simetrala, centrom upisane kružnice ili njenim poluprečnikom (konstrukcija, svojstvo jednake udaljenosti od stranica, račun uglova koje simetrala obrazuje);",
+        "- ZABRANJENA zamjena: zadatak o PODUDARNOSTI trouglova i njenim kriterijima (SUS/USU/SSS/SSU) — to je gradivo drugih lekcija; server takav paket odbija ČAK I KAD UČENIK IZRIČITO TRAŽI podudarnost, jer izabrana lekcija određuje šta se vježba."
+      ]
     }
   },
   "contracts": [
@@ -177,6 +197,12 @@
      "evidence": "NPP KS_2018-0135; kanonski naslov imenuje SSU. Audit P1 T139/T140: zadatak sa ZAHVAĆENIM uglom (SUS konfiguracija) označen kao SSU — položaj ugla je dio kriterija, pa je zahvaćeni ugao na ovoj lekciji dokazan prekršaj."},
     {"lesson_id": "7-04-017", "title": "Primjena podudarnosti u dokazivanju jednakosti elemenata",
      "requirement_type": "congruence_proof", "enforcement": "blocking",
-     "evidence": "Kanonski naslov imenuje primjenu podudarnosti u dokazivanju; klasifikator PROOF_REQUIRED."}
+     "evidence": "Kanonski naslov imenuje primjenu podudarnosti u dokazivanju; klasifikator PROOF_REQUIRED."},
+    {"lesson_id": "7-04-022", "title": "Simetrale uglova i centar upisane kružnice",
+     "requirement_type": "angle_bisector_incenter_semantics", "enforcement": "blocking",
+     "evidence": "Kanonski naslov imenuje simetrale uglova i centar upisane kružnice; kriteriji podudarnosti su gradivo lekcija 7-04-013..016 (koje već nose congruence_criterion ugovor). DISC-E009 (pre-release discovery 100 na 8a8f04d): na učenikov izričit zahtjev objavljen je zadatak „koji kriterij podudarnosti garantuje da su trouglovi ABD i ACD podudarni“ — PEDAGOGY_FALSE_ACCEPT, lekcija nije imala ugovor koji bi drift zaustavio."},
+    {"lesson_id": "7-04-023", "title": "Visine trougla i ortocentar",
+     "requirement_type": "altitude_orthocenter_semantics", "enforcement": "blocking",
+     "evidence": "DISC-E010 (pre-release discovery 100 na 8a8f04d): MCQ „koji skup podataka jednoznačno određuje trougao“ objavljen s DVIJE tačne opcije (osnovica+stopa visine+dužina visine i osnovica+oba nalegla ugla — USU); potpuna deterministička presuda traži geometrijski motor van opsega, pa je arhetip zabranjen na lekciji."}
   ]
 }

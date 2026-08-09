@@ -327,7 +327,10 @@ def test_graph_naked_equation_solving_still_fails():
 
 def test_contract_registry_covers_exactly_the_reviewed_lessons():
     contracts = semantic_practice.all_contracts()
-    assert len(contracts) == 27
+    # Task 2: +1 ugovor za 7-04-023 (DISC-E010, zabrana arhetipa „koji skup
+    # podataka jednoznačno određuje trougao“) i +1 za 7-04-022 (DISC-E009,
+    # zabrana drifta na kriterije podudarnosti).
+    assert len(contracts) == 29
     compiled = json.loads(
         (ROOT / "data" / "lesson_semantics.compiled.json").read_text(
             encoding="utf-8"))

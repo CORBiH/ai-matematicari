@@ -220,6 +220,33 @@ def _feature_included_angle_with_sides(task_text, options_text):
     return _included_angle_by_notation(task_text)
 
 
+# ŽIVI DISC NALAZ (E010, lekcija o visinama trougla i ortocentru — ID nosi
+# ISKLJUČIVO red u data/semantic_practice_contracts.json, nikad ovaj modul):
+# objavljen je MCQ „Koji od navedenih skupova podataka jednoznačno … određuje
+# trougao ABC…“ u kojem su DVIJE opcije istovremeno jednoznačno određivale
+# trougao (osnovica + stopa visine + dužina visine, ali i osnovica + oba
+# nalegla ugla — USU). Arhetip „koji skup podataka jednoznačno određuje /
+# dovoljan je za konstrukciju“ suštinski poziva na više tačnih odgovora, a
+# potpuna deterministička presuda bi tražila geometrijski motor koji je van
+# opsega ovog izdanja (odluka globalnog forenzičkog plana). Osobina je zato
+# ZABRANA ARHETIPA na nivou ugovora lekcije: pali se SAMO kad proza spaja
+# jednoznačnost/dovoljnost s određivanjem/konstrukcijom trougla — direktna
+# pitanja o visinama, ortocentru i sama uputstva „konstruiši visinu“ NIKAD
+# ne okidaju (nemaju jednoznačn/dovoljn).
+_CONSTRUCTION_DETERMINATION_RE = re.compile(
+    r"(?:jednozna[čc]n\w*|dovoljn\w*)[^.?!]{0,120}(?:odre[dđ]\w*|konstru\w*)"
+    r"|(?:odre[dđ]\w*|konstru\w*)[^.?!]{0,120}(?:jednozna[čc]n\w*|dovoljn\w*)",
+    re.IGNORECASE)
+_TRIANGLE_WORD_RE = re.compile(r"trougl\w*|trougao", re.IGNORECASE)
+
+
+def _feature_construction_determination_request(task_text, options_text):
+    haystack = f"{task_text or ''} {options_text or ''}"
+    if not _TRIANGLE_WORD_RE.search(haystack):
+        return False
+    return bool(_CONSTRUCTION_DETERMINATION_RE.search(haystack))
+
+
 FEATURE_CHECKS = MappingProxyType({
     "variables_present": _feature_variables_present,
     "variable_identity_present": _feature_variable_identity_present,
@@ -230,6 +257,7 @@ FEATURE_CHECKS = MappingProxyType({
     "congruence_semantics_present": _feature_congruence_semantics_present,
     "volume_request": _feature_volume_request,
     "included_angle_with_sides": _feature_included_angle_with_sides,
+    "construction_determination_request": _feature_construction_determination_request,
 })
 
 VISUAL_POLICIES = ("visual_essential", "textual_structured_equivalent",
