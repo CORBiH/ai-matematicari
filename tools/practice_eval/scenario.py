@@ -65,6 +65,13 @@ class Scenario:
     # root-cause kategorija). Obavezna za Talas B: scenario koji ne cilja
     # nijedan dokazan nalaz je nasumican uzorak, ne dijagnostika.
     targets_wave_a_findings: tuple = ()
+    # RC11 (discovery-100): šta scenario OČEKIVA od odnosa zahtjeva i lekcije.
+    #   "must_follow"      — zahtjev je predmet testa i mora biti ispunjen;
+    #                        dokazano nespojiv zahtjev čini scenario NEVALJANIM.
+    #   "lesson_overrides" — namjerna sonda: zahtjev je van lekcije i bot ga
+    #                        NE smije poslušati (lekcija je vlasnik vježbe).
+    # Vidi tools/practice_eval/coherence.py.
+    request_alignment: str = "must_follow"
 
     @property
     def session_id(self):
@@ -126,11 +133,16 @@ def _parse_scenario(raw, source, line_number) -> Scenario:
         normalized["rubrics"] = list(normalized["rubrics"])
         steps.append(normalized)
 
+    alignment = raw.get("request_alignment", "must_follow")
+    _require(alignment in ("must_follow", "lesson_overrides"),
+             f"{where}: unknown request_alignment {alignment!r}")
+
     return Scenario(
         id=str(raw["id"]), wave=raw["wave"], importance=raw["importance"],
         grade=raw["grade"], oblast=str(raw["oblast"]), topic_id=str(raw["topic_id"]),
         reason=str(raw["reason"]), steps=tuple(steps), tags=tuple(raw.get("tags", ())),
         targets_wave_a_findings=tuple(raw.get("targets_wave_a_findings", ())),
+        request_alignment=str(alignment),
     )
 
 

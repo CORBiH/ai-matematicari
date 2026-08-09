@@ -39,6 +39,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from tools.practice_eval import checks as check_lib          # noqa: E402
+from tools.practice_eval import classify as classify_lib     # noqa: E402
+from tools.practice_eval import coherence as coherence_lib   # noqa: E402
 from tools.practice_eval.scenario import (                    # noqa: E402
     Scenario, ScenarioError, load_scenarios, validate_scenarios,
 )
@@ -124,6 +126,7 @@ class ObservingLLM:
         self._local.failure = None
         self._local.tutor_output = None
         self._local.reviewer_output = None
+        self._local.single_call_output = None
 
     def request_record(self):
         return {
@@ -134,6 +137,7 @@ class ObservingLLM:
             "failure": getattr(self._local, "failure", None),
             "tutor_output": getattr(self._local, "tutor_output", None),
             "reviewer_output": getattr(self._local, "reviewer_output", None),
+            "single_call_output": getattr(self._local, "single_call_output", None),
         }
 
     def _count(self, method_name):
@@ -176,8 +180,17 @@ class ObservingLLM:
 
     # -- metode koje aplikacija stvarno zove ------------------------------
     def practice_turn(self, instructions, input_text):
-        return self._invoke("tutor", "practice_turn", self._inner.practice_turn,
-                            instructions, input_text)
+        # SANKCIONISANA JEDNOPOZIVNA RUTA (živi C001/C002): legacy K1/K3 put
+        # pravi zadatak u JEDNOM pozivu i to NIJE kvar proizvoda. Ranije se
+        # ovdje izlaz nije snimao, pa `_final_task_package` nije imao šta da
+        # vrati, `package_clean` je vraćao SKIP i scenario je izgledao kao
+        # rupa u pokrivenosti — iako je paket postojao i bio provjerljiv.
+        # Snima se STVARAN izlaz stvarnog poziva: nijedan poziv se ne izmišlja
+        # i knjigovodstvo ostaje istinito (jedan poziv = jedan poziv).
+        result = self._invoke("tutor", "practice_turn", self._inner.practice_turn,
+                              instructions, input_text)
+        self._local.single_call_output = result.output
+        return result
 
     def lesson_fidelity_turn(self, instructions, input_text):
         return self._invoke("reviewer", "lesson_fidelity_turn",
@@ -286,6 +299,15 @@ class TurnRecord:
     log_lines: tuple = ()
     check_results: list = field(default_factory=list)
     session_after_summary: dict = field(default_factory=dict)
+    # RC11: STVARNA ruta izvršavanja ovog turna, izvedena iz snimljenih vrsta
+    # poziva — `universal_two_call` / `single_call` / `deterministic_zero_call`.
+    # Jednopozivni scenario time izričito zapisuje svoju rutu i ne može više
+    # izgledati kao rupa u pokrivenosti (živi C001/C002).
+    route: str = ""
+    # Je li strukturni paket uopšte uhvaćen na ovom turnu (za razliku od
+    # „uhvaćen i čist“). Bez ovoga se „nema šta da se provjeri“ ne razlikuje
+    # od „provjereno i uredno“.
+    package_captured: bool = False
 
 
 @dataclass
@@ -308,6 +330,18 @@ class ScenarioRecord:
     session_id: str
     turns: list
     preconditions_unmet: list = field(default_factory=list)
+    # RC11 taksonomija (tools/practice_eval/classify.py): sirovi PASS/FAIL ne
+    # razlikuje pogrešan objavljen sadržaj, sigurno odbijanje objave, nevaljan
+    # scenario i posljedicu ranijeg odbijanja. Ova polja to razdvajaju.
+    outcome_class: str = ""
+    routes: list = field(default_factory=list)
+    package_evidence: list = field(default_factory=list)
+    root_failures: list = field(default_factory=list)
+    cascade_failures: list = field(default_factory=list)
+    coherence_problems: list = field(default_factory=list)
+    request_alignment: str = "must_follow"
+    third_call_violations: list = field(default_factory=list)
+    classification_notes: list = field(default_factory=list)
 
 
 def _session_summary(session):
@@ -340,7 +374,13 @@ def _session_summary(session):
 
 
 def _final_task_package(record):
-    """Paket koji bi se STVARNO objavio, kad ga univerzalni put uopšte ima."""
+    """Paket koji bi se STVARNO objavio, bez obzira na rutu.
+
+    ŽIVI C001/C002: sankcionisana JEDNOPOZIVNA ruta (legacy K1/K3) pravi
+    zadatak u jednom pozivu i nema recenzenta. Ranije se ovdje gledao samo
+    univerzalni par (tutor/reviewer), pa jednopozivni paket nije bio uhvaćen,
+    `package_clean` je vraćao SKIP i scenario je izgledao kao rupa u
+    pokrivenosti — iako ruta nije kvar i paket je bio provjerljiv."""
     reviewer = record.get("reviewer_output")
     if reviewer is not None:
         final = getattr(reviewer, "final", None)
@@ -348,7 +388,10 @@ def _final_task_package(record):
         if task is not None:
             return task
     tutor = record.get("tutor_output")
-    return getattr(tutor, "new_task", None)
+    task = getattr(tutor, "new_task", None)
+    if task is not None:
+        return task
+    return getattr(record.get("single_call_output"), "new_task", None)
 
 
 def _difficulty_profile_for(scenario):
@@ -484,6 +527,11 @@ def run_scenario(flask_app, llm, capture, scenario: Scenario, token) -> Scenario
         )
 
         package = _final_task_package(request_record)
+        turn.package_captured = package is not None
+        turn.route = classify_lib.turn_route({
+            "sdk_calls": turn.sdk_calls, "sdk_call_kinds": turn.sdk_call_kinds,
+            "precondition_unmet": turn.precondition_unmet,
+        })
         reviewer_output = request_record.get("reviewer_output")
         difficulty_profile = _difficulty_profile_for(scenario)
         practice_contract = _practice_contract_for(scenario)
@@ -578,7 +626,7 @@ def run_scenario(flask_app, llm, capture, scenario: Scenario, token) -> Scenario
         status = STATUS_PASS
 
     root_causes = sorted({check_lib.root_cause(entry["check"]) for entry in failed})
-    return ScenarioRecord(
+    record = ScenarioRecord(
         id=scenario.id, wave=scenario.wave, importance=scenario.importance,
         grade=scenario.grade, oblast=scenario.oblast, topic_id=scenario.topic_id,
         reason=scenario.reason, tags=list(scenario.tags), status=status,
@@ -590,6 +638,19 @@ def run_scenario(flask_app, llm, capture, scenario: Scenario, token) -> Scenario
         turns=[asdict(turn) for turn in turn_records],
         preconditions_unmet=unmet,
     )
+    # RC11: klasifikacija se računa iz VEĆ SNIMLJENOG zapisa, pa je izvještaj
+    # ne mora ponovo izvoditi i ne može se raziću s njim.
+    verdict = classify_lib.classify(asdict(record), scenario)
+    record.outcome_class = verdict["outcome_class"]
+    record.routes = verdict["routes"]
+    record.package_evidence = verdict["package_evidence"]
+    record.root_failures = verdict["root_failures"]
+    record.cascade_failures = verdict["cascade_failures"]
+    record.coherence_problems = verdict["coherence_problems"]
+    record.request_alignment = verdict["request_alignment"]
+    record.third_call_violations = verdict["third_call_violations"]
+    record.classification_notes = verdict["notes"]
+    return record
 
 
 def _build_payload(scenario: Scenario, step, session_before, last_client_turn_id):
@@ -768,6 +829,10 @@ def dry_run(scenarios, output_dir: Path):
     from matbot.topics import lesson_info
 
     problems = validate_scenarios(scenarios)
+    # RC11: dokazano nespojiva poruka i lekcija se hvataju OVDJE — prije nego
+    # što talas potroši ijedan živi poziv na nevaljano očekivanje (22 od 100
+    # scenarija u discovery-100). Vidi tools/practice_eval/coherence.py.
+    problems.extend(coherence_lib.validate_wave(scenarios))
     for scenario in scenarios:
         lesson = lesson_info(scenario.grade, scenario.topic_id)
         if lesson is None:

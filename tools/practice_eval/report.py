@@ -118,9 +118,43 @@ def build_summary(meta, records, total_lessons) -> dict:
             by_interaction[kind][record["status"]] += 1
             by_interaction[kind]["_n"] += 1
 
+    # RC11 taksonomija: sirovi PASS/FAIL ne razlikuje pogrešan objavljen
+    # sadržaj od sigurnog odbijanja, nevaljanog scenarija i posljedice ranijeg
+    # pada. Ove agregacije su JEDINI način da izvještaj odgovori na pitanje
+    # „koliko je od ovoga zaista kvar proizvoda?“ (vidi classify.py).
+    outcome_counter = Counter(record.get("outcome_class") or "UNCLASSIFIED"
+                              for record in records)
+    outcome_scenarios = defaultdict(list)
+    for record in records:
+        outcome_scenarios[record.get("outcome_class") or "UNCLASSIFIED"].append(
+            record["id"])
+    route_counter = Counter()
+    for record in records:
+        for route in record.get("routes") or ():
+            route_counter[route] += 1
+    product_evidence = sorted(
+        record["id"] for record in records if record.get("package_evidence"))
+    invalid_scenarios = sorted(
+        record["id"] for record in records if record.get("coherence_problems"))
+    third_call = sorted(
+        record["id"] for record in records if record.get("third_call_violations"))
+    cascade_only = sorted(
+        record["id"] for record in records
+        if record.get("cascade_failures") and not record.get("root_failures"))
+
     return {
         "runtime": meta,
         "totals": {status: counts[status] for status in STATUSES},
+        "outcome_classes": dict(outcome_counter.most_common()),
+        "outcome_scenarios": {key: sorted(value)
+                              for key, value in outcome_scenarios.items()},
+        "routes": dict(route_counter.most_common()),
+        # Dokaz na nivou PAKETA preživljava nevaljan scenario (živi B012) —
+        # ova lista se NIKAD ne prazni zbog nekoherentne fiksture.
+        "package_level_product_evidence": product_evidence,
+        "invalid_scenarios": invalid_scenarios,
+        "third_call_violations": third_call,
+        "cascade_only_scenarios": cascade_only,
         "scenarios": len(records),
         "sdk_calls": sum(record.get("sdk_calls", 0) for record in records),
         "deterministic_pass": _pass_line(records)[1],
@@ -222,6 +256,31 @@ def render_markdown(summary) -> str:
         f"strogi PASS {summary['critical_pass']}.",
         "",
         "REVIEW znači **nedokazano**, nikad „dobro“.",
+        "",
+        "## Klasifikacija ishoda (RC11)",
+        "",
+        "Sirovi PASS/FAIL ne razlikuje pogrešan objavljen sadržaj od sigurnog "
+        "odbijanja objave, nevaljanog scenarija i posljedice ranijeg pada.",
+        "",
+        "| Klasa ishoda | Broj |",
+        "|---|---|",
+    ]
+    for outcome, count in (summary.get("outcome_classes") or {}).items():
+        lines.append(f"| {outcome} | {count} |")
+    lines += [
+        "",
+        "- dokaz o paketu (preživljava nevaljan scenario): "
+        f"**{', '.join(summary.get('package_level_product_evidence') or []) or '—'}**",
+        "- nevaljani scenariji (poruka protiv lekcije): "
+        f"{', '.join(summary.get('invalid_scenarios') or []) or '—'}",
+        "- samo posljedica ranijeg sigurnog odbijanja: "
+        f"{', '.join(summary.get('cascade_only_scenarios') or []) or '—'}",
+        "- prekoračena granica poziva: "
+        f"**{', '.join(summary.get('third_call_violations') or []) or '—'}**",
+        "- rute izvršavanja: "
+        + (", ".join(f"{route}={count}"
+                     for route, count in (summary.get("routes") or {}).items())
+           or "—"),
         "",
         "## Pokrivenost kurikuluma (izračunato, ne procijenjeno)",
         "",
