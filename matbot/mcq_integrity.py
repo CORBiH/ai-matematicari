@@ -608,8 +608,11 @@ def evaluate_comparison_mcq(question: str,
 #   • proza mora IZRIČITO tražiti rješavanje („Riješi…“, „…rješenje…“) — bez
 #     direktive orakl ćuti;
 #   • superlativ („najveće rješenje“), „koliko“, negacija („koja NIJE…“) i
-#     ograničenje domena („u skupu…“, prirodni/cijeli brojevi) isključuju cio
-#     orakl: tada tačan odgovor NIJE nužno cio skup rješenja nad Q;
+#     STVARNO ograničenje domena (dokaz suženja: „u skupu cijelih brojeva“,
+#     „prirodni brojevi“, x ∈ ℤ…) isključuju cio orakl: tada tačan odgovor
+#     NIJE nužno cio skup rješenja nad Q. Sama riječ „skup“ NIJE dokaz —
+#     „skup rješenja“ je obična formulacija potpunog rješenja (vidi komentar
+#     uz `_solve_domain_restricted`);
 #   • SVAKI matematički segment pitanja mora biti pročitan zatvorenom
 #     gramatikom ispod, a TAČNO JEDAN smije sadržavati relaciju — nepročitan
 #     segment (npr. $x\in\mathbb{Z}$, $x^2>4$, $|x|<3$) znači ćutanje, nikad
@@ -617,9 +620,10 @@ def evaluate_comparison_mcq(question: str,
 #   • podržana je isključivo LINEARNA relacija s jednom nepoznatom i egzaktno
 #     čitljivim racionalnim konstantama (cio broj, decimalni zapis, \frac);
 #     lančana nejednačina se rješava kao presjek dvaju linearnih uslova;
-#   • opcije su relacije u ISTOJ nepoznatoj, gole vrijednosti ili jednočlani
-#     skupovi ({-1}); gola vrijednost/jednočlan skup je KANDIDAT-TAČKA — cio
-#     skup rješenja samo kod jednačine, a kod nejednačine dokazivo pogrešan;
+#   • opcije su relacije u ISTOJ nepoznatoj, gole vrijednosti, jednočlani
+#     skupovi ({-1}) ili intervalni zapis ((-3,3), [2,+\infty)…); gola
+#     vrijednost/jednočlan skup je KANDIDAT-TAČKA — cio skup rješenja samo
+#     kod jednačine, a kod nejednačine dokazivo pogrešan;
 #   • RAZDVOJENO JE „zadatak van dometa“ od „opcija koju ne znam pročitati“
 #     (targeted live verifikacija, dva objavljena pogrešna paketa): kad je
 #     zadatak DOKAZANO u dometu i skup rješenja izveden, nečitljiva opcija NE
@@ -644,9 +648,53 @@ _SOLVE_MEMBERSHIP_RE = re.compile(
     r"\bzadovoljav\w*|\bpripada\w*"
     r"|\bkoj\w*\s+(?:je\s+)?(?:vrijednost|broj)\w*",
     re.IGNORECASE)
-_SOLVE_DOMAIN_BLOCKER_RE = re.compile(
-    r"\bskup\w*|\bprirodn\w*|\bcijel\w*|\bnegativn\w*|\bpozitivn\w*",
+# ŽIVI FINALNI P0 TALAS (30 real-model scenarija; 8 FAIL iste klase: LSP0-A05…
+# A08, B03, B04, B06, M05): raniji blokator domena hvatao je `\bskup\w*` i
+# `\bcijel\w*` BILO GDJE u prozi, pa je i OBIČNA formulacija potpunog rješenja
+# („skup rješenja“, „cijeli skup rješenja“, „tačan zapis skupa rješenja“…)
+# gasila cio orakl (applicable=False) prije ijedne matematičke provjere. Još
+# gore: TAČNI repliki ranije objavljenih pogrešnih paketa ({-5} uz interval
+# -6<x<-4; {-1} uz interval -2<x<0) i dalje su prolazili bez ijednog
+# determinističkog nalaza, jer su nosili „cijeli skup rješenja“. „Skup
+# rješenja“ znači SKUP RJEŠENJA — ne suženje domena.
+#
+# Blokada je zato POZITIVNA: orakl se isključuje samo na stvaran dokaz suženja
+# domena, nikad na riječ „skup“ samu:
+#   • pridjev brojevnog skupa NEPOSREDNO uz imenicu koja domen stvarno nosi:
+#     „cijelih BROJEVA“, „cijele VRIJEDNOSTI“, „cijelih RJEŠENJA“,
+#     „racionalnih brojeva“… („cijeli SKUP rješenja“ NE — „skup“ je objekat
+#     rješavanja, ne nosilac domena; „na realnoj OSI“ NE — osa nije domen);
+#   • pridjevi koji su domen sami po sebi: prirodn-, cjelobrojn-,
+#     (ne)negativn-, (ne)pozitivn- (ponašanje starog blokatora, zadržano);
+#   • fraza „u skupu / nad skupom / iz skupa“ + pridjev brojevnog skupa;
+#   • simbolika domena, isključivo u USKOM kontekstu (vidi
+#     `_SOLVE_DOMAIN_SYMBOL_RE`).
+# Domen zapisan unutar $…$ ($x\in\mathbb{Z}$) i dalje gasi orakl kroz postojeću
+# kapiju nepročitanog segmenta — ovdje se čita isključivo proza.
+_SOLVE_DOMAIN_NOUN = r"(?:broj\w*|vrijednost\w*|rje[šs]enj\w*)"
+_SOLVE_DOMAIN_ADJECTIVE = (
+    r"(?:prirodn|cijel|cjelobrojn|racionaln|iracionaln|realn|decimaln"
+    r"|parn|neparn|prost|nenegativn|negativn|nepozitivn|pozitivn)")
+_SOLVE_DOMAIN_WORD_RE = re.compile(
+    r"\bprirodn\w*|\bcjelobrojn\w*|\b(?:ne)?negativn\w*|\b(?:ne)?pozitivn\w*"
+    r"|\b" + _SOLVE_DOMAIN_ADJECTIVE + r"\w*\s+" + _SOLVE_DOMAIN_NOUN
+    + r"|\b(?:u\s+skupu|nad\s+skupom|iz\s+skupa)\s+(?:svih\s+)?"
+    + _SOLVE_DOMAIN_ADJECTIVE + r"\w*",
     re.IGNORECASE)
+# NAMJERNO bez IGNORECASE: samo VELIKO N/Z/Q/R je oznaka brojevnog skupa, i to
+# samo kao samostalan token u kontekstu pripadnosti ili prijedloga — „Riješi“
+# ne smije postati domen R, ni „u Zenici“ domen Z (negativni lookahead).
+_SOLVE_DOMAIN_LETTER = r"[NZQR](?![0-9A-Za-zčćžšđČĆŽŠĐ])"
+_SOLVE_DOMAIN_SYMBOL_RE = re.compile(
+    r"[ℕℤℚℝ]|\\mathbb\{\s*[NZQR]\s*\}"
+    r"|(?:∈|\\in\b)\s*" + _SOLVE_DOMAIN_LETTER
+    + r"|(?:\b[Uu]\s+|\b[Ss]kup(?:u|a|om)?\s+)" + _SOLVE_DOMAIN_LETTER)
+
+
+def _solve_domain_restricted(prose: str) -> bool:
+    """Stvaran dokaz suženja domena u prozi — nikad riječ „skup“ sama."""
+    return bool(_SOLVE_DOMAIN_WORD_RE.search(prose)
+                or _SOLVE_DOMAIN_SYMBOL_RE.search(prose))
 _SOLVE_RELATION_TOKEN_RE = re.compile(r"<=|>=|<|>|=")
 # \frac s egzaktno čitljivim argumentima (broj ili jedno slovo); „§“ je interni
 # marker razlomačke crte — literal „/“ iz ulaza zadržava svoju dvosmislenost
@@ -956,6 +1004,75 @@ def _solve_bare_point(text: str) -> Optional[_SolutionSet]:
     return _SolutionSet.point(side[1])
 
 
+# ŽIVI FINALNI P0 TALAS, druga posljedica: čim „skup rješenja“ više ne gasi
+# orakl, u domet ulaze i živi paketi A05–A08/M05 i deterministička porodica
+# `interval_solution` („…zapiši skup rješenja intervalom“) — svi nose opcije u
+# intervalnom zapisu ((-3,3), [-11,-4), (9\frac{1}{2},\infty)…). Bez ovog
+# čitanja bi DOKAZANO ISPRAVNI paketi padali kao `unverifiable_solution_option`.
+# Zapis je ZATVOREN školski oblik i preslikava se na već postojeće kanonske
+# skupove — nikakva nova aritmetika, granice čita ista gramatika kao gole
+# vrijednosti (cio broj, decimala, \frac, ugovorni mješoviti broj):
+#   • (a,b) / [a,b] / [a,b) / (a,b] uz a<b  → interval;
+#   • (a,+\infty) / [a,+\infty)             → zrak > / >= a;
+#   • (-\infty,b) / (-\infty,b]             → zrak < / <= b.
+# SVE ostalo se NE pogađa i pada na postojećoj kapiji nečitljive opcije:
+# uključena beskonačnost ([-∞,…), (-∞,∞), a>=b (prazan/degenerisan zapis),
+# više od jednog zareza na vrhu zapisa (decimalni zarez u granici se time
+# ŽRTVUJE — ista doktrina kao {2,5} kod jednočlanog skupa) i nečitljiv kraj.
+_SOLVE_NEGATIVE_INFINITY = frozenset({"-\\infty", "−\\infty", "-∞", "−∞"})
+_SOLVE_POSITIVE_INFINITY = frozenset({"+\\infty", "\\infty", "+∞", "∞"})
+
+
+def _solve_interval_set(text: str) -> Optional[_SolutionSet]:
+    """Intervalni zapis kao kanonski skup, ili None kad zapis nije dokazan."""
+    stripped = (text or "").replace("\\left", "").replace("\\right", "").strip()
+    if len(stripped) < 3 or stripped[0] not in "([" or stripped[-1] not in ")]":
+        return None
+    # Zarez se broji samo na vrhu zapisa — `\frac{1,5}{2}` u granici ne smije
+    # presjeći listu, ali ni postati pogođena vrijednost (padne na granici).
+    parts = [""]
+    depth = 0
+    for character in stripped[1:-1]:
+        if character == "{":
+            depth += 1
+        elif character == "}":
+            depth = max(depth - 1, 0)
+        if character == "," and depth == 0:
+            parts.append("")
+        else:
+            parts[-1] += character
+    if len(parts) != 2:
+        return None
+    left_text, right_text = parts
+    left_compact = re.sub(r"\s+", "", left_text)
+    right_compact = re.sub(r"\s+", "", right_text)
+    lower_included = stripped[0] == "["
+    upper_included = stripped[-1] == "]"
+    left_infinite = left_compact in _SOLVE_NEGATIVE_INFINITY
+    right_infinite = right_compact in _SOLVE_POSITIVE_INFINITY
+    if left_infinite:
+        if lower_included or right_infinite:
+            # [-∞,… je malformiran zapis, a (-∞,∞) orakl nikad ne izvodi.
+            return None
+        bound = _solve_bare_point(right_text)
+        if bound is None:
+            return None
+        return _SolutionSet.ray("<=" if upper_included else "<", bound.value)
+    if right_infinite:
+        if upper_included:
+            return None
+        bound = _solve_bare_point(left_text)
+        if bound is None:
+            return None
+        return _SolutionSet.ray(">=" if lower_included else ">", bound.value)
+    lower = _solve_bare_point(left_text)
+    upper = _solve_bare_point(right_text)
+    if lower is None or upper is None or lower.value >= upper.value:
+        return None
+    return _SolutionSet.interval(lower.value, lower_included,
+                                 upper.value, upper_included)
+
+
 def _solve_option_set(option_text: str, variable: str,
                       allow_bare_value: bool) -> Optional[_SolutionSet]:
     text = (option_text or "").strip()
@@ -969,6 +1086,11 @@ def _solve_option_set(option_text: str, variable: str,
         if not allow_bare_value:
             return None
         return _solve_bare_point(singleton_inner)
+    interval = _solve_interval_set(text)
+    if interval is not None:
+        # Intervalni zapis je PUNI zapis skupa (kao relacija) — presuđuje se
+        # uvijek, nezavisno od `allow_bare_value`.
+        return interval
     normalized = _normalize_solve_segment(text)
     if normalized is None:
         return None
@@ -1001,10 +1123,12 @@ def evaluate_linear_solve_mcq(question: str,
     if (_QUANTITY_BLOCKER_RE.search(prose) or _SOLVE_NEGATION_RE.search(prose)
             or _SUPERLATIVE_MAX_RE.search(prose)
             or _SUPERLATIVE_MIN_RE.search(prose)
-            or _SOLVE_DOMAIN_BLOCKER_RE.search(prose)):
-        # „najveće rješenje“, „koliko rješenja“, „koja NIJE rješenje“ i domen
-        # (N/Z…) mijenjaju šta je tačan odgovor — tada cio skup nad Q nije
-        # mjerilo i orakl ne smije presuđivati.
+            or _solve_domain_restricted(prose)):
+        # „najveće rješenje“, „koliko rješenja“, „koja NIJE rješenje“ i DOKAZAN
+        # domen („u skupu cijelih brojeva“, x ∈ ℤ…) mijenjaju šta je tačan
+        # odgovor — tada cio skup nad Q nije mjerilo i orakl ne smije
+        # presuđivati. Obična formulacija „skup rješenja“ NIJE domen — vidi
+        # `_solve_domain_restricted` (živi finalni P0 talas: 8 lažnih ćutanja).
         return LinearSolveMCQResult(False, False)
 
     candidates = []

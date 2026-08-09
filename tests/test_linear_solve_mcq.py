@@ -729,3 +729,240 @@ def test_preflight_catches_the_live_bare_option_package_too():
     found = [issue for issue in issues if issue.code == "no_correct_option"]
     assert found, [issue.code for issue in issues]
     assert "server solved: -2 < x < 0" in found[0].detail
+
+
+# ---------------------------------------------------------------------------
+# 8) GRANICA DOMENA — ŽIVI FINALNI P0 TALAS (8 lažnih semantičkih ćutanja)
+# ---------------------------------------------------------------------------
+# Stari blokator domena hvatao je `\bskup\w*` i `\bcijel\w*` bilo gdje u prozi,
+# pa je OBIČNA formulacija potpunog rješenja („skup rješenja“, „cijeli skup
+# rješenja“) gasila orakl (applicable=False) prije ijedne provjere — a TAČNI
+# repliki ranije objavljenih pogrešnih paketa ({-5}, {-1}) prolazili su bez
+# ijednog determinističkog nalaza. Blokada je sada POZITIVNA: gasi se samo na
+# stvaran dokaz suženja domena (vidi `mcq_integrity._solve_domain_restricted`).
+
+CHAIN_TASK_OPTIONS = (r"$x<-3$", r"$x>-3$", r"$-4<x<-2$", r"$x=-2$")
+
+
+@pytest.mark.parametrize("wording", [
+    "Riješi nejednačinu i odredi skup rješenja: {math}",
+    "Riješi nejednačinu i nađi skup rješenja: {math}",
+    "Riješi nejednačinu i izaberi cijeli skup rješenja: {math}",
+    "Koji je skup rješenja nejednačine {math}?",
+    "Riješi {math} i izaberi tačan zapis skupa rješenja.",
+    "Odredi skup svih rješenja nejednačine {math}.",
+    "Odredi cijeli skup rješenja: {math}",
+])
+def test_solution_set_wording_is_not_a_domain_restriction(wording):
+    """„Skup rješenja“ znači SKUP RJEŠENJA — orakl se angažuje i presuđuje."""
+    question = wording.format(math=r"$-3<x+1<-1$")
+    result = evaluate(question, CHAIN_TASK_OPTIONS)
+    assert result.applicable, question
+    assert result.valid and result.correct_index == 2, question
+    failure, _ = publication_failure(question, CHAIN_TASK_OPTIONS, 2,
+                                     CHAIN_TASK_OPTIONS[2])
+    assert failure == "", question
+
+
+@pytest.mark.parametrize("question", [
+    r"Riješi nejednačinu $-3<x+1<-1$ u skupu cijelih brojeva.",
+    r"Riješi nejednačinu $-3<x+1<-1$ u skupu prirodnih brojeva.",
+    r"Riješi nejednačinu $-3<x+1<-1$ u skupu racionalnih brojeva.",
+    r"Riješi nejednačinu $-3<x+1<-1$ za x ∈ Z.",
+    r"Riješi nejednačinu $-3<x+1<-1$ za x ∈ N.",
+    r"Riješi nejednačinu $-3<x+1<-1$ za x ∈ ℤ.",
+    r"Riješi nejednačinu $-3<x+1<-1$ za x ∈ ℕ.",
+    "Riješi nejednačinu $-3<x+1<-1$ za x \\in \\mathbb{Z}.",
+    r"Riješi nejednačinu $-3<x+1<-1$ u Z.",
+    r"Riješi nejednačinu $-3<x+1<-1$ u skupu Z.",
+    r"Riješi nejednačinu $-3<x+1<-1$ nad skupom Q.",
+    r"Odredi skup rješenja nejednačine $-3<x+1<-1$ u skupu cijelih brojeva.",
+    r"Riješi nejednačinu i označi skup svih cijelih rješenja: $-3<x+1<-1$",
+    r"Riješi nejednačinu $-3<x+1<-1$. Koji od ponuđenih skupova predstavlja "
+    r"sve cijele vrijednosti $x$ koje zadovoljavaju nejednačinu?",
+])
+def test_genuine_domain_restrictions_keep_the_oracle_out(question):
+    """Stvaran domen (pridjev uz broj/vrijednost/rješenje, u skupu + pridjev,
+    ∈/\\in/N-Z-Q-R simboli u uskom kontekstu) i dalje isključuje orakl."""
+    _silent(question, CHAIN_TASK_OPTIONS)
+
+
+def test_domain_letter_is_never_read_out_of_context():
+    """Veliko slovo u običnoj riječi („Riješi“ nosi R) ili malo „u“ ispred
+    obične riječi nikad nije domen — orakl se angažuje."""
+    question = (r"Riješi nejednačinu $-3<x+1<-1$ i u odgovoru izaberi "
+                r"tačan skup rješenja.")
+    result = evaluate(question, CHAIN_TASK_OPTIONS)
+    assert result.applicable and result.valid
+    assert result.correct_index == 2
+
+
+# TAČNI REPLIKI ranije objavljenih pogrešnih paketa (finalni talas, silence
+# audit): oba su nosila „cijeli skup rješenja“ i vraćala applicable=False bez
+# ijednog koda. Sada su U DOMETU i dokazano padaju zatvoreno.
+
+REPLAY_A_TASK = (r"Riješi nejednačinu i izaberi cijeli skup rješenja: "
+                 r"$-4 < x + 2 < -2$.")
+REPLAY_A_OPTIONS = (r"$\{-6,-5\}$", r"$\{-5,-4,-3\}$", r"$\{-5\}$", r"$\{-4\}$")
+
+
+def test_exact_former_p0_replay_singleton_minus5_is_blocked():
+    result = evaluate(REPLAY_A_TASK, REPLAY_A_OPTIONS)
+    assert result.applicable, "„cijeli skup rješenja“ više ne gasi orakl"
+    assert not result.valid
+    assert result.solution_display == "-6 < x < -4"
+    # {-5} JESTE pročitan kao tačka (član intervala, ne interval); višečlani
+    # skupovi su nečitljivi, pa paket pada zatvoreno — nikad tiho.
+    assert result.option_displays[2] == "x = -5"
+    assert result.reason_code == "unverifiable_solution_option"
+    failure, _ = publication_failure(REPLAY_A_TASK, REPLAY_A_OPTIONS, 2,
+                                     REPLAY_A_OPTIONS[2])
+    assert failure == "unverifiable_solution_option"
+
+
+def test_former_p0_shape_with_readable_singletons_hits_no_correct_option():
+    """Ista klasa sa svim ČITLJIVIM opcijama: tačka nikad nije interval."""
+    options = (r"$\{-5\}$", r"$\{-6\}$", r"$\{-4\}$", r"$\{0\}$")
+    result = evaluate(REPLAY_A_TASK, options)
+    assert result.applicable and not result.valid
+    assert result.solution_display == "-6 < x < -4"
+    assert result.reason_code == "no_correct_option"
+    failure, _ = publication_failure(REPLAY_A_TASK, options, 0, options[0])
+    assert failure == "no_correct_option"
+
+
+REPLAY_B_TASK = (r"Riješi nejednačinu $-1 < x + 1 < 1$ i izaberi odgovor "
+                 r"koji predstavlja CIJELI skup njenih rješenja.")
+REPLAY_B_OPTIONS = (r"$\{-1\}$", r"$\{0\}$", r"$\{-2\}$", r"$\varnothing$")
+
+
+def test_exact_former_p0_replay_singleton_minus1_is_blocked():
+    result = evaluate(REPLAY_B_TASK, REPLAY_B_OPTIONS)
+    assert result.applicable, "„CIJELI skup njenih rješenja“ više ne gasi orakl"
+    assert not result.valid
+    assert result.solution_display == "-2 < x < 0"
+    assert result.option_displays[0] == "x = -1"
+    # $\varnothing$ je nečitljiv zapis → zatvoreno padanje na poznatom zadatku.
+    assert result.reason_code == "unverifiable_solution_option"
+    failure, _ = publication_failure(REPLAY_B_TASK, REPLAY_B_OPTIONS, 0,
+                                     REPLAY_B_OPTIONS[0])
+    assert failure == "unverifiable_solution_option"
+
+
+def test_solution_set_wording_with_all_singletons_hits_no_correct_option():
+    """Zahtijevani kontrolni oblik: „odredi skup rješenja“ + četiri tačke —
+    izvedeno $-2<x<0$, nijedna opcija nije cio skup, objava blokirana."""
+    question = r"Riješi nejednačinu i odredi skup rješenja: $-1 < x+1 < 1$"
+    options = ("{1}", "{-2}", "{-1}", "{0}")
+    result = evaluate(question, options)
+    assert result.applicable and not result.valid
+    assert result.solution_display == "-2 < x < 0"
+    assert result.option_displays == ("x = 1", "x = -2", "x = -1", "x = 0")
+    assert result.reason_code == "no_correct_option"
+    assert result.correct_indices == ()
+    failure, _ = publication_failure(question, options, 2, options[2])
+    assert failure == "no_correct_option"
+
+
+# SVIH 8 živih lažnih ćutanja (LSP0-A05…A08, B03, B04, B06, M05) — tačna
+# pitanja i opcije iz talasa. Tri su relacijska (B03/B04/B06), pet nosi
+# intervalni zapis (A05–A08, M05) — svi sada dobijaju PUNU matematičku presudu
+# i svi su, kako je nezavisna provjera talasa i utvrdila, ispravni paketi.
+@pytest.mark.parametrize("question,options,correct", [
+    (r"Riješi nejednakost i izaberi interval koji predstavlja skup rješenja: "
+     r"$1 < x + 4 < 7$.",
+     (r"$(-3,3)$", r"$(-3,3]$", r"$[-3,3]$", r"$(-2,3)$"), 0),
+    (r"Riješi nejednakost $-8\le x+3< -1$ i izaberi interval koji tačno "
+     r"predstavlja skup rješenja.",
+     (r"$[-8,-1)$", r"$[-11,-4)$", r"$(-5,-1)$", r"$(-11,-4]$"), 1),
+    (r"Riješi $-2 < x - 5 \le 6$ i izaberite tačan zapis skupa rješenja.",
+     (r"$(3,11)$", r"$(3,11]$", r"$[3,11)$", r"$[3,11]$"), 1),
+    (r"Riješi nejednakost $0 \le x - 3 \le 9$ i izaberi tačan skup rješenja "
+     r"zapisan intervalom.",
+     ("[0,9]", "[3,12]", "[3,11]", "(3,12]"), 1),
+    (r"Riješi nejednakost $-3x>9$ i izaberi tačan skup rješenja.",
+     (r"$x<-3$", r"$x<3$", r"$x>-3$", r"$x>3$"), 0),
+    (r"Za nejednakost $-4x\le -8$ koja je tačna relacija koja predstavlja "
+     r"cijeli skup rješenja nakon pravilne promjene smjera?",
+     (r"$x>2$", r"$x\le -2$", r"$x\le 2$", r"$x\ge 2$"), 3),
+    (r"Riješi nejednačinu $-\frac{5}{2}x \ge 10$ i izaberi tačan skup "
+     r"rješenja.",
+     (r"$x \le -2$", r"$x \ge -4$", r"$x \le -4$", r"$x < -4$"), 2),
+    (r"Riješi nejednačinu $2x>19$ i izaberi tačan skup rješenja kao zraku "
+     r"(interval) na realnoj osi. U opcijama je korišten mješoviti oblik za "
+     r"granicu $9\frac{1}{2}$.",
+     (r"$[9\frac{1}{2},\infty)$", r"$(9\frac{1}{2},\infty)$",
+      r"$(-\infty,9\frac{1}{2})$", r"$(-\infty,9\frac{1}{2}]$"), 1),
+])
+def test_all_eight_live_false_silences_now_get_full_adjudication(
+        question, options, correct):
+    result = evaluate(question, options)
+    assert result.applicable, question
+    assert result.valid, (question, result.reason_code, result.option_displays)
+    assert result.correct_index == correct, question
+    failure, _ = publication_failure(question, options, correct,
+                                     options[correct])
+    assert failure == ""
+
+
+# ---------------------------------------------------------------------------
+# 8b) INTERVALNI ZAPIS OPCIJA — zatvorena gramatika, nikad pogađanje
+# ---------------------------------------------------------------------------
+
+def test_interval_ray_options_adjudicate_like_relations():
+    """Zrak u intervalnom zapisu je ISTI skup kao relacija — deterministička
+    porodica `interval_solution` sada dobija pravu presudu umjesto ćutanja."""
+    question = (r"Riješi nejednačinu $2x + 3 < 9$ i zapiši skup rješenja "
+                r"intervalom.")
+    options = (r"$(-\infty, 3)$", r"$(3, +\infty)$", r"$(-\infty, 3]$",
+               r"$(-\infty, 4)$")
+    result = evaluate(question, options)
+    assert result.applicable and result.valid
+    assert result.solution_display == "x < 3"
+    assert result.option_displays == ("x < 3", "x > 3", "x <= 3", "x < 4")
+    assert result.correct_index == 0
+    failure, _ = publication_failure(question, options, 0, options[0])
+    assert failure == ""
+
+
+def test_interval_and_relation_for_the_same_set_are_duplicate_answers():
+    result = evaluate(r"Riješi nejednačinu: $x+3<8$",
+                      (r"$x<5$", r"$(-\infty,5)$", r"$x>5$", r"$x=5$"))
+    assert result.applicable and not result.valid
+    assert result.reason_code == "multiple_correct_options"
+    assert result.correct_indices == (0, 1)
+
+
+def test_interval_option_grammar_is_closed_and_never_guessed():
+    """Malformiran/degenerisan intervalni zapis na poznatom zadatku pada
+    zatvoreno (nečitljiva opcija), nikad pogođen, nikad tih."""
+    question = r"Riješi nejednačinu: $x+3<8$"
+    for bad in (r"$(5,2)$", r"$(2,2)$", r"$(-\infty,+\infty)$",
+                r"$[-\infty,5)$", r"$(-\infty,5]]$", r"$(1,2,3)$",
+                r"$(,5)$", r"$(x,5)$", r"$(2;5)$", r"$(+\infty,5)$"):
+        result = evaluate(question, (r"$x<5$", bad, r"$x>5$", r"$x=5$"))
+        assert result.applicable, bad
+        assert result.reason_code == "unverifiable_solution_option", bad
+        assert result.option_displays[1] == "?", bad
+
+
+def test_decimal_comma_interval_bound_is_sacrificed_never_guessed():
+    """(2,5, 7) — decimalni zarez u granici napravi tri dijela na vrhu zapisa:
+    ne pogađa se (ista doktrina kao {2,5} kod jednočlanog skupa), pada
+    zatvoreno."""
+    result = evaluate(r"Riješi nejednačinu: $x+3<8$",
+                      (r"$x<5$", r"$(2,5, 7)$", r"$x>5$", r"$x=5$"))
+    assert result.applicable
+    assert result.reason_code == "unverifiable_solution_option"
+
+
+def test_bounded_interval_with_mixed_number_bounds_is_exact():
+    chain = evaluate(r"Riješi nejednačinu i odredi skup rješenja: "
+                     r"$-2\frac{1}{2} < x < 3\frac{1}{4}$",
+                     (r"$(-2\frac{1}{2}, 3\frac{1}{4})$",
+                      r"$[-2\frac{1}{2}, 3\frac{1}{4}]$",
+                      r"$(-2\frac{1}{2}, 3\frac{1}{4}]$", "$x<3$"))
+    assert chain.applicable and chain.valid
+    assert chain.solution_display == "-5/2 < x < 13/4"
+    assert chain.option_displays[0] == "-5/2 < x < 13/4"
+    assert chain.correct_index == 0
