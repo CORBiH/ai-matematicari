@@ -64,6 +64,32 @@ relacijskog znaka ($<$, $>$, $=$, \\le, \\ge, ≤, ≥…). Preformulisan zadata
 relaciju STVARNO napiše ($x+2>5$) prolazi ovdje netaknut i dalje se sudi samo
 po kanonskom skupu rješenja.
 
+TREĆI NALAZ — „DOBIJENA“ RELACIJA KOJA NIJE ISTI SKUP RJEŠENJA
+--------------------------------------------------------------
+Živi ciljani nalaz (jedini blokator te kampanje): učenik je dao $x>3$ i tražio
+preoblikovanje u kojem se lijevoj strani dodaje 2, a desnoj 4. Objavljeno je
+
+    „Početna nejednačina je $x>3$. Dodajemo $2$ s lijeve strane i $4$ s desne
+     strane pa dobijamo $x+2>7$. Riješi dobijenu nejednačinu $x+2>7$…“
+
+s označenim $(5,\\infty)$ — tačnim za $x+2>7$, ali NE za traženo $x>3$.
+
+Zašto je prošlo: `read_solve_statement` po ugovoru vraća NAJVIŠE JEDNU
+relaciju, a dvije RAZLIČITE proglašava nejednoznačnošću. To je tačno za
+ZAHTJEV (server ne smije birati koji je uslov „pravi“), ali za TEKST ZADATKA
+je slijepo — zadatak koji preoblikuje NAMJERNO nosi dvije: polaznu i dobijenu.
+Zbog `relation_ambiguous=True` provjera relacije nije ni pokrenuta, a nova
+provjera iz drugog nalaza traži da relacije NEMA — pa je i ona ćutala.
+
+Rješenje NE širi matematiku nego ČITANJE: `mcq_integrity.read_solve_relations`
+vraća SVE dokazivo pročitane relacije REDOM, s rasponom u tekstu, istom
+gramatikom i istim egzaktnim računom. Zadatak koji SAM tvrdi preoblikovanje
+(zatvoren skup markera: dobi…, nastal…, preoblik…, transform…, rezult…,
+izmijenj…, nova + imenica relacije) mora imati OPERATIVNU relaciju — prvu koja
+počinje IZA markera — s ISTIM kanonskim skupom rješenja kao zahtjev.
+
+Kad iza markera nema pročitljive relacije, ništa se ne tvrdi.
+
 Vjernost zahtjevu NE nadjačava lekciju: semantički ugovori vježbe (Task 2)
 i dalje odbijaju zadatak van lekcije čak i kad je učenikov zahtjev vjerno
 prepisan — te dvije kapije su nezavisne i obje moraju proći.
@@ -80,6 +106,7 @@ DOMAIN_MISMATCH = "domain_mismatch"
 RELATION_MISMATCH = "relation_mismatch"
 TASK_TYPE_MISMATCH = "task_type_mismatch"
 MISSING_REQUESTED_RELATION = "missing_requested_relation"
+TRANSFORMED_RELATION_MISMATCH = "transformed_relation_mismatch"
 
 # Direktiva rješavanja u PORUCI — ponovo se koristi zatvoreni uzorak orakla,
 # da se granica „ovo je zahtjev za zadatak“ ne izmišlja po drugi put.
@@ -120,6 +147,63 @@ def _refers_to_a_relation_it_never_states(task_text):
     if not _SOLVE_DIRECTIVE_RE.search(text):
         return False                     # tekst uopšte ne traži rješavanje
     return bool(_DEICTIC_RELATION_RE.search(text))
+
+
+# ---------------------------------------------------------------------------
+# ZATVORENA GRAMATIKA TVRDNJE O PREOBLIKOVANJU
+# ---------------------------------------------------------------------------
+# Ista porodica riječi kao deiktički pridjevi iznad, ali u GLAGOLSKOM/
+# participskom obliku kojim tekst zadatka stvarno najavljuje rezultat
+# („…pa dobijamo“, „nastaje“, „preoblikovanjem“, „transformisana“,
+# „rezultujuća“). Marker je USKI LOKALNI KONTEKST, ništa više: on samo bira
+# KOJA je od pročitanih relacija ona koju učenik treba riješiti. Namjerno se
+# NE hvataju pridjevi polazne strane (original/početn/polazn/prvobitn) — oni
+# pokazuju na polaznu relaciju, koja je po definiciji ono što je traženo.
+#
+# „nov…“ je jedini oblik koji traži imenicu uz sebe: samostalno bi hvatao
+# „novčić“, „novembar“ i slično.
+_TRANSFORMED_RELATION_MARKER_RE = re.compile(
+    r"\bdobi\w*"
+    r"|\bnastal\w*|\bnastaj\w*|\bnastan\w*"
+    r"|\bpreoblik\w*"
+    r"|\btransform\w*"
+    r"|\brezult\w*"
+    r"|\bizmijenj\w*|\bizmenj\w*"
+    r"|\bnov\w*\s+" + _RELATION_NOUN,
+    re.IGNORECASE)
+
+
+def _non_equivalent_transformed_relation(request, task_text, shared_domain):
+    """Prva DOKAZANO neekvivalentna „dobijena“ relacija, ili None.
+
+    None znači „ništa se ne može dokazati“ — uključujući slučaj kad iza
+    markera uopšte nema PROČITLJIVE relacije. Preskočeno nije dokaz
+    ispravnosti (doktrina cijelog projekta): kad se operativna relacija ne
+    može bezbjedno izolovati, ponašanje ostaje konzervativno."""
+    text = task_text or ""
+    markers = list(_TRANSFORMED_RELATION_MARKER_RE.finditer(text))
+    if not markers:
+        return None                      # zadatak ne tvrdi nikakvo preoblikovanje
+    relations = mcq_integrity.read_solve_relations(text)
+    if not relations:
+        return None                      # nijedna relacija nije pročitljiva
+
+    # PRIDRUŽIVANJE: za svaki marker uzima se PRVA relacija koja počinje iza
+    # njega — „relacija neposredno iza fraze“, nikad slijepo poređenje svake
+    # relacije u tekstu. Relacije prije prvog markera (npr. citirana polazna)
+    # se time ne diraju.
+    operative = []
+    for marker in markers:
+        following = next((relation for relation in relations
+                          if relation.start >= marker.end()), None)
+        if following is not None and following not in operative:
+            operative.append(following)
+
+    for relation in operative:
+        if not mcq_integrity.solution_sets_match(
+                request.solution, relation.solution, shared_domain):
+            return relation
+    return None
 
 
 def _requested_kind(request):
@@ -182,13 +266,29 @@ def request_fidelity_failures(student_message, task_text):
             f"{MISSING_REQUESTED_RELATION}: the task refers to a relation it "
             f"never writes; requested '{request.solution_display()}'")
 
+    shared_domain = (requested_domain
+                     if requested_domain and task.domain == requested_domain
+                     else "")
+
+    # 2b) „DOBIJENA“ RELACIJA KOJA NIJE ISTI SKUP RJEŠENJA (vidi docstring).
+    #     Angažuje se SAMO kad zadatak nosi VIŠE različitih čitljivih relacija
+    #     (tada `task.has_relation` po ugovoru ćuti kao „nejednoznačno“) i kad
+    #     SAM tvrdi preoblikovanje. Kad zadatak ima tačno jednu relaciju,
+    #     odluku i dalje donosi provjera 2 ispod — bez dvostrukog nalaza.
+    if (explicit_relation and not task.has_relation
+            and _SOLVE_DIRECTIVE_RE.search(task_text)):
+        drifted = _non_equivalent_transformed_relation(
+            request, task_text, shared_domain)
+        if drifted is not None:
+            failures.append(
+                f"{TRANSFORMED_RELATION_MISMATCH}: requested "
+                f"'{request.solution_display()}', task's transformed relation "
+                f"'{drifted.display()}'")
+
     # 2) RELACIJA — poredi se KANONSKI SKUP RJEŠENJA. Kad su domeni saglasni i
     #    diskretni, poredi se i presjek s tim domenom, pa preformulacija koja
     #    nad traženim domenom daje isti skup ostaje dozvoljena.
     if explicit_relation and task.has_relation:
-        shared_domain = (requested_domain
-                         if requested_domain and task.domain == requested_domain
-                         else "")
         if not mcq_integrity.solution_sets_match(
                 request.solution, task.solution, shared_domain):
             failures.append(

@@ -40,20 +40,31 @@ def _is_escaped(text, pos):
     return pos > 0 and text[pos - 1] == "\\"
 
 
-def tokenize_math(text):
-    """Vrati listu (kind, content) segmenata za dati tekst. Nikad ne baca
-    izuzetak; prazan/None ulaz vraća [("text", "")]."""
+def tokenize_math_spans(text):
+    """Isti prolaz kao `tokenize_math`, ali vraća i RASPON sadržaja u ULAZU:
+    listu (kind, content, start, end) gdje je `text[start:end] == content`.
+
+    ZAŠTO POSTOJI: čitač „riješi“ relacija (matbot/mcq_integrity.py) mora znati
+    REDOSLIJED i POZICIJU svake pročitane relacije da bi je mogao pridružiti
+    lokalnom tekstualnom kontekstu (npr. „…pa dobijamo $x+2>7$“). Bez raspona
+    bi se to moralo raditi drugim, paralelnim parsiranjem delimitera — a ovaj
+    modul postoji upravo zato da parsiranje `$…$`/`$$…$$` postoji na TAČNO
+    JEDNOM mjestu (vidi živi nalaz C-3 u docs/CURRENT_STATE.md).
+
+    `tokenize_math` je od sada tanak omotač oko ove funkcije, pa se dvije
+    implementacije ne mogu razići."""
     if not text:
-        return [(TEXT, text or "")]
+        return [(TEXT, text or "", 0, 0)]
 
     segments = []
+    buf_start = 0
     buf = []
     i = 0
     n = len(text)
 
     def flush_text():
         if buf:
-            segments.append((TEXT, "".join(buf)))
+            segments.append((TEXT, "".join(buf), buf_start, i))
             buf.clear()
 
     while i < n:
@@ -66,11 +77,12 @@ def tokenize_math(text):
                 if j == -1:
                     # nezatvoren display: otvarajući "$$" se otpisuje,
                     # ostatak ide kao obični tekst bez daljeg parsiranja.
-                    segments.append((TEXT, text[i + 2:]))
+                    segments.append((TEXT, text[i + 2:], i + 2, n))
                     i = n
                     break
-                segments.append((DISPLAY, text[i + 2:j]))
+                segments.append((DISPLAY, text[i + 2:j], i + 2, j))
                 i = j + 2
+                buf_start = i
                 continue
             else:
                 flush_text()
@@ -83,17 +95,27 @@ def tokenize_math(text):
                     j += 1
                 if close == -1:
                     # nezatvoren inline: otvarajući "$" se otpisuje.
-                    segments.append((TEXT, text[i + 1:]))
+                    segments.append((TEXT, text[i + 1:], i + 1, n))
                     i = n
                     break
-                segments.append((INLINE, text[i + 1:close]))
+                segments.append((INLINE, text[i + 1:close], i + 1, close))
                 i = close + 1
+                buf_start = i
                 continue
+        if not buf:
+            buf_start = i
         buf.append(ch)
         i += 1
 
     flush_text()
     return segments
+
+
+def tokenize_math(text):
+    """Vrati listu (kind, content) segmenata za dati tekst. Nikad ne baca
+    izuzetak; prazan/None ulaz vraća [("text", "")]."""
+    return [(kind, content)
+            for kind, content, _start, _end in tokenize_math_spans(text)]
 
 
 def join_segments(segments):

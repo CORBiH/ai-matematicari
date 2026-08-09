@@ -17,7 +17,8 @@ from fractions import Fraction
 from typing import Iterable, Optional
 
 from matbot.mathcheck import safe_numeric_value
-from matbot.mathsegments import TEXT, math_contents, tokenize_math
+from matbot.mathsegments import (TEXT, math_contents, tokenize_math,
+                                 tokenize_math_spans)
 
 
 SUPPORTED_DIVISORS = frozenset({2, 3, 4, 5, 6, 9, 10, 15, 25})
@@ -1661,26 +1662,100 @@ class SolveStatement:
         return self.solution.display(self.variable or "x")
 
 
-def _request_relation_candidates(text: str) -> list:
-    """Nizovi znakova koji SMIJU biti relacija — iz $…$ i iz golog teksta."""
+def _trim_relation_run(run: str, start: int) -> tuple:
+    """(očišćen niz, start, end) — isto skraćivanje kao dosad, uz RASPON.
+
+    Raspon se vodi kroz svaki korak skraćivanja da bi pozivalac mogao znati
+    GDJE se pročitana relacija nalazi u ulazu (vidi `read_solve_relations`)."""
+    leading = len(run) - len(run.lstrip())
+    start += leading
+    run = run.strip()
+    end = start + len(run)
+    while run and run[-1] in _REQUEST_TRAILING_PUNCT:
+        run = run[:-1]
+        end -= 1
+    # Rečenična zagrada oko izraza („(riješi x>3)“) nije dio izraza;
+    # skida se SAMO kad je nesparena, pa `2(x-3)=x+5` ostaje netaknut.
+    while run.endswith(")") and run.count(")") > run.count("("):
+        run = run[:-1]
+        end -= 1
+    while run.startswith("(") and run.count("(") > run.count(")"):
+        run = run[1:]
+        start += 1
+    return run, start, end
+
+
+def _request_relation_candidate_spans(text: str) -> list:
+    """(start, end, niz) za svaki kandidat relacije — iz $…$ i iz golog teksta.
+
+    Rasponi dolaze iz ZAJEDNIČKOG tokenizatora (matbot/mathsegments.py), pa
+    ovaj modul ni ovdje ne parsira delimitere sam."""
     candidates = []
-    for kind, content in tokenize_math(text or ""):
+    for kind, content, start, end in tokenize_math_spans(text or ""):
         if kind != TEXT:
-            candidates.append(content)
+            # Matematički segment ide NETAKNUT (bajt za bajt kao dosad) —
+            # skraćivanje interpunkcije vrijedi samo za goli tekst.
+            candidates.append((start, end, content))
             continue
         for match in _REQUEST_BARE_RUN_RE.finditer(content):
-            run = match.group(0).strip()
-            while run and run[-1] in _REQUEST_TRAILING_PUNCT:
-                run = run[:-1]
-            # Rečenična zagrada oko izraza („(riješi x>3)“) nije dio izraza;
-            # skida se SAMO kad je nesparena, pa `2(x-3)=x+5` ostaje netaknut.
-            while run.endswith(")") and run.count(")") > run.count("("):
-                run = run[:-1]
-            while run.startswith("(") and run.count("(") > run.count(")"):
-                run = run[1:]
+            run, run_start, run_end = _trim_relation_run(
+                match.group(0), start + match.start())
             if run and _SOLVE_RELATION_TOKEN_RE.search(run):
-                candidates.append(run)
+                candidates.append((run_start, run_end, run))
     return candidates
+
+
+def _request_relation_candidates(text: str) -> list:
+    """Nizovi znakova koji SMIJU biti relacija — iz $…$ i iz golog teksta."""
+    return [run for _start, _end, run in _request_relation_candidate_spans(text)]
+
+
+@dataclass(frozen=True)
+class SolveRelation:
+    """JEDNA dokazivo pročitana relacija i njen RASPON u izvornom tekstu."""
+
+    start: int
+    end: int
+    solution: object
+    variable: str
+    kind: str          # RELATION_EQUATION | RELATION_INEQUALITY
+
+    def display(self) -> str:
+        return self.solution.display(self.variable or "x")
+
+
+def read_solve_relations(text: str) -> tuple:
+    """SVE dokazivo pročitane linearne relacije iz teksta, REDOM pojavljivanja.
+
+    ZAŠTO POSTOJI (živi ciljani nalaz): `read_solve_statement` po ugovoru vraća
+    NAJVIŠE JEDNU relaciju — dvije različite znače „nejednoznačno“ i tada ne
+    tvrdi ništa. To je tačno za ZAHTJEV (ne zna se koji je uslov „pravi“), ali
+    slijepo za TEKST ZADATKA koji NAMJERNO navodi dvije: polaznu i „dobijenu“.
+    Objavljen je zadatak koji uz polaznu $x>3$ nosi „dobijenu“ $x+2>7$ — ne
+    ekvivalentnu — a nijedna kapija to nije mogla vidjeti, jer je čitač izjave
+    obje relacije proglasio nejednoznačnošću.
+
+    Ovdje NEMA nove matematike: koriste se ISTA gramatika, ISTA
+    normalizacija i ISTI egzaktni `Fraction` račun kao u `read_solve_statement`
+    (koji je od sada i sam izgrađen nad ovom funkcijom). Nepročitljiv kandidat
+    se PRESKAČE — nikad se ne pogađa. Nelinearno, simboličko i CAS ostaju van
+    dometa, kao i dosad.
+
+    Raspon (`start`/`end`) postoji da bi pozivalac mogao pridružiti relaciju
+    USKOM lokalnom tekstualnom kontekstu; ovaj modul sam ne tumači prozu."""
+    found = []
+    for start, end, candidate in _request_relation_candidate_spans(text or ""):
+        normalized = _normalize_solve_segment(candidate)
+        if normalized is None or not _SOLVE_RELATION_TOKEN_RE.search(normalized):
+            continue
+        solved = _solve_relation_text(normalized)
+        if solved is None:
+            continue
+        kind = (RELATION_EQUATION
+                if _SOLVE_RELATION_TOKEN_RE.findall(normalized) == ["="]
+                else RELATION_INEQUALITY)
+        found.append(SolveRelation(start, end, solved[0], solved[1], kind))
+    return tuple(found)
 
 
 def read_solve_statement(text: str) -> SolveStatement:
@@ -1734,19 +1809,12 @@ def read_solve_statement(text: str) -> SolveStatement:
     else:
         domain_status, resolved_domain = "none", ""
 
-    # 2) RELACIJA — svaki kandidat kroz ISTU gramatiku; različiti kanonski
-    #    skupovi znače nejednoznačnost, isti skup zapisan dvaput ne znači.
+    # 2) RELACIJA — svaki kandidat kroz ISTU gramatiku (`read_solve_relations`);
+    #    različiti kanonski skupovi znače nejednoznačnost, isti skup zapisan
+    #    dvaput ne znači.
     seen = []
-    for candidate in _request_relation_candidates(raw):
-        normalized = _normalize_solve_segment(candidate)
-        if normalized is None or not _SOLVE_RELATION_TOKEN_RE.search(normalized):
-            continue
-        solved = _solve_relation_text(normalized)
-        if solved is None:
-            continue
-        kind = (RELATION_EQUATION if _SOLVE_RELATION_TOKEN_RE.findall(normalized) == ["="]
-                else RELATION_INEQUALITY)
-        entry = (solved[0], solved[1], kind)
+    for relation in read_solve_relations(raw):
+        entry = (relation.solution, relation.variable, relation.kind)
         if entry not in seen:
             seen.append(entry)
     if len(seen) == 1:
