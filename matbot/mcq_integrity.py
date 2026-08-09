@@ -617,10 +617,17 @@ def evaluate_comparison_mcq(question: str,
 #   • podržana je isključivo LINEARNA relacija s jednom nepoznatom i egzaktno
 #     čitljivim racionalnim konstantama (cio broj, decimalni zapis, \frac);
 #     lančana nejednačina se rješava kao presjek dvaju linearnih uslova;
-#   • sve opcije moraju biti relacije u ISTOJ nepoznatoj (ili, SAMO kod
-#     jednačine, gole vrijednosti — tačka je jedina vrsta skupa koju gola
-#     vrijednost jednoznačno imenuje); prozna/nepročitljiva opcija isključuje
-#     cio orakl;
+#   • opcije su relacije u ISTOJ nepoznatoj, gole vrijednosti ili jednočlani
+#     skupovi ({-1}); gola vrijednost/jednočlan skup je KANDIDAT-TAČKA — cio
+#     skup rješenja samo kod jednačine, a kod nejednačine dokazivo pogrešan;
+#   • RAZDVOJENO JE „zadatak van dometa“ od „opcija koju ne znam pročitati“
+#     (targeted live verifikacija, dva objavljena pogrešna paketa): kad je
+#     zadatak DOKAZANO u dometu i skup rješenja izveden, nečitljiva opcija NE
+#     gasi orakl nego pada zatvoreno (`unverifiable_solution_option`) — ćutanje
+#     bi značilo „objavi bez ijedne matematičke provjere“. Mješovit broj
+#     ($9\frac{4}{5}$ = 49/5) se sada čita EGZAKTNO po ugovoru uz
+#     `_SOLVE_MIXED_NUMBER_RE`. Jedini namjerni izuzetak ćutanja na nivou
+#     opcije: gola vrijednost/jednočlan skup na pitanju o ČLANSTVU;
 #   • sva aritmetika je egzaktna (`Fraction`) — float nikad ne odlučuje istinu.
 #
 # Dvije relacije su „isti odgovor“ SAMO kad opisuju ISTI skup rješenja:
@@ -654,6 +661,30 @@ _SOLVE_TERM_RE = re.compile(
     r"|(?P<var>[A-Za-z]))"
     r"(?:[/§](?P<den>[+-]?\d+(?:[.,]\d+)?))?")
 _SOLVE_REVERSED_OP = {"<": ">", "<=": ">=", ">": "<", ">=": "<="}
+# MJEŠOVIT BROJ `K\frac{p}{q}` — EGZAKTNA vrijednost K + p/q (zatvaranje
+# posljednje poznate rupe: ovaj zapis je ranije NAMJERNO ćutao, pa je „riješi“
+# zadatak s mješovitim opcijama ostajao bez ijedne determinističke provjere).
+# UGOVOR — zamjenjuje se isključivo dokazano jednoznačan školski oblik, tačno
+# onaj koji `deterministic/core.py::fraction_display` stvarno emituje:
+#   • cio dio K ≥ 1, nazivnik q ≥ 2, PRAVI razlomački dio 1 ≤ p < q;
+#   • predznak NIJE dio zapisa: `-9\frac{4}{5}` znači -(9 + 4/5) = -49/5
+#     (školska konvencija) i to garantuje postojeći parser članova, jer se
+#     zamjena `9\frac{4}{5}` → `49§5` obavlja bez predznaka pa `-` ostaje
+#     unarni/binarni znak CIJELOG člana — nikad -9 + 4/5;
+#   • nepravi sufiks (9\frac{7}{5}), K=0, p=0, q<2, q=0, slovo/cifra odmah iza —
+#     SVE ostaje nezamijenjeno i pada na postojećoj cifra-uz-\frac kapiji kao
+#     nečitljivo (za opciju poznatog zadatka → fail closed, nikad tiho).
+_SOLVE_MIXED_NUMBER_RE = re.compile(
+    r"(?P<whole>\d+)\s*\\[dt]?frac\{(?P<num>\d+)\}\{(?P<den>\d+)\}")
+
+# ŽIVA TARGETED VERIFIKACIJA (24 scenarija, 2 FAIL iste klase): objavljena su
+# DVA pogrešna paketa u kojima je „riješi nejednačinu“ zadatak nosio opcije u
+# zapisu jednočlanog skupa ({-5} za skup -6<x<-4; {-1} za skup -2<x<0). Parser
+# opcija nije poznavao vitičaste zagrade, JEDNA nepročitljiva opcija je gasila
+# CIO orakl (applicable=False), i deterministička zaštita je nestala baš na
+# paketu koji ju je najviše trebao. Ovaj kod razdvaja te dvije stvari: zadatak
+# u dometu + nečitljiva opcija = zatvoreno padanje, nikad tiho odustajanje.
+UNVERIFIABLE_SOLUTION_OPTION_CODE = "unverifiable_solution_option"
 
 
 @dataclass(frozen=True)
@@ -723,6 +754,33 @@ def _solve_literal(text: str) -> Fraction:
     return Fraction(text.replace(",", "."))
 
 
+def _replace_mixed_numbers(text: str) -> str:
+    """Zamijeni svaki UGOVORNO valjan mješovit broj egzaktnim nepravim razlomkom.
+
+    `9\\frac{4}{5}` → `49§5` (= (9·5+4)/5), bez ikakvog diranja predznaka.
+    Oblik van ugovora (vidi `_SOLVE_MIXED_NUMBER_RE`) se NE zamjenjuje — ostaje
+    cifra-uz-\\frac i pada na postojećoj kapiji u opštoj petlji ispod, pa
+    malformiran zapis nikad ne postane pogođena vrijednost."""
+    out = []
+    position = 0
+    for match in _SOLVE_MIXED_NUMBER_RE.finditer(text):
+        if match.start() < position:
+            continue
+        whole = int(match.group("whole"))
+        numerator = int(match.group("num"))
+        denominator = int(match.group("den"))
+        before = text[match.start() - 1] if match.start() > 0 else ""
+        after = text[match.end()] if match.end() < len(text) else ""
+        if (whole < 1 or denominator < 2 or not 1 <= numerator < denominator
+                or before in (".", ",", "§") or after.isalnum()):
+            continue                    # van ugovora — namjerno bez zamjene
+        out.append(text[position:match.start()])
+        out.append(f"{whole * denominator + numerator}§{denominator}")
+        position = match.end()
+    out.append(text[position:])
+    return "".join(out)
+
+
 def _normalize_solve_segment(segment: str) -> Optional[str]:
     """Zatvorena normalizacija LaTeX segmenta, ili None kad išta ostane nepročitano."""
     text = segment or ""
@@ -735,18 +793,26 @@ def _normalize_solve_segment(segment: str) -> Optional[str]:
         text = text.replace(old, new)
     text = (text.replace("·", "*").replace("−", "-")
             .replace("≤", "<=").replace("≥", ">="))
+    # PRVO ugovorno valjani mješoviti brojevi (egzaktno, vidi helper), pa TEK
+    # ONDA opšta \frac zamjena — svaka PREOSTALA cifra uz \frac je time
+    # dokazano malformiran zapis i pada ispod.
+    text = _replace_mixed_numbers(text)
     while match := _SOLVE_FRAC_RE.search(text):
-        # MJEŠOVIT BROJ ($9\frac{4}{5}$ = 9 + 4/5) NIJE podržan: prosta zamjena
-        # bi nadovezala cifre (94§5 = 94/5 ≠ 49/5) i orakl bi POGREŠNO oborio
-        # ispravan paket (uhvaćeno na determinističkim bulk testovima). Cifra
-        # ili zatvorena zagrada neposredno prije/cifra neposredno poslije
-        # razlomka znači ćutanje cijelog orakla, nikad pogađanje vrijednosti.
+        # Cifra ili zatvorena zagrada neposredno prije / cifra neposredno
+        # poslije razlomka NAKON ugovorne zamjene mješovitih brojeva = zapis
+        # koji se ne pogađa (nepravi sufiks 9\frac{7}{5}, K=0, p=0, q=0…):
+        # prosta zamjena bi nadovezala cifre (94§5 = 94/5 ≠ 49/5).
         before = text[match.start() - 1] if match.start() > 0 else ""
         after = text[match.end()] if match.end() < len(text) else ""
         if before.isdigit() or before == "}" or after.isdigit():
             return None
         text = (text[:match.start()] + match.group(1) + "§" + match.group(2)
                 + text[match.end():])
+    if re.search(r"\d\s+\d", text):
+        # „9 4/5“ (tekstualni mješovit broj) bi se brisanjem razmaka slijepio u
+        # „94/5“ — pogođena vrijednost umjesto 49/5. Deterministički sadržaj
+        # takav zapis ne emituje (uvijek \frac), pa se ne pogađa: nečitljivo.
+        return None
     text = re.sub(r"\s+", "", text)
     text = text.replace(":", "/")
     if not text or _SOLVE_UNSUPPORTED_CHAR_RE.search(text):
@@ -859,11 +925,50 @@ def _solve_relation_text(text: str) -> Optional[tuple]:
     return solution, next(iter(variables))
 
 
+def _solve_singleton_inner(text: str) -> Optional[str]:
+    """Sadržaj JEDNOČLANOG skupa `{c}` / `\\{c\\}`, ili None kad zapis nije takav.
+
+    ŽIVI NALAZ (targeted verifikacija): model tačku piše i kao skup — `{-1}`,
+    `{ 5 }`, `\\{-5\\}`. Višečlani skup NIKAD nije tačka, pa zarez/tačka-zarez u
+    sadržaju diskvalifikuje zapis: `{2,5}` je nerazlučiv od skupa {2, 5}
+    (decimalni zarez se ovdje NAMJERNO žrtvuje — ne pogađa se)."""
+    stripped = (text or "").strip()
+    # Escaped vitičaste su ISTI zapis: \{-1\} == {-1}. `\frac{...}` nema
+    # backslash neposredno ispred vitičaste, pa ga zamjena ne dira.
+    stripped = stripped.replace("\\{", "{").replace("\\}", "}")
+    if len(stripped) < 3 or not (stripped.startswith("{") and stripped.endswith("}")):
+        return None
+    inner = stripped[1:-1].strip()
+    if not inner or "," in inner or ";" in inner:
+        return None
+    return inner
+
+
+def _solve_bare_point(text: str) -> Optional[_SolutionSet]:
+    """Čista vrijednost (bez relacije i bez nepoznate) kao KANDIDAT-TAČKA."""
+    normalized = _normalize_solve_segment(text)
+    if normalized is None or _SOLVE_RELATION_TOKEN_RE.search(normalized):
+        return None
+    variables: set = set()
+    side = _solve_side_terms(normalized, variables)
+    if side is None or variables or side[0] != 0:
+        return None
+    return _SolutionSet.point(side[1])
+
+
 def _solve_option_set(option_text: str, variable: str,
                       allow_bare_value: bool) -> Optional[_SolutionSet]:
     text = (option_text or "").strip()
     if text.startswith("$") and text.endswith("$") and text.count("$") == 2:
         text = text[1:-1].strip()
+    singleton_inner = _solve_singleton_inner(text)
+    if singleton_inner is not None:
+        # Jednočlan skup je samo drugi ZAPIS vrijednosti — ista kapija kao gola
+        # vrijednost: kod jednačine je to cio skup rješenja, kod nejednačine
+        # dokazivo pogrešan kandidat (tačka ≠ zrak ≠ interval).
+        if not allow_bare_value:
+            return None
+        return _solve_bare_point(singleton_inner)
     normalized = _normalize_solve_segment(text)
     if normalized is None:
         return None
@@ -873,11 +978,7 @@ def _solve_option_set(option_text: str, variable: str,
         # izvedenim zrakom/intervalom dokazano pada — vidi `allow_bare_value`.
         if not allow_bare_value:
             return None
-        variables: set = set()
-        side = _solve_side_terms(normalized, variables)
-        if side is None or variables or side[0] != 0:
-            return None
-        return _SolutionSet.point(side[1])
+        return _solve_bare_point(normalized)
     solved = _solve_relation_text(normalized)
     if solved is None:
         return None
@@ -933,16 +1034,33 @@ def evaluate_linear_solve_mcq(question: str,
     allow_bare_value = (solution.kind == "point"
                         or not _SOLVE_MEMBERSHIP_RE.search(prose))
     option_sets = []
+    unverifiable = False
     for option in options:
         parsed = _solve_option_set(option, variable,
                                    allow_bare_value=allow_bare_value)
         if parsed is None:
-            return LinearSolveMCQResult(False, False)
+            # Pitanje o ČLANSTVU s golom vrijednošću/jednočlanim skupom: zadatak
+            # semantički NIJE „riješi skup“ i orakl ostaje van njega (ćutanje),
+            # kao i dosad. Proba s allow_bare_value=True razlikuje baš taj
+            # slučaj od stvarno nečitljivog zapisa.
+            if (not allow_bare_value
+                    and _solve_option_set(option, variable,
+                                          allow_bare_value=True) is not None):
+                return LinearSolveMCQResult(False, False)
+            # ZADATAK JE U DOMETU i skup rješenja je izveden: nečitljiva opcija
+            # više NE gasi orakl. Ćutanje bi značilo „objavi bez ijedne
+            # matematičke provjere“ — upravo klasa dva živa pogrešna paketa.
+            unverifiable = True
+            option_sets.append(None)
+            continue
         option_sets.append(parsed)
 
     solution_display = solution.display(variable)
-    option_displays = tuple(candidate.display(variable)
+    option_displays = tuple("?" if candidate is None else candidate.display(variable)
                             for candidate in option_sets)
+    if unverifiable:
+        return LinearSolveMCQResult(True, False, UNVERIFIABLE_SOLUTION_OPTION_CODE,
+                                    solution_display, option_displays, ())
     correct_indices = tuple(index for index, candidate in enumerate(option_sets)
                             if candidate == solution)
     if not correct_indices:

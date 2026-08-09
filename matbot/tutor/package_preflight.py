@@ -506,6 +506,15 @@ def format_for_reviewer(issues):
         "other satisfying option. For `marked_option_math_mismatch` mark the option that "
         "actually satisfies the condition and copy that option's text into "
         "expected_answer. "
+        # Targeted live verifikacija: {-5}/{-1} objavljeni kao „rješenje“
+        # intervala — orakl sada zna jednočlane skupove, a NEPOZNAT zapis opcije
+        # pada zatvoreno umjesto da ugasi provjeru. Recenzentu treba recept.
+        f"For `{mcq_integrity.UNVERIFIABLE_SOLUTION_OPTION_CODE}` at least one option "
+        "is not written in a verifiable answer form for this solve task: rewrite "
+        "EVERY option as a plain value, a singleton set like {-1}, a relation such "
+        "as `x<5`, or a chain such as `-2<x<0` in the task's unknown, keep exactly "
+        "one option equal to the COMPLETE solution set, and recompute "
+        "correct_option_id and expected_answer. "
         # Produkcijski nalaz: „Daj mi novi zadatak.“ je vratio doslovno isti
         # zadatak i iste opcije. Recenzent mora znati da kozmetika nije dovoljna.
         f"For `{DUPLICATE_ACTIVE_TASK_CODE}` the proposed task is the SAME task the "
