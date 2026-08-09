@@ -240,6 +240,7 @@ function loadPage(options = {}) {
     + ' setInteractionPhase: (p) => { interactionPhase = p; },'
     + ' setSessionId: (v) => { sessionId = v; },'
     + ' flags: () => ({ tutorBusy, choiceBusy, interactionPhase }),'
+    + ' hasActiveTurn: () => activeTurn !== null,'
     + ' };\n';
   const patched = source.slice(0, anchor) + probe + source.slice(anchor);
 
@@ -278,7 +279,9 @@ function loadPage(options = {}) {
     URLSearchParams, TextEncoder, TextDecoder, Blob, atob, btoa,
     fetch: async (url, init = {}) => {
       const body = init.body && typeof init.body === 'string' ? JSON.parse(init.body) : init.body;
-      const entry = { url: String(url), method: init.method || 'GET', body, headers: init.headers || {} };
+      // `signal` se prosljeđuje da testovi mogu i POSMATRATI abort (signal.aborted)
+      // i REAGOVATI na njega (odbiti pending promise kao pravi fetch u pregledaču).
+      const entry = { url: String(url), method: init.method || 'GET', body, headers: init.headers || {}, signal: init.signal || null };
       network.requests.push(entry);
       if (!network.responder) throw new Error('no network responder configured');
       return network.responder(entry);

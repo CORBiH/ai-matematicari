@@ -887,6 +887,47 @@ document.addEventListener('DOMContentLoaded', () => {
     function nextRequestGeneration(){ requestGeneration += 1; return requestGeneration; }
     function currentRequestGeneration(){ return requestGeneration; }
     function invalidatePendingResponses(){ requestGeneration += 1; }
+    /* --- ŽIVOTNI CIKLUS AKTIVNOG TURNA (Nazad/Obriši tokom generisanja) ----
+       Živi nalaz: učenik ode "Nazad" dok se prvi zadatak još generiše, izabere
+       drugu lekciju — i novi razgovor ostane trajno prazan. Uzrok: tutorBusy
+       čisti SAMO finally turna u letu, a njegov AbortController je bio lokalan,
+       pa navigacija napušteni zahtjev nije mogla ni prekinuti ni osloboditi
+       busy stanje — auto-start nove lekcije je tiho progutan na
+       `if (tutorBusy) return;`.
+
+       VLASNIŠTVO (zaštita od trke): svaki zahtjev na startu registruje svoj
+       token (beginTutorTurn) i SAMO aktuelni vlasnik smije u finally osloboditi
+       globalno busy stanje (endTutorTurn). Zakašnjeli finally starog turna zato
+       ne može oboriti busy/typing NOVOG turna koji je u međuvremenu krenuo.
+       Namjeran prekid (cancelPendingTutorTurn) oduzima vlasništvo PRIJE aborta,
+       pa catch starog turna po tome razlikuje navigaciju od stvarnog
+       timeouta/mrežne greške i ne ispisuje nikakvu poruku. */
+    let activeTurn = null;                    // token zahtjeva koji trenutno drži busy stanje
+    function beginTutorTurn(ac){
+      const token = { ac: ac };
+      activeTurn = token;
+      return token;
+    }
+    function ownsActiveTurn(token){ return activeTurn === token; }
+    function endTutorTurn(token){
+      if (activeTurn !== token) return false; // smijenjen turn: tuđe stanje se ne dira
+      activeTurn = null;
+      return true;
+    }
+    /* Poziva se SAMO kad učenik stvarno napušta razgovor (exitTutorToHome,
+       resetTutorConversation) — nikad iz nepovezanih UI radnji. Dupli submit u
+       ISTOM razgovoru i dalje blokira `if (tutorBusy) return;` kao i do sada. */
+    function cancelPendingTutorTurn(){
+      if (!activeTurn) return;
+      const stale = activeTurn;
+      activeTurn = null;               // prva je smjena vlasnika → catch/finally starog turna postaju no-op
+      invalidatePendingResponses();    // ni uspio odgovor starog turna ne smije upisati stanje
+      tutorBusy = false;
+      choiceBusy = false;
+      hideTutorTyping();
+      setTutorBusy(false);
+      try { stale.ac.abort(); } catch(_){}
+    }
     let interactionPhase = null;   // 'awaiting_practice_answer' | null
     /* Phase 7.2: zadnja poruka tutora (za follow-up nastavak: "može", "nastavi") */
     let lastTutorMessage = '';
@@ -1268,6 +1309,7 @@ document.addEventListener('DOMContentLoaded', () => {
        pohranjenu historiju/zadnji zadatak, tako da vidljivo stanje UVIJEK
        odgovara onome što model pamti. */
     function resetTutorConversation(){
+      cancelPendingTutorTurn();   // zamjena konteksta prekida turn u letu — nova lekcija mora moći startati
       interactionPhase = null;
       lastTutorMessage = '';
       lastTurnWasGraded = false;
@@ -1477,6 +1519,7 @@ document.addEventListener('DOMContentLoaded', () => {
        razgovora OSTAJU, ali se practice/follow-up stanje čisti da staro stanje
        ne procuri u novi izbor (faza, zadnji zadatak, slika, placeholder). */
     function exitTutorToHome(){
+      cancelPendingTutorTurn();   // Nazad tokom generisanja: napušteni turn se prekida i oslobađa busy stanje
       interactionPhase = null;
       try { localStorage.removeItem(LASTTASK_KEY); } catch(_){}
       clearNextState();
@@ -1757,6 +1800,7 @@ document.addEventListener('DOMContentLoaded', () => {
         conversation_history: tutorHistory()
       };
       const ac = new AbortController();
+      const choiceToken = beginTutorTurn(ac);   // navigacija smije prekinuti i klik-odgovor
       const abortTimer = setTimeout(()=>{ try { ac.abort(); } catch(_){} }, TUTOR_ABORT_MS);
       try{
         const j = await jsonTutorRequest(payload, ac, null);
@@ -1783,21 +1827,27 @@ document.addEventListener('DOMContentLoaded', () => {
             requestTopic: payload.selected_topic,
             requestGeneration: choiceGeneration
           });
-        } else {
+        } else if (ownsActiveTurn(choiceToken)) {
           // deterministički blok (nevažeći ID / nema aktivnog zadatka / već završen) ili greška:
-          // ne boji ništa, vrati kartice u prethodno stanje
+          // ne boji ništa, vrati kartice u prethodno stanje. Smijenjen turn
+          // (namjeran prekid navigacijom) ne smije dirati kartice novog konteksta.
           optionsBox.querySelectorAll('.mc-option-card').forEach(b=>{ b.disabled = false; });
         }
       }catch(err){
-        optionsBox.querySelectorAll('.mc-option-card').forEach(b=>{ b.disabled = false; });
-        appendTutorMsg('bot', '<em>Greška pri slanju zahtjeva. Pokušaj ponovo.</em>');
+        if (ownsActiveTurn(choiceToken)){
+          optionsBox.querySelectorAll('.mc-option-card').forEach(b=>{ b.disabled = false; });
+          appendTutorMsg('bot', '<em>Greška pri slanju zahtjeva. Pokušaj ponovo.</em>');
+        }
+        /* smijenjen turn: bez poruke — kartice su već uklonjene ili zamijenjene */
       }finally{
         btn.classList.remove('loading');
         clearTimeout(abortTimer);
-        hideTutorTyping();
-        setTutorBusy(false);
-        tutorBusy = false;
-        choiceBusy = false;
+        if (endTutorTurn(choiceToken)){   // samo vlasnik oslobađa busy stanje
+          hideTutorTyping();
+          setTutorBusy(false);
+          tutorBusy = false;
+          choiceBusy = false;
+        }
       }
     }
 
@@ -2093,6 +2143,7 @@ document.addEventListener('DOMContentLoaded', () => {
          zauvijek gledati "Tutor razmišlja...". Vrijednost MORA nadmašiti
          serverski najgori slučaj; vidi definiciju TUTOR_ABORT_MS. */
       const ac = new AbortController();
+      const turnToken = beginTutorTurn(ac);   // navigacija smije prekinuti ovaj zahtjev
       const abortTimer = setTimeout(()=>{ try { ac.abort(); } catch(_){} }, TUTOR_ABORT_MS);
       try{
         let result = null;   // {j, rendered:true} | {errorShown:true} | null
@@ -2123,16 +2174,21 @@ document.addEventListener('DOMContentLoaded', () => {
           applyTutorResponse(j, { fromTyped, answerPhase, rendered: false, isNewTaskRequest, retryPayload: payload, requestFingerprint: payloadPracticeFingerprint(payload), requestTopic: payload.selected_topic, requestGeneration: turnGeneration });
         }
       }catch(err){
-        if (err && err.name === 'AbortError'){
+        if (!ownsActiveTurn(turnToken)){
+          /* namjeran prekid navigacijom (Nazad/Obriši/nova lekcija): stari turn
+             ne ispisuje ništa — ekran već pripada novom kontekstu */
+        } else if (err && err.name === 'AbortError'){
           appendTutorMsg('bot', '<em>⏳ Odgovor traje duže nego obično. Pokušaj ponovo za koji trenutak.</em>');
         } else {
           appendTutorMsg('bot', '<em>Greška pri slanju zahtjeva. Pokušaj ponovo.</em>');
         }
       }finally{
         clearTimeout(abortTimer);
-        hideTutorTyping();
-        setTutorBusy(false);
-        tutorBusy = false;
+        if (endTutorTurn(turnToken)){   // samo vlasnik oslobađa busy stanje (trka sa novim turnom)
+          hideTutorTyping();
+          setTutorBusy(false);
+          tutorBusy = false;
+        }
       }
     }
 
@@ -2149,6 +2205,7 @@ document.addEventListener('DOMContentLoaded', () => {
       showTutorTyping(practiceStagesFor(payload, true));
       setTutorBusy(true);
       const ac = new AbortController();
+      const turnToken = beginTutorTurn(ac);   // i retry turn je prekidiv navigacijom
       const abortTimer = setTimeout(()=>{ try { ac.abort(); } catch(_){} }, TUTOR_ABORT_MS);
       try{
         let result = null;
@@ -2167,16 +2224,20 @@ document.addEventListener('DOMContentLoaded', () => {
           applyTutorResponse(j, { rendered: false, isNewTaskRequest: true, retryPayload: payload, requestFingerprint: payloadPracticeFingerprint(payload), requestTopic: payload.selected_topic });
         }
       }catch(err){
-        if (err && err.name === 'AbortError'){
+        if (!ownsActiveTurn(turnToken)){
+          /* namjeran prekid navigacijom: bez poruke (vidi sendTutorMsg) */
+        } else if (err && err.name === 'AbortError'){
           appendTutorMsg('bot', '<em>⏳ Odgovor traje duže nego obično. Pokušaj ponovo za koji trenutak.</em>');
         } else {
           appendTutorMsg('bot', '<em>Greška pri slanju zahtjeva. Pokušaj ponovo.</em>');
         }
       }finally{
         clearTimeout(abortTimer);
-        hideTutorTyping();
-        setTutorBusy(false);
-        tutorBusy = false;
+        if (endTutorTurn(turnToken)){   // samo vlasnik oslobađa busy stanje
+          hideTutorTyping();
+          setTutorBusy(false);
+          tutorBusy = false;
+        }
       }
     }
 
