@@ -122,9 +122,19 @@ MAX_OUTPUT_TOKENS = _int_env("MATBOT_MAX_OUTPUT_TOKENS", 1200)
 #
 # GORNJA GRANICA: tvrdo ograničeno na MAX_OUTPUT_TOKENS_HARD_CEILING da
 # pogrešno postavljena env varijabla ne može nekontrolisano podići trošak.
+#
+# PODIZANJE 2500 → 4000 (PP-1 LIVE-150, scenario E015): Tutorov odgovor na
+# „daj laksi“ nakon koordinatno-geometrijskog zadatka nivoa 3 (egzaktan odgovor
+# $Q(347/169, 157/169, 36/169)$) presječen je na 2500 tokena —
+# `llm_output_limit_truncated`, ValidationError „EOF while parsing a string“,
+# turn je pao zatvoreno i učenik je dobio tehnički fallback umjesto zadatka.
+# Skromno povećanje latencije/troška je izričito prihvaćeno kao proizvodna
+# odluka; granica ostaje TVRDA na MAX_OUTPUT_TOKENS_HARD_CEILING, pa
+# podrazumijevana vrijednost sada sjedi TAČNO na njoj i env varijabla je više
+# ne može podići — samo spustiti.
 MAX_OUTPUT_TOKENS_HARD_CEILING = 4000
 MAX_OUTPUT_TOKENS_PRACTICE = min(
-    _int_env("MATBOT_MAX_OUTPUT_TOKENS_PRACTICE", 2500),
+    _int_env("MATBOT_MAX_OUTPUT_TOKENS_PRACTICE", 4000),
     MAX_OUTPUT_TOKENS_HARD_CEILING,
 )
 

@@ -681,6 +681,32 @@ def _deterministic_choice_reply(annex, is_correct, wrong_before):
     return f"Nije tačno. {rule_hint}".strip()
 
 
+def _deterministic_top_hint(session, annex, hint_text):
+    """Treći (posljednji) nagovještaj: postupak PA konačan rezultat.
+
+    ZAŠTO POSTOJI (PP-1 LIVE-150, odluka o ljestvici): model-put ljestvicu već
+    ovako vodi — `_HINT_LEVEL_GUIDANCE[2]` traži „CIJELI postupak i konačan
+    rezultat“, a `_guard_answer_leak` zato izričito izuzima vrh ljestvice
+    (`is_hint_ladder_top`). Deterministički motori su pisali treći nagovještaj
+    kao POSTUPAK BEZ rezultata, pa je isti učenik na istoj lekciji dobijao
+    različitu pomoć zavisno od rute. Ovo je harmonizacija te jedne razlike.
+
+    Rezultat se dopisuje iz `answer_reply` — OBJAVLJENOG, sanitizovanog teksta
+    tačne opcije (isti izvor koji `_deterministic_choice_reply` već koristi pri
+    otkrivanju), nikad iz sirovog `display_answer`: sirov zapis je za porodice
+    s vlastitim dolarima pravio pokvaren MathJax (`$$13$ i $16$$`) i nebezbjedne
+    jedinice (`$360 min$`). Nijedan motor se ne dira, pa identitet zadatka,
+    pohranjeni nagovještaji i rješenje ostaju bajt za bajt isti.
+
+    Kad pohranjeni nagovještaj rezultat VEĆ otkriva, ništa se ne dopisuje —
+    dokazuje ISTI `feedback.leaks_answer` detektor koji čuva nivoe 1 i 2, nikad
+    novi."""
+    answer_reply = (annex.get("answer_reply") or "").strip()
+    if not answer_reply or _reveals_committed_answer(session, hint_text):
+        return hint_text
+    return f"{hint_text} Konačan rezultat je {answer_reply}."
+
+
 def _run_deterministic_help_turn(store, session, turn, context, request_id,
                                  ui_action, annex):
     """DETERMINISTIC_HINT / DETERMINISTIC_SOLUTION: pohranjena ljestvica
@@ -700,6 +726,10 @@ def _run_deterministic_help_turn(store, session, turn, context, request_id,
             return _error_response(session["current_task"])
         index = min(session["hint_level"], len(hints) - 1)
         answer = hints[index]
+        # Vrh ljestvice se prepoznaje ISTIM uslovom kao na model-putu
+        # (`is_hint_ladder_top`): `hint_level` je broj RANIJE datih nagovještaja.
+        if session["hint_level"] >= config.MAX_HINT_LEVEL - 1:
+            answer = _deterministic_top_hint(session, annex, answer)
         session["hint_level"] = min(session["hint_level"] + 1, config.MAX_HINT_LEVEL)
         session["current_task_had_hint"] = True
         route, intent = "deterministic_hint", "hint_request"

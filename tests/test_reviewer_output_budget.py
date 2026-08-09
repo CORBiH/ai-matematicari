@@ -95,9 +95,19 @@ def _complete_reviewer_json():
 # 1. ODVOJENI BUDŽETI
 # ---------------------------------------------------------------------------
 
-def test_reviewer_budget_exists_and_is_larger_than_the_tutor_budget():
+def test_reviewer_budget_is_separate_from_the_tutor_budget():
+    """Budžeti su ODVOJENE, nezavisno konfigurisane veličine.
+
+    Do PP-1 LIVE-150 je ovdje stajalo `recenzent > tutor`, jer je mjerenje nad
+    347 poziva pokazalo da recenzent traži više prostora (max 2395) nego tutor
+    (max 1938). Nalaz E015 je pokazao i suprotan rep: tutorov odgovor na „daj
+    laksi“ s egzaktnim koordinatama presječen je na 2500. Proizvodna odluka je
+    podigla TUTOROV budžet na 4000, pa poredak više nije invarijanta — ono što
+    jeste i ostaje jeste da su budžeti razdvojeni i svaki ispod tvrde granice."""
     assert hasattr(config, "MAX_OUTPUT_TOKENS_REVIEWER")
-    assert config.MAX_OUTPUT_TOKENS_REVIEWER > config.MAX_OUTPUT_TOKENS_PRACTICE
+    assert config.MAX_OUTPUT_TOKENS_REVIEWER != config.MAX_OUTPUT_TOKENS
+    assert config.MAX_OUTPUT_TOKENS_REVIEWER <= config.MAX_OUTPUT_TOKENS_HARD_CEILING
+    assert config.MAX_OUTPUT_TOKENS_PRACTICE <= config.MAX_OUTPUT_TOKENS_HARD_CEILING
 
 
 def test_reviewer_budget_covers_the_highest_measured_successful_output():
@@ -122,8 +132,13 @@ def test_reviewer_call_uses_the_reviewer_budget():
 
 
 def test_explain_and_quick_budgets_are_untouched():
+    """Podizanje Practice budžeta (PP-1 LIVE-150, E015) NIJE diralo ostale
+    modove — Quick i Explain ostaju na svojim izmjerenim vrijednostima."""
     assert config.MAX_OUTPUT_TOKENS == 1200
-    assert config.MAX_OUTPUT_TOKENS_PRACTICE == 2500
+    assert config.MAX_OUTPUT_TOKENS_EXPLAIN == 2500
+    # Practice: 2500 → 4000 (E015 presjecanje); granica ostaje tvrda.
+    assert config.MAX_OUTPUT_TOKENS_PRACTICE == 4000
+    assert config.MAX_OUTPUT_TOKENS_PRACTICE <= config.MAX_OUTPUT_TOKENS_HARD_CEILING
 
 
 # ---------------------------------------------------------------------------
