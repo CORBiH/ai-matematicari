@@ -57,6 +57,42 @@ def _pass_line(records):
     return _rate(counts["PASS"], len(records)), _rate(deterministic, len(records)), counts
 
 
+def _safe_fail_closed_details(records):
+    """Sačuvaj dijagnostiku odbijenog kandidata, ne samo novu oznaku ishoda."""
+    details = []
+    for record in records:
+        if record.get("outcome_class") != classify_lib.SAFE_FAIL_CLOSED:
+            continue
+        evidence = classify_lib.package_evidence(record)
+        safe_steps = classify_lib.safely_rejected_package_steps(record, evidence)
+        turns = [turn for turn in record.get("turns") or ()
+                 if turn.get("step_index") in safe_steps]
+        preflight = []
+        reviewer_actions = []
+        rejection_reasons = []
+        for turn in turns:
+            for value in (turn.get("tutor_draft_issues"),
+                          turn.get("reviewer_final_issues")):
+                if value and value not in preflight:
+                    preflight.append(value)
+            if turn.get("reviewer_decision"):
+                reviewer_actions.append(turn["reviewer_decision"])
+            rejected = [line for line in turn.get("log_lines") or ()
+                        if "tutor_rejected" in line]
+            rejection_reasons.extend(rejected[-1:])
+        details.append({
+            "scenario": record.get("id", ""),
+            "sdk_calls": int(record.get("sdk_calls") or 0),
+            "package_findings": [
+                f"{entry.get('check')}: {entry.get('detail')}" for entry in evidence
+            ],
+            "preflight_findings": preflight,
+            "reviewer_actions": reviewer_actions,
+            "rejection_reasons": rejection_reasons,
+        })
+    return details
+
+
 def _interaction_types(record):
     """Izvedeno iz stvarnih koraka, ne iz oznaka — oznaka može lagati."""
     kinds = set()
@@ -152,9 +188,10 @@ def build_summary(meta, records, total_lessons) -> dict:
         "outcome_classes": dict(outcome_counter.most_common()),
         "outcome_scenarios": {key: sorted(value)
                               for key, value in outcome_scenarios.items()},
+        "safe_fail_closed_details": _safe_fail_closed_details(records),
         "routes": dict(route_counter.most_common()),
-        # Dokaz na nivou PAKETA preživljava nevaljan scenario (živi B012) —
-        # ova lista se NIKAD ne prazni zbog nekoherentne fiksture.
+        # Dokaz na nivou uhvaćenog kandidata/paketa preživljava i sigurno
+        # odbijanje i nevaljan scenario. Klasa ishoda govori je li objavljen.
         "package_level_product_evidence": product_evidence,
         "invalid_scenarios": invalid_scenarios,
         "third_call_violations": third_call,
@@ -273,8 +310,10 @@ def render_markdown(summary) -> str:
         lines.append(f"| {outcome} | {count} |")
     lines += [
         "",
-        "- dokaz o paketu (preživljava nevaljan scenario): "
+        "- nalaz o uhvaćenom kandidatu/paketu (ne znači nužno objavu): "
         f"**{', '.join(summary.get('package_level_product_evidence') or []) or '—'}**",
+        "- sigurno odbijeni kandidati prije commita stanja: "
+        f"**{', '.join((summary.get('outcome_scenarios') or {}).get('SAFE_FAIL_CLOSED', [])) or '—'}**",
         "- nevaljani scenariji (poruka protiv lekcije): "
         f"{', '.join(summary.get('invalid_scenarios') or []) or '—'}",
         "- samo posljedica ranijeg sigurnog odbijanja: "
@@ -285,6 +324,27 @@ def render_markdown(summary) -> str:
         + (", ".join(f"{route}={count}"
                      for route, count in (summary.get("routes") or {}).items())
            or "—"),
+        "",
+        "## SAFE_FAIL_CLOSED dijagnostika",
+        "",
+        "Oznaka ne briše nalaz o kandidatu: ispod ostaju razlog odbijanja, "
+        "preflight, odluka recenzenta i stvaran broj poziva.",
+        "",
+    ]
+    safe_details = summary.get("safe_fail_closed_details") or []
+    if not safe_details:
+        lines.append("Nema sigurno odbijenih kandidata.")
+    for detail in safe_details:
+        lines.append(
+            f"- **{detail['scenario']}** · SDK poziva: **{detail['sdk_calls']}** · "
+            f"Reviewer: `{', '.join(detail['reviewer_actions']) or '—'}`")
+        lines.append("  - nalaz paketa: "
+                     + ("; ".join(detail["package_findings"]) or "—"))
+        lines.append("  - preflight: "
+                     + ("; ".join(detail["preflight_findings"]) or "—"))
+        lines.append("  - odbijanje: "
+                     + ("; ".join(detail["rejection_reasons"]) or "publication blocked"))
+    lines += [
         "",
         "## Pokrivenost kurikuluma (izračunato, ne procijenjeno)",
         "",

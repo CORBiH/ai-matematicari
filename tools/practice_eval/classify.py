@@ -139,11 +139,13 @@ def _publication_blocked_steps(record) -> set:
 
 
 def package_evidence(record) -> list:
-    """Padovi koji mjere SADRŽAJ objavljenog paketa.
+    """Padovi koji mjere SADRŽAJ uhvaćenog kandidata/paketa.
 
     ŽIVI B012: scenario je bio nekoherentan, ali su objavljene opcije `2` i
     `{2}` bile isti odgovor. Taj dokaz se NE SMIJE izgubiti zato što je drugo
-    polje scenarija bilo pokvareno."""
+    polje scenarija bilo pokvareno. FINAL40: nalaz o kandidatu koji je sigurno
+    odbijen prije objave takođe ostaje vidljiv, ali sam po sebi više ne tvrdi
+    da je pogrešan sadržaj stigao do učenika."""
     turns_by_step = {
         turn.get("step_index"): turn
         for turn in (record or {}).get("turns") or ()
@@ -160,6 +162,59 @@ def package_evidence(record) -> list:
             continue
         evidence.append(entry)
     return evidence
+
+
+def _turn_has_committed_task_state(turn) -> bool:
+    """Je li odbijeni turn ipak ostavio dokaz objavljenog/aktivnog zadatka.
+
+    Klasifikacija je namjerno konzervativna. Bez snimka praznog stanja i
+    odgovora bez objavljenog zadatka kandidat se ne proglašava sigurnim samo
+    zato što je jedna publikacijska provjera pala.
+    """
+    turn = turn or {}
+    if "response" not in turn or "session_after_summary" not in turn:
+        return True
+    response = turn.get("response") or {}
+    if response.get("status") == "ready" or response.get("last_tutor_task"):
+        return True
+    summary = turn.get("session_after_summary") or {}
+    if int(summary.get("current_task_chars") or 0) > 0:
+        return True
+    return any(summary.get(key) for key in (
+        "task_signature_hash", "correct_option_id", "marked_option_text",
+        "expected_answer",
+    ))
+
+
+def safely_rejected_package_steps(record, evidence=None) -> set:
+    """Koraci s lošim kandidatom koji dokazivo nisu ni objavili ni commitovali.
+
+    Potrebni su svi dokazi FINAL40 ugovora: paket je uhvaćen, publikacija je
+    pala i poslije turna nema aktivnog/objavljenog zadatka. Nalaz o paketu se
+    NE briše; ova funkcija samo razlikuje kandidata od objavljenog paketa.
+    """
+    record = record or {}
+    evidence = package_evidence(record) if evidence is None else evidence
+    evidence_steps = {entry.get("step") for entry in evidence}
+    blocked_steps = _publication_blocked_steps(record)
+    turns_by_step = {
+        turn.get("step_index"): turn for turn in record.get("turns") or ()
+    }
+    safe = set()
+    for step in evidence_steps & blocked_steps:
+        turn = turns_by_step.get(step) or {}
+        if turn.get("package_captured") is not True:
+            continue
+        if _turn_has_committed_task_state(turn):
+            continue
+        # Protivrječan zapis (npr. `published=pass` i drugi publication FAIL)
+        # nije dovoljan dokaz sigurnog odbijanja.
+        if any(result.get("name") in ("published", "task_published")
+               and result.get("outcome") == "pass"
+               for result in turn.get("check_results") or ()):
+            continue
+        safe.add(step)
+    return safe
 
 
 def cascade_split(record) -> dict:
@@ -216,6 +271,14 @@ def classify(record, scenario=None) -> dict:
     split = cascade_split(record)
     routes = sorted({turn_route(turn) for turn in record.get("turns") or ()})
     third_calls = third_call_violations(record)
+    safe_package_steps = safely_rejected_package_steps(record, evidence)
+    published_package_evidence = [
+        entry for entry in evidence if entry.get("step") not in safe_package_steps
+    ]
+    independent_roots = [
+        entry for entry in split["root"]
+        if entry.get("step") not in safe_package_steps
+    ]
 
     notes = []
     if status == "TIMEOUT":
@@ -227,7 +290,7 @@ def classify(record, scenario=None) -> dict:
         # sakriva iza nevaljanog scenarija.
         outcome = PRODUCT_CORRECTNESS_FAILURE
         notes.append("call budget exceeded — more than two model calls in a turn")
-    elif evidence:
+    elif published_package_evidence:
         # PRAVILO B012: dokaz o paketu ima prednost nad svime osim infrastrukture
         # i prekoračenja poziva — čak i kad je scenario nevaljan.
         outcome = PRODUCT_CORRECTNESS_FAILURE
@@ -237,6 +300,11 @@ def classify(record, scenario=None) -> dict:
     elif coherence_issues:
         outcome = HARNESS_INVALID_SCENARIO
         notes.extend(coherence_issues[:4])
+    elif evidence and safe_package_steps and not independent_roots:
+        outcome = SAFE_FAIL_CLOSED
+        notes.append(
+            "candidate package findings preserved; publication was rejected "
+            "before task/session state was committed")
     elif not split["root"] and split["cascade"]:
         outcome = CASCADE_ONLY
         notes.append(f"all failures follow the safe block at step {split['root_step']}")

@@ -476,6 +476,140 @@ def test_a_blocked_publication_alone_is_safe_not_wrong_content():
     assert verdict["package_evidence"] == []
 
 
+def _captured_rejected_candidate_record(*, calls=2, status="FAIL"):
+    turn = _turn(calls=calls, results=[
+        ("published", "fail", "safe error"),
+        ("task_published", "fail", "turn not published"),
+        ("package_clean", "fail", "multiple_correct_options: x=1"),
+    ])
+    turn.update({
+        "package_captured": True,
+        "response": {"answer": "safe error", "last_tutor_task": ""},
+        "session_after_summary": {},
+        "reviewer_decision": "fail_closed",
+        "tutor_draft_issues": "multiple_correct_options: x=1",
+        "reviewer_final_issues": "multiple_correct_options: x=1",
+        "log_lines": [
+            "tutor_rejected request_id=test stage=reviewer_final_mcq "
+            "detail=multiple_correct_options: x=1"
+        ],
+    })
+    return _record(
+        status=status, turns=[turn],
+        failed=[
+            ("published", 0, "safe error"),
+            ("task_published", 0, "turn not published"),
+            ("package_clean", 0, "multiple_correct_options: x=1"),
+        ])
+
+
+def test_captured_bad_candidate_rejected_before_commit_is_safe_fail_closed():
+    """FINAL40: nalaz ostaje vidljiv, ali odbijeni kandidat nije objavljen kvar."""
+    record = _captured_rejected_candidate_record()
+    verdict = classify.classify(record)
+
+    assert verdict["outcome_class"] == classify.SAFE_FAIL_CLOSED
+    assert [entry["check"] for entry in verdict["package_evidence"]] == [
+        "package_clean"]
+    assert classify.safely_rejected_package_steps(
+        record, verdict["package_evidence"]) == {0}
+    assert any("findings preserved" in note for note in verdict["notes"])
+
+
+def test_captured_bad_package_that_publishes_remains_product_failure():
+    turn = _turn(results=[
+        ("published", "pass", ""),
+        ("task_published", "pass", ""),
+        ("package_clean", "fail", "multiple_correct_options: x=1"),
+    ])
+    turn.update({
+        "package_captured": True,
+        "response": {"status": "ready", "last_tutor_task": "Solve x=1"},
+        "session_after_summary": {
+            "current_task_chars": 9, "task_signature_hash": "published",
+            "correct_option_id": "a", "expected_answer": "x=1",
+        },
+    })
+    record = _record(
+        turns=[turn],
+        failed=[("package_clean", 0, "multiple_correct_options: x=1")])
+
+    assert classify.classify(record)["outcome_class"] == \
+        classify.PRODUCT_CORRECTNESS_FAILURE
+    assert classify.safely_rejected_package_steps(record) == set()
+
+
+def test_rejection_label_cannot_hide_committed_task_state():
+    record = _captured_rejected_candidate_record()
+    record["turns"][0]["session_after_summary"] = {
+        "current_task_chars": 8, "task_signature_hash": "committed",
+    }
+
+    assert classify.safely_rejected_package_steps(record) == set()
+    assert classify.classify(record)["outcome_class"] == \
+        classify.PRODUCT_CORRECTNESS_FAILURE
+
+
+def test_later_independently_bad_publication_wins_over_earlier_safe_rejection():
+    record = _captured_rejected_candidate_record()
+    later = _turn(step=1, results=[
+        ("published", "pass", ""),
+        ("package_clean", "fail", "wrong marked answer"),
+    ])
+    later.update({
+        "package_captured": True,
+        "response": {"status": "ready", "last_tutor_task": "bad task"},
+        "session_after_summary": {"current_task_chars": 8,
+                                  "task_signature_hash": "bad"},
+    })
+    record["turns"].append(later)
+    record["failed_checks"].append({
+        "check": "package_clean", "step": 1, "detail": "wrong marked answer",
+        "label": "step1:package_clean",
+    })
+
+    verdict = classify.classify(record)
+    assert verdict["outcome_class"] == classify.PRODUCT_CORRECTNESS_FAILURE
+    assert {entry["step"] for entry in verdict["package_evidence"]} == {0, 1}
+
+
+def test_safe_candidate_with_a_third_call_is_still_blocking():
+    verdict = classify.classify(_captured_rejected_candidate_record(calls=3))
+    assert verdict["third_call_violations"]
+    assert verdict["outcome_class"] == classify.PRODUCT_CORRECTNESS_FAILURE
+
+
+def test_sdk_infrastructure_status_wins_over_candidate_classification():
+    verdict = classify.classify(
+        _captured_rejected_candidate_record(status="INFRA_ERROR"))
+    assert verdict["outcome_class"] == classify.INFRA_SDK
+
+
+def test_safe_fail_closed_report_keeps_findings_reviewer_and_call_count():
+    record = _captured_rejected_candidate_record()
+    verdict = classify.classify(record)
+    record.update({
+        "id": "FW-SAFE", "topic_id": "7-02-019", "grade": 7,
+        "oblast": "Cijeli brojevi", "importance": "critical", "sdk_calls": 2,
+        "outcome_class": verdict["outcome_class"],
+        "routes": verdict["routes"],
+        "third_call_violations": verdict["third_call_violations"],
+        "root_failures": verdict["root_failures"],
+        "cascade_failures": verdict["cascade_failures"],
+        "coherence_problems": [],
+    })
+    summary = report_lib.build_summary({}, [record], 534)
+    detail = summary["safe_fail_closed_details"][0]
+    assert detail["scenario"] == "FW-SAFE"
+    assert detail["sdk_calls"] == 2
+    assert detail["reviewer_actions"] == ["fail_closed"]
+    assert "multiple_correct_options" in " ".join(detail["preflight_findings"])
+    summary["examples"] = {}
+    markdown = report_lib.render_markdown(summary)
+    assert "SAFE_FAIL_CLOSED dijagnostika" in markdown
+    assert "FW-SAFE" in markdown and "Reviewer: `fail_closed`" in markdown
+
+
 def test_review_without_any_failure_is_a_coverage_gap():
     verdict = classify.classify(_record(status="REVIEW", turns=[_turn()]))
     assert verdict["outcome_class"] == classify.COVERAGE_GAP
@@ -516,6 +650,31 @@ def test_positive_equivalence_check_requires_a_distinct_equal_solve_set():
         _equivalence_observation("Riješi nejednačinu $x>3$.",
                                  "Riješi nejednačinu $x<3$."))
     assert drifted.outcome == check_lib.FAIL
+
+
+def test_equivalence_check_passes_for_canonical_reformulation():
+    result = check_lib.check_request_equivalent_reformulation(
+        _equivalence_observation("Riješi nejednačinu $x>3$.",
+                                 "Riješi nejednačinu $x+2>5$."))
+    assert result.outcome == check_lib.PASS, result
+
+
+def test_equivalence_check_fails_when_expected_resulting_relation_is_missing():
+    result = check_lib.check_request_equivalent_reformulation(
+        _equivalence_observation(
+            "Riješi nejednačinu $x>3$ i preoblikuj je.",
+            "Riješi dobijenu nejednačinu i izaberi skup rješenja."))
+    assert result.outcome == check_lib.FAIL, result
+    assert "missing_requested_relation" in result.detail
+
+
+def test_equivalence_check_does_not_invent_semantics_for_present_unreadable_relation():
+    result = check_lib.check_request_equivalent_reformulation(
+        _equivalence_observation(
+            "Riješi nejednačinu $x>3$.",
+            r"Riješi dobijenu nejednačinu $x^2>4$."))
+    assert result.outcome == check_lib.SKIP, result
+    assert "readable relation" in result.detail
 
 
 # ---------------------------------------------------------------------------

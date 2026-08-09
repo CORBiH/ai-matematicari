@@ -823,14 +823,18 @@ def check_request_equivalent_reformulation(obs: TurnObservation) -> CheckResult:
                            "no published task relation to compare")
     requested = mcq_integrity.read_solve_statement(obs.student_message)
     generated = mcq_integrity.read_solve_statement(obs.task_after)
-    if not requested.has_relation or not generated.has_relation:
-        return CheckResult("request_equivalent_reformulation", SKIP,
-                           "both request and task need one readable relation")
+    # Produktna provjera ima uzak, dokaziv nalaz za FINAL40 oblik: zahtjev ima
+    # jednu čitljivu relaciju, a solve-zadatak se deiktički poziva na
+    # "dobijenu/originalnu" relaciju koju nigdje ne napiše. Taj slučaj je FAIL,
+    # ne opšti parser-SKIP. Nečitljiva ali PRISUTNA relacija ostaje nedokaziva.
     failures = request_fidelity.request_fidelity_failures(
         obs.student_message, obs.task_after)
     if failures:
         return CheckResult("request_equivalent_reformulation", FAIL,
                            "; ".join(failures))
+    if not requested.has_relation or not generated.has_relation:
+        return CheckResult("request_equivalent_reformulation", SKIP,
+                           "both request and task need one readable relation")
     requested_relation = _single_normalized_relation(obs.student_message)
     generated_relation = _single_normalized_relation(obs.task_after)
     if not requested_relation or not generated_relation:
