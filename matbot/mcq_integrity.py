@@ -628,6 +628,15 @@ def evaluate_comparison_mcq(question: str,
 _SOLVE_DIRECTIVE_RE = re.compile(
     r"\brije[šs]i\w*\b|\brje[šs]enj\w*", re.IGNORECASE)
 _SOLVE_NEGATION_RE = re.compile(r"\bnije\b|\bnisu\b", re.IGNORECASE)
+# PITANJE O ČLANSTVU, ne o skupu rješenja („Koja vrijednost zadovoljava…“,
+# „Koji broj je rješenje…“). Tu je gola brojčana opcija POTPUNO legitimna, pa
+# se za takav tekst gola vrijednost NE tumači kao kandidat-skup. Blokira
+# ISKLJUČIVO tu jednu mogućnost — opcije-relacije se i dalje presuđuju normalno,
+# pa se nijedan već pokriven oblik ne gubi.
+_SOLVE_MEMBERSHIP_RE = re.compile(
+    r"\bzadovoljav\w*|\bpripada\w*"
+    r"|\bkoj\w*\s+(?:je\s+)?(?:vrijednost|broj)\w*",
+    re.IGNORECASE)
 _SOLVE_DOMAIN_BLOCKER_RE = re.compile(
     r"\bskup\w*|\bprirodn\w*|\bcijel\w*|\bnegativn\w*|\bpozitivn\w*",
     re.IGNORECASE)
@@ -851,7 +860,7 @@ def _solve_relation_text(text: str) -> Optional[tuple]:
 
 
 def _solve_option_set(option_text: str, variable: str,
-                      equation_task: bool) -> Optional[_SolutionSet]:
+                      allow_bare_value: bool) -> Optional[_SolutionSet]:
     text = (option_text or "").strip()
     if text.startswith("$") and text.endswith("$") and text.count("$") == 2:
         text = text[1:-1].strip()
@@ -859,10 +868,10 @@ def _solve_option_set(option_text: str, variable: str,
     if normalized is None:
         return None
     if not _SOLVE_RELATION_TOKEN_RE.search(normalized):
-        # Gola vrijednost jednoznačno imenuje rješenje SAMO kod jednačine
-        # (tačke); skup rješenja nejednačine ne može biti opisan jednim brojem,
-        # a „koja vrijednost zadovoljava…“ zadatke orakl ne smije presuđivati.
-        if not equation_task:
+        # Gola vrijednost je KANDIDAT-TAČKA. Za jednačinu je to i cio skup
+        # rješenja; za nejednačinu je to samo JEDAN član, pa poređenje s
+        # izvedenim zrakom/intervalom dokazano pada — vidi `allow_bare_value`.
+        if not allow_bare_value:
             return None
         variables: set = set()
         side = _solve_side_terms(normalized, variables)
@@ -913,10 +922,20 @@ def evaluate_linear_solve_mcq(question: str,
         return LinearSolveMCQResult(False, False)
     solution, variable = solved
 
+    # ŽIVI PP-1 LIVE-150 NALAZ (F008, druga pojava): objavljeno je
+    #     „Riješi nejednačinu: $-1 < x+1 < 1$“  opcije 1 / -2 / -1 / 0, označeno -1
+    # Skup rješenja je $-2<x<0$; $-1$ je samo JEDAN član. Orakl je tada ćutao jer
+    # je golu vrijednost primao SAMO kad je izvedeno rješenje tačka (jednačina),
+    # pa nijedan deterministički nalaz nije ni postojao i recenzent je odobrio.
+    # Izričit zahtjev „Riješi nejednačinu“ traži CIO skup, pa je gola vrijednost
+    # dokazivo nedovoljna — tačka nikad nije jednaka zraku ni intervalu. Pitanja
+    # o članstvu zadržavaju staro ponašanje (vidi `_SOLVE_MEMBERSHIP_RE`).
+    allow_bare_value = (solution.kind == "point"
+                        or not _SOLVE_MEMBERSHIP_RE.search(prose))
     option_sets = []
     for option in options:
         parsed = _solve_option_set(option, variable,
-                                   equation_task=solution.kind == "point")
+                                   allow_bare_value=allow_bare_value)
         if parsed is None:
             return LinearSolveMCQResult(False, False)
         option_sets.append(parsed)

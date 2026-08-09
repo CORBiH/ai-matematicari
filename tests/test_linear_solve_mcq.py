@@ -19,6 +19,8 @@ GRANICE (namjerno uske, isti princip kao ostali orakli):
 ZERO model poziva: sve je čist deterministički kod.
 """
 from matbot import mcq_integrity
+import pytest
+
 from matbot.mcq_integrity import evaluate_linear_solve_mcq, publication_failure
 
 # Tačan živi zadatak i opcije iz PP1-F008 (scenario je sačuvan u artefaktu
@@ -61,6 +63,53 @@ def test_pp1_f008_satisfying_member_is_not_the_solution_set():
     assert "x = -3" in result.option_displays
     assert result.solution_display == "-4 < x < -2"
     assert result.reason_code == "no_correct_option"
+
+
+# ---------------------------------------------------------------------------
+# 1b) PP1-F008, DRUGA ŽIVA POJAVA — gole brojčane opcije na nejednačini
+# ---------------------------------------------------------------------------
+# Završni LIVE-150 (poslije prve F008 ispravke) objavio je ISTU klasu greške u
+# drugom zapisu: opcije više nisu bile relacije nego GOLI BROJEVI, a orakl je
+# tada ćutao (`applicable=False`) jer je golu vrijednost primao samo kad je
+# izvedeno rješenje tačka. Nijedan deterministički nalaz nije postojao,
+# recenzent je odobrio, i nevažeći MCQ je objavljen.
+F008B_TASK = r"Riješi nejednačinu: $-1 < x+1 < 1$"
+F008B_OPTIONS = ("1", "-2", "-1", "0")
+F008B_MARKED = 2   # opcija c, „-1“
+
+
+def test_pp1_f008_live_bare_option_regression_is_rejected():
+    result = evaluate(F008B_TASK, F008B_OPTIONS)
+    assert result.applicable, "gole opcije više ne smiju ugasiti orakl"
+    assert not result.valid
+    assert result.reason_code == "no_correct_option"
+    assert result.solution_display == "-2 < x < 0"
+    assert result.correct_indices == ()
+
+
+def test_pp1_f008_live_bare_options_parse_as_point_candidates():
+    """Svaka gola vrijednost je KANDIDAT-TAČKA; tačka nikad nije interval."""
+    result = evaluate(F008B_TASK, F008B_OPTIONS)
+    assert result.option_displays == ("x = 1", "x = -2", "x = -1", "x = 0")
+    assert result.solution_display == "-2 < x < 0"
+    # označeni „-1“ JESTE član skupa, ali član nije rješenje
+    assert "x = -1" in result.option_displays
+
+
+def test_pp1_f008_live_bare_option_package_cannot_publish():
+    failure, result = publication_failure(
+        F008B_TASK, F008B_OPTIONS, F008B_MARKED, F008B_OPTIONS[F008B_MARKED])
+    assert failure == "no_correct_option"
+    assert result.solution_display == "-2 < x < 0"
+
+
+def test_pp1_f008_live_positive_control_interval_option_passes():
+    options = ("$1$", r"$-2<x<0$", "$-1$", "$0$")
+    result = evaluate(F008B_TASK, options)
+    assert result.applicable and result.valid
+    assert result.correct_index == 1
+    failure, _ = publication_failure(F008B_TASK, options, 1, options[1])
+    assert failure == ""
 
 
 def test_pp1_f008_positive_control_full_interval_option_passes():
@@ -205,10 +254,33 @@ def test_division_by_unknown_stays_silent():
             (r"$x>\frac{1}{2}$", r"$x<\frac{1}{2}$", r"$x=2$", r"$x>2$"))
 
 
-def test_bare_value_options_on_an_inequality_stay_silent():
-    """„Koja vrijednost zadovoljava…“ oblik: gola vrijednost ne opisuje skup,
-    pa orakl NE presuđuje — ne smije lažno oboriti valjan zadatak članstva."""
-    _silent(r"Riješi nejednačinu: $x+3<8$", ("4", "5", "2", "1"))
+def test_membership_question_with_bare_options_stays_silent():
+    """PITANJE O ČLANSTVU nije pitanje o skupu rješenja: „Koja vrijednost
+    zadovoljava…“ ima potpuno legitimne gole brojčane opcije, pa ga orakl NE
+    smije presuđivati kao da traži cio skup."""
+    _silent(r"Koja vrijednost zadovoljava nejednačinu $x+1<3$?", ("0", "2", "3", "4"))
+
+
+@pytest.mark.parametrize("question", [
+    r"Koji broj je rješenje nejednačine $x+1<3$?",
+    r"Koja vrijednost je rješenje nejednačine $x+1<3$?",
+    r"Koji od brojeva zadovoljava nejednačinu $x+1<3$?",
+])
+def test_membership_wording_blocks_bare_values_even_with_a_solve_word(question):
+    """Riječ „rješenje“ sama po sebi ne pretvara članstvo u traženje skupa —
+    zato blokada gleda formulaciju pitanja, ne samo prisustvo direktive."""
+    _silent(question, ("0", "2", "3", "4"))
+
+
+def test_membership_wording_does_not_disable_relation_options():
+    """Blokada je USKA: gasi SAMO tumačenje golih vrijednosti. MCQ s
+    opcijama-relacijama se i dalje presuđuje, pa se nijedan već pokriven
+    oblik ne gubi (npr. živi F009 sufiks „Koja od ponuđenih…“)."""
+    result = evaluate(
+        r"Riješi nejednačinu: $-3x>9$. Koja od ponuđenih je tačna rješenja?",
+        (r"$x<-3$", r"$x>-3$", r"$x<3$", r"$x>3$"))
+    assert result.applicable and result.valid
+    assert result.correct_index == 0
 
 
 def test_prose_option_disables_the_oracle():
@@ -347,3 +419,35 @@ def test_preflight_issue_carries_the_server_derived_solution_set():
     found = [issue for issue in issues if issue.code == "no_correct_option"]
     assert found, [issue.code for issue in issues]
     assert "server solved: -4 < x < -2" in found[0].detail
+
+
+def test_preflight_catches_the_live_bare_option_package_too():
+    """Ista kapija mora uhvatiti i drugu živu pojavu (gole opcije) — nalaz
+    stiže recenzentu PRIJE drugog poziva, s izvedenim skupom rješenja."""
+    from matbot.tutor import package_preflight as preflight
+    from matbot.tutor.schema import (DifficultyEvidence, SignatureParameter,
+                                     TaskPayload, TaskSignature, TutorOption)
+    task = TaskPayload(
+        selected_lesson_id="7-02-019",
+        selected_lesson_title="Nejednačine sa sabiranjem i oduzimanjem u Z",
+        target_difficulty_level=1, text=F008B_TASK, task_type="multiple_choice",
+        options=[TutorOption(id="abcd"[i], text=value)
+                 for i, value in enumerate(F008B_OPTIONS)],
+        correct_option_index=F008B_MARKED, correct_option_id="c",
+        expected_answer=F008B_OPTIONS[F008B_MARKED],
+        solution=r"Oduzmi $1$ od svih strana pa je $-2<x<0$.",
+        difficulty="easy",
+        difficulty_evidence=DifficultyEvidence(
+            reasoning_steps=1, condition_count=1, operation_count=1,
+            representation_change_count=0, requires_explanation=False,
+            requires_comparison=False, requires_construction=False,
+            requires_proof_or_justification=False, combines_concepts=False),
+        task_signature=TaskSignature(
+            task_family="linear_inequality", operation_or_relation="solve",
+            normalized_parameters=[SignatureParameter(name="case", value="f008b")],
+            required_conditions=[], relevant_objects=["nejednakost"],
+            answer_type="multiple_choice"))
+    issues = preflight.collect_package_issues(task)
+    found = [issue for issue in issues if issue.code == "no_correct_option"]
+    assert found, [issue.code for issue in issues]
+    assert "server solved: -2 < x < 0" in found[0].detail
