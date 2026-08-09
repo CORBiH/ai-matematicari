@@ -14,7 +14,8 @@ import re
 from dataclasses import dataclass, field
 from typing import Optional
 
-from matbot import api, config, feedback, geometrycheck, mathsafe, option_equivalence
+from matbot import (api, config, feedback, geometrycheck, mathsafe, mcq_integrity,
+                    option_equivalence, request_fidelity)
 from matbot.mathcheck import find_numeric_inconsistencies
 from matbot.mathsegments import DISPLAY, INLINE, tokenize_math
 from matbot.practice import PRACTICE_UNAVAILABLE_MESSAGE, SAFE_ERROR_MESSAGE
@@ -801,6 +802,49 @@ def check_package_clean(obs: TurnObservation) -> CheckResult:
     return CheckResult("package_clean", PASS)
 
 
+def _single_normalized_relation(text: str) -> str:
+    relations = []
+    for candidate in mcq_integrity._request_relation_candidates(text or ""):
+        normalized = mcq_integrity._normalize_solve_segment(candidate)
+        if normalized and normalized not in relations:
+            relations.append(normalized)
+    return relations[0] if len(relations) == 1 else ""
+
+
+def check_request_equivalent_reformulation(obs: TurnObservation) -> CheckResult:
+    """Positive control: a distinct relation with the same solve set is valid.
+
+    This delegates the mathematical decision to Task 3's existing fidelity
+    semantics. The extra raw-relation comparison only proves that the live
+    package exercised a reformulation instead of echoing the request verbatim.
+    """
+    if not obs.task_after:
+        return CheckResult("request_equivalent_reformulation", SKIP,
+                           "no published task relation to compare")
+    requested = mcq_integrity.read_solve_statement(obs.student_message)
+    generated = mcq_integrity.read_solve_statement(obs.task_after)
+    if not requested.has_relation or not generated.has_relation:
+        return CheckResult("request_equivalent_reformulation", SKIP,
+                           "both request and task need one readable relation")
+    failures = request_fidelity.request_fidelity_failures(
+        obs.student_message, obs.task_after)
+    if failures:
+        return CheckResult("request_equivalent_reformulation", FAIL,
+                           "; ".join(failures))
+    requested_relation = _single_normalized_relation(obs.student_message)
+    generated_relation = _single_normalized_relation(obs.task_after)
+    if not requested_relation or not generated_relation:
+        return CheckResult("request_equivalent_reformulation", SKIP,
+                           "a unique raw relation could not be isolated")
+    if requested_relation == generated_relation:
+        return CheckResult("request_equivalent_reformulation", FAIL,
+                           "task repeated the requested relation instead of reformulating it")
+    return CheckResult(
+        "request_equivalent_reformulation", PASS,
+        f"distinct relations share the canonical solution set: "
+        f"{requested_relation!r} vs {generated_relation!r}")
+
+
 def check_stays_in_lesson(obs: TurnObservation) -> CheckResult:
     """Poruka pokušava promijeniti temu ili uputiti model mimo moda."""
     session_lesson = (obs.session_after or {}).get("lesson_id")
@@ -869,6 +913,7 @@ _CHECKS = {
     "state_unchanged": check_state_unchanged,
     "identical_response": check_identical_response,
     "package_clean": check_package_clean,
+    "request_equivalent_reformulation": check_request_equivalent_reformulation,
     "stays_in_lesson": check_stays_in_lesson,
 }
 
@@ -941,6 +986,7 @@ _ROOT_CAUSE = {
     "zero_calls": "call_budget",
     "options_ok": "mcq_integrity",
     "package_clean": "mcq_integrity",
+    "request_equivalent_reformulation": "request_fidelity",
     "lesson_matches": "lesson_scope",
     "stays_in_lesson": "lesson_scope",
     "no_leak": "internal_leak",

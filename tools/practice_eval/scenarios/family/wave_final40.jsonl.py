@@ -294,11 +294,13 @@ def build():
          "dijela.",
          "D005 step 4 class: a boundary arm of the angle cannot also be its "
          "interior divider.", ("D005",)),
-        ("FW-G04", ANGLE,
-         "Traži da učenik imenuje ugao koji nastaje kada se dva kraka "
-         "označe slovima.",
-         "Ordinary angle-naming task — the divider rule must not fire on it.",
-         ("D005",)),
+        ("FW-G04", (7, "Ugao i trougao", "7-04-023"),
+         "Traži da učenik izabere koji skup podataka jednoznačno određuje "
+         "trougao za konstrukciju do kongruentnosti.",
+         "E010 mitigation boundary: the blocking semantic contract must avoid "
+         "or reject this known ambiguous construction-determination archetype. "
+         "This probe does not claim a complete oracle for uniqueness of all "
+         "triangle constructions.", ("E010",)),
         ("FW-G05", BISECTOR,
          "Traži zadatak o simetrali ugla i tački u kojoj se simetrale sijeku.",
          "E009 lesson content stays available: bisector and incenter tasks are "
@@ -315,13 +317,24 @@ def build():
                        "terminology_clean", "bosnian", "no_leak", "no_verdict",
                        "calls_at_most:2"]
     for sid, (grade, oblast, topic), ask, reason, targets in geometry_cases:
+        is_e010 = sid == "FW-G04"
+        checks = (geometry_checks if not is_e010 else
+                  ["response_schema", "lesson_matches", "stays_in_lesson",
+                   "package_clean", "geometry_ok", "math_safe",
+                   "terminology_clean", "bosnian", "no_leak",
+                   "calls_at_most:2"])
+        tags = ["group_geometry", "real_model", "final40", "geometry_notation"]
+        if is_e010:
+            tags.extend(["e010_mitigation", "mitigation_not_full_oracle"])
         rows.append(scenario(
             sid, grade, oblast, topic, reason,
-            ["group_geometry", "real_model", "final40", "geometry_notation"],
+            tags,
             [solve_step(
                 f"Kreiraj samostalan MCQ sa četiri opcije za izabranu lekciju. "
                 f"{ask} Osiguraj da je tačno jedna opcija tačna. Ne rješavaj "
-                f"zadatak učeniku.", checks=geometry_checks)],
+                f"zadatak učeniku.", checks=checks,
+                rubrics=["refusal_quality"] if is_e010 else None)],
+            alignment="lesson_overrides" if is_e010 else "must_follow",
             targets=targets,
         ))
 
@@ -334,10 +347,13 @@ def build():
          "$N=\\{1,2,3,...\\}$",
          "A020 request fidelity: the published task must keep N and must not "
          "silently switch to Z.", ("A020",)),
-        ("FW-R02", IN_G7_ADD,
-         "riješi nejednačinu $-2<x<2$ isključivo u skupu cijelih brojeva",
-         "A009 request fidelity: the published task must solve the exact "
-         "relation that was asked for.", ("A009",)),
+        ("FW-R02", IN_G7_Q,
+         "riješi nejednačinu $x>3$, ali je u tekstu zadatka obavezno "
+         "preoblikuj dodavanjem iste nenulte cijele konstante na obje strane; "
+         "ne prepisuj relaciju doslovno",
+         "Task 3 positive control: a syntactically distinct reformulation with "
+         "the same canonical solution set must not be rejected as request "
+         "drift. Exact A009 replay remains covered by FW-D04.", ("B003",)),
         ("FW-R03", IN_G7_Q,
          "riješi nejednačinu $\\frac{1}{3}<x\\le\\frac{5}{6}$ isključivo u "
          "skupu racionalnih brojeva",
@@ -349,12 +365,19 @@ def build():
          "both survive.", ("A010",)),
     ]
     for sid, (grade, oblast, topic), ask, reason, targets in fidelity_cases:
+        positive_equivalence = sid == "FW-R02"
+        checks = list(SOLVE_CHECKS)
+        if positive_equivalence:
+            checks.append("request_equivalent_reformulation")
+        tags = ["group_request_fidelity", "real_model", "final40",
+                "request_fidelity", "solve_set_adjudicated"]
+        if positive_equivalence:
+            tags.append("request_equivalence_positive")
         rows.append(scenario(
             sid, grade, oblast, topic, reason,
-            ["group_request_fidelity", "real_model", "final40",
-             "request_fidelity", "solve_set_adjudicated"],
+            tags,
             [solve_step(f"Kreiraj samostalan MCQ sa četiri opcije: {ask}. "
-                        f"{SET_TAIL}")],
+                        f"{SET_TAIL}", checks=checks)],
             targets=targets,
         ))
 
@@ -377,37 +400,66 @@ def build():
             rubrics=["lesson_alignment", "refusal_quality"])],
         alignment="lesson_overrides", targets=("E009", "E006"),
     ))
-    # Sankcionisana JEDNOPOZIVNA ruta (C001/C002): jedan poziv NIJE kvar, ali
-    # paket mora biti uhvaćen i provjeren kao i na univerzalnoj ruti.
+    # Kanonska deterministička ruta: ovaj reprezentativni zadatak i sve njegove
+    # provjere moraju ostati na tačno nula modelskih poziva. Raniji C001/C002
+    # jednopozivni replay je redundantno pokriven posebnim live gateom i
+    # klasifikacijskim testovima, pa ustupa mjesto izričito traženoj zero-call
+    # kontroli bez povećanja broja scenarija.
     rows.append(scenario(
-        "FW-X02", 6, "Razlomci", "6-04-012",
-        "C001/C002 class: the sanctioned K1/K3 fraction route may generate in "
-        "a single call. The route is not a defect, but its package must be "
-        "captured and checked like any other.",
-        ["group_regression", "real_model", "final40", "single_call_route"],
-        [solve_step(
-            "Daj mi jedan zadatak iz ove lekcije.",
-            checks=["published", "task_published", "options_ok",
-                    "package_clean", "lesson_matches", "math_safe",
-                    "terminology_clean", "bosnian", "no_leak",
-                    "calls_at_most:2"])],
-        targets=("C001", "C002"),
+        "FW-X02", 6, "Djeljivost brojeva", "6-03-004",
+        "Canonical deterministic divisibility generation must record the real "
+        "zero-call route: no Tutor, no Reviewer and no fabricated package calls.",
+        ["group_regression", "deterministic", "final40", "zero_call_control"],
+        [{"kind": "text", "message": "Daj mi jedan zadatak za vježbu iz ove teme.",
+          "expect_calls": 0,
+          "checks": ["response_schema", "not_safe_error", "no_fallback_text",
+                     "no_leak", "no_control_chars", "math_safe",
+                     "terminology_clean", "bosnian", "published",
+                     "task_published", "task_self_contained", "lesson_matches",
+                     "stays_in_lesson", "options_ok", "numeric_consistent",
+                     "package_clean", "no_verdict", "task_not_completed",
+                     "zero_calls"],
+          "rubrics": []}],
+        targets=("deterministic_zero_call",),
     ))
-    # Višeturni lanac: prvi korak traži zadatak, ostali mijenjaju težinu.
-    # Ako prvi korak sigurno padne, kasnija odstupanja su POSLJEDICA (§10).
+    # Kompaktna trostepena ljestvica. Sintetički root/cascade scenario koji je
+    # ranije bio ovdje već ima direktne offline klasifikacijske regresije; ova
+    # zamjena čuva četiri regresijska scenarija i dodaje nedostajući live ugovor.
     rows.append(scenario(
-        "FW-X03", 9, "Linearne jednačine i nejednačine", "9-04-002",
-        "Root-vs-cascade control: when an earlier turn safely blocks "
-        "publication, later difficulty expectations diverge as a consequence, "
-        "not as independent defects.",
-        ["group_regression", "real_model", "final40", "cascade_control"],
-        [solve_step("Daj mi jedan zadatak iz ove lekcije."),
-         {"kind": "text", "message": "Daj mi teži zadatak.", "expect_calls": 2,
-          "requires_active_task": True,
-          "checks": ["published", "task_published", "task_differs",
-                     "package_clean", "calls_at_most:2"],
-          "rubrics": ["difficulty_appropriate"]}],
-        targets=("difficulty_cascade",),
+        "FW-X03", 9, "Tačka, prava i ravan", "9-02-006",
+        "Three-step hint contract: hints 1 and 2 must not reveal the final "
+        "result; hint 3 must give a complete procedure and final result while "
+        "preserving the active task. Each help turn uses at most one real call.",
+        ["group_regression", "real_model", "final40", "hint_ladder"],
+        [solve_step("Daj mi jedan samostalan MCQ zadatak iz ove lekcije."),
+         {"kind": "text", "message": "Ne znam, daj mi prvi hint.",
+          "intent": "hint_request", "interaction_phase": "practice_help",
+          "send_last_task": True, "requires_active_task": True,
+          "expect_calls": 1, "collect_help": True,
+          "checks": ["response_schema", "not_safe_error", "no_fallback_text",
+                     "no_leak", "math_safe", "terminology_clean", "bosnian",
+                     "no_new_task", "task_preserved", "help_nonempty",
+                     "hint_no_leak", "reveal_absent", "task_not_completed",
+                     "calls_at_most:1"], "rubrics": []},
+         {"kind": "text", "message": "Daj mi drugi hint.",
+          "intent": "hint_request", "interaction_phase": "practice_help",
+          "send_last_task": True, "requires_active_task": True,
+          "expect_calls": 1, "collect_help": True,
+          "checks": ["response_schema", "not_safe_error", "no_fallback_text",
+                     "no_leak", "math_safe", "terminology_clean", "bosnian",
+                     "no_new_task", "task_preserved", "help_nonempty",
+                     "hint_no_leak", "hint_differs", "reveal_absent",
+                     "task_not_completed", "calls_at_most:1"], "rubrics": []},
+         {"kind": "text", "message": "Daj mi treći hint.",
+          "intent": "hint_request", "interaction_phase": "practice_help",
+          "send_last_task": True, "requires_active_task": True,
+          "expect_calls": 1, "collect_help": True,
+          "checks": ["response_schema", "not_safe_error", "no_fallback_text",
+                     "no_leak", "math_safe", "terminology_clean", "bosnian",
+                     "no_new_task", "task_preserved", "help_nonempty",
+                     "solution_complete", "hint_differs", "reveal_absent",
+                     "task_not_completed", "calls_at_most:1"], "rubrics": []}],
+        targets=("hint_ladder_contract",),
     ))
     # Obični nastavak ne smije naslijediti raniji izričit uslov (Task 3, §10).
     rows.append(scenario(

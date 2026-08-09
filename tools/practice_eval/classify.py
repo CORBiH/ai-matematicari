@@ -67,7 +67,7 @@ ROUTES = (ROUTE_UNIVERSAL_TWO_CALL, ROUTE_SINGLE_CALL, ROUTE_DETERMINISTIC,
 PACKAGE_LEVEL_CHECKS = frozenset({
     "options_ok", "package_clean", "task_self_contained", "numeric_consistent",
     "math_safe", "geometry_ok", "terminology_clean", "no_leak",
-    "no_control_chars", "bosnian",
+    "no_control_chars", "bosnian", "request_equivalent_reformulation",
 })
 
 # Provjere koje padaju kad turn NIJE objavio. Same po sebi ne dokazuju
@@ -144,8 +144,22 @@ def package_evidence(record) -> list:
     ŽIVI B012: scenario je bio nekoherentan, ali su objavljene opcije `2` i
     `{2}` bile isti odgovor. Taj dokaz se NE SMIJE izgubiti zato što je drugo
     polje scenarija bilo pokvareno."""
-    return [entry for entry in _failed_checks(record)
-            if entry.get("check") in PACKAGE_LEVEL_CHECKS]
+    turns_by_step = {
+        turn.get("step_index"): turn
+        for turn in (record or {}).get("turns") or ()
+    }
+    evidence = []
+    for entry in _failed_checks(record):
+        if entry.get("check") not in PACKAGE_LEVEL_CHECKS:
+            continue
+        turn = turns_by_step.get(entry.get("step"))
+        # New records state this explicitly. Keep older artifacts that predate
+        # `package_captured` readable, but never turn an SDK failure with an
+        # explicitly absent package into product-package evidence.
+        if turn is not None and turn.get("package_captured") is False:
+            continue
+        evidence.append(entry)
+    return evidence
 
 
 def cascade_split(record) -> dict:

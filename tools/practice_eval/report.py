@@ -10,6 +10,8 @@ import json
 from collections import Counter, defaultdict
 from pathlib import Path
 
+from tools.practice_eval import classify as classify_lib
+
 STATUSES = ("PASS", "FAIL", "REVIEW", "INFRA_ERROR", "RATE_LIMITED", "TIMEOUT")
 _EXAMPLE_CHARS = 400
 _MAX_EXAMPLES_PER_CAUSE = 3
@@ -132,8 +134,10 @@ def build_summary(meta, records, total_lessons) -> dict:
     for record in records:
         for route in record.get("routes") or ():
             route_counter[route] += 1
+    # Recompute from raw turns instead of trusting persisted classification.
+    # This keeps interrupted artifacts honest when `package_captured=false`.
     product_evidence = sorted(
-        record["id"] for record in records if record.get("package_evidence"))
+        record["id"] for record in records if classify_lib.package_evidence(record))
     invalid_scenarios = sorted(
         record["id"] for record in records if record.get("coherence_problems"))
     third_call = sorted(

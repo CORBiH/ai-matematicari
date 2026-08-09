@@ -28,8 +28,9 @@ import json
 
 import pytest
 
-from tools.practice_eval import classify, coherence, runner
-from tools.practice_eval.scenario import Scenario, load_scenarios
+from tools.practice_eval import checks as check_lib
+from tools.practice_eval import classify, coherence, report as report_lib, runner
+from tools.practice_eval.scenario import Scenario, load_scenarios, validate_scenarios
 
 FINAL_WAVE = (runner.ROOT / "tools" / "practice_eval" / "scenarios" / "family"
               / "wave_final40.jsonl")
@@ -164,6 +165,35 @@ def test_b012_package_evidence_survives_a_confounded_scenario():
     assert verdict["package_evidence"], "dokaz o paketu je izgubljen"
     assert verdict["coherence_problems"], "nekoherentnost se i dalje prijavljuje"
     assert any("independently" in note for note in verdict["notes"])
+
+
+def test_uncaptured_infrastructure_turn_is_not_package_evidence():
+    """FINAL-40 FW-D01: SDK failure happened before generation, so the
+    mechanical `options_ok` failure cannot describe a product package."""
+    turn = _turn(calls=1, kinds=("tutor_turn",),
+                 results=[("options_ok", "fail", "option_count=0")])
+    turn["package_captured"] = False
+    record = _record(
+        status="RATE_LIMITED", turns=[turn],
+        failed=[("options_ok", 0, "option_count=0")])
+    # Simulate the stale persisted value written by the interrupted run; the
+    # report must recompute from raw turn evidence instead of trusting it.
+    record.update({
+        "id": "FW-D01", "topic_id": "9-04-002", "grade": 9,
+        "oblast": "Linearne jednačine i nejednačine",
+        "importance": "critical", "package_evidence": record["failed_checks"],
+    })
+
+    verdict = classify.classify(record)
+    assert verdict["outcome_class"] == classify.INFRA_SDK
+    assert verdict["package_evidence"] == []
+    assert verdict["outcome_class"] not in {
+        classify.PRODUCT_CORRECTNESS_FAILURE,
+        classify.SAFE_FAIL_CLOSED,
+        classify.COVERAGE_GAP,
+    }
+    summary = report_lib.build_summary({}, [record], 534)
+    assert summary["package_level_product_evidence"] == []
 
 
 def test_confounded_scenario_without_package_evidence_stays_harness():
@@ -461,6 +491,33 @@ def test_transport_statuses_never_become_product_failures(status, expected):
         "outcome_class"] == expected
 
 
+def _equivalence_observation(request, task):
+    return check_lib.TurnObservation(
+        scenario_id="FW-R02", step_index=0, step_kind="text",
+        topic_id="7-03-019", grade=7,
+        request_payload={"student_message": request}, http_status=200,
+        response={"status": "ready", "answer": "Evo zadatka."},
+        session_before=None, session_after={"current_task": task}, sdk_calls=2,
+    )
+
+
+def test_positive_equivalence_check_requires_a_distinct_equal_solve_set():
+    result = check_lib.check_request_equivalent_reformulation(
+        _equivalence_observation("Riješi nejednačinu $x>3$.",
+                                 "Riješi nejednačinu $x+2>5$."))
+    assert result.outcome == check_lib.PASS, result
+
+    repeated = check_lib.check_request_equivalent_reformulation(
+        _equivalence_observation("Riješi nejednačinu $x>3$.",
+                                 "Riješi nejednačinu $x>3$."))
+    assert repeated.outcome == check_lib.FAIL
+
+    drifted = check_lib.check_request_equivalent_reformulation(
+        _equivalence_observation("Riješi nejednačinu $x>3$.",
+                                 "Riješi nejednačinu $x<3$."))
+    assert drifted.outcome == check_lib.FAIL
+
+
 # ---------------------------------------------------------------------------
 # 11) POLITIKA N / N0 — prikovana uz proizvod
 # ---------------------------------------------------------------------------
@@ -495,6 +552,7 @@ def _final_scenarios():
 def test_final_wave_is_forty_coherent_scenarios():
     scenarios = _final_scenarios()
     assert len(scenarios) == 40
+    assert validate_scenarios(scenarios) == []
     assert coherence.validate_wave(scenarios) == []
     assert coherence.domain_policy_problems(scenarios) == []
 
@@ -522,6 +580,34 @@ def test_final_wave_replays_every_required_historical_identifier():
     assert required <= covered, sorted(required - covered)
 
 
+def test_final_wave_contains_all_follow_up_controls():
+    scenarios = _final_scenarios()
+    by_tag = {tag: scenario for scenario in scenarios for tag in scenario.tags}
+
+    e010 = by_tag["e010_mitigation"]
+    assert e010.id == "FW-G04"
+    assert "E010" in e010.targets_wave_a_findings
+    assert "mitigation_not_full_oracle" in e010.tags
+
+    equivalence = by_tag["request_equivalence_positive"]
+    assert equivalence.id == "FW-R02"
+    assert "request_equivalent_reformulation" in equivalence.steps[0]["checks"]
+
+    zero_call = by_tag["zero_call_control"]
+    assert zero_call.id == "FW-X02"
+    assert all(step["expect_calls"] == 0 for step in zero_call.steps)
+    assert all("zero_calls" in step["checks"] for step in zero_call.steps)
+
+    hints = by_tag["hint_ladder"]
+    hint_steps = [step for step in hints.steps
+                  if step.get("intent") == "hint_request"]
+    assert len(hint_steps) == 3
+    assert all(step["expect_calls"] == 1 for step in hint_steps)
+    assert "hint_no_leak" in hint_steps[0]["checks"]
+    assert "hint_no_leak" in hint_steps[1]["checks"]
+    assert "solution_complete" in hint_steps[2]["checks"]
+
+
 def test_final_wave_sessions_are_isolated_and_ids_unique():
     scenarios = _final_scenarios()
     assert len({s.id for s in scenarios}) == len(scenarios)
@@ -535,8 +621,7 @@ def test_final_wave_declares_lesson_priority_probes_explicitly():
                  if s.request_alignment == "lesson_overrides"]
     assert overrides, "završni talas mora nositi bar jednu sondu lekcijskog prioriteta"
     for scenario in overrides:
-        assert "E009" in scenario.targets_wave_a_findings or \
-               "E006" in scenario.targets_wave_a_findings
+        assert {"E006", "E009", "E010"} & set(scenario.targets_wave_a_findings)
 
 
 def test_final_wave_dry_run_passes_with_zero_model_calls(tmp_path):

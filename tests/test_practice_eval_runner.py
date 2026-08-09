@@ -9,6 +9,7 @@ Zašto baš ovo: prethodna faza je pokazala da najveća zamka nije loš model, n
 `SAFE_ERROR_MESSAGE` koji stigne sa HTTP 200 i prođe kao uspjeh. Taj slučaj
 ovdje ima svoj izričit test.
 """
+import io
 import json
 import sys
 
@@ -144,6 +145,28 @@ def test_dry_run_rejects_an_unknown_check_name(tmp_path):
     bad["steps"][0]["checks"] = ["definitely_not_a_check"]
     summary = runner.dry_run(_write(tmp_path, bad), tmp_path / "dry")
     assert any("unknown check" in problem for problem in summary["problems"])
+
+
+def test_list_cli_survives_a_strict_cp1252_console(tmp_path, monkeypatch):
+    row = _scenario()
+    row["reason"] = "Unicode evaluator output: čćž → must not crash"
+    path = tmp_path / "cp1252.jsonl"
+    path.write_text(json.dumps(row, ensure_ascii=False), encoding="utf-8")
+
+    raw = io.BytesIO()
+    cp1252 = io.TextIOWrapper(raw, encoding="cp1252", errors="strict")
+    original = sys.stdout
+    monkeypatch.setattr(sys, "stdout", cp1252)
+    try:
+        result = runner.main(["--scenarios", str(path), "--list"])
+        cp1252.flush()
+    finally:
+        monkeypatch.setattr(sys, "stdout", original)
+
+    output = raw.getvalue().decode("cp1252")
+    assert result == 0
+    assert "1 scenarios, 0 SDK calls made" in output
+    assert "\\u010d" in output and "\\u2192" in output
 
 
 # ---------------------------------------------------------------------------

@@ -55,6 +55,26 @@ STATUS_INFRA = "INFRA_ERROR"
 STATUS_RATE_LIMITED = "RATE_LIMITED"
 STATUS_TIMEOUT = "TIMEOUT"
 
+
+def _console_print(*values, sep=" ", end="\n", file=None, flush=False):
+    """Write evaluator CLI output without assuming a UTF-8 console.
+
+    Structured artifacts remain UTF-8. Only the console surface falls back
+    to escaped Unicode when the active stream (notably Windows CP1252) cannot
+    encode a character. Application/model encoding is never mutated.
+    """
+    stream = file or sys.stdout
+    text = sep.join(str(value) for value in values) + end
+    encoding = getattr(stream, "encoding", None)
+    if encoding:
+        try:
+            text = text.encode(encoding, errors="backslashreplace").decode(encoding)
+        except LookupError:
+            pass
+    stream.write(text)
+    if flush:
+        stream.flush()
+
 # Prefiksi log redova koje smijemo prepisati u izvještaj. Aplikacija ih već
 # emituje ograničene i scrubovane (matbot/llm.py::_scrub, practice._clip_for_log).
 _SAFE_LOG_PREFIXES = (
@@ -787,9 +807,10 @@ def run_campaign(scenarios, output_dir: Path, max_model_calls: int, concurrency:
             records.append(record)
             with results_path.open("a", encoding="utf-8") as handle:
                 handle.write(json.dumps(asdict(record), ensure_ascii=False) + "\n")
-            print(f"[{record.status:<12}] {record.id}  {record.topic_id}  "
-                  f"calls={record.sdk_calls}  {record.duration_s}s"
-                  + (f"  → {','.join(record.root_causes)}" if record.root_causes else ""))
+            _console_print(f"[{record.status:<12}] {record.id}  {record.topic_id}  "
+                           f"calls={record.sdk_calls}  {record.duration_s}s"
+                           + (f"  -> {','.join(record.root_causes)}"
+                              if record.root_causes else ""))
         if delay_ms:
             time.sleep(delay_ms / 1000.0)
         return record
@@ -798,7 +819,7 @@ def run_campaign(scenarios, output_dir: Path, max_model_calls: int, concurrency:
         if concurrency <= 1:
             for scenario in pending:
                 if llm.budget_exceeded:
-                    print("STOP: campaign SDK call ceiling reached.")
+                    _console_print("STOP: campaign SDK call ceiling reached.")
                     break
                 _one(scenario)
         else:
@@ -935,17 +956,18 @@ def main(argv=None):
     try:
         scenarios = load_scenarios(Path(args.scenarios))
     except ScenarioError as error:
-        print(f"SCENARIO ERROR: {error}")
+        _console_print(f"SCENARIO ERROR: {error}")
         return 2
     selected = select(scenarios, args)
 
     if args.list:
-        print(f"{'ID':<6} {'W':<2} {'IMP':<12} {'G':<2} {'TOPIC':<10} {'CALLS':<6} REASON")
+        _console_print(f"{'ID':<6} {'W':<2} {'IMP':<12} {'G':<2} {'TOPIC':<10} {'CALLS':<6} REASON")
         for scenario in selected:
             calls = sum(step.get("expect_calls", 0) for step in scenario.steps)
-            print(f"{scenario.id:<6} {scenario.wave:<2} {scenario.importance:<12} "
-                  f"{scenario.grade:<2} {scenario.topic_id:<10} {calls:<6} {scenario.reason[:70]}")
-        print(f"\n{len(selected)} scenarios, 0 SDK calls made.")
+            _console_print(f"{scenario.id:<6} {scenario.wave:<2} {scenario.importance:<12} "
+                           f"{scenario.grade:<2} {scenario.topic_id:<10} {calls:<6} "
+                           f"{scenario.reason[:70]}")
+        _console_print(f"\n{len(selected)} scenarios, 0 SDK calls made.")
         return 0
 
     output_dir = Path(args.output_dir) if args.output_dir else \
@@ -953,25 +975,26 @@ def main(argv=None):
 
     if args.dry_run:
         summary = dry_run(selected, output_dir)
-        print(json.dumps({key: value for key, value in summary.items() if key != "runtime"},
-                         ensure_ascii=False, indent=2))
-        print("\nRUNTIME: " + json.dumps(summary["runtime"], ensure_ascii=False))
-        print(f"\nWritten to {output_dir}")
-        print("DRY RUN — 0 SDK calls made.")
+        _console_print(json.dumps(
+            {key: value for key, value in summary.items() if key != "runtime"},
+            ensure_ascii=False, indent=2))
+        _console_print("\nRUNTIME: " + json.dumps(summary["runtime"], ensure_ascii=False))
+        _console_print(f"\nWritten to {output_dir}")
+        _console_print("DRY RUN — 0 SDK calls made.")
         return 1 if summary["problems"] else 0
 
     concurrency = max(1, min(args.concurrency, MAX_CONCURRENCY))
     _, maximum = estimate_calls(selected)
     ceiling = args.max_model_calls or maximum
     if not os.environ.get("OPENAI_API_KEY"):
-        print("REFUSING TO RUN: OPENAI_API_KEY is not present in this process environment.")
+        _console_print("REFUSING TO RUN: OPENAI_API_KEY is not present in this process environment.")
         return 2
 
     meta, records = run_campaign(selected, output_dir, ceiling, concurrency,
                                  args.delay_ms, args.resume)
     all_records = report_lib.load_records(output_dir / "results.jsonl")
     report_lib.write_reports(output_dir, meta, all_records, _total_lesson_count())
-    print(f"\nResults: {output_dir}")
+    _console_print(f"\nResults: {output_dir}")
     return 0
 
 
