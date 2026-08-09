@@ -78,6 +78,14 @@ MATHJAX_COMMAND_ALLOWLIST = frozenset({
     # pakete u preflight-u, gurali recenzenta u ispravke i završavali kao
     # tehnički fallback umjesto zadatka.
     "overrightarrow", "bigl", "bigr",
+    # ŽIVI FINAL-40 NALAZ (5 od 13 sigurnih odbijanja: dva paketa su pala i u
+    # nacrtu i u recenzentovom finalu na ISTOM kodu): za „cijeli skup rješenja“
+    # model standardno piše set-builder `\{x\in\mathbb{Q}\mid x>-2\}`. `\mid` je
+    # obična TeX relacijska crta (bez argumenata), koju MathJax v3 tex-mml-chtml
+    # podržava u bazi — dok je allowlist nije znao, kod
+    # unknown_mathjax_command:mid obarao je ispravne opcije, expected_answer i
+    # rješenja, i gurao recenzenta u prepisivanje koje je uvodilo NOVE greške.
+    "mid",
     # operatori i relacije
     "cdot", "times", "div", "pm", "mp", "approx", "neq", "ne", "not",
     "le", "leq", "ge", "geq", "lt", "gt", "equiv", "sim", "propto",
@@ -315,8 +323,15 @@ def sanitize_math_text(text: str) -> str:
 # i stizao do browsera kao sirov, neomeđen tekst (backslash i sve) umjesto da
 # padne zatvoreno. \b je ovdje bio identičan propust kao onaj koji je D35-1
 # već ispravio za regexe udvostručenog backslasha.
+# `\mid` je NAMJERNO ovdje, iako ne nosi argumente (živi FINAL-40 nalaz, dva
+# paketa s kodom `unknown_mathjax_command_outside_math:mid`): kad se pojavio
+# izvan matematike, uvijek je bio dio CIJELOG set-builder zapisa koji je iscurio
+# iz $...$ (`\{x\in\mathbb{Z}\mid x>3\}` bez ijednog delimitera). Usko
+# umotavanje samog simbola ostavilo bi `\{x\in\mathbb{Z}` kao goli tekst, pa
+# `\mid` izvan matematike i dalje pada zatvoreno — dozvoljen je ISKLJUČIVO
+# unutar $...$ (vidi MATHJAX_COMMAND_ALLOWLIST).
 _RAW_LATEX_COMMAND_RE = re.compile(
-    r"\\(?:frac|sqrt|text|mathbb|cdot|begin|end)" + _COMMAND_BOUNDARY
+    r"\\(?:frac|sqrt|text|mathbb|cdot|begin|end|mid)" + _COMMAND_BOUNDARY
 )
 
 # ---------------------------------------------------------------------------

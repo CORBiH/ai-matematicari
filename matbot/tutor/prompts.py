@@ -202,6 +202,34 @@ Without the parentheses the expression means $((7,5\\cdot 10):5)\\cdot 10 = 150$
 server's numeric verifier reads exactly that, and the whole turn is discarded."""
 
 
+# ŽIVI FINAL-40 NALAZ (ljestvica nagovještaja, lekcija o pravoj i ravni): drugi
+# nagovještaj je odbijen u objavi kodom `unknown_mathjax_command:tdot` — komanda
+# `\tdot` ne postoji ni u jednoj MathJax bazi. Server je vratio sigurnu poruku,
+# `hint_level` je ISPRAVNO ostao na 1, pa sljedeći zahtjev nije mogao dati treći
+# (puni) nagovještaj. Šta je model tim zapisom MISLIO nije dokazivo iz artefakta
+# i NE POGAĐA SE: sirov izlaz se nigdje ne čuva (pravilo 7), a nepoznata komanda
+# se po CLAUDE.md nikad ne prepravlja. Zato se ne dira validator nego UGOVOR
+# ZAPISA za polja pomoći — do sada su `hint` i `worked_solution` bili jedina
+# vidljiva površina za koju prompt nigdje nije rekao da prolazi kroz ISTI
+# deterministički prag kao tekst zadatka.
+_HELP_NOTATION_RULE = """ZAPIS U `hint` I `worked_solution` (isti prag kao za zadatak):
+- Oba polja prolaze kroz ISTU determinističku provjeru zapisa kao tekst zadatka.
+  Jedna nepoznata LaTeX komanda unutar $...$ obara CIO turn: učenik ne dobije
+  nikakvu pomoć, poziv je potrošen, a ljestvica nagovještaja ostaje na istom
+  nivou — sljedeći zahtjev zato NE može dati završno rješenje.
+- Koristi ISKLJUČIVO komande koje ovaj projekat već koristi: \\frac, \\sqrt,
+  \\cdot, \\times, \\div, \\le, \\ge, \\neq, \\approx, \\in, \\mid, \\angle,
+  \\perp, \\parallel, \\vec, \\overrightarrow, \\pi i grčka slova, \\text.
+- Ako komanda nije na toj listi, NE IZMIŠLJAJ je i ne skraćuj joj ime: napiši
+  isti korak riječima ili već dozvoljenom komandom. Izmišljena komanda je za
+  server isto što i pokvaren zapis — ne pogađa se šta je trebala značiti.
+- Množenje I skalarni proizvod pišu se OBA kao $\\cdot$ (npr. $\\vec{v}\\cdot\\vec{n}$)
+  — nikad nekom drugom „tačka“ komandom.
+- Backslash svake komande mora biti ispravno JSON-escapeovan (dupli backslash),
+  da poslije parsiranja ostane komanda (\\cdot), a ne kontrolni znak (TAB, form
+  feed) iza kojeg vise gola slova."""
+
+
 _TASK_RULE = """KAD PRAVIŠ ZADATAK:
 - zadatak mora ispitivati BAŠ izabranu lekciju, ne samo istu oblast
 - tačno 4 opcije; TAČNO JEDNA je tačna; nijedne dvije ne smiju značiti istu vrijednost
@@ -355,6 +383,7 @@ def build_tutor_instructions(context):
         f"{_FIELD_RULE}\n\n"
         f"{_TASK_RULE}\n\n"
         f"{_SCALED_DIVISION_RULE}\n\n"
+        f"{_HELP_NOTATION_RULE}\n\n"
         f"{_STRUCTURED_TASK_RULE}\n\n"
         f"{_TARGET_LEVEL_RULE}\n\n"
         f"{_SHARED_TARGET_BLOCK}\n\n"

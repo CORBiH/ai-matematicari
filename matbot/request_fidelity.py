@@ -40,10 +40,36 @@ GRANICE (namjerno uske):
     obični nastavci („teže“, „drugi zadatak“, „objasni“) ne nasljeđuju stari
     uslov.
 
+DRUGI NALAZ — RELACIJA KOJU ZADATAK NIKAD NE NAPIŠE
+---------------------------------------------------
+Živi FINAL-40 lažni prolaz (jedini objavljen paket s prekršajem vjernosti u
+cijeloj kampanji): učenik je dao $x>3$ i tražio da se relacija u tekstu
+preoblikuje dodavanjem iste nenulte cijele konstante na obje strane. Objavljeno
+je „Na obje strane originalne nejednačine dodan je isti nenulti cijeli broj 2.
+Riješite dobijenu nejednačinu…“ — a NIJEDNA nejednačina u tekstu ne stoji.
+Zadatak nije samostalan (učenik nema šta riješiti), a među opcijama je stajalo
+i doslovno $x>3$.
+
+Provjera relacije iznad je tu ĆUTALA po vlastitom pravilu („zadatak bez
+pročitljive relacije ne dokazuje prekršaj“) — i to pravilo ostaje tačno za
+zapis koji parser ne ume da pročita ($x^2>4$). Ovdje se dokazuje nešto drugo i
+strukturno: tekst se DEIKTIČKI poziva na relaciju (originalna/dobijena/nastala
+nejednačina ili jednačina) a NIJEDAN relacijski znak se u njemu ne pojavljuje.
+Tada nije riječ o nepročitanoj relaciji nego o relaciji koje NEMA.
+
+Sva tri uslova moraju vrijediti istovremeno, pa nijedan pozitivni kontrolni
+slučaj ne pada: zahtjev nosi tačno jednu čitljivu relaciju, tekst zadatka traži
+rješavanje i deiktički imenuje relaciju, a u cijelom tekstu nema ni jednog
+relacijskog znaka ($<$, $>$, $=$, \\le, \\ge, ≤, ≥…). Preformulisan zadatak koji
+relaciju STVARNO napiše ($x+2>5$) prolazi ovdje netaknut i dalje se sudi samo
+po kanonskom skupu rješenja.
+
 Vjernost zahtjevu NE nadjačava lekciju: semantički ugovori vježbe (Task 2)
 i dalje odbijaju zadatak van lekcije čak i kad je učenikov zahtjev vjerno
 prepisan — te dvije kapije su nezavisne i obje moraju proći.
 """
+import re
+
 from matbot import mcq_integrity
 
 # Interni kod nalaza — kao svi ostali, ide ISKLJUČIVO u log i recenzentov
@@ -53,10 +79,47 @@ REQUEST_FIDELITY_CODE = "request_fidelity_violation"
 DOMAIN_MISMATCH = "domain_mismatch"
 RELATION_MISMATCH = "relation_mismatch"
 TASK_TYPE_MISMATCH = "task_type_mismatch"
+MISSING_REQUESTED_RELATION = "missing_requested_relation"
 
 # Direktiva rješavanja u PORUCI — ponovo se koristi zatvoreni uzorak orakla,
 # da se granica „ovo je zahtjev za zadatak“ ne izmišlja po drugi put.
 _SOLVE_DIRECTIVE_RE = mcq_integrity._SOLVE_DIRECTIVE_RE
+
+# ---------------------------------------------------------------------------
+# ZATVORENA GRAMATIKA DEIKTIČKOG POZIVANJA NA RELACIJU
+# ---------------------------------------------------------------------------
+# Namjerno NIJE opšti razumijevač prirodnog jezika: samo pridjev iz zatvorenog
+# skupa neposredno uz imenicu relacije. „Nejednačina“ SADRŽI „jednačinu“ kao
+# podniz, pa negirani oblik stoji PRVI u alternaciji (isti razlog kao u
+# mcq_integrity._REQUEST_INEQUALITY_WORD_RE).
+_RELATION_NOUN = (r"(?:nejedna[čc]in\w*|jedna[čc]in\w*|nejednakost\w*"
+                  r"|jednakost\w*|relacij\w*)")
+_RELATION_DEICTIC_ADJECTIVE = (
+    r"(?:original\w*|polazn\w*|po[čc]etn\w*|prvobitn\w*|prethodn\w*"
+    r"|dobijen\w*|dobiven\w*|nastal\w*|rezultuju[čć]\w*|dobijenoj?"
+    r"|transformisan\w*|transformisan[eoj]\w*|preoblikovan\w*"
+    r"|izmijenjen\w*|izmenjen\w*|nov\w*)")
+_DEICTIC_RELATION_RE = re.compile(
+    r"\b" + _RELATION_DEICTIC_ADJECTIVE + r"\s+" + _RELATION_NOUN
+    + r"|\b" + _RELATION_NOUN + r"\s+" + _RELATION_DEICTIC_ADJECTIVE,
+    re.IGNORECASE)
+
+# BILO KOJI relacijski znak — golim znakom, LaTeX komandom ili Unicode-om.
+# Prisustvo makar jednog znači „relacija je zapisana“ i novi nalaz ĆUTI:
+# dokazivanje da je zapisana relacija POGREŠNA je posao provjere relacije
+# iznad, a nedokaziva relacija ($x^2>4$) se po doktrini projekta preskače.
+_ANY_RELATION_TOKEN_RE = re.compile(
+    r"[<>=≤≥≠]|\\(?:leq|le|geq|ge|lt|gt|neq|ne|equiv|approx)(?![A-Za-z])")
+
+
+def _refers_to_a_relation_it_never_states(task_text):
+    """True SAMO kad tekst traži rješavanje relacije koju uopšte ne pokazuje."""
+    text = task_text or ""
+    if _ANY_RELATION_TOKEN_RE.search(text):
+        return False                     # relacija JESTE zapisana — nije naš nalaz
+    if not _SOLVE_DIRECTIVE_RE.search(text):
+        return False                     # tekst uopšte ne traži rješavanje
+    return bool(_DEICTIC_RELATION_RE.search(text))
 
 
 def _requested_kind(request):
@@ -108,6 +171,16 @@ def request_fidelity_failures(student_message, task_text):
             failures.append(
                 f"{DOMAIN_MISMATCH}: requested {requested_domain}, "
                 "task states no provable domain")
+
+    # 2a) RELACIJA KOJU ZADATAK NIKAD NE NAPIŠE (vidi docstring modula).
+    #     Zahtjev nosi tačno jednu čitljivu relaciju, tekst zadatka se na
+    #     relaciju deiktički poziva i traži da je učenik riješi — a u cijelom
+    #     tekstu nema nijednog relacijskog znaka. Takav zadatak nije samostalan
+    #     i ne izvršava traženu preformulaciju, pa se ne smije objaviti.
+    if explicit_relation and _refers_to_a_relation_it_never_states(task_text):
+        failures.append(
+            f"{MISSING_REQUESTED_RELATION}: the task refers to a relation it "
+            f"never writes; requested '{request.solution_display()}'")
 
     # 2) RELACIJA — poredi se KANONSKI SKUP RJEŠENJA. Kad su domeni saglasni i
     #    diskretni, poredi se i presjek s tim domenom, pa preformulacija koja

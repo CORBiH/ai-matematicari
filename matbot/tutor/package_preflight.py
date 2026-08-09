@@ -505,7 +505,21 @@ def format_for_reviewer(issues):
         "for another and never drop the domain sentence. For `relation_mismatch` "
         "solve the EXACT equation or inequality the student wrote (an equivalent "
         "rearrangement with the identical solution set is fine, a different "
-        "solution set is not) and recompute every option. For `task_type_mismatch` "
+        "solution set is not) and recompute every option. "
+        # Živi FINAL-40 lažni prolaz: „Na obje strane originalne nejednačine
+        # dodan je isti nenulti cijeli broj 2. Riješite dobijenu nejednačinu…“
+        # bez ijedne nejednačine u tekstu. Recept mora tražiti DOPISIVANJE
+        # relacije, ne preformulaciju rečenice.
+        f"For `{request_fidelity_module.MISSING_REQUESTED_RELATION}` the task "
+        "text points at a relation (`originalna`/`dobijena`/`nastala` "
+        "jednačina or nejednačina) that it NEVER writes down, so the student "
+        "has nothing to solve and the task is not self-contained: WRITE THE "
+        "COMPLETE resulting relation into the task text itself, inside $...$, "
+        "with every side fully written out — a task that says `Riješi dobijenu "
+        "nejednačinu` while showing no relation can never be published. Keep "
+        "the solution set the student asked for unchanged, then recompute "
+        "correct_option_id, correct_option_index, expected_answer and every "
+        "option for the relation you actually wrote. For `task_type_mismatch` "
         "keep the requested kind: an inequality request must stay an inequality "
         "and an equation request must stay an equation. If honouring the request "
         "would break the selected lesson's semantic contract, return "

@@ -1443,7 +1443,18 @@ def _solve_set_builder(inner: str, variable: str) -> Optional[_SolutionSet]:
     gramatiku kao opcija-relacija. Skup se tumači pod DEKLARISANIM domenom
     (diskretni se diskretizuje, Q/R ostaju kontinuirani) — poređenje je zatim
     poštena jednakost skupova brojeva, bez obzira na to kojim je domenom skup
-    zapisan. Sve nedokazivo vraća None (fail closed na podržanom zadatku)."""
+    zapisan. Sve nedokazivo vraća None (fail closed na podržanom zadatku).
+
+    ŽIVI FINAL-40 NALAZ: separator je do sada bio ISKLJUČIVO goli znak `:` ili
+    `|`, a model školski set-builder u LaTeX-u piše komandom — `\\{x\\in\\mathbb{Q}
+    \\mid x>-2\\}`. `\\mid` JESTE ta ista uspravna crta (i MathJax je tako
+    renderuje), pa je oblik koji je ovaj čitač već trebao podržavati padao kao
+    `unverifiable_solution_option`. Zamjena je zatvorena i doslovna: `\\mid` →
+    `|`, plus skidanje LaTeX razmaknica koje nikad ne nose značenje. Nijedan
+    drugi zapis se ne pogađa (`\\vert`, `\\Vert`, `\\colon` … i dalje ćute)."""
+    inner = inner.replace("\\mid", "|")
+    for spacing in ("\\,", "\\;", "\\!", "\\ "):
+        inner = inner.replace(spacing, " ")
     separator_index = None
     depth = 0
     for index, character in enumerate(inner):
