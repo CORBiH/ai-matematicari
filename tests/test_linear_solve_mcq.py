@@ -9,8 +9,10 @@ nije ni pokušao matematiku: orakli u mcq_integrity pokrivali su djeljivost,
 direktan račun i poređenje — „riješi (ne)jednačinu“ nije imao nijedan.
 
 GRANICE (namjerno uske, isti princip kao ostali orakli):
-  • proza mora izričito tražiti rješavanje; superlativ, „koliko“, negacija i
-    ograničenje domena („u skupu“, prirodni/cijeli brojevi) isključuju orakl;
+  • proza mora izričito tražiti rješavanje; superlativ, „koliko“ i negacija
+    isključuju orakl; DOKAZIV domen Q/R/Z/N/N0 (DISC/LSP0 talas, RC3) se
+    presuđuje POD domenom (Q/R kontinuirano, Z/N/N0 presjek s cijelim
+    brojevima), a svako drugo/nedokazivo suženje i dalje isključuje orakl;
   • svaki matematički segment mora biti pročitan zatvorenom gramatikom, a
     TAČNO JEDAN smije nositi relaciju — nepročitano znači ćutanje, ne pogađanje;
   • sva aritmetika je egzaktna (`Fraction`); dvije relacije su isti odgovor
@@ -391,12 +393,19 @@ def test_membership_question_with_singleton_options_stays_silent():
             ("{0}", "{2}", "{3}", "{4}"))
 
 
-def test_domain_restricted_task_with_singleton_options_stays_silent():
+def test_domain_restricted_task_with_singleton_options_is_now_adjudicated():
     """Živa verifikacija je imala VALJAN slučaj: nejednačina sužena na cijele
-    brojeve s objavljenim {-3}. Domenski sužen zadatak ostaje van orakla —
-    singleton podrška ga ne smije lažno oboriti."""
-    _silent(r"Riješi nejednačinu $-3<x+1<-1$ u skupu cijelih brojeva.",
-            (r"$\{-3\}$", r"$\{-2\}$", r"$\{-4\}$", r"$\{0\}$"))
+    brojeve s objavljenim {-3}. RC3 (LSP0/DISC talas): domen Z se više ne
+    gasi nego PRESUĐUJE — skup rješenja nad Z je tačno {-3} i valjan paket
+    dobija punu matematičku potvrdu umjesto ćutanja."""
+    question = r"Riješi nejednačinu $-3<x+1<-1$ u skupu cijelih brojeva."
+    options = (r"$\{-3\}$", r"$\{-2\}$", r"$\{-4\}$", r"$\{0\}$")
+    result = evaluate(question, options)
+    assert result.applicable and result.valid
+    assert result.solution_display == "{-3}"
+    assert result.correct_index == 0
+    failure, _ = publication_failure(question, options, 0, options[0])
+    assert failure == ""
 
 
 def test_generator_style_mixed_number_options_are_now_adjudicated():
@@ -456,11 +465,17 @@ def test_superlative_question_stays_silent():
             ("$4$", "$3$", "$2$", "$1$"))
 
 
-def test_domain_restricted_question_stays_silent():
-    """Nad N/Z „$x<5$“ i „$x\\le 4$“ postaju isti skup — orakl nad Q to ne
-    smije presuđivati, pa domen isključuje cio orakl."""
-    _silent(r"Riješi nejednačinu $x+3<8$ u skupu prirodnih brojeva.",
-            (r"$x<5$", r"$x>5$", r"$x=4$", r"$x<4$"))
+def test_domain_restricted_question_is_now_adjudicated_under_n():
+    """Nad N „$x<5$“ je tačno {1,2,3,4} — RC3: domen se presuđuje, ne gasi.
+    Distraktori {1,2,3} (x<4) i {4} (x=4) su dokazano različiti skupovi."""
+    question = r"Riješi nejednačinu $x+3<8$ u skupu prirodnih brojeva."
+    options = (r"$x<5$", r"$x>5$", r"$x=4$", r"$x<4$")
+    result = evaluate(question, options)
+    assert result.applicable and result.valid
+    assert result.solution_display == "{1, 2, 3, 4}"
+    assert result.correct_index == 0
+    failure, _ = publication_failure(question, options, 0, options[0])
+    assert failure == ""
 
 
 def test_two_relation_segments_stay_silent():
@@ -468,10 +483,24 @@ def test_two_relation_segments_stay_silent():
             (r"$x=2$", r"$x=1$", r"$x=0$", r"$x=3$"))
 
 
-def test_unreadable_extra_segment_stays_silent():
-    """$x\\in\\mathbb{Z}$ nosi uslov koji mijenja rješenje — nepročitan
-    segment znači ćutanje cijelog orakla."""
-    _silent(r"Riješi nejednačinu: $x+3<8$, $x\in\mathbb{Z}$",
+def test_domain_declaration_segment_is_read_as_evidence():
+    """$x\\in\\mathbb{Z}$ je ranije bio nečitljiv segment (ćutanje) — RC3 ga
+    čita kao DEKLARACIJU domena: rješenje x<5 nad Z je „x <= 4 [cijeli]“ i
+    presuđuje se pod tim domenom."""
+    question = r"Riješi nejednačinu: $x+3<8$, $x\in\mathbb{Z}$"
+    options = (r"$x<5$", r"$x>5$", r"$x=5$", r"$x<3$")
+    result = evaluate(question, options)
+    assert result.applicable and result.valid
+    assert result.solution_display == "x <= 4 [cijeli]"
+    assert result.correct_index == 0
+    failure, _ = publication_failure(question, options, 0, options[0])
+    assert failure == ""
+
+
+def test_genuinely_unreadable_segment_still_stays_silent():
+    """Segment koji NIJE ni relacija ni deklaracija domena ($x^2+1$ uz
+    relaciju) i dalje gasi orakl — nepročitano znači ćutanje."""
+    _silent(r"Riješi nejednačinu: $x+3<8$, $x^2+1$",
             (r"$x<5$", r"$x>5$", r"$x=5$", r"$x<3$"))
 
 
@@ -480,9 +509,23 @@ def test_identity_equation_stays_silent():
             (r"$x=1$", r"$x=2$", r"$x=0$", r"$x=3$"))
 
 
-def test_parenthesised_equation_stays_silent():
-    _silent(r"Riješi jednačinu: $2(x+3)=10$",
-            (r"$x=2$", r"$x=1$", r"$x=4$", r"$x=8$"))
+def test_parenthesised_equation_is_now_adjudicated():
+    """DISC-B017/B007 (RC2): jednonivovska školska zagrada `k(ax+b)` se čita
+    distributivno i egzaktno — parenthesized zadatak više ne gasi orakl."""
+    question = r"Riješi jednačinu: $2(x+3)=10$"
+    options = (r"$x=2$", r"$x=1$", r"$x=4$", r"$x=8$")
+    result = evaluate(question, options)
+    assert result.applicable and result.valid
+    assert result.solution_display == "x = 2"
+    assert result.correct_index == 0
+    failure, _ = publication_failure(question, options, 0, options[0])
+    assert failure == ""
+
+
+def test_product_of_binomials_still_stays_silent():
+    """(x+1)(x-2) je nelinearno — grupa bez predznaka iza grupe se ne tumači."""
+    _silent(r"Riješi jednačinu: $(x+1)(x-2)=0$",
+            (r"$x=-1$", r"$x=2$", r"$x=1$", r"$x=0$"))
 
 
 def test_option_in_a_different_variable_fails_closed():
@@ -764,14 +807,15 @@ def test_solution_set_wording_is_not_a_domain_restriction(wording):
     assert failure == "", question
 
 
+# RC3 (LSP0/DISC talas): dokazan domen Z/Q se PRESUĐUJE. Za lanac
+# $-3<x+1<-1$ (kontinuirano $-4<x<-2$): nad Z je skup tačno {-3}, pa je
+# interval-opcija $-4<x<-2$ (diskretizovana u {-3}) jedina tačna; nad Q ostaje
+# kontinuirani interval i ista opcija je tačna — u OBA slučaja punom presudom.
 @pytest.mark.parametrize("question", [
     r"Riješi nejednačinu $-3<x+1<-1$ u skupu cijelih brojeva.",
-    r"Riješi nejednačinu $-3<x+1<-1$ u skupu prirodnih brojeva.",
     r"Riješi nejednačinu $-3<x+1<-1$ u skupu racionalnih brojeva.",
     r"Riješi nejednačinu $-3<x+1<-1$ za x ∈ Z.",
-    r"Riješi nejednačinu $-3<x+1<-1$ za x ∈ N.",
     r"Riješi nejednačinu $-3<x+1<-1$ za x ∈ ℤ.",
-    r"Riješi nejednačinu $-3<x+1<-1$ za x ∈ ℕ.",
     "Riješi nejednačinu $-3<x+1<-1$ za x \\in \\mathbb{Z}.",
     r"Riješi nejednačinu $-3<x+1<-1$ u Z.",
     r"Riješi nejednačinu $-3<x+1<-1$ u skupu Z.",
@@ -781,9 +825,49 @@ def test_solution_set_wording_is_not_a_domain_restriction(wording):
     r"Riješi nejednačinu $-3<x+1<-1$. Koji od ponuđenih skupova predstavlja "
     r"sve cijele vrijednosti $x$ koje zadovoljavaju nejednačinu?",
 ])
-def test_genuine_domain_restrictions_keep_the_oracle_out(question):
-    """Stvaran domen (pridjev uz broj/vrijednost/rješenje, u skupu + pridjev,
-    ∈/\\in/N-Z-Q-R simboli u uskom kontekstu) i dalje isključuje orakl."""
+def test_supported_domain_restrictions_now_adjudicate(question):
+    """Dokaziv domen Z/Q više ne gasi orakl — presuđuje se pod domenom."""
+    result = evaluate(question, CHAIN_TASK_OPTIONS)
+    assert result.applicable, question
+    assert result.valid and result.correct_index == 2, (question, result)
+    failure, _ = publication_failure(question, CHAIN_TASK_OPTIONS, 2,
+                                     CHAIN_TASK_OPTIONS[2])
+    assert failure == "", question
+
+
+@pytest.mark.parametrize("question", [
+    r"Riješi nejednačinu $-3<x+1<-1$ u skupu prirodnih brojeva.",
+    r"Riješi nejednačinu $-3<x+1<-1$ za x ∈ N.",
+    r"Riješi nejednačinu $-3<x+1<-1$ za x ∈ ℕ.",
+])
+def test_natural_domain_with_empty_solution_blocks_publication(question):
+    """Nad N je skup rješenja lanca PRAZAN — tri opcije (x<-3, interval i
+    tačka x=-2) postaju isti prazan skup, pa MCQ dokazano pada zatvoreno."""
+    result = evaluate(question, CHAIN_TASK_OPTIONS)
+    assert result.applicable, question
+    assert not result.valid, question
+    assert result.solution_display == "∅"
+    assert result.reason_code == "multiple_correct_options"
+    failure, _ = publication_failure(question, CHAIN_TASK_OPTIONS, 2,
+                                     CHAIN_TASK_OPTIONS[2])
+    assert failure == "multiple_correct_options", question
+
+
+@pytest.mark.parametrize("question", [
+    r"Riješi nejednačinu $-3<x+1<-1$ u skupu parnih brojeva.",
+    r"Riješi nejednačinu $-3<x+1<-1$ u skupu prostih brojeva.",
+    r"Riješi nejednačinu $-3<x+1<-1$ u skupu pozitivnih brojeva.",
+    r"Riješi nejednačinu $-3<x+1<-1$ u skupu decimalnih brojeva.",
+    r"Riješi nejednačinu $-3<x+1<-1$ u skupu iracionalnih brojeva.",
+    r"Riješi nejednačinu $-3<x+1<-1$ u skupu prirodnih brojeva zajedno "
+    r"s nulom.",
+    r"Riješi nejednačinu $-3<x+1<-1$ u skupu cijelih brojeva, za "
+    r"$x\in\mathbb{N}$.",
+])
+def test_unsupported_or_conflicting_domains_keep_the_oracle_out(question):
+    """Nepodržano suženje (parni, prosti, pozitivni, decimalni, iracionalni),
+    „prirodni … s nulom“ bez izričitog N0 i PROTIVRJEČNI domeni i dalje znače
+    ćutanje — nedokazivost nikad ne postaje presuda."""
     _silent(question, CHAIN_TASK_OPTIONS)
 
 
@@ -842,11 +926,14 @@ def test_exact_former_p0_replay_singleton_minus1_is_blocked():
     assert not result.valid
     assert result.solution_display == "-2 < x < 0"
     assert result.option_displays[0] == "x = -1"
-    # $\varnothing$ je nečitljiv zapis → zatvoreno padanje na poznatom zadatku.
-    assert result.reason_code == "unverifiable_solution_option"
+    # RC3 (§7): $\varnothing$ je sada ČITLJIV zapis praznog skupa, pa su sve
+    # četiri opcije shvaćene — presuda je MATEMATIČKA (tačka/prazan skup nikad
+    # nije interval), i dalje zatvoreno blokirana, sa jačim kodom.
+    assert result.option_displays[3] == "∅"
+    assert result.reason_code == "no_correct_option"
     failure, _ = publication_failure(REPLAY_B_TASK, REPLAY_B_OPTIONS, 0,
                                      REPLAY_B_OPTIONS[0])
-    assert failure == "unverifiable_solution_option"
+    assert failure == "no_correct_option"
 
 
 def test_solution_set_wording_with_all_singletons_hits_no_correct_option():

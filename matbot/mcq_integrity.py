@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 from dataclasses import dataclass
 from fractions import Fraction
@@ -691,18 +692,152 @@ _SOLVE_DOMAIN_SYMBOL_RE = re.compile(
     + r"|(?:\b[Uu]\s+|\b[Ss]kup(?:u|a|om)?\s+)" + _SOLVE_DOMAIN_LETTER)
 
 
-def _solve_domain_restricted(prose: str) -> bool:
-    """Stvaran dokaz suženja domena u prozi — nikad riječ „skup“ sama."""
-    return bool(_SOLVE_DOMAIN_WORD_RE.search(prose)
-                or _SOLVE_DOMAIN_SYMBOL_RE.search(prose))
+# ---------------------------------------------------------------------------
+# RAZRJEŠENJE DOMENA (LSP0/DISC talas, RC3): suženje domena više ne gasi orakl
+# bezuslovno. Kad je domen DOKAZIVO tačno jedan od Q/R/Z/N/N0, orakl presuđuje
+# pod tim domenom: Q/R zadržavaju kontinuiranu semantiku (nikad se ne
+# diskretizuju), Z/N/N0 presijecaju egzaktno rješenje s cijelim brojevima
+# (LSP0-E02: „(cijeli brojevi)“ + x=-1 i -2<x<0 su ISTI skup {-1} — objavljen
+# je MCQ s dvije tačne opcije jer je orakl na domen ćutao). Svako suženje koje
+# se ne može dokazati kao tačno jedan podržan domen (parni, prosti, pozitivni,
+# protivrječni domeni, „prirodni … nula“ bez izričitog N0) i dalje znači
+# ćutanje — nedokazivost nikad ne postaje presuda.
+# ---------------------------------------------------------------------------
+
+# N0 tokeni — ISTI uski kontekst kao golo slovo domena (vidi
+# _SOLVE_DOMAIN_LETTER): „N0“/„N_0“ iza ∈/\in ili prijedloga/„skup“, plus
+# jednoznačni simboli ℕ₀ / \mathbb{N}_0. Golo slovo N iza kog stoji cifra NE
+# hvata _SOLVE_DOMAIN_LETTER (negativni lookahead), pa se ovi oblici čitaju
+# ovdje — prije skeniranja običnih simbola.
+_SOLVE_DOMAIN_N0_RE = re.compile(
+    r"ℕ₀|ℕ_\{?0\}?|\\mathbb\{\s*N\s*\}_\{?0\}?"
+    r"|(?:∈|\\in\b|\b[Uu]\s+|\b[Ss]kup(?:u|a|om)?\s+)\s*N_?0\b")
+
+_SOLVE_DOMAIN_LETTER_MAP = {"N": "N", "Z": "Z", "Q": "Q", "R": "R",
+                            "ℕ": "N", "ℤ": "Z", "ℚ": "Q", "ℝ": "R"}
+
+
+def _classify_domain_adjective(matched_text: str) -> Optional[str]:
+    """Podržan domen iz JEDNOG pogotka _SOLVE_DOMAIN_WORD_RE, ili None.
+
+    Redoslijed je bitan: „iracionaln“ sadrži „racionaln“ kao podniz, pa se
+    provjerava prije. Sve što nije N/Z/Q/R (parn, neparn, prost, decimaln,
+    (ne)negativn, (ne)pozitivn…) vraća None — nepodržano suženje."""
+    lowered = matched_text.lower()
+    if "prirodn" in lowered:
+        return "N"
+    if "cjelobrojn" in lowered or "cijel" in lowered:
+        return "Z"
+    if "iracionaln" in lowered:
+        return None
+    if "racionaln" in lowered:
+        return "Q"
+    if "realn" in lowered:
+        return "R"
+    return None
+
+
+def _domain_from_symbol_text(matched_text: str) -> Optional[str]:
+    """Slovo domena iz JEDNOG pogotka _SOLVE_DOMAIN_SYMBOL_RE."""
+    for token in ("ℕ", "ℤ", "ℚ", "ℝ"):
+        if token in matched_text:
+            return _SOLVE_DOMAIN_LETTER_MAP[token]
+    blackboard = re.search(r"\\mathbb\{\s*([NZQR])\s*\}", matched_text)
+    if blackboard:
+        return blackboard.group(1)
+    trailing = re.search(r"([NZQR])\s*$", matched_text.strip())
+    return trailing.group(1) if trailing else None
+
+
+def _resolve_solve_domain(prose: str) -> tuple:
+    """(status, domen, deklarisane nepoznate) iz PROZE pitanja.
+
+    status: "none" (nema suženja), "supported" (tačno jedan od Q/R/Z/N/N0),
+    "unsupported" (suženje postoji ali se ne može dokazati kao tačno jedan
+    podržan domen — orakl mora ćutati, kao i dosad)."""
+    domains = set()
+    declared_variables = set()
+    unsupported = False
+    # N0 tokeni PRIJE običnih simbola: „\mathbb{N}_0“ bi se inače pročitao i
+    # kao N (simbol) i kao N0 → lažna protivrječnost.
+    stripped = _SOLVE_DOMAIN_N0_RE.sub(" ", prose or "")
+    if stripped != (prose or ""):
+        domains.add("N0")
+    for match in _SOLVE_DOMAIN_WORD_RE.finditer(stripped):
+        domain = _classify_domain_adjective(match.group(0))
+        if domain is None:
+            unsupported = True
+        else:
+            domains.add(domain)
+    for match in _SOLVE_DOMAIN_SYMBOL_RE.finditer(stripped):
+        domain = _domain_from_symbol_text(match.group(0))
+        if domain is None:
+            unsupported = True
+        else:
+            domains.add(domain)
+        # Slovo NEPOSREDNO ispred ∈/\in imenuje nepoznatu na koju se domen
+        # odnosi („za x ∈ Z“) — pamti se i poredi s nepoznatom relacije.
+        if match.group(0).lstrip().startswith(("∈", "\\in")):
+            head = stripped[:match.start()].rstrip()
+            if head and head[-1].isalpha() and (
+                    len(head) == 1 or not head[-2].isalpha()):
+                declared_variables.add(head[-1])
+    if "N" in domains and re.search(r"\bnul\w*", stripped, re.IGNORECASE):
+        # „prirodnih brojeva … nula/nulom“: možda N0, možda komentar o nuli —
+        # bez izričitog N0 tokena se NE pogađa.
+        unsupported = True
+    if not domains and not unsupported:
+        return "none", "", declared_variables
+    if unsupported or len(domains) != 1:
+        return "unsupported", "", declared_variables
+    return "supported", next(iter(domains)), declared_variables
+
+
+# Čista deklaracija domena kao ZASEBAN matematički segment ($x\in\mathbb{Z}$,
+# $x ∈ Z$, $x\in\mathbb{N}_0$) — ranije je takav segment bio nečitljiv i gasio
+# cio orakl; sada je domenska EVIDENCIJA. Sve ostalo s ∈ i dalje pada na
+# postojećoj kapiji nepročitanog segmenta.
+_SOLVE_SEGMENT_DOMAIN_RE = re.compile(
+    r"^\s*(?:([A-Za-z])\s*)?(?:\\in\b|∈)\s*"
+    r"(?:\\mathbb\{\s*([NZQR])\s*\}|([ℕℤℚℝ])|([NZQR]))\s*"
+    r"(?:(_\{?0\}?|₀)\s*)?$")
+
+
+def _segment_domain_declaration(segment: str) -> Optional[tuple]:
+    """(nepoznata|None, domen) ili None kad segment NIJE čista deklaracija."""
+    match = _SOLVE_SEGMENT_DOMAIN_RE.match(segment or "")
+    if match is None:
+        return None
+    letter = match.group(2) or match.group(4) or ""
+    if match.group(3):
+        letter = _SOLVE_DOMAIN_LETTER_MAP[match.group(3)]
+    if match.group(5):
+        if letter != "N":
+            return None            # Z_0 i sl. — nepoznata notacija, ne pogađa se
+        letter = "N0"
+    if letter not in _SOLVE_DOMAIN_LETTER_MAP and letter != "N0":
+        return None
+    return match.group(1), letter
 _SOLVE_RELATION_TOKEN_RE = re.compile(r"<=|>=|<|>|=")
 # \frac s egzaktno čitljivim argumentima (broj ili jedno slovo); „§“ je interni
 # marker razlomačke crte — literal „/“ iz ulaza zadržava svoju dvosmislenost
 # („3/4x“ se NE tumači), dok je \frac{3}{4}x jednoznačno (3/4)·x.
+# DISC talas (B014): argument smije nositi i JEDAN već zamijenjen unutrašnji
+# razlomak (`2§3`), pa se \frac{1}{\frac{2}{3}} čita iznutra prema vani —
+# oba argumenta brojčana znače EGZAKTNO izračunatu vrijednost (Fraction),
+# nikad tekstualno nadovezan `1§2§3` (dvosmislen za parser članova).
+_SOLVE_FRAC_ARG = r"[+-]?(?:\d+(?:[.,]\d+)?(?:§[+-]?\d+(?:[.,]\d+)?)?|[A-Za-z])"
 _SOLVE_FRAC_RE = re.compile(
-    r"\\[dt]?frac\{([+-]?(?:\d+(?:[.,]\d+)?|[A-Za-z]))\}"
-    r"\{([+-]?(?:\d+(?:[.,]\d+)?|[A-Za-z]))\}")
-_SOLVE_UNSUPPORTED_CHAR_RE = re.compile(r"[^0-9A-Za-z+\-*/=<>.,§]")
+    r"\\[dt]?frac\{(" + _SOLVE_FRAC_ARG + r")\}\{(" + _SOLVE_FRAC_ARG + r")\}")
+# DISC talas (B012/B013): školski oblik „linearni brojnik / brojčani nazivnik“
+# (\frac{2x+1}{3}) je dosad gasio orakl. Brojnik mora nositi slovo (čisto
+# brojčani već pokriva _SOLVE_FRAC_RE), nazivnik je egzaktan broj ≠ 0;
+# zamjena daje `(2x+1)§3` — grupu koju parser strane zna raspodijeliti.
+# Nazivnik s promjenljivom se NE podržava (nelinearno) i dalje ćuti.
+_SOLVE_LINEAR_FRAC_RE = re.compile(
+    r"\\[dt]?frac\{([0-9A-Za-z+\-*.,§ ]+)\}"
+    r"\{([+-]?\d+(?:[.,]\d+)?(?:§[+-]?\d+(?:[.,]\d+)?)?)\}")
+_SOLVE_UNSUPPORTED_CHAR_RE = re.compile(r"[^0-9A-Za-z+\-*/=<>.,§()]")
 _SOLVE_TERM_RE = re.compile(
     r"(?P<sign>[+-]?)"
     r"(?:(?P<num>\d+(?:[.,]\d+)?(?:§[+-]?\d+(?:[.,]\d+)?)?)(?:\*?(?P<var_after>[A-Za-z]))?"
@@ -733,6 +868,11 @@ _SOLVE_MIXED_NUMBER_RE = re.compile(
 # paketu koji ju je najviše trebao. Ovaj kod razdvaja te dvije stvari: zadatak
 # u dometu + nečitljiva opcija = zatvoreno padanje, nikad tiho odustajanje.
 UNVERIFIABLE_SOLUTION_OPTION_CODE = "unverifiable_solution_option"
+# DISC talas (RC1): dva različita zapisa ISTOG skupa među pročitanim opcijama.
+# NAMJERNO isti string kao publikacijski kod semantičkih duplikata
+# (package_preflight.SEMANTIC_DUPLICATE_CODE) — recenzentski recept „zamijeni
+# distraktor(e) da sve četiri opcije budu semantički različite“ već postoji.
+EQUIVALENT_SOLUTION_OPTIONS_CODE = "semantically_duplicate_options"
 
 
 @dataclass(frozen=True)
@@ -740,15 +880,29 @@ class _SolutionSet:
     """Kanonski zapis skupa rješenja; jednakost dataklasa = jednakost skupova.
 
     Konstrukcija ide isključivo kroz classmethod-e, pa nekorištena polja uvijek
-    nose podrazumijevane vrijednosti i poređenje ostaje kanonsko."""
+    nose podrazumijevane vrijednosti i poređenje ostaje kanonsko.
 
-    kind: str                      # "point" | "ray" | "interval"
-    op: str = ""                   # za ray: "<" | "<=" | ">" | ">="
+    DISC/LSP0 talas (RC3): uz kontinuirane oblike (point/ray/interval) postoje
+    i DISKRETNI kanonski oblici, izvedeni presjekom kontinuiranog rješenja s
+    domenom Z/N/N0 (vidi `_discretize`):
+      • "finite"    — konačan skup tačaka (sortirani, jedinstveni članovi);
+      • "empty"     — prazan skup (npr. necjelobrojna tačka nad Z);
+      • "int_ray"   — beskonačan diskretni zrak cijelih brojeva, granica
+                      NORMALIZOVANA na uključivu (">=" ili "<=") — time
+                      x>3 i x>=4 nad Z postaju ISTI kanonski zapis;
+      • "int_range" — ograničen cjelobrojni raspon PREVELIK za materijalizaciju
+                      (vidi _MAX_FINITE_SET_MEMBERS): granice se porede
+                      simbolički, članovi se NIKAD ne alociraju iz modelovih
+                      vrijednosti."""
+
+    kind: str                      # "point"|"ray"|"interval"|"finite"|"empty"|"int_ray"|"int_range"
+    op: str = ""                   # za ray/int_ray: "<" | "<=" | ">" | ">="
     value: Fraction = Fraction(0)  # tačka ili granica zraka
     lower: Fraction = Fraction(0)
     lower_included: bool = False
     upper: Fraction = Fraction(0)
     upper_included: bool = False
+    members: tuple = ()            # samo za "finite"
 
     @classmethod
     def point(cls, value):
@@ -763,14 +917,97 @@ class _SolutionSet:
         return cls("interval", lower=lower, lower_included=lower_included,
                    upper=upper, upper_included=upper_included)
 
+    @classmethod
+    def finite(cls, values):
+        members = tuple(sorted(set(values)))
+        if not members:
+            return cls("empty")
+        return cls("finite", members=members)
+
+    @classmethod
+    def empty_set(cls):
+        return cls("empty")
+
+    @classmethod
+    def int_ray(cls, op, bound):
+        return cls("int_ray", op=op, value=bound)
+
+    @classmethod
+    def int_range(cls, lower, upper):
+        return cls("int_range", lower=lower, upper=upper)
+
     def display(self, variable: str) -> str:
         if self.kind == "point":
             return f"{variable} = {self.value}"
         if self.kind == "ray":
             return f"{variable} {self.op} {self.value}"
+        if self.kind == "finite":
+            return "{" + ", ".join(str(member) for member in self.members) + "}"
+        if self.kind == "empty":
+            return "∅"
+        if self.kind == "int_ray":
+            return f"{variable} {self.op} {self.value} [cijeli]"
+        if self.kind == "int_range":
+            return f"{{{self.lower}, …, {self.upper}}}"
         left = "<=" if self.lower_included else "<"
         right = "<=" if self.upper_included else "<"
         return f"{self.lower} {left} {variable} {right} {self.upper}"
+
+
+# Stroga granica materijalizacije konačnog cjelobrojnog skupa: školski zadaci
+# ne prelaze desetak članova, a modelove vrijednosti NIKAD ne smiju alocirati
+# velik raspon (CLAUDE.md: MAX granice se ne šire bez razloga).
+_MAX_FINITE_SET_MEMBERS = 24
+
+# Donja granica diskretnog domena; None = bez donje granice (Z).
+# KONVENCIJA PROJEKTA (ne mijenjati): N = {1,2,3,...}, N0 = {0,1,2,3,...}.
+_SOLVE_DISCRETE_DOMAIN_MIN = {"Z": None, "N": 1, "N0": 0}
+
+
+def _bounded_int_set(lower, upper) -> _SolutionSet:
+    """Kanonski skup cijelih brojeva lower..upper (uključivo)."""
+    if upper < lower:
+        return _SolutionSet.empty_set()
+    if upper - lower + 1 <= _MAX_FINITE_SET_MEMBERS:
+        return _SolutionSet.finite(
+            Fraction(value) for value in range(int(lower), int(upper) + 1))
+    return _SolutionSet.int_range(Fraction(lower), Fraction(upper))
+
+
+def _discretize(solution: _SolutionSet, domain: str) -> _SolutionSet:
+    """Presjek kontinuiranog skupa rješenja s diskretnim domenom Z/N/N0.
+
+    Sve granice se računaju egzaktno nad `Fraction` (floor/ceil su egzaktni
+    nad racionalnim brojevima); rezultat je kanonski diskretni oblik, pa
+    jednakost dataklasa ostaje jednakost SKUPOVA — x>3 i x>=4 nad Z su isti
+    zapis, a -2<x<0 nad Z je tačno {-1} (LSP0-E02)."""
+    minimum = _SOLVE_DISCRETE_DOMAIN_MIN[domain]
+    if solution.kind == "point":
+        value = solution.value
+        if value.denominator != 1 or (minimum is not None and value < minimum):
+            return _SolutionSet.empty_set()
+        return _SolutionSet.finite((value,))
+    if solution.kind == "ray":
+        if solution.op in (">", ">="):
+            low = (math.floor(solution.value) + 1 if solution.op == ">"
+                   else math.ceil(solution.value))
+            if minimum is not None:
+                low = max(low, minimum)
+            return _SolutionSet.int_ray(">=", Fraction(low))
+        high = (math.ceil(solution.value) - 1 if solution.op == "<"
+                else math.floor(solution.value))
+        if minimum is None:
+            return _SolutionSet.int_ray("<=", Fraction(high))
+        return _bounded_int_set(minimum, high)
+    if solution.kind == "interval":
+        low = (math.ceil(solution.lower) if solution.lower_included
+               else math.floor(solution.lower) + 1)
+        high = (math.floor(solution.upper) if solution.upper_included
+                else math.ceil(solution.upper) - 1)
+        if minimum is not None:
+            low = max(low, minimum)
+        return _bounded_int_set(low, high)
+    return solution                  # već diskretan kanonski zapis
 
 
 @dataclass(frozen=True)
@@ -833,6 +1070,7 @@ def _normalize_solve_segment(segment: str) -> Optional[str]:
     """Zatvorena normalizacija LaTeX segmenta, ili None kad išta ostane nepročitano."""
     text = segment or ""
     for old, new in (("\\left", ""), ("\\right", ""),
+                     ("\\displaystyle", " "), ("\\textstyle", " "),
                      ("\\leq", "<="), ("\\geq", ">="),
                      ("\\le", "<="), ("\\ge", ">="),
                      ("\\lt", "<"), ("\\gt", ">"),
@@ -854,7 +1092,36 @@ def _normalize_solve_segment(segment: str) -> Optional[str]:
         after = text[match.end()] if match.end() < len(text) else ""
         if before.isdigit() or before == "}" or after.isdigit():
             return None
-        text = (text[:match.start()] + match.group(1) + "§" + match.group(2)
+        numerator, denominator = match.group(1), match.group(2)
+        if numerator[-1:].isalpha() or denominator[-1:].isalpha():
+            # Slovo u argumentu: postojeće tekstualno ponašanje (x§2 i sl.).
+            replacement = numerator + "§" + denominator
+        else:
+            # Oba argumenta brojčana (moguće s unutrašnjim §, DISC B014):
+            # egzaktan Fraction račun, kanonski `p§q` — nikad `1§2§3`.
+            try:
+                bottom = _solve_literal(denominator)
+                if bottom == 0:
+                    return None
+                value = _solve_literal(numerator) / bottom
+            except (ValueError, ZeroDivisionError):
+                return None
+            replacement = (str(value.numerator) if value.denominator == 1
+                           else f"{value.numerator}§{value.denominator}")
+        text = text[:match.start()] + replacement + text[match.end():]
+    # DISC talas (B012/B013): linearni brojnik / brojčani nazivnik. Zamjena u
+    # grupu `(2x+1)§3` — parser strane je raspodjeljuje egzaktno. Brojnik bez
+    # slova ovdje znači malformiran zapis (čisto brojčani je već morao biti
+    # zamijenjen gore); cifra neposredno iza razlomka bi se slijepila s
+    # nazivnikom, pa se ne pogađa.
+    while match := _SOLVE_LINEAR_FRAC_RE.search(text):
+        numerator = match.group(1)
+        after = text[match.end()] if match.end() < len(text) else ""
+        if not any(character.isalpha() for character in numerator):
+            return None
+        if after.isdigit() or (text[match.start() - 1:match.start()] == "}"):
+            return None
+        text = (text[:match.start()] + "(" + numerator + ")§" + match.group(2)
                 + text[match.end():])
     if re.search(r"\d\s+\d", text):
         # „9 4/5“ (tekstualni mješovit broj) bi se brisanjem razmaka slijepio u
@@ -868,7 +1135,20 @@ def _normalize_solve_segment(segment: str) -> Optional[str]:
     return text
 
 
-def _solve_side_terms(text: str, variables: set) -> Optional[tuple]:
+# DISC talas (B007/B017): školska jednonivovska zagrada `k(ax+b)` — brojčani
+# koeficijent (i eventualni brojčani nazivnik iza grupe: `(x+1)/2` odnosno
+# `(x+1)§2` iz linearnog razlomka). Unutrašnjost NEMA zagrada (regex), pa
+# gniježdenje, `(x+1)(x-2)` (grupa bez predznaka iza grupe) i `(x+1)^2`
+# (`^` van dozvoljenog skupa znakova) i dalje dokazano ćute.
+_SOLVE_GROUP_RE = re.compile(
+    r"(?P<sign>[+-]?)"
+    r"(?P<coef>\d+(?:[.,]\d+)?(?:§[+-]?\d+(?:[.,]\d+)?)?)?\*?"
+    r"\((?P<inner>[^()]+)\)"
+    r"(?:[/§](?P<den>[+-]?\d+(?:[.,]\d+)?(?:§[+-]?\d+(?:[.,]\d+)?)?))?")
+
+
+def _solve_side_terms(text: str, variables: set,
+                      allow_groups: bool = True) -> Optional[tuple]:
     """Jedna strana relacije kao (koeficijent uz nepoznatu, slobodni član)."""
     if not text:
         return None
@@ -877,6 +1157,41 @@ def _solve_side_terms(text: str, variables: set) -> Optional[tuple]:
     position = 0
     first = True
     while position < len(text):
+        group = _SOLVE_GROUP_RE.match(text, position) if allow_groups else None
+        if group is not None:
+            if not first and not group.group("sign"):
+                # Grupa bez eksplicitnog +/- iza prethodnog člana: implicitno
+                # množenje ((x+1)(x-2), x(x-1)) — nelinearno, ne tumači se.
+                return None
+            inner = group.group("inner")
+            if _SOLVE_RELATION_TOKEN_RE.search(inner):
+                return None
+            if "," in inner and not any(ch.isalpha() for ch in inner):
+                # `(5,2)` bez slova je nerazlučivo od (degenerisanog)
+                # intervalnog zapisa — zarez se NE pogađa kao decimalni
+                # (ista doktrina kao {2,5} kod jednočlanog skupa).
+                return None
+            inner_side = _solve_side_terms(inner, variables, allow_groups=False)
+            if inner_side is None:
+                return None
+            try:
+                factor = (_solve_literal(group.group("coef"))
+                          if group.group("coef") else Fraction(1))
+                denominator = (_solve_literal(group.group("den"))
+                              if group.group("den") else None)
+            except (ValueError, ZeroDivisionError):
+                return None
+            if group.group("sign") == "-":
+                factor = -factor
+            if denominator is not None:
+                if denominator == 0:
+                    return None
+                factor /= denominator
+            coeff += factor * inner_side[0]
+            constant += factor * inner_side[1]
+            position = group.end()
+            first = False
+            continue
         match = _SOLVE_TERM_RE.match(text, position)
         if match is None or match.end() == position:
             return None
@@ -1025,7 +1340,13 @@ _SOLVE_POSITIVE_INFINITY = frozenset({"+\\infty", "\\infty", "+∞", "∞"})
 
 def _solve_interval_set(text: str) -> Optional[_SolutionSet]:
     """Intervalni zapis kao kanonski skup, ili None kad zapis nije dokazan."""
-    stripped = (text or "").replace("\\left", "").replace("\\right", "").strip()
+    stripped = (text or "").replace("\\left", "").replace("\\right", "")
+    # DISC-B013: razmaknica `\,` u granici ($(-\infty,\,\frac{11}{3})$) nosi
+    # ZAREZ koji bi presjekao listu na vrhu zapisa — razmaknice se skidaju
+    # PRIJE brojanja zareza (nikad ne nose značenje).
+    for spacing in ("\\,", "\\;", "\\!", "\\ "):
+        stripped = stripped.replace(spacing, " ")
+    stripped = stripped.strip()
     if len(stripped) < 3 or stripped[0] not in "([" or stripped[-1] not in ")]":
         return None
     # Zarez se broji samo na vrhu zapisa — `\frac{1,5}{2}` u granici ne smije
@@ -1073,24 +1394,133 @@ def _solve_interval_set(text: str) -> Optional[_SolutionSet]:
                                  upper.value, upper_included)
 
 
+# ---------------------------------------------------------------------------
+# GRAMATIKA OPCIJA POD DOMENOM (DISC/LSP0 talas, RC3 + §7): prazan skup,
+# set-builder i konačni cjelobrojni skupovi. Sve se tumači POD DOMENOM
+# ZADATKA; nepodržan zapis na podržanom zadatku pada zatvoreno
+# (`unverifiable_solution_option`), nikad tiho.
+# ---------------------------------------------------------------------------
+
+_SOLVE_EMPTY_SET_RE = re.compile(
+    r"^\s*(?:∅|\\emptyset\b|\\varnothing\b|\{\s*\}|\\\{\s*\\\})\s*$")
+# `x ∈ {…}` ispred zapisa skupa (LSP0-E02, opcija `x\in\{-2,-1\}`).
+_SOLVE_MEMBER_PREFIX_RE = re.compile(r"^\s*([A-Za-z])\s*(?:\\in\b|∈)\s*")
+_SOLVE_INT_MEMBER_RE = re.compile(r"[+-]?\d+")
+
+
+def _strip_set_braces(text: str) -> Optional[str]:
+    """Sadržaj vanjskog vitičastog para (`{…}` ili `\\{…\\}`), ili None."""
+    stripped = (text or "").strip().replace("\\{", "{").replace("\\}", "}")
+    if (len(stripped) >= 3 and stripped.startswith("{")
+            and stripped.endswith("}")):
+        inner = stripped[1:-1].strip()
+        return inner or None
+    return None
+
+
+def _solve_finite_int_set(inner: str) -> Optional[_SolutionSet]:
+    """Konačan skup CIJELIH literala `{-1,0,1}`, ili None.
+
+    Članovi su isključivo cijeli brojevi: decimalni zarez u vitičastim
+    zagradama ostaje žrtvovan (ista doktrina kao `_solve_singleton_inner` —
+    `{2,5}` se pod kontinuiranim domenom nikad ne pogađa; pod cjelobrojnim
+    domenom je jedino cjelobrojno čitanje i smisleno)."""
+    members = []
+    for part in re.split(r"[,;]", inner):
+        part = part.strip()
+        if not _SOLVE_INT_MEMBER_RE.fullmatch(part):
+            return None
+        members.append(Fraction(int(part)))
+    return _SolutionSet.finite(members) if members else None
+
+
+def _solve_set_builder(inner: str, variable: str) -> Optional[_SolutionSet]:
+    """Set-builder `{x ∈ D : relacija}` / `{x∈D | relacija}` kao kanonski skup.
+
+    DISC-A012: `(-2,\\infty)` i `{x ∈ Q : x>-2}` su ISTI skup rješenja nad Q —
+    objavljen je MCQ s obje opcije tačne. Deklaracija lijevo koristi ISTU
+    zatvorenu gramatiku kao segmentna deklaracija domena; relacija desno ISTU
+    gramatiku kao opcija-relacija. Skup se tumači pod DEKLARISANIM domenom
+    (diskretni se diskretizuje, Q/R ostaju kontinuirani) — poređenje je zatim
+    poštena jednakost skupova brojeva, bez obzira na to kojim je domenom skup
+    zapisan. Sve nedokazivo vraća None (fail closed na podržanom zadatku)."""
+    separator_index = None
+    depth = 0
+    for index, character in enumerate(inner):
+        if character == "{":
+            depth += 1
+        elif character == "}":
+            depth = max(depth - 1, 0)
+        elif character in ":|" and depth == 0:
+            separator_index = index
+            break
+    if separator_index is None:
+        return None
+    declaration = _segment_domain_declaration(inner[:separator_index])
+    if declaration is None:
+        return None
+    declared_variable, declared_domain = declaration
+    if declared_variable is None or declared_variable != variable:
+        return None
+    normalized = _normalize_solve_segment(inner[separator_index + 1:])
+    if normalized is None or not _SOLVE_RELATION_TOKEN_RE.search(normalized):
+        return None
+    solved = _solve_relation_text(normalized)
+    if solved is None or solved[1] != variable:
+        return None
+    if declared_domain in _SOLVE_DISCRETE_DOMAIN_MIN:
+        return _discretize(solved[0], declared_domain)
+    return solved[0]
+
+
 def _solve_option_set(option_text: str, variable: str,
-                      allow_bare_value: bool) -> Optional[_SolutionSet]:
+                      allow_bare_value: bool,
+                      domain: str = "") -> Optional[_SolutionSet]:
     text = (option_text or "").strip()
     if text.startswith("$") and text.endswith("$") and text.count("$") == 2:
         text = text[1:-1].strip()
-    singleton_inner = _solve_singleton_inner(text)
-    if singleton_inner is not None:
+    discrete = domain in _SOLVE_DISCRETE_DOMAIN_MIN
+    if _SOLVE_EMPTY_SET_RE.match(text):
+        # Prazan skup je PUNI zapis skupa: nad Z je npr. tačka 1/2 prazan
+        # presjek, pa ∅ mora biti dokaziva tačna opcija — a nad kontinuiranim
+        # rješenjem uvijek dokazivo pogrešna (čitljiva!) opcija.
+        return _SolutionSet.empty_set()
+    member_prefix = _SOLVE_MEMBER_PREFIX_RE.match(text)
+    if member_prefix is not None:
+        # `x ∈ {…}` — prefiks pripadnosti ispred zapisa skupa (LSP0-E02).
+        remainder = text[member_prefix.end():].strip()
+        if member_prefix.group(1) != variable:
+            return None
+        if _SOLVE_EMPTY_SET_RE.match(remainder):
+            return _SolutionSet.empty_set()
+        if _strip_set_braces(remainder) is None:
+            return None            # `x ∈ 5` i sl. — nije zapis skupa
+        text = remainder
+    brace_inner = _strip_set_braces(text)
+    if brace_inner is not None:
+        if "\\in" in brace_inner or "∈" in brace_inner:
+            return _solve_set_builder(brace_inner, variable)
+        if "," in brace_inner or ";" in brace_inner:
+            # Višečlan skup: pod DISKRETNIM domenom je legitiman zapis punog
+            # rješenja; pod kontinuiranim se i dalje NE pogađa (decimalni
+            # zarez) i pada zatvoreno na podržanom zadatku.
+            if discrete:
+                return _solve_finite_int_set(brace_inner)
+            return None
         # Jednočlan skup je samo drugi ZAPIS vrijednosti — ista kapija kao gola
         # vrijednost: kod jednačine je to cio skup rješenja, kod nejednačine
         # dokazivo pogrešan kandidat (tačka ≠ zrak ≠ interval).
         if not allow_bare_value:
             return None
-        return _solve_bare_point(singleton_inner)
+        point = _solve_bare_point(brace_inner)
+        if point is None:
+            return None
+        return _discretize(point, domain) if discrete else point
     interval = _solve_interval_set(text)
     if interval is not None:
         # Intervalni zapis je PUNI zapis skupa (kao relacija) — presuđuje se
         # uvijek, nezavisno od `allow_bare_value`.
-        return interval
+        return _discretize(interval, domain) if discrete else interval
     normalized = _normalize_solve_segment(text)
     if normalized is None:
         return None
@@ -1100,14 +1530,51 @@ def _solve_option_set(option_text: str, variable: str,
         # izvedenim zrakom/intervalom dokazano pada — vidi `allow_bare_value`.
         if not allow_bare_value:
             return None
-        return _solve_bare_point(normalized)
+        point = _solve_bare_point(normalized)
+        if point is None:
+            return None
+        return _discretize(point, domain) if discrete else point
     solved = _solve_relation_text(normalized)
     if solved is None:
         return None
     solution, option_variable = solved
     if option_variable != variable:
         return None
-    return solution
+    return _discretize(solution, domain) if discrete else solution
+
+
+def continuous_answer_set(option_text: str) -> Optional[tuple]:
+    """(kanonski KONTINUIRANI skup, nepoznata|None) jedne MCQ opcije, ili None.
+
+    JAVNA tačka za matbot/option_equivalence (DISC talas, RC1): dva zapisa s
+    ISTIM kontinuiranim skupom su isti odgovor pod SVAKIM domenom — presjek
+    istog skupa s bilo kojim domenom je isti skup — pa je ovo DOMEN-SLIJEPA,
+    sigurna ekvivalencija (`11` ≡ `{11}` ≡ `x=11`; `(-2,\\infty)` ≡ `x>-2`).
+    Domen-osjetljive jednakosti (x=-1 vs -2<x<0 nad Z; set-builder) ovdje
+    NAMJERNO nisu dokazive — njih presuđuje evaluate_linear_solve_mcq, koji
+    domen zadatka stvarno zna. None znači „nepoznato“, nikad „različito“."""
+    text = (option_text or "").strip()
+    if text.startswith("$") and text.endswith("$") and text.count("$") == 2:
+        text = text[1:-1].strip()
+    if _SOLVE_EMPTY_SET_RE.match(text):
+        return _SolutionSet.empty_set(), None
+    brace_inner = _strip_set_braces(text)
+    if brace_inner is not None:
+        if ("," in brace_inner or ";" in brace_inner
+                or "\\in" in brace_inner or "∈" in brace_inner):
+            return None
+        point = _solve_bare_point(brace_inner)
+        return (point, None) if point is not None else None
+    interval = _solve_interval_set(text)
+    if interval is not None:
+        return interval, None
+    normalized = _normalize_solve_segment(text)
+    if normalized is None:
+        return None
+    if not _SOLVE_RELATION_TOKEN_RE.search(normalized):
+        point = _solve_bare_point(normalized)
+        return (point, None) if point is not None else None
+    return _solve_relation_text(normalized)
 
 
 def evaluate_linear_solve_mcq(question: str,
@@ -1122,30 +1589,57 @@ def evaluate_linear_solve_mcq(question: str,
         return LinearSolveMCQResult(False, False)
     if (_QUANTITY_BLOCKER_RE.search(prose) or _SOLVE_NEGATION_RE.search(prose)
             or _SUPERLATIVE_MAX_RE.search(prose)
-            or _SUPERLATIVE_MIN_RE.search(prose)
-            or _solve_domain_restricted(prose)):
-        # „najveće rješenje“, „koliko rješenja“, „koja NIJE rješenje“ i DOKAZAN
-        # domen („u skupu cijelih brojeva“, x ∈ ℤ…) mijenjaju šta je tačan
-        # odgovor — tada cio skup nad Q nije mjerilo i orakl ne smije
-        # presuđivati. Obična formulacija „skup rješenja“ NIJE domen — vidi
-        # `_solve_domain_restricted` (živi finalni P0 talas: 8 lažnih ćutanja).
+            or _SUPERLATIVE_MIN_RE.search(prose)):
+        # „najveće rješenje“, „koliko rješenja“, „koja NIJE rješenje“ mijenjaju
+        # šta je tačan odgovor — tada cio skup nije mjerilo i orakl ćuti.
+        return LinearSolveMCQResult(False, False)
+    # DOMEN (LSP0/DISC talas, RC3): dokaziv Q/R/Z/N/N0 više ne gasi orakl —
+    # presuđuje se POD domenom (Q/R kontinuirano, Z/N/N0 presjek s cijelim
+    # brojevima). Svako drugo suženje (parni, prosti, pozitivni, protivrječno,
+    # nedokazivo) i dalje znači ćutanje. Obična formulacija „skup rješenja“
+    # NIJE domen (živi finalni P0 talas: 8 lažnih ćutanja).
+    domain_status, domain, declared_variables = _resolve_solve_domain(prose)
+    if domain_status == "unsupported":
         return LinearSolveMCQResult(False, False)
 
     candidates = []
+    segment_domains = set()
     for segment in math_contents(tokenize_math(question or "")):
+        declaration = _segment_domain_declaration(segment)
+        if declaration is not None:
+            # Čista deklaracija domena ($x\in\mathbb{Z}$) je EVIDENCIJA, ne
+            # nečitljiv segment (ranije je gasila cio orakl).
+            declared_variable, segment_domain = declaration
+            if declared_variable is not None:
+                declared_variables.add(declared_variable)
+            segment_domains.add(segment_domain)
+            continue
         normalized = _normalize_solve_segment(segment)
         if normalized is None:
-            # Nepročitan segment ($x\in\mathbb{Z}$, $x^2>4$…) može nositi
-            # uslov koji mijenja rješenje — cio orakl tada ćuti.
+            # Nepročitan segment ($x^2>4$, $|x|<3$…) može nositi uslov koji
+            # mijenja rješenje — cio orakl tada ćuti.
             return LinearSolveMCQResult(False, False)
         if _SOLVE_RELATION_TOKEN_RE.search(normalized):
             candidates.append(normalized)
+    if len(segment_domains) > 1:
+        return LinearSolveMCQResult(False, False)
+    if segment_domains:
+        segment_domain = segment_domains.pop()
+        if domain and segment_domain != domain:
+            # Proza i segment tvrde RAZLIČITE domene — ne pogađa se.
+            return LinearSolveMCQResult(False, False)
+        domain = segment_domain
     if len(candidates) != 1:
         return LinearSolveMCQResult(False, False)
     solved = _solve_relation_text(candidates[0])
     if solved is None:
         return LinearSolveMCQResult(False, False)
     solution, variable = solved
+    if declared_variables and declared_variables != {variable}:
+        # Domen deklarisan za NEKU DRUGU nepoznatu — nedokazivo, ćutanje.
+        return LinearSolveMCQResult(False, False)
+    if domain in _SOLVE_DISCRETE_DOMAIN_MIN:
+        solution = _discretize(solution, domain)
 
     # ŽIVI PP-1 LIVE-150 NALAZ (F008, druga pojava): objavljeno je
     #     „Riješi nejednačinu: $-1 < x+1 < 1$“  opcije 1 / -2 / -1 / 0, označeno -1
@@ -1155,13 +1649,17 @@ def evaluate_linear_solve_mcq(question: str,
     # Izričit zahtjev „Riješi nejednačinu“ traži CIO skup, pa je gola vrijednost
     # dokazivo nedovoljna — tačka nikad nije jednaka zraku ni intervalu. Pitanja
     # o članstvu zadržavaju staro ponašanje (vidi `_SOLVE_MEMBERSHIP_RE`).
-    allow_bare_value = (solution.kind == "point"
+    solution_is_pointlike = (solution.kind == "point"
+                             or (solution.kind == "finite"
+                                 and len(solution.members) == 1))
+    allow_bare_value = (solution_is_pointlike
                         or not _SOLVE_MEMBERSHIP_RE.search(prose))
     option_sets = []
     unverifiable = False
     for option in options:
         parsed = _solve_option_set(option, variable,
-                                   allow_bare_value=allow_bare_value)
+                                   allow_bare_value=allow_bare_value,
+                                   domain=domain)
         if parsed is None:
             # Pitanje o ČLANSTVU s golom vrijednošću/jednočlanim skupom: zadatak
             # semantički NIJE „riješi skup“ i orakl ostaje van njega (ćutanje),
@@ -1169,7 +1667,8 @@ def evaluate_linear_solve_mcq(question: str,
             # slučaj od stvarno nečitljivog zapisa.
             if (not allow_bare_value
                     and _solve_option_set(option, variable,
-                                          allow_bare_value=True) is not None):
+                                          allow_bare_value=True,
+                                          domain=domain) is not None):
                 return LinearSolveMCQResult(False, False)
             # ZADATAK JE U DOMETU i skup rješenja je izveden: nečitljiva opcija
             # više NE gasi orakl. Ćutanje bi značilo „objavi bez ijedne
@@ -1195,6 +1694,17 @@ def evaluate_linear_solve_mcq(question: str,
         return LinearSolveMCQResult(True, False, "multiple_correct_options",
                                     solution_display, option_displays,
                                     correct_indices)
+    # DISC talas (RC1, dubinska odbrana): dva RAZLIČITA zapisa istog skupa među
+    # PROČITANIM opcijama — čak i kad nijedan nije tačan odgovor — čine MCQ
+    # dokazano neispravnim (učenik vidi „dvije iste“ opcije). Kod je namjerno
+    # ISTI kao postojeći publikacijski kod za semantičke duplikate, pa
+    # recenzentski recept i logovi ostaju jednoobrazni.
+    for i in range(len(option_sets)):
+        for j in range(i + 1, len(option_sets)):
+            if option_sets[i] == option_sets[j]:
+                return LinearSolveMCQResult(
+                    True, False, EQUIVALENT_SOLUTION_OPTIONS_CODE,
+                    solution_display, option_displays, correct_indices)
     return LinearSolveMCQResult(True, True, "", solution_display,
                                 option_displays, correct_indices)
 

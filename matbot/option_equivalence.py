@@ -13,7 +13,7 @@ mathcheck poredi LANAC jednakosti UNUTAR jednog izraza, ne DVIJE odvojene
 opcije jedna s drugom; tekstualno poređenje ne prepoznaje ni zaokruživanje ni
 komutativnost.
 
-DVA nezavisna, sigurna testa (OR — bilo koji dovoljan da se opcije proglase
+TRI nezavisna, sigurna testa (OR — bilo koji dovoljan da se opcije proglase
 ekvivalentnim):
   1. NUMERIČKA jednakost obje vrijednosti (ponovo koristi restricted-AST
      evaluator iz matbot/mathcheck.py — NIKAD eval()), s tolerancijom
@@ -22,6 +22,12 @@ ekvivalentnim):
      kanonsko stablo (broj/promjenljiva/+/-/*//^/\\sqrt) gdje se djeca
      komutativnih operacija (+, *) SORTIRAJU prije poređenja — pa
      "a\\sqrt{2}" i "\\sqrt{2}a" postaju STRUKTURNO identični.
+  3. SKUP-RJEŠENJE jednakost (DISC talas, RC1): gola vrijednost, jednočlan
+     skup ({11} i \\{11\\}), x=c, relacija i intervalni zapis kanonikalizuju
+     se ISTOM zatvorenom solve gramatikom (mcq_integrity.continuous_answer_set)
+     u kanonski kontinuirani skup — isti skup je isti odgovor pod svakim
+     domenom. Domen-osjetljiva jednakost (x=-1 vs -2<x<0 nad Z) se ovdje
+     NAMJERNO ne tvrdi — nju presuđuje evaluate_linear_solve_mcq s domenom.
 
 Kad NIJEDAN test ne može sigurno dokazati jednakost, opcije se smatraju
 RAZLIČITIM — modul NIKAD ne "pogađa" da su dvije opcije iste; nedokazivost
@@ -30,7 +36,7 @@ nije dokaz jednakosti (isti princip kao mathcheck.py: preskoči, ne pogađaj).
 import re
 import unicodedata
 
-from matbot import mathcheck
+from matbot import mathcheck, mcq_integrity
 
 _UNIT_STRIP_RE = re.compile(
     r"\\(?:text|mathrm|mathit)\s*\{[^{}]*\}\s*(?:\^\s*(?:\{[^{}]*\}|\w))?"
@@ -359,6 +365,29 @@ def canonicalize_expression(latex_expr):
 
 
 # ---------------------------------------------------------------------------
+# 3) SKUP-RJEŠENJE ekvivalencija (DISC talas, RC1) — ponovo koristi zatvorenu
+#    solve gramatiku iz mcq_integrity, NIKAD novi paralelni parser.
+# ---------------------------------------------------------------------------
+
+def _solve_sets_equivalent(bare_a, bare_b):
+    """True SAMO kad su oba zapisa pročitana kao kanonski KONTINUIRANI skup i
+    skupovi su identični. Nepročitljivo = False (nepoznato, ne „različito“).
+    Relacije u dvije RAZLIČITE nepoznate se ne proglašavaju istim odgovorom."""
+    parsed_a = mcq_integrity.continuous_answer_set(bare_a)
+    if parsed_a is None:
+        return False
+    parsed_b = mcq_integrity.continuous_answer_set(bare_b)
+    if parsed_b is None:
+        return False
+    set_a, variable_a = parsed_a
+    set_b, variable_b = parsed_b
+    if (variable_a is not None and variable_b is not None
+            and variable_a != variable_b):
+        return False
+    return set_a == set_b
+
+
+# ---------------------------------------------------------------------------
 # JAVNI API
 # ---------------------------------------------------------------------------
 
@@ -398,9 +427,17 @@ def options_are_equivalent(text_a, text_b):
 
     canon_a = canonicalize_expression(val_a)
     canon_b = canonicalize_expression(val_b)
-    if canon_a is not None and canon_b is not None:
-        return canon_a == canon_b
-    return False
+    if canon_a is not None and canon_b is not None and canon_a == canon_b:
+        return True
+    # TREĆI nezavisni test (DISC talas, RC1): SKUP-RJEŠENJE ekvivalencija.
+    # Živi nalazi B007/B012/B014: `$11$` i `$\{11\}$` (escaped vitičaste!) su
+    # isti jednočlan odgovor, a nijedan od gornja dva testa ih ne čita.
+    # `mcq_integrity.continuous_answer_set` kanonikalizuje golu vrijednost,
+    # jednočlan skup, x=c, relaciju i intervalni zapis u ISTI kanonski skup —
+    # dva zapisa istog KONTINUIRANOG skupa su isti odgovor pod svakim domenom,
+    # pa je test siguran i bez domena zadatka. Domen-osjetljiva jednakost
+    # (x=-1 vs -2<x<0 nad Z) se ovdje NAMJERNO ne tvrdi (nema dokaza domena).
+    return _solve_sets_equivalent(bare_a, bare_b)
 
 
 def find_equivalent_option_pairs(option_texts):
@@ -464,7 +501,12 @@ def classify_equivalence(text_a, text_b):
             return "numeric_exact_vs_rounded"
         return "numeric_exact"
 
-    return "symbolic_commutative"
+    canon_a = canonicalize_expression(val_a)
+    canon_b = canonicalize_expression(val_b)
+    if canon_a is not None and canon_a == canon_b:
+        return "symbolic_commutative"
+    # Jedini preostali način da options_are_equivalent bude True (DISC RC1).
+    return "equivalent_solution_set"
 
 
 def find_equivalent_option_pairs_with_types(option_texts):
