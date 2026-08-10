@@ -811,6 +811,22 @@ def _single_normalized_relation(text: str) -> str:
     return relations[0] if len(relations) == 1 else ""
 
 
+def _read_normalized_relations(text: str) -> list:
+    """Readable relations in textual order, using the product's reader.
+
+    The evaluator keeps syntax only to prove that a reformulation is visibly
+    distinct.  Parsing and solution-set semantics remain owned by
+    ``matbot.mcq_integrity``.
+    """
+    normalized = []
+    for relation in mcq_integrity.read_solve_relations(text or ""):
+        raw = (text or "")[relation.start:relation.end]
+        value = mcq_integrity._normalize_solve_segment(raw)
+        if value and value not in normalized:
+            normalized.append(value)
+    return normalized
+
+
 def check_request_equivalent_reformulation(obs: TurnObservation) -> CheckResult:
     """Positive control: a distinct relation with the same solve set is valid.
 
@@ -821,32 +837,55 @@ def check_request_equivalent_reformulation(obs: TurnObservation) -> CheckResult:
     if not obs.task_after:
         return CheckResult("request_equivalent_reformulation", SKIP,
                            "no published task relation to compare")
-    requested = mcq_integrity.read_solve_statement(obs.student_message)
-    generated = mcq_integrity.read_solve_statement(obs.task_after)
     # Produktna provjera ima uzak, dokaziv nalaz za FINAL40 oblik: zahtjev ima
     # jednu čitljivu relaciju, a solve-zadatak se deiktički poziva na
-    # "dobijenu/originalnu" relaciju koju nigdje ne napiše. Taj slučaj je FAIL,
-    # ne opšti parser-SKIP. Nečitljiva ali PRISUTNA relacija ostaje nedokaziva.
+    # "dobijenu/originalnu" relaciju koju nigdje ne napiše, kao i za TR-A3
+    # oblik gdje objavljena "dobijena" relacija mijenja skup rješenja. Ti
+    # slučajevi su FAIL, ne opšti parser-SKIP. Nečitljiva ali PRISUTNA relacija
+    # ostaje nedokaziva.
     failures = request_fidelity.request_fidelity_failures(
         obs.student_message, obs.task_after)
     if failures:
         return CheckResult("request_equivalent_reformulation", FAIL,
                            "; ".join(failures))
-    if not requested.has_relation or not generated.has_relation:
+
+    requested = mcq_integrity.read_solve_statement(obs.student_message)
+    generated = mcq_integrity.read_solve_statement(obs.task_after)
+    generated_relations = mcq_integrity.read_solve_relations(obs.task_after)
+    if not requested.has_relation or not generated_relations:
         return CheckResult("request_equivalent_reformulation", SKIP,
                            "both request and task need one readable relation")
     requested_relation = _single_normalized_relation(obs.student_message)
-    generated_relation = _single_normalized_relation(obs.task_after)
-    if not requested_relation or not generated_relation:
+    if not requested_relation:
         return CheckResult("request_equivalent_reformulation", SKIP,
-                           "a unique raw relation could not be isolated")
-    if requested_relation == generated_relation:
+                           "a unique raw request relation could not be isolated")
+
+    # Pozitivni VIŠERELACIJSKI put: zadatak smije citirati i original i
+    # rezultat. Svaka čitljiva relacija mora imati isti kanonski skup kao
+    # zahtjev prije nego evaluator smije tvrditi PASS. Ako produktna semantika
+    # nije označila operativnu relaciju, a među čitljivim relacijama postoji
+    # drugačiji skup, ostajemo konzervativni SKIP — ne izmišljamo značenje.
+    shared_domain = (requested.domain
+                     if requested.domain and generated.domain == requested.domain
+                     else "")
+    if any(not mcq_integrity.solution_sets_match(
+            requested.solution, relation.solution, shared_domain)
+            for relation in generated_relations):
+        return CheckResult(
+            "request_equivalent_reformulation", SKIP,
+            "multiple readable task relations exist, but product semantics "
+            "did not prove every one equivalent to the request")
+
+    generated_syntax = _read_normalized_relations(obs.task_after)
+    distinct = [value for value in generated_syntax
+                if value != requested_relation]
+    if not distinct:
         return CheckResult("request_equivalent_reformulation", FAIL,
                            "task repeated the requested relation instead of reformulating it")
     return CheckResult(
         "request_equivalent_reformulation", PASS,
         f"distinct relations share the canonical solution set: "
-        f"{requested_relation!r} vs {generated_relation!r}")
+        f"{requested_relation!r} vs {distinct[0]!r}")
 
 
 def check_stays_in_lesson(obs: TurnObservation) -> CheckResult:

@@ -635,6 +635,65 @@ def _equivalence_observation(request, task):
     )
 
 
+TR_A3_REQUEST = (
+    "Kreiraj samostalan MCQ sa četiri opcije za nejednačinu $x>3$. U tekstu "
+    "pokušaj preoblikovanje tako što lijevoj strani dodaš 2, a desnoj strani "
+    "4, pa nastavi sa dobijenom nejednačinom. Traži cijeli skup rješenja i "
+    "tačno jednu matematički tačnu opciju. Ne rješavaj zadatak učeniku.")
+TR_A3_BAD_TASK = (
+    "Početna nejednačina je $x>3$. Dodajemo $2$ s lijeve strane i $4$ s "
+    "desne strane pa dobijamo $x+2>7$. Riješi dobijenu nejednačinu $x+2>7$ "
+    "i nađi cijeli skup rješenja.")
+
+
+def _record_for_request_fidelity_result(result, *, published=True):
+    publication = "pass" if published else "fail"
+    check_results = [
+        ("published", publication, "" if published else "turn not published"),
+        ("task_published", publication,
+         "" if published else "turn not published"),
+        (result.name, result.outcome, result.detail),
+    ]
+    turn = _turn(results=check_results)
+    turn.update({
+        "package_captured": True,
+        "response": ({"status": "ready", "last_tutor_task": TR_A3_BAD_TASK}
+                     if published else {"last_tutor_task": ""}),
+        "session_after_summary": (
+            {"current_task_chars": len(TR_A3_BAD_TASK),
+             "task_signature_hash": "historical-tr-a3",
+             "correct_option_id": "c", "expected_answer": "(5,infinity)"}
+            if published else {}),
+    })
+    failed = [(name, 0, detail) for name, outcome, detail in check_results
+              if outcome == check_lib.FAIL]
+    return _record(turns=[turn], failed=failed,
+                   status="FAIL" if failed else "PASS")
+
+
+def test_historical_tr_a3_is_a_published_request_fidelity_failure():
+    result = check_lib.check_request_equivalent_reformulation(
+        _equivalence_observation(TR_A3_REQUEST, TR_A3_BAD_TASK))
+    assert result.outcome == check_lib.FAIL, result
+    assert "transformed_relation_mismatch" in result.detail
+
+    verdict = classify.classify(_record_for_request_fidelity_result(result))
+    assert verdict["outcome_class"] == classify.PRODUCT_CORRECTNESS_FAILURE
+    assert [entry["check"] for entry in verdict["package_evidence"]] == [
+        "request_equivalent_reformulation"]
+
+
+def test_same_tr_a3_candidate_rejected_before_commit_is_safe_fail_closed():
+    result = check_lib.check_request_equivalent_reformulation(
+        _equivalence_observation(TR_A3_REQUEST, TR_A3_BAD_TASK))
+    record = _record_for_request_fidelity_result(result, published=False)
+    verdict = classify.classify(record)
+
+    assert verdict["outcome_class"] == classify.SAFE_FAIL_CLOSED
+    assert verdict["package_evidence"]
+    assert classify.safely_rejected_package_steps(record) == {0}
+
+
 def test_positive_equivalence_check_requires_a_distinct_equal_solve_set():
     result = check_lib.check_request_equivalent_reformulation(
         _equivalence_observation("Riješi nejednačinu $x>3$.",
@@ -659,6 +718,24 @@ def test_equivalence_check_passes_for_canonical_reformulation():
     assert result.outcome == check_lib.PASS, result
 
 
+def test_equivalence_check_passes_with_original_and_resulting_inequality():
+    result = check_lib.check_request_equivalent_reformulation(
+        _equivalence_observation(
+            "Riješi nejednačinu $x>3$.",
+            "Početna nejednačina je $x>3$, a nakon preoblikovanja dobijamo "
+            "$x+2>5$. Riješi dobijenu nejednačinu $x+2>5$."))
+    assert result.outcome == check_lib.PASS, result
+
+
+def test_equivalence_check_passes_with_original_and_resulting_equation():
+    result = check_lib.check_request_equivalent_reformulation(
+        _equivalence_observation(
+            "Riješi jednačinu $2x=6$.",
+            "Originalna jednačina je $2x=6$, a preoblikovana jednačina je "
+            "$x=3$. Riješi rezultujuću jednačinu $x=3$."))
+    assert result.outcome == check_lib.PASS, result
+
+
 def test_equivalence_check_fails_when_expected_resulting_relation_is_missing():
     result = check_lib.check_request_equivalent_reformulation(
         _equivalence_observation(
@@ -673,6 +750,16 @@ def test_equivalence_check_does_not_invent_semantics_for_present_unreadable_rela
         _equivalence_observation(
             "Riješi nejednačinu $x>3$.",
             r"Riješi dobijenu nejednačinu $x^2>4$."))
+    assert result.outcome == check_lib.SKIP, result
+    assert "readable relation" in result.detail
+
+
+@pytest.mark.parametrize("relation", [r"$x^2>9$", r"$|x|<3$"])
+def test_equivalence_check_stays_conservative_for_nonlinear_relations(relation):
+    result = check_lib.check_request_equivalent_reformulation(
+        _equivalence_observation(
+            "Riješi nejednačinu $x>3$.",
+            f"Riješi dobijenu nejednačinu {relation}."))
     assert result.outcome == check_lib.SKIP, result
     assert "readable relation" in result.detail
 
