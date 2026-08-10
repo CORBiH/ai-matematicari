@@ -39,6 +39,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from tools.practice_eval import checks as check_lib          # noqa: E402
+from tools.practice_eval import campaign_config              # noqa: E402
 from tools.practice_eval import classify as classify_lib     # noqa: E402
 from tools.practice_eval import coherence as coherence_lib   # noqa: E402
 from tools.practice_eval.scenario import (                    # noqa: E402
@@ -273,7 +274,7 @@ def runtime_metadata():
     from matbot import config, practice
 
     pipeline = (os.environ.get("MATBOT_PRACTICE_PIPELINE", "") or "").strip().lower()
-    return {
+    metadata = {
         "git_commit": _git("rev-parse", "HEAD"),
         "git_tree": _git("rev-parse", "HEAD^{tree}"),
         "git_dirty": bool(_git("status", "--porcelain")),
@@ -287,6 +288,9 @@ def runtime_metadata():
         "universal_pipeline_active": pipeline == practice.UNIVERSAL_PIPELINE_FLAG,
         "difficulty_levels_enabled": config.practice_difficulty_levels_enabled(),
     }
+    metadata.update(campaign_config.environment_snapshot(
+        config.deterministic_practice_enabled()))
+    return metadata
 
 
 # ---------------------------------------------------------------------------
@@ -847,9 +851,12 @@ def _real_llm():
 # ---------------------------------------------------------------------------
 
 def dry_run(scenarios, output_dir: Path):
+    from matbot import config
     from matbot.topics import lesson_info
 
     problems = validate_scenarios(scenarios)
+    problems.extend(campaign_config.preflight_environment_problems(
+        scenarios, config.deterministic_practice_enabled()))
     # RC11: dokazano nespojiva poruka i lekcija se hvataju OVDJE — prije nego
     # što talas potroši ijedan živi poziv na nevaljano očekivanje (22 od 100
     # scenarija u discovery-100). Vidi tools/practice_eval/coherence.py.
@@ -982,6 +989,16 @@ def main(argv=None):
         _console_print(f"\nWritten to {output_dir}")
         _console_print("DRY RUN — 0 SDK calls made.")
         return 1 if summary["problems"] else 0
+
+    # Isti env-preflight kao dry-run, ali i za direktan live poziv: odbija se
+    # PRIJE `_real_llm()` i prije ijednog SDK poziva.
+    from matbot import config as matbot_config
+    environment_problems = campaign_config.preflight_environment_problems(
+        selected, matbot_config.deterministic_practice_enabled())
+    if environment_problems:
+        for problem in environment_problems:
+            _console_print(f"HARNESS CONFIGURATION ERROR: {problem}")
+        return 2
 
     concurrency = max(1, min(args.concurrency, MAX_CONCURRENCY))
     _, maximum = estimate_calls(selected)

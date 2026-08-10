@@ -270,6 +270,10 @@ def render_markdown(summary) -> str:
         f"(dirty: {runtime.get('git_dirty')})",
         f"- pipeline: `{runtime.get('practice_pipeline')}` · "
         f"difficulty levels: `{runtime.get('difficulty_levels_enabled')}`",
+        f"- deterministic practice: enabled="
+        f"`{runtime.get('deterministic_practice_enabled')}` · value="
+        f"`{runtime.get('deterministic_practice_value')}` · source="
+        f"`{runtime.get('deterministic_practice_source')}`",
         f"- model: tutor `{runtime.get('tutor_model')}` / reviewer "
         f"`{runtime.get('reviewer_model')}` · effort `{runtime.get('reasoning_effort')}` · "
         f"timeout `{runtime.get('timeout_seconds')}` s",
