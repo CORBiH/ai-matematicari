@@ -558,6 +558,22 @@ def format_for_reviewer(issues):
         "correct_option_id, correct_option_index, expected_answer and every "
         "option for the relation you actually wrote. If no safe equivalent "
         "reformulation can be produced, return `fail_closed`. "
+        # Živi ciljani recheck (T3): objavljeno „…dodavanjem 2 na obje strane
+        # … dobijenu relaciju $x+2>7$“ uz polaznu $x>3$. Recept mora reći da je
+        # sama TVRDNJA netačna — inače recenzent „popravi“ opcije za $x+2>7$.
+        f"For `{request_fidelity_module.TRANSFORMED_RELATION_NOT_EQUIVALENT}` the "
+        "task text contradicts ITSELF: it states an original relation, narrates a "
+        "step performed on it (adding, subtracting, multiplying or dividing both "
+        "sides), and then writes a resulting relation whose solution set is NOT "
+        "the same. The narrated step is therefore false mathematics and must "
+        "never be shown to a student as a correct derivation. Either RECOMPUTE "
+        "the resulting relation so it really follows from the original — the same "
+        "amount on BOTH sides, so $x>3$ with $+2$ gives $x+2>5$, never $x+2>7$ — "
+        "or change the stated original so the written result really does follow. "
+        "Then recompute correct_option_id, correct_option_index, expected_answer "
+        "and every option for the corrected relation. Never keep both the "
+        "original and a result that does not follow from it, and if you cannot "
+        "make the derivation true, return `fail_closed`. "
         "For `task_type_mismatch` "
         "keep the requested kind: an inequality request must stay an inequality "
         "and an equation request must stay an equation. If honouring the request "
@@ -605,6 +621,25 @@ def format_for_reviewer(issues):
         "as `x<5`, or a chain such as `-2<x<0` in the task's unknown, keep exactly "
         "one option equal to the COMPLETE solution set, and recompute "
         "correct_option_id and expected_answer. "
+        # Živi ciljani recheck (T1): lekcija o racionalnim brojevima, rješenje
+        # $x>3$, a sve četiri opcije cjelobrojna nabrajanja; označeno
+        # $\{4,5,6,\dots\}$ — nedostaje npr. $7/2$. Recept mora imenovati
+        # DOMENSKU semantiku, inače recenzent samo pomjeri granicu nabrajanja.
+        f"For `{mcq_integrity.DISCRETE_OPTIONS_FOR_CONTINUOUS_SOLUTION_CODE}` the "
+        "solution set of this task is CONTINUOUS (the lesson works over the "
+        "rational or real numbers, or the task declares no integer domain at "
+        "all), but the options offer only integer enumerations such as "
+        "`{4,5,6,...}`. An integer list can NEVER be the complete solution set "
+        "of a continuous inequality: between $3$ and $4$ there are rationals "
+        "like $7/2$ that satisfy it and appear in no enumeration, so no option "
+        "is correct and shifting the first listed integer fixes nothing. Write "
+        "the marked option as the COMPLETE set over the task's own domain — a "
+        "relation such as `x>3`, an interval such as `(3,\\infty)`, or a "
+        "set-builder such as `\\{x\\in Q \\mid x>3\\}` — keep the distractors in "
+        "that same style, and recompute correct_option_id, correct_option_index "
+        "and expected_answer. Use an integer enumeration ONLY when the task "
+        "itself restricts the unknown to whole numbers and SAYS SO; never change "
+        "the lesson's domain just to make an enumeration fit. "
         # Produkcijski nalaz: „Daj mi novi zadatak.“ je vratio doslovno isti
         # zadatak i iste opcije. Recenzent mora znati da kozmetika nije dovoljna.
         f"For `{DUPLICATE_ACTIVE_TASK_CODE}` the proposed task is the SAME task the "

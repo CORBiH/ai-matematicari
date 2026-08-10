@@ -148,6 +148,7 @@ TASK_TYPE_MISMATCH = "task_type_mismatch"
 MISSING_REQUESTED_RELATION = "missing_requested_relation"
 TRANSFORMED_RELATION_MISMATCH = "transformed_relation_mismatch"
 MISSING_DISTINCT_TRANSFORMED_RELATION = "missing_distinct_transformed_relation"
+TRANSFORMED_RELATION_NOT_EQUIVALENT = "transformed_relation_not_equivalent"
 
 # Direktiva rješavanja u PORUCI — ponovo se koristi zatvoreni uzorak orakla,
 # da se granica „ovo je zahtjev za zadatak“ ne izmišlja po drugi put.
@@ -203,15 +204,14 @@ def _refers_to_a_relation_it_never_states(task_text):
 #
 # „nov…“ je jedini oblik koji traži imenicu uz sebe: samostalno bi hvatao
 # „novčić“, „novembar“ i slično.
-_TRANSFORMED_RELATION_MARKER_RE = re.compile(
-    r"\bdobi\w*"
-    r"|\bnastal\w*|\bnastaj\w*|\bnastan\w*"
-    r"|\bpreoblik\w*"
-    r"|\btransform\w*"
-    r"|\brezult\w*"
-    r"|\bizmijenj\w*|\bizmenj\w*"
-    r"|\bnov\w*\s+" + _RELATION_NOUN,
-    re.IGNORECASE)
+#
+# GRAMATIKA VIŠE NE ŽIVI OVDJE (živi ciljani recheck): jedan ciljani talas je
+# prošao, a sljedeći je pao na ISTOJ klasi drugim riječima („…pa imamo $x+2>7$“
+# nema nijednu riječ iz porodice rezultata, ali ima zahvat nad STRANAMA). Dvije
+# kopije odluke „šta je marker preoblikovanja“ su tu razliku i proizvele, pa je
+# gramatika preseljena uz čitač relacija (`mcq_integrity`) i ima je SAMO JEDNA —
+# koriste je i orakl MCQ-a i sve provjere vjernosti ovdje.
+_TRANSFORMED_RELATION_MARKER_RE = mcq_integrity._TRANSFORMATION_MARKER_RE
 
 
 def _non_equivalent_transformed_relation(request, task_text, shared_domain):
@@ -319,6 +319,40 @@ def _only_restates_the_requested_relation(student_message, task_text):
                for source in _normalized_relation_sources(text))
 
 
+def _self_inconsistent_transformation(task_text):
+    """Detalj kad zadatak SAM sebi protivrječi o preoblikovanju, ili None.
+
+    Sidro je ovdje ZADATAK, ne poruka: tekst navodi polaznu relaciju, pripovijeda
+    zahvat nad njom i zapiše rezultat. Ako rezultat nema isti kanonski skup
+    rješenja kao polazna iz ISTOG teksta, objavljena je neistinita matematička
+    tvrdnja — bez obzira na to kako je poruka glasila.
+
+    Zašto postoji odvojeno od `transformed_relation_mismatch`: ta provjera
+    poredi zadatak sa ZAHTJEVOM i zato traži da zahtjev nosi tačno jednu
+    čitljivu relaciju. Živi promašaj je bio upravo tu — učenikova poruka je
+    citirala OBJE relacije („polazna je $x>3$ … predstavi $x+2>7$ kao dobijenu“),
+    pa je zahtjev bio nejednoznačan i sve provjere vezane za njega su ćutale.
+    Zadatak je ipak objavio da se dodavanjem 2 na obje strane od $x>3$ dobija
+    $x+2>7$ — što je netačno i za sedmi razred pogrešna matematika.
+
+    Domen se čita iz istog teksta, pa preoblikovanje koje je nad dokazanim
+    diskretnim domenom ekvivalentno ($x>3$ → $x\\ge 4$ nad Z) ostaje dozvoljeno."""
+    text = task_text or ""
+    if not _SOLVE_DIRECTIVE_RE.search(text):
+        return None                      # tekst ne traži rješavanje
+    original, operative = mcq_integrity.transformation_relations(text)
+    if original is None or operative is None:
+        return None                      # par se ne može dokazati — ćuti
+    statement = mcq_integrity.read_solve_statement(text)
+    domain = statement.domain if statement.domain_status == "supported" else ""
+    if mcq_integrity.solution_sets_match(
+            original.solution, operative.solution, domain):
+        return None
+    return (f"{TRANSFORMED_RELATION_NOT_EQUIVALENT}: the task derives "
+            f"'{operative.display()}' from its own '{original.display()}', "
+            f"which is a different solution set")
+
+
 def _requested_kind(request):
     """Izričito imenovana vrsta ima prednost nad vrstom izvedenom iz relacije."""
     return request.stated_kind or request.relation_kind
@@ -335,24 +369,38 @@ def request_fidelity_failures(student_message, task_text):
     Prazna torka znači „nema dokazanog prekršaja“ — što uključuje i sve
     slučajeve u kojima zahtjev nije strukturno čitljiv. To NIJE dokaz da je
     zadatak vjeran zahtjevu, nego odsustvo dokazanog prekršaja."""
-    message = student_message or ""
-    if not message.strip() or not (task_text or "").strip():
+    if not (task_text or "").strip():
         return ()
+    message = student_message or ""
     request = mcq_integrity.read_solve_statement(message)
+    explicit_relation = request.has_relation
+
+    # 0) ZADATAK KOJI SAM SEBI PROTIVRJEČI (PETI NALAZ, živi ciljani recheck).
+    #    Sidro je SAM tekst zadatka, pa se ova provjera pokreće i kad je poruka
+    #    prazna, generička ili — kao u živom promašaju — kad citira OBJE
+    #    relacije pa je kao zahtjev nejednoznačna. Kad zahtjev NOSI tačno jednu
+    #    čitljivu relaciju, mjerodavna je provjera 2b ispod (poređenje sa
+    #    ZAHTJEVOM); dva koda za isti defekt se time nikad ne prijave zajedno.
+    failures = []
+    if not explicit_relation:
+        detail = _self_inconsistent_transformation(task_text)
+        if detail is not None:
+            failures.append(detail)
+
+    if not message.strip():
+        return tuple(failures)
 
     # ANGAŽMAN: bez izričite relacije, poruka mora bar tražiti rješavanje.
     # „Daj mi teži zadatak“ i „objasni“ time nemaju šta da sačuvaju.
-    explicit_relation = request.has_relation
     if not explicit_relation and not _SOLVE_DIRECTIVE_RE.search(message):
-        return ()
+        return tuple(failures)
     requested_domain = (request.domain
                         if request.domain_status == "supported" else "")
     requested_kind = _requested_kind(request)
     if not explicit_relation and not requested_domain and not requested_kind:
-        return ()
+        return tuple(failures)
 
     task = mcq_integrity.read_solve_statement(task_text)
-    failures = []
 
     # 1) DOMEN. Traženi domen mora biti DOKAZIVO sačuvan: „nije spomenut“ i
     #    „nedokaziv“ se tretiraju isto kao pogrešan domen, jer bez izričitog

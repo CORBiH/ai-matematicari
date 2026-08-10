@@ -673,7 +673,19 @@ _SOLVE_MEMBERSHIP_RE = re.compile(
 #     `_SOLVE_DOMAIN_SYMBOL_RE`).
 # Domen zapisan unutar $…$ ($x\in\mathbb{Z}$) i dalje gasi orakl kroz postojeću
 # kapiju nepročitanog segmenta — ovdje se čita isključivo proza.
-_SOLVE_DOMAIN_NOUN = r"(?:broj\w*|vrijednost\w*|rje[šs]enj\w*)"
+# ŽIVI CILJANI NALAZ (T1): `broj\w*` je hvatao i JEDNINU, pa je rečenica
+# „na obje strane dodan isti nenulti CIJELI BROJ“ — koja opisuje DODANU
+# KONSTANTU — pročitana kao deklaracija domena Z. Posljedica je bila teška:
+# rješenje `x>3` se diskretizovalo, pa je cjelobrojno nabrajanje `{4,5,6,…}`
+# ispalo TAČNO u lekciji o racionalnim brojevima, gdje je nepotpuno.
+#
+# Ispravka je jezička, ne fraza: ime brojevnog SKUPA je u ovom korpusu uvijek
+# u MNOŽINI („cijeli brojevi“, „skup racionalnih brojeva“), dok jednina imenuje
+# jednu VRIJEDNOST („isti nenulti cijeli broj“, „neki racionalan broj“). Zato
+# ova alternativa traži množinu `brojev…`; oblik „u skupu cijelih brojeva“ i
+# parentetičko „(cijeli brojevi)“ i dalje prolaze nepromijenjeni, kao i posebna
+# alternativa s prijedlogom ispod.
+_SOLVE_DOMAIN_NOUN = r"(?:brojev\w*|vrijednost\w*|rje[šs]enj\w*)"
 _SOLVE_DOMAIN_ADJECTIVE = (
     r"(?:prirodn|cijel|cjelobrojn|racionaln|iracionaln|realn|decimaln"
     r"|parn|neparn|prost|nenegativn|negativn|nepozitivn|pozitivn)")
@@ -874,6 +886,10 @@ UNVERIFIABLE_SOLUTION_OPTION_CODE = "unverifiable_solution_option"
 # (package_preflight.SEMANTIC_DUPLICATE_CODE) — recenzentski recept „zamijeni
 # distraktor(e) da sve četiri opcije budu semantički različite“ već postoji.
 EQUIVALENT_SOLUTION_OPTIONS_CODE = "semantically_duplicate_options"
+# Kontinuiran skup rješenja (Q/R ili nedeklarisan domen), a ponuđena su samo
+# cjelobrojna nabrajanja — vidi `evaluate_linear_solve_mcq` (živi nalaz T1).
+DISCRETE_OPTIONS_FOR_CONTINUOUS_SOLUTION_CODE = (
+    "discrete_options_for_continuous_solution")
 
 
 @dataclass(frozen=True)
@@ -1435,6 +1451,55 @@ def _solve_finite_int_set(inner: str) -> Optional[_SolutionSet]:
     return _SolutionSet.finite(members) if members else None
 
 
+# Otvoreno nabrajanje `{4,5,6,\dots}` — tri tačke bilo kojim od uobičajenih
+# zapisa. Zatvoreno: nikad se ne pogađa ništa osim POSLJEDNJEG člana.
+_SOLVE_ELLIPSIS_RE = re.compile(
+    r"^(?:\\dots|\\ldots|\\cdots|\\dotsc|\.\.\.|…)$")
+
+
+def _solve_open_int_enumeration(inner: str, domain: str) -> Optional[_SolutionSet]:
+    """Otvoreno nabrajanje cijelih brojeva `{4,5,6,…}` kao CJELOBROJNI zrak.
+
+    ŽIVI CILJANI NALAZ (T1): objavljen je MCQ za `x+2>5` (dakle `x>3`) u lekciji
+    o racionalnim brojevima, a SVE četiri opcije su bile cjelobrojna nabrajanja;
+    označeno je `{4,5,6,…}`. Nad Q to NIJE cio skup rješenja — `7/2` je veće od
+    `3` i nedostaje. Dotad je ovaj zapis bio potpuno NEČITLJIV, pa se nije mogao
+    ni dokazati kao pogrešan.
+
+    Čitanje je namjerno usko i egzaktno:
+      • članovi su cijeli literali, korak je TAČNO 1 (aritmetičke progresije se
+        ne modeluju — `{2,4,6,…}` ostaje nepročitano);
+      • potrebna su najmanje DVA člana prije tri tačke, da korak bude dokazan;
+      • tri tačke moraju biti POSLJEDNJI element (vodeće `{…,1,2,3}` se ne
+        pogađa);
+      • pod diskretnim domenom svaki napisani član mora pripadati tom domenu,
+        inače se zapis ne tumači.
+
+    Rezultat je `int_ray(">=", prvi)` — ISTI kanonski oblik koji `_discretize`
+    proizvodi za `x>3` nad Z. Zato domen SAM odlučuje o ekvivalenciji, bez
+    ijednog novog poređenja: nad Z/N/N0 je rješenje diskretizovano pa se
+    poklapa, a nad Q/R ostaje kontinuirani `ray` koji diskretnom zraku NIKAD
+    nije jednak. Nabrajanja se time ne zabranjuju globalno — ona su tačan
+    odgovor tamo gdje jesu, i dokazano pogrešan tamo gdje nisu."""
+    parts = [part.strip() for part in re.split(r"[,;]", inner)]
+    if len(parts) < 3 or not _SOLVE_ELLIPSIS_RE.match(parts[-1]):
+        return None
+    members = []
+    for part in parts[:-1]:
+        if not _SOLVE_INT_MEMBER_RE.fullmatch(part):
+            return None
+        members.append(int(part))
+    if len(members) < 2:
+        return None
+    if any(second - first != 1 for first, second in zip(members, members[1:])):
+        return None
+    minimum = _SOLVE_DISCRETE_DOMAIN_MIN.get(domain)
+    if minimum is not None and members[0] < minimum:
+        # Napisan član van domena — zapis se ne tumači umjesto modela.
+        return None
+    return _SolutionSet.int_ray(">=", Fraction(members[0]))
+
+
 def _solve_set_builder(inner: str, variable: str) -> Optional[_SolutionSet]:
     """Set-builder `{x ∈ D : relacija}` / `{x∈D | relacija}` kao kanonski skup.
 
@@ -1513,8 +1578,14 @@ def _solve_option_set(option_text: str, variable: str,
         if "\\in" in brace_inner or "∈" in brace_inner:
             return _solve_set_builder(brace_inner, variable)
         if "," in brace_inner or ";" in brace_inner:
-            # Višečlan skup: pod DISKRETNIM domenom je legitiman zapis punog
-            # rješenja; pod kontinuiranim se i dalje NE pogađa (decimalni
+            # Otvoreno nabrajanje `{4,5,6,…}` je CJELOBROJNI ZRAK i čita se pod
+            # SVAKIM domenom — upravo zato da nad Q/R bude dokazano pogrešno,
+            # a ne tiho nečitljivo (živi T1). Vidi `_solve_open_int_enumeration`.
+            open_ray = _solve_open_int_enumeration(brace_inner, domain)
+            if open_ray is not None:
+                return open_ray
+            # Zatvoren višečlan skup: pod DISKRETNIM domenom je legitiman zapis
+            # punog rješenja; pod kontinuiranim se i dalje NE pogađa (decimalni
             # zarez) i pada zatvoreno na podržanom zadatku.
             if discrete:
                 return _solve_finite_int_set(brace_inner)
@@ -1758,6 +1829,91 @@ def read_solve_relations(text: str) -> tuple:
     return tuple(found)
 
 
+# ---------------------------------------------------------------------------
+# ZATVORENA GRAMATIKA PRIPOVIJEDANOG PREOBLIKOVANJA (živi ciljani recheck)
+# ---------------------------------------------------------------------------
+# ŽIVA POUKA: jedna ciljana provjera je prošla, pa je SLJEDEĆI živi talas pao na
+# istoj klasi drugim riječima. Zato gramatika ne živi u pozivaocu (i ne raste po
+# jednoj rečenici), nego OVDJE — uz čitač relacija — i ima je SAMO JEDNA.
+#
+# Semantička klasa je „tekst tvrdi da je relacija REZULTAT nekog zahvata nad
+# polaznom“, a ona se u ovom korpusu iskazuje na tačno dva načina:
+#
+#   1. IMENOVANJEM REZULTATA — dobijamo/dobivena/nastala/preoblikovana/
+#      transformisana/rezultujuća/izmijenjena/nova (ne)jednačina;
+#   2. IMENOVANJEM ZAHVATA NAD STRANAMA relacije — „dodamo 2 na obje strane“,
+#      „na lijevu stranu dodamo 2, a na desnu 4“, „pomnožimo obje strane“.
+#
+# Drugi oblik je bio slijepa mrlja: živi zadatak „…pa imamo $x+2>7$“ ne sadrži
+# NIJEDNU riječ iz prve porodice, a nedvosmisleno tvrdi preoblikovanje.
+#
+# `strana` (strana relacije) se namjerno razlikuje od `stranica` (stranica
+# mnogougla): nabrojani nastavci hvataju SAMO prvu riječ, pa geometrijski
+# zadatak o stranicama trougla nikad ne uđe u ovu gramatiku. Prozor između
+# glagola i imenice ne prelazi granicu rečenice — `[^.?!]` — pa se „Kvadrat ima
+# četiri strane. Ako dodamo…“ ne slijepi u jedan marker.
+_TRANSFORMATION_RESULT_RE = (
+    r"\bdobi\w*|\bdobiv\w*"
+    r"|\bnastal\w*|\bnastaj\w*|\bnastan\w*"
+    r"|\bpreoblik\w*"
+    r"|\btransform\w*"
+    r"|\brezult\w*"
+    r"|\bizmijenj\w*|\bizmenj\w*"
+    r"|\bnov\w*\s+(?:nejedna[čc]in\w*|jedna[čc]in\w*|nejednakost\w*"
+    r"|jednakost\w*|relacij\w*)")
+_TRANSFORMATION_OPERATION_VERB = (
+    r"(?:\bdoda\w*|\boduz\w*|\b(?:po)?mno[žz]\w*|\b(?:po)?dij?el\w*)")
+_TRANSFORMATION_SIDE_NOUN = r"\bstran(?:a|e|i|u|om|ama)\b"
+_TRANSFORMATION_MARKER_RE = re.compile(
+    _TRANSFORMATION_RESULT_RE
+    + r"|" + _TRANSFORMATION_OPERATION_VERB + r"[^.?!]{0,40}?" + _TRANSFORMATION_SIDE_NOUN
+    + r"|" + _TRANSFORMATION_SIDE_NOUN + r"[^.?!]{0,40}?" + _TRANSFORMATION_OPERATION_VERB,
+    re.IGNORECASE)
+
+
+def transformation_relations(text: str) -> tuple:
+    """`(polazna, operativna)` relacija pripovijedanog preoblikovanja, ili `(None, None)`.
+
+    OPERATIVNA je ona koju tekst predstavlja kao REZULTAT zahvata — dakle ona
+    koju učenik stvarno treba riješiti. Pridruživanje je isključivo strukturno:
+    za svaki marker uzima se PRVA relacija koja počinje iza njega. Kad markeri
+    pokazuju na RAZLIČITE kanonske skupove, ništa se ne tvrdi — pozicija se
+    nikad ne pogađa.
+
+    POLAZNA je posljednja relacija koja počinje PRIJE prvog markera; kad je
+    nema (tekst rezultat navodi prvi), par se ne formira.
+
+    Ovo je JEDINO mjesto koje odlučuje „koja je relacija operativna“: koristi ga
+    i orakl MCQ-a (da uopšte može suditi preoblikovan zadatak) i provjera
+    vjernosti zahtjevu. Dvije kopije te odluke su već jednom proizvele živi
+    promašaj."""
+    raw = text or ""
+    relations = read_solve_relations(raw)
+    if len(relations) < 2:
+        return (None, None)
+    markers = list(_TRANSFORMATION_MARKER_RE.finditer(raw))
+    if not markers:
+        return (None, None)
+    operatives = []
+    for marker in markers:
+        following = next((relation for relation in relations
+                          if relation.start >= marker.end()), None)
+        if following is not None:
+            operatives.append(following)
+    if not operatives:
+        return (None, None)
+    if len({(relation.solution, relation.variable)
+            for relation in operatives}) != 1:
+        return (None, None)      # markeri pokazuju na različite skupove
+    operative = operatives[0]
+    first_marker = min(marker.start() for marker in markers)
+    original = None
+    for relation in relations:
+        if relation.start < first_marker:
+            original = relation
+    return (original, operative)
+
+
 def read_solve_statement(text: str) -> SolveStatement:
     """Pročitaj domen i relaciju iz slobodnog teksta zatvorenom gramatikom.
 
@@ -1903,9 +2059,22 @@ def evaluate_linear_solve_mcq(question: str,
             # Proza i segment tvrde RAZLIČITE domene — ne pogađa se.
             return LinearSolveMCQResult(False, False)
         domain = segment_domain
-    if len(candidates) != 1:
+    if len(candidates) == 1:
+        solved = _solve_relation_text(candidates[0])
+    elif len(candidates) >= 2:
+        # ŽIVI CILJANI NALAZ (T1): zadatak koji POŠTENO preoblikuje relaciju
+        # nosi DVIJE — polaznu i dobijenu — pa je cio orakl dosad ćutao i MCQ
+        # se objavljivao bez ijedne matematičke provjere opcija. Preoblikovanje
+        # je time bilo rupa u pokrivenosti upravo tamo gdje ga učenik traži.
+        # Ne pogađa se ništa: operativnu relaciju bira ZAJEDNIČKA strukturna
+        # asocijacija (`transformation_relations`), a kad ona ne može dokazati
+        # koja je — orakl ćuti kao i prije.
+        _original, operative = transformation_relations(question or "")
+        if operative is None:
+            return LinearSolveMCQResult(False, False)
+        solved = (operative.solution, operative.variable)
+    else:
         return LinearSolveMCQResult(False, False)
-    solved = _solve_relation_text(candidates[0])
     if solved is None:
         return LinearSolveMCQResult(False, False)
     solution, variable = solved
@@ -1961,7 +2130,18 @@ def evaluate_linear_solve_mcq(question: str,
     correct_indices = tuple(index for index, candidate in enumerate(option_sets)
                             if candidate == solution)
     if not correct_indices:
-        return LinearSolveMCQResult(True, False, "no_correct_option",
+        # ŽIVI CILJANI NALAZ (T1): nad KONTINUIRANIM skupom rješenja svaka
+        # ponuđena opcija je bila cjelobrojno nabrajanje. Generički
+        # `no_correct_option` bi recenzenta naveo da „popravi“ granicu
+        # nabrajanja i ostane jednako pogrešan; zato taj slučaj dobija VLASTITI
+        # kod, s receptom koji imenuje domensku semantiku.
+        code = ("discrete_options_for_continuous_solution"
+                if (solution.kind in ("ray", "interval")
+                    and any(candidate is not None
+                            and candidate.kind in ("int_ray", "int_range")
+                            for candidate in option_sets))
+                else "no_correct_option")
+        return LinearSolveMCQResult(True, False, code,
                                     solution_display, option_displays,
                                     correct_indices)
     if len(correct_indices) != 1:

@@ -27,9 +27,13 @@ ZERO poziva modela: sve je čist deterministički kod ili FakeLLM.
 import pytest
 
 from matbot import mcq_integrity
-from matbot.request_fidelity import (MISSING_REQUESTED_RELATION,
+from matbot.request_fidelity import (DOMAIN_MISMATCH,
+                                     MISSING_DISTINCT_TRANSFORMED_RELATION,
+                                     MISSING_REQUESTED_RELATION,
                                      RELATION_MISMATCH, REQUEST_FIDELITY_CODE,
+                                     TASK_TYPE_MISMATCH,
                                      TRANSFORMED_RELATION_MISMATCH,
+                                     TRANSFORMED_RELATION_NOT_EQUIVALENT,
                                      request_fidelity_failures)
 
 # ---------------------------------------------------------------------------
@@ -178,9 +182,34 @@ def test_unprovable_shapes_preserve_conservative_behaviour(task):
     assert request_fidelity_failures("Riješi x>3", task) == (), task
 
 
-def test_request_without_an_explicit_relation_is_unaffected():
+def test_request_without_an_explicit_relation_adds_no_request_constraint():
+    """Generička poruka NE nasljeđuje uslov iz prethodnog turna — provjere
+    vezane za ZAHTJEV (domen, relacija, vrsta) i dalje ćute.
+
+    Ranije je ovaj test tvrdio da tada nema NIJEDNOG nalaza, pa je i doslovno
+    neistinit korak (`$x>3$` → `$x+2>7$`) prolazio čim poruka nije nosila
+    relaciju. Živi ciljani recheck je pokazao da je to premalo: neistinita
+    izvedba je pogrešna matematika bez obzira na to šta je učenik pitao, pa je
+    sidro za nju SAM zadatak (vidi `TRANSFORMED_RELATION_NOT_EQUIVALENT`).
+    Namjera testa ostaje ista i provjerava se strože: nijedan nalaz izveden iz
+    ZAHTJEVA se ne pojavljuje."""
+    request_derived = (DOMAIN_MISMATCH, RELATION_MISMATCH, TASK_TYPE_MISMATCH,
+                       TRANSFORMED_RELATION_MISMATCH,
+                       MISSING_REQUESTED_RELATION,
+                       MISSING_DISTINCT_TRANSFORMED_RELATION)
     for message in ("Daj mi teži zadatak.", "Ne znam.", "Objasni mi ovo."):
-        assert request_fidelity_failures(message, LIVE_TASK) == (), message
+        details = request_fidelity_failures(message, LIVE_TASK)
+        assert not [detail for detail in details
+                    if detail.startswith(request_derived)], (message, details)
+        # ...a sam zadatak i dalje objavljuje neistinit korak.
+        assert [detail for detail in details
+                if detail.startswith(TRANSFORMED_RELATION_NOT_EQUIVALENT)], message
+
+
+def test_a_clean_task_is_untouched_by_a_generic_follow_up():
+    """Kontrola uz prethodni test: bez samoprotivrječnosti nema nalaza."""
+    for message in ("Daj mi teži zadatak.", "Ne znam.", "Objasni mi ovo."):
+        assert request_fidelity_failures(message, REPAIRED_TASK) == (), message
 
 
 def test_task_without_a_solve_directive_is_not_this_finding():
