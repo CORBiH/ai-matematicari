@@ -616,11 +616,22 @@ def format_for_reviewer(issues):
         # intervala — orakl sada zna jednočlane skupove, a NEPOZNAT zapis opcije
         # pada zatvoreno umjesto da ugasi provjeru. Recenzentu treba recept.
         f"For `{mcq_integrity.UNVERIFIABLE_SOLUTION_OPTION_CODE}` at least one option "
-        "is not written in a verifiable answer form for this solve task: rewrite "
-        "EVERY option as a plain value, a singleton set like {-1}, a relation such "
-        "as `x<5`, or a chain such as `-2<x<0` in the task's unknown, keep exactly "
-        "one option equal to the COMPLETE solution set, and recompute "
-        "correct_option_id and expected_answer. "
+        "is not written in a verifiable answer form for this solve task. Do NOT "
+        "reach for a different exotic notation — REBUILD every option using the "
+        "SIMPLEST supported form: a relation such as `x<5` or `x\\ge 4`, a chain "
+        "such as `-2<x<0`, an interval such as `(3,\\infty)` or `[4,\\infty)`, a "
+        "set-builder that names its domain EXPLICITLY such as "
+        "`\\{x\\in\\mathbb{Q} \\mid x>3\\}`, or a plain value / singleton set like "
+        "`3` / `\\{3\\}` for an equation. A set-builder WITHOUT a domain "
+        "(`\\{x \\mid x>3\\}`), an enumeration without braces, a decorated option "
+        "(`\\subset`), two conditions in one option, or an answer written in words "
+        "can never be read. For an infinite solution set over Q or R use a "
+        "relation, an interval or a domain-explicit set-builder; over Z, N or N0 a "
+        "simple relation such as `x\\ge 4` is preferred and the integer "
+        "enumeration `\\{4,5,6,...\\}` is also accepted. The server detail names the "
+        "solution it derived, so make exactly one option mean EXACTLY that set, "
+        "keep the other three meaning different sets, and recompute "
+        "correct_option_id, correct_option_index and expected_answer. "
         # Živi ciljani recheck (T1): lekcija o racionalnim brojevima, rješenje
         # $x>3$, a sve četiri opcije cjelobrojna nabrajanja; označeno
         # $\{4,5,6,\dots\}$ — nedostaje npr. $7/2$. Recept mora imenovati

@@ -301,7 +301,21 @@ def _every_relation_token_is_readable(text, relations):
 
 
 def _only_restates_the_requested_relation(student_message, task_text):
-    """True kad zadatak tvrdi preoblikovanje, a ne napiše NIJEDAN novi zapis."""
+    """True kad zadatak tvrdi preoblikovanje, a ne napiše NIJEDAN novi zapis.
+
+    ŽIVI LAŽNI ODBIJ (T1 recheck, scenario R-T1QP): poredilo se sa SVIM
+    relacijama iz poruke, a učenik je u istoj poruci sam napisao i polaznu i
+    ciljanu („Polazna nejednačina je $x>3$; dodaj 2 na obje strane i u zadatku
+    napiši ekvivalentnu preoblikovanu relaciju $x+2>5$“). Zadatak koji je
+    UPRAVO to i uradio — napisao $x+2>5$ — i dalje je padao, jer je i taj zapis
+    stajao u poruci. Scenario je time bio neprolazan bez obzira na to šta model
+    napiše, a upravo je on tražena pozitivna kontrola.
+
+    Mjerilo je zato POLAZNA relacija, a to je PRVA koju poruka napiše: nalaz
+    tvrdi „zadatak je samo prepisao original“, ne „zadatak nije napisao ništa
+    što učenik nije spomenuo“. Sužavanje je konzervativno — nalaz se javlja
+    RJEĐE, nikad češće — a istorijski FW-R02 oblik (poruka nosi samo $x>3$)
+    ostaje netaknut jer je tamo prva relacija ujedno i jedina."""
     text = task_text or ""
     if not _TRANSFORMED_RELATION_MARKER_RE.search(text):
         return False                     # zadatak ne tvrdi nikakvo preoblikovanje
@@ -315,7 +329,8 @@ def _only_restates_the_requested_relation(student_message, task_text):
     requested = _normalized_relation_sources(student_message)
     if not requested:
         return False
-    return all(source in requested
+    original = requested[0]
+    return all(source == original
                for source in _normalized_relation_sources(text))
 
 

@@ -266,6 +266,49 @@ sign_complexity, scaffolding, distractor_closeness, reasoning_depth.
 Ova dijagnostika je INTERNA: učenik je ne vidi."""
 
 
+# ŽIVI T1 RECHECK (b38d08a, 6 od 6 nacrta s MCQ nalazom): u svakom nacrtu tog
+# talasa server je našao defekt opcija — tri puta `unverifiable_solution_option`,
+# tri puta `multiple_correct_options` — pa su i OBA tražena pozitivna scenarija
+# (Q i Z) pala zatvoreno iako je matematika bila tačna. Uzrok nije validator
+# nego UGOVOR AUTORSTVA: prompt do sada nigdje nije rekao ŠTA opcija „riješi
+# ne/jednačinu“ zadatka mora značiti (cio skup rješenja), koji su zapisi
+# serverski DOKAZIVI, ni da odgovor zavisi od domena. Isti obrazac kao
+# `_HELP_NOTATION_RULE`: vidljiva površina koju deterministički sloj sudi, a
+# prompt je nikad nije opisao.
+#
+# Nabrojani zapisi su IZMJERENI nad `mcq_integrity._solve_option_set` — ovdje se
+# ne obećava ništa što server ne ume da pročita. Pravilo NE popušta nijednu
+# provjeru; ono samo traži oblike koje provjera može dokazati.
+_SOLVE_TASK_AUTHORING_RULE = """KAD ZADATAK TRAŽI SKUP RJEŠENJA (ne/jednačine):
+- Server SAM riješi relaciju iz zadatka i uporedi je sa SVAKOM opcijom po
+  ZNAČENJU skupa. Zapis koji server ne može pročitati obara cio turn
+  (`unverifiable_solution_option`) i učenik ne dobije ništa — zato sve četiri
+  opcije moraju biti u dokazivom zapisu, ne samo tačna.
+- DOKAZIVI ZAPISI:
+  • relacija: $x>3$, $x\\ge 4$, $-2<x<0$;
+  • interval: $(3,\\infty)$, $[4,\\infty)$;
+  • skup s IZRIČITIM domenom: $\\{x\\in\\mathbb{Q}\\mid x>3\\}$;
+  • jedna vrijednost ili jednočlan skup: $3$, $\\{3\\}$ — za jednačine;
+  • nabrajanje cijelih brojeva: $\\{4,5,6,\\dots\\}$ — samo uz cjelobrojni domen.
+- $\\{x\\mid x>3\\}$ BEZ domena NIJE dokaziv zapis: uvijek napiši i skup lijevo od
+  crte ($x\\in\\mathbb{Q}$, $\\mathbb{Z}$, $\\mathbb{N}$, $\\mathbb{R}$). Ne ukrašavaj
+  opciju ($\\subset$, dva uslova u jednoj opciji, riječi umjesto zapisa) i ne piši
+  nabrajanje bez vitičastih zagrada.
+- DOMEN ODLUČUJE koji je zapis TAČAN:
+  • Q, R ili domen koji zadatak ne navodi: nabrajanje cijelih brojeva NIKAD nije
+    cio skup — između $3$ i $4$ leži $7/2$. Koristi relaciju, interval ili skup
+    s domenom.
+  • Z, N ili N0: najjednostavnija je relacija ($x\\ge 4$); nabrajanje
+    $\\{4,5,6,\\dots\\}$ je tu dozvoljeno i tačno.
+- TAČNO JEDNA opcija smije značiti cio skup rješenja. Ostale tri moraju značiti
+  RAZLIČITE skupove (npr. $x>5$, $x\\ge 3$, $x>1$): dva zapisa ISTOG skupa su
+  dvije tačne opcije i turn propada.
+- Kad učenik traži DRUGAČIJI, ali ekvivalentan oblik relacije, u tekstu zadatka
+  mora STVARNO stajati ta nova relacija: za $x>3$ i korak „+2 na obje strane“
+  napiši $x+2>5$. Opis koraka bez napisane nove relacije ne ispunjava zahtjev, a
+  napisana nova relacija mora imati ISTI skup rješenja (nikad $x+2>7$)."""
+
+
 _STRUCTURED_TASK_RULE = """STRUCTURED TASK PACKAGE (required for every `new_task`):
 - selected_lesson_id sadrži SAMO goli kanonski ID lekcije (tačno onaj ID iz reda "- lekcija:" u ulazu, bez naslova) — nikad "Naslov (ID)" i nikad naslov u tom polju; naslov ide isključivo u selected_lesson_title, but the server owns and canonicalizes that display copy;
 - target_difficulty_level is 1 for the first task, shifts one bounded step for easier/harder, and otherwise stays at the committed level;
@@ -382,6 +425,7 @@ def build_tutor_instructions(context):
         f"{_INTENT_GUIDE}\n\n"
         f"{_FIELD_RULE}\n\n"
         f"{_TASK_RULE}\n\n"
+        f"{_SOLVE_TASK_AUTHORING_RULE}\n\n"
         f"{_SCALED_DIVISION_RULE}\n\n"
         f"{_HELP_NOTATION_RULE}\n\n"
         f"{_STRUCTURED_TASK_RULE}\n\n"
@@ -570,6 +614,10 @@ def build_reviewer_instructions(context):
         "10. da je bosanski prirodan i primjeren uzrastu.\n\n"
         "11. verify that lesson identity, level, text, options, marked answer, solution, difficulty evidence, and signature describe one task. Independently recompute `reviewed_difficulty_evidence` from only the visible task, answer requirements, options, and solution: ignore Tutor numerical counts. Count only actions the student must perform; four MCQ options are not four conditions or operations, selecting one option with one rule is one direct application, a solution explanation is not a student explanation requirement, and `combines_concepts` is true only when the student must combine distinct mathematical concepts. Return your independently calculated evidence even if the wording needs no textual correction. Level 1 may be a direct yes/no, recognition, calculation, classification, substitution, or one-rule selection; choosing a visible option is not by itself mathematical comparison or a second reasoning step. Level 2 permits a bounded pair of related rules/concepts, conditions, or operations, straightforward explanation/comparison, or one manageable representation change; `combines_concepts` alone is not Level 3. Level 3 requires construction, proof, three-or-more connected requirements/operations, advanced representation change, or comparable depth. For multiple choice, correct_option_id and correct_option_index must select the same visible option and expected_answer must be an exact copy of its text; explanation belongs only in solution. Signature parameters are only closed name/value entries with canonical string values: no arbitrary metadata, and order alone is never a new task. When correcting, update options, correct option ID/index, expected answer, solution, and the complete signature together, then return the complete fresh package. Set `task_package_consistent`, `difficulty_evidence_valid`, and `task_signature_consistent` accordingly.\n\n"
         f"{_SCALED_DIVISION_RULE}\n\n"
+        # Isti ugovor autorstva kao Tutor: na `correct` RECENZENT piše opcije
+        # koje se objavljuju, pa mora znati iste dokazive zapise (živi T1
+        # recheck — recenzent je popravio jedan nalaz i ostavio drugi).
+        f"{_SOLVE_TASK_AUTHORING_RULE}\n\n"
         f"{_SHARED_TARGET_BLOCK}\n\n"
         f"{_REVIEWER_LESSON_FIDELITY_RULE}\n\n"
         f"{_REVIEWER_DECISION_RULE}\n\n"
