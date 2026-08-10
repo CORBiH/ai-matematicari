@@ -64,10 +64,11 @@ def test_no_product_module_imports_the_evaluator_package():
 # 2. REGISTAR PROVJERA KAMPANJE JE NEPROMIJENJEN
 # ---------------------------------------------------------------------------
 
-# Zatečeno stanje na kandidatu c17538a. Faza 0 ne dodaje i ne uklanja nijednu
-# provjeru: uvezivanje mjerača tvrdnji je Faza 2 i traži vlastitu kalibraciju
-# lažnih pozitiva nad živim talasom.
-FROZEN_CHECK_NAMES = (
+# Zatečeno stanje na kandidatu c17538a, uz ČETIRI provjere koje je uvezala
+# arhitektonska Faza 2 (mjerenje otkrivanja tvrdnje, provenijencija vrha
+# ljestvice, upotrebljivost pomoći, proporcionalnost zapisa). Nijedna zatečena
+# provjera nije uklonjena ni preimenovana — skup se samo širi, i to svjesno.
+PHASE0_CHECK_NAMES = (
     'bosnian', 'correct_option_stable', 'free_text_grading_no_oracle', 'geometry_ok',
     'help_nonempty', 'hint_differs', 'hint_no_leak', 'identical_response',
     'lesson_matches', 'math_safe', 'no_answer_leak', 'no_control_chars',
@@ -80,19 +81,46 @@ FROZEN_CHECK_NAMES = (
     'verdict_correct', 'verdict_incorrect', 'zero_calls',
 )
 
+PHASE2_ADDED_CHECK_NAMES = (
+    'help_has_task_scaffold', 'help_notation_in_scope',
+    'hint_proposition_no_leak', 'hint_top_from_verified_solution',
+    # Hardening prije živog talasa (Problem A + C): oblik označenog odgovora i
+    # STVARNA klasa koju je server izabrao poslije objave. `task_class:<klasa>`
+    # je PARAMETRIČNO ime (kao `calls_at_most:N`), pa ne stoji u registru.
+    'symbolic_marked_answer',
+)
+
+FROZEN_CHECK_NAMES = tuple(sorted(PHASE0_CHECK_NAMES + PHASE2_ADDED_CHECK_NAMES))
+
 
 def test_the_campaign_check_registry_is_unchanged_by_phase_zero():
     assert tuple(sorted(check_lib._CHECKS)) == FROZEN_CHECK_NAMES
 
 
-def test_the_phase_zero_proposition_measure_is_deliberately_not_wired():
-    """Mjerenje bez uvezivanja: Faza 0 ne smije promijeniti nijedan rezultat."""
+def test_no_phase_zero_check_was_removed_or_renamed_by_phase_two():
+    """Širenje registra je dozvoljeno; tiho gubljenje zatečene provjere nije."""
+    missing = [name for name in PHASE0_CHECK_NAMES if name not in check_lib._CHECKS]
+    assert not missing, missing
+
+
+def test_the_proposition_measure_is_now_wired_through_the_product_module():
+    """FAZA 2 — BIVŠA NAMJERNA NEUVEZANOST, SADA UVEZANOST S DOKAZOM.
+
+    Faza 0 je izričito zamrznula da mjerač tvrdnji NIJE uvezan (mjerila je, ali
+    nije mijenjala nijedan rezultat). Faza 2 ga uvezuje, ali NE uvozom
+    evaluatora u proizvod: mjera je preseljena u produkcijski modul
+    `matbot.hint_policy`, pa i server i evaluator pozivaju DOSLOVNO istu
+    funkciju. `tools/practice_eval/hintsemantics.py` ostaje zamrznut dokaz Faze
+    0 i dalje se NE uvozi u `checks.py`."""
+    from matbot import hint_policy
     from tools.practice_eval import hintsemantics
-    assert hintsemantics.measure not in check_lib._CHECKS.values()
-    assert not any(name.startswith("proposition") for name in check_lib._CHECKS)
+
     assert "hintsemantics" not in _imported_modules("tools/practice_eval/checks.py")
-    assert "tools.practice_eval.hintsemantics" not in _imported_modules(
-        "tools/practice_eval/runner.py")
+    assert hintsemantics.measure not in check_lib._CHECKS.values()
+    assert "hint_proposition_no_leak" in check_lib._CHECKS
+    assert "matbot" in _imported_modules("tools/practice_eval/checks.py")
+    # Produkcijska mjera JE dosežna iz provjere (isti kod, ne kopija ponašanja).
+    assert callable(hint_policy.proposition_disclosure)
 
 
 # ---------------------------------------------------------------------------

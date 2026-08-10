@@ -121,9 +121,14 @@ def _turn(message, session_id="b53", client_turn_id="b53-t1"):
     }
 
 
+APPROVED_SOLUTION = (r"Podijelimo obje strane sa $2$: $x=\frac{8}{2}=4$. "
+                     r"Provjera: $2\cdot 4=8$.")
+
+
 def _seed(store, fake_llm):
     task = make_task_payload(text=TASK, options=(r"$x=4$", r"$x=3$", r"$x=8$", r"$x=2$"),
-                             correct_option_index=0, expected=ANSWER)
+                             correct_option_index=0, expected=ANSWER,
+                             solution=APPROVED_SOLUTION)
     queue_two_call(fake_llm, draft=make_tutor_draft(intent="generate_task", new_task=task))
     response = tutor_pipeline.run_turn(store, fake_llm, _turn("Daj mi zadatak."))
     assert response.get("status") == "ready", response
@@ -175,14 +180,19 @@ def test_a_step_hint_without_the_result_still_passes_through(store, fake_llm):
 
 
 def test_explicit_full_solution_request_may_still_reveal(store, fake_llm):
+    """Otkrivanje je i dalje dozvoljeno — od Faze 2 iz PROVJERENOG artefakta.
+
+    Anti-leak gate se ne dira: on i dalje NE važi za `full_solution_request`.
+    Mijenja se samo autor teksta: objavljuje se recenzentom odobreno `solution`
+    polje, a ne svježa proza help-turna."""
     _seed(store, fake_llm)
-    worked = r"Podijelimo obje strane sa $2$: $x=\frac{8}{2}=4$."
     queue_two_call(fake_llm, draft=make_tutor_draft(
-        intent="full_solution_request", reply=worked, new_task=None,
-        worked_solution=worked))
+        intent="full_solution_request", reply="Evo cijelog postupka.", new_task=None,
+        worked_solution=r"Nešto potpuno drugo: $x=9$."))
     response = tutor_pipeline.run_turn(store, fake_llm,
                                        _turn("Uradi ga ti.", client_turn_id="b53-f1"))
-    assert worked in response["answer"]
+    assert APPROVED_SOLUTION in response["answer"]
+    assert "x=9" not in response["answer"].replace(" ", "")
     assert response.get("revealed_correct_option_id")
 
 

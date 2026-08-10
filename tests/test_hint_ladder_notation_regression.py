@@ -88,13 +88,21 @@ def _publish(store, fake):
 
 
 def _ask_for_help(store, fake, hint, message, turn_id):
-    """Jedan help turn: tačno JEDAN pripremljen odgovor modela."""
+    """Jedan help turn KUCANOM PORUKOM: tačno JEDAN pripremljen odgovor modela.
+
+    FAZA 2 — ZAŠTO KUCANA PORUKA, A NE DUGME. Objavljene opcije ove lekcije su
+    TVRDNJE o položaju prave i ravni, pa je klasa zadatka propoziciona; kad
+    učenik pritisne dugme, server unaprijed zna da je turn pomoć i cijelu
+    ljestvicu sastavlja sam (nula poziva — vidi
+    `test_the_help_button_ladder_is_zero_call_for_this_propositional_lesson`).
+    Kucana poruka je jedini put na kojem model još piše nagovještaj, jer prije
+    poziva namjera nije serverska činjenica — i zato je ovdje jedino mjesto na
+    kojem se ISTORIJSKI defekt zapisa (`\\tdot`) uopšte može reprodukovati."""
     fake.queue(make_tutor_draft(intent="hint_request", new_task=None,
                                reply="Idemo korak po korak.", hint=hint))
     before = fake.call_count
     response = run_practice_turn(store, fake, _turn(
-        message, intent="hint_request", interaction_phase="practice_help",
-        client_turn_id=turn_id))
+        message, interaction_phase="practice_help", client_turn_id=turn_id))
     assert fake.call_count - before == 1, "help turn smije potrošiti TAČNO jedan poziv"
     return response
 
@@ -151,6 +159,33 @@ def test_prompt_asks_the_third_hint_for_the_full_procedure_and_result():
     guidance = tutor_prompts._HINT_LEVEL_GUIDANCE
     assert "NIVO 3" in guidance[2] and "konačan rezultat" in guidance[2]
     assert "BEZ" in guidance[0] and "BEZ" in guidance[1]
+
+
+def test_the_help_button_ladder_is_zero_call_for_this_propositional_lesson():
+    """FAZA 2: kad učenik pritisne dugme, historijski defekt je NEDOSTIŽAN.
+
+    Opcije ove lekcije su tvrdnje, pa server unaprijed zna klasu zadatka i
+    cijelu ljestvicu sastavlja sam. Nepostojeća komanda u nagovještaju modela
+    tada ne može ni nastati — nema modela u toj petlji."""
+    store, fake = SessionStore(), FakeLLM()
+    _publish(store, fake)
+    calls_before = fake.call_count
+
+    served = []
+    for index in range(1, 4):
+        response = run_practice_turn(store, fake, _turn(
+            "Ne znam.", intent="hint_request", interaction_phase="practice_help",
+            client_turn_id=f"btn{index}"))
+        assert response["status"] == "ready", response
+        assert response["answer"] != SAFE_ERROR_MESSAGE
+        served.append(response["answer"])
+
+    assert fake.call_count == calls_before, "ljestvica preko dugmeta ne troši poziv"
+    assert store.peek(SESSION)["hint_level"] == config.MAX_HINT_LEVEL
+    assert len(set(served)) == 3, "svaki nivo mora donijeti nov tekst"
+    assert LIVE_OPTIONS[0] not in served[0]
+    assert LIVE_OPTIONS[0] not in served[1]
+    assert "leži u ravni" in served[2]      # vrh ljestvice DAJE rezultat
 
 
 # ---------------------------------------------------------------------------

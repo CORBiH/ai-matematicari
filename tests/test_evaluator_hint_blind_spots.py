@@ -251,17 +251,54 @@ def test_current_leak_oracle_also_misses_the_tr_b1_hint1():
 
 
 def test_phase0_measure_does_not_reach_the_tr_b1_disclosure():
-    """ZAMRZNUTA PREOSTALA SLIJEPA TAČKA — namjerno, ne propust.
+    """ZAMRZNUTA MJERNA ČINJENICA — mjerač po tačnim tokenima ovo NE dosiže.
 
     Poslije izuzetka „token već stoji u tekstu zadatka“ označenoj opciji ostaju
     samo tri sadržajna tokena, ispod praga tvrdnje. Uz to je curenje ovdje
-    PARAFRAZA u drugom padežu („zajedničkih tačaka“ → „zajednička tačka“), a
-    Faza 0 izričito ne uvodi korjenovanje ni sinonime.
+    PARAFRAZA u drugom padežu („zajedničkih tačaka“ → „zajednička tačka“), a ni
+    Faza 0 ni Faza 2 ne uvode korjenovanje ni sinonime.
 
-    Faza 2 ne smije se proglasiti gotovom dok ovaj slučaj ostaje nedosegnut."""
+    ZAŠTO SE MJERAČ NE „POPRAVLJA“ STEMMINGOM (izmjereno u Fazi 2): skraćivanje
+    tokena na zajednički korijen slije `svaku`/`svakoj` i `pravu`/`pravom`, pa
+    marked-only skup FW-X03 postaje prazan — „popravka“ bi oborila JEDINI slučaj
+    koji mjerač stvarno dokazuje, a TR-B1 i dalje ne bi dosegla.
+
+    FAZA 2 ZATO OVAJ RAZRED ZATVARA KONSTRUKCIJOM, ne mjerenjem: za zadatak čiji
+    je odgovor tvrdnja server sam sastavlja nagovještaje 1 i 2 iz šablona koji ne
+    prepisuje nijedno slovo iz ponuđenih opcija. Dokaz je u
+    `tests/test_phase2_hint_architecture.py`
+    (`test_tr_b1_hint1_paraphrase_class_is_unreachable_by_construction`)."""
     result = _measure(hint_evidence.TR_B1, 1)
     assert result.verdict == hintsemantics.NOT_APPLICABLE
     assert result.proposition_tokens < hintsemantics.MIN_PROPOSITION_TOKENS
+
+
+def test_the_product_measure_agrees_with_the_frozen_phase0_measure():
+    """Produkcijski mjerač je VJERAN PORT, ne novi kriterij.
+
+    Faza 2 mjeru seli u proizvod (`matbot.hint_policy`) da je i server i
+    evaluator pozivaju doslovno istu. Kalibracija Faze 0 (156 živih turnova,
+    1 DISCLOSED, 0 lažnih pozitiva) ostaje na snazi samo ako se dvije
+    implementacije poklapaju na SVAKOM zamrznutom dokazu."""
+    from matbot import hint_policy
+
+    cases = []
+    for evidence in hint_evidence.ALL_EVIDENCE:
+        for level, _text in evidence.hints:
+            cases.append((evidence, evidence.hint(level)))
+    cases.append((hint_evidence.FW_X03, hint_evidence.CLEAN_PROPOSITIONAL_HINT))
+    cases.append((hint_evidence.TR_B1, hint_evidence.CLEAN_PROPOSITIONAL_HINT_TR_B1))
+
+    for evidence, text in cases:
+        frozen = hintsemantics.measure(text, evidence.marked_option_text,
+                                       evidence.distractor_texts, evidence.task_text)
+        product = hint_policy.proposition_disclosure(
+            text, evidence.marked_option_text, evidence.distractor_texts,
+            evidence.task_text)
+        assert product.verdict == frozen.verdict, (evidence.scenario_id, text[:40])
+        assert product.marked_coverage == pytest.approx(frozen.marked_coverage)
+        assert product.marked_only_coverage == pytest.approx(frozen.marked_only_coverage)
+        assert product.proposition_tokens == frozen.proposition_tokens
 
 
 def test_tr_b1_hint2_published_out_of_grade_notation_with_no_gate_to_stop_it():
@@ -282,11 +319,20 @@ def test_tr_b1_hint2_published_out_of_grade_notation_with_no_gate_to_stop_it():
 # ---------------------------------------------------------------------------
 
 def test_blind_spot_matrix_covers_every_required_class():
+    """Faza 2 dodaje TRI razreda; nijedan zatečeni nije uklonjen.
+
+    `server_composed_top_hint` je nova, JAKA tvrdnja (provenijencija vrha
+    ljestvice), `help_out_of_grade_technique` novi izmjereni razred (živi TR-B1
+    nagovještaj 2), a `help_branch_coverage` (hardening prije živog talasa)
+    zamrzava da oznaka scenarija NIKAD nije dokaz da je grana vožena."""
     assert set(release_contract.BLIND_SPOT_KEYS) == {
         "value_answer_leak",
         "proposition_answer_leak",
+        "server_composed_top_hint",
         "false_intermediate_reasoning",
         "final_answer_without_verified_derivation",
+        "help_out_of_grade_technique",
+        "help_branch_coverage",
         "lesson_semantic_alignment",
         "model_self_reported_checks",
     }
@@ -299,11 +345,22 @@ def test_every_blind_spot_declares_a_known_verification_strength():
         assert spot.owner.strip()
 
 
-def test_only_the_value_shaped_leak_is_deterministically_verified():
-    """Jedina klasa nagovještaja s pravim oraklom je vrijednosno curenje."""
+def test_only_value_leak_and_top_hint_provenance_are_deterministically_verified():
+    """FAZA 2 doda TAČNO JEDNU novu jaku tvrdnju — i ni jednu više.
+
+    Zatečeno stanje (Faza 0): jedina deterministički dokazana klasa bilo je
+    VRIJEDNOSNO curenje. Faza 2 dodaje PROVENIJENCIJU vrha ljestvice: server
+    tekst sastavlja iz recenzentom odobrenog rješenja, pa se to poredi bajt za
+    bajt (`checks.check_hint_top_from_verified_solution`). To NIJE tvrdnja da je
+    izvod ispravan — nego da nema svježeg, neprovjerenog izvoda.
+
+    Sve ostalo (parafraza, ispravnost međukoraka, semantička vjernost lekciji,
+    nova tehnika opisana riječima) i dalje traži ručni pregled."""
     verified = {spot.key for spot in release_contract.BLIND_SPOTS
                 if spot.strength == release_contract.DETERMINISTICALLY_VERIFIED}
-    assert verified == {"value_answer_leak"}
+    assert verified == {"value_answer_leak", "server_composed_top_hint"}
+    assert release_contract.blind_spot("false_intermediate_reasoning").strength == \
+        release_contract.MANUAL_SEMANTIC_REVIEW_REQUIRED
 
 
 def test_value_shaped_leak_oracle_really_still_works():

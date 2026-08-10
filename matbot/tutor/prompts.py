@@ -5,14 +5,24 @@ nikad kao ručno napisan prompt po lekciji. Zajednička matematička/jezička
 pravila se ne dupliraju: dolaze iz `matbot/rules.py`, isto kao i ranije, pa
 terminologija i notacija ostaju identične u sva tri moda.
 
-Dva prompta:
+Tri prompta:
   • `build_tutor_*`    — nacrt (namjera + odgovor + eventualan zadatak),
-  • `build_reviewer_*` — NEZAVISNA provjera i konačan payload.
+  • `build_reviewer_*` — NEZAVISNA provjera i konačan payload,
+  • `build_help_*`     — SAMO pomoć nad AKTIVNIM zadatkom (arhitektonska Faza 2).
 
 Recenzent NAMJERNO ne dobija „odobri ako izgleda dobro“ ton: traži se da sam
 riješi zadatak prije nego što išta odobri.
+
+ZAŠTO POSTOJI TREĆI PROMPT (Faza 2). Turn pomoći je do sada dobijao DOSLOVNO
+isti sistemski prompt kao izrada zadatka: ugovor MCQ paketa, strukturisani
+potpis, ciljani nivo težine, polazna složenost, pravila smjera težine — ništa
+od toga ne opisuje nagovještaj. Kad server DETERMINISTIČKI zna da je turn pomoć
+(učenik je pritisnuo dugme, `pipeline._explicit_ui_action`), prompt se sužava na
+ono što pomoć stvarno traži. Ugovor izrade zadatka ostaje bajt za bajt
+nepromijenjen — kucana poruka i dalje ide kroz `build_tutor_*`, jer prije poziva
+namjera nije serverska činjenica.
 """
-from matbot import difficulty_profiles, difficulty_target
+from matbot import difficulty_profiles, difficulty_target, hint_policy
 from matbot.lesson_fidelity import semantic_task_requirement
 from matbot.mcq_integrity import explicit_compound_divisor_request
 from matbot.rules import build_shared_math_rules
@@ -39,20 +49,59 @@ def _clip(text, limit=_CLIP):
 # ponovljeno „Ne znam“ vraćalo istu neupotrebljivu najavu. Zatečeni
 # jednopozivni put je ovu ljestvicu imao (matbot/prompts.py); univerzalni ju je
 # pri pivotu izgubio.
+#
+# ARHITEKTONSKA FAZA 2 — VRH LJESTVICE VIŠE NIJE MODELOV. Zatečeni nivo 3 je
+# tražio „CIJELI postupak i konačan rezultat“ od modela, bez recenzenta i bez
+# ijednog preflighta — tako je FW-X03 nagovještaj 3 objavio TAČAN zaključak
+# preko NETAČNE međutvrdnje. Nivo 3 sada sastavlja server iz PROVJERENOG
+# rješenja objavljenog zadatka (matbot/hint_policy.py::compose_top_hint), pa
+# tekst ovog nivoa opisuje TU činjenicu — prompt ne smije obećavati autorstvo
+# koje model više nema.
 _HINT_LEVEL_GUIDANCE = {
     0: ("SLJEDEĆI HINT JE NIVO 1: usmjeri na PRVI KORAK (koje pravilo ili "
         "operacija se primjenjuje), BEZ računa i BEZ rezultata."),
     1: ("SLJEDEĆI HINT JE NIVO 2: daj KONKRETAN međukorak — tačno koji račun "
         "treba izvesti — ali JOŠ BEZ konačnog rezultata."),
-    2: ("SLJEDEĆI HINT JE NIVO 3: pokaži CIJELI postupak i konačan rezultat; "
-        "učenik je već dva puta zapeo."),
+    2: ("SLJEDEĆI HINT JE NIVO 3: cijeli postupak i konačan rezultat sastavlja "
+        "SERVER iz već provjerenog rješenja ovog zadatka — ne izmišljaj nov "
+        "izvod. U `hint` napiši samo kratku uputu za posljednji korak."),
+}
+
+# LJESTVICA ZA TVRDNJU/PREPOZNAVANJE (Faza 2). Kad je odgovor ISKAZ, a ne
+# vrijednost, generična uputa „koje pravilo se primjenjuje“ je nebezbjedna: to
+# pravilo JE odgovor. Živi FW-X03 nagovještaj 1 je zato doslovno izrekao
+# označenu tvrdnju, a TR-B1 nagovještaj 1 njen kriterij kao parafrazu. Za tu
+# klasu nagovještaje 1 i 2 sastavlja server
+# (matbot/hint_policy.py::compose_propositional_hint), pa ovaj tekst modelu
+# govori tačno to i traži uputu koja NE izriče kriterij odluke.
+_PROPOSITIONAL_HINT_LEVEL_GUIDANCE = {
+    0: ("SLJEDEĆI HINT JE NIVO 1: odgovor na ovaj zadatak je TVRDNJA, ne "
+        "vrijednost, pa nagovještaj ovog nivoa sastavlja SERVER. Ne izriči "
+        "definiciju, kriterij ni svojstvo po kojem se bira tačna opcija; u "
+        "`hint` napiši samo ŠTA učenik treba uporediti među ponuđenim opcijama."),
+    1: ("SLJEDEĆI HINT JE NIVO 2: odgovor je TVRDNJA, pa i ovaj nivo sastavlja "
+        "SERVER. Ne izriči tvrdnju koja jedinstveno bira tačnu opciju; u `hint` "
+        "napiši samo kako se izbor sužava provjerom svih opcija."),
+    2: ("SLJEDEĆI HINT JE NIVO 3: postupak i konačan odgovor sastavlja SERVER "
+        "iz već provjerenog rješenja ovog zadatka — ne izmišljaj nov izvod."),
 }
 
 
-def _hint_level_guidance(hint_level):
-    guidance = _HINT_LEVEL_GUIDANCE.get(hint_level, _HINT_LEVEL_GUIDANCE[2])
+def _hint_level_guidance(hint_level, task_class=hint_policy.COMPUTATIONAL):
+    table = (_HINT_LEVEL_GUIDANCE if task_class == hint_policy.COMPUTATIONAL
+             else _PROPOSITIONAL_HINT_LEVEL_GUIDANCE)
+    guidance = table.get(hint_level, table[2])
     return (guidance + " Svaki hint mora donijeti NOVU informaciju u odnosu na "
             "prethodni — nikad ne ponavljaj raniji hint drugim riječima.")
+
+
+def session_task_class(session):
+    """Klasa AKTIVNOG zadatka iz SERVER-VLASNIČKE sesije (nikad iz proze modela).
+
+    Tanak alias nad `hint_policy.session_task_class` — sastavljanje konteksta
+    (tekst zadatka + objavljene opcije + serverski `correct_option_id`) živi na
+    JEDNOM mjestu, pa produkcija i evaluator ne mogu mjeriti različitu klasu."""
+    return hint_policy.session_task_class(session)
 
 
 def _lesson_block(context):
@@ -106,7 +155,8 @@ def _state_block(session, student_message, trusted_verdict=None, ui_action=""):
             )
         lines.append(f"- TEŽINA AKTIVNOG ZADATKA: {session['difficulty']}")
         lines.append(f"- BROJ VEĆ DATIH HINTOVA: {session['hint_level']}")
-        lines.append("- " + _hint_level_guidance(session["hint_level"]))
+        lines.append("- " + _hint_level_guidance(session["hint_level"],
+                                                 session_task_class(session)))
     else:
         lines.append("- AKTIVNI ZADATAK: ne postoji (učenik još nije dobio zadatak)")
 
@@ -212,6 +262,18 @@ server's numeric verifier reads exactly that, and the whole turn is discarded.""
 # ZAPISA za polja pomoći — do sada su `hint` i `worked_solution` bili jedina
 # vidljiva površina za koju prompt nigdje nije rekao da prolazi kroz ISTI
 # deterministički prag kao tekst zadatka.
+#
+# ARHITEKTONSKA FAZA 2 — JEDNA NADVLADANA REČENICA UKLONJENA. Blok je do sada
+# kao primjer nosio `$\\vec{v}\\cdot\\vec{n}$` i `\\vec`/`\\overrightarrow` u
+# listi „koristi ove komande“. Taj primjer je uveden zbog `\tdot` nalaza (kako
+# se piše skalarni proizvod), ali je time DOSLOVNO pozivao na zapis koji je u
+# istoj porodici lekcija proizveo drugi živi blokator: TR-B1 nagovještaj 2 je
+# lekciji 9. razreda osnovne škole ponudio parametarski oblik prave i skalarni
+# proizvod. `\\vec` OSTAJE na mathsafe allowlisti — „je li zapis bezbjedan“ i
+# „pripada li ovom zadatku“ su dva različita pitanja (isti razlog kao za
+# MATHJAX_COMMAND_ALLOWLIST u CLAUDE.md) — a proporcionalnost sada sudi
+# deterministički (matbot/hint_policy.py::out_of_scope_notation_codes). Dužnost
+# „ne izmišljaj komandu“ iz izvornog nalaza ostaje netaknuta.
 _HELP_NOTATION_RULE = """ZAPIS U `hint` I `worked_solution` (isti prag kao za zadatak):
 - Oba polja prolaze kroz ISTU determinističku provjeru zapisa kao tekst zadatka.
   Jedna nepoznata LaTeX komanda unutar $...$ obara CIO turn: učenik ne dobije
@@ -219,12 +281,17 @@ _HELP_NOTATION_RULE = """ZAPIS U `hint` I `worked_solution` (isti prag kao za za
   nivou — sljedeći zahtjev zato NE može dati završno rješenje.
 - Koristi ISKLJUČIVO komande koje ovaj projekat već koristi: \\frac, \\sqrt,
   \\cdot, \\times, \\div, \\le, \\ge, \\neq, \\approx, \\in, \\mid, \\angle,
-  \\perp, \\parallel, \\vec, \\overrightarrow, \\pi i grčka slova, \\text.
+  \\perp, \\parallel, \\pi i grčka slova, \\text.
 - Ako komanda nije na toj listi, NE IZMIŠLJAJ je i ne skraćuj joj ime: napiši
   isti korak riječima ili već dozvoljenom komandom. Izmišljena komanda je za
   server isto što i pokvaren zapis — ne pogađa se šta je trebala značiti.
-- Množenje I skalarni proizvod pišu se OBA kao $\\cdot$ (npr. $\\vec{v}\\cdot\\vec{n}$)
-  — nikad nekom drugom „tačka“ komandom.
+- Množenje se piše kao $\\cdot$ (npr. $3\\cdot 4$) — nikad nekom drugom „tačka“
+  komandom.
+- NE UVODI MATEMATIKU KOJE NEMA U ZADATKU. Vektorski zapis, integral, suma,
+  granična vrijednost, matrica i slična napredna mašinerija smiju se pojaviti u
+  pomoći SAMO ako ih sam zadatak, njegove opcije ili njegovo rješenje već
+  koriste. Server to provjerava deterministički i odbija pomoć koja uvodi novu
+  tehniku — pomoć mora ostati u okviru postupka kojim je zadatak riješen.
 - Backslash svake komande mora biti ispravno JSON-escapeovan (dupli backslash),
   da poslije parsiranja ostane komanda (\\cdot), a ne kontrolni znak (TAB, form
   feed) iza kojeg vise gola slova."""
@@ -461,6 +528,130 @@ def build_tutor_input(context, session, student_message, trusted_verdict=None,
     return "\n\n".join([
         _lesson_block(context),
         _state_block(session, student_message, trusted_verdict, ui_action),
+        "Vrati strukturisan odgovor prema šemi.",
+    ])
+
+
+# ---------------------------------------------------------------------------
+# PROMPT POMOĆI (arhitektonska Faza 2)
+# ---------------------------------------------------------------------------
+# Sadrži SAMO ono što pomoć nad aktivnim zadatkom stvarno traži. Ne nosi ugovor
+# MCQ paketa, strukturisani potpis, ciljani nivo težine, polaznu složenost,
+# pravila smjera težine ni ugovore autorstva zadatka — ništa od toga ne opisuje
+# nagovještaj, a mjerenje je pokazalo da je turn pomoći do sada dobijao cijeli
+# prompt za IZRADU zadatka. Ugovor izrade se ne dira: ovaj prompt se koristi
+# ISKLJUČIVO kad je server deterministički utvrdio da je turn pomoć
+# (`pipeline._explicit_ui_action`).
+
+_HELP_FIELD_RULE = """PRAVILO POLJA ZA TURN POMOĆI (server odbija payload koji ga prekrši):
+- `intent` mora biti TAČNO ona vrijednost koju server navodi kao TRAŽENU AKCIJU;
+- `new_task` mora biti null — u ovom turnu se NE SMIJE izdati nov zadatak, ni
+  lakši, ni teži, ni sljedeći. Zahtjev za novim zadatkom server ovdje odbija;
+- `grading` mora biti null — ovaj turn ne ocjenjuje učenika;
+- `difficulty_diagnostics` mora biti null — težina se u ovom turnu ne mijenja;
+- za `hint_request` popuni `hint`; za `full_solution_request` popuni `worked_solution`;
+- `lesson_focus` popuni: koju tačno vještinu izabrane lekcije ovaj korak pomoći cilja;
+- `reply` je kratak uvod, a `hint` / `worked_solution` nosi STVARNU pomoć —
+  server ih dopisuje uz `reply`, pa najava bez sadržaja učeniku ne pomaže."""
+
+
+_HINT_LADDER_COMPUTATIONAL = """LJESTVICA POMOĆI — RAČUNSKI ZADATAK (odgovor je vrijednost ili izraz):
+- NIVO 1: imenuj PRVI KORAK — koje pravilo, operacija, formula ili zapis se
+  primjenjuje na brojeve i objekte IZ OVOG zadatka. Bez računanja i bez rezultata.
+- NIVO 2: izvedi JEDAN konkretan međukorak (svođenje na zajednički nazivnik,
+  prebacivanje člana, uvrštavanje, skraćivanje) i ostavi učeniku posljednji
+  korak. Još bez konačnog rezultata.
+- Konačan rezultat i tekst označene opcije NE SMIJU se pojaviti na nivou 1 ni 2
+  — ni kao vrijednost, ni unutar računa, ni kao „dakle dobiješ …“. Server to
+  provjerava deterministički i takav tekst zamjenjuje neutralnim korakom, pa
+  učenik izgubi pomoć koju si mu htio dati.
+- Svaki nivo mora donijeti NOVU informaciju: nivo 2 je STROGO jači od nivoa 1,
+  nikad njegova parafraza.
+- Pomoć mora biti vezana za brojeve i objekte iz aktivnog zadatka. Generični
+  podsticaj („razmisli još malo“, „prisjeti se gradiva“, „provjeri opcije“)
+  server odbija kao pomoć bez sadržaja."""
+
+
+_HINT_LADDER_PROPOSITIONAL = """LJESTVICA POMOĆI — PREPOZNAVANJE TVRDNJE (odgovor je iskaz, ne vrijednost):
+- Ovdje je „pravilo koje se primjenjuje“ ISTOVREMENO i odgovor, pa je uputa
+  „primijeni definiciju“ otkrivanje rješenja, a ne pomoć.
+- NIVO 1: reci ŠTA treba uporediti među SVIM ponuđenim opcijama — o kojim
+  objektima govore, koje svojstvo im pripisuju, važi li to u svakom slučaju ili
+  samo u nekom. NE izriči definiciju, kriterij, svojstvo ni teoremu po kojoj se
+  bira tačna opcija i NE parafraziraj označenu opciju.
+- NIVO 2: suzi izbor — reci kako se opcija obara protivprimjerom ili kako se
+  provjerava smjer implikacije. I dalje ne smiješ jedinstveno odrediti tačnu opciju.
+- Nijedno svojstvo koje ima SAMO tačna opcija, a samo po sebi odlučuje pitanje,
+  ne smije se pojaviti u nagovještaju nivoa 1 ili 2 — ni doslovno ni parafrazom.
+- Za ovu klasu zadatka nagovještaj po pravilu sastavlja server iz strukture
+  ponuđenih opcija; tvoj tekst se koristi samo kad server nije mogao unaprijed
+  znati da je ovaj turn pomoć."""
+
+
+def _help_state_block(session, student_message, ui_action, task_class):
+    """Stanje potrebno ISKLJUČIVO za pomoć — bez težine, historije zadataka i
+    ugovora izrade."""
+    lines = ["AKTIVNI ZADATAK (pomoć se odnosi ISKLJUČIVO na njega):",
+             f"- pitanje: {session['current_task']}"]
+    if session.get("current_options"):
+        lines.append("- PONUĐENE OPCIJE (učenik ih vidi ovim redom):")
+        for option in session["current_options"]:
+            lines.append(f"  {option['id']}) {option['text']}")
+    if session.get("expected_answer_summary"):
+        if ui_action == "hint_request":
+            lines.append(
+                "- INTERNI TAČAN ODGOVOR (učenik ga NE vidi; služi ti SAMO za "
+                "samoprovjeru i NE SMIJEŠ ga napisati ni u kojem obliku): "
+                f"{session['expected_answer_summary']}")
+        else:
+            lines.append(
+                "- INTERNI TAČAN ODGOVOR (postupak mora završiti tačno na njemu): "
+                f"{session['expected_answer_summary']}")
+    lines.append(f"- KLASA ZADATKA (serverska činjenica): {task_class} — "
+                 "primijeni ljestvicu pomoći za TU klasu.")
+    lines.append(f"- BROJ VEĆ DATIH HINTOVA: {session.get('hint_level', 0)}")
+    lines.append("- " + _hint_level_guidance(session.get("hint_level", 0), task_class))
+    lines.append("- TRAŽENA AKCIJA (serverska činjenica; polje `intent` mora biti "
+                 f"tačno ta vrijednost): {ui_action}")
+    if session.get("recent_turns"):
+        lines.append("- POMOĆ KOJU SI VEĆ DAO (ne ponavljaj je i ne parafraziraj):")
+        for turn in session["recent_turns"][-_MAX_HISTORY_TURNS:]:
+            lines.append(f"  Ti: {_clip(turn['tutor'])}")
+    lines.append(f"- NOVA PORUKA UČENIKA: „{_clip(student_message, 400)}“")
+    return "\n".join(lines)
+
+
+def build_help_instructions(context):
+    """Sistemski prompt turna POMOĆI. Stabilan prefiks, identičan za svih 534.
+
+    Oba ugovora ljestvice stoje u prefiksu (i računski i propozicioni), pa je
+    prefiks bajt za bajt isti za sve lekcije i keš prompta radi; koja ljestvica
+    važi kaže server u ulazu."""
+    shared = build_shared_math_rules(
+        context.grade, context.title, context.oblast, mode="practice"
+    )
+    return (
+        "Ti si iskusan nastavnik matematike u osnovnoj školi u Bosni i "
+        "Hercegovini. Učenik ima AKTIVAN zadatak i tražio je pomoć. U ovom turnu "
+        "NE praviš nov zadatak — pomažeš mu da sam riješi onaj koji već stoji "
+        "pred njim.\n\n"
+        f"{_HELP_FIELD_RULE}\n\n"
+        f"{_HINT_LADDER_COMPUTATIONAL}\n\n"
+        f"{_HINT_LADDER_PROPOSITIONAL}\n\n"
+        f"{_SCALED_DIVISION_RULE}\n\n"
+        f"{_HELP_NOTATION_RULE}\n\n"
+        "TON: obraćaj se učeniku direktno, toplo i kratko. Nikad ne spominji "
+        "interna polja, „namjeru“, recenzenta ni to da si model.\n\n"
+        # --- dinamički (po lekciji) dio TEK OD OVE TAČKE ---
+        f"{shared}\n"
+    )
+
+
+def build_help_input(context, session, student_message, ui_action="hint_request",
+                     task_class=hint_policy.COMPUTATIONAL):
+    return "\n\n".join([
+        _lesson_block(context),
+        _help_state_block(session, student_message, ui_action, task_class),
         "Vrati strukturisan odgovor prema šemi.",
     ])
 

@@ -153,21 +153,37 @@ def test_explicit_full_solution_request_may_reveal_the_answer(store, fake_llm):
     assert response.get("revealed_correct_option_id")
 
 
-def test_third_hint_may_show_the_result(store, fake_llm):
-    """Prompt ljestvica: nivo 3 izričito pokazuje cijeli postupak i rezultat."""
+def test_third_hint_shows_the_result_from_the_verified_artifact(store, fake_llm):
+    """Nivo 3 DAJE rezultat — ali od Faze 2 ga sastavlja SERVER, ne model.
+
+    ZATEČENO: vrh ljestvice je bio svježa proza modela i prolazio je
+    nepromijenjen (anti-leak gate ga izričito izuzima). Baš tako je FW-X03
+    nagovještaj 3 objavio tačan zaključak preko NETAČNE međutvrdnje.
+
+    OD FAZE 2: tekst dolazi iz recenzentom odobrenog `solution` polja
+    objavljenog paketa (`hint_policy.compose_top_hint`). Rezultat je i dalje tu
+    — model kao autor izvoda nije."""
+    from matbot import hint_policy
+
     _seed_task(store, fake_llm)
     for index in range(2):
         _text_turn(store, fake_llm, "Ne znam.", SAFE_REPLY, intent="hint_request",
                    hint=SAFE_REPLY)
     assert store.peek("leak-1")["hint_level"] == 2
 
-    full = "Cijeli postupak: iz $x+2=9$ slijedi $x=9-2=7$, dakle $x=7$."
-    draft = make_tutor_draft(intent="hint_request", reply=full, new_task=None, hint=full)
+    fresh_proof = "Cijeli postupak: iz $x+2=9$ slijedi $x=9-2=7$, dakle $x=7$."
+    draft = make_tutor_draft(intent="hint_request", reply=fresh_proof, new_task=None,
+                             hint=fresh_proof)
     queue_two_call(fake_llm, draft=draft)
     response = tutor_pipeline.run_turn(store, fake_llm,
                                        _turn("Ne znam.", client_turn_id="leak-t9"))
-    assert full in response["answer"]                       # prolazi nepromijenjen
-    assert response["answer"] != tutor_pipeline.LEAK_BLOCKED_REPLY
+
+    answer = response["answer"]
+    assert answer.startswith(hint_policy.TOP_HINT_INTRO)
+    assert fresh_proof not in answer, "svježa proza modela se NE objavljuje"
+    assert "x=7" in answer.replace(" ", "")             # rezultat je i dalje tu
+    assert answer != tutor_pipeline.LEAK_BLOCKED_REPLY
+    assert store.peek("leak-1")["hint_level"] == 3
 
 
 def test_value_already_visible_in_the_task_is_not_treated_as_a_leak(store, fake_llm):

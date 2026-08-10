@@ -219,7 +219,13 @@ DEFAULT_TUTOR_OPTIONS = ("$\\frac{5}{7}$", "$\\frac{5}{14}$", "$\\frac{6}{7}$", 
 
 def make_task_payload(text=DEFAULT_TUTOR_TASK_TEXT, options=None,
                       correct_option_index=0, expected="$\\frac{5}{7}$",
-                      difficulty="standard"):
+                      difficulty="standard", solution=None):
+    """`solution` je namjerno zaseban od `expected` (arhitektonska Faza 2).
+
+    Vrh ljestvice nagovještaja i puno rješenje se od Faze 2 sastavljaju iz
+    RECENZENTOM ODOBRENOG `solution` polja objavljenog paketa, pa test koji
+    ispituje taj put mora moći napisati stvaran postupak, a ne samo rezultat.
+    Podrazumijevano ostaje `expected` — svaki zatečeni test se ponaša isto."""
     from matbot.tutor.schema import (DifficultyEvidence, SignatureParameter, TaskPayload,
                                      TaskSignature, TutorOption)
 
@@ -234,7 +240,7 @@ def make_task_payload(text=DEFAULT_TUTOR_TASK_TEXT, options=None,
         correct_option_index=correct_option_index,
         correct_option_id="abcd"[correct_option_index],
         expected_answer=expected,
-        solution=expected,
+        solution=expected if solution is None else solution,
         difficulty=difficulty,
         difficulty_evidence=DifficultyEvidence(
             reasoning_steps=1, condition_count=1, operation_count=1,

@@ -37,7 +37,21 @@ FINAL40_OVERRIDES = {
     "AI_TUTOR_TIMEOUT": "45",
 }
 
-CAMPAIGNS = {"final40": FINAL40_OVERRIDES}
+# F6H (Phase-2 help architecture) deliberately reuses the FINAL40 runtime, the
+# canonical live-validation candidate configuration — same models, same
+# reasoning effort, same output ceiling and the same **45 second** per-call
+# timeout.  Without a registered campaign the runner would fall back to the
+# unconfigured product default `AI_TUTOR_TIMEOUT=30`
+# (`matbot/config.py::AI_TIMEOUT_S`), which is the product's own default and was
+# never the authoritative live-validation value.  Nothing in the product's
+# timeout code changes; this is launcher configuration only.
+F6H_OVERRIDES = dict(FINAL40_OVERRIDES)
+
+CAMPAIGNS = {"final40": FINAL40_OVERRIDES, "f6h": F6H_OVERRIDES}
+
+# Per-call timeout every registered campaign must run with, in seconds. Frozen
+# so a future campaign cannot silently inherit the 30 s product default.
+CANONICAL_CAMPAIGN_TIMEOUT_S = "45"
 
 
 class CampaignConfigurationError(ValueError):

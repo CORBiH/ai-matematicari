@@ -35,6 +35,17 @@ Flask + a single-page frontend, one OpenAI call per turn, no database.
    no hidden replacement call. If output is bad, reject it and return the canned
    safe message. A rejection never costs an extra call. See
    [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#the-two-call-practice-boundary).
+
+   *Amendment (Phase 2, help ladder):* a **help** turn never reaches the
+   Reviewer (there is no package to review) and now often reaches no model at
+   all. The **ladder top (hint 3) and the full solution are server-composed from
+   the Reviewer-approved `solution`/`expected_answer` of the published task — 0
+   calls** — and for a task whose answer is a *proposition* hints 1 and 2 are
+   server-composed too. Only hint 1/2 on a *computational* task still spends
+   exactly one call, through the dedicated help prompt. Without a verified
+   solution artifact the full reveal **fails closed**; a fresh model derivation
+   is never requested. Policy lives in `matbot/hint_policy.py`, flow in
+   `matbot/tutor/pipeline.py`.
 5. **All 534 lessons use ONE active Practice pipeline** — the universal
    two-call Tutor+Reviewer path (`matbot/tutor/`). There is no separate active
    orchestration for "contracted" vs "legacy" lessons. Curriculum metadata and
@@ -59,6 +70,40 @@ Flask + a single-page frontend, one OpenAI call per turn, no database.
    `fail_closed`. Deterministic server checks still run on top of whatever the
    Reviewer returns: math safety, terminology, numeric consistency, geometry
    notation, and option uniqueness can reject a task the Reviewer approved.
+5e. **A hint is never allowed to state the criterion that selects the marked
+   answer, and the ladder top never carries fresh reasoning.** Both were live
+   release blockers (FW-X03, TR-B1). The protection is **construction, not
+   detection**: the task class comes from the shape of the *published* options
+   (`matbot/hint_policy.py`), the propositional templates copy nothing from the
+   options, and the ladder top/full solution are composed from artifacts that
+   already passed the Reviewer and every publication validator. Do not "fix" the
+   token-level proposition measure with stemming — it was measured to destroy the
+   one case it does prove. Do not let a hint introduce mathematical machinery
+   absent from the approved task, its options, or its approved solution.
+
+   **`COMPUTATIONAL` requires positive proof of a value/result shape** — a short
+   *symbolic* option (`$p \perp \alpha$`, `$A \subset B$`, `$\mathbb{Z}$`,
+   `$\alpha+\beta=180^\circ$`) is recognition, not a value. Never reintroduce the
+   rule "few prose words ⇒ computational", and never let `task_type`,
+   `task_signature.answer_type` or a lesson title pick the ladder: the first two
+   have no server-side value validation, and the third would break the invariant
+   that one lesson may yield both classes. When in doubt the propositional ladder
+   wins — safety over availability.
+
+   **The same answer form means different things in different tasks**, so the
+   classifier takes the **published task text** as its first input. Only a *pure
+   quantity* (no relation operator, no named object) is computational from its
+   shape; a *relation-like* answer (`$x>3$`, `$x=3$`, `$P=24$ cm`) needs
+   `mcq_integrity.evaluate_linear_solve_mcq` to actually solve the published task
+   and confirm the marked option is that result. `hint_policy.session_task_class`
+   is the single entry point — production and the evaluator must never derive the
+   class from different context.
+
+   **The server must never teach an invalid method.** Propositional level 2
+   compares each option against the task's given conditions and the lesson's
+   definition; it must not tell the student that one counterexample refutes an
+   option (false for existential and configuration-specific claims), and must not
+   present the converse of an implication as a test of the implication.
 5c. **Practice difficulty never changes lesson identity.** Easier/harder keep
    the lesson's skill and move only difficulty dimensions. The Tutor must report
    which dimensions moved (`difficulty_diagnostics`) and the Reviewer verifies
@@ -174,6 +219,7 @@ Flask + a single-page frontend, one OpenAI call per turn, no database.
 | HTTP routing, guard chain, mode dispatch | `matbot/api.py` |
 | Payload validation (grade/mode/ids/history/topic) | `matbot/validation.py` |
 | Practice turn orchestration + session state | `matbot/practice.py`, `matbot/session_store.py` |
+| Help-ladder policy (task class, server-composed hints, scope gate) | `matbot/hint_policy.py` |
 | Explain turn orchestration (stateless) | `matbot/explain.py` |
 | Result/Quick turn orchestration (stateless) | `matbot/quick.py` |
 | Shared maths/language/notation prompt rules | `matbot/rules.py` |

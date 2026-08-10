@@ -24,6 +24,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from matbot.hint_policy import COMPUTATIONAL as COMPUTATIONAL_CLASS
+from matbot.hint_policy import PROPOSITIONAL as PROPOSITIONAL_CLASS
 from tools.practice_eval import classify
 
 # --- jačina dokaza ---------------------------------------------------------
@@ -46,12 +48,24 @@ IDENTIFIER_ONLY_CHECKS = frozenset({
     "stays_in_lesson",
 })
 
+# OGRANIČEN (token-nivo) DOKAZ — arhitektonska Faza 2. PASS ovih provjera znači
+# „struktura otkrivanja se nije mogla dokazati po TAČNIM tokenima“, a ne
+# „nagovještaj semantički ne otkriva odgovor“. Živi TR-B1 dokazuje razliku:
+# parafraza u drugom padežu prolazi mjerač. Klasu parafraze zatvara KONSTRUKCIJA
+# u proizvodu (`matbot/hint_policy.py`: server sam sastavlja nagovještaje 1 i 2
+# kad je odgovor tvrdnja), pa ovaj PASS nikad ne smije nositi spremnost izdanja.
+BOUNDED_TOKEN_CHECKS = frozenset({
+    "hint_proposition_no_leak",
+})
+
 # Provjere čiji je SKIP po dizajnu čest i znači „ne mogu ništa dokazati“.
 # Nabrojane su da izvještaj ne bi smio prikazati njihov izostanak kao uspjeh.
 KNOWN_SKIPPING_CHECKS = frozenset({
     "numeric_consistent", "geometry_ok", "task_self_contained",
     "solution_complete", "hint_no_leak", "no_answer_leak", "package_clean",
     "free_text_grading_no_oracle",
+    "hint_proposition_no_leak", "hint_top_from_verified_solution",
+    "help_has_task_scaffold", "help_notation_in_scope",
 })
 
 
@@ -63,7 +77,7 @@ def strength_for_check(name: str, outcome: str) -> str:
         return MANUAL_SEMANTIC_REVIEW_REQUIRED
     if outcome == "pass":
         # PASS provjere koja poredi samo identifikator NIJE semantički dokaz.
-        if name in IDENTIFIER_ONLY_CHECKS:
+        if name in IDENTIFIER_ONLY_CHECKS or name in BOUNDED_TOKEN_CHECKS:
             return MANUAL_SEMANTIC_REVIEW_REQUIRED
         return DETERMINISTICALLY_VERIFIED
     return NOT_APPLICABLE
@@ -95,23 +109,65 @@ BLIND_SPOTS = (
     BlindSpot(
         key="proposition_answer_leak",
         question="Does the reply restate the marked PROPOSITION for hint 1/2?",
-        owner="nobody in production; tools.practice_eval.hintsemantics measures a subset",
+        owner=("matbot.hint_policy — construction for propositional tasks (server "
+               "composes hints 1/2); checks.check_hint_proposition_no_leak measures "
+               "the exact-token subset"),
+        # Konstrukcija zatvara klasu za propozicione zadatke, ali mjerač i dalje ne
+        # dosiže parafrazu, a računski zadaci ostaju modelovi — najjača ISTINITA
+        # tvrdnja o proizvoljnom nagovještaju ostaje ručni pregled.
         strength=MANUAL_SEMANTIC_REVIEW_REQUIRED,
         live_evidence="FW-X03 hint 1 (hint_no_leak PASS) and TR-B1 hint 1 (audit: 0 leaks)",
     ),
     BlindSpot(
+        key="server_composed_top_hint",
+        question="Is the ladder top / full solution a verified artifact, not fresh prose?",
+        owner=("matbot.hint_policy.compose_top_hint via matbot.tutor.pipeline; "
+               "checks.check_hint_top_from_verified_solution re-derives and compares it"),
+        strength=DETERMINISTICALLY_VERIFIED,
+        live_evidence="FW-X03 hint 3 was fresh model prose with a false intermediate step",
+    ),
+    BlindSpot(
         key="false_intermediate_reasoning",
         question="Is every inference inside a hint or solution mathematically sound?",
-        owner="nobody — mathcheck skips any expression carrying a variable",
+        owner=("nobody for model-authored hint levels 1-2 — mathcheck skips any "
+               "expression carrying a variable; the ladder top no longer contains "
+               "model-authored reasoning at all"),
         strength=MANUAL_SEMANTIC_REVIEW_REQUIRED,
         live_evidence="FW-X03 hint 3 published a false in-plane perpendicularity implication",
     ),
     BlindSpot(
         key="final_answer_without_verified_derivation",
         question="Does a correct final result prove the published derivation?",
-        owner="checks.check_solution_complete — locates the result, never the proof",
+        owner=("checks.check_solution_complete locates the result, never the proof; "
+               "provenance is now proven separately by "
+               "checks.check_hint_top_from_verified_solution"),
         strength=MANUAL_SEMANTIC_REVIEW_REQUIRED,
         live_evidence="FW-X03 step 3 recorded solution_complete=SKIP while the proof was false",
+    ),
+    BlindSpot(
+        key="help_out_of_grade_technique",
+        question="Does a hint introduce machinery absent from the approved task?",
+        owner=("matbot.hint_policy.out_of_scope_notation_codes via "
+               "matbot.tutor.pipeline; checks.check_help_notation_in_scope. It "
+               "proves only that certain advanced NOTATION was introduced; it "
+               "proves nothing about semantic grade appropriateness. For "
+               "propositional help the class is eliminated by construction "
+               "(server-composed hints 1-2, verified-artifact hint 3); for "
+               "MODEL-authored computational hints 1-2 grade/lesson semantic fit "
+               "stays a manual live-review duty until Phase 3 lesson contracts"),
+        strength=MANUAL_SEMANTIC_REVIEW_REQUIRED,
+        live_evidence="TR-B1 hint 2 served a parametric line and a dot product in grade 9",
+    ),
+    BlindSpot(
+        key="help_branch_coverage",
+        question="Did the campaign actually exercise BOTH help ladders?",
+        owner=("checks.task_class:<class> records the server-selected class AFTER "
+               "publication; release_contract.hint_branch_coverage counts it. A "
+               "scenario tag is never evidence — the model owns the generated "
+               "answer shape, so a miss is a coverage gap, never a defect"),
+        strength=MANUAL_SEMANTIC_REVIEW_REQUIRED,
+        live_evidence=("wave F6H labels lessons recognition/computational, but the "
+                       "class is only knowable from the published options"),
     ),
     BlindSpot(
         key="lesson_semantic_alignment",
@@ -175,6 +231,93 @@ def scenario_strengths(record) -> dict:
             if previous is None or order[current] < order[previous]:
                 strengths[name] = current
     return strengths
+
+
+# ---------------------------------------------------------------------------
+# POKRIVENOST GRANA POMOĆI (hardening prije živog talasa, Problem C)
+# ---------------------------------------------------------------------------
+# Oznaka scenarija („recognition“ / „computational“) NIJE dokaz da je grana
+# vožena: oblik opcija bira model pri generisanju, pa se klasa zna TEK poslije
+# objave. Ova funkcija čita SNIMLJENE rezultate provjere `task_class:<klasa>` i
+# broji koliko je grana STVARNO izvršeno. Ne poziva model i ne mijenja nijedan
+# postojeći izlaz kampanje.
+#
+# Scenario se broji SAMO kad je cijela ljestvica poslužena: klasa se poklopila i
+# vrh ljestvice je dokazano serverska kompozicija provjerenog artefakta.
+REQUIRED_PROPOSITIONAL_LADDERS = 3
+REQUIRED_COMPUTATIONAL_LADDERS = 3
+REQUIRED_SYMBOLIC_PROPOSITIONAL = 1
+
+
+@dataclass(frozen=True)
+class BranchCoverage:
+    propositional: tuple = ()
+    computational: tuple = ()
+    symbolic_propositional: tuple = ()
+    gaps: tuple = ()
+    complete: bool = False
+    notes: tuple = ()
+
+
+def _passed_checks(record) -> set:
+    names = set()
+    for turn in (record or {}).get("turns") or ():
+        for result in turn.get("check_results") or ():
+            if (result.get("outcome") or "") == "pass":
+                names.add(result.get("name") or "")
+    return names
+
+
+def _skipped_task_class_labels(record) -> list:
+    labels = []
+    for turn in (record or {}).get("turns") or ():
+        for result in turn.get("check_results") or ():
+            name = result.get("name") or ""
+            if name.startswith("task_class:") and (result.get("outcome") or "") == "skip":
+                labels.append(name)
+    return labels
+
+
+def hint_branch_coverage(records) -> BranchCoverage:
+    """Koje su grane ljestvice pomoći ŽIVO izvršene, po snimljenim zapisima."""
+    propositional, computational, symbolic, gaps, notes = [], [], [], [], []
+    for record in records or ():
+        scenario_id = (record or {}).get("id") or "?"
+        passed = _passed_checks(record)
+        served_top = "hint_top_from_verified_solution" in passed
+        if f"task_class:{PROPOSITIONAL_CLASS}" in passed and served_top:
+            propositional.append(scenario_id)
+            if "symbolic_marked_answer" in passed:
+                symbolic.append(scenario_id)
+        elif f"task_class:{COMPUTATIONAL_CLASS}" in passed and served_top:
+            computational.append(scenario_id)
+        else:
+            for label in dict.fromkeys(_skipped_task_class_labels(record)):
+                gaps.append(f"{scenario_id}:{label}")
+            if not _skipped_task_class_labels(record) and (
+                    f"task_class:{PROPOSITIONAL_CLASS}" in passed
+                    or f"task_class:{COMPUTATIONAL_CLASS}" in passed):
+                gaps.append(f"{scenario_id}: class matched but the ladder top was "
+                            "not proven server-composed")
+
+    complete = (len(propositional) >= REQUIRED_PROPOSITIONAL_LADDERS
+                and len(computational) >= REQUIRED_COMPUTATIONAL_LADDERS
+                and len(symbolic) >= REQUIRED_SYMBOLIC_PROPOSITIONAL)
+    if not complete:
+        notes.append(
+            "help branch coverage incomplete: Phase 2 needs at least "
+            f"{REQUIRED_PROPOSITIONAL_LADDERS} propositional and "
+            f"{REQUIRED_COMPUTATIONAL_LADDERS} computational full ladders plus "
+            f"{REQUIRED_SYMBOLIC_PROPOSITIONAL} short-symbolic propositional task; "
+            "a scenario tag is never evidence")
+    return BranchCoverage(
+        propositional=tuple(dict.fromkeys(propositional)),
+        computational=tuple(dict.fromkeys(computational)),
+        symbolic_propositional=tuple(dict.fromkeys(symbolic)),
+        gaps=tuple(dict.fromkeys(gaps)),
+        complete=complete,
+        notes=tuple(notes),
+    )
 
 
 def release_verdict(records, scenarios=None, manual_blockers=()) -> ReleaseVerdict:

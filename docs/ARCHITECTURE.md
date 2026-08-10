@@ -64,8 +64,10 @@ Call accounting for a Practice turn:
 | Outcome | Calls |
 |---|---|
 | blocked before the model (unknown lesson, invalid/stale click, completed task) | **0** |
+| help served by the server (see the help ladder below) | **0** |
 | Tutor timeout / transport failure | **1** |
 | Tutor draft violates the per-intent field rule (nothing to review) | **1** |
+| model-authored hint level 1/2 on a computational task | **1** |
 | approve, correct, fail_closed, or any server-side rejection afterwards | **2** |
 
 Enforced by construction, not by convention:
@@ -95,6 +97,111 @@ call for one user turn when `/chat/stream` fails **after** the model call (5xx o
 dropped connection). Known-blocking statuses (400/401/403/409/413/429) are already
 excluded from the fallback. Tracked as C-6 in [CURRENT_STATE.md](CURRENT_STATE.md).
 
+### The help ladder (Phase 2)
+
+Two published release blockers came out of the help path, and both were found by
+**manual reading** while every automatic check was green: a first hint that
+restated the marked *proposition* verbatim (the value-shaped leak oracle cannot
+see a sentence), and a third hint that reached the correct conclusion through a
+**false** intermediate step (fresh model prose, no Reviewer, no preflight). A
+second campaign added a hint that leaked the same criterion as a *paraphrase*,
+plus a hint that served a parametric line and a dot product to a grade-9
+*primary-school* lesson.
+
+Phase 2 does not answer these with more detection. It removes the unsafe classes
+by construction, in `matbot/hint_policy.py` (pure policy, no lesson IDs, no model)
+and `matbot/tutor/pipeline.py` (flow only):
+
+| Help step | Author | Calls |
+|---|---|---|
+| hint 1/2, answer is a **value/expression** (computational) | model, through the shaped help prompt | **1** |
+| hint 1/2, answer is a **proposition/recognition** | server template that copies **nothing** from the options | **0** |
+| hint 3 (ladder top) — any class | server composition of the **Reviewer-approved** `solution` + `expected_answer` | **0** |
+| full solution ("Uradi ga ti") — any class | same server composition | **0** |
+| lesson with a complete deterministic generator | its own stored ladder (Phase 4H, unchanged) | **0** |
+
+- **Task class is a server-owned structural fact**, derived from the shape of the
+  *published* options plus the server's own `correct_option_id` — never from
+  `task_type`, never from `task_signature.answer_type` (whose *value* no server
+  validator checks, so it is model prose in a structured field), never from model
+  prose, never from a lesson title or ID. The same lesson may validly yield both
+  classes.
+- **`COMPUTATIONAL` needs positive proof, not the absence of prose.** A short
+  *symbolic* option is not a value: `$p \perp \alpha$`, `$A \subset B$`,
+  `$A\cap B=\varnothing$`, `$\mathbb{Z}$` and `$\alpha+\beta=180^\circ$` are all
+  recognition answers. `hint_policy.value_shaped` therefore requires all four of:
+  at most two prose words outside math; a numeric literal (or `\pi` / `\infty`)
+  somewhere; no command that asserts a relation between named objects
+  (`\perp`, `\parallel`, `\subset`, `\cong`, `\varnothing`, …); and no part of
+  the answer naming two different objects — so `$x=2, y=3$` is two values while
+  `$\alpha+\beta=180^\circ$` is one assertion.
+- **The option shape alone is still not enough: the same form means two things.**
+  With options `$x>3$` / `$x>5$` / `$x>1$` / `$x\ge 4$`, "Riješi nejednačinu
+  $x-1>2$" asks for a *derived result* while "Which inequality describes all
+  numbers to the right of 3?" asks for *recognition of a notation*. The
+  classifier therefore takes the **published task text** as its first input, and
+  splits the value proof in two:
+  - a **pure quantity** (no relation operator, no named object: `150`, `$12$ cm`,
+    `$\frac{3}{4}$`, `$\sqrt{2}$`, `$4\pi$`, `$\{1,2,3\}$`, `$(2,3)$`) is
+    `COMPUTATIONAL` from its shape alone — a quantity cannot be a proposition, so
+    no task-level evidence is needed;
+  - a **relation-like** answer (`$x=3$`, `$x>3$`, `$y=2x+1$`, `$\alpha=60^\circ$`,
+    `$P=24$ cm`, set-builders) is `COMPUTATIONAL` **only** when
+    `mcq_integrity.evaluate_linear_solve_mcq` — the pre-existing server oracle
+    that already gates publication — reads a relation out of the published task,
+    solves it with exact `Fraction` arithmetic, and confirms the marked option is
+    that derived solution. No new mathematics and no keyword catalogue is added.
+  Anything unprovable falls back to the *propositional* ladder, the one that
+  states no decision criterion. Known conservative losses (labelled geometry
+  results such as `$P=24$ cm`, angle values, set-builder answers, system
+  solutions, computed set operations naming the sets, purely symbolic algebraic
+  results, domain classification) get useful server-composed help, never a
+  refusal — an availability trade Phase 3/4 can recover with richer contracts.
+- **No fresh unverified proof can reach the ladder top.** The published text is
+  a composition of artifacts that already passed generation, the Reviewer, and
+  every publication validator. Without such an artifact the full reveal **fails
+  closed** — the server never asks a model to invent a derivation.
+- The typed-message route cannot be classified before the call (intent is model
+  output there), so the call is spent — but the same server composition replaces
+  the model text. The guarantee never depends on which route the turn took.
+- **The propositional templates prescribe only universally valid reasoning.**
+  Level 1 compares objects, relations, assumed conditions and strength across all
+  options. Level 2 compares each option against the task's *given* conditions and
+  the lesson's definition, and rejects one only on a concrete conflict with those
+  two sources. An earlier level 2 told the student that one counterexample
+  refutes an option; that is invalid for existential claims ("a line and a plane
+  *can* have …" — such a distractor sits in the live TR-B1 package), for claims
+  about the task's specific configuration, and for definition recognition. The
+  server must never teach an invalid method, so that specialization was removed
+  outright: `implication_shaped` proves the *shape* of the options, never that
+  the task concerns a universal implication. The one remaining specialization is
+  a pure reading aid — separate hypothesis from conclusion and note that a
+  reversed direction is a *different* statement to be checked separately.
+- **Proportionality without Phase-3 curriculum data:** advanced machinery
+  (`\vec`, `\int`, `\sum`, `\lim`, matrices …) may appear in help only if the
+  approved task, its options, or its approved solution already use it. This gate
+  proves that certain advanced **notation** was introduced; it proves **nothing**
+  about semantic grade appropriateness. For propositional help the historical
+  TR-B1 advanced-technique class is eliminated by construction (server-composed
+  hints 1–2, verified-artifact hint 3); for **model-authored computational hints
+  1–2 grade/lesson semantic fit stays a manual live-review duty** until Phase 3
+  provides richer lesson contracts.
+- Secondary guards on model-authored help: the exact-token proposition-disclosure
+  measure, the contentless-help floor, and the pre-existing `feedback.leaks_answer`
+  gate. The token measure cannot reach a paraphrase — that class is closed by
+  construction above, and the evaluator classifies its PASS as bounded evidence,
+  never as semantic proof.
+- **A scenario label is not branch coverage.** The model owns the generated
+  answer shape, so the class is only knowable after publication. The campaign
+  records it with `task_class:<class>`; a mismatch is a SKIP → `COVERAGE_GAP`,
+  never a product failure. `release_contract.hint_branch_coverage` requires at
+  least 3 propositional and 3 computational full ladders plus one
+  short-symbolic propositional task before Phase 2 may claim coverage.
+- **One classifier, one context.** `hint_policy.session_task_class(session)` is
+  the single entry point: the help path (`matbot/tutor/`) and the evaluator
+  (`tools/practice_eval/`) both call it on the same session, so neither can
+  measure a weaker option-only class than the server actually acts on.
+
 ---
 
 ## Prompt assembly
@@ -112,6 +219,19 @@ Two layers, both deterministic — no model call is used to build a prompt.
 2. **Mode-specific** — `prompts.build_{instructions,explain_instructions,quick_instructions}`
    append behaviour rules, then `build_{input,explain_input,quick_input}` build the
    per-turn input block.
+
+The universal Practice path builds **three** prompts
+(`matbot/tutor/prompts.py`): `build_tutor_*` (draft), `build_reviewer_*`
+(independent verification), and — since Phase 2 — `build_help_*`, used only when
+the server has *deterministically* established that the turn is help (the student
+pressed a help button). The help prompt carries only what help needs: lesson
+identity, the visible task and options, the hint level and its ladder contract,
+the notation/terminology rules. It deliberately drops the task-authoring contract
+(structured package, target difficulty level, starting complexity, difficulty
+direction, solve-set authoring, the intent enum), which measurement showed help
+turns were receiving in full: 19 634 → 11 024 characters of system instructions
+on a sample lesson. Nothing was removed from the generation prompt; every rule
+family's reachability is gated by `tests/test_prompt_architecture_gate.py`.
 
 The prefix is stable per (grade, lesson) so OpenAI prompt caching can apply.
 The prompt never contains: all 500+ lessons, the raw payload, session ids, or

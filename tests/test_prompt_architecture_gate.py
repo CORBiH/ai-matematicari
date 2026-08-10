@@ -101,7 +101,14 @@ LESSON_ROWS = _lesson_rows()
 
 
 def _tutor_prompt_surface() -> str:
-    """Sve što `matbot/tutor/prompts.py` STVARNO pošalje, za svih 534 lekcije."""
+    """Sve što `matbot/tutor/prompts.py` STVARNO pošalje, za svih 534 lekcije.
+
+    ARHITEKTONSKA FAZA 2: modul od tada gradi TRI sistemska prompta, pa površina
+    mora sadržavati i onaj TREĆI (`build_help_instructions`). Bez ovog reda bi
+    kapija za blokove pravila POMOĆI tvrdila da su nedosežni — dakle mjerila bi
+    lažni kvar — a što je gore, novi mrtav blok POMOĆI bi joj bio nevidljiv.
+    Detektor se ovim ne slabi ni za jedan blok: skup mjerenih blokova je isti,
+    samo je pošiljka izmjerena u cijelosti."""
     parts = []
     for grade, topic_id, _title, _oblast in LESSON_ROWS:
         context = lesson_context_module.build(grade, topic_id)
@@ -109,6 +116,7 @@ def _tutor_prompt_surface() -> str:
             continue
         parts.append(tutor_prompts.build_tutor_instructions(context))
         parts.append(tutor_prompts.build_reviewer_instructions(context))
+        parts.append(tutor_prompts.build_help_instructions(context))
     return "\n".join(parts)
 
 
@@ -236,7 +244,8 @@ def _contradictory_level1_claims() -> tuple:
     """Fraze prisutne u POŠILJCI koje tvrde granicu različitu od mjerodavne."""
     context = lesson_context_module.build(9, "9-02-006")
     shipped = (tutor_prompts.build_tutor_instructions(context)
-               + "\n" + tutor_prompts.build_reviewer_instructions(context)).lower()
+               + "\n" + tutor_prompts.build_reviewer_instructions(context)
+               + "\n" + tutor_prompts.build_help_instructions(context)).lower()
     return tuple(
         (phrase, field, claimed, GLOBAL_LEVEL1_MAX[field])
         for phrase, field, claimed in LEVEL1_NUMERIC_CLAIMS
@@ -350,6 +359,9 @@ def test_level_one_semantics_restatement_inventory_is_frozen():
 TUTOR = "tutor"
 REVIEWER = "reviewer"
 BOTH = "both"
+# Arhitektonska Faza 2: treći sistemski prompt (`build_help_instructions`) ide
+# ISKLJUČIVO na turn pomoći koji je server deterministički prepoznao.
+HELP = "help"
 
 PROTECTED_RULE_FAMILIES = (
     # (porodica, dokazna fraza, primalac)
@@ -377,11 +389,20 @@ PROTECTED_RULE_FAMILIES = (
     ("shared_language_terminology", "PRAVILA JEZIKA I TERMINOLOGIJE", BOTH),
     ("shared_math_notation", "PRAVILA MATEMATIČKOG ZAPISA", BOTH),
     ("shared_arithmetic_selfcheck", "OBAVEZNA SAMOPROVJERA RAČUNA", BOTH),
+    # --- arhitektonska Faza 2: porodice prompta POMOĆI ---
+    ("help_field_contract", "PRAVILO POLJA ZA TURN POMOĆI", HELP),
+    ("help_ladder_computational", "LJESTVICA POMOĆI — RAČUNSKI ZADATAK", HELP),
+    ("help_ladder_propositional", "LJESTVICA POMOĆI — PREPOZNAVANJE TVRDNJE", HELP),
+    ("help_notation_in_help_prompt", "ZAPIS U `hint` I `worked_solution`", HELP),
+    ("help_scaled_division", "WHEN YOU SCALE BOTH SIDES OF A DIVISION", HELP),
+    ("help_lesson_identity", "KANONSKA LEKCIJA", HELP),
+    ("help_ladder_level_guidance", "SLJEDEĆI HINT JE NIVO 1", HELP),
+    ("help_language_terminology", "PRAVILA JEZIKA I TERMINOLOGIJE", HELP),
 )
 
 
 def _phase1_surfaces():
-    """Stvarno sastavljen Tutor i Reviewer prompt, uključujući ulazni blok.
+    """Stvarno sastavljen Tutor, Reviewer i Help prompt, uključujući ulazni blok.
 
     `_lesson_block`/`_state_block` idu u INPUT, ne u sistemske instrukcije, pa
     se porodice poput ljestvice nagovještaja moraju tražiti i tamo."""
@@ -389,6 +410,7 @@ def _phase1_surfaces():
     session = {
         "current_task": "Neka prava $p$ siječe ravan $\\alpha$ u tački $A$.",
         "current_options": [{"id": "a", "text": "$1$"}, {"id": "b", "text": "$2$"}],
+        "correct_option_id": "a",
         "expected_answer_summary": "$1$", "difficulty": "easy",
         "difficulty_level": 1, "hint_level": 0, "recent_tasks": [], "recent_turns": [],
     }
@@ -397,17 +419,22 @@ def _phase1_surfaces():
     reviewer = (tutor_prompts.build_reviewer_instructions(context) + "\n"
                 + tutor_prompts.build_reviewer_input(context, session, "Daj mi zadatak.",
                                                      "{}"))
-    return tutor, reviewer
+    help_prompt = (tutor_prompts.build_help_instructions(context) + "\n"
+                   + tutor_prompts.build_help_input(context, session, "Ne znam.",
+                                                    "hint_request"))
+    return tutor, reviewer, help_prompt
 
 
 def test_every_protected_rule_family_still_reaches_its_intended_call():
-    tutor, reviewer = _phase1_surfaces()
+    tutor, reviewer, help_prompt = _phase1_surfaces()
     missing = []
     for family, phrase, audience in PROTECTED_RULE_FAMILIES:
         if audience in (TUTOR, BOTH) and phrase not in tutor:
             missing.append(f"{family} → Tutor")
         if audience in (REVIEWER, BOTH) and phrase not in reviewer:
             missing.append(f"{family} → Reviewer")
+        if audience == HELP and phrase not in help_prompt:
+            missing.append(f"{family} → Help")
     assert not missing, (
         "Porodica pravila je nestala iz pošiljke: " + ", ".join(missing) +
         ". Preformulisanje je dozvoljeno; tiho brisanje cijele porodice nije. "
@@ -417,12 +444,71 @@ def test_every_protected_rule_family_still_reaches_its_intended_call():
 
 
 def test_the_protected_family_inventory_is_not_silently_shrunk():
-    """Skidanje reda iz tabele mora biti svjesna izmjena, ne slučajna."""
-    assert len(PROTECTED_RULE_FAMILIES) == 24
-    assert len({family for family, _phrase, _audience in PROTECTED_RULE_FAMILIES}) == 24
+    """Skidanje reda iz tabele mora biti svjesna izmjena, ne slučajna.
+
+    Faza 2 dodaje OSAM porodica prompta pomoći (24 → 32). Nijedan zatečeni red
+    nije uklonjen: pomoć je dobila vlastitu pošiljku, a ugovor izrade zadatka je
+    ostao gdje je bio."""
+    assert len(PROTECTED_RULE_FAMILIES) == 32
+    assert len({family for family, _phrase, _audience in PROTECTED_RULE_FAMILIES}) == 32
+    assert sum(1 for _f, _p, audience in PROTECTED_RULE_FAMILIES
+               if audience == HELP) == 8
 
 
 def test_protected_families_are_not_asserted_against_an_empty_surface():
     """Kapija je beskorisna ako su površine prazne — dokaži da nisu."""
-    tutor, reviewer = _phase1_surfaces()
+    tutor, reviewer, help_prompt = _phase1_surfaces()
     assert len(tutor) > 15000 and len(reviewer) > 15000
+    assert len(help_prompt) > 4000
+
+
+def test_the_help_prompt_drops_the_task_authoring_contract():
+    """FAZA 2 — MJERENJE OBLIKOVANJA PROMPTA.
+
+    Turn pomoći je do sada dobijao DOSLOVNO ugovor izrade zadatka. Ovdje se
+    zaključava da ga prompt pomoći više ne nosi, a da ga prompt izrade i dalje
+    nosi u cijelosti — oblikovanje ne smije nikome ništa oduzeti."""
+    context = lesson_context_module.build(9, "9-02-006")
+    tutor = tutor_prompts.build_tutor_instructions(context)
+    help_prompt = tutor_prompts.build_help_instructions(context)
+    generation_only = (
+        "STRUCTURED TASK PACKAGE",
+        "TARGET DIFFICULTY LEVEL",
+        "ACTIVE DIFFICULTY TARGETS",
+        "POLAZNA SLOŽENOST",
+        "KAD MIJENJAŠ TEŽINU",
+        "KAD PRAVIŠ ZADATAK",
+        "KAD ZADATAK TRAŽI SKUP RJEŠENJA",
+        "ODREDI NAMJERU",
+    )
+    for phrase in generation_only:
+        assert phrase in tutor, phrase
+        assert phrase not in help_prompt, phrase
+
+
+def test_the_help_prompt_is_materially_smaller_than_the_generation_prompt():
+    """Oblikovanje mora biti MJERLJIVO, ne samo namjera.
+
+    Izmjereno na lekciji 9-02-006: 19 634 → 11 024 znaka sistemskih instrukcija,
+    dakle preko 8 500 znaka manje. Ostatak je dijeljeni blok pravila
+    (`rules.build_shared_math_rules`), koji pomoć STVARNO treba — on nosi razred,
+    domen, terminologiju i notaciju."""
+    context = lesson_context_module.build(9, "9-02-006")
+    tutor = tutor_prompts.build_tutor_instructions(context)
+    help_prompt = tutor_prompts.build_help_instructions(context)
+    assert len(tutor) - len(help_prompt) > 6000, (len(help_prompt), len(tutor))
+    assert len(help_prompt) < len(tutor) * 0.60, (len(help_prompt), len(tutor))
+
+
+def test_the_help_prompt_prefix_is_identical_for_every_lesson():
+    """Stabilan prefiks (Workstream K): sadržaj po lekciji dolazi TEK na kraju."""
+    marker = "TON: obraćaj se učeniku direktno"
+    prefixes = set()
+    for grade, topic_id, _title, _oblast in LESSON_ROWS[::37]:
+        context = lesson_context_module.build(grade, topic_id)
+        if context is None:
+            continue
+        shipped = tutor_prompts.build_help_instructions(context)
+        assert marker in shipped, topic_id
+        prefixes.add(shipped[:shipped.index(marker)])
+    assert len(prefixes) == 1

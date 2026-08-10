@@ -14,8 +14,8 @@ import re
 from dataclasses import dataclass, field
 from typing import Optional
 
-from matbot import (api, config, feedback, geometrycheck, mathsafe, mcq_integrity,
-                    option_equivalence, request_fidelity)
+from matbot import (api, config, feedback, geometrycheck, hint_policy, mathsafe,
+                    mcq_integrity, option_equivalence, request_fidelity)
 from matbot.mathcheck import find_numeric_inconsistencies
 from matbot.mathsegments import DISPLAY, INLINE, tokenize_math
 from matbot.practice import PRACTICE_UNAVAILABLE_MESSAGE, SAFE_ERROR_MESSAGE
@@ -177,6 +177,46 @@ class TurnObservation:
         payload = self.request_payload or {}
         is_hint = (payload.get("intent") or "") == "hint_request"
         return is_hint and self.hint_level_before >= config.MAX_HINT_LEVEL - 1
+
+    @property
+    def marked_option_index(self) -> int:
+        """Indeks označene opcije po SERVERSKOM `correct_option_id`, ili -1."""
+        correct_id = (self.session_after or {}).get("correct_option_id") or ""
+        for index, option in enumerate(self.options_after):
+            if isinstance(option, dict) and option.get("id") == correct_id:
+                return index
+        return -1
+
+    @property
+    def option_texts(self) -> list:
+        return [option.get("text") or "" for option in self.options_after
+                if isinstance(option, dict)]
+
+    @property
+    def distractor_option_texts(self) -> list:
+        correct_id = (self.session_after or {}).get("correct_option_id") or ""
+        return [option.get("text") or "" for option in self.options_after
+                if isinstance(option, dict) and option.get("id") != correct_id]
+
+    @property
+    def help_task_class(self) -> str:
+        """Ista server-vlasnička klasa koju produkcija koristi za ljestvicu.
+
+        Poziva se ISTA ulazna tačka (`hint_policy.session_task_class`) nad ISTOM
+        snimljenom sesijom koju produkcija čita — dakle i tekst zadatka, ne samo
+        opcije. Bez ovoga bi evaluator mjerio slabiju klasifikaciju od one koju
+        server stvarno koristi (nalaz završnog pregleda)."""
+        return hint_policy.session_task_class(self.session_after
+                                              or self.session_before or {})
+
+    @property
+    def serves_full_solution(self) -> bool:
+        """True kad OVAJ turn služi puno rješenje („uradi ga ti“)."""
+        payload = self.request_payload or {}
+        if (payload.get("intent") or "") == "solution_request":
+            return True
+        return ((self.session_after or {}).get("last_result") == "full_solution"
+                and (self.session_before or {}).get("last_result") != "full_solution")
 
     @property
     def visible_task_text(self) -> str:
@@ -703,6 +743,181 @@ def check_free_text_grading_no_oracle(obs: TurnObservation) -> CheckResult:
     )
 
 
+def check_hint_proposition_no_leak(obs: TurnObservation) -> CheckResult:
+    """OTKRIVANJE OZNAČENE TVRDNJE u nagovještaju 1/2 (arhitektonska Faza 2).
+
+    ZAŠTO POSTOJI. `hint_no_leak` traži VRIJEDNOST: doslovnu podnisku, otkrivajuću
+    frazu uz kratak odgovor, ili tvrđen broj u `$…$`. Kad je označena opcija
+    REČENICA, odgovor nije vrijednost nego iskaz, pa nijedan od ta tri sloja ne
+    može ništa dokazati — živi FW-X03 nagovještaj 1 je doslovno izrekao označenu
+    tvrdnju, a `hint_no_leak` je vratio PASS. Faza 0 je taj mjerač NAPRAVILA i
+    izričito ga OSTAVILA NEUVEZANOG; Faza 2 ga uvezuje.
+
+    Poziva se PRODUKCIJSKI mjerač (`matbot.hint_policy.proposition_disclosure`) —
+    isti kod koji server pokreće nad tekstom modela, pa se evaluacija i proizvod
+    ne mogu razići. Vrh ljestvice se nikad ne mjeri: po ugovoru SMIJE dati
+    rezultat (isti izuzetak kao `hint_no_leak`).
+
+    GRANICA KOJU PASS NOSI: poređenje je po TAČNIM tokenima, pa parafraza u
+    drugom padežu ostaje van dosega (živi TR-B1). Zato je ovaj PASS u
+    `release_contract` klasifikovan kao OGRANIČEN dokaz, nikad kao semantički —
+    klasu parafraze zatvara KONSTRUKCIJA u proizvodu (server sam sastavlja
+    nagovještaje 1 i 2 kad je odgovor tvrdnja), ne ovaj mjerač."""
+    name = "hint_proposition_no_leak"
+    if obs.serves_hint_ladder_top:
+        return CheckResult(name, SKIP,
+                           "treći nagovještaj po ugovoru daje konačan rezultat — "
+                           "the third hint is contractually allowed to state the answer")
+    if obs.serves_full_solution:
+        return CheckResult(name, SKIP, "explicit solution request may disclose the answer")
+    marked = obs.correct_option_text or obs.expected_answer
+    if not marked or not obs.distractor_option_texts:
+        return CheckResult(name, SKIP, "no marked option and distractor set to compare")
+    result = hint_policy.proposition_disclosure(
+        obs.answer, marked, obs.distractor_option_texts,
+        obs.task_after or obs.task_before)
+    if result.disclosed:
+        return CheckResult(name, FAIL,
+                           f"{hint_policy.PROPOSITION_LEAK_CODE}: "
+                           f"marked_coverage={result.marked_coverage:.2f} "
+                           f"marked_only={result.marked_only_coverage:.2f} "
+                           f"distractor_only={result.distractor_only_coverage:.2f}")
+    if result.verdict == hint_policy.NOT_APPLICABLE:
+        return CheckResult(name, SKIP, result.detail)
+    return CheckResult(name, PASS, result.detail)
+
+
+def check_hint_top_from_verified_solution(obs: TurnObservation) -> CheckResult:
+    """VRH LJESTVICE / PUNO RJEŠENJE MORA BITI SERVERSKI SASTAVLJEN (Faza 2).
+
+    ZAŠTO POSTOJI. Živi FW-X03 nagovještaj 3 je objavio TAČAN zaključak preko
+    NETAČNE međutvrdnje; `solution_complete` je našao rezultat i vratio SKIP, jer
+    nijedan deterministički sloj ne može suditi o izvodu. Faza 2 taj problem ne
+    rješava provjerom izvoda — ona ukida SVJEŽ izvod: vrh ljestvice i puno
+    rješenje server sastavlja iz recenzentom odobrenog `solution` polja
+    objavljenog paketa.
+
+    Ovdje se ta tvrdnja DOKAZUJE, a ne pretpostavlja: kompozicija se ponovo
+    izračuna istom produkcijskom funkcijom nad artefaktima iz sesije i poredi s
+    tekstom koji je učenik stvarno vidio. PASS je zato pun deterministički dokaz
+    provenijencije — jedina jaka tvrdnja koju evaluator o vrhu ljestvice ima."""
+    name = "hint_top_from_verified_solution"
+    session = obs.session_after or {}
+    if not (obs.serves_hint_ladder_top or obs.serves_full_solution):
+        return CheckResult(name, SKIP, "this turn does not serve the ladder top or a full solution")
+    solution = session.get("solution_summary") or ""
+    expected = session.get("expected_answer_summary") or ""
+    if not solution:
+        return CheckResult(name, SKIP,
+                           "no verified solution artifact stored for this task — "
+                           "provenance cannot be proven either way")
+    if session.get("deterministic_task"):
+        return CheckResult(name, SKIP,
+                           "deterministic route serves its own stored ladder (Phase 4H)")
+    task_class = obs.help_task_class
+    composed = (hint_policy.compose_full_solution(solution, expected, task_class)
+                if obs.serves_full_solution
+                else hint_policy.compose_top_hint(solution, expected, task_class))
+    if not composed:
+        return CheckResult(name, SKIP, "server composition is empty for this artifact")
+    if _normalized(obs.answer) != _normalized(composed):
+        return CheckResult(name, FAIL,
+                           "the served text is not the server composition of the "
+                           "verified solution artifact — fresh model prose reached "
+                           "the student")
+    return CheckResult(name, PASS,
+                       "served text is byte-equivalent to the server composition of "
+                       "the Reviewer-approved solution artifact")
+
+
+def check_help_has_task_scaffold(obs: TurnObservation) -> CheckResult:
+    """POMOĆ MORA NOSITI SKELA, NE PODSTICAJ (Faza 2, upotrebljivost).
+
+    Sigurnost sama nije dovoljna: „Razmisli još malo.“ je bezbjedno i beskorisno.
+    Poziva se ISTI produkcijski deterministički prag
+    (`hint_policy.empty_help_code`), koji je anker­ovan na CIO tekst — pa kratak
+    ali stvaran nagovještaj nikad nije pogodak."""
+    name = "help_has_task_scaffold"
+    text = obs.answer.strip()
+    if not text or text in _FALLBACK_MESSAGES:
+        return CheckResult(name, SKIP, "no help text on this turn")
+    code = hint_policy.empty_help_code(text)
+    if code:
+        return CheckResult(name, FAIL, code)
+    return CheckResult(name, PASS)
+
+
+def check_help_notation_in_scope(obs: TurnObservation) -> CheckResult:
+    """PROPORCIONALNOST ZAPISA RAZREDU I ZADATKU (Faza 2).
+
+    Živi TR-B1 nagovještaj 2 je lekciji 9. razreda osnovne škole ponudio
+    parametarski oblik prave i skalarni proizvod. Nijedna kapija to nije vidjela:
+    `\\vec` je na mathsafe allowlisti, terminologija je čista, brojevnog lanca
+    nema. Mjerilo je ono što je VEĆ prošlo objavu (tekst zadatka, opcije,
+    očekivani odgovor, odobreno rješenje) — isti produkcijski dokaz."""
+    name = "help_notation_in_scope"
+    session = obs.session_after or obs.session_before or {}
+    approved = [session.get("current_task") or "",
+                session.get("expected_answer_summary") or "",
+                session.get("solution_summary") or ""]
+    approved.extend(obs.option_texts)
+    approved = [text for text in approved if text]
+    if not approved:
+        return CheckResult(name, SKIP, "no approved task artifact to compare against")
+    codes = hint_policy.out_of_scope_notation_codes(obs.answer, approved)
+    if codes:
+        return CheckResult(name, FAIL, ",".join(codes[:3]))
+    return CheckResult(name, PASS)
+
+
+def check_symbolic_marked_answer(obs: TurnObservation) -> CheckResult:
+    """Je li označeni odgovor KRATAK SIMBOLIČKI zapis (matematika bez proze)?
+
+    Postoji zbog Problema A: prva verzija klasifikacije je kratku simboličku
+    opciju (`$p \\perp \\alpha$`, `$A\\subset B$`, `$\\mathbb{Z}$`) tretirala kao
+    vrijednost i puštala je na model-autorsku ljestvicu. Ova provjera sama NIŠTA
+    ne tvrdi o klasi — uz `task_class:propositional` daje ŽIVI dokaz da je ta
+    klasa stvarno prošla serverskom ljestvicom."""
+    name = "symbolic_marked_answer"
+    marked = obs.correct_option_text
+    if not marked:
+        return CheckResult(name, SKIP, "no marked option text on this turn")
+    if not hint_policy.marked_answer_is_short_symbolic(marked):
+        return CheckResult(name, SKIP,
+                           "marked answer carries prose or no math segment — "
+                           "not a short symbolic answer shape")
+    return CheckResult(name, PASS, "marked answer is a short symbolic shape")
+
+
+def _make_task_class_check(expected: str):
+    """`task_class:<klasa>` — STVARNA klasa koju je server izabrao POSLIJE objave.
+
+    ZAŠTO POSTOJI (Problem C). Oznaka scenarija („recognition“/„computational“)
+    NIJE dokaz: oblik opcija bira model pri generisanju, pa se klasa zna tek
+    poslije objave. Bez ove provjere kampanja ne može tvrditi da je ijedna grana
+    arhitekture stvarno vožena.
+
+    NEPOKLAPANJE JE SKIP, NIKAD FAIL. Kad model proizvede drugačiji oblik
+    odgovora, to nije kvar proizvoda — to je RUPA U POKRIVENOSTI
+    (`classify.COVERAGE_GAP` preko REVIEW statusa). Klasa se računa ISTOM
+    produkcijskom funkcijom koju server koristi za odabir ljestvice, pa evaluator
+    i proizvod ne mogu izmjeriti različitu klasu."""
+    def check(obs: TurnObservation) -> CheckResult:
+        name = f"task_class:{expected}"
+        if not obs.options_after or obs.marked_option_index < 0:
+            return CheckResult(name, SKIP,
+                               "no published option set and marked option to classify")
+        actual = obs.help_task_class
+        if actual != expected:
+            return CheckResult(
+                name, SKIP,
+                f"branch not exercised: server classified this task as {actual!r}, "
+                f"the scenario targeted {expected!r} — coverage gap, not a product "
+                "defect (the model owns the generated answer shape)")
+        return CheckResult(name, PASS, f"server-selected task class is {actual!r}")
+    return check
+
+
 def check_hint_differs(obs: TurnObservation) -> CheckResult:
     if not obs.previous_help_texts:
         return CheckResult("hint_differs", SKIP, "first hint in this session")
@@ -951,6 +1166,12 @@ _CHECKS = {
     "reveal_absent": check_reveal_absent,
     "help_nonempty": check_help_nonempty,
     "hint_no_leak": check_hint_no_leak,
+    # --- arhitektonska Faza 2 (ljestvica nagovještaja) ---
+    "hint_proposition_no_leak": check_hint_proposition_no_leak,
+    "hint_top_from_verified_solution": check_hint_top_from_verified_solution,
+    "help_has_task_scaffold": check_help_has_task_scaffold,
+    "help_notation_in_scope": check_help_notation_in_scope,
+    "symbolic_marked_answer": check_symbolic_marked_answer,
     "hint_differs": check_hint_differs,
     "task_differs": check_task_differs,
     "state_unchanged": check_state_unchanged,
@@ -968,6 +1189,10 @@ RUBRICS = {
     "grade_fit": "Odgovara li težina i rječnik izabranom razredu?",
     "lesson_alignment": "Ispituje li zadatak BAŠ izabranu lekciju, a ne samo oblast?",
     "hint_usefulness": "Pomjera li hint učenika za tačno jedan koristan korak?",
+    # Arhitektonska Faza 2: PASS `hint_proposition_no_leak` je ograničen dokaz po
+    # tačnim tokenima (parafraza ostaje van dosega), pa semantičko pitanje mora
+    # ostati na ručnom pregledu — nikad se ne pretvara u automatsku tvrdnju.
+    "hint_safety": "Otkriva li hint kriterij po kojem se bira tačna opcija (i parafrazom)?",
     "difficulty_appropriate": "Je li promjena težine stvarna, a ne samo oznaka?",
     "pedagogy": "Je li odgovor tehnički ispravan ALI pedagoški loš?",
     "refusal_quality": "Je li odbijanje van teme pristojno i vraća li učenika na zadatak?",
@@ -976,7 +1201,7 @@ RUBRICS = {
 
 
 def known_check_names() -> tuple:
-    return tuple(sorted(_CHECKS)) + ("calls_at_most:N", "level:N")
+    return tuple(sorted(_CHECKS)) + ("calls_at_most:N", "level:N", "task_class:CLASS")
 
 
 def resolve(name: str):
@@ -993,6 +1218,12 @@ def resolve(name: str):
             return _make_level_check(int(name.split(":", 1)[1]))
         except ValueError:
             return None
+    if name.startswith("task_class:"):
+        expected = name.split(":", 1)[1]
+        # Zatvoren skup: samo klase koje politika pomoći stvarno bira.
+        if expected in (hint_policy.COMPUTATIONAL, hint_policy.PROPOSITIONAL):
+            return _make_task_class_check(expected)
+        return None
     return None
 
 
@@ -1023,6 +1254,11 @@ _ROOT_CAUSE = {
     "response_schema": "response_contract",
     "no_answer_leak": "answer_leak",
     "hint_no_leak": "answer_leak",
+    "hint_proposition_no_leak": "answer_leak",
+    "hint_top_from_verified_solution": "solution_disclosure",
+    "help_has_task_scaffold": "hint_quality",
+    "help_notation_in_scope": "notation_and_math",
+    "symbolic_marked_answer": "help_branch_coverage",
     "solution_complete": "solution_disclosure",
     "free_text_grading_no_oracle": "grading",
     "not_published": "guard_did_not_block",
@@ -1062,4 +1298,6 @@ def root_cause(check_name: str) -> str:
         return "call_budget"
     if check_name.startswith("level:"):
         return "difficulty_control"
+    if check_name.startswith("task_class:"):
+        return "help_branch_coverage"
     return _ROOT_CAUSE.get(check_name, "other")

@@ -168,16 +168,26 @@ def test_b_prompt_tells_the_model_what_the_next_hint_level_must_add():
 
 
 def test_b_full_solution_text_also_reaches_the_student():
+    """Isti kvar plumbinga („najava bez sadržaja“) sada se dokazuje nad
+    PROVJERENIM artefaktom: od Faze 2 puno rješenje dolazi iz recenzentom
+    odobrenog polja `solution`, pa učenik dobija stvaran postupak i bez ijednog
+    poziva modela."""
+    from matbot import hint_policy
+
     store, fake = SessionStore(), FakeLLM()
     _bootstrap(store, fake)
-    solution = "$12 : 4 = 3$, ostatak je $0$, pa je $4$ djelilac broja $12$."
+    approved = store.peek("diag")["solution_summary"]
+    assert approved
+
     draft = make_tutor_draft(intent="full_solution_request",
                              reply="Evo cijelog postupka.",
-                             worked_solution=solution, new_task=None)
+                             worked_solution="samo najava, bez postupka",
+                             new_task=None)
     fake.queue(draft)
-    fake.queue(make_reviewer_final(decision="approve", final=draft))
     response = run_practice_turn(store, fake, _turn(student_message="Uradi ga ti."))
-    assert solution in response["answer"]
+    assert approved in response["answer"]
+    assert response["answer"].startswith(hint_policy.FULL_SOLUTION_INTRO)
+    assert "samo najava" not in response["answer"]
 
 
 def test_b_hint_is_not_duplicated_when_the_reply_already_contains_it():

@@ -27,7 +27,7 @@ import time
 import uuid
 
 from matbot import (config, difficulty_level, difficulty_profiles, feedback,
-                    geometrycheck, mcq_integrity, option_equivalence,
+                    geometrycheck, hint_policy, mcq_integrity, option_equivalence,
                     practice_policy)
 from matbot.llm import LLMError, failure_diagnostics_kv
 from matbot.mathcheck import find_numeric_inconsistencies
@@ -707,6 +707,279 @@ def _deterministic_top_hint(session, annex, hint_text):
     return f"{hint_text} Konačan rezultat je {answer_reply}."
 
 
+# ---------------------------------------------------------------------------
+# SERVER-VLASNIČKA LJESTVICA POMOĆI (arhitektonska Faza 2)
+# ---------------------------------------------------------------------------
+# ŽIVI BLOKATORI KOJE OVO ZATVARA (oba objavljena, oba pala samo na RUČNI pregled):
+#
+#   FW-X03 nagovještaj 1 — doslovno je izrekao definiciju koja glasi kao označena
+#       opcija. `hint_no_leak` je vratio PASS: orakl curenja traži VRIJEDNOST, a
+#       odgovor je bio REČENICA.
+#   FW-X03 nagovještaj 3 — tačan zaključak preko NETAČNE međutvrdnje. Vrh
+#       ljestvice je bio svježa proza modela: bez recenzenta, bez preflighta,
+#       bez ijednog validatora koji o izvodu može bilo šta dokazati.
+#   TR-B1 nagovještaj 1 — isti kriterij kao PARAFRAZA u drugom padežu; mjerenje
+#       po tačnim tokenima to dokazano ne dosiže (Faza 0 je to zamrznula).
+#   TR-B1 nagovještaj 2 — parametarski oblik prave i skalarni proizvod u lekciji
+#       9. razreda osnovne škole.
+#
+# ARHITEKTURA (matbot/hint_policy.py drži čistu politiku, ovdje je samo tok):
+#   • vrh ljestvice i puno rješenje sastavlja SERVER iz PROVJERENOG artefakta
+#     objave (`solution_summary`, `expected_answer_summary` — tekstovi koje je
+#     recenzent odobrio i koje su prošli sve serverske validatore) → nula poziva
+#     i nijedan nov, neprovjeren izvod;
+#   • za zadatak čiji je odgovor TVRDNJA nagovještaje 1 i 2 sastavlja SERVER iz
+#     šablona koji NE prepisuje nijedno slovo iz ponuđenih opcija → otkrivanje
+#     označene tvrdnje je nemoguće po konstrukciji, i doslovno i parafrazom;
+#   • za RAČUNSKI zadatak nagovještaje 1 i 2 i dalje piše model (ta ljestvica
+#     radi i mjeri je deterministički vrijednosni orakl), ali svaki njegov tekst
+#     prolazi kroz uske deterministe: proporcionalnost zapisa, prazna pomoć,
+#     otkrivanje tvrdnje i zatečeni anti-leak gate.
+#
+# Kad server nema provjeren artefakt, puno otkrivanje PADA ZATVORENO — nikad se
+# ne traži od modela da izmisli neprovjeren izvod. Nema trećeg poziva; broj
+# poziva se ovim samo SMANJUJE.
+HELP_ARTIFACT_MISSING_CODE = "help_verified_solution_artifact_missing"
+HELP_INTENTS = frozenset({"hint_request", "full_solution_request"})
+
+
+def _option_texts(session):
+    return [option.get("text", "") for option in (session.get("current_options") or [])
+            if isinstance(option, dict)]
+
+
+def _distractor_texts(session):
+    correct_id = session.get("correct_option_id") or ""
+    return [option.get("text", "") for option in (session.get("current_options") or [])
+            if isinstance(option, dict) and option.get("id") != correct_id]
+
+
+def _approved_artifact_texts(session):
+    """Tekstovi koji su PROŠLI cio put objave — jedini dokaz opsega ovog zadatka.
+
+    Koristi se za proporcionalnost: Faza 3 tek donosi pun lekcijski opseg, a
+    ovdje je mjerilo ono što je recenzent već odobrio i što je server već
+    validirao."""
+    texts = [session.get("current_task") or "",
+             session.get("expected_answer_summary") or "",
+             session.get("solution_summary") or ""]
+    texts.extend(_option_texts(session))
+    return tuple(text for text in texts if text)
+
+
+def _help_task_class(session):
+    """Klasa aktivnog zadatka — serverska činjenica iz objavljenih opcija."""
+    return tutor_prompts.session_task_class(session)
+
+
+def _served_hint_level(session):
+    return hint_policy.served_hint_level(session.get("hint_level", 0),
+                                         config.MAX_HINT_LEVEL)
+
+
+def _help_author(session, ui_action):
+    """Ko piše OVAJ korak pomoći — odluka poznata PRIJE ijednog poziva."""
+    if ui_action == "full_solution_request":
+        return hint_policy.SERVER
+    return hint_policy.hint_author(_help_task_class(session),
+                                   _served_hint_level(session), config.MAX_HINT_LEVEL)
+
+
+def _validated_help_text(raw, context, where):
+    """Isti deterministički niz koji objava pokreće nad tekstom zadatka."""
+    text = _safe_text(raw, where)
+    _reject_if_inconsistent(text, where)
+    _reject_if_geometry_invalid(text, context, where)
+    return text
+
+
+def _server_help_text(session, context, ui_action):
+    """Tekst pomoći koji SERVER sam sastavlja, već validiran. '' = ne može.
+
+    Prazan rezultat NIJE tekst za učenika: pozivalac tada pada zatvoreno, jer
+    alternativa (tražiti od modela svjež izvod) je upravo klasa FW-X03/3."""
+    task_class = _help_task_class(session)
+    solution = session.get("solution_summary") or ""
+    expected = session.get("expected_answer_summary") or ""
+    if ui_action == "full_solution_request":
+        raw = hint_policy.compose_full_solution(solution, expected, task_class)
+    elif _served_hint_level(session) >= config.MAX_HINT_LEVEL:
+        raw = hint_policy.compose_top_hint(solution, expected, task_class)
+    else:
+        raw = hint_policy.compose_propositional_hint(
+            _served_hint_level(session), context.title, _option_texts(session))
+    if not raw:
+        return ""
+    return _validated_help_text(raw, context, ui_action)
+
+
+def _finalize_help_answer(session, context, request_id, intent, answer):
+    """JEDAN vlasnik vidljivog teksta pomoći — isti za dugme i za kucanu poruku.
+
+    Zato je ovdje, a ne u ruti: kucana poruka namjeru dobija TEK od modela, pa
+    server prije poziva ne zna da je turn pomoć. Garancija ne smije zavisiti od
+    toga kojim je putem turn došao — model je u tom slučaju poziv već potrošio,
+    a njegov tekst se ipak odbacuje.
+
+    Baca UnifiedOutputError (fail closed) ili vraća konačan tekst."""
+    if intent not in HELP_INTENTS:
+        return answer
+    served = _served_hint_level(session)
+    if _help_author(session, intent) == hint_policy.SERVER:
+        composed = _server_help_text(session, context, intent)
+        if not composed:
+            raise UnifiedOutputError(f"{HELP_ARTIFACT_MISSING_CODE} [{intent}]")
+        logger.info(
+            "help_text_server_owned request_id=%s topic=%s intent=%s level=%s class=%s",
+            request_id, context.topic_id, intent, served, _help_task_class(session),
+        )
+        return composed
+
+    # MODEL je autor (računski zadatak, nivo 1 ili 2) — uski deterministi.
+    codes = hint_policy.out_of_scope_notation_codes(
+        answer, _approved_artifact_texts(session))
+    if codes:
+        raise UnifiedOutputError(f"{','.join(codes)} [{intent}]")
+    empty = hint_policy.empty_help_code(answer)
+    if empty:
+        raise UnifiedOutputError(f"{empty} [{intent}]")
+
+    # ODBRANA U DUBINI: mjerač otkrivanja tvrdnje je za računsku klasu po
+    # pravilu NOT_APPLICABLE, ali klasa se izvodi iz OBLIKA opcija — kad je
+    # označena opcija kratak zapis skupa („$\\{x\\in\\mathbb{Q}\\mid x>3\\}$“),
+    # mjerač JE primjenjiv i ostaje jedina kapija te klase. Nalaz ne obara turn:
+    # tekst se zamjenjuje serverskim skelom, pa učenik i dalje dobije pomoć.
+    marked, expected = _committed_answer(session)
+    disclosure = hint_policy.proposition_disclosure(
+        answer, marked or expected, _distractor_texts(session),
+        session.get("current_task") or "")
+    if disclosure.disclosed:
+        logger.warning(
+            "help_proposition_leak_blocked request_id=%s topic=%s intent=%s level=%s "
+            "code=%s marked_coverage=%.2f",
+            request_id, context.topic_id, intent, served,
+            hint_policy.PROPOSITION_LEAK_CODE, disclosure.marked_coverage,
+        )
+        return _validated_help_text(
+            hint_policy.compose_propositional_hint(
+                served, context.title, _option_texts(session)),
+            context, intent)
+    return answer
+
+
+def _run_server_owned_help_turn(store, session, turn, context, request_id, ui_action,
+                                answer):
+    """SERVER_HINT / SERVER_SOLUTION: pomoć sastavljena iz provjerenih činjenica
+    objavljenog paketa — nula poziva modela.
+
+    Stanje se mijenja TAČNO onako kako ga mijenja model-put: nagovještaj podiže
+    ljestvicu jednom, puno rješenje zatvara zadatak i otkriva opciju. Zadatak,
+    opcije, označen odgovor, lekcija i nivo težine se NE DIRAJU."""
+    timer = _TurnTimer()
+    client_turn_id = turn.get("client_turn_id") or ""
+    if (client_turn_id and client_turn_id == session.get("last_help_turn_id")
+            and session.get("last_help_response") is not None):
+        # Idempotentan retry: identičan odgovor, bez mutacije i bez pomjeranja
+        # ljestvice nagovještaja.
+        return copy.deepcopy(session["last_help_response"])
+
+    identity = session.get("current_task_identity") or ""
+    reveal = False
+    if ui_action == "hint_request":
+        session["hint_level"] = min(session["hint_level"] + 1, config.MAX_HINT_LEVEL)
+        session["current_task_had_hint"] = True
+        route = "server_hint"
+    else:
+        session["last_result"] = "full_solution"
+        if session["correct_option_id"]:
+            session["task_completed"] = True
+            reveal = True
+        route = "server_solution"
+
+    session["recent_turns"].append(
+        {"student": turn["student_message"][:300], "tutor": answer[:400]}
+    )
+    response = {
+        "status": "ready",
+        "answer": answer,
+        "answer_verdict": None,
+        "last_tutor_task": session["current_task"] or "",
+        "next_state": _next_state(session),
+        "session_mode": "practice",
+        "effective_topic": context.topic_id,
+    }
+    if reveal:
+        response["revealed_correct_option_id"] = session["correct_option_id"]
+    if client_turn_id:
+        session["last_help_turn_id"] = client_turn_id
+        session["last_help_response"] = copy.deepcopy(response)
+    with timer.stage("commit"):
+        store.save(session)
+    _log_turn_diagnostics(
+        request_id, context, turn, session, intent=ui_action, calls=0,
+        published=False, task_preserved=True, state_mutated=True,
+        previous_identity=identity, final_identity=identity,
+        route=route, timer=timer)
+    return response
+
+
+def _call_help(llm, context, session, student_message, ui_action, task_class,
+               timer=None):
+    """JEDAN poziv s promptom POMOĆI (bez ugovora izrade zadatka)."""
+    timer = timer or _TurnTimer()
+    with timer.stage("prompt_build"):
+        instructions = tutor_prompts.build_help_instructions(context)
+        input_text = tutor_prompts.build_help_input(
+            context, session, student_message, ui_action, task_class)
+    with timer.stage("tutor_call"):
+        result = llm.tutor_turn(instructions, input_text)
+    timer.note_ms("tutor_api", getattr(result, "latency_ms", None))
+    return result
+
+
+def _one_call_help(llm, context, session, student_message, ui_action, request_id,
+                   timer):
+    """Nacrt pomoći iz TAČNO JEDNOG poziva. Recenzenta nema — nema paketa koji
+    bi se recenzirao, a semantičku granicu pomoći drži server (vidi
+    `_finalize_help_answer`). Vraća (draft | None, broj_poziva)."""
+    task_class = _help_task_class(session)
+    try:
+        result = _call_help(llm, context, session, student_message, ui_action,
+                            task_class, timer=timer)
+    except LLMError as error:
+        logger.warning(
+            "help_call request_id=%s topic=%s stage=help call=1 %s",
+            request_id, context.topic_id, failure_diagnostics_kv(error),
+        )
+        return None, 0
+    calls = 1
+    _log_sdk_entry(request_id, context, "help", calls, result)
+
+    with timer.stage("tutor_validate"):
+        draft = normalize_for_intent(result.output)
+        if draft.intent in TASK_INTENTS:
+            # KONTINUITET AKTIVNOG ZADATKA JE SERVERSKA ODLUKA, NE MODELOVA.
+            _log_rejection(
+                request_id, context, "ui_action_forbids_new_task",
+                f"ui_action={ui_action} draft_intent={draft.intent}", draft.intent)
+            return None, calls
+        if draft.intent != ui_action:
+            # Tražena akcija je serverska činjenica (dugme). Model je ne bira;
+            # kad je propusti, popunjava se traženo polje iz `reply` — sadržaj se
+            # NIKAD ne izmišlja, samo se koristi ono što je model već napisao.
+            updates = {"intent": ui_action}
+            field = "hint" if ui_action == "hint_request" else "worked_solution"
+            if not (getattr(draft, field) or "").strip():
+                updates[field] = draft.reply
+            draft = draft.model_copy(update=updates)
+        try:
+            validate_final(draft, has_active_task=True)
+        except UnifiedOutputError as error:
+            _log_rejection(request_id, context, "help_draft", error, draft.intent)
+            return None, calls
+    return draft, calls
+
+
 def _run_deterministic_help_turn(store, session, turn, context, request_id,
                                  ui_action, annex):
     """DETERMINISTIC_HINT / DETERMINISTIC_SOLUTION: pohranjena ljestvica
@@ -1107,6 +1380,30 @@ def _run_text_turn(store, llm, session, turn, context, request_id):
             return _run_deterministic_help_turn(
                 store, session, turn, context, request_id, ui_action, annex)
 
+    # Faza 2: SERVER-VLASNIČKI dio ljestvice pomoći (vrh ljestvice, puno
+    # rješenje, i nivoi 1–2 kad je odgovor TVRDNJA) — nula poziva modela. Ruta
+    # se bira iz server-vlasničkih činjenica (pritisnuto dugme + oblik
+    # objavljenih opcija), nikad iz proze modela.
+    if ui_action and _help_author(session, ui_action) == hint_policy.SERVER:
+        help_timer = _TurnTimer()
+        try:
+            with help_timer.stage("publish"):
+                answer = _server_help_text(session, context, ui_action)
+                if not answer:
+                    raise UnifiedOutputError(
+                        f"{HELP_ARTIFACT_MISSING_CODE} [{ui_action}]")
+        except UnifiedOutputError as error:
+            _log_rejection(request_id, context, "server_owned_help", error, ui_action)
+            _log_turn_diagnostics(
+                request_id, context, turn, session, intent=ui_action, calls=0,
+                published=False, task_preserved=bool(active_task_before),
+                state_mutated=False, previous_identity=identity_before,
+                final_identity=identity_before, rejection_code=str(error)[:60],
+                route="server_help_rejected", timer=help_timer)
+            return _error_response(active_task_before)
+        return _run_server_owned_help_turn(
+            store, session, turn, context, request_id, ui_action, answer)
+
     # Faza 4H: DETERMINISTIC_PACKAGE ruta — samo server-vlasničke činjenice
     # (lekcija s potpunim generatorom + UI polje ili zatvoren skup poruka).
     generator = _deterministic_generator_for(context)
@@ -1119,10 +1416,18 @@ def _run_text_turn(store, llm, session, turn, context, request_id):
 
     timer = _TurnTimer()
 
-    final, calls = _two_call(
-        llm, context, session, turn["student_message"], request_id, None, ui_action,
-        timer=timer,
-    )
+    if ui_action:
+        # Faza 2: pomoć koju model još piše (računski zadatak, nivo 1 ili 2)
+        # dobija PROMPT POMOĆI, ne ugovor izrade zadatka. Jedan poziv, kao i
+        # ranije — recenzenta na ovom putu nikad nije bilo.
+        final, calls = _one_call_help(
+            llm, context, session, turn["student_message"], ui_action, request_id,
+            timer)
+    else:
+        final, calls = _two_call(
+            llm, context, session, turn["student_message"], request_id, None, ui_action,
+            timer=timer,
+        )
     if final is None:
         # Odbijeno prije objave (nacrt, recenzent ili invarijanta nad konačnim
         # paketom). Sesija je lokalna kopija i nije commitovana.
@@ -1165,6 +1470,12 @@ def _run_text_turn(store, llm, session, turn, context, request_id):
             answer = intro + "\n\nZadatak: " + task_text
         else:
             answer = _compose_visible_help(final, reply, context)
+            # Faza 2: JEDAN vlasnik vidljivog teksta pomoći. Vrh ljestvice, puno
+            # rješenje i propozicioni nivoi 1–2 se ovdje ZAMJENJUJU serverski
+            # sastavljenim tekstom iz provjerenog artefakta — i na kucanoj poruci,
+            # gdje je poziv već potrošen. Garancija ne smije zavisiti od rute.
+            answer = _finalize_help_answer(
+                session, context, request_id, final.intent, answer)
             # Treći hint po prompt ljestvici SMIJE pokazati cijeli postupak i
             # rezultat; `hint_level` je ovdje još broj RANIJE datih hintova.
             answer = _guard_answer_leak(
@@ -1397,7 +1708,13 @@ def _two_call(llm, context, session, student_message, request_id, trusted_verdic
     `ui_action` je namjera koju je učenik izričito tražio dugmetom nad AKTIVNIM
     zadatkom (vidi `_explicit_ui_action`). Kad postoji, nov zadatak se u ovom
     turnu ne smije izdati — pa se nacrt s takvom namjerom odbija ODMAH, prije
-    recenzenta: nema šta recenzirati kad paket ionako ne smije biti objavljen."""
+    recenzenta: nema šta recenzirati kad paket ionako ne smije biti objavljen.
+
+    FAZA 2: turn s `ui_action` više NE dolazi ovim putem — pomoć ide kroz
+    `_one_call_help` (prompt pomoći) ili je server sam sastavi. Parametar i
+    provjera ostaju kao ODBRANA U DUBINI: ako pomoć ikad ponovo prođe ovuda,
+    zabrana objave novog zadatka je i dalje na mjestu, a ista invarijanta
+    treći put stoji u objavi (`_run_text_turn`)."""
     calls = 0
     timer = timer or _TurnTimer()
     try:
