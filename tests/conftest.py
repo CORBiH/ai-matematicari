@@ -568,6 +568,9 @@ _UNIVERSAL_TWO_CALL_MODULES = frozenset({
     "test_reviewer_package_consistency",
     "test_difficulty_progression_state",
     "test_semantic_family_pipeline",
+    # Arhitektonska Faza 1: značenje `checks.*` je pravilo RECENZENTA, pa se
+    # dokazuje na dvopozivnom putu na kojem recenzent uopšte postoji.
+    "test_reviewer_check_semantics",
 })
 
 

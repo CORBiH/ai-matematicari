@@ -23,13 +23,23 @@ dokazane forenzikom nad `git log` i sastavljenim promptom:
      <= 1), koji `difficulty_evidence_errors` stvarno sprovodi — dakle model
      dobija prag STROŽI od presude, u istom pasusu s tačnim pragom.
 
-ŠTA OVAJ FAJL RADI: zamrzava OBA nalaza. Inventarni testovi su ZELENI danas i
-padaju čim se pojavi NOV mrtav blok ili NOVA kontradikcija. Sami invarijantni
-testovi su `xfail(strict=True)` i označeni EXPECTED_PHASE1_FAILURE: kad Faza 1
-popravi proizvod, oni XPASS-uju i suita pada — to je namjeran signal za
-predaju, ne neobjašnjen crveni test.
+STANJE POSLIJE FAZE 1 — OBA NALAZA SU ZATVORENA U PROIZVODU:
 
-FAZA 0 NE DIRA PROIZVOD. Nijedan prompt se ovdje ne mijenja.
+  A) `_REVIEWER_CHECK_SEMANTICS_RULE` je uvezan TAČNO JEDNOM u
+     `build_reviewer_instructions`, odmah uz `_REVIEWER_DECISION_RULE`.
+     `KNOWN_UNSHIPPED_RULE_BLOCKS` je prazan, a `xfail` je uklonjen.
+
+  B) Nadvladana rečenica iz 00bbd45 je uklonjena iz `_TARGET_LEVEL_RULE`;
+     ostala su samo ograničenja koja se poklapaju s `GLOBAL_LEVEL1_MAX`.
+     `KNOWN_LEVEL1_CONTRADICTIONS` je prazan, a `xfail` je uklonjen.
+
+DETEKTORI SE NE SLABE. Oba mjerača i dalje rade nad STVARNO sastavljenim
+promptom kroz svih 534 lekcije, pa svaki NOV mrtav blok ili NOVA kontradiktorna
+numerička granica obara suitu odmah. Prazan zamrznut skup je jača tvrdnja od
+ranijeg, ne slabija.
+
+Faza 1 je uz to dodala zaštitu PORODICA PRAVILA (dno fajla): ne snima prompt
+bajt za bajt — štiti samo to da važne semantičke porodice ne nestanu tiho.
 """
 from __future__ import annotations
 
@@ -146,11 +156,9 @@ def _unreachable_rule_blocks() -> dict:
     return unreachable
 
 
-# Zatečeno stanje na kandidatu c17538a, dokazano gornjim mjeračem. Svaki NOV
-# unos ovdje je nov mrtav prompt blok i mora oboriti suitu ODMAH.
-KNOWN_UNSHIPPED_RULE_BLOCKS = {
-    "matbot/tutor/prompts.py": ("_REVIEWER_CHECK_SEMANTICS_RULE",),
-}
+# Poslije Faze 1: NIJEDAN blok pravila nije nedosežan. Prazan skup je najjača
+# moguća tvrdnja — svaki NOV mrtav prompt blok obara suitu ODMAH.
+KNOWN_UNSHIPPED_RULE_BLOCKS = {}
 
 
 # ---------------------------------------------------------------------------
@@ -166,40 +174,43 @@ def test_rule_block_detector_sees_every_prompt_module():
 
 
 def test_no_new_unshipped_prompt_rule_block_appears():
-    """ZELEN DANAS. Pada čim se pojavi NOV blok pravila koji se ne šalje.
-
-    Pada i kad Faza 1 popravi zatečeni blok — tada je poruka uputa: ukloni
-    ime iz `KNOWN_UNSHIPPED_RULE_BLOCKS` i obriši `xfail` ispod."""
+    """Pada čim se pojavi NOV blok pravila koji se ne šalje."""
     actual = _unreachable_rule_blocks()
     assert actual == KNOWN_UNSHIPPED_RULE_BLOCKS, (
         "Skup NEPOSLATIH blokova pravila se promijenio.\n"
         f"  izmjereno: {actual}\n"
         f"  zamrznuto: {KNOWN_UNSHIPPED_RULE_BLOCKS}\n"
-        "Ako je Faza 1 uvezala _REVIEWER_CHECK_SEMANTICS_RULE: obriši taj unos "
-        "iz KNOWN_UNSHIPPED_RULE_BLOCKS i ukloni xfail sa "
-        "test_every_prompt_rule_block_is_reachable. Ako je dodat NOV blok koji "
-        "se ne šalje: to je isti kvar kao c7552b8 — uveži ga ili obriši."
+        "Nov blok koji se ne šalje je isti kvar kao c7552b8 — uveži ga ili "
+        "obriši; nikad ga ne ostavljaj napisanog a neposlatog."
     )
 
 
-def test_the_known_unshipped_block_is_exactly_the_reviewer_check_semantics_rule():
-    """Provenijencija nalaza: ime, veličina i namjena mrtvog bloka."""
-    blocks = _rule_blocks("matbot/tutor/prompts.py")
-    dead = blocks["_REVIEWER_CHECK_SEMANTICS_RULE"]
-    assert "WHAT `checks.*` DESCRIBE" in dead
-    # Sadržaj je upravo pravilo koje bi FW-D04 klasu spriječilo.
-    assert "that is the CORRECTED task, never the original draft" in dead
-    assert dead not in tutor_prompts.build_reviewer_instructions(
-        lesson_context_module.build(9, "9-02-006"))
-
-
-@pytest.mark.xfail(strict=True, reason=(
-    "EXPECTED_PHASE1_FAILURE — _REVIEWER_CHECK_SEMANTICS_RULE je definisan "
-    "(c7552b8) a nikad uvezan u build_reviewer_instructions. Faza 0 ga samo "
-    "mjeri; uvezivanje je Faza 1. Kad ovaj test XPASS-uje, Faza 1 je sletjela: "
-    "ukloni xfail i ažuriraj KNOWN_UNSHIPPED_RULE_BLOCKS."))
 def test_every_prompt_rule_block_is_reachable():
+    """Faza 1: bivši EXPECTED_PHASE1_FAILURE, sada obična invarijanta."""
     assert _unreachable_rule_blocks() == {}
+
+
+def test_the_reviewer_check_semantics_rule_now_ships_exactly_once():
+    """Provenijencija zatvorenog nalaza: gdje je i koliko puta blok stiže.
+
+    Uvezan je JEDNOM, u recenzentov prompt — Tutor ga ne dobija, jer on ne
+    donosi odluku niti popunjava `checks.*`."""
+    block = tutor_prompts._REVIEWER_CHECK_SEMANTICS_RULE
+    context = lesson_context_module.build(9, "9-02-006")
+    reviewer = tutor_prompts.build_reviewer_instructions(context)
+    assert "WHAT `checks.*` DESCRIBE" in block
+    assert reviewer.count(block) == 1
+    assert block not in tutor_prompts.build_tutor_instructions(context)
+
+
+def test_the_reviewer_check_semantics_rule_ships_for_every_lesson():
+    """Blok stoji u STABILNOM prefiksu, pa ne smije ovisiti o lekciji."""
+    for grade, topic_id, _title, _oblast in LESSON_ROWS[::37]:
+        context = lesson_context_module.build(grade, topic_id)
+        if context is None:
+            continue
+        assert tutor_prompts._REVIEWER_CHECK_SEMANTICS_RULE in \
+            tutor_prompts.build_reviewer_instructions(context), topic_id
 
 
 # ---------------------------------------------------------------------------
@@ -233,12 +244,10 @@ def _contradictory_level1_claims() -> tuple:
     )
 
 
-# Zatečeno stanje na kandidatu c17538a. Obje kontradikcije žive u
-# `_TARGET_LEVEL_RULE`, uz tačne rečenice u istom pasusu.
-KNOWN_LEVEL1_CONTRADICTIONS = (
-    ("one operation", "operation_count", 1, 2),
-    ("no representation change", "representation_change_count", 0, 1),
-)
+# Poslije Faze 1: nijedna poslata fraza ne tvrdi granicu različitu od
+# mjerodavne. Tabela fraza iznad se NE SMANJUJE — i dalje traži sve tri
+# nadvladane formulacije, pa njihov povratak odmah obara suitu.
+KNOWN_LEVEL1_CONTRADICTIONS = ()
 
 
 def test_the_authoritative_difficulty_block_is_rendered_from_the_validator_constants():
@@ -256,33 +265,49 @@ def test_the_authoritative_difficulty_block_ships_verbatim_to_both_calls():
 
 
 def test_no_new_contradictory_level_one_numeric_claim_appears():
-    """ZELEN DANAS. Pada na SVAKU novu kontradiktornu numeričku granicu."""
+    """Pada na SVAKU novu kontradiktornu numeričku granicu."""
     actual = _contradictory_level1_claims()
     assert actual == KNOWN_LEVEL1_CONTRADICTIONS, (
         "Skup kontradiktornih numeričkih tvrdnji o nivou 1 se promijenio.\n"
         f"  izmjereno (fraza, polje, tvrdi, mjerodavno): {actual}\n"
         f"  zamrznuto: {KNOWN_LEVEL1_CONTRADICTIONS}\n"
-        "Ako je Faza 1 uklonila nadvladanu rečenicu iz _TARGET_LEVEL_RULE: "
-        "isprazni KNOWN_LEVEL1_CONTRADICTIONS i ukloni xfail sa "
-        "test_no_shipped_rule_block_contradicts_the_authoritative_level_bounds."
+        "Nijedan poslati blok ne smije tvrditi granicu različitu od "
+        "GLOBAL_LEVEL1_MAX — mjerodavan je server-renderovan blok cilja."
     )
 
 
-def test_both_known_contradictions_live_in_the_same_shipped_rule_block():
-    """Provenijencija: 00bbd45 i 24d629f su u ISTOM pasusu, jedan uz drugi."""
-    rule = tutor_prompts._TARGET_LEVEL_RULE.lower()
-    assert "one operation, no representation change" in rule       # 00bbd45
-    assert "up to two connected operations" in rule                # 24d629f
-    assert "one change of representation" in rule                  # 24d629f
-
-
-@pytest.mark.xfail(strict=True, reason=(
-    "EXPECTED_PHASE1_FAILURE — _TARGET_LEVEL_RULE i dalje šalje nadvladanu "
-    "rečenicu iz 00bbd45 („one operation, no representation change“) uz tačnu "
-    "iz 24d629f. Mjerodavan je GLOBAL_LEVEL1_MAX (operation_count <= 2, "
-    "representation_change_count <= 1). Uklanjanje nadvladane rečenice je Faza 1."))
 def test_no_shipped_rule_block_contradicts_the_authoritative_level_bounds():
+    """Faza 1: bivši EXPECTED_PHASE1_FAILURE, sada obična invarijanta."""
     assert _contradictory_level1_claims() == ()
+
+
+def test_the_superseded_level_one_sentence_is_gone_and_the_correct_one_remains():
+    """Provenijencija zatvorenog nalaza (Faza 1).
+
+    Uklonjena su ISKLJUČIVO dva nadvladana ograničenja iz 00bbd45. Rečenica iz
+    24d629f, koja se poklapa s `GLOBAL_LEVEL1_MAX`, ostaje netaknuta, kao i
+    dva ograničenja iz 00bbd45 koja se s njim poklapaju."""
+    rule = tutor_prompts._TARGET_LEVEL_RULE.lower()
+    # uklonjeno (00bbd45, nadvladano)
+    assert "one operation" not in rule
+    assert "no representation change" not in rule
+    # zadržano iz iste rečenice — poklapa se s mjerodavnim granicama
+    assert "one reasoning step and one condition" in rule
+    # zadržano (24d629f) — mjerodavna kvalitativna dozvola
+    assert "up to two connected operations" in rule
+    assert "one change of representation" in rule
+
+
+def test_removing_the_superseded_sentence_kept_every_other_target_level_duty():
+    """Ostatak bloka nosi jedinstvene odgovornosti koje se NE smiju izgubiti."""
+    rule = tutor_prompts._TARGET_LEVEL_RULE
+    assert "Never derive a multi-step result and label it Level 1" in rule
+    assert "A lesson whose title is conceptual is still introduced directly" in rule
+    assert "Level 2 is a bounded combination" in rule
+    assert "Level 3 requires construction, proof or justification" in rule
+    assert "A harder request moves ONE bounded step up" in rule
+    assert "Overshooting the requested level is\nrejected exactly like undershooting it" in rule
+    assert "`difficulty_evidence` must honestly describe the task you actually wrote" in rule
 
 
 # ---------------------------------------------------------------------------
@@ -304,3 +329,100 @@ def test_level_one_semantics_restatement_inventory_is_frozen():
         f"{restating}. Dodavanje još jednog iskaza istog pravila je upravo "
         "obrazac koji je proizveo kontradikciju 00bbd45/24d629f."
     )
+
+
+# ---------------------------------------------------------------------------
+# D) OČUVANJE PORODICA PRAVILA (Faza 1)
+# ---------------------------------------------------------------------------
+# NIJE snimak prompta bajt za bajt: takav snimak bi zabranio i običnu popravku
+# formulacije, pa bi ga prvo čišćenje obrisalo. Ovdje se štiti samo to da
+# POJEDINA SEMANTIČKA PORODICA ne nestane tiho iz pošiljke.
+#
+# Svaki unos je (ime porodice, dokazna fraza, kome mora stići). Fraza je
+# namjerno KRATKA i nosi pojam, ne stil — preformulisanje rečenice oko nje ne
+# obara test, a brisanje cijele porodice obara.
+#
+# ZAŠTO POSTOJI: Faza 0 je izmjerila da je jedno pravilo (`c7552b8`) bilo
+# napisano a nikad poslato ČETIRI DANA i kroz jednu kampanju, a da ga nijedan
+# test nije tražio. Doseg (kapija A) dokazuje da blok POSTOJI u nekom promptu;
+# ovo dokazuje da postoji u PRAVOM promptu.
+
+TUTOR = "tutor"
+REVIEWER = "reviewer"
+BOTH = "both"
+
+PROTECTED_RULE_FAMILIES = (
+    # (porodica, dokazna fraza, primalac)
+    ("reviewer_decision_consistency", "DECISION CONSISTENCY RULE", REVIEWER),
+    ("reviewer_check_semantics", "WHAT `checks.*` DESCRIBE", REVIEWER),
+    ("reviewer_lesson_fidelity", "WHAT `inside_lesson` MEANS", REVIEWER),
+    ("reviewer_target_level", "TARGET LEVEL DECISION RULE", REVIEWER),
+    ("reviewer_preflight_authority", "SERVER-DETECTED DRAFT ISSUES", REVIEWER),
+    ("reviewer_independent_solve", "checks.independent_answer", REVIEWER),
+    ("authoritative_difficulty_target", "ACTIVE DIFFICULTY TARGETS", BOTH),
+    ("difficulty_counting_semantics", "HOW TO COUNT DIFFICULTY EVIDENCE", BOTH),
+    ("solve_task_authoring", "KAD ZADATAK TRAŽI SKUP RJEŠENJA", BOTH),
+    ("scaled_division_notation", "WHEN YOU SCALE BOTH SIDES OF A DIVISION", BOTH),
+    ("intent_vocabulary", "ODREDI NAMJERU", TUTOR),
+    ("field_contract", "PRAVILO POLJA", TUTOR),
+    ("mcq_authoring", "KAD PRAVIŠ ZADATAK", TUTOR),
+    ("structured_task_package", "STRUCTURED TASK PACKAGE", TUTOR),
+    ("target_level_authoring", "TARGET DIFFICULTY LEVEL", TUTOR),
+    ("starting_complexity", "POLAZNA SLOŽENOST", TUTOR),
+    ("difficulty_direction", "KAD MIJENJAŠ TEŽINU", TUTOR),
+    ("help_notation", "ZAPIS U `hint` I `worked_solution`", TUTOR),
+    ("hint_ladder_guidance", "SLJEDEĆI HINT JE NIVO 1", TUTOR),
+    ("lesson_identity", "KANONSKA LEKCIJA", TUTOR),
+    ("shared_domain_safety", "DOMEN I SIGURNOST", BOTH),
+    ("shared_language_terminology", "PRAVILA JEZIKA I TERMINOLOGIJE", BOTH),
+    ("shared_math_notation", "PRAVILA MATEMATIČKOG ZAPISA", BOTH),
+    ("shared_arithmetic_selfcheck", "OBAVEZNA SAMOPROVJERA RAČUNA", BOTH),
+)
+
+
+def _phase1_surfaces():
+    """Stvarno sastavljen Tutor i Reviewer prompt, uključujući ulazni blok.
+
+    `_lesson_block`/`_state_block` idu u INPUT, ne u sistemske instrukcije, pa
+    se porodice poput ljestvice nagovještaja moraju tražiti i tamo."""
+    context = lesson_context_module.build(9, "9-02-006")
+    session = {
+        "current_task": "Neka prava $p$ siječe ravan $\\alpha$ u tački $A$.",
+        "current_options": [{"id": "a", "text": "$1$"}, {"id": "b", "text": "$2$"}],
+        "expected_answer_summary": "$1$", "difficulty": "easy",
+        "difficulty_level": 1, "hint_level": 0, "recent_tasks": [], "recent_turns": [],
+    }
+    tutor = (tutor_prompts.build_tutor_instructions(context) + "\n"
+             + tutor_prompts.build_tutor_input(context, session, "Daj mi hint."))
+    reviewer = (tutor_prompts.build_reviewer_instructions(context) + "\n"
+                + tutor_prompts.build_reviewer_input(context, session, "Daj mi zadatak.",
+                                                     "{}"))
+    return tutor, reviewer
+
+
+def test_every_protected_rule_family_still_reaches_its_intended_call():
+    tutor, reviewer = _phase1_surfaces()
+    missing = []
+    for family, phrase, audience in PROTECTED_RULE_FAMILIES:
+        if audience in (TUTOR, BOTH) and phrase not in tutor:
+            missing.append(f"{family} → Tutor")
+        if audience in (REVIEWER, BOTH) and phrase not in reviewer:
+            missing.append(f"{family} → Reviewer")
+    assert not missing, (
+        "Porodica pravila je nestala iz pošiljke: " + ", ".join(missing) +
+        ". Preformulisanje je dozvoljeno; tiho brisanje cijele porodice nije. "
+        "Ako je porodica namjerno uklonjena, obriši njen red i u izvještaju "
+        "dokaži gdje njeno ponašanje sada živi."
+    )
+
+
+def test_the_protected_family_inventory_is_not_silently_shrunk():
+    """Skidanje reda iz tabele mora biti svjesna izmjena, ne slučajna."""
+    assert len(PROTECTED_RULE_FAMILIES) == 24
+    assert len({family for family, _phrase, _audience in PROTECTED_RULE_FAMILIES}) == 24
+
+
+def test_protected_families_are_not_asserted_against_an_empty_surface():
+    """Kapija je beskorisna ako su površine prazne — dokaži da nisu."""
+    tutor, reviewer = _phase1_surfaces()
+    assert len(tutor) > 15000 and len(reviewer) > 15000

@@ -327,11 +327,23 @@ _STRUCTURED_TASK_RULE = """STRUCTURED TASK PACKAGE (required for every `new_task
 # steps=3/operations=4 i ipak vratio `approve`, pa je turn propao. Pravilo je
 # zato apsolutno i bez ijedne riječi o konkretnoj lekciji, figuri ili oblasti:
 # nivo 1 je DIREKTNA primjena, a izvedeni višekorakan račun tu ne spada.
+#
+# ARHITEKTONSKA FAZA 1 — UKLONJENA NADVLADANA REČENICA. Ovaj blok je do sada
+# nosio i „…one operation, no representation change.“ (uvedeno 00bbd45,
+# 2026-08-04) i „Level 1 tolerates one change of representation and up to two
+# connected operations…“ (uvedeno 24d629f, 2026-08-05, DAN kasnije, upravo da
+# popravi živi pad koji je prva rečenica izazvala). Mjerodavan je
+# `GLOBAL_LEVEL1_MAX` (operation_count <= 2, representation_change_count <= 1)
+# — ista konstanta iz koje se renderuje `_SHARED_TARGET_BLOCK` i po kojoj sudi
+# `difficulty_evidence_errors`. Prva rečenica je dakle modelu slala prag STROŽI
+# od presude, u istom pasusu s tačnim pragom. Uklonjena su ISKLJUČIVO ta dva
+# nadvladana ograničenja; „one reasoning step“ i „one condition“ ostaju jer se
+# poklapaju s mjerodavnim granicama. Nijedan validator se ne dira.
 _TARGET_LEVEL_RULE = """TARGET DIFFICULTY LEVEL (universal; identical for every lesson):
 Level 1 must be a GENUINELY DIRECT introductory task built on the selected lesson:
 recognizing a definition, identifying a named object or property, applying one
 directly stated fact, one simple calculation, or a one-rule classification or
-selection. One reasoning step, one condition, one operation, no representation change.
+selection. One reasoning step and one condition.
 - Never derive a multi-step result and label it Level 1. When a task needs a chain
   of rules or formulas, several intermediate quantities, or a value computed from
   other computed values, it is NOT Level 1: replace it with a direct application of
@@ -500,10 +512,35 @@ _REVIEWER_TARGET_LEVEL_RULE = """TARGET LEVEL DECISION RULE (the server enforces
 # Serverske invarijante se NE popuštaju. Ovaj blok samo recenzentu izričito
 # kaže ono što validator ionako radi, jer je isti pristup već izmjerivo
 # pomogao kod pravila o ciljanom nivou.
+#
+# ARHITEKTONSKA FAZA 1 — DVIJE ISPRAVKE NAD OVIM BLOKOM:
+#
+#   1) BLOK NIJE BIO POSLAT. Uveden je u c7552b8, ali nikad nije bio uvezan u
+#      `build_reviewer_instructions` — statička kapija Faze 0
+#      (`tests/test_prompt_architecture_gate.py`) ga je izmjerila kao JEDINI
+#      nedosežan blok pravila u sva tri prompt modula. Klasa kvara koju je
+#      trebao spriječiti je ostala živa: FW-D04 (final40_c17538a) je pao kodom
+#      `odobreno uprkos oborenim provjerama: ['inside_lesson']` uz odluku
+#      `correct`. Zatečeni `_REVIEWER_DECISION_RULE` tu kontradikciju izričito
+#      opisuje SAMO za `approve` („A single false check with `approve` is a
+#      contradiction“), a `validate_reviewer` obara i `correct` — pa recenzentu
+#      pravilo koje pokriva njegov stvarni slučaj nikad nije stiglo.
+#
+#   2) PRVA REČENICA JE USKLAĐENA S KOMPAKTNIM ODOBRENJEM (523dfce, koji je
+#      došao POSLIJE c7552b8). Od tada recenzent na `approve` polje `final`
+#      IZOSTAVLJA, a server objavljuje nepromijenjen nacrt. Doslovan zatečeni
+#      tekst („the package you return in `final`“) bi na `approve` bio
+#      neistinit i protivrječio bi bloku ODLUKA u istom promptu. Mijenja se
+#      samo referent provjera, nikad njihov autoritet: `validate_reviewer`
+#      već sudi nad `basis` (nacrt na `approve`, `final` na `correct`).
 _REVIEWER_CHECK_SEMANTICS_RULE = """WHAT `checks.*` DESCRIBE (unambiguous):
-- Every `checks.*` field describes the package you return in `final` — for
-  `correct` that is the CORRECTED task, never the original draft. Never report a
-  defect you already fixed: if you repaired it, the check is true for what you return.
+- Every `checks.*` field describes the package the server will publish: for
+  `correct` that is the CORRECTED task you return in `final`, and for `approve`
+  it is the unchanged draft. Never report a defect you already fixed: if you
+  repaired it, the check is true for what will be published.
+- A false value in a mandatory check contradicts BOTH `approve` and `correct`.
+  The server rejects such a payload whichever of the two you chose, so a
+  correction whose checks still describe the old draft loses the whole turn.
 - The server re-runs its own validators on your final package, so a check you
   report is never accepted as proof and never replaces those validators.
 - Report honestly. `math_correct`, `marked_option_correct`, `inside_lesson` and
@@ -621,6 +658,11 @@ def build_reviewer_instructions(context):
         f"{_SHARED_TARGET_BLOCK}\n\n"
         f"{_REVIEWER_LESSON_FIDELITY_RULE}\n\n"
         f"{_REVIEWER_DECISION_RULE}\n\n"
+        # Faza 1: značenje `checks.*` stoji ODMAH uz pravilo odluke — to su dvije
+        # polovine iste invarijante (`validate_reviewer`: odluka + provjere nad
+        # istim `basis`). Ostaje u STABILNOM prefiksu (Workstream K), pa se keš
+        # prompta ne mijenja.
+        f"{_REVIEWER_CHECK_SEMANTICS_RULE}\n\n"
         f"{_REVIEWER_TARGET_LEVEL_RULE}\n\n"
         f"{_REVIEWER_PREFLIGHT_RULE}\n\n"
         # --- dinamički (po lekciji) dio TEK OD OVE TAČKE (Workstream K) ---
