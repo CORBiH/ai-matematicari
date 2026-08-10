@@ -90,6 +90,46 @@ počinje IZA markera — s ISTIM kanonskim skupom rješenja kao zahtjev.
 
 Kad iza markera nema pročitljive relacije, ništa se ne tvrdi.
 
+ČETVRTI NALAZ — „DOBIJENA“ RELACIJA KOJA JE SAMO PREPISANA POLAZNA
+------------------------------------------------------------------
+Živi FINAL-40 lažni prolaz (jedini objavljen prekršaj vjernosti u toj
+kampanji): učenik je dao $x>3$ i IZRIČITO tražio „preoblikuj dodavanjem iste
+nenulte cijele konstante na obje strane; ne prepisuj relaciju doslovno“.
+Objavljeno je
+
+    „Riješi nejednačinu DOBIJENU dodavanjem iste nenulte cijele konstante na
+     obje strane originalne relacije $x>3$…“
+
+— dakle tekst tvrdi dobijenu nejednačinu, a jedina relacija koju napiše je
+DOSLOVNO tražena polazna. Označeno je $\\{x\\in Q\\mid x>3\\}$, matematički
+tačno za $x>3$, pa nijedna postojeća kapija nije imala šta da prijavi:
+relacija JESTE zapisana (drugi nalaz ćuti), zadatak nosi tačno JEDNU relaciju
+pa `has_relation` nije nejednoznačno (treći nalaz ćuti), a skup rješenja je
+identičan traženom (provjera relacije ćuti — i s pravom, jer poredi skupove).
+
+Nedostajala je jedina stvar koju je učenik tražio: DRUGI ZAPIS. Zato ovaj
+nalaz jedini gleda SINTAKSU, i to samo kad su sva četiri uslova istovremeno
+ispunjena:
+
+  1. poruka nosi tačno jednu dokazivo pročitanu relaciju;
+  2. poruka IZRIČITO traži drugačiji zapis (zatvoren skup: preoblik…,
+     transform…, „ne prepisuj/nemoj prepisivati/ne kopiraj“, „u drugom
+     obliku/zapisu“) — obično „Riješi x>3“ time nikad ne postaje zahtjev za
+     preoblikovanjem;
+  3. tekst zadatka SAM tvrdi preoblikovanje (isti zatvoreni skup markera kao
+     treći nalaz) i traži rješavanje;
+  4. svaka relacija u tekstu je dokazivo pročitana i nijedna nije zapisana
+     drugačije od one koju je učenik već napisao.
+
+Uslov 4 nosi i konzervativnost: nepročitan relacijski znak bilo gdje u tekstu
+($x^2>9$) znači „nešto je zapisano a ne zna se šta“ — tada se ništa ne tvrdi.
+Poređenje je nad kanonskim ZAPISOM (`_normalize_solve_segment`), pa razmak i
+LaTeX kozmetika ne prave lažnu razliku, a $3<x$ ili $x+2>5$ jesu drugi zapis.
+
+Ova tri nalaza su međusobno isključiva po konstrukciji: drugi traži da
+relacije NEMA, treći da ih ima više i da je „dobijena“ drugog skupa rješenja,
+četvrti da postoji ali da nijedna nije nova.
+
 Vjernost zahtjevu NE nadjačava lekciju: semantički ugovori vježbe (Task 2)
 i dalje odbijaju zadatak van lekcije čak i kad je učenikov zahtjev vjerno
 prepisan — te dvije kapije su nezavisne i obje moraju proći.
@@ -107,6 +147,7 @@ RELATION_MISMATCH = "relation_mismatch"
 TASK_TYPE_MISMATCH = "task_type_mismatch"
 MISSING_REQUESTED_RELATION = "missing_requested_relation"
 TRANSFORMED_RELATION_MISMATCH = "transformed_relation_mismatch"
+MISSING_DISTINCT_TRANSFORMED_RELATION = "missing_distinct_transformed_relation"
 
 # Direktiva rješavanja u PORUCI — ponovo se koristi zatvoreni uzorak orakla,
 # da se granica „ovo je zahtjev za zadatak“ ne izmišlja po drugi put.
@@ -206,6 +247,78 @@ def _non_equivalent_transformed_relation(request, task_text, shared_domain):
     return None
 
 
+# ---------------------------------------------------------------------------
+# ZATVORENA GRAMATIKA IZRIČITOG ZAHTJEVA ZA DRUGAČIJIM ZAPISOM
+# ---------------------------------------------------------------------------
+# Ovo je JEDINI prekidač četvrtog nalaza: bez njega obično „Riješi $x>3$“ nikad
+# ne postaje zahtjev da se relacija prepiše u drugom obliku, pa zadatak koji
+# doslovno rješava napisanu relaciju ostaje ispravan (i najčešći) slučaj.
+# Skup je zatvoren i traži IMPERATIV/IMENICU preoblikovanja ili IZRIČITU
+# zabranu prepisivanja — nikad puko pominjanje riječi „oblik“.
+_REQUESTED_REFORMULATION_RE = re.compile(
+    r"\bpreoblik\w*"
+    r"|\btransform\w*"
+    r"|\bne\s+prepi\w*|\bnemoj\s+prepisiv\w*|\bbez\s+prepisiv\w*"
+    r"|\bne\s+kopira\w*|\bnemoj\s+kopira\w*"
+    r"|\b(?:drug\w*|druk[čc]ij\w*)\s+(?:oblik\w*|zapis\w*)",
+    re.IGNORECASE)
+
+
+def _requests_a_distinct_reformulation(student_message):
+    """True SAMO kad poruka izričito traži DRUGAČIJI ZAPIS iste relacije."""
+    return bool(_REQUESTED_REFORMULATION_RE.search(student_message or ""))
+
+
+def _normalized_relation_sources(text):
+    """Kanonski ZAPIS svake dokazivo pročitane relacije, redom, bez duplikata.
+
+    Namjerno se ne poredi skup rješenja (to rade provjere iznad) nego zapis:
+    četvrti nalaz pita „je li išta napisano DRUGAČIJE“, a ne „je li tačno“.
+    Normalizacija je ista koju čitač relacija ionako pravi, pa razmak i LaTeX
+    kozmetika ($x \\ge 4$ / $x\\ge4$) nikad ne prave lažnu razliku."""
+    raw = text or ""
+    sources = []
+    for relation in mcq_integrity.read_solve_relations(raw):
+        value = mcq_integrity._normalize_solve_segment(
+            raw[relation.start:relation.end])
+        if value and value not in sources:
+            sources.append(value)
+    return sources
+
+
+def _every_relation_token_is_readable(text, relations):
+    """True kad SVAKI relacijski znak pripada dokazano pročitanoj relaciji.
+
+    Zapisana ali nepročitana relacija ($x^2>9$, skupovni zapis) znači da se ne
+    zna šta je napisano — a četvrti nalaz upravo tvrdi da NIŠTA novo nije
+    napisano. Bez ovog uslova bi nedokazivo postalo presuda."""
+    spans = tuple((relation.start, relation.end) for relation in relations)
+    for match in _ANY_RELATION_TOKEN_RE.finditer(text or ""):
+        if not any(start <= match.start() and match.end() <= end
+                   for start, end in spans):
+            return False
+    return True
+
+
+def _only_restates_the_requested_relation(student_message, task_text):
+    """True kad zadatak tvrdi preoblikovanje, a ne napiše NIJEDAN novi zapis."""
+    text = task_text or ""
+    if not _TRANSFORMED_RELATION_MARKER_RE.search(text):
+        return False                     # zadatak ne tvrdi nikakvo preoblikovanje
+    if not _SOLVE_DIRECTIVE_RE.search(text):
+        return False                     # tekst uopšte ne traži rješavanje
+    relations = mcq_integrity.read_solve_relations(text)
+    if not relations:
+        return False                     # relacije nema — to je DRUGI nalaz
+    if not _every_relation_token_is_readable(text, relations):
+        return False                     # nešto je zapisano a nepročitano
+    requested = _normalized_relation_sources(student_message)
+    if not requested:
+        return False
+    return all(source in requested
+               for source in _normalized_relation_sources(text))
+
+
 def _requested_kind(request):
     """Izričito imenovana vrsta ima prednost nad vrstom izvedenom iz relacije."""
     return request.stated_kind or request.relation_kind
@@ -284,6 +397,19 @@ def request_fidelity_failures(student_message, task_text):
                 f"{TRANSFORMED_RELATION_MISMATCH}: requested "
                 f"'{request.solution_display()}', task's transformed relation "
                 f"'{drifted.display()}'")
+
+    # 2c) TVRDNJA O PREOBLIKOVANJU BEZ IJEDNOG NOVOG ZAPISA (vidi docstring).
+    #     Jedini nalaz koji gleda SINTAKSU, i to samo kad je učenik izričito
+    #     tražio drugačiji zapis: zadatak koji tvrdi „dobijenu“ relaciju a
+    #     napiše samo doslovno traženu polaznu nije uradio ono što je traženo,
+    #     iako mu je skup rješenja tačan. Bez uslova o izričitom zahtjevu ovo bi
+    #     oborilo svaki obični „riješi napisanu relaciju“ zadatak.
+    if (explicit_relation and _requests_a_distinct_reformulation(message)
+            and _only_restates_the_requested_relation(message, task_text)):
+        failures.append(
+            f"{MISSING_DISTINCT_TRANSFORMED_RELATION}: the task announces a "
+            f"transformed relation but writes no relation distinct from the "
+            f"requested one; requested '{request.solution_display()}'")
 
     # 2) RELACIJA — poredi se KANONSKI SKUP RJEŠENJA. Kad su domeni saglasni i
     #    diskretni, poredi se i presjek s tim domenom, pa preformulacija koja

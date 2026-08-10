@@ -538,7 +538,27 @@ def format_for_reviewer(issues):
         "expected_answer and every option for the corrected relation. If the "
         "student explicitly asked for two DIFFERENT amounts on the two sides, "
         "that request cannot be honoured as an equivalent reformulation: return "
-        "`fail_closed`. For `task_type_mismatch` "
+        "`fail_closed`. "
+        # Živi FINAL-40 lažni prolaz: „Riješi nejednačinu DOBIJENU dodavanjem
+        # iste nenulte cijele konstante na obje strane originalne relacije
+        # $x>3$“ — tvrdi dobijenu relaciju, a napiše samo polaznu. Recept mora
+        # reći da je prepisivanje originala neispunjen zahtjev, inače recenzent
+        # „popravi“ opcije (koje su ionako tačne za $x>3$) i ništa se ne mijenja.
+        f"For `{request_fidelity_module.MISSING_DISTINCT_TRANSFORMED_RELATION}` "
+        "the student explicitly asked for a DIFFERENT but EQUIVALENT written "
+        "form of the relation, and your task announces a transformed/resulting "
+        "relation (`dobijena`, `nastala`, `preoblikovana`…) while the ONLY "
+        "relation it writes down is the student's original one: merely copying "
+        "the original relation never satisfies that request, no matter how "
+        "correct the marked answer is. WRITE THE TRANSFORMED RELATION ITSELF "
+        "into the task text, inside $...$, with both sides fully written out — "
+        "for the requested $x>3$, adding $2$ to both sides gives $x+2>5$, which "
+        "is a valid reformulation, while repeating $x>3$ is not. Its solution "
+        "set must stay EXACTLY equal to the requested one, then recompute "
+        "correct_option_id, correct_option_index, expected_answer and every "
+        "option for the relation you actually wrote. If no safe equivalent "
+        "reformulation can be produced, return `fail_closed`. "
+        "For `task_type_mismatch` "
         "keep the requested kind: an inequality request must stay an inequality "
         "and an equation request must stay an equation. If honouring the request "
         "would break the selected lesson's semantic contract, return "
