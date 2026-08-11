@@ -318,8 +318,11 @@ _TASK_RULE = """KAD PRAVIŠ ZADATAK:
   toga daj neutralne podatke — mjere, položaje, koordinate, definiciju — iz
   kojih učenik mora izračunati, uporediti, zaključiti ili prepoznati odgovor.
 - u `solution` i `expected_answer` NIKAD ne imenuj slovo opcije („opcija a“,
-  „odgovor b“, „pod c)“): server opcije izmiješa POSLIJE tebe, pa svako slovo
-  koje napišeš postaje netačno. Napiši matematički odgovor, ne oznaku."""
+  „odgovor b“, „pod c)“) NI njen redni broj ili položaj („prva opcija“, „treća
+  tvrdnja“): server opcije izmiješa POSLIJE tebe i tek onda dodjeljuje slova, pa
+  svaka takva oznaka postaje netačna i cijeli paket biva odbijen. Objasni SADRŽAJ
+  tačnog odgovora — matematiku, ne oznaku. Imenovanje matematičkih objekata
+  (`tačka A`, `duž AB`, `funkcija f`) nije oznaka opcije i ostaje dozvoljeno."""
 
 # POLAZNA SLOŽENOST — namjerno kratko i apsolutno pravilo, ne sistem težine.
 # ZAŠTO POSTOJI (ručni test, 2026-08-03): prvi zadatak uvodne lekcije 6. razreda
@@ -868,6 +871,43 @@ _REVIEWER_OPTION_UNIQUENESS_RULE = """`exactly_one_option_correct` (mandatory, m
   valid answers is never a reason to approve."""
 
 
+# IDENTITET OPCIJE JE SERVERSKI — vlasništvo RECENZENTA nad KONAČNIM paketom.
+#
+# ŽIVA KAPIJA IZDANJA (canonical live release gate na 2fa9507, scenario težeg
+# zadatka na prelazu nivoa 1→2; lekcija se namjerno ne navodi): recenzent je
+# vratio `correct` s kompletno prepravljenim paketom, a njegov KONAČAN
+# `solution` je imenovao slovo opcije. Server je odbio objavu
+# (`solution_option_label_claim [solution]`) — dakle sigurno, ali scenario nije
+# objavio ništa i kapija je pala.
+#
+# Zabrana je i ranije POSTOJALA, ali zakopana u sredini numerisane tačke 11,
+# koja je inače o dokazima težine. Ovdje stoji kao ZASEBAN blok, i to zato što
+# je živi dokaz da se prekršaj dešava BAŠ U ISPRAVCI: pravilo mora izričito
+# tražiti ponovnu provjeru nad KONAČNIM tekstom, isto kao
+# `_REVIEWER_OPTION_UNIQUENESS_RULE`. Jedna kanonska formulacija, ne dvije koje
+# se mogu raziđu — zato je rečenica iz tačke 11 premještena, a ne duplirana.
+#
+# Deterministička kapija se NE dira: ona ostaje backstop koji pada zatvoreno.
+# Ovo je popravka GENERISANJA, da backstop ne mora ni da se oglasi.
+_REVIEWER_OPTION_IDENTITY_RULE = """OPTION IDENTITY IS THE SERVER'S, NEVER YOURS:
+- The server shuffles the options AFTER you answer and only then assigns the
+  letters a/b/c/d. Any letter or position you write is therefore a claim you
+  cannot know, and the server rejects the whole package rather than publish it.
+- In `solution` and `expected_answer` never identify the answer by option
+  letter („opcija a", „odgovor je b", „pod c)"), by option number, or by
+  position ("prva opcija", "treća tvrdnja", "posljednji odgovor"). Do not write
+  "izaberi …" pointing at an option either.
+- Say the MATHEMATICS instead. „Brojnik pokazuje koliko dijelova uzimamo, a
+  nazivnik na koliko je jednakih dijelova cjelina podijeljena." is correct;
+  „Tačan odgovor je b)." is not. Naming the correct answer's CONTENT is always
+  allowed — it is only the server-owned label or position that is forbidden.
+- Ordinary mathematical names are NOT option labels and stay welcome: `tačka A`,
+  `duž AB`, `ugao ABC`, `funkcija f`, `skup B`.
+- AFTER ANY REPAIR you make, re-read your FINAL `solution` and
+  `expected_answer` and remove every such label — including one you merely
+  copied over from the draft. The package that is judged is the one you return."""
+
+
 # VJEŽBAJMO V1 (F5K): `inside_lesson` više NIJE „zvuči srodno“. Živi audit:
 # 14 objavljenih, matematički ispravnih zadataka POGREŠNE lekcije (grafik →
 # uvrštavanje; mreža → zapremina; tekstualni → goli izraz; dokaz → brojevni
@@ -967,7 +1007,7 @@ def build_reviewer_instructions(context):
         "8. da je zadatak rješiv i jednoznačan;\n"
         "9. da je MathJax ispravan (samo $...$, poznate komande);\n"
         "10. da je bosanski prirodan i primjeren uzrastu.\n\n"
-        "11. verify that lesson identity, level, text, options, marked answer, solution, difficulty evidence, and signature describe one task. Independently recompute `reviewed_difficulty_evidence` from only the visible task, answer requirements, options, and solution: ignore Tutor numerical counts. Count only actions the student must perform; four MCQ options are not four conditions or operations, selecting one option with one rule is one direct application, a solution explanation is not a student explanation requirement, and `combines_concepts` is true only when the student must combine distinct mathematical concepts. Return your independently calculated evidence even if the wording needs no textual correction. Level 1 may be a direct yes/no, recognition, calculation, classification, substitution, or one-rule selection; choosing a visible option is not by itself mathematical comparison or a second reasoning step. Level 2 permits a bounded pair of related rules/concepts, conditions, or operations, straightforward explanation/comparison, or one manageable representation change; `combines_concepts` alone is not Level 3. Level 3 requires construction, proof, three-or-more connected requirements/operations, advanced representation change, or comparable depth. For multiple choice, correct_option_id and correct_option_index must select the same visible option and expected_answer must be an exact copy of its text; explanation belongs only in solution. Never name an option letter (`opcija a`, `odgovor b`) inside solution or expected_answer: the server shuffles the options after you, so any letter you write becomes false. Signature parameters are only closed name/value entries with canonical string values: no arbitrary metadata, and order alone is never a new task. When correcting, update options, correct option ID/index, expected answer, solution, and the complete signature together, then return the complete fresh package. Set `task_package_consistent`, `difficulty_evidence_valid`, and `task_signature_consistent` accordingly.\n\n"
+        "11. verify that lesson identity, level, text, options, marked answer, solution, difficulty evidence, and signature describe one task. Independently recompute `reviewed_difficulty_evidence` from only the visible task, answer requirements, options, and solution: ignore Tutor numerical counts. Count only actions the student must perform; four MCQ options are not four conditions or operations, selecting one option with one rule is one direct application, a solution explanation is not a student explanation requirement, and `combines_concepts` is true only when the student must combine distinct mathematical concepts. Return your independently calculated evidence even if the wording needs no textual correction. Level 1 may be a direct yes/no, recognition, calculation, classification, substitution, or one-rule selection; choosing a visible option is not by itself mathematical comparison or a second reasoning step. Level 2 permits a bounded pair of related rules/concepts, conditions, or operations, straightforward explanation/comparison, or one manageable representation change; `combines_concepts` alone is not Level 3. Level 3 requires construction, proof, three-or-more connected requirements/operations, advanced representation change, or comparable depth. For multiple choice, correct_option_id and correct_option_index must select the same visible option and expected_answer must be an exact copy of its text; explanation belongs only in solution. Signature parameters are only closed name/value entries with canonical string values: no arbitrary metadata, and order alone is never a new task. When correcting, update options, correct option ID/index, expected answer, solution, and the complete signature together, then return the complete fresh package. Set `task_package_consistent`, `difficulty_evidence_valid`, and `task_signature_consistent` accordingly.\n\n"
         f"{_SCALED_DIVISION_RULE}\n\n"
         # Isti ugovor autorstva kao Tutor: na `correct` RECENZENT piše opcije
         # koje se objavljuju, pa mora znati iste dokazive zapise (živi T1
@@ -986,6 +1026,10 @@ def build_reviewer_instructions(context):
         f"{_REVIEWER_CHECK_SEMANTICS_RULE}\n\n"
         f"{_REVIEWER_STEM_REASONING_RULE}\n\n"
         f"{_REVIEWER_OPTION_UNIQUENESS_RULE}\n\n"
+        # Živa kapija izdanja (2fa9507): prekršaj je nastao u ISPRAVCI, pa
+        # pravilo stoji odmah uz drugo pravilo koje traži ponovnu ocjenu nad
+        # konačnim paketom.
+        f"{_REVIEWER_OPTION_IDENTITY_RULE}\n\n"
         f"{_REVIEWER_TARGET_LEVEL_RULE}\n\n"
         f"{_REVIEWER_PREFLIGHT_RULE}\n\n"
         # --- dinamički (po lekciji) dio TEK OD OVE TAČKE (Workstream K) ---
