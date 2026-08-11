@@ -251,6 +251,199 @@ def test_arrow_method_reaches_both_prompts_for_proportionality(universal):
         assert "\\uparrow\\uparrow" in text and "\\uparrow\\downarrow" in text
 
 
+# ---------------------------------------------------------------------------
+# 6) FAZA 3 (G-1) — POLITIKA VAŽI I ZA MODEL-AUTORSKU POMOĆ
+# ---------------------------------------------------------------------------
+# ŽIVA PRAZNINA: politika PP-1 je vezala ZADATAK, opcije i rješenje, ali ne i
+# tekst pomoći koji piše model — iako je prompt POMOĆI 6. razreda doslovno
+# zabranjivao korijen („NIKAD ga ne uvodi u zadatak, opcije, HINT ni rješenje“).
+# Prompt je zabranjivao, server nije mjerio: ista klasa kao FINAL40 FW-G06,
+# samo na susjednoj površini.
+#
+# Kontrola lažnog odbijanja je NAMJERNO isti tekst hinta na 8. razredu: jedina
+# razlika je razred, pa test dokazuje da mjeri POLITIKA, a ne uzorak.
+
+RADICAL_HINT = ("Sjeti se da je $\\sqrt{9}=3$, pa to iskoristi u sljedećem "
+                "koraku računa.")
+
+_G6_MODEL_LESSON = "6-09-001"      # model-ruta, bez ugovora vježbe, bez scope-a
+_G8_MODEL_LESSON = "8-02-002"      # ista struktura, razred koji korijen POZNAJE
+
+
+def _computational_task(context, text, options, correct, expected, solution):
+    payload = make_task_payload(text=text, options=list(options),
+                                correct_option_index=correct, expected=expected,
+                                solution=solution)
+    return payload.model_copy(update={
+        "selected_lesson_id": context.topic_id,
+        "selected_lesson_title": context.title,
+    })
+
+
+def _publish_computational(store, fake, grade, lesson, session_id):
+    """Objavi RAČUNSKI zadatak (klasu bira server iz objavljenih opcija)."""
+    context = lesson_context_module.build(grade, lesson)
+    task = _computational_task(
+        context,
+        "Ugao $\\alpha$ ima mjeru $40^\\circ$. Kolika je mjera ugla koji ga "
+        "dopunjava do pravog ugla?",
+        ("$50^\\circ$", "$140^\\circ$", "$60^\\circ$", "$320^\\circ$"),
+        0, "$50^\\circ$",
+        "Pravi ugao ima $90^\\circ$, pa je traženi ugao $90-40=50$ stepeni.")
+    fake.queue(make_tutor_draft(intent="generate_task", new_task=task))
+    fake.queue(make_reviewer_final(
+        final=make_tutor_draft(intent="generate_task", new_task=task)))
+    response = run_practice_turn(store, fake, turn(
+        lesson, message="Daj mi zadatak.", grade=grade,
+        **{"session_id": session_id}))
+    assert response["status"] == "ready", response.get("answer")
+    return context
+
+
+def _press_model_hint(store, fake, grade, lesson, session_id, hint_text):
+    """Jedan pritisak na hint s MODEL-autorskim tekstom. Vraća (odgovor, poziva)."""
+    fake.queue(make_tutor_draft(intent="hint_request", new_task=None,
+                                reply="Idemo korak po korak.", hint=hint_text))
+    before = fake.call_count
+    response = run_practice_turn(store, fake, turn(
+        lesson, message="Ne znam.", grade=grade, intent="hint_request",
+        interaction_phase="practice_help", client_turn_id=f"{session_id}-h1",
+        **{"session_id": session_id}))
+    return response, fake.call_count - before
+
+
+def test_grade6_model_hint_with_a_radical_is_replaced_by_the_server_scaffold(
+        universal, caplog):
+    caplog.set_level(logging.WARNING, logger="matbot.tutor")
+    store, fake = SessionStore(), FakeLLM()
+    session_id = "g6-help-policy"
+    _publish_computational(store, fake, 6, _G6_MODEL_LESSON, session_id)
+
+    response, calls = _press_model_hint(
+        store, fake, 6, _G6_MODEL_LESSON, session_id, RADICAL_HINT)
+
+    # 1) zabranjeni zapis NIKAD ne stiže učeniku
+    assert "\\sqrt" not in response["answer"]
+    assert RADICAL_HINT not in response["answer"]
+    # 2) turn NE propada — učenik dobije upotrebljivu serversku pomoć
+    assert response["status"] == "ready"
+    assert response["answer"] != SAFE_ERROR_MESSAGE
+    assert len(response["answer"].strip()) >= 25
+    # 3) TAČNO jedan poziv: nema ni retryja ni popravnog drugog poziva
+    assert calls == 1
+    # 4) nalaz je zapisan, i to samo internim kodom (CLAUDE.md pravilo 7)
+    assert "help_curriculum_policy_blocked" in caplog.text
+    assert pp.GRADE_CAPABILITY_CODE in caplog.text
+    assert "\\sqrt" not in caplog.text
+    # 5) stanje ljestvice napreduje normalno
+    assert store.peek(session_id)["hint_level"] == 1
+
+
+def test_grade8_model_hint_with_the_same_radical_is_served_unchanged(universal):
+    """KONTROLA LAŽNOG ODBIJANJA: isti tekst, razred koji korijen poznaje."""
+    store, fake = SessionStore(), FakeLLM()
+    session_id = "g8-help-policy"
+    context = _publish_computational(
+        store, fake, 8, _G8_MODEL_LESSON, session_id)
+    assert context.practice_policy.radical_notation_allowed is True
+
+    response, calls = _press_model_hint(
+        store, fake, 8, _G8_MODEL_LESSON, session_id, RADICAL_HINT)
+
+    assert RADICAL_HINT in response["answer"]
+    assert response["status"] == "ready"
+    assert calls == 1
+
+
+def test_grade6_ordinary_model_hint_is_untouched(universal):
+    """KONTROLA: legitimna pomoć 6. razreda (binarno oduzimanje) ostaje ista."""
+    store, fake = SessionStore(), FakeLLM()
+    session_id = "g6-help-ok"
+    _publish_computational(store, fake, 6, _G6_MODEL_LESSON, session_id)
+    plain = ("Pravi ugao ima $90^\\circ$; oduzmi datu mjeru od te vrijednosti, "
+             "npr. $90 - 40$, i dobićeš traženi ugao.")
+
+    response, calls = _press_model_hint(
+        store, fake, 6, _G6_MODEL_LESSON, session_id, plain)
+
+    assert plain in response["answer"]
+    assert calls == 1
+
+
+def test_help_policy_check_reads_the_same_resolved_policy_as_publication(
+        universal):
+    """Nijedna druga kopija pravila: ista funkcija, isti razriješeni objekat."""
+    context = lesson_context_module.build(6, _G6_MODEL_LESSON)
+    assert pp.text_policy_failures(context.practice_policy, RADICAL_HINT) \
+        == (pp.GRADE_CAPABILITY_CODE,)
+    context8 = lesson_context_module.build(8, _G8_MODEL_LESSON)
+    assert pp.text_policy_failures(context8.practice_policy, RADICAL_HINT) == ()
+
+
+def test_server_scaffold_never_violates_the_policy_it_replaces(universal):
+    """Zamjena mora biti bezbjedna za SVAKU lekciju, inače bi lijek bio defekt."""
+    from matbot import hint_policy
+
+    for grade, lesson in ((6, _G6_MODEL_LESSON), (6, "6-12-004"),
+                          (8, _G8_MODEL_LESSON), (9, "9-01-001")):
+        context = lesson_context_module.build(grade, lesson)
+        if context is None:
+            continue
+        for level in (1, 2):
+            scaffold = hint_policy.compose_propositional_hint(
+                level, context.title, ("Ako je $a>b$, onda je $a-b>0$.", "b"))
+            assert pp.text_policy_failures(
+                context.practice_policy, scaffold) == (), (grade, lesson, level)
+
+
+# ---------------------------------------------------------------------------
+# 7) FAZA 3 (G-2) — RECENZENTOV KONAČNI PAKET VIDI ISTU POLITIKU KAO PREFLIGHT
+# ---------------------------------------------------------------------------
+
+def test_reviewer_final_package_with_a_radical_is_rejected_by_the_invariant(
+        universal, caplog):
+    caplog.set_level(logging.INFO, logger="matbot.tutor")
+    context = lesson_context_module.build(6, _G6_MODEL_LESSON)
+    clean = _computational_task(
+        context,
+        "Ugao $\\alpha$ ima mjeru $40^\\circ$. Kolika je mjera ugla koji ga "
+        "dopunjava do pravog ugla?",
+        ("$50^\\circ$", "$140^\\circ$", "$60^\\circ$", "$320^\\circ$"),
+        0, "$50^\\circ$", "Pravi ugao ima $90^\\circ$, pa je $90-40=50$.")
+    radical = _computational_task(
+        context,
+        "Jednakostraničan trougao ima stranicu $6$. Kolika je udaljenost "
+        "centra upisane kružnice od stranice?",
+        ("$\\sqrt{3}$", "$3$", "$6$", "$2$"),
+        0, "$\\sqrt{3}$", "Udaljenost je $\\sqrt{3}$.")
+    store, fake = SessionStore(), FakeLLM()
+    fake.queue(make_tutor_draft(intent="generate_task", new_task=clean))
+    fake.queue(make_reviewer_final(
+        decision="correct",
+        final=make_tutor_draft(intent="generate_task", new_task=radical)))
+
+    response = run_practice_turn(store, fake, turn(
+        _G6_MODEL_LESSON, message="Daj mi zadatak.",
+        **{"session_id": "g6-reviewer-final"}))
+
+    assert fake.call_count == 2                     # nikad treći poziv
+    assert response["answer"] == SAFE_ERROR_MESSAGE
+    assert store.peek("g6-reviewer-final") is None  # nijedna mutacija
+    assert "reviewer_final_mcq" in caplog.text
+    assert pp.GRADE_CAPABILITY_CODE in caplog.text
+
+
+def test_reviewer_final_invariant_receives_the_policy_argument(universal):
+    """Struktura, ne samo ishod: preflight i konačna invarijanta dijele ulaz."""
+    import inspect
+
+    source = inspect.getsource(pipeline._two_call)
+    draft_call = source.index("draft_issues = package_preflight")
+    final_call = source.index("final_issues = package_preflight")
+    assert "practice_policy=" in source[draft_call:final_call]
+    assert "practice_policy=" in source[final_call:]
+
+
 def test_pipeline_passes_the_same_resolved_policy_to_the_generator(
         universal, monkeypatch):
     context = lesson_context_module.build(6, "6-07-002")

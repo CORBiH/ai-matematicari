@@ -1244,6 +1244,44 @@ def check_curriculum_task_form_consistent(obs: TurnObservation) -> CheckResult:
     return CheckResult(name, PASS)
 
 
+def check_help_curriculum_policy_consistent(obs: TurnObservation) -> CheckResult:
+    """Poštuje li SERVIRANA POMOĆ kurikularnu politiku lekcije (Faza 3, G-1).
+
+    ZAŠTO ZASEBNO OD `curriculum_task_form_consistent`: taj mjerač gleda
+    OBJAVLJEN PAKET (tekst zadatka, opcije, rješenje). Politika PP-1 je do Faze 3
+    i u produkciji važila samo tamo, pa je model-autorski nagovještaj mogao
+    uvesti zapis koji razred nema — a isti turn je nosio prompt koji to izričito
+    zabranjuje. Produkcija sada tu politiku primjenjuje i na pomoć
+    (`matbot.tutor.pipeline._finalize_help_answer`), pa evaluator mora umjeti
+    izmjeriti upravo tu površinu.
+
+    ZAŠTO ZASEBNO OD `help_notation_in_scope`: taj mjerač dokazuje
+    PROPORCIONALNOST ZADATKU (zatvoreni skup napredne mašinerije koji NE sadrži
+    ni `sqrt` ni `sin`/`log`), a ovaj dokazuje SPOSOBNOST RAZREDA. Dvije
+    različite tvrdnje, dva odvojena mjerača.
+
+    Poziva se ISTA produkcijska čista funkcija i ISTI server-vlasnički kontekst
+    lekcije — evaluator nikad ne pravi slabiji dvojnik politike.
+
+    PASS je OGRANIČEN dokaz: dokazuje se samo ZAPIS/metodska proza koju politika
+    imenuje, nikad da je nagovještaj pedagoški primjeren (vidi
+    release_contract.BLIND_SPOTS)."""
+    name = "help_curriculum_policy_consistent"
+    text = obs.answer.strip()
+    if not text or text in _FALLBACK_MESSAGES:
+        return CheckResult(name, SKIP, "no served help text on this turn")
+    context = lesson_context.build(obs.grade, obs.topic_id)
+    if context is None:
+        return CheckResult(name, SKIP, "no canonical lesson context")
+    policy = getattr(context, "practice_policy", None)
+    if policy is None:
+        return CheckResult(name, SKIP, "no resolved practice policy")
+    codes = practice_policy.text_policy_failures(policy, text)
+    if codes:
+        return CheckResult(name, FAIL, ",".join(codes[:3]))
+    return CheckResult(name, PASS)
+
+
 def _make_calls_check(limit: int):
     def check(obs: TurnObservation) -> CheckResult:
         if obs.sdk_calls > limit:
@@ -1302,6 +1340,10 @@ _CHECKS = {
     "solution_option_binding_consistent": check_solution_option_binding_consistent,
     "help_has_task_scaffold": check_help_has_task_scaffold,
     "help_notation_in_scope": check_help_notation_in_scope,
+    # Kurikularna politika lekcije nad SERVIRANOM pomoći (Faza 3, G-1) — stoji
+    # UZ `help_notation_in_scope`, nikad umjesto njega: proporcionalnost zadatku
+    # i sposobnost razreda su dvije različite tvrdnje.
+    "help_curriculum_policy_consistent": check_help_curriculum_policy_consistent,
     "symbolic_marked_answer": check_symbolic_marked_answer,
     "hint_differs": check_hint_differs,
     "task_differs": check_task_differs,
@@ -1397,6 +1439,10 @@ _ROOT_CAUSE = {
     "solution_option_binding_consistent": "option_binding",
     "help_has_task_scaffold": "hint_quality",
     "help_notation_in_scope": "notation_and_math",
+    # ISTI root cause kao `curriculum_task_form_consistent`: to je jedan te isti
+    # defekt (gradivo van razreda) na dvije površine, pa izvještaj ne smije
+    # razdvojiti klasu FW-G06 u dvije kante.
+    "help_curriculum_policy_consistent": "lesson_scope",
     "symbolic_marked_answer": "help_branch_coverage",
     "solution_complete": "solution_disclosure",
     "free_text_grading_no_oracle": "grading",

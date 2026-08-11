@@ -863,6 +863,38 @@ def _finalize_help_answer(session, context, request_id, intent, answer):
     if empty:
         raise UnifiedOutputError(f"{empty} [{intent}]")
 
+    # KURIKULARNA POLITIKA LEKCIJE VAŽI I ZA POMOĆ (Faza 3, G-1).
+    # Politika PP-1 se do sada provjeravala nad ZADATKOM, opcijama i rješenjem
+    # (`_validate_task_server_side`, `collect_package_issues`) — ali NIKAD nad
+    # tekstom pomoći koji piše model. Isti turn je pri tome nosio prompt koji to
+    # izričito zabranjuje: razredni blok 6. razreda (`rules._grade_rules` →
+    # `practice_policy.radical_capability_rule_text`) doslovno kaže „NIKAD ga ne
+    # uvodi u zadatak, opcije, HINT ni rješenje". Prompt je zabranjivao, server
+    # nije provjeravao — ista klasa kao živi FINAL40 FW-G06, samo na susjednoj
+    # površini. `out_of_scope_notation_codes` iznad tu ne pomaže: njegov zatvoreni
+    # skup (`\vec`, `\int`, `\sum`, matrice…) NE sadrži ni `sqrt` ni `sin`/`log`,
+    # jer mjeri proporcionalnost ZADATKU, a ne sposobnost RAZREDA.
+    #
+    # Vlasnik ostaje `practice_policy` — ovdje se ne izvodi nijedno novo
+    # kurikularno pravilo, ne postoji nijedan zapis matematike i nema grananja po
+    # razredu ni po ID-ju lekcije: politika je već razriješena u LessonContextu.
+    #
+    # Lijek je POSTOJEĆI obrazac zamjene (vidi dva nalaza ispod), ne pad turna:
+    # učenik je pomoć već platio jednim pozivom, pa se opasan tekst zamjenjuje
+    # serverskim skelom. Nema drugog poziva i nema trećeg modela.
+    policy = getattr(context, "practice_policy", None)
+    policy_codes = practice_policy.text_policy_failures(policy, answer)
+    if policy_codes:
+        logger.warning(
+            "help_curriculum_policy_blocked request_id=%s topic=%s intent=%s "
+            "level=%s codes=%s",
+            request_id, context.topic_id, intent, served, ",".join(policy_codes),
+        )
+        return _validated_help_text(
+            hint_policy.compose_propositional_hint(
+                served, context.title, _option_texts(session)),
+            context, intent)
+
     # ISTA ARHITEKTONSKA GRANICA KAO NA OBJAVI (živi H12): slovo opcije je
     # serversko vlasništvo, pa ga model-autorski nagovještaj ne smije imenovati
     # NIKAKO — ni pogrešno (kontradikcija s objavljenim stanjem) ni tačno (to je
@@ -1961,6 +1993,13 @@ def _two_call(llm, context, session, student_message, request_id, trusted_verdic
             previous_signature=previous_signature,
             difficulty_profile=difficulty_profile,
             practice_contract=context.practice_contract,
+            # SIMETRIJA S PREFLIGHTOM (Faza 3, G-2): nacrt se provjerava UZ
+            # razriješenu politiku, pa je i recenzentov KONAČNI paket mora
+            # dobiti — inače prekršaj politike u recenzentovoj ispravci stiže
+            # tek do grublje kapije objave i logu ostavlja generički kod
+            # umjesto tačnog nalaza. Objava (`_validate_task_server_side`)
+            # istu provjeru i dalje ponavlja: ovo je raniji sloj, ne zamjena.
+            practice_policy=getattr(context, "practice_policy", None),
             student_message=student_message)
         if final_issues:
             # `unchanged=True` znači: recenzent je vidio nalaz i vratio paket s

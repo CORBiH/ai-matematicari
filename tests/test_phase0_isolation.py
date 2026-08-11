@@ -111,8 +111,22 @@ FINAL40_BLOCKER_CHECK_NAMES = (
     'geometry_relation_consistent',
 )
 
+PHASE3_ADDED_CHECK_NAMES = (
+    # Faza 3 (G-3): prva provjera registra koja sudi KURIKULARNU POLITIKU nad
+    # SERVIRANOM POMOĆI. Postoji jer nijedan zatečeni mjerač tu površinu nije
+    # dosezao — `help_notation_in_scope` mjeri proporcionalnost ZADATKU
+    # (zatvoren skup napredne mašinerije BEZ `sqrt`/`sin`/`log`), a
+    # `curriculum_task_form_consistent` mjeri OBJAVLJEN PAKET. Zove ISTU
+    # produkcijsku funkciju (`practice_policy.text_policy_failures`) koju objava
+    # i preflight već koriste, i OGRANIČEN je dokaz
+    # (release_contract.BOUNDED_CLASS_CHECKS): PASS nikad ne nosi spremnost
+    # izdanja.
+    'help_curriculum_policy_consistent',
+)
+
 FROZEN_CHECK_NAMES = tuple(sorted(
-    PHASE0_CHECK_NAMES + PHASE2_ADDED_CHECK_NAMES + FINAL40_BLOCKER_CHECK_NAMES))
+    PHASE0_CHECK_NAMES + PHASE2_ADDED_CHECK_NAMES + FINAL40_BLOCKER_CHECK_NAMES
+    + PHASE3_ADDED_CHECK_NAMES))
 
 
 def test_the_campaign_check_registry_is_unchanged_by_phase_zero():

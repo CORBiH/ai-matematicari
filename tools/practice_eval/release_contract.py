@@ -70,6 +70,11 @@ BOUNDED_TOKEN_CHECKS = frozenset({
 BOUNDED_CLASS_CHECKS = frozenset({
     "stem_answer_disclosure_safe",
     "curriculum_task_form_consistent",
+    # Kurikularna politika nad SERVIRANOM pomoći (Faza 3, G-1): dokazuje se
+    # isto što i za paket — ZAPIS van razreda i imenovana metodska proza —
+    # nikad da je nagovještaj pedagoški primjeren lekciji. Zato je i njegov
+    # PASS ograničen dokaz, tačno kao kod mjerača paketa iznad.
+    "help_curriculum_policy_consistent",
     # Geometrijska koherencija: dokazuje se TAČNO jedna klasa
     # protivrječnosti (poklopljeni zraci uz nenulti ugao). PASS nikad ne
     # znači da je geometrija zadatka ispravna — samo da ta klasa nije
@@ -85,6 +90,7 @@ KNOWN_SKIPPING_CHECKS = frozenset({
     "free_text_grading_no_oracle",
     "hint_proposition_no_leak", "hint_top_from_verified_solution",
     "help_has_task_scaffold", "help_notation_in_scope",
+    "help_curriculum_policy_consistent",
     "stem_answer_disclosure_safe", "curriculum_task_form_consistent",
     "geometry_relation_consistent",
 })
@@ -183,16 +189,29 @@ BLIND_SPOTS = (
     BlindSpot(
         key="help_out_of_grade_technique",
         question="Does a hint introduce machinery absent from the approved task?",
-        owner=("matbot.hint_policy.out_of_scope_notation_codes via "
-               "matbot.tutor.pipeline; checks.check_help_notation_in_scope. It "
-               "proves only that certain advanced NOTATION was introduced; it "
-               "proves nothing about semantic grade appropriateness. For "
+        owner=("two independent owners, both production functions the evaluator "
+               "calls directly. (1) matbot.hint_policy.out_of_scope_notation_codes "
+               "via matbot.tutor.pipeline; checks.check_help_notation_in_scope. It "
+               "proves only that certain advanced NOTATION was introduced that the "
+               "approved task does not already use (proportionality to the TASK); it "
+               "proves nothing about semantic grade appropriateness. (2) Phase 3: "
+               "matbot.practice_policy.text_policy_failures now also runs on "
+               "MODEL-authored help in matbot.tutor.pipeline._finalize_help_answer, "
+               "which replaces the offending text with the server scaffold instead "
+               "of failing the turn; checks.check_help_curriculum_policy_consistent "
+               "resolves the SAME policy from the same server-owned lesson context "
+               "(capability of the GRADE). Together they close out-of-grade "
+               "NOTATION and named method prose on every help surface. For "
                "propositional help the class is eliminated by construction "
-               "(server-composed hints 1-2, verified-artifact hint 3); for "
-               "MODEL-authored computational hints 1-2 grade/lesson semantic fit "
-               "stays a manual live-review duty until Phase 3 lesson contracts"),
+               "(server-composed hints 1-2, verified-artifact hint 3). Neither owner "
+               "closes the semantic class: whether a MODEL-authored computational "
+               "hint's reasoning actually suits the lesson stays a manual "
+               "live-review duty"),
         strength=MANUAL_SEMANTIC_REVIEW_REQUIRED,
-        live_evidence="TR-B1 hint 2 served a parametric line and a dot product in grade 9",
+        live_evidence=("TR-B1 hint 2 served a parametric line and a dot product in "
+                       "grade 9; FW-G06 proved the same class for the package, and "
+                       "until Phase 3 the identical grade-6 radical was forbidden by "
+                       "the help prompt while no server gate measured the hint"),
     ),
     BlindSpot(
         key="help_branch_coverage",

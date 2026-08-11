@@ -170,7 +170,46 @@ def test_release_verdict_explains_why_unproven_is_not_verified():
 
 
 def test_every_declared_strength_is_a_known_vocabulary_value():
-    for name in ("published", "lesson_matches", "solution_complete", "options_ok"):
+    for name in ("published", "lesson_matches", "solution_complete", "options_ok",
+                 "help_curriculum_policy_consistent"):
         for outcome in ("pass", "fail", "skip", ""):
             assert release_contract.strength_for_check(name, outcome) in \
                 release_contract.VERIFICATION_STRENGTHS
+
+
+# ---------------------------------------------------------------------------
+# 4. FAZA 3 — OGRANIČEN DOKAZ NAD SERVIRANOM POMOĆI NE NOSI SPREMNOST IZDANJA
+# ---------------------------------------------------------------------------
+
+def test_help_curriculum_policy_pass_never_carries_release_readiness():
+    """PASS dokazuje ZAPIS van razreda, ne pedagošku primjerenost pomoći."""
+    record = _record(status="PASS", turns=[_turn(0, results=[
+        ("published", "pass", ""),
+        ("help_curriculum_policy_consistent", "pass", ""),
+    ])])
+    verdict = release_contract.release_verdict([record])
+    assert any(entry.endswith(":help_curriculum_policy_consistent")
+               for entry in verdict.unproven)
+    assert verdict.ready is False
+
+
+def test_help_curriculum_policy_fail_is_a_release_blocker():
+    record = _record(turns=[_turn(0, results=[
+        ("published", "pass", ""),
+        ("help_curriculum_policy_consistent", "fail", "grade_capability_mismatch"),
+    ])])
+    verdict = release_contract.release_verdict([record])
+    assert verdict.ready is False
+    assert any("help_curriculum_policy_consistent" in entry
+               for entry in verdict.blockers)
+
+
+def test_every_bounded_class_check_is_also_registered_as_a_real_check():
+    """Ugovor ne smije imenovati mjerač koji ne postoji (tiha rupa u dokazu)."""
+    from tools.practice_eval import checks as check_lib
+
+    known = set(check_lib.known_check_names())
+    for name in release_contract.BOUNDED_CLASS_CHECKS:
+        assert name in known, name
+        assert release_contract.strength_for_check(name, "pass") == \
+            release_contract.MANUAL_SEMANTIC_REVIEW_REQUIRED

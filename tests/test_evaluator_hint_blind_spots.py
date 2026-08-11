@@ -423,3 +423,119 @@ def test_a_real_deterministic_check_pass_is_still_verified():
         release_contract.MANUAL_SEMANTIC_REVIEW_REQUIRED
     assert release_contract.strength_for_check("options_ok", "fail") == \
         release_contract.DETERMINISTICALLY_FAILED
+
+
+# ---------------------------------------------------------------------------
+# FAZA 3 (G-3) — KURIKULARNA POLITIKA NAD SERVIRANOM POMOĆI
+# ---------------------------------------------------------------------------
+# Do Faze 3 evaluator nije imao NIJEDAN mjerač te površine: `help_notation_in_scope`
+# mjeri proporcionalnost ZADATKU (zatvoren skup napredne mašinerije koji ne
+# sadrži ni `sqrt` ni `sin`/`log`), a `curriculum_task_form_consistent` mjeri
+# OBJAVLJEN PAKET. Nagovještaj 6. razreda s korijenom prolazio je kroz oba.
+
+_P3_TASK = r"Ugao ima mjeru $40^\circ$. Koliki je njegov dopunski ugao?"
+_P3_OPTIONS = (r"$50^\circ$", r"$140^\circ$", r"$60^\circ$", r"$320^\circ$")
+_RADICAL_HELP = (r"Sjeti se da je $\sqrt{9}=3$, pa to iskoristi u sljedećem "
+                 r"koraku računa.")
+_PLAIN_HELP = (r"Pravi ugao ima $90^\circ$; oduzmi datu mjeru od te "
+               r"vrijednosti i dobićeš traženi ugao.")
+
+
+def _help_observation(grade, topic_id, served_help):
+    """Turn pomoći nad zakucanim paketom — isti oblik koji runner stvarno gradi."""
+    session = {
+        "lesson_id": topic_id,
+        "current_task": _P3_TASK,
+        "current_options": [{"id": oid, "text": text} for oid, text
+                            in zip("abcd", _P3_OPTIONS)],
+        "correct_option_id": "a",
+        "expected_answer_summary": _P3_OPTIONS[0],
+        "solution_summary": r"Pravi ugao ima $90^\circ$, pa je $90-40=50$.",
+        "task_completed": False,
+        "hint_level": 1,
+    }
+    return check_lib.TurnObservation(
+        scenario_id="P3-HELP", step_index=1, step_kind="text",
+        topic_id=topic_id, grade=grade,
+        request_payload={"student_message": "Ne znam.", "intent": "hint_request",
+                         "interaction_phase": "practice_help"},
+        http_status=200,
+        response={"status": "ready", "answer": served_help,
+                  "effective_topic": topic_id, "session_mode": "practice"},
+        session_before=dict(session, hint_level=0),
+        session_after=session,
+        sdk_calls=1,
+    )
+
+
+def _policy_check(grade, topic_id, served_help):
+    check = check_lib.resolve("help_curriculum_policy_consistent")
+    return check(_help_observation(grade, topic_id, served_help))
+
+
+def test_help_curriculum_policy_fails_on_a_grade6_radical_hint():
+    result = _policy_check(6, "6-09-001", _RADICAL_HELP)
+    assert result.outcome == check_lib.FAIL
+    assert "grade_capability_mismatch" in result.detail
+
+
+def test_help_curriculum_policy_passes_the_same_text_in_grade8():
+    """KONTROLA LAŽNOG ODBIJANJA: mjeri POLITIKA razreda, ne uzorak teksta."""
+    assert _policy_check(8, "8-02-002", _RADICAL_HELP).outcome == check_lib.PASS
+
+
+def test_help_curriculum_policy_passes_ordinary_grade6_help():
+    assert _policy_check(6, "6-09-001", _PLAIN_HELP).outcome == check_lib.PASS
+
+
+def test_help_curriculum_policy_skips_when_nothing_was_served():
+    """SKIP, nikad PASS: „nije bilo pomoći“ nije dokaz ispravnosti."""
+    for served in ("", "   ", check_lib.SAFE_ERROR_MESSAGE):
+        assert _policy_check(6, "6-09-001", served).outcome == check_lib.SKIP, served
+
+
+def test_help_curriculum_policy_skips_an_unknown_lesson():
+    assert _policy_check(6, "6-99-999", _PLAIN_HELP).outcome == check_lib.SKIP
+
+
+def test_help_curriculum_policy_calls_the_production_function_not_a_copy():
+    """Evaluator NIKAD ne pravi slabiji dvojnik politike (doktrina Faze 2)."""
+    import inspect
+
+    source = inspect.getsource(check_lib.check_help_curriculum_policy_consistent)
+    assert "practice_policy.text_policy_failures" in source
+    assert "lesson_context.build" in source
+    assert "re.compile" not in source        # nijedan lokalni uzorak u mjeraču
+
+
+def test_help_curriculum_policy_pass_is_bounded_evidence_only():
+    """PASS dokazuje ZAPIS, nikad pedagošku primjerenost nagovještaja."""
+    name = "help_curriculum_policy_consistent"
+    assert name in release_contract.BOUNDED_CLASS_CHECKS
+    assert name in release_contract.KNOWN_SKIPPING_CHECKS
+    assert release_contract.strength_for_check(name, "pass") == \
+        release_contract.MANUAL_SEMANTIC_REVIEW_REQUIRED
+    assert release_contract.strength_for_check(name, "fail") == \
+        release_contract.DETERMINISTICALLY_FAILED
+    assert release_contract.strength_for_check(name, "skip") == \
+        release_contract.MANUAL_SEMANTIC_REVIEW_REQUIRED
+
+
+def test_out_of_grade_help_blind_spot_names_both_production_owners():
+    """Registar mora tačno opisati KO danas mjeri — i šta ostaje ručno."""
+    spot = release_contract.blind_spot("help_out_of_grade_technique")
+    assert "practice_policy.text_policy_failures" in spot.owner
+    assert "_finalize_help_answer" in spot.owner
+    assert "check_help_curriculum_policy_consistent" in spot.owner
+    assert "out_of_scope_notation_codes" in spot.owner      # stari vlasnik ostaje
+    # Klasa NIJE proglašena riješenom: semantička primjerenost ostaje ručna.
+    assert spot.strength == release_contract.MANUAL_SEMANTIC_REVIEW_REQUIRED
+
+
+def test_the_two_help_notation_owners_prove_different_things():
+    """`sqrt` NIJE napredna mašinerija — zato drugi mjerač uopšte postoji."""
+    from matbot import hint_policy
+
+    assert "sqrt" not in hint_policy.ADVANCED_MACHINERY_COMMANDS
+    assert "sin" not in hint_policy.ADVANCED_MACHINERY_COMMANDS
+    assert hint_policy.out_of_scope_notation_codes(_RADICAL_HELP, ("$1+1$",)) == ()
