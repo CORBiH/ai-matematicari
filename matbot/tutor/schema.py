@@ -227,6 +227,20 @@ class ReviewerChecks(BaseModel):
     # i vraća NOT_PROVEN. Ovo je zato MODEL-SEMANTIČKA presuda, a ne serverski
     # dokaz — vidi matbot/tutor/reviewer_authority.py.
     stem_requires_student_reasoning: bool
+    # TAČNO JEDNA TAČNA OPCIJA (živi FINAL40 blokator FW-F03 na faf7a81):
+    # objavljen je MCQ u kojem su DVIJE prozne opcije bile matematički tačne —
+    # „Da, jer svaki x ima tačno jedan y“ i „Da, i dozvoljeno je da se isti y
+    # ponavlja“. Obje ispravno odgovaraju na pitanje, pa je učenik koji izabere
+    # drugu označen kao netačan iako nije pogriješio.
+    #
+    # ZAŠTO OVDJE, A NE U DETERMINISTI: `option_equivalence` dokazuje
+    # EKVIVALENCIJU, ne ISTINITOST. Te dvije opcije NISU ekvivalentne — one su
+    # dva različita, oba tačna iskaza. Utvrditi to znači ocijeniti matematičku
+    # istinu proizvoljne proze, što nijedan ograničeni provjerivač ne može i ne
+    # smije tvrditi. Zato je vlasnik model, a `marked_option_correct` ne pokriva
+    # ovu klasu: ono je JEDNOSTRANA tvrdnja o označenoj opciji i za taj paket je
+    # bilo istinito.
+    exactly_one_option_correct: bool
 
 
 class ReviewerFinal(BaseModel):

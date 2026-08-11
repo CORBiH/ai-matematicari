@@ -202,7 +202,8 @@ def _all_true_checks():
         mathjax_valid=True, language_age_appropriate=True, independently_solved=True,
         independent_answer="provjereno", task_package_consistent=True,
         difficulty_evidence_valid=True, task_signature_consistent=True,
-        stem_requires_student_reasoning=True)
+        stem_requires_student_reasoning=True,
+        exactly_one_option_correct=True)
 
 
 def _turn():

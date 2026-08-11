@@ -300,6 +300,13 @@ _HELP_NOTATION_RULE = """ZAPIS U `hint` I `worked_solution` (isti prag kao za za
 _TASK_RULE = """KAD PRAVIŠ ZADATAK:
 - zadatak mora ispitivati BAŠ izabranu lekciju, ne samo istu oblast
 - tačno 4 opcije; TAČNO JEDNA je tačna; nijedne dvije ne smiju značiti istu vrijednost
+- „tačno jedna tačna OPCIJA“ nije isto što i „zadatak ima tačno jedno RJEŠENJE“:
+  zadatak smije imati beskonačan skup rješenja, a i dalje samo jednu tačnu opciju
+- svaka pogrešna opcija mora biti NETAČNA kao cjelina pod konačnim tekstom i
+  domenom. Drugačija formulacija ne pretvara drugu TAČNU tvrdnju u valjan
+  distraktor: dva različita, oba tačna obrazloženja istog zaključka su DVIJE
+  tačne opcije. Pogrešna opcija smije sadržati tačan međukorak samo ako joj je
+  presudna tvrdnja netačna.
 - `correct_option_index` je indeks tačne opcije (0-3) u nizu koji si napisao
 - `expected_answer` je tačan odgovor, isti kao tekst tačne opcije
 - pogrešne opcije moraju biti uvjerljive greške, ne nasumični brojevi
@@ -776,10 +783,14 @@ _REVIEWER_CHECK_SEMANTICS_RULE = """WHAT `checks.*` DESCRIBE (unambiguous):
 - The server re-runs its own validators on your final package, so a check you
   report is never accepted as proof and never replaces those validators.
 - Report honestly. `math_correct`, `marked_option_correct`, `inside_lesson`,
-  `task_solvable_and_unambiguous` and `stem_requires_student_reasoning` are the
+  `task_solvable_and_unambiguous`, `stem_requires_student_reasoning` and
+  `exactly_one_option_correct` are the
   ones the server cannot verify for every
   lesson: a false value there fails the turn closed, which is the correct outcome.
   If you cannot make them true, return `fail_closed` instead of a package.
+- `marked_option_correct` asks ONLY about the marked option; it says nothing
+  about the other three. Whether some OTHER option is also correct is
+  `exactly_one_option_correct`, and both must be judged on the FINAL package.
 - Do not lower a check merely because you are unsure about tone or wording."""
 
 
@@ -813,6 +824,48 @@ _REVIEWER_STEM_REASONING_RULE = """`stem_requires_student_reasoning` (mandatory,
   question, the mathematics and exactly one correct option. Rewording the same
   decisive fact is NOT a repair. If the property cannot be made derivable
   without stating it, return `fail_closed`."""
+
+
+# TAČNO JEDNA TAČNA OPCIJA — vlasništvo RECENZENTA (živi FINAL40 FW-F03, faf7a81).
+#
+# Objavljen je MCQ „Relacija je zadana tačkama … Predstavlja li ovaj skup tačaka
+# funkciju?“ u kojem su DVIJE opcije bile tačne: „Da, jer svaki x ima tačno jedan
+# y“ i „Da, i dozvoljeno je da se isti y ponavlja za različite x“. Obje ispravno
+# odgovaraju, pa je učenik koji izabere drugu označen kao netačan bez greške.
+#
+# Nijedan deterministi to nije mogao vidjeti: `option_equivalence` i
+# `mcq_integrity` dokazuju EKVIVALENCIJU, a te dvije opcije nisu ekvivalentne
+# nego nezavisno TAČNE. `marked_option_correct` je bilo istinito — ono je
+# jednostrana tvrdnja o označenoj opciji.
+#
+# KRITIČNA PROVENIJENCIJA: defekt je nastao u RECENZENTOVOJ ISPRAVCI drugog
+# nalaza. Zato pravilo izričito traži PONOVNU ocjenu nad KONAČNIM paketom.
+_REVIEWER_OPTION_UNIQUENESS_RULE = """`exactly_one_option_correct` (mandatory, model judgement):
+- Judge the COMPLETE mathematical meaning of EVERY option against the FINAL
+  stem, the FINAL domain and any stated assumptions. Exactly one complete option
+  may be a mathematically correct answer to that exact question.
+- TWO OPTIONS DO NOT HAVE TO LOOK ALIKE TO BOTH BE CORRECT. They need not be
+  equal, equivalent, paraphrases, or even share vocabulary. If option C gives one
+  valid reason the answer is „yes" and option D gives a DIFFERENT but also valid
+  reason for the same „yes", then two complete options are correct and this check
+  is FALSE — however differently they are worded.
+- Every distractor must be FALSE as a complete option. Different wording, a
+  different method, or a different true fact does not make an option a valid
+  distractor. A distractor MAY contain a true intermediate statement as long as
+  its decisive claim or conclusion makes the COMPLETE option false.
+- Do NOT set this false merely because two options begin with the same word,
+  share vocabulary, discuss the same concept, use related reasoning, or have
+  similar shape — nor because one distractor contains a true intermediate step.
+  The only question is: are two or more COMPLETE options mathematically correct
+  answers to this exact final task?
+- AFTER ANY REPAIR you make — to the stem, the options, the marked answer, the
+  domain, the constraints or the mathematics — RE-EVALUATE this from scratch
+  against the FINAL package. Never carry over the judgement from the package you
+  started with: repairing one defect can itself create a second valid answer, and
+  that is exactly how this defect reached a student.
+- If you cannot confidently establish that exactly one complete option is
+  correct, set it FALSE and return `fail_closed`. Uncertainty about multiple
+  valid answers is never a reason to approve."""
 
 
 # VJEŽBAJMO V1 (F5K): `inside_lesson` više NIJE „zvuči srodno“. Živi audit:
@@ -932,6 +985,7 @@ def build_reviewer_instructions(context):
         # prompta ne mijenja.
         f"{_REVIEWER_CHECK_SEMANTICS_RULE}\n\n"
         f"{_REVIEWER_STEM_REASONING_RULE}\n\n"
+        f"{_REVIEWER_OPTION_UNIQUENESS_RULE}\n\n"
         f"{_REVIEWER_TARGET_LEVEL_RULE}\n\n"
         f"{_REVIEWER_PREFLIGHT_RULE}\n\n"
         # --- dinamički (po lekciji) dio TEK OD OVE TAČKE (Workstream K) ---

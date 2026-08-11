@@ -105,7 +105,8 @@ def checks():
         independently_solved=True, independent_answer="nema rješenja",
         task_package_consistent=True, difficulty_evidence_valid=True,
         task_signature_consistent=True,
-        stem_requires_student_reasoning=True)
+        stem_requires_student_reasoning=True,
+        exactly_one_option_correct=True)
 
 
 def queue(fake, draft_task, *, decision="approve", final_task=...):

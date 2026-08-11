@@ -82,6 +82,16 @@ MODEL_ONLY_BLOCKING_CHECKS = frozenset({
     # prepisuje odgovor umjesto da rasuđuje. Serverski detektori ostaju
     # mjerodavni za svoje klase — ovo je DODATNI sloj, nikad zamjena.
     "stem_requires_student_reasoning",
+    # ŽIVI FINAL40 BLOKATOR (FW-F03 na faf7a81): objavljen je MCQ s DVIJE
+    # matematički tačne prozne opcije. `marked_option_correct` je pri tome bilo
+    # ISTINITO — ono je jednostrana tvrdnja o označenoj opciji i o ostale tri ne
+    # kaže ništa; zato nijedna kontradikcija nije ni postojala. Deterministi
+    # dokazuju EKVIVALENCIJU (`option_equivalence`, `mcq_integrity`), a ove dvije
+    # opcije nisu ekvivalentne nego nezavisno tačne — utvrditi to znači suditi
+    # matematičku istinu proizvoljne proze, što nijedan ograničeni provjerivač
+    # ne smije tvrditi. Klasa zato pripada OVDJE: nema determinističke zamjene, a
+    # netačna tvrdnja znači da učenik s tačnim odgovorom bude označen netačnim.
+    "exactly_one_option_correct",
 })
 
 # --- 3) SAVJETODAVNO: kvalitet, ne ispravnost -------------------------------
