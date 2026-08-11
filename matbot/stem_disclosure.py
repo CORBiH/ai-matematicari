@@ -290,14 +290,32 @@ def _point_to_ray_disclosure(context, ask, options, marked_index):
 # učenik utvrdi — odgovor „da" stoji u zadatku.
 #
 # DOKAZ JE STRUKTURAN, NE LEKSIČKI. Traže se ČETIRI uslova istovremeno:
-#   1. opcije su polarni skup (bar jedno „Da…" i bar jedno „Ne…"), a označena
-#      je POTVRDNA — inače tvrdnja ne otkriva označeni odgovor (a kad je
-#      označeno „Ne", tvrdnja je NETAČNA, što je drugi defekt i drugi vlasnik);
+#   1. upitna rečenica traži DA/NE presudu (upitna čestica `li`);
 #   2. upitna rečenica traži klasu: njen POSLJEDNJI sadržajni token prije
 #      zagrade/upitnika je tražena klasa C („…predstavlja FUNKCIJU?");
 #   3. deklarativni dio tvrdi ISTU klasu u zatvorenom okviru davanja
 #      („data je C", „C je zadana") — nikad puko pominjanje riječi;
 #   4. C ima bar 5 znakova (kratke riječi nisu klasa).
+#
+# USLOV 1 JE RANIJE MJERIO OBLIK OPCIJA — i to je bio ŽIVI FINAL40 BLOKATOR
+# (FW-F06 na 5057749). Tražilo se da opcije budu „Da"/„Ne" skup i da označena
+# bude potvrdna; objavljen je isti defekt s REČENIČNIM opcijama („Skup tačaka
+# predstavlja funkciju…") i detektor je zaćutao iako je uslove 2 i 3 već
+# prepoznao. Otkrivanje klase je svojstvo PARA stem+pitanje: kad stem tvrdi da
+# objekat JESTE klase C, a pitanje traži da učenik utvrdi je li klase C,
+# odgovor je saopšten bez obzira na to kako je tačna opcija napisana. Zato se
+# uslov 1 mjeri nad PITANJEM.
+#
+# Mjereno nad 2772 zamrznuta objavljena paketa: 17 ih uopšte tvrdi traženu
+# klasu; 10 od njih ima i DA/NE pitanje i SVIH 10 su stvarni FW-F03/FW-F06
+# defekti kroz šest kampanja (nijedan nema označen odričan odgovor, pa se
+# „zamka" u kojoj bi stem namjerno lagao empirijski ne pojavljuje). Preostalih
+# 7 nema upitnu česticu i ostaju dozvoljeni.
+#
+# NE DOKAZUJE: da tekst ne otkriva odgovor na neki drugi način. Ovo je i dalje
+# ograničena klasa — samo tvrdnja PRIPADNOSTI KLASI uz DA/NE pitanje o toj
+# istoj klasi. Svaka druga parafraza ostaje van dometa (vidi registar slijepih
+# tačaka u tools/practice_eval/release_contract.py).
 #
 # ZAŠTO JE POSLJEDNJI SADRŽAJNI TOKEN, A NE BILO KOJI: „Da li je TROUGAO ABC
 # JEDNAKOKRAKI?" ima traženu klasu „jednakokraki“, a „trougao“ je SUBJEKT koji
@@ -311,8 +329,17 @@ _GIVEN_WORDS = frozenset({
     "nacrtan", "nacrtana", "naveden", "navedena", "navedeno",
 })
 _COPULAS = frozenset({"je", "su", "jeste", "jesu"})
-_AFFIRMATIVE_OPENERS = frozenset({"da", "jeste", "jest", "tačno", "tacno"})
-_NEGATIVE_OPENERS = frozenset({"ne", "nije", "nisu", "netačno", "netacno"})
+# UPITNA ČESTICA — jedini pouzdan znak da je pitanje DA/NE klasifikacija.
+# ŽIVI FINAL40 BLOKATOR (FW-F06 na 5057749): raniji uslov je „da/ne pitanje“
+# dokazivao preko OBLIKA OPCIJA (prva riječ „Da“/„Ne“). Objavljen je paket s
+# istim otkrivanjem, ali s rečeničnim opcijama („Skup tačaka predstavlja…“), pa
+# je detektor zaćutao iako je oba semantička dijela već prepoznao. Otkrivanje
+# klase je svojstvo PARA stem+pitanje, ne načina na koji je odgovor napisan.
+#
+# `li` je u bosanskom samostalna upitna čestica („Da li…“, „Predstavlja li…“) i
+# kao ZASEBAN token se ne pojavljuje ni u jednoj drugoj ulozi; „koliko“ je jedan
+# token i nikad ne daje „li“. Zato je uslov zatvoren i uzak.
+POLAR_QUESTION_TOKEN = "li"
 # Najkraća klasa koja se uopšte razmatra. Kraće riječi u bosanskom su gotovo
 # uvijek funkcijske ili subjekt, nikad naziv semantičke klase.
 MIN_CLASS_TOKEN_CHARS = 5
@@ -335,17 +362,18 @@ def _class_stem(token):
     return stem
 
 
-def _polar_marked_affirmative(options, marked_index):
-    """Tačno: opcije su Da/Ne skup i označena je POTVRDNA."""
-    openers = []
-    for option in options:
-        tokens = _tokenize(option)
-        openers.append(tokens[0] if tokens else "")
-    if not any(opener in _AFFIRMATIVE_OPENERS for opener in openers):
-        return False
-    if not any(opener in _NEGATIVE_OPENERS for opener in openers):
-        return False
-    return openers[marked_index] in _AFFIRMATIVE_OPENERS
+def _asks_polar_class_question(ask):
+    """Traži li upitna rečenica DA/NE presudu (upitna čestica `li`)?
+
+    Ovo je zamjena za raniji uslov nad OBLIKOM OPCIJA. Mjeri se PITANJE, jer se
+    tu klasifikacija i traži: „Da li … predstavlja funkciju?" i „Koja tvrdnja
+    ispravno opisuje DA LI … predstavlja funkciju?" su ista klasa bez obzira na
+    to jesu li opcije „Da“/„Ne“ ili pune rečenice.
+
+    Uslov je i UŽI od ranijeg tamo gdje treba: „Kolika je vrijednost funkcije?"
+    i „Koji je domen funkcije?" nemaju česticu, pa ostaju dozvoljeni čak i kad
+    im je posljednji sadržajni token upravo tvrđena klasa."""
+    return POLAR_QUESTION_TOKEN in _tokenize(ask)
 
 
 def _queried_class(ask):
@@ -374,9 +402,14 @@ def _stem_asserts_class(context, class_stem):
     return False
 
 
-def _class_assertion_disclosure(context, ask, options, marked_index):
-    """Uzak dokaz: stem tvrdi baš klasu koju pitanje traži da učenik utvrdi."""
-    if not _polar_marked_affirmative(options, marked_index):
+def _class_assertion_disclosure(context, ask):
+    """Uzak dokaz: stem tvrdi baš klasu koju pitanje traži da učenik utvrdi.
+
+    NE PRIMA OPCIJE: otkrivanje je svojstvo para stem+pitanje. Kad stem tvrdi
+    da objekat JESTE klase C, a pitanje traži da učenik utvrdi je li objekat
+    klase C, odgovor je već saopšten — bez obzira na to je li tačna opcija
+    napisana kao „Da“ ili kao puna rečenica (živi FW-F06, 5057749)."""
+    if not _asks_polar_class_question(ask):
         return ""
     queried = _queried_class(ask)
     if not queried:
@@ -387,9 +420,8 @@ def _class_assertion_disclosure(context, ask, options, marked_index):
     if not _stem_asserts_class(context, class_stem):
         return ""
     return (f"{STEM_ANSWER_DISCLOSURE_CODE}: the stem already asserts that the "
-            f"object IS a '{queried}', which is exactly the class the question "
-            "asks the student to determine, and the marked option is the "
-            "affirmative one (semantic-class assertion)")
+            f"object IS a '{queried}', which is exactly the class the yes/no "
+            "question asks the student to determine (semantic-class assertion)")
 
 
 # ---------------------------------------------------------------------------
@@ -545,11 +577,12 @@ def stem_answer_disclosure(task_text, option_texts, marked_index):
     if not context or not ask:
         return ""
 
-    # Klasa TVRDNJE SEMANTIČKE KLASE ide PRIJE kapije izborne zamjenice: njena
-    # upitna rečenica je polarna („Da li … predstavlja funkciju?") i nikad ne
-    # sadrži „koji/koja/koje". Ostale dvije klase ostaju bajt za bajt iste.
-    class_assertion = _class_assertion_disclosure(
-        context, ask, options, marked_index)
+    # Klasa TVRDNJE SEMANTIČKE KLASE ide PRIJE kapije izborne zamjenice, jer
+    # kapija nije mjerodavna za nju ni u jednom smjeru: čisti polarni oblik
+    # („Da li … predstavlja funkciju?") NEMA izbornu zamjenicu i kapija bi ga
+    # oborila, a živi FW-F06 oblik („KOJA tvrdnja ispravno opisuje da li …?")
+    # je ima, ali nije paket izbora entiteta. Ostale klase ostaju iste.
+    class_assertion = _class_assertion_disclosure(context, ask)
     if class_assertion:
         return class_assertion
 

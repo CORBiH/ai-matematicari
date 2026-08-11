@@ -200,16 +200,32 @@ def test_class_assertion_detection_is_label_independent():
       "predstavlja funkciju?"),
      [NO_OPTIONS[0], NO_OPTIONS[1], NO_OPTIONS[2], YES_OPTION], 3,
      "puko pominjanje riječi nije tvrdnja o objektu"),
-    ((r"Data je funkcija prikazana tačkama $(1,2)$, $(1,3)$. Da li ovaj skup "
-      r"predstavlja funkciju?"),
-     [NO_OPTIONS[0], NO_OPTIONS[1], NO_OPTIONS[2], YES_OPTION], 0,
-     "označeno je NE — tvrdnja je netačna, a to je drugi defekt"),
     (r"Data je funkcija $f$. Koji od navedenih parova pripada grafiku funkcije?",
      ["$(1,2)$", "$(2,3)$", "$(3,4)$", "$(4,5)$"], 0,
      "nije polarno pitanje"),
 ])
 def test_class_assertion_false_positive_controls(question, options, marked, why):
     assert stem_answer_disclosure(question, options, marked) == "", why
+
+
+def test_class_assertion_does_not_depend_on_which_option_is_marked():
+    """Ranije se OVDJE očekivala tišina — namjerno POOŠTRENO (FW-F06).
+
+    Do 5057749 se tražilo da označena opcija bude POTVRDNA, pa je ovaj paket
+    prolazio uz obrazloženje „označeno je NE, to je drugi defekt". To je bila
+    greška u vlasništvu: stem tvrdi da objekat JESTE funkcija, a pitanje traži
+    da učenik utvrdi je li funkcija — odgovor je saopšten bez obzira na to koja
+    je opcija označena. (Ovaj konkretan paket je uz to i matematički pogrešan:
+    $(1,2)$ i $(1,3)$ dijele $x=1$, pa tvrdnja iz stema nije tačna. Dva defekta
+    ne poništavaju jedan drugi — tišina bi bila pogrešna u oba slučaja.)
+    """
+    question = (r"Data je funkcija prikazana tačkama $(1,2)$, $(1,3)$. Da li "
+                r"ovaj skup predstavlja funkciju?")
+    options = [NO_OPTIONS[0], NO_OPTIONS[1], NO_OPTIONS[2], YES_OPTION]
+    verdicts = {marked: stem_answer_disclosure(question, options, marked)
+                for marked in range(4)}
+    assert all(verdicts.values()), verdicts
+    assert len(set(verdicts.values())) == 1, "presuda ne smije zavisiti od oznake"
 
 
 def test_the_two_earlier_disclosure_classes_are_untouched():
