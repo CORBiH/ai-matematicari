@@ -20,6 +20,8 @@ Lekcije bez geometrije ne dobiju ništa (prazan string).
 """
 import re
 
+from matbot import practice_policy
+
 # Koliko najviše blokova figura ide u jedan prompt — lekcija koja spomene više
 # figura (npr. „Poređenje kvadrata i romba“) dobije oba, ali nikad cijeli
 # dokument. Štiti veličinu prompta.
@@ -477,11 +479,44 @@ _SYMBOL_SELF_CHECK = (
 )
 
 
-def build_geometry_rules(oblast, lesson_title, mode="practice"):
+def _without_radical_formulas(block):
+    """Blok formula bez ijednog reda koji traži zapis korijena.
+
+    ZAŠTO POSTOJI (pretkomitna provjera dosljednosti popravke FINAL40): blokovi
+    figura su GRADE-AGNOSTIČNI — isti `mnogougao` blok dobija uvodna lekcija
+    6. razreda o mnogouglu i dvanaest lekcija 8. razreda iz oblasti „Mnogougao,
+    kružnica i krug". Jedan njegov red („Pravilni šestougao: …
+    $P=\\frac{3a^2\\sqrt{3}}{2}$…") je gradivo 8. razreda, pa je 6. razred
+    istovremeno dobijao FORMULU s korijenom i razredno pravilo koje korijen
+    ZABRANJUJE. Model ne smije dobiti dvije suprotne instrukcije za istu
+    lekciju.
+
+    Filtrira se RED, ne blok: ostalih pet redova (broj dijagonala, zbir
+    unutrašnjih i vanjskih uglova, uglovi pravilnog $n$-tougla, broj stranica,
+    obim i površina preko $r_u$) jesu gradivo 6. razreda i moraju ostati.
+    Mjerilo je ISTO koje objava koristi (`practice_policy.find_radical_notation`),
+    pa se prag prompta i prag validatora ne mogu razići.
+
+    Blok koji bi ostao samo sa zaglavljem se izostavlja u cijelosti — prazan
+    naslov „FORMULE — X:" ne nosi nikakvu informaciju."""
+    kept = [line for line in block.splitlines(keepends=True)
+            if not practice_policy.find_radical_notation(line)]
+    if len(kept) <= 1:
+        return ""
+    return "".join(kept)
+
+
+def build_geometry_rules(oblast, lesson_title, mode="practice",
+                         allow_radical_notation=True):
     """Sastavi SAMO geometrijske blokove relevantne za ovu lekciju.
 
     Vraća "" za negeometrijske lekcije — nijedan geometrijski simbol ni formula
     ne ulazi u prompt lekcije koja s njima nema veze.
+
+    `allow_radical_notation=False` (razred kojem politika zabranjuje korijen —
+    vidi matbot/practice_policy.py) izostavlja formule koje bi tražile zapis
+    korijena. Podrazumijevano `True` znači bajt-za-bajt zatečeno ponašanje za
+    svaki drugi razred i svaki drugi pozivalac.
     """
     del mode  # trenutno isti sadržaj za sve modove; parametar radi simetrije s rules.py
     scope, figures = route_geometry_topic(oblast, lesson_title)
@@ -492,6 +527,8 @@ def build_geometry_rules(oblast, lesson_title, mode="practice"):
     parts.append(_SOLID_TERMS if scope == "solid" else _PLANE_TERMS)
     for figure_id in figures:
         block = _FIGURE_RULES.get(figure_id)
+        if block and not allow_radical_notation:
+            block = _without_radical_formulas(block)
         if block:
             parts.append(block)
     parts.append(_SYMBOL_SELF_CHECK)

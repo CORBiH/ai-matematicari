@@ -1,0 +1,113 @@
+{
+  "_readme": [
+    "ZAMRZNUTI BLOKATORI FINAL40 (kampanja 2fe5636, 40/40 scenarija).",
+    "",
+    "Svaki zapis je DOSLOVAN objavljeni paket iz",
+    "scratchpad/practice_eval/final40_2fe5636_20260811-101833/results.jsonl",
+    "ili njegova tražena ispravka. Ne mijenjati tekstove — oni su dokaz.",
+    "",
+    "expected: 'blocked' = server MORA odbiti prije objave i prije ijedne",
+    "mutacije sesije; 'published' = paket MORA proći (pozitivna kontrola).",
+    "Za 'blocked' zapise `codes` nabraja interne kodove koje nalaz mora nositi."
+  ],
+  "campaign": "final40_2fe5636_20260811-101833",
+  "commit": "2fe563658817816d876315ef8583b7cd1ebd5ec3",
+  "fixtures": [
+    {
+      "id": "G03_BAD",
+      "scenario": "FW-G03",
+      "grade": 6,
+      "topic_id": "6-09-001",
+      "expected": "blocked",
+      "codes": ["stem_answer_disclosure"],
+      "student_message": "Kreiraj samostalan MCQ sa četiri opcije za izabranu lekciju. Traži da učenik odredi koji krak dijeli ugao $\\angle ABC$ na dva dijela. Osiguraj da je tačno jedna opcija tačna. Ne rješavaj zadatak učeniku.",
+      "question": "Na vrhu $B$ su dati zraci $\\overrightarrow{BA}$ i $\\overrightarrow{BC}$ koji određuju ugao $\\angle ABC$. Također iz vrha $B$ polaze dodatni zraci $\\overrightarrow{BD}$ i $\\overrightarrow{BE}$. U opisu je rečeno da zrak $\\overrightarrow{BD}$ leži između zraka $\\overrightarrow{BA}$ i $\\overrightarrow{BC}$, dok zrak $\\overrightarrow{BE}$ ne leži između njih. Koji od navedenih zraka dijeli ugao $\\angle ABC$ na dva dijela (tj. leži između zraka $\\overrightarrow{BA}$ i $\\overrightarrow{BC}$)?",
+      "options": ["$\\overrightarrow{BC}$", "$\\overrightarrow{BD}$", "$\\overrightarrow{BA}$", "$\\overrightarrow{BE}$"],
+      "marked_index": 1,
+      "note": "Deklarativni dio tvrdi BAŠ osobinu koju upitna rečenica pita, i to za označeni zrak. Reviewer je vratio decision=correct i sam objavio paket."
+    },
+    {
+      "id": "G03_GOOD",
+      "scenario": "FW-G03 (ispravka)",
+      "grade": 6,
+      "topic_id": "6-09-001",
+      "expected": "published",
+      "student_message": "Kreiraj samostalan MCQ sa četiri opcije za izabranu lekciju. Traži da učenik odredi koji krak dijeli ugao $\\angle ABC$ na dva dijela. Osiguraj da je tačno jedna opcija tačna. Ne rješavaj zadatak učeniku.",
+      "question": "Iz vrha $B$ polaze četiri zraka. Ugao $\\angle ABC$ ima mjeru $80^\\circ$. Zrak $\\overrightarrow{BD}$ zaklapa sa zrakom $\\overrightarrow{BA}$ ugao od $30^\\circ$, a zrak $\\overrightarrow{BE}$ zaklapa sa zrakom $\\overrightarrow{BA}$ ugao od $100^\\circ$, mjereno u istom smjeru. Koji od navedenih zraka dijeli ugao $\\angle ABC$ na dva dijela?",
+      "options": ["$\\overrightarrow{BC}$", "$\\overrightarrow{BD}$", "$\\overrightarrow{BA}$", "$\\overrightarrow{BE}$"],
+      "marked_index": 1,
+      "note": "Isto pitanje i iste opcije; učenik sada ima MJERE iz kojih osobina SLIJEDI, umjesto same tvrdnje."
+    },
+    {
+      "id": "G06_BAD",
+      "scenario": "FW-G06",
+      "grade": 6,
+      "topic_id": "6-12-004",
+      "expected": "blocked",
+      "codes": ["grade_capability_mismatch"],
+      "student_message": "Kreiraj samostalan MCQ sa četiri opcije za izabranu lekciju. Traži zadatak o udaljenosti centra upisane kružnice od stranica trougla. Osiguraj da je tačno jedna opcija tačna. Ne rješavaj zadatak učeniku.",
+      "question": "U jednakostraničnom trouglu stranice su dužine $6$. Kolika je udaljenost centra upisane kružnice (incentra) od svake stranice?",
+      "options": ["$\\sqrt{3}$", "$1,5$", "$3$", "$2\\sqrt{3}$"],
+      "marked_index": 0,
+      "note": "Matematika je tačna. Kvadratni korijen se u kurikulumu uvodi tek u 8. razredu (data/topics.json, oblast „Realni brojevi, korijeni i stepeni“)."
+    },
+    {
+      "id": "G06_GOOD_G05_STYLE",
+      "scenario": "FW-G05 (doslovno, pozitivna kontrola)",
+      "grade": 6,
+      "topic_id": "6-12-004",
+      "expected": "published",
+      "student_message": "Kreiraj samostalan MCQ sa četiri opcije za izabranu lekciju. Traži zadatak o simetrali ugla i tački u kojoj se simetrale sijeku. Osiguraj da je tačno jedna opcija tačna. Ne rješavaj zadatak učeniku.",
+      "question": "Koja tvrdnja je tačna za simetrale uglova u običnom trouglu?",
+      "options": [
+        "Simetrale uglova trougla sijeku se u tački koja je jednako udaljena od svih stranica.",
+        "Simetrale stranica trougla sijeku se u ortocentru.",
+        "Simetrale uglova trougla sijeku se u centru opisane kružnice.",
+        "Simetrale uglova trougla sijeku se u tački koja je jednako udaljena od svih temena."
+      ],
+      "marked_index": 0,
+      "note": "Ručni audit ju je PRIHVATIO. Ista lekcija kao G06 — popravka ne smije ugasiti lekciju."
+    },
+    {
+      "id": "G06_GOOD_EQUAL_DISTANCE",
+      "scenario": "FW-G06 (dozvoljena zamjena)",
+      "grade": 6,
+      "topic_id": "6-12-004",
+      "expected": "published",
+      "student_message": "Kreiraj samostalan MCQ sa četiri opcije za izabranu lekciju. Traži zadatak o udaljenosti centra upisane kružnice od stranica trougla. Osiguraj da je tačno jedna opcija tačna. Ne rješavaj zadatak učeniku.",
+      "question": "Centar upisane kružnice trougla udaljen je $2$ cm od jedne stranice. Kolika je njegova udaljenost od preostale dvije stranice?",
+      "options": ["$2$ cm od obje stranice", "$4$ cm od obje stranice", "$1$ cm od obje stranice", "Ne može se odrediti"],
+      "marked_index": 0,
+      "note": "Ista tema (udaljenost incentra od stranica) i isti brojevni podatak, bez ijedne mašinerije van razreda."
+    },
+    {
+      "id": "G0804_GOOD_POLYGON",
+      "scenario": "pretkomitna provjera dosljednosti prompta",
+      "grade": 6,
+      "topic_id": "6-08-004",
+      "expected": "published",
+      "student_message": "Kreiraj samostalan MCQ sa četiri opcije za izabranu lekciju. Osiguraj da je tačno jedna opcija tačna. Ne rješavaj zadatak učeniku.",
+      "question": "Koliki je zbir unutrašnjih uglova petougla?",
+      "options": ["$540^\\circ$", "$360^\\circ$", "$720^\\circ$", "$900^\\circ$"],
+      "marked_index": 0,
+      "note": "6-08-004 je JEDINA lekcija 6. razreda kojoj je geometrijski blok prompta nudio formulu s korijenom (pravilni šestougao). Poslije filtriranja tog JEDNOG reda lekcija i dalje nosi pet redova koji jesu gradivo 6. razreda; ovaj zadatak koristi jedan od njih ($S_n=(n-2)\\cdot 180^\\circ$) i mora se objaviti."
+    },
+    {
+      "id": "G01_GOOD",
+      "scenario": "FW-G01 (doslovno, pozitivna kontrola)",
+      "grade": 6,
+      "topic_id": "6-09-001",
+      "expected": "published",
+      "student_message": "Kreiraj samostalan MCQ sa četiri opcije za izabranu lekciju. Traži da učenik imenuje tjeme i krakove ugla $\\angle ABC$. Osiguraj da je tačno jedna opcija tačna. Ne rješavaj zadatak učeniku.",
+      "question": "Koje su tjeme i krakovi ugla $\\angle ABC$?",
+      "options": [
+        "Tjeme je B; krakovi su $BA$ i $BC$.",
+        "Tjeme je B; krakovi su $AB$ i $AC$.",
+        "Tjeme je C; krakovi su $CB$ i $CA$.",
+        "Tjeme je A; krakovi su $AB$ i $AC$."
+      ],
+      "marked_index": 0,
+      "note": "Ista lekcija kao G03; označena opcija doslovno ponavlja entitete iz pitanja, ali tekst ne tvrdi traženu osobinu."
+    }
+  ]
+}

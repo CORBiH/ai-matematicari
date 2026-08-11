@@ -28,7 +28,7 @@ import uuid
 
 from matbot import (config, difficulty_level, difficulty_profiles, feedback,
                     geometrycheck, hint_policy, mcq_integrity, option_equivalence,
-                    practice_policy)
+                    practice_policy, stem_disclosure)
 from matbot.llm import LLMError, failure_diagnostics_kv
 from matbot.mathcheck import find_numeric_inconsistencies
 from matbot.semantics import detectors as semantic_detectors
@@ -458,6 +458,16 @@ def _validate_task_server_side(task, context, previous_signature=""):
     )
     if mcq_failure:
         raise UnifiedOutputError(f"mcq_integrity: {mcq_failure}")
+
+    # TEKST ZADATKA KOJI SAM OTKRIVA OZNAČENU OPCIJU (živi FINAL40 FW-G03) —
+    # ODBRANA U DUBINI. Preflight isti nalaz već šalje recenzentu i ponavlja ga
+    # nad recenzentovim konačnim paketom; ovdje je posljednja tačka prije IJEDNE
+    # mutacije sesije, i vrijedi i za deterministički put. Vidi
+    # matbot/stem_disclosure.py.
+    disclosure = stem_disclosure.stem_answer_disclosure(
+        task_text, option_texts, task.correct_option_index)
+    if disclosure:
+        raise UnifiedOutputError(disclosure)
 
     # KANONSKI IDENTITET — posljednja kapija prije mutacije sesije. Poredi se
     # ono što učenik VIDI, nikad `task_signature` koju model deklariše o sebi.

@@ -328,7 +328,14 @@ def test_blind_spot_matrix_covers_every_required_class():
 
     POPRAVKA VEZANJA ZA OPCIJU (živi H12) dodaje ČETVRTI razred:
     `solution_option_binding` je ZASEBAN od provenijencije upravo zato što je
-    H12 imao urednu provenijenciju i netačno slovo opcije."""
+    H12 imao urednu provenijenciju i netačno slovo opcije.
+
+    POPRAVKA BLOKATORA FINAL40 dodaje PETI i ŠESTI razred, oba o SAMOM
+    OBJAVLJENOM ZADATKU (dosad su svi razredi govorili o pomoći ili o
+    rješenju): `stem_answer_disclosure` (FW-G03 — tekst zadatka sam izriče
+    presudu) i `grade_capability_of_published_task` (FW-G06 — zadatak traži
+    zapis koji razred nije upoznao). Oba su OGRANIČENI dokazi i zato nose
+    MANUAL_SEMANTIC_REVIEW_REQUIRED."""
     assert set(release_contract.BLIND_SPOT_KEYS) == {
         "value_answer_leak",
         "proposition_answer_leak",
@@ -340,6 +347,8 @@ def test_blind_spot_matrix_covers_every_required_class():
         "help_branch_coverage",
         "lesson_semantic_alignment",
         "model_self_reported_checks",
+        "stem_answer_disclosure",
+        "grade_capability_of_published_task",
     }
 
 

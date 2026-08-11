@@ -160,6 +160,9 @@ _GRADE_RULES = {
         + "\n".join(practice_policy.unknown_member_rule_lines()) + "\n"
         "- Pošto su svi brojevi nenegativni, pitanje okretanja znaka nejednačine množenjem/"
         "dijeljenjem negativnim brojem se u ovom razredu NE javlja.\n"
+        # Granica zapisa korijena je JEDNA istina u practice_policy (PP-1) —
+        # ista koju server provjerava prije objave (živi FINAL40 FW-G06).
+        + practice_policy.radical_capability_rule_text()
     ),
     7: (
         "PRAVILA ZA 7. RAZRED:\n"
@@ -448,7 +451,18 @@ def build_shared_math_rules(grade, lesson_title, oblast, mode, student_message="
     # Geometrijske oznake i formule (kanonska BiH konvencija, vidi
     # matbot/geometry_rules.py) — prazan string za negeometrijske lekcije, pa
     # nijedna formula ne curi u lekciju kojoj ne pripada.
-    geometry = geometry_rules.build_geometry_rules(oblast, lesson_title, mode=mode)
+    #
+    # JEDNA ISTINA O SPOSOBNOSTI RAZREDA (pretkomitna provjera dosljednosti
+    # popravke FINAL40): razredni blok iznad nosi ZABRANU korijena za razred
+    # koji ga nema, pa geometrijski blok ISPOD ne smije istovremeno ponuditi
+    # formulu s korijenom. Uslov je namjerno vezan za `mode != "quick"` —
+    # tačno tada je razredni blok (a s njim i zabrana) u promptu. Quick nema
+    # razredna kurikularna ograničenja (vidi komentar iznad) i zato mu se
+    # formule ne diraju: tamo protivrječnosti nema.
+    allow_radicals = (mode == "quick"
+                      or practice_policy.radical_notation_allowed_for_grade(grade))
+    geometry = geometry_rules.build_geometry_rules(
+        oblast, lesson_title, mode=mode, allow_radical_notation=allow_radicals)
     if geometry:
         parts.append(geometry)
 

@@ -116,6 +116,62 @@ _ADVANCED_PROSE_RE = re.compile(
 )
 
 # ---------------------------------------------------------------------------
+# KURIKULARNA SPOSOBNOST RAZREDA — ZAPIS KOJI RAZRED JOŠ NIJE UPOZNAO
+# ---------------------------------------------------------------------------
+# ŽIVI BLOKATOR IZDANJA (FINAL40, FW-G06 na lekciji 6. razreda o simetrali
+# ugla i konstrukciji): objavljen je zadatak „Jednakostraničan trougao ima
+# stranicu $6$. Kolika je udaljenost centra upisane kružnice od svake
+# stranice?" s označenim $\\sqrt{3}$. Matematika je TAČNA i nijedan postojeći
+# validator nije imao šta prijaviti — ali kvadratni korijen 6. razred nije ni
+# sreo, pa zadatak nije rješiv sredstvima koja učenik ima.
+#
+# Ovo je ISTA vrsta granice kao ADVANCED_SCOPE_OPERATIONS iznad (trigonometrija
+# i logaritmi nisu gradivo 6-9), samo finija: nije „van osnovne škole" nego
+# „još nije u ovom razredu". Zato dijeli isti mehanizam — jednom razriješena
+# politika koju konzumiraju prompt, deterministički motor i validatori.
+#
+# KURIKULARNI DOKAZ (data/topics.json, kanonski izvor lekcija):
+#   • 6. razred (119 lekcija) i 7. razred (122): NIJEDNA lekcija ne uvodi
+#     korijen, iracionalne brojeve ni Pitagorinu teoremu — nijedna njihova
+#     oblast ih ni ne imenuje;
+#   • korijen se uvodi u 8. razredu, i to vlastitom oblašću („Realni brojevi,
+#     korijeni i stepeni", s lekcijama o iracionalnim brojevima, kvadratnom
+#     korijenu nenegativnog racionalnog broja, korijenu proizvoda i količnika
+#     i približnim vrijednostima korijena); Pitagorina teorema je takođe
+#     8. razred.
+#
+# ZAŠTO ZABRANA VAŽI SAMO ZA 6. RAZRED, iako kurikulum korijen uvodi tek u 8:
+# mjereno nad 2698 zamrznutih objavljenih paketa svih kampanja —
+#   • 6. razred: TRI paketa s korijenom u cijelom korpusu, i sva tri su ISTI
+#     ovaj defekt (FW-G06, ponovljen u tri odvojene FINAL40 kampanje:
+#     c04d2a1, c17538a, 2fe5636). Nijedan legitiman slučaj ne postoji;
+#   • 7. razred: 14 paketa na 4 lekcije, a 37 od 122 lekcije 7. razreda već
+#     dobija geometrijski blok prompta koji SAM uči formule s korijenom
+#     (matbot/geometry_rules.py). Zabrana u 7. razredu bi protivrječila
+#     zatečenom promptu i njen učinak nije dokazan.
+# Granica se zato postavlja tačno tamo gdje je dokazana. Šire važenje je
+# posao kurikularne faze, ne popravke blokatora.
+RADICAL_CURRICULUM_GRADE = 8
+_RADICAL_FORBIDDEN_GRADES = (6,)
+
+
+def radical_notation_allowed_for_grade(grade):
+    """JEDINA tabela razred → smije li zapis korijena.
+
+    Zove je i `resolve()` (za polje politike) i `rules.py` (da geometrijski
+    blok prompta ne bi ponudio formulu koju ista politika zabranjuje). Dvije
+    kopije ovog odgovora su upravo ono što je proizvelo protivrječnost koju
+    ova funkcija zatvara."""
+    try:
+        return int(grade) not in _RADICAL_FORBIDDEN_GRADES
+    except (TypeError, ValueError):
+        return True
+
+# Korijen se traži SAMO u matematičkim segmentima: prozna riječ „korijen" u
+# rečenici („korijen jednačine") nije zapis i nikad nije pogodak.
+_RADICAL_RE = re.compile(r"\\sqrt\b|\\radical\b|√")
+
+# ---------------------------------------------------------------------------
 # ZABRANJENA METODSKA PROZA (samo kad politika zabranjuje prebacivanje)
 # ---------------------------------------------------------------------------
 # Stemovi hvataju sve oblike: prebaci/prebacimo/prebacuj/prebacivanjem...
@@ -152,6 +208,9 @@ class ResolvedPracticePolicy:
     visible_number_domain: str    # nonnegative | any
     advanced_scope_allowed: tuple # () — buduća lekcija smije izričito dozvoliti
     arrow_method_lesson: bool     # metoda strelica je školska metoda lekcije
+    # Kurikularna sposobnost razreda: smije li objavljeni sadržaj uopšte
+    # koristiti zapis korijena (vidi RADICAL_CURRICULUM_GRADE iznad).
+    radical_notation_allowed: bool = True
     # Metodska proza se skenira SAMO nad lekcijama o jednačinama/nejednačinama
     # kojima je politika zabranila prebacivanje: riječ „prebaci“ u lekciji o
     # mjernim jedinicama ili konstrukciji nije metodski prekršaj i ne smije
@@ -196,6 +255,7 @@ def resolve(grade, lesson_id="", family_id="", parameters=None,
         visible_number_domain=visible,
         advanced_scope_allowed=(),
         arrow_method_lesson=arrow,
+        radical_notation_allowed=radical_notation_allowed_for_grade(grade),
         scan_method_prose=bool(forbidden) and equation_lesson,
     )
 
@@ -232,6 +292,39 @@ def advanced_scope_rule_text():
         "rješenje. Ako učenik sam spomene takav pojam, smiješ kratko reći da to "
         "nije gradivo osnovne škole — bez rješavanja tim metodama.\n"
     )
+
+
+def radical_capability_rule_text(policy=None):
+    """Granica zapisa korijena za razred — prazno kad razred korijen poznaje."""
+    if policy is not None and policy.radical_notation_allowed:
+        return ""
+    return (
+        "- Kvadratni korijen ($\\sqrt{\\;}$) NIJE gradivo ovog razreda "
+        f"(uvodi se u {RADICAL_CURRICULUM_GRADE}. razredu): NIKAD ga ne "
+        "uvodi u tekst zadatka, opcije, hint ni rješenje, ni kao međukorak. "
+        "Ako bi tačan odgovor tražio korijen, zadatak nije za ovaj razred — "
+        "napravi drugi zadatak iste lekcije čiji je odgovor izraziv bez "
+        "korijena (pojmovno pitanje, konstrukcijski korak, svojstvo).\n")
+
+
+def grade_capability_repair_text():
+    """Recept za recenzenta uz `GRADE_CAPABILITY_CODE` — JEDNA istina.
+
+    Živi u OVOM modulu, uz samu granicu, iz dva razloga: da recept i pravilo
+    ne mogu da se raziđu, i da motor paketa (`matbot/tutor/package_preflight.py`)
+    ostane bez ijednog konkretnog matematičkog zapisa — što njegova
+    arhitektonska kapija i traži."""
+    return (
+        f"For `{GRADE_CAPABILITY_CODE}` the named field uses notation this "
+        "GRADE has not met yet — a square root, which the curriculum "
+        f"introduces only in grade {RADICAL_CURRICULUM_GRADE}. The mathematics "
+        "may be perfectly correct and still be unsolvable with the tools this "
+        "student has. Rounding the root away to a decimal does NOT fix it: the "
+        "derivation itself is out of grade. REPLACE THE TASK with one that "
+        "exercises the SAME lesson but whose answer is expressible without any "
+        "root — a conceptual property question, a recognition question, or a "
+        "construction step. If the lesson's content cannot be exercised at "
+        "this grade without a root, return `fail_closed`. ")
 
 
 def modular_curriculum_rule_text():
@@ -286,6 +379,18 @@ def find_forbidden_method_prose(text):
     return found
 
 
+def find_radical_notation(text):
+    """Zapisi korijena u matematičkim segmentima teksta (interna dijagnostika).
+
+    Skenira se SAMO matematika: prozna riječ „korijen" nije zapis, a učenikova
+    poruka nikad ne prolazi ovuda (vidi `find_advanced_scope_violations`)."""
+    found = []
+    math_parts, _ = _math_and_prose(text)
+    for part in math_parts:
+        found.extend(match.group(0) for match in _RADICAL_RE.finditer(part))
+    return found
+
+
 def find_advanced_scope_violations(text, policy=None):
     """Napredne operacije koje politika lekcije ne dozvoljava.
 
@@ -310,6 +415,10 @@ FORBIDDEN_METHOD_CODE = "forbidden_method_language"
 VISIBLE_DOMAIN_CODE = "visible_value_outside_domain"
 ADVANCED_SCOPE_CODE = "advanced_scope_violation"
 METHOD_PROVENANCE_CODE = "method_provenance_mismatch"
+# Zapis/mašinerija koju izabrani RAZRED još nije upoznao (FINAL40 FW-G06).
+# Namjerno NIJE `wrong_math` ni `advanced_scope_violation`: matematika je
+# tačna i nije van osnovne škole — samo je van ovog razreda.
+GRADE_CAPABILITY_CODE = "grade_capability_mismatch"
 
 
 def text_policy_failures(policy, text):
@@ -326,6 +435,8 @@ def text_policy_failures(policy, text):
         failures.append(VISIBLE_DOMAIN_CODE)
     if find_advanced_scope_violations(text, policy):
         failures.append(ADVANCED_SCOPE_CODE)
+    if not policy.radical_notation_allowed and find_radical_notation(text):
+        failures.append(GRADE_CAPABILITY_CODE)
     return tuple(failures)
 
 

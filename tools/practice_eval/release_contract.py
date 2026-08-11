@@ -58,6 +58,20 @@ BOUNDED_TOKEN_CHECKS = frozenset({
     "hint_proposition_no_leak",
 })
 
+# OGRANIČEN (klasni) DOKAZ — FINAL40 blokatori. Oba mjerača zovu produkcijsku
+# funkciju, ali svaka od njih pokriva samo svoju DOKAZIVU KLASU:
+#   • `stem_answer_disclosure_safe` sudi samo MCQ IZBORA ENTITETA; zadatak s
+#     rečeničnim opcijama nikad ne može biti oboren, pa PASS ne znači da tekst
+#     ne otkriva odgovor;
+#   • `curriculum_task_form_consistent` dokazuje samo da nije upotrijebljen
+#     ZAPIS van razreda (korijen u 6. razredu, trigonometrija/logaritmi);
+#     pedagoški oblik zadatka time nije izmjeren.
+# Zato njihov PASS nikad ne nosi spremnost izdanja — ručne rubrike ostaju.
+BOUNDED_CLASS_CHECKS = frozenset({
+    "stem_answer_disclosure_safe",
+    "curriculum_task_form_consistent",
+})
+
 # Provjere čiji je SKIP po dizajnu čest i znači „ne mogu ništa dokazati“.
 # Nabrojane su da izvještaj ne bi smio prikazati njihov izostanak kao uspjeh.
 KNOWN_SKIPPING_CHECKS = frozenset({
@@ -66,6 +80,7 @@ KNOWN_SKIPPING_CHECKS = frozenset({
     "free_text_grading_no_oracle",
     "hint_proposition_no_leak", "hint_top_from_verified_solution",
     "help_has_task_scaffold", "help_notation_in_scope",
+    "stem_answer_disclosure_safe", "curriculum_task_form_consistent",
 })
 
 
@@ -77,7 +92,8 @@ def strength_for_check(name: str, outcome: str) -> str:
         return MANUAL_SEMANTIC_REVIEW_REQUIRED
     if outcome == "pass":
         # PASS provjere koja poredi samo identifikator NIJE semantički dokaz.
-        if name in IDENTIFIER_ONLY_CHECKS or name in BOUNDED_TOKEN_CHECKS:
+        if (name in IDENTIFIER_ONLY_CHECKS or name in BOUNDED_TOKEN_CHECKS
+                or name in BOUNDED_CLASS_CHECKS):
             return MANUAL_SEMANTIC_REVIEW_REQUIRED
         return DETERMINISTICALLY_VERIFIED
     return NOT_APPLICABLE
@@ -182,6 +198,38 @@ BLIND_SPOTS = (
         strength=MANUAL_SEMANTIC_REVIEW_REQUIRED,
         live_evidence=("wave F6H labels lessons recognition/computational, but the "
                        "class is only knowable from the published options"),
+    ),
+    BlindSpot(
+        key="stem_answer_disclosure",
+        question="Does the TASK TEXT itself state which option is correct?",
+        owner=("matbot.stem_disclosure.stem_answer_disclosure at draft preflight, "
+               "at the reviewer-final invariant and at publication "
+               "(matbot.tutor.pipeline._validate_task_server_side); "
+               "checks.check_stem_answer_disclosure_safe calls the SAME function"),
+        # Konstrukcija ne postoji — model piše tekst — pa je ovo DETEKCIJA, i
+        # to samo u klasi izbora entiteta. Zadatak čije su opcije rečenice
+        # („Koja tvrdnja je tačna…“) ostaje potpuno nepokriven.
+        strength=MANUAL_SEMANTIC_REVIEW_REQUIRED,
+        live_evidence=("FW-G03 (final40 2fe5636): the stem said ray BD lies "
+                       "between BA and BC, then asked which ray lies between "
+                       "BA and BC; no_leak PASS, reviewer decision=correct"),
+    ),
+    BlindSpot(
+        key="grade_capability_of_published_task",
+        question="Does the published task need machinery this GRADE has not met?",
+        owner=("matbot.practice_policy — resolved per (grade, lesson) and enforced "
+               "on every visible surface by text_policy_failures at draft "
+               "preflight and at publication; "
+               "checks.check_curriculum_task_form_consistent resolves the SAME "
+               "policy from the same server-owned lesson context"),
+        # Dokazuje se ZAPIS (korijen prije 8. razreda, trigonometrija/logaritmi),
+        # nikad pedagoški oblik zadatka. „Zadatak je pojmovno prekomplikovan za
+        # lekciju“ ostaje ručna presuda.
+        strength=MANUAL_SEMANTIC_REVIEW_REQUIRED,
+        live_evidence=("FW-G06 (final40 c04d2a1, c17538a and 2fe5636 — the same "
+                       "defect three campaigns running): grade-6 lesson "
+                       "„Simetrala ugla i konstrukcija“ published an "
+                       "equilateral-triangle inradius task marked $\\sqrt{3}$"),
     ),
     BlindSpot(
         key="lesson_semantic_alignment",

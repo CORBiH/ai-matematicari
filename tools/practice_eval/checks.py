@@ -15,11 +15,13 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from matbot import (api, config, feedback, geometrycheck, hint_policy, mathsafe,
-                    mcq_integrity, option_equivalence, request_fidelity)
+                    mcq_integrity, option_equivalence, practice_policy,
+                    request_fidelity, stem_disclosure)
 from matbot.mathcheck import find_numeric_inconsistencies
 from matbot.mathsegments import DISPLAY, INLINE, tokenize_math
 from matbot.practice import PRACTICE_UNAVAILABLE_MESSAGE, SAFE_ERROR_MESSAGE
 from matbot.terminology import normalize_terminology
+from matbot.tutor import lesson_context
 from matbot.tutor import package_preflight
 
 # Serverski „canned" tekstovi. Svaki od njih stiže sa HTTP 200 i, kad se pojavi
@@ -1167,6 +1169,60 @@ def check_stays_in_lesson(obs: TurnObservation) -> CheckResult:
     return CheckResult("stays_in_lesson", PASS)
 
 
+# ---------------------------------------------------------------------------
+# FINAL40 BLOKATORI — evaluator zove ISTU produkcijsku čistu funkciju
+# ---------------------------------------------------------------------------
+# Ista doktrina kao za klasifikaciju zadatka u Fazi 2: evaluator NIKAD ne pravi
+# slabiji dvojnik orakla. Ako se produkcijski prag pomjeri, mjerač se pomjera s
+# njim — divergencija dvije kopije istog pravila je strukturno nemoguća.
+
+def check_stem_answer_disclosure_safe(obs: TurnObservation) -> CheckResult:
+    """Otkriva li SAM tekst zadatka koja je opcija tačna (FINAL40 FW-G03).
+
+    PASS je OGRANIČEN dokaz: produkcijski detektor pokriva samo MCQ IZBORA
+    ENTITETA, pa PASS znači „u podržanoj klasi nije dokazano otkrivanje", nikad
+    „zadatak sigurno ne otkriva odgovor". Semantiku i dalje sudi ručna rubrika
+    `pedagogy` / `lesson_alignment` (vidi release_contract.BLIND_SPOTS)."""
+    name = "stem_answer_disclosure_safe"
+    marked = obs.marked_option_index
+    options = obs.option_texts
+    if not obs.task_after or len(options) != 4 or marked < 0:
+        return CheckResult(name, SKIP, "no published four-option package")
+    detail = stem_disclosure.stem_answer_disclosure(obs.task_after, options, marked)
+    if detail:
+        return CheckResult(name, FAIL, detail)
+    return CheckResult(name, PASS)
+
+
+def check_curriculum_task_form_consistent(obs: TurnObservation) -> CheckResult:
+    """Koristi li objavljen paket zapis koji RAZRED još nije upoznao (FW-G06).
+
+    Politika se razrješava iz SERVERSKOG konteksta lekcije (grade + lekcija),
+    isto kao u produkciji, i mjeri se nad istim vidljivim površinama koje
+    objava skenira: tekst zadatka, sve opcije, rješenje."""
+    name = "curriculum_task_form_consistent"
+    if not obs.task_after:
+        return CheckResult(name, SKIP, "no published task")
+    context = lesson_context.build(obs.grade, obs.topic_id)
+    if context is None:
+        return CheckResult(name, SKIP, "no canonical lesson context")
+    policy = getattr(context, "practice_policy", None)
+    if policy is None:
+        return CheckResult(name, SKIP, "no resolved practice policy")
+    surfaces = [("task_text", obs.task_after),
+                ("solution", (obs.session_after or {}).get("solution_summary") or "")]
+    surfaces.extend(("option", text) for text in obs.option_texts)
+    failures = []
+    for label, surface in surfaces:
+        for code in practice_policy.text_policy_failures(policy, surface):
+            entry = f"{code} [{label}]"
+            if entry not in failures:
+                failures.append(entry)
+    if failures:
+        return CheckResult(name, FAIL, "; ".join(failures[:3]))
+    return CheckResult(name, PASS)
+
+
 def _make_calls_check(limit: int):
     def check(obs: TurnObservation) -> CheckResult:
         if obs.sdk_calls > limit:
@@ -1233,6 +1289,9 @@ _CHECKS = {
     "package_clean": check_package_clean,
     "request_equivalent_reformulation": check_request_equivalent_reformulation,
     "stays_in_lesson": check_stays_in_lesson,
+    # --- FINAL40 blokatori (FW-G03, FW-G06) ---
+    "stem_answer_disclosure_safe": check_stem_answer_disclosure_safe,
+    "curriculum_task_form_consistent": check_curriculum_task_form_consistent,
 }
 
 # Kvalitativne rubrike (0 = neprihvatljivo, 1 = djelimično, 2 = dobro).
@@ -1326,6 +1385,8 @@ _ROOT_CAUSE = {
     "lesson_matches": "lesson_scope",
     "stays_in_lesson": "lesson_scope",
     "no_leak": "internal_leak",
+    "stem_answer_disclosure_safe": "answer_leak",
+    "curriculum_task_form_consistent": "lesson_scope",
     "no_control_chars": "notation_and_math",
     "math_safe": "notation_and_math",
     "numeric_consistent": "notation_and_math",

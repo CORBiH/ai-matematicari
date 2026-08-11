@@ -34,6 +34,7 @@ from dataclasses import dataclass
 from matbot import lesson_fidelity, mcq_integrity, option_equivalence
 from matbot import practice_policy as practice_policy_module
 from matbot import request_fidelity as request_fidelity_module
+from matbot import stem_disclosure as stem_disclosure_module
 from matbot.semantics import detectors as semantic_detectors
 from matbot.tutor import task_identity
 from matbot.mathcheck import find_numeric_inconsistencies
@@ -300,6 +301,23 @@ def collect_package_issues(task, contract=None, previous_signature="",
                 detail = (f"server read divisors: {read}" if read
                           else "server could not read any divisor")
             issues.append(PackageIssue(failure, detail=detail))
+
+    # 4a2) TEKST ZADATKA SAM OTKRIVA OZNAČENU OPCIJU (FINAL40 FW-G03).
+    # Zadatak može biti matematički tačan, s četiri različite opcije i tačno
+    # jednom tačnom — a da učenik ne rasuđuje nego prepisuje, jer deklarativni
+    # dio teksta tvrdi BAŠ onu osobinu koju upitna rečenica pita, i to BAŠ za
+    # označeni entitet. Nijedna postojeća kapija to nije mjerila: zaštita od
+    # curenja gleda ODGOVOR tutora i izričito izuzima sve što već stoji u
+    # tekstu zadatka. Vidi matbot/stem_disclosure.py.
+    if task_text_safe and option_texts and all(option_texts) and isinstance(
+            marked_index, int):
+        disclosure = stem_disclosure_module.stem_answer_disclosure(
+            task_text, option_texts, marked_index)
+        if disclosure:
+            issues.append(PackageIssue(
+                stem_disclosure_module.STEM_ANSWER_DISCLOSURE_CODE,
+                option_ids=(_option_id(task, marked_index),),
+                detail=disclosure))
 
     # 4b) ISTI ZADATAK KAO AKTIVNI (produkcijski nalaz: „Daj mi novi zadatak.“
     # je vratio doslovno isti zadatak i iste opcije). Poredi se SERVERSKI izveden
@@ -597,6 +615,28 @@ def format_for_reviewer(issues):
         "introduces an operation outside the primary-school curriculum "
         "(sin/cos/tg/log): replace the task or rewrite the field using only "
         "methods this lesson teaches. "
+        # ŽIVI FINAL40 FW-G06: bez izričitog recepta recenzent „popravi“
+        # brojeve i vrati paket s ISTIM nalazom (obrazac F4E E01). Sam recept
+        # živi uz granicu koju opisuje (matbot/practice_policy.py) — ovaj motor
+        # po svojoj arhitektonskoj kapiji ne smije nositi konkretan zapis.
+        + practice_policy_module.grade_capability_repair_text() +
+        # ŽIVI FINAL40 FW-G03: recenzent je nacrt s ovim defektom proglasio
+        # `correct` i sam ga objavio. Recept mora reći da se briše TVRDNJA,
+        # ne entitet — inače recenzent ukloni BD iz teksta i zadatak postane
+        # nerješiv.
+        f"For `{stem_disclosure_module.STEM_ANSWER_DISCLOSURE_CODE}` the task "
+        "text itself already states, about the marked option, the very "
+        "property the question asks the student to determine — so the student "
+        "only has to copy it back. Do NOT delete the entity from the task: it "
+        "is legitimate data and the task needs it. DELETE THE SENTENCE OR "
+        "CLAUSE THAT ASSERTS THE DECISIVE PROPERTY (and the clause that denies "
+        "it for another option, which discloses the answer just as much), and "
+        "instead give the student the neutral data from which that property "
+        "FOLLOWS — measures, positions, coordinates, a definition to apply. "
+        "Keep the question and every option unchanged where you can, and "
+        "recompute correct_option_id, correct_option_index and expected_answer "
+        "for the rewritten text. If the property cannot be made derivable "
+        "without stating it, return `fail_closed`. "
         "For `numeric_inconsistency` an equality chain inside $...$ in the named "
         "field is numerically false: recompute every step and rewrite that field so "
         "every shown equality holds. When a false equality is the DELIBERATE point "

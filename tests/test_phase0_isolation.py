@@ -94,7 +94,20 @@ PHASE2_ADDED_CHECK_NAMES = (
     'solution_option_binding_consistent',
 )
 
-FROZEN_CHECK_NAMES = tuple(sorted(PHASE0_CHECK_NAMES + PHASE2_ADDED_CHECK_NAMES))
+FINAL40_BLOCKER_CHECK_NAMES = (
+    # Popravka blokatora FINAL40 (2fe5636). Prve dvije provjere u registru
+    # koje sude SAM OBJAVLJENI ZADATAK, a ne pomoć ni rješenje: FW-G03 (tekst
+    # zadatka izriče osobinu koju pita) i FW-G06 (zadatak traži zapis koji
+    # razred nije upoznao). Obje zovu PRODUKCIJSKU funkciju, pa se prag
+    # evaluatora i produkta ne mogu razići — i obje su OGRANIČEN dokaz
+    # (release_contract.BOUNDED_CLASS_CHECKS), pa im PASS nikad ne nosi
+    # spremnost izdanja.
+    'curriculum_task_form_consistent',
+    'stem_answer_disclosure_safe',
+)
+
+FROZEN_CHECK_NAMES = tuple(sorted(
+    PHASE0_CHECK_NAMES + PHASE2_ADDED_CHECK_NAMES + FINAL40_BLOCKER_CHECK_NAMES))
 
 
 def test_the_campaign_check_registry_is_unchanged_by_phase_zero():
