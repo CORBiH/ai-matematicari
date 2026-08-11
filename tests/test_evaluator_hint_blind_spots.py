@@ -349,6 +349,9 @@ def test_blind_spot_matrix_covers_every_required_class():
         "model_self_reported_checks",
         "stem_answer_disclosure",
         "grade_capability_of_published_task",
+        # Geometrijska koherencija premise (ciljani FW-G03): prvi razred
+        # koji tvrdi da objavljena KONFIGURACIJA uopšte postoji.
+        "geometric_premise_coherence",
     }
 
 

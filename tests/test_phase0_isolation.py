@@ -104,6 +104,11 @@ FINAL40_BLOCKER_CHECK_NAMES = (
     # spremnost izdanja.
     'curriculum_task_form_consistent',
     'stem_answer_disclosure_safe',
+    # Ciljani blokator geometrijske koherencije (FW-G03 na b9151fc):
+    # prva provjera registra koja sudi GEOMETRIJSKU PREMISU objavljenog
+    # zadatka. Namjerno NEMA scope kapiju — `geometry_ok` se gasi za
+    # lekcije o uglovima (scope "") i zato je živi paket propustio.
+    'geometry_relation_consistent',
 )
 
 FROZEN_CHECK_NAMES = tuple(sorted(

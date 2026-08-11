@@ -31,7 +31,7 @@ modela (CLAUDE.md, pravilo 7).
 import re
 from dataclasses import dataclass
 
-from matbot import lesson_fidelity, mcq_integrity, option_equivalence
+from matbot import geometrycheck, lesson_fidelity, mcq_integrity, option_equivalence
 from matbot import practice_policy as practice_policy_module
 from matbot import request_fidelity as request_fidelity_module
 from matbot import stem_disclosure as stem_disclosure_module
@@ -404,6 +404,19 @@ def collect_package_issues(task, contract=None, previous_signature="",
     if _semantic_practice.fake_visual_reference(raw_task_text):
         issues.append(PackageIssue(FAKE_VISUAL_CODE,
                                    detail="task text references an absent picture"))
+
+    # 6b2) PROTIVRJEČNA GEOMETRIJSKA PREMISA (ciljani blokator FW-G03).
+    # Objava ovaj nalaz ionako ponavlja kroz `_reject_if_geometry_invalid`, ali
+    # tamo je prekasno da ga IKO popravi: turn je već potrošio oba poziva.
+    # Ovdje ide recenzentu kao serverska činjenica, pa ispravka staje u ISTI
+    # drugi poziv — tačno ono zbog čega `correct` postoji. Zove se ISTA čista
+    # funkcija koju objava zove (matbot/geometrycheck.py); nema drugog praga i
+    # nema kopije detektora. Ostale geometrijske provjere (konvencija simbola)
+    # se OVDJE namjerno ne pokreću — one zavise od scope-a lekcije koji ovaj
+    # motor ne poznaje, a ova protivrječnost je egzaktna i bez njega.
+    for reason in geometrycheck.geometry_relation_contradictions(raw_task_text):
+        issues.append(PackageIssue(
+            geometrycheck.GEOMETRY_RELATION_CONTRADICTION, detail=reason))
     if practice_contract is not None:
         options_joined = " ".join(
             getattr(option, "text", "") for option in
@@ -506,6 +519,24 @@ def format_for_reviewer(issues):
         "semantic feature): REPLACE THE TASK with one that genuinely performs the "
         "lesson's required action described in the lesson's semantic contract "
         "block — never just reword the same task. "
+        # ŽIVI CILJANI BLOKATOR FW-G03: recept mora reći da se mijenja PREMISA,
+        # a ne mjere ni odgovor — inače recenzent „popravi“ uglove i objavi
+        # isti nemogući raspored.
+        f"For `{geometrycheck.GEOMETRY_RELATION_CONTRADICTION}` the task states "
+        "a geometric configuration that cannot exist. The detail names the "
+        f"class: `{geometrycheck.COINCIDENT_RAYS_NONZERO_ANGLE}` means the text "
+        "says one ray LIES ON (or coincides with) another ray from the same "
+        "vertex, and then gives a NONZERO angle between exactly those two rays. "
+        "Two rays that lie on each other are the SAME ray, so the angle between "
+        "them is exactly zero — the premise is false, no matter how correct the "
+        "marked answer is. KEEP the candidate rays, KEEP every given angle "
+        "measure and KEEP the question: fix only the FALSE PREMISE. Rays drawn "
+        "from the vertex INSIDE the angle are what such a task needs, so write "
+        "that instead — for example that the rays start at the vertex and lie "
+        "inside the angle, with their measures taken from one arm. Never write "
+        "that a ray lies ON an arm while also giving it a nonzero angle to that "
+        "arm, and do not change the marked option to repair this. If you cannot "
+        "state a configuration that really exists, return `fail_closed`. "
         f"For `{FAKE_VISUAL_CODE}` the text references a picture that does not "
         "exist in this text-only UI: rewrite the task so every needed object is "
         "stated in the text itself (coordinates, table, list of faces), or replace "

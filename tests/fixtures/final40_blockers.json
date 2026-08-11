@@ -81,6 +81,31 @@
       "note": "Ista tema (udaljenost incentra od stranica) i isti brojevni podatak, bez ijedne mašinerije van razreda."
     },
     {
+      "id": "G03_GEOM_BAD",
+      "scenario": "FW-G03 (ciljana kampanja b9151fc)",
+      "grade": 6,
+      "topic_id": "6-09-001",
+      "expected": "blocked",
+      "codes": ["geometry_relation_contradiction"],
+      "student_message": "Kreiraj samostalan MCQ sa četiri opcije za izabranu lekciju. Traži da učenik odredi koji krak dijeli ugao $\\angle ABC$ na dva dijela. Osiguraj da je tačno jedna opcija tačna. Ne rješavaj zadatak učeniku.",
+      "question": "Ugao $\\angle ABC$ iznosi $60^\\circ$. Na kraku $BA$ nalaze se četiri zadata kraka iz tačke $B$: $BD$, $BE$, $BF$ i $BG$. Poznato je da su uglovi mjereni od kraka $BA$ redom: $\\angle ABD=10^\\circ$, $\\angle ABE=30^\\circ$, $\\angle ABF=20^\\circ$ i $\\angle ABG=40^\\circ$. Koji od navedenih krakova dijeli ugao $\\angle ABC$ na dva jednaka dijela?",
+      "options": ["krak $BG$", "krak $BE$", "krak $BF$", "krak $BD$"],
+      "marked_index": 1,
+      "note": "Označeno $BE$ JESTE broj koji je autor htio ($60:2=30$), pa ovo NIJE pogrešan označen odgovor. Neistinita je PREMISA: zrak koji leži NA zraku $BA$ je isti zrak, pa je ugao prema $BA$ nužno $0^\\circ$, nikad $10^\\circ$. Recenzent: approve; geometry_ok: SKIP (lekcija nema geometrijski scope)."
+    },
+    {
+      "id": "G03_GEOM_GOOD",
+      "scenario": "FW-G03 (koherentna ispravka)",
+      "grade": 6,
+      "topic_id": "6-09-001",
+      "expected": "published",
+      "student_message": "Kreiraj samostalan MCQ sa četiri opcije za izabranu lekciju. Traži da učenik odredi koji krak dijeli ugao $\\angle ABC$ na dva dijela. Osiguraj da je tačno jedna opcija tačna. Ne rješavaj zadatak učeniku.",
+      "question": "Ugao $\\angle ABC$ iznosi $60^\\circ$. Iz tjemena $B$ polaze kraci $BD$, $BE$, $BF$ i $BG$ koji leže unutar ugla $\\angle ABC$. Njihovi uglovi mjereni od kraka $BA$ su redom: $\\angle ABD=10^\\circ$, $\\angle ABE=30^\\circ$, $\\angle ABF=20^\\circ$ i $\\angle ABG=40^\\circ$. Koji od navedenih krakova dijeli ugao $\\angle ABC$ na dva jednaka dijela?",
+      "options": ["krak $BG$", "krak $BE$", "krak $BF$", "krak $BD$"],
+      "marked_index": 1,
+      "note": "Isti arhetip, iste opcije, isti označen odgovor i iste mjere — mijenja se SAMO premisa: kraci polaze iz tjemena i leže UNUTAR ugla umjesto NA kraku $BA$. Dokazuje da popravka ne zabranjuje traženi oblik zadatka."
+    },
+    {
       "id": "G0804_GOOD_POLYGON",
       "scenario": "pretkomitna provjera dosljednosti prompta",
       "grade": 6,

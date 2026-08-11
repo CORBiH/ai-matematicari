@@ -1194,6 +1194,27 @@ def check_stem_answer_disclosure_safe(obs: TurnObservation) -> CheckResult:
     return CheckResult(name, PASS)
 
 
+def check_geometry_relation_consistent(obs: TurnObservation) -> CheckResult:
+    """Tvrdi li objavljen zadatak geometrijsku konfiguraciju koja NE POSTOJI?
+
+    ZAŠTO ZASEBNO OD `geometry_ok`: taj mjerač se gasi kad lekcija nema
+    geometrijski scope (`route_geometry_topic` vraća "" za lekcije o uglovima),
+    pa je za ciljani FW-G03 vratio SKIP. Produkcija tu NIJE bila slijepa —
+    `find_geometry_issues` protivrječnosti odnosa pokreće PRIJE scope kapije —
+    ali evaluator jeste. Ovaj mjerač zato nema scope kapiju i zove ISTU
+    produkcijsku čistu funkciju.
+
+    PASS je OGRANIČEN dokaz: dokazuje se samo klasa `coincident_rays_nonzero_
+    angle`, nikad da je cijela geometrija zadatka ispravna."""
+    name = "geometry_relation_consistent"
+    if not obs.task_after:
+        return CheckResult(name, SKIP, "no published task")
+    reasons = geometrycheck.geometry_relation_contradictions(obs.task_after)
+    if reasons:
+        return CheckResult(name, FAIL, ",".join(reasons))
+    return CheckResult(name, PASS)
+
+
 def check_curriculum_task_form_consistent(obs: TurnObservation) -> CheckResult:
     """Koristi li objavljen paket zapis koji RAZRED još nije upoznao (FW-G06).
 
@@ -1292,6 +1313,8 @@ _CHECKS = {
     # --- FINAL40 blokatori (FW-G03, FW-G06) ---
     "stem_answer_disclosure_safe": check_stem_answer_disclosure_safe,
     "curriculum_task_form_consistent": check_curriculum_task_form_consistent,
+    # --- ciljani blokator geometrijske koherencije (FW-G03) ---
+    "geometry_relation_consistent": check_geometry_relation_consistent,
 }
 
 # Kvalitativne rubrike (0 = neprihvatljivo, 1 = djelimično, 2 = dobro).
@@ -1387,6 +1410,7 @@ _ROOT_CAUSE = {
     "no_leak": "internal_leak",
     "stem_answer_disclosure_safe": "answer_leak",
     "curriculum_task_form_consistent": "lesson_scope",
+    "geometry_relation_consistent": "notation_and_math",
     "no_control_chars": "notation_and_math",
     "math_safe": "notation_and_math",
     "numeric_consistent": "notation_and_math",

@@ -70,6 +70,11 @@ BOUNDED_TOKEN_CHECKS = frozenset({
 BOUNDED_CLASS_CHECKS = frozenset({
     "stem_answer_disclosure_safe",
     "curriculum_task_form_consistent",
+    # Geometrijska koherencija: dokazuje se TAČNO jedna klasa
+    # protivrječnosti (poklopljeni zraci uz nenulti ugao). PASS nikad ne
+    # znači da je geometrija zadatka ispravna — samo da ta klasa nije
+    # dokazana.
+    "geometry_relation_consistent",
 })
 
 # Provjere čiji je SKIP po dizajnu čest i znači „ne mogu ništa dokazati“.
@@ -81,6 +86,7 @@ KNOWN_SKIPPING_CHECKS = frozenset({
     "hint_proposition_no_leak", "hint_top_from_verified_solution",
     "help_has_task_scaffold", "help_notation_in_scope",
     "stem_answer_disclosure_safe", "curriculum_task_form_consistent",
+    "geometry_relation_consistent",
 })
 
 
@@ -230,6 +236,21 @@ BLIND_SPOTS = (
                        "defect three campaigns running): grade-6 lesson "
                        "„Simetrala ugla i konstrukcija“ published an "
                        "equilateral-triangle inradius task marked $\\sqrt{3}$"),
+    ),
+    BlindSpot(
+        key="geometric_premise_coherence",
+        question="Does the published task assert a configuration that cannot exist?",
+        owner=("matbot.geometrycheck.geometry_relation_contradictions at draft "
+               "preflight and at publication via find_geometry_issues "
+               "(matbot.tutor.pipeline._reject_if_geometry_invalid); "
+               "checks.check_geometry_relation_consistent calls the SAME function"),
+        # Egzaktna Euklidska činjenica, ali samo za JEDNU klasu premise;
+        # „je li zrak stvarno unutar ugla" i svaka druga konfiguracija ostaju
+        # potpuno nedokazane bez slike.
+        strength=MANUAL_SEMANTIC_REVIEW_REQUIRED,
+        live_evidence=("FW-G03 (targeted b9151fc): the stem put rays BD/BE/BF/BG "
+                       "ON arm BA and then gave them nonzero angles to BA; "
+                       "reviewer decision=approve, geometry_ok=SKIP"),
     ),
     BlindSpot(
         key="lesson_semantic_alignment",

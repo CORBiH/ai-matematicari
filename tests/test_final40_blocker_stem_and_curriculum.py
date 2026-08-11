@@ -99,7 +99,11 @@ def test_the_frozen_blocker_set_is_complete():
                           # Pretkomitna provjera dosljednosti prompta: jedina
                           # lekcija 6. razreda čiji je prompt nosio formulu s
                           # korijenom mora ostati upotrebljiva.
-                          "G0804_GOOD_POLYGON"}
+                          "G0804_GOOD_POLYGON",
+                          # Ciljani blokator geometrijske koherencije
+                          # (FW-G03 na b9151fc) — vidi
+                          # tests/test_geometry_relation_coherence.py.
+                          "G03_GEOM_BAD", "G03_GEOM_GOOD"}
     for fixture in FIXTURES:
         assert fixture["expected"] in ("blocked", "published"), fixture["id"]
         assert len(fixture["options"]) == 4, fixture["id"]

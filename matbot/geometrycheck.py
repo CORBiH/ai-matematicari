@@ -59,6 +59,11 @@ PYRAMID_APOTHEM_EDGE_CONFUSION = "pyramid_apothem_edge_confusion"
 GEOMETRY_FORMULA_SYMBOL_CONFLICT = "geometry_formula_symbol_conflict"
 ANGLE_DIVIDER_VERTEX_MISMATCH = "angle_divider_vertex_mismatch"
 ANGLE_DIVIDER_BOUNDARY_RAY = "angle_divider_boundary_ray"
+# Protivrječna geometrijska PREMISA (ciljani blokator FW-G03) — vidi odjeljak
+# „KOHERENTNOST GEOMETRIJSKE PREMISE" niže. Kod nosi i ograničen RAZLOG,
+# npr. `geometry_relation_contradiction:coincident_rays_nonzero_angle`.
+GEOMETRY_RELATION_CONTRADICTION = "geometry_relation_contradiction"
+COINCIDENT_RAYS_NONZERO_ANGLE = "coincident_rays_nonzero_angle"
 
 ALL_ISSUE_CODES = (
     CIRCLE_DIAMETER_USES_D, CIRCLE_DIAMETER_USES_LOWER_D, CIRCLE_RADIUS_USES_R,
@@ -66,7 +71,7 @@ ALL_ISSUE_CODES = (
     SOLID_SPACE_DIAGONAL_USES_D, SOLID_FACE_DIAGONAL_USES_D,
     SOLID_BASE_AREA_SYMBOL_MISMATCH, PYRAMID_APOTHEM_EDGE_CONFUSION,
     GEOMETRY_FORMULA_SYMBOL_CONFLICT, ANGLE_DIVIDER_VERTEX_MISMATCH,
-    ANGLE_DIVIDER_BOUNDARY_RAY,
+    ANGLE_DIVIDER_BOUNDARY_RAY, GEOMETRY_RELATION_CONTRADICTION,
 )
 
 # --- uloge sadržaja ---------------------------------------------------------
@@ -290,6 +295,169 @@ def _divider_coherence_issues(flat):
     return issues
 
 
+# ---------------------------------------------------------------------------
+# KOHERENTNOST GEOMETRIJSKE PREMISE: POKLOPLJENI ZRACI I NENULTI UGAO
+# ---------------------------------------------------------------------------
+# ŽIVI BLOKATOR IZDANJA (ciljana kampanja b9151fc, FW-G03, lekcija o pojmu
+# ugla). Objavljen je zadatak:
+#
+#   „Ugao $\angle ABC$ iznosi $60^\circ$. NA KRAKU $BA$ nalaze se četiri
+#    zadata kraka iz tačke $B$: $BD$, $BE$, $BF$ i $BG$. Poznato je da su
+#    uglovi mjereni od kraka $BA$ redom: $\angle ABD=10^\circ$,
+#    $\angle ABE=30^\circ$, $\angle ABF=20^\circ$ i $\angle ABG=40^\circ$.
+#    Koji od navedenih krakova dijeli ugao $\angle ABC$ na dva jednaka djela?“
+#
+# Označeno je $BE$ i to JESTE broj koji je autor htio ($60:2=30$). Ali premisa
+# je neistinita: ako zrak $BD$ leži NA zraku $BA$, onda je to ISTI zrak i
+# $\angle ABD$ je nužno $0^\circ$, nikad $10^\circ$. Zadatak time traži od
+# učenika da rasuđuje o konfiguraciji koja ne postoji.
+#
+# Nijedna postojeća kapija to nije mogla vidjeti: `mathcheck` nema jednakost
+# koju bi oborio, opcije su različite, označena opcija je „tačna“, oznake su
+# kanonske, a koherentnost djelioca (D005 iznad) traži TVRDNJU o dijeljenju
+# uz `\overrightarrow` zapis — ovdje je zapis goli par slova i tvrdnja je o
+# POLOŽAJU, ne o dijeljenju.
+#
+# ŠTA SE OVDJE DOKAZUJE — jedna egzaktna Euklidska činjenica i ništa više:
+#
+#     zrak VP i zrak VQ su ISTI zrak  ⟹  ugao između njih je tačno 0°.
+#
+# Dakle: tekst koji IZRIČITO tvrdi poklapanje dvaju zraka iz istog tjemena, a
+# istom paru pripiše NENULTI ugao, protivrječi sam sebi. Nema procjene, nema
+# praga, nema slike.
+#
+# ŠTA SE NE DOKAZUJE: da li zrak zaista jeste unutar ugla, da li su mjere
+# međusobno konzistentne, da li konfiguracija postoji. Sve što se ne može
+# pročitati zatvorenom gramatikom se PRESKAČE (doktrina modula).
+#
+# GRANICA KOJU JE LAKO PREKORAČITI — „NA KRAKU“ NIJE „UNUTAR UGLA“:
+# „krak $BE$ leži UNUTAR ugla $ABC$“ je ispravna i uobičajena premisa i nikad
+# se ne smije normalizovati u „leži na kraku“. Zato je sidro isključivo
+# predlog „na/sa“ + IMENICA ZRAKA, nikad „unutar“, „u“ ni „između“.
+#
+# ZAŠTO NE „PRAVA“: tačka na PRAVOJ $BA$ smije biti i sa suprotne strane
+# tjemena, pa je ugao tada $180^\circ$, a ne $0^\circ$. Imenica prave se zato
+# NIKAD ne prihvata kao sidro — samo krak/zrak/poluprava/duž, koji svi počinju
+# u tjemenu.
+#
+# Kod nalaza i ograničen razlog stoje uz ostale kodove na vrhu modula
+# (CLAUDE.md pravilo 7: u dijagnostiku ide kod i razlog, nikad sadržaj).
+
+# Par velikih slova kao oznaka zraka/kraka ($BA$, $BD$). PRVO slovo je tjeme.
+# Negativni lookaround čuva od hvatanja „AB“ ili „BD“ unutar troslovne oznake
+# ugla „ABD“ — tamo par nikad ne smije biti pročitan kao zrak.
+_RELATION_PAIR_RE = re.compile(r"(?<![A-Za-z])([A-Z])\s*([A-Z])(?![A-Za-z])")
+
+# Imenice koje označavaju ZRAK IZ TJEMENA. „Prava“ NIJE među njima (vidi gore).
+_RAY_NOUN = r"(?:krak\w*|zrak\w*|poluprav\w*|du[žz]\w*)"
+# Glagol položaja — zatvoren skup.
+_ON_VERB_RE = re.compile(r"(?i)\b(?:nalaz\w*|le[žz]\w*|pripada\w*)\b")
+# Sidro „na kraku BA“ / „sa krakom BA“ — PREDLOG je obavezan i zatvoren.
+_ON_RAY_ANCHOR_RE = re.compile(
+    r"(?i)\b(?:na|sa|sa\s+istim|s)\s+" + _RAY_NOUN + r"\s*"
+    r"(?<![A-Za-z])([A-Z])\s*([A-Z])(?![A-Za-z])")
+# Izričito poklapanje: „BD se poklapa sa BA“, „BD je isti zrak kao BA“.
+_COINCIDE_RE = re.compile(
+    r"(?<![A-Za-z])([A-Z])\s*([A-Z])(?![A-Za-z])"
+    r"(?:(?![.?!;]).){0,40}?"
+    r"(?i:se\s+poklapa\w*|poklapaju\s+se|je\s+isti\s+" + _RAY_NOUN
+    + r"\s+kao|jeste\s+isti\s+" + _RAY_NOUN + r"\s+kao)"
+    r"(?:(?![.?!;]).){0,30}?"
+    r"(?<![A-Za-z])([A-Z])\s*([A-Z])(?![A-Za-z])")
+# Tačka na zraku: „Tačka $D$ leži na kraku $BA$“ → zrak BD JESTE zrak BA.
+_POINT_ON_RAY_RE = re.compile(
+    r"(?i)\bta[čc]k\w*\s*(?<![A-Za-z])([A-Z])(?![A-Za-z])"
+    r"(?:(?![.?!;]).){0,40}?"
+    r"\b(?:nalaz\w*|le[žz]\w*|pripada\w*)\b"
+    r"(?:(?![.?!;]).){0,20}?"
+    r"\bna\s+" + _RAY_NOUN + r"\s*"
+    r"(?<![A-Za-z])([A-Z])\s*([A-Z])(?![A-Za-z])")
+
+# Dodjela mjere uglu: `\angle ABD=10^\circ`, `\angle ABD je 30 stepeni`.
+_ANGLE_MEASURE_RE = re.compile(
+    _ANGLE_TOKEN
+    + r"\s*(?:=|\b(?i:je|iznosi)\b)\s*"
+    + r"(\d+(?:[.,]\d+)?)\s*(?:\^\s*\\circ|\\circ|°|(?i:stepen\w*|stupnj\w*))")
+
+_SENTENCE_SPLIT_RE = re.compile(r"[.?!;]")
+
+
+def _coincident_ray_claims(sentence):
+    """Skup dokazanih tvrdnji poklapanja: {(tjeme, krajA, krajB)}.
+
+    Par je NEUREĐEN po krajevima (poklapanje je simetrično) i uvijek dijeli
+    tjeme — dva zraka bez zajedničkog početka se ovdje nikad ne porede."""
+    claims = set()
+
+    def add(vertex_a, end_a, vertex_b, end_b):
+        if vertex_a != vertex_b or end_a == end_b:
+            return                       # različito tjeme ili isti zrak
+        claims.add((vertex_a, *sorted((end_a, end_b))))
+
+    # 1) SIDRO „na kraku BA“ + glagol položaja + ostali zraci iz ISTOG tjemena.
+    #    Živi oblik je nabrajanje: „Na kraku BA nalaze se … BD, BE, BF i BG“.
+    if _ON_VERB_RE.search(sentence):
+        for anchor in _ON_RAY_ANCHOR_RE.finditer(sentence):
+            vertex, base_end = anchor.group(1), anchor.group(2)
+            for pair in _RELATION_PAIR_RE.finditer(sentence):
+                if pair.start() == anchor.start(1):
+                    continue             # samo sidro
+                add(vertex, base_end, pair.group(1), pair.group(2))
+
+    # 2) IZRIČITO POKLAPANJE dvaju imenovanih zraka.
+    for match in _COINCIDE_RE.finditer(sentence):
+        add(match.group(1), match.group(2), match.group(3), match.group(4))
+
+    # 3) TAČKA NA ZRAKU: tačka X na zraku VE znači da je zrak VX isti zrak.
+    for match in _POINT_ON_RAY_RE.finditer(sentence):
+        point, vertex, base_end = match.group(1), match.group(2), match.group(3)
+        if point != vertex:
+            add(vertex, base_end, vertex, point)
+    return claims
+
+
+def _angle_measures(text):
+    """{(tjeme, krakA, krakB): [mjere]} iz dodjela `\\angle XYZ = θ`."""
+    measures = {}
+    for match in _ANGLE_MEASURE_RE.finditer(text):
+        first, vertex, second = match.group(1), match.group(2), match.group(3)
+        if first == vertex or second == vertex or first == second:
+            continue                     # degenerisan zapis — ne dokazuje se
+        try:
+            value = float(match.group(4).replace(",", "."))
+        except ValueError:
+            continue
+        measures.setdefault((vertex, *sorted((first, second))), []).append(value)
+    return measures
+
+
+def geometry_relation_contradictions(text):
+    """Ograničeni razlozi dokazanih geometrijskih protivrječnosti u tekstu.
+
+    Prazna torka znači „nije dokazano" — uključujući svaku formulaciju koju
+    zatvorena gramatika ne pročita. To NIJE dokaz da je geometrija ispravna.
+
+    Čista funkcija: bez modela, bez stanja, bez ijedne oznake lekcije. Radi s
+    proizvoljnim slovima — nijedna tačka, zrak ni mjera nije konstanta."""
+    flat = flatten(text)
+    if not flat:
+        return ()
+    measures = _angle_measures(flat)
+    if not measures:
+        return ()                        # bez ijedne mjere nema šta protivrječiti
+    claims = set()
+    for sentence in _SENTENCE_SPLIT_RE.split(flat):
+        claims |= _coincident_ray_claims(sentence)
+    if not claims:
+        return ()
+    for key in sorted(claims & set(measures)):
+        if any(value != 0 for value in measures[key]):
+            # Razlog je KLASA protivrječnosti, nikad slova ni brojevi iz
+            # sadržaja (pravilo 7) — klasa je dovoljna i za log i za recept.
+            return (COINCIDENT_RAYS_NONZERO_ANGLE,)
+    return ()
+
+
 def _circle_active(scope, figures):
     figs = set(figures or ())
     if scope == "plane" and "krug" in figs:
@@ -336,6 +504,12 @@ def find_geometry_issues(text, scope, figures=(), role=ROLE_AUTHORITATIVE,
     # NE zavisi od scope-a (lekcije o uglovima rutiraju scope "") — pokreće se
     # prije scope kapije, uz iste role/policy izuzetke iznad.
     issues.extend(_divider_coherence_issues(flat))
+    # Ciljani blokator FW-G03: protivrječna geometrijska premisa (poklopljeni
+    # zraci uz nenulti ugao). Isti razlog za mjesto poziva kao iznad — lekcije
+    # o uglovima nemaju scope, a protivrječnost je egzaktna bez konvencije
+    # simbola. Prosljeđuje se IZVORNI tekst: funkcija sama zove `flatten`.
+    for reason in geometry_relation_contradictions(text):
+        issues.append(f"{GEOMETRY_RELATION_CONTRADICTION}:{reason}")
     if not scope:
         # Bez scope-a nema konvencije simbola — ostale provjere se preskaču.
         seen = []
