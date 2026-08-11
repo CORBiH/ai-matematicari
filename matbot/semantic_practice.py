@@ -398,6 +398,33 @@ def fidelity_failures(contract, task_text, options_text=""):
     return tuple(failures)
 
 
+def request_conflicts(contract, student_message):
+    """Kodovi za ZAHTJEV koji traži baš ono što ugovor lekcije ZABRANJUJE.
+
+    ZAŠTO POSTOJI (živi FINAL40 blokator FW-G04, lekcija „Visine trougla i
+    ortocentar"): učenik je izričito tražio arhetip `construction_determination_
+    request`, koji ugovor TE lekcije zabranjuje (živi E010 nalaz: taj arhetip
+    suštinski poziva na više tačnih odgovora). Server je zahtjev tiho zamijenio
+    NEPOVEZANIM zadatkom o površini trougla i objavio ga. Kanonski scenario je
+    pri tome izričito `lesson_overrides` s rubrikom `refusal_quality` i BEZ
+    provjere `published` — dakle traženo ponašanje je ODBIJANJE, ne zamjena.
+
+    Ovo NIJE novi jezički razumijevač: koriste se ISTI zatvoreni provjerivači
+    osobina (`FEATURE_CHECKS`) koje ugovor već primjenjuje na zadatak, samo nad
+    porukom učenika. Provjeravaju se ISKLJUČIVO zabranjene osobine — tražene
+    osobine opisuju ZADATAK, ne zahtjev, i ovdje nemaju smisla.
+
+    Prazna torka = nema DOKAZANOG sukoba (uključujući svaku poruku koju
+    zatvorena gramatika ne pročita). To nije dokaz da je zahtjev u lekciji."""
+    if contract is None or not (student_message or "").strip():
+        return ()
+    failures = []
+    for feature in contract.forbidden_features:
+        if FEATURE_CHECKS[feature](student_message, ""):
+            failures.append(f"request_forbidden:{feature}")
+    return tuple(failures)
+
+
 def fake_visual_reference(task_text):
     """GLOBALNA zabrana (sve lekcije): pozivanje na sliku/crtež koji u
     tekstualnom UI-ju ne postoji. Vraća True kad je pozivanje dokazano."""

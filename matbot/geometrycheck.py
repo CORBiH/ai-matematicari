@@ -431,6 +431,88 @@ def _angle_measures(text):
     return measures
 
 
+# ---------------------------------------------------------------------------
+# TAČKE NABROJANE NA KRACIMA IMENOVANOG UGLA (živi FINAL40 FW-G03, 1df3852)
+# ---------------------------------------------------------------------------
+# ŽIVI BLOKATOR IZDANJA:
+#
+#   „Ugao je ∠ABC i mjera ∠ABC je 40°. NA KRAKU AB I KRAKU BC NALAZE SE TAČKE
+#    D, E, F, G tako da su mjere uglova … m∠ABD=20°, m∠ABE=10°, … Koji krak
+#    dijeli ugao ∠ABC na dva jednaka dijela?"        označeno: krak BD
+#
+# Tačka na kraku ugla NE MOŽE zatvarati unutrašnji ugao s tim istim krakom:
+# ako je D na kraku BA, zrak BD JESTE zrak BA i m∠ABD = 0; ako je D na kraku
+# BC, zrak BD je zrak BC i m∠ABD = m∠ABC. Nijedna od objavljenih mjera
+# (20/10/15/5 uz ∠ABC=40) nije ni 0 ni 40 — premisa je nemoguća, pa označeni
+# „unutrašnji djelilac" nema koherentnu podlogu.
+#
+# ZAŠTO POSTOJEĆI DETEKTOR ĆUTI: `_POINT_ON_RAY_RE` traži red „tačka X … na
+# kraku VE", a živi tekst ga OKREĆE („na kraku … nalaze se tačke …") i nabraja
+# VIŠE tačaka odjednom. `_ON_RAY_ANCHOR_RE` pri tome čita par „AB" kao zrak
+# čije je tjeme A — a krak AB ugla ABC ima tjeme B. Orijentacija se zato ovdje
+# izvodi ISKLJUČIVO iz tjemena imenovanog ugla, nikad iz redoslijeda slova.
+#
+# GRANICE (namjerno uske, sve moraju vrijediti):
+#   • u tekstu postoji TAČNO JEDAN različit imenovani ugao (inače tjeme nije
+#     jednoznačno i ništa se ne tvrdi);
+#   • svaki imenovani krak mora biti krak BAŠ tog ugla (dijeli mu tjeme);
+#   • tačke su pojedinačna velika slova i nisu oznake samog ugla;
+#   • kad su imenovana OBA kraka, tačka je na jednom ILI drugom, pa je
+#     dozvoljen skup mjera {0, m∠ugla} i mjera CIJELOG ugla mora biti
+#     zapisana — bez nje se NIŠTA ne tvrdi (NOT_PROVEN);
+#   • kad je imenovan SAMO JEDAN krak, dozvoljena mjera je isključivo 0.
+# „Prava" nije krak (vidi `_RAY_NOUN`), a „unutar ugla" nikad ne stiže ovamo.
+_ARM_ANCHOR_RE = re.compile(
+    r"(?i)\bna\s+" + _RAY_NOUN + r"\s*"
+    r"(?<![A-Za-z])([A-Z])\s*([A-Z])(?![A-Za-z])"
+    r"(?:\s*(?:,|\bi\b)\s*(?:" + _RAY_NOUN + r"\s*)?"
+    r"(?<![A-Za-z])([A-Z])\s*([A-Z])(?![A-Za-z]))?")
+_POINT_LIST_RE = re.compile(
+    r"(?i)\bta[čc]k\w*\s+((?:(?<![A-Za-z])[A-Z](?![A-Za-z])\s*(?:,|\bi\b)?\s*)+)")
+_POINT_LETTER_RE = re.compile(r"(?<![A-Za-z])([A-Z])(?![A-Za-z])")
+
+
+def _arm_point_contradiction(flat, measures):
+    """True kad su tačke NA OBA KRAKA ugla, a njihove mjere to poriču.
+
+    TJEME SE NE POGAĐA: izvodi se iz ZAJEDNIČKOG slova dva imenovana kraka
+    („krak AB" i „krak BC" dijele B), pa redoslijed slova u zapisu nikad nije
+    pretpostavka. Zato se traže OBA kraka — s jednim imenovanim krakom tjeme
+    ostaje dvosmisleno i ništa se ne tvrdi."""
+    for sentence in _SENTENCE_SPLIT_RE.split(flat):
+        if not _ON_VERB_RE.search(sentence):
+            continue
+        anchor = _ARM_ANCHOR_RE.search(sentence)
+        if anchor is None or not anchor.group(3):
+            continue                     # oba kraka moraju biti imenovana
+        first = {anchor.group(1), anchor.group(2)}
+        second = {anchor.group(3), anchor.group(4)}
+        shared = first & second
+        if len(shared) != 1:
+            continue                     # kraci ne dijele tačno jedno tjeme
+        vertex = shared.pop()
+        ends = (first | second) - {vertex}
+        if len(ends) != 2:
+            continue
+        end_a, end_b = sorted(ends)
+        full = measures.get((vertex, end_a, end_b)) or []
+        if len(full) != 1:
+            continue                     # mjera cijelog ugla nije zapisana
+        allowed = {0.0, full[0]}
+        listed = _POINT_LIST_RE.search(sentence)
+        if listed is None:
+            continue
+        points = {letter for letter in _POINT_LETTER_RE.findall(listed.group(1))
+                  if letter not in {vertex, end_a, end_b}}
+        for point in points:
+            for reference in (end_a, end_b):
+                key = (vertex, *sorted((reference, point)))
+                for value in measures.get(key, ()):
+                    if value not in allowed:
+                        return True
+    return False
+
+
 def geometry_relation_contradictions(text):
     """Ograničeni razlozi dokazanih geometrijskih protivrječnosti u tekstu.
 
@@ -448,13 +530,15 @@ def geometry_relation_contradictions(text):
     claims = set()
     for sentence in _SENTENCE_SPLIT_RE.split(flat):
         claims |= _coincident_ray_claims(sentence)
-    if not claims:
-        return ()
     for key in sorted(claims & set(measures)):
         if any(value != 0 for value in measures[key]):
             # Razlog je KLASA protivrječnosti, nikad slova ni brojevi iz
             # sadržaja (pravilo 7) — klasa je dovoljna i za log i za recept.
             return (COINCIDENT_RAYS_NONZERO_ANGLE,)
+    # Ista KLASA protivrječnosti (poklopljeni zraci uz nenulti ugao), samo
+    # iskazana obrnutim redom i nad NABROJANIM tačkama — vidi odjeljak iznad.
+    if _arm_point_contradiction(flat, measures):
+        return (COINCIDENT_RAYS_NONZERO_ANGLE,)
     return ()
 
 

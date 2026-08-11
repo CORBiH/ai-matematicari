@@ -815,12 +815,45 @@ _SOLVE_SEGMENT_DOMAIN_RE = re.compile(
     r"(?:\\mathbb\{\s*([NZQR])\s*\}|([ℕℤℚℝ])|([NZQR]))\s*"
     r"(?:(_\{?0\}?|₀)\s*)?$")
 
+# ŽIVI FINAL40 BLOKATOR (FW-S07): domen je bio imenovan i u prozi („u skupu
+# cijelih brojeva") i GOLIM SIMBOLOM u zasebnom segmentu ($\mathbb{Z}$), bez
+# ijednog ∈. Taj segment nije bio deklaracija po gornjem uzorku, pa je pao na
+# kapiju „nepročitan segment može nositi uslov" i UGASIO CIO ORAKL — objavljen
+# je MCQ u kojem su i $-6<x<-4$ i $\{-5\}$ nad Z isti skup $\{-5\}$, dakle dvije
+# tačne opcije. Orakl je taj defekt ODUVIJEK znao dokazati (`multiple_correct_
+# options`); nedostajala je samo NORMALIZACIJA ZAPISA domena, ne nova matematika.
+#
+# NAMJERNO UŽE OD PROZNOG PRAVILA: priznaje se samo NEDVOSMISLEN simbol skupa
+# (`\mathbb{Z}`, `ℤ`), nikad golo veliko slovo — segment `$Z$` i dalje ostaje
+# nepročitan, jer bi tamo `Z` moglo biti obična promjenljiva.
+_SOLVE_SEGMENT_BARE_DOMAIN_RE = re.compile(
+    r"^\s*(?:\\mathbb\{\s*([NZQR])\s*\}|([ℕℤℚℝ]))\s*"
+    r"(?:(_\{?0\}?|₀)\s*)?$")
+
+
+def _bare_segment_domain(segment: str) -> Optional[str]:
+    """Domen iz segmenta koji je SAMO simbol skupa, ili None."""
+    match = _SOLVE_SEGMENT_BARE_DOMAIN_RE.match(segment or "")
+    if match is None:
+        return None
+    letter = match.group(1) or ""
+    if match.group(2):
+        letter = _SOLVE_DOMAIN_LETTER_MAP[match.group(2)]
+    if match.group(3):
+        if letter != "N":
+            return None            # Z_0 i sl. — nepoznata notacija, ne pogađa se
+        letter = "N0"
+    if letter not in _SOLVE_DOMAIN_LETTER_MAP and letter != "N0":
+        return None
+    return letter
+
 
 def _segment_domain_declaration(segment: str) -> Optional[tuple]:
     """(nepoznata|None, domen) ili None kad segment NIJE čista deklaracija."""
     match = _SOLVE_SEGMENT_DOMAIN_RE.match(segment or "")
     if match is None:
-        return None
+        bare = _bare_segment_domain(segment)
+        return (None, bare) if bare else None
     letter = match.group(2) or match.group(4) or ""
     if match.group(3):
         letter = _SOLVE_DOMAIN_LETTER_MAP[match.group(3)]
@@ -2034,7 +2067,19 @@ def evaluate_linear_solve_mcq(question: str,
 
     candidates = []
     segment_domains = set()
+    # Da li je orakl uopšte postao primjenjiv ZAHVALJUJUĆI golom simbolu skupa
+    # (vidi `_SOLVE_SEGMENT_BARE_DOMAIN_RE`). Mjereno nad 2751 zamrznutim
+    # paketom: ta normalizacija čini primjenjivim još 24 paketa, od kojih 3
+    # nose DOKAZAN defekt, a 8 samo nečitljivu opciju (`\colon` skupovni zapis,
+    # prozni prefiks „Skup rješenja:", vitičaste zagrade van matematike). Tih 8
+    # je ranije objavljeno BEZ ijedne provjere; pretvoriti ih sada u zatvoreni
+    # pad značilo bi da „ne mogu pročitati" postaje presuda — tačno ono što
+    # doktrina ovog modula zabranjuje. Zato normalizacija smije DODATI dokaz,
+    # ali nikad ne smije sama proizvesti nov `unverifiable` pad.
+    bare_domain_segment = False
     for segment in math_contents(tokenize_math(question or "")):
+        if _bare_segment_domain(segment):
+            bare_domain_segment = True
         declaration = _segment_domain_declaration(segment)
         if declaration is not None:
             # Čista deklaracija domena ($x\in\mathbb{Z}$) je EVIDENCIJA, ne
@@ -2125,6 +2170,11 @@ def evaluate_linear_solve_mcq(question: str,
     option_displays = tuple("?" if candidate is None else candidate.display(variable)
                             for candidate in option_sets)
     if unverifiable:
+        if bare_domain_segment:
+            # Vidi obrazloženje uz `bare_domain_segment`: tišina je TAČNO
+            # zatečeno ponašanje ovog paketa, pa normalizacija ne smanjuje
+            # dostupnost. Dokazani defekti ispod i dalje obaraju paket.
+            return LinearSolveMCQResult(False, False)
         return LinearSolveMCQResult(True, False, UNVERIFIABLE_SOLUTION_OPTION_CODE,
                                     solution_display, option_displays, ())
     correct_indices = tuple(index for index, candidate in enumerate(option_sets)

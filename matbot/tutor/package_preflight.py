@@ -73,6 +73,10 @@ DUPLICATE_ACTIVE_TASK_CODE = "duplicate_active_task"
 SEMANTIC_FIDELITY_CODE = "semantic_fidelity_violation"
 # Tekst se poziva na sliku/crtež koji u tekstualnom UI-ju ne postoji.
 FAKE_VISUAL_CODE = "fake_visual_reference"
+# Učenikov zahtjev traži baš arhetip koji ugovor OVE lekcije zabranjuje
+# (FINAL40 FW-G04). Lekcija je vlasnik vježbe: takav turn se odbija, nikad se
+# tiho ne zamjenjuje drugim zadatkom. Vidi matbot/semantic_practice.py.
+REQUEST_CONTRACT_CONFLICT_CODE = "request_contract_conflict"
 
 
 @dataclass(frozen=True)
@@ -428,6 +432,16 @@ def collect_package_issues(task, contract=None, previous_signature="",
                 SEMANTIC_FIDELITY_CODE,
                 detail=(f"{practice_contract.requirement_type}: "
                         + ",".join(fidelity))))
+        # 6b3) ZAHTJEV TRAŽI ONO ŠTO UGOVOR LEKCIJE ZABRANJUJE (FINAL40 FW-G04).
+        # Lekcija je vlasnik vježbe (`request_alignment: lesson_overrides`), pa
+        # takav turn mora biti ODBIJEN — nikad tiho zamijenjen nepovezanim
+        # zadatkom, kako se uživo dogodilo. Zove se ISTI zatvoreni provjerivač
+        # osobina, samo nad porukom; nedokaziva poruka se preskače.
+        for conflict in _semantic_practice.request_conflicts(
+                practice_contract, student_message):
+            issues.append(PackageIssue(
+                REQUEST_CONTRACT_CONFLICT_CODE,
+                detail=f"{practice_contract.requirement_type}: {conflict}"))
 
     # 6c) POLITIKA PP-1 (audit ovlašćenja pravila): metoda razreda, vidljivi
     #     brojevni domen, napredne operacije — isti detektori koje objava
@@ -541,6 +555,15 @@ def format_for_reviewer(issues):
         "exist in this text-only UI: rewrite the task so every needed object is "
         "stated in the text itself (coordinates, table, list of faces), or replace "
         "the task. "
+        # ŽIVI FINAL40 FW-G04: recenzent je zahtjev koji lekcija ZABRANJUJE
+        # tiho zamijenio nepovezanim zadatkom druge vještine i objavio ga.
+        # Jedini ispravan ishod je odbijanje — zato recept NEMA popravku.
+        f"For `{REQUEST_CONTRACT_CONFLICT_CODE}` the STUDENT'S OWN REQUEST asks "
+        "for exactly the task archetype this lesson's contract forbids. This is "
+        "NOT repairable: the lesson owns the exercise, so the request cannot be "
+        "served here. Do NOT silently substitute a different task to satisfy the "
+        "server — publishing some other task instead of the requested one is the "
+        "defect this finding exists to stop. Return `fail_closed`. "
         # Task 3 (živi DISC A009/A010/A020/A023): recept MORA imenovati tačan
         # traženi domen/relaciju. Generičko „neka bude relevantno“ je upravo
         # ono što je pustilo N→Z drift da se objavi.
@@ -672,6 +695,18 @@ def format_for_reviewer(issues):
         "recompute correct_option_id, correct_option_index and expected_answer "
         "for the rewritten text. If the property cannot be made derivable "
         "without stating it, return `fail_closed`. "
+        # ŽIVI FINAL40 FW-F03/FW-F06: isti kod, ali otkrivanje je u IMENOVANJU
+        # klase („Data je FUNKCIJA … predstavlja li ovo FUNKCIJU?"). Recept
+        # mora imenovati baš tu radnju, jer „obriši tvrdnju" recenzent ovdje
+        # čita kao „obriši podatke".
+        "When the detail says `semantic-class assertion`, the stem NAMES the "
+        "object as the very class the question asks about (for example it says "
+        "a function is given and then asks whether the data represent a "
+        "function), and the marked option is the affirmative one. Rename the "
+        "object with a NEUTRAL word that does not decide the question — the "
+        "given data, the set of pairs, the table, the relation — and keep every "
+        "number and the question exactly as they are. Never keep the class word "
+        "in the declarative part while asking for that same class. "
         "For `numeric_inconsistency` an equality chain inside $...$ in the named "
         "field is numerically false: recompute every step and rewrite that field so "
         "every shown equality holds. When a false equality is the DELIBERATE point "

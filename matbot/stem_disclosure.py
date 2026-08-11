@@ -272,6 +272,126 @@ def _point_to_ray_disclosure(context, ask, options, marked_index):
             "(point-to-ray angular-interior implication)")
 
 
+# ---------------------------------------------------------------------------
+# TREĆA KLASA — TVRDNJA SEMANTIČKE KLASE (živi FINAL40 FW-F03 i FW-F06)
+# ---------------------------------------------------------------------------
+# ŽIVI BLOKATORI IZDANJA (FINAL40 na 1df3852, lekcija 6. razreda o prikazu
+# funkcije):
+#
+#   FW-F03  „DATA JE FUNKCIJA prikazana tačkama … Predstavlja li ovaj skup
+#            tačaka FUNKCIJU …?"                     označeno: „Da — …"
+#   FW-F06  „FUNKCIJA JE ZADANA tačkama … Da li ovaj skup tačaka predstavlja
+#            FUNKCIJU?"                              označeno: „Da — …"
+#
+# Matematika je tačna, opcije su različite, tačno jedna je tačna — i obje
+# postojeće klase ćute: opcije su REČENICE (nisu atomarni entiteti), pa klasa
+# izbora entiteta ne postoji, a nema ni imenovanog ugla za point→ray most.
+# Ipak, deklarativni dio TVRDI baš onu klasu koju upitna rečenica traži da
+# učenik utvrdi — odgovor „da" stoji u zadatku.
+#
+# DOKAZ JE STRUKTURAN, NE LEKSIČKI. Traže se ČETIRI uslova istovremeno:
+#   1. opcije su polarni skup (bar jedno „Da…" i bar jedno „Ne…"), a označena
+#      je POTVRDNA — inače tvrdnja ne otkriva označeni odgovor (a kad je
+#      označeno „Ne", tvrdnja je NETAČNA, što je drugi defekt i drugi vlasnik);
+#   2. upitna rečenica traži klasu: njen POSLJEDNJI sadržajni token prije
+#      zagrade/upitnika je tražena klasa C („…predstavlja FUNKCIJU?");
+#   3. deklarativni dio tvrdi ISTU klasu u zatvorenom okviru davanja
+#      („data je C", „C je zadana") — nikad puko pominjanje riječi;
+#   4. C ima bar 5 znakova (kratke riječi nisu klasa).
+#
+# ZAŠTO JE POSLJEDNJI SADRŽAJNI TOKEN, A NE BILO KOJI: „Da li je TROUGAO ABC
+# JEDNAKOKRAKI?" ima traženu klasu „jednakokraki“, a „trougao“ je SUBJEKT koji
+# stem smije slobodno dati. Bez tog razlikovanja bi svaki „Dat je trougao…"
+# zadatak bio lažno oboren.
+_GIVEN_WORDS = frozenset({
+    "dat", "data", "dato", "dati", "date", "dana", "dan", "dano",
+    "zadat", "zadata", "zadan", "zadana", "zadano", "zadani", "zadane",
+    "prikazan", "prikazana", "prikazano", "prikazani",
+    "definisan", "definisana", "definiran", "definirana",
+    "nacrtan", "nacrtana", "naveden", "navedena", "navedeno",
+})
+_COPULAS = frozenset({"je", "su", "jeste", "jesu"})
+_AFFIRMATIVE_OPENERS = frozenset({"da", "jeste", "jest", "tačno", "tacno"})
+_NEGATIVE_OPENERS = frozenset({"ne", "nije", "nisu", "netačno", "netacno"})
+# Najkraća klasa koja se uopšte razmatra. Kraće riječi u bosanskom su gotovo
+# uvijek funkcijske ili subjekt, nikad naziv semantičke klase.
+MIN_CLASS_TOKEN_CHARS = 5
+_VOWELS = "aeiou"
+_ASK_TAIL_CUT_RE = re.compile(r"[(–—]")
+
+
+def _class_stem(token):
+    """Ograničena normalizacija padeža: skida NAJVIŠE dva završna samoglasnika.
+
+    NIJE stemmer: „funkcija"/„funkciju"/„funkcije" → „funkcij", ali
+    „funkcija" i „relacija" ostaju RAZLIČITE. Bez ovoga bi nominativ u tvrdnji
+    i akuzativ u pitanju bili dvije nepovezane riječi."""
+    stem = token or ""
+    for _ in range(2):
+        if len(stem) > MIN_CLASS_TOKEN_CHARS - 1 and stem[-1] in _VOWELS:
+            stem = stem[:-1]
+        else:
+            break
+    return stem
+
+
+def _polar_marked_affirmative(options, marked_index):
+    """Tačno: opcije su Da/Ne skup i označena je POTVRDNA."""
+    openers = []
+    for option in options:
+        tokens = _tokenize(option)
+        openers.append(tokens[0] if tokens else "")
+    if not any(opener in _AFFIRMATIVE_OPENERS for opener in openers):
+        return False
+    if not any(opener in _NEGATIVE_OPENERS for opener in openers):
+        return False
+    return openers[marked_index] in _AFFIRMATIVE_OPENERS
+
+
+def _queried_class(ask):
+    """Tražena klasa = posljednji sadržajni token upitne rečenice, ili ''."""
+    head = _ASK_TAIL_CUT_RE.split(ask or "", 1)[0]
+    tokens = [token for token in _tokenize(head)
+              if token not in _FUNCTION_WORDS and not token.isdigit()]
+    if not tokens:
+        return ""
+    last = tokens[-1]
+    return last if len(last) >= MIN_CLASS_TOKEN_CHARS else ""
+
+
+def _stem_asserts_class(context, class_stem):
+    """Tvrdi li deklarativni dio da objekat JESTE te klase (zatvoren okvir)."""
+    tokens = _tokenize(context)
+    for index, token in enumerate(tokens):
+        following = tokens[index + 1] if index + 1 < len(tokens) else ""
+        after = tokens[index + 2] if index + 2 < len(tokens) else ""
+        if token in _GIVEN_WORDS and following in _COPULAS:
+            if _class_stem(after) == class_stem:
+                return True
+        if _class_stem(token) == class_stem and following in _COPULAS:
+            if after in _GIVEN_WORDS:
+                return True
+    return False
+
+
+def _class_assertion_disclosure(context, ask, options, marked_index):
+    """Uzak dokaz: stem tvrdi baš klasu koju pitanje traži da učenik utvrdi."""
+    if not _polar_marked_affirmative(options, marked_index):
+        return ""
+    queried = _queried_class(ask)
+    if not queried:
+        return ""
+    class_stem = _class_stem(queried)
+    if len(class_stem) < MIN_CLASS_TOKEN_CHARS - 1:
+        return ""
+    if not _stem_asserts_class(context, class_stem):
+        return ""
+    return (f"{STEM_ANSWER_DISCLOSURE_CODE}: the stem already asserts that the "
+            f"object IS a '{queried}', which is exactly the class the question "
+            "asks the student to determine, and the marked option is the "
+            "affirmative one (semantic-class assertion)")
+
+
 def _split_ask(task_text):
     """(kontekst, upitna rečenica) ili (None, None) kad klasa nije prepoznata."""
     text = (task_text or "").strip()
@@ -340,7 +460,18 @@ def stem_answer_disclosure(task_text, option_texts, marked_index):
         return ""
 
     context, ask = _split_ask(task_text)
-    if not context or not ask or not _SELECTOR_RE.search(ask):
+    if not context or not ask:
+        return ""
+
+    # Klasa TVRDNJE SEMANTIČKE KLASE ide PRIJE kapije izborne zamjenice: njena
+    # upitna rečenica je polarna („Da li … predstavlja funkciju?") i nikad ne
+    # sadrži „koji/koja/koje". Ostale dvije klase ostaju bajt za bajt iste.
+    class_assertion = _class_assertion_disclosure(
+        context, ask, options, marked_index)
+    if class_assertion:
+        return class_assertion
+
+    if not _SELECTOR_RE.search(ask):
         return ""
 
     point_bridge = _point_to_ray_disclosure(
