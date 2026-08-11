@@ -307,6 +307,7 @@ def make_reviewer_checks(independent_answer="$\\frac{5}{7}$", **overrides):
         "task_package_consistent": True,
         "difficulty_evidence_valid": True,
         "task_signature_consistent": True,
+        "stem_requires_student_reasoning": True,
     }
     values.update(overrides)
     return ReviewerChecks(**values)

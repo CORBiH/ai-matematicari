@@ -72,6 +72,16 @@ MODEL_ONLY_BLOCKING_CHECKS = frozenset({
     "marked_option_correct",
     "inside_lesson",
     "task_solvable_and_unambiguous",
+    # ŽIVI CILJANI RECHECK (7c13eb9): objavljen je zadatak čiji stem PARAFRAZIRA
+    # traženu osobinu — „zraka BD prolazi između BA i BC“ uz pitanje „koji krak
+    # dijeli ugao ABC na dva dijela“. Ograničeni detektori
+    # (matbot/stem_disclosure.py) pokrivaju svoje dokazane klase i tu s pravom
+    # vraćaju NOT_PROVEN: dokazati ekvivalenciju parafraze traži razumijevač
+    # prirodnog jezika, što je izričito van arhitekture. Klasa zato pripada
+    # OVDJE: nema determinističke zamjene, a netačna tvrdnja znači da učenik
+    # prepisuje odgovor umjesto da rasuđuje. Serverski detektori ostaju
+    # mjerodavni za svoje klase — ovo je DODATNI sloj, nikad zamjena.
+    "stem_requires_student_reasoning",
 })
 
 # --- 3) SAVJETODAVNO: kvalitet, ne ispravnost -------------------------------

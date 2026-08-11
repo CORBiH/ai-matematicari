@@ -180,7 +180,8 @@ def _checks():
         mathjax_valid=True, language_age_appropriate=True,
         independently_solved=True, independent_answer="$2$",
         task_package_consistent=True, difficulty_evidence_valid=True,
-        task_signature_consistent=True)
+        task_signature_consistent=True,
+        stem_requires_student_reasoning=True)
 
 
 # DOSLOVNI dokazi iz artefakta kapije 9d52d0a (grade9, 9-04-010):

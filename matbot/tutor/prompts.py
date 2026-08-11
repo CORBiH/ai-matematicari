@@ -304,6 +304,12 @@ _TASK_RULE = """KAD PRAVIŠ ZADATAK:
 - `expected_answer` je tačan odgovor, isti kao tekst tačne opcije
 - pogrešne opcije moraju biti uvjerljive greške, ne nasumični brojevi
 - NE otkrivaj koja je opcija tačna u tekstu `reply`
+- TEKST ZADATKA SMIJE DATI PODATKE, ALI NE I ODGOVOR: nikad — ni doslovno ni
+  parafrazom — ne napiši da jedna od opcija već ima baš onu osobinu koju
+  pitanje traži da učenik utvrdi. („Zraka $BD$ prolazi između $BA$ i $BC$“ uz
+  pitanje „koji krak dijeli ugao?“ je otkrivanje, samo drugim riječima.) Umjesto
+  toga daj neutralne podatke — mjere, položaje, koordinate, definiciju — iz
+  kojih učenik mora izračunati, uporediti, zaključiti ili prepoznati odgovor.
 - u `solution` i `expected_answer` NIKAD ne imenuj slovo opcije („opcija a“,
   „odgovor b“, „pod c)“): server opcije izmiješa POSLIJE tebe, pa svako slovo
   koje napišeš postaje netačno. Napiši matematički odgovor, ne oznaku."""
@@ -769,11 +775,44 @@ _REVIEWER_CHECK_SEMANTICS_RULE = """WHAT `checks.*` DESCRIBE (unambiguous):
   correction whose checks still describe the old draft loses the whole turn.
 - The server re-runs its own validators on your final package, so a check you
   report is never accepted as proof and never replaces those validators.
-- Report honestly. `math_correct`, `marked_option_correct`, `inside_lesson` and
-  `task_solvable_and_unambiguous` are the ones the server cannot verify for every
+- Report honestly. `math_correct`, `marked_option_correct`, `inside_lesson`,
+  `task_solvable_and_unambiguous` and `stem_requires_student_reasoning` are the
+  ones the server cannot verify for every
   lesson: a false value there fails the turn closed, which is the correct outcome.
   If you cannot make them true, return `fail_closed` instead of a package.
 - Do not lower a check merely because you are unsure about tone or wording."""
+
+
+# SEMANTIČKO SAMOOTKRIVANJE — vlasništvo RECENZENTA (živi ciljani recheck 7c13eb9).
+#
+# Objavljen je zadatak: „Tačka D leži unutar tog ugla (tj. zraka BD PROLAZI
+# IZMEĐU BA i BC). Koji krak DIJELI ugao ABC na dva dijela?“, označeno BD.
+# Geometrija je koherentna, nijedan ograničeni detektor nema šta dokazati —
+# stem parafrazira traženu osobinu drugim riječima, pa mjerač preklapanja
+# tokena po svojoj doktrini ćuti. Dokazivanje ekvivalencije parafraze traži
+# razumijevač prirodnog jezika i izričito je van arhitekture ovog projekta.
+#
+# Zato ovu klasu sudi RECENZENT, kroz obaveznu provjeru koja mu već postoji u
+# šemi. Serverski detektori ostaju mjerodavni za svoje dokazane klase.
+_REVIEWER_STEM_REASONING_RULE = """`stem_requires_student_reasoning` (mandatory, model judgement):
+- Ask yourself: does the task text itself already tell the student — in the same
+  words OR IN A PARAPHRASE — that one specific option has the exact property or
+  relationship the question asks them to identify? If yes, the check is FALSE.
+- It is disclosure even when the wording differs. „ray BD passes between BA and
+  BC" answers „which ray divides angle ABC"; „D is the only point between the
+  arms" answers „which is the interior ray"; „a function is given" answers „is
+  this a function". Different words, same decisive fact.
+- It is NOT disclosure when the stem merely supplies the DATA the student needs:
+  numerical angle measures to compare, a table of points to read, a construction
+  set-up, or a named object whose OTHER property is being asked (a function is
+  given and you ask for f(3); a triangle is given and you ask whether it is
+  isosceles). The student must still calculate, compare, infer or recognise.
+- REPAIR, when false: delete the sentence or clause that states the decisive
+  property and put NEUTRAL data in its place, from which the answer follows —
+  measures, positions, coordinates, a definition to apply. Keep the lesson, the
+  question, the mathematics and exactly one correct option. Rewording the same
+  decisive fact is NOT a repair. If the property cannot be made derivable
+  without stating it, return `fail_closed`."""
 
 
 # VJEŽBAJMO V1 (F5K): `inside_lesson` više NIJE „zvuči srodno“. Živi audit:
@@ -892,6 +931,7 @@ def build_reviewer_instructions(context):
         # istim `basis`). Ostaje u STABILNOM prefiksu (Workstream K), pa se keš
         # prompta ne mijenja.
         f"{_REVIEWER_CHECK_SEMANTICS_RULE}\n\n"
+        f"{_REVIEWER_STEM_REASONING_RULE}\n\n"
         f"{_REVIEWER_TARGET_LEVEL_RULE}\n\n"
         f"{_REVIEWER_PREFLIGHT_RULE}\n\n"
         # --- dinamički (po lekciji) dio TEK OD OVE TAČKE (Workstream K) ---

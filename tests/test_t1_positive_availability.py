@@ -231,7 +231,8 @@ def _run(monkeypatch, session_id, message, draft_task, *, decision="approve",
             task_solvable_and_unambiguous=True, mathjax_valid=True,
             language_age_appropriate=True, independently_solved=True,
             independent_answer="provjereno", task_package_consistent=True,
-            difficulty_evidence_valid=True, task_signature_consistent=True),
+            difficulty_evidence_valid=True, task_signature_consistent=True,
+ stem_requires_student_reasoning=True),
         final=draft.model_copy(update={"new_task": final_task}),
         reviewed_difficulty_evidence=final_task.difficulty_evidence))
     response = run_practice_turn(store, fake, _turn(session_id, message))

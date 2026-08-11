@@ -104,7 +104,8 @@ def checks():
         mathjax_valid=True, language_age_appropriate=True,
         independently_solved=True, independent_answer="nema rješenja",
         task_package_consistent=True, difficulty_evidence_valid=True,
-        task_signature_consistent=True)
+        task_signature_consistent=True,
+        stem_requires_student_reasoning=True)
 
 
 def queue(fake, draft_task, *, decision="approve", final_task=...):

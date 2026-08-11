@@ -230,7 +230,14 @@ BLIND_SPOTS = (
         owner=("matbot.stem_disclosure.stem_answer_disclosure at draft preflight, "
                "at the reviewer-final invariant and at publication "
                "(matbot.tutor.pipeline._validate_task_server_side); "
-               "checks.check_stem_answer_disclosure_safe calls the SAME function"),
+               "checks.check_stem_answer_disclosure_safe calls the SAME function. "
+               "An ADDITIONAL, non-deterministic layer sits above it: the "
+               "Reviewer must report `stem_requires_student_reasoning`, which "
+               "matbot.tutor.reviewer_authority lists as MODEL_ONLY_BLOCKING, so "
+               "a false value forbids both `approve` and `correct`. That is a "
+               "model judgement, never server proof: it exists precisely because "
+               "the PARAPHRASED class is not deterministically provable, and it "
+               "never replaces the bounded detectors"),
         # Konstrukcija ne postoji — model piše tekst — pa je ovo DETEKCIJA, i
         # to samo u klasi izbora entiteta plus uskom point→ray mostu za
         # eksplicitno imenovani ugao. Zadatak čije su opcije rečenice („Koja
@@ -238,7 +245,12 @@ BLIND_SPOTS = (
         strength=MANUAL_SEMANTIC_REVIEW_REQUIRED,
         live_evidence=("FW-G03 (final40 2fe5636): the stem said ray BD lies "
                        "between BA and BC, then asked which ray lies between "
-                       "BA and BC; no_leak PASS, reviewer decision=correct"),
+                       "BA and BC; no_leak PASS, reviewer decision=correct. "
+                       "Recurred PARAPHRASED on 7c13eb9 (M-FW-G03): 'zraka BD "
+                       "prolazi izmedju BA i BC' answering 'koji krak dijeli "
+                       "ugao' — every bounded detector correctly returned "
+                       "NOT_PROVEN, which is why the class moved to the "
+                       "Reviewer instead of growing another regex"),
     ),
     BlindSpot(
         key="grade_capability_of_published_task",

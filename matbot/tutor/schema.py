@@ -219,6 +219,14 @@ class ReviewerChecks(BaseModel):
     task_package_consistent: bool
     difficulty_evidence_valid: bool
     task_signature_consistent: bool
+    # SEMANTIČKO SAMOOTKRIVANJE (živi ciljani recheck na 7c13eb9): tekst zadatka
+    # ne smije — ni doslovno ni PARAFRAZOM — reći koja opcija već ima baš onu
+    # osobinu koju pitanje traži da učenik utvrdi. Ograničeni serverski
+    # detektori pokrivaju svoje dokazane klase; parafraza („zraka BD PROLAZI
+    # IZMEĐU BA i BC“ uz pitanje „koji krak DIJELI ugao“) im po doktrini izmiče
+    # i vraća NOT_PROVEN. Ovo je zato MODEL-SEMANTIČKA presuda, a ne serverski
+    # dokaz — vidi matbot/tutor/reviewer_authority.py.
+    stem_requires_student_reasoning: bool
 
 
 class ReviewerFinal(BaseModel):
