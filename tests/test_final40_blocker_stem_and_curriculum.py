@@ -93,7 +93,8 @@ def _preflight_codes(fixture):
 
 def test_the_frozen_blocker_set_is_complete():
     """Uputa §22: skup mora nositi tačno ove slučajeve, s izričitim ishodom."""
-    assert set(BY_ID) == {"G03_BAD", "G03_GOOD", "G06_BAD",
+    assert set(BY_ID) == {"G03_BAD", "G03_POINT_RAY_BAD",
+                          "G03_POINT_RAY_GOOD", "G03_GOOD", "G06_BAD",
                           "G06_GOOD_G05_STYLE", "G06_GOOD_EQUAL_DISTANCE",
                           "G01_GOOD",
                           # Pretkomitna provjera dosljednosti prompta: jedina
@@ -131,6 +132,8 @@ def test_frozen_blocker_publication_outcome(fixture_id):
 
 G03_BAD = BY_ID["G03_BAD"]
 G03_GOOD = BY_ID["G03_GOOD"]
+G03_POINT_RAY_BAD = BY_ID["G03_POINT_RAY_BAD"]
+G03_POINT_RAY_GOOD = BY_ID["G03_POINT_RAY_GOOD"]
 
 
 def test_live_g03_stem_discloses_the_marked_option():
@@ -139,6 +142,15 @@ def test_live_g03_stem_discloses_the_marked_option():
     assert detail.startswith(STEM_ANSWER_DISCLOSURE_CODE)
     # Dokaz je STRUKTURAN: imenuje se zajednički niz, ne lekcija ni entitet.
     assert "leži između zraka ba i bc" in detail
+    assert "6-09-001" not in detail and "BD" not in detail
+
+
+def test_latest_live_point_to_ray_g03_discloses_the_marked_option():
+    detail = stem_answer_disclosure(
+        G03_POINT_RAY_BAD["question"], G03_POINT_RAY_BAD["options"],
+        G03_POINT_RAY_BAD["marked_index"])
+    assert detail.startswith(STEM_ANSWER_DISCLOSURE_CODE)
+    assert "point-to-ray angular-interior implication" in detail
     assert "6-09-001" not in detail and "BD" not in detail
 
 
@@ -172,6 +184,55 @@ def test_removing_only_the_negated_clause_is_not_enough():
         "(tj. leži između zraka $\\overrightarrow{BA}$ i $\\overrightarrow{BC}$)?"
     assert stem_answer_disclosure(without_negation, G03_BAD["options"],
                                   G03_BAD["marked_index"])
+
+
+def test_point_to_ray_bridge_uses_arbitrary_explicit_labels():
+    detail = stem_answer_disclosure(
+        "Ugao $\\angle AVB$ je dat. Tačka $X$ leži između krakova $VA$ i "
+        "$VB$. Koji krak dijeli ugao $\\angle AVB$ na dva dijela?",
+        ["krak $VX$", "krak $VA$", "krak $VY$", "krak $VB$"], 0)
+    assert detail.startswith(STEM_ANSWER_DISCLOSURE_CODE)
+    assert "point-to-ray angular-interior implication" in detail
+
+
+POINT_RAY_NOT_PROVEN = (
+    # A: tačka je samo uvedena; presudna osobina nije izrečena.
+    ("Ugao $\\angle ABC$ je dat. Tačka $D$ je data. Koji krak dijeli ugao "
+     "$\\angle ABC$ na dva dijela?",
+     ["krak $BD$", "krak $BC$", "krak $BE$", "krak $BA$"], 0),
+    # B: položaj na BA ne dokazuje simetralu.
+    ("Ugao $\\angle ABC$ je dat. Tačka $D$ leži na kraku $BA$. Koji krak je "
+     "simetrala ugla $\\angle ABC$?",
+     ["krak $BD$", "krak $BC$", "krak $BE$", "krak $BA$"], 0),
+    # Čak ni unutrašnja tačka ne dokazuje JEDNAKE dijelove.
+    ("Ugao $\\angle ABC$ je dat. Tačka $D$ leži između krakova $BA$ i $BC$. "
+     "Koji krak dijeli ugao $\\angle ABC$ na dva jednaka dijela?",
+     ["krak $BD$", "krak $BC$", "krak $BE$", "krak $BA$"], 0),
+    # C: između na duži nije angularna unutrašnjost.
+    ("Ugao $\\angle ABC$ je dat. Tačka $D$ leži između $A$ i $C$ na duži "
+     "$AC$. Koji krak dijeli ugao $\\angle ABC$ na dva dijela?",
+     ["krak $BD$", "krak $BC$", "krak $BE$", "krak $BA$"], 0),
+    # D: drugo pitanje ne konzumira angularni položaj tačke.
+    ("Tačka $D$ leži između krakova $BA$ i $BC$. Koje su tjeme i krakovi "
+     "ugla $\\angle ABC$?",
+     ["$B$", "$A$", "$C$", "$D$"], 0),
+    # G: ista osobina za dva kandidata nije jedinstven dokaz.
+    ("Ugao $\\angle ABC$ je dat. Tačke $D$ i $E$ leže između krakova $BA$ i "
+     "$BC$. Koji krak dijeli ugao $\\angle ABC$ na dva dijela?",
+     ["krak $BD$", "krak $BC$", "krak $BE$", "krak $BA$"], 0),
+)
+
+
+@pytest.mark.parametrize("text,options,marked", POINT_RAY_NOT_PROVEN)
+def test_point_to_ray_bridge_stays_not_proven_at_false_positive_boundaries(
+        text, options, marked):
+    assert stem_answer_disclosure(text, options, marked) == ""
+
+
+def test_coherent_10_30_20_40_g03_is_not_point_to_ray_disclosure():
+    fixture = BY_ID["G03_GEOM_GOOD"]
+    assert stem_answer_disclosure(
+        fixture["question"], fixture["options"], fixture["marked_index"]) == ""
 
 
 # ===========================================================================
@@ -237,6 +298,7 @@ def test_lexical_overlap_alone_is_never_a_disclosure(text, options, marked):
 @pytest.mark.parametrize("fixture_id",
                          ["G01_GOOD", "G06_GOOD_G05_STYLE",
                           "G06_GOOD_EQUAL_DISTANCE", "G03_GOOD",
+                          "G03_POINT_RAY_GOOD", "G03_GEOM_GOOD",
                           "G0804_GOOD_POLYGON"])
 def test_frozen_positive_controls_are_never_disclosures(fixture_id):
     fixture = BY_ID[fixture_id]
@@ -368,6 +430,11 @@ def test_reviewer_input_carries_a_repair_recipe_for_both_findings():
     assert STEM_ANSWER_DISCLOSURE_CODE in block
     # Recept mora zabraniti brisanje ENTITETA — inače zadatak postane nerješiv.
     assert "Do NOT delete the entity" in block
+    assert "point's stated angular position" in package_preflight.format_for_reviewer(
+        package_preflight.collect_package_issues(
+            _package(G03_POINT_RAY_BAD)[1],
+            student_message=G03_POINT_RAY_BAD["student_message"]))
+    assert "never silently change the marked answer" in block
 
     context, task = _package(G06_BAD)
     block = package_preflight.format_for_reviewer(
@@ -403,7 +470,8 @@ def _model_route_only(monkeypatch):
     monkeypatch.setenv("MATBOT_PRACTICE_DIFFICULTY_LEVELS", "enabled")
 
 
-@pytest.mark.parametrize("fixture_id", ["G03_BAD", "G06_BAD"])
+@pytest.mark.parametrize("fixture_id", ["G03_BAD", "G03_POINT_RAY_BAD",
+                                         "G06_BAD"])
 def test_blocker_package_is_never_published_and_never_mutates_the_session(
         fixture_id, store, fake_llm):
     fixture = BY_ID[fixture_id]
@@ -425,6 +493,7 @@ def test_blocker_package_is_never_published_and_never_mutates_the_session(
 
 @pytest.mark.parametrize("fixture_id", ["G03_GOOD", "G06_GOOD_G05_STYLE",
                                         "G06_GOOD_EQUAL_DISTANCE", "G01_GOOD",
+                                        "G03_POINT_RAY_GOOD", "G03_GEOM_GOOD",
                                         "G0804_GOOD_POLYGON"])
 def test_positive_control_package_publishes_in_two_calls(
         fixture_id, store, fake_llm):
@@ -484,6 +553,50 @@ def test_reviewer_returning_the_same_disclosing_task_is_never_published(
     assert store.peek("g03-unchanged") is None
 
 
+def test_reviewer_repairs_point_to_ray_disclosure_without_changing_candidates(
+        store, fake_llm):
+    """Drugi poziv briše presudnu tvrdnju, ne kandidata ni označeni odgovor."""
+    _context, broken = _package(G03_POINT_RAY_BAD)
+    _context, repaired = _package(G03_POINT_RAY_GOOD)
+    assert [option.text for option in broken.options] == \
+        [option.text for option in repaired.options]
+    assert broken.correct_option_index == repaired.correct_option_index
+    queue_two_call(
+        fake_llm,
+        draft=make_tutor_draft(intent="generate_task", new_task=broken),
+        reviewer=make_reviewer_final(
+            decision="correct",
+            final=make_tutor_draft(intent="generate_task", new_task=repaired)))
+
+    response = tutor_pipeline.run_turn(
+        store, fake_llm,
+        _turn("g03-point-repair", G03_POINT_RAY_BAD["topic_id"],
+              G03_POINT_RAY_BAD["student_message"]))
+
+    assert response.get("status") == "ready"
+    assert fake_llm.call_count == 2
+    session = store.peek("g03-point-repair")
+    assert session["current_task"] == G03_POINT_RAY_GOOD["question"]
+    assert session["expected_answer_summary"] == "krak BD"
+
+
+def test_reviewer_failing_point_to_ray_repair_is_rejected_without_mutation(
+        store, fake_llm):
+    _context, broken = _package(G03_POINT_RAY_BAD)
+    draft = make_tutor_draft(intent="generate_task", new_task=broken)
+    queue_two_call(fake_llm, draft=draft,
+                   reviewer=make_reviewer_final(decision="correct", final=draft))
+
+    response = tutor_pipeline.run_turn(
+        store, fake_llm,
+        _turn("g03-point-unchanged", G03_POINT_RAY_BAD["topic_id"],
+              G03_POINT_RAY_BAD["student_message"]))
+
+    assert response["answer"] == tutor_pipeline.SAFE_ERROR_MESSAGE
+    assert fake_llm.call_count == 2
+    assert store.peek("g03-point-unchanged") is None
+
+
 # ===========================================================================
 # 7) PARITET EVALUATORA — ISTA funkcija, nikad slabiji dvojnik (uputa §18)
 # ===========================================================================
@@ -513,6 +626,7 @@ def _observation(fixture):
 
 @pytest.mark.parametrize("fixture_id,check_name", [
     ("G03_BAD", "stem_answer_disclosure_safe"),
+    ("G03_POINT_RAY_BAD", "stem_answer_disclosure_safe"),
     ("G06_BAD", "curriculum_task_form_consistent"),
 ])
 def test_evaluator_fails_the_same_packages_production_blocks(fixture_id, check_name):
@@ -524,6 +638,7 @@ def test_evaluator_fails_the_same_packages_production_blocks(fixture_id, check_n
 
 @pytest.mark.parametrize("fixture_id", ["G03_GOOD", "G06_GOOD_G05_STYLE",
                                         "G06_GOOD_EQUAL_DISTANCE", "G01_GOOD",
+                                        "G03_POINT_RAY_GOOD", "G03_GEOM_GOOD",
                                         "G0804_GOOD_POLYGON"])
 def test_evaluator_passes_every_positive_control(fixture_id):
     from tools.practice_eval import checks as check_lib

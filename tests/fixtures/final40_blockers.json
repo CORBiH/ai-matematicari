@@ -4,7 +4,8 @@
     "",
     "Svaki zapis je DOSLOVAN objavljeni paket iz",
     "scratchpad/practice_eval/final40_2fe5636_20260811-101833/results.jsonl",
-    "ili njegova tražena ispravka. Ne mijenjati tekstove — oni su dokaz.",
+    "scratchpad/practice_eval/geometry_targeted_38b7880_20260811-124355/results.jsonl",
+    "ili njihova tražena ispravka. Ne mijenjati tekstove — oni su dokaz.",
     "",
     "expected: 'blocked' = server MORA odbiti prije objave i prije ijedne",
     "mutacije sesije; 'published' = paket MORA proći (pozitivna kontrola).",
@@ -25,6 +26,31 @@
       "options": ["$\\overrightarrow{BC}$", "$\\overrightarrow{BD}$", "$\\overrightarrow{BA}$", "$\\overrightarrow{BE}$"],
       "marked_index": 1,
       "note": "Deklarativni dio tvrdi BAŠ osobinu koju upitna rečenica pita, i to za označeni zrak. Reviewer je vratio decision=correct i sam objavio paket."
+    },
+    {
+      "id": "G03_POINT_RAY_BAD",
+      "scenario": "FW-G03 (ciljana kampanja 38b7880)",
+      "grade": 6,
+      "topic_id": "6-09-001",
+      "expected": "blocked",
+      "codes": ["stem_answer_disclosure"],
+      "student_message": "Kreiraj samostalan MCQ sa četiri opcije za izabranu lekciju. Traži da učenik odredi koji krak dijeli ugao $\\angle ABC$ na dva dijela. Osiguraj da je tačno jedna opcija tačna. Ne rješavaj zadatak učeniku.",
+      "question": "Ugao $\\angle ABC$ ima krakove $BA$ i $BC$. Tačka $D$ leži između krakova $BA$ i $BC$, dok tačka $E$ leži izvan tog ugla. Koji krak dijeli ugao $\\angle ABC$ na dva dijela?",
+      "options": ["krak BD", "krak BC", "krak BE", "krak BA"],
+      "marked_index": 0,
+      "note": "Doslovni živi paket: položaj tačke D jednoznačno određuje da je zrak BD unutrašnji zrak koji pitanje traži. Produkcijski mjerač na 38b7880 pogrešno je vratio PASS."
+    },
+    {
+      "id": "G03_POINT_RAY_GOOD",
+      "scenario": "FW-G03 point→ray (ispravka)",
+      "grade": 6,
+      "topic_id": "6-09-001",
+      "expected": "published",
+      "student_message": "Kreiraj samostalan MCQ sa četiri opcije za izabranu lekciju. Traži da učenik odredi koji krak dijeli ugao $\\angle ABC$ na dva dijela. Osiguraj da je tačno jedna opcija tačna. Ne rješavaj zadatak učeniku.",
+      "question": "Ugao $\\angle ABC$ ima mjeru $80^\\circ$. Krak $BD$ zaklapa sa krakom $BA$ ugao od $30^\\circ$, a krak $BE$ ugao od $100^\\circ$, mjereno u istom smjeru. Koji krak dijeli ugao $\\angle ABC$ na dva dijela?",
+      "options": ["krak BD", "krak BC", "krak BE", "krak BA"],
+      "marked_index": 0,
+      "note": "Isti kandidati i isti označeni odgovor; odlučujuća tvrdnja o tački D zamijenjena je neutralnim mjerama iz kojih učenik zaključuje."
     },
     {
       "id": "G03_GOOD",

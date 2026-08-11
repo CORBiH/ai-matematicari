@@ -32,7 +32,8 @@ NIJEDAN sloj nikad ne pita da li SAM ZADATAK otkriva svoj odgovor. Evaluatorski
 
 ŠTA OVAJ MODUL JESTE
 --------------------
-Uzak deterministički detektor JEDNE klase: MCQ IZBORA ENTITETA (sve četiri
+Uzak deterministički detektor DVIJE srodne klase izbora entiteta. Prva je MCQ
+IZBORA ENTITETA (sve četiri
 opcije su atomarni entiteti — zrak, tačka, oznaka, vrijednost), u kojem
 DEKLARATIVNI dio teksta tvrdi ISTU osobinu koju pita UPITNA rečenica, i to
 za TAČNO JEDAN entitet — označeni.
@@ -43,16 +44,22 @@ gleda koji je entitet SUBJEKT te klauze (posljednji entitet PRIJE osobine).
 Entiteti UNUTAR osobine su dio osobine, ne subjekt — zato „…BD leži između BA
 i BC" ima tačno jedan subjekt (BD), a ne tri.
 
+Druga je još uži geometrijski most dokazan živim FW-G03 na 38b7880: imenovani
+ugao daje tjeme B, tekst izričito kaže da TAČKA D leži unutar/između njegovih
+krakova, a opcija je ZRAK BD. Samo kad pitanje traži unutrašnji zrak koji dijeli
+ugao (ne simetralu), svi entiteti su eksplicitni i TAČNO JEDNA opcija tako
+izdvojena, položaj tačke D direktno dokazuje položaj zraka BD.
+
 ŠTA OVAJ MODUL NIJE
 -------------------
 Nije zabrana da se tačna opcija pojavi u tekstu. Entitet smije biti podatak:
 „Dati su zraci BD i BE. Koji leži između BA i BC?" je ispravan zadatak i ovdje
 prolazi netaknut — tekst uvodi BD, ali ne tvrdi traženu osobinu o njemu.
 
-Nije ni prepoznavač prirodnog jezika: bez dokazane strukture (upitna rečenica
-s izbornom zamjenicom, četiri atomarna entiteta, dovoljno dug zajednički niz,
-jedinstven nenegiran subjekt) modul ĆUTI. Preskočeno NIJE dokaz ispravnosti —
-semantiku i dalje nezavisno sudi recenzent (doktrina cijelog projekta).
+Nije ni opći geometrijski zaključivač: tačka se nikad ne prevodi u pravu, duž,
+kružnicu ili ravan; čak ni „tačka D je na BA" ne dokazuje da je BD simetrala.
+Bez kompletne dokazane strukture modul ĆUTI. Preskočeno NIJE dokaz ispravnosti
+— semantiku i dalje nezavisno sudi recenzent (doktrina cijelog projekta).
 """
 import re
 
@@ -106,6 +113,24 @@ _CLAUSE_SPLIT_RE = re.compile(
 _LATEX_COMMAND_RE = re.compile(r"\\[A-Za-z]+")
 _WORD_RE = re.compile(r"[0-9A-Za-zČčĆćĐđŠšŽž]+")
 
+# Uski point→ray most. Ovi skupovi nisu jezički model nego zatvorena gramatika
+# tačno dokazane klase. Generički `_entity_key` ostaje netaknut.
+_ANGLE_LATEX_RE = re.compile(
+    r"\\angle\s*\{?\s*([A-Za-z])\s*([A-Za-z])\s*([A-Za-z])",
+    re.IGNORECASE)
+_ANGLE_WORDS = frozenset({"ugao", "ugla", "uglu"})
+_POINT_WORDS = frozenset({"tačka", "tačke", "tacka", "tacke",
+                          "točka", "točke", "tocka", "tocke",
+                          "point", "points"})
+_LIE_WORDS = frozenset({"leži", "leže", "lezi", "leze",
+                        "nalazi", "nalaze"})
+_BETWEEN_WORDS = frozenset({"između", "izmedju"})
+_INSIDE_WORDS = frozenset({"unutar"})
+_RAY_WORD_PREFIXES = ("krak", "zrak", "poluprav", "ray", "arm")
+_EQUAL_DIVISION_PREFIXES = ("jednak", "simetral", "polovi", "bisekt")
+_POINT_ASSERTION_SPLIT_RE = re.compile(
+    r"[.!?;:,]|\bdok\b|\bali\b", re.IGNORECASE)
+
 
 def _tokenize(text):
     """Niz normalizovanih tokena; matematika se svodi na gole identifikatore."""
@@ -122,6 +147,129 @@ def _entity_key(option_text):
     """Atomarni entitet opcije, ili prazno kad opcija nije jedan entitet."""
     tokens = _tokenize(option_text)
     return tokens[0] if len(tokens) == 1 else ""
+
+
+def _named_angle(text):
+    """Jedini eksplicitni troslovni ugao kao (krak1, tjeme, krak2)."""
+    found = {tuple(part.lower() for part in match.groups())
+             for match in _ANGLE_LATEX_RE.finditer(text or "")}
+    tokens = _tokenize(text)
+    for index, token in enumerate(tokens[:-1]):
+        label = tokens[index + 1]
+        if token in _ANGLE_WORDS and re.fullmatch(r"[a-z]{3}", label):
+            found.add(tuple(label))
+    return next(iter(found)) if len(found) == 1 else None
+
+
+def _ray_option_key(option_text):
+    """Eksplicitni dvoslovni zrak opcije, uključujući `krak BD`."""
+    tokens = _tokenize(option_text)
+    if len(tokens) == 2 and tokens[0].startswith(_RAY_WORD_PREFIXES):
+        tokens = tokens[1:]
+    if len(tokens) != 1 or not re.fullmatch(r"[a-z]{2}", tokens[0]):
+        return None
+    start, endpoint = tokens[0]
+    if start == endpoint:
+        return None
+    return start, endpoint
+
+
+def _asks_for_interior_dividing_ray(ask):
+    """Pita li se za unutrašnji zrak, ali NE za simetralu/jednake dijelove."""
+    tokens = _tokenize(ask)
+    if not any(token.startswith(_RAY_WORD_PREFIXES) for token in tokens):
+        return False
+    if any(token.startswith(_EQUAL_DIVISION_PREFIXES) for token in tokens):
+        return False
+    has_angle = bool(_named_angle(ask))
+    if has_angle and any(token in {"dijeli", "deli"} for token in tokens):
+        return True
+    if (any(token in _BETWEEN_WORDS for token in tokens)
+            and any(token in _LIE_WORDS for token in tokens)):
+        return True
+    return has_angle and any(token.startswith(("unutraš", "unutras", "interior"))
+                             for token in tokens)
+
+
+def _point_labels_before(tokens, stop):
+    """Eksplicitne oznake uz `tačka/točka/point` prije glagola relacije."""
+    labels = set()
+    for index in range(stop):
+        if tokens[index] not in _POINT_WORDS:
+            continue
+        cursor = index + 1
+        while cursor < stop:
+            token = tokens[cursor]
+            if re.fullmatch(r"[a-z]", token):
+                labels.add(token)
+                cursor += 1
+                continue
+            if token in {"i", "and"} or token in _POINT_WORDS:
+                cursor += 1
+                continue
+            break
+    return labels
+
+
+def _explicit_interior_points(context, angle):
+    """Tačke izričito smještene u TAJ ugao ili između TAČNO njegovih krakova."""
+    first, vertex, last = angle
+    boundaries = {vertex + first, vertex + last}
+    angle_label = "".join(angle)
+    points = set()
+    for raw_clause in _POINT_ASSERTION_SPLIT_RE.split(context or ""):
+        tokens = _tokenize(raw_clause)
+        if not tokens:
+            continue
+        for relation_index, relation in enumerate(tokens):
+            if relation not in _BETWEEN_WORDS | _INSIDE_WORDS:
+                continue
+            lie_index = next(
+                (index for index in range(relation_index - 1, -1, -1)
+                 if tokens[index] in _LIE_WORDS), None)
+            if lie_index is None:
+                continue
+            labels = _point_labels_before(tokens, lie_index)
+            if not labels:
+                continue
+            if any(token in _NEGATIONS for token in tokens[:relation_index]):
+                continue
+            suffix = tokens[relation_index + 1:]
+            if relation in _BETWEEN_WORDS:
+                has_ray_word = any(token.startswith(_RAY_WORD_PREFIXES)
+                                   for token in suffix)
+                stated_rays = {token for token in suffix
+                               if re.fullmatch(r"[a-z]{2}", token)}
+                if has_ray_word and boundaries <= stated_rays:
+                    points.update(labels)
+            else:
+                has_angle_word = (any(token in _ANGLE_WORDS for token in suffix)
+                                  or "\\angle" in raw_clause)
+                if has_angle_word and angle_label in suffix:
+                    points.update(labels)
+    return points
+
+
+def _point_to_ray_disclosure(context, ask, options, marked_index):
+    """Uzak dokaz: unutrašnja tačka jednoznačno otkriva zrak iz tjemena."""
+    angle = _named_angle(ask)
+    if not angle or not _asks_for_interior_dividing_ray(ask):
+        return ""
+    points = _explicit_interior_points(context, angle)
+    if not points:
+        return ""
+    vertex = angle[1]
+    identified = set()
+    for index, option in enumerate(options):
+        ray = _ray_option_key(option)
+        if ray and ray[0] == vertex and ray[1] in points:
+            identified.add(index)
+    if identified != {marked_index}:
+        return ""                    # nijedan, pogrešan ili više kandidata
+    return (f"{STEM_ANSWER_DISCLOSURE_CODE}: the stem explicitly places the "
+            "endpoint of exactly one option ray inside the named angle, which "
+            "directly identifies that ray as the requested interior divider "
+            "(point-to-ray angular-interior implication)")
 
 
 def _split_ask(task_text):
@@ -191,15 +339,20 @@ def stem_answer_disclosure(task_text, option_texts, marked_index):
     if not 0 <= marked_index < len(options):
         return ""
 
+    context, ask = _split_ask(task_text)
+    if not context or not ask or not _SELECTOR_RE.search(ask):
+        return ""
+
+    point_bridge = _point_to_ray_disclosure(
+        context, ask, options, marked_index)
+    if point_bridge:
+        return point_bridge
+
     keys = [_entity_key(option) for option in options]
     if not all(keys) or len(set(keys)) != len(keys):
         return ""                        # nije klasa izbora atomarnih entiteta
     entities = frozenset(keys)
     marked = keys[marked_index]
-
-    context, ask = _split_ask(task_text)
-    if not context or not ask or not _SELECTOR_RE.search(ask):
-        return ""
 
     ask_tokens = _tokenize(ask)
     if not ask_tokens:

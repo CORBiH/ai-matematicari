@@ -60,9 +60,9 @@ BOUNDED_TOKEN_CHECKS = frozenset({
 
 # OGRANIČEN (klasni) DOKAZ — FINAL40 blokatori. Oba mjerača zovu produkcijsku
 # funkciju, ali svaka od njih pokriva samo svoju DOKAZIVU KLASU:
-#   • `stem_answer_disclosure_safe` sudi samo MCQ IZBORA ENTITETA; zadatak s
-#     rečeničnim opcijama nikad ne može biti oboren, pa PASS ne znači da tekst
-#     ne otkriva odgovor;
+#   • `stem_answer_disclosure_safe` sudi samo MCQ IZBORA ENTITETA i uski
+#     point→ray most za imenovani ugao; zadatak s rečeničnim opcijama nikad ne
+#     može biti oboren, pa PASS ne znači da tekst ne otkriva odgovor;
 #   • `curriculum_task_form_consistent` dokazuje samo da nije upotrijebljen
 #     ZAPIS van razreda (korijen u 6. razredu, trigonometrija/logaritmi);
 #     pedagoški oblik zadatka time nije izmjeren.
@@ -213,8 +213,9 @@ BLIND_SPOTS = (
                "(matbot.tutor.pipeline._validate_task_server_side); "
                "checks.check_stem_answer_disclosure_safe calls the SAME function"),
         # Konstrukcija ne postoji — model piše tekst — pa je ovo DETEKCIJA, i
-        # to samo u klasi izbora entiteta. Zadatak čije su opcije rečenice
-        # („Koja tvrdnja je tačna…“) ostaje potpuno nepokriven.
+        # to samo u klasi izbora entiteta plus uskom point→ray mostu za
+        # eksplicitno imenovani ugao. Zadatak čije su opcije rečenice („Koja
+        # tvrdnja je tačna…“) ostaje potpuno nepokriven.
         strength=MANUAL_SEMANTIC_REVIEW_REQUIRED,
         live_evidence=("FW-G03 (final40 2fe5636): the stem said ray BD lies "
                        "between BA and BC, then asked which ray lies between "
