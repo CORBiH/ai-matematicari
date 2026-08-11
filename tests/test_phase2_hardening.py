@@ -845,6 +845,59 @@ def test_the_wave_declares_a_branch_target_on_every_publication_step():
         release_contract.REQUIRED_COMPUTATIONAL_LADDERS + 2
 
 
+def test_exactly_one_recognition_scenario_asks_for_a_symbolic_option_set():
+    """RUPA U POKRIVENOSTI IZ PRVOG F6H TALASA: short-symbolic propositional 0/1.
+
+    Uzrok NIJE klasifikator: svih šest lekcija prepoznavanja dobilo je golo „Daj
+    mi zadatak.“, pa je model svaki put napisao OPISNE opcije. Zatvara se
+    ISKLJUČIVO učenikovom porukom na JEDNOJ lekciji — proizvod, klasifikacija i
+    pragovi se ne diraju, a ostalih pet meta ostaje prozno, pa se propoziciona
+    pokrivenost ne smanjuje.
+
+    Poruka i dalje mora proći Tutora, recenzenta, objavu i klasifikator; ako
+    model ipak napiše prozu, `symbolic_marked_answer` opet preskače i rupa
+    OSTAJE rupa (`hint_branch_coverage` je i dalje jedini sudija)."""
+    import json
+    from pathlib import Path
+
+    path = (Path(__file__).resolve().parent.parent / "tools" / "practice_eval"
+            / "scenarios" / "family" / "wave_hint2.jsonl")
+    records = [json.loads(line) for line in
+               path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    asking = [record for record in records
+              if "symbolic_request" in (record.get("tags") or ())]
+    assert len(asking) == 1
+    scenario = asking[0]
+    assert scenario["topic_id"] == "9-02-006"       # doslovna FW-X03/TR-B1 lekcija
+    message = scenario["steps"][0]["message"]
+    assert "simbolički" not in message              # traži se OBLIK, ne naša oznaka
+    assert "matematički zapis" in message and "bez opisnih rečenica" in message
+    # Klasni cilj i mjerači su NEPROMIJENJENI — mijenja se samo poruka.
+    assert f"task_class:{hint_policy.PROPOSITIONAL}" in scenario["steps"][0]["checks"]
+    assert "symbolic_marked_answer" in scenario["steps"][0]["checks"]
+    assert len(scenario["steps"]) == 1 + config.MAX_HINT_LEVEL
+    others = [record for record in records if record is not scenario
+              and "recognition" in (record.get("tags") or ())]
+    assert len(others) == 5
+    assert all(step["message"] == "Daj mi zadatak."
+               for record in others for step in record["steps"][:1])
+
+
+def test_every_wave_step_that_can_show_an_option_letter_measures_the_binding():
+    """Živi H12: provenijencija je bila PASS, a slovo opcije netačno. Zato svaki
+    korak koji učeniku može pokazati oznaku nosi I `solution_option_binding_
+    consistent` — nikad umjesto provenijencije, uvijek uz nju."""
+    for scenario in _hint_wave():
+        for index, step in enumerate(scenario.steps):
+            assert "solution_option_binding_consistent" in step["checks"], \
+                (scenario.id, index)
+        top_steps = [step for step in scenario.steps
+                     if "hint_top_from_verified_solution" in step["checks"]]
+        assert top_steps, scenario.id
+        for step in top_steps:
+            assert "solution_option_binding_consistent" in step["checks"], scenario.id
+
+
 def test_every_wave_scenario_can_reach_a_full_ladder_or_a_full_solution():
     for scenario in _hint_wave():
         intents = [step.get("intent") or "" for step in scenario.steps]

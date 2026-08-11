@@ -806,7 +806,6 @@ def check_hint_top_from_verified_solution(obs: TurnObservation) -> CheckResult:
     if not (obs.serves_hint_ladder_top or obs.serves_full_solution):
         return CheckResult(name, SKIP, "this turn does not serve the ladder top or a full solution")
     solution = session.get("solution_summary") or ""
-    expected = session.get("expected_answer_summary") or ""
     if not solution:
         return CheckResult(name, SKIP,
                            "no verified solution artifact stored for this task — "
@@ -814,10 +813,12 @@ def check_hint_top_from_verified_solution(obs: TurnObservation) -> CheckResult:
     if session.get("deterministic_task"):
         return CheckResult(name, SKIP,
                            "deterministic route serves its own stored ladder (Phase 4H)")
-    task_class = obs.help_task_class
-    composed = (hint_policy.compose_full_solution(solution, expected, task_class)
+    # ISTA ULAZNA TAČKA KOJU PRODUKCIJA ZOVE (`hint_policy.*_for_session`) —
+    # inače bi evaluator mogao birati drugi izvor konačnog odgovora od servera i
+    # prijaviti lažan razlaz. Vidi `hint_policy.session_marked_answer`.
+    composed = (hint_policy.compose_full_solution_for_session(session)
                 if obs.serves_full_solution
-                else hint_policy.compose_top_hint(solution, expected, task_class))
+                else hint_policy.compose_top_hint_for_session(session))
     if not composed:
         return CheckResult(name, SKIP, "server composition is empty for this artifact")
     if _normalized(obs.answer) != _normalized(composed):
@@ -828,6 +829,58 @@ def check_hint_top_from_verified_solution(obs: TurnObservation) -> CheckResult:
     return CheckResult(name, PASS,
                        "served text is byte-equivalent to the server composition of "
                        "the Reviewer-approved solution artifact")
+
+
+def check_solution_option_binding_consistent(obs: TurnObservation) -> CheckResult:
+    """VEZANJE ZA OPCIJU JE DRUGO SVOJSTVO OD PROVENIJENCIJE (živi H12, F6H).
+
+    ZAŠTO POSTOJI I ZAŠTO JE ZASEBNA. H12 je prošao
+    `hint_top_from_verified_solution` — posluženi tekst JESTE bio tačna serverska
+    kompozicija recenzentom odobrenog artefakta. Ali je taj provjereni artefakt
+    sam nosio „…$(3,2)$, što je opcija a.“, dok je server commitovao
+    `correct_option_id=c`. Provenijencija dokazuje ODAKLE je tekst došao;
+    dokazuje li ona i da tekst pokazuje na TAČNU opciju — ne dokazuje. Zato se
+    ove dvije provjere NIKAD ne spajaju: spajanje bi jednu od njih ućutkalo.
+
+    ŠTA OVA PROVJERA DOKAZUJE, kad prođe:
+      1. svako IZRIČITO slovo opcije u tekstu koji učenik vidi jednako je
+         serverskom `correct_option_id` (golo slovo bez MCQ riječi se ne mjeri —
+         `tačka A`, `prava a`, `skup B`, `ugao C` nisu oznake opcija);
+      2. `revealed_correct_option_id`, kad ga odgovor nosi, jednak je istom ID-u;
+      3. `expected_answer_summary` je tekst opcije koju server SADA drži tačnom
+         (odgovor je vezan za TRENUTNI skup opcija, ne za predshuffle polje).
+    """
+    name = "solution_option_binding_consistent"
+    session = obs.session_after or obs.session_before or {}
+    correct_id = (session.get("correct_option_id") or "").strip()
+    if not correct_id or not obs.options_after:
+        return CheckResult(name, SKIP, "no committed option set to bind against")
+
+    failure = mcq_integrity.option_binding_failure(obs.answer, correct_id)
+    if failure:
+        claimed = ",".join(mcq_integrity.option_label_claims(obs.answer))
+        return CheckResult(name, FAIL,
+                           f"{failure}: student-visible text asserts option "
+                           f"'{claimed}' while the server committed '{correct_id}'")
+
+    revealed = (obs.response or {}).get("revealed_correct_option_id")
+    if revealed is not None and str(revealed) != correct_id:
+        return CheckResult(name, FAIL,
+                           f"revealed_correct_option_id={revealed!r} contradicts the "
+                           f"committed '{correct_id}'")
+
+    marked = obs.correct_option_text
+    expected = obs.expected_answer
+    if expected and marked and expected.strip() != marked.strip():
+        return CheckResult(name, FAIL,
+                           "expected_answer_summary is not the text of the currently "
+                           "marked option — the answer is not bound to the current "
+                           "option set")
+    claims = mcq_integrity.option_label_claims(obs.answer)
+    detail = (f"every asserted option label is '{correct_id}'" if claims
+              else "no explicit option label is asserted; reveal and marked answer "
+                   "agree with the committed option")
+    return CheckResult(name, PASS, detail)
 
 
 def check_help_has_task_scaffold(obs: TurnObservation) -> CheckResult:
@@ -1169,6 +1222,7 @@ _CHECKS = {
     # --- arhitektonska Faza 2 (ljestvica nagovještaja) ---
     "hint_proposition_no_leak": check_hint_proposition_no_leak,
     "hint_top_from_verified_solution": check_hint_top_from_verified_solution,
+    "solution_option_binding_consistent": check_solution_option_binding_consistent,
     "help_has_task_scaffold": check_help_has_task_scaffold,
     "help_notation_in_scope": check_help_notation_in_scope,
     "symbolic_marked_answer": check_symbolic_marked_answer,
@@ -1256,6 +1310,9 @@ _ROOT_CAUSE = {
     "hint_no_leak": "answer_leak",
     "hint_proposition_no_leak": "answer_leak",
     "hint_top_from_verified_solution": "solution_disclosure",
+    # Namjerno DRUGI root cause od provenijencije: H12 je imao urednu
+    # provenijenciju i pokvareno vezanje za opciju.
+    "solution_option_binding_consistent": "option_binding",
     "help_has_task_scaffold": "hint_quality",
     "help_notation_in_scope": "notation_and_math",
     "symbolic_marked_answer": "help_branch_coverage",

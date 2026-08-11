@@ -798,19 +798,26 @@ def _server_help_text(session, context, ui_action):
 
     Prazan rezultat NIJE tekst za učenika: pozivalac tada pada zatvoreno, jer
     alternativa (tražiti od modela svjež izvod) je upravo klasa FW-X03/3."""
-    task_class = _help_task_class(session)
-    solution = session.get("solution_summary") or ""
-    expected = session.get("expected_answer_summary") or ""
     if ui_action == "full_solution_request":
-        raw = hint_policy.compose_full_solution(solution, expected, task_class)
+        raw = hint_policy.compose_full_solution_for_session(session)
     elif _served_hint_level(session) >= config.MAX_HINT_LEVEL:
-        raw = hint_policy.compose_top_hint(solution, expected, task_class)
+        raw = hint_policy.compose_top_hint_for_session(session)
     else:
         raw = hint_policy.compose_propositional_hint(
             _served_hint_level(session), context.title, _option_texts(session))
     if not raw:
         return ""
-    return _validated_help_text(raw, context, ui_action)
+    text = _validated_help_text(raw, context, ui_action)
+    # ODBRANA U DUBINI nad SERVERSKOM kompozicijom (živi H12). Objava već
+    # garantuje artefakt bez MCQ oznake, pa ovo u normalnom radu nikad ne okine;
+    # kad okine, PADA ZATVORENO umjesto da tiho prepravi tekst — provenijencija
+    # mora ostati „posluženo == kompozicija pohranjenog artefakta“ bajt za bajt,
+    # inače bi mjerač prijavio lažan razlaz.
+    binding = mcq_integrity.option_binding_failure(
+        text, session.get("correct_option_id") or "")
+    if binding:
+        raise UnifiedOutputError(f"{binding} [{ui_action}]")
+    return text
 
 
 def _finalize_help_answer(session, context, request_id, intent, answer):
@@ -826,6 +833,8 @@ def _finalize_help_answer(session, context, request_id, intent, answer):
         return answer
     served = _served_hint_level(session)
     if _help_author(session, intent) == hint_policy.SERVER:
+        # `_server_help_text` je JEDINI vlasnik serverski sastavljenog teksta i
+        # sam nosi kapiju vezanja za opciju (živi H12) — ovdje se ne ponavlja.
         composed = _server_help_text(session, context, intent)
         if not composed:
             raise UnifiedOutputError(f"{HELP_ARTIFACT_MISSING_CODE} [{intent}]")
@@ -843,6 +852,23 @@ def _finalize_help_answer(session, context, request_id, intent, answer):
     empty = hint_policy.empty_help_code(answer)
     if empty:
         raise UnifiedOutputError(f"{empty} [{intent}]")
+
+    # ISTA ARHITEKTONSKA GRANICA KAO NA OBJAVI (živi H12): slovo opcije je
+    # serversko vlasništvo, pa ga model-autorski nagovještaj ne smije imenovati
+    # NIKAKO — ni pogrešno (kontradikcija s objavljenim stanjem) ni tačno (to je
+    # otkrivanje odgovora koje `feedback.leaks_answer` ne vidi, jer poredi TEKST
+    # opcije, ne njeno slovo). Lijek je isti kao za dokazano otkrivanje tvrdnje:
+    # tekst se zamjenjuje serverskim skelom, turn ne propada i nema drugog poziva.
+    if mcq_integrity.option_label_claims(answer):
+        logger.warning(
+            "help_option_label_blocked request_id=%s topic=%s intent=%s level=%s code=%s",
+            request_id, context.topic_id, intent, served,
+            mcq_integrity.OPTION_LABEL_CLAIM_CODE,
+        )
+        return _validated_help_text(
+            hint_policy.compose_propositional_hint(
+                served, context.title, _option_texts(session)),
+            context, intent)
 
     # ODBRANA U DUBINI: mjerač otkrivanja tvrdnje je za računsku klasu po
     # pravilu NOT_APPLICABLE, ali klasa se izvodi iz OBLIKA opcija — kad je
@@ -1633,6 +1659,52 @@ def _guard_answer_leak(session, request_id, context, intent, answer, *,
     return LEAK_BLOCKED_REPLY
 
 
+def _bind_artifact_to_published_options(solution, option_texts, marked_index,
+                                        correct_option_id, request_id, context):
+    """SERVER JE JEDINI VLASNIK IDENTITETA OPCIJE — i poslije miješanja.
+
+    ŽIVI H12 (talas F6H, lekcija se namjerno ne navodi): recenzentom odobreno
+    `solution` je glasilo „…su $(3,2)$, što je opcija a.“, server je opcije
+    izmiješao i tačan odgovor je završio na `c`. Puno rješenje se od Faze 2
+    sastavlja BAJT ZA BAJT iz tog artefakta, pa je učenik dobio tačnu matematiku
+    uz netačno slovo opcije. `hint_top_from_verified_solution` je pri tome bio
+    PASS — provenijencija dokazuje ODAKLE je tekst došao, nikad da je vezan za
+    tačnu opciju.
+
+    OVDJE JE JEDINO MJESTO NA KOJEM SE TO MOŽE ZATVORITI PRIJE UČENIKA: prvi
+    trenutak u kojem KONAČAN `correct_option_id` postoji, a sesija još nije
+    mutirana. Model smije posjedovati matematiku; slovo opcije nikad.
+
+    Politika je uska i dokaziva:
+      • artefakt bez ijedne MCQ oznake prolazi netaknut (ogromna većina);
+      • apozicijska/zagradna klauzula se BRIŠE, uz dokaz da nijedna cifra i
+        nijedan matematički segment nisu nestali;
+      • sve ostalo pada ZATVORENO — rečenica se nikad ne prepravlja pogađanjem,
+        a slovo se nikad ne „popravlja“ u drugo slovo (to bi od modelove tvrdnje
+        napravilo serversku).
+    Označena opcija i `expected_answer` se ne normalizuju: one DEFINIŠU identitet
+    opcije, pa oznaka u njima znači pokvaren paket."""
+    marked_text = (option_texts[marked_index]
+                   if 0 <= marked_index < len(option_texts) else "")
+    if mcq_integrity.option_label_claims(marked_text):
+        raise UnifiedOutputError(
+            f"{mcq_integrity.OPTION_LABEL_CLAIM_CODE} [tačna opcija]")
+
+    normalized, code = mcq_integrity.option_label_normalization(solution)
+    if code:
+        raise UnifiedOutputError(f"{code} [solution]")
+    if normalized != solution:
+        _reject_if_inconsistent(normalized, "solution")
+        logger.info(
+            "solution_option_label_normalized request_id=%s topic=%s "
+            "claimed=%s committed=%s removed_chars=%s",
+            request_id, context.topic_id,
+            ",".join(mcq_integrity.option_label_claims(solution)),
+            correct_option_id, len(solution) - len(normalized),
+        )
+    return normalized
+
+
 def _publish_task(session, context, final, request_id, target_level=None):
     """Provjeri i primijeni nov zadatak. Baca UnifiedOutputError (fail closed)."""
     task = final.new_task
@@ -1642,6 +1714,11 @@ def _publish_task(session, context, final, request_id, target_level=None):
     current_options, correct_option_id = _shuffle_options(
         option_texts, task.correct_option_index
     )
+    # Tek sada postoji KONAČAN identitet opcije — i tek sada se model-autorski
+    # artefakt smije vezati za njega. Prije ijedne mutacije sesije.
+    solution = _bind_artifact_to_published_options(
+        solution, option_texts, task.correct_option_index, correct_option_id,
+        request_id, context)
     signature_record = _structured_signature_record(task, context)
     if _is_duplicate_structured_signature(signature_record, session["recent_task_signatures"]):
         raise UnifiedOutputError("duplicate structured task signature")

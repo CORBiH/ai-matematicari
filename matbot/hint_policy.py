@@ -388,6 +388,24 @@ def session_task_class(session):
     return effective_task_class(session.get("current_task") or "", texts, marked)
 
 
+def session_marked_answer(session):
+    """Konačan odgovor vezan za TRENUTNI serverski skup opcija.
+
+    ŽIVI H12 (talas F6H): odgovor koji se dopisuje na vrh ljestvice mora doći iz
+    opcije koju server SADA drži tačnom, ne iz polja koje je model napisao PRIJE
+    miješanja. Objava dokazuje da su ta dva teksta jednaka
+    (`expected answer does not match marked option` pada zatvoreno), pa je ovo u
+    normalnom radu bajt za bajt isti niz — ali kad se ikad raziđu, mjerodavna je
+    TRENUTNA označena opcija. `expected_answer_summary` ostaje rezerva za sesiju
+    bez opcija (npr. stariji zapis)."""
+    session = session or {}
+    correct_id = session.get("correct_option_id") or ""
+    for option in session.get("current_options") or ():
+        if isinstance(option, dict) and option.get("id") == correct_id:
+            return option.get("text") or ""
+    return session.get("expected_answer_summary") or ""
+
+
 # ---------------------------------------------------------------------------
 # 2. LJESTVICA — ko je AUTOR kojeg nagovještaja
 # ---------------------------------------------------------------------------
@@ -575,6 +593,29 @@ def compose_full_solution(solution, expected_answer, task_class):
     """Puno rješenje („uradi ga ti“) iz ISTOG provjerenog artefakta."""
     return _compose_from_artifact(FULL_SOLUTION_INTRO, solution, expected_answer,
                                   task_class)
+
+
+# JEDINA ULAZNA TAČKA ZA KOMPOZICIJU IZ SESIJE — isti razlog kao kod
+# `session_task_class`: produkcija (`matbot/tutor/pipeline.py`) i evaluator
+# (`tools/practice_eval/checks.py`) moraju sastavljati iz DOSLOVNO istog
+# konteksta. Kad bi svaki sam birao izvor konačnog odgovora, jedan bi mogao
+# uzeti `expected_answer_summary`, a drugi trenutnu označenu opciju — i
+# provenijencijska provjera bi prijavila lažan razlaz.
+
+def compose_top_hint_for_session(session):
+    """Vrh ljestvice iz artefakta objave, vezan za TRENUTNO stanje sesije."""
+    session = session or {}
+    return compose_top_hint(session.get("solution_summary") or "",
+                            session_marked_answer(session),
+                            session_task_class(session))
+
+
+def compose_full_solution_for_session(session):
+    """Puno rješenje iz artefakta objave, vezano za TRENUTNO stanje sesije."""
+    session = session or {}
+    return compose_full_solution(session.get("solution_summary") or "",
+                                 session_marked_answer(session),
+                                 session_task_class(session))
 
 
 # ---------------------------------------------------------------------------

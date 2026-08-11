@@ -324,11 +324,16 @@ def test_blind_spot_matrix_covers_every_required_class():
     `server_composed_top_hint` je nova, JAKA tvrdnja (provenijencija vrha
     ljestvice), `help_out_of_grade_technique` novi izmjereni razred (živi TR-B1
     nagovještaj 2), a `help_branch_coverage` (hardening prije živog talasa)
-    zamrzava da oznaka scenarija NIKAD nije dokaz da je grana vožena."""
+    zamrzava da oznaka scenarija NIKAD nije dokaz da je grana vožena.
+
+    POPRAVKA VEZANJA ZA OPCIJU (živi H12) dodaje ČETVRTI razred:
+    `solution_option_binding` je ZASEBAN od provenijencije upravo zato što je
+    H12 imao urednu provenijenciju i netačno slovo opcije."""
     assert set(release_contract.BLIND_SPOT_KEYS) == {
         "value_answer_leak",
         "proposition_answer_leak",
         "server_composed_top_hint",
+        "solution_option_binding",
         "false_intermediate_reasoning",
         "final_answer_without_verified_derivation",
         "help_out_of_grade_technique",
@@ -345,8 +350,8 @@ def test_every_blind_spot_declares_a_known_verification_strength():
         assert spot.owner.strip()
 
 
-def test_only_value_leak_and_top_hint_provenance_are_deterministically_verified():
-    """FAZA 2 doda TAČNO JEDNU novu jaku tvrdnju — i ni jednu više.
+def test_only_value_leak_binding_and_provenance_are_deterministically_verified():
+    """Jake tvrdnje su NABROJANE i rastu samo uz dokaz — nikad slučajno.
 
     Zatečeno stanje (Faza 0): jedina deterministički dokazana klasa bilo je
     VRIJEDNOSNO curenje. Faza 2 dodaje PROVENIJENCIJU vrha ljestvice: server
@@ -354,13 +359,30 @@ def test_only_value_leak_and_top_hint_provenance_are_deterministically_verified(
     bajt (`checks.check_hint_top_from_verified_solution`). To NIJE tvrdnja da je
     izvod ispravan — nego da nema svježeg, neprovjerenog izvoda.
 
+    Popravka poslije H12 dodaje TREĆU: VEZANJE ZA OPCIJU. Ona je dokaziva jer je
+    skup eksplicitnih MCQ oznaka zatvoren i jer objava ne pušta artefakt koji
+    ijednu od njih nosi — dakle konstrukcija, pa mjerenje.
+
     Sve ostalo (parafraza, ispravnost međukoraka, semantička vjernost lekciji,
     nova tehnika opisana riječima) i dalje traži ručni pregled."""
     verified = {spot.key for spot in release_contract.BLIND_SPOTS
                 if spot.strength == release_contract.DETERMINISTICALLY_VERIFIED}
-    assert verified == {"value_answer_leak", "server_composed_top_hint"}
+    assert verified == {"value_answer_leak", "server_composed_top_hint",
+                        "solution_option_binding"}
     assert release_contract.blind_spot("false_intermediate_reasoning").strength == \
         release_contract.MANUAL_SEMANTIC_REVIEW_REQUIRED
+
+
+def test_option_binding_is_a_separate_property_from_provenance():
+    """H12 je bio PASS na provenijenciji i pokvaren na vezanju — dvije stvari.
+
+    Ako neko ikad spoji ova dva razreda u jedan, jedan od njih prestaje da se
+    mjeri. Zato su i vlasnik i živi dokaz izričito različiti."""
+    provenance = release_contract.blind_spot("server_composed_top_hint")
+    binding = release_contract.blind_spot("solution_option_binding")
+    assert provenance.owner != binding.owner
+    assert provenance.live_evidence != binding.live_evidence
+    assert "H12" in binding.live_evidence
 
 
 def test_value_shaped_leak_oracle_really_still_works():

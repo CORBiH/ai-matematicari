@@ -127,6 +127,20 @@ BLIND_SPOTS = (
         live_evidence="FW-X03 hint 3 was fresh model prose with a false intermediate step",
     ),
     BlindSpot(
+        key="solution_option_binding",
+        question="Does the student-visible text point at the CURRENT correct option?",
+        owner=("matbot.mcq_integrity.option_label_normalization at publication "
+               "(matbot.tutor.pipeline._bind_artifact_to_published_options) and "
+               "option_binding_failure at help time; "
+               "checks.check_solution_option_binding_consistent measures it"),
+        # Konstrukcija je deterministička i potpuna za EKSPLICITNE MCQ oznake:
+        # objava ne pušta artefakt koji imenuje slovo opcije, pa kontradikcija
+        # ne može ni nastati. Mjerač poredi isti zatvoreni skup oznaka.
+        strength=DETERMINISTICALLY_VERIFIED,
+        live_evidence=("H12 (phase2_hint_live_510b1be): verified artifact said "
+                       "„opcija a“ while the server committed option c"),
+    ),
+    BlindSpot(
         key="false_intermediate_reasoning",
         question="Is every inference inside a hint or solution mathematically sound?",
         owner=("nobody for model-authored hint levels 1-2 — mathcheck skips any "

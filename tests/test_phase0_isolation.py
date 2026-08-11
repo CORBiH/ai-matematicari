@@ -88,6 +88,10 @@ PHASE2_ADDED_CHECK_NAMES = (
     # STVARNA klasa koju je server izabrao poslije objave. `task_class:<klasa>`
     # je PARAMETRIČNO ime (kao `calls_at_most:N`), pa ne stoji u registru.
     'symbolic_marked_answer',
+    # Popravka poslije živog H12 (talas F6H): vezanje vidljivog teksta za
+    # SERVERSKI `correct_option_id`. Stoji UZ `hint_top_from_verified_solution`,
+    # nikad umjesto nje — H12 je provenijenciju prošao, a vezanje pokvario.
+    'solution_option_binding_consistent',
 )
 
 FROZEN_CHECK_NAMES = tuple(sorted(PHASE0_CHECK_NAMES + PHASE2_ADDED_CHECK_NAMES))

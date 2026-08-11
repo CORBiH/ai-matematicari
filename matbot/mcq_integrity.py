@@ -2453,6 +2453,163 @@ def publication_failure(question: str, option_texts: Iterable[str], marked_index
     return "", result
 
 
+# ---------------------------------------------------------------------------
+# EKSPLICITNO VLASNIŠTVO NAD SLOVOM OPCIJE (živi H12, talas F6H)
+# ---------------------------------------------------------------------------
+# ŽIVI NALAZ. Recenzentom odobreno `solution` je glasilo „…koordinate tačke A su
+# $(3,2)$, što je opcija a.“, a server je poslije toga izmiješao opcije i tačan
+# odgovor je završio na `c`. Puno rješenje se od Faze 2 sastavlja BAJT ZA BAJT iz
+# tog provjerenog artefakta, pa je učenik dobio tačnu matematiku uz NETAČNO slovo
+# opcije. Provenijencija je pri tome bila uredna — `hint_top_from_verified_solution`
+# je vratio PASS — jer provenijencija i vezanje za opciju NISU isto svojstvo.
+#
+# ARHITEKTONSKA GRANICA KOJU OVO ZATVARA: model smije posjedovati MATEMATIKU, ali
+# IDENTITET OPCIJE (a/b/c/d) posjeduje isključivo server, i to TEK poslije
+# miješanja. Zato svaki model-autorski tekst koji imenuje slovo opcije nosi
+# tvrdnju koju model u trenutku pisanja nije mogao znati.
+#
+# GRAMATIKA JE ZATVORENA I USKA. Traži se IZRIČITA MCQ riječ neposredno ispred
+# slova (`opcija a`, `odgovor b`, `izbor c`, `pod d)`, `option a`) — nikad golo
+# slovo. Time imenovani matematički objekti („tačka $A$“, „prava $a$“, „skup $B$“,
+# „ugao $C$“) ostaju netaknuti PO KONSTRUKCIJI, jer ispred njih stoji imenica
+# objekta, a ne MCQ riječ. Matematički segmenti se ne skeniraju uopšte.
+#
+# RAZDVOJNIK JE OBAVEZAN. `opcij\w*` je pohlepan, pa bi bez traženog razmaka
+# sama riječ „opcija“ / „opcijama“ backtrackingom dala lažnu tvrdnju o slovu
+# „a“. Zato iza MCQ riječi mora doći granica riječi I bar jedan razmak.
+_LABEL_WORD = r"(?:opcij\w*|odgovor\w*|izbor\w*|option)\b"
+_LABEL_LETTER = r"(?:\s*:\s*|\s+)(?:je\s+|su\s+)?([a-d])\b"
+# „pod a)“ traži zatvorenu zagradu: golo „pod a“ je u bosanskom obična riječ.
+_OPTION_LABEL_CLAIM_RE = re.compile(
+    rf"{_LABEL_WORD}{_LABEL_LETTER}" r"|\bpod\s+([a-d])\s*\)",
+    re.IGNORECASE,
+)
+
+# Klauzula koja se smije UKLONITI bez diranja matematike: apozicija na kraju
+# rečenice („…, što je opcija a.“) ili zagrada („… (opcija a) …“). Sve ostalo je
+# nedokazivo uklonjivo — tamo se pada zatvoreno umjesto da se rečenica lomi.
+_LABEL_CLAIM = rf"(?:{_LABEL_WORD}{_LABEL_LETTER}\s*\)?|\bpod\s+[a-d]\s*\))"
+# Unutar zagrade zatvarač pripada samoj zagradi, pa ga oblik „pod a“ ne traži.
+_LABEL_CLAIM_IN_PARENS = rf"(?:{_LABEL_WORD}{_LABEL_LETTER}|\bpod\s+[a-d])"
+# Zatvoren skup diskursnih veznika i kopula koji smiju stajati IZMEĐU zareza i
+# same oznake. Nijedan od njih ne nosi matematiku, a uklanjanje se ionako dešava
+# samo kad klauzula ZAVRŠAVA rečenicu i kad globalni dokaz očuvanosti prođe.
+_CLAUSE_CONNECTOR = (r"(?:što|sto|a\s+to|odnosno|dakle|tj\.?|to\s+jest|pa|zato"
+                     r"|prema\s+tome)?\s*(?:odgovara|predstavlja)?")
+_CLAUSE_COPULA = r"(?:(?:je|su|to|jeste)\s+){0,2}"
+_REMOVABLE_OPTION_LABEL_CLAUSE_RE = re.compile(
+    rf"\s*\(\s*{_LABEL_CLAIM_IN_PARENS}\s*\)"
+    rf"|\s*[,;]\s*{_CLAUSE_CONNECTOR}\s*{_CLAUSE_COPULA}{_LABEL_CLAIM}\s*(?=[.!?]|\Z)"
+    rf"|\s*[—–]\s*{_CLAUSE_CONNECTOR}\s*{_CLAUSE_COPULA}{_LABEL_CLAIM}\s*(?=[.!?]|\Z)",
+    re.IGNORECASE,
+)
+
+# TREĆI DOKAZIVO UKLONJIV OBLIK: ZAVRŠNA REČENICA-POKAZIVAČ.
+# ŽIVI H04 (isti talas F6H): „…pa nije dovoljan za zaključak da je četverougao
+# paralelogram.\n\nDakle, jedino tvrdnja iz opcije a) je opšti dovoljan uslov.“
+# Oznaka tu nije apozicija nego jezgro posljednje rečenice, pa je brisanje
+# klauzule nemoguće — ali je brisanje CIJELE te rečenice dokazivo bez gubitka
+# matematike: uslovi ispod traže da ona NE sadrži nijedan `$` segment i nijednu
+# cifru, i da joj prethodi bar jedna druga rečenica. Konačan odgovor time ne
+# nestaje: serverska kompozicija ionako dopisuje rezultat kad ga artefakt ne
+# iznosi (`hint_policy._result_sentence`).
+#
+# Zašto je ovo bilo NEVIDLJIVO: H04 je u živom talasu PROŠAO ručni pregled, jer
+# je miješanje tačnu opciju slučajno ostavilo na `a`. Ista rečenica na drugom
+# ishodu miješanja je H12. Vlasništvo nad slovom ne smije zavisiti od sreće.
+_REMOVABLE_LABEL_SENTENCE_RE = re.compile(
+    rf"(?<=[.!?])\s*[^.!?$0-9]*{_LABEL_CLAIM}[^.!?$0-9]*[.!?]\s*\Z",
+    re.IGNORECASE,
+)
+
+_DIGIT_ONLY_RE = re.compile(r"\d")
+
+OPTION_LABEL_CLAIM_CODE = "solution_option_label_claim"
+OPTION_LABEL_BINDING_CODE = "option_label_binding_mismatch"
+
+
+def option_label_claims(text: str) -> tuple[str, ...]:
+    """Slova opcija koja tekst IZRIČITO imenuje, redoslijedom pojavljivanja.
+
+    Skeniraju se SAMO tekstualni segmenti — `$a$` unutar matematike nikad nije
+    MCQ oznaka. Prazna torka znači „tekst ne posjeduje nijedno slovo opcije“, a
+    to je jedini oblik artefakta koji smije preživjeti miješanje opcija."""
+    claims: list[str] = []
+    for kind, content in tokenize_math(text or ""):
+        if kind != TEXT:
+            continue
+        for match in _OPTION_LABEL_CLAIM_RE.finditer(content):
+            letter = match.group(1) or match.group(2) or ""
+            claims.append(letter.lower())
+    return tuple(claims)
+
+
+def strip_option_label_clauses(text: str) -> tuple[str, tuple[str, ...]]:
+    """Ukloni DOKAZIVO uklonjive MCQ klauzule; vrati (tekst, preostale tvrdnje).
+
+    Uklanjanje je čisto BRISANJE apozicijske klauzule iz tekstualnog segmenta:
+    matematika ostaje bajt za bajt ista (`map_text_segments`), a pozivalac
+    dodatno dokaže da nijedna cifra nije nestala. Kad preostane ijedna tvrdnja,
+    normalizacija NIJE uspjela i pozivalac mora pasti zatvoreno — nikad se ne
+    pogađa šta je rečenica htjela reći."""
+    from matbot.mathsegments import map_text_segments
+
+    def _clean(segment: str) -> str:
+        previous = None
+        current = segment
+        while previous != current:
+            previous = current
+            current = _REMOVABLE_OPTION_LABEL_CLAUSE_RE.sub("", current)
+        return current
+
+    # 1) Apozicija/zagrada unutar tekstualnog segmenta — matematika je netaknuta
+    #    bajt za bajt jer se matematički segmenti uopšte ne prosljeđuju.
+    normalized = map_text_segments(text or "", _clean)
+    # 2) Završna rečenica-pokazivač nad CIJELIM tekstom (granica rečenice se ne
+    #    može vidjeti iz jednog segmenta). Obrazac sam zabranjuje `$` i cifru u
+    #    onome što briše, pa ni ovdje ne može nestati matematika.
+    previous = None
+    while previous != normalized:
+        previous = normalized
+        normalized = _REMOVABLE_LABEL_SENTENCE_RE.sub("", normalized)
+    return normalized.rstrip(), option_label_claims(normalized)
+
+
+def option_label_normalization(text: str) -> tuple[str, str]:
+    """(normalizovan_tekst, kod_defekta). Prazan kod = tekst je upotrebljiv.
+
+    Sadržajna očuvanost se DOKAZUJE, ne tvrdi: cifre i matematički segmenti
+    prije i poslije moraju biti identični, a tekst ne smije ostati prazan."""
+    original = text or ""
+    if not option_label_claims(original):
+        return original, ""
+    normalized, remaining = strip_option_label_clauses(original)
+    if remaining:
+        return original, OPTION_LABEL_CLAIM_CODE
+    if not normalized.strip():
+        return original, OPTION_LABEL_CLAIM_CODE
+    if _DIGIT_ONLY_RE.findall(original) != _DIGIT_ONLY_RE.findall(normalized):
+        return original, OPTION_LABEL_CLAIM_CODE
+    if math_contents(tokenize_math(original)) != math_contents(tokenize_math(normalized)):
+        return original, OPTION_LABEL_CLAIM_CODE
+    return normalized, ""
+
+
+def option_binding_failure(text: str, correct_option_id: str) -> str:
+    """Kod kad vidljiv tekst imenuje slovo opcije koje NIJE serverski tačno.
+
+    Ovo je namjerno DRUGO svojstvo od provenijencije: provenijencija dokazuje
+    ODAKLE je tekst došao, ovo dokazuje da je vezanje za trenutnu objavljenu
+    opciju tačno. Nijedno ne implicira drugo (živi H12)."""
+    correct = (correct_option_id or "").strip().lower()
+    claims = option_label_claims(text)
+    if not claims:
+        return ""
+    if not correct:
+        return OPTION_LABEL_BINDING_CODE
+    return "" if all(claim == correct for claim in claims) else OPTION_LABEL_BINDING_CODE
+
+
 def option_reference_failure(text: str, current_options: Iterable[dict],
                              correct_option_id: str) -> str:
     """Validate explicit option ordinals/labels against committed UI state.

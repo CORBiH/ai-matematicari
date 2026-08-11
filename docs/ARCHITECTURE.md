@@ -200,7 +200,49 @@ and `matbot/tutor/pipeline.py` (flow only):
 - **One classifier, one context.** `hint_policy.session_task_class(session)` is
   the single entry point: the help path (`matbot/tutor/`) and the evaluator
   (`tools/practice_eval/`) both call it on the same session, so neither can
-  measure a weaker option-only class than the server actually acts on.
+  measure a weaker option-only class than the server actually acts on. The same
+  rule holds for the composition itself —
+  `hint_policy.compose_top_hint_for_session` /
+  `compose_full_solution_for_session` are the only entry points production and
+  the evaluator use, so they cannot pick different sources for the final answer.
+
+### Provenance is not option binding (live H12)
+
+Wave F6H proved the whole ladder above and left exactly one product blocker. A
+Reviewer-approved `solution` read "…su $(3,2)$, što je opcija a."; the server
+then shuffled the options and committed `correct_option_id = c`. The full
+solution is a **byte-for-byte** composition of that verified artifact, so
+`hint_top_from_verified_solution` passed — correctly. **Provenance proves where
+the text came from; it never proves the text points at the right option.** The
+two are separate properties and are never merged into one check.
+
+Ownership: the model may own the mathematics and the mathematical answer; the
+**server alone owns option identity (a/b/c/d), and only after the shuffle**. So
+a model-authored artifact must never name an option letter.
+
+- **Publication is the primary defense** (`matbot/tutor/pipeline.py::
+  _bind_artifact_to_published_options`) — the first moment the final
+  `correct_option_id` exists and the session is still untouched. An artifact
+  with no MCQ label passes untouched; a **provably removable** appositive or
+  parenthetical clause (`, što je opcija a.`, `(opcija c)`, `— odgovor b.`) is
+  deleted, with the deletion proven content-preserving (identical digits,
+  identical math segments, non-empty result); anything else **fails closed**. A
+  letter is never rewritten into another letter — that would turn the model's
+  claim into the server's. A marked option or `expected_answer` naming a letter
+  fails closed outright: those *define* option identity.
+- **The grammar is closed and narrow** (`mcq_integrity.option_label_claims`): an
+  explicit MCQ word must sit immediately before the letter (`opcija a`,
+  `odgovor b`, `izbor c`, `pod d)`, `option a`), and only text segments are
+  scanned. Named mathematical objects — "tačka A", "prava a", "skup B",
+  "ugao C" — are therefore untouched by construction.
+- **Help time is defense in depth.** Server-composed help fails closed on a
+  surviving label rather than repairing it (repair would break the byte-for-byte
+  provenance guarantee); a *model-authored* hint naming any letter is replaced by
+  the server scaffold — a correct letter is an answer leak that
+  `feedback.leaks_answer` cannot see, since that oracle compares option *text*.
+- **Measured separately** by `checks.solution_option_binding_consistent`, which
+  proves that every asserted letter, `revealed_correct_option_id`, and
+  `expected_answer_summary` all agree with the currently marked option.
 
 ---
 

@@ -104,6 +104,20 @@ Flask + a single-page frontend, one OpenAI call per turn, no database.
    definition; it must not tell the student that one counterexample refutes an
    option (false for existential and configuration-specific claims), and must not
    present the converse of an implication as a test of the implication.
+5f. **The server owns MCQ option identity; the model owns only the mathematics.**
+   Option letters (a/b/c/d) exist only *after* `_shuffle_options`, so any letter a
+   model wrote is a claim it could not have known. Live blocker H12: a
+   Reviewer-approved `solution` said "…$(3,2)$, što je opcija a." while the server
+   committed `correct_option_id = c`, and the full solution — a byte-for-byte
+   composition of that verified artifact — served the contradiction.
+   **Provenance and option binding are different properties**; keep
+   `hint_top_from_verified_solution` and `solution_option_binding_consistent`
+   separate. Publication normalizes a provably removable appositive label clause
+   out of the artifact and otherwise **fails closed**
+   (`matbot/tutor/pipeline.py::_bind_artifact_to_published_options`,
+   `mcq_integrity.option_label_claims`). Never "fix" a letter into another letter,
+   and never widen the grammar past explicit MCQ words — `tačka A`, `prava a`,
+   `skup B`, `ugao C` are object names, not labels.
 5c. **Practice difficulty never changes lesson identity.** Easier/harder keep
    the lesson's skill and move only difficulty dimensions. The Tutor must report
    which dimensions moved (`difficulty_diagnostics`) and the Reviewer verifies

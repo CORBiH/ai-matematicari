@@ -14,7 +14,10 @@ uske deterministe. Ovaj talas to mjeri ŽIVO.
   • `hint_top_from_verified_solution`   — provenijencija vrha ljestvice i punog
                                           rješenja (bajt za bajt);
   • `help_has_task_scaffold`            — pomoć bez ijednog koraka;
-  • `help_notation_in_scope`            — napredna mašinerija van zadatka.
+  • `help_notation_in_scope`            — napredna mašinerija van zadatka;
+  • `solution_option_binding_consistent` — vezanje vidljivog teksta za SERVERSKI
+                                          `correct_option_id` (živi H12; stoji
+                                          UZ provenijenciju, nikad umjesto nje).
 
 BUDŽET (`expect_calls` je GORNJA granica troška, ne tvrdnja): 12 scenarija.
 Deklarisani maksimum je 46 poziva, ali je STVARNI trošak znatno manji: svaka
@@ -27,6 +30,11 @@ NISU dokaz. Svaki scenario nosi `task_class:<klasa>` koja bilježi STVARNU
 serversku klasu poslije objave. Traži se najmanje 3 propozicione + 3 računske
 pune ljestvice i najmanje 1 KRATKO-SIMBOLIČKI propozicioni zadatak; presudu
 donosi `release_contract.hint_branch_coverage` nad snimljenim zapisima.
+
+RUPA IZ PRVOG F6H TALASA (short-symbolic propositional 0/1) se zatvara ISKLJUČIVO
+promjenom UČENIKOVE PORUKE na jednoj lekciji prepoznavanja
+(`SYMBOLIC_OPTION_REQUEST`), nikad promjenom klasifikacije ni ubrizgavanjem
+stanja. Ako model i tada napiše proznu opciju, rupa ostaje rupa.
 
 ROUTE PREFLIGHT: sve lekcije su MODEL-lekcije (nemaju semantički ugovor porodice
 s potpunim determinističkim generatorom, i nisu K1/K3 legacy lekcije), pa turnovi
@@ -94,6 +102,7 @@ PUBLISH_CHECKS = [
     "options_ok", "package_clean", "no_leak", "no_control_chars", "math_safe",
     "numeric_consistent", "geometry_ok", "terminology_clean", "bosnian",
     "lesson_matches", "stays_in_lesson", "no_verdict", "calls_at_most:2",
+    "solution_option_binding_consistent",
 ]
 
 # Grana arhitekture se bilježi TAMO GDJE JE PRVI PUT DOKAZIVA — na objavi, iz
@@ -113,14 +122,17 @@ HINT_CHECKS = [
     "reveal_absent", "no_leak", "no_control_chars", "math_safe",
     "numeric_consistent", "geometry_ok", "terminology_clean", "bosnian",
     "lesson_matches", "stays_in_lesson", "no_verdict", "calls_at_most:1",
+    "solution_option_binding_consistent",
 ]
 
 # Vrh ljestvice: rezultat je DOZVOLJEN, ali provenijencija je obavezna.
+# `solution_option_binding_consistent` stoji UZ provenijenciju, nikad umjesto
+# nje: živi H12 je imao urednu provenijenciju i netačno slovo opcije.
 TOP_HINT_CHECKS = [
     "published", "not_safe_error", "no_fallback_text", "response_schema",
     "help_nonempty", "help_has_task_scaffold", "help_notation_in_scope",
-    "hint_top_from_verified_solution", "hint_differs",
-    "no_new_task", "task_preserved", "correct_option_stable",
+    "hint_top_from_verified_solution", "solution_option_binding_consistent",
+    "hint_differs", "no_new_task", "task_preserved", "correct_option_stable",
     "no_leak", "no_control_chars", "math_safe", "numeric_consistent",
     "geometry_ok", "terminology_clean", "bosnian", "lesson_matches",
     "stays_in_lesson", "no_verdict", "zero_calls", "calls_at_most:0",
@@ -129,7 +141,8 @@ TOP_HINT_CHECKS = [
 SOLUTION_CHECKS = [
     "published", "not_safe_error", "no_fallback_text", "response_schema",
     "help_nonempty", "help_has_task_scaffold", "help_notation_in_scope",
-    "hint_top_from_verified_solution", "reveal_present", "task_completed",
+    "hint_top_from_verified_solution", "solution_option_binding_consistent",
+    "reveal_present", "task_completed",
     "no_new_task", "task_preserved", "no_leak", "no_control_chars", "math_safe",
     "numeric_consistent", "geometry_ok", "terminology_clean", "bosnian",
     "lesson_matches", "stays_in_lesson", "no_verdict", "zero_calls",
@@ -140,8 +153,30 @@ PUBLISH_RUBRICS = ["clarity", "grade_fit", "lesson_alignment"]
 HELP_RUBRICS = ["clarity", "grade_fit", "hint_usefulness", "hint_safety", "pedagogy"]
 
 
-def _publish_step(target_class):
-    return {"kind": "text", "message": "Daj mi zadatak.", "expect_calls": 2,
+# TRAŽENJE KRATKO-SIMBOLIČKOG SKUPA OPCIJA (rupa u pokrivenosti iz talasa F6H:
+# short-symbolic propositional 0/1). Prethodni talas je na svih šest lekcija
+# prepoznavanja slao golo „Daj mi zadatak.“, pa je model svaki put napisao
+# OPISNE opcije i `symbolic_marked_answer` je uvijek preskočio.
+#
+# OVO NIJE PROMJENA PROIZVODA I NIJE UBRIZGAVANJE STANJA: mijenja se ISKLJUČIVO
+# učenikova poruka u scenariju. Zadatak i dalje prolazi Tutora, recenzenta,
+# objavu, serversku klasifikaciju i put pomoći, a klasu i dalje određuje
+# `hint_policy` iz OBJAVLJENIH opcija. Ako model ipak napiše proznu opciju,
+# `symbolic_marked_answer` opet preskače i rupa OSTAJE rupa — nijedna provjera
+# se zbog ovoga ne popušta.
+SYMBOLIC_OPTION_REQUEST = (
+    "Daj mi zadatak iz ove lekcije u kojem su sve četiri ponuđene opcije "
+    "napisane samo kao matematički zapis odnosa, bez opisnih rečenica."
+)
+# Doslovna lekcija FW-X03/TR-B1 i već ŽIVO dokazana model-ruta prepoznavanja
+# (H01 je u talasu F6H dao punu propozicionu ljestvicu). Traži se tačno JEDNA
+# meta: ostalih pet lekcija prepoznavanja ostaje netaknuto, pa se prozna
+# propoziciona pokrivenost ne smanjuje.
+SYMBOLIC_TARGET_TOPIC = "9-02-006"
+
+
+def _publish_step(target_class, message="Daj mi zadatak."):
+    return {"kind": "text", "message": message, "expect_calls": 2,
             "checks": PUBLISH_CHECKS + _branch_checks(target_class),
             "rubrics": list(PUBLISH_RUBRICS)}
 
@@ -188,11 +223,17 @@ def build():
     index = 1
     # 1) Puna ljestvica 0→1→2→3 na lekcijama prepoznavanja (cilj: klasa tvrdnje).
     for topic_id, grade, reason in RECOGNITION:
+        symbolic = topic_id == SYMBOLIC_TARGET_TOPIC
+        tags = ["hint_ladder", "recognition", "phase2"]
+        if symbolic:
+            tags.append("symbolic_request")
         scenarios.append(_scenario(
-            index, topic_id, grade, reason,
-            ("hint_ladder", "recognition", "phase2"),
-            [_publish_step(PROPOSITIONAL_CLASS), _hint_step(), _hint_step(),
-             _hint_step(top=True)]))
+            index, topic_id, grade,
+            reason + (" Izričito se traži simbolički skup opcija." if symbolic else ""),
+            tuple(tags),
+            [_publish_step(PROPOSITIONAL_CLASS,
+                           SYMBOLIC_OPTION_REQUEST if symbolic else "Daj mi zadatak."),
+             _hint_step(), _hint_step(), _hint_step(top=True)]))
         index += 1
     # 2) Puna ljestvica na računskim lekcijama (cilj: model piše nivoe 1 i 2).
     for topic_id, grade, reason in COMPUTATIONAL[:-1]:
