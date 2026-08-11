@@ -392,6 +392,88 @@ def _class_assertion_disclosure(context, ask, options, marked_index):
             "affirmative one (semantic-class assertion)")
 
 
+# ---------------------------------------------------------------------------
+# ČETVRTA KLASA — STEM SAM ZAPIŠE DEFINICIJU SIMETRALE (živi ciljani recheck)
+# ---------------------------------------------------------------------------
+# ŽIVI BLOKATOR (targeted recheck na 2012b31, scenario R-FW-G03): pošto je
+# ranija protivrječna premisa popravljena, model je objavio KOHERENTAN zadatak
+#
+#   „Unutar tog ugla nalazi se tačka $D$ … takva da je $\\angle ABD = \\angle DBC$.
+#    … Koji krak dijeli ugao $\\angle ABC$ na dva JEDNAKA dijela?"   označeno: BD
+#
+# Geometrija je ispravna i nijedna postojeća kapija nema šta prijaviti:
+# protivrječnosti nema, a point→ray most NAMJERNO isključuje pitanja o jednakim
+# dijelovima (položaj tačke UNUTAR ugla sam po sebi ne dokazuje simetralu — to
+# isključenje ostaje tačno). Ali `∠ABD = ∠DBC` JESTE definicija toga da zrak BD
+# dijeli ugao na dva jednaka dijela, pa stem doslovno zapisuje traženi odgovor.
+#
+# DOKAZ JE ČISTO STRUKTURAN — poravnanje oznaka, nikad aritmetika:
+#   • upitna rečenica traži ZRAK koji dijeli ugao na JEDNAKE dijelove;
+#   • imenovani ugao u pitanju daje tjeme i tačno dva kraka;
+#   • stem nosi jednakost DVA ugla istog tjemena čiji spoljni krajevi dijele
+#     tačno jedno slovo (kandidat), a preostala dva su BAŠ ta dva kraka;
+#   • tačno jedna opcija imenuje zrak iz tjemena ka kandidatu.
+# Bilo koje odstupanje → NOT_PROVEN. Poređenje BROJEVA (`∠ABD=20°` uz
+# `∠ABC=40°`) ovdje NIKAD ne pogađa: traže se dva `\\angle` tokena oko znaka
+# jednakosti, ne mjere.
+# `m` ispred druge oznake je mjera istog ugla („m\angle ABD = m\angle DBC") i
+# piše se jednako često kao goli oblik — bez nje bi detektor promašio upravo
+# zapis kojim je izvorni FW-G03 i bio napisan.
+_ANGLE_EQUALITY_RE = re.compile(
+    r"\\(?:angle|measuredangle)\s*\{?\s*([A-Za-z])\s*([A-Za-z])\s*([A-Za-z])\s*\}?"
+    r"\s*=\s*(?:m\s*)?"
+    r"\\(?:angle|measuredangle)\s*\{?\s*([A-Za-z])\s*([A-Za-z])\s*([A-Za-z])\s*\}?")
+
+
+def _asks_for_equal_division_ray(ask):
+    """Pita li se KOJI zrak dijeli imenovani ugao na JEDNAKE dijelove."""
+    tokens = _tokenize(ask)
+    if not any(token.startswith(_RAY_WORD_PREFIXES) for token in tokens):
+        return False
+    return any(token.startswith(_EQUAL_DIVISION_PREFIXES) for token in tokens)
+
+
+def _equal_subangle_candidate(context, angle):
+    """Slovo kandidata kojem stem pripisuje jednake podugove, ili ''."""
+    first_arm, vertex, second_arm = angle
+    arms = {first_arm, second_arm}
+    for match in _ANGLE_EQUALITY_RE.finditer(context or ""):
+        left = tuple(part.lower() for part in match.groups()[:3])
+        right = tuple(part.lower() for part in match.groups()[3:])
+        if left[1] != vertex or right[1] != vertex:
+            continue                     # podugovi nisu iz istog tjemena
+        left_outer, right_outer = {left[0], left[2]}, {right[0], right[2]}
+        shared = left_outer & right_outer
+        if len(shared) != 1:
+            continue
+        candidate = shared.pop()
+        if candidate in arms or candidate == vertex:
+            continue                     # kandidat mora biti NOV unutrašnji zrak
+        if (left_outer | right_outer) - {candidate} != arms:
+            continue                     # spoljni krajevi nisu baš oba kraka
+        return candidate
+    return ""
+
+
+def _equal_subangle_disclosure(context, ask, options, marked_index):
+    """Uzak dokaz: stem zapisuje samu definiciju traženog jednakog dijeljenja."""
+    angle = _named_angle(ask)
+    if not angle or not _asks_for_equal_division_ray(ask):
+        return ""
+    candidate = _equal_subangle_candidate(context, angle)
+    if not candidate:
+        return ""
+    ray = angle[1] + candidate
+    identified = {index for index, option in enumerate(options)
+                  if ray in _tokenize(option)}
+    if identified != {marked_index}:
+        return ""                        # nijedan, pogrešan ili više kandidata
+    return (f"{STEM_ANSWER_DISCLOSURE_CODE}: the stem states that the two "
+            "sub-angles on either side of exactly one option ray are equal, "
+            "which is the definition of the equal division the question asks "
+            "the student to identify (equal-subangle definition)")
+
+
 def _split_ask(task_text):
     """(kontekst, upitna rečenica) ili (None, None) kad klasa nije prepoznata."""
     text = (task_text or "").strip()
@@ -478,6 +560,13 @@ def stem_answer_disclosure(task_text, option_texts, marked_index):
         context, ask, options, marked_index)
     if point_bridge:
         return point_bridge
+
+    # Međusobno isključivo s mostom iznad po konstrukciji: taj traži pitanje o
+    # unutrašnjem zraku BEZ jednakih dijelova, ovaj tačno ono s njima.
+    equal_subangles = _equal_subangle_disclosure(
+        context, ask, options, marked_index)
+    if equal_subangles:
+        return equal_subangles
 
     keys = [_entity_key(option) for option in options]
     if not all(keys) or len(set(keys)) != len(keys):

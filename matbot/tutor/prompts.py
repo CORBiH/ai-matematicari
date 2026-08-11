@@ -379,6 +379,37 @@ _SOLVE_TASK_AUTHORING_RULE = """KAD ZADATAK TRAŽI SKUP RJEŠENJA (ne/jednačine
   napisana nova relacija mora imati ISTI skup rješenja (nikad $x+2>7$)."""
 
 
+# IZRIČIT ZAHTJEV — JEDAN blok, DOSLOVNO isti za Tutora i Recenzenta.
+#
+# ŽIVI CILJANI NALAZ (FW-G05, ponovljen na 2012b31): učenik je tražio „zadatak o
+# simetrali ugla I TAČKI u kojoj se simetrale sijeku“, a objavljen je zadatak o
+# jednom konstrukcijskom koraku — tražena komponenta je tiho nestala. Isti oblik
+# je ranije (FW-G04) proizveo potpunu zamjenu zadatka drugom vještinom.
+#
+# ZAŠTO JE OVO PROMPT, A NE SERVERSKA KAPIJA: „koje su komponente izričito
+# tražene“ nije dokazivo zatvorenom gramatikom bez opšteg razumijevača
+# prirodnog jezika (vidi analizu uz `matbot/request_fidelity.py` — tamo živi
+# ONO što server STVARNO ume dokazati: domen, relacija, vrsta zadatka).
+# Ovaj blok je zato pomoć modelu, a ne dokaz; evaluator ga i dalje vodi kao
+# MANUAL_SEMANTIC_REVIEW_REQUIRED i ništa ovdje ne tvrdi determinističku
+# potpunost.
+_EXPLICIT_REQUEST_RULE = """IZRIČIT ZAHTJEV UČENIKA SE NE SMIJE TIHO SMANJITI:
+- Kad poruka izričito imenuje VIŠE komponenti („traži X i Y“, „uključi X“,
+  „koristi X“, „odredi X“), objavljen zadatak mora nositi SVAKU komponentu koja
+  je spojiva s izabranom lekcijom — ne samo onu koju je najlakše napisati.
+- Zamjena traženog zadatka susjednim, lakšim ili samo djelimičnim zadatkom NIJE
+  ispravka nego tiho ispuštanje zahtjeva, i strogo je zabranjena.
+- Ako se cio izričit zahtjev ne može vjerno ispuniti unutar izabrane lekcije, NE
+  pravi djelimičnu ni zamjensku verziju — vrati `fail_closed`.
+- LEKCIJA I DALJE IMA PREDNOST: komponenta koja je van izabrane lekcije se ne
+  ubacuje na silu; tada je ispravan ishod `fail_closed`, nikad tiha zamjena.
+- TUTOR: prije nego što vratiš `new_task`, provjeri da je svaka izričito tražena
+  i s lekcijom spojiva komponenta stvarno u tekstu zadatka.
+- RECENZENT: prije `approve` ili `correct` uporedi KONAČAN zadatak s porukom
+  učenika. Ako je ijedna takva komponenta nestala, ne odobravaj — vrati je u
+  ISTOM (drugom i posljednjem) pozivu ili vrati `fail_closed`."""
+
+
 _STRUCTURED_TASK_RULE = """STRUCTURED TASK PACKAGE (required for every `new_task`):
 - selected_lesson_id sadrži SAMO goli kanonski ID lekcije (tačno onaj ID iz reda "- lekcija:" u ulazu, bez naslova) — nikad "Naslov (ID)" i nikad naslov u tom polju; naslov ide isključivo u selected_lesson_title, but the server owns and canonicalizes that display copy;
 - target_difficulty_level is 1 for the first task, shifts one bounded step for easier/harder, and otherwise stays at the committed level;
@@ -507,6 +538,7 @@ def build_tutor_instructions(context):
         f"{_INTENT_GUIDE}\n\n"
         f"{_FIELD_RULE}\n\n"
         f"{_TASK_RULE}\n\n"
+        f"{_EXPLICIT_REQUEST_RULE}\n\n"
         f"{_SOLVE_TASK_AUTHORING_RULE}\n\n"
         f"{_SCALED_DIVISION_RULE}\n\n"
         f"{_HELP_NOTATION_RULE}\n\n"
@@ -851,6 +883,9 @@ def build_reviewer_instructions(context):
         f"{_SOLVE_TASK_AUTHORING_RULE}\n\n"
         f"{_SHARED_TARGET_BLOCK}\n\n"
         f"{_REVIEWER_LESSON_FIDELITY_RULE}\n\n"
+        # ISTI blok koji Tutor dobija, bajt za bajt: jedna kanonska formulacija
+        # umjesto dvije koje mogu da se raziđu (isti princip kao ugovori težine).
+        f"{_EXPLICIT_REQUEST_RULE}\n\n"
         f"{_REVIEWER_DECISION_RULE}\n\n"
         # Faza 1: značenje `checks.*` stoji ODMAH uz pravilo odluke — to su dvije
         # polovine iste invarijante (`validate_reviewer`: odluka + provjere nad
