@@ -618,7 +618,9 @@
     },
     "6-02-008": {
       "activation_class": "READY",
-      "advisory_parameters": [],
+      "advisory_parameters": [
+        "max_variable_degree"
+      ],
       "contract_version": "5F.1",
       "detector": "polynomial_basic",
       "enforced_parameters": [
@@ -635,22 +637,24 @@
       "forbidden_neighbour_skills": [],
       "lesson_id": "6-02-008",
       "level_bounds": {
-        "1": "dva-tri člana, mali koeficijenti",
-        "2": "četiri člana, negativni koeficijenti",
-        "3": "viši stepeni i pet članova"
+        "1": "jedna promjenljiva, mali koeficijenti",
+        "2": "jedna promjenljiva, veći koeficijenti i veća vrijednost",
+        "3": "dvije promjenljive u istom izrazu, dva uvrštavanja"
       },
       "parameters": {
         "concepts": [
           "expression_evaluation"
         ],
+        "max_variable_degree": "1",
         "number_domain": "natural"
       },
       "prompt_lines": [
         "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
         "- glavna vidljiva radnja mora biti: brojna vrijednost izraza",
+        "- promjenljiva se smije pojaviti SAMO na prvi stepen: bez stepenovanja i bez izraza višeg stepena; više članova i više promjenljivih su dozvoljeni",
         "- ako prekršiš ovo, server odbija paket prije objave"
       ],
-      "reviewer_note": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja."
+      "reviewer_note": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja. Promjenljiva ostaje na prvom stepenu (max_variable_degree=1)."
     },
     "6-03-001": {
       "activation_class": "READY",

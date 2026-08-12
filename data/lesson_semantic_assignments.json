@@ -412,15 +412,17 @@
         "concepts": [
           "expression_evaluation"
         ],
-        "number_domain": "natural"
+        "number_domain": "natural",
+        "max_variable_degree": "1"
       },
       "level_bounds": {
-        "1": "dva-tri člana, mali koeficijenti",
-        "2": "četiri člana, negativni koeficijenti",
-        "3": "viši stepeni i pet članova"
+        "1": "jedna promjenljiva, mali koeficijenti",
+        "2": "jedna promjenljiva, veći koeficijenti i veća vrijednost",
+        "3": "dvije promjenljive u istom izrazu, dva uvrštavanja"
       },
       "forbidden_neighbour_skills": [],
-      "reviewer_note": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja."
+      "_scope_note": "ŽIVI QA NALAZ (direktor škole): traženjem sve težih zadataka lekcija je na nivou 3 dolazila do izraza s x^2, jer je porodični podrazumijevani level_bounds ('viši stepeni i pet članova') prepisan sa 8-07-001/9-01-001 na 6. razred. Dokaz KS_2018-0059 i KS_2018-0074 traži samo: 'izračunavati vrijednost brojevnog izraza i vrijednost izraza s promjenljivim za date vrijednosti promjenljivih'. Stepenovanje u 6. razredu NE postoji ni u jednoj NPP stavki (mjereno nad svim stavkama razreda 6: nula pogodaka za stepen/potencija/izložilac/eksponent/monom/polinom kao operaciju); uvodi se tek u 8. razredu (KS_2018-0264, KS_2018-0289, RS_2014-0104). Množina 'promjenljivih' u istom dokazu nosi nivo 3: dvije promjenljive umjesto višeg stepena.",
+      "reviewer_note": "Invarijanta: polinom je rječnik koeficijenata; rezultat provjeren uvrštavanjem broja. Promjenljiva ostaje na prvom stepenu (max_variable_degree=1)."
     },
     {
       "lesson_id": "6-03-001",

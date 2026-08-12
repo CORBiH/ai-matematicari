@@ -1490,18 +1490,33 @@
             "integer"
           ],
           "required": false
+        },
+        "max_variable_degree": {
+          "kind": "enum",
+          "values": [
+            "1",
+            "2"
+          ],
+          "required": false
         }
       },
       "enforced_parameters": [
         "concepts",
         "number_domain"
       ],
-      "advisory_parameters": [],
+      "advisory_parameters": [
+        "max_variable_degree"
+      ],
       "prompt_template": {
         "header": "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
         "main_line": {
           "parameter": "concepts",
           "text": "- glavna vidljiva radnja mora biti: {values}"
+        },
+        "parameter_lines": {
+          "max_variable_degree": {
+            "1": "- promjenljiva se smije pojaviti SAMO na prvi stepen: bez stepenovanja i bez izraza višeg stepena; više članova i više promjenljivih su dozvoljeni"
+          }
         },
         "closing": "- ako prekršiš ovo, server odbija paket prije objave"
       },

@@ -36,6 +36,30 @@ _SUPPORTED_CONCEPTS = frozenset({
 })
 _SUPPORTED_DOMAINS = frozenset({"natural", "integer"})
 
+# ---------------------------------------------------------------------------
+# KURIKULARNA GRANICA STEPENA PROMJENLJIVE
+# ---------------------------------------------------------------------------
+# ŽIVI QA NALAZ (direktor škole, Practice): u lekciji o izrazima s promjenljivim
+# traženje sve težih zadataka dovelo je do izraza s $x^2$. Uzrok NIJE bio bug u
+# računu — nivo 3 je NAMJERNO dizao stepen, jer ova porodica opslužuje i lekcije
+# u kojima je stepenovanje obrađeno gradivo, a generator o lekciji ne zna ništa
+# osim parametara ugovora.
+#
+# Granica zato dolazi iz UGOVORA LEKCIJE (`max_variable_degree`), nikad iz
+# razreda, naslova ni ID-ja lekcije: ista porodica u jednoj lekciji smije
+# $x^2$, u drugoj ne smije, i to je razlika PODATAKA. Bez parametra vrijedi
+# istorijsko ponašanje (stepen do 2) — nijedna postojeća lekcija se ne mijenja.
+_DEFAULT_MAX_VARIABLE_DEGREE = 2
+_DEGREE_BOUNDED_CONCEPTS = frozenset({"expression_evaluation"})
+
+
+def max_variable_degree(parameters) -> int:
+    """Najviši dozvoljeni stepen promjenljive iz ugovora lekcije."""
+    raw = (parameters or {}).get("max_variable_degree")
+    if raw is None:
+        return _DEFAULT_MAX_VARIABLE_DEGREE
+    return int(raw)
+
 
 def supports(parameters) -> bool:
     parameters = parameters or {}
@@ -52,6 +76,7 @@ def generate_package(lesson_id, lesson_title, parameters, level, rng=None):
     rng = rng or random.Random()
     level = core.clamp_level(level)
     domain = parameters.get("number_domain") or "integer"
+    max_degree = max_variable_degree(parameters)
     for _ in range(60):
         try:
             concept = rng.choice(tuple(parameters["concepts"]))
@@ -74,6 +99,12 @@ def generate_package(lesson_id, lesson_title, parameters, level, rng=None):
                 "monomial_mul_div": _monomial_mul_div_package,
                 "like_terms_select": _like_terms_select_package,
             }[concept]
+            # Granicu stepena prima SAMO koncept koji gradi slobodan izraz;
+            # ostali koncepti su stepenom definisani sami po sebi (kvadrat
+            # binoma, monom, razlika kubova) i lekcija ih ne smije „spuštati“.
+            if concept in _DEGREE_BOUNDED_CONCEPTS:
+                return builder(rng, level, domain, lesson_id, lesson_title,
+                               max_degree=max_degree)
             return builder(rng, level, domain, lesson_id, lesson_title)
         except DeterministicGenerationError:
             continue
@@ -159,7 +190,15 @@ def _coefficient(rng, level, domain, allow_zero=False):
 # BROJNA VRIJEDNOST IZRAZA
 # ---------------------------------------------------------------------------
 
-def _evaluation_package(rng, level, domain, lesson_id, lesson_title):
+def _evaluation_package(rng, level, domain, lesson_id, lesson_title,
+                        max_degree=_DEFAULT_MAX_VARIABLE_DEGREE):
+    if max_degree < 2:
+        # Lekcija u kojoj stepenovanje NIJE obrađeno: nivo 3 raste po dimenziji
+        # koju kurikulum stvarno traži — „vrijednost izraza s promjenljivim za
+        # date vrijednosti PROMJENLJIVIH“ — dakle druga promjenljiva i drugo
+        # uvrštavanje, nikad viši stepen.
+        return _linear_evaluation_package(rng, level, domain, lesson_id,
+                                          lesson_title)
     a = _coefficient(rng, level, domain)
     b = _coefficient(rng, level, domain)
     if a == 0:
@@ -202,6 +241,95 @@ def _evaluation_package(rng, level, domain, lesson_id, lesson_title):
         distractor_values=candidates, hints=(hint1, hint2, hint3),
         solution=solution,
         signature_parameters=[("expression", display), ("x", str(x))],
+        required_conditions=["expression_evaluation"],
+        relevant_objects=["expression"], generator_version=GENERATOR_VERSION,
+        display_of=core.fraction_display)
+
+
+# ---------------------------------------------------------------------------
+# LINEARNI IZRAZ (max_variable_degree = 1)
+# ---------------------------------------------------------------------------
+# Izraz je i ovdje SERVER-VLASNIČKA STRUKTURA — lista (koeficijent,
+# promjenljiva) plus slobodan član — pa se stepen ne „provjerava u tekstu“
+# nego po konstrukciji ne može ni nastati: nijedan član nema izlagač.
+#
+# NIVOI (jedina dimenzija koju dokaz lekcije nosi):
+#   1 — jedna promjenljiva, mali koeficijenti, mala vrijednost;
+#   2 — jedna promjenljiva, veći koeficijenti i veća vrijednost;
+#   3 — DVIJE promjenljive u istom izrazu, dakle dva uvrštavanja i praćenje
+#       koja vrijednost ide uz koju promjenljivu.
+
+_LINEAR_VARIABLE_PAIRS = (("x", "y"), ("a", "b"), ("m", "n"), ("p", "q"))
+
+
+def _linear_term_display(coefficient, variable, leading):
+    body = variable if abs(coefficient) == 1 else f"{abs(coefficient)}{variable}"
+    if leading:
+        return f"-{body}" if coefficient < 0 else body
+    return f" - {body}" if coefficient < 0 else f" + {body}"
+
+
+def _linear_evaluation_package(rng, level, domain, lesson_id, lesson_title):
+    # Nivoi 1 i 2 zadržavaju POSTOJEĆI oblik (jedna promjenljiva $x$); mijenja
+    # se samo nivo 3, koji je i bio jedino mjesto gdje je nastajao stepen.
+    names = ["x"] if level < 3 else list(rng.choice(_LINEAR_VARIABLE_PAIRS))
+    terms = []
+    for name in names:
+        coefficient = _coefficient(rng, level, domain)
+        if coefficient == 0:
+            raise DeterministicGenerationError("nema promjenljive")
+        terms.append((coefficient, name))
+    constant = _coefficient(rng, level, domain)
+
+    values = {}
+    for name in names:
+        value = rng.randint(2, 6 if level == 1 else 9)
+        if domain == "integer" and level > 1 and rng.random() < 0.4:
+            value = -value
+        values[name] = value
+
+    display = "".join(
+        _linear_term_display(coefficient, name, leading=index == 0)
+        for index, (coefficient, name) in enumerate(terms))
+    if constant:
+        display += (f" - {abs(constant)}" if constant < 0
+                    else f" + {constant}")
+    total = Fraction(constant) + sum(
+        Fraction(coefficient) * Fraction(values[name])
+        for coefficient, name in terms)
+
+    given = " i ".join(f"${name} = {values[name]}$" for name in names)
+    question = (f"Izračunaj brojnu vrijednost izraza ${display}$ za {given}.")
+    pieces = []
+    for coefficient, name in terms:
+        factor = core.parenthesized(str(values[name]))
+        pieces.append(factor if coefficient == 1 else
+                      f"{core.parenthesized(str(coefficient))} \\cdot {factor}")
+    substitution = " + ".join(pieces)
+    if constant:
+        substitution += f" + {core.parenthesized(str(constant))}"
+    chain = f"{substitution} = {core.plain_fraction_display(total)}"
+    hint1 = ("Brojna vrijednost izraza: umjesto svake promjenljive uvrsti "
+             "njenu datu vrijednost pa izračunaj po redoslijedu operacija.")
+    hint2 = f"Uvrsti {given}: ${substitution}$."
+    hint3 = ("Prvo izračunaj proizvode, pa tek onda saberi (i oduzmi) "
+             "dobijene brojeve.")
+    solution = (f"Uvrstimo {given}: ${chain}$. Vrijednost izraza je "
+                f"${core.fraction_display(total)}$.")
+    shift = max(abs(values[name]) for name in names)
+    candidates = [total + 1, total - 1, -total, total + shift, total - shift,
+                  total + 2]
+    if domain == "natural":
+        candidates = [value for value in candidates if value >= 0]
+    signature = [("expression", display)] + [
+        (name, str(values[name])) for name in names]
+    return core.build_package(
+        lesson_id=lesson_id, lesson_title=lesson_title,
+        family_id="polynomial_basic", operation="expression_evaluation",
+        level=level, question=question, answer_value=total,
+        answer_display=core.fraction_display(total),
+        distractor_values=candidates, hints=(hint1, hint2, hint3),
+        solution=solution, signature_parameters=signature,
         required_conditions=["expression_evaluation"],
         relevant_objects=["expression"], generator_version=GENERATOR_VERSION,
         display_of=core.fraction_display)
