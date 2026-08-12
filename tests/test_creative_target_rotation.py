@@ -202,3 +202,43 @@ def test_rejected_attempts_rotate_the_target_through_the_real_pipeline(
     attempts = [record["archetype"]
                 for record in session["recent_creative_targets"]]
     assert attempts == targets[-esc.RECENT_TARGET_ATTEMPTS:]
+
+
+# ---------------------------------------------------------------------------
+# ŽIVI NALAZ (finalna kampanja, turn 7): planer je iz „nepokušanih“ uzeo PRVI
+# PO ENUMU i tako ponovo ciljao arhetip koji je učenik upravo vidio, pa je
+# recenzent s pravom oborio raznolikost. Izbor sada nigdje ne zavisi od
+# abecednog reda — samo od dvije postojeće historije.
+# ---------------------------------------------------------------------------
+
+LIVE_PUBLISHED = ("fraction_remainder", "fraction_of_fraction",
+                  "multi_fraction_remainder")     # najstarije → najnovije
+LIVE_ATTEMPTED = ("fraction_of_quantity",)
+
+
+def test_live_turn7_picks_the_least_recently_published_unattempted():
+    assert esc.select_target(SUPPORTED, LIVE_PUBLISHED, LIVE_ATTEMPTED) == \
+        "fraction_remainder"
+
+
+def test_live_turn7_does_not_repeat_the_just_seen_archetype():
+    chosen = esc.select_target(SUPPORTED, LIVE_PUBLISHED, LIVE_ATTEMPTED)
+    assert chosen != "fraction_of_fraction"
+    assert chosen != LIVE_PUBLISHED[-1]
+
+
+def test_selection_never_depends_on_enum_order():
+    """Ista historija, PERMUTIRAN enum → isti cilj."""
+    shuffled = tuple(reversed(SUPPORTED))
+    assert (esc.select_target(SUPPORTED, LIVE_PUBLISHED, LIVE_ATTEMPTED)
+            == esc.select_target(shuffled, LIVE_PUBLISHED, LIVE_ATTEMPTED))
+
+
+def test_tier2_prefers_unattempted_over_least_recent_overall():
+    """Nepokušani kandidat ima prednost i kad je viđen skorije od pokušanog."""
+    published = ("fraction_of_quantity", "fraction_remainder",
+                 "fraction_of_fraction")
+    attempted = ("fraction_of_quantity",)
+    chosen = esc.select_target(SUPPORTED, published, attempted)
+    assert chosen not in attempted
+    assert chosen == "multi_fraction_remainder"      # jedini potpuno svjež

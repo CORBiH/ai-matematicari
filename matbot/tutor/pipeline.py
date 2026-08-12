@@ -2049,6 +2049,27 @@ def _two_call(llm, context, session, student_message, request_id, trusted_verdic
             f"recent={','.join(escalation.recent_archetypes)}", draft.intent)
         return None, calls
 
+    # KREATIVNA RUTA: RECENZENT JE ČISTI VERIFIKATOR (živi nalaz, turn 4).
+    # Server je već izabrao cilj i egzaktno provjerio Tutorove činjenice, pa je
+    # JEDINI paket koji smije biti objavljen upravo taj — kanonizovan Tutorov
+    # nacrt. Recenzentova zamjena (`final`) ovdje NIKAD nije osnova objave: ona
+    # je nova proza koju niko više ne sudi, a treći poziv ne postoji. Uživo je
+    # takva zamjena promijenila pitanje (12−9 umjesto 30·2/5·3/4), pa je
+    # objavljeni paket tvrdio `fraction_of_fraction` s odgovorom 3 dok potpis
+    # daje 9.
+    #
+    # `correct` zato OBARA turn umjesto da objavi nacrt: sama ta odluka znači
+    # da recenzent nacrt NIJE bezuslovno odobrio, pa bi objava nacrta izložila
+    # tačno onu manu koju je htio popraviti. Ostaju dva ishoda — `approve` ili
+    # pad — što je i lakše otkloniti u logu. Sljedeći ZAHTJEV učenika dobija
+    # drugi cilj kroz postojeću rotaciju; ovdje se ništa ne ponavlja.
+    if escalation is not None and reviewer.decision != "approve":
+        _log_rejection(
+            request_id, context, "creative_reviewer_not_approved",
+            f"decision={reviewer.decision} target={escalation.target_archetype} "
+            f"has_final={reviewer.final is not None}", draft.intent)
+        return None, calls
+
     # Faza 4H (Workstream J): na `approve` se objavljuje UPRAVO odobreni nacrt.
     # Recenzent na odobrenju više ne vraća eho paketa (medijalno ~1400 izlaznih
     # tokena ≈ 15+ sekundi generisanja); eventualni poslani `final` se IGNORIŠE

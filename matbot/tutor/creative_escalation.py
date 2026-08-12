@@ -321,33 +321,40 @@ def select_target(supported, recent, attempted=()) -> str:
     nedogled — živi nalaz: četiri uzastopna pokušaja na isti arhetip.
 
     Pokušaj NIJE trajna zabrana: kad ponestane svježih kandidata, pravilo
-    najdavnije viđenog vrati i njega."""
+    najdavnije viđenog vrati i njega.
+
+    TRI NIVOA, bez ijedne odluke po abecedi (živi nalaz: planer je iz
+    „nepokušanih“ uzeo PRVI po enumu i tako ponovo ciljao arhetip koji je
+    učenik upravo vidio, pa je recenzent s pravom oborio raznolikost):
+      1. nikad nedavno objavljen NI pokušan;
+      2. inače nepokušani, pa među njima NAJDAVNIJE OBJAVLJEN;
+      3. inače svi, pa najdavnije korišten po objema historijama."""
     supported = tuple(supported)
     if not supported:
         return ""
     recent, attempted = tuple(recent), tuple(attempted)
+
+    def _least_recent(names, history):
+        """Ime čija je posljednja pojava u `history` NAJSTARIJA (nikad enum-red)."""
+        def last_seen(name):
+            for offset, seen in enumerate(reversed(history)):
+                if seen == name:
+                    return offset
+            return len(history)
+        return max(names, key=last_seen)
+
+    # TIER 1 — potpuno svjež kandidat.
     fresh = [name for name in supported
              if name not in recent and name not in attempted]
     if fresh:
         return fresh[0]
-    # Ništa potpuno svježe. Ako JESTE bilo pokušaja, izbjegni bar njih — inače
-    # se odbijeni cilj bira iznova. Kad pokušaja nema, ova grana se PRESKAČE i
-    # vrijedi zatečeno pravilo najdavnije viđenog, bajt za bajt kao ranije.
-    if attempted:
-        unattempted = [name for name in supported if name not in attempted]
-        if unattempted:
-            return unattempted[0]
-
-    # Sve viđeno i sve pokušano: uzmi onaj čija je posljednja pojava NAJSTARIJA,
-    # mjereno preko OBJE historije.
-    def last_seen(name):
-        combined = recent + attempted
-        for offset, seen in enumerate(reversed(combined)):
-            if seen == name:
-                return offset
-        return len(combined)
-
-    return max(supported, key=last_seen)
+    # TIER 2 — izbjegni ono što je upravo pokušano i palo, pa među preostalima
+    # uzmi onaj koji je učenik NAJDAVNIJE vidio.
+    unattempted = [name for name in supported if name not in attempted]
+    if unattempted:
+        return _least_recent(unattempted, recent)
+    # TIER 3 — sve je i viđeno i pokušano: najdavnije korišteno ukupno.
+    return _least_recent(supported, recent + attempted)
 
 
 def decide(context, session, deterministic_intent, transition,
