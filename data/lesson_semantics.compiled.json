@@ -1505,7 +1505,9 @@
     },
     "6-04-015": {
       "activation_class": "READY",
-      "advisory_parameters": [],
+      "advisory_parameters": [
+        "creative_escalation"
+      ],
       "contract_version": "5F.1",
       "detector": "structured_word_problem",
       "enforced_parameters": [
@@ -1525,6 +1527,7 @@
         "3": "veće vrijednosti ili više povezanih relacija"
       },
       "parameters": {
+        "creative_escalation": "enabled",
         "problem_types": [
           "fraction_of_quantity",
           "fraction_remainder"

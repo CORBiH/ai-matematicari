@@ -2074,12 +2074,21 @@
             "pythagoras_leg"
           ],
           "required": true
+        },
+        "creative_escalation": {
+          "kind": "enum",
+          "values": [
+            "enabled"
+          ],
+          "required": false
         }
       },
       "enforced_parameters": [
         "problem_types"
       ],
-      "advisory_parameters": [],
+      "advisory_parameters": [
+        "creative_escalation"
+      ],
       "prompt_template": {
         "header": "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
         "main_line": {

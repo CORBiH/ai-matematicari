@@ -997,8 +997,10 @@
         "problem_types": [
           "fraction_of_quantity",
           "fraction_remainder"
-        ]
+        ],
+        "creative_escalation": "enabled"
       },
+      "_pilot_note": "ŽIVI QA NALAZ (direktor škole): traženje sve težih zadataka vraća isti matematički arhetip s drugim imenom/predmetom/brojevima. Mjereno nad 3600 determinističkih paketa ove lekcije: 2960 različitih tekstova, ali samo 12 rečeničnih kostura i 2 strukturna arhetipa, ista na sva tri nivoa; 50,2% uzastopnih parova ponovi isti arhetip. Zato PILOT ograničene AI-eskalacije (matbot/tutor/creative_escalation.py): obična progresija ostaje deterministička i nula-poziva, a model se uključuje tek kad je ljestvica iscrpljena ili kad učenik izričito traži drugi tip. Uključeno SAMO na ovoj lekciji — ostalih osam lekcija iste porodice ostaje nepromijenjeno dok pilot ne bude potvrđen uživo.",
       "level_bounds": {
         "1": "jedna direktna relacija, mali brojevi",
         "2": "jedan dodatni korak (ostatak, kusur, druga promjena)",

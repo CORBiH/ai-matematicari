@@ -34,6 +34,7 @@ from matbot.mathcheck import find_numeric_inconsistencies
 from matbot.semantics import detectors as semantic_detectors
 from matbot.tutor import lesson_context as lesson_context_module
 from matbot.tutor import package_preflight
+from matbot.tutor import creative_escalation
 from matbot.tutor import reviewer_authority
 from matbot.tutor import task_identity
 from matbot.tutor import prompts as tutor_prompts
@@ -484,12 +485,13 @@ def _validate_task_server_side(task, context, previous_signature=""):
 # ---------------------------------------------------------------------------
 
 def _call_tutor(llm, context, session, student_message, trusted_verdict, ui_action="",
-                timer=None):
+                timer=None, escalation_block=""):
     timer = timer or _TurnTimer()
     with timer.stage("prompt_build"):
         instructions = tutor_prompts.build_tutor_instructions(context)
         input_text = tutor_prompts.build_tutor_input(
-            context, session, student_message, trusted_verdict, ui_action
+            context, session, student_message, trusted_verdict, ui_action,
+            escalation_block=escalation_block,
         )
     with timer.stage("tutor_call"):
         result = llm.tutor_turn(instructions, input_text)
@@ -500,14 +502,15 @@ def _call_tutor(llm, context, session, student_message, trusted_verdict, ui_acti
 
 
 def _call_reviewer(llm, context, session, student_message, draft, trusted_verdict,
-                   preflight_block="", ui_action="", timer=None, timeout_s=None):
+                   preflight_block="", ui_action="", timer=None, timeout_s=None,
+                   escalation_block=""):
     timer = timer or _TurnTimer()
     with timer.stage("prompt_build"):
         instructions = tutor_prompts.build_reviewer_instructions(context)
         draft_json = draft.model_dump_json(indent=None, exclude_none=True)
         input_text = tutor_prompts.build_reviewer_input(
             context, session, student_message, draft_json, trusted_verdict,
-            preflight_block, ui_action,
+            preflight_block, ui_action, escalation_block=escalation_block,
         )
     with timer.stage("reviewer_call"):
         result = llm.reviewer_turn(instructions, input_text, timeout_s=timeout_s)
@@ -599,6 +602,27 @@ _EASIER_MESSAGE_RE = re.compile(
     r"(?:daj\s+mi\s+)?(?:jedan\s+)?lakši\s+zadatak\s*[.!]?", re.IGNORECASE)
 _HARDER_MESSAGE_RE = re.compile(
     r"(?:daj\s+mi\s+)?(?:jedan\s+)?(?:još\s+)?teži\s+zadatak\s*[.!]?", re.IGNORECASE)
+# IZRIČIT ZAHTJEV ZA DRUGAČIJIM TIPOM (pilot raznolikosti). Namjerno UZAK i
+# zatvoren skup obrazaca, ne desetine doslovnih fraza: traži se riječ koja
+# znači „drugi/drugačiji tip“ ili „ne opet isto“. Poruke koje ovo NE pogode
+# ponašaju se tačno kao i ranije.
+_VARIETY_MESSAGE_RE = re.compile(
+    "drugačij|drugacij"                      # „daj mi drugačiji zadatak“
+    "|drugi tip|drugi oblik"                 # „daj neki drugi tip zadatka“
+    "|druge vrste|drugu vrstu"
+    "|nešto drugo|nesto drugo"
+    "|nešto drugačij|nesto drugacij"
+    "|opet ist|isti fazon|isto kao",         # „nemoj opet isti fazon“
+    re.IGNORECASE)
+
+
+def _explicit_variety_request(turn):
+    """True kad učenik izričito traži DRUGI TIP zadatka (ne samo teže)."""
+    if (turn.get("intent") or "").strip():
+        return False
+    if (turn.get("difficulty_request") or "").strip():
+        return False
+    return bool(_VARIETY_MESSAGE_RE.search(turn.get("student_message") or ""))
 
 
 def _deterministic_task_intent(turn, session):
@@ -1475,9 +1499,21 @@ def _run_text_turn(store, llm, session, turn, context, request_id):
     # Faza 4H: DETERMINISTIC_PACKAGE ruta — samo server-vlasničke činjenice
     # (lekcija s potpunim generatorom + UI polje ili zatvoren skup poruka).
     generator = _deterministic_generator_for(context)
-    if generator is not None and not ui_action:
-        deterministic_intent = _deterministic_task_intent(turn, session)
-        if deterministic_intent:
+    # PILOT RAZNOLIKOSTI: jedna odluka, jedan vlasnik. Eskalacija se dešava SAMO
+    # kad je deterministička ljestvica iscrpljena (teže na maksimumu) ili kad
+    # učenik izričito traži drugi TIP zadatka. Obična progresija (novi zadatak,
+    # teže ispod maksimuma, lakše) ovdje ne prolazi i ostaje nula-poziva.
+    escalation = None
+    if not ui_action:
+        deterministic_intent = (_deterministic_task_intent(turn, session)
+                                if generator is not None else "")
+        escalation = creative_escalation.decide(
+            context, session, deterministic_intent,
+            difficulty_level.transition(
+                session.get("difficulty_level", 1),
+                "harder" if deterministic_intent == "harder_task" else ""),
+            explicit_variety=_explicit_variety_request(turn))
+        if generator is not None and deterministic_intent and escalation is None:
             return _run_deterministic_task_turn(
                 store, session, turn, context, request_id, deterministic_intent,
                 generator)
@@ -1494,7 +1530,7 @@ def _run_text_turn(store, llm, session, turn, context, request_id):
     else:
         final, calls = _two_call(
             llm, context, session, turn["student_message"], request_id, None, ui_action,
-            timer=timer,
+            timer=timer, escalation=escalation,
         )
     if final is None:
         # Odbijeno prije objave (nacrt, recenzent ili invarijanta nad konačnim
@@ -1818,7 +1854,7 @@ def _log_sdk_entry(request_id, context, stage, call_index, result):
 
 
 def _two_call(llm, context, session, student_message, request_id, trusted_verdict,
-              ui_action="", timer=None):
+              ui_action="", timer=None, escalation=None):
     """Tutor → Reviewer. Vraća (final_draft | None, broj_poziva).
 
     Nijedna grana ne pravi treći poziv. Kad Tutor nacrt ne može ni da se
@@ -1839,7 +1875,7 @@ def _two_call(llm, context, session, student_message, request_id, trusted_verdic
     try:
         tutor_result = _call_tutor(
             llm, context, session, student_message, trusted_verdict, ui_action,
-            timer=timer,
+            timer=timer, escalation_block=creative_escalation.prompt_block(escalation),
         )
         calls += 1
         _log_sdk_entry(request_id, context, "tutor", calls, tutor_result)
@@ -1923,6 +1959,7 @@ def _two_call(llm, context, session, student_message, request_id, trusted_verdic
             llm, context, session, student_message, draft, trusted_verdict,
             package_preflight.format_for_reviewer(draft_issues), timer=timer,
             timeout_s=min(config.AI_TIMEOUT_S, remaining_s),
+            escalation_block=creative_escalation.prompt_block(escalation),
         )
         calls += 1
         _log_sdk_entry(request_id, context, "reviewer", calls, reviewer_result)
@@ -1946,6 +1983,18 @@ def _two_call(llm, context, session, student_message, request_id, trusted_verdic
             request_id, context, "reviewer_fail_closed",
             reviewer.fail_reason_code, draft.intent,
         )
+        return None, calls
+
+    # RAZNOLIKOST NA ESKALACIJSKOM PUTU: server je izričito tražio DRUGI tip
+    # zadatka, pa kozmetički preslikan isti tip nije ispunjenje zahtjeva.
+    # PADA ZATVORENO — nema trećeg poziva ni ponovnog generisanja; učenik
+    # dobija sigurnu poruku, a ne isti zadatak s drugim imenom.
+    if (creative_escalation.reviewer_requires_variety(escalation)
+            and reviewer.checks.substantially_different_from_recent is not True):
+        _log_rejection(
+            request_id, context, "creative_escalation_not_varied",
+            f"reason={escalation.reason} target={escalation.target_archetype} "
+            f"recent={','.join(escalation.recent_archetypes)}", draft.intent)
         return None, calls
 
     # Faza 4H (Workstream J): na `approve` se objavljuje UPRAVO odobreni nacrt.

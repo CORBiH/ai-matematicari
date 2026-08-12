@@ -575,12 +575,19 @@ def build_tutor_instructions(context):
 
 
 def build_tutor_input(context, session, student_message, trusted_verdict=None,
-                      ui_action=""):
-    return "\n\n".join([
+                      ui_action="", escalation_block=""):
+    """`escalation_block` je serverski zahtjev za raznolikošću (pilot) ili "".
+
+    Prazan string znači da se ulaz ne mijenja ni za jedan znak u odnosu na
+    raniji oblik — obična Practice traffic ostaje bajt-identična."""
+    blocks = [
         _lesson_block(context),
         _state_block(session, student_message, trusted_verdict, ui_action),
-        "Vrati strukturisan odgovor prema šemi.",
-    ])
+    ]
+    if escalation_block:
+        blocks.append(escalation_block)
+    blocks.append("Vrati strukturisan odgovor prema šemi.")
+    return "\n\n".join(blocks)
 
 
 # ---------------------------------------------------------------------------
@@ -1060,7 +1067,8 @@ def build_reviewer_instructions(context):
 
 
 def build_reviewer_input(context, session, student_message, draft_json,
-                         trusted_verdict=None, preflight_block="", ui_action=""):
+                         trusted_verdict=None, preflight_block="", ui_action="",
+                         escalation_block=""):
     """`preflight_block` su DETERMINISTIČKI serverski nalazi o nacrtu.
 
     Prazan string kad server nije dokazao nijedan defekt — tada se ulaz ne
@@ -1072,6 +1080,14 @@ def build_reviewer_input(context, session, student_message, draft_json,
     ]
     if preflight_block:
         blocks.append(preflight_block)
+    if escalation_block:
+        # ISTI blok koji je dobio Tutor — recenzent sudi o raznolikosti prema
+        # istim serverskim činjenicama, nikad prema vlastitoj pretpostavci.
+        blocks.append(escalation_block + "\n"
+                      "- U `checks.substantially_different_from_recent` upiši "
+                      "da li je zadatak SUŠTINSKI druge matematičke strukture "
+                      "od nedavnih. Isti tip s drugim imenima, predmetima ili "
+                      "brojevima NIJE drugačiji — tada upiši false.")
     blocks.append("Vrati strukturisanu odluku prema šemi.")
     return "\n\n".join(blocks)
 

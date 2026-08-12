@@ -241,6 +241,14 @@ class ReviewerChecks(BaseModel):
     # ovu klasu: ono je JEDNOSTRANA tvrdnja o označenoj opciji i za taj paket je
     # bilo istinito.
     exactly_one_option_correct: bool
+    # RAZNOLIKOST NA ESKALACIJSKOM PUTU (pilot, matbot/tutor/creative_escalation.py).
+    # Popunjava se SAMO kad je server tražio drugačiji tip zadatka; na svim
+    # ostalim turnovima ostaje None i ništa ne mijenja — zato Optional, a ne
+    # obavezno polje. Presudu daje model jer je pitanje semantičko („je li ovo
+    # druga matematička struktura ili isti zadatak s drugim imenima“), a
+    # deterministički jezički razumijevač je izvan arhitekture. Serverski
+    # strukturni provjeravači ostaju mjerodavni za svoje klase.
+    substantially_different_from_recent: Optional[bool] = None
 
 
 class ReviewerFinal(BaseModel):
