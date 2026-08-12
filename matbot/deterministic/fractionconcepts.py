@@ -73,6 +73,86 @@ def _frac_text(numerator, denominator):
     return f"\\frac{{{numerator}}}{{{denominator}}}"
 
 
+# ---------------------------------------------------------------------------
+# KURIKULARNI PREDIKATI VRSTA RAZLOMAKA — jedini izvor istine ove porodice
+# ---------------------------------------------------------------------------
+# ŽIVI P0 NALAZ (QA nad OBJAVLJENIM Practice paketom vrsta razlomaka):
+# objavljeno je „Koji od ponuđenih razlomaka je PRAVI?“ s opcijama
+# $\frac{1}{9}$, $\frac{24}{8}$, $\frac{2}{8}$, $\frac{9}{8}$ — DVIJE su tačne
+# ($\frac{1}{9}$ i $\frac{2}{8}$), a server je priznavao samo jednu, pa je
+# matematički tačan odgovor učenika ocijenjen kao netačan.
+#
+# UZROK: distraktori su birani iz fiksnog skupa „po jedan primjer svake vrste
+# + još jedan pravi razlomak“, dakle po ULOZI koju im je kod dodijelio, bez
+# ijedne provjere da distraktor NE zadovoljava traženi pojam.
+#
+# Zato vrste ovdje postoje kao PREDIKATI nad (brojnik, nazivnik), a ne kao
+# imena uloga u kodu. Definicije su kurikularne i doslovno one koje generator
+# izgovara učeniku u nagovještaju i u rješenju:
+#   pravi    — brojnik manji od nazivnika;
+#   nepravi  — brojnik veći od nazivnika ILI jednak;
+#   prividni — vrijednost je cio broj (brojnik je višekratnik nazivnika).
+#
+# PRIVIDNI JE PODSKUP NEPRAVIH ($\frac{24}{8}$ je i nepravi i prividni). Klase
+# se NIKAD ne smiju tretirati kao međusobno isključive uloge — ta pretpostavka
+# je drugo lice istog defekta: „Koji je NEPRAVI?“ s prividnim distraktorom je
+# jednako imao dvije tačne opcije.
+
+def is_proper_fraction(numerator: int, denominator: int) -> bool:
+    """Pravi razlomak: brojnik manji od nazivnika."""
+    return numerator < denominator
+
+
+def is_improper_fraction(numerator: int, denominator: int) -> bool:
+    """Nepravi razlomak: brojnik veći od nazivnika ili jednak njemu."""
+    return numerator >= denominator
+
+
+def is_apparent_fraction(numerator: int, denominator: int) -> bool:
+    """Prividni razlomak: vrijednost je cio broj."""
+    return numerator % denominator == 0
+
+
+FRACTION_TYPE_PREDICATES = {
+    "proper": is_proper_fraction,
+    "improper": is_improper_fraction,
+    "apparent": is_apparent_fraction,
+}
+
+
+def _type_candidate_pool(rng, denominator):
+    """Bazen kandidata (brojnik, nazivnik) za klasifikacijski MCQ.
+
+    Bazen namjerno NE ZNA koja je vrsta tražena: uloge (tačna opcija naspram
+    distraktora) dodjeljuje isključivo predikat tražene vrste, pa se defekt
+    „distraktor je slučajno i sam tačan“ ne može ponoviti ni za jednu vrstu.
+
+    Nazivnici su susjedni ($d$ i $d+1$) da četiri opcije i dalje izgledaju kao
+    jedan zadatak. Vrijednosti se dedupliciraju jer objava odbija dvije opcije
+    iste vrijednosti (`option_equivalence`), a $\\frac{6}{3}$ i $\\frac{8}{4}$
+    su ista vrijednost."""
+    candidates, values = [], set()
+    for den in (denominator, denominator + 1):
+        numerators = [*rng.sample(range(1, den), min(3, den - 1)),
+                      den + rng.randint(1, den - 1),
+                      den * 2 + rng.randint(1, den - 1),
+                      den * rng.randint(2, 4)]
+        for numerator in numerators:
+            value = Fraction(numerator, den)
+            if value in values:
+                continue
+            values.add(value)
+            candidates.append((numerator, den))
+    return candidates
+
+
+def _exactly_one_satisfies(predicate, pairs) -> bool:
+    """Invarijanta arhetipa: tačno jedna ponuđena opcija zadovoljava traženi
+    pojam. Generator predikat POSJEDUJE (bira ga iz strukturisanog `asked`), pa
+    ovo nije nikakvo čitanje pitanja — samo zatvaranje kruga prije objave."""
+    return sum(1 for pair in pairs if predicate(*pair)) == 1
+
+
 def _part_package(rng, level, lesson_id, lesson_title, concept):
     denominator = rng.randint(3, 8 if level == 1 else 12)
     numerator = rng.randint(1, denominator - 1)
@@ -114,13 +194,10 @@ def _types_package(rng, level, lesson_id, lesson_title, concept):
     asked = rng.choice(("proper", "improper", "apparent")
                        if level < 3 else ("improper", "apparent", "mixed"))
     denominator = rng.randint(3, 9)
-    proper = _frac_text(rng.randint(1, denominator - 1), denominator)
-    improper_numerator = denominator * rng.randint(1, 2) + rng.randint(1, denominator - 1)
-    improper = _frac_text(improper_numerator, denominator)
-    apparent_factor = rng.randint(2, 4)
-    apparent = _frac_text(denominator * apparent_factor, denominator)
-    another_proper = _frac_text(1, denominator + 1)
     if asked == "mixed":
+        improper_numerator = (denominator * rng.randint(1, 2)
+                              + rng.randint(1, denominator - 1))
+        improper = _frac_text(improper_numerator, denominator)
         whole, remainder = divmod(improper_numerator, denominator)
         correct = f"${whole}{_frac_text(remainder, denominator)}$"
         wrong = [f"${whole + 1}{_frac_text(remainder, denominator)}$",
@@ -136,23 +213,37 @@ def _types_package(rng, level, lesson_id, lesson_title, concept):
                        f"${improper} = {whole}{_frac_text(remainder, denominator)}$.")
         signature_kind = "mixed"
     else:
-        kinds = {"proper": ("PRAVI", proper,
-                            "brojnik mu je manji od nazivnika"),
-                 "improper": ("NEPRAVI", improper,
+        words = {"proper": ("PRAVI", "brojnik mu je manji od nazivnika"),
+                 "improper": ("NEPRAVI",
                               "brojnik mu je veći od nazivnika (ili jednak)"),
-                 "apparent": ("PRIVIDNI", apparent,
+                 "apparent": ("PRIVIDNI",
                               "brojnik je višekratnik nazivnika, pa je "
                               "vrijednost cio broj")}
-        word, correct_body, rule = kinds[asked]
-        pool = {proper, improper, apparent, another_proper} - {correct_body}
-        wrong = sorted(pool)[:3]
+        word, rule = words[asked]
+        # TAČNO JEDNA TAČNA PO KONSTRUKCIJI: tačna opcija se bira iz kandidata
+        # koji predikat ZADOVOLJAVAJU, a sva tri distraktora iz onih koji ga NE
+        # zadovoljavaju. Nijedna opcija nije „vrsta po ulozi“ — svaka je
+        # klasifikovana istim predikatom kojim se pitanje postavlja.
+        predicate = FRACTION_TYPE_PREDICATES[asked]
+        candidates = _type_candidate_pool(rng, denominator)
+        true_pool = [pair for pair in candidates if predicate(*pair)]
+        false_pool = [pair for pair in candidates if not predicate(*pair)]
+        if not true_pool or len(false_pool) < 3:
+            raise DeterministicGenerationError(
+                "bazen ne dozvoljava tačno jednu tačnu opciju")
+        correct_pair = rng.choice(true_pool)
+        wrong_pairs = rng.sample(false_pool, 3)
+        if not _exactly_one_satisfies(predicate, (correct_pair, *wrong_pairs)):
+            raise DeterministicGenerationError(
+                "MCQ nema tačno jednu tačnu opciju")
+        correct_body = _frac_text(*correct_pair)
         correct = f"${correct_body}$"
+        wrong = [f"${_frac_text(*pair)}$" for pair in wrong_pairs]
         question = f"Koji od ponuđenih razlomaka je {word}?"
         explanation = (f"Razlomak ${correct_body}$ je {word.lower()}: "
                        f"{rule}.")
         signature_kind = asked
-    option_texts = (correct, *(f"${w}$" if not w.startswith("$") else w
-                               for w in wrong))
+    option_texts = (correct, *wrong)
     if len(set(option_texts)) != 4:
         raise DeterministicGenerationError("opcije nisu jedinstvene")
     hints = (
