@@ -1,18 +1,26 @@
-"""NOV ZADATAK NA MAKSIMUMU IDE KREATIVNOM RUTOM (proizvodna odluka).
+"""RUTIRANJE NA MAKSIMUMU: „novi zadatak“ ostaje DETERMINISTIČKI, „teži“ ide modelu.
 
-RUČNI TEST U PRODUKCIJI (6. razred, `Tekstualni zadaci s razlomcima`): učenik
-se popeo na maksimum, tražio „Daj mi novi zadatak.“ i dobio DETERMINISTIČKI
-zadatak. Nivo je pri tome bio ISPRAVAN — ostajao je 3, i dobijeni zadatak je
-bio zadatak nivoa 3. Problem nije bio TEŽINA nego RUTA: na iscrpljenoj
-ljestvici „još jedan“ znači isto što i „nešto drugo“, a to je upravo ono što
-kreativna eskalacija postoji da ponudi.
+ODLUKA JE DONESENA NA ŽIVIM MJERENJIMA, ne na pretpostavci. Kratko je bilo
+uključeno `NEW @ max → kreativna ruta`; živi retest nad 8 pokušaja pokazao je:
 
-ŠTA SE MIJENJA: samo okidač eskalacije (`decide`) dobija treći razlog —
-`next_task` kad je ciljni nivo maksimalan. Prelazi nivoa se NE diraju,
-verifikatorska politika recenzenta se NE dira, planer se NE dira.
+  • objavljeno 2/8 (25%). Tri pada su bila `substantially_different_from_recent`,
+    i to STRUKTURNO: uz ČETIRI arhetipa i prozor od tri, planer na maksimumu
+    skoro uvijek mora ponuditi tip koji je učenik nedavno vidio. Što učenik duže
+    ostane na vrhu, to je gore — najangažovaniji učenik dobija najlošije;
+  • medijan 35 s po pokušaju (23,5–48,3 s), uz jedan stvarni istek recenzenta;
+  • do dva poziva po pokušaju, dakle ~8 poziva po jednom objavljenom zadatku.
 
-ŠTA SE NE SMIJE DESITI: da lekcija koja nije u pilotu postane model-vođena
-samo zato što je nivo 3. Zato je posljednji test u fajlu izolacija.
+U međuvremenu je deterministički nivo 3 dobio ČETIRI arhetipa i 10 rečeničnih
+kostura (mjereno: 3838/4000 različitih tekstova), pa je razlog zbog kojeg je
+pilot i nastao („samo dva arhetipa, ista na sva tri nivoa“) uglavnom otpao.
+
+UGOVOR KOJI OVAJ FAJL ZAKLJUČAVA:
+  podrazumijevana radnja (`novi zadatak`) je jeftina, trenutna i UVIJEK
+  dostupna na svakom nivou; model se troši SAMO kad učenik izričito zatraži
+  teže na maksimumu ili drugi tip zadatka.
+
+Sigurnosne invarijante kreativne rute se ovom promjenom NE diraju — zato su
+testovi H–K i dalje ovdje, samo na `teži` putu na kojem eskalacija sada živi.
 """
 import json
 
@@ -43,6 +51,8 @@ CREATIVE_TASK = {
     "facts": {"type": "fraction_of_fraction", "total": "48",
               "first_fraction": "3/4", "second_fraction": "1/2"},
 }
+NEW_MESSAGE = "Daj mi novi zadatak."
+HARDER_MESSAGE = "Daj mi teži zadatak."
 
 
 @pytest.fixture
@@ -57,6 +67,11 @@ def turn(session_id, message, lesson=PILOT_LESSON, grade=GRADE):
             "difficulty_request": "", "interaction_phase": "",
             "last_tutor_task": "", "interaction_type": "student_question",
             "selected_option_id": "", "client_turn_id": ""}
+
+
+def signature(session):
+    raw = (session.get("current_task_signature") or {}).get("structured_signature")
+    return json.loads(raw) if raw else {}
 
 
 def published_history(session, lesson=PILOT_LESSON):
@@ -96,7 +111,7 @@ def creative_draft(target):
                 for n, v in CREATIVE_TASK["facts"].items()]}),
     })
     return make_tutor_draft(
-        intent="next_task", reply="Evo zadatka.",
+        intent="harder_task", reply="Evo zadatka.",
         lesson_focus="tekstualni zadaci s razlomcima",
         difficulty_diagnostics=make_difficulty_diagnostics(direction="higher"),
         new_task=payload)
@@ -104,8 +119,7 @@ def creative_draft(target):
 
 def climb_to_max(store, fake, session_id):
     """Deterministički 1→2→3; nula poziva, kao u produkciji."""
-    for message in ("Daj mi zadatak.", "Daj mi teži zadatak.",
-                    "Daj mi teži zadatak."):
+    for message in ("Daj mi zadatak.", HARDER_MESSAGE, HARDER_MESSAGE):
         assert run_practice_turn(store, fake, turn(session_id, message)
                                  )["status"] == "ready"
     assert fake.call_count == 0
@@ -115,10 +129,10 @@ def climb_to_max(store, fake, session_id):
 
 def force_target(store, session_id, desired):
     """Postavi historiju objava tako da planer izabere baš `desired`."""
+    from matbot.semantics import contracts as contracts_module
     supported = esc._contract_archetypes(
-        type("C", (), {"semantic_contract": __import__(
-            "matbot.semantics.contracts", fromlist=["x"]
-        ).contract_for(PILOT_LESSON)})())
+        type("C", (), {"semantic_contract":
+                       contracts_module.contract_for(PILOT_LESSON)})())
     session = store.peek(session_id)
     session["recent_task_signatures"] = [
         {"lesson_id": PILOT_LESSON,
@@ -128,15 +142,22 @@ def force_target(store, session_id, desired):
     store.save(session)
 
 
+def _context():
+    from matbot.semantics import contracts as contracts_module
+    return type("C", (), {
+        "topic_id": PILOT_LESSON,
+        "semantic_contract": contracts_module.contract_for(PILOT_LESSON)})()
+
+
 # ---------------------------------------------------------------------------
-# A/B — niži nivoi ostaju DETERMINISTIČKI i nula-pozivni
+# A/B/C — „NOVI ZADATAK“ JE DETERMINISTIČKI NA SVAKOM NIVOU
 # ---------------------------------------------------------------------------
 
 def test_a_new_at_level_1_stays_deterministic(universal):
     store, fake = SessionStore(), FakeLLM()
     assert run_practice_turn(store, fake, turn("lvl1", "Daj mi zadatak.")
                              )["status"] == "ready"
-    assert run_practice_turn(store, fake, turn("lvl1", "Daj mi novi zadatak.")
+    assert run_practice_turn(store, fake, turn("lvl1", NEW_MESSAGE)
                              )["status"] == "ready"
     assert store.peek("lvl1")["difficulty_level"] == 1
     assert fake.call_count == 0
@@ -145,88 +166,96 @@ def test_a_new_at_level_1_stays_deterministic(universal):
 def test_b_new_at_level_2_stays_deterministic(universal):
     store, fake = SessionStore(), FakeLLM()
     run_practice_turn(store, fake, turn("lvl2", "Daj mi zadatak."))
-    run_practice_turn(store, fake, turn("lvl2", "Daj mi teži zadatak."))
+    run_practice_turn(store, fake, turn("lvl2", HARDER_MESSAGE))
     assert store.peek("lvl2")["difficulty_level"] == 2
-    assert run_practice_turn(store, fake, turn("lvl2", "Daj mi novi zadatak.")
+    assert run_practice_turn(store, fake, turn("lvl2", NEW_MESSAGE)
                              )["status"] == "ready"
     assert store.peek("lvl2")["difficulty_level"] == 2
     assert fake.call_count == 0
 
 
-# ---------------------------------------------------------------------------
-# C/G — PRIMARNA REGRESIJA: NOV ZADATAK NA MAKSIMUMU → KREATIVNA RUTA
-# ---------------------------------------------------------------------------
+def test_c_new_at_max_stays_deterministic_and_zero_call(universal):
+    """PRIMARNA REGRESIJA. Nivo ostaje 3, ruta je deterministička, 0 poziva.
 
-def test_c_new_at_max_uses_the_creative_route_and_publishes(universal):
+    `FakeLLM` bez ijednog pripremljenog odgovora je ovdje dio dokaza: da ruta
+    dotakne model, turn bi pao jer odgovor nije pripremljen."""
     store, fake = SessionStore(), FakeLLM()
     climb_to_max(store, fake, "max-new")
-    force_target(store, "max-new", "fraction_of_fraction")
-    before_calls = fake.call_count
+    before = store.peek("max-new")
+    assert before["difficulty_level"] == MAX_LEVEL
 
-    draft = creative_draft("fraction_of_fraction")
-    fake.queue(draft)
-    fake.queue(make_reviewer_final(
-        decision="approve", final=draft,
-        checks=make_reviewer_checks(
-            independent_answer="$18$", matches_target_archetype=True,
-            substantially_different_from_recent=True)))
-    response = run_practice_turn(store, fake, turn("max-new", "Daj mi novi zadatak."))
-
+    response = run_practice_turn(store, fake, turn("max-new", NEW_MESSAGE))
     session = store.peek("max-new")
+
     assert response["status"] == "ready", response
-    assert CREATIVE_TASK["text"] in (session.get("current_task") or "")
-    assert session["difficulty_level"] == MAX_LEVEL          # nivo ostaje 3
-    assert published_history(session)[-1] == "fraction_of_fraction"
-    assert fake.call_count - before_calls == 2               # Tutor + Recenzent
-    assert len(fake.tutor_calls) == 1 and len(fake.reviewer_calls) == 1
+    assert session["difficulty_level"] == MAX_LEVEL          # nivo se ne mijenja
+    assert fake.call_count == 0                              # ni Tutor ni recenzent
+    assert len(fake.tutor_calls) == 0 and len(fake.reviewer_calls) == 0
+    assert session["current_task"] != before["current_task"]  # nov zadatak
+    # Objavljen paket je STVARNO zadatak nivoa 3 iz determinističkog pogona.
+    parameters = {p["name"]: p["value"]
+                  for p in signature(session)["normalized_parameters"]}
+    assert parameters["level"] == "3"
+    assert parameters["type"] in dict(
+        _context().semantic_contract.parameters)["problem_types_by_level"]["3"]
 
 
-def test_c_decide_reports_the_new_reason_at_max(universal):
+def test_c_decide_never_escalates_on_next_task(universal):
+    """Okidač je uklonjen: `next_task` ne eskalira ni na maksimumu."""
     from matbot import difficulty_level
-    from matbot.semantics import contracts as contracts_module
 
-    context = type("C", (), {
-        "topic_id": PILOT_LESSON,
-        "semantic_contract": contracts_module.contract_for(PILOT_LESSON)})()
-    transition = difficulty_level.transition(MAX_LEVEL, "")
-    decision = esc.decide(context, {"difficulty_level": MAX_LEVEL},
-                          "next_task", transition)
-    assert decision is not None
-    assert decision.reason == esc.REASON_MAX_LEVEL_NEW
-    assert decision.level == MAX_LEVEL
-    # Nivo se NE mijenja — prelaz je i dalje `same`.
-    assert transition.target_level == MAX_LEVEL and not transition.level_changed
-
-
-def test_new_below_max_never_escalates(universal):
-    from matbot import difficulty_level
-    from matbot.semantics import contracts as contracts_module
-
-    context = type("C", (), {
-        "topic_id": PILOT_LESSON,
-        "semantic_contract": contracts_module.contract_for(PILOT_LESSON)})()
-    for level in (1, 2):
+    for level in (1, 2, MAX_LEVEL):
         transition = difficulty_level.transition(level, "")
-        assert esc.decide(context, {"difficulty_level": level},
-                          "next_task", transition) is None
+        assert transition.target_level == level              # nivo se čuva
+        assert esc.decide(_context(), {"difficulty_level": level},
+                          "next_task", transition) is None, level
 
 
-def test_generate_task_at_max_does_not_escalate(universal):
-    """`generate_task` znači da aktivnog zadatka NEMA — nema ni od čega
-    praviti „nešto drugo“, pa okidač na to namjerno ne reaguje."""
+def test_generate_task_never_escalates(universal):
     from matbot import difficulty_level
-    from matbot.semantics import contracts as contracts_module
 
-    context = type("C", (), {
-        "topic_id": PILOT_LESSON,
-        "semantic_contract": contracts_module.contract_for(PILOT_LESSON)})()
     transition = difficulty_level.transition(MAX_LEVEL, "")
-    assert esc.decide(context, {"difficulty_level": MAX_LEVEL},
+    assert esc.decide(_context(), {"difficulty_level": MAX_LEVEL},
                       "generate_task", transition) is None
 
 
+def test_no_reason_constant_survives_for_new_at_max():
+    """Konstanta i njen tekst su uklonjeni, ne samo zaobiđeni."""
+    assert not hasattr(esc, "REASON_MAX_LEVEL_NEW")
+    assert set(esc._REASON_TEXT) == {esc.REASON_MAX_LEVEL_HARDER,
+                                     esc.REASON_EXPLICIT_VARIETY}
+
+
 # ---------------------------------------------------------------------------
-# D/E — teže i lakše ostaju nepromijenjeni
+# §7 — DETERMINISTIČKI NIVO 3 STVARNO NUDI RAZNOLIKOST
+# ---------------------------------------------------------------------------
+
+def test_consecutive_new_at_max_rotates_without_immediate_repeats(universal):
+    """Šest uzastopnih „novi zadatak“ na maksimumu: 0 poziva, bez ponavljanja.
+
+    Ne uvodi nikakvo novo stanje — mjeri se zatečeno ponašanje generatora i
+    postojećeg čuvara duplikata."""
+    store, fake = SessionStore(), FakeLLM()
+    climb_to_max(store, fake, "variety")
+    texts, archetypes = [], []
+    for _ in range(6):
+        assert run_practice_turn(store, fake, turn("variety", NEW_MESSAGE)
+                                 )["status"] == "ready"
+        session = store.peek("variety")
+        assert session["difficulty_level"] == MAX_LEVEL
+        texts.append(session["current_task"])
+        parameters = {p["name"]: p["value"]
+                      for p in signature(session)["normalized_parameters"]}
+        assert parameters["level"] == "3"
+        archetypes.append(parameters["type"])
+    assert fake.call_count == 0
+    assert len(set(texts)) == len(texts)                  # nijedan doslovan duplikat
+    assert all(a != b for a, b in zip(texts, texts[1:]))  # ni uzastopni
+    assert len(set(archetypes)) >= 2                      # više od jedne strukture
+
+
+# ---------------------------------------------------------------------------
+# D/E — TEŽE I LAKŠE OSTAJU NEPROMIJENJENI
 # ---------------------------------------------------------------------------
 
 def test_d_harder_at_max_still_uses_the_creative_route(universal):
@@ -240,11 +269,35 @@ def test_d_harder_at_max_still_uses_the_creative_route(universal):
         checks=make_reviewer_checks(
             independent_answer="$18$", matches_target_archetype=True,
             substantially_different_from_recent=True)))
-    response = run_practice_turn(store, fake,
-                                 turn("max-harder", "Daj mi teži zadatak."))
+    response = run_practice_turn(store, fake, turn("max-harder", HARDER_MESSAGE))
+    session = store.peek("max-harder")
     assert response["status"] == "ready"
-    assert store.peek("max-harder")["difficulty_level"] == MAX_LEVEL
+    assert CREATIVE_TASK["text"] in (session.get("current_task") or "")
+    assert session["difficulty_level"] == MAX_LEVEL
+    assert published_history(session)[-1] == "fraction_of_fraction"
     assert len(fake.tutor_calls) == 1 and len(fake.reviewer_calls) == 1
+
+
+def test_d_decide_still_escalates_on_harder_at_max(universal):
+    from matbot import difficulty_level
+
+    transition = difficulty_level.transition(MAX_LEVEL, "harder")
+    assert transition.boundary_reason == "at_maximum"
+    decision = esc.decide(_context(), {"difficulty_level": MAX_LEVEL},
+                          "harder_task", transition)
+    assert decision is not None
+    assert decision.reason == esc.REASON_MAX_LEVEL_HARDER
+    assert decision.level == MAX_LEVEL
+
+
+def test_f_explicit_variety_request_still_escalates(universal):
+    from matbot import difficulty_level
+
+    decision = esc.decide(_context(), {"difficulty_level": 2}, "",
+                          difficulty_level.transition(2, ""),
+                          explicit_variety=True)
+    assert decision is not None
+    assert decision.reason == esc.REASON_EXPLICIT_VARIETY
 
 
 def test_e_easier_at_max_drops_to_two_and_stays_deterministic(universal):
@@ -254,47 +307,39 @@ def test_e_easier_at_max_drops_to_two_and_stays_deterministic(universal):
                                  turn("max-easier", "Daj mi lakši zadatak."))
     assert response["status"] == "ready"
     assert store.peek("max-easier")["difficulty_level"] == 2
-    assert fake.call_count == 0                      # nikakva kreativna ruta
+    assert fake.call_count == 0
 
 
 # ---------------------------------------------------------------------------
-# F/K — IZOLACIJA: nivo 3 sam po sebi ne pravi model-rutu
+# G — IZOLACIJA: nijedna lekcija van pilota ne postaje model-vođena
 # ---------------------------------------------------------------------------
 
-def test_f_unsupported_lesson_never_escalates_on_new_at_max(universal):
-    """Lekcija bez pilota mora ostati na svojoj ruti i na maksimumu."""
+def test_g_unsupported_lesson_never_escalates_even_on_harder_at_max(universal):
+    """Prve tri lekcije su IZ ISTE PORODICE i nose `problem_types` — njih
+    zaustavlja ISKLJUČIVO pilot-kapija, pa test stvarno mjeri nju."""
     from matbot import difficulty_level
     from matbot.semantics import contracts as contracts_module
-    from matbot.tutor import lesson_context
 
-    transition = difficulty_level.transition(MAX_LEVEL, "")
+    transition = difficulty_level.transition(MAX_LEVEL, "harder")
     checked = 0
-    # KLJUČNE KONTROLE: prve tri lekcije su IZ ISTE PORODICE i NOSE
-    # `problem_types` — njih zaustavlja ISKLJUČIVO pilot-kapija. Bez njih bi
-    # test prolazio i kad se kapija ukloni, jer lekcije bez enuma ionako padnu
-    # na drugoj provjeri (mjereno: falsifikacija F2 je to i pokazala).
     for lesson in ("6-03-010", "6-05-011", "8-04-016",
                    "6-04-003", "6-04-009", "9-02-006"):
-        contract = contracts_module.contract_for(lesson)
-        context = type("C", (), {"topic_id": lesson,
-                                 "semantic_contract": contract})()
+        context = type("C", (), {
+            "topic_id": lesson,
+            "semantic_contract": contracts_module.contract_for(lesson)})()
         assert esc.is_pilot_lesson(context) is False, lesson
         assert esc.decide(context, {"difficulty_level": MAX_LEVEL},
-                          "next_task", transition) is None, lesson
+                          "harder_task", transition) is None, lesson
         checked += 1
     assert checked == 6
-    # I pozitivna kontrola: pilot lekcija JESTE u pilotu.
-    pilot = type("C", (), {
-        "topic_id": PILOT_LESSON,
-        "semantic_contract": contracts_module.contract_for(PILOT_LESSON)})()
-    assert esc.is_pilot_lesson(pilot) is True
+    assert esc.is_pilot_lesson(_context()) is True
 
 
 # ---------------------------------------------------------------------------
-# H/I — sigurnost recenzenta NEPROMIJENJENA + iskrena poruka
+# H–K — SIGURNOST KREATIVNE RUTE (sada na `teži` putu) OSTAJE NETAKNUTA
 # ---------------------------------------------------------------------------
 
-def _rejected_creative_new(session_id, decision, universal_env=None):
+def _rejected_creative_harder(session_id, decision):
     store, fake = SessionStore(), FakeLLM()
     climb_to_max(store, fake, session_id)
     force_target(store, session_id, "fraction_of_fraction")
@@ -308,7 +353,7 @@ def _rejected_creative_new(session_id, decision, universal_env=None):
         checks=make_reviewer_checks(
             independent_answer="$18$", matches_target_archetype=True,
             substantially_different_from_recent=True)))
-    response = run_practice_turn(store, fake, turn(session_id, "Daj mi novi zadatak."))
+    response = run_practice_turn(store, fake, turn(session_id, HARDER_MESSAGE))
     session = store.peek(session_id)
     return {"response": response, "session": session,
             "published_before": before_published,
@@ -319,26 +364,21 @@ def _rejected_creative_new(session_id, decision, universal_env=None):
 
 
 def test_h_creative_correct_fails_closed_with_the_quality_message(universal):
-    result = _rejected_creative_new("max-correct", "correct")
+    result = _rejected_creative_harder("h-correct", "correct")
     assert "status" not in result["response"]
     assert CREATIVE_TASK["text"] not in (result["session"].get("current_task") or "")
     assert result["published_after"] == result["published_before"]
     assert result["session"]["difficulty_level"] == MAX_LEVEL
     assert result["attempts_after"] == ["fraction_of_fraction"]
     assert result["tutor_calls"] == 1 and result["reviewer_calls"] == 1
-    # ISKRENA poruka umjesto generičke.
     assert result["response"]["answer"] == tutor_pipeline.QUALITY_REJECTION_MESSAGE
     assert result["response"]["answer"] != tutor_pipeline.SAFE_ERROR_MESSAGE
 
 
 def test_i_creative_fail_closed_still_fails_closed_safely(universal):
-    """`fail_closed` pada na ZAJEDNIČKOJ grani (dijeli je s običnom rutom).
-
-    Mapiranje poruke je NAMJERNO usko: samo dokazana kategorija
-    `creative_reviewer_not_approved` (živi log: `decision=correct`) dobija
-    iskreniju poruku. Širenje na `fail_closed` diralo bi i običnu rutu, pa se
-    ovdje zaključava zatečeno ponašanje umjesto da se tiho proširi."""
-    result = _rejected_creative_new("max-failclosed", "fail_closed")
+    """`fail_closed` pada na ZAJEDNIČKOJ grani (dijeli je s običnom rutom), pa
+    zadržava zatečenu poruku — mapiranje je namjerno usko."""
+    result = _rejected_creative_harder("i-failclosed", "fail_closed")
     assert "status" not in result["response"]
     assert result["published_after"] == result["published_before"]
     assert result["session"]["difficulty_level"] == MAX_LEVEL
@@ -353,37 +393,10 @@ def test_quality_message_never_leaks_internal_vocabulary():
         assert forbidden not in message, forbidden
 
 
-def test_generic_failures_keep_the_original_safe_message(universal):
-    """Nekreativno odbijanje NE smije dobiti poruku o kvalitetu."""
+def test_j_rejected_harder_keeps_level_and_rotates_next_target(universal):
     store, fake = SessionStore(), FakeLLM()
-    climb_to_max(store, fake, "generic-fail")
-    # Neupotrebljiv nacrt pada PRIJE recenzenta (kapija činjenica), dakle to
-    # nije kategorija `creative_reviewer_not_approved`.
-    bad = make_tutor_draft(
-        intent="next_task", reply="Evo.",
-        lesson_focus="tekstualni zadaci s razlomcima",
-        difficulty_diagnostics=make_difficulty_diagnostics(direction="higher"),
-        new_task=make_task_payload(
-            text="Neupotrebljiv nacrt bez činjenica.",
-            options=("$1$", "$2$", "$3$", "$4$"), correct_option_index=0,
-            expected="$1$", solution="x", difficulty="hard"))
-    fake.queue(bad)
-    response = run_practice_turn(store, fake,
-                                 turn("generic-fail", "Daj mi novi zadatak."))
-    assert "status" not in response
-    assert response["answer"] == tutor_pipeline.SAFE_ERROR_MESSAGE
-    assert len(fake.reviewer_calls) == 0                 # pao prije recenzenta
-
-
-# ---------------------------------------------------------------------------
-# J — RETRY: ponovni zahtjev ostaje na maksimumu i ROTIRA cilj
-# ---------------------------------------------------------------------------
-
-def test_j_retry_stays_creative_at_max_and_rotates_the_target(universal):
-    store, fake = SessionStore(), FakeLLM()
-    climb_to_max(store, fake, "retry")
-    force_target(store, "retry", "fraction_of_fraction")
-
+    climb_to_max(store, fake, "j-retry")
+    force_target(store, "j-retry", "fraction_of_fraction")
     draft = creative_draft("fraction_of_fraction")
     fake.queue(draft)
     fake.queue(make_reviewer_final(
@@ -391,32 +404,42 @@ def test_j_retry_stays_creative_at_max_and_rotates_the_target(universal):
         checks=make_reviewer_checks(
             independent_answer="$18$", matches_target_archetype=True,
             substantially_different_from_recent=True)))
-    first = run_practice_turn(store, fake, turn("retry", "Daj mi novi zadatak."))
-    assert "status" not in first
-    session = store.peek("retry")
+    assert "status" not in run_practice_turn(
+        store, fake, turn("j-retry", HARDER_MESSAGE))
+    session = store.peek("j-retry")
     assert session["difficulty_level"] == MAX_LEVEL
     assert attempt_history(session) == ["fraction_of_fraction"]
 
-    # Isti korisnički zahtjev ponovo — bez ijednog automatskog pokušaja servera.
     from matbot import difficulty_level
-    from matbot.semantics import contracts as contracts_module
-    context = type("C", (), {
-        "topic_id": PILOT_LESSON,
-        "semantic_contract": contracts_module.contract_for(PILOT_LESSON)})()
-    decision = esc.decide(context, store.peek("retry"), "next_task",
-                          difficulty_level.transition(MAX_LEVEL, ""))
+    decision = esc.decide(_context(), store.peek("j-retry"), "harder_task",
+                          difficulty_level.transition(MAX_LEVEL, "harder"))
     assert decision is not None
-    assert decision.reason == esc.REASON_MAX_LEVEL_NEW
-    assert decision.target_archetype != "fraction_of_fraction"   # rotirano
+    assert decision.reason == esc.REASON_MAX_LEVEL_HARDER
+    assert decision.target_archetype != "fraction_of_fraction"
     assert "fraction_of_fraction" in decision.attempted_archetypes
 
 
-def test_k_no_third_call_on_any_creative_new_outcome(universal):
-    for name, decision in (("approve", "approve"), ("correct", "correct"),
-                           ("failclosed", "fail_closed")):
-        result = _rejected_creative_new(f"calls-{name}", decision) \
-            if decision != "approve" else None
-        if result is None:
-            continue
+def test_k_no_third_call_on_any_creative_outcome(universal):
+    for name, decision in (("correct", "correct"), ("failclosed", "fail_closed")):
+        result = _rejected_creative_harder(f"k-{name}", decision)
         assert result["tutor_calls"] == 1, name
         assert result["reviewer_calls"] == 1, name
+
+
+def test_generic_failures_keep_the_original_safe_message(universal):
+    """Nekreativno odbijanje NE smije dobiti poruku o kvalitetu."""
+    store, fake = SessionStore(), FakeLLM()
+    climb_to_max(store, fake, "generic-fail")
+    bad = make_tutor_draft(
+        intent="harder_task", reply="Evo.",
+        lesson_focus="tekstualni zadaci s razlomcima",
+        difficulty_diagnostics=make_difficulty_diagnostics(direction="higher"),
+        new_task=make_task_payload(
+            text="Neupotrebljiv nacrt bez činjenica.",
+            options=("$1$", "$2$", "$3$", "$4$"), correct_option_index=0,
+            expected="$1$", solution="x", difficulty="hard"))
+    fake.queue(bad)
+    response = run_practice_turn(store, fake, turn("generic-fail", HARDER_MESSAGE))
+    assert "status" not in response
+    assert response["answer"] == tutor_pipeline.SAFE_ERROR_MESSAGE
+    assert len(fake.reviewer_calls) == 0

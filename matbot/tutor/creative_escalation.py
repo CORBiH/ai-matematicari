@@ -61,12 +61,21 @@ RECENT_TARGET_ATTEMPTS = 3
 # Razlozi eskalacije — zatvoren skup, jedan vlasnik rutiranja.
 REASON_MAX_LEVEL_HARDER = "max_level_harder"
 REASON_EXPLICIT_VARIETY = "explicit_variety"
-# PROIZVODNA ODLUKA (ručni test, 6. razred, tekstualni zadaci s razlomcima):
-# na maksimumu „Daj mi novi zadatak“ je do sada ostajao na determinističkoj
-# ruti. Nivo je pri tome bio ISPRAVAN (ostajao je 3) — mijenja se samo RUTA:
-# kad je ljestvica iscrpljena, „još jedan, ali drugačiji“ znači isto što i
-# „teže“ — jedini prostor koji je preostao je DRUGA STRUKTURA na istom nivou.
-REASON_MAX_LEVEL_NEW = "max_level_new"
+
+# ZAŠTO „NOV ZADATAK“ NA MAKSIMUMU **NIJE** OKIDAČ (mjereno uživo, 8 pokušaja).
+# Nakratko je bio: nivo je pri tome ostajao ispravan (3), mijenjala se samo
+# ruta. Ali živi retest je pokazao da to nije dobar proizvod:
+#   • objavljeno 2/8 (25%) — 3 pada na `substantially_different_from_recent`,
+#     jer uz ČETIRI arhetipa i prozor od tri, planer na maksimumu skoro uvijek
+#     mora ponuditi tip koji je učenik nedavno vidio; što učenik duže ostane
+#     na vrhu, to je gore;
+#   • medijan 35 s po pokušaju (23,5–48,3), uz jedan stvarni istek recenzenta;
+#   • do dva poziva po pokušaju, dakle ~8 poziva po jednom objavljenom zadatku.
+# U međuvremenu je deterministički nivo 3 dobio ČETIRI arhetipa i 10 rečeničnih
+# kostura (mjereno: 3838/4000 različitih tekstova), pa je razlog zbog kojeg je
+# pilot i nastao („samo dva arhetipa, ista na sva tri nivoa“) uglavnom otpao.
+# Zato: podrazumijevana radnja ostaje jeftina, trenutna i uvijek dostupna, a
+# model se troši SAMO kad učenik izričito zatraži teže ili drugi tip.
 
 
 @dataclass(frozen=True)
@@ -381,15 +390,9 @@ def decide(context, session, deterministic_intent, transition,
     elif (deterministic_intent == "harder_task" and transition is not None
             and transition.boundary_reason == "at_maximum"):
         reason = REASON_MAX_LEVEL_HARDER
-    elif (deterministic_intent == "next_task" and transition is not None
-            and int(getattr(transition, "target_level", 0)) >= MAX_LEVEL):
-        # NOVI ZADATAK NA MAKSIMUMU. Granica se ovdje NE čita iz
-        # `boundary_reason` — ono se puni samo kad je smjer TRAŽEN a nivo se
-        # nije pomjerio; „novi“ je zahtjev bez smjera, pa je jedini pošten
-        # test sam ciljni nivo. Nivo ostaje isti (`same` prelaz), mijenja se
-        # samo ruta. `generate_task` se namjerno NE hvata: on znači da aktivnog
-        # zadatka nema, a tada nema ni od čega praviti „nešto drugo“.
-        reason = REASON_MAX_LEVEL_NEW
+    # `next_task` na maksimumu NAMJERNO nije okidač — vidi obrazloženje uz
+    # REASON_* konstante iznad. Obična „daj mi novi zadatak“ ostaje
+    # deterministička i nula-pozivna na SVAKOM nivou.
     if not reason:
         return None
 
@@ -427,8 +430,6 @@ _REASON_TEXT = {
         "učenik traži teže, a već je na najvišem nivou ove lekcije",
     REASON_EXPLICIT_VARIETY:
         "učenik izričito traži drugačiji tip zadatka",
-    REASON_MAX_LEVEL_NEW:
-        "učenik traži nov zadatak, a već je na najvišem nivou ove lekcije",
 }
 
 
@@ -496,7 +497,7 @@ def prompt_block(decision) -> str:
     # nivo po dizajnu ostaje najviši i četvrtog nivoa nema. Ovaj izuzetak vrijedi
     # SAMO za taj tačan slučaj; kod izričitog traženja drugog tipa na nivou 1/2
     # se NE dodaje, pa se njime ne može opravdati gradivo iznad tekućeg nivoa.
-    if (decision.reason in (REASON_MAX_LEVEL_HARDER, REASON_MAX_LEVEL_NEW)
+    if (decision.reason == REASON_MAX_LEVEL_HARDER
             and decision.level >= MAX_LEVEL):
         lines.extend([
             f"- TEŽINA NA MAKSIMUMU: nivo OSTAJE {decision.level} i to je "
