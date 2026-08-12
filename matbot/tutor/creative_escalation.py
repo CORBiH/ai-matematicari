@@ -26,7 +26,10 @@ jedna lekcija; nijedna druga ne mijenja ponašanje. Arhetipi NISU
 izmišljeni — to su `problem_types` iz kompajliranog ugovora lekcije, isti
 enum koji deterministički generator već koristi.
 """
+import re
 from dataclasses import dataclass
+
+from matbot.difficulty_level import MAX_LEVEL
 
 # Pilot se uključuje ISKLJUČIVO PODACIMA — `creative_escalation: "enabled"` u
 # ugovoru lekcije. Nikad ID lekcije u Pythonu (matbot/tutor/ to izričito
@@ -222,6 +225,38 @@ ANSWER_NOT_VERIFIABLE = "creative_answer_not_verifiable"
 ANSWER_MISMATCH = "creative_answer_mismatch"
 ANSWER_NOT_UNIQUE = "creative_answer_not_unique"
 FACTS_MISSING = "creative_facts_missing_for_target"
+FACTS_NOT_CANONICAL = "creative_facts_not_canonical"
+
+# ŽIVI NALAZ (finalna kampanja, turnovi 6 i 7): Tutor je mašinske činjenice
+# upisao u PREZENTACIJSKOM obliku — `total='3\cdot48'`, `fraction='\tfrac{2}{3}'`.
+# Rješavač ih je ispravno odbio, ali kao „nije egzaktan broj“, pa se greška
+# NOTACIJE nije razlikovala od greške MATEMATIKE.
+#
+# GRANICA KOJU OVO POVLAČI: učeniku vidljiva matematika smije biti LaTeX;
+# mašinske činjenice NE SMIJU. One su podatak, ne prikaz. Zato zatvoren oblik:
+# cio broj (`48`) ili razlomak `p/q` — tačno ono što deterministički generator
+# ionako upisuje, pa kreativni paket ima ISTI oblik potpisa kao serverski.
+#
+# NAMJERNO SE NIŠTA NE RAČUNA I NE PREVODI: izraz `3\cdot48` se ne evaluira,
+# `\tfrac{2}{3}` se ne prevodi. Server prima atomske činjenice ili odbija —
+# parser modelovih izraza se ovdje ne uvodi ni u kom obliku.
+_INTEGER_FACT_RE = re.compile(r"^-?\d+$")
+_RATIONAL_FACT_RE = re.compile(r"^-?\d+(?:/\d+)?$")
+# Veličine koje moraju biti CIO broj; sve ostale tražene su racionalne.
+_INTEGER_FACTS = frozenset({"total"})
+
+
+def _fact_is_canonical(name, value) -> bool:
+    text = (value or "").strip()
+    if not text or text != (value or ""):
+        return False                      # razmaci nisu kanonski oblik
+    pattern = (_INTEGER_FACT_RE if name in _INTEGER_FACTS
+               else _RATIONAL_FACT_RE)
+    if not pattern.match(text):
+        return False
+    if "/" in text and text.split("/", 1)[1].lstrip("0") == "":
+        return False                      # nazivnik 0
+    return True
 
 
 def _option_value(text):
@@ -257,6 +292,12 @@ def facts_failure(decision, task) -> str:
     required = set(wordfacts.REQUIRED_FACTS.get(decision.target_archetype, ()))
     if not required <= set(parameters):
         return FACTS_MISSING
+    # NOTACIJA PRIJE MATEMATIKE: prezentacijski zapis se odbija SVOJIM kodom, da
+    # se u dijagnostici ne miješa s pogrešnim računom. Provjeravaju se samo
+    # veličine koje ciljni arhetip traži — ostali potpisi se ne diraju.
+    for name in sorted(required):
+        if not _fact_is_canonical(name, parameters.get(name)):
+            return FACTS_NOT_CANONICAL
     try:
         truth = wordfacts.solve_from_parameters(decision.target_archetype,
                                                 parameters)
@@ -393,18 +434,59 @@ def prompt_block(decision) -> str:
                      + ", ".join(decision.recent_archetypes))
     required = _required_facts(decision.target_archetype)
     if required:
+        integers = [name for name in required if name in _INTEGER_FACTS]
+        rationals = [name for name in required if name not in _INTEGER_FACTS]
         lines.append(
             "- OBAVEZNO u `task_signature.normalized_parameters` upiši "
             "egzaktne veličine zadatka: "
             + ", ".join(required)
             + " (i `type` = ciljni tip). Server iz njih SAM preračunava "
               "odgovor i odbija paket ako se ne slaže s označenom opcijom.")
+        # ŽIVI NALAZ (turnovi 6 i 7): upisano je `3\cdot48` i `\tfrac{2}{3}`.
+        # Ovo je jedino mjesto gdje se oblik MAŠINSKIH činjenica propisuje —
+        # namjerno ovdje, a ne kao opšta lekcija o formatiranju u svim promptima.
+        lines.append(
+            "- TE VELIČINE SU MAŠINSKI PODACI, NE PRIKAZ ZA UČENIKA: bez LaTeX-a, "
+            "bez `$`, bez jedinica i bez računskih izraza. Cjelinu izračunaj "
+            "PRIJE upisa.")
+        if integers:
+            lines.append(
+                f"    • {', '.join(integers)}: cio broj, npr. `144` "
+                "(NE `3\\cdot48`, NE `144 olovaka`)")
+        if rationals:
+            lines.append(
+                f"    • {', '.join(rationals)}: razlomak oblika `p/q`, npr. "
+                "`2/3` (NE `\\tfrac{2}{3}`, NE `\\frac{2}{3}`, NE `$2/3$`)")
+        lines.append(
+            "    • u TEKSTU zadatka i u rješenju LaTeX ostaje normalan i "
+            "poželjan — ograničenje vrijedi SAMO za ove činjenice")
     lines.extend([
         "- zadatak mora biti SUŠTINSKI drugačije matematičke strukture od "
         "nedavnih, a ne isti zadatak s drugim imenom, predmetom ili brojevima",
         "- ostani STROGO unutar izabrane lekcije i njenog ugovora; ne uvodi "
         "gradivo koje lekcija nema samo da bi zadatak bio teži",
     ])
+    # TEŽINA NA MAKSIMUMU (živi nalaz, turn 4): potpuno ispravan paket je pao s
+    # `difficulty_not_changed`. Recenzent je slijedio globalno pravilo „teže =
+    # jedan korak naviše od upisanog nivoa“, koje na maksimumu NIJE ispunjivo —
+    # nivo po dizajnu ostaje najviši i četvrtog nivoa nema. Ovaj izuzetak vrijedi
+    # SAMO za taj tačan slučaj; kod izričitog traženja drugog tipa na nivou 1/2
+    # se NE dodaje, pa se njime ne može opravdati gradivo iznad tekućeg nivoa.
+    if (decision.reason == REASON_MAX_LEVEL_HARDER
+            and decision.level >= MAX_LEVEL):
+        lines.extend([
+            f"- TEŽINA NA MAKSIMUMU: nivo OSTAJE {decision.level} i to je "
+            "ISPRAVNO, a ne greška. Ne postoji nivo iznad njega.",
+            "  • pravilo „teži zahtjev pomjera nivo jedan korak naviše“ ovdje "
+            "SE NE PRIMJENJUJE;",
+            "  • `difficulty_not_changed` NIJE valjan razlog odbijanja u ovom "
+            "turnu, niti je nepromijenjen broj nivoa sam po sebi nedostatak;",
+            "  • veći izazov dolazi iz DRUGE STRUKTURE zadatka na istom nivou, "
+            "pa dimenzije težine ne moraju sve rasti;",
+            f"  • i dalje se provjerava: zadatak mora odgovarati nivou "
+            f"{decision.level} ove lekcije, bez gradiva izvan lekcije i bez "
+            "izmišljenog nivoa iznad najvišeg.",
+        ])
     if not decision.diversity_possible:
         # ISKRENOST PREMA ARHITEKTURI: kad lekcija ima jedan arhetip, tražiti
         # „drugu strukturu“ znači tražiti izlazak iz lekcije. Tada se traži
