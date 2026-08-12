@@ -61,6 +61,12 @@ RECENT_TARGET_ATTEMPTS = 3
 # Razlozi eskalacije — zatvoren skup, jedan vlasnik rutiranja.
 REASON_MAX_LEVEL_HARDER = "max_level_harder"
 REASON_EXPLICIT_VARIETY = "explicit_variety"
+# PROIZVODNA ODLUKA (ručni test, 6. razred, tekstualni zadaci s razlomcima):
+# na maksimumu „Daj mi novi zadatak“ je do sada ostajao na determinističkoj
+# ruti. Nivo je pri tome bio ISPRAVAN (ostajao je 3) — mijenja se samo RUTA:
+# kad je ljestvica iscrpljena, „još jedan, ali drugačiji“ znači isto što i
+# „teže“ — jedini prostor koji je preostao je DRUGA STRUKTURA na istom nivou.
+REASON_MAX_LEVEL_NEW = "max_level_new"
 
 
 @dataclass(frozen=True)
@@ -375,6 +381,15 @@ def decide(context, session, deterministic_intent, transition,
     elif (deterministic_intent == "harder_task" and transition is not None
             and transition.boundary_reason == "at_maximum"):
         reason = REASON_MAX_LEVEL_HARDER
+    elif (deterministic_intent == "next_task" and transition is not None
+            and int(getattr(transition, "target_level", 0)) >= MAX_LEVEL):
+        # NOVI ZADATAK NA MAKSIMUMU. Granica se ovdje NE čita iz
+        # `boundary_reason` — ono se puni samo kad je smjer TRAŽEN a nivo se
+        # nije pomjerio; „novi“ je zahtjev bez smjera, pa je jedini pošten
+        # test sam ciljni nivo. Nivo ostaje isti (`same` prelaz), mijenja se
+        # samo ruta. `generate_task` se namjerno NE hvata: on znači da aktivnog
+        # zadatka nema, a tada nema ni od čega praviti „nešto drugo“.
+        reason = REASON_MAX_LEVEL_NEW
     if not reason:
         return None
 
@@ -412,6 +427,8 @@ _REASON_TEXT = {
         "učenik traži teže, a već je na najvišem nivou ove lekcije",
     REASON_EXPLICIT_VARIETY:
         "učenik izričito traži drugačiji tip zadatka",
+    REASON_MAX_LEVEL_NEW:
+        "učenik traži nov zadatak, a već je na najvišem nivou ove lekcije",
 }
 
 
@@ -479,7 +496,7 @@ def prompt_block(decision) -> str:
     # nivo po dizajnu ostaje najviši i četvrtog nivoa nema. Ovaj izuzetak vrijedi
     # SAMO za taj tačan slučaj; kod izričitog traženja drugog tipa na nivou 1/2
     # se NE dodaje, pa se njime ne može opravdati gradivo iznad tekućeg nivoa.
-    if (decision.reason == REASON_MAX_LEVEL_HARDER
+    if (decision.reason in (REASON_MAX_LEVEL_HARDER, REASON_MAX_LEVEL_NEW)
             and decision.level >= MAX_LEVEL):
         lines.extend([
             f"- TEŽINA NA MAKSIMUMU: nivo OSTAJE {decision.level} i to je "

@@ -50,6 +50,20 @@ SAFE_ERROR_MESSAGE = (
     "Nešto je zapelo pri sastavljanju odgovora. Pošalji poruku ponovo za koji trenutak."
 )
 
+# ISKRENA PORUKA ZA ODBIJANJE ZBOG KVALITETA (ručni test u produkciji).
+# Kreativni zadatak koji recenzent NIJE bezuslovno odobrio pada zatvoreno — to
+# je namjerna kontrola kvaliteta, ali je učenik dobijao istu poruku kao kod
+# ispada infrastrukture, pa je sigurno ponašanje izgledalo kao kvar servera.
+# Poruka NE pominje recenzenta, tutora, model, AI, provjere ni ciljni arhetip:
+# učeniku kaže samo šta se desilo i šta da uradi. Vrijedi ISKLJUČIVO za tu
+# jednu kategoriju; SDK greške, istek vremena i sve ostale objavne odbijenice
+# zadržavaju zatečenu poruku.
+QUALITY_REJECTION_MESSAGE = (
+    "Ovaj zadatak nije prošao provjeru kvaliteta. Pokušaj ponovo — "
+    "napravit ću ti drugi."
+)
+CREATIVE_NOT_APPROVED_CODE = "creative_reviewer_not_approved"
+
 # Recenzentov KONAČAN paket i dalje nosi dokazan deterministički defekt. Zaseban
 # kod da gate ovo razlikuje od obične završne validacije i od pada šeme.
 REVIEWER_FINAL_INTEGRITY_CODE = "reviewer_final_mcq_integrity_rejection"
@@ -254,16 +268,20 @@ def _clip(value, limit=_LOG_LIMIT):
     return text if len(text) <= limit else text[:limit] + "…"
 
 
-def _error_response(active_task=""):
+def _error_response(active_task="", message=""):
     """Namjerno BEZ 'status' i BEZ 'next_state' — frontend tada čuva svoje
     stanje (isti ugovor kao i ranije).
+
+    `message` je UZAK izuzetak: podrazumijevano ostaje `SAFE_ERROR_MESSAGE`, a
+    poziva se s drugom porukom samo za dokazanu kategoriju odbijanja (vidi
+    `QUALITY_REJECTION_MESSAGE`). Oblik odgovora se pri tome ne mijenja.
 
     `task_preserved` je EKSPLICITAN metapodatak, ne nagađanje iz teksta:
     frontend je do sada brisao kartice opcija za SVAKI odgovor bez
     `status:'ready'`, iako je server aktivan zadatak zadržao. Sada mu server
     jasno kaže da zadatak i dalje stoji, pa učenik može nastaviti da odgovara."""
     return {
-        "answer": SAFE_ERROR_MESSAGE,
+        "answer": message or SAFE_ERROR_MESSAGE,
         "last_tutor_task": active_task or "",
         "task_preserved": bool(active_task),
     }
@@ -1524,13 +1542,15 @@ def _run_text_turn(store, llm, session, turn, context, request_id):
         # Faza 2: pomoć koju model još piše (računski zadatak, nivo 1 ili 2)
         # dobija PROMPT POMOĆI, ne ugovor izrade zadatka. Jedan poziv, kao i
         # ranije — recenzenta na ovom putu nikad nije bilo.
+        rejection = {}
         final, calls = _one_call_help(
             llm, context, session, turn["student_message"], ui_action, request_id,
             timer)
     else:
+        rejection = {}
         final, calls = _two_call(
             llm, context, session, turn["student_message"], request_id, None, ui_action,
-            timer=timer, escalation=escalation,
+            timer=timer, escalation=escalation, rejection=rejection,
         )
     if final is None:
         # Odbijeno prije objave (nacrt, recenzent ili invarijanta nad konačnim
@@ -1552,7 +1572,10 @@ def _run_text_turn(store, llm, session, turn, context, request_id):
             state_mutated=False, previous_identity=identity_before,
             final_identity=identity_before,
             rejection_code="rejected_before_publication", timer=timer)
-        return _error_response(active_task_before)
+        return _error_response(
+            active_task_before,
+            QUALITY_REJECTION_MESSAGE
+            if rejection.get("code") == CREATIVE_NOT_APPROVED_CODE else "")
 
     try:
         with timer.stage("publish"):
@@ -1865,7 +1888,7 @@ def _log_sdk_entry(request_id, context, stage, call_index, result):
 
 
 def _two_call(llm, context, session, student_message, request_id, trusted_verdict,
-              ui_action="", timer=None, escalation=None):
+              ui_action="", timer=None, escalation=None, rejection=None):
     """Tutor → Reviewer. Vraća (final_draft | None, broj_poziva).
 
     Nijedna grana ne pravi treći poziv. Kad Tutor nacrt ne može ni da se
@@ -2068,6 +2091,11 @@ def _two_call(llm, context, session, student_message, request_id, trusted_verdic
             request_id, context, "creative_reviewer_not_approved",
             f"decision={reviewer.decision} target={escalation.target_archetype} "
             f"has_final={reviewer.final is not None}", draft.intent)
+        # Jedina kategorija koja učeniku dobija ISKRENU poruku umjesto generičke
+        # (vidi QUALITY_REJECTION_MESSAGE). Prenosi se kroz opcioni nosilac, da
+        # se ne mijenja potpis povratne vrijednosti na desetak mjesta.
+        if rejection is not None:
+            rejection["code"] = CREATIVE_NOT_APPROVED_CODE
         return None, calls
 
     # Faza 4H (Workstream J): na `approve` se objavljuje UPRAVO odobreni nacrt.
