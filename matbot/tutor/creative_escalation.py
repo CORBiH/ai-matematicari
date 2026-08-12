@@ -59,6 +59,10 @@ class CreativeEscalationDecision:
     supported_archetypes: tuple
     recent_archetypes: tuple
     level: int
+    # Značenje svakog dozvoljenog arhetipa, iz ugovora lekcije. Identifikator
+    # sam po sebi modelu ne kazuje ništa — a cilj mora ostati mašinski
+    # provjerljiv identifikator, ne opis.
+    definitions: tuple = ()
 
     @property
     def diversity_possible(self) -> bool:
@@ -152,6 +156,68 @@ def archetype_failure(decision, operation_or_relation) -> str:
     return ""
 
 
+# ---------------------------------------------------------------------------
+# EGZAKTNA PROVJERA ODGOVORA KREATIVNOG PAKETA
+# ---------------------------------------------------------------------------
+# Živi nalaz je pokazao da recenzentov boolean sam po sebi nije dovoljan da
+# paket bude ispravan. Za porodice čiji IR server poznaje (strukturisani
+# tekstualni zadaci) paket u potpisu nosi iste veličine koje deterministički
+# generator ionako upisuje, pa ih server može PRERAČUNATI egzaktnim rješavačem
+# i uporediti s označenom opcijom. Nijedna proza se ne parsira.
+ANSWER_NOT_VERIFIABLE = "creative_answer_not_verifiable"
+ANSWER_MISMATCH = "creative_answer_mismatch"
+ANSWER_NOT_UNIQUE = "creative_answer_not_unique"
+
+
+def _option_value(text):
+    from fractions import Fraction
+    body = (text or "").strip()
+    if body.startswith("$") and body.endswith("$"):
+        body = body[1:-1]
+    try:
+        return Fraction(body.strip())
+    except (ValueError, ZeroDivisionError, ArithmeticError):
+        return None
+
+
+def answer_failure(decision, task) -> str:
+    """Kod greške ili "" — egzaktna serverska provjera odgovora i jedinstvenosti.
+
+    Vraća "" i kad tip nema rekonstrukciju iz potpisa (tada je autoritet
+    ostatak postojećih validatora) — ali NE kad tip jeste podržan, a paket
+    činjenice ne nosi ili se ne slaže. Tada pada zatvoreno."""
+    from matbot.mathkernel import wordfacts
+
+    if decision is None or task is None:
+        return ""
+    if decision.target_archetype not in wordfacts.UNKNOWN_BY_TYPE:
+        return ""
+    parameters = {p.name: p.value
+                  for p in task.task_signature.normalized_parameters}
+    # RAZLIKA KOJA SE MORA ČUVATI: „nije ni pokušao dati činjenice“ nije isto
+    # što i „dao ih je, ali pogrešne“. Paket koji ne nosi NIJEDNU veličinu
+    # traženog tipa nema šta da se provjeri — tada ovaj sloj ĆUTI i autoritet
+    # ostaju postojeći validatori i recenzent (inače bi svaki model-paket bez
+    # IR-a padao, što je šira promjena nego što ovo proširenje nosi). Ali čim
+    # paket TVRDI neku od traženih veličina, mora se i preračunati: činjenice
+    # drugog arhetipa tada padaju, a ne prolaze kao „nema šta da se provjeri“.
+    required = set(wordfacts.REQUIRED_FACTS.get(decision.target_archetype, ()))
+    if not (required & set(parameters)):
+        return ""
+    try:
+        truth = wordfacts.solve_from_parameters(decision.target_archetype,
+                                                parameters)
+    except Exception:                       # noqa: BLE001 — kernel greška
+        return ANSWER_NOT_VERIFIABLE
+    values = [_option_value(option.text) for option in task.options]
+    marked = values[task.correct_option_index]
+    if marked is None or marked != truth:
+        return ANSWER_MISMATCH
+    if sum(1 for value in values if value == truth) != 1:
+        return ANSWER_NOT_UNIQUE
+    return ""
+
+
 def select_target(supported, recent) -> str:
     """Arhetip koji NIJE nedavno viđen; inače najdavnije viđeni.
 
@@ -203,12 +269,17 @@ def decide(context, session, deterministic_intent, transition,
                                supported=supported)
     level = int(getattr(transition, "target_level", 0) or
                 session.get("difficulty_level", 1))
+    definitions = dict(getattr(
+        getattr(context, "semantic_contract", None), "archetype_definitions", {})
+        or {})
     return CreativeEscalationDecision(
         reason=reason,
         target_archetype=select_target(supported, recent),
         supported_archetypes=supported,
         recent_archetypes=recent,
         level=min(max(level, 1), 3),
+        definitions=tuple((name, definitions[name]) for name in supported
+                          if name in definitions),
     )
 
 
@@ -224,6 +295,11 @@ _REASON_TEXT = {
 }
 
 
+def _required_facts(archetype) -> tuple:
+    from matbot.mathkernel import wordfacts
+    return tuple(wordfacts.REQUIRED_FACTS.get(archetype, ()))
+
+
 def prompt_block(decision) -> str:
     """Blok koji ide u OBA prompta; prazan string kad eskalacije nema."""
     if decision is None:
@@ -237,9 +313,20 @@ def prompt_block(decision) -> str:
         f"- tipovi koje ova lekcija uopšte dozvoljava: "
         f"{', '.join(decision.supported_archetypes)}",
     ]
+    for name, meaning in decision.definitions:
+        marker = "  ← CILJ" if name == decision.target_archetype else ""
+        lines.append(f"    • {name}: {meaning}{marker}")
     if decision.recent_archetypes:
         lines.append("- nedavno već viđeni tipovi (izbjegni ih): "
                      + ", ".join(decision.recent_archetypes))
+    required = _required_facts(decision.target_archetype)
+    if required:
+        lines.append(
+            "- OBAVEZNO u `task_signature.normalized_parameters` upiši "
+            "egzaktne veličine zadatka: "
+            + ", ".join(required)
+            + " (i `type` = ciljni tip). Server iz njih SAM preračunava "
+              "odgovor i odbija paket ako se ne slaže s označenom opcijom.")
     lines.extend([
         "- zadatak mora biti SUŠTINSKI drugačije matematičke strukture od "
         "nedavnih, a ne isti zadatak s drugim imenom, predmetom ili brojevima",

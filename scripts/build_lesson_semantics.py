@@ -171,6 +171,14 @@ def _prompt_lines(family, parameters):
     return lines
 
 
+def _archetype_definitions(family, parameters):
+    """Definicije SAMO za vrijednosti koje ova lekcija dozvoljava."""
+    definitions = family.get("archetype_definitions") or {}
+    used = parameters.get("problem_types") or ()
+    return {name: definitions[name] for name in sorted(used)
+            if name in definitions}
+
+
 def build_assignment(row, families):
     """Razriješi jednu dodjelu u kompajliran ugovor. Baca SemanticSchemaError."""
     if not isinstance(row, dict):
@@ -217,7 +225,7 @@ def build_assignment(row, families):
     level_bounds = {str(key): str(value)
                     for key, value in sorted((row.get("level_bounds") or {}).items())}
 
-    return {
+    entry = {
         "lesson_id": lesson_id,
         "family_id": family_id,
         "family_version": int(family.get("family_version", 1)),
@@ -234,8 +242,20 @@ def build_assignment(row, families):
         "level_bounds": level_bounds,
         "evidence_ids": sorted(evidence),
         "prompt_lines": _prompt_lines(family, parameters),
+        # DEFINICIJE ARHETIPA koje lekcija stvarno koristi. Identifikator sam
+        # po sebi modelu ne kazuje ništa, a eskalacijski put mora imenovati
+        # CILJ mašinski provjerljivo — pa se uz identifikator nosi i njegovo
+        # značenje. Podatak porodice, nikad tekst u kodu.
+        "archetype_definitions": _archetype_definitions(family, parameters),
         "reviewer_note": str(row.get("reviewer_note") or ""),
     }
+    # Prazan rječnik se NE upisuje: lekcija bez arhetipskog rječnika mora
+    # ostati bajt-identična ranijem artefaktu, da se u pregledu razlika vidi
+    # samo lekcija koja se stvarno mijenja. Čitač već ima podrazumijevanu
+    # praznu vrijednost (matbot/semantics/contracts.py).
+    if not entry["archetype_definitions"]:
+        del entry["archetype_definitions"]
+    return entry
 
 
 def compile_all():

@@ -126,6 +126,81 @@ def _solve_fraction_remainder(facts: WordProblemFacts) -> WordProblemSolution:
         {"part": used, "remainder": remainder})
 
 
+def _solve_fraction_of_fraction(facts: WordProblemFacts) -> WordProblemSolution:
+    """Dio VEĆ IZDVOJENOG dijela: total · p/q · r/s.
+
+    KURIKULARNI OSNOV (KS_2018-0045, sadržaji 6. razreda): „Množenje razlomka
+    razlomkom“ je izričito gradivo, a KS_2018-0073 traži tekstualne zadatke.
+    Struktura je DVIJE povezane razlomačke relacije — druga se odnosi na
+    rezultat prve, ne na polaznu cjelinu (po tome se razlikuje od
+    `multi_fraction_remainder`).
+
+    OBJE međuveličine moraju biti cijeli brojevi: zadatak broji predmete, pa
+    „2/3 od 37 olovaka“ nije školski ispravno. Zaokruživanja nema — nevaljan
+    primjerak pada zatvoreno."""
+    total = facts.value_of("total")
+    first = facts.value_of("first_fraction")
+    second = facts.value_of("second_fraction")
+    if first <= 0 or second <= 0 or first > 1 or second > 1:
+        raise WordProblemError("razlomci dijela moraju biti u (0, 1]")
+    middle = first * total
+    value = second * middle
+    if middle.denominator != 1 or value.denominator != 1:
+        raise WordProblemError("međurezultat ili rezultat nije cio broj")
+    if value <= 0:
+        raise WordProblemError("dio dijela nije pozitivan")
+    return WordProblemSolution(
+        Quantity("part", value, facts.unit_of("total")),
+        ("first_fraction · total", "second_fraction · middle"),
+        {"middle": middle, "part": value})
+
+
+def _solve_multi_fraction_remainder(facts: WordProblemFacts) -> WordProblemSolution:
+    """Više dijelova ISTE cjeline, pa ostatak: total · (1 − Σ p_i/q_i).
+
+    KURIKULARNI OSNOV: „Sabiranje i oduzimanje razlomaka različitih imenilaca“
+    i „Množenje razlomka prirodnim brojem“ su izričito gradivo 6. razreda
+    (KS_2018-0045); KS_2018-0057 nosi osnovne operacije, KS_2018-0073
+    tekstualne zadatke.
+
+    Svi razlomci se odnose na POLAZNU cjelinu (za razliku od uzastopnog
+    uklanjanja, gdje se svaki sljedeći odnosi na tekući ostatak). Zbir
+    dijelova mora biti strogo manji od cjeline, a svaki pojedinačni dio i
+    ostatak moraju biti cijeli brojevi."""
+    total = facts.value_of("total")
+    fractions = []
+    index = 1
+    while True:
+        name = f"fraction_{index}"
+        try:
+            fractions.append(facts.value_of(name))
+        except WordProblemError:
+            break
+        index += 1
+    if len(fractions) < 2:
+        raise WordProblemError("potrebna su bar dva dijela cjeline")
+    if any(part <= 0 for part in fractions):
+        raise WordProblemError("svaki dio mora biti pozitivan")
+    if sum(fractions, Fraction(0)) >= 1:
+        raise WordProblemError("dijelovi premašuju cjelinu")
+    parts = [part * total for part in fractions]
+    taken = sum(parts, Fraction(0))
+    remainder = total - taken
+    if any(part.denominator != 1 for part in parts) or remainder.denominator != 1:
+        raise WordProblemError("dijelovi ili ostatak nisu cijeli brojevi")
+    if remainder <= 0:
+        raise WordProblemError("ostatak nije pozitivan")
+    auxiliary = {f"part_{number}": value
+                 for number, value in enumerate(parts, start=1)}
+    auxiliary["taken"] = taken
+    auxiliary["remainder"] = remainder
+    return WordProblemSolution(
+        Quantity("remainder", remainder, facts.unit_of("total")),
+        tuple(f"fraction_{number} · total" for number in
+              range(1, len(fractions) + 1)) + ("total - Σ parts",),
+        auxiliary)
+
+
 def _solve_money_total(facts: WordProblemFacts) -> WordProblemSolution:
     price_a = facts.value_of("price_a")
     price_b = facts.value_of("price_b")
@@ -252,6 +327,8 @@ _SOLVERS = {
     "sharing_remainder": _solve_sharing_remainder,
     "fraction_of_quantity": _solve_fraction_of_quantity,
     "fraction_remainder": _solve_fraction_remainder,
+    "fraction_of_fraction": _solve_fraction_of_fraction,
+    "multi_fraction_remainder": _solve_multi_fraction_remainder,
     "money_total": _solve_money_total,
     "money_change": _solve_money_change,
     "signed_change": _solve_signed_change,
@@ -274,3 +351,51 @@ def solve(facts: WordProblemFacts) -> WordProblemSolution:
         raise WordProblemError(
             f"nepodržan semantički tip {facts.semantic_type!r}")
     return solver(facts)
+
+
+# ---------------------------------------------------------------------------
+# REKONSTRUKCIJA IR-a IZ POTPISA PAKETA
+# ---------------------------------------------------------------------------
+# Koristi se kad paket NE dolazi iz determinističkog generatora (kreativna
+# eskalacija): server iz potpisa rekonstruiše iste činjenice i SAM preračuna
+# odgovor, pa tačnost ne ovisi ni o jednoj modelovoj tvrdnji. Proza se ne dira.
+UNKNOWN_BY_TYPE = {
+    "fraction_of_quantity": "part",
+    "fraction_remainder": "remainder",
+    "fraction_of_fraction": "part",
+    "multi_fraction_remainder": "remainder",
+}
+
+# Imena veličina koje potpis MORA nositi da bi server mogao preračunati
+# odgovor. `multi_fraction_remainder` prima i dalje fraction_3, fraction_4…
+REQUIRED_FACTS = {
+    "fraction_of_quantity": ("total", "fraction"),
+    "fraction_remainder": ("total", "fraction"),
+    "fraction_of_fraction": ("total", "first_fraction", "second_fraction"),
+    "multi_fraction_remainder": ("total", "fraction_1", "fraction_2"),
+}
+
+
+def solve_from_parameters(semantic_type: str, parameters) -> Fraction:
+    """Egzaktan odgovor iz {ime: vrijednost} potpisa, ili WordProblemError.
+
+    `parameters` su stringovi iz `task_signature.normalized_parameters`.
+    Nijedna vrijednost se ne pogađa: neparsiva ili nedostajuća veličina pada
+    zatvoreno. Ovo NIJE parsiranje proze — čita se strukturisani potpis."""
+    unknown = UNKNOWN_BY_TYPE.get(semantic_type)
+    if unknown is None:
+        raise WordProblemError(
+            f"tip {semantic_type!r} nema rekonstrukciju iz potpisa")
+    known = []
+    for name, raw in dict(parameters or {}).items():
+        if name == "type":
+            continue
+        try:
+            known.append(Quantity(name, Fraction(str(raw))))
+        except (ValueError, ZeroDivisionError, ArithmeticError):
+            raise WordProblemError(f"veličina {name!r} nije egzaktan broj")
+    if not known:
+        raise WordProblemError("potpis ne nosi nijednu veličinu")
+    facts = WordProblemFacts(semantic_type=semantic_type, entities=(),
+                             known=tuple(known), unknown=unknown)
+    return solve(facts).answer.value

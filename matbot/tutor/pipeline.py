@@ -1915,6 +1915,19 @@ def _two_call(llm, context, session, student_message, request_id, trusted_verdic
                 draft.intent)
             return None, calls
 
+        # EGZAKTAN ODGOVOR, NE RECENZENTOVA TVRDNJA: za porodice čiji IR server
+        # poznaje, potpis nosi iste veličine koje deterministički generator
+        # upisuje, pa server sam preračuna odgovor i traži da označena opcija
+        # bude baš taj broj — i da ga ima TAČNO JEDNA opcija. Prije recenzenta,
+        # jer je čisto aritmetika. Proza se ne parsira.
+        answer_error = creative_escalation.answer_failure(
+            escalation, draft.new_task)
+        if answer_error:
+            _log_rejection(
+                request_id, context, answer_error,
+                f"target={escalation.target_archetype}", draft.intent)
+            return None, calls
+
     # Reviewer sees the canonical server title; raw Tutor output remains on
     # the wrapper for safe offline diagnostics only.
     draft = _canonicalize_draft_lesson_title(draft, context)

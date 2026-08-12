@@ -17,6 +17,7 @@ identična IR-u. Jedna semantička porodica ``structured_word_problem``;
 razlike među lekcijama nose parametri (``problem_types``) — nikad ID lekcije.
 """
 import random
+from math import gcd
 import re
 from fractions import Fraction
 
@@ -124,6 +125,8 @@ def generate_package(lesson_id, lesson_title, parameters, level, rng=None):
         "sharing_remainder": _sharing_remainder,
         "fraction_of_quantity": _fraction_of_quantity,
         "fraction_remainder": _fraction_remainder,
+        "fraction_of_fraction": _fraction_of_fraction,
+        "multi_fraction_remainder": _multi_fraction_remainder,
         "money_total": _money_total,
         "money_change": _money_change,
         "signed_change": _signed_change,
@@ -298,6 +301,127 @@ def _fraction_remainder(rng, level, lesson_id, lesson_title, problem_type):
                 f"${total} - {_int_display(part)} = {_int_display(answer)}$ "
                 f"{objects}.")
     distractors = [part, answer + 1, answer - 1, Fraction(total)]
+    return _build(lesson_id, lesson_title, problem_type, level, question,
+                  facts, answer, _int_display(answer), distractors, hints,
+                  solution, display_of=_int_display)
+
+
+# ---------------------------------------------------------------------------
+# DIO VEĆ IZDVOJENOG DIJELA I VIŠE DIJELOVA ISTE CJELINE
+# ---------------------------------------------------------------------------
+# ŽIVI NALAZ (ciljani živi retest): sva tri Tutorova nacrta na nivou 3 posegla
+# su za bogatijom strukturom nego što su nudila postojeća dva arhetipa, pa ih
+# je serverska kapija ispravno odbila. Kurikulum 6. razreda te strukture
+# IZRIČITO nosi (KS_2018-0045: „Množenje razlomka razlomkom“, „Sabiranje i
+# oduzimanje razlomaka različitih imenilaca“), pa nedostatak nije bio u kapiji
+# nego u rječniku arhetipa lekcije.
+#
+# Oba nova tipa broje PREDMETE, pa se traži cjelobrojnost svake međuveličine —
+# „2/3 od 37 olovaka“ nije školski ispravan zadatak i pada zatvoreno.
+
+_SECOND_OBJECTS = {
+    "olovaka": "plavih", "klikera": "staklenih", "sličica": "novih",
+    "jabuka": "crvenih", "bombona": "čokoladnih", "knjiga": "slikovnica",
+}
+
+
+def _fraction_of_fraction(rng, level, lesson_id, lesson_title, problem_type):
+    """total · p/q · r/s — druga relacija se odnosi na REZULTAT prve."""
+    first = _fraction_pool(rng, level)
+    second = _fraction_pool(rng, max(level, 2))
+    # Cjelina se gradi UNAZAD iz oba nazivnika, pa su obje međuveličine
+    # cjelobrojne po konstrukciji, bez ijednog zaokruženja.
+    unit = rng.randint(1, 3 if level < 3 else 5)
+    total = first.denominator * second.denominator * unit
+    if total > (60 if level < 3 else 200):
+        raise DeterministicGenerationError("cjelina prevelika za razred")
+    facts = WordProblemFacts(
+        semantic_type="fraction_of_fraction",
+        entities=(rng.choice(_NAMES), rng.choice(_OBJECTS)),
+        known=(Quantity("total", Fraction(total)),
+               Quantity("first_fraction", first),
+               Quantity("second_fraction", second)),
+        unknown="part",
+        relationships=("middle = first_fraction · total",
+                       "part = second_fraction · middle"))
+    solved = wordfacts.solve(facts)
+    name, objects = facts.entities
+    adjective = _SECOND_OBJECTS[objects]
+    first_display = core.plain_fraction_display(first)
+    second_display = core.plain_fraction_display(second)
+    question = (f"{name} ima ${total}$ {objects}. Od toga je "
+                f"${first_display}$ {adjective}. Od {adjective} je "
+                f"${second_display}$ posebno označeno. Koliko je posebno "
+                f"označenih {objects}?")
+    _assert_prose_matches(question, [str(total), first_display, second_display])
+    answer = solved.answer.value
+    middle = solved.auxiliary["middle"]
+    hints = (
+        "Prvo izračunaj koliko je prvog dijela cjeline.",
+        f"Prvi dio: ${first_display} \\cdot {total} = {_int_display(middle)}$.",
+        "Drugi razlomak se odnosi na TAJ dio, ne na polaznu cjelinu — "
+        "pomnoži ga s njim.",
+    )
+    solution = (f"Prvo: ${first_display} \\cdot {total} = "
+                f"{_int_display(middle)}$ {adjective}. Zatim: "
+                f"${second_display} \\cdot {_int_display(middle)} = "
+                f"{_int_display(answer)}$, pa je posebno označenih "
+                f"${_int_display(answer)}$ {objects}.")
+    distractors = [middle, Fraction(total) - answer, answer + 1,
+                   first * Fraction(total) * Fraction(2), answer + middle]
+    return _build(lesson_id, lesson_title, problem_type, level, question,
+                  facts, answer, _int_display(answer), distractors, hints,
+                  solution, display_of=_int_display)
+
+
+def _multi_fraction_remainder(rng, level, lesson_id, lesson_title, problem_type):
+    """total · (1 − Σ p_i/q_i) — svi dijelovi se odnose na ISTU cjelinu."""
+    count = 2 if level < 3 else 3
+    denominators = rng.sample((2, 3, 4, 6, 8, 12), count)
+    fractions = [Fraction(1, denominator) for denominator in denominators]
+    if sum(fractions, Fraction(0)) >= 1:
+        raise DeterministicGenerationError("dijelovi premašuju cjelinu")
+    common = 1
+    for denominator in denominators:
+        common = common * denominator // gcd(common, denominator)
+    total = common * rng.randint(1, 2 if level < 3 else 4)
+    if total > (60 if level < 3 else 240):
+        raise DeterministicGenerationError("cjelina prevelika za razred")
+    known = [Quantity("total", Fraction(total))]
+    for number, fraction in enumerate(fractions, start=1):
+        known.append(Quantity(f"fraction_{number}", fraction))
+    facts = WordProblemFacts(
+        semantic_type="multi_fraction_remainder",
+        entities=(rng.choice(_NAMES), rng.choice(_OBJECTS)),
+        known=tuple(known), unknown="remainder",
+        relationships=tuple(f"part_{number} = fraction_{number} · total"
+                            for number in range(1, count + 1))
+        + ("remainder = total - Σ parts",))
+    solved = wordfacts.solve(facts)
+    name, objects = facts.entities
+    displays = [core.plain_fraction_display(fraction) for fraction in fractions]
+    listed = ", ".join(f"${display}$" for display in displays[:-1])
+    # Bez broja prijatelja i bez zamjenice: broj dijelova se mijenja s nivoom
+    # („dvoma“/„trima“), a imena su i muška i ženska — nijedan od ta dva oblika
+    # ne smije se zalijepiti na šablon koji ih ne zna.
+    question = (f"{name} ima ${total}$ {objects}. Pokloni {listed} i "
+                f"${displays[-1]}$ od SVOJIH {objects}. Koliko {objects} je "
+                "OSTALO?")
+    _assert_prose_matches(question, [str(total), *displays])
+    answer = solved.answer.value
+    taken = solved.auxiliary["taken"]
+    hints = (
+        "Svi razlomci se odnose na POLAZNU cjelinu, ne jedan na drugi.",
+        f"Izračunaj svaki dio pa ih saberi: ukupno poklonjeno "
+        f"${_int_display(taken)}$.",
+        "Od cjeline oduzmi zbir poklonjenih dijelova.",
+    )
+    steps = " + ".join(f"{display} \\cdot {total}" for display in displays)
+    solution = (f"Poklonjeno je ${steps} = {_int_display(taken)}$, pa je "
+                f"ostalo ${total} - {_int_display(taken)} = "
+                f"{_int_display(answer)}$ {objects}.")
+    distractors = [taken, answer + 1, answer - 1, Fraction(total),
+                   solved.auxiliary["part_1"]]
     return _build(lesson_id, lesson_title, problem_type, level, question,
                   facts, answer, _int_display(answer), distractors, hints,
                   solution, display_of=_int_display)

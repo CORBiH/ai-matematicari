@@ -30,6 +30,12 @@ from tests.conftest import (FakeLLM, make_difficulty_diagnostics,
 ROOT = Path(__file__).resolve().parent.parent
 
 LESSON = "6-04-015"
+
+def _contract_enum():
+    """Enum se čita iz UGOVORA — test ne smije zaostati za podacima."""
+    from matbot.semantics import contracts as _contracts
+    return tuple(dict(_contracts.contract_for(LESSON).parameters)["problem_types"])
+
 TITLE = "Tekstualni zadaci s razlomcima"
 GRADE = 6
 
@@ -108,8 +114,9 @@ def test_no_lesson_id_is_hard_coded_in_the_escalation_module():
 def test_supported_archetypes_come_from_the_lesson_contract():
     context = lesson_context.build(GRADE, LESSON)
     contract = context.semantic_contract
-    assert tuple(dict(contract.parameters)["problem_types"]) == (
-        "fraction_of_quantity", "fraction_remainder")
+    # Enum raste s kurikularnim proširenjima — test čita UGOVOR, ne konstantu.
+    assert tuple(dict(contract.parameters)["problem_types"]) == _contract_enum()
+    assert len(_contract_enum()) >= 2
 
 
 @pytest.mark.parametrize("recent,expected", [
@@ -260,7 +267,7 @@ def _draft(text, expected, options, solution,
         new_task=payload)
 
 
-SUPPORTED = ("fraction_of_quantity", "fraction_remainder")
+SUPPORTED = _contract_enum()
 
 
 def _warm_up(fake, store, session_id="esc"):
@@ -289,8 +296,13 @@ def _run_escalation(fake, store, session_id="esc"):
 
 def test_cosmetic_reskin_is_rejected_without_a_third_call(universal):
     store, fake = SessionStore(), FakeLLM()
+    # Oznaka MORA biti serverski cilj — inače paket padne već na determinističkoj
+    # kapiji arhetipa i nikad ne stigne do presude o RAZNOLIKOSTI, koju ovaj
+    # test upravo ispituje.
+    target = _warm_up(fake, store)
     draft = _draft(_RESKIN_TEXT, "$15$", ("$15$", "$30$", "$45$", "$12$"),
-                   "$\\frac{1}{3} \\cdot 45 = 15$, pa je poklonjeno $15$ bombona.")
+                   "$\\frac{1}{3} \\cdot 45 = 15$, pa je poklonjeno $15$ bombona.",
+                   archetype=target)
     fake.queue(draft)
     fake.queue(make_reviewer_final(
         decision="approve", final=draft,
@@ -299,7 +311,7 @@ def test_cosmetic_reskin_is_rejected_without_a_third_call(universal):
             matches_target_archetype=True,
             substantially_different_from_recent=False)))
 
-    response = _run_escalation(fake, store)
+    response = _escalate(fake, store)
 
     # `_error_response` po ugovoru NEMA 'status' — frontend tada čuva stanje.
     assert "status" not in response
@@ -472,7 +484,7 @@ def test_decide_wires_session_history_into_target_selection():
             "structured_signature": json.dumps(
                 {"operation_or_relation": decision.target_archetype})})
     assert avoidable == 0, chosen
-    assert len(set(chosen)) == 2, chosen
+    assert set(chosen) == set(SUPPORTED), chosen
 
 
 def test_single_archetype_lesson_does_not_claim_false_variety():

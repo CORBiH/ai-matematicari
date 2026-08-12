@@ -1508,6 +1508,12 @@
       "advisory_parameters": [
         "creative_escalation"
       ],
+      "archetype_definitions": {
+        "fraction_of_fraction": "prvo se izdvoji razlomak cjeline, pa se traži razlomak TOG izdvojenog dijela; drugi razlomak se odnosi na rezultat prvog, nikad na polaznu cjelinu",
+        "fraction_of_quantity": "jedan razlomak POZNATE cjeline; traži se taj dio (jedna relacija)",
+        "fraction_remainder": "uzme se jedan razlomak cjeline, pa se traži OSTATAK (dio pa oduzimanje)",
+        "multi_fraction_remainder": "od ISTE polazne cjeline uzme se više razlomaka (svaki se odnosi na tu cjelinu, ne jedan na drugi), pa se traži ostatak"
+      },
       "contract_version": "5F.1",
       "detector": "structured_word_problem",
       "enforced_parameters": [
@@ -1529,13 +1535,15 @@
       "parameters": {
         "creative_escalation": "enabled",
         "problem_types": [
+          "fraction_of_fraction",
           "fraction_of_quantity",
-          "fraction_remainder"
+          "fraction_remainder",
+          "multi_fraction_remainder"
         ]
       },
       "prompt_lines": [
         "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
-        "- glavna vidljiva radnja mora biti: razlomak od date veličine, ostatak poslije uzetog dijela",
+        "- glavna vidljiva radnja mora biti: dio već izdvojenog dijela cjeline, razlomak od date veličine, ostatak poslije uzetog dijela, ostatak poslije više dijelova iste cjeline",
         "- sve poznate veličine moraju biti izričito navedene u tekstu zadatka; odgovor slijedi isključivo iz njih",
         "- ako prekršiš ovo, server odbija paket prije objave"
       ],

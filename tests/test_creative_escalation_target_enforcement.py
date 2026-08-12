@@ -35,13 +35,21 @@ ROOT = Path(__file__).resolve().parent.parent
 
 LESSON = "6-04-015"
 GRADE = 6
-SUPPORTED = ("fraction_of_quantity", "fraction_remainder")
+SUPPORTED = ()   # popunjeno iz ugovora ispod
 FREE_TEXT = "successive subtraction of fractions of an initial quantity"
+
+def _contract_enum():
+    """Enum se čita iz UGOVORA — test ne smije zaostati za podacima."""
+    from matbot.semantics import contracts as _contracts
+    return tuple(dict(_contracts.contract_for(LESSON).parameters)["problem_types"])
+
+SUPPORTED = _contract_enum()
 
 # Po jedan zadatak koji STVARNO jeste dati arhetip. Server bira cilj, pa test
 # nudi zadatak koji tom cilju odgovara umjesto da arhetip pretpostavi.
 TASKS = {
     "fraction_remainder": {
+        "archetype": "fraction_remainder",
         "text": ("Lejla je potrošila $\\frac{2}{5}$ od svojih $40$ olovaka. "
                  "Koliko olovaka joj je OSTALO?"),
         "options": ("$24$", "$16$", "$40$", "$8$"),
@@ -51,6 +59,7 @@ TASKS = {
                      "ostalo $40 - 16 = 24$ olovaka."),
     },
     "fraction_of_quantity": {
+        "archetype": "fraction_of_quantity",
         "text": ("Lejla ima $40$ olovaka i pokloni $\\frac{2}{5}$ od toga. "
                  "Koliko olovaka je poklonjeno?"),
         "options": ("$16$", "$24$", "$40$", "$8$"),
@@ -86,6 +95,12 @@ def history(session):
     return out
 
 
+# Od uvođenja egzaktne serverske provjere odgovora, kreativni paket mora nositi
+# IR veličine u potpisu. Nacrt se veže na STVARNU lekciju jer `FakeLLM` svojim
+# „__fixture__“ drafovima prepisuje `normalized_parameters`.
+FACTS = {'fraction_remainder': {'type': 'fraction_remainder', 'total': '40', 'fraction': '2/5'}, 'fraction_of_quantity': {'type': 'fraction_of_quantity', 'total': '40', 'fraction': '2/5'}, 'fraction_of_fraction': {'type': 'fraction_of_fraction', 'total': '48', 'first_fraction': '2/3', 'second_fraction': '1/4'}, 'multi_fraction_remainder': {'type': 'multi_fraction_remainder', 'total': '24', 'fraction_1': '1/3', 'fraction_2': '1/4', 'fraction_3': '1/6'}}
+
+
 _LEVEL_EVIDENCE = {
     1: DifficultyEvidence(
         reasoning_steps=1, condition_count=1, operation_count=1,
@@ -106,9 +121,15 @@ def draft_with(operation, task, level=3, intent="harder_task"):
         correct_option_index=task["correct_index"], expected=task["expected"],
         solution=task["solution"],
         difficulty={1: "easy", 2: "standard", 3: "hard"}[level])
+    from matbot.tutor.schema import SignatureParameter
+    facts = FACTS[task["archetype"]]
     signature = payload.task_signature.model_copy(update={
-        "operation_or_relation": operation})
+        "operation_or_relation": operation,
+        "normalized_parameters": [SignatureParameter(name=n, value=v)
+                                  for n, v in facts.items()]})
     payload = payload.model_copy(update={
+        "selected_lesson_id": LESSON,
+        "selected_lesson_title": "Tekstualni zadaci s razlomcima",
         "target_difficulty_level": level,
         "task_signature": signature,
         "difficulty_evidence": _LEVEL_EVIDENCE[level],
@@ -142,6 +163,19 @@ def server_target(store, session_id):
     return esc.select_target(SUPPORTED, recent)
 
 
+def _seed_for_available_task(store, session_id):
+    """Postavi historiju tako da cilj bude arhetip za koji suite ima zadatak."""
+    desired = next(name for name in SUPPORTED if name in TASKS)
+    session = store.peek(session_id)
+    session["recent_task_signatures"] = [
+        {"lesson_id": LESSON,
+         "structured_signature": json.dumps({"operation_or_relation": name}),
+         "structured_signature_hash": f"seed-{name}"}
+        for name in SUPPORTED if name != desired]
+    store.save(session)
+    return desired
+
+
 def other_than(target):
     return next(name for name in SUPPORTED if name != target)
 
@@ -154,7 +188,20 @@ def run_case(session_id, label=None, **checks_overrides):
     ponašanje oznake i recenzentovih presuda."""
     store, fake = SessionStore(), FakeLLM()
     warm_up_to_max(store, fake, session_id)
+    # Ova matrica ispituje ponašanje OZNAKE i recenzentovih presuda, što je
+    # nezavisno od toga koji je arhetip cilj. Historija se zato postavlja tako
+    # da server izabere jedan od dva arhetipa za koje suite ima zadatak — cilj
+    # i dalje računa `select_target`, ne test.
+    desired = next(name for name in SUPPORTED if name in TASKS)
+    session = store.peek(session_id)
+    session["recent_task_signatures"] = [
+        {"lesson_id": LESSON,
+         "structured_signature": json.dumps({"operation_or_relation": name}),
+         "structured_signature_hash": f"seed-{name}"}
+        for name in SUPPORTED if name != desired]
+    store.save(session)
     target = server_target(store, session_id)
+    assert target == desired, (target, desired)
     before = history(store.peek(session_id))
     task = TASKS[target]
     if label is None:
@@ -311,7 +358,10 @@ def test_case_f_polluted_history_is_filtered_at_read_time():
     ]}
     recent = esc.recent_archetypes(session, LESSON, supported=SUPPORTED)
     assert recent == ("fraction_remainder", "fraction_of_quantity")
-    assert esc.select_target(SUPPORTED, recent) == "fraction_remainder"
+    # Cilj je prvi PODRŽANI koji nije nedavno viđen — raste s enumom, pa se
+    # računa iz ugovora umjesto da se upiše kao konstanta.
+    assert esc.select_target(SUPPORTED, recent) == next(
+        name for name in SUPPORTED if name not in recent)
 
 
 def test_decide_reads_history_through_the_contract_filter():
@@ -328,7 +378,8 @@ def test_decide_reads_history_through_the_contract_filter():
     assert decision is not None
     assert FREE_TEXT not in decision.recent_archetypes
     assert decision.recent_archetypes == ("fraction_of_quantity",)
-    assert decision.target_archetype == "fraction_remainder"
+    assert decision.target_archetype == next(
+        name for name in SUPPORTED if name != "fraction_of_quantity")
 
 
 # ---------------------------------------------------------------------------
@@ -421,6 +472,7 @@ def test_ordinary_progression_still_zero_call_and_unaffected(universal):
 def test_easier_after_valid_creative_returns_to_deterministic(universal):
     store, fake = SessionStore(), FakeLLM()
     warm_up_to_max(store, fake, "recover")
+    _seed_for_available_task(store, "recover")
     target = server_target(store, "recover")
     task = TASKS[target]
     draft = draft_with(target, task)
@@ -448,6 +500,7 @@ def test_explicit_variety_still_reaches_escalation(universal):
     assert run_practice_turn(store, fake, turn("variety", "Daj mi zadatak.")
                              )["status"] == "ready"
     assert fake.call_count == 0
+    _seed_for_available_task(store, "variety")
     target = server_target(store, "variety")
     task = TASKS[target]
     # Izričita raznolikost radi NEZAVISNO od maksimuma — ovdje smo na nivou 1,

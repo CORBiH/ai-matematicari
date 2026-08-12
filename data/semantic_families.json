@@ -2062,6 +2062,8 @@
             "sharing_remainder",
             "fraction_of_quantity",
             "fraction_remainder",
+            "fraction_of_fraction",
+            "multi_fraction_remainder",
             "money_total",
             "money_change",
             "signed_change",
@@ -2100,11 +2102,19 @@
         ],
         "closing": "- ako prekršiš ovo, server odbija paket prije objave"
       },
+      "archetype_definitions": {
+        "fraction_of_quantity": "jedan razlomak POZNATE cjeline; traži se taj dio (jedna relacija)",
+        "fraction_remainder": "uzme se jedan razlomak cjeline, pa se traži OSTATAK (dio pa oduzimanje)",
+        "fraction_of_fraction": "prvo se izdvoji razlomak cjeline, pa se traži razlomak TOG izdvojenog dijela; drugi razlomak se odnosi na rezultat prvog, nikad na polaznu cjelinu",
+        "multi_fraction_remainder": "od ISTE polazne cjeline uzme se više razlomaka (svaki se odnosi na tu cjelinu, ne jedan na drugi), pa se traži ostatak"
+      },
       "value_labels": {
         "equal_sharing": "podjela na jednake dijelove",
         "sharing_remainder": "dijeljenje s ostatkom u priči",
         "fraction_of_quantity": "razlomak od date veličine",
         "fraction_remainder": "ostatak poslije uzetog dijela",
+        "fraction_of_fraction": "dio već izdvojenog dijela cjeline",
+        "multi_fraction_remainder": "ostatak poslije više dijelova iste cjeline",
         "money_total": "ukupan iznos kupovine",
         "money_change": "kusur pri plaćanju",
         "signed_change": "promjene s predznakom (temperatura)",

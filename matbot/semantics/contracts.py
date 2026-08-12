@@ -45,6 +45,7 @@ class SemanticContract:
     advisory_parameters: tuple
     forbidden_neighbour_skills: tuple
     level_bounds: MappingProxyType
+    archetype_definitions: MappingProxyType
     evidence_ids: tuple
     prompt_lines: tuple
     reviewer_note: str
@@ -80,6 +81,8 @@ def _build(entry):
             advisory_parameters=tuple(entry.get("advisory_parameters", ())),
             forbidden_neighbour_skills=tuple(entry.get("forbidden_neighbour_skills", ())),
             level_bounds=MappingProxyType(dict(entry.get("level_bounds", {}))),
+            archetype_definitions=MappingProxyType(
+                dict(entry.get("archetype_definitions", {}))),
             evidence_ids=tuple(entry.get("evidence_ids", ())),
             prompt_lines=tuple(entry.get("prompt_lines", ())),
             reviewer_note=str(entry.get("reviewer_note", "")),
