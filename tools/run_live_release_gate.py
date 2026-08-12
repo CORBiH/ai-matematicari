@@ -44,8 +44,29 @@ REQUIRED_SCENARIO_COUNT = 14
 # Faza 4H: semantic_fresh i semantic_harder (lekcija porodice
 # fraction_arithmetic_direct) sada idu DETERMINISTIČKOM strategijom — nula
 # SDK poziva po scenariju, i gate to IZRIČITO dokazuje (expected_calls=0,
-# stroga jednakost po scenariju). Plafon pada 23 → 19.
-SDK_CALL_CEILING = 19
+# stroga jednakost po scenariju). Plafon je tada pao 23 → 19.
+#
+# ŽIVI NALAZ (zvanična kapija, scenario `first_hint`): kapija je pala s
+# „expected 1 SDK call, actual 0“ — a aplikacija NIJE bila u regresiji. Model
+# poziva u kapiji je bio stariji od SERVER-VLASNIČKE POMOĆI (Faza 2):
+#   • `full_solution_request` je UVIJEK serverski → 0 poziva;
+#   • prvi hint je serverski za klasu TVRDNJE i na vrhu ljestvice → 0 poziva,
+#     a modelu ostaje samo RAČUNSKA ljestvica 1–2 → 1 poziv.
+# Oba se znaju PRIJE ijednog poziva (`pipeline._help_author`), pa kapija svoje
+# očekivanje IZVODI iz iste politike umjesto da ga pogađa. Zbog toga:
+#   • `full_solution` očekuje TAČNO 0 (statički, dokazano prvom granom politike);
+#   • `first_hint` očekuje 0 ILI 1 — ali VRIJEDNOST SE ZAMRZAVA PRIJE turna i
+#     poredi se strogom jednakošću; „bilo šta od toga dvoga“ nije prihvaćeno;
+#   • statički zbir je 17, pa je maksimalan dostižan plan 18, ne 19.
+SDK_CALL_CEILING = 18
+# Zbir svih scenarija čiji je ugovor statički (bez `first_hint`).
+_STATIC_PLAN_CALLS = 17
+# Sentinel: očekivanje se izvodi iz serverske politike pomoći PRIJE turna.
+DERIVED_FROM_HELP_POLICY = None
+# UI radnja koju kapija šalje za scenarije pomoći — ista mapa koju koristi
+# produkcijski put (`pipeline._UI_ACTION_BY_INTENT`), samo za ova dva intenta.
+_HELP_UI_ACTION = {"hint_request": "hint_request",
+                   "solution_request": "full_solution_request"}
 sys.path.insert(0, str(ROOT))
 
 from matbot import config, release_config, feedback, mathsafe, mcq_integrity, practice  # noqa: E402
@@ -75,7 +96,10 @@ class GateRefusal(RuntimeError):
 class GateScenario:
     role: str
     scenario: Scenario
-    expected_calls: int
+    # None = `DERIVED_FROM_HELP_POLICY`: tačna vrijednost se izvodi iz
+    # serverske politike pomoći neposredno PRIJE turna (nikad poslije njega —
+    # to bi bilo kružno i kapija ne bi hvatala višak/manjak poziva).
+    expected_calls: int | None
 
 
 def _git(*args: str) -> str:
@@ -166,6 +190,13 @@ def _require_model_routed_plan(plan):
     ijednog SDK poziva: očekivani pozivi > 0 traže model-put, a tačno 0 poziva
     traži deterministički put."""
     for item in plan:
+        if item.scenario.intent in _HELP_UI_ACTION:
+            # POMOĆ NIJE IZRADA ZADATKA. Njen broj poziva određuje serverska
+            # politika pomoći nad OBJAVLJENIM zadatkom, ne ruta lekcije: na
+            # model-lekciji `full_solution` legitimno ima 0 poziva. Ranije je
+            # ovdje vrijedilo „0 poziva ⇒ deterministička lekcija“, pa bi
+            # ispravan plan bio odbijen prije ijednog poziva.
+            continue
         deterministic = _routes_deterministically(item.scenario.lesson_id)
         if item.expected_calls > 0 and deterministic and                 item.scenario.path != "contract":
             raise GateRefusal(
@@ -177,8 +208,37 @@ def _require_model_routed_plan(plan):
                 "lesson no longer routes deterministically.")
 
 
+def resolve_expected_calls(gate: GateScenario, session_before: dict) -> tuple[int, str]:
+    """Tacan broj poziva OVOG scenarija — ZAMRZNUT PRIJE turna.
+
+    Za scenarije pomoci pita se ISTA runtime politika koju produkcija koristi
+    za rutiranje (`pipeline._help_author`), pa kapija ne drzi drugu kopiju
+    politike koja bi se mogla razici s njom. Nikad se ne gleda ishod turna:
+    ocekivanje izvedeno iz rezultata ne bi moglo pasti."""
+    if gate.expected_calls is not None:
+        return gate.expected_calls, "static_plan"
+    ui_action = _HELP_UI_ACTION.get(gate.scenario.intent, "")
+    if not ui_action:
+        raise GateRefusal(
+            f"Gate scenario '{gate.role}' has no static call contract and is "
+            "not a help scenario; its expected call count cannot be derived.")
+    from matbot.tutor import pipeline as tutor_pipeline
+    from matbot import hint_policy
+
+    author = tutor_pipeline._help_author(session_before or {}, ui_action)
+    expected = 0 if author == hint_policy.SERVER else 1
+    return expected, f"help_policy:{author}"
+
+
+def max_planned_calls(plan) -> int:
+    """Gornja granica plana: izvedeni scenariji pomoci trose najvise 1 poziv."""
+    return sum(1 if item.expected_calls is None else item.expected_calls
+               for item in plan)
+
+
 def build_release_gate_plan(commit_sha: str) -> tuple[GateScenario, ...]:
-    """The exact 14-scenario / 19-call plan, pure except curriculum lookup."""
+    """The exact 14-scenario plan (17 static + derived first hint), pure
+    except curriculum lookup."""
     grade7 = _select_rotating_lesson(7, commit_sha)
     grade8 = _select_rotating_lesson(8, commit_sha)
     grade9 = _select_rotating_lesson(9, commit_sha)
@@ -199,9 +259,13 @@ def build_release_gate_plan(commit_sha: str) -> tuple[GateScenario, ...]:
                  requires=1, interaction="correct_choice", role="correct_choice"),
         scenario("release_gate_core_harder_level1_to_2", CORE_MODEL, "harder",
                  "release-core", "Daj mi teži zadatak.", 2, requires=1, role="harder_level2"),
-        scenario("release_gate_first_hint", CORE_MODEL, "", "release-core", "Ne znam.", 1,
+        # Prvi hint: 0 kad je zadatak klase TVRDNJE (server sastavlja), 1 kad je
+        # RAČUNSKI. Vrijednost izvodi `resolve_expected_calls` iz sesije prije turna.
+        scenario("release_gate_first_hint", CORE_MODEL, "", "release-core", "Ne znam.",
+                 DERIVED_FROM_HELP_POLICY,
                  requires=2, interaction="hint", intent="hint_request", role="first_hint"),
-        scenario("release_gate_full_solution", CORE_MODEL, "", "release-core", "Uradi ga ti.", 1,
+        # Puno rješenje je UVIJEK serverska kompozicija verifikovanog artefakta.
+        scenario("release_gate_full_solution", CORE_MODEL, "", "release-core", "Uradi ga ti.", 0,
                  requires=2, interaction="full_solution", intent="solution_request", role="full_solution"),
         scenario("release_gate_core_easier_level2_to_1", CORE_MODEL, "easier",
                  "release-core", "Daj mi lakši zadatak.", 2, requires=2, role="easier_level1"),
@@ -320,15 +384,23 @@ def _structured_transition_errors(gate: GateScenario, result, prior_signature=No
 
 
 def _scenario_errors(gate: GateScenario, result, prior_task: str, prior_options: Iterable[dict],
-                     prior_signature=None) -> list[str]:
+                     prior_signature=None, *, expected_calls=None) -> list[str]:
+    """`expected_calls` je vrijednost ZAMRZNUTA PRIJE turna; kad nije data,
+    scenario mora imati staticki ugovor."""
+    if expected_calls is None:
+        expected_calls = gate.expected_calls
+    if expected_calls is None:
+        raise GateRefusal(
+            f"Gate scenario '{gate.role}' was scored without a frozen "
+            "expected call count.")
     errors = []
     if not result.published:
         errors.append(result.failure_class or "turn_not_published")
         if result.session_unchanged_after_rejection is not True:
             errors.append("state_mutation_after_rejection")
         return errors
-    if result.sdk_calls_this_turn != gate.expected_calls:
-        errors.append(f"expected_{gate.expected_calls}_sdk_calls_got_{result.sdk_calls_this_turn}")
+    if result.sdk_calls_this_turn != expected_calls:
+        errors.append(f"expected_{expected_calls}_sdk_calls_got_{result.sdk_calls_this_turn}")
     if result.lesson_id != gate.scenario.lesson_id or result.effective_topic != gate.scenario.lesson_id \
             or result.session_lesson_id_after != gate.scenario.lesson_id:
         errors.append("wrong_lesson")
@@ -417,7 +489,9 @@ def _failure_console_lines(document: dict, result_path: Path) -> list[str]:
             previous=result.get("previous_level", "-"), target=result.get("target_level", "-"),
             committed=result.get("session_level_after", "-"),
         ),
-        f"SDK CALLS: {document.get('actual_sdk_calls', 0)}/{SDK_CALL_CEILING}",
+        f"SDK CALLS: {document.get('actual_sdk_calls', 0)}"
+        f"/{document.get('planned_sdk_calls', SDK_CALL_CEILING)}"
+        f" (ceiling {document.get('sdk_call_ceiling', SDK_CALL_CEILING)})",
         "STATE PRESERVED: " + str(
             result.get("session_unchanged_after_rejection") is True
         ).lower(),
@@ -428,8 +502,15 @@ def _failure_console_lines(document: dict, result_path: Path) -> list[str]:
 def run_live_release_gate() -> int:
     commit_sha, tree_hash = _require_live_preconditions()
     plan = build_release_gate_plan(commit_sha)
-    if len(plan) != REQUIRED_SCENARIO_COUNT or sum(item.expected_calls for item in plan) != SDK_CALL_CEILING:
-        raise GateRefusal("The committed release-gate plan is not the required 14-scenario/19-call plan.")
+    # PLAFON je gornja granica, a PLAN je tacan ugovor: ovdje se dokazuje samo
+    # da ni najskuplji moguci ishod plana ne prelazi plafon. Tacan zbir se
+    # sabira dok se scenariji izvrsavaju, iz vrijednosti zamrznutih PRIJE turna.
+    if len(plan) != REQUIRED_SCENARIO_COUNT:
+        raise GateRefusal("The committed release-gate plan is not the required 14-scenario plan.")
+    if max_planned_calls(plan) != SDK_CALL_CEILING:
+        raise GateRefusal(
+            f"The committed plan's maximum is {max_planned_calls(plan)} SDK calls, "
+            f"but the ceiling is {SDK_CALL_CEILING}.")
 
     started = datetime.now(timezone.utc)
     store = SessionStore()
@@ -446,39 +527,53 @@ def run_live_release_gate() -> int:
     matbot_logger.setLevel(logging.INFO)
     matbot_logger.addHandler(capture)
     scenario_rows = []
+    planned_calls = 0
+    actual_calls = 0
     failures: list[str] = []
     infrastructure_failures: list[str] = []
     try:
         for gate in plan:
             before = store.peek(gate.scenario.session_id) or {}
+            # ZAMRZAVANJE PRIJE TURNA — poslije turna bi bilo kruzno.
+            expected_calls, expected_basis = resolve_expected_calls(gate, before)
+            planned_calls += expected_calls
             result, stop = _run_one_turn(store, llm, capture, report, gate.scenario, "release-gate")
             errors = _scenario_errors(gate, result, before.get("current_task", ""),
                                       before.get("current_options", []),
-                                      before.get("current_task_signature"))
-            scenario_rows.append({"role": gate.role, "expected_sdk_calls": gate.expected_calls,
+                                      before.get("current_task_signature"),
+                                      expected_calls=expected_calls)
+            scenario_rows.append({"role": gate.role, "expected_sdk_calls": expected_calls,
+                                  "expected_call_basis": expected_basis,
                                   "errors": errors, "result": asdict(result)})
             if result.failure_is_infrastructure:
                 infrastructure_failures.append(gate.role)
             if errors or stop:
                 failures.extend(f"{gate.role}:{error}" for error in (errors or [result.stop_triggered or "stopped"]))
                 break
+        actual_calls = llm.call_count
         cap_probe_refused = False
-        if not failures and llm.call_count == SDK_CALL_CEILING:
+        if not failures:
+            # GRANICA SE DOKAZUJE UVIJEK, ne samo kad plan slucajno potrosi
+            # cijeli budzet: brojac se dopuni do plafona (`_count` je cisti
+            # brojac i ne dodiruje SDK), pa PRVI poziv IZNAD plafona mora biti
+            # odbijen. `actual_calls` je snimljen prije dopune.
+            while llm.call_count < SDK_CALL_CEILING:
+                llm._count("release_gate_ceiling_pad")
             try:
-                llm._count("release_gate_twentieth_call_probe")
+                llm._count("release_gate_over_ceiling_probe")
             except SDKCallBudgetExceeded:
                 cap_probe_refused = True
             else:  # pragma: no cover - defensive; _count must never allow this
-                failures.append("twentieth_sdk_call_was_not_refused")
-        else:
-            cap_probe_refused = False
+                failures.append("sdk_call_above_ceiling_was_not_refused")
     finally:
         matbot_logger.removeHandler(capture)
         matbot_logger.setLevel(previous_level)
 
     finished = datetime.now(timezone.utc)
     all_required_completed = len(scenario_rows) == REQUIRED_SCENARIO_COUNT and not failures
-    passed = bool(all_required_completed and llm.call_count == SDK_CALL_CEILING
+    # TACAN UGOVOR je planirani zbir, a plafon je samo gornja granica.
+    passed = bool(all_required_completed and actual_calls == planned_calls
+                  and planned_calls <= SDK_CALL_CEILING
                   and cap_probe_refused and not infrastructure_failures)
     document = {
         "campaign": "release-gate",
@@ -498,7 +593,11 @@ def run_live_release_gate() -> int:
         "scenario_count": len(scenario_rows),
         "required_scenario_count": REQUIRED_SCENARIO_COUNT,
         "sdk_call_ceiling": SDK_CALL_CEILING,
-        "actual_sdk_calls": llm.call_count,
+        "planned_sdk_calls": planned_calls,
+        "actual_sdk_calls": actual_calls,
+        "call_above_ceiling_refused": cap_probe_refused,
+        # Zatečeno ime zadržano zbog starijih čitalaca artefakta; ordinalno je
+        # („dvadeseti“) i više ne opisuje granicu, pa je novo ime mjerodavno.
         "twentieth_call_refused_before_sdk": cap_probe_refused,
         "scenarios": scenario_rows,
         "validation_failures": failures,
@@ -522,7 +621,8 @@ def _run_static_checks() -> None:
     """Inert plan/budget checks.  No SDK client is created or invoked."""
     plan = build_release_gate_plan("0123456789abcdef" * 4)
     assert len(plan) == REQUIRED_SCENARIO_COUNT
-    assert sum(item.expected_calls for item in plan) == SDK_CALL_CEILING
+    assert max_planned_calls(plan) == SDK_CALL_CEILING
+    assert sum(item.expected_calls or 0 for item in plan) == _STATIC_PLAN_CALLS
     assert [item.role for item in plan] == [
         "fresh_level1", "correct_choice", "harder_level2", "first_hint", "full_solution",
         "easier_level1", "same_level_new", "contract_fresh", "contract_harder",
@@ -534,11 +634,12 @@ def _run_static_checks() -> None:
     for _ in range(SDK_CALL_CEILING):
         counter._count("static")
     try:
-        counter._count("static-twentieth")
+        counter._count("static-above-ceiling")
     except SDKCallBudgetExceeded:
         pass
     else:
-        raise AssertionError("20th SDK call was not refused")
+        raise AssertionError(
+            f"SDK call #{SDK_CALL_CEILING + 1} was not refused")
 
 
 def main(argv=None) -> int:

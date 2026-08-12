@@ -17,8 +17,15 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 REQUIRED_SCENARIOS = 14
 # Faza 4H: semantic_fresh/semantic_harder idu deterministički (0 poziva) —
-# plafon i tačan broj poziva prolazne kampanje padaju 23 → 19.
-REQUIRED_CALLS = 19
+# plafon i tačan broj poziva prolazne kampanje pali su 23 → 19.
+#
+# SERVER-VLASNIČKA POMOĆ (živi nalaz na scenariju `first_hint`): puno rješenje
+# je uvijek serversko (0 poziva), a prvi hint je serverski za klasu tvrdnje,
+# pa TAČAN broj poziva prolazne kampanje više NIJE jedna konstanta — statički
+# dio plana je 17, a `first_hint` mu dodaje 0 ili 1. Zato se ovdje NE
+# duplira nijedan zbir: tačan ugovor se čita IZ ARTEFAKTA
+# (`planned_sdk_calls`), a ovdje ostaje samo plafon kao gornja granica.
+REQUIRED_CALL_CEILING = 18
 MAX_AGE = timedelta(hours=24)
 REQUIRED_PIPELINE = "universal_two_call"
 
@@ -67,12 +74,20 @@ def validate_result(document: dict, *, expected_commit: str | None = None,
         errors.append("wrong_scenario_count")
     if document.get("required_scenario_count") != REQUIRED_SCENARIOS:
         errors.append("missing_required_scenario_count")
-    if document.get("actual_sdk_calls") != REQUIRED_CALLS:
-        errors.append("wrong_sdk_call_count")
-    if document.get("sdk_call_ceiling") != REQUIRED_CALLS:
+    planned = document.get("planned_sdk_calls")
+    actual = document.get("actual_sdk_calls")
+    if not isinstance(planned, int) or isinstance(planned, bool) or planned <= 0:
+        # Zatečeni (stari) artefakt nema ovo polje — i ne smije proći.
+        errors.append("missing_planned_sdk_calls")
+    else:
+        if planned > REQUIRED_CALL_CEILING:
+            errors.append("planned_sdk_calls_above_ceiling")
+        if actual != planned:
+            errors.append("wrong_sdk_call_count")
+    if document.get("sdk_call_ceiling") != REQUIRED_CALL_CEILING:
         errors.append("wrong_sdk_call_ceiling")
-    if document.get("twentieth_call_refused_before_sdk") is not True:
-        errors.append("twentieth_call_not_refused")
+    if document.get("call_above_ceiling_refused") is not True:
+        errors.append("call_above_ceiling_not_refused")
     if document.get("validation_failures"):
         errors.append("hidden_validation_failures")
     if document.get("infrastructure_failures"):

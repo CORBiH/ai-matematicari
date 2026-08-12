@@ -31,8 +31,10 @@ def _passing_document():
         "finished_at": datetime.now(timezone.utc).isoformat(),
         "scenario_count": 14,
         "required_scenario_count": 14,
-        "sdk_call_ceiling": 19,
-        "actual_sdk_calls": 19,
+        "sdk_call_ceiling": 18,
+        "planned_sdk_calls": 17,
+        "actual_sdk_calls": 17,
+        "call_above_ceiling_refused": True,
         "twentieth_call_refused_before_sdk": True,
         "validation_failures": [],
         "infrastructure_failures": [],
@@ -45,20 +47,29 @@ def _passing_document():
     }
 
 
-def test_release_gate_plan_is_exactly_fourteen_scenarios_and_nineteen_calls():
+def test_release_gate_plan_is_fourteen_scenarios_capped_at_eighteen_calls():
     """Faza 4B: plan pokriva OBA puta — deterministicki K1/K3 (6-04-005, 1
     poziv) i semanticki put (6-04-009). Faza 4H: semanticka lekcija ima potpun
     deterministicki generator, pa njeni scenariji IZRICITO dokazuju NULA
-    poziva; plafon pada 23 → 19."""
+    poziva; plafon je tada pao 23 → 19.
+
+    SERVER-VLASNICKA POMOC: `full_solution` je uvijek serverski (0 poziva), a
+    `first_hint` se IZVODI iz politike prije turna, pa staticki dio plana nosi
+    17 poziva, a maksimum plana je 18 — 19 vise nije dostizno."""
     plan = runner.build_release_gate_plan("0123456789abcdef" * 4)
     assert len(plan) == 14
-    assert sum(item.expected_calls for item in plan) == 19
+    assert runner.max_planned_calls(plan) == 18 == runner.SDK_CALL_CEILING
+    assert sum(item.expected_calls or 0 for item in plan) == 17
     by_role = {item.role: item for item in plan}
     assert by_role["contract_fresh"].scenario.path == "contract"
     assert by_role["contract_fresh"].expected_calls == 1
     assert by_role["semantic_fresh"].scenario.path == "non_contract"
     assert by_role["semantic_fresh"].expected_calls == 0
     assert by_role["semantic_harder"].expected_calls == 0
+    # C) puno rjesenje je serversko — tacno 0, nikad raspon.
+    assert by_role["full_solution"].expected_calls == 0
+    # Prvi hint NEMA statickog broja: izvodi se iz politike prije turna.
+    assert by_role["first_hint"].expected_calls is runner.DERIVED_FROM_HELP_POLICY
     assert [item.role for item in plan][:7] == [
         "fresh_level1", "correct_choice", "harder_level2", "first_hint", "full_solution",
         "easier_level1", "same_level_new",
@@ -89,7 +100,7 @@ def test_offline_result_checker_fails_closed_for_age_count_skip_and_infrastructu
 
     skipped = _passing_document()
     skipped["scenarios"][0]["result"]["attempted"] = False
-    skipped["actual_sdk_calls"] = 18
+    skipped["actual_sdk_calls"] = 16
     skipped["infrastructure_failures"] = ["timeout"]
     errors = checker.validate_result(skipped, expected_commit=SHA, expected_tree=TREE)
     assert {"scenario_failed_or_skipped", "wrong_sdk_call_count", "infrastructure_failure"} <= set(errors)
@@ -328,7 +339,7 @@ def test_failed_live_gate_console_summary_is_informative_and_does_not_echo_hidde
     assert "FAILED SCENARIO: easier_level1" in report
     assert "REASON: difficulty_direction_not_measurable" in report
     assert "LEVELS: previous=2 target=1 committed=2" in report
-    assert "SDK CALLS: 9/19" in report
+    assert "SDK CALLS: 9/17 (ceiling 18)" in report
     assert "STATE PRESERVED: true" in report
     assert "SECRET" not in report
 

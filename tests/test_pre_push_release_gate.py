@@ -73,8 +73,12 @@ def passing_document(commit_sha, tree_hash):
         "difficulty_levels_enabled": True,
         "scenario_count": 14,
         "required_scenario_count": 14,
-        "actual_sdk_calls": 19,
-        "sdk_call_ceiling": 19,
+        # SERVER-VLASNIČKA POMOĆ: tačan ugovor je PLANIRANI zbir iz same
+        # kampanje (17 statički + izvedeni prvi hint), a 18 je samo plafon.
+        "planned_sdk_calls": 17,
+        "actual_sdk_calls": 17,
+        "sdk_call_ceiling": 18,
+        "call_above_ceiling_refused": True,
         "twentieth_call_refused_before_sdk": True,
         "validation_failures": [],
         "infrastructure_failures": [],
@@ -246,9 +250,11 @@ def test_a_malformed_artifact_blocks(repo):
 @pytest.mark.parametrize("field,value", [
     ("scenario_count", 3),
     ("actual_sdk_calls", 5),
+    ("planned_sdk_calls", 0),
+    ("planned_sdk_calls", 19),
     ("sdk_call_ceiling", 12),
     ("required_scenario_count", 3),
-    ("twentieth_call_refused_before_sdk", False),
+    ("call_above_ceiling_refused", False),
     ("clean_worktree", False),
     ("practice_pipeline", "legacy_single_call"),
     ("difficulty_levels_enabled", False),
