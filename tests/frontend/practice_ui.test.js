@@ -13,7 +13,7 @@
 const test = require('node:test');
 const assert = require('node:assert');
 
-const { loadPage, jsonResponse, settle } = require('./browser_stub.js');
+const { loadPage, jsonResponse, settle, optionText } = require('./browser_stub.js');
 
 const TASK = 'Koji od sljedećih brojeva je djeljiv i sa 6 i sa 25?';
 const OPTIONS = [
@@ -289,7 +289,7 @@ test('a safe error hides the option cards but never leaves a stale set behind', 
 
   await sendChip(page, 'Daj mi novi zadatak.', null);
 
-  assert.deepStrictEqual(cards(page).map(b => b.innerHTML), [],
+  assert.deepStrictEqual(cards(page).map(optionText), [],
     'nijedna zastarjela kartica ne smije preživjeti sigurnu poruku');
   assert.strictEqual(page.ui.optionsBox.dataset.taskText, '',
     'potpis zadatka se briše, pa sljedeći ready odgovor gradi svjež set');
@@ -313,7 +313,7 @@ test('retrying after a safe error does not keep stale options once a new task ar
   });
   await sendChip(page, 'Daj mi novi zadatak.', null);
 
-  assert.deepStrictEqual(cards(page).map(b => b.innerHTML), ['81', '17', '22', '35'],
+  assert.deepStrictEqual(cards(page).map(optionText), ['81', '17', '22', '35'],
     'stare opcije moraju biti u potpunosti zamijenjene');
   assert.deepStrictEqual(cards(page).map(b => b.disabled), [false, false, false, false]);
   assert.strictEqual(page.ui.storedLastTask(), NEW_TASK);
@@ -321,13 +321,13 @@ test('retrying after a safe error does not keep stale options once a new task ar
 
 test('a solution turn does not rebuild the option cards', async () => {
   const page = practicePage();
-  const before = cards(page).map(b => b.dataset.optionId + ':' + b.innerHTML);
+  const before = cards(page).map(b => b.dataset.optionId + ':' + optionText(b));
   respondJsonOnly(page, readyTask({ answer: 'Evo postupka.', revealed_correct_option_id: 'b' }));
 
   await sendChip(page, 'Uradi ga ti.', { intent: 'solution_request' });
 
   const after = cards(page);
-  assert.deepStrictEqual(after.map(b => b.dataset.optionId + ':' + b.innerHTML), before,
+  assert.deepStrictEqual(after.map(b => b.dataset.optionId + ':' + optionText(b)), before,
     'rješenje rješava POSTOJEĆI zadatak — kartice se ne prave iznova');
   assert.strictEqual(after.find(b => b.dataset.optionId === 'b').classList.contains('correct'), true);
   assert.deepStrictEqual(after.map(b => b.disabled), [true, true, true, true],

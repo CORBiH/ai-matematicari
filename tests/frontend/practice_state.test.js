@@ -16,7 +16,7 @@
 const test = require('node:test');
 const assert = require('node:assert');
 
-const { loadPage, jsonResponse, settle } = require('./browser_stub.js');
+const { loadPage, jsonResponse, settle, optionText } = require('./browser_stub.js');
 
 const CHAT = '/api/ai-tutor/chat';
 const STREAM = '/api/ai-tutor/chat/stream';
@@ -118,7 +118,7 @@ async function sendChip(page, message, chipMeta) {
 test('the exact production sequence resets every per-task visual state', async () => {
   const page = practicePage();
   await publish(page, ready(TASK_A, OPTIONS_A, IDENTITY_A));
-  assert.deepStrictEqual(cards(page).map(b => b.innerHTML), ['322', '390', '349', '375']);
+  assert.deepStrictEqual(cards(page).map(optionText), ['322', '390', '349', '375']);
 
   // klik na 390 → netačno
   respond(page, ready(TASK_A, OPTIONS_A, IDENTITY_A, {
@@ -133,7 +133,7 @@ test('the exact production sequence resets every per-task visual state', async (
   await publish(page, ready(TASK_B, OPTIONS_B, IDENTITY_B));
 
   const after = cards(page);
-  assert.deepStrictEqual(after.map(b => b.innerHTML), ['41', '70', '33', '58']);
+  assert.deepStrictEqual(after.map(optionText), ['41', '70', '33', '58']);
   assert.strictEqual(after.some(b => b.classList.contains('incorrect')), false,
     'crvena klasa prvog zadatka je preživjela');
   assert.strictEqual(after.some(b => b.classList.contains('correct')), false);
@@ -187,7 +187,7 @@ for (const [label, message, chip] of [
     respond(page, safeErrorPreserved(TASK_A));
     await sendChip(page, message, chip);
 
-    assert.deepStrictEqual(cards(page).map(b => b.innerHTML), ['322', '390', '349', '375'],
+    assert.deepStrictEqual(cards(page).map(optionText), ['322', '390', '349', '375'],
       'opcije su nestale iako je server sačuvao zadatak');
     assert.deepStrictEqual(classesOf(page), before);
     assert.strictEqual(page.ui.optionsBox.dataset.taskIdentity, IDENTITY_A);
@@ -214,7 +214,7 @@ test('a safe error with no preserved task may show no options', async () => {
   await publish(page, ready(TASK_A, OPTIONS_A, IDENTITY_A));
   respond(page, { answer: SAFE_ERROR, last_tutor_task: '', task_preserved: false });
   await sendChip(page, 'Daj mi novi zadatak.', null);
-  assert.deepStrictEqual(cards(page).map(b => b.innerHTML), []);
+  assert.deepStrictEqual(cards(page).map(optionText), []);
 });
 
 test('a failed choice request leaves the task and re-enables the options', async () => {
@@ -225,7 +225,7 @@ test('a failed choice request leaves the task and re-enables the options', async
     throw new Error('network down');
   };
   await clickOption(page, 'b');
-  assert.deepStrictEqual(cards(page).map(b => b.innerHTML), ['322', '390', '349', '375']);
+  assert.deepStrictEqual(cards(page).map(optionText), ['322', '390', '349', '375']);
   assert.deepStrictEqual(cards(page).map(b => b.disabled), [false, false, false, false]);
 });
 
@@ -247,7 +247,7 @@ test('a slow older response cannot overwrite a newer accepted task', async () =>
   await settle();
 
   assert.strictEqual(page.ui.storedLastTask(), TASK_B);
-  assert.deepStrictEqual(cards(page).map(b => b.innerHTML), ['41', '70', '33', '58']);
+  assert.deepStrictEqual(cards(page).map(optionText), ['41', '70', '33', '58']);
   assert.strictEqual(page.ui.optionsBox.dataset.taskIdentity, IDENTITY_B);
 });
 
@@ -266,7 +266,7 @@ test('a response for another topic cannot commit after switching topics', async 
   /* Praćenje zadatka je vezano za temu, pa `storedLastTask()` nakon promjene
      teme namjerno čita prazno. Mjerodavno je da odgovor STARE teme nije upisao
      ništa vidljivo: kartice i identitet su i dalje od zadatka A. */
-  assert.deepStrictEqual(cards(page).map(b => b.innerHTML), ['322', '390', '349', '375']);
+  assert.deepStrictEqual(cards(page).map(optionText), ['322', '390', '349', '375']);
   assert.strictEqual(page.ui.optionsBox.dataset.taskIdentity, IDENTITY_A);
 });
 
@@ -282,7 +282,7 @@ test('closing the practice view invalidates pending responses', async () => {
   await settle();
 
   assert.strictEqual(page.ui.storedLastTask(), TASK_A);
-  assert.deepStrictEqual(cards(page).map(b => b.innerHTML), ['322', '390', '349', '375']);
+  assert.deepStrictEqual(cards(page).map(optionText), ['322', '390', '349', '375']);
 });
 
 test('a timed-out request that finishes later cannot overwrite the retry', async () => {
@@ -336,7 +336,7 @@ test('a curriculum reset (grade/topic change) invalidates in-flight responses', 
   });
   await settle();
 
-  assert.deepStrictEqual(cards(page).map(b => b.innerHTML), [],
+  assert.deepStrictEqual(cards(page).map(optionText), [],
     'odgovor iz stare sesije je ponovo naslikao opcije poslije reseta');
   assert.strictEqual(page.ui.storedLastTask(), '');
 });
@@ -357,7 +357,7 @@ test('a malformed response leaves the controls usable and the next turn works', 
 
   // Oporavak: novi ispravan odgovor se normalno primjenjuje.
   await publish(page, ready(TASK_B, OPTIONS_B, IDENTITY_B));
-  assert.deepStrictEqual(cards(page).map(b => b.innerHTML), ['41', '70', '33', '58']);
+  assert.deepStrictEqual(cards(page).map(optionText), ['41', '70', '33', '58']);
   assert.strictEqual(page.ui.optionsBox.dataset.taskIdentity, IDENTITY_B);
 });
 
@@ -419,6 +419,6 @@ test('an accepted new task updates text, options and identity together', async (
   await publish(page, ready(TASK_B, OPTIONS_B, IDENTITY_B));
   assert.strictEqual(page.ui.storedLastTask(), TASK_B);
   assert.strictEqual(page.ui.optionsBox.dataset.taskIdentity, IDENTITY_B);
-  assert.deepStrictEqual(cards(page).map(b => b.innerHTML), ['41', '70', '33', '58']);
+  assert.deepStrictEqual(cards(page).map(optionText), ['41', '70', '33', '58']);
   assert.strictEqual(page.ui.optionsBox.dataset.taskText, TASK_B);
 });

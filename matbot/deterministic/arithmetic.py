@@ -715,9 +715,20 @@ def _remainder_package(rng, lesson_id, lesson_title, level):
 
     hint1 = ("Dijeljenje s ostatkom zapisuje se kao a = b·q + r, gdje je "
              "ostatak r manji od djelioca b.")
-    hint2 = (f"Potraži najveći sadržilac broja ${divisor}$ koji ne premašuje "
-             f"djeljenik, pa pogledaj šta ostane." if level < 3 else
-             f"Uvrsti u zapis a = b·q + r: $a = {divisor} \\cdot {quotient} + "
+    # REGISTAR, NE TERMIN (predizdanje, ciljana popravka). Zatečeno:
+    # „Potraži najveći sadržilac broja $6$ koji ne premašuje djeljenik, pa
+    # pogledaj šta ostane.“ — „ne premašuje“ je administrativna fraza, a
+    # „djeljenik“ je apstraktna uputa na broj koji učeniku VEĆ stoji napisan u
+    # pitanju (nivoi 1 i 2 uvijek prikazuju djeljenik). Sada se imenuje sam
+    # broj i traži se konkretna radnja.
+    #
+    # `sadržilac` se NAMJERNO ZADRŽAVA: KS_2018 (6. razred) izričito traži
+    # „upotrebljavati pojmove: djeljivo je, sadržilac je, djelilac je…“
+    # (stavke KS_2018-0036/0037/0039/0044, RS_2014-0024), a „višekratnik“ se u
+    # oba izvora NE pojavljuje nijednom. Termin nije defekt — rečenica jeste.
+    hint2 = (f"Nađi najveći sadržilac broja ${divisor}$ koji nije veći od "
+             f"${dividend}$, pa vidi koliko ostane do ${dividend}$." if level < 3
+             else f"Uvrsti u zapis a = b·q + r: $a = {divisor} \\cdot {quotient} + "
              f"{remainder}$.")
     hint3 = f"Provjeri zapisom: ${identity}$ — ostatak mora biti manji od djelioca."
     solution = (f"Vrijedi ${identity}$, a ostatak ${remainder}$ je manji od "

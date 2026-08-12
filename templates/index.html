@@ -283,6 +283,11 @@
   .mc-option-card.loading{opacity:.7;position:relative;}
   .mc-option-card.correct{background:#123a1f;border-color:#3fbf6f;box-shadow:0 0 0 1px #3fbf6f inset;}
   .mc-option-card.incorrect{background:#3a1414;border-color:#c9564f;box-shadow:0 0 0 1px #c9564f inset;}
+  /* Jedini flex potomak kartice: proza i MathJax ostaju u običnom inline toku
+     unutar njega, pa razmak oko riječi između dva $…$ ne nestaje (vidi
+     buildOptionCards). `min-width:0` čuva prelamanje dugih opcija na uskim
+     ekranima — flex element se inače ne smije suziti ispod svog sadržaja. */
+  .mc-option-text{flex:1 1 auto;min-width:0;}
   .mc-option-card mjx-container{margin:0 !important;}
 
   /* Phase 2: mala preporuka video lekcije unutar transcripta */
@@ -1725,7 +1730,20 @@ document.addEventListener('DOMContentLoaded', () => {
         b.type = 'button';
         b.className = 'mc-option-card';
         b.dataset.optionId = opt.id;
-        b.innerHTML = escapeHtml(opt.text || '');
+        /* JEDAN flex potomak nosi CIO tekst opcije (živi predizdanje nalaz).
+           Kartica je `display:flex`. Dok je tekst jedan čvor, sve je uredu —
+           ali MathJax `$…$` zamijeni `mjx-container` elementima, pa proza
+           IZMEĐU njih („ ili “) postane zaseban anoniman flex element, a
+           razmaci na njegovim krajevima se po specifikaciji flexboxa NE
+           prikazuju. Objavljena opcija `$x = 0$ ili $x = 3$` se tako čitala
+           kao „x = 0ilix = 3“. Tekst opcije je pri tome bio ispravan na
+           serveru, u mathsafe, u terminologiji i u payloadu — kvar je čisto
+           layout. S ovim omotačem kartica ima TAČNO JEDAN flex element, pa
+           unutar njega vrijede obična inline pravila za razmake. */
+        const text = document.createElement('span');
+        text.className = 'mc-option-text';
+        text.innerHTML = escapeHtml(opt.text || '');
+        b.appendChild(text);
         b.addEventListener('click', ()=>{ sendChoiceAnswer(opt.id); });
         optionsBox.appendChild(b);
       });

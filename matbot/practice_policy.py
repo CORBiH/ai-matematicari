@@ -65,6 +65,41 @@ UNKNOWN_ROLE_RELATIONS = {
                         "nepoznati djelilac = djeljenik podijeljen količnikom"),
 }
 
+# ISTA METODA, ali kao GOTOVA ŠKOLSKA REČENICA za tekst koji učenik čita.
+#
+# ZAŠTO POSTOJI (predizdanje, ciljana popravka): relacije iznad su zapisane u
+# `=` obliku jer tako idu u prompt i u interno rezonovanje. Deterministički
+# motor nejednačina ih je do sada pretvarao u prozu isječkom
+# `_role_sentence(role).split("=")[1]` i kalemio dobijeni fragment u DRUGU
+# rečenicu, čiji je subjekat bio interna riječ „granica“ (ime promjenljive
+# `bound`). Nastajalo je npr. „pa je granica količnik puta djelilac“ — imenska
+# fraza kojoj je subjekat obrisan, u rečenici o pojmu koji učenik 6. razreda
+# nigdje nije sreo. To NIJE stvar ukusa nego pokvarena rečenična konstrukcija.
+#
+# Zato ovdje stoji potpuna rečenica po ulozi, autorski napisana, koja se u
+# tekst ubacuje CIJELA. Tabela je TOTALNA (isti ključevi kao relacije iznad) —
+# time parnost ključeva postaje provjerljiva invarijanta
+# (`tests/test_role_sentence_integrity.py`), što s djelimičnom tabelom ne bi
+# bilo moguće iskazati. Metoda je i dalje veza među članovima (6. razred):
+# nijedna rečenica ne pominje prebacivanje preko znaka jednakosti.
+#
+# `UNKNOWN_ROLE_RELATIONS` se NE dira — `unknown_member_rule_lines()` renderuje
+# isključivo nju, pa se prompt Tutora i Recenzenta ne mijenja ni za jedan znak.
+UNKNOWN_ROLE_EXPLANATIONS = {
+    "unknown_addend":
+        "nepoznati sabirak dobiješ tako što od zbira oduzmeš poznati sabirak",
+    "unknown_minuend":
+        "nepoznati umanjenik dobiješ tako što razlici dodaš umanjilac",
+    "unknown_subtrahend":
+        "nepoznati umanjilac dobiješ tako što od umanjenika oduzmeš razliku",
+    "unknown_factor":
+        "nepoznati činilac dobiješ tako što proizvod podijeliš poznatim činiocem",
+    "unknown_dividend":
+        "nepoznati djeljenik dobiješ tako što količnik pomnožiš djeliocem",
+    "unknown_divisor":
+        "nepoznati djelilac dobiješ tako što djeljenik podijeliš količnikom",
+}
+
 _EQUATION_METHOD_BY_GRADE = {
     6: METHOD_UNKNOWN_MEMBER,
     7: METHOD_TRANSPOSITION,

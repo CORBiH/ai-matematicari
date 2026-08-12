@@ -26,8 +26,11 @@ from fractions import Fraction
 
 from matbot.deterministic import core
 from matbot.deterministic.core import DeterministicGenerationError
-# PP-1: relacije nepoznatog člana — ISTE rečenice koje rules.py renderuje u
-# oba prompta (jedna istina, vidi matbot/practice_policy.py).
+# PP-1, dva pogleda na ISTU metodu (jedna istina, vidi matbot/practice_policy.py):
+#   • RELATIONS   — relacije koje rules.py renderuje u oba prompta;
+#   • EXPLANATIONS — iste veze kao GOTOVE školske rečenice za tekst učeniku,
+#     da se proza nikad ne sklapa isječkom relacije.
+from matbot.practice_policy import UNKNOWN_ROLE_EXPLANATIONS as _ROLE_EXPLANATIONS
 from matbot.practice_policy import UNKNOWN_ROLE_RELATIONS as _ROLE_RELATIONS
 
 FAMILY_IDS = ("linear_equation_direct", "simple_quadratic_equation")
@@ -944,8 +947,39 @@ def _equivalence_package(rng, level, domain, lesson_id, lesson_title):
 # ---------------------------------------------------------------------------
 
 def _role_sentence(role):
-    """„nepoznati sabirak = zbir minus poznati sabirak“ — iz PP-1 tabele."""
+    """„nepoznati sabirak = zbir minus poznati sabirak“ — iz PP-1 tabele.
+
+    Koristi se SAMO tamo gdje relacija stoji kao CIJELA, navedena kao pravilo
+    iza dvotačke („U ovoj jednačini $x$ je djeljenik: <relacija>.“). Nikad se
+    ne dijeli na komade — vidi `_associated_equation_line`."""
     return _ROLE_RELATIONS[role][1]
+
+
+def _associated_equation_line(role, equation, computation):
+    """Potpuna uputa o pridruženoj jednačini nejednačine — DVIJE kratke rečenice.
+
+    ZAŠTO POSTOJI (predizdanje, ciljana popravka). Sva četiri oblika
+    nejednačine gradila su ovu uputu ovako:
+
+        f"… $x$ je djeljenik, pa je granica "
+        f"{_role_sentence('unknown_dividend').split('=')[1].strip()} — …"
+
+    Isječak `.split("=")[1]` uzima PREDIKAT tuđe rečenice („količnik puta
+    djelilac“), briše mu subjekat („nepoznati djeljenik“) i kalemi ga na nov
+    subjekat `granica` — internu riječ za promjenljivu `bound`, koju učenik
+    6. razreda nigdje nije sreo. Nastajalo je: „pa je granica količnik puta
+    djelilac“. Dva množitelja iste greške: dva od četiri oblika su uz to
+    najavljivala jednačinu („Zamisli pridruženu jednačinu:“) a NIKAD je nisu
+    prikazala.
+
+    Ovdje se ništa ne isječkuje: uloga dolazi kao CIJELO polje oznake iz PP-1
+    tabele, objašnjenje kao GOTOVA rečenica iz `UNKNOWN_ROLE_EXPLANATIONS`, a
+    pridružena jednačina se stvarno prikazuje. `computation` ostaje bajt za
+    bajt isti račun koji je i ranije stajao u ovoj uputi — matematika se ne
+    dira, mijenja se samo rečenica oko nje."""
+    return (f"Zamisli pridruženu jednačinu ${equation}$. U njoj je $x$ "
+            f"{_ROLE_RELATIONS[role][0]}, a {_ROLE_EXPLANATIONS[role]}: "
+            f"${computation}$.")
 
 
 def _role_value(rng, domain, level, small=False, nonzero=True):
@@ -1225,10 +1259,10 @@ def _role_inequality_additive_package(rng, level, domain, lesson_id,
     if form == "x_plus":
         rhs = bound + known                   # granica se KONSTRUIŠE unaprijed
         inequality = f"x + {show(known)} {symbol} {show(rhs)}"
-        role_line = ("Zamisli pridruženu jednačinu $x + "
-                     f"{show(known)} = {show(rhs)}$: $x$ je sabirak, pa je "
-                     f"granica {_role_sentence('unknown_addend').split('=')[1].strip()}"
-                     f" — ${show(rhs)} - {show(known)} = {show(bound)}$.")
+        role_line = _associated_equation_line(
+            "unknown_addend",
+            f"x + {show(known)} = {show(rhs)}",
+            f"{show(rhs)} - {show(known)} = {show(bound)}")
         steps = f"x {symbol} {show(rhs)} - {show(known)}"
     else:
         rhs = _role_value(rng, domain, level, small=True)
@@ -1236,10 +1270,10 @@ def _role_inequality_additive_package(rng, level, domain, lesson_id,
             raise DeterministicGenerationError("degenerisana desna strana")
         bound = rhs + known                   # umanjenik = razlika + umanjilac
         inequality = f"x - {show(known)} {symbol} {show(rhs)}"
-        role_line = ("Zamisli pridruženu jednačinu $x - "
-                     f"{show(known)} = {show(rhs)}$: $x$ je umanjenik, pa je "
-                     f"granica {_role_sentence('unknown_minuend').split('=')[1].strip()}"
-                     f" — ${show(rhs)} + {show(known)} = {show(bound)}$.")
+        role_line = _associated_equation_line(
+            "unknown_minuend",
+            f"x - {show(known)} = {show(rhs)}",
+            f"{show(rhs)} + {show(known)} = {show(bound)}")
         steps = f"x {symbol} {show(rhs)} + {show(known)}"
     answer_symbol = symbol                    # sabiranje/oduzimanje čuva smjer
     bound_display = show(bound)
@@ -1299,9 +1333,10 @@ def _role_inequality_multiplicative_package(rng, level, domain, lesson_id,
                        if multiplier.denominator > 1
                        else f"{show(multiplier)}x")
         inequality = f"{coefficient} {symbol} {show(rhs)}"
-        role_line = (f"Zamisli pridruženu jednačinu: $x$ je činilac, pa je "
-                     f"granica {_role_sentence('unknown_factor').split('=')[1].strip()}"
-                     f" — ${show(rhs)} : {core.parenthesized(show(multiplier))} = {show(bound)}$.")
+        role_line = _associated_equation_line(
+            "unknown_factor",
+            f"{coefficient} = {show(rhs)}",
+            f"{show(rhs)} : {core.parenthesized(show(multiplier))} = {show(bound)}")
         steps = f"x {symbol} {show(rhs)} : {core.parenthesized(show(multiplier))}"
     else:
         rhs = _role_value(rng, domain, level, small=True)
@@ -1310,9 +1345,10 @@ def _role_inequality_multiplicative_package(rng, level, domain, lesson_id,
         bound = rhs * multiplier              # djeljenik = količnik · djelilac
         inequality = (f"x : {core.parenthesized(show(multiplier))} {symbol} "
                       f"{show(rhs)}")
-        role_line = (f"Zamisli pridruženu jednačinu: $x$ je djeljenik, pa je "
-                     f"granica {_role_sentence('unknown_dividend').split('=')[1].strip()}"
-                     f" — ${show(rhs)} \\cdot {core.parenthesized(show(multiplier))} = {show(bound)}$.")
+        role_line = _associated_equation_line(
+            "unknown_dividend",
+            f"x : {core.parenthesized(show(multiplier))} = {show(rhs)}",
+            f"{show(rhs)} \\cdot {core.parenthesized(show(multiplier))} = {show(bound)}")
         steps = f"x {symbol} {show(rhs)} \\cdot {core.parenthesized(show(multiplier))}"
     bound_display = show(bound)
     correct, options = _role_inequality_options(symbol, bound_display, show,

@@ -319,4 +319,17 @@ async function settle(times = 6) {
   for (let i = 0; i < times; i += 1) await new Promise(resolve => setTimeout(resolve, 0));
 }
 
-module.exports = { loadPage, jsonResponse, settle, Element, Doc };
+/** Vidljiv tekst MCQ kartice — ČITA GA KROZ `.mc-option-text` omotač.
+ *
+ * Kartica je `display:flex`, pa cio tekst opcije mora biti u TAČNO JEDNOM
+ * potomku: kad MathJax razbije `$…$` u `mjx-container` elemente, proza između
+ * njih inače postane zaseban anoniman flex element i razmaci na njegovim
+ * krajevima nestanu („x = 0ilix = 3“). Testovi zato tekst čitaju odavde, a ne
+ * s dugmeta — čitanje s dugmeta bi tiho prošlo i kad omotač nestane.
+ */
+function optionText(card) {
+  const wrapper = card.querySelector('.mc-option-text');
+  return wrapper === null ? null : wrapper.innerHTML;
+}
+
+module.exports = { loadPage, jsonResponse, settle, optionText, Element, Doc };
