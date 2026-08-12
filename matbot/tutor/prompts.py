@@ -322,7 +322,12 @@ _TASK_RULE = """KAD PRAVIŠ ZADATAK:
   tvrdnja“): server opcije izmiješa POSLIJE tebe i tek onda dodjeljuje slova, pa
   svaka takva oznaka postaje netačna i cijeli paket biva odbijen. Objasni SADRŽAJ
   tačnog odgovora — matematiku, ne oznaku. Imenovanje matematičkih objekata
-  (`tačka A`, `duž AB`, `funkcija f`) nije oznaka opcije i ostaje dozvoljeno."""
+  (`tačka A`, `duž AB`, `funkcija f`) nije oznaka opcije i ostaje dozvoljeno.
+- KAD SU OPCIJE TVRDNJE („Koja tvrdnja o razlomku … je tačna?“), tačan odgovor
+  je sama TVRDNJA, pa je PONOVI SVOJIM RIJEČIMA i objasni zašto vrijedi. Nikad
+  ne počinji rečenicu oznakom te tvrdnje: „Tvrdnja pod a) je tačna.“ i „Tačan
+  odgovor je b) jer …“ su odbijeni paketi, a „U razlomku $\\frac{3}{5}$ brojnik
+  je $3$, a nazivnik $5$.“ je isto objašnjenje bez ijedne oznake."""
 
 # POLAZNA SLOŽENOST — namjerno kratko i apsolutno pravilo, ne sistem težine.
 # ZAŠTO POSTOJI (ručni test, 2026-08-03): prvi zadatak uvodne lekcije 6. razreda
@@ -908,6 +913,12 @@ _REVIEWER_OPTION_IDENTITY_RULE = """OPTION IDENTITY IS THE SERVER'S, NEVER YOURS
   nazivnik na koliko je jednakih dijelova cjelina podijeljena." is correct;
   „Tačan odgovor je b)." is not. Naming the correct answer's CONTENT is always
   allowed — it is only the server-owned label or position that is forbidden.
+- WHEN THE OPTIONS ARE STATEMENTS („Koja tvrdnja … je tačna?"), the correct
+  answer IS a statement, so RESTATE that statement in your own words and say why
+  it holds. Never let the label be the subject of the sentence: „Tvrdnja pod a)
+  je tačna." and „Tačan odgovor je b) jer …" are rejected packages, while „U
+  razlomku $\\frac{3}{5}$ brojnik je $3$, a nazivnik $5$." carries the same
+  explanation with no label at all.
 - Ordinary mathematical names are NOT option labels and stay welcome: `tačka A`,
   `duž AB`, `ugao ABC`, `funkcija f`, `skup B`.
 - AFTER ANY REPAIR you make, re-read your FINAL `solution` and
