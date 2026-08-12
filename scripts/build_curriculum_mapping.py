@@ -47,7 +47,7 @@ PHASE1_XLSX = ROOT / "reference" / "curriculum" / "semantics" / "MATBOT_Faza1_KS
 TOPICS_JSON = ROOT / "data" / "topics.json"
 OUTPUT_XLSX = ROOT / "reference" / "curriculum" / "semantics" / "MATBOT_Faza2_Mapiranje.xlsx"
 
-EXPECTED_LESSON_COUNT = 534
+EXPECTED_LESSON_COUNT = 536
 EXPECTED_ITEM_COUNT = 573
 # Kontrolni brojevi iz lista Kontrola Faze 1 — build pada ako se ne poklope.
 EXPECTED_ITEMS_BY_SOURCE_GRADE = {

@@ -262,7 +262,7 @@ def test_divisibility_lessons_say_djelilac_and_never_faktor_for_the_divisor():
     divisor_words = 0
     for seed in range(20):
         for level in (1, 2, 3):
-            package = _generate("6-03-001", "Djelilac/faktor i sadržilac/"
+            package = _generate("6-03-001", "Djelilac/djelitelj i sadržilac/"
                                 "višekratnik prirodnog broja", entry, level,
                                 seed, 6)
             blob = " ".join(_published(t) for t in _visible(package)).lower()
@@ -287,7 +287,7 @@ def test_curriculum_lesson_titles_are_not_rewritten():
     titles = {l["id"]: l["title"]
               for gd in topics["grades"].values() for l in gd["lessons"]}
     assert titles["6-03-001"] == \
-        "Djelilac/faktor i sadržilac/višekratnik prirodnog broja"
+        "Djelilac/djelitelj i sadržilac/višekratnik prirodnog broja"
     assert titles["6-04-001"] == \
         "Pojam razlomka, brojnik/brojilac i nazivnik/imenilac"
     assert titles["6-04-009"] == \

@@ -56,8 +56,8 @@ def turn_for(topic_id, grade, **changes):
 # 1-2: svih 534 lekcija — jedan put, jedna šema
 # ---------------------------------------------------------------------------
 
-def test_curriculum_really_has_534_lessons():
-    assert len(LESSONS) == 534
+def test_curriculum_really_has_every_lesson():
+    assert len(LESSONS) == 536
 
 
 def test_all_534_lessons_resolve_to_the_universal_pipeline():
@@ -70,7 +70,7 @@ def test_all_534_lessons_resolve_to_the_universal_pipeline():
     assert not missing, f"lekcije bez univerzalnog konteksta: {missing[:10]}"
 
 
-def test_all_534_lessons_use_the_same_final_schema():
+def test_every_lesson_uses_the_same_final_schema():
     """Ista šema, isti oblik odgovora — bez obzira ima li lekcija ugovor."""
     seen_contract, seen_legacy = 0, 0
     for grade, topic in LESSONS:
@@ -80,7 +80,9 @@ def test_all_534_lessons_use_the_same_final_schema():
         else:
             seen_legacy += 1
         assert isinstance(context, lesson_context_module.LessonContext)
-    assert seen_contract == 6 and seen_legacy == 528
+    # Dvije nove lekcije Skupova nemaju K1/K3 ugovor (semantički je
+    # odvojen sloj), pa rastu SAMO u legacy brojaču.
+    assert seen_contract == 6 and seen_legacy == 530
 
 
 @pytest.mark.parametrize("grade,topic", [
@@ -669,13 +671,16 @@ def test_no_lesson_silently_enters_another_execution_path(monkeypatch):
 # ---------------------------------------------------------------------------
 
 def test_legacy_family_mapping_parity_is_still_intact():
-    """528/528 mapiranje ostaje netaknuto — sada kao KONTEKST, ne kao put."""
+    """Mapiranje bez ugovora ostaje netaknuto — sada kao KONTEKST, ne kao put.
+
+    Broj raste kad kurikulum dobije lekciju bez K1/K3 ugovora (dvije nove
+    lekcije Skupova), pa se čita iz zamrznutog baseline-a, ne iz konstante."""
     baseline = json.loads(
         (ROOT / "tests" / "fixtures" / "legacy_routing_baseline.json").read_text(
             encoding="utf-8")
     )
     rows = baseline["lessons"] if isinstance(baseline, dict) else baseline
-    assert len(rows) == 528
+    assert len(rows) == 530
     checked = 0
     for row in rows:
         topic = row["topic_id"]
@@ -683,7 +688,7 @@ def test_legacy_family_mapping_parity_is_still_intact():
         assert context is not None, topic
         assert list(context.families) == list(row["families"]), topic
         checked += 1
-    assert checked == 528
+    assert checked == 530
 
 
 def test_no_lesson_id_branching_in_the_universal_engine():

@@ -49,8 +49,8 @@ def pipeline():
 
 def test_both_input_workbooks_load_with_expected_counts(pipeline):
     lessons, items, _mappings, _issues = pipeline
-    assert len(lessons) == 534
-    assert len({l.lesson_id for l in lessons}) == 534
+    assert len(lessons) == 536
+    assert len({l.lesson_id for l in lessons}) == 536
     assert len(items) == 573
     assert len({i.item_id for i in items}) == 573
 
@@ -319,9 +319,9 @@ def test_phase2_workbook_has_all_required_sheets(phase2_workbook):
     ]
 
 
-def test_phase2_lessons_sheet_preserves_all_534(phase2_workbook):
+def test_phase2_lessons_sheet_preserves_every_lesson(phase2_workbook):
     rows = list(phase2_workbook["Lekcije_534"].iter_rows(values_only=True))[1:]
-    assert len(rows) == 534
+    assert len(rows) == 536
     data = json.loads((ROOT / "data" / "topics.json").read_text(encoding="utf-8"))
     json_ids = {
         (lesson["id"], lesson["title"])

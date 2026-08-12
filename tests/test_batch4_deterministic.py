@@ -74,12 +74,12 @@ _BATCH4_FAMILY_OF = {
 # 1) POKRIVENOST — nezavisno reprodukovan konačan broj
 # ---------------------------------------------------------------------------
 
-def test_batch4_coverage_is_exactly_352_lessons_in_44_families():
+def test_batch4_coverage_is_exactly_354_lessons_in_44_families():
     compiled = json.loads(
         (ROOT / "data" / "lesson_semantics.compiled.json").read_text(
             encoding="utf-8"))
     lessons = compiled["lessons"]
-    assert len(lessons) == 352
+    assert len(lessons) == 354
     assert len({entry["family_id"] for entry in lessons.values()}) == 44
     assert len(_BATCH4_FAMILY_OF) == 80
     for lesson_id, family_id in _BATCH4_FAMILY_OF.items():

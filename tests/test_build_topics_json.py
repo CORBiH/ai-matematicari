@@ -22,8 +22,8 @@ from matbot.topics import lesson_info  # noqa: E402
 
 DATA_PATH = ROOT / "data" / "topics.json"
 CURRICULUM_DIR = ROOT / "reference" / "curriculum"
-EXPECTED_COUNTS = {"6": 119, "7": 122, "8": 131, "9": 162}
-EXPECTED_TOTAL = 534
+EXPECTED_COUNTS = {"6": 121, "7": 122, "8": 131, "9": 162}
+EXPECTED_TOTAL = 536
 
 
 def load_generated_json():
@@ -185,7 +185,7 @@ def test_counts_per_grade_match_new_curriculum():
     assert counts == EXPECTED_COUNTS
 
 
-def test_total_lesson_count_is_534():
+def test_total_lesson_count_matches_the_canonical_workbook():
     data = load_generated_json()
     total = sum(len(gd["lessons"]) for gd in data["grades"].values())
     assert total == EXPECTED_TOTAL

@@ -127,10 +127,10 @@ def test_dry_run_validates_wave_a_and_makes_zero_model_calls(tmp_path):
     assert summary["unique_ids_ok"] is True
     assert summary["estimated_model_calls_max"] == WAVE_A_CALL_BUDGET
     # Pokrivenost je IZRAČUNATA iz kurikuluma, ne procijenjena.
-    assert summary["curriculum_lessons_total"] == 534
+    assert summary["curriculum_lessons_total"] == 536
     assert summary["unique_lessons"] == 39
     assert summary["lesson_coverage_percent"] == pytest.approx(
-        100.0 * 39 / 534, abs=0.01)
+        100.0 * 39 / 536, abs=0.01)
 
 
 def test_dry_run_reports_an_unknown_topic_instead_of_silently_passing(tmp_path):

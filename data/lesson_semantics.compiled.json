@@ -347,6 +347,74 @@
       ],
       "reviewer_note": "Invarijanta: jednakost skupova je skupovna (poredak/duplikati nebitni); komplement traži izričit univerzum."
     },
+    "6-01-012": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "finite_set",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-6-01-012"
+      ],
+      "family_id": "finite_set_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "6-01-012",
+      "level_bounds": {
+        "1": "dvije operacije nad skupovima do 5 elemenata, bez zagrada",
+        "2": "dvije operacije sa zagradom koja mijenja redoslijed",
+        "3": "tri operacije i zagrade, do tri skupa"
+      },
+      "parameters": {
+        "concepts": [
+          "multi_operation"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: više skupovnih operacija u JEDNOM zadatku (npr. (A ∪ B) \\ C)",
+        "- skupovi se porede kao skupovi: poredak zapisivanja i ponovljeni elementi ne mijenjaju skup",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: zadatak mora tražiti BAR DVIJE skupovne operacije nad konačnim skupovima; jedna operacija nije ova lekcija. Skupovi se porede kao skupovi (poredak i ponavljanje ne mijenjaju skup)."
+    },
+    "6-01-013": {
+      "activation_class": "READY",
+      "advisory_parameters": [],
+      "contract_version": "5F.1",
+      "detector": "finite_set",
+      "enforced_parameters": [
+        "concepts"
+      ],
+      "enforcement_mode": "blocking",
+      "evidence_ids": [
+        "CANON-TITLE-6-01-013"
+      ],
+      "family_id": "finite_set_direct",
+      "family_version": 1,
+      "forbidden_neighbour_skills": [],
+      "lesson_id": "6-01-013",
+      "level_bounds": {
+        "1": "jedna situacija i jedna operacija, mali skupovi",
+        "2": "dvije grupe i jedna operacija, trazi se popis clanova",
+        "3": "dvije operacije u istoj prici, do tri grupe"
+      },
+      "parameters": {
+        "concepts": [
+          "set_word_problem"
+        ]
+      },
+      "prompt_lines": [
+        "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
+        "- glavna vidljiva radnja mora biti: tekstualni zadatak koji se modeluje skupovima i skupovnim operacijama",
+        "- skupovi se porede kao skupovi: poredak zapisivanja i ponovljeni elementi ne mijenjaju skup",
+        "- ako prekršiš ovo, server odbija paket prije objave"
+      ],
+      "reviewer_note": "Invarijanta: zadatak mora imati TEKSTUALNU situaciju iz koje se skupovi čitaju; goli simbolički zapis skupovne operacije nije ova lekcija."
+    },
     "6-02-001": {
       "activation_class": "READY",
       "advisory_parameters": [],
@@ -618,13 +686,12 @@
     },
     "6-02-008": {
       "activation_class": "READY",
-      "advisory_parameters": [
-        "max_variable_degree"
-      ],
+      "advisory_parameters": [],
       "contract_version": "5F.1",
       "detector": "polynomial_basic",
       "enforced_parameters": [
         "concepts",
+        "max_variable_degree",
         "number_domain"
       ],
       "enforcement_mode": "blocking",

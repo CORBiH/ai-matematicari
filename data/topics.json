@@ -73,6 +73,16 @@
           "title": "Direktni/Dekartov proizvod skupova"
         },
         {
+          "id": "6-01-012",
+          "oblast": "Skupovi i skupovne operacije",
+          "title": "Zadaci s više skupovnih operacija"
+        },
+        {
+          "id": "6-01-013",
+          "oblast": "Skupovi i skupovne operacije",
+          "title": "Tekstualni zadaci sa skupovima"
+        },
+        {
           "id": "6-02-001",
           "oblast": "Prirodni brojevi i skupovi N/N0",
           "title": "Skupovi N i N0"
@@ -120,7 +130,7 @@
         {
           "id": "6-03-001",
           "oblast": "Djeljivost brojeva",
-          "title": "Djelilac/faktor i sadržilac/višekratnik prirodnog broja"
+          "title": "Djelilac/djelitelj i sadržilac/višekratnik prirodnog broja"
         },
         {
           "id": "6-03-002",

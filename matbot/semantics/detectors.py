@@ -328,8 +328,88 @@ def _detect_fraction_arithmetic(contract, text):
                    denominator_relation=required_relation)
 
 
+# ---------------------------------------------------------------------------
+# DETEKTOR PORODICE: polynomial_basic — STEPEN PROMJENLJIVE
+# ---------------------------------------------------------------------------
+# ŽIVI QA NALAZ (direktor škole, „Izrazi s promjenljivim i brojna vrijednost
+# izraza“): traženjem sve težih zadataka lekcija je dolazila do
+# izraza s $x^2$. Ugovor lekcije to već zabranjuje (`max_variable_degree: 1`,
+# a njen `_scope_note` nosi dokaz: stepenovanje u 6. razredu ne postoji ni u
+# jednoj NPP stavki i uvodi se tek u 8. razredu), i DETERMINISTIČKI generator
+# ga poštuje — ali ta granica je bila SAMO savjetodavna: porodični detektor
+# nije postojao, pa je `detect` vraćao UNSUPPORTED i model-put nije imao ništa
+# što bi prekršaj oborilo. Ovdje se ta granica dokazuje.
+#
+# LEKCIJSKI, NE RAZREDNI OPSEG: mjeri se ISKLJUČIVO `max_variable_degree` iz
+# ugovora TE lekcije. Lekcija bez tog parametra (npr. one čiji JESTE predmet
+# stepenovanje) prolazi kroz ovaj detektor netaknuta — zabrana stepenovanja po
+# razredu bila bi arhitektonski pogrešna.
+#
+# GRANICA DOKAZA: dokazuje se samo VIDLJIVA notacija stepena nad
+# PROMJENLJIVOM unutar `$...$` — `x^2`, `x^{2}`, `x²`, `x**2` i izričit
+# proizvod iste promjenljive sa samom sobom (`x \cdot x`). Brojevni stepen
+# (`2^3`) i sve što se ne može dokazati ostaju UNSUPPORTED, nikad odbijeni.
+CODE_VARIABLE_DEGREE_EXCEEDED = "semantic_variable_degree_exceeded"
+
+# Baza mora biti SAMOSTALNO slovo: `cm^2` (jedinica) nije promjenljiva, pa
+# lookbehind odbija slovo prije baze.
+_VARIABLE_POWER_RE = re.compile(
+    r"(?<![A-Za-zčćžšđČĆŽŠĐ\\])([A-Za-z])\s*(?:\^\s*\{?\s*(\d+)\s*\}?"
+    r"|\*\*\s*(\d+)|([²³⁴⁵⁶⁷⁸⁹]))")
+_SUPERSCRIPT_DIGITS = {"²": 2, "³": 3, "⁴": 4, "⁵": 5, "⁶": 6, "⁷": 7,
+                       "⁸": 8, "⁹": 9}
+# Ista promjenljiva pomnožena sama sobom je stepen bez oznake stepena.
+_VARIABLE_SELF_PRODUCT_RE = re.compile(
+    r"(?<![A-Za-zčćžšđČĆŽŠĐ\\])([A-Za-z])\s*(?:\\cdot|\\times|\*|·)\s*\1"
+    r"(?![A-Za-zčćžšđČĆŽŠĐ])")
+
+
+def _contract_max_variable_degree(contract):
+    """Deklarisana granica stepena promjenljive, ili None kad je lekcija nema."""
+    raw = contract.parameters.get("max_variable_degree")
+    if raw in (None, ""):
+        return None
+    try:
+        return int(str(raw))
+    except (TypeError, ValueError):
+        return None
+
+
+def _detect_polynomial_basic(contract, text):
+    limit = _contract_max_variable_degree(contract)
+    if limit is None:
+        return _result(STATUS_UNSUPPORTED,
+                       reason="lekcija ne deklariše najveći stepen promjenljive")
+    for content in math_contents(tokenize_math(text or "")):
+        for match in _VARIABLE_POWER_RE.finditer(content):
+            base = match.group(1)
+            raw = match.group(2) or match.group(3)
+            degree = int(raw) if raw else _SUPERSCRIPT_DIGITS[match.group(4)]
+            if degree > limit:
+                return _result(
+                    STATUS_FAIL, CODE_VARIABLE_DEGREE_EXCEEDED,
+                    f"promjenljiva „{base}“ je na stepen {degree}, a lekcija "
+                    f"dozvoljava najviše {limit}",
+                    variable=base, degree=degree, allowed_degree=limit,
+                    segment=content)
+        if limit < 2:
+            product = _VARIABLE_SELF_PRODUCT_RE.search(content)
+            if product:
+                base = product.group(1)
+                return _result(
+                    STATUS_FAIL, CODE_VARIABLE_DEGREE_EXCEEDED,
+                    f"promjenljiva „{base}“ je pomnožena sama sobom, što je "
+                    f"stepen 2, a lekcija dozvoljava najviše {limit}",
+                    variable=base, degree=2, allowed_degree=limit,
+                    segment=content)
+    return _result(STATUS_UNSUPPORTED,
+                   reason="nije nađen dokaziv prekršaj stepena promjenljive",
+                   allowed_degree=limit)
+
+
 DETECTORS = {
     "fraction_arithmetic": _detect_fraction_arithmetic,
+    "polynomial_basic": _detect_polynomial_basic,
 }
 
 

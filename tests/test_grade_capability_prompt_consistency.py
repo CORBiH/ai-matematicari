@@ -90,9 +90,9 @@ def _positive_radical_recipes(prompt):
 # 1) REVIZIJA SVIH 119 LEKCIJA 6. RAZREDA — nad CIJELIM Tutor promptom
 # ===========================================================================
 
-def test_grade_six_lesson_count_is_the_expected_119():
+def test_grade_six_lesson_count_matches_the_curriculum():
     """Sidro revizije: ako se kurikulum promijeni, brojevi u izvještaju lažu."""
-    assert len(GRADE6_LESSONS) == 119
+    assert len(GRADE6_LESSONS) == 121
 
 
 def test_every_grade_six_lesson_has_the_radical_prohibition():

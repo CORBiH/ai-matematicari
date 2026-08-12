@@ -43,9 +43,9 @@ def test_1_frozen_baseline_covers_every_non_pilot_lesson():
         for lesson in grade["lessons"]
     }
     baseline_ids = {row["topic_id"] for row in LESSONS}
-    assert len(all_ids) == 534
+    assert len(all_ids) == 536
     assert baseline_ids == all_ids - ENABLED
-    assert len(baseline_ids) == 528
+    assert len(baseline_ids) == 530
 
 
 def test_2_all_528_legacy_routes_match_the_baseline():

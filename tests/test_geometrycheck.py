@@ -290,7 +290,7 @@ def test_40_audit_all_534_lessons_for_unexpected_geometry_routing():
                 circle_lessons.append((lesson["id"], lesson["title"]))
             if scope == "solid":
                 solid_lessons.append((lesson["id"], lesson["title"]))
-    assert checked == 534
+    assert checked == 536
     # Nijedna statistička/dijagramska lekcija ne smije biti u krug skupu.
     for _id, title in circle_lessons:
         assert "dijagram" not in title.lower(), f"{_id} pogrešno rutiran na krug"

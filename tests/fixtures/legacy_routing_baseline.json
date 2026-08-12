@@ -186,6 +186,38 @@
    "easier_family": "direct_computation"
   },
   {
+   "topic_id": "6-01-012",
+   "grade": 6,
+   "oblast": "Skupovi i skupovne operacije",
+   "families": [
+    "direct_computation",
+    "find_missing_value",
+    "recognize_correct_statement",
+    "detect_student_error",
+    "compare_or_order",
+    "word_problem"
+   ],
+   "first_family": "direct_computation",
+   "harder_family": "direct_computation",
+   "easier_family": "direct_computation"
+  },
+  {
+   "topic_id": "6-01-013",
+   "grade": 6,
+   "oblast": "Skupovi i skupovne operacije",
+   "families": [
+    "word_problem",
+    "direct_computation",
+    "find_missing_value",
+    "recognize_correct_statement",
+    "detect_student_error",
+    "compare_or_order"
+   ],
+   "first_family": "word_problem",
+   "harder_family": "word_problem",
+   "easier_family": "word_problem"
+  },
+  {
    "topic_id": "6-02-001",
    "grade": 6,
    "oblast": "Prirodni brojevi i skupovi N/N0",

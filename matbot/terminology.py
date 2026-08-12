@@ -332,15 +332,36 @@ def _cinilac_suffix(match):
 # Bez ove zaštite normalizacija bi ga pretvorila u „nazivnik (nazivnik)“ —
 # tačno onaj pokvareni oblik zbog kojeg se slijepa zamjena i zabranjuje.
 #
-# Namjerno NEMA parnjaka za „faktor (činilac)“: „činilac“ nema nijednu pojavu
-# u KS_2018, pa dvojni oblik za faktor nije kurikularno utemeljen i njegovo
-# sažimanje u „faktor“ je ŽELJENO ponašanje.
-_ALIAS_PAIR_PREFIX_RE = re.compile(r"nazivnik\s*\(\s*$", re.IGNORECASE)
+# DVA OBLIKA ISTOG PARA (živi nalaz, Edin-feedback): zaštita je prvo pokrivala
+# SAMO zagradu, a kanonski KURIKULARNI naslovi par pišu KOSOM CRTOM:
+#
+#     „Pojam razlomka, brojnik/brojilac i nazivnik/imenilac“
+#     „Svođenje razlomaka na zajednički nazivnik/imenilac“
+#
+# pa je normalizacija baš te naslove pretvarala u „nazivnik/nazivnik“ — isti
+# pokvareni oblik zbog kojeg zaštita i postoji, samo s drugim razdvojnikom.
+# Zato razdvojnik ulazi u obrazac, a ne novi spisak fraza.
+#
+# ISTI PAR ZA FAKTOR (terminološka direktiva: „FAKTOR (ČINILAC)“): kurikularni
+# dokaz ispod i dalje stoji — „činilac“ nema nijednu pojavu u KS_2018 — pa GOLI
+# „činilac“ i dalje postaje „faktor“ (prihvatanje ulaza → kanonski izlaz). Ali
+# kad je dvojni naziv NAMJERNO napisan uz vlastiti kanonski termin, on je uvod
+# pojma, a ne greška, i ne smije se sažeti u „faktor (faktor)“.
+_ALIAS_PAIR_SEPARATOR = r"(?:\(|/)"
+_ALIAS_PAIR_PREFIX_RE = re.compile(
+    rf"nazivnik\s*{_ALIAS_PAIR_SEPARATOR}\s*$", re.IGNORECASE)
+_FAKTOR_ALIAS_PAIR_PREFIX_RE = re.compile(
+    rf"faktor\s*{_ALIAS_PAIR_SEPARATOR}\s*$", re.IGNORECASE)
 
 
 def _protect_alias_pair(match) -> bool:
     """True kad je pogodak drugi član sankcionisanog para — ostavi ga."""
     return bool(_ALIAS_PAIR_PREFIX_RE.search(match.string[:match.start()]))
+
+
+def _protect_faktor_alias_pair(match) -> bool:
+    """True kad „činilac“ stoji kao dvojni naziv uz vlastiti kanonski termin."""
+    return bool(_FAKTOR_ALIAS_PAIR_PREFIX_RE.search(match.string[:match.start()]))
 
 
 # ---------------------------------------------------------------------------
@@ -368,7 +389,8 @@ _RULES = (
 _NORMALIZE_ONLY_RULES = (
     (_IMENILAC_RE, _imenilac_suffix, _IMENILAC_SUFFIX_MAP, "nazivnik",
      _protect_alias_pair),
-    (_CINILAC_RE, _cinilac_suffix, _CINILAC_SUFFIX_MAP, "faktor", None),
+    (_CINILAC_RE, _cinilac_suffix, _CINILAC_SUFFIX_MAP, "faktor",
+     _protect_faktor_alias_pair),
 )
 
 _ALL_REPLACEMENT_RULES = _RULES + _NORMALIZE_ONLY_RULES

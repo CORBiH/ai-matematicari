@@ -529,7 +529,9 @@
             "difference",
             "complement",
             "ordered_pair",
-            "cartesian_product"
+            "cartesian_product",
+            "multi_operation",
+            "set_word_problem"
           ],
           "required": true
         }
@@ -559,7 +561,9 @@
         "difference": "razlika skupova",
         "complement": "komplement uz izričit univerzalni skup",
         "ordered_pair": "uređeni par (poredak je bitan)",
-        "cartesian_product": "Dekartov proizvod skupova"
+        "cartesian_product": "Dekartov proizvod skupova",
+        "multi_operation": "više skupovnih operacija u JEDNOM zadatku (npr. (A ∪ B) \\ C)",
+        "set_word_problem": "tekstualni zadatak koji se modeluje skupovima i skupovnim operacijama"
       }
     },
     "fraction_arithmetic_direct": {
@@ -1515,11 +1519,10 @@
       },
       "enforced_parameters": [
         "concepts",
-        "number_domain"
-      ],
-      "advisory_parameters": [
+        "number_domain",
         "max_variable_degree"
       ],
+      "advisory_parameters": [],
       "prompt_template": {
         "header": "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
         "main_line": {
