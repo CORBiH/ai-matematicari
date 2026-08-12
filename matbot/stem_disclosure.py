@@ -321,12 +321,54 @@ def _point_to_ray_disclosure(context, ask, options, marked_index):
 # JEDNAKOKRAKI?" ima traženu klasu „jednakokraki“, a „trougao“ je SUBJEKT koji
 # stem smije slobodno dati. Bez tog razlikovanja bi svaki „Dat je trougao…"
 # zadatak bio lažno oboren.
+#
+# OKVIR DAVANJA JE ZATVOREN SKUP TAČNIH OBLIKA, ne stem i ne regex. Poređenje
+# je `token in _GIVEN_WORDS` nad malim slovima iz `_tokenize`; jedina
+# normalizacija u ovoj klasi je `_class_stem`, i ona važi ISKLJUČIVO za naziv
+# klase, nikad za glagol. Zato se svaki particip mora navesti doslovno.
+#
+# ŽIVI FINAL40 BLOKATOR (FW-F03): objavljeno je
+#
+#   „FUNKCIJA JE PREDSTAVLJENA skupom tačaka … Da li ovaj skup tačaka
+#    predstavlja FUNKCIJU?"                              označeno: „Da — …"
+#
+# Uslovi 1, 2 i 4 su bili ispunjeni (`li` je nađen, tražena klasa `funkciju`,
+# dužina prolazi), a `_stem_asserts_class` je vratio False iz jednog jedinog
+# razloga: `predstavljena` nije bila u ovom skupu. Zamjena samo glagola to
+# potvrđuje — `zadana`, `data`, `prikazana`, `definisana`, `navedena` i
+# `nacrtana` isti zadatak OBARAJU, a `predstavljena` i `opisana` ga puštaju.
+#
+# ZAŠTO CIJELA PARADIGMA, A NE DVA ZATEČENA OBLIKA: particip se slaže s
+# nazivom klase, a klasa u ovim zadacima nije uvijek ženskog roda jednine —
+# „Graf je predstavljen…", „Preslikavanje je opisano…", „Relacije su
+# opisane…", „Funkcije su predstavljene…". Dodati samo `predstavljena` i
+# `opisana` značilo bi zakrpiti tačno jedan živi string i ostaviti isti kvar
+# za svaki drugi rod i broj. Zato obje nove porodice ulaze u punom rodno-
+# brojevnom nizu (m/ž/s jednine + m/ž množine).
+#
+# ZAŠTO SE ZATEČENE PORODICE NE REGENERIŠU: njihovi nizovi su nepotpuni
+# (`zadat` nema `zadato/zadati/zadate`, `definisan` nema srednji rod ni
+# množinu…). Popunjavanje bi proširilo detektor izvan ovog blokatora i tražilo
+# vlastito mjerenje nad zamrznutim korpusom. To je zaseban zadatak; ovdje se
+# NIJEDAN zatečeni oblik ne dira.
+#
+# ZAŠTO OVO NE MOŽE POKVARITI VEZU SUBJEKT↔KLASA: skup je samo rječnik
+# GLAGOLSKOG mjesta. Uslov da tvrdnja govori baš o traženoj klasi živi u
+# `_stem_asserts_class` (particip mora stajati uz kopulu koja je uz sam naziv
+# klase) i taj okvir se ne mijenja ni za jedan znak. Zato „Skup tačaka je
+# PREDSTAVLJEN u koordinatnom sistemu… Da li ovaj skup tačaka predstavlja
+# funkciju?" i dalje PROLAZI: tu je rečeno kako je skup prikazan, a nigdje da
+# je funkcija.
 _GIVEN_WORDS = frozenset({
     "dat", "data", "dato", "dati", "date", "dana", "dan", "dano",
     "zadat", "zadata", "zadan", "zadana", "zadano", "zadani", "zadane",
     "prikazan", "prikazana", "prikazano", "prikazani",
     "definisan", "definisana", "definiran", "definirana",
     "nacrtan", "nacrtana", "naveden", "navedena", "navedeno",
+    # Nove porodice (živi FW-F03) — pun rodno-brojevni niz participa.
+    "predstavljen", "predstavljena", "predstavljeno",
+    "predstavljeni", "predstavljene",
+    "opisan", "opisana", "opisano", "opisani", "opisane",
 })
 _COPULAS = frozenset({"je", "su", "jeste", "jesu"})
 # UPITNA ČESTICA — jedini pouzdan znak da je pitanje DA/NE klasifikacija.
