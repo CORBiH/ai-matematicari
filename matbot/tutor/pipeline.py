@@ -1531,10 +1531,22 @@ def _run_text_turn(store, llm, session, turn, context, request_id):
                 session.get("difficulty_level", 1),
                 "harder" if deterministic_intent == "harder_task" else ""),
             explicit_variety=_explicit_variety_request(turn))
-        if generator is not None and deterministic_intent and escalation is None:
-            return _run_deterministic_task_turn(
-                store, session, turn, context, request_id, deterministic_intent,
-                generator)
+        if generator is not None and escalation is None:
+            fallback_intent = deterministic_intent
+            if not fallback_intent and _explicit_variety_request(turn) \
+                    and creative_escalation.is_pilot_lesson(context):
+                # ISCRPLJEN BAZEN, IZRIČITA RAZNOLIKOST: „daj mi drugačiji tip“
+                # nije u zatvorenom skupu determinističkih poruka, pa bi bez
+                # ovoga turn pao na MODELSKI put BEZ bloka eskalacije — poziv
+                # bez cilja i bez kapije raznolikosti. Kad svježeg tipa nema,
+                # server ionako može ponuditi samo drugi primjer, a to daje
+                # generator odmah i bez poziva.
+                fallback_intent = ("next_task" if session.get("current_task")
+                                   else "generate_task")
+            if fallback_intent:
+                return _run_deterministic_task_turn(
+                    store, session, turn, context, request_id, fallback_intent,
+                    generator)
 
     timer = _TurnTimer()
 

@@ -328,48 +328,41 @@ def facts_failure(decision, task) -> str:
 
 
 def select_target(supported, recent, attempted=()) -> str:
-    """Arhetip koji NIJE nedavno viđen ni nedavno POKUŠAN; inače najdavniji.
+    """SVJEŽ arhetip — nikad nedavno objavljen NI nedavno pokušan; inače "".
 
     Dva ulaza s različitim značenjem (§16): `recent` su zadaci koje je učenik
     STVARNO VIDIO, `attempted` su ciljevi koje je generisanje nedavno pokušalo
     i koji NISU objavljeni. Bez drugog ulaza odbijen cilj se bira iznova u
     nedogled — živi nalaz: četiri uzastopna pokušaja na isti arhetip.
 
-    Pokušaj NIJE trajna zabrana: kad ponestane svježih kandidata, pravilo
-    najdavnije viđenog vrati i njega.
+    ZAŠTO SAMO SVJEŽ (živa kampanja nad c0bbf59, 14 kreativnih turnova):
+    planer je ranije, kad ponestane svježih, uzimao najdavnije viđeni arhetip
+    (nekadašnji nivoi 2 i 3). Sva četiri takva nacrta koja su stigla do
+    recenzenta bila su KOZMETIČKI PRESVUČENI zadaci, nijedan materijalno nov:
 
-    TRI NIVOA, bez ijedne odluke po abecedi (živi nalaz: planer je iz
-    „nepokušanih“ uzeo PRVI po enumu i tako ponovo ciljao arhetip koji je
-    učenik upravo vidio, pa je recenzent s pravom oborio raznolikost):
-      1. nikad nedavno objavljen NI pokušan;
-      2. inače nepokušani, pa među njima NAJDAVNIJE OBJAVLJEN;
-      3. inače svi, pa najdavnije korišten po objema historijama."""
+        objavljeno : „Jasna ima 96 naljepnica i pokloni 5/12 od toga.
+                      Koliko naljepnica ostane nakon darivanja?“
+        nacrt      : „Marko ima 180 naljepnica. Daje 7/12 od njih prijateljima.
+                      Koliko naljepnica ostane nakon darivanja?“
+
+    Recenzent je tri odbio, a ovaj četvrti pustio i on je OBJAVLJEN. To nije
+    samo modelova greška: unutar ovog IR-a materijalno drugačiji primjer ISTOG
+    arhetipa ne postoji. `facts_failure` bira rješavač po ciljnom arhetipu i
+    traži tačno `wordfacts.REQUIRED_FACTS[arhetip]`, pa svaki paket koji prođe
+    kapiju IMA istu strukturu zavisnosti, isti niz koraka i isti traženi
+    podatak — slobodni su samo brojevi i proza. „Isti arhetip, drugi primjer“
+    server dakle ne može ni dobiti ni dokazati.
+
+    Zato se ponovljeni arhetip više ne cilja: nema odluke koju bi model tu
+    mogao donijeti bolje od servera. Kad svježeg kandidata nema, `decide` vraća
+    None i turn ide determinističkim putem — bez ijednog poziva."""
     supported = tuple(supported)
     if not supported:
         return ""
     recent, attempted = tuple(recent), tuple(attempted)
-
-    def _least_recent(names, history):
-        """Ime čija je posljednja pojava u `history` NAJSTARIJA (nikad enum-red)."""
-        def last_seen(name):
-            for offset, seen in enumerate(reversed(history)):
-                if seen == name:
-                    return offset
-            return len(history)
-        return max(names, key=last_seen)
-
-    # TIER 1 — potpuno svjež kandidat.
     fresh = [name for name in supported
              if name not in recent and name not in attempted]
-    if fresh:
-        return fresh[0]
-    # TIER 2 — izbjegni ono što je upravo pokušano i palo, pa među preostalima
-    # uzmi onaj koji je učenik NAJDAVNIJE vidio.
-    unattempted = [name for name in supported if name not in attempted]
-    if unattempted:
-        return _least_recent(unattempted, recent)
-    # TIER 3 — sve je i viđeno i pokušano: najdavnije korišteno ukupno.
-    return _least_recent(supported, recent + attempted)
+    return fresh[0] if fresh else ""
 
 
 def decide(context, session, deterministic_intent, transition,
@@ -406,12 +399,18 @@ def decide(context, session, deterministic_intent, transition,
     attempted = recent_target_attempts(session, lesson_id, supported=supported)
     level = int(getattr(transition, "target_level", 0) or
                 session.get("difficulty_level", 1))
+    # ISCRPLJEN BAZEN → NEMA POZIVA. Kad svježeg arhetipa nema, model bi mogao
+    # ponuditi samo drugi PRIMJER već viđenog tipa — a to deterministički
+    # generator daje odmah, tačno i bez ijednog poziva. Vidi `select_target`.
+    target = select_target(supported, recent, attempted)
+    if not target:
+        return None
     definitions = dict(getattr(
         getattr(context, "semantic_contract", None), "archetype_definitions", {})
         or {})
     return CreativeEscalationDecision(
         reason=reason,
-        target_archetype=select_target(supported, recent, attempted),
+        target_archetype=target,
         supported_archetypes=supported,
         recent_archetypes=recent,
         attempted_archetypes=attempted,

@@ -124,9 +124,10 @@ def test_supported_archetypes_come_from_the_lesson_contract():
     (("fraction_of_quantity",), "fraction_remainder"),
     (("fraction_remainder",), "fraction_of_quantity"),
     (("fraction_of_quantity", "fraction_of_quantity"), "fraction_remainder"),
-    # sve viđeno → najdavnije viđeni
-    (("fraction_remainder", "fraction_of_quantity"), "fraction_remainder"),
-    (("fraction_of_quantity", "fraction_remainder"), "fraction_of_quantity"),
+    # SVE VIĐENO → nema cilja. Ponovljeni arhetip bi mogao dati samo drugi
+    # PRIMJER istog tipa, a to daje deterministički generator bez poziva.
+    (("fraction_remainder", "fraction_of_quantity"), ""),
+    (("fraction_of_quantity", "fraction_remainder"), ""),
 ])
 def test_target_selection_avoids_recent_archetypes(recent, expected):
     supported = ("fraction_of_quantity", "fraction_remainder")
@@ -136,7 +137,9 @@ def test_target_selection_avoids_recent_archetypes(recent, expected):
 def test_selection_is_server_owned_arithmetic_not_a_model_judgement():
     """Planer ne smije nikad pozvati model — čista funkcija nad enumom."""
     assert esc.select_target((), ()) == ""
-    assert esc.select_target(("only_one",), ("only_one",)) == "only_one"
+    # Jedini podržani tip je već viđen → iscrpljeno, ne ponavlja se.
+    assert esc.select_target(("only_one",), ("only_one",)) == ""
+    assert esc.select_target(("only_one",), ()) == "only_one"
 
 
 # ---------------------------------------------------------------------------
@@ -494,14 +497,21 @@ def test_recent_archetype_history_is_read_from_existing_session_state():
 # ---------------------------------------------------------------------------
 
 def test_planner_never_produces_an_avoidable_immediate_repeat():
+    """Sada JAČE svojstvo: izabrani cilj NIKAD nije u prozoru nedavnih.
+
+    Ranije se tražilo samo da se ne ponovi zadnji arhetip; kad se bazen
+    isprazni, planer više ne bira ništa (prazan string), pa se ponavljanje ne
+    može desiti ni u jednom obliku."""
     supported = ("fraction_of_quantity", "fraction_remainder")
-    recent, avoidable = [], 0
+    recent = []
     for _ in range(50):
-        target = esc.select_target(supported, tuple(recent[-esc.RECENT_WINDOW:]))
-        if recent and target == recent[-1] and len(supported) > 1:
-            avoidable += 1
+        window = tuple(recent[-esc.RECENT_WINDOW:])
+        target = esc.select_target(supported, window)
+        assert target not in window, (target, window)
+        if not target:
+            break
         recent.append(target)
-    assert avoidable == 0, recent[:10]
+    assert recent == list(supported), recent
 
 
 def test_decide_wires_session_history_into_target_selection():

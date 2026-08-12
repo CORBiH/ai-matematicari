@@ -39,34 +39,41 @@ def test_attempted_target_is_avoided_while_alternatives_exist():
     assert second != first
 
 
-def test_four_failed_attempts_do_not_repeat_a_target():
-    """TAČAN živi scenario: četiri pokušaja, nijedna objava."""
+def test_failed_attempts_never_repeat_a_target_and_then_stop():
+    """TAČAN živi scenario: pokušaji bez ijedne objave.
+
+    Tri arhetipa su već objavljena, pa je svjež samo jedan. Kad i on padne,
+    planer NE bira ponovo — vraća prazno i turn ide bez poziva."""
     published = ("fraction_of_quantity", "fraction_remainder",
                  "fraction_of_fraction")
     attempted, targets = [], []
     for _ in range(4):
         target = esc.select_target(SUPPORTED, published, tuple(attempted))
         targets.append(target)
+        if not target:
+            continue
         attempted = (attempted + [target])[-esc.RECENT_TARGET_ATTEMPTS:]
-    assert len(set(targets)) == 4, targets
-    assert len(targets) == len(SUPPORTED)
+    assert targets == ["multi_fraction_remainder", "", "", ""], targets
 
 
-def test_attempt_history_is_not_a_permanent_blacklist():
-    """Kad ponestane svježih kandidata, pao cilj se smije vratiti."""
-    published = ()
-    attempted = tuple(SUPPORTED)          # sve pokušano
-    assert esc.select_target(SUPPORTED, published, attempted) in SUPPORTED
+def test_exhausted_pool_yields_no_target_at_all():
+    """Pao cilj se NE vraća kad ponestane svježih — nema ponovljenog tipa.
+
+    Ranije je ovdje vrijedilo suprotno („pokušaj nije trajna zabrana“). Živa
+    kampanja je pokazala zašto to ne valja: sva četiri nacrta na ponovljeni
+    arhetip bila su kozmetički presvučeni zadaci, a jedan je i objavljen."""
+    assert esc.select_target(SUPPORTED, (), tuple(SUPPORTED)) == ""
+    assert esc.select_target(SUPPORTED, tuple(SUPPORTED), ()) == ""
 
 
-def test_selection_without_attempts_is_byte_for_byte_the_old_rule():
-    """Bez pokušaja ponašanje mora ostati zatečeno."""
+def test_selection_without_attempts_matches_the_published_history_rule():
+    """Bez pokušaja odlučuje samo historija objava."""
     supported = ("fraction_of_quantity", "fraction_remainder")
     for recent, expected in [
             ((), "fraction_of_quantity"),
             (("fraction_of_quantity",), "fraction_remainder"),
-            (("fraction_remainder", "fraction_of_quantity"), "fraction_remainder"),
-            (("fraction_of_quantity", "fraction_remainder"), "fraction_of_quantity")]:
+            (("fraction_remainder", "fraction_of_quantity"), ""),
+            (("fraction_of_quantity", "fraction_remainder"), "")]:
         assert esc.select_target(supported, recent) == expected
         assert esc.select_target(supported, recent, ()) == expected
 
@@ -178,7 +185,15 @@ def test_rejected_attempts_rotate_the_target_through_the_real_pipeline(
             context, session, "harder_task",
             type("T", (), {"boundary_reason": "at_maximum",
                            "target_level": 3})())
-        assert decision is not None
+        if decision is None:
+            # BAZEN ISCRPLJEN: nema više svježeg tipa, pa nema ni poziva.
+            # Turn od ovog trenutka ide determinističkim putem.
+            calls_before = fake.call_count
+            response = run_practice_turn(
+                store, fake, turn("rot", "Daj mi teži zadatak."))
+            assert response["status"] == "ready"
+            assert fake.call_count == calls_before
+            break
         targets.append(decision.target_archetype)
         # Nacrt bez ciljnih činjenica → pada prije recenzenta; upravo to
         # produkcija bilježi kao POKUŠAJ.
@@ -193,11 +208,14 @@ def test_rejected_attempts_rotate_the_target_through_the_real_pipeline(
             new_task=payload))
         response = run_practice_turn(store, fake, turn("rot", "Daj mi teži zadatak."))
         assert "status" not in response                 # sigurna poruka
+        # Historija OBJAVA netaknuta — učenik nijedan od tih nacrta nije vidio.
+        # Provjerava se ODMAH, jer turn nakon iscrpljenog bazena legitimno
+        # objavljuje deterministički zadatak i tada historija smije narasti.
+        assert store.peek("rot")["recent_task_signatures"] == published_before
 
-    assert len(set(targets)) == 4, targets
+    assert len(set(targets)) == len(targets), targets       # nijedan ponovljen
+    assert targets, "bar jedan svjež cilj mora postojati"
     session = store.peek("rot")
-    # Historija OBJAVA netaknuta — učenik nijedan od tih nacrta nije vidio.
-    assert session["recent_task_signatures"] == published_before
     # Historija POKUŠAJA je zabilježila (ograničeno).
     attempts = [record["archetype"]
                 for record in session["recent_creative_targets"]]
@@ -216,9 +234,11 @@ LIVE_PUBLISHED = ("fraction_remainder", "fraction_of_fraction",
 LIVE_ATTEMPTED = ("fraction_of_quantity",)
 
 
-def test_live_turn7_picks_the_least_recently_published_unattempted():
-    assert esc.select_target(SUPPORTED, LIVE_PUBLISHED, LIVE_ATTEMPTED) == \
-        "fraction_remainder"
+def test_live_turn7_no_longer_targets_an_already_seen_archetype():
+    """Isto živo stanje, nova politika: tada je birano „najdavnije viđeno“, a
+    kasnija kampanja je dokazala da takav cilj daje samo presvučen zadatak.
+    Sada se ne bira ništa — turn ide bez poziva."""
+    assert esc.select_target(SUPPORTED, LIVE_PUBLISHED, LIVE_ATTEMPTED) == ""
 
 
 def test_live_turn7_does_not_repeat_the_just_seen_archetype():

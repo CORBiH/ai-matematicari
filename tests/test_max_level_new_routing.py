@@ -411,12 +411,34 @@ def test_j_rejected_harder_keeps_level_and_rotates_next_target(universal):
     assert attempt_history(session) == ["fraction_of_fraction"]
 
     from matbot import difficulty_level
-    decision = esc.decide(_context(), store.peek("j-retry"), "harder_task",
-                          difficulty_level.transition(MAX_LEVEL, "harder"))
-    assert decision is not None
-    assert decision.reason == esc.REASON_MAX_LEVEL_HARDER
-    assert decision.target_archetype != "fraction_of_fraction"
-    assert "fraction_of_fraction" in decision.attempted_archetypes
+    # `force_target` je ostavio TAČNO jedan svjež tip i on je upravo pao, pa
+    # svježeg kandidata više nema: eskalacije nema, a turn ide bez poziva.
+    assert esc.decide(_context(), store.peek("j-retry"), "harder_task",
+                      difficulty_level.transition(MAX_LEVEL, "harder")) is None
+    calls_before = fake.call_count
+    assert run_practice_turn(store, fake, turn("j-retry", HARDER_MESSAGE)
+                             )["status"] == "ready"
+    assert fake.call_count == calls_before
+    assert store.peek("j-retry")["difficulty_level"] == MAX_LEVEL
+
+    # ROTACIJA i dalje vrijedi dok svježih tipova IMA: s dva slobodna tipa
+    # planer nakon palog pokušaja bira onaj drugi.
+    session = store.peek("j-retry")
+    supported = esc._contract_archetypes(_context())
+    session["recent_task_signatures"] = [
+        {"lesson_id": PILOT_LESSON,
+         "structured_signature": json.dumps({"operation_or_relation": name}),
+         "structured_signature_hash": f"seed-{name}"}
+        for name in supported[2:]]
+    session["recent_creative_targets"] = [
+        {"lesson_id": PILOT_LESSON, "archetype": supported[0]}]
+    store.save(session)
+    rotated = esc.decide(_context(), store.peek("j-retry"), "harder_task",
+                         difficulty_level.transition(MAX_LEVEL, "harder"))
+    assert rotated is not None
+    assert rotated.reason == esc.REASON_MAX_LEVEL_HARDER
+    assert rotated.target_archetype == supported[1]
+    assert supported[0] in rotated.attempted_archetypes
 
 
 def test_k_no_third_call_on_any_creative_outcome(universal):
