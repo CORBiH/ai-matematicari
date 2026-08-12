@@ -50,6 +50,10 @@ _CREATIVE_ARCHETYPE_PARAMETER = "creative_problem_types"
 # se izbjegne neposredno ponavljanje, premalo da zaključa ponudu kad lekcija
 # ima samo dva-tri arhetipa.
 RECENT_WINDOW = 3
+# Koliko NEOBJAVLJENIH pokušaja pamtimo za rotaciju cilja. Namjerno kratko:
+# dovoljno da četiri uzastopna pada ne ciljaju isto, premalo da trajno
+# zabrani arhetip koji je pao iz prolaznog razloga.
+RECENT_TARGET_ATTEMPTS = 3
 
 # Razlozi eskalacije — zatvoren skup, jedan vlasnik rutiranja.
 REASON_MAX_LEVEL_HARDER = "max_level_harder"
@@ -63,8 +67,12 @@ class CreativeEscalationDecision:
     reason: str
     target_archetype: str
     supported_archetypes: tuple
+    # ŠTA JE UČENIK VIDIO — jedini ulaz za recenzentovu presudu o raznolikosti.
     recent_archetypes: tuple
     level: int
+    # ŠTA JE GENERISANJE POKUŠALO A NIJE OBJAVILO — samo za izbor cilja.
+    # Nikad se ne prosljeđuje recenzentu kao „viđeni zadaci“ (§16).
+    attempted_archetypes: tuple = ()
     # Značenje svakog dozvoljenog arhetipa, iz ugovora lekcije. Identifikator
     # sam po sebi modelu ne kazuje ništa — a cilj mora ostati mašinski
     # provjerljiv identifikator, ne opis.
@@ -135,33 +143,71 @@ def recent_archetypes(session, lesson_id, limit=RECENT_WINDOW,
     return tuple(found[-limit:]) if limit else tuple(found)
 
 
+def recent_target_attempts(session, lesson_id, limit=RECENT_TARGET_ATTEMPTS,
+                           supported=()) -> tuple:
+    """Nedavno POKUŠANI kreativni ciljevi koji NISU objavljeni.
+
+    Odvojena projekcija od `recent_task_signatures` (§16): ovo nije ono što je
+    učenik vidio, pa se nikad ne smije koristiti kao opis viđenih zadataka —
+    isključivo planer bira po njemu. Isti filtar pri čitanju kao i kod objava:
+    vrijednost van enuma lekcije se preskače."""
+    allowed = frozenset(supported or ())
+    found = []
+    for record in (session.get("recent_creative_targets") or []):
+        if not isinstance(record, dict):
+            continue
+        if record.get("lesson_id") != lesson_id:
+            continue
+        archetype = record.get("archetype") or ""
+        if not archetype:
+            continue
+        if allowed and archetype not in allowed:
+            continue
+        found.append(archetype)
+    return tuple(found[-limit:]) if limit else tuple(found)
+
+
 # ---------------------------------------------------------------------------
-# SERVERSKA VALIDACIJA ARHETIPA OBJAVLJENOG PAKETA
+# TAKSONOMIJA JE SERVERSKA — MODELOVA OZNAKA NIJE AUTORITET
 # ---------------------------------------------------------------------------
-# ŽIVI NALAZ (ciljana kampanja): server je tražio `fraction_remainder`, Tutor je
-# vratio paket čiji je `operation_or_relation` bio slobodan tekst, a recenzent
-# ga je odobrio. Paket je objavljen i historija je zagađena.
+# ŽIVI NALAZ #1 (ciljana kampanja): Tutor je u `operation_or_relation` upisao
+# slobodan tekst, recenzent ga odobrio, paket objavljen, historija zagađena.
+# Odgovor je tada bio: traži da model VRATI ciljni identifikator.
 #
-# GRANICA KOJU OVO ZATVARA: model smije pisati SADRŽAJ, ali ne smije
-# redefinisati serversku taksonomiju. Enum dolazi iz ugovora lekcije, pa ova
-# provjera nigdje ne poznaje ni jednu konkretnu vrijednost.
-ARCHETYPE_NOT_IN_CONTRACT = "creative_archetype_not_in_contract"
-ARCHETYPE_NOT_TARGET = "creative_archetype_not_target"
+# ŽIVI NALAZ #2 (finalna kampanja): tako postavljena kapija dala je 0/4
+# dostupnosti. Server je tražio `multi_fraction_remainder`, a model je isti
+# pojam opisao prirodnim jezikom („take_multiple_fractions_then_remainder“).
+# Sve četiri su ISPRAVNO odbijene po tadašnjem pravilu — ali pravilo je mjerilo
+# PREPISIVANJE NISKE, a ne matematiku.
+#
+# ZAKLJUČAK: prepisivanje internog identifikatora nije sigurnosno svojstvo.
+# Server je cilj već IZABRAO; nema šta da uči od modelove oznake. Kanonski
+# arhetip je zato `decision.target_archetype`, a modelova oznaka postaje
+# NEAUTORITATIVAN metapodatak koji nikad ne ulazi u objavu ni u historiju.
+#
+# Ono što JESTE sigurnosno svojstvo i ostaje netaknuto:
+#   1. strukturisane činjenice moraju mehanički odgovarati CILJU (facts_failure);
+#   2. egzaktan rješavač mora reprodukovati označeni odgovor (facts_failure);
+#   3. recenzent mora presuditi da SEMANTIKA zadatka odgovara cilju
+#      (matches_target_archetype) — jedina presuda koja vidi prozu.
+# Tek kad sve troje prođe, server sam upisuje kanonski identifikator.
 
 
-def archetype_failure(decision, operation_or_relation) -> str:
-    """Kod greške ili "" — čisto deterministička, recenzent je ne može nadjačati.
+def canonical_task(task, decision):
+    """Kopija zadatka čiji je `operation_or_relation` SERVERSKI cilj.
 
-    Dvije odvojene tvrdnje: (1) vrijednost uopšte pripada enumu lekcije,
-    (2) i to baš onom arhetipu koji je server izabrao."""
-    if decision is None:
-        return ""
-    value = (operation_or_relation or "").strip()
-    if value not in decision.supported_archetypes:
-        return ARCHETYPE_NOT_IN_CONTRACT
-    if value != decision.target_archetype:
-        return ARCHETYPE_NOT_TARGET
-    return ""
+    Poziva se ISKLJUČIVO nakon što strukturisane činjenice prođu
+    `facts_failure` — oznaka se ne poklanja, ona se ZARAĐUJE dokazom da je
+    nacrt mehanički saglasan s ciljem. Vraća se NOVI objekat; nacrt se ne
+    mutira, da nijedan drugi sloj ne vidi tiho izmijenjeno stanje."""
+    if decision is None or task is None:
+        return task
+    signature = task.task_signature
+    if signature.operation_or_relation == decision.target_archetype:
+        return task
+    return task.model_copy(update={
+        "task_signature": signature.model_copy(update={
+            "operation_or_relation": decision.target_archetype})})
 
 
 # ---------------------------------------------------------------------------
@@ -175,6 +221,7 @@ def archetype_failure(decision, operation_or_relation) -> str:
 ANSWER_NOT_VERIFIABLE = "creative_answer_not_verifiable"
 ANSWER_MISMATCH = "creative_answer_mismatch"
 ANSWER_NOT_UNIQUE = "creative_answer_not_unique"
+FACTS_MISSING = "creative_facts_missing_for_target"
 
 
 def _option_value(text):
@@ -188,12 +235,17 @@ def _option_value(text):
         return None
 
 
-def answer_failure(decision, task) -> str:
-    """Kod greške ili "" — egzaktna serverska provjera odgovora i jedinstvenosti.
+def facts_failure(decision, task) -> str:
+    """Kod greške ili "" — jedina DETERMINISTIČKA kapija kreativnog nacrta.
 
-    Vraća "" i kad tip nema rekonstrukciju iz potpisa (tada je autoritet
-    ostatak postojećih validatora) — ali NE kad tip jeste podržan, a paket
-    činjenice ne nosi ili se ne slaže. Tada pada zatvoreno."""
+    Mjeri se STRUKTURA, nikad oznaka: rješavač se bira po SERVERSKOM cilju, a
+    nacrt mora ponuditi sve veličine koje taj cilj traži, one moraju biti
+    rješive, i označena opcija mora biti baš taj broj — i to jedina takva.
+
+    OBAVEZNA JE, ne uslovna: pošto modelova oznaka više nije autoritet, ovo je
+    jedini sloj koji prije recenzenta može dokazati da nacrt uopšte JESTE
+    traženi arhetip. Nacrt bez traženih činjenica zato pada zatvoreno na
+    jednom pozivu — ranije je tu ćutao, jer je oznaka nosila tu tvrdnju."""
     from matbot.mathkernel import wordfacts
 
     if decision is None or task is None:
@@ -202,16 +254,9 @@ def answer_failure(decision, task) -> str:
         return ""
     parameters = {p.name: p.value
                   for p in task.task_signature.normalized_parameters}
-    # RAZLIKA KOJA SE MORA ČUVATI: „nije ni pokušao dati činjenice“ nije isto
-    # što i „dao ih je, ali pogrešne“. Paket koji ne nosi NIJEDNU veličinu
-    # traženog tipa nema šta da se provjeri — tada ovaj sloj ĆUTI i autoritet
-    # ostaju postojeći validatori i recenzent (inače bi svaki model-paket bez
-    # IR-a padao, što je šira promjena nego što ovo proširenje nosi). Ali čim
-    # paket TVRDI neku od traženih veličina, mora se i preračunati: činjenice
-    # drugog arhetipa tada padaju, a ne prolaze kao „nema šta da se provjeri“.
     required = set(wordfacts.REQUIRED_FACTS.get(decision.target_archetype, ()))
-    if not (required & set(parameters)):
-        return ""
+    if not required <= set(parameters):
+        return FACTS_MISSING
     try:
         truth = wordfacts.solve_from_parameters(decision.target_archetype,
                                                 parameters)
@@ -226,23 +271,40 @@ def answer_failure(decision, task) -> str:
     return ""
 
 
-def select_target(supported, recent) -> str:
-    """Arhetip koji NIJE nedavno viđen; inače najdavnije viđeni.
+def select_target(supported, recent, attempted=()) -> str:
+    """Arhetip koji NIJE nedavno viđen ni nedavno POKUŠAN; inače najdavniji.
 
-    Čisto serverska aritmetika nad zatvorenim enumom — model nikad ne odlučuje
-    da li su posljednja tri ista."""
+    Dva ulaza s različitim značenjem (§16): `recent` su zadaci koje je učenik
+    STVARNO VIDIO, `attempted` su ciljevi koje je generisanje nedavno pokušalo
+    i koji NISU objavljeni. Bez drugog ulaza odbijen cilj se bira iznova u
+    nedogled — živi nalaz: četiri uzastopna pokušaja na isti arhetip.
+
+    Pokušaj NIJE trajna zabrana: kad ponestane svježih kandidata, pravilo
+    najdavnije viđenog vrati i njega."""
     supported = tuple(supported)
     if not supported:
         return ""
-    unseen = [name for name in supported if name not in recent]
-    if unseen:
-        return unseen[0]
-    # Svi su viđeni: uzmi onaj čija je posljednja pojava NAJSTARIJA.
+    recent, attempted = tuple(recent), tuple(attempted)
+    fresh = [name for name in supported
+             if name not in recent and name not in attempted]
+    if fresh:
+        return fresh[0]
+    # Ništa potpuno svježe. Ako JESTE bilo pokušaja, izbjegni bar njih — inače
+    # se odbijeni cilj bira iznova. Kad pokušaja nema, ova grana se PRESKAČE i
+    # vrijedi zatečeno pravilo najdavnije viđenog, bajt za bajt kao ranije.
+    if attempted:
+        unattempted = [name for name in supported if name not in attempted]
+        if unattempted:
+            return unattempted[0]
+
+    # Sve viđeno i sve pokušano: uzmi onaj čija je posljednja pojava NAJSTARIJA,
+    # mjereno preko OBJE historije.
     def last_seen(name):
-        for offset, seen in enumerate(reversed(recent)):
+        combined = recent + attempted
+        for offset, seen in enumerate(reversed(combined)):
             if seen == name:
                 return offset
-        return len(recent)
+        return len(combined)
 
     return max(supported, key=last_seen)
 
@@ -273,8 +335,9 @@ def decide(context, session, deterministic_intent, transition,
         return None
     # Historija se čita FILTRIRANO kroz enum lekcije — zatečena zagađena
     # vrijednost ne smije ni ući u izbor cilja.
-    recent = recent_archetypes(session, getattr(context, "topic_id", ""),
-                               supported=supported)
+    lesson_id = getattr(context, "topic_id", "")
+    recent = recent_archetypes(session, lesson_id, supported=supported)
+    attempted = recent_target_attempts(session, lesson_id, supported=supported)
     level = int(getattr(transition, "target_level", 0) or
                 session.get("difficulty_level", 1))
     definitions = dict(getattr(
@@ -282,9 +345,10 @@ def decide(context, session, deterministic_intent, transition,
         or {})
     return CreativeEscalationDecision(
         reason=reason,
-        target_archetype=select_target(supported, recent),
+        target_archetype=select_target(supported, recent, attempted),
         supported_archetypes=supported,
         recent_archetypes=recent,
+        attempted_archetypes=attempted,
         level=min(max(level, 1), 3),
         definitions=tuple((name, definitions[name]) for name in supported
                           if name in definitions),

@@ -244,48 +244,53 @@ def test_case_a_valid_target_publishes(universal):
 
 
 # ---------------------------------------------------------------------------
-# CASE B — slobodan tekst (TAČAN ŽIVI DEFEKT) → pada PRIJE recenzenta
+# CASE B — slobodan tekst u OZNACI, ali ispravan zadatak → OBJAVLJUJE SE
 # ---------------------------------------------------------------------------
+# ŽIVI NALAZ #2: ranije je ova oznaka obarala paket, i to je dalo 0/4
+# dostupnosti — sve četiri Tutorove oznake bile su prirodni jezik, a bar tri
+# su opisivale TAČAN ciljni arhetip. Prepisivanje interne niske nije
+# sigurnosno svojstvo; struktura, egzaktan odgovor i recenzentova presuda jesu.
 
-def test_case_b_free_text_archetype_is_rejected_before_the_reviewer(universal):
+def test_case_b_free_text_label_publishes_under_the_server_target(universal):
     result = run_case("case-b", label=FREE_TEXT,
                       matches_target_archetype=True,
                       substantially_different_from_recent=True)
-    assert result["published"] is False
-    assert "status" not in result["response"]          # sigurna poruka
-    assert result["history_after"] == result["history_before"]
+    assert result["published"] is True
+    assert result["response"]["status"] == "ready"
+    # KLJUČNO: modelova slobodna niska NE ulazi u kanonsku historiju.
+    assert result["history_after"][-1] == result["target"]
     assert FREE_TEXT not in result["history_after"]
-    # Paket koji ionako ne može biti objavljen ne troši drugi poziv.
-    assert result["tutor_calls"] == 1
-    assert result["reviewer_calls"] == 0
+    assert result["tutor_calls"] == 1 and result["reviewer_calls"] == 1
 
 
 @pytest.mark.parametrize("label", [
-    "hard fraction task", "word problem", "razlomci", "",
+    "hard fraction task", "word problem", "razlomci", "", "banana",
+    "take_multiple_fractions_then_remainder",     # doslovno iz žive kampanje
 ])
-def test_case_b_any_invented_label_is_rejected(universal, label):
+def test_case_b_any_label_yields_the_canonical_server_archetype(universal, label):
     result = run_case(f"case-b-{label or 'empty'}", label=label,
                       matches_target_archetype=True,
                       substantially_different_from_recent=True)
-    assert result["published"] is False
-    assert result["history_after"] == result["history_before"]
-    assert result["reviewer_calls"] == 0
+    assert result["published"] is True
+    assert result["history_after"][-1] == result["target"]
+    assert label not in result["history_after"]
 
 
 # ---------------------------------------------------------------------------
-# CASE C — dozvoljen enum, ali NIJE izabrani cilj → pada PRIJE recenzenta
+# CASE C — oznaka je DRUGI dozvoljeni enum, zadatak je ciljni → OBJAVLJUJE SE
 # ---------------------------------------------------------------------------
 
-def test_case_c_wrong_allowed_enum_is_rejected(universal):
+def test_case_c_wrong_allowed_enum_label_is_not_authoritative(universal):
     result = run_case("case-c", label="__other__",
                       matches_target_archetype=True,
                       substantially_different_from_recent=True)
     assert result["label"] != result["target"]
-    assert result["label"] in SUPPORTED               # jeste dozvoljen enum…
-    assert result["published"] is False               # …ali nije traženi
-    assert result["history_after"] == result["history_before"]
-    assert result["tutor_calls"] == 1
-    assert result["reviewer_calls"] == 0
+    assert result["label"] in SUPPORTED
+    # Oznaka nije autoritet ni kad je „skoro tačna“: mjeri se struktura.
+    assert result["published"] is True
+    assert result["history_after"][-1] == result["target"]
+    assert result["label"] not in result["history_after"][-1:]
+    assert result["tutor_calls"] == 1 and result["reviewer_calls"] == 1
 
 
 # ---------------------------------------------------------------------------
@@ -392,24 +397,33 @@ def _decision(target="fraction_remainder", supported=SUPPORTED):
         supported_archetypes=supported, recent_archetypes=(), level=3)
 
 
-@pytest.mark.parametrize("value,expected", [
-    ("fraction_remainder", ""),
-    ("  fraction_remainder  ", ""),
-    ("fraction_of_quantity", esc.ARCHETYPE_NOT_TARGET),
-    (FREE_TEXT, esc.ARCHETYPE_NOT_IN_CONTRACT),
-    ("hard fraction task", esc.ARCHETYPE_NOT_IN_CONTRACT),
-    ("word problem", esc.ARCHETYPE_NOT_IN_CONTRACT),
-    ("", esc.ARCHETYPE_NOT_IN_CONTRACT),
-    (None, esc.ARCHETYPE_NOT_IN_CONTRACT),
+@pytest.mark.parametrize("label", [
+    "fraction_remainder", FREE_TEXT, "hard fraction task", "banana", "", None,
 ])
-def test_archetype_failure_codes(value, expected):
-    assert esc.archetype_failure(_decision(), value) == expected
+def test_canonical_task_always_carries_the_server_target(label):
+    """Ma šta model upisao, kanonski potpis nosi SERVERSKI cilj."""
+    from matbot.tutor.schema import SignatureParameter
+    payload = make_task_payload(
+        text=TASKS["fraction_remainder"]["text"],
+        options=TASKS["fraction_remainder"]["options"],
+        correct_option_index=0, expected="$24$",
+        solution=TASKS["fraction_remainder"]["solution"], difficulty="hard")
+    payload = payload.model_copy(update={
+        "task_signature": payload.task_signature.model_copy(update={
+            "operation_or_relation": label,
+            "normalized_parameters": [
+                SignatureParameter(name=n, value=v)
+                for n, v in FACTS["fraction_remainder"].items()]})})
+    canonical = esc.canonical_task(payload, _decision())
+    assert canonical.task_signature.operation_or_relation == "fraction_remainder"
+    # Nacrt se NE mutira — kanonizacija vraća novi objekat.
+    assert payload.task_signature.operation_or_relation == label
 
 
-def test_archetype_validation_is_inert_without_escalation():
-    """Van eskalacije validator ne smije reći ništa — obična ruta se ne dira."""
-    assert esc.archetype_failure(None, FREE_TEXT) == ""
-    assert esc.archetype_failure(None, "bilo šta") == ""
+def test_canonicalization_is_inert_without_escalation():
+    """Van eskalacije se taksonomija ne dira — obična ruta ostaje ista."""
+    assert esc.canonical_task(None, None) is None
+    assert esc.canonical_task("paket", None) == "paket"
 
 
 def test_allowed_enum_comes_from_the_lesson_contract_not_from_code():

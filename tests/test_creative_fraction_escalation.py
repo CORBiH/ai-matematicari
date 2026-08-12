@@ -245,20 +245,44 @@ def _level3_evidence():
         requires_proof_or_justification=False, combines_concepts=False)
 
 
-def _draft(text, expected, options, solution,
-           archetype="fraction_remainder"):
-    """`archetype` je OZNAKA koju Tutor upisuje u potpis.
+# Strukturisane činjenice po arhetipu. Otkad modelova OZNAKA nije autoritet,
+# jedini deterministički dokaz da je nacrt traženi arhetip su ove veličine —
+# pa ih svaki kreativni nacrt mora nositi, tačno kao u produkciji.
+_FACTS = {
+    "fraction_of_quantity": {"type": "fraction_of_quantity",
+                             "total": "40", "fraction": "2/5"},
+    "fraction_remainder": {"type": "fraction_remainder",
+                           "total": "40", "fraction": "2/5"},
+    "fraction_of_fraction": {"type": "fraction_of_fraction", "total": "48",
+                             "first_fraction": "2/3", "second_fraction": "1/4"},
+    "multi_fraction_remainder": {"type": "multi_fraction_remainder",
+                                 "total": "24", "fraction_1": "1/3",
+                                 "fraction_2": "1/4", "fraction_3": "1/6"},
+}
 
-    Od uvođenja serverske provjere ciljnog arhetipa oznaka mora biti baš enum
-    koji je server izabrao — ranija fixture-vrijednost („fixture_operation“)
-    danas s pravom pada prije objave."""
+
+def _draft(text, expected, options, solution,
+           archetype="fraction_remainder", facts=None):
+    """`archetype` je OZNAKA koju Tutor upisuje u potpis — NEAUTORITATIVNA.
+
+    `facts` su strukturisane veličine koje moraju opisivati STVARNU matematiku
+    ovog teksta; podrazumijevano se uzimaju tipske za dati arhetip."""
+    from matbot.tutor.schema import SignatureParameter
     payload = make_task_payload(text=text, options=options, expected=expected,
                                 solution=solution, difficulty="hard")
+    facts = facts if facts is not None else _FACTS.get(archetype)
+    signature_update = {"operation_or_relation": archetype}
+    if facts:
+        signature_update["normalized_parameters"] = [
+            SignatureParameter(name=name, value=value)
+            for name, value in facts.items()]
     payload = payload.model_copy(update={
+        "selected_lesson_id": LESSON,
+        "selected_lesson_title": "Tekstualni zadaci s razlomcima",
         "target_difficulty_level": 3,
         "difficulty_evidence": _level3_evidence(),
-        "task_signature": payload.task_signature.model_copy(update={
-            "operation_or_relation": archetype}),
+        "task_signature": payload.task_signature.model_copy(
+            update=signature_update),
     })
     return make_tutor_draft(
         intent="harder_task", reply="Evo zadatka.",
@@ -270,18 +294,32 @@ def _draft(text, expected, options, solution,
 SUPPORTED = _contract_enum()
 
 
-def _warm_up(fake, store, session_id="esc"):
+def _warm_up(fake, store, session_id="esc", desired=None):
     """Deterministički do maksimuma; vrati arhetip koji će server ZATRAŽITI.
 
-    Cilj se ne smije pretpostaviti — zavisi od stvarne historije sesije."""
+    Cilj se ne smije pretpostaviti — zavisi od stvarne historije sesije. Kad
+    fixtura nosi matematiku TAČNO jednog arhetipa, `desired` postavlja
+    historiju tako da server izabere baš njega; cilj i dalje računa
+    `select_target`, ne test."""
     for message in ["Daj mi zadatak.", "Daj mi teži zadatak.",
                     "Daj mi teži zadatak."]:
         assert run_practice_turn(store, fake, turn(session_id, message)
                                  )["status"] == "ready"
     assert fake.call_count == 0
+    if desired is not None:
+        session = store.peek(session_id)
+        session["recent_task_signatures"] = [
+            {"lesson_id": LESSON,
+             "structured_signature": json.dumps({"operation_or_relation": name}),
+             "structured_signature_hash": f"seed-{name}"}
+            for name in SUPPORTED if name != desired]
+        store.save(session)
     recent = esc.recent_archetypes(store.peek(session_id), LESSON,
                                    supported=SUPPORTED)
-    return esc.select_target(SUPPORTED, recent)
+    target = esc.select_target(SUPPORTED, recent)
+    if desired is not None:
+        assert target == desired, (target, desired)
+    return target
 
 
 def _escalate(fake, store, session_id="esc"):
@@ -299,10 +337,12 @@ def test_cosmetic_reskin_is_rejected_without_a_third_call(universal):
     # Oznaka MORA biti serverski cilj — inače paket padne već na determinističkoj
     # kapiji arhetipa i nikad ne stigne do presude o RAZNOLIKOSTI, koju ovaj
     # test upravo ispituje.
-    target = _warm_up(fake, store)
+    target = _warm_up(fake, store, desired="fraction_of_quantity")
     draft = _draft(_RESKIN_TEXT, "$15$", ("$15$", "$30$", "$45$", "$12$"),
                    "$\\frac{1}{3} \\cdot 45 = 15$, pa je poklonjeno $15$ bombona.",
-                   archetype=target)
+                   archetype=target,
+                   facts={"type": "fraction_of_quantity", "total": "45",
+                          "fraction": "1/3"})
     fake.queue(draft)
     fake.queue(make_reviewer_final(
         decision="approve", final=draft,
@@ -325,10 +365,12 @@ def test_cosmetic_reskin_is_rejected_without_a_third_call(universal):
 
 def test_genuinely_different_archetype_is_published_in_two_calls(universal):
     store, fake = SessionStore(), FakeLLM()
-    target = _warm_up(fake, store)
+    target = _warm_up(fake, store, desired="fraction_remainder")
     draft = _draft(_DIFFERENT_TEXT, "$24$", ("$24$", "$16$", "$40$", "$8$"),
                    "Potrošeno je $\\frac{2}{5} \\cdot 40 = 16$, pa je ostalo "
-                   "$40 - 16 = 24$ olovaka.", archetype=target)
+                   "$40 - 16 = 24$ olovaka.", archetype=target,
+                   facts={"type": "fraction_remainder", "total": "40",
+                          "fraction": "2/5"})
     fake.queue(draft)
     fake.queue(make_reviewer_final(
         decision="approve", final=draft,
@@ -409,10 +451,12 @@ def test_ordinary_turn_prompt_is_unchanged_without_escalation():
 
 def test_easier_after_escalation_returns_to_deterministic_level_two(universal):
     store, fake = SessionStore(), FakeLLM()
-    target = _warm_up(fake, store)
+    target = _warm_up(fake, store, desired="fraction_remainder")
     draft = _draft(_DIFFERENT_TEXT, "$24$", ("$24$", "$16$", "$40$", "$8$"),
                    "Potrošeno je $\\frac{2}{5} \\cdot 40 = 16$, pa je ostalo "
-                   "$40 - 16 = 24$ olovaka.", archetype=target)
+                   "$40 - 16 = 24$ olovaka.", archetype=target,
+                   facts={"type": "fraction_remainder", "total": "40",
+                          "fraction": "2/5"})
     fake.queue(draft)
     fake.queue(make_reviewer_final(
         decision="approve", final=draft,

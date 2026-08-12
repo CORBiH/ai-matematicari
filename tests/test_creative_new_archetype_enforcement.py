@@ -231,18 +231,23 @@ def test_case_4_duplicate_true_answer_is_rejected(universal, target):
 
 
 # ---------------------------------------------------------------------------
-# CASE 5 — Tutor izmišlja JOŠ JEDAN novi tip → pada prije recenzenta
+# CASE 5 — Tutor izmišlja PETI tip u oznaci → oznaka se NEUTRALIŠE, ne nasljeđuje
 # ---------------------------------------------------------------------------
+# Ranije je ovo obaralo paket. Otkad je taksonomija serverska, izmišljena
+# vrijednost ne može ući u sistem NI DA JE PROPUŠTENA: objavljuje se serverski
+# cilj, pa `successive_fraction_remainder` nikad ne postaje arhetip lekcije.
+# Zaštita od petog arhetipa je time JAČA (konstrukcija umjesto detekcije), a
+# ispravan zadatak zbog pogrešne naljepnice više ne propada.
 
 @pytest.mark.parametrize("target", tuple(TASKS))
-def test_case_5_invented_archetype_rejected_before_reviewer(universal, target):
+def test_case_5_invented_label_never_becomes_an_archetype(universal, target):
     result = run(f"new-5-{target}",
                  lambda t: draft(TASKS[t], "successive_fraction_remainder"),
                  target, **APPROVE)
-    assert result["published"] is False
-    assert result["history_after"] == result["history_before"]
-    assert result["tutor_calls"] == 1
-    assert result["reviewer_calls"] == 0
+    assert result["published"] is True
+    assert result["history_after"][-1] == target
+    assert "successive_fraction_remainder" not in result["history_after"]
+    assert result["tutor_calls"] == 1 and result["reviewer_calls"] == 1
 
 
 # ---------------------------------------------------------------------------
@@ -255,34 +260,33 @@ def _decision(target):
         supported_archetypes=SUPPORTED, recent_archetypes=(), level=3)
 
 
-def test_answer_failure_is_silent_without_escalation():
-    assert esc.answer_failure(None, None) == ""
+def test_facts_failure_is_silent_without_escalation():
+    assert esc.facts_failure(None, None) == ""
 
 
 @pytest.mark.parametrize("target", ("fraction_of_fraction",
                                     "multi_fraction_remainder"))
-def test_answer_failure_accepts_a_correct_package(target):
+def test_facts_failure_accepts_a_correct_package(target):
     package = draft(TASKS[target], target).new_task
-    assert esc.answer_failure(_decision(target), package) == ""
+    assert esc.facts_failure(_decision(target), package) == ""
 
 
 @pytest.mark.parametrize("target", ("fraction_of_fraction",
                                     "multi_fraction_remainder"))
-def test_answer_failure_is_silent_when_facts_are_absent(target):
-    """„Nije ni pokušao dati činjenice“ nije isto što i „dao pogrešne“.
+def test_facts_failure_rejects_a_package_without_the_target_facts(target):
+    """OD SADA OBAVEZNO: bez činjenica cilja nema čime dokazati arhetip.
 
-    Paket bez ijedne tražene veličine nema šta da se provjeri — ovaj sloj tada
-    ćuti, a autoritet ostaju postojeći validatori i recenzent. Paket koji
-    TVRDI neku od traženih veličina mora se preračunati (vidi test ispod)."""
+    Ranije je ovaj sloj tu ĆUTAO, jer je tvrdnju „ovo je taj arhetip“ nosila
+    modelova OZNAKA. Otkad oznaka nije autoritet, struktura je jedini
+    deterministički dokaz — pa paket bez nje pada zatvoreno."""
     package = draft(TASKS[target], target, facts={"type": target}).new_task
-    assert esc.answer_failure(_decision(target), package) == ""
+    assert esc.facts_failure(_decision(target), package) == esc.FACTS_MISSING
 
 
 @pytest.mark.parametrize("target", ("fraction_of_fraction",
                                     "multi_fraction_remainder"))
-def test_answer_failure_rejects_partial_or_foreign_facts(target):
+def test_facts_failure_rejects_partial_or_foreign_facts(target):
     """Činjenice drugog arhetipa NE smiju proći kao „nema šta da se provjeri“."""
     foreign = {"type": target, "total": "48", "fraction": "2/3"}
     package = draft(TASKS[target], target, facts=foreign).new_task
-    assert esc.answer_failure(_decision(target), package) == \
-        esc.ANSWER_NOT_VERIFIABLE
+    assert esc.facts_failure(_decision(target), package) == esc.FACTS_MISSING

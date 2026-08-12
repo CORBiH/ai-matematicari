@@ -64,6 +64,14 @@ def _fresh_session(session_id, curriculum_fingerprint, grade, lesson_id,
         # auditable across the active session.
         "current_task_difficulty_evidence": None,
         "recent_task_signatures": [],    # max MAX_RECENT_SIGNATURES potpisa zadataka
+        # POKUŠANI kreativni ciljevi — STROGO ODVOJENO od `recent_task_signatures`.
+        # Prvo odgovara na pitanje „šta je generisanje nedavno POKUŠALO“, drugo
+        # na pitanje „šta je učenik STVARNO VIDIO“. Odbijen nacrt nikad ne smije
+        # ući u drugo: recenzentu bi se kasnije opisao kao viđen zadatak, a
+        # nikad nije objavljen. Živi nalaz koji ovo traži: četiri uzastopna
+        # kreativna pokušaja ciljala su ISTI arhetip, jer odbijanje (ispravno)
+        # ne mijenja historiju objava, pa je planer svaki put birao isto.
+        "recent_creative_targets": [],
     }
 
 
@@ -128,6 +136,30 @@ class SessionStore:
             while len(self._sessions) > config.MAX_SESSIONS_IN_MEMORY:
                 oldest = next(iter(self._sessions))
                 del self._sessions[oldest]
+
+    def record_creative_target(self, session_id, lesson_id, archetype, limit):
+        """Upiši POKUŠAN kreativni cilj — jedini upis koji preživi odbijanje.
+
+        ZAŠTO POSTOJI IZUZETAK: `store.save` je jedina commit tačka turna baš
+        zato da poluprimijenjeno stanje ZADATKA ne procuri kad turn padne
+        zatvoreno. Ovdje se ne upisuje nikakvo stanje zadatka — upisuje se
+        SERVERSKA bilješka planera o tome šta je upravo pokušano, i ona mora
+        preživjeti neuspjeh, inače planer vječno bira isti cilj (živi nalaz:
+        4/4 pokušaja na isti arhetip).
+
+        Zato ova metoda NIKAD ne prima pozivaočevu (mutiranu) sesiju: radi nad
+        pohranjenim objektom i dira TAČNO jedan ključ, pa neuspjeli turn ne
+        može njome propustiti ništa drugo."""
+        if not session_id or not archetype:
+            return
+        with self._lock:
+            stored = self._sessions.get(session_id)
+            if stored is None:
+                return
+            history = list(stored.get("recent_creative_targets") or ())
+            history.append({"lesson_id": str(lesson_id or ""),
+                            "archetype": str(archetype)})
+            stored["recent_creative_targets"] = history[-max(int(limit), 0):]
 
     def peek(self, session_id):
         """Samo za testove/dijagnostiku: kopija sesije ili None."""

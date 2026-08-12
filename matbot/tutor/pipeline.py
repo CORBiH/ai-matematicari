@@ -1535,6 +1535,17 @@ def _run_text_turn(store, llm, session, turn, context, request_id):
     if final is None:
         # Odbijeno prije objave (nacrt, recenzent ili invarijanta nad konačnim
         # paketom). Sesija je lokalna kopija i nije commitovana.
+        #
+        # JEDINI IZUZETAK: pokušani kreativni CILJ. Bez njega planer nema kako
+        # saznati da je upravo pao i bira isti arhetip iznova (živi nalaz 4/4).
+        # Upisuje se preko namjenske metode koja radi nad POHRANJENOM sesijom i
+        # dira tačno jedan ključ — poluprimijenjeno stanje zadatka iz ovog
+        # turna zato ne može procuriti. U historiju OBJAVA ne ide ništa.
+        if escalation is not None:
+            store.record_creative_target(
+                session["session_id"], context.topic_id,
+                escalation.target_archetype,
+                creative_escalation.RECENT_TARGET_ATTEMPTS)
         _log_turn_diagnostics(
             request_id, context, turn, session, intent="", calls=calls,
             published=False, task_preserved=bool(active_task_before),
@@ -1904,29 +1915,28 @@ def _two_call(llm, context, session, student_message, request_id, trusted_verdic
     # objavljen ne zaslužuje drugi poziv, isto kao neupotrebljiv nacrt iznad.
     # Recenzent je NE MOŽE nadjačati — on kasnije sudi samo o SEMANTICI.
     if escalation is not None and draft.new_task is not None:
-        archetype_error = creative_escalation.archetype_failure(
-            escalation, draft.new_task.task_signature.operation_or_relation)
-        if archetype_error:
+        # STRUKTURA, NE OZNAKA. Server je cilj već izabrao, pa od modela ne uči
+        # koji je arhetip u pitanju — provjerava da li nacrt MEHANIČKI jeste
+        # taj arhetip: nosi li sve veličine koje cilj traži, rješavaju li se
+        # egzaktno, i je li označena opcija baš taj broj, jedina takva.
+        # Prije recenzenta, jer je čisto aritmetika; proza se ne parsira.
+        facts_error = creative_escalation.facts_failure(
+            escalation, draft.new_task)
+        if facts_error:
             _log_rejection(
-                request_id, context, archetype_error,
+                request_id, context, facts_error,
                 f"target={escalation.target_archetype} "
-                f"tutor={draft.new_task.task_signature.operation_or_relation!r} "
-                f"allowed={','.join(escalation.supported_archetypes)}",
+                f"tutor_label={draft.new_task.task_signature.operation_or_relation!r}",
                 draft.intent)
             return None, calls
 
-        # EGZAKTAN ODGOVOR, NE RECENZENTOVA TVRDNJA: za porodice čiji IR server
-        # poznaje, potpis nosi iste veličine koje deterministički generator
-        # upisuje, pa server sam preračuna odgovor i traži da označena opcija
-        # bude baš taj broj — i da ga ima TAČNO JEDNA opcija. Prije recenzenta,
-        # jer je čisto aritmetika. Proza se ne parsira.
-        answer_error = creative_escalation.answer_failure(
-            escalation, draft.new_task)
-        if answer_error:
-            _log_rejection(
-                request_id, context, answer_error,
-                f"target={escalation.target_archetype}", draft.intent)
-            return None, calls
+        # TEK SADA kanonizacija. Oznaka se ne poklanja prije dokaza: nacrt je
+        # upravo dokazao da je mehanički saglasan s ciljem, pa server upisuje
+        # SVOJ identifikator i modelova slobodna niska dalje ne putuje — ni u
+        # recenzentov paket, ni u objavu, ni u historiju.
+        draft = draft.model_copy(update={
+            "new_task": creative_escalation.canonical_task(
+                draft.new_task, escalation)})
 
     # Reviewer sees the canonical server title; raw Tutor output remains on
     # the wrapper for safe offline diagnostics only.

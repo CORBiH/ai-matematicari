@@ -54,7 +54,21 @@ def types_for_level(parameters, level) -> tuple:
     return pool or tuple(parameters.get("problem_types") or ())
 
 
-_NAMES = ("Amar", "Lejla", "Emir", "Sara", "Tarik", "Amina", "Vedad", "Hana")
+# ŽIVI NALAZ (finalna ciljana kampanja, dva puta u istoj sesiji): pool imena je
+# mješovit po rodu, a rečenica `_fraction_remainder` bila je tvrdo u muškom
+# rodu — „Amina je potrošio … Koliko … mu je OSTALO?“. Rod je zato PODATAK uz
+# ime, nikad zaključak iz oblika niske: nastavak „-a“ nosi i Nikola, pa bi
+# pogađanje po zadnjem slovu samo premjestilo grešku.
+_PEOPLE = (("Amar", "m"), ("Lejla", "f"), ("Emir", "m"), ("Sara", "f"),
+           ("Tarik", "m"), ("Amina", "f"), ("Vedad", "m"), ("Hana", "f"))
+# Šabloni bez rodnog slaganja (prezent: „ima“, „dijeli“, „kupuje“, „plaća“)
+# koriste ovu listu i troše RNG identično kao ranije — ista dužina, isti izbor.
+_NAMES = tuple(name for name, _ in _PEOPLE)
+# Oblici koje bira rod subjekta. Zatvorena tabela, ne generativna morfologija.
+_GENDERED_FORMS = {
+    "m": {"potrosio": "potrošio", "dative": "mu"},
+    "f": {"potrosio": "potrošila", "dative": "joj"},
+}
 _OBJECTS = ("olovaka", "klikera", "sličica", "jabuka", "bombona", "knjiga")
 _GROUP_WORDS = ("kutije", "grupe", "police", "korpe")
 
@@ -292,9 +306,11 @@ def _fraction_remainder(rng, level, lesson_id, lesson_title, problem_type):
     fraction = _fraction_pool(rng, max(level, 2))
     per_unit = rng.randint(2, 8 if level < 3 else 15)
     total = fraction.denominator * per_unit
+    person, gender = rng.choice(_PEOPLE)
+    forms = _GENDERED_FORMS[gender]
     facts = WordProblemFacts(
         semantic_type="fraction_remainder",
-        entities=(rng.choice(_NAMES), rng.choice(_OBJECTS)),
+        entities=(person, rng.choice(_OBJECTS)),
         known=(Quantity("total", Fraction(total)),
                Quantity("fraction", fraction)),
         unknown="remainder",
@@ -302,8 +318,9 @@ def _fraction_remainder(rng, level, lesson_id, lesson_title, problem_type):
     solved = wordfacts.solve(facts)
     name, objects = facts.entities
     fraction_display = core.plain_fraction_display(fraction)
-    question = (f"{name} je potrošio ${fraction_display}$ od svojih "
-                f"${total}$ {objects}. Koliko {objects} mu je OSTALO?")
+    question = (f"{name} je {forms['potrosio']} ${fraction_display}$ od svojih "
+                f"${total}$ {objects}. Koliko {objects} {forms['dative']} je "
+                f"OSTALO?")
     _assert_prose_matches(question, [str(total), fraction_display])
     answer = solved.answer.value
     part = solved.auxiliary["part"]
