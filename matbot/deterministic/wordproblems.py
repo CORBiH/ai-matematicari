@@ -40,6 +40,20 @@ def supports(parameters) -> bool:
     return bool(problem_types) and problem_types <= _SUPPORTED_TYPES
 
 
+def types_for_level(parameters, level) -> tuple:
+    """Tipovi dozvoljeni za OBIČNU izradu na datom nivou težine.
+
+    Enum `problem_types` kaže šta lekcija kurikularno podržava; on NE kaže na
+    kojem nivou težine ta struktura pripada. Kad ugovor nosi
+    `problem_types_by_level`, obična ljestvica bira samo iz pool-a tog nivoa.
+    Bez tog parametra ponašanje je bajt za bajt zatečeno (cijeli enum), pa
+    nijedna druga lekcija ove porodice ne mijenja ponašanje."""
+    parameters = parameters or {}
+    by_level = parameters.get("problem_types_by_level") or {}
+    pool = tuple(by_level.get(str(level)) or ())
+    return pool or tuple(parameters.get("problem_types") or ())
+
+
 _NAMES = ("Amar", "Lejla", "Emir", "Sara", "Tarik", "Amina", "Vedad", "Hana")
 _OBJECTS = ("olovaka", "klikera", "sličica", "jabuka", "bombona", "knjiga")
 _GROUP_WORDS = ("kutije", "grupe", "police", "korpe")
@@ -138,9 +152,12 @@ def generate_package(lesson_id, lesson_title, parameters, level, rng=None):
         "pythagoras_distance": _pythagoras_distance,
         "pythagoras_leg": _pythagoras_leg,
     }
+    pool = types_for_level(parameters, level)
+    if not pool:
+        raise DeterministicGenerationError("nivo nema nijedan dozvoljen tip")
     for _ in range(80):
         try:
-            problem_type = rng.choice(tuple(parameters["problem_types"]))
+            problem_type = rng.choice(pool)
             return builders[problem_type](rng, level, lesson_id, lesson_title,
                                           problem_type)
         except DeterministicGenerationError:

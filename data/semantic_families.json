@@ -2077,6 +2077,50 @@
           ],
           "required": true
         },
+        "problem_types_by_level": {
+          "kind": "enum_set_by_level",
+          "values": [
+            "equal_sharing",
+            "sharing_remainder",
+            "fraction_of_quantity",
+            "fraction_remainder",
+            "fraction_of_fraction",
+            "multi_fraction_remainder",
+            "money_total",
+            "money_change",
+            "signed_change",
+            "number_equation",
+            "sum_difference_system",
+            "sum_multiple_system",
+            "box_volume",
+            "cube_surface",
+            "pythagoras_distance",
+            "pythagoras_leg"
+          ],
+          "required": false
+        },
+        "creative_problem_types": {
+          "kind": "enum_set",
+          "values": [
+            "equal_sharing",
+            "sharing_remainder",
+            "fraction_of_quantity",
+            "fraction_remainder",
+            "fraction_of_fraction",
+            "multi_fraction_remainder",
+            "money_total",
+            "money_change",
+            "signed_change",
+            "number_equation",
+            "sum_difference_system",
+            "sum_multiple_system",
+            "box_volume",
+            "cube_surface",
+            "pythagoras_distance",
+            "pythagoras_leg"
+          ],
+          "required": false
+        },
         "creative_escalation": {
           "kind": "enum",
           "values": [
@@ -2089,7 +2133,9 @@
         "problem_types"
       ],
       "advisory_parameters": [
-        "creative_escalation"
+        "creative_escalation",
+        "creative_problem_types",
+        "problem_types_by_level"
       ],
       "prompt_template": {
         "header": "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",

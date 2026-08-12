@@ -105,9 +105,49 @@ def _validate_parameters(raw, schema, lesson_id):
                     f"{lesson_id}: '{name}' sadrži nedozvoljene vrijednosti {bad}")
             # Sortirano radi determinističkog artefakta.
             resolved[name] = sorted(set(value))
+        elif spec["kind"] == "enum_set_by_level":
+            # Rječnik NIVO → dozvoljene vrijednosti. Postoji da se razdvoji
+            # „šta lekcija uopšte podržava“ od „šta smije nastati na datom
+            # nivou težine“: prvo je pitanje kurikuluma, drugo je pitanje
+            # ugovora o težini, i jedno ne smije tiho odlučivati o drugom.
+            if not isinstance(value, dict) or not value:
+                raise SemanticSchemaError(
+                    f"{lesson_id}: '{name}' mora biti neprazan rječnik po nivou")
+            by_level = {}
+            for level, values in value.items():
+                if str(level) not in ("1", "2", "3"):
+                    raise SemanticSchemaError(
+                        f"{lesson_id}: '{name}' ima nepoznat nivo {level!r}")
+                if not isinstance(values, list) or not values:
+                    raise SemanticSchemaError(
+                        f"{lesson_id}: '{name}' nivo {level} mora biti "
+                        f"neprazna lista")
+                bad = sorted(set(values) - set(allowed))
+                if bad:
+                    raise SemanticSchemaError(
+                        f"{lesson_id}: '{name}' nivo {level} sadrži "
+                        f"nedozvoljene vrijednosti {bad}")
+                by_level[str(level)] = sorted(set(values))
+            resolved[name] = dict(sorted(by_level.items()))
         else:
             raise SemanticSchemaError(
                 f"{lesson_id}: nepoznata vrsta parametra '{spec['kind']}'")
+
+    # PODSKUP UKUPNOG ENUMA. Nivo-pool i kreativni pool su SUŽENJA onoga što
+    # lekcija podržava — nikad bočni ulaz za tip koji ugovor ne nosi.
+    supported = set(resolved.get("problem_types") or ())
+    if supported:
+        for name in ("creative_problem_types",):
+            extra = sorted(set(resolved.get(name) or ()) - supported)
+            if extra:
+                raise SemanticSchemaError(
+                    f"{lesson_id}: '{name}' nosi tipove van problem_types {extra}")
+        for level, values in (resolved.get("problem_types_by_level") or {}).items():
+            extra = sorted(set(values) - supported)
+            if extra:
+                raise SemanticSchemaError(
+                    f"{lesson_id}: 'problem_types_by_level' nivo {level} nosi "
+                    f"tipove van problem_types {extra}")
     return resolved
 
 

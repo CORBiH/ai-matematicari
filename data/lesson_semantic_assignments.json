@@ -1000,8 +1000,30 @@
           "fraction_of_fraction",
           "multi_fraction_remainder"
         ],
+        "problem_types_by_level": {
+          "1": [
+            "fraction_of_quantity"
+          ],
+          "2": [
+            "fraction_of_quantity",
+            "fraction_remainder"
+          ],
+          "3": [
+            "fraction_of_quantity",
+            "fraction_remainder",
+            "fraction_of_fraction",
+            "multi_fraction_remainder"
+          ]
+        },
+        "creative_problem_types": [
+          "fraction_of_quantity",
+          "fraction_remainder",
+          "fraction_of_fraction",
+          "multi_fraction_remainder"
+        ],
         "creative_escalation": "enabled"
       },
+      "_difficulty_note": "PODJELA TEŽINE (mjereno nad 5000 sesija po nivou kroz stvarni put): sam enum `problem_types` je odgovarao na pitanje kurikuluma („smije li ova lekcija uopšte ovaj tip“), a deterministički generator ga je čitao kao odgovor i na pitanje težine — birao je ravnomjerno iz cijelog enuma bez obzira na nivo. Posljedica: 81,1% zadataka NIVOA 1 bilo je višekoračno, a nivo 1 ugovorom znači „jedna direktna relacija“. Curenje je postojalo i prije proširenja arhetipa (fraction_remainder, dubina 2, u 60,1% zadataka nivoa 1), a proširenje ga je pojačalo i uvelo grafove dubine 3 na nivo 1 te dubine 3 na nivo 2. Zato `problem_types_by_level`: nivo 1 = jedna relacija (fraction_of_quantity), nivo 2 = jedan dodatni korak nad ISTOM cjelinom (+ fraction_remainder, što je „ostatak“ koji level_bounds izričito imenuje kao oznaku nivoa 2), nivo 3 = „više povezanih relacija“ (+ fraction_of_fraction, gdje druga relacija mijenja referentnu cjelinu, i + multi_fraction_remainder). `creative_problem_types` je NAMJERNO odvojen i drži sva četiri: kreativna eskalacija se javlja tek na maksimumu i cijeli razlog njenog proširenja bio je dostupnost težih tipova.",
       "_archetype_note": "PROŠIRENJE ARHETIPA (živi ciljani retest): sva tri Tutorova nacrta na nivou 3 posegla su za bogatijom strukturom nego što su nudila dva postojeća arhetipa, pa ih je serverska kapija ispravno odbila — 0 objavljenih od 3 pokušaja. Kapija nije bila problem; rječnik arhetipa lekcije jeste bio pretanak: oba postojeća tipa su JEDNOKORAČNA, a eskalacija traži i teže i strukturno drugačije. Dodana su dva tipa koje kurikulum 6. razreda IZRIČITO nosi (KS_2018-0045, sadržaji: „Množenje razlomka razlomkom“ i „Sabiranje i oduzimanje razlomaka različitih imenilaca“; uz KS_2018-0057 osnovne operacije i KS_2018-0073 tekstualne zadatke): fraction_of_fraction (dio već izdvojenog dijela) i multi_fraction_remainder (više dijelova ISTE cjeline pa ostatak). Treći kandidat, successive_fraction_remainder (uzastopno uklanjanje od tekućeg ostatka), NIJE dodan — nijedna stavka 6. razreda ga ne imenuje, a mijenja referentnu cjelinu iz koraka u korak. Oba nova tipa imaju egzaktan rješavač u matbot/mathkernel/wordfacts.py i determinističke generatore.", "_pilot_note": "ŽIVI QA NALAZ (direktor škole): traženje sve težih zadataka vraća isti matematički arhetip s drugim imenom/predmetom/brojevima. Mjereno nad 3600 determinističkih paketa ove lekcije: 2960 različitih tekstova, ali samo 12 rečeničnih kostura i 2 strukturna arhetipa, ista na sva tri nivoa; 50,2% uzastopnih parova ponovi isti arhetip. Zato PILOT ograničene AI-eskalacije (matbot/tutor/creative_escalation.py): obična progresija ostaje deterministička i nula-poziva, a model se uključuje tek kad je ljestvica iscrpljena ili kad učenik izričito traži drugi tip. Uključeno SAMO na ovoj lekciji — ostalih osam lekcija iste porodice ostaje nepromijenjeno dok pilot ne bude potvrđen uživo.",
       "level_bounds": {
         "1": "jedna direktna relacija, mali brojevi",

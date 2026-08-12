@@ -39,6 +39,12 @@ _PILOT_ENABLED = "enabled"
 # Porodica i dalje mora nositi strukturisan enum arhetipa — bez njega server
 # nema čime da bira cilj, pa eskalacija ne bi imala smisla.
 _ARCHETYPE_PARAMETER = "problem_types"
+# KREATIVNI POOL JE ODVOJEN OD NIVOA. Obična ljestvica se sužava po nivou
+# (`problem_types_by_level`), a eskalacija se javlja TEK na maksimumu i postoji
+# upravo zato da ponudi strukturu koju niži nivoi ne nose. Kad bi cilj birala
+# iz nivo-pool-a, ispravka težine bi ponovo izgladnjela eskalaciju — tačno
+# stanje zbog kojeg je enum i proširivan.
+_CREATIVE_ARCHETYPE_PARAMETER = "creative_problem_types"
 
 # Koliko unazad gledamo kad biramo „nešto drugo“. Namjerno malo: dovoljno da
 # se izbjegne neposredno ponavljanje, premalo da zaključa ponudu kad lekcija
@@ -79,7 +85,9 @@ def _contract_parameters(context) -> dict:
 
 
 def _contract_archetypes(context) -> tuple:
-    return tuple(_contract_parameters(context).get(_ARCHETYPE_PARAMETER) or ())
+    parameters = _contract_parameters(context)
+    creative = tuple(parameters.get(_CREATIVE_ARCHETYPE_PARAMETER) or ())
+    return creative or tuple(parameters.get(_ARCHETYPE_PARAMETER) or ())
 
 
 def is_pilot_lesson(context) -> bool:

@@ -1506,7 +1506,9 @@
     "6-04-015": {
       "activation_class": "READY",
       "advisory_parameters": [
-        "creative_escalation"
+        "creative_escalation",
+        "creative_problem_types",
+        "problem_types_by_level"
       ],
       "archetype_definitions": {
         "fraction_of_fraction": "prvo se izdvoji razlomak cjeline, pa se traži razlomak TOG izdvojenog dijela; drugi razlomak se odnosi na rezultat prvog, nikad na polaznu cjelinu",
@@ -1534,12 +1536,33 @@
       },
       "parameters": {
         "creative_escalation": "enabled",
+        "creative_problem_types": [
+          "fraction_of_fraction",
+          "fraction_of_quantity",
+          "fraction_remainder",
+          "multi_fraction_remainder"
+        ],
         "problem_types": [
           "fraction_of_fraction",
           "fraction_of_quantity",
           "fraction_remainder",
           "multi_fraction_remainder"
-        ]
+        ],
+        "problem_types_by_level": {
+          "1": [
+            "fraction_of_quantity"
+          ],
+          "2": [
+            "fraction_of_quantity",
+            "fraction_remainder"
+          ],
+          "3": [
+            "fraction_of_fraction",
+            "fraction_of_quantity",
+            "fraction_remainder",
+            "multi_fraction_remainder"
+          ]
+        }
       },
       "prompt_lines": [
         "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",

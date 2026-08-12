@@ -63,7 +63,15 @@ class SemanticContract:
 def _freeze_parameters(raw):
     frozen = {}
     for key, value in sorted(raw.items()):
-        frozen[key] = tuple(value) if isinstance(value, list) else value
+        if isinstance(value, dict):
+            # Parametar oblika NIVO → lista (problem_types_by_level): zamrzava
+            # se i spolja i iznutra, da ugovor ostane nepromjenjiv kroz sve
+            # čitaoce, isto kao ravne liste ispod.
+            frozen[key] = MappingProxyType({
+                str(inner): tuple(items) if isinstance(items, list) else items
+                for inner, items in sorted(value.items())})
+        else:
+            frozen[key] = tuple(value) if isinstance(value, list) else value
     return MappingProxyType(frozen)
 
 
