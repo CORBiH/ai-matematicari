@@ -1101,22 +1101,10 @@ def build_reviewer_input(context, session, student_message, draft_json,
                       "dolazi do rezultata, NE kako je zadatak nazvan u "
                       "potpisu — oznaka koja se slaže, a struktura koja se ne "
                       "slaže, znači false.\n"
-                      "- IZBOR CILJNOG TIPA JE SERVERSKI, NE TVOJ. Server vodi "
-                      "tačnu evidenciju objavljenih i pokušanih tipova i već je "
-                      "izabrao najbolji dozvoljeni cilj. To što je taj tip "
-                      "nedavno viđen NIJE, sam po sebi, razlog za `false` — "
-                      "kad su svi tipovi potrošeni, server namjerno bira "
-                      "najdavnije viđeni.\n"
-                      "- U `checks.substantially_different_from_recent` sudi "
-                      "SAMO o OVOM zadatku naspram KONKRETNIH nedavnih zadataka "
-                      "nabrojanih iznad: je li ovo stvarno nov primjer ili samo "
-                      "presvučen stari?\n"
-                      "  • `false` = isti zadatak u novom ruhu: isti niz "
-                      "koraka rješavanja, isti odnosi i isti traženi podatak, a "
-                      "promijenjeni su samo ime, predmet, priča ili brojevi;\n"
-                      "  • `true` = matematički drugačiji primjer — druge "
-                      "veličine i odnosi, drugačiji put do rezultata ili drugo "
-                      "pitanje — pa i kad je tip zadatka isti kao nedavno.")
+                      "- U `checks.substantially_different_from_recent` upiši "
+                      "da li je zadatak SUŠTINSKI druge matematičke strukture "
+                      "od nedavnih. Isti tip s drugim imenima, predmetima ili "
+                      "brojevima NIJE drugačiji — tada upiši false.")
     blocks.append("Vrati strukturisanu odluku prema šemi.")
     return "\n\n".join(blocks)
 
