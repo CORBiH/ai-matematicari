@@ -2038,7 +2038,9 @@
     },
     "6-07-001": {
       "activation_class": "READY",
-      "advisory_parameters": [],
+      "advisory_parameters": [
+        "max_variable_degree"
+      ],
       "contract_version": "5F.1",
       "detector": "linear_equation",
       "enforced_parameters": [
@@ -2054,11 +2056,12 @@
       "forbidden_neighbour_skills": [],
       "lesson_id": "6-07-001",
       "level_bounds": {
-        "1": "jedan računski korak do rješenja",
-        "2": "dva koraka ili negativni koeficijenti",
-        "3": "tri koraka (sređivanje pa rješavanje)"
+        "1": "razlikovanje jednačine, jednakosti, nejednačine i izraza",
+        "2": "uz njih i nejednakost bez nepoznate",
+        "3": "najfinija razlika: zapis s dvije nepoznate"
       },
       "parameters": {
+        "max_variable_degree": "1",
         "number_domain": "integer",
         "shapes": [
           "classification"
@@ -2068,10 +2071,11 @@
         "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
         "- glavna vidljiva radnja mora biti: prepoznavanje vrste zapisa",
         "- jedna nepoznata i tačno jedno rješenje",
+        "- nepoznata se smije pojaviti SAMO na prvi stepen: bez stepenovanja i bez kvadratnih jednačina, ni kao tačan zapis ni kao ponuđena pogrešna opcija",
         "- koeficijenti i rješenje su cijeli brojevi",
         "- ako prekršiš ovo, server odbija paket prije objave"
       ],
-      "reviewer_note": "Invarijanta: jedinstveno rješenje, provjera uvrštavanjem egzaktna."
+      "reviewer_note": "Invarijanta: jedinstveno rješenje, provjera uvrštavanjem egzaktna. Nepoznata ostaje na prvom stepenu (max_variable_degree=1)."
     },
     "6-07-002": {
       "activation_class": "READY",

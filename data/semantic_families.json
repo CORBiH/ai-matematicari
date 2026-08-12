@@ -956,13 +956,23 @@
             "decimal"
           ],
           "required": true
+        },
+        "max_variable_degree": {
+          "kind": "enum",
+          "values": [
+            "1",
+            "2"
+          ],
+          "required": false
         }
       },
       "enforced_parameters": [
         "shapes",
         "number_domain"
       ],
-      "advisory_parameters": [],
+      "advisory_parameters": [
+        "max_variable_degree"
+      ],
       "prompt_template": {
         "header": "SEMANTIČKI UGOVOR LEKCIJE (server ga provjerava determinističkim putem):",
         "main_line": {
@@ -973,6 +983,9 @@
           "- jedna nepoznata i tačno jedno rješenje"
         ],
         "parameter_lines": {
+          "max_variable_degree": {
+            "1": "- nepoznata se smije pojaviti SAMO na prvi stepen: bez stepenovanja i bez kvadratnih jednačina, ni kao tačan zapis ni kao ponuđena pogrešna opcija"
+          },
           "number_domain": {
             "integer": "- koeficijenti i rješenje su cijeli brojevi",
             "rational": "- koeficijenti i rješenje smiju biti razlomci",

@@ -1336,15 +1336,17 @@
         "shapes": [
           "classification"
         ],
-        "number_domain": "integer"
+        "number_domain": "integer",
+        "max_variable_degree": "1"
       },
       "level_bounds": {
-        "1": "jedan računski korak do rješenja",
-        "2": "dva koraka ili negativni koeficijenti",
-        "3": "tri koraka (sređivanje pa rješavanje)"
+        "1": "razlikovanje jednačine, jednakosti, nejednačine i izraza",
+        "2": "uz njih i nejednakost bez nepoznate",
+        "3": "najfinija razlika: zapis s dvije nepoznate"
       },
       "forbidden_neighbour_skills": [],
-      "reviewer_note": "Invarijanta: jedinstveno rješenje, provjera uvrštavanjem egzaktna."
+      "_scope_note": "ŽIVI QA NALAZ: klasifikacijski MCQ je na nivoima 2 i 3 nudio kvadratnu jednačinu ($x^{2} + b = c$) kao pogrešnu opciju, u ~50% paketa. Ishod ove lekcije (KS_2018-0060) traži samo: 'razlikovati značenje jednačina, jednakost, nejednačina i nejednakost'. Stepenovanje se u 6. razredu ne pojavljuje ni u jednoj NPP stavki i uvodi se tek u 8. razredu (KS_2018-0264, KS_2018-0289); učenik zato ne može OBRAZLOŽITI zašto kvadratna jednačina otpada, nego samo prepoznati nepoznat zapis. Ista porodica u 9-04-001 i 9-04-012 kvadratnu jednačinu i dalje smije nuditi (KS_2018-0289 izričito nosi 'Kvadratne jednačine'). Nivoi 2 i 3 zato rastu po pojmovima koje ishod imenuje: nejednakost bez nepoznate, pa zapis s dvije nepoznate.",
+      "reviewer_note": "Invarijanta: jedinstveno rješenje, provjera uvrštavanjem egzaktna. Nepoznata ostaje na prvom stepenu (max_variable_degree=1)."
     },
     {
       "lesson_id": "6-07-002",

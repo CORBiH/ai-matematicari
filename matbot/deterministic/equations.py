@@ -83,6 +83,7 @@ def generate_package(lesson_id, lesson_title, parameters, level, rng=None,
     shapes = tuple(parameters["shapes"])
     # Kvadratna porodica ne nosi number_domain — radi nad cijelim brojevima.
     domain = parameters.get("number_domain") or "integer"
+    max_degree = core.max_variable_degree(parameters)
     unknown_member = (policy is not None and getattr(
         policy, "equation_method", "") == "unknown_member")
     for _ in range(60):
@@ -90,7 +91,8 @@ def generate_package(lesson_id, lesson_title, parameters, level, rng=None,
             shape = rng.choice(shapes)
             if unknown_member:
                 return _unknown_member_package(rng, level, domain, shape,
-                                               lesson_id, lesson_title)
+                                               lesson_id, lesson_title,
+                                               max_degree=max_degree)
             builder = {
                 "one_step_additive": _additive_package,
                 "one_step_multiplicative": _multiplicative_package,
@@ -119,6 +121,11 @@ def generate_package(lesson_id, lesson_title, parameters, level, rng=None,
             if shape.startswith("solve_inequality"):
                 return _solve_inequality_package(rng, level, domain, shape,
                                                  lesson_id, lesson_title)
+            # Granicu stepena nepoznate prima SAMO oblik koji bira vrste
+            # ponuđenih zapisa; ostali oblici su vrstom definisani sami po sebi.
+            if shape == "classification":
+                return builder(rng, level, domain, lesson_id, lesson_title,
+                               max_degree=max_degree)
             return builder(rng, level, domain, lesson_id, lesson_title)
         except DeterministicGenerationError:
             continue
@@ -774,9 +781,17 @@ def _classification_samples(rng):
     expression = f"{a}x + {b}"
     quadratic = f"x^{{2}} + {b} = {c}"
     two_unknowns = f"x + y = {c}"
+    # NEJEDNAKOST — četvrti pojam koji ishod lekcije izričito imenuje uz
+    # jednačinu, jednakost i nejednačinu, a taksonomija ga do sada nije imala.
+    # Uvijek TAČNA brojevna nejednakost, i to BEZ ijednog novog rng poteza:
+    # sve vrijednosti su već izvučene, pa se niz slučajnih brojeva ne pomjera
+    # i paketi lekcija koje ovaj pojam ne koriste ostaju bajt za bajt isti.
+    numeric_inequality = (f"{a} + {b} > {c}" if total > c
+                          else f"{a} + {b} < {c + 1}")
     return {"equation": equation, "inequality": inequality,
             "equality": equality, "expression": expression,
-            "quadratic": quadratic, "two_unknowns": two_unknowns}
+            "quadratic": quadratic, "two_unknowns": two_unknowns,
+            "numeric_inequality": numeric_inequality}
 
 
 _KIND_LABELS = {
@@ -786,17 +801,55 @@ _KIND_LABELS = {
     "expression": "izraz (nema znaka jednakosti ni nejednakosti)",
 }
 
+# ZAŠTO je svaki ponuđeni zapis pogrešan — rečenica rješenja se SASTAVLJA od
+# stvarno izabranih vrsta. Ranije je bila fiksna („pogrešan znak, bez
+# nepoznate, kvadrat ili dvije nepoznate“), pa je i na nivou 1, gdje nijedan
+# kvadrat ni dvije nepoznate nisu ponuđeni, tvrdila nešto što u zadatku ne
+# postoji — i uz to izgovarala pojam koji lekcija ne obrađuje.
+_KIND_REASONS = {
+    "equality": "nema nepoznate",
+    "numeric_inequality": "nema nepoznate",
+    "expression": "nema ni znaka jednakosti ni znaka nejednakosti",
+    "inequality": "ima znak nejednakosti, a ne jednakosti",
+    "equation": "ima znak jednakosti, a ne nejednakosti",
+    "two_unknowns": "ima dvije nepoznate",
+    "quadratic": "nepoznata nije na prvom stepenu",
+}
 
-def _classification_package(rng, level, domain, lesson_id, lesson_title):
+# PREFERENCIJSKI RED VRSTA po (nivo, tražena vrsta); uzimaju se PRVE TRI koje
+# ugovor lekcije dozvoljava. Kad su sve vrste dozvoljene, prve tri su tačno
+# istorijska trojka — zato lekcije bez granice ostaju bajt za bajt iste.
+_CLASSIFICATION_KIND_ORDER = {
+    (1, "equation"): ("equality", "expression", "inequality",
+                      "numeric_inequality", "two_unknowns"),
+    (1, "inequality"): ("equality", "expression", "equation",
+                        "numeric_inequality", "two_unknowns"),
+    (2, "equation"): ("quadratic", "two_unknowns", "inequality",
+                      "numeric_inequality", "equality", "expression"),
+    (2, "inequality"): ("equality", "expression", "equation",
+                        "numeric_inequality", "two_unknowns"),
+}
+
+
+def _classification_wrong_kinds(level, ask, max_degree):
+    """Tri pogrešne vrste iz reda preferencije, bez vrsta koje ugovor zabranjuje.
+
+    Jedina zabrana koju ugovor danas nosi je STEPEN NEPOZNATE: `quadratic` je
+    kvadratna jednačina, pa lekcija s `max_variable_degree = 1` do nje ne
+    dolazi — ni kao tačan odgovor ni kao distraktor."""
+    order = _CLASSIFICATION_KIND_ORDER[(min(level, 2), ask)]
+    allowed = [kind for kind in order
+               if kind != "quadratic" or max_degree >= 2]
+    if len(allowed) < 3:
+        raise DeterministicGenerationError("nema tri dozvoljene pogrešne vrste")
+    return tuple(allowed[:3])
+
+
+def _classification_package(rng, level, domain, lesson_id, lesson_title,
+                            max_degree=core.DEFAULT_MAX_VARIABLE_DEGREE):
     samples = _classification_samples(rng)
     ask = rng.choice(("equation", "inequality"))
-    if level == 1:
-        wrong_kinds = ("equality", "expression",
-                       "inequality" if ask == "equation" else "equation")
-    else:
-        wrong_kinds = ("quadratic" if ask == "equation" else "equality",
-                       "two_unknowns" if ask == "equation" else "expression",
-                       "inequality" if ask == "equation" else "equation")
+    wrong_kinds = _classification_wrong_kinds(level, ask, max_degree)
     correct = f"${samples[ask]}$"
     option_texts = (correct, *(f"${samples[kind]}$" for kind in wrong_kinds))
     if len(set(option_texts)) != 4:
@@ -806,11 +859,13 @@ def _classification_package(rng, level, domain, lesson_id, lesson_title):
              "nejednakosti i nepoznatu; jednakost nema nepoznate, a izraz "
              "nema ni jednakosti ni nejednakosti.")
     hint2 = "Za svaki zapis provjeri: ima li nepoznatu? Koji znak povezuje strane?"
-    hint3 = ("Linearna s JEDNOM nepoznatom: nepoznata na prvi stepen i samo "
-             "jedno slovo.")
+    hint3 = (("Linearna s JEDNOM nepoznatom: nepoznata na prvi stepen i samo "
+              "jedno slovo.") if "quadratic" in wrong_kinds else
+             ("Linearna s JEDNOM nepoznatom: u zapisu je samo jedno slovo kao "
+              "nepoznata."))
+    reasons = list(dict.fromkeys(_KIND_REASONS[kind] for kind in wrong_kinds))
     solution_text = (f"Zapis ${samples[ask]}$ je {_KIND_LABELS[ask]}. Ostali "
-                     "zapisi to nisu (pogrešan znak, bez nepoznate, kvadrat "
-                     "ili dvije nepoznate).")
+                     f"zapisi to nisu: {'; '.join(reasons)}.")
     return core.build_package(
         lesson_id=lesson_id, lesson_title=lesson_title,
         family_id="linear_equation_direct", operation="classification",
@@ -1051,7 +1106,8 @@ def _role_display_of(domain):
 
 
 def _unknown_member_package(rng, level, domain, shape, lesson_id,
-                            lesson_title):
+                            lesson_title,
+                            max_degree=core.DEFAULT_MAX_VARIABLE_DEGREE):
     """Ruta metode nepoznatog člana za JEDAN oblik ugovora, ili fail closed."""
     builders = {
         "one_step_additive": _role_additive_package,
@@ -1072,6 +1128,9 @@ def _unknown_member_package(rng, level, domain, shape, lesson_id,
     }
     builder = neutral.get(shape)
     if builder is not None:
+        if shape == "classification":
+            return builder(rng, level, domain, lesson_id, lesson_title,
+                           max_degree=max_degree)
         return builder(rng, level, domain, lesson_id, lesson_title)
     # DET-G6: oblik bez varijante nepoznatog člana pod ovom politikom pada
     # zatvoreno — nikad tiho s pogrešnom metodom. Model-put preuzima lekciju.

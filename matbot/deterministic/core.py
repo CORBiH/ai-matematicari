@@ -248,6 +248,25 @@ def clamp_level(level) -> int:
     return min(max(int(level), 1), 3)
 
 
+# ---------------------------------------------------------------------------
+# KURIKULARNA GRANICA STEPENA NEPOZNATE / PROMJENLJIVE
+# ---------------------------------------------------------------------------
+# Ista činjenica pogađa više porodica: lekcija u kojoj stepenovanje NIJE
+# obrađeno ne smije ga vidjeti ni kao tačan odgovor ni kao distraktor. Granica
+# je zato parametar UGOVORA LEKCIJE, nikad razred, naslov ni ID lekcije — ista
+# porodica u jednoj lekciji smije $x^2$, u drugoj ne smije, i to je razlika
+# PODATAKA. Bez parametra vrijedi istorijsko ponašanje (stepen do 2).
+DEFAULT_MAX_VARIABLE_DEGREE = 2
+
+
+def max_variable_degree(parameters) -> int:
+    """Najviši dozvoljeni stepen nepoznate iz ugovora lekcije."""
+    raw = (parameters or {}).get("max_variable_degree")
+    if raw is None:
+        return DEFAULT_MAX_VARIABLE_DEGREE
+    return int(raw)
+
+
 def build_package(*, lesson_id, lesson_title, family_id, operation, level,
                   question, answer_value, answer_display, distractor_values,
                   hints, solution, signature_parameters, required_conditions,
