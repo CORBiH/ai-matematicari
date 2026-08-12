@@ -986,7 +986,7 @@ def _equivalence_package(rng, level, domain, lesson_id, lesson_title):
 
 # ---------------------------------------------------------------------------
 # METODA NEPOZNATOG ČLANA (PP-1, 6. razred) — oblici se grade iz ULOGE
-# nepoznatog člana (sabirak/umanjenik/umanjilac/činilac/djeljenik/djelilac).
+# nepoznatog člana (sabirak/umanjenik/umanjilac/faktor/djeljenik/djelilac).
 #
 # ZAŠTO POSTOJI (audit ovlašćenja pravila): zatečeni graditelji uče
 # prebacivanje preko znaka jednakosti — metodu koju kurikulum 6. razreda
@@ -1219,7 +1219,7 @@ def _role_subtract_from_package(rng, level, domain, lesson_id, lesson_title):
 
 
 def _role_multiplicative_package(rng, level, domain, lesson_id, lesson_title):
-    """a·x = b (činilac), x : a = b (djeljenik), a : x = b (djelilac)."""
+    """a·x = b (faktor), x : a = b (djeljenik), a : x = b (djelilac)."""
     show = lambda v: _domain_show(domain, v)
     solution = _role_value(rng, domain, level)
     if solution == 0:
@@ -1241,12 +1241,12 @@ def _role_multiplicative_package(rng, level, domain, lesson_id, lesson_title):
         equation = (f"{coefficient_display} \\cdot x = {show(product)}"
                     if multiplier.denominator > 1
                     else f"{show(multiplier)}x = {show(product)}")
-        role_line = f"U ovoj jednačini $x$ je činilac: {_role_sentence(role)}."
+        role_line = f"U ovoj jednačini $x$ je faktor: {_role_sentence(role)}."
         compute = f"x = {show(product)} : {core.parenthesized(show(multiplier))}"
         check = (f"{show(multiplier)} \\cdot {show(solution)} = {show(product)}"
                  if multiplier.denominator == 1 else
                  f"{show(multiplier)} \\cdot {show(solution)} = {show(product)}")
-        hint2 = (f"Proizvod je ${show(product)}$, poznati činilac je "
+        hint2 = (f"Proizvod je ${show(product)}$, poznati faktor je "
                  f"${show(multiplier)}$: dakle ${compute}$.")
     elif form == "dividend":
         role = "unknown_dividend"

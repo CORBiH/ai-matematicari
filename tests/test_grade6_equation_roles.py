@@ -30,7 +30,9 @@ CASES = {
                  "number_domain": "decimal"},
 }
 
-ROLE_WORDS = ("sabirak", "umanjenik", "umanjilac", "činilac", "djeljenik",
+# „faktor“, ne „činilac“: KS_2018 koristi isključivo „faktor“ (vidi
+# tests/test_student_terminology_policy.py i matbot/terminology.py, pravilo 11).
+ROLE_WORDS = ("sabirak", "umanjenik", "umanjilac", "faktor", "djeljenik",
               "djelilac")
 
 # Riječi kojih u prozi 6. razreda NE SMIJE biti (metodske i predznačene).

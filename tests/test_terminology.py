@@ -55,7 +55,10 @@ def test_faktor_is_left_unchanged():
 
 
 def test_unrelated_words_are_not_rewritten():
-    text = "Činilac i djelilac ostaju netaknuti, kao i čitanje."
+    # „djelilac“ (dijeljenje) i „čitanje“ se NE diraju. „Činilac“ se od
+    # terminološke politike (KS koristi samo „faktor“) normalizuje — vidi
+    # tests/test_student_terminology_policy.py.
+    text = "Djelilac ostaje netaknut, kao i čitanje i čitav broj."
     assert terminology.normalize_terminology(text) == text
 
 
@@ -188,6 +191,10 @@ def test_forbidden_term_appears_only_as_an_explicit_prohibition():
         Path("matbot/lesson_relevance.py"),
         Path("tests/test_terminology.py"),
         Path("tests/test_rules.py"),       # provjerava DA su termini deklarisani zabranjeni u promptu
+        # Nova terminološka politika: „čimbenik“ je KONTROLA (dokaz da
+        # zabranjen termin i dalje jeste zabranjen, za razliku od parova
+        # imenilac/nazivnik i činilac/faktor koji su samo normalizacija).
+        Path("tests/test_student_terminology_policy.py"),
         # Univerzalni put: hrvatski oblik je ULAZ testa (nacrt modela) kojim se
         # dokazuje da normalizacija radi i na novom, dvopozivnom putu.
         Path("tests/test_universal_tutor_pipeline.py"),

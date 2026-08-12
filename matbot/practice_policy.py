@@ -57,8 +57,11 @@ UNKNOWN_ROLE_RELATIONS = {
                         "nepoznati umanjenik = razlika plus umanjilac"),
     "unknown_subtrahend": ("nepoznati umanjilac",
                            "nepoznati umanjilac = umanjenik minus razlika"),
-    "unknown_factor": ("nepoznati činilac",
-                       "nepoznati činilac = proizvod podijeljen poznatim činiocem"),
+    # „faktor“, ne „činilac“: KS_2018 (plan koji projekat prati) koristi
+    # „faktor“ 56 puta, a „činilac“ nijednom — taj oblik dolazi samo iz
+    # RS_2014. Vidi matbot/terminology.py, pravilo 11.
+    "unknown_factor": ("nepoznati faktor",
+                       "nepoznati faktor = proizvod podijeljen poznatim faktorom"),
     "unknown_dividend": ("nepoznati djeljenik",
                          "nepoznati djeljenik = količnik puta djelilac"),
     "unknown_divisor": ("nepoznati djelilac",
@@ -93,7 +96,7 @@ UNKNOWN_ROLE_EXPLANATIONS = {
     "unknown_subtrahend":
         "nepoznati umanjilac dobiješ tako što od umanjenika oduzmeš razliku",
     "unknown_factor":
-        "nepoznati činilac dobiješ tako što proizvod podijeliš poznatim činiocem",
+        "nepoznati faktor dobiješ tako što proizvod podijeliš poznatim faktorom",
     "unknown_dividend":
         "nepoznati djeljenik dobiješ tako što količnik pomnožiš djeliocem",
     "unknown_divisor":

@@ -177,8 +177,15 @@ def _part_package(rng, level, lesson_id, lesson_title, concept):
     option_texts = (correct, *wrong)
     if len(set(option_texts)) != 4:
         raise DeterministicGenerationError("opcije nisu jedinstvene")
+    # DVOSTRUKI NAZIV SAMO PRI UVOĐENJU POJMA. Ovo je jedini deterministički
+    # tekst koji nazivnik DEFINIŠE (koncept `part_of_whole` — „Pojam
+    # razlomka“), pa dvojni oblik stoji tačno ovdje, a svuda drugdje ostaje
+    # samo „nazivnik“ — isto pravilo koje rules.py već ima za „linijar
+    # (lenjir)“. Izvor para je kurikulum: KS_2018 ga u sheetu `Terminologija`
+    # vodi kao eksplicitni alias („imenilac (nazivnik)“, str. 8), a
+    # KS_2018-0046 nabraja „brojilac (brojnik), imenilac (nazivnik)“.
     hints = (
-        "Nazivnik kazuje na koliko je jednakih dijelova cjelina "
+        "Nazivnik (imenilac) kazuje na koliko je jednakih dijelova cjelina "
         "podijeljena, brojnik koliko se dijelova uzima.",
         "Kod količnika: djeljenik ide u brojnik, djelilac u nazivnik.",
         "Pazi na poredak — zamijenjen brojnik i nazivnik daju drugi broj.",

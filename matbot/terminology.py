@@ -285,29 +285,90 @@ def _imenilac_suffix(match):
 
 
 # ---------------------------------------------------------------------------
+# 11) ČINILAC → FAKTOR (živi QA nalaz, direktor škole — SAMO normalizacija,
+#     NE zabranjen termin)
+# ---------------------------------------------------------------------------
+# KURIKULARNI DOKAZ (reference/curriculum/semantics/MATBOT_Faza1_KS_RS_NPP):
+# u KS_2018 (bosanski plan koji projekat prati) „faktor“ se pojavljuje 56 puta
+# u punom tekstu stranica i 13 puta u stavkama ishoda — a „činilac“ NIJEDNOM.
+# „Činilac“ dolazi isključivo iz RS_2014 (8 pojava, npr. RS_2014-0104
+# „Rastavljanje polinoma na činioce“). Kanonski termin projekta je zato
+# „faktor“ (rules.py, obavezni termini).
+#
+# Kao i kod para imenilac/nazivnik, ovo je NORMALIZACIJA, ne zabrana: riječ je
+# potpuno legitimna u srpskom registru i doslovno stoji u kurikularnom izvoru,
+# pa je `contains_forbidden_term` NE smije prijavljivati — inače bi repo-sken
+# pao nad podacima koje ne prepravljamo. Deklinacija je ista kao kod
+# „imenilac“ (nepostojano a): osnove „činilac/činilaca“ i „činioc-“.
+_CINILAC_SUFFIX_MAP = {
+    # osnova „činioc“
+    "ima": "faktorima",
+    "em": "faktorom",
+    "i": "faktori",
+    "e": "faktore",
+    "u": "faktoru",
+    # zajedničko: činioca/činilaca → faktora
+    "a": "faktora",
+    # osnova „činilac“
+    "": "faktor",
+}
+_CINILAC_RE = re.compile(
+    r"\bčinilac(a)?(?![A-Za-zčćžšđČĆŽŠĐ])"
+    r"|\bčinioc(ima|em|e|i|a|u)(?![A-Za-zčćžšđČĆŽŠĐ])",
+    re.IGNORECASE,
+)
+
+
+def _cinilac_suffix(match):
+    return (match.group(1) if match.group(1) is not None else match.group(2)) or ""
+
+
+# ---------------------------------------------------------------------------
+# ZAŠTITA SANKCIONISANOG DVOJNOG NAZIVA
+# ---------------------------------------------------------------------------
+# Par „nazivnik (imenilac)“ je KURIKULARNO SANKCIONISAN: KS_2018 ga u sheetu
+# `Terminologija` vodi kao eksplicitni alias (str. 8), a KS_2018-0046 nabraja
+# „brojilac (brojnik), imenilac (nazivnik)“. Koristi se pri UVOĐENJU pojma.
+# Bez ove zaštite normalizacija bi ga pretvorila u „nazivnik (nazivnik)“ —
+# tačno onaj pokvareni oblik zbog kojeg se slijepa zamjena i zabranjuje.
+#
+# Namjerno NEMA parnjaka za „faktor (činilac)“: „činilac“ nema nijednu pojavu
+# u KS_2018, pa dvojni oblik za faktor nije kurikularno utemeljen i njegovo
+# sažimanje u „faktor“ je ŽELJENO ponašanje.
+_ALIAS_PAIR_PREFIX_RE = re.compile(r"nazivnik\s*\(\s*$", re.IGNORECASE)
+
+
+def _protect_alias_pair(match) -> bool:
+    """True kad je pogodak drugi član sankcionisanog para — ostavi ga."""
+    return bool(_ALIAS_PAIR_PREFIX_RE.search(match.string[:match.start()]))
+
+
+# ---------------------------------------------------------------------------
 # Zajednička primjena — svako pravilo je (regex, suffix_extractor, suffix_map
 # | None). suffix_map=None znači "osnova + isti nastavak kao izvor" (potpuno
 # dijeljena deklinacija, npr. potenciranje/stepenovanje).
 # ---------------------------------------------------------------------------
 _RULES = (
-    (_CIMBENIK_RE, _cimbenik_suffix, _CIMBENIK_SUFFIX_MAP, "faktor"),
-    (_KUTOMER_RE, _kutomer_suffix, _KUTOMER_SUFFIX_MAP, "uglomjer"),
-    (_JEDNAKOKRACNI_RE, _jednakokracni_suffix, _JEDNAKOKRACNI_SUFFIX_MAP, "jednakokraki"),
-    (_ZBROJ_RE, _zbroj_suffix, _ZBROJ_SUFFIX_MAP, "zbir"),
-    (_POTENCIRANJE_RE, lambda m: m.group(1), None, "stepenovanj"),
-    (_TROKUT_RE, _trokut_suffix, _TROKUT_SUFFIX_MAP, "trougao"),
-    (_TOCAN_RE, lambda m: m.group(1), None, "tač"),
+    (_CIMBENIK_RE, _cimbenik_suffix, _CIMBENIK_SUFFIX_MAP, "faktor", None),
+    (_KUTOMER_RE, _kutomer_suffix, _KUTOMER_SUFFIX_MAP, "uglomjer", None),
+    (_JEDNAKOKRACNI_RE, _jednakokracni_suffix, _JEDNAKOKRACNI_SUFFIX_MAP, "jednakokraki", None),
+    (_ZBROJ_RE, _zbroj_suffix, _ZBROJ_SUFFIX_MAP, "zbir", None),
+    (_POTENCIRANJE_RE, lambda m: m.group(1), None, "stepenovanj", None),
+    (_TROKUT_RE, _trokut_suffix, _TROKUT_SUFFIX_MAP, "trougao", None),
+    (_TOCAN_RE, lambda m: m.group(1), None, "tač", None),
     # MORA ostati POSLIJE _KUTOMER_RE: „kutomer“ se prvo pretvori u „uglomjer“,
     # pa ovo pravilo nema šta da dohvati unutar njega.
-    (_KUT_RE, _kut_suffix, _KUT_SUFFIX_MAP, "ugao"),
-    (_PRESEK_RE, _presek_suffix, _PRESEK_SUFFIX_MAP, "presjek"),
+    (_KUT_RE, _kut_suffix, _KUT_SUFFIX_MAP, "ugao", None),
+    (_PRESEK_RE, _presek_suffix, _PRESEK_SUFFIX_MAP, "presjek", None),
 )
 
 # Pravila koja se PRIMJENJUJU pri normalizaciji, ali NE čine termin
 # „zabranjenim“ za repo-sken (`contains_forbidden_term`) — vidi obrazloženje
 # uz IMENILAC iznad (kurikularni naslovi legitimno sadrže izvornu riječ).
 _NORMALIZE_ONLY_RULES = (
-    (_IMENILAC_RE, _imenilac_suffix, _IMENILAC_SUFFIX_MAP, "nazivnik"),
+    (_IMENILAC_RE, _imenilac_suffix, _IMENILAC_SUFFIX_MAP, "nazivnik",
+     _protect_alias_pair),
+    (_CINILAC_RE, _cinilac_suffix, _CINILAC_SUFFIX_MAP, "faktor", None),
 )
 
 _ALL_REPLACEMENT_RULES = _RULES + _NORMALIZE_ONLY_RULES
@@ -321,7 +382,8 @@ _TRIGGER_SUBSTRINGS = (
 )
 
 # Okidači za CIJELU normalizaciju (uklj. normalize-only parove).
-_ALL_TRIGGER_SUBSTRINGS = _TRIGGER_SUBSTRINGS + ("imenil", "imenioc")
+_ALL_TRIGGER_SUBSTRINGS = _TRIGGER_SUBSTRINGS + ("imenil", "imenioc",
+                                                  "činil", "činioc")
 
 
 def _match_capitalization(source: str, replacement: str) -> str:
@@ -335,12 +397,15 @@ def _match_capitalization(source: str, replacement: str) -> str:
 
 
 def _replace_in_plain_text(text: str) -> str:
-    for pattern, suffix_of, suffix_map, base_replacement in _ALL_REPLACEMENT_RULES:
+    for pattern, suffix_of, suffix_map, base_replacement, protect in _ALL_REPLACEMENT_RULES:
         if not pattern.search(text):
             continue
 
-        def _sub(match, suffix_of=suffix_of, suffix_map=suffix_map, base_replacement=base_replacement):
+        def _sub(match, suffix_of=suffix_of, suffix_map=suffix_map,
+                 base_replacement=base_replacement, protect=protect):
             whole = match.group(0)
+            if protect is not None and protect(match):
+                return whole
             suffix = suffix_of(match)
             if suffix_map is None:
                 replacement = base_replacement + suffix

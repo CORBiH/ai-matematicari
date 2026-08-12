@@ -69,11 +69,18 @@ _LANGUAGE_RULES = (
     "suma (za osnovnoškolski zbir), potenciranje, čimbenik (u SVIM padežima), "
     "ekavsko presek (ispravno: presjek), samo "
     "„lenjir“ bez „linijar“ pri prvom spominjanju pribora.\n"
-    "- Za rastavljanje na činioce i množenje UVIJEK koristi riječ „faktor“ (faktora, "
-    "faktori, faktore, faktorom, faktorima) ili „činilac“ — NIKAD hrvatski „čimbenik“, "
+    "- Za rastavljanje na faktore i za množenje UVIJEK koristi riječ „faktor“ (faktora, "
+    "faktori, faktore, faktorom, faktorima) — nikad „čimbenik“ ni „činilac“, "
     "ni u jednom padežu, ni u zadatku, ni u opcijama, ni u hintu, ni u objašnjenju.\n"
+    # NE koristi riječ „djeljivost“ ovdje: univerzalna pravila ne smiju uvoditi
+    # rječnik djeljivosti u lekciju koja ga nema — taj rječnik dolazi isključivo
+    # iz kompajliranog ugovora lekcije (vidi test_reviewer_difficulty_preflight).
+    "- „Faktor“ je uloga u MNOŽENJU i u rastavljanju na proste faktore, a „djelilac“ "
+    "uloga u DIJELJENJU (djeljenik : djelilac = količnik) — te dvije riječi nikad "
+    "ne zamjenjuj jednu drugom.\n"
     "- Za dvostruke nazive ne ponavljaj oba izraza u svakoj rečenici: prvi put "
-    "„linijar (lenjir)“ / „tjeme (vrh)“, poslije u istom odgovoru samo „linijar“ / „tjeme“.\n"
+    "„linijar (lenjir)“ / „tjeme (vrh)“ / „nazivnik (imenilac)“, poslije u istom "
+    "odgovoru samo „linijar“ / „tjeme“ / „nazivnik“.\n"
     "- Ako učenik koristi pogrešnu riječ, ne posramljuj ga — razumij šta misli i "
     "prirodno koristi standardan izraz u svom odgovoru.\n"
 )
