@@ -249,6 +249,14 @@ class ReviewerChecks(BaseModel):
     # deterministički jezički razumijevač je izvan arhitekture. Serverski
     # strukturni provjeravači ostaju mjerodavni za svoje klase.
     substantially_different_from_recent: Optional[bool] = None
+    # ODGOVARA LI STRUKTURA ZADATKA IZABRANOM ARHETIPU (živi nalaz ciljane
+    # kampanje). Odvojeno pitanje od raznolikosti: paket može biti suštinski
+    # drugačiji od nedavnih, a ipak NE biti ono što je server tražio. Server
+    # deterministički provjerava OZNAKU (`operation_or_relation` mora biti baš
+    # ciljni enum) — ali tačna oznaka ne dokazuje tačnu matematičku strukturu,
+    # a to je semantička presuda koju samo model može dati. Popunjava se SAMO
+    # na eskalacijskom putu; inače ostaje None i ništa ne mijenja.
+    matches_target_archetype: Optional[bool] = None
 
 
 class ReviewerFinal(BaseModel):

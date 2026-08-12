@@ -1084,6 +1084,12 @@ def build_reviewer_input(context, session, student_message, draft_json,
         # ISTI blok koji je dobio Tutor — recenzent sudi o raznolikosti prema
         # istim serverskim činjenicama, nikad prema vlastitoj pretpostavci.
         blocks.append(escalation_block + "\n"
+                      "- U `checks.matches_target_archetype` upiši da li "
+                      "STVARNA matematička struktura zadatka odgovara CILJNOM "
+                      "tipu iznad. Gledaj šta se traži i kojim koracima se "
+                      "dolazi do rezultata, NE kako je zadatak nazvan u "
+                      "potpisu — oznaka koja se slaže, a struktura koja se ne "
+                      "slaže, znači false.\n"
                       "- U `checks.substantially_different_from_recent` upiši "
                       "da li je zadatak SUŠTINSKI druge matematičke strukture "
                       "od nedavnih. Isti tip s drugim imenima, predmetima ili "

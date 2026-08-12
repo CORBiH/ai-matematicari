@@ -1897,6 +1897,24 @@ def _two_call(llm, context, session, student_message, request_id, trusted_verdic
             _log_rejection(request_id, context, "tutor_draft", error, draft.intent)
             return None, calls
 
+    # ARHETIP JE SERVERSKA TAKSONOMIJA (živi nalaz ciljane kampanje). Model
+    # smije pisati SADRŽAJ, ali ne smije redefinisati enum lekcije ni
+    # zamijeniti arhetip koji je server izabrao. Provjera je čisto
+    # deterministička i stoji PRIJE recenzenta: paket koji ionako ne može biti
+    # objavljen ne zaslužuje drugi poziv, isto kao neupotrebljiv nacrt iznad.
+    # Recenzent je NE MOŽE nadjačati — on kasnije sudi samo o SEMANTICI.
+    if escalation is not None and draft.new_task is not None:
+        archetype_error = creative_escalation.archetype_failure(
+            escalation, draft.new_task.task_signature.operation_or_relation)
+        if archetype_error:
+            _log_rejection(
+                request_id, context, archetype_error,
+                f"target={escalation.target_archetype} "
+                f"tutor={draft.new_task.task_signature.operation_or_relation!r} "
+                f"allowed={','.join(escalation.supported_archetypes)}",
+                draft.intent)
+            return None, calls
+
     # Reviewer sees the canonical server title; raw Tutor output remains on
     # the wrapper for safe offline diagnostics only.
     draft = _canonicalize_draft_lesson_title(draft, context)
@@ -1989,6 +2007,17 @@ def _two_call(llm, context, session, student_message, request_id, trusted_verdic
     # zadatka, pa kozmetički preslikan isti tip nije ispunjenje zahtjeva.
     # PADA ZATVORENO — nema trećeg poziva ni ponovnog generisanja; učenik
     # dobija sigurnu poruku, a ne isti zadatak s drugim imenom.
+    if (creative_escalation.reviewer_requires_target_match(escalation)
+            and reviewer.checks.matches_target_archetype is not True):
+        # Tačna OZNAKA ne dokazuje tačnu STRUKTURU: model može upisati ciljni
+        # enum, a zadatak graditi po drugom obrascu. Ovo je jedina presuda koja
+        # tu razliku može vidjeti, pa bez nje paket ne izlazi.
+        _log_rejection(
+            request_id, context, "creative_escalation_target_mismatch",
+            f"reason={escalation.reason} target={escalation.target_archetype}",
+            draft.intent)
+        return None, calls
+
     if (creative_escalation.reviewer_requires_variety(escalation)
             and reviewer.checks.substantially_different_from_recent is not True):
         _log_rejection(

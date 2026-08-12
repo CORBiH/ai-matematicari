@@ -87,14 +87,25 @@ def is_pilot_lesson(context) -> bool:
     return len(_contract_archetypes(context)) >= 1
 
 
-def recent_archetypes(session, lesson_id, limit=RECENT_WINDOW) -> tuple:
+def recent_archetypes(session, lesson_id, limit=RECENT_WINDOW,
+                      supported=()) -> tuple:
     """Nedavno objavljeni arhetipi ove lekcije, najnoviji POSLJEDNJI.
 
     Čita se POSTOJEĆA serverska historija (`recent_task_signatures`) — pilot
     ne uvodi nijedno novo stanje sesije. `operation_or_relation` je isti enum
-    koji ugovor deklariše kao `problem_types`."""
+    koji ugovor deklariše kao `problem_types`.
+
+    FILTRIRANJE PRI ČITANJU (živi nalaz ciljane kampanje): Tutor je jednom
+    upisao slobodan tekst („successive subtraction of fractions of an initial
+    quantity“) u potpis, pa je ta vrijednost završila u historiji i zauzela
+    mjesto u prozoru od tri. Objava to od sada odbija, ali ZATEČENE sesije
+    mogu i dalje nositi takvu vrijednost. Zato se pri čitanju zadržavaju samo
+    vrijednosti koje lekcija stvarno deklariše — nepoznato se PRESKAČE, ne
+    ruši planer i ne troši prozor. Historija se NE prepisuje: filtriranje pri
+    čitanju je dovoljno i ne dira tuđe stanje."""
     import json
 
+    allowed = frozenset(supported or ())
     found = []
     for record in (session.get("recent_task_signatures") or []):
         if record.get("lesson_id") != lesson_id:
@@ -104,9 +115,41 @@ def recent_archetypes(session, lesson_id, limit=RECENT_WINDOW) -> tuple:
         except (TypeError, ValueError):
             continue
         archetype = signature.get("operation_or_relation") or ""
-        if archetype:
-            found.append(archetype)
+        if not archetype:
+            continue
+        if allowed and archetype not in allowed:
+            continue          # slobodan tekst iz zatečene sesije — ignoriši
+        found.append(archetype)
     return tuple(found[-limit:]) if limit else tuple(found)
+
+
+# ---------------------------------------------------------------------------
+# SERVERSKA VALIDACIJA ARHETIPA OBJAVLJENOG PAKETA
+# ---------------------------------------------------------------------------
+# ŽIVI NALAZ (ciljana kampanja): server je tražio `fraction_remainder`, Tutor je
+# vratio paket čiji je `operation_or_relation` bio slobodan tekst, a recenzent
+# ga je odobrio. Paket je objavljen i historija je zagađena.
+#
+# GRANICA KOJU OVO ZATVARA: model smije pisati SADRŽAJ, ali ne smije
+# redefinisati serversku taksonomiju. Enum dolazi iz ugovora lekcije, pa ova
+# provjera nigdje ne poznaje ni jednu konkretnu vrijednost.
+ARCHETYPE_NOT_IN_CONTRACT = "creative_archetype_not_in_contract"
+ARCHETYPE_NOT_TARGET = "creative_archetype_not_target"
+
+
+def archetype_failure(decision, operation_or_relation) -> str:
+    """Kod greške ili "" — čisto deterministička, recenzent je ne može nadjačati.
+
+    Dvije odvojene tvrdnje: (1) vrijednost uopšte pripada enumu lekcije,
+    (2) i to baš onom arhetipu koji je server izabrao."""
+    if decision is None:
+        return ""
+    value = (operation_or_relation or "").strip()
+    if value not in decision.supported_archetypes:
+        return ARCHETYPE_NOT_IN_CONTRACT
+    if value != decision.target_archetype:
+        return ARCHETYPE_NOT_TARGET
+    return ""
 
 
 def select_target(supported, recent) -> str:
@@ -154,7 +197,10 @@ def decide(context, session, deterministic_intent, transition,
     supported = _contract_archetypes(context)
     if not supported:
         return None
-    recent = recent_archetypes(session, getattr(context, "topic_id", ""))
+    # Historija se čita FILTRIRANO kroz enum lekcije — zatečena zagađena
+    # vrijednost ne smije ni ući u izbor cilja.
+    recent = recent_archetypes(session, getattr(context, "topic_id", ""),
+                               supported=supported)
     level = int(getattr(transition, "target_level", 0) or
                 session.get("difficulty_level", 1))
     return CreativeEscalationDecision(
@@ -217,3 +263,11 @@ def reviewer_requires_variety(decision) -> bool:
     Samo kad eskalacija stvarno traži DRUGI arhetip — kod lekcije s jednim
     arhetipom to bi bio nemoguć zahtjev."""
     return decision is not None and decision.diversity_possible
+
+
+def reviewer_requires_target_match(decision) -> bool:
+    """Presuda „odgovara li STRUKTURA zadatka izabranom arhetipu“ traži se na
+    SVAKOJ eskalaciji — i kad lekcija ima samo jedan arhetip, jer tačna
+    oznaka ne dokazuje tačnu matematičku strukturu (živi nalaz: model može
+    napisati ispravan enum, a zadatak graditi po drugom obrascu)."""
+    return decision is not None

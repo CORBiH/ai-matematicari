@@ -238,12 +238,20 @@ def _level3_evidence():
         requires_proof_or_justification=False, combines_concepts=False)
 
 
-def _draft(text, expected, options, solution):
+def _draft(text, expected, options, solution,
+           archetype="fraction_remainder"):
+    """`archetype` je OZNAKA koju Tutor upisuje u potpis.
+
+    Od uvođenja serverske provjere ciljnog arhetipa oznaka mora biti baš enum
+    koji je server izabrao — ranija fixture-vrijednost („fixture_operation“)
+    danas s pravom pada prije objave."""
     payload = make_task_payload(text=text, options=options, expected=expected,
                                 solution=solution, difficulty="hard")
     payload = payload.model_copy(update={
         "target_difficulty_level": 3,
         "difficulty_evidence": _level3_evidence(),
+        "task_signature": payload.task_signature.model_copy(update={
+            "operation_or_relation": archetype}),
     })
     return make_tutor_draft(
         intent="harder_task", reply="Evo zadatka.",
@@ -252,14 +260,31 @@ def _draft(text, expected, options, solution):
         new_task=payload)
 
 
-def _run_escalation(fake, store, session_id="esc"):
-    """Dovedi sesiju do maksimuma deterministički, pa traži teže još jednom."""
+SUPPORTED = ("fraction_of_quantity", "fraction_remainder")
+
+
+def _warm_up(fake, store, session_id="esc"):
+    """Deterministički do maksimuma; vrati arhetip koji će server ZATRAŽITI.
+
+    Cilj se ne smije pretpostaviti — zavisi od stvarne historije sesije."""
     for message in ["Daj mi zadatak.", "Daj mi teži zadatak.",
                     "Daj mi teži zadatak."]:
         assert run_practice_turn(store, fake, turn(session_id, message)
                                  )["status"] == "ready"
     assert fake.call_count == 0
+    recent = esc.recent_archetypes(store.peek(session_id), LESSON,
+                                   supported=SUPPORTED)
+    return esc.select_target(SUPPORTED, recent)
+
+
+def _escalate(fake, store, session_id="esc"):
     return run_practice_turn(store, fake, turn(session_id, "Daj mi teži zadatak."))
+
+
+def _run_escalation(fake, store, session_id="esc"):
+    """Zatečeni oblik: zagrij pa eskaliraj (nacrt je već u redu čekanja)."""
+    _warm_up(fake, store, session_id)
+    return _escalate(fake, store, session_id)
 
 
 def test_cosmetic_reskin_is_rejected_without_a_third_call(universal):
@@ -271,6 +296,7 @@ def test_cosmetic_reskin_is_rejected_without_a_third_call(universal):
         decision="approve", final=draft,
         checks=make_reviewer_checks(
             independent_answer="$15$",
+            matches_target_archetype=True,
             substantially_different_from_recent=False)))
 
     response = _run_escalation(fake, store)
@@ -287,17 +313,19 @@ def test_cosmetic_reskin_is_rejected_without_a_third_call(universal):
 
 def test_genuinely_different_archetype_is_published_in_two_calls(universal):
     store, fake = SessionStore(), FakeLLM()
+    target = _warm_up(fake, store)
     draft = _draft(_DIFFERENT_TEXT, "$24$", ("$24$", "$16$", "$40$", "$8$"),
                    "Potrošeno je $\\frac{2}{5} \\cdot 40 = 16$, pa je ostalo "
-                   "$40 - 16 = 24$ olovaka.")
+                   "$40 - 16 = 24$ olovaka.", archetype=target)
     fake.queue(draft)
     fake.queue(make_reviewer_final(
         decision="approve", final=draft,
         checks=make_reviewer_checks(
             independent_answer="$24$",
+            matches_target_archetype=True,
             substantially_different_from_recent=True)))
 
-    response = _run_escalation(fake, store)
+    response = _escalate(fake, store)
     session = store.peek("esc")
 
     assert response["status"] == "ready"
@@ -369,15 +397,17 @@ def test_ordinary_turn_prompt_is_unchanged_without_escalation():
 
 def test_easier_after_escalation_returns_to_deterministic_level_two(universal):
     store, fake = SessionStore(), FakeLLM()
+    target = _warm_up(fake, store)
     draft = _draft(_DIFFERENT_TEXT, "$24$", ("$24$", "$16$", "$40$", "$8$"),
                    "Potrošeno je $\\frac{2}{5} \\cdot 40 = 16$, pa je ostalo "
-                   "$40 - 16 = 24$ olovaka.")
+                   "$40 - 16 = 24$ olovaka.", archetype=target)
     fake.queue(draft)
     fake.queue(make_reviewer_final(
         decision="approve", final=draft,
         checks=make_reviewer_checks(independent_answer="$24$",
-                                    substantially_different_from_recent=True)))
-    assert _run_escalation(fake, store)["status"] == "ready"
+                                    matches_target_archetype=True,
+            substantially_different_from_recent=True)))
+    assert _escalate(fake, store)["status"] == "ready"
     assert store.peek("esc")["difficulty_level"] == 3
     calls_after_escalation = fake.call_count
 
