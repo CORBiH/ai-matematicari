@@ -1,0 +1,46 @@
+{
+  "_readme": [
+    "KURIKULARNI OPSEG PO LEKCIJI — deklarativni PODACI, nikad grana u Pythonu.",
+    "",
+    "ZAŠTO POSTOJI (živi FINAL40 blokator FW-X03, kandidat 4fa5fc0): lekcija",
+    "9-02-006 „Međusobni položaj prave i ravni“ nema semantički ugovor, pa je",
+    "sve što Tutor i Recenzent o njoj znaju — NASLOV. Taj naslov doslovno",
+    "postoji i u osnovnoj školi (sintetički, na modelu tijela) i u srednjoj",
+    "školi / na fakultetu (analitički, u R3). Bez ijedne granice model je",
+    "posegnuo za analitičkom verzijom i objavljen je zadatak s jednačinom",
+    "ravni, parametarskim zapisom prave, normalnim vektorom i skalarnim",
+    "proizvodom — učeniku 9. razreda osnovne škole.",
+    "",
+    "ZAŠTO OVDJE, A NE U topics.json: `data/topics.json` je GENERISAN artefakt",
+    "(scripts/build_topics_json.py iz kanonskog Excela). Ručna izmjena bi",
+    "nestala pri prvom sljedećem buildu, a `test_rerunning_generator_script_is_",
+    "idempotent` bi odmah pao. Kanonski Excel ima tačno četiri kolone i binaran",
+    "je, pa nije pregledljiv u diffu. Zato opseg živi ovdje, kao verzionisani",
+    "tekst, a builder ga deterministički spaja u generisani JSON.",
+    "",
+    "PRAVILO: svaka stavka mora imati `evidence_ids` iz postojećeg kurikularnog",
+    "mapiranja (reference/curriculum/semantics/MATBOT_Faza2_Mapiranje.xlsx,",
+    "sheet `Stavke_NPP`). Ne izmišlja se kurikulum: `lesson_scope` i",
+    "`objectives` smiju samo PREFORMULISATI ono što te stavke već traže.",
+    "",
+    "OPSEG OVE DATOTEKE: namjerno JEDNA lekcija. Ostalih 70 izloženih",
+    "lekcija bez opsega je poznat, zaseban posao — nijedna od njih nije",
+    "dokazani blokator u tekućoj FINAL40 kampanji."
+  ],
+  "schema_version": 1,
+  "overrides": {
+    "9-02-006": {
+      "lesson_scope": "Međusobni položaj prave i ravni posmatra se geometrijski — na crtežu i na modelu prostornog tijela, npr. kvadra. Prava može ležati u ravni, biti paralelna s ravni ili je sjeći u jednoj tački. Zadaci ostaju na prepoznavanju, opisivanju i obrazlaganju tih odnosa, bez računanja koordinatama.",
+      "objectives": [
+        "prepoznati i opisati međusobni položaj prave i ravni u prostoru",
+        "na crtežu ili na modelu kvadra odrediti leži li prava u ravni, je li paralelna s ravni ili je siječe",
+        "obrazložiti međusobne odnose tačaka, pravih i ravni u prostoru"
+      ],
+      "evidence_ids": [
+        "KS_2018-0333",
+        "RS_2014-0116"
+      ],
+      "evidence_note": "KS_2018-0333: „na modelu kvadra odrediti međusobne položaje prave i ravni“; RS_2014-0116: „da objasne međusobne odnose tačaka, pravih i ravnih u prostoru“. Obje su `exact` mapirane na 9-02-006 (coverage_status=both_sources). Rečenica „bez računanja koordinatama“ je granica NIVOA, izvedena iz izmjerenog odsustva: u svih 573 NPP stavki nema nijednog pogotka za skalarni proizvod, jednačinu ravni, normalni vektor ni trodimenzionalne koordinate; vektori postoje samo u 7. razredu (KS_2018-0083..0088) i bez skalarnog proizvoda."
+    }
+  }
+}

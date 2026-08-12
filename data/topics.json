@@ -2031,7 +2031,13 @@
         {
           "id": "9-02-006",
           "oblast": "Tačka, prava i ravan",
-          "title": "Međusobni položaj prave i ravni"
+          "title": "Međusobni položaj prave i ravni",
+          "lesson_scope": "Međusobni položaj prave i ravni posmatra se geometrijski — na crtežu i na modelu prostornog tijela, npr. kvadra. Prava može ležati u ravni, biti paralelna s ravni ili je sjeći u jednoj tački. Zadaci ostaju na prepoznavanju, opisivanju i obrazlaganju tih odnosa, bez računanja koordinatama.",
+          "objectives": [
+            "prepoznati i opisati međusobni položaj prave i ravni u prostoru",
+            "na crtežu ili na modelu kvadra odrediti leži li prava u ravni, je li paralelna s ravni ili je siječe",
+            "obrazložiti međusobne odnose tačaka, pravih i ravni u prostoru"
+          ]
         },
         {
           "id": "9-02-007",

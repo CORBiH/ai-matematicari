@@ -15,11 +15,50 @@ import openpyxl
 ROOT = Path(__file__).resolve().parent.parent
 XLSX_PATH = ROOT / "reference" / "curriculum" / "MATBOT_Sve_Lekcije_6_7_8_9.xlsx"
 JSON_PATH = ROOT / "data" / "topics.json"
+SCOPE_OVERRIDES_PATH = ROOT / "data" / "lesson_scope_overrides.json"
 SHEET_NAME = "Sve lekcije"
 EXPECTED_HEADER = ("Razred", "Oblast", "Lekcija", "ID lekcije")
 
+# Polja koja se smiju spojiti iz overrides fajla u generisani zapis lekcije.
+# Zatvorena lista: runtime čita tačno ova dva (matbot/topics.py::lesson_info),
+# a `evidence_ids`/`evidence_note` ostaju SAMO u izvoru kao provenijencija.
+SCOPE_OVERRIDE_FIELDS = ("lesson_scope", "objectives")
 
-def build_grades(rows):
+
+def load_scope_overrides(path=None):
+    """Kurikularni opseg po lekciji, ili prazno kad fajl ne postoji.
+
+    Kanonski Excel nosi samo četiri kolone i binaran je, pa se opseg lekcije
+    drži u verzionisanom JSON-u pored njega (isti obrazac kao
+    data/routing_overrides.json). Odsustvo fajla NIJE greška — tada se
+    generiše tačno ono što se generisalo i ranije."""
+    path = path or SCOPE_OVERRIDES_PATH
+    if not path.exists():
+        return {}
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    overrides = payload.get("overrides", {})
+    resolved = {}
+    for topic_id, entry in overrides.items():
+        if not entry.get("evidence_ids"):
+            raise ValueError(
+                f"opseg lekcije bez kurikularnog dokaza: {topic_id!r}")
+        fields = {name: entry[name] for name in SCOPE_OVERRIDE_FIELDS
+                  if name in entry}
+        if not fields:
+            raise ValueError(f"prazan opseg lekcije: {topic_id!r}")
+        resolved[str(topic_id)] = fields
+    return resolved
+
+
+def build_grades(rows, scope_overrides=None):
+    """Redovi → strukture razreda. ČISTA funkcija nad datim redovima.
+
+    Namjerno NE provjerava da je svaki override iskorišten: pozivalac smije
+    proslijediti proizvoljan podskup redova (postojeći testovi to rade), pa bi
+    takva provjera tu bila netačna. Pokrivenost overrides-a čuva kanonski build
+    (`main`), gdje su redovi cio kurikulum."""
+    if scope_overrides is None:
+        scope_overrides = load_scope_overrides()
     grades = {}
     seen_ids = set()
     seen_combos = set()
@@ -43,8 +82,26 @@ def build_grades(rows):
         grade = grades.setdefault(grade_key, {"oblast_order": [], "lessons": []})
         if oblast not in grade["oblast_order"]:
             grade["oblast_order"].append(oblast)
-        grade["lessons"].append({"id": topic_id, "oblast": oblast, "title": lekcija})
+        lesson = {"id": topic_id, "oblast": oblast, "title": lekcija}
+        # Spajanje je determinističko: uvijek isti ključevi, uvijek istim
+        # redom, i SAMO za lekciju koja u izvoru stvarno ima red. Lekcija bez
+        # opsega ostaje bajt za bajt kao prije (bez ijednog dodatnog ključa).
+        override = scope_overrides.get(topic_id, {})
+        for name in SCOPE_OVERRIDE_FIELDS:
+            if name in override:
+                lesson[name] = override[name]
+        grade["lessons"].append(lesson)
     return grades
+
+
+def unapplied_scope_overrides(grades, scope_overrides):
+    """ID-jevi opsega koje kanonski kurikulum uopšte ne poznaje.
+
+    Opseg za nepostojeću lekciju je tiha smrt podatka: nikad se ne ćuti, ali
+    se sudi SAMO nad kompletnim kurikulumom (vidi `build_grades`)."""
+    known = {lesson["id"] for grade in grades.values()
+             for lesson in grade["lessons"]}
+    return sorted(set(scope_overrides) - known)
 
 
 def load_rows(xlsx_path):
@@ -74,7 +131,12 @@ def load_rows(xlsx_path):
 def main():
     try:
         data_rows = load_rows(XLSX_PATH)
-        grades = build_grades(data_rows)
+        scope_overrides = load_scope_overrides()
+        grades = build_grades(data_rows, scope_overrides)
+        unapplied = unapplied_scope_overrides(grades, scope_overrides)
+        if unapplied:
+            raise ValueError(
+                "opseg lekcije za nepoznat ID: " + ", ".join(unapplied))
     except (FileNotFoundError, ValueError) as exc:
         print(str(exc), file=sys.stderr)
         sys.exit(1)
