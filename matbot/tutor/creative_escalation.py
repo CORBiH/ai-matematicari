@@ -455,8 +455,25 @@ def prompt_block(decision) -> str:
         marker = "  ← CILJ" if name == decision.target_archetype else ""
         lines.append(f"    • {name}: {meaning}{marker}")
     if decision.recent_archetypes:
-        lines.append("- nedavno već viđeni tipovi (izbjegni ih): "
-                     + ", ".join(decision.recent_archetypes))
+        seen = ", ".join(decision.recent_archetypes)
+        if decision.target_archetype in decision.recent_archetypes:
+            # ŽIVI NALAZ (5 odbijanja na `substantially_different_from_recent`,
+            # 4 od njih ovdje): blok je znao reći „CILJ: fraction_remainder“ i
+            # odmah ispod „nedavno viđeni tipovi (IZBJEGNI IH): …,
+            # fraction_remainder, …“. Ta dva reda su se DOSLOVNO protivrječila
+            # kad planer uđe u drugi/treći nivo izbora, pa je recenzent pošteno
+            # odgovarao „nije drugačije“ — na cilj koji je server sam odredio.
+            # Kad je izbor iscrpljen, traži se drugačiji PRIMJER, ne drugi tip.
+            lines.append(f"- učenik je nedavno vidio ove tipove: {seen}")
+            lines.append(
+                f"- CILJ `{decision.target_archetype}` JESTE među njima i to je "
+                "NAMJERNA serverska odluka: svježih tipova više nema, pa je "
+                "izabran najdavnije viđeni. Zato zadatak mora biti DRUGAČIJI "
+                "PRIMJER tog tipa — druge veličine, drugi odnosi i drugačiji "
+                "put do rezultata — a nikako isti zadatak s drugim imenom, "
+                "predmetom ili brojevima.")
+        else:
+            lines.append(f"- nedavno već viđeni tipovi (izbjegni ih): {seen}")
     required = _required_facts(decision.target_archetype)
     if required:
         integers = [name for name in required if name in _INTEGER_FACTS]
