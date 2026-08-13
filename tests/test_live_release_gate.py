@@ -630,3 +630,45 @@ def test_canary_diagnostics_distinguish_tutor_reviewer_and_authoritative_evidenc
     assert result.final_difficulty_evidence_source == "reviewer"
     assert result.final_difficulty_evidence == reviewer.reviewed_difficulty_evidence.model_dump()
     assert result.final_difficulty_validator_errors == []
+
+
+def test_package_ownership_is_proven_per_route(monkeypatch):
+    """Vlasnistvo nad objavljenim paketom dokazuje se po ruti koja je isla.
+
+    Zivi nalaz (zvanicna kapija): trazilo se da paket UVIJEK bude recenzentski
+    — invarijanta univerzalnog dvopozivnog puta. Na brzoj ruti recenzent
+    legitimno ne radi, pa je ispravan turn padao s tri greske odjednom.
+    Provjera nije ukinuta nego preslikana: svaka ruta dokazuje SVOG
+    verifikatora i SVOJ ciljni nivo."""
+    gate = _gate("harder_level2")
+
+    def result(source, *, reviewer_level=None, tutor_level=None, checks=None):
+        return SimpleNamespace(
+            previous_level=1, target_level=2, session_level_before=1,
+            session_level_after=2, reviewer_final_target_level=reviewer_level,
+            tutor_proposed_target_level=tutor_level,
+            final_structured_package_source=source,
+            structured_package_validation_passed=True,
+            structured_package_validation_errors=[],
+            reviewer_checks=checks or {},
+            committed_task_signature_matches_final=True,
+            committed_task_signature="sig", final_task_signature="sig")
+
+    all_true = {"task_package_consistent": True, "difficulty_evidence_valid": True,
+                "task_signature_consistent": True}
+    # Brza ruta: paket je tutorski, a nivo mora biti serverski potvrdjen.
+    assert runner._structured_transition_errors(
+        gate, result("tutor_task", tutor_level=2), None) == []
+    assert "wrong_fast_route_declared_target_level" in runner._structured_transition_errors(
+        gate, result("tutor_task", tutor_level=3), None)
+    # Eskalirani turn: puni recenzentski ugovor ostaje na snazi.
+    assert runner._structured_transition_errors(
+        gate, result("reviewer_final_task", reviewer_level=2, checks=all_true), None) == []
+    assert "wrong_reviewer_final_target_level" in runner._structured_transition_errors(
+        gate, result("reviewer_final_task", reviewer_level=3, checks=all_true), None)
+    assert "reviewer_structured_checks_not_all_true" in runner._structured_transition_errors(
+        gate, result("reviewer_final_task", reviewer_level=2,
+                     checks={"task_package_consistent": True}), None)
+    # Paket bez poznatog vlasnika i dalje pada zatvoreno.
+    assert any(e.startswith("final_package_has_no_known_owner")
+               for e in runner._structured_transition_errors(gate, result("mystery"), None))

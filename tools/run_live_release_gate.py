@@ -383,19 +383,36 @@ def _structured_transition_errors(gate: GateScenario, result, prior_signature=No
         errors.append("unexpected_previous_committed_level")
     if result.target_level != expected:
         errors.append("wrong_server_target_level")
-    if result.reviewer_final_target_level != expected:
-        errors.append("wrong_reviewer_final_target_level")
-    if result.final_structured_package_source not in {"reviewer_final_task", "reviewer_corrected_task"}:
-        errors.append("final_package_is_not_reviewer_owned")
+    # VLASNIŠTVO NAD OBJAVLJENIM PAKETOM SE DOKAZUJE PO RUTI KOJA JE STVARNO
+    # IŠLA. Ranije se tražilo da paket UVIJEK bude recenzentski — invarijanta
+    # univerzalnog dvopozivnog puta. Na brzoj ruti recenzent legitimno ne radi:
+    # paket provjerava server (`package_preflight` + validatori objave), a
+    # recenzent se poziva tek kad nalaz postoji. Provjera se zato ne ukida nego
+    # preslikava: svaka ruta mora dokazati SVOG verifikatora i SVOJ ciljni nivo.
+    package_source = result.final_structured_package_source
+    reviewer_owned = package_source in {"reviewer_final_task", "reviewer_corrected_task"}
+    if reviewer_owned:
+        # Eskalirani turn — nepromijenjen, puni recenzentski ugovor.
+        if result.reviewer_final_target_level != expected:
+            errors.append("wrong_reviewer_final_target_level")
+        checks = result.reviewer_checks or {}
+        if (checks.get("task_package_consistent") is not True
+                or checks.get("difficulty_evidence_valid") is not True
+                or checks.get("task_signature_consistent") is not True):
+            errors.append("reviewer_structured_checks_not_all_true")
+    elif package_source == "tutor_task":
+        # Brza ruta: nema recenzenta, pa nivo mora biti SERVERSKI potvrđen —
+        # deklaracija modela mora se poklopiti s ciljem koji je server odredio
+        # i koji objava nezavisno provjerava.
+        if result.tutor_proposed_target_level != expected:
+            errors.append("wrong_fast_route_declared_target_level")
+    else:
+        errors.append(f"final_package_has_no_known_owner_{package_source}")
+    # Serverska validacija paketa vrijedi na OBJE rute i ostaje bezuslovna.
     if result.structured_package_validation_passed is not True:
         errors.append("structured_package_validation_failed")
     if result.structured_package_validation_errors:
         errors.append("structured_package_validation_errors_present")
-    checks = result.reviewer_checks or {}
-    if (checks.get("task_package_consistent") is not True
-            or checks.get("difficulty_evidence_valid") is not True
-            or checks.get("task_signature_consistent") is not True):
-        errors.append("reviewer_structured_checks_not_all_true")
     if result.committed_task_signature_matches_final is not True:
         errors.append("committed_signature_does_not_match_final_package")
     if role == "same_level_new":
