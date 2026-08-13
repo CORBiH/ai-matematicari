@@ -119,17 +119,25 @@ def fast_single_call_lessons() -> frozenset:
 # Deterministička strategija odlučuje PRIJE ove tačke, pa je sve što dovde
 # stigne po definiciji modelski podržana lekcija.
 #
-#   "lessons"      — samo izričito navedene (zatečeno ponašanje, pilot)
-#   "model_backed" — svaka lekcija koja ionako ide na model
+#   "lessons"      — samo izričito navedene (pilot; podrazumijevano u kodu)
+#   "model_backed" — svaka lekcija koja ionako ide na model (PRODUKCIJA)
 #   "off"          — nikad (potpuni rollback na `_two_call`)
+#
+# PRODUKCIJSKU VRIJEDNOST POSTAVLJA DEPLOY, NE OVAJ PODRAZUMIJEVANI IZRAZ.
+# Ugrađivanje `model_backed` ovdje prevelo bi CIJELU testnu svitu na brzu rutu i
+# time ugasilo dokaze univerzalnog dvopozivnog puta koji ostaje rollback. Zato
+# kod čuva pilot vrijednost, a deploy upisuje `model_backed` u produkcijski
+# `.env` (vidi .github/workflows/deploy-vps.yml) — isti mehanizam kojim se već
+# upisuje APP_VERSION. Startup log ispisuje efektivnu vrijednost, pa tiho
+# odstupanje nije moguće.
 FAST_SINGLE_CALL_SCOPE = os.environ.get("MATBOT_FAST_SINGLE_CALL_SCOPE", "lessons")
 # Pojedinačno isključenje unutar opsega — rollback jedne lekcije bez gašenja rute.
 _FAST_EXCLUDE_RAW = os.environ.get("MATBOT_FAST_SINGLE_CALL_EXCLUDE", "")
 
 
 def fast_single_call_scope() -> str:
-    return os.environ.get("MATBOT_FAST_SINGLE_CALL_SCOPE",
-                          FAST_SINGLE_CALL_SCOPE).strip().lower()
+    return (os.environ.get("MATBOT_FAST_SINGLE_CALL_SCOPE", "").strip().lower()
+            or FAST_SINGLE_CALL_SCOPE)
 
 
 def fast_single_call_excluded() -> frozenset:

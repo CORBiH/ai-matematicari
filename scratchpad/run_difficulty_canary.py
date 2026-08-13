@@ -403,6 +403,17 @@ class CountingLLM:
         self.last_tutor_output = result.output
         return result
 
+    def fast_turn(self, instructions, input_text, timeout_s=None):
+        # BRZA RUTA SE BROJI KAO I SVAKA DRUGA. Bez ovog omotača `fast_turn` bi
+        # prošao pored brojača (klasa nema `__getattr__`), pa bi zvanična kapija
+        # ili pukla na AttributeError ili — gore — mjerila arhitekturu koju
+        # produkcija ne izvršava. Plafon smije imati samo jedna vrata.
+        self._count("fast_turn")
+        result = self._call("tutor", self._inner.fast_turn, instructions, input_text,
+                            timeout_s=timeout_s)
+        self.last_tutor_output = result.output
+        return result
+
     def lesson_fidelity_turn(self, instructions, input_text):
         self._count("lesson_fidelity_turn")
         result = self._call("reviewer", self._inner.lesson_fidelity_turn, instructions, input_text)
@@ -559,6 +570,9 @@ class TurnResult:
     sdk_calls_before_turn: int = 0
     sdk_calls_after_turn: int = 0
     sdk_calls_this_turn: int = 0
+    # Imena SDK faza baš ovog turna. Broj poziva ne razlikuje recenzentski
+    # POPRAVAK od skrivenog ponavljanja tutorskog poziva; sastav razlikuje.
+    sdk_call_stages: list = field(default_factory=list)
     published: bool = False
     answer_text: Optional[str] = None
     published_task_text: Optional[str] = None
@@ -1848,6 +1862,7 @@ def _run_one_turn(store, llm, capture, report, scenario: Scenario, campaign: str
         result.stop_triggered = "sdk_call_ceiling_reached"
         result.sdk_calls_after_turn = llm.call_count
         result.sdk_calls_this_turn = llm.call_count - calls_before
+        result.sdk_call_stages = list(getattr(llm, "call_log", [])[calls_before:])
         report.turns.append(result)
         return result, True
     except LLMError as exc:  # defensive; run_practice_turn already catches these
@@ -1856,6 +1871,7 @@ def _run_one_turn(store, llm, capture, report, scenario: Scenario, campaign: str
         result.prerequisite = f"LLMError escaped run_practice_turn: {type(exc).__name__}"
         result.sdk_calls_after_turn = llm.call_count
         result.sdk_calls_this_turn = llm.call_count - calls_before
+        result.sdk_call_stages = list(getattr(llm, "call_log", [])[calls_before:])
         report.turns.append(result)
         report.total_task_turns_attempted += 1
         report.rejected_count += 1
@@ -1863,6 +1879,7 @@ def _run_one_turn(store, llm, capture, report, scenario: Scenario, campaign: str
 
     result.sdk_calls_after_turn = llm.call_count
     result.sdk_calls_this_turn = llm.call_count - calls_before
+    result.sdk_call_stages = list(getattr(llm, "call_log", [])[calls_before:])
     result.diagnostics = capture.safe_diagnostics()
 
     if result.sdk_calls_this_turn > turn_cap:

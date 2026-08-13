@@ -47,6 +47,18 @@ jobs:
               echo "APP_VERSION=$VERSION" >> .env
             fi
 
+            # AUDITIRANA PRACTICE ARHITEKTURA — brza jednopozivna ruta.
+            # Produkcijski .env zivi na serveru i nije u repou, pa varijabla
+            # koja postoji samo u dokumentaciji nikad ne stigne do kontejnera:
+            # produkcija bi tiho izvrsavala jednu arhitekturu dok su je kapije
+            # mjerile u drugoj. Isti mehanizam kojim se vec upisuje APP_VERSION
+            # zato upisuje i opseg rute. Idempotentno; ne dira druge vrijednosti.
+            if grep -q '^MATBOT_FAST_SINGLE_CALL_SCOPE=' .env; then
+              sed -i "s/^MATBOT_FAST_SINGLE_CALL_SCOPE=.*/MATBOT_FAST_SINGLE_CALL_SCOPE=model_backed/" .env
+            else
+              echo "MATBOT_FAST_SINGLE_CALL_SCOPE=model_backed" >> .env
+            fi
+
             docker compose build
             docker compose up -d --remove-orphans
 

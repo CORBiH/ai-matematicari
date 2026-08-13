@@ -54,12 +54,19 @@ def test_release_gate_plan_is_fourteen_scenarios_capped_at_eighteen_calls():
     poziva; plafon je tada pao 23 → 19.
 
     SERVER-VLASNICKA POMOC: `full_solution` je uvijek serverski (0 poziva), a
-    `first_hint` se IZVODI iz politike prije turna, pa staticki dio plana nosi
-    17 poziva, a maksimum plana je 18 — 19 vise nije dostizno."""
+    `first_hint` se IZVODI iz politike prije turna.
+
+    BRZA RUTA: modelski podrzana lekcija trosi TACNO 1 poziv (ne 2), pa je
+    staticki dio plana 10. Recenzentski popravak je USLOVAN i dodaje najvise
+    jos jedan poziv po modelskom scenariju, sto plafon mora pokriti — zato je
+    maksimum 21. Tacnost i dalje cuva ugovor po scenariju, koji trazi da drugi
+    poziv bude RECENZENTSKI, nikad ponovljeni tutorski."""
     plan = runner.build_release_gate_plan("0123456789abcdef" * 4)
     assert len(plan) == 14
-    assert runner.max_planned_calls(plan) == 18 == runner.SDK_CALL_CEILING
-    assert sum(item.expected_calls or 0 for item in plan) == 17
+    assert runner.max_planned_calls(plan) == 21 == runner.SDK_CALL_CEILING
+    assert sum(item.expected_calls or 0 for item in plan) == 10
+    # Pomoc nikad ne eskalira, pa joj plafon ne priznaje dodatni poziv.
+    assert runner._MAX_CALLS_PER_TURN == 2
     by_role = {item.role: item for item in plan}
     assert by_role["contract_fresh"].scenario.path == "contract"
     assert by_role["contract_fresh"].expected_calls == 1
@@ -209,7 +216,7 @@ def test_gate_harness_calls_the_public_practice_router(monkeypatch):
         def reset(self): pass
         def safe_diagnostics(self): return []
     class LLM:
-        ceiling = 19
+        ceiling = 21
         call_count = 0
         last_tutor_output = None
         last_reviewer_output = None

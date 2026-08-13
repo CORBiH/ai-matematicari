@@ -29,6 +29,12 @@ services:
       AI_TUTOR_TIMEOUT: ${AI_TUTOR_TIMEOUT:-}
       OPENAI_MODEL_TEXT: ${OPENAI_MODEL_TEXT:-}
       MATBOT_REASONING_EFFORT: ${MATBOT_REASONING_EFFORT:-}
+      # Rollback ručke brze Practice rute. Podrazumijevana vrijednost je
+      # UGRAĐENA u matbot/config.py (auditirana arhitektura), pa prazno ovdje
+      # znači „ostavi ugrađeno“ — a ne tiho gašenje rute.
+      MATBOT_FAST_SINGLE_CALL_SCOPE: ${MATBOT_FAST_SINGLE_CALL_SCOPE:-}
+      MATBOT_FAST_SINGLE_CALL_EXCLUDE: ${MATBOT_FAST_SINGLE_CALL_EXCLUDE:-}
+      MATBOT_DETERMINISTIC_VARIETY_GATE: ${MATBOT_DETERMINISTIC_VARIETY_GATE:-}
     ports:
       - "127.0.0.1:8080:8080" # samo lokalno; javni saobraćaj ide kroz nginx
     volumes:

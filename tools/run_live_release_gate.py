@@ -58,9 +58,19 @@ REQUIRED_SCENARIO_COUNT = 14
 #   • `first_hint` očekuje 0 ILI 1 — ali VRIJEDNOST SE ZAMRZAVA PRIJE turna i
 #     poredi se strogom jednakošću; „bilo šta od toga dvoga“ nije prihvaćeno;
 #   • statički zbir je 17, pa je maksimalan dostižan plan 18, ne 19.
-SDK_CALL_CEILING = 18
+# Tutorska klasa = PRVI poziv turna (bilo koja ruta). Recenzentska = POPRAVAK.
+_TUTOR_STAGE_NAMES = frozenset({"fast_turn", "practice_turn", "tutor_turn"})
+_REVIEWER_STAGE_NAMES = frozenset({"reviewer_turn", "lesson_fidelity_turn"})
+# Arhitektonska granica iz CLAUDE.md pravilo 4 — nikad se ne podiže.
+_MAX_CALLS_PER_TURN = 2
+# Brza ruta troši 1 poziv po scenariju izrade zadatka; recenzentski popravak je
+# uslovan i dodaje najviše još jedan. Plafon zato pokriva NAJGORI dozvoljeni
+# ishod (svaki modelski scenario eskalirao), a tačnost čuva ugovor po scenariju
+# iznad. Vrijednost se DOKAZUJE iz plana (`max_planned_calls`), ne pogađa —
+# provjera ispod pada zatvoreno ako se plan i plafon raziđu.
+SDK_CALL_CEILING = 21
 # Zbir svih scenarija čiji je ugovor statički (bez `first_hint`).
-_STATIC_PLAN_CALLS = 17
+_STATIC_PLAN_CALLS = 10
 # Sentinel: očekivanje se izvodi iz serverske politike pomoći PRIJE turna.
 DERIVED_FROM_HELP_POLICY = None
 # UI radnja koju kapija šalje za scenarije pomoći — ista mapa koju koristi
@@ -231,9 +241,22 @@ def resolve_expected_calls(gate: GateScenario, session_before: dict) -> tuple[in
 
 
 def max_planned_calls(plan) -> int:
-    """Gornja granica plana: izvedeni scenariji pomoci trose najvise 1 poziv."""
-    return sum(1 if item.expected_calls is None else item.expected_calls
-               for item in plan)
+    """Gornja granica plana: izvedeni scenariji pomoci trose najvise 1 poziv.
+
+    UKLJUCUJE i uslovni recenzentski popravak: svaki scenario koji uopste zove
+    model smije dobiti najvise jos jedan poziv kad preflight nadje nalaz. To je
+    NAJGORI DOZVOLJENI ishod, ne ocekivanje — tacnost cuva ugovor po scenariju
+    (`_scenario_errors`), koji trazi da drugi poziv bude RECENZENTSKI, nikad
+    ponovljeni tutorski."""
+    total = 0
+    for item in plan:
+        planned = 1 if item.expected_calls is None else item.expected_calls
+        # Pomoć nikad ne stiže do recenzenta (nema paketa za recenziju), pa joj
+        # se dodatak ne priznaje — plafon ostaje najtješnji koji arhitektura
+        # dopušta.
+        escalatable = planned > 0 and item.scenario.intent not in _HELP_UI_ACTION
+        total += planned + (1 if escalatable else 0)
+    return total
 
 
 def build_release_gate_plan(commit_sha: str) -> tuple[GateScenario, ...]:
@@ -254,11 +277,11 @@ def build_release_gate_plan(commit_sha: str) -> tuple[GateScenario, ...]:
 
     plan = (
         scenario("release_gate_core_fresh_level1", CORE_MODEL, "", "release-core",
-                 "Daj mi zadatak.", 2, role="fresh_level1"),
+                 "Daj mi zadatak.", 1, role="fresh_level1"),
         scenario("release_gate_correct_committed_choice", CORE_MODEL, "", "release-core", "", 1,
                  requires=1, interaction="correct_choice", role="correct_choice"),
         scenario("release_gate_core_harder_level1_to_2", CORE_MODEL, "harder",
-                 "release-core", "Daj mi teži zadatak.", 2, requires=1, role="harder_level2"),
+                 "release-core", "Daj mi teži zadatak.", 1, requires=1, role="harder_level2"),
         # Prvi hint: 0 kad je zadatak klase TVRDNJE (server sastavlja), 1 kad je
         # RAČUNSKI. Vrijednost izvodi `resolve_expected_calls` iz sesije prije turna.
         scenario("release_gate_first_hint", CORE_MODEL, "", "release-core", "Ne znam.",
@@ -268,9 +291,9 @@ def build_release_gate_plan(commit_sha: str) -> tuple[GateScenario, ...]:
         scenario("release_gate_full_solution", CORE_MODEL, "", "release-core", "Uradi ga ti.", 0,
                  requires=2, interaction="full_solution", intent="solution_request", role="full_solution"),
         scenario("release_gate_core_easier_level2_to_1", CORE_MODEL, "easier",
-                 "release-core", "Daj mi lakši zadatak.", 2, requires=2, role="easier_level1"),
+                 "release-core", "Daj mi lakši zadatak.", 1, requires=2, role="easier_level1"),
         scenario("release_gate_core_new_same_level", CORE_MODEL, "", "release-core",
-                 "Daj mi novi zadatak.", 2, requires=1, role="same_level_new"),
+                 "Daj mi novi zadatak.", 1, requires=1, role="same_level_new"),
         scenario("release_gate_contract_fresh", CORE_CONTRACT, "", "release-contract", "Daj mi zadatak.", 1,
                  path="contract", role="contract_fresh"),
         scenario("release_gate_contract_harder", CORE_CONTRACT, "harder", "release-contract",
@@ -280,11 +303,11 @@ def build_release_gate_plan(commit_sha: str) -> tuple[GateScenario, ...]:
                  "Daj mi zadatak.", 0, role="semantic_fresh"),
         scenario("release_gate_semantic_harder", CORE_SEMANTIC, "harder", "release-semantic",
                  "Daj mi teži zadatak.", 0, requires=1, role="semantic_harder"),
-        scenario("release_gate_grade7_rotating", grade7, "", "release-grade7", "Daj mi zadatak.", 2,
+        scenario("release_gate_grade7_rotating", grade7, "", "release-grade7", "Daj mi zadatak.", 1,
                  role="grade7"),
-        scenario("release_gate_grade8_rotating", grade8, "", "release-grade8", "Daj mi zadatak.", 2,
+        scenario("release_gate_grade8_rotating", grade8, "", "release-grade8", "Daj mi zadatak.", 1,
                  role="grade8"),
-        scenario("release_gate_grade9_rotating", grade9, "", "release-grade9", "Daj mi zadatak.", 2,
+        scenario("release_gate_grade9_rotating", grade9, "", "release-grade9", "Daj mi zadatak.", 1,
                  role="grade9"),
     )
     _require_model_routed_plan(plan)
@@ -399,8 +422,27 @@ def _scenario_errors(gate: GateScenario, result, prior_task: str, prior_options:
         if result.session_unchanged_after_rejection is not True:
             errors.append("state_mutation_after_rejection")
         return errors
-    if result.sdk_calls_this_turn != expected_calls:
-        errors.append(f"expected_{expected_calls}_sdk_calls_got_{result.sdk_calls_this_turn}")
+    # UGOVOR POZIVA BRZE RUTE (nije raspon). Očekuje se TAČNO `expected_calls`.
+    # Drugi poziv je dozvoljen isključivo kad je to RECENZENTSKI POPRAVAK, i to
+    # se dokazuje SASTAVOM poziva, ne brojem: u jednom turnu smije stajati samo
+    # jedan poziv tutorske klase. Dva tutorska poziva su skriveno ponavljanje i
+    # padaju i dalje — ova provjera je stroža od golog broja, jer goli broj „2“
+    # ne razlikuje popravak od retry-ja.
+    stages = list(getattr(result, "sdk_call_stages", ()) or ())
+    tutor_stages = [name for name in stages if name in _TUTOR_STAGE_NAMES]
+    reviewer_stages = [name for name in stages if name in _REVIEWER_STAGE_NAMES]
+    if stages and len(tutor_stages) > 1:
+        errors.append(f"repeated_tutor_stage_calls_{len(tutor_stages)}")
+    if stages and len(reviewer_stages) > 1:
+        errors.append(f"repeated_reviewer_stage_calls_{len(reviewer_stages)}")
+    if stages and len(stages) > len(tutor_stages) + len(reviewer_stages):
+        errors.append("unknown_sdk_stage_in_turn")
+    escalated = bool(reviewer_stages) and expected_calls > 0
+    allowed_calls = expected_calls + (1 if escalated else 0)
+    if result.sdk_calls_this_turn != allowed_calls:
+        errors.append(f"expected_{allowed_calls}_sdk_calls_got_{result.sdk_calls_this_turn}")
+    if result.sdk_calls_this_turn > _MAX_CALLS_PER_TURN:
+        errors.append(f"more_than_two_calls_in_one_turn_{result.sdk_calls_this_turn}")
     if result.lesson_id != gate.scenario.lesson_id or result.effective_topic != gate.scenario.lesson_id \
             or result.session_lesson_id_after != gate.scenario.lesson_id:
         errors.append("wrong_lesson")

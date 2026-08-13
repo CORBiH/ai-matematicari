@@ -69,9 +69,22 @@ def effective_configuration(environ=None):
         value = (env.get(name) or "").strip()
         return value or "(unset)"
 
+    # RUTA I MODEL SE VIDE U STARTUP LOGU. Bez toga se poslije deploya ne može
+    # dokazati koju arhitekturu proces STVARNO izvršava — a upravo tiho
+    # odstupanje je kvar zbog kojeg ovaj modul postoji. Vrijednosti se čitaju iz
+    # `matbot.config`, dakle uključuju i ugrađenu podrazumijevanu vrijednost,
+    # ne samo ono što je neko upisao u okruženje.
+    from matbot import config as _config
+
     report = {
         "practice_pipeline": read("MATBOT_PRACTICE_PIPELINE"),
         "difficulty_levels": read("MATBOT_PRACTICE_DIFFICULTY_LEVELS"),
+        "fast_single_call_scope": _config.fast_single_call_scope(),
+        "fast_model": _config.FAST_MODEL,
+        "fast_reasoning_effort": _config.FAST_REASONING_EFFORT,
+        "deterministic_practice": ("enabled" if _config.deterministic_practice_enabled()
+                                   else "disabled"),
+        "deterministic_variety_gate": read("MATBOT_DETERMINISTIC_VARIETY_GATE"),
         "model": read("OPENAI_MODEL_TEXT"),
         "reasoning_effort": read("MATBOT_REASONING_EFFORT"),
         "timeout_seconds": read("AI_TUTOR_TIMEOUT"),

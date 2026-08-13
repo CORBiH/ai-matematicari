@@ -127,13 +127,17 @@ def test_e_scoring_without_a_frozen_expectation_is_refused():
 # F/G) PLAN I PLAFON
 # ---------------------------------------------------------------------------
 
-def test_f_plan_total_is_static_seventeen_plus_derived_hint():
+def test_f_plan_total_is_static_ten_plus_derived_hint():
+    """Brza ruta: modelski scenario trosi 1 poziv, pa je staticki zbir 10.
+
+    Invarijanta je nepromijenjena: jedina razlika izmedju dva DOSTIZNA
+    staticka plana je izvedeni prvi hint (0 ili 1)."""
     plan = runner.build_release_gate_plan("0123456789abcdef" * 4)
     static_total = sum(item.expected_calls or 0 for item in plan)
-    assert static_total == 17
-    assert runner.max_planned_calls(plan) == 18
-    # Oba dostizna ukupna plana i njihova jedina razlika je izvedeni hint.
-    assert {static_total, static_total + 1} == {17, 18}
+    assert static_total == 10
+    assert {static_total, static_total + 1} == {10, 11}
+    # Plafon pokriva i uslovni recenzentski popravak svakog modelskog scenarija.
+    assert runner.max_planned_calls(plan) == 21
 
 
 @pytest.mark.parametrize("planned,actual,expected_error", [
