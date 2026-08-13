@@ -1,0 +1,7053 @@
+{
+ "_readme": [
+  "Arhetipi zadatka koje svaka lekcija legitimno podrzava.",
+  "Izvedeno iz naslova, kanonskih ishoda i semanticke porodice —",
+  "nikad rucno po ID-ju lekcije (scripts/build_archetype_support.py).",
+  "Arhetip je PREFERENCIJA; semanticke kapije i dalje odlucuju o objavi."
+ ],
+ "schema_version": 1,
+ "narrow_threshold": 3,
+ "archetypes": [
+  "DIRECT_COMPUTE",
+  "FIND_MISSING_VALUE",
+  "ERROR_ANALYSIS",
+  "CHOOSE_CORRECT_REASONING",
+  "COMPARE_RESULTS",
+  "COMPLETE_MISSING_STEP",
+  "TRANSLATE_REPRESENTATION",
+  "MULTI_STEP_APPLICATION",
+  "CLASSIFY_CASE"
+ ],
+ "lessons": {
+  "6-01-001": {
+   "grade": 6,
+   "family": "finite_set_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "6-01-002": {
+   "grade": 6,
+   "family": "finite_set_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "6-01-003": {
+   "grade": 6,
+   "family": "finite_set_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "6-01-004": {
+   "grade": 6,
+   "family": "finite_set_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "6-01-005": {
+   "grade": 6,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-01-006": {
+   "grade": 6,
+   "family": "finite_set_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-01-007": {
+   "grade": 6,
+   "family": "finite_set_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "6-01-008": {
+   "grade": 6,
+   "family": "finite_set_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "6-01-009": {
+   "grade": 6,
+   "family": "finite_set_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "6-01-010": {
+   "grade": 6,
+   "family": "finite_set_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-01-011": {
+   "grade": 6,
+   "family": "finite_set_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "6-01-012": {
+   "grade": 6,
+   "family": "finite_set_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-01-013": {
+   "grade": 6,
+   "family": "finite_set_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-02-001": {
+   "grade": 6,
+   "family": "number_set_membership",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "6-02-002": {
+   "grade": 6,
+   "family": "number_comparison_order",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-02-003": {
+   "grade": 6,
+   "family": "natural_arithmetic_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "6-02-004": {
+   "grade": 6,
+   "family": "natural_arithmetic_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "6-02-005": {
+   "grade": 6,
+   "family": "natural_arithmetic_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "6-02-006": {
+   "grade": 6,
+   "family": "operation_property_recognition",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "6-02-007": {
+   "grade": 6,
+   "family": "natural_arithmetic_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "6-02-008": {
+   "grade": 6,
+   "family": "polynomial_basic",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "6-02-009": {
+   "grade": 6,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "6-03-001": {
+   "grade": 6,
+   "family": "common_divisors_multiples",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "6-03-002": {
+   "grade": 6,
+   "family": "divisibility_value_properties",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "6-03-003": {
+   "grade": 6,
+   "family": "divisibility_value_properties",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-03-004": {
+   "grade": 6,
+   "family": "divisibility_predicate_application",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-03-005": {
+   "grade": 6,
+   "family": "prime_structure",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "6-03-006": {
+   "grade": 6,
+   "family": "prime_structure",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "6-03-007": {
+   "grade": 6,
+   "family": "prime_structure",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "6-03-008": {
+   "grade": 6,
+   "family": "common_divisors_multiples",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-03-009": {
+   "grade": 6,
+   "family": "common_divisors_multiples",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-03-010": {
+   "grade": 6,
+   "family": "structured_word_problem",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-04-001": {
+   "grade": 6,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-04-002": {
+   "grade": 6,
+   "family": "fraction_concept_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-04-003": {
+   "grade": 6,
+   "family": "fraction_concept_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-04-004": {
+   "grade": 6,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-04-005": {
+   "grade": 6,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-04-006": {
+   "grade": 6,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-04-007": {
+   "grade": 6,
+   "family": "fraction_concept_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-04-008": {
+   "grade": 6,
+   "family": "number_comparison_order",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-04-009": {
+   "grade": 6,
+   "family": "fraction_arithmetic_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-04-010": {
+   "grade": 6,
+   "family": "fraction_arithmetic_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-04-011": {
+   "grade": 6,
+   "family": "fraction_arithmetic_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-04-012": {
+   "grade": 6,
+   "family": "fraction_arithmetic_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-04-013": {
+   "grade": 6,
+   "family": "operation_property_recognition",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-04-014": {
+   "grade": 6,
+   "family": "rational_arithmetic_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-04-015": {
+   "grade": 6,
+   "family": "structured_word_problem",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-05-001": {
+   "grade": 6,
+   "family": "fraction_decimal_conversion",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-05-002": {
+   "grade": 6,
+   "family": "fraction_decimal_conversion",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-05-003": {
+   "grade": 6,
+   "family": "fraction_decimal_conversion",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-05-004": {
+   "grade": 6,
+   "family": "fraction_concept_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-05-005": {
+   "grade": 6,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-05-006": {
+   "grade": 6,
+   "family": "number_comparison_order",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-05-007": {
+   "grade": 6,
+   "family": "decimal_rounding",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-05-008": {
+   "grade": 6,
+   "family": "decimal_arithmetic_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-05-009": {
+   "grade": 6,
+   "family": "decimal_arithmetic_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-05-010": {
+   "grade": 6,
+   "family": "decimal_arithmetic_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-05-011": {
+   "grade": 6,
+   "family": "structured_word_problem",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-06-001": {
+   "grade": 6,
+   "family": "percent_basic",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-06-002": {
+   "grade": 6,
+   "family": "percent_basic",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-06-003": {
+   "grade": 6,
+   "family": "ratio_proportion_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-06-004": {
+   "grade": 6,
+   "family": "arithmetic_mean_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-07-001": {
+   "grade": 6,
+   "family": "linear_equation_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "6-07-002": {
+   "grade": 6,
+   "family": "linear_equation_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-07-003": {
+   "grade": 6,
+   "family": "linear_equation_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-07-004": {
+   "grade": 6,
+   "family": "linear_equation_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-07-005": {
+   "grade": 6,
+   "family": "linear_equation_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-07-006": {
+   "grade": 6,
+   "family": "linear_equation_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-07-007": {
+   "grade": 6,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "6-08-001": {
+   "grade": 6,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": false
+  },
+  "6-08-002": {
+   "grade": 6,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": false
+  },
+  "6-08-003": {
+   "grade": 6,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "6-08-004": {
+   "grade": 6,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-08-005": {
+   "grade": 6,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-08-006": {
+   "grade": 6,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": false
+  },
+  "6-08-007": {
+   "grade": 6,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-08-008": {
+   "grade": 6,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": false
+  },
+  "6-08-009": {
+   "grade": 6,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-08-010": {
+   "grade": 6,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": false
+  },
+  "6-08-011": {
+   "grade": 6,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": false
+  },
+  "6-09-001": {
+   "grade": 6,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": false
+  },
+  "6-09-002": {
+   "grade": 6,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": true
+  },
+  "6-09-003": {
+   "grade": 6,
+   "family": "angle_relationships_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": false
+  },
+  "6-09-004": {
+   "grade": 6,
+   "family": "angle_relationships_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "6-09-005": {
+   "grade": 6,
+   "family": "angle_relationships_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "6-09-006": {
+   "grade": 6,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "6-09-007": {
+   "grade": 6,
+   "family": "angle_relationships_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-09-008": {
+   "grade": 6,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-09-009": {
+   "grade": 6,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": true
+  },
+  "6-09-010": {
+   "grade": 6,
+   "family": "unit_conversion_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-09-011": {
+   "grade": 6,
+   "family": "angle_relationships_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-09-012": {
+   "grade": 6,
+   "family": "angle_relationships_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "6-09-013": {
+   "grade": 6,
+   "family": "angle_relationships_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": false
+  },
+  "6-09-014": {
+   "grade": 6,
+   "family": "angle_relationships_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": false
+  },
+  "6-09-015": {
+   "grade": 6,
+   "family": "angle_relationships_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": true
+  },
+  "6-09-016": {
+   "grade": 6,
+   "family": "angle_relationships_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": true
+  },
+  "6-10-001": {
+   "grade": 6,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-10-002": {
+   "grade": 6,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-10-003": {
+   "grade": 6,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-10-004": {
+   "grade": 6,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-10-005": {
+   "grade": 6,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-10-006": {
+   "grade": 6,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-10-007": {
+   "grade": 6,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-10-008": {
+   "grade": 6,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-11-001": {
+   "grade": 6,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": true
+  },
+  "6-11-002": {
+   "grade": 6,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "6-12-001": {
+   "grade": 6,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "6-12-002": {
+   "grade": 6,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "6-12-003": {
+   "grade": 6,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-12-004": {
+   "grade": 6,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-12-005": {
+   "grade": 6,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "6-12-006": {
+   "grade": 6,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "6-12-007": {
+   "grade": 6,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "6-12-008": {
+   "grade": 6,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "6-13-001": {
+   "grade": 6,
+   "family": "unit_conversion_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-13-002": {
+   "grade": 6,
+   "family": "unit_conversion_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-13-003": {
+   "grade": 6,
+   "family": "unit_conversion_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-13-004": {
+   "grade": 6,
+   "family": "unit_conversion_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-13-005": {
+   "grade": 6,
+   "family": "unit_conversion_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-13-006": {
+   "grade": 6,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "6-13-007": {
+   "grade": 6,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "7-01-001": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": false
+  },
+  "7-01-002": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": true
+  },
+  "7-01-003": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": true
+  },
+  "7-01-004": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": true
+  },
+  "7-01-005": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": true
+  },
+  "7-01-006": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": true
+  },
+  "7-01-007": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-01-008": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-01-009": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-01-010": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "7-01-011": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "7-01-012": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": true
+  },
+  "7-01-013": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": true
+  },
+  "7-01-014": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": true
+  },
+  "7-01-015": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": true
+  },
+  "7-01-016": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": true
+  },
+  "7-01-017": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-01-018": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-01-019": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "7-02-001": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "7-02-002": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "7-02-003": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "7-02-004": {
+   "grade": 7,
+   "family": "absolute_value_opposite",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-02-005": {
+   "grade": 7,
+   "family": "absolute_value_opposite",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "7-02-006": {
+   "grade": 7,
+   "family": "number_comparison_order",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "7-02-007": {
+   "grade": 7,
+   "family": "integer_arithmetic_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-02-008": {
+   "grade": 7,
+   "family": "integer_arithmetic_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-02-009": {
+   "grade": 7,
+   "family": "integer_arithmetic_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "7-02-010": {
+   "grade": 7,
+   "family": "operation_property_recognition",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-02-011": {
+   "grade": 7,
+   "family": "integer_arithmetic_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-02-012": {
+   "grade": 7,
+   "family": "integer_arithmetic_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-02-013": {
+   "grade": 7,
+   "family": "integer_arithmetic_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-02-014": {
+   "grade": 7,
+   "family": "operation_property_recognition",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-02-015": {
+   "grade": 7,
+   "family": "integer_arithmetic_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "7-02-016": {
+   "grade": 7,
+   "family": "linear_equation_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-02-017": {
+   "grade": 7,
+   "family": "linear_equation_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-02-018": {
+   "grade": 7,
+   "family": "linear_equation_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-02-019": {
+   "grade": 7,
+   "family": "linear_equation_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-02-020": {
+   "grade": 7,
+   "family": "linear_equation_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-02-021": {
+   "grade": 7,
+   "family": "structured_word_problem",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "7-03-001": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "7-03-002": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-03-003": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "7-03-004": {
+   "grade": 7,
+   "family": "absolute_value_opposite",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-03-005": {
+   "grade": 7,
+   "family": "absolute_value_opposite",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-03-006": {
+   "grade": 7,
+   "family": "number_comparison_order",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "7-03-007": {
+   "grade": 7,
+   "family": "fraction_decimal_conversion",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "7-03-008": {
+   "grade": 7,
+   "family": "fraction_decimal_conversion",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "7-03-009": {
+   "grade": 7,
+   "family": "rational_arithmetic_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-03-010": {
+   "grade": 7,
+   "family": "rational_arithmetic_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-03-011": {
+   "grade": 7,
+   "family": "rational_arithmetic_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-03-012": {
+   "grade": 7,
+   "family": "rational_arithmetic_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-03-013": {
+   "grade": 7,
+   "family": "operation_property_recognition",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-03-014": {
+   "grade": 7,
+   "family": "rational_arithmetic_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-03-015": {
+   "grade": 7,
+   "family": "rational_arithmetic_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "7-03-016": {
+   "grade": 7,
+   "family": "linear_equation_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-03-017": {
+   "grade": 7,
+   "family": "linear_equation_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-03-018": {
+   "grade": 7,
+   "family": "linear_equation_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-03-019": {
+   "grade": 7,
+   "family": "linear_equation_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-03-020": {
+   "grade": 7,
+   "family": "structured_word_problem",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "7-03-021": {
+   "grade": 7,
+   "family": "decimal_rounding",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "7-04-001": {
+   "grade": 7,
+   "family": "angle_relationships_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": false
+  },
+  "7-04-002": {
+   "grade": 7,
+   "family": "angle_relationships_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": false
+  },
+  "7-04-003": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-04-004": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-04-005": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-04-006": {
+   "grade": 7,
+   "family": "angle_relationships_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": false
+  },
+  "7-04-007": {
+   "grade": 7,
+   "family": "angle_relationships_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": false
+  },
+  "7-04-008": {
+   "grade": 7,
+   "family": "angle_relationships_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": true
+  },
+  "7-04-009": {
+   "grade": 7,
+   "family": "angle_relationships_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": true
+  },
+  "7-04-010": {
+   "grade": 7,
+   "family": "angle_relationships_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": true
+  },
+  "7-04-011": {
+   "grade": 7,
+   "family": "angle_relationships_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": false
+  },
+  "7-04-012": {
+   "grade": 7,
+   "family": "angle_relationships_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": true
+  },
+  "7-04-013": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": true
+  },
+  "7-04-014": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": true
+  },
+  "7-04-015": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": true
+  },
+  "7-04-016": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": true
+  },
+  "7-04-017": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "7-04-018": {
+   "grade": 7,
+   "family": "angle_relationships_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "7-04-019": {
+   "grade": 7,
+   "family": "angle_relationships_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-04-020": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-04-021": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": true
+  },
+  "7-04-022": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-04-023": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-04-024": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-04-025": {
+   "grade": 7,
+   "family": "geometry_formula_2d",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-05-001": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-05-002": {
+   "grade": 7,
+   "family": "angle_relationships_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-05-003": {
+   "grade": 7,
+   "family": "angle_relationships_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-05-004": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-05-005": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-05-006": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-05-007": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-05-008": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-05-009": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-05-010": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-05-011": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "7-05-012": {
+   "grade": 7,
+   "family": "geometry_formula_2d",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "7-05-013": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-05-014": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-05-015": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-05-016": {
+   "grade": 7,
+   "family": "geometry_formula_2d",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "7-05-017": {
+   "grade": 7,
+   "family": "geometry_formula_2d",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "7-05-018": {
+   "grade": 7,
+   "family": "unit_conversion_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "7-05-019": {
+   "grade": 7,
+   "family": "geometry_formula_2d",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "7-05-020": {
+   "grade": 7,
+   "family": "geometry_formula_2d",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "7-05-021": {
+   "grade": 7,
+   "family": "geometry_formula_2d",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "7-05-022": {
+   "grade": 7,
+   "family": "geometry_formula_2d",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "7-05-023": {
+   "grade": 7,
+   "family": "geometry_formula_2d",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-05-024": {
+   "grade": 7,
+   "family": "geometry_formula_2d",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-05-025": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "7-06-001": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": false
+  },
+  "7-06-002": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": false
+  },
+  "7-06-003": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": false
+  },
+  "7-06-004": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": false
+  },
+  "7-06-005": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": false
+  },
+  "7-06-006": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": false
+  },
+  "7-06-007": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": false
+  },
+  "7-06-008": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": false
+  },
+  "7-06-009": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "7-06-010": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": false
+  },
+  "7-06-011": {
+   "grade": 7,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": false
+  },
+  "8-01-001": {
+   "grade": 8,
+   "family": "number_set_membership",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-01-002": {
+   "grade": 8,
+   "family": "number_set_membership",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "8-01-003": {
+   "grade": 8,
+   "family": "number_set_membership",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-01-004": {
+   "grade": 8,
+   "family": "number_comparison_order",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-01-005": {
+   "grade": 8,
+   "family": "absolute_value_opposite",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-01-006": {
+   "grade": 8,
+   "family": "power_arithmetic_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-01-007": {
+   "grade": 8,
+   "family": "square_root_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-01-008": {
+   "grade": 8,
+   "family": "square_root_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-01-009": {
+   "grade": 8,
+   "family": "simple_quadratic_equation",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-01-010": {
+   "grade": 8,
+   "family": "square_root_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-01-011": {
+   "grade": 8,
+   "family": "square_root_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-01-012": {
+   "grade": 8,
+   "family": "rational_arithmetic_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-01-013": {
+   "grade": 8,
+   "family": "power_arithmetic_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-01-014": {
+   "grade": 8,
+   "family": "power_arithmetic_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-01-015": {
+   "grade": 8,
+   "family": "power_arithmetic_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "8-01-016": {
+   "grade": 8,
+   "family": "power_arithmetic_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-01-017": {
+   "grade": 8,
+   "family": "power_arithmetic_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "8-02-001": {
+   "grade": 8,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "8-02-002": {
+   "grade": 8,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "8-02-003": {
+   "grade": 8,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "8-02-004": {
+   "grade": 8,
+   "family": "coordinate_line_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "8-02-005": {
+   "grade": 8,
+   "family": "linear_function_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "8-02-006": {
+   "grade": 8,
+   "family": "linear_function_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "8-02-007": {
+   "grade": 8,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "8-02-008": {
+   "grade": 8,
+   "family": "coordinate_line_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "8-02-009": {
+   "grade": 8,
+   "family": "coordinate_line_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "8-02-010": {
+   "grade": 8,
+   "family": "linear_function_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "8-02-011": {
+   "grade": 8,
+   "family": "linear_function_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "8-02-012": {
+   "grade": 8,
+   "family": "coordinate_line_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "8-02-013": {
+   "grade": 8,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "8-02-014": {
+   "grade": 8,
+   "family": "coordinate_line_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "8-03-001": {
+   "grade": 8,
+   "family": "ratio_proportion_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-03-002": {
+   "grade": 8,
+   "family": "ratio_proportion_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-03-003": {
+   "grade": 8,
+   "family": "ratio_proportion_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-03-004": {
+   "grade": 8,
+   "family": "ratio_proportion_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "8-03-005": {
+   "grade": 8,
+   "family": "ratio_proportion_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-03-006": {
+   "grade": 8,
+   "family": "linear_function_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "8-03-007": {
+   "grade": 8,
+   "family": "linear_function_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-03-008": {
+   "grade": 8,
+   "family": "similarity_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-03-009": {
+   "grade": 8,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-03-010": {
+   "grade": 8,
+   "family": "ratio_proportion_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-03-011": {
+   "grade": 8,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "8-03-012": {
+   "grade": 8,
+   "family": "ratio_proportion_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "8-03-013": {
+   "grade": 8,
+   "family": "similarity_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-03-014": {
+   "grade": 8,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-03-015": {
+   "grade": 8,
+   "family": "similarity_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-03-016": {
+   "grade": 8,
+   "family": "similarity_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-03-017": {
+   "grade": 8,
+   "family": "percent_basic",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "8-03-018": {
+   "grade": 8,
+   "family": "percent_basic",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "8-03-019": {
+   "grade": 8,
+   "family": "financial_arithmetic_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-03-020": {
+   "grade": 8,
+   "family": "ratio_proportion_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "8-04-001": {
+   "grade": 8,
+   "family": "pythagoras_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "8-04-002": {
+   "grade": 8,
+   "family": "pythagoras_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "8-04-003": {
+   "grade": 8,
+   "family": "pythagoras_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "8-04-004": {
+   "grade": 8,
+   "family": "pythagoras_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "8-04-005": {
+   "grade": 8,
+   "family": "pythagoras_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "8-04-006": {
+   "grade": 8,
+   "family": "pythagoras_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "8-04-007": {
+   "grade": 8,
+   "family": "pythagoras_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "8-04-008": {
+   "grade": 8,
+   "family": "pythagoras_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "8-04-009": {
+   "grade": 8,
+   "family": "pythagoras_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "8-04-010": {
+   "grade": 8,
+   "family": "pythagoras_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "8-04-011": {
+   "grade": 8,
+   "family": "pythagoras_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "8-04-012": {
+   "grade": 8,
+   "family": "pythagoras_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "8-04-013": {
+   "grade": 8,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "8-04-014": {
+   "grade": 8,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "8-04-015": {
+   "grade": 8,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "8-04-016": {
+   "grade": 8,
+   "family": "structured_word_problem",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "8-05-001": {
+   "grade": 8,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-05-002": {
+   "grade": 8,
+   "family": "solid_geometry_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-05-003": {
+   "grade": 8,
+   "family": "solid_geometry_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-05-004": {
+   "grade": 8,
+   "family": "solid_geometry_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-05-005": {
+   "grade": 8,
+   "family": "solid_geometry_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-05-006": {
+   "grade": 8,
+   "family": "solid_geometry_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-05-007": {
+   "grade": 8,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-05-008": {
+   "grade": 8,
+   "family": "solid_geometry_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-05-009": {
+   "grade": 8,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-05-010": {
+   "grade": 8,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-05-011": {
+   "grade": 8,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-05-012": {
+   "grade": 8,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-05-013": {
+   "grade": 8,
+   "family": "solid_geometry_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-05-014": {
+   "grade": 8,
+   "family": "solid_geometry_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-05-015": {
+   "grade": 8,
+   "family": "solid_geometry_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-05-016": {
+   "grade": 8,
+   "family": "solid_geometry_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-05-017": {
+   "grade": 8,
+   "family": "solid_geometry_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-05-018": {
+   "grade": 8,
+   "family": "solid_geometry_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-05-019": {
+   "grade": 8,
+   "family": "solid_geometry_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-05-020": {
+   "grade": 8,
+   "family": "solid_geometry_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-05-021": {
+   "grade": 8,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "8-05-022": {
+   "grade": 8,
+   "family": "unit_conversion_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "8-06-001": {
+   "grade": 8,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": false
+  },
+  "8-06-002": {
+   "grade": 8,
+   "family": "frequency_basic",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": true
+  },
+  "8-06-003": {
+   "grade": 8,
+   "family": "frequency_basic",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "8-06-004": {
+   "grade": 8,
+   "family": "frequency_basic",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "8-06-005": {
+   "grade": 8,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": true
+  },
+  "8-06-006": {
+   "grade": 8,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": true
+  },
+  "8-06-007": {
+   "grade": 8,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "8-06-008": {
+   "grade": 8,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": true
+  },
+  "8-06-009": {
+   "grade": 8,
+   "family": "arithmetic_mean_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-06-010": {
+   "grade": 8,
+   "family": "event_probability_facts",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-06-011": {
+   "grade": 8,
+   "family": "event_probability_facts",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": true
+  },
+  "8-06-012": {
+   "grade": 8,
+   "family": "classical_probability_basic",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": true
+  },
+  "8-06-013": {
+   "grade": 8,
+   "family": "classical_probability_basic",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": true
+  },
+  "8-07-001": {
+   "grade": 8,
+   "family": "polynomial_basic",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-07-002": {
+   "grade": 8,
+   "family": "polynomial_basic",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-07-003": {
+   "grade": 8,
+   "family": "polynomial_basic",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-07-004": {
+   "grade": 8,
+   "family": "polynomial_basic",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-07-005": {
+   "grade": 8,
+   "family": "polynomial_basic",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-07-006": {
+   "grade": 8,
+   "family": "polynomial_basic",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-07-007": {
+   "grade": 8,
+   "family": "polynomial_basic",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-07-008": {
+   "grade": 8,
+   "family": "polynomial_basic",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-07-009": {
+   "grade": 8,
+   "family": "polynomial_basic",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "8-07-010": {
+   "grade": 8,
+   "family": "polynomial_basic",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-07-011": {
+   "grade": 8,
+   "family": "polynomial_basic",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "8-07-012": {
+   "grade": 8,
+   "family": "polynomial_basic",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-07-013": {
+   "grade": 8,
+   "family": "simple_quadratic_equation",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-08-001": {
+   "grade": 8,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": false
+  },
+  "8-08-002": {
+   "grade": 8,
+   "family": "geometry_formula_2d",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-08-003": {
+   "grade": 8,
+   "family": "polygon_angle_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": true
+  },
+  "8-08-004": {
+   "grade": 8,
+   "family": "geometry_formula_2d",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "8-08-005": {
+   "grade": 8,
+   "family": "geometry_formula_2d",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "8-08-006": {
+   "grade": 8,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-08-007": {
+   "grade": 8,
+   "family": "geometry_formula_2d",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "8-08-008": {
+   "grade": 8,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-08-009": {
+   "grade": 8,
+   "family": "geometry_formula_2d",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "8-08-010": {
+   "grade": 8,
+   "family": "geometry_formula_2d",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "8-08-011": {
+   "grade": 8,
+   "family": "geometry_formula_2d",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "8-08-012": {
+   "grade": 8,
+   "family": "geometry_formula_2d",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": true
+  },
+  "8-09-001": {
+   "grade": 8,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": false
+  },
+  "8-09-002": {
+   "grade": 8,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": true
+  },
+  "8-09-003": {
+   "grade": 8,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "8-09-004": {
+   "grade": 8,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-01-001": {
+   "grade": 9,
+   "family": "polynomial_basic",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-01-002": {
+   "grade": 9,
+   "family": "rational_expression_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-01-003": {
+   "grade": 9,
+   "family": "rational_expression_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-01-004": {
+   "grade": 9,
+   "family": "rational_expression_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-01-005": {
+   "grade": 9,
+   "family": "rational_expression_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-01-006": {
+   "grade": 9,
+   "family": "rational_expression_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-01-007": {
+   "grade": 9,
+   "family": "rational_expression_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-01-008": {
+   "grade": 9,
+   "family": "rational_expression_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-01-009": {
+   "grade": 9,
+   "family": "rational_expression_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-01-010": {
+   "grade": 9,
+   "family": "rational_expression_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-01-011": {
+   "grade": 9,
+   "family": "rational_expression_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-01-012": {
+   "grade": 9,
+   "family": "rational_expression_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-01-013": {
+   "grade": 9,
+   "family": "rational_expression_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-01-014": {
+   "grade": 9,
+   "family": "rational_equation_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-01-015": {
+   "grade": 9,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-01-016": {
+   "grade": 9,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-01-017": {
+   "grade": 9,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-02-001": {
+   "grade": 9,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": false
+  },
+  "9-02-002": {
+   "grade": 9,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": true
+  },
+  "9-02-003": {
+   "grade": 9,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": false
+  },
+  "9-02-004": {
+   "grade": 9,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": true
+  },
+  "9-02-005": {
+   "grade": 9,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": true
+  },
+  "9-02-006": {
+   "grade": 9,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "9-02-007": {
+   "grade": 9,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": true
+  },
+  "9-02-008": {
+   "grade": 9,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": true
+  },
+  "9-02-009": {
+   "grade": 9,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": true
+  },
+  "9-02-010": {
+   "grade": 9,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": true
+  },
+  "9-02-011": {
+   "grade": 9,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "9-02-012": {
+   "grade": 9,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "9-02-013": {
+   "grade": 9,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": false
+  },
+  "9-02-014": {
+   "grade": 9,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": true
+  },
+  "9-02-015": {
+   "grade": 9,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "9-02-016": {
+   "grade": 9,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": true
+  },
+  "9-02-017": {
+   "grade": 9,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": false
+  },
+  "9-03-001": {
+   "grade": 9,
+   "family": "linear_function_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "9-03-002": {
+   "grade": 9,
+   "family": "linear_function_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "9-03-003": {
+   "grade": 9,
+   "family": "linear_function_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-03-004": {
+   "grade": 9,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-03-005": {
+   "grade": 9,
+   "family": "coordinate_line_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "9-03-006": {
+   "grade": 9,
+   "family": "coordinate_line_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "9-03-007": {
+   "grade": 9,
+   "family": "linear_function_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "9-03-008": {
+   "grade": 9,
+   "family": "linear_function_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "9-03-009": {
+   "grade": 9,
+   "family": "linear_function_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "9-03-010": {
+   "grade": 9,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-03-011": {
+   "grade": 9,
+   "family": "linear_function_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-03-012": {
+   "grade": 9,
+   "family": "linear_function_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-03-013": {
+   "grade": 9,
+   "family": "linear_function_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-03-014": {
+   "grade": 9,
+   "family": "linear_function_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "9-03-015": {
+   "grade": 9,
+   "family": "coordinate_line_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "9-03-016": {
+   "grade": 9,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-03-017": {
+   "grade": 9,
+   "family": "coordinate_line_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "9-03-018": {
+   "grade": 9,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-03-019": {
+   "grade": 9,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-03-020": {
+   "grade": 9,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-03-021": {
+   "grade": 9,
+   "family": "coordinate_line_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "9-03-022": {
+   "grade": 9,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-04-001": {
+   "grade": 9,
+   "family": "linear_equation_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-04-002": {
+   "grade": 9,
+   "family": "linear_equation_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-04-003": {
+   "grade": 9,
+   "family": "linear_equation_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "9-04-004": {
+   "grade": 9,
+   "family": "linear_equation_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-04-005": {
+   "grade": 9,
+   "family": "rational_equation_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-04-006": {
+   "grade": 9,
+   "family": "rational_equation_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-04-007": {
+   "grade": 9,
+   "family": "parametric_linear_discussion",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "9-04-008": {
+   "grade": 9,
+   "family": "linear_equation_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "9-04-009": {
+   "grade": 9,
+   "family": "linear_equation_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "9-04-010": {
+   "grade": 9,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-04-011": {
+   "grade": 9,
+   "family": "structured_word_problem",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-04-012": {
+   "grade": 9,
+   "family": "linear_equation_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-04-013": {
+   "grade": 9,
+   "family": "linear_inequality_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-04-014": {
+   "grade": 9,
+   "family": "linear_equation_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "9-04-015": {
+   "grade": 9,
+   "family": "linear_inequality_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-04-016": {
+   "grade": 9,
+   "family": "linear_equation_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "9-04-017": {
+   "grade": 9,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "9-04-018": {
+   "grade": 9,
+   "family": "linear_inequality_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "9-04-019": {
+   "grade": 9,
+   "family": "linear_equation_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "9-04-020": {
+   "grade": 9,
+   "family": "linear_equation_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "9-04-021": {
+   "grade": 9,
+   "family": "linear_equation_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "9-04-022": {
+   "grade": 9,
+   "family": "parametric_linear_discussion",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "9-05-001": {
+   "grade": 9,
+   "family": "linear_system_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "9-05-002": {
+   "grade": 9,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-05-003": {
+   "grade": 9,
+   "family": "linear_system_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-05-004": {
+   "grade": 9,
+   "family": "linear_system_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "9-05-005": {
+   "grade": 9,
+   "family": "linear_system_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "9-05-006": {
+   "grade": 9,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-05-007": {
+   "grade": 9,
+   "family": "linear_system_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-05-008": {
+   "grade": 9,
+   "family": "linear_system_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-05-009": {
+   "grade": 9,
+   "family": "linear_system_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "9-05-010": {
+   "grade": 9,
+   "family": "linear_system_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "9-05-011": {
+   "grade": 9,
+   "family": "linear_system_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "9-05-012": {
+   "grade": 9,
+   "family": "linear_system_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "9-05-013": {
+   "grade": 9,
+   "family": "structured_word_problem",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-05-014": {
+   "grade": 9,
+   "family": "linear_system_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "9-05-015": {
+   "grade": 9,
+   "family": "linear_system_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-05-016": {
+   "grade": 9,
+   "family": "linear_system_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-05-017": {
+   "grade": 9,
+   "family": "parametric_linear_discussion",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "9-06-001": {
+   "grade": 9,
+   "family": "polynomial_basic",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "9-06-002": {
+   "grade": 9,
+   "family": "polynomial_basic",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-06-003": {
+   "grade": 9,
+   "family": "polynomial_basic",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "9-06-004": {
+   "grade": 9,
+   "family": "polynomial_basic",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-06-005": {
+   "grade": 9,
+   "family": "polynomial_basic",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-06-006": {
+   "grade": 9,
+   "family": "polynomial_basic",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "9-06-007": {
+   "grade": 9,
+   "family": "polynomial_basic",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-06-008": {
+   "grade": 9,
+   "family": "polynomial_basic",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-06-009": {
+   "grade": 9,
+   "family": "polynomial_basic",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "9-06-010": {
+   "grade": 9,
+   "family": "polynomial_basic",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "9-06-011": {
+   "grade": 9,
+   "family": "polynomial_basic",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-06-012": {
+   "grade": 9,
+   "family": "polynomial_basic",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-06-013": {
+   "grade": 9,
+   "family": "simple_quadratic_equation",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "9-06-014": {
+   "grade": 9,
+   "family": "simple_quadratic_equation",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "9-06-015": {
+   "grade": 9,
+   "family": "simple_quadratic_equation",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-06-016": {
+   "grade": 9,
+   "family": "polynomial_basic",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "9-07-001": {
+   "grade": 9,
+   "family": "solid_geometry_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": false
+  },
+  "9-07-002": {
+   "grade": 9,
+   "family": "solid_geometry_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": false
+  },
+  "9-07-003": {
+   "grade": 9,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-07-004": {
+   "grade": 9,
+   "family": "solid_geometry_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "9-07-005": {
+   "grade": 9,
+   "family": "solid_geometry_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-07-006": {
+   "grade": 9,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": true
+  },
+  "9-07-007": {
+   "grade": 9,
+   "family": "solid_geometry_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-07-008": {
+   "grade": 9,
+   "family": "solid_geometry_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": false
+  },
+  "9-07-009": {
+   "grade": 9,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-07-010": {
+   "grade": 9,
+   "family": "solid_geometry_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-07-011": {
+   "grade": 9,
+   "family": "solid_geometry_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-07-012": {
+   "grade": 9,
+   "family": "solid_geometry_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": true
+  },
+  "9-07-013": {
+   "grade": 9,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": true
+  },
+  "9-07-014": {
+   "grade": 9,
+   "family": "solid_geometry_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-07-015": {
+   "grade": 9,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": false
+  },
+  "9-07-016": {
+   "grade": 9,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-07-017": {
+   "grade": 9,
+   "family": "solid_geometry_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-07-018": {
+   "grade": 9,
+   "family": "solid_geometry_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-07-019": {
+   "grade": 9,
+   "family": "solid_geometry_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": true
+  },
+  "9-07-020": {
+   "grade": 9,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": false
+  },
+  "9-07-021": {
+   "grade": 9,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-07-022": {
+   "grade": 9,
+   "family": "solid_geometry_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-07-023": {
+   "grade": 9,
+   "family": "solid_geometry_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-07-024": {
+   "grade": 9,
+   "family": "solid_geometry_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-07-025": {
+   "grade": 9,
+   "family": "solid_geometry_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": true
+  },
+  "9-07-026": {
+   "grade": 9,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": true
+  },
+  "9-07-027": {
+   "grade": 9,
+   "family": "solid_geometry_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "9-07-028": {
+   "grade": 9,
+   "family": "solid_geometry_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-07-029": {
+   "grade": 9,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "9-07-030": {
+   "grade": 9,
+   "family": "solid_geometry_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "9-07-031": {
+   "grade": 9,
+   "family": "solid_geometry_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "9-07-032": {
+   "grade": 9,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": false
+  },
+  "9-07-033": {
+   "grade": 9,
+   "family": "structured_word_problem",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-07-034": {
+   "grade": 9,
+   "family": "unit_conversion_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "MULTI_STEP_APPLICATION",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-07-035": {
+   "grade": 9,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": true
+  },
+  "9-07-036": {
+   "grade": 9,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": true
+  },
+  "9-07-037": {
+   "grade": 9,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE"
+   ],
+   "narrow_scope": true
+  },
+  "9-07-038": {
+   "grade": 9,
+   "family": "solid_geometry_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE"
+   ],
+   "narrow_scope": false
+  },
+  "9-08-001": {
+   "grade": 9,
+   "family": "classical_probability_basic",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "DIRECT_COMPUTE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-08-002": {
+   "grade": 9,
+   "family": "classical_probability_basic",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "CLASSIFY_CASE",
+    "DIRECT_COMPUTE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-08-003": {
+   "grade": 9,
+   "family": "event_probability_facts",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-08-004": {
+   "grade": 9,
+   "family": "financial_arithmetic_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-08-005": {
+   "grade": 9,
+   "family": "financial_arithmetic_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-08-006": {
+   "grade": 9,
+   "family": "financial_arithmetic_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-08-007": {
+   "grade": 9,
+   "family": "",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-08-008": {
+   "grade": 9,
+   "family": "financial_arithmetic_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-08-009": {
+   "grade": 9,
+   "family": "event_probability_facts",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-08-010": {
+   "grade": 9,
+   "family": "arithmetic_mean_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-08-011": {
+   "grade": 9,
+   "family": "unit_conversion_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-08-012": {
+   "grade": 9,
+   "family": "power_arithmetic_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "COMPARE_RESULTS",
+    "COMPLETE_MISSING_STEP",
+    "DIRECT_COMPUTE",
+    "ERROR_ANALYSIS",
+    "FIND_MISSING_VALUE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  },
+  "9-08-013": {
+   "grade": 9,
+   "family": "unit_conversion_direct",
+   "supported": [
+    "CHOOSE_CORRECT_REASONING",
+    "DIRECT_COMPUTE",
+    "TRANSLATE_REPRESENTATION"
+   ],
+   "narrow_scope": false
+  }
+ },
+ "narrow_scope_lessons": [
+  "6-09-002",
+  "6-09-009",
+  "6-09-015",
+  "6-09-016",
+  "6-11-001",
+  "7-01-002",
+  "7-01-003",
+  "7-01-004",
+  "7-01-005",
+  "7-01-006",
+  "7-01-012",
+  "7-01-013",
+  "7-01-014",
+  "7-01-015",
+  "7-01-016",
+  "7-04-008",
+  "7-04-009",
+  "7-04-010",
+  "7-04-012",
+  "7-04-013",
+  "7-04-014",
+  "7-04-015",
+  "7-04-016",
+  "7-04-021",
+  "8-06-002",
+  "8-06-005",
+  "8-06-006",
+  "8-06-008",
+  "8-06-011",
+  "8-06-012",
+  "8-06-013",
+  "8-08-003",
+  "8-08-012",
+  "8-09-002",
+  "9-02-002",
+  "9-02-004",
+  "9-02-005",
+  "9-02-007",
+  "9-02-008",
+  "9-02-009",
+  "9-02-010",
+  "9-02-014",
+  "9-02-016",
+  "9-07-006",
+  "9-07-012",
+  "9-07-013",
+  "9-07-019",
+  "9-07-025",
+  "9-07-026",
+  "9-07-035",
+  "9-07-036",
+  "9-07-037"
+ ]
+}

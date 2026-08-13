@@ -34,7 +34,7 @@
    "reason": "mjereno dobra raznolikost",
    "lesson_count": 5,
    "weak": false,
-   "median_distinct_templates": 8,
+   "median_distinct_templates": 7,
    "lessons_with_same_sentence_on_every_level": 0
   },
   "angle_relationships_direct": {
@@ -67,15 +67,15 @@
    "lesson_count": 3,
    "weak": true,
    "median_distinct_templates": 2,
-   "lessons_with_same_sentence_on_every_level": 1
+   "lessons_with_same_sentence_on_every_level": 0
   },
   "coordinate_line_direct": {
    "route": "KEEP_DETERMINISTIC",
    "reason": "mjereno dobra raznolikost",
    "lesson_count": 10,
    "weak": false,
-   "median_distinct_templates": 7,
-   "lessons_with_same_sentence_on_every_level": 2
+   "median_distinct_templates": 6,
+   "lessons_with_same_sentence_on_every_level": 1
   },
   "decimal_arithmetic_direct": {
    "route": "NEEDS_MORE_EVIDENCE",
@@ -130,15 +130,15 @@
    "reason": "mjereno dobra raznolikost",
    "lesson_count": 10,
    "weak": false,
-   "median_distinct_templates": 4,
+   "median_distinct_templates": 5,
    "lessons_with_same_sentence_on_every_level": 1
   },
   "fraction_arithmetic_direct": {
-   "route": "KEEP_DETERMINISTIC",
-   "reason": "mjereno dobra raznolikost",
+   "route": "NEEDS_MORE_EVIDENCE",
+   "reason": "medijan 3 rečenica — na granici, ostaje deterministička",
    "lesson_count": 4,
-   "weak": false,
-   "median_distinct_templates": 4,
+   "weak": true,
+   "median_distinct_templates": 3,
    "lessons_with_same_sentence_on_every_level": 0
   },
   "fraction_concept_direct": {
@@ -147,7 +147,7 @@
    "lesson_count": 4,
    "weak": true,
    "median_distinct_templates": 2,
-   "lessons_with_same_sentence_on_every_level": 1
+   "lessons_with_same_sentence_on_every_level": 2
   },
   "fraction_decimal_conversion": {
    "route": "MIGRATE_TO_LUNA",
@@ -171,14 +171,14 @@
    "lesson_count": 18,
    "weak": true,
    "median_distinct_templates": 1,
-   "lessons_with_same_sentence_on_every_level": 12
+   "lessons_with_same_sentence_on_every_level": 13
   },
   "integer_arithmetic_direct": {
    "route": "KEEP_DETERMINISTIC",
    "reason": "mjereno dobra raznolikost",
    "lesson_count": 7,
    "weak": false,
-   "median_distinct_templates": 8,
+   "median_distinct_templates": 9,
    "lessons_with_same_sentence_on_every_level": 0
   },
   "linear_equation_direct": {
@@ -186,8 +186,8 @@
    "reason": "mjereno dobra raznolikost",
    "lesson_count": 27,
    "weak": false,
-   "median_distinct_templates": 4,
-   "lessons_with_same_sentence_on_every_level": 7
+   "median_distinct_templates": 3,
+   "lessons_with_same_sentence_on_every_level": 5
   },
   "linear_function_direct": {
    "route": "KEEP_DETERMINISTIC",
@@ -202,7 +202,7 @@
    "reason": "mjereno dobra raznolikost",
    "lesson_count": 3,
    "weak": false,
-   "median_distinct_templates": 4,
+   "median_distinct_templates": 6,
    "lessons_with_same_sentence_on_every_level": 0
   },
   "linear_system_direct": {
@@ -218,7 +218,7 @@
    "reason": "mjereno dobra raznolikost",
    "lesson_count": 4,
    "weak": false,
-   "median_distinct_templates": 8,
+   "median_distinct_templates": 6,
    "lessons_with_same_sentence_on_every_level": 0
   },
   "number_comparison_order": {
@@ -227,7 +227,7 @@
    "lesson_count": 6,
    "weak": false,
    "median_distinct_templates": 3,
-   "lessons_with_same_sentence_on_every_level": 2
+   "lessons_with_same_sentence_on_every_level": 3
   },
   "number_set_membership": {
    "route": "MIGRATE_TO_LUNA",
@@ -235,38 +235,38 @@
    "lesson_count": 4,
    "weak": true,
    "median_distinct_templates": 1,
-   "lessons_with_same_sentence_on_every_level": 4
+   "lessons_with_same_sentence_on_every_level": 3
   },
   "operation_property_recognition": {
    "route": "KEEP_DETERMINISTIC",
    "reason": "mjereno dobra raznolikost",
    "lesson_count": 5,
    "weak": false,
-   "median_distinct_templates": 11,
+   "median_distinct_templates": 10,
    "lessons_with_same_sentence_on_every_level": 0
   },
   "parametric_linear_discussion": {
-   "route": "MIGRATE_TO_LUNA",
-   "reason": "isti obrazac kao dokazane porodice; medijan 2 rečenica",
+   "route": "KEEP_DETERMINISTIC",
+   "reason": "mjereno dobra raznolikost",
    "lesson_count": 3,
-   "weak": true,
-   "median_distinct_templates": 2,
+   "weak": false,
+   "median_distinct_templates": 3,
    "lessons_with_same_sentence_on_every_level": 1
   },
   "percent_basic": {
-   "route": "MIGRATE_TO_LUNA",
-   "reason": "A/B dokaz; medijan 2 rečenica po lekciji",
+   "route": "KEEP_DETERMINISTIC",
+   "reason": "mjereno dobra raznolikost",
    "lesson_count": 4,
-   "weak": true,
-   "median_distinct_templates": 2,
-   "lessons_with_same_sentence_on_every_level": 2
+   "weak": false,
+   "median_distinct_templates": 3,
+   "lessons_with_same_sentence_on_every_level": 1
   },
   "polygon_angle_direct": {
    "route": "KEEP_DETERMINISTIC",
    "reason": "mjereno dobra raznolikost",
    "lesson_count": 1,
    "weak": false,
-   "median_distinct_templates": 13,
+   "median_distinct_templates": 12,
    "lessons_with_same_sentence_on_every_level": 0
   },
   "polynomial_basic": {
@@ -274,7 +274,7 @@
    "reason": "mjereno dobra raznolikost",
    "lesson_count": 27,
    "weak": false,
-   "median_distinct_templates": 6,
+   "median_distinct_templates": 5,
    "lessons_with_same_sentence_on_every_level": 3
   },
   "power_arithmetic_direct": {
@@ -299,7 +299,7 @@
    "lesson_count": 12,
    "weak": true,
    "median_distinct_templates": 1,
-   "lessons_with_same_sentence_on_every_level": 12
+   "lessons_with_same_sentence_on_every_level": 11
   },
   "ratio_proportion_direct": {
    "route": "MIGRATE_TO_LUNA",
@@ -307,7 +307,7 @@
    "lesson_count": 9,
    "weak": true,
    "median_distinct_templates": 1,
-   "lessons_with_same_sentence_on_every_level": 9
+   "lessons_with_same_sentence_on_every_level": 8
   },
   "rational_arithmetic_direct": {
    "route": "KEEP_DETERMINISTIC",
@@ -323,7 +323,7 @@
    "lesson_count": 3,
    "weak": true,
    "median_distinct_templates": 2,
-   "lessons_with_same_sentence_on_every_level": 1
+   "lessons_with_same_sentence_on_every_level": 0
   },
   "rational_expression_direct": {
    "route": "MIGRATE_TO_LUNA",
@@ -339,7 +339,7 @@
    "lesson_count": 4,
    "weak": true,
    "median_distinct_templates": 1,
-   "lessons_with_same_sentence_on_every_level": 3
+   "lessons_with_same_sentence_on_every_level": 4
   },
   "simple_quadratic_equation": {
    "route": "MIGRATE_TO_LUNA",
@@ -355,7 +355,7 @@
    "lesson_count": 36,
    "weak": true,
    "median_distinct_templates": 1,
-   "lessons_with_same_sentence_on_every_level": 25
+   "lessons_with_same_sentence_on_every_level": 27
   },
   "square_root_direct": {
    "route": "MIGRATE_TO_LUNA",
@@ -378,7 +378,7 @@
    "reason": "mjereno dobra raznolikost",
    "lesson_count": 11,
    "weak": false,
-   "median_distinct_templates": 8,
+   "median_distinct_templates": 9,
    "lessons_with_same_sentence_on_every_level": 0
   }
  },
@@ -391,8 +391,6 @@
   "fraction_decimal_conversion",
   "geometry_formula_2d",
   "number_set_membership",
-  "parametric_linear_discussion",
-  "percent_basic",
   "power_arithmetic_direct",
   "prime_structure",
   "pythagoras_direct",
@@ -406,47 +404,15 @@
   "structured_word_problem"
  ],
  "deterministic_lesson_exceptions": [
-  "6-03-001",
   "6-03-010",
   "6-04-003",
-  "6-04-015",
-  "6-05-002",
-  "6-05-011",
-  "6-09-004",
-  "6-09-011",
-  "6-09-012",
   "6-09-015",
   "6-09-016",
-  "7-02-021",
-  "7-04-001",
-  "7-04-002",
-  "7-05-019",
-  "7-05-020",
-  "7-05-023",
-  "8-01-006",
-  "8-03-017",
-  "8-05-002",
-  "8-05-003",
-  "8-05-004",
-  "8-05-006",
-  "8-05-008",
-  "8-07-013",
-  "9-01-002",
-  "9-01-003",
-  "9-01-004",
-  "9-01-005",
-  "9-04-022",
-  "9-06-013",
-  "9-07-001",
-  "9-07-002",
-  "9-07-005",
-  "9-07-008",
-  "9-08-004",
-  "9-08-008",
-  "9-08-012"
+  "9-08-008"
  ],
  "migrated_lessons": [
   "6-02-001",
+  "6-03-001",
   "6-03-002",
   "6-03-003",
   "6-03-005",
@@ -456,20 +422,27 @@
   "6-03-009",
   "6-04-002",
   "6-04-007",
+  "6-04-015",
   "6-05-001",
+  "6-05-002",
   "6-05-003",
   "6-05-004",
-  "6-06-001",
-  "6-06-002",
+  "6-05-011",
   "6-06-003",
   "6-09-003",
+  "6-09-004",
   "6-09-005",
   "6-09-007",
+  "6-09-011",
+  "6-09-012",
   "6-09-013",
   "6-09-014",
+  "7-02-021",
   "7-03-007",
   "7-03-008",
   "7-03-020",
+  "7-04-001",
+  "7-04-002",
   "7-04-006",
   "7-04-007",
   "7-04-008",
@@ -485,12 +458,16 @@
   "7-05-012",
   "7-05-016",
   "7-05-017",
+  "7-05-019",
+  "7-05-020",
   "7-05-021",
   "7-05-022",
+  "7-05-023",
   "7-05-024",
   "8-01-001",
   "8-01-002",
   "8-01-003",
+  "8-01-006",
   "8-01-007",
   "8-01-008",
   "8-01-009",
@@ -512,7 +489,6 @@
   "8-03-013",
   "8-03-015",
   "8-03-016",
-  "8-03-018",
   "8-03-019",
   "8-03-020",
   "8-04-001",
@@ -528,7 +504,12 @@
   "8-04-011",
   "8-04-012",
   "8-04-016",
+  "8-05-002",
+  "8-05-003",
+  "8-05-004",
   "8-05-005",
+  "8-05-006",
+  "8-05-008",
   "8-05-013",
   "8-05-014",
   "8-05-015",
@@ -537,6 +518,7 @@
   "8-05-018",
   "8-05-019",
   "8-05-020",
+  "8-07-013",
   "8-08-002",
   "8-08-004",
   "8-08-005",
@@ -545,6 +527,10 @@
   "8-08-010",
   "8-08-011",
   "8-08-012",
+  "9-01-002",
+  "9-01-003",
+  "9-01-004",
+  "9-01-005",
   "9-01-006",
   "9-01-007",
   "9-01-008",
@@ -556,14 +542,17 @@
   "9-01-014",
   "9-04-005",
   "9-04-006",
-  "9-04-007",
   "9-04-011",
   "9-05-013",
-  "9-05-017",
+  "9-06-013",
   "9-06-014",
   "9-06-015",
+  "9-07-001",
+  "9-07-002",
   "9-07-004",
+  "9-07-005",
   "9-07-007",
+  "9-07-008",
   "9-07-010",
   "9-07-011",
   "9-07-012",
@@ -581,7 +570,41 @@
   "9-07-031",
   "9-07-033",
   "9-07-038",
+  "9-08-004",
   "9-08-005",
-  "9-08-006"
+  "9-08-006",
+  "9-08-012"
+ ],
+ "archetype_demoted_lessons": [
+  "6-03-001",
+  "6-04-015",
+  "6-05-002",
+  "6-05-011",
+  "6-09-004",
+  "6-09-011",
+  "6-09-012",
+  "7-02-021",
+  "7-04-001",
+  "7-04-002",
+  "7-05-019",
+  "7-05-020",
+  "7-05-023",
+  "8-01-006",
+  "8-05-002",
+  "8-05-003",
+  "8-05-004",
+  "8-05-006",
+  "8-05-008",
+  "8-07-013",
+  "9-01-003",
+  "9-01-005",
+  "9-01-007",
+  "9-06-013",
+  "9-07-001",
+  "9-07-002",
+  "9-07-005",
+  "9-07-008",
+  "9-08-004",
+  "9-08-012"
  ]
 }

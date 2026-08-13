@@ -86,15 +86,18 @@ _VARIANTS = [
 ]
 
 
-def rational_task(suffix="", correct_index=0, level=1, variant=0):
+def rational_task(suffix="", correct_index=0, level=1, variant=0, text=None):
     """Ispravan paket iz lekcije „Skup racionalnih brojeva Q“.
 
     `variant` mijenja PONUĐENE VRIJEDNOSTI, ne samo tekst: duplikat se u ovom
     projektu mjeri strukturisanim potpisom, pa dva zadatka s istim opcijama
-    jesu isti zadatak bez obzira na drugačiju rečenicu."""
+    jesu isti zadatak bez obzira na drugačiju rečenicu.
+
+    `text` dozvoljava DRUGI OBLIK zadatka (arhetip): „daj novi“ traži drugu
+    vrstu vježbe, ne samo druge brojeve."""
     options = _VARIANTS[variant]
     payload = make_task_payload(
-        text=f"Koji od navedenih brojeva pripada skupu $\\mathbb{{Q}}$?{suffix}",
+        text=text or f"Koji od navedenih brojeva pripada skupu $\mathbb{{Q}}$?{suffix}",
         options=options, correct_option_index=correct_index,
         expected=options[correct_index],
         solution="Racionalan broj se može zapisati kao količnik dva cijela broja.",
@@ -365,7 +368,10 @@ def test_new_preserves_level_and_changes_the_task(fast_route):
     fake.queue(draft_for(rational_task()))
     run_practice_turn(store, fake, turn("f7", "Daj mi zadatak."))
     before = store.peek("f7")
-    fake.queue(draft_for(rational_task(suffix=" Odaberi tačan odgovor.", variant=1),
+    # DRUGI OBLIK, ne samo drugi brojevi — „daj novi“ to i traži.
+    fake.queue(draft_for(rational_task(
+        variant=1, text="Učenik tvrdi da $\sqrt{5}$ pripada skupu "
+                        "$\mathbb{Q}$. Koja ispravka je tačna?"),
                          intent="next_task"))
     run_practice_turn(store, fake, turn("f7", "Daj mi novi zadatak."))
     after = store.peek("f7")
@@ -420,8 +426,12 @@ def test_distinct_task_publishes_on_one_call(fast_route):
     fake.queue(draft_for(rational_task()))
     run_practice_turn(store, fake, turn("f9b", "Daj mi zadatak."))
     published = store.peek("f9b")["current_task"]
-    fake.queue(draft_for(rational_task(" Odaberi tačan odgovor.", variant=2),
-                         intent="next_task"))
+    # DRUGI OBLIK, ne samo drugi brojevi — „daj novi“ to i traži.
+    fake.queue(draft_for(
+        rational_task(variant=2,
+                      text="Učenik tvrdi da $\sqrt{7}$ pripada skupu "
+                           "$\mathbb{Q}$. Gdje je pogriješio?"),
+        intent="next_task"))
     response = run_practice_turn(store, fake, turn("f9b", "Daj mi novi zadatak."))
     assert response["status"] == "ready"
     assert store.peek("f9b")["current_task"] != published

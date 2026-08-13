@@ -109,12 +109,31 @@ def main():
     # poštuje: dokazano jaka lekcija ostaje na nula poziva i unutar slabe
     # porodice. Spisak je IZVEDEN iz mjerenja, nikad ručno pisan.
     lessons = quality.get("lessons") or {}
-    strong_in_weak = sorted(
+    # ARHETIP ODLUČUJE O IZUZETKU (nalaz iz ručnog QA). Lekcija se vraća u
+    # determinističku rutu SAMO ako je i po šablonu dobra I nudi više od jednog
+    # OBLIKA vježbe — ili joj je opseg dokazano uzak, pa jedan oblik nije mana.
+    # Lekcija s 11 rečenica o kupovini i kusuru ima jedan oblik i 8 mogućih:
+    # takva se ne vraća, jer je učenik doživljava kao istu vježbu.
+    def keeps_deterministic(row):
+        if row.get("weak"):
+            return False
+        if row.get("narrow_scope"):
+            return True                     # uzak opseg: jedan oblik JE opseg
+        if len(row.get("supported_archetypes") or ()) < 3:
+            return True
+        return row.get("distinct_archetypes", 0) >= 2
+
+    strong_in_weak, weak_in_weak = [], []
+    for lesson_id, row in lessons.items():
+        if row.get("family") not in set(migrate):
+            continue
+        (strong_in_weak if keeps_deterministic(row) else weak_in_weak).append(lesson_id)
+    strong_in_weak.sort()
+    weak_in_weak.sort()
+    archetype_demoted = sorted(
         lesson_id for lesson_id, row in lessons.items()
-        if row.get("family") in set(migrate) and not row.get("weak"))
-    weak_in_weak = sorted(
-        lesson_id for lesson_id, row in lessons.items()
-        if row.get("family") in set(migrate) and row.get("weak"))
+        if row.get("family") in set(migrate) and not row.get("weak")
+        and not keeps_deterministic(row))
     payload = {
         "_readme": [
             "Klasifikacija determinističkih PORODICA u produkcijsku rutu.",
@@ -135,6 +154,8 @@ def main():
         # ostaju determinističke uprkos porodici.
         "deterministic_lesson_exceptions": strong_in_weak,
         "migrated_lessons": weak_in_weak,
+        # Lekcije koje su po ŠABLONU dobre, ali nude samo jedan OBLIK vježbe.
+        "archetype_demoted_lessons": archetype_demoted,
     }
     counts = {}
     for decision in decisions.values():
@@ -144,6 +165,7 @@ def main():
           f"{sum(d['lesson_count'] for d in decisions.values() if d['route'] == 'MIGRATE_TO_LUNA')}")
     print(f"  pojedinacno slabe -> Luna      : {len(weak_in_weak)}")
     print(f"  pojedinacno jake  -> ostaju 0-call: {len(strong_in_weak)}")
+    print(f"  sablonski dobre, ALI jedan arhetip -> Luna: {len(archetype_demoted)}")
     print(f"\n{'porodica':<34}{'lekc':>5}  ruta / razlog")
     for name, decision in sorted(decisions.items(), key=lambda kv: (kv[1]["route"], kv[0])):
         if decision["route"] == "KEEP_DETERMINISTIC":

@@ -34,7 +34,7 @@ from dataclasses import dataclass
 from fractions import Fraction
 
 from matbot import geometrycheck, lesson_fidelity, mcq_integrity, option_equivalence
-from matbot import solution_consistency
+from matbot import solution_consistency, task_archetypes
 from matbot import practice_policy as practice_policy_module
 from matbot import request_fidelity as request_fidelity_module
 from matbot import stem_disclosure as stem_disclosure_module
@@ -250,7 +250,8 @@ def contract_package_issues(task, lesson_constraints):
     return tuple(issues)
 
 
-def structural_repetition_issue(task, recent_structures, intent):
+def structural_repetition_issue(task, recent_structures, intent, lesson_id="",
+                                supported_archetypes=()):
     """Nalaz kad je „nov“ zadatak ista VJEŽBA s drugim brojevima.
 
     ZAHTJEV IZ PRODUKCIJE: promjena brojeva, imena ili redoslijeda opcija nije
@@ -273,6 +274,24 @@ def structural_repetition_issue(task, recent_structures, intent):
                 TASK_TOO_SIMILAR_CODE,
                 detail=("isti oblik zadatka kao nedavni: promijenjeni su samo "
                         "brojevi/imena. Promijeni VRSTU vježbe, ne vrijednosti"))
+
+    # ARHETIP JE JAČA MJERA OD ŠABLONA (nalaz: 12 različitih rečenica, a sve
+    # ista vježba — kupovina i kusur). Ponavljanje oblika je nalaz SAMO kad
+    # lekcija dokazano ima drugi legitiman oblik; uska lekcija se ne tjera da
+    # izmišlja.
+    if len(supported_archetypes or ()) >= 2:
+        archetype = task_archetypes.classify(
+            str(getattr(task, "text", "") or ""), option_texts)
+        previous = [entry.get("archetype") for entry in recent_structures
+                    if isinstance(entry, dict)]
+        if archetype and previous and previous[-1] == archetype:
+            alternatives = [a for a in supported_archetypes if a != archetype]
+            if alternatives:
+                return PackageIssue(
+                    TASK_TOO_SIMILAR_CODE,
+                    detail=(f"isti ARHETIP kao prethodni zadatak ({archetype}); "
+                            "lekcija podržava i: "
+                            + ", ".join(alternatives[:4])))
     return None
 
 

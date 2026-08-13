@@ -22,7 +22,8 @@ ono što pomoć stvarno traži. Ugovor izrade zadatka ostaje bajt za bajt
 nepromijenjen — kucana poruka i dalje ide kroz `build_tutor_*`, jer prije poziva
 namjera nije serverska činjenica.
 """
-from matbot import config, difficulty_profiles, difficulty_target, hint_policy
+from matbot import archetype_support, config, difficulty_profiles, difficulty_target
+from matbot import hint_policy, task_archetypes
 from matbot.lesson_fidelity import semantic_task_requirement
 from matbot.mcq_integrity import explicit_compound_divisor_request
 from matbot.rules import build_shared_math_rules
@@ -244,6 +245,20 @@ def _state_block(session, student_message, trusted_verdict=None, ui_action=""):
         lines.append("- VEĆ ISKORIŠTENI OBLICI ZADATKA U OVOJ SESIJI:")
         for text in structures:
             lines.append(f"  • {_clip(text)}")
+        # SERVER IMENUJE SLJEDEĆI OBLIK (mjereno: bez toga se model vraća na
+        # `DIRECT_COMPUTE` u 68 % slučajeva). Preferencija nije dozvola da se
+        # izađe iz lekcije — semantičke kapije ostaju iznad nje.
+        preferred = archetype_support.preferred_archetype(
+            session.get("lesson_id") or "",
+            [entry.get("archetype") for entry in
+             (session.get("recent_structures") or []) if isinstance(entry, dict)])
+        if preferred:
+            lines.append(
+                f"- TRAŽENI OBLIK SLJEDEĆEG ZADATKA: {preferred} — "
+                + task_archetypes.describe(preferred)
+                + ". Ostani STROGO unutar ove lekcije; ako taj oblik za nju nije "
+                  "smislen, izaberi drugi oblik koji jeste, ali NIKAD ne izlazi "
+                  "iz lekcije.")
         lines.append(
             "- ZA SLJEDEĆI ZADATAK izaberi DRUGU vrstu vježbe unutar iste lekcije. "
             "Promjena brojeva, imena, predmeta ili redoslijeda opcija NIJE dovoljna. "

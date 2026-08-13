@@ -39,6 +39,7 @@ from matbot.tutor import reviewer_authority
 from matbot.tutor import task_identity
 from matbot.tutor import prompts as tutor_prompts
 from matbot import deterministic as deterministic_generators
+from matbot import archetype_support
 from matbot import deterministic_variety
 from matbot.deterministic.core import DeterministicGenerationError
 from matbot.tutor.schema import (TASK_INTENTS, TutorDraft, UnifiedOutputError,
@@ -2001,8 +2002,13 @@ def _publish_task(session, context, final, request_id, target_level=None):
     # STRUKTURNI OTISAK objavljenog zadatka — „ista vježba s drugim brojevima“.
     structure = task_identity.structural_signature(task_text, option_texts)
     if structure:
-        session.setdefault("recent_structures", []).append(
-            {"signature": structure, "text": task_text[:160]})
+        # Uz otisak se pamti i ARHETIP: šablon kaže kako rečenica izgleda, a
+        # arhetip šta učenik mora uraditi. Raznolikost se mjeri drugim.
+        session.setdefault("recent_structures", []).append({
+            "signature": structure,
+            "archetype": archetype_support.classify(task_text, option_texts),
+            "text": task_text[:160],
+        })
     _log_difficulty(request_id, context, final)
     return task_text
 
@@ -2144,7 +2150,9 @@ def _fast_single_call(llm, context, session, turn, request_id, ui_action="",
         # RAZNOLIKOST NA „DAJ NOVI“: ista vježba s drugim brojevima nije nov
         # zadatak. Nalaz je popravljiv — recenzent dobija izričit recept.
         repetition = package_preflight.structural_repetition_issue(
-            draft.new_task, session.get("recent_structures") or [], draft.intent)
+            draft.new_task, session.get("recent_structures") or [], draft.intent,
+            lesson_id=context.topic_id,
+            supported_archetypes=archetype_support.supported(context.topic_id))
         if repetition is not None:
             issues.append(repetition)
         # CILJNI NIVO JE POPRAVLJIV NALAZ, NE PAD U OBJAVI (živi nalaz brze
@@ -2353,7 +2361,9 @@ def _reviewer_stage(llm, context, session, student_message, draft,
             for issue in (draft_issues or ()))
         if asked_for_diversity_repair:
             repetition = package_preflight.structural_repetition_issue(
-                final.new_task, session.get("recent_structures") or [], final.intent)
+                final.new_task, session.get("recent_structures") or [], final.intent,
+                lesson_id=context.topic_id,
+                supported_archetypes=archetype_support.supported(context.topic_id))
             if repetition is not None:
                 final_issues = tuple(final_issues) + (repetition,)
         if final_issues:
