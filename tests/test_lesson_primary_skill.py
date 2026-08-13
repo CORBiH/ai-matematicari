@@ -55,7 +55,15 @@ def test_artifact_never_duplicates_the_curriculum_index():
         assert "title" not in row, lesson_id
         assert "oblast" not in row, lesson_id
         assert set(row) <= {"grade", "primary_skills", "supporting_concepts",
-                            "neighbour_exclusions", "evidence_ids"}, lesson_id
+                            "neighbour_exclusions", "evidence_ids",
+                            "objective_source", "objective_confidence"}, lesson_id
+        # Porijeklo je OBAVEZNO i iz zatvorenog rječnika: lekcija čiji je opseg
+        # izveden mora biti prepoznatljiva u reviziji, ne stopljena s dokazanim.
+        assert row["objective_source"] in {
+            "npp_exact_mapping", "npp_neighbour_only", "canonical_lesson_scope"}, lesson_id
+        assert row["objective_confidence"] in {"high", "medium", "low"}, lesson_id
+        assert bool(row["primary_skills"]) == (
+            row["objective_source"] == "npp_exact_mapping"), lesson_id
 
 
 def test_every_compiled_lesson_id_exists_in_the_curriculum():
