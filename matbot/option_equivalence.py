@@ -391,6 +391,99 @@ def _solve_sets_equivalent(bare_a, bare_b):
 # JAVNI API
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# 4) KONAČAN SKUP RJEŠENJA (produkcijski nalaz, ručni QA, „Jednačina x²=a“)
+# ---------------------------------------------------------------------------
+# Objavljen zadatak za $x^2=12$ ponudio je i $x \in \{-\sqrt{12}, \sqrt{12}\}$
+# i $x \in \{-2\sqrt{3}, 2\sqrt{3}\}$, pa je učenik imao DVA tačna odgovora, a
+# samo jedan je bio označen. Gola vrijednost $\sqrt{12}$ i $2\sqrt{3}$ su se već
+# prepoznavale, ali skup se nikad nije rastavljao — čak ni puko preslagivanje
+# $\{\sqrt{12}, -\sqrt{12}\}$ nije bilo prepoznato. `continuous_answer_state`
+# pokriva KONTINUIRANE skupove (intervale), ne konačne.
+#
+# Elementi se NE porede novim parserom: koristi se ISTI dokazani primitiv
+# (`options_are_equivalent` nad jednim elementom), pa konačan skup ne može
+# tvrditi ekvivalenciju jaču od one koju projekat već ume dokazati.
+_SET_PREFIX_RE = re.compile(
+    r"^\s*(?:([A-Za-z]\w*)\s*(?:\\in|=|\\subseteq)\s*)?", re.IGNORECASE)
+_PM_RE = re.compile(r"^\s*(?:([A-Za-z]\w*)\s*=\s*)?\\pm\s*(.+)$")
+
+
+def _split_top_level(body):
+    """Podijeli po zarezima na NULTOJ dubini vitičastih/oblih zagrada."""
+    parts, depth, current = [], 0, []
+    for char in body:
+        if char in "{([":
+            depth += 1
+        elif char in "})]":
+            depth -= 1
+        if char == "," and depth == 0:
+            parts.append("".join(current))
+            current = []
+            continue
+        current.append(char)
+    parts.append("".join(current))
+    return [part.strip() for part in parts if part.strip()]
+
+
+def finite_answer_set(text):
+    """Kanonski KONAČAN skup rješenja, ili None kad se ne može sigurno pročitati.
+
+    None znači „nepoznato“, nikad „različito“ — isti princip nesigurnosti kao
+    u ostatku modula."""
+    bare = _strip_math_delimiters(text or "")
+    if not bare.strip():
+        return None
+    prefix = _SET_PREFIX_RE.match(bare)
+    # NEPOZNATA SE NE GUBI: „x ∈ {-2,2}“ i „y ∈ {-2,2}“ su tvrdnje o RAZLIČITIM
+    # veličinama, dakle različiti odgovori — isti oprez koji već ima
+    # `_solve_sets_equivalent`.
+    variable = (prefix.group(1) if prefix else None) or None
+    body = (bare[prefix.end():] if prefix else bare).strip()
+    plus_minus = _PM_RE.match(bare)
+    if plus_minus:
+        element = (plus_minus.group(2) or "").strip()
+        if not element:
+            return None
+        return (plus_minus.group(1) or None,
+                tuple(sorted({f"+{element}", f"-{element}"})))
+    for opening, closing in ((r"\{", r"\}"), ("{", "}")):
+        if body.startswith(opening) and body.endswith(closing):
+            inner = body[len(opening):-len(closing)]
+            elements = _split_top_level(inner)
+            if len(elements) < 2:
+                return None       # jednočlan skup već pokriva continuous_answer_set
+            return (variable, tuple(elements))
+    return None
+
+
+def _finite_sets_equivalent(text_a, text_b):
+    """True SAMO kad su oba zapisa KONAČNI skupovi iste veličine i postoji
+    bijekcija u kojoj je svaki par elemenata DOKAZANO ista vrijednost."""
+    parsed_a = finite_answer_set(text_a)
+    parsed_b = finite_answer_set(text_b)
+    if parsed_a is None or parsed_b is None:
+        return False
+    variable_a, set_a = parsed_a
+    variable_b, set_b = parsed_b
+    if variable_a is not None and variable_b is not None and variable_a != variable_b:
+        return False
+    if len(set_a) != len(set_b):
+        return False
+    remaining = list(set_b)
+    for element in set_a:
+        match = None
+        for candidate in remaining:
+            if element.strip() == candidate.strip() or options_are_equivalent(
+                    element, candidate):
+                match = candidate
+                break
+        if match is None:
+            return False
+        remaining.remove(match)
+    return not remaining
+
+
 def options_are_equivalent(text_a, text_b):
     """Vrati True SAMO kad je SIGURNO DOKAZANO da dvije MC opcije predstavljaju
     istu vrijednost/izraz (numerički ili simbolički). Vraća False i kad su
@@ -437,7 +530,10 @@ def options_are_equivalent(text_a, text_b):
     # dva zapisa istog KONTINUIRANOG skupa su isti odgovor pod svakim domenom,
     # pa je test siguran i bez domena zadatka. Domen-osjetljiva jednakost
     # (x=-1 vs -2<x<0 nad Z) se ovdje NAMJERNO ne tvrdi (nema dokaza domena).
-    return _solve_sets_equivalent(bare_a, bare_b)
+    if _solve_sets_equivalent(bare_a, bare_b):
+        return True
+    # ČETVRTI test: KONAČAN skup rješenja (npr. dva korijena kvadratne).
+    return _finite_sets_equivalent(text_a, text_b)
 
 
 def find_equivalent_option_pairs(option_texts):

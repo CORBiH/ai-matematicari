@@ -34,6 +34,7 @@ from dataclasses import dataclass
 from fractions import Fraction
 
 from matbot import geometrycheck, lesson_fidelity, mcq_integrity, option_equivalence
+from matbot import solution_consistency
 from matbot import practice_policy as practice_policy_module
 from matbot import request_fidelity as request_fidelity_module
 from matbot import stem_disclosure as stem_disclosure_module
@@ -51,6 +52,7 @@ from matbot.tutor.schema import (INCOMPLETE_TASK_TEXT_CODE, UnifiedOutputError,
 MAX_ISSUES = 8
 # Dovoljno za `target Level 1; <kod validatora>; steps=… flags=…`, i dalje tvrda
 # granica. Ovo je granica DIJAGNOSTIKE, ne prag težine.
+SOLUTION_DIVERGENCE_CODE = "solution_answer_divergence"
 CONTRACT_ANSWER_FORM_CODE = "contract_answer_form_violation"
 CONTRACT_EQUIVALENCE_CODE = "contract_equivalence_violation"
 CONTRACT_SINGLE_IRREDUCIBLE_CODE = "contract_multiple_irreducible_options"
@@ -354,6 +356,19 @@ def collect_package_issues(task, contract=None, previous_signature="",
         issues.append(PackageIssue(
             "expected_answer_not_marked_option",
             option_ids=(_option_id(task, marked_index),)))
+
+    # 3a) OZNAČEN ODGOVOR MORA SLIJEDITI IZ VLASTITOG RJEŠENJA (produkcijski
+    #     nalaz, ručni QA): objavljen paket je računao „ukupno 10,50; kusur
+    #     9,50“, a označio 11,50 — učenik je izabrao tačnih 9,50 i dobio
+    #     netačno. Provjera je uska i preskače kad ne može dokazati; mjereno
+    #     nad 1056 determinističkih paketa: nijedna lažna uzbuna.
+    divergence_code, divergence_detail = solution_consistency.divergence(
+        marked_text, getattr(task, "solution", ""))
+    if divergence_code:
+        issues.append(PackageIssue(
+            divergence_code,
+            option_ids=(_option_id(task, marked_index),) if isinstance(marked_index, int) else (),
+            detail=divergence_detail))
 
     # 3b) SEMANTIČKI ZAHTJEV KOJI NASLOV LEKCIJE DETERMINISTIČKI NAMEĆE.
     # ŽIVI RELEASE GATE (commit 0883e8c, scenario `fresh_level1`): za lekciju o

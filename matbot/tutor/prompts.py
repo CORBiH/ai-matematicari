@@ -1108,6 +1108,12 @@ _REVIEWER_PREFLIGHT_RULE = """SERVER-DETECTED DRAFT ISSUES (when that block is p
   option to the bare answer — every option must stay under the server's character
   limit stated in the task rules. An option is an answer, not an explanation: move
   the reasoning into `solution`. Returning the same long option loses the turn.
+- For `solution_answer_divergence` the marked option carries a value that your own
+  `solution` never arrives at. One of the two is wrong. RE-DERIVE the arithmetic,
+  then make the marked option, `expected_answer` and the final value of `solution`
+  the SAME number. Do not "fix" this by rewriting the explanation around the old
+  marked value, and do not silently change the task so the wrong value becomes
+  right — the student is graded against the marked option.
 - For `contract_answer_form_violation` the lesson's own contract requires the marked
   answer in a specific written form (an irreducible fraction: numerator and
   denominator share no divisor greater than 1). Reduce it fully — 4/6 is not
