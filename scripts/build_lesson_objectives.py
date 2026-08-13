@@ -244,11 +244,22 @@ def build():
             scored.sort(key=lambda item: -item[0])
             primary = [text for _, text, _ in scored[:MAX_PRIMARY]]
             evidence = [item for _, _, item in scored[:MAX_PRIMARY]]
+            # ŠIROK ISHOD OBLASTI NIJE PRIMARNA VJEŠTINA LEKCIJE (živi nalaz, val 1).
+            # Lekcija „Upoređivanje decimalnih brojeva“ dobila je kao primarnu
+            # vještinu „izvoditi osnovne računske operacije s decimalnim
+            # brojevima“ — istinit ishod TE OBLASTI, ali ne ono što lekcija
+            # ispituje. Posljedica je bila dvostruka: mjerenje je proglašavalo
+            # savršeno pogođene zadatke promašajem, a prompt je istu rečenicu
+            # nudio kao OBAVEZAN cilj i time gurao generisanje s lekcije.
+            # Dokaz koji ne dodiruje nijednu razlikovnu riječ naslova ostaje
+            # dokaz VEZE, a ne dokaz VJEŠTINE — zato ide u pomoćne pojmove.
+            marks = _distinguishing_words(lesson, payload["lessons"])
+            if primary and not any(_content_overlap(text, marks) for text in primary):
+                supporting = primary + supporting
+                primary, evidence = [], []
+                stats["primary_demoted_to_supporting"] += 1
             if primary:
-                marks = _distinguishing_words(lesson, payload["lessons"])
-                strong = any(_content_overlap(text, marks) for text in primary)
-                source = "npp_exact_mapping"
-                confidence = "high" if strong else "medium"
+                source, confidence = "npp_exact_mapping", "high"
             elif exclusions:
                 source, confidence = "npp_neighbour_only", "medium"
             else:
@@ -281,8 +292,7 @@ def build():
             stats["compiled"] += 1
             if primary:
                 stats["with_primary"] += 1
-                if confidence == "high":
-                    stats["primary_high"] += 1
+
             if exclusions:
                 stats["with_exclusions"] += 1
     return compiled, stats
@@ -299,7 +309,7 @@ def main(argv=None):
     compiled, stats = build()
     print(f"lekcija s kompajliranim ishodima: {stats['compiled']}")
     print(f"  s primarnom vještinom : {stats['with_primary']}")
-    print(f"    od toga jak dokaz   : {stats['primary_high']}")
+    print(f"  širok ishod -> pomoćni : {stats['primary_demoted_to_supporting']}")
     print(f"  sa susjednim zabranama: {stats['with_exclusions']}")
     print(f"  odbačeni nepovezani `exact` redovi: {stats['dropped_unrelated_exact']}")
     print(f"  opseg iz susjednih lekcija: {stats['scope_from_siblings']}")

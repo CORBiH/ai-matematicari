@@ -114,9 +114,39 @@ def fast_single_call_lessons() -> frozenset:
     return frozenset(part.strip() for part in raw.split(",") if part.strip())
 
 
+# OPSEG BRZE RUTE — pravilo, ne spisak ID-jeva. Spisak od stotinu lekcija bio bi
+# grananje po lekciji prerušeno u podatak; ruta se zato bira po KLASI lekcije.
+# Deterministička strategija odlučuje PRIJE ove tačke, pa je sve što dovde
+# stigne po definiciji modelski podržana lekcija.
+#
+#   "lessons"      — samo izričito navedene (zatečeno ponašanje, pilot)
+#   "model_backed" — svaka lekcija koja ionako ide na model
+#   "off"          — nikad (potpuni rollback na `_two_call`)
+FAST_SINGLE_CALL_SCOPE = os.environ.get("MATBOT_FAST_SINGLE_CALL_SCOPE", "lessons")
+# Pojedinačno isključenje unutar opsega — rollback jedne lekcije bez gašenja rute.
+_FAST_EXCLUDE_RAW = os.environ.get("MATBOT_FAST_SINGLE_CALL_EXCLUDE", "")
+
+
+def fast_single_call_scope() -> str:
+    return os.environ.get("MATBOT_FAST_SINGLE_CALL_SCOPE",
+                          FAST_SINGLE_CALL_SCOPE).strip().lower()
+
+
+def fast_single_call_excluded() -> frozenset:
+    raw = os.environ.get("MATBOT_FAST_SINGLE_CALL_EXCLUDE", _FAST_EXCLUDE_RAW)
+    return frozenset(part.strip() for part in raw.split(",") if part.strip())
+
+
 def fast_single_call_enabled_for(lesson_id) -> bool:
-    """True SAMO kad je ta lekcija izričito navedena u konfiguraciji."""
-    return bool(lesson_id) and lesson_id in fast_single_call_lessons()
+    """Da li ova modelski podržana lekcija ide brzom rutom."""
+    if not lesson_id:
+        return False
+    scope = fast_single_call_scope()
+    if scope == "off" or lesson_id in fast_single_call_excluded():
+        return False
+    if scope == "model_backed":
+        return True
+    return lesson_id in fast_single_call_lessons()
 AI_TIMEOUT_S = _float_env("AI_TUTOR_TIMEOUT", 30.0)
 
 # Faza 4H (Workstream L): rok CIJELOG Practice turna. Podrazumijevano tačno

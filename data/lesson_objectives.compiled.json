@@ -39,16 +39,19 @@
   },
   "6-01-003": {
    "grade": 6,
-   "primary_skills": [
+   "primary_skills": [],
+   "supporting_concepts": [
     "koristi skupove i skupovne operacije u primjerima iz svakodnevnog života, uz grafičku ilustraciju"
    ],
-   "supporting_concepts": [],
-   "neighbour_exclusions": [],
-   "evidence_ids": [
-    "KS_2018-0012"
+   "neighbour_exclusions": [
+    "Pojam skupa, elementi skupa i označavanje",
+    "Načini zadavanja skupa",
+    "Podskup i jednakost skupova",
+    "Euler-Vennov/Vennov dijagram"
    ],
-   "objective_source": "npp_exact_mapping",
-   "objective_confidence": "medium"
+   "evidence_ids": [],
+   "objective_source": "canonical_lesson_scope",
+   "objective_confidence": "low"
   },
   "6-01-004": {
    "grade": 6,
@@ -97,33 +100,37 @@
   },
   "6-01-007": {
    "grade": 6,
-   "primary_skills": [
+   "primary_skills": [],
+   "supporting_concepts": [
     "koristi skupove i skupovne operacije u primjerima iz svakodnevnog života, uz grafičku ilustraciju"
    ],
-   "supporting_concepts": [],
-   "neighbour_exclusions": [],
-   "evidence_ids": [
-    "KS_2018-0012"
+   "neighbour_exclusions": [
+    "Pojam skupa, elementi skupa i označavanje",
+    "Načini zadavanja skupa",
+    "Brojnost skupa i prazan skup",
+    "Podskup i jednakost skupova"
    ],
-   "objective_source": "npp_exact_mapping",
-   "objective_confidence": "medium"
+   "evidence_ids": [],
+   "objective_source": "canonical_lesson_scope",
+   "objective_confidence": "low"
   },
   "6-01-008": {
    "grade": 6,
-   "primary_skills": [
+   "primary_skills": [],
+   "supporting_concepts": [
     "izvoditi skupovne operacije",
     "zadavati i zapisivati skupove na različite načine",
     "razlikovati jednakobrojne i jednake skupove"
    ],
-   "supporting_concepts": [],
-   "neighbour_exclusions": [],
-   "evidence_ids": [
-    "KS_2018-0011",
-    "KS_2018-0005",
-    "KS_2018-0008"
+   "neighbour_exclusions": [
+    "Pojam skupa, elementi skupa i označavanje",
+    "Načini zadavanja skupa",
+    "Brojnost skupa i prazan skup",
+    "Podskup i jednakost skupova"
    ],
-   "objective_source": "npp_exact_mapping",
-   "objective_confidence": "medium"
+   "evidence_ids": [],
+   "objective_source": "canonical_lesson_scope",
+   "objective_confidence": "low"
   },
   "6-01-009": {
    "grade": 6,
@@ -158,16 +165,19 @@
   },
   "6-01-011": {
    "grade": 6,
-   "primary_skills": [
+   "primary_skills": [],
+   "supporting_concepts": [
     "koristi skupove i skupovne operacije u primjerima iz svakodnevnog života, uz grafičku ilustraciju"
    ],
-   "supporting_concepts": [],
-   "neighbour_exclusions": [],
-   "evidence_ids": [
-    "KS_2018-0012"
+   "neighbour_exclusions": [
+    "Pojam skupa, elementi skupa i označavanje",
+    "Načini zadavanja skupa",
+    "Brojnost skupa i prazan skup",
+    "Podskup i jednakost skupova"
    ],
-   "objective_source": "npp_exact_mapping",
-   "objective_confidence": "medium"
+   "evidence_ids": [],
+   "objective_source": "canonical_lesson_scope",
+   "objective_confidence": "low"
   },
   "6-01-012": {
    "grade": 6,
@@ -771,39 +781,39 @@
   },
   "6-05-006": {
    "grade": 6,
-   "primary_skills": [
-    "izvoditi osnovne računske operacije s decimalnim brojevima"
-   ],
+   "primary_skills": [],
    "supporting_concepts": [
+    "izvoditi osnovne računske operacije s decimalnim brojevima",
     "prevoditi decimalni broj u oblik",
-    "poredati po veličini date decimalne brojeve",
-    "Računske operacije s decimalnim brojevima treba uraditi tako da učenici razumiju zašto se one obavljaju baš na taj način, ali ne treba insistirati na zamornom računu"
+    "poredati po veličini date decimalne brojeve"
    ],
-   "neighbour_exclusions": [],
-   "evidence_ids": [
-    "KS_2018-0069"
+   "neighbour_exclusions": [
+    "Decimalni zapis razlomka",
+    "Decimalni broj: cijeli dio, decimalni dio i decimalna mjesta",
+    "Pretvaranje razlomka u decimalni broj i obratno",
+    "Konačni i beskonačni/periodični decimalni brojevi"
    ],
-   "objective_source": "npp_exact_mapping",
-   "objective_confidence": "medium"
+   "evidence_ids": [],
+   "objective_source": "canonical_lesson_scope",
+   "objective_confidence": "low"
   },
   "6-05-007": {
    "grade": 6,
-   "primary_skills": [
-    "zaokružiti decimalni broj na zadati broj decimala",
-    "izvoditi osnovne računske operacije s decimalnim brojevima"
-   ],
+   "primary_skills": [],
    "supporting_concepts": [
-    "prevoditi decimalni broj u oblik",
-    "poredati po veličini date decimalne brojeve",
-    "Računske operacije s decimalnim brojevima treba uraditi tako da učenici razumiju zašto se one obavljaju baš na taj način, ali ne treba insistirati na zamornom računu"
+    "zaokružiti decimalni broj na zadati broj decimala",
+    "izvoditi osnovne računske operacije s decimalnim brojevima",
+    "prevoditi decimalni broj u oblik"
    ],
-   "neighbour_exclusions": [],
-   "evidence_ids": [
-    "KS_2018-0067",
-    "KS_2018-0069"
+   "neighbour_exclusions": [
+    "Decimalni zapis razlomka",
+    "Decimalni broj: cijeli dio, decimalni dio i decimalna mjesta",
+    "Pretvaranje razlomka u decimalni broj i obratno",
+    "Konačni i beskonačni/periodični decimalni brojevi"
    ],
-   "objective_source": "npp_exact_mapping",
-   "objective_confidence": "medium"
+   "evidence_ids": [],
+   "objective_source": "canonical_lesson_scope",
+   "objective_confidence": "low"
   },
   "6-05-008": {
    "grade": 6,
@@ -821,39 +831,39 @@
   },
   "6-05-009": {
    "grade": 6,
-   "primary_skills": [
-    "izvoditi osnovne računske operacije s decimalnim brojevima",
-    "decimalne brojeve množiti i dijeliti dekadskim jedinicama"
-   ],
+   "primary_skills": [],
    "supporting_concepts": [
-    "prevoditi decimalni broj u oblik",
-    "poredati po veličini date decimalne brojeve",
-    "Računske operacije s decimalnim brojevima treba uraditi tako da učenici razumiju zašto se one obavljaju baš na taj način, ali ne treba insistirati na zamornom računu"
+    "izvoditi osnovne računske operacije s decimalnim brojevima",
+    "decimalne brojeve množiti i dijeliti dekadskim jedinicama",
+    "prevoditi decimalni broj u oblik"
    ],
-   "neighbour_exclusions": [],
-   "evidence_ids": [
-    "KS_2018-0069",
-    "KS_2018-0070"
+   "neighbour_exclusions": [
+    "Decimalni zapis razlomka",
+    "Decimalni broj: cijeli dio, decimalni dio i decimalna mjesta",
+    "Pretvaranje razlomka u decimalni broj i obratno",
+    "Konačni i beskonačni/periodični decimalni brojevi"
    ],
-   "objective_source": "npp_exact_mapping",
-   "objective_confidence": "medium"
+   "evidence_ids": [],
+   "objective_source": "canonical_lesson_scope",
+   "objective_confidence": "low"
   },
   "6-05-010": {
    "grade": 6,
-   "primary_skills": [
+   "primary_skills": [],
+   "supporting_concepts": [
     "decimalne brojeve množiti i dijeliti dekadskim jedinicama",
     "dijeliti dva prirodna broja (rezultat može biti decimalni broj) i vršiti provjeru",
     "dijeliti dva decimalna broja i vršiti provjeru"
    ],
-   "supporting_concepts": [],
-   "neighbour_exclusions": [],
-   "evidence_ids": [
-    "KS_2018-0070",
-    "KS_2018-0071",
-    "KS_2018-0072"
+   "neighbour_exclusions": [
+    "Decimalni zapis razlomka",
+    "Decimalni broj: cijeli dio, decimalni dio i decimalna mjesta",
+    "Pretvaranje razlomka u decimalni broj i obratno",
+    "Konačni i beskonačni/periodični decimalni brojevi"
    ],
-   "objective_source": "npp_exact_mapping",
-   "objective_confidence": "medium"
+   "evidence_ids": [],
+   "objective_source": "canonical_lesson_scope",
+   "objective_confidence": "low"
   },
   "6-05-011": {
    "grade": 6,
@@ -945,18 +955,20 @@
   },
   "6-07-002": {
    "grade": 6,
-   "primary_skills": [
-    "rješavati jednačine i nejednačine u skupu"
-   ],
+   "primary_skills": [],
    "supporting_concepts": [
+    "rješavati jednačine i nejednačine u skupu",
     "rješavati jednostavne tipove jednačina: a+x=b, x-a=b, a-x=b,ax=b, a:x=b i x:a=b"
    ],
-   "neighbour_exclusions": [],
-   "evidence_ids": [
-    "KS_2018-0075"
+   "neighbour_exclusions": [
+    "Jednakost, jednačina, nejednakost i nejednačina",
+    "Nejednačine s razlomcima oblika x ± a < b / > b i a ± x < b / > b",
+    "Jednačine s množenjem i dijeljenjem razlomaka",
+    "Nejednačine s množenjem i dijeljenjem razlomaka"
    ],
-   "objective_source": "npp_exact_mapping",
-   "objective_confidence": "medium"
+   "evidence_ids": [],
+   "objective_source": "canonical_lesson_scope",
+   "objective_confidence": "low"
   },
   "6-07-003": {
    "grade": 6,
@@ -1001,16 +1013,19 @@
   },
   "6-07-006": {
    "grade": 6,
-   "primary_skills": [
+   "primary_skills": [],
+   "supporting_concepts": [
     "rješavati jednačine i nejednačine u skupu"
    ],
-   "supporting_concepts": [],
-   "neighbour_exclusions": [],
-   "evidence_ids": [
-    "KS_2018-0075"
+   "neighbour_exclusions": [
+    "Jednakost, jednačina, nejednakost i nejednačina",
+    "Jednačine s razlomcima oblika x ± a = b i a ± x = b",
+    "Nejednačine s razlomcima oblika x ± a < b / > b i a ± x < b / > b",
+    "Jednačine s množenjem i dijeljenjem razlomaka"
    ],
-   "objective_source": "npp_exact_mapping",
-   "objective_confidence": "medium"
+   "evidence_ids": [],
+   "objective_source": "canonical_lesson_scope",
+   "objective_confidence": "low"
   },
   "6-07-007": {
    "grade": 6,
@@ -1208,16 +1223,19 @@
   },
   "6-09-002": {
    "grade": 6,
-   "primary_skills": [
+   "primary_skills": [],
+   "supporting_concepts": [
     "svojstva komplementnih i suplementnih uglova"
    ],
-   "supporting_concepts": [],
-   "neighbour_exclusions": [],
-   "evidence_ids": [
-    "KS_2018-0033"
+   "neighbour_exclusions": [
+    "Pojam ugla, elementi i označavanje",
+    "Vrste uglova: nula, oštri, pravi, tupi, opruženi i puni ugao",
+    "Centralni/središnji ugao",
+    "Periferijski/obodni ugao i odnos sa centralnim uglom"
    ],
-   "objective_source": "npp_exact_mapping",
-   "objective_confidence": "medium"
+   "evidence_ids": [],
+   "objective_source": "canonical_lesson_scope",
+   "objective_confidence": "low"
   },
   "6-09-003": {
    "grade": 6,
@@ -1554,16 +1572,16 @@
   },
   "6-11-002": {
    "grade": 6,
-   "primary_skills": [
+   "primary_skills": [],
+   "supporting_concepts": [
     "Da znaju šta je vektor i operacije sa vektorima (sabiranje, oduzimanje i množenje vektora brojem)"
    ],
-   "supporting_concepts": [],
-   "neighbour_exclusions": [],
-   "evidence_ids": [
-    "RS_2014-0030"
+   "neighbour_exclusions": [
+    "Vektor kao orijentisana duž"
    ],
-   "objective_source": "npp_exact_mapping",
-   "objective_confidence": "medium"
+   "evidence_ids": [],
+   "objective_source": "canonical_lesson_scope",
+   "objective_confidence": "low"
   },
   "6-12-001": {
    "grade": 6,
@@ -1778,87 +1796,101 @@
   },
   "7-01-001": {
    "grade": 7,
-   "primary_skills": [
+   "primary_skills": [],
+   "supporting_concepts": [
     "stečeno znanje o vektorima i izometrijskim preslikavanjima, koristiti za rješavanje zadataka iz geometrije i fizike"
    ],
-   "supporting_concepts": [],
-   "neighbour_exclusions": [],
-   "evidence_ids": [
-    "KS_2018-0095"
+   "neighbour_exclusions": [
+    "Pravac, smjer i intenzitet (dužina) vektora",
+    "Nula-vektor",
+    "Jednaki vektori",
+    "Suprotni vektori"
    ],
-   "objective_source": "npp_exact_mapping",
-   "objective_confidence": "medium"
+   "evidence_ids": [],
+   "objective_source": "canonical_lesson_scope",
+   "objective_confidence": "low"
   },
   "7-01-002": {
    "grade": 7,
-   "primary_skills": [
+   "primary_skills": [],
+   "supporting_concepts": [
     "stečeno znanje o vektorima i izometrijskim preslikavanjima, koristiti za rješavanje zadataka iz geometrije i fizike"
    ],
-   "supporting_concepts": [],
-   "neighbour_exclusions": [],
-   "evidence_ids": [
-    "KS_2018-0095"
+   "neighbour_exclusions": [
+    "Usmjerena duž i pojam vektora",
+    "Nula-vektor",
+    "Jednaki vektori",
+    "Suprotni vektori"
    ],
-   "objective_source": "npp_exact_mapping",
-   "objective_confidence": "medium"
+   "evidence_ids": [],
+   "objective_source": "canonical_lesson_scope",
+   "objective_confidence": "low"
   },
   "7-01-003": {
    "grade": 7,
-   "primary_skills": [
+   "primary_skills": [],
+   "supporting_concepts": [
     "stečeno znanje o vektorima i izometrijskim preslikavanjima, koristiti za rješavanje zadataka iz geometrije i fizike"
    ],
-   "supporting_concepts": [],
-   "neighbour_exclusions": [],
-   "evidence_ids": [
-    "KS_2018-0095"
+   "neighbour_exclusions": [
+    "Usmjerena duž i pojam vektora",
+    "Pravac, smjer i intenzitet (dužina) vektora",
+    "Jednaki vektori",
+    "Suprotni vektori"
    ],
-   "objective_source": "npp_exact_mapping",
-   "objective_confidence": "medium"
+   "evidence_ids": [],
+   "objective_source": "canonical_lesson_scope",
+   "objective_confidence": "low"
   },
   "7-01-004": {
    "grade": 7,
-   "primary_skills": [
+   "primary_skills": [],
+   "supporting_concepts": [
     "definisati vektor",
     "primjenjivati svojstva operacija s vektorima",
-    "uočavati konkretne primjene vektora",
-    "rješavati jednostavne zadatke s vektorima"
+    "uočavati konkretne primjene vektora"
    ],
-   "supporting_concepts": [],
-   "neighbour_exclusions": [],
-   "evidence_ids": [
-    "KS_2018-0083",
-    "KS_2018-0086",
-    "KS_2018-0087",
-    "KS_2018-0088"
+   "neighbour_exclusions": [
+    "Usmjerena duž i pojam vektora",
+    "Pravac, smjer i intenzitet (dužina) vektora",
+    "Nula-vektor",
+    "Suprotni vektori"
    ],
-   "objective_source": "npp_exact_mapping",
-   "objective_confidence": "medium"
+   "evidence_ids": [],
+   "objective_source": "canonical_lesson_scope",
+   "objective_confidence": "low"
   },
   "7-01-005": {
    "grade": 7,
-   "primary_skills": [
+   "primary_skills": [],
+   "supporting_concepts": [
     "stečeno znanje o vektorima i izometrijskim preslikavanjima, koristiti za rješavanje zadataka iz geometrije i fizike"
    ],
-   "supporting_concepts": [],
-   "neighbour_exclusions": [],
-   "evidence_ids": [
-    "KS_2018-0095"
+   "neighbour_exclusions": [
+    "Usmjerena duž i pojam vektora",
+    "Pravac, smjer i intenzitet (dužina) vektora",
+    "Nula-vektor",
+    "Jednaki vektori"
    ],
-   "objective_source": "npp_exact_mapping",
-   "objective_confidence": "medium"
+   "evidence_ids": [],
+   "objective_source": "canonical_lesson_scope",
+   "objective_confidence": "low"
   },
   "7-01-006": {
    "grade": 7,
-   "primary_skills": [
+   "primary_skills": [],
+   "supporting_concepts": [
     "stečeno znanje o vektorima i izometrijskim preslikavanjima, koristiti za rješavanje zadataka iz geometrije i fizike"
    ],
-   "supporting_concepts": [],
-   "neighbour_exclusions": [],
-   "evidence_ids": [
-    "KS_2018-0095"
+   "neighbour_exclusions": [
+    "Usmjerena duž i pojam vektora",
+    "Pravac, smjer i intenzitet (dužina) vektora",
+    "Nula-vektor",
+    "Jednaki vektori"
    ],
-   "objective_source": "npp_exact_mapping",
-   "objective_confidence": "medium"
+   "evidence_ids": [],
+   "objective_source": "canonical_lesson_scope",
+   "objective_confidence": "low"
   },
   "7-01-007": {
    "grade": 7,
@@ -1957,16 +1989,19 @@
   },
   "7-01-014": {
    "grade": 7,
-   "primary_skills": [
+   "primary_skills": [],
+   "supporting_concepts": [
     "stečeno znanje o vektorima i izometrijskim preslikavanjima, koristiti za rješavanje zadataka iz geometrije i fizike"
    ],
-   "supporting_concepts": [],
-   "neighbour_exclusions": [],
-   "evidence_ids": [
-    "KS_2018-0095"
+   "neighbour_exclusions": [
+    "Usmjerena duž i pojam vektora",
+    "Pravac, smjer i intenzitet (dužina) vektora",
+    "Nula-vektor",
+    "Jednaki vektori"
    ],
-   "objective_source": "npp_exact_mapping",
-   "objective_confidence": "medium"
+   "evidence_ids": [],
+   "objective_source": "canonical_lesson_scope",
+   "objective_confidence": "low"
   },
   "7-01-015": {
    "grade": 7,
@@ -2106,22 +2141,21 @@
   },
   "7-02-004": {
    "grade": 7,
-   "primary_skills": [
+   "primary_skills": [],
+   "supporting_concepts": [
     "razlikovati pozitivne i negativne cijele brojeve i prepoznati ih u primjerima iz svakodnevnog života",
     "uspješno rješavati jednačine i nejednačine datih oblika u skupu cijelih brojeva",
     "Da znaju izvoditi računske operacije sa cijelim brojevima"
    ],
-   "supporting_concepts": [
-    "predznaci pozitivnih i negativnih brojeva"
+   "neighbour_exclusions": [
+    "Potreba za negativnim cijelim brojevima",
+    "Skup cijelih brojeva Z",
+    "Prikaz na brojevnoj pravoj",
+    "Apsolutna vrijednost cijelog broja"
    ],
-   "neighbour_exclusions": [],
-   "evidence_ids": [
-    "KS_2018-0096",
-    "KS_2018-0108",
-    "RS_2014-0042"
-   ],
-   "objective_source": "npp_exact_mapping",
-   "objective_confidence": "medium"
+   "evidence_ids": [],
+   "objective_source": "canonical_lesson_scope",
+   "objective_confidence": "low"
   },
   "7-02-005": {
    "grade": 7,
@@ -2232,16 +2266,19 @@
   },
   "7-02-012": {
    "grade": 7,
-   "primary_skills": [
+   "primary_skills": [],
+   "supporting_concepts": [
     "dijeliti cijele brojeve"
    ],
-   "supporting_concepts": [],
-   "neighbour_exclusions": [],
-   "evidence_ids": [
-    "KS_2018-0106"
+   "neighbour_exclusions": [
+    "Potreba za negativnim cijelim brojevima",
+    "Skup cijelih brojeva Z",
+    "Prikaz na brojevnoj pravoj",
+    "Suprotni cijeli brojevi"
    ],
-   "objective_source": "npp_exact_mapping",
-   "objective_confidence": "medium"
+   "evidence_ids": [],
+   "objective_source": "canonical_lesson_scope",
+   "objective_confidence": "low"
   },
   "7-02-013": {
    "grade": 7,
@@ -2548,16 +2585,19 @@
   },
   "7-03-012": {
    "grade": 7,
-   "primary_skills": [
+   "primary_skills": [],
+   "supporting_concepts": [
     "dijeliti racionalne brojeve"
    ],
-   "supporting_concepts": [],
-   "neighbour_exclusions": [],
-   "evidence_ids": [
-    "KS_2018-0121"
+   "neighbour_exclusions": [
+    "Skup racionalnih brojeva Q",
+    "Pozitivni, negativni racionalni brojevi i nula",
+    "Prikaz racionalnih brojeva na brojevnoj pravoj",
+    "Suprotan racionalni broj"
    ],
-   "objective_source": "npp_exact_mapping",
-   "objective_confidence": "medium"
+   "evidence_ids": [],
+   "objective_source": "canonical_lesson_scope",
+   "objective_confidence": "low"
   },
   "7-03-013": {
    "grade": 7,
@@ -2781,16 +2821,19 @@
   },
   "7-04-007": {
    "grade": 7,
-   "primary_skills": [
+   "primary_skills": [],
+   "supporting_concepts": [
     "razlikovati trouglove prema stranicama i prema uglovima"
    ],
-   "supporting_concepts": [],
-   "neighbour_exclusions": [],
-   "evidence_ids": [
-    "KS_2018-0129"
+   "neighbour_exclusions": [
+    "Uglovi sa paralelnim kracima",
+    "Uglovi sa normalnim kracima",
+    "Konstrukcije uglova 60°, 30°, 90° i 45°",
+    "Konstrukcije izvedenih uglova 15°, 75°, 105°, 120° i 135°"
    ],
-   "objective_source": "npp_exact_mapping",
-   "objective_confidence": "medium"
+   "evidence_ids": [],
+   "objective_source": "canonical_lesson_scope",
+   "objective_confidence": "low"
   },
   "7-04-008": {
    "grade": 7,
@@ -3964,22 +4007,21 @@
   },
   "8-02-005": {
    "grade": 8,
-   "primary_skills": [
+   "primary_skills": [],
+   "supporting_concepts": [
     "ispitivati da li tačka s datim koordinatama leži na pravoj zadatoj linearnom funkcijom",
     "izražavati linearnu funkciju riječima i simbolima",
-    "ispitivati svojstva linearne funkcije",
-    "zaključivati kad je linearna funkcija rastuća, a kad opadajuća"
+    "ispitivati svojstva linearne funkcije"
    ],
-   "supporting_concepts": [],
-   "neighbour_exclusions": [],
-   "evidence_ids": [
-    "KS_2018-0347",
-    "KS_2018-0339",
-    "KS_2018-0343",
-    "KS_2018-0348"
+   "neighbour_exclusions": [
+    "Pravougli koordinatni sistem, ose i kvadranti",
+    "Koordinate tačke i uređeni par",
+    "Crtanje i očitavanje tačaka",
+    "Udaljenost između dvije tačke"
    ],
-   "objective_source": "npp_exact_mapping",
-   "objective_confidence": "medium"
+   "evidence_ids": [],
+   "objective_source": "canonical_lesson_scope",
+   "objective_confidence": "low"
   },
   "8-02-006": {
    "grade": 8,
@@ -5337,20 +5379,21 @@
   },
   "8-08-001": {
    "grade": 8,
-   "primary_skills": [
-    "odabrati metode rješavanja problemskih situacija povezanih sa izračunavanjem obima i površine mnogouglova Mnogougaona linija Mnogougao, poligon Konveksni i nekonveksni mnogougao Tjemena,…",
-    "prepoznavati pravilne mnogouglove"
-   ],
+   "primary_skills": [],
    "supporting_concepts": [
+    "odabrati metode rješavanja problemskih situacija povezanih sa izračunavanjem obima i površine mnogouglova Mnogougaona linija Mnogougao, poligon Konveksni i nekonveksni mnogougao Tjemena,…",
+    "prepoznavati pravilne mnogouglove",
     "Insistirati na tačnoj konstrukciji pravilnih mnogouglova sa 6, 8 i 12 stranica"
    ],
-   "neighbour_exclusions": [],
-   "evidence_ids": [
-    "KS_2018-0300",
-    "KS_2018-0296"
+   "neighbour_exclusions": [
+    "Zbir unutrašnjih uglova mnogougla",
+    "Zbir vanjskih uglova konveksnog mnogougla",
+    "Broj dijagonala mnogougla",
+    "Pravilni mnogougao"
    ],
-   "objective_source": "npp_exact_mapping",
-   "objective_confidence": "medium"
+   "evidence_ids": [],
+   "objective_source": "canonical_lesson_scope",
+   "objective_confidence": "low"
   },
   "8-08-002": {
    "grade": 8,
@@ -5621,18 +5664,20 @@
   },
   "9-01-003": {
    "grade": 9,
-   "primary_skills": [
+   "primary_skills": [],
+   "supporting_concepts": [
     "definisati razlomljeni racionalni izraz (algebarski razlomak)",
     "određivati oblast definisanosti algebarskog razlomka"
    ],
-   "supporting_concepts": [],
-   "neighbour_exclusions": [],
-   "evidence_ids": [
-    "KS_2018-0316",
-    "KS_2018-0318"
+   "neighbour_exclusions": [
+    "Algebarski izraz: konstante, promjenljive i članovi",
+    "Algebarski razlomak i uslov definiranosti",
+    "Proširivanje algebarskog razlomka",
+    "Skraćivanje algebarskog razlomka faktorizacijom"
    ],
-   "objective_source": "npp_exact_mapping",
-   "objective_confidence": "medium"
+   "evidence_ids": [],
+   "objective_source": "canonical_lesson_scope",
+   "objective_confidence": "low"
   },
   "9-01-004": {
    "grade": 9,
@@ -5664,18 +5709,20 @@
   },
   "9-01-006": {
    "grade": 9,
-   "primary_skills": [
+   "primary_skills": [],
+   "supporting_concepts": [
     "definisati razlomljeni racionalni izraz (algebarski razlomak)",
     "određivati oblast definisanosti algebarskog razlomka"
    ],
-   "supporting_concepts": [],
-   "neighbour_exclusions": [],
-   "evidence_ids": [
-    "KS_2018-0316",
-    "KS_2018-0318"
+   "neighbour_exclusions": [
+    "Algebarski izraz: konstante, promjenljive i članovi",
+    "Algebarski razlomak i uslov definiranosti",
+    "Brojna vrijednost algebarskog razlomka",
+    "Proširivanje algebarskog razlomka"
    ],
-   "objective_source": "npp_exact_mapping",
-   "objective_confidence": "medium"
+   "evidence_ids": [],
+   "objective_source": "canonical_lesson_scope",
+   "objective_confidence": "low"
   },
   "9-01-007": {
    "grade": 9,
@@ -6091,35 +6138,37 @@
   },
   "9-03-001": {
    "grade": 9,
-   "primary_skills": [
+   "primary_skills": [],
+   "supporting_concepts": [
     "određivati domenu funkcije"
    ],
-   "supporting_concepts": [],
-   "neighbour_exclusions": [],
-   "evidence_ids": [
-    "KS_2018-0340"
+   "neighbour_exclusions": [
+    "Linearna funkcija y = kx + n",
+    "Grafik linearne funkcije",
+    "Značenje koeficijenta k",
+    "Značenje slobodnog člana n"
    ],
-   "objective_source": "npp_exact_mapping",
-   "objective_confidence": "medium"
+   "evidence_ids": [],
+   "objective_source": "canonical_lesson_scope",
+   "objective_confidence": "low"
   },
   "9-03-002": {
    "grade": 9,
-   "primary_skills": [
+   "primary_skills": [],
+   "supporting_concepts": [
     "izražavati linearnu funkciju riječima i simbolima",
     "ispitivati svojstva linearne funkcije",
-    "ispitivati da li tačka s datim koordinatama leži na pravoj zadatoj linearnom funkcijom",
-    "zaključivati kad je linearna funkcija rastuća, a kad opadajuća"
+    "ispitivati da li tačka s datim koordinatama leži na pravoj zadatoj linearnom funkcijom"
    ],
-   "supporting_concepts": [],
-   "neighbour_exclusions": [],
-   "evidence_ids": [
-    "KS_2018-0339",
-    "KS_2018-0343",
-    "KS_2018-0347",
-    "KS_2018-0348"
+   "neighbour_exclusions": [
+    "Funkcija i vrijednost funkcije",
+    "Značenje koeficijenta k",
+    "Značenje slobodnog člana n",
+    "Presjeci grafika sa koordinatnim osama"
    ],
-   "objective_source": "npp_exact_mapping",
-   "objective_confidence": "medium"
+   "evidence_ids": [],
+   "objective_source": "canonical_lesson_scope",
+   "objective_confidence": "low"
   },
   "9-03-003": {
    "grade": 9,
@@ -6183,20 +6232,21 @@
   },
   "9-03-007": {
    "grade": 9,
-   "primary_skills": [
+   "primary_skills": [],
+   "supporting_concepts": [
     "ispitivati svojstva linearne funkcije",
     "odrediti nulu razlomljene racionalne funkcije",
     "odrediti nule funkcije y=kx+n"
    ],
-   "supporting_concepts": [],
-   "neighbour_exclusions": [],
-   "evidence_ids": [
-    "KS_2018-0343",
-    "KS_2018-0320",
-    "KS_2018-0345"
+   "neighbour_exclusions": [
+    "Funkcija i vrijednost funkcije",
+    "Tabela vrijednosti linearne funkcije",
+    "Grafik linearne funkcije",
+    "Značenje koeficijenta k"
    ],
-   "objective_source": "npp_exact_mapping",
-   "objective_confidence": "medium"
+   "evidence_ids": [],
+   "objective_source": "canonical_lesson_scope",
+   "objective_confidence": "low"
   },
   "9-03-008": {
    "grade": 9,
@@ -6213,16 +6263,19 @@
   },
   "9-03-009": {
    "grade": 9,
-   "primary_skills": [
+   "primary_skills": [],
+   "supporting_concepts": [
     "ispitivati svojstva linearne funkcije"
    ],
-   "supporting_concepts": [],
-   "neighbour_exclusions": [],
-   "evidence_ids": [
-    "KS_2018-0343"
+   "neighbour_exclusions": [
+    "Funkcija i vrijednost funkcije",
+    "Tabela vrijednosti linearne funkcije",
+    "Grafik linearne funkcije",
+    "Značenje koeficijenta k"
    ],
-   "objective_source": "npp_exact_mapping",
-   "objective_confidence": "medium"
+   "evidence_ids": [],
+   "objective_source": "canonical_lesson_scope",
+   "objective_confidence": "low"
   },
   "9-03-010": {
    "grade": 9,
@@ -6239,18 +6292,20 @@
   },
   "9-03-011": {
    "grade": 9,
-   "primary_skills": [
-    "iz zadanih svojstava , elemenata ili grafa odrediti funkciju"
-   ],
+   "primary_skills": [],
    "supporting_concepts": [
+    "iz zadanih svojstava , elemenata ili grafa odrediti funkciju",
     "objašnjavati da je ravan jednoznačno određena sa tri tačke koje ne pripadaju istoj pravoj"
    ],
-   "neighbour_exclusions": [],
-   "evidence_ids": [
-    "KS_2018-0344"
+   "neighbour_exclusions": [
+    "Funkcija i vrijednost funkcije",
+    "Linearna funkcija y = kx + n",
+    "Tabela vrijednosti linearne funkcije",
+    "Grafik linearne funkcije"
    ],
-   "objective_source": "npp_exact_mapping",
-   "objective_confidence": "medium"
+   "evidence_ids": [],
+   "objective_source": "canonical_lesson_scope",
+   "objective_confidence": "low"
   },
   "9-03-012": {
    "grade": 9,
@@ -6339,16 +6394,19 @@
   },
   "9-03-018": {
    "grade": 9,
-   "primary_skills": [
+   "primary_skills": [],
+   "supporting_concepts": [
     "ispitivati svojstva linearne funkcije"
    ],
-   "supporting_concepts": [],
-   "neighbour_exclusions": [],
-   "evidence_ids": [
-    "KS_2018-0343"
+   "neighbour_exclusions": [
+    "Funkcija i vrijednost funkcije",
+    "Tabela vrijednosti linearne funkcije",
+    "Grafik linearne funkcije",
+    "Značenje koeficijenta k"
    ],
-   "objective_source": "npp_exact_mapping",
-   "objective_confidence": "medium"
+   "evidence_ids": [],
+   "objective_source": "canonical_lesson_scope",
+   "objective_confidence": "low"
   },
   "9-03-019": {
    "grade": 9,
@@ -6736,16 +6794,19 @@
   },
   "9-05-001": {
    "grade": 9,
-   "primary_skills": [
+   "primary_skills": [],
+   "supporting_concepts": [
     "provjeravati tačnost dobijenih rješenja i diskutovati o njima u kontekstu problema"
    ],
-   "supporting_concepts": [],
-   "neighbour_exclusions": [],
-   "evidence_ids": [
-    "KS_2018-0365"
+   "neighbour_exclusions": [
+    "Grafički prikaz linearne jednačine sa dvije nepoznate",
+    "Pojam sistema dvije linearne jednačine",
+    "Provjera uređenog para u sistemu",
+    "Ekvivalentni sistemi"
    ],
-   "objective_source": "npp_exact_mapping",
-   "objective_confidence": "medium"
+   "evidence_ids": [],
+   "objective_source": "canonical_lesson_scope",
+   "objective_confidence": "low"
   },
   "9-05-002": {
    "grade": 9,
@@ -6899,16 +6960,19 @@
   },
   "9-05-012": {
    "grade": 9,
-   "primary_skills": [
+   "primary_skills": [],
+   "supporting_concepts": [
     "provjeravati tačnost dobijenih rješenja i diskutovati o njima u kontekstu problema"
    ],
-   "supporting_concepts": [],
-   "neighbour_exclusions": [],
-   "evidence_ids": [
-    "KS_2018-0365"
+   "neighbour_exclusions": [
+    "Linearna jednačina sa dvije nepoznate i njena rješenja",
+    "Grafički prikaz linearne jednačine sa dvije nepoznate",
+    "Pojam sistema dvije linearne jednačine",
+    "Provjera uređenog para u sistemu"
    ],
-   "objective_source": "npp_exact_mapping",
-   "objective_confidence": "medium"
+   "evidence_ids": [],
+   "objective_source": "canonical_lesson_scope",
+   "objective_confidence": "low"
   },
   "9-05-013": {
    "grade": 9,
@@ -6926,18 +6990,20 @@
   },
   "9-05-014": {
    "grade": 9,
-   "primary_skills": [
-    "tumačiti kad je sistem proturječan, odnosno neodređen"
-   ],
+   "primary_skills": [],
    "supporting_concepts": [
+    "tumačiti kad je sistem proturječan, odnosno neodređen",
     "tumačiti suštinu grafičke metode da se obje jednačine sistema prikažu kao prave u koordinatnom sistemu, kao i nedostatak ove metode"
    ],
-   "neighbour_exclusions": [],
-   "evidence_ids": [
-    "KS_2018-0369"
+   "neighbour_exclusions": [
+    "Linearna jednačina sa dvije nepoznate i njena rješenja",
+    "Grafički prikaz linearne jednačine sa dvije nepoznate",
+    "Pojam sistema dvije linearne jednačine",
+    "Provjera uređenog para u sistemu"
    ],
-   "objective_source": "npp_exact_mapping",
-   "objective_confidence": "medium"
+   "evidence_ids": [],
+   "objective_source": "canonical_lesson_scope",
+   "objective_confidence": "low"
   },
   "9-05-015": {
    "grade": 9,
@@ -7611,16 +7677,19 @@
   },
   "9-07-026": {
    "grade": 9,
-   "primary_skills": [
+   "primary_skills": [],
+   "supporting_concepts": [
     "kombinovati svojstva geometrijskih tijela za rješavanje problemskih zadataka"
    ],
-   "supporting_concepts": [],
-   "neighbour_exclusions": [],
-   "evidence_ids": [
-    "KS_2018-0402"
+   "neighbour_exclusions": [
+    "Pojam poliedra i njegovi elementi",
+    "Prizma i njeni elementi",
+    "Mreža prizme",
+    "Površina uspravne prizme"
    ],
-   "objective_source": "npp_exact_mapping",
-   "objective_confidence": "medium"
+   "evidence_ids": [],
+   "objective_source": "canonical_lesson_scope",
+   "objective_confidence": "low"
   },
   "9-07-027": {
    "grade": 9,

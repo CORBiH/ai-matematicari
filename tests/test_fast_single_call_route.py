@@ -284,6 +284,35 @@ def test_prompt_states_the_server_option_length_limit():
     assert "{3}" in tutor_prompts._TASK_RULE or "{5}" in tutor_prompts._TASK_RULE
 
 
+def test_scope_rule_routes_by_class_not_by_lesson_list(monkeypatch):
+    """Spisak od stotinu ID-jeva bio bi grananje po lekciji prerušeno u podatak.
+
+    Deterministička strategija bira PRIJE ove tačke, pa je svaka lekcija koja
+    dovde stigne po definiciji modelski podržana."""
+    monkeypatch.setenv("MATBOT_FAST_SINGLE_CALL_LESSONS", "")
+    monkeypatch.setenv("MATBOT_FAST_SINGLE_CALL_EXCLUDE", "")
+    monkeypatch.setenv("MATBOT_FAST_SINGLE_CALL_SCOPE", "lessons")
+    assert not config.fast_single_call_enabled_for("7-03-001")
+    monkeypatch.setenv("MATBOT_FAST_SINGLE_CALL_SCOPE", "model_backed")
+    assert config.fast_single_call_enabled_for("7-03-001")
+    assert config.fast_single_call_enabled_for("9-07-018")
+    # Rollback jedne lekcije ne gasi rutu.
+    monkeypatch.setenv("MATBOT_FAST_SINGLE_CALL_EXCLUDE", "7-03-001")
+    assert not config.fast_single_call_enabled_for("7-03-001")
+    assert config.fast_single_call_enabled_for("9-07-018")
+    # Potpuni rollback.
+    monkeypatch.setenv("MATBOT_FAST_SINGLE_CALL_SCOPE", "off")
+    assert not config.fast_single_call_enabled_for("9-07-018")
+
+
+def test_scope_default_preserves_the_pilot_behaviour(monkeypatch):
+    monkeypatch.delenv("MATBOT_FAST_SINGLE_CALL_SCOPE", raising=False)
+    monkeypatch.setenv("MATBOT_FAST_SINGLE_CALL_LESSONS", "6-04-015")
+    monkeypatch.setenv("MATBOT_FAST_SINGLE_CALL_EXCLUDE", "")
+    assert config.fast_single_call_enabled_for("6-04-015")
+    assert not config.fast_single_call_enabled_for("6-04-016")
+
+
 def test_prompt_names_the_exact_server_target_level(fast_route):
     """ŽIVI NALAZ (val 5): 12 od 18 eskalacija bilo je `difficulty_target_mismatch`
     jer je model morao POGODITI nivo koji server već zna — stanje nosi POČETNI
