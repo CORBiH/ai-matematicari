@@ -10,3 +10,10 @@ venv/
 storage/
 scratchpad/live_release_gate/
 scratchpad/practice_eval/
+# Evaluacijski artefakti kampanja (sirovi turnovi, presude, metrike). Isti
+# razlog kao gore: to su MJERENJA, ne izvorni kod, i zvanicna kapija odbija
+# rad u prljavom radnom stablu.
+scratchpad/final_practice_finish/
+scratchpad/overnight_practice_finish/
+scratchpad/fast_single_call_eval/
+scratchpad/grade6_7_ladder_live_audit/
