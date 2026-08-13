@@ -619,6 +619,115 @@ def compose_full_solution_for_session(session):
 
 
 # ---------------------------------------------------------------------------
+# DRUGAČIJE OBJAŠNJENJE — obećanje nije objašnjenje
+# ---------------------------------------------------------------------------
+# ŽIVI NALAZ (direktor škole): uz aktivan zadatak učenik je pisao „objasni na
+# drugi način“ i dobio SAMO najavu — „Dobro, objasniću na drugi način, korak po
+# korak i kratko.“ — bez ijedne brojke. Na sljedeću poruku („pa objasni“) opet
+# najavu. Uzrok je bio asimetrija ugovora polja: `hint_request` mora donijeti
+# `hint`, `full_solution_request` mora donijeti `worked_solution`, a
+# `explanation_request` nema NIJEDNO obavezno polje sadržaja — sve živi u
+# `reply`, pa je najava prolazila kao ispravan odgovor.
+#
+# SERVER IMA ČIME DA ODGOVORI I BEZ NOVOG POZIVA: objavljeni zadatak već nosi
+# PROVJEREN artefakt (`solution_summary` + označeni odgovor) — isti onaj iz
+# kojeg se sastavljaju vrh ljestvice i puno rješenje. Zato se prazno obećanje
+# dopunjuje kompozicijom iz TOG artefakta, a ne novom derivacijom.
+EXPLANATION_INTRO = (
+    "Dobro — evo istog zadatka objašnjenog drugim riječima, korak po korak."
+)
+
+# MJERA JE USKA I DOKAZIVA, ne jezički sud: „nema nijednog matematičkog
+# segmenta i nijedne cifre“. Objašnjenje računskog zadatka bez ijednog broja ne
+# postoji; čim tekst nosi matematiku, model se NE dira.
+_MATH_SEGMENT_RE = re.compile(r"\$[^$]+\$")
+_ANY_DIGIT_RE = re.compile(r"\d")
+
+
+def is_meta_only_explanation(text) -> bool:
+    """True kad vidljivi tekst ne nosi NIJEDAN dokaziv trag matematike."""
+    body = (text or "").strip()
+    if not body:
+        return True
+    if _MATH_SEGMENT_RE.search(body):
+        return False
+    return not _ANY_DIGIT_RE.search(body)
+
+
+def alternative_explanation_may_reveal(session) -> bool:
+    """Smije li objašnjenje nositi i REZULTAT — samo kad on više nije tajna.
+
+    Provjereni artefakt sadrži i konačan odgovor, pa bi njegovo sastavljanje
+    nad NERIJEŠENIM zadatkom bilo otkrivanje rješenja — tačno ono što
+    `_guard_answer_leak` s pravom obara. Zato se kompozicija nudi tek kad je
+    zadatak završen ili je rješenje već prikazano."""
+    session = session or {}
+    if session.get("task_completed"):
+        return True
+    return session.get("last_result") == "full_solution"
+
+
+METHOD_EXPLANATION_INTRO = (
+    "Dobro — evo istog zadatka objašnjenog drugim riječima. Prati postupak, a "
+    "rezultat izračunaj sam."
+)
+
+
+def _method_prefix(solution, marked_answer):
+    """Dio postupka PRIJE nego što se pojavi rezultat, ili ''.
+
+    Rez je DOKAZIV (pretraga stringa), ne procjena: tekst se skraćuje tačno na
+    mjestu gdje se prvi put pojavi označeni odgovor. Ono što ostane mora i
+    dalje nositi matematiku, inače nije objašnjenje nego uvod."""
+    body = (solution or "").strip()
+    answer = (marked_answer or "").strip()
+    if not body:
+        return ""
+    if answer and answer in body:
+        body = body[:body.index(answer)].strip()
+        # Rez ostavlja odsječenu rečenicu („… Rezultat je“), pa se vraćamo na
+        # posljednju CIJELU rečenicu — pola rečenice nije objašnjenje.
+        end = body.rfind(".")
+        if end != -1:
+            body = body[:end + 1]
+    body = body.rstrip(" ,;:-–—=").strip()
+    if not body or is_meta_only_explanation(body):
+        return ""
+    return body
+
+
+def compose_alternative_explanation_for_session(session):
+    """Objašnjenje aktivnog zadatka iz PROVJERENOG artefakta, ili ''.
+
+    DVA REŽIMA, jer artefakt sadrži i konačan odgovor:
+      • zadatak je završen (ili je rješenje već prikazano) → cijelo objašnjenje;
+      • zadatak je OTVOREN → samo POSTUPAK do rezultata, i to tek nakon što
+        postojeći mjerač (`feedback.leaks_answer`) DOKAŽE da tekst ne odaje
+        odgovor. Ako se to ne može dokazati, vraća se prazno i pozivalac
+        ostavlja zatečeno ponašanje.
+
+    Prazan rezultat NIKAD nije tekst za učenika."""
+    from matbot import feedback
+
+    session = session or {}
+    if not (session.get("current_task") or "").strip():
+        return ""
+    solution = session.get("solution_summary") or ""
+    marked = session_marked_answer(session)
+    if alternative_explanation_may_reveal(session):
+        return _compose_from_artifact(EXPLANATION_INTRO, solution, marked,
+                                      session_task_class(session))
+    method = _method_prefix(solution, marked)
+    if not method:
+        return ""
+    composed = "\n\n".join([METHOD_EXPLANATION_INTRO, method])
+    if feedback.leaks_answer(composed, marked, session.get("expected_answer_summary") or "",
+                             task_text=session.get("current_task") or ""):
+        return ""
+    return composed
+
+
+# ---------------------------------------------------------------------------
 # 4. MJERAČ OTKRIVANJA TVRDNJE (drugi sloj, nad tekstom MODELA)
 # ---------------------------------------------------------------------------
 # Vjeran port mjerača iz Faze 0 (`tools/practice_eval/hintsemantics.py`) u

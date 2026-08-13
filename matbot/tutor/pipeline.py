@@ -1619,7 +1619,7 @@ def _run_text_turn(store, llm, session, turn, context, request_id):
             intro = _intro_for(intro_intent, previous_level, target_level)
             answer = intro + "\n\nZadatak: " + task_text
         else:
-            answer = _compose_visible_help(final, reply, context)
+            answer = _compose_visible_help(final, reply, context, session)
             # Faza 2: JEDAN vlasnik vidljivog teksta pomoći. Vrh ljestvice, puno
             # rješenje i propozicioni nivoi 1–2 se ovdje ZAMJENJUJU serverski
             # sastavljenim tekstom iz provjerenog artefakta — i na kucanoj poruci,
@@ -1684,7 +1684,7 @@ def _run_text_turn(store, llm, session, turn, context, request_id):
     return response
 
 
-def _compose_visible_help(final, reply, context):
+def _compose_visible_help(final, reply, context, session=None):
     """Sastavi ono što učenik STVARNO vidi za hint/rješenje.
 
     ZAŠTO POSTOJI (ručni test, 2026-08-03): na „Ne znam“ je model najavu stavio
@@ -1699,6 +1699,21 @@ def _compose_visible_help(final, reply, context):
         extra = (final.hint or "").strip()
     elif final.intent == "full_solution_request":
         extra = (final.worked_solution or "").strip()
+    elif final.intent == "explanation_request":
+        # OBEĆANJE NIJE OBJAŠNJENJE (živi nalaz, vidi hint_policy). Ova namjera
+        # nema obavezno polje sadržaja — sve živi u `reply` — pa je najava
+        # („objasniću ti drugim riječima“) prolazila kao ispravan odgovor. Kad
+        # tekst nema NIJEDAN trag matematike, server ZAMJENJUJE praznu najavu
+        # objašnjenjem iz PROVJERENOG artefakta objavljenog zadatka: najava ne
+        # nosi ništa, pa bi njeno zadržavanje samo udvostručilo uvod. Nijedan
+        # dodatni modelski poziv.
+        if hint_policy.is_meta_only_explanation(reply):
+            composed = hint_policy.compose_alternative_explanation_for_session(session)
+            if composed:
+                safe_composed = _safe_text(composed, final.intent)
+                _reject_if_inconsistent(safe_composed, final.intent)
+                _reject_if_geometry_invalid(safe_composed, context, final.intent)
+                return safe_composed
     if not extra:
         return reply
 

@@ -27,6 +27,7 @@ import copy
 import logging
 import os
 import random
+import re
 import uuid
 
 from matbot import (config, difficulty_level, feedback, geometry_rules,
@@ -53,6 +54,29 @@ from matbot.topics import lesson_info
 logger = logging.getLogger("matbot.practice")
 
 SAFE_ERROR_MESSAGE = "Nešto je zapelo pri sastavljanju odgovora. Pošalji poruku ponovo za koji trenutak."
+
+# ZAHTJEV ZA DRUGAČIJIM OBJAŠNJENJEM AKTIVNOG ZADATKA — zatvoren, uzak skup.
+# Jednopozivna šema (`PracticeTurnOutput`) NEMA polje `intent`, pa se namjera
+# čita iz UČENIKOVE poruke, nikad iz modelove proze.
+#
+# GRANICA JE NAMJERNO USKA, i to je mjereno: širi obrazac („bilo koje
+# objasni“) hvatao je i „Objasni mi ovu lekciju.“ (pitanje o LEKCIJI, ne o
+# zadatku) i „…ali ne razumijem drugi korak“ (razgovor o koraku), pa je server
+# na njih podmetao objašnjenje zadatka. Traži se zato objašnjenje ZADATKA uz
+# izričit signal PONAVLJANJA ili DRUGOG načina — tačno ono što je učenik u
+# živom nalazu i tražio.
+_EXPLAIN_VERB = r"(?:objasni|objašnjenje|objasnjenje|pojasni)"
+_EXPLANATION_REQUEST_RE = re.compile(
+    rf"{_EXPLAIN_VERB}[^.?!]*\b(?:drugačij|drugacij|drugi\s+način|drugi\s+nacin"
+    rf"|opet|ponovo|jednostavnije)"
+    rf"|\b(?:drugačij|drugacij|opet|ponovo)[^.?!]*{_EXPLAIN_VERB}"
+    rf"|^\s*(?:pa\s+|hajde\s+)?{_EXPLAIN_VERB}\s*[.!?]?\s*$",
+    re.IGNORECASE)
+
+
+def _is_explanation_request(student_message) -> bool:
+    """True SAMO za „objasni (ovo) drugačije/opet“ — vidi obrazloženje iznad."""
+    return bool(_EXPLANATION_REQUEST_RE.search((student_message or "").strip()))
 
 # Lekcija čiji ugovor je izričito označen kao `unsupported`: nema sigurnog
 # načina da se za nju generiše provjerljiv zadatak. Poruka je JASNA i drukčija
@@ -1088,6 +1112,39 @@ def _handle_text_turn(store, llm, session, turn, lesson_id, request_id):
             target_level=(transition.target_level if transition is not None else None),
             avoid_texts=session["recent_tasks"],
         )
+        if not prepared.ok and transition is not None and transition.level_changed:
+            # ŽIVI NALAZ (direktor škole, „Proširivanje razlomaka“): tražeći
+            # sve teže zadatke učenik je zapinjao na GENERIČKOJ grešci i ostajao
+            # zaglavljen na nivou 2. Uzrok nije „nema nivoa 4“ nego to što
+            # profil višeg nivoa traži KOMBINACIJU koju arhetip te lekcije ne
+            # može proizvesti: `target_levels_for_level` na nivou 3 postavlja
+            # SVAKU dimenziju na maksimum, pa `identify_equivalent` (jedan
+            # razlomak) dobije `term_count = 2` i generisanje se iscrpi
+            # (`generation_exhausted`). Mjereno nad svih šest ugovornih lekcija:
+            # tri od šest uopšte ne mogu proizvesti nivo 3.
+            #
+            # ODGOVOR JE POŠTEN VRH, NE IZMIŠLJEN NIVO: kad sljedeći nivo nije
+            # ostvariv, lekcija je STVARNO na svom maksimumu, pa se pravi
+            # najjači zadatak koji ugovor UMIJE i nivo ostaje nepromijenjen —
+            # isto što `difficulty_level` već radi na pravoj granici ljestvice.
+            # Nijedan dodatni modelski poziv: priprema kostura je čisto
+            # serverska i besplatna.
+            fallback = contract_pipeline.prepare_task(
+                contract, plan,
+                difficulty_request=turn["difficulty_request"],
+                target_level=transition.previous_level,
+                avoid_texts=session["recent_tasks"],
+            )
+            if fallback.ok:
+                logger.info(
+                    "practice_plan request_id=%s level_unreachable target=%s "
+                    "kept=%s archetype=%s", request_id, transition.target_level,
+                    transition.previous_level, plan.archetype_id,
+                )
+                prepared = fallback
+                transition = difficulty_level.at_generatable_boundary(transition)
+                generation_changed = True
+
         if prepared.ok:
             prepared_skeleton = prepared.skeleton
             logger.info(
@@ -1219,6 +1276,22 @@ def _handle_text_turn(store, llm, session, turn, lesson_id, request_id):
             # zadatku ne smije uvesti vlastiti broj (vidi funkciju iznad).
             _reject_if_prose_invents_mathematics(reply, session, contract, "reply")
             answer = reply
+            # OBEĆANJE NIJE OBJAŠNJENJE (živi nalaz — vidi hint_policy).
+            # „Objasni na drugi način“ uz aktivan zadatak vraćalo je samo
+            # najavu. Ovaj put NEMA polje `intent` (jednopozivna šema), pa se
+            # zahtjev prepoznaje iz ZATVORENOG skupa serverskih obrazaca — isti
+            # princip kao `_SIMPLE_TASK_REQUEST_RE` — a nikad iz proze modela.
+            # Sužavanje je nužno: bez njega bi svaki odgovor bez brojke (hint,
+            # pohvala, pojašnjenje) bio zamijenjen objašnjenjem zadatka.
+            if (_is_explanation_request(turn["student_message"])
+                    and hint_policy.is_meta_only_explanation(answer)):
+                composed = hint_policy.compose_alternative_explanation_for_session(
+                    session)
+                if composed:
+                    composed_text, composed_safe = sanitize_and_validate_math_text(
+                        composed)
+                    if composed_safe:
+                        answer = normalize_terminology(composed_text)
 
         session["recent_turns"].append(
             {"student": turn["student_message"][:300], "tutor": answer[:400]}

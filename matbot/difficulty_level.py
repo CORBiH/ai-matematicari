@@ -77,6 +77,28 @@ def transition(previous_level, difficulty_request=""):
     return DifficultyTransition(previous, target, label, changed, boundary)
 
 
+def at_generatable_boundary(source):
+    """Isti prelaz, ali zaustavljen na nivou koji lekcija UMIJE proizvesti.
+
+    Ljestvica ima tri nivoa, a pojedina lekcija ne mora umjeti sva tri: profil
+    višeg nivoa može tražiti kombinaciju dimenzija koju njen arhetip ne može
+    generisati. Tada je taj niži nivo NJEN stvarni vrh, pa se prelaz opisuje
+    tačno kao i prava granica ljestvice — nivo se ne mijenja i `boundary_reason`
+    imenuje kraj. Time uvod ostaje pošten („već najviši nivo“) umjesto da server
+    tvrdi promjenu koje nema, ili da turn padne na generičku grešku.
+
+    Vraća NOV objekat; ulazni prelaz se ne mijenja."""
+    boundary = "at_maximum" if source.request == "harder" else (
+        "at_minimum" if source.request == "easier" else None)
+    return DifficultyTransition(
+        previous_level=source.previous_level,
+        target_level=source.previous_level,
+        request=source.request,
+        level_changed=False,
+        boundary_reason=boundary,
+    )
+
+
 # ---------------------------------------------------------------------------
 # OSAM DIJELJENIH DIMENZIJA — jedna fiksna tabela, dijele je Tutor i
 # Recenzent (matbot/prompts.py, matbot/lesson_fidelity.py). Namjerno OPŠTE

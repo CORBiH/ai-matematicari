@@ -236,7 +236,17 @@ KAKO SE HINT I RJEŠENJE PRIKAZUJU (bitno):
 `hint` i `worked_solution` su POLJA KOJA UČENIK ČITA — server ih dopisuje uz
 `reply`. Zato `hint` mora sadržavati STVARNU pomoć, a ne najavu. Ne piši
 „evo ti uputa“ i ne ostavljaj `hint` prazan kad je zatražena pomoć: napiši
-konkretnu uputu koja pomjera učenika za jedan korak."""
+konkretnu uputu koja pomjera učenika za jedan korak.
+
+OBJAŠNJENJE SE PIŠE ODMAH, NE NAJAVLJUJE (živi nalaz):
+`explanation_request` NEMA zasebno polje sadržaja — sve što učenik pročita
+jeste `reply`. Zato `reply` mora u ISTOM odgovoru sadržavati STVARNO
+objašnjenje aktivnog zadatka: konkretne veličine, korake i rezultat. Rečenice
+tipa „Dobro, objasniću ti drugim riječima“ ili „objasniću korak po korak“ NISU
+objašnjenje — ako je to sve što napišeš, učenik nije dobio ništa i server
+odgovor mora zamijeniti vlastitom kompozicijom. Kad učenik traži DRUGI način,
+objasni isti zadatak drugim putem ili drugim riječima, ali NE mijenjaj zadatak
+i NE mijenjaj tačan odgovor."""
 
 # ŽIVI NALAZ B45 (lekcija o dijeljenju decimalnih brojeva, treći hint):
 # napisano je `$7,5\\cdot 10:5\\cdot 10 = 75:50$`. Po standardnom prioritetu to
