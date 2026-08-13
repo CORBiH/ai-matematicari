@@ -797,7 +797,23 @@ def _turn_payload(scenario: Scenario, *, selected_option_id: str = "",
     }
 
 
-_INTRO_PREFIXES = (
+def _tutor_pipeline_intros():
+    """Uvodi AKTIVNOG puta (`matbot/tutor/pipeline.py`).
+
+    Postoje DVIJE serverske tabele uvoda: legacy u `matbot/practice.py` i ova.
+    Kapija je poznavala samo legacy, pa je potpuno ispravan serverski uvod
+    („Evo sljedećeg zadatka.“ za `next_task`) citala kao — nikakav uvod."""
+    from matbot.tutor import pipeline as tutor_pipeline
+
+    values = set(tutor_pipeline._NEW_TASK_INTRO.values())
+    for name in ("_AT_MAXIMUM_INTRO", "_AT_MINIMUM_INTRO", "_SAME_LEVEL_INTRO"):
+        value = getattr(tutor_pipeline, name, None)
+        if isinstance(value, str):
+            values.add(value)
+    return frozenset(values)
+
+
+_INTRO_PREFIXES = tuple(sorted({
     practice._SAME_FAMILY_RETRY_INTRO,
     practice._SAME_SUPPORTED_DIFFICULTY_INTRO,
     practice._ANOTHER_ADVANCED_TASK_INTRO,
@@ -805,7 +821,7 @@ _INTRO_PREFIXES = (
     practice._HARDER_TASK_INTRO,
     practice._EASIER_TASK_INTRO,
     practice._NEW_TASK_INTRO,
-)
+} | _tutor_pipeline_intros(), key=len, reverse=True))
 
 
 def _actual_intro(answer_text: Optional[str]) -> Optional[str]:

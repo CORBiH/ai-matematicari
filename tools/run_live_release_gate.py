@@ -423,6 +423,35 @@ def _structured_transition_errors(gate: GateScenario, result, prior_signature=No
     return errors
 
 
+def _intro_errors(result) -> list[str]:
+    """Uvod mora biti SERVERSKI i ISTINIT — to je invarijanta, ne konkretan string.
+
+    Dvije serverske tabele uvoda postoje (`matbot/practice.py` i aktivna
+    `matbot/tutor/pipeline.py`), pa je poređenje s jednom od njih obaralo
+    potpuno ispravan turn: na „Daj mi novi zadatak.“ aktivni put vraća „Evo
+    sljedećeg zadatka.“, a kapija je očekivala legacy „Evo zadatka.“.
+
+    Ono što se zaista mora dokazati ostaje netaknuto:
+      • uvod je JEDAN OD SERVERSKIH uvoda (nikad modelova proza);
+      • uvod ne TVRDI promjenu koja se nije desila (živi nalaz F09/F10).
+    """
+    from scratchpad.run_difficulty_canary import _INTRO_PREFIXES
+
+    actual = result.intro_actual
+    if actual == result.intro_expected:
+        return []
+    if not actual or actual not in _INTRO_PREFIXES:
+        return ["intro_is_not_server_owned"]
+    before = result.session_level_before
+    after = result.session_level_after
+    if isinstance(before, int) and isinstance(after, int):
+        if "težeg" in actual and after <= before:
+            return ["untruthful_intro_claims_harder"]
+        if "lakšeg" in actual and after >= before:
+            return ["untruthful_intro_claims_easier"]
+    return []
+
+
 def _scenario_errors(gate: GateScenario, result, prior_task: str, prior_options: Iterable[dict],
                      prior_signature=None, *, expected_calls=None) -> list[str]:
     """`expected_calls` je vrijednost ZAMRZNUTA PRIJE turna; kad nije data,
@@ -469,8 +498,7 @@ def _scenario_errors(gate: GateScenario, result, prior_task: str, prior_options:
     if gate.role in {"fresh_level1", "harder_level2", "easier_level1", "same_level_new",
                      "contract_fresh", "contract_harder", "grade7", "grade8", "grade9"}:
         errors.extend(_task_output_errors(result))
-        if result.intro_actual != result.intro_expected:
-            errors.append("untruthful_intro")
+        errors.extend(_intro_errors(result))
     # The candidate structured runtime supplies Reviewer-validated generic
     # difficulty evidence.  Do not reconstruct semantic difficulty from
     # Bosnian task prose in that runtime; the legacy parser remains only for

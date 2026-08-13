@@ -682,3 +682,40 @@ def test_package_ownership_is_proven_per_route():
     # Paket bez poznatog vlasnika i dalje pada zatvoreno.
     assert any(e.startswith("final_package_has_no_known_owner")
                for e in runner._structured_transition_errors(gate, result("mystery"), None))
+
+
+def test_intro_must_be_server_owned_and_truthful():
+    """Uvod se dokazuje kao SERVERSKI i ISTINIT, ne kao odredjeni string.
+
+    Zivi nalaz (zvanicna kapija, scenario `same_level_new`): postoje DVIJE
+    serverske tabele uvoda — legacy `matbot/practice.py` i aktivna
+    `matbot/tutor/pipeline.py`. Kapija je poredila s legacy tabelom, pa je
+    potpuno ispravan turn („Evo sljedeceg zadatka.“ na `next_task`) padao kao
+    „untruthful_intro“."""
+    from matbot.tutor import pipeline as tutor_pipeline
+
+    def result(actual, expected, before=1, after=1):
+        return SimpleNamespace(intro_actual=actual, intro_expected=expected,
+                               session_level_before=before, session_level_after=after)
+
+    server_next = tutor_pipeline._NEW_TASK_INTRO["next_task"]
+    # Serverski uvod iz AKTIVNE tabele prolazi i kad se razlikuje od legacy.
+    assert runner._intro_errors(result(server_next, "Evo zadatka.")) == []
+    # Tacno poklapanje i dalje prolazi.
+    assert runner._intro_errors(result("Evo zadatka.", "Evo zadatka.")) == []
+    # Modelova proza NIJE serverski uvod.
+    assert runner._intro_errors(
+        result("Naravno, evo jednog zanimljivog zadatka!", "Evo zadatka.")) == [
+        "intro_is_not_server_owned"]
+    assert runner._intro_errors(result(None, "Evo zadatka.")) == ["intro_is_not_server_owned"]
+    # Neistinita tvrdnja o promjeni tezine i dalje pada (nalaz F09/F10).
+    assert runner._intro_errors(
+        result(tutor_pipeline._NEW_TASK_INTRO["harder_task"], "Evo zadatka.",
+               before=3, after=3)) == ["untruthful_intro_claims_harder"]
+    assert runner._intro_errors(
+        result(tutor_pipeline._NEW_TASK_INTRO["easier_task"], "Evo zadatka.",
+               before=1, after=1)) == ["untruthful_intro_claims_easier"]
+    # Istinita tvrdnja o promjeni prolazi.
+    assert runner._intro_errors(
+        result(tutor_pipeline._NEW_TASK_INTRO["harder_task"], "Evo zadatka.",
+               before=1, after=2)) == []
