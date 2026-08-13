@@ -1070,6 +1070,53 @@ def _call_help(llm, context, session, student_message, ui_action, task_class,
     return result
 
 
+# JEDAN NAGOVJEŠTAJ PO ZADATKU (zahtjev iz produkcije).
+# Učenik traži pomoć jednom i dobija JEDAN koristan strateški nagovještaj.
+# Ponovni klik na isti zadatak vraća ISTI tekst i NE troši novi poziv — ni
+# modelski ni serverski — pa nema ni „dubljeg“ nagovještaja ni puzajućeg
+# otkrivanja odgovora. Puno rješenje ostaje zasebna radnja („Uradi ga ti“).
+STORED_HINT_KEY = "current_task_hint"
+
+
+def stored_hint_for_active_task(session):
+    """Već posluženi nagovještaj za AKTIVAN zadatak, ili '' kad ga nema."""
+    if not config.practice_single_hint_enabled():
+        return ""
+    stored = session.get(STORED_HINT_KEY) or {}
+    if not isinstance(stored, dict):
+        return ""
+    if stored.get("task") != (session.get("current_task") or ""):
+        return ""      # nagovještaj pripada PROŠLOM zadatku — ne služi se
+    return str(stored.get("text") or "")
+
+
+def remember_hint(session, text):
+    """Zapamti nagovještaj uz TEKST zadatka za koji je dat."""
+    if config.practice_single_hint_enabled() and text:
+        session[STORED_HINT_KEY] = {"task": session.get("current_task") or "",
+                                    "text": text}
+
+
+def _hint_repeat_response(store, session, turn, hint_text, context):
+    """Ponovljen klik na nagovještaj: ISTI tekst, NULA poziva, isti zadatak.
+
+    Stanje zadatka se ne dira (nivo, opcije, identitet, `task_completed`), pa
+    ponavljanje ne može ni otkriti odgovor ni pomjeriti ljestvicu."""
+    session["recent_turns"].append(
+        {"student": turn["student_message"][:300], "tutor": hint_text[:400]})
+    session["current_task_had_hint"] = True
+    store.save(session)
+    return {
+        "status": "ready",
+        "answer": hint_text,
+        "answer_verdict": None,
+        "last_tutor_task": session.get("current_task") or "",
+        "next_state": _next_state(session),
+        "session_mode": "practice",
+        "effective_topic": context.topic_id,
+    }
+
+
 def _one_call_help(llm, context, session, student_message, ui_action, request_id,
                    timer):
     """Nacrt pomoći iz TAČNO JEDNOG poziva. Recenzenta nema — nema paketa koji
@@ -1573,6 +1620,15 @@ def _run_text_turn(store, llm, session, turn, context, request_id):
 
     timer = _TurnTimer()
 
+    if ui_action == "hint_request":
+        # PONOVLJEN KLIK NA NAGOVJEŠTAJ NE KOŠTA NIŠTA. Odluka je poznata PRIJE
+        # ijednog poziva i ne dira stanje zadatka.
+        repeated = stored_hint_for_active_task(session)
+        if repeated:
+            logger.info("hint_repeat_served_from_session request_id=%s topic=%s",
+                        request_id, context.topic_id)
+            return _hint_repeat_response(store, session, turn, repeated, context)
+
     if ui_action:
         # Faza 2: pomoć koju model još piše (računski zadatak, nivo 1 ili 2)
         # dobija PROMPT POMOĆI, ne ugovor izrade zadatka. Jedan poziv, kao i
@@ -1667,6 +1723,9 @@ def _run_text_turn(store, llm, session, turn, context, request_id):
                                     and session["hint_level"] >= config.MAX_HINT_LEVEL - 1),
             )
             if final.intent == "hint_request":
+                # JEDAN NAGOVJEŠTAJ: tekst se pamti uz aktivan zadatak, pa
+                # ponovni klik više ne stiže ni do prompta ni do modela.
+                remember_hint(session, answer)
                 session["hint_level"] = min(
                     session["hint_level"] + 1, config.MAX_HINT_LEVEL
                 )
@@ -1909,6 +1968,8 @@ def _publish_task(session, context, final, request_id, target_level=None):
         session["difficulty"] = difficulty_level.LEVEL_TO_LABEL[target_level]
         session["difficulty_level"] = target_level
     session["hint_level"] = 0
+    # NOV ZADATAK — NOV NAGOVJEŠTAJ. Pohranjeni tekst pripada prošlom zadatku.
+    session.pop(STORED_HINT_KEY, None)
     session["recent_tasks"].append(task_text)
     session["current_options"] = current_options
     session["correct_option_id"] = correct_option_id

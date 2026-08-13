@@ -58,6 +58,11 @@ def _runtime(monkeypatch):
     monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", "universal_two_call")
     monkeypatch.setenv("MATBOT_PRACTICE_DIFFICULTY_LEVELS", "enabled")
     monkeypatch.setenv("MATBOT_DETERMINISTIC_PRACTICE", "disabled")
+    # LJESTVICA 1→2→3 JE OD OVOG IZDANJA ROLLBACK PUT. Produkcija služi JEDAN
+    # nagovještaj po zadatku (`MATBOT_PRACTICE_SINGLE_HINT`), ali vršna
+    # kompozicija ostaje vezana za verifikovani artefakt i mora ostati
+    # dokazana — zato je ovaj fajl vozi izričito isključenom zastavicom.
+    monkeypatch.setenv("MATBOT_PRACTICE_SINGLE_HINT", "disabled")
 
 
 # ---------------------------------------------------------------------------

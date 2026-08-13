@@ -49,6 +49,8 @@ def _runtime(monkeypatch):
     monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", "universal_two_call")
     monkeypatch.setenv("MATBOT_PRACTICE_DIFFICULTY_LEVELS", "enabled")
     monkeypatch.setenv("MATBOT_DETERMINISTIC_PRACTICE", "disabled")
+    # Ljestvica nagovještaja je rollback put (vidi test_phase2_hint_architecture).
+    monkeypatch.setenv("MATBOT_PRACTICE_SINGLE_HINT", "disabled")
 
 
 # ---------------------------------------------------------------------------

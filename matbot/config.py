@@ -312,6 +312,20 @@ ALLOWED_IMAGE_FORMATS = ("JPEG", "PNG", "WEBP")
 MAX_RECENT_TASKS = 3
 MAX_RECENT_TURNS = 3
 MAX_HINT_LEVEL = 3
+
+# JEDAN NAGOVJEŠTAJ, NE LJESTVICA (zahtjev iz produkcije). Učenik traži pomoć
+# jednom i dobija JEDAN koristan strateški nagovještaj; ponovni klik vraća ISTI
+# tekst i NE troši novi poziv. Puno rješenje ostaje zasebna radnja („Uradi ga
+# ti“). Ljestvica 1→2→3 ostaje u kodu kao rollback (`disabled`), jer je njena
+# vršna kompozicija dokazana i vezana za verifikovani artefakt.
+PRACTICE_SINGLE_HINT_FLAG = "MATBOT_PRACTICE_SINGLE_HINT"
+
+
+def practice_single_hint_enabled():
+    """True osim kad je izričito isključeno — jedan nagovještaj je zatečeno
+    produkcijsko ponašanje od ovog izdanja."""
+    value = (os.environ.get(PRACTICE_SINGLE_HINT_FLAG, "") or "").strip().lower()
+    return value != "disabled"
 MAX_SESSIONS_IN_MEMORY = 2000
 MAX_RECENT_FAMILIES = 6      # historija porodica zadataka (LRU izbor + prompt)
 MAX_RECENT_SIGNATURES = 8    # potpisi zadataka za otkrivanje doslovnog ponavljanja
