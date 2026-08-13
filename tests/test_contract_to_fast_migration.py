@@ -193,3 +193,54 @@ def test_answer_verification_still_rejects_a_wrong_marked_option(lesson_id):
     task = _package(_fraction(5, 6), "Zadatak s razlomkom " + _fraction(2, 3) + ".")
     codes = [i.code for i in preflight.contract_package_issues(task, context)]
     assert preflight.CONTRACT_EQUIVALENCE_CODE in codes
+
+
+# ---------------------------------------------------------------------------
+# OBLIK KAO RAZLIKOVNA OSOBINA (zivi nalaz migracije)
+# ---------------------------------------------------------------------------
+
+def test_equivalent_value_options_are_legitimate_where_form_is_the_skill():
+    """ZIVI NALAZ: za „koji je nesvodivi oblik od 12/18?“ distraktori 4/6 i 6/9
+    JESU jednaki po vrijednosti — i to je poenta zadatka. Opste pravilo
+    „ista vrijednost = duplikat“ obaralo je 4 od 8 turnova te lekcije."""
+    context = lesson_context.build(6, "6-04-006")
+    assert preflight.form_is_the_discriminator(context)
+    task = _Task("Koji je nesvodivi oblik razlomka " + _fraction(12, 18) + "?",
+                 _fraction(2, 3), [_fraction(4, 6), _fraction(6, 9), _fraction(3, 4)])
+    codes = [i.code for i in preflight.collect_package_issues(
+        task, lesson_constraints=context)]
+    assert preflight.SEMANTIC_DUPLICATE_CODE not in codes
+    assert preflight.CONTRACT_ANSWER_FORM_CODE not in codes
+
+
+def test_form_rule_applies_only_where_the_contract_declares_it():
+    assert not preflight.form_is_the_discriminator(lesson_context.build(6, "6-04-005"))
+    assert not preflight.form_is_the_discriminator(lesson_context.build(6, "6-04-001"))
+
+
+def test_literal_duplicates_still_fail_even_where_form_discriminates():
+    """Jedinstvenost se ne gubi — samo se mjeri zapisom."""
+    context = lesson_context.build(6, "6-04-006")
+    task = _Task("Koji je nesvodivi oblik razlomka " + _fraction(12, 18) + "?",
+                 _fraction(2, 3), [_fraction(2, 3), _fraction(4, 6), _fraction(3, 4)])
+    codes = [i.code for i in preflight.collect_package_issues(
+        task, lesson_constraints=context)]
+    assert "duplicate_option_text" in codes
+
+
+def test_two_correct_answers_are_rejected_where_form_discriminates():
+    """Dvije opcije jednake izvoru I nesvodive znace dva tacna odgovora."""
+    context = lesson_context.build(6, "6-04-006")
+    task = _Task("Koji je nesvodivi oblik razlomka " + _fraction(12, 18) + "?",
+                 _fraction(2, 3), [_fraction(4, 6), _fraction(6, 9), _fraction(-2, -3)])
+    codes = [i.code for i in preflight.contract_package_issues(task, context)]
+    assert preflight.CONTRACT_SINGLE_IRREDUCIBLE_CODE in codes
+
+
+def test_irreducible_distractor_of_a_different_value_is_allowed():
+    """Nesvodiv razlomak DRUGE vrijednosti je valjan distraktor."""
+    context = lesson_context.build(6, "6-04-006")
+    task = _Task("Koji je nesvodivi oblik razlomka " + _fraction(12, 18) + "?",
+                 _fraction(2, 3), [_fraction(3, 4), _fraction(4, 5), _fraction(5, 7)])
+    assert preflight.CONTRACT_SINGLE_IRREDUCIBLE_CODE not in [
+        i.code for i in preflight.contract_package_issues(task, context)]

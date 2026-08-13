@@ -1113,6 +1113,11 @@ _REVIEWER_PREFLIGHT_RULE = """SERVER-DETECTED DRAFT ISSUES (when that block is p
   denominator share no divisor greater than 1). Reduce it fully — 4/6 is not
   acceptable where 2/3 is required — and recompute `expected_answer`, the marked
   option and `solution` to match. Changing only the prose is rejected.
+- For `contract_multiple_irreducible_options` more than one option is BOTH equal in
+  value to the fraction in the task AND already fully reduced, i.e. the task has two
+  correct answers. Replace the extra one with a fraction that is either a different
+  value or not yet reduced. Where the lesson tests the reduced FORM, distractors of
+  the same value in unreduced form are correct and welcome — do not remove those.
 - For `contract_equivalence_violation` the lesson's archetype requires the marked
   option to have the SAME VALUE as the fraction stated in the task text. Either mark
   the option that truly equals it, or rewrite the task so the marked option is that

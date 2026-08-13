@@ -53,6 +53,7 @@ MAX_ISSUES = 8
 # granica. Ovo je granica DIJAGNOSTIKE, ne prag težine.
 CONTRACT_ANSWER_FORM_CODE = "contract_answer_form_violation"
 CONTRACT_EQUIVALENCE_CODE = "contract_equivalence_violation"
+CONTRACT_SINGLE_IRREDUCIBLE_CODE = "contract_multiple_irreducible_options"
 _MAX_DETAIL_CHARS = 200
 
 # Kod koji objava već koristi za isti nalaz — namjerno ISTI string, da se
@@ -163,6 +164,21 @@ def _contract_fractions(text):
     return out
 
 
+def form_is_the_discriminator(lesson_constraints):
+    """True kad ugovor lekcije čini OBLIK zapisa razlikovnim, ne vrijednost.
+
+    ŽIVI NALAZ (migracija K1/K3, lekcija o skraćivanju): za „koji je nesvodivi
+    oblik od 12/18?“ distraktori 4/6 i 6/9 SU jednaki po vrijednosti — i to je
+    upravo poenta. Opšte pravilo „dvije opcije iste vrijednosti su duplikat“
+    tu obara ispravan zadatak: 4 od 8 turnova nije objavljeno i ljestvica
+    težine se nije pomjerila. Gdje ugovor traži nesvodiv oblik, jedinstvenost
+    se mjeri ZAPISOM, a tačnost oblikom — što `contract_package_issues` i
+    `_single_irreducible_option_issue` dokazuju."""
+    representation = getattr(lesson_constraints, "representation_constraints", {}) or {}
+    return (bool(getattr(lesson_constraints, "has_contract", False))
+            and representation.get("answer_form") == "irreducible")
+
+
 def contract_package_issues(task, lesson_constraints):
     """Nalazi koje UGOVOR lekcije dokazuje nad objavljenim paketom.
 
@@ -193,6 +209,30 @@ def contract_package_issues(task, lesson_constraints):
                 detail=("ugovor lekcije traži NESVODIV razlomak, a označena "
                         f"opcija je {numerator}/{denominator}; skrati je do kraja "
                         "i uskladi expected_answer i solution")))
+        # SAMO JEDAN TAČAN ODGOVOR. Kad je oblik razlikovan, tačna je opcija koja
+        # je i JEDNAKA izvornoj vrijednosti i NESVODIVA. Nesvodiv razlomak DRUGE
+        # vrijednosti je sasvim valjan distraktor, pa se ne broji — inače bi
+        # provjera obarala ispravne zadatke.
+        source_values = _contract_fractions(str(getattr(task, "text", "") or ""))
+        # Bez izvornog razlomka u tekstu ne može se dokazati KOJA je opcija
+        # tačna, pa se ova provjera preskače umjesto da pogađa.
+        irreducible = None if not source_values else []
+        for option in (options if source_values else ()):
+            text = str(getattr(option, "text", "") or "")
+            found = _contract_fractions(text)
+            if len(found) != 1:
+                continue
+            numerator, denominator = _CONTRACT_FRACTION_RE.search(text).groups()
+            if math.gcd(abs(int(numerator)), abs(int(denominator))) != 1:
+                continue
+            if source_values and found[0] not in source_values:
+                continue
+            irreducible.append(text)
+        if irreducible is not None and len(irreducible) > 1:
+            issues.append(PackageIssue(
+                CONTRACT_SINGLE_IRREDUCIBLE_CODE,
+                detail=("ugovor traži nesvodiv oblik, pa SAMO JEDNA opcija smije "
+                        f"biti nesvodiva; nesvodivih ima {len(irreducible)}")))
     archetypes = tuple(getattr(lesson_constraints, "task_archetypes", ()) or ())
     if "identify_equivalent" in archetypes:
         text = str(getattr(task, "text", "") or "")
@@ -285,8 +325,14 @@ def collect_package_issues(task, contract=None, previous_signature="",
                 "duplicate_option_text",
                 option_ids=(_option_id(task, i), _option_id(task, j)),
                 option_indexes=(i, j)))
+        form_discriminates = form_is_the_discriminator(lesson_constraints)
         for i, j, kind in option_equivalence.find_equivalent_option_pairs_with_types(
                 option_texts):
+            if form_discriminates and option_texts[i].strip() != option_texts[j].strip():
+                # Ista vrijednost, RAZLIČIT zapis — u ovoj lekciji to je
+                # namjeran distraktor, ne duplikat. Doslovni duplikat i dalje
+                # pada gore (`duplicate_option_text`).
+                continue
             issues.append(PackageIssue(
                 SEMANTIC_DUPLICATE_CODE,
                 option_ids=(_option_id(task, i), _option_id(task, j)),

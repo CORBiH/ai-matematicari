@@ -434,7 +434,17 @@ def _validate_task_server_side(task, context, previous_signature=""):
     duplicates = option_equivalence.find_textual_duplicate_pairs(option_texts)
     if duplicates:
         raise UnifiedOutputError(f"duple opcije: {duplicates}")
-    equivalent = option_equivalence.find_equivalent_option_pairs(option_texts)
+    # OBLIK KAO RAZLIKOVNA OSOBINA (migracija K1/K3). Za lekciju čiji ugovor
+    # traži NESVODIV oblik, opcije iste vrijednosti a različitog zapisa su
+    # namjerni distraktori — ne duplikati. Preflight primjenjuje isto pravilo,
+    # pa se dva sloja ne razilaze; doslovni duplikat i dalje pada iznad, a
+    # `contract_multiple_irreducible_options` čuva da tačan bude samo jedan.
+    if package_preflight.form_is_the_discriminator(context):
+        equivalent = [pair for pair in
+                      option_equivalence.find_equivalent_option_pairs(option_texts)
+                      if option_texts[pair[0]].strip() == option_texts[pair[1]].strip()]
+    else:
+        equivalent = option_equivalence.find_equivalent_option_pairs(option_texts)
     if equivalent:
         raise UnifiedOutputError(f"semantically_duplicate_options: {equivalent}")
 
