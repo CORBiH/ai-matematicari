@@ -1020,6 +1020,9 @@ def _run_server_owned_help_turn(store, session, turn, context, request_id, ui_ac
     identity = session.get("current_task_identity") or ""
     reveal = False
     if ui_action == "hint_request":
+        # JEDAN NAGOVJEŠTAJ: i serverski sastavljen tekst se pamti uz zadatak,
+        # pa ponovni klik više ne stiže ni dovde.
+        remember_hint(session, answer)
         session["hint_level"] = min(session["hint_level"] + 1, config.MAX_HINT_LEVEL)
         session["current_task_had_hint"] = True
         route = "server_hint"
@@ -1184,6 +1187,9 @@ def _run_deterministic_help_turn(store, session, turn, context, request_id,
         # (`is_hint_ladder_top`): `hint_level` je broj RANIJE datih nagovještaja.
         if session["hint_level"] >= config.MAX_HINT_LEVEL - 1:
             answer = _deterministic_top_hint(session, annex, answer)
+        # JEDAN NAGOVJEŠTAJ: i deterministički se pamti uz zadatak, pa ponovni
+        # klik više ne stiže dovde i ne pomjera ljestvicu.
+        remember_hint(session, answer)
         session["hint_level"] = min(session["hint_level"] + 1, config.MAX_HINT_LEVEL)
         session["current_task_had_hint"] = True
         route, intent = "deterministic_hint", "hint_request"
@@ -1553,6 +1559,17 @@ def _run_text_turn(store, llm, session, turn, context, request_id):
     identity_before = session.get("current_task_identity") or ""
     ui_action = _explicit_ui_action(turn, session)
 
+    if ui_action == "hint_request":
+        # PONOVLJEN KLIK NA NAGOVJEŠTAJ NE KOŠTA NIŠTA i ne produbljuje pomoć.
+        # Mora stajati PRIJE svake grane pomoći (determinističke, serverske i
+        # modelske) — sve tri se vraćaju ranije, pa bi inače nagovještaj i dalje
+        # išao na sljedeći nivo.
+        repeated = stored_hint_for_active_task(session)
+        if repeated:
+            logger.info("hint_repeat_served_from_session request_id=%s topic=%s",
+                        request_id, context.topic_id)
+            return _hint_repeat_response(store, session, turn, repeated, context)
+
     # Faza 4H: dugme pomoći nad aktivnim DETERMINISTIČKIM zadatkom — ljestvica
     # nagovještaja i rješenje su pohranjene serverske činjenice paketa.
     if ui_action:
@@ -1620,15 +1637,6 @@ def _run_text_turn(store, llm, session, turn, context, request_id):
                     generator)
 
     timer = _TurnTimer()
-
-    if ui_action == "hint_request":
-        # PONOVLJEN KLIK NA NAGOVJEŠTAJ NE KOŠTA NIŠTA. Odluka je poznata PRIJE
-        # ijednog poziva i ne dira stanje zadatka.
-        repeated = stored_hint_for_active_task(session)
-        if repeated:
-            logger.info("hint_repeat_served_from_session request_id=%s topic=%s",
-                        request_id, context.topic_id)
-            return _hint_repeat_response(store, session, turn, repeated, context)
 
     if ui_action:
         # Faza 2: pomoć koju model još piše (računski zadatak, nivo 1 ili 2)

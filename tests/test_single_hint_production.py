@@ -182,3 +182,26 @@ def test_rollback_flag_restores_the_progressive_ladder(monkeypatch, production):
                                 hint="Drugi nivo.", lesson_focus="razlomci"))
     run_practice_turn(store, fake, _turn("h7", "Ne znam.", intent="hint_request"))
     assert fake.call_count == calls_before + 1        # ljestvica opet trosi poziv
+
+
+def test_server_composed_hint_also_repeats_without_deepening(production, monkeypatch):
+    """ZIVI NALAZ (ciljani QA): propozicioni nagovjestaj je serverski i vraca se
+    RANIJE od modelske grane, pa je ponovni klik i dalje isao na sljedeci nivo —
+    bez ijednog poziva, ali s NOVIM (dubljim) tekstom."""
+    monkeypatch.setenv("MATBOT_DETERMINISTIC_PRACTICE", "enabled")
+    store, fake = SessionStore(), FakeLLM()
+    lesson = ("6-01-001", 6)          # determinsticka lekcija, 0 poziva
+    payload = {"session_id": "sh", "grade": lesson[1], "selected_topic": lesson[0],
+               "selected_oblast": "", "student_message": "Daj mi zadatak.",
+               "intent": "", "difficulty_request": "", "interaction_phase": "",
+               "last_tutor_task": "", "interaction_type": "student_question",
+               "selected_option_id": "", "client_turn_id": ""}
+    run_practice_turn(store, fake, payload)
+    assert store.peek("sh")["current_task"]
+
+    hint_payload = dict(payload, student_message="Ne znam.", intent="hint_request")
+    first = run_practice_turn(store, fake, hint_payload)
+    second = run_practice_turn(store, fake, dict(hint_payload))
+    assert fake.call_count == 0                       # serverski, bez poziva
+    assert second["answer"] == first["answer"]        # ISTI tekst, ne dublji
+    assert store.peek("sh")["hint_level"] < config.MAX_HINT_LEVEL

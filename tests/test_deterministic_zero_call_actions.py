@@ -7,6 +7,8 @@ pohranjene pri objavi — pa se služe trenutno, bez modela.
 """
 import logging
 
+
+
 import pytest
 
 from matbot.practice import SAFE_ERROR_MESSAGE, run_practice_turn
@@ -238,3 +240,12 @@ def test_model_task_still_uses_the_model_for_help(universal):
 
     assert response["status"] == "ready"
     assert fake.call_count == 1
+
+
+@pytest.fixture(autouse=True)
+def _single_hint_rollback(monkeypatch):
+    """Ljestvica nagovještaja je od ovog izdanja ROLLBACK put."""
+    # LJESTVICA NAGOVJEŠTAJA JE ROLLBACK PUT. Produkcija služi JEDAN
+    # nagovještaj po zadatku; ovi testovi čuvaju da ljestvica ostane
+    # ispravna kad se vrati (MATBOT_PRACTICE_SINGLE_HINT=disabled).
+    monkeypatch.setenv("MATBOT_PRACTICE_SINGLE_HINT", "disabled")

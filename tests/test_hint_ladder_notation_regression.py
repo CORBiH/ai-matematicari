@@ -59,6 +59,10 @@ def _universal_runtime(monkeypatch):
     monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", "universal_two_call")
     monkeypatch.setenv("MATBOT_PRACTICE_DIFFICULTY_LEVELS", "enabled")
     monkeypatch.setenv("MATBOT_DETERMINISTIC_PRACTICE", "disabled")
+    # LJESTVICA NAGOVJEŠTAJA JE ROLLBACK PUT. Produkcija služi JEDAN
+    # nagovještaj po zadatku; ovi testovi čuvaju da ljestvica ostane
+    # ispravna kad se vrati (MATBOT_PRACTICE_SINGLE_HINT=disabled).
+    monkeypatch.setenv("MATBOT_PRACTICE_SINGLE_HINT", "disabled")
 
 
 def _turn(message, **changes):

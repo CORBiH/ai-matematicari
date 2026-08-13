@@ -17,6 +17,8 @@ ijednog poziva modela.
 import dataclasses
 import logging
 
+
+
 import pytest
 
 from matbot import terminology
@@ -282,3 +284,12 @@ def test_choice_reply_uses_the_published_option_text(universal):
     published_option = next(option["text"] for option in session["current_options"]
                             if option["id"] == correct)
     assert published_option in response["answer"]
+
+
+@pytest.fixture(autouse=True)
+def _single_hint_rollback(monkeypatch):
+    """Ljestvica nagovještaja je od ovog izdanja ROLLBACK put."""
+    # LJESTVICA NAGOVJEŠTAJA JE ROLLBACK PUT. Produkcija služi JEDAN
+    # nagovještaj po zadatku; ovi testovi čuvaju da ljestvica ostane
+    # ispravna kad se vrati (MATBOT_PRACTICE_SINGLE_HINT=disabled).
+    monkeypatch.setenv("MATBOT_PRACTICE_SINGLE_HINT", "disabled")
