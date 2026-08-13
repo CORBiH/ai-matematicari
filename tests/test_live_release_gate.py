@@ -380,7 +380,8 @@ def test_gate_harness_records_a_compact_approve_as_reviewer_owned(monkeypatch):
         def tutor_turn(self, instructions, input_text):
             return self._result(self.queue.pop(0), input_text)
 
-        def reviewer_turn(self, instructions, input_text, timeout_s=None):
+        def reviewer_turn(self, instructions, input_text, timeout_s=None,
+                          model=None, reasoning_effort=None):
             return self._result(self.queue.pop(0), input_text)
 
     monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", "universal_two_call")
@@ -415,7 +416,8 @@ def test_gate_harness_records_a_deterministic_scenario_with_zero_calls(monkeypat
         def tutor_turn(self, instructions, input_text):
             raise AssertionError("deterministic scenario must not call the model")
 
-        def reviewer_turn(self, instructions, input_text, timeout_s=None):
+        def reviewer_turn(self, instructions, input_text, timeout_s=None,
+                          model=None, reasoning_effort=None):
             raise AssertionError("deterministic scenario must not call the model")
 
     monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", "universal_two_call")
@@ -471,7 +473,8 @@ def test_gate_harness_preserves_safe_first_call_llm_failure_details(
                     "unapproved_detail": "must not be persisted",
                 })
 
-        def reviewer_turn(self, instructions, input_text, timeout_s=None):
+        def reviewer_turn(self, instructions, input_text, timeout_s=None,
+                          model=None, reasoning_effort=None):
             raise AssertionError("Reviewer must not run after first Tutor failure")
 
     monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", "universal_two_call")

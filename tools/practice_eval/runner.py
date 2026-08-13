@@ -223,7 +223,8 @@ class ObservingLLM:
         self._local.tutor_output = result.output
         return result
 
-    def reviewer_turn(self, instructions, input_text, timeout_s=None):
+    def reviewer_turn(self, instructions, input_text, timeout_s=None,
+                      model=None, reasoning_effort=None):
         # Faza 4H: pipeline prosljeđuje sužen rok ostatka turna.
         result = self._invoke("reviewer", "reviewer_turn", self._inner.reviewer_turn,
                               instructions, input_text, timeout_s=timeout_s)

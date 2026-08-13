@@ -420,7 +420,8 @@ class CountingLLM:
         self.last_tutor_output = result.output
         return result
 
-    def reviewer_turn(self, instructions, input_text, timeout_s=None):
+    def reviewer_turn(self, instructions, input_text, timeout_s=None,
+                      model=None, reasoning_effort=None):
         # Faza 4H: pipeline prosljeđuje SUŽEN rok ostatka turna; brojanje i
         # klasifikacija poziva se ne mijenjaju.
         self._count("reviewer_turn")

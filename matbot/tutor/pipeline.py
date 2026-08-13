@@ -521,7 +521,7 @@ def _call_tutor(llm, context, session, student_message, trusted_verdict, ui_acti
 
 def _call_reviewer(llm, context, session, student_message, draft, trusted_verdict,
                    preflight_block="", ui_action="", timer=None, timeout_s=None,
-                   escalation_block=""):
+                   escalation_block="", model=None, reasoning_effort=None):
     timer = timer or _TurnTimer()
     with timer.stage("prompt_build"):
         instructions = tutor_prompts.build_reviewer_instructions(context)
@@ -531,7 +531,8 @@ def _call_reviewer(llm, context, session, student_message, draft, trusted_verdic
             preflight_block, ui_action, escalation_block=escalation_block,
         )
     with timer.stage("reviewer_call"):
-        result = llm.reviewer_turn(instructions, input_text, timeout_s=timeout_s)
+        result = llm.reviewer_turn(instructions, input_text, timeout_s=timeout_s,
+                                   model=model, reasoning_effort=reasoning_effort)
     timer.note_ms("reviewer_api", getattr(result, "latency_ms", None))
     return result
 
@@ -2075,16 +2076,20 @@ def _fast_single_call(llm, context, session, turn, request_id, ui_action="",
             f"remaining={remaining_s:.1f}s before reviewer call", draft.intent)
         return None, calls
 
+    # POPRAVAK IDE ISTIM BRZIM MODELOM (živi nalaz, val 2): eskalacija na spori
+    # recenzentski model umirala je na roku u 7 od 12 slučajeva (37–41 s naspram
+    # 33–35 s kod uspjelih). Brza ruta mora biti brza i kad popravlja.
     return _reviewer_stage(
         llm, context, session, student_message, draft, None, request_id,
         issues, difficulty_profile, calls, timer, escalation, rejection,
-        remaining_s)
+        remaining_s, reviewer_model=config.FAST_REVIEWER_MODEL,
+        reviewer_effort=config.FAST_REASONING_EFFORT)
 
 
 def _reviewer_stage(llm, context, session, student_message, draft,
                     trusted_verdict, request_id, draft_issues,
                     difficulty_profile, calls, timer, escalation, rejection,
-                    remaining_s):
+                    remaining_s, reviewer_model=None, reviewer_effort=None):
     """DRUGI (i posljednji) poziv — DIJELE ga obje model-podržane rute.
 
     Izdvojeno iz `_two_call` bez ijedne izmjene ponašanja: brza ruta
@@ -2099,6 +2104,7 @@ def _reviewer_stage(llm, context, session, student_message, draft,
             package_preflight.format_for_reviewer(draft_issues), timer=timer,
             timeout_s=min(config.AI_TIMEOUT_S, remaining_s),
             escalation_block=creative_escalation.prompt_block(escalation),
+            model=reviewer_model, reasoning_effort=reviewer_effort,
         )
         calls += 1
         _log_sdk_entry(request_id, context, "reviewer", calls, reviewer_result)

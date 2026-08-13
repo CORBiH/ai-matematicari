@@ -341,7 +341,7 @@ class OpenAIPracticeLLM:
         )
 
     def reviewer_turn(self, instructions: str, input_text: str,
-                      timeout_s=None) -> LLMResult:
+                      timeout_s=None, model=None, reasoning_effort=None) -> LLMResult:
         """DRUGI (i posljednji) poziv: nezavisna provjera + konačan payload.
 
         `config.REVIEWER_MODEL` je zaseban podesiv izbor da bi se recenzent
@@ -357,7 +357,10 @@ class OpenAIPracticeLLM:
             # Tutorovog nacrta. Tutorov budžet se ovim NE mijenja.
             instructions, input_text, ReviewerFinal,
             max_output_tokens=config.MAX_OUTPUT_TOKENS_REVIEWER,
-            model=config.REVIEWER_MODEL,
+            # Per-poziv izbor (brza ruta popravlja svojim modelom); bez njega
+            # važi zatečeni recenzentski model i ništa se ne mijenja.
+            model=model or config.REVIEWER_MODEL,
+            reasoning_effort=reasoning_effort,
             timeout_s=timeout_s,
         )
 

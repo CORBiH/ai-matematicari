@@ -114,7 +114,8 @@ def test_fw_x02_uses_deterministic_route_with_no_fabricated_calls(
         def tutor_turn(self, instructions, input_text):
             raise AssertionError("FW-X02 must not call Tutor")
 
-        def reviewer_turn(self, instructions, input_text, timeout_s=None):
+        def reviewer_turn(self, instructions, input_text, timeout_s=None,
+                          model=None, reasoning_effort=None):
             raise AssertionError("FW-X02 must not call Reviewer")
 
     monkeypatch.delenv(campaign_config.DETERMINISTIC_FLAG, raising=False)

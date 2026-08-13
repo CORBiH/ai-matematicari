@@ -466,7 +466,8 @@ class FakeLLM:
         self._bind_universal_fixture_metadata(result.output, input_text)
         return result
 
-    def reviewer_turn(self, instructions, input_text, timeout_s=None):
+    def reviewer_turn(self, instructions, input_text, timeout_s=None,
+                      model=None, reasoning_effort=None):
         """DRUGI (i posljednji) poziv univerzalnog Practice puta.
 
         `timeout_s` (Faza 4H): pipeline sada prosljeđuje SUŽEN rok ostatka
