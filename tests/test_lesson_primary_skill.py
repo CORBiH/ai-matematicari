@@ -60,7 +60,8 @@ def test_artifact_never_duplicates_the_curriculum_index():
         # Porijeklo je OBAVEZNO i iz zatvorenog rječnika: lekcija čiji je opseg
         # izveden mora biti prepoznatljiva u reviziji, ne stopljena s dokazanim.
         assert row["objective_source"] in {
-            "npp_exact_mapping", "npp_neighbour_only", "canonical_lesson_scope"}, lesson_id
+            "npp_exact_mapping", "npp_neighbour_only", "canonical_lesson_scope",
+            "canonical_title_only"}, lesson_id
         assert row["objective_confidence"] in {"high", "medium", "low"}, lesson_id
         assert bool(row["primary_skills"]) == (
             row["objective_source"] == "npp_exact_mapping"), lesson_id

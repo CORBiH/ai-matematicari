@@ -195,10 +195,20 @@ def _sibling_boundaries(lesson, siblings):
     own = _content_words(lesson["title"])
     if not own:
         return []
+    order = [row["id"] for row in siblings]
+    position = order.index(lesson["id"]) if lesson["id"] in order else -1
     out = []
     for other in siblings:
         # Susjed je lekcija ISTE oblasti: samo tu je zamjena vještine stvarna.
         if other["id"] == lesson["id"] or other.get("oblast") != lesson.get("oblast"):
+            continue
+        # PRETHODNA LEKCIJA JE PREDUSLOV, NE SUPARNIK (živi nalaz, val 3).
+        # Lekcija „predstavljanje rješenja nejednačine na brojevnoj polupravoj“
+        # dobila je kao zabranu rješavanje nejednačine — a rješenje se ne može
+        # predstaviti bez rješavanja. Redoslijed u kanonskom spisku JESTE
+        # kurikularni slijed, pa ranija lekcija iste oblasti ulazi u alat, ne
+        # u zabranu. Zabranjuje se samo ono što dolazi POSLIJE ili paralelno.
+        if position >= 0 and order.index(other["id"]) < position:
             continue
         theirs = _content_words(other["title"])
         if not theirs:
@@ -285,8 +295,12 @@ def build():
                 if exclusions and not primary:
                     stats["scope_from_siblings"] += 1
             if not primary and not exclusions:
-                stats["no_usable_signal"] += 1
-                continue
+                # POSLJEDNJA LEKCIJA OBLASTI nema kasnijih susjeda, pa nema ni
+                # zabrana. To nije „nemjerljivo“: kanonski NASLOV je provjeren
+                # podatak i sam po sebi je mjerilo. Klasa je izdvojena da se u
+                # reviziji vidi da počiva samo na naslovu.
+                source, confidence = "canonical_title_only", "low"
+                stats["title_only"] += 1
             compiled[lesson_id] = OrderedDict([
                 ("grade", int(grade)),
                 ("primary_skills", primary[:MAX_PRIMARY]),
@@ -320,6 +334,7 @@ def main(argv=None):
     print(f"  sa susjednim zabranama: {stats['with_exclusions']}")
     print(f"  odbačeni nepovezani `exact` redovi: {stats['dropped_unrelated_exact']}")
     print(f"  opseg iz susjednih lekcija: {stats['scope_from_siblings']}")
+    print(f"  samo kanonski naslov  : {stats['title_only']}")
     print(f"  bez ijednog mjerila   : {stats['no_usable_signal']}")
     if args.write:
         document = OrderedDict([

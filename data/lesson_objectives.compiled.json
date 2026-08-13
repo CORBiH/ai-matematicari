@@ -28,10 +28,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Pojam skupa, elementi skupa i označavanje",
     "Brojnost skupa i prazan skup",
     "Podskup i jednakost skupova",
-    "Euler-Vennov/Vennov dijagram"
+    "Euler-Vennov/Vennov dijagram",
+    "Unija skupova"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -44,10 +44,10 @@
     "koristi skupove i skupovne operacije u primjerima iz svakodnevnog života, uz grafičku ilustraciju"
    ],
    "neighbour_exclusions": [
-    "Pojam skupa, elementi skupa i označavanje",
-    "Načini zadavanja skupa",
     "Podskup i jednakost skupova",
-    "Euler-Vennov/Vennov dijagram"
+    "Euler-Vennov/Vennov dijagram",
+    "Unija skupova",
+    "Presjek skupova"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -105,10 +105,10 @@
     "koristi skupove i skupovne operacije u primjerima iz svakodnevnog života, uz grafičku ilustraciju"
    ],
    "neighbour_exclusions": [
-    "Pojam skupa, elementi skupa i označavanje",
-    "Načini zadavanja skupa",
-    "Brojnost skupa i prazan skup",
-    "Podskup i jednakost skupova"
+    "Razlika skupova",
+    "Komplement skupa",
+    "Uređeni par",
+    "Direktni/Dekartov proizvod skupova"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -123,10 +123,10 @@
     "razlikovati jednakobrojne i jednake skupove"
    ],
    "neighbour_exclusions": [
-    "Pojam skupa, elementi skupa i označavanje",
-    "Načini zadavanja skupa",
-    "Brojnost skupa i prazan skup",
-    "Podskup i jednakost skupova"
+    "Komplement skupa",
+    "Uređeni par",
+    "Direktni/Dekartov proizvod skupova",
+    "Zadaci s više skupovnih operacija"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -137,10 +137,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Pojam skupa, elementi skupa i označavanje",
-    "Načini zadavanja skupa",
-    "Brojnost skupa i prazan skup",
-    "Podskup i jednakost skupova"
+    "Uređeni par",
+    "Direktni/Dekartov proizvod skupova",
+    "Zadaci s više skupovnih operacija",
+    "Tekstualni zadaci sa skupovima"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -170,10 +170,8 @@
     "koristi skupove i skupovne operacije u primjerima iz svakodnevnog života, uz grafičku ilustraciju"
    ],
    "neighbour_exclusions": [
-    "Pojam skupa, elementi skupa i označavanje",
-    "Načini zadavanja skupa",
-    "Brojnost skupa i prazan skup",
-    "Podskup i jednakost skupova"
+    "Zadaci s više skupovnih operacija",
+    "Tekstualni zadaci sa skupovima"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -223,10 +221,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Skupovi N i N0",
     "Sabiranje i oduzimanje u skupu N0",
     "Množenje i dijeljenje u skupu N0",
-    "Dijeljenje s ostatkom: a = bq + r"
+    "Dijeljenje s ostatkom: a = bq + r",
+    "Svojstva računskih operacija: komutativnost, asocijativnost, distributivnost"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -239,10 +237,10 @@
     "predznaci pozitivnih i negativnih brojeva"
    ],
    "neighbour_exclusions": [
-    "Skupovi N i N0",
-    "Čitanje, zapisivanje i upoređivanje prirodnih brojeva",
     "Množenje i dijeljenje u skupu N0",
-    "Dijeljenje s ostatkom: a = bq + r"
+    "Dijeljenje s ostatkom: a = bq + r",
+    "Svojstva računskih operacija: komutativnost, asocijativnost, distributivnost",
+    "Redoslijed računskih operacija i zagrade"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -253,10 +251,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Skupovi N i N0",
-    "Čitanje, zapisivanje i upoređivanje prirodnih brojeva",
-    "Sabiranje i oduzimanje u skupu N0",
-    "Dijeljenje s ostatkom: a = bq + r"
+    "Dijeljenje s ostatkom: a = bq + r",
+    "Svojstva računskih operacija: komutativnost, asocijativnost, distributivnost",
+    "Redoslijed računskih operacija i zagrade",
+    "Izrazi s promjenljivim i brojna vrijednost izraza"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -284,10 +282,9 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Skupovi N i N0",
-    "Čitanje, zapisivanje i upoređivanje prirodnih brojeva",
-    "Sabiranje i oduzimanje u skupu N0",
-    "Množenje i dijeljenje u skupu N0"
+    "Redoslijed računskih operacija i zagrade",
+    "Izrazi s promjenljivim i brojna vrijednost izraza",
+    "Pridruživanje brojeva po datom pravilu"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -298,10 +295,8 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Skupovi N i N0",
-    "Čitanje, zapisivanje i upoređivanje prirodnih brojeva",
-    "Sabiranje i oduzimanje u skupu N0",
-    "Množenje i dijeljenje u skupu N0"
+    "Izrazi s promjenljivim i brojna vrijednost izraza",
+    "Pridruživanje brojeva po datom pravilu"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -328,14 +323,9 @@
    "grade": 6,
    "primary_skills": [],
    "supporting_concepts": [],
-   "neighbour_exclusions": [
-    "Skupovi N i N0",
-    "Čitanje, zapisivanje i upoređivanje prirodnih brojeva",
-    "Sabiranje i oduzimanje u skupu N0",
-    "Množenje i dijeljenje u skupu N0"
-   ],
+   "neighbour_exclusions": [],
    "evidence_ids": [],
-   "objective_source": "canonical_lesson_scope",
+   "objective_source": "canonical_title_only",
    "objective_confidence": "low"
   },
   "6-03-001": {
@@ -365,10 +355,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Djelilac/djelitelj i sadržilac/višekratnik prirodnog broja",
     "Djeljivost dekadskim jedinicama",
     "Pravila djeljivosti sa 2, 3, 4, 5, 6, 9, 10, 15 i 25",
-    "Prosti i složeni brojevi"
+    "Prosti i složeni brojevi",
+    "Relativno prosti brojevi"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -379,10 +369,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Djelilac/djelitelj i sadržilac/višekratnik prirodnog broja",
-    "Djeljivost zbira, razlike i proizvoda",
     "Pravila djeljivosti sa 2, 3, 4, 5, 6, 9, 10, 15 i 25",
-    "Prosti i složeni brojevi"
+    "Prosti i složeni brojevi",
+    "Relativno prosti brojevi",
+    "Rastavljanje složenih brojeva na proste faktore"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -432,10 +422,10 @@
     "utvrđivati jesu li dva data broja uzajamno (relativno) prosta"
    ],
    "neighbour_exclusions": [
-    "Djelilac/djelitelj i sadržilac/višekratnik prirodnog broja",
-    "Djeljivost zbira, razlike i proizvoda",
-    "Djeljivost dekadskim jedinicama",
-    "Pravila djeljivosti sa 2, 3, 4, 5, 6, 9, 10, 15 i 25"
+    "Rastavljanje složenih brojeva na proste faktore",
+    "Zajednički djelioci i najveći zajednički djelilac / NZD",
+    "Zajednički sadržioci i najmanji zajednički sadržilac / NZS",
+    "Tekstualni zadaci iz djeljivosti"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -587,10 +577,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Pojam razlomka, brojnik/brojilac i nazivnik/imenilac",
-    "Razlomak kao dio cjeline i kao količnik",
-    "Pravi, nepravi i prividni razlomci; mješoviti brojevi",
-    "Prikaz razlomka na brojevnoj polupravoj/osi"
+    "Upoređivanje razlomaka",
+    "Sabiranje i oduzimanje razlomaka jednakih nazivnika",
+    "Sabiranje i oduzimanje razlomaka različitih nazivnika",
+    "Množenje razlomka prirodnim brojem i razlomkom"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -652,10 +642,9 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Pojam razlomka, brojnik/brojilac i nazivnik/imenilac",
-    "Razlomak kao dio cjeline i kao količnik",
-    "Pravi, nepravi i prividni razlomci; mješoviti brojevi",
-    "Prikaz razlomka na brojevnoj polupravoj/osi"
+    "Svojstva računskih operacija s razlomcima",
+    "Brojevni izrazi s razlomcima",
+    "Tekstualni zadaci s razlomcima"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -729,10 +718,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Decimalni zapis razlomka",
     "Pretvaranje razlomka u decimalni broj i obratno",
     "Konačni i beskonačni/periodični decimalni brojevi",
-    "Pridruživanje decimalnih brojeva tačkama brojevne poluprave/osi"
+    "Pridruživanje decimalnih brojeva tačkama brojevne poluprave/osi",
+    "Upoređivanje decimalnih brojeva"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -756,10 +745,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Decimalni zapis razlomka",
-    "Decimalni broj: cijeli dio, decimalni dio i decimalna mjesta",
-    "Pretvaranje razlomka u decimalni broj i obratno",
-    "Pridruživanje decimalnih brojeva tačkama brojevne poluprave/osi"
+    "Pridruživanje decimalnih brojeva tačkama brojevne poluprave/osi",
+    "Upoređivanje decimalnih brojeva",
+    "Zaokruživanje decimalnih brojeva",
+    "Sabiranje i oduzimanje decimalnih brojeva"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -770,10 +759,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Decimalni zapis razlomka",
-    "Decimalni broj: cijeli dio, decimalni dio i decimalna mjesta",
-    "Pretvaranje razlomka u decimalni broj i obratno",
-    "Konačni i beskonačni/periodični decimalni brojevi"
+    "Upoređivanje decimalnih brojeva",
+    "Zaokruživanje decimalnih brojeva",
+    "Sabiranje i oduzimanje decimalnih brojeva",
+    "Množenje decimalnih brojeva"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -788,10 +777,10 @@
     "poredati po veličini date decimalne brojeve"
    ],
    "neighbour_exclusions": [
-    "Decimalni zapis razlomka",
-    "Decimalni broj: cijeli dio, decimalni dio i decimalna mjesta",
-    "Pretvaranje razlomka u decimalni broj i obratno",
-    "Konačni i beskonačni/periodični decimalni brojevi"
+    "Zaokruživanje decimalnih brojeva",
+    "Sabiranje i oduzimanje decimalnih brojeva",
+    "Množenje decimalnih brojeva",
+    "Dijeljenje decimalnih brojeva"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -806,10 +795,10 @@
     "prevoditi decimalni broj u oblik"
    ],
    "neighbour_exclusions": [
-    "Decimalni zapis razlomka",
-    "Decimalni broj: cijeli dio, decimalni dio i decimalna mjesta",
-    "Pretvaranje razlomka u decimalni broj i obratno",
-    "Konačni i beskonačni/periodični decimalni brojevi"
+    "Sabiranje i oduzimanje decimalnih brojeva",
+    "Množenje decimalnih brojeva",
+    "Dijeljenje decimalnih brojeva",
+    "Brojevni izrazi i tekstualni zadaci s decimalnim brojevima"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -820,10 +809,9 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Decimalni zapis razlomka",
-    "Decimalni broj: cijeli dio, decimalni dio i decimalna mjesta",
-    "Pretvaranje razlomka u decimalni broj i obratno",
-    "Konačni i beskonačni/periodični decimalni brojevi"
+    "Množenje decimalnih brojeva",
+    "Dijeljenje decimalnih brojeva",
+    "Brojevni izrazi i tekstualni zadaci s decimalnim brojevima"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -838,10 +826,8 @@
     "prevoditi decimalni broj u oblik"
    ],
    "neighbour_exclusions": [
-    "Decimalni zapis razlomka",
-    "Decimalni broj: cijeli dio, decimalni dio i decimalna mjesta",
-    "Pretvaranje razlomka u decimalni broj i obratno",
-    "Konačni i beskonačni/periodični decimalni brojevi"
+    "Dijeljenje decimalnih brojeva",
+    "Brojevni izrazi i tekstualni zadaci s decimalnim brojevima"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -856,10 +842,7 @@
     "dijeliti dva decimalna broja i vršiti provjeru"
    ],
    "neighbour_exclusions": [
-    "Decimalni zapis razlomka",
-    "Decimalni broj: cijeli dio, decimalni dio i decimalna mjesta",
-    "Pretvaranje razlomka u decimalni broj i obratno",
-    "Konačni i beskonačni/periodični decimalni brojevi"
+    "Brojevni izrazi i tekstualni zadaci s decimalnim brojevima"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -914,8 +897,6 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Postotni zapis razlomka",
-    "Postotak/procenat i procenat broja",
     "Aritmetička sredina danih brojeva / dva broja"
    ],
    "evidence_ids": [],
@@ -959,10 +940,10 @@
     "rješavati jednostavne tipove jednačina: a+x=b, x-a=b, a-x=b,ax=b, a:x=b i x:a=b"
    ],
    "neighbour_exclusions": [
-    "Jednakost, jednačina, nejednakost i nejednačina",
     "Nejednačine s razlomcima oblika x ± a < b / > b i a ± x < b / > b",
     "Jednačine s množenjem i dijeljenjem razlomaka",
-    "Nejednačine s množenjem i dijeljenjem razlomaka"
+    "Nejednačine s množenjem i dijeljenjem razlomaka",
+    "Jednačine i nejednačine s decimalnim brojevima"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -1016,10 +997,7 @@
     "rješavati jednačine i nejednačine u skupu"
    ],
    "neighbour_exclusions": [
-    "Jednakost, jednačina, nejednakost i nejednačina",
-    "Jednačine s razlomcima oblika x ± a = b i a ± x = b",
-    "Nejednačine s razlomcima oblika x ± a < b / > b i a ± x < b / > b",
-    "Jednačine s množenjem i dijeljenjem razlomaka"
+    "Predstavljanje rješenja nejednačine na brojevnoj polupravoj/osi"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -1029,14 +1007,9 @@
    "grade": 6,
    "primary_skills": [],
    "supporting_concepts": [],
-   "neighbour_exclusions": [
-    "Jednakost, jednačina, nejednakost i nejednačina",
-    "Jednačine s razlomcima oblika x ± a = b i a ± x = b",
-    "Nejednačine s razlomcima oblika x ± a < b / > b i a ± x < b / > b",
-    "Jednačine s množenjem i dijeljenjem razlomaka"
-   ],
+   "neighbour_exclusions": [],
    "evidence_ids": [],
-   "objective_source": "canonical_lesson_scope",
+   "objective_source": "canonical_title_only",
    "objective_confidence": "low"
   },
   "6-08-001": {
@@ -1057,10 +1030,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Tačka, prava, ravan, poluprava i duž",
     "Izlomljena linija",
     "Mnogougao/mnogokut",
-    "Kružnica i krug"
+    "Kružnica i krug",
+    "Centar, poluprečnik/polumjer i prečnik/promjer"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -1124,10 +1097,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Tačka, prava, ravan, poluprava i duž",
-    "Geometrijske figure kao skupovi tačaka",
-    "Izlomljena linija",
-    "Mnogougao/mnogokut"
+    "Kružni luk i tetiva",
+    "Odnos prave i kružnice: sječica/sekanta i tangenta",
+    "Konstrukcija tangente na kružnicu",
+    "Odnos dvije kružnice"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -1195,14 +1168,9 @@
    "grade": 6,
    "primary_skills": [],
    "supporting_concepts": [],
-   "neighbour_exclusions": [
-    "Tačka, prava, ravan, poluprava i duž",
-    "Geometrijske figure kao skupovi tačaka",
-    "Izlomljena linija",
-    "Mnogougao/mnogokut"
-   ],
+   "neighbour_exclusions": [],
    "evidence_ids": [],
-   "objective_source": "canonical_lesson_scope",
+   "objective_source": "canonical_title_only",
    "objective_confidence": "low"
   },
   "6-09-001": {
@@ -1226,10 +1194,10 @@
     "svojstva komplementnih i suplementnih uglova"
    ],
    "neighbour_exclusions": [
-    "Pojam ugla, elementi i označavanje",
     "Vrste uglova: nula, oštri, pravi, tupi, opruženi i puni ugao",
     "Centralni/središnji ugao",
-    "Periferijski/obodni ugao i odnos sa centralnim uglom"
+    "Periferijski/obodni ugao i odnos sa centralnim uglom",
+    "Prenošenje i konstrukcija jednakog ugla"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -1291,10 +1259,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Pojam ugla, elementi i označavanje",
-    "Konveksni i nekonveksni uglovi",
-    "Vrste uglova: nula, oštri, pravi, tupi, opruženi i puni ugao",
-    "Centralni/središnji ugao"
+    "Upoređivanje uglova",
+    "Grafičko sabiranje i oduzimanje uglova",
+    "Mjerenje uglova uglomjerom",
+    "Ugaone jedinice: stepen, minuta, sekunda"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -1380,10 +1348,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Pojam ugla, elementi i označavanje",
-    "Konveksni i nekonveksni uglovi",
-    "Vrste uglova: nula, oštri, pravi, tupi, opruženi i puni ugao",
-    "Centralni/središnji ugao"
+    "Susjedni, uporedni i unakrsni uglovi",
+    "Komplementni i suplementni uglovi",
+    "Uglovi uz transverzalu paralelnih pravih",
+    "Uglovi s paralelnim i normalnim kracima"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -1420,10 +1388,7 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Pojam ugla, elementi i označavanje",
-    "Konveksni i nekonveksni uglovi",
-    "Vrste uglova: nula, oštri, pravi, tupi, opruženi i puni ugao",
-    "Centralni/središnji ugao"
+    "Uglovi s paralelnim i normalnim kracima"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -1433,14 +1398,9 @@
    "grade": 6,
    "primary_skills": [],
    "supporting_concepts": [],
-   "neighbour_exclusions": [
-    "Pojam ugla, elementi i označavanje",
-    "Konveksni i nekonveksni uglovi",
-    "Vrste uglova: nula, oštri, pravi, tupi, opruženi i puni ugao",
-    "Centralni/središnji ugao"
-   ],
+   "neighbour_exclusions": [],
    "evidence_ids": [],
-   "objective_source": "canonical_lesson_scope",
+   "objective_source": "canonical_title_only",
    "objective_confidence": "low"
   },
   "6-10-001": {
@@ -1462,10 +1422,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Koordinatni polupravac",
     "Pravougli koordinatni sistem u ravni",
     "Crtanje i očitavanje tačaka u koordinatnom sistemu",
-    "Relacije"
+    "Relacije",
+    "Funkcije/preslikavanja: domen, kodomen i pravilo"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -1476,10 +1436,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Koordinatni polupravac",
-    "Brojevna osa i koordinate tačaka",
     "Crtanje i očitavanje tačaka u koordinatnom sistemu",
-    "Relacije"
+    "Relacije",
+    "Funkcije/preslikavanja: domen, kodomen i pravilo",
+    "Prikaz funkcije tabelom i grafički"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -1490,10 +1450,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Koordinatni polupravac",
-    "Brojevna osa i koordinate tačaka",
-    "Pravougli koordinatni sistem u ravni",
-    "Relacije"
+    "Relacije",
+    "Funkcije/preslikavanja: domen, kodomen i pravilo",
+    "Prikaz funkcije tabelom i grafički",
+    "Tabele, stupčasti i kružni dijagrami"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -1504,10 +1464,9 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Koordinatni polupravac",
-    "Brojevna osa i koordinate tačaka",
-    "Pravougli koordinatni sistem u ravni",
-    "Crtanje i očitavanje tačaka u koordinatnom sistemu"
+    "Funkcije/preslikavanja: domen, kodomen i pravilo",
+    "Prikaz funkcije tabelom i grafički",
+    "Tabele, stupčasti i kružni dijagrami"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -1518,10 +1477,8 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Koordinatni polupravac",
-    "Brojevna osa i koordinate tačaka",
-    "Pravougli koordinatni sistem u ravni",
-    "Crtanje i očitavanje tačaka u koordinatnom sistemu"
+    "Prikaz funkcije tabelom i grafički",
+    "Tabele, stupčasti i kružni dijagrami"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -1534,10 +1491,7 @@
     "određivati koji je razlomak predstavljen grafičkim prikazom"
    ],
    "neighbour_exclusions": [
-    "Koordinatni polupravac",
-    "Brojevna osa i koordinate tačaka",
-    "Pravougli koordinatni sistem u ravni",
-    "Crtanje i očitavanje tačaka u koordinatnom sistemu"
+    "Tabele, stupčasti i kružni dijagrami"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -1547,14 +1501,9 @@
    "grade": 6,
    "primary_skills": [],
    "supporting_concepts": [],
-   "neighbour_exclusions": [
-    "Koordinatni polupravac",
-    "Brojevna osa i koordinate tačaka",
-    "Pravougli koordinatni sistem u ravni",
-    "Crtanje i očitavanje tačaka u koordinatnom sistemu"
-   ],
+   "neighbour_exclusions": [],
    "evidence_ids": [],
-   "objective_source": "canonical_lesson_scope",
+   "objective_source": "canonical_title_only",
    "objective_confidence": "low"
   },
   "6-11-001": {
@@ -1574,11 +1523,9 @@
    "supporting_concepts": [
     "Da znaju šta je vektor i operacije sa vektorima (sabiranje, oduzimanje i množenje vektora brojem)"
    ],
-   "neighbour_exclusions": [
-    "Vektor kao orijentisana duž"
-   ],
+   "neighbour_exclusions": [],
    "evidence_ids": [],
-   "objective_source": "canonical_lesson_scope",
+   "objective_source": "canonical_title_only",
    "objective_confidence": "low"
   },
   "6-12-001": {
@@ -1601,10 +1548,10 @@
     "uočavati primjere osnosimetričnih i centralnosimetričnih figura"
    ],
    "neighbour_exclusions": [
-    "Osna simetrija u ravni",
     "Simetrala duži i konstrukcija",
     "Simetrala ugla i konstrukcija",
-    "Centralna simetrija"
+    "Centralna simetrija",
+    "Centralno simetrične tačke i figure"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -1641,10 +1588,8 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Osna simetrija u ravni",
-    "Osno simetrične tačke i figure",
-    "Simetrala duži i konstrukcija",
-    "Simetrala ugla i konstrukcija"
+    "Translacija",
+    "Rotacija"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -1657,10 +1602,8 @@
     "uočavati primjere osnosimetričnih i centralnosimetričnih figura"
    ],
    "neighbour_exclusions": [
-    "Osna simetrija u ravni",
-    "Osno simetrične tačke i figure",
-    "Simetrala duži i konstrukcija",
-    "Simetrala ugla i konstrukcija"
+    "Translacija",
+    "Rotacija"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -1671,10 +1614,7 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Osna simetrija u ravni",
-    "Osno simetrične tačke i figure",
-    "Simetrala duži i konstrukcija",
-    "Simetrala ugla i konstrukcija"
+    "Rotacija"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -1684,14 +1624,9 @@
    "grade": 6,
    "primary_skills": [],
    "supporting_concepts": [],
-   "neighbour_exclusions": [
-    "Osna simetrija u ravni",
-    "Osno simetrične tačke i figure",
-    "Simetrala duži i konstrukcija",
-    "Simetrala ugla i konstrukcija"
-   ],
+   "neighbour_exclusions": [],
    "evidence_ids": [],
-   "objective_source": "canonical_lesson_scope",
+   "objective_source": "canonical_title_only",
    "objective_confidence": "low"
   },
   "6-13-001": {
@@ -1713,10 +1648,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Mjerne jedinice za dužinu",
     "Mjerne jedinice za vrijeme",
     "Mjerne jedinice za površinu",
-    "Preračunavanje mjernih jedinica"
+    "Preračunavanje mjernih jedinica",
+    "Čitanje podataka iz tabela i dijagrama"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -1727,10 +1662,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Mjerne jedinice za dužinu",
-    "Mjerne jedinice za masu",
     "Mjerne jedinice za površinu",
-    "Preračunavanje mjernih jedinica"
+    "Preračunavanje mjernih jedinica",
+    "Čitanje podataka iz tabela i dijagrama",
+    "Prezentovanje podataka tabelom, dijagramom ili koordinatnim sistemom"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -1741,10 +1676,9 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Mjerne jedinice za dužinu",
-    "Mjerne jedinice za masu",
-    "Mjerne jedinice za vrijeme",
-    "Preračunavanje mjernih jedinica"
+    "Preračunavanje mjernih jedinica",
+    "Čitanje podataka iz tabela i dijagrama",
+    "Prezentovanje podataka tabelom, dijagramom ili koordinatnim sistemom"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -1755,10 +1689,8 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Mjerne jedinice za dužinu",
-    "Mjerne jedinice za masu",
-    "Mjerne jedinice za vrijeme",
-    "Mjerne jedinice za površinu"
+    "Čitanje podataka iz tabela i dijagrama",
+    "Prezentovanje podataka tabelom, dijagramom ili koordinatnim sistemom"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -1769,10 +1701,7 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Mjerne jedinice za dužinu",
-    "Mjerne jedinice za masu",
-    "Mjerne jedinice za vrijeme",
-    "Mjerne jedinice za površinu"
+    "Prezentovanje podataka tabelom, dijagramom ili koordinatnim sistemom"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -1782,14 +1711,9 @@
    "grade": 6,
    "primary_skills": [],
    "supporting_concepts": [],
-   "neighbour_exclusions": [
-    "Mjerne jedinice za dužinu",
-    "Mjerne jedinice za masu",
-    "Mjerne jedinice za vrijeme",
-    "Mjerne jedinice za površinu"
-   ],
+   "neighbour_exclusions": [],
    "evidence_ids": [],
-   "objective_source": "canonical_lesson_scope",
+   "objective_source": "canonical_title_only",
    "objective_confidence": "low"
   },
   "7-01-001": {
@@ -1815,10 +1739,10 @@
     "stečeno znanje o vektorima i izometrijskim preslikavanjima, koristiti za rješavanje zadataka iz geometrije i fizike"
    ],
    "neighbour_exclusions": [
-    "Usmjerena duž i pojam vektora",
     "Nula-vektor",
     "Jednaki vektori",
-    "Suprotni vektori"
+    "Suprotni vektori",
+    "Kolinearni vektori"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -1831,10 +1755,10 @@
     "stečeno znanje o vektorima i izometrijskim preslikavanjima, koristiti za rješavanje zadataka iz geometrije i fizike"
    ],
    "neighbour_exclusions": [
-    "Usmjerena duž i pojam vektora",
-    "Pravac, smjer i intenzitet (dužina) vektora",
     "Jednaki vektori",
-    "Suprotni vektori"
+    "Suprotni vektori",
+    "Kolinearni vektori",
+    "Sabiranje vektora - metoda nadovezivanja (trougla) i metoda paralelograma"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -1849,10 +1773,10 @@
     "uočavati konkretne primjene vektora"
    ],
    "neighbour_exclusions": [
-    "Usmjerena duž i pojam vektora",
-    "Pravac, smjer i intenzitet (dužina) vektora",
-    "Nula-vektor",
-    "Suprotni vektori"
+    "Suprotni vektori",
+    "Kolinearni vektori",
+    "Sabiranje vektora - metoda nadovezivanja (trougla) i metoda paralelograma",
+    "Oduzimanje vektora"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -1865,10 +1789,10 @@
     "stečeno znanje o vektorima i izometrijskim preslikavanjima, koristiti za rješavanje zadataka iz geometrije i fizike"
    ],
    "neighbour_exclusions": [
-    "Usmjerena duž i pojam vektora",
-    "Pravac, smjer i intenzitet (dužina) vektora",
-    "Nula-vektor",
-    "Jednaki vektori"
+    "Kolinearni vektori",
+    "Sabiranje vektora - metoda nadovezivanja (trougla) i metoda paralelograma",
+    "Oduzimanje vektora",
+    "Množenje vektora prirodnim brojem"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -1881,10 +1805,10 @@
     "stečeno znanje o vektorima i izometrijskim preslikavanjima, koristiti za rješavanje zadataka iz geometrije i fizike"
    ],
    "neighbour_exclusions": [
-    "Usmjerena duž i pojam vektora",
-    "Pravac, smjer i intenzitet (dužina) vektora",
-    "Nula-vektor",
-    "Jednaki vektori"
+    "Sabiranje vektora - metoda nadovezivanja (trougla) i metoda paralelograma",
+    "Oduzimanje vektora",
+    "Množenje vektora prirodnim brojem",
+    "Zadaci sa različitim operacijama"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -1908,10 +1832,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Usmjerena duž i pojam vektora",
-    "Pravac, smjer i intenzitet (dužina) vektora",
-    "Nula-vektor",
-    "Jednaki vektori"
+    "Množenje vektora prirodnim brojem",
+    "Zadaci sa različitim operacijama",
+    "Primjene vektora u kretanju i fizici",
+    "Translacija figure vektorom"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -1935,10 +1859,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Usmjerena duž i pojam vektora",
-    "Pravac, smjer i intenzitet (dužina) vektora",
-    "Nula-vektor",
-    "Jednaki vektori"
+    "Primjene vektora u kretanju i fizici",
+    "Translacija figure vektorom",
+    "Rotacija: centar i ugao rotacije",
+    "Osna simetrija"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -1949,10 +1873,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Usmjerena duž i pojam vektora",
-    "Pravac, smjer i intenzitet (dužina) vektora",
-    "Nula-vektor",
-    "Jednaki vektori"
+    "Translacija figure vektorom",
+    "Rotacija: centar i ugao rotacije",
+    "Osna simetrija",
+    "Centralna simetrija"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -1976,10 +1900,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Usmjerena duž i pojam vektora",
-    "Pravac, smjer i intenzitet (dužina) vektora",
-    "Nula-vektor",
-    "Jednaki vektori"
+    "Osna simetrija",
+    "Centralna simetrija",
+    "Kompozicija izometrijskih preslikavanja",
+    "Osa i centar simetrije figure"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -1992,10 +1916,10 @@
     "stečeno znanje o vektorima i izometrijskim preslikavanjima, koristiti za rješavanje zadataka iz geometrije i fizike"
    ],
    "neighbour_exclusions": [
-    "Usmjerena duž i pojam vektora",
-    "Pravac, smjer i intenzitet (dužina) vektora",
-    "Nula-vektor",
-    "Jednaki vektori"
+    "Centralna simetrija",
+    "Kompozicija izometrijskih preslikavanja",
+    "Osa i centar simetrije figure",
+    "Simetrala duži i konstrukcija"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -2008,10 +1932,10 @@
     "predznaci pozitivnih i negativnih brojeva"
    ],
    "neighbour_exclusions": [
-    "Usmjerena duž i pojam vektora",
-    "Pravac, smjer i intenzitet (dužina) vektora",
-    "Nula-vektor",
-    "Jednaki vektori"
+    "Kompozicija izometrijskih preslikavanja",
+    "Osa i centar simetrije figure",
+    "Simetrala duži i konstrukcija",
+    "Simetrala ugla i konstrukcija"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -2022,10 +1946,9 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Usmjerena duž i pojam vektora",
-    "Pravac, smjer i intenzitet (dužina) vektora",
-    "Nula-vektor",
-    "Jednaki vektori"
+    "Osa i centar simetrije figure",
+    "Simetrala duži i konstrukcija",
+    "Simetrala ugla i konstrukcija"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -2146,10 +2069,10 @@
     "Da znaju izvoditi računske operacije sa cijelim brojevima"
    ],
    "neighbour_exclusions": [
-    "Potreba za negativnim cijelim brojevima",
-    "Skup cijelih brojeva Z",
-    "Prikaz na brojevnoj pravoj",
-    "Apsolutna vrijednost cijelog broja"
+    "Apsolutna vrijednost cijelog broja",
+    "Upoređivanje i uređenje cijelih brojeva",
+    "Sabiranje cijelih brojeva istih znakova",
+    "Sabiranje cijelih brojeva različitih znakova"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -2240,10 +2163,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Potreba za negativnim cijelim brojevima",
-    "Skup cijelih brojeva Z",
-    "Prikaz na brojevnoj pravoj",
-    "Suprotni cijeli brojevi"
+    "Množenje cijelih brojeva i pravilo znakova",
+    "Dijeljenje cijelih brojeva i pravilo znakova",
+    "Proizvod više cijelih faktora",
+    "Distributivnost u skupu Z"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -2269,10 +2192,10 @@
     "dijeliti cijele brojeve"
    ],
    "neighbour_exclusions": [
-    "Potreba za negativnim cijelim brojevima",
-    "Skup cijelih brojeva Z",
-    "Prikaz na brojevnoj pravoj",
-    "Suprotni cijeli brojevi"
+    "Proizvod više cijelih faktora",
+    "Distributivnost u skupu Z",
+    "Brojevni izrazi sa cijelim brojevima",
+    "Jednačine sa sabiranjem i oduzimanjem u Z"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -2283,10 +2206,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Potreba za negativnim cijelim brojevima",
-    "Skup cijelih brojeva Z",
-    "Prikaz na brojevnoj pravoj",
-    "Suprotni cijeli brojevi"
+    "Distributivnost u skupu Z",
+    "Brojevni izrazi sa cijelim brojevima",
+    "Jednačine sa sabiranjem i oduzimanjem u Z",
+    "Jednačine sa množenjem i dijeljenjem u Z"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -2297,10 +2220,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Potreba za negativnim cijelim brojevima",
-    "Skup cijelih brojeva Z",
-    "Prikaz na brojevnoj pravoj",
-    "Suprotni cijeli brojevi"
+    "Brojevni izrazi sa cijelim brojevima",
+    "Jednačine sa sabiranjem i oduzimanjem u Z",
+    "Jednačine sa množenjem i dijeljenjem u Z",
+    "Jednačine sa apsolutnom vrijednošću"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -2346,10 +2269,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Potreba za negativnim cijelim brojevima",
-    "Skup cijelih brojeva Z",
-    "Prikaz na brojevnoj pravoj",
-    "Suprotni cijeli brojevi"
+    "Jednačine sa apsolutnom vrijednošću",
+    "Nejednačine sa sabiranjem i oduzimanjem u Z",
+    "Nejednačine sa množenjem i dijeljenjem u Z",
+    "Tekstualni zadaci s cijelim brojevima"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -2360,10 +2283,9 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Potreba za negativnim cijelim brojevima",
-    "Skup cijelih brojeva Z",
-    "Prikaz na brojevnoj pravoj",
-    "Suprotni cijeli brojevi"
+    "Nejednačine sa sabiranjem i oduzimanjem u Z",
+    "Nejednačine sa množenjem i dijeljenjem u Z",
+    "Tekstualni zadaci s cijelim brojevima"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -2376,10 +2298,8 @@
     "označavanje operacija sabiranja i oduzimanja"
    ],
    "neighbour_exclusions": [
-    "Potreba za negativnim cijelim brojevima",
-    "Skup cijelih brojeva Z",
-    "Prikaz na brojevnoj pravoj",
-    "Suprotni cijeli brojevi"
+    "Nejednačine sa množenjem i dijeljenjem u Z",
+    "Tekstualni zadaci s cijelim brojevima"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -2390,10 +2310,7 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Potreba za negativnim cijelim brojevima",
-    "Skup cijelih brojeva Z",
-    "Prikaz na brojevnoj pravoj",
-    "Suprotni cijeli brojevi"
+    "Tekstualni zadaci s cijelim brojevima"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -2403,14 +2320,9 @@
    "grade": 7,
    "primary_skills": [],
    "supporting_concepts": [],
-   "neighbour_exclusions": [
-    "Potreba za negativnim cijelim brojevima",
-    "Skup cijelih brojeva Z",
-    "Prikaz na brojevnoj pravoj",
-    "Suprotni cijeli brojevi"
-   ],
+   "neighbour_exclusions": [],
    "evidence_ids": [],
-   "objective_source": "canonical_lesson_scope",
+   "objective_source": "canonical_title_only",
    "objective_confidence": "low"
   },
   "7-03-001": {
@@ -2439,10 +2351,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Skup racionalnih brojeva Q",
     "Prikaz racionalnih brojeva na brojevnoj pravoj",
     "Suprotan racionalni broj",
-    "Apsolutna vrijednost racionalnog broja"
+    "Apsolutna vrijednost racionalnog broja",
+    "Upoređivanje racionalnih brojeva"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -2588,10 +2500,10 @@
     "dijeliti racionalne brojeve"
    ],
    "neighbour_exclusions": [
-    "Skup racionalnih brojeva Q",
-    "Pozitivni, negativni racionalni brojevi i nula",
-    "Prikaz racionalnih brojeva na brojevnoj pravoj",
-    "Suprotan racionalni broj"
+    "Svojstva računskih operacija u Q",
+    "Brojevni izrazi sa zagradama u Q",
+    "Dvojni razlomci",
+    "Jednačine u Q sa sabiranjem i oduzimanjem"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -2602,10 +2514,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Skup racionalnih brojeva Q",
-    "Pozitivni, negativni racionalni brojevi i nula",
-    "Prikaz racionalnih brojeva na brojevnoj pravoj",
-    "Suprotan racionalni broj"
+    "Brojevni izrazi sa zagradama u Q",
+    "Dvojni razlomci",
+    "Jednačine u Q sa sabiranjem i oduzimanjem",
+    "Jednačine u Q sa množenjem i dijeljenjem"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -2648,10 +2560,10 @@
     "označavanje operacija sabiranja i oduzimanja"
    ],
    "neighbour_exclusions": [
-    "Skup racionalnih brojeva Q",
-    "Pozitivni, negativni racionalni brojevi i nula",
-    "Prikaz racionalnih brojeva na brojevnoj pravoj",
-    "Suprotan racionalni broj"
+    "Jednačine u Q sa množenjem i dijeljenjem",
+    "Jednačine sa zagradama i svođenjem sličnih članova",
+    "Nejednačine u Q",
+    "Primjena linearne jednačine u tekstualnom zadatku"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -2662,10 +2574,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Skup racionalnih brojeva Q",
-    "Pozitivni, negativni racionalni brojevi i nula",
-    "Prikaz racionalnih brojeva na brojevnoj pravoj",
-    "Suprotan racionalni broj"
+    "Jednačine sa zagradama i svođenjem sličnih članova",
+    "Nejednačine u Q",
+    "Primjena linearne jednačine u tekstualnom zadatku",
+    "Procjena, zaokruživanje i približan račun"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -2676,10 +2588,9 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Skup racionalnih brojeva Q",
-    "Pozitivni, negativni racionalni brojevi i nula",
-    "Prikaz racionalnih brojeva na brojevnoj pravoj",
-    "Suprotan racionalni broj"
+    "Nejednačine u Q",
+    "Primjena linearne jednačine u tekstualnom zadatku",
+    "Procjena, zaokruživanje i približan račun"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -2703,10 +2614,7 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Skup racionalnih brojeva Q",
-    "Pozitivni, negativni racionalni brojevi i nula",
-    "Prikaz racionalnih brojeva na brojevnoj pravoj",
-    "Suprotan racionalni broj"
+    "Procjena, zaokruživanje i približan račun"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -2716,14 +2624,9 @@
    "grade": 7,
    "primary_skills": [],
    "supporting_concepts": [],
-   "neighbour_exclusions": [
-    "Skup racionalnih brojeva Q",
-    "Pozitivni, negativni racionalni brojevi i nula",
-    "Prikaz racionalnih brojeva na brojevnoj pravoj",
-    "Suprotan racionalni broj"
-   ],
+   "neighbour_exclusions": [],
    "evidence_ids": [],
-   "objective_source": "canonical_lesson_scope",
+   "objective_source": "canonical_title_only",
    "objective_confidence": "low"
   },
   "7-04-001": {
@@ -2824,10 +2727,10 @@
     "razlikovati trouglove prema stranicama i prema uglovima"
    ],
    "neighbour_exclusions": [
-    "Uglovi sa paralelnim kracima",
-    "Uglovi sa normalnim kracima",
-    "Konstrukcije uglova 60°, 30°, 90° i 45°",
-    "Konstrukcije izvedenih uglova 15°, 75°, 105°, 120° i 135°"
+    "Zbir unutrašnjih uglova trougla",
+    "Vanjski ugao trougla",
+    "Zbir vanjskih uglova trougla",
+    "Odnos stranica i naspramnih uglova"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -2861,10 +2764,10 @@
     "slobodno koriste termine stranice, tjemena (vrhovi) i uglovi trougla"
    ],
    "neighbour_exclusions": [
-    "Uglovi sa paralelnim kracima",
-    "Uglovi sa normalnim kracima",
-    "Konstrukcije uglova 60°, 30°, 90° i 45°",
-    "Konstrukcije izvedenih uglova 15°, 75°, 105°, 120° i 135°"
+    "Zbir vanjskih uglova trougla",
+    "Odnos stranica i naspramnih uglova",
+    "Nejednakost trougla",
+    "Podudarnost trouglova - SUS"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -2911,10 +2814,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Uglovi sa paralelnim kracima",
-    "Uglovi sa normalnim kracima",
-    "Konstrukcije uglova 60°, 30°, 90° i 45°",
-    "Konstrukcije izvedenih uglova 15°, 75°, 105°, 120° i 135°"
+    "Podudarnost trouglova - SUS",
+    "Podudarnost trouglova - USU",
+    "Podudarnost trouglova - SSS",
+    "Podudarnost trouglova - SSU"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -2928,10 +2831,10 @@
     "razlikuju unutrašnje i spoljašnje uglove trougla"
    ],
    "neighbour_exclusions": [
-    "Uglovi sa paralelnim kracima",
-    "Uglovi sa normalnim kracima",
-    "Konstrukcije uglova 60°, 30°, 90° i 45°",
-    "Konstrukcije izvedenih uglova 15°, 75°, 105°, 120° i 135°"
+    "Primjena podudarnosti u dokazivanju jednakosti elemenata",
+    "Jednakokraki trougao - svojstva",
+    "Pravougli trougao i posebni uglovi",
+    "Osnovne konstrukcije trougla"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -2945,10 +2848,10 @@
     "razlikuju unutrašnje i spoljašnje uglove trougla"
    ],
    "neighbour_exclusions": [
-    "Uglovi sa paralelnim kracima",
-    "Uglovi sa normalnim kracima",
-    "Konstrukcije uglova 60°, 30°, 90° i 45°",
-    "Konstrukcije izvedenih uglova 15°, 75°, 105°, 120° i 135°"
+    "Primjena podudarnosti u dokazivanju jednakosti elemenata",
+    "Jednakokraki trougao - svojstva",
+    "Pravougli trougao i posebni uglovi",
+    "Osnovne konstrukcije trougla"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -2962,10 +2865,10 @@
     "razlikuju unutrašnje i spoljašnje uglove trougla"
    ],
    "neighbour_exclusions": [
-    "Uglovi sa paralelnim kracima",
-    "Uglovi sa normalnim kracima",
-    "Konstrukcije uglova 60°, 30°, 90° i 45°",
-    "Konstrukcije izvedenih uglova 15°, 75°, 105°, 120° i 135°"
+    "Primjena podudarnosti u dokazivanju jednakosti elemenata",
+    "Jednakokraki trougao - svojstva",
+    "Pravougli trougao i posebni uglovi",
+    "Osnovne konstrukcije trougla"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -2979,10 +2882,10 @@
     "razlikuju unutrašnje i spoljašnje uglove trougla"
    ],
    "neighbour_exclusions": [
-    "Uglovi sa paralelnim kracima",
-    "Uglovi sa normalnim kracima",
-    "Konstrukcije uglova 60°, 30°, 90° i 45°",
-    "Konstrukcije izvedenih uglova 15°, 75°, 105°, 120° i 135°"
+    "Primjena podudarnosti u dokazivanju jednakosti elemenata",
+    "Jednakokraki trougao - svojstva",
+    "Pravougli trougao i posebni uglovi",
+    "Osnovne konstrukcije trougla"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -2993,10 +2896,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Uglovi sa paralelnim kracima",
-    "Uglovi sa normalnim kracima",
-    "Konstrukcije uglova 60°, 30°, 90° i 45°",
-    "Konstrukcije izvedenih uglova 15°, 75°, 105°, 120° i 135°"
+    "Jednakokraki trougao - svojstva",
+    "Pravougli trougao i posebni uglovi",
+    "Osnovne konstrukcije trougla",
+    "Simetrale stranica i centar opisane kružnice"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -3065,10 +2968,10 @@
     "objašnjavati gdje se nalazi centar kružnice opisane oko oštrouglog, pravouglog i tupouglog trougla"
    ],
    "neighbour_exclusions": [
-    "Uglovi sa paralelnim kracima",
-    "Uglovi sa normalnim kracima",
-    "Konstrukcije uglova 60°, 30°, 90° i 45°",
-    "Konstrukcije izvedenih uglova 15°, 75°, 105°, 120° i 135°"
+    "Simetrale uglova i centar upisane kružnice",
+    "Visine trougla i ortocentar",
+    "Težišne duži i težište",
+    "Srednja linija trougla"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -3186,10 +3089,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Pojam, elementi i vrste četverougla",
-    "Zbir unutrašnjih uglova četverougla",
-    "Zbir vanjskih uglova četverougla",
-    "Uslovi da je četverougao paralelogram"
+    "Uslovi da je četverougao paralelogram",
+    "Pravougaonik - svojstva",
+    "Romb - svojstva",
+    "Kvadrat - svojstva"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -3202,10 +3105,10 @@
     "definisati paralelogram, vrste i objašnjavati svojstva paralelograma i uslove pod kojima je neki četvorougao paralelogram"
    ],
    "neighbour_exclusions": [
-    "Pojam, elementi i vrste četverougla",
-    "Zbir unutrašnjih uglova četverougla",
-    "Zbir vanjskih uglova četverougla",
-    "Paralelogram - definicija i svojstva"
+    "Pravougaonik - svojstva",
+    "Romb - svojstva",
+    "Kvadrat - svojstva",
+    "Konstrukcije paralelograma"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -3216,10 +3119,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Pojam, elementi i vrste četverougla",
-    "Zbir unutrašnjih uglova četverougla",
-    "Zbir vanjskih uglova četverougla",
-    "Paralelogram - definicija i svojstva"
+    "Romb - svojstva",
+    "Kvadrat - svojstva",
+    "Konstrukcije paralelograma",
+    "Trapez i vrste trapeza"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -3230,10 +3133,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Pojam, elementi i vrste četverougla",
-    "Zbir unutrašnjih uglova četverougla",
-    "Zbir vanjskih uglova četverougla",
-    "Paralelogram - definicija i svojstva"
+    "Kvadrat - svojstva",
+    "Konstrukcije paralelograma",
+    "Trapez i vrste trapeza",
+    "Svojstva jednakokrakog trapeza"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -3244,10 +3147,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Pojam, elementi i vrste četverougla",
-    "Zbir unutrašnjih uglova četverougla",
-    "Zbir vanjskih uglova četverougla",
-    "Paralelogram - definicija i svojstva"
+    "Konstrukcije paralelograma",
+    "Trapez i vrste trapeza",
+    "Svojstva jednakokrakog trapeza",
+    "Srednja linija trapeza"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -3329,10 +3232,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Pojam, elementi i vrste četverougla",
-    "Zbir unutrašnjih uglova četverougla",
-    "Zbir vanjskih uglova četverougla",
-    "Paralelogram - definicija i svojstva"
+    "Konstrukcije deltoida",
+    "Obim trougla",
+    "Obim četverougla",
+    "Mjerne jedinice za površinu"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -3384,10 +3287,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Pojam, elementi i vrste četverougla",
-    "Zbir unutrašnjih uglova četverougla",
-    "Zbir vanjskih uglova četverougla",
-    "Paralelogram - definicija i svojstva"
+    "Površina pravougaonika i kvadrata - obnova",
+    "Površina paralelograma",
+    "Površina trougla",
+    "Površina trapeza"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -3474,10 +3377,8 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Pojam, elementi i vrste četverougla",
-    "Zbir unutrašnjih uglova četverougla",
-    "Zbir vanjskih uglova četverougla",
-    "Paralelogram - definicija i svojstva"
+    "Površina četverougla sa normalnim dijagonalama",
+    "Složene figure i primjena obima/površine"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -3488,10 +3389,7 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Pojam, elementi i vrste četverougla",
-    "Zbir unutrašnjih uglova četverougla",
-    "Zbir vanjskih uglova četverougla",
-    "Paralelogram - definicija i svojstva"
+    "Složene figure i primjena obima/površine"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -3501,14 +3399,9 @@
    "grade": 7,
    "primary_skills": [],
    "supporting_concepts": [],
-   "neighbour_exclusions": [
-    "Pojam, elementi i vrste četverougla",
-    "Zbir unutrašnjih uglova četverougla",
-    "Zbir vanjskih uglova četverougla",
-    "Paralelogram - definicija i svojstva"
-   ],
+   "neighbour_exclusions": [],
    "evidence_ids": [],
-   "objective_source": "canonical_lesson_scope",
+   "objective_source": "canonical_title_only",
    "objective_confidence": "low"
   },
   "7-06-001": {
@@ -3530,10 +3423,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Tačka, prava, ravan, poluprava i duž",
     "Izlomljena linija",
     "Mnogougao/mnogokut",
-    "Kružnica i krug"
+    "Kružnica i krug",
+    "Centar, poluprečnik/polumjer i prečnik/promjer"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -3544,10 +3437,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Tačka, prava, ravan, poluprava i duž",
-    "Geometrijske figure kao skupovi tačaka",
     "Mnogougao/mnogokut",
-    "Kružnica i krug"
+    "Kružnica i krug",
+    "Centar, poluprečnik/polumjer i prečnik/promjer",
+    "Kružni luk i tetiva"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -3558,10 +3451,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Tačka, prava, ravan, poluprava i duž",
-    "Geometrijske figure kao skupovi tačaka",
-    "Izlomljena linija",
-    "Kružnica i krug"
+    "Kružnica i krug",
+    "Centar, poluprečnik/polumjer i prečnik/promjer",
+    "Kružni luk i tetiva",
+    "Odnos prave i kružnice: sječica/sekanta i tangenta"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -3574,10 +3467,10 @@
     "koristiti formulu za računanje površine kružnog isječka i kružnog prstena"
    ],
    "neighbour_exclusions": [
-    "Tačka, prava, ravan, poluprava i duž",
-    "Geometrijske figure kao skupovi tačaka",
-    "Izlomljena linija",
-    "Mnogougao/mnogokut"
+    "Centar, poluprečnik/polumjer i prečnik/promjer",
+    "Kružni luk i tetiva",
+    "Odnos prave i kružnice: sječica/sekanta i tangenta",
+    "Konstrukcija tangente na kružnicu"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -3588,10 +3481,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Tačka, prava, ravan, poluprava i duž",
-    "Geometrijske figure kao skupovi tačaka",
-    "Izlomljena linija",
-    "Mnogougao/mnogokut"
+    "Kružni luk i tetiva",
+    "Odnos prave i kružnice: sječica/sekanta i tangenta",
+    "Konstrukcija tangente na kružnicu",
+    "Odnos dvije kružnice"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -3602,10 +3495,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Tačka, prava, ravan, poluprava i duž",
-    "Geometrijske figure kao skupovi tačaka",
-    "Izlomljena linija",
-    "Mnogougao/mnogokut"
+    "Odnos prave i kružnice: sječica/sekanta i tangenta",
+    "Konstrukcija tangente na kružnicu",
+    "Odnos dvije kružnice",
+    "Kružni isječak, odsječak i prsten"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -3618,10 +3511,9 @@
     "opisivati odnos kružnice i prave"
    ],
    "neighbour_exclusions": [
-    "Tačka, prava, ravan, poluprava i duž",
-    "Geometrijske figure kao skupovi tačaka",
-    "Izlomljena linija",
-    "Mnogougao/mnogokut"
+    "Konstrukcija tangente na kružnicu",
+    "Odnos dvije kružnice",
+    "Kružni isječak, odsječak i prsten"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -3632,10 +3524,8 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Tačka, prava, ravan, poluprava i duž",
-    "Geometrijske figure kao skupovi tačaka",
-    "Izlomljena linija",
-    "Mnogougao/mnogokut"
+    "Odnos dvije kružnice",
+    "Kružni isječak, odsječak i prsten"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -3658,14 +3548,9 @@
    "grade": 7,
    "primary_skills": [],
    "supporting_concepts": [],
-   "neighbour_exclusions": [
-    "Tačka, prava, ravan, poluprava i duž",
-    "Geometrijske figure kao skupovi tačaka",
-    "Izlomljena linija",
-    "Mnogougao/mnogokut"
-   ],
+   "neighbour_exclusions": [],
    "evidence_ids": [],
-   "objective_source": "canonical_lesson_scope",
+   "objective_source": "canonical_title_only",
    "objective_confidence": "low"
   },
   "8-01-001": {
@@ -3707,10 +3592,10 @@
     "upoređivati dva realna broja"
    ],
    "neighbour_exclusions": [
-    "Skupovi N, Z, Q, I i R i odnosi među njima",
-    "Iracionalni brojevi i beskonačni neperiodični decimalni zapis",
     "Apsolutna vrijednost realnog broja",
-    "Kvadrat racionalnog broja"
+    "Kvadrat racionalnog broja",
+    "Savršeni kvadrati i procjena",
+    "Kvadratni korijen nenegativnog racionalnog broja"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -3723,10 +3608,10 @@
     "upoređivati dva realna broja"
    ],
    "neighbour_exclusions": [
-    "Skupovi N, Z, Q, I i R i odnosi među njima",
-    "Iracionalni brojevi i beskonačni neperiodični decimalni zapis",
     "Apsolutna vrijednost realnog broja",
-    "Kvadrat racionalnog broja"
+    "Kvadrat racionalnog broja",
+    "Savršeni kvadrati i procjena",
+    "Kvadratni korijen nenegativnog racionalnog broja"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -3739,10 +3624,10 @@
     "upoređivati dva realna broja"
    ],
    "neighbour_exclusions": [
-    "Skupovi N, Z, Q, I i R i odnosi među njima",
-    "Iracionalni brojevi i beskonačni neperiodični decimalni zapis",
-    "Realni brojevi i brojevna osa",
-    "Uređenost i poređenje realnih brojeva"
+    "Kvadrat racionalnog broja",
+    "Savršeni kvadrati i procjena",
+    "Kvadratni korijen nenegativnog racionalnog broja",
+    "Jednačina x²=a, a≥0"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -3768,10 +3653,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Skupovi N, Z, Q, I i R i odnosi među njima",
-    "Iracionalni brojevi i beskonačni neperiodični decimalni zapis",
-    "Realni brojevi i brojevna osa",
-    "Uređenost i poređenje realnih brojeva"
+    "Kvadratni korijen nenegativnog racionalnog broja",
+    "Jednačina x²=a, a≥0",
+    "Korijen proizvoda i količnika",
+    "Približne vrijednosti kvadratnog korijena"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -3855,10 +3740,10 @@
     "primjenjivati svojstva sabiranja i množenja u skupu realnih brojeva"
    ],
    "neighbour_exclusions": [
-    "Skupovi N, Z, Q, I i R i odnosi među njima",
-    "Iracionalni brojevi i beskonačni neperiodični decimalni zapis",
-    "Realni brojevi i brojevna osa",
-    "Uređenost i poređenje realnih brojeva"
+    "Stepen sa cijelim izložiocem",
+    "Nulti i negativni eksponent",
+    "Množenje i dijeljenje stepena jednakih osnova",
+    "Stepen proizvoda, količnika i stepena"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -3886,10 +3771,9 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Skupovi N, Z, Q, I i R i odnosi među njima",
-    "Iracionalni brojevi i beskonačni neperiodični decimalni zapis",
-    "Realni brojevi i brojevna osa",
-    "Uređenost i poređenje realnih brojeva"
+    "Množenje i dijeljenje stepena jednakih osnova",
+    "Stepen proizvoda, količnika i stepena",
+    "Naučni zapis broja"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -3942,14 +3826,9 @@
    "grade": 8,
    "primary_skills": [],
    "supporting_concepts": [],
-   "neighbour_exclusions": [
-    "Skupovi N, Z, Q, I i R i odnosi među njima",
-    "Iracionalni brojevi i beskonačni neperiodični decimalni zapis",
-    "Realni brojevi i brojevna osa",
-    "Uređenost i poređenje realnih brojeva"
-   ],
+   "neighbour_exclusions": [],
    "evidence_ids": [],
-   "objective_source": "canonical_lesson_scope",
+   "objective_source": "canonical_title_only",
    "objective_confidence": "low"
   },
   "8-02-001": {
@@ -3992,10 +3871,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Pravougli koordinatni sistem, ose i kvadranti",
-    "Koordinate tačke i uređeni par",
     "Udaljenost između dvije tačke",
-    "Pojam linearne funkcije y=kx+n"
+    "Pojam linearne funkcije y=kx+n",
+    "Tabela vrijednosti linearne funkcije",
+    "Grafik linearne funkcije"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -4023,10 +3902,10 @@
     "ispitivati svojstva linearne funkcije"
    ],
    "neighbour_exclusions": [
-    "Pravougli koordinatni sistem, ose i kvadranti",
-    "Koordinate tačke i uređeni par",
-    "Crtanje i očitavanje tačaka",
-    "Udaljenost između dvije tačke"
+    "Tabela vrijednosti linearne funkcije",
+    "Grafik linearne funkcije",
+    "Geometrijsko značenje koeficijenta k",
+    "Geometrijsko značenje slobodnog člana n"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -4037,10 +3916,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Pravougli koordinatni sistem, ose i kvadranti",
-    "Koordinate tačke i uređeni par",
-    "Crtanje i očitavanje tačaka",
-    "Udaljenost između dvije tačke"
+    "Grafik linearne funkcije",
+    "Geometrijsko značenje koeficijenta k",
+    "Geometrijsko značenje slobodnog člana n",
+    "Nula linearne funkcije"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -4051,10 +3930,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Pravougli koordinatni sistem, ose i kvadranti",
-    "Koordinate tačke i uređeni par",
-    "Crtanje i očitavanje tačaka",
-    "Udaljenost između dvije tačke"
+    "Geometrijsko značenje koeficijenta k",
+    "Geometrijsko značenje slobodnog člana n",
+    "Nula linearne funkcije",
+    "Znak i tok linearne funkcije"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -4065,10 +3944,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Pravougli koordinatni sistem, ose i kvadranti",
-    "Koordinate tačke i uređeni par",
-    "Crtanje i očitavanje tačaka",
-    "Udaljenost između dvije tačke"
+    "Geometrijsko značenje slobodnog člana n",
+    "Nula linearne funkcije",
+    "Znak i tok linearne funkcije",
+    "Eksplicitni i implicitni oblik prave"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -4079,10 +3958,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Pravougli koordinatni sistem, ose i kvadranti",
-    "Koordinate tačke i uređeni par",
-    "Crtanje i očitavanje tačaka",
-    "Udaljenost između dvije tačke"
+    "Nula linearne funkcije",
+    "Znak i tok linearne funkcije",
+    "Eksplicitni i implicitni oblik prave",
+    "Modeliranje problemske situacije linearnom funkcijom"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -4093,10 +3972,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Pravougli koordinatni sistem, ose i kvadranti",
-    "Koordinate tačke i uređeni par",
-    "Crtanje i očitavanje tačaka",
-    "Udaljenost između dvije tačke"
+    "Znak i tok linearne funkcije",
+    "Eksplicitni i implicitni oblik prave",
+    "Modeliranje problemske situacije linearnom funkcijom",
+    "Paralelne i presječne prave preko koeficijenta k"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -4107,10 +3986,9 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Pravougli koordinatni sistem, ose i kvadranti",
-    "Koordinate tačke i uređeni par",
-    "Crtanje i očitavanje tačaka",
-    "Udaljenost između dvije tačke"
+    "Eksplicitni i implicitni oblik prave",
+    "Modeliranje problemske situacije linearnom funkcijom",
+    "Paralelne i presječne prave preko koeficijenta k"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -4121,10 +3999,8 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Pravougli koordinatni sistem, ose i kvadranti",
-    "Koordinate tačke i uređeni par",
-    "Crtanje i očitavanje tačaka",
-    "Udaljenost između dvije tačke"
+    "Modeliranje problemske situacije linearnom funkcijom",
+    "Paralelne i presječne prave preko koeficijenta k"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -4135,10 +4011,7 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Pravougli koordinatni sistem, ose i kvadranti",
-    "Koordinate tačke i uređeni par",
-    "Crtanje i očitavanje tačaka",
-    "Udaljenost između dvije tačke"
+    "Paralelne i presječne prave preko koeficijenta k"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -4148,14 +4021,9 @@
    "grade": 8,
    "primary_skills": [],
    "supporting_concepts": [],
-   "neighbour_exclusions": [
-    "Pravougli koordinatni sistem, ose i kvadranti",
-    "Koordinate tačke i uređeni par",
-    "Crtanje i očitavanje tačaka",
-    "Udaljenost između dvije tačke"
-   ],
+   "neighbour_exclusions": [],
    "evidence_ids": [],
-   "objective_source": "canonical_lesson_scope",
+   "objective_source": "canonical_title_only",
    "objective_confidence": "low"
   },
   "8-03-001": {
@@ -4224,10 +4092,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Razmjera i omjer veličina",
-    "Proporcija i osnovno svojstvo",
-    "Nepoznati član proporcije",
-    "Prepoznavanje direktne proporcionalnosti"
+    "Funkcija direktne proporcionalnosti y=kx",
+    "Funkcija obrnute proporcionalnosti y=k/x",
+    "Proporcionalne duži",
+    "Talesova teorema"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -4251,10 +4119,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Razmjera i omjer veličina",
-    "Proporcija i osnovno svojstvo",
-    "Nepoznati član proporcije",
-    "Prepoznavanje direktne proporcionalnosti"
+    "Proporcionalne duži",
+    "Talesova teorema",
+    "Četvrta geometrijska proporcionala",
+    "Dijeljenje duži na jednake dijelove"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -4282,10 +4150,10 @@
     "razumjeti Talesovu teoremu, iskazivati je i na slici navoditi date uslove i tvrdnje"
    ],
    "neighbour_exclusions": [
-    "Razmjera i omjer veličina",
-    "Proporcija i osnovno svojstvo",
-    "Nepoznati član proporcije",
-    "Prepoznavanje direktne proporcionalnosti"
+    "Četvrta geometrijska proporcionala",
+    "Dijeljenje duži na jednake dijelove",
+    "Dijeljenje duži u datoj razmjeri",
+    "Pojam sličnosti i koeficijent sličnosti"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -4298,10 +4166,10 @@
     "izračunati dužine stranica, obim i površinu sličnih trouglova"
    ],
    "neighbour_exclusions": [
-    "Razmjera i omjer veličina",
-    "Proporcija i osnovno svojstvo",
-    "Nepoznati član proporcije",
-    "Prepoznavanje direktne proporcionalnosti"
+    "Dijeljenje duži na jednake dijelove",
+    "Dijeljenje duži u datoj razmjeri",
+    "Pojam sličnosti i koeficijent sličnosti",
+    "Stavovi sličnosti trouglova"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -4398,10 +4266,9 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Razmjera i omjer veličina",
-    "Proporcija i osnovno svojstvo",
-    "Nepoznati član proporcije",
-    "Prepoznavanje direktne proporcionalnosti"
+    "Određivanje osnovice ili procentne stope",
+    "Jednostavni kamatni račun",
+    "Proporcionalna podjela"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -4412,10 +4279,8 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Razmjera i omjer veličina",
-    "Proporcija i osnovno svojstvo",
-    "Nepoznati član proporcije",
-    "Prepoznavanje direktne proporcionalnosti"
+    "Jednostavni kamatni račun",
+    "Proporcionalna podjela"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -4426,10 +4291,7 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Razmjera i omjer veličina",
-    "Proporcija i osnovno svojstvo",
-    "Nepoznati član proporcije",
-    "Prepoznavanje direktne proporcionalnosti"
+    "Proporcionalna podjela"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -4472,10 +4334,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Pitagorina teorema - formulacija",
     "Određivanje nepoznate katete",
     "Dijagonala kvadrata",
-    "Dijagonala pravougaonika"
+    "Dijagonala pravougaonika",
+    "Visina jednakokrakog trougla"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -4486,10 +4348,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Pitagorina teorema - formulacija",
-    "Obrat Pitagorine teoreme",
     "Dijagonala kvadrata",
-    "Dijagonala pravougaonika"
+    "Dijagonala pravougaonika",
+    "Visina jednakokrakog trougla",
+    "Visina jednakostraničnog trougla"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -4515,10 +4377,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Pitagorina teorema - formulacija",
-    "Obrat Pitagorine teoreme",
-    "Određivanje nepoznate katete",
-    "Dijagonala kvadrata"
+    "Visina jednakokrakog trougla",
+    "Visina jednakostraničnog trougla",
+    "Površina jednakostraničnog trougla",
+    "Primjena na romb"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -4529,10 +4391,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Pitagorina teorema - formulacija",
-    "Obrat Pitagorine teoreme",
-    "Određivanje nepoznate katete",
-    "Dijagonala kvadrata"
+    "Visina jednakostraničnog trougla",
+    "Površina jednakostraničnog trougla",
+    "Primjena na romb",
+    "Primjena na jednakokraki trapez"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -4543,10 +4405,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Pitagorina teorema - formulacija",
-    "Obrat Pitagorine teoreme",
-    "Određivanje nepoznate katete",
-    "Dijagonala kvadrata"
+    "Površina jednakostraničnog trougla",
+    "Primjena na romb",
+    "Primjena na jednakokraki trapez",
+    "Primjena na pravougli trapez"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -4557,10 +4419,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Pitagorina teorema - formulacija",
-    "Obrat Pitagorine teoreme",
-    "Određivanje nepoznate katete",
-    "Dijagonala kvadrata"
+    "Primjena na romb",
+    "Primjena na jednakokraki trapez",
+    "Primjena na pravougli trapez",
+    "Tetiva i udaljenost od centra"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -4571,10 +4433,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Pitagorina teorema - formulacija",
-    "Obrat Pitagorine teoreme",
-    "Određivanje nepoznate katete",
-    "Dijagonala kvadrata"
+    "Primjena na jednakokraki trapez",
+    "Primjena na pravougli trapez",
+    "Tetiva i udaljenost od centra",
+    "Udaljenost tačaka u koordinatnom sistemu"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -4615,10 +4477,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Pitagorina teorema - formulacija",
-    "Obrat Pitagorine teoreme",
-    "Određivanje nepoznate katete",
-    "Dijagonala kvadrata"
+    "Udaljenost tačaka u koordinatnom sistemu",
+    "Konstrukcija iracionalnih tačaka na osi",
+    "Konstruktivni zadaci sa površinama kvadrata",
+    "Praktični problemski zadaci"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -4658,10 +4520,7 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Pitagorina teorema - formulacija",
-    "Obrat Pitagorine teoreme",
-    "Određivanje nepoznate katete",
-    "Dijagonala kvadrata"
+    "Praktični problemski zadaci"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -4671,14 +4530,9 @@
    "grade": 8,
    "primary_skills": [],
    "supporting_concepts": [],
-   "neighbour_exclusions": [
-    "Pitagorina teorema - formulacija",
-    "Obrat Pitagorine teoreme",
-    "Određivanje nepoznate katete",
-    "Dijagonala kvadrata"
-   ],
+   "neighbour_exclusions": [],
    "evidence_ids": [],
-   "objective_source": "canonical_lesson_scope",
+   "objective_source": "canonical_title_only",
    "objective_confidence": "low"
   },
   "8-05-001": {
@@ -4700,10 +4554,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Rogalj i njegovi elementi",
     "Prizma - baze, omotač, ivice i visina",
     "Piramida - baza, bočne strane, vrh i visina",
-    "Pravilna uspravna trostrana prizma"
+    "Pravilna uspravna trostrana prizma",
+    "Pravilna uspravna četverostrana prizma"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -4714,10 +4568,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Rogalj i njegovi elementi",
-    "Poliedar i osnovni elementi",
     "Piramida - baza, bočne strane, vrh i visina",
-    "Pravilna uspravna trostrana prizma"
+    "Pravilna uspravna trostrana prizma",
+    "Pravilna uspravna četverostrana prizma",
+    "Pravilna uspravna trostrana piramida"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -4728,10 +4582,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Rogalj i njegovi elementi",
-    "Poliedar i osnovni elementi",
-    "Prizma - baze, omotač, ivice i visina",
-    "Pravilna uspravna trostrana prizma"
+    "Pravilna uspravna trostrana prizma",
+    "Pravilna uspravna četverostrana prizma",
+    "Pravilna uspravna trostrana piramida",
+    "Pravilna uspravna četverostrana piramida"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -4742,10 +4596,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Rogalj i njegovi elementi",
-    "Poliedar i osnovni elementi",
-    "Prizma - baze, omotač, ivice i visina",
-    "Piramida - baza, bočne strane, vrh i visina"
+    "Pravilna uspravna četverostrana prizma",
+    "Pravilna uspravna trostrana piramida",
+    "Pravilna uspravna četverostrana piramida",
+    "Mreža trostrane prizme"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -4756,10 +4610,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Rogalj i njegovi elementi",
-    "Poliedar i osnovni elementi",
-    "Prizma - baze, omotač, ivice i visina",
-    "Piramida - baza, bočne strane, vrh i visina"
+    "Pravilna uspravna trostrana piramida",
+    "Pravilna uspravna četverostrana piramida",
+    "Mreža trostrane prizme",
+    "Mreža četverostrane prizme"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -4770,10 +4624,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Rogalj i njegovi elementi",
-    "Poliedar i osnovni elementi",
-    "Prizma - baze, omotač, ivice i visina",
-    "Piramida - baza, bočne strane, vrh i visina"
+    "Pravilna uspravna četverostrana piramida",
+    "Mreža trostrane prizme",
+    "Mreža četverostrane prizme",
+    "Mreža trostrane piramide"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -4784,10 +4638,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Rogalj i njegovi elementi",
-    "Poliedar i osnovni elementi",
-    "Prizma - baze, omotač, ivice i visina",
-    "Piramida - baza, bočne strane, vrh i visina"
+    "Mreža trostrane prizme",
+    "Mreža četverostrane prizme",
+    "Mreža trostrane piramide",
+    "Mreža četverostrane piramide"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -4798,10 +4652,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Rogalj i njegovi elementi",
-    "Poliedar i osnovni elementi",
-    "Prizma - baze, omotač, ivice i visina",
-    "Piramida - baza, bočne strane, vrh i visina"
+    "Mreža četverostrane prizme",
+    "Mreža trostrane piramide",
+    "Mreža četverostrane piramide",
+    "Površina omotača pravilne prizme"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -4812,10 +4666,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Rogalj i njegovi elementi",
-    "Poliedar i osnovni elementi",
-    "Prizma - baze, omotač, ivice i visina",
-    "Piramida - baza, bočne strane, vrh i visina"
+    "Mreža trostrane piramide",
+    "Mreža četverostrane piramide",
+    "Površina omotača pravilne prizme",
+    "Ukupna površina pravilne prizme"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -4826,10 +4680,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Rogalj i njegovi elementi",
-    "Poliedar i osnovni elementi",
-    "Prizma - baze, omotač, ivice i visina",
-    "Piramida - baza, bočne strane, vrh i visina"
+    "Mreža četverostrane piramide",
+    "Površina omotača pravilne prizme",
+    "Ukupna površina pravilne prizme",
+    "Zapremina pravilne prizme"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -4840,10 +4694,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Rogalj i njegovi elementi",
-    "Poliedar i osnovni elementi",
-    "Prizma - baze, omotač, ivice i visina",
-    "Piramida - baza, bočne strane, vrh i visina"
+    "Površina omotača pravilne prizme",
+    "Ukupna površina pravilne prizme",
+    "Zapremina pravilne prizme",
+    "Prostorna dijagonala pravilne četverostrane prizme"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -4854,10 +4708,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Rogalj i njegovi elementi",
-    "Poliedar i osnovni elementi",
-    "Prizma - baze, omotač, ivice i visina",
-    "Piramida - baza, bočne strane, vrh i visina"
+    "Ukupna površina pravilne prizme",
+    "Zapremina pravilne prizme",
+    "Prostorna dijagonala pravilne četverostrane prizme",
+    "Apotema pravilne piramide"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -4868,10 +4722,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Rogalj i njegovi elementi",
-    "Poliedar i osnovni elementi",
-    "Prizma - baze, omotač, ivice i visina",
-    "Piramida - baza, bočne strane, vrh i visina"
+    "Zapremina pravilne prizme",
+    "Prostorna dijagonala pravilne četverostrane prizme",
+    "Apotema pravilne piramide",
+    "Površina omotača pravilne piramide"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -4897,10 +4751,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Rogalj i njegovi elementi",
-    "Poliedar i osnovni elementi",
-    "Prizma - baze, omotač, ivice i visina",
-    "Piramida - baza, bočne strane, vrh i visina"
+    "Apotema pravilne piramide",
+    "Površina omotača pravilne piramide",
+    "Ukupna površina pravilne piramide",
+    "Zapremina pravilne piramide"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -4911,10 +4765,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Rogalj i njegovi elementi",
-    "Poliedar i osnovni elementi",
-    "Prizma - baze, omotač, ivice i visina",
-    "Piramida - baza, bočne strane, vrh i visina"
+    "Površina omotača pravilne piramide",
+    "Ukupna površina pravilne piramide",
+    "Zapremina pravilne piramide",
+    "Složeni zadaci s prizmama i piramidama"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -4925,10 +4779,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Rogalj i njegovi elementi",
-    "Poliedar i osnovni elementi",
-    "Prizma - baze, omotač, ivice i visina",
-    "Piramida - baza, bočne strane, vrh i visina"
+    "Ukupna površina pravilne piramide",
+    "Zapremina pravilne piramide",
+    "Složeni zadaci s prizmama i piramidama",
+    "Mjerne jedinice površine i zapremine"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -4939,10 +4793,9 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Rogalj i njegovi elementi",
-    "Poliedar i osnovni elementi",
-    "Prizma - baze, omotač, ivice i visina",
-    "Piramida - baza, bočne strane, vrh i visina"
+    "Zapremina pravilne piramide",
+    "Složeni zadaci s prizmama i piramidama",
+    "Mjerne jedinice površine i zapremine"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -4953,10 +4806,8 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Rogalj i njegovi elementi",
-    "Poliedar i osnovni elementi",
-    "Prizma - baze, omotač, ivice i visina",
-    "Piramida - baza, bočne strane, vrh i visina"
+    "Složeni zadaci s prizmama i piramidama",
+    "Mjerne jedinice površine i zapremine"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -4967,10 +4818,7 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Rogalj i njegovi elementi",
-    "Poliedar i osnovni elementi",
-    "Prizma - baze, omotač, ivice i visina",
-    "Piramida - baza, bočne strane, vrh i visina"
+    "Mjerne jedinice površine i zapremine"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -4980,14 +4828,9 @@
    "grade": 8,
    "primary_skills": [],
    "supporting_concepts": [],
-   "neighbour_exclusions": [
-    "Rogalj i njegovi elementi",
-    "Poliedar i osnovni elementi",
-    "Prizma - baze, omotač, ivice i visina",
-    "Piramida - baza, bočne strane, vrh i visina"
-   ],
+   "neighbour_exclusions": [],
    "evidence_ids": [],
-   "objective_source": "canonical_lesson_scope",
+   "objective_source": "canonical_title_only",
    "objective_confidence": "low"
   },
   "8-06-001": {
@@ -5011,10 +4854,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Obilježje, podaci i skup posmatranja",
     "Stupčasti dijagram",
     "Kružni dijagram",
-    "Linijski i tačkasti prikaz podataka"
+    "Linijski i tačkasti prikaz podataka",
+    "Čitanje i kritičko tumačenje dijagrama"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -5053,10 +4896,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Obilježje, podaci i skup posmatranja",
-    "Frekvencija",
-    "Relativna frekvencija",
-    "Tabela frekvencija"
+    "Kružni dijagram",
+    "Linijski i tačkasti prikaz podataka",
+    "Čitanje i kritičko tumačenje dijagrama",
+    "Aritmetička sredina"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -5067,10 +4910,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Obilježje, podaci i skup posmatranja",
-    "Frekvencija",
-    "Relativna frekvencija",
-    "Tabela frekvencija"
+    "Linijski i tačkasti prikaz podataka",
+    "Čitanje i kritičko tumačenje dijagrama",
+    "Aritmetička sredina",
+    "Elementarni ishod i slučajni događaj"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -5081,10 +4924,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Obilježje, podaci i skup posmatranja",
-    "Frekvencija",
-    "Relativna frekvencija",
-    "Tabela frekvencija"
+    "Čitanje i kritičko tumačenje dijagrama",
+    "Aritmetička sredina",
+    "Elementarni ishod i slučajni događaj",
+    "Siguran, nemoguć i slučajan događaj"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -5137,10 +4980,8 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Obilježje, podaci i skup posmatranja",
-    "Frekvencija",
-    "Relativna frekvencija",
-    "Tabela frekvencija"
+    "Povoljni ishodi i klasična vjerovatnoća",
+    "Komplementarni događaj"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -5165,14 +5006,9 @@
     "prepoznavati koji su elementarni događaji povoljni za zadani događaj",
     "Tabelarno i grafičko prikazivanje podataka treba da posluži da učenici uoče značaj matematike za predviđanje narednih događaja"
    ],
-   "neighbour_exclusions": [
-    "Obilježje, podaci i skup posmatranja",
-    "Frekvencija",
-    "Relativna frekvencija",
-    "Tabela frekvencija"
-   ],
+   "neighbour_exclusions": [],
    "evidence_ids": [],
-   "objective_source": "canonical_lesson_scope",
+   "objective_source": "canonical_title_only",
    "objective_confidence": "low"
   },
   "8-07-001": {
@@ -5199,10 +5035,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Algebarski racionalni izraz i brojna vrijednost",
     "Slični monomi",
     "Sabiranje i oduzimanje monoma",
-    "Množenje i dijeljenje monoma"
+    "Množenje i dijeljenje monoma",
+    "Polinom i sređivanje polinoma"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -5233,10 +5069,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Algebarski racionalni izraz i brojna vrijednost",
-    "Monom, koeficijent i stepen monoma",
-    "Slični monomi",
-    "Množenje i dijeljenje monoma"
+    "Množenje i dijeljenje monoma",
+    "Polinom i sređivanje polinoma",
+    "Sabiranje i oduzimanje polinoma",
+    "Množenje polinoma"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -5247,10 +5083,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Algebarski racionalni izraz i brojna vrijednost",
-    "Monom, koeficijent i stepen monoma",
-    "Slični monomi",
-    "Sabiranje i oduzimanje monoma"
+    "Polinom i sređivanje polinoma",
+    "Sabiranje i oduzimanje polinoma",
+    "Množenje polinoma",
+    "Kvadrat zbira i razlike"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -5377,14 +5213,9 @@
    "grade": 8,
    "primary_skills": [],
    "supporting_concepts": [],
-   "neighbour_exclusions": [
-    "Algebarski racionalni izraz i brojna vrijednost",
-    "Monom, koeficijent i stepen monoma",
-    "Slični monomi",
-    "Sabiranje i oduzimanje monoma"
-   ],
+   "neighbour_exclusions": [],
    "evidence_ids": [],
-   "objective_source": "canonical_lesson_scope",
+   "objective_source": "canonical_title_only",
    "objective_confidence": "low"
   },
   "8-08-001": {
@@ -5578,14 +5409,9 @@
    "grade": 8,
    "primary_skills": [],
    "supporting_concepts": [],
-   "neighbour_exclusions": [
-    "Vrste mnogouglova",
-    "Zbir unutrašnjih uglova mnogougla",
-    "Zbir vanjskih uglova konveksnog mnogougla",
-    "Broj dijagonala mnogougla"
-   ],
+   "neighbour_exclusions": [],
    "evidence_ids": [],
-   "objective_source": "canonical_lesson_scope",
+   "objective_source": "canonical_title_only",
    "objective_confidence": "low"
   },
   "8-09-001": {
@@ -5606,7 +5432,6 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Pojam, pravac, smjer i intenzitet vektora",
     "Sabiranje i oduzimanje vektora",
     "Množenje vektora brojem i primjene"
    ],
@@ -5663,10 +5488,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Algebarski izraz: konstante, promjenljive i članovi",
     "Brojna vrijednost algebarskog razlomka",
     "Proširivanje algebarskog razlomka",
-    "Skraćivanje algebarskog razlomka faktorizacijom"
+    "Skraćivanje algebarskog razlomka faktorizacijom",
+    "Jednaki algebarski razlomci"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -5680,10 +5505,10 @@
     "određivati oblast definisanosti algebarskog razlomka"
    ],
    "neighbour_exclusions": [
-    "Algebarski izraz: konstante, promjenljive i članovi",
-    "Algebarski razlomak i uslov definiranosti",
     "Proširivanje algebarskog razlomka",
-    "Skraćivanje algebarskog razlomka faktorizacijom"
+    "Skraćivanje algebarskog razlomka faktorizacijom",
+    "Jednaki algebarski razlomci",
+    "Zajednički nazivnik algebarskih razlomaka"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -5694,10 +5519,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Algebarski izraz: konstante, promjenljive i članovi",
-    "Algebarski razlomak i uslov definiranosti",
-    "Brojna vrijednost algebarskog razlomka",
-    "Skraćivanje algebarskog razlomka faktorizacijom"
+    "Skraćivanje algebarskog razlomka faktorizacijom",
+    "Jednaki algebarski razlomci",
+    "Zajednički nazivnik algebarskih razlomaka",
+    "Sabiranje algebarskih razlomaka"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -5708,10 +5533,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Algebarski izraz: konstante, promjenljive i članovi",
-    "Algebarski razlomak i uslov definiranosti",
-    "Brojna vrijednost algebarskog razlomka",
-    "Proširivanje algebarskog razlomka"
+    "Jednaki algebarski razlomci",
+    "Zajednički nazivnik algebarskih razlomaka",
+    "Sabiranje algebarskih razlomaka",
+    "Oduzimanje algebarskih razlomaka"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -5725,10 +5550,10 @@
     "određivati oblast definisanosti algebarskog razlomka"
    ],
    "neighbour_exclusions": [
-    "Algebarski izraz: konstante, promjenljive i članovi",
-    "Algebarski razlomak i uslov definiranosti",
-    "Brojna vrijednost algebarskog razlomka",
-    "Proširivanje algebarskog razlomka"
+    "Zajednički nazivnik algebarskih razlomaka",
+    "Sabiranje algebarskih razlomaka",
+    "Oduzimanje algebarskih razlomaka",
+    "Množenje algebarskih razlomaka"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -5739,10 +5564,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Algebarski izraz: konstante, promjenljive i članovi",
-    "Algebarski razlomak i uslov definiranosti",
-    "Brojna vrijednost algebarskog razlomka",
-    "Proširivanje algebarskog razlomka"
+    "Sabiranje algebarskih razlomaka",
+    "Oduzimanje algebarskih razlomaka",
+    "Množenje algebarskih razlomaka",
+    "Dijeljenje algebarskih razlomaka"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -5753,10 +5578,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Algebarski izraz: konstante, promjenljive i članovi",
-    "Algebarski razlomak i uslov definiranosti",
-    "Brojna vrijednost algebarskog razlomka",
-    "Proširivanje algebarskog razlomka"
+    "Oduzimanje algebarskih razlomaka",
+    "Množenje algebarskih razlomaka",
+    "Dijeljenje algebarskih razlomaka",
+    "Složeni razlomljeni racionalni izraz"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -5767,10 +5592,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Algebarski izraz: konstante, promjenljive i članovi",
-    "Algebarski razlomak i uslov definiranosti",
-    "Brojna vrijednost algebarskog razlomka",
-    "Proširivanje algebarskog razlomka"
+    "Množenje algebarskih razlomaka",
+    "Dijeljenje algebarskih razlomaka",
+    "Složeni razlomljeni racionalni izraz",
+    "Sređivanje razlomljenog racionalnog izraza"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -5781,10 +5606,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Algebarski izraz: konstante, promjenljive i članovi",
-    "Algebarski razlomak i uslov definiranosti",
-    "Brojna vrijednost algebarskog razlomka",
-    "Proširivanje algebarskog razlomka"
+    "Dijeljenje algebarskih razlomaka",
+    "Složeni razlomljeni racionalni izraz",
+    "Sređivanje razlomljenog racionalnog izraza",
+    "Jednačine sa algebarskim razlomcima"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -5795,10 +5620,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Algebarski izraz: konstante, promjenljive i članovi",
-    "Algebarski razlomak i uslov definiranosti",
-    "Brojna vrijednost algebarskog razlomka",
-    "Proširivanje algebarskog razlomka"
+    "Složeni razlomljeni racionalni izraz",
+    "Sređivanje razlomljenog racionalnog izraza",
+    "Jednačine sa algebarskim razlomcima",
+    "Tekstualni zadaci sa racionalnim izrazima"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -5841,10 +5666,9 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Algebarski izraz: konstante, promjenljive i članovi",
-    "Algebarski razlomak i uslov definiranosti",
-    "Brojna vrijednost algebarskog razlomka",
-    "Proširivanje algebarskog razlomka"
+    "Tekstualni zadaci sa racionalnim izrazima",
+    "Diskusija racionalnog izraza sa parametrom",
+    "Dokaz identiteta sa algebarskim razlomcima"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -5855,10 +5679,8 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Algebarski izraz: konstante, promjenljive i članovi",
-    "Algebarski razlomak i uslov definiranosti",
-    "Brojna vrijednost algebarskog razlomka",
-    "Proširivanje algebarskog razlomka"
+    "Diskusija racionalnog izraza sa parametrom",
+    "Dokaz identiteta sa algebarskim razlomcima"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -5869,10 +5691,7 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Algebarski izraz: konstante, promjenljive i članovi",
-    "Algebarski razlomak i uslov definiranosti",
-    "Brojna vrijednost algebarskog razlomka",
-    "Proširivanje algebarskog razlomka"
+    "Dokaz identiteta sa algebarskim razlomcima"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -5882,14 +5701,9 @@
    "grade": 9,
    "primary_skills": [],
    "supporting_concepts": [],
-   "neighbour_exclusions": [
-    "Algebarski izraz: konstante, promjenljive i članovi",
-    "Algebarski razlomak i uslov definiranosti",
-    "Brojna vrijednost algebarskog razlomka",
-    "Proširivanje algebarskog razlomka"
-   ],
+   "neighbour_exclusions": [],
    "evidence_ids": [],
-   "objective_source": "canonical_lesson_scope",
+   "objective_source": "canonical_title_only",
    "objective_confidence": "low"
   },
   "9-02-001": {
@@ -5916,10 +5730,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Međusobni odnos tačke i prave",
     "Međusobni odnos tačke i ravni",
     "Određenost ravni",
-    "Međusobni položaj dvije prave u prostoru"
+    "Međusobni položaj dvije prave u prostoru",
+    "Međusobni položaj prave i ravni"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -5945,10 +5759,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Međusobni odnos tačke i prave",
-    "Određenost prave",
-    "Međusobni odnos tačke i ravni",
-    "Međusobni položaj dvije prave u prostoru"
+    "Međusobni položaj dvije prave u prostoru",
+    "Međusobni položaj prave i ravni",
+    "Međusobni položaj dvije ravni",
+    "Normala na ravan"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -5959,10 +5773,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Međusobni odnos tačke i prave",
-    "Određenost prave",
-    "Međusobni odnos tačke i ravni",
-    "Određenost ravni"
+    "Međusobni položaj prave i ravni",
+    "Međusobni položaj dvije ravni",
+    "Normala na ravan",
+    "Rastojanje tačke od ravni"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -5988,10 +5802,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Međusobni odnos tačke i prave",
-    "Određenost prave",
-    "Međusobni odnos tačke i ravni",
-    "Određenost ravni"
+    "Normala na ravan",
+    "Rastojanje tačke od ravni",
+    "Rastojanje paralelnih ravni",
+    "Ortogonalna projekcija tačke na ravan"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -6032,10 +5846,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Međusobni odnos tačke i prave",
-    "Određenost prave",
-    "Međusobni odnos tačke i ravni",
-    "Određenost ravni"
+    "Ortogonalna projekcija tačke na ravan",
+    "Ortogonalna projekcija duži na ravan",
+    "Ugao između prave i ravni",
+    "Diedar i ugao između ravni"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -6123,10 +5937,7 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Međusobni odnos tačke i prave",
-    "Određenost prave",
-    "Međusobni odnos tačke i ravni",
-    "Određenost ravni"
+    "Skiciranje prostornih odnosa"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -6136,14 +5947,9 @@
    "grade": 9,
    "primary_skills": [],
    "supporting_concepts": [],
-   "neighbour_exclusions": [
-    "Međusobni odnos tačke i prave",
-    "Određenost prave",
-    "Međusobni odnos tačke i ravni",
-    "Određenost ravni"
-   ],
+   "neighbour_exclusions": [],
    "evidence_ids": [],
-   "objective_source": "canonical_lesson_scope",
+   "objective_source": "canonical_title_only",
    "objective_confidence": "low"
   },
   "9-03-001": {
@@ -6171,10 +5977,10 @@
     "ispitivati da li tačka s datim koordinatama leži na pravoj zadatoj linearnom funkcijom"
    ],
    "neighbour_exclusions": [
-    "Funkcija i vrijednost funkcije",
     "Značenje koeficijenta k",
     "Značenje slobodnog člana n",
-    "Presjeci grafika sa koordinatnim osama"
+    "Presjeci grafika sa koordinatnim osama",
+    "Da li tačka pripada grafiku funkcije"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -6217,10 +6023,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Funkcija i vrijednost funkcije",
-    "Linearna funkcija y = kx + n",
-    "Tabela vrijednosti linearne funkcije",
-    "Grafik linearne funkcije"
+    "Značenje slobodnog člana n",
+    "Nula linearne funkcije",
+    "Rastuća i opadajuća linearna funkcija",
+    "Znak linearne funkcije"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -6231,10 +6037,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Funkcija i vrijednost funkcije",
-    "Linearna funkcija y = kx + n",
-    "Tabela vrijednosti linearne funkcije",
-    "Grafik linearne funkcije"
+    "Nula linearne funkcije",
+    "Rastuća i opadajuća linearna funkcija",
+    "Znak linearne funkcije",
+    "Presjeci grafika sa koordinatnim osama"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -6249,10 +6055,10 @@
     "odrediti nule funkcije y=kx+n"
    ],
    "neighbour_exclusions": [
-    "Funkcija i vrijednost funkcije",
-    "Tabela vrijednosti linearne funkcije",
-    "Grafik linearne funkcije",
-    "Značenje koeficijenta k"
+    "Rastuća i opadajuća linearna funkcija",
+    "Znak linearne funkcije",
+    "Presjeci grafika sa koordinatnim osama",
+    "Da li tačka pripada grafiku funkcije"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -6278,10 +6084,10 @@
     "ispitivati svojstva linearne funkcije"
    ],
    "neighbour_exclusions": [
-    "Funkcija i vrijednost funkcije",
-    "Tabela vrijednosti linearne funkcije",
-    "Grafik linearne funkcije",
-    "Značenje koeficijenta k"
+    "Presjeci grafika sa koordinatnim osama",
+    "Da li tačka pripada grafiku funkcije",
+    "Eksplicitni i implicitni oblik jednačine prave",
+    "Prelazak iz implicitnog u eksplicitni oblik"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -6308,10 +6114,10 @@
     "objašnjavati da je ravan jednoznačno određena sa tri tačke koje ne pripadaju istoj pravoj"
    ],
    "neighbour_exclusions": [
-    "Funkcija i vrijednost funkcije",
-    "Linearna funkcija y = kx + n",
-    "Tabela vrijednosti linearne funkcije",
-    "Grafik linearne funkcije"
+    "Eksplicitni i implicitni oblik jednačine prave",
+    "Prelazak iz implicitnog u eksplicitni oblik",
+    "Jednačina prave kroz dvije tačke",
+    "Paralelne i podudarne prave prema koeficijentima"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -6365,10 +6171,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Funkcija i vrijednost funkcije",
-    "Linearna funkcija y = kx + n",
-    "Tabela vrijednosti linearne funkcije",
-    "Grafik linearne funkcije"
+    "Okomite prave u koordinatnoj ravni",
+    "Presjek dvije prave",
+    "Primjena linearne funkcije u problemu",
+    "Grafik direktne proporcionalnosti y = kx"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -6379,10 +6185,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Funkcija i vrijednost funkcije",
-    "Linearna funkcija y = kx + n",
-    "Tabela vrijednosti linearne funkcije",
-    "Grafik linearne funkcije"
+    "Presjek dvije prave",
+    "Primjena linearne funkcije u problemu",
+    "Grafik direktne proporcionalnosti y = kx",
+    "Grafik obrnute proporcionalnosti y = k/x"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -6393,10 +6199,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Funkcija i vrijednost funkcije",
-    "Linearna funkcija y = kx + n",
-    "Tabela vrijednosti linearne funkcije",
-    "Grafik linearne funkcije"
+    "Primjena linearne funkcije u problemu",
+    "Grafik direktne proporcionalnosti y = kx",
+    "Grafik obrnute proporcionalnosti y = k/x",
+    "Poređenje direktne, obrnute i linearne zavisnosti"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -6409,10 +6215,10 @@
     "ispitivati svojstva linearne funkcije"
    ],
    "neighbour_exclusions": [
-    "Funkcija i vrijednost funkcije",
-    "Tabela vrijednosti linearne funkcije",
-    "Grafik linearne funkcije",
-    "Značenje koeficijenta k"
+    "Grafik direktne proporcionalnosti y = kx",
+    "Grafik obrnute proporcionalnosti y = k/x",
+    "Poređenje direktne, obrnute i linearne zavisnosti",
+    "Grafik jednostavne razlomljene funkcije"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -6436,10 +6242,8 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Funkcija i vrijednost funkcije",
-    "Linearna funkcija y = kx + n",
-    "Tabela vrijednosti linearne funkcije",
-    "Grafik linearne funkcije"
+    "Poređenje direktne, obrnute i linearne zavisnosti",
+    "Grafik jednostavne razlomljene funkcije"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -6450,10 +6254,7 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Funkcija i vrijednost funkcije",
-    "Linearna funkcija y = kx + n",
-    "Tabela vrijednosti linearne funkcije",
-    "Grafik linearne funkcije"
+    "Grafik jednostavne razlomljene funkcije"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -6521,10 +6322,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Osnovni pojmovi linearne jednačine",
-    "Ekvivalentne jednačine",
     "Jednačina sa razlomcima",
-    "Jednačina sa algebarskim razlomcima"
+    "Jednačina sa algebarskim razlomcima",
+    "Jednačina sa dvojnim razlomkom",
+    "Jednačina sa promjenljivim koeficijentom"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -6535,10 +6336,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Osnovni pojmovi linearne jednačine",
-    "Ekvivalentne jednačine",
-    "Jednačina sa zagradama",
-    "Jednačina sa dvojnim razlomkom"
+    "Jednačina sa dvojnim razlomkom",
+    "Jednačina sa promjenljivim koeficijentom",
+    "Jednačina bez rješenja",
+    "Identitet sa beskonačno mnogo rješenja"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -6549,10 +6350,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Osnovni pojmovi linearne jednačine",
-    "Ekvivalentne jednačine",
-    "Jednačina sa zagradama",
-    "Jednačina sa dvojnim razlomkom"
+    "Jednačina sa dvojnim razlomkom",
+    "Jednačina sa promjenljivim koeficijentom",
+    "Jednačina bez rješenja",
+    "Identitet sa beskonačno mnogo rješenja"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -6563,10 +6364,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Osnovni pojmovi linearne jednačine",
-    "Ekvivalentne jednačine",
-    "Jednačina sa zagradama",
-    "Jednačina sa razlomcima"
+    "Jednačina sa promjenljivim koeficijentom",
+    "Jednačina bez rješenja",
+    "Identitet sa beskonačno mnogo rješenja",
+    "Grafičko rješavanje linearne jednačine"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -6577,10 +6378,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Osnovni pojmovi linearne jednačine",
-    "Ekvivalentne jednačine",
-    "Jednačina sa zagradama",
-    "Jednačina sa razlomcima"
+    "Jednačina bez rješenja",
+    "Identitet sa beskonačno mnogo rješenja",
+    "Grafičko rješavanje linearne jednačine",
+    "Tekstualni zadatak koji se svodi na linearnu jednačinu"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -6591,10 +6392,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Osnovni pojmovi linearne jednačine",
-    "Ekvivalentne jednačine",
-    "Jednačina sa zagradama",
-    "Jednačina sa razlomcima"
+    "Identitet sa beskonačno mnogo rješenja",
+    "Grafičko rješavanje linearne jednačine",
+    "Tekstualni zadatak koji se svodi na linearnu jednačinu",
+    "Osnovni pojmovi linearne nejednačine"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -6605,10 +6406,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Osnovni pojmovi linearne jednačine",
-    "Ekvivalentne jednačine",
-    "Jednačina sa zagradama",
-    "Jednačina sa razlomcima"
+    "Grafičko rješavanje linearne jednačine",
+    "Tekstualni zadatak koji se svodi na linearnu jednačinu",
+    "Osnovni pojmovi linearne nejednačine",
+    "Ekvivalentne nejednačine"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -6634,10 +6435,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Osnovni pojmovi linearne jednačine",
-    "Ekvivalentne jednačine",
-    "Jednačina sa zagradama",
-    "Jednačina sa razlomcima"
+    "Osnovni pojmovi linearne nejednačine",
+    "Ekvivalentne nejednačine",
+    "Nejednačina sa zagradama",
+    "Nejednačina sa razlomcima"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -6684,10 +6485,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Osnovni pojmovi linearne jednačine",
-    "Ekvivalentne jednačine",
-    "Jednačina sa zagradama",
-    "Jednačina sa razlomcima"
+    "Nejednačina sa razlomcima",
+    "Promjena znaka nejednakosti pri množenju ili dijeljenju negativnim brojem",
+    "Skup rješenja na brojevnoj pravoj",
+    "Skup rješenja intervalom"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -6711,10 +6512,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Osnovni pojmovi linearne jednačine",
-    "Ekvivalentne jednačine",
-    "Jednačina sa zagradama",
-    "Jednačina sa razlomcima"
+    "Skup rješenja na brojevnoj pravoj",
+    "Skup rješenja intervalom",
+    "Provjera rješenja jednačine i nejednačine",
+    "Linearna jednačina sa apsolutnom vrijednošću"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -6738,10 +6539,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Osnovni pojmovi linearne jednačine",
-    "Ekvivalentne jednačine",
-    "Jednačina sa zagradama",
-    "Jednačina sa razlomcima"
+    "Provjera rješenja jednačine i nejednačine",
+    "Linearna jednačina sa apsolutnom vrijednošću",
+    "Linearna nejednačina sa apsolutnom vrijednošću",
+    "Diskusija linearne jednačine sa parametrom"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -6792,14 +6593,9 @@
    "grade": 9,
    "primary_skills": [],
    "supporting_concepts": [],
-   "neighbour_exclusions": [
-    "Osnovni pojmovi linearne jednačine",
-    "Ekvivalentne jednačine",
-    "Jednačina sa zagradama",
-    "Jednačina sa razlomcima"
-   ],
+   "neighbour_exclusions": [],
    "evidence_ids": [],
-   "objective_source": "canonical_lesson_scope",
+   "objective_source": "canonical_title_only",
    "objective_confidence": "low"
   },
   "9-05-001": {
@@ -6855,10 +6651,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Linearna jednačina sa dvije nepoznate i njena rješenja",
-    "Grafički prikaz linearne jednačine sa dvije nepoznate",
-    "Pojam sistema dvije linearne jednačine",
-    "Ekvivalentni sistemi"
+    "Ekvivalentni sistemi",
+    "Grafička metoda rješavanja sistema",
+    "Metoda supstitucije",
+    "Metoda suprotnih koeficijenata (Gausova metoda)"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -6931,10 +6727,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Linearna jednačina sa dvije nepoznate i njena rješenja",
-    "Grafički prikaz linearne jednačine sa dvije nepoznate",
-    "Pojam sistema dvije linearne jednačine",
-    "Provjera uređenog para u sistemu"
+    "Sistem sa beskonačno mnogo rješenja",
+    "Odnos koeficijenata i broj rješenja sistema",
+    "Tekstualni zadatak sa sistemom",
+    "Geometrijsko tumačenje rješenja sistema"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -6945,10 +6741,9 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Linearna jednačina sa dvije nepoznate i njena rješenja",
-    "Grafički prikaz linearne jednačine sa dvije nepoznate",
-    "Pojam sistema dvije linearne jednačine",
-    "Provjera uređenog para u sistemu"
+    "Tekstualni zadatak sa sistemom",
+    "Sistem sa razlomljenim koeficijentima",
+    "Sistem sa parametrom"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -6959,10 +6754,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Linearna jednačina sa dvije nepoznate i njena rješenja",
-    "Grafički prikaz linearne jednačine sa dvije nepoznate",
-    "Pojam sistema dvije linearne jednačine",
-    "Provjera uređenog para u sistemu"
+    "Odnos koeficijenata i broj rješenja sistema",
+    "Tekstualni zadatak sa sistemom",
+    "Geometrijsko tumačenje rješenja sistema",
+    "Provjera rješenja sistema"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -6975,10 +6770,10 @@
     "provjeravati tačnost dobijenih rješenja i diskutovati o njima u kontekstu problema"
    ],
    "neighbour_exclusions": [
-    "Linearna jednačina sa dvije nepoznate i njena rješenja",
-    "Grafički prikaz linearne jednačine sa dvije nepoznate",
-    "Pojam sistema dvije linearne jednačine",
-    "Provjera uređenog para u sistemu"
+    "Tekstualni zadatak sa sistemom",
+    "Geometrijsko tumačenje rješenja sistema",
+    "Provjera rješenja sistema",
+    "Sistem sa razlomljenim koeficijentima"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -6989,10 +6784,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Linearna jednačina sa dvije nepoznate i njena rješenja",
-    "Grafički prikaz linearne jednačine sa dvije nepoznate",
-    "Pojam sistema dvije linearne jednačine",
-    "Provjera uređenog para u sistemu"
+    "Geometrijsko tumačenje rješenja sistema",
+    "Provjera rješenja sistema",
+    "Sistem sa razlomljenim koeficijentima",
+    "Sistem sa parametrom"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -7006,10 +6801,9 @@
     "tumačiti suštinu grafičke metode da se obje jednačine sistema prikažu kao prave u koordinatnom sistemu, kao i nedostatak ove metode"
    ],
    "neighbour_exclusions": [
-    "Linearna jednačina sa dvije nepoznate i njena rješenja",
-    "Grafički prikaz linearne jednačine sa dvije nepoznate",
-    "Pojam sistema dvije linearne jednačine",
-    "Provjera uređenog para u sistemu"
+    "Provjera rješenja sistema",
+    "Sistem sa razlomljenim koeficijentima",
+    "Sistem sa parametrom"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -7033,10 +6827,7 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Linearna jednačina sa dvije nepoznate i njena rješenja",
-    "Grafički prikaz linearne jednačine sa dvije nepoznate",
-    "Pojam sistema dvije linearne jednačine",
-    "Provjera uređenog para u sistemu"
+    "Sistem sa parametrom"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -7046,14 +6837,9 @@
    "grade": 9,
    "primary_skills": [],
    "supporting_concepts": [],
-   "neighbour_exclusions": [
-    "Linearna jednačina sa dvije nepoznate i njena rješenja",
-    "Grafički prikaz linearne jednačine sa dvije nepoznate",
-    "Pojam sistema dvije linearne jednačine",
-    "Ekvivalentni sistemi"
-   ],
+   "neighbour_exclusions": [],
    "evidence_ids": [],
-   "objective_source": "canonical_lesson_scope",
+   "objective_source": "canonical_title_only",
    "objective_confidence": "low"
   },
   "9-06-001": {
@@ -7088,10 +6874,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Monom i polinom u skupu realnih brojeva",
-    "Sređivanje polinoma",
     "Množenje polinoma",
-    "Kvadrat binoma"
+    "Kvadrat binoma",
+    "Razlika kvadrata",
+    "Kub binoma"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -7134,10 +6920,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Monom i polinom u skupu realnih brojeva",
-    "Sređivanje polinoma",
-    "Sabiranje i oduzimanje polinoma",
-    "Množenje polinoma"
+    "Kub binoma",
+    "Zbir i razlika kubova",
+    "Izlučivanje zajedničkog faktora",
+    "Rastavljanje grupisanjem"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -7180,10 +6966,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Monom i polinom u skupu realnih brojeva",
-    "Sređivanje polinoma",
-    "Sabiranje i oduzimanje polinoma",
-    "Množenje polinoma"
+    "Rastavljanje grupisanjem",
+    "Faktorizacija primjenom identiteta",
+    "Domena algebarskog razlomka pomoću faktorizacije",
+    "Jednostavna kvadratna jednačina ax² + bx = 0"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -7194,10 +6980,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Monom i polinom u skupu realnih brojeva",
-    "Sređivanje polinoma",
-    "Sabiranje i oduzimanje polinoma",
-    "Množenje polinoma"
+    "Faktorizacija primjenom identiteta",
+    "Domena algebarskog razlomka pomoću faktorizacije",
+    "Jednostavna kvadratna jednačina ax² + bx = 0",
+    "Jednostavna kvadratna jednačina x² - a = 0"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -7208,10 +6994,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Monom i polinom u skupu realnih brojeva",
-    "Sređivanje polinoma",
-    "Sabiranje i oduzimanje polinoma",
-    "Množenje polinoma"
+    "Domena algebarskog razlomka pomoću faktorizacije",
+    "Jednostavna kvadratna jednačina ax² + bx = 0",
+    "Jednostavna kvadratna jednačina x² - a = 0",
+    "Kvadratna jednačina oblika x² ± 2ax + a² = 0"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -7222,10 +7008,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Monom i polinom u skupu realnih brojeva",
-    "Sređivanje polinoma",
-    "Sabiranje i oduzimanje polinoma",
-    "Množenje polinoma"
+    "Jednostavna kvadratna jednačina ax² + bx = 0",
+    "Jednostavna kvadratna jednačina x² - a = 0",
+    "Kvadratna jednačina oblika x² ± 2ax + a² = 0",
+    "Nula proizvoda i provjera rješenja"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -7274,14 +7060,9 @@
    "grade": 9,
    "primary_skills": [],
    "supporting_concepts": [],
-   "neighbour_exclusions": [
-    "Monom i polinom u skupu realnih brojeva",
-    "Sređivanje polinoma",
-    "Sabiranje i oduzimanje polinoma",
-    "Množenje polinoma"
-   ],
+   "neighbour_exclusions": [],
    "evidence_ids": [],
-   "objective_source": "canonical_lesson_scope",
+   "objective_source": "canonical_title_only",
    "objective_confidence": "low"
   },
   "9-07-001": {
@@ -7303,10 +7084,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Pojam poliedra i njegovi elementi",
     "Mreža prizme",
     "Površina uspravne prizme",
-    "Zapremina prizme"
+    "Zapremina prizme",
+    "Dijagonalni presjek prizme"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -7338,10 +7119,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Pojam poliedra i njegovi elementi",
-    "Prizma i njeni elementi",
-    "Mreža prizme",
-    "Zapremina prizme"
+    "Zapremina prizme",
+    "Dijagonalni presjek prizme",
+    "Primjena Pitagorine teoreme na pravilnu prizmu",
+    "Piramida i njeni elementi"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -7373,10 +7154,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Pojam poliedra i njegovi elementi",
-    "Prizma i njeni elementi",
-    "Mreža prizme",
-    "Površina uspravne prizme"
+    "Primjena Pitagorine teoreme na pravilnu prizmu",
+    "Piramida i njeni elementi",
+    "Mreža piramide",
+    "Površina pravilne piramide"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -7402,10 +7183,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Pojam poliedra i njegovi elementi",
-    "Prizma i njeni elementi",
-    "Mreža prizme",
-    "Površina uspravne prizme"
+    "Mreža piramide",
+    "Površina pravilne piramide",
+    "Zapremina pravilne piramide",
+    "Apotema pravilne piramide"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -7471,10 +7252,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Pojam poliedra i njegovi elementi",
-    "Prizma i njeni elementi",
-    "Mreža prizme",
-    "Površina uspravne prizme"
+    "Presjeci piramide",
+    "Primjena Pitagorine teoreme na piramidu",
+    "Valjak ili cilindar i njegovi elementi",
+    "Mreža valjka"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -7485,10 +7266,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Pojam poliedra i njegovi elementi",
-    "Prizma i njeni elementi",
-    "Mreža prizme",
-    "Površina uspravne prizme"
+    "Primjena Pitagorine teoreme na piramidu",
+    "Valjak ili cilindar i njegovi elementi",
+    "Mreža valjka",
+    "Površina valjka"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -7499,10 +7280,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Pojam poliedra i njegovi elementi",
-    "Prizma i njeni elementi",
-    "Mreža prizme",
-    "Površina uspravne prizme"
+    "Valjak ili cilindar i njegovi elementi",
+    "Mreža valjka",
+    "Površina valjka",
+    "Zapremina valjka"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -7513,10 +7294,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Pojam poliedra i njegovi elementi",
-    "Prizma i njeni elementi",
-    "Mreža prizme",
-    "Površina uspravne prizme"
+    "Mreža valjka",
+    "Površina valjka",
+    "Zapremina valjka",
+    "Osni presjek valjka"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -7578,10 +7359,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Pojam poliedra i njegovi elementi",
-    "Prizma i njeni elementi",
-    "Mreža prizme",
-    "Površina uspravne prizme"
+    "Kupa ili stožac i njeni elementi",
+    "Mreža kupe",
+    "Površina kupe",
+    "Zapremina kupe"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -7592,10 +7373,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Pojam poliedra i njegovi elementi",
-    "Prizma i njeni elementi",
-    "Mreža prizme",
-    "Površina uspravne prizme"
+    "Mreža kupe",
+    "Površina kupe",
+    "Zapremina kupe",
+    "Izvodnica kupe"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -7676,10 +7457,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Pojam poliedra i njegovi elementi",
-    "Prizma i njeni elementi",
-    "Mreža prizme",
-    "Površina uspravne prizme"
+    "Sfera i lopta ili kugla",
+    "Površina sfere",
+    "Zapremina lopte",
+    "Presjek lopte ravni"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -7692,10 +7473,10 @@
     "kombinovati svojstva geometrijskih tijela za rješavanje problemskih zadataka"
    ],
    "neighbour_exclusions": [
-    "Pojam poliedra i njegovi elementi",
-    "Prizma i njeni elementi",
-    "Mreža prizme",
-    "Površina uspravne prizme"
+    "Površina sfere",
+    "Zapremina lopte",
+    "Presjek lopte ravni",
+    "Odnos zapremina prizme i piramide"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -7706,10 +7487,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Pojam poliedra i njegovi elementi",
-    "Prizma i njeni elementi",
-    "Mreža prizme",
-    "Površina uspravne prizme"
+    "Zapremina lopte",
+    "Presjek lopte ravni",
+    "Odnos zapremina prizme i piramide",
+    "Odnos zapremina valjka i kupe"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -7752,10 +7533,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Pojam poliedra i njegovi elementi",
-    "Prizma i njeni elementi",
-    "Mreža prizme",
-    "Površina uspravne prizme"
+    "Odnos zapremina valjka i kupe",
+    "Složeno geometrijsko tijelo",
+    "Tekstualni zadaci sa površinom i zapreminom",
+    "Mjerne jedinice površine i zapremine u zadacima sa tijelima"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -7766,10 +7547,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Pojam poliedra i njegovi elementi",
-    "Prizma i njeni elementi",
-    "Mreža prizme",
-    "Površina uspravne prizme"
+    "Složeno geometrijsko tijelo",
+    "Tekstualni zadaci sa površinom i zapreminom",
+    "Mjerne jedinice površine i zapremine u zadacima sa tijelima",
+    "Zarubljena piramida"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -7793,10 +7574,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Pojam poliedra i njegovi elementi",
-    "Prizma i njeni elementi",
-    "Mreža prizme",
-    "Površina uspravne prizme"
+    "Mjerne jedinice površine i zapremine u zadacima sa tijelima",
+    "Zarubljena piramida",
+    "Zarubljena kupa",
+    "Platonova i Arhimedova tijela"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -7807,10 +7588,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Pojam poliedra i njegovi elementi",
-    "Prizma i njeni elementi",
-    "Mreža prizme",
-    "Površina uspravne prizme"
+    "Zarubljena piramida",
+    "Zarubljena kupa",
+    "Platonova i Arhimedova tijela",
+    "Masa tijela iz gustine i zapremine"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -7821,10 +7602,9 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Pojam poliedra i njegovi elementi",
-    "Prizma i njeni elementi",
-    "Mreža prizme",
-    "Površina uspravne prizme"
+    "Zarubljena kupa",
+    "Platonova i Arhimedova tijela",
+    "Masa tijela iz gustine i zapremine"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -7835,10 +7615,8 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Pojam poliedra i njegovi elementi",
-    "Prizma i njeni elementi",
-    "Mreža prizme",
-    "Površina uspravne prizme"
+    "Platonova i Arhimedova tijela",
+    "Masa tijela iz gustine i zapremine"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -7849,10 +7627,7 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Pojam poliedra i njegovi elementi",
-    "Prizma i njeni elementi",
-    "Mreža prizme",
-    "Površina uspravne prizme"
+    "Masa tijela iz gustine i zapremine"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -7862,14 +7637,9 @@
    "grade": 9,
    "primary_skills": [],
    "supporting_concepts": [],
-   "neighbour_exclusions": [
-    "Pojam poliedra i njegovi elementi",
-    "Prizma i njeni elementi",
-    "Mreža prizme",
-    "Površina uspravne prizme"
-   ],
+   "neighbour_exclusions": [],
    "evidence_ids": [],
-   "objective_source": "canonical_lesson_scope",
+   "objective_source": "canonical_title_only",
    "objective_confidence": "low"
   },
   "9-08-001": {
@@ -7904,10 +7674,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Uvod u vjerovatnoću i skup elementarnih događaja",
-    "Vjerovatnoća slučajnog događaja",
     "Preračunavanje valuta",
-    "Kamata na štednju"
+    "Kamata na štednju",
+    "Kamata na kredit",
+    "Čitanje otplatnog plana"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -7918,10 +7688,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Uvod u vjerovatnoću i skup elementarnih događaja",
-    "Vjerovatnoća slučajnog događaja",
-    "Donošenje odluke na osnovu vjerovatnoće",
-    "Kamata na štednju"
+    "Kamata na štednju",
+    "Kamata na kredit",
+    "Čitanje otplatnog plana",
+    "Lični finansijski budžet"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -7932,10 +7702,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Uvod u vjerovatnoću i skup elementarnih događaja",
-    "Vjerovatnoća slučajnog događaja",
-    "Donošenje odluke na osnovu vjerovatnoće",
-    "Preračunavanje valuta"
+    "Kamata na kredit",
+    "Čitanje otplatnog plana",
+    "Lični finansijski budžet",
+    "Populacija i uzorak"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -7946,10 +7716,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Uvod u vjerovatnoću i skup elementarnih događaja",
-    "Vjerovatnoća slučajnog događaja",
-    "Donošenje odluke na osnovu vjerovatnoće",
-    "Preračunavanje valuta"
+    "Čitanje otplatnog plana",
+    "Lični finansijski budžet",
+    "Populacija i uzorak",
+    "Aritmetička sredina i interpretacija podataka"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -7960,10 +7730,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Uvod u vjerovatnoću i skup elementarnih događaja",
-    "Vjerovatnoća slučajnog događaja",
-    "Donošenje odluke na osnovu vjerovatnoće",
-    "Preračunavanje valuta"
+    "Lični finansijski budžet",
+    "Populacija i uzorak",
+    "Aritmetička sredina i interpretacija podataka",
+    "Pretvaranje mjernih jedinica za dužinu, površinu i zapreminu"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -7974,10 +7744,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Uvod u vjerovatnoću i skup elementarnih događaja",
-    "Vjerovatnoća slučajnog događaja",
-    "Donošenje odluke na osnovu vjerovatnoće",
-    "Preračunavanje valuta"
+    "Populacija i uzorak",
+    "Aritmetička sredina i interpretacija podataka",
+    "Pretvaranje mjernih jedinica za dužinu, površinu i zapreminu",
+    "Prefiksi mjernih jedinica kao stepeni broja 10"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -7988,10 +7758,10 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Uvod u vjerovatnoću i skup elementarnih događaja",
-    "Vjerovatnoća slučajnog događaja",
-    "Donošenje odluke na osnovu vjerovatnoće",
-    "Preračunavanje valuta"
+    "Aritmetička sredina i interpretacija podataka",
+    "Pretvaranje mjernih jedinica za dužinu, površinu i zapreminu",
+    "Prefiksi mjernih jedinica kao stepeni broja 10",
+    "Pretvaranje brzine m/s i km/h"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -8002,10 +7772,9 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Uvod u vjerovatnoću i skup elementarnih događaja",
-    "Vjerovatnoća slučajnog događaja",
-    "Donošenje odluke na osnovu vjerovatnoće",
-    "Preračunavanje valuta"
+    "Pretvaranje mjernih jedinica za dužinu, površinu i zapreminu",
+    "Prefiksi mjernih jedinica kao stepeni broja 10",
+    "Pretvaranje brzine m/s i km/h"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -8016,10 +7785,8 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Uvod u vjerovatnoću i skup elementarnih događaja",
-    "Vjerovatnoća slučajnog događaja",
-    "Donošenje odluke na osnovu vjerovatnoće",
-    "Preračunavanje valuta"
+    "Prefiksi mjernih jedinica kao stepeni broja 10",
+    "Pretvaranje brzine m/s i km/h"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -8030,10 +7797,7 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "Uvod u vjerovatnoću i skup elementarnih događaja",
-    "Vjerovatnoća slučajnog događaja",
-    "Donošenje odluke na osnovu vjerovatnoće",
-    "Preračunavanje valuta"
+    "Pretvaranje brzine m/s i km/h"
    ],
    "evidence_ids": [],
    "objective_source": "canonical_lesson_scope",
@@ -8043,14 +7807,9 @@
    "grade": 9,
    "primary_skills": [],
    "supporting_concepts": [],
-   "neighbour_exclusions": [
-    "Uvod u vjerovatnoću i skup elementarnih događaja",
-    "Vjerovatnoća slučajnog događaja",
-    "Donošenje odluke na osnovu vjerovatnoće",
-    "Preračunavanje valuta"
-   ],
+   "neighbour_exclusions": [],
    "evidence_ids": [],
-   "objective_source": "canonical_lesson_scope",
+   "objective_source": "canonical_title_only",
    "objective_confidence": "low"
   }
  }

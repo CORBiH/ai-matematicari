@@ -85,11 +85,16 @@ def coverage():
 def report(rows):
     total = len(rows)
     have_primary = [r for r in rows if r["has_primary_skill"]]
+    # MJERILO je sve što server zna prije generisanja: dokazana vještina,
+    # semantička porodica, susjedne zabrane ILI kanonski naslov kao izdvojena,
+    # označena klasa. Nemjerljivo je samo ono što nema nijedno od toga.
     family_only = [r for r in rows
                    if not r["has_primary_skill"]
-                   and (r["family_concepts"] or r["neighbour_exclusions"])]
+                   and (r["family_concepts"] or r["neighbour_exclusions"]
+                        or r["objective_source"] == "canonical_title_only")]
     bare = [r for r in rows if not r["has_primary_skill"]
-            and not r["family_concepts"] and not r["neighbour_exclusions"]]
+            and not r["family_concepts"] and not r["neighbour_exclusions"]
+            and r["objective_source"] != "canonical_title_only"]
     print("=" * 92)
     print(f"LEKCIJA UKUPNO: {total}")
     print(f"  primarna vještina (NPP/override): {len(have_primary):>3}  "
