@@ -5,6 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from matbot.contracts import registry as contract_registry
 from tools import check_live_release_gate as checker
 from tools import run_live_release_gate as runner
 
@@ -69,8 +70,14 @@ def test_release_gate_plan_is_fourteen_scenarios_capped_at_eighteen_calls():
     # Pomoc nikad ne eskalira, pa joj plafon ne priznaje dodatni poziv.
     assert runner._MAX_CALLS_PER_TURN == 2
     by_role = {item.role: item for item in plan}
-    assert by_role["contract_fresh"].scenario.path == "contract"
+    # MIGRACIJA K1/K3: ugovorna lekcija vise nema vlastitu rutu. Scenario ostaje
+    # i dalje trosi TACNO jedan poziv, ali ga trosi na zajednickoj brzoj ruti —
+    # ugovor sada zivi kao ogranicenje u promptu i serverska provjera objave.
+    assert by_role["contract_fresh"].scenario.path == "non_contract"
     assert by_role["contract_fresh"].expected_calls == 1
+    assert by_role["contract_harder"].expected_calls == 1
+    assert contract_registry.contract_for(
+        by_role["contract_fresh"].scenario.lesson_id) is not None
     assert by_role["semantic_fresh"].scenario.path == "non_contract"
     assert by_role["semantic_fresh"].expected_calls == 0
     assert by_role["semantic_harder"].expected_calls == 0
@@ -181,25 +188,47 @@ def test_public_router_reaches_universal_pipeline_and_not_legacy(monkeypatch):
     assert len(called) == 1
 
 
-def test_structured_release_runtime_preserves_deterministic_contract_call_budget(monkeypatch):
+def test_contract_lesson_keeps_a_one_call_budget_on_the_fast_route(monkeypatch):
+    """MIGRACIJA K1/K3: ugovorna lekcija vise NE trosi zaseban ugovorni poziv.
+
+    Ranije je ovaj test dokazivao da 6-04-005 ide starim jednopozivnim
+    ugovornim putem. Posto ugovor vise nije RUTA nego PODATAK, dokazuje se
+    ono sto stvarno mora vrijediti: ista lekcija trosi TACNO jedan poziv i
+    trosi ga na brzoj ruti, nikad na starom ugovornom pozivu."""
     from matbot import practice
     from matbot.session_store import SessionStore
-    from tests.conftest import FakeLLM, make_output
+    from tests.conftest import FakeLLM
 
     monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", "universal_two_call")
     monkeypatch.setenv("MATBOT_PRACTICE_DIFFICULTY_LEVELS", "enabled")
-    store, fake = SessionStore(), FakeLLM()
-    fake.queue(make_output(reply="Evo zadatka."))
-    # Faza 4B: 6-04-009 je presla na semanticki dvopozivni put, pa se budzet
-    # K1/K3 puta dokazuje na lekciji koja je JOS UVIJEK na njemu (6-04-005).
-    response = practice.run_practice_turn(store, fake, {
-        "session_id": "gate-contract", "grade": 6, "selected_topic": "6-04-005",
-        "selected_oblast": "", "student_message": "Daj mi zadatak.", "intent": "",
-        "difficulty_request": "", "interaction_phase": "", "last_tutor_task": "",
-        "interaction_type": "student_question", "selected_option_id": "", "client_turn_id": "",
-    })
-    assert response["status"] == "ready"
-    assert fake.call_count == 1
+    monkeypatch.setenv("MATBOT_FAST_SINGLE_CALL_SCOPE", "model_backed")
+
+    class Recorder(FakeLLM):
+        def __init__(self):
+            super().__init__()
+            self.stages = []
+
+        def fast_turn(self, instructions, input_text, timeout_s=None):
+            self.stages.append("fast_turn")
+            raise RuntimeError("stop-after-route")
+
+        def practice_turn(self, instructions, input_text):
+            self.stages.append("practice_turn")
+            raise RuntimeError("stop-after-route")
+
+    store, fake = SessionStore(), Recorder()
+    # Stub prekida turn odmah nakon izbora rute — mjeri se RUTA, ne objava.
+    try:
+        practice.run_practice_turn(store, fake, {
+            "session_id": "gate-contract", "grade": 6, "selected_topic": "6-04-005",
+            "selected_oblast": "", "student_message": "Daj mi zadatak.", "intent": "",
+            "difficulty_request": "", "interaction_phase": "", "last_tutor_task": "",
+            "interaction_type": "student_question", "selected_option_id": "",
+            "client_turn_id": "",
+        })
+    except RuntimeError:
+        pass
+    assert fake.stages == ["fast_turn"], fake.stages
 
 
 def test_gate_harness_calls_the_public_practice_router(monkeypatch):

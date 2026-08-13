@@ -38,6 +38,19 @@ def universal(monkeypatch):
     monkeypatch.setenv("MATBOT_PRACTICE_DIFFICULTY_LEVELS", "enabled")
 
 
+@pytest.fixture
+def legacy_contract(monkeypatch):
+    """ROLLBACK put ugovornog motora (migracija K1/K3).
+
+    Ugovorna lekcija u produkciji više NE ide ovim putem — ide brzom Luna
+    rutom kao svaka druga nedeterministička lekcija. Motor se ne briše dok
+    migracija ne dobije produkcijski staž, pa ovi testovi ostaju DOKAZ da je
+    rollback i dalje ispravan: ljestvica se penje, drži se na dostižnom vrhu,
+    uvijek objavljuje i troši tačno jedan poziv."""
+    monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", "legacy_single_call")
+    monkeypatch.setenv("MATBOT_PRACTICE_DIFFICULTY_LEVELS", "enabled")
+
+
 def turn(sid, message, lesson, request=""):
     return {"session_id": sid, "grade": 6, "selected_topic": lesson,
             "selected_oblast": "", "student_message": message, "intent": "",
@@ -219,7 +232,7 @@ def _step(store, fake, sid, message, request=""):
     return response, store.peek(sid), fake.call_count - calls_before
 
 
-def test_b_ladder_climbs_and_then_holds_at_the_generatable_top(universal):
+def test_b_ladder_climbs_and_then_holds_at_the_generatable_top(legacy_contract):
     store, fake = SessionStore(), FakeLLM()
     response, session, calls = _step(store, fake, "b1", "Daj mi zadatak.")
     assert response["status"] == "ready" and session["difficulty_level"] == 1
@@ -242,7 +255,7 @@ def test_b_ladder_climbs_and_then_holds_at_the_generatable_top(universal):
         assert calls == 1, attempt                                       # H/I
 
 
-def test_b_top_of_ladder_uses_the_honest_max_level_intro(universal):
+def test_b_top_of_ladder_uses_the_honest_max_level_intro(legacy_contract):
     store, fake = SessionStore(), FakeLLM()
     _step(store, fake, "b2", "Daj mi zadatak.")
     _step(store, fake, "b2", "Daj mi teži zadatak.", "harder")
@@ -254,7 +267,7 @@ def test_b_top_of_ladder_uses_the_honest_max_level_intro(universal):
         assert leak not in answer.lower()
 
 
-def test_b_new_and_easier_still_behave_at_the_top(universal):
+def test_b_new_and_easier_still_behave_at_the_top(legacy_contract):
     store, fake = SessionStore(), FakeLLM()
     _step(store, fake, "b3", "Daj mi zadatak.")
     _step(store, fake, "b3", "Daj mi teži zadatak.", "harder")
@@ -293,7 +306,7 @@ def test_b_no_creative_escalation_is_imported_into_the_contract_route(universal)
 # BUG C — jedan neuspjeli turn = jedna poruka o grešci
 # ===========================================================================
 
-def test_c_one_failed_backend_turn_yields_exactly_one_error_payload(universal):
+def test_c_one_failed_backend_turn_yields_exactly_one_error_payload(legacy_contract):
     """Backend na jedan zahtjev vraća JEDAN odgovor s jednom porukom."""
     class FailingLLM(FakeLLM):
         def practice_turn(self, *args, **kwargs):

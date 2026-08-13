@@ -118,11 +118,37 @@ def _lesson_block(context):
     if len(context.families) > 1:
         lines.append("- prihvatljivi oblici: " + ", ".join(context.families))
     if context.has_contract:
+        # UGOVOR LEKCIJE KAO OGRANIČENJE, NE KAO DRUGA RUTA (migracija K1/K3).
+        # Ova lekcija je ranije imala vlastiti modelski put čiji je prompt nosio
+        # sva ugovorna ograničenja. Put je uklonjen, pa ograničenja moraju stići
+        # ovdje — inače bi model morao pogađati ono što server već zna i što
+        # objava deterministički provjerava.
         lines.append(f"- deklarisana vještina: {context.skill}")
         if context.allowed_operations:
             lines.append("- dozvoljene operacije: " + ", ".join(context.allowed_operations))
+        if getattr(context, "operand_types", ()):
+            lines.append("- tipovi operanada: " + ", ".join(context.operand_types))
         for key, value in sorted(context.operand_constraints.items()):
             lines.append(f"- ograničenje: {key} = {value}")
+        if getattr(context, "task_archetypes", ()):
+            lines.append("- dozvoljen oblik zadatka (arhetip): "
+                         + ", ".join(context.task_archetypes))
+        if getattr(context, "prohibited_archetypes", ()):
+            lines.append("- ZABRANJEN oblik zadatka: "
+                         + ", ".join(context.prohibited_archetypes))
+        answer_form = (getattr(context, "representation_constraints", {}) or {}).get(
+            "answer_form", "")
+        if answer_form == "irreducible":
+            # SERVER OVO DETERMINISTIČKI PROVJERAVA PRI OBJAVI. Za lekciju o
+            # skraćivanju to nije stilski zahtjev nego sama vještina.
+            lines.append("- OBAVEZAN OBLIK ODGOVORA: tačna opcija mora biti "
+                         "NESVODIV razlomak (brojnik i nazivnik bez zajedničkog "
+                         "djelioca većeg od 1). Skraćen do kraja, ne djelimično.")
+        elif answer_form:
+            lines.append(f"- obavezan oblik odgovora: {answer_form}")
+        if getattr(context, "error_categories", ()):
+            lines.append("- pogrešne opcije neka budu tipične greške ovog "
+                         "gradiva: " + ", ".join(context.error_categories))
     if context.lesson_scope:
         lines.append(f"- lesson scope/objectives: {context.lesson_scope}")
     elif context.objectives:
@@ -1082,6 +1108,15 @@ _REVIEWER_PREFLIGHT_RULE = """SERVER-DETECTED DRAFT ISSUES (when that block is p
   option to the bare answer — every option must stay under the server's character
   limit stated in the task rules. An option is an answer, not an explanation: move
   the reasoning into `solution`. Returning the same long option loses the turn.
+- For `contract_answer_form_violation` the lesson's own contract requires the marked
+  answer in a specific written form (an irreducible fraction: numerator and
+  denominator share no divisor greater than 1). Reduce it fully — 4/6 is not
+  acceptable where 2/3 is required — and recompute `expected_answer`, the marked
+  option and `solution` to match. Changing only the prose is rejected.
+- For `contract_equivalence_violation` the lesson's archetype requires the marked
+  option to have the SAME VALUE as the fraction stated in the task text. Either mark
+  the option that truly equals it, or rewrite the task so the marked option is that
+  value; never leave a marked option of a different value.
 - Keep the exact selected lesson in every correction, and recompute the difficulty
   evidence so it honestly describes the task you actually return.
 - Exactly one visible option stays correct. Recompute correct_option_id,

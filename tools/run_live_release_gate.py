@@ -294,10 +294,15 @@ def build_release_gate_plan(commit_sha: str) -> tuple[GateScenario, ...]:
                  "release-core", "Daj mi lakši zadatak.", 1, requires=2, role="easier_level1"),
         scenario("release_gate_core_new_same_level", CORE_MODEL, "", "release-core",
                  "Daj mi novi zadatak.", 1, requires=1, role="same_level_new"),
-        scenario("release_gate_contract_fresh", CORE_CONTRACT, "", "release-contract", "Daj mi zadatak.", 1,
-                 path="contract", role="contract_fresh"),
+        # MIGRACIJA K1/K3: ova lekcija više nema vlastitu modelsku rutu. Scenariji
+        # ostaju, ali sada dokazuju da UGOVORNA OGRANIČENJA prežive na brzoj ruti
+        # (1 poziv, Luna), a ne da ugovor bira drugi put. `path` ostaje
+        # "non_contract" jer ruta više nije ugovorna — provjeru ugovora radi
+        # server (`package_preflight.contract_package_issues`).
+        scenario("release_gate_contract_fresh", CORE_CONTRACT, "", "release-contract",
+                 "Daj mi zadatak.", 1, role="contract_fresh"),
         scenario("release_gate_contract_harder", CORE_CONTRACT, "harder", "release-contract",
-                 "Daj mi teži zadatak.", 1, path="contract", requires=1, role="contract_harder"),
+                 "Daj mi teži zadatak.", 1, requires=1, role="contract_harder"),
         # Faza 4H: deterministička strategija — TAČNO nula poziva po scenariju.
         scenario("release_gate_semantic_fresh", CORE_SEMANTIC, "", "release-semantic",
                  "Daj mi zadatak.", 0, role="semantic_fresh"),

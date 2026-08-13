@@ -40,6 +40,14 @@ class LessonContext:
     geometry_figures: tuple = ()
     # Opcioni deklarativni opis matematike (postoji za migrirane lekcije).
     has_contract: bool = False
+    # UGOVOR JE PODATAK O ZADATKU, NE DRUGA RUTA (migracija K1/K3). Ova polja
+    # su ranije živjela samo u ugovornom motoru; sada idu u brzi prompt i u
+    # serversku provjeru objave, pa lekcija s ugovorom ne treba vlastiti put.
+    task_archetypes: tuple = ()
+    prohibited_archetypes: tuple = ()
+    operand_types: tuple = ()
+    representation_constraints: dict = field(default_factory=dict)
+    error_categories: tuple = ()
     skill: str = ""
     allowed_operations: tuple = ()
     operand_constraints: dict = field(default_factory=dict)
@@ -103,6 +111,15 @@ def build(grade, topic_id):
         skill=contract.skill if contract is not None else "",
         allowed_operations=tuple(contract.allowed_operations) if contract is not None else (),
         operand_constraints=dict(contract.operand_constraints) if contract is not None else {},
+        task_archetypes=(tuple(contract.allowed_task_archetypes)
+                         if contract is not None else ()),
+        prohibited_archetypes=(tuple(contract.prohibited_task_archetypes)
+                               if contract is not None else ()),
+        operand_types=tuple(contract.operand_types) if contract is not None else (),
+        representation_constraints=(dict(contract.representation_constraints)
+                                    if contract is not None else {}),
+        error_categories=(tuple(contract.error_category_set)
+                          if contract is not None else ()),
         lesson_scope=str(lesson.get("lesson_scope", "") or ""),
         # PRIMARNA VJEŠTINA IZ KANONSKOG KURIKULUMA (vidi matbot/lesson_objectives.py).
         # `topics.json` nosi ručno pisan opseg za nekoliko lekcija; za sve

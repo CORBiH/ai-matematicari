@@ -150,14 +150,49 @@ def test_gate_environment_is_the_one_the_release_gate_uses(release_gate_env):
 
 
 # ---------------------------------------------------------------------------
-# 2) K1/K3 lekcija BEZ semantičkog ugovora zadržava zatečeni put
+# 2) K1/K3 lekcija BEZ semantičkog ugovora — MIGRIRANA na brzu rutu
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize("lesson_id", K1K3_ONLY_LESSONS)
-def test_k1k3_lesson_without_semantics_stays_on_legacy(
+def test_k1k3_lesson_without_semantics_now_uses_the_universal_fast_route(
         lesson_id, release_gate_env, route_spy, fake_llm, store):
+    """Ugovor je PODATAK o zadatku, ne razlog za vlastiti izvršni put.
+
+    Ranije je ova lekcija imala zasebnu modelsku rutu na drugom modelu. Sada
+    ide istim putem kao svaka druga nedeterministička lekcija, a ograničenja
+    ugovora se čuvaju u promptu i u serverskoj provjeri objave."""
     assert k1k3_registry.contract_for(lesson_id) is not None
     assert sem_contracts.contract_for(lesson_id) is None
+    practice.run_practice_turn(store, fake_llm, turn_for(lesson_id))
+    assert route_spy == ["universal"], (lesson_id, route_spy)
+
+
+@pytest.mark.parametrize("lesson_id", K1K3_ONLY_LESSONS)
+def test_k1k3_contract_still_constrains_the_migrated_lesson(lesson_id):
+    """Migracija ne smije izgubiti nijedno ugovorno ograničenje."""
+    from matbot.tutor import lesson_context, prompts as tutor_prompts
+
+    context = lesson_context.build(6, lesson_id)
+    assert context.has_contract
+    block = tutor_prompts._lesson_block(context)
+    contract = k1k3_registry.contract_for(lesson_id)
+    assert contract.skill in block
+    for operation in contract.allowed_operations:
+        assert operation in block
+    for archetype in contract.allowed_task_archetypes:
+        assert archetype in block
+    # Smjer skaliranja razlikuje proširivanje od skraćivanja — mora biti izgovoren.
+    assert str(contract.operand_constraints["scaling_direction"]) in block
+    if contract.representation_constraints.get("answer_form") == "irreducible":
+        assert "NESVODIV" in block
+
+
+@pytest.mark.parametrize("lesson_id", K1K3_ONLY_LESSONS)
+def test_legacy_contract_route_remains_reachable_for_rollback(
+        lesson_id, monkeypatch, route_spy, fake_llm, store):
+    """ROLLBACK: stari ugovorni put se ne briše dok migracija ne dobije staž."""
+    monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", "legacy_single_call")
+    monkeypatch.setenv("MATBOT_PRACTICE_DIFFICULTY_LEVELS", "enabled")
     practice.run_practice_turn(store, fake_llm, turn_for(lesson_id))
     assert route_spy == ["legacy"], (lesson_id, route_spy)
 
@@ -171,8 +206,9 @@ def test_non_semantic_lessons_route_exactly_as_before(
         lesson_id, release_gate_env, route_spy, fake_llm, store):
     grade = 9 if lesson_id.startswith("9-") else 6
     practice.run_practice_turn(store, fake_llm, turn_for(lesson_id, grade=grade))
-    expected = "legacy" if k1k3_registry.contract_for(lesson_id) is not None else "universal"
-    assert route_spy == [expected], (lesson_id, route_spy)
+    # Poslije migracije K1/K3: svaka nedeterministička lekcija ide istim putem,
+    # bez obzira nosi li ugovor.
+    assert route_spy == ["universal"], (lesson_id, route_spy)
 
 
 def test_divisibility_lesson_keeps_its_title_requirement_beside_its_contract():

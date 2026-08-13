@@ -951,23 +951,25 @@ def run_practice_turn(store, llm, turn):
     put. Implementacija univerzalnog puta se NE briše — dijagnostika i popravke
     žive u matbot/tutor/ i pokrivene su testovima koje zastavica uključuje."""
     if _universal_pipeline_enabled():
-        # The validated release runtime enables the shared level controller.
-        # In that runtime deterministic K1/K3 contracts keep their established
-        # one-call generator; all other lessons use Tutor+Reviewer.
+        # JEDNA MODELSKA RUTA ZA SVE NEDETERMINISTIČKE LEKCIJE (migracija K1/K3).
         #
-        # AKTIVAN SEMANTIČKI UGOVOR IMA PREDNOST (Faza 4B). Ranije je uslov
-        # gledao samo „ima li lekcija K1/K3 red“, pa je lekcija koja je u
-        # međuvremenu dobila KOMPAJLIRAN semantički ugovor i dalje padala na
-        # legacy put i time zaobilazila SVOJ ugovor: Tutorov kontekst,
-        # recenzentovu ispravku i završnu semantičku revalidaciju. Odluka je
-        # podatak (postojanje ugovora), ne grana po ID-ju lekcije, i K1/K3
-        # lekcija bez semantičkog ugovora ostaje tačno na svom putu.
-        topic_id = turn.get("selected_topic", "")
-        if (_difficulty_levels_enabled()
-                and contract_registry.contract_for(topic_id) is not None
-                and semantic_contracts.contract_for(topic_id) is None):
-            return _run_legacy_single_call_turn(store, llm, turn)
+        # Ranije je lekcija s K1/K3 ugovorom i BEZ semantičkog ugovora išla
+        # zasebnim jednopozivnim putem na drugom modelu. To je bila druga
+        # MODELSKA ARHITEKTURA za tačno dvije lekcije (proširivanje i skraćivanje
+        # razlomaka), a ne svojstvo tih lekcija — ugovor je podatak o zadatku,
+        # ne razlog za vlastiti izvršni put.
+        #
+        # Ugovor se NE odbacuje: njegova ograničenja sada ulaze u brzi prompt
+        # (`matbot/tutor/lesson_context.py` + `prompts._lesson_block`) i u
+        # serversku provjeru objave (`package_preflight.contract_package_issue`),
+        # dakle kao PODACI i determinističke provjere, a ne kao grana.
+        #
+        # Deterministička strategija i dalje bira prva, unutar tutor pipelinea,
+        # pa lekcija s potpunim generatorom ostaje na nula poziva.
         return tutor_pipeline.run_turn(store, llm, turn)
+    # ROLLBACK: bez eksplicitne zastavice sve ide starim jednopozivnim putem,
+    # uključujući K1/K3 ugovorni motor. Ovaj put se NE briše dok migracija ne
+    # dobije produkcijski staž.
     return _run_legacy_single_call_turn(store, llm, turn)
 
 

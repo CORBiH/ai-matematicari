@@ -165,16 +165,39 @@ def test_universal_route_remains_available_for_the_same_lesson(universal_only):
     assert (fake.fast_calls, fake.reviewer_call_count) == (0, 1)   # stari put
 
 
-def test_deterministic_and_contract_routes_are_untouched(fast_route):
+def test_deterministic_route_is_untouched_and_contract_lesson_joins_the_fast_route(
+        fast_route, monkeypatch):
+    """Determinističke lekcije ostaju na nula poziva; K1/K3 se MIGRIRA.
+
+    Ranije je ovaj test dokazivao da ugovorna lekcija NE ide brzom rutom. To je
+    bila implementacijska činjenica zatečene arhitekture, a ne osobina lekcije:
+    ugovor je podatak o zadatku. Nakon migracije ugovorna lekcija ide istim
+    putem kao svaka druga modelski podržana lekcija, uz sva svoja ograničenja."""
     store, fake = SessionStore(), FastFake()
     assert run_practice_turn(store, fake, turn(
         "d1", "Daj mi zadatak.", *DETERMINISTIC_LESSON))["status"] == "ready"
     assert fake.call_count == 0                               # 0-call ostaje 0-call
+    # PRODUKCIJSKI OPSEG: ruta se bira po klasi lekcije, ne po spisku ID-jeva.
+    monkeypatch.setenv("MATBOT_FAST_SINGLE_CALL_SCOPE", "model_backed")
     store2, fake2 = SessionStore(), FastFake()
-    fake2.queue(make_tutor_draft(intent="generate_task", reply="Evo.",
-                                 lesson_focus="razlomci"))
+    contract_task = make_task_payload(
+        text="Koji razlomak je jednak $\frac{2}{3}$?",
+        options=["$\frac{4}{6}$", "$\frac{3}{4}$", "$\frac{5}{6}$", "$\frac{1}{3}$"],
+        correct_option_index=0, expected="$\frac{4}{6}$",
+        solution="Proširivanjem s 2 dobijemo $\frac{4}{6}$, iste vrijednosti.",
+        difficulty="standard").model_copy(update={
+            "selected_lesson_id": CONTRACT_LESSON[0],
+            "selected_lesson_title": "Proširivanje razlomaka"})
+    fake2.queue(make_tutor_draft(intent="generate_task", reply="Evo zadatka.",
+                                 lesson_focus="proširivanje razlomaka",
+                                 new_task=contract_task))
+    # Recenzent je uslovan; ovdje se dokazuje RUTA, pa mu se odgovor pripremi da
+    # turn može završiti bez obzira na to je li preflight našao nalaz.
+    fake2.queue(make_reviewer_final(decision="approve", checks=make_reviewer_checks()))
     run_practice_turn(store2, fake2, turn("c1", "Daj mi zadatak.", *CONTRACT_LESSON))
-    assert fake2.fast_calls == 0                              # K1/K3 ne ide brzom rutom
+    assert fake2.fast_calls == 1                              # K1/K3 sada ide brzom rutom
+    assert fake2.practice_call_count == 0                     # NIKAD stari ugovorni poziv
+    assert fake2.call_count <= 2                              # plafon se ne mijenja
 
 
 # ---------------------------------------------------------------------------

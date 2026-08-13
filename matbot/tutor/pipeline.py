@@ -2050,7 +2050,8 @@ def _fast_single_call(llm, context, session, turn, request_id, ui_action="",
             difficulty_profile=difficulty_profile,
             practice_contract=context.practice_contract,
             practice_policy=getattr(context, "practice_policy", None),
-            student_message=student_message))
+            student_message=student_message,
+            lesson_constraints=context))
         # CILJNI NIVO JE POPRAVLJIV NALAZ, NE PAD U OBJAVI (živi nalaz brze
         # rute): objava traži TAČNU jednakost deklarisanog i
         # serverskog cilja, pa je nacrt s pogrešnim nivoom prolazio preflight i
@@ -2245,7 +2246,8 @@ def _reviewer_stage(llm, context, session, student_message, draft,
             # umjesto tačnog nalaza. Objava (`_validate_task_server_side`)
             # istu provjeru i dalje ponavlja: ovo je raniji sloj, ne zamjena.
             practice_policy=getattr(context, "practice_policy", None),
-            student_message=student_message)
+            student_message=student_message,
+            lesson_constraints=context)
         if final_issues:
             # `unchanged=True` znači: recenzent je vidio nalaz i vratio paket s
             # POTPUNO ISTIM nalazima — dakle nije ni pokušao ispravku.
@@ -2389,7 +2391,8 @@ def _two_call(llm, context, session, student_message, request_id, trusted_verdic
             difficulty_profile=difficulty_profile,
             practice_contract=context.practice_contract,
             practice_policy=getattr(context, "practice_policy", None),
-            student_message=student_message)
+            student_message=student_message,
+            lesson_constraints=context)
     if draft_issues:
         logger.info(
             "tutor_draft_preflight request_id=%s topic=%s intent=%s issues=%s",

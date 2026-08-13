@@ -28,8 +28,10 @@ BEZBJEDNOST DIJAGNOSTIKE: nalaz nosi SAMO kod, ID-jeve opcija i kratak
 ograničen detalj — nikad tekst zadatka, opcije, rješenje, prompt ni sirov izlaz
 modela (CLAUDE.md, pravilo 7).
 """
+import math
 import re
 from dataclasses import dataclass
+from fractions import Fraction
 
 from matbot import geometrycheck, lesson_fidelity, mcq_integrity, option_equivalence
 from matbot import practice_policy as practice_policy_module
@@ -49,6 +51,8 @@ from matbot.tutor.schema import (INCOMPLETE_TASK_TEXT_CODE, UnifiedOutputError,
 MAX_ISSUES = 8
 # Dovoljno za `target Level 1; <kod validatora>; steps=… flags=…`, i dalje tvrda
 # granica. Ovo je granica DIJAGNOSTIKE, ne prag težine.
+CONTRACT_ANSWER_FORM_CODE = "contract_answer_form_violation"
+CONTRACT_EQUIVALENCE_CODE = "contract_equivalence_violation"
 _MAX_DETAIL_CHARS = 200
 
 # Kod koji objava već koristi za isti nalaz — namjerno ISTI string, da se
@@ -138,9 +142,75 @@ def _option_id(task, index):
         return str(index)
 
 
+# UGOVOR LEKCIJE KAO DETERMINISTIČKA PROVJERA (migracija K1/K3).
+# Lekcije s K1/K3 ugovorom su ranije imale vlastiti modelski put čiji je motor
+# provjeravao STRUKTURISAN DOKAZ (korake). Brza ruta ne traži dokaz — zato se
+# ovdje čuva ono što se DA dokazati iz objavljenog paketa samog. Provjere su
+# vođene UGOVORNIM PODACIMA, ne ID-jem lekcije, i preskaču kad ne mogu dokazati.
+_CONTRACT_FRACTION_RE = re.compile(r"\\+t?frac\{\s*(-?\d+)\s*\}\{\s*(-?\d+)\s*\}")
+# Negacija okreće smisao pitanja („koji NIJE jednak…“), pa provjera jednakosti
+# tada ne bi bila dokaz nego pogađanje — u tom slučaju se preskače.
+_CONTRACT_NEGATION_RE = re.compile(r"\b(nije|nisu|ne\s+pripada|neta[čc]n)", re.IGNORECASE)
+
+
+def _contract_fractions(text):
+    out = []
+    for numerator, denominator in _CONTRACT_FRACTION_RE.findall(text or ""):
+        try:
+            out.append(Fraction(int(numerator), int(denominator)))
+        except (ValueError, ZeroDivisionError):
+            continue
+    return out
+
+
+def contract_package_issues(task, lesson_constraints):
+    """Nalazi koje UGOVOR lekcije dokazuje nad objavljenim paketom.
+
+    Čita samo deklarativna polja (`representation_constraints`,
+    `task_archetypes`). Bez ugovora vraća prazno i ponašanje je nepromijenjeno.
+    „Ne mogu dokazati“ NIKAD ne znači „prošlo je“ — takav slučaj se preskače."""
+    if lesson_constraints is None or not getattr(lesson_constraints, "has_contract", False):
+        return ()
+    marked_index = getattr(task, "correct_option_index", None)
+    options = list(getattr(task, "options", None) or ())
+    if not isinstance(marked_index, int) or not 0 <= marked_index < len(options):
+        return ()
+    marked_text = str(getattr(options[marked_index], "text", "") or "")
+    marked = _contract_fractions(marked_text)
+    if len(marked) != 1:
+        return ()          # označen odgovor nije jedan razlomak → nedokazivo
+    issues = []
+    representation = getattr(lesson_constraints, "representation_constraints", {}) or {}
+    if representation.get("answer_form") == "irreducible":
+        # NESVODIV = brojnik i nazivnik NAPISANI bez zajedničkog djelioca.
+        # Gleda se zapis, ne vrijednost: 4/6 i 2/3 imaju istu vrijednost, a samo
+        # jedan je skraćen do kraja — a upravo to lekcija ispituje.
+        numerator, denominator = _CONTRACT_FRACTION_RE.search(marked_text).groups()
+        if math.gcd(abs(int(numerator)), abs(int(denominator))) > 1:
+            issues.append(PackageIssue(
+                CONTRACT_ANSWER_FORM_CODE,
+                option_ids=(_option_id(task, marked_index),),
+                detail=("ugovor lekcije traži NESVODIV razlomak, a označena "
+                        f"opcija je {numerator}/{denominator}; skrati je do kraja "
+                        "i uskladi expected_answer i solution")))
+    archetypes = tuple(getattr(lesson_constraints, "task_archetypes", ()) or ())
+    if "identify_equivalent" in archetypes:
+        text = str(getattr(task, "text", "") or "")
+        if not _CONTRACT_NEGATION_RE.search(text):
+            in_text = _contract_fractions(text)
+            if in_text and marked[0] not in in_text:
+                issues.append(PackageIssue(
+                    CONTRACT_EQUIVALENCE_CODE,
+                    option_ids=(_option_id(task, marked_index),),
+                    detail=("arhetip `identify_equivalent`: označena opcija mora "
+                            "imati ISTU vrijednost kao razlomak iz teksta zadatka")))
+    return tuple(issues)
+
+
 def collect_package_issues(task, contract=None, previous_signature="",
                            difficulty_profile=None, practice_contract=None,
-                           practice_policy=None, student_message=""):
+                           practice_policy=None, student_message="",
+                           lesson_constraints=None):
     """Vrati zatvorenu torku nalaza postojećih validatora nad JEDNIM paketom.
 
     Prazna torka = nijedan deterministički validator ne može dokazati defekt.
@@ -172,6 +242,9 @@ def collect_package_issues(task, contract=None, previous_signature="",
     if task is None:
         return ()
     issues = []
+    # 0) UGOVOR LEKCIJE (migracija K1/K3): ono što je ranije dokazivao zaseban
+    #    ugovorni motor, a dokazivo je i iz samog objavljenog paketa.
+    issues.extend(contract_package_issues(task, lesson_constraints))
 
     # 1) STRUKTURA PAKETA — postojeći `validate_task` (broj opcija, jedinstveni
     #    ID-jevi, slaganje correct_option_id/index, prazna/preduga polja...).
