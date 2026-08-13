@@ -1,0 +1,28 @@
+{
+ "_readme": "Algebarski OBLICI koje lekcija DEKLARIŠE svojim gradivom (naslov + NPP ishodi). Izvedeno, ne rucno pisano: scripts/build_form_variant_support.py. Lekcija bez unosa nema rotaciju oblika i ponasa se kao ranije.",
+ "schema_version": 1,
+ "lessons": {
+  "6-07-002": {
+   "grade": 6,
+   "title": "Jednačine s razlomcima oblika x ± a = b i a ± x = b",
+   "supported": [
+    "X_PLUS_A",
+    "X_MINUS_A",
+    "A_PLUS_X",
+    "A_MINUS_X"
+   ],
+   "source": "npp_declared_forms"
+  },
+  "6-07-003": {
+   "grade": 6,
+   "title": "Nejednačine s razlomcima oblika x ± a < b / > b i a ± x < b / > b",
+   "supported": [
+    "X_PLUS_A",
+    "X_MINUS_A",
+    "A_PLUS_X",
+    "A_MINUS_X"
+   ],
+   "source": "npp_declared_forms"
+  }
+ }
+}

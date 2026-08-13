@@ -40,6 +40,7 @@ from matbot.tutor import task_identity
 from matbot.tutor import prompts as tutor_prompts
 from matbot import deterministic as deterministic_generators
 from matbot import archetype_support
+from matbot import form_variants
 from matbot import deterministic_variety
 from matbot.deterministic.core import DeterministicGenerationError
 from matbot.tutor.schema import (TASK_INTENTS, TutorDraft, UnifiedOutputError,
@@ -584,6 +585,20 @@ def _log_difficulty(request_id, context, final):
 # Registar živi u matbot/deterministic/__init__.py da dodavanje novog
 # kapaciteta ne dira orkestrator (kapacitetna ekspanzija, poslije Faze 4H).
 _DETERMINISTIC_GENERATORS = deterministic_generators.GENERATORS
+
+
+def _generate_optional_kwargs(generator, **candidates):
+    """Proslijedi imenovani argument SAMO generatoru koji ga deklariše.
+
+    Isti princip kao kod `policy`: umjesto mehaničkog širenja potpisa svih 27
+    modula, jedna tačka gleda potpis i šalje ono što modul zna konsumirati.
+    Modul koji ne zna za argument radi bajt za bajt kao prije."""
+    try:
+        accepted = inspect.signature(generator.generate_package).parameters
+    except (TypeError, ValueError):
+        return {}
+    return {name: value for name, value in candidates.items()
+            if value and name in accepted}
 
 
 def _generate_with_policy(generator, *, policy, **kwargs):
@@ -1251,11 +1266,21 @@ def _run_deterministic_task_turn(store, session, turn, context, request_id,
         # nikad model. Svaki kandidat prolazi ISTU objavnu validaciju.
         for _attempt in range(12):
             try:
+                # SERVER BIRA ALGEBARSKI OBLIK (LRU), generator ga ispunjava.
+                # Bez ovoga je lekcija čiji NPP izričito nabraja `x ± a` I
+                # `a ± x` davala samo `x`-prvi oblik — mjereno 20/20.
                 candidate = _generate_with_policy(
                     generator, policy=getattr(context, "practice_policy", None),
                     lesson_id=context.topic_id, lesson_title=context.title,
                     parameters=context.semantic_contract.parameters,
-                    level=generator_level)
+                    level=generator_level,
+                    **_generate_optional_kwargs(
+                        generator,
+                        preferred_form=form_variants.preferred_variant(
+                            context.topic_id,
+                            [entry.get("form_variant") for entry
+                             in (session.get("recent_structures") or ())
+                             if isinstance(entry, dict)])))
             except DeterministicGenerationError as error:
                 _log_rejection(request_id, context, "deterministic_generation",
                                error, intent)
@@ -2010,6 +2035,10 @@ def _publish_task(session, context, final, request_id, target_level=None):
         session.setdefault("recent_structures", []).append({
             "signature": structure,
             "archetype": archetype_support.classify(task_text, option_texts),
+            # DRUGA OSA RAZNOLIKOSTI: arhetip kaže ŠTA se traži, oblik kaže
+            # GDJE stoji nepoznata. `a - x` i `x - a` su isti arhetip, a
+            # pedagoški različiti zadaci — zato se pamte odvojeno.
+            "form_variant": form_variants.classify(task_text),
             "text": task_text,
         })
     _log_difficulty(request_id, context, final)

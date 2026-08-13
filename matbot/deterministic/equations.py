@@ -21,9 +21,11 @@ mathcheck nezavisno dokazuje.
 NIVO = broj računskih koraka do rješenja (1, 2 ili 3) — dokaz težine time
 opisuje stvarni postupak, ne proznu procjenu.
 """
+import inspect
 import random
 from fractions import Fraction
 
+from matbot import form_variants
 from matbot.deterministic import core
 from matbot.deterministic.core import DeterministicGenerationError
 # PP-1, dva pogleda na ISTU metodu (jedna istina, vidi matbot/practice_policy.py):
@@ -47,6 +49,14 @@ _SUPPORTED_SHAPES = frozenset({
     "absolute_value_equation", "absolute_value_inequality",
     "classification", "solution_count", "equivalence_choice",
 })
+# Oblici koje aditivna nejednačina ume da napravi. Redoslijed je stabilan da bi
+# rotacija bila ponovljiva; sadržaj dolazi iz zatvorene liste `form_variants`.
+_ADDITIVE_FORMS = (form_variants.X_PLUS_A, form_variants.X_MINUS_A,
+                   form_variants.A_PLUS_X, form_variants.A_MINUS_X)
+# Bez serverskog izbora vrijedi zatečeno ponašanje — `a ± x` se dobija samo kad
+# ga gradivo lekcije deklariše, nikad slučajno.
+_DEFAULT_ADDITIVE_FORMS = (form_variants.X_PLUS_A, form_variants.X_MINUS_A)
+
 _QUADRATIC_SHAPES = frozenset({
     "x_squared_equals_a", "factor_out_x", "perfect_square_trinomial",
 })
@@ -69,7 +79,7 @@ def supports(parameters) -> bool:
 
 
 def generate_package(lesson_id, lesson_title, parameters, level, rng=None,
-                     policy=None):
+                     policy=None, preferred_form=""):
     """`policy` je razriješena PP-1 politika (matbot/practice_policy.py) ili
     None. Kad politika traži metodu nepoznatog člana (6. razred), oblici se
     grade iz ULOGE nepoznatog člana — transpoziciona proza za te oblike NIKAD
@@ -92,7 +102,8 @@ def generate_package(lesson_id, lesson_title, parameters, level, rng=None,
             if unknown_member:
                 return _unknown_member_package(rng, level, domain, shape,
                                                lesson_id, lesson_title,
-                                               max_degree=max_degree)
+                                               max_degree=max_degree,
+                                               preferred_form=preferred_form)
             builder = {
                 "one_step_additive": _additive_package,
                 "one_step_multiplicative": _multiplicative_package,
@@ -120,7 +131,8 @@ def generate_package(lesson_id, lesson_title, parameters, level, rng=None,
                                           lesson_title)
             if shape.startswith("solve_inequality"):
                 return _solve_inequality_package(rng, level, domain, shape,
-                                                 lesson_id, lesson_title)
+                                                 lesson_id, lesson_title,
+                                                 preferred_form=preferred_form)
             # Granicu stepena nepoznate prima SAMO oblik koji bira vrste
             # ponuđenih zapisa; ostali oblici su vrstom definisani sami po sebi.
             if shape == "classification":
@@ -570,24 +582,60 @@ def _inequality_text(symbol, bound_display):
 
 
 def _solve_inequality_package(rng, level, domain, shape, lesson_id,
-                              lesson_title):
+                              lesson_title, preferred_form=""):
     show = lambda v: _domain_show(domain, v)
     less = rng.random() < 0.5
     symbol = "<" if less else ">"
     flipped = {"<": ">", ">": "<"}[symbol]
 
     if shape == "solve_inequality_additive":
+        # ALGEBARSKI OBLIK JE DIO GRADIVA, NE UKRAS (ručni nalaz nad
+        # lekcijom o nejednačinama s razlomcima).
+        # NPP za ovu lekciju izričito nabraja `x ± a` I `a ± x`, a generator je
+        # znao samo `x`-prvi oblik: mjereno 20 od 20 zadataka. `a - x` nije
+        # kozmetička varijanta — izolacija nepoznate tamo množi nejednakost s
+        # $-1$ i OBRĆE smjer, što je upravo ono što lekcija uči.
+        #
+        # Server bira oblik (LRU rotacija u `matbot/form_variants.py`); ovdje se
+        # samo poštuje izbor. Bez izbora se bira slučajno IZ SVA ČETIRI oblika,
+        # pa lekcija bez rotacije više nije zaključana na `x`-prvi.
+        # Bez serverskog izbora ostaju SAMO zatečena dva oblika: lekcija koja
+        # `a ± x` nije deklarisala ne smije ga dobiti slučajno.
+        variant = (preferred_form if preferred_form in _ADDITIVE_FORMS
+                   else rng.choice(_DEFAULT_ADDITIVE_FORMS))
         bound = _value(rng, domain, level)
         offset = abs(_value(rng, domain, level, small=True))
-        sign = rng.random() < 0.5
-        lhs_rhs = bound + (offset if sign else -offset)
-        inequality = (f"x + {_term(offset)} {symbol} {show(lhs_rhs)}" if sign
-                      else f"x - {_term(offset)} {symbol} {show(lhs_rhs)}")
         answer_symbol = symbol
-        steps = (f"x {symbol} {show(lhs_rhs)} {'-' if sign else '+'} "
-                 f"{_term(offset)}")
-        rule = ("Sabiranje i oduzimanje ne mijenjaju smjer nejednakosti — "
-                "prebaci poznati član sa suprotnim predznakom.")
+        keeps_direction = ("Sabiranje i oduzimanje ne mijenjaju smjer "
+                           "nejednakosti — prebaci poznati član sa suprotnim "
+                           "predznakom.")
+        if variant == form_variants.A_MINUS_X:
+            # `a - x ? b`. Bira se $a = bound + offset$, pa je $b = offset$:
+            # obje vrijednosti ostaju u Q+ po konstrukciji, a rješenje je
+            # tačno `bound` — SA OBRNUTIM smjerom.
+            known = bound + offset
+            lhs_rhs = offset
+            inequality = f"{_term(known)} - x {symbol} {show(lhs_rhs)}"
+            answer_symbol = flipped
+            steps = (f"-x {symbol} {show(lhs_rhs)} - {_term(known)}"
+                     f" \\;\\Rightarrow\\; x {flipped} {show(bound)}")
+            rule = ("Kad se nepoznata ODUZIMA od broja, izolacija je množi s "
+                    "$-1$, pa se smjer nejednakosti OBRĆE.")
+        elif variant == form_variants.A_PLUS_X:
+            lhs_rhs = bound + offset
+            inequality = f"{_term(offset)} + x {symbol} {show(lhs_rhs)}"
+            steps = f"x {symbol} {show(lhs_rhs)} - {_term(offset)}"
+            rule = keeps_direction
+        elif variant == form_variants.X_MINUS_A:
+            lhs_rhs = bound - offset
+            inequality = f"x - {_term(offset)} {symbol} {show(lhs_rhs)}"
+            steps = f"x {symbol} {show(lhs_rhs)} + {_term(offset)}"
+            rule = keeps_direction
+        else:
+            lhs_rhs = bound + offset
+            inequality = f"x + {_term(offset)} {symbol} {show(lhs_rhs)}"
+            steps = f"x {symbol} {show(lhs_rhs)} - {_term(offset)}"
+            rule = keeps_direction
     elif shape == "solve_inequality_parentheses":
         factor = rng.randint(2, 4)
         inner = rng.randint(1, 6)
@@ -1107,7 +1155,8 @@ def _role_display_of(domain):
 
 def _unknown_member_package(rng, level, domain, shape, lesson_id,
                             lesson_title,
-                            max_degree=core.DEFAULT_MAX_VARIABLE_DEGREE):
+                            max_degree=core.DEFAULT_MAX_VARIABLE_DEGREE,
+                            preferred_form=""):
     """Ruta metode nepoznatog člana za JEDAN oblik ugovora, ili fail closed."""
     builders = {
         "one_step_additive": _role_additive_package,
@@ -1118,6 +1167,12 @@ def _unknown_member_package(rng, level, domain, shape, lesson_id,
     }
     builder = builders.get(shape)
     if builder is not None:
+        # ALGEBARSKI OBLIK prima samo graditelj koji ga zna konsumirati;
+        # ostali rade bajt za bajt kao prije.
+        if preferred_form and "preferred_form" in inspect.signature(
+                builder).parameters:
+            return builder(rng, level, domain, lesson_id, lesson_title,
+                           preferred_form=preferred_form)
         return builder(rng, level, domain, lesson_id, lesson_title)
     # Metodski NEUTRALNI oblici (uvrštavanje/prepoznavanje — bez postupka
     # rješavanja u prozi) smiju proći nepromijenjeni i pod ovom politikom.
@@ -1307,23 +1362,59 @@ def _role_inequality_options(answer_symbol, bound_display, show, bound):
 
 
 def _role_inequality_additive_package(rng, level, domain, lesson_id,
-                                      lesson_title):
-    """x + a ≶ b i x - a > b — smjer se NE mijenja (sabiranje/oduzimanje)."""
+                                      lesson_title, preferred_form=""):
+    """`x ± a` I `a ± x` metodom nepoznatog člana (PP-1, 6. razred).
+
+    RUČNI NALAZ KOJI JE OVO IZNUDIO: NPP lekcije o nejednačinama s
+    razlomcima izričito nabraja
+    oba porodična oblika, a generator je znao samo `x`-prvi — mjereno 20 od 20
+    zadataka. `a - x` nije kozmetička varijanta: nepoznata je tu UMANJILAC, pa
+    izolacija OBRĆE smjer nejednakosti. To je upravo ono što lekcija uči.
+
+    Oblik bira server (LRU, `matbot/form_variants.py`). Bez izbora ostaju samo
+    zatečena dva oblika — lekcija koja `a ± x` nije deklarisala ne dobija ga
+    slučajno."""
     show = lambda v: _domain_show(domain, v)
     bound, known = _role_pair(rng, domain, level)
     if bound == 0 or known == 0:
         raise DeterministicGenerationError("degenerisan član")
     symbol = "<" if rng.random() < 0.5 else ">"
-    form = rng.choice(("x_plus", "x_minus" if symbol == ">" else "x_plus"))
-    if form == "x_plus":
+    flipped = {"<": ">", ">": "<"}[symbol]
+    default_forms = (form_variants.X_PLUS_A,
+                     form_variants.X_MINUS_A if symbol == ">"
+                     else form_variants.X_PLUS_A)
+    form = (preferred_form if preferred_form in _ADDITIVE_FORMS
+            else rng.choice(default_forms))
+    answer_symbol = symbol                    # sabiranje/oduzimanje čuva smjer
+    direction_line = "Smjer nejednakosti se ne mijenja"
+    direction_hint = ("sabiranje i oduzimanje istog broja ne mijenjaju smjer "
+                      "nejednakosti")
+    if form == form_variants.A_MINUS_X:
+        # `a - x ≶ b`: nepoznata je UMANJILAC. Umanjenik se konstruiše kao
+        # granica + razlika, pa sve vidljive vrijednosti ostaju u Q+, a
+        # rješenje je tačno `bound` — SA OBRNUTIM smjerom.
+        rhs = known                           # razlika
+        minuend = bound + rhs                 # umanjenik = granica + razlika
+        inequality = f"{show(minuend)} - x {symbol} {show(rhs)}"
+        role_line = _associated_equation_line(
+            "unknown_subtrahend",
+            f"{show(minuend)} - x = {show(rhs)}",
+            f"{show(minuend)} - {show(rhs)} = {show(bound)}")
+        steps = f"x {flipped} {show(minuend)} - {show(rhs)}"
+        answer_symbol = flipped
+        direction_line = ("Nepoznata se ODUZIMA, pa se pri izolaciji smjer "
+                          "nejednakosti OBRĆE")
+        direction_hint = ("kada je nepoznata umanjilac, veći $x$ daje MANJU "
+                          "razliku, pa se smjer obrće")
+    elif form == form_variants.A_PLUS_X:
         rhs = bound + known                   # granica se KONSTRUIŠE unaprijed
-        inequality = f"x + {show(known)} {symbol} {show(rhs)}"
+        inequality = f"{show(known)} + x {symbol} {show(rhs)}"
         role_line = _associated_equation_line(
             "unknown_addend",
-            f"x + {show(known)} = {show(rhs)}",
+            f"{show(known)} + x = {show(rhs)}",
             f"{show(rhs)} - {show(known)} = {show(bound)}")
         steps = f"x {symbol} {show(rhs)} - {show(known)}"
-    else:
+    elif form == form_variants.X_MINUS_A:
         rhs = _role_value(rng, domain, level, small=True)
         if rhs == 0:
             raise DeterministicGenerationError("degenerisana desna strana")
@@ -1334,18 +1425,24 @@ def _role_inequality_additive_package(rng, level, domain, lesson_id,
             f"x - {show(known)} = {show(rhs)}",
             f"{show(rhs)} + {show(known)} = {show(bound)}")
         steps = f"x {symbol} {show(rhs)} + {show(known)}"
-    answer_symbol = symbol                    # sabiranje/oduzimanje čuva smjer
+    else:
+        rhs = bound + known                   # granica se KONSTRUIŠE unaprijed
+        inequality = f"x + {show(known)} {symbol} {show(rhs)}"
+        role_line = _associated_equation_line(
+            "unknown_addend",
+            f"x + {show(known)} = {show(rhs)}",
+            f"{show(rhs)} - {show(known)} = {show(bound)}")
+        steps = f"x {symbol} {show(rhs)} - {show(known)}"
     bound_display = show(bound)
     correct, options = _role_inequality_options(answer_symbol, bound_display,
                                                 show, bound)
-    hint2 = (f"Postupak: ${steps}$ — sabiranje i oduzimanje istog broja "
-             "ne mijenjaju smjer nejednakosti.")
+    hint2 = f"Postupak: ${steps}$ — {direction_hint}."
     hint3 = ("Rješenje čitaš kao skup: svi brojevi koji zadovoljavaju "
              "dobijenu nejednakost.")
     probe = bound + (Fraction(1) if answer_symbol == ">" else Fraction(0))
     if answer_symbol == "<":
         probe = bound / 2
-    solution_text = (f"{role_line} Smjer nejednakosti se ne mijenja, pa je "
+    solution_text = (f"{role_line} {direction_line}, pa je "
                      f"rješenje $x {answer_symbol} {bound_display}$. Probni "
                      f"broj ${show(probe)}$ zadovoljava polaznu nejednačinu, "
                      "što potvrđuje smjer.")
