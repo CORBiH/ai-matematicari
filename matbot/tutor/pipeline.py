@@ -2004,10 +2004,13 @@ def _publish_task(session, context, final, request_id, target_level=None):
     if structure:
         # Uz otisak se pamti i ARHETIP: šablon kaže kako rečenica izgleda, a
         # arhetip šta učenik mora uraditi. Raznolikost se mjeri drugim.
+        # Tekst se pamti CIJEL, ne skraćen: zahtjev zadatka („Koliki kusur
+        # dobije…?“) stoji na KRAJU rečenice, pa bi rezanje na 160 znakova
+        # uklonilo baš ono po čemu se mjeri da li je vježba ista.
         session.setdefault("recent_structures", []).append({
             "signature": structure,
             "archetype": archetype_support.classify(task_text, option_texts),
-            "text": task_text[:160],
+            "text": task_text,
         })
     _log_difficulty(request_id, context, final)
     return task_text

@@ -258,7 +258,9 @@ def _state_block(session, student_message, trusted_verdict=None, ui_action=""):
                 + task_archetypes.describe(preferred)
                 + ". Ostani STROGO unutar ove lekcije; ako taj oblik za nju nije "
                   "smislen, izaberi drugi oblik koji jeste, ali NIKAD ne izlazi "
-                  "iz lekcije.")
+                  "iz lekcije. Smiješ ponoviti raniji oblik samo ako se stvarno "
+                  "promijeni ŠTA se traži — isti zahtjev s drugim brojevima, "
+                  "imenima ili predmetima nije nov zadatak.")
         lines.append(
             "- ZA SLJEDEĆI ZADATAK izaberi DRUGU vrstu vježbe unutar iste lekcije. "
             "Promjena brojeva, imena, predmeta ili redoslijeda opcija NIJE dovoljna. "

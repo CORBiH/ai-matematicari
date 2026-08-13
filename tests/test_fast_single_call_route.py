@@ -438,6 +438,53 @@ def test_distinct_task_publishes_on_one_call(fast_route):
     assert fake.reviewer_call_count == 0
 
 
+def test_repeated_archetype_with_a_real_change_publishes_without_the_reviewer(fast_route):
+    """REGRESIJA OBJAVE: ponovljen OBLIK nije sam po sebi razlog za recenzenta.
+
+    Prva verzija kapije tražila je drugi arhetip na svaki „daj novi“ i oborila
+    objavu na 87,5 % — zadaci koji su bili potpuno ispravni i stvarno drugačiji
+    padali su jer recenzent nije uspio proizvesti drugi oblik."""
+    store, fake = SessionStore(), FastFake()
+    fake.queue(draft_for(rational_task(
+        text="Koji od navedenih brojeva pripada skupu $\\mathbb{Q}$?")))
+    run_practice_turn(store, fake, turn("ar1", "Daj mi zadatak."))
+    published = store.peek("ar1")["current_task"]
+
+    # Isti arhetip (razvrstavanje), ali se traži NEŠTO DRUGO.
+    fake.queue(draft_for(rational_task(
+        variant=1, text="Koji od navedenih zapisa je periodičan decimalni broj?"),
+        intent="next_task"))
+    response = run_practice_turn(store, fake, turn("ar1", "Daj mi novi zadatak."))
+    assert response["status"] == "ready"
+    assert store.peek("ar1")["current_task"] != published
+    assert fake.reviewer_call_count == 0                  # bez drugog poziva
+    assert fake.call_count == 2                           # 1 + 1
+
+
+def test_cosmetic_rewrite_reaches_the_reviewer_and_still_fails_closed(fast_route):
+    """Recenzent se zove SAMO za stvarno ponavljanje — i ne smije ga propustiti."""
+    store, fake = SessionStore(), FastFake()
+    original = "Koji od navedenih brojeva pripada skupu $\\mathbb{Q}$?"
+    fake.queue(draft_for(rational_task(text=original)))
+    run_practice_turn(store, fake, turn("ar2", "Daj mi zadatak."))
+    published = store.peek("ar2")["current_task"]
+
+    # Nacrt: ista vježba, promijenjene samo ponuđene vrijednosti.
+    fake.queue(draft_for(rational_task(variant=1, text=original + " Odaberi tačan."),
+                         intent="next_task"))
+    # Recenzent uzvraća KOZMETIČKOM prepravkom — mora pasti zatvoreno.
+    fake.queue(make_reviewer_final(
+        decision="correct",
+        final=draft_for(rational_task(variant=2, text=original + " Zaokruži tačan."),
+                        "next_task"),
+        checks=make_reviewer_checks()))
+    response = run_practice_turn(store, fake, turn("ar2", "Daj mi novi zadatak."))
+    assert fake.reviewer_call_count == 1
+    assert fake.call_count == 3                           # 1 + (1 + 1), nikad više
+    assert response.get("status") != "ready" or \
+        store.peek("ar2")["current_task"] == published
+
+
 # ---------------------------------------------------------------------------
 # 12b) CILJNI NIVO — POPRAVLJIV NALAZ, NE PAD U OBJAVI
 # ---------------------------------------------------------------------------

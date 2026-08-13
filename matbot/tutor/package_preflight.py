@@ -276,22 +276,37 @@ def structural_repetition_issue(task, recent_structures, intent, lesson_id="",
                         "brojevi/imena. Promijeni VRSTU vježbe, ne vrijednosti"))
 
     # ARHETIP JE JAČA MJERA OD ŠABLONA (nalaz: 12 različitih rečenica, a sve
-    # ista vježba — kupovina i kusur). Ponavljanje oblika je nalaz SAMO kad
-    # lekcija dokazano ima drugi legitiman oblik; uska lekcija se ne tjera da
-    # izmišlja.
-    if len(supported_archetypes or ()) >= 2:
-        archetype = task_archetypes.classify(
-            str(getattr(task, "text", "") or ""), option_texts)
-        previous = [entry.get("archetype") for entry in recent_structures
-                    if isinstance(entry, dict)]
-        if archetype and previous and previous[-1] == archetype:
-            alternatives = [a for a in supported_archetypes if a != archetype]
-            if alternatives:
-                return PackageIssue(
-                    TASK_TOO_SIMILAR_CODE,
-                    detail=(f"isti ARHETIP kao prethodni zadatak ({archetype}); "
-                            "lekcija podržava i: "
-                            + ", ".join(alternatives[:4])))
+    # ista vježba — kupovina i kusur). ALI PONOVLJEN ARHETIP SAM PO SEBI NIJE
+    # DEFEKT. Prva verzija ove kapije odbijala je svako ponavljanje oblika i
+    # oborila objavu na 87,5 % — tri zadatka su pala jer recenzent nije uspio
+    # proizvesti drugi oblik, iako je zadatak bio potpuno ispravan i stvarno
+    # drugačiji. Prava invarijanta nije „drugi arhetip“ nego:
+    #
+    #     učeniku se ne smije dati ISTA vježba s kozmetičkim zamjenama.
+    #
+    # Zato je arhetip sada USLOV, a ne zaključak: gleda se samo kad se oblik
+    # ponovio, i tek tada se mjeri da li je vježba stvarno ista
+    # (`task_identity.same_exercise`, pragovi mjereni nad stvarnim korpusom).
+    # Rotacija ostaje serverska PREFERENCIJA u promptu, ne kapija.
+    if len(supported_archetypes or ()) < 2:
+        return None
+    task_text = str(getattr(task, "text", "") or "")
+    archetype = task_archetypes.classify(task_text, option_texts)
+    if not archetype:
+        return None
+    for entry in reversed(recent_structures):
+        if not isinstance(entry, dict) or entry.get("archetype") != archetype:
+            continue
+        if not task_identity.same_exercise(task_text, entry.get("text") or ""):
+            continue
+        alternatives = [a for a in supported_archetypes if a != archetype]
+        return PackageIssue(
+            TASK_TOO_SIMILAR_CODE,
+            detail=(f"isti oblik vježbe kao raniji zadatak ({archetype}): traži se "
+                    "isto, promijenjeni su samo brojevi/imena/predmeti. Promijeni "
+                    "ŠTA se traži"
+                    + (f"; lekcija podržava i: {', '.join(alternatives[:4])}"
+                       if alternatives else "")))
     return None
 
 

@@ -132,28 +132,74 @@ class _Task:
         self.correct_option_index = 0
 
 
-def test_repeating_the_previous_archetype_is_flagged_when_alternatives_exist():
-    recent = [{"signature": "other", "archetype": ta.DIRECT_COMPUTE, "text": "x"}]
-    issue = preflight.structural_repetition_issue(
-        _Task("Izracunaj obim kvadrata stranice $9$ cm."), recent, "next_task",
-        lesson_id="6-05-011",
-        supported_archetypes=(ta.DIRECT_COMPUTE, ta.ERROR_ANALYSIS, ta.COMPARE_RESULTS))
+SUPPORTED = (ta.MULTI_STEP_APPLICATION, ta.DIRECT_COMPUTE, ta.ERROR_ANALYSIS,
+             ta.FIND_MISSING_VALUE, ta.COMPARE_RESULTS)
+
+SHOPPING = ("Ana kupuje hljeb od $2$ KM, mlijeko od $3$ KM i sok od $1$ KM. "
+            "Koliki kusur dobije od $10$ KM?")
+
+
+def _history(text, archetype=None):
+    return [{"signature": "ranije", "text": text,
+             "archetype": archetype or ta.classify(text)}]
+
+
+def _gate(text, recent, supported=SUPPORTED):
+    return preflight.structural_repetition_issue(
+        _Task(text), recent, "next_task", lesson_id="6-05-011",
+        supported_archetypes=supported)
+
+
+# --- 4-5) KOZMETICKA ZAMJENA JE I DALJE ISTA VJEZBA -------------------------
+
+def test_same_archetype_with_only_new_numbers_is_rejected():
+    issue = _gate("Ana kupuje hljeb od $4$ KM, mlijeko od $2$ KM i sok od $2$ KM. "
+                  "Koliki kusur dobije od $20$ KM?", _history(SHOPPING))
     assert issue is not None and issue.code == preflight.TASK_TOO_SIMILAR_CODE
 
 
+def test_same_archetype_with_only_new_names_and_objects_is_rejected():
+    """Kanonski par iz produkcije: zamijenjeni su ime i roba, zahtjev je isti."""
+    issue = _gate("Haris kupuje kiflu od $1$ KM, jogurt od $2$ KM i vodu od $3$ KM. "
+                  "Koliki kusur dobije od $20$ KM?", _history(SHOPPING))
+    assert issue is not None and issue.code == preflight.TASK_TOO_SIMILAR_CODE
+
+
+# --- 2-3) ISTI ARHETIP NIJE SAM PO SEBI DEFEKT ------------------------------
+
+def test_repeating_the_archetype_is_not_automatically_invalid():
+    """Regresija: prva verzija kapije obarala je objavu na 87,5 % baš ovdje."""
+    candidate = ("Ana je od $10$ KM dobila $3$ KM kusura, a prva dva artikla "
+                 "koštaju $4$ i $2$ KM. Koliko košta treći artikal?")
+    assert ta.classify(candidate) == ta.classify(SHOPPING)      # isti arhetip…
+    assert _gate(candidate, _history(SHOPPING)) is None         # …ali druga vježba
+
+
+def test_same_archetype_with_a_different_requirement_publishes():
+    previous = "Izracunaj obim kvadrata stranice $6$ cm."
+    candidate = "Kvadrat ima obim $28$ cm. Kolika je njegova stranica?"
+    assert _gate(candidate, _history(previous)) is None
+
+
 def test_a_different_archetype_passes_the_gate():
-    recent = [{"signature": "other", "archetype": ta.DIRECT_COMPUTE, "text": "x"}]
-    assert preflight.structural_repetition_issue(
-        _Task("Ucenik je izracunao obim kao $5 \\cdot 3$. Gdje je pogrijesio?"),
-        recent, "next_task", lesson_id="6-05-011",
-        supported_archetypes=(ta.DIRECT_COMPUTE, ta.ERROR_ANALYSIS)) is None
+    assert _gate("Ucenik je izracunao obim kao $5 \\cdot 3$. Gdje je pogrijesio?",
+                 _history("Izracunaj obim kvadrata stranice $6$ cm.")) is None
+
+
+def test_repetition_is_measured_against_the_whole_bounded_history():
+    """Ponavljanje otprije dva zadatka je i dalje ponavljanje."""
+    recent = _history("Izracunaj obim kvadrata stranice $6$ cm.")
+    recent.append({"signature": "b", "text": "Koji broj nedostaje: $12+\\square=19$?",
+                   "archetype": ta.FIND_MISSING_VALUE})
+    issue = _gate("Izracunaj obim kvadrata stranice $9$ cm.", recent)
+    assert issue is not None and issue.code == preflight.TASK_TOO_SIMILAR_CODE
 
 
 def test_narrow_lesson_is_not_gated_on_archetype_repetition():
-    recent = [{"signature": "other", "archetype": ta.DIRECT_COMPUTE, "text": "x"}]
     assert preflight.structural_repetition_issue(
-        _Task("Izracunaj nesto drugo sasvim."), recent, "next_task",
-        lesson_id="x", supported_archetypes=(ta.DIRECT_COMPUTE,)) is None
+        _Task("Ana kupuje kiflu od $1$ KM i sok od $2$ KM. Koliki kusur dobije "
+              "od $10$ KM?"), _history(SHOPPING), "next_task",
+        lesson_id="x", supported_archetypes=(ta.MULTI_STEP_APPLICATION,)) is None
 
 
 # ---------------------------------------------------------------------------

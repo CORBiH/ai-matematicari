@@ -146,12 +146,74 @@ def structural_signature(task_text, option_texts=()):
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
-def structural_overlap(first_text, second_text):
-    """Udio zajedničkih sadržajnih riječi dvije strukture (0.0–1.0)."""
-    def words(text):
-        return {word for word in re.findall(r"[^\W\d_]{3,}", structural_fragment(text))}
+def _content_words(text):
+    return {word for word in re.findall(r"[^\W\d_]{3,}", text)}
 
-    left, right = words(first_text), words(second_text)
+
+def _jaccard(left, right):
     if not left or not right:
         return 0.0
     return len(left & right) / len(left | right)
+
+
+def structural_overlap(first_text, second_text):
+    """Udio zajedničkih sadržajnih riječi dvije strukture (0.0–1.0)."""
+    return _jaccard(_content_words(structural_fragment(first_text)),
+                    _content_words(structural_fragment(second_text)))
+
+
+# ---------------------------------------------------------------------------
+# ZAHTJEV ZADATKA — „šta se traži“, odvojeno od „o čemu je priča“
+# ---------------------------------------------------------------------------
+# NALAZ KOJI JE OVO IZNUDIO (kalibracija nad 852 stvarno objavljena zadatka):
+# preklapanje riječi mjeri TEMU, ne vježbu. Kanonski par koji MORA pasti —
+#
+#     „Ana kupi hljeb, mlijeko i sok. Koliki kusur dobije od «n» KM?“
+#     „Haris kupi kiflu, jogurt i vodu. Koliki kusur dobije od «n» KM?“
+#
+# — dijeli samo 45 % riječi, jer se zamijenila roba. Ali ZAHTJEV je doslovno
+# isti. Zato se posebno mjeri završna upitna/imperativna klauza: ona nosi ono
+# što učenik mora uraditi, dok imena i predmeti nose samo kulisu.
+_SENTENCE_RE = re.compile(r"[^.?!]+[.?!]?")
+
+# Pragovi su MJERENI, ne procijenjeni (skripta `scratchpad/diversity2/`):
+#   • u pojasu cjelovitog preklapanja ≥ 0.70 svaki pregledani par iz stvarnog
+#     korpusa bio je ista vježba s drugim vrijednostima;
+#   • ispod 0.70 se pojavljuju stvarno različite vježbe (npr. „odredi nagib“
+#     naspram „odredi međusobni položaj“), pa je to donja granica.
+_SAME_ASK_MIN = 0.8         # isti zahtjev…
+_SAME_ASK_CONTEXT_MIN = 0.3  # …uz prepoznatljivo isti postav
+_SAME_WHOLE_MIN = 0.7       # ili je cijela struktura ista (predmet u pitanju)
+
+
+def ask_fragment(text):
+    """Kanonska završna klauza: ono što zadatak TRAŽI, bez brojeva i imena."""
+    skeleton = structural_fragment(text)
+    sentences = [part.strip() for part in _SENTENCE_RE.findall(skeleton) if part.strip()]
+    if not sentences:
+        return skeleton
+    questions = [part for part in sentences if part.endswith("?")]
+    return questions[-1] if questions else sentences[-1]
+
+
+def ask_overlap(first_text, second_text):
+    """Koliko se poklapa ONO ŠTO SE TRAŽI u dva zadatka (0.0–1.0)."""
+    return _jaccard(_content_words(ask_fragment(first_text)),
+                    _content_words(ask_fragment(second_text)))
+
+
+def same_exercise(first_text, second_text):
+    """True kad su dva zadatka ISTA VJEŽBA s kozmetičkim zamjenama.
+
+    Namjerno konzervativno: dokazuje se SAMO istost, nikad različitost. Kad
+    mjera ne može dokazati istost, vraća False — guard koji ne može dokazati
+    mora skipovati, ne nagađati (CLAUDE.md). Zato promjena VRSTE zahtjeva
+    („izračunaj obim“ → „iz obima nađi stranicu“) ovdje nikad nije ista vježba,
+    a promjena imena, robe ili brojeva jeste."""
+    if not (first_text or "").strip() or not (second_text or "").strip():
+        return False
+    whole = structural_overlap(first_text, second_text)
+    if whole >= _SAME_WHOLE_MIN:
+        return True
+    return (ask_overlap(first_text, second_text) >= _SAME_ASK_MIN
+            and whole >= _SAME_ASK_CONTEXT_MIN)
