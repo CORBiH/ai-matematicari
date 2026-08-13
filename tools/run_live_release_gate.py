@@ -40,7 +40,7 @@ CORE_MODEL = ("6-04-001", 6)
 CORE_CONTRACT = ("6-04-005", 6)
 # Lekcija s AKTIVNIM semantičkim ugovorom (porodica fraction_arithmetic_direct).
 CORE_SEMANTIC = ("6-04-009", 6)
-REQUIRED_SCENARIO_COUNT = 14
+REQUIRED_SCENARIO_COUNT = 15
 # Faza 4H: semantic_fresh i semantic_harder (lekcija porodice
 # fraction_arithmetic_direct) sada idu DETERMINISTIČKOM strategijom — nula
 # SDK poziva po scenariju, i gate to IZRIČITO dokazuje (expected_calls=0,
@@ -68,9 +68,9 @@ _MAX_CALLS_PER_TURN = 2
 # ishod (svaki modelski scenario eskalirao), a tačnost čuva ugovor po scenariju
 # iznad. Vrijednost se DOKAZUJE iz plana (`max_planned_calls`), ne pogađa —
 # provjera ispod pada zatvoreno ako se plan i plafon raziđu.
-SDK_CALL_CEILING = 21
+SDK_CALL_CEILING = 23
 # Zbir svih scenarija čiji je ugovor statički (bez `first_hint`).
-_STATIC_PLAN_CALLS = 10
+_STATIC_PLAN_CALLS = 11
 # Sentinel: očekivanje se izvodi iz serverske politike pomoći PRIJE turna.
 DERIVED_FROM_HELP_POLICY = None
 # UI radnja koju kapija šalje za scenarije pomoći — ista mapa koju koristi
@@ -186,9 +186,16 @@ def _routes_deterministically(lesson_id: str) -> bool:
     lekcije ide determinističkom strategijom (blocking ugovor + registrovan
     generator koji parametre POTPUNO podržava)."""
     from matbot import deterministic as deterministic_registry
+    from matbot import deterministic_variety
 
     contract = semantic_contracts.contract_for(lesson_id)
     if contract is None or not contract.blocking:
+        return False
+    # ISTA VLAST KAO PRODUKCIJA. Kapija je ovdje držala vlastitu kopiju odluke,
+    # pa bi poslije selidbe mjereno slabih porodica mjerila arhitekturu koju
+    # produkcija više ne izvršava — tačno onaj tihi razlaz zbog kojeg postoji
+    # `matbot/release_config.py`. Odluka se zato čita iz istog izvora.
+    if deterministic_variety.family_routes_to_model(contract.family_id):
         return False
     module = deterministic_registry.GENERATORS.get(contract.family_id)
     return module is not None and module.supports(dict(contract.parameters))
@@ -259,9 +266,32 @@ def max_planned_calls(plan) -> int:
     return total
 
 
+def _migrated_deterministic_lesson():
+    """Lekcija iz porodice koja je MJERENO slaba i preseljena na modelsku rutu.
+
+    Bira se iz artefakta klasifikacije (`data/deterministic_routing.json`), ne
+    iz ugrađenog spiska: kapija tako dokazuje STVARNU produkcijsku odluku, a
+    promjena klasifikacije automatski mijenja i ono što se dokazuje."""
+    from matbot import deterministic_variety
+
+    routing = deterministic_variety._payload()
+    quality_path = ROOT / "data" / "deterministic_quality.json"
+    try:
+        quality = json.loads(quality_path.read_text(encoding="utf-8"))["families"]
+    except (OSError, ValueError, KeyError) as exc:
+        raise GateRefusal("Deterministic quality measurement is unavailable.") from exc
+    for family in routing.get("migrate_to_luna_families") or ():
+        for lesson_id in (quality.get(family) or {}).get("lessons") or ():
+            grade = int(str(lesson_id).split("-", 1)[0])
+            if lesson_info(grade, lesson_id):
+                return lesson_id, grade
+    raise GateRefusal("No migrated deterministic family is available to prove.")
+
+
 def build_release_gate_plan(commit_sha: str) -> tuple[GateScenario, ...]:
     """The exact 14-scenario plan (17 static + derived first hint), pure
     except curriculum lookup."""
+    migrated = _migrated_deterministic_lesson()
     grade7 = _select_rotating_lesson(7, commit_sha)
     grade8 = _select_rotating_lesson(8, commit_sha)
     grade9 = _select_rotating_lesson(9, commit_sha)
@@ -308,6 +338,11 @@ def build_release_gate_plan(commit_sha: str) -> tuple[GateScenario, ...]:
                  "Daj mi zadatak.", 0, role="semantic_fresh"),
         scenario("release_gate_semantic_harder", CORE_SEMANTIC, "harder", "release-semantic",
                  "Daj mi teži zadatak.", 0, requires=1, role="semantic_harder"),
+        # MJERENO SLABA DETERMINISTIČKA PORODICA → MODELSKA RUTA. Bez ovog
+        # scenarija kapija ne bi dokazivala najnoviju produkcijsku odluku:
+        # 21 porodica koja je ranije bila nula-poziva sada troši tačno jedan.
+        scenario("release_gate_migrated_deterministic", migrated, "", "release-migrated",
+                 "Daj mi zadatak.", 1, role="migrated_deterministic"),
         scenario("release_gate_grade7_rotating", grade7, "", "release-grade7", "Daj mi zadatak.", 1,
                  role="grade7"),
         scenario("release_gate_grade8_rotating", grade8, "", "release-grade8", "Daj mi zadatak.", 1,
@@ -501,7 +536,8 @@ def _scenario_errors(gate: GateScenario, result, prior_task: str, prior_options:
     if (os.environ.get("MATBOT_PRACTICE_PIPELINE", "") or "").strip().lower() == REQUIRED_PIPELINE:
         errors.extend(_structured_transition_errors(gate, result, prior_signature))
     if gate.role in {"fresh_level1", "harder_level2", "easier_level1", "same_level_new",
-                     "contract_fresh", "contract_harder", "grade7", "grade8", "grade9"}:
+                     "contract_fresh", "contract_harder", "migrated_deterministic",
+                     "grade7", "grade8", "grade9"}:
         errors.extend(_task_output_errors(result))
         errors.extend(_intro_errors(result))
     # The candidate structured runtime supplies Reviewer-validated generic
@@ -730,7 +766,7 @@ def _run_static_checks() -> None:
     assert [item.role for item in plan] == [
         "fresh_level1", "correct_choice", "harder_level2", "first_hint", "full_solution",
         "easier_level1", "same_level_new", "contract_fresh", "contract_harder",
-        "semantic_fresh", "semantic_harder",
+        "semantic_fresh", "semantic_harder", "migrated_deterministic",
         "grade7", "grade8", "grade9",
     ]
     assert _selected_lessons(plan) == _selected_lessons(build_release_gate_plan("0123456789abcdef" * 4))

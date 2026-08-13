@@ -10,6 +10,23 @@ from tools import check_live_release_gate as checker
 from tools import run_live_release_gate as runner
 
 
+@pytest.fixture(autouse=True)
+def _production_routing(monkeypatch):
+    """Plan kapije opisuje PRODUKCIJU, pa se gradi u produkcijskoj konfiguraciji.
+
+    Bez ove zastavice mjereno slaba porodica i dalje ide determinističkom rutom,
+    pa bi scenario `migrated_deterministic` bio nemoguć — i kapija to izričito
+    odbija umjesto da tiho izmjeri drugu arhitekturu."""
+    monkeypatch.setenv("MATBOT_DETERMINISTIC_VARIETY_GATE", "enabled")
+    from matbot import deterministic_variety
+    deterministic_variety._payload.cache_clear()
+    deterministic_variety._migrated_families.cache_clear()
+    yield
+    deterministic_variety._payload.cache_clear()
+    deterministic_variety._migrated_families.cache_clear()
+
+
+
 SHA = "a" * 40
 TREE = "b" * 40
 
@@ -18,7 +35,7 @@ def _passing_document():
     roles = [
         "fresh_level1", "correct_choice", "harder_level2", "first_hint", "full_solution",
         "easier_level1", "same_level_new", "contract_fresh", "contract_harder",
-        "semantic_fresh", "semantic_harder",
+        "semantic_fresh", "semantic_harder", "migrated_deterministic",
         "grade7", "grade8", "grade9",
     ]
     return {
@@ -30,9 +47,9 @@ def _passing_document():
         "practice_pipeline": "universal_two_call",
         "difficulty_levels_enabled": True,
         "finished_at": datetime.now(timezone.utc).isoformat(),
-        "scenario_count": 14,
-        "required_scenario_count": 14,
-        "sdk_call_ceiling": 21,
+        "scenario_count": 15,
+        "required_scenario_count": 15,
+        "sdk_call_ceiling": 23,
         "planned_sdk_calls": 17,
         "escalated_sdk_calls": 0,
         "actual_sdk_calls": 17,
@@ -49,7 +66,7 @@ def _passing_document():
     }
 
 
-def test_release_gate_plan_is_fourteen_scenarios_capped_at_eighteen_calls():
+def test_release_gate_plan_covers_every_route_class():
     """Faza 4B: plan pokriva OBA puta — deterministicki K1/K3 (6-04-005, 1
     poziv) i semanticki put (6-04-009). Faza 4H: semanticka lekcija ima potpun
     deterministicki generator, pa njeni scenariji IZRICITO dokazuju NULA
@@ -64,9 +81,9 @@ def test_release_gate_plan_is_fourteen_scenarios_capped_at_eighteen_calls():
     maksimum 21. Tacnost i dalje cuva ugovor po scenariju, koji trazi da drugi
     poziv bude RECENZENTSKI, nikad ponovljeni tutorski."""
     plan = runner.build_release_gate_plan("0123456789abcdef" * 4)
-    assert len(plan) == 14
-    assert runner.max_planned_calls(plan) == 21 == runner.SDK_CALL_CEILING
-    assert sum(item.expected_calls or 0 for item in plan) == 10
+    assert len(plan) == 15
+    assert runner.max_planned_calls(plan) == 23 == runner.SDK_CALL_CEILING
+    assert sum(item.expected_calls or 0 for item in plan) == 11
     # Pomoc nikad ne eskalira, pa joj plafon ne priznaje dodatni poziv.
     assert runner._MAX_CALLS_PER_TURN == 2
     by_role = {item.role: item for item in plan}
@@ -76,6 +93,10 @@ def test_release_gate_plan_is_fourteen_scenarios_capped_at_eighteen_calls():
     assert by_role["contract_fresh"].scenario.path == "non_contract"
     assert by_role["contract_fresh"].expected_calls == 1
     assert by_role["contract_harder"].expected_calls == 1
+    # MJERENO SLABA DETERMINISTICKA PORODICA sada trosi tacno jedan poziv.
+    assert by_role["migrated_deterministic"].expected_calls == 1
+    # JAKA PORODICA ostaje na nula poziva — selidba je selektivna, ne opsta.
+    assert by_role["semantic_fresh"].expected_calls == 0
     assert contract_registry.contract_for(
         by_role["contract_fresh"].scenario.lesson_id) is not None
     assert by_role["semantic_fresh"].scenario.path == "non_contract"
@@ -376,7 +397,7 @@ def test_failed_live_gate_console_summary_is_informative_and_does_not_echo_hidde
     assert "FAILED SCENARIO: easier_level1" in report
     assert "REASON: difficulty_direction_not_measurable" in report
     assert "LEVELS: previous=2 target=1 committed=2" in report
-    assert "SDK CALLS: 9/17 (ceiling 21)" in report
+    assert "SDK CALLS: 9/17 (ceiling 23)" in report
     assert "STATE PRESERVED: true" in report
     assert "SECRET" not in report
 

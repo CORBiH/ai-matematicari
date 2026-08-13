@@ -22,6 +22,24 @@ from tools import check_live_release_gate as checker
 from tools import run_live_release_gate as runner
 
 
+@pytest.fixture(autouse=True)
+def _production_routing(monkeypatch):
+    """Plan kapije opisuje PRODUKCIJU, pa se gradi u produkcijskoj konfiguraciji.
+
+    Bez ove zastavice mjereno slaba porodica i dalje ide determinističkom rutom,
+    pa bi scenario `migrated_deterministic` bio nemoguć — i kapija to izričito
+    odbija umjesto da tiho izmjeri drugu arhitekturu."""
+    monkeypatch.setenv("MATBOT_DETERMINISTIC_VARIETY_GATE", "enabled")
+    from matbot import deterministic_variety
+    deterministic_variety._payload.cache_clear()
+    deterministic_variety._migrated_families.cache_clear()
+    yield
+    deterministic_variety._payload.cache_clear()
+    deterministic_variety._migrated_families.cache_clear()
+
+
+
+
 def _gate(role):
     return next(item for item in runner.build_release_gate_plan("0123456789abcdef" * 4)
                 if item.role == role)
@@ -127,17 +145,17 @@ def test_e_scoring_without_a_frozen_expectation_is_refused():
 # F/G) PLAN I PLAFON
 # ---------------------------------------------------------------------------
 
-def test_f_plan_total_is_static_ten_plus_derived_hint():
+def test_f_plan_total_is_static_eleven_plus_derived_hint():
     """Brza ruta: modelski scenario trosi 1 poziv, pa je staticki zbir 10.
 
     Invarijanta je nepromijenjena: jedina razlika izmedju dva DOSTIZNA
     staticka plana je izvedeni prvi hint (0 ili 1)."""
     plan = runner.build_release_gate_plan("0123456789abcdef" * 4)
     static_total = sum(item.expected_calls or 0 for item in plan)
-    assert static_total == 10
-    assert {static_total, static_total + 1} == {10, 11}
+    assert static_total == 11
+    assert {static_total, static_total + 1} == {11, 12}
     # Plafon pokriva i uslovni recenzentski popravak svakog modelskog scenarija.
-    assert runner.max_planned_calls(plan) == 21
+    assert runner.max_planned_calls(plan) == 23
 
 
 @pytest.mark.parametrize("planned,actual,expected_error", [
@@ -184,7 +202,7 @@ def test_f_artifact_without_escalation_count_is_refused(passing_document):
 def test_g_plan_may_never_exceed_the_ceiling(passing_document):
     assert runner.max_planned_calls(
         runner.build_release_gate_plan("0123456789abcdef" * 4)) <= runner.SDK_CALL_CEILING
-    over = dict(passing_document, planned_sdk_calls=22, actual_sdk_calls=22)
+    over = dict(passing_document, planned_sdk_calls=24, actual_sdk_calls=24)
     assert "planned_sdk_calls_above_ceiling" in checker.validate_result(over)
 
 
@@ -266,7 +284,7 @@ def passing_document():
     from datetime import datetime, timezone
     roles = ["fresh_level1", "correct_choice", "harder_level2", "first_hint",
              "full_solution", "easier_level1", "same_level_new", "contract_fresh",
-             "contract_harder", "semantic_fresh", "semantic_harder",
+             "contract_harder", "semantic_fresh", "semantic_harder", "migrated_deterministic",
              "grade7", "grade8", "grade9"]
     return {
         "campaign": "release-gate", "verdict": "PASS",
@@ -274,8 +292,8 @@ def passing_document():
         "clean_worktree": True, "practice_pipeline": "universal_two_call",
         "difficulty_levels_enabled": True,
         "finished_at": datetime.now(timezone.utc).isoformat(),
-        "scenario_count": 14, "required_scenario_count": 14,
-        "sdk_call_ceiling": 21, "planned_sdk_calls": 17, "actual_sdk_calls": 17,
+        "scenario_count": 15, "required_scenario_count": 15,
+        "sdk_call_ceiling": 23, "planned_sdk_calls": 17, "actual_sdk_calls": 17,
         "escalated_sdk_calls": 0,
         "call_above_ceiling_refused": True,
         "twentieth_call_refused_before_sdk": True,

@@ -15,7 +15,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent.parent
-REQUIRED_SCENARIOS = 14
+REQUIRED_SCENARIOS = 15
 # Faza 4H: semantic_fresh/semantic_harder idu deterministički (0 poziva) —
 # plafon i tačan broj poziva prolazne kampanje pali su 23 → 19.
 #
@@ -27,7 +27,7 @@ REQUIRED_SCENARIOS = 14
 # (`planned_sdk_calls`), a ovdje ostaje samo plafon kao gornja granica.
 # Plafon MORA pratiti runner (`tools/run_live_release_gate.py`): brza ruta trosi
 # 1 poziv po scenariju, a uslovni recenzentski popravak najvise jos jedan.
-REQUIRED_CALL_CEILING = 21
+REQUIRED_CALL_CEILING = 23
 MAX_AGE = timedelta(hours=24)
 REQUIRED_PIPELINE = "universal_two_call"
 
@@ -111,7 +111,7 @@ def validate_result(document: dict, *, expected_commit: str | None = None,
         required_roles = {
             "fresh_level1", "correct_choice", "harder_level2", "first_hint", "full_solution",
             "easier_level1", "same_level_new", "contract_fresh", "contract_harder",
-            "semantic_fresh", "semantic_harder",
+            "semantic_fresh", "semantic_harder", "migrated_deterministic",
             "grade7", "grade8", "grade9",
         }
         actual_roles = {row.get("role") for row in scenarios if isinstance(row, dict)}
