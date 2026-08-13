@@ -1,17 +1,24 @@
-"""Mjerena raznolikost determinističkih porodica — čitalac artefakta.
+"""Kvalitet determinističkih PORODICA → izbor rute. Čitalac artefakta.
 
-ZAŠTO POSTOJI (živi nalaz, statička revizija 352 determinističke lekcije):
-nulti poziv i nula sekundi imaju veliku vrijednost, ali ne po svaku cijenu.
-49 lekcija mjereno je kao slabe: na tri nivoa težine daju istu rečenicu s
-drugim brojevima (npr. dvije arhetipske rečenice na 18 uzoraka). Za učenika
-koji tri puta traži teže to nije ljestvica nego ponavljanje.
+ZAŠTO POSTOJI: nulti poziv, nula sekundi i serverski dokazana matematika imaju
+veliku vrijednost — ali ne po svaku cijenu. Mjereno nad 352 determinističke
+lekcije: u 21 porodici učenik na „daj novi“ i na sva tri nivoa težine dobija
+ISTU rečenicu s drugim brojevima. Za vježbanje to nije ljestvica nego
+ponavljanje, a mjereno je i da takva porodica često uopšte ne može objaviti
+nov zadatak (A/B: objava 0.80 naspram 0.98 na Luni).
 
-Odluka je PODATAK, ne grananje po lekciji: mjerenje se kompajlira u
-`data/deterministic_variety.json` (scripts/build_deterministic_variety.py), a
-birač strategije samo pita „je li ova porodica mjereno slaba?“. Dodavanje ili
-popravak generatora mijenja mjerenje, ne Python.
+ŠTA SE PROMIJENILO U ODNOSU NA PRVU VERZIJU OVOG MODULA:
+prva verzija je vodila spisak LEKCIJA i mjerila samo koliko su tekstovi
+doslovno različiti. Oboje je bilo pogrešno. „Različit broj“ nije različit
+zadatak, pa se sada mjeri ŠABLON (tekst s maskiranim brojevima); a odluka po
+lekciji je spisak izuzetaka prerušen u podatak, pa se sada odlučuje po
+PORODICI — generator je porodica, i ako je slab, slab je za svaku svoju
+lekciju. Dodavanje ili popravak generatora mijenja MJERENJE, ne Python.
 
-Inertan po dizajnu: bez artefakta ponašanje je bajt-identično zatečenom.
+GRANICA: ovaj modul ne odlučuje ništa sam. On čita
+`data/deterministic_routing.json` (proizvod `scripts/build_deterministic_*.py`)
+i odgovara na jedno pitanje: „ide li ova porodica na modelsku rutu?“.
+Bez artefakta ponašanje je bajt-identično determinističkom.
 """
 import json
 import logging
@@ -21,17 +28,29 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-_ARTIFACT = Path(__file__).resolve().parent.parent / "data" / "deterministic_variety.json"
+_ARTIFACT = Path(__file__).resolve().parent.parent / "data" / "deterministic_routing.json"
+
+# Vrijednost koja se seli na model. Ostale klase ostaju determinističke:
+#   KEEP_DETERMINISTIC                    — mjereno dobra raznolikost
+#   KEEP_DETERMINISTIC_FOR_REPRESENTATION — koncept traži prikaz (brojevna prava,
+#                                           dijagram) koji tekstualni MCQ ne bi dao
+#   NEEDS_MORE_EVIDENCE                   — signal na granici; ne dira se
+MIGRATE_ROUTE = "MIGRATE_TO_LUNA"
 
 
 def _enabled() -> bool:
-    """Prekidač rute — PODRAZUMIJEVANO ISKLJUČEN, i to namjerno.
+    """Prekidač rute. `enabled` seli mjereno slabe porodice na modelsku rutu.
 
-    Uključivanje oduzima determinističku rutu 49 lekcijama, a time i garanciju
-    „nula poziva, nula sekundi, matematika dokazana serverom“ koju te porodice
-    danas daju. To je zamjena jedne stvarne vrijednosti za drugu i mora biti
-    svjesna odluka s vlastitim mjerenjem, ne nusproizvod ove revizije. Mjerenje
-    i mehanizam postoje; odluka ostaje na čovjeku."""
+    PRODUKCIJSKU VRIJEDNOST POSTAVLJA DEPLOY, ne ovaj podrazumijevani izraz —
+    isti obrazac koji već važi za `MATBOT_FAST_SINGLE_CALL_SCOPE`. Ugrađivanje
+    „uključeno“ ovdje prevelo bi cijelu testnu svitu na modelsku rutu i ugasilo
+    117 dokaza determinističkih generatora, koji ostaju ROLLBACK put i moraju
+    ostati provjereni.
+
+    Ime varijable je zadržano radi kontinuiteta, ali joj je ZNAČENJE PROŠIRENO:
+    više ne govori o „raznolikosti teksta po lekciji“ nego o klasifikaciji
+    kvaliteta PORODICE iz `data/deterministic_routing.json`. `disabled` (i
+    odsustvo) znači: nijedna porodica se ne seli — potpun rollback."""
     return os.environ.get("MATBOT_DETERMINISTIC_VARIETY_GATE", "disabled") == "enabled"
 
 
@@ -45,21 +64,27 @@ def _payload() -> dict:
 
 
 @lru_cache(maxsize=1)
-def _weak() -> frozenset:
-    return frozenset(_payload().get("weak_variety_lessons") or ())
+def _migrated_families() -> frozenset:
+    payload = _payload()
+    families = payload.get("families") or {}
+    named = payload.get("migrate_to_luna_families")
+    if named:
+        return frozenset(named)
+    return frozenset(name for name, row in families.items()
+                     if row.get("route") == MIGRATE_ROUTE)
 
 
-def is_weak(lesson_id) -> bool:
-    """True samo kad je lekcija MJERENA i mjerenje ju je proglasilo slabom."""
-    if not lesson_id or not _enabled():
+def family_routes_to_model(family_id) -> bool:
+    """True samo kad je porodica MJERENA i klasifikovana za selidbu."""
+    if not family_id or not _enabled():
         return False
-    return lesson_id in _weak()
+    return family_id in _migrated_families()
 
 
-def measurement(lesson_id) -> dict:
-    return dict((_payload().get("measurements") or {}).get(lesson_id) or {})
+def classification(family_id) -> dict:
+    return dict((_payload().get("families") or {}).get(family_id) or {})
 
 
 def coverage():
-    payload = _payload()
-    return len(payload.get("measurements") or {}), len(_weak())
+    """(izmjerenih porodica, porodica na modelskoj ruti)."""
+    return len(_payload().get("families") or {}), len(_migrated_families())

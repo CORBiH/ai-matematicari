@@ -609,15 +609,19 @@ def _deterministic_generator_for(context):
     """Modul generatora za lekciju, ili None kad lekcija nije POTPUNO pokrivena."""
     if not config.deterministic_practice_enabled():
         return None
-    # MJERENA RAZNOLIKOST (statička revizija 352 determinističke lekcije):
-    # 49 porodica na tri nivoa težine daje istu rečenicu s drugim brojevima.
-    # Za učenika koji tri puta traži teže to nije ljestvica nego ponavljanje,
-    # pa takva lekcija ide modelskoj ruti. Mjerenje je podatak, ne spisak u
-    # kodu — vidi `matbot/deterministic_variety.py`.
-    if deterministic_variety.is_weak(getattr(context, "topic_id", "")):
-        return None
     contract = getattr(context, "semantic_contract", None)
     if contract is None or not getattr(contract, "blocking", False):
+        return None
+    # MJEREN KVALITET PORODICE (revizija 352 determinističke lekcije): u 21
+    # porodici učenik na „daj novi“ i na sva tri nivoa dobija ISTU rečenicu s
+    # drugim brojevima, a generator često ne može ni objaviti nov zadatak.
+    # Takva porodica ide modelskoj ruti; jaka ostaje na nula poziva.
+    #
+    # Odluka je po PORODICI (generatoru) i dolazi iz mjerenja
+    # (`data/deterministic_routing.json`), nikad po ID-ju lekcije — vidi
+    # `matbot/deterministic_variety.py`.
+    if deterministic_variety.family_routes_to_model(
+            getattr(contract, "family_id", "")):
         return None
     module = _DETERMINISTIC_GENERATORS.get(getattr(contract, "family_id", ""))
     if module is None or not module.supports(getattr(contract, "parameters", None)):

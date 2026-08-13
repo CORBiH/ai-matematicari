@@ -75,6 +75,7 @@ def effective_configuration(environ=None):
     # `matbot.config`, dakle uključuju i ugrađenu podrazumijevanu vrijednost,
     # ne samo ono što je neko upisao u okruženje.
     from matbot import config as _config
+    from matbot import deterministic_variety as _deterministic_variety
 
     report = {
         "practice_pipeline": read("MATBOT_PRACTICE_PIPELINE"),
@@ -85,6 +86,7 @@ def effective_configuration(environ=None):
         "deterministic_practice": ("enabled" if _config.deterministic_practice_enabled()
                                    else "disabled"),
         "deterministic_variety_gate": read("MATBOT_DETERMINISTIC_VARIETY_GATE"),
+        "deterministic_families_on_model": str(_deterministic_variety.coverage()[1]),
         "model": read("OPENAI_MODEL_TEXT"),
         "reasoning_effort": read("MATBOT_REASONING_EFFORT"),
         "timeout_seconds": read("AI_TUTOR_TIMEOUT"),

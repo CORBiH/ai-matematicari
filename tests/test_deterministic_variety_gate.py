@@ -1,9 +1,11 @@
-"""Mjerena raznolikost determinističkih porodica — kapija i njen rollback.
+"""Kvalitet determinističkih PORODICA → izbor rute (kapija i njen rollback).
 
-Statička revizija 352 determinističke lekcije pokazala je da 49 njih na tri
-nivoa težine daje istu rečenicu s drugim brojevima. Mjerenje je kompajlirano u
-podatak; kapija je NAMJERNO isključena, jer bi uključivanje oduzelo tim
-lekcijama garanciju nula poziva.
+Mjerenje nad 352 determinističke lekcije pokazalo je da u 21 porodici učenik na
+„daj novi“ i na sva tri nivoa dobija ISTU rečenicu s drugim brojevima. Te
+porodice idu modelskoj ruti; jake ostaju na nula poziva.
+
+Odluka je po PORODICI (generatoru) i dolazi iz mjerenja — nikad po ID-ju
+lekcije. Ovi testovi čuvaju upravo to.
 """
 import json
 from pathlib import Path
@@ -13,56 +15,132 @@ import pytest
 from matbot import deterministic_variety
 from matbot.tutor import lesson_context, pipeline as tutor_pipeline
 
-ARTIFACT = Path(__file__).resolve().parents[1] / "data" / "deterministic_variety.json"
+ROOT = Path(__file__).resolve().parents[1]
+ROUTING = json.loads((ROOT / "data" / "deterministic_routing.json").read_text(encoding="utf-8"))
+QUALITY = json.loads((ROOT / "data" / "deterministic_quality.json").read_text(encoding="utf-8"))
+GRADE_OF = {lesson["id"]: int(grade)
+            for grade, block in json.loads(
+                (ROOT / "data" / "topics.json").read_text(encoding="utf-8"))["grades"].items()
+            for lesson in block["lessons"]}
 
 
 @pytest.fixture(autouse=True)
 def _clear_caches():
     deterministic_variety._payload.cache_clear()
-    deterministic_variety._weak.cache_clear()
+    deterministic_variety._migrated_families.cache_clear()
     yield
     deterministic_variety._payload.cache_clear()
-    deterministic_variety._weak.cache_clear()
+    deterministic_variety._migrated_families.cache_clear()
 
 
-def _weak_lesson():
-    return json.loads(ARTIFACT.read_text(encoding="utf-8"))["weak_variety_lessons"][0]
+def _sample(route):
+    for name, row in sorted(ROUTING["families"].items()):
+        if row["route"] == route:
+            return name, QUALITY["families"][name]["lessons"][0]
+    return None, None
 
 
-def test_gate_is_off_by_default_so_behaviour_is_unchanged(monkeypatch):
-    monkeypatch.delenv("MATBOT_DETERMINISTIC_VARIETY_GATE", raising=False)
-    assert not deterministic_variety.is_weak(_weak_lesson())
+def _routes_deterministically(lesson_id):
+    context = lesson_context.build(GRADE_OF[lesson_id], lesson_id)
+    return tutor_pipeline._deterministic_generator_for(context) is not None
 
 
-def test_measured_weak_lesson_leaves_the_deterministic_route_when_enabled(monkeypatch):
-    monkeypatch.setenv("MATBOT_DETERMINISTIC_VARIETY_GATE", "enabled")
-    lesson_id = _weak_lesson()
-    assert deterministic_variety.is_weak(lesson_id)
-    grade = int(lesson_id.split("-")[0])
-    context = lesson_context.build(grade, lesson_id)
+@pytest.fixture
+def release_env(monkeypatch):
+    monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", "universal_two_call")
     monkeypatch.setenv("MATBOT_PRACTICE_DIFFICULTY_LEVELS", "enabled")
-    assert tutor_pipeline._deterministic_generator_for(context) is None
 
 
-def test_strong_lesson_keeps_its_zero_call_generator(monkeypatch):
+# ---------------------------------------------------------------------------
+# 1) ROLLBACK: bez zastavice ponašanje je bajt-identično determinističkom
+# ---------------------------------------------------------------------------
+
+def test_gate_is_off_by_default_so_behaviour_is_unchanged(monkeypatch, release_env):
+    monkeypatch.delenv("MATBOT_DETERMINISTIC_VARIETY_GATE", raising=False)
+    family, lesson_id = _sample("MIGRATE_TO_LUNA")
+    assert not deterministic_variety.family_routes_to_model(family)
+    assert _routes_deterministically(lesson_id)
+
+
+def test_disabled_is_a_full_rollback(monkeypatch, release_env):
+    monkeypatch.setenv("MATBOT_DETERMINISTIC_VARIETY_GATE", "disabled")
+    for family in ROUTING["migrate_to_luna_families"]:
+        assert not deterministic_variety.family_routes_to_model(family)
+
+
+# ---------------------------------------------------------------------------
+# 2) UKLJUČENO: mjereno slaba porodica ide modelskoj ruti, jaka ostaje 0-call
+# ---------------------------------------------------------------------------
+
+def test_migrated_family_leaves_the_deterministic_route(monkeypatch, release_env):
     monkeypatch.setenv("MATBOT_DETERMINISTIC_VARIETY_GATE", "enabled")
-    payload = json.loads(ARTIFACT.read_text(encoding="utf-8"))
-    weak = set(payload["weak_variety_lessons"])
-    strong = next(k for k, v in payload["measurements"].items()
-                  if k not in weak and v["variety_ratio"] >= 0.9)
-    assert not deterministic_variety.is_weak(strong)
+    family, lesson_id = _sample("MIGRATE_TO_LUNA")
+    assert deterministic_variety.family_routes_to_model(family)
+    assert not _routes_deterministically(lesson_id)
 
 
-def test_missing_artifact_never_changes_a_route(monkeypatch):
+def test_strong_family_keeps_its_zero_call_generator(monkeypatch, release_env):
+    monkeypatch.setenv("MATBOT_DETERMINISTIC_VARIETY_GATE", "enabled")
+    family, lesson_id = _sample("KEEP_DETERMINISTIC")
+    assert not deterministic_variety.family_routes_to_model(family)
+    assert _routes_deterministically(lesson_id)
+
+
+@pytest.mark.parametrize("route", ["KEEP_DETERMINISTIC",
+                                   "KEEP_DETERMINISTIC_FOR_REPRESENTATION",
+                                   "NEEDS_MORE_EVIDENCE"])
+def test_only_the_migrate_class_ever_leaves_the_generator(route, monkeypatch, release_env):
+    """Nijedna druga klasa se ne seli — ni granična, ni ona zbog prikaza."""
+    monkeypatch.setenv("MATBOT_DETERMINISTIC_VARIETY_GATE", "enabled")
+    for name, row in ROUTING["families"].items():
+        if row["route"] == route:
+            assert not deterministic_variety.family_routes_to_model(name), name
+
+
+# ---------------------------------------------------------------------------
+# 3) ODLUKA JE PODATAK O PORODICI, NE SPISAK LEKCIJA
+# ---------------------------------------------------------------------------
+
+def test_decision_is_family_driven_not_a_lesson_list():
+    """Artefakt smije nositi lekcije kao DOKAZ, ali ruta se bira po porodici."""
+    assert ROUTING["migrate_to_luna_families"]
+    assert all(isinstance(name, str) and "-" not in name
+               for name in ROUTING["migrate_to_luna_families"])
+    for name, row in ROUTING["families"].items():
+        assert row["route"] in {"KEEP_DETERMINISTIC", "MIGRATE_TO_LUNA",
+                                "KEEP_DETERMINISTIC_FOR_REPRESENTATION",
+                                "NEEDS_MORE_EVIDENCE"}
+        assert row["reason"]
+
+
+def test_no_lesson_id_patch_table_exists_in_the_engine():
+    """Nijedan ID lekcije ne smije ući u kod koji bira rutu."""
+    import re
+
+    source = (ROOT / "matbot" / "deterministic_variety.py").read_text(encoding="utf-8")
+    assert not re.search(r"\b\d-\d\d-\d\d\d\b", source)
+    selector = (ROOT / "matbot" / "tutor" / "pipeline.py").read_text(encoding="utf-8")
+    window = selector[selector.index("def _deterministic_generator_for"):][:1600]
+    assert not re.search(r"\b\d-\d\d-\d\d\d\b", window)
+
+
+def test_missing_artifact_never_changes_a_route(monkeypatch, release_env):
     """Odsustvo mjerenja nije dokaz slabosti."""
     monkeypatch.setenv("MATBOT_DETERMINISTIC_VARIETY_GATE", "enabled")
     monkeypatch.setattr(deterministic_variety, "_ARTIFACT", Path("nema.json"))
     deterministic_variety._payload.cache_clear()
-    deterministic_variety._weak.cache_clear()
-    assert not deterministic_variety.is_weak(_weak_lesson())
+    deterministic_variety._migrated_families.cache_clear()
+    family, _ = _sample("MIGRATE_TO_LUNA")
+    assert not deterministic_variety.family_routes_to_model(family)
 
 
-def test_measurement_covers_every_deterministic_lesson_it_judges():
-    payload = json.loads(ARTIFACT.read_text(encoding="utf-8"))
-    assert set(payload["weak_variety_lessons"]) <= set(payload["measurements"])
-    assert len(payload["measurements"]) >= 300
+def test_every_migrated_family_was_measured_weak():
+    """Nijedna porodica se ne seli bez mjerenja koje to opravdava."""
+    for name in ROUTING["migrate_to_luna_families"]:
+        assert QUALITY["families"][name]["weak"], name
+        assert ROUTING["families"][name]["median_distinct_templates"] <= 3, name
+
+
+def test_measurement_covers_every_family_it_judges():
+    assert set(ROUTING["families"]) == set(QUALITY["families"])
+    assert QUALITY["deterministic_lessons_measured"] >= 300

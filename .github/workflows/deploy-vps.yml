@@ -59,6 +59,18 @@ jobs:
               echo "MATBOT_FAST_SINGLE_CALL_SCOPE=model_backed" >> .env
             fi
 
+            # MJERENO SLABE DETERMINISTICKE PORODICE IDU NA LUNU.
+            # Ista logika kao iznad: podrazumijevana vrijednost u kodu je
+            # `disabled` da testna svita i dalje dokazuje deterministicke
+            # generatore (rollback put), pa produkcijsku vrijednost mora
+            # upisati deploy. Odluka je po PORODICI i zivi u
+            # data/deterministic_routing.json.
+            if grep -q '^MATBOT_DETERMINISTIC_VARIETY_GATE=' .env; then
+              sed -i "s/^MATBOT_DETERMINISTIC_VARIETY_GATE=.*/MATBOT_DETERMINISTIC_VARIETY_GATE=enabled/" .env
+            else
+              echo "MATBOT_DETERMINISTIC_VARIETY_GATE=enabled" >> .env
+            fi
+
             docker compose build
             docker compose up -d --remove-orphans
 

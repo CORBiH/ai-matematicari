@@ -1,0 +1,408 @@
+{
+ "_readme": [
+  "Klasifikacija determinističkih PORODICA u produkcijsku rutu.",
+  "Odluka je po porodici (generatoru), nikad po lekciji — vidi",
+  "scripts/build_deterministic_routing.py za pravilo i dokaz.",
+  "`migrate_to_luna_families` je jedini spisak koji birač strategije čita."
+ ],
+ "schema_version": 1,
+ "rule": {
+  "weakness": "build_deterministic_quality.classify (šablon, više signala)",
+  "clear_repetition_median": 2,
+  "ab_proven_families": [
+   "fraction_decimal_conversion",
+   "geometry_formula_2d",
+   "number_set_membership",
+   "percent_basic",
+   "power_arithmetic_direct",
+   "pythagoras_direct",
+   "ratio_proportion_direct",
+   "rational_expression_direct",
+   "similarity_direct",
+   "simple_quadratic_equation",
+   "solid_geometry_direct",
+   "square_root_direct"
+  ],
+  "representation_families": [
+   "coordinate_line_direct",
+   "finite_set_direct"
+  ]
+ },
+ "families": {
+  "absolute_value_opposite": {
+   "route": "KEEP_DETERMINISTIC",
+   "reason": "mjereno dobra raznolikost",
+   "lesson_count": 5,
+   "weak": false,
+   "median_distinct_templates": 8,
+   "lessons_with_same_sentence_on_every_level": 0
+  },
+  "angle_relationships_direct": {
+   "route": "MIGRATE_TO_LUNA",
+   "reason": "isti obrazac kao dokazane porodice; medijan 2 rečenica",
+   "lesson_count": 23,
+   "weak": true,
+   "median_distinct_templates": 2,
+   "lessons_with_same_sentence_on_every_level": 14
+  },
+  "arithmetic_mean_direct": {
+   "route": "NEEDS_MORE_EVIDENCE",
+   "reason": "medijan 3 rečenica — na granici, ostaje deterministička",
+   "lesson_count": 3,
+   "weak": true,
+   "median_distinct_templates": 3,
+   "lessons_with_same_sentence_on_every_level": 0
+  },
+  "classical_probability_basic": {
+   "route": "KEEP_DETERMINISTIC",
+   "reason": "mjereno dobra raznolikost",
+   "lesson_count": 4,
+   "weak": false,
+   "median_distinct_templates": 20,
+   "lessons_with_same_sentence_on_every_level": 1
+  },
+  "common_divisors_multiples": {
+   "route": "MIGRATE_TO_LUNA",
+   "reason": "isti obrazac kao dokazane porodice; medijan 2 rečenica",
+   "lesson_count": 3,
+   "weak": true,
+   "median_distinct_templates": 2,
+   "lessons_with_same_sentence_on_every_level": 1
+  },
+  "coordinate_line_direct": {
+   "route": "KEEP_DETERMINISTIC",
+   "reason": "mjereno dobra raznolikost",
+   "lesson_count": 10,
+   "weak": false,
+   "median_distinct_templates": 7,
+   "lessons_with_same_sentence_on_every_level": 2
+  },
+  "decimal_arithmetic_direct": {
+   "route": "NEEDS_MORE_EVIDENCE",
+   "reason": "medijan 3 rečenica — na granici, ostaje deterministička",
+   "lesson_count": 3,
+   "weak": true,
+   "median_distinct_templates": 3,
+   "lessons_with_same_sentence_on_every_level": 0
+  },
+  "decimal_rounding": {
+   "route": "KEEP_DETERMINISTIC",
+   "reason": "mjereno dobra raznolikost",
+   "lesson_count": 2,
+   "weak": false,
+   "median_distinct_templates": 4,
+   "lessons_with_same_sentence_on_every_level": 0
+  },
+  "divisibility_predicate_application": {
+   "route": "NEEDS_MORE_EVIDENCE",
+   "reason": "medijan 3 rečenica — na granici, ostaje deterministička",
+   "lesson_count": 1,
+   "weak": true,
+   "median_distinct_templates": 3,
+   "lessons_with_same_sentence_on_every_level": 0
+  },
+  "divisibility_value_properties": {
+   "route": "MIGRATE_TO_LUNA",
+   "reason": "isti obrazac kao dokazane porodice; medijan 1 rečenica",
+   "lesson_count": 2,
+   "weak": true,
+   "median_distinct_templates": 1,
+   "lessons_with_same_sentence_on_every_level": 2
+  },
+  "event_probability_facts": {
+   "route": "KEEP_DETERMINISTIC",
+   "reason": "mjereno dobra raznolikost",
+   "lesson_count": 4,
+   "weak": false,
+   "median_distinct_templates": 5,
+   "lessons_with_same_sentence_on_every_level": 0
+  },
+  "financial_arithmetic_direct": {
+   "route": "MIGRATE_TO_LUNA",
+   "reason": "isti obrazac kao dokazane porodice; medijan 2 rečenica",
+   "lesson_count": 5,
+   "weak": true,
+   "median_distinct_templates": 2,
+   "lessons_with_same_sentence_on_every_level": 0
+  },
+  "finite_set_direct": {
+   "route": "KEEP_DETERMINISTIC",
+   "reason": "mjereno dobra raznolikost",
+   "lesson_count": 10,
+   "weak": false,
+   "median_distinct_templates": 4,
+   "lessons_with_same_sentence_on_every_level": 1
+  },
+  "fraction_arithmetic_direct": {
+   "route": "KEEP_DETERMINISTIC",
+   "reason": "mjereno dobra raznolikost",
+   "lesson_count": 4,
+   "weak": false,
+   "median_distinct_templates": 4,
+   "lessons_with_same_sentence_on_every_level": 0
+  },
+  "fraction_concept_direct": {
+   "route": "MIGRATE_TO_LUNA",
+   "reason": "isti obrazac kao dokazane porodice; medijan 2 rečenica",
+   "lesson_count": 4,
+   "weak": true,
+   "median_distinct_templates": 2,
+   "lessons_with_same_sentence_on_every_level": 1
+  },
+  "fraction_decimal_conversion": {
+   "route": "MIGRATE_TO_LUNA",
+   "reason": "A/B dokaz; medijan 2 rečenica po lekciji",
+   "lesson_count": 5,
+   "weak": true,
+   "median_distinct_templates": 2,
+   "lessons_with_same_sentence_on_every_level": 3
+  },
+  "frequency_basic": {
+   "route": "NEEDS_MORE_EVIDENCE",
+   "reason": "medijan 3 rečenica — na granici, ostaje deterministička",
+   "lesson_count": 3,
+   "weak": true,
+   "median_distinct_templates": 3,
+   "lessons_with_same_sentence_on_every_level": 0
+  },
+  "geometry_formula_2d": {
+   "route": "MIGRATE_TO_LUNA",
+   "reason": "A/B dokaz; medijan 1 rečenica po lekciji",
+   "lesson_count": 18,
+   "weak": true,
+   "median_distinct_templates": 1,
+   "lessons_with_same_sentence_on_every_level": 12
+  },
+  "integer_arithmetic_direct": {
+   "route": "KEEP_DETERMINISTIC",
+   "reason": "mjereno dobra raznolikost",
+   "lesson_count": 7,
+   "weak": false,
+   "median_distinct_templates": 8,
+   "lessons_with_same_sentence_on_every_level": 0
+  },
+  "linear_equation_direct": {
+   "route": "KEEP_DETERMINISTIC",
+   "reason": "mjereno dobra raznolikost",
+   "lesson_count": 27,
+   "weak": false,
+   "median_distinct_templates": 4,
+   "lessons_with_same_sentence_on_every_level": 7
+  },
+  "linear_function_direct": {
+   "route": "KEEP_DETERMINISTIC",
+   "reason": "mjereno dobra raznolikost",
+   "lesson_count": 16,
+   "weak": false,
+   "median_distinct_templates": 5,
+   "lessons_with_same_sentence_on_every_level": 3
+  },
+  "linear_inequality_direct": {
+   "route": "KEEP_DETERMINISTIC",
+   "reason": "mjereno dobra raznolikost",
+   "lesson_count": 3,
+   "weak": false,
+   "median_distinct_templates": 4,
+   "lessons_with_same_sentence_on_every_level": 0
+  },
+  "linear_system_direct": {
+   "route": "KEEP_DETERMINISTIC",
+   "reason": "mjereno dobra raznolikost",
+   "lesson_count": 13,
+   "weak": false,
+   "median_distinct_templates": 10,
+   "lessons_with_same_sentence_on_every_level": 0
+  },
+  "natural_arithmetic_direct": {
+   "route": "KEEP_DETERMINISTIC",
+   "reason": "mjereno dobra raznolikost",
+   "lesson_count": 4,
+   "weak": false,
+   "median_distinct_templates": 8,
+   "lessons_with_same_sentence_on_every_level": 0
+  },
+  "number_comparison_order": {
+   "route": "KEEP_DETERMINISTIC",
+   "reason": "mjereno dobra raznolikost",
+   "lesson_count": 6,
+   "weak": false,
+   "median_distinct_templates": 3,
+   "lessons_with_same_sentence_on_every_level": 2
+  },
+  "number_set_membership": {
+   "route": "MIGRATE_TO_LUNA",
+   "reason": "A/B dokaz; medijan 1 rečenica po lekciji",
+   "lesson_count": 4,
+   "weak": true,
+   "median_distinct_templates": 1,
+   "lessons_with_same_sentence_on_every_level": 4
+  },
+  "operation_property_recognition": {
+   "route": "KEEP_DETERMINISTIC",
+   "reason": "mjereno dobra raznolikost",
+   "lesson_count": 5,
+   "weak": false,
+   "median_distinct_templates": 11,
+   "lessons_with_same_sentence_on_every_level": 0
+  },
+  "parametric_linear_discussion": {
+   "route": "MIGRATE_TO_LUNA",
+   "reason": "isti obrazac kao dokazane porodice; medijan 2 rečenica",
+   "lesson_count": 3,
+   "weak": true,
+   "median_distinct_templates": 2,
+   "lessons_with_same_sentence_on_every_level": 1
+  },
+  "percent_basic": {
+   "route": "MIGRATE_TO_LUNA",
+   "reason": "A/B dokaz; medijan 2 rečenica po lekciji",
+   "lesson_count": 4,
+   "weak": true,
+   "median_distinct_templates": 2,
+   "lessons_with_same_sentence_on_every_level": 2
+  },
+  "polygon_angle_direct": {
+   "route": "KEEP_DETERMINISTIC",
+   "reason": "mjereno dobra raznolikost",
+   "lesson_count": 1,
+   "weak": false,
+   "median_distinct_templates": 13,
+   "lessons_with_same_sentence_on_every_level": 0
+  },
+  "polynomial_basic": {
+   "route": "KEEP_DETERMINISTIC",
+   "reason": "mjereno dobra raznolikost",
+   "lesson_count": 27,
+   "weak": false,
+   "median_distinct_templates": 6,
+   "lessons_with_same_sentence_on_every_level": 3
+  },
+  "power_arithmetic_direct": {
+   "route": "MIGRATE_TO_LUNA",
+   "reason": "A/B dokaz; medijan 3 rečenica po lekciji",
+   "lesson_count": 7,
+   "weak": true,
+   "median_distinct_templates": 3,
+   "lessons_with_same_sentence_on_every_level": 0
+  },
+  "prime_structure": {
+   "route": "MIGRATE_TO_LUNA",
+   "reason": "isti obrazac kao dokazane porodice; medijan 1 rečenica",
+   "lesson_count": 3,
+   "weak": true,
+   "median_distinct_templates": 1,
+   "lessons_with_same_sentence_on_every_level": 2
+  },
+  "pythagoras_direct": {
+   "route": "MIGRATE_TO_LUNA",
+   "reason": "A/B dokaz; medijan 1 rečenica po lekciji",
+   "lesson_count": 12,
+   "weak": true,
+   "median_distinct_templates": 1,
+   "lessons_with_same_sentence_on_every_level": 12
+  },
+  "ratio_proportion_direct": {
+   "route": "MIGRATE_TO_LUNA",
+   "reason": "A/B dokaz; medijan 1 rečenica po lekciji",
+   "lesson_count": 9,
+   "weak": true,
+   "median_distinct_templates": 1,
+   "lessons_with_same_sentence_on_every_level": 9
+  },
+  "rational_arithmetic_direct": {
+   "route": "KEEP_DETERMINISTIC",
+   "reason": "mjereno dobra raznolikost",
+   "lesson_count": 8,
+   "weak": false,
+   "median_distinct_templates": 12,
+   "lessons_with_same_sentence_on_every_level": 0
+  },
+  "rational_equation_direct": {
+   "route": "MIGRATE_TO_LUNA",
+   "reason": "isti obrazac kao dokazane porodice; medijan 2 rečenica",
+   "lesson_count": 3,
+   "weak": true,
+   "median_distinct_templates": 2,
+   "lessons_with_same_sentence_on_every_level": 1
+  },
+  "rational_expression_direct": {
+   "route": "MIGRATE_TO_LUNA",
+   "reason": "A/B dokaz; medijan 2 rečenica po lekciji",
+   "lesson_count": 12,
+   "weak": true,
+   "median_distinct_templates": 2,
+   "lessons_with_same_sentence_on_every_level": 6
+  },
+  "similarity_direct": {
+   "route": "MIGRATE_TO_LUNA",
+   "reason": "A/B dokaz; medijan 1 rečenica po lekciji",
+   "lesson_count": 4,
+   "weak": true,
+   "median_distinct_templates": 1,
+   "lessons_with_same_sentence_on_every_level": 3
+  },
+  "simple_quadratic_equation": {
+   "route": "MIGRATE_TO_LUNA",
+   "reason": "A/B dokaz; medijan 2 rečenica po lekciji",
+   "lesson_count": 5,
+   "weak": true,
+   "median_distinct_templates": 2,
+   "lessons_with_same_sentence_on_every_level": 3
+  },
+  "solid_geometry_direct": {
+   "route": "MIGRATE_TO_LUNA",
+   "reason": "A/B dokaz; medijan 1 rečenica po lekciji",
+   "lesson_count": 36,
+   "weak": true,
+   "median_distinct_templates": 1,
+   "lessons_with_same_sentence_on_every_level": 25
+  },
+  "square_root_direct": {
+   "route": "MIGRATE_TO_LUNA",
+   "reason": "A/B dokaz; medijan 2 rečenica po lekciji",
+   "lesson_count": 4,
+   "weak": true,
+   "median_distinct_templates": 2,
+   "lessons_with_same_sentence_on_every_level": 2
+  },
+  "structured_word_problem": {
+   "route": "MIGRATE_TO_LUNA",
+   "reason": "isti obrazac kao dokazane porodice; medijan 2 rečenica",
+   "lesson_count": 9,
+   "weak": true,
+   "median_distinct_templates": 2,
+   "lessons_with_same_sentence_on_every_level": 2
+  },
+  "unit_conversion_direct": {
+   "route": "KEEP_DETERMINISTIC",
+   "reason": "mjereno dobra raznolikost",
+   "lesson_count": 11,
+   "weak": false,
+   "median_distinct_templates": 8,
+   "lessons_with_same_sentence_on_every_level": 0
+  }
+ },
+ "migrate_to_luna_families": [
+  "angle_relationships_direct",
+  "common_divisors_multiples",
+  "divisibility_value_properties",
+  "financial_arithmetic_direct",
+  "fraction_concept_direct",
+  "fraction_decimal_conversion",
+  "geometry_formula_2d",
+  "number_set_membership",
+  "parametric_linear_discussion",
+  "percent_basic",
+  "power_arithmetic_direct",
+  "prime_structure",
+  "pythagoras_direct",
+  "ratio_proportion_direct",
+  "rational_equation_direct",
+  "rational_expression_direct",
+  "similarity_direct",
+  "simple_quadratic_equation",
+  "solid_geometry_direct",
+  "square_root_direct",
+  "structured_word_problem"
+ ]
+}
