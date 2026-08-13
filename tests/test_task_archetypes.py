@@ -195,6 +195,54 @@ def test_repetition_is_measured_against_the_whole_bounded_history():
     assert issue is not None and issue.code == preflight.TASK_TOO_SIMILAR_CODE
 
 
+# --- ROTACIJA: SAVJETODAVAN NALAZ, NIKAD PAD U OBJAVI ----------------------
+
+def _rotation(text, recent, lesson_id="6-05-011"):
+    return preflight.archetype_rotation_issue(
+        _Task(text), recent, "next_task", lesson_id=lesson_id)
+
+
+def test_repeated_form_asks_for_an_unused_one_without_being_a_defect():
+    """Nalaz postoji da bi recenzent dobio recept — ali nije `task_too_similar`."""
+    issue = _rotation("Izracunaj obim kvadrata stranice $9$ cm.",
+                      _history("Izracunaj povrsinu kvadrata stranice $4$ cm."))
+    assert issue is not None
+    assert issue.code == preflight.TASK_FORM_REPEATED_CODE
+    assert issue.code != preflight.TASK_TOO_SIMILAR_CODE
+    assert "neiskorišten oblik" in issue.detail
+
+
+def test_rotation_looks_two_tasks_back_not_only_at_the_previous_one():
+    """Živi nalaz: model se vraćao na `DIRECT_COMPUTE` i preko jednog zadatka."""
+    recent = _history("Izracunaj obim kvadrata stranice $4$ cm.")
+    recent.append({"signature": "b", "archetype": ta.CHOOSE_CORRECT_REASONING,
+                   "text": "Koja tvrdnja o obimu je tacna?"})
+    assert _rotation("Izracunaj obim kvadrata stranice $9$ cm.", recent) is not None
+
+
+def test_rotation_is_silent_once_every_supported_form_has_been_used():
+    supported = archetype_support.supported("6-05-011")
+    recent = [{"signature": str(index), "archetype": archetype,
+               "text": f"Zadatak broj {index}."}
+              for index, archetype in enumerate(supported)]
+    recent.append({"signature": "z", "archetype": ta.DIRECT_COMPUTE,
+                   "text": "Izracunaj obim kvadrata stranice $4$ cm."})
+    assert _rotation("Izracunaj obim kvadrata stranice $9$ cm.", recent) is None
+
+
+def test_rotation_advisory_follows_the_rollback_flag(monkeypatch):
+    monkeypatch.setenv("MATBOT_ARCHETYPE_ROTATION", "disabled")
+    archetype_support._payload.cache_clear()
+    assert _rotation("Izracunaj obim kvadrata stranice $9$ cm.",
+                     _history("Izracunaj povrsinu kvadrata stranice $4$ cm.")) is None
+
+
+def test_narrow_lesson_gets_no_rotation_advisory():
+    assert _rotation("Izracunaj obim kvadrata stranice $9$ cm.",
+                     _history("Izracunaj povrsinu kvadrata stranice $4$ cm."),
+                     lesson_id=SUPPORT["narrow_scope_lessons"][0]) is None
+
+
 def test_narrow_lesson_is_not_gated_on_archetype_repetition():
     assert preflight.structural_repetition_issue(
         _Task("Ana kupuje kiflu od $1$ KM i sok od $2$ KM. Koliki kusur dobije "

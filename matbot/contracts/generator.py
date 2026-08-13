@@ -434,8 +434,16 @@ def generate(contract, archetype_id, difficulty_request="", target_level=None,
     (`difficulty.verify_matches_target`), ne samo da je unutar granica
     (check_within_bounds i dalje radi identično, nepromijenjeno)."""
     if rng is None:
+        # GLOBALNI `random`, ne svjež `Random()`: u produkciji je ponašanje
+        # istovjetno (oba su nasumična), ali svjež primjerak se sam sije iz
+        # entropije, pa ga `random.seed(...)` u testu NIJE mogao kontrolisati.
+        # Posljedica je bila mjerljiva nestabilnost pakета testova: generator
+        # dva puta zaredom izvuče isti zadatak, čuvar duplikata ga ISPRAVNO
+        # odbije, i test težinskog automata padne — 4 od 50 pokretanja, bez
+        # ikakve veze s ponašanjem koje se ispituje. Čuvar duplikata ostaje
+        # netaknut; ovdje se popravlja samo ono što je oduvijek bila namjera.
         import random as _random
-        rng = _random.Random()
+        rng = _random
     build = _GENERATORS.get(archetype_id)
     if build is None:
         raise GenerationError(f"arhetip '{archetype_id}' nema generator")

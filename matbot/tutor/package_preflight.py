@@ -33,8 +33,8 @@ import re
 from dataclasses import dataclass
 from fractions import Fraction
 
-from matbot import geometrycheck, lesson_fidelity, mcq_integrity, option_equivalence
-from matbot import solution_consistency, task_archetypes
+from matbot import archetype_support, geometrycheck, lesson_fidelity, mcq_integrity
+from matbot import option_equivalence, solution_consistency, task_archetypes
 from matbot import practice_policy as practice_policy_module
 from matbot import request_fidelity as request_fidelity_module
 from matbot import stem_disclosure as stem_disclosure_module
@@ -54,6 +54,8 @@ MAX_ISSUES = 8
 # granica. Ovo je granica DIJAGNOSTIKE, ne prag težine.
 SOLUTION_DIVERGENCE_CODE = "solution_answer_divergence"
 TASK_TOO_SIMILAR_CODE = "task_too_similar"
+# SAVJETODAVAN nalaz (ne obara objavu) — vidi `archetype_rotation_issue`.
+TASK_FORM_REPEATED_CODE = "task_form_repeated"
 CONTRACT_ANSWER_FORM_CODE = "contract_answer_form_violation"
 CONTRACT_EQUIVALENCE_CODE = "contract_equivalence_violation"
 CONTRACT_SINGLE_IRREDUCIBLE_CODE = "contract_multiple_irreducible_options"
@@ -308,6 +310,53 @@ def structural_repetition_issue(task, recent_structures, intent, lesson_id="",
                     + (f"; lekcija podržava i: {', '.join(alternatives[:4])}"
                        if alternatives else "")))
     return None
+
+
+def archetype_rotation_issue(task, recent_structures, intent, lesson_id=""):
+    """SAVJETODAVAN nalaz: oblik se ponovio, a lekcija ima neiskorišten.
+
+    RAZLIKA OD `structural_repetition_issue` JE NAMJERNA I MJERENA:
+
+      • `task_too_similar` je DEFEKT — ista vježba s kozmetičkim zamjenama.
+        Ako ga ni recenzent ne popravi, turn pada zatvoreno.
+      • `task_form_repeated` je PROPUŠTENA PREFERENCIJA — zadatak je stvarno
+        drugačiji, samo je istog oblika kao prethodni. To je razlog da se
+        recenzentu kaže „probaj ovaj oblik“, ali NIKAD razlog da učenik ostane
+        bez zadatka. Zato se ovaj nalaz ne provjerava ponovo nad recenzentovim
+        odgovorom (`pipeline._reviewer_stage`).
+
+    Zašto uopšte postoji: bez ikakvog pritiska model se vraća na
+    `DIRECT_COMPUTE` (mjereno: 68 % od 921 objavljenog zadatka, i 2 od 6
+    oblika u sesiji na živom valu). Preferencija u promptu sama nije dovoljna.
+
+    Gura se samo dok postoji NEISKORIŠTEN podržan oblik — kad su svi iskorišteni,
+    ponavljanje je legitimno i rotacija ćuti. Rollback: `MATBOT_ARCHETYPE_ROTATION`
+    isključuje i ovo, jer preferenciju bira `archetype_support`."""
+    if intent != "next_task" or not recent_structures:
+        return None
+    used = [entry.get("archetype") for entry in recent_structures
+            if isinstance(entry, dict) and entry.get("archetype")]
+    if not used:
+        return None
+    preferred = archetype_support.preferred_archetype(lesson_id, used)
+    if not preferred or preferred in used:
+        return None                      # nema neiskorištenog oblika — ne gura se
+    option_texts = [str(getattr(option, "text", "") or "")
+                    for option in (getattr(task, "options", None) or ())]
+    archetype = task_archetypes.classify(
+        str(getattr(task, "text", "") or ""), option_texts)
+    # Gleda se POSLJEDNJA DVA objavljena oblika, ne samo prethodni: živi val je
+    # pokazao da se model vraća na `DIRECT_COMPUTE` i preko jednog zadatka
+    # (D → C → D → D → D → D), pa bi provjera samo prethodnog to propustila.
+    # Dalje od dva se namjerno ne gura — tada je ponavljanje već legitimno
+    # kruženje kroz oblike, a svaka eskalacija košta drugi poziv.
+    if not archetype or archetype not in used[-2:]:
+        return None
+    return PackageIssue(
+        TASK_FORM_REPEATED_CODE,
+        detail=(f"oblik `{archetype}` je isti kao u prethodnom zadatku, a lekcija "
+                f"ima neiskorišten oblik `{preferred}` — {task_archetypes.describe(preferred)}. "
+                "Napravi zadatak TOG oblika, i dalje strogo unutar iste lekcije"))
 
 
 def collect_package_issues(task, contract=None, previous_signature="",

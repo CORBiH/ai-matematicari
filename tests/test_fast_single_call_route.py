@@ -438,27 +438,58 @@ def test_distinct_task_publishes_on_one_call(fast_route):
     assert fake.reviewer_call_count == 0
 
 
-def test_repeated_archetype_with_a_real_change_publishes_without_the_reviewer(fast_route):
-    """REGRESIJA OBJAVE: ponovljen OBLIK nije sam po sebi razlog za recenzenta.
+def test_rotation_advisory_asks_the_reviewer_but_never_costs_the_task(fast_route):
+    """Ponovljen OBLIK traži drugi pokušaj, ali učenik uvijek dobije zadatak.
 
-    Prva verzija kapije tražila je drugi arhetip na svaki „daj novi“ i oborila
-    objavu na 87,5 % — zadaci koji su bili potpuno ispravni i stvarno drugačiji
-    padali su jer recenzent nije uspio proizvesti drugi oblik."""
+    Ovo je granica između dvije kapije: `task_too_similar` je defekt i pada
+    zatvoreno, `task_form_repeated` je propuštena preferencija i objavljuje se
+    čak i kad recenzent zadrži isti oblik."""
     store, fake = SessionStore(), FastFake()
     fake.queue(draft_for(rational_task(
         text="Koji od navedenih brojeva pripada skupu $\\mathbb{Q}$?")))
-    run_practice_turn(store, fake, turn("ar1", "Daj mi zadatak."))
-    published = store.peek("ar1")["current_task"]
+    run_practice_turn(store, fake, turn("ar3", "Daj mi zadatak."))
+    published = store.peek("ar3")["current_task"]
 
-    # Isti arhetip (razvrstavanje), ali se traži NEŠTO DRUGO.
+    # Nacrt: isti OBLIK, druga vježba → savjetodavan nalaz, eskalacija.
     fake.queue(draft_for(rational_task(
         variant=1, text="Koji od navedenih zapisa je periodičan decimalni broj?"),
         intent="next_task"))
-    response = run_practice_turn(store, fake, turn("ar1", "Daj mi novi zadatak."))
+    # Recenzent zadrži isti oblik, ali opet drugu vježbu — mora se OBJAVITI.
+    fake.queue(make_reviewer_final(
+        decision="correct",
+        final=draft_for(rational_task(
+            variant=2, text="Koji od navedenih razlomaka je pravi razlomak?"),
+            "next_task"),
+        checks=make_reviewer_checks()))
+    response = run_practice_turn(store, fake, turn("ar3", "Daj mi novi zadatak."))
+    assert fake.reviewer_call_count == 1
+    assert fake.call_count == 3                           # 1 + (1 + 1), nikad više
     assert response["status"] == "ready"
-    assert store.peek("ar1")["current_task"] != published
-    assert fake.reviewer_call_count == 0                  # bez drugog poziva
-    assert fake.call_count == 2                           # 1 + 1
+    assert store.peek("ar3")["current_task"] != published
+
+
+def test_a_failed_rotation_repair_falls_back_to_the_clean_draft(fast_route):
+    """Rotacija je NADOGRADNJA, ne uslov: neuspjela popravka ne košta zadatak.
+
+    Bez ovoga bi savjetodavni nalaz obarao objavu kad recenzent vrati paket s
+    nezavisnim defektom — a nacrt je već prošao svaki deterministički validator
+    i bez nalaza bi se objavio na jednom pozivu."""
+    store, fake = SessionStore(), FastFake()
+    fake.queue(draft_for(rational_task(
+        text="Koji od navedenih brojeva pripada skupu $\\mathbb{Q}$?")))
+    run_practice_turn(store, fake, turn("ar4", "Daj mi zadatak."))
+    published = store.peek("ar4")["current_task"]
+
+    clean_draft = rational_task(
+        variant=1, text="Koji od navedenih zapisa je periodičan decimalni broj?")
+    fake.queue(draft_for(clean_draft, intent="next_task"))
+    fake.queue(make_reviewer_final(decision="fail_closed", checks=make_reviewer_checks()))
+    response = run_practice_turn(store, fake, turn("ar4", "Daj mi novi zadatak."))
+    assert fake.reviewer_call_count == 1
+    assert fake.call_count == 3                           # 1 + (1 + 1), nikad više
+    assert response["status"] == "ready"
+    assert store.peek("ar4")["current_task"] == clean_draft.text
+    assert store.peek("ar4")["current_task"] != published
 
 
 def test_cosmetic_rewrite_reaches_the_reviewer_and_still_fails_closed(fast_route):

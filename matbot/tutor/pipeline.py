@@ -2158,6 +2158,14 @@ def _fast_single_call(llm, context, session, turn, request_id, ui_action="",
             supported_archetypes=archetype_support.supported(context.topic_id))
         if repetition is not None:
             issues.append(repetition)
+        # ROTACIJA OBLIKA: savjetodavan nalaz. Traži od recenzenta neiskorišten
+        # oblik, ali NIKAD ne obara objavu — bez njega se model vraća na
+        # `DIRECT_COMPUTE`, a s tvrdom kapijom je objava pala na 87,5 %.
+        rotation = package_preflight.archetype_rotation_issue(
+            draft.new_task, session.get("recent_structures") or [], draft.intent,
+            lesson_id=context.topic_id)
+        if rotation is not None:
+            issues.append(rotation)
         # CILJNI NIVO JE POPRAVLJIV NALAZ, NE PAD U OBJAVI (živi nalaz brze
         # rute): objava traži TAČNU jednakost deklarisanog i
         # serverskog cilja, pa je nacrt s pogrešnim nivoom prolazio preflight i
@@ -2190,8 +2198,21 @@ def _fast_single_call(llm, context, session, turn, request_id, ui_action="",
         request_id, context.topic_id, draft.intent, reason,
         package_preflight.describe_issues(issues) if issues else "-")
 
+    # ROTACIJA NIKAD NE SMIJE KOŠTATI ZADATAK: kad je JEDINI razlog eskalacije
+    # savjetodavan nalaz o obliku, nacrt je već prošao svaki deterministički
+    # validator i bez tog nalaza bi se objavio na jednom pozivu. Popravka je
+    # nadogradnja, a nadogradnja koja ne uspije vraća ono što smo već imali.
+    advisory_only = bool(issues) and escalation is None and all(
+        issue.code == package_preflight.TASK_FORM_REPEATED_CODE for issue in issues)
+
     remaining_s = config.practice_turn_deadline_s() - timer.total_ms() / 1000.0
     if remaining_s < config.MIN_STAGE_BUDGET_S:
+        if advisory_only:
+            logger.info(
+                "fast_rotation_fallback request_id=%s topic=%s intent=%s "
+                "reason=turn_deadline calls=%s",
+                request_id, context.topic_id, draft.intent, calls)
+            return draft, calls
         _log_rejection(
             request_id, context, "turn_deadline",
             f"remaining={remaining_s:.1f}s before reviewer call", draft.intent)
@@ -2200,11 +2221,20 @@ def _fast_single_call(llm, context, session, turn, request_id, ui_action="",
     # POPRAVAK IDE ISTIM BRZIM MODELOM (živi nalaz, val 2): eskalacija na spori
     # recenzentski model umirala je na roku u 7 od 12 slučajeva (37–41 s naspram
     # 33–35 s kod uspjelih). Brza ruta mora biti brza i kad popravlja.
-    return _reviewer_stage(
+    final, calls = _reviewer_stage(
         llm, context, session, student_message, draft, None, request_id,
         issues, difficulty_profile, calls, timer, escalation, rejection,
         remaining_s, reviewer_model=config.FAST_REVIEWER_MODEL,
         reviewer_effort=config.FAST_REASONING_EFFORT)
+
+    # Ista zaštita i kad popravka propadne u recenzentu. Trećeg poziva nema —
+    # `calls` se ne mijenja, vraća se nacrt koji je već bio ispravan.
+    if final is None and advisory_only:
+        logger.info(
+            "fast_rotation_fallback request_id=%s topic=%s intent=%s calls=%s",
+            request_id, context.topic_id, draft.intent, calls)
+        return draft, calls
+    return final, calls
 
 
 def _reviewer_stage(llm, context, session, student_message, draft,
