@@ -632,7 +632,7 @@ def test_canary_diagnostics_distinguish_tutor_reviewer_and_authoritative_evidenc
     assert result.final_difficulty_validator_errors == []
 
 
-def test_package_ownership_is_proven_per_route(monkeypatch):
+def test_package_ownership_is_proven_per_route():
     """Vlasnistvo nad objavljenim paketom dokazuje se po ruti koja je isla.
 
     Zivi nalaz (zvanicna kapija): trazilo se da paket UVIJEK bude recenzentski
@@ -640,7 +640,17 @@ def test_package_ownership_is_proven_per_route(monkeypatch):
     legitimno ne radi, pa je ispravan turn padao s tri greske odjednom.
     Provjera nije ukinuta nego preslikana: svaka ruta dokazuje SVOG
     verifikatora i SVOJ ciljni nivo."""
-    gate = _gate("harder_level2")
+    # HERMETICKI: scenario se sastavlja ovdje umjesto da se gradi cijeli plan
+    # kapije. Gradnja plana dodiruje kurikulum i rute lekcija, a ovaj test
+    # provjerava samo cistu funkciju bodovanja.
+    from scratchpad.run_difficulty_canary import Scenario
+
+    gate = runner.GateScenario(
+        "harder_level2",
+        Scenario("release_gate_core_harder_level1_to_2", "6-04-001", 6,
+                 "non_contract", "harder", "release-core", "Daj mi tezi zadatak.",
+                 1, "task_generation", ""),
+        1)
 
     def result(source, *, reviewer_level=None, tutor_level=None, checks=None):
         return SimpleNamespace(
