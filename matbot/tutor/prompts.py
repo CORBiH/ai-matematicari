@@ -22,7 +22,7 @@ ono što pomoć stvarno traži. Ugovor izrade zadatka ostaje bajt za bajt
 nepromijenjen — kucana poruka i dalje ide kroz `build_tutor_*`, jer prije poziva
 namjera nije serverska činjenica.
 """
-from matbot import difficulty_profiles, difficulty_target, hint_policy
+from matbot import config, difficulty_profiles, difficulty_target, hint_policy
 from matbot.lesson_fidelity import semantic_task_requirement
 from matbot.mcq_integrity import explicit_compound_divisor_request
 from matbot.rules import build_shared_math_rules
@@ -320,9 +320,17 @@ _HELP_NOTATION_RULE = """ZAPIS U `hint` I `worked_solution` (isti prag kao za za
   feed) iza kojeg vise gola slova."""
 
 
+# SERVERSKE GRANICE SE IMENUJU, NE POGAĐAJU (isti obrazac kao ciljni nivo
+# težine): dužina opcije je tvrda serverska granica, a prompt je nikad nije
+# izgovorio — pa je „preduga opcija“ postala vodeći uzrok eskalacije nakon što
+# je nesklad ciljnog nivoa uklonjen. Broj se čita iz konfiguracije da granica
+# ostane na JEDNOM mjestu.
 _TASK_RULE = """KAD PRAVIŠ ZADATAK:
 - zadatak mora ispitivati BAŠ izabranu lekciju, ne samo istu oblast
 - tačno 4 opcije; TAČNO JEDNA je tačna; nijedne dvije ne smiju značiti istu vrijednost
+- svaka opcija mora biti KRAĆA od @@MAX_OPT@@ znakova: opcija je
+  odgovor, ne objašnjenje. Ako ti opcija bježi u rečenicu, skrati je na sam
+  odgovor — obrazloženje ide u `solution`, nikad u opciju
 - „tačno jedna tačna OPCIJA“ nije isto što i „zadatak ima tačno jedno RJEŠENJE“:
   zadatak smije imati beskonačan skup rješenja, a i dalje samo jednu tačnu opciju
 - svaka pogrešna opcija mora biti NETAČNA kao cjelina pod konačnim tekstom i
@@ -350,7 +358,7 @@ _TASK_RULE = """KAD PRAVIŠ ZADATAK:
   je sama TVRDNJA, pa je PONOVI SVOJIM RIJEČIMA i objasni zašto vrijedi. Nikad
   ne počinji rečenicu oznakom te tvrdnje: „Tvrdnja pod a) je tačna.“ i „Tačan
   odgovor je b) jer …“ su odbijeni paketi, a „U razlomku $\\frac{3}{5}$ brojnik
-  je $3$, a nazivnik $5$.“ je isto objašnjenje bez ijedne oznake."""
+  je $3$, a nazivnik $5$.“ je isto objašnjenje bez ijedne oznake.""".replace("@@MAX_OPT@@", str(config.MAX_OPTION_TEXT_CHARS))
 
 # POLAZNA SLOŽENOST — namjerno kratko i apsolutno pravilo, ne sistem težine.
 # ZAŠTO POSTOJI (ručni test, 2026-08-03): prvi zadatak uvodne lekcije 6. razreda

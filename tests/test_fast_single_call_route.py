@@ -265,6 +265,16 @@ def test_prompt_states_that_the_server_owns_the_turn_type(fast_route):
     assert "najjačem dozvoljenom" in sent
 
 
+def test_prompt_states_the_server_option_length_limit():
+    """Granica dužine opcije je serverska činjenica; poslije uklanjanja neslaganja
+    ciljnog nivoa „preduga opcija“ je postala vodeći uzrok eskalacije."""
+    from matbot import config as _config
+    assert f"KRAĆA od {_config.MAX_OPTION_TEXT_CHARS} znakova" in tutor_prompts._TASK_RULE
+    assert "@@" not in tutor_prompts._TASK_RULE
+    # LaTeX vitičaste zagrade u pravilima moraju preživjeti materijalizaciju
+    assert "{3}" in tutor_prompts._TASK_RULE or "{5}" in tutor_prompts._TASK_RULE
+
+
 def test_prompt_names_the_exact_server_target_level(fast_route):
     """ŽIVI NALAZ (val 5): 12 od 18 eskalacija bilo je `difficulty_target_mismatch`
     jer je model morao POGODITI nivo koji server već zna — stanje nosi POČETNI
