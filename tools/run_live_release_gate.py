@@ -195,7 +195,7 @@ def _routes_deterministically(lesson_id: str) -> bool:
     # pa bi poslije selidbe mjereno slabih porodica mjerila arhitekturu koju
     # produkcija više ne izvršava — tačno onaj tihi razlaz zbog kojeg postoji
     # `matbot/release_config.py`. Odluka se zato čita iz istog izvora.
-    if deterministic_variety.family_routes_to_model(contract.family_id):
+    if deterministic_variety.family_routes_to_model(contract.family_id, lesson_id):
         return False
     module = deterministic_registry.GENERATORS.get(contract.family_id)
     return module is not None and module.supports(dict(contract.parameters))
@@ -280,11 +280,12 @@ def _migrated_deterministic_lesson():
         quality = json.loads(quality_path.read_text(encoding="utf-8"))["families"]
     except (OSError, ValueError, KeyError) as exc:
         raise GateRefusal("Deterministic quality measurement is unavailable.") from exc
-    for family in routing.get("migrate_to_luna_families") or ():
-        for lesson_id in (quality.get(family) or {}).get("lessons") or ():
-            grade = int(str(lesson_id).split("-", 1)[0])
-            if lesson_info(grade, lesson_id):
-                return lesson_id, grade
+    # Lekcija mora biti STVARNO migrirana: porodica je slaba, ali pojedinačno
+    # dobre lekcije unutar nje ostaju determinističke.
+    for lesson_id in routing.get("migrated_lessons") or ():
+        grade = int(str(lesson_id).split("-", 1)[0])
+        if lesson_info(grade, lesson_id):
+            return lesson_id, grade
     raise GateRefusal("No migrated deterministic family is available to prove.")
 
 

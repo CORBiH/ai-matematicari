@@ -144,3 +144,40 @@ def test_every_migrated_family_was_measured_weak():
 def test_measurement_covers_every_family_it_judges():
     assert set(ROUTING["families"]) == set(QUALITY["families"])
     assert QUALITY["deterministic_lessons_measured"] >= 300
+
+
+# ---------------------------------------------------------------------------
+# 4) PRECIZNOST PO LEKCIJI — odluka po porodici je bila pregruba
+# ---------------------------------------------------------------------------
+
+def test_individually_strong_lesson_stays_deterministic_inside_a_weak_family(
+        monkeypatch, release_env):
+    """Nalaz: lekcija s 12 razlicitih recenica otisla je na model samo zato sto
+    joj je PORODICA mjerena kao slaba."""
+    monkeypatch.setenv("MATBOT_DETERMINISTIC_VARIETY_GATE", "enabled")
+    exceptions = ROUTING["deterministic_lesson_exceptions"]
+    assert exceptions, "ocekivana bar jedna pojedinacno dobra lekcija"
+    for lesson_id in exceptions[:5]:
+        family = QUALITY["lessons"][lesson_id]["family"]
+        assert family in ROUTING["migrate_to_luna_families"], lesson_id
+        assert not deterministic_variety.family_routes_to_model(family, lesson_id)
+        assert _routes_deterministically(lesson_id), lesson_id
+
+
+def test_individually_weak_sibling_still_routes_to_the_model(monkeypatch, release_env):
+    monkeypatch.setenv("MATBOT_DETERMINISTIC_VARIETY_GATE", "enabled")
+    for lesson_id in ROUTING["migrated_lessons"][:5]:
+        family = QUALITY["lessons"][lesson_id]["family"]
+        assert deterministic_variety.family_routes_to_model(family, lesson_id)
+        assert not _routes_deterministically(lesson_id), lesson_id
+
+
+def test_every_exception_is_measured_strong_not_handwritten():
+    """Izuzeci moraju biti IZVEDENI iz mjerenja, nikad rucno pisani."""
+    for lesson_id in ROUTING["deterministic_lesson_exceptions"]:
+        row = QUALITY["lessons"][lesson_id]
+        assert row["weak"] is False, lesson_id
+        assert row["reasons"] == [], lesson_id
+        assert row["distinct_templates"] >= 3, lesson_id
+    overlap = set(ROUTING["deterministic_lesson_exceptions"]) & set(ROUTING["migrated_lessons"])
+    assert not overlap

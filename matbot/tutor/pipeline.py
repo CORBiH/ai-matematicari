@@ -621,7 +621,8 @@ def _deterministic_generator_for(context):
     # (`data/deterministic_routing.json`), nikad po ID-ju lekcije — vidi
     # `matbot/deterministic_variety.py`.
     if deterministic_variety.family_routes_to_model(
-            getattr(contract, "family_id", "")):
+            getattr(contract, "family_id", ""),
+            getattr(context, "topic_id", "")):
         return None
     module = _DETERMINISTIC_GENERATORS.get(getattr(contract, "family_id", ""))
     if module is None or not module.supports(getattr(contract, "parameters", None)):

@@ -100,20 +100,31 @@ def test_former_contract_lesson_is_still_fast(production):
     assert _stages_for("6-04-005") == ["fast_turn"]
 
 
-@pytest.mark.parametrize("route,expected", [
-    ("MIGRATE_TO_LUNA", ["fast_turn"]),
-    ("KEEP_DETERMINISTIC", []),
-])
-def test_every_family_of_a_class_routes_the_same_way(route, expected, production):
-    """Ruta je osobina PORODICE: sve njene lekcije idu istim putem."""
+def test_strong_class_families_route_the_same_way_for_every_lesson(production):
+    """Jaka porodica nema izuzetaka: svaka njena lekcija ostaje na nula poziva."""
     checked = 0
     for name, row in sorted(ROUTING["families"].items()):
-        if row["route"] != route:
+        if row["route"] != "KEEP_DETERMINISTIC":
             continue
         for lesson_id in QUALITY["families"][name]["lessons"][:2]:
-            assert _stages_for(lesson_id) == expected, (name, lesson_id)
+            assert _stages_for(lesson_id) == [], (name, lesson_id)
             checked += 1
     assert checked > 0
+
+
+def test_migrated_family_routes_by_MEASURED_LESSON_not_by_family_alone(production):
+    """ODLUKA PO PORODICI JE BILA PREGRUBA.
+
+    Unutar slabe porodice ima pojedinacno dobrih lekcija (npr. 12 razlicitih
+    recenica i uredan raspored po nivoima). One ostaju na nula poziva; samo
+    mjereno slabe lekcije idu na model."""
+    migrated = ROUTING["migrated_lessons"]
+    exceptions = ROUTING["deterministic_lesson_exceptions"]
+    assert migrated and exceptions
+    for lesson_id in migrated[:4]:
+        assert _stages_for(lesson_id) == ["fast_turn"], lesson_id
+    for lesson_id in exceptions[:4]:
+        assert _stages_for(lesson_id) == [], lesson_id
 
 
 def test_no_route_ever_exceeds_two_calls(production):

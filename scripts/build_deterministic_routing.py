@@ -100,6 +100,21 @@ def main():
         }
 
     migrate = sorted(n for n, d in decisions.items() if d["route"] == "MIGRATE_TO_LUNA")
+
+    # PRECIZNOST PO LEKCIJI (nalaz: odluka po porodici je bila pregruba).
+    # Lekcija „Brojevni izrazi i tekstualni zadaci s decimalnim brojevima“ ima
+    # 12 različitih rečenica i uredan raspored po nivoima, a otišla je na model
+    # samo zato što joj je PORODICA mjerena kao slaba. Generator je zajednički,
+    # ali njegova pokrivenost po lekciji nije — pa se mjerenje po lekciji
+    # poštuje: dokazano jaka lekcija ostaje na nula poziva i unutar slabe
+    # porodice. Spisak je IZVEDEN iz mjerenja, nikad ručno pisan.
+    lessons = quality.get("lessons") or {}
+    strong_in_weak = sorted(
+        lesson_id for lesson_id, row in lessons.items()
+        if row.get("family") in set(migrate) and not row.get("weak"))
+    weak_in_weak = sorted(
+        lesson_id for lesson_id, row in lessons.items()
+        if row.get("family") in set(migrate) and row.get("weak"))
     payload = {
         "_readme": [
             "Klasifikacija determinističkih PORODICA u produkcijsku rutu.",
@@ -116,13 +131,19 @@ def main():
         },
         "families": decisions,
         "migrate_to_luna_families": migrate,
+        # Lekcije iz migriranih porodica koje su POJEDINAČNO mjerene kao dobre —
+        # ostaju determinističke uprkos porodici.
+        "deterministic_lesson_exceptions": strong_in_weak,
+        "migrated_lessons": weak_in_weak,
     }
     counts = {}
     for decision in decisions.values():
         counts[decision["route"]] = counts.get(decision["route"], 0) + 1
     print("KLASIFIKACIJA PORODICA:", counts)
-    print(f"lekcija koje se sele: "
+    print(f"lekcija u migriranim porodicama: "
           f"{sum(d['lesson_count'] for d in decisions.values() if d['route'] == 'MIGRATE_TO_LUNA')}")
+    print(f"  pojedinacno slabe -> Luna      : {len(weak_in_weak)}")
+    print(f"  pojedinacno jake  -> ostaju 0-call: {len(strong_in_weak)}")
     print(f"\n{'porodica':<34}{'lekc':>5}  ruta / razlog")
     for name, decision in sorted(decisions.items(), key=lambda kv: (kv[1]["route"], kv[0])):
         if decision["route"] == "KEEP_DETERMINISTIC":

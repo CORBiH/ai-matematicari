@@ -74,11 +74,29 @@ def _migrated_families() -> frozenset:
                      if row.get("route") == MIGRATE_ROUTE)
 
 
-def family_routes_to_model(family_id) -> bool:
-    """True samo kad je porodica MJERENA i klasifikovana za selidbu."""
+@lru_cache(maxsize=1)
+def _lesson_exceptions() -> frozenset:
+    """Lekcije koje su POJEDINAČNO mjerene kao dobre unutar slabe porodice."""
+    return frozenset(_payload().get("deterministic_lesson_exceptions") or ())
+
+
+def family_routes_to_model(family_id, lesson_id="") -> bool:
+    """True samo kad je porodica MJERENA za selidbu I lekcija je ne opovrgava.
+
+    ODLUKA PO PORODICI JE BILA PREGRUBA (nalaz): lekcija „Brojevni izrazi i
+    tekstualni zadaci s decimalnim brojevima“ ima 12 različitih rečenica i
+    uredan raspored po nivoima, a otišla je na model samo zato što joj je
+    porodica mjerena kao slaba. Generator je zajednički, ali njegova
+    pokrivenost po lekciji nije. Zato mjerenje PO LEKCIJI nadjačava porodicu:
+    dokazano dobra lekcija ostaje na nula poziva.
+
+    Spisak izuzetaka je IZVEDEN iz mjerenja (`scripts/build_deterministic_*`),
+    nikad ručno pisan — popravak generatora mijenja mjerenje, ne Python."""
     if not family_id or not _enabled():
         return False
-    return family_id in _migrated_families()
+    if family_id not in _migrated_families():
+        return False
+    return lesson_id not in _lesson_exceptions()
 
 
 def classification(family_id) -> dict:
@@ -86,5 +104,6 @@ def classification(family_id) -> dict:
 
 
 def coverage():
-    """(izmjerenih porodica, porodica na modelskoj ruti)."""
-    return len(_payload().get("families") or {}), len(_migrated_families())
+    """(izmjerenih porodica, porodica na modelskoj ruti, izuzetih lekcija)."""
+    return (len(_payload().get("families") or {}), len(_migrated_families()),
+            len(_lesson_exceptions()))

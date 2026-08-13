@@ -87,6 +87,7 @@ def effective_configuration(environ=None):
                                    else "disabled"),
         "deterministic_variety_gate": read("MATBOT_DETERMINISTIC_VARIETY_GATE"),
         "deterministic_families_on_model": str(_deterministic_variety.coverage()[1]),
+        "deterministic_lesson_exceptions": str(_deterministic_variety.coverage()[2]),
         "model": read("OPENAI_MODEL_TEXT"),
         "reasoning_effort": read("MATBOT_REASONING_EFFORT"),
         "timeout_seconds": read("AI_TUTOR_TIMEOUT"),
