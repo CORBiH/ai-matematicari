@@ -99,6 +99,15 @@ MATHJAX_COMMAND_ALLOWLIST = frozenset({
     "dots", "ldots", "cdots", "vdots", "prime", "square", "triangle",
     "in", "notin", "subset", "subseteq", "supset", "cup", "cap",
     "emptyset", "varnothing", "forall", "exists",
+    # ŽIVI NALAZ (široki audit 6.–7. razreda, lekcija „Zadaci s više skupovnih
+    # operacija“): lekcija OBAVEZNO traži RAZLIKU SKUPOVA, a allowlist je znao
+    # uniju i presjek, ali ne i razliku. Pet od šest turnova te lekcije palo je
+    # na vlastitom sigurnosnom sloju s kodovima
+    # `unknown_mathjax_command:setminus` i `unknown_mathjax_command:backslash`.
+    # Obje su standardne, bezargumentne TeX komande za isti simbol „\“ i nose
+    # tačno onoliko rizika koliko `\cup`/`\cap` — nikakav. Dodaje se SAMO
+    # notacija koju kurikulum te lekcije stvarno predaje.
+    "setminus", "backslash",
     "Rightarrow", "Leftarrow", "Leftrightarrow", "to", "rightarrow",
     "leftarrow", "mapsto",
     # Metoda strelica za proporcionalnost (audit ovlašćenja pravila, odluka

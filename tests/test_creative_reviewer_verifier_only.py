@@ -316,7 +316,11 @@ def test_verifier_only_rule_is_gated_on_escalation(universal):
     import inspect
     from matbot.tutor import pipeline as tutor_pipeline
 
-    source = inspect.getsource(tutor_pipeline._two_call)
+    # Recenzentska faza je IZDVOJENA u `_reviewer_stage` da je obje
+    # model-podržane rute dijele; kapija se čita odatle, plus iz `_two_call`
+    # koji je poziva.
+    source = (inspect.getsource(tutor_pipeline._two_call)
+              + inspect.getsource(tutor_pipeline._reviewer_stage))
     assert "creative_reviewer_not_approved" in source
     marker = source.index("creative_reviewer_not_approved")
     guard = source[:marker]

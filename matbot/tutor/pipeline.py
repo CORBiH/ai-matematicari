@@ -1558,6 +1558,15 @@ def _run_text_turn(store, llm, session, turn, context, request_id):
         final, calls = _one_call_help(
             llm, context, session, turn["student_message"], ui_action, request_id,
             timer)
+    elif config.fast_single_call_enabled_for(context.topic_id):
+        # EKSPERIMENTALNA BRZA RUTA — vidi `_fast_single_call`. Uključuje se
+        # ISKLJUČIVO konfiguracijom po lekciji; bez nje ovaj grana ne postoji za
+        # produkciju i `_two_call` ostaje netaknut put.
+        rejection = {}
+        final, calls = _fast_single_call(
+            llm, context, session, turn, request_id, ui_action,
+            timer=timer, escalation=escalation, rejection=rejection,
+        )
     else:
         rejection = {}
         final, calls = _two_call(
@@ -1914,130 +1923,151 @@ def _log_sdk_entry(request_id, context, stage, call_index, result):
     )
 
 
-def _two_call(llm, context, session, student_message, request_id, trusted_verdict,
-              ui_action="", timer=None, escalation=None, rejection=None):
-    """Tutor → Reviewer. Vraća (final_draft | None, broj_poziva).
+FAST_ROUTE = "fast_single_call"
+# Kodovi eskalacije brze rute — stabilni, idu u log i u dijagnostiku.
+FAST_ESCALATED_PREFLIGHT = "fast_escalated_preflight_issues"
+FAST_ESCALATED_CREATIVE = "fast_escalated_creative_escalation"
+FAST_NO_TASK_CODE = "fast_task_turn_without_task"
 
-    Nijedna grana ne pravi treći poziv. Kad Tutor nacrt ne može ni da se
-    isparsira, DRUGI POZIV SE NE DEŠAVA — nema šta da se recenzira.
 
-    `ui_action` je namjera koju je učenik izričito tražio dugmetom nad AKTIVNIM
-    zadatkom (vidi `_explicit_ui_action`). Kad postoji, nov zadatak se u ovom
-    turnu ne smije izdati — pa se nacrt s takvom namjerom odbija ODMAH, prije
-    recenzenta: nema šta recenzirati kad paket ionako ne smije biti objavljen.
+def _fast_requires_task(turn, session):
+    """SERVER odlučuje da li je ovo turn IZRADE zadatka, ne model.
 
-    FAZA 2: turn s `ui_action` više NE dolazi ovim putem — pomoć ide kroz
-    `_one_call_help` (prompt pomoći) ili je server sam sastavi. Parametar i
-    provjera ostaju kao ODBRANA U DUBINI: ako pomoć ikad ponovo prođe ovuda,
-    zabrana objave novog zadatka je i dalje na mjestu, a ista invarijanta
-    treći put stoji u objavi (`_run_text_turn`)."""
+    Čita se ISTI zatvoreni skup serverskih činjenica koji već bira
+    determinističku rutu (`_deterministic_task_intent`): UI polje težine i
+    zatvoren skup poruka. Kad je odgovor „da“, model NEMA pravo da odgovori
+    razgovorno — živi audit je pokazao dva takva turna („već si na najtežem
+    nivou, hoćeš li drugi iste težine?“) umjesto objavljenog zadatka."""
+    return _deterministic_task_intent(turn, session) or ""
+
+
+def _fast_single_call(llm, context, session, turn, request_id, ui_action="",
+                      timer=None, escalation=None, rejection=None):
+    """JEDAN generativni poziv → deterministička kapija → objava.
+
+    ZAŠTO POSTOJI (široki živi audit 6.–7. razreda): kašnjenje i padovi su
+    vezani za RUTU. Univerzalni dvopozivni put mjeri 30–41 s po turnu, a
+    njegov drugi poziv se troši i onda kad prvi nacrt nema nijedan DOKAZAN
+    defekt. Ovdje se recenzent troši SAMO kad `package_preflight` — isti
+    validatori koje objava ionako pokreće — nađe nalaz.
+
+    TOK (najviše DVA poziva, nikad tri):
+        1. generativni poziv (`llm.fast_turn`, ista `TutorDraft` šema)
+        2. `validate_final`  — šema i namjera
+        3. serverska nadležnost: kad je turn IZRADE zadatka, nacrt bez zadatka
+           pada zatvoreno (model ne smije odgovoriti razgovorno)
+        4. kreativna kapija činjenica (nepromijenjena)
+        5. `package_preflight.collect_package_issues`
+             • prazno  → OBJAVA ODMAH (jedan poziv)
+             • nalazi  → USLOVNA eskalacija na POSTOJEĆEG recenzenta
+        6. objava prolazi ISTI `validate_task_package` i `_publish_task`
+
+    Nema ponovnog generisanja, nema petlje, nema trećeg poziva."""
     calls = 0
     timer = timer or _TurnTimer()
+    rejection = rejection if rejection is not None else {}
+    student_message = turn["student_message"]
+    required_task_intent = _fast_requires_task(turn, session)
+
     try:
-        tutor_result = _call_tutor(
-            llm, context, session, student_message, trusted_verdict, ui_action,
-            timer=timer, escalation_block=creative_escalation.prompt_block(escalation),
-        )
+        with timer.stage("prompt_build"):
+            instructions = tutor_prompts.build_tutor_instructions(context)
+            input_text = tutor_prompts.build_tutor_input(
+                context, session, student_message, None, ui_action,
+                escalation_block=creative_escalation.prompt_block(escalation),
+                required_task_intent=required_task_intent,
+            )
+        with timer.stage("fast_call"):
+            result = llm.fast_turn(instructions, input_text)
+        timer.note_ms("fast_api", getattr(result, "latency_ms", None))
         calls += 1
-        _log_sdk_entry(request_id, context, "tutor", calls, tutor_result)
+        _log_sdk_entry(request_id, context, FAST_ROUTE, calls, result)
     except LLMError as error:
         logger.warning(
-            "tutor_call request_id=%s topic=%s stage=tutor call=1 %s",
-            request_id, context.topic_id, failure_diagnostics_kv(error),
-        )
+            "fast_call request_id=%s topic=%s stage=fast call=1 %s",
+            request_id, context.topic_id, failure_diagnostics_kv(error))
         return None, calls
 
-    with timer.stage("tutor_validate"):
-        draft = normalize_for_intent(tutor_result.output)
-        has_active_task = bool(session["current_task"])
+    with timer.stage("fast_validate"):
+        draft = normalize_for_intent(result.output)
         try:
-            validate_final(draft, has_active_task=has_active_task)
+            validate_final(draft, has_active_task=bool(session["current_task"]))
         except UnifiedOutputError as error:
-            # Neupotrebljiv nacrt: recenzent se NE poziva (nema validnog
-            # predmeta), pa turn staje na jednom pozivu.
-            _log_rejection(request_id, context, "tutor_draft", error, draft.intent)
+            _log_rejection(request_id, context, "fast_draft", error, draft.intent)
             return None, calls
 
-    # ARHETIP JE SERVERSKA TAKSONOMIJA (živi nalaz ciljane kampanje). Model
-    # smije pisati SADRŽAJ, ali ne smije redefinisati enum lekcije ni
-    # zamijeniti arhetip koji je server izabrao. Provjera je čisto
-    # deterministička i stoji PRIJE recenzenta: paket koji ionako ne može biti
-    # objavljen ne zaslužuje drugi poziv, isto kao neupotrebljiv nacrt iznad.
-    # Recenzent je NE MOŽE nadjačati — on kasnije sudi samo o SEMANTICI.
+    # SERVERSKA NADLEŽNOST NAD VRSTOM TURNA — model je ne može preglasati.
+    if required_task_intent and draft.intent not in TASK_INTENTS:
+        _log_rejection(
+            request_id, context, FAST_NO_TASK_CODE,
+            f"server_intent={required_task_intent} draft_intent={draft.intent}",
+            draft.intent)
+        return None, calls
+
     if escalation is not None and draft.new_task is not None:
-        # STRUKTURA, NE OZNAKA. Server je cilj već izabrao, pa od modela ne uči
-        # koji je arhetip u pitanju — provjerava da li nacrt MEHANIČKI jeste
-        # taj arhetip: nosi li sve veličine koje cilj traži, rješavaju li se
-        # egzaktno, i je li označena opcija baš taj broj, jedina takva.
-        # Prije recenzenta, jer je čisto aritmetika; proza se ne parsira.
-        facts_error = creative_escalation.facts_failure(
-            escalation, draft.new_task)
+        facts_error = creative_escalation.facts_failure(escalation, draft.new_task)
         if facts_error:
             _log_rejection(
                 request_id, context, facts_error,
-                f"target={escalation.target_archetype} "
-                f"tutor_label={draft.new_task.task_signature.operation_or_relation!r}",
-                draft.intent)
+                f"target={escalation.target_archetype}", draft.intent)
             return None, calls
-
-        # TEK SADA kanonizacija. Oznaka se ne poklanja prije dokaza: nacrt je
-        # upravo dokazao da je mehanički saglasan s ciljem, pa server upisuje
-        # SVOJ identifikator i modelova slobodna niska dalje ne putuje — ni u
-        # recenzentov paket, ni u objavu, ni u historiju.
         draft = draft.model_copy(update={
-            "new_task": creative_escalation.canonical_task(
-                draft.new_task, escalation)})
+            "new_task": creative_escalation.canonical_task(draft.new_task,
+                                                           escalation)})
 
-    # Reviewer sees the canonical server title; raw Tutor output remains on
-    # the wrapper for safe offline diagnostics only.
     draft = _canonicalize_draft_lesson_title(draft, context)
-
-    # Only task publication needs the independent generation Reviewer.  A
-    # normal answer, hint, explanation, or full-solution turn is complete
-    # after Tutor semantically interpreted the free-form student message.
     if draft.intent not in TASK_INTENTS:
+        # Odgovor, objašnjenje ili pojašnjenje — recenzenta ni dvopozivni put
+        # ovdje nikad nije imao.
         return draft, calls
 
-    # KONTINUITET AKTIVNOG ZADATKA JE SERVERSKA ODLUKA, NE MODELOVA.
     if ui_action:
         _log_rejection(
             request_id, context, "ui_action_forbids_new_task",
-            f"ui_action={ui_action} draft_intent={draft.intent}", draft.intent,
-        )
+            f"ui_action={ui_action} draft_intent={draft.intent}", draft.intent)
         return None, calls
 
-    # ------------------------------------------------------------------
-    # PREFLIGHT NAD TUTOROVIM NACRTOM (živi gate 00bbd45)
-    # ------------------------------------------------------------------
-    # Isti deterministički validatori koje objava ionako pokreće, ali SADA —
-    # dok drugi poziv još nije napravljen. Nalaz se NE koristi za odbijanje
-    # nacrta (nacrt s nalazom je upravo ono što recenzent treba da popravi),
-    # nego ulazi u recenzentov ulaz kao serverska činjenica.
-    previous_signature = session.get("current_task_identity") or ""
-    # Faza F5G: lekcijski-relativni profil težine — jedno razrješenje po turnu,
-    # iz server-vlasničkog konteksta, pa ISTE granice vide preflight,
-    # recenzentska invarijanta i objava (validate_task_package ga razrješava
-    # sam iz istog konteksta).
     difficulty_profile = difficulty_profiles.resolve_for_context(context)
     with timer.stage("preflight"):
-        draft_issues = package_preflight.collect_package_issues(
+        issues = list(package_preflight.collect_package_issues(
             draft.new_task, contract=context.semantic_contract,
-            previous_signature=previous_signature,
+            previous_signature=session.get("current_task_identity") or "",
             difficulty_profile=difficulty_profile,
             practice_contract=context.practice_contract,
             practice_policy=getattr(context, "practice_policy", None),
-            student_message=student_message)
-    if draft_issues:
-        logger.info(
-            "tutor_draft_preflight request_id=%s topic=%s intent=%s issues=%s",
-            request_id, context.topic_id, draft.intent,
-            package_preflight.describe_issues(draft_issues),
-        )
+            student_message=student_message))
+        # CILJNI NIVO JE POPRAVLJIV NALAZ, NE PAD U OBJAVI (živi nalaz brze
+        # rute): objava traži TAČNU jednakost deklarisanog i
+        # serverskog cilja, pa je nacrt s pogrešnim nivoom prolazio preflight i
+        # umirao tek u objavi — bez ijedne prilike za ispravku, iako recenzent
+        # tačno to zna popraviti u DRUGOM (i posljednjem) pozivu. Ista
+        # jednakost se zato provjerava OVDJE, a nalaz ide istim kanalom kao
+        # svaki drugi. Objava provjeru i dalje ponavlja: ovo je raniji sloj,
+        # nikad zamjena.
+        target_level = (_target_level_for(session, draft.intent, student_message)
+                        if _difficulty_levels_enabled() else None)
+        target_issue = package_preflight.difficulty_target_issue(
+            draft.new_task, target_level)
+        if target_issue is not None:
+            issues.append(target_issue)
+    issues = tuple(issues)
 
-    # Faza 4H (Workstream L): eksplicitni rok CIJELOG turna. Skoro istekao
-    # Tutor poziv ne smije slijepo započeti dug recenzentski poziv — bolje
-    # siguran pad odmah nego 90-sekundno čekanje učenika. Podrazumijevani rok
-    # (2×AI_TIMEOUT_S) ne mijenja zatečeno ponašanje ni za milisekundu.
+    # KREATIVNA RUTA UVIJEK IDE NA RECENZENTA: njena raznolikost i poklapanje
+    # arhetipa su SEMANTIČKE presude koje nijedan deterministički validator ne
+    # može donijeti (vidi `reviewer_requires_*`). Brza ruta ih ne preskače.
+    needs_reviewer = bool(issues) or escalation is not None
+    if not needs_reviewer:
+        logger.info(
+            "fast_published request_id=%s topic=%s intent=%s calls=%s",
+            request_id, context.topic_id, draft.intent, calls)
+        return draft, calls
+
+    reason = FAST_ESCALATED_CREATIVE if escalation is not None else FAST_ESCALATED_PREFLIGHT
+    logger.info(
+        "fast_escalation request_id=%s topic=%s intent=%s reason=%s issues=%s",
+        request_id, context.topic_id, draft.intent, reason,
+        package_preflight.describe_issues(issues) if issues else "-")
+
     remaining_s = config.practice_turn_deadline_s() - timer.total_ms() / 1000.0
     if remaining_s < config.MIN_STAGE_BUDGET_S:
         _log_rejection(
@@ -2045,6 +2075,24 @@ def _two_call(llm, context, session, student_message, request_id, trusted_verdic
             f"remaining={remaining_s:.1f}s before reviewer call", draft.intent)
         return None, calls
 
+    return _reviewer_stage(
+        llm, context, session, student_message, draft, None, request_id,
+        issues, difficulty_profile, calls, timer, escalation, rejection,
+        remaining_s)
+
+
+def _reviewer_stage(llm, context, session, student_message, draft,
+                    trusted_verdict, request_id, draft_issues,
+                    difficulty_profile, calls, timer, escalation, rejection,
+                    remaining_s):
+    """DRUGI (i posljednji) poziv — DIJELE ga obje model-podržane rute.
+
+    Izdvojeno iz `_two_call` bez ijedne izmjene ponašanja: brza ruta
+    (`_fast_single_call`) eskalira OVDJE kad deterministički preflight nađe
+    nalaz, pa recenzentska logika, njeni gate-ovi i verifikatorska politika
+    kreativne rute postoje u JEDNOM primjerku."""
+    has_active_task = bool(session["current_task"])
+    previous_signature = session.get("current_task_identity") or ""
     try:
         reviewer_result = _call_reviewer(
             llm, context, session, student_message, draft, trusted_verdict,
@@ -2207,3 +2255,140 @@ def _two_call(llm, context, session, student_message, request_id, trusted_verdic
             request_id, context.topic_id, final.intent,
         )
     return final, calls
+
+
+def _two_call(llm, context, session, student_message, request_id, trusted_verdict,
+              ui_action="", timer=None, escalation=None, rejection=None):
+    """Tutor → Reviewer. Vraća (final_draft | None, broj_poziva).
+
+    Nijedna grana ne pravi treći poziv. Kad Tutor nacrt ne može ni da se
+    isparsira, DRUGI POZIV SE NE DEŠAVA — nema šta da se recenzira.
+
+    `ui_action` je namjera koju je učenik izričito tražio dugmetom nad AKTIVNIM
+    zadatkom (vidi `_explicit_ui_action`). Kad postoji, nov zadatak se u ovom
+    turnu ne smije izdati — pa se nacrt s takvom namjerom odbija ODMAH, prije
+    recenzenta: nema šta recenzirati kad paket ionako ne smije biti objavljen.
+
+    FAZA 2: turn s `ui_action` više NE dolazi ovim putem — pomoć ide kroz
+    `_one_call_help` (prompt pomoći) ili je server sam sastavi. Parametar i
+    provjera ostaju kao ODBRANA U DUBINI: ako pomoć ikad ponovo prođe ovuda,
+    zabrana objave novog zadatka je i dalje na mjestu, a ista invarijanta
+    treći put stoji u objavi (`_run_text_turn`)."""
+    calls = 0
+    timer = timer or _TurnTimer()
+    try:
+        tutor_result = _call_tutor(
+            llm, context, session, student_message, trusted_verdict, ui_action,
+            timer=timer, escalation_block=creative_escalation.prompt_block(escalation),
+        )
+        calls += 1
+        _log_sdk_entry(request_id, context, "tutor", calls, tutor_result)
+    except LLMError as error:
+        logger.warning(
+            "tutor_call request_id=%s topic=%s stage=tutor call=1 %s",
+            request_id, context.topic_id, failure_diagnostics_kv(error),
+        )
+        return None, calls
+
+    with timer.stage("tutor_validate"):
+        draft = normalize_for_intent(tutor_result.output)
+        has_active_task = bool(session["current_task"])
+        try:
+            validate_final(draft, has_active_task=has_active_task)
+        except UnifiedOutputError as error:
+            # Neupotrebljiv nacrt: recenzent se NE poziva (nema validnog
+            # predmeta), pa turn staje na jednom pozivu.
+            _log_rejection(request_id, context, "tutor_draft", error, draft.intent)
+            return None, calls
+
+    # ARHETIP JE SERVERSKA TAKSONOMIJA (živi nalaz ciljane kampanje). Model
+    # smije pisati SADRŽAJ, ali ne smije redefinisati enum lekcije ni
+    # zamijeniti arhetip koji je server izabrao. Provjera je čisto
+    # deterministička i stoji PRIJE recenzenta: paket koji ionako ne može biti
+    # objavljen ne zaslužuje drugi poziv, isto kao neupotrebljiv nacrt iznad.
+    # Recenzent je NE MOŽE nadjačati — on kasnije sudi samo o SEMANTICI.
+    if escalation is not None and draft.new_task is not None:
+        # STRUKTURA, NE OZNAKA. Server je cilj već izabrao, pa od modela ne uči
+        # koji je arhetip u pitanju — provjerava da li nacrt MEHANIČKI jeste
+        # taj arhetip: nosi li sve veličine koje cilj traži, rješavaju li se
+        # egzaktno, i je li označena opcija baš taj broj, jedina takva.
+        # Prije recenzenta, jer je čisto aritmetika; proza se ne parsira.
+        facts_error = creative_escalation.facts_failure(
+            escalation, draft.new_task)
+        if facts_error:
+            _log_rejection(
+                request_id, context, facts_error,
+                f"target={escalation.target_archetype} "
+                f"tutor_label={draft.new_task.task_signature.operation_or_relation!r}",
+                draft.intent)
+            return None, calls
+
+        # TEK SADA kanonizacija. Oznaka se ne poklanja prije dokaza: nacrt je
+        # upravo dokazao da je mehanički saglasan s ciljem, pa server upisuje
+        # SVOJ identifikator i modelova slobodna niska dalje ne putuje — ni u
+        # recenzentov paket, ni u objavu, ni u historiju.
+        draft = draft.model_copy(update={
+            "new_task": creative_escalation.canonical_task(
+                draft.new_task, escalation)})
+
+    # Reviewer sees the canonical server title; raw Tutor output remains on
+    # the wrapper for safe offline diagnostics only.
+    draft = _canonicalize_draft_lesson_title(draft, context)
+
+    # Only task publication needs the independent generation Reviewer.  A
+    # normal answer, hint, explanation, or full-solution turn is complete
+    # after Tutor semantically interpreted the free-form student message.
+    if draft.intent not in TASK_INTENTS:
+        return draft, calls
+
+    # KONTINUITET AKTIVNOG ZADATKA JE SERVERSKA ODLUKA, NE MODELOVA.
+    if ui_action:
+        _log_rejection(
+            request_id, context, "ui_action_forbids_new_task",
+            f"ui_action={ui_action} draft_intent={draft.intent}", draft.intent,
+        )
+        return None, calls
+
+    # ------------------------------------------------------------------
+    # PREFLIGHT NAD TUTOROVIM NACRTOM (živi gate 00bbd45)
+    # ------------------------------------------------------------------
+    # Isti deterministički validatori koje objava ionako pokreće, ali SADA —
+    # dok drugi poziv još nije napravljen. Nalaz se NE koristi za odbijanje
+    # nacrta (nacrt s nalazom je upravo ono što recenzent treba da popravi),
+    # nego ulazi u recenzentov ulaz kao serverska činjenica.
+    previous_signature = session.get("current_task_identity") or ""
+    # Faza F5G: lekcijski-relativni profil težine — jedno razrješenje po turnu,
+    # iz server-vlasničkog konteksta, pa ISTE granice vide preflight,
+    # recenzentska invarijanta i objava (validate_task_package ga razrješava
+    # sam iz istog konteksta).
+    difficulty_profile = difficulty_profiles.resolve_for_context(context)
+    with timer.stage("preflight"):
+        draft_issues = package_preflight.collect_package_issues(
+            draft.new_task, contract=context.semantic_contract,
+            previous_signature=previous_signature,
+            difficulty_profile=difficulty_profile,
+            practice_contract=context.practice_contract,
+            practice_policy=getattr(context, "practice_policy", None),
+            student_message=student_message)
+    if draft_issues:
+        logger.info(
+            "tutor_draft_preflight request_id=%s topic=%s intent=%s issues=%s",
+            request_id, context.topic_id, draft.intent,
+            package_preflight.describe_issues(draft_issues),
+        )
+
+    # Faza 4H (Workstream L): eksplicitni rok CIJELOG turna. Skoro istekao
+    # Tutor poziv ne smije slijepo započeti dug recenzentski poziv — bolje
+    # siguran pad odmah nego 90-sekundno čekanje učenika. Podrazumijevani rok
+    # (2×AI_TIMEOUT_S) ne mijenja zatečeno ponašanje ni za milisekundu.
+    remaining_s = config.practice_turn_deadline_s() - timer.total_ms() / 1000.0
+    if remaining_s < config.MIN_STAGE_BUDGET_S:
+        _log_rejection(
+            request_id, context, "turn_deadline",
+            f"remaining={remaining_s:.1f}s before reviewer call", draft.intent)
+        return None, calls
+
+    return _reviewer_stage(
+        llm, context, session, student_message, draft, trusted_verdict,
+        request_id, draft_issues, difficulty_profile, calls, timer, escalation,
+        rejection, remaining_s)

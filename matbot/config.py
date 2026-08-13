@@ -82,6 +82,36 @@ REASONING_EFFORT = os.environ.get("MATBOT_REASONING_EFFORT", "low")
 # ijedne izmjene Practice logike — poslovna logika ne zna koji je model u igri.
 TUTOR_MODEL = os.environ.get("MATBOT_TUTOR_MODEL", OPENAI_MODEL_TEXT)
 REVIEWER_MODEL = os.environ.get("MATBOT_REVIEWER_MODEL", OPENAI_MODEL_TEXT)
+
+# --- EKSPERIMENTALNI BRZI JEDNOPOZIVNI PUT (`fast_single_call`) ------------
+# ZAŠTO POSTOJI: široki živi audit je pokazao da su i kašnjenje i padovi
+# vezani za RUTU, ne za razred — deterministička ruta ~0 s, ugovorna ~8 s, a
+# univerzalna dvopozivna 30–41 s uz najviše odbijanja. Ovaj put pokušava da
+# NORMALAN model-podržan turn spusti na JEDAN poziv, a recenzenta zadrži kao
+# USLOVNU eskalaciju kad deterministički preflight nađe dokazan defekt.
+#
+# NIŠTA SE NE MIJENJA PODRAZUMIJEVANO: bez izričitih varijabli okruženja
+# produkcija ostaje na `universal_two_call` s istim modelom. Model i ruta se
+# biraju NEZAVISNO, da se A/B poređenje može voditi bez izmjene koda.
+FAST_MODEL = os.environ.get("MATBOT_FAST_MODEL", "gpt-5.6-luna")
+FAST_REASONING_EFFORT = os.environ.get("MATBOT_FAST_REASONING_EFFORT", "low")
+# Lekcije za koje je brzi put uključen — zarezom odvojena lista ID-jeva.
+# Prazno (podrazumijevano) znači: nijedna lekcija, put je potpuno neaktivan.
+_FAST_LESSONS_RAW = os.environ.get("MATBOT_FAST_SINGLE_CALL_LESSONS", "")
+
+
+def fast_single_call_lessons() -> frozenset:
+    """Skup lekcija na eksperimentalnoj brzoj ruti (podaci, ne grana po ID-ju).
+
+    Čita se pri svakom pozivu da bi test/evaluacija mogli mijenjati opseg bez
+    ponovnog učitavanja modula."""
+    raw = os.environ.get("MATBOT_FAST_SINGLE_CALL_LESSONS", _FAST_LESSONS_RAW)
+    return frozenset(part.strip() for part in raw.split(",") if part.strip())
+
+
+def fast_single_call_enabled_for(lesson_id) -> bool:
+    """True SAMO kad je ta lekcija izričito navedena u konfiguraciji."""
+    return bool(lesson_id) and lesson_id in fast_single_call_lessons()
 AI_TIMEOUT_S = _float_env("AI_TUTOR_TIMEOUT", 30.0)
 
 # Faza 4H (Workstream L): rok CIJELOG Practice turna. Podrazumijevano tačno

@@ -437,7 +437,9 @@ def test_reviewer_final_invariant_receives_the_policy_argument(universal):
     """Struktura, ne samo ishod: preflight i konačna invarijanta dijele ulaz."""
     import inspect
 
-    source = inspect.getsource(pipeline._two_call)
+    # Ista provjera nad DIJELJENOM recenzentskom fazom (vidi `_reviewer_stage`).
+    source = (inspect.getsource(pipeline._two_call)
+              + inspect.getsource(pipeline._reviewer_stage))
     draft_call = source.index("draft_issues = package_preflight")
     final_call = source.index("final_issues = package_preflight")
     assert "practice_policy=" in source[draft_call:final_call]

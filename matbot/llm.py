@@ -325,6 +325,21 @@ class OpenAIPracticeLLM:
             model=config.TUTOR_MODEL,
         )
 
+    def fast_turn(self, instructions: str, input_text: str,
+                  timeout_s=None) -> LLMResult:
+        """JEDINI poziv eksperimentalnog brzog puta (`fast_single_call`).
+
+        ISTA STRUKTURNA ŠEMA kao Tutor (`TutorDraft`) — nijedan validator,
+        prompt ni objava ne moraju znati da je model drugi. Razlikuju se samo
+        model i reasoning effort, i oba su zasebno podesiva, pa se brza ruta
+        može mjeriti naspram zatečene bez ijedne izmjene logike."""
+        return self._structured_turn(
+            instructions, input_text, TutorDraft,
+            max_output_tokens=config.MAX_OUTPUT_TOKENS_PRACTICE,
+            model=config.FAST_MODEL, timeout_s=timeout_s,
+            reasoning_effort=config.FAST_REASONING_EFFORT,
+        )
+
     def reviewer_turn(self, instructions: str, input_text: str,
                       timeout_s=None) -> LLMResult:
         """DRUGI (i posljednji) poziv: nezavisna provjera + konačan payload.
@@ -389,7 +404,7 @@ class OpenAIPracticeLLM:
 
     def _structured_turn(self, instructions: str, input_text: str, text_format,
                           max_output_tokens=None, image=None, model=None,
-                          timeout_s=None) -> LLMResult:
+                          timeout_s=None, reasoning_effort=None) -> LLMResult:
         import openai
         import pydantic
 
@@ -397,6 +412,9 @@ class OpenAIPracticeLLM:
         # `model` je per-poziv izbor (Tutor vs Reviewer). Kad izostane, važi
         # model adaptera — svi zatečeni putevi se time ne mijenjaju.
         active_model = model or self.model
+        # `reasoning_effort` je, kao i model, PER-POZIV izbor; bez njega važi
+        # podešavanje adaptera, pa se zatečeni putevi ne mijenjaju.
+        active_effort = reasoning_effort or self.reasoning_effort
         client = self._get_client()
         # Faza 4H: per-poziv rok smije samo SUZITI podrazumijevani (nikad
         # produžiti). `with_options` dijeli isti HTTP pool — nema nove konekcije.
@@ -404,7 +422,7 @@ class OpenAIPracticeLLM:
             client = client.with_options(timeout=max(float(timeout_s), 1.0))
         diag = {
             "model": active_model,
-            "reasoning_effort": self.reasoning_effort,
+            "reasoning_effort": active_effort,
             "max_output_tokens": budget,
             "instructions_chars": len(instructions or ""),
             "input_chars": len(input_text or ""),
@@ -426,7 +444,7 @@ class OpenAIPracticeLLM:
                 instructions=instructions,
                 input=self._build_input(input_text, image),
                 text_format=text_format,
-                reasoning={"effort": self.reasoning_effort},
+                reasoning={"effort": active_effort},
                 max_output_tokens=budget,
                 # Svaki turn šalje kompletan prompt iznova (instructions+input);
                 # ne koristimo previous_response_id ni background mode, pa nema

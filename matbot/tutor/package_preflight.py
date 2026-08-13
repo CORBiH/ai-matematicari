@@ -488,6 +488,29 @@ def semantic_duplicate_index_pairs(issues):
                  if issue.code == SEMANTIC_DUPLICATE_CODE and issue.option_indexes)
 
 
+# CILJNI NIVO TEŽINE JE SERVERSKA ČINJENICA (živi nalaz brze jednopozivne
+# rute): nacrt je tri puta deklarisao nivo 2 dok je server tražio 3, pa je paket
+# prolazio preflight i padao TEK u objavi — bez ijedne prilike za ispravku.
+# Nalaz je popravljiv: recenzent u ISTOM drugom pozivu smije vratiti paket s
+# ispravnim ciljem, pa ovaj kod ide istim kanalom kao svaki drugi nalaz.
+DIFFICULTY_TARGET_MISMATCH_CODE = "difficulty_target_mismatch"
+
+
+def difficulty_target_issue(task, target_level):
+    """Nalaz kad nacrt deklariše DRUGI ciljni nivo od serverskog, ili None.
+
+    Provjerava se ISTA jednakost koju objava (`validate_task_package`) ionako
+    zahtijeva — ovdje samo RANIJE, da bi bila popravljiva."""
+    if task is None or target_level is None:
+        return None
+    declared = getattr(task, "target_difficulty_level", None)
+    if declared == target_level:
+        return None
+    return PackageIssue(
+        DIFFICULTY_TARGET_MISMATCH_CODE,
+        detail=f"draft declared level {declared}, server target is {target_level}")
+
+
 def format_for_reviewer(issues):
     """Deterministički blok za ULAZ recenzenta. Prazno = nema nalaza."""
     if not issues:
@@ -508,6 +531,15 @@ def format_for_reviewer(issues):
         "issue detail names the exact rejected command or defect (for example "
         "`unknown_mathjax_command:\\ty` or `damaged_latex_form`): remove or replace "
         "exactly that construct, do not return the field unchanged. "
+        # ŽIVI NALAZ BRZE RUTE: nacrt je deklarisao nivo 2 dok je
+        # server tražio 3. Cilj je SERVERSKA činjenica — recenzent je ne bira,
+        # nego paket dovodi u sklad s njom.
+        f"For `{DIFFICULTY_TARGET_MISMATCH_CODE}` the draft declared a different "
+        "target difficulty level than the server requires. THE SERVER TARGET IN "
+        "THE ISSUE DETAIL IS AUTHORITATIVE: return a complete package whose "
+        "`target_difficulty_level` is exactly that number and whose task and "
+        "difficulty evidence genuinely belong at that level — never lower the "
+        "target to match the draft. "
         # ŽIVI TALAS F4E (E01, E12): za kodove uskog matematičkog orakla nije
         # postojao nijedan lijek u ovom bloku, pa je recenzent dobijao goli kod
         # i vraćao `correct` s istim nalazom. Uputstvo ne mijenja prag orakla —

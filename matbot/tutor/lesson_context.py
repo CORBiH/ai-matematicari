@@ -13,6 +13,7 @@ samo ima manje popunjenih polja.
 """
 from dataclasses import dataclass, field
 
+from matbot import lesson_objectives
 from matbot import geometry_rules, practice_policy, semantic_practice, task_families
 from matbot.contracts import registry as contract_registry
 from matbot.semantics import contracts as semantic_contracts
@@ -44,6 +45,7 @@ class LessonContext:
     operand_constraints: dict = field(default_factory=dict)
     lesson_scope: str = ""
     objectives: tuple = ()
+    supporting_concepts: tuple = ()
     exclusions: tuple = ()
     # Semantički ugovor porodice (Faza 4A) — None za lekciju koja ga nema, i
     # tada se cio sistem ponaša bajt za bajt kao prije. Nepromjenjiv je, pa
@@ -98,8 +100,16 @@ def build(grade, topic_id):
         allowed_operations=tuple(contract.allowed_operations) if contract is not None else (),
         operand_constraints=dict(contract.operand_constraints) if contract is not None else {},
         lesson_scope=str(lesson.get("lesson_scope", "") or ""),
-        objectives=tuple(lesson.get("objectives", []) or ()),
-        exclusions=tuple(lesson.get("exclusions", []) or ()),
+        # PRIMARNA VJEŠTINA IZ KANONSKOG KURIKULUMA (vidi matbot/lesson_objectives.py).
+        # `topics.json` nosi ručno pisan opseg za nekoliko lekcija; za sve
+        # ostale se ovdje dopunjuju kompajlirani NPP ishodi, koji su do sada
+        # postojali u kanonskom mapiranju a nikad nisu stizali do prompta.
+        # Ručno pisan opseg IMA PREDNOST — dopuna nikad ne gazi autorski unos.
+        objectives=(tuple(lesson.get("objectives", []) or ())
+                    or lesson_objectives.primary_skills(lesson["id"])),
+        supporting_concepts=lesson_objectives.supporting_concepts(lesson["id"]),
+        exclusions=(tuple(lesson.get("exclusions", []) or ())
+                    or lesson_objectives.neighbour_exclusions(lesson["id"])),
         semantic_contract=semantic_contract,
         practice_contract=semantic_practice.contract_for(lesson["id"]),
         practice_policy=practice_policy.resolve(

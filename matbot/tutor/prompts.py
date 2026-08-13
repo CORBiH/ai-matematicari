@@ -126,11 +126,24 @@ def _lesson_block(context):
     if context.lesson_scope:
         lines.append(f"- lesson scope/objectives: {context.lesson_scope}")
     elif context.objectives:
-        lines.append("- lesson objectives: " + "; ".join(context.objectives))
+        # PRIMARNA VJEŠTINA, NE SAMO TEMA (živi nalaz: semantički zanos).
+        # Pojmovna lekcija o jednom skupu brojeva dobijala je zadatke čija je
+        # stvarna vještina sabiranje razlomaka: brojevi jesu bili iz lekcije,
+        # ali se ispitivala SUSJEDNA vještina. Ishodi ispod dolaze iz kanonskog
+        # mapiranja NPP-a na lekciju i do sada uopšte nisu stizali do modela.
+        lines.append("- PRIMARNA VJEŠTINA OVE LEKCIJE (zadatak mora ciljati baš "
+                     "nju): " + "; ".join(context.objectives))
+        lines.append("- ono što učenik mora POKAZATI da zna jeste ta vještina; "
+                     "brojevi i pojmovi iz lekcije sami po sebi NISU dovoljni")
     else:
         lines.append("- scope note: title-only lesson; grade, area and exact title are the minimum semantic anchor. Do not broaden to the entire area.")
+    supporting = getattr(context, "supporting_concepts", ())
+    if supporting:
+        lines.append("- pomoćni pojmovi (smiju se koristiti kao alat, ali NE "
+                     "smiju postati ono što se ispituje): " + "; ".join(supporting))
     if context.exclusions:
-        lines.append("- exclusions: " + "; ".join(context.exclusions))
+        lines.append("- SUSJEDNE VJEŠTINE — nikad cilj ovog zadatka: "
+                     + "; ".join(context.exclusions))
     return "\n".join(lines)
 
 
@@ -589,16 +602,53 @@ def build_tutor_instructions(context):
     )
 
 
+# SERVERSKA NADLEŽNOST NAD VRSTOM TURNA (živi nalaz širokog audita 6.–7.
+# razreda): na maksimumu težine model je dva puta odgovorio razgovorno —
+# „već si na najtežem nivou, hoćeš li drugi iste težine?“ — umjesto da objavi
+# zadatak. Odluku o tome DA LI turn nosi zadatak donosi server (zatvoren skup
+# poruka + UI polje), pa se ta činjenica saopštava modelu izričito. Blok je
+# ADITIVAN: bez njega je ulaz bajt-identičan zatečenom.
+_REQUIRED_TASK_INTENT_TEXT = {
+    "generate_task": "učenik traži PRVI zadatak",
+    "next_task": "učenik traži NOV zadatak iste težine",
+    "harder_task": "učenik traži TEŽI zadatak",
+    "easier_task": "učenik traži LAKŠI zadatak",
+}
+
+
+def _required_task_block(required_task_intent):
+    if not required_task_intent:
+        return ""
+    reason = _REQUIRED_TASK_INTENT_TEXT.get(required_task_intent,
+                                            "učenik traži zadatak")
+    return (
+        "SERVERSKA ODLUKA O OVOM TURNU (nije prijedlog):\n"
+        f"- {reason}, pa `intent` mora biti tačno `{required_task_intent}`, a "
+        "`new_task` OBAVEZAN;\n"
+        "- CILJNI NIVO TEŽINE ODREĐUJE SERVER i naveden je u stanju iznad. Ako "
+        "je učenik već na najvišem nivou koji ova lekcija ima, to NIJE razlog "
+        "da izostaviš zadatak: napravi NOV zadatak na tom najjačem dozvoljenom "
+        "nivou;\n"
+        "- NIKAD ne odgovaraj rečenicom tipa „već si na najtežem nivou, hoćeš "
+        "li drugi iste težine?“ — takav odgovor server odbija i učenik ostaje "
+        "bez zadatka."
+    )
+
+
 def build_tutor_input(context, session, student_message, trusted_verdict=None,
-                      ui_action="", escalation_block=""):
+                      ui_action="", escalation_block="", required_task_intent=""):
     """`escalation_block` je serverski zahtjev za raznolikošću (pilot) ili "".
 
     Prazan string znači da se ulaz ne mijenja ni za jedan znak u odnosu na
-    raniji oblik — obična Practice traffic ostaje bajt-identična."""
+    raniji oblik — obična Practice traffic ostaje bajt-identična. Isto važi i
+    za `required_task_intent`: prazno = nepromijenjen ulaz."""
     blocks = [
         _lesson_block(context),
         _state_block(session, student_message, trusted_verdict, ui_action),
     ]
+    required_block = _required_task_block(required_task_intent)
+    if required_block:
+        blocks.append(required_block)
     if escalation_block:
         blocks.append(escalation_block)
     blocks.append("Vrati strukturisan odgovor prema šemi.")

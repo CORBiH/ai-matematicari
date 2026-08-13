@@ -1,0 +1,3049 @@
+{
+ "_readme": [
+  "GENERISANO — ne uređivati ručno.",
+  "Izvor: reference/curriculum/semantics/MATBOT_Faza2_Mapiranje.xlsx",
+  "Generator: scripts/build_lesson_objectives.py",
+  "primary_skills = ishodi TE lekcije (relation=exact, filtrirano)",
+  "supporting_concepts = smiju se pojaviti, ne smiju biti CILJ",
+  "neighbour_exclusions = ishodi SUSJEDNIH lekcija; nikad cilj zadatka"
+ ],
+ "schema_version": 1,
+ "lessons": {
+  "6-01-003": {
+   "grade": 6,
+   "primary_skills": [
+    "koristi skupove i skupovne operacije u primjerima iz svakodnevnog života, uz grafičku ilustraciju"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0012"
+   ]
+  },
+  "6-01-005": {
+   "grade": 6,
+   "primary_skills": [
+    "predstavljati skupove grafički (Vennov dijagram)",
+    "koristi skupove i skupovne operacije u primjerima iz svakodnevnog života, uz grafičku ilustraciju"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0006",
+    "KS_2018-0012"
+   ]
+  },
+  "6-01-006": {
+   "grade": 6,
+   "primary_skills": [
+    "koristi skupove i skupovne operacije u primjerima iz svakodnevnog života, uz grafičku ilustraciju",
+    "da je skup realnih brojeva unija skupova racionalnih i iracionalnih brojeva",
+    "Skup realnih brojeva uvesti kao uniju skupova racionalnih i iracionalnih brojeva"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0012",
+    "KS_2018-0195",
+    "RS_2014-0078"
+   ]
+  },
+  "6-01-007": {
+   "grade": 6,
+   "primary_skills": [
+    "koristi skupove i skupovne operacije u primjerima iz svakodnevnog života, uz grafičku ilustraciju"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0012"
+   ]
+  },
+  "6-01-008": {
+   "grade": 6,
+   "primary_skills": [
+    "izvoditi skupovne operacije"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0011"
+   ]
+  },
+  "6-01-010": {
+   "grade": 6,
+   "primary_skills": [
+    "formirati pojam uređeni par",
+    "rješavati jednostavne zadatke u vezi s procentima Uređeni par Koordinatna ravan Koordinatni početak Koordinatne ose Pravougli koordinatni sistem Koordinate tačke Razmjera Proporcija…",
+    "formirati uređeni par čije komponente zadovoljavaju određene relacije (rješenje sistema)"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0009",
+    "KS_2018-0237",
+    "KS_2018-0367"
+   ]
+  },
+  "6-01-011": {
+   "grade": 6,
+   "primary_skills": [
+    "koristi skupove i skupovne operacije u primjerima iz svakodnevnog života, uz grafičku ilustraciju"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0012"
+   ]
+  },
+  "6-01-012": {
+   "grade": 6,
+   "primary_skills": [
+    "zapisivati matematičkim simbolima odnos dva ili više zadanih skupova"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0010"
+   ]
+  },
+  "6-02-005": {
+   "grade": 6,
+   "primary_skills": [
+    "dijeliti prirodne brojeve s ostatkom"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [
+    "primjenjivati pravila za djeljivost sa 2, sa 3, sa 5, 6, 9, 4, 25 i sa 10n",
+    "rješavati tekstualne zadatke",
+    "Da obnove i prodube znanja o djeljivosti u skupu No i kriterijumima djeljivosti"
+   ],
+   "evidence_ids": [
+    "KS_2018-0035"
+   ]
+  },
+  "6-02-008": {
+   "grade": 6,
+   "primary_skills": [
+    "izračunavati vrijednost brojevnog izraza i vrijednost izraza s promjenljivim za date vrijednosti promjenljivih",
+    "izračunati vrijednost brojevnog izraza i vrijednost izraza s promjenljivim za date vrijednosti promjenljivih"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [
+    "rješavati jednačine i nejednačine u skupu"
+   ],
+   "evidence_ids": [
+    "KS_2018-0059",
+    "KS_2018-0074"
+   ]
+  },
+  "6-03-001": {
+   "grade": 6,
+   "primary_skills": [
+    "upotrebljavati pojmove: djeljivo je, sadržilac je, djelilac je, prost broj je",
+    "određivati djelioce datog broja",
+    "određivati odnos broja i njegovog sadržioca (djelioca)",
+    "pismeno i napamet određivati najveći zajednički djelilac, odnosno najmanji zajednički sadržilac datih brojeva"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [
+    "primjenjivati pravila za djeljivost sa 2, sa 3, sa 5, 6, 9, 4, 25 i sa 10n",
+    "Da obnove i prodube znanja o djeljivosti u skupu No i kriterijumima djeljivosti"
+   ],
+   "evidence_ids": [
+    "KS_2018-0036",
+    "KS_2018-0038",
+    "KS_2018-0039",
+    "KS_2018-0044"
+   ]
+  },
+  "6-03-004": {
+   "grade": 6,
+   "primary_skills": [
+    "primjenjivati pravila za djeljivost sa 2, sa 3, sa 5, 6, 9, 4, 25 i sa 10n",
+    "Da obnove i prodube znanja o djeljivosti u skupu No i kriterijumima djeljivosti"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [
+    "dijeliti prirodne brojeve s ostatkom",
+    "upotrebljavati pojmove: djeljivo je, sadržilac je, djelilac je, prost broj je",
+    "određivati odnos broja i njegovog sadržioca (djelioca)",
+    "rješavati tekstualne zadatke"
+   ],
+   "evidence_ids": [
+    "KS_2018-0040",
+    "RS_2014-0022"
+   ]
+  },
+  "6-03-005": {
+   "grade": 6,
+   "primary_skills": [],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [
+    "rastavljati dati broj na proste faktore"
+   ],
+   "evidence_ids": []
+  },
+  "6-03-007": {
+   "grade": 6,
+   "primary_skills": [
+    "rastavljati dati broj na proste faktore"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [
+    "rješavati tekstualne zadatke",
+    "Da usvoje pojmove i praktične načine za određivanje najvećeg zajedničkog djelioca i najmanjeg zajedničkog sadržioca. 5"
+   ],
+   "evidence_ids": [
+    "KS_2018-0043"
+   ]
+  },
+  "6-03-008": {
+   "grade": 6,
+   "primary_skills": [
+    "pismeno i napamet određivati najveći zajednički djelilac, odnosno najmanji zajednički sadržilac datih brojeva"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [
+    "rastavljati dati broj na proste faktore"
+   ],
+   "evidence_ids": [
+    "KS_2018-0044"
+   ]
+  },
+  "6-03-009": {
+   "grade": 6,
+   "primary_skills": [
+    "pismeno i napamet određivati najveći zajednički djelilac, odnosno najmanji zajednički sadržilac datih brojeva"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0044"
+   ]
+  },
+  "6-04-001": {
+   "grade": 6,
+   "primary_skills": [
+    "usvojiti pojmove: razlomak, brojilac (brojnik), nazivnik (nazivnik), razlomačka crta"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0046"
+   ]
+  },
+  "6-04-002": {
+   "grade": 6,
+   "primary_skills": [],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [
+    "usvojiti pojmove: razlomak, brojilac (brojnik), nazivnik (nazivnik), razlomačka crta",
+    "obrazlagati rješenja nejednačina na brojevnoj polupravoj"
+   ],
+   "evidence_ids": []
+  },
+  "6-04-003": {
+   "grade": 6,
+   "primary_skills": [
+    "zapisivati nepravi razlomak u obliku mješovitog broja i obrnuto"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0051"
+   ]
+  },
+  "6-04-004": {
+   "grade": 6,
+   "primary_skills": [
+    "prikazivati dati razlomak oblika na brojevnoj polupravoj i kao dio figure"
+   ],
+   "supporting_concepts": [
+    "određivati koji je razlomak predstavljen grafičkim prikazom"
+   ],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0049"
+   ]
+  },
+  "6-04-005": {
+   "grade": 6,
+   "primary_skills": [],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [
+    "rješavati tekstualne zadatke",
+    "upoređivati razlomke"
+   ],
+   "evidence_ids": []
+  },
+  "6-04-006": {
+   "grade": 6,
+   "primary_skills": [],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [
+    "razumjeti da proširivanjem i skraćivanjem razlomak ne mijenja vrijednost"
+   ],
+   "evidence_ids": []
+  },
+  "6-04-008": {
+   "grade": 6,
+   "primary_skills": [],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [
+    "razumjeti da proširivanjem i skraćivanjem razlomak ne mijenja vrijednost",
+    "obrazlagati rješenja nejednačina na brojevnoj polupravoj"
+   ],
+   "evidence_ids": []
+  },
+  "6-04-009": {
+   "grade": 6,
+   "primary_skills": [],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [
+    "obrazlagati rješenja nejednačina na brojevnoj polupravoj",
+    "rješavati jednačine i nejednačine u skupu",
+    "Da ovladaju rješavanjem jednačina i nejednačina sa razlomcima"
+   ],
+   "evidence_ids": []
+  },
+  "6-04-010": {
+   "grade": 6,
+   "primary_skills": [],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [
+    "rješavati jednačine i nejednačine u skupu"
+   ],
+   "evidence_ids": []
+  },
+  "6-04-011": {
+   "grade": 6,
+   "primary_skills": [],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [
+    "obrazlagati rješenja nejednačina na brojevnoj polupravoj"
+   ],
+   "evidence_ids": []
+  },
+  "6-04-013": {
+   "grade": 6,
+   "primary_skills": [
+    "izvoditi osnovne računske operacije sa razlomcima"
+   ],
+   "supporting_concepts": [
+    "određivati koji je razlomak predstavljen grafičkim prikazom"
+   ],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0057"
+   ]
+  },
+  "6-04-014": {
+   "grade": 6,
+   "primary_skills": [],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [
+    "rješavati tekstualne zadatke",
+    "razlikovati značenje jednačina, jednakost, nejednačina i nejednakost",
+    "obrazlagati rješenja nejednačina na brojevnoj polupravoj",
+    "rješavati jednačine i nejednačine u skupu"
+   ],
+   "evidence_ids": []
+  },
+  "6-05-001": {
+   "grade": 6,
+   "primary_skills": [
+    "zapisivati nepravi razlomak u obliku mješovitog broja i obrnuto",
+    "zapisivati razlomak oblika, u obliku decimalnog broja",
+    "koristiti zapis i decimalnog broja i razlomka i pretvarati jedan zapis u drugi"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0051",
+    "KS_2018-0052",
+    "KS_2018-0065"
+   ]
+  },
+  "6-05-003": {
+   "grade": 6,
+   "primary_skills": [
+    "koristiti zapis i decimalnog broja i razlomka i pretvarati jedan zapis u drugi"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0065"
+   ]
+  },
+  "6-05-007": {
+   "grade": 6,
+   "primary_skills": [
+    "zaokružiti decimalni broj na zadati broj decimala"
+   ],
+   "supporting_concepts": [
+    "prevoditi decimalni broj u oblik",
+    "poredati po veličini date decimalne brojeve",
+    "Računske operacije s decimalnim brojevima treba uraditi tako da učenici razumiju zašto se one obavljaju baš na taj način, ali ne treba insistirati na zamornom računu"
+   ],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0067"
+   ]
+  },
+  "6-05-010": {
+   "grade": 6,
+   "primary_skills": [
+    "dijeliti dva prirodna broja (rezultat može biti decimalni broj) i vršiti provjeru"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0071"
+   ]
+  },
+  "6-05-011": {
+   "grade": 6,
+   "primary_skills": [],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [
+    "rješavati tekstualne zadatke",
+    "rješavati jednačine i nejednačine u skupu"
+   ],
+   "evidence_ids": []
+  },
+  "6-06-002": {
+   "grade": 6,
+   "primary_skills": [
+    "izračunavati procenat ma kojeg broja",
+    "rješavati jednostavne zadatke u vezi s procentima Uređeni par Koordinatna ravan Koordinatni početak Koordinatne ose Pravougli koordinatni sistem Koordinate tačke Razmjera Proporcija…"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [
+    "rješavati tekstualne zadatke"
+   ],
+   "evidence_ids": [
+    "KS_2018-0056",
+    "KS_2018-0237"
+   ]
+  },
+  "6-07-001": {
+   "grade": 6,
+   "primary_skills": [
+    "razlikovati značenje jednačina, jednakost, nejednačina i nejednakost"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [
+    "izračunavati vrijednost brojevnog izraza i vrijednost izraza s promjenljivim za date vrijednosti promjenljivih",
+    "izračunati vrijednost brojevnog izraza i vrijednost izraza s promjenljivim za date vrijednosti promjenljivih"
+   ],
+   "evidence_ids": [
+    "KS_2018-0060"
+   ]
+  },
+  "6-07-002": {
+   "grade": 6,
+   "primary_skills": [
+    "rješavati jednačine i nejednačine u skupu"
+   ],
+   "supporting_concepts": [
+    "rješavati jednostavne tipove jednačina: a+x=b, x-a=b, a-x=b,ax=b, a:x=b i x:a=b"
+   ],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0075"
+   ]
+  },
+  "6-07-003": {
+   "grade": 6,
+   "primary_skills": [
+    "rješavati jednačine i nejednačine u skupu",
+    "Da ovladaju rješavanjem jednačina i nejednačina sa razlomcima"
+   ],
+   "supporting_concepts": [
+    "rješavati jednostavne tipove nejednačina: x ± a < b, a ± x < b, x ± a > b, a ± x >b, a x b, x a b, x : a b, a : x b"
+   ],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0075",
+    "RS_2014-0026"
+   ]
+  },
+  "6-07-004": {
+   "grade": 6,
+   "primary_skills": [],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [
+    "rješavati tekstualne zadatke"
+   ],
+   "evidence_ids": []
+  },
+  "6-07-005": {
+   "grade": 6,
+   "primary_skills": [],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [
+    "rješavati tekstualne zadatke"
+   ],
+   "evidence_ids": []
+  },
+  "6-07-006": {
+   "grade": 6,
+   "primary_skills": [
+    "rješavati jednačine i nejednačine u skupu"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0075"
+   ]
+  },
+  "6-08-001": {
+   "grade": 6,
+   "primary_skills": [
+    "Koristeći znanja o skupovima, zatim osnovne pojmove (tačka, prava, ravan, prostor) i značenje riječi između i iza, da definišu duž, polupravu, poluravan i poluprostor"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "RS_2014-0016"
+   ]
+  },
+  "6-08-004": {
+   "grade": 6,
+   "primary_skills": [
+    "definisati mnogougao"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0016"
+   ]
+  },
+  "6-08-005": {
+   "grade": 6,
+   "primary_skills": [
+    "definisati i razlikovati krug i kružnicu",
+    "koristiti formulu za računanje površine kružnog isječka i kružnog prstena Kružnica Krug Poluprečnik Tetiva Prečnik Sječica Tangenta Centralni i periferijski ugao kruga Broj Obim kruga…"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0017",
+    "KS_2018-0312"
+   ]
+  },
+  "6-08-007": {
+   "grade": 6,
+   "primary_skills": [
+    "definisati pojmove: središnji (centralni) ugao, kružni luk i tetiva"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0021"
+   ]
+  },
+  "6-08-008": {
+   "grade": 6,
+   "primary_skills": [
+    "nacrtati i opisati odnos prave i kružnice"
+   ],
+   "supporting_concepts": [
+    "opisivati odnos kružnice i prave"
+   ],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0018"
+   ]
+  },
+  "6-08-010": {
+   "grade": 6,
+   "primary_skills": [
+    "utvrđivati međusobni odnos dvije kružnice"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0303"
+   ]
+  },
+  "6-09-003": {
+   "grade": 6,
+   "primary_skills": [
+    "vrste uglova: (ne)konveksan, pun ugao, nula ugao, opružen ugao, oštar ugao, tup ugao"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0026"
+   ]
+  },
+  "6-09-004": {
+   "grade": 6,
+   "primary_skills": [
+    "definisati pojmove: središnji (centralni) ugao, kružni luk i tetiva"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0021"
+   ]
+  },
+  "6-09-005": {
+   "grade": 6,
+   "primary_skills": [
+    "odnos izmđu centralnog i periferijskog ugla nad istim kružnim lukom",
+    "poznavati odnos centralnog i periferijskog ugla",
+    "Demonstrirati centralni i periferijski ugao i konstrukciju tangente"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0024",
+    "KS_2018-0304",
+    "RS_2014-0093"
+   ]
+  },
+  "6-09-007": {
+   "grade": 6,
+   "primary_skills": [
+    "upoređivati veličine uglova",
+    "Da se upoznaju sa osobinama uglova. 4"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0020",
+    "RS_2014-0021"
+   ]
+  },
+  "6-09-008": {
+   "grade": 6,
+   "primary_skills": [
+    "razlikovati vrste uglova i grafički računati s njima"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0027"
+   ]
+  },
+  "6-09-009": {
+   "grade": 6,
+   "primary_skills": [
+    "crtati zadani ugao, kao i već nacrtani mjeriti uglomjerom"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0031"
+   ]
+  },
+  "6-09-011": {
+   "grade": 6,
+   "primary_skills": [
+    "grafički sabirati i oduzimati uglove"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0025"
+   ]
+  },
+  "6-11-002": {
+   "grade": 6,
+   "primary_skills": [
+    "Da znaju šta je vektor i operacije sa vektorima (sabiranje, oduzimanje i množenje vektora brojem)"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "RS_2014-0030"
+   ]
+  },
+  "6-12-001": {
+   "grade": 6,
+   "primary_skills": [
+    "Da se upoznaju sa osnom simetrijom u ravni i usvoje tehniku konstruisanja osno simetričnih figura"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "RS_2014-0028"
+   ]
+  },
+  "6-12-003": {
+   "grade": 6,
+   "primary_skills": [
+    "Da umiju da konstruišu simetralu duži i simetralu ugla i to primjenjuju u konstruktivnim zadacima"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "RS_2014-0029"
+   ]
+  },
+  "6-12-004": {
+   "grade": 6,
+   "primary_skills": [
+    "Da umiju da konstruišu simetralu duži i simetralu ugla i to primjenjuju u konstruktivnim zadacima"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "RS_2014-0029"
+   ]
+  },
+  "7-01-009": {
+   "grade": 7,
+   "primary_skills": [
+    "množiti vektore prirodnim brojem"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0085"
+   ]
+  },
+  "7-01-012": {
+   "grade": 7,
+   "primary_skills": [
+    "izvršiti translaciju i rotaciju date figure"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0092"
+   ]
+  },
+  "7-01-017": {
+   "grade": 7,
+   "primary_skills": [
+    "odrediti osu i centar simetrije"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0091"
+   ]
+  },
+  "7-01-018": {
+   "grade": 7,
+   "primary_skills": [
+    "definisati simetralu duži i ugla",
+    "konstruisati simetralu duži i ugla"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [
+    "objašnjavati svojstva srednje duži trougla. kružnice trougla Težišna duž, težišnica, medijana Težište trougla Srednja linija trougla Visina trougla Ortocentar Opisana i upisana kružnica…",
+    "objašnjavati pojmove: obim i površina (trougla, četverougla)",
+    "primjenjivati formule za računanje obima i površine pravougaonika, kvadrata, romba, paralelograma, trougla, trapeza i četvorougla s uzajamno normalnim dijagonalama Kvadrat Romb Trapez…",
+    "Izračunava veličinu površine pravougaonika, kvadrata, paralelograma, trougla, trapeza i četverougla sa normalnim dijagonalama"
+   ],
+   "evidence_ids": [
+    "KS_2018-0093",
+    "KS_2018-0094"
+   ]
+  },
+  "7-01-019": {
+   "grade": 7,
+   "primary_skills": [
+    "definisati simetralu duži i ugla",
+    "konstruisati simetralu duži i ugla",
+    "konstruisati neke uglove primjenjujući svojstva simetrale ugla"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [
+    "objašnjavati svojstva srednje duži trougla. kružnice trougla Težišna duž, težišnica, medijana Težište trougla Srednja linija trougla Visina trougla Ortocentar Opisana i upisana kružnica…",
+    "primjenjivati formule za računanje obima i površine pravougaonika, kvadrata, romba, paralelograma, trougla, trapeza i četvorougla s uzajamno normalnim dijagonalama Kvadrat Romb Trapez…"
+   ],
+   "evidence_ids": [
+    "KS_2018-0093",
+    "KS_2018-0094",
+    "KS_2018-0127"
+   ]
+  },
+  "7-02-001": {
+   "grade": 7,
+   "primary_skills": [
+    "Da znaju izvoditi računske operacije sa cijelim brojevima"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "RS_2014-0042"
+   ]
+  },
+  "7-02-002": {
+   "grade": 7,
+   "primary_skills": [
+    "znati koji brojevi čine skup cijelih brojeva",
+    "uspješno rješavati jednačine i nejednačine datih oblika u skupu cijelih brojeva"
+   ],
+   "supporting_concepts": [
+    "predznaci pozitivnih i negativnih brojeva"
+   ],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0097",
+    "KS_2018-0108"
+   ]
+  },
+  "7-02-003": {
+   "grade": 7,
+   "primary_skills": [
+    "prikazivati cijele brojeve na brojevnoj pravoj",
+    "Učenici treba da znaju upoređivati cijele brojeve, predstavljati ih na brojevnoj pravoj",
+    "Učenici treba da znaju da upoređuju racionalne brojeve i prikazuju ih na brojevnoj pravoj"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0098",
+    "RS_2014-0041",
+    "RS_2014-0049"
+   ]
+  },
+  "7-02-005": {
+   "grade": 7,
+   "primary_skills": [
+    "određivati apsolutnu vrijednost datog cijelog broja",
+    "određivati cijele brojeve kojima je zadana apsolutna vrijednost"
+   ],
+   "supporting_concepts": [
+    "predznaci pozitivnih i negativnih brojeva"
+   ],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0101",
+    "KS_2018-0102"
+   ]
+  },
+  "7-02-006": {
+   "grade": 7,
+   "primary_skills": [
+    "uspješno rješavati jednačine i nejednačine datih oblika u skupu cijelih brojeva"
+   ],
+   "supporting_concepts": [
+    "predznaci pozitivnih i negativnih brojeva",
+    "Učenici treba da znaju upoređivati cijele brojeve, predstavljati ih na brojevnoj pravoj"
+   ],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0108"
+   ]
+  },
+  "7-02-009": {
+   "grade": 7,
+   "primary_skills": [
+    "uspješno rješavati jednačine i nejednačine datih oblika u skupu cijelih brojeva"
+   ],
+   "supporting_concepts": [
+    "Računske operacije s cijelim i racionalnim brojevima treba uraditi tako da učenici razumiju zašto se one obavljaju baš na taj način, ali ne treba insistirati na zamornom računu"
+   ],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0108"
+   ]
+  },
+  "7-02-015": {
+   "grade": 7,
+   "primary_skills": [
+    "izračunavati vrijednosti brojevnih izraza s cijelim brojevima",
+    "izračunavati vrijednosti brojevnih izraza s racionalnim brojevima"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [
+    "stečeno znanje o vektorima i izometrijskim preslikavanjima, koristiti za rješavanje zadataka iz geometrije i fizike"
+   ],
+   "evidence_ids": [
+    "KS_2018-0107",
+    "KS_2018-0122"
+   ]
+  },
+  "7-02-016": {
+   "grade": 7,
+   "primary_skills": [],
+   "supporting_concepts": [
+    "označavanje operacija sabiranja i oduzimanja"
+   ],
+   "neighbour_exclusions": [
+    "izračunavati vrijednosti brojevnih izraza s cijelim brojevima",
+    "uspješno rješavati jednačine i nejednačine datih oblika u skupu cijelih brojeva"
+   ],
+   "evidence_ids": []
+  },
+  "7-03-001": {
+   "grade": 7,
+   "primary_skills": [
+    "znati da skup racionalnih brojeva čine pozitivni i negativni razlomci i broj 0",
+    "uspješno rješavati jednačine i nejednačine datih oblika u skupu racionalnih brojeva",
+    "shvatiti potrebu proširivanja skupa racionalnih brojeva",
+    "Da izvode računske operacije u skupu racionalnih brojeva"
+   ],
+   "supporting_concepts": [
+    "Ponoviti skup racionalnih brojeva, posebno množenje"
+   ],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0109",
+    "KS_2018-0124",
+    "KS_2018-0190",
+    "RS_2014-0050"
+   ]
+  },
+  "7-03-003": {
+   "grade": 7,
+   "primary_skills": [
+    "prikazivati racionalne brojeve sa nazivnikom 10 na brojevnoj pravoj",
+    "Učenici treba da znaju da upoređuju racionalne brojeve i prikazuju ih na brojevnoj pravoj"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0112",
+    "RS_2014-0049"
+   ]
+  },
+  "7-03-004": {
+   "grade": 7,
+   "primary_skills": [
+    "određivati broj suprotan datom broju",
+    "određivati broj suprotan datom racionalnom broju"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0100",
+    "KS_2018-0114"
+   ]
+  },
+  "7-03-005": {
+   "grade": 7,
+   "primary_skills": [
+    "određivati apsolutnu vrijednost datog racionalnog broja",
+    "određivati racionalne brojeve kojima je zadana apsolutna vrijednost"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0115",
+    "KS_2018-0116"
+   ]
+  },
+  "7-03-007": {
+   "grade": 7,
+   "primary_skills": [
+    "zapisivati razlomak u obliku decimalnog broja i obratno"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0111"
+   ]
+  },
+  "7-03-008": {
+   "grade": 7,
+   "primary_skills": [
+    "zapisivati razlomak u obliku decimalnog broja i obratno"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0111"
+   ]
+  },
+  "7-03-014": {
+   "grade": 7,
+   "primary_skills": [],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [
+    "stečeno znanje o vektorima i izometrijskim preslikavanjima, koristiti za rješavanje zadataka iz geometrije i fizike"
+   ],
+   "evidence_ids": []
+  },
+  "7-03-019": {
+   "grade": 7,
+   "primary_skills": [
+    "Da znaju rješavati prostije jednačine i nejednačine"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "RS_2014-0043"
+   ]
+  },
+  "7-04-001": {
+   "grade": 7,
+   "primary_skills": [
+    "objašnjavati svojstva uglova s paralelnim kracima, kao i uglova s normalnim kracima"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0126"
+   ]
+  },
+  "7-04-002": {
+   "grade": 7,
+   "primary_skills": [
+    "objašnjavati svojstva uglova s paralelnim kracima, kao i uglova s normalnim kracima"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0126"
+   ]
+  },
+  "7-04-003": {
+   "grade": 7,
+   "primary_skills": [
+    "da je zbir spoljašnjih uglova trougla jednak 360 , Trougao Elementi trougla Zbir unutrašnjih uglova trougla Zbir vanjskih uglova trougla Konstrukcije nekih uglova Podudarnost trouglova…",
+    "izvoditi elementarne konstrukcije Četverougao Stranice, uglovi (unutrašnji, i spoljašnji), tjemena (vrhovi) dijagonale Konveksni i nekonveksni četverouglovi Konstrukcije četverougla…"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [
+    "objašnjavati svojstva srednje duži trougla. kružnice trougla Težišna duž, težišnica, medijana Težište trougla Srednja linija trougla Visina trougla Ortocentar Opisana i upisana kružnica…",
+    "primjenjivati formule za računanje obima i površine pravougaonika, kvadrata, romba, paralelograma, trougla, trapeza i četvorougla s uzajamno normalnim dijagonalama Kvadrat Romb Trapez…"
+   ],
+   "evidence_ids": [
+    "KS_2018-0135",
+    "KS_2018-0160"
+   ]
+  },
+  "7-04-004": {
+   "grade": 7,
+   "primary_skills": [],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [
+    "primjenjivati formule za računanje obima i površine pravougaonika, kvadrata, romba, paralelograma, trougla, trapeza i četvorougla s uzajamno normalnim dijagonalama Kvadrat Romb Trapez…"
+   ],
+   "evidence_ids": []
+  },
+  "7-04-005": {
+   "grade": 7,
+   "primary_skills": [
+    "definisati trougao i njegove elemente",
+    "da je zbir spoljašnjih uglova trougla jednak 360 , Trougao Elementi trougla Zbir unutrašnjih uglova trougla Zbir vanjskih uglova trougla Konstrukcije nekih uglova Podudarnost trouglova…",
+    "uočavati zavisnosti među datim elementima trougla kao i za utvrđivanje redoslijeda konstruktivnih koraka",
+    "Da znaju nabrojati elemente trougla, izračunavati uglove trougla"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0128",
+    "KS_2018-0135",
+    "KS_2018-0145",
+    "RS_2014-0044"
+   ]
+  },
+  "7-04-006": {
+   "grade": 7,
+   "primary_skills": [
+    "razlikovati trouglove prema stranicama i prema uglovima"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0129"
+   ]
+  },
+  "7-04-007": {
+   "grade": 7,
+   "primary_skills": [
+    "razlikovati trouglove prema stranicama i prema uglovima"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0129"
+   ]
+  },
+  "7-04-008": {
+   "grade": 7,
+   "primary_skills": [
+    "da je zbir unutrašnjih uglova trougla jednak 180",
+    "da je zbir spoljašnjih uglova trougla jednak 360 , Trougao Elementi trougla Zbir unutrašnjih uglova trougla Zbir vanjskih uglova trougla Konstrukcije nekih uglova Podudarnost trouglova…",
+    "da je spoljašnji ugao trougla jednak zbiru dva njemu nesusjedna unutrašnja ugla"
+   ],
+   "supporting_concepts": [
+    "slobodno koriste termine stranice, tjemena (vrhovi) i uglovi trougla",
+    "znaju smisao pojmova visina, simetrala unutrašnjeg ugla, simetrala stranice i težišna duž trougla",
+    "razlikuju unutrašnje i spoljašnje uglove trougla"
+   ],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0134",
+    "KS_2018-0135",
+    "KS_2018-0136"
+   ]
+  },
+  "7-04-010": {
+   "grade": 7,
+   "primary_skills": [
+    "da je zbir unutrašnjih uglova trougla jednak 180",
+    "da je zbir spoljašnjih uglova trougla jednak 360 , Trougao Elementi trougla Zbir unutrašnjih uglova trougla Zbir vanjskih uglova trougla Konstrukcije nekih uglova Podudarnost trouglova…"
+   ],
+   "supporting_concepts": [
+    "slobodno koriste termine stranice, tjemena (vrhovi) i uglovi trougla",
+    "razlikuju unutrašnje i spoljašnje uglove trougla"
+   ],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0134",
+    "KS_2018-0135"
+   ]
+  },
+  "7-04-011": {
+   "grade": 7,
+   "primary_skills": [
+    "da naspram jednakih uglova (stranica) leže jednake stranice (uglovi)",
+    "Objasniti odnose stranica i odnose stranica i uglova u trouglu"
+   ],
+   "supporting_concepts": [
+    "da naspram veće stranice (većeg ugla) leži veći ugao (veća stranica)",
+    "prepoznaju stranicu naspram datog ugla i ugao naspram date stranice"
+   ],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0137",
+    "RS_2014-0045"
+   ]
+  },
+  "7-04-013": {
+   "grade": 7,
+   "primary_skills": [
+    "da je zbir spoljašnjih uglova trougla jednak 360 , Trougao Elementi trougla Zbir unutrašnjih uglova trougla Zbir vanjskih uglova trougla Konstrukcije nekih uglova Podudarnost trouglova…"
+   ],
+   "supporting_concepts": [
+    "razlikuju unutrašnje i spoljašnje uglove trougla"
+   ],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0135"
+   ]
+  },
+  "7-04-014": {
+   "grade": 7,
+   "primary_skills": [
+    "da je zbir spoljašnjih uglova trougla jednak 360 , Trougao Elementi trougla Zbir unutrašnjih uglova trougla Zbir vanjskih uglova trougla Konstrukcije nekih uglova Podudarnost trouglova…"
+   ],
+   "supporting_concepts": [
+    "razlikuju unutrašnje i spoljašnje uglove trougla"
+   ],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0135"
+   ]
+  },
+  "7-04-015": {
+   "grade": 7,
+   "primary_skills": [
+    "da je zbir spoljašnjih uglova trougla jednak 360 , Trougao Elementi trougla Zbir unutrašnjih uglova trougla Zbir vanjskih uglova trougla Konstrukcije nekih uglova Podudarnost trouglova…"
+   ],
+   "supporting_concepts": [
+    "razlikuju unutrašnje i spoljašnje uglove trougla"
+   ],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0135"
+   ]
+  },
+  "7-04-016": {
+   "grade": 7,
+   "primary_skills": [
+    "da je zbir spoljašnjih uglova trougla jednak 360 , Trougao Elementi trougla Zbir unutrašnjih uglova trougla Zbir vanjskih uglova trougla Konstrukcije nekih uglova Podudarnost trouglova…"
+   ],
+   "supporting_concepts": [
+    "razlikuju unutrašnje i spoljašnje uglove trougla"
+   ],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0135"
+   ]
+  },
+  "7-04-018": {
+   "grade": 7,
+   "primary_skills": [
+    "da je trougao koji ima dva jednaka ugla jednakokrak"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0133"
+   ]
+  },
+  "7-04-019": {
+   "grade": 7,
+   "primary_skills": [
+    "primijenjivati svojstva pravouglog trougla čiji su oštri uglovi jednaki ili iznose 30 i 60"
+   ],
+   "supporting_concepts": [
+    "objašnjavati gdje se nalazi ortocentar kod oštrouglog, pravouglog i tupouglog trougla"
+   ],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0140"
+   ]
+  },
+  "7-04-020": {
+   "grade": 7,
+   "primary_skills": [
+    "da je zbir spoljašnjih uglova trougla jednak 360 , Trougao Elementi trougla Zbir unutrašnjih uglova trougla Zbir vanjskih uglova trougla Konstrukcije nekih uglova Podudarnost trouglova…",
+    "stavove o podudarnosti trouglova primijeniti u izvođenju osnovnih konstrukcija trougla",
+    "izvoditi elementarne konstrukcije trougla"
+   ],
+   "supporting_concepts": [
+    "razlikuju unutrašnje i spoljašnje uglove trougla"
+   ],
+   "neighbour_exclusions": [
+    "primjenjivati formule za računanje obima i površine pravougaonika, kvadrata, romba, paralelograma, trougla, trapeza i četvorougla s uzajamno normalnim dijagonalama Kvadrat Romb Trapez…"
+   ],
+   "evidence_ids": [
+    "KS_2018-0135",
+    "KS_2018-0142",
+    "KS_2018-0143"
+   ]
+  },
+  "7-04-022": {
+   "grade": 7,
+   "primary_skills": [
+    "konstruisati kružnicu upisanu u trougao"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0149"
+   ]
+  },
+  "7-04-023": {
+   "grade": 7,
+   "primary_skills": [
+    "konstruisati visinu trougla",
+    "znati da se visine trougla sijeku u jednoj tački",
+    "objašnjavati svojstva srednje duži trougla. kružnice trougla Težišna duž, težišnica, medijana Težište trougla Srednja linija trougla Visina trougla Ortocentar Opisana i upisana kružnica…"
+   ],
+   "supporting_concepts": [
+    "objašnjavati gdje se nalazi ortocentar kod oštrouglog, pravouglog i tupouglog trougla"
+   ],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0150",
+    "KS_2018-0151",
+    "KS_2018-0155"
+   ]
+  },
+  "7-04-024": {
+   "grade": 7,
+   "primary_skills": [
+    "znati da se težišne duži trougla sijeku u jednoj tački",
+    "objašnjavati svojstva srednje duži trougla. kružnice trougla Težišna duž, težišnica, medijana Težište trougla Srednja linija trougla Visina trougla Ortocentar Opisana i upisana kružnica…"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0154",
+    "KS_2018-0155"
+   ]
+  },
+  "7-04-025": {
+   "grade": 7,
+   "primary_skills": [
+    "objašnjavati svojstva srednje duži trougla. kružnice trougla Težišna duž, težišnica, medijana Težište trougla Srednja linija trougla Visina trougla Ortocentar Opisana i upisana kružnica…"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0155"
+   ]
+  },
+  "7-05-001": {
+   "grade": 7,
+   "primary_skills": [
+    "definisati četverougao i elemente četverougla"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0156"
+   ]
+  },
+  "7-05-002": {
+   "grade": 7,
+   "primary_skills": [
+    "da je zbir unutrašnjih uglova trougla jednak 180"
+   ],
+   "supporting_concepts": [
+    "razlikuju unutrašnje i spoljašnje uglove trougla"
+   ],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0134"
+   ]
+  },
+  "7-05-009": {
+   "grade": 7,
+   "primary_skills": [],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [
+    "primjenjivati formule za računanje obima i površine pravougaonika, kvadrata, romba, paralelograma, trougla, trapeza i četvorougla s uzajamno normalnim dijagonalama Kvadrat Romb Trapez…"
+   ],
+   "evidence_ids": []
+  },
+  "7-05-010": {
+   "grade": 7,
+   "primary_skills": [
+    "definisati trapez i vrste trapeza"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0161"
+   ]
+  },
+  "7-05-011": {
+   "grade": 7,
+   "primary_skills": [
+    "objašnjavati svojstva jednakokrakog trapeza",
+    "primjenjivati formule za računanje obima i površine pravougaonika, kvadrata, romba, paralelograma, trougla, trapeza i četvorougla s uzajamno normalnim dijagonalama Kvadrat Romb Trapez…"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0163",
+    "KS_2018-0167"
+   ]
+  },
+  "7-05-012": {
+   "grade": 7,
+   "primary_skills": [
+    "objašnjavati svojstva srednje duži trougla. kružnice trougla Težišna duž, težišnica, medijana Težište trougla Srednja linija trougla Visina trougla Ortocentar Opisana i upisana kružnica…",
+    "objašnjavati svojstva srednje duži trapeza",
+    "primjenjivati formule za računanje obima i površine pravougaonika, kvadrata, romba, paralelograma, trougla, trapeza i četvorougla s uzajamno normalnim dijagonalama Kvadrat Romb Trapez…",
+    "objašnjavati postupak konstrukcije kvadrata čija je površina jednaka zbiru / razlici površina dva zadana kvadrata"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0155",
+    "KS_2018-0162",
+    "KS_2018-0167",
+    "KS_2018-0212"
+   ]
+  },
+  "7-05-013": {
+   "grade": 7,
+   "primary_skills": [
+    "izvoditi elementarne konstrukcije trapeza"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0164"
+   ]
+  },
+  "7-05-015": {
+   "grade": 7,
+   "primary_skills": [
+    "objašnjavati svojstva i izvoditi elementarne konstrukcije deltoida"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0165"
+   ]
+  },
+  "7-05-016": {
+   "grade": 7,
+   "primary_skills": [
+    "objašnjavati svojstva srednje duži trougla. kružnice trougla Težišna duž, težišnica, medijana Težište trougla Srednja linija trougla Visina trougla Ortocentar Opisana i upisana kružnica…",
+    "primjenjivati formule za računanje obima i površine pravougaonika, kvadrata, romba, paralelograma, trougla, trapeza i četvorougla s uzajamno normalnim dijagonalama Kvadrat Romb Trapez…"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0155",
+    "KS_2018-0167"
+   ]
+  },
+  "7-05-019": {
+   "grade": 7,
+   "primary_skills": [
+    "primjenjivati zajednička i posebna svojstva paralelograma, pravougaonika, kvadrata, romba",
+    "primjenjivati formule za računanje obima i površine pravougaonika, kvadrata, romba, paralelograma, trougla, trapeza i četvorougla s uzajamno normalnim dijagonalama Kvadrat Romb Trapez…",
+    "Učenici treba da znaju osnovna svojstva paralelograma, pravougaonika, kvadrata, romba, trapeza, deltoida",
+    "Izračunava veličinu površine pravougaonika, kvadrata, paralelograma, trougla, trapeza i četverougla sa normalnim dijagonalama"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [
+    "definisati simetralu duži i ugla",
+    "konstruisati simetralu duži i ugla",
+    "izvoditi operacije u skupu racionalnim postupkom",
+    "da je zbir spoljašnjih uglova trougla jednak 360 , Trougao Elementi trougla Zbir unutrašnjih uglova trougla Zbir vanjskih uglova trougla Konstrukcije nekih uglova Podudarnost trouglova…"
+   ],
+   "evidence_ids": [
+    "KS_2018-0159",
+    "KS_2018-0167",
+    "RS_2014-0054",
+    "RS_2014-0057"
+   ]
+  },
+  "7-05-020": {
+   "grade": 7,
+   "primary_skills": [
+    "primjenjivati formule za računanje obima i površine pravougaonika, kvadrata, romba, paralelograma, trougla, trapeza i četvorougla s uzajamno normalnim dijagonalama Kvadrat Romb Trapez…"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [
+    "definisati simetralu duži i ugla",
+    "konstruisati simetralu duži i ugla",
+    "izvoditi operacije u skupu racionalnim postupkom",
+    "da je zbir spoljašnjih uglova trougla jednak 360 , Trougao Elementi trougla Zbir unutrašnjih uglova trougla Zbir vanjskih uglova trougla Konstrukcije nekih uglova Podudarnost trouglova…"
+   ],
+   "evidence_ids": [
+    "KS_2018-0167"
+   ]
+  },
+  "7-05-021": {
+   "grade": 7,
+   "primary_skills": [
+    "objašnjavati svojstva srednje duži trougla. kružnice trougla Težišna duž, težišnica, medijana Težište trougla Srednja linija trougla Visina trougla Ortocentar Opisana i upisana kružnica…",
+    "objašnjavati pojmove: obim i površina (trougla, četverougla)",
+    "primjenjivati formule za računanje obima i površine pravougaonika, kvadrata, romba, paralelograma, trougla, trapeza i četvorougla s uzajamno normalnim dijagonalama Kvadrat Romb Trapez…",
+    "Učenik treba da zna da definiše jednakosti površina geometrijskih figura"
+   ],
+   "supporting_concepts": [
+    "razlikuju unutrašnje i spoljašnje uglove trougla"
+   ],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0155",
+    "KS_2018-0166",
+    "KS_2018-0167",
+    "RS_2014-0056"
+   ]
+  },
+  "7-05-022": {
+   "grade": 7,
+   "primary_skills": [
+    "primjenjivati formule za računanje obima i površine pravougaonika, kvadrata, romba, paralelograma, trougla, trapeza i četvorougla s uzajamno normalnim dijagonalama Kvadrat Romb Trapez…"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0167"
+   ]
+  },
+  "7-06-005": {
+   "grade": 7,
+   "primary_skills": [
+    "koristiti formulu za računanje površine kružnog isječka i kružnog prstena Kružnica Krug Poluprečnik Tetiva Prečnik Sječica Tangenta Centralni i periferijski ugao kruga Broj Obim kruga…"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0312"
+   ]
+  },
+  "7-06-010": {
+   "grade": 7,
+   "primary_skills": [
+    "utvrđivati međusobni odnos dvije kružnice"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0303"
+   ]
+  },
+  "8-01-008": {
+   "grade": 8,
+   "primary_skills": [
+    "definisati kvadratni korijen",
+    "izračunavati kvadratni korijen",
+    "Pravilno formirati kvadratni korijen i pojam iracionalnog broja"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [
+    "znati i razumjeti formulaciju Pitagorine teoreme",
+    "znati i razumjeti formulaciju teoreme obrnute Pitagorinoj"
+   ],
+   "evidence_ids": [
+    "KS_2018-0184",
+    "KS_2018-0185",
+    "RS_2014-0075"
+   ]
+  },
+  "8-01-010": {
+   "grade": 8,
+   "primary_skills": [
+    "objašnjavati da je korijen proizvoda jednak proizvodu korijena",
+    "objašnjavati da je korijen količnika i jednak količniku korijena"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0186",
+    "KS_2018-0187"
+   ]
+  },
+  "8-01-011": {
+   "grade": 8,
+   "primary_skills": [
+    "koristiti tablice kvadrata i kvadratnih korijena"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0188"
+   ]
+  },
+  "8-01-013": {
+   "grade": 8,
+   "primary_skills": [
+    "usvojiti pojam vjerovatnoće događaja i računati vjerovatnoću u jednostavnim primjerima Cijeli racionalni izrazi Stepen čiji je izložilac cijeli broj"
+   ],
+   "supporting_concepts": [
+    "objašnjavati pojam stepena kada je izložilac cijeli broj, a osnova realan broj",
+    "izračunavati vrijednost stepena i računati sa stepenima",
+    "izvoditi osnovne računske operacije sa stepenima"
+   ],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0264"
+   ]
+  },
+  "8-01-015": {
+   "grade": 8,
+   "primary_skills": [
+    "imenovati osnovu i izložilac zadatog stepena",
+    "primjenjivati formule za množenje i dijeljenje stepena istih osnova",
+    "rješavati jednačine na način koji se temelji na rastavljanju polinoma na faktore Stepen, potencija Izložilac,eksponent Osnova, baza Stepenovanje, stepenovanje Množenje i dijeljenje stepena…"
+   ],
+   "supporting_concepts": [
+    "objašnjavati pojam stepena kada je izložilac cijeli broj, a osnova realan broj",
+    "izračunavati vrijednost stepena i računati sa stepenima",
+    "objašnjavati da se mogu sabirati i oduzimati samo stepeni s jednakim osnovama i jednakim izložiocima"
+   ],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0266",
+    "KS_2018-0270",
+    "KS_2018-0289"
+   ]
+  },
+  "8-01-016": {
+   "grade": 8,
+   "primary_skills": [
+    "usvojiti pojam vjerovatnoće događaja i računati vjerovatnoću u jednostavnim primjerima Cijeli racionalni izrazi Stepen čiji je izložilac cijeli broj",
+    "rješavati jednačine na način koji se temelji na rastavljanju polinoma na faktore Stepen, potencija Izložilac,eksponent Osnova, baza Stepenovanje, stepenovanje Množenje i dijeljenje stepena…",
+    "množenje stepena jednakih osnova. • Dijeljenje stepena jednakih osnova. • Stepen proizvoda"
+   ],
+   "supporting_concepts": [
+    "izračunavati vrijednost stepena i računati sa stepenima",
+    "izvoditi osnovne računske operacije sa stepenima"
+   ],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0264",
+    "KS_2018-0289",
+    "RS_2014-0104"
+   ]
+  },
+  "8-02-001": {
+   "grade": 8,
+   "primary_skills": [
+    "definisati pojmove: koordinatni sistem u ravni, koordinatna ravan, koordinatni početak; koordinatne ose, koordinate tačke"
+   ],
+   "supporting_concepts": [
+    "Demonstrirati prikazivanje funkcija u pravouglom koordinatnom sistemu",
+    "Ukazati na obostrano jednoznačno pridruživanje uređenih parova realnih brojeva tačkama pravouglog koordinatnog sistema"
+   ],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0221"
+   ]
+  },
+  "8-02-002": {
+   "grade": 8,
+   "primary_skills": [
+    "određivati koordinate zadate tačke u koordinatnoj ravni",
+    "rješavati jednostavne zadatke u vezi s procentima Uređeni par Koordinatna ravan Koordinatni početak Koordinatne ose Pravougli koordinatni sistem Koordinate tačke Razmjera Proporcija…"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0223",
+    "KS_2018-0237"
+   ]
+  },
+  "8-02-004": {
+   "grade": 8,
+   "primary_skills": [
+    "izračunavati rastojanje između dvije tačke u pravouglom koordinatnom sistemu"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0224"
+   ]
+  },
+  "8-02-005": {
+   "grade": 8,
+   "primary_skills": [
+    "ispitivati svojstva linearne funkcije",
+    "zaključivati kad je linearna funkcija rastuća, a kad opadajuća"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0343",
+    "KS_2018-0348"
+   ]
+  },
+  "8-03-002": {
+   "grade": 8,
+   "primary_skills": [
+    "objašnjavati kako se formira proporcija"
+   ],
+   "supporting_concepts": [
+    "Naučiti ih rješavanje i primjenu proporcija u tekstualnim zadacima"
+   ],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0227"
+   ]
+  },
+  "8-03-003": {
+   "grade": 8,
+   "primary_skills": [
+    "znati svojstva i odrediti nepoznati član proporcije"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0228"
+   ]
+  },
+  "8-03-006": {
+   "grade": 8,
+   "primary_skills": [
+    "crtati grafik funkcija direktne i obrnute proporcionalnosti"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0231"
+   ]
+  },
+  "8-03-008": {
+   "grade": 8,
+   "primary_skills": [
+    "objašnjavati pojmove razmjere i proporcionalnosti duži",
+    "izračunati dužine stranica, obim i površinu sličnih trouglova Duž Mjerenje duži Razmjera duži Proporcionalne duži Talesova teorema Podjela duži Četvrta geometrijska proporcionala Slični…"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0214",
+    "KS_2018-0220"
+   ]
+  },
+  "8-03-010": {
+   "grade": 8,
+   "primary_skills": [
+    "izračunati dužine stranica, obim i površinu sličnih trouglova Duž Mjerenje duži Razmjera duži Proporcionalne duži Talesova teorema Podjela duži Četvrta geometrijska proporcionala Slični…"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0220"
+   ]
+  },
+  "8-03-011": {
+   "grade": 8,
+   "primary_skills": [
+    "dijeliti duž grafički (konstruktivno) na jednake dijelove i u datoj razmjeri"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0217"
+   ]
+  },
+  "8-03-012": {
+   "grade": 8,
+   "primary_skills": [
+    "dijeliti duž grafički (konstruktivno) na jednake dijelove i u datoj razmjeri"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0217"
+   ]
+  },
+  "8-03-013": {
+   "grade": 8,
+   "primary_skills": [
+    "izračunati dužine stranica, obim i površinu sličnih trouglova Duž Mjerenje duži Razmjera duži Proporcionalne duži Talesova teorema Podjela duži Četvrta geometrijska proporcionala Slični…",
+    "Pravilno formirati pojam koeficijenta sličnosti"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0220",
+    "RS_2014-0102"
+   ]
+  },
+  "8-03-014": {
+   "grade": 8,
+   "primary_skills": [
+    "usvojiti pojam sličnosti trouglova",
+    "znati stavove o sličnosti trouglova"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0218",
+    "KS_2018-0219"
+   ]
+  },
+  "8-03-015": {
+   "grade": 8,
+   "primary_skills": [
+    "izračunati dužine stranica, obim i površinu sličnih trouglova Duž Mjerenje duži Razmjera duži Proporcionalne duži Talesova teorema Podjela duži Četvrta geometrijska proporcionala Slični…"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0220"
+   ]
+  },
+  "8-03-016": {
+   "grade": 8,
+   "primary_skills": [
+    "usvojiti pojam sličnosti trouglova",
+    "izračunati dužine stranica, obim i površinu sličnih trouglova Duž Mjerenje duži Razmjera duži Proporcionalne duži Talesova teorema Podjela duži Četvrta geometrijska proporcionala Slični…"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0218",
+    "KS_2018-0220"
+   ]
+  },
+  "8-03-020": {
+   "grade": 8,
+   "primary_skills": [
+    "izračunati dužine stranica, obim i površinu sličnih trouglova Duž Mjerenje duži Razmjera duži Proporcionalne duži Talesova teorema Podjela duži Četvrta geometrijska proporcionala Slični…",
+    "primjenjivati direktnu i obrnutu proporcionalnost u različitim kontekstima (sraazmjerni račun, kamatni račun, procentni račun, proporcionalna podjela)"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0220",
+    "KS_2018-0232"
+   ]
+  },
+  "8-04-004": {
+   "grade": 8,
+   "primary_skills": [
+    "primjenjivati formule za računanje obima i površine pravougaonika, kvadrata, romba, paralelograma, trougla, trapeza i četvorougla s uzajamno normalnim dijagonalama Kvadrat Romb Trapez…",
+    "objašnjavati postupak konstrukcije kvadrata čija je površina jednaka zbiru / razlici površina dva zadana kvadrata"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0167",
+    "KS_2018-0212"
+   ]
+  },
+  "8-04-010": {
+   "grade": 8,
+   "primary_skills": [
+    "primjenjivati formule za računanje obima i površine pravougaonika, kvadrata, romba, paralelograma, trougla, trapeza i četvorougla s uzajamno normalnim dijagonalama Kvadrat Romb Trapez…"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0167"
+   ]
+  },
+  "8-04-011": {
+   "grade": 8,
+   "primary_skills": [
+    "primjenjivati formule za računanje obima i površine pravougaonika, kvadrata, romba, paralelograma, trougla, trapeza i četvorougla s uzajamno normalnim dijagonalama Kvadrat Romb Trapez…"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0167"
+   ]
+  },
+  "8-04-013": {
+   "grade": 8,
+   "primary_skills": [
+    "Demonstrirati prikazivanje funkcija u pravouglom koordinatnom sistemu"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "RS_2014-0096"
+   ]
+  },
+  "8-04-014": {
+   "grade": 8,
+   "primary_skills": [],
+   "supporting_concepts": [
+    "objašnjavati postupak konstrukcije duži dužine ... i tačaka koje su pridružene brojevima ... na brojevnoj pravoj"
+   ],
+   "neighbour_exclusions": [
+    "izračunati dužine stranica, obim i površinu sličnih trouglova Duž Mjerenje duži Razmjera duži Proporcionalne duži Talesova teorema Podjela duži Četvrta geometrijska proporcionala Slični…",
+    "izračunavati obim i površinu mnogougla",
+    "upoređivati i procjenjivati veličine obima i površine mnogougla",
+    "odabrati metode rješavanja problemskih situacija povezanih sa izračunavanjem obima i površine mnogouglova Mnogougaona linija Mnogougao, poligon Konveksni i nekonveksni mnogougao Tjemena,…"
+   ],
+   "evidence_ids": []
+  },
+  "8-05-015": {
+   "grade": 8,
+   "primary_skills": [
+    "objašnjavati postupak za izračunavanje: dijagonale kvadra i kocke, površine kvadra i kocke, površine prizme, zapremine kvadra i kocke, zapremine prizme",
+    "da koristi formule za izračunavanje površine i zapremine prizme"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0386",
+    "RS_2014-0124"
+   ]
+  },
+  "8-06-003": {
+   "grade": 8,
+   "primary_skills": [
+    "prikazivati prikupljene podatke o tom obilježju pomoću tablice frekvencija i relativnih frekvencija te grafički pomoću stupčastog dijagrama i kružnog dijagrama",
+    "navesti elementarne događaje Obilježje skupa objekata Frekvencija Relativna frekvencija Tablični prikaz Stupčasti dijagram Kružni dijagram Aritmetička sredina"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0250",
+    "KS_2018-0253"
+   ]
+  },
+  "8-06-004": {
+   "grade": 8,
+   "primary_skills": [
+    "prikazivati prikupljene podatke o tom obilježju pomoću tablice frekvencija i relativnih frekvencija te grafički pomoću stupčastog dijagrama i kružnog dijagrama"
+   ],
+   "supporting_concepts": [
+    "Tabelarno i grafičko prikazivanje podataka treba da posluži da učenici uoče značaj matematike za predviđanje narednih događaja"
+   ],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0250"
+   ]
+  },
+  "8-06-005": {
+   "grade": 8,
+   "primary_skills": [
+    "navesti elementarne događaje Obilježje skupa objekata Frekvencija Relativna frekvencija Tablični prikaz Stupčasti dijagram Kružni dijagram Aritmetička sredina"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0253"
+   ]
+  },
+  "8-06-006": {
+   "grade": 8,
+   "primary_skills": [
+    "navesti elementarne događaje Obilježje skupa objekata Frekvencija Relativna frekvencija Tablični prikaz Stupčasti dijagram Kružni dijagram Aritmetička sredina"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0253"
+   ]
+  },
+  "8-06-008": {
+   "grade": 8,
+   "primary_skills": [],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [
+    "prikazivati prikupljene podatke o tom obilježju pomoću tablice frekvencija i relativnih frekvencija te grafički pomoću stupčastog dijagrama i kružnog dijagrama"
+   ],
+   "evidence_ids": []
+  },
+  "8-06-009": {
+   "grade": 8,
+   "primary_skills": [
+    "navesti elementarne događaje Obilježje skupa objekata Frekvencija Relativna frekvencija Tablični prikaz Stupčasti dijagram Kružni dijagram Aritmetička sredina"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0253"
+   ]
+  },
+  "8-06-012": {
+   "grade": 8,
+   "primary_skills": [],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [
+    "prikazivati prikupljene podatke o tom obilježju pomoću tablice frekvencija i relativnih frekvencija te grafički pomoću stupčastog dijagrama i kružnog dijagrama",
+    "navesti elementarne događaje Obilježje skupa objekata Frekvencija Relativna frekvencija Tablični prikaz Stupčasti dijagram Kružni dijagram Aritmetička sredina"
+   ],
+   "evidence_ids": []
+  },
+  "8-07-001": {
+   "grade": 8,
+   "primary_skills": [
+    "usvojiti pojam vjerovatnoće događaja i računati vjerovatnoću u jednostavnim primjerima Cijeli racionalni izrazi Stepen čiji je izložilac cijeli broj"
+   ],
+   "supporting_concepts": [
+    "kvadrirati racionalne brojeve"
+   ],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0264"
+   ]
+  },
+  "8-07-003": {
+   "grade": 8,
+   "primary_skills": [
+    "usvojiti pojam vjerovatnoće događaja i računati vjerovatnoću u jednostavnim primjerima Cijeli racionalni izrazi Stepen čiji je izložilac cijeli broj"
+   ],
+   "supporting_concepts": [
+    "formirati polinome od datih monoma",
+    "izvoditi računske operacije sa monomima primjenom usvojenih pravila"
+   ],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0264"
+   ]
+  },
+  "8-07-006": {
+   "grade": 8,
+   "primary_skills": [
+    "definisati polinom"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0277"
+   ]
+  },
+  "8-07-008": {
+   "grade": 8,
+   "primary_skills": [
+    "usvojiti pojam vjerovatnoće događaja i računati vjerovatnoću u jednostavnim primjerima Cijeli racionalni izrazi Stepen čiji je izložilac cijeli broj",
+    "rješavati jednačine na način koji se temelji na rastavljanju polinoma na faktore Stepen, potencija Izložilac,eksponent Osnova, baza Stepenovanje, stepenovanje Množenje i dijeljenje stepena…",
+    "množenje stepena jednakih osnova. • Dijeljenje stepena jednakih osnova. • Stepen proizvoda"
+   ],
+   "supporting_concepts": [
+    "formirati polinome od datih monoma"
+   ],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0264",
+    "KS_2018-0289",
+    "RS_2014-0104"
+   ]
+  },
+  "8-07-009": {
+   "grade": 8,
+   "primary_skills": [
+    "usvojiti pojam vjerovatnoće događaja i računati vjerovatnoću u jednostavnim primjerima Cijeli racionalni izrazi Stepen čiji je izložilac cijeli broj",
+    "oblika razlike kvadrata, zbira i razlike kubova na proste faktore"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0264",
+    "KS_2018-0284"
+   ]
+  },
+  "8-07-010": {
+   "grade": 8,
+   "primary_skills": [
+    "objašnjavati da je kvadrat proizvoda jednak proizvodu kvadrata",
+    "objašnjavati da je kvadrat količnika jednak količniku kvadrata",
+    "prepoznati kvadrat binoma i razliku kvadrata"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0181",
+    "KS_2018-0182",
+    "KS_2018-0280"
+   ]
+  },
+  "8-07-011": {
+   "grade": 8,
+   "primary_skills": [
+    "usvojiti pojam vjerovatnoće događaja i računati vjerovatnoću u jednostavnim primjerima Cijeli racionalni izrazi Stepen čiji je izložilac cijeli broj",
+    "primjenjivati razliku kvadrata, kvadrat binoma, zbir i razliku kubova, kub binoma"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0264",
+    "KS_2018-0281"
+   ]
+  },
+  "8-08-001": {
+   "grade": 8,
+   "primary_skills": [
+    "odabrati metode rješavanja problemskih situacija povezanih sa izračunavanjem obima i površine mnogouglova Mnogougaona linija Mnogougao, poligon Konveksni i nekonveksni mnogougao Tjemena,…"
+   ],
+   "supporting_concepts": [
+    "Insistirati na tačnoj konstrukciji pravilnih mnogouglova sa 6, 8 i 12 stranica"
+   ],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0300"
+   ]
+  },
+  "8-08-002": {
+   "grade": 8,
+   "primary_skills": [
+    "odrediti zbir unutrašnjih uglova mnogougla",
+    "izračunavati unutrašnji ugao pravilnog mnogougla"
+   ],
+   "supporting_concepts": [
+    "definisati mnogougao kao uniju mnogougaone linije u ravni i njene unutrašnje oblasti",
+    "Definisati mnogougao kao uniju mnogougaone linije u ravni i njene unutrašnje oblasti"
+   ],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0292",
+    "KS_2018-0295"
+   ]
+  },
+  "8-08-003": {
+   "grade": 8,
+   "primary_skills": [
+    "objašnjavati da je zbir vanjskih uglova svakog mnogougla pun ugao"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0293"
+   ]
+  },
+  "8-08-004": {
+   "grade": 8,
+   "primary_skills": [
+    "određivati ukupan broj dijagonala mnogougla",
+    "odabrati metode rješavanja problemskih situacija povezanih sa izračunavanjem obima i površine mnogouglova Mnogougaona linija Mnogougao, poligon Konveksni i nekonveksni mnogougao Tjemena,…",
+    "Ukazati na zavisnost zbira uglova i broja dijagonala mnogougla od broja stranica"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0294",
+    "KS_2018-0300",
+    "RS_2014-0088"
+   ]
+  },
+  "8-08-005": {
+   "grade": 8,
+   "primary_skills": [
+    "konstruisati pravilni mnogougao",
+    "odabrati metode rješavanja problemskih situacija povezanih sa izračunavanjem obima i površine mnogouglova Mnogougaona linija Mnogougao, poligon Konveksni i nekonveksni mnogougao Tjemena,…"
+   ],
+   "supporting_concepts": [
+    "Obratiti pažnju na simetriju pravilnog mnogougla"
+   ],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0297",
+    "KS_2018-0300"
+   ]
+  },
+  "8-08-006": {
+   "grade": 8,
+   "primary_skills": [],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [
+    "odabrati metode rješavanja problemskih situacija povezanih sa izračunavanjem obima i površine mnogouglova Mnogougaona linija Mnogougao, poligon Konveksni i nekonveksni mnogougao Tjemena,…",
+    "koristiti formulu za računanje površine kružnog isječka i kružnog prstena Kružnica Krug Poluprečnik Tetiva Prečnik Sječica Tangenta Centralni i periferijski ugao kruga Broj Obim kruga…"
+   ],
+   "evidence_ids": []
+  },
+  "8-08-007": {
+   "grade": 8,
+   "primary_skills": [
+    "izračunavati obim i površinu mnogougla",
+    "upoređivati i procjenjivati veličine obima i površine mnogougla",
+    "odabrati metode rješavanja problemskih situacija povezanih sa izračunavanjem obima i površine mnogouglova Mnogougaona linija Mnogougao, poligon Konveksni i nekonveksni mnogougao Tjemena,…"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0298",
+    "KS_2018-0299",
+    "KS_2018-0300"
+   ]
+  },
+  "8-08-008": {
+   "grade": 8,
+   "primary_skills": [
+    "razlikovati krug (površ) od kružnice (linije), dijelove kruga i kružnice"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0301"
+   ]
+  },
+  "8-08-009": {
+   "grade": 8,
+   "primary_skills": [
+    "odabrati metode rješavanja problemskih situacija povezanih sa izračunavanjem obima i površine mnogouglova Mnogougaona linija Mnogougao, poligon Konveksni i nekonveksni mnogougao Tjemena,…",
+    "broj shvatiti kao omjer obima kruga i prečnika kruga i na osnovu toga računati približnu vrijednost broja",
+    "izračunavati obim kruga iz njegovog prečnika i obrnuto",
+    "koristiti formulu za računanje površine kružnog isječka i kružnog prstena Kružnica Krug Poluprečnik Tetiva Prečnik Sječica Tangenta Centralni i periferijski ugao kruga Broj Obim kruga…"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [
+    "objašnjavati površinu kruga poluprečnika r kao površinu puta veću od površine kvadrata stranice dužine r",
+    "koristiti formulu za računanje površine kruga",
+    "izraziti obim i površinu kruga brojem ili izračunati približnu, decimalnim brojem iskazanu vrijednost"
+   ],
+   "evidence_ids": [
+    "KS_2018-0300",
+    "KS_2018-0306",
+    "KS_2018-0307",
+    "KS_2018-0312"
+   ]
+  },
+  "8-08-010": {
+   "grade": 8,
+   "primary_skills": [
+    "odabrati metode rješavanja problemskih situacija povezanih sa izračunavanjem obima i površine mnogouglova Mnogougaona linija Mnogougao, poligon Konveksni i nekonveksni mnogougao Tjemena,…",
+    "izvesti i koristiti formulu za računanje dužine kružnog luka",
+    "koristiti formulu za računanje površine kružnog isječka i kružnog prstena Kružnica Krug Poluprečnik Tetiva Prečnik Sječica Tangenta Centralni i periferijski ugao kruga Broj Obim kruga…"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0300",
+    "KS_2018-0308",
+    "KS_2018-0312"
+   ]
+  },
+  "8-08-011": {
+   "grade": 8,
+   "primary_skills": [
+    "odabrati metode rješavanja problemskih situacija povezanih sa izračunavanjem obima i površine mnogouglova Mnogougaona linija Mnogougao, poligon Konveksni i nekonveksni mnogougao Tjemena,…",
+    "objašnjavati površinu kruga poluprečnika r kao površinu puta veću od površine kvadrata stranice dužine r",
+    "koristiti formulu za računanje površine kruga",
+    "izraziti obim i površinu kruga brojem ili izračunati približnu, decimalnim brojem iskazanu vrijednost"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [
+    "broj shvatiti kao omjer obima kruga i prečnika kruga i na osnovu toga računati približnu vrijednost broja",
+    "izračunavati obim kruga iz njegovog prečnika i obrnuto"
+   ],
+   "evidence_ids": [
+    "KS_2018-0300",
+    "KS_2018-0309",
+    "KS_2018-0310",
+    "KS_2018-0311"
+   ]
+  },
+  "8-09-004": {
+   "grade": 8,
+   "primary_skills": [
+    "množiti vektore prirodnim brojem"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0085"
+   ]
+  },
+  "9-01-003": {
+   "grade": 9,
+   "primary_skills": [
+    "definisati razlomljeni racionalni izraz (algebarski razlomak)",
+    "određivati oblast definisanosti algebarskog razlomka"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0316",
+    "KS_2018-0318"
+   ]
+  },
+  "9-01-006": {
+   "grade": 9,
+   "primary_skills": [
+    "definisati razlomljeni racionalni izraz (algebarski razlomak)"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0316"
+   ]
+  },
+  "9-02-001": {
+   "grade": 9,
+   "primary_skills": [
+    "objašnjavati da su tačka, prava i ravan osnovni geometrijski pojmovi",
+    "određivati paralelnu projekciju tačke i duži na ravan"
+   ],
+   "supporting_concepts": [
+    "objašnjavati da je ravan jednoznačno određena sa tri tačke koje ne pripadaju istoj pravoj"
+   ],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0324",
+    "KS_2018-0338"
+   ]
+  },
+  "9-02-003": {
+   "grade": 9,
+   "primary_skills": [
+    "određivati paralelnu projekciju tačke i duži na ravan"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0338"
+   ]
+  },
+  "9-02-006": {
+   "grade": 9,
+   "primary_skills": [
+    "na modelu kvadra odrediti međusobne položaje prave i ravni"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0333"
+   ]
+  },
+  "9-02-008": {
+   "grade": 9,
+   "primary_skills": [
+    "definisati rastojanje tačke od ravni i normalu na ravan",
+    "određivati paralelnu projekciju tačke i duži na ravan"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0332",
+    "KS_2018-0338"
+   ]
+  },
+  "9-02-009": {
+   "grade": 9,
+   "primary_skills": [
+    "definisati rastojanje tačke od ravni i normalu na ravan"
+   ],
+   "supporting_concepts": [
+    "primijeniti Pitagorinu teoremu i druga svojstva za izračunavanje udaljenosti tačke od ravni diedra i od ivica diedra, kao i za druge problemske situacije"
+   ],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0332"
+   ]
+  },
+  "9-02-011": {
+   "grade": 9,
+   "primary_skills": [
+    "objašnjavati da su tačka, prava i ravan osnovni geometrijski pojmovi",
+    "definisati i odrediti ortogonalnu projekciju tačke, duži i prave na ravan",
+    "određivati paralelnu projekciju tačke i duži na ravan",
+    "da znaju da nabroje bitne činjenice o projekcijama na ravan. (2) Linearne jednačine i nejednačine sa jednom nepoznatom"
+   ],
+   "supporting_concepts": [
+    "objašnjavati da je ravan jednoznačno određena sa tri tačke koje ne pripadaju istoj pravoj"
+   ],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0324",
+    "KS_2018-0337",
+    "KS_2018-0338",
+    "RS_2014-0117"
+   ]
+  },
+  "9-02-012": {
+   "grade": 9,
+   "primary_skills": [
+    "definisati i odrediti ortogonalnu projekciju tačke, duži i prave na ravan",
+    "da znaju da nabroje bitne činjenice o projekcijama na ravan. (2) Linearne jednačine i nejednačine sa jednom nepoznatom"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0337",
+    "RS_2014-0117"
+   ]
+  },
+  "9-02-013": {
+   "grade": 9,
+   "primary_skills": [
+    "određivati odnose između tačaka, pravih i ravni"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0325"
+   ]
+  },
+  "9-02-014": {
+   "grade": 9,
+   "primary_skills": [
+    "definisati diedar i ugao diedra"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0334"
+   ]
+  },
+  "9-02-015": {
+   "grade": 9,
+   "primary_skills": [
+    "određivati paralelnu projekciju tačke i duži na ravan",
+    "da znaju da nabroje bitne činjenice o projekcijama na ravan. (2) Linearne jednačine i nejednačine sa jednom nepoznatom"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0338",
+    "RS_2014-0117"
+   ]
+  },
+  "9-03-001": {
+   "grade": 9,
+   "primary_skills": [
+    "određivati domenu funkcije"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0340"
+   ]
+  },
+  "9-03-002": {
+   "grade": 9,
+   "primary_skills": [
+    "zaključivati kad je linearna funkcija rastuća, a kad opadajuća"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0348"
+   ]
+  },
+  "9-03-003": {
+   "grade": 9,
+   "primary_skills": [
+    "izračunavati vrijednosti funkcije za određene vrijednosti nezavisno promjenjljive x"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0341"
+   ]
+  },
+  "9-03-004": {
+   "grade": 9,
+   "primary_skills": [
+    "prikazivati grafički linearnu funkciju funkcije i iz nacrtanog grafika čitati vrijednosti funkcije",
+    "ispitivati svojstva linearne funkcije",
+    "objašnjavati da je grafik linearne funkcije prava",
+    "crtati grafike funkcija x=a i y=b"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0342",
+    "KS_2018-0343",
+    "KS_2018-0346",
+    "KS_2018-0351"
+   ]
+  },
+  "9-03-007": {
+   "grade": 9,
+   "primary_skills": [
+    "odrediti nulu razlomljene racionalne funkcije",
+    "ispitivati svojstva linearne funkcije",
+    "odrediti nule funkcije y=kx+n"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0320",
+    "KS_2018-0343",
+    "KS_2018-0345"
+   ]
+  },
+  "9-03-008": {
+   "grade": 9,
+   "primary_skills": [
+    "zaključivati kad je linearna funkcija rastuća, a kad opadajuća"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0348"
+   ]
+  },
+  "9-03-009": {
+   "grade": 9,
+   "primary_skills": [
+    "ispitivati svojstva linearne funkcije"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0343"
+   ]
+  },
+  "9-03-010": {
+   "grade": 9,
+   "primary_skills": [
+    "određivati koordinate presječnih tačaka grafika funkcije sa koordinatnim osama"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0350"
+   ]
+  },
+  "9-03-012": {
+   "grade": 9,
+   "primary_skills": [
+    "upotrebljavati eksplicitni i implicitni oblik jednačine prave",
+    "uočiti linearnu funkcijsku ovisnost u problemima iz prakse Pravougli koordinatni sistem Linearna funkcija Vrijednost funkcije Grafik linearne funkcije Eksplicitni i implicitni oblik…"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0353",
+    "KS_2018-0354"
+   ]
+  },
+  "9-03-013": {
+   "grade": 9,
+   "primary_skills": [
+    "tumačiti postupak za prelazak s implicitnog oblika ax+by+c=0, a,b 0 na eksplicitni oblik y=kx+b"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0352"
+   ]
+  },
+  "9-03-014": {
+   "grade": 9,
+   "primary_skills": [
+    "objašnjavati da su tačka, prava i ravan osnovni geometrijski pojmovi",
+    "objašnjavati da je prava jednoznačno određena sa dvije različite tačke"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0324",
+    "KS_2018-0330"
+   ]
+  },
+  "9-03-018": {
+   "grade": 9,
+   "primary_skills": [
+    "ispitivati svojstva linearne funkcije"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0343"
+   ]
+  },
+  "9-03-019": {
+   "grade": 9,
+   "primary_skills": [
+    "crtati grafik funkcija direktne i obrnute proporcionalnosti"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0231"
+   ]
+  },
+  "9-03-022": {
+   "grade": 9,
+   "primary_skills": [
+    "izračunavati vrijednost razlomljene racionalne funkcije za date vrijednosti promjenljivih",
+    "odrediti nulu razlomljene racionalne funkcije",
+    "crtati grafike funkcija x=a i y=b",
+    "da zna da nacrta grafik razlomljene funkcije. (6) Valjak"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0319",
+    "KS_2018-0320",
+    "KS_2018-0351",
+    "RS_2014-0133"
+   ]
+  },
+  "9-04-001": {
+   "grade": 9,
+   "primary_skills": [
+    "rješavati jednačine na način koji se temelji na rastavljanju polinoma na faktore Stepen, potencija Izložilac,eksponent Osnova, baza Stepenovanje, stepenovanje Množenje i dijeljenje stepena…",
+    "definisati pojmove: linearna jednačina, jednakost, rješenje jednačine, ekvivalentne jednačine, linearna nejednačina, nejednakost, skup rješenja linearne nejednačine, ekvivalentne nejednačine",
+    "rješavati linearne jednačine i nejednačine sa jednom nepoznatom",
+    "primjenjivati elementarne transformacije: Linearna jednačina Jednakost Identitet Rješenje jednačine Ekvivalentne jednačine, Linearna nejednačina Nejednakost, Skup rješenja linearne…"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0289",
+    "KS_2018-0355",
+    "KS_2018-0361",
+    "KS_2018-0363"
+   ]
+  },
+  "9-04-002": {
+   "grade": 9,
+   "primary_skills": [
+    "uočiti linearnu funkcijsku ovisnost u problemima iz prakse Pravougli koordinatni sistem Linearna funkcija Vrijednost funkcije Grafik linearne funkcije Eksplicitni i implicitni oblik…",
+    "definisati pojmove: linearna jednačina, jednakost, rješenje jednačine, ekvivalentne jednačine, linearna nejednačina, nejednakost, skup rješenja linearne nejednačine, ekvivalentne nejednačine",
+    "koristiti ekvivalentne jednačine kako bi objasnio promjene u različitim kontekstima",
+    "primjenjivati elementarne transformacije: Linearna jednačina Jednakost Identitet Rješenje jednačine Ekvivalentne jednačine, Linearna nejednačina Nejednakost, Skup rješenja linearne…"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0354",
+    "KS_2018-0355",
+    "KS_2018-0360",
+    "KS_2018-0363"
+   ]
+  },
+  "9-04-010": {
+   "grade": 9,
+   "primary_skills": [
+    "uočiti linearnu funkcijsku ovisnost u problemima iz prakse Pravougli koordinatni sistem Linearna funkcija Vrijednost funkcije Grafik linearne funkcije Eksplicitni i implicitni oblik…"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0354"
+   ]
+  },
+  "9-04-012": {
+   "grade": 9,
+   "primary_skills": [
+    "uočiti linearnu funkcijsku ovisnost u problemima iz prakse Pravougli koordinatni sistem Linearna funkcija Vrijednost funkcije Grafik linearne funkcije Eksplicitni i implicitni oblik…",
+    "definisati pojmove: linearna jednačina, jednakost, rješenje jednačine, ekvivalentne jednačine, linearna nejednačina, nejednakost, skup rješenja linearne nejednačine, ekvivalentne nejednačine",
+    "primjenjivati elementarne transformacije: Linearna jednačina Jednakost Identitet Rješenje jednačine Ekvivalentne jednačine, Linearna nejednačina Nejednakost, Skup rješenja linearne…",
+    "da učenici znaju da rješavaju linerane jednačine i nejednačine sa jednom nepoznatom"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0354",
+    "KS_2018-0355",
+    "KS_2018-0363",
+    "RS_2014-0118"
+   ]
+  },
+  "9-04-013": {
+   "grade": 9,
+   "primary_skills": [
+    "uočiti linearnu funkcijsku ovisnost u problemima iz prakse Pravougli koordinatni sistem Linearna funkcija Vrijednost funkcije Grafik linearne funkcije Eksplicitni i implicitni oblik…",
+    "definisati pojmove: linearna jednačina, jednakost, rješenje jednačine, ekvivalentne jednačine, linearna nejednačina, nejednakost, skup rješenja linearne nejednačine, ekvivalentne nejednačine",
+    "primjenjivati elementarne transformacije: Linearna jednačina Jednakost Identitet Rješenje jednačine Ekvivalentne jednačine, Linearna nejednačina Nejednakost, Skup rješenja linearne…"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0354",
+    "KS_2018-0355",
+    "KS_2018-0363"
+   ]
+  },
+  "9-04-015": {
+   "grade": 9,
+   "primary_skills": [
+    "Da ovladaju rješavanjem jednačina i nejednačina sa razlomcima"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "RS_2014-0026"
+   ]
+  },
+  "9-04-019": {
+   "grade": 9,
+   "primary_skills": [
+    "analizirati rješenja jednačina i nejednačina"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0357"
+   ]
+  },
+  "9-04-020": {
+   "grade": 9,
+   "primary_skills": [
+    "da znaju da riješe linearne jednačine i nejednačine sa apsolutnim vrijednostima. (3) Prizma"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "RS_2014-0121"
+   ]
+  },
+  "9-04-021": {
+   "grade": 9,
+   "primary_skills": [
+    "da znaju da riješe linearne jednačine i nejednačine sa apsolutnim vrijednostima. (3) Prizma"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "RS_2014-0121"
+   ]
+  },
+  "9-05-001": {
+   "grade": 9,
+   "primary_skills": [
+    "provjeravati tačnost dobijenih rješenja i diskutovati o njima u kontekstu problema"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0365"
+   ]
+  },
+  "9-05-002": {
+   "grade": 9,
+   "primary_skills": [
+    "prikazivati grafičkom metodom da li sistem od dvije linearne jednačine ima jedinstveno rješenje, beskonačno mnogo rješenja ili nema rješenje, tj. da li se prave sijeku, poklapaju ili su…"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0371"
+   ]
+  },
+  "9-05-003": {
+   "grade": 9,
+   "primary_skills": [
+    "uočiti linearnu funkcijsku ovisnost u problemima iz prakse Pravougli koordinatni sistem Linearna funkcija Vrijednost funkcije Grafik linearne funkcije Eksplicitni i implicitni oblik…",
+    "definisati pojmove linearne jednačine s dvije nepoznate i sistema od dvije linearne jednačine s dvije nepoznate",
+    "prikazivati grafičkom metodom da li sistem od dvije linearne jednačine ima jedinstveno rješenje, beskonačno mnogo rješenja ili nema rješenje, tj. da li se prave sijeku, poklapaju ili su…",
+    "sastavljati sisteme linearnih jednačina s dvije nepoznate"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0354",
+    "KS_2018-0366",
+    "KS_2018-0371",
+    "KS_2018-0375"
+   ]
+  },
+  "9-05-005": {
+   "grade": 9,
+   "primary_skills": [
+    "objašnjavati šta su ekvivalentni sistemi"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0368"
+   ]
+  },
+  "9-05-006": {
+   "grade": 9,
+   "primary_skills": [
+    "tumačiti suštinu grafičke metode da se obje jednačine sistema prikažu kao prave u koordinatnom sistemu, kao i nedostatak ove metode"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0370"
+   ]
+  },
+  "9-05-007": {
+   "grade": 9,
+   "primary_skills": [
+    "primjenjivati postupak rješavanja sistema metodom supstitucije"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0372"
+   ]
+  },
+  "9-05-008": {
+   "grade": 9,
+   "primary_skills": [
+    "primjenjivati postupak rješavanja sistema metodom suprotnih koeficijenata",
+    "metodom suprotnih koeficijenata"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0373",
+    "RS_2014-0140"
+   ]
+  },
+  "9-05-012": {
+   "grade": 9,
+   "primary_skills": [
+    "provjeravati tačnost dobijenih rješenja i diskutovati o njima u kontekstu problema"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0365"
+   ]
+  },
+  "9-05-015": {
+   "grade": 9,
+   "primary_skills": [
+    "provjeravati tačnost dobijenih rješenja i diskutovati o njima u kontekstu problema"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0365"
+   ]
+  },
+  "9-06-005": {
+   "grade": 9,
+   "primary_skills": [
+    "prepoznati kvadrat binoma i razliku kvadrata",
+    "primjenjivati razliku kvadrata, kvadrat binoma, zbir i razliku kubova, kub binoma",
+    "rješavati jednačine na način koji se temelji na rastavljanju polinoma na faktore Stepen, potencija Izložilac,eksponent Osnova, baza Stepenovanje, stepenovanje Množenje i dijeljenje stepena…",
+    "primjenjivati formule za razliku kvadrata, kvadrat binoma, zbir i razliku kubova, kub binoma"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0280",
+    "KS_2018-0281",
+    "KS_2018-0289",
+    "KS_2018-0323"
+   ]
+  },
+  "9-06-007": {
+   "grade": 9,
+   "primary_skills": [
+    "primjenjivati razliku kvadrata, kvadrat binoma, zbir i razliku kubova, kub binoma",
+    "primjenjivati formule za razliku kvadrata, kvadrat binoma, zbir i razliku kubova, kub binoma"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0281",
+    "KS_2018-0323"
+   ]
+  },
+  "9-06-008": {
+   "grade": 9,
+   "primary_skills": [
+    "primjenjivati razliku kvadrata, kvadrat binoma, zbir i razliku kubova, kub binoma",
+    "oblika razlike kvadrata, zbira i razlike kubova na proste faktore",
+    "primjenjivati formule za razliku kvadrata, kvadrat binoma, zbir i razliku kubova, kub binoma"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0281",
+    "KS_2018-0284",
+    "KS_2018-0323"
+   ]
+  },
+  "9-06-013": {
+   "grade": 9,
+   "primary_skills": [
+    "rješavati jednačine na način koji se temelji na rastavljanju polinoma na faktore Stepen, potencija Izložilac,eksponent Osnova, baza Stepenovanje, stepenovanje Množenje i dijeljenje stepena…"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0289"
+   ]
+  },
+  "9-06-014": {
+   "grade": 9,
+   "primary_skills": [
+    "rješavati jednačine na način koji se temelji na rastavljanju polinoma na faktore Stepen, potencija Izložilac,eksponent Osnova, baza Stepenovanje, stepenovanje Množenje i dijeljenje stepena…"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0289"
+   ]
+  },
+  "9-06-015": {
+   "grade": 9,
+   "primary_skills": [
+    "rješavati jednačine na način koji se temelji na rastavljanju polinoma na faktore Stepen, potencija Izložilac,eksponent Osnova, baza Stepenovanje, stepenovanje Množenje i dijeljenje stepena…"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0289"
+   ]
+  },
+  "9-07-003": {
+   "grade": 9,
+   "primary_skills": [
+    "objašnjavati pojmove: osnove (baze), osnovne ivice, bočne ivice, visine, bočne strane, omotač i Rogalj Poliedar Geometrijska tijela Prizma Mreža prizme Osnova (baza) prizme Omotač prizme…",
+    "skicirati prizme i njihove mreže",
+    "kombinovati svojstva geometrijskih tijela za rješavanje problemskih zadataka",
+    "da nacrta mrežu prizme"
+   ],
+   "supporting_concepts": [
+    "prepoznati i opisati prizme"
+   ],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0379",
+    "KS_2018-0381",
+    "KS_2018-0402",
+    "RS_2014-0123"
+   ]
+  },
+  "9-07-005": {
+   "grade": 9,
+   "primary_skills": [
+    "objašnjavati postupak za izračunavanje: dijagonale kvadra i kocke, površine kvadra i kocke, površine prizme, zapremine kvadra i kocke, zapremine prizme",
+    "kombinovati svojstva geometrijskih tijela za rješavanje problemskih zadataka",
+    "da koristi formule za izračunavanje površine i zapremine prizme"
+   ],
+   "supporting_concepts": [
+    "prepoznati i opisati prizme"
+   ],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0386",
+    "KS_2018-0402",
+    "RS_2014-0124"
+   ]
+  },
+  "9-07-007": {
+   "grade": 9,
+   "primary_skills": [
+    "učenik treba da zna da definiše prizmu"
+   ],
+   "supporting_concepts": [
+    "prepoznati i opisati prizme"
+   ],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "RS_2014-0122"
+   ]
+  },
+  "9-07-009": {
+   "grade": 9,
+   "primary_skills": [
+    "kombinovati svojstva geometrijskih tijela za rješavanje problemskih zadataka",
+    "da zna da nacrta mrežu piramide"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0402",
+    "RS_2014-0127"
+   ]
+  },
+  "9-07-010": {
+   "grade": 9,
+   "primary_skills": [
+    "kombinovati svojstva geometrijskih tijela za rješavanje problemskih zadataka",
+    "da zna da izračunava površinu i zapreminu piramide"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0402",
+    "RS_2014-0128"
+   ]
+  },
+  "9-07-011": {
+   "grade": 9,
+   "primary_skills": [
+    "objašnjavati postupke za računanje nepoznatih elemenata piramide u nekim elementarnim slučajevima, površine i zapremine piramide",
+    "kombinovati svojstva geometrijskih tijela za rješavanje problemskih zadataka",
+    "da zna da izračunava površinu i zapreminu piramide"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0390",
+    "KS_2018-0402",
+    "RS_2014-0128"
+   ]
+  },
+  "9-07-016": {
+   "grade": 9,
+   "primary_skills": [
+    "nacrtati mrežu valjka",
+    "kombinovati svojstva geometrijskih tijela za rješavanje problemskih zadataka",
+    "da nacrta mrežu valjka"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0392",
+    "KS_2018-0402",
+    "RS_2014-0135"
+   ]
+  },
+  "9-07-017": {
+   "grade": 9,
+   "primary_skills": [
+    "postupke za računanje površine i zapremine valjka",
+    "kombinovati svojstva geometrijskih tijela za rješavanje problemskih zadataka",
+    "da izračunava površinu i zapreminu valjka"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0394",
+    "KS_2018-0402",
+    "RS_2014-0136"
+   ]
+  },
+  "9-07-018": {
+   "grade": 9,
+   "primary_skills": [
+    "postupke za računanje površine i zapremine valjka",
+    "kombinovati svojstva geometrijskih tijela za rješavanje problemskih zadataka",
+    "da izračunava površinu i zapreminu valjka"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0394",
+    "KS_2018-0402",
+    "RS_2014-0136"
+   ]
+  },
+  "9-07-021": {
+   "grade": 9,
+   "primary_skills": [
+    "nacrtati mrežu kupe",
+    "kombinovati svojstva geometrijskih tijela za rješavanje problemskih zadataka",
+    "da nacrta mrežu kupe"
+   ],
+   "supporting_concepts": [
+    "učenik će biti sposoban da definiše kupu"
+   ],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0396",
+    "KS_2018-0402",
+    "RS_2014-0144"
+   ]
+  },
+  "9-07-022": {
+   "grade": 9,
+   "primary_skills": [
+    "kombinovati svojstva geometrijskih tijela za rješavanje problemskih zadataka",
+    "da izračunava površinu i zapreminu kupe"
+   ],
+   "supporting_concepts": [
+    "učenik će biti sposoban da definiše kupu"
+   ],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0402",
+    "RS_2014-0145"
+   ]
+  },
+  "9-07-023": {
+   "grade": 9,
+   "primary_skills": [
+    "postupke za računanje nepoznatog elementa kupe, površine i zapremine kupe",
+    "kombinovati svojstva geometrijskih tijela za rješavanje problemskih zadataka",
+    "da izračunava površinu i zapreminu kupe"
+   ],
+   "supporting_concepts": [
+    "učenik će biti sposoban da definiše kupu"
+   ],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0398",
+    "KS_2018-0402",
+    "RS_2014-0145"
+   ]
+  },
+  "9-07-024": {
+   "grade": 9,
+   "primary_skills": [
+    "definicije kupe, osnove, omotača, izvodnice i visine kupe",
+    "kombinovati svojstva geometrijskih tijela za rješavanje problemskih zadataka"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0395",
+    "KS_2018-0402"
+   ]
+  },
+  "9-07-026": {
+   "grade": 9,
+   "primary_skills": [
+    "kombinovati svojstva geometrijskih tijela za rješavanje problemskih zadataka"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0402"
+   ]
+  },
+  "9-07-028": {
+   "grade": 9,
+   "primary_skills": [
+    "kombinovati svojstva geometrijskih tijela za rješavanje problemskih zadataka",
+    "da izračunava površinu i zapreminu lopte"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0402",
+    "RS_2014-0149"
+   ]
+  },
+  "9-07-029": {
+   "grade": 9,
+   "primary_skills": [
+    "prepoznavati geometrijske likove nastale presjekom ravni i tijela",
+    "da razlikuje presjeke i dijelove lopte"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0384",
+    "RS_2014-0148"
+   ]
+  },
+  "9-07-032": {
+   "grade": 9,
+   "primary_skills": [
+    "razlikovati svojstva geometrijskih tijela"
+   ],
+   "supporting_concepts": [],
+   "neighbour_exclusions": [],
+   "evidence_ids": [
+    "KS_2018-0383"
+   ]
+  }
+ }
+}
