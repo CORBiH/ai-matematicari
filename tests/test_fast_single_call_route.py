@@ -265,6 +265,25 @@ def test_prompt_states_that_the_server_owns_the_turn_type(fast_route):
     assert "najjačem dozvoljenom" in sent
 
 
+def test_prompt_names_the_exact_server_target_level(fast_route):
+    """ŽIVI NALAZ (val 5): 12 od 18 eskalacija bilo je `difficulty_target_mismatch`
+    jer je model morao POGODITI nivo koji server već zna — stanje nosi POČETNI
+    nivo, ne cilj turna."""
+    store, fake = SessionStore(), FastFake()
+    fake.queue(draft_for(rational_task()))
+    run_practice_turn(store, fake, turn("lvl", "Daj mi zadatak."))
+    fake.queue(draft_for(rational_task(" teži", level=2, variant=1), intent="harder_task"))
+    run_practice_turn(store, fake, turn("lvl", "Daj mi teži zadatak.", request="harder"))
+    sent = fake.last_fast_input
+    assert "`target_difficulty_level` mora biti TAČNO 2" in sent, sent[-400:]
+
+
+def test_target_level_line_is_absent_when_the_controller_is_off():
+    assert "target_difficulty_level" not in tutor_prompts._required_task_block(
+        "harder_task", None)
+    assert "TAČNO 3" in tutor_prompts._required_task_block("harder_task", 3)
+
+
 def test_required_task_block_is_absent_without_a_server_task_intent():
     """Bez serverske namjere ulaz je bajt-identičan zatečenom."""
     assert tutor_prompts._required_task_block("") == ""

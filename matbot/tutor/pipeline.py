@@ -1973,10 +1973,16 @@ def _fast_single_call(llm, context, session, turn, request_id, ui_action="",
     try:
         with timer.stage("prompt_build"):
             instructions = tutor_prompts.build_tutor_instructions(context)
+            # Cilj se računa ISTIM serverskim putem kojim ga objava provjerava,
+            # pa model dobija tačan broj umjesto da ga pogađa.
+            planned_level = (
+                _target_level_for(session, required_task_intent, student_message)
+                if (required_task_intent and _difficulty_levels_enabled()) else None)
             input_text = tutor_prompts.build_tutor_input(
                 context, session, student_message, None, ui_action,
                 escalation_block=creative_escalation.prompt_block(escalation),
                 required_task_intent=required_task_intent,
+                target_level=planned_level,
             )
         with timer.stage("fast_call"):
             result = llm.fast_turn(instructions, input_text)

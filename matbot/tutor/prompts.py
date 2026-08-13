@@ -616,12 +616,22 @@ _REQUIRED_TASK_INTENT_TEXT = {
 }
 
 
-def _required_task_block(required_task_intent):
+def _required_task_block(required_task_intent, target_level=None):
     if not required_task_intent:
         return ""
     reason = _REQUIRED_TASK_INTENT_TEXT.get(required_task_intent,
                                             "učenik traži zadatak")
-    return (
+    # TAČAN CILJNI BROJ, NE NAGAĐANJE (živi nalaz, val 5): 12 od 18 eskalacija
+    # bilo je `difficulty_target_mismatch` — model je morao POGODITI nivo koji
+    # server već zna. Stanje iznad nosi POČETNI nivo, a ne cilj ovog turna, pa
+    # je „teže“ redovno deklarisano kao isti nivo. Server ga sada imenuje.
+    target_line = ""
+    if target_level:
+        target_line = (
+            f"- `target_difficulty_level` mora biti TAČNO {target_level}. To je "
+            "serverska odluka, ne procjena: napravi zadatak koji STVARNO "
+            f"pripada nivou {target_level} i deklariši baš taj broj;\n")
+    return (target_line + (
         "SERVERSKA ODLUKA O OVOM TURNU (nije prijedlog):\n"
         f"- {reason}, pa `intent` mora biti tačno `{required_task_intent}`, a "
         "`new_task` OBAVEZAN;\n"
@@ -632,11 +642,12 @@ def _required_task_block(required_task_intent):
         "- NIKAD ne odgovaraj rečenicom tipa „već si na najtežem nivou, hoćeš "
         "li drugi iste težine?“ — takav odgovor server odbija i učenik ostaje "
         "bez zadatka."
-    )
+    ))
 
 
 def build_tutor_input(context, session, student_message, trusted_verdict=None,
-                      ui_action="", escalation_block="", required_task_intent=""):
+                      ui_action="", escalation_block="", required_task_intent="",
+                      target_level=None):
     """`escalation_block` je serverski zahtjev za raznolikošću (pilot) ili "".
 
     Prazan string znači da se ulaz ne mijenja ni za jedan znak u odnosu na
@@ -646,7 +657,7 @@ def build_tutor_input(context, session, student_message, trusted_verdict=None,
         _lesson_block(context),
         _state_block(session, student_message, trusted_verdict, ui_action),
     ]
-    required_block = _required_task_block(required_task_intent)
+    required_block = _required_task_block(required_task_intent, target_level)
     if required_block:
         blocks.append(required_block)
     if escalation_block:
