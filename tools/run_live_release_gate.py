@@ -615,6 +615,11 @@ def run_live_release_gate() -> int:
     matbot_logger.addHandler(capture)
     scenario_rows = []
     planned_calls = 0
+    # DOKAZANE ESKALACIJE SE BROJE ODVOJENO. Recenzentski popravak je uslovan i
+    # ne moze se zamrznuti prije turna, ali se ne smije ni tiho progutati: svaki
+    # dodatni poziv mora biti RECENZENTSKA faza scenarija koji je inace prosao
+    # (`_scenario_errors` je vec dokazao sastav poziva i granicu od 2 po turnu).
+    escalated_calls = 0
     actual_calls = 0
     failures: list[str] = []
     infrastructure_failures: list[str] = []
@@ -629,8 +634,13 @@ def run_live_release_gate() -> int:
                                       before.get("current_options", []),
                                       before.get("current_task_signature"),
                                       expected_calls=expected_calls)
+            stages = list(getattr(result, "sdk_call_stages", ()) or ())
+            escalation = sum(1 for name in stages if name in _REVIEWER_STAGE_NAMES)                 if (not errors and expected_calls > 0) else 0
+            escalated_calls += escalation
             scenario_rows.append({"role": gate.role, "expected_sdk_calls": expected_calls,
                                   "expected_call_basis": expected_basis,
+                                  "reviewer_escalation_calls": escalation,
+                                  "sdk_call_stages": stages,
                                   "errors": errors, "result": asdict(result)})
             if result.failure_is_infrastructure:
                 infrastructure_failures.append(gate.role)
@@ -659,8 +669,9 @@ def run_live_release_gate() -> int:
     finished = datetime.now(timezone.utc)
     all_required_completed = len(scenario_rows) == REQUIRED_SCENARIO_COUNT and not failures
     # TACAN UGOVOR je planirani zbir, a plafon je samo gornja granica.
-    passed = bool(all_required_completed and actual_calls == planned_calls
-                  and planned_calls <= SDK_CALL_CEILING
+    passed = bool(all_required_completed
+                  and actual_calls == planned_calls + escalated_calls
+                  and planned_calls + escalated_calls <= SDK_CALL_CEILING
                   and cap_probe_refused and not infrastructure_failures)
     document = {
         "campaign": "release-gate",
@@ -681,6 +692,7 @@ def run_live_release_gate() -> int:
         "required_scenario_count": REQUIRED_SCENARIO_COUNT,
         "sdk_call_ceiling": SDK_CALL_CEILING,
         "planned_sdk_calls": planned_calls,
+        "escalated_sdk_calls": escalated_calls,
         "actual_sdk_calls": actual_calls,
         "call_above_ceiling_refused": cap_probe_refused,
         # Zatečeno ime zadržano zbog starijih čitalaca artefakta; ordinalno je

@@ -76,8 +76,9 @@ def passing_document(commit_sha, tree_hash):
         # SERVER-VLASNIČKA POMOĆ: tačan ugovor je PLANIRANI zbir iz same
         # kampanje (17 statički + izvedeni prvi hint), a 18 je samo plafon.
         "planned_sdk_calls": 17,
+        "escalated_sdk_calls": 0,
         "actual_sdk_calls": 17,
-        "sdk_call_ceiling": 18,
+        "sdk_call_ceiling": 21,
         "call_above_ceiling_refused": True,
         "twentieth_call_refused_before_sdk": True,
         "validation_failures": [],

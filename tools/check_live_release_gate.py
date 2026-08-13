@@ -25,7 +25,9 @@ REQUIRED_SCENARIOS = 14
 # dio plana je 17, a `first_hint` mu dodaje 0 ili 1. Zato se ovdje NE
 # duplira nijedan zbir: tačan ugovor se čita IZ ARTEFAKTA
 # (`planned_sdk_calls`), a ovdje ostaje samo plafon kao gornja granica.
-REQUIRED_CALL_CEILING = 18
+# Plafon MORA pratiti runner (`tools/run_live_release_gate.py`): brza ruta trosi
+# 1 poziv po scenariju, a uslovni recenzentski popravak najvise jos jedan.
+REQUIRED_CALL_CEILING = 21
 MAX_AGE = timedelta(hours=24)
 REQUIRED_PIPELINE = "universal_two_call"
 
@@ -82,8 +84,18 @@ def validate_result(document: dict, *, expected_commit: str | None = None,
     else:
         if planned > REQUIRED_CALL_CEILING:
             errors.append("planned_sdk_calls_above_ceiling")
-        if actual != planned:
+        # Uslovni recenzentski popravak dodaje pozive koji se ne mogu zamrznuti
+        # prije turna. Ne prastaju se paušalno: runner ih broji SAMO kad je
+        # dodatni poziv recenzentska faza scenarija koji je inace prosao.
+        escalated = document.get("escalated_sdk_calls")
+        if escalated is None:
+            errors.append("missing_escalated_sdk_calls")
+        elif not isinstance(escalated, int) or escalated < 0:
+            errors.append("invalid_escalated_sdk_calls")
+        elif actual != planned + escalated:
             errors.append("wrong_sdk_call_count")
+        elif planned + escalated > REQUIRED_CALL_CEILING:
+            errors.append("planned_sdk_calls_above_ceiling")
     if document.get("sdk_call_ceiling") != REQUIRED_CALL_CEILING:
         errors.append("wrong_sdk_call_ceiling")
     if document.get("call_above_ceiling_refused") is not True:

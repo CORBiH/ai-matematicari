@@ -31,8 +31,9 @@ def _passing_document():
         "finished_at": datetime.now(timezone.utc).isoformat(),
         "scenario_count": 14,
         "required_scenario_count": 14,
-        "sdk_call_ceiling": 18,
+        "sdk_call_ceiling": 21,
         "planned_sdk_calls": 17,
+        "escalated_sdk_calls": 0,
         "actual_sdk_calls": 17,
         "call_above_ceiling_refused": True,
         "twentieth_call_refused_before_sdk": True,
@@ -346,7 +347,7 @@ def test_failed_live_gate_console_summary_is_informative_and_does_not_echo_hidde
     assert "FAILED SCENARIO: easier_level1" in report
     assert "REASON: difficulty_direction_not_measurable" in report
     assert "LEVELS: previous=2 target=1 committed=2" in report
-    assert "SDK CALLS: 9/17 (ceiling 18)" in report
+    assert "SDK CALLS: 9/17 (ceiling 21)" in report
     assert "STATE PRESERVED: true" in report
     assert "SECRET" not in report
 

@@ -154,10 +154,37 @@ def test_f_offline_validator_requires_actual_to_equal_planned(
         assert expected_error in errors
 
 
+@pytest.mark.parametrize("planned,escalated,actual,expected_error", [
+    # Dokazana eskalacija se PRIZNAJE, ali samo tacno onoliko koliko je brojana.
+    (10, 2, 12, None),
+    (10, 0, 12, "wrong_sdk_call_count"),
+    (10, 2, 13, "wrong_sdk_call_count"),
+    (10, 2, 11, "wrong_sdk_call_count"),
+])
+def test_f_escalation_calls_must_be_counted_not_forgiven(
+        planned, escalated, actual, expected_error, passing_document):
+    """Uslovni recenzentski popravak se ne moze zamrznuti prije turna, ali se ne
+    smije ni tiho progutati: artefakt mora nositi TACAN broj eskalacija."""
+    document = dict(passing_document, planned_sdk_calls=planned,
+                    escalated_sdk_calls=escalated, actual_sdk_calls=actual)
+    errors = checker.validate_result(document)
+    if expected_error is None:
+        assert "wrong_sdk_call_count" not in errors
+    else:
+        assert expected_error in errors
+
+
+def test_f_artifact_without_escalation_count_is_refused(passing_document):
+    """Zatecen (stari) artefakt nema polje — i ne smije proci."""
+    document = dict(passing_document)
+    document.pop("escalated_sdk_calls")
+    assert "missing_escalated_sdk_calls" in checker.validate_result(document)
+
+
 def test_g_plan_may_never_exceed_the_ceiling(passing_document):
     assert runner.max_planned_calls(
         runner.build_release_gate_plan("0123456789abcdef" * 4)) <= runner.SDK_CALL_CEILING
-    over = dict(passing_document, planned_sdk_calls=19, actual_sdk_calls=19)
+    over = dict(passing_document, planned_sdk_calls=22, actual_sdk_calls=22)
     assert "planned_sdk_calls_above_ceiling" in checker.validate_result(over)
 
 
@@ -248,7 +275,8 @@ def passing_document():
         "difficulty_levels_enabled": True,
         "finished_at": datetime.now(timezone.utc).isoformat(),
         "scenario_count": 14, "required_scenario_count": 14,
-        "sdk_call_ceiling": 18, "planned_sdk_calls": 17, "actual_sdk_calls": 17,
+        "sdk_call_ceiling": 21, "planned_sdk_calls": 17, "actual_sdk_calls": 17,
+        "escalated_sdk_calls": 0,
         "call_above_ceiling_refused": True,
         "twentieth_call_refused_before_sdk": True,
         "validation_failures": [], "infrastructure_failures": [],
