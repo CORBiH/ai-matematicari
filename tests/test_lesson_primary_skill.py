@@ -99,10 +99,30 @@ def test_context_carries_the_primary_skill():
 
 
 def test_prompt_states_the_primary_skill_as_binding():
-    lesson_id, row = _lesson_with_objectives()
-    context = lesson_context.build(row["grade"], lesson_id)
+    """Ručno pisan opseg je provjeren i zato OBAVEZUJE."""
+    context = lesson_context.LessonContext(
+        grade=6, topic_id="6-01-001", title="Pojam skupa", oblast_id="6-01",
+        oblast="Skupovi i skupovne operacije",
+        objectives=("prepoznati element skupa",), objectives_source="authored")
     block = tutor_prompts._lesson_block(context)
     assert "PRIMARNA VJEŠTINA OVE LEKCIJE" in block
+    assert "prepoznati element skupa" in block
+    assert "NISU dovoljni" in block
+
+
+def test_compiled_objectives_frame_the_lesson_but_never_override_the_title():
+    """AUTOMATSKI IZVUČEN ISHOD NIJE NAREDBA (živi nalaz, val 2).
+
+    Kanonsko mapiranje je grubo i zna prenijeti ishod s druge lekcije. Kao
+    OBAVEZAN cilj takva rečenica gura generisanje s lekcije, pa izvučeni ishodi
+    ostaju okvir, a cilj ostaje ono što naslov imenuje."""
+    lesson_id, row = _lesson_with_objectives()
+    context = lesson_context.build(row["grade"], lesson_id)
+    assert context.objectives_source == "compiled"
+    block = tutor_prompts._lesson_block(context)
+    assert "kurikularni okvir ove lekcije" in block
+    assert "PRIMARNA VJEŠTINA OVE LEKCIJE" not in block
+    assert "CILJ ostaje ono što naslov lekcije imenuje" in block
     assert row["primary_skills"][0][:40] in block
     assert "NISU dovoljni" in block
 

@@ -150,7 +150,7 @@
    "grade": 6,
    "primary_skills": [
     "formirati pojam uređeni par",
-    "rješavati jednostavne zadatke u vezi s procentima Uređeni par Koordinatna ravan Koordinatni početak Koordinatne ose Pravougli koordinatni sistem Koordinate tačke Razmjera Proporcija…",
+    "rješavati jednostavne zadatke u vezi s procentima Uređeni par Koordinatna ravan Koordinatni početak Koordinatne ose Pravougli koordinatni sistem Koordinate tačke",
     "formirati uređeni par čije komponente zadovoljavaju određene relacije (rješenje sistema)"
    ],
    "supporting_concepts": [],
@@ -897,16 +897,14 @@
   "6-06-002": {
    "grade": 6,
    "primary_skills": [
-    "izračunavati procenat ma kojeg broja",
-    "rješavati jednostavne zadatke u vezi s procentima Uređeni par Koordinatna ravan Koordinatni početak Koordinatne ose Pravougli koordinatni sistem Koordinate tačke Razmjera Proporcija…"
+    "izračunavati procenat ma kojeg broja"
    ],
    "supporting_concepts": [],
    "neighbour_exclusions": [
     "rješavati tekstualne zadatke"
    ],
    "evidence_ids": [
-    "KS_2018-0056",
-    "KS_2018-0237"
+    "KS_2018-0056"
    ],
    "objective_source": "npp_exact_mapping",
    "objective_confidence": "high"
@@ -1105,17 +1103,17 @@
   "6-08-005": {
    "grade": 6,
    "primary_skills": [
-    "koristiti formulu za računanje površine kružnog isječka i kružnog prstena Kružnica Krug Poluprečnik Tetiva Prečnik Sječica Tangenta Centralni i periferijski ugao kruga Broj Obim kruga…",
     "definisati i razlikovati krug i kružnicu",
     "Da obnove i prodube znanja o kružnici i krugu",
+    "koristiti formulu za računanje površine kružnog isječka i kružnog prstena",
     "koristi skupove i skupovne operacije u primjerima iz svakodnevnog života, uz grafičku ilustraciju"
    ],
    "supporting_concepts": [],
    "neighbour_exclusions": [],
    "evidence_ids": [
-    "KS_2018-0312",
     "KS_2018-0017",
     "RS_2014-0018",
+    "KS_2018-0312",
     "KS_2018-0012"
    ],
    "objective_source": "npp_exact_mapping",
@@ -2054,9 +2052,9 @@
    ],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "objašnjavati svojstva srednje duži trougla. kružnice trougla Težišna duž, težišnica, medijana Težište trougla Srednja linija trougla Visina trougla Ortocentar Opisana i upisana kružnica…",
+    "objašnjavati svojstva srednje duži trougla. kružnice trougla Težišna duž, težišnica, medijana Težište trougla Srednja linija trougla Visina trougla",
     "objašnjavati pojmove: obim i površina (trougla, četverougla)",
-    "primjenjivati formule za računanje obima i površine pravougaonika, kvadrata, romba, paralelograma, trougla, trapeza i četvorougla s uzajamno normalnim dijagonalama Kvadrat Romb Trapez…",
+    "primjenjivati formule za računanje obima i površine pravougaonika, kvadrata, romba, paralelograma, trougla, trapeza i četvorougla s uzajamno normalnim dijagonalama",
     "Izračunava veličinu površine pravougaonika, kvadrata, paralelograma, trougla, trapeza i četverougla sa normalnim dijagonalama"
    ],
    "evidence_ids": [
@@ -2075,8 +2073,8 @@
    ],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "objašnjavati svojstva srednje duži trougla. kružnice trougla Težišna duž, težišnica, medijana Težište trougla Srednja linija trougla Visina trougla Ortocentar Opisana i upisana kružnica…",
-    "primjenjivati formule za računanje obima i površine pravougaonika, kvadrata, romba, paralelograma, trougla, trapeza i četvorougla s uzajamno normalnim dijagonalama Kvadrat Romb Trapez…"
+    "objašnjavati svojstva srednje duži trougla. kružnice trougla Težišna duž, težišnica, medijana Težište trougla Srednja linija trougla Visina trougla",
+    "primjenjivati formule za računanje obima i površine pravougaonika, kvadrata, romba, paralelograma, trougla, trapeza i četvorougla s uzajamno normalnim dijagonalama"
    ],
    "evidence_ids": [
     "KS_2018-0093",
@@ -2757,13 +2755,13 @@
   "7-04-003": {
    "grade": 7,
    "primary_skills": [
-    "da je zbir spoljašnjih uglova trougla jednak 360 , Trougao Elementi trougla Zbir unutrašnjih uglova trougla Zbir vanjskih uglova trougla Konstrukcije nekih uglova Podudarnost trouglova…",
-    "izvoditi elementarne konstrukcije Četverougao Stranice, uglovi (unutrašnji, i spoljašnji), tjemena (vrhovi) dijagonale Konveksni i nekonveksni četverouglovi Konstrukcije četverougla…"
+    "da je zbir spoljašnjih uglova trougla jednak 360",
+    "izvoditi elementarne konstrukcije"
    ],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "objašnjavati svojstva srednje duži trougla. kružnice trougla Težišna duž, težišnica, medijana Težište trougla Srednja linija trougla Visina trougla Ortocentar Opisana i upisana kružnica…",
-    "primjenjivati formule za računanje obima i površine pravougaonika, kvadrata, romba, paralelograma, trougla, trapeza i četvorougla s uzajamno normalnim dijagonalama Kvadrat Romb Trapez…"
+    "objašnjavati svojstva srednje duži trougla. kružnice trougla Težišna duž, težišnica, medijana Težište trougla Srednja linija trougla Visina trougla",
+    "primjenjivati formule za računanje obima i površine pravougaonika, kvadrata, romba, paralelograma, trougla, trapeza i četvorougla s uzajamno normalnim dijagonalama"
    ],
    "evidence_ids": [
     "KS_2018-0135",
@@ -2777,7 +2775,7 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "primjenjivati formule za računanje obima i površine pravougaonika, kvadrata, romba, paralelograma, trougla, trapeza i četvorougla s uzajamno normalnim dijagonalama Kvadrat Romb Trapez…"
+    "primjenjivati formule za računanje obima i površine pravougaonika, kvadrata, romba, paralelograma, trougla, trapeza i četvorougla s uzajamno normalnim dijagonalama"
    ],
    "evidence_ids": [],
    "objective_source": "npp_neighbour_only",
@@ -2786,18 +2784,18 @@
   "7-04-005": {
    "grade": 7,
    "primary_skills": [
-    "da je zbir spoljašnjih uglova trougla jednak 360 , Trougao Elementi trougla Zbir unutrašnjih uglova trougla Zbir vanjskih uglova trougla Konstrukcije nekih uglova Podudarnost trouglova…",
     "definisati trougao i njegove elemente",
     "uočavati zavisnosti među datim elementima trougla kao i za utvrđivanje redoslijeda konstruktivnih koraka",
-    "Da znaju nabrojati elemente trougla, izračunavati uglove trougla"
+    "Da znaju nabrojati elemente trougla, izračunavati uglove trougla",
+    "da je zbir spoljašnjih uglova trougla jednak 360"
    ],
    "supporting_concepts": [],
    "neighbour_exclusions": [],
    "evidence_ids": [
-    "KS_2018-0135",
     "KS_2018-0128",
     "KS_2018-0145",
-    "RS_2014-0044"
+    "RS_2014-0044",
+    "KS_2018-0135"
    ],
    "objective_source": "npp_exact_mapping",
    "objective_confidence": "high"
@@ -2838,9 +2836,9 @@
   "7-04-008": {
    "grade": 7,
    "primary_skills": [
-    "da je zbir spoljašnjih uglova trougla jednak 360 , Trougao Elementi trougla Zbir unutrašnjih uglova trougla Zbir vanjskih uglova trougla Konstrukcije nekih uglova Podudarnost trouglova…",
     "da je zbir unutrašnjih uglova trougla jednak 180",
-    "da je spoljašnji ugao trougla jednak zbiru dva njemu nesusjedna unutrašnja ugla"
+    "da je spoljašnji ugao trougla jednak zbiru dva njemu nesusjedna unutrašnja ugla",
+    "da je zbir spoljašnjih uglova trougla jednak 360"
    ],
    "supporting_concepts": [
     "slobodno koriste termine stranice, tjemena (vrhovi) i uglovi trougla",
@@ -2849,9 +2847,9 @@
    ],
    "neighbour_exclusions": [],
    "evidence_ids": [
-    "KS_2018-0135",
     "KS_2018-0134",
-    "KS_2018-0136"
+    "KS_2018-0136",
+    "KS_2018-0135"
    ],
    "objective_source": "npp_exact_mapping",
    "objective_confidence": "high"
@@ -2875,8 +2873,8 @@
   "7-04-010": {
    "grade": 7,
    "primary_skills": [
-    "da je zbir spoljašnjih uglova trougla jednak 360 , Trougao Elementi trougla Zbir unutrašnjih uglova trougla Zbir vanjskih uglova trougla Konstrukcije nekih uglova Podudarnost trouglova…",
-    "da je zbir unutrašnjih uglova trougla jednak 180"
+    "da je zbir unutrašnjih uglova trougla jednak 180",
+    "da je zbir spoljašnjih uglova trougla jednak 360"
    ],
    "supporting_concepts": [
     "slobodno koriste termine stranice, tjemena (vrhovi) i uglovi trougla",
@@ -2884,8 +2882,8 @@
    ],
    "neighbour_exclusions": [],
    "evidence_ids": [
-    "KS_2018-0135",
-    "KS_2018-0134"
+    "KS_2018-0134",
+    "KS_2018-0135"
    ],
    "objective_source": "npp_exact_mapping",
    "objective_confidence": "high"
@@ -2924,63 +2922,71 @@
   },
   "7-04-013": {
    "grade": 7,
-   "primary_skills": [
-    "da je zbir spoljašnjih uglova trougla jednak 360 , Trougao Elementi trougla Zbir unutrašnjih uglova trougla Zbir vanjskih uglova trougla Konstrukcije nekih uglova Podudarnost trouglova…"
-   ],
+   "primary_skills": [],
    "supporting_concepts": [
+    "da je zbir spoljašnjih uglova trougla jednak 360",
     "razlikuju unutrašnje i spoljašnje uglove trougla"
    ],
-   "neighbour_exclusions": [],
-   "evidence_ids": [
-    "KS_2018-0135"
+   "neighbour_exclusions": [
+    "Uglovi sa paralelnim kracima",
+    "Uglovi sa normalnim kracima",
+    "Konstrukcije uglova 60°, 30°, 90° i 45°",
+    "Konstrukcije izvedenih uglova 15°, 75°, 105°, 120° i 135°"
    ],
-   "objective_source": "npp_exact_mapping",
-   "objective_confidence": "high"
+   "evidence_ids": [],
+   "objective_source": "canonical_lesson_scope",
+   "objective_confidence": "low"
   },
   "7-04-014": {
    "grade": 7,
-   "primary_skills": [
-    "da je zbir spoljašnjih uglova trougla jednak 360 , Trougao Elementi trougla Zbir unutrašnjih uglova trougla Zbir vanjskih uglova trougla Konstrukcije nekih uglova Podudarnost trouglova…"
-   ],
+   "primary_skills": [],
    "supporting_concepts": [
+    "da je zbir spoljašnjih uglova trougla jednak 360",
     "razlikuju unutrašnje i spoljašnje uglove trougla"
    ],
-   "neighbour_exclusions": [],
-   "evidence_ids": [
-    "KS_2018-0135"
+   "neighbour_exclusions": [
+    "Uglovi sa paralelnim kracima",
+    "Uglovi sa normalnim kracima",
+    "Konstrukcije uglova 60°, 30°, 90° i 45°",
+    "Konstrukcije izvedenih uglova 15°, 75°, 105°, 120° i 135°"
    ],
-   "objective_source": "npp_exact_mapping",
-   "objective_confidence": "high"
+   "evidence_ids": [],
+   "objective_source": "canonical_lesson_scope",
+   "objective_confidence": "low"
   },
   "7-04-015": {
    "grade": 7,
-   "primary_skills": [
-    "da je zbir spoljašnjih uglova trougla jednak 360 , Trougao Elementi trougla Zbir unutrašnjih uglova trougla Zbir vanjskih uglova trougla Konstrukcije nekih uglova Podudarnost trouglova…"
-   ],
+   "primary_skills": [],
    "supporting_concepts": [
+    "da je zbir spoljašnjih uglova trougla jednak 360",
     "razlikuju unutrašnje i spoljašnje uglove trougla"
    ],
-   "neighbour_exclusions": [],
-   "evidence_ids": [
-    "KS_2018-0135"
+   "neighbour_exclusions": [
+    "Uglovi sa paralelnim kracima",
+    "Uglovi sa normalnim kracima",
+    "Konstrukcije uglova 60°, 30°, 90° i 45°",
+    "Konstrukcije izvedenih uglova 15°, 75°, 105°, 120° i 135°"
    ],
-   "objective_source": "npp_exact_mapping",
-   "objective_confidence": "high"
+   "evidence_ids": [],
+   "objective_source": "canonical_lesson_scope",
+   "objective_confidence": "low"
   },
   "7-04-016": {
    "grade": 7,
-   "primary_skills": [
-    "da je zbir spoljašnjih uglova trougla jednak 360 , Trougao Elementi trougla Zbir unutrašnjih uglova trougla Zbir vanjskih uglova trougla Konstrukcije nekih uglova Podudarnost trouglova…"
-   ],
+   "primary_skills": [],
    "supporting_concepts": [
+    "da je zbir spoljašnjih uglova trougla jednak 360",
     "razlikuju unutrašnje i spoljašnje uglove trougla"
    ],
-   "neighbour_exclusions": [],
-   "evidence_ids": [
-    "KS_2018-0135"
+   "neighbour_exclusions": [
+    "Uglovi sa paralelnim kracima",
+    "Uglovi sa normalnim kracima",
+    "Konstrukcije uglova 60°, 30°, 90° i 45°",
+    "Konstrukcije izvedenih uglova 15°, 75°, 105°, 120° i 135°"
    ],
-   "objective_source": "npp_exact_mapping",
-   "objective_confidence": "high"
+   "evidence_ids": [],
+   "objective_source": "canonical_lesson_scope",
+   "objective_confidence": "low"
   },
   "7-04-017": {
    "grade": 7,
@@ -3002,7 +3008,7 @@
     "da su uglovi na osnovici jednakokrakog trougla jednaki",
     "da je trougao koji ima dva jednaka ugla jednakokrak",
     "objašnjavati kako se primjenom Pitagorine teoreme određuju nepoznati elementi kvadrata, pravougaonika, jednakokrakog trougla, jednakostraničnog trougla, romba, jednakokrakog i pravouglog…",
-    "primjenjivati formule za računanje obima i površine pravougaonika, kvadrata, romba, paralelograma, trougla, trapeza i četvorougla s uzajamno normalnim dijagonalama Kvadrat Romb Trapez…"
+    "primjenjivati formule za računanje obima i površine pravougaonika, kvadrata, romba, paralelograma, trougla, trapeza i četvorougla s uzajamno normalnim dijagonalama"
    ],
    "supporting_concepts": [],
    "neighbour_exclusions": [],
@@ -3033,20 +3039,20 @@
   "7-04-020": {
    "grade": 7,
    "primary_skills": [
-    "da je zbir spoljašnjih uglova trougla jednak 360 , Trougao Elementi trougla Zbir unutrašnjih uglova trougla Zbir vanjskih uglova trougla Konstrukcije nekih uglova Podudarnost trouglova…",
     "stavove o podudarnosti trouglova primijeniti u izvođenju osnovnih konstrukcija trougla",
-    "izvoditi elementarne konstrukcije trougla"
+    "izvoditi elementarne konstrukcije trougla",
+    "da je zbir spoljašnjih uglova trougla jednak 360"
    ],
    "supporting_concepts": [
     "razlikuju unutrašnje i spoljašnje uglove trougla"
    ],
    "neighbour_exclusions": [
-    "primjenjivati formule za računanje obima i površine pravougaonika, kvadrata, romba, paralelograma, trougla, trapeza i četvorougla s uzajamno normalnim dijagonalama Kvadrat Romb Trapez…"
+    "primjenjivati formule za računanje obima i površine pravougaonika, kvadrata, romba, paralelograma, trougla, trapeza i četvorougla s uzajamno normalnim dijagonalama"
    ],
    "evidence_ids": [
-    "KS_2018-0135",
     "KS_2018-0142",
-    "KS_2018-0143"
+    "KS_2018-0143",
+    "KS_2018-0135"
    ],
    "objective_source": "npp_exact_mapping",
    "objective_confidence": "high"
@@ -3084,18 +3090,18 @@
   "7-04-023": {
    "grade": 7,
    "primary_skills": [
-    "objašnjavati svojstva srednje duži trougla. kružnice trougla Težišna duž, težišnica, medijana Težište trougla Srednja linija trougla Visina trougla Ortocentar Opisana i upisana kružnica…",
     "konstruisati visinu trougla",
-    "znati da se visine trougla sijeku u jednoj tački"
+    "znati da se visine trougla sijeku u jednoj tački",
+    "objašnjavati svojstva srednje duži trougla. kružnice trougla Težišna duž, težišnica, medijana Težište trougla Srednja linija trougla Visina trougla"
    ],
    "supporting_concepts": [
     "objašnjavati gdje se nalazi ortocentar kod oštrouglog, pravouglog i tupouglog trougla"
    ],
    "neighbour_exclusions": [],
    "evidence_ids": [
-    "KS_2018-0155",
     "KS_2018-0150",
-    "KS_2018-0151"
+    "KS_2018-0151",
+    "KS_2018-0155"
    ],
    "objective_source": "npp_exact_mapping",
    "objective_confidence": "high"
@@ -3103,7 +3109,7 @@
   "7-04-024": {
    "grade": 7,
    "primary_skills": [
-    "objašnjavati svojstva srednje duži trougla. kružnice trougla Težišna duž, težišnica, medijana Težište trougla Srednja linija trougla Visina trougla Ortocentar Opisana i upisana kružnica…",
+    "objašnjavati svojstva srednje duži trougla. kružnice trougla Težišna duž, težišnica, medijana Težište trougla Srednja linija trougla Visina trougla",
     "znati da se težišne duži trougla sijeku u jednoj tački",
     "konstruisati težišnu duž trougla"
    ],
@@ -3120,7 +3126,7 @@
   "7-04-025": {
    "grade": 7,
    "primary_skills": [
-    "objašnjavati svojstva srednje duži trougla. kružnice trougla Težišna duž, težišnica, medijana Težište trougla Srednja linija trougla Visina trougla Ortocentar Opisana i upisana kružnica…"
+    "objašnjavati svojstva srednje duži trougla. kružnice trougla Težišna duž, težišnica, medijana Težište trougla Srednja linija trougla Visina trougla"
    ],
    "supporting_concepts": [],
    "neighbour_exclusions": [],
@@ -3252,7 +3258,7 @@
    "primary_skills": [],
    "supporting_concepts": [],
    "neighbour_exclusions": [
-    "primjenjivati formule za računanje obima i površine pravougaonika, kvadrata, romba, paralelograma, trougla, trapeza i četvorougla s uzajamno normalnim dijagonalama Kvadrat Romb Trapez…"
+    "primjenjivati formule za računanje obima i površine pravougaonika, kvadrata, romba, paralelograma, trougla, trapeza i četvorougla s uzajamno normalnim dijagonalama"
    ],
    "evidence_ids": [],
    "objective_source": "npp_neighbour_only",
@@ -3275,7 +3281,7 @@
    "grade": 7,
    "primary_skills": [
     "objašnjavati svojstva jednakokrakog trapeza",
-    "primjenjivati formule za računanje obima i površine pravougaonika, kvadrata, romba, paralelograma, trougla, trapeza i četvorougla s uzajamno normalnim dijagonalama Kvadrat Romb Trapez…"
+    "primjenjivati formule za računanje obima i površine pravougaonika, kvadrata, romba, paralelograma, trougla, trapeza i četvorougla s uzajamno normalnim dijagonalama"
    ],
    "supporting_concepts": [],
    "neighbour_exclusions": [],
@@ -3289,17 +3295,17 @@
   "7-05-012": {
    "grade": 7,
    "primary_skills": [
-    "objašnjavati svojstva srednje duži trougla. kružnice trougla Težišna duž, težišnica, medijana Težište trougla Srednja linija trougla Visina trougla Ortocentar Opisana i upisana kružnica…",
-    "primjenjivati formule za računanje obima i površine pravougaonika, kvadrata, romba, paralelograma, trougla, trapeza i četvorougla s uzajamno normalnim dijagonalama Kvadrat Romb Trapez…",
+    "objašnjavati svojstva srednje duži trougla. kružnice trougla Težišna duž, težišnica, medijana Težište trougla Srednja linija trougla Visina trougla",
     "objašnjavati svojstva srednje duži trapeza",
+    "primjenjivati formule za računanje obima i površine pravougaonika, kvadrata, romba, paralelograma, trougla, trapeza i četvorougla s uzajamno normalnim dijagonalama",
     "objašnjavati postupak konstrukcije kvadrata čija je površina jednaka zbiru / razlici površina dva zadana kvadrata"
    ],
    "supporting_concepts": [],
    "neighbour_exclusions": [],
    "evidence_ids": [
     "KS_2018-0155",
-    "KS_2018-0167",
     "KS_2018-0162",
+    "KS_2018-0167",
     "KS_2018-0212"
    ],
    "objective_source": "npp_exact_mapping",
@@ -3348,8 +3354,8 @@
   "7-05-016": {
    "grade": 7,
    "primary_skills": [
-    "primjenjivati formule za računanje obima i površine pravougaonika, kvadrata, romba, paralelograma, trougla, trapeza i četvorougla s uzajamno normalnim dijagonalama Kvadrat Romb Trapez…",
-    "objašnjavati svojstva srednje duži trougla. kružnice trougla Težišna duž, težišnica, medijana Težište trougla Srednja linija trougla Visina trougla Ortocentar Opisana i upisana kružnica…"
+    "primjenjivati formule za računanje obima i površine pravougaonika, kvadrata, romba, paralelograma, trougla, trapeza i četvorougla s uzajamno normalnim dijagonalama",
+    "objašnjavati svojstva srednje duži trougla. kružnice trougla Težišna duž, težišnica, medijana Težište trougla Srednja linija trougla Visina trougla"
    ],
    "supporting_concepts": [],
    "neighbour_exclusions": [],
@@ -3363,7 +3369,7 @@
   "7-05-017": {
    "grade": 7,
    "primary_skills": [
-    "primjenjivati formule za računanje obima i površine pravougaonika, kvadrata, romba, paralelograma, trougla, trapeza i četvorougla s uzajamno normalnim dijagonalama Kvadrat Romb Trapez…"
+    "primjenjivati formule za računanje obima i površine pravougaonika, kvadrata, romba, paralelograma, trougla, trapeza i četvorougla s uzajamno normalnim dijagonalama"
    ],
    "supporting_concepts": [],
    "neighbour_exclusions": [],
@@ -3390,7 +3396,7 @@
   "7-05-019": {
    "grade": 7,
    "primary_skills": [
-    "primjenjivati formule za računanje obima i površine pravougaonika, kvadrata, romba, paralelograma, trougla, trapeza i četvorougla s uzajamno normalnim dijagonalama Kvadrat Romb Trapez…",
+    "primjenjivati formule za računanje obima i površine pravougaonika, kvadrata, romba, paralelograma, trougla, trapeza i četvorougla s uzajamno normalnim dijagonalama",
     "Izračunava veličinu površine pravougaonika, kvadrata, paralelograma, trougla, trapeza i četverougla sa normalnim dijagonalama",
     "primjenjivati zajednička i posebna svojstva paralelograma, pravougaonika, kvadrata, romba",
     "Učenici treba da znaju osnovna svojstva paralelograma, pravougaonika, kvadrata, romba, trapeza, deltoida"
@@ -3400,7 +3406,7 @@
     "definisati simetralu duži i ugla",
     "konstruisati simetralu duži i ugla",
     "izvoditi operacije u skupu racionalnim postupkom",
-    "da je zbir spoljašnjih uglova trougla jednak 360 , Trougao Elementi trougla Zbir unutrašnjih uglova trougla Zbir vanjskih uglova trougla Konstrukcije nekih uglova Podudarnost trouglova…"
+    "da je zbir spoljašnjih uglova trougla jednak 360"
    ],
    "evidence_ids": [
     "KS_2018-0167",
@@ -3414,14 +3420,14 @@
   "7-05-020": {
    "grade": 7,
    "primary_skills": [
-    "primjenjivati formule za računanje obima i površine pravougaonika, kvadrata, romba, paralelograma, trougla, trapeza i četvorougla s uzajamno normalnim dijagonalama Kvadrat Romb Trapez…"
+    "primjenjivati formule za računanje obima i površine pravougaonika, kvadrata, romba, paralelograma, trougla, trapeza i četvorougla s uzajamno normalnim dijagonalama"
    ],
    "supporting_concepts": [],
    "neighbour_exclusions": [
     "definisati simetralu duži i ugla",
     "konstruisati simetralu duži i ugla",
     "izvoditi operacije u skupu racionalnim postupkom",
-    "da je zbir spoljašnjih uglova trougla jednak 360 , Trougao Elementi trougla Zbir unutrašnjih uglova trougla Zbir vanjskih uglova trougla Konstrukcije nekih uglova Podudarnost trouglova…"
+    "da je zbir spoljašnjih uglova trougla jednak 360"
    ],
    "evidence_ids": [
     "KS_2018-0167"
@@ -3433,8 +3439,8 @@
    "grade": 7,
    "primary_skills": [
     "objašnjavati pojmove: obim i površina (trougla, četverougla)",
-    "primjenjivati formule za računanje obima i površine pravougaonika, kvadrata, romba, paralelograma, trougla, trapeza i četvorougla s uzajamno normalnim dijagonalama Kvadrat Romb Trapez…",
-    "objašnjavati svojstva srednje duži trougla. kružnice trougla Težišna duž, težišnica, medijana Težište trougla Srednja linija trougla Visina trougla Ortocentar Opisana i upisana kružnica…",
+    "primjenjivati formule za računanje obima i površine pravougaonika, kvadrata, romba, paralelograma, trougla, trapeza i četvorougla s uzajamno normalnim dijagonalama",
+    "objašnjavati svojstva srednje duži trougla. kružnice trougla Težišna duž, težišnica, medijana Težište trougla Srednja linija trougla Visina trougla",
     "Učenik treba da zna da definiše jednakosti površina geometrijskih figura"
    ],
    "supporting_concepts": [
@@ -3453,7 +3459,7 @@
   "7-05-022": {
    "grade": 7,
    "primary_skills": [
-    "primjenjivati formule za računanje obima i površine pravougaonika, kvadrata, romba, paralelograma, trougla, trapeza i četvorougla s uzajamno normalnim dijagonalama Kvadrat Romb Trapez…"
+    "primjenjivati formule za računanje obima i površine pravougaonika, kvadrata, romba, paralelograma, trougla, trapeza i četvorougla s uzajamno normalnim dijagonalama"
    ],
    "supporting_concepts": [],
    "neighbour_exclusions": [],
@@ -3563,16 +3569,19 @@
   },
   "7-06-005": {
    "grade": 7,
-   "primary_skills": [
-    "koristiti formulu za računanje površine kružnog isječka i kružnog prstena Kružnica Krug Poluprečnik Tetiva Prečnik Sječica Tangenta Centralni i periferijski ugao kruga Broj Obim kruga…"
+   "primary_skills": [],
+   "supporting_concepts": [
+    "koristiti formulu za računanje površine kružnog isječka i kružnog prstena"
    ],
-   "supporting_concepts": [],
-   "neighbour_exclusions": [],
-   "evidence_ids": [
-    "KS_2018-0312"
+   "neighbour_exclusions": [
+    "Tačka, prava, ravan, poluprava i duž",
+    "Geometrijske figure kao skupovi tačaka",
+    "Izlomljena linija",
+    "Mnogougao/mnogokut"
    ],
-   "objective_source": "npp_exact_mapping",
-   "objective_confidence": "high"
+   "evidence_ids": [],
+   "objective_source": "canonical_lesson_scope",
+   "objective_confidence": "low"
   },
   "7-06-006": {
    "grade": 7,
@@ -3962,7 +3971,7 @@
   "8-02-002": {
    "grade": 8,
    "primary_skills": [
-    "rješavati jednostavne zadatke u vezi s procentima Uređeni par Koordinatna ravan Koordinatni početak Koordinatne ose Pravougli koordinatni sistem Koordinate tačke Razmjera Proporcija…",
+    "rješavati jednostavne zadatke u vezi s procentima Uređeni par Koordinatna ravan Koordinatni početak Koordinatne ose Pravougli koordinatni sistem Koordinate tačke",
     "određivati koordinate zadate tačke u koordinatnoj ravni",
     "Ukazati na obostrano jednoznačno pridruživanje uređenih parova realnih brojeva tačkama pravouglog koordinatnog sistema",
     "određivati tačku u koordinatnoj ravni sa zadatim koordinatama"
@@ -4254,14 +4263,14 @@
   "8-03-008": {
    "grade": 8,
    "primary_skills": [
-    "izračunati dužine stranica, obim i površinu sličnih trouglova Duž Mjerenje duži Razmjera duži Proporcionalne duži Talesova teorema Podjela duži Četvrta geometrijska proporcionala Slični…",
-    "objašnjavati pojmove razmjere i proporcionalnosti duži"
+    "objašnjavati pojmove razmjere i proporcionalnosti duži",
+    "izračunati dužine stranica, obim i površinu sličnih trouglova"
    ],
    "supporting_concepts": [],
    "neighbour_exclusions": [],
    "evidence_ids": [
-    "KS_2018-0220",
-    "KS_2018-0214"
+    "KS_2018-0214",
+    "KS_2018-0220"
    ],
    "objective_source": "npp_exact_mapping",
    "objective_confidence": "high"
@@ -4284,16 +4293,19 @@
   },
   "8-03-010": {
    "grade": 8,
-   "primary_skills": [
-    "izračunati dužine stranica, obim i površinu sličnih trouglova Duž Mjerenje duži Razmjera duži Proporcionalne duži Talesova teorema Podjela duži Četvrta geometrijska proporcionala Slični…"
+   "primary_skills": [],
+   "supporting_concepts": [
+    "izračunati dužine stranica, obim i površinu sličnih trouglova"
    ],
-   "supporting_concepts": [],
-   "neighbour_exclusions": [],
-   "evidence_ids": [
-    "KS_2018-0220"
+   "neighbour_exclusions": [
+    "Razmjera i omjer veličina",
+    "Proporcija i osnovno svojstvo",
+    "Nepoznati član proporcije",
+    "Prepoznavanje direktne proporcionalnosti"
    ],
-   "objective_source": "npp_exact_mapping",
-   "objective_confidence": "high"
+   "evidence_ids": [],
+   "objective_source": "canonical_lesson_scope",
+   "objective_confidence": "low"
   },
   "8-03-011": {
    "grade": 8,
@@ -4327,7 +4339,7 @@
    "grade": 8,
    "primary_skills": [
     "Pravilno formirati pojam koeficijenta sličnosti",
-    "izračunati dužine stranica, obim i površinu sličnih trouglova Duž Mjerenje duži Razmjera duži Proporcionalne duži Talesova teorema Podjela duži Četvrta geometrijska proporcionala Slični…"
+    "izračunati dužine stranica, obim i površinu sličnih trouglova"
    ],
    "supporting_concepts": [],
    "neighbour_exclusions": [],
@@ -4356,7 +4368,7 @@
   "8-03-015": {
    "grade": 8,
    "primary_skills": [
-    "izračunati dužine stranica, obim i površinu sličnih trouglova Duž Mjerenje duži Razmjera duži Proporcionalne duži Talesova teorema Podjela duži Četvrta geometrijska proporcionala Slični…"
+    "izračunati dužine stranica, obim i površinu sličnih trouglova"
    ],
    "supporting_concepts": [],
    "neighbour_exclusions": [],
@@ -4369,7 +4381,7 @@
   "8-03-016": {
    "grade": 8,
    "primary_skills": [
-    "izračunati dužine stranica, obim i površinu sličnih trouglova Duž Mjerenje duži Razmjera duži Proporcionalne duži Talesova teorema Podjela duži Četvrta geometrijska proporcionala Slični…",
+    "izračunati dužine stranica, obim i površinu sličnih trouglova",
     "usvojiti pojam sličnosti trouglova"
    ],
    "supporting_concepts": [],
@@ -4426,14 +4438,14 @@
   "8-03-020": {
    "grade": 8,
    "primary_skills": [
-    "izračunati dužine stranica, obim i površinu sličnih trouglova Duž Mjerenje duži Razmjera duži Proporcionalne duži Talesova teorema Podjela duži Četvrta geometrijska proporcionala Slični…",
-    "primjenjivati direktnu i obrnutu proporcionalnost u različitim kontekstima (sraazmjerni račun, kamatni račun, procentni račun, proporcionalna podjela)"
+    "primjenjivati direktnu i obrnutu proporcionalnost u različitim kontekstima (sraazmjerni račun, kamatni račun, procentni račun, proporcionalna podjela)",
+    "izračunati dužine stranica, obim i površinu sličnih trouglova"
    ],
    "supporting_concepts": [],
    "neighbour_exclusions": [],
    "evidence_ids": [
-    "KS_2018-0220",
-    "KS_2018-0232"
+    "KS_2018-0232",
+    "KS_2018-0220"
    ],
    "objective_source": "npp_exact_mapping",
    "objective_confidence": "high"
@@ -4486,7 +4498,7 @@
   "8-04-004": {
    "grade": 8,
    "primary_skills": [
-    "primjenjivati formule za računanje obima i površine pravougaonika, kvadrata, romba, paralelograma, trougla, trapeza i četvorougla s uzajamno normalnim dijagonalama Kvadrat Romb Trapez…",
+    "primjenjivati formule za računanje obima i površine pravougaonika, kvadrata, romba, paralelograma, trougla, trapeza i četvorougla s uzajamno normalnim dijagonalama",
     "objašnjavati postupak konstrukcije kvadrata čija je površina jednaka zbiru / razlici površina dva zadana kvadrata"
    ],
    "supporting_concepts": [],
@@ -4572,7 +4584,7 @@
    "grade": 8,
    "primary_skills": [
     "objašnjavati svojstva jednakokrakog trapeza",
-    "primjenjivati formule za računanje obima i površine pravougaonika, kvadrata, romba, paralelograma, trougla, trapeza i četvorougla s uzajamno normalnim dijagonalama Kvadrat Romb Trapez…"
+    "primjenjivati formule za računanje obima i površine pravougaonika, kvadrata, romba, paralelograma, trougla, trapeza i četvorougla s uzajamno normalnim dijagonalama"
    ],
    "supporting_concepts": [],
    "neighbour_exclusions": [],
@@ -4586,14 +4598,14 @@
   "8-04-011": {
    "grade": 8,
    "primary_skills": [
-    "primjenjivati formule za računanje obima i površine pravougaonika, kvadrata, romba, paralelograma, trougla, trapeza i četvorougla s uzajamno normalnim dijagonalama Kvadrat Romb Trapez…",
-    "objašnjavati kako se primjenom Pitagorine teoreme određuju nepoznati elementi kvadrata, pravougaonika, jednakokrakog trougla, jednakostraničnog trougla, romba, jednakokrakog i pravouglog…"
+    "objašnjavati kako se primjenom Pitagorine teoreme određuju nepoznati elementi kvadrata, pravougaonika, jednakokrakog trougla, jednakostraničnog trougla, romba, jednakokrakog i pravouglog…",
+    "primjenjivati formule za računanje obima i površine pravougaonika, kvadrata, romba, paralelograma, trougla, trapeza i četvorougla s uzajamno normalnim dijagonalama"
    ],
    "supporting_concepts": [],
    "neighbour_exclusions": [],
    "evidence_ids": [
-    "KS_2018-0167",
-    "KS_2018-0209"
+    "KS_2018-0209",
+    "KS_2018-0167"
    ],
    "objective_source": "npp_exact_mapping",
    "objective_confidence": "high"
@@ -4632,7 +4644,7 @@
     "objašnjavati postupak konstrukcije duži dužine ... i tačaka koje su pridružene brojevima ... na brojevnoj pravoj"
    ],
    "neighbour_exclusions": [
-    "izračunati dužine stranica, obim i površinu sličnih trouglova Duž Mjerenje duži Razmjera duži Proporcionalne duži Talesova teorema Podjela duži Četvrta geometrijska proporcionala Slični…",
+    "izračunati dužine stranica, obim i površinu sličnih trouglova",
     "izračunavati obim i površinu mnogougla",
     "upoređivati i procjenjivati veličine obima i površine mnogougla",
     "odabrati metode rješavanja problemskih situacija povezanih sa izračunavanjem obima i površine mnogouglova Mnogougaona linija Mnogougao, poligon Konveksni i nekonveksni mnogougao Tjemena,…"
@@ -5011,14 +5023,12 @@
   "8-06-003": {
    "grade": 8,
    "primary_skills": [
-    "prikazivati prikupljene podatke o tom obilježju pomoću tablice frekvencija i relativnih frekvencija te grafički pomoću stupčastog dijagrama i kružnog dijagrama",
-    "navesti elementarne događaje Obilježje skupa objekata Frekvencija Relativna frekvencija Tablični prikaz Stupčasti dijagram Kružni dijagram Aritmetička sredina"
+    "prikazivati prikupljene podatke o tom obilježju pomoću tablice frekvencija i relativnih frekvencija te grafički pomoću stupčastog dijagrama i kružnog dijagrama"
    ],
    "supporting_concepts": [],
    "neighbour_exclusions": [],
    "evidence_ids": [
-    "KS_2018-0250",
-    "KS_2018-0253"
+    "KS_2018-0250"
    ],
    "objective_source": "npp_exact_mapping",
    "objective_confidence": "high"
@@ -5040,29 +5050,31 @@
   },
   "8-06-005": {
    "grade": 8,
-   "primary_skills": [
-    "navesti elementarne događaje Obilježje skupa objekata Frekvencija Relativna frekvencija Tablični prikaz Stupčasti dijagram Kružni dijagram Aritmetička sredina"
-   ],
+   "primary_skills": [],
    "supporting_concepts": [],
-   "neighbour_exclusions": [],
-   "evidence_ids": [
-    "KS_2018-0253"
+   "neighbour_exclusions": [
+    "Obilježje, podaci i skup posmatranja",
+    "Frekvencija",
+    "Relativna frekvencija",
+    "Tabela frekvencija"
    ],
-   "objective_source": "npp_exact_mapping",
-   "objective_confidence": "high"
+   "evidence_ids": [],
+   "objective_source": "canonical_lesson_scope",
+   "objective_confidence": "low"
   },
   "8-06-006": {
    "grade": 8,
-   "primary_skills": [
-    "navesti elementarne događaje Obilježje skupa objekata Frekvencija Relativna frekvencija Tablični prikaz Stupčasti dijagram Kružni dijagram Aritmetička sredina"
-   ],
+   "primary_skills": [],
    "supporting_concepts": [],
-   "neighbour_exclusions": [],
-   "evidence_ids": [
-    "KS_2018-0253"
+   "neighbour_exclusions": [
+    "Obilježje, podaci i skup posmatranja",
+    "Frekvencija",
+    "Relativna frekvencija",
+    "Tabela frekvencija"
    ],
-   "objective_source": "npp_exact_mapping",
-   "objective_confidence": "high"
+   "evidence_ids": [],
+   "objective_source": "canonical_lesson_scope",
+   "objective_confidence": "low"
   },
   "8-06-007": {
    "grade": 8,
@@ -5093,14 +5105,12 @@
    "grade": 8,
    "primary_skills": [
     "izračunavati aritmetičku sredinu te interpretirati dobivene podatke usvojiti pojam slučajnog događaja",
-    "navesti elementarne događaje Obilježje skupa objekata Frekvencija Relativna frekvencija Tablični prikaz Stupčasti dijagram Kružni dijagram Aritmetička sredina",
     "Da se upoznaju sa pojmom razmjere i pojmom aritmetičke sredine. 6"
    ],
    "supporting_concepts": [],
    "neighbour_exclusions": [],
    "evidence_ids": [
     "KS_2018-0252",
-    "KS_2018-0253",
     "RS_2014-0027"
    ],
    "objective_source": "npp_exact_mapping",
@@ -5142,7 +5152,7 @@
    "supporting_concepts": [],
    "neighbour_exclusions": [
     "prikazivati prikupljene podatke o tom obilježju pomoću tablice frekvencija i relativnih frekvencija te grafički pomoću stupčastog dijagrama i kružnog dijagrama",
-    "navesti elementarne događaje Obilježje skupa objekata Frekvencija Relativna frekvencija Tablični prikaz Stupčasti dijagram Kružni dijagram Aritmetička sredina"
+    "navesti elementarne događaje Obilježje skupa objekata"
    ],
    "evidence_ids": [],
    "objective_source": "npp_neighbour_only",
@@ -5466,7 +5476,7 @@
    "supporting_concepts": [],
    "neighbour_exclusions": [
     "odabrati metode rješavanja problemskih situacija povezanih sa izračunavanjem obima i površine mnogouglova Mnogougaona linija Mnogougao, poligon Konveksni i nekonveksni mnogougao Tjemena,…",
-    "koristiti formulu za računanje površine kružnog isječka i kružnog prstena Kružnica Krug Poluprečnik Tetiva Prečnik Sječica Tangenta Centralni i periferijski ugao kruga Broj Obim kruga…"
+    "koristiti formulu za računanje površine kružnog isječka i kružnog prstena"
    ],
    "evidence_ids": [],
    "objective_source": "npp_neighbour_only",
@@ -5505,10 +5515,10 @@
   "8-08-009": {
    "grade": 8,
    "primary_skills": [
-    "koristiti formulu za računanje površine kružnog isječka i kružnog prstena Kružnica Krug Poluprečnik Tetiva Prečnik Sječica Tangenta Centralni i periferijski ugao kruga Broj Obim kruga…",
     "broj shvatiti kao omjer obima kruga i prečnika kruga i na osnovu toga računati približnu vrijednost broja",
     "izračunavati obim kruga iz njegovog prečnika i obrnuto",
-    "odabrati metode rješavanja problemskih situacija povezanih sa izračunavanjem obima i površine mnogouglova Mnogougaona linija Mnogougao, poligon Konveksni i nekonveksni mnogougao Tjemena,…"
+    "odabrati metode rješavanja problemskih situacija povezanih sa izračunavanjem obima i površine mnogouglova Mnogougaona linija Mnogougao, poligon Konveksni i nekonveksni mnogougao Tjemena,…",
+    "koristiti formulu za računanje površine kružnog isječka i kružnog prstena"
    ],
    "supporting_concepts": [],
    "neighbour_exclusions": [
@@ -5517,10 +5527,10 @@
     "izraziti obim i površinu kruga brojem ili izračunati približnu, decimalnim brojem iskazanu vrijednost"
    ],
    "evidence_ids": [
-    "KS_2018-0312",
     "KS_2018-0306",
     "KS_2018-0307",
-    "KS_2018-0300"
+    "KS_2018-0300",
+    "KS_2018-0312"
    ],
    "objective_source": "npp_exact_mapping",
    "objective_confidence": "high"
@@ -5529,7 +5539,7 @@
    "grade": 8,
    "primary_skills": [
     "izvesti i koristiti formulu za računanje dužine kružnog luka",
-    "koristiti formulu za računanje površine kružnog isječka i kružnog prstena Kružnica Krug Poluprečnik Tetiva Prečnik Sječica Tangenta Centralni i periferijski ugao kruga Broj Obim kruga…",
+    "koristiti formulu za računanje površine kružnog isječka i kružnog prstena",
     "odabrati metode rješavanja problemskih situacija povezanih sa izračunavanjem obima i površine mnogouglova Mnogougaona linija Mnogougao, poligon Konveksni i nekonveksni mnogougao Tjemena,…"
    ],
    "supporting_concepts": [],
@@ -5545,10 +5555,10 @@
   "8-08-011": {
    "grade": 8,
    "primary_skills": [
-    "koristiti formulu za računanje površine kružnog isječka i kružnog prstena Kružnica Krug Poluprečnik Tetiva Prečnik Sječica Tangenta Centralni i periferijski ugao kruga Broj Obim kruga…",
     "objašnjavati površinu kruga poluprečnika r kao površinu puta veću od površine kvadrata stranice dužine r",
     "koristiti formulu za računanje površine kruga",
-    "izraziti obim i površinu kruga brojem ili izračunati približnu, decimalnim brojem iskazanu vrijednost"
+    "izraziti obim i površinu kruga brojem ili izračunati približnu, decimalnim brojem iskazanu vrijednost",
+    "odabrati metode rješavanja problemskih situacija povezanih sa izračunavanjem obima i površine mnogouglova Mnogougaona linija Mnogougao, poligon Konveksni i nekonveksni mnogougao Tjemena,…"
    ],
    "supporting_concepts": [],
    "neighbour_exclusions": [
@@ -5556,10 +5566,10 @@
     "izračunavati obim kruga iz njegovog prečnika i obrnuto"
    ],
    "evidence_ids": [
-    "KS_2018-0312",
     "KS_2018-0309",
     "KS_2018-0310",
-    "KS_2018-0311"
+    "KS_2018-0311",
+    "KS_2018-0300"
    ],
    "objective_source": "npp_exact_mapping",
    "objective_confidence": "high"
@@ -6472,17 +6482,17 @@
    "grade": 9,
    "primary_skills": [
     "definisati pojmove: linearna jednačina, jednakost, rješenje jednačine, ekvivalentne jednačine, linearna nejednačina, nejednakost, skup rješenja linearne nejednačine, ekvivalentne nejednačine",
-    "primjenjivati elementarne transformacije: Linearna jednačina Jednakost Identitet Rješenje jednačine Ekvivalentne jednačine, Linearna nejednačina Nejednakost, Skup rješenja linearne…",
     "rješavati linearne jednačine i nejednačine sa jednom nepoznatom",
-    "rješavati jednačine na način koji se temelji na rastavljanju polinoma na faktore Stepen, potencija Izložilac,eksponent Osnova, baza Stepenovanje, stepenovanje Množenje i dijeljenje stepena…"
+    "rješavati jednačine na način koji se temelji na rastavljanju polinoma na faktore Stepen, potencija Izložilac,eksponent Osnova, baza Stepenovanje, stepenovanje Množenje i dijeljenje stepena…",
+    "primjenjivati elementarne transformacije: Linearna jednačina"
    ],
    "supporting_concepts": [],
    "neighbour_exclusions": [],
    "evidence_ids": [
     "KS_2018-0355",
-    "KS_2018-0363",
     "KS_2018-0361",
-    "KS_2018-0289"
+    "KS_2018-0289",
+    "KS_2018-0363"
    ],
    "objective_source": "npp_exact_mapping",
    "objective_confidence": "high"
@@ -6491,16 +6501,16 @@
    "grade": 9,
    "primary_skills": [
     "definisati pojmove: linearna jednačina, jednakost, rješenje jednačine, ekvivalentne jednačine, linearna nejednačina, nejednakost, skup rješenja linearne nejednačine, ekvivalentne nejednačine",
-    "primjenjivati elementarne transformacije: Linearna jednačina Jednakost Identitet Rješenje jednačine Ekvivalentne jednačine, Linearna nejednačina Nejednakost, Skup rješenja linearne…",
     "koristiti ekvivalentne jednačine kako bi objasnio promjene u različitim kontekstima",
+    "primjenjivati elementarne transformacije: Linearna jednačina",
     "uočiti linearnu funkcijsku ovisnost u problemima iz prakse Pravougli koordinatni sistem Linearna funkcija Vrijednost funkcije Grafik linearne funkcije Eksplicitni i implicitni oblik…"
    ],
    "supporting_concepts": [],
    "neighbour_exclusions": [],
    "evidence_ids": [
     "KS_2018-0355",
-    "KS_2018-0363",
     "KS_2018-0360",
+    "KS_2018-0363",
     "KS_2018-0354"
    ],
    "objective_source": "npp_exact_mapping",
@@ -6637,16 +6647,16 @@
    "grade": 9,
    "primary_skills": [
     "definisati pojmove: linearna jednačina, jednakost, rješenje jednačine, ekvivalentne jednačine, linearna nejednačina, nejednakost, skup rješenja linearne nejednačine, ekvivalentne nejednačine",
-    "primjenjivati elementarne transformacije: Linearna jednačina Jednakost Identitet Rješenje jednačine Ekvivalentne jednačine, Linearna nejednačina Nejednakost, Skup rješenja linearne…",
     "uočiti linearnu funkcijsku ovisnost u problemima iz prakse Pravougli koordinatni sistem Linearna funkcija Vrijednost funkcije Grafik linearne funkcije Eksplicitni i implicitni oblik…",
+    "primjenjivati elementarne transformacije: Linearna jednačina",
     "da učenici znaju da rješavaju linerane jednačine i nejednačine sa jednom nepoznatom"
    ],
    "supporting_concepts": [],
    "neighbour_exclusions": [],
    "evidence_ids": [
     "KS_2018-0355",
-    "KS_2018-0363",
     "KS_2018-0354",
+    "KS_2018-0363",
     "RS_2014-0118"
    ],
    "objective_source": "npp_exact_mapping",
@@ -6656,15 +6666,15 @@
    "grade": 9,
    "primary_skills": [
     "definisati pojmove: linearna jednačina, jednakost, rješenje jednačine, ekvivalentne jednačine, linearna nejednačina, nejednakost, skup rješenja linearne nejednačine, ekvivalentne nejednačine",
-    "primjenjivati elementarne transformacije: Linearna jednačina Jednakost Identitet Rješenje jednačine Ekvivalentne jednačine, Linearna nejednačina Nejednakost, Skup rješenja linearne…",
-    "uočiti linearnu funkcijsku ovisnost u problemima iz prakse Pravougli koordinatni sistem Linearna funkcija Vrijednost funkcije Grafik linearne funkcije Eksplicitni i implicitni oblik…"
+    "uočiti linearnu funkcijsku ovisnost u problemima iz prakse Pravougli koordinatni sistem Linearna funkcija Vrijednost funkcije Grafik linearne funkcije Eksplicitni i implicitni oblik…",
+    "primjenjivati elementarne transformacije: Linearna jednačina"
    ],
    "supporting_concepts": [],
    "neighbour_exclusions": [],
    "evidence_ids": [
     "KS_2018-0355",
-    "KS_2018-0363",
-    "KS_2018-0354"
+    "KS_2018-0354",
+    "KS_2018-0363"
    ],
    "objective_source": "npp_exact_mapping",
    "objective_confidence": "high"
@@ -7305,20 +7315,20 @@
   "9-07-003": {
    "grade": 9,
    "primary_skills": [
-    "objašnjavati pojmove: osnove (baze), osnovne ivice, bočne ivice, visine, bočne strane, omotač i Rogalj Poliedar Geometrijska tijela Prizma Mreža prizme Osnova (baza) prizme Omotač prizme…",
     "skicirati prizme i njihove mreže",
     "učenik treba da zna da definiše prizmu",
-    "da nacrta mrežu prizme"
+    "da nacrta mrežu prizme",
+    "kombinovati svojstva geometrijskih tijela za rješavanje problemskih zadataka"
    ],
    "supporting_concepts": [
     "prepoznati i opisati prizme"
    ],
    "neighbour_exclusions": [],
    "evidence_ids": [
-    "KS_2018-0379",
     "KS_2018-0381",
     "RS_2014-0122",
-    "RS_2014-0123"
+    "RS_2014-0123",
+    "KS_2018-0402"
    ],
    "objective_source": "npp_exact_mapping",
    "objective_confidence": "high"
@@ -7879,7 +7889,7 @@
   "9-08-002": {
    "grade": 9,
    "primary_skills": [
-    "navesti elementarne događaje Obilježje skupa objekata Frekvencija Relativna frekvencija Tablični prikaz Stupčasti dijagram Kružni dijagram Aritmetička sredina"
+    "navesti elementarne događaje Obilježje skupa objekata"
    ],
    "supporting_concepts": [],
    "neighbour_exclusions": [],

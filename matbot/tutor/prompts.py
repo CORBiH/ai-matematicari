@@ -131,8 +131,22 @@ def _lesson_block(context):
         # stvarna vještina sabiranje razlomaka: brojevi jesu bili iz lekcije,
         # ali se ispitivala SUSJEDNA vještina. Ishodi ispod dolaze iz kanonskog
         # mapiranja NPP-a na lekciju i do sada uopšte nisu stizali do modela.
-        lines.append("- PRIMARNA VJEŠTINA OVE LEKCIJE (zadatak mora ciljati baš "
-                     "nju): " + "; ".join(context.objectives))
+        if getattr(context, "objectives_source", "authored") == "authored":
+            lines.append("- PRIMARNA VJEŠTINA OVE LEKCIJE (zadatak mora ciljati "
+                         "baš nju): " + "; ".join(context.objectives))
+        else:
+            # AUTOMATSKI IZVUČEN ISHOD NIJE NAREDBA (živi nalaz, val 2).
+            # Kanonsko mapiranje je grubo: jedna algebarska lekcija o kvadratu
+            # binoma dobila je kao „primarnu vještinu“ i vjerovatnoću i jednu
+            # geometrijsku konstrukciju — istinite NPP rečenice, prenesene s
+            # drugih lekcija. Kao OBAVEZAN cilj takva rečenica gura generisanje
+            # s lekcije. Kanonski NASLOV je provjeren podatak i ostaje cilj;
+            # izvučeni ishodi su okvir koji ga pojašnjava, ne zamjenjuje.
+            lines.append("- kurikularni okvir ove lekcije (NPP ishodi vezani za "
+                         "nju; okvir, ne spisak dozvoljenih zadataka): "
+                         + "; ".join(context.objectives))
+            lines.append("- CILJ ostaje ono što naslov lekcije imenuje. Ako se "
+                         "neki ishod iznad ne odnosi na ovaj naslov, zanemari ga.")
         lines.append("- ono što učenik mora POKAZATI da zna jeste ta vještina; "
                      "brojevi i pojmovi iz lekcije sami po sebi NISU dovoljni")
     else:

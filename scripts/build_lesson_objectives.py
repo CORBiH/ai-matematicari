@@ -74,6 +74,12 @@ _WORD_RE = re.compile(r"[^\W\d_]{4,}", re.UNICODE)
 # Rečenice u izvoru ponekad nose zalijepljen pojmovnik iza tačke:
 # „… u skupu racionalnim postupkom. Pozitivni racionalni brojevi Negativni …“
 _GLOSSARY_TAIL_RE = re.compile(r"\.\s+(?=[A-ZČĆŽŠĐ])")
+# Pojmovnik se lijepi i BEZ tačke: „… kružnog prstena Kružnica Krug Poluprečnik
+# Tetiva …“. Rez ide pred niz od bar dvije uzastopne riječi velikim početnim
+# slovom koje slijedi riječ malim slovom — jedan velikoslovni pojam ostaje, jer
+# može biti legitiman dio rečenice.
+_GLOSSARY_RUN_RE = re.compile(
+    r"(?<=[a-zćčžšđ,])\s+(?=(?:[A-ZČĆŽŠĐ][\wćčžšđ]*(?:,|\s+|$)){2,})")
 
 
 def _fold(word):
@@ -98,7 +104,8 @@ def _clean(text):
     body = " ".join(normalize_terminology(text or "").split())
     if not body:
         return ""
-    head = _GLOSSARY_TAIL_RE.split(body)[0].strip(" ,;:.")
+    head = _GLOSSARY_RUN_RE.split(
+        _GLOSSARY_TAIL_RE.split(body)[0])[0].strip(" ,;:.")
     if len(head) > MAX_CHARS:
         head = head[:MAX_CHARS].rsplit(" ", 1)[0] + "…"
     return head

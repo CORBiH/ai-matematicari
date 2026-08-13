@@ -45,6 +45,10 @@ class LessonContext:
     operand_constraints: dict = field(default_factory=dict)
     lesson_scope: str = ""
     objectives: tuple = ()
+    # „authored“ = ručno pisan opseg (provjeren), „compiled“ = automatski
+    # izvučen iz NPP mapiranja. Vidi `_lesson_block`: samo prvi smije biti
+    # OBAVEZAN cilj.
+    objectives_source: str = "authored"
     supporting_concepts: tuple = ()
     exclusions: tuple = ()
     # Semantički ugovor porodice (Faza 4A) — None za lekciju koja ga nema, i
@@ -107,6 +111,8 @@ def build(grade, topic_id):
         # Ručno pisan opseg IMA PREDNOST — dopuna nikad ne gazi autorski unos.
         objectives=(tuple(lesson.get("objectives", []) or ())
                     or lesson_objectives.primary_skills(lesson["id"])),
+        objectives_source=("authored" if lesson.get("objectives")
+                           else "compiled"),
         supporting_concepts=lesson_objectives.supporting_concepts(lesson["id"]),
         exclusions=(tuple(lesson.get("exclusions", []) or ())
                     or lesson_objectives.neighbour_exclusions(lesson["id"])),
