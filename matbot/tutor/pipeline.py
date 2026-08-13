@@ -39,6 +39,7 @@ from matbot.tutor import reviewer_authority
 from matbot.tutor import task_identity
 from matbot.tutor import prompts as tutor_prompts
 from matbot import deterministic as deterministic_generators
+from matbot import deterministic_variety
 from matbot.deterministic.core import DeterministicGenerationError
 from matbot.tutor.schema import (TASK_INTENTS, TutorDraft, UnifiedOutputError,
                                  normalize_for_intent, validate_final, validate_task,
@@ -597,6 +598,13 @@ def _generate_with_policy(generator, *, policy, **kwargs):
 def _deterministic_generator_for(context):
     """Modul generatora za lekciju, ili None kad lekcija nije POTPUNO pokrivena."""
     if not config.deterministic_practice_enabled():
+        return None
+    # MJERENA RAZNOLIKOST (statička revizija 352 determinističke lekcije):
+    # 49 porodica na tri nivoa težine daje istu rečenicu s drugim brojevima.
+    # Za učenika koji tri puta traži teže to nije ljestvica nego ponavljanje,
+    # pa takva lekcija ide modelskoj ruti. Mjerenje je podatak, ne spisak u
+    # kodu — vidi `matbot/deterministic_variety.py`.
+    if deterministic_variety.is_weak(getattr(context, "topic_id", "")):
         return None
     contract = getattr(context, "semantic_contract", None)
     if contract is None or not getattr(contract, "blocking", False):
