@@ -23,6 +23,7 @@ distraktor — koriste se faktorizacije DRUGE vrijednosti.
 import random
 from math import gcd, lcm
 
+from matbot import divisibility_rules
 from matbot.deterministic import core
 from matbot.deterministic.core import DeterministicGenerationError
 
@@ -162,8 +163,14 @@ def _divisibility_package(rng, level, divisors, lesson_id, lesson_title):
     condition = " i ".join(f"sa ${d}$" for d in chosen)
     question = f"Koji od ponuđenih brojeva je djeljiv {condition}?"
     rules = ", ".join(str(d) for d in chosen)
-    hint1 = ("Primijeni pravilo djeljivosti za svaki navedeni broj — gledaj "
-             "posljednju cifru, zbir cifara ili posljednje dvije cifre.")
+    # NAGOVJEŠTAJ SKROJEN ZA OVAJ ZADATAK (nalaz iz produkcije + offline
+    # revizija): zatečeni tekst je bio ISTI za svaki djelilac — nabrajao je tri
+    # kategorije pravila i nikad nije rekao koje ide uz djelioce iz zadatka.
+    # Generator djelioce zna tačno, pa ta činjenica mora doći do učenika.
+    # Kad tabela ne zna pravilo, zadržava se zatečeni tekst.
+    hint1 = divisibility_rules.hint_for(chosen) or (
+        "Primijeni pravilo djeljivosti za svaki navedeni broj — gledaj "
+        "posljednju cifru, zbir cifara ili posljednje dvije cifre.")
     hint2 = (f"Provjeri svaku opciju redom: broj mora zadovoljiti pravilo "
              f"djeljivosti sa {rules}"
              + (" — svako od navedenih pravila istovremeno." if len(chosen) > 1
