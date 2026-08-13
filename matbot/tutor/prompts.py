@@ -1064,6 +1064,10 @@ _REVIEWER_PREFLIGHT_RULE = """SERVER-DETECTED DRAFT ISSUES (when that block is p
   conditions. Never fix this by lowering the reported counts, clearing a flag, or
   relabelling the level while the task stays the same: the server recomputes the
   evidence you return and rejects a dishonest package.
+- For a reported over-long option (`task_structure_invalid`), SHORTEN the offending
+  option to the bare answer — every option must stay under the server's character
+  limit stated in the task rules. An option is an answer, not an explanation: move
+  the reasoning into `solution`. Returning the same long option loses the turn.
 - Keep the exact selected lesson in every correction, and recompute the difficulty
   evidence so it honestly describes the task you actually return.
 - Exactly one visible option stays correct. Recompute correct_option_id,

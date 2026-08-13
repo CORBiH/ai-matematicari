@@ -265,6 +265,15 @@ def test_prompt_states_that_the_server_owns_the_turn_type(fast_route):
     assert "najjačem dozvoljenom" in sent
 
 
+def test_reviewer_is_told_how_to_repair_an_over_long_option():
+    """`unchanged=True` u živom padu: recenzent je vidio nalaz ali nije znao
+    ŠTA da uradi — pravilo nije imalo recept za predugu opciju."""
+    rule = tutor_prompts._REVIEWER_PREFLIGHT_RULE
+    assert "task_structure_invalid" in rule
+    assert "SHORTEN" in rule and "solution" in rule
+    assert "approve` is FORBIDDEN" in rule
+
+
 def test_prompt_states_the_server_option_length_limit():
     """Granica dužine opcije je serverska činjenica; poslije uklanjanja neslaganja
     ciljnog nivoa „preduga opcija“ je postala vodeći uzrok eskalacije."""
