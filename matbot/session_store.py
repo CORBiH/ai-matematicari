@@ -64,6 +64,9 @@ def _fresh_session(session_id, curriculum_fingerprint, grade, lesson_id,
         # auditable across the active session.
         "current_task_difficulty_evidence": None,
         "recent_task_signatures": [],    # max MAX_RECENT_SIGNATURES potpisa zadataka
+        # STRUKTURNI otisci (broj i ime maskirani) — „isti zadatak s drugim
+        # brojevima“. Ograničeno kao i sve ostalo: stanje sesije ne raste.
+        "recent_structures": [],
         # POKUŠANI kreativni ciljevi — STROGO ODVOJENO od `recent_task_signatures`.
         # Prvo odgovara na pitanje „šta je generisanje nedavno POKUŠALO“, drugo
         # na pitanje „šta je učenik STVARNO VIDIO“. Odbijen nacrt nikad ne smije
@@ -130,6 +133,10 @@ class SessionStore:
             session["recently_used_families"][-config.MAX_RECENT_FAMILIES:]
         session["recent_task_signatures"] = \
             session["recent_task_signatures"][-config.MAX_RECENT_SIGNATURES:]
+        # Prozor strukturnih otisaka je kratak i OGRANIČEN: stanje sesije ne
+        # smije rasti s brojem odrađenih zadataka.
+        session["recent_structures"] = \
+            session.get("recent_structures", [])[-config.MAX_RECENT_STRUCTURES:]
         with self._lock:
             self._sessions.pop(session["session_id"], None)
             self._sessions[session["session_id"]] = copy.deepcopy(session)

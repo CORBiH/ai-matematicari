@@ -329,6 +329,10 @@ def practice_single_hint_enabled():
 MAX_SESSIONS_IN_MEMORY = 2000
 MAX_RECENT_FAMILIES = 6      # historija porodica zadataka (LRU izbor + prompt)
 MAX_RECENT_SIGNATURES = 8    # potpisi zadataka za otkrivanje doslovnog ponavljanja
+# Koliko STRUKTURA zadatka sesija pamti za provjeru raznolikosti. Prozor je
+# namjerno kratak: dovoljno da „daj novi“ ne vrati istu vježbu, a stanje sesije
+# ne raste (isti princip kao svaka druga historija ovdje).
+MAX_RECENT_STRUCTURES = 6
 
 # Gornja granica za OBIČAN feedback na PRVI pogrešan klik ("Netačno." + hint).
 # Nije tvrdo sječenje: shape_first_wrong_feedback skraćuje SAMO na sigurnoj

@@ -55,6 +55,9 @@ def _task(text, options, marked=0):
 TASK_1 = ("Koji od sljedećih brojeva je djeljiv sa 10?", ("70", "41", "33", "58"))
 TASK_2 = ("Koji od sljedećih brojeva je djeljiv sa 5?", ("35", "42", "61", "24"))
 TASK_3 = ("Koji od sljedećih brojeva je djeljiv sa 25?", ("75", "42", "61", "24"))
+# Druga VRSTA vježbe (obrazloženje umjesto prepoznavanja) — za „daj novi“.
+OTHER_STRUCTURE = ("Broj 70 je djeljiv sa 10. Koji korak to najbolje obrazlaže?",
+                   ("završava nulom", "zbir cifara je 7", "veći je od 10", "paran je"))
 
 
 def _evidence_for(level):
@@ -184,8 +187,10 @@ def test_harder_at_the_maximum_level_does_not_promise_more():
 def test_a_plain_new_task_intro_is_unchanged():
     store, fake = SessionStore(), FakeLLM()
     _publish(store, fake, "intro-7", TASK_1)
-    response = _publish(store, fake, "intro-7", TASK_2, "Daj mi novi zadatak.",
-                        intent_name="next_task")
+    # „Daj mi novi“ mora donijeti STVARNO drugu vježbu: TASK_2 se od TASK_1
+    # razlikuje samo brojem, pa ga provjera raznolikosti s pravom odbija.
+    response = _publish(store, fake, "intro-7", OTHER_STRUCTURE,
+                        "Daj mi novi zadatak.", intent_name="next_task")
     assert response["answer"].startswith("Evo sljedećeg zadatka.")
 
 

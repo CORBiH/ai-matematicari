@@ -234,6 +234,24 @@ def _state_block(session, student_message, trusted_verdict=None, ui_action=""):
         for task in session["recent_tasks"][-_MAX_HISTORY_TURNS:]:
             lines.append(f"  • {_clip(task)}")
 
+    # STRUKTURE KOJE SU VEĆ ISKORIŠTENE (zahtjev iz produkcije: „isti zadatak s
+    # drugim brojevima“ nije nova vježba). Šalje se SAŽETAK strukture, ne cijela
+    # historija — model treba znati šta NE smije ponoviti, ne cijeli razgovor.
+    structures = [entry.get("text", "") for entry in
+                  (session.get("recent_structures") or [])[-_MAX_HISTORY_TURNS:]
+                  if isinstance(entry, dict)]
+    if structures:
+        lines.append("- VEĆ ISKORIŠTENI OBLICI ZADATKA U OVOJ SESIJI:")
+        for text in structures:
+            lines.append(f"  • {_clip(text)}")
+        lines.append(
+            "- ZA SLJEDEĆI ZADATAK izaberi DRUGU vrstu vježbe unutar iste lekcije. "
+            "Promjena brojeva, imena, predmeta ili redoslijeda opcija NIJE dovoljna. "
+            "Promijeni ono što se traži: umjesto direktnog računanja traži "
+            "nedostajuću veličinu, prepoznavanje greške u ponuđenom postupku, "
+            "poređenje dva rezultata, prevod između zapisa ili primjenu u kratkom "
+            "tekstualnom zadatku — ali NIKAD izvan opsega ove lekcije.")
+
     if session["recent_turns"]:
         lines.append("- KRATKA HISTORIJA RAZGOVORA:")
         for turn in session["recent_turns"][-_MAX_HISTORY_TURNS:]:
@@ -1108,6 +1126,14 @@ _REVIEWER_PREFLIGHT_RULE = """SERVER-DETECTED DRAFT ISSUES (when that block is p
   option to the bare answer — every option must stay under the server's character
   limit stated in the task rules. An option is an answer, not an explanation: move
   the reasoning into `solution`. Returning the same long option loses the turn.
+- For `task_too_similar` the student asked for a NEW task and you returned the same
+  exercise with different numbers or names. Do NOT merely change values, names or
+  option order. Change the TASK ARCHETYPE or the reasoning structure while staying
+  strictly inside the exact selected lesson: e.g. ask for a missing quantity instead
+  of a direct result, ask which of several worked steps is wrong, ask to compare two
+  results, ask to translate between representations, or move between a symbolic and a
+  word-problem form. If the lesson genuinely supports only one task structure, keep
+  the structure and return `fail_closed` rather than leaving the lesson.
 - For `solution_answer_divergence` the marked option carries a value that your own
   `solution` never arrives at. One of the two is wrong. RE-DERIVE the arithmetic,
   then make the marked option, `expected_answer` and the final value of `solution`

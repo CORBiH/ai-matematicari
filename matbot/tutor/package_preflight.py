@@ -53,6 +53,7 @@ MAX_ISSUES = 8
 # Dovoljno za `target Level 1; <kod validatora>; steps=… flags=…`, i dalje tvrda
 # granica. Ovo je granica DIJAGNOSTIKE, ne prag težine.
 SOLUTION_DIVERGENCE_CODE = "solution_answer_divergence"
+TASK_TOO_SIMILAR_CODE = "task_too_similar"
 CONTRACT_ANSWER_FORM_CODE = "contract_answer_form_violation"
 CONTRACT_EQUIVALENCE_CODE = "contract_equivalence_violation"
 CONTRACT_SINGLE_IRREDUCIBLE_CODE = "contract_multiple_irreducible_options"
@@ -247,6 +248,32 @@ def contract_package_issues(task, lesson_constraints):
                     detail=("arhetip `identify_equivalent`: označena opcija mora "
                             "imati ISTU vrijednost kao razlomak iz teksta zadatka")))
     return tuple(issues)
+
+
+def structural_repetition_issue(task, recent_structures, intent):
+    """Nalaz kad je „nov“ zadatak ista VJEŽBA s drugim brojevima.
+
+    ZAHTJEV IZ PRODUKCIJE: promjena brojeva, imena ili redoslijeda opcija nije
+    nov zadatak. Provjera se pokreće SAMO na izričit zahtjev za novim zadatkom
+    (`next_task`) — na „teže“/„lakše“ struktura smije ostati ista, jer se tamo
+    mijenja nivo, a ne vrsta vježbe.
+
+    Vraća PackageIssue ili None. Nepoznata struktura = None (nedokazivo)."""
+    if intent != "next_task" or not recent_structures:
+        return None
+    option_texts = [str(getattr(option, "text", "") or "")
+                    for option in (getattr(task, "options", None) or ())]
+    structure = task_identity.structural_signature(
+        str(getattr(task, "text", "") or ""), option_texts)
+    if not structure:
+        return None
+    for entry in recent_structures:
+        if isinstance(entry, dict) and entry.get("signature") == structure:
+            return PackageIssue(
+                TASK_TOO_SIMILAR_CODE,
+                detail=("isti oblik zadatka kao nedavni: promijenjeni su samo "
+                        "brojevi/imena. Promijeni VRSTU vježbe, ne vrijednosti"))
+    return None
 
 
 def collect_package_issues(task, contract=None, previous_signature="",

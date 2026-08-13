@@ -40,8 +40,11 @@ TASK = "Koji od sljedećih brojeva je djeljiv sa 25?"
 OPTIONS = ("322", "390", "349", "375")
 CORRECT = 3                                   # 375
 
-OTHER_TASK = "Koji od sljedećih brojeva je djeljiv sa 10?"
-OTHER_OPTIONS = ("41", "70", "33", "58")
+# STVARNO DRUGA VJEŽBA, ne isti zadatak s drugim brojem. Raniji primjer se od
+# `TASK` razlikovao samo brojem (25 → 10), pa ga nova provjera raznolikosti s
+# pravom odbija: „daj novi“ mora promijeniti VRSTU vježbe, ne vrijednosti.
+OTHER_TASK = "Broj 70 je djeljiv sa 10. Koji korak to najbolje obrazlaže?"
+OTHER_OPTIONS = ("završava nulom", "zbir cifara je 7", "veći je od 10", "paran je")
 
 
 @pytest.fixture(autouse=True)

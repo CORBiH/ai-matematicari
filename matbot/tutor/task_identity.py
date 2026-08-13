@@ -78,3 +78,80 @@ def is_same_task(first_signature, second_signature):
     Nepoznat potpis nikad nije dokaz jednakosti — isti princip kao svaki drugi
     verifikator u projektu."""
     return bool(first_signature) and first_signature == second_signature
+
+
+# ---------------------------------------------------------------------------
+# STRUKTURNI OTISAK — „isti zadatak s drugim brojevima“ (zahtjev iz produkcije)
+# ---------------------------------------------------------------------------
+# `canonical_signature` iznad namjerno hvata samo DOSLOVNO isti paket. Učenik
+# međutim ne doživljava kao nov zadatak ni ovo:
+#
+#     „Ana ima 12 jabuka…“   →   „Haris ima 19 jabuka…“
+#     „Koliko je 12 + 7?“    →   „Koliko je 45 + 8?“
+#
+# Zato postoji DRUGI, grublji otisak: iz vidljivog teksta se maskiraju brojevi i
+# vlastita imena, pa ostaje REČENIČNA STRUKTURA zadatka. Dva zadatka istog
+# strukturnog otiska su za učenika ista vježba.
+#
+# GRANICA: ovo NIJE mjera semantičke istosti i ne koristi se za odbijanje
+# TAČNOSTI — samo za raznolikost. Nepoznat otisak nikad ne znači „isto“.
+_NUMBER_TOKEN_RE = re.compile(r"-?\d+(?:[.,]\d+)?")
+_LATEX_COMMAND_RE = re.compile(r"\[a-zA-Z]+")
+# Vlastito ime: veliko slovo usred rečenice (ne prva riječ, ne iza tačke).
+_PROPER_NOUN_RE = re.compile(r"(?<=[a-zšđčćž,])\s+([A-ZŠĐČĆŽ][a-zšđčćž]{2,})")
+# Riječ kojom zadatak POČINJE, a nije ime: imperativ ili upitna riječ. Sve
+# ostalo na početku rečenice tretira se kao vlastito ime („Ana ima…“ vs
+# „Haris ima…“ je ista vježba). Popis je zatvoren i služi SAMO raznolikosti.
+# Zamjenice koje se mijenjaju ZAJEDNO s imenom („Ana … joj“ / „Haris … mu“).
+# Zatvoren popis; „je“ se NAMJERNO izostavlja jer je i pomoćni glagol.
+_PRONOUN_RE = re.compile(
+    r"\b(joj|mu|im|ju|ga|ih|njoj|njemu|njima|njega|nje)\b", re.IGNORECASE)
+_TASK_STARTERS = frozenset("""
+koliko koji koja koje kojih kojeg izračunaj izracunaj odredi zapiši zapisi
+skrati proširi prosiri riješi rijesi nađi nadji prikaži prikazi izaberi
+odaberi dopuni poredaj uporedi pretvori razlomak broj ako za sve dat data
+dato date koliki kolika koliko čemu cemu šta sta gdje kada zaokruži zaokruzi
+provjeri nacrtaj konstruiši konstruisi dokaži dokazi napiši napisi
+""".split())
+
+
+def structural_fragment(text):
+    """Rečenična struktura fragmenta: bez brojeva i bez vlastitih imena."""
+    body = unicodedata.normalize("NFKC", text or "")
+    body = _MATH_DELIMITERS_RE.sub(" ", body)
+    body = _LATEX_SPACING_RE.sub(" ", body)
+    body = _COSMETIC_RE.sub("", body)
+    body = _PROPER_NOUN_RE.sub(" «ime»", body)
+    first = body.split(None, 1)
+    if first and first[0][:1].isupper() and first[0].strip(".,:;").casefold()             not in _TASK_STARTERS:
+        body = "«ime»" + (" " + first[1] if len(first) > 1 else "")
+    body = _LATEX_COMMAND_RE.sub("«izraz»", body)
+    body = _NUMBER_TOKEN_RE.sub("«n»", body)
+    body = _PRONOUN_RE.sub("«zam»", body)
+    body = _WHITESPACE_RE.sub(" ", body).strip()
+    return body.casefold()
+
+
+def structural_signature(task_text, option_texts=()):
+    """Otisak STRUKTURE zadatka. Prazan kad nema teksta.
+
+    Opcije ulaze samo svojim BROJEM i oblikom (ne vrijednostima): dva zadatka
+    koja se razlikuju samo ponuđenim brojevima nisu različite vježbe."""
+    skeleton = structural_fragment(task_text)
+    if not skeleton:
+        return ""
+    shapes = sorted({structural_fragment(option) for option in (option_texts or ())})
+    encoded = json.dumps({"q": skeleton, "o": shapes}, ensure_ascii=True,
+                         sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+
+def structural_overlap(first_text, second_text):
+    """Udio zajedničkih sadržajnih riječi dvije strukture (0.0–1.0)."""
+    def words(text):
+        return {word for word in re.findall(r"[^\W\d_]{3,}", structural_fragment(text))}
+
+    left, right = words(first_text), words(second_text)
+    if not left or not right:
+        return 0.0
+    return len(left & right) / len(left | right)

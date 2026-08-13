@@ -1990,6 +1990,11 @@ def _publish_task(session, context, final, request_id, target_level=None):
     session["current_task_signature"] = signature_record
     session["current_task_difficulty_evidence"] = task.difficulty_evidence.model_dump()
     session["recent_task_signatures"].append(signature_record)
+    # STRUKTURNI OTISAK objavljenog zadatka — „ista vježba s drugim brojevima“.
+    structure = task_identity.structural_signature(task_text, option_texts)
+    if structure:
+        session.setdefault("recent_structures", []).append(
+            {"signature": structure, "text": task_text[:160]})
     _log_difficulty(request_id, context, final)
     return task_text
 
@@ -2128,6 +2133,12 @@ def _fast_single_call(llm, context, session, turn, request_id, ui_action="",
             practice_policy=getattr(context, "practice_policy", None),
             student_message=student_message,
             lesson_constraints=context))
+        # RAZNOLIKOST NA „DAJ NOVI“: ista vježba s drugim brojevima nije nov
+        # zadatak. Nalaz je popravljiv — recenzent dobija izričit recept.
+        repetition = package_preflight.structural_repetition_issue(
+            draft.new_task, session.get("recent_structures") or [], draft.intent)
+        if repetition is not None:
+            issues.append(repetition)
         # CILJNI NIVO JE POPRAVLJIV NALAZ, NE PAD U OBJAVI (živi nalaz brze
         # rute): objava traži TAČNU jednakost deklarisanog i
         # serverskog cilja, pa je nacrt s pogrešnim nivoom prolazio preflight i
@@ -2324,6 +2335,19 @@ def _reviewer_stage(llm, context, session, student_message, draft,
             practice_policy=getattr(context, "practice_policy", None),
             student_message=student_message,
             lesson_constraints=context)
+        # REVALIDACIJA POPRAVKE, NE NOVA KAPIJA. Provjera raznolikosti se na
+        # KONAČNOM paketu traži samo ako je NACRT već imao isti nalaz — dakle
+        # ako smo popravku upravo zbog toga i tražili. Bez tog uslova bi ista
+        # provjera pala na kreativni put, koji ima vlastiti (jači) mehanizam
+        # raznolikosti i nikad nije prošao kroz nacrtnu provjeru.
+        asked_for_diversity_repair = any(
+            issue.code == package_preflight.TASK_TOO_SIMILAR_CODE
+            for issue in (draft_issues or ()))
+        if asked_for_diversity_repair:
+            repetition = package_preflight.structural_repetition_issue(
+                final.new_task, session.get("recent_structures") or [], final.intent)
+            if repetition is not None:
+                final_issues = tuple(final_issues) + (repetition,)
         if final_issues:
             # `unchanged=True` znači: recenzent je vidio nalaz i vratio paket s
             # POTPUNO ISTIM nalazima — dakle nije ni pokušao ispravku.
