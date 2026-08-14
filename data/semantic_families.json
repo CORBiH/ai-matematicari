@@ -1586,6 +1586,18 @@
           "parameter": "concepts",
           "text": "- glavna vidljiva radnja mora biti: {values}"
         },
+        "parameter_lines": {
+          "concepts": {
+            "scientific_notation": [
+              "- zadatak ide u TAČNO JEDNOM od dva smjera; izaberi jedan i drži ga se do kraja:",
+              "  (a) dat je OBIČAN broj, traži se naučni zapis — tačna opcija je oblika $a \\cdot 10^{n}$, gdje je $1 \\le |a| < 10$ i $n$ cio broj;",
+              "  (b) dat je naučni zapis, traži se OBIČNA vrijednost — tačna opcija je obična decimalna vrijednost, a NE naučni zapis;",
+              "- SVE ČETIRI opcije moraju imati RAZLIČITU BROJEVNU VRIJEDNOST. Isti broj zapisan drukčije (npr. $7,2 \\cdot 10^{-4}$, $72 \\cdot 10^{-5}$ i $0,72 \\cdot 10^{-3}$) su TRI TAČNA odgovora i server takav paket odbija;",
+              "- distraktori se prave POMJERANJEM VRIJEDNOSTI (izložilac veći ili manji za jedan bez ispravke prvog faktora, pogrešan znak izložioca, zarez pomjeren na pogrešnu stranu) — nikad drugim zapisom iste vrijednosti;",
+              "- u TEKSTU ZADATKA ne piši jednakost koju učenik treba dopuniti (npr. „$0,0065 = 6,5 \\cdot 10^{\\square}$“); postavi pitanje, a jednakost neka stoji tek u rješenju."
+            ]
+          }
+        },
         "closing": "- ako prekršiš ovo, server odbija paket prije objave"
       },
       "value_labels": {

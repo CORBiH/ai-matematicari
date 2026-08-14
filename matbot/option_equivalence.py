@@ -179,11 +179,34 @@ def _numeric_candidates(expr):
         return None
 
 
+# Tolerancija zaokruživanja se računa iz BROJA DECIMALA ZAPISA, pa je
+# APSOLUTNA — a vrijednosti mogu biti proizvoljno male. Za `7,2 \cdot 10^{-4}`
+# zapis ima jednu decimalu, pa je tolerancija 0,055, dok su same vrijednosti
+# reda 0,0007: tada su SVE male vrijednosti međusobno „jednake“.
+#
+# MJERENO (lekcija „Naučni zapis broja“, 12 živih turnova): četiri očito
+# različite opcije — $7,2\cdot 10^{-4}$, $7,2\cdot 10^{-5}$, $7,2\cdot 10^{-3}$,
+# $6,2\cdot 10^{-4}$ — proglašavane su svih šest parova jednakim, pa je paket
+# odbijan kao „više tačnih opcija“. To je bio uzrok 5 od 6 odbijanja te lekcije.
+# Deterministički generator je isti problem odavno zaobilazio time što NE nudi
+# negativne izložioce (vidi komentar u matbot/deterministic/powers.py), ali
+# model-put to ne može — mali brojevi su upravo gradivo te lekcije.
+#
+# POPRAVKA NE POPUŠTA PROVJERU, NEGO JE ČINI TAČNIJOM: tolerancija zaokruživanja
+# ne smije biti reda veličine samih vrijednosti. Dva broja koja se razlikuju za
+# više od 5 % vlastite veličine nisu „isti broj drukčije zaokružen“. Jednake
+# vrijednosti (razlika 0) ostaju jednake pod bilo kojom tolerancijom.
+_ROUNDING_MAGNITUDE_SHARE = 0.05
+
+
 def _numeric_tolerance(expr_a, expr_b, magnitude):
+    relative_floor = max(1e-9 * abs(magnitude), 1e-9)
     places = mathcheck._decimal_places(expr_a, expr_b)
-    if places:
-        return 0.5 * (10 ** -places) * 1.1
-    return max(1e-9 * abs(magnitude), 1e-9)
+    if not places:
+        return relative_floor
+    rounding = 0.5 * (10 ** -places) * 1.1
+    magnitude_cap = _ROUNDING_MAGNITUDE_SHARE * abs(magnitude)
+    return max(min(rounding, magnitude_cap), relative_floor)
 
 
 # ---------------------------------------------------------------------------

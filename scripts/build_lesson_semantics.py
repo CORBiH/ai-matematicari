@@ -197,8 +197,18 @@ def _prompt_lines(family, parameters):
 
     for parameter_name, value_lines in (template.get("parameter_lines") or {}).items():
         value = parameters.get(parameter_name)
+        # enum_set s TAČNO JEDNOM vrijednošću JESTE jedna vrijednost. Lekcija
+        # koja deklariše jedan jedini pojam (npr. `concepts: ["scientific_
+        # notation"]`) nema šta drugo raditi, pa smije dobiti liniju vezanu za
+        # tu vrijednost. Lista s više vrijednosti se i dalje preskače — tamo se
+        # ne zna koja bi linija važila.
+        if isinstance(value, (list, tuple)) and len(value) == 1:
+            value = value[0]
         if isinstance(value, (str, int)) and value in value_lines:
-            lines.append(value_lines[value])
+            rendered = value_lines[value]
+            # Linija smije biti i VIŠE linija: neki ugovori traže nekoliko
+            # rečenica, a spajanje u jednu dugu liniju bi ih učinilo nečitkim.
+            lines.extend(rendered if isinstance(rendered, list) else [rendered])
 
     forbidden = parameters.get("forbidden_directives") or ()
     if forbidden and "forbidden" in template:
