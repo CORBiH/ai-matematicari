@@ -29,3 +29,6 @@ scratchpad/zero_call_audit/
 # i scripts/build_measure_dimensions.py), ne izvorni kod.
 scratchpad/semantic_authority/
 scratchpad/semantic_triage/
+# Zavrsna prijemna kampanja: turns.jsonl, summary/failures/report i replay
+# izvjestaji su MJERENJA, ne izvorni kod.
+scratchpad/final_practice_acceptance/
