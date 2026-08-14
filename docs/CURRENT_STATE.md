@@ -1,8 +1,9 @@
 # MAT-BOT — current state
 
 Last updated: **2026-08-14** (release/config parity hardening).
-HEAD after this phase: **`REPLACE_WITH_FINAL_HEAD`**.
-Test baseline: **8760 passing, 3 skipped**.
+Release-gated commit for this phase: **`960af72`** (this documentation note follows
+it as a docs-only commit, which the pre-push hook exempts by design).
+Test baseline: **8761 passing, 3 skipped**.
 Runtime models: `gpt-5.6-luna` (Practice fast route, reasoning effort `low`) and
 `gpt-5-mini` (Explain, Quick, and the two-call rollback path; effort `low`).
 
@@ -35,11 +36,17 @@ container), and startup refuses to boot on a deviation under
 longer requires SSH. See [DEPLOYMENT.md](DEPLOYMENT.md) and
 [LIVE_RELEASE_GATE.md](LIVE_RELEASE_GATE.md).
 
+Live release gate for `960af72` (real model, `gpt-5.6-luna` fast route): **PASS** —
+15/15 scenarios, 12 planned + 1 proven Reviewer escalation = 13 actual calls against
+a ceiling of 23, the over-ceiling call refused before the SDK, zero validation and
+zero infrastructure failures, and — for the first time — `timeout_seconds = 45.0`
+matching production instead of the built-in 30.0. The artifact also records the
+complete applied configuration, which the pre-push hook now compares against the
+declaration.
+
 ---
 
 ## Earlier phases
-
-**Phase F5K (2026-08-08):** last V1 semantic-fidelity blocker; see below.
 
 **Phase F5K (2026-08-08):** the 150-turn real-state audit showed the last
 V1 blocker — mathematically correct tasks from the WRONG lesson (graph →
