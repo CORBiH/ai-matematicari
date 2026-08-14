@@ -399,17 +399,21 @@ def _reject_if_geometry_invalid(text, context, where):
         raise UnifiedOutputError(f"geometry_notation: {','.join(issues)} [{where}]")
 
 
-def _reject_if_semantic_contract_violated(text, context, where):
+def _reject_if_semantic_contract_violated(text, context, where, answer_text=""):
     """ODBRANA U DUBINI (Faza 4B): isti detektor koji je već pokrenut u
     preflightu i u invarijanti nad recenzentovim paketom, sada i NEPOSREDNO
     PRIJE OBJAVE — dakle prije ijedne mutacije sesije.
 
     Ne uvodi novi prag: `unsupported` i dalje nikad ne odbija, a blokira samo
-    lekcija čiji ugovor je izričito `blocking`."""
+    lekcija čiji ugovor je izričito `blocking`.
+
+    `answer_text` je OZNAČENA opcija. Dio detektora dokaz čita iz odgovora, a
+    ne iz uslova zadatka (dimenzija tražene veličine), pa se ovaj poziv radi
+    DVAPUT: nad tekstom zadatka bez odgovora, i nad odgovorom čim je poznat."""
     contract = getattr(context, "semantic_contract", None)
     if contract is None or not getattr(contract, "blocking", False):
         return
-    detection = semantic_detectors.detect(contract, text)
+    detection = semantic_detectors.detect(contract, text, answer_text=answer_text)
     if detection.status == semantic_detectors.STATUS_FAIL:
         raise UnifiedOutputError(
             f"{detection.code}: {detection.reason} [{where}]")
@@ -455,6 +459,9 @@ def _validate_task_server_side(task, context, previous_signature=""):
     correct_text = option_texts[task.correct_option_index]
     _reject_if_inconsistent(correct_text, "tačna opcija")
     _reject_if_geometry_invalid(correct_text, context, "tačna opcija")
+    # Dimenzija tražene veličine se dokazuje tek kad se zna OZNAČENA opcija.
+    _reject_if_semantic_contract_violated(task_text, context, "označena opcija",
+                                          answer_text=correct_text)
     expected = _safe_text(task.expected_answer, "expected_answer", allow_wrap=True)
     _reject_if_inconsistent(expected, "expected_answer")
     if expected.strip() != correct_text.strip():

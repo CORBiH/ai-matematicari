@@ -506,8 +506,13 @@ def collect_package_issues(task, contract=None, previous_signature="",
     # `unsupported` je eksplicitno „ne znam“ i nikad ne odbija paket.
     if contract is not None and getattr(contract, "blocking", False):
         visible, visible_safe = safe_visible_text(getattr(task, "text", ""))
+        # OZNAČENA OPCIJA JE DOKAZ ZA DIO DETEKTORA. Uslov zadatka opisuje ono
+        # što je DATO, a dio ugovora govori o onome što se TRAŽI — to stoji u
+        # odgovoru. Detektor zato dobija i označenu opciju; koji detektor je
+        # traži, zna registar u matbot/semantics/detectors.py, ne ovaj modul.
         detection = semantic_detectors.detect(
-            contract, visible if visible_safe else getattr(task, "text", ""))
+            contract, visible if visible_safe else getattr(task, "text", ""),
+            answer_text=marked_text or "")
         if detection.status == semantic_detectors.STATUS_FAIL:
             issues.append(PackageIssue(
                 detection.code,

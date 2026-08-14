@@ -336,9 +336,9 @@ def test_detector_runs_before_reviewer_after_reviewer_and_before_publication(
     seen = []
     original = sem_detectors.detect
 
-    def spy(contract, text):
+    def spy(contract, text, answer_text=""):
         seen.append(getattr(contract, "lesson_id", None))
-        return original(contract, text)
+        return original(contract, text, answer_text=answer_text)
 
     monkeypatch.setattr(sem_detectors, "detect", spy)
     response = _publish(fake_llm, store, lesson)

@@ -20,8 +20,11 @@ izrazi, slike i višeznačne formulacije se NE ocjenjuju.
 """
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass, field
+from functools import lru_cache
+from pathlib import Path
 from types import MappingProxyType
 
 from matbot.mathsegments import math_contents, tokenize_math
@@ -407,18 +410,149 @@ def _detect_polynomial_basic(contract, text):
                    allowed_degree=limit)
 
 
+# ---------------------------------------------------------------------------
+# PRIMITIV: DIMENZIJA TRAŽENE VELIČINE (dužina / površina / zapremina)
+# ---------------------------------------------------------------------------
+# ŽIVI NALAZ, DVA PUTA: „Mreža prizme“ je odgovarana FORMULOM ZAPREMINE (F5K,
+# 150-turn real-state audit), a pravougaonik sa traženom POVRŠINOM odgovoren je
+# obimom — `$P=26\,\text{cm}$` umjesto `cm^2` (D35-5, slikovni turn). Oba su
+# ista klasa greške: zadatak ostaje matematički uredan, ali mjeri DRUGU
+# veličinu nego što lekcija ispituje.
+#
+# To se ne mora nagađati iz proze. Eksponent mjerne jedinice u OZNAČENOM
+# odgovoru je server-vlasnički, objektivan dokaz: `cm` je dužina, `cm^2`
+# površina, `cm^3` zapremina. Vrsta zadatka koju ugovor deklariše (`kinds`)
+# određuje koja je dimenzija dozvoljena.
+#
+# MAPA JE IZVEDENA MJERENJEM, NE RUČNO: `data/semantic_measure_dimensions.json`
+# gradi `scripts/build_measure_dimensions.py` iz determinističkih generatora
+# istih porodica — vrsta kod koje eksponent nije bio jedinstven kroz cio uzorak
+# se NE upisuje i time se nikad ne blokira.
+#
+# GRANICA DOKAZA: dokazuje se samo kad označeni odgovor NOSI mjernu jedinicu i
+# kad deklarisane vrste dopuštaju uži skup dimenzija od svih. Bez jedinice,
+# uz vrstu bez jedinice (broj ivica, zbir uglova) ili uz vrste koje pokrivaju
+# sve tri dimenzije — UNSUPPORTED, nikad odbijanje.
+CODE_MEASURE_DIMENSION_MISMATCH = "semantic_measure_dimension_mismatch"
+
+_DIMENSIONS_PATH = (Path(__file__).resolve().parent.parent.parent
+                    / "data" / "semantic_measure_dimensions.json")
+
+_DIMENSION_NAMES = {1: "dužina (cm)", 2: "površina (cm$^2$)",
+                    3: "zapremina (cm$^3$)"}
+
+# ZAPIS JEDINICE IMA VIŠE OBLIKA I SVI MORAJU BITI PROČITANI JEDNAKO:
+#   `cm²` / `cm³`            — deterministički generator (Unicode)
+#   `cm^2` / `cm^{2}`        — obični MathJax
+#   `\text{cm}^2`            — jedinica kao tekst unutar matematike
+#   `cm$^2$`                 — jedinica u prozi, eksponent u vlastitom `$...$`
+# Posljednji oblik je mutacijski dokaz uhvatio kao PROPUST: bez tolerancije na
+# `$` između jedinice i eksponenta, `cm$^2$` se čitalo kao dužina, pa bi
+# površina prošla kao dužina — tiho lažno negativan nalaz.
+_UNIT_RE = re.compile(
+    r"(?:\\text\s*\{)?\s*(mm|cm|dm|km|m)\s*\}?\s*"
+    r"(?:\$?\s*\^\s*\{?\s*([23])\s*\}?\s*\$?|([²³]))?")
+_SUPERSCRIPT = {"²": 2, "³": 3}
+
+
+@lru_cache(maxsize=1)
+def _measure_dimensions():
+    """(dimenzija_po_vrsti, vrste_bez_jedinice). Odsustvo artefakta =
+    nijedna vrsta nije dokaziva — detektor tada samo vraća UNSUPPORTED."""
+    try:
+        payload = json.loads(_DIMENSIONS_PATH.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}, frozenset()
+    by_kind = {str(k): int(v) for k, v in
+               (payload.get("dimension_by_kind") or {}).items()}
+    return by_kind, frozenset(payload.get("unitless_kinds") or ())
+
+
+def unit_exponents(text):
+    """Skup eksponenata mjernih jedinica; prazan skup = nema jedinice."""
+    found = set()
+    for match in _UNIT_RE.finditer(text or ""):
+        if match.group(2):
+            found.add(int(match.group(2)))
+        elif match.group(3):
+            found.add(_SUPERSCRIPT[match.group(3)])
+        else:
+            found.add(1)
+    return found
+
+
+def _detect_measure_dimension(contract, text, answer_text=""):
+    by_kind, unitless = _measure_dimensions()
+    kinds = tuple(contract.parameters.get("kinds") or ())
+    if not kinds or not by_kind:
+        return _result(STATUS_UNSUPPORTED,
+                       reason="lekcija ne deklariše vrstu tražene veličine")
+    if any(kind in unitless for kind in kinds):
+        # Lekcija smije tražiti broj (ivice, dijagonale, zbir uglova) —
+        # tada mjerna jedinica uopšte ne mora postojati.
+        return _result(STATUS_UNSUPPORTED,
+                       reason="lekcija dopušta i veličinu bez mjerne jedinice",
+                       kinds=kinds)
+    allowed = {by_kind.get(kind) for kind in kinds}
+    if None in allowed:
+        return _result(STATUS_UNSUPPORTED,
+                       reason="bar jedna vrsta nema dokazanu dimenziju",
+                       kinds=kinds)
+    if allowed == {1, 2, 3}:
+        return _result(STATUS_UNSUPPORTED,
+                       reason="lekcija dopušta sve tri dimenzije — nema šta da se dokaže",
+                       kinds=kinds)
+    observed = unit_exponents(answer_text)
+    if not observed:
+        return _result(STATUS_UNSUPPORTED,
+                       reason="označeni odgovor ne nosi mjernu jedinicu",
+                       allowed_dimensions=tuple(sorted(allowed)))
+    if len(observed) > 1:
+        # Više različitih jedinica u jednom odgovoru — višeznačno, ne dokazuje se.
+        return _result(STATUS_UNSUPPORTED,
+                       reason="označeni odgovor nosi više različitih jedinica",
+                       observed_dimensions=tuple(sorted(observed)),
+                       allowed_dimensions=tuple(sorted(allowed)))
+    actual = next(iter(observed))
+    if actual in allowed:
+        return _result(STATUS_PASS,
+                       reason="dimenzija tražene veličine odgovara vrsti zadatka",
+                       dimension=actual, allowed_dimensions=tuple(sorted(allowed)))
+    wanted = ", ".join(_DIMENSION_NAMES.get(dim, str(dim))
+                       for dim in sorted(allowed))
+    return _result(
+        STATUS_FAIL, CODE_MEASURE_DIMENSION_MISMATCH,
+        f"označeni odgovor mjeri {_DIMENSION_NAMES.get(actual, actual)}, a ova "
+        f"lekcija traži {wanted} — preformuliši zadatak tako da tražena "
+        f"veličina bude {wanted}, ne {_DIMENSION_NAMES.get(actual, actual)}",
+        dimension=actual, allowed_dimensions=tuple(sorted(allowed)), kinds=kinds)
+
+
 DETECTORS = {
     "fraction_arithmetic": _detect_fraction_arithmetic,
     "polynomial_basic": _detect_polynomial_basic,
+    "geometry_formula_2d": _detect_measure_dimension,
+    "solid_geometry_direct": _detect_measure_dimension,
 }
 
+# Detektori kojima je dokaz OZNAČEN ODGOVOR, a ne tekst zadatka. Tekst nosi
+# ULAZNE veličine (`a = 16` cm i u zadatku o površini), pa bi mjerenje nad njim
+# bilo sistematski pogrešno.
+_ANSWER_EVIDENCE_DETECTORS = frozenset({"geometry_formula_2d",
+                                        "solid_geometry_direct"})
 
-def detect(contract, text):
-    """Pokreni detektor porodice. Nepoznat detektor NIKAD ne odbija paket."""
+
+def detect(contract, text, answer_text=""):
+    """Pokreni detektor porodice. Nepoznat detektor NIKAD ne odbija paket.
+
+    `answer_text` je OZNAČENA opcija (server-vlasnička, poslije shuffle-a).
+    Detektori koji je ne traže ponašaju se bajt za bajt kao ranije."""
     if contract is None:
         return _result(STATUS_UNSUPPORTED, reason="lekcija nema semantički ugovor")
     handler = DETECTORS.get(contract.detector)
     if handler is None:
         return _result(STATUS_UNSUPPORTED,
                        reason=f"detektor '{contract.detector}' nije implementiran")
+    if contract.detector in _ANSWER_EVIDENCE_DETECTORS:
+        return handler(contract, text, answer_text)
     return handler(contract, text)

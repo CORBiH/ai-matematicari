@@ -24,3 +24,7 @@ scratchpad/grade6_7_ladder_live_audit/
 scratchpad/diversity2/
 scratchpad/ineqform/
 scratchpad/zero_call_audit/
+# Inventura semantickog autoriteta: detector_matrix/lesson_coverage/audit.md i
+# replay izvjestaji su MJERENJA (gradi ih scripts/build_semantic_authority_report.py
+# i scripts/build_measure_dimensions.py), ne izvorni kod.
+scratchpad/semantic_authority/

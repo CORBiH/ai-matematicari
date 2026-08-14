@@ -449,6 +449,74 @@ Deterministic packages pass byte-for-byte the same validators and the same
 and all unmapped lessons keep the Tutor+Reviewer path unchanged. Rollback:
 `MATBOT_DETERMINISTIC_PRACTICE=disabled`.
 
+### Semantic authority — what "blocking" is allowed to mean
+
+**BLOCKING does not mean "we hope the prompt follows it".** It means: *the
+server can independently prove, from the published package, that the lesson's
+semantic rule is violated, and it refuses publication if the violation is not
+repaired.* Anything weaker is labelled honestly instead.
+
+Every lesson contract in `data/lesson_semantics.compiled.json` carries
+`enforcement_mode: blocking` — all 354 of them, across 41 detector names. That
+label was written faster than the detectors were: `matbot/semantics/detectors.py`
+implements a subset, and `detect()` returns `UNSUPPORTED` for the rest.
+`UNSUPPORTED` never rejects, so those contracts were labelled blocking while
+proving nothing. The three-state engine was right; the label over-promised.
+
+The more useful measurement is **route**, not label:
+
+| | lessons |
+|---|---|
+| contract lessons served by a deterministic generator (0 calls) | **189** |
+| contract lessons served by the model route | **165** |
+
+On the deterministic route the server builds the package itself, so lesson
+drift is structurally impossible and a detector adds nothing — those contracts
+are `REDUNDANT` by construction. Only the model route can drift. Both
+previously implemented detectors (`fraction_arithmetic`, `polynomial_basic`)
+cover *only* deterministic lessons, so **effective blocking coverage on the
+drift-prone route was 0 lessons**.
+
+**The measured-quantity dimension primitive** is the first real one. Two live
+P1s were the same class of error: a net/surface lesson answered with a *volume*
+formula (F5K), and a requested *area* answered with a perimeter — `$P=26$ cm`
+instead of `cm²` (D35-5). Neither is a mathematical mistake; both measure the
+wrong quantity. That is objectively provable:
+
+```
+contract `kinds`          → allowed dimension set   (data)
+unit exponent of the      → measured dimension      (cm=1, cm²=2, cm³=3)
+  server-marked option
+outside the allowed set   → PROVEN violation
+```
+
+- The kind→dimension map is **derived, not hand-written**:
+  `scripts/build_measure_dimensions.py` samples the deterministic generators of
+  the same families and records the exponent each kind actually produces. A kind
+  whose exponent is not unanimous across the sample is **not** written to
+  `data/semantic_measure_dimensions.json`, and therefore can never block.
+- Evidence is the **marked option**, never the task text: the task states what
+  is *given* (`a = 16` cm even in an area task), the answer states what was
+  *asked*. The detector interface takes `answer_text` for exactly this reason.
+- It stays `UNSUPPORTED` — never a rejection — when the answer carries no unit,
+  when the lesson may legitimately ask for a unitless count (edges, diagonals,
+  angle sums), or when the declared kinds span all three dimensions.
+- A lesson that deliberately teaches **both** area and perimeter has allowed
+  set `{1,2}`; cm and cm² both pass, cm³ still fails. Uncertainty is never
+  converted into rejection, and never into "semantic check passed".
+
+Measured before enabling it: **0 false positives across 39,384 known-good
+packages** (31,680 deterministic + 7,704 harvested live), and **100 % detection
+of 667 out-of-scope dimension mutations**.
+
+Effective coverage after this phase: **54 model-route lessons run the detector,
+43 of them with a contract that genuinely constrains the answer.** The other 11
+run it and honestly report `UNSUPPORTED`. The remaining 18 detector names on the
+model route stay `UNKNOWN`: they keep their prompt guidance and every generic
+validator, but the server does not claim to enforce them. Current inventory:
+`python scripts/build_semantic_authority_report.py` →
+`scratchpad/semantic_authority/{detector_matrix,lesson_coverage}.json`, `audit.md`.
+
 **Task diversity has three independent axes.** "Daj mi novi zadatak" must not
 return the same exercise with different numbers or names. Three separate
 mechanisms enforce that, and the difference between them is deliberate and
