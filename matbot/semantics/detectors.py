@@ -751,18 +751,144 @@ def _detect_scientific_notation(contract, text, answer_text=""):
         **evidence)
 
 
+# ---------------------------------------------------------------------------
+# PRIMITIV: ODNOS DJELILAC / SADRŽILAC
+# ---------------------------------------------------------------------------
+# ŽIVI BLOKER ZAVRŠNE PRIJEMNE KAMPANJE (lekcija o djeliocu i sadržiocu,
+# 6. razred, model-ruta). Objavljen je zadatak
+#
+#     „Koja tvrdnja tačno opisuje odnos brojeva $5$ i $20$?“
+#
+# s OZNAČENIM odgovorom „$5$ je sadržilac broja $20$ jer je $20=5\cdot4$.“
+# To je netačno: `sadržilac` znači VIŠEKRATNIK, a iz $20=5\cdot4$ slijedi da je
+# 20 sadržilac broja 5, ne obrnuto. Obrazloženje uz odgovor zapravo potkrepljuje
+# suprotnu tvrdnju.
+#
+# ZAŠTO GA NIJEDAN VALIDATOR NIJE UHVATIO: greška je u ZNAČENJU dva stručna
+# termina, ne u aritmetici. `mcq_integrity` nema jednačinu koju bi riješio,
+# `option_equivalence` vidi četiri različita teksta, a `mathcheck` vidi
+# „$20=5\cdot4$“ — što je brojevno TAČNO. Ista lekcija je u istoj kampanji
+# objavila i zadatak koji tu istu formulaciju tretira kao GREŠKU koju treba
+# ispraviti, pa je sistem sam sebi protivrječio.
+#
+# Odnos je, međutim, egzaktno provjerljiv cjelobrojnom aritmetikom:
+#     „A je djelilac broja B“    ⇔  A ≠ 0 i B mod A = 0
+#     „A je sadržilac broja B“   ⇔  B ≠ 0 i A mod B = 0
+#
+# GRAMATIKA JE NAMJERNO USKA — samo oblik koji se stvarno pojavljuje u
+# opcijama: `A je <odnos> broja B`. Rečenica bez izričitog drugog broja
+# („Broj $3$ je djelilac: $51 : 3 = 17$“ iz determinističkog generatora),
+# odričan oblik („nije ni djelilac ni sadržilac“) i sve ostalo ostaju
+# UNSUPPORTED — nikad odbijeni. Ovo nije parser prirodnog jezika.
+CODE_FALSE_DIVISOR_MULTIPLE_CLAIM = "semantic_false_divisor_multiple_claim"
+
+_DIVISOR_WORDS = ("djelilac", "djelitelj")
+_MULTIPLE_WORDS = ("sadržilac", "sadrzilac", "višekratnik", "visekratnik")
+
+# `A je djelilac broja B` / `$20$ je sadržilac broja $5$`.
+# Odričan oblik se hvata zasebno i NIKAD se ne tumači kao tvrdnja.
+_RELATION_RE = re.compile(
+    r"(?<![\w])\$?(?P<a>\d{1,9})\$?\s*(?:je|jeste)\s+"
+    r"(?P<rel>djelilac|djelitelj|sadržilac|sadrzilac|višekratnik|visekratnik)\s+"
+    r"broja\s+\$?(?P<b>\d{1,9})\$?",
+    re.IGNORECASE)
+_NEGATION_RE = re.compile(r"\bni(?:je|su)\b", re.IGNORECASE)
+# Obrazloženje oblika `jer je B = A \cdot k` — jedini oblik koji se provjerava.
+_PRODUCT_REASON_RE = re.compile(
+    r"jer\s+je\s+\$?(?P<left>\d{1,9})\s*=\s*(?P<f1>\d{1,9})\s*"
+    r"(?:\\cdot|\\times|·|×|\*)\s*(?P<f2>\d{1,9})",
+    re.IGNORECASE)
+
+
+def divisor_multiple_claims(text):
+    """Sve DOKAZIVE tvrdnje o odnosu u tekstu: [(a, rel, b, is_true)].
+
+    Prazna lista znači „ništa se ne može sigurno pročitati“, nikad „netačno“."""
+    body = text or ""
+    if _NEGATION_RE.search(body):
+        # `4 nije ni djelilac ni sadržilac broja 20` — odričnu tvrdnju ovaj
+        # detektor ne ocjenjuje; potvrdno čitanje bi bilo obrnuto od značenja.
+        return []
+    claims = []
+    for match in _RELATION_RE.finditer(body):
+        a, b = int(match.group("a")), int(match.group("b"))
+        relation = match.group("rel").lower()
+        if relation.startswith(("djelilac", "djelitelj")):
+            true = a != 0 and b % a == 0
+            kind = "divisor"
+        else:
+            true = b != 0 and a % b == 0
+            kind = "multiple"
+        claims.append((a, kind, b, true))
+    return claims
+
+
+def _reason_supports(text, a, kind, b):
+    """Da li obrazloženje `jer je X = Y·Z` potkrepljuje TU tvrdnju.
+
+    Vraća True/False/None; None znači „nema obrazloženja koje umijem čitati“."""
+    match = _PRODUCT_REASON_RE.search(text or "")
+    if match is None:
+        return None
+    left = int(match.group("left"))
+    factors = {int(match.group("f1")), int(match.group("f2"))}
+    if left != int(match.group("f1")) * int(match.group("f2")):
+        return False                     # sam proizvod je netačan
+    # Proizvod dokazuje da je `left` sadržilac svakog činioca. Tvrdnja je
+    # potkrijepljena samo ako se to poklapa s onim što je rečeno.
+    if kind == "multiple":
+        return a == left and b in factors
+    return b == left and a in factors
+
+
+def _detect_divisor_multiple(contract, text, answer_text=""):
+    if not (answer_text or "").strip():
+        return _result(STATUS_UNSUPPORTED, reason="nema označenog odgovora")
+    claims = divisor_multiple_claims(answer_text)
+    if not claims:
+        return _result(STATUS_UNSUPPORTED,
+                       reason="označeni odgovor ne sadrži čitljivu tvrdnju o "
+                              "djeliocu ili sadržiocu")
+    for a, kind, b, true in claims:
+        if not true:
+            spoken = "djelilac" if kind == "divisor" else "sadržilac"
+            correct = ("sadržilac" if kind == "divisor" else "djelilac")
+            return _result(
+                STATUS_FAIL, CODE_FALSE_DIVISOR_MULTIPLE_CLAIM,
+                f"označeni odgovor tvrdi da je {a} {spoken} broja {b}, a to je "
+                f"netačno — ako a dijeli b, onda je a DJELILAC broja b, a b "
+                f"SADRŽILAC broja a; ovdje je odnos okrenut (provjeri da li je "
+                f"{a} možda {correct} broja {b}). Preuredi zadatak i SVE opcije "
+                f"tako da tačno jedna tvrdnja bude potpuno tačna",
+                claim=f"{a} {kind} {b}")
+    for a, kind, b, _true in claims:
+        supported = _reason_supports(answer_text, a, kind, b)
+        if supported is False:
+            return _result(
+                STATUS_FAIL, CODE_FALSE_DIVISOR_MULTIPLE_CLAIM,
+                f"odnos je tačan, ali ga navedeno obrazloženje ne potkrepljuje "
+                f"(ili je sam račun netačan) — obrazloženje mora pokazati "
+                f"upravo tvrđeni odnos brojeva {a} i {b}",
+                claim=f"{a} {kind} {b}", reason_supports=False)
+    return _result(STATUS_PASS,
+                   reason="tvrdnja o odnosu djelioca i sadržioca je tačna",
+                   claims=tuple(f"{a}:{k}:{b}" for a, k, b, _t in claims))
+
+
 DETECTORS = {
     "fraction_arithmetic": _detect_fraction_arithmetic,
     "polynomial_basic": _detect_polynomial_basic,
     "geometry_formula_2d": _detect_measure_dimension,
     "solid_geometry_direct": _detect_measure_dimension,
+    "common_divisors_multiples": _detect_divisor_multiple,
 }
 
 # Detektori kojima je dokaz OZNAČEN ODGOVOR, a ne tekst zadatka. Tekst nosi
 # ULAZNE veličine (`a = 16` cm i u zadatku o površini), pa bi mjerenje nad njim
 # bilo sistematski pogrešno.
 _ANSWER_EVIDENCE_DETECTORS = frozenset({"geometry_formula_2d",
-                                        "solid_geometry_direct"})
+                                        "solid_geometry_direct",
+                                        "common_divisors_multiples"})
 
 
 def detect(contract, text, answer_text=""):

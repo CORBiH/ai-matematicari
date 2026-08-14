@@ -1,0 +1,53 @@
+[
+ {
+  "code": "WRONG_MARKED",
+  "severity": "RELEASE_BLOCKER",
+  "turns": [
+   23,
+   25,
+   26,
+   27
+  ],
+  "distinct_published_tasks": 1,
+  "lesson_id": "6-03-001",
+  "grade": 6,
+  "route": "model",
+  "question": "Koja tvrdnja tačno opisuje odnos brojeva $5$ i $20$?",
+  "marked": "$5$ je sadržilac broja $20$ jer je $20=5\\cdot4$.",
+  "why": "'sadržilac'=multiple. 20=5*4 makes 20 the multiple of 5, so '5 je sadržilac broja 20' is FALSE. No option is fully correct: option[1] '20 je sadržilac broja 5' has the TRUE claim but a false justification ('jer je manji od njega').",
+  "internal_contradiction": "the SAME lesson in the SAME campaign publishes 'Učenik je zaključio da je 4 sadržilac broja 20. Koja ispravka je tačna?' -> marked '4 je djelilac broja 20', i.e. the project itself treats this exact phrasing as the error to correct.",
+  "why_no_validator_caught_it": "the error is domain-term semantics, not arithmetic: mcq_integrity has no equation to solve, option_equivalence sees four distinct texts, mathcheck sees '20=5*4' which is numerically TRUE."
+ },
+ {
+  "code": "VARIETY",
+  "severity": "NON_BLOCKING",
+  "count": 4,
+  "detail": "consecutive published tasks with an identical structural signature; all on the DETERMINISTIC route, where the structural task_too_similar guard is a model-route preflight finding only. The deterministic route guarantees a non-identical task (12-attempt loop + canonical identity in _publish_task) but not a different exercise shape.",
+  "instances": [
+   {
+    "turn": 33,
+    "session": "acc-full-6-07-001",
+    "lesson_id": "6-07-001",
+    "route": "deterministic"
+   },
+   {
+    "turn": 83,
+    "session": "acc-full-9-05-001",
+    "lesson_id": "9-05-001",
+    "route": "deterministic"
+   },
+   {
+    "turn": 90,
+    "session": "acc-full-9-05-001",
+    "lesson_id": "9-05-001",
+    "route": "deterministic"
+   },
+   {
+    "turn": 108,
+    "session": "acc-short-6-06-001",
+    "lesson_id": "6-06-001",
+    "route": "deterministic"
+   }
+  ]
+ }
+]

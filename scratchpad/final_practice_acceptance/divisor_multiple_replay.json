@@ -1,0 +1,55 @@
+{
+ "deterministic": {
+  "packages": 360,
+  "status": {
+   "unsupported": 360
+  },
+  "fails": []
+ },
+ "live": {
+  "packages": 3389,
+  "status": {
+   "unsupported": 3261,
+   "fail": 4,
+   "pass": 124
+  },
+  "fails": [
+   [
+    "acceptance",
+    "6-03-001",
+    "Koja tvrdnja tačno opisuje odnos brojeva $5$ i $20$?",
+    "$5$ je sadržilac broja $20$ jer je $20=5\\cdot4$.",
+    "označeni odgovor tvrdi da je 5 sadržilac broja 20, a to je netačno — ako a dijeli b, onda je a DJELILAC broja "
+   ],
+   [
+    "acceptance",
+    "6-03-001",
+    "Koja tvrdnja tačno opisuje odnos brojeva $5$ i $20$?",
+    "$5$ je sadržilac broja $20$ jer je $20=5\\cdot4$.",
+    "označeni odgovor tvrdi da je 5 sadržilac broja 20, a to je netačno — ako a dijeli b, onda je a DJELILAC broja "
+   ],
+   [
+    "acceptance",
+    "6-03-001",
+    "Koja tvrdnja tačno opisuje odnos brojeva $5$ i $20$?",
+    "$5$ je sadržilac broja $20$ jer je $20=5\\cdot4$.",
+    "označeni odgovor tvrdi da je 5 sadržilac broja 20, a to je netačno — ako a dijeli b, onda je a DJELILAC broja "
+   ],
+   [
+    "acceptance",
+    "6-03-001",
+    "Koja tvrdnja tačno opisuje odnos brojeva $5$ i $20$?",
+    "$5$ je sadržilac broja $20$ jer je $20=5\\cdot4$.",
+    "označeni odgovor tvrdi da je 5 sadržilac broja 20, a to je netačno — ako a dijeli b, onda je a DJELILAC broja "
+   ]
+  ]
+ },
+ "mutations": {
+  "pairs": 200,
+  "counters": {
+   "truth:pass": 600,
+   "reversal:fail": 600
+  },
+  "missed": []
+ }
+}

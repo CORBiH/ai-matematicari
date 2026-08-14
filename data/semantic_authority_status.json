@@ -11,8 +11,8 @@
  "contract_version": "5F.1",
  "counts": {
   "REDUNDANT": 189,
-  "UNKNOWN": 111,
-  "IMPLEMENTED": 54
+  "UNKNOWN": 108,
+  "IMPLEMENTED": 57
  },
  "lessons": {
   "6-01-001": {
@@ -158,9 +158,9 @@
   "6-03-001": {
    "detector": "common_divisors_multiples",
    "requested_enforcement": "blocking",
-   "detector_status": "UNKNOWN",
+   "detector_status": "IMPLEMENTED",
    "production_route": "model",
-   "server_can_refuse_publication": false
+   "server_can_refuse_publication": true
   },
   "6-03-002": {
    "detector": "divisibility_value",
@@ -207,16 +207,16 @@
   "6-03-008": {
    "detector": "common_divisors_multiples",
    "requested_enforcement": "blocking",
-   "detector_status": "UNKNOWN",
+   "detector_status": "IMPLEMENTED",
    "production_route": "model",
-   "server_can_refuse_publication": false
+   "server_can_refuse_publication": true
   },
   "6-03-009": {
    "detector": "common_divisors_multiples",
    "requested_enforcement": "blocking",
-   "detector_status": "UNKNOWN",
+   "detector_status": "IMPLEMENTED",
    "production_route": "model",
-   "server_can_refuse_publication": false
+   "server_can_refuse_publication": true
   },
   "6-03-010": {
    "detector": "structured_word_problem",

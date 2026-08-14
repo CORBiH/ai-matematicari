@@ -108,8 +108,10 @@ def test_the_derived_answer_class_map_rejected_the_ambiguous_tokens():
 def test_the_measure_dimension_detector_is_unchanged():
     assert detectors.DETECTORS["geometry_formula_2d"] is detectors._detect_measure_dimension
     assert detectors.DETECTORS["solid_geometry_direct"] is detectors._detect_measure_dimension
-    assert detectors._ANSWER_EVIDENCE_DETECTORS == frozenset(
-        {"geometry_formula_2d", "solid_geometry_direct"})
+    # Skup detektora koji dokaz čitaju iz OZNAČENOG odgovora smije rasti kad se
+    # doda nov takav detektor; ove dvije porodice moraju ostati u njemu.
+    assert {"geometry_formula_2d", "solid_geometry_direct"} <= \
+        detectors._ANSWER_EVIDENCE_DETECTORS
 
 
 def test_the_measure_dimension_detector_still_proves_its_three_outcomes():

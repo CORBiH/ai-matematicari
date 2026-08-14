@@ -1,0 +1,89 @@
+{
+ "candidate": {
+  "head": "a31ef4d76a85a832d56e7ab7e6f36c7a14338fc5",
+  "tree": "ab34a2b0e2c5de47ff02d29301b41b6e38a1d91e"
+ },
+ "campaign": {
+  "acceptance_turns": 115,
+  "grading_verification_turns": 8,
+  "recovery_smoke_turns": 23,
+  "total_budget_used": 146,
+  "budget": 150,
+  "sessions": 15,
+  "lessons": 13,
+  "grades": [
+   6,
+   7,
+   8,
+   9
+  ],
+  "model_calls": 78,
+  "generation_turns": 56,
+  "route_split": {
+   "model": 32,
+   "deterministic": 14
+  }
+ },
+ "publication": {
+  "overall": "54/56",
+  "overall_pct": 96.4,
+  "first_call_pct": 83.9,
+  "reviewer_rate_pct": 16.1,
+  "reviewer_repair": "7/9",
+  "fail_closed": 2
+ },
+ "safety": {
+  "wrong_math": 0,
+  "wrong_marked": 1,
+  "multi_correct": 0,
+  "solution_divergence": 0,
+  "incomplete_unsolvable": 0,
+  "lesson_drift": 0,
+  "hint_leak": 0,
+  "state_corruption": 0,
+  "third_calls": 0
+ },
+ "grading": {
+  "deterministic_correct": "4/4",
+  "deterministic_incorrect": "2/2",
+  "model_correct": "2/2",
+  "model_incorrect": "2/2"
+ },
+ "help": {
+  "active_hint_levels": 1,
+  "repeated_hint_identical": "10/10",
+  "model_calls_on_hints": 0,
+  "hint_leaks": 0
+ },
+ "difficulty": {
+  "harder_moved_up": 10,
+  "easier_moved_down": 10,
+  "unchanged": 0
+ },
+ "variety": {
+  "identical_structural_signature_consecutive": 4,
+  "all_on_route": "deterministic"
+ },
+ "performance": {
+  "deterministic": {
+   "n": 14,
+   "p50": 5,
+   "p95": 14,
+   "max": 14
+  },
+  "luna_first_call": {
+   "n": 25,
+   "p50": 8523,
+   "p95": 13206,
+   "max": 13765
+  },
+  "luna_plus_reviewer": {
+   "n": 7,
+   "p50": 18038,
+   "p95": 26949,
+   "max": 26949
+  }
+ },
+ "verdict": "PRACTICE_V1_ACCEPTANCE_FAIL",
+ "blocking_reason": "1 published task with a mathematically false marked answer (WRONG_MARKED), lesson 6-03-001"
+}
