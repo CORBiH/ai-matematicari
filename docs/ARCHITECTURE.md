@@ -549,6 +549,28 @@ question — but not for an **answer class**, which is an authoring choice the m
 may legitimately make differently. *The deterministic corpus is not a valid
 stand-in for model-authored content when proving an author-chosen property.*
 
+**A second rejected candidate: canonical scientific notation** (lesson 8-01-017,
+the only `EXACT_PARSED_MATH` rule left). The checker works and is kept unwired in
+`detectors.scientific_notation_form`: 16/16 notation variants read correctly,
+180 deterministic packages → 156 PASS / 24 UNSUPPORTED / 0 FAIL, 12 live shadow
+turns → 2 PASS / 10 UNSUPPORTED / 0 FAIL, and 315/315 mutations caught. It is
+conditional on the *answer* being written as `a·10^n`, so the lesson's reverse
+direction ("Koliko iznosi $9,9\cdot 10^5$?", whose correct answer is an ordinary
+decimal) can never be blocked.
+
+It is still **not enabled**, because the same shadow run published and accepted
+
+```
+$2,4\cdot 10^3 = 0,24\cdot 10^4$
+```
+
+as a marked answer — where `0,24·10^4` is deliberately non-canonical and the
+statement is true. That package survived only because it carries *two* powers of
+ten. A task with one non-canonical but correct answer ("which notation equals
+2400?", "which is *not* scientific notation?") is equally natural for this lesson
+and would have been falsely blocked; 12 turns simply did not hit it. The bar is
+zero false blocks and the upside was one lesson, so the rule stays `UNKNOWN`.
+
 **Task diversity has three independent axes.** "Daj mi novi zadatak" must not
 return the same exercise with different numbers or names. Three separate
 mechanisms enforce that, and the difference between them is deliberate and

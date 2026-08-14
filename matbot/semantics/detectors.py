@@ -633,6 +633,124 @@ def _detect_answer_class(contract, text, answer_text=""):
         required_class=wanted, answer_class=actual, tokens=tokens)
 
 
+# ---------------------------------------------------------------------------
+# PRIMITIV: KANONSKI NAUČNI ZAPIS BROJA
+# ---------------------------------------------------------------------------
+# Lekcija „Naučni zapis broja“ traži zapis $a \cdot 10^{n}$ u KANONSKOM obliku.
+# Definicija nije pretpostavljena — doslovno je zapisana u nagovještaju
+# vlastitog determinističkog generatora ove lekcije: „Naučni zapis ima oblik
+# a·10^n, gdje je 1 ≤ a < 10, a n cio broj“.
+#
+# ZAŠTO SE NE PROVJERAVA SMJER ZADATKA: ista lekcija legitimno ide u OBA smjera
+# — `plain_to_scientific` („Zapiši broj 420000 u naučnom zapisu“, odgovor JESTE
+# naučni zapis) i `scientific_to_plain` („Koliko iznosi 4,2·10^5?“, odgovor je
+# OBIČAN decimalni broj). Detektor koji bi tražio naučni zapis u svakom odgovoru
+# lažno bi odbio cio obrnuti smjer.
+#
+# Zato je pravilo uslovno na OBLIKU ODGOVORA, ne na smjeru zadatka:
+#     odgovor NIJE oblika a·10^n  →  UNSUPPORTED (pravilo se ne primjenjuje)
+#     odgovor JESTE oblika a·10^n →  mora biti kanonski, inače FAIL
+# Obrnuti smjer time nikad ne može biti odbijen, a `42 \cdot 10^{4}` može.
+#
+# ============ MJEREN, TEHNIČKI ISPRAVAN, ALI NIJE UKLJUČEN ============
+# Brojke su bile dobre:
+#     16/16 zapisnih varijanti (\cdot, \times, ·, 10^{-4}, bez zagrada) tačno
+#     180 determinističkih paketa: 156 PASS (smjer „zapiši“), 24 UNSUPPORTED
+#         (obrnuti smjer), 0 FAIL
+#     12 živih Luna turnova u sjenci: 2 PASS, 10 UNSUPPORTED, 0 FAIL
+#     315/315 mutacija (42·10^4, 0,42·10^6, 420·10^3) uhvaćeno — 100 %
+#
+# ZAŠTO IPAK NIJE ZAKAČEN: ista sjenka je pokazala da Luna na OVOJ lekciji
+# koristi NEKANONSKI zapis kao legitiman sadržaj tačnog odgovora — objavljen i
+# prihvaćen paket imao je označeno
+#
+#     $2,4\cdot 10^3 = 0,24\cdot 10^4$
+#
+# gdje je `0,24·10^4` namjerno nekanonski, a tvrdnja tačna. Taj paket je prošao
+# kao UNSUPPORTED samo zato što nosi DVA stepena broja 10. Zadatak s JEDNIM
+# nekanonskim ali tačnim odgovorom („koji zapis je jednak 2400?“, „koji zapis
+# NIJE naučni?“) je ista, potpuno realna vrsta zadatka za lekciju o naučnom
+# zapisu — i detektor bi ga odbio. Uzorak od 12 turnova ga naprosto nije
+# pogodio.
+#
+# Prag za bloker je NULA lažnih odbijanja, a dobitak bi bio JEDNA lekcija.
+# Zato pravilo ostaje UNKNOWN dok se ne skupi živi korpus koji tu vrstu
+# zadatka ili isključi ili potvrdi. Kod i mjerenja ostaju da sljedeći pokušaj
+# ne počinje ispočetka; `tests/` čuva odluku.
+# ======================================================================
+CODE_NONCANONICAL_SCIENTIFIC_NOTATION = "semantic_noncanonical_scientific_notation"
+
+_SCIENTIFIC_CONCEPT = "scientific_notation"
+
+# `4,2 \cdot 10^{5}`, `4.2 \times 10^-3`, `-3,5·10^{4}`, `10^{6}` (a = 1).
+# Mantisa i stepen moraju činiti CIO matematički segment — zbir, proizvod više
+# stepena ili jedinica uz broj izlaze iz granice dokaza i ostaju UNSUPPORTED.
+_SCI_NOTATION_RE = re.compile(
+    r"\A\s*(?:(?P<mantissa>[+-]?\d+(?:[.,]\d+)?)\s*(?:\\cdot|\\times|·|×|\*)\s*)?"
+    r"10\s*\^\s*\{?\s*(?P<exponent>[+-]?\d+)\s*\}?\s*\Z")
+# Ima li odgovor UOPŠTE stepen broja 10 — ako nema, pravilo se ne primjenjuje.
+_POWER_OF_TEN_RE = re.compile(r"10\s*\^")
+
+
+def scientific_notation_form(answer_text):
+    """(status, dokazi) za JEDAN odgovor. Ne poznaje nijednu lekciju.
+
+    `unsupported` znači „ovo nije zapis a·10^n koji umijem pročitati“ — nikad
+    „neispravno je“."""
+    contents = [content for content in math_contents(tokenize_math(answer_text or ""))
+                if content.strip()]
+    if not contents:
+        contents = [answer_text or ""]
+    powered = [content for content in contents if _POWER_OF_TEN_RE.search(content)]
+    if not powered:
+        return STATUS_UNSUPPORTED, {"reason": "odgovor nije zapis sa stepenom broja 10"}
+    if len(powered) > 1:
+        return STATUS_UNSUPPORTED, {"reason": "više zapisa sa stepenom broja 10"}
+    match = _SCI_NOTATION_RE.match(powered[0])
+    if match is None:
+        return STATUS_UNSUPPORTED, {"reason": "zapis sa stepenom 10 nije oblika a·10^n"}
+    raw = match.group("mantissa")
+    exponent = int(match.group("exponent"))
+    if raw is None:
+        mantissa = 1.0            # `10^{n}` je a = 1, dakle kanonski
+    else:
+        try:
+            mantissa = abs(float(raw.replace(",", ".")))
+        except ValueError:
+            return STATUS_UNSUPPORTED, {"reason": "mantisa se ne može pročitati"}
+    if mantissa == 0:
+        return STATUS_UNSUPPORTED, {"reason": "mantisa je nula"}
+    if 1 <= mantissa < 10:
+        return STATUS_PASS, {"mantissa": raw or "1", "exponent": exponent}
+    return STATUS_FAIL, {"mantissa": raw or "1", "exponent": exponent}
+
+
+def _detect_scientific_notation(contract, text, answer_text=""):
+    concepts = tuple(contract.parameters.get("concepts") or ())
+    # Pravilo vrijedi samo za lekciju koja JESTE o naučnom zapisu. Ostale
+    # lekcije porodice stepena (kvadrat, zakoni stepena, prefiksi) prolaze
+    # netaknute — odluka se čita iz ugovora, nikad iz ID-ja lekcije.
+    if concepts != (_SCIENTIFIC_CONCEPT,):
+        return _result(STATUS_UNSUPPORTED,
+                       reason="lekcija nije o naučnom zapisu broja",
+                       concepts=concepts)
+    if not (answer_text or "").strip():
+        return _result(STATUS_UNSUPPORTED, reason="nema označenog odgovora")
+    status, evidence = scientific_notation_form(answer_text)
+    if status == STATUS_PASS:
+        return _result(STATUS_PASS, reason="odgovor je u kanonskom naučnom zapisu",
+                       **evidence)
+    if status == STATUS_UNSUPPORTED:
+        return _result(STATUS_UNSUPPORTED, **evidence)
+    return _result(
+        STATUS_FAIL, CODE_NONCANONICAL_SCIENTIFIC_NOTATION,
+        "označeni odgovor je zapisan kao $a \\cdot 10^{n}$, ali nije u "
+        "kanonskom naučnom zapisu — mantisa mora zadovoljavati $1 \\le |a| "
+        "< 10$, a izložilac biti cio broj; preformuliši zadatak i SVE opcije "
+        "tako da traženi odgovor bude u tom obliku",
+        **evidence)
+
+
 DETECTORS = {
     "fraction_arithmetic": _detect_fraction_arithmetic,
     "polynomial_basic": _detect_polynomial_basic,
