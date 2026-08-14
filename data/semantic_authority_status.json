@@ -1,0 +1,2497 @@
+{
+ "_readme": [
+  "STVARNI autoritet po lekciji, IZVEDEN iz koda i rute.",
+  "`requested_enforcement` je ono sto ugovor TRAZI (uvijek `blocking`).",
+  "`detector_status` je ono sto server MOZE:",
+  "  IMPLEMENTED = postoji detektor i lekcija ide model-rutom -> objava se moze odbiti",
+  "  REDUNDANT   = paket gradi server (0-pozivna ruta) -> drift nije moguc",
+  "  UNKNOWN     = ugovor trazi blokadu, a dokaza nema -> NISTA se ne blokira",
+  "Gradi ga scripts/build_semantic_triage.py; ne cita ga runtime."
+ ],
+ "contract_version": "5F.1",
+ "counts": {
+  "REDUNDANT": 189,
+  "UNKNOWN": 111,
+  "IMPLEMENTED": 54
+ },
+ "lessons": {
+  "6-01-001": {
+   "detector": "finite_set",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "6-01-002": {
+   "detector": "finite_set",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "6-01-003": {
+   "detector": "finite_set",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "6-01-004": {
+   "detector": "finite_set",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "6-01-006": {
+   "detector": "finite_set",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "6-01-007": {
+   "detector": "finite_set",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "6-01-008": {
+   "detector": "finite_set",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "6-01-009": {
+   "detector": "finite_set",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "6-01-010": {
+   "detector": "finite_set",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "6-01-011": {
+   "detector": "finite_set",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "6-01-012": {
+   "detector": "finite_set",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "6-01-013": {
+   "detector": "finite_set",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "6-02-001": {
+   "detector": "number_set_membership",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "6-02-002": {
+   "detector": "number_ordering",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "6-02-003": {
+   "detector": "numeric_arithmetic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "6-02-004": {
+   "detector": "numeric_arithmetic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "6-02-005": {
+   "detector": "numeric_arithmetic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "6-02-006": {
+   "detector": "operation_property",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "6-02-007": {
+   "detector": "numeric_arithmetic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "6-02-008": {
+   "detector": "polynomial_basic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "6-03-001": {
+   "detector": "common_divisors_multiples",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "6-03-002": {
+   "detector": "divisibility_value",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "6-03-003": {
+   "detector": "divisibility_value",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "6-03-004": {
+   "detector": "divisibility_predicate",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "6-03-005": {
+   "detector": "prime_structure",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "6-03-006": {
+   "detector": "prime_structure",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "6-03-007": {
+   "detector": "prime_structure",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "6-03-008": {
+   "detector": "common_divisors_multiples",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "6-03-009": {
+   "detector": "common_divisors_multiples",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "6-03-010": {
+   "detector": "structured_word_problem",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "6-04-002": {
+   "detector": "fraction_concept",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "6-04-003": {
+   "detector": "fraction_concept",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "6-04-007": {
+   "detector": "fraction_concept",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "6-04-008": {
+   "detector": "number_ordering",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "6-04-009": {
+   "detector": "fraction_arithmetic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "6-04-010": {
+   "detector": "fraction_arithmetic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "6-04-011": {
+   "detector": "fraction_arithmetic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "6-04-012": {
+   "detector": "fraction_arithmetic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "6-04-013": {
+   "detector": "operation_property",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "6-04-014": {
+   "detector": "numeric_arithmetic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "6-04-015": {
+   "detector": "structured_word_problem",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "6-05-001": {
+   "detector": "fraction_decimal",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "6-05-002": {
+   "detector": "fraction_decimal",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "6-05-003": {
+   "detector": "fraction_decimal",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "6-05-004": {
+   "detector": "fraction_concept",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "6-05-006": {
+   "detector": "number_ordering",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "6-05-007": {
+   "detector": "decimal_rounding",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "6-05-008": {
+   "detector": "numeric_arithmetic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "6-05-009": {
+   "detector": "numeric_arithmetic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "6-05-010": {
+   "detector": "numeric_arithmetic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "6-05-011": {
+   "detector": "structured_word_problem",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "6-06-001": {
+   "detector": "percent_basic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "6-06-002": {
+   "detector": "percent_basic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "6-06-003": {
+   "detector": "ratio_proportion",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "6-06-004": {
+   "detector": "arithmetic_mean",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "6-07-001": {
+   "detector": "linear_equation",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "6-07-002": {
+   "detector": "linear_equation",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "6-07-003": {
+   "detector": "linear_equation",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "6-07-004": {
+   "detector": "linear_equation",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "6-07-005": {
+   "detector": "linear_equation",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "6-07-006": {
+   "detector": "linear_equation",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "6-09-003": {
+   "detector": "angle_relationships_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "6-09-004": {
+   "detector": "angle_relationships_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "6-09-005": {
+   "detector": "angle_relationships_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "6-09-007": {
+   "detector": "angle_relationships_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "6-09-010": {
+   "detector": "unit_conversion",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "6-09-011": {
+   "detector": "angle_relationships_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "6-09-012": {
+   "detector": "angle_relationships_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "6-09-013": {
+   "detector": "angle_relationships_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "6-09-014": {
+   "detector": "angle_relationships_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "6-09-015": {
+   "detector": "angle_relationships_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "6-09-016": {
+   "detector": "angle_relationships_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "6-13-001": {
+   "detector": "unit_conversion",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "6-13-002": {
+   "detector": "unit_conversion",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "6-13-003": {
+   "detector": "unit_conversion",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "6-13-004": {
+   "detector": "unit_conversion",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "6-13-005": {
+   "detector": "unit_conversion",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "7-02-004": {
+   "detector": "absolute_opposite",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "7-02-005": {
+   "detector": "absolute_opposite",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "7-02-006": {
+   "detector": "number_ordering",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "7-02-007": {
+   "detector": "numeric_arithmetic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "7-02-008": {
+   "detector": "numeric_arithmetic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "7-02-009": {
+   "detector": "numeric_arithmetic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "7-02-010": {
+   "detector": "operation_property",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "7-02-011": {
+   "detector": "numeric_arithmetic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "7-02-012": {
+   "detector": "numeric_arithmetic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "7-02-013": {
+   "detector": "numeric_arithmetic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "7-02-014": {
+   "detector": "operation_property",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "7-02-015": {
+   "detector": "numeric_arithmetic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "7-02-016": {
+   "detector": "linear_equation",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "7-02-017": {
+   "detector": "linear_equation",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "7-02-018": {
+   "detector": "linear_equation",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "7-02-019": {
+   "detector": "linear_equation",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "7-02-020": {
+   "detector": "linear_equation",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "7-02-021": {
+   "detector": "structured_word_problem",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "7-03-004": {
+   "detector": "absolute_opposite",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "7-03-005": {
+   "detector": "absolute_opposite",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "7-03-006": {
+   "detector": "number_ordering",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "7-03-007": {
+   "detector": "fraction_decimal",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "7-03-008": {
+   "detector": "fraction_decimal",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "7-03-009": {
+   "detector": "numeric_arithmetic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "7-03-010": {
+   "detector": "numeric_arithmetic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "7-03-011": {
+   "detector": "numeric_arithmetic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "7-03-012": {
+   "detector": "numeric_arithmetic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "7-03-013": {
+   "detector": "operation_property",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "7-03-014": {
+   "detector": "numeric_arithmetic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "7-03-015": {
+   "detector": "numeric_arithmetic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "7-03-016": {
+   "detector": "linear_equation",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "7-03-017": {
+   "detector": "linear_equation",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "7-03-018": {
+   "detector": "linear_equation",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "7-03-019": {
+   "detector": "linear_equation",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "7-03-020": {
+   "detector": "structured_word_problem",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "7-03-021": {
+   "detector": "decimal_rounding",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "7-04-001": {
+   "detector": "angle_relationships_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "7-04-002": {
+   "detector": "angle_relationships_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "7-04-006": {
+   "detector": "angle_relationships_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "7-04-007": {
+   "detector": "angle_relationships_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "7-04-008": {
+   "detector": "angle_relationships_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "7-04-009": {
+   "detector": "angle_relationships_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "7-04-010": {
+   "detector": "angle_relationships_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "7-04-011": {
+   "detector": "angle_relationships_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "7-04-012": {
+   "detector": "angle_relationships_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "7-04-018": {
+   "detector": "angle_relationships_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "7-04-019": {
+   "detector": "angle_relationships_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "7-04-025": {
+   "detector": "geometry_formula_2d",
+   "requested_enforcement": "blocking",
+   "detector_status": "IMPLEMENTED",
+   "production_route": "model",
+   "server_can_refuse_publication": true
+  },
+  "7-05-002": {
+   "detector": "angle_relationships_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "7-05-003": {
+   "detector": "angle_relationships_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "7-05-012": {
+   "detector": "geometry_formula_2d",
+   "requested_enforcement": "blocking",
+   "detector_status": "IMPLEMENTED",
+   "production_route": "model",
+   "server_can_refuse_publication": true
+  },
+  "7-05-016": {
+   "detector": "geometry_formula_2d",
+   "requested_enforcement": "blocking",
+   "detector_status": "IMPLEMENTED",
+   "production_route": "model",
+   "server_can_refuse_publication": true
+  },
+  "7-05-017": {
+   "detector": "geometry_formula_2d",
+   "requested_enforcement": "blocking",
+   "detector_status": "IMPLEMENTED",
+   "production_route": "model",
+   "server_can_refuse_publication": true
+  },
+  "7-05-018": {
+   "detector": "unit_conversion",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "7-05-019": {
+   "detector": "geometry_formula_2d",
+   "requested_enforcement": "blocking",
+   "detector_status": "IMPLEMENTED",
+   "production_route": "model",
+   "server_can_refuse_publication": true
+  },
+  "7-05-020": {
+   "detector": "geometry_formula_2d",
+   "requested_enforcement": "blocking",
+   "detector_status": "IMPLEMENTED",
+   "production_route": "model",
+   "server_can_refuse_publication": true
+  },
+  "7-05-021": {
+   "detector": "geometry_formula_2d",
+   "requested_enforcement": "blocking",
+   "detector_status": "IMPLEMENTED",
+   "production_route": "model",
+   "server_can_refuse_publication": true
+  },
+  "7-05-022": {
+   "detector": "geometry_formula_2d",
+   "requested_enforcement": "blocking",
+   "detector_status": "IMPLEMENTED",
+   "production_route": "model",
+   "server_can_refuse_publication": true
+  },
+  "7-05-023": {
+   "detector": "geometry_formula_2d",
+   "requested_enforcement": "blocking",
+   "detector_status": "IMPLEMENTED",
+   "production_route": "model",
+   "server_can_refuse_publication": true
+  },
+  "7-05-024": {
+   "detector": "geometry_formula_2d",
+   "requested_enforcement": "blocking",
+   "detector_status": "IMPLEMENTED",
+   "production_route": "model",
+   "server_can_refuse_publication": true
+  },
+  "8-01-001": {
+   "detector": "number_set_membership",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "8-01-002": {
+   "detector": "number_set_membership",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "8-01-003": {
+   "detector": "number_set_membership",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "8-01-004": {
+   "detector": "number_ordering",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "8-01-005": {
+   "detector": "absolute_opposite",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "8-01-006": {
+   "detector": "power_arithmetic",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "8-01-007": {
+   "detector": "square_root",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "8-01-008": {
+   "detector": "square_root",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "8-01-009": {
+   "detector": "simple_quadratic",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "8-01-010": {
+   "detector": "square_root",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "8-01-011": {
+   "detector": "square_root",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "8-01-012": {
+   "detector": "numeric_arithmetic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "8-01-013": {
+   "detector": "power_arithmetic",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "8-01-014": {
+   "detector": "power_arithmetic",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "8-01-015": {
+   "detector": "power_arithmetic",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "8-01-016": {
+   "detector": "power_arithmetic",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "8-01-017": {
+   "detector": "power_arithmetic",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "8-02-004": {
+   "detector": "coordinate_line",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "8-02-005": {
+   "detector": "linear_function",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "8-02-006": {
+   "detector": "linear_function",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "8-02-008": {
+   "detector": "coordinate_line",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "8-02-009": {
+   "detector": "coordinate_line",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "8-02-010": {
+   "detector": "linear_function",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "8-02-011": {
+   "detector": "linear_function",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "8-02-012": {
+   "detector": "coordinate_line",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "8-02-014": {
+   "detector": "coordinate_line",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "8-03-001": {
+   "detector": "ratio_proportion",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "8-03-002": {
+   "detector": "ratio_proportion",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "8-03-003": {
+   "detector": "ratio_proportion",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "8-03-004": {
+   "detector": "ratio_proportion",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "8-03-005": {
+   "detector": "ratio_proportion",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "8-03-006": {
+   "detector": "linear_function",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "8-03-007": {
+   "detector": "linear_function",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "8-03-008": {
+   "detector": "similarity",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "8-03-010": {
+   "detector": "ratio_proportion",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "8-03-012": {
+   "detector": "ratio_proportion",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "8-03-013": {
+   "detector": "similarity",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "8-03-015": {
+   "detector": "similarity",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "8-03-016": {
+   "detector": "similarity",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "8-03-017": {
+   "detector": "percent_basic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "8-03-018": {
+   "detector": "percent_basic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "8-03-019": {
+   "detector": "financial_arithmetic",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "8-03-020": {
+   "detector": "ratio_proportion",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "8-04-001": {
+   "detector": "pythagoras_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "8-04-002": {
+   "detector": "pythagoras_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "8-04-003": {
+   "detector": "pythagoras_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "8-04-004": {
+   "detector": "pythagoras_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "8-04-005": {
+   "detector": "pythagoras_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "8-04-006": {
+   "detector": "pythagoras_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "8-04-007": {
+   "detector": "pythagoras_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "8-04-008": {
+   "detector": "pythagoras_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "8-04-009": {
+   "detector": "pythagoras_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "8-04-010": {
+   "detector": "pythagoras_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "8-04-011": {
+   "detector": "pythagoras_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "8-04-012": {
+   "detector": "pythagoras_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "8-04-016": {
+   "detector": "structured_word_problem",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "8-05-002": {
+   "detector": "solid_geometry_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "IMPLEMENTED",
+   "production_route": "model",
+   "server_can_refuse_publication": true
+  },
+  "8-05-003": {
+   "detector": "solid_geometry_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "IMPLEMENTED",
+   "production_route": "model",
+   "server_can_refuse_publication": true
+  },
+  "8-05-004": {
+   "detector": "solid_geometry_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "IMPLEMENTED",
+   "production_route": "model",
+   "server_can_refuse_publication": true
+  },
+  "8-05-005": {
+   "detector": "solid_geometry_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "IMPLEMENTED",
+   "production_route": "model",
+   "server_can_refuse_publication": true
+  },
+  "8-05-006": {
+   "detector": "solid_geometry_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "IMPLEMENTED",
+   "production_route": "model",
+   "server_can_refuse_publication": true
+  },
+  "8-05-008": {
+   "detector": "solid_geometry_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "IMPLEMENTED",
+   "production_route": "model",
+   "server_can_refuse_publication": true
+  },
+  "8-05-013": {
+   "detector": "solid_geometry_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "IMPLEMENTED",
+   "production_route": "model",
+   "server_can_refuse_publication": true
+  },
+  "8-05-014": {
+   "detector": "solid_geometry_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "IMPLEMENTED",
+   "production_route": "model",
+   "server_can_refuse_publication": true
+  },
+  "8-05-015": {
+   "detector": "solid_geometry_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "IMPLEMENTED",
+   "production_route": "model",
+   "server_can_refuse_publication": true
+  },
+  "8-05-016": {
+   "detector": "solid_geometry_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "IMPLEMENTED",
+   "production_route": "model",
+   "server_can_refuse_publication": true
+  },
+  "8-05-017": {
+   "detector": "solid_geometry_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "IMPLEMENTED",
+   "production_route": "model",
+   "server_can_refuse_publication": true
+  },
+  "8-05-018": {
+   "detector": "solid_geometry_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "IMPLEMENTED",
+   "production_route": "model",
+   "server_can_refuse_publication": true
+  },
+  "8-05-019": {
+   "detector": "solid_geometry_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "IMPLEMENTED",
+   "production_route": "model",
+   "server_can_refuse_publication": true
+  },
+  "8-05-020": {
+   "detector": "solid_geometry_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "IMPLEMENTED",
+   "production_route": "model",
+   "server_can_refuse_publication": true
+  },
+  "8-05-022": {
+   "detector": "unit_conversion",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "8-06-002": {
+   "detector": "frequency_basic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "8-06-003": {
+   "detector": "frequency_basic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "8-06-004": {
+   "detector": "frequency_basic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "8-06-009": {
+   "detector": "arithmetic_mean",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "8-06-010": {
+   "detector": "event_probability",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "8-06-011": {
+   "detector": "event_probability",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "8-06-012": {
+   "detector": "classical_probability",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "8-06-013": {
+   "detector": "classical_probability",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "8-07-001": {
+   "detector": "polynomial_basic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "8-07-002": {
+   "detector": "polynomial_basic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "8-07-003": {
+   "detector": "polynomial_basic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "8-07-004": {
+   "detector": "polynomial_basic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "8-07-005": {
+   "detector": "polynomial_basic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "8-07-006": {
+   "detector": "polynomial_basic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "8-07-007": {
+   "detector": "polynomial_basic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "8-07-008": {
+   "detector": "polynomial_basic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "8-07-009": {
+   "detector": "polynomial_basic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "8-07-010": {
+   "detector": "polynomial_basic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "8-07-011": {
+   "detector": "polynomial_basic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "8-07-012": {
+   "detector": "polynomial_basic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "8-07-013": {
+   "detector": "simple_quadratic",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "8-08-002": {
+   "detector": "geometry_formula_2d",
+   "requested_enforcement": "blocking",
+   "detector_status": "IMPLEMENTED",
+   "production_route": "model",
+   "server_can_refuse_publication": true
+  },
+  "8-08-003": {
+   "detector": "polygon_angle",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "8-08-004": {
+   "detector": "geometry_formula_2d",
+   "requested_enforcement": "blocking",
+   "detector_status": "IMPLEMENTED",
+   "production_route": "model",
+   "server_can_refuse_publication": true
+  },
+  "8-08-005": {
+   "detector": "geometry_formula_2d",
+   "requested_enforcement": "blocking",
+   "detector_status": "IMPLEMENTED",
+   "production_route": "model",
+   "server_can_refuse_publication": true
+  },
+  "8-08-007": {
+   "detector": "geometry_formula_2d",
+   "requested_enforcement": "blocking",
+   "detector_status": "IMPLEMENTED",
+   "production_route": "model",
+   "server_can_refuse_publication": true
+  },
+  "8-08-009": {
+   "detector": "geometry_formula_2d",
+   "requested_enforcement": "blocking",
+   "detector_status": "IMPLEMENTED",
+   "production_route": "model",
+   "server_can_refuse_publication": true
+  },
+  "8-08-010": {
+   "detector": "geometry_formula_2d",
+   "requested_enforcement": "blocking",
+   "detector_status": "IMPLEMENTED",
+   "production_route": "model",
+   "server_can_refuse_publication": true
+  },
+  "8-08-011": {
+   "detector": "geometry_formula_2d",
+   "requested_enforcement": "blocking",
+   "detector_status": "IMPLEMENTED",
+   "production_route": "model",
+   "server_can_refuse_publication": true
+  },
+  "8-08-012": {
+   "detector": "geometry_formula_2d",
+   "requested_enforcement": "blocking",
+   "detector_status": "IMPLEMENTED",
+   "production_route": "model",
+   "server_can_refuse_publication": true
+  },
+  "9-01-001": {
+   "detector": "polynomial_basic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-01-002": {
+   "detector": "rational_expression",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "9-01-003": {
+   "detector": "rational_expression",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "9-01-004": {
+   "detector": "rational_expression",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "9-01-005": {
+   "detector": "rational_expression",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "9-01-006": {
+   "detector": "rational_expression",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "9-01-007": {
+   "detector": "rational_expression",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "9-01-008": {
+   "detector": "rational_expression",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "9-01-009": {
+   "detector": "rational_expression",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "9-01-010": {
+   "detector": "rational_expression",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "9-01-011": {
+   "detector": "rational_expression",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "9-01-012": {
+   "detector": "rational_expression",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "9-01-013": {
+   "detector": "rational_expression",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "9-01-014": {
+   "detector": "rational_equation",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "9-03-001": {
+   "detector": "linear_function",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-03-002": {
+   "detector": "linear_function",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-03-003": {
+   "detector": "linear_function",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-03-005": {
+   "detector": "coordinate_line",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-03-006": {
+   "detector": "coordinate_line",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-03-007": {
+   "detector": "linear_function",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-03-008": {
+   "detector": "linear_function",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-03-009": {
+   "detector": "linear_function",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-03-011": {
+   "detector": "linear_function",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-03-012": {
+   "detector": "linear_function",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-03-013": {
+   "detector": "linear_function",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-03-014": {
+   "detector": "linear_function",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-03-015": {
+   "detector": "coordinate_line",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-03-017": {
+   "detector": "coordinate_line",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-03-021": {
+   "detector": "coordinate_line",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-04-001": {
+   "detector": "linear_equation",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-04-002": {
+   "detector": "linear_equation",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-04-003": {
+   "detector": "linear_equation",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-04-004": {
+   "detector": "linear_equation",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-04-005": {
+   "detector": "rational_equation",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "9-04-006": {
+   "detector": "rational_equation",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "9-04-007": {
+   "detector": "parametric_linear",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-04-008": {
+   "detector": "linear_equation",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-04-009": {
+   "detector": "linear_equation",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-04-011": {
+   "detector": "structured_word_problem",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "9-04-012": {
+   "detector": "linear_equation",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-04-013": {
+   "detector": "linear_inequality",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-04-014": {
+   "detector": "linear_equation",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-04-015": {
+   "detector": "linear_inequality",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-04-016": {
+   "detector": "linear_equation",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-04-018": {
+   "detector": "linear_inequality",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-04-019": {
+   "detector": "linear_equation",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-04-020": {
+   "detector": "linear_equation",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-04-021": {
+   "detector": "linear_equation",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-04-022": {
+   "detector": "parametric_linear",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-05-001": {
+   "detector": "linear_system_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-05-003": {
+   "detector": "linear_system_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-05-004": {
+   "detector": "linear_system_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-05-005": {
+   "detector": "linear_system_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-05-007": {
+   "detector": "linear_system_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-05-008": {
+   "detector": "linear_system_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-05-009": {
+   "detector": "linear_system_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-05-010": {
+   "detector": "linear_system_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-05-011": {
+   "detector": "linear_system_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-05-012": {
+   "detector": "linear_system_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-05-013": {
+   "detector": "structured_word_problem",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "9-05-014": {
+   "detector": "linear_system_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-05-015": {
+   "detector": "linear_system_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-05-016": {
+   "detector": "linear_system_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-05-017": {
+   "detector": "parametric_linear",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-06-001": {
+   "detector": "polynomial_basic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-06-002": {
+   "detector": "polynomial_basic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-06-003": {
+   "detector": "polynomial_basic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-06-004": {
+   "detector": "polynomial_basic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-06-005": {
+   "detector": "polynomial_basic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-06-006": {
+   "detector": "polynomial_basic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-06-007": {
+   "detector": "polynomial_basic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-06-008": {
+   "detector": "polynomial_basic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-06-009": {
+   "detector": "polynomial_basic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-06-010": {
+   "detector": "polynomial_basic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-06-011": {
+   "detector": "polynomial_basic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-06-012": {
+   "detector": "polynomial_basic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-06-013": {
+   "detector": "simple_quadratic",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "9-06-014": {
+   "detector": "simple_quadratic",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "9-06-015": {
+   "detector": "simple_quadratic",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "9-06-016": {
+   "detector": "polynomial_basic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-07-001": {
+   "detector": "solid_geometry_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "IMPLEMENTED",
+   "production_route": "model",
+   "server_can_refuse_publication": true
+  },
+  "9-07-002": {
+   "detector": "solid_geometry_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "IMPLEMENTED",
+   "production_route": "model",
+   "server_can_refuse_publication": true
+  },
+  "9-07-004": {
+   "detector": "solid_geometry_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "IMPLEMENTED",
+   "production_route": "model",
+   "server_can_refuse_publication": true
+  },
+  "9-07-005": {
+   "detector": "solid_geometry_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "IMPLEMENTED",
+   "production_route": "model",
+   "server_can_refuse_publication": true
+  },
+  "9-07-007": {
+   "detector": "solid_geometry_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "IMPLEMENTED",
+   "production_route": "model",
+   "server_can_refuse_publication": true
+  },
+  "9-07-008": {
+   "detector": "solid_geometry_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "IMPLEMENTED",
+   "production_route": "model",
+   "server_can_refuse_publication": true
+  },
+  "9-07-010": {
+   "detector": "solid_geometry_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "IMPLEMENTED",
+   "production_route": "model",
+   "server_can_refuse_publication": true
+  },
+  "9-07-011": {
+   "detector": "solid_geometry_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "IMPLEMENTED",
+   "production_route": "model",
+   "server_can_refuse_publication": true
+  },
+  "9-07-012": {
+   "detector": "solid_geometry_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "IMPLEMENTED",
+   "production_route": "model",
+   "server_can_refuse_publication": true
+  },
+  "9-07-014": {
+   "detector": "solid_geometry_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "IMPLEMENTED",
+   "production_route": "model",
+   "server_can_refuse_publication": true
+  },
+  "9-07-017": {
+   "detector": "solid_geometry_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "IMPLEMENTED",
+   "production_route": "model",
+   "server_can_refuse_publication": true
+  },
+  "9-07-018": {
+   "detector": "solid_geometry_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "IMPLEMENTED",
+   "production_route": "model",
+   "server_can_refuse_publication": true
+  },
+  "9-07-019": {
+   "detector": "solid_geometry_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "IMPLEMENTED",
+   "production_route": "model",
+   "server_can_refuse_publication": true
+  },
+  "9-07-022": {
+   "detector": "solid_geometry_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "IMPLEMENTED",
+   "production_route": "model",
+   "server_can_refuse_publication": true
+  },
+  "9-07-023": {
+   "detector": "solid_geometry_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "IMPLEMENTED",
+   "production_route": "model",
+   "server_can_refuse_publication": true
+  },
+  "9-07-024": {
+   "detector": "solid_geometry_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "IMPLEMENTED",
+   "production_route": "model",
+   "server_can_refuse_publication": true
+  },
+  "9-07-025": {
+   "detector": "solid_geometry_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "IMPLEMENTED",
+   "production_route": "model",
+   "server_can_refuse_publication": true
+  },
+  "9-07-027": {
+   "detector": "solid_geometry_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "IMPLEMENTED",
+   "production_route": "model",
+   "server_can_refuse_publication": true
+  },
+  "9-07-028": {
+   "detector": "solid_geometry_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "IMPLEMENTED",
+   "production_route": "model",
+   "server_can_refuse_publication": true
+  },
+  "9-07-030": {
+   "detector": "solid_geometry_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "IMPLEMENTED",
+   "production_route": "model",
+   "server_can_refuse_publication": true
+  },
+  "9-07-031": {
+   "detector": "solid_geometry_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "IMPLEMENTED",
+   "production_route": "model",
+   "server_can_refuse_publication": true
+  },
+  "9-07-033": {
+   "detector": "structured_word_problem",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "9-07-034": {
+   "detector": "unit_conversion",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-07-038": {
+   "detector": "solid_geometry_direct",
+   "requested_enforcement": "blocking",
+   "detector_status": "IMPLEMENTED",
+   "production_route": "model",
+   "server_can_refuse_publication": true
+  },
+  "9-08-001": {
+   "detector": "classical_probability",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-08-002": {
+   "detector": "classical_probability",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-08-003": {
+   "detector": "event_probability",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-08-004": {
+   "detector": "financial_arithmetic",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "9-08-005": {
+   "detector": "financial_arithmetic",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "9-08-006": {
+   "detector": "financial_arithmetic",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "9-08-008": {
+   "detector": "financial_arithmetic",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-08-009": {
+   "detector": "event_probability",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-08-010": {
+   "detector": "arithmetic_mean",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-08-011": {
+   "detector": "unit_conversion",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  },
+  "9-08-012": {
+   "detector": "power_arithmetic",
+   "requested_enforcement": "blocking",
+   "detector_status": "UNKNOWN",
+   "production_route": "model",
+   "server_can_refuse_publication": false
+  },
+  "9-08-013": {
+   "detector": "unit_conversion",
+   "requested_enforcement": "blocking",
+   "detector_status": "REDUNDANT",
+   "production_route": "deterministic",
+   "server_can_refuse_publication": false
+  }
+ }
+}

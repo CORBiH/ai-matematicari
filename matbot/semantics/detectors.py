@@ -528,6 +528,111 @@ def _detect_measure_dimension(contract, text, answer_text=""):
         dimension=actual, allowed_dimensions=tuple(sorted(allowed)), kinds=kinds)
 
 
+# ---------------------------------------------------------------------------
+# PRIMITIV: KLASA TRAŽENOG ODGOVORA (rezultat vs prepoznavanje)
+# ---------------------------------------------------------------------------
+# Lekcija „Vrste uglova“ traži da učenik ugao IMENUJE, a ne da mu izračuna
+# mjeru; „Obrat Pitagorine teoreme“ traži ODLUKU je li trougao pravougli, a ne
+# dužinu hipotenuze. Kad model na takvoj lekciji vrati broj, zadatak je
+# matematički uredan a ispituje DRUGU vještinu — to je isti drift koji je F5K
+# revizija našla kao „dokaz identiteta sveden na brojevni razlomak“.
+#
+# KLASU NE IZMIŠLJAMO I NE PARSIRAMO PONOVO: čita je `hint_policy.value_shaped`,
+# već dokazan klasifikator kojim ljestvica pomoći razlikuje računski od
+# tvrdnjskog zadatka (četiri nužna uslova, živo provjeren). Nema drugog parsera.
+#
+# MAPA JE IZVEDENA MJERENJEM: `data/semantic_answer_classes.json` gradi
+# `scripts/build_answer_classes.py` nad determinističkim generatorima. Pojam
+# kod kojeg klasa nije jednoglasna se NE upisuje (mjereno: 200 pojmova
+# dokazano, 2 odbačena kao neodlučiva).
+#
+# ============================ MJEREN I ODBIJEN ============================
+# OVAJ PRIMITIV NIJE ZAKAČEN U `DETECTORS` I NE SMIJE BITI, dok se ne pojavi
+# dokaz kakvog danas nema. Replika je pokazala:
+#
+#     determinstički korpus : 21.120 paketa, 0 lažnih blokada
+#     ŽIVI korpus (model)   :  3.287 paketa, 48 lažnih blokada (1,46 %)
+#
+# Svih 48 su ručno pregledane i sve su LAŽNE: sistem kao odgovor na lekciji o
+# ekvivalentnim sistemima, odluka s obrazloženjem („Da, jer svaki činilac…“),
+# simbolička tvrdnja („$A=N$“), i „Tačno“ na zadatku provjere.
+#
+# POUKA KOJA VRIJEDI ŠIRE OD OVOG PRIMITIVA: metoda izvođenja mape iz
+# determinističkog generatora radi za MJERNU JEDINICU (dimenzija tražene
+# veličine je fizičko svojstvo onoga što se pita), ali NE radi za KLASU
+# ODGOVORA — oblik odgovora je autorski izbor, a model legitimno bira drukčiji
+# nego generator. Determinstički korpus zato NIJE valjan zamjenik za model-
+# autorski korpus kad se dokazuje svojstvo koje autor bira.
+#
+# Kod i podaci ostaju kao dokaz mjerenja i da bi se provjera mogla jeftino
+# ponoviti kad se sakupi dovoljno živih paketa po porodici (danas: 13 uzoraka
+# na 111 lekcija, 13 od 18 porodica bez ijednog). `tests/` čuva odluku.
+# ==========================================================================
+CODE_ANSWER_CLASS_MISMATCH = "semantic_answer_class_mismatch"
+
+_ANSWER_CLASSES_PATH = (Path(__file__).resolve().parent.parent.parent
+                        / "data" / "semantic_answer_classes.json")
+
+# Polja ugovora koja imenuju VRSTU zadatka; ime polja se razlikuje po porodici.
+_TOKEN_FIELDS = ("kinds", "concepts", "shapes", "problem_types")
+
+_CLASS_LABELS = {
+    "value": "REZULTAT (izračunata vrijednost)",
+    "prose": "PREPOZNAVANJE (naziv, vrsta ili tvrdnja, bez računanja)",
+}
+
+
+@lru_cache(maxsize=1)
+def _answer_classes():
+    try:
+        payload = json.loads(_ANSWER_CLASSES_PATH.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return {str(k): str(v) for k, v in (payload.get("class_by_token") or {}).items()}
+
+
+def declared_tokens(contract):
+    tokens = []
+    for field in _TOKEN_FIELDS:
+        for item in contract.parameters.get(field) or ():
+            tokens.append(str(item))
+    return tuple(tokens)
+
+
+def _detect_answer_class(contract, text, answer_text=""):
+    by_token = _answer_classes()
+    tokens = declared_tokens(contract)
+    if not tokens or not by_token:
+        return _result(STATUS_UNSUPPORTED,
+                       reason="lekcija ne deklariše vrstu zadatka")
+    required = {by_token.get(token) for token in tokens}
+    if None in required:
+        return _result(STATUS_UNSUPPORTED,
+                       reason="bar jedan deklarisan pojam nema dokazanu klasu odgovora",
+                       tokens=tokens)
+    if len(required) != 1:
+        return _result(STATUS_UNSUPPORTED,
+                       reason="lekcija legitimno traži i prepoznavanje i račun",
+                       tokens=tokens)
+    wanted = next(iter(required))
+    if not (answer_text or "").strip():
+        return _result(STATUS_UNSUPPORTED, reason="nema označenog odgovora",
+                       required_class=wanted)
+    from matbot import hint_policy
+    actual = "value" if hint_policy.value_shaped(answer_text) else "prose"
+    if actual == wanted:
+        return _result(STATUS_PASS,
+                       reason="klasa odgovora odgovara vrsti zadatka",
+                       required_class=wanted, answer_class=actual)
+    return _result(
+        STATUS_FAIL, CODE_ANSWER_CLASS_MISMATCH,
+        f"ova lekcija traži odgovor tipa {_CLASS_LABELS[wanted]}, a označeni "
+        f"odgovor je tipa {_CLASS_LABELS[actual]} — preformuliši zadatak i SVE "
+        f"opcije tako da se od učenika traži "
+        f"{'izračunata vrijednost' if wanted == 'value' else 'prepoznavanje/naziv, bez računanja'}",
+        required_class=wanted, answer_class=actual, tokens=tokens)
+
+
 DETECTORS = {
     "fraction_arithmetic": _detect_fraction_arithmetic,
     "polynomial_basic": _detect_polynomial_basic,
@@ -543,10 +648,14 @@ _ANSWER_EVIDENCE_DETECTORS = frozenset({"geometry_formula_2d",
 
 
 def detect(contract, text, answer_text=""):
-    """Pokreni detektor porodice. Nepoznat detektor NIKAD ne odbija paket.
+    """Pokreni detektor porodice.
 
     `answer_text` je OZNAČENA opcija (server-vlasnička, poslije shuffle-a).
-    Detektori koji je ne traže ponašaju se bajt za bajt kao ranije."""
+    Detektori koji je ne traže ponašaju se bajt za bajt kao ranije.
+
+    Porodica bez vlastitog detektora i dalje vraća UNSUPPORTED. Primitiv klase
+    odgovora (`_detect_answer_class`) NIJE zakačen ovdje — mjereno je odbijen,
+    vidi njegov komentar."""
     if contract is None:
         return _result(STATUS_UNSUPPORTED, reason="lekcija nema semantički ugovor")
     handler = DETECTORS.get(contract.detector)

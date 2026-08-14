@@ -28,3 +28,4 @@ scratchpad/zero_call_audit/
 # replay izvjestaji su MJERENJA (gradi ih scripts/build_semantic_authority_report.py
 # i scripts/build_measure_dimensions.py), ne izvorni kod.
 scratchpad/semantic_authority/
+scratchpad/semantic_triage/

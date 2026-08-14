@@ -509,13 +509,45 @@ Measured before enabling it: **0 false positives across 39,384 known-good
 packages** (31,680 deterministic + 7,704 harvested live), and **100 % detection
 of 667 out-of-scope dimension mutations**.
 
-Effective coverage after this phase: **54 model-route lessons run the detector,
-43 of them with a contract that genuinely constrains the answer.** The other 11
-run it and honestly report `UNSUPPORTED`. The remaining 18 detector names on the
-model route stay `UNKNOWN`: they keep their prompt guidance and every generic
-validator, but the server does not claim to enforce them. Current inventory:
+Effective coverage: **54 model-route lessons run the detector, 43 of them with a
+contract that genuinely constrains the answer.** The other 11 run it and honestly
+report `UNSUPPORTED`. The remaining 18 detector names on the model route stay
+`UNKNOWN`: they keep their prompt guidance and every generic validator, but the
+server does not claim to enforce them. Current inventory:
 `python scripts/build_semantic_authority_report.py` →
 `scratchpad/semantic_authority/{detector_matrix,lesson_coverage}.json`, `audit.md`.
+
+**Runtime authority is published separately from the contract label.**
+`enforcement_mode: blocking` in `data/lesson_semantics.compiled.json` says what a
+contract *requests*; it does not say what the server *can do*.
+`data/semantic_authority_status.json` (built by
+`scripts/build_semantic_triage.py`) states the latter per lesson —
+`IMPLEMENTED` / `REDUNDANT` / `UNKNOWN` plus an explicit
+`server_can_refuse_publication` flag — so no future reader can mistake the label
+for enforcement. The contract schema is deliberately **not** migrated; a derived
+artifact solves the honesty problem without touching data 354 lessons depend on.
+
+**A rejected candidate, kept as evidence (UNKNOWN triage).** The strongest
+follow-up primitive was a generic **answer class** check — recognition vs
+computed result — reusing the live-proven `hint_policy.value_shaped` classifier,
+with the token→class map derived from the deterministic generators exactly as the
+accepted dimension map was. It was measured and **rejected**:
+
+| corpus | packages | false blocks |
+|---|---|---|
+| deterministic known-good | 21,120 | **0** |
+| live, model-authored | 3,287 | **48 (1.46 %)** |
+
+All 48 were inspected and all are false — a system of equations as the answer on
+an equivalent-systems lesson, a decision plus justification, a symbolic assertion
+(`$A=N$`), `"Tačno"` on a verification task. The acceptance bar for a blocker is
+zero, so it is **not wired into `DETECTORS`**, and a test keeps it that way.
+
+The transferable rule: deriving a check from the deterministic generator works
+for a **unit** — the dimension of the quantity asked is a physical property of the
+question — but not for an **answer class**, which is an authoring choice the model
+may legitimately make differently. *The deterministic corpus is not a valid
+stand-in for model-authored content when proving an author-chosen property.*
 
 **Task diversity has three independent axes.** "Daj mi novi zadatak" must not
 return the same exercise with different numbers or names. Three separate
