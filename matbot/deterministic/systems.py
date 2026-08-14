@@ -142,9 +142,6 @@ def _k_solve(rng, level, fractions_allowed):
         "question": f"Riješi sistem jednačina: {system}",
         "option_texts": tuple(f"${_pair_display(px, py)}$" for px, py in options),
         "answer_display": f"{_pair_display(x, y)}",
-        "rule": ("Sistem se rješava supstitucijom ili metodom suprotnih "
-                 "koeficijenata; rješenje je uređeni par $(x, y)$ koji "
-                 "zadovoljava OBJE jednačine"),
         "hint2": ("Izrazi jednu nepoznatu iz prve jednačine pa je uvrsti u "
                   "drugu (ili izjednači koeficijente pa oduzmi jednačine)."),
         "hint3": (f"Provjera kandidata: uvrsti par u prvu jednačinu — "
@@ -173,12 +170,27 @@ def _k_solve(rng, level, fractions_allowed):
 
 
 def _k_verify_pair(rng, level, fractions_allowed):
+    """Isti sistem kao `solve`, ali zadatak traži PROVJERU ponuđenih parova.
+
+    Paket se namjerno gradi nad `_k_solve` (isti egzaktno konstruisan sistem,
+    ista jedinstvenost rješenja jer je determinanta različita od nule), ali sve
+    što opisuje METODU mora se ovdje zamijeniti — inače se naslijedi uputa da
+    se sistem riješi, a učenik od toga nema koristi kad su mu kandidati već
+    ponuđeni. `hints[0]` je od ove faze čista funkcija oblika zadatka
+    (`_RULE_BY_OPERATION`), pa se ne može naslijediti; ljestvica ispod njega je
+    rollback put i mora govoriti istu metodu."""
     spec = _k_solve(rng, level, fractions_allowed)
     spec["question"] = spec["question"].replace(
         "Riješi sistem jednačina:",
         "Koji od ponuđenih uređenih parova JESTE rješenje sistema")
     spec["question"] += "?"
     spec["operation"] = "verify_pair"
+    # NE „izrazi nepoznatu pa uvrsti u drugu jednačinu“ — to je rješavanje.
+    # Ovdje je korak provjera OBJE jednakosti; koja opcija prolazi ne kaže se.
+    spec["hint2"] = ("Uvrsti ponuđeni par u prvu jednačinu i izračunaj lijevu "
+                     "stranu, pa isto uradi s drugom jednačinom.")
+    # `hint3` naslijeđen iz `_k_solve` već je provjera kandidata uvrštavanjem,
+    # dakle tražena metoda — ostaje.
     spec["evidence"] = _ev(level)
     return spec
 
@@ -212,9 +224,6 @@ def _k_single_equation(rng, level, fractions_allowed):
         "option_texts": tuple(f"${_pair_display(px, py)}$"
                               for px, py in safe_options[:4]),
         "answer_display": f"{_pair_display(x, y)}",
-        "rule": ("Linearna jednačina s dvije nepoznate ima beskonačno mnogo "
-                 "rješenja — rješenje je svaki par koji uvrštavanjem daje "
-                 "tačnu jednakost"),
         "hint2": "Uvrsti svaki ponuđeni par u jednačinu i izračunaj lijevu stranu.",
         "hint3": (f"Tačan par uvrštavanjem daje "
                   f"${core.plain_fraction_display(c)}$ na lijevoj strani."),
@@ -290,11 +299,6 @@ def _k_classify(rng, level, fractions_allowed):
             "question": question,
             "option_texts": option_texts,
             "answer_display": answer_display,
-            "rule": ("Broj rješenja sistema čita se iz odnosa koeficijenata: "
-                     "različiti omjeri daju jedno rješenje, proporcionalni "
-                     "koeficijenti uz nepoznate bez proporcionalnih slobodnih "
-                     "članova nijedno, a potpuna proporcionalnost beskonačno "
-                     "mnogo"),
             "hint2": ("Uporedi omjere $\\frac{a_1}{a_2}$, $\\frac{b_1}{b_2}$ "
                       "i $\\frac{c_1}{c_2}$."),
             "hint3": f"U ovom sistemu: {relation}.",
@@ -332,9 +336,6 @@ def _k_equivalent_system(rng, level, fractions_allowed):
                          _system_display(*wrong1), _system_display(*wrong2),
                          _system_display(*wrong3)),
         "answer_display": _system_display(*equivalent).strip("$"),
-        "rule": ("Ekvivalentni sistemi imaju ISTO rješenje — jednačina se "
-                 "smije pomnožiti brojem različitim od nule, a jednačine se "
-                 "smiju sabirati"),
         "hint2": (f"Prva jednačina tačnog sistema je polazna prva jednačina "
                   f"pomnožena sa ${k}$."),
         "hint3": (f"Uvrsti ${_pair_display(x, y)}$ u svaki ponuđeni sistem — "
@@ -359,6 +360,65 @@ _KINDS = {
     "equivalent_system": _k_equivalent_system,
 }
 
+# JEDAN NAGOVJEŠTAJ MORA GOVORITI METODU KOJU ZADATAK TRAŽI ---------------
+#
+# RUČNI NALAZ IZ POTPUNE 0-POZIVNE REVIZIJE: dva OBLIKA zadatka dijelila su
+# jedan nagovještaj, iako traže različit postupak.
+#
+#   • `verify_pair` („Koji od ponuđenih uređenih parova JESTE rješenje
+#     sistema?“) dobijao je nagovještaj oblika `solve_system` — „sistem se
+#     rješava supstitucijom ili metodom suprotnih koeficijenata“. Učeniku se
+#     tako nalagalo da RIJEŠI sistem, a zadatak od njega traži samo da
+#     PROVJERI ponuđeni par. Mjereno: 360 paketa; u tri lekcije devetog
+#     razreda to je JEDINI oblik, pa je ondje svaki nagovještaj govorio
+#     pogrešnu metodu. (Koje su to lekcije stoji u testu, ne ovdje — porodica
+#     ne smije poznavati nijednu lekciju.)
+#   • `system_geometry` („U kakvom su međusobnom položaju te prave?“) dobijao
+#     je nagovještaj oblika `classify_solutions` — o BROJU rješenja. Kriterij
+#     jeste isti (odnos koeficijenata), ali nagovještaj nije spominjao ni
+#     prave ni njihov položaj, dakle ni ono što zadatak pita.
+#
+# Uzrok nije bio matematički nego strukturni: `_k_verify_pair` gradi paket
+# pozivom `_k_solve` i mijenja samo tekst pitanja i `operation`, pa je
+# NASLIJEDIO tuđi nagovještaj; `_k_classify` je jednim tekstom pokrivao oba
+# svoja ishoda. Zato nagovještaj više NIJE polje koje pojedini graditelj nosi
+# (i može ga naslijediti), nego ČISTA FUNKCIJA server-vlasničkog oblika
+# zadatka: nasljeđivanje tuđe metode je sada nemoguće po konstrukciji.
+#
+# Ključ je `operation` — strukturisana činjenica koju generator već upisuje u
+# potpis paketa i u `required_conditions`. Nema čitanja ID-ja lekcije, nema
+# pogađanja iz teksta zadatka.
+_RULE_BY_OPERATION = {
+    "solve_system": (
+        "Sistem se rješava supstitucijom ili metodom suprotnih koeficijenata; "
+        "rješenje je uređeni par $(x, y)$ koji zadovoljava OBJE jednačine"),
+    # NE „riješi sistem“: zadatak daje kandidate, pa je tražena metoda
+    # uvrštavanje. Namjerno se govori o „ponuđenom paru“ uopšteno — koji je od
+    # njih tačan ostaje na učeniku.
+    "verify_pair": (
+        "Uvrsti $x$ i $y$ iz ponuđenog para u OBJE jednačine — par je rješenje "
+        "sistema samo ako obje jednakosti budu tačne"),
+    "single_equation_pair": (
+        "Linearna jednačina s dvije nepoznate ima beskonačno mnogo rješenja — "
+        "rješenje je svaki par koji uvrštavanjem daje tačnu jednakost"),
+    "classify_solutions": (
+        "Broj rješenja sistema čita se iz odnosa koeficijenata: različiti "
+        "omjeri daju jedno rješenje, proporcionalni koeficijenti uz nepoznate "
+        "bez proporcionalnih slobodnih članova nijedno, a potpuna "
+        "proporcionalnost beskonačno mnogo"),
+    # Isti kriterij kao iznad, ali izrečen o ONOME ŠTO SE PITA — o pravama.
+    # Nijedna od tri ponuđene geometrijske formulacije se ne izgovara doslovno,
+    # inače bi zaštita od procurivanja odgovora odbacivala baš taj ishod.
+    "system_geometry": (
+        "Međusobni položaj dviju pravih čita se iz odnosa koeficijenata uz "
+        "nepoznate: kad su omjeri različiti, prave imaju tačno jednu "
+        "zajedničku tačku; kad su jednaki, zajedničke tačke ili nema nijedne "
+        "ili ih ima beskonačno — o tome odlučuje odnos slobodnih članova"),
+    "equivalent_system": (
+        "Ekvivalentni sistemi imaju ISTO rješenje — jednačina se smije "
+        "pomnožiti brojem različitim od nule, a jednačine se smiju sabirati"),
+}
+
 
 def generate_package(lesson_id, lesson_title, parameters, level, rng=None):
     if not supports(parameters):
@@ -376,7 +436,14 @@ def generate_package(lesson_id, lesson_title, parameters, level, rng=None):
         option_texts = spec["option_texts"]
         if len(set(option_texts)) != 4:
             continue
-        hints = (f"{spec['rule']}.", spec["hint2"], spec["hint3"])
+        # Nagovještaj se BIRA PO OBLIKU ZADATKA, ne nasljeđuje se od graditelja
+        # koji je paket sastavio. Oblik bez deklarisane metode pada ZATVORENO:
+        # radije nema zadatka nego zadatak koji uči pogrešan postupak.
+        rule = _RULE_BY_OPERATION.get(spec["operation"])
+        if rule is None:
+            raise DeterministicGenerationError(
+                f"oblik zadatka bez deklarisane metode: {spec['operation']}")
+        hints = (f"{rule}.", spec["hint2"], spec["hint3"])
         if spec["answer_display"] in hints[0]:
             # Prikaz odgovora ne smije procuriti kroz prvu uputu — novi
             # pokušaj bira drugi zadatak (ista zaštita kao u geometry).
