@@ -17,7 +17,7 @@ bi kapiju prestao činiti kapijom: prestala bi hvatati i višak i manjak poziva.
 """
 import pytest
 
-from matbot import config, hint_policy
+from matbot import config, hint_policy, release_config
 from tools import check_live_release_gate as checker
 from tools import run_live_release_gate as runner
 
@@ -291,6 +291,8 @@ def passing_document():
         "tested_commit_sha": "a" * 40, "tested_tree_hash": "b" * 40,
         "clean_worktree": True, "practice_pipeline": "universal_two_call",
         "difficulty_levels_enabled": True,
+        "timeout_seconds": float(release_config.REQUIRED_RELEASE_ENV["AI_TUTOR_TIMEOUT"]),
+        "release_configuration": dict(release_config.REQUIRED_RELEASE_ENV),
         "finished_at": datetime.now(timezone.utc).isoformat(),
         "scenario_count": 15, "required_scenario_count": 15,
         "sdk_call_ceiling": 23, "planned_sdk_calls": 17, "actual_sdk_calls": 17,

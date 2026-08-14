@@ -1,13 +1,18 @@
 """Pure tests for the permanent live-release plan and offline verifier."""
 import copy
+import os
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
+from matbot import config, release_config
 from matbot.contracts import registry as contract_registry
 from tools import check_live_release_gate as checker
 from tools import run_live_release_gate as runner
+
+ROOT = Path(__file__).resolve().parent.parent
 
 
 @pytest.fixture(autouse=True)
@@ -46,6 +51,13 @@ def _passing_document():
         "clean_worktree": True,
         "practice_pipeline": "universal_two_call",
         "difficulty_levels_enabled": True,
+        # ARTEFAKT MORA DOKAZATI ČIME JE MJERENO. Zvanična kampanja je jednom
+        # prošla s rokom od 30 s dok produkcija radi na 45 s, jer je kapija od
+        # deklarisanih vrijednosti provjeravala samo dvije. Provjera artefakta
+        # zato traži i rok i cijelu primijenjenu konfiguraciju.
+        "timeout_seconds": float(
+            release_config.REQUIRED_RELEASE_ENV["AI_TUTOR_TIMEOUT"]),
+        "release_configuration": dict(release_config.REQUIRED_RELEASE_ENV),
         "finished_at": datetime.now(timezone.utc).isoformat(),
         "scenario_count": 15,
         "required_scenario_count": 15,
@@ -168,12 +180,70 @@ def test_gate_preconditions_require_enabled_difficulty_controller(monkeypatch, d
         runner._require_live_preconditions()
 
 
-def test_gate_preconditions_accept_the_two_exact_runtime_flags(monkeypatch):
+def _apply_declaration(monkeypatch):
+    """Postavi CIJELU auditiranu konfiguraciju, kao skriptni put kapije."""
+    for name, value in release_config.REQUIRED_RELEASE_ENV.items():
+        monkeypatch.setenv(name, value)
+    # `AI_TIMEOUT_S` se u `matbot.config` čita PRI UVOZU, a u testnoj sviti je
+    # modul odavno uvezen. Skriptni put kapije postavlja okruženje prije tog
+    # uvoza; ovdje se isti ishod dobija izričitom zamjenom.
+    monkeypatch.setattr(config, "AI_TIMEOUT_S",
+                        float(release_config.REQUIRED_RELEASE_ENV["AI_TUTOR_TIMEOUT"]))
+
+
+def test_gate_preconditions_accept_the_whole_audited_configuration(monkeypatch):
     monkeypatch.setattr(runner, "_git", lambda *args: "" if args[0] == "status" else SHA)
     monkeypatch.setenv("OPENAI_API_KEY", "fake-offline-test-key")
-    monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", "universal_two_call")
-    monkeypatch.setenv("MATBOT_PRACTICE_DIFFICULTY_LEVELS", "enabled")
+    _apply_declaration(monkeypatch)
     assert runner._require_live_preconditions() == (SHA, SHA)
+
+
+@pytest.mark.parametrize("name,wrong", [
+    ("MATBOT_FAST_SINGLE_CALL_SCOPE", "lessons"),
+    ("MATBOT_DETERMINISTIC_VARIETY_GATE", "disabled"),
+    ("MATBOT_PRACTICE_SINGLE_HINT", "disabled"),
+    ("MATBOT_ARCHETYPE_ROTATION", "disabled"),
+    ("MATBOT_FORM_ROTATION", "disabled"),
+])
+def test_gate_preconditions_reject_a_route_changing_flag(monkeypatch, name, wrong):
+    """Ranije je kapija provjeravala SAMO rutu i nivoe težine, pa je mogla
+    izmjeriti drugu arhitekturu nego što produkcija izvršava."""
+    monkeypatch.setattr(runner, "_git", lambda *args: "" if args[0] == "status" else SHA)
+    monkeypatch.setenv("OPENAI_API_KEY", "fake-offline-test-key")
+    _apply_declaration(monkeypatch)
+    monkeypatch.setenv(name, wrong)
+    with pytest.raises(runner.GateRefusal):
+        runner._require_live_preconditions()
+
+
+@pytest.mark.parametrize("timeout", [30.0, 45.5, 60.0])
+def test_gate_preconditions_require_the_production_timeout(monkeypatch, timeout):
+    """ŽIVI NALAZ: kampanja je prošla s 30 s dok produkcija radi na 45 s, jer
+    je rok provjeravan samo kao „pozitivan broj“."""
+    monkeypatch.setattr(runner, "_git", lambda *args: "" if args[0] == "status" else SHA)
+    monkeypatch.setenv("OPENAI_API_KEY", "fake-offline-test-key")
+    _apply_declaration(monkeypatch)
+    monkeypatch.setattr(config, "AI_TIMEOUT_S", timeout)
+    with pytest.raises(runner.GateRefusal):
+        runner._require_live_preconditions()
+
+
+def test_importing_the_gate_never_mutates_the_process_environment():
+    """Bezuslovna primjena pri uvozu bi promijenila rutu Practice turnova
+    svakom procesu koji ovaj modul samo uveze — uključujući testnu svitu."""
+    import subprocess
+    import sys as _sys
+    clean = {key: value for key, value in os.environ.items()
+             if key not in release_config.REQUIRED_RELEASE_ENV}
+    clean["FLASK_SECRET_KEY"] = "test-only"
+    result = subprocess.run(
+        [_sys.executable, "-c",
+         "import os, tools.run_live_release_gate;"
+         "print('SCOPE', os.environ.get('MATBOT_FAST_SINGLE_CALL_SCOPE'))"],
+        cwd=str(ROOT), capture_output=True, text=True, encoding="utf-8",
+        errors="replace", env=clean, timeout=300)
+    assert result.returncode == 0, result.stderr
+    assert "SCOPE None" in result.stdout, result.stdout
 
 
 def test_offline_checker_rejects_legacy_or_missing_structured_runtime_identity():

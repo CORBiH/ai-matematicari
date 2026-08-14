@@ -120,6 +120,15 @@ and `matbot/tutor/pipeline.py` (flow only):
 | full solution ("Uradi ga ti") — any class | same server composition | **0** |
 | lesson with a complete deterministic generator | its own stored ladder (Phase 4H, unchanged) | **0** |
 
+**Production serves ONE hint, not a ladder** (`MATBOT_PRACTICE_SINGLE_HINT`,
+enabled by default and written explicitly by deploy). A student who asks for help
+gets one useful strategic hint; **clicking again returns the identical stored text
+and spends no call**. The full solution stays a separate action ("Uradi ga ti").
+The 1→2→3 ladder above remains in the code as the rollback (`disabled`) because
+its top step's composition is what binds the reveal to a verified artifact — that
+proof is what the single hint inherits. Everything the ladder rows say about
+authorship and call cost still applies to the one hint that is actually served.
+
 - **Task class is a server-owned structural fact**, derived from the shape of the
   *published* options plus the server's own `correct_option_id` — never from
   `task_type`, never from `task_signature.answer_type` (whose *value* no server
@@ -317,16 +326,56 @@ reject it. The server alone owns option shuffling, option ids, which option is
 correct in the browser, the deterministic verdict for a click, and session
 state.
 
-**Current production state and rollback.** With `MATBOT_PRACTICE_PIPELINE`
-unset (the current production configuration), `legacy_single_call` remains the
-default. `universal_two_call` is the candidate structured path; its mandatory
-local release gate must be run only with both
-`MATBOT_PRACTICE_PIPELINE=universal_two_call` and
-`MATBOT_PRACTICE_DIFFICULTY_LEVELS=enabled`. A passing local result does not
-activate production: activation happens explicitly only after push, deployment
-health verification, and a controlled configuration change. After activation,
-`legacy_single_call` remains the rollback path. See
+**Current production state and rollback.** `universal_two_call` **is** production,
+and `MATBOT_PRACTICE_PIPELINE=universal_two_call` is written into the VPS `.env`
+by the deploy workflow from `deploy/production_release.env` on every release.
+`legacy_single_call` is the code default only so the test suite keeps proving the
+rollback path; it is no longer what an unconfigured production would run, because
+an unconfigured production no longer starts (see *Release configuration is
+enforced* below). `MATBOT_PRACTICE_PIPELINE=legacy_single_call` remains the
+rollback, but reaching it is now a commit to the declaration plus a release gate,
+not a hand edit on the server. See
 [LESSON_CONTRACTS.md](LESSON_CONTRACTS.md) for the preserved deterministic engine.
+
+**Measured production routing (HEAD `0c02fca`, exhaustive offline audit).** Of the
+534 lessons, **189 across 29 semantic families are served with zero model calls**
+today — that figure comes from calling the orchestrator's real routing function in
+the production environment, not from the coverage table. The gap to the 352
+lessons / 44 families that *have* complete generators is the variety gate: 19
+families measured as producing too little task variety (163 lessons) are routed to
+the Luna model path instead, with 5 lesson-level exceptions pinned back to
+deterministic. Every remaining lesson runs the **GPT-5.6 Luna fast single-call
+route**, where the Reviewer is a *conditional* escalation — it fires only when
+deterministic preflight proves a defect, repairs on the same fast model, and a
+failed repair falls back to the already-validated draft rather than costing the
+student a task. The two-call ceiling of rule 4 is unchanged.
+
+**Release configuration is enforced, not hoped for.** Production once ran the
+legacy single-call architecture silently for weeks while every release gate
+measured the universal one, because two environment variables were simply absent
+from the VPS `.env` and nothing failed — `/healthz` stayed green. The guard written
+in response (`release_config.require_release_configuration`) was then **never called
+by anything**: not by startup, not by the deploy workflow, not by the pre-push hook,
+not by a test, while `app.py` claimed "the deploy check decides to fail closed" and
+no such check existed. Startup logged a WARNING and served students anyway.
+
+Since this phase there is one declaration, `deploy/production_release.env`, read by
+`matbot/release_config.py`, the deploy script, the live release gate and the offline
+artifact checker — no value is written in two places. Three independent enforcement
+points use it:
+
+| Where | What it does |
+|---|---|
+| `deploy/apply_release_env.sh` | idempotently writes every declared value into the VPS `.env` on each deploy; existing keys replaced in place, secrets untouched and never printed |
+| deploy workflow, twice | `python -m matbot.release_config --require` in a throwaway container *before* the live service is replaced, and again inside the running container |
+| `app.py` startup | under `MATBOT_RELEASE_ENFORCEMENT=enabled`, `require_release_configuration()` raises and the worker refuses to boot |
+
+The enforcement flag is opt-in so local work and the test suite still import `app`
+without production flags; its own absence in production is caught by the two deploy
+checks, which run unconditionally. The fast-model choice stays **code-owned** rather
+than an environment value, but is still verified through
+`REQUIRED_EFFECTIVE_CONFIG`, which compares the *effective resolved* model — catching
+both a wrong environment variable and an unreviewed change to the built-in default.
 
 ```
 ```
@@ -372,8 +421,11 @@ solution) served with **zero model calls**. The registry lives in
 the pure `matbot/mathkernel/` authority —, `wordproblems` (facts-before-prose
 structured word problems), `settheory`, `statsdata`, `finance`, `parametric`,
 `inequalities`, `properties`, `fractionconcepts`, `similarity`, `polygons`,
-`linefacts`) share one core (`matbot/deterministic/core.py`) and serve
+`linefacts`) share one core (`matbot/deterministic/core.py`) and *have complete generators for*
 **44 semantic families covering 352 lessons (65.9%) across all four grades**
+— of which **29 families / 189 lessons are actually served with zero calls in
+production**; the rest are routed to Luna by the variety gate (see *Measured
+production routing* above)
 (source of truth: `data/lesson_semantic_assignments.json`, compiled by
 `scripts/build_lesson_semantics.py`; bulk activation table and coverage report:
 `scripts/bulk_onboard_deterministic.py` →
@@ -396,6 +448,37 @@ Deterministic packages pass byte-for-byte the same validators and the same
 `_publish_task` as model packages; free-form messages, help on a model task,
 and all unmapped lessons keep the Tutor+Reviewer path unchanged. Rollback:
 `MATBOT_DETERMINISTIC_PRACTICE=disabled`.
+
+**Task diversity has three independent axes.** "Daj mi novi zadatak" must not
+return the same exercise with different numbers or names. Three separate
+mechanisms enforce that, and the difference between them is deliberate and
+measured:
+
+| Axis | Module | Status of a repeat |
+|---|---|---|
+| **Structural identity** | `matbot/tutor/task_identity.py` (`same_exercise`) | **Defect.** The same exercise with cosmetic substitutions is rejected; if the Reviewer does not repair it, the turn fails closed. |
+| **Archetype rotation** | `matbot/archetype_support.py`, `data/task_archetype_support.json` (`MATBOT_ARCHETYPE_ROTATION`) | **Missed preference.** The server names the next archetype in the prompt by LRU rotation, but a repeat never costs the student a task: when it is the only reason to escalate, a failed repair republishes the draft that already passed every deterministic validator. |
+| **Form variants** | `matbot/form_variants.py`, `data/task_form_variants.json` (`MATBOT_FORM_ROTATION`) | Second axis, orthogonal to archetype. |
+
+The thresholds are measured, not estimated: over 852 really published tasks, whole-text
+overlap ≥ 0.70 was always the same exercise, and because word overlap measures *topic*
+rather than *exercise*, the final clause (what the task actually asks) is scored
+separately — the canonical pair that must fail shares only 45% of its words but 100%
+of its requirement.
+
+**Form coverage is derived from the curriculum, never from a hand list.**
+`scripts/build_form_variant_support.py` reads lesson titles and NPP outcomes and
+finds exactly **2 grade-6 lessons** that declare both inequality forms. Those
+lessons had produced the `x`-first form 20 times out of 20 — structurally
+impossible to vary, because the generator chose between `x_plus` and `x_plus`. This
+matters mathematically, not cosmetically: in `a − x` the unknown is the
+**subtrahend**, so isolating it *reverses* the inequality — precisely what the
+lesson teaches. The classifier reads the **published task text** and looks only at
+which side the unknown stands on, so swapping sides (`b > x − a`) cannot fake a
+different form. A lesson that does not declare `a ± x` never receives it. Measured
+after: 5/5/5/5 across 20 tasks, versus 13/7/0/0 before; independent exact-rational
+verification over 400 packages found 0 marked-option mismatches and the direction
+reversed in every `a − x` task.
 
 **Lesson-relative difficulty profiles (Phase F5G, model route only).** The
 1–3 difficulty rubric (`matbot/tutor/schema.py::difficulty_evidence_errors`)
@@ -645,10 +728,16 @@ real HTTP status so the client does not silently retry.
 ## Configuration
 
 All in `matbot/config.py`, read from environment variables (names only — values live
-in `.env`, which is never read by tooling or documentation):
+in `.env`, which is never read by tooling or documentation). The subset that decides
+**which architecture production runs** is declared once in
+`deploy/production_release.env` and enforced — see *Release configuration is enforced*
+above and [LIVE_RELEASE_GATE.md](LIVE_RELEASE_GATE.md#required-production-configuration)
+for the full table.
 
 `OPENAI_MODEL_TEXT` (default `gpt-5-mini`) · `MATBOT_REASONING_EFFORT` (default `low`)
-· `AI_TUTOR_TIMEOUT` (30 s) · `MATBOT_MAX_OUTPUT_TOKENS` (1200, used by Quick only)
+· `AI_TUTOR_TIMEOUT` (**45 s in production**; the built-in default is 30 and the
+release gate now applies and records the production value, after a campaign passed
+at 30 while production ran at 45) · `MATBOT_MAX_OUTPUT_TOKENS` (1200, used by Quick only)
 · `MATBOT_MAX_OUTPUT_TOKENS_PRACTICE` (2500, hard-ceilinged at 4000)
 · `MATBOT_MAX_OUTPUT_TOKENS_EXPLAIN` (2500, same hard ceiling — added 2026-08-01,
 default not yet live-validated, see [CURRENT_STATE.md](CURRENT_STATE.md) C-9)

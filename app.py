@@ -17,15 +17,33 @@ config.require_secret_key(config.SECRET_KEY)
 # MATBOT_PRACTICE_DIFFICULTY_LEVELS, dok su release gate-ovi mjerili obje
 # uključene. Ništa u logu to nije pokazivalo, pa je odstupanje otkriveno tek
 # ručnim testom. Sadržaj reda je zatvorena lista ne-tajnih vrijednosti iz
-# matbot/release_config.py; odstupanje se dodatno prijavljuje kao WARNING, ali
-# NE ruši start — o padu zatvoreno odlučuje deploy provjera, ne uvoz modula.
+# matbot/release_config.py.
 logging.getLogger("matbot.startup").info(
     "matbot_effective_configuration %s", release_config.format_effective_configuration()
 )
-for _problem in release_config.release_configuration_problems():
-    logging.getLogger("matbot.startup").warning(
-        "matbot_release_configuration_mismatch %s", _problem
-    )
+
+# ODSTUPANJE PADA ZATVORENO — ali samo u produkcijskom izdanju.
+#
+# Raniji oblik je odstupanje prijavljivao kao WARNING i nastavljao, uz komentar
+# da o padu zatvoreno odlučuje „deploy provjera“. Takva provjera nije
+# postojala: `require_release_configuration` nije zvao NIKO — ni start, ni
+# deploy workflow, ni pre-push, ni ijedan test. Zbog toga je pogrešna
+# konfiguracija i dalje mogla tiho posluživati učenike, jer WARNING u logu
+# kontejnera niko ne gleda dok je `/healthz` zelen.
+#
+# `MATBOT_RELEASE_ENFORCEMENT=enabled` razdvaja produkcijsko izdanje od običnog
+# lokalnog/testnog uvoza: bez tog razdvajanja bi svaki lokalni `import app`
+# padao, pa bi guard morao biti isključen — a isključen guard je tačno stanje
+# koje je i dovelo do tihog odstupanja. Da ni sam prekidač ne bi mogao tiho
+# nestati, deploy dodatno zove `python -m matbot.release_config --require`
+# BEZUSLOVNO, a sam prekidač je jedna od obaveznih vrijednosti.
+if release_config.release_enforcement_enabled():
+    release_config.require_release_configuration()
+else:
+    for _problem in release_config.release_configuration_problems():
+        logging.getLogger("matbot.startup").warning(
+            "matbot_release_configuration_mismatch %s", _problem
+        )
 
 app = Flask(__name__)
 app.secret_key = config.SECRET_KEY

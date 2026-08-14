@@ -10,4 +10,10 @@
 Dockerfile text eol=lf
 docker-compose.yml text eol=lf
 .env.example text eol=lf
+# Deklaraciju obavezne produkcijske konfiguracije cita POSIX ljuska na VPS-u
+# (`while IFS= read -r line`). Uz CRLF bi svaka vrijednost dobila zavrsni \r i
+# u `.env` zavrsila kao `universal_two_call\r`, pa bi provjera konfiguracije
+# poredila nevidljivo drukciji tekst. Ovdje se zato ne oslanjamo na
+# core.autocrlf nego izricito trazimo LF.
+deploy/production_release.env text eol=lf
 *.bat text eol=crlf

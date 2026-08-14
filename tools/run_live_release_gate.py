@@ -22,6 +22,68 @@ from typing import Iterable
 
 ROOT = Path(__file__).resolve().parent.parent
 RESULT_DIR = ROOT / "scratchpad" / "live_release_gate"
+
+# ---------------------------------------------------------------------------
+# PRODUKCIJSKA KONFIGURACIJA SE PRIMJENJUJE PRIJE IJEDNOG UVOZA `matbot`.
+#
+# ŽIVI NALAZ: zvanična kapija je prošla s `timeout_seconds = 30.0` dok
+# produkcija radi na 45 s. Uzrok nije bio pogrešan rok nego to ŠTO GA NIKO NIJE
+# PRIMJENJIVAO: `_require_live_preconditions` je od pet deklarisanih obaveznih
+# vrijednosti provjeravao samo dvije (rutu i nivoe težine), a rok samo „je li
+# pozitivan broj“. Ostatak je zavisio od toga šta je operater ručno postavio u
+# svojoj ljusci, i `AI_TUTOR_TIMEOUT` je izostao — pa je `config.AI_TIMEOUT_S`
+# uzeo ugrađenih 30 s. Isto je vrijedilo za opseg brze rute i kapiju
+# raznolikosti, koje MIJENJAJU rutu lekcija: kapija je mogla mjeriti jednu
+# arhitekturu dok produkcija izvršava drugu.
+#
+# Zato kapija konfiguraciju PRIMJENJUJE, a ne traži od operatera da je pogodi:
+# odsutna varijabla se postavlja iz `deploy/production_release.env`, a
+# PRISUTNA I RAZLIČITA vrijednost pada zatvoreno (nikad se tiho ne pregazi
+# namjeran izbor operatera). Mora se desiti prije `from matbot import config`,
+# jer se `AI_TIMEOUT_S` i izbor modela čitaju pri uvozu modula.
+#
+# PRIMJENA IDE SAMO NA SKRIPTNOM PUTU (`__name__ == "__main__"`), i to je
+# ključno: bezuslovna primjena pri uvozu bi mijenjala `os.environ` CIJELOG
+# procesa koji ovaj modul samo uveze. Testna svita ga uvozi, pa bi joj tiho
+# uključila `MATBOT_FAST_SINGLE_CALL_SCOPE=model_backed` i time promijenila
+# rutu Practice turnova — mjereno: harness testovi su odmah počeli tražiti
+# `fast_turn` na dvopozivnom duplikatu. Konfiguracija se zato pri uvozu samo
+# PROVJERAVA (`_require_live_preconditions`), nikad ne postavlja: pozivalac
+# koji je nije postavio dobija odbijanje, a ne tiho drukčije mjerenje.
+# ---------------------------------------------------------------------------
+sys.path.insert(0, str(ROOT))
+from matbot import release_config as _release_config  # noqa: E402
+
+
+class GateRefusal(RuntimeError):
+    """A precondition failed before any SDK delegation was possible."""
+
+
+def _apply_required_release_environment(environ=None):
+    """Postavi obaveznu konfiguraciju; padni na svakom svjesnom neslaganju.
+
+    Vraća primijenjeni rječnik da bi artefakt mogao dokazati ČIME je mjereno."""
+    env = os.environ if environ is None else environ
+    conflicts = []
+    for name, expected in sorted(_release_config.REQUIRED_RELEASE_ENV.items()):
+        present = (env.get(name) or "").strip()
+        if not present:
+            env[name] = expected
+        elif present != expected:
+            # Poruka nosi samo ime i očekivanu vrijednost — nikad zatečenu.
+            conflicts.append(f"{name} (očekivano: {expected})")
+    if conflicts:
+        raise GateRefusal(
+            "The shell environment contradicts the audited production configuration: "
+            + ", ".join(conflicts))
+    return dict(_release_config.REQUIRED_RELEASE_ENV)
+
+
+# Deklaracija kojom kampanja MORA biti mjerena; artefakt je zapisuje.
+APPLIED_RELEASE_ENV = dict(_release_config.REQUIRED_RELEASE_ENV)
+
+if __name__ == "__main__":
+    _apply_required_release_environment()
 # Kapacitetna ekspanzija: lekcije oblasti djeljivosti dobijaju blocking
 # semantičke ugovore u talasima (6-03-004 u prvom, 6-03-002 u Batch #2), pa
 # model-scenarije kapije nosi lekcija koja je KLASIFIKATOROM ostala na
@@ -77,7 +139,6 @@ DERIVED_FROM_HELP_POLICY = None
 # produkcijski put (`pipeline._UI_ACTION_BY_INTENT`), samo za ova dva intenta.
 _HELP_UI_ACTION = {"hint_request": "hint_request",
                    "solution_request": "full_solution_request"}
-sys.path.insert(0, str(ROOT))
 
 from matbot import config, release_config, feedback, mathsafe, mcq_integrity, practice  # noqa: E402
 from matbot.contracts import registry as contract_registry  # noqa: E402
@@ -87,19 +148,21 @@ from matbot.session_store import SessionStore  # noqa: E402
 from matbot.topics import lesson_info  # noqa: E402
 
 # JEDAN izvor istine o release konfiguraciji — isti koji koristi i deploy
-# provjera (matbot/release_config.py). Produkcija je jednom tiho radila bez ove
-# dvije zastavice dok su gate-ovi mjerili obje uključene.
+# provjera (matbot/release_config.py → deploy/production_release.env).
+# Produkcija je jednom tiho radila bez prve dvije zastavice dok su gate-ovi
+# mjerili obje uključene. Nijedna vrijednost se ovdje NE PONAVLJA kao literal.
 REQUIRED_PIPELINE = release_config.REQUIRED_RELEASE_ENV["MATBOT_PRACTICE_PIPELINE"]
 REQUIRED_DIFFICULTY_LEVELS = release_config.REQUIRED_RELEASE_ENV["MATBOT_PRACTICE_DIFFICULTY_LEVELS"]
+REQUIRED_RELEASE_TIMEOUT = release_config.REQUIRED_RELEASE_ENV["AI_TUTOR_TIMEOUT"]
+REQUIRED_TIMEOUT_S = float(REQUIRED_RELEASE_TIMEOUT)
 
 from scratchpad.run_difficulty_canary import (  # noqa: E402
     CanaryReport, CountingLLM, SDKCallBudgetExceeded, Scenario, _LogCapture,
     _has_disallowed_control_character, _run_one_turn,
 )
 
-
-class GateRefusal(RuntimeError):
-    """A precondition failed before any SDK delegation was possible."""
+# `GateRefusal` je definisan uz primjenu konfiguracije na vrhu modula, jer
+# primjena mora odbiti neslaganje PRIJE nego što se `matbot.config` uveze.
 
 
 @dataclass(frozen=True)
@@ -140,8 +203,20 @@ def _require_live_preconditions() -> tuple[str, str]:
         raise GateRefusal("MATBOT_PRACTICE_PIPELINE must be exactly universal_two_call.")
     if not config.practice_difficulty_levels_enabled():
         raise GateRefusal("MATBOT_PRACTICE_DIFFICULTY_LEVELS must be exactly enabled.")
-    if not isinstance(config.AI_TIMEOUT_S, (int, float)) or config.AI_TIMEOUT_S <= 0:
-        raise GateRefusal("AI_TUTOR_TIMEOUT runtime configuration is invalid.")
+    # CIJELA obavezna konfiguracija, ne samo dvije vrijednosti iznad. Primjena
+    # na vrhu modula je već postavila odsutne i odbila svjesno neslaganje; ovo
+    # dokazuje ISHOD (uključujući ugrađeni izbor brzog modela) prije prvog
+    # plaćenog poziva, umjesto da se na njega oslanjamo implicitno.
+    problems = release_config.release_configuration_problems()
+    if problems:
+        raise GateRefusal(
+            "The audited production configuration is not in effect: " + "; ".join(problems))
+    # Rok se ne provjerava više kao „bilo koji pozitivan broj“: kapija mora
+    # mjeriti ISTI rok koji produkcija izvršava (živi nalaz — 30 s naspram 45 s).
+    if float(config.AI_TIMEOUT_S) != REQUIRED_TIMEOUT_S:
+        raise GateRefusal(
+            f"AI_TUTOR_TIMEOUT must be exactly {REQUIRED_RELEASE_TIMEOUT} seconds "
+            "so the gate measures the production timeout.")
     return _head_metadata()
 
 
@@ -635,7 +710,8 @@ def run_live_release_gate() -> int:
     # da ni najskuplji moguci ishod plana ne prelazi plafon. Tacan zbir se
     # sabira dok se scenariji izvrsavaju, iz vrijednosti zamrznutih PRIJE turna.
     if len(plan) != REQUIRED_SCENARIO_COUNT:
-        raise GateRefusal("The committed release-gate plan is not the required 14-scenario plan.")
+        raise GateRefusal("The committed release-gate plan is not the required "
+                          f"{REQUIRED_SCENARIO_COUNT}-scenario plan.")
     if max_planned_calls(plan) != SDK_CALL_CEILING:
         raise GateRefusal(
             f"The committed plan's maximum is {max_planned_calls(plan)} SDK calls, "
@@ -727,8 +803,15 @@ def run_live_release_gate() -> int:
         "model": config.OPENAI_MODEL_TEXT,
         "reasoning_effort": config.REASONING_EFFORT,
         "timeout_seconds": config.AI_TIMEOUT_S,
+        "required_timeout_seconds": REQUIRED_TIMEOUT_S,
         "practice_pipeline": REQUIRED_PIPELINE,
         "difficulty_levels_enabled": True,
+        # ČIME JE MJERENO — cijela primijenjena konfiguracija, ne samo ruta.
+        # Bez ovoga se iz artefakta nije moglo pročitati da je kampanja išla s
+        # drugim rokom (30 s) i, potencijalno, s drugom rutom lekcija nego
+        # produkcija. Fajl je ne-tajni po konstrukciji (vidi release_config).
+        "release_configuration": dict(sorted(APPLIED_RELEASE_ENV.items())),
+        "effective_configuration": release_config.effective_configuration(),
         "selected_lessons": _selected_lessons(plan),
         "scenario_count": len(scenario_rows),
         "required_scenario_count": REQUIRED_SCENARIO_COUNT,
@@ -787,6 +870,11 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="Manual commit-bound MAT-BOT live release gate")
     parser.add_argument("--static-checks", action="store_true", help="run inert plan/budget checks only")
     args = parser.parse_args(argv)
+    # ČIME SE MJERI — vidljivo PRIJE prvog poziva, istim redom kakav produkcija
+    # ispisuje na startu. Bez ovoga se tek iz artefakta (poslije potrošenog
+    # budžeta) vidjelo da je kampanja išla s drugim rokom nego produkcija.
+    print("matbot_release_gate_configuration "
+          + release_config.format_effective_configuration())
     if args.static_checks:
         _run_static_checks()
         print("LIVE RELEASE GATE STATIC CHECKS PASS — ZERO SDK CALLS")

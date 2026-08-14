@@ -15,6 +15,9 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+from matbot import release_config  # noqa: E402
+
 REQUIRED_SCENARIOS = 15
 # Faza 4H: semantic_fresh/semantic_harder idu deterministički (0 poziva) —
 # plafon i tačan broj poziva prolazne kampanje pali su 23 → 19.
@@ -29,7 +32,11 @@ REQUIRED_SCENARIOS = 15
 # 1 poziv po scenariju, a uslovni recenzentski popravak najvise jos jedan.
 REQUIRED_CALL_CEILING = 23
 MAX_AGE = timedelta(hours=24)
-REQUIRED_PIPELINE = "universal_two_call"
+# NIJEDAN LITERAL SE NE PONAVLJA. Ruta i rok su ranije stajali ovdje kao
+# vlastita kopija; kopija je upravo ono što je pustilo kampanju s rokom od
+# 30 s dok produkcija radi na 45 s. Izvor je isti fajl koji čita i deploy.
+REQUIRED_PIPELINE = release_config.REQUIRED_RELEASE_ENV["MATBOT_PRACTICE_PIPELINE"]
+REQUIRED_TIMEOUT_S = float(release_config.REQUIRED_RELEASE_ENV["AI_TUTOR_TIMEOUT"])
 
 
 def _git(*args: str) -> str:
@@ -72,6 +79,21 @@ def validate_result(document: dict, *, expected_commit: str | None = None,
         errors.append("wrong_practice_pipeline")
     if document.get("difficulty_levels_enabled") is not True:
         errors.append("difficulty_levels_not_enabled")
+    # ROK KOJIM JE MJERENO MORA BITI PRODUKCIJSKI. Zatečeni (stariji) artefakt
+    # nema ovo polje ili nosi ugrađenih 30 s — i ne smije autorizovati push.
+    measured_timeout = document.get("timeout_seconds")
+    if not isinstance(measured_timeout, (int, float)) or isinstance(measured_timeout, bool):
+        errors.append("missing_timeout_seconds")
+    elif float(measured_timeout) != REQUIRED_TIMEOUT_S:
+        errors.append("gate_timeout_is_not_the_production_timeout")
+    # Cijela primijenjena konfiguracija, ne samo ruta: kapija koja je mjerila
+    # drugi opseg brze rute ili drugu kapiju raznolikosti mjerila je drugu
+    # arhitekturu nego što produkcija izvršava.
+    applied = document.get("release_configuration")
+    if not isinstance(applied, dict):
+        errors.append("missing_release_configuration")
+    elif applied != dict(release_config.REQUIRED_RELEASE_ENV):
+        errors.append("gate_configuration_is_not_the_production_configuration")
     if document.get("scenario_count") != REQUIRED_SCENARIOS:
         errors.append("wrong_scenario_count")
     if document.get("required_scenario_count") != REQUIRED_SCENARIOS:

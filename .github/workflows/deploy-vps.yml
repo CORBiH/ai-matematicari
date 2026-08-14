@@ -47,31 +47,36 @@ jobs:
               echo "APP_VERSION=$VERSION" >> .env
             fi
 
-            # AUDITIRANA PRACTICE ARHITEKTURA — brza jednopozivna ruta.
+            # AUDITIRANA PRACTICE KONFIGURACIJA — CIJELA, IZ JEDNOG IZVORA.
+            #
             # Produkcijski .env zivi na serveru i nije u repou, pa varijabla
             # koja postoji samo u dokumentaciji nikad ne stigne do kontejnera:
             # produkcija bi tiho izvrsavala jednu arhitekturu dok su je kapije
-            # mjerile u drugoj. Isti mehanizam kojim se vec upisuje APP_VERSION
-            # zato upisuje i opseg rute. Idempotentno; ne dira druge vrijednosti.
-            if grep -q '^MATBOT_FAST_SINGLE_CALL_SCOPE=' .env; then
-              sed -i "s/^MATBOT_FAST_SINGLE_CALL_SCOPE=.*/MATBOT_FAST_SINGLE_CALL_SCOPE=model_backed/" .env
-            else
-              echo "MATBOT_FAST_SINGLE_CALL_SCOPE=model_backed" >> .env
-            fi
-
-            # MJERENO SLABE DETERMINISTICKE PORODICE IDU NA LUNU.
-            # Ista logika kao iznad: podrazumijevana vrijednost u kodu je
-            # `disabled` da testna svita i dalje dokazuje deterministicke
-            # generatore (rollback put), pa produkcijsku vrijednost mora
-            # upisati deploy. Odluka je po PORODICI i zivi u
-            # data/deterministic_routing.json.
-            if grep -q '^MATBOT_DETERMINISTIC_VARIETY_GATE=' .env; then
-              sed -i "s/^MATBOT_DETERMINISTIC_VARIETY_GATE=.*/MATBOT_DETERMINISTIC_VARIETY_GATE=enabled/" .env
-            else
-              echo "MATBOT_DETERMINISTIC_VARIETY_GATE=enabled" >> .env
-            fi
+            # mjerile u drugoj. Tako je i bilo — MATBOT_PRACTICE_PIPELINE i
+            # MATBOT_PRACTICE_DIFFICULTY_LEVELS su nedostajale na VPS-u dok su
+            # gate-ovi mjerili obje ukljucene, a ovaj korak je upisivao samo
+            # dvije od potrebnih vrijednosti.
+            #
+            # Spisak vise NIJE ovdje: cita se iz deploy/production_release.env,
+            # istog fajla koji cita i matbot/release_config.py, pa nova
+            # vrijednost ima tacno jedno mjesto. Sama petlja je u
+            # deploy/apply_release_env.sh da bi je testovi mogli POKRENUTI —
+            # logika koja odlucuje sta produkcija izvrsava ne smije zivjeti
+            # samo unutar heredoca koji nijedan test ne vidi. Idempotentno;
+            # tajne u `.env` ostaju netaknute i nikad se ne ispisuju.
+            sh deploy/apply_release_env.sh .env deploy/production_release.env
 
             docker compose build
+
+            # KONFIGURACIJA SE PROVJERAVA PRIJE NEGO STO DIRAMO ZIVU USLUGU.
+            # Provjera ide UNUTAR kontejnera, dakle kroz isto razrjesenje
+            # konfiguracije koje ima i aplikacija (ukljucujuci ugradjene
+            # vrijednosti poput izbora brzog modela). Pada zatvoreno: `set -e`
+            # obara deploy prije `up -d`, pa pogresna konfiguracija nikad ne
+            # zamijeni ispravnu koja trenutno radi.
+            docker compose run --rm --no-deps -T matbot \
+              python -m matbot.release_config --require
+
             docker compose up -d --remove-orphans
 
                         docker compose ps
@@ -94,6 +99,15 @@ jobs:
                 exit 1
               fi
             done
+
+            # DOKAZ NAD KONTEJNEROM KOJI STVARNO POSLUZUJE UCENIKE.
+            # Provjera iznad je isla kroz `run --rm` (zaseban kratkotrajni
+            # kontejner). Ovaj korak ispituje ZIVI proces i ispisuje njegovu
+            # efektivnu ne-tajnu konfiguraciju u log workflowa, pa se poslije
+            # deploya moze dokazati koju arhitekturu produkcija izvrsava — bez
+            # SSH-a i bez ijedne tajne u izlazu.
+            echo "Effective non-secret configuration of the running service:"
+            docker compose exec -T matbot python -m matbot.release_config --require
 
             echo "Deployment successful: $VERSION"
           EOF

@@ -24,6 +24,8 @@ from pathlib import Path
 
 import pytest
 
+from matbot import release_config
+
 ROOT = Path(__file__).resolve().parent.parent
 HOOK = ROOT / ".githooks" / "pre-push"
 CHECKER = ROOT / "tools" / "check_live_release_gate.py"
@@ -71,6 +73,10 @@ def passing_document(commit_sha, tree_hash):
         "clean_worktree": True,
         "practice_pipeline": "universal_two_call",
         "difficulty_levels_enabled": True,
+        # Rok i primijenjena konfiguracija su dio ugovora artefakta: kampanja
+        # mjerena drugim rokom ili drugom rutom ne autorizuje push.
+        "timeout_seconds": float(release_config.REQUIRED_RELEASE_ENV["AI_TUTOR_TIMEOUT"]),
+        "release_configuration": dict(release_config.REQUIRED_RELEASE_ENV),
         "scenario_count": 15,
         "required_scenario_count": 15,
         # SERVER-VLASNIČKA POMOĆ: tačan ugovor je PLANIRANI zbir iz same
@@ -150,6 +156,18 @@ def repo(tmp_path):
     (path / "tools").mkdir()
     (path / "tools" / "check_live_release_gate.py").write_text(
         CHECKER.read_text(encoding="utf-8"), encoding="utf-8")
+    # Provjera artefakta čita obaveznu konfiguraciju iz JEDNOG izvora istine
+    # (nikad iz vlastite kopije literala), pa privremeni repo mora nositi i
+    # njega — u pravom repou su oba fajla uvijek prisutna.
+    (path / "matbot").mkdir()
+    (path / "matbot" / "__init__.py").write_text("", encoding="utf-8")
+    (path / "matbot" / "release_config.py").write_text(
+        (ROOT / "matbot" / "release_config.py").read_text(encoding="utf-8"),
+        encoding="utf-8")
+    (path / "deploy").mkdir()
+    (path / "deploy" / "production_release.env").write_text(
+        (ROOT / "deploy" / "production_release.env").read_text(encoding="utf-8"),
+        encoding="utf-8")
     # Hook bira interpreter sam; dajemo mu isti kojim testovi rade.
     venv_bin = path / ".venv" / "bin"
     venv_bin.mkdir(parents=True)

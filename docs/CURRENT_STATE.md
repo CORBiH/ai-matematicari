@@ -1,7 +1,45 @@
 # MAT-BOT — current state
 
-Last updated: 2026-08-08 (Vježbajmo V1 semantic fidelity, Phase F5K).
-Test baseline: **6212 passing**. Runtime model: `gpt-5-mini`, reasoning effort `low`.
+Last updated: **2026-08-14** (release/config parity hardening).
+HEAD after this phase: **`REPLACE_WITH_FINAL_HEAD`**.
+Test baseline: **8760 passing, 3 skipped**.
+Runtime models: `gpt-5.6-luna` (Practice fast route, reasoning effort `low`) and
+`gpt-5-mini` (Explain, Quick, and the two-call rollback path; effort `low`).
+
+## Production reality at a glance
+
+| Fact | Value |
+|---|---|
+| Practice pipeline | `universal_two_call`, with the **Luna fast single-call route** for every model-backed lesson |
+| Zero-call deterministic lessons | **189 lessons / 29 families**, measured by calling the real routing function |
+| Lessons with complete generators | 352 / 44 families — 19 families (163 lessons) are routed to Luna by the **variety gate**, 5 lesson exceptions pinned back |
+| Second model call | conditional Reviewer escalation only, repaired on the same fast model; hard ceiling still 2 |
+| Help | **exactly one hint**; a repeated click returns the identical stored text at **0 calls**; the full solution is a separate action, server-composed, 0 calls |
+| Diversity | three axes — structural identity (a repeat is a *defect*), archetype rotation (a repeat is a *missed preference*), form-variant rotation |
+| Per-call timeout | **45 s**, written by deploy and measured by the release gate |
+| Release gate | 15 scenarios, 11 static + 0–1 derived planned calls, ceiling 23 |
+
+**Release/config parity (2026-08-14).** `require_release_configuration()` existed
+but was **called by nothing** — not startup, not the deploy workflow, not the
+pre-push hook, not a test — while `app.py` claimed a deploy check would fail closed
+and no such check existed. Startup logged a WARNING and served students anyway. The
+lists had also drifted apart: deploy persisted two flags the declaration did not
+contain, and the release gate validated two of the five declared values, checking
+the timeout only as "a positive number" — so the campaign for `0c02fca` passed at
+**30 s** while production runs at **45 s**. There is now one declaration
+(`deploy/production_release.env`) read by the guard, the deploy script, the gate and
+the offline artifact checker, and three enforcement points: deploy persists it,
+deploy verifies it twice (before replacing the live service and inside the running
+container), and startup refuses to boot on a deviation under
+`MATBOT_RELEASE_ENFORCEMENT=enabled`. Restoring the audited production state no
+longer requires SSH. See [DEPLOYMENT.md](DEPLOYMENT.md) and
+[LIVE_RELEASE_GATE.md](LIVE_RELEASE_GATE.md).
+
+---
+
+## Earlier phases
+
+**Phase F5K (2026-08-08):** last V1 semantic-fidelity blocker; see below.
 
 **Phase F5K (2026-08-08):** the 150-turn real-state audit showed the last
 V1 blocker — mathematically correct tasks from the WRONG lesson (graph →
@@ -40,7 +78,8 @@ See docs/ARCHITECTURE.md.
 
 | Area | State |
 |---|---|
-| Practice | Hardened. Family contracts are followed by fail-closed lesson-semantic contracts; **272 lessons across 30 semantic families (all four grades, 50.9% of the curriculum) now run the deterministic execution strategy** — structured actions cost zero model calls, proven offline by a ~81,000-package fuzz through the full validator stack (`tests/test_deterministic_bulk_properties.py`, `MATBOT_FUZZ_SEEDS=100`). Batch #3 added exact-arithmetic geometry (plane formulas, Pythagoras with symbolic radicals, solids with exact π), angle relationships, systems of linear equations, and polynomial factorization/algebraic identities. Harder/easier prefers the primary lesson family; exact option ground truth/classified error uniqueness, ordered-pair/system substitution, numeric and geometry checks, and idempotent choice retry remain enforced. Coverage source of truth: `reference/curriculum/semantics/deterministic_coverage_report.json`. |
+| Practice | Hardened. Family contracts are followed by fail-closed lesson-semantic contracts. **352 lessons across 44 semantic families have complete deterministic generators; 189 lessons across 29 families are what production actually serves at zero model calls** — the difference is the variety gate, which routes 19 measured-weak families (163 lessons) to the Luna fast route with 5 lesson-level exceptions pinned back. The zero-call set is proven offline by a ~81,000-package fuzz through the full validator stack (`tests/test_deterministic_bulk_properties.py`, `MATBOT_FUZZ_SEEDS=100`) and by an exhaustive audit of **all 189 active zero-call lessons — 11,340 packages and 567 help turns at 0 model calls**, which found no math, notation, multiple-correct-option or contradictory-solution defect. Batch #3 added exact-arithmetic geometry (plane formulas, Pythagoras with symbolic radicals, solids with exact π), angle relationships, systems of linear equations, and polynomial factorization/algebraic identities. Harder/easier prefers the primary lesson family; exact option ground truth/classified error uniqueness, ordered-pair/system substitution, numeric and geometry checks, and idempotent choice retry remain enforced. Coverage source of truth: `reference/curriculum/semantics/deterministic_coverage_report.json`; production routing decision: `data/deterministic_routing.json`. |
+| Release / deploy configuration | **Hardened 2026-08-14.** One declaration (`deploy/production_release.env`) is persisted by deploy, verified twice on the deploy path, enforced at startup, applied and recorded by the live release gate, and checked in the pushed artifact by the pre-push hook. Previously the guard was dead code and the gate measured a 30 s timeout against a 45 s production. |
 | Result / Quick | Hardened for text and for secure image input. Transport-level MathJax over-escaping repair, conversational-repair handling, context-free by design. |
 | Image upload | Hardened. Bounded in-memory read, pixel-bomb guard, format sniffing, re-encode, strict metadata-only logging. Quick mode only. |
 | Security / transport | Hardened. Signed token, two-tier rate limiting, per-session lock, ProxyFix, body-size cap, no secret ever logged. |
@@ -214,6 +253,22 @@ internal codes never leak to the browser · XSS (escape before every
 
 ## Prioritized next steps
 
+0. **Known open Practice items from the 2026-08-14 audits** (none is a config
+   issue, and none was touched by the config-parity phase):
+   - `linear_system_direct` serves *"solve by substitution or opposite
+     coefficients…"* to 180 `verify_pair` packages, where the student only needs
+     to substitute — the same task-blind-hint shape that the divisibility fix
+     closed, and the clearest remaining instance of it.
+   - The zero-call audit flags 4,683 of 11,340 packages `GENERIC_HINT`, but that
+     is largely a **classifier artifact**: a hint that states the exact rule
+     scores "generic" simply for containing no digit or `$`. Do not chase the
+     ratio — putting the task's numbers into a hint trades directly against the
+     answer-leak protections.
+   - Rule-authority audit P2 residue: 43 of 44 semantic detectors are
+     unimplemented, so "blocking" mostly cannot block; systems method naming and
+     the latent cross-multiplication guard are open. PHASE B still needs a human
+     curriculum call (the `imenilac`/`nazivnik` question is now resolved — the
+     engines say `nazivnik` and `imenilac` appears 0 times in the corpus).
 1. **Targeted live validation of the D35 fixes (not yet run)** — the deterministic
    halves are locked by tests, but three behaviours are prompt-dependent and can
    only be confirmed live: whether the model actually populates the new image
