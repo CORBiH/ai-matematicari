@@ -256,10 +256,32 @@ def _check_rectangle(out):
 # ---------------------------------------------------------------------------
 # Aritmetika / razlomci — istina iz visible_math
 # ---------------------------------------------------------------------------
+# ŠKOLSKI OBLIK „a/b od n“ (živa dijagnostika Sol migracije, slučaj „2/3 od
+# 27“): udžbenik dio cjeline piše riječju „od“, model to VJERNO prepiše u
+# visible_math, a AST evaluator prozu ne razumije — provjera se nije izvršila
+# i tačan odgovor je padao. Kurikularno „od“ ovdje znači TAČNO množenje.
+# Namjerno usko: normalizuje se ISKLJUČIVO cio zapis oblika
+# `<izraz> od <broj>` (jedno „od“, desno gol broj) → `(<izraz>)*(<broj>)`;
+# lijeva strana i dalje ide kroz postojeći AST s bijelom listom — nikakva
+# opšta obrada prirodnog jezika.
+_OD_FORM_RE = re.compile(
+    r"^\s*(?P<expr>[^\s].*?)\s+od\s+(?P<n>-?\d+(?:[.,]\d+)?)\s*$",
+    re.IGNORECASE,
+)
+
+
+def _normalize_od_form(source):
+    match = _OD_FORM_RE.match(source or "")
+    if match is None or " od " in match.group("expr").lower():
+        return source
+    return "(%s)*(%s)" % (match.group("expr"), match.group("n"))
+
+
 def _check_expression(out):
     source = _visible_math(out)
     if source is None:
         return not_engaged("image_math_source_missing")
+    source = _normalize_od_form(source)
     try:
         candidates = evaluate_candidates(source.rstrip("=").strip())
     except (_Unsupported, _MathError):

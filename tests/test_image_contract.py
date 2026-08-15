@@ -71,6 +71,7 @@ def test_image_result_uses_the_dedicated_schema():
         "reply", "readability", "all_required_symbols_visible", "task_type",
         "visible_math", "visible_problem_text", "requested_quantity",
         "visible_values", "unit", "answer_confidence", "uncertainty_reason",
+        "math_content_uncertain",
     }
 
 
@@ -118,10 +119,26 @@ def test_non_high_confidence_fails_closed(confidence):
     assert response["answer"] == IMAGE_UNREADABLE_MESSAGE
 
 
-def test_reported_uncertainty_fails_closed():
+def test_material_math_uncertainty_fails_closed():
+    """Nečitljiv MATEMATIČKI sadržaj (math_content_uncertain=True) blokira —
+    ista zaštita kao ranije, sada kroz strukturni signal."""
     response, _fake = run_image(make_quick_image_output(
-        reply="$x=5$", uncertainty_reason="Desna strana je prekrivena."))
+        reply="$x=5$", uncertainty_reason="Desna strana je prekrivena.",
+        math_content_uncertain=True))
     assert response["answer"] == IMAGE_UNREADABLE_MESSAGE
+
+
+def test_harmless_framing_note_does_not_block_when_math_is_certain():
+    """KALIBRACIJA ZA SOL (živa dijagnostika 2026-08-15): pošten opis kadra
+    („izrez blizu ivice“) uz SVE čitljive simbole i math_content_uncertain=False
+    NE smije sam po sebi ubiti objavu — to je ranije radilo, i temeljitiji
+    model je zbog vlastite iskrenosti bio kažnjavan."""
+    response, _fake = run_image(make_quick_image_output(
+        reply="$x=5$", task_type="linear_equation",
+        requested_quantity="value_of_unknown", visible_math="3x+5=20",
+        uncertainty_reason="Izrez je blizu ivice stranice.",
+        math_content_uncertain=False))
+    assert response["answer"] == "$x=5$"
 
 
 def test_call35_obscured_value_cannot_produce_a_public_answer():
@@ -443,10 +460,24 @@ def test_supported_with_missing_evidence_is_a_safe_rejection():
     assert response["answer"] == IMAGE_UNREADABLE_MESSAGE
 
 
-def test_supported_with_unparsable_evidence_is_a_safe_rejection():
+def test_supported_but_unparsable_evidence_is_not_applicable_and_continues():
+    """TRI-STATE DOKTRINA (2026-08-15): dokaz koji verifikator NE UMIJE
+    parsirati nije dokaz greške — NOT_APPLICABLE nastavlja kroz opšte
+    validatore (verifikacija se ne tvrdi). Živa dijagnostika: sva 4 lažna
+    odbijanja poslije Sol migracije bila su baš ovaj spoj not_engaged→reject."""
     response, _fake = run_image(make_quick_image_output(
         reply="$x=5$", task_type="linear_equation",
         requested_quantity="value_of_unknown", visible_math="3x + ??? = @@"))
+    assert response["answer"] == "$x=5$"
+
+
+def test_missing_evidence_for_supported_family_still_blocks():
+    """IZUZETAK koji ostaje (tačno D35T-2 rupa): porodica izraza/jednačine
+    BEZ ijednog dokaznog zapisa (prazan/naslovni visible_math) uz tvrdnju da
+    je sve vidljivo — kontradikcija vlastitih tvrdnji, nikad objava."""
+    response, _fake = run_image(make_quick_image_output(
+        reply="$x=5$", task_type="linear_equation",
+        requested_quantity="value_of_unknown", visible_math=""))
     assert response["answer"] == IMAGE_UNREADABLE_MESSAGE
 
 

@@ -178,6 +178,17 @@ class QuickImageTurnOutput(BaseModel):
     unit: str
     answer_confidence: Literal["high", "medium", "low"]
     uncertainty_reason: str
+    # STRUKTURNI signal MATEMATIČKI BITNE nesigurnosti (kalibracija za Sol,
+    # 2026-08-15): temeljit model istinito napominje i BEZAZLENE stvari o kadru
+    # („izrez blizu ivice“), a raniji gate je blokirao na SVAKI neprazan
+    # `uncertainty_reason` — pošten opis kadra ubijao je objavu iako je svaki
+    # potreban simbol bio jasan. `True` znači: neki matematički simbol,
+    # vrijednost, predznak, eksponent, nazivnik, znak nejednakosti ili jedinica
+    # POTREBNA za rješenje je nečitljiva/dvosmislena → objava se blokira.
+    # Napomena o kadru uz sve čitljive simbole ide u `uncertainty_reason` uz
+    # `False` — informativna je, ne blokira. Definicija polja živi u promptu
+    # (matbot/prompts.py, _QUICK_IMAGE_RULES).
+    math_content_uncertain: bool
 
 
 class InvalidOutputError(ValueError):

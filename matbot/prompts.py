@@ -363,6 +363,12 @@ _QUICK_IMAGE_RULES = (
     "'uncertainty_reason'), a ne rješava pogađanjem.\n"
     "- 'answer_confidence' je 'high' samo kad si SVE potrebne podatke stvarno pročitao "
     "sa slike; inače 'medium' ili 'low'.\n"
+    "- 'math_content_uncertain': true SAMO kad je neki MATEMATIČKI element potreban za "
+    "rješenje nečitljiv ili dvosmislen — cifra, predznak, eksponent, brojnik/nazivnik, "
+    "znak nejednakosti, jedinica, oznaka na skici. Bezazlene napomene o kadru (izrez uz "
+    "ivicu, vidljiv rub stranice, susjedni nebitni fragment) NISU matematička nesigurnost: "
+    "njih smiješ opisati u 'uncertainty_reason' uz math_content_uncertain=false. Ako je "
+    "math_content_uncertain=true, u 'uncertainty_reason' obavezno reci ŠTA je nečitljivo.\n"
     "\n"
 )
 

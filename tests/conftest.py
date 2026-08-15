@@ -60,6 +60,7 @@ def make_quick_image_output(
     unit="",
     answer_confidence="high",
     uncertainty_reason="",
+    math_content_uncertain=False,
 ):
     """Default je „jasna slika, model siguran“ — tj. stanje u kojem odgovor
     PROLAZI kapiju iz matbot/quick.py, pa postojeći testovi plumbinga slike
@@ -76,6 +77,7 @@ def make_quick_image_output(
         unit=unit,
         answer_confidence=answer_confidence,
         uncertainty_reason=uncertainty_reason,
+        math_content_uncertain=math_content_uncertain,
     )
 
 

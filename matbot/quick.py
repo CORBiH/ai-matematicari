@@ -170,8 +170,16 @@ def _image_gate_issue(out):
         return "missing_required_symbol"
     if out.answer_confidence != "high":
         return "low_confidence"
-    if (out.uncertainty_reason or "").strip():
-        return "uncertainty_reported"
+    # KALIBRACIJA ZA SOL (2026-08-15): raniji uslov „uncertainty_reason mora
+    # biti prazan“ bio je pretup — temeljit model istinito napomene i bezazlene
+    # stvari o kadru (izrez uz ivicu, susjedni rub stranice), pa je pošten opis
+    # ubijao objavu iako je SVAKI potreban matematički simbol bio jasan.
+    # Blokira STRUKTURNI signal `math_content_uncertain` (definicija u
+    # matbot/schema.py + prompt): nečitljiva cifra, predznak, eksponent,
+    # nazivnik, znak nejednakosti ili jedinica → blokada, kao i do sada.
+    # Napomena o kadru uz math_content_uncertain=False je informativna (log).
+    if out.math_content_uncertain:
+        return "math_content_uncertain"
     return None
 
 
@@ -297,20 +305,42 @@ def run_quick_turn(llm, turn, image=None):
                            request_id, e)
             return {"answer": SAFE_ERROR_MESSAGE, "last_tutor_task": ""}
 
-        # Deterministička provjera podržanih porodica. Za podržanu porodicu
-        # objavljivanje traži supported ∧ engaged ∧ verified — „provjera se nije
-        # izvršila“ NIKAD ne znači „provjereno“ (živi nalaz D35T-2). Nepodržana
-        # porodica ide dalje kroz opšte provjere, uz istu strogu kapiju
-        # čitljivosti — i dalje bez ijednog dodatnog poziva modela.
+        # Deterministička provjera podržanih porodica — TRI RAZLIČITA STANJA
+        # (doktrina precizirana 2026-08-15, poslije Sol migracije; živa
+        # dijagnostika 4 lažna odbijanja — sva četiri su bila not_engaged
+        # spojen s failed):
+        #
+        #   VERIFIED      (engaged ∧ verified)  → objava smije dalje;
+        #   CONTRADICTED  (engaged ∧ ¬verified) → BLOKADA: nezavisan račun je
+        #                 DOKAZAO da se odgovor ne slaže s vidljivim dokazom;
+        #   NOT_APPLICABLE (¬engaged)           → verifikator NE POKRIVA baš
+        #                 ovaj podoblik (pravougaonik iz stranice+dijagonale,
+        #                 nejednačina u polju jednačine, miješane jedinice…).
+        #                 To NIJE dokaz greške — odgovor ide dalje kroz opšte
+        #                 validatore (mathsafe/mathcheck/geometrycheck…), a
+        #                 „provjereno“ se NIKAD ne tvrdi.
+        #
+        # IZUZETAK koji ostaje blokada (tačno D35T-2 rupa): model za porodicu
+        # izraza/jednačine NIJE dao nikakav dokazni zapis (prazan ili
+        # naslovni `visible_math`) iako kapija čitljivosti tvrdi da je sve
+        # vidljivo — kontradikcija vlastitih tvrdnji, nikad objava.
         verification = imagecheck.verify_image_answer(result.output)
         if verification.supported and not verification.may_publish:
+            blocking = (
+                verification.engaged                       # CONTRADICTED
+                or verification.code == "image_math_source_missing"
+            )
             logger.warning(
-                "quick_turn request_id=%s category=invalid_output detail=image_check "
+                "quick_turn request_id=%s category=%s detail=image_check "
                 "task_type=%s engaged=%s verified=%s code=%s",
-                request_id, result.output.task_type, verification.engaged,
+                request_id,
+                "invalid_output" if blocking else "image_check_not_applicable",
+                result.output.task_type, verification.engaged,
                 verification.verified, verification.code,
             )
-            return {"answer": IMAGE_UNREADABLE_MESSAGE, "last_tutor_task": ""}
+            if blocking:
+                return {"answer": IMAGE_UNREADABLE_MESSAGE, "last_tutor_task": ""}
+            # NOT_APPLICABLE: nastavi kroz opšte validatore ispod.
 
     raw_reply = result.output.reply.strip()
 

@@ -213,11 +213,20 @@ Flask + a single-page frontend, one OpenAI call per turn, no database.
   **not** deterministic in general — do not describe it as such, and never claim the
   model's transcription is independently known to be correct.
 
-- **For a supported image family, "the verifier did not engage" means FAIL CLOSED.**
+- **The image verifier is tri-state (doctrine refined 2026-08-15, post-Sol).**
   `imagecheck.verify_image_answer` returns `ImageVerification(supported, engaged,
   verified, code)` — never a bare list, because an empty list once meant both
   "verified" and "had nothing to check" and let a wrong answer through (D35T-2).
-  Publication requires `supported ∧ engaged ∧ verified`. Deterministic ground truth
+  For a supported family: VERIFIED (`engaged ∧ verified`) may publish;
+  CONTRADICTED (`engaged ∧ ¬verified`) always blocks; NOT_APPLICABLE
+  (`¬engaged` — the verifier does not cover this exact subform, e.g. rectangle
+  from side+diagonal, an inequality in the equation slot, mixed units) is NOT
+  evidence of error: the answer continues through the general validators and
+  verification is never claimed. The one `¬engaged` case that still blocks is
+  `image_math_source_missing` — the model claimed everything visible yet gave
+  no evidence transcript, which is exactly the D35T-2 hole. Live measurement
+  (4/4 diagnosed false rejects after the Sol migration) is what forced the
+  not_engaged/failed split. Deterministic ground truth
   comes only from validated structured evidence (`visible_values`, `visible_math`) —
   never from the model's public reply, its proposed answer, textbook patterns, or
   "the value that makes the equation solvable". `visible_problem_text` is prose and
