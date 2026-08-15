@@ -141,9 +141,10 @@ _MATH_NOTATION_RULES = (
     "NIKAD samo dio izraza u $...$ a ostatak (zagrade, jedinica, broj) van njega.\n"
     "- Prijelom pasusa piši kao STVARAN novi red u tekstu — NIKAD kao vidljiva dva "
     "znaka backslash+n (\\n) unutar teksta koji učenik čita.\n"
-    "- Izbjegavaj \\begin{cases}...\\end{cases} (nepouzdano kroz JSON strukturirani "
-    "izlaz) — sistem jednačina piši kao odvojene $...$ linije, npr. $2x+3y=8$ pa u "
-    "novom redu $4x-y=2$, umjesto jednog cases bloka.\n"
+    "- NIKAD ne koristi \\begin{...}...\\end{...} okruženja (cases, aligned, array, "
+    "matrix...) niti znak & za poravnanje — server takav zapis ODBIJA cio. Svaku "
+    "jednačinu/izraz piši u svom zasebnom $...$: $2x+3y=8$ pa u novom redu $4x-y=2$, "
+    "umjesto jednog cases/aligned bloka.\n"
     "- Odgovori su kratki, bez velikih naslova i bez zidova teksta.\n"
 )
 

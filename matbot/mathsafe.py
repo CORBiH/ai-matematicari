@@ -119,6 +119,12 @@ MATHJAX_COMMAND_ALLOWLIST = frozenset({
     "sin", "cos", "tan", "cot", "sec", "csc", "min", "max", "gcd",
     # razmaci
     "quad", "qquad",
+    # Živi nalaz Explain v1 (Luna, lekcija o sličnim trouglovima): model zna napisati
+    # `$O_2=k\thickspace\text{·}O_1$` — semantički inertan razmak je rušio CIO
+    # inače ispravan odgovor. Razmak ne može promijeniti matematiku, pa
+    # imenovane spacing komande idu u bijelu listu (dokumentovani podržani
+    # način širenja — vidi CLAUDE.md o MATHJAX_COMMAND_ALLOWLIST).
+    "thinspace", "medspace", "thickspace", "enspace",
 })
 
 # Poredak od DUŽE ka KRAĆOJ komandi: regex alternacija inače „stane“ na kraćem

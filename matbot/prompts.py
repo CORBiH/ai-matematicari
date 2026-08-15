@@ -207,8 +207,12 @@ def build_explain_instructions(grade: int, lesson_title: str = "", oblast: str =
         "(nikad „ravnina“), „obje“ (nikad „obe“), „promjenljiva“ (nikad „promenljiva“), „vrijednost“ "
         "(nikad „vrednost“). Unija skupova se OPISUJE kao skup svih elemenata — ne kao „zbir“ "
         "elemenata.\n"
-        "- PAŽNJA NA SLIČNE LaTeX KOMANDE: \\ne znači „nije jednako“ (≠) — za množenje UVIJEK \\cdot. "
-        "Prije slanja pročitaj svaku formulu onako kako će se prikazati.\n"
+        "- TVRDNJA O DJELJIVOSTI: prije nego napišeš da neki broj JESTE ili NIJE djeljiv drugim, "
+        "STVARNO podijeli i provjeri ostatak (npr. $30=6\\cdot5$, dakle $30$ JESTE djeljiv sa $6$). "
+        "Primjer u objašnjenju mora potvrđivati pravilo, ne zbunjivati.\n"
+        "- PAŽNJA NA SLIČNE LaTeX KOMANDE: \\ne znači „nije jednako“ (≠) — za množenje UVIJEK \\cdot "
+        "(nikad ·, \\text{·} ni \\times bez potrebe). Za razmak koristi \\, ili ništa — bez egzotičnih "
+        "spacing komandi. Prije slanja pročitaj svaku formulu onako kako će se prikazati.\n"
         "- KRAJ ODGOVORA: ne završavaj frazama tipa „Tu stajemo“, „To je to“, „Nadam se da je jasno“ ili "
         "sličnim praznim zaključcima. Završi kratkim MATEMATIČKIM zaključkom — rezultatom, pravilom ili "
         "zapažanjem koje si upravo pokazao.\n"
@@ -235,7 +239,7 @@ HISTORY_OLDER_ITEM_CHARS = 250  # nepromijenjeno u odnosu na raniju verziju
 
 def build_explain_input(lesson_title, oblast, history, student_message,
                         interaction_phase="", last_tutor_message="",
-                        lesson_context_strong=True, lesson_objectives=()):
+                        lesson_context_strong=True):
     """history: lista {'role': 'user'|'assistant', 'content': str} iz frontenda
     (max 3 razmjene = 6 poruka, već isječeno u pozivaocu — vidi
     matbot/explain.py:_clean_history). Redoslijed je hronološki (najstarije
@@ -243,13 +247,12 @@ def build_explain_input(lesson_title, oblast, history, student_message,
     lines = []
     if lesson_context_strong:
         lines.append(f"LEKCIJA: {lesson_title or 'nije izabrana'} (oblast: {oblast or 'nepoznata'})")
-        # KANONSKI ISHODI LEKCIJE (matbot/lesson_objectives.py, isti artefakt
-        # koji koristi i Practice): 227/536 lekcija ih ima. Ranije je Explain
-        # dobijao SAMO naslov — objašnjenje je pogađalo šta lekcija predaje.
-        # Odsustvo ishoda NIJE greška: linija se tada ne šalje, kao ranije.
-        if lesson_objectives:
-            lines.append("CILJ LEKCIJE (predaje se OVO): "
-                         + "; ".join(list(lesson_objectives)[:3]))
+        # NAMJERNO BEZ kurikularnih ishoda (lesson_objectives): pokušano u v1
+        # migraciji i POVUČENO na živom dokazu — mapiranje jedne lekcije o skupovima (6. razred) nosi
+        # ishod POGREŠNOG RAZREDA („skup realnih brojeva kao unija Q i I“,
+        # gradivo 8/9) uz confidence=high, pa je šestaš dobio iracionalne
+        # brojeve u objašnjenju unije. Dok se mapiranje ne auditira po razredu,
+        # naslov + oblast + pravila razreda su jedini pouzdani kontekst.
     else:
         # Poruka je dokazano iz druge teme (matbot/lesson_relevance.py). Lekcija
         # ostaje vidljiva samo kao pozadinski podatak, s Quick-ovom provjerenom

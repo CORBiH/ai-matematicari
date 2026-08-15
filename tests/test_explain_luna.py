@@ -139,54 +139,42 @@ def test_grade_styles_differ():
         oblast="Cijeli brojevi")
 
 
-def test_lesson_objectives_reach_the_input_when_present():
-    text = build_explain_input(
-        "Naslov", "Oblast", [], "Objasni mi ovo.",
-        lesson_objectives=("prepoznavanje razlomka", "pisanje razlomka"))
-    assert "CILJ LEKCIJE" in text
-    assert "prepoznavanje razlomka" in text
-
-
-def test_missing_objectives_change_nothing():
-    text = build_explain_input("Naslov", "Oblast", [], "Objasni mi ovo.")
-    assert "CILJ LEKCIJE" not in text
-
-
 def test_student_message_is_a_separate_labelled_line():
-    text = build_explain_input("Naslov", "Oblast", [], "Zašto?",
-                               lesson_objectives=())
+    text = build_explain_input("Naslov", "Oblast", [], "Zašto?")
     assert "PORUKA UČENIKA: Zašto?" in text
+
+
+def test_curriculum_objectives_stay_out_of_the_explain_input():
+    """POVUČENO NA ŽIVOM DOKAZU (finalna kampanja f01): mapiranje ishoda za
+    6-01-006 nosi gradivo pogrešnog razreda (ℝ=ℚ∪𝕀 za šestaše) uz
+    confidence=high. Dok se artefakt ne auditira po razredu, Explain prompt
+    NE SMIJE nositi „CILJ LEKCIJE“ liniju."""
+    import inspect
+
+    from matbot import explain as explain_module
+    from matbot import prompts as prompts_module
+    assert "lesson_objectives" not in inspect.signature(
+        prompts_module.build_explain_input).parameters
+    assert "CILJ LEKCIJE" not in inspect.getsource(prompts_module)
+    assert "lesson_objectives" not in inspect.getsource(explain_module)
+
+
+def test_divisibility_self_check_reaches_the_prompt():
+    """Živi nalaz f02 (Luna, 56 poziva): „$12+18=30$ … vidimo da $30$ nije
+    djeljiv sa $6$“ — a $30=6\cdot5$. Tvrdnja o djeljivosti mora biti
+    provjerena dijeljenjem prije slanja."""
+    text = _instructions()
+    assert "TVRDNJA O DJELJIVOSTI" in text
+
+
+def test_environment_ban_covers_aligned_not_only_cases():
+    """Živi nalaz f08/f27: Luna piše $egin{aligned}x+y&=5\end{aligned}$,
+    server to ispravno odbija cio — pa je pravilo prošireno s cases na SVA
+    okruženja i znak &."""
+    text = _instructions()
+    assert "aligned" in text and "&" in text
 
 
 def test_history_is_bounded_to_three_exchanges():
     raw = [{"role": "user", "content": f"p{i}"} for i in range(20)]
     assert len(_clean_history(raw)) == MAX_HISTORY_MESSAGES
-
-
-def test_run_explain_turn_feeds_objectives_from_canonical_data(store=None):
-    """Integracija: lekcija s mapiranim ishodima ih dobije u ulazu prompta."""
-    import json
-    from pathlib import Path
-
-    data = json.loads((Path(__file__).resolve().parent.parent
-                       / "data" / "lesson_objectives.compiled.json")
-                      .read_text(encoding="utf-8"))["lessons"]
-    lesson_id = next(k for k, v in data.items()
-                     if v.get("primary_skills") and k.startswith("6-"))
-    fake = FakeLLM()
-    fake.queue(make_explain_output(reply="Evo objašnjenja."))
-    captured = {}
-    original = fake.explain_turn
-
-    def spy(instructions, input_text):
-        captured["input"] = input_text
-        return original(instructions, input_text)
-
-    fake.explain_turn = spy
-    r = run_explain_turn(fake, {
-        "grade": 6, "selected_topic": lesson_id, "selected_oblast": "",
-        "student_message": "Objasni mi ovu lekciju.",
-        "conversation_history": [], "interaction_phase": "",
-    })
-    assert r["status"] == "ready"
-    assert "CILJ LEKCIJE" in captured["input"]
