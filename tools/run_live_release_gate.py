@@ -611,28 +611,11 @@ def _scenario_errors(gate: GateScenario, result, prior_task: str, prior_options:
                      "grade7", "grade8", "grade9"}:
         errors.extend(_task_output_errors(result))
         errors.extend(_intro_errors(result))
-    # Jedini motor isporučuje difficulty evidence koju je RECENZENT provjerio,
-    # pa se semantička težina NIKAD ne rekonstruiše iz bosanske proze zadatka.
-    # Parser koji je to radio služio je isključivo povučenom putu i uklonjen je
-    # zajedno s njim; grana ostaje `False` da se blok ne pokrene slučajno.
-    if False:
-        before = mcq_integrity.difficulty_profile(
-            prior_task, [option.get("text", "") for option in prior_options]
-        )
-        after = mcq_integrity.difficulty_profile(
-            result.published_task_text or "", [option.get("text", "") for option in result.next_state_options]
-        )
-        if not before.measurable or not after.measurable or after.level <= before.level:
-            errors.append("difficulty_direction_not_measurable")
-    if gate.role == "easier_level1" and use_legacy_difficulty_parser:
-        before = mcq_integrity.difficulty_profile(
-            prior_task, [option.get("text", "") for option in prior_options]
-        )
-        after = mcq_integrity.difficulty_profile(
-            result.published_task_text or "", [option.get("text", "") for option in result.next_state_options]
-        )
-        if not before.measurable or not after.measurable or after.level >= before.level:
-            errors.append("difficulty_direction_not_measurable")
+    # POVLACENJE (2026-08-14): jedini motor isporucuje difficulty evidence koju
+    # je RECENZENT provjerio, pa se semanticka tezina NIKAD ne rekonstruise iz
+    # bosanske proze zadatka. Parser koji je to radio (`mcq_integrity.
+    # difficulty_profile` nad `harder_level2`/`easier_level1`) sluzio je
+    # ISKLJUCIVO povucenom putu i uklonjen je zajedno s njim.
     if gate.role == "correct_choice":
         if result.answer_verdict != "correct" or not result.task_completed_after:
             errors.append("correct_committed_answer_not_recognized")
