@@ -111,6 +111,15 @@ FAST_REVIEWER_MODEL = os.environ.get("MATBOT_FAST_REVIEWER_MODEL", FAST_MODEL)
 # (fail-closed na produkcijskom startu i u kapiji izdanja).
 EXPLAIN_MODEL = os.environ.get("MATBOT_EXPLAIN_MODEL", "gpt-5.6-luna")
 EXPLAIN_REASONING_EFFORT = os.environ.get("MATBOT_EXPLAIN_REASONING_EFFORT", "low")
+
+# --- „Samo rezultat“ (Quick) — vlastiti izbor modela, SAMO za tekst ---------
+# Ista migracija i isti mehanizam kao Explain iznad (2026-08-15). VAŽNO:
+# odnosi se ISKLJUČIVO na tekstualni Quick poziv. Poziv sa SLIKOM namjerno
+# ostaje na modelu adaptera (OPENAI_MODEL_TEXT): cijela stroga kapija
+# čitljivosti (D35-5/D35-6) i nezavisna provjera (imagecheck) mjerene su na
+# tom modelu, a ponašanje vida drugog modela ovdje nije dokazano.
+QUICK_MODEL = os.environ.get("MATBOT_QUICK_MODEL", "gpt-5.6-luna")
+QUICK_REASONING_EFFORT = os.environ.get("MATBOT_QUICK_REASONING_EFFORT", "low")
 # Lekcije za koje je brzi put uključen — zarezom odvojena lista ID-jeva.
 # Prazno (podrazumijevano) znači: nijedna lekcija, put je potpuno neaktivan.
 _FAST_LESSONS_RAW = os.environ.get("MATBOT_FAST_SINGLE_CALL_LESSONS", "")

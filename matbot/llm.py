@@ -368,10 +368,21 @@ class OpenAIPracticeLLM:
 
         Šema je QuickImageTurnOutput (matbot/schema.py): živi nalaz D35-5/D35-6
         pokazao je da je gola `{reply}` šema činila sliku neprovjerljivom, pa
-        model uz odgovor mora prijaviti i šta je stvarno vidio. Tekstualni
-        poziv ostaje na QuickTurnOutput, bajt za bajt kao ranije."""
-        text_format = QuickImageTurnOutput if image is not None else QuickTurnOutput
-        return self._structured_turn(instructions, input_text, text_format, image=image)
+        model uz odgovor mora prijaviti i šta je stvarno vidio.
+
+        MODEL (migracija 2026-08-15): TEKSTUALNI poziv ide eksplicitno na
+        config.QUICK_MODEL (gpt-5.6-luna, effort low) — isti obrazac kao
+        Explain. Poziv sa SLIKOM namjerno OSTAJE na modelu adaptera
+        (OPENAI_MODEL_TEXT): kapija čitljivosti i imagecheck su mjerene na
+        njemu, a vid drugog modela ovdje nije dokazan."""
+        if image is not None:
+            return self._structured_turn(
+                instructions, input_text, QuickImageTurnOutput, image=image)
+        return self._structured_turn(
+            instructions, input_text, QuickTurnOutput,
+            model=config.QUICK_MODEL,
+            reasoning_effort=config.QUICK_REASONING_EFFORT,
+        )
 
     def _build_input(self, input_text, image):
         """Tekst → string (nepromijenjen put). Tekst + slika → jedna user

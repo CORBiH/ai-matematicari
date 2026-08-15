@@ -153,9 +153,10 @@ def test_forbidden_term_appears_only_as_an_explicit_prohibition():
         Path("matbot/lesson_relevance.py"),
         Path("tests/test_terminology.py"),
         Path("tests/test_rules.py"),       # provjerava DA su termini deklarisani zabranjeni u promptu
-        # Explain v1 (Luna): isti razlog kao test_rules.py — dokazuje da
-        # zabranjeni termini stižu u Explain prompt KAO ZABRANE.
+        # Explain/Quick v1 (Luna): isti razlog kao test_rules.py — dokazuju da
+        # zabranjeni termini stižu u prompt KAO ZABRANE.
         Path("tests/test_explain_luna.py"),
+        Path("tests/test_quick_luna.py"),
         # Nova terminološka politika: „čimbenik“ je KONTROLA (dokaz da
         # zabranjen termin i dalje jeste zabranjen, za razliku od parova
         # imenilac/nazivnik i činilac/faktor koji su samo normalizacija).

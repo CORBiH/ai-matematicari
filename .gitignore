@@ -33,3 +33,5 @@ scratchpad/semantic_triage/
 # izvjestaji su MJERENJA, ne izvorni kod.
 scratchpad/final_practice_acceptance/
 scratchpad/practice_legacy_audit/
+
+.claude/settings.local.json

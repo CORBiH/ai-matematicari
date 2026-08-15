@@ -123,6 +123,10 @@ REQUIRED_EFFECTIVE_CONFIG = {
     # isti mehanizam kojim je zaštićen i izbor brzog modela.
     "explain_model": "gpt-5.6-luna",
     "explain_reasoning_effort": "low",
+    # „Samo rezultat“ (migracija 2026-08-15): tekstualni Quick poziv — slika
+    # namjerno ostaje na modelu adaptera (vidi matbot/config.py).
+    "quick_model": "gpt-5.6-luna",
+    "quick_reasoning_effort": "low",
 }
 
 # Imena koja se NIKAD ne ispisuju ni u jednoj dijagnostici ovog modula.
@@ -153,6 +157,8 @@ def _effective_config_problems():
         "fast_reviewer_model": _config.FAST_REVIEWER_MODEL,
         "explain_model": _config.EXPLAIN_MODEL,
         "explain_reasoning_effort": _config.EXPLAIN_REASONING_EFFORT,
+        "quick_model": _config.QUICK_MODEL,
+        "quick_reasoning_effort": _config.QUICK_REASONING_EFFORT,
     }
     return [f"{key} ima pogrešnu vrijednost (očekivano: {expected})"
             for key, expected in sorted(REQUIRED_EFFECTIVE_CONFIG.items())
@@ -213,6 +219,8 @@ def effective_configuration(environ=None):
         "fast_reviewer_model": _config.FAST_REVIEWER_MODEL,
         "explain_model": _config.EXPLAIN_MODEL,
         "explain_reasoning_effort": _config.EXPLAIN_REASONING_EFFORT,
+        "quick_model": _config.QUICK_MODEL,
+        "quick_reasoning_effort": _config.QUICK_REASONING_EFFORT,
         "deterministic_practice": ("enabled" if _config.deterministic_practice_enabled()
                                    else "disabled"),
         "deterministic_variety_gate": read("MATBOT_DETERMINISTIC_VARIETY_GATE"),

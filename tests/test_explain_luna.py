@@ -58,22 +58,14 @@ def test_the_real_adapter_sends_luna_low_for_explain(monkeypatch):
     assert seen["max_output_tokens"] == config.MAX_OUTPUT_TOKENS_EXPLAIN
 
 
-def test_practice_and_quick_choices_are_untouched_by_the_migration(monkeypatch):
-    """Migracija Explain-a NE dira ni Luna brzu rutu ni Quick."""
+def test_practice_choice_is_untouched_by_the_migration():
+    """Migracija Explain-a NE dira Luna brzu rutu.
+
+    (Quick je u međuvremenu dobio VLASTITU migraciju — njegov identitet čuva
+    tests/test_quick_luna.py, pa raniji „Quick nema svoj model“ dio ovog
+    testa više ne opisuje proizvod.)"""
     assert config.FAST_MODEL == "gpt-5.6-luna"
     assert config.FAST_REASONING_EFFORT == "low"
-    llm = OpenAIPracticeLLM()
-    seen = {}
-
-    def spy(instructions, input_text, text_format, **kw):
-        seen.update(kw)
-        raise RuntimeError("stop-before-network")
-
-    monkeypatch.setattr(llm, "_structured_turn", spy)
-    with pytest.raises(RuntimeError):
-        llm.quick_turn("i", "u")
-    # Quick i dalje nasljeđuje model adaptera — nikakav novi izbor.
-    assert "model" not in seen or seen.get("model") is None
 
 
 # ---------------------------------------------------------------------------
