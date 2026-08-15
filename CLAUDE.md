@@ -25,6 +25,12 @@ Flask + a single-page frontend, one OpenAI call per turn, no database.
    Refer to environment variables by *name* only.
 4. **Bounded model calls per application turn — the limit depends on the mode.**
    - **Explain and Quick: exactly one call.** Unchanged.
+   - **Kontrolni ("Sutra imam kontrolni"): at most exactly two per generated
+     test** — one Luna batch call that generates all five MCQ questions, then a
+     *conditional* second batch call that regenerates only the slots the server
+     validators rejected. If the package still is not fully valid, the whole
+     test fails closed ("Nismo uspjeli pripremiti test."). Submitting/grading a
+     test costs **zero** calls — grading is deterministic and server-side.
    - **Practice: at most exactly two** — Tutor draft, then an independent
      Reviewer that finalizes. This replaced the former one-call rule in the
      universal-pipeline pivot; the Reviewer is *not* a retry or a repair call,
@@ -118,6 +124,16 @@ Flask + a single-page frontend, one OpenAI call per turn, no database.
    `mcq_integrity.option_label_claims`). Never "fix" a letter into another letter,
    and never widen the grammar past explicit MCQ words — `tačka A`, `prava a`,
    `skup B`, `ugao C` are object names, not labels.
+5g. **Kontrolni: the server owns the whole test.** Grade+oblast resolve
+   server-side against `data/topics.json` (`topics.oblast_lessons`); the server
+   picks the five lesson/difficulty slots *before* generation and the model may
+   not substitute a slot (echo `slot`/`lesson_id`/`difficulty` is enforced).
+   The `/exam/start` client payload carries ONLY question text and shuffled
+   options — never `correct_option_id`, `expected_answer`, `solution`, or
+   lesson metadata; the answer key lives in the in-memory `KontrolniStore` and
+   grading is purely deterministic on `/exam/submit`. A graded exam is
+   idempotent (resubmission returns the stored result), a new test invalidates
+   the old `exam_id`, and a partially valid package is never published.
 5c. **Practice difficulty never changes lesson identity.** Easier/harder keep
    the lesson's skill and move only difficulty dimensions. The Tutor must report
    which dimensions moved (`difficulty_diagnostics`) and the Reviewer verifies
@@ -253,6 +269,7 @@ Flask + a single-page frontend, one OpenAI call per turn, no database.
 | Help-ladder policy (task class, server-composed hints, scope gate) | `matbot/hint_policy.py` |
 | Explain turn orchestration (stateless) | `matbot/explain.py` |
 | Result/Quick turn orchestration (stateless) | `matbot/quick.py` |
+| Kontrolni test mode (generation, answer key, grading) | `matbot/kontrolni.py` |
 | Shared maths/language/notation prompt rules | `matbot/rules.py` |
 | Mode-specific prompt assembly | `matbot/prompts.py` |
 | Universal lesson-contract engine (Practice) | `matbot/contracts/` |

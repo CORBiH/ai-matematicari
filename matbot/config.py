@@ -136,6 +136,17 @@ QUICK_IMAGE_MODEL = os.environ.get("MATBOT_QUICK_IMAGE_MODEL", "gpt-5.6-sol")
 QUICK_IMAGE_REASONING_EFFORT = os.environ.get(
     "MATBOT_QUICK_IMAGE_REASONING_EFFORT", "low")
 QUICK_IMAGE_DETAIL = os.environ.get("MATBOT_QUICK_IMAGE_DETAIL", "original")
+
+# --- „Sutra imam kontrolni“ (Kontrolni) — vlastiti izbor modela -------------
+# Isti mehanizam vlasništva kao Explain/Quick (2026-08-15): auditirana
+# vrijednost živi u KODU, `.env` je smije prepisati samo svjesno, a odstupanje
+# efektivne vrijednosti pada zatvoreno kroz
+# `release_config.REQUIRED_EFFECTIVE_CONFIG`. Mod NAMJERNO ne nasljeđuje
+# nijednu generičku varijablu (OPENAI_MODEL_TEXT) — batch generisanje testa je
+# zaseban put i njegov model ne smije tiho odlutati s tuđom migracijom.
+KONTROLNI_MODEL = os.environ.get("MATBOT_KONTROLNI_MODEL", "gpt-5.6-luna")
+KONTROLNI_REASONING_EFFORT = os.environ.get(
+    "MATBOT_KONTROLNI_REASONING_EFFORT", "low")
 # Lekcije za koje je brzi put uključen — zarezom odvojena lista ID-jeva.
 # Prazno (podrazumijevano) znači: nijedna lekcija, put je potpuno neaktivan.
 _FAST_LESSONS_RAW = os.environ.get("MATBOT_FAST_SINGLE_CALL_LESSONS", "")
@@ -305,6 +316,22 @@ def reviewer_output_budget():
 
 
 MAX_OUTPUT_TOKENS_REVIEWER = reviewer_output_budget()
+
+# --- Budžet izlaznih tokena SAMO za Kontrolni batch poziv ------------------
+# ZAŠTO VLASTITI, VEĆI BUDŽET (i vlastita tvrda granica): jedan Kontrolni
+# poziv generiše PET kompletnih MCQ pitanja (tekst + 4 opcije + očekivani
+# odgovor + kratko rješenje po pitanju) — vidljivi izlaz je po konstrukciji
+# ~5x veći od jednog Practice zadatka, a `max_output_tokens` kod reasoning
+# modela pokriva i reasoning tokene (vidi mjerenje uz
+# MAX_OUTPUT_TOKENS_PRACTICE). TRADE-OFF je izričit: jedan batch od ~6000
+# tokena zamjenjuje pet zasebnih poziva od po ~1200+ (ukupno jeftinije i brže),
+# a tvrda granica od 8000 sprječava da pogrešna env varijabla nekontrolisano
+# podigne trošak/latenciju — kao i svuda, env je smije samo SPUSTITI.
+MAX_OUTPUT_TOKENS_KONTROLNI_CEILING = 8000
+MAX_OUTPUT_TOKENS_KONTROLNI = min(
+    _int_env("MATBOT_MAX_OUTPUT_TOKENS_KONTROLNI", 6000),
+    MAX_OUTPUT_TOKENS_KONTROLNI_CEILING,
+)
 
 # Ograničenja ulaza (server odbija prevelike poruke prije AI poziva)
 MAX_MESSAGE_CHARS = _int_env("MATBOT_MAX_MESSAGE_CHARS", 4000)

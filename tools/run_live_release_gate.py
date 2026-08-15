@@ -130,7 +130,16 @@ _MAX_CALLS_PER_TURN = 2
 # ishod (svaki modelski scenario eskalirao), a tačnost čuva ugovor po scenariju
 # iznad. Vrijednost se DOKAZUJE iz plana (`max_planned_calls`), ne pogađa —
 # provjera ispod pada zatvoreno ako se plan i plafon raziđu.
-SDK_CALL_CEILING = 23
+#
+# „SUTRA IMAM KONTROLNI“ (v1): kapija dodatno dokazuje novi mod — dva stvarna
+# testa (standard pa harder), svaki s ugovorom „najviše 2 poziva, bez trećeg“.
+# Plafon je zato zbir Practice plana (23) i najgoreg kontrolni ishoda (4).
+KONTROLNI_TEST_PLAN = (
+    ("release-kontrolni", 6, "6-04", ""),
+    ("release-kontrolni", 6, "6-04", "harder"),
+)
+KONTROLNI_MAX_CALLS = 2 * len(KONTROLNI_TEST_PLAN)
+SDK_CALL_CEILING = 23 + KONTROLNI_MAX_CALLS
 # Zbir svih scenarija čiji je ugovor statički (bez `first_hint`).
 _STATIC_PLAN_CALLS = 11
 # Sentinel: očekivanje se izvodi iz serverske politike pomoći PRIJE turna.
@@ -677,6 +686,85 @@ def _failure_console_lines(document: dict, result_path: Path) -> list[str]:
     ]
 
 
+def _run_kontrolni_stage(llm) -> tuple[list[dict], list[str], int]:
+    """„Sutra imam kontrolni“ dokazi: bezbjedno generisanje 5 pitanja, tačno
+    serversko ocjenjivanje, ključ odgovora NIKAD u klijentskom payloadu i
+    granica od najviše dva poziva po testu. Vraća (redovi, padovi, potrošeno)."""
+    from matbot import kontrolni
+
+    store = kontrolni.KontrolniStore()
+    rows: list[dict] = []
+    failures: list[str] = []
+    stage_start = llm.call_count
+    expected_difficulty = {"": "standard", "harder": "harder"}
+    for session_id, grade, oblast_id, relative in KONTROLNI_TEST_PLAN:
+        calls_before = llm.call_count
+        payload = {"session_id": session_id, "grade": grade, "oblast_id": oblast_id}
+        if relative:
+            payload["relative"] = relative
+        errors: list[str] = []
+        try:
+            status, resp = kontrolni.run_start(store, llm, payload)
+        except Exception as exc:  # noqa: BLE001 — kapija mora prijaviti, ne pasti
+            rows.append({"oblast_id": oblast_id, "relative": relative,
+                         "errors": [f"kontrolni_exception:{type(exc).__name__}"]})
+            failures.append(f"kontrolni:exception:{type(exc).__name__}")
+            break
+        calls = llm.call_count - calls_before
+        row = {"oblast_id": oblast_id, "grade": grade, "relative": relative,
+               "status": resp.get("status"), "sdk_calls": calls,
+               "difficulty": resp.get("difficulty")}
+        if calls > 2:
+            errors.append(f"kontrolni_over_two_calls:{calls}")
+        if status != 200 or resp.get("status") != "ready":
+            errors.append("kontrolni_generation_failed_closed")
+        else:
+            if resp.get("difficulty") != expected_difficulty[relative]:
+                errors.append("kontrolni_wrong_profile")
+            questions = resp.get("questions") or []
+            if len(questions) != 5:
+                errors.append("kontrolni_not_five_questions")
+            if any(len(q.get("options", [])) != 4 for q in questions):
+                errors.append("kontrolni_not_four_options")
+            client_body = json.dumps(resp, ensure_ascii=False)
+            for forbidden in ("correct", "solution", "expected", "lesson"):
+                if forbidden in client_body:
+                    errors.append(f"kontrolni_answer_key_exposed:{forbidden}")
+            state = store.get(session_id)
+            stored = (state or {}).get("questions") or []
+            if len(stored) != 5 or any(q["correct_option_id"] not in "abcd" for q in stored):
+                errors.append("kontrolni_server_key_incomplete")
+            else:
+                # Ocjenjivanje: namjerno 1 pogrešan → 4/5 (80%), preporuka
+                # nosi lekciju pogrešnog pitanja, a „popravljena“ ponovna
+                # predaja NE mijenja pohranjen rezultat.
+                key = {q["id"]: q["correct_option_id"] for q in stored}
+                submitted = dict(key)
+                first = stored[0]
+                submitted[first["id"]] = next(
+                    o["id"] for o in first["options"]
+                    if o["id"] != first["correct_option_id"])
+                _s, graded = kontrolni.run_submit(store, {
+                    "session_id": session_id, "exam_id": resp["exam_id"],
+                    "answers": submitted})
+                if graded.get("score") != 4 or graded.get("percentage") != 80:
+                    errors.append("kontrolni_grading_incorrect")
+                lessons = (graded.get("recommendation") or {}).get("lessons") or []
+                if first["lesson_title"] not in lessons:
+                    errors.append("kontrolni_recommendation_missing_lesson")
+                _s, again = kontrolni.run_submit(store, {
+                    "session_id": session_id, "exam_id": resp["exam_id"],
+                    "answers": key})
+                if again.get("score") != 4:
+                    errors.append("kontrolni_forged_resubmission_regraded")
+        row["errors"] = errors
+        rows.append(row)
+        if errors:
+            failures.extend(f"kontrolni:{error}" for error in errors)
+            break
+    return rows, failures, llm.call_count - stage_start
+
+
 def run_live_release_gate() -> int:
     commit_sha, tree_hash = _require_live_preconditions()
     plan = build_release_gate_plan(commit_sha)
@@ -686,10 +774,10 @@ def run_live_release_gate() -> int:
     if len(plan) != REQUIRED_SCENARIO_COUNT:
         raise GateRefusal("The committed release-gate plan is not the required "
                           f"{REQUIRED_SCENARIO_COUNT}-scenario plan.")
-    if max_planned_calls(plan) != SDK_CALL_CEILING:
+    if max_planned_calls(plan) + KONTROLNI_MAX_CALLS != SDK_CALL_CEILING:
         raise GateRefusal(
-            f"The committed plan's maximum is {max_planned_calls(plan)} SDK calls, "
-            f"but the ceiling is {SDK_CALL_CEILING}.")
+            f"The committed plan's maximum is {max_planned_calls(plan)} SDK calls "
+            f"+ {KONTROLNI_MAX_CALLS} kontrolni, but the ceiling is {SDK_CALL_CEILING}.")
 
     started = datetime.now(timezone.utc)
     store = SessionStore()
@@ -739,6 +827,11 @@ def run_live_release_gate() -> int:
             if errors or stop:
                 failures.extend(f"{gate.role}:{error}" for error in (errors or [result.stop_triggered or "stopped"]))
                 break
+        kontrolni_rows: list[dict] = []
+        kontrolni_calls = 0
+        if not failures:
+            kontrolni_rows, kontrolni_failures, kontrolni_calls = _run_kontrolni_stage(llm)
+            failures.extend(kontrolni_failures)
         actual_calls = llm.call_count
         cap_probe_refused = False
         if not failures:
@@ -759,11 +852,16 @@ def run_live_release_gate() -> int:
         matbot_logger.setLevel(previous_level)
 
     finished = datetime.now(timezone.utc)
-    all_required_completed = len(scenario_rows) == REQUIRED_SCENARIO_COUNT and not failures
+    all_required_completed = (len(scenario_rows) == REQUIRED_SCENARIO_COUNT
+                              and len(kontrolni_rows) == len(KONTROLNI_TEST_PLAN)
+                              and not failures)
     # TACAN UGOVOR je planirani zbir, a plafon je samo gornja granica.
+    # Kontrolni stage je USLOVAN po pozivima (1 ili 2 po testu), pa se broji
+    # izmjereno, uz vlastitu tvrdu granicu.
     passed = bool(all_required_completed
-                  and actual_calls == planned_calls + escalated_calls
-                  and planned_calls + escalated_calls <= SDK_CALL_CEILING
+                  and actual_calls == planned_calls + escalated_calls + kontrolni_calls
+                  and kontrolni_calls <= KONTROLNI_MAX_CALLS
+                  and planned_calls + escalated_calls + kontrolni_calls <= SDK_CALL_CEILING
                   and cap_probe_refused and not infrastructure_failures)
     document = {
         "campaign": "release-gate",
@@ -791,6 +889,10 @@ def run_live_release_gate() -> int:
         "sdk_call_ceiling": SDK_CALL_CEILING,
         "planned_sdk_calls": planned_calls,
         "escalated_sdk_calls": escalated_calls,
+        "kontrolni_tests": kontrolni_rows,
+        "kontrolni_required_tests": len(KONTROLNI_TEST_PLAN),
+        "kontrolni_sdk_calls": kontrolni_calls,
+        "kontrolni_max_calls": KONTROLNI_MAX_CALLS,
         "actual_sdk_calls": actual_calls,
         "call_above_ceiling_refused": cap_probe_refused,
         # Zatečeno ime zadržano zbog starijih čitalaca artefakta; ordinalno je
@@ -818,7 +920,7 @@ def _run_static_checks() -> None:
     """Inert plan/budget checks.  No SDK client is created or invoked."""
     plan = build_release_gate_plan("0123456789abcdef" * 4)
     assert len(plan) == REQUIRED_SCENARIO_COUNT
-    assert max_planned_calls(plan) == SDK_CALL_CEILING
+    assert max_planned_calls(plan) + KONTROLNI_MAX_CALLS == SDK_CALL_CEILING
     assert sum(item.expected_calls or 0 for item in plan) == _STATIC_PLAN_CALLS
     assert [item.role for item in plan] == [
         "fresh_level1", "correct_choice", "harder_level2", "first_hint", "full_solution",

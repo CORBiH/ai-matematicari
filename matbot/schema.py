@@ -91,6 +91,41 @@ class QuickTurnOutput(BaseModel):
     reply: str
 
 
+class KontrolniQuestionOutput(BaseModel):
+    """JEDNO pitanje batch-generisanog kontrolnog testa („Sutra imam kontrolni“).
+
+    Model radi nad serverskim SLOTOVIMA (lekcija + težina po slotu) i mora
+    svaki slot vratiti NEPROMIJENJEN (echo `slot`/`lesson_id`/`difficulty` se
+    unakrsno provjerava u matbot/kontrolni.py — zamjena lekcije pada). Opcije
+    su goli tekstovi BEZ slova: slova (a–d) dodjeljuje ISKLJUČIVO server
+    poslije miješanja, pa nijedno slovo koje bi model napisao ne može biti
+    tačno (isti princip kao Practice pravilo 5f)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    slot: int
+    lesson_id: str
+    text: str
+    options: list[str]
+    correct_option_index: int
+    expected_answer: str
+    # Kratko rješenje — SERVER-ONLY dokazni materijal (mathcheck) i osnova za
+    # kratku ispravku na ekranu rezultata. Nikad ne ide u browser prije predaje.
+    solution: str
+    difficulty: Literal["easy", "medium", "hard", "demanding"]
+
+
+class KontrolniTestOutput(BaseModel):
+    """Kompletan batch: model vraća pitanje za SVAKI traženi slot, ništa više.
+
+    Broj slotova varira (5 u prvom pozivu; manje u uslovnoj popravci), pa
+    dužinu liste provjerava server po traženim slotovima, ne šema."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    questions: list[KontrolniQuestionOutput]
+
+
 # Granice INTERNIH polja slike (nikad vidljivih učeniku). Namjerno male: ova
 # polja služe serverskoj provjeri, ne prepisivanju cijelog zadatka.
 # Granice su kalibrisane 2026-08-15 uz migraciju slike na gpt-5.6-sol (živa

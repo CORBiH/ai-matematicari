@@ -94,7 +94,11 @@ def test_release_gate_plan_covers_every_route_class():
     poziv bude RECENZENTSKI, nikad ponovljeni tutorski."""
     plan = runner.build_release_gate_plan("0123456789abcdef" * 4)
     assert len(plan) == 15
-    assert runner.max_planned_calls(plan) == 23 == runner.SDK_CALL_CEILING
+    # „Sutra imam kontrolni“ (v1): plafon = Practice plan (23) + najgori
+    # kontrolni ishod (2 testa × 2 poziva). Practice dio plana je nepromijenjen.
+    assert runner.max_planned_calls(plan) == 23
+    assert runner.KONTROLNI_MAX_CALLS == 4
+    assert runner.SDK_CALL_CEILING == 23 + runner.KONTROLNI_MAX_CALLS
     assert sum(item.expected_calls or 0 for item in plan) == 11
     # Pomoc nikad ne eskalira, pa joj plafon ne priznaje dodatni poziv.
     assert runner._MAX_CALLS_PER_TURN == 2

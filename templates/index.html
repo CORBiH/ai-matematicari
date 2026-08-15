@@ -156,7 +156,7 @@
   .card.is-empty{display:none}
 
   /* ===== Screen switching (home ↔ chat) ===== */
-  #tutorHome[hidden],#tutor-card[hidden]{display:none !important;}
+  #tutorHome[hidden],#tutor-card[hidden],#exam-card[hidden]{display:none !important;}
 
   /* ===== SCREEN 1: Start/Home — onboarding kartica ===== */
   .home-screen{flex:1 1 auto;min-height:0;overflow-y:auto;display:flex;align-items:flex-start;justify-content:center;padding:5vh .25rem 2rem;}
@@ -289,6 +289,32 @@
      ekranima — flex element se inače ne smije suziti ispod svog sadržaja. */
   .mc-option-text{flex:1 1 auto;min-width:0;}
   .mc-option-card mjx-container{margin:0 !important;}
+
+  /* ===== „Sutra imam kontrolni“: test ekran (5 MCQ pitanja) =====
+     Ista vizuelna porodica kao chat kartica; opcije koriste postojeće
+     .mc-option-card kartice uz .selected stanje (izbor PRIJE predaje ne
+     otkriva tačnost — zeleno/crveno postoji samo na ekranu rezultata). */
+  .exam-body{flex:1 1 auto;min-height:0;overflow-y:auto;display:flex;flex-direction:column;
+    gap:.6rem;padding:.4rem .2rem .6rem;}
+  .exam-progress{color:var(--muted);font-size:.9rem;font-weight:600;}
+  .exam-qtext{font-size:1.05rem;line-height:1.5;background:#101b16;border:1px solid rgba(86,200,143,.22);
+    border-radius:12px;padding:.8rem .9rem;}
+  .mc-option-card.selected{background:#1b3a2c;border-color:var(--accent-bot);
+    box-shadow:0 0 0 1.5px var(--accent-bot) inset;}
+  .exam-nav{display:flex;gap:.5rem;justify-content:space-between;align-items:center;flex-wrap:wrap;}
+  .exam-nav .spacer{flex:1 1 auto;}
+  .exam-loading{flex:1 1 auto;display:grid;place-items:center;color:var(--muted);
+    text-align:center;padding:1.2rem;font-size:1rem;}
+  .exam-score{font-size:1.15rem;text-align:center;padding:.7rem;}
+  .exam-score b{font-size:1.7rem;display:block;margin-top:.15rem;}
+  .exam-result-row{border:1px solid rgba(255,255,255,.12);border-radius:10px;
+    padding:.55rem .75rem;font-size:.95rem;line-height:1.45;}
+  .exam-result-row.ok{border-color:rgba(63,191,111,.5);background:#10241a;}
+  .exam-result-row.bad{border-color:rgba(201,86,79,.5);background:#2a1414;}
+  .exam-recommend{background:#101b16;border:1px solid rgba(86,200,143,.22);border-radius:12px;
+    padding:.7rem .9rem;font-size:.95rem;}
+  .exam-recommend ul{margin:.35rem 0 0 1.1rem;padding:0;}
+  .exam-next{display:flex;gap:.5rem;flex-wrap:wrap;justify-content:center;padding:.3rem 0 .6rem;}
 
   /* Phase 2: mala preporuka video lekcije unutar transcripta */
   .tutor-video-hint{align-self:flex-start;color:var(--muted);font-size:.85rem;
@@ -442,6 +468,57 @@
       <div class="muted" id="tutorMeta"></div>
 
     </div><!-- /tutor-card -->
+
+    <!-- ===== SCREEN 3: „Sutra imam kontrolni“ — test od 5 MCQ pitanja =====
+         Odgovori se biraju lokalno i šalju TEK na „Završi test“; tačnost se
+         ne prikazuje po pitanju, a ključ odgovora nikad nije u ovom DOM-u
+         prije predaje (server ga šalje tek u rezultatu). -->
+    <div class="card tutor-card" id="exam-card" hidden>
+      <div class="tutor-topbar">
+        <div class="tutor-topbar-info">
+          <span class="tutor-pill" id="examTopbarGrade">6. razred</span>
+          <span class="tutor-pill">Kontrolni</span>
+          <span class="tutor-pill" id="examTopbarOblast"></span>
+        </div>
+        <div class="tutor-topbar-actions">
+          <button type="button" class="btn sm tutor-back-btn" id="examBackBtn" title="Nazad na izbor">Nazad</button>
+        </div>
+      </div>
+
+      <div class="exam-loading" id="examLoading" hidden>
+        <div>🤖 Pripremam test iz oblasti <b id="examLoadingOblast"></b>…<br>
+        <span class="muted">Ovo može potrajati do minute.</span></div>
+      </div>
+
+      <div class="exam-loading" id="examError" hidden>
+        <div><span id="examErrorMsg">Nismo uspjeli pripremiti test. Pokušaj ponovo.</span><br><br>
+          <button type="button" class="btn" id="examRetryBtn">Pokušaj ponovo</button>
+        </div>
+      </div>
+
+      <div class="exam-body" id="examQuestionView" hidden>
+        <div class="exam-progress" id="examProgress">Pitanje 1 od 5</div>
+        <div class="exam-qtext" id="examQText"></div>
+        <div class="mc-options" id="examOptions"></div>
+        <div class="exam-nav">
+          <button type="button" class="btn secondary sm" id="examPrevBtn">← Prethodno</button>
+          <span class="spacer"></span>
+          <button type="button" class="btn secondary sm" id="examNextBtn">Sljedeće →</button>
+          <button type="button" class="btn" id="examFinishBtn" hidden>Završi test</button>
+        </div>
+      </div>
+
+      <div class="exam-body" id="examResultView" hidden>
+        <div class="exam-score">Rezultat<b id="examScore"></b></div>
+        <div id="examResultList" class="stack" style="display:flex;flex-direction:column;gap:.45rem;"></div>
+        <div class="exam-recommend" id="examRecommend"></div>
+        <div class="exam-next">
+          <button type="button" class="btn secondary" id="examEasierBtn">Lakši test</button>
+          <button type="button" class="btn" id="examSameBtn">Novi test</button>
+          <button type="button" class="btn secondary" id="examHarderBtn">Teži test</button>
+        </div>
+      </div>
+    </div><!-- /exam-card -->
   </main>
 
   <!-- TOASTS -->
@@ -1452,11 +1529,15 @@ document.addEventListener('DOMContentLoaded', () => {
       if (state.mode === 'exam'){
         const ob = oblastSelect.value;
         if (!ob){ showToast('Prvo izaberi oblast.', 'err'); try{ oblastSelect.focus(); }catch(_){} return; }
+        /* Kanonski ID oblasti dolazi iz topics odgovora (prva lekcija grupe);
+           server ionako SAM razrješava oblast kroz data/topics.json i odbija
+           nepoznat ID — ime oblasti je ovdje samo za prikaz. */
+        const lessons = topicsByOblast[ob] || [];
+        const oblastId = (lessons[0] && lessons[0].oblast_id) || '';
+        if (!oblastId){ showToast('Oblast trenutno nije dostupna. Osvježi stranicu.', 'err'); return; }
         state.oblast = ob; state.topic = ''; state.topicName = ''; state.topicOblast = ''; state.topicOblastId = ''; state.topicSource = '';
-        try { localStorage.removeItem(LASTTASK_KEY); } catch(_){} // nova oblast = svjež practice tok
-        try { localStorage.removeItem(RECENTTASKS_KEY); } catch(_){}
-        clearStoredActiveTopic();
-        enterChat(AUTO_MESSAGES.exam);
+        hidePicker();
+        enterExam(ob, oblastId);
         return;
       }
       const ob = oblastSelect.value;
@@ -1575,6 +1656,214 @@ document.addEventListener('DOMContentLoaded', () => {
       showHome();
     }
     window.startFreshTutorConversation = startFreshTutorConversation;
+
+    /* ===== „Sutra imam kontrolni“: test od 5 MCQ pitanja =====
+       Server je autoritativan za SVE: on bira lekcije, generiše test, čuva
+       ključ odgovora i ocjenjuje. Ovaj kod samo prikazuje pitanja, skuplja
+       izbore i šalje ih JEDNOM na kraju — nikad ne zna tačne odgovore prije
+       rezultata i nikad sam ne računa skor. */
+    const examCard = document.getElementById('exam-card');
+    const examEls = {
+      grade: document.getElementById('examTopbarGrade'),
+      oblast: document.getElementById('examTopbarOblast'),
+      back: document.getElementById('examBackBtn'),
+      loading: document.getElementById('examLoading'),
+      loadingOblast: document.getElementById('examLoadingOblast'),
+      error: document.getElementById('examError'),
+      errorMsg: document.getElementById('examErrorMsg'),
+      retry: document.getElementById('examRetryBtn'),
+      questionView: document.getElementById('examQuestionView'),
+      progress: document.getElementById('examProgress'),
+      qtext: document.getElementById('examQText'),
+      options: document.getElementById('examOptions'),
+      prev: document.getElementById('examPrevBtn'),
+      next: document.getElementById('examNextBtn'),
+      finish: document.getElementById('examFinishBtn'),
+      resultView: document.getElementById('examResultView'),
+      score: document.getElementById('examScore'),
+      resultList: document.getElementById('examResultList'),
+      recommend: document.getElementById('examRecommend'),
+      easier: document.getElementById('examEasierBtn'),
+      same: document.getElementById('examSameBtn'),
+      harder: document.getElementById('examHarderBtn'),
+    };
+    const exam = {
+      oblastId: '', oblastName: '', grade: '6',
+      examId: '', difficulty: 'standard', questions: [],
+      answers: {}, index: 0, busy: false, abort: null, lastRelative: '',
+    };
+    /* Generisanje je najviše 2 poziva modela × 45 s serverskog roka —
+       prekid tek iznad toga, da uslovna popravka ne bude ubijena s klijenta. */
+    const EXAM_ABORT_MS = 120000;
+
+    function examTypeset(node){
+      if (window.MathJax && MathJax.typesetPromise) MathJax.typesetPromise([node]).catch(()=>{});
+    }
+    function examShow(section){
+      ['loading','error','questionView','resultView'].forEach(k=>{
+        examEls[k].hidden = (k !== section);
+      });
+    }
+    function enterExam(oblastName, oblastId){
+      exam.oblastId = oblastId; exam.oblastName = oblastName; exam.grade = state.grade;
+      examEls.grade.textContent = state.grade + '. razred';
+      examEls.oblast.textContent = oblastName;
+      home.hidden = true; card.hidden = true; examCard.hidden = false;
+      startExam('');
+    }
+    function exitExamToHome(){
+      if (exam.abort){ try { exam.abort.abort(); } catch(_){} exam.abort = null; }
+      exam.busy = false; exam.examId = ''; exam.questions = []; exam.answers = {};
+      examCard.hidden = true;
+      showHome();
+    }
+    examEls.back.addEventListener('click', exitExamToHome);
+
+    async function startExam(relative){
+      if (exam.busy) return;
+      exam.busy = true; exam.lastRelative = relative || '';
+      exam.examId = ''; exam.questions = []; exam.answers = {}; exam.index = 0;
+      examEls.loadingOblast.textContent = exam.oblastName;
+      examShow('loading');
+      const ac = new AbortController();
+      exam.abort = ac;
+      const abortTimer = setTimeout(()=>{ try { ac.abort(); } catch(_){} }, EXAM_ABORT_MS);
+      try {
+        const body = {
+          session_id: sessionId,
+          grade: parseInt(exam.grade, 10) || 6,
+          oblast_id: exam.oblastId,
+        };
+        if (relative) body.relative = relative;
+        const r = await fetch('/api/ai-tutor/exam/start', {
+          method: 'POST',
+          headers: tutorHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify(body), credentials: 'include', signal: ac.signal
+        });
+        const j = await r.json().catch(()=>({}));
+        if (r.ok && j && j.status === 'ready' && Array.isArray(j.questions) && j.questions.length){
+          exam.examId = j.exam_id;
+          exam.difficulty = j.difficulty || 'standard';
+          exam.questions = j.questions;
+          renderExamQuestion(0);
+        } else {
+          examEls.errorMsg.textContent = (j && (j.message || j.detail)) ||
+            'Nismo uspjeli pripremiti test. Pokušaj ponovo.';
+          examShow('error');
+        }
+      } catch (err){
+        examEls.errorMsg.textContent = (err && err.name === 'AbortError')
+          ? 'Priprema testa traje duže nego obično. Pokušaj ponovo.'
+          : 'Greška pri pripremi testa. Provjeri vezu i pokušaj ponovo.';
+        examShow('error');
+      } finally {
+        clearTimeout(abortTimer);
+        exam.abort = null; exam.busy = false;
+      }
+    }
+    examEls.retry.addEventListener('click', ()=>startExam(exam.lastRelative));
+
+    function renderExamQuestion(index){
+      exam.index = Math.max(0, Math.min(index, exam.questions.length - 1));
+      const q = exam.questions[exam.index];
+      examEls.progress.textContent = 'Pitanje ' + (exam.index + 1) + ' od ' + exam.questions.length;
+      examEls.qtext.innerHTML = escapeHtml(q.text);
+      examEls.options.innerHTML = '';
+      q.options.forEach(opt=>{
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'mc-option-card' + (exam.answers[q.id] === opt.id ? ' selected' : '');
+        /* Isti omotač kao Practice kartice: jedan flex potomak čuva razmake
+           između MathJax segmenata (vidi buildOptionCards). */
+        const text = document.createElement('span');
+        text.className = 'mc-option-text';
+        text.innerHTML = escapeHtml(opt.text || '');
+        b.appendChild(text);
+        b.addEventListener('click', ()=>{
+          exam.answers[q.id] = opt.id;   // izbor se smije mijenjati do predaje
+          examEls.options.querySelectorAll('.mc-option-card').forEach(x=>x.classList.remove('selected'));
+          b.classList.add('selected');
+        });
+        examEls.options.appendChild(b);
+      });
+      const last = exam.index === exam.questions.length - 1;
+      examEls.prev.disabled = exam.index === 0;
+      examEls.next.hidden = last;
+      examEls.finish.hidden = !last;
+      examShow('questionView');
+      examTypeset(examEls.qtext); examTypeset(examEls.options);
+    }
+    examEls.prev.addEventListener('click', ()=>renderExamQuestion(exam.index - 1));
+    examEls.next.addEventListener('click', ()=>renderExamQuestion(exam.index + 1));
+
+    async function submitExam(){
+      if (exam.busy || !exam.examId) return;
+      const unanswered = exam.questions.filter(q=>!exam.answers[q.id]);
+      if (unanswered.length){
+        showToast('Nisi odgovorio/la na ' + unanswered.length +
+          (unanswered.length === 1 ? ' pitanje.' : ' pitanja.'), 'err');
+        renderExamQuestion(exam.questions.indexOf(unanswered[0]));
+        return;
+      }
+      exam.busy = true;
+      examEls.finish.disabled = true;
+      try {
+        const r = await fetch('/api/ai-tutor/exam/submit', {
+          method: 'POST',
+          headers: tutorHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({ session_id: sessionId, exam_id: exam.examId, answers: exam.answers }),
+          credentials: 'include'
+        });
+        const j = await r.json().catch(()=>({}));
+        if (r.ok && j && j.status === 'graded'){
+          renderExamResult(j);
+        } else if (j && j.status === 'incomplete'){
+          showToast(j.message || 'Odgovori na sva pitanja.', 'err');
+        } else {
+          showToast((j && (j.detail || j.message)) || 'Greška pri predaji. Pokušaj ponovo.', 'err');
+        }
+      } catch (_){
+        showToast('Greška pri predaji. Provjeri vezu i pokušaj ponovo.', 'err');
+      } finally {
+        exam.busy = false;
+        examEls.finish.disabled = false;
+      }
+    }
+    examEls.finish.addEventListener('click', submitExam);
+
+    function renderExamResult(j){
+      examEls.score.textContent = j.score + '/' + j.total + ' — ' + j.percentage + '%';
+      examEls.resultList.innerHTML = '';
+      (j.questions || []).forEach(q=>{
+        const row = document.createElement('div');
+        row.className = 'exam-result-row ' + (q.correct ? 'ok' : 'bad');
+        if (q.correct){
+          row.innerHTML = '<b>Pitanje ' + q.ordinal + '</b> — tačno ✅';
+        } else {
+          row.innerHTML = '<b>Pitanje ' + q.ordinal + '</b> — netačno ❌ · Tačan odgovor: <b>' +
+            escapeHtml((q.correct_option_id || '').toUpperCase()) + ')</b> ' +
+            escapeHtml(q.correct_text || '') +
+            '<br><span class="muted">Lekcija: ' + escapeHtml(q.lesson_title || '') + '</span>';
+        }
+        examEls.resultList.appendChild(row);
+      });
+      const rec = j.recommendation || {};
+      let recHtml = '<b>' + escapeHtml(rec.message || '') + '</b>';
+      if (rec.lessons && rec.lessons.length){
+        recHtml += '<div style="margin-top:.35rem;">Preporuka za ponavljanje:</div><ul>' +
+          rec.lessons.map(t=>'<li>' + escapeHtml(t) + '</li>').join('') + '</ul>';
+      }
+      examEls.recommend.innerHTML = recHtml;
+      /* Kliješteno na krajevima: server ionako ne ide ispod easier / iznad
+         harder, ali dugme koje ništa ne mijenja ne treba ni nuditi. */
+      examEls.easier.disabled = exam.difficulty === 'easier';
+      examEls.harder.disabled = exam.difficulty === 'harder';
+      examShow('resultView');
+      examTypeset(examEls.resultList);
+    }
+    examEls.easier.addEventListener('click', ()=>startExam('easier'));
+    examEls.same.addEventListener('click', ()=>startExam('same'));
+    examEls.harder.addEventListener('click', ()=>startExam('harder'));
 
     /* teme i oblasti iz backenda (nikad hardkodirano): lekcije grupisane po
        oblasti za explain/practice, lista oblasti za exam */

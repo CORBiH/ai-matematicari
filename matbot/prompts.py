@@ -493,3 +493,116 @@ def build_quick_input(lesson_title, oblast, history, student_message,
     else:
         lines.append(f"PORUKA UČENIKA: {student_message}")
     return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# „SUTRA IMAM KONTROLNI“ — batch generisanje testa od 5 MCQ pitanja
+# ---------------------------------------------------------------------------
+
+_KONTROLNI_DIFFICULTY_GUIDE = (
+    "ZNAČENJE TEŽINE (relativno za razred i lekciju):\n"
+    "- lagan: jedan korak, direktna primjena definicije/postupka, mali brojevi.\n"
+    "- srednji: dva-tri koraka ili jedna promjena reprezentacije, tipičan "
+    "školski zadatak.\n"
+    "- težak: više koraka, kombinovanje unutar lekcije, pažljiviji brojevi ili "
+    "obrnut smjer pitanja.\n"
+    "- zahtjevan: najteži razuman zadatak te lekcije za taj razred — višekoračno "
+    "rasuđivanje, ali BEZ gradiva izvan lekcije i razreda.\n"
+)
+
+
+def build_kontrolni_instructions(grade: int, oblast: str) -> str:
+    """Sistemska pravila batch generisanja kontrolnog testa.
+
+    Slotove (lekcija + težina po slotu) nosi ULAZ (build_kontrolni_input) —
+    instrukcije su stabilne po (razred, oblast), pa se prompt keš bolje koristi
+    između prvog i uslovnog drugog poziva."""
+    shared_rules = build_shared_math_rules(grade, "", oblast, mode="kontrolni")
+    return (
+        "Ti si iskusan nastavnik matematike u osnovnoj školi u Bosni i Hercegovini. "
+        f"Sastavljaš KONTROLNI TEST za {grade}. razred iz oblasti „{oblast}“. "
+        "Dobijaš numerisane SLOTOVE; za svaki slot napravi TAČNO JEDNO pitanje "
+        "sa višestrukim izborom.\n"
+        "\n"
+        f"{shared_rules}"
+        "\n"
+        f"{_KONTROLNI_DIFFICULTY_GUIDE}"
+        "\n"
+        "PRAVILA TESTA (obavezno, svako kršenje odbacuje pitanje):\n"
+        "- Vrati pitanje za SVAKI traženi slot i NIJEDAN drugi; u svakom pitanju "
+        "vrati NEPROMIJENJENE `slot`, `lesson_id` i `difficulty` iz tog slota. "
+        "NIKAD ne zamjenjuj ciljanu lekciju drugom.\n"
+        "- Pitanje mora provjeravati UPRAVO vještinu ciljane lekcije, primjereno "
+        "razredu — ne opštu temu oblasti, ne gradivo druge lekcije.\n"
+        "- TAČNO 4 opcije. TAČNO JEDNA matematički ispravna. Distraktori su "
+        "uvjerljivi rezultati tipičnih grešaka, ali DOKAZIVO pogrešni i "
+        "MEĐUSOBNO RAZLIČITI — nikad ekvivalentan zapis iste vrijednosti "
+        "(npr. $8\\sqrt{2}$ i $11,3$; $\\frac{1}{2}$ i $0,5$; skup napisan "
+        "drugim redoslijedom).\n"
+        "- Opcije su GOLI odgovori (vrijednost/izraz/kratka tvrdnja), bez "
+        "slova, bez „a)“ i bez rednog broja. Slova opcijama dodjeljuje "
+        "aplikacija NAKON miješanja — ti ih ne znaš, pa ih NIKAD ne pominji "
+        "ni u tekstu pitanja ni u rješenju.\n"
+        "- `correct_option_index` pokazuje na tačnu opciju u TVOM nizu (0–3), a "
+        "`expected_answer` mora biti DOSLOVNO jednak toj opciji.\n"
+        "- `solution` je kratko rješenje (2–4 rečenice) koje izvodi tačan "
+        "rezultat postupkom lekcije. Bez slova opcija, bez novih zadataka.\n"
+        "- Tekst pitanja NIKAD ne sadrži ni ne odaje konačan odgovor; mora biti "
+        "potpun i jednoznačno rješiv (svi potrebni podaci navedeni, jedinice "
+        "dosljedne).\n"
+        "- PET PITANJA MORA BITI MEĐUSOBNO STRUKTURNO RAZLIČITO: različite "
+        "postavke i oblici pitanja, nikad isti zadatak s drugim brojevima u "
+        "dva slota. Ako ulaz navede „VEĆ ISKORIŠTENA PITANJA“, novo pitanje se "
+        "mora suštinski razlikovati i od njih.\n"
+        "- Sav vidljivi tekst je na bosanskom jeziku (ijekavica), primjeren "
+        "uzrastu. Matematiku piši validnim MathJax-om u JEDNOSTRUKIM $...$ "
+        "delimiterima.\n"
+        "- Ovo je TEST, ne čas: bez pozdrava, bez savjeta, bez nagovještaja u "
+        "tekstu pitanja.\n"
+        "- Svako pitanje provjerava JEDNU stvar: nikad ne spajaj dva nezavisna "
+        "potpitanja u jedno pitanje. Tekst pitanja je potpuna, prirodna "
+        "rečenica — bez praznina za dopunjavanje.\n"
+        "- PRIJE nego što označiš tačnu opciju, uporedi je s rezultatom svog "
+        "rješenja: označena opcija i zaključak rješenja moraju biti ISTA "
+        "vrijednost/tvrdnja.\n"
+        "- Za pitanja o POSTUPKU (konstrukcija, redoslijed koraka): svaki "
+        "distraktor mora voditi do POGREŠNOG rezultata — nikad ne nudi "
+        "alternativan ISPRAVAN postupak kao distraktor.\n"
+        "- Provjeri svaki distraktor posebno: nijedan ne smije biti tačan ni "
+        "pod kojim ispravnim tumačenjem pitanja.\n"
+        "- LaTeX DISCIPLINA: svaka komanda počinje obrnutom kosom crtom. "
+        "NIKAD ne piši cdot, sqrt, frac, circ bez \\ ispred — zapis poput "
+        "$2^xcdot2^3$ je neispravan i cijelo pitanje se odbacuje.\n"
+        "- OBLIK PITANJA: traži KONKRETAN rezultat (broj, mjeru, skup, "
+        "konkretnu jednakost). Izbjegavaj oblike „koji postupak…“ i „koja se "
+        "jednakost može dokazati…“ — kod njih više ponuđenih odgovora zna biti "
+        "odbranjivo tačno, a takvo pitanje je neispravno. Ako ipak pišeš takvo "
+        "pitanje, svaki distraktor mora biti NEISTINIT, ne samo drugačiji.\n"
+    )
+
+
+def build_kontrolni_input(grade: int, oblast: str, slots, contexts,
+                          avoid_texts=()) -> str:
+    """Serverski slotovi → ulaz batch poziva. `contexts` je mapa
+    slot_broj → LessonContext (kanonski naslov/opseg/ciljevi lekcije), pa model
+    dobija ono što server ZNA o lekciji i ne mora (i ne smije) sam izmišljati
+    šta lekcija pokriva."""
+    lines = [f"RAZRED: {grade}", f"OBLAST: {oblast}", "SLOTOVI TESTA:"]
+    for slot in slots:
+        context = contexts.get(slot["slot"])
+        lines.append(
+            f"SLOT {slot['slot']}: lesson_id={slot['lesson_id']} | "
+            f"LEKCIJA: {slot['lesson_title']} | "
+            f"difficulty={slot['difficulty']}")
+        scope = getattr(context, "lesson_scope", "") if context else ""
+        if scope:
+            lines.append(f"  OPSEG LEKCIJE: {_clip(scope, 300)}")
+        objectives = list(getattr(context, "objectives", ()) or ())[:2] if context else []
+        for objective in objectives:
+            lines.append(f"  CILJ: {_clip(str(objective), 200)}")
+    if avoid_texts:
+        lines.append("VEĆ ISKORIŠTENA PITANJA (novo pitanje se mora suštinski "
+                     "razlikovati od svakog):")
+        for text in avoid_texts:
+            lines.append(f"- {_clip(text, 240)}")
+    return "\n".join(lines)

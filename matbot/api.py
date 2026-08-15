@@ -13,7 +13,7 @@ import time
 
 from flask import Blueprint, Response, current_app, jsonify, request
 
-from matbot import auth, config, imageinput, validation
+from matbot import auth, config, imageinput, kontrolni, validation
 from matbot.explain import run_explain_turn
 from matbot.practice import SAFE_ERROR_MESSAGE, run_practice_turn
 from matbot.quick import run_quick_turn
@@ -313,6 +313,107 @@ def chat_stream():
     logger.info("chat_request_timing endpoint=stream status=200 total_ms=%s",
                 int((time.perf_counter() - started) * 1000))
     return Response(body, mimetype="text/event-stream")
+
+
+def _get_exam_store():
+    store = current_app.config.get("MATBOT_EXAM_STORE")
+    if store is None:
+        store = kontrolni.KontrolniStore()
+        current_app.config["MATBOT_EXAM_STORE"] = store
+    return store
+
+
+@ai_tutor_bp.route("/exam/start", methods=["POST"])
+def exam_start():
+    """„Sutra imam kontrolni“: generisanje testa od 5 MCQ pitanja.
+
+    ISTI guard lanac kao /chat (token → IP limit → validacija → session limit →
+    per-session lock) jer ovaj endpoint troši do DVA poziva modela. Ključ
+    odgovora ostaje na serveru — odgovor nosi samo tekst i opcije."""
+    started = time.perf_counter()
+    token = request.headers.get(auth.TOKEN_HEADER, "")
+    try:
+        auth.verify_token(token)
+    except auth.TokenError as e:
+        logger.info("auth_failed category=%s endpoint=exam_start", e.code)
+        return jsonify(_auth_error()), 401
+
+    ip_allowed, ip_retry_after = _get_ip_limiter().check("ip:" + _client_ip())
+    if not ip_allowed:
+        logger.info("rate_limited bucket=ip endpoint=exam_start retry_after=%s", ip_retry_after)
+        response = jsonify(_rate_limit_error(ip_retry_after))
+        response.headers["Retry-After"] = str(ip_retry_after)
+        return response, 429
+
+    payload = request.get_json(silent=True)
+    try:
+        session_id, _grade, _oblast, _relative = kontrolni.validate_start_payload(payload)
+    except kontrolni.ExamValidationError as e:
+        logger.info("validation_failed endpoint=exam_start code=%s", e.code)
+        return jsonify({"error": e.code, "detail": e.detail}), 400
+
+    sess_allowed, sess_retry_after = _get_session_limiter().check("sess:" + session_id)
+    if not sess_allowed:
+        logger.info("rate_limited bucket=session endpoint=exam_start retry_after=%s",
+                    sess_retry_after)
+        response = jsonify(_rate_limit_error(sess_retry_after))
+        response.headers["Retry-After"] = str(sess_retry_after)
+        return response, 429
+
+    turn_locks = _get_turn_locks()
+    if not turn_locks.try_acquire(session_id):
+        logger.info("turn_in_progress endpoint=exam_start")
+        return jsonify({"error": "TURN_IN_PROGRESS",
+                        "detail": TURN_IN_PROGRESS_MESSAGE}), 409
+    try:
+        status_code, result = kontrolni.run_start(_get_exam_store(), _get_llm(), payload)
+    except kontrolni.ExamValidationError as e:
+        logger.info("validation_failed endpoint=exam_start code=%s", e.code)
+        status_code, result = 400, {"error": e.code, "detail": e.detail}
+    except Exception:
+        # Ista posljednja odbrana kao /chat: interni izuzetak NIKAD učeniku.
+        logger.exception("exam_start unexpected_error")
+        status_code, result = 200, {"status": "failed",
+                                    "message": kontrolni.GENERATION_FAILED_MESSAGE}
+    finally:
+        turn_locks.release(session_id)
+    logger.info("chat_request_timing endpoint=exam_start status=%s total_ms=%s",
+                status_code, int((time.perf_counter() - started) * 1000))
+    return jsonify(result), status_code
+
+
+@ai_tutor_bp.route("/exam/submit", methods=["POST"])
+def exam_submit():
+    """Serversko ocjenjivanje predanog testa — NULA poziva modela.
+
+    Guard: token + IP limit (kao /feedback). Session limiter se namjerno NE
+    troši: predaja ne pravi AI turn, a učenik ne smije ostati bez kredita za
+    sljedeći test zato što je predao ovaj."""
+    token = request.headers.get(auth.TOKEN_HEADER, "")
+    try:
+        auth.verify_token(token)
+    except auth.TokenError as e:
+        logger.info("auth_failed category=%s endpoint=exam_submit", e.code)
+        return jsonify(_auth_error()), 401
+
+    ip_allowed, ip_retry_after = _get_ip_limiter().check("ip:" + _client_ip())
+    if not ip_allowed:
+        logger.info("rate_limited bucket=ip endpoint=exam_submit retry_after=%s", ip_retry_after)
+        response = jsonify(_rate_limit_error(ip_retry_after))
+        response.headers["Retry-After"] = str(ip_retry_after)
+        return response, 429
+
+    payload = request.get_json(silent=True)
+    try:
+        status_code, result = kontrolni.run_submit(_get_exam_store(), payload)
+    except kontrolni.ExamValidationError as e:
+        logger.info("validation_failed endpoint=exam_submit code=%s", e.code)
+        status_code, result = 400, {"error": e.code, "detail": e.detail}
+    except Exception:
+        logger.exception("exam_submit unexpected_error")
+        status_code, result = 200, {"status": "failed",
+                                    "message": kontrolni.GENERATION_FAILED_MESSAGE}
+    return jsonify(result), status_code
 
 
 @ai_tutor_bp.route("/feedback", methods=["POST"])

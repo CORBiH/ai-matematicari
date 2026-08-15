@@ -132,6 +132,10 @@ REQUIRED_EFFECTIVE_CONFIG = {
     "quick_image_model": "gpt-5.6-sol",
     "quick_image_reasoning_effort": "low",
     "quick_image_detail": "original",
+    # „Sutra imam kontrolni“ (v1, 2026-08-15): batch generisanje testa ima
+    # vlastiti, kodom auditiran identitet — isti mehanizam kao Explain/Quick.
+    "kontrolni_model": "gpt-5.6-luna",
+    "kontrolni_reasoning_effort": "low",
 }
 
 # Imena koja se NIKAD ne ispisuju ni u jednoj dijagnostici ovog modula.
@@ -167,6 +171,8 @@ def _effective_config_problems():
         "quick_image_model": _config.QUICK_IMAGE_MODEL,
         "quick_image_reasoning_effort": _config.QUICK_IMAGE_REASONING_EFFORT,
         "quick_image_detail": _config.QUICK_IMAGE_DETAIL,
+        "kontrolni_model": _config.KONTROLNI_MODEL,
+        "kontrolni_reasoning_effort": _config.KONTROLNI_REASONING_EFFORT,
     }
     return [f"{key} ima pogrešnu vrijednost (očekivano: {expected})"
             for key, expected in sorted(REQUIRED_EFFECTIVE_CONFIG.items())
@@ -232,6 +238,8 @@ def effective_configuration(environ=None):
         "quick_image_model": _config.QUICK_IMAGE_MODEL,
         "quick_image_reasoning_effort": _config.QUICK_IMAGE_REASONING_EFFORT,
         "quick_image_detail": _config.QUICK_IMAGE_DETAIL,
+        "kontrolni_model": _config.KONTROLNI_MODEL,
+        "kontrolni_reasoning_effort": _config.KONTROLNI_REASONING_EFFORT,
         "deterministic_practice": ("enabled" if _config.deterministic_practice_enabled()
                                    else "disabled"),
         "deterministic_variety_gate": read("MATBOT_DETERMINISTIC_VARIETY_GATE"),

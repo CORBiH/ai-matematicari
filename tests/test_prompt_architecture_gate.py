@@ -143,6 +143,10 @@ def _legacy_prompt_surface() -> str:
         for repair, image in itertools.product((False, True), (False, True)):
             parts.append(legacy_prompts.build_quick_instructions(
                 grade, title, oblast, repair_intent=repair, image_present=image))
+        # „Sutra imam kontrolni“ (v1): batch instrukcije su četvrti prompt ovog
+        # modula — bez ovog reda bi kapija tvrdila da je vodič težine mrtav blok,
+        # a novi mrtav kontrolni blok bi joj bio nevidljiv.
+        parts.append(legacy_prompts.build_kontrolni_instructions(grade, oblast))
     return "\n".join(parts)
 
 

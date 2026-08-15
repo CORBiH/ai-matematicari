@@ -431,6 +431,13 @@ class CountingLLM:
         self.last_reviewer_output = result.output
         return result
 
+    def kontrolni_turn(self, instructions, input_text):
+        # „Sutra imam kontrolni“ (v1): batch poziv se broji kroz ISTA vrata kao
+        # svaki drugi — plafon kapije ne smije imati sporedni ulaz.
+        self._count("kontrolni_turn")
+        return self._call("kontrolni", self._inner.kontrolni_turn,
+                          instructions, input_text)
+
     def _call(self, stage, method, instructions, input_text, **kwargs):
         try:
             return method(instructions, input_text, **kwargs)

@@ -34,6 +34,7 @@ from dataclasses import dataclass, field
 from matbot import config
 from matbot.schema import (
     ExplainTurnOutput,
+    KontrolniTestOutput,
     PracticeTurnOutput,
     QuickImageTurnOutput,
     QuickTurnOutput,
@@ -387,6 +388,22 @@ class OpenAIPracticeLLM:
             instructions, input_text, QuickTurnOutput,
             model=config.QUICK_MODEL,
             reasoning_effort=config.QUICK_REASONING_EFFORT,
+        )
+
+    def kontrolni_turn(self, instructions: str, input_text: str) -> LLMResult:
+        """Batch generisanje kontrolnog testa („Sutra imam kontrolni“).
+
+        JEDAN poziv vraća SVIH pet pitanja (ili, u uslovnoj popravci, samo pale
+        slotove) — orkestracija u matbot/kontrolni.py garantuje najviše dva
+        ovakva poziva po testu, bez retryja. Model i effort su vlastiti,
+        auditirani izbor (config.KONTROLNI_MODEL), budžet je veći jer je izlaz
+        po konstrukciji ~5 zadataka (vidi config.MAX_OUTPUT_TOKENS_KONTROLNI);
+        `store=False` i `max_retries=0` važe kao i za svaki drugi put."""
+        return self._structured_turn(
+            instructions, input_text, KontrolniTestOutput,
+            max_output_tokens=config.MAX_OUTPUT_TOKENS_KONTROLNI,
+            model=config.KONTROLNI_MODEL,
+            reasoning_effort=config.KONTROLNI_REASONING_EFFORT,
         )
 
     def _build_input(self, input_text, image):

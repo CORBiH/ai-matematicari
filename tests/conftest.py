@@ -81,6 +81,39 @@ def make_quick_image_output(
     )
 
 
+def make_kontrolni_question(slot=1, lesson_id="6-04-001", text=None,
+                            options=None, correct_option_index=0,
+                            expected_answer=None, solution=None,
+                            difficulty="easy"):
+    """Jedno validno kontrolni pitanje; podrazumijevani sadržaj prolazi SVE
+    determinističke validatore (upitna matematika se u testovima kvari
+    izričitim argumentima, nikad podrazumijevano)."""
+    from matbot.schema import KontrolniQuestionOutput
+
+    option_texts = options or [
+        "$\\frac{2}{5}$", "$\\frac{3}{5}$", "$\\frac{1}{5}$", "$\\frac{4}{5}$"]
+    return KontrolniQuestionOutput(
+        slot=slot,
+        lesson_id=lesson_id,
+        text=text or f"Koji dio kruga je osjenčen ako je obojeno {slot + 1} od 5 jednakih dijelova?",
+        options=option_texts,
+        correct_option_index=correct_option_index,
+        expected_answer=(expected_answer if expected_answer is not None
+                         else option_texts[correct_option_index]),
+        # Rješenje IZVODI označenu vrijednost — živi validator odbija rješenje
+        # čiji se brojevi razilaze s označenom opcijom (kampanja v1, sfera).
+        solution=solution or ("Krug je podijeljen na jednake dijelove, pa "
+                              f"osjenčeni dio iznosi {option_texts[correct_option_index]}."),
+        difficulty=difficulty,
+    )
+
+
+def make_kontrolni_test(questions):
+    from matbot.schema import KontrolniTestOutput
+
+    return KontrolniTestOutput(questions=questions)
+
+
 def make_options(*texts):
     return [Option(text=t) for t in texts]
 
@@ -525,6 +558,14 @@ class FakeLLM:
         self.quick_images.append(image)
         return self._next(instructions, input_text)
 
+    def kontrolni_turn(self, instructions, input_text):
+        """Batch poziv „Sutra imam kontrolni“ — broji se u call_count kao i
+        svaki drugi modelski poziv (testovi „najviše 2 poziva po testu“ time
+        hvataju svaki skriveni dodatni poziv)."""
+        self.kontrolni_calls = getattr(self, "kontrolni_calls", [])
+        self.kontrolni_calls.append((instructions, input_text))
+        return self._next(instructions, input_text)
+
 
 def turn_payload(msg="Daj mi jedan zadatak za vježbu iz ove teme.", **kw):
     """Minimalan Practice payload za testove.
@@ -572,7 +613,12 @@ def flask_app(fake_llm, store):
     app.config["MATBOT_SESSION_LIMITER"] = RateLimiter(per_minute=100000, per_hour=100000)
     app.config["MATBOT_IP_LIMITER"] = RateLimiter(per_minute=100000, per_hour=100000)
     app.config["MATBOT_TURN_LOCKS"] = TurnLockRegistry()
+    # Svjež kontrolni store po testu — isti razlog kao limiteri iznad: app je
+    # module-level singleton, pa bi stanje testa curilo u sljedeći test.
+    from matbot.kontrolni import KontrolniStore
+    app.config["MATBOT_EXAM_STORE"] = KontrolniStore()
     yield app
+    app.config.pop("MATBOT_EXAM_STORE", None)
     app.config.pop("MATBOT_LLM", None)
     app.config.pop("MATBOT_SESSION_STORE", None)
     app.config.pop("MATBOT_SESSION_LIMITER", None)

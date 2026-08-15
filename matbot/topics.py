@@ -44,6 +44,25 @@ def lesson_info(grade, topic_id):
     return None
 
 
+def oblast_lessons(grade, oblast_id):
+    """Kanonski spisak lekcija JEDNE oblasti: [{"id", "title"}, ...] u
+    kurikularnom redoslijedu, ili prazna lista za nepoznat (grade, oblast_id).
+
+    Postoji zbog moda „Sutra imam kontrolni“: klijent bira oblast, a server
+    ODAVDE izvodi koje lekcije toj oblasti pripadaju — model nikad sam ne
+    odlučuje šta je u oblasti, a proizvoljno ime oblasti iz browsera se ne
+    prihvata (isti princip kao lesson_info za selected_topic)."""
+    grade_data = _load().get("grades", {}).get(str(grade).strip())
+    wanted = str(oblast_id or "").strip()
+    if not grade_data or not wanted:
+        return []
+    return [
+        {"id": lesson["id"], "title": lesson["title"], "oblast": lesson["oblast"]}
+        for lesson in grade_data.get("lessons", [])
+        if oblast_id_for_topic(lesson["id"]) == wanted
+    ]
+
+
 def topics_response(grade):
     """Vraća {grouped, oblast_order} za dati razred (string ili int).
 
