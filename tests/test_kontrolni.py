@@ -9,13 +9,15 @@ lekcija, tranzicije lakši/isti/teži, zabranu doslovnog ponavljanja, zatvoren
 pad nepotpunog paketa i granicu od NAJVIŠE dva poziva modela bez trećeg.
 """
 import json
+import pathlib
 import re
 
 import pytest
 
-from matbot import kontrolni
+from matbot import config, kontrolni
 from matbot.llm import LLMResult, LLMUnavailable
 from matbot.schema import KontrolniQuestionOutput, KontrolniTestOutput
+from matbot.tutor.package_preflight import safe_visible_text
 from tests.conftest import FakeLLM, make_kontrolni_question, make_kontrolni_test
 
 _SLOT_RE = re.compile(r"SLOT (\d+): lesson_id=(\S+) \| LEKCIJA: (.+?) \| difficulty=(\w+)")
@@ -40,7 +42,7 @@ class EchoKontrolniLLM(FakeLLM):
         self.batch_calls = 0
         self.vary_from = vary_from
 
-    def kontrolni_turn(self, instructions, input_text):
+    def kontrolni_turn(self, instructions, input_text, timeout_s=None):
         self.calls.append((instructions, input_text))
         self.kontrolni_calls = getattr(self, "kontrolni_calls", [])
         self.kontrolni_calls.append((instructions, input_text))
@@ -291,7 +293,7 @@ def test_option_letter_claim_in_solution_is_rejected(exam_store):
 
 def test_failed_repair_fails_the_whole_test_closed_without_third_call(exam_store):
     class AlwaysBrokenLLM(EchoKontrolniLLM):
-        def kontrolni_turn(self, instructions, input_text):
+        def kontrolni_turn(self, instructions, input_text, timeout_s=None):
             result = super().kontrolni_turn(instructions, input_text)
             broken = [q.model_copy(update={"lesson_id": "6-01-001"})
                       for q in result.output.questions]
@@ -372,7 +374,7 @@ def test_new_test_never_repeats_previous_questions_signatures(exam_store):
 def test_literal_repeat_from_model_is_rejected(exam_store):
     class RepeatingLLM(EchoKontrolniLLM):
         """Uvijek vraća IDENTIČNA pitanja (vary_from fiksan po pozivu)."""
-        def kontrolni_turn(self, instructions, input_text):
+        def kontrolni_turn(self, instructions, input_text, timeout_s=None):
             self.batch_calls -= self.batch_calls  # resetuj varijaciju: uvijek isti test
             return super().kontrolni_turn(instructions, input_text)
 
@@ -750,6 +752,111 @@ def test_valid_recipe_question_with_wrong_distractors_passes():
     assert clean is not None, code
 
 
+# ---------------------------------------------------------------------------
+# ŽIVI NALAZ A (2026-08-16): STRANI DELIMITERI U OPCIJAMA
+# Produkcija je učeniku prikazala „\( 8/5 \)“ — razlomak iscrtan, delimiteri
+# vidljivi. Uzrok: model povremeno vrati `\(…\)`, a umotavanje je pravilo
+# MIJEŠAN zapis. Kanonizacija je sada prvi korak sanitizacije.
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("raw,expected", [
+    (r"\(\frac{5}{8}\) čokolade", "$\\frac{5}{8}$ čokolade"),
+    (r"\(\frac{5}{8}\)", "$\\frac{5}{8}$"),
+    (r"\(x^2\)", "$x^2$"),
+    (r"\(\sqrt{3}\)", "$\\sqrt{3}$"),
+    (r"\(x \le 4\)", "$x \\le 4$"),
+    (r"\(2,5\,\text{cm}^2\)", "$2,5\\,\\text{cm}^2$"),
+    (r"\(A = \{1,2,3\}\)", "$A = \\{1,2,3\\}$"),
+    (r"\(\mathbb{Z}\)", "$\\mathbb{Z}$"),
+    (r"\[\frac{5}{8}\]", "$$\\frac{5}{8}$$"),
+])
+def test_alien_delimiters_become_the_canonical_form(raw, expected):
+    cleaned, safe = safe_visible_text(raw, allow_wrap=True)
+    assert safe and cleaned == expected
+    assert "\\(" not in cleaned and "\\)" not in cleaned
+
+
+def test_canonical_and_plain_text_are_untouched():
+    for text in ("$\\frac{5}{8}$", "obična proza bez matematike",
+                 "$P = \\left(a+b\\right) \\cdot h$"):
+        cleaned, safe = safe_visible_text(text, allow_wrap=True)
+        assert safe and cleaned == text, text
+
+
+@pytest.mark.parametrize("raw", [r"\(nezatvoreno", r"nezatvoreno\)", r"\[pola"])
+def test_unpaired_alien_delimiter_fails_closed(raw):
+    """Neuparen delimiter bi na ekranu bio doslovno smeće — zatvaranje se ne
+    izmišlja, paket pada zatvoreno (ista doktrina kao nepoznata komanda)."""
+    _cleaned, safe = safe_visible_text(raw, allow_wrap=True)
+    assert not safe
+
+
+def test_generated_question_with_alien_delimiters_publishes_clean(exam_store):
+    """Cio put: model vrati `\\(…\\)`, objavljena opcija je kanonska."""
+    def alien(question, _slot):
+        return question.model_copy(update={
+            "options": [r"\(\frac{2}{5}\)", r"\(\frac{3}{5}\)",
+                        r"\(\frac{1}{5}\)", r"\(\frac{4}{5}\)"],
+            "expected_answer": r"\(\frac{2}{5}\)",
+            "solution": r"Osjenčeni dio je \(\frac{2}{5}\) kruga.",
+        })
+
+    llm = EchoKontrolniLLM(mutate={1: alien})
+    _s, resp = kontrolni.run_start(exam_store, llm, start_payload())
+    assert resp["status"] == "ready"
+    published = json.dumps(resp, ensure_ascii=False)
+    assert "\\\\(" not in published and "\\\\)" not in published
+    first = exam_store.get("kontrolni-sess")["questions"][0]
+    assert all(o["text"].startswith("$") for o in first["options"])
+
+
+# ---------------------------------------------------------------------------
+# ŽIVI NALAZ B (2026-08-16): UKUPAN ROK GENERISANJA
+# Jedno generisanje je isteklo, ponovljeni pokušaj prošao. Kontrolni nije imao
+# ukupan rok, pa je legitiman dvopozivni zahtjev mogao trajati do ~90 s i
+# probiti podrazumijevani proxy rok (60 s) — učenik bi dobio 504 umjesto
+# kontrolisane poruke.
+# ---------------------------------------------------------------------------
+
+def test_total_deadline_is_below_the_default_proxy_timeout():
+    from matbot import config
+    assert config.kontrolni_deadline_s() <= 55.0
+    # Klijent nikad ne odustaje prije servera.
+    index = (pathlib.Path(__file__).resolve().parent.parent
+             / "templates" / "index.html").read_text(encoding="utf-8")
+    abort_ms = int(re.search(r"const EXAM_ABORT_MS = (\d+);", index).group(1))
+    assert abort_ms / 1000.0 > config.kontrolni_deadline_s()
+
+
+def test_repair_call_gets_only_the_remaining_budget(exam_store, monkeypatch):
+    """Drugi poziv smije trajati samo do ukupnog roka — ne punih 45 s."""
+    seen = []
+
+    class TimingLLM(EchoKontrolniLLM):
+        def kontrolni_turn(self, instructions, input_text, timeout_s=None):
+            seen.append(timeout_s)
+            return super().kontrolni_turn(instructions, input_text)
+
+    llm = TimingLLM(mutate={2: lambda q, _s: q.model_copy(
+        update={"lesson_id": "6-01-001"})})
+    _s, resp = kontrolni.run_start(exam_store, llm, start_payload())
+    assert resp["status"] == "ready" and llm.call_count == 2
+    assert seen[0] is None                      # prvi poziv: puni rok adaptera
+    assert seen[1] is not None and 0 < seen[1] <= config.kontrolni_deadline_s()
+
+
+def test_exhausted_deadline_skips_repair_and_fails_closed(exam_store, monkeypatch):
+    """Kad prvi poziv pojede budžet, popravka se NE pokušava (nema trećeg
+    poziva, nema 504) — paket pada zatvoreno s kontrolisanom porukom."""
+    monkeypatch.setattr(config, "kontrolni_deadline_s", lambda: 0.001)
+    llm = EchoKontrolniLLM(mutate={2: lambda q, _s: q.model_copy(
+        update={"lesson_id": "6-01-001"})})
+    _s, resp = kontrolni.run_start(exam_store, llm, start_payload())
+    assert resp["status"] == "failed"
+    assert resp["message"] == kontrolni.GENERATION_FAILED_MESSAGE
+    assert llm.call_count == 1                  # popravka preskočena
+
+
 def test_prompt_actually_carries_rules_and_slots(exam_store):
     llm = EchoKontrolniLLM()
     kontrolni.run_start(exam_store, llm, start_payload())
@@ -819,7 +926,7 @@ def test_api_invalid_payload_is_400_with_zero_model_calls(client, fake_llm):
 
 def test_api_generation_failure_returns_controlled_message(client, flask_app):
     class DeadLLM(FakeLLM):
-        def kontrolni_turn(self, instructions, input_text):
+        def kontrolni_turn(self, instructions, input_text, timeout_s=None):
             self.calls.append((instructions, input_text))
             raise LLMUnavailable("mreža")
 

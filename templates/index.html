@@ -1830,9 +1830,12 @@ document.addEventListener('DOMContentLoaded', () => {
       examId: '', difficulty: 'standard', questions: [],
       answers: {}, index: 0, busy: false, abort: null, lastRelative: '',
     };
-    /* Generisanje je najviše 2 poziva modela × 45 s serverskog roka —
-       prekid tek iznad toga, da uslovna popravka ne bude ubijena s klijenta. */
-    const EXAM_ABORT_MS = 120000;
+    /* KLIJENT NIKAD NE ODUSTAJE PRIJE SERVERA. Server od 2026-08-16 ima
+       UKUPAN rok generisanja (config.kontrolni_deadline_s = 50 s, uz suženi
+       drugi poziv), pa najduži legitiman zahtjev traje ~50 s + režija. 90 s
+       ostavlja punu rezervu iznad toga, a učenik ne gleda vrtešku minutu i po
+       kad veza tiho padne — greška i „Pokušaj ponovo“ stižu ranije. */
+    const EXAM_ABORT_MS = 90000;
 
     function examTypeset(node){
       if (window.MathJax && MathJax.typesetPromise) MathJax.typesetPromise([node]).catch(()=>{});

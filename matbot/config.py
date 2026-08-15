@@ -214,6 +214,38 @@ MIN_STAGE_BUDGET_S = 5.0
 
 def practice_turn_deadline_s():
     return _PRACTICE_TURN_DEADLINE_S or (2 * AI_TIMEOUT_S)
+
+
+# --- UKUPAN ROK GENERISANJA KONTROLNOG TESTA -------------------------------
+# ŽIVI NALAZ (produkcija, 2026-08-16): jedno generisanje kontrolnog je isteklo,
+# a odmah ponovljeni pokušaj je prošao normalno. Lanac rokova pokazuje ZAŠTO je
+# to bilo moguće:
+#
+#   pregledač (fetch abort)      90 s   (templates/index.html: EXAM_ABORT_MS)
+#   nginx (proxy_read_timeout)   ~60 s  PODRAZUMIJEVANO — živi na VPS-u, nije
+#                                       u repou i odavde se ne može pročitati
+#   gunicorn                    120 s   (Dockerfile --timeout)
+#   OpenAI SDK, PO POZIVU        45 s   (AI_TUTOR_TIMEOUT, max_retries=0)
+#   kontrolni UKUPNO             ---    NIJE POSTOJAO
+#
+# Bez ukupnog roka legitiman dvopozivni zahtjev (batch + uslovna popravka)
+# smije trajati do ~90 s, što probija podrazumijevani nginx rok od 60 s — tada
+# učenik dobije 504 umjesto kontrolisane poruke. Practice je isti problem
+# odavno riješio (`practice_turn_deadline_s` + suženi drugi poziv); kontrolni
+# to nije imao.
+#
+# IZBOR 50 s: mjereno p50 ≈ 9–11 s, p95 ≈ 13–15 s, najgori viđen dvopozivni
+# test ≈ 21 s. Rok od 50 s daje preko dvostruke rezerve nad najgorim izmjerenim
+# slučajem, a ostaje ispod podrazumijevanog proxy roka — pa se sporo
+# generisanje završi NAŠOM porukom („Nismo uspjeli pripremiti test.“) i
+# ponudom „Pokušaj ponovo“, nikad sirovim 504. Nema trećeg poziva ni retryja:
+# kad ostatak budžeta padne ispod MIN_STAGE_BUDGET_S, popravka se preskače i
+# paket pada zatvoreno.
+_KONTROLNI_DEADLINE_S = _float_env("MATBOT_KONTROLNI_DEADLINE_S", 0.0)
+
+
+def kontrolni_deadline_s():
+    return _KONTROLNI_DEADLINE_S or 50.0
 MAX_OUTPUT_TOKENS = _int_env("MATBOT_MAX_OUTPUT_TOKENS", 1200)
 
 # --- Budžet izlaznih tokena SAMO za Practice generisanje zadatka -----------

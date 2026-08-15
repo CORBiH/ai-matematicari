@@ -735,6 +735,12 @@ def find_unsafe_math_issues(text: str) -> list:
     # worked solution.
     if text.rstrip().endswith("\\"):
         issues.append("dangling_terminal_backslash")
+    # PREOSTAO STRANI DELIMITER = DOSLOVNO SMEĆE NA EKRANU. Uparen `\(…\)` je
+    # već preveden u kanonski `$…$` (canonicalize_math_delimiters), pa sve što
+    # ovdje ostane je NEUPAREN ili miješan zapis — tačno ono što je učenik
+    # vidio kao „\( 8/5 \)“. Zatvaranje se NE izmišlja: paket pada zatvoreno.
+    if _RESIDUAL_ALIEN_DELIMITER_RE.search(text):
+        issues.append("residual_alien_math_delimiter")
     for part in _outside_math_parts(text):
         # Strukturne komande izvan matematike (nose argumente) — ne pogađaju se.
         if _RAW_LATEX_COMMAND_RE.search(part):
@@ -777,6 +783,52 @@ def find_unsafe_math_issues(text: str) -> list:
     return issues
 
 
+# ---------------------------------------------------------------------------
+# JEDAN KANONSKI ZAPIS MATEMATIKE: `$…$` (i `$$…$$` za display).
+#
+# ŽIVI PRODUKCIJSKI NALAZ (kontrolni, 6. razred, Razlomci, 2026-08-16): učenik
+# je u opcijama vidio DOSLOVNE delimitere — „\( 8/5 \)“ — uz uredno iscrtan
+# razlomak, dio u crvenom. Uzrok je bio MIJEŠANJE zapisa, dokazano izvršavanjem:
+#
+#   model vrati        `\(\frac{5}{8}\) čokolade`
+#   wrap_isolated_frac →`\($\frac{5}{8}$\) čokolade`   ← razlomak se iscrta,
+#                                                        `\(` i `\)` ostanu proza
+#   model vrati        `\(\frac{5}{8}\)`
+#   whole-expr wrap    →`$\(\frac{5}{8}\)$`            ← `\(` UNUTAR math moda
+#                                                        je TeX greška → crveno
+#
+# Zapis `\(…\)` nije samo kozmetički problem: `matbot/mathsegments.py` poznaje
+# isključivo `$…$`, pa je SVE unutar `\(…\)` za naše verifikatore bila PROZA —
+# mathcheck, geometrycheck i provjera komandi to gradivo uopšte nisu vidjeli.
+#
+# Zato se strani delimiteri prevode u kanonski oblik PRVIM korakom, prije
+# ijednog umotavanja. Prevodi se samo UPARENI oblik; neupareni ostaje netaknut
+# i pada kroz postojeće provjere (ne izmišljamo zatvaranje).
+# ---------------------------------------------------------------------------
+
+_ALIEN_INLINE_MATH_RE = re.compile(r"(?<!\\)\\\((.*?)(?<!\\)\\\)", re.DOTALL)
+_ALIEN_DISPLAY_MATH_RE = re.compile(r"(?<!\\)\\\[(.*?)(?<!\\)\\\]", re.DOTALL)
+# `\left(` i `\right)` NISU pogodak: ispred zagrade tamo stoji slovo, ne `\`.
+_RESIDUAL_ALIEN_DELIMITER_RE = re.compile(r"(?<!\\)\\[()\[\]]")
+
+
+def canonicalize_math_delimiters(text: str) -> str:
+    """`\\(…\\)` → `$…$`, `\\[…\\]` → `$$…$$`. Ostalo netaknuto.
+
+    Sadržaj koji već nosi `$` se NE dira: takav zapis je već miješan i mora
+    pasti zatvoreno kroz redovne provjere, a ne biti „popravljen“ nagađanjem."""
+    def _inline(match):
+        body = match.group(1)
+        return match.group(0) if "$" in body else "$" + body.strip() + "$"
+
+    def _display(match):
+        body = match.group(1)
+        return match.group(0) if "$" in body else "$$" + body.strip() + "$$"
+
+    text = _ALIEN_INLINE_MATH_RE.sub(_inline, text or "")
+    return _ALIEN_DISPLAY_MATH_RE.sub(_display, text)
+
+
 def sanitize_and_validate_math_text(text: str, allow_whole_expression_wrap: bool = False):
     """Glavna ulazna tačka za USER-VISIBLE matematički tekst (task pitanje,
     opcije, feedback/reply). Vraća (sanitizovan_tekst, is_safe).
@@ -808,7 +860,11 @@ def sanitize_and_validate_math_text_with_issues(text: str, allow_whole_expressio
     sankcionisani log kodovi po CLAUDE.md pravilu 7 — nose najviše ime
     komande, nikad rečenicu sadržaja. Pravila se NE mijenjaju: is_safe je i
     dalje tačno `len(issues) == 0`."""
-    cleaned = sanitize_math_text(text)
+    # PRVI korak: jedan kanonski zapis. Mora biti prije svakog umotavanja —
+    # inače `wrap_isolated_frac_tokens` umota matematiku UNUTAR `\(…\)` i
+    # napravi miješani zapis koji je učenik vidio u produkciji.
+    cleaned = canonicalize_math_delimiters(text)
+    cleaned = sanitize_math_text(cleaned)
     cleaned = replace_literal_newline_escapes(cleaned)
     cleaned = repair_malformed_math_inside(cleaned)
     if allow_whole_expression_wrap and "$" not in cleaned and _looks_like_pure_math_expression(cleaned):

@@ -558,12 +558,14 @@ class FakeLLM:
         self.quick_images.append(image)
         return self._next(instructions, input_text)
 
-    def kontrolni_turn(self, instructions, input_text):
+    def kontrolni_turn(self, instructions, input_text, timeout_s=None):
         """Batch poziv „Sutra imam kontrolni“ — broji se u call_count kao i
         svaki drugi modelski poziv (testovi „najviše 2 poziva po testu“ time
         hvataju svaki skriveni dodatni poziv)."""
         self.kontrolni_calls = getattr(self, "kontrolni_calls", [])
         self.kontrolni_calls.append((instructions, input_text))
+        self.kontrolni_timeouts = getattr(self, "kontrolni_timeouts", [])
+        self.kontrolni_timeouts.append(timeout_s)
         return self._next(instructions, input_text)
 
 

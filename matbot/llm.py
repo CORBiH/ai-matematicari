@@ -390,7 +390,8 @@ class OpenAIPracticeLLM:
             reasoning_effort=config.QUICK_REASONING_EFFORT,
         )
 
-    def kontrolni_turn(self, instructions: str, input_text: str) -> LLMResult:
+    def kontrolni_turn(self, instructions: str, input_text: str,
+                       timeout_s=None) -> LLMResult:
         """Batch generisanje kontrolnog testa („Sutra imam kontrolni“).
 
         JEDAN poziv vraća SVIH pet pitanja (ili, u uslovnoj popravci, samo pale
@@ -398,12 +399,18 @@ class OpenAIPracticeLLM:
         ovakva poziva po testu, bez retryja. Model i effort su vlastiti,
         auditirani izbor (config.KONTROLNI_MODEL), budžet je veći jer je izlaz
         po konstrukciji ~5 zadataka (vidi config.MAX_OUTPUT_TOKENS_KONTROLNI);
-        `store=False` i `max_retries=0` važe kao i za svaki drugi put."""
+        `store=False` i `max_retries=0` važe kao i za svaki drugi put.
+
+        `timeout_s` (2026-08-16): pozivalac smije SUZITI rok ovog poziva na
+        ostatak ukupnog roka generisanja (config.kontrolni_deadline_s) — nikad
+        ga proširiti. Bez toga je dvopozivni zahtjev mogao trajati do ~90 s i
+        probiti podrazumijevani proxy rok."""
         return self._structured_turn(
             instructions, input_text, KontrolniTestOutput,
             max_output_tokens=config.MAX_OUTPUT_TOKENS_KONTROLNI,
             model=config.KONTROLNI_MODEL,
             reasoning_effort=config.KONTROLNI_REASONING_EFFORT,
+            timeout_s=timeout_s,
         )
 
     def _build_input(self, input_text, image):

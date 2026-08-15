@@ -730,14 +730,16 @@ def _slot_contexts(grade, slots):
     return contexts
 
 def _call_batch(llm, grade, oblast_name, slots, contexts, avoid_texts, request_id,
-                stage):
+                stage, timeout_s=None):
     """Jedan batch poziv; vrati (mapa slot→parsed pitanje, latency_ms) ili
-    (None, latency) na LLM grešku. NIKAD ne pravi dodatni poziv."""
+    (None, latency) na LLM grešku. NIKAD ne pravi dodatni poziv.
+
+    `timeout_s` sužava rok poziva na ostatak ukupnog roka generisanja."""
     instructions = build_kontrolni_instructions(grade, oblast_name)
     input_text = build_kontrolni_input(grade, oblast_name, slots, contexts,
                                        avoid_texts)
     try:
-        result = llm.kontrolni_turn(instructions, input_text)
+        result = llm.kontrolni_turn(instructions, input_text, timeout_s=timeout_s)
     except LLMError as error:
         logger.warning("kontrolni_llm_failed request_id=%s stage=%s category=%s %s",
                        request_id, stage, error.category,
@@ -759,6 +761,10 @@ def generate_test(llm, grade, oblast_name, slots, recent_signatures,
     """
     contexts = _slot_contexts(grade, slots)
     meta = {"calls": 0, "latency_ms": 0, "reject_codes": [], "repaired_slots": []}
+    # UKUPAN ROK generisanja (vidi config.kontrolni_deadline_s): drugi poziv
+    # dobija samo ostatak, a kad ostatka nema — preskače se i paket pada
+    # zatvoreno. Nikad treći poziv, nikad retry.
+    started_at = time.perf_counter()
 
     parsed_by_slot, latency = _call_batch(
         llm, grade, oblast_name, slots, contexts, (), request_id, "batch")
@@ -789,11 +795,17 @@ def generate_test(llm, grade, oblast_name, slots, recent_signatures,
     if failed_slots:
         # USLOVNI drugi (i posljednji) poziv: SAMO pali slotovi, uz tekstove
         # prihvaćenih pitanja kao „već iskorišteno — mora se razlikovati“.
+        remaining_s = config.kontrolni_deadline_s() - (time.perf_counter() - started_at)
+        if remaining_s < config.MIN_STAGE_BUDGET_S:
+            # Prvi poziv je pojeo cijeli budžet: popravka se NE pokušava, jer
+            # bi probila ukupan rok i vratila 504 umjesto naše poruke.
+            meta["reject_codes"].append("deadline_exhausted_before_repair")
+            return None, meta
         meta["repaired_slots"] = [slot["slot"] for slot in failed_slots]
         avoid_texts = [accepted[number]["text"] for number in sorted(accepted)]
         parsed_by_slot, latency = _call_batch(
             llm, grade, oblast_name, failed_slots, contexts, avoid_texts,
-            request_id, "repair")
+            request_id, "repair", timeout_s=remaining_s)
         meta["calls"] += 1
         meta["latency_ms"] += latency
         if parsed_by_slot is None:
