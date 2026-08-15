@@ -367,7 +367,9 @@ def test_case28_validated_image_becomes_one_input_image_item(client, fake_llm):
     content = built[0]["content"]
     assert sum(1 for c in content if c["type"] == "input_image") == 1
     assert content[1]["image_url"] == image.data_url
-    assert content[1]["detail"] == "high"
+    # Migracija na Sol (2026-08-15): model vidi ORIGINALNU fotografiju —
+    # isto podešavanje kojim je vision benchmark mjeren.
+    assert content[1]["detail"] == "original"
 
 
 def test_case29_user_text_becomes_one_input_text_item(client, fake_llm):

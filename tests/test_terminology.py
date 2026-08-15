@@ -176,7 +176,11 @@ def test_forbidden_term_appears_only_as_an_explicit_prohibition():
         Path("docs/ARCHITECTURE.md"),      # dokumentuje terminology.py mehanizam (koji termini SU pokriveni)
     }
     suffixes = {".py", ".html", ".md", ".txt", ".json", ".yml", ".yaml"}
-    skip_dirs = {".git", ".venv", "__pycache__", "node_modules"}
+    # `vision_ab_test` su MJERENJA (ground truth + sirovi OCR izlazi): sadrže
+    # VJERNE transkripcije izvornog materijala (uklj. hrvatski radni list s
+    # „trokut“/„točke“) — to je dokazni materijal benchmarka, ne tekst koji
+    # ijedan mod servira učeniku, i ne smije se „normalizovati“.
+    skip_dirs = {".git", ".venv", "__pycache__", "node_modules", "vision_ab_test"}
 
     offenders = []
     for path in ROOT.rglob("*"):

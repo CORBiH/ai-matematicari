@@ -93,11 +93,20 @@ class QuickTurnOutput(BaseModel):
 
 # Granice INTERNIH polja slike (nikad vidljivih učeniku). Namjerno male: ova
 # polja služe serverskoj provjeri, ne prepisivanju cijelog zadatka.
-MAX_VISIBLE_PROBLEM_TEXT_CHARS = 300
-MAX_VISIBLE_MATH_CHARS = 120
-MAX_UNCERTAINTY_REASON_CHARS = 200
-MAX_VISIBLE_VALUE_FIELD_CHARS = 24
-MAX_VISIBLE_VALUES = 8
+# Granice su kalibrisane 2026-08-15 uz migraciju slike na gpt-5.6-sol (živa
+# produkcijska proba kroz run_quick_turn): Sol kao temeljitiji čitač prijavljuje
+# POTPUNIJU evidenciju od ranijeg modela — duži visible_math (npr. kurzivna
+# algebarska jednačina u LaTeX-u lako pređe 120 znakova) i više visible_values.
+# Stare, uže granice su obarale odgovor kodovima `predug visible_math` /
+# `previše visible_values` PRIJE nego što bi kapija čitljivosti uopšte rekla
+# svoje. Granice i dalje postoje s istom svrhom (interna polja moraju ostati
+# ograničena — nikad transkripcija cijele strane udžbenika), samo primaju
+# evidenciju jednog stvarnog zadatka u cjelini.
+MAX_VISIBLE_PROBLEM_TEXT_CHARS = 500
+MAX_VISIBLE_MATH_CHARS = 300
+MAX_UNCERTAINTY_REASON_CHARS = 300
+MAX_VISIBLE_VALUE_FIELD_CHARS = 64
+MAX_VISIBLE_VALUES = 20
 
 
 class VisibleValue(BaseModel):

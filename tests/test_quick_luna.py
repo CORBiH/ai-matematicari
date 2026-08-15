@@ -1,9 +1,10 @@
 """„Samo rezultat“ v1 — identitet modela i ugovor efektivnog prompta.
 
-Migracija 2026-08-15 (ista kao Explain): tekstualni Quick poziv dobija
-vlastiti, kodom auditiran izbor gpt-5.6-luna / low. Poziv sa SLIKOM namjerno
-ostaje na modelu adaptera (OPENAI_MODEL_TEXT): stroga kapija čitljivosti
-(D35-5/D35-6) i nezavisni imagecheck mjereni su na njemu.
+Dvije migracije 2026-08-15: (1) tekstualni Quick poziv → gpt-5.6-luna / low
+(isti obrazac kao Explain); (2) poziv sa SLIKOM → gpt-5.6-sol / low /
+detail="original", po vision benchmarku (scratchpad/vision_ab_test: Sol 94,3%,
+100% na štampanom, 0 čisto računskih grešaka). Stroga kapija čitljivosti
+(D35-5/D35-6) i nezavisni imagecheck ostaju netaknuti.
 
 Baseline prije migracije (gpt-5-mini, 20 živih poziva, sve ručno provjereno):
 20/20 matematički tačno, tačne jedinice, oba rješenja za $x^2=9$, uredno
@@ -35,9 +36,10 @@ def test_release_enforcement_covers_the_quick_choice():
     assert report["quick_reasoning_effort"] == "low"
 
 
-def test_text_call_sends_luna_low_but_image_call_keeps_the_adapter_model(monkeypatch):
-    """Tekst → Luna/low; slika → BEZ per-poziv modela (adapter default),
-    jer su kapija čitljivosti i imagecheck mjereni na tom modelu."""
+def test_text_call_sends_luna_and_image_call_sends_sol(monkeypatch):
+    """Tekst → Luna/low. Slika → Sol/low (migracija 2026-08-15, vision
+    benchmark: Sol 94,3% / 0 čisto računskih grešaka — vidi
+    scratchpad/vision_ab_test i obrazloženje u matbot/config.py)."""
     llm = OpenAIPracticeLLM()
     seen = {}
 
@@ -58,7 +60,63 @@ def test_text_call_sends_luna_low_but_image_call_keeps_the_adapter_model(monkeyp
 
     with pytest.raises(RuntimeError):
         llm.quick_turn("i", "u", image=_FakeImage())
-    assert "model" not in seen and "reasoning_effort" not in seen
+    assert seen["model"] == "gpt-5.6-sol"
+    assert seen["reasoning_effort"] == "low"
+    assert seen["image"] is not None
+
+
+def test_quick_image_identity_is_sol_low_original_by_code():
+    assert config.QUICK_IMAGE_MODEL == "gpt-5.6-sol"
+    assert config.QUICK_IMAGE_REASONING_EFFORT == "low"
+    assert config.QUICK_IMAGE_DETAIL == "original"
+
+
+def test_release_enforcement_covers_the_image_choice():
+    """Zaostala env varijabla ne može tiho vratiti stari model slike."""
+    req = release_config.REQUIRED_EFFECTIVE_CONFIG
+    assert req["quick_image_model"] == "gpt-5.6-sol"
+    assert req["quick_image_reasoning_effort"] == "low"
+    assert req["quick_image_detail"] == "original"
+    report = release_config.effective_configuration({})
+    assert report["quick_image_model"] == "gpt-5.6-sol"
+    assert report["quick_image_detail"] == "original"
+
+
+def test_image_input_carries_detail_original():
+    """Model vidi ORIGINALNU fotografiju — isto podešavanje kojim je
+    benchmark mjeren; nema downscalinga radi cijene/latencije."""
+    llm = OpenAIPracticeLLM()
+
+    class _FakeImage:
+        data_url = "data:image/jpeg;base64,AAAA"
+
+    built = llm._build_input("tekst", _FakeImage())
+    image_part = built[0]["content"][1]
+    assert image_part["detail"] == "original"
+    assert image_part["image_url"] == "data:image/jpeg;base64,AAAA"
+    # tekstualni put netaknut: string prolazi kroz isto mjesto nepromijenjen
+    assert llm._build_input("samo tekst", None) == "samo tekst"
+
+
+def test_generic_model_variable_cannot_override_the_image_identity(monkeypatch):
+    """OPENAI_MODEL_TEXT (generička varijabla) NE smije uticati na sliku:
+    identitet slike je vlastita konstanta, a drift hvata release enforcement."""
+    monkeypatch.setattr(config, "OPENAI_MODEL_TEXT", "gpt-nesto-drugo")
+    llm = OpenAIPracticeLLM()
+    seen = {}
+
+    def spy(instructions, input_text, text_format, **kw):
+        seen.update(kw)
+        raise RuntimeError("stop")
+
+    monkeypatch.setattr(llm, "_structured_turn", spy)
+
+    class _FakeImage:
+        pass
+
+    with pytest.raises(RuntimeError):
+        llm.quick_turn("i", "u", image=_FakeImage())
+    assert seen["model"] == "gpt-5.6-sol"
 
 
 def test_practice_and_explain_choices_are_untouched_by_the_quick_migration():

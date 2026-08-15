@@ -370,14 +370,19 @@ class OpenAIPracticeLLM:
         pokazao je da je gola `{reply}` šema činila sliku neprovjerljivom, pa
         model uz odgovor mora prijaviti i šta je stvarno vidio.
 
-        MODEL (migracija 2026-08-15): TEKSTUALNI poziv ide eksplicitno na
-        config.QUICK_MODEL (gpt-5.6-luna, effort low) — isti obrazac kao
-        Explain. Poziv sa SLIKOM namjerno OSTAJE na modelu adaptera
-        (OPENAI_MODEL_TEXT): kapija čitljivosti i imagecheck su mjerene na
-        njemu, a vid drugog modela ovdje nije dokazan."""
+        MODELI (migracije 2026-08-15): TEKST ide na config.QUICK_MODEL
+        (gpt-5.6-luna / low). SLIKA ide na config.QUICK_IMAGE_MODEL
+        (gpt-5.6-sol / low, detail="original") — izbor dokazan vision
+        benchmarkom (scratchpad/vision_ab_test): Sol je jedini bez ijedne
+        čisto računske greške i sa 100% tačnosti na štampanom materijalu;
+        obrazloženje uz konstante u matbot/config.py. I dalje TAČNO JEDAN
+        poziv modela — bez OCR pred-poziva, bez fallback modela."""
         if image is not None:
             return self._structured_turn(
-                instructions, input_text, QuickImageTurnOutput, image=image)
+                instructions, input_text, QuickImageTurnOutput, image=image,
+                model=config.QUICK_IMAGE_MODEL,
+                reasoning_effort=config.QUICK_IMAGE_REASONING_EFFORT,
+            )
         return self._structured_turn(
             instructions, input_text, QuickTurnOutput,
             model=config.QUICK_MODEL,
@@ -389,15 +394,18 @@ class OpenAIPracticeLLM:
         poruka sa tačno jednom `input_text` i tačno jednom `input_image`
         stavkom (Responses API format, openai SDK 2.41.1).
 
-        `detail="high"` je izabran namjerno: sitan matematički tekst (indeksi,
-        eksponenti, razlomačke crte) se na `low` detalju gubi."""
+        `detail` dolazi iz config.QUICK_IMAGE_DETAIL (od migracije na Sol:
+        "original" — model vidi originalnu fotografiju; benchmark je mjeren
+        upravo tim podešavanjem). Ranije tvrdo "high" — sitan matematički
+        tekst (indeksi, eksponenti, razlomačke crte) se na "low" gubi."""
         if image is None:
             return input_text
         return [{
             "role": "user",
             "content": [
                 {"type": "input_text", "text": input_text},
-                {"type": "input_image", "image_url": image.data_url, "detail": "high"},
+                {"type": "input_image", "image_url": image.data_url,
+                 "detail": config.QUICK_IMAGE_DETAIL},
             ],
         }]
 

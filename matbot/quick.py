@@ -247,7 +247,15 @@ def run_quick_turn(llm, turn, image=None):
     try:
         result = llm.quick_turn(instructions, input_text, image=image)
         if image is not None:
-            validate_quick_image_output(result.output)
+            # SAMO osnovna provjera (neprazan reply) PRIJE kapije čitljivosti.
+            # Puna ograničenja internih polja dolaze POSLIJE kapije — živa
+            # proba migracije na Sol: na fotografiji CIJELE stranice udžbenika
+            # temeljit čitač prijavi evidenciju svih zadataka, pa su dužinske
+            # granice obarale odgovor generičkom porukom PRIJE nego što bi
+            # kapija rekla ispravno „Na slici vidim više zadataka…“. Kapija
+            # čita samo šemom tipizirana polja (Literal/bool), pa joj dužinske
+            # granice nisu preduslov.
+            validate_quick_output(result.output)
         else:
             validate_quick_output(result.output)
     except LLMError as e:
@@ -279,6 +287,15 @@ def run_quick_turn(llm, turn, image=None):
                 result.output.task_type, result.output.answer_confidence,
             )
             return {"answer": _image_gate_message(gate_issue), "last_tutor_task": ""}
+
+        # Puna ograničenja internih polja evidencije — TEK POSLIJE kapije
+        # (vidi komentar uz poziv modela). Prekršaj i dalje pada zatvoreno.
+        try:
+            validate_quick_image_output(result.output)
+        except InvalidOutputError as e:
+            logger.warning("quick_turn request_id=%s category=invalid_output detail=%s",
+                           request_id, e)
+            return {"answer": SAFE_ERROR_MESSAGE, "last_tutor_task": ""}
 
         # Deterministička provjera podržanih porodica. Za podržanu porodicu
         # objavljivanje traži supported ∧ engaged ∧ verified — „provjera se nije

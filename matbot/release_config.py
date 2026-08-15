@@ -127,6 +127,11 @@ REQUIRED_EFFECTIVE_CONFIG = {
     # namjerno ostaje na modelu adaptera (vidi matbot/config.py).
     "quick_model": "gpt-5.6-luna",
     "quick_reasoning_effort": "low",
+    # Slika u „Samo rezultat“ (migracija 2026-08-15, vision benchmark):
+    # Sol / low / original — tekstualni Quick ostaje na Luni.
+    "quick_image_model": "gpt-5.6-sol",
+    "quick_image_reasoning_effort": "low",
+    "quick_image_detail": "original",
 }
 
 # Imena koja se NIKAD ne ispisuju ni u jednoj dijagnostici ovog modula.
@@ -159,6 +164,9 @@ def _effective_config_problems():
         "explain_reasoning_effort": _config.EXPLAIN_REASONING_EFFORT,
         "quick_model": _config.QUICK_MODEL,
         "quick_reasoning_effort": _config.QUICK_REASONING_EFFORT,
+        "quick_image_model": _config.QUICK_IMAGE_MODEL,
+        "quick_image_reasoning_effort": _config.QUICK_IMAGE_REASONING_EFFORT,
+        "quick_image_detail": _config.QUICK_IMAGE_DETAIL,
     }
     return [f"{key} ima pogrešnu vrijednost (očekivano: {expected})"
             for key, expected in sorted(REQUIRED_EFFECTIVE_CONFIG.items())
@@ -221,6 +229,9 @@ def effective_configuration(environ=None):
         "explain_reasoning_effort": _config.EXPLAIN_REASONING_EFFORT,
         "quick_model": _config.QUICK_MODEL,
         "quick_reasoning_effort": _config.QUICK_REASONING_EFFORT,
+        "quick_image_model": _config.QUICK_IMAGE_MODEL,
+        "quick_image_reasoning_effort": _config.QUICK_IMAGE_REASONING_EFFORT,
+        "quick_image_detail": _config.QUICK_IMAGE_DETAIL,
         "deterministic_practice": ("enabled" if _config.deterministic_practice_enabled()
                                    else "disabled"),
         "deterministic_variety_gate": read("MATBOT_DETERMINISTIC_VARIETY_GATE"),

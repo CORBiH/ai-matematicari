@@ -120,6 +120,22 @@ EXPLAIN_REASONING_EFFORT = os.environ.get("MATBOT_EXPLAIN_REASONING_EFFORT", "lo
 # tom modelu, a ponašanje vida drugog modela ovdje nije dokazano.
 QUICK_MODEL = os.environ.get("MATBOT_QUICK_MODEL", "gpt-5.6-luna")
 QUICK_REASONING_EFFORT = os.environ.get("MATBOT_QUICK_REASONING_EFFORT", "low")
+
+# --- „Samo rezultat“ — poziv SA SLIKOM (migracija 2026-08-15) ---------------
+# Vision benchmark (scratchpad/vision_ab_test, 11 slika x 3 modela, 97
+# ground-truth zadataka): Sol 94,3% tačnosti (100% štampano, 82,1% rukopis),
+# NULA čisto računskih grešaka i najpotpunija detekcija zadataka — naspram
+# Luna 79,5% (15 kritičnih OCR grešaka, uklj. > → ≥ i 53°30' → 35°30') i
+# Terra 85,2% (4 računske greške na tačno pročitanom ulazu). Za mod koji
+# vraća gotov rezultat sa slike, profil „nikad pogrešan na čisto pročitanom“
+# je presudan — zato slika ide na Sol, a tekst OSTAJE na Luni.
+#
+# detail="original" — isto podešavanje kojim je benchmark mjeren (SDK 2.52.1
+# ga podržava): model vidi originalnu fotografiju, bez downscalinga.
+QUICK_IMAGE_MODEL = os.environ.get("MATBOT_QUICK_IMAGE_MODEL", "gpt-5.6-sol")
+QUICK_IMAGE_REASONING_EFFORT = os.environ.get(
+    "MATBOT_QUICK_IMAGE_REASONING_EFFORT", "low")
+QUICK_IMAGE_DETAIL = os.environ.get("MATBOT_QUICK_IMAGE_DETAIL", "original")
 # Lekcije za koje je brzi put uključen — zarezom odvojena lista ID-jeva.
 # Prazno (podrazumijevano) znači: nijedna lekcija, put je potpuno neaktivan.
 _FAST_LESSONS_RAW = os.environ.get("MATBOT_FAST_SINGLE_CALL_LESSONS", "")
