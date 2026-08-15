@@ -30,7 +30,13 @@ REQUIRED_SCENARIOS = 15
 # (`planned_sdk_calls`), a ovdje ostaje samo plafon kao gornja granica.
 # Plafon MORA pratiti runner (`tools/run_live_release_gate.py`): brza ruta trosi
 # 1 poziv po scenariju, a uslovni recenzentski popravak najvise jos jedan.
-REQUIRED_CALL_CEILING = 23
+PRACTICE_CALL_CEILING = 23
+# „SUTRA IMAM KONTROLNI“ (v1): kapija dodatno dokazuje novi mod — dva stvarna
+# testa, svaki najvise 2 poziva (batch + uslovna popravka, bez treceg). Zbir
+# se cita iz artefakta (`kontrolni_sdk_calls`), plafon je zbir oba dijela.
+KONTROLNI_REQUIRED_TESTS = 2
+KONTROLNI_MAX_CALLS = 2 * KONTROLNI_REQUIRED_TESTS
+REQUIRED_CALL_CEILING = PRACTICE_CALL_CEILING + KONTROLNI_MAX_CALLS
 MAX_AGE = timedelta(hours=24)
 # NIJEDAN LITERAL SE NE PONAVLJA. Ruta i rok su ranije stajali ovdje kao
 # vlastita kopija; kopija je upravo ono što je pustilo kampanju s rokom od
@@ -97,11 +103,35 @@ def validate_result(document: dict, *, expected_commit: str | None = None,
         errors.append("missing_required_scenario_count")
     planned = document.get("planned_sdk_calls")
     actual = document.get("actual_sdk_calls")
+    # Kontrolni stage je USLOVAN po pozivima (1 ili 2 po testu) — čita se iz
+    # artefakta, uz vlastitu tvrdu granicu. Zatečeni (stariji) artefakt bez
+    # ovih polja NE prolazi: mjerio je arhitekturu bez kontrolni moda.
+    kontrolni_calls = document.get("kontrolni_sdk_calls")
+    if (not isinstance(kontrolni_calls, int) or isinstance(kontrolni_calls, bool)
+            or not KONTROLNI_REQUIRED_TESTS <= kontrolni_calls <= KONTROLNI_MAX_CALLS):
+        errors.append("invalid_kontrolni_sdk_calls")
+        kontrolni_calls = None
+    if document.get("kontrolni_max_calls") != KONTROLNI_MAX_CALLS:
+        errors.append("wrong_kontrolni_max_calls")
+    if document.get("kontrolni_required_tests") != KONTROLNI_REQUIRED_TESTS:
+        errors.append("missing_kontrolni_required_tests")
+    kontrolni_tests = document.get("kontrolni_tests")
+    if (not isinstance(kontrolni_tests, list)
+            or len(kontrolni_tests) != KONTROLNI_REQUIRED_TESTS):
+        errors.append("required_kontrolni_tests_missing")
+    else:
+        for row in kontrolni_tests:
+            if (not isinstance(row, dict) or row.get("status") != "ready"
+                    or row.get("errors")
+                    or not isinstance(row.get("sdk_calls"), int)
+                    or not 1 <= row["sdk_calls"] <= 2):
+                errors.append("kontrolni_test_not_clean")
+                break
     if not isinstance(planned, int) or isinstance(planned, bool) or planned <= 0:
         # Zatečeni (stari) artefakt nema ovo polje — i ne smije proći.
         errors.append("missing_planned_sdk_calls")
     else:
-        if planned > REQUIRED_CALL_CEILING:
+        if planned > PRACTICE_CALL_CEILING:
             errors.append("planned_sdk_calls_above_ceiling")
         # Uslovni recenzentski popravak dodaje pozive koji se ne mogu zamrznuti
         # prije turna. Ne prastaju se paušalno: runner ih broji SAMO kad je
@@ -111,9 +141,9 @@ def validate_result(document: dict, *, expected_commit: str | None = None,
             errors.append("missing_escalated_sdk_calls")
         elif not isinstance(escalated, int) or escalated < 0:
             errors.append("invalid_escalated_sdk_calls")
-        elif actual != planned + escalated:
+        elif kontrolni_calls is not None and actual != planned + escalated + kontrolni_calls:
             errors.append("wrong_sdk_call_count")
-        elif planned + escalated > REQUIRED_CALL_CEILING:
+        elif planned + escalated > PRACTICE_CALL_CEILING:
             errors.append("planned_sdk_calls_above_ceiling")
     if document.get("sdk_call_ceiling") != REQUIRED_CALL_CEILING:
         errors.append("wrong_sdk_call_ceiling")

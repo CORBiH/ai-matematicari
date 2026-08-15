@@ -61,10 +61,21 @@ def _passing_document():
         "finished_at": datetime.now(timezone.utc).isoformat(),
         "scenario_count": 15,
         "required_scenario_count": 15,
-        "sdk_call_ceiling": 23,
+        # Kontrolni v1: plafon = Practice (23) + kontrolni (4); stvarni zbir
+        # nosi i kontrolni pozive (17 + 0 + 4).
+        "sdk_call_ceiling": 27,
         "planned_sdk_calls": 17,
         "escalated_sdk_calls": 0,
-        "actual_sdk_calls": 17,
+        "kontrolni_sdk_calls": 4,
+        "kontrolni_max_calls": 4,
+        "kontrolni_required_tests": 2,
+        "kontrolni_tests": [
+            {"oblast_id": "6-04", "grade": 6, "relative": "", "status": "ready",
+             "sdk_calls": 2, "difficulty": "standard", "errors": []},
+            {"oblast_id": "6-04", "grade": 6, "relative": "harder", "status": "ready",
+             "sdk_calls": 2, "difficulty": "harder", "errors": []},
+        ],
+        "actual_sdk_calls": 21,
         "call_above_ceiling_refused": True,
         "twentieth_call_refused_before_sdk": True,
         "validation_failures": [],
@@ -472,7 +483,7 @@ def test_failed_live_gate_console_summary_is_informative_and_does_not_echo_hidde
     assert "FAILED SCENARIO: easier_level1" in report
     assert "REASON: difficulty_direction_not_measurable" in report
     assert "LEVELS: previous=2 target=1 committed=2" in report
-    assert "SDK CALLS: 9/17 (ceiling 23)" in report
+    assert "SDK CALLS: 9/17 (ceiling 27)" in report
     assert "STATE PRESERVED: true" in report
     assert "SECRET" not in report
 

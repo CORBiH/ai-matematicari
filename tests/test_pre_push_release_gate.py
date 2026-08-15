@@ -82,8 +82,19 @@ def passing_document(commit_sha, tree_hash):
         # kampanje (statički + izvedeni prvi hint); plafon je samo gornja granica.
         "planned_sdk_calls": 17,
         "escalated_sdk_calls": 0,
-        "actual_sdk_calls": 17,
-        "sdk_call_ceiling": 23,
+        # Kontrolni v1: plafon = Practice (23) + kontrolni (4); stvarni zbir
+        # nosi i kontrolni pozive (17 + 0 + 4).
+        "kontrolni_sdk_calls": 4,
+        "kontrolni_max_calls": 4,
+        "kontrolni_required_tests": 2,
+        "kontrolni_tests": [
+            {"oblast_id": "6-04", "grade": 6, "relative": "", "status": "ready",
+             "sdk_calls": 2, "difficulty": "standard", "errors": []},
+            {"oblast_id": "6-04", "grade": 6, "relative": "harder", "status": "ready",
+             "sdk_calls": 2, "difficulty": "harder", "errors": []},
+        ],
+        "actual_sdk_calls": 21,
+        "sdk_call_ceiling": 27,
         "call_above_ceiling_refused": True,
         "twentieth_call_refused_before_sdk": True,
         "validation_failures": [],
