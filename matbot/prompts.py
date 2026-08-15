@@ -573,20 +573,111 @@ def build_kontrolni_instructions(grade: int, oblast: str) -> str:
         "- LaTeX DISCIPLINA: svaka komanda počinje obrnutom kosom crtom. "
         "NIKAD ne piši cdot, sqrt, frac, circ bez \\ ispred — zapis poput "
         "$2^xcdot2^3$ je neispravan i cijelo pitanje se odbacuje.\n"
-        "- OBLIK PITANJA: traži KONKRETAN rezultat (broj, mjeru, skup, "
-        "konkretnu jednakost). Izbjegavaj oblike „koji postupak…“ i „koja se "
-        "jednakost može dokazati…“ — kod njih više ponuđenih odgovora zna biti "
-        "odbranjivo tačno, a takvo pitanje je neispravno. Ako ipak pišeš takvo "
-        "pitanje, svaki distraktor mora biti NEISTINIT, ne samo drugačiji.\n"
+        "- OBLIK PITANJA JE OBAVEZAN: pitanje traži KONKRETAN, izračunljiv "
+        "rezultat (broj, mjeru, izraz, skup, uređeni par), a opcije su "
+        "VRIJEDNOSTI. Pitanja koja biraju TVRDNJU — „koja tvrdnja je tačna“, "
+        "„koji zaključak slijedi“, „koja jednakost se može dokazati“, „koji "
+        "postupak/slijed konstrukcije“, „koja definicija opisuje“ — NE SMIJU se "
+        "pisati: kod njih više ponuđenih odgovora zna biti odbranjivo tačno, pa "
+        "aplikacija takvo pitanje odbacuje i test propada.\n"
+        "  Umjesto „Koja jednakost slijedi iz podudarnosti?“ pitaj „Kolika je "
+        "dužina stranice $EF$?“; umjesto „Koji postupak daje ugao od "
+        "$75^\\circ$?“ pitaj „Kolika je mjera ugla koji nastaje spajanjem ugla "
+        "od $60^\\circ$ i ugla od $15^\\circ$?“. Ista lekcija, provjerljiv "
+        "odgovor.\n"
+        "- IZUZETAK: tvrdnja je dozvoljena samo ako je svaka od četiri opcije "
+        "ČISTA brojevna relacija koju je moguće provjeriti računom (npr. "
+        "$\\frac{5}{8}<\\frac{2}{3}$), i tačno jedna je tačna.\n"
     )
 
 
+# DOKAZ ZA POPRAVKU: zašto je slot pao, rečeno modelu SERVEROVIM riječima.
+#
+# ŽIVI NALAZ (baseline 6-04, 6 testova): samo 1 od 6 testova je prošao iz
+# PRVOG poziva, a jedan slot je pao s `equivalent_options` pa POSLIJE POPRAVKE
+# ponovo s istim kodom — jer popravka nije znala ŠTA je bilo pogrešno, nego je
+# samo dobila „napravi pitanje za ovaj slot“. Poruke ispod su zatvoren,
+# server-owned skup: opisuju defekt i traženu ispravku, nikad interni kod.
+_KONTROLNI_REPAIR_FEEDBACK = (
+    ("equivalent_options", "Dvije opcije su imale ISTU brojnu vrijednost "
+     "(npr. $\\frac{1}{2}$ i $0,5$, ili $\\frac{2}{4}$ i $\\frac{1}{2}$). "
+     "Vrati četiri opcije koje su PAROVIMA različite po vrijednosti — razlika "
+     "u zapisu nije razlika u vrijednosti."),
+    ("duplicate_options", "Dvije opcije su bile doslovno iste. Vrati četiri "
+     "različite opcije."),
+    ("unprovable_claim_selection", "Pitanje je tražilo izbor tvrdnje čiju "
+     "istinitost nije moguće provjeriti računom. Postavi pitanje koje traži "
+     "KONKRETAN rezultat (broj, mjeru, izraz ili skup), a opcije neka budu "
+     "vrijednosti — ista lekcija i ista težina."),
+    ("proven_multi_correct", "Više od jedne opcije bilo je tačno. Tačna smije "
+     "biti isključivo jedna; ostale moraju biti dokazivo netačne."),
+    ("marked_option_provably_false", "Označena opcija nije bila tačna, a tačna "
+     "je stajala među neoznačenima. Provjeri račun i označi tačnu."),
+    ("proven_zero_correct", "Nijedna ponuđena opcija nije bila tačna. Izračunaj "
+     "rezultat i uvrsti ga među opcije."),
+    ("marked_statement_provably_false", "Označena tvrdnja je netačna. Provjeri "
+     "je računom prije nego što je označiš."),
+    ("distractor_statement_provably_true", "Jedan distraktor je bio tačan. "
+     "Svaki distraktor mora biti dokazivo netačan."),
+    ("solution_marked_value_divergence", "Rješenje je izvelo jednu vrijednost, "
+     "a označena opcija nosi drugu. Označena opcija i zaključak rješenja moraju "
+     "biti ista vrijednost."),
+    ("mcq_integrity", "Označena opcija nije rezultat zadatka. Riješi zadatak pa "
+     "označi opciju koja mu odgovara."),
+    ("divisibility", "Tvrdnja o djeljivosti nije bila tačna za označeni broj, "
+     "ili je važila i za neki distraktor. Provjeri svaki broj posebno."),
+    ("decimal_place_marked_wrong", "Označena cifra nije na traženom decimalnom "
+     "mjestu. Prebroj mjesta iza zareza: desetinke, stotinke, hiljaditke."),
+    ("angle_side_correspondence", "Naspram jednakih uglova leže njima "
+     "NASPRAMNE stranice ($\\alpha$↔$a$, $\\beta$↔$b$, $\\gamma$↔$c$). Označena "
+     "jednakost nije poštovala tu korespondenciju."),
+    ("construction", "Označeni postupak ne daje traženu mjeru, ili je i neki "
+     "distraktor daje. Provjeri svaki postupak računom."),
+    ("stem_reveals_marked_option", "Tekst zadatka je sadržavao baš označeni "
+     "odgovor. Zadatak ne smije otkrivati svoje rješenje."),
+    ("stem_answer_disclosure", "Tekst zadatka je odavao tačan odgovor. "
+     "Preformuliši ga tako da učenik mora računati."),
+    ("expected_option_mismatch", "`expected_answer` se nije DOSLOVNO poklapao s "
+     "označenom opcijom. Prepiši ga znak po znak."),
+    ("lesson_target_replaced", "Zamijenio si ciljanu lekciju. Vrati "
+     "NEPROMIJENJEN `lesson_id` iz slota."),
+    ("difficulty_target_replaced", "Zamijenio si traženu težinu. Vrati "
+     "NEPROMIJENJEN `difficulty` iz slota."),
+    ("numeric_inconsistency", "Brojevi u zadatku, opciji ili rješenju nisu se "
+     "slagali. Preračunaj i uskladi ih."),
+    ("geometry_notation", "Geometrijske oznake nisu bile ispravne (npr. $P$ za "
+     "površinu, $O$ za obim, $r$ poluprečnik, $R$ prečnik)."),
+    ("option_label_claim", "Pominjao si slovo opcije (a/b/c/d). Slova dodjeljuje "
+     "aplikacija — nikad ih ne spominji."),
+    ("damaged_latex", "Matematički zapis je bio neispravan. Svaka komanda "
+     "počinje obrnutom kosom crtom i stoji unutar $...$."),
+    ("caret_outside_math", "Znak `^` se pojavio izvan $...$. Cijeli izraz mora "
+     "biti unutar $...$."),
+    ("unsafe_or_long", "Zapis je bio neispravan ili predug. Piši kraće i "
+     "isključivo validan MathJax u $...$."),
+    ("repeated_task_signature", "Pitanje je bilo isto kao već korišteno. "
+     "Napravi suštinski drugačije."),
+    ("option_count", "Nije bilo tačno četiri opcije."),
+    ("bad_correct_index", "`correct_option_index` nije pokazivao na opciju."),
+)
+
+
+def kontrolni_repair_hint(code: str) -> str:
+    """Kratka, server-owna uputa za pali slot. Nikad interni kod modelu."""
+    for prefix, message in _KONTROLNI_REPAIR_FEEDBACK:
+        if prefix in (code or ""):
+            return message
+    return ("Pitanje nije prošlo provjeru ispravnosti. Provjeri račun, označi "
+            "tačnu opciju i vrati četiri po vrijednosti različite opcije.")
+
+
 def build_kontrolni_input(grade: int, oblast: str, slots, contexts,
-                          avoid_texts=()) -> str:
+                          avoid_texts=(), slot_feedback=None) -> str:
     """Serverski slotovi → ulaz batch poziva. `contexts` je mapa
     slot_broj → LessonContext (kanonski naslov/opseg/ciljevi lekcije), pa model
     dobija ono što server ZNA o lekciji i ne mora (i ne smije) sam izmišljati
     šta lekcija pokriva."""
+    feedback = slot_feedback or {}
     lines = [f"RAZRED: {grade}", f"OBLAST: {oblast}", "SLOTOVI TESTA:"]
     for slot in slots:
         context = contexts.get(slot["slot"])
@@ -594,6 +685,12 @@ def build_kontrolni_input(grade: int, oblast: str, slots, contexts,
             f"SLOT {slot['slot']}: lesson_id={slot['lesson_id']} | "
             f"LEKCIJA: {slot['lesson_title']} | "
             f"difficulty={slot['difficulty']}")
+        # POPRAVKA ZNA ŠTA JE BILO POGREŠNO. Bez ovoga je model ponavljao istu
+        # grešku (mjereno: isti `equivalent_options` i prije i poslije popravke).
+        hint = feedback.get(slot["slot"])
+        if hint:
+            lines.append(f"  PRETHODNI POKUŠAJ ZA OVAJ SLOT JE ODBIJEN: {hint}")
+            lines.append("  Zadrži ISTU lekciju i ISTU težinu; popravi samo ovaj slot.")
         scope = getattr(context, "lesson_scope", "") if context else ""
         if scope:
             lines.append(f"  OPSEG LEKCIJE: {_clip(scope, 300)}")

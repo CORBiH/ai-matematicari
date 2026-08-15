@@ -43,11 +43,13 @@ import secrets
 import threading
 import time
 
-from matbot import config, geometrycheck, mcq_integrity, option_equivalence, stem_disclosure
+from matbot import (config, exactly_one, geometrycheck, mcq_integrity,
+                    option_equivalence, stem_disclosure)
 from matbot.llm import LLMError, failure_diagnostics_kv
 from matbot.mathcheck import find_numeric_inconsistencies
 from matbot.mathsegments import TEXT, tokenize_math
-from matbot.prompts import build_kontrolni_input, build_kontrolni_instructions
+from matbot.prompts import (build_kontrolni_input, build_kontrolni_instructions,
+                            kontrolni_repair_hint)
 from matbot.topics import oblast_lessons
 from matbot.tutor import lesson_context, task_identity
 from matbot.tutor.package_preflight import safe_visible_text
@@ -695,6 +697,17 @@ def validate_generated_question(parsed, slot, context, prior_signatures):
     if notation_failure:
         return None, notation_failure
 
+    # TAČNO JEDAN TAČAN — DOKAZ, NE ODSUSTVO NALAZA (matbot/exactly_one.py).
+    # Za oblik „izaberi tvrdnju“ (recept, zaključak, jednakost, opis) objava
+    # traži POZITIVAN dokaz da je tačna tačno jedna opcija. Dva živa nalaza
+    # (2/300) prošla su upravo zato što su svi raniji čuvari tražili dokazan
+    # defekt, a nijedan nije tražio dokaz ispravnosti. Pitanja koja traže
+    # konkretan rezultat ovdje prolaze nedirnuta.
+    exactly_one_failure = exactly_one.publication_failure(
+        text, option_texts, correct_index)
+    if exactly_one_failure:
+        return None, exactly_one_failure
+
     disclosure = stem_disclosure.stem_answer_disclosure(
         text, option_texts, correct_index)
     if disclosure:
@@ -730,14 +743,15 @@ def _slot_contexts(grade, slots):
     return contexts
 
 def _call_batch(llm, grade, oblast_name, slots, contexts, avoid_texts, request_id,
-                stage, timeout_s=None):
+                stage, timeout_s=None, slot_feedback=None):
     """Jedan batch poziv; vrati (mapa slot→parsed pitanje, latency_ms) ili
     (None, latency) na LLM grešku. NIKAD ne pravi dodatni poziv.
 
-    `timeout_s` sužava rok poziva na ostatak ukupnog roka generisanja."""
+    `timeout_s` sužava rok poziva na ostatak ukupnog roka generisanja.
+    `slot_feedback` nosi RAZLOG odbijanja po slotu (samo za popravku)."""
     instructions = build_kontrolni_instructions(grade, oblast_name)
     input_text = build_kontrolni_input(grade, oblast_name, slots, contexts,
-                                       avoid_texts)
+                                       avoid_texts, slot_feedback=slot_feedback)
     try:
         result = llm.kontrolni_turn(instructions, input_text, timeout_s=timeout_s)
     except LLMError as error:
@@ -776,17 +790,22 @@ def generate_test(llm, grade, oblast_name, slots, recent_signatures,
     accepted = {}
     known_signatures = set(recent_signatures or ())
     failed_slots = []
+    # RAZLOG PO SLOTU putuje u popravku (vidi prompts.kontrolni_repair_hint):
+    # bez njega je model ponavljao isti defekt (mjereno na `equivalent_options`).
+    slot_feedback = {}
     for slot in slots:
         parsed = parsed_by_slot.get(slot["slot"])
         if parsed is None:
             failed_slots.append(slot)
             meta["reject_codes"].append(f"slot{slot['slot']}:missing")
+            slot_feedback[slot["slot"]] = kontrolni_repair_hint("missing")
             continue
         clean, code = validate_generated_question(
             parsed, slot, contexts[slot["slot"]], known_signatures)
         if clean is None:
             failed_slots.append(slot)
             meta["reject_codes"].append(f"slot{slot['slot']}:{code}")
+            slot_feedback[slot["slot"]] = kontrolni_repair_hint(code)
             continue
         accepted[slot["slot"]] = clean
         if clean["signature"]:
@@ -805,7 +824,8 @@ def generate_test(llm, grade, oblast_name, slots, recent_signatures,
         avoid_texts = [accepted[number]["text"] for number in sorted(accepted)]
         parsed_by_slot, latency = _call_batch(
             llm, grade, oblast_name, failed_slots, contexts, avoid_texts,
-            request_id, "repair", timeout_s=remaining_s)
+            request_id, "repair", timeout_s=remaining_s,
+            slot_feedback=slot_feedback)
         meta["calls"] += 1
         meta["latency_ms"] += latency
         if parsed_by_slot is None:

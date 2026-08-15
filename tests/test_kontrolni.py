@@ -14,8 +14,9 @@ import re
 
 import pytest
 
-from matbot import config, kontrolni
+from matbot import config, exactly_one, kontrolni, option_equivalence
 from matbot.llm import LLMResult, LLMUnavailable
+from matbot.prompts import kontrolni_repair_hint
 from matbot.schema import KontrolniQuestionOutput, KontrolniTestOutput
 from matbot.tutor.package_preflight import safe_visible_text
 from tests.conftest import FakeLLM, make_kontrolni_question, make_kontrolni_test
@@ -680,7 +681,11 @@ def test_triple_form_angle_equality_is_also_judged():
     assert clean is None and code == "angle_side_correspondence_violated"
 
 
-def test_correct_angle_side_correspondence_passes():
+def test_correct_correspondence_is_still_unprovable_and_therefore_rejected():
+    """DOKTRINA JE JAČA OD RANIJEG PONAŠANJA: i kad je korespondencija ispravna,
+    server ne može DOKAZATI da je tačna tačno jedna opcija (u jednakostraničnom
+    trouglu vrijedi i $a=b$), pa oblik pada i slot ide u popravku. Ranije je
+    isti paket prolazio samo zato što nijedan čuvar nije imao nalaz."""
     question = make_kontrolni_question(
         text="U trouglu je $\\beta=\\gamma$. Koji odnos između naspramnih stranica mora važiti?",
         options=["$b=c$", "$a=b$", "$a+b=c$", "$a=c$"],
@@ -688,7 +693,7 @@ def test_correct_angle_side_correspondence_passes():
         solution="Naspram jednakih uglova leže jednake stranice: naspram $\\beta$ je $b$, "
                  "naspram $\\gamma$ je $c$, pa je $b=c$.")
     clean, code = _validate(question)
-    assert clean is not None, code
+    assert clean is None and code == "unprovable_claim_selection"
 
 
 def test_live_r3_wrong_decimal_place_is_rejected():
@@ -739,7 +744,10 @@ def test_marked_recipe_that_misses_target_is_rejected():
     assert clean is None and code == "construction_marked_recipe_misses_target"
 
 
-def test_valid_recipe_question_with_wrong_distractors_passes():
+def test_recipe_question_is_rejected_even_when_this_wording_is_decidable():
+    """Isti razlog: recept je oblik „izaberi tvrdnju". Šablonski čuvar poznaje
+    samo dvije doslovne formulacije — živi nalaz je promakao TREĆOM — pa se
+    objava više ne smije oslanjati na to da baš taj šablon razumije rečenicu."""
     question = make_kontrolni_question(
         text="Kako se konstrukcijom može dobiti ugao od $75^\\circ$?",
         options=["Sastaviti ugao od $60^\\circ$ i ugao od $15^\\circ$.",
@@ -749,7 +757,7 @@ def test_valid_recipe_question_with_wrong_distractors_passes():
         correct_option_index=0,
         solution="Sastavljanjem uglova od $60^\\circ$ i $15^\\circ$ dobija se ugao od 75 stepeni.")
     clean, code = _validate(question)
-    assert clean is not None, code
+    assert clean is None and code == "unprovable_claim_selection"
 
 
 # ---------------------------------------------------------------------------
@@ -855,6 +863,161 @@ def test_exhausted_deadline_skips_repair_and_fails_closed(exam_store, monkeypatc
     assert resp["status"] == "failed"
     assert resp["message"] == kontrolni.GENERATION_FAILED_MESSAGE
     assert llm.call_count == 1                  # popravka preskočena
+
+
+# ---------------------------------------------------------------------------
+# DOKTRINA „TAČNO JEDAN TAČAN" (matbot/exactly_one.py) — dva ISTORIJSKA nalaza
+# iz živih kampanja (2/300 objavljenih pitanja) i njihova klasa.
+# ---------------------------------------------------------------------------
+
+# Nalaz 1: 7. razred, „Konstrukcije izvedenih uglova 15°, 75°, 105°, 120°".
+# Označen recept daje 45°, a traženih 75° daje NEOZNAČENA opcija b.
+HISTORICAL_RECIPE_STEM = (
+    "Koji slijed konstrukcija pomoću šestara i linijara (lenjira) daje ugao "
+    "od $75^\\circ$?")
+HISTORICAL_RECIPE_OPTIONS = [
+    "Konstruisati ugao od $90^\\circ$, zatim njegovu simetralu i dobiti ugao od $45^\\circ$",
+    "Konstruisati ugao od $90^\\circ$, zatim njegovu simetralu i dodati ugao od $30^\\circ$",
+    "Konstruisati ugao od $60^\\circ$, zatim ugao od $30^\\circ$ i uzeti njihov zbir",
+    "Konstruisati ugao od $60^\\circ$, zatim njegovu simetralu i sabrati ga sa uglom od $15^\\circ$",
+]
+
+# Nalaz 2: 7. razred, „Primjena podudarnosti u dokazivanju jednakosti elemenata".
+# Ista podudarnost $ABD\\cong ACD$ daje I $BD=DC$ I $\\angle ABD=\\angle ACD$.
+HISTORICAL_PROOF_STEM = (
+    "U trouglu $ABC$ važi $AB=AC$. Duž $AD$ je simetrala ugla kod tjemena $A$ "
+    "i siječe stranicu $BC$ u tački $D$. Koja jednakost se može dokazati "
+    "primjenom podudarnosti trouglova $ABD$ i $ACD$?")
+HISTORICAL_PROOF_OPTIONS = [
+    "$BD=DC$", "$AB=AD$", "$BC=AD$", "$\\angle ABD=\\angle ACD$"]
+
+
+@pytest.mark.parametrize("stem,options,marked", [
+    (HISTORICAL_RECIPE_STEM, HISTORICAL_RECIPE_OPTIONS, 3),
+    (HISTORICAL_PROOF_STEM, HISTORICAL_PROOF_OPTIONS, 0),
+])
+def test_historical_prose_defects_are_now_rejected(stem, options, marked):
+    """Oba živa nalaza padaju — ne po rečenici, nego zato što server ne može
+    DOKAZATI da je tačna tačno jedna opcija."""
+    assert exactly_one.publication_failure(stem, options, marked) == \
+        "unprovable_claim_selection"
+    clean, code = _validate(make_kontrolni_question(
+        text=stem, options=options, correct_option_index=marked,
+        expected_answer=options[marked],
+        solution="Postupak vodi do traženog rezultata."))
+    assert clean is None and code == "unprovable_claim_selection"
+
+
+def test_provable_claim_with_exactly_one_true_is_accepted():
+    stem = "Uporedi razlomke $\\frac{5}{8}$ i $\\frac{2}{3}$. Koja tvrdnja je tačna?"
+    options = ["$\\frac{5}{8}<\\frac{2}{3}$", "$\\frac{5}{8}>\\frac{2}{3}$",
+               "$\\frac{5}{8}=\\frac{2}{3}$", "$\\frac{5}{8}=\\frac{35}{72}$"]
+    verdict, _code = exactly_one.evaluate(stem, options, 0)
+    assert verdict == exactly_one.PROVEN_ONE_CORRECT
+    clean, code = _validate(make_kontrolni_question(
+        text=stem, options=options, correct_option_index=0,
+        expected_answer=options[0],
+        solution="Svođenjem na zajednički nazivnik slijedi $\\frac{5}{8}<\\frac{2}{3}$."))
+    assert clean is not None, code
+
+
+@pytest.mark.parametrize("options,marked,verdict", [
+    (["$1>2$", "$2>3$", "$3>4$", "$4>5$"], 0, exactly_one.PROVEN_ZERO_CORRECT),
+    (["$1<2$", "$2<3$", "$3>4$", "$4>5$"], 0, exactly_one.PROVEN_MULTI_CORRECT),
+    (["$1<2$", "$2>3$", "$3>4$", "$4>5$"], 1, exactly_one.PROVEN_ZERO_CORRECT),
+    (["$1<2$", "$2>3$", "$3>4$", "$4>5$"], 0, exactly_one.PROVEN_ONE_CORRECT),
+])
+def test_four_verdicts_of_the_doctrine(options, marked, verdict):
+    assert exactly_one.evaluate("Koja tvrdnja je tačna?", options, marked)[0] == verdict
+
+
+def test_value_questions_never_enter_the_claim_gate():
+    """Pitanja koja traže REZULTAT ostaju netaknuta — inače bi doktrina
+    oborila i sasvim ispravna računska pitanja."""
+    for stem, options in (
+        ("Izračunaj proizvod $2\\cdot\\frac{3}{5}\\cdot\\frac{4}{7}$.",
+         ["$\\frac{24}{35}$", "$\\frac{12}{35}$", "$\\frac{8}{35}$", "$\\frac{24}{17}$"]),
+        ("Odredi najveći zajednički djelilac brojeva $84$ i $126$.",
+         ["$42$", "$21$", "$14$", "$63$"]),
+        ("Zapiši nepravi razlomak $\\frac{17}{5}$ u obliku mješovitog broja.",
+         ["$3\\frac{2}{5}$", "$2\\frac{3}{5}$", "$3\\frac{5}{2}$", "$4\\frac{2}{5}$"]),
+    ):
+        assert not exactly_one.is_claim_selection(stem, options), stem
+        assert exactly_one.publication_failure(stem, options, 0) == ""
+
+
+@pytest.mark.parametrize("options", [
+    ["$\\frac{1}{2}$", "$0,5$", "$\\frac{1}{3}$", "$\\frac{1}{4}$"],        # decimalni ≡ razlomak
+    ["$8\\sqrt{2}$", "$11,3$", "$\\frac{1}{3}$", "$\\frac{1}{4}$"],          # radikal ≡ decimalni
+    ["$\\frac{2}{4}$", "$\\frac{1}{2}$", "$\\frac{1}{3}$", "$\\frac{1}{5}$"],  # neskraćen ≡ skraćen
+])
+def test_equivalent_options_are_always_rejected(options):
+    clean, code = _validate(make_kontrolni_question(
+        text="Izračunaj vrijednost izraza.", options=options,
+        correct_option_index=0, expected_answer=options[0],
+        solution=f"Rezultat je {options[0]}."))
+    assert clean is None and code in ("equivalent_options", "duplicate_options")
+
+
+# ---------------------------------------------------------------------------
+# POPRAVKA ZNA RAZLOG (živi baseline 6-04: isti `equivalent_options` i prije i
+# poslije popravke, jer popravka nije znala šta je bilo pogrešno)
+# ---------------------------------------------------------------------------
+
+def test_repair_receives_the_exact_failure_reason(exam_store):
+    def equivalent(question, _slot):
+        return question.model_copy(update={
+            "options": ["$\\frac{1}{2}$", "$0,5$", "$\\frac{1}{3}$", "$\\frac{1}{4}$"],
+            "expected_answer": "$\\frac{1}{2}$",
+            "solution": "Rezultat je $\\frac{1}{2}$.",
+        })
+
+    llm = EchoKontrolniLLM(mutate={3: equivalent})
+    _s, resp = kontrolni.run_start(exam_store, llm, start_payload())
+    assert resp["status"] == "ready" and llm.call_count == 2
+    repair_input = llm.kontrolni_calls[1][1]
+    assert "PRETHODNI POKUŠAJ ZA OVAJ SLOT JE ODBIJEN" in repair_input
+    assert "ISTU brojnu vrijednost" in repair_input
+    assert "Zadrži ISTU lekciju i ISTU težinu" in repair_input
+    # Popravka je SLOT-SKOPIRANA: traži se samo pali slot.
+    assert _parse_slots(repair_input) and [s["slot"] for s in _parse_slots(repair_input)] == [3]
+
+
+def test_repair_keeps_lesson_and_difficulty_of_the_failed_slot(exam_store):
+    llm = EchoKontrolniLLM(mutate={2: lambda q, _s: q.model_copy(
+        update={"options": ["$\\frac{1}{2}$", "$0,5$", "$\\frac{1}{3}$", "$\\frac{1}{4}$"],
+                "expected_answer": "$\\frac{1}{2}$"})})
+    _s, resp = kontrolni.run_start(exam_store, llm, start_payload())
+    assert resp["status"] == "ready"
+    first_slots = {s["slot"]: (s["lesson_id"], s["difficulty"])
+                   for s in _parse_slots(llm.kontrolni_calls[0][1])}
+    repair_slots = {s["slot"]: (s["lesson_id"], s["difficulty"])
+                    for s in _parse_slots(llm.kontrolni_calls[1][1])}
+    assert repair_slots == {2: first_slots[2]}
+    state = exam_store.get("kontrolni-sess")
+    assert state["questions"][1]["lesson_id"] == first_slots[2][0]
+    assert state["questions"][1]["difficulty"] == first_slots[2][1]
+
+
+def test_published_options_are_always_pairwise_non_equivalent(exam_store):
+    llm = EchoKontrolniLLM()
+    kontrolni.run_start(exam_store, llm, start_payload())
+    for question in exam_store.get("kontrolni-sess")["questions"]:
+        texts = [o["text"] for o in question["options"]]
+        assert not option_equivalence.find_equivalent_option_pairs(texts)
+        assert not option_equivalence.find_textual_duplicate_pairs(texts)
+
+
+@pytest.mark.parametrize("code,fragment", [
+    ("equivalent_options", "ISTU brojnu vrijednost"),
+    ("unprovable_claim_selection", "KONKRETAN rezultat"),
+    ("mcq_integrity_marked_option_math_mismatch", "nije rezultat zadatka"),
+    ("lesson_target_replaced", "NEPROMIJENJEN `lesson_id`"),
+    ("stem_reveals_marked_option", "ne smije otkrivati"),
+    ("nepoznat_kod_koji_ne_postoji", "Provjeri račun"),
+])
+def test_repair_hints_are_specific_and_closed(code, fragment):
+    assert fragment in kontrolni_repair_hint(code)
 
 
 def test_prompt_actually_carries_rules_and_slots(exam_store):
