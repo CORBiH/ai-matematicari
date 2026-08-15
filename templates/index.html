@@ -1030,11 +1030,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const QUICK_PLACEHOLDER = 'Upiši zadatak ili dodaj sliku...';
     const ANSWER_PLACEHOLDER = 'Upiši svoj odgovor na zadatak...';
     const MODE_LABELS = { explain: 'Objašnjenje', practice: 'Vježba', exam: 'Kontrolni', quick: 'Rezultat' };
-    /* auto-poruka koja se šalje odmah po ulasku u chat (quick nema auto-poruku) */
+    /* auto-poruka koja se šalje odmah po ulasku u chat (quick nema auto-poruku).
+       NEMA `exam` unosa: kontrolni NIKAD ne ulazi u chat — ide na vlastiti
+       ekran i /exam/start (živi produkcijski nalaz: stari chat-put je slao
+       „Pripremi me.“ generičkom /chat endpointu i dobijao canned odbijenicu). */
     const AUTO_MESSAGES = {
       explain: 'Objasni mi ovu temu.',
-      practice: 'Daj mi jedan zadatak za vježbu iz ove teme.',
-      exam: 'Sutra imam kontrolni iz ove oblasti. Pripremi me.'
+      practice: 'Daj mi jedan zadatak za vježbu iz ove teme.'
     };
     const topicNames = {};         // topic id → display_name (za prijateljski meta red)
     const topicOblasti = {};       // topic id → naziv oblasti (samo prikaz/prompt)
@@ -2201,23 +2203,9 @@ document.addEventListener('DOMContentLoaded', () => {
         { label: '📘 Objasni mi ovo', msg: 'Objasni mi ovaj zadatak korak po korak.' },
         { label: '🎬 Preporuči mi klip', msg: 'Preporuči mi video lekciju za ovu temu.', intent: 'recommend_video' }
       ];
-      if (mode === 'exam'){
-        /* Prečice za ZAVRŠEN kontrolni ("Daj još zadataka", "Objasni prvi
-           zadatak", "Preporuči klip") smiju se pojaviti SAMO kad je kontrolni
-           završen. Dok je kontrolni AKTIVAN (exam_status === 'active') ne
-           prikazujemo prečice — učenik treba riješiti tekuću stavku. */
-        const examStatus = (j.exam_state && j.exam_state.exam_status) || '';
-        if (examStatus === 'active') return [];
-        return [
-          /* BUG 4: "Daj još zadataka" pokreće NOVU vježbu (novi zadatak iz iste
-             oblasti), a NE objašnjenje prve stavke kontrolnog. Zato eksplicitno
-             prelazi u practice mod i šalje jasan zahtjev za novim zadatkom.
-             "Objasni prvi zadatak" ostaje zaseban — objašnjava 1. stavku kontrolnog. */
-          { label: '➕ Daj još zadataka', msg: 'Daj mi jedan novi zadatak za vježbu.', mode: 'practice' },
-          { label: '📘 Objasni prvi zadatak', msg: 'Objasni mi prvi zadatak iz kontrolnog korak po korak.' },
-          { label: '🎬 Preporuči mi klip', msg: 'Preporuči mi video lekciju za ovu temu.', intent: 'recommend_video' }
-        ];
-      }
+      /* Kontrolni NEMA chat prečice: mod živi na vlastitom ekranu i nikad ne
+         ulazi u razgovor — stara chat-based kontrolni dugmad su uklonjena
+         (živi produkcijski nalaz 2026-08-15). */
       return [   /* quick */
         { label: '📘 Objasni postupak', msg: 'Objasni mi postupak korak po korak.', mode: 'explain' },
         { label: '✏️ Sličan zadatak', msg: 'Daj mi sličan zadatak za vježbu.', mode: 'practice' }

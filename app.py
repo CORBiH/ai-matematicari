@@ -3,6 +3,7 @@ from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 import logging
+import os
 
 from matbot import auth, config, release_config
 from matbot.api import REQUEST_TOO_LARGE_MESSAGE, ai_tutor_bp
@@ -87,14 +88,26 @@ def index():
     return render_template("index.html", embed_token=auth.issue_token())
 
 
+def _health_payload():
+    """`version` = APP_VERSION koju deploy upisuje u .env (kratki commit SHA).
+
+    POSTOJI ZBOG IZMJERENOG TIHOG KVARA (2026-08-15): produkcija je 30+
+    deployova posluživala zamrznutu staru verziju dok je `{"ok": true}` bio
+    zelen — zdravlje BEZ identiteta nije dokaz deploya. Deploy workflow sada
+    poredi ovu vrijednost sa pushanim commitom PREKO JAVNOG DOMENA, pa
+    divergencija domena i deploy mete pada glasno umjesto da bude nevidljiva.
+    Kratki SHA javnog repozitorija nije tajna."""
+    return {"ok": True, "version": os.environ.get("APP_VERSION", "")}
+
+
 @app.route("/healthz")
 def healthz():
-    return {"ok": True}, 200
+    return _health_payload(), 200
 
 
 @app.route("/_healthz")
 def _healthz():
-    return {"ok": True}, 200
+    return _health_payload(), 200
 
 
 @app.route("/api/ai-tutor/topics")

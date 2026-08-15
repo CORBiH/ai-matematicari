@@ -38,6 +38,15 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
 
+            # CHECKOUT MORA BITI TAČNO PUSHANI COMMIT. Tiho zastarjeli remote
+            # (ili pogrešan clone) do sada bi prošao kao „success“: build je
+            # keširan, stari kontejner je zdrav, /healthz zelen. Odstupanje
+            # sada pada GLASNO, prije nego što se išta gradi.
+            if [ "$(git rev-parse HEAD)" != "${{ github.sha }}" ]; then
+              echo "DEPLOY REFUSED: checkout $(git rev-parse HEAD) != pushed ${{ github.sha }}"
+              exit 1
+            fi
+
             VERSION=$(git rev-parse --short HEAD)
             echo "Deploying version: $VERSION"
 
@@ -74,12 +83,20 @@ jobs:
             # vrijednosti poput izbora brzog modela). Pada zatvoreno: `set -e`
             # obara deploy prije `up -d`, pa pogresna konfiguracija nikad ne
             # zamijeni ispravnu koja trenutno radi.
+            # KRITIČNO: `< /dev/null`. Cijela ova skripta stiže SSH-u kroz
+            # STDIN (heredoc), a `docker compose run` (i exec) PRIKAČI stdin
+            # na kontejner — docker klijent tada POJEDE OSTATAK SKRIPTE kao
+            # ulaz kontejnera. IZMJERENA POSLJEDICA (2026-08-14 → 2026-08-15):
+            # svaki deploy poslije uvođenja ove provjere završavao je TAČNO
+            # OVDJE — `up -d` se više nikad nije izvršio, stari kontejner je
+            # ostao da poslužuje (healthz zelen, workflow „success“), pa
+            # učenici 30+ deployova nisu dobili nijednu novu verziju.
             docker compose run --rm --no-deps -T matbot \
-              python -m matbot.release_config --require
+              python -m matbot.release_config --require < /dev/null
 
             docker compose up -d --remove-orphans
 
-                        docker compose ps
+            docker compose ps
             docker compose logs --tail=80
 
             echo "Waiting for app to become healthy..."
@@ -106,8 +123,39 @@ jobs:
             # efektivnu ne-tajnu konfiguraciju u log workflowa, pa se poslije
             # deploya moze dokazati koju arhitekturu produkcija izvrsava — bez
             # SSH-a i bez ijedne tajne u izlazu.
+            # KONTEJNER KOJI POSLUŽUJE MORA BITI IZ OVOG DEPLOYA. APP_VERSION
+            # ulazi u okruženje kontejnera pri KREIRANJU (env_file), pa stara
+            # vrijednost ovdje znači da `up -d` nije zamijenio kontejner —
+            # tačno tihi kvar koji je ovaj workflow imao. Pada glasno.
+            RUNNING_VERSION=$(docker compose exec -T matbot printenv APP_VERSION < /dev/null)
+            if [ "$RUNNING_VERSION" != "$VERSION" ]; then
+              echo "DEPLOY FAILED: running container has APP_VERSION=$RUNNING_VERSION, expected $VERSION"
+              exit 1
+            fi
+            echo "Running container APP_VERSION: $RUNNING_VERSION"
+
             echo "Effective non-secret configuration of the running service:"
-            docker compose exec -T matbot python -m matbot.release_config --require
+            docker compose exec -T matbot python -m matbot.release_config --require < /dev/null
 
             echo "Deployment successful: $VERSION"
           EOF
+
+      # DOKAZ NAD JAVNIM DOMENOM, SA RUNNERA (ne kroz SSH): učenici ne
+      # razgovaraju sa 127.0.0.1 nego sa https://bot.matematicari.com. Ako
+      # domen poslužuje drugu mašinu ili stariji kontejner, ovo pada GLASNO —
+      # zeleni interni healthz više nikad nije dokaz deploya.
+      - name: Verify public domain serves this deploy
+        run: |
+          VERSION="$(echo "${{ github.sha }}" | cut -c1-7)"
+          for i in 1 2 3 4 5 6; do
+            SERVED=$(curl -fsS --max-time 15 https://bot.matematicari.com/healthz \
+              | python3 -c "import json,sys; print(json.load(sys.stdin).get('version',''))" || true)
+            if [ "$SERVED" = "$VERSION" ]; then
+              echo "Public domain serves version $SERVED"
+              exit 0
+            fi
+            echo "Attempt $i: public domain serves '$SERVED', expected '$VERSION'"
+            sleep 10
+          done
+          echo "DEPLOY FAILED: public domain never served $VERSION"
+          exit 1

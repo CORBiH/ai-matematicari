@@ -84,10 +84,14 @@ def test_index_route_still_works():
 def test_healthz_still_works():
     r = client().get("/healthz")
     assert r.status_code == 200
-    assert r.get_json() == {"ok": True}
+    payload = r.get_json()
+    # `version` = APP_VERSION deploya (prazno lokalno): zdravlje bez
+    # identiteta je jednom sakrilo 30+ tihih no-op deployova (2026-08-15).
+    assert payload["ok"] is True and "version" in payload
 
 
 def test_underscore_healthz_still_works():
     r = client().get("/_healthz")
     assert r.status_code == 200
-    assert r.get_json() == {"ok": True}
+    payload = r.get_json()
+    assert payload["ok"] is True and "version" in payload

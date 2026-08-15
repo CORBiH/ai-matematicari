@@ -171,7 +171,10 @@ def test_feedback_invalid_payloads_rejected(client):
 
 def test_existing_routes_still_work(client):
     assert client.get("/").status_code == 200
-    assert client.get("/healthz").get_json() == {"ok": True}
-    assert client.get("/_healthz").get_json() == {"ok": True}
+    # `version` = APP_VERSION deploya (prazno lokalno) — vidi app._health_payload:
+    # zdravlje bez identiteta je jednom sakrilo 30+ tihih no-op deployova.
+    for path in ("/healthz", "/_healthz"):
+        health = client.get(path).get_json()
+        assert health["ok"] is True and "version" in health
     topics = client.get("/api/ai-tutor/topics?grade=6").get_json()
     assert topics["oblast_order"]
