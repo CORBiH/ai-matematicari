@@ -121,8 +121,8 @@ REQUIRED_SCENARIO_COUNT = 15
 #     poredi se strogom jednakošću; „bilo šta od toga dvoga“ nije prihvaćeno;
 #   • statički zbir je 17, pa je maksimalan dostižan plan 18, ne 19.
 # Tutorska klasa = PRVI poziv turna (bilo koja ruta). Recenzentska = POPRAVAK.
-_TUTOR_STAGE_NAMES = frozenset({"fast_turn", "practice_turn", "tutor_turn"})
-_REVIEWER_STAGE_NAMES = frozenset({"reviewer_turn", "lesson_fidelity_turn"})
+_TUTOR_STAGE_NAMES = frozenset({"fast_turn", "tutor_turn"})
+_REVIEWER_STAGE_NAMES = frozenset({"reviewer_turn"})
 # Arhitektonska granica iz CLAUDE.md pravilo 4 — nikad se ne podiže.
 _MAX_CALLS_PER_TURN = 2
 # Brza ruta troši 1 poziv po scenariju izrade zadatka; recenzentski popravak je
@@ -151,7 +151,6 @@ from matbot.topics import lesson_info  # noqa: E402
 # provjera (matbot/release_config.py → deploy/production_release.env).
 # Produkcija je jednom tiho radila bez prve dvije zastavice dok su gate-ovi
 # mjerili obje uključene. Nijedna vrijednost se ovdje NE PONAVLJA kao literal.
-REQUIRED_PIPELINE = release_config.REQUIRED_RELEASE_ENV["MATBOT_PRACTICE_PIPELINE"]
 REQUIRED_DIFFICULTY_LEVELS = release_config.REQUIRED_RELEASE_ENV["MATBOT_PRACTICE_DIFFICULTY_LEVELS"]
 REQUIRED_RELEASE_TIMEOUT = release_config.REQUIRED_RELEASE_ENV["AI_TUTOR_TIMEOUT"]
 REQUIRED_TIMEOUT_S = float(REQUIRED_RELEASE_TIMEOUT)
@@ -198,9 +197,6 @@ def _require_live_preconditions() -> tuple[str, str]:
         raise GateRefusal("Worktree is dirty; commit or stash changes before the live release gate.")
     if not bool((os.environ.get("OPENAI_API_KEY", "") or "").strip()):
         raise GateRefusal("OPENAI_API_KEY is not present in this shell environment.")
-    pipeline = (os.environ.get("MATBOT_PRACTICE_PIPELINE", "") or "").strip().lower()
-    if pipeline != REQUIRED_PIPELINE:
-        raise GateRefusal("MATBOT_PRACTICE_PIPELINE must be exactly universal_two_call.")
     if not config.practice_difficulty_levels_enabled():
         raise GateRefusal("MATBOT_PRACTICE_DIFFICULTY_LEVELS must be exactly enabled.")
     # CIJELA obavezna konfiguracija, ne samo dvije vrijednosti iznad. Primjena
@@ -609,22 +605,17 @@ def _scenario_errors(gate: GateScenario, result, prior_task: str, prior_options:
             or result.session_lesson_id_after != gate.scenario.lesson_id:
         errors.append("wrong_lesson")
     errors.extend(_transition_errors(gate.role, result))
-    if (os.environ.get("MATBOT_PRACTICE_PIPELINE", "") or "").strip().lower() == REQUIRED_PIPELINE:
-        errors.extend(_structured_transition_errors(gate, result, prior_signature))
+    errors.extend(_structured_transition_errors(gate, result, prior_signature))
     if gate.role in {"fresh_level1", "harder_level2", "easier_level1", "same_level_new",
                      "contract_fresh", "contract_harder", "migrated_deterministic",
                      "grade7", "grade8", "grade9"}:
         errors.extend(_task_output_errors(result))
         errors.extend(_intro_errors(result))
-    # The candidate structured runtime supplies Reviewer-validated generic
-    # difficulty evidence.  Do not reconstruct semantic difficulty from
-    # Bosnian task prose in that runtime; the legacy parser remains only for
-    # the rollback path's independently provable divisibility MCQs.
-    use_legacy_difficulty_parser = (
-        (os.environ.get("MATBOT_PRACTICE_PIPELINE", "") or "").strip().lower()
-        != REQUIRED_PIPELINE
-    )
-    if gate.role == "harder_level2" and use_legacy_difficulty_parser:
+    # Jedini motor isporučuje difficulty evidence koju je RECENZENT provjerio,
+    # pa se semantička težina NIKAD ne rekonstruiše iz bosanske proze zadatka.
+    # Parser koji je to radio služio je isključivo povučenom putu i uklonjen je
+    # zajedno s njim; grana ostaje `False` da se blok ne pokrene slučajno.
+    if False:
         before = mcq_integrity.difficulty_profile(
             prior_task, [option.get("text", "") for option in prior_options]
         )
@@ -804,7 +795,6 @@ def run_live_release_gate() -> int:
         "reasoning_effort": config.REASONING_EFFORT,
         "timeout_seconds": config.AI_TIMEOUT_S,
         "required_timeout_seconds": REQUIRED_TIMEOUT_S,
-        "practice_pipeline": REQUIRED_PIPELINE,
         "difficulty_levels_enabled": True,
         # ČIME JE MJERENO — cijela primijenjena konfiguracija, ne samo ruta.
         # Bez ovoga se iz artefakta nije moglo pročitati da je kampanja išla s

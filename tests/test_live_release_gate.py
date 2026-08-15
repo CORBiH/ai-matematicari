@@ -246,29 +246,30 @@ def test_importing_the_gate_never_mutates_the_process_environment():
     assert "SCOPE None" in result.stdout, result.stdout
 
 
-def test_offline_checker_rejects_legacy_or_missing_structured_runtime_identity():
-    legacy = _passing_document()
-    legacy["practice_pipeline"] = "legacy_single_call"
-    assert "wrong_practice_pipeline" in checker.validate_result(
-        legacy, expected_commit=SHA, expected_tree=TREE)
+def test_offline_checker_still_rejects_a_missing_runtime_identity():
+    """POVLAČENJE (2026-08-14): polje `practice_pipeline` više ne postoji.
+
+    Ranije je ovaj test dokazivao da artefakt s `legacy_single_call` ne smije
+    autorizovati push. Ta vrijednost sada ne postoji ni kao izbor, pa se
+    dokazuje ono što je i dalje istina: artefakt koji ne potvrđuje ostatak
+    produkcijske konfiguracije i dalje pada."""
     missing = _passing_document()
-    missing.pop("practice_pipeline")
     missing["difficulty_levels_enabled"] = False
     errors = checker.validate_result(missing, expected_commit=SHA, expected_tree=TREE)
-    assert {"wrong_practice_pipeline", "difficulty_levels_not_enabled"} <= set(errors)
+    assert "difficulty_levels_not_enabled" in errors
 
 
-def test_public_router_reaches_universal_pipeline_and_not_legacy(monkeypatch):
-    """Gate scenarios use the public Practice entrypoint; no private bypass."""
+def test_public_router_reaches_the_single_engine(monkeypatch):
+    """Gate scenarios use the public Practice entrypoint; no private bypass.
+
+    Poslije povlačenja starog motora nema više „druge rute“ koju bi trebalo
+    isključiti — dokazuje se da javni ulaz vodi TAČNO u jedini motor."""
     from matbot import practice
     from matbot.session_store import SessionStore
 
-    monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", "universal_two_call")
     called = []
     monkeypatch.setattr(practice.tutor_pipeline, "run_turn",
                         lambda store, llm, turn: called.append(turn) or {"status": "ready"})
-    monkeypatch.setattr(practice, "_run_legacy_single_call_turn",
-                        lambda *args: (_ for _ in ()).throw(AssertionError("legacy path invoked")))
     response = practice.run_practice_turn(SessionStore(), object(), {
         "session_id": "gate-route", "grade": 6, "selected_topic": "6-03-001",
         "selected_oblast": "", "student_message": "Daj mi zadatak.", "intent": "",

@@ -83,22 +83,6 @@ def make_options(*texts):
     return [Option(text=t) for t in texts]
 
 
-# --- ČVOROVI SERVERSKOG KOSTURA (matbot/contracts/evidence.py) ---------------
-# Male pomoćne funkcije da testovi generatora/verifikatora pišu izraze čitljivo.
-# Namjerno ne znaju nijednu lekciju. (Modelov „dokaz“ više ne postoji — server
-# konstruiše kostur; ovi helperi grade INTERNE čvorove, ne izlaz modela.)
-
-def frac(numerator, denominator=1):
-    """Literal čvor `num/den` (necijeli znak ide uz brojnik)."""
-    from matbot.contracts import evidence as _ev
-    return _ev.Node(num=numerator, den=denominator)
-
-
-def node(op, left, right):
-    """Binarna operacija nad dva čvora."""
-    from matbot.contracts import evidence as _ev
-    return _ev.Node(op=op, args=(left, right))
-
 
 # Default zadatak MORA zadovoljiti ugovor porodice (matbot/task_family_validation.py):
 # „proširi ... nazivnik“ + četiri razlomka = expand_to_given_denominator, a ujedno
@@ -540,60 +524,26 @@ class FakeLLM:
         return self._next(instructions, input_text)
 
 
-# ---------------------------------------------------------------------------
-# IZBOR PRACTICE PUTA U TESTOVIMA
-# ---------------------------------------------------------------------------
-# Nakon rollbacka (2026-08-03) AKTIVAN i podrazumijevan je STABILAN jednopozivni
-# put. Univerzalni dvopozivni put postoji iza eksplicitne zastavice
-# `MATBOT_PRACTICE_PIPELINE=universal_two_call` i NIJE aktivan u produkciji.
-#
-# Zato je podrazumijevano stanje u testovima isto kao u produkciji (varijabla
-# obrisana → stabilan put), a moduli koji testiraju univerzalni put moraju se
-# EKSPLICITNO prijaviti ispod. Time nijedan test ne može slučajno tvrditi da je
-# neprovjeren put aktivan.
-_UNIVERSAL_TWO_CALL_MODULES = frozenset({
-    "test_universal_tutor_pipeline",
-    "test_universal_tutor_diagnosis",
-    "test_structured_practice_packages",
-    "test_reviewer_target_level_consistency",
-    "test_reviewer_mcq_preflight",
-    "test_reviewer_difficulty_preflight",
-    # Runner live dijagnostike (tools/practice_eval) se testira u TAČNO onoj
-    # konfiguraciji u kojoj se i pokreće — inače bi unit test tvrdio nešto o
-    # putu koji kampanja nikad ne vozi.
-    "test_practice_eval_runner",
-    # Nepotpun tekst zadatka (živi nalaz A25/B02/B30/B42) je defekt univerzalnog
-    # dvopozivnog puta — integracijski dio testa mora voziti taj put.
-    "test_incomplete_task_text",
-    "test_answer_leak_guard",
-    "test_answer_leak_semantic",
-    "test_answer_leak_false_positives",
-    "test_eval_correct_attempt_not_leak",
-    "test_digit_placeholder_divisibility_mcq",
-    "test_divisibility_semantic_requirement_gate",
-    "test_unsafe_notation_preflight",
-    "test_reviewer_correction_resolves_issues",
-    "test_scaled_division_hint",
-    "test_reviewer_package_consistency",
-    "test_difficulty_progression_state",
-    "test_semantic_family_pipeline",
-    # Arhitektonska Faza 1: značenje `checks.*` je pravilo RECENZENTA, pa se
-    # dokazuje na dvopozivnom putu na kojem recenzent uopšte postoji.
-    "test_reviewer_check_semantics",
-})
+def turn_payload(msg="Daj mi jedan zadatak za vježbu iz ove teme.", **kw):
+    """Minimalan Practice payload za testove.
 
-
-@pytest.fixture(autouse=True)
-def _practice_pipeline_selection(request, monkeypatch):
-    """Pripni put koji dati modul zaista testira.
-
-    Podrazumijevano se briše varijabla — test tada vidi TAČNO ono što vidi
-    produkcija."""
-    module = request.node.module.__name__.rsplit(".", 1)[-1]
-    if module in _UNIVERSAL_TWO_CALL_MODULES:
-        monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", "universal_two_call")
-    else:
-        monkeypatch.delenv("MATBOT_PRACTICE_PIPELINE", raising=False)
+    Živio je u `tests/test_practice.py` — fajlu koji je testirao STARI
+    jednopozivni motor i obrisan je s njegovim povlačenjem (2026-08-14).
+    Sam graditelj payloada nije bio vezan za motor, pa je preseljen ovdje
+    umjesto da se prepisuje u tri fajla koja ga i dalje koriste."""
+    base = {
+        "session_id": "sess-1",
+        "grade": 6,
+        "selected_topic": "6-01-006",   # Unija skupova (stvarna lekcija iz topics.json)
+        "selected_oblast": "",
+        "student_message": msg,
+        "intent": "",
+        "difficulty_request": "",
+        "interaction_phase": "",
+        "last_tutor_task": "",
+    }
+    base.update(kw)
+    return base
 
 
 @pytest.fixture

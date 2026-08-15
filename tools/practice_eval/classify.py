@@ -56,10 +56,9 @@ OUTCOME_CLASSES = (
 
 # --- rute izvršavanja (istinito knjigovodstvo poziva) ----------------------
 ROUTE_UNIVERSAL_TWO_CALL = "universal_two_call"
-ROUTE_SINGLE_CALL = "single_call"
 ROUTE_DETERMINISTIC = "deterministic_zero_call"
 ROUTE_NO_MODEL_TURN = "no_model_turn"
-ROUTES = (ROUTE_UNIVERSAL_TWO_CALL, ROUTE_SINGLE_CALL, ROUTE_DETERMINISTIC,
+ROUTES = (ROUTE_UNIVERSAL_TWO_CALL, ROUTE_DETERMINISTIC,
           ROUTE_NO_MODEL_TURN)
 
 # Provjere koje mjere SADRŽAJ OBJAVLJENOG PAKETA. Njihov pad je dokaz o
@@ -104,8 +103,6 @@ def turn_route(turn) -> str:
         return ROUTE_DETERMINISTIC
     if "tutor_turn" in kinds or "reviewer_turn" in kinds:
         return ROUTE_UNIVERSAL_TWO_CALL
-    if "practice_turn" in kinds:
-        return ROUTE_SINGLE_CALL
     return ROUTE_NO_MODEL_TURN
 
 

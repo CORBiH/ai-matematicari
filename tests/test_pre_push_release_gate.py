@@ -71,7 +71,6 @@ def passing_document(commit_sha, tree_hash):
         "tested_commit_sha": commit_sha,
         "tested_tree_hash": tree_hash,
         "clean_worktree": True,
-        "practice_pipeline": "universal_two_call",
         "difficulty_levels_enabled": True,
         # Rok i primijenjena konfiguracija su dio ugovora artefakta: kampanja
         # mjerena drugim rokom ili drugom rutom ne autorizuje push.
@@ -275,7 +274,6 @@ def test_a_malformed_artifact_blocks(repo):
     ("required_scenario_count", 3),
     ("call_above_ceiling_refused", False),
     ("clean_worktree", False),
-    ("practice_pipeline", "legacy_single_call"),
     ("difficulty_levels_enabled", False),
     ("validation_failures", ["harder_level2:something"]),
     ("infrastructure_failures", ["llm_timeout"]),

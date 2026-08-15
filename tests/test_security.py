@@ -11,7 +11,7 @@ import pytest
 from matbot import auth
 from matbot.ratelimit import RateLimiter
 from matbot.turnlock import TurnLockRegistry
-from tests.conftest import FakeLLM, make_output, make_task
+from tests.conftest import queue_two_call, FakeLLM, make_output, make_task
 
 
 def chat_payload(msg="Daj mi jedan zadatak za vježbu iz ove teme.", mode="practice", **kw):
@@ -21,7 +21,10 @@ def chat_payload(msg="Daj mi jedan zadatak za vježbu iz ove teme.", mode="pract
         "grade": 6,
         "mode": mode,
         "entry_source": "manual_topic_choice",
-        "selected_topic": "6-01-006",   # Unija skupova — stvarna lekcija u topics.json
+        # 6-01-005 ide MODELSKOM rutom. Ranije je ovdje stajala 6-01-006, koju
+        # aktivni motor servira DETERMINISTIČKI (nula poziva) — tada mjerenje
+        # „treći zahtjev nije stigao do LLM-a“ ne dokazuje ništa.
+        "selected_topic": "6-01-005",
         "selected_oblast": "",
         "student_message": msg,
         "conversation_history": [],
@@ -52,7 +55,9 @@ def test_index_route_issues_signed_embed_token(flask_app):
 
 def test_valid_token_passes(flask_app, fake_llm):
     c = _authed_client(flask_app)
-    fake_llm.queue(make_output(reply="Evo zadatka.", new_task=make_task()))
+    # Jedini motor je Tutor+uslovni Recenzent, pa se i pripremaju TA dva
+    # odgovora; stara jednopozivna šema više nema ko da je pročita.
+    queue_two_call(fake_llm)
     r = c.post("/api/ai-tutor/chat", json=chat_payload())
     assert r.status_code == 200
     assert r.get_json()["status"] == "ready"

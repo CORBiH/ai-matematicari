@@ -135,16 +135,3 @@ def test_publication_failure_for_wrong_mark_on_new_variant():
     failure, _ = mcq_integrity.publication_failure(
         "Koji broj je djeljiv sa 6 te sa 25?", OPTIONS_6_25, 1, "150")
     assert failure == "marked_option_math_mismatch"
-
-
-def test_fingerprints_distinguish_different_compound_tasks():
-    first = mcq_integrity.evaluate_divisibility_mcq(
-        "Koji broj je djeljiv i sa 6 i sa 25?", OPTIONS_6_25)
-    second = mcq_integrity.evaluate_divisibility_mcq(
-        "Koji broj je djeljiv i sa 6 i sa 25?", ("300", "60", "75", "90"))
-    fp1 = mcq_integrity.mathematical_fingerprint(first, "direct_computation")
-    fp2 = mcq_integrity.mathematical_fingerprint(second, "direct_computation")
-    assert fp1 and fp2 and fp1 != fp2
-    same = mcq_integrity.evaluate_divisibility_mcq(
-        "Koji od brojeva je djeljiv i sa 6 i sa 25?", OPTIONS_6_25)
-    assert mcq_integrity.mathematical_fingerprint(same, "direct_computation") == fp1

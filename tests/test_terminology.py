@@ -10,7 +10,7 @@ from matbot.explain import run_explain_turn
 from matbot.practice import run_practice_turn
 from matbot.quick import run_quick_turn
 from matbot.session_store import SessionStore
-from tests.conftest import (FakeLLM, make_explain_output, make_options, make_output,
+from tests.conftest import (queue_two_call, FakeLLM, make_explain_output, make_options, make_output,
                              make_quick_output, make_task)
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -106,44 +106,6 @@ def _practice_payload(msg="Daj zadatak.", **kw):
     }
     base.update(kw)
     return base
-
-
-def test_practice_task_is_normalized_and_model_intro_is_ignored():
-    store, fake = SessionStore(), FakeLLM()
-    # Zadatak zadovoljava ugovor prve porodice (expand_to_given_denominator),
-    # a namjerno sadrži zabranjeni termin u tekstu i u jednoj opciji.
-    fake.queue(make_output(
-        reply="Rastavi na čimbenike.",
-        new_task=make_task(
-            text="Proširi razlomak $\\frac{3}{8}$ tako da nazivnik bude $24$ "
-                 "(pomnoži oba čimbenika).",
-            expected="$\\frac{9}{24}$",
-            options=make_options("$\\frac{9}{24}$", "$\\frac{3}{24}$",
-                                  "$\\frac{9}{8}$", "$\\frac{6}{24}$"))))
-    r = run_practice_turn(store, fake, _practice_payload())
-
-    assert not terminology.contains_forbidden_term(r["answer"])
-    assert r["answer"].startswith("Evo zadatka.\n\nZadatak: ")
-    assert "Rastavi" not in r["answer"]
-    assert "faktora" in r["answer"]
-    assert not terminology.contains_forbidden_term(r["last_tutor_task"])
-    for option in r["next_state"]["task"]["options"]:
-        assert not terminology.contains_forbidden_term(option["text"])
-
-
-def test_practice_wrong_answer_hint_is_normalized():
-    store, fake = SessionStore(), FakeLLM()
-    fake.queue(make_output(reply="Evo zadatka.", new_task=make_task()))
-    run_practice_turn(store, fake, _practice_payload())
-    sess = store.peek("sess-term")
-    wrong = next(o["id"] for o in sess["current_options"] if o["id"] != sess["correct_option_id"])
-
-    fake.queue(make_output(reply="x", hint="Pronađi prvo najmanji čimbenik broja."))
-    r = run_practice_turn(store, fake, _practice_payload(
-        msg="[klik]", interaction_type="choice_answer",
-        selected_option_id=wrong, client_turn_id="t1"))
-    assert not terminology.contains_forbidden_term(r["answer"])
-    assert "faktor" in r["answer"]
 
 
 def test_explain_reply_is_normalized():

@@ -13,7 +13,7 @@ from matbot.llm import LLMTimeout
 from matbot.quick import run_quick_turn
 from matbot.practice import SAFE_ERROR_MESSAGE
 from matbot.ratelimit import RateLimiter
-from tests.conftest import FakeLLM, make_output, make_quick_output, make_task
+from tests.conftest import queue_two_call, FakeLLM, make_output, make_quick_output, make_task
 
 
 def quick_turn_payload(msg="Koliko je 3/4 + 2/5?", **kw):
@@ -359,9 +359,9 @@ def test_quick_llm_error_returns_safe_message_without_status(flask_app, fake_llm
 # ---------------------------------------------------------------------------
 
 def test_practice_still_works_and_is_not_routed_through_quick(flask_app, fake_llm):
-    """Practice koristi stabilan put: JEDAN tutor poziv + recenzent vjernosti
-    (jer ovaj turn pravi zadatak). Quick ima svoj put i ne dodiruje se."""
-    fake_llm.queue(make_output(reply="Evo zadatka.", new_task=make_task()))
+    """Practice ide JEDINIM motorom; za ovu lekciju to je deterministicka
+    strategija (nula poziva). Quick ima svoj put i ne dodiruje se."""
+    queue_two_call(fake_llm)
     c = _authed(flask_app)
     payload = http_payload(
         mode="practice", msg="Daj mi jedan zadatak za vježbu iz ove teme.",
@@ -373,8 +373,10 @@ def test_practice_still_works_and_is_not_routed_through_quick(flask_app, fake_ll
     assert j["session_mode"] == "practice"
     assert j["last_tutor_task"]                       # Practice I DALJE prati zadatak
     assert j["next_state"].get("task", {}).get("question")
-    assert fake_llm.practice_call_count == 1           # jedan tutor poziv
-    assert len(fake_llm.fidelity_calls) == 1           # + recenzent (turn pravi zadatak)
+    # 6-04-007 ima potpun serverski generator -> deterministicka ruta,
+    # nula modelskih poziva. Quick put se i dalje ne dodiruje.
+    assert fake_llm.call_count == 0
+    assert len(fake_llm.quick_calls) == 0
     assert len(fake_llm.quick_calls) == 0              # practice NIJE išao kroz quick put
 
 

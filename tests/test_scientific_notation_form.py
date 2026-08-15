@@ -157,12 +157,15 @@ def test_single_hint_diversity_and_config_are_untouched():
     assert config.practice_single_hint_enabled() is True
     assert archetype_support._enabled() is True
     assert form_variants._enabled() is True
-    assert release_config.REQUIRED_RELEASE_ENV["MATBOT_PRACTICE_PIPELINE"] == \
-        "universal_two_call"
+    # POVLACENJE (2026-08-14): stari motor je uklonjen, pa
+    # `MATBOT_PRACTICE_PIPELINE` vise nije ni deklarisan. Cuva se
+    # ono sto jos bira rutu lekcije — opseg brze rute.
+    assert "MATBOT_PRACTICE_PIPELINE" not in release_config.REQUIRED_RELEASE_ENV
+    assert release_config.REQUIRED_RELEASE_ENV["MATBOT_FAST_SINGLE_CALL_SCOPE"] == \
+        "model_backed"
 
 
 def test_zero_call_routes_stay_zero_call(monkeypatch):
-    monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", "universal_two_call")
     monkeypatch.setenv("MATBOT_PRACTICE_DIFFICULTY_LEVELS", "enabled")
     monkeypatch.setenv("MATBOT_DETERMINISTIC_VARIETY_GATE", "enabled")
     from matbot.practice import run_practice_turn

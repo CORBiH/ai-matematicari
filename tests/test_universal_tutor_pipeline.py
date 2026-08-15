@@ -652,13 +652,15 @@ def test_idempotent_click_retry_makes_no_extra_call():
 
 
 def test_no_lesson_silently_enters_another_execution_path(monkeypatch):
-    """Ni jedna lekcija ne smije skliznuti na zamrznuti jednopozivni put."""
+    """Ni jedna lekcija ne smije skliznuti na drugi izvršni put.
+
+    POVLAČENJE (2026-08-14): raniji oblik ovog testa je podmetao eksploziv u
+    `practice._run_legacy_single_call_turn`. Ta funkcija više NE POSTOJI — pa
+    se dokazuje jače: da simbola nema, i da svaka lekcija i dalje objavljuje
+    kroz jedini motor."""
     from matbot import practice as practice_module
 
-    def _explode(*args, **kwargs):
-        raise AssertionError("zamrznuti jednopozivni put NE SMIJE biti pozvan")
-
-    monkeypatch.setattr(practice_module, "_run_legacy_single_call_turn", _explode)
+    assert not hasattr(practice_module, "_run_legacy_single_call_turn")
     for grade, topic in [(6, "6-04-009"), (6, "6-04-014"), (9, "9-05-004")]:
         store, fake = SessionStore(), FakeLLM()
         queue_two_call(fake)
@@ -738,29 +740,6 @@ def test_one_universal_prompt_serves_every_lesson():
 # ---------------------------------------------------------------------------
 # K1/K3 sačuvan, ali ne blokira univerzalni put
 # ---------------------------------------------------------------------------
-
-def test_deterministic_k1_k3_generator_is_preserved_and_still_works():
-    import random as _random
-
-    from matbot.contracts import generator
-
-    contract = contract_registry.contract_for("6-04-009")
-    skeleton = generator.generate(contract, "direct_computation", rng=_random.Random(0))
-    ok, code = generator.self_verify(contract, skeleton)
-    assert ok, code
-
-
-def test_universal_pipeline_is_opt_in_and_never_the_default(monkeypatch):
-    """ROLLBACK 2026-08-03: podrazumijevano je STABILAN jednopozivni put; ovaj
-    (univerzalni) put se uključuje SAMO eksplicitnom zastavicom. Puna kapija
-    živi u tests/test_practice_pipeline_selection.py."""
-    from matbot import practice as practice_module
-
-    monkeypatch.delenv("MATBOT_PRACTICE_PIPELINE", raising=False)
-    assert practice_module._universal_pipeline_enabled() is False
-    monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE",
-                       practice_module.UNIVERSAL_PIPELINE_FLAG)
-    assert practice_module._universal_pipeline_enabled() is True
 
 
 # ---------------------------------------------------------------------------

@@ -331,7 +331,6 @@ def test_the_detector_makes_no_model_call():
 
 def test_deterministic_lessons_keep_their_zero_call_route(monkeypatch):
     """Novi detektor ne smije ni dodirnuti 0-pozivnu rutu."""
-    monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", "universal_two_call")
     monkeypatch.setenv("MATBOT_PRACTICE_DIFFICULTY_LEVELS", "enabled")
     monkeypatch.setenv("MATBOT_DETERMINISTIC_VARIETY_GATE", "enabled")
     from matbot.practice import run_practice_turn
@@ -382,8 +381,12 @@ def test_single_hint_archetype_and_form_rotation_are_untouched():
 
 def test_release_configuration_enforcement_is_untouched():
     from matbot import release_config
-    assert release_config.REQUIRED_RELEASE_ENV["MATBOT_PRACTICE_PIPELINE"] == \
-        "universal_two_call"
+    # POVLACENJE (2026-08-14): stari motor je uklonjen, pa
+    # `MATBOT_PRACTICE_PIPELINE` vise nije ni deklarisan. Cuva se
+    # ono sto jos bira rutu lekcije — opseg brze rute.
+    assert "MATBOT_PRACTICE_PIPELINE" not in release_config.REQUIRED_RELEASE_ENV
+    assert release_config.REQUIRED_RELEASE_ENV["MATBOT_FAST_SINGLE_CALL_SCOPE"] == \
+        "model_backed"
     assert release_config.REQUIRED_RELEASE_ENV["AI_TUTOR_TIMEOUT"] == "45"
     assert release_config.release_configuration_problems(
         dict(release_config.REQUIRED_RELEASE_ENV), include_effective=False) == []

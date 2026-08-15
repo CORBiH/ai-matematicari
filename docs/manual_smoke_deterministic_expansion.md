@@ -1,8 +1,7 @@
 # Ručni smoke test — deterministička kapacitetna ekspanzija
 
 Vrijedi za stanje u kojem su aktivne obje release zastavice
-(`MATBOT_PRACTICE_PIPELINE=universal_two_call`,
-`MATBOT_PRACTICE_DIFFICULTY_LEVELS=enabled`) i deterministička strategija
+(`MATBOT_PRACTICE_DIFFICULTY_LEVELS=enabled`) i deterministička strategija
 (podrazumijevano uključena; rollback: `MATBOT_DETERMINISTIC_PRACTICE=disabled`).
 
 **Šta se općenito očekuje na determinističkoj lekciji** (svaka stavka ispod):

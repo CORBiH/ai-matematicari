@@ -61,7 +61,10 @@ def _problems(env):
 
 def test_required_release_configuration_is_declared_once():
     required = release_config.REQUIRED_RELEASE_ENV
-    assert required["MATBOT_PRACTICE_PIPELINE"] == "universal_two_call"
+    assert required["MATBOT_FAST_SINGLE_CALL_SCOPE"] == "model_backed"
+    # POVUČENO (2026-08-14): stari motor ne postoji, pa ga ni
+    # konfiguracija ne smije spominjati — inače bi izgledalo da se bira.
+    assert "MATBOT_PRACTICE_PIPELINE" not in required
     assert required["MATBOT_PRACTICE_DIFFICULTY_LEVELS"] == "enabled"
     assert required["AI_TUTOR_TIMEOUT"] == "45"
     assert required["OPENAI_MODEL_TEXT"] == "gpt-5-mini"
@@ -116,7 +119,7 @@ def test_the_declaration_is_the_only_place_the_values_are_written():
                  ROOT / "tools" / "run_live_release_gate.py",
                  ROOT / "tools" / "check_live_release_gate.py"):
         source = path.read_text(encoding="utf-8")
-        assert "universal_two_call\"" not in source and "'universal_two_call'" not in source, path
+        assert "model_backed\"" not in source and "'model_backed'" not in source, path
 
 
 def test_every_declared_value_is_safe_for_the_deploy_substitution():
@@ -178,8 +181,8 @@ def test_an_empty_variable_is_reported(name):
 @pytest.mark.parametrize("name,wrong", [
     # Tačno primjeri iz zadatka: svaki od njih znači da produkcija izvršava
     # DRUGU arhitekturu nego onu koju je kapija izdanja izmjerila.
-    ("MATBOT_PRACTICE_PIPELINE", "legacy_single_call"),
-    ("MATBOT_PRACTICE_PIPELINE", "universal"),
+    ("MATBOT_FAST_SINGLE_CALL_SCOPE", "lessons"),
+    ("MATBOT_FAST_SINGLE_CALL_SCOPE", "model"),
     ("MATBOT_PRACTICE_DIFFICULTY_LEVELS", "disabled"),
     ("MATBOT_PRACTICE_DIFFICULTY_LEVELS", "true"),
     ("MATBOT_PRACTICE_DIFFICULTY_LEVELS", "1"),
@@ -206,8 +209,8 @@ def test_require_release_configuration_raises_on_a_wrong_value():
     start aplikacije i deploy korak, pa njeno ponašanje mora biti dokazano."""
     with pytest.raises(RuntimeError) as excinfo:
         release_config.require_release_configuration(
-            _env(MATBOT_PRACTICE_PIPELINE="legacy_single_call"))
-    assert "MATBOT_PRACTICE_PIPELINE" in str(excinfo.value)
+            _env(MATBOT_FAST_SINGLE_CALL_SCOPE="lessons"))
+    assert "MATBOT_FAST_SINGLE_CALL_SCOPE" in str(excinfo.value)
 
 
 def test_release_enforcement_is_an_exact_flag():
@@ -221,7 +224,7 @@ def test_release_enforcement_is_an_exact_flag():
 
 def test_the_guard_never_echoes_a_secret():
     env = _env(OPENAI_API_KEY="super-secret", FLASK_SECRET_KEY="also-secret",
-               MATBOT_PRACTICE_PIPELINE="legacy_single_call")
+               MATBOT_FAST_SINGLE_CALL_SCOPE="lessons")
     blob = " ".join(_problems(env))
     assert "super-secret" not in blob and "also-secret" not in blob
 
@@ -236,7 +239,7 @@ def test_effective_configuration_reports_only_non_secret_values():
     blob = " ".join(f"{key}={value}" for key, value in report.items())
     assert "super-secret" not in blob and "also-secret" not in blob
     assert "OPENAI_API_KEY" not in report and "FLASK_SECRET_KEY" not in report
-    for key in ("practice_pipeline", "difficulty_levels", "model", "reasoning_effort",
+    for key in ("difficulty_levels", "model", "reasoning_effort",
                 "timeout_seconds", "reviewer_output_tokens"):
         assert key in report, key
 
@@ -245,7 +248,7 @@ def test_startup_diagnostics_prove_every_audited_choice():
     """Poslije deploya se iz jednog reda mora vidjeti KOJU arhitekturu proces
     izvršava — inače se tiho odstupanje opet vidi tek ručnim testom."""
     report = release_config.effective_configuration(_env())
-    for key in ("practice_pipeline", "difficulty_levels", "fast_single_call_scope",
+    for key in ("difficulty_levels", "fast_single_call_scope",
                 "deterministic_variety_gate", "fast_model", "fast_reasoning_effort",
                 "fast_reviewer_model", "single_hint", "archetype_rotation",
                 "form_rotation", "timeout_seconds", "release_enforcement"):
@@ -256,7 +259,7 @@ def test_startup_diagnostics_prove_every_audited_choice():
 
 def test_effective_configuration_survives_a_missing_variable():
     report = release_config.effective_configuration({})
-    assert report["practice_pipeline"] == "(unset)"
+    assert report["difficulty_levels"] == "(unset)"
 
 
 def test_the_config_cli_never_prints_a_secret_and_fails_closed():
@@ -264,17 +267,17 @@ def test_the_config_cli_never_prints_a_secret_and_fails_closed():
     env = dict(os.environ)
     env.update(_env())
     env.update({"OPENAI_API_KEY": "super-secret", "FLASK_SECRET_KEY": "also-secret",
-                "MATBOT_PRACTICE_PIPELINE": "legacy_single_call"})
+                "MATBOT_FAST_SINGLE_CALL_SCOPE": "lessons"})
     result = subprocess.run([sys.executable, "-m", "matbot.release_config", "--require"],
                             cwd=str(ROOT), capture_output=True, text=True,
                             encoding="utf-8", errors="replace", env=env, timeout=180)
     assert result.returncode == 1, result.stdout
     assert "super-secret" not in result.stdout and "also-secret" not in result.stdout
     assert "super-secret" not in result.stderr and "also-secret" not in result.stderr
-    assert "MATBOT_PRACTICE_PIPELINE" in result.stdout
+    assert "MATBOT_FAST_SINGLE_CALL_SCOPE" in result.stdout
 
-    env["MATBOT_PRACTICE_PIPELINE"] = \
-        release_config.REQUIRED_RELEASE_ENV["MATBOT_PRACTICE_PIPELINE"]
+    env["MATBOT_FAST_SINGLE_CALL_SCOPE"] = \
+        release_config.REQUIRED_RELEASE_ENV["MATBOT_FAST_SINGLE_CALL_SCOPE"]
     accepted = subprocess.run([sys.executable, "-m", "matbot.release_config", "--require"],
                               cwd=str(ROOT), capture_output=True, text=True,
                               encoding="utf-8", errors="replace", env=env, timeout=180)
@@ -344,7 +347,7 @@ def test_repeated_deploy_is_idempotent_and_never_duplicates_a_key(tmp_path):
     second = run()
     third = run()
     assert first == second == third, "ponovljeni deploy mora dati identican .env"
-    assert "legacy_single_call" not in first, "pogresna zatecena vrijednost mora biti zamijenjena"
+    assert "SCOPE=lessons" not in first, "pogresna zatecena vrijednost mora biti zamijenjena"
     for name in release_config.REQUIRED_RELEASE_ENV:
         occurrences = [line for line in first.splitlines() if line.startswith(f"{name}=")]
         assert len(occurrences) == 1, (name, occurrences)
@@ -358,7 +361,6 @@ def test_repeated_deploy_is_idempotent_and_never_duplicates_a_key(tmp_path):
 def test_the_release_gate_uses_the_same_definition():
     """Gate i deploy guard NE smiju imati dvije liste istine."""
     import tools.run_live_release_gate as gate
-    assert gate.REQUIRED_PIPELINE == release_config.REQUIRED_RELEASE_ENV["MATBOT_PRACTICE_PIPELINE"]
     assert gate.REQUIRED_DIFFICULTY_LEVELS == release_config.REQUIRED_RELEASE_ENV["MATBOT_PRACTICE_DIFFICULTY_LEVELS"]
 
 
@@ -408,8 +410,6 @@ def test_the_gate_timeout_equals_the_production_timeout():
         release_config.REQUIRED_RELEASE_ENV["MATBOT_FAST_SINGLE_CALL_SCOPE"] in line, line
     assert "deterministic_variety_gate=" + \
         release_config.REQUIRED_RELEASE_ENV["MATBOT_DETERMINISTIC_VARIETY_GATE"] in line, line
-    assert "practice_pipeline=" + \
-        release_config.REQUIRED_RELEASE_ENV["MATBOT_PRACTICE_PIPELINE"] in line, line
 
 
 # Da uvoz kapije NE mijenja okruženje procesa dokazuje
@@ -423,11 +423,11 @@ def test_the_gate_refuses_an_environment_that_contradicts_the_declaration():
     pregazi tiho — inače bi namjeran izbor operatera nestao bez traga."""
     import tools.run_live_release_gate as gate
     hostile = dict(release_config.REQUIRED_RELEASE_ENV)
-    hostile["MATBOT_PRACTICE_PIPELINE"] = "legacy_single_call"
+    hostile["MATBOT_FAST_SINGLE_CALL_SCOPE"] = "lessons"
     with pytest.raises(gate.GateRefusal) as excinfo:
         gate._apply_required_release_environment(hostile)
-    assert "MATBOT_PRACTICE_PIPELINE" in str(excinfo.value)
-    assert "legacy_single_call" not in str(excinfo.value)
+    assert "MATBOT_FAST_SINGLE_CALL_SCOPE" in str(excinfo.value)
+    assert "lessons" not in str(excinfo.value)
 
 
 def test_the_gate_applier_fills_in_a_missing_value(tmp_path):
@@ -513,9 +513,9 @@ def test_the_flask_app_refuses_to_start_on_a_wrong_production_configuration():
     hostile = dict(os.environ)
     hostile.update(release_config.REQUIRED_RELEASE_ENV)
     hostile["FLASK_SECRET_KEY"] = "test-only"
-    hostile["MATBOT_PRACTICE_PIPELINE"] = "legacy_single_call"
+    hostile["MATBOT_FAST_SINGLE_CALL_SCOPE"] = "lessons"
     result = subprocess.run([sys.executable, "-c", "import app"], cwd=str(ROOT),
                             capture_output=True, text=True, encoding="utf-8",
                             errors="replace", env=hostile, timeout=180)
     assert result.returncode != 0
-    assert "MATBOT_PRACTICE_PIPELINE" in result.stderr
+    assert "MATBOT_FAST_SINGLE_CALL_SCOPE" in result.stderr

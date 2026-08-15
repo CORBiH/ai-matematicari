@@ -122,10 +122,18 @@ Flask + a single-page frontend, one OpenAI call per turn, no database.
    the lesson's skill and move only difficulty dimensions. The Tutor must report
    which dimensions moved (`difficulty_diagnostics`) and the Reviewer verifies
    the direction. Those diagnostics are **internal**: logged, never shown.
-5d. **The deterministic K1/K3 generator is preserved, not active.**
-   `matbot/contracts/generator.py` and its tests stay green and are reachable
-   through `MATBOT_PRACTICE_PIPELINE=legacy_single_call` (rollback only). Do not
-   expand it, and do not reintroduce it as a second active top-level branch.
+5d. **The legacy single-call Practice engine is RETIRED (2026-08-14), not
+   disabled.** `matbot/practice.py` is now a thin boundary that unconditionally
+   calls `tutor_pipeline.run_turn`; the old orchestration, the K1/K3 generator
+   (`matbot/contracts/{generator,constraints,evidence,pipeline,intent,prompting}.py`),
+   `matbot/systemcheck.py`, `matbot/task_family_validation.py`, the legacy
+   Practice prompt builders and the `practice_turn`/`lesson_fidelity_turn` model
+   methods are **deleted**. `MATBOT_PRACTICE_PIPELINE` and `MATBOT_CONTRACT_ENGINE`
+   no longer exist, so no stale `.env` value can resurrect the old path.
+   **Rollback is Git history (a known-good commit), not configuration.**
+   Contract *data* survives and still feeds the Luna prompt through
+   `contracts/registry.py` + `contracts/schema.py` — do not confuse the retired
+   engine with the live data.
 5a. **Adding a normal supported lesson must change data, not Python.** Do not add
    a per-lesson validator, a per-lesson family list, a topic-ID branch, or a
    lesson name inside `matbot/contracts/`. `tests/test_contract_architecture_gate.py`
@@ -247,13 +255,13 @@ Flask + a single-page frontend, one OpenAI call per turn, no database.
 | Geometry symbols, formulas, topic routing | `matbot/geometry_rules.py` |
 | The only OpenAI call site | `matbot/llm.py` |
 | Strict output schemas (incl. the image-only Quick schema) | `matbot/schema.py` |
+| Answer-notation classifier (release gate only) | `matbot/answer_kind.py` |
 | Explain selected-lesson relevance | `matbot/lesson_relevance.py` |
 | Deterministic image-answer verifier | `matbot/imagecheck.py` |
 | Shared `$...$`/`$$...$$` tokenizer (text/inline/display segments) | `matbot/mathsegments.py` |
 | MathJax safety + repair | `matbot/mathsafe.py` |
 | Numeric-consistency verifier | `matbot/mathcheck.py` |
 | Geometry-notation verifier | `matbot/geometrycheck.py` |
-| Linear-system substitution verifier (Practice only) | `matbot/systemcheck.py` |
 | Terminology normalizer | `matbot/terminology.py` |
 | Image upload validation/normalization | `matbot/imageinput.py` |
 | Auth token, rate limits, per-session lock | `matbot/auth.py`, `matbot/ratelimit.py`, `matbot/turnlock.py` |

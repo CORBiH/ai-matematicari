@@ -61,7 +61,8 @@ def test_explicit_allowlisted_campaign_override_still_works():
 
     assert applied["AI_TUTOR_TIMEOUT"] == "12"
     assert environ["AI_TUTOR_TIMEOUT"] == "12"
-    assert environ["MATBOT_PRACTICE_PIPELINE"] == "universal_two_call"
+    # POVLACENJE (2026-08-14): zastavica izbora motora vise ne postoji.
+    assert "MATBOT_PRACTICE_PIPELINE" not in environ
 
 
 def test_unauthorized_behavior_override_is_rejected_before_any_mutation():

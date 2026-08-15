@@ -54,8 +54,10 @@ OPTIONS_BY_LESSON = {
 
 @pytest.fixture
 def release_gate_env(monkeypatch):
-    """TAČNO okruženje obaveznog live release gatea."""
-    monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", "universal_two_call")
+    """TAČNO okruženje obaveznog live release gatea.
+
+    `MATBOT_PRACTICE_PIPELINE` je uklonjen s povlačenjem starog motora — niko
+    ga više ne čita, pa bi njegovo postavljanje ovdje lažno sugerisalo izbor."""
     monkeypatch.setenv("MATBOT_PRACTICE_DIFFICULTY_LEVELS", "enabled")
     return True
 
@@ -113,12 +115,15 @@ def level_two_evidence():
 
 @pytest.fixture
 def route_spy(monkeypatch):
-    """Zabilježi KOJI put je router izabrao, bez pokretanja turna."""
+    """Zabilježi KOJI put je router izabrao, bez pokretanja turna.
+
+    POVLAČENJE (2026-08-14): ranije je ovaj špijun pratio DVA puta i dokazivao
+    da lekcija nije tiho skliznula na stari jednopozivni motor. Tog motora više
+    nema, pa se prati jedini koji postoji — a da drugog nema dokazuje
+    `test_no_supported_path_can_reach_a_retired_engine` u ovom fajlu."""
     seen = []
     monkeypatch.setattr(tutor_pipeline, "run_turn",
                         lambda *a, **k: seen.append("universal") or {"status": "spy"})
-    monkeypatch.setattr(practice, "_run_legacy_single_call_turn",
-                        lambda *a, **k: seen.append("legacy") or {"status": "spy"})
     return seen
 
 
@@ -139,14 +144,6 @@ def test_semantic_lessons_receive_the_compiled_contract(lesson_id):
     assert context.semantic_contract is not None
     assert context.semantic_contract.blocking
     assert context.semantic_contract.prompt_block().strip()
-
-
-def test_gate_environment_is_the_one_the_release_gate_uses(release_gate_env):
-    """Obje zastavice zajedno — isto što gate zahtijeva prije pokretanja."""
-    from matbot import config
-
-    assert practice._universal_pipeline_enabled()
-    assert config.practice_difficulty_levels_enabled()
 
 
 # ---------------------------------------------------------------------------
@@ -185,16 +182,6 @@ def test_k1k3_contract_still_constrains_the_migrated_lesson(lesson_id):
     assert str(contract.operand_constraints["scaling_direction"]) in block
     if contract.representation_constraints.get("answer_form") == "irreducible":
         assert "NESVODIV" in block
-
-
-@pytest.mark.parametrize("lesson_id", K1K3_ONLY_LESSONS)
-def test_legacy_contract_route_remains_reachable_for_rollback(
-        lesson_id, monkeypatch, route_spy, fake_llm, store):
-    """ROLLBACK: stari ugovorni put se ne briše dok migracija ne dobije staž."""
-    monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", "legacy_single_call")
-    monkeypatch.setenv("MATBOT_PRACTICE_DIFFICULTY_LEVELS", "enabled")
-    practice.run_practice_turn(store, fake_llm, turn_for(lesson_id))
-    assert route_spy == ["legacy"], (lesson_id, route_spy)
 
 
 # ---------------------------------------------------------------------------
@@ -380,3 +367,34 @@ import pytest as _pytest_f4h
 @_pytest_f4h.fixture(autouse=True)
 def _model_route_only_f4h(monkeypatch):
     monkeypatch.setenv("MATBOT_DETERMINISTIC_PRACTICE", "disabled")
+
+
+# ---------------------------------------------------------------------------
+# POVLAČENJE STAROG MOTORA (2026-08-14) — dokaz da druge rute NEMA
+# ---------------------------------------------------------------------------
+
+def test_no_supported_path_can_reach_a_retired_engine():
+    """Stari jednopozivni motor nije isključen — njega NEMA.
+
+    Ovo je razlog zašto `route_spy` više ne prati dvije rute: ne postoji
+    zastavica, grana ni simbol kojim bi se druga ruta izabrala, pa ni zaostala
+    vrijednost u produkcijskom `.env`-u ne može oživjeti povučeno ponašanje."""
+    import inspect
+
+    from matbot import practice as practice_module
+
+    for gone in ("_run_legacy_single_call_turn", "_universal_pipeline_enabled",
+                 "UNIVERSAL_PIPELINE_FLAG", "_handle_text_turn", "_handle_choice_answer",
+                 "_apply_new_task", "_shuffle_options"):
+        assert not hasattr(practice_module, gone), gone
+
+    source = inspect.getsource(practice_module)
+    assert "MATBOT_PRACTICE_PIPELINE" not in source.split('"""', 2)[2], \
+        "izbor rute ne smije postojati izvan istorijske napomene"
+    assert "os.environ" not in source, "granica ne smije čitati okruženje"
+
+    # Javni ulaz vodi TAČNO u jedini motor.
+    assert practice_module.run_practice_turn.__module__ == "matbot.practice"
+    body = inspect.getsource(practice_module.run_practice_turn)
+    assert "tutor_pipeline.run_turn" in body
+    assert "else" not in body and "if " not in body, "nema grananja rute"

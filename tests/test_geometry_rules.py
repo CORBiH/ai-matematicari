@@ -429,7 +429,10 @@ _OLD_CONVENTION_R_AS_CIRCUMSCRIBED = re.compile(r"\$?R\$?\s*(?:=|je|označava)\s
 
 def test_full_practice_instructions_have_no_contradictory_geometry_symbols():
     for grade, oblast, lesson in _REPRESENTATIVE_GEOMETRY_TOPICS:
-        full = prompts.build_instructions(grade, lesson_title=lesson, oblast=oblast)
+        # Stari Practice graditelj je povucen; zajednicki blok je isti izvor
+        # koji aktivni tutor prompt splajsa.
+        from matbot.rules import build_shared_math_rules
+        full = build_shared_math_rules(grade, lesson, oblast, mode="practice")
         assert not _OLD_CONVENTION_D_AS_DIAMETER.search(full), (oblast, lesson)
         assert not _OLD_CONVENTION_R_AS_CIRCUMSCRIBED.search(full), (oblast, lesson)
         assert "$R=2r$" in full.replace(" ", "")
@@ -453,7 +456,10 @@ def test_combined_prompt_defines_R_as_diameter_exactly_once_per_scope():
     """The full prompt must state R's meaning consistently — not once as
     diameter and again elsewhere as circumscribed radius."""
     for grade, oblast, lesson in _REPRESENTATIVE_GEOMETRY_TOPICS:
-        full = prompts.build_instructions(grade, lesson_title=lesson, oblast=oblast)
+        # Stari Practice graditelj je povucen; zajednicki blok je isti izvor
+        # koji aktivni tutor prompt splajsa.
+        from matbot.rules import build_shared_math_rules
+        full = build_shared_math_rules(grade, lesson, oblast, mode="practice")
         # r_o (circumscribed radius) must be the ONLY place that mentions
         # "opisane kružnice" together with a poluprečnik definition — and it
         # must be attributed to r_o, never to R.
@@ -471,7 +477,10 @@ def test_all_four_grades_and_both_scopes_are_free_of_old_convention():
         (g, "Četverougao", "Površina pravougaonika") for g in (6, 7, 8, 9)
     ]
     for grade, oblast, lesson in probes:
-        full = prompts.build_instructions(grade, lesson_title=lesson, oblast=oblast)
+        # Stari Practice graditelj je povucen; zajednicki blok je isti izvor
+        # koji aktivni tutor prompt splajsa.
+        from matbot.rules import build_shared_math_rules
+        full = build_shared_math_rules(grade, lesson, oblast, mode="practice")
         assert not _OLD_CONVENTION_D_AS_DIAMETER.search(full)
         assert not _OLD_CONVENTION_R_AS_CIRCUMSCRIBED.search(full)
 

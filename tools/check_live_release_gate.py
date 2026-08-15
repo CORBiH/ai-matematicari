@@ -35,7 +35,6 @@ MAX_AGE = timedelta(hours=24)
 # NIJEDAN LITERAL SE NE PONAVLJA. Ruta i rok su ranije stajali ovdje kao
 # vlastita kopija; kopija je upravo ono što je pustilo kampanju s rokom od
 # 30 s dok produkcija radi na 45 s. Izvor je isti fajl koji čita i deploy.
-REQUIRED_PIPELINE = release_config.REQUIRED_RELEASE_ENV["MATBOT_PRACTICE_PIPELINE"]
 REQUIRED_TIMEOUT_S = float(release_config.REQUIRED_RELEASE_ENV["AI_TUTOR_TIMEOUT"])
 
 
@@ -75,8 +74,6 @@ def validate_result(document: dict, *, expected_commit: str | None = None,
         errors.append("tree_hash_mismatch")
     if document.get("clean_worktree") is not True:
         errors.append("clean_worktree_not_confirmed")
-    if document.get("practice_pipeline") != REQUIRED_PIPELINE:
-        errors.append("wrong_practice_pipeline")
     if document.get("difficulty_levels_enabled") is not True:
         errors.append("difficulty_levels_not_enabled")
     # ROK KOJIM JE MJERENO MORA BITI PRODUKCIJSKI. Zatečeni (stariji) artefakt

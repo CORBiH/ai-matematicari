@@ -43,47 +43,6 @@ def direction_sentence(kind):
             "druga opada.")
 
 
-def setup_rows(known_left, known_right, asked_left, unit_left, unit_right,
-               unknown="x"):
-    """Dva reda školskog rasporeda — traženi član u donjem redu desno.
-
-    Svaka vrijednost ide u svoj $...$; između kolona je $\\rightarrow$, pa
-    prikaz ne zavisi ni od kakvog poravnanja."""
-    return (
-        f"${known_left}$ {unit_left} $\\rightarrow$ ${known_right}$ {unit_right}",
-        f"${asked_left}$ {unit_left} $\\rightarrow$ ${unknown}$ {unit_right}",
-    )
-
-
-def oriented_proportion(known_left, known_right, asked_left, kind,
-                        unknown="x"):
-    """Proporcija pročitana UZ SMJER strelica (strelica uz x gleda nagore).
-
-    Direktna: obje kolone se čitaju odozdo nagore →
-        x : known_right = asked_left : known_left
-    Obrnuta: lijeva kolona se čita odozgo nadolje →
-        x : known_right = known_left : asked_left
-    """
-    if kind == KIND_DIRECT:
-        return f"{unknown} : {known_right} = {asked_left} : {known_left}"
-    return f"{unknown} : {known_right} = {known_left} : {asked_left}"
-
-
-def method_lines(known_left, known_right, asked_left, kind, unit_left,
-                 unit_right, unknown="x"):
-    """Kompletan zapis metode strelica za pravilo trojno — lista redova."""
-    rows = setup_rows(known_left, known_right, asked_left, unit_left,
-                      unit_right, unknown)
-    proportion = oriented_proportion(known_left, known_right, asked_left,
-                                     kind, unknown)
-    return [
-        rows[0],
-        rows[1],
-        direction_sentence(kind),
-        f"Proporcija (čita se uz smjer strelica): ${proportion}$.",
-    ]
-
-
 def prompt_rule_text():
     """Blok oblasti proporcija za OBA prompta — jedina formulacija metode."""
     return (

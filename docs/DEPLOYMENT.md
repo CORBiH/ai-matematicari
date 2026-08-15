@@ -49,12 +49,16 @@ Docker, bound to `127.0.0.1:8080`.
     `docker compose exec -T matbot python -m matbot.release_config --require`,
     which also prints the effective non-secret configuration into the workflow log.
 
-Steps 5, 7 and 10 exist because production once ran silently on the legacy
-single-call architecture while every release gate measured the universal one:
-`MATBOT_PRACTICE_PIPELINE` and `MATBOT_PRACTICE_DIFFICULTY_LEVELS` were simply
-absent from the VPS `.env`, and nothing failed — `/healthz` stayed green. The guard
+Steps 5, 7 and 10 exist because production once ran silently on a different
+Practice architecture than every release gate measured: two architecture flags
+were simply absent from the VPS `.env`, and nothing failed — `/healthz` stayed green. The guard
 written in response (`release_config.require_release_configuration`) was then never
 called by anything for weeks. It is now on the real path, twice.
+
+(One of those two flags, `MATBOT_PRACTICE_PIPELINE`, was **removed** on
+2026-08-14 when the legacy single-call engine was retired: there is only one
+engine now, so nothing is left to select. A stale value in the VPS `.env` is
+inert — deploy no longer writes it and no code reads it.)
 
 Required GitHub secrets (names only): `VPS_SSH_KEY_B64`, `VPS_HOST`, `VPS_USER`,
 `VPS_APP_DIR`.

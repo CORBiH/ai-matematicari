@@ -98,16 +98,6 @@ def _registry():
     return _cache
 
 
-def engine_enabled():
-    """Globalni prekidač novog motora.
-
-    PRIVREMENO (Faza A–C) i namijenjeno ISKLJUČIVO razvoju: gasi motor za SVE
-    lekcije odjednom. Podrazumijevano je uključen; mora nestati u Fazi D —
-    vidi docs/LESSON_CONTRACTS.md. Nikad se ne koristi kao odgovor na pad
-    pojedinačnog ugovora (za to postoji auditiran status 'legacy_pinned')."""
-    return (os.environ.get("MATBOT_CONTRACT_ENGINE", "on") or "on").strip().lower() != "off"
-
-
 def contract_for(topic_id):
     """Ugovor za kanonski ID lekcije, ili None kad reda nema."""
     if not topic_id:
@@ -116,8 +106,13 @@ def contract_for(topic_id):
 
 
 def practice_state(contract):
-    """Jedno od STATE_* — bez preklapanja i bez tihog fallbacka."""
-    if contract is None or not engine_enabled():
+    """Jedno od STATE_* — bez preklapanja i bez tihog fallbacka.
+
+    POVLAČENJE (2026-08-14): globalni prekidač `MATBOT_CONTRACT_ENGINE` je
+    uklonjen zajedno sa starim motorom koji je gasio. Stanje se sada čita
+    ISKLJUČIVO iz statusa ugovora — dakle iz podataka, a ne iz okruženja, pa
+    zaostala vrijednost u `.env`-u ne može promijeniti klasifikaciju."""
+    if contract is None:
         return STATE_LEGACY
     if contract.status == "enabled":
         return STATE_ENGINE

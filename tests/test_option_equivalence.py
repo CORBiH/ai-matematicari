@@ -11,7 +11,7 @@ from matbot.option_equivalence import (
 from matbot.practice import SAFE_ERROR_MESSAGE, run_practice_turn
 from matbot.session_store import SessionStore
 from tests.conftest import FakeLLM, make_options, make_output, make_task
-from tests.test_practice import turn_payload
+from tests.conftest import turn_payload
 
 
 # --- Kategorija 16-25: numerička i simbolička ekvivalencija -----------------
@@ -75,39 +75,3 @@ def test_case28_find_equivalent_option_pairs_detects_non_adjacent_pair():
     # Dupla vrijednost na pozicijama 0 i 3 (ne susjedne) — mora biti uhvaćeno.
     opts = ["$5/8$", "$1/3$", "$1/4$", "$10/16$"]
     assert find_equivalent_option_pairs(opts) == [(0, 3)]
-
-
-def test_case29_full_path_semantically_duplicate_options_rejected_no_second_call():
-    """Integracija (Defekt 4): $8\\sqrt2\\,cm$ i $11,3\\,cm$ kao dvije od četiri
-    opcije — cio zadatak se odbija PRIJE mutacije sesije, bez drugog poziva."""
-    options = make_options("$8\\sqrt{2}\\,\\text{cm}$", "$11,3\\,\\text{cm}$", "$9\\,\\text{cm}$", "$14\\,\\text{cm}$")
-    store, fake = SessionStore(), FakeLLM()
-    fake.queue(make_output(
-        reply="Evo zadatka.",
-        new_task=make_task(text="Izračunaj dijagonalu kvadrata.", expected="$8\\sqrt{2}\\,\\text{cm}$",
-                            options=options, correct_option_index=0),
-    ))
-    r = run_practice_turn(store, fake, turn_payload())
-    assert "status" not in r
-    assert r["answer"] == SAFE_ERROR_MESSAGE
-    assert fake.practice_call_count == 1
-    sess = store.peek("sess-1")
-    assert sess is None or not sess.get("current_task")
-
-
-def test_case30_full_path_distinct_formula_options_accepted(monkeypatch):
-    """Kontrolni slučaj: četiri STVARNO različite formule (ne preslagan isti
-    izraz) prolaze normalno — provjera ne pravi lažne pozitivne odbijanja."""
-    monkeypatch.setattr(tf, "select_family", lambda *a, **kw: "choose_correct_formula")
-    options = make_options("$d=a\\sqrt{2}$", "$d=a^2$", "$d=2a$", "$d=\\frac{a}{2}$")
-    store, fake = SessionStore(), FakeLLM()
-    fake.queue(make_output(
-        reply="Evo zadatka.",
-        new_task=make_task(text="Koja formula tačno izražava dijagonalu kvadrata?",
-                            expected="$d=a\\sqrt{2}$",
-                            options=options, correct_option_index=0,
-                            task_family="choose_correct_formula"),
-    ))
-    r = run_practice_turn(store, fake, turn_payload())
-    assert r.get("status") == "ready"
-    assert fake.practice_call_count == 1

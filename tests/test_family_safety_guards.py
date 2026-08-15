@@ -388,43 +388,6 @@ def test_disc_d005_findings_survive_a_real_scope_too():
     assert geometrycheck.ANGLE_DIVIDER_VERTEX_MISMATCH in issues
 
 
-def test_disc_d005_full_practice_path_rejects_both_replays():
-    """Integracija: oba istorijska D005 paketa kroz run_practice_turn —
-    deterministički nalaz na stvarnom publikacijskom putu, bez modela."""
-    from matbot.practice import SAFE_ERROR_MESSAGE, run_practice_turn
-    from matbot.session_store import SessionStore
-    from tests.conftest import FakeLLM, make_options, make_output, make_task
-    from tests.test_practice import turn_payload
-
-    step2_options = (
-        r"Vrh $C$ i jedan krak $\overrightarrow{CB}$; drugi ugao je $\angle ABC$",
-        r"Vrh $A$ i jedan krak $\overrightarrow{AC}$; drugi ugao je $\angle BCA$",
-        r"Vrh $B$ i jedan krak $\overrightarrow{BC}$; drugi ugao je $\angle CAB$",
-        r"Vrh $B$ i jedan krak $\overrightarrow{BA}$; drugi ugao je $\angle BAC$")
-    step4_options = (
-        r"Vrh $D$; krakovi $\overrightarrow{DB}$ i $\overrightarrow{DC}$",
-        r"Vrh $B$; krakovi $\overrightarrow{BC}$ i $\overrightarrow{BD}$; "
-        r"drugi uglovi su $\angle ABC$ i $\angle ABD$",
-        r"Vrh $C$; krakovi $\overrightarrow{CB}$ i $\overrightarrow{CD}$",
-        r"Vrh $B$; krakovi $\overrightarrow{BC}$ i $\overrightarrow{BD}$; "
-        r"drugi uglovi su $\angle ACB$ i $\angle ADB$")
-    for task_text, options_texts, marked in (
-            (D005_STEP2_TASK, step2_options, 3),
-            (D005_STEP4_TASK, step4_options, 1)):
-        store, fake = SessionStore(), FakeLLM()
-        fake.queue(make_output(
-            reply="Evo zadatka.",
-            new_task=make_task(text=task_text,
-                               expected=options_texts[marked],
-                               options=make_options(*options_texts),
-                               correct_option_index=marked),
-        ))
-        result = run_practice_turn(store, fake, turn_payload())
-        assert result["answer"] == SAFE_ERROR_MESSAGE, task_text[:40]
-        session = store.peek("sess-1")
-        assert session is None or not session.get("current_task")
-
-
 @pytest.mark.parametrize("task_text,marked_text", [
     (D005_STEP2_TASK,
      r"Vrh $B$ i jedan krak $\overrightarrow{BA}$; drugi ugao je $\angle BAC$"),

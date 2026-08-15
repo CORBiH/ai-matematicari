@@ -334,11 +334,6 @@ MAX_RECENT_SIGNATURES = 8    # potpisi zadataka za otkrivanje doslovnog ponavlja
 # ne raste (isti princip kao svaka druga historija ovdje).
 MAX_RECENT_STRUCTURES = 6
 
-# Gornja granica za OBIČAN feedback na PRVI pogrešan klik ("Netačno." + hint).
-# Nije tvrdo sječenje: shape_first_wrong_feedback skraćuje SAMO na sigurnoj
-# granici rečenice s uravnoteženim $...$ — validan MathJax se nikad ne lomi.
-MAX_FIRST_WRONG_FEEDBACK_CHARS = 320
-
 # --- Security hardening (Faza: token + rate limit + concurrency lock) ------
 # FLASK_SECRET_KEY je primarni naziv (novi security kod). SECRET_KEY je
 # kompatibilni alias — produkcijski VPS ga već ima postavljenog iz ranije faze.

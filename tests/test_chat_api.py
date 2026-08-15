@@ -1,7 +1,7 @@
 """Testovi API sloja: /chat, /chat/stream, /feedback + regresija postojećih ruta."""
 import json
 
-from tests.conftest import make_output, make_task
+from tests.conftest import queue_two_call, make_output, make_task
 
 
 def chat_payload(msg="Daj mi jedan zadatak za vježbu iz ove teme.", mode="practice", **kw):
@@ -11,7 +11,7 @@ def chat_payload(msg="Daj mi jedan zadatak za vježbu iz ove teme.", mode="pract
         "grade": 6,
         "mode": mode,
         "entry_source": "manual_topic_choice",
-        "selected_topic": "6-01-006",
+        "selected_topic": "6-01-005",
         "selected_oblast": "",
         "student_message": msg,
         "conversation_history": [],
@@ -21,18 +21,18 @@ def chat_payload(msg="Daj mi jedan zadatak za vježbu iz ove teme.", mode="pract
 
 
 def test_chat_json_payload_works(client, fake_llm):
-    fake_llm.queue(make_output(reply="Evo zadatka.", new_task=make_task()))
+    queue_two_call(fake_llm)
     r = client.post("/api/ai-tutor/chat", json=chat_payload())
     assert r.status_code == 200
     j = r.get_json()
     assert j["status"] == "ready"
     assert j["session_mode"] == "practice"
     assert j["last_tutor_task"]
-    assert fake_llm.practice_call_count == 1   # stabilan jednopozivni put
+    assert len(fake_llm.tutor_calls) == 1   # stabilan jednopozivni put
 
 
 def test_multipart_without_image_processed(client, fake_llm):
-    fake_llm.queue(make_output(reply="Evo zadatka.", new_task=make_task()))
+    queue_two_call(fake_llm)
     r = client.post(
         "/api/ai-tutor/chat",
         data={"payload": json.dumps(chat_payload())},
@@ -40,7 +40,7 @@ def test_multipart_without_image_processed(client, fake_llm):
     )
     assert r.status_code == 200
     assert r.get_json()["status"] == "ready"
-    assert fake_llm.practice_call_count == 1   # stabilan jednopozivni put
+    assert len(fake_llm.tutor_calls) == 1   # stabilan jednopozivni put
 
 
 def test_multipart_with_image_controlled_no_llm(client, fake_llm):
@@ -59,7 +59,7 @@ def test_multipart_with_image_controlled_no_llm(client, fake_llm):
     assert "Slike" in j["answer"]
     assert "next_state" not in j          # stanje netaknuto
     assert j["last_tutor_task"] == ""
-    assert fake_llm.practice_call_count == 0
+    assert len(fake_llm.tutor_calls) == 0
 
 
 def test_non_ai_modes_do_not_call_llm(client, fake_llm):
@@ -74,11 +74,11 @@ def test_non_ai_modes_do_not_call_llm(client, fake_llm):
         assert j["session_mode"] == mode
         assert j["last_tutor_task"] == ""
         assert "Vježbaj sa mnom" in j["answer"]
-    assert fake_llm.practice_call_count == 0
+    assert len(fake_llm.tutor_calls) == 0
 
 
 def test_sse_stream_returns_valid_done_event(client, fake_llm):
-    fake_llm.queue(make_output(reply="Evo zadatka.", new_task=make_task()))
+    queue_two_call(fake_llm)
     r = client.post("/api/ai-tutor/chat/stream", json=chat_payload())
     assert r.status_code == 200
     assert r.content_type.startswith("text/event-stream")
@@ -89,12 +89,12 @@ def test_sse_stream_returns_valid_done_event(client, fake_llm):
     assert data["status"] == "ready"
     assert data["answer"]
     assert "last_tutor_task" in data
-    assert fake_llm.practice_call_count == 1   # stabilan jednopozivni put
+    assert len(fake_llm.tutor_calls) == 1   # stabilan jednopozivni put
 
 
 def test_last_tutor_task_always_present(client, fake_llm):
     # normalan turn
-    fake_llm.queue(make_output(reply="Evo zadatka.", new_task=make_task()))
+    queue_two_call(fake_llm)
     j1 = client.post("/api/ai-tutor/chat", json=chat_payload()).get_json()
     assert "last_tutor_task" in j1
     # ne-practice mod
@@ -108,17 +108,6 @@ def test_last_tutor_task_always_present(client, fake_llm):
     # prazna poruka
     j4 = client.post("/api/ai-tutor/chat", json=chat_payload(msg="")).get_json()
     assert "last_tutor_task" in j4
-
-
-def test_next_state_never_exposes_expected_answer(client, fake_llm, store):
-    fake_llm.queue(make_output(reply="Evo zadatka.",
-                               new_task=make_task(expected="TAJNO-RJESENJE-5/8")))
-    r = client.post("/api/ai-tutor/chat", json=chat_payload())
-    raw = r.get_data(as_text=True)
-    assert "TAJNO-RJESENJE" not in raw
-    assert "expected_answer" not in raw
-    # ...a server ga interno IMA (samo na serveru)
-    assert store.peek("api-sess")["expected_answer_summary"] == "TAJNO-RJESENJE-5/8"
 
 
 def test_internal_exception_not_shown_to_student(client, fake_llm):
@@ -147,14 +136,14 @@ def test_garbage_body_handled(client, fake_llm):
                     content_type="application/json")
     assert r.status_code == 200
     assert "answer" in r.get_json()
-    assert fake_llm.practice_call_count == 0
+    assert len(fake_llm.tutor_calls) == 0
 
 
 def test_too_long_message_rejected_without_llm(client, fake_llm):
     r = client.post("/api/ai-tutor/chat", json=chat_payload(msg="x" * 5000))
     assert r.status_code == 200
     assert "preduga" in r.get_json()["answer"]
-    assert fake_llm.practice_call_count == 0
+    assert len(fake_llm.tutor_calls) == 0
 
 
 def test_feedback_valid_payload_ok(client):

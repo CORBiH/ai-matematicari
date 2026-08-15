@@ -490,20 +490,6 @@ def _coprime_package(rng, level, lesson_id, lesson_title):
         wrap="", accepted_answers=(f"{min(a, b)} i {max(a, b)}",))
 
 
-def _factorization(value):
-    factors = {}
-    remaining = value
-    for prime in _PRIMES:
-        while remaining % prime == 0:
-            factors[prime] = factors.get(prime, 0) + 1
-            remaining //= prime
-        if remaining == 1:
-            break
-    if remaining != 1:
-        raise DeterministicGenerationError("faktorizacija van skupa prostih")
-    return factors
-
-
 def _factor_display(factors):
     parts = []
     for prime in sorted(factors):

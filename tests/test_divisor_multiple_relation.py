@@ -200,8 +200,12 @@ def test_single_hint_diversity_and_config_are_untouched():
     assert config.practice_single_hint_enabled() is True
     assert archetype_support._enabled() is True
     assert form_variants._enabled() is True
-    assert release_config.REQUIRED_RELEASE_ENV["MATBOT_PRACTICE_PIPELINE"] == \
-        "universal_two_call"
+    # POVLACENJE (2026-08-14): stari motor je uklonjen, pa
+    # `MATBOT_PRACTICE_PIPELINE` vise nije ni deklarisan. Cuva se
+    # ono sto jos bira rutu lekcije — opseg brze rute.
+    assert "MATBOT_PRACTICE_PIPELINE" not in release_config.REQUIRED_RELEASE_ENV
+    assert release_config.REQUIRED_RELEASE_ENV["MATBOT_FAST_SINGLE_CALL_SCOPE"] == \
+        "model_backed"
 
 
 def test_publication_is_refused_when_the_marked_answer_reverses_the_relation():

@@ -15,7 +15,6 @@ import pytest
 
 from matbot import geometrycheck as gc
 from matbot.geometry_rules import route_geometry_topic
-from matbot.task_family_validation import CONTRACTS, question_geometry_policy
 from matbot.topics import lesson_info
 
 CIRC = ("plane", ["krug"])
@@ -310,31 +309,6 @@ INTENTIONAL_FAMILIES = (
     "detect_student_error", "detect_formula_error", "recognize_correct_statement",
     "verify_solution", "choose_correct_formula", "identify_next_step",
 )
-
-
-def test_intentional_error_families_allow_geometry_violation_in_question():
-    for family in INTENTIONAL_FAMILIES:
-        assert question_geometry_policy(family) == "allow_intentional_violation", family
-
-
-def test_all_other_families_check_question_geometry():
-    for family in CONTRACTS:
-        if family not in INTENTIONAL_FAMILIES:
-            assert question_geometry_policy(family) == "check", family
-
-
-def test_unknown_family_defaults_to_check():
-    assert question_geometry_policy("") == "check"
-    assert question_geometry_policy("nepostojeca_porodica") == "check"
-
-
-def test_geometry_policy_declared_independently_of_numeric_policy():
-    """Dvije politike se trenutno poklapaju, ali su ODVOJENA polja — promjena
-    jedne ne smije tiho promijeniti drugu."""
-    contract = CONTRACTS["direct_formula_application"]
-    assert contract.question_numeric_policy == "check"
-    assert contract.question_geometry_policy == "check"
-    assert "question_geometry_policy" in contract.__dataclass_fields__
 
 
 def test_issue_codes_are_internal_only():

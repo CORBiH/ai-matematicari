@@ -1,12 +1,12 @@
 """JEDAN izvor istine o konfiguraciji s kojom release ide u produkciju.
 
-POTVRĐEN PRODUKCIJSKI NALAZ: na VPS-u su nedostajale
+POTVRĐEN PRODUKCIJSKI NALAZ (istorijski): na VPS-u su nedostajale dvije
+zastavice arhitekture, pa je aplikacija tiho radila na podrazumijevanoj
+konfiguraciji dok su release gate-ovi mjerili drugu.
 
-    MATBOT_PRACTICE_PIPELINE=universal_two_call
-    MATBOT_PRACTICE_DIFFICULTY_LEVELS=enabled
-
-pa je aplikacija tiho radila na legacy/podrazumijevanoj konfiguraciji, dok su
-release gate-ovi mjerili obje uključene. Klik na MCQ opciju je proradio tek
+Jedna od njih, `MATBOT_PRACTICE_PIPELINE`, više NE POSTOJI: motor koji je
+birala je povučen (2026-08-14), pa ni zaostala vrijednost na VPS-u ne može
+ništa promijeniti. `MATBOT_PRACTICE_DIFFICULTY_LEVELS` i dalje vrijedi. Klik na MCQ opciju je proradio tek
 nakon što su varijable dodane i kontejner ponovo kreiran.
 
 Tiho odstupanje je najgori mogući ishod: sve izgleda zdravo, a mjeri se jedan
@@ -198,7 +198,8 @@ def effective_configuration(environ=None):
     from matbot import deterministic_variety as _deterministic_variety
 
     report = {
-        "practice_pipeline": read("MATBOT_PRACTICE_PIPELINE"),
+        # `practice_pipeline` je uklonjen s povlačenjem starog motora
+        # (2026-08-14): postoji samo jedan, pa nema šta da se prijavi.
         "difficulty_levels": read("MATBOT_PRACTICE_DIFFICULTY_LEVELS"),
         "fast_single_call_scope": _config.fast_single_call_scope(),
         "fast_model": _config.FAST_MODEL,

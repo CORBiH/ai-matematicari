@@ -13,7 +13,7 @@ from matbot.explain import run_explain_turn
 from matbot.practice import SAFE_ERROR_MESSAGE
 from matbot.llm import LLMTimeout
 from matbot.ratelimit import RateLimiter
-from tests.conftest import FakeLLM, make_explain_output, make_output, make_task
+from tests.conftest import queue_two_call, FakeLLM, make_explain_output, make_output, make_task
 
 
 def explain_turn_payload(msg="Objasni mi ovu temu.", **kw):
@@ -405,9 +405,9 @@ def test_explain_response_has_no_control_chars_anywhere():
 # ---------------------------------------------------------------------------
 
 def test_practice_still_works_and_uses_one_call(flask_app, fake_llm):
-    """Practice koristi STABILAN jednopozivni put (podrazumijevano nakon
-    rollbacka); Explain ima svoj i ne dodiruje se — to je ovdje i poenta."""
-    fake_llm.queue(make_output(reply="Evo zadatka.", new_task=make_task()))
+    """Practice ide JEDINIM motorom (Tutor + uslovni Recenzent); Explain ima
+    svoj put i ne dodiruje se — to je ovdje i poenta."""
+    queue_two_call(fake_llm)
     c = _authed(flask_app)
     payload = http_payload(mode="practice", msg="Daj mi jedan zadatak za vježbu iz ove teme.")
     r = c.post("/api/ai-tutor/chat", json=payload)
@@ -416,8 +416,11 @@ def test_practice_still_works_and_uses_one_call(flask_app, fake_llm):
     assert j["session_mode"] == "practice"
     assert j["last_tutor_task"]                       # Practice I DALJE prati zadatak
     assert j["next_state"].get("task", {}).get("question")
-    assert fake_llm.practice_call_count == 1
-    assert len(fake_llm.tutor_calls) == 0   # univerzalni put nije aktivan
+    # 6-01-006 (Unija skupova) ima POTPUN serverski generator, pa je jedini
+    # motor servira DETERMINISTICKI — nula modelskih poziva. To je jaca
+    # tvrdnja od stare („tacno jedan poziv“), i istinita je.
+    assert fake_llm.call_count == 0
+    assert len(fake_llm.tutor_calls) == 0
     assert len(fake_llm.explain_calls) == 0           # practice NIJE išao kroz explain put
 
 

@@ -422,10 +422,6 @@ def served_hint_level(hint_level_before, max_hint_level):
     return max(1, min(before + 1, int(max_hint_level)))
 
 
-def is_ladder_top(hint_level_before, max_hint_level):
-    return served_hint_level(hint_level_before, max_hint_level) >= int(max_hint_level)
-
-
 def hint_author(task_class, served_level, max_hint_level):
     """Autor nagovještaja — serverska odluka, poznata PRIJE ijednog poziva.
 

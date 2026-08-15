@@ -43,7 +43,6 @@ from tools.practice_eval import release_contract
 
 @pytest.fixture(autouse=True)
 def _runtime(monkeypatch):
-    monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", "universal_two_call")
     monkeypatch.setenv("MATBOT_PRACTICE_DIFFICULTY_LEVELS", "enabled")
     monkeypatch.setenv("MATBOT_DETERMINISTIC_PRACTICE", "disabled")
     # LJESTVICA NAGOVJEŠTAJA JE ROLLBACK PUT. Produkcija služi JEDAN
@@ -1007,7 +1006,7 @@ def test_the_f6h_campaign_runs_with_the_canonical_forty_five_second_timeout():
     environ = {}
     applied = campaign_config.apply_campaign_environment("f6h", environ=environ)
     assert environ["AI_TUTOR_TIMEOUT"] == "45"
-    assert applied["MATBOT_PRACTICE_PIPELINE"] == "universal_two_call"
+    assert "MATBOT_PRACTICE_PIPELINE" not in applied   # povucena zastavica
     assert applied["MATBOT_PRACTICE_DIFFICULTY_LEVELS"] == "enabled"
     # Launcher ne smije ubrizgati rollback determinističke rute.
     assert campaign_config.DETERMINISTIC_FLAG not in environ

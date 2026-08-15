@@ -32,3 +32,4 @@ scratchpad/semantic_triage/
 # Zavrsna prijemna kampanja: turns.jsonl, summary/failures/report i replay
 # izvjestaji su MJERENJA, ne izvorni kod.
 scratchpad/final_practice_acceptance/
+scratchpad/practice_legacy_audit/

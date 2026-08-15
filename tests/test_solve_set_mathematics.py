@@ -309,27 +309,6 @@ def test_distinct_or_unprovable_representations_are_never_claimed_equal(pair):
     assert not options_are_equivalent(*pair), pair
 
 
-def test_full_practice_path_rejects_the_b007_duplicate_package():
-    """Integracija: tačan istorijski B007 paket kroz run_practice_turn —
-    odbijen PRIJE mutacije sesije, bez drugog poziva vrh dva dozvoljena."""
-    from matbot.practice import SAFE_ERROR_MESSAGE, run_practice_turn
-    from matbot.session_store import SessionStore
-    from tests.conftest import FakeLLM, make_options, make_output, make_task
-    from tests.test_practice import turn_payload
-
-    options = make_options(*B007_OPTIONS)
-    store, fake = SessionStore(), FakeLLM()
-    fake.queue(make_output(
-        reply="Evo zadatka.",
-        new_task=make_task(text=B007_TASK, expected="$11$",
-                           options=options, correct_option_index=1),
-    ))
-    result = run_practice_turn(store, fake, turn_payload())
-    assert result["answer"] == SAFE_ERROR_MESSAGE
-    session = store.peek("sess-1")
-    assert session is None or not session.get("current_task")
-
-
 # ---------------------------------------------------------------------------
 # 4) GRAMATIKA OPCIJA POD DOMENOM (§7) i zatvorene granice
 # ---------------------------------------------------------------------------

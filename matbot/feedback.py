@@ -57,23 +57,6 @@ _REMAINDER_TASK_RE = re.compile(
 _DIVISOR_MENTION_RE = re.compile(r"\bsa\s+\$?\s*(\d+)\b", re.IGNORECASE)
 
 
-def _balanced_math(text):
-    """True kad su svi $...$ delimiteri upareni (paran broj neescaped '$')."""
-    return (len(_DOLLAR_SPLIT.split(text)) % 2) == 1
-
-
-def strip_leading_verdict(text):
-    """Ukloni modelovu vlastitu ocjenu i „Hint:“ oznaku s početka teksta."""
-    cleaned = (text or "").strip()
-    previous = None
-    # Ponavljamo jer model zna napisati i „Netačno. Nije tačno.“ zaredom.
-    while cleaned != previous:
-        previous = cleaned
-        cleaned = _LEADING_VERDICT_RE.sub("", cleaned, count=1).strip()
-    cleaned = _LEADING_HINT_LABEL_RE.sub("", cleaned, count=1).strip()
-    return cleaned
-
-
 def ensure_hint_makes_progress(task_text, hint):
     """Replace a provably insufficient composite-remainder hint.
 
@@ -100,64 +83,6 @@ def ensure_hint_makes_progress(task_text, hint):
         + "$, pronađi najveći višekratnik broja $" + str(divisor)
         + "$ koji nije veći od $" + str(dividend) + "$, pa ga oduzmi od broja."
     )
-
-
-def _sentence_boundary_clip(text, limit):
-    """Pokušaj 1: najduža cjelovita REČENICA unutar `limit` znakova iza koje su
-    $...$ delimiteri uravnoteženi. Vraća None ako takva granica ne postoji."""
-    best = None
-    for match in _SENTENCE_END_RE.finditer(text):
-        end = match.end()
-        if end > limit:
-            break
-        if _balanced_math(text[:end]):
-            best = end
-    if best is None:
-        return None
-    return text[:best].strip()
-
-
-def _word_boundary_clip(text, limit):
-    """Pokušaj 2 (kad nema kraja rečenice unutar limita): najdulji prefiks do
-    granice RIJEČI unutar `limit` znakova, iza kojeg su $...$ delimiteri
-    uravnoteženi (tj. prefiks se nikad ne završava USRED $...$ segmenta).
-    Vraća None ako ni ovo nije moguće — poziva se GENERIC_HINT."""
-    best = None
-    for match in _WORD_BOUNDARY_RE.finditer(text):
-        end = match.start()
-        if end == 0:
-            continue
-        if end > limit:
-            break
-        if _balanced_math(text[:end]):
-            best = end
-    if best is None:
-        return None
-    return text[:best].rstrip(" ,;:—-").strip()
-
-
-def clip_preserving_math(text, limit):
-    """Skrati tekst na najviše `limit` znakova bez ikad presijecanja unutar
-    $...$. Redoslijed pokušaja:
-      1. granica rečenice (najčitljivije)
-      2. granica riječi (i dalje čitljivo, ako rečenica ne staje)
-      3. None — pozivalac MORA pasti na kraći, unaprijed bezbjedan tekst
-         (GENERIC_HINT); ovaj modul namjerno NIKAD ne vraća tekst duži od
-         `limit` niti hard-siječe usred $...$.
-    """
-    text = (text or "").strip()
-    if len(text) <= limit:
-        return text if _balanced_math(text) else None
-
-    clipped = _sentence_boundary_clip(text, limit)
-    if clipped is not None:
-        return clipped
-
-    clipped = _word_boundary_clip(text, limit)
-    if clipped is not None:
-        return clipped
-
-    return None
 
 
 def _normalized(text):
@@ -324,16 +249,6 @@ def _reveals_value_inside_math(text, task_text, *candidates):
     return bool(provable & _asserted_numbers(text))
 
 
-def _has_numeric_inconsistency(text):
-    """True ako hint sadrži DOKAZANO nedosljedan lanac jednakosti
-    (matbot/mathcheck.py) — npr. model napiše ispravnu formulu ali pogrešnu
-    supstituciju u samom hintu. Tretira se isto kao curenje odgovora: server
-    NE odbija cio turn, nego tiho pada na GENERIC_HINT (bez drugog AI poziva)
-    da bi ostatak razgovora ("Netačno." + koristan sljedeći korak) i dalje
-    stigao do učenika."""
-    return bool(find_numeric_inconsistencies(text))
-
-
 def leaks_answer(text, correct_option_text="", expected_answer="", task_text=""):
     """True ako tekst otkriva tačan odgovor.
 
@@ -371,43 +286,3 @@ def leaks_answer(text, correct_option_text="", expected_answer="", task_text="")
         return True
 
     return _reveals_value_inside_math(text, task_text, correct_option_text, expected_answer)
-
-
-def shape_first_wrong_feedback(model_hint, model_reply, correct_option_text="",
-                                expected_answer="", limit=None):
-    """Sastavi vidljiv odgovor za PRVI pogrešan klik.
-
-    Uvijek počinje tačno s „Netačno.“, zatim jedan sažet hint, i UVIJEK ostaje
-    unutar `limit` znakova — ako sigurno skraćivanje (rečenica pa riječ, oboje
-    bez sijecanja $...$) nije moguće, koristi se kratak GENERIC_HINT umjesto
-    vraćanja predugog originala. Ako model nije dao upotrebljiv hint ili je u
-    njemu procurio tačan odgovor, također se koristi GENERIC_HINT — u oba
-    slučaja bez drugog AI poziva.
-    """
-    limit = config.MAX_FIRST_WRONG_FEEDBACK_CHARS if limit is None else limit
-
-    hint = strip_leading_verdict(model_hint) or strip_leading_verdict(model_reply)
-    if (not hint or leaks_answer(hint, correct_option_text, expected_answer)
-            or _has_numeric_inconsistency(hint)):
-        hint = GENERIC_HINT
-
-    # Hint se mjeri BEZ fiksnog prefiksa da granica opisuje stvarni sadržaj.
-    budget = max(limit - len(VERDICT_PREFIX) - len(HINT_PREFIX) - 2, 40)  # 2 = prazan red
-    clipped = clip_preserving_math(hint, budget)
-    if (clipped is None or leaks_answer(clipped, correct_option_text, expected_answer)
-            or _has_numeric_inconsistency(clipped or "")):
-        clipped = GENERIC_HINT
-        if len(clipped) > budget:  # teorijski nemoguće s trenutnim config limitima
-            clipped = clipped[:budget].rstrip()
-
-    return f"{VERDICT_PREFIX}\n\n{HINT_PREFIX}{clipped}"
-
-
-def shape_final_wrong_prefix(model_reply):
-    """Drugi pogrešan klik: zadržava se postojeće ponašanje otkrivanja rješenja,
-    ali odgovor i dalje POČINJE s „Netačno.“ i bez modelove duple ocjene.
-    Tekst se ne skraćuje — tu je puno objašnjenje legitimno."""
-    body = strip_leading_verdict(model_reply)
-    if not body:
-        return VERDICT_PREFIX
-    return f"{VERDICT_PREFIX}\n\n{body}"

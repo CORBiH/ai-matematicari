@@ -6,7 +6,6 @@ u skladu sa ostalim testovima u ovom repou (fake/deterministički, ne live).
 """
 from matbot.prompts import (
     build_explain_instructions,
-    build_instructions,
     build_quick_instructions,
 )
 from matbot.rules import (
@@ -15,6 +14,17 @@ from matbot.rules import (
     build_shared_math_rules,
     route_topic_rules,
 )
+
+
+def build_instructions(grade, lesson_title="", oblast=""):
+    """Practice instrukcije više NE gradi matbot/prompts.py.
+
+    Stari jednopozivni motor je povučen (2026-08-14) zajedno sa svojim
+    graditeljem prompta; Practice prompt sada sastavlja `matbot/tutor/prompts.py`
+    iz konteksta lekcije. Ono što OVI testovi provjeravaju su ZAJEDNIČKA
+    matematička/jezička pravila, a njih i dalje isporučuje isti izvor za sva tri
+    moda — pa se provjeravaju direktno na njemu."""
+    return build_shared_math_rules(grade, lesson_title, oblast, mode="practice")
 
 
 # ---------------------------------------------------------------------------
@@ -472,70 +482,6 @@ def test_construction_quick_not_forced_full_structure_or_concise_option_rule():
     )
     assert "ANALIZA, POTREBAN PRIBOR" not in text
     assert "new_task.options" not in text
-
-
-def test_construction_practice_options_within_hard_limit_validate():
-    """Reprezentativan construction MC zadatak sa četiri kratke opcije mora
-    proći validate_output bez greške (regresija za 'preduga opcija' live bug)."""
-    from matbot.schema import NewTask, Option, PracticeTurnOutput, validate_output
-
-    task = NewTask(
-        text="Nakon što nacrtaš ugao i zabodeš šestar u njegovo tjeme, šta radiš sljedeće?",
-        expected_answer="Opiši luk koji siječe oba kraka ugla.",
-        difficulty="standard",
-        options=[
-            Option(text="Opišem luk koji siječe oba kraka ugla."),
-            Option(text="Izmjerim dužinu jednog kraka."),
-            Option(text="Povučem paralelu s prvim krakom."),
-            Option(text="Promijenim otvor šestara i nacrtam kružnicu."),
-        ],
-        correct_option_index=0,
-    )
-    out = PracticeTurnOutput(reply="Evo zadatka.", evaluation=None, gave_hint=False, new_task=task)
-    validate_output(out)  # ne smije baciti InvalidOutputError
-
-
-def test_construction_option_over_hard_limit_still_rejected():
-    from matbot.schema import InvalidOutputError, NewTask, Option, PracticeTurnOutput, validate_output
-
-    too_long = "Ovo je namjerno predugačak opis cijele konstrukcije od početka do kraja " * 4
-    assert len(too_long) > 200
-    task = NewTask(
-        text="Koji je sljedeći korak?",
-        expected_answer="Kratak odgovor.",
-        difficulty="standard",
-        options=[
-            Option(text=too_long),
-            Option(text="Izmjerim dužinu jednog kraka."),
-            Option(text="Povučem paralelu s prvim krakom."),
-            Option(text="Promijenim otvor šestara i nacrtam kružnicu."),
-        ],
-        correct_option_index=1,
-    )
-    out = PracticeTurnOutput(reply="Evo zadatka.", evaluation=None, gave_hint=False, new_task=task)
-    import pytest
-    with pytest.raises(InvalidOutputError):
-        validate_output(out)
-
-
-def test_construction_still_requires_exactly_four_options():
-    from matbot.schema import InvalidOutputError, NewTask, Option, PracticeTurnOutput, validate_output
-
-    task = NewTask(
-        text="Koji je sljedeći korak?",
-        expected_answer="Kratak odgovor.",
-        difficulty="standard",
-        options=[
-            Option(text="Opišem luk koji siječe oba kraka ugla."),
-            Option(text="Izmjerim dužinu jednog kraka."),
-            Option(text="Povučem paralelu s prvim krakom."),
-        ],
-        correct_option_index=0,
-    )
-    out = PracticeTurnOutput(reply="Evo zadatka.", evaluation=None, gave_hint=False, new_task=task)
-    import pytest
-    with pytest.raises(InvalidOutputError):
-        validate_output(out)
 
 
 def test_construction_remains_multiple_choice_instruction_present():

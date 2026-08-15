@@ -721,10 +721,6 @@ def _simplify_combined_package(rng, level, lesson_id, lesson_title, concept):
 # 11) JEDNAČINE S ALGEBARSKIM RAZLOMCIMA
 # ---------------------------------------------------------------------------
 
-def _fraction_display_or_int(value: Fraction) -> str:
-    return core.fraction_display(value)
-
-
 def _fraction_equation_package(rng, level, lesson_id, lesson_title, concept):
     x_poly = Polynomial.monomial(1, 1)
     if level == 1:

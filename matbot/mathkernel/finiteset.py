@@ -35,10 +35,6 @@ def complement(subset, universe) -> frozenset:
     return universe - subset
 
 
-def is_subset(first, second) -> bool:
-    return canonical(first) <= canonical(second)
-
-
 def sets_equal(first, second) -> bool:
     return canonical(first) == canonical(second)
 

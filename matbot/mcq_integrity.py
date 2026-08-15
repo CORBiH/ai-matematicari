@@ -1338,25 +1338,6 @@ def _solve_relation_text(text: str) -> Optional[tuple]:
     return solution, next(iter(variables))
 
 
-def _solve_singleton_inner(text: str) -> Optional[str]:
-    """Sadržaj JEDNOČLANOG skupa `{c}` / `\\{c\\}`, ili None kad zapis nije takav.
-
-    ŽIVI NALAZ (targeted verifikacija): model tačku piše i kao skup — `{-1}`,
-    `{ 5 }`, `\\{-5\\}`. Višečlani skup NIKAD nije tačka, pa zarez/tačka-zarez u
-    sadržaju diskvalifikuje zapis: `{2,5}` je nerazlučiv od skupa {2, 5}
-    (decimalni zarez se ovdje NAMJERNO žrtvuje — ne pogađa se)."""
-    stripped = (text or "").strip()
-    # Escaped vitičaste su ISTI zapis: \{-1\} == {-1}. `\frac{...}` nema
-    # backslash neposredno ispred vitičaste, pa ga zamjena ne dira.
-    stripped = stripped.replace("\\{", "{").replace("\\}", "}")
-    if len(stripped) < 3 or not (stripped.startswith("{") and stripped.endswith("}")):
-        return None
-    inner = stripped[1:-1].strip()
-    if not inner or "," in inner or ";" in inner:
-        return None
-    return inner
-
-
 def _solve_bare_point(text: str) -> Optional[_SolutionSet]:
     """Čista vrijednost (bez relacije i bez nepoznate) kao KANDIDAT-TAČKA."""
     normalized = _normalize_solve_segment(text)
@@ -1472,9 +1453,8 @@ def _solve_finite_int_set(inner: str) -> Optional[_SolutionSet]:
     """Konačan skup CIJELIH literala `{-1,0,1}`, ili None.
 
     Članovi su isključivo cijeli brojevi: decimalni zarez u vitičastim
-    zagradama ostaje žrtvovan (ista doktrina kao `_solve_singleton_inner` —
-    `{2,5}` se pod kontinuiranim domenom nikad ne pogađa; pod cjelobrojnim
-    domenom je jedino cjelobrojno čitanje i smisleno)."""
+    zagradama ostaje žrtvovan — `{2,5}` se pod kontinuiranim domenom nikad ne
+    pogađa; pod cjelobrojnim domenom je jedino cjelobrojno čitanje i smisleno."""
     members = []
     for part in re.split(r"[,;]", inner):
         part = part.strip()
@@ -1810,7 +1790,15 @@ def _request_relation_candidate_spans(text: str) -> list:
 
 
 def _request_relation_candidates(text: str) -> list:
-    """Nizovi znakova koji SMIJU biti relacija — iz $…$ i iz golog teksta."""
+    """Nizovi znakova koji SMIJU biti relacija — iz $…$ i iz golog teksta.
+
+    AKTIVNI server ovo ne zove; zove ga EVALUACIJSKI HARNESS
+    (`tools/practice_eval/coherence.py` i `checks.py`), koji iz iste
+    podjele nezavisno izvodi vrstu tražene relacije. Uklonjen je u prvom
+    prolazu povlačenja starog motora i VRAĆEN kad se pokazalo da bi kapija
+    izdanja ostala bez te nezavisne provjere — produkcijska nedosežnost
+    sama po sebi ne znači da je simbol mrtav.
+    """
     return [run for _start, _end, run in _request_relation_candidate_spans(text)]
 
 
@@ -2660,58 +2648,6 @@ def option_binding_failure(text: str, correct_option_id: str) -> str:
     return "" if all(claim == correct for claim in claims) else OPTION_LABEL_BINDING_CODE
 
 
-def option_reference_failure(text: str, current_options: Iterable[dict],
-                             correct_option_id: str) -> str:
-    """Validate explicit option ordinals/labels against committed UI state.
-
-    A bare correct value is intentionally allowed.  The gate activates only
-    when prose explicitly claims an ordinal (``treća opcija``) or option label
-    (``opcija B``), and compares that claim with the post-shuffle visible
-    position and server-owned correct ID.  It therefore cannot trust a
-    Tutor/Reviewer ordinal that was written before server shuffling.
-    """
-    options = tuple(current_options or ())
-    ids = [str(option.get("id", "")) for option in options if isinstance(option, dict)]
-    if len(ids) != len(options) or correct_option_id not in ids:
-        return "expected_answer_option_reference_mismatch"
-    correct_position = ids.index(correct_option_id)
-    for position, pattern in _OPTION_ORDINAL_PATTERNS:
-        if pattern.search(text or "") and position != correct_position:
-            return "expected_answer_option_reference_mismatch"
-    for match in _OPTION_LABEL_RE.finditer(text or ""):
-        if match.group(1).lower() != correct_option_id.lower():
-            return "expected_answer_option_reference_mismatch"
-
-    # If prose both identifies an option and names one of the displayed bare
-    # integer values, that value must be the value at the committed correct
-    # option.  Other mathematical numbers (for example a divisor 25) are not
-    # visible-option values and remain harmless.
-    values = [_bare_integer(str(option.get("text", ""))) for option in options]
-    correct_value = values[correct_position]
-    mentioned_values = {int(value) for value in _ANSWER_NUMBER_RE.findall(text or "")}
-    visible_alternatives = {value for value in values if value is not None and value != correct_value}
-    if mentioned_values & visible_alternatives:
-        return "expected_answer_option_reference_mismatch"
-    return ""
-
-
-def mathematical_fingerprint(result: DivisibilityMCQResult, task_family: str,
-                             objective: str = "divisibility_selection") -> str:
-    """A hash-only fingerprint for equivalent supported mathematical tasks."""
-    if not result.applicable or not result.valid or result.correct_value is None:
-        return ""
-    payload = {
-        "answer_form": "integer_mcq",
-        "divisors": list(result.divisors),
-        "family": task_family or "",
-        "objective": objective,
-        "option_values": sorted(result.option_values),
-        "unique_correct_value": result.correct_value,
-    }
-    encoded = json.dumps(payload, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
-    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
-
-
 def difficulty_profile(question: str, option_texts: Iterable[str]) -> DivisibilityDifficultyProfile:
     """Derive the requested three-level profile from visible structure only."""
     text = question or ""
@@ -2737,42 +2673,3 @@ def difficulty_profile(question: str, option_texts: Iterable[str]) -> Divisibili
     if len(divisors) == 1:
         return DivisibilityDifficultyProfile(True, 2, divisors=divisors)
     return DivisibilityDifficultyProfile(False, reason_code="difficulty_direction_not_measurable")
-
-
-def feedback_failure(question: str, current_options: Iterable[dict], correct_option_id: str,
-                     response_text: str) -> str:
-    """Reject only explicit stale/incorrect affirmative answer claims in feedback.
-
-    Intermediate arithmetic remains allowed.  A first-wrong hint is also not
-    forced to reveal the correct answer: this check fires only when the model
-    positively calls an integer divisible/correct/selected answer.
-    """
-    options = tuple(current_options or ())
-    texts = tuple(str(option.get("text", "")) for option in options)
-    result = evaluate_divisibility_mcq(question, texts)
-    if not result.applicable or not result.valid:
-        return ""
-    marked_index = next((i for i, option in enumerate(options)
-                         if option.get("id") == correct_option_id), None)
-    if marked_index != result.correct_index:
-        return "marked_option_math_mismatch"
-
-    correct_value = result.correct_value
-    normalized = (response_text or "")
-    patterns = (
-        re.compile(r"(?<!\d)(-?\d+)(?!\d)\s+(?:je|jeste)\s+djeljiv\w*", re.IGNORECASE),
-        re.compile(r"\bzato\s+je\s+(-?\d+)\s+djeljiv\w*", re.IGNORECASE),
-        re.compile(
-            r"(?:ta[čc]n\w*|ispravn\w*)\s+(?:odgovor|opcija|izbor)\s*(?:je|:)?\s*"
-            r"(?:broj\s*)?(-?\d+)", re.IGNORECASE,
-        ),
-        re.compile(
-            r"(?:izabrao\s+si|odabrao\s+si)\s+(?:broj\s*)?(-?\d+)\s+"
-            r"(?:kao\s+)?(?:ta[čc]n\w*|ispravn\w*)", re.IGNORECASE,
-        ),
-    )
-    for pattern in patterns:
-        for match in pattern.finditer(normalized):
-            if int(match.group(1)) != correct_value:
-                return "stale_correct_option"
-    return ""

@@ -1868,9 +1868,10 @@ def _compose_visible_help(final, reply, context, session=None):
 # i označena opcija na ekranu. Zadatak je ostao otvoren, pa je učeniku preostalo
 # samo da klikne ponuđeni odgovor. Ponovilo se i na drugi pokušaj.
 #
-# Legacy Practice put ovo hvata (`feedback.shape_first_wrong_feedback`), a
-# univerzalni put je pri pivotu ostao BEZ ijednog determinističkog anti-leak
-# sloja. Ovdje se koristi ISTI `feedback.leaks_answer`, ne novi detektor.
+# Povučeni Practice put je ovo hvatao vlastitim oblikovanjem prvog pogrešnog
+# feedbacka (dužinski cap + „Netačno.“ prefiks); univerzalni put to NIKAD nije
+# preuzeo i pri pivotu je ostao BEZ determinističkog anti-leak sloja. Zato se
+# ovdje koristi `feedback.leaks_answer` — jedina aktivna zaštita te vrste.
 #
 # Gate je namjerno uzak, jer treći korak istog scenarija (koristan hint bez
 # rezultata) NIJE procurio i mora ostati netaknut:

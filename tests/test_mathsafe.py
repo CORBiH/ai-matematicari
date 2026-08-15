@@ -397,30 +397,6 @@ def test_pure_sqrt_units_expression_still_whole_wrapped():
     assert text == "$54\\sqrt{3}\\,\\text{cm}^3$"
 
 
-# ---------------------------------------------------------------------------
-# Cross-mode invarijante: Practice, Explain i Quick dijele JEDNU centralnu
-# funkciju; samo Practice MC opcije koriste allow_whole_expression_wrap=True.
-# ---------------------------------------------------------------------------
-
-def test_all_three_modes_import_the_same_central_function():
-    import inspect
-
-    from matbot import explain, practice, quick
-
-    for module in (practice, explain, quick):
-        assert "sanitize_and_validate_math_text" in inspect.getsource(module)
-
-
-def test_only_practice_options_use_whole_expression_wrap():
-    import inspect
-
-    from matbot import explain, practice, quick
-
-    assert "allow_whole_expression_wrap=True" in inspect.getsource(practice)
-    assert "allow_whole_expression_wrap=True" not in inspect.getsource(explain)
-    assert "allow_whole_expression_wrap=True" not in inspect.getsource(quick)
-
-
 def test_raw_commands_never_survive_outside_math_in_default_mode():
     for command in ("\\frac{1}{2}", "\\sqrt{5}", "\\text{cm}", "\\begin{cases}x=1\\end{cases}"):
         text, is_safe = sanitize_and_validate_math_text(f"Prefix {command} suffix")

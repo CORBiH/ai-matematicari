@@ -32,13 +32,6 @@ def test_exact_live_hint_repaired_via_full_sanitize_pipeline():
     assert is_safe
 
 
-def test_shaped_first_wrong_feedback_no_longer_has_stray_brace():
-    shaped = feedback.shape_first_wrong_feedback(LIVE_HINT_REPAIRED, "")
-    expected = f"Netačno.\n\nHint: {LIVE_HINT_REPAIRED}"
-    assert shaped == expected
-    assert not shaped.endswith("}")
-
-
 def test_simple_example_from_the_spec():
     assert repair_stray_terminal_brace("Provjeri $x=7$.}") == "Provjeri $x=7$."
 
@@ -156,66 +149,6 @@ def test_empty_and_none_are_safe():
 def test_text_without_brace_is_returned_identical():
     text = "Sasvim običan tekst bez ijedne zagrade."
     assert repair_stray_terminal_brace(text) is text
-
-
-# ---------------------------------------------------------------------------
-# 9. First-wrong feedback stays within the hard limit
-# ---------------------------------------------------------------------------
-
-def test_first_wrong_feedback_with_stray_brace_stays_within_hard_limit():
-    long_hint_with_brace = ("Provjeri prvi korak pažljivo. " * 20) + "}"
-    out = feedback.shape_first_wrong_feedback(long_hint_with_brace, "")
-    assert len(out) <= config.MAX_FIRST_WRONG_FEEDBACK_CHARS
-    assert out.startswith("Netačno.")
-
-
-# ---------------------------------------------------------------------------
-# 10. Answer-leak detection remains unchanged
-# ---------------------------------------------------------------------------
-
-def test_leak_detection_still_works_on_repaired_text():
-    out = feedback.shape_first_wrong_feedback("Odgovor je 2.}", "", expected_answer="2")
-    assert feedback.GENERIC_HINT in out
-    assert "2." not in out
-
-
-def test_legitimate_hint_with_stray_brace_is_not_treated_as_leak():
-    out = feedback.shape_first_wrong_feedback(
-        "Podijeli brojnik i nazivnik sa $4$.}", "", expected_answer="24"
-    )
-    assert "Podijeli brojnik i nazivnik sa $4$." in out
-    assert feedback.GENERIC_HINT not in out
-
-
-# ---------------------------------------------------------------------------
-# 11. Exactly one LLM call remains guaranteed (integration)
-# ---------------------------------------------------------------------------
-
-def test_practice_wrong_answer_with_stray_brace_hint_makes_one_llm_call():
-    store, fake = SessionStore(), FakeLLM()
-    fake.queue(make_output(reply="Evo zadatka.",
-                            new_task=make_task_for_family("expand_to_given_denominator")))
-    r0 = run_practice_turn(store, fake, {
-        "session_id": "sess-brace", "grade": 6, "selected_topic": "6-04-007",
-        "selected_oblast": "", "student_message": "Daj zadatak.", "intent": "",
-        "difficulty_request": "", "interaction_phase": "", "last_tutor_task": "",
-        "interaction_type": "", "selected_option_id": "", "client_turn_id": "",
-    })
-    sess = store.peek("sess-brace")
-    wrong = next(o["id"] for o in sess["current_options"] if o["id"] != sess["correct_option_id"])
-
-    fake.queue(make_output(reply="", hint=LIVE_HINT))
-    r = run_practice_turn(store, fake, {
-        "session_id": "sess-brace", "grade": 6, "selected_topic": "6-04-007",
-        "selected_oblast": "", "student_message": "[klik]", "intent": "",
-        "difficulty_request": "", "interaction_phase": "",
-        "last_tutor_task": "", "interaction_type": "choice_answer",
-        "selected_option_id": wrong, "client_turn_id": "t1",
-    })
-    assert fake.practice_call_count == 2  # bootstrap + klik, bez popravnog poziva
-    assert r["answer"].startswith("Netačno.")
-    assert not r["answer"].endswith("}")
-    assert LIVE_HINT_REPAIRED in r["answer"]
 
 
 # ---------------------------------------------------------------------------

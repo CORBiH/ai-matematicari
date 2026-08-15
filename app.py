@@ -13,9 +13,9 @@ config.require_secret_key(config.SECRET_KEY)
 
 # JEDAN red na startu s EFEKTIVNOM konfiguracijom — nikad tajna.
 #
-# ZAŠTO POSTOJI: produkcija je radila bez MATBOT_PRACTICE_PIPELINE i
-# MATBOT_PRACTICE_DIFFICULTY_LEVELS, dok su release gate-ovi mjerili obje
-# uključene. Ništa u logu to nije pokazivalo, pa je odstupanje otkriveno tek
+# ZAŠTO POSTOJI: produkcija je radila bez dvije zastavice arhitekture, dok su
+# release gate-ovi mjerili drugu konfiguraciju. (Jedna od njih je u
+# međuvremenu povučena zajedno sa starim Practice motorom.) Ništa u logu to nije pokazivalo, pa je odstupanje otkriveno tek
 # ručnim testom. Sadržaj reda je zatvorena lista ne-tajnih vrijednosti iz
 # matbot/release_config.py.
 logging.getLogger("matbot.startup").info(

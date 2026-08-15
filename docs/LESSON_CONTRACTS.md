@@ -26,7 +26,7 @@ odbijeno — **nijedno zbog pogrešne matematike**, sva zbog reprezentacije:
   na numeričkoj provjeri.
 
 Sada **server iz ugovora KONSTRUIŠE** operande, operaciju, tačan odgovor,
-distraktore i označeni indeks (`matbot/contracts/generator.py`). Tačnost,
+distraktore i označeni indeks (POVUČENO 2026-08-14: `matbot/contracts/generator.py` je obrisan; ugovor je sada podatak, ne generator). Tačnost,
 vjernost lekciji i označeni odgovor su tačni **po konstrukciji**, a ne
 naknadnom rekonstrukcijom. Model dobija gotov zadatak i piše samo okolnu
 bosansku prozu.
@@ -258,7 +258,7 @@ navedena ovdje.
 
 | Oznaka | Šta je | Ukloniti u |
 |---|---|---|
-| `MATBOT_CONTRACT_ENGINE=off` | globalno gašenje motora, **samo za razvoj**; nikad odgovor na pad pojedinačnog ugovora | Faza D |
+| ~~`MATBOT_CONTRACT_ENGINE=off`~~ | **UKLONJENO 2026-08-14** zajedno s povučenim K1/K3 motorom koji je gasilo. Ugovor je sada isključivo PODATAK za Luna prompt; nema prekidača. | — |
 | `stage_a_only=True` u `schema.build` | ograničava uključene ugovore na deterministički podržane arhetipe | kad se skup sposobnosti proširi |
 | suženje `allowed_task_archetypes` u 6 pilot redova | drži K2/K4 van rotacije dok nemaju generator | kad K2/K4 dobiju generator |
 

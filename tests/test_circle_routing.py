@@ -84,7 +84,14 @@ def test_full_quick_prompt_contains_circle_area_formula():
 
 def test_practice_and_explain_prompts_also_carry_the_convention():
     oblast, title = live_lesson()
-    for builder in (prompts.build_instructions, prompts.build_explain_instructions):
+    # Practice prompt vise ne gradi matbot/prompts.py (stari motor je povucen
+    # 2026-08-14) — konvenciju u njega splajsa isti zajednicki izvor.
+    from matbot.rules import build_shared_math_rules
+
+    def practice_builder(grade, lesson_title="", oblast=""):
+        return build_shared_math_rules(grade, lesson_title, oblast, mode="practice")
+
+    for builder in (practice_builder, prompts.build_explain_instructions):
         full = builder(LIVE_GRADE, lesson_title=title, oblast=oblast)
         assert "$R=2r$" in full.replace(" ", ""), builder.__name__
 

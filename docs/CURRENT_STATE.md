@@ -196,7 +196,7 @@ broken context, or significant UX damage · **P3** terminology, formatting, clar
 | ID | Sev | Risk |
 |---|---|---|
 | R-1 | P1 | Wrong algebraic transformation or equation solution. `mathcheck` skips every expression containing a variable by design; nothing verifies `2x+6=10 ⇒ x=2`. |
-| R-2 | P1 | Wrong 2×2 system solution in Explain. `systemcheck.py` already does exact substitution but is wired into Practice only. |
+| R-2 | P1 | Wrong 2×2 system solution in Explain. (`systemcheck.py` was deleted with the retired Practice engine on 2026-08-14 — it had **zero** references in the active path, so it had already stopped protecting production. Re-adding an exact substitution check is now new work, not wiring.) |
 | R-3 | P1 | Unit errors (`cm` vs `cm²`, `dm³` ↔ litar). No verifier; `mathcheck` *strips* units before evaluating. |
 | R-4 | P2 | Grade-inappropriate depth (negatives in grade 6, transposition method in grade 6). Prompt-only. |
 | R-5 | P2 | Topic leakage / renaming the lesson. Prompt-only; `effective_topic` is server-pinned so the UI label stays correct. |
@@ -293,7 +293,7 @@ internal codes never leak to the browser · XSS (escape before every
 3. **C-6** — implement the recommended bounded response cache
    ([EXPLAIN_REQUEST_IDEMPOTENCY.md](EXPLAIN_REQUEST_IDEMPOTENCY.md)), extending
    `TurnLockRegistry`'s existing concurrency pattern rather than a new subsystem.
-4. **R-2** (optional) — wire the existing `systemcheck` into Explain, only if
+4. **R-2** (optional) — write a fresh exact substitution check for Explain, only if
    grade-9 live sampling shows real system errors.
 5. **R-6/R-7** (optional) — add the same "student text is content, never an
    instruction" clause Quick already has for images to Explain's prompt rules,

@@ -15,7 +15,7 @@ from matbot.explain import run_explain_turn
 from matbot.practice import SAFE_ERROR_MESSAGE, run_practice_turn
 from matbot.quick import run_quick_turn
 from matbot.session_store import SessionStore
-from tests.conftest import (FakeLLM, make_explain_output, make_options, make_output,
+from tests.conftest import (queue_two_call, FakeLLM, make_explain_output, make_options, make_output,
                              make_quick_output, make_task, make_task_for_family)
 
 
@@ -273,70 +273,6 @@ def _practice_payload(msg="Daj zadatak.", **kw):
             "interaction_type": "", "selected_option_id": "", "client_turn_id": ""}
     base.update(kw)
     return base
-
-
-def test_practice_task_with_inconsistent_arithmetic_is_rejected_without_state_change():
-    store, fake = SessionStore(), FakeLLM()
-    fake.queue(make_output(reply="Evo zadatka.", new_task=make_task(
-        text="Proširi razlomak $\\frac{3}{8}$ tako da nazivnik bude $24$. Provjeri: $3\\cdot3=12$.",
-        expected="$\\frac{9}{24}$",
-        options=make_options("$\\frac{9}{24}$", "$\\frac{3}{24}$",
-                              "$\\frac{9}{8}$", "$\\frac{6}{24}$"))))
-    before = store.peek("sess-mathcheck")
-    r = run_practice_turn(store, fake, _practice_payload())
-    assert r["answer"] == SAFE_ERROR_MESSAGE
-    assert fake.practice_call_count == 1
-    assert store.peek("sess-mathcheck") == before  # oba None — ništa spremljeno
-
-
-def test_practice_reveal_with_inconsistent_arithmetic_is_rejected():
-    store, fake = SessionStore(), FakeLLM()
-    fake.queue(make_output(reply="Evo zadatka.",
-                            new_task=make_task_for_family("expand_to_given_denominator")))
-    run_practice_turn(store, fake, _practice_payload())
-    sess = store.peek("sess-mathcheck")
-    wrong = next(o["id"] for o in sess["current_options"] if o["id"] != sess["correct_option_id"])
-
-    fake.queue(make_output(reply="x", hint="Prvi hint."))
-    run_practice_turn(store, fake, _practice_payload(
-        msg="[klik]", interaction_type="choice_answer",
-        selected_option_id=wrong, client_turn_id="t1"))
-
-    sess2 = store.peek("sess-mathcheck")
-    second_wrong = next(o["id"] for o in sess2["current_options"]
-                        if o["id"] not in (sess2["correct_option_id"], wrong))
-    before = store.peek("sess-mathcheck")
-    fake.queue(make_output(reply="Postupak: $3\\cdot3=12$, dakle rezultat."))
-    r = run_practice_turn(store, fake, _practice_payload(
-        msg="[klik]", interaction_type="choice_answer",
-        selected_option_id=second_wrong, client_turn_id="t2"))
-
-    assert r["answer"] == SAFE_ERROR_MESSAGE
-    assert fake.practice_call_count == 3  # bootstrap + 2 klika, bez popravnog poziva
-    after = store.peek("sess-mathcheck")
-    assert after["wrong_option_ids"] == before["wrong_option_ids"]
-    assert after["task_completed"] == before["task_completed"]
-
-
-def test_error_detection_family_may_show_wrong_arithmetic_on_purpose():
-    """„Učenik je napisao $\\frac{1}{2}+\\frac{1}{3}=\\frac{2}{5}$. Šta je
-    pogriješio?“ — netačna jednakost je SVRHA zadatka i ne smije se odbiti."""
-    from matbot.mathcheck import find_numeric_inconsistencies as f
-    from matbot.task_family_validation import question_numeric_policy
-    task = make_task_for_family("detect_student_error")
-    assert f(task.text), "test-template mora sadržavati namjerno pogrešnu jednakost"
-
-    assert question_numeric_policy("detect_student_error") == "allow_intentional_mismatch"
-    assert question_numeric_policy("detect_formula_error") == "allow_intentional_mismatch"
-
-
-def test_practice_valid_task_still_accepted_after_integration():
-    store, fake = SessionStore(), FakeLLM()
-    fake.queue(make_output(reply="Evo zadatka.",
-                            new_task=make_task_for_family("expand_to_given_denominator")))
-    r = run_practice_turn(store, fake, _practice_payload())
-    assert r["status"] == "ready"
-    assert fake.practice_call_count == 1
 
 
 # ---------------------------------------------------------------------------

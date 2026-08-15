@@ -111,7 +111,7 @@ def chat_payload(msg="Daj mi jedan zadatak za vježbu iz ove teme.", **kw):
         "grade": 6,
         "mode": "practice",
         "entry_source": "manual_topic_choice",
-        "selected_topic": "6-01-006",
+        "selected_topic": "6-01-005",   # modelska ruta (vidi test_security.py)
         "selected_oblast": "",
         "student_message": msg,
         "conversation_history": [],

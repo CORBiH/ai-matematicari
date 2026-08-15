@@ -326,16 +326,18 @@ reject it. The server alone owns option shuffling, option ids, which option is
 correct in the browser, the deterministic verdict for a click, and session
 state.
 
-**Current production state and rollback.** `universal_two_call` **is** production,
-and `MATBOT_PRACTICE_PIPELINE=universal_two_call` is written into the VPS `.env`
-by the deploy workflow from `deploy/production_release.env` on every release.
-`legacy_single_call` is the code default only so the test suite keeps proving the
-rollback path; it is no longer what an unconfigured production would run, because
-an unconfigured production no longer starts (see *Release configuration is
-enforced* below). `MATBOT_PRACTICE_PIPELINE=legacy_single_call` remains the
-rollback, but reaching it is now a commit to the declaration plus a release gate,
-not a hand edit on the server. See
-[LESSON_CONTRACTS.md](LESSON_CONTRACTS.md) for the preserved deterministic engine.
+**Current production state and rollback.** There is exactly **one** supported
+Vjezbajmo engine. The legacy single-call Practice path was **retired on
+2026-08-14** — not disabled, deleted. `matbot/practice.py` is a thin boundary
+that unconditionally calls `tutor_pipeline.run_turn`; `MATBOT_PRACTICE_PIPELINE`
+and `MATBOT_CONTRACT_ENGINE` no longer exist in the code or in
+`deploy/production_release.env`, so a stale value left in the VPS `.env` is inert
+and cannot resurrect the old path.
+
+**Rollback is Git history**, i.e. redeploying a known-good commit — no longer a
+configuration switch. The engine chooses between the deterministic strategy
+(zero model calls) and the model route (Luna Tutor + conditional Reviewer, hard
+ceiling two calls) from server-owned facts, inside that single engine.
 
 **Measured production routing (HEAD `0c02fca`, exhaustive offline audit).** Of the
 534 lessons, **189 across 29 semantic families are served with zero model calls**
@@ -801,8 +803,6 @@ All are pure functions, no model calls, and all follow the same discipline:
 | `terminology.py` | eight forbidden terms and their declined forms — the Croatian variant of `faktor`, `kutomer`, `jednakokračni`, `zbroj`, `potenciranje`, plus `trokut`→`trougao`, `točan`→`tačan` (D35-3b) and the Croatian word for angle→`ugao` — outside math segments only. (`suma` is deliberately not covered — see [CURRENT_STATE.md](CURRENT_STATE.md) C-8.) | rewrite in place | all |
 | `lesson_relevance.py` | the selected Explain lesson overriding a self-contained question from another topic (D35-3) | drop the "teach the lesson" prompt rules for that turn | explain |
 | `option_equivalence.py` | two options equal after simplification | reject task | practice |
-| `task_family_validation.py` | generated task does not match the server-assigned pedagogical family | reject task | practice |
-| `systemcheck.py` | ordered pair that does not solve the shown 2×2 system; non-equivalent "equivalent system" options | reject task | practice |
 | `imageinput.py` | oversized upload, decompression bomb, disallowed/spoofed format, degenerate size | 400/413 before any call | quick |
 | `quick.py` image gate | an image answer whose reported readability is not `clear`, whose required symbols are not all visible, whose confidence is not `high`, or which reports any uncertainty (D35-6) | discard the proposed maths, return a short server-owned message | quick (image only) |
 

@@ -79,7 +79,7 @@ def _console_print(*values, sep=" ", end="\n", file=None, flush=False):
 # Prefiksi log redova koje smijemo prepisati u izvještaj. Aplikacija ih već
 # emituje ograničene i scrubovane (matbot/llm.py::_scrub, practice._clip_for_log).
 _SAFE_LOG_PREFIXES = (
-    "practice_turn ", "practice_choice ", "practice_plan ",
+    "practice_choice ", "practice_plan ",
     "practice_contract_rejected ", "practice_duplicate_options ",
     "practice_system_verification ", "practice_difficulty_label_mismatch ",
     "lesson_fidelity ", "tutor_turn ", "tutor_choice ", "tutor_rejected ",
@@ -147,7 +147,6 @@ class ObservingLLM:
         self._local.failure = None
         self._local.tutor_output = None
         self._local.reviewer_output = None
-        self._local.single_call_output = None
 
     def request_record(self):
         return {
@@ -158,7 +157,6 @@ class ObservingLLM:
             "failure": getattr(self._local, "failure", None),
             "tutor_output": getattr(self._local, "tutor_output", None),
             "reviewer_output": getattr(self._local, "reviewer_output", None),
-            "single_call_output": getattr(self._local, "single_call_output", None),
         }
 
     def _count(self, method_name):
@@ -199,23 +197,6 @@ class ObservingLLM:
         self._local.usage = usage
         return result
 
-    # -- metode koje aplikacija stvarno zove ------------------------------
-    def practice_turn(self, instructions, input_text):
-        # SANKCIONISANA JEDNOPOZIVNA RUTA (živi C001/C002): legacy K1/K3 put
-        # pravi zadatak u JEDNOM pozivu i to NIJE kvar proizvoda. Ranije se
-        # ovdje izlaz nije snimao, pa `_final_task_package` nije imao šta da
-        # vrati, `package_clean` je vraćao SKIP i scenario je izgledao kao
-        # rupa u pokrivenosti — iako je paket postojao i bio provjerljiv.
-        # Snima se STVARAN izlaz stvarnog poziva: nijedan poziv se ne izmišlja
-        # i knjigovodstvo ostaje istinito (jedan poziv = jedan poziv).
-        result = self._invoke("tutor", "practice_turn", self._inner.practice_turn,
-                              instructions, input_text)
-        self._local.single_call_output = result.output
-        return result
-
-    def lesson_fidelity_turn(self, instructions, input_text):
-        return self._invoke("reviewer", "lesson_fidelity_turn",
-                            self._inner.lesson_fidelity_turn, instructions, input_text)
 
     def tutor_turn(self, instructions, input_text):
         result = self._invoke("tutor", "tutor_turn", self._inner.tutor_turn,
@@ -274,7 +255,6 @@ def _git(*args):
 def runtime_metadata():
     from matbot import config, practice
 
-    pipeline = (os.environ.get("MATBOT_PRACTICE_PIPELINE", "") or "").strip().lower()
     metadata = {
         "git_commit": _git("rev-parse", "HEAD"),
         "git_tree": _git("rev-parse", "HEAD^{tree}"),
@@ -285,8 +265,9 @@ def runtime_metadata():
         "reasoning_effort": config.REASONING_EFFORT,
         "timeout_seconds": config.AI_TIMEOUT_S,
         "max_output_tokens_practice": config.MAX_OUTPUT_TOKENS_PRACTICE,
-        "practice_pipeline": pipeline or "(unset → legacy_single_call)",
-        "universal_pipeline_active": pipeline == practice.UNIVERSAL_PIPELINE_FLAG,
+        # Jedan podržan motor od povlačenja starog jednopozivnog puta
+        # (2026-08-14) — nema više izbora koji bi metapodatak morao zabilježiti.
+        "practice_engine": "tutor_pipeline (single supported engine)",
         "difficulty_levels_enabled": config.practice_difficulty_levels_enabled(),
     }
     metadata.update(campaign_config.environment_snapshot(
@@ -416,7 +397,9 @@ def _final_task_package(record):
     task = getattr(tutor, "new_task", None)
     if task is not None:
         return task
-    return getattr(record.get("single_call_output"), "new_task", None)
+    # Stari jednopozivni motor je povucen (2026-08-14): njegov izlaz vise
+    # ne postoji, pa ni paket iz njega. Paket dolazi iz Tutor/Reviewer para.
+    return None
 
 
 def _difficulty_profile_for(scenario):

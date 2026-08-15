@@ -219,18 +219,18 @@ sys.path.insert(0, str(ROOT))
 
 from matbot import (config, difficulty_level, feedback, lesson_fidelity, mathsafe,
                     mcq_integrity, practice)  # noqa: E402
-from matbot.contracts import difficulty as contract_difficulty  # noqa: E402
 from matbot.contracts import registry as contract_registry  # noqa: E402
 from matbot.llm import LLMError, OpenAIPracticeLLM, safe_failure_diagnostics  # noqa: E402
 from matbot.mathcheck import find_numeric_inconsistencies  # noqa: E402
 from matbot.mathsegments import DISPLAY, INLINE, TEXT, tokenize_math  # noqa: E402
 from matbot.session_store import SessionStore  # noqa: E402
-from matbot.task_family_validation import (  # noqa: E402
+from matbot.answer_kind import (  # noqa: E402
     canonical_answer_kind, detected_answer_kind,
 )
 from matbot.topics import lesson_info  # noqa: E402
 from matbot.tutor import lesson_context as tutor_lesson_context  # noqa: E402
 from matbot.tutor import pipeline as tutor_pipeline  # noqa: E402
+from matbot.tutor import pipeline as tutor_pipeline_module  # noqa: E402
 from matbot.tutor.schema import difficulty_evidence_errors  # noqa: E402
 
 
@@ -272,7 +272,7 @@ FAILURE_CLASSES = (
 # Only these log-line prefixes are ever copied into the report. Everything the
 # application logs under them is already bounded and scrubbed.
 _SAFE_LOG_PREFIXES = (
-    "practice_turn ", "practice_choice ", "practice_contract_rejected ",
+    "practice_choice ", "practice_contract_rejected ",
     "lesson_fidelity ", "practice_plan ", "practice_duplicate_options ",
     "practice_system_verification ", "practice_difficulty_label_mismatch ",
     "tutor_rejected ",
@@ -397,11 +397,6 @@ class CountingLLM:
         self.call_count += 1
         self.call_log.append(method_name)
 
-    def practice_turn(self, instructions, input_text):
-        self._count("practice_turn")
-        result = self._call("tutor", self._inner.practice_turn, instructions, input_text)
-        self.last_tutor_output = result.output
-        return result
 
     def fast_turn(self, instructions, input_text, timeout_s=None):
         # BRZA RUTA SE BROJI KAO I SVAKA DRUGA. Bez ovog omotača `fast_turn` bi
@@ -414,11 +409,6 @@ class CountingLLM:
         self.last_tutor_output = result.output
         return result
 
-    def lesson_fidelity_turn(self, instructions, input_text):
-        self._count("lesson_fidelity_turn")
-        result = self._call("reviewer", self._inner.lesson_fidelity_turn, instructions, input_text)
-        self.last_reviewer_output = result.output
-        return result
 
     # Defensive pass-throughs for the inactive universal_two_call path —
     # unreachable (refused at precondition check), counted anyway so the
@@ -798,30 +788,42 @@ def _turn_payload(scenario: Scenario, *, selected_option_id: str = "",
 
 
 def _tutor_pipeline_intros():
-    """Uvodi AKTIVNOG puta (`matbot/tutor/pipeline.py`).
+    """Uvodi JEDINOG motora (`matbot/tutor/pipeline.py`).
 
-    Postoje DVIJE serverske tabele uvoda: legacy u `matbot/practice.py` i ova.
-    Kapija je poznavala samo legacy, pa je potpuno ispravan serverski uvod
-    („Evo sljedećeg zadatka.“ za `next_task`) citala kao — nikakav uvod."""
+    Ranije su postojale DVIJE serverske tabele uvoda — legacy u
+    `matbot/practice.py` i ova. Legacy motor je povučen (2026-08-14), pa je
+    ostala tačno jedna i kapija više ne mora da ih spaja.
+
+    NAPOMENA UZ IMENA: ranija verzija je tražila `_AT_MAXIMUM_INTRO` /
+    `_AT_MINIMUM_INTRO` / `_SAME_LEVEL_INTRO`, kojih u aktivnom modulu NEMA —
+    prave konstante su `INTRO_AT_HARDEST_LEVEL` i `INTRO_AT_EASIEST_LEVEL`.
+    Zato su granični uvodi kapiji ranije izgledali kao „nikakav uvod“."""
     from matbot.tutor import pipeline as tutor_pipeline
 
     values = set(tutor_pipeline._NEW_TASK_INTRO.values())
-    for name in ("_AT_MAXIMUM_INTRO", "_AT_MINIMUM_INTRO", "_SAME_LEVEL_INTRO"):
-        value = getattr(tutor_pipeline, name, None)
-        if isinstance(value, str):
-            values.add(value)
+    values.add(tutor_pipeline.INTRO_AT_EASIEST_LEVEL)
+    values.add(tutor_pipeline.INTRO_AT_HARDEST_LEVEL)
     return frozenset(values)
 
 
-_INTRO_PREFIXES = tuple(sorted({
-    practice._SAME_FAMILY_RETRY_INTRO,
-    practice._SAME_SUPPORTED_DIFFICULTY_INTRO,
-    practice._ANOTHER_ADVANCED_TASK_INTRO,
-    practice._ANOTHER_INTRO_TASK_INTRO,
-    practice._HARDER_TASK_INTRO,
-    practice._EASIER_TASK_INTRO,
-    practice._NEW_TASK_INTRO,
-} | _tutor_pipeline_intros(), key=len, reverse=True))
+_INTRO_PREFIXES = tuple(sorted(_tutor_pipeline_intros(), key=len, reverse=True))
+
+
+# Zahtjev iz UI-ja → namjera koju aktivni birač uvoda razumije.
+_INTENT_FOR_REQUEST = {"harder": "harder_task", "easier": "easier_task",
+                       "": "generate_task"}
+
+
+def _expected_intro(request_type, transition):
+    """Očekivan uvod = ONO ŠTO BI AKTIVNI SERVER IZABRAO, ne kopija pravila."""
+    from matbot.tutor import pipeline as tutor_pipeline
+
+    intent = _INTENT_FOR_REQUEST.get((request_type or "").strip().lower(),
+                                     "generate_task")
+    if transition is None:
+        return tutor_pipeline._intro_for(intent, None, None)
+    return tutor_pipeline._intro_for(intent, transition.previous_level,
+                                     transition.target_level)
 
 
 def _actual_intro(answer_text: Optional[str]) -> Optional[str]:
@@ -1210,7 +1212,7 @@ def _validate_divisibility_final_turn(result: TurnResult) -> list[str]:
             errors.append("level1_effective_server_label_is_not_easy")
         if result.level_changed is not False:
             errors.append("fresh_level1_unexpected_level_change")
-        if result.intro_actual == practice._ANOTHER_ADVANCED_TASK_INTRO:
+        if result.intro_actual == tutor_pipeline_module.INTRO_AT_HARDEST_LEVEL:
             errors.append("advanced_task_at_level1")
     else:
         if result.level_changed is not True:
@@ -1276,7 +1278,7 @@ def _run_divisibility_final_static_checks() -> None:
             effective_topic=DIVISIBILITY[0], session_lesson_id_after=DIVISIBILITY[0],
             session_level_after=target,
             effective_server_label="easy" if target == 1 else "standard",
-            intro_actual=(None if target == 1 else practice._HARDER_TASK_INTRO),
+            intro_actual=(None if target == 1 else tutor_pipeline_module._NEW_TASK_INTRO["harder_task"]),
             reviewer_checks=required_checks,
             tutor_declared_answer_kind=declared,
             final_declared_answer_kind=declared,
@@ -1535,7 +1537,7 @@ def _validate_production_smoke_final_turn(result: TurnResult) -> list[str]:
                 errors.append("fresh_level1_unexpected_level_change")
             if result.effective_server_label != "easy":
                 errors.append("level1_effective_server_label_is_not_easy")
-            if result.intro_actual == practice._ANOTHER_ADVANCED_TASK_INTRO:
+            if result.intro_actual == tutor_pipeline_module.INTRO_AT_HARDEST_LEVEL:
                 errors.append("advanced_task_at_level1")
         else:
             if result.level_changed is not True:
@@ -1667,7 +1669,7 @@ def _run_production_smoke_final_static_checks() -> None:
             visible_correct_option_value="Da", model_marked_option_value="Da",
             effective_topic=DIVISIBILITY[0], session_lesson_id_after=DIVISIBILITY[0],
             effective_server_label="standard" if harder else "easy",
-            intro_actual=practice._HARDER_TASK_INTRO if harder else practice._NEW_TASK_INTRO,
+            intro_actual=tutor_pipeline_module._NEW_TASK_INTRO["harder_task"] if harder else tutor_pipeline_module._NEW_TASK_INTRO["generate_task"],
             reviewer_checks=dict(reviewer_checks), tutor_declared_answer_kind="short_text",
             final_declared_answer_kind="short_text",
             final_canonical_answer_kind="short_text", final_detected_answer_kind=None,
@@ -1820,20 +1822,15 @@ def _run_one_turn(store, llm, capture, report, scenario: Scenario, campaign: str
         report.skipped_unmet_prerequisite += 1
         return result, True
 
+    # `generation_changed` je nekad predviđalo da li DETERMINISTIČKI K1/K3
+    # generator kapabilnošću uopšte može prikazati pomjeren nivo. Taj generator
+    # je povučen (2026-08-14): lekcije s ugovorom idu istom modelskom rutom kao
+    # sve ostale, gdje RECENZENT garantuje da objavljen zadatak odgovara nivou.
+    # Zato predviđanja više nema — ostaje serverska tranzicija kao jedini izvor.
     generation_changed = True
-    if scenario.path == "contract":
-        contract = contract_registry.contract_for(scenario.lesson_id)
-        if contract is not None:
-            generation_changed = (
-                contract_difficulty.measurable_target_profile(contract, transition.previous_level)
-                != contract_difficulty.measurable_target_profile(contract, transition.target_level)
-            )
-        result.generation_changed = generation_changed
+    result.generation_changed = generation_changed
 
-    result.intro_expected = practice._new_task_intro(
-        {"difficulty_request": scenario.request_type}, retry_required=False,
-        transition=transition, generation_changed=generation_changed,
-    )
+    result.intro_expected = _expected_intro(scenario.request_type, transition)
 
     if scenario.interaction_kind in {"correct_choice", "hint", "full_solution"}:
         turn_cap = 1

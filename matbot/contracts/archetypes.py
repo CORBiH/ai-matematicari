@@ -4,26 +4,29 @@ Podjela koja se NE smije miješati:
   • ARHETIP opisuje interakciju (izračunaj / dopuni / prepoznaj ekvivalent /
     nađi grešku). Ne zna nijednu lekciju ni oblast.
   • UGOVOR LEKCIJE opisuje koja matematika smije da se pojavi.
-  • GENERATOR (matbot/contracts/generator.py) konstruiše konkretan zadatak iz
-    ugovora — arhetip je samo ime recepta i nosilac politika provjere teksta.
 
 Zato ISTI `direct_computation` opslužuje i sabiranje razlomaka jednakih
 imenilaca i množenje razlomaka i sabiranje cijelih brojeva — razlika je
 isključivo u vrijednostima ugovora, ne u kodu.
 
-Arhetip je „podržan“ SAMO ako za njega postoji serverski generator koji tačan
-odgovor KONSTRUIŠE (generator.IMPLEMENTED_ARCHETYPES). Ranija faza je ovdje
-provjeravala i vrste modelovog dokaza — taj smjer je ukinut nakon Live96:
-model više ne izvještava matematiku, pa dokaz nema šta da deklariše.
+ŠTA JE OVDJE NESTALO S POVLAČENJEM STAROG MOTORA (2026-08-14): arhetip je
+ranije bio „podržan“ samo ako za njega postoji SERVERSKI GENERATOR koji tačan
+odgovor konstruiše (`generator.IMPLEMENTED_ARCHETYPES`). Tog generatora više
+nema — zadatak piše model, a server ga provjerava — pa je i ta provjera
+uklonjena: obećanje koje niko više ne daje se ne može prekršiti.
+
+Ostaje provjera KATEGORIJA GREŠKE, i ona i dalje vrijedi: `error_category_set`
+uključenog ugovora ide kao PODATAK u aktivni Luna prompt
+(matbot/tutor/lesson_context.py), pa kategorija koju projekat ne poznaje ne bi
+bila bezopasna.
 """
 from dataclasses import dataclass
 
-from matbot.contracts import generator, verifiers
+from matbot.contracts import verifiers
 from matbot.contracts.schema import ContractSchemaError
 
-# Politika numeričke provjere TEKSTA PITANJA (isti pojam kao u
-# matbot/task_family_validation.py): arhetip čiji je predmet ispitivanja BAŠ
-# pogrešan postupak smije prikazati nedosljedan lanac.
+# Politika numeričke provjere TEKSTA PITANJA: arhetip čiji je predmet
+# ispitivanja BAŠ pogrešan postupak smije prikazati nedosljedan lanac.
 POLICY_CHECK = "check"
 POLICY_ALLOW_MISMATCH = "allow_intentional_mismatch"
 GEOMETRY_POLICY_CHECK = "check"
@@ -76,17 +79,11 @@ def archetype_for(archetype_id):
     return _REGISTRY.get(archetype_id)
 
 
-def implemented_ids():
-    """Arhetipi za koje postoji STVARNI serverski generator (ne samo ime)."""
-    return generator.IMPLEMENTED_ARCHETYPES
-
-
 def assert_supported(contract):
-    """Provjeri da UKLJUČEN ugovor traži samo ono što je stvarno implementirano.
+    """Provjeri da UKLJUČEN ugovor navodi samo pojmove koje projekat poznaje.
 
     Poziva se pri UČITAVANJU (registry.load_all) — defekt ugovora je greška
-    starta/CI-ja, nikad iznenađenje pred učenikom. Širenje podataka (npr.
-    dodavanje find_missing_value lekciji) bez generičkog generatora pada OVDJE."""
+    starta/CI-ja, nikad iznenađenje pred učenikom."""
     if contract.status != "enabled":
         return
     where = contract.canonical_topic_id
@@ -94,12 +91,6 @@ def assert_supported(contract):
         if archetype_id not in _REGISTRY:
             raise ContractSchemaError(
                 f"{where}: arhetip '{archetype_id}' nije definisan"
-            )
-        if archetype_id not in generator.IMPLEMENTED_ARCHETYPES:
-            raise ContractSchemaError(
-                f"{where}: arhetip '{archetype_id}' nema serverski generator — "
-                f"uključen ugovor ne smije obećavati oblik koji server ne umije "
-                f"konstruisati"
             )
     unknown = sorted(set(contract.error_category_set) - verifiers.DERIVABLE_ERROR_CATEGORIES)
     if unknown:

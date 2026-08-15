@@ -123,7 +123,7 @@ def test_category_incomplete_max_output_tokens():
     )
     llm = _llm(resp)
     with pytest.raises(LLMIncompleteMaxOutputTokens) as exc:
-        llm.practice_turn("instrukcije", "ulaz")
+        llm.tutor_turn("instrukcije", "ulaz")
     assert exc.value.category == "llm_incomplete_max_output_tokens"
     diag = exc.value.diagnostics
     assert diag["status"] == "incomplete"
@@ -137,7 +137,7 @@ def test_category_empty_output():
     """(3) Nema nikakvog tekstualnog izlaza — završeno, ali prazno."""
     resp = _FakeResponse(status="completed", output=[], output_parsed=None, output_text="")
     with pytest.raises(LLMEmptyOutput) as exc:
-        _llm(resp).practice_turn("i", "u")
+        _llm(resp).tutor_turn("i", "u")
     assert exc.value.category == "llm_empty_output"
     assert exc.value.diagnostics["output_text_chars"] == 0
 
@@ -149,7 +149,7 @@ def test_category_partial_structured_output_is_schema_parse_error():
         output_parsed=None, output_text='{"reply": "poc',
     )
     with pytest.raises(LLMSchemaParseError) as exc:
-        _llm(resp).practice_turn("i", "u")
+        _llm(resp).tutor_turn("i", "u")
     assert exc.value.category == "llm_schema_parse_error"
     assert exc.value.diagnostics["output_text_chars"] > 0
     assert exc.value.diagnostics["has_message_item"] is True
@@ -172,7 +172,7 @@ def test_category_invalid_json_schema_validation_error():
         validation_error = err
 
     with pytest.raises(LLMSchemaParseError) as exc:
-        _llm(validation_error).practice_turn("i", "u")
+        _llm(validation_error).tutor_turn("i", "u")
     assert exc.value.category == "llm_malformed_json"
     assert exc.value.diagnostics["exception_class"] == "ValidationError"
 
@@ -188,7 +188,7 @@ def test_category_schema_parse_error_still_exists_for_a_wrong_shape():
         validation_error = err
 
     with pytest.raises(LLMSchemaParseError) as exc:
-        _llm(validation_error).practice_turn("i", "u")
+        _llm(validation_error).tutor_turn("i", "u")
     assert exc.value.category == "llm_schema_parse_error"
 
 
@@ -199,7 +199,7 @@ def test_category_refusal():
         output_parsed=None, output_text="",
     )
     with pytest.raises(LLMRefusal) as exc:
-        _llm(resp).practice_turn("i", "u")
+        _llm(resp).tutor_turn("i", "u")
     assert exc.value.category == "llm_refusal"
     assert "Ne mogu" in exc.value.diagnostics["refusal_summary"]
 
@@ -208,7 +208,7 @@ def test_category_refusal_via_content_filter():
     resp = _FakeResponse(status="incomplete", incomplete_reason="content_filter",
                          output=[_ReasoningItem()], output_parsed=None)
     with pytest.raises(LLMRefusal) as exc:
-        _llm(resp).practice_turn("i", "u")
+        _llm(resp).tutor_turn("i", "u")
     assert exc.value.category == "llm_refusal"
 
 
@@ -217,7 +217,7 @@ def test_category_timeout():
     import openai
 
     with pytest.raises(LLMTimeout) as exc:
-        _llm(openai.APITimeoutError(request=None)).practice_turn("i", "u")
+        _llm(openai.APITimeoutError(request=None)).tutor_turn("i", "u")
     assert exc.value.category == "llm_timeout"
     assert exc.value.category != "llm_invalid_output_unknown"
 
@@ -225,7 +225,7 @@ def test_category_timeout():
 def test_category_generic_sdk_error():
     """(8) Generička SDK/transport greška."""
     with pytest.raises(LLMUnavailable) as exc:
-        _llm(RuntimeError("connection reset")).practice_turn("i", "u")
+        _llm(RuntimeError("connection reset")).tutor_turn("i", "u")
     assert exc.value.category == "llm_sdk_error"
     assert exc.value.diagnostics["exception_class"] == "RuntimeError"
 
@@ -234,7 +234,7 @@ def test_category_unknown_incomplete_reason_falls_back():
     resp = _FakeResponse(status="incomplete", incomplete_reason=None,
                          output=[_ReasoningItem()], output_parsed=None)
     with pytest.raises(LLMInvalidOutput) as exc:
-        _llm(resp).practice_turn("i", "u")
+        _llm(resp).tutor_turn("i", "u")
     assert exc.value.category == "llm_invalid_output_unknown"
 
 
@@ -257,7 +257,7 @@ def test_successful_call_unchanged_and_returns_usage_and_diagnostics():
     resp = _FakeResponse(status="completed", output=[_Message([_Text("{}")])],
                          output_parsed=_valid_parsed(), output_text="{}",
                          usage=_Usage(100, 200, 50))
-    result = _llm(resp).practice_turn("i", "u")
+    result = _llm(resp).tutor_turn("i", "u")
     assert result.output.reply == "U redu."
     assert result.usage["output_tokens"] == 200
     assert result.diagnostics["parsed_ok"] is True
@@ -269,7 +269,7 @@ def test_practice_uses_dedicated_larger_output_budget():
     resp = _FakeResponse(status="completed", output=[_Message([_Text("{}")])],
                          output_parsed=_valid_parsed(), output_text="{}")
     llm = _llm(resp)
-    llm.practice_turn("i", "u")
+    llm.tutor_turn("i", "u")
     assert llm._client.responses.last_kwargs["max_output_tokens"] == config.MAX_OUTPUT_TOKENS_PRACTICE
     assert config.MAX_OUTPUT_TOKENS_PRACTICE > config.MAX_OUTPUT_TOKENS
     assert config.MAX_OUTPUT_TOKENS_PRACTICE <= config.MAX_OUTPUT_TOKENS_HARD_CEILING
@@ -310,7 +310,7 @@ def test_practice_budget_unchanged_by_explain_dedicated_budget():
     resp = _FakeResponse(status="completed", output=[_Message([_Text("{}")])],
                          output_parsed=_valid_parsed(), output_text="{}")
     llm = _llm(resp)
-    llm.practice_turn("i", "u")
+    llm.tutor_turn("i", "u")
     assert llm._client.responses.last_kwargs["max_output_tokens"] == config.MAX_OUTPUT_TOKENS_PRACTICE
 
 
@@ -339,7 +339,7 @@ def test_exactly_one_sdk_call_per_turn_on_failure():
                          output=[_ReasoningItem()], output_parsed=None)
     llm = _llm(resp)
     with pytest.raises(LLMIncompleteMaxOutputTokens):
-        llm.practice_turn("i", "u")
+        llm.tutor_turn("i", "u")
     assert llm._client.responses.calls == 1
 
 
@@ -359,7 +359,7 @@ def test_diagnostics_never_contain_secrets():
     """(12) Čak i kad SDK ubaci ključ/token u tekst izuzetka, log ga ne smije nositi."""
     leaky = RuntimeError("auth failed for sk-proj-ABCDEF1234567890 Authorization: Bearer zzzz")
     with pytest.raises(LLMUnavailable) as exc:
-        _llm(leaky).practice_turn("i", "u")
+        _llm(leaky).tutor_turn("i", "u")
     line = failure_diagnostics_kv(exc.value)
     assert "sk-proj-ABCDEF1234567890" not in line
     assert "zzzz" not in line
@@ -370,7 +370,7 @@ def test_diagnostics_values_are_length_bounded():
     """(11) Nijedna dijagnostička vrijednost nije neograničeno duga."""
     huge = RuntimeError("E" * 5000)
     with pytest.raises(LLMUnavailable) as exc:
-        _llm(huge).practice_turn("i", "u")
+        _llm(huge).tutor_turn("i", "u")
     line = failure_diagnostics_kv(exc.value)
     assert "E" * 5000 not in line
     assert len(line) < 2000
@@ -380,7 +380,7 @@ def test_diagnostics_never_contain_full_prompt_or_output():
     resp = _FakeResponse(status="completed", output=[_Message([_Text("X" * 3000)])],
                          output_parsed=None, output_text="X" * 3000)
     with pytest.raises(LLMSchemaParseError) as exc:
-        _llm(resp).practice_turn("TAJNE-INSTRUKCIJE" * 50, "TAJNI-ULAZ" * 50)
+        _llm(resp).tutor_turn("TAJNE-INSTRUKCIJE" * 50, "TAJNI-ULAZ" * 50)
     line = failure_diagnostics_kv(exc.value)
     assert "TAJNE-INSTRUKCIJE" not in line
     assert "TAJNI-ULAZ" not in line
@@ -402,7 +402,7 @@ class _FailingLLM:
         self.error = error
         self.call_count = 0
 
-    def practice_turn(self, instructions, input_text):
+    def tutor_turn(self, instructions, input_text):
         self.call_count += 1
         raise self.error
 
@@ -429,7 +429,14 @@ def test_safe_browser_response_identical_for_every_failure_category(error):
     """(9) Sigurna poruka učeniku je NEPROMIJENJENA za svaku internu kategoriju."""
     store, llm = SessionStore(), _FailingLLM(error)
     r = run_practice_turn(store, llm, _payload())
-    assert r == {"answer": SAFE_ERROR_MESSAGE, "last_tutor_task": ""}
+    # Jedini motor uz iste dvije vidljive vrijednosti vraća i SERVERSKO polje
+    # `task_preserved` (postoji odvajkada na ovom putu, nije promjena ovog
+    # čišćenja). Dokazuje se ono što je učeniku vidljivo i što je obećanje
+    # pravila 7: ista sigurna poruka, nikakav zadatak, nikakav interni kod.
+    assert r["answer"] == SAFE_ERROR_MESSAGE
+    assert r["last_tutor_task"] == ""
+    assert "status" not in r and "next_state" not in r
+    assert set(r) <= {"answer", "last_tutor_task", "task_preserved"}
     assert llm.call_count == 1  # (14) tačno jedan poziv
 
 
@@ -472,15 +479,17 @@ def test_structured_failure_log_line_is_emitted_with_category_and_topic(caplog):
         "instructions_chars": 16819, "input_chars": 1911,
         "usage": {"input_tokens": 6774, "output_tokens": 2500, "reasoning_tokens": 2500},
     }))
-    with caplog.at_level(logging.WARNING, logger="matbot.practice"):
+    # Jedini motor loguje na `matbot.tutor` (stari je logovao na
+    # `matbot.practice`). Dijagnostika je ISTA i i dalje strukturisana;
+    # mijenja se samo logger i imena par polja.
+    with caplog.at_level(logging.WARNING, logger="matbot"):
         run_practice_turn(store, llm, _payload())
     line = "\n".join(rec.message for rec in caplog.records)
-    assert "category=llm_incomplete_max_output_tokens" in line
+    assert "stage=tutor" in line
     assert "topic=6-04-007" in line
-    assert "mode=practice" in line
+    assert "status=incomplete" in line
     assert "incomplete_reason=max_output_tokens" in line
     assert "max_output_tokens=2500" in line
-    assert "family=" in line
     for forbidden in ("sk-", "Bearer", "api_key", "OPENAI_API_KEY"):
         assert forbidden not in line
 

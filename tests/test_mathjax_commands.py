@@ -17,7 +17,7 @@ from tests.conftest import FakeLLM, make_explain_output, make_output, make_quick
 
 def _explain_payload(msg="Objasni mi ovu temu."):
     return {
-        "session_id": "cmd-exp", "grade": 6, "selected_topic": "6-01-006",
+        "session_id": "cmd-exp", "grade": 6, "selected_topic": "6-01-005",
         "selected_oblast": "", "student_message": msg, "intent": "",
         "difficulty_request": "", "interaction_phase": "",
         "last_tutor_task": "", "last_tutor_message": "", "conversation_history": [],
@@ -35,7 +35,7 @@ def _quick_payload(msg="Koliko je 3/4 + 2/5?"):
 
 def _practice_payload(msg="Koliko je 2+2?"):
     return {
-        "session_id": "cmd-prac", "grade": 6, "selected_topic": "6-01-006",
+        "session_id": "cmd-prac", "grade": 6, "selected_topic": "6-01-005",
         "selected_oblast": "", "student_message": msg, "intent": "",
         "difficulty_request": "", "interaction_phase": "", "last_tutor_task": "",
     }
@@ -152,15 +152,6 @@ def test_braces_and_arguments_remain_intact():
 
 def test_nested_braces_survive():
     assert _clean("$x^{2}+\\text{cm}^{2}$") == "$x^{2}+\\text{cm}^{2}$"
-
-
-# --- 9-10: ista zaštita u sva tri moda --------------------------------------
-
-def test_practice_rejects_unknown_command(store):
-    fake = FakeLLM()
-    fake.queue(make_output(reply=CALL10_TAB_REPLY, evaluation="correct"))
-    response = run_practice_turn(store, fake, _practice_payload())
-    assert response["answer"] == SAFE_ERROR_MESSAGE
 
 
 def test_explain_rejects_unknown_command():

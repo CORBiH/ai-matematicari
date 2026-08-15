@@ -134,7 +134,9 @@ def _legacy_prompt_surface() -> str:
     # Explain/Quick grananje ovisi o zastavicama, ne o lekciji, pa je uzorak
     # lekcija dovoljan dok su sve zastavice pokrivene.
     for grade, _topic_id, title, oblast in LESSON_ROWS[:60]:
-        parts.append(legacy_prompts.build_instructions(grade, title, oblast))
+        # Practice grana: stari graditelj je povucen, zajednicki blok ostaje.
+        from matbot.rules import build_shared_math_rules
+        parts.append(build_shared_math_rules(grade, title, oblast, "practice"))
         for strong in (True, False):
             parts.append(legacy_prompts.build_explain_instructions(
                 grade, title, oblast, lesson_context_strong=strong))

@@ -23,7 +23,6 @@ sys.path.insert(0, str(ROOT))
 from matbot import geometry_rules                      # noqa: E402
 from matbot.contracts import registry                  # noqa: E402
 from matbot.rules import route_topic_rules             # noqa: E402
-from matbot.task_families import select_family         # noqa: E402
 
 import re                                              # noqa: E402
 
@@ -169,12 +168,12 @@ def build():
                 "topic_id": topic_id,
                 "grade": int(grade),
                 "oblast": lesson["oblast"],
+                # POVLAČENJE (2026-08-14): `first/harder/easier_family` su
+                # dolazili iz `task_families.select_family` — SELEKTORA starog
+                # jednopozivnog motora, koji je povučen. Ostaje REDOSLIJED
+                # porodica, jer njega i dalje čita aktivni put
+                # (tutor/lesson_context.py → applicable_families).
                 "families": families,
-                "first_family": select_family(families),
-                "harder_family": select_family(
-                    families, current_family=families[-1], difficulty_request="harder"),
-                "easier_family": select_family(
-                    families, current_family=families[-1], difficulty_request="easier"),
             })
     return {
         "_readme": (

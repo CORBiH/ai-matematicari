@@ -62,8 +62,8 @@ typed a short string. Assert that the *rule text is sent*, and measure obedience
 ### 2. Unit tests
 
 Pure functions, no Flask, no LLM: `mathsafe`, `mathcheck`, `geometrycheck`,
-`geometry_rules`, `terminology`, `option_equivalence`, `systemcheck`,
-`task_family_validation`, `contracts.{schema,evidence,verifiers,constraints,
+`geometry_rules`, `terminology`, `option_equivalence`, `answer_kind`,
+`contracts.{schema,verifiers,
 difficulty,generator,intent}`, `topics`, `ratelimit`,
 `turnlock`, `session_store`.
 

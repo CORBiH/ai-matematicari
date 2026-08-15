@@ -265,11 +265,6 @@ def test_leaving_the_selected_lesson_is_a_semantic_failure():
 # 6 + 7 + 8) RUTE — jednopozivna, deterministička, univerzalna
 # ---------------------------------------------------------------------------
 
-def test_sanctioned_single_call_route_is_recorded_as_such():
-    assert classify.turn_route(
-        {"sdk_calls": 1, "sdk_call_kinds": ["practice_turn"]}
-    ) == classify.ROUTE_SINGLE_CALL
-
 
 def test_deterministic_route_makes_zero_calls():
     assert classify.turn_route(
@@ -287,27 +282,6 @@ def test_skipped_precondition_is_not_mistaken_for_a_route():
     assert classify.turn_route(
         {"sdk_calls": 0, "sdk_call_kinds": [], "precondition_unmet": "no active task"}
     ) == classify.ROUTE_NO_MODEL_TURN
-
-
-def test_single_call_package_is_captured_so_it_is_not_a_fake_coverage_gap():
-    """Živi C001/C002: paket jednopozivne rute mora biti uhvaćen i provjerljiv
-    isto kao na univerzalnoj ruti. Ranije se snimao samo tutor/reviewer izlaz,
-    pa je `package_clean` vraćao SKIP i scenario je izgledao kao rupa."""
-    class _Output:
-        new_task = "TASK-PACKAGE"
-
-    captured = runner._final_task_package(
-        {"reviewer_output": None, "tutor_output": None,
-         "single_call_output": _Output()})
-    assert captured == "TASK-PACKAGE"
-    # a univerzalna ruta i dalje ima prednost kad postoji
-    class _Reviewer:
-        class final:
-            new_task = "REVIEWED-PACKAGE"
-
-    assert runner._final_task_package(
-        {"reviewer_output": _Reviewer(), "tutor_output": None,
-         "single_call_output": _Output()}) == "REVIEWED-PACKAGE"
 
 
 def test_no_package_anywhere_is_still_reported_as_missing():
@@ -341,46 +315,6 @@ def _single_call_scenario(tmp_path):
     path = tmp_path / "single.jsonl"
     path.write_text(json.dumps(row, ensure_ascii=False), encoding="utf-8")
     return load_scenarios(path)
-
-
-def test_single_call_route_is_captured_and_checked_by_the_real_runner(
-        tmp_path, fake_llm, monkeypatch, _levels_on):
-    """Živi C001/C002: sankcionisana jednopozivna ruta mora dati STRUKTURNI
-    paket i mora biti provjerena kao i univerzalna. Ranije je `package_clean`
-    vraćao SKIP i scenario je izgledao kao rupa u pokrivenosti."""
-    from tests.conftest import make_options, make_output, make_task
-
-    fake_llm.queue(make_output(
-        reply="Evo zadatka.",
-        new_task=make_task(
-            text=r"Koliko je $\frac{1}{4}+\frac{1}{4}$?",
-            expected=r"$\frac{1}{2}$",
-            options=make_options(r"$\frac{1}{2}$", r"$\frac{3}{8}$",
-                                 r"$\frac{1}{8}$", r"$\frac{3}{4}$"),
-            correct_option_index=0)))
-    monkeypatch.setattr(runner, "_real_llm", lambda: fake_llm)
-    _meta, records = runner.run_campaign(
-        _single_call_scenario(tmp_path), tmp_path / "out", 10, 1, 0, False)
-
-    record = records[0]
-    turn = record.turns[0]
-    # Ruta je IZRIČITO zapisana: generisanje ide kroz `practice_turn`, ne kroz
-    # par tutor+reviewer. Knjigovodstvo ostaje ISTINITO — legacy put uz
-    # generisanje pokreće i provjeru vjernosti lekciji, pa su to dva stvarna
-    # poziva; nijedan se ne izmišlja i nijedan se ne skriva.
-    assert turn["route"] == classify.ROUTE_SINGLE_CALL, turn["sdk_call_kinds"]
-    assert "practice_turn" in turn["sdk_call_kinds"]
-    assert "tutor_turn" not in turn["sdk_call_kinds"]
-    assert turn["sdk_calls"] == len(turn["sdk_call_kinds"])
-    assert classify.ROUTE_SINGLE_CALL in record.routes
-    # SUŠTINA C001/C002: paket JESTE uhvaćen, pa `package_clean` više nije
-    # preskočen i scenario ne može izgledati kao rupa u pokrivenosti.
-    assert turn["package_captured"] is True
-    package_check = next(result for result in turn["check_results"]
-                         if result["name"] == "package_clean")
-    assert package_check["outcome"] != "skip", package_check
-    # Dva stvarna poziva nisu prekršaj granice od dva.
-    assert classify.third_call_violations({"turns": [turn]}) == []
 
 
 # ---------------------------------------------------------------------------

@@ -52,7 +52,6 @@ The gate measures, and the artifact records, exactly this — the same declarati
 
 | Variable | Value |
 |---|---|
-| `MATBOT_PRACTICE_PIPELINE` | `universal_two_call` |
 | `MATBOT_PRACTICE_DIFFICULTY_LEVELS` | `enabled` |
 | `MATBOT_FAST_SINGLE_CALL_SCOPE` | `model_backed` |
 | `MATBOT_DETERMINISTIC_VARIETY_GATE` | `enabled` |

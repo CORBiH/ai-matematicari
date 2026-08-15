@@ -29,7 +29,6 @@ POST /api/ai-tutor/chat  (Flask test client, isti payload kao templates/index.ht
                                           → session limit → turn lock)
   → matbot/practice.py::run_practice_turn
   → matbot/tutor/pipeline.py            (universal_two_call)  ILI
-    matbot/practice.py::_run_legacy_single_call_turn (lekcije s ugovorom)
   → matbot/llm.py::OpenAIPracticeLLM    (STVARNI OpenAI poziv)
 ```
 
@@ -250,7 +249,6 @@ python tools/run_practice_eval.py --list
 python tools/run_practice_eval.py --wave A --dry-run
 
 # Live (traži OPENAI_API_KEY u OVOM procesu)
-$env:MATBOT_PRACTICE_PIPELINE      = "universal_two_call"
 $env:MATBOT_PRACTICE_DIFFICULTY_LEVELS = "enabled"
 $env:AI_TUTOR_TIMEOUT              = "45"
 python tools/run_practice_eval.py --wave A --max-model-calls 100

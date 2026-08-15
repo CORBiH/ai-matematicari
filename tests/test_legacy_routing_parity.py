@@ -63,16 +63,6 @@ def test_2_all_528_legacy_routes_match_the_baseline():
     )
 
 
-# --- 3-6: prva porodica, redoslijed, teže, lakše ----------------------------
-
-def test_3_initial_family_matches_for_every_lesson():
-    wrong = [
-        row["topic_id"] for row in LESSONS
-        if tf.select_family(_current(row)) != row["first_family"]
-    ]
-    assert not wrong, wrong[:10]
-
-
 def test_4_family_order_matches_exactly():
     """Ne samo skup — REDOSLIJED, jer o njemu zavisi i prvi zadatak i rotacija."""
     reordered = [
@@ -83,28 +73,6 @@ def test_4_family_order_matches_exactly():
     assert not reordered, reordered[:10]
 
 
-def test_5_harder_behaviour_matches():
-    wrong = []
-    for row in LESSONS:
-        families = _current(row)
-        harder = tf.select_family(
-            families, current_family=families[-1], difficulty_request="harder")
-        if harder != row["harder_family"]:
-            wrong.append((row["topic_id"], row["harder_family"], harder))
-    assert not wrong, wrong[:10]
-
-
-def test_6_easier_behaviour_matches():
-    wrong = []
-    for row in LESSONS:
-        families = _current(row)
-        easier = tf.select_family(
-            families, current_family=families[-1], difficulty_request="easier")
-        if easier != row["easier_family"]:
-            wrong.append((row["topic_id"], row["easier_family"], easier))
-    assert not wrong, wrong[:10]
-
-
 # --- 7: nijedna porodica koju legacy još treba nije preuranjeno obrisana -----
 
 def test_7_no_family_required_by_legacy_was_removed():
@@ -113,13 +81,6 @@ def test_7_no_family_required_by_legacy_was_removed():
     assert not missing, (
         f"Porodice koje nemigrirane lekcije još koriste, a obrisane su: {missing}"
     )
-
-
-def test_7_every_legacy_family_still_has_a_contract():
-    from matbot.task_family_validation import CONTRACTS
-
-    required = {family for row in LESSONS for family in row["families"]}
-    assert not sorted(required - set(CONTRACTS))
 
 
 @pytest.mark.parametrize("family,consumers", [
@@ -168,69 +129,6 @@ def test_8_pilot_lessons_do_not_appear_in_the_legacy_baseline():
     for topic_id in ENABLED:
         assert topic_id not in baseline_ids
         assert registry.state_for_topic(topic_id) == registry.STATE_ENGINE
-
-
-def test_9_enabled_contract_failure_never_invokes_legacy(monkeypatch):
-    """Detaljan scenarij živi u test_contract_architecture_gate.py::test_g6_*;
-    ovdje se drži granica: pad ugovora ne smije pozvati legacy routing."""
-    from matbot.contracts import verifiers
-
-    calls = []
-    original = tf.applicable_families
-    monkeypatch.setattr(
-        tf, "applicable_families",
-        lambda *a, **kw: calls.append(a) or original(*a, **kw))
-    monkeypatch.setattr(
-        verifiers, "verify_exact_rational",
-        lambda *a, **kw: verifiers.VerifierResult(True, False, "forced"))
-
-    from matbot.practice import SAFE_ERROR_MESSAGE, run_practice_turn
-    from matbot.session_store import SessionStore
-    from tests.conftest import FakeLLM
-
-    # Oboren verifikator obara SAMOPROVJERU serverskog generatora, pa priprema
-    # kostura padne PRIJE jedinog poziva — FakeLLM ne treba nijedan odgovor.
-    store, fake = SessionStore(), FakeLLM()
-    response = run_practice_turn(store, fake, {
-        "session_id": "parity-fail", "grade": 6, "selected_topic": "6-04-009",
-        "selected_oblast": "", "student_message": "Daj zadatak.", "intent": "",
-        "difficulty_request": "", "interaction_phase": "", "last_tutor_task": "",
-        "interaction_type": "student_question", "selected_option_id": "",
-        "client_turn_id": "",
-    })
-    assert response["answer"] == SAFE_ERROR_MESSAGE
-    assert calls == [], "legacy routing je pozvan za lekciju s uključenim ugovorom"
-
-
-def test_10_unsupported_contract_never_invokes_legacy(monkeypatch):
-    from matbot.contracts import schema
-
-    contract = registry.contract_for("6-04-009")
-    unsupported = schema.replace(contract, status="unsupported")
-
-    calls = []
-    original = tf.applicable_families
-    monkeypatch.setattr(
-        tf, "applicable_families",
-        lambda *a, **kw: calls.append(a) or original(*a, **kw))
-
-    from matbot.practice import PRACTICE_UNAVAILABLE_MESSAGE, run_practice_turn
-    from matbot.session_store import SessionStore
-    from tests.conftest import FakeLLM
-
-    store, fake = SessionStore(), FakeLLM()
-    with registry.override_contracts({"6-04-009": unsupported}):
-        response = run_practice_turn(store, fake, {
-            "session_id": "parity-unsupported", "grade": 6,
-            "selected_topic": "6-04-009", "selected_oblast": "",
-            "student_message": "Daj zadatak.", "intent": "",
-            "difficulty_request": "", "interaction_phase": "", "last_tutor_task": "",
-            "interaction_type": "student_question", "selected_option_id": "",
-            "client_turn_id": "",
-        })
-    assert response["answer"] == PRACTICE_UNAVAILABLE_MESSAGE
-    assert fake.call_count == 0, "nedostupna lekcija ne smije trošiti AI poziv"
-    assert calls == []
 
 
 # --- 13: privremeni ID-jevi lekcija su ograničeni na legacy granicu ----------

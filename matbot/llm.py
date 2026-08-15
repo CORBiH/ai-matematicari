@@ -291,28 +291,6 @@ class OpenAIPracticeLLM:
             self._client = OpenAI(max_retries=0, timeout=self.timeout_s)
         return self._client
 
-    def practice_turn(self, instructions: str, input_text: str) -> LLMResult:
-        # Practice je JEDINI mod koji generiše strukturiran zadatak (pitanje +
-        # 4 opcije + interni metapodaci) i zato ima VEĆI budžet izlaznih tokena
-        # od Quick — vidi config.MAX_OUTPUT_TOKENS_PRACTICE.
-        return self._structured_turn(
-            instructions, input_text, PracticeTurnOutput,
-            max_output_tokens=config.MAX_OUTPUT_TOKENS_PRACTICE,
-        )
-
-    def lesson_fidelity_turn(self, instructions: str, input_text: str) -> LLMResult:
-        """DRUGI (i posljednji) poziv stabilnog puta — SAMO za turn koji pravi
-        zadatak. Provjerava da zadatak ispituje tačno izabranu lekciju.
-
-        Model se bira preko `config.REVIEWER_MODEL` da bi se recenzent kasnije
-        mogao spustiti na jeftiniji model bez ijedne izmjene Practice logike."""
-        from matbot.lesson_fidelity import LessonFidelityReview
-
-        return self._structured_turn(
-            instructions, input_text, LessonFidelityReview,
-            max_output_tokens=config.MAX_OUTPUT_TOKENS_PRACTICE,
-            model=config.REVIEWER_MODEL,
-        )
 
     def tutor_turn(self, instructions: str, input_text: str) -> LLMResult:
         """PRVI od dva poziva univerzalnog Practice puta (nacrt).
