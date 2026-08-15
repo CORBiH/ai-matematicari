@@ -100,6 +100,17 @@ FAST_REASONING_EFFORT = os.environ.get("MATBOT_FAST_REASONING_EFFORT", "low")
 # (padovi 37–41 s naspram 33–35 s kod uspjelih). „Brza“ ruta čiji je popravak
 # spor nije brza — popravak zato ide istim brzim modelom.
 FAST_REVIEWER_MODEL = os.environ.get("MATBOT_FAST_REVIEWER_MODEL", FAST_MODEL)
+
+# --- „Objasni mi“ (Explain) — vlastiti izbor modela --------------------------
+# Do migracije (2026-08-15) Explain je NASLJEĐIVAO model adaptera
+# (OPENAI_MODEL_TEXT → gpt-5-mini u produkciji), pa bi promjena te zajedničke
+# varijable tiho promijenila i Explain. Sada je izbor EKSPLICITAN i vlasništvo
+# KODA — isti obrazac kao FAST_MODEL iznad: auditirana vrijednost živi ovdje,
+# `.env` je smije prepisati samo svjesno (varijabla ispod), a odstupanje
+# efektivne vrijednosti hvata `release_config.REQUIRED_EFFECTIVE_CONFIG`
+# (fail-closed na produkcijskom startu i u kapiji izdanja).
+EXPLAIN_MODEL = os.environ.get("MATBOT_EXPLAIN_MODEL", "gpt-5.6-luna")
+EXPLAIN_REASONING_EFFORT = os.environ.get("MATBOT_EXPLAIN_REASONING_EFFORT", "low")
 # Lekcije za koje je brzi put uključen — zarezom odvojena lista ID-jeva.
 # Prazno (podrazumijevano) znači: nijedna lekcija, put je potpuno neaktivan.
 _FAST_LESSONS_RAW = os.environ.get("MATBOT_FAST_SINGLE_CALL_LESSONS", "")

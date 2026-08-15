@@ -10,7 +10,8 @@ svoje stanje — isti mehanizam kao practice).
 import logging
 import uuid
 
-from matbot import config, geometry_rules, geometrycheck, lesson_relevance, prompts
+from matbot import (config, geometry_rules, geometrycheck, lesson_objectives,
+                    lesson_relevance, prompts)
 from matbot.llm import LLMError, failure_diagnostics_kv
 from matbot.mathcheck import find_numeric_inconsistencies
 from matbot.mathsafe import normalize_result_math_transport, sanitize_and_validate_math_text
@@ -98,6 +99,9 @@ def run_explain_turn(llm, turn):
         interaction_phase=turn["interaction_phase"],
         last_tutor_message=turn.get("last_tutor_message", ""),
         lesson_context_strong=lesson_context_strong,
+        # Kanonski ishodi lekcije — isti artefakt koji hrani Practice prompt.
+        # Prazno za lekcije bez mapiranih ishoda (ponašanje kao ranije).
+        lesson_objectives=lesson_objectives.primary_skills(lesson_id),
     )
 
     try:

@@ -346,9 +346,16 @@ class OpenAIPracticeLLM:
         # Explain dozvoljava odgovor do 3.3x duži od Quick-a (vidi
         # config.MAX_OUTPUT_TOKENS_EXPLAIN, živi nalaz C-9) — zato NE dijeli
         # Quick-ov manji budžet, nego ima svoj, isti kao Practice.
+        #
+        # MODEL JE OD 2026-08-15 EKSPLICITAN (config.EXPLAIN_MODEL →
+        # gpt-5.6-luna, effort low): ranije je važio model adaptera
+        # (OPENAI_MODEL_TEXT), pa Explain nije imao vlastiti identitet u
+        # konfiguraciji i dijelio je sudbinu Quick-a i Practice fallbacka.
         return self._structured_turn(
             instructions, input_text, ExplainTurnOutput,
             max_output_tokens=config.MAX_OUTPUT_TOKENS_EXPLAIN,
+            model=config.EXPLAIN_MODEL,
+            reasoning_effort=config.EXPLAIN_REASONING_EFFORT,
         )
 
     def quick_turn(self, instructions: str, input_text: str, image=None) -> LLMResult:

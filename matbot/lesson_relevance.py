@@ -72,6 +72,11 @@ _TOPIC_PATTERNS = {
     "skup": r"skup\w*|unij\w*|pres[jе]?ek\w*",
     "djeljivost": r"prost broj\w*|dj?eljiv\w*|nzd|nzs",
     "statistika": r"srednja vr[ij]?ednost|aritmeti[cč]ka sredina|vjerovatn\w*",
+    # Živi nalaz Explain baseline (b08): „Objasni mi Pitagorinu teoremu.“ u
+    # lekciji o razlomcima NIJE prepoznato kao druga tema — pojam nije postojao
+    # u leksikonu, pa je učenik prvo dobio cijeli neželjeni uvod u razlomke.
+    "pitagora": r"pitagor\w*",
+    "transformacije": r"rotacij\w*|translacij\w*|simetrij\w*",
 }
 _TOPIC_RES = {
     name: re.compile(r"\b(?:" + pattern + r")\b", re.UNICODE)
