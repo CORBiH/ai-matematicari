@@ -234,6 +234,9 @@ function loadPage(options = {}) {
     'clearAwaitingPracticeTask', 'storedLastTask', 'storedNextState',
     'currentRequestGeneration', 'invalidatePendingResponses', 'clearOptions',
     'invalidatePracticeCurriculumState',
+    // „Sutra imam kontrolni“: stanje ekrana, tok testa i predaja.
+    'enterExam', 'exitExamToHome', 'startExam', 'submitExam', 'renderExamQuestion',
+    'setExamState', 'examState', 'exam', 'examCard', 'examEls',
   ];
   const probe = `\n;globalThis.__ui = {${exported.join(', ')},`
     + ' setChipMeta: (m) => { pendingChipMeta = m; },'

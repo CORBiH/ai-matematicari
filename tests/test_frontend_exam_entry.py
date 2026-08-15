@@ -87,6 +87,100 @@ def test_practice_explain_quick_entry_flows_unchanged():
 
 
 # ---------------------------------------------------------------------------
+# (1b) Layout ugovor kontrolnog ekrana (živi screenshot 2026-08-16):
+#      preklopljena stanja, ugniježđen scroll, previše praznine.
+#      GRANICA: ovo nije pregledač — mjeri se CSS ugovor koji kvar čini
+#      nemogućim, ne rendering. Ponašanje rukovaoca dokazuje
+#      tests/frontend/exam_state_machine.test.js, a piksele živa provjera.
+# ---------------------------------------------------------------------------
+
+def _exam_css():
+    start = INDEX.index(".exam-card{")
+    end = INDEX.index("/* Phase 2: mala preporuka")
+    return re.sub(r"/\*[\s\S]*?\*/", "", INDEX[start:end])
+
+
+def test_exam_sections_are_state_driven_not_attribute_driven():
+    css = _exam_css()
+    assert ".exam-card [data-exam-state]{display:none;}" in css
+    for state in ("generating", "question", "submitting", "result", "error"):
+        assert f'.exam-card[data-state="{state}"] [data-exam-state="{state}"]' in css
+    # Svaka sekcija u markupu mora nositi svoje stanje — nijedna se ne oslanja
+    # na `hidden` (mehanizam koji je u produkciji pao).
+    card = INDEX[INDEX.index('id="exam-card"'):INDEX.index("<!-- /exam-card -->")]
+    sections = re.findall(r'<div class="exam-section[^"]*" data-exam-state="(\w+)"[^>]*>', card)
+    assert sorted(sections) == ["error", "generating", "question", "result", "submitting"]
+    # NIJEDNA sekcija stanja ne smije se oslanjati na atribut `hidden` — to je
+    # tačno mehanizam koji je u produkciji bio bez efekta. (`examFinishBtn` ga
+    # legitimno koristi: to je dugme unutar jednog stanja, ne stanje.)
+    for tag in re.findall(r"<div[^>]*data-exam-state=[^>]*>", card):
+        assert " hidden" not in tag, tag
+
+
+def test_exam_has_no_nested_scroll_container():
+    css = _exam_css()
+    assert "overflow-y:auto" not in css
+    # Kartica ide u dokumentni tok; pravilo mora nadjačati `tutor-fullscreen`
+    # ljusku (veća specifičnost, ne samo redoslijed).
+    assert "body.exam-open.tutor-fullscreen main{height:auto;min-height:100dvh;}" in INDEX
+    assert "body.exam-open{overflow:auto;}" in INDEX
+
+
+def test_exam_covers_every_required_viewport_class():
+    css = _exam_css()
+    # E (uski mobitel), C (tablet), B (laptop), A (veliki desktop). D (mobitel
+    # 390–767) je osnovni, mobile-first sloj bez upita.
+    for query in ("@media (max-width:389px)", "@media (min-width:768px)",
+                  "@media (min-width:1024px)", "@media (min-width:1440px)"):
+        assert query in css, query
+    # Dvije kolone tek od laptopa naviše i samo za kratke opcije.
+    assert ".exam-options{display:grid;grid-template-columns:1fr;" in css
+    assert ".exam-options.exam-options-2col{grid-template-columns:1fr 1fr;}" in css
+    assert "EXAM_TWO_COL_MAX_CHARS" in INDEX
+
+
+def test_exam_cannot_overflow_horizontally():
+    css = _exam_css()
+    for rule in (".exam-qtext", ".exam-option-text", ".exam-options", ".exam-section"):
+        block = css[css.index(rule + "{"):css.index("}", css.index(rule + "{"))]
+        assert "min-width:0" in block or "overflow-wrap:anywhere" in block, rule
+    # Duga formula smije kliziti SAMA, stranica nikad.
+    assert 'mjx-container[display="true"]{overflow-x:auto' in css
+    assert "flex-wrap:wrap" in css[css.index(".exam-topbar{"):]
+
+
+def test_exam_touch_targets_and_focus_states():
+    css = _exam_css()
+    assert "min-height:52px" in css                      # opcija
+    assert ".exam-next .btn{min-height:44px" in css       # akcije rezultata
+    assert ".exam-option:focus-visible{outline:3px solid" in css
+    # Onemogućeno dugme mora ostati čitljivo (ne skoro nevidljivo).
+    disabled = css[css.index(".exam-next .btn:disabled"):]
+    opacity = float(re.search(r"opacity:([\d.]+)", disabled).group(1))
+    assert opacity >= 0.45, opacity
+    # Izbor se ne oslanja samo na boju: ima i prsten i istaknuto slovo opcije.
+    assert ".exam-option.selected{" in css and "box-shadow:0 0 0 2px" in css
+    assert ".exam-option.selected .exam-option-key{" in css
+
+
+def test_result_screen_is_compact_and_conditional():
+    # Prazna sekcija „ponovi“ se ne prikazuje za 5/5 (uslovno u JS-u).
+    assert "if (rec.lessons && rec.lessons.length){" in INDEX
+    assert "Ponovi ove lekcije" in INDEX
+    assert 'examEls.score.textContent = j.score' in INDEX
+    assert 'examEls.scorePct.textContent = j.percentage' in INDEX
+    # Rezultat ne smije ostati u ogromnoj kutiji: kompaktan padding.
+    css = _exam_css()
+    recommend = css[css.index(".exam-recommend{"):css.index("}", css.index(".exam-recommend{"))]
+    assert "padding:.65rem .85rem" in recommend
+
+
+def test_loading_copy_does_not_promise_a_minute():
+    assert "Ovo može potrajati do minute" not in INDEX
+    assert "Ovo obično traje nekoliko sekundi." in INDEX
+
+
+# ---------------------------------------------------------------------------
 # (2) Deploy workflow: tihi no-op deploy mora biti nemoguć
 # ---------------------------------------------------------------------------
 

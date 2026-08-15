@@ -290,31 +290,148 @@
   .mc-option-text{flex:1 1 auto;min-width:0;}
   .mc-option-card mjx-container{margin:0 !important;}
 
-  /* ===== „Sutra imam kontrolni“: test ekran (5 MCQ pitanja) =====
-     Ista vizuelna porodica kao chat kartica; opcije koriste postojeće
-     .mc-option-card kartice uz .selected stanje (izbor PRIJE predaje ne
-     otkriva tačnost — zeleno/crveno postoji samo na ekranu rezultata). */
-  .exam-body{flex:1 1 auto;min-height:0;overflow-y:auto;display:flex;flex-direction:column;
-    gap:.6rem;padding:.4rem .2rem .6rem;}
-  .exam-progress{color:var(--muted);font-size:.9rem;font-weight:600;}
-  .exam-qtext{font-size:1.05rem;line-height:1.5;background:#101b16;border:1px solid rgba(86,200,143,.22);
-    border-radius:12px;padding:.8rem .9rem;}
-  .mc-option-card.selected{background:#1b3a2c;border-color:var(--accent-bot);
-    box-shadow:0 0 0 1.5px var(--accent-bot) inset;}
-  .exam-nav{display:flex;gap:.5rem;justify-content:space-between;align-items:center;flex-wrap:wrap;}
-  .exam-nav .spacer{flex:1 1 auto;}
-  .exam-loading{flex:1 1 auto;display:grid;place-items:center;color:var(--muted);
-    text-align:center;padding:1.2rem;font-size:1rem;}
-  .exam-score{font-size:1.15rem;text-align:center;padding:.7rem;}
-  .exam-score b{font-size:1.7rem;display:block;margin-top:.15rem;}
+  /* ===== „Sutra imam kontrolni“: test ekran (5 MCQ pitanja) ==================
+     JEDNO STANJE ISTOVREMENO — STRUKTURNO, NE DOGOVOROM.
+     ŽIVI PRODUKCIJSKI NALAZ (screenshot 2026-08-16): učenik je poslije
+     završenog testa istovremeno gledao „Pripremam test…“, „Nismo uspjeli
+     pripremiti test.“ I rezultat. Uzrok je bio čisto CSS: sekcije su se
+     skrivale HTML atributom `hidden`, ali su njihove klase postavljale
+     `display:flex`/`display:grid` — a AUTORSKI stylesheet uvijek pobjeđuje
+     UA pravilo `[hidden]{display:none}` (ista specifičnost, autor ima veći
+     prioritet). Atribut `hidden` je time bio potpuno bez efekta.
+     POPRAVKA: vidljivost više ne ovisi ni o jednom atributu po sekciji, nego o
+     JEDNOJ vrijednosti `data-state` na kartici. Dva stanja ne mogu koegzistirati
+     jer jedan atribut ne može imati dvije vrijednosti. */
+  .exam-card{display:flex;flex-direction:column;gap:.55rem;
+    padding:.6rem .75rem .8rem;border-radius:14px;}
+  .exam-card [data-exam-state]{display:none;}
+  .exam-card[data-state="generating"] [data-exam-state="generating"],
+  .exam-card[data-state="question"] [data-exam-state="question"],
+  .exam-card[data-state="submitting"] [data-exam-state="submitting"],
+  .exam-card[data-state="result"] [data-exam-state="result"],
+  .exam-card[data-state="error"] [data-exam-state="error"]{display:flex;flex-direction:column;}
+
+  /* KONTROLNI KORISTI DOKUMENTNI TOK (jedan scroll stranice).
+     Chat ljuska je `height:100dvh` + unutrašnji `overflow-y:auto` — ispravno za
+     razgovor (composer je prikovan za dno), ali za test to pravi UGNIJEŽDEN
+     scrollbar unutar kartice (živi nalaz). Klasa se postavlja SAMO dok je
+     kontrolni otvoren, pa ostali modovi ostaju bajt-za-bajt isti. */
+  body.exam-open{overflow:auto;}
+  body.exam-open main{height:auto;min-height:100dvh;}
+  body.exam-open.tutor-fullscreen main{height:auto;min-height:100dvh;}
+
+  .exam-section{gap:.6rem;min-width:0;}
+  /* Zaglavlje: značke lijevo, akcija desno; na uskom ekranu se prelama bez
+     preklapanja i bez horizontalnog prelijevanja. */
+  .exam-topbar{display:flex;align-items:center;justify-content:space-between;
+    gap:.5rem;flex-wrap:wrap;padding-bottom:.5rem;border-bottom:1px solid rgba(255,255,255,.08);}
+  .exam-topbar-info{display:flex;align-items:center;gap:.35rem;flex-wrap:wrap;min-width:0;}
+  .exam-topbar .tutor-pill{max-width:100%;}
+
+  /* --- napredak: „Pitanje 2 od 5“ + diskretne tačkice ---------------------- */
+  .exam-progress-row{display:flex;align-items:center;justify-content:space-between;
+    gap:.75rem;flex-wrap:wrap;}
+  .exam-progress{color:var(--muted);font-size:.92rem;font-weight:700;letter-spacing:.01em;}
+  .exam-dots{display:flex;gap:.3rem;align-items:center;}
+  .exam-dot{width:9px;height:9px;border-radius:999px;background:rgba(255,255,255,.16);
+    border:1px solid rgba(255,255,255,.14);transition:background .15s ease,transform .15s ease;}
+  .exam-dot.answered{background:var(--accent-bot);border-color:var(--accent-bot);}
+  .exam-dot.current{transform:scale(1.35);background:#9ee6c4;border-color:#9ee6c4;}
+
+  .exam-qtext{font-size:1.05rem;line-height:1.55;background:#101b16;
+    border:1px solid rgba(86,200,143,.22);border-radius:12px;padding:.85rem .95rem;
+    overflow-wrap:anywhere;min-width:0;}
+  /* Duga formula smije horizontalno kliziti SAMA ZA SEBE — nikad cijela stranica. */
+  .exam-qtext mjx-container,.exam-option-text mjx-container{max-width:100%;}
+  .exam-qtext mjx-container[display="true"]{overflow-x:auto;overflow-y:hidden;}
+
+  /* --- opcije: pune širine, velika dodirna zona --------------------------- */
+  .exam-options{display:grid;grid-template-columns:1fr;gap:.5rem;min-width:0;}
+  .exam-option{display:flex;align-items:center;gap:.6rem;width:100%;text-align:left;
+    min-height:52px;background:#12211c;border:1.5px solid rgba(86,200,143,.32);
+    color:#eef6f3;border-radius:12px;padding:.65rem .8rem;font-size:1rem;line-height:1.45;
+    cursor:pointer;transition:border-color .15s ease,background .15s ease,transform .05s ease;}
+  .exam-option:hover:not(:disabled){border-color:var(--accent-bot);background:#16281f;}
+  .exam-option:active:not(:disabled){transform:translateY(1px);}
+  .exam-option:focus-visible{outline:3px solid #9ee6c4;outline-offset:2px;}
+  .exam-option-key{flex:0 0 auto;display:grid;place-items:center;width:26px;height:26px;
+    border-radius:999px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);
+    font-weight:700;font-size:.85rem;}
+  /* Izbor mora biti očit i BEZ oslanjanja na boju: ispuna + prsten + slovo. */
+  .exam-option.selected{background:#1b3a2c;border-color:var(--accent-bot);
+    box-shadow:0 0 0 2px var(--accent-bot) inset;}
+  .exam-option.selected .exam-option-key{background:var(--accent-bot);color:#08150f;
+    border-color:var(--accent-bot);}
+  .exam-option-text{flex:1 1 auto;min-width:0;overflow-wrap:anywhere;}
+
+  .exam-nav{display:flex;gap:.5rem;justify-content:space-between;align-items:center;
+    flex-wrap:wrap;padding-top:.15rem;}
+  .exam-nav .btn{min-height:42px;}
+
+  /* --- generisanje / greška: kompaktne centrirane kartice ------------------ */
+  .exam-status{align-items:center;justify-content:center;text-align:center;
+    gap:.55rem;padding:1.4rem .9rem;color:var(--muted);}
+  .exam-status strong{color:var(--text);font-size:1.05rem;font-weight:700;}
+  .exam-status .exam-status-sub{font-size:.9rem;}
+  .exam-status-bar{width:min(260px,70%);height:4px;border-radius:999px;
+    background:rgba(255,255,255,.10);overflow:hidden;position:relative;}
+  .exam-status-bar::after{content:"";position:absolute;inset:0;width:40%;border-radius:999px;
+    background:var(--accent-bot);animation:examSlide 1.1s ease-in-out infinite;}
+  @keyframes examSlide{0%{transform:translateX(-110%);}100%{transform:translateX(260%);}}
+  @media (prefers-reduced-motion:reduce){
+    .exam-status-bar::after{animation:none;width:100%;opacity:.5;}
+  }
+  .exam-status .exam-status-actions{display:flex;gap:.5rem;flex-wrap:wrap;justify-content:center;}
+
+  /* --- rezultat: kompaktna hijerarhija ------------------------------------ */
+  .exam-score{display:flex;align-items:baseline;justify-content:center;gap:.6rem;
+    flex-wrap:wrap;background:#101b16;border:1px solid rgba(86,200,143,.22);
+    border-radius:12px;padding:.7rem .9rem;}
+  .exam-score-label{color:var(--muted);font-size:.95rem;font-weight:600;}
+  .exam-score-value{font-size:1.9rem;font-weight:800;line-height:1;color:#eef6f3;}
+  .exam-score-pct{font-size:1.05rem;font-weight:700;color:var(--accent-bot);}
+  .exam-recommend{background:#101b16;border:1px solid rgba(86,200,143,.22);
+    border-radius:12px;padding:.65rem .85rem;font-size:.95rem;line-height:1.5;}
+  .exam-recommend-title{color:var(--muted);font-size:.82rem;font-weight:700;
+    text-transform:uppercase;letter-spacing:.04em;margin-bottom:.2rem;}
+  .exam-recommend ul{margin:.35rem 0 0;padding-left:1.1rem;}
+  .exam-recommend li{margin:.12rem 0;}
+  .exam-answers{display:grid;grid-template-columns:1fr;gap:.4rem;min-width:0;}
   .exam-result-row{border:1px solid rgba(255,255,255,.12);border-radius:10px;
-    padding:.55rem .75rem;font-size:.95rem;line-height:1.45;}
-  .exam-result-row.ok{border-color:rgba(63,191,111,.5);background:#10241a;}
-  .exam-result-row.bad{border-color:rgba(201,86,79,.5);background:#2a1414;}
-  .exam-recommend{background:#101b16;border:1px solid rgba(86,200,143,.22);border-radius:12px;
-    padding:.7rem .9rem;font-size:.95rem;}
-  .exam-recommend ul{margin:.35rem 0 0 1.1rem;padding:0;}
-  .exam-next{display:flex;gap:.5rem;flex-wrap:wrap;justify-content:center;padding:.3rem 0 .6rem;}
+    padding:.45rem .7rem;font-size:.92rem;line-height:1.4;overflow-wrap:anywhere;}
+  .exam-result-row.ok{border-color:rgba(63,191,111,.45);background:#10241a;}
+  .exam-result-row.bad{border-color:rgba(201,86,79,.45);background:#2a1414;}
+  .exam-result-lesson{color:var(--muted);font-size:.84rem;}
+  .exam-next{display:flex;gap:.5rem;flex-wrap:wrap;justify-content:center;padding-top:.15rem;}
+  .exam-next .btn{min-height:44px;flex:1 1 auto;max-width:220px;}
+  /* Onemogućeno dugme mora ostati ČITLJIVO (ne skoro nevidljivo). */
+  .exam-next .btn:disabled,.exam-nav .btn:disabled{opacity:.5;cursor:not-allowed;filter:grayscale(.35);}
+  .btn:focus-visible,.exam-option:focus-visible{outline:3px solid #9ee6c4;outline-offset:2px;}
+
+  /* --- responzivnost: E → A ----------------------------------------------- */
+  @media (max-width:389px){            /* E: uski mobitel ~320–389 */
+    .exam-card{padding:.5rem .55rem .7rem;}
+    .exam-qtext{font-size:1rem;padding:.7rem .75rem;}
+    .exam-option{font-size:.96rem;min-height:48px;padding:.6rem .65rem;}
+    .exam-score-value{font-size:1.6rem;}
+    .exam-next .btn{max-width:none;width:100%;}
+  }
+  @media (min-width:768px){            /* C: tablet i naviše */
+    .exam-card{padding:.75rem 1rem .95rem;gap:.65rem;}
+    .exam-qtext{font-size:1.1rem;padding:.95rem 1.05rem;}
+  }
+  @media (min-width:1024px){           /* B: laptop — koristi širinu */
+    .exam-answers{grid-template-columns:1fr 1fr;}
+    /* Dvije kolone SAMO kad su sve opcije kratke (klasu postavlja JS mjerenjem
+       stvarnog teksta) — duge opcije ostaju u jednoj koloni, gdje su čitljivije. */
+    .exam-options.exam-options-2col{grid-template-columns:1fr 1fr;}
+    .exam-status{padding:1.6rem 1rem;}
+  }
+  @media (min-width:1440px){           /* A: veliki desktop */
+    .exam-qtext{font-size:1.15rem;}
+    .exam-option{font-size:1.05rem;}
+    .exam-score-value{font-size:2.1rem;}
+  }
 
   /* Phase 2: mala preporuka video lekcije unutar transcripta */
   .tutor-video-hint{align-self:flex-start;color:var(--muted);font-size:.85rem;
@@ -473,9 +590,9 @@
          Odgovori se biraju lokalno i šalju TEK na „Završi test“; tačnost se
          ne prikazuje po pitanju, a ključ odgovora nikad nije u ovom DOM-u
          prije predaje (server ga šalje tek u rezultatu). -->
-    <div class="card tutor-card" id="exam-card" hidden>
-      <div class="tutor-topbar">
-        <div class="tutor-topbar-info">
+    <div class="card exam-card" id="exam-card" data-state="generating" hidden>
+      <div class="exam-topbar">
+        <div class="exam-topbar-info">
           <span class="tutor-pill" id="examTopbarGrade">6. razred</span>
           <span class="tutor-pill">Kontrolni</span>
           <span class="tutor-pill" id="examTopbarOblast"></span>
@@ -485,33 +602,53 @@
         </div>
       </div>
 
-      <div class="exam-loading" id="examLoading" hidden>
-        <div>🤖 Pripremam test iz oblasti <b id="examLoadingOblast"></b>…<br>
-        <span class="muted">Ovo može potrajati do minute.</span></div>
+      <!-- GENERATING -->
+      <div class="exam-section exam-status" data-exam-state="generating" id="examLoading" role="status" aria-live="polite">
+        <strong>🤖 Pripremam test…</strong>
+        <span class="exam-status-sub" id="examLoadingOblast"></span>
+        <span class="exam-status-bar" aria-hidden="true"></span>
+        <span class="exam-status-sub">Ovo obično traje nekoliko sekundi.</span>
       </div>
 
-      <div class="exam-loading" id="examError" hidden>
-        <div><span id="examErrorMsg">Nismo uspjeli pripremiti test. Pokušaj ponovo.</span><br><br>
+      <!-- SUBMITTING -->
+      <div class="exam-section exam-status" data-exam-state="submitting" role="status" aria-live="polite">
+        <strong>Predajem test…</strong>
+        <span class="exam-status-bar" aria-hidden="true"></span>
+      </div>
+
+      <!-- GENERATION_ERROR -->
+      <div class="exam-section exam-status" data-exam-state="error" role="alert">
+        <strong id="examErrorMsg">Nismo uspjeli pripremiti test.</strong>
+        <span class="exam-status-actions">
           <button type="button" class="btn" id="examRetryBtn">Pokušaj ponovo</button>
-        </div>
+          <button type="button" class="btn secondary" id="examErrorBackBtn">Nazad</button>
+        </span>
       </div>
 
-      <div class="exam-body" id="examQuestionView" hidden>
-        <div class="exam-progress" id="examProgress">Pitanje 1 od 5</div>
+      <!-- QUESTION -->
+      <div class="exam-section" data-exam-state="question" id="examQuestionView">
+        <div class="exam-progress-row">
+          <span class="exam-progress" id="examProgress">Pitanje 1 od 5</span>
+          <span class="exam-dots" id="examDots" aria-hidden="true"></span>
+        </div>
         <div class="exam-qtext" id="examQText"></div>
-        <div class="mc-options" id="examOptions"></div>
+        <div class="exam-options" id="examOptions" role="group" aria-label="Ponuđeni odgovori"></div>
         <div class="exam-nav">
           <button type="button" class="btn secondary sm" id="examPrevBtn">← Prethodno</button>
-          <span class="spacer"></span>
-          <button type="button" class="btn secondary sm" id="examNextBtn">Sljedeće →</button>
+          <button type="button" class="btn sm" id="examNextBtn">Sljedeće →</button>
           <button type="button" class="btn" id="examFinishBtn" hidden>Završi test</button>
         </div>
       </div>
 
-      <div class="exam-body" id="examResultView" hidden>
-        <div class="exam-score">Rezultat<b id="examScore"></b></div>
-        <div id="examResultList" class="stack" style="display:flex;flex-direction:column;gap:.45rem;"></div>
+      <!-- RESULT -->
+      <div class="exam-section" data-exam-state="result" id="examResultView">
+        <div class="exam-score" role="status" aria-live="polite">
+          <span class="exam-score-label">Rezultat</span>
+          <span class="exam-score-value" id="examScore"></span>
+          <span class="exam-score-pct" id="examScorePct"></span>
+        </div>
         <div class="exam-recommend" id="examRecommend"></div>
+        <div class="exam-answers" id="examResultList"></div>
         <div class="exam-next">
           <button type="button" class="btn secondary" id="examEasierBtn">Lakši test</button>
           <button type="button" class="btn" id="examSameBtn">Novi test</button>
@@ -1669,20 +1806,19 @@ document.addEventListener('DOMContentLoaded', () => {
       grade: document.getElementById('examTopbarGrade'),
       oblast: document.getElementById('examTopbarOblast'),
       back: document.getElementById('examBackBtn'),
-      loading: document.getElementById('examLoading'),
       loadingOblast: document.getElementById('examLoadingOblast'),
-      error: document.getElementById('examError'),
       errorMsg: document.getElementById('examErrorMsg'),
       retry: document.getElementById('examRetryBtn'),
-      questionView: document.getElementById('examQuestionView'),
+      errorBack: document.getElementById('examErrorBackBtn'),
       progress: document.getElementById('examProgress'),
+      dots: document.getElementById('examDots'),
       qtext: document.getElementById('examQText'),
       options: document.getElementById('examOptions'),
       prev: document.getElementById('examPrevBtn'),
       next: document.getElementById('examNextBtn'),
       finish: document.getElementById('examFinishBtn'),
-      resultView: document.getElementById('examResultView'),
       score: document.getElementById('examScore'),
+      scorePct: document.getElementById('examScorePct'),
       resultList: document.getElementById('examResultList'),
       recommend: document.getElementById('examRecommend'),
       easier: document.getElementById('examEasierBtn'),
@@ -1701,32 +1837,51 @@ document.addEventListener('DOMContentLoaded', () => {
     function examTypeset(node){
       if (window.MathJax && MathJax.typesetPromise) MathJax.typesetPromise([node]).catch(()=>{});
     }
-    function examShow(section){
-      ['loading','error','questionView','resultView'].forEach(k=>{
-        examEls[k].hidden = (k !== section);
-      });
+    /* JEDINO mjesto koje mijenja vidljivo stanje kontrolnog.
+       Stanje je JEDNA vrijednost atributa (`data-state`), a CSS prikazuje samo
+       sekciju koja joj odgovara — dva stanja se ne mogu preklopiti ni greškom.
+       Prije ovoga su se sekcije skrivale atributom `hidden`, koji je klasa s
+       `display:flex/grid` poništavala, pa su se loader, greška i rezultat
+       prikazivali ISTOVREMENO (živi produkcijski screenshot). */
+    const EXAM_STATES = ['generating', 'question', 'submitting', 'result', 'error'];
+    function setExamState(next){
+      if (EXAM_STATES.indexOf(next) === -1) return;
+      examCard.dataset.state = next;
     }
+    function examState(){ return examCard.dataset.state; }
     function enterExam(oblastName, oblastId){
       exam.oblastId = oblastId; exam.oblastName = oblastName; exam.grade = state.grade;
       examEls.grade.textContent = state.grade + '. razred';
       examEls.oblast.textContent = oblastName;
       home.hidden = true; card.hidden = true; examCard.hidden = false;
+      /* Kontrolni ekran ide u dokumentni tok: jedan scroll stranice, bez
+         ugniježđenog scrollbara unutar kartice (živi nalaz). */
+      document.body.classList.add('exam-open');
       startExam('');
     }
     function exitExamToHome(){
       if (exam.abort){ try { exam.abort.abort(); } catch(_){} exam.abort = null; }
       exam.busy = false; exam.examId = ''; exam.questions = []; exam.answers = {};
       examCard.hidden = true;
+      document.body.classList.remove('exam-open');
       showHome();
     }
     examEls.back.addEventListener('click', exitExamToHome);
+    examEls.errorBack.addEventListener('click', exitExamToHome);
 
     async function startExam(relative){
       if (exam.busy) return;
       exam.busy = true; exam.lastRelative = relative || '';
+      /* Stari test se BRIŠE prije novog: nijedan ostatak (pitanja, odgovori,
+         rezultat) ne smije preživjeti ispod novog stanja. */
       exam.examId = ''; exam.questions = []; exam.answers = {}; exam.index = 0;
+      examEls.resultList.innerHTML = '';
+      examEls.recommend.innerHTML = '';
+      examEls.options.innerHTML = '';
+      examEls.qtext.innerHTML = '';
       examEls.loadingOblast.textContent = exam.oblastName;
-      examShow('loading');
+      setExamState('generating');
+      try { examCard.scrollIntoView({ block: 'start' }); } catch(_){}
       const ac = new AbortController();
       exam.abort = ac;
       const abortTimer = setTimeout(()=>{ try { ac.abort(); } catch(_){} }, EXAM_ABORT_MS);
@@ -1750,14 +1905,14 @@ document.addEventListener('DOMContentLoaded', () => {
           renderExamQuestion(0);
         } else {
           examEls.errorMsg.textContent = (j && (j.message || j.detail)) ||
-            'Nismo uspjeli pripremiti test. Pokušaj ponovo.';
-          examShow('error');
+            'Nismo uspjeli pripremiti test.';
+          setExamState('error');
         }
       } catch (err){
         examEls.errorMsg.textContent = (err && err.name === 'AbortError')
-          ? 'Priprema testa traje duže nego obično. Pokušaj ponovo.'
-          : 'Greška pri pripremi testa. Provjeri vezu i pokušaj ponovo.';
-        examShow('error');
+          ? 'Priprema testa traje duže nego obično.'
+          : 'Greška pri pripremi testa. Provjeri vezu.';
+        setExamState('error');
       } finally {
         clearTimeout(abortTimer);
         exam.abort = null; exam.busy = false;
@@ -1765,26 +1920,56 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     examEls.retry.addEventListener('click', ()=>startExam(exam.lastRelative));
 
+    /* Dvije kolone su bezbjedne SAMO za kratke opcije bez prelamanja; duge
+       opcije (proza, formule) ostaju u jednoj koloni gdje su čitljivije.
+       Mjeri se stvaran tekst, ne pretpostavka o lekciji. */
+    const EXAM_TWO_COL_MAX_CHARS = 32;
+    function examOptionsFitTwoColumns(options){
+      return options.every(o => (o.text || '').length <= EXAM_TWO_COL_MAX_CHARS);
+    }
+    function renderExamDots(){
+      examEls.dots.innerHTML = '';
+      exam.questions.forEach((q, i)=>{
+        const dot = document.createElement('span');
+        dot.className = 'exam-dot'
+          + (exam.answers[q.id] ? ' answered' : '')
+          + (i === exam.index ? ' current' : '');
+        examEls.dots.appendChild(dot);
+      });
+    }
     function renderExamQuestion(index){
       exam.index = Math.max(0, Math.min(index, exam.questions.length - 1));
       const q = exam.questions[exam.index];
       examEls.progress.textContent = 'Pitanje ' + (exam.index + 1) + ' od ' + exam.questions.length;
       examEls.qtext.innerHTML = escapeHtml(q.text);
       examEls.options.innerHTML = '';
+      examEls.options.className = 'exam-options'
+        + (examOptionsFitTwoColumns(q.options) ? ' exam-options-2col' : '');
       q.options.forEach(opt=>{
         const b = document.createElement('button');
         b.type = 'button';
-        b.className = 'mc-option-card' + (exam.answers[q.id] === opt.id ? ' selected' : '');
-        /* Isti omotač kao Practice kartice: jedan flex potomak čuva razmake
-           između MathJax segmenata (vidi buildOptionCards). */
+        const chosen = exam.answers[q.id] === opt.id;
+        b.className = 'exam-option' + (chosen ? ' selected' : '');
+        b.setAttribute('aria-pressed', chosen ? 'true' : 'false');
+        const key = document.createElement('span');
+        key.className = 'exam-option-key';
+        key.textContent = (opt.id || '').toUpperCase();
+        /* Cio tekst opcije živi u TAČNO JEDNOM flex potomku — inače proza
+           između dva `$…$` segmenta izgubi razmake (vidi buildOptionCards). */
         const text = document.createElement('span');
-        text.className = 'mc-option-text';
+        text.className = 'exam-option-text';
         text.innerHTML = escapeHtml(opt.text || '');
+        b.appendChild(key);
         b.appendChild(text);
         b.addEventListener('click', ()=>{
           exam.answers[q.id] = opt.id;   // izbor se smije mijenjati do predaje
-          examEls.options.querySelectorAll('.mc-option-card').forEach(x=>x.classList.remove('selected'));
+          examEls.options.querySelectorAll('.exam-option').forEach(x=>{
+            x.classList.remove('selected');
+            x.setAttribute('aria-pressed', 'false');
+          });
           b.classList.add('selected');
+          b.setAttribute('aria-pressed', 'true');
+          renderExamDots();
         });
         examEls.options.appendChild(b);
       });
@@ -1792,7 +1977,9 @@ document.addEventListener('DOMContentLoaded', () => {
       examEls.prev.disabled = exam.index === 0;
       examEls.next.hidden = last;
       examEls.finish.hidden = !last;
-      examShow('questionView');
+      examEls.finish.disabled = false;
+      renderExamDots();
+      setExamState('question');
       examTypeset(examEls.qtext); examTypeset(examEls.options);
     }
     examEls.prev.addEventListener('click', ()=>renderExamQuestion(exam.index - 1));
@@ -1809,6 +1996,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       exam.busy = true;
       examEls.finish.disabled = true;
+      setExamState('submitting');
       try {
         const r = await fetch('/api/ai-tutor/exam/submit', {
           method: 'POST',
@@ -1820,11 +2008,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if (r.ok && j && j.status === 'graded'){
           renderExamResult(j);
         } else if (j && j.status === 'incomplete'){
+          /* Server je autoritativan i za potpunost: vrati učenika na pitanja. */
+          setExamState('question');
           showToast(j.message || 'Odgovori na sva pitanja.', 'err');
         } else {
+          setExamState('question');
           showToast((j && (j.detail || j.message)) || 'Greška pri predaji. Pokušaj ponovo.', 'err');
         }
       } catch (_){
+        setExamState('question');
         showToast('Greška pri predaji. Provjeri vezu i pokušaj ponovo.', 'err');
       } finally {
         exam.busy = false;
@@ -1834,7 +2026,18 @@ document.addEventListener('DOMContentLoaded', () => {
     examEls.finish.addEventListener('click', submitExam);
 
     function renderExamResult(j){
-      examEls.score.textContent = j.score + '/' + j.total + ' — ' + j.percentage + '%';
+      examEls.score.textContent = j.score + '/' + j.total;
+      examEls.scorePct.textContent = j.percentage + '%';
+      /* PREPORUKA: kratka rubrika + lekcije SAMO kad grešaka ima. Za 5/5 se
+         prazna sekcija „ponovi“ ne prikazuje uopšte. */
+      const rec = j.recommendation || {};
+      let recHtml = '<div class="exam-recommend-title">Preporuka</div>'
+        + escapeHtml(rec.message || '');
+      if (rec.lessons && rec.lessons.length){
+        recHtml += '<div class="exam-recommend-title" style="margin-top:.5rem;">Ponovi ove lekcije</div><ul>'
+          + rec.lessons.map(t=>'<li>' + escapeHtml(t) + '</li>').join('') + '</ul>';
+      }
+      examEls.recommend.innerHTML = recHtml;
       examEls.resultList.innerHTML = '';
       (j.questions || []).forEach(q=>{
         const row = document.createElement('div');
@@ -1842,25 +2045,19 @@ document.addEventListener('DOMContentLoaded', () => {
         if (q.correct){
           row.innerHTML = '<b>Pitanje ' + q.ordinal + '</b> — tačno ✅';
         } else {
-          row.innerHTML = '<b>Pitanje ' + q.ordinal + '</b> — netačno ❌ · Tačan odgovor: <b>' +
-            escapeHtml((q.correct_option_id || '').toUpperCase()) + ')</b> ' +
-            escapeHtml(q.correct_text || '') +
-            '<br><span class="muted">Lekcija: ' + escapeHtml(q.lesson_title || '') + '</span>';
+          row.innerHTML = '<b>Pitanje ' + q.ordinal + '</b> — netačno ❌ · Tačan: <b>'
+            + escapeHtml((q.correct_option_id || '').toUpperCase()) + ')</b> '
+            + escapeHtml(q.correct_text || '')
+            + '<div class="exam-result-lesson">' + escapeHtml(q.lesson_title || '') + '</div>';
         }
         examEls.resultList.appendChild(row);
       });
-      const rec = j.recommendation || {};
-      let recHtml = '<b>' + escapeHtml(rec.message || '') + '</b>';
-      if (rec.lessons && rec.lessons.length){
-        recHtml += '<div style="margin-top:.35rem;">Preporuka za ponavljanje:</div><ul>' +
-          rec.lessons.map(t=>'<li>' + escapeHtml(t) + '</li>').join('') + '</ul>';
-      }
-      examEls.recommend.innerHTML = recHtml;
       /* Kliješteno na krajevima: server ionako ne ide ispod easier / iznad
          harder, ali dugme koje ništa ne mijenja ne treba ni nuditi. */
       examEls.easier.disabled = exam.difficulty === 'easier';
       examEls.harder.disabled = exam.difficulty === 'harder';
-      examShow('resultView');
+      setExamState('result');
+      try { examCard.scrollIntoView({ block: 'start' }); } catch(_){}
       examTypeset(examEls.resultList);
     }
     examEls.easier.addEventListener('click', ()=>startExam('easier'));
