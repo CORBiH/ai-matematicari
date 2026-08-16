@@ -491,6 +491,14 @@ _SUPERLATIVE_MIN_RE = re.compile(r"\bnajmanj\w*", re.IGNORECASE)
 # a ne najveću ponuđenu opciju.
 _SUPERLATIVE_FUNCTION_RE = re.compile(
     r"\b(?:najve[ćc]\w*|najmanj\w*)\s+(?:zajedni[čc]k|dekadsk)", re.IGNORECASE)
+# RELACIJA U MATEMATICI ZADATKA = superlativ je uslovljen (vidi
+# `_evaluate_superlative_mcq`). Namjerno gruba, jer se koristi SAMO za ćutanje:
+# lažno prepoznat uslov znači jedan orakl manje, nikad pogrešnu presudu.
+# `\b` se ovdje NE smije koristiti: „\geq10“ nema granicu riječi između „geq“ i
+# „10“, pa bi lančana nejednačina prošla nezapaženo. Negativni lookahead umjesto
+# toga sprječava i da „\le“ zahvati „\left“.
+_CONSTRAINED_SUPERLATIVE_RE = re.compile(
+    r"[<>≤≥≠=]|\\(?:leq|geq|neq|le|ge|ne)(?![A-Za-z])")
 _BASE_SIGNS = ("<", ">", "=")
 _DISQUALIFYING_SIGNS = ("≤", "≥", "≠", "\\le", "\\ge", "\\ne", "\\leq", "\\geq", "\\neq")
 
@@ -555,10 +563,31 @@ def _evaluate_sign_mcq(question, prose, options) -> ComparisonMCQResult:
                                correct_indices)
 
 
-def _evaluate_superlative_mcq(prose, options) -> ComparisonMCQResult:
+def _evaluate_superlative_mcq(question, prose, options) -> ComparisonMCQResult:
     if _SUPERLATIVE_FUNCTION_RE.search(prose):
         # NZD/NZS pitanje — superlativ je dio imena funkcije, ne relacija.
         return ComparisonMCQResult(False, False)
+    # SUPERLATIV NAD USLOVOM NIJE SUPERLATIV NAD OPCIJAMA (živi nalaz, Faza F,
+    # forenzika odbijenih slotova kontrolnog, lekcija 7-02-019):
+    #
+    #   „Odredi najveći cijeli broj $x$ koji zadovoljava nejednačinu
+    #    $-9<x+4\leq6$.“      opcije: 2 / -13 / 10 / -5
+    #
+    # Traženi maksimum je maksimum SKUPA RJEŠENJA ($-13<x\le2$), dakle $2$. Orakl
+    # je ovdje uzimao najveću PONUĐENU vrijednost i proglašavao $10$ tačnim, pa je
+    # presuda bila OBRNUTA u oba smjera: tačno označeno $2$ je odbijeno
+    # (`marked_option_math_mismatch`), a pogrešno označeno $10$ ODOBRENO. Lažno
+    # odobrenje je teže od lažnog odbijanja — server je potvrđivao netačan ključ.
+    #
+    # Uslov se prepoznaje po relaciji u matematici SAMOG ZADATKA: „Koji od
+    # ponuđenih brojeva je najveći?“ nema nijednu (brojevi su samo u opcijama), a
+    # svaka (ne)jednačina je ima. Kad relacija postoji, ovaj orakl NE zna izvesti
+    # skup rješenja, pa ćuti umjesto da pogađa (čuvar koji ne može dokazati mora
+    # preskočiti). Rješavanje uslovljenog superlativa je namjerno IZVAN dometa —
+    # `evaluate_linear_solve_mcq` ga i sam izričito isključuje.
+    for segment in math_contents(tokenize_math(question or "")):
+        if _CONSTRAINED_SUPERLATIVE_RE.search(segment):
+            return ComparisonMCQResult(False, False)
     wants_max = bool(_SUPERLATIVE_MAX_RE.search(prose))
     wants_min = bool(_SUPERLATIVE_MIN_RE.search(prose))
     if wants_max == wants_min:   # nijedan ili oba — nedokazivo
@@ -592,7 +621,7 @@ def evaluate_comparison_mcq(question: str,
     sign_result = _evaluate_sign_mcq(question, prose, options)
     if sign_result.applicable or _SIGN_QUESTION_RE.search(prose):
         return sign_result
-    return _evaluate_superlative_mcq(prose, options)
+    return _evaluate_superlative_mcq(question, prose, options)
 
 
 # ---------------------------------------------------------------------------
