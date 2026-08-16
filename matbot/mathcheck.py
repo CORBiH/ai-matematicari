@@ -676,6 +676,44 @@ def _verified_remainder_division(segment, stated_remainders):
     return (dividend - divisor * quotient) in stated_remainders
 
 
+# ---------------------------------------------------------------------------
+# NEPOTPUNA LIJEVA STRANA NA GRANICI SEGMENTA (živi nalaz, Explain/procenti)
+# ---------------------------------------------------------------------------
+# Model je napisao:
+#
+#   `$15\%$ od $300\ \text{KM} = \frac{15}{100}\cdot300\ \text{KM} = 45\ \text{KM}$`
+#
+# Kvalifikator „15% od“ ostao je u PROZI, izvan segmenta, pa segment počinje
+# nepotpunom lijevom stranom `300 KM`. Učeniku prikazan red glasi
+# „15% od 300 KM = … = 45 KM“ i TAČAN je, a ovaj modul je poredio 300 i 45 i
+# oborio ispravno objašnjenje (`numeric_equality_mismatch`).
+#
+# Suzbija se SAMO taj oblik, i samo kad se može dokazati:
+#   • segment je odmah iza DRUGOG matematičkog segmenta,
+#   • razdvaja ih KRATAK prozni most bez kraja rečenice (dakle ista fraza),
+#   • i kad se prvi član odsiječe, ostatak lanca ima BAR DVA člana i potpuno
+#     je dosljedan.
+# Ako ostatak ne može posvjedočiti (npr. „$2+2$ je $5 = 6$“), prijava ostaje.
+_PROSE_BRIDGE_MAX_CHARS = 24
+_BRIDGE_SENTENCE_END_RE = re.compile(r"[.!?:;]")
+
+
+def _leading_operand_continues_prose(tokens, index, segment, pi_values):
+    """True kad prvi član lanca nije potpuna lijeva strana iskaza."""
+    if index < 2:
+        return False
+    bridge_kind, bridge = tokens[index - 1]
+    previous_kind = tokens[index - 2][0]
+    if bridge_kind != TEXT or previous_kind not in (INLINE, DISPLAY):
+        return False
+    if len(bridge) > _PROSE_BRIDGE_MAX_CHARS or _BRIDGE_SENTENCE_END_RE.search(bridge):
+        return False
+    chain = _CHAIN_SPLIT.split(segment)
+    if len(chain) < 5:          # poslije odsijecanja mora ostati bar dva člana
+        return False
+    return not check_segment("".join(chain[2:]), pi_values)
+
+
 def find_numeric_inconsistencies(text):
     """Glavna ulazna tačka. Vrati listu INTERNIH razloga (prazno = nema
     dokazane nedosljednosti). Nikad ne mijenja tekst i nikad ne poziva model."""
@@ -702,6 +740,8 @@ def find_numeric_inconsistencies(text):
                 index + 1 < len(tokens) and tokens[index + 1][0] == TEXT) else ""
             if _declares_false(before, after):
                 continue
+        if _leading_operand_continues_prose(tokens, index, content, pi_values):
+            continue
         issues.extend(found)
     return issues
 
