@@ -876,3 +876,34 @@ def sanitize_and_validate_math_text_with_issues(text: str, allow_whole_expressio
         cleaned = wrap_standalone_symbols_outside_math(cleaned)
     cleaned = repair_stray_terminal_brace(cleaned)
     return cleaned, find_unsafe_math_issues(cleaned)
+
+
+# ---------------------------------------------------------------------------
+# VIDLJIV SADRŽAJ POSLIJE SANITIZACIJE (živi nalaz P0-2)
+# ---------------------------------------------------------------------------
+# Šema odbija prazan `reply` (schema.validate_quick_output), ali ta provjera
+# gleda SIROVI model izlaz — a tekst može postati prazan TEK POSLIJE
+# sanitizacije. Finalna prijemna kampanja (kandidat e767cac, turn D08) uhvatila
+# je objavljen odgovor `{"status":"ready","answer":""}`: model je vratio `$$`,
+# što je neprazan string za šemu, a `sanitize_and_validate_math_text` ga svede
+# na `""` i pri tom prijavi `is_safe=True` — prazno, a „sigurno“.
+#
+# Ovo NIJE zakrpa za doslovni `$$`. Pita se šta učenik STVARNO VIDI: skidaju se
+# delimiteri i isključivo RAZMAČNE LaTeX komande. Sve što nosi ma i jedan
+# vidljiv znak ostaje validno — `0`, `$0$`, `-1`, `1/2`, `∅`, `x=4` su uredni
+# odgovori i nikad ne smiju pasti na ovoj provjeri.
+_LATEX_SPACING_RE = re.compile(
+    r"\\(?:quad|qquad|thinspace|medspace|thickspace|nobreakspace"
+    r"|hspace\s*\{[^}]*\}|vspace\s*\{[^}]*\}|[,;:!]|\s)"
+)
+
+
+def visible_text_is_empty(text: str) -> bool:
+    """True kad poslije sanitizacije ne ostaje NIŠTA vidljivo za učenika."""
+    if not text:
+        return True
+    stripped = _LATEX_SPACING_RE.sub(" ", text)
+    stripped = stripped.replace("$", " ").replace("\\\\", " ")
+    stripped = stripped.replace("\u00a0", " ").replace("\u200b", " ")
+    stripped = stripped.replace("\u2060", " ").replace("\u2063", " ")
+    return not stripped.strip()

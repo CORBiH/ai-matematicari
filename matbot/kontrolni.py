@@ -43,8 +43,8 @@ import secrets
 import threading
 import time
 
-from matbot import (config, exactly_one, geometrycheck, mcq_integrity,
-                    option_equivalence, stem_disclosure)
+from matbot import (config, exactly_one, geometrycheck, linear_system_mcq,
+                    mcq_integrity, option_equivalence, stem_disclosure)
 from matbot.llm import LLMError, failure_diagnostics_kv
 from matbot.mathcheck import find_numeric_inconsistencies
 from matbot.mathsegments import TEXT, tokenize_math
@@ -672,6 +672,18 @@ def validate_generated_question(parsed, slot, context, prior_signatures):
         text, option_texts, correct_index, expected)
     if mcq_failure:
         return None, f"mcq_integrity_{mcq_failure}"
+
+    # SISTEM DVIJE LINEARNE JEDNAČINE (živi nalaz P0-1, finalna prijemna
+    # kampanja e767cac, K5 q5): za taj oblik nijedan orakl iznad nije bio
+    # primjenjiv, pa je objava zavisila SAMO od toga što model sam sebi nije
+    # protivrječio (`expected_answer == označena opcija`). Objavljeno je pitanje
+    # čije tačno rješenje ($x=\frac{12}{5}$) nije bilo ni među ponuđenim
+    # opcijama. Ovdje server sam riješi sistem egzaktno i tek onda ocijeni sve
+    # četiri opcije — vidi matbot/linear_system_mcq.py.
+    system_failure = linear_system_mcq.publication_failure(
+        text, option_texts, correct_index, solution)
+    if system_failure:
+        return None, f"linear_system_{system_failure}"
 
     # ŽIVA KAMPANJA v1: uski dokazi povrh orakla (vidi blokove komentara gore).
     divisibility_failure = _divisibility_claim_failure(text, option_texts,

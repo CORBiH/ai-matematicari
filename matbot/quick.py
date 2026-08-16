@@ -15,7 +15,8 @@ import uuid
 from matbot import config, geometry_rules, geometrycheck, imagecheck, prompts, quick_context
 from matbot.llm import LLMError, failure_diagnostics_kv
 from matbot.mathcheck import find_numeric_inconsistencies
-from matbot.mathsafe import normalize_result_math_transport, sanitize_and_validate_math_text
+from matbot.mathsafe import (normalize_result_math_transport,
+                             sanitize_and_validate_math_text, visible_text_is_empty)
 from matbot.practice import SAFE_ERROR_MESSAGE
 from matbot.rules import OFF_TOPIC_ANSWER
 from matbot.schema import (
@@ -491,6 +492,20 @@ def run_quick_turn(llm, turn, image=None, context_store=None):
         logger.warning("quick_turn request_id=%s category=unsafe_math_output", request_id)
         return {"answer": SAFE_ERROR_MESSAGE, "last_tutor_task": ""}
     answer = normalize_terminology(answer)
+
+    # PRAZAN VIDLJIV ODGOVOR NIKAD NE IZLAZI KAO USPJEH (živi nalaz P0-2,
+    # finalna prijemna kampanja e767cac, turn D08). Šema odbija prazan `reply`,
+    # ali gleda SIROVI izlaz modela — `$$` je za nju neprazan string, a
+    # sanitizacija ga svede na `""` i pri tom kaže `is_safe=True`. Rezultat je
+    # bio objavljen `{"status":"ready","answer":""}`: učenik vidi „Nema
+    # odgovora.“, a prečica „Objasni postupak“ se svejedno iscrta jer je status
+    # `ready`. Provjera je NAMJERNO na finalnom tekstu (poslije transporta,
+    # sanitizacije i terminologije), pa hvata i prazne delimitere i izlaz koji
+    # nosi samo razmačne komande — ne samo doslovni `$$`. Bez drugog poziva
+    # modela: isti kanonski sigurni odgovor kao svako drugo odbijanje.
+    if visible_text_is_empty(answer):
+        logger.warning("quick_turn request_id=%s category=empty_visible_answer", request_id)
+        return {"answer": SAFE_ERROR_MESSAGE, "last_tutor_task": ""}
 
     # Numerička dosljednost lanca jednakosti (matbot/mathcheck.py). Quick vraća
     # gotov rezultat, pa je pogrešan račun ovdje najvidljiviji učeniku.
