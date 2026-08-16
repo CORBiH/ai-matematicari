@@ -148,10 +148,48 @@ def carries_own_subject(text):
     return bool(numbers) and bool(_OPERATOR_RE.search(text))
 
 
+# ---------------------------------------------------------------------------
+# POJMOVI KOJE NOSI SIMBOL, A NORMALIZACIJA IH BRIŠE (živi nalaz: `%`)
+# ---------------------------------------------------------------------------
+# `_normalize` namjerno briše svu interpunkciju (`[^\w\s]`), pa uz nju nestane i
+# svaki matematički znak. Za `%` je to bio ISHOD U PRODUKCIJI: „Koliko je 15%
+# od 300 KM?“ poslije normalizacije glasi „koliko je 15 od 300 km“ — nijedan
+# pojam se ne imenuje, guard ne može dokazati drugu temu i konzervativno vraća
+# JAK kontekst, pa je učenik u lekciji „Osna simetrija“ dobio predavanje o
+# simetriji umjesto odgovora.
+#
+# Ispravka NIJE zadržavanje sve interpunkcije u `_normalize` (to bi promijenilo
+# svaki postojeći regex pojmova). Simbol se čita iz SIROVE poruke i preslikava
+# na VEĆ POSTOJEĆI kanonski pojam iz leksikona — `15%` dobija tačno onu težinu
+# koju bi imala napisana riječ „posto“/„procenat“. Nema novog rječnika i nema
+# nove politike: zatvara se rupa, ne uvodi ponašanje.
+#
+# Traži se BROJČANI obrazac (`15%`, `15 %`, `12,5%`, `0,5%`), nikad goli znak —
+# samo „%“ nije matematički predmet.
+_PERCENT_VALUE_RE = re.compile(r"\d+(?:[.,]\d+)?\s*%")
+
+# Namjerno JEDAN ulaz. Revizija ostalih znakova (√, ∩, ∪, ∈, =, <, >, ≤, ≥, ²)
+# pokazala je da nisu ista klasa: `=` i `²` su dvosmisleni (`P = 24` i
+# `12 cm^2` nisu jednačina ni stepenovanje), a `√`, `∩`, `∈` se javljaju
+# UNUTAR formula tuđe teme (`c=\sqrt{a^2+b^2}` u Pitagori, `P(A ∩ B)` u
+# vjerovatnoći) pa bi ih proglasili drugom temom. Za njih guard i dalje ćuti.
+_SYMBOLIC_CONCEPTS = ((_PERCENT_VALUE_RE, "procenat"),)
+
+
+def symbolic_topics(text):
+    """Pojmovi koje nosi matematički SIMBOL u sirovoj poruci."""
+    return {concept for pattern, concept in _SYMBOLIC_CONCEPTS
+            if pattern.search(text or "")}
+
+
 def named_topics(text):
-    """Skup imenovanih matematičkih pojmova koje tekst spominje."""
+    """Skup imenovanih matematičkih pojmova koje tekst spominje.
+
+    Riječi se traže nad normalizovanim tekstom, a simboli nad SIROVIM — jer ih
+    normalizacija briše. Oba puta daju imena iz ISTOG leksikona."""
     normalized = _normalize(text)
-    return {name for name, pattern in _TOPIC_RES.items() if pattern.search(normalized)}
+    words = {name for name, pattern in _TOPIC_RES.items() if pattern.search(normalized)}
+    return words | symbolic_topics(text)
 
 
 def lesson_context_is_strong(student_message, lesson_title="", oblast=""):
