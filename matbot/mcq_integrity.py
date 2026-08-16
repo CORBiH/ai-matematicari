@@ -568,7 +568,7 @@ def _evaluate_superlative_mcq(question, prose, options) -> ComparisonMCQResult:
         # NZD/NZS pitanje — superlativ je dio imena funkcije, ne relacija.
         return ComparisonMCQResult(False, False)
     # SUPERLATIV NAD USLOVOM NIJE SUPERLATIV NAD OPCIJAMA (živi nalaz, Faza F,
-    # forenzika odbijenih slotova kontrolnog, lekcija 7-02-019):
+    # forenzika odbijenih slotova kontrolnog, 7. razred, cijeli brojevi):
     #
     #   „Odredi najveći cijeli broj $x$ koji zadovoljava nejednačinu
     #    $-9<x+4\leq6$.“      opcije: 2 / -13 / 10 / -5
