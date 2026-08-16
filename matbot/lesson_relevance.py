@@ -100,6 +100,54 @@ def _is_deictic(normalized):
     )
 
 
+# ---------------------------------------------------------------------------
+# VLASTITI PREDMET PORUKE (živi nalaz: deiktički prefiks je gasio provjeru)
+# ---------------------------------------------------------------------------
+# `_DEICTIC_PHRASES` sadrži i GOLE riječi „objasni“, „kako“, „zasto“, „pojasni“,
+# a `_is_deictic` hvata svaku poruku koja tako POČINJE. Zato je jedna riječ na
+# početku gasila cijelu provjeru relevantnosti: mjereno nad svih 536 lekcija,
+# „Sabiranje razlomaka 3/4 + 2/5.“ je slab kontekst u 479 lekcija, a „Kako se
+# računa 3/4 + 2/5?“ u 0; isto „Pitagorina teorema…“ 487 → „Objasni Pitagorinu
+# teoremu.“ 0. Ista matematika, suprotan zaključak.
+#
+# ISPRAVKA NIJE BRISANJE TIH RIJEČI. One postoje zbog stvarnih nastavaka
+# („Kako?“, „Zašto?“, „Objasni jednostavnije.“) koji BEZ lekcije i historije
+# nemaju značenje i moraju je i dalje nasljeđivati.
+#
+# Razlika je u tome NOSI LI PORUKA VLASTITI PREDMET. Deiktički početak je samo
+# uljudan uvod kad iza njega ne stoji nikakva matematika; kad stoji, poruka je
+# samostalan zahtjev i sudi joj se po SADRŽAJU (što i dalje može ispasti
+# „jak kontekst“ — samostalno pitanje O IZABRANOJ lekciji ostaje relevantno).
+_NUMBER_TOKEN_RE = re.compile(r"\d+(?:[.,]\d+)?")
+# Operator ili relacija traži se u IZVORNOJ poruci: `_normalize` briše
+# interpunkciju, pa bi „x=4“ poslije nje izgledalo kao obična riječ.
+_OPERATOR_RE = re.compile(r"[+\-*/=<>^%]|\\frac|\\sqrt|\\cdot|\bputa\b|\bpodijelj")
+_MATH_SEGMENT_RE = re.compile(r"\$[^$]+\$")
+
+
+def carries_own_subject(text):
+    """True = poruka nosi VLASTITI matematički predmet (samostalan zahtjev).
+
+    Tri signala, svaki strukturan i jezički neutralan:
+      • imenuje matematički pojam iz leksikona;
+      • nosi matematički segment `$…$`;
+      • nosi dvije brojčane vrijednosti, ili jednu uz operator/relaciju.
+
+    Namjerno NE gleda dužinu poruke: „Zašto x=4?“ je kratko a samostalno, dok
+    je „Zašto ovdje dijelimo sa 3?“ duže a i dalje nastavak prethodnog koraka
+    (jedan broj, bez operatora)."""
+    if not text:
+        return False
+    if named_topics(text):
+        return True
+    if _MATH_SEGMENT_RE.search(text):
+        return True
+    numbers = _NUMBER_TOKEN_RE.findall(text)
+    if len(numbers) >= 2:
+        return True
+    return bool(numbers) and bool(_OPERATOR_RE.search(text))
+
+
 def named_topics(text):
     """Skup imenovanih matematičkih pojmova koje tekst spominje."""
     normalized = _normalize(text)
@@ -122,7 +170,12 @@ def lesson_context_is_strong(student_message, lesson_title="", oblast=""):
         return True
 
     normalized = _normalize(student_message)
-    if not normalized or _is_deictic(normalized):
+    if not normalized:
+        return True
+    # STVARAN NASTAVAK = deiktički početak BEZ vlastitog predmeta. Uljudan uvod
+    # („Objasni…“, „Kako…“, „Zašto…“) ispred samostalnog pitanja više ne gasi
+    # provjeru — vidi `carries_own_subject`.
+    if _is_deictic(normalized) and not carries_own_subject(student_message):
         return True
 
     message_topics = named_topics(student_message)
