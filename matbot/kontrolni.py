@@ -44,7 +44,8 @@ import threading
 import time
 
 from matbot import (config, exactly_one, geometrycheck, linear_system_mcq,
-                    mcq_integrity, option_equivalence, square_pyramid_mcq,
+                    mcq_integrity, option_equivalence,
+                    point_plane_projection_mcq, square_pyramid_mcq,
                     stem_disclosure)
 from matbot.llm import LLMError, failure_diagnostics_kv
 from matbot.mathcheck import find_numeric_inconsistencies
@@ -698,6 +699,17 @@ def validate_generated_question(parsed, slot, context, prior_signatures):
         text, option_texts, correct_index)
     if pyramid_failure:
         return None, f"square_pyramid_{pyramid_failure}"
+
+    # ORTOGONALNA PROJEKCIJA DUŽI NA RAVAN (živi nalaz N-6, ista kampanja):
+    # objavljeno je „tačke s ISTE strane, udaljenosti 9 i 12, $AB=15$, kolika
+    # je projekcija?“ s označenih $12$, a tačno je $\sqrt{216}=6\sqrt6$ — dakle
+    # nijedna opcija nije bila tačna. $12$ nastaje samo ako se $9$ uzme kao
+    # NORMALNA RAZLIKA umjesto $|12-9|=3$. Opet zamjena uloga, pa je modelov
+    # račun ostao aritmetički tačan — vidi matbot/point_plane_projection_mcq.py.
+    projection_failure = point_plane_projection_mcq.publication_failure(
+        text, option_texts, correct_index)
+    if projection_failure:
+        return None, f"point_plane_{projection_failure}"
 
     # ŽIVA KAMPANJA v1: uski dokazi povrh orakla (vidi blokove komentara gore).
     divisibility_failure = _divisibility_claim_failure(text, option_texts,
