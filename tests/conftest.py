@@ -61,6 +61,7 @@ def make_quick_image_output(
     answer_confidence="high",
     uncertainty_reason="",
     math_content_uncertain=False,
+    detected_tasks=None,
 ):
     """Default je „jasna slika, model siguran“ — tj. stanje u kojem odgovor
     PROLAZI kapiju iz matbot/quick.py, pa postojeći testovi plumbinga slike
@@ -78,7 +79,15 @@ def make_quick_image_output(
         answer_confidence=answer_confidence,
         uncertainty_reason=uncertainty_reason,
         math_content_uncertain=math_content_uncertain,
+        detected_tasks=detected_tasks or [],
     )
+
+
+def make_detected_task(label, text, fully_readable=True):
+    """Jedan zadatak sa stranice s više zadataka (inventar za Quick kontekst)."""
+    from matbot.schema import DetectedTask
+
+    return DetectedTask(label=label, text=text, fully_readable=fully_readable)
 
 
 def make_kontrolni_question(slot=1, lesson_id="6-04-001", text=None,

@@ -13,7 +13,7 @@ import time
 
 from flask import Blueprint, Response, current_app, jsonify, request
 
-from matbot import auth, config, imageinput, kontrolni, validation
+from matbot import auth, config, imageinput, kontrolni, quick_context, validation
 from matbot.explain import run_explain_turn
 from matbot.practice import SAFE_ERROR_MESSAGE, run_practice_turn
 from matbot.quick import run_quick_turn
@@ -268,7 +268,8 @@ def _guarded_chat_turn():
         if mode == "explain":
             return 200, run_explain_turn(_get_llm(), turn)
         if mode == "quick":
-            return 200, run_quick_turn(_get_llm(), turn, image=image)
+            return 200, run_quick_turn(_get_llm(), turn, image=image,
+                                       context_store=_get_quick_context_store())
         return 200, run_practice_turn(_get_store(), _get_llm(), turn)
     except Exception:
         # Zadnja linija odbrane: interni exception NIKAD ne ide učeniku.
@@ -313,6 +314,16 @@ def chat_stream():
     logger.info("chat_request_timing endpoint=stream status=200 total_ms=%s",
                 int((time.perf_counter() - started) * 1000))
     return Response(body, mimetype="text/event-stream")
+
+
+def _get_quick_context_store():
+    """Aktivan Quick zadatak po sesiji (matbot/quick_context.py). Isti obrazac
+    kao ostali storeovi: in-memory, bez baze, gubi se na restart."""
+    store = current_app.config.get("MATBOT_QUICK_CONTEXT_STORE")
+    if store is None:
+        store = quick_context.QuickContextStore()
+        current_app.config["MATBOT_QUICK_CONTEXT_STORE"] = store
+    return store
 
 
 def _get_exam_store():

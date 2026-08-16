@@ -72,6 +72,9 @@ def test_image_result_uses_the_dedicated_schema():
         "visible_math", "visible_problem_text", "requested_quantity",
         "visible_values", "unit", "answer_confidence", "uncertainty_reason",
         "math_content_uncertain",
+        # v2 (2026-08-16): inventar zadataka sa stranice s VIŠE zadataka —
+        # bez njega „Treći." poslije slike nema odakle da se riješi.
+        "detected_tasks",
     }
 
 

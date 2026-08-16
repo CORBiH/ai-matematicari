@@ -12,7 +12,7 @@ import re
 import unicodedata
 import uuid
 
-from matbot import geometry_rules, geometrycheck, imagecheck, prompts
+from matbot import config, geometry_rules, geometrycheck, imagecheck, prompts, quick_context
 from matbot.llm import LLMError, failure_diagnostics_kv
 from matbot.mathcheck import find_numeric_inconsistencies
 from matbot.mathsafe import normalize_result_math_transport, sanitize_and_validate_math_text
@@ -191,6 +191,72 @@ def _image_gate_message(issue):
     return IMAGE_UNREADABLE_MESSAGE
 
 
+# ---------------------------------------------------------------------------
+# NAMJERA UČENIKA (v2, 2026-08-16) — mala, deterministička klasifikacija.
+#
+# „Samo rezultat“ opisuje PODRAZUMIJEVANI oblik odgovora, a ne zabranu. Server
+# ovdje NE rješava matematiku i ne pogađa značenje — bira samo (a) ugovor
+# prompta, (b) dozvoljenu dužinu odgovora i (c) da li se aktivan zadatak mijenja.
+# Sve što nije prepoznato ostaje RESULT, dakle zatečeno ponašanje.
+# ---------------------------------------------------------------------------
+
+INTENT_RESULT = "result"
+INTENT_EXPLAIN = "explain"
+INTENT_VERIFY = "verify"
+INTENT_SUBTASK = "subtask"
+
+_EXPLAIN_MARKERS = (
+    "objasni", "objasnite", "objasnjenje", "kako si", "kako se", "kako to",
+    "kako dobijem", "kako doci", "zasto", "pokazi postupak", "pokazi korake",
+    "postupak", "korak po korak", "izvedi", "detaljno", "sta sam pogrijesio",
+    "sta sam pogresio", "gdje sam pogrijesio", "drugim nacinom", "drugi nacin",
+)
+_VERIFY_MARKERS = (
+    "provjeri", "provjerite", "je li tacno", "jel tacno", "da li je tacno",
+    "je li ovo tacno", "jesam li", "da li sam", "tacno li je", "provjera",
+)
+# Poruka koja nosi RAČUN (operator, „2x“, razlomak) je zadatak, ne oznaka.
+_MATH_CONTENT_RE = re.compile(r"[=+*/^:]|\d\s*[a-zA-Z]|\\frac|\d\s*[-−]\s*\d")
+
+
+def classify_quick_intent(message, has_context=False):
+    """Vrati (namjera, oznaka_podzadatka). Namjerno uska i konzervativna."""
+    normalized = _normalized_conversation_phrase(message)
+    if not normalized:
+        return INTENT_RESULT, ""
+    label = quick_context.requested_task_label(message) if has_context else ""
+    if any(marker in normalized for marker in _VERIFY_MARKERS):
+        return INTENT_VERIFY, label
+    if any(marker in normalized for marker in _EXPLAIN_MARKERS):
+        return INTENT_EXPLAIN, label
+    # Gola oznaka („Treći.“, „pod b)“, „zadatak 3“) mijenja AKTIVAN zadatak.
+    # Poruka koja SAMA nosi matematiku nikad nije izbor zadatka — živi nalaz:
+    # „2x + 5 = 13“ se folda u tri riječi s ciframa, pa je bio čitan kao izbor
+    # zadatka 2 i dobijao odgovor na PRETHODNI zadatak.
+    if label and len(normalized.split()) <= 3 and not _MATH_CONTENT_RE.search(message or ""):
+        return INTENT_SUBTASK, label
+    return INTENT_RESULT, label
+
+
+def _reply_limit_for(intent):
+    """Rezultat ostaje kratak; objašnjenje koje je učenik TRAŽIO ima svoju,
+    i dalje čvrstu granicu (nikad esej)."""
+    if intent in (INTENT_EXPLAIN, INTENT_VERIFY):
+        return config.MAX_QUICK_EXPLANATION_CHARS
+    return config.MAX_QUICK_REPLY_CHARS
+
+
+# NOVI ZADATAK BRIŠE STARI KONTEKST. Uska, izričita najava — dvosmislena poruka
+# („a ovaj?“) NE briše kontekst, nego ga koristi.
+_NEW_TASK_MARKERS = ("novi zadatak", "nova zadaca", "drugi zadatak",
+                     "sljedeci zadatak", "sledeci zadatak", "novo pitanje")
+
+
+def starts_new_task(message):
+    normalized = _normalized_conversation_phrase(message)
+    return any(marker in normalized for marker in _NEW_TASK_MARKERS)
+
+
 def _clean_history(raw_history):
     """Frontend šalje [{'role','content'}, ...]. Zadrži samo validne stavke,
     isjeci sadržaj i uzmi najviše zadnje 3 razmjene. Klijentski sadržaj se
@@ -209,13 +275,18 @@ def _clean_history(raw_history):
     return cleaned[-MAX_HISTORY_MESSAGES:]
 
 
-def run_quick_turn(llm, turn, image=None):
+def run_quick_turn(llm, turn, image=None, context_store=None):
     """turn: očišćeni dict iz api.py. Vraća JSON-spreman dict.
 
-    `image`: matbot.imageinput.ValidatedImage ili None. Slika VAŽI SAMO ZA OVAJ
-    turn — server je nigdje ne pamti, ne upisuje u historiju i ne šalje u
-    sljedećim pozivima. Ako kasnija poruka ponovo treba sliku, učenik je mora
-    priložiti iznova (frontend čisti prilog nakon uspješnog odgovora)."""
+    `image`: matbot.imageinput.ValidatedImage ili None. SAMI BAJTOVI slike važe
+    SAMO ZA OVAJ turn — server ih nigdje ne pamti i ne šalje u sljedećim
+    pozivima.
+
+    `context_store`: matbot.quick_context.QuickContextStore ili None. Pamti se
+    ISKLJUČIVO semantika AKTIVNOG zadatka (tekst zadatka, dati podaci, tražena
+    veličina, zadnji rezultat, inventar zadataka sa stranice) — nikad slika.
+    Bez storea mod radi tačno kao ranije (stateless), pa stara sesija i restart
+    padaju bezbjedno."""
     request_id = uuid.uuid4().hex[:12]
 
     # Canonical podaci iz topics.json — samo kao mekan kontekst (ne ograničenje).
@@ -234,9 +305,48 @@ def run_quick_turn(llm, turn, image=None):
 
     repair_intent = is_conversational_repair_message(student_message)
     clock_time = direct_clock_time_question(student_message)
+
+    # --- AKTIVAN ZADATAK -----------------------------------------------------
+    # Nova slika ili izričita najava novog zadatka BRIŠU stari kontekst; sve
+    # ostalo ga koristi. Kontekst nikad ne prelazi granicu sesije ni moda.
+    session_id = turn.get("session_id") or ""
+    stored_context = None if image is not None else (
+        context_store.get(session_id) if context_store else None)
+    if stored_context and starts_new_task(student_message):
+        stored_context = None
+        if context_store:
+            context_store.clear(session_id)
+    intent, task_label = classify_quick_intent(
+        student_message, has_context=bool(stored_context))
+    # AKTIVAN ZADATAK SE ŠALJE MODELU SAMO ZA NASTAVAK (objasni/provjeri/izbor).
+    # Poruka koja SAMA nosi zadatak je nov zadatak i ne smije vidjeti stari
+    # kontekst — živa kampanja, turn 03: poslije „3456 + 2891“ je na „2x + 5 =
+    # 13“ stigao odgovor „$3456+2891=6347$“, jer je stari zadatak i dalje bio u
+    # promptu. Historija razgovora ostaje, pa referentna pitanja i dalje rade.
+    follow_up = intent in (INTENT_EXPLAIN, INTENT_VERIFY, INTENT_SUBTASK)
+    if not follow_up:
+        stored_context = None
+    # Izbor zadatka sa stranice se radi SAMO kad je poruka stvarno izbor
+    # („Treći.“). Inače je broj u poruci dio matematike — turn 18: „Zašto si
+    # dijelio sa 5/9?“ je čitano kao izbor zadatka 5 i vraćalo poruku o
+    # nečitljivoj slici.
+    if stored_context and task_label and intent == INTENT_SUBTASK:
+        stored_context, status = quick_context.select_task(stored_context, task_label)
+        if status == "unreadable":
+            # Pošteno: taj zadatak NIJE pouzdano pročitan — ne pogađa se.
+            logger.info("quick_turn request_id=%s task_select=unreadable", request_id)
+            if context_store:
+                context_store.save(stored_context)
+            return {"status": "ready", "answer": IMAGE_UNREADABLE_MESSAGE,
+                    "answer_verdict": None, "last_tutor_task": "", "next_state": {},
+                    "session_mode": "quick", "effective_topic": lesson_id or ""}
+        if status == "selected" and context_store:
+            context_store.save(stored_context)
+
     instructions = prompts.build_quick_instructions(
         turn["grade"], lesson_title=lesson_title, oblast=oblast,
         repair_intent=repair_intent, image_present=image is not None,
+        intent=intent,
     )
     input_text = prompts.build_quick_input(
         lesson_title=lesson_title,
@@ -245,6 +355,7 @@ def run_quick_turn(llm, turn, image=None):
         student_message=student_message,
         image_present=image is not None,
         server_default_instruction=server_default_instruction,
+        task_context=quick_context.prompt_block(stored_context),
     )
 
     if image is not None:
@@ -254,6 +365,7 @@ def run_quick_turn(llm, turn, image=None):
 
     try:
         result = llm.quick_turn(instructions, input_text, image=image)
+        reply_limit = _reply_limit_for(intent)
         if image is not None:
             # SAMO osnovna provjera (neprazan reply) PRIJE kapije čitljivosti.
             # Puna ograničenja internih polja dolaze POSLIJE kapije — živa
@@ -263,9 +375,9 @@ def run_quick_turn(llm, turn, image=None):
             # kapija rekla ispravno „Na slici vidim više zadataka…“. Kapija
             # čita samo šemom tipizirana polja (Literal/bool), pa joj dužinske
             # granice nisu preduslov.
-            validate_quick_output(result.output)
+            validate_quick_output(result.output, max_reply_chars=reply_limit)
         else:
-            validate_quick_output(result.output)
+            validate_quick_output(result.output, max_reply_chars=reply_limit)
     except LLMError as e:
         logger.warning(
             "quick_turn request_id=%s category=%s mode=quick %s",
@@ -294,12 +406,21 @@ def run_quick_turn(llm, turn, image=None):
                 request_id, gate_issue, result.output.readability,
                 result.output.task_type, result.output.answer_confidence,
             )
+            # STRANICA S VIŠE ZADATAKA: odgovor je pitanje „koji da riješim?",
+            # ali ono što je model pročitao se PAMTI — inače sljedeće „Treći."
+            # nema odakle da se riješi (živi baseline, turnovi 6 i 7).
+            if gate_issue == "multiple_tasks" and context_store and session_id:
+                inventory = quick_context.from_image_output(session_id, result.output)
+                if inventory.get("detected_tasks"):
+                    context_store.save(inventory)
+                    logger.info("quick_turn request_id=%s stored_task_inventory=%s",
+                                request_id, len(inventory["detected_tasks"]))
             return {"answer": _image_gate_message(gate_issue), "last_tutor_task": ""}
 
         # Puna ograničenja internih polja evidencije — TEK POSLIJE kapije
         # (vidi komentar uz poziv modela). Prekršaj i dalje pada zatvoreno.
         try:
-            validate_quick_image_output(result.output)
+            validate_quick_image_output(result.output, max_reply_chars=reply_limit)
         except InvalidOutputError as e:
             logger.warning("quick_turn request_id=%s category=invalid_output detail=%s",
                            request_id, e)
@@ -384,9 +505,25 @@ def run_quick_turn(llm, turn, image=None):
                        request_id, ",".join(geometry_issues))
         return {"answer": SAFE_ERROR_MESSAGE, "last_tutor_task": ""}
 
+    # AKTIVAN ZADATAK poslije uspješnog odgovora. Slika daje bogat kontekst
+    # (pročitani zadatak + dati podaci); tekstualni zadatak pamti sam sebe, a
+    # follow-up (objasni/zašto/provjeri) samo osvježava zadnji rezultat.
+    if context_store and session_id:
+        if image is not None:
+            # Nova slika UVIJEK zamjenjuje aktivan zadatak.
+            fresh = quick_context.from_image_output(session_id, result.output)
+        elif follow_up and stored_context:
+            # Nastavak radi nad ISTIM zadatkom — osvježava se samo rezultat.
+            fresh = stored_context
+        else:
+            # Sve ostalo je nov zadatak i briše stari kontekst.
+            fresh = quick_context.from_text_task(session_id, student_message)
+        context_store.save(quick_context.with_result(fresh, answer))
+
     logger.info(
-        "quick_turn request_id=%s ok latency_ms=%s usage=%s",
-        request_id, result.latency_ms, result.usage,
+        "quick_turn request_id=%s ok intent=%s context=%s latency_ms=%s usage=%s",
+        request_id, intent, "yes" if stored_context else "no",
+        result.latency_ms, result.usage,
     )
 
     return {

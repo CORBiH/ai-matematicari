@@ -217,6 +217,23 @@ Flask + a single-page frontend, one OpenAI call per turn, no database.
   weak context only when the message names a maths concept that does not overlap
   the lesson's; deictic messages and unprovable cases keep the previous behaviour.
 
+- **Quick ("Samo rezultat") is a normal maths chat whose DEFAULT is a short
+  result (v2, 2026-08-16).** A bare problem still gets a concise answer, but an
+  explicit request — "objasni", "zašto", "pokaži postupak", "provjeri", "drugim
+  načinom", "treći" — is answered in place. Quick never tells the student to
+  switch to Explain, and the frontend Quick chips no longer change mode. The
+  server classifies intent deterministically (`quick.classify_quick_intent`) and
+  that choice selects *only* the prompt contract and the reply length cap
+  (result 1200 chars vs explanation 2400) — never the mathematics.
+  It stays **exactly one model call per turn**: text and text follow-ups go to
+  Luna, a newly uploaded image to Sol. A follow-up after an image is answered
+  from `matbot/quick_context.py` (transcribed task, givens, requested quantity,
+  last result, and for a multi-task page the `detected_tasks` inventory) — Sol
+  is **not** called again and the student never re-uploads. A task the model did
+  not mark `fully_readable` is never solved from memory; the server asks for a
+  clearer image instead. The context is per session, in-memory, replaced by any
+  new task or new image, and lost on restart by design.
+
 - **Result mode answers direct clock-time questions.** A valid `HH:MM` plus a fixed
   time phrase is in scope; `60:15` in a calculation stays division. If the model
   still returns the generic off-topic refusal, the server substitutes a
@@ -268,7 +285,8 @@ Flask + a single-page frontend, one OpenAI call per turn, no database.
 | Practice turn orchestration + session state | `matbot/practice.py`, `matbot/session_store.py` |
 | Help-ladder policy (task class, server-composed hints, scope gate) | `matbot/hint_policy.py` |
 | Explain turn orchestration (stateless) | `matbot/explain.py` |
-| Result/Quick turn orchestration (stateless) | `matbot/quick.py` |
+| Result/Quick turn orchestration | `matbot/quick.py` |
+| Quick active-task context (per session, ephemeral) | `matbot/quick_context.py` |
 | Kontrolni test mode (generation, answer key, grading) | `matbot/kontrolni.py` |
 | Shared maths/language/notation prompt rules | `matbot/rules.py` |
 | Mode-specific prompt assembly | `matbot/prompts.py` |

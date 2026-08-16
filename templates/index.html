@@ -1330,6 +1330,11 @@ document.addEventListener('DOMContentLoaded', () => {
     function wantsPracticeTask(t){
       const s = foldTutorText(t).trim();
       if (!s || s.length > 80) return false;
+      /* Poruka koja SAMA nosi matematiku je zadatak koji učenik DAJE, ne
+         zahtjev za novim zadatkom za vježbu. Bez ovoga je „Novi zadatak:
+         84:7“ u Rezultatu prebacivalo učenika u Vježbu (živi nalaz v2):
+         „novi“ + „zadatak“ su palili pravilo ispod. */
+      if (/[0-9=]/.test(s)) return false;
       if (/\b(primjer\w*|objasni|pojasni|kako|zasto|hint|pomozi|pomoc)\b/.test(s)) return false;
       if (/\bzadat\w*\b/.test(s) &&
           /\b(daj|zadaj|posalji|novi|nov|drugi|jos|sljedeci|slican|zelim|hocu|moze|mozes|trebam)\b/.test(s)) return true;
@@ -2406,8 +2411,15 @@ document.addEventListener('DOMContentLoaded', () => {
       /* Kontrolni NEMA chat prečice: mod živi na vlastitom ekranu i nikad ne
          ulazi u razgovor — stara chat-based kontrolni dugmad su uklonjena
          (živi produkcijski nalaz 2026-08-15). */
+      /* „Samo rezultat“ je od v2 normalan matematički razgovor: objašnjenje,
+         provjera i drugi način su NJEGOVE namjere, ne razlog za izlazak iz
+         moda. Zato ove prečice šalju običnu Quick poruku i NEMAJU `mode` —
+         ranije je „Objasni postupak“ prebacivao u Objasni mi, gdje model više
+         nije imao ni sliku ni zadatak, pa je odgovarao „tekst zadatka nije
+         vidljiv“. Mod se mijenja SAMO izborom na početnom ekranu. */
       return [   /* quick */
-        { label: '📘 Objasni postupak', msg: 'Objasni mi postupak korak po korak.', mode: 'explain' },
+        { label: '📘 Objasni postupak', msg: 'Objasni mi postupak korak po korak.' },
+        { label: '✅ Provjeri odgovor', msg: 'Provjeri je li moj odgovor tačan.' },
         { label: '✏️ Sličan zadatak', msg: 'Daj mi sličan zadatak za vježbu.', mode: 'practice' }
       ];
     }

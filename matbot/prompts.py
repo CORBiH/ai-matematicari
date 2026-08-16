@@ -369,6 +369,12 @@ _QUICK_IMAGE_RULES = (
     "ivicu, vidljiv rub stranice, susjedni nebitni fragment) NISU matematička nesigurnost: "
     "njih smiješ opisati u 'uncertainty_reason' uz math_content_uncertain=false. Ako je "
     "math_content_uncertain=true, u 'uncertainty_reason' obavezno reci ŠTA je nečitljivo.\n"
+    "- 'detected_tasks': popuni SAMO kada je readability='multiple_tasks'. Za svaki "
+    "zadatak sa stranice vrati njegovu oznaku ('label' — broj ili slovo kako piše na "
+    "slici), POTPUNU transkripciju TOG zadatka ('text', sa svim brojevima i "
+    "podzadacima) i 'fully_readable'. Postavi fully_readable=false čim ijedan simbol "
+    "tog zadatka nije siguran — takav zadatak aplikacija neće rješavati iz sjećanja, "
+    "nego će tražiti jasniju sliku. U svim ostalim slučajevima vrati praznu listu.\n"
     "\n"
 )
 
@@ -381,14 +387,79 @@ QUICK_IMAGE_DEFAULT_INSTRUCTION = (
 )
 
 
+# NAMJERA UČENIKA ODREĐUJE OBLIK ODGOVORA (v2, 2026-08-16).
+#
+# „Samo rezultat“ je PODRAZUMIJEVANI oblik, a ne zabrana. Raniji prompt je
+# tvrdio i „ne prikazuj postupak“ i „smiješ dati veoma kratak postupak kad se
+# traži“, uz preporuku da učenik pređe u „Objasni mi“ — dvije kontradiktorne
+# poruke i jedan nepotreban izlaz iz moda. Sada server unaprijed zna šta je
+# učenik tražio (matbot/quick.py::classify_quick_intent) i modelu daje TAČNO
+# jedan ugovor oblika.
+_QUICK_INTENT_CONTRACTS = {
+    "result": (
+        "OBLIK ODGOVORA ZA OVU PORUKU: SAMO REZULTAT.\n"
+        "- Vrati konačan rezultat u standardnom školskom obliku, s jedinicom kad "
+        "je potrebna. Bez postupka, bez uvoda i bez pitanja na kraju.\n"
+        "- Najviše jedna kratka dopunska rečenica, i to samo kad bi bez nje "
+        "odgovor bio nejasan (npr. koji podatak nedostaje).\n"
+    ),
+    "explain": (
+        "OBLIK ODGOVORA ZA OVU PORUKU: UČENIK JE TRAŽIO OBJAŠNJENJE.\n"
+        "- Objasni tačno ono što je pitao: cio postupak, jedan jedini korak, "
+        "razlog jednog poteza ili drugi način rješavanja — šta god je tražio.\n"
+        "- Kratki, jasni koraci (obično 2–6 redova), primjereni razredu; svaki "
+        "korak u svom redu, bez naslova i bez uvodnih rečenica.\n"
+        "- NE upućuj učenika u drugi mod i ne izvinjavaj se što objašnjavaš — "
+        "objašnjenje je ovdje potpuno normalan odgovor.\n"
+        "- Bez predavanja i bez ponavljanja cijele lekcije.\n"
+    ),
+    "verify": (
+        "OBLIK ODGOVORA ZA OVU PORUKU: UČENIK TRAŽI PROVJERU.\n"
+        "- Počni jasnom presudom: tačno ili netačno.\n"
+        "- Dodaj kratku provjeru računom; ako je netačno, reci gdje je greška i "
+        "koji je tačan rezultat. Najviše nekoliko redova.\n"
+    ),
+    "subtask": (
+        "OBLIK ODGOVORA ZA OVU PORUKU: UČENIK JE IZABRAO ZADATAK.\n"
+        "- Riješi TAČNO taj zadatak iz aktivnog konteksta i vrati rezultat (bez "
+        "postupka, osim ako ga izričito traži).\n"
+        "- Ako zadatak s tom oznakom nije u aktivnom kontekstu, kratko to reci i "
+        "zatraži da ga učenik pošalje — NIKAD ne rješavaj neki drugi zadatak.\n"
+    ),
+}
+
+# METODA PO RAZREDU, SAMO ZA OBJAŠNJENJE. Zajednička pravila razreda su za Quick
+# namjerno isključena (vidi rules.build_shared_math_rules) da ograničenja skupa
+# brojeva ne bi obarala tačan račun — ali kad učenik traži POSTUPAK, a razred je
+# poznat, metoda mora biti ona koju škola uči, inače šestom razredu objašnjavamo
+# prebacivanje preko znaka jednakosti.
+_QUICK_GRADE_METHOD = {
+    6: (
+        "METODA ZA 6. RAZRED (kad objašnjavaš jednačinu ili nejednačinu):\n"
+        "- Koristi VEZU MEĐU ČLANOVIMA RAČUNSKIH OPERACIJA (nepoznati član): "
+        "nepoznati sabirak = zbir − poznati sabirak; nepoznati umanjilac = "
+        "umanjenik − razlika; nepoznati faktor = proizvod : poznati faktor; "
+        "nepoznati djeljenik = količnik · djelilac; nepoznati djelilac = "
+        "djeljenik : količnik.\n"
+        "- NE objašnjavaj „prebacivanjem preko znaka jednakosti“ i ne uvodi "
+        "negativne brojeve u sam postupak.\n\n"
+    ),
+}
+
+
 def build_quick_instructions(
     grade: int,
     lesson_title: str = "",
     oblast: str = "",
     repair_intent: bool = False,
     image_present: bool = False,
+    intent: str = "result",
 ) -> str:
     style = _QUICK_GRADE_STYLE.get(grade, _QUICK_GRADE_STYLE[6])
+    intent_contract = _QUICK_INTENT_CONTRACTS.get(
+        intent, _QUICK_INTENT_CONTRACTS["result"])
+    method_rule = (_QUICK_GRADE_METHOD.get(grade, "")
+                   if intent in ("explain", "verify") else "")
     shared_rules = build_shared_math_rules(grade, lesson_title, oblast, mode="quick")
     repair_rule = (
         "POSEBNA POPRAVKA RAZGOVORA (obavezno za ovu poruku):\n"
@@ -402,11 +473,14 @@ def build_quick_instructions(
     )
     return (
         "Ti si iskusan nastavnik matematike u osnovnoj školi u Bosni i Hercegovini. "
-        "Vodiš mod 'Samo rezultat': odgovori na NAJNOVIJI stvarni zahtjev učenika "
-        "brzo i direktno — ne drži cijelu lekciju i ne prikazuj postupak korak po "
-        "korak osim kad ga učenik izričito traži.\n"
+        "Vodiš mod 'Samo rezultat': to je NORMALAN matematički razgovor u kojem je "
+        "podrazumijevani odgovor kratak rezultat, ali učenik svojim zahtjevom bira "
+        "oblik odgovora. Odgovori na NAJNOVIJI stvarni zahtjev učenika.\n"
         f"{style}\n"
         "\n"
+        f"{intent_contract}"
+        "\n"
+        f"{method_rule}"
         f"{shared_rules}"
         "\n"
         f"{_QUICK_IMAGE_RULES if image_present else ''}"
@@ -436,10 +510,8 @@ def build_quick_instructions(
         "- Prethodna metodološka pravila (razred/oblast) opisuju KAKO izgleda postupak KADA "
         "se prikazuje — u ovom modu to je SAMO ako učenik izričito zatraži postupak; inače "
         "daješ samo rezultat, bez obzira šta pravilo za oblast opisuje.\n"
-        "- Za jasno postavljen zadatak: vrati SAMO konačan rezultat u standardnom školskom obliku, "
-        "s ispravnom jedinicom kad je potrebna, unutar $...$. Ne prikazuj dugačak postupak.\n"
-        "- Dozvoljena je najviše jedna kratka dopunska rečenica kad je neophodna da odgovor ne bude "
-        "nejasan (npr. napomena da rješenje ne postoji u datom skupu, ili koji podatak nedostaje).\n"
+        "- Oblik odgovora za OVU poruku propisan je gore („OBLIK ODGOVORA ZA OVU PORUKU“) — "
+        "on ima prednost nad opštim opisom moda.\n"
         "- Ne završavaj odgovor pitanjem tipa „Želiš li objašnjenje?“ ili slično.\n"
         "- NIKAD sam od sebe ne generišeš novi zadatak za vježbu i ne ocjenjuješ učenika — ovo nije "
         "Vježbaj sa mnom mod.\n"
@@ -449,10 +521,11 @@ def build_quick_instructions(
         "kratko zatraži cijeli izraz ili zadatak (npr. „Na koji izraz misliš? Pošalji cijeli zadatak.“) "
         "umjesto da pogađaš. Ako poruka dozvoljava više različitih tumačenja, kratko zatraži pojašnjenje "
         "umjesto da nasumično izabereš jedno.\n"
-        "- Ako učenik izričito zatraži postupak (npr. „Kako?“, „Pokaži postupak.“, „Zašto?“, "
-        "„Kako si to dobio?“, „Objasni.“) — oslanjajući se na historiju razgovora ako postoji — smiješ dati "
-        "VEOMA KRATAK postupak (par kratkih koraka), ali NE dugačko predavanje. Možeš kratko spomenuti da "
-        "za detaljno učenje postoji mod „Objasni mi“, ali ne promoviraj drugi mod u svakom odgovoru.\n"
+        "- Kad učenik traži postupak, objašnjenje, provjeru, drugi način, zaokruživanje ili samo "
+        "jedan podzadatak — to su NORMALNI zahtjevi u ovom modu. Uradi tačno to, oslanjajući se na "
+        "historiju razgovora i aktivan zadatak. NIKAD ne govori učeniku da pređe u drugi mod.\n"
+        "- Zadrži tačan (nesveden na decimalu) oblik rezultata osim kad učenik traži zaokruživanje "
+        "ili približnu vrijednost; tada zaokruži tačno onako kako je tražio.\n"
         "- SVAKODNEVNA MJERENJA SU MATEMATIKA: pitanje o vremenu na satu (npr. „Sastanak je u 12:30. "
         "Koliko je sati?“), o novcu, dužini, masi ili temperaturi jeste osnovnoškolska matematika i "
         "NA NJEGA SE ODGOVARA. Zapis „12:30“ je vrijeme, a ne dijeljenje. Ne odbijaj takvo pitanje kao "
@@ -465,7 +538,8 @@ def build_quick_instructions(
 
 
 def build_quick_input(lesson_title, oblast, history, student_message,
-                      image_present=False, server_default_instruction=False):
+                      image_present=False, server_default_instruction=False,
+                      task_context=""):
     """history: lista {'role': 'user'|'assistant', 'content': str}, već isječena
     na najviše 3 razmjene (6 poruka) u pozivaocu — isti oblik kao Explain.
 
@@ -475,6 +549,12 @@ def build_quick_input(lesson_title, oblast, history, student_message,
     lines = []
     if lesson_title:
         lines.append(f"IZABRANA LEKCIJA (kontekst, ne ograničenje): {lesson_title} (oblast: {oblast or 'nepoznata'})")
+
+    # AKTIVAN ZADATAK koji server pamti iz ranijeg turna (matbot/quick_context.py).
+    # Postoji zbog slike: sami bajtovi slike ne prežive turn, pa bez ovoga
+    # „objasni treći“ nema odakle da se riješi.
+    if task_context:
+        lines.append(task_context)
 
     if image_present:
         lines.append("UZ OVU PORUKU JE PRILOŽENA SLIKA (zadatak je na slici).")

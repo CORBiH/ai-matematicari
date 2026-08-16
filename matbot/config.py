@@ -371,6 +371,12 @@ MAX_TASK_CHARS = 600
 MAX_REPLY_CHARS = 2500
 MAX_EXPLAIN_REPLY_CHARS = 4000  # objašnjenje smije biti nešto duže od practice feedbacka
 MAX_QUICK_REPLY_CHARS = 1200  # Quick ("Samo rezultat") je namjerno kratak i direktan
+# GRANICA ZA OBJAŠNJENJE U QUICK-u (v2, 2026-08-16). „Samo rezultat" opisuje
+# PODRAZUMIJEVANI oblik odgovora, a ne zabranu: kad učenik izričito traži
+# postupak („objasni", „zašto", „pokaži korake"), odgovor smije biti duži — ali
+# i dalje ograničen. Nije esej: 2400 znakova je otprilike jedan ekran koraka,
+# dvostruko od rezultatske granice, i dalje daleko ispod Explain granice (4000).
+MAX_QUICK_EXPLANATION_CHARS = 2400
 MAX_EXPECTED_ANSWER_CHARS = 400
 MAX_OPTION_TEXT_CHARS = 200
 MAX_HISTORY_ITEMS = _int_env("MATBOT_MAX_HISTORY_ITEMS", 6)

@@ -142,6 +142,11 @@ MAX_VISIBLE_MATH_CHARS = 300
 MAX_UNCERTAINTY_REASON_CHARS = 300
 MAX_VISIBLE_VALUE_FIELD_CHARS = 64
 MAX_VISIBLE_VALUES = 20
+# Inventar zadataka sa stranice (samo za `multiple_tasks`). Granice postoje da
+# slika stranice nikad ne postane pun OCR transkript udžbenika.
+MAX_DETECTED_TASKS = 8
+MAX_DETECTED_TASK_TEXT_CHARS = 400
+MAX_DETECTED_TASK_LABEL_CHARS = 12
 
 
 class VisibleValue(BaseModel):
@@ -152,6 +157,20 @@ class VisibleValue(BaseModel):
     symbol: str   # npr. "a", "b", "x"
     value: str    # npr. "8" — string da bi zapis ostao onakav kakav je na slici
     unit: str     # npr. "cm"; prazno kad jedinice nema
+
+
+class DetectedTask(BaseModel):
+    """JEDAN zadatak prepoznat na stranici s više zadataka.
+
+    `fully_readable` je granica povjerenja: samo zadatak koji je model pročitao
+    U CIJELOSTI smije kasnije biti riješen iz zapamćenog konteksta, bez nove
+    slike. Za sve ostalo server traži jasniju sliku umjesto da pogađa."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    label: str            # oznaka sa stranice: „1“, „2“, „a“, „b“…
+    text: str             # POTPUNA transkripcija TOG zadatka
+    fully_readable: bool
 
 
 class QuickImageTurnOutput(BaseModel):
@@ -224,6 +243,18 @@ class QuickImageTurnOutput(BaseModel):
     # `False` — informativna je, ne blokira. Definicija polja živi u promptu
     # (matbot/prompts.py, _QUICK_IMAGE_RULES).
     math_content_uncertain: bool
+    # INVENTAR ZADATAKA — popunjava se SAMO kad je `readability="multiple_tasks"`.
+    #
+    # ZAŠTO POSTOJI (živi baseline 2026-08-16): na stranici s pet zadataka
+    # server je ispravno tražio „napiši koji da riješim“, ali je sve što je
+    # model pročitao nestajalo s turnom — pa je na „Treći.“ odgovarao
+    # „Pošalji sliku ili napiši tekst trećeg zadatka.“ Ovdje se pamti tačno
+    # onoliko koliko treba da se izabrani zadatak kasnije riješi BEZ nove
+    # slike i BEZ drugog poziva modela.
+    #
+    # Nije transkript cijele stranice: prazna lista je uredan ishod, a zadatak
+    # čiji `fully_readable` nije `true` server NIKAD ne rješava iz sjećanja.
+    detected_tasks: list[DetectedTask]
 
 
 class InvalidOutputError(ValueError):
@@ -238,22 +269,36 @@ def validate_explain_output(out: ExplainTurnOutput) -> None:
         raise InvalidOutputError("predug reply")
 
 
-def validate_quick_output(out) -> None:
+def validate_quick_output(out, max_reply_chars=None) -> None:
     """Server-side provjere Quick outputa povrh strict šeme.
 
     Prima OBJE Quick šeme (tekstualnu i sliku) — zajedničko je samo `reply`;
-    interna polja slike provjerava validate_quick_image_output."""
+    interna polja slike provjerava validate_quick_image_output.
+
+    `max_reply_chars`: granica ZAVISI OD NAMJERE (v2, 2026-08-16). Rezultat
+    ostaje kratak (config.MAX_QUICK_REPLY_CHARS), ali objašnjenje koje je
+    učenik IZRIČITO tražio ne smije pasti samo zato što je duže od rezultata —
+    ono ima svoju, i dalje čvrstu granicu (config.MAX_QUICK_EXPLANATION_CHARS).
+    Bez argumenta važi zatečena granica, pa stariji pozivaoci ostaju isti."""
     if not (out.reply or "").strip():
         raise InvalidOutputError("prazan reply")
-    if len(out.reply) > config.MAX_QUICK_REPLY_CHARS:
+    limit = max_reply_chars or config.MAX_QUICK_REPLY_CHARS
+    if len(out.reply) > limit:
         raise InvalidOutputError("predug reply")
 
 
-def validate_quick_image_output(out: QuickImageTurnOutput) -> None:
+def validate_quick_image_output(out: QuickImageTurnOutput, max_reply_chars=None) -> None:
     """Ograničenja INTERNIH polja slike. Ona nikad ne stižu do učenika, ali
     ulaze u serversku logiku i log, pa moraju biti kratka i brojčano ograničena
     (bez transkripcije cijele strane udžbenika)."""
-    validate_quick_output(out)
+    validate_quick_output(out, max_reply_chars=max_reply_chars)
+    if len(out.detected_tasks) > MAX_DETECTED_TASKS:
+        raise InvalidOutputError("previše detected_tasks")
+    for task in out.detected_tasks:
+        if len(task.label) > MAX_DETECTED_TASK_LABEL_CHARS:
+            raise InvalidOutputError("preduga oznaka zadatka")
+        if len(task.text) > MAX_DETECTED_TASK_TEXT_CHARS:
+            raise InvalidOutputError("preduga transkripcija zadatka")
     if len(out.visible_problem_text) > MAX_VISIBLE_PROBLEM_TEXT_CHARS:
         raise InvalidOutputError("predug visible_problem_text")
     if len(out.visible_math) > MAX_VISIBLE_MATH_CHARS:

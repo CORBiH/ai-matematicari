@@ -144,10 +144,18 @@ def test_role_and_language_reach_the_prompt():
 
 
 def test_result_only_and_exactness_rules_reach_the_prompt():
+    """v2: „samo rezultat" je PODRAZUMIJEVANI ugovor oblika (intent=result),
+    a ne više jedna rečenica u opštem opisu moda. Kratkoća se traži i dalje —
+    samo je sada vezana za namjeru koju je server prepoznao."""
     text = _instructions()
-    assert "SAMO konačan rezultat" in text
-    assert "Ne prikazuj dugačak postupak" in text
-    assert "s ispravnom jedinicom kad je potrebna" in text
+    assert "OBLIK ODGOVORA ZA OVU PORUKU: SAMO REZULTAT" in text
+    assert "Bez postupka" in text
+    assert "s jedinicom kad je potrebna" in text
+    # Zahtjev za objašnjenjem dobija DRUGI ugovor, u istom modu.
+    explain = build_quick_instructions(7, lesson_title="Naslov", oblast="Oblast",
+                                       intent="explain")
+    assert "UČENIK JE TRAŽIO OBJAŠNJENJE" in explain
+    assert "NE upućuj učenika u drugi mod" in explain
 
 
 def test_missing_data_rule_reaches_the_prompt():
