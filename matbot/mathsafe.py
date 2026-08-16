@@ -31,6 +31,7 @@ delimiter-parsing u ovom modulu sada ide kroz matbot/mathsegments.py —
 zajednički tokenizator koji ISPRAVNO razlikuje `$...$` (inline) od `$$...$$`
 (display) jednim lijevo-desno prolazom, bez regex alternacije."""
 import re
+import unicodedata
 
 from matbot.mathsegments import (
     DISPLAY,
@@ -1063,3 +1064,33 @@ def visible_text_is_empty(text: str) -> bool:
     stripped = stripped.replace("\u00a0", " ").replace("\u200b", " ")
     stripped = stripped.replace("\u2060", " ").replace("\u2063", " ")
     return not stripped.strip()
+
+
+# ---------------------------------------------------------------------------
+# BEZ SADRZAJA, IAKO NIJE PRAZNO (zivi nalaz: Quick je objavio `$:$`)
+# ---------------------------------------------------------------------------
+# `visible_text_is_empty` je zatvorio P0 „prazan odgovor sa status=ready".
+# Ostao je uzi oblik: odgovor koji NIJE prazan, ali nosi samo interpunkciju,
+# delimitere ili oblikovanje — u produkciji je to bio doslovno `$:$`.
+#
+# Mjeri se SADRZAJ, ne duzina: dovoljan je jedan alfanumericki znak, jedna
+# ne-razmacna LaTeX komanda, ili jedan matematicki simbol izvan ASCII-ja.
+# Zato prolaze `0`, `$0$`, `-1`, `12`, `1/2`, `$x=4$`, `$\pi$`, `$45^\circ$`,
+# `∅`, `Da.`, `12:3=4` — a padaju `:`, `$;$`, `$.$`, `$-$`, `$...$`.
+_MEANINGFUL_COMMAND_RE = re.compile(r"\[A-Za-z]+")
+
+
+def lacks_meaningful_content(text: str) -> bool:
+    """True kad poslije sanitizacije nema NISTA sadrzajno za ucenika."""
+    if visible_text_is_empty(text):
+        return True
+    stripped = _LATEX_SPACING_RE.sub(" ", text or "")
+    if _MEANINGFUL_COMMAND_RE.search(stripped):
+        return False
+    stripped = stripped.replace("$", " ")
+    for char in stripped:
+        if char.isalnum():
+            return False
+        if ord(char) > 127 and not unicodedata.category(char).startswith("P"):
+            return False
+    return True

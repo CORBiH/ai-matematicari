@@ -15,8 +15,9 @@ import uuid
 from matbot import config, geometry_rules, geometrycheck, imagecheck, prompts, quick_context
 from matbot.llm import LLMError, failure_diagnostics_kv
 from matbot.mathcheck import find_numeric_inconsistencies
-from matbot.mathsafe import (normalize_result_math_transport,
-                             sanitize_and_validate_math_text, visible_text_is_empty)
+from matbot.mathsafe import (lacks_meaningful_content,
+                             normalize_result_math_transport,
+                             sanitize_and_validate_math_text)
 from matbot.practice import SAFE_ERROR_MESSAGE
 from matbot.rules import OFF_TOPIC_ANSWER
 from matbot.schema import (
@@ -503,7 +504,11 @@ def run_quick_turn(llm, turn, image=None, context_store=None):
     # sanitizacije i terminologije), pa hvata i prazne delimitere i izlaz koji
     # nosi samo razmačne komande — ne samo doslovni `$$`. Bez drugog poziva
     # modela: isti kanonski sigurni odgovor kao svako drugo odbijanje.
-    if visible_text_is_empty(answer):
+    # Prošireno (živi nalaz): odgovor NE SMIJE biti ni prazan ni bezsadržajan.
+    # Produkcija je objavila doslovno `$:$` — nije prazno, pa je prošlo prvu
+    # provjeru, a učeniku ne znači ništa. Mjeri se sadržaj, ne dužina, pa
+    # kratki tačni odgovori (`0`, `$x=4$`, `$\pi$`, `12`) ostaju netaknuti.
+    if lacks_meaningful_content(answer):
         logger.warning("quick_turn request_id=%s category=empty_visible_answer", request_id)
         return {"answer": SAFE_ERROR_MESSAGE, "last_tutor_task": ""}
 
