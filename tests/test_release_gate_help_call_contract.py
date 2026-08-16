@@ -18,6 +18,7 @@ bi kapiju prestao činiti kapijom: prestala bi hvatati i višak i manjak poziva.
 import pytest
 
 from matbot import config, hint_policy, release_config
+from tests.conftest import gate_mode_coverage_fields
 from tools import check_live_release_gate as checker
 from tools import run_live_release_gate as runner
 
@@ -160,9 +161,11 @@ def test_f_plan_total_is_static_eleven_plus_derived_hint():
 
 # Kontrolni v1: stvarni zbir = planirano + eskalirano + kontrolni (fixture
 # nosi kontrolni_sdk_calls=4), pa prolazne vrijednosti uključuju taj dodatak.
+# Stvarni zbir nosi i kontrolni (4), Explain (4) i Quick (4) pozive, pa je
+# prolazan `actual` = planned + escalated + 12.
 @pytest.mark.parametrize("planned,actual,expected_error", [
-    (17, 21, None), (17, 17, "wrong_sdk_call_count"),
-    (17, 22, "wrong_sdk_call_count"), (18, 22, None),
+    (17, 29, None), (17, 17, "wrong_sdk_call_count"),
+    (17, 30, "wrong_sdk_call_count"), (18, 30, None),
 ])
 def test_f_offline_validator_requires_actual_to_equal_planned(
         planned, actual, expected_error, passing_document):
@@ -176,11 +179,11 @@ def test_f_offline_validator_requires_actual_to_equal_planned(
 
 @pytest.mark.parametrize("planned,escalated,actual,expected_error", [
     # Dokazana eskalacija se PRIZNAJE, ali samo tacno onoliko koliko je brojana
-    # (fixture nosi i kontrolni_sdk_calls=4 u stvarnom zbiru).
-    (10, 2, 16, None),
-    (10, 0, 16, "wrong_sdk_call_count"),
-    (10, 2, 17, "wrong_sdk_call_count"),
-    (10, 2, 12, "wrong_sdk_call_count"),
+    # (fixture nosi kontrolni 4 + explain 4 + quick 4 u stvarnom zbiru).
+    (10, 2, 24, None),
+    (10, 0, 24, "wrong_sdk_call_count"),
+    (10, 2, 25, "wrong_sdk_call_count"),
+    (10, 2, 20, "wrong_sdk_call_count"),
 ])
 def test_f_escalation_calls_must_be_counted_not_forgiven(
         planned, escalated, actual, expected_error, passing_document):
@@ -300,7 +303,8 @@ def passing_document():
         "scenario_count": 15, "required_scenario_count": 15,
         # Kontrolni v1: plafon = Practice (23) + kontrolni (4); stvarni zbir
         # nosi i kontrolni pozive (17 + 0 + 4).
-        "sdk_call_ceiling": 27, "planned_sdk_calls": 17, "actual_sdk_calls": 21,
+        "sdk_call_ceiling": 35, "planned_sdk_calls": 17, "actual_sdk_calls": 29,
+        **gate_mode_coverage_fields(),
         "escalated_sdk_calls": 0,
         "kontrolni_sdk_calls": 4, "kontrolni_max_calls": 4,
         "kontrolni_required_tests": 2,

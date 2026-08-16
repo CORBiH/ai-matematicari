@@ -9,6 +9,7 @@ import pytest
 
 from matbot import config, release_config
 from matbot.contracts import registry as contract_registry
+from tests.conftest import gate_mode_coverage_fields
 from tools import check_live_release_gate as checker
 from tools import run_live_release_gate as runner
 
@@ -63,7 +64,7 @@ def _passing_document():
         "required_scenario_count": 15,
         # Kontrolni v1: plafon = Practice (23) + kontrolni (4); stvarni zbir
         # nosi i kontrolni pozive (17 + 0 + 4).
-        "sdk_call_ceiling": 27,
+        "sdk_call_ceiling": 35,
         "planned_sdk_calls": 17,
         "escalated_sdk_calls": 0,
         "kontrolni_sdk_calls": 4,
@@ -75,7 +76,8 @@ def _passing_document():
             {"oblast_id": "6-04", "grade": 6, "relative": "harder", "status": "ready",
              "sdk_calls": 2, "difficulty": "harder", "errors": []},
         ],
-        "actual_sdk_calls": 21,
+        "actual_sdk_calls": 29,
+        **gate_mode_coverage_fields(),
         "call_above_ceiling_refused": True,
         "twentieth_call_refused_before_sdk": True,
         "validation_failures": [],
@@ -109,7 +111,11 @@ def test_release_gate_plan_covers_every_route_class():
     # kontrolni ishod (2 testa × 2 poziva). Practice dio plana je nepromijenjen.
     assert runner.max_planned_calls(plan) == 23
     assert runner.KONTROLNI_MAX_CALLS == 4
-    assert runner.SDK_CALL_CEILING == 23 + runner.KONTROLNI_MAX_CALLS
+    # Plafon prati SVE mjerene modove: Practice (23) + Kontrolni + Explain +
+    # Quick (tekst i slika). Explain i Quick troše tačno jedan poziv po turnu.
+    assert runner.SDK_CALL_CEILING == (23 + runner.KONTROLNI_MAX_CALLS
+                                       + runner.EXPLAIN_MAX_CALLS
+                                       + runner.QUICK_MAX_CALLS)
     assert sum(item.expected_calls or 0 for item in plan) == 11
     # Pomoc nikad ne eskalira, pa joj plafon ne priznaje dodatni poziv.
     assert runner._MAX_CALLS_PER_TURN == 2
@@ -304,7 +310,7 @@ def test_contract_lesson_keeps_a_one_call_budget_on_the_fast_route(monkeypatch):
     trosi ga na brzoj ruti, nikad na starom ugovornom pozivu."""
     from matbot import practice
     from matbot.session_store import SessionStore
-    from tests.conftest import FakeLLM
+    from tests.conftest import gate_mode_coverage_fields, FakeLLM
 
     monkeypatch.setenv("MATBOT_PRACTICE_PIPELINE", "universal_two_call")
     monkeypatch.setenv("MATBOT_PRACTICE_DIFFICULTY_LEVELS", "enabled")
@@ -483,7 +489,7 @@ def test_failed_live_gate_console_summary_is_informative_and_does_not_echo_hidde
     assert "FAILED SCENARIO: easier_level1" in report
     assert "REASON: difficulty_direction_not_measurable" in report
     assert "LEVELS: previous=2 target=1 committed=2" in report
-    assert "SDK CALLS: 9/17 (ceiling 27)" in report
+    assert f"SDK CALLS: 9/17 (ceiling {runner.SDK_CALL_CEILING})" in report
     assert "STATE PRESERVED: true" in report
     assert "SECRET" not in report
 

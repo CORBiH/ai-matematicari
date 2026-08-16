@@ -139,7 +139,40 @@ KONTROLNI_TEST_PLAN = (
     ("release-kontrolni", 6, "6-04", "harder"),
 )
 KONTROLNI_MAX_CALLS = 2 * len(KONTROLNI_TEST_PLAN)
-SDK_CALL_CEILING = 23 + KONTROLNI_MAX_CALLS
+
+# ---------------------------------------------------------------------------
+# EXPLAIN I QUICK (proširenje pokrivenosti, prije ovoga NIJEDAN nije bio mjeren)
+# ---------------------------------------------------------------------------
+# Do sada je zvanična kapija dokazivala samo Practice i Kontrolni, pa je izmjena
+# u Explainu ili Quicku mogla proći bez ijednog živog mjerenja — zabilježeno kao
+# procesni P1. Dodaju se MINIMALNI, determinističko-provjerljivi scenariji: svaki
+# tvrdi identitet modela, granicu poziva i bezbjednu objavu, a NIKAD tačan
+# tekst odgovora (proza je stohastična i ne smije obarati izdanje).
+#
+# (oznaka, razred, lekcija, poruka, ocekivan_kontekst)
+EXPLAIN_TEST_PLAN = (
+    ("explain_same_lesson", 6, "6-04-009",
+     "Objasni mi ovu temu.", "strong"),
+    ("explain_off_lesson", 6, "6-12-001",
+     "Objasni Pitagorinu teoremu.", "weak"),
+    ("explain_percent_relevance", 6, "6-12-001",
+     "Koliko je 15% od 300 KM?", "weak"),
+    ("explain_deictic_followup", 6, "6-04-009",
+     "Objasni jednostavnije.", "strong"),
+)
+EXPLAIN_MAX_CALLS = len(EXPLAIN_TEST_PLAN)
+
+# (oznaka, poruka, slika?)
+QUICK_TEST_PLAN = (
+    ("quick_bare_problem", "2x + 5 = 13", False),
+    ("quick_explanation_stays_quick", "Objasni postupak.", False),
+    ("quick_legitimate_zero", "Koliko je $0 \\cdot 15$?", False),
+    ("quick_new_image", "", True),
+)
+QUICK_MAX_CALLS = len(QUICK_TEST_PLAN)
+
+SDK_CALL_CEILING = (23 + KONTROLNI_MAX_CALLS + EXPLAIN_MAX_CALLS
+                    + QUICK_MAX_CALLS)
 # Zbir svih scenarija čiji je ugovor statički (bez `first_hint`).
 _STATIC_PLAN_CALLS = 11
 # Sentinel: očekivanje se izvodi iz serverske politike pomoći PRIJE turna.
@@ -780,6 +813,138 @@ def _run_kontrolni_stage(llm) -> tuple[list[dict], list[str], int]:
     return rows, failures, llm.call_count - stage_start
 
 
+def _gate_fixture_image():
+    """Determinističa slika zadatka, generisana iz REPOZITORIJUMSKOG koda.
+
+    Namjerno se ne komituje binarni fajl: fiksni tekst se iscrtava Pillowom
+    (već je zavisnost — `matbot/imageinput.py`), pa je scenario stabilan i
+    reproducibilan, a repozitorij ostaje bez slike."""
+    import base64
+    import io
+
+    from PIL import Image, ImageDraw, ImageFont
+
+    from matbot import imageinput
+
+    try:
+        font = ImageFont.load_default(size=64)
+    except TypeError:                       # starije Pillow izdanje
+        font = ImageFont.load_default()
+    canvas = Image.new("RGB", (760, 220), "white")
+    ImageDraw.Draw(canvas).text((40, 70), "12 x 4 = ?", fill="black", font=font)
+    buffer = io.BytesIO()
+    canvas.save(buffer, format="JPEG", quality=92)
+    payload = buffer.getvalue()
+    data_url = "data:image/jpeg;base64," + base64.b64encode(payload).decode()
+    return imageinput.ValidatedImage(data_url, "JPEG", canvas.width, canvas.height,
+                                     len(payload), len(payload))
+
+
+def _run_explain_stage(llm) -> tuple[list[dict], list[str], int]:
+    """„Objasni mi“ dokazi: identitet modela, TAČNO jedan poziv po turnu i
+    ugovor relevantnosti lekcije. Proza se NE tvrdi — samo struktura."""
+    from matbot import explain, lesson_relevance
+    from matbot.topics import lesson_info
+
+    rows: list[dict] = []
+    failures: list[str] = []
+    stage_start = llm.call_count
+    published_any = False
+    for role, grade, lesson_id, message, expected_context in EXPLAIN_TEST_PLAN:
+        calls_before = llm.call_count
+        info = lesson_info(grade, lesson_id) or {"title": "", "oblast": ""}
+        strong = lesson_relevance.lesson_context_is_strong(
+            message, info["title"], info["oblast"])
+        errors: list[str] = []
+        try:
+            response = explain.run_explain_turn(llm, {
+                "grade": grade, "selected_topic": lesson_id, "selected_oblast": "",
+                "student_message": message, "conversation_history": [],
+                "interaction_phase": "", "last_tutor_message": ""})
+        except Exception as exc:  # noqa: BLE001 — kapija prijavljuje, ne pada
+            rows.append({"role": role, "errors": [f"explain_exception:{type(exc).__name__}"]})
+            failures.append(f"explain:{role}:exception:{type(exc).__name__}")
+            break
+        calls = llm.call_count - calls_before
+        answer = response.get("answer") or ""
+        row = {"role": role, "grade": grade, "lesson_id": lesson_id,
+               "sdk_calls": calls, "status": response.get("status"),
+               "context_strong": strong, "expected_context": expected_context,
+               "effective_topic": response.get("effective_topic")}
+        if calls != 1:
+            errors.append(f"explain_call_count:{calls}")
+        actual_context = "strong" if strong else "weak"
+        if actual_context != expected_context:
+            errors.append(f"explain_relevance:{actual_context}")
+        if response.get("status") == "ready":
+            published_any = True
+            if not answer.strip():
+                errors.append("explain_empty_publication")
+            if _has_disallowed_control_character(answer):
+                errors.append("explain_control_character")
+            if response.get("session_mode") != "explain":
+                errors.append(f"explain_mode_switch:{response.get('session_mode')}")
+        row["errors"] = errors
+        rows.append(row)
+        failures.extend(f"explain:{role}:{error}" for error in errors)
+    if not published_any and not failures:
+        failures.append("explain:explain_never_published")
+    return rows, failures, llm.call_count - stage_start
+
+
+def _run_quick_stage(llm) -> tuple[list[dict], list[str], int]:
+    """„Samo rezultat“ dokazi: Luna za tekst, Sol/original za NOVU sliku,
+    tačno jedan poziv po turnu, nikad oba modela u istom turnu, i objava koja
+    ima sadržaj."""
+    from matbot import quick, quick_context
+    from matbot.mathsafe import lacks_meaningful_content
+
+    rows: list[dict] = []
+    failures: list[str] = []
+    stage_start = llm.call_count
+    context_store = quick_context.QuickContextStore()
+    published_any = False
+    for role, message, with_image in QUICK_TEST_PLAN:
+        calls_before = llm.call_count
+        stages_before = len(llm.call_log)
+        image = _gate_fixture_image() if with_image else None
+        errors: list[str] = []
+        try:
+            response = quick.run_quick_turn(llm, {
+                "session_id": "release-quick", "grade": 7, "selected_topic": "",
+                "selected_oblast": "", "student_message": message,
+                "conversation_history": [], "interaction_phase": ""},
+                image=image, context_store=context_store)
+        except Exception as exc:  # noqa: BLE001
+            rows.append({"role": role, "errors": [f"quick_exception:{type(exc).__name__}"]})
+            failures.append(f"quick:{role}:exception:{type(exc).__name__}")
+            break
+        calls = llm.call_count - calls_before
+        stages = llm.call_log[stages_before:]
+        answer = response.get("answer") or ""
+        row = {"role": role, "sdk_calls": calls, "status": response.get("status"),
+               "with_image": with_image, "stages": list(stages)}
+        if calls != 1:
+            errors.append(f"quick_call_count:{calls}")
+        # Nikad oba modela u istom turnu — slika je Sol, tekst je Luna.
+        if len({stage for stage in stages}) > 1:
+            errors.append("quick_mixed_models_in_one_turn")
+        if response.get("status") == "ready":
+            published_any = True
+            if lacks_meaningful_content(answer):
+                errors.append("quick_meaningless_publication")
+            if response.get("session_mode") != "quick":
+                errors.append(f"quick_mode_switch:{response.get('session_mode')}")
+            if _has_disallowed_control_character(answer):
+                errors.append("quick_control_character")
+        row["errors"] = errors
+        rows.append(row)
+        failures.extend(f"quick:{role}:{error}" for error in errors)
+    if not published_any and not failures:
+        failures.append("quick:quick_never_published")
+    return rows, failures, llm.call_count - stage_start
+
+
 def run_live_release_gate() -> int:
     commit_sha, tree_hash = _require_live_preconditions()
     plan = build_release_gate_plan(commit_sha)
@@ -789,10 +954,12 @@ def run_live_release_gate() -> int:
     if len(plan) != REQUIRED_SCENARIO_COUNT:
         raise GateRefusal("The committed release-gate plan is not the required "
                           f"{REQUIRED_SCENARIO_COUNT}-scenario plan.")
-    if max_planned_calls(plan) + KONTROLNI_MAX_CALLS != SDK_CALL_CEILING:
+    if (max_planned_calls(plan) + KONTROLNI_MAX_CALLS + EXPLAIN_MAX_CALLS
+            + QUICK_MAX_CALLS != SDK_CALL_CEILING):
         raise GateRefusal(
             f"The committed plan's maximum is {max_planned_calls(plan)} SDK calls "
-            f"+ {KONTROLNI_MAX_CALLS} kontrolni, but the ceiling is {SDK_CALL_CEILING}.")
+            f"+ {KONTROLNI_MAX_CALLS} kontrolni + {EXPLAIN_MAX_CALLS} explain "
+            f"+ {QUICK_MAX_CALLS} quick, but the ceiling is {SDK_CALL_CEILING}.")
 
     started = datetime.now(timezone.utc)
     store = SessionStore()
@@ -844,9 +1011,19 @@ def run_live_release_gate() -> int:
                 break
         kontrolni_rows: list[dict] = []
         kontrolni_calls = 0
+        explain_rows: list[dict] = []
+        explain_calls = 0
+        quick_rows: list[dict] = []
+        quick_calls = 0
         if not failures:
             kontrolni_rows, kontrolni_failures, kontrolni_calls = _run_kontrolni_stage(llm)
             failures.extend(kontrolni_failures)
+        if not failures:
+            explain_rows, explain_failures, explain_calls = _run_explain_stage(llm)
+            failures.extend(explain_failures)
+        if not failures:
+            quick_rows, quick_failures, quick_calls = _run_quick_stage(llm)
+            failures.extend(quick_failures)
         actual_calls = llm.call_count
         cap_probe_refused = False
         if not failures:
@@ -869,14 +1046,19 @@ def run_live_release_gate() -> int:
     finished = datetime.now(timezone.utc)
     all_required_completed = (len(scenario_rows) == REQUIRED_SCENARIO_COUNT
                               and len(kontrolni_rows) == len(KONTROLNI_TEST_PLAN)
+                              and len(explain_rows) == len(EXPLAIN_TEST_PLAN)
+                              and len(quick_rows) == len(QUICK_TEST_PLAN)
                               and not failures)
     # TACAN UGOVOR je planirani zbir, a plafon je samo gornja granica.
     # Kontrolni stage je USLOVAN po pozivima (1 ili 2 po testu), pa se broji
     # izmjereno, uz vlastitu tvrdu granicu.
+    extra_calls = kontrolni_calls + explain_calls + quick_calls
     passed = bool(all_required_completed
-                  and actual_calls == planned_calls + escalated_calls + kontrolni_calls
+                  and actual_calls == planned_calls + escalated_calls + extra_calls
                   and kontrolni_calls <= KONTROLNI_MAX_CALLS
-                  and planned_calls + escalated_calls + kontrolni_calls <= SDK_CALL_CEILING
+                  and explain_calls == EXPLAIN_MAX_CALLS
+                  and quick_calls == QUICK_MAX_CALLS
+                  and planned_calls + escalated_calls + extra_calls <= SDK_CALL_CEILING
                   and cap_probe_refused and not infrastructure_failures)
     document = {
         "campaign": "release-gate",
@@ -907,6 +1089,16 @@ def run_live_release_gate() -> int:
         "kontrolni_tests": kontrolni_rows,
         "kontrolni_required_tests": len(KONTROLNI_TEST_PLAN),
         "kontrolni_sdk_calls": kontrolni_calls,
+        # Proširenje pokrivenosti: Explain i Quick (tekst + slika) su do sada
+        # bili potpuno nemjereni u zvaničnoj kapiji.
+        "explain_turns": explain_rows,
+        "explain_required_turns": len(EXPLAIN_TEST_PLAN),
+        "explain_sdk_calls": explain_calls,
+        "quick_turns": quick_rows,
+        "quick_required_turns": len(QUICK_TEST_PLAN),
+        "quick_sdk_calls": quick_calls,
+        "covered_modes": ["practice", "kontrolni", "explain", "quick_text",
+                          "quick_image"],
         "kontrolni_max_calls": KONTROLNI_MAX_CALLS,
         "actual_sdk_calls": actual_calls,
         "call_above_ceiling_refused": cap_probe_refused,
@@ -935,7 +1127,8 @@ def _run_static_checks() -> None:
     """Inert plan/budget checks.  No SDK client is created or invoked."""
     plan = build_release_gate_plan("0123456789abcdef" * 4)
     assert len(plan) == REQUIRED_SCENARIO_COUNT
-    assert max_planned_calls(plan) + KONTROLNI_MAX_CALLS == SDK_CALL_CEILING
+    assert (max_planned_calls(plan) + KONTROLNI_MAX_CALLS + EXPLAIN_MAX_CALLS
+            + QUICK_MAX_CALLS == SDK_CALL_CEILING)
     assert sum(item.expected_calls or 0 for item in plan) == _STATIC_PLAN_CALLS
     assert [item.role for item in plan] == [
         "fresh_level1", "correct_choice", "harder_level2", "first_hint", "full_solution",

@@ -36,7 +36,20 @@ PRACTICE_CALL_CEILING = 23
 # se cita iz artefakta (`kontrolni_sdk_calls`), plafon je zbir oba dijela.
 KONTROLNI_REQUIRED_TESTS = 2
 KONTROLNI_MAX_CALLS = 2 * KONTROLNI_REQUIRED_TESTS
-REQUIRED_CALL_CEILING = PRACTICE_CALL_CEILING + KONTROLNI_MAX_CALLS
+# PROSIRENJE POKRIVENOSTI: „Objasni mi" i „Samo rezultat" (tekst + slika) su do
+# sada bili potpuno nemjereni, pa je izmjena u njima mogla proci kapiju bez
+# ijednog zivog dokaza (zabiljezeno kao procesni P1). Oba moda troše TACNO
+# jedan poziv po turnu, pa im je zbir fiksan i provjerava se strogom
+# jednakoscu — artefakt bez tih polja NE PROLAZI, jer je mjerio arhitekturu
+# bez tih modova.
+EXPLAIN_REQUIRED_TURNS = 4
+EXPLAIN_MAX_CALLS = EXPLAIN_REQUIRED_TURNS
+QUICK_REQUIRED_TURNS = 4
+QUICK_MAX_CALLS = QUICK_REQUIRED_TURNS
+REQUIRED_CALL_CEILING = (PRACTICE_CALL_CEILING + KONTROLNI_MAX_CALLS
+                         + EXPLAIN_MAX_CALLS + QUICK_MAX_CALLS)
+REQUIRED_COVERED_MODES = ["practice", "kontrolni", "explain", "quick_text",
+                          "quick_image"]
 MAX_AGE = timedelta(hours=24)
 # NIJEDAN LITERAL SE NE PONAVLJA. Ruta i rok su ranije stajali ovdje kao
 # vlastita kopija; kopija je upravo ono što je pustilo kampanju s rokom od
@@ -138,6 +151,34 @@ def validate_result(document: dict, *, expected_commit: str | None = None,
         else:
             if published_rows == 0:
                 errors.append("kontrolni_never_published")
+
+    # --- PROSIRENA POKRIVENOST: Explain i Quick -----------------------------
+    if document.get("covered_modes") != REQUIRED_COVERED_MODES:
+        errors.append("missing_mode_coverage")
+    explain_calls = document.get("explain_sdk_calls")
+    if explain_calls != EXPLAIN_MAX_CALLS:
+        errors.append("invalid_explain_sdk_calls")
+        explain_calls = None
+    if document.get("explain_required_turns") != EXPLAIN_REQUIRED_TURNS:
+        errors.append("missing_explain_required_turns")
+    quick_calls = document.get("quick_sdk_calls")
+    if quick_calls != QUICK_MAX_CALLS:
+        errors.append("invalid_quick_sdk_calls")
+        quick_calls = None
+    if document.get("quick_required_turns") != QUICK_REQUIRED_TURNS:
+        errors.append("missing_quick_required_turns")
+    for field, required, label in (("explain_turns", EXPLAIN_REQUIRED_TURNS, "explain"),
+                                   ("quick_turns", QUICK_REQUIRED_TURNS, "quick")):
+        rows = document.get(field)
+        if not isinstance(rows, list) or len(rows) != required:
+            errors.append(f"required_{label}_turns_missing")
+            continue
+        for row in rows:
+            if (not isinstance(row, dict) or row.get("errors")
+                    or row.get("sdk_calls") != 1):
+                errors.append(f"{label}_turn_not_clean")
+                break
+
     if not isinstance(planned, int) or isinstance(planned, bool) or planned <= 0:
         # Zatečeni (stari) artefakt nema ovo polje — i ne smije proći.
         errors.append("missing_planned_sdk_calls")
@@ -152,7 +193,10 @@ def validate_result(document: dict, *, expected_commit: str | None = None,
             errors.append("missing_escalated_sdk_calls")
         elif not isinstance(escalated, int) or escalated < 0:
             errors.append("invalid_escalated_sdk_calls")
-        elif kontrolni_calls is not None and actual != planned + escalated + kontrolni_calls:
+        elif (kontrolni_calls is not None and explain_calls is not None
+              and quick_calls is not None
+              and actual != planned + escalated + kontrolni_calls
+              + explain_calls + quick_calls):
             errors.append("wrong_sdk_call_count")
         elif planned + escalated > PRACTICE_CALL_CEILING:
             errors.append("planned_sdk_calls_above_ceiling")

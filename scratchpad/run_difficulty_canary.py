@@ -440,6 +440,21 @@ class CountingLLM:
         return self._call("kontrolni", self._inner.kontrolni_turn,
                           instructions, input_text, timeout_s=timeout_s)
 
+    def explain_turn(self, instructions, input_text):
+        # „Objasni mi“ (proširenje pokrivenosti kapije): isti brojač, isti
+        # plafon. Bez ovog omotača Explain scenario bi pukao na AttributeError
+        # ili — gore — prošao pored jedinih vrata do plafona.
+        self._count("explain_turn")
+        return self._call("explain", self._inner.explain_turn,
+                          instructions, input_text)
+
+    def quick_turn(self, instructions, input_text, image=None):
+        # „Samo rezultat“: NOVA slika ide na Sol, tekst na Lunu. Ime faze ih
+        # razdvaja da kapija može dokazati da u JEDNOM turnu nikad ne rade oba.
+        self._count("quick_image_turn" if image is not None else "quick_turn")
+        return self._call("quick", self._inner.quick_turn, instructions,
+                          input_text, image=image)
+
     def _call(self, stage, method, instructions, input_text, **kwargs):
         try:
             return method(instructions, input_text, **kwargs)

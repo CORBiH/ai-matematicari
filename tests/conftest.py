@@ -654,3 +654,37 @@ __all__ = [
     "make_explain_output", "make_quick_output", "LLMTimeout", "LLMUnavailable",
     "DEFAULT_TASK_TEXT", "DEFAULT_TASK_OPTIONS",
 ]
+
+
+# ---------------------------------------------------------------------------
+# ZAJEDNICKI DIO ARTEFAKTA KAPIJE: prosirena pokrivenost modova
+# ---------------------------------------------------------------------------
+# Explain i Quick (tekst + slika) su dodati u zvanicnu kapiju; oba trose TACNO
+# jedan poziv po turnu, pa je njihov zbir fiksan. Vise test fajlova gradi
+# "prolazni artefakt", pa vrijednosti zive na JEDNOM mjestu — inace se razidju
+# cim se plan promijeni.
+GATE_EXPLAIN_TURNS = 4
+GATE_QUICK_TURNS = 4
+GATE_EXTRA_CALLS = GATE_EXPLAIN_TURNS + GATE_QUICK_TURNS
+
+
+def gate_mode_coverage_fields():
+    """Polja koja verifier trazi za Explain/Quick pokrivenost."""
+    return {
+        "covered_modes": ["practice", "kontrolni", "explain", "quick_text",
+                          "quick_image"],
+        "explain_sdk_calls": GATE_EXPLAIN_TURNS,
+        "explain_required_turns": GATE_EXPLAIN_TURNS,
+        "explain_turns": [
+            {"role": role, "sdk_calls": 1, "status": "ready", "errors": []}
+            for role in ("explain_same_lesson", "explain_off_lesson",
+                         "explain_percent_relevance", "explain_deictic_followup")
+        ],
+        "quick_sdk_calls": GATE_QUICK_TURNS,
+        "quick_required_turns": GATE_QUICK_TURNS,
+        "quick_turns": [
+            {"role": role, "sdk_calls": 1, "status": "ready", "errors": []}
+            for role in ("quick_bare_problem", "quick_explanation_stays_quick",
+                         "quick_legitimate_zero", "quick_new_image")
+        ],
+    }
