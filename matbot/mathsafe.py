@@ -718,6 +718,150 @@ def _looks_like_pure_math_expression(text: str) -> bool:
     return not re.search(r"[A-Za-z]", residue)
 
 
+# ---------------------------------------------------------------------------
+# INTEGRITET STRUKTURNE MATEMATIKE (živi nalazi N-1 i N-3, 2026-08-16)
+# ---------------------------------------------------------------------------
+# Dvije objavljene greške ISTE KLASE: LaTeX je bio sintaksno ispravan, svaka
+# komanda je bila na dozvoljenoj listi, i zato je sve prošlo — a ono što je
+# učenik vidio nije bila matematika.
+#
+#   N-1  `$\sqrt{ posibilidades }\,\text{cm}$`   (kontrolni 8-04, distraktor)
+#   N-3  `$AB\beta CD$`                           (kontrolni 7-05, u zadatku)
+#
+# Allowlist odgovara na pitanje „SMIJE LI ova komanda postojati“, ali nikad na
+# „IMA LI SMISLA OVDJE“. Obje provjere ispod su POZITIVNO definisane (šta je
+# dozvoljeno na tom mjestu), ne crne liste riječi ili slova — konkretne riječi
+# („posibilidades“) i konkretno slovo (`\beta`) nisu nigdje pomenuti.
+#
+# Provjere su NAMJERNO u dijeljenom sloju: isto oštećenje objavljuje se i kroz
+# Quick i kroz Explain (dokazano izvršavanjem), jer svi modovi sude o objavi
+# ovom istom funkcijom. Kontrolni je dodiruje kroz `_safe_field`.
+
+# Komande čiji argument MORA biti matematički izraz. `\text`, `\mathbb`,
+# `\operatorname`, `\begin`/`\end` NISU ovdje — njihov argument je proza ili
+# ime, pa je `\text{cm}` i dalje potpuno uredan.
+_MATH_ARGUMENT_COMMANDS = frozenset({
+    "sqrt", "frac", "dfrac", "tfrac", "overline", "underline",
+    "vec", "hat", "bar", "tilde", "widehat", "widetilde",
+})
+# Imena funkcija smiju stajati u izrazu kao višeslovni niz.
+_EXPRESSION_FUNCTION_WORDS = frozenset({
+    "sin", "cos", "tg", "ctg", "tan", "cot", "sec", "csc",
+    "arcsin", "arccos", "arctg", "arctan", "log", "ln", "lg", "exp",
+    "lim", "max", "min", "det", "mod", "nzd", "nzs", "abs",
+})
+# Prag je 4: `ab`, `xy` i `abc` su legitimni proizvodi promjenljivih, dok su
+# sve stvarno viđene proze („tekst“, „broj“, „odgovor“, „posibilidades“) duže.
+_MIN_PROSE_RUN = 4
+_LETTER_RUN_RE = re.compile(r"[^\W\d_]{2,}")
+_PROSE_ARGUMENT_GROUP_RE = re.compile(
+    r"\\(?:text|mathrm|mathbb|mathcal|operatorname)\s*\{[^{}]*\}")
+_COMMAND_TOKEN_RE = re.compile(r"\\[A-Za-z]+")
+# INDEKS JE OZNAKA, NE IZRAZ. `V_{valjka}`, `V_{kupe}`, `S_{osnove}`, `x_{max}`
+# su uredna školska notacija — deterministički generator zapremina ih stvarno
+# piše (matbot/deterministic/geometry.py). Sadržaj indeksa se zato izuzima iz
+# provjere proze, isto kao sadržaj `\text{…}`.
+_SCRIPT_GROUP_RE = re.compile(r"[_^]\s*\{[^{}]*\}")
+
+# Ono što SMIJE stajati između dva geometrijska objekta: relacije i binarni
+# operatori. Goli simbol (grčko slovo, `\infty`, …) tu nije relacija.
+_RELATIONAL_COMMANDS = frozenset({
+    "parallel", "perp", "cong", "sim", "simeq", "equiv", "approx", "propto",
+    "ne", "neq", "le", "leq", "ge", "geq", "ll", "gg", "doteq",
+    "in", "notin", "ni", "subset", "subseteq", "supset", "supseteq",
+    "subsetneq", "supsetneq", "mid", "nmid",
+    "cdot", "times", "div", "pm", "mp", "cap", "cup", "setminus",
+    "oplus", "otimes", "circ", "ast", "star",
+    "to", "mapsto", "rightarrow", "leftarrow", "Rightarrow", "Leftarrow",
+    "leftrightarrow", "Leftrightarrow", "implies", "iff", "longrightarrow",
+})
+# `AB\beta CD` — dva višeslovna VELIKA imena (oznake duži/tačaka) razdvojena
+# komandom. Zatvorena/otvorena vitičasta zagrada je dopuštena da bi se uhvatio
+# i `\overline{AB}\beta\overline{CD}`.
+_OBJECT_RELATION_RE = re.compile(
+    r"(?<![A-Za-z])([A-Z]{2,})\}?\s*\\([A-Za-z]+)\s*"
+    r"(?:\\[A-Za-z]+\s*)?\{?([A-Z]{2,})(?![A-Za-z])")
+
+
+def _balanced_group(text: str, start: int):
+    """(sadržaj, indeks_poslije) za `{…}` koji počinje na `start`."""
+    if start >= len(text) or text[start] != "{":
+        return None, start
+    depth = 0
+    for index in range(start, len(text)):
+        if text[index] == "{":
+            depth += 1
+        elif text[index] == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start + 1:index], index + 1
+    return None, start
+
+
+def structured_command_arguments(segment: str) -> list:
+    """[(komanda, argument), …] za komande čiji argument mora biti izraz."""
+    found = []
+    for match in _COMMAND_TOKEN_RE.finditer(segment):
+        name = match.group(0)[1:]
+        if name not in _MATH_ARGUMENT_COMMANDS:
+            continue
+        position = match.end()
+        # `\sqrt[3]{…}` — opcioni stepen korijena se preskače.
+        if position < len(segment) and segment[position] == "[":
+            close = segment.find("]", position)
+            if close != -1:
+                position = close + 1
+        while position < len(segment) and segment[position].isspace():
+            position += 1
+        argument, position = _balanced_group(segment, position)
+        if argument is None:
+            continue
+        found.append((name, argument))
+        if name in ("frac", "dfrac", "tfrac"):
+            while position < len(segment) and segment[position].isspace():
+                position += 1
+            second, _end = _balanced_group(segment, position)
+            if second is not None:
+                found.append((name, second))
+    return found
+
+
+def prose_words_in_expression(argument: str) -> list:
+    """Riječi koje u IZRAZU nemaju šta tražiti.
+
+    Ne dira: cifre, operatore, jednoslovne i dvoslovne promjenljive, imena
+    funkcija, oznake tačaka velikim slovima (`AB`, `ABC`) i sadržaj `\\text{…}`."""
+    stripped = _PROSE_ARGUMENT_GROUP_RE.sub(" ", argument)
+    while True:                            # ugniježđeni indeksi: `x_{a_{1}}`
+        reduced = _SCRIPT_GROUP_RE.sub(" ", stripped)
+        if reduced == stripped:
+            break
+        stripped = reduced
+    stripped = _COMMAND_TOKEN_RE.sub(" ", stripped)
+    words = []
+    for run in _LETTER_RUN_RE.findall(stripped):
+        if run.isupper():
+            continue                       # AB, CD, ABC — oznake tačaka
+        if run.lower() in _EXPRESSION_FUNCTION_WORDS:
+            continue
+        if len(run) >= _MIN_PROSE_RUN:
+            words.append(run)
+    return words
+
+
+def find_structured_math_issues(segment: str) -> list:
+    """Semantički integritet JEDNOG matematičkog segmenta (bez delimitera)."""
+    issues = []
+    for name, argument in structured_command_arguments(segment):
+        for word in prose_words_in_expression(argument):
+            issues.append("prose_in_math_argument:" + (name + ":" + word)[:32])
+    for match in _OBJECT_RELATION_RE.finditer(segment):
+        command = match.group(2)
+        if command not in _RELATIONAL_COMMANDS:
+            issues.append("nonrelational_command_between_objects:" + command[:24])
+    return issues
+
+
 def find_unsafe_math_issues(text: str) -> list:
     """Vraća listu razloga zašto TEKST (već propušten kroz sanitize_math_text
     + gornje repair korake) NIJE bezbjedan za prikaz učeniku. Prazna lista =
@@ -780,6 +924,8 @@ def find_unsafe_math_issues(text: str) -> list:
         # UVIJEK sumnjiv — ne pogađamo namjeru, odbijamo cio odgovor.
         if "$" in part:
             issues.append("nested_dollar_in_math_segment")
+        # N-1/N-3: komanda smije postojati, ali mora imati smisla NA TOM MJESTU.
+        issues.extend(find_structured_math_issues(part))
     return issues
 
 
