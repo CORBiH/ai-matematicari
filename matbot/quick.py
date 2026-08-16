@@ -334,12 +334,18 @@ def run_quick_turn(llm, turn, image=None, context_store=None):
         stored_context, status = quick_context.select_task(stored_context, task_label)
         if status == "unreadable":
             # Pošteno: taj zadatak NIJE pouzdano pročitan — ne pogađa se.
+            #
+            # OBLIK ODGOVORA (usklađeno 2026-08-16): kao SVAKA druga slikovna
+            # kapija u ovom fajlu (`_image_gate_message` niže, blokada
+            # `image_math_source_missing`) — bez polja `status`. To nije
+            # kozmetika: `status` je jedino strukturno polje po kojem frontend
+            # zna da je odgovor STVARNO objavljen, pa je ova jedina kapija s
+            # „ready“ nudila prečicu „Objasni postupak“ nad zadatkom koji
+            # nije ni pročitan. Poruka i zapis konteksta ostaju isti.
             logger.info("quick_turn request_id=%s task_select=unreadable", request_id)
             if context_store:
                 context_store.save(stored_context)
-            return {"status": "ready", "answer": IMAGE_UNREADABLE_MESSAGE,
-                    "answer_verdict": None, "last_tutor_task": "", "next_state": {},
-                    "session_mode": "quick", "effective_topic": lesson_id or ""}
+            return {"answer": IMAGE_UNREADABLE_MESSAGE, "last_tutor_task": ""}
         if status == "selected" and context_store:
             context_store.save(stored_context)
 

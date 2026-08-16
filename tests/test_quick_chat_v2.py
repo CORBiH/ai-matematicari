@@ -294,12 +294,63 @@ def test_history_keeps_exactly_six_messages():
 # ---------------------------------------------------------------------------
 
 def test_quick_chips_do_not_switch_mode():
+    """Poslije čišćenja akcija (2026-08-16) Quick ima TAČNO jednu prečicu.
+
+    „Provjeri odgovor“ je uklonjena (učenik po pravilu nije ništa ponudio — to
+    se traži porukom), a „Sličan zadatak“ je bila živi P0: slala je
+    mode=practice sa selected_topic='' jer Quick nema lekciju → 400
+    MISSING_TOPIC, a mod je do tada VEĆ bio promijenjen.
+    """
     zone = INDEX[INDEX.index("return [   /* quick */"):]
     block = zone[:zone.index("]")]
-    assert "Objasni postupak" in block and "Provjeri odgovor" in block
-    for line in block.splitlines():
-        if "Objasni postupak" in line or "Provjeri odgovor" in line:
-            assert "mode:" not in line, line
+    assert "Objasni postupak" in block
+    assert "Provjeri odgovor" not in block
+    assert "Sličan zadatak" not in block
+    assert "mode:" not in block, block
+
+
+def test_no_quick_action_can_enter_practice_without_a_lesson():
+    """P0 regresija na nivou izvora; ponašanje dokazuje DOM svita.
+
+    Cijeli frontend smije imati SAMO jednu prečicu koja mijenja mod, i to onu
+    iz „Objasni mi“ (gdje lekcija postoji), a i nju čuva brana u renderChips.
+    """
+    zone = INDEX[INDEX.index("function chipDefs"):INDEX.index("function renderChips")]
+    assert zone.count("mode: 'practice'") == 1
+    assert "Pređi na vježbu" in zone
+    render = INDEX[INDEX.index("function renderChips"):]
+    render = render[:render.index("function showFallback")]
+    assert "if (c.mode === 'practice' && !practiceHandoffTopic()) return;" in render
+
+
+def test_image_gates_are_not_publishable_answers():
+    """Nijedna slikovna kapija ne smije nositi `status` — to je JEDINO
+
+    strukturno polje po kojem frontend zna da je odgovor stvarno objavljen, pa
+    prečica „Objasni postupak“ ne smije stajati ispod poruke „ne mogu
+    pročitati“ ili „na slici vidim više zadataka“.
+    """
+    for readability in ("multiple_tasks", "non_math", "unreadable"):
+        fake = FakeLLM()
+        fake.queue(make_quick_image_output(reply="…", readability=readability))
+        response = run_turn(fake, "", image=_Image())
+        assert "status" not in response, readability
+
+    # Izbor zadatka koji model NIJE pouzdano pročitao — ista klasa odgovora.
+    store = quick_context.QuickContextStore()
+    fake = FakeLLM()
+    fake.queue(make_quick_image_output(
+        reply="Više zadataka.", readability="multiple_tasks",
+        detected_tasks=[make_detected_task("2", "…nejasno…", fully_readable=False)]))
+    run_turn(fake, "", store=store, image=_Image())
+    response = run_turn(fake, "Drugi.", store=store)
+    assert response["answer"] == quick.IMAGE_UNREADABLE_MESSAGE
+    assert "status" not in response
+
+    # Kontrola: STVARNO riješen zadatak i dalje nosi status ready.
+    fake = FakeLLM()
+    fake.queue(make_quick_output(reply="$x=4$"))
+    assert run_turn(fake, "2x + 5 = 13")["status"] == "ready"
 
 
 def test_typed_task_with_math_does_not_switch_out_of_quick():

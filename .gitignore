@@ -39,3 +39,6 @@ scratchpad/practice_legacy_audit/
 # su MJERENJA i dokazni materijal, ne izvorni kod.
 scratchpad/vision_ab_test/
 scratchpad/quick_live_40/
+# Audit predlozenih akcija (2026-08-16) je MJERENJE stanja UI-ja, ne izvorni
+# kod — isti razlog kao kampanje iznad: zvanicna kapija odbija prljavo stablo.
+scratchpad/suggested_actions_audit.md

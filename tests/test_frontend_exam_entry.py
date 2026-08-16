@@ -70,9 +70,20 @@ def test_old_exam_chat_buttons_are_gone():
     assert "Daj još zadataka" not in INDEX
     assert "Objasni prvi zadatak" not in INDEX
     assert "exam_state" not in INDEX
-    # Chip definicije ne smiju imati exam granu — kontrolni nikad nije u chatu.
+
+
+def test_chip_defs_exam_branch_returns_nothing():
+    """Kontrolni nikad nije u chatu — i to sada stoji IZRIČITO.
+
+    Ranije je ovaj test tražio da `chipDefs` uopšte NEMA exam granu. Audit
+    2026-08-16 je pokazao da je odsustvo grane bilo slabija garancija nego što
+    je izgledalo: `session_mode:'exam'` je propadao kroz sve provjere i
+    završavao na Quick prečicama (nedostižno iz UI-ja, ali nesprijeceno).
+    Sada se traži suprotno — grana postoji i vraća PRAZAN skup.
+    Stvarno ponašanje dokazuje tests/frontend/suggested_actions.test.js.
+    """
     chip_zone = INDEX[INDEX.index("function chipDefs"):INDEX.index("function renderChips")]
-    assert "mode === 'exam'" not in chip_zone
+    assert "if (mode === 'exam') return [];" in chip_zone
 
 
 def test_practice_explain_quick_entry_flows_unchanged():
@@ -95,8 +106,12 @@ def test_practice_explain_quick_entry_flows_unchanged():
 # ---------------------------------------------------------------------------
 
 def _exam_css():
+    # Kraj bloka je prvo pravilo POSLIJE kontrolnog. Ranije je to bio komentar
+    # „Phase 2: mala preporuka video lekcije“, koji je uklonjen zajedno s
+    # mrtvim `maybeVideoHint` (audit 2026-08-16); `.bot-feedback{` je stabilnija
+    # granica jer je stvarno pravilo, ne komentar.
     start = INDEX.index(".exam-card{")
-    end = INDEX.index("/* Phase 2: mala preporuka")
+    end = INDEX.index(".bot-feedback{")
     return re.sub(r"/\*[\s\S]*?\*/", "", INDEX[start:end])
 
 

@@ -35,7 +35,11 @@ def test_shared_mode_guard_function_exists():
 def test_case24_chip_mode_switch_clears_awaiting_practice_task():
     html = _read()
     switch_start = html.index("if (c.mode && c.mode !== state.mode){")
-    switch_region = html[switch_start: switch_start + 500]
+    # Region je ISJEČEN DO KRAJA BLOKA, ne na fiksnih 500 znakova: prozor po
+    # broju znakova je pukao čim je u blok ušla konstrukcijska brana protiv
+    # prelaska u Vježbu bez lekcije (audit 2026-08-16), iako se sam kod nije
+    # promijenio. Granica je `hideChips();`, prvi red POSLIJE bloka.
+    switch_region = html[switch_start: html.index("hideChips();", switch_start)]
     assert "clearAwaitingPracticeTask();" in switch_region
     # NE smije se vratiti na samo in-memory nuliranje (stari bag: interactionPhase
     # se nulirao, ali LASTTASK_KEY u localStorage je ostajao netaknut).

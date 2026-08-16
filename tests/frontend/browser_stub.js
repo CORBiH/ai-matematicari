@@ -237,11 +237,16 @@ function loadPage(options = {}) {
     // „Sutra imam kontrolni“: stanje ekrana, tok testa i predaja.
     'enterExam', 'exitExamToHome', 'startExam', 'submitExam', 'renderExamQuestion',
     'setExamState', 'examState', 'exam', 'examCard', 'examEls',
+    // Predložene akcije (chipovi): generator, render i kanonska lekcija za
+    // prelazak u Vježbu. `topicNames` je isti objekat koji stranica puni iz
+    // /topics, pa ga test popunjava umjesto mreže.
+    'chipDefs', 'renderChips', 'chipsBox', 'practiceHandoffTopic', 'topicNames',
   ];
   const probe = `\n;globalThis.__ui = {${exported.join(', ')},`
     + ' setChipMeta: (m) => { pendingChipMeta = m; },'
     + ' setInteractionPhase: (p) => { interactionPhase = p; },'
     + ' setSessionId: (v) => { sessionId = v; },'
+    + ' setLastTurnWasGraded: (v) => { lastTurnWasGraded = !!v; },'
     + ' flags: () => ({ tutorBusy, choiceBusy, interactionPhase }),'
     + ' hasActiveTurn: () => activeTurn !== null,'
     + ' };\n';

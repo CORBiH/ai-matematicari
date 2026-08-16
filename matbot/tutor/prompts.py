@@ -192,7 +192,7 @@ def _state_block(session, student_message, trusted_verdict=None, ui_action=""):
     """Trenutno stanje vježbe — serverska istina, ne modelovo sjećanje.
 
     `ui_action` je namjera koju je učenik izričito tražio DUGMETOM nad aktivnim
-    zadatkom („Ne znam — daj mi hint“, „Uradi ga ti“). Prazno je za kucanu
+    zadatkom („Daj mi hint“, „Uradi ga ti“). Prazno je za kucanu
     poruku i tada se ulaz ne mijenja ni za jedan znak. Ovo je samo saopštenje
     modelu — zabranu objave novog zadatka server ionako sprovodi deterministički
     (matbot/tutor/pipeline.py), pa ne ovisi o tome hoće li je model poslušati."""
