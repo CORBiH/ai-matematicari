@@ -120,13 +120,24 @@ def validate_result(document: dict, *, expected_commit: str | None = None,
             or len(kontrolni_tests) != KONTROLNI_REQUIRED_TESTS):
         errors.append("required_kontrolni_tests_missing")
     else:
+        published_rows = 0
         for row in kontrolni_tests:
-            if (not isinstance(row, dict) or row.get("status") != "ready"
-                    or row.get("errors")
+            if (not isinstance(row, dict) or row.get("errors")
                     or not isinstance(row.get("sdk_calls"), int)
                     or not 1 <= row["sdk_calls"] <= 2):
                 errors.append("kontrolni_test_not_clean")
                 break
+            # PAD ZATVORENO NIJE KVAR BEZBJEDNOSTI (ispravan ishod kad paket ne
+            # zadovolji validatore), ali bar jedan test mora biti STVARNO
+            # objavljen — inače bi kapija prošla i za mod koji ništa ne objavi.
+            if row.get("status") == "ready":
+                published_rows += 1
+            elif row.get("status") != "failed":
+                errors.append("kontrolni_test_not_clean")
+                break
+        else:
+            if published_rows == 0:
+                errors.append("kontrolni_never_published")
     if not isinstance(planned, int) or isinstance(planned, bool) or planned <= 0:
         # Zatečeni (stari) artefakt nema ovo polje — i ne smije proći.
         errors.append("missing_planned_sdk_calls")
