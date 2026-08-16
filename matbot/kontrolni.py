@@ -44,7 +44,8 @@ import threading
 import time
 
 from matbot import (config, exactly_one, geometrycheck, linear_system_mcq,
-                    mcq_integrity, option_equivalence, stem_disclosure)
+                    mcq_integrity, option_equivalence, square_pyramid_mcq,
+                    stem_disclosure)
 from matbot.llm import LLMError, failure_diagnostics_kv
 from matbot.mathcheck import find_numeric_inconsistencies
 from matbot.mathsegments import TEXT, tokenize_math
@@ -684,6 +685,19 @@ def validate_generated_question(parsed, slot, context, prior_signatures):
         text, option_texts, correct_index, solution)
     if system_failure:
         return None, f"linear_system_{system_failure}"
+
+    # PRAVILNA ČETVOROSTRANA PIRAMIDA (živi nalaz N-4, post-deploy 70bb514):
+    # objavljeno je „$a=10$, apotema $h_a=13$, kolika je bočna ivica $s$?“ s
+    # označenim $\sqrt{219}$, a tačno je $\sqrt{194}$ — i ta opcija je bila
+    # ponuđena. $\sqrt{219}$ nastaje SAMO ako se apotema upotrijebi kao visina
+    # piramide. To je zamjena ULOGA veličina, pa je modelov račun ostao
+    # aritmetički tačan i nijedan postojeći validator nije imao za šta da se
+    # uhvati. Server sada sam izračuna traženu dužinu egzaktno — vidi
+    # matbot/square_pyramid_mcq.py.
+    pyramid_failure = square_pyramid_mcq.publication_failure(
+        text, option_texts, correct_index)
+    if pyramid_failure:
+        return None, f"square_pyramid_{pyramid_failure}"
 
     # ŽIVA KAMPANJA v1: uski dokazi povrh orakla (vidi blokove komentara gore).
     divisibility_failure = _divisibility_claim_failure(text, option_texts,
