@@ -1413,11 +1413,17 @@ def _k_polyhedron_elements(rng, level):
     if prism:
         counts = {"tjemena": 2 * n, "ivica": 3 * n, "strana": n + 2}
         body = f"{n}-tostrana prizma"
-        formula = "prizma: 2n tjemena, 3n ivica, n+2 strane"
+        # `formula` se UVIJEK umeće u $…$ (vidi sastavljanje rješenja iznad),
+        # pa riječi moraju biti u `\text{…}`. Bez toga MathJax ih iscrtava kao
+        # niz kurzivnih promjenljivih („prizma“ → p·r·i·z·m·a) — ista klasa
+        # kao živi nalaz N-5 („$ treinta\,\text{cm}$“).
+        formula = ("\\text{prizma}: 2n \\text{ tjemena}, 3n \\text{ ivica}, "
+                   "n+2 \\text{ strane}")
     else:
         counts = {"tjemena": n + 1, "ivica": 2 * n, "strana": n + 1}
         body = f"{n}-tostrana piramida"
-        formula = "piramida: n+1 tjemena, 2n ivica, n+1 strana"
+        formula = ("\\text{piramida}: n+1 \\text{ tjemena}, 2n \\text{ ivica}, "
+                   "n+1 \\text{ strana}")
     answer = counts[which]
     others = sorted(set(counts.values()) - {answer})
     distractors = [Fraction(v) for v in others]

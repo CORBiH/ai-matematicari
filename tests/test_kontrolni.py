@@ -573,7 +573,12 @@ def test_live15_damaged_latex_word_in_math_is_rejected():
         correct_option_index=0,
         solution="Izložioci se sabiraju, pa je $x=4$.")
     clean, code = _validate(question)
-    assert clean is None and code == "damaged_latex_word_in_math"
+    # Paket i dalje PADA; od uvođenja opšte zabrane gole proze u matematici
+    # (N-5) „xcdot“ obori već `mathsafe` unutar `_safe_field`, prije uže
+    # kontrolni-provjere. Oba koda su ispravna odbijanja — test čuva ZAŠTITU,
+    # ne redoslijed detektora.
+    assert clean is None
+    assert code in ("damaged_latex_word_in_math", "unsafe_or_long_text")
 
 
 def test_live11_caret_outside_math_is_rejected():

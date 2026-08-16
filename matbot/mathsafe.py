@@ -855,6 +855,16 @@ def find_structured_math_issues(segment: str) -> list:
     for name, argument in structured_command_arguments(segment):
         for word in prose_words_in_expression(argument):
             issues.append("prose_in_math_argument:" + (name + ":" + word)[:32])
+    # N-5: GOLA PROZA KAO MATEMATIČKI ATOM. N-1 gleda samo argumente
+    # strukturnih komandi, pa je „$ treinta\,\text{cm}$“ (živi nalaz, kontrolni
+    # 7-05: španska riječ za trideset kao ponuđena opcija) prolazio netaknut —
+    # `\,` i `\text{cm}` su uredni, a `treinta` nije bilo ničiji argument.
+    # Ista mjera kao za argumente: iz segmenta se izuzmu `\text{…}`, INDEKSI i
+    # komande, pa ono što ostane ne smije biti riječ. Jednoslovne i dvoslovne
+    # oznake (`x`, `AB`, `cm`), velika slova (`ABC`, `KM`) i imena funkcija
+    # ostaju netaknuti.
+    for word in prose_words_in_expression(segment):
+        issues.append("prose_atom_in_math:" + word[:24])
     for match in _OBJECT_RELATION_RE.finditer(segment):
         command = match.group(2)
         if command not in _RELATIONAL_COMMANDS:
