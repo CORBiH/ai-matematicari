@@ -644,6 +644,30 @@ def wrap_isolated_frac_tokens(text: str) -> str:
     return map_text_segments(text, lambda t: _FRAC_TOKEN_RE.sub(lambda m: "$" + m.group(0) + "$", t))
 
 
+# Akcenat NAD ZNAKOM MNOŽENJA (živi nalaz, Quick turn Q04): model je napisao
+# `$2\bar{\text{·}}5+5=15$`. Račun je bio tačan, ali se `\bar{\text{·}}`
+# iscrtava kao tačka s crtom iznad — student vidi nepostojeću notaciju.
+#
+# Kanonizacija je dopuštena JER JE NAMJERA DOKAZANA SADRŽAJEM: argument je
+# doslovno znak množenja (`·` ili `\cdot`), eventualno umotan u `\text{…}`.
+# „Crta nad znakom množenja“ nema nijedno legitimno matematičko čitanje, pa se
+# ne pogađa ništa — zadržava se isti glif u ispravnom zapisu.
+#
+# NIKAD se ne dira `\bar{x}`, `\overline{AB}`, `0,\overline{3}` ni bilo koji
+# drugi argument: pravilo traži da CIJELI argument bude znak množenja.
+_ACCENTED_MULTIPLICATION_DOT_RE = re.compile(
+    r"\\(?:bar|overline)\s*\{\s*"
+    r"(?:\\(?:text|mathrm)\s*\{\s*(?:·|\\cdot)\s*\}|·|\\cdot)"
+    r"\s*\}")
+
+
+def repair_accented_multiplication_dot(text: str) -> str:
+    """`\\bar{\\text{·}}` → `\\cdot`; svaki drugi akcent ostaje netaknut."""
+    if not text:
+        return text
+    return _ACCENTED_MULTIPLICATION_DOT_RE.sub(r"\\cdot", text)
+
+
 def repair_stray_terminal_brace(text: str) -> str:
     """Ukloni TAČNO JEDNU zalutalu zatvarajuću vitičastu zagradu „}“ na SAMOM
     kraju vidljivog teksta (prije eventualnog praznog prostora), kad je
@@ -1023,6 +1047,7 @@ def sanitize_and_validate_math_text_with_issues(text: str, allow_whole_expressio
     cleaned = canonicalize_math_delimiters(text)
     cleaned = sanitize_math_text(cleaned)
     cleaned = replace_literal_newline_escapes(cleaned)
+    cleaned = repair_accented_multiplication_dot(cleaned)
     cleaned = repair_malformed_math_inside(cleaned)
     if allow_whole_expression_wrap and "$" not in cleaned and _looks_like_pure_math_expression(cleaned):
         cleaned = "$" + cleaned.strip() + "$"
