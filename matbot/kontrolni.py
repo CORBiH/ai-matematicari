@@ -46,7 +46,7 @@ import time
 from matbot import (config, exactly_one, geometrycheck, linear_system_mcq,
                     mcq_integrity, option_equivalence,
                     point_plane_projection_mcq, square_pyramid_mcq,
-                    stem_disclosure)
+                    stem_disclosure, triangle_consistency)
 from matbot.llm import LLMError, failure_diagnostics_kv
 from matbot.mathcheck import find_numeric_inconsistencies
 from matbot.mathsegments import TEXT, tokenize_math
@@ -657,6 +657,17 @@ def validate_generated_question(parsed, slot, context, prior_signatures):
             surface, context.geometry_scope, list(context.geometry_figures))
         if geometry_issues:
             return None, f"geometry_notation_{field_name}"
+
+    # POSTOJI LI OBJEKAT KOJI ZADATAK OPISUJE (živi nalaz post-deploy 3128968):
+    # objavljen je obim trougla čiji su ZADATI podaci međusobno nemogući
+    # ($\alpha=50^\circ$, $\beta=60^\circ$, $a=6$, $b=7$ — sinusna teorema
+    # promašuje 3,2 %). Notaciju sudi `geometrycheck`, vrijednosti sude orakli
+    # iznad; nijedan od njih ne pita postoji li sam objekat. Sudi se ISKLJUČIVO
+    # iz teksta zadatka — označena opcija i rješenje su ono što se provjerava,
+    # pa ne smiju biti dokaz. Vidi matbot/triangle_consistency.py.
+    triangle_failure = triangle_consistency.publication_failure(text)
+    if triangle_failure:
+        return None, triangle_failure
 
     if expected.strip() != correct_text.strip():
         return None, "expected_option_mismatch"

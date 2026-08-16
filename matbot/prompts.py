@@ -689,6 +689,11 @@ _KONTROLNI_REPAIR_FEEDBACK = (
      "istinitost nije moguće provjeriti računom. Postavi pitanje koje traži "
      "KONKRETAN rezultat (broj, mjeru, izraz ili skup), a opcije neka budu "
      "vrijednosti — ista lekcija i ista težina."),
+    ("inconsistent_triangle_givens", "Zadati podaci ne mogu opisati nijedan "
+     "trougao (npr. zbir uglova nije $180^\\circ$, stranice ne zadovoljavaju "
+     "nejednakost trougla, ili zadata stranica ne odgovara zadatom naspramnom "
+     "uglu). Vrati zadatak čiji su SVI zadati podaci međusobno saglasni i "
+     "provjeri ih prije nego što ih napišeš."),
     ("proven_multi_correct", "Više od jedne opcije bilo je tačno. Tačna smije "
      "biti isključivo jedna; ostale moraju biti dokazivo netačne."),
     ("marked_option_provably_false", "Označena opcija nije bila tačna, a tačna "
