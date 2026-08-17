@@ -98,7 +98,12 @@ MATHJAX_COMMAND_ALLOWLIST = frozenset({
     "tau", "phi", "varphi", "Phi", "chi", "psi", "Psi", "omega", "Omega",
     "nabla", "circ", "degree", "infty",
     "dots", "ldots", "cdots", "vdots", "prime", "square", "triangle",
-    "in", "notin", "subset", "subseteq", "supset", "cup", "cap",
+    # `supseteq` je dodan uz reviziju granice `\n` komandi (vidi
+    # _literal_newline_replacement): allowlist je znao `subset`, `subseteq` i
+    # `supset`, a baš `supseteq` je nedostajao, pa je ispravan školski zapis
+    # „$A \supseteq B$“ padao na `unknown_mathjax_command:supseteq`.
+    # Bezargumentna relacija — isti (nikakav) rizik kao već prisutna tri.
+    "in", "notin", "subset", "subseteq", "supset", "supseteq", "cup", "cap",
     "emptyset", "varnothing", "forall", "exists",
     # ŽIVI NALAZ (široki audit 6.–7. razreda, lekcija „Zadaci s više skupovnih
     # operacija“): lekcija OBAVEZNO traži RAZLIKU SKUPOVA, a allowlist je znao
@@ -387,7 +392,7 @@ _STANDALONE_SYMBOL_COMMANDS = frozenset({
     "approx", "neq", "ne", "le", "leq", "ge", "geq", "equiv", "sim",
     "pm", "mp", "times", "div", "circ", "degree",
     # skupovni i strelice
-    "in", "notin", "subset", "subseteq", "supset", "cup", "cap",
+    "in", "notin", "subset", "subseteq", "supset", "supseteq", "cup", "cap",
     "emptyset", "varnothing", "to", "rightarrow", "leftarrow", "mapsto",
     "Rightarrow", "Leftarrow", "Leftrightarrow",
     # tri tačke
@@ -421,13 +426,48 @@ def wrap_standalone_symbols_outside_math(text: str) -> str:
 _DAMAGED_LATEX_FORM_RE = re.compile(r"\dsqrt|sqrt\d|\btext[a-zA-Z]")
 _LITERAL_NEWLINE_ESCAPE = "\\n"
 # Doslovan "\n" (backslash+n) je ambiguan: identičan je prefiksu \neq, \ne,
-# \not, \nu, \nabla i sličnih ISPRAVNIH LaTeX komandi. Popravlja se SAMO kad
-# NE nastavlja neku od tih POZNATIH komandi (provjereno kao CIJELA riječ —
-# nakon nastavka ne smije slijediti još jedno slovo). Obična riječ/rečenica
-# koja slijedi (npr. "\nDrugi", "\nNovi") NIJE ovaj slučaj i ispravno se
-# pretvara — provjera je usko ograničena na eq/e/ot/u/abla, ne na "bilo koje
-# slovo", jer bi to blokiralo svaki prelom pred novom rečenicom.
-_LITERAL_NEWLINE_ESCAPE_RE = re.compile(r"\\n(?!(?:eq|e|ot|u|abla)(?![A-Za-z]))")
+# \not, \nu, \nabla i sličnih ISPRAVNIH LaTeX komandi.
+#
+# ŽIVI RELEASE GATE (`release_gate_migrated_deterministic`, lekcija o skupovima
+# N i N0): zaštita je ranije bila ZATVORENA LISTA nastavaka
+# `(?:eq|e|ot|u|abla)(?![A-Za-z])`, prepisana ručno pored allowliste komandi.
+# `\notin` nije stao ni u jednu granu (iza `ot` stoji još jedno slovo), pa je
+# `\n` obrisan i ispravna opcija je do validatora stigla kao `otin`
+# (`prose_atom_in_math:otin`). Ista rupa je bila i tiša: `$N \ni 1$` je
+# postajao `$N i 1$` — jednoslovni ostatak ne pada ni na jednom detektoru, pa
+# je IZMIJENJEN sadržaj mogao biti objavljen kao „siguran“.
+#
+# Zato se granica sada pita JEDINU mjerodavnu instancu — MATHJAX_COMMAND_
+# ALLOWLIST — umjesto prepisane liste. Uzima se maksimalan niz slova iza `\n`:
+#   • daje li poznatu komandu → to NIJE prelom reda, ostaje netaknuto;
+#   • nema slova iza → jeste doslovan prelom (van matematike stvarni prelom,
+#     unutar matematike se briše, kako je i bilo);
+#   • slova ima, ali komanda nije poznata → UNUTAR matematike se ne dira, nego
+#     pada zatvoreno na skeneru komandi (ranije se tiho brisalo); IZVAN
+#     matematike ostaje prelom reda, jer je tamo proza ("\nDrugi", "\nNovi")
+#     jedino smisleno čitanje.
+_LITERAL_NEWLINE_ESCAPE_RE = re.compile(r"\\n([A-Za-z]*)")
+
+
+def _literal_newline_replacement(match, inside_math):
+    suffix = match.group(1)
+    if ("n" + suffix) in MATHJAX_COMMAND_ALLOWLIST:
+        return match.group(0)
+    if not suffix:
+        return "" if inside_math else "\n"
+    if inside_math:
+        return match.group(0)
+    return "\n" + suffix
+
+
+def _has_residual_literal_newline(part: str) -> bool:
+    """Postoji doslovan `\\n` koji NIJE početak poznate komande.
+
+    Detektor mora imati istu granicu kao popravljač: `\\neq`, `\\notin`,
+    `\\nu`, `\\nabla` … su komande i nikad nisu prelom reda, a sve ostalo
+    (`\\nDrugi`, `\\ni`, `\\nema`) jeste zaostali doslovan escape."""
+    return any(("n" + match.group(1)) not in MATHJAX_COMMAND_ALLOWLIST
+               for match in _LITERAL_NEWLINE_ESCAPE_RE.finditer(part))
 _FRAC_TOKEN_RE = re.compile(r"\\frac\{[^{}]*\}\{[^{}]*\}")
 _PURE_MATH_EXPRESSION_RE = re.compile(r"^[\d\s+\-*/=,.:;()\[\]{}^_°'\"\\a-zA-Z]+$")
 
@@ -609,22 +649,25 @@ def _inside_math_parts(text):
 
 def replace_literal_newline_escapes(text: str) -> str:
     """Popravlja doslovan "\\n" (dva vidljiva znaka, backslash+n) I VAN I
-    UNUTAR matematičkih segmenata — provjerava se preko
-    _LITERAL_NEWLINE_ESCAPE_RE, koja NIKAD ne pogađa \\neq/\\ne/\\not/\\nu/
-    \\nabla i slične ISPRAVNE komande (traži se da 'n' NIJE praćeno drugim
-    slovom).
+    UNUTAR matematičkih segmenata. Nijedna komanda iz
+    MATHJAX_COMMAND_ALLOWLIST se ne dira (\\notin, \\neq, \\ne, \\nu,
+    \\nabla …) — vidi _literal_newline_replacement.
 
     Van matematike: pretvara se u stvaran prelom reda (prelom pasusa).
     Unutar $...$ ili $$...$$: UKLANJA se (živi nalaz: „$d = \\n\\sqrt{128}$“ —
     stvaran newline unutar matematike nema smisla i i dalje bi mogao lomiti
-    MathJax; brisanje daje čist „$d = \\sqrt{128}$“)."""
+    MathJax; brisanje daje čist „$d = \\sqrt{128}$“) — ali SAMO kad iza njega
+    ne stoji nijedno slovo. Niz slova unutar matematike može biti jedino
+    komanda, pa nepoznat oblik ostaje netaknut i pada zatvoreno."""
     if not text or _LITERAL_NEWLINE_ESCAPE not in text:
         return text or ""
     if "$" not in text:
-        return _LITERAL_NEWLINE_ESCAPE_RE.sub("\n", text)
+        return _LITERAL_NEWLINE_ESCAPE_RE.sub(
+            lambda m: _literal_newline_replacement(m, False), text)
     segments = tokenize_math(text)
     new_segments = [
-        (kind, _LITERAL_NEWLINE_ESCAPE_RE.sub("\n" if kind == TEXT else "", content))
+        (kind, _LITERAL_NEWLINE_ESCAPE_RE.sub(
+            lambda m: _literal_newline_replacement(m, kind != TEXT), content))
         for kind, content in segments
     ]
     return join_segments(new_segments)
@@ -934,7 +977,7 @@ def find_unsafe_math_issues(text: str) -> list:
                 issues.append("unknown_mathjax_command_outside_math:" + command[:24])
         if _DAMAGED_LATEX_FORM_RE.search(part):
             issues.append("damaged_latex_form")
-        if _LITERAL_NEWLINE_ESCAPE_RE.search(part):
+        if _has_residual_literal_newline(part):
             issues.append("literal_newline_escape")
         if any(ord(ch) < 0x20 and ch not in ("\n", "\t") for ch in part):
             issues.append("control_character")
@@ -945,7 +988,7 @@ def find_unsafe_math_issues(text: str) -> list:
         bare_other = _BARE_OTHER_COMMAND_RESIDUE_RE.search(part)
         if bare_other:
             issues.append("bare_command_in_math:" + bare_other.group(0)[:24])
-        if _LITERAL_NEWLINE_ESCAPE_RE.search(part):
+        if _has_residual_literal_newline(part):
             issues.append("literal_newline_escape_in_math")
         if any(ord(ch) < 0x20 for ch in part):
             issues.append("control_character_in_math")
