@@ -677,6 +677,69 @@ def _verified_remainder_division(segment, stated_remainders):
 
 
 # ---------------------------------------------------------------------------
+# SAT UNUTAR MATEMATIČKOG SEGMENTA (živi produkcijski nalaz, quick_turn
+# request_id=61f0acd12a4d)
+# ---------------------------------------------------------------------------
+# Zadatak: polazak u `9:15`, vožnja $1\\frac{3}{5}$ sata. Objavljen rezultat
+# `10:51` bio je TAČAN, ali je „Objasni mi postupak korak po korak.“ vratilo
+# sigurnu poruku uz `numeric_equality_mismatch: nevaljan izraz (dijeljenje
+# nulom)`: korak `$9:15 + 1:00 = 10:15$` je preko bosanskog školskog dijeljenja
+# postao `9/15 + 1/00`.
+#
+# Školsko dijeljenje se NE ISKLJUČUJE i ne slabi. Sat se ne PRETPOSTAVLJA nego
+# DOKAZUJE, isto kao dijeljenje s ostatkom niže:
+#   • svaki član lanca je oblika `H:MM` — sat najviše dvocifren, minute TAČNO
+#     dvocifrene i u opsegu 00–59 (školsko dijeljenje ne dopunjuje nulom, pa
+#     `3:4`, `60:15=4`, `72:9` i `60:0` ne mogu ni ući u ovu granu);
+#   • članovi su spojeni ISKLJUČIVO sa `+` ili `-`, bez ijednog drugog znaka;
+#   • ima ih BAR TRI — dakle bar jedna operacija i rezultat, pa `$12:30$` i
+#     `$12:30=0,4$` ostaju dijeljenje (Rezultat mod na to i računa, vidi
+#     tests/test_clock_time.py);
+#   • sve strane jednakosti daju ISTI ukupan broj minuta.
+# Kad ijedan uslov padne, izraz se vraća postojećem putu i provjerava se kao i
+# dosad — netačna satnica (`$9:15 + 1:00 = 10:20$`) tako i dalje pada.
+# `\\approx` nikad ne ulazi ovdje: lanac se dijeli samo po `=`, pa ostatak
+# `\\approx…` ostane kao neprepoznat višak i dokaz propada.
+_CLOCK_TERM_RE = re.compile(r"([+-]?)\s*(\d{1,2}):([0-5]\d)")
+_MIN_CLOCK_TERMS = 3
+
+
+def _clock_side_minutes(part):
+    """(ukupno_minuta, broj_članova) za `H:MM (± H:MM)*`, inače (None, 0)."""
+    cleaned = _strip_units_and_spacing(part)
+    total, count, position = 0, 0, 0
+    for match in _CLOCK_TERM_RE.finditer(cleaned):
+        if cleaned[position:match.start()].strip():
+            return None, 0          # nešto što nije operator stoji između članova
+        if count == 0 and match.group(1):
+            return None, 0          # vodeći znak: nije vrijednost sata
+        minutes = int(match.group(2)) * 60 + int(match.group(3))
+        total += -minutes if match.group(1) == "-" else minutes
+        count += 1
+        position = match.end()
+    if count == 0 or cleaned[position:].strip():
+        return None, 0
+    return total, count
+
+
+def _verified_clock_arithmetic(segment):
+    """True SAMO kad je cio segment DOKAZANA satnica (vidi komentar iznad)."""
+    if ":" not in segment:
+        return False
+    sides, terms = [], 0
+    parts = segment.split("=")
+    if len(parts) < 2:
+        return False
+    for part in parts:
+        minutes, count = _clock_side_minutes(part)
+        if minutes is None:
+            return False
+        sides.append(minutes)
+        terms += count
+    return terms >= _MIN_CLOCK_TERMS and len(set(sides)) == 1
+
+
+# ---------------------------------------------------------------------------
 # NEPOTPUNA LIJEVA STRANA NA GRANICI SEGMENTA (živi nalaz, Explain/procenti)
 # ---------------------------------------------------------------------------
 # Model je napisao:
@@ -725,6 +788,11 @@ def find_numeric_inconsistencies(text):
     tokens = tokenize_math(text or "")
     for index, (kind, content) in enumerate(tokens):
         if kind not in (INLINE, DISPLAY):
+            continue
+        # DOKAZANA satnica se provjerava PRIJE `check_segment`, jer bi je
+        # dvotačka kao dijeljenje oborila već na `1:00` (dijeljenje nulom) —
+        # jedini nalaz koji se poslije više ne može amnestirati.
+        if _verified_clock_arithmetic(content):
             continue
         found = check_segment(content, pi_values)
         if not found:
