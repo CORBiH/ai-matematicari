@@ -215,6 +215,27 @@ def _numeric_tolerance(expr_a, expr_b, magnitude):
 #    ograničen rekurzivni spust nad whitelist gramatikom).
 # ---------------------------------------------------------------------------
 
+# NIZ VELIKIH SLOVA JE OZNAKA, NE PROIZVOD (živi release gate
+# `release_gate_grade7_rotating`, lekcija o podudarnosti trouglova — SSU).
+# Tokenizator je svako slovo pretvarao u zasebnu promjenljivu, pa je opcija
+# `SUS` bila proizvod S·U·S, a `SSU` proizvod S·S·U — komutativno JEDNAKI. Time
+# je server DOKAZIVAO `semantically_duplicate_options (symbolic_commutative)`
+# nad dva različita kriterija podudarnosti i lekcija nije mogla objaviti nijedan
+# ispravan MCQ. Recenzent je s pravom vraćao `correct` s nepromijenjenim
+# paketom: ukloniti jednu od te dvije opcije znači uništiti zadatak.
+#
+# Ista greška je proglašavala duplikatima i oznake tačaka: `ABC`/`ACB`/`BAC`/
+# `CAB` bile su svih šest parova „dokazano ekvivalentne“.
+#
+# Množenje se u ovom projektu UVIJEK piše sa `\cdot` (matbot/rules.py), pa
+# implicitno množenje susjednih VELIKIH slova nije zapis nego pogađanje; niz
+# velikih slova je ime objekta (`AB`, `ABC`, `SUS`) — isto pravilo koje
+# `mathsafe.prose_words_in_expression` već koristi kad ih izuzima iz provjere
+# proze. Mala slova (`ab` vs `ba`) ostaju komutativan proizvod, kako i jesu u
+# algebri, a `$AB \cdot CD$` vs `$CD \cdot AB$` ostaje dokazan duplikat.
+_UPPERCASE_LABEL_RE = re.compile(r"[A-Z]{2,}")
+
+
 def _tokenize(expr):
     tokens = []
     i, n = 0, len(expr)
@@ -248,6 +269,9 @@ def _tokenize(expr):
         m = _NUM_TOKEN_RE.match(expr, i)
         if m:
             tokens.append(("NUM", m.group(0).replace(",", "."))); i = m.end(); continue
+        m = _UPPERCASE_LABEL_RE.match(expr, i)
+        if m:
+            tokens.append(("VAR", m.group(0))); i = m.end(); continue
         if ch.isalpha():
             tokens.append(("VAR", ch)); i += 1; continue
         raise _Unknown(f"neočekivan znak {ch!r}")

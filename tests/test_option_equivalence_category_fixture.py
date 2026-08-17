@@ -1,4 +1,19 @@
-"""KATEGORIJSKA FIKSTURA ZA `option_equivalence` (Faza 0). Bez izmjena proizvoda.
+"""KATEGORIJSKA FIKSTURA ZA `option_equivalence` (Faza 0 → RIJEŠENO).
+
+STATUS 2026-08-17: nalaz je RIJEŠEN. Sve ispod ostaje zapis kako je otkriven i
+zašto Faza 0 nije smjela pogađati; testovi mehanizma sada tvrde ISPRAVLJENO
+ponašanje. Okidač za rješavanje je bio drugi živi release gate
+(`release_gate_grade7_rotating`, lekcija o podudarnosti trouglova — SSU), gdje
+je isti mehanizam proglasio duplikatima kriterije `SUS` i `SSU`: tu dvosmislice
+NEMA — to su dva različita kriterija — pa je mehanizam dokazano pogrešan, a ne
+samo nedokaziv. Vidi tests/test_uppercase_label_option_equivalence.py.
+
+Razrješenje ide u smjeru koji ovaj isti fajl već dokumentuje kao projektno
+pravilo (`test_overline_segment_is_left_unproven_rather_than_guessed`,
+`test_angle_names_are_not_collapsed_either`): kad se ne može DOKAZATI, kapija
+ne tvrdi ekvivalenciju. Goli `$AB$`/`$BA$` je bio jedino mjesto koje je to
+pravilo kršilo; sada se ponaša isto kao `\\overline{AB}` i `\\angle BAC`.
+
 
 ZAŠTO POSTOJI. Živi FW-G02 (final40_c17538a, lekcija 6-09-001 „Uglovi“, poruka
 učenika traži da prepozna KOJI KRAK polazi iz tjemena ugla $\\angle BAC$) pao
@@ -30,13 +45,18 @@ može riješiti gledanjem same opcije.
   3. sudar se javlja ISKLJUČIVO kod gole dvoslovne matematičke opcije bez
      proze i bez usmjerenog zapisa.
 
-ZATO JE KLASIFIKACIJA: `UNRESOLVED_PENDING_PHASE4`.
+KLASIFIKACIJA U FAZI 0 JE BILA: `UNRESOLVED_PENDING_PHASE4`.
 Tačni tekstovi opcija iz FW-G02 nisu povratljivi (CLAUDE.md, pravilo 7:
-artefakt nosi samo kod i ID-jeve opcija), pa se ne može dokazati koji je od dva
-objekta Tutor mislio. Faza 0 NE MIJENJA `option_equivalence` i ne pogađa.
-Podatak koji Faza 4 (server renderuje opcije) treba: kad server sam ispisuje
-opciju, on zna o kojem objektu je riječ i može emitovati usmjeren zapis, čime
-sudar prestaje da bude moguć.
+artefakt nosi samo kod i ID-jeve opcija), pa se nije moglo dokazati koji je od
+dva objekta Tutor mislio, a Faza 0 nije smjela pogađati.
+
+RAZRJEŠENJE (`RESOLVED_UPPERCASE_LABEL_IS_ATOMIC`): ne odlučuje se KOJI je
+objekat u pitanju — odlučuje se da tvrdnja nije dokaziva, pa se i ne iznosi.
+Niz od dva ili više velikih slova je jedan atomski simbol (množenje se u ovom
+projektu uvijek piše sa `\\cdot`), pa `AB` i `BA` više nisu „dokazano isti“.
+Smjer promašaja je konzervativan i identičan onome koji ovaj fajl već brani za
+`\\overline{AB}`: propušten duplikat, nikad lažna optužba. Doslovno identična
+opcija i dalje pada na `duplicate_option_text`.
 """
 from __future__ import annotations
 
@@ -48,8 +68,9 @@ from matbot import geometrycheck, option_equivalence
 CONFIRMED_DEFECT = "CONFIRMED_DEFECT"
 EXPECTED_REPRESENTATION_RULE = "EXPECTED_REPRESENTATION_RULE"
 UNRESOLVED_PENDING_PHASE4 = "UNRESOLVED_PENDING_PHASE4"
+RESOLVED_UPPERCASE_LABEL_IS_ATOMIC = "RESOLVED_UPPERCASE_LABEL_IS_ATOMIC"
 
-FW_G02_CLASSIFICATION = UNRESOLVED_PENDING_PHASE4
+FW_G02_CLASSIFICATION = RESOLVED_UPPERCASE_LABEL_IS_ATOMIC
 
 # Dijagnostika iz kampanje — SAMO kodovi i ID-jevi opcija, nikad sadržaj.
 FW_G02_DRAFT_FINDING = "semantically_duplicate_options: option IDs a and d (symbolic_commutative)"
@@ -58,7 +79,7 @@ FW_G02_TOPIC_ID = "6-09-001"
 
 
 # ---------------------------------------------------------------------------
-# 1. MEHANIZAM — goli dvoslovni token je komutativan
+# 1. MEHANIZAM — goli niz velikih slova više NIJE implicitni proizvod
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize("first,second", (
@@ -66,9 +87,10 @@ FW_G02_TOPIC_ID = "6-09-001"
     ("$AC$", "$CA$"),
     ("$BC$", "$CB$"),
 ))
-def test_bare_two_letter_labels_are_canonicalized_commutatively(first, second):
-    assert option_equivalence.options_are_equivalent(first, second) is True
-    assert option_equivalence.classify_equivalence(first, second) == "symbolic_commutative"
+def test_bare_two_letter_labels_are_no_longer_collapsed(first, second):
+    """Bio je `symbolic_commutative` (mehanizam FW-G02); sada je nedokazano."""
+    assert option_equivalence.options_are_equivalent(first, second) is False
+    assert option_equivalence.classify_equivalence(first, second) is None
 
 
 def test_distinct_bare_labels_are_not_confused():
@@ -121,9 +143,11 @@ def test_overline_segment_is_left_unproven_rather_than_guessed():
 # 3. KLASIFIKACIJA NALAZA — izričita, bez pogađanja
 # ---------------------------------------------------------------------------
 
-def test_fw_g02_classification_is_explicitly_unresolved():
-    """Faza 0 ne proglašava kvar bez dokaza o kojem objektu je bila riječ."""
-    assert FW_G02_CLASSIFICATION == UNRESOLVED_PENDING_PHASE4
+def test_fw_g02_classification_is_resolved_without_guessing_the_object():
+    """Riješeno bez odlučivanja KOJI je objekat: tvrdnja koja se ne može
+    dokazati se više ne iznosi (isto pravilo kao za `\\overline{AB}`)."""
+    assert FW_G02_CLASSIFICATION == RESOLVED_UPPERCASE_LABEL_IS_ATOMIC
+    assert option_equivalence.options_are_equivalent("$AB$", "$BA$") is False
 
 
 def test_the_campaign_diagnostics_carry_only_codes_and_option_ids():
