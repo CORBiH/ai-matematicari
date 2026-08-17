@@ -114,6 +114,22 @@
   .error-banner{width:min(100% - 32px,1120px);margin:12px auto 0;background:#ffe9e9;border:1px solid #f3b8b8;color:#7a1e1e;padding:.8rem 1rem;border-radius:10px;}
   .muted{color:var(--muted);font-size:.95rem}
   .hidden{display:none}
+  /* `.hidden` MORA pobijediti i nad klasama koje SAME postavljaju `display`.
+     ŽIVI NALAZ (2026-08-17): zaglavlje razgovora je pokazivalo DVA prazna
+     pilla. `#topbarTopic` i `#topbarStreak` jesu dobijali klasu `hidden`, ali
+     je `.tutor-pill{display:inline-flex}` deklarisan KASNIJE u ovom istom
+     stylesheetu — pri jednakoj specifičnosti pobjeđuje kasnije pravilo, pa je
+     `hidden` bio bez ikakvog efekta. Isti propust je na početnom ekranu držao
+     vidljivom grupu „Lekcija“ u modu kontrolnog (`.home-picker-group{display:grid}`).
+     Ista klasa greške kao kod `.exam-card [data-exam-state]` sekcija niže.
+     Rješava se SPECIFIČNOŠĆU (0,2,0), ne redoslijedom — zato pravilo smije
+     stajati tačno ovdje, uz klasu koju štiti, i ne može ga pokvariti buduće
+     dodavanje pravila na dno stylesheeta. */
+  .tutor-pill.hidden,
+  .home-picker-group.hidden{display:none;}
+  /* Konstrukcijska brava, ne detekcija: pill bez teksta se ne crta ni kada
+     neko sutra zaboravi klasu. Prazan okvir u zaglavlju nije stanje — kvar je. */
+  .tutor-pill:empty{display:none;}
 
   /* file chip */
   .file-chip{display:none;align-items:center;gap:.5rem;background:#13231f;border:1px dashed rgba(86,200,143,.45);color:#d8efe7;padding:.35rem .55rem;border-radius:999px;font-size:.88rem;}
@@ -162,7 +178,16 @@
   .home-screen{flex:1 1 auto;min-height:0;overflow-y:auto;display:flex;align-items:flex-start;justify-content:center;padding:5vh .25rem 2rem;}
   .home-card{width:min(100%,660px);background:var(--card-bg);border:1px solid var(--card-border);border-radius:20px;
     padding:1.9rem 1.7rem 1.7rem;box-shadow:0 18px 60px rgba(0,0,0,.4);backdrop-filter:blur(10px);animation:fadeIn .25s ease;}
+  /* Marka lijevo, izlaz desno — jedini red koji se dodaje početnoj kartici.
+     `align-items:flex-start` drži dugme uz gornji rub naslovnog bloka; brand je
+     mala oznaka, pa bi centriranje spustilo dugme ispod optičke linije. */
+  .home-topbar{display:flex;align-items:flex-start;justify-content:space-between;
+    gap:.75rem;margin-bottom:.15rem;}
   .home-brand{font-size:.92rem;font-weight:800;letter-spacing:.14em;color:var(--accent-bot);text-transform:uppercase;}
+  /* Diskretnije nego u zaglavlju razgovora: na početnom ekranu nema šta da se
+     napusti, pa izlaz ne smije konkurisati izboru moda. Ista klasa, dakle ista
+     geometrija i isto ponašanje na uskom ekranu. */
+  .home-topbar .topbar-btn--exit{min-height:32px;padding:.3rem .6rem;font-size:.8rem;}
   .home-heading{margin:.35rem 0 .2rem;font-size:1.5rem;line-height:1.25;font-weight:800;}
   .home-lede{margin:0;color:var(--muted);font-size:.95rem;}
   .home-step{margin-top:1.35rem;}
@@ -189,21 +214,73 @@
   /* ===== SCREEN 2: Chat — jedan fokusiran panel ===== */
   .tutor-card{border-top:0;display:flex;flex-direction:column;height:100%;min-height:0;padding:.55rem .7rem .65rem;}
   .tutor-title,.tutor-sub{display:none;}
-  .tutor-topbar{display:flex;align-items:center;justify-content:space-between;gap:.6rem;flex-wrap:wrap;
-    padding:.15rem .1rem .45rem;border-bottom:1px solid var(--card-border);margin-bottom:.35rem;flex:0 0 auto;}
-  .tutor-topbar-info{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;min-width:0;}
-  .tutor-pill{display:inline-flex;align-items:center;background:#12211c;border:1px solid rgba(86,200,143,.25);
-    color:#d8efe7;border-radius:999px;padding:.22rem .6rem;font-size:.82rem;font-weight:600;white-space:nowrap;
-    max-width:46vw;overflow:hidden;text-overflow:ellipsis;}
+  .tutor-topbar{display:flex;align-items:center;justify-content:space-between;gap:.4rem .75rem;flex-wrap:wrap;
+    padding:.3rem .15rem .5rem;border-bottom:1px solid var(--card-border);margin-bottom:.5rem;flex:0 0 auto;}
+  /* `flex:1 1 0` (a NE `auto`): osnovna širina pillova se ne računa pri odluci
+     o prelamanju, pa se lijeva strana SKUPLJA (ellipsis unutar pilla) umjesto
+     da gura akcijsku grupu u drugi red već na laptopu. Dugačak naziv lekcije
+     time više ne pomjera dugmad. */
+  .tutor-topbar-info{display:flex;align-items:center;gap:.35rem;flex:1 1 0;flex-wrap:wrap;min-width:0;}
+  /* `inline-block`, NE `inline-flex`: `text-overflow:ellipsis` djeluje samo na
+     blok kontejner, pa je uz `inline-flex` (kao flex stavka: `flex`) dugačak
+     naziv lekcije bio TVRDO ODSJEČEN, bez „…“. Pill nosi isključivo tekst, pa
+     flex kontekst unutar njega ništa nije davao. Vertikalno poravnanje u
+     zaglavlju i dalje radi `align-items:center` na roditelju.
+     `100%` umjesto ranijeg `46vw`: granica se mjeri prema STVARNOJ širini
+     lijeve strane zaglavlja, pa dugačak naziv ne može prerasti svoj red i
+     gurnuti akcije van kartice. Puni tekst ostaje dostupan — sadržaj elementa
+     je necenzurisan (čitači ekrana ga čitaju cijelog), a mišu ga daje `title`
+     koji `updateTopbar` postavlja uz skraćeni naziv. */
+  .tutor-pill{display:inline-block;background:#12211c;border:1px solid rgba(86,200,143,.25);
+    color:#d8efe7;border-radius:999px;padding:.22rem .6rem;font-size:.82rem;font-weight:600;
+    line-height:1.35;white-space:nowrap;
+    max-width:100%;overflow:hidden;text-overflow:ellipsis;}
   .tutor-streak-pill{background:#2a2110;border-color:rgba(240,178,95,.45);color:#ffe2ad;}
   .tutor-streak-pill.pulse{animation:streakPulse .42s ease;}
   @keyframes streakPulse{0%{transform:scale(1)}45%{transform:scale(1.08)}100%{transform:scale(1)}}
-  .tutor-topbar-actions{display:flex;gap:.4rem;flex:0 0 auto;}
-  .tutor-topbar-actions .btn.sm{padding:.42rem .75rem;font-size:.88rem;border-radius:10px;}
-  .tutor-back-btn{display:inline-flex;align-items:center;justify-content:center;gap:.35rem;min-height:36px;min-width:86px;background:#d8efe7;color:#0d1815;border:1px solid rgba(216,239,231,.85);font-weight:800;box-shadow:0 6px 18px rgba(0,0,0,.22);}
-  .tutor-back-btn:hover{background:#eef6f3;color:#09100e;border-color:#eef6f3;}
-  .tutor-clear-btn{display:inline-flex;align-items:center;justify-content:center;min-height:36px;background:#23191a;color:#ffdede;border:1px solid rgba(208,98,98,.45);font-weight:800;}
-  .tutor-clear-btn:hover{background:#332020;border-color:rgba(208,98,98,.7);}
+  /* JEDNA akcijska grupa za sve topbar radnje (razgovor i kontrolni koriste
+     istu). `flex:0 1 auto` + `flex-wrap`: kada zaglavlju ponestane širine,
+     grupa se prelama U CJELINI u novi red umjesto da naraste preko pillova ili
+     izađe iz kartice. Ranije je bila `flex:0 0 auto` bez `align-items`, pa su
+     se dugmad na uskom ekranu sudarala s lijevom stranom zaglavlja. */
+  .tutor-topbar-actions{display:flex;align-items:center;justify-content:flex-end;
+    gap:.4rem;flex:0 1 auto;flex-wrap:wrap;min-width:0;}
+  /* Jedinstvena geometrija za sva tri dugmeta: ista visina, isti radijus, isti
+     font. Hijerarhija se nosi BOJOM, ne veličinom — inače „Nazad“ (najčešća
+     radnja) izgleda kao primarna akcija cijelog ekrana. */
+  /* `position:relative` je nužan: na uskom ekranu se natpis sklanja klasičnim
+     „samo za čitač“ trikom (`position:absolute`), pa mora imati pozicionirani
+     roditelj — inače bi se mjerio prema stranici i mogao dodati horizontalni
+     scroll, tačno ono što ovaj zadatak zabranjuje. */
+  .topbar-btn{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:.32rem;
+    min-height:36px;padding:.4rem .72rem;font:inherit;font-size:.86rem;font-weight:700;line-height:1;
+    border-radius:10px;border:1px solid transparent;cursor:pointer;white-space:nowrap;
+    background:transparent;color:var(--text);
+    transition:background .15s ease,border-color .15s ease,color .15s ease,transform .05s ease;}
+  .topbar-btn:active{transform:translateY(1px);}
+  .topbar-btn:focus-visible{outline:2px solid #9ee6c4;outline-offset:2px;}
+  .topbar-btn-icon{font-size:1rem;line-height:1;}
+  /* Obriši — destruktivna SPOREDNA radnja: najtiša, ali nedvosmisleno crvena. */
+  .topbar-btn--danger{background:rgba(208,98,98,.10);border-color:rgba(208,98,98,.34);color:#f1c9c9;}
+  .topbar-btn--danger:hover{background:rgba(208,98,98,.20);border-color:rgba(208,98,98,.62);color:#ffe3e3;}
+  /* Nazad — obična navigacija unutar MAT-BOT-a: najčitljivije od tri. */
+  .topbar-btn--nav{background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.20);color:var(--text);}
+  .topbar-btn--nav:hover{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.34);}
+  /* Zatvori — IZLAZAK iz MAT-BOT-a: goli obris, bez ispune, da se ne pobrka s
+     navigacijom unutar aplikacije. */
+  .topbar-btn--exit{background:transparent;border-color:rgba(255,255,255,.22);color:var(--muted);}
+  .topbar-btn--exit:hover{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.40);color:var(--text);}
+  /* Uski ekran: natpisi „Obriši“ i „Zatvori“ se sklapaju u ikone, „Nazad“
+     zadržava tekst (najčešća radnja). Dodirna zona ostaje ≥36px, a puno
+     značenje nose `aria-label`/`title`, koji ostaju nepromijenjeni. */
+  @media (max-width:430px){
+    .topbar-btn{padding:.4rem .6rem;}
+    .topbar-btn--danger,.topbar-btn--exit{min-width:38px;padding:.4rem .5rem;gap:0;}
+    .topbar-btn--danger .topbar-btn-label,
+    .topbar-btn--exit .topbar-btn-label{
+      position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+      clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0;}
+  }
   .tutor-fallback{background:#211a0f;border:1px dashed #b8842e;color:#f0d9a6;padding:.5rem .65rem;border-radius:10px;margin:.25rem 0;flex:0 0 auto;}
   body.dark .tutor-fallback{background:#241d0f;color:#f0d9a6;border-color:#8a6a2f;}
 
@@ -235,23 +312,36 @@
   .tutor-typing .dots::after{content:'...';animation:dots 1s steps(3,end) infinite;margin-left:.2rem;}
 
   /* ChatGPT-stil composer: jedan tamni zaobljeni pill [ + ] [ input ] [ ↑ ] */
-  .composer{display:flex;align-items:center;gap:.45rem;background:#111315;border:1px solid #2b3033;
-    border-radius:22px;padding:.32rem .45rem;box-shadow:0 2px 14px rgba(0,0,0,.28);flex:0 0 auto;}
+  /* Razmaci: + i 📷 su PAR (uska praznina među njima), a tekstualno polje i
+     „pošalji“ su odvojeni širim razmakom. Sve tri dodirne zone su iste
+     veličine i vertikalno centrirane u istoj liniji kao prvi red teksta. */
+  .composer{display:flex;align-items:center;gap:.22rem;background:#111315;border:1px solid #2b3033;
+    border-radius:22px;padding:.3rem .42rem;box-shadow:0 2px 14px rgba(0,0,0,.28);flex:0 0 auto;
+    transition:border-color .15s ease,box-shadow .15s ease;}
+  /* Fokus se vidi na CIJELOM composeru — textarea nema vlastiti obrub, pa bez
+     ovoga tastatura nije imala nikakav vidljiv trag u unosu. */
+  .composer:focus-within{border-color:#3d7d66;box-shadow:0 2px 18px rgba(0,0,0,.34);}
   .composer textarea{flex:1;min-width:0;background:transparent;border:0;outline:0;color:#ececf1;resize:none;
-    box-shadow:none;font-size:1.02rem;line-height:1.5;padding:.5rem .35rem;min-height:24px;max-height:180px;overflow-y:auto;}
+    box-shadow:none;font-size:1.02rem;line-height:1.5;padding:.5rem .45rem;margin:0 .18rem;
+    min-height:24px;max-height:180px;overflow-y:auto;}
   .composer textarea::placeholder{color:#9aa0aa;}
-  .composer-plus{flex:0 0 auto;display:grid;place-items:center;width:36px;height:36px;padding:0;
+  .composer-plus{flex:0 0 auto;display:grid;place-items:center;width:38px;height:38px;padding:0;
     border-radius:50%;background:transparent;color:#c9ccd3;font-size:1.5rem;line-height:0;cursor:pointer;user-select:none;
     transition:background .15s ease,color .15s ease;}
   .composer-plus:hover{background:#23282b;color:#fff;}
-  .composer-camera{font-size:1.1rem;}
+  .composer-camera{font-size:1.05rem;}
   .composer-plus-icon,.composer-send-icon{display:block;line-height:1;transform:translateY(-1px);}
-  .composer-send{flex:0 0 auto;display:grid;place-items:center;width:36px;height:36px;padding:0;
+  .composer-send{flex:0 0 auto;display:grid;place-items:center;width:38px;height:38px;padding:0;
     border:0;border-radius:50%;background:#eef6f3;color:#101416;font-size:1.25rem;font-weight:700;line-height:0;
-    cursor:pointer;transition:opacity .15s ease,transform .05s ease;}
+    cursor:pointer;transition:opacity .15s ease,background .15s ease,transform .05s ease;}
   .composer-send:hover{opacity:.85;}
   .composer-send:active{transform:translateY(1px);}
   .composer-send:disabled{opacity:.4;cursor:not-allowed;}
+  /* + i 📷 su <label> elementi (klik otvara pripadni <input type=file>). Label
+     nije fokusabilan, a pripadni input je `display:none`, pa su ova dva dugmeta
+     bila NEDOSTUPNA s tastature. `tabindex` + vidljiv fokus to zatvaraju;
+     Enter/Space obrađuje rukovalac uz composer. */
+  .composer-plus:focus-visible,.composer-send:focus-visible{outline:2px solid #9ee6c4;outline-offset:2px;}
   .tutor-chip{margin:0 0 .45rem;flex:0 0 auto;}
   #tutorMeta{font-size:.82rem;margin-top:.35rem;min-height:1rem;flex:0 0 auto;}
 
@@ -333,7 +423,7 @@
      preklapanja i bez horizontalnog prelijevanja. */
   .exam-topbar{display:flex;align-items:center;justify-content:space-between;
     gap:.5rem;flex-wrap:wrap;padding-bottom:.5rem;border-bottom:1px solid rgba(255,255,255,.08);}
-  .exam-topbar-info{display:flex;align-items:center;gap:.35rem;flex-wrap:wrap;min-width:0;}
+  .exam-topbar-info{display:flex;align-items:center;gap:.35rem;flex:1 1 0;flex-wrap:wrap;min-width:0;}
   .exam-topbar .tutor-pill{max-width:100%;}
 
   /* --- napredak: „Pitanje 2 od 5“ + diskretne tačkice ---------------------- */
@@ -447,9 +537,15 @@
   .feedback-btn:disabled{opacity:.55;cursor:default;}
 
 
-  /* empty-state pomoć prije prve poruke */
-  .tutor-empty{align-self:flex-start;background:transparent;border:0;border-radius:0;
-    padding:.3rem .15rem;margin:.1rem 0 .2rem;font-size:.88rem;flex:0 0 auto;color:var(--muted);}
+  /* empty-state pomoć prije prve poruke.
+     `margin:auto` u kolonskom flexu upija SLOBODNU visinu s obje strane, pa
+     hint stoji u sredini praznog razgovora umjesto zalijepljen uz gornji lijevi
+     ugao ispod zaglavlja — prazan ekran tako izgleda namjerno, a ne nedovršeno.
+     Bez ilustracije i bez kartice: čim stigne prva poruka, hint dobija `hidden`
+     i sav prostor ide razgovoru. */
+  .tutor-empty{align-self:center;margin:auto;max-width:32ch;text-align:center;
+    background:transparent;border:0;border-radius:0;padding:1rem .6rem;
+    font-size:.95rem;line-height:1.6;flex:0 0 auto;color:var(--muted);}
 
 
   body.tutor-fullscreen{padding:0;}
@@ -467,14 +563,17 @@
     .home-card{padding:1.3rem 1rem 1.1rem;border-radius:16px;}
     .home-heading{font-size:1.25rem;}
     .home-modes{grid-template-columns:1fr;}
-    .tutor-pill{max-width:60vw;font-size:.78rem;}
-    .tutor-topbar{align-items:flex-start;}
-    .tutor-topbar-actions .btn.sm{padding:.38rem .7rem;font-size:.82rem;}
+    .tutor-pill{font-size:.78rem;}
+    /* NE `align-items:flex-start`: to je razbijalo vertikalno centriranje
+       zaglavlja i pillovi su „visili“ iznad dugmadi. Prelamanje na uskom ekranu
+       rješava `flex-wrap` na samom zaglavlju, ne poravnanje. */
+    .topbar-btn{font-size:.82rem;padding:.4rem .66rem;}
     .tbubble{max-width:96%;font-size:.96rem;line-height:1.58;}
     .tmsg-bot .tbubble{max-width:96%;}
     .tmsg-user .tbubble{max-width:78%;}
-    .composer{border-radius:22px;padding:.32rem .42rem;}
-    .composer-plus,.composer-send{width:34px;height:34px;}
+    .composer{border-radius:22px;padding:.3rem .4rem;}
+    /* Ne ispod 36px: to je donja granica upotrebljive dodirne zone na mobitelu. */
+    .composer-plus,.composer-send{width:36px;height:36px;}
     #tutorMeta{font-size:.78rem;}
     body.tutor-fullscreen{padding:0;}
     body.tutor-fullscreen main{width:min(100% - 8px,1120px);height:100dvh;padding:4px 0;}
@@ -486,7 +585,14 @@
     <!-- ===== SCREEN 1: Start/Home — onboarding (razred → izbor → lekcija/oblast) ===== -->
     <section id="tutorHome" class="home-screen" aria-label="Početni ekran">
       <div class="home-card">
-        <div class="home-brand">MAT-BOT</div>
+        <!-- Izlaz mora postojati i PRIJE ulaska u razgovor: bez ovoga učenik
+             koji stoji na početnom ekranu nema nijednu kontrolu za izlazak čim
+             se sakrije Thinkific-ovo dugme. Isti `requestExitMatbot`, ista
+             potvrda, isti `matbot:close` — nijedna druga implementacija. -->
+        <div class="home-topbar">
+          <div class="home-brand">MAT-BOT</div>
+          <button type="button" class="topbar-btn topbar-btn--exit" id="homeExitBtn" title="Zatvori MAT-BOT" aria-label="Zatvori MAT-BOT"><span class="topbar-btn-icon" aria-hidden="true">✕</span><span class="topbar-btn-label">Zatvori</span></button>
+        </div>
         <h1 class="home-heading">Tvoj AI tutor za matematiku</h1>
         <p class="home-lede">Izaberi šta ti treba, pa razgovaraj s tutorom svojim tempom.</p>
 
@@ -557,8 +663,9 @@
           <span class="tutor-pill tutor-streak-pill hidden" id="topbarStreak" aria-live="polite"></span>
         </div>
         <div class="tutor-topbar-actions">
-          <button type="button" class="btn sm tutor-clear-btn" id="tutorClearBtn" title="Obriši razgovor">🗑️ Obriši</button>
-          <button type="button" class="btn sm tutor-back-btn" id="tutorBackBtn" title="Nazad na izbor">Nazad</button>
+          <button type="button" class="topbar-btn topbar-btn--danger" id="tutorClearBtn" title="Obriši razgovor" aria-label="Obriši razgovor"><span class="topbar-btn-icon" aria-hidden="true">🗑️</span><span class="topbar-btn-label">Obriši</span></button>
+          <button type="button" class="topbar-btn topbar-btn--nav" id="tutorBackBtn" title="Nazad na izbor" aria-label="Nazad na izbor"><span class="topbar-btn-label">Nazad</span></button>
+          <button type="button" class="topbar-btn topbar-btn--exit" id="tutorExitBtn" title="Zatvori MAT-BOT" aria-label="Zatvori MAT-BOT"><span class="topbar-btn-icon" aria-hidden="true">✕</span><span class="topbar-btn-label">Zatvori</span></button>
         </div>
       </div>
 
@@ -580,8 +687,14 @@
       <div class="composer" id="tutorComposer">
         <input id="tutorImage" type="file" accept="image/jpeg,image/png,image/webp" style="display:none;">
         <input id="tutorCameraImage" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" style="display:none;">
-        <label for="tutorImage" id="tutorImageBtn" class="composer-plus" title="Dodaj sliku zadatka" aria-label="Dodaj sliku zadatka"><span class="composer-plus-icon" aria-hidden="true">+</span></label>
-        <label for="tutorCameraImage" id="tutorCameraBtn" class="composer-plus composer-camera" title="Otvori kameru" aria-label="Otvori kameru"><span aria-hidden="true">📷</span></label>
+        <!-- DVA RAZLIČITA POLJA, DVIJE RAZLIČITE NAMJERE:
+             `tutorImage` nema `capture`, pa otvara BIRAČ FAJLOVA (galerija,
+             screenshot, Preuzimanja). `tutorCameraImage` ima `capture="environment"`,
+             pa na mobitelu odmah otvara zadnju kameru. Na desktopu preglednik
+             `capture` ignoriše i otvara birač — degradacija je tiha i composer
+             ostaje ispravan, što je i namjera (nema oslanjanja na getUserMedia). -->
+        <label for="tutorImage" id="tutorImageBtn" class="composer-plus" role="button" tabindex="0" title="Dodaj sliku" aria-label="Dodaj sliku"><span class="composer-plus-icon" aria-hidden="true">+</span></label>
+        <label for="tutorCameraImage" id="tutorCameraBtn" class="composer-plus composer-camera" role="button" tabindex="0" title="Fotografiši zadatak" aria-label="Fotografiši zadatak"><span aria-hidden="true">📷</span></label>
         <textarea id="tutorMessage" rows="1" placeholder="Upiši pitanje ili zadatak..."></textarea>
         <button id="tutorSend" type="button" class="composer-send" title="Pošalji" aria-label="Pošalji"><span class="composer-send-icon" aria-hidden="true">↑</span></button>
       </div>
@@ -601,7 +714,8 @@
           <span class="tutor-pill" id="examTopbarOblast"></span>
         </div>
         <div class="tutor-topbar-actions">
-          <button type="button" class="btn sm tutor-back-btn" id="examBackBtn" title="Nazad na izbor">Nazad</button>
+          <button type="button" class="topbar-btn topbar-btn--nav" id="examBackBtn" title="Nazad na izbor" aria-label="Nazad na izbor"><span class="topbar-btn-label">Nazad</span></button>
+          <button type="button" class="topbar-btn topbar-btn--exit" id="examExitBtn" title="Zatvori MAT-BOT" aria-label="Zatvori MAT-BOT"><span class="topbar-btn-icon" aria-hidden="true">✕</span><span class="topbar-btn-label">Zatvori</span></button>
         </div>
       </div>
 
@@ -679,6 +793,23 @@
     </div>
   </div>
 
+  <!-- Potvrda izlaska iz MAT-BOT-a. Koristi POSTOJEĆI modal sistem (overlay +
+       `data-close`), pa nema drugog dijaloškog mehanizma na stranici i ponaša
+       se identično ostalim potvrdama — uključujući klik izvan i Escape. -->
+  <div class="modal" id="confirm-exit" role="dialog" aria-modal="true"
+       aria-labelledby="confirmExitTitle" aria-describedby="confirmExitText">
+    <div class="box">
+      <button type="button" class="modal-close" data-close="#confirm-exit" aria-label="Zatvori dijalog">×</button>
+      <h3 id="confirmExitTitle">Izaći iz MAT-BOT-a?</h3>
+      <p id="confirmExitText">Da li ste sigurni da želite izaći iz MAT-BOT-a?</p>
+      <div class="actions">
+        <!-- „Ostani“ je početni fokus: sigurna radnja, nikad izlazak na Enter. -->
+        <button type="button" class="btn secondary" id="stayInMatbot" data-close="#confirm-exit" data-modal-initial-focus>Ostani</button>
+        <button type="button" class="btn danger" id="doExitMatbot">Izađi</button>
+      </div>
+    </div>
+  </div>
+
   <div class="modal" id="session-summary">
     <div class="box">
       <button type="button" class="modal-close" data-close="#session-summary" aria-label="Zatvori">×</button>
@@ -730,11 +861,49 @@ function hideTyping(){
   document.getElementById('typing').style.display='none';
 }
 
-/* --- MODALI --- */
-function openModal(id){ document.getElementById('overlay').style.display='block'; document.querySelector(id).style.display='flex'; }
-function closeModal(id){ document.getElementById('overlay').style.display='none'; document.querySelector(id).style.display='none'; }
-document.getElementById('overlay').addEventListener('click', ()=>{ document.querySelectorAll('.modal').forEach(m=>m.style.display='none'); document.getElementById('overlay').style.display='none'; });
+/* --- MODALI ---
+   Jedan mehanizam za sve dijaloge (potvrda brisanja, rezime sesije, potvrda
+   izlaska): overlay + `display:flex` + `data-close`. Dodano je samo ono što je
+   nedostajalo za pristupačnost — fokus ulazi u dijalog, vraća se na dugme koje
+   ga je otvorilo, a Escape zatvara dijalog BEZ izvršavanja njegove radnje. */
+let lastModalTrigger = null;
+function openModal(id){
+  const el = document.activeElement;
+  lastModalTrigger = (el && el !== document.body) ? el : null;
+  document.getElementById('overlay').style.display='block';
+  const m = document.querySelector(id);
+  if (!m) return;
+  m.style.display='flex';
+  /* Početni fokus ide na SIGURNU radnju (odustani/ostani) — Enter odmah po
+     otvaranju nikad ne smije obrisati razgovor ni izaći iz aplikacije. */
+  const first = m.querySelector('[data-modal-initial-focus]') || m.querySelector('.actions .btn');
+  try { if (first && first.focus) first.focus(); } catch(_){}
+}
+function restoreModalTrigger(){
+  try { if (lastModalTrigger && lastModalTrigger.isConnected !== false && lastModalTrigger.focus) lastModalTrigger.focus(); } catch(_){}
+  lastModalTrigger = null;
+}
+function closeModal(id){
+  document.getElementById('overlay').style.display='none';
+  const m = document.querySelector(id);
+  if (m) m.style.display='none';
+  restoreModalTrigger();
+}
+function closeAllModals(){
+  let closed = false;
+  document.querySelectorAll('.modal').forEach(m=>{ if (m.style.display === 'flex') closed = true; m.style.display='none'; });
+  document.getElementById('overlay').style.display='none';
+  restoreModalTrigger();
+  return closed;
+}
+document.getElementById('overlay').addEventListener('click', closeAllModals);
 document.addEventListener('click',(e)=>{ const closeSel=e.target.getAttribute?.('data-close'); if (closeSel){ e.preventDefault(); closeModal(closeSel); }});
+/* Escape zatvara otvoreni dijalog i NIŠTA više ne pokreće: potvrda izlaska se
+   time povlači, a učenik ostaje u MAT-BOT-u. */
+document.addEventListener('keydown',(e)=>{
+  if (e.key !== 'Escape' && e.key !== 'Esc') return;
+  if (closeAllModals()) { if (e.preventDefault) e.preventDefault(); }
+});
 
 /* --- TOAST --- */
 function showToast(msg, type='warn', timeout=2600){
@@ -819,6 +988,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const oblastSelect= document.getElementById('homeOblastSelect');
     const topicsError = document.getElementById('homeTopicsError');
     const backBtn     = document.getElementById('homeBack');
+    const homeExitBtn = document.getElementById('homeExitBtn');
     const continueBtn = document.getElementById('homeContinue');
     /* SCREEN 2: chat */
     const card        = document.getElementById('tutor-card');
@@ -828,6 +998,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const topbarStreak= document.getElementById('topbarStreak');
     const chatBackBtn = document.getElementById('tutorBackBtn');
     const clearChatBtn= document.getElementById('tutorClearBtn');
+    const chatExitBtn = document.getElementById('tutorExitBtn');
     const summaryText = document.getElementById('sessionSummaryText');
     const summaryVideo= document.getElementById('sessionSummaryVideo');
     const summaryContinue = document.getElementById('summaryContinue');
@@ -1708,11 +1879,19 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateTopbar(){
       /* Rezultat/Quick mod je kontekst-slobodan: bez razreda i teme, samo mod. */
       const resultMode = (state.mode === 'quick');
+      /* Razred ostaje vidljiv u SVIM modovima, i u Rezultatu. Ranije se ovdje
+         skrivao, ali je `.hidden` nad `.tutor-pill` bio bez efekta (CSS
+         redoslijed), pa se pravilo nikad nije izvršilo — a razred je jedini
+         stalni orijentir u zaglavlju. Popravljanjem CSS-a bi tiho nestao, pa
+         se namjera ovdje eksplicitno povlači umjesto da se pusti kao regresija. */
       topbarGrade.textContent = state.grade + '. razred';
-      topbarGrade.classList.toggle('hidden', resultMode);
       topbarMode.textContent = MODE_LABELS[state.mode] || '';
       const ctx = resultMode ? '' : (state.topicName || state.oblast || '');
       topbarTopic.textContent = ctx;
+      /* Naziv lekcije je jedini pill koji se stvarno skraćuje („…“). Sadržaj
+         elementa ostaje pun — skraćivanje je čisto vizuelno, pa ga čitači
+         ekrana čitaju cijelog; `title` isti taj tekst daje i mišu. */
+      if (ctx) topbarTopic.title = ctx; else topbarTopic.removeAttribute('title');
       topbarTopic.classList.toggle('hidden', !ctx);
       const ns = storedNextState();
       updateStreakPill(ns ? ns.correct_streak : 0, state.mode);
@@ -1793,6 +1972,41 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     if (clearChatBtn) clearChatBtn.addEventListener('click', ()=>openModal('#confirm-clear'));
 
+    /* ------- „Zatvori“ = izlazak iz MAT-BOT-a -------
+       MAT-BOT živi u Thinkific iframeu i NEMA vlastiti prozor koji bi mogao
+       zatvoriti (`window.close()` na iframe ne radi, a `window.top.location`
+       je cross-origin). Izlaz se zato OBJAVLJUJE roditeljskoj stranici jednom
+       porukom, a šta zatvaranje znači (skloni lightbox, vrati na lekciju)
+       odlučuje Thinkific strana. Poruka je zatvorena konstanta bez ijednog
+       podatka učenika — ni teksta, ni slike, ni historije — pa je `'*'` kao
+       targetOrigin bezopasan i nužan (školska domena nije poznata unaprijed).
+
+       Ako niko ne sluša — samostalno otvorena stranica, `?t=test` — pad je
+       TIH: učenik ostane u MAT-BOT-u i dobije poruku, umjesto praznog ekrana.
+       Ista radnja se veže i na chat i na kontrolni; potvrda je jedna. */
+    let exitInFlight = false;
+    function requestExitMatbot(){ openModal('#confirm-exit'); }
+    function performExitMatbot(){
+      if (exitInFlight) return;   // dvostruki klik / Enter ne smiju poslati dvije poruke
+      exitInFlight = true;
+      let delivered = false;
+      try {
+        if (window.parent && window.parent !== window && window.parent.postMessage){
+          window.parent.postMessage({ type: 'matbot:close', source: 'matbot' }, '*');
+          delivered = true;
+        }
+      } catch(_){}
+      if (!delivered) showToast('Zatvaranje radi samo unutar Thinkifica.', 'warn');
+      setTimeout(()=>{ exitInFlight = false; }, 1200);
+    }
+    if (chatExitBtn) chatExitBtn.addEventListener('click', requestExitMatbot);
+    if (homeExitBtn) homeExitBtn.addEventListener('click', requestExitMatbot);
+    const doExitBtn = document.getElementById('doExitMatbot');
+    if (doExitBtn) doExitBtn.addEventListener('click', ()=>{
+      closeModal('#confirm-exit');
+      performExitMatbot();
+    });
+
     /* Interni reset ostaje dostupan ako zatreba: briše transcript, historiju,
        zadnji zadatak i fazu, pa vodi na početni ekran. Nije izložen kao topbar dugme. */
     function startFreshTutorConversation(){
@@ -1813,6 +2027,7 @@ document.addEventListener('DOMContentLoaded', () => {
       grade: document.getElementById('examTopbarGrade'),
       oblast: document.getElementById('examTopbarOblast'),
       back: document.getElementById('examBackBtn'),
+      exit: document.getElementById('examExitBtn'),
       loadingOblast: document.getElementById('examLoadingOblast'),
       errorMsg: document.getElementById('examErrorMsg'),
       retry: document.getElementById('examRetryBtn'),
@@ -1863,6 +2078,8 @@ document.addEventListener('DOMContentLoaded', () => {
       exam.oblastId = oblastId; exam.oblastName = oblastName; exam.grade = state.grade;
       examEls.grade.textContent = state.grade + '. razred';
       examEls.oblast.textContent = oblastName;
+      // isti razlog kao kod naziva lekcije: dug naziv oblasti se skraćuje vizuelno
+      if (oblastName) examEls.oblast.title = oblastName; else examEls.oblast.removeAttribute('title');
       home.hidden = true; card.hidden = true; examCard.hidden = false;
       /* Kontrolni ekran ide u dokumentni tok: jedan scroll stranice, bez
          ugniježđenog scrollbara unutar kartice (živi nalaz). */
@@ -1878,6 +2095,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     examEls.back.addEventListener('click', exitExamToHome);
     examEls.errorBack.addEventListener('click', exitExamToHome);
+    /* Isti izlaz iz aplikacije i sa ekrana kontrolnog: bez ovoga bi „Zatvori“
+       nestajao tačno na ekranu s kojeg ga je najlakše zatražiti. */
+    if (examEls.exit) examEls.exit.addEventListener('click', requestExitMatbot);
 
     async function startExam(relative){
       if (exam.busy) return;
@@ -2178,8 +2398,19 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleTutorImageChange(input){
       if (!input) return;
       input.addEventListener('change', ()=>{
-        const f = tutorImageFile();
-        if (!f) { clearTutorImage(); return; }
+        /* Galerija i kamera su DVA odvojena <input> polja i oba mogu istovremeno
+           držati fajl, a `tutorImageFile()` uvijek preferira kameru. Izbor iz
+           galerije POSLIJE fotografije je zato tiho ostajao bez efekta — poslala
+           bi se stara fotografija. Novi izbor prazni drugo polje, pa je priložena
+           uvijek ZADNJA odabrana slika. Otkazan dijalog (bez fajla) NE dira
+           drugo polje: otkazivanje ne smije skinuti već priložen prilog. */
+        const f = (input.files && input.files[0]) ? input.files[0] : null;
+        if (!f) { if (!tutorImageFile()) clearTutorImage(); return; }
+        const other = (input === tutorCameraImg) ? tutorImg : tutorCameraImg;
+        if (other && other.files && other.files.length){
+          try { const dt = new DataTransfer(); other.files = dt.files; } catch(_){}
+          other.value = '';
+        }
         /* Odbijamo unaprijed SAMO ono što backend sigurno ne prihvata i što se
            vidi bez čitanja bajta: poznat nepodržan tip ili prevelik fajl. */
         const typeKnown = !!(f.type && f.type.indexOf('image/') === 0);
@@ -2200,6 +2431,20 @@ document.addEventListener('DOMContentLoaded', () => {
     handleTutorImageChange(tutorImg);
     handleTutorImageChange(tutorCameraImg);
     if (tutorImgRemove) tutorImgRemove.addEventListener('click', clearTutorImage);
+    /* + i 📷 su <label>-i nad skrivenim <input type=file>: miš ih otvara, ali
+       tastatura nije imala nikakav put do njih (label nije fokusabilan, a input
+       je `display:none`). `tabindex` u markupu + ovo daje Enter/Space. Kada je
+       turn u toku, `setTutorBusy` postavlja `aria-disabled`, pa i tastatura mora
+       poštovati istu blokadu kao `pointer-events:none` za miš. */
+    [tutorImgBtn, tutorCameraBtn].forEach(el=>{
+      if (!el) return;
+      el.addEventListener('keydown', (e)=>{
+        if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return;
+        if (el.getAttribute('aria-disabled') === 'true') return;
+        if (e.preventDefault) e.preventDefault();
+        el.click();
+      });
+    });
     /* posljednja odbrana od curenja memorije ako korisnik zatvori/osvježi tab */
     window.addEventListener('pagehide', revokeTutorImagePreview);
 

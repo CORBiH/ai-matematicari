@@ -255,7 +255,18 @@ function loadPage(options = {}) {
   const doc = new Doc();
   const network = { requests: [], responder: null };
 
+  /* Roditeljski prozor (u produkciji: Thinkific stranica oko iframea).
+   * Postoji da bi test mogao DOKAZATI da „Izađi“ objavljuje tačno jednu
+   * `matbot:close` poruku — bez njega bi izlazak bio nedokaziv, a to je jedina
+   * radnja koja učenika izvodi iz aplikacije. `options.parent === false`
+   * simulira samostalno otvorenu stranicu (niko ne sluša). */
+  const parentMessages = [];
+  const parentWindow = options.parent === false ? undefined : {
+    postMessage(message, targetOrigin) { parentMessages.push({ message, targetOrigin }); },
+  };
+
   const win = {
+    parent: parentWindow,
     MathJax: undefined,
     matchMedia: () => ({ matches: false, addEventListener() {}, removeEventListener() {} }),
     scrollTo() {},
@@ -308,7 +319,7 @@ function loadPage(options = {}) {
   const ui = sandbox.__ui;
   if (!ui) throw new Error('page bootstrap did not run');
   if (options.sessionId !== false) ui.setSessionId(options.sessionId || 'test-session');
-  return { ui, doc, win, sandbox, network };
+  return { ui, doc, win, sandbox, network, parentMessages };
 }
 
 /** JSON odgovor u obliku koji stvarna ruta vraća. */
