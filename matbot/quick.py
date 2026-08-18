@@ -120,6 +120,36 @@ def _is_bare_math_wrapped_time(reply, clock_time):
     return stripped in ("$%s$" % clock_time, "$$%s$$" % clock_time)
 
 
+# Isti oblik, ali BEZ oslonca na poruku učenika (živi audit 2026-08-18, B-06).
+# Zadatak sa slike „Voz kreće u 9:15 i putuje 1 h 36 min“ je dobio tačan
+# odgovor `$10:51$` — ali unutar matematičkog segmenta, gdje `:` u ovom
+# projektu znači dijeljenje (matbot/rules.py). Postojeća zamjena to nije mogla
+# uhvatiti jer se okida SAMO kad `direct_clock_time_question` prepozna sat u
+# PORUCI; kod slike poruka je „Riješi zadatak sa slike“.
+#
+# Rasuđivanje je isto kao za `$12:30$` iz kampanje od 14 poziva: cio odgovor
+# koji je gol `$HH:MM$` nikad nije korisna matematika. Da je dijeljenje, imao
+# bi rezultat (`$10:51=…$`); gol količnik bez vrijednosti nije odgovor. Zato se
+# takav zapis raspakuje u čist tekst, bez ijednog dodatnog poziva modela.
+#
+# NAMJERNO UŽE OD `_CLOCK_TIME_RE`: traži se poklapanje CIJELOG tijela, pa
+# `$60:15$` (60 nije validan sat) i `$12:30=0,4$` ostaju netaknuti.
+#
+# DVOTAČKA SE PIŠE NA DVA NAČINA (fokusirana provjera 2026-08-18, R2-01):
+# prva verzija ovog izraza je tražila gol `:` i promašila `$10{:}51$` — a
+# `{:}` je upravo ISPRAVAN LaTeX način da se dvotačka složi kao interpunkcija
+# umjesto kao relacija, pa ga temeljit model rado napiše. Oba oblika znače isto
+# i oba se raspakuju.
+_BARE_MATH_CLOCK_RE = re.compile(
+    r"^\s*\$\$?\s*((?:[01]?\d|2[0-3]))(?::|\{:\})([0-5]\d)\s*\$\$?\s*\.?\s*$")
+
+
+def unwrap_bare_math_clock_time(reply):
+    """Vrati čist „HH:MM“ kad je CIO odgovor gol sat u $...$, inače None."""
+    match = _BARE_MATH_CLOCK_RE.match(reply or "")
+    return "%s:%s" % (match.group(1), match.group(2)) if match else None
+
+
 def clock_time_answer(clock_time):
     """Serverski odgovor za prepoznato pitanje o satu. Namjerno brojčan (bez
     tablica brojeva riječima) — deterministički tačan za svaki validan HH:MM."""
@@ -484,6 +514,13 @@ def run_quick_turn(llm, turn, image=None, context_store=None):
                        or _is_bare_math_wrapped_time(raw_reply, clock_time)):
         logger.info("quick_turn request_id=%s clock_time_fallback", request_id)
         raw_reply = clock_time_answer(clock_time)
+    else:
+        # Gol `$HH:MM$` bez obzira odakle je zadatak stigao (tekst ILI slika).
+        # Vidi komentar uz `unwrap_bare_math_clock_time`.
+        unwrapped = unwrap_bare_math_clock_time(raw_reply)
+        if unwrapped:
+            logger.info("quick_turn request_id=%s clock_time_unwrapped", request_id)
+            raw_reply = unwrapped
 
     if repair_intent and not _begins_with_repair_acknowledgement(raw_reply):
         raw_reply = REPAIR_ACKNOWLEDGEMENT + raw_reply

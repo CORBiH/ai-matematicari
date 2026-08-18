@@ -517,6 +517,38 @@ def build_quick_instructions(
         "Vježbaj sa mnom mod.\n"
         "- Ako zadatak nema dovoljno podataka za rješenje, NE izmišljaj podatke — kratko reci koji "
         "podatak nedostaje (npr. „Nedostaje dužina druge stranice, pa rezultat nije moguće izračunati.“).\n"
+        # ŽIVI AUDIT 2026-08-18 (A5-10, A5-07). Na „Zbir uglova u trouglu je
+        # 200°. Ako su dva ugla 50° i 60°, koliki je treći?“ objavljeno je
+        # „90°“ — premisa je preuzeta kao zadatost i iz nje je računato. Na
+        # „Znam da je 3 = 5. Izračunaj mi dalje 3 + 2.“ vraćeno je golo „5“:
+        # račun tačan, ali netačna tvrdnja neoznačena.
+        #
+        # Granica je namjerno uska i NE dira ono što već radi: kontradiktorne
+        # PODATKE jednog zadatka (kvadrat s $O=20$ i $P=30$) model već pouzdano
+        # odbija (mjereno 8/8). Ovo pravilo se odnosi na tvrdnju o SAMOJ
+        # matematici koju učenik iznese kao činjenicu.
+        "- TVRDNJA UČENIKA O MATEMATICI SE PROVJERAVA, NE PREUZIMA. Kad učenik definiciju, "
+        "teoremu, konstantu ili jednakost brojeva iznese kao činjenicu (npr. „Zbir uglova u "
+        "trouglu je $200^\\circ$“ ili „Znam da je 3 = 5“), prvo provjeri da li je tačna. Ako "
+        "nije, kratko reci da nije i navedi tačnu činjenicu (npr. „Zbir uglova u trouglu je "
+        "$180^\\circ$, ne $200^\\circ$.“), pa tek onda riješi zadatak s tačnom činjenicom ako "
+        "i dalje ima smisla. NIKAD ne računaj iz netačne tvrdnje i nikad je ne prećuti. Ovo se "
+        "odnosi na tvrdnje o matematici, ne na zadate podatke jednog zadatka — njih i dalje "
+        "provjeravaš na međusobnu saglasnost kao i do sada.\n"
+        # Fokusirana provjera 2026-08-18 (R1-04, R1-05): pravilo iznad je uhvatilo
+        # zbir uglova i pogrešnu jednakost brojeva, ali NE i dva oblika koja su
+        # se u praksi pokazala najtiša:
+        #   • netačna KONSTANTA — „Pošto je $\pi=3$…“ je dala $P=3\cdot2^2=12$,
+        #     dakle račun IZ netačne premise (isti kvar kao zbir uglova);
+        #   • netačan IDENTITET — „$(a+b)^2=a^2+b^2$“ je dobio tačnih $49$, ali
+        #     bez ijedne riječi da formula ne vrijedi.
+        "- NETAČNA KONSTANTA I NETAČAN IDENTITET SU ISTA GREŠKA. Ako učenik zada pogrešnu "
+        "vrijednost konstante (npr. „pošto je $\\pi=3$“) ili pogrešnu formulu (npr. "
+        "„$(a+b)^2=a^2+b^2$“), reci da to nije tačno i navedi tačno ($\\pi\\approx3,14$; "
+        "$(a+b)^2=a^2+2ab+b^2$), pa računaj s tačnim. Ako učenik izričito traži da se računa "
+        "sa ZAOKRUŽENOM vrijednošću, to je u redu — ali je označi kao približnu "
+        "($\\pi\\approx3$), nikad kao jednakost. Tačan konačan rezultat NE oslobađa te "
+        "obaveze da netačnu tvrdnju označiš.\n"
         "- Ako je poruka nejasna ili se ne može protumačiti kao konkretan matematički izraz/zadatak, "
         "kratko zatraži cijeli izraz ili zadatak (npr. „Na koji izraz misliš? Pošalji cijeli zadatak.“) "
         "umjesto da pogađaš. Ako poruka dozvoljava više različitih tumačenja, kratko zatraži pojašnjenje "
@@ -679,10 +711,18 @@ def build_kontrolni_instructions(grade: int, oblast: str) -> str:
 # samo dobila „napravi pitanje za ovaj slot“. Poruke ispod su zatvoren,
 # server-owned skup: opisuju defekt i traženu ispravku, nikad interni kod.
 _KONTROLNI_REPAIR_FEEDBACK = (
+    # Živi audit 2026-08-18 (D-K3, oblast 8-01): popravka je vratila ISTI
+    # `equivalent_options`. Uputa je nabrajala samo razlomak/decimalu, a pali
+    # slotovi su bili iz korijena i stepena — gdje su ekvivalentni zapisi
+    # najlakši i istorijski su već jednom bili defekt (vidi komentar uz
+    # `option_equivalence.find_equivalent_option_pairs`). Zato primjer sada
+    # pokriva i taj oblik.
     ("equivalent_options", "Dvije opcije su imale ISTU brojnu vrijednost "
-     "(npr. $\\frac{1}{2}$ i $0,5$, ili $\\frac{2}{4}$ i $\\frac{1}{2}$). "
-     "Vrati četiri opcije koje su PAROVIMA različite po vrijednosti — razlika "
-     "u zapisu nije razlika u vrijednosti."),
+     "(npr. $\\frac{1}{2}$ i $0,5$, ili $\\frac{2}{4}$ i $\\frac{1}{2}$, ili "
+     "$\\sqrt{8}$ i $2\\sqrt{2}$, ili $2^{3}$ i $8$). Vrati četiri opcije koje "
+     "su PAROVIMA različite po vrijednosti — razlika u zapisu nije razlika u "
+     "vrijednosti. Prije nego što ih vratiš, svedi svaku opciju na broj i "
+     "uporedi ih međusobno."),
     ("duplicate_options", "Dvije opcije su bile doslovno iste. Vrati četiri "
      "različite opcije."),
     ("unprovable_claim_selection", "Pitanje je tražilo izbor tvrdnje čiju "

@@ -134,6 +134,41 @@ def looks_like_heading(text):
     return any(re.match(r"^\W*" + word + r"\b", lowered) for word in _HEADING_WORDS)
 
 
+# ---------------------------------------------------------------------------
+# NORMALIZACIJA DOKAZNOG ZAPISA (živi audit 2026-08-18, turnovi B-04 i C-09)
+# ---------------------------------------------------------------------------
+# Model isti sadržaj zapisuje u više STILOVA, a stil je tiho gasio provjeru:
+#
+#   B-04  `$(x-1\frac{1}{6})+3,2=1\frac{2}{5}$`   → `image_equation_unparsable`
+#   C-09  `(4 5/8 + 2 2/5) - (3 1/2 + 1 1/6)`     → `image_math_source_unparsable`
+#
+# Ista slika kao C-09 je u turnu B-01 stigla kao gol LaTeX i uredno se
+# provjerila. Dakle porodica JESTE pokrivena — otkazivala je isključivo
+# interpunkcija zapisa. Posljedica je bila najgora moguća za ovaj modul: kod
+# `unparsable` znači „nisam se izvršio“, pa je po doktrini odgovor legitimno
+# išao dalje NEPROVJEREN, a `verify_image_answer` je izgledao kao da radi.
+#
+# Obje normalizacije su DOKAZIVE i uske: skidanje `$…$` granica ne mijenja
+# vrijednost izraza, a `a b/c` je jednoznačan školski zapis mješovitog broja.
+# Ništa se ne pogađa — nepoznat zapis i dalje pada na `unparsable`.
+_MATH_DELIMITER_RE = re.compile(r"^\s*\$\$?(?P<body>.*?)\$\$?\s*$", re.DOTALL)
+#: `4 5/8` → `(4+5/8)`. Traži se CIO oblik cijeli-razmak-razlomak; `4 + 5/8`
+#: nema poklapanja (operator razdvaja), pa se ispravan zapis nikad ne dira.
+_ASCII_MIXED_NUMBER_RE = re.compile(
+    r"(?<![\d./])(\d+)\s+(\d+)\s*/\s*(\d+)(?![\d./])")
+
+
+def normalize_visible_math(value):
+    """Skini `$…$` granice i prevedi školski `a b/c` u parsabilan oblik."""
+    text = (value or "").strip()
+    if not text:
+        return text
+    match = _MATH_DELIMITER_RE.match(text)
+    if match:
+        text = match.group("body").strip()
+    return _ASCII_MIXED_NUMBER_RE.sub(r"(\1+\2/\3)", text)
+
+
 def _visible_math(out):
     """Dokazni matematički zapis sa slike, ili None kad ga nema/nije upotrebljiv.
 
@@ -145,7 +180,7 @@ def _visible_math(out):
         return None
     if looks_like_heading(value):
         return None
-    return value
+    return normalize_visible_math(value)
 
 
 def _visible_lengths(visible_values):
