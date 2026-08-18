@@ -519,6 +519,45 @@ _BARE_OTHER_COMMAND_RESIDUE_RE = re.compile(
     r"(?<![\\A-Za-z])(?:" + _BARE_OTHER_COMMAND_ALTERNATION + r")" + _COMMAND_BOUNDARY
 )
 
+# ---------------------------------------------------------------------------
+# GRANICA SKENERA GOLIH KOMANDI (živi A/B modela, 2026-08-18, zadatak UNI-2)
+# ---------------------------------------------------------------------------
+# Oba skenera iznad traže IZGUBLJEN BACKSLASH: poznata komanda koja je unutar
+# matematike ostala kao gola riječ („2 cdot 3“, „4ecdot2“). Skenirali su CIO
+# matematički segment — uključujući SADRŽAJ `\text{…}`.
+#
+# Unutar `\text{…}` izgubljen backslash NE POSTOJI kao pojava: taj sadržaj je
+# po definiciji proza ili mjerna oznaka, a `\text{min}` je VEĆ potpun i
+# ispravan zapis. Posljedica je bila lažno odbijanje potpuno tačnog odgovora:
+#
+#     $45\,\text{min}=0,75\,\text{h}$   →  bare_command_in_math:min
+#
+# jer je `min` (funkcija $\min$) u MATHJAX_COMMAND_ALLOWLIST. Isto je padalo i
+# `\text{sin}`, `\text{max}`. „min“ je standardna oznaka za minutu, pa je svaki
+# idiomatski zapis pretvaranja vremena padao zatvoreno na kanonsku poruku.
+#
+# Popravka je GRANICA PARSIRANJA, ne izuzetak za riječ: sadržaj propisno
+# napisanih proznih argumenata se MASKIRA prije skeniranja golih komandi.
+# Namjerno se maskira SAMO PAYLOAD, a ime komande i vitičaste zagrade ostaju —
+# time se ne mijenja nijedna druga provjera i ostaje uparenost zagrada.
+#
+# KRITIČNO: regex traži BACKSLASH ispred imena, pa POKVAREN zapis `text{min}`
+# (bez backslasha — upravo defekt koji `_BARE_COMMAND_RESIDUE_RE` i postoji da
+# uhvati) NIJE maskiran i i dalje pada. Detekcija golih funkcija IZVAN proznog
+# konteksta (`$min(a,b)$`, `$sin x$`) ostaje netaknuta.
+_PROSE_ARGUMENT_PAYLOAD_RE = re.compile(
+    r"(\\(?:text|mathrm|mathbb|mathcal|operatorname)\s*\{)([^{}]*)(\})")
+
+
+def _mask_prose_argument_payloads(segment: str) -> str:
+    """Zamijeni sadržaj `\\text{…}` i srodnih razmacima ISTE dužine.
+
+    Koristi se ISKLJUČIVO kao ulaz skenerima golih komandi. Dužina se čuva da
+    prijavljeni isječak i svaka buduća provjera zasnovana na poziciji ostanu
+    tačni; struktura (`\\text{` … `}`) ostaje netaknuta."""
+    return _PROSE_ARGUMENT_PAYLOAD_RE.sub(
+        lambda m: m.group(1) + (" " * len(m.group(2))) + m.group(3), segment)
+
 # Živi nalaz (Phase 7 live test, "Dijagonala kvadrata"): model je vratio
 # UDVOSTRUČEN backslash neposredno ispred poznate LaTeX komande — npr.
 # doslovno "\\\\sqrt{2}" (DVA backslash znaka, ne jedan) umjesto "\\sqrt{2}".
@@ -983,9 +1022,13 @@ def find_unsafe_math_issues(text: str) -> list:
             issues.append("control_character")
     for part in _inside_math_parts(text):
         issues.extend(find_unknown_math_commands(part))
-        if _BARE_COMMAND_RESIDUE_RE.search(part):
+        # Skeneri IZGUBLJENOG BACKSLASHA ne smiju čitati sadržaj propisno
+        # napisanog `\text{…}` — tamo izgubljen backslash ne postoji kao
+        # pojava. Vidi `_mask_prose_argument_payloads`.
+        scannable = _mask_prose_argument_payloads(part)
+        if _BARE_COMMAND_RESIDUE_RE.search(scannable):
             issues.append("unrepaired_bare_command_in_math")
-        bare_other = _BARE_OTHER_COMMAND_RESIDUE_RE.search(part)
+        bare_other = _BARE_OTHER_COMMAND_RESIDUE_RE.search(scannable)
         if bare_other:
             issues.append("bare_command_in_math:" + bare_other.group(0)[:24])
         if _has_residual_literal_newline(part):
