@@ -49,3 +49,12 @@ scratchpad/final_core_v1_acceptance/
 # reprodukcija, revizija laznih odbijanja i zive kampanje su MJERENJA i dokazni
 # materijal, ne izvorni kod — zvanicna kapija odbija prljavo stablo.
 scratchpad/triangle_freeze/
+
+# Zive kampanje od 2026-08-18 (audit proizvoda, A/B reasoning efforta, A/B
+# modela i potvrdni A/B). Isti razlog kao sve gore: sirovi turnovi, presude i
+# metrike su MJERENJA, ne izvorni kod, a zvanicna kapija odbija rad u prljavom
+# radnom stablu.
+scratchpad/live_product_audit_2026_08_18/
+scratchpad/ab_reasoning_effort_2026_08_18/
+scratchpad/ab_model_2026_08_18/
+scratchpad/ab_model_confirm_2026_08_18/
