@@ -113,12 +113,27 @@ EXPLAIN_MODEL = os.environ.get("MATBOT_EXPLAIN_MODEL", "gpt-5.6-luna")
 EXPLAIN_REASONING_EFFORT = os.environ.get("MATBOT_EXPLAIN_REASONING_EFFORT", "low")
 
 # --- „Samo rezultat“ (Quick) — vlastiti izbor modela, SAMO za tekst ---------
-# Ista migracija i isti mehanizam kao Explain iznad (2026-08-15). VAŽNO:
-# odnosi se ISKLJUČIVO na tekstualni Quick poziv. Poziv sa SLIKOM namjerno
-# ostaje na modelu adaptera (OPENAI_MODEL_TEXT): cijela stroga kapija
-# čitljivosti (D35-5/D35-6) i nezavisna provjera (imagecheck) mjerene su na
-# tom modelu, a ponašanje vida drugog modela ovdje nije dokazano.
-QUICK_MODEL = os.environ.get("MATBOT_QUICK_MODEL", "gpt-5.6-luna")
+# Isti mehanizam vlasništva kao Explain iznad: auditirana vrijednost živi u
+# KODU, `.env` je smije prepisati samo svjesno, a odstupanje efektivnog izbora
+# pada zatvoreno kroz `release_config.REQUIRED_EFFECTIVE_CONFIG`.
+#
+# MIGRACIJA 2026-08-18: tekstualni Quick prelazi s `gpt-5.6-luna` na
+# `gpt-5.6-sol`. Odluka je mjerena, ne pretpostavljena — potvrdni upareni A/B
+# na 150 zadataka (300 odgovora, isti prompt, naizmjeničan redoslijed krakova,
+# effort `low` u oba):
+#
+#   matematička tačnost   Luna 124/150 (82,7%)  →  Sol 143/150 (95,3%)
+#   konceptualne greške   Luna 9                →  Sol 1
+#   McNemar (22:3)        p = 0,000157
+#
+# Presudan je bio JEDAN mehanizam: brojnost unije računata kao |A|+|B|-1.
+# Luna ga je napravila u 7 od 14 prilika u kojima je presjek stvarno imao dva
+# elementa; Sol nijednom. Effort NIJE poluga koja to rješava — zaseban A/B
+# (low vs medium, isti korpus) dao je p = 0,69 i pogoršao baš skupove.
+#
+# SLIKA I DALJE IMA VLASTITI IZBOR (QUICK_IMAGE_MODEL niže) — ova migracija ga
+# ne dira, kao ni Explain, Kontrolni, Tutor i Reviewer.
+QUICK_MODEL = os.environ.get("MATBOT_QUICK_MODEL", "gpt-5.6-sol")
 QUICK_REASONING_EFFORT = os.environ.get("MATBOT_QUICK_REASONING_EFFORT", "low")
 
 # --- „Samo rezultat“ — poziv SA SLIKOM (migracija 2026-08-15) ---------------
@@ -128,7 +143,9 @@ QUICK_REASONING_EFFORT = os.environ.get("MATBOT_QUICK_REASONING_EFFORT", "low")
 # Luna 79,5% (15 kritičnih OCR grešaka, uklj. > → ≥ i 53°30' → 35°30') i
 # Terra 85,2% (4 računske greške na tačno pročitanom ulazu). Za mod koji
 # vraća gotov rezultat sa slike, profil „nikad pogrešan na čisto pročitanom“
-# je presudan — zato slika ide na Sol, a tekst OSTAJE na Luni.
+# je presudan — zato slika ide na Sol. (Od 2026-08-18 i TEKST ide na Sol, ali
+# po vlastitom, zasebno mjerenom dokazu — vidi QUICK_MODEL iznad. Dva izbora
+# ostaju odvojena podešavanja i mogu se nezavisno vratiti.)
 #
 # detail="original" — isto podešavanje kojim je benchmark mjeren (SDK 2.52.1
 # ga podržava): model vidi originalnu fotografiju, bez downscalinga.

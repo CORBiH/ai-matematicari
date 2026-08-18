@@ -365,7 +365,7 @@ def test_typed_task_with_math_does_not_switch_out_of_quick():
 # ---------------------------------------------------------------------------
 
 def test_model_identities_unchanged():
-    assert (config.QUICK_MODEL, config.QUICK_REASONING_EFFORT) == ("gpt-5.6-luna", "low")
+    assert (config.QUICK_MODEL, config.QUICK_REASONING_EFFORT) == ("gpt-5.6-sol", "low")
     assert (config.QUICK_IMAGE_MODEL, config.QUICK_IMAGE_REASONING_EFFORT,
             config.QUICK_IMAGE_DETAIL) == ("gpt-5.6-sol", "low", "original")
 

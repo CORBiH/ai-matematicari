@@ -123,9 +123,11 @@ REQUIRED_EFFECTIVE_CONFIG = {
     # isti mehanizam kojim je zaštićen i izbor brzog modela.
     "explain_model": "gpt-5.6-luna",
     "explain_reasoning_effort": "low",
-    # „Samo rezultat“ (migracija 2026-08-15): tekstualni Quick poziv — slika
-    # namjerno ostaje na modelu adaptera (vidi matbot/config.py).
-    "quick_model": "gpt-5.6-luna",
+    # „Samo rezultat“ — tekstualni Quick poziv. Migracija 2026-08-18 s Lune na
+    # Sol; dokaz je upareni A/B na 150 zadataka (82,7% → 95,3%, McNemar
+    # p = 0,000157), obrazloženje uz QUICK_MODEL u matbot/config.py. Slika ima
+    # SVOJ izbor niže i ovom migracijom nije dirnuta.
+    "quick_model": "gpt-5.6-sol",
     "quick_reasoning_effort": "low",
     # Slika u „Samo rezultat“ (migracija 2026-08-15, vision benchmark):
     # Sol / low / original — tekstualni Quick ostaje na Luni.

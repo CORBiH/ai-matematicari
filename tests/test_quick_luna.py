@@ -1,10 +1,16 @@
-"""„Samo rezultat“ v1 — identitet modela i ugovor efektivnog prompta.
+"""„Samo rezultat“ — identitet modela i ugovor efektivnog prompta.
 
-Dvije migracije 2026-08-15: (1) tekstualni Quick poziv → gpt-5.6-luna / low
-(isti obrazac kao Explain); (2) poziv sa SLIKOM → gpt-5.6-sol / low /
+Migracije 2026-08-15: (1) tekstualni Quick poziv → gpt-5.6-luna / low (isti
+obrazac kao Explain); (2) poziv sa SLIKOM → gpt-5.6-sol / low /
 detail="original", po vision benchmarku (scratchpad/vision_ab_test: Sol 94,3%,
 100% na štampanom, 0 čisto računskih grešaka). Stroga kapija čitljivosti
 (D35-5/D35-6) i nezavisni imagecheck ostaju netaknuti.
+
+MIGRACIJA 2026-08-18: i TEKSTUALNI poziv prelazi na gpt-5.6-sol / low, po
+uparenom A/B na 150 zadataka (Luna 124/150 → Sol 143/150; McNemar p =
+0,000157; mehanizam |A|+|B|-1 kod brojnosti unije 7/14 → 0/14). Effort ostaje
+`low` i prompt se NE mijenja — obrazloženje uz QUICK_MODEL u matbot/config.py.
+Izbor za sliku je zaseban i ovom migracijom nije dirnut.
 
 Baseline prije migracije (gpt-5-mini, 20 živih poziva, sve ručno provjereno):
 20/20 matematički tačno, tačne jedinice, oba rješenja za $x^2=9$, uredno
@@ -23,23 +29,43 @@ from matbot.quick import MAX_HISTORY_MESSAGES, _clean_history
 # 1) IDENTITET MODELA
 # ---------------------------------------------------------------------------
 
-def test_quick_model_is_luna_low_by_code():
-    assert config.QUICK_MODEL == "gpt-5.6-luna"
+def test_quick_text_model_is_sol_low_by_code():
+    assert config.QUICK_MODEL == "gpt-5.6-sol"
     assert config.QUICK_REASONING_EFFORT == "low"
 
 
+def test_quick_migration_did_not_touch_any_other_route():
+    """Migracija 2026-08-18 mijenja SAMO tekstualni Quick izbor."""
+    assert config.QUICK_IMAGE_MODEL == "gpt-5.6-sol"
+    assert config.QUICK_IMAGE_REASONING_EFFORT == "low"
+    assert config.QUICK_IMAGE_DETAIL == "original"
+    assert config.EXPLAIN_MODEL == "gpt-5.6-luna"
+    assert config.KONTROLNI_MODEL == "gpt-5.6-luna"
+    assert config.FAST_MODEL == "gpt-5.6-luna"
+    assert config.FAST_REVIEWER_MODEL == "gpt-5.6-luna"
+    assert config.TUTOR_MODEL == config.OPENAI_MODEL_TEXT
+    assert config.REVIEWER_MODEL == config.OPENAI_MODEL_TEXT
+
+
 def test_release_enforcement_covers_the_quick_choice():
-    assert release_config.REQUIRED_EFFECTIVE_CONFIG["quick_model"] == "gpt-5.6-luna"
+    assert release_config.REQUIRED_EFFECTIVE_CONFIG["quick_model"] == "gpt-5.6-sol"
     assert release_config.REQUIRED_EFFECTIVE_CONFIG["quick_reasoning_effort"] == "low"
     report = release_config.effective_configuration({})
-    assert report["quick_model"] == "gpt-5.6-luna"
+    assert report["quick_model"] == "gpt-5.6-sol"
     assert report["quick_reasoning_effort"] == "low"
+    # Ostale rute u istoj deklaraciji ostaju netaknute.
+    required = release_config.REQUIRED_EFFECTIVE_CONFIG
+    assert required["quick_image_model"] == "gpt-5.6-sol"
+    assert required["explain_model"] == "gpt-5.6-luna"
+    assert required["kontrolni_model"] == "gpt-5.6-luna"
+    assert required["fast_model"] == "gpt-5.6-luna"
 
 
-def test_text_call_sends_luna_and_image_call_sends_sol(monkeypatch):
-    """Tekst → Luna/low. Slika → Sol/low (migracija 2026-08-15, vision
-    benchmark: Sol 94,3% / 0 čisto računskih grešaka — vidi
-    scratchpad/vision_ab_test i obrazloženje u matbot/config.py)."""
+def test_text_call_and_image_call_both_send_sol_low(monkeypatch):
+    """Tekst → Sol/low (migracija 2026-08-18). Slika → Sol/low/original.
+
+    Dva izbora ostaju ODVOJENA podešavanja — poklapaju se u vrijednosti, ali
+    se čitaju iz različitih konstanti i mogu se nezavisno vratiti."""
     llm = OpenAIPracticeLLM()
     seen = {}
 
@@ -52,7 +78,7 @@ def test_text_call_sends_luna_and_image_call_sends_sol(monkeypatch):
 
     with pytest.raises(RuntimeError):
         llm.quick_turn("i", "u")
-    assert seen["model"] == "gpt-5.6-luna"
+    assert seen["model"] == "gpt-5.6-sol"
     assert seen["reasoning_effort"] == "low"
 
     class _FakeImage:
