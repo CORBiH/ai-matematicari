@@ -173,7 +173,18 @@ def test_tutor_instructions_share_a_long_static_prefix_across_lessons():
     b = tutor_prompts.build_tutor_instructions(build(9, "9-05-010"))
     assert _common_prefix_length(a, b) > 6000
     # Dinamički dio (razred/lekcija) je pri KRAJU instrukcija.
-    assert a.find("6. razred") > len(a) // 2
+    #
+    # SONDA JE ZAMIJENJENA (popravka metode 6. razreda, 2026-08-20), a mjerena
+    # invarijanta je ostala ista i provjerava se STROŽE — na OBA prompta, ne
+    # samo na prvom. Zatečena sonda je bio niz „6. razred“, koji u ovom promptu
+    # NIJE dolazio iz razrednog bloka nego iz bloka oblasti „OBLAST —
+    # JEDNAČINE“ („6. razred koristi vezu među članovima; 7-9. razred smiju…“).
+    # Ta rečenica je uklonjena jer je šestašu izričito nudila metodu starijih
+    # razreda; sonda je time mjerila tekst koji više ne postoji, a ne mjesto
+    # dinamičkog dijela. Zaglavlje razrednog bloka je pravi, po razredu
+    # promjenljiv marker i postoji za svaki razred.
+    assert a.find("PRAVILA ZA 6. RAZRED") > len(a) // 2
+    assert b.find("PRAVILA ZA 9. RAZRED") > len(b) // 2
 
 
 def test_reviewer_instructions_share_a_long_static_prefix_across_lessons():

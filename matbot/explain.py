@@ -10,7 +10,8 @@ svoje stanje — isti mehanizam kao practice).
 import logging
 import uuid
 
-from matbot import config, geometry_rules, geometrycheck, lesson_relevance, prompts
+from matbot import (config, geometry_rules, geometrycheck, lesson_relevance,
+                    practice_policy, prompts)
 from matbot.llm import LLMError, failure_diagnostics_kv
 from matbot.mathcheck import find_numeric_inconsistencies
 from matbot.mathsafe import normalize_result_math_transport, sanitize_and_validate_math_text
@@ -65,6 +66,53 @@ def _clean_history(raw_history):
             continue
         cleaned.append({"role": role, "content": content.strip()[:HISTORY_ITEM_RAW_CHARS]})
     return cleaned[-MAX_HISTORY_MESSAGES:]
+
+
+def _observe_method_policy(answer, grade, lesson_title, oblast, lesson_id,
+                           request_id):
+    """MJERENJE, NE KAPIJA — kurikularna politika (PP-1) nad Explain odgovorom.
+
+    ZAŠTO SAMO MJERENJE (forenzički trag modova, 2026-08-20): Vježbajmo istu
+    politiku SPROVODI (`tutor/pipeline.py`), a Explain je do sada nije ni
+    gledao. Ali detektori su građeni nad PAKETOM zadatka, ne nad slobodnom
+    prozom objašnjenja, i nad ovom površinom imaju dvije dokazane klase lažnog
+    pozitiva:
+
+      • leksički: `find_forbidden_method_prose` traži stem „prebac“, pa jednako
+        pogađa „Prebacimo član na drugu stranu“ i „NE prebacujemo član na drugu
+        stranu“ — a druga rečenica UČI tačno pravilo. Uzorak se namjerno NE
+        proširuje negacijom: isti uzorak je živa kapija Vježbajma i takva
+        izmjena bi je oslabila („Ne zaboravi: prebacimo član…“ bi prošlo).
+      • opseg: Explain po dokazanom nalazu D35-3 SMIJE odgovoriti na pitanje iz
+        druge teme, pa šestaš koji pita za Pitagorinu teoremu legitimno vidi
+        $\\sqrt{\\;}$ — isti zapis koji je u Practice paketu prekršaj razreda.
+
+    Zato ovaj poziv NIŠTA ne odbija i ne mijenja odgovor. Loguje kodove (samo
+    interno — CLAUDE.md pravilo 7), razdvojene po TIPU dokaza, i uz njih
+    NEZAVISAN pozitivan signal: koje je uloge nepoznatog člana odgovor imenovao.
+    Kombinacija „leksički pogodak + nijedna uloga“ je kandidat za stvarni
+    prekršaj; „leksički pogodak + imenovana uloga“ je kandidat za negaciju.
+    Tvrda kapija se smije uvesti tek kad TO mjerenje postoji."""
+    policy = practice_policy.resolve(
+        grade=grade, lesson_id=lesson_id, lesson_title=lesson_title,
+        oblast=oblast,
+    )
+    if not policy.scan_method_prose:
+        return
+    codes = practice_policy.text_policy_failures(policy, answer)
+    roles = practice_policy.unknown_member_role_mentions(answer)
+    if not codes and not roles:
+        return
+    logger.info(
+        "explain_method_policy_observed request_id=%s grade=%s topic=%s "
+        "method=%s lexical=%s structural=%s roles_named=%s enforcement=log_only",
+        request_id, policy.grade, lesson_id or "-", policy.equation_method,
+        ",".join(c for c in codes
+                 if c in practice_policy.LEXICAL_POLICY_CODES) or "-",
+        ",".join(c for c in codes
+                 if c in practice_policy.STRUCTURAL_POLICY_CODES) or "-",
+        ",".join(roles) or "-",
+    )
 
 
 def run_explain_turn(llm, turn):
@@ -155,6 +203,9 @@ def run_explain_turn(llm, turn):
         logger.warning("explain_turn request_id=%s category=invalid_output detail=geometry_notation:%s",
                        request_id, ",".join(geometry_issues))
         return {"answer": SAFE_ERROR_MESSAGE, "last_tutor_task": ""}
+
+    _observe_method_policy(answer, turn["grade"], lesson_title, oblast,
+                           lesson_id, request_id)
 
     logger.info(
         "explain_turn request_id=%s ok latency_ms=%s usage=%s",

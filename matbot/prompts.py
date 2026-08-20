@@ -12,6 +12,7 @@ ovaj fajl dodaje SAMO mode-specifične (Practice/Explain/Quick) instrukcije.
 """
 import re
 
+from matbot import practice_policy
 from matbot.mathsegments import DISPLAY, INLINE, TEXT, tokenize_math
 from matbot.rules import build_shared_math_rules
 
@@ -433,18 +434,15 @@ _QUICK_INTENT_CONTRACTS = {
 # brojeva ne bi obarala tačan račun — ali kad učenik traži POSTUPAK, a razred je
 # poznat, metoda mora biti ona koju škola uči, inače šestom razredu objašnjavamo
 # prebacivanje preko znaka jednakosti.
-_QUICK_GRADE_METHOD = {
-    6: (
-        "METODA ZA 6. RAZRED (kad objašnjavaš jednačinu ili nejednačinu):\n"
-        "- Koristi VEZU MEĐU ČLANOVIMA RAČUNSKIH OPERACIJA (nepoznati član): "
-        "nepoznati sabirak = zbir − poznati sabirak; nepoznati umanjilac = "
-        "umanjenik − razlika; nepoznati faktor = proizvod : poznati faktor; "
-        "nepoznati djeljenik = količnik · djelilac; nepoznati djelilac = "
-        "djeljenik : količnik.\n"
-        "- NE objašnjavaj „prebacivanjem preko znaka jednakosti“ i ne uvodi "
-        "negativne brojeve u sam postupak.\n\n"
-    ),
-}
+#
+# TABELA RELACIJA VIŠE NE ŽIVI OVDJE (forenzički trag modova, 2026-08-20).
+# Zatečeni `_QUICK_GRADE_METHOD` je bio RUČNO PREPISANA kopija PP-1 tabele i
+# već se od nje razišao: nije imao ulogu `unknown_minuend` („nepoznati
+# umanjenik = razlika plus umanjilac“), pa je Quick objašnjavao jednačinu
+# $x - a = b$ bez pravila koje joj pripada. Kopija je obrisana; jedini izvor je
+# `practice_policy.equation_method_rule_text()`, koji tabelu gradi iz
+# `UNKNOWN_ROLE_RELATIONS`. Quick zadržava zatečeno USLOVLJAVANJE: blok ide
+# samo kad učenik traži postupak ili provjeru (intent explain/verify).
 
 
 def build_quick_instructions(
@@ -458,8 +456,14 @@ def build_quick_instructions(
     style = _QUICK_GRADE_STYLE.get(grade, _QUICK_GRADE_STYLE[6])
     intent_contract = _QUICK_INTENT_CONTRACTS.get(
         intent, _QUICK_INTENT_CONTRACTS["result"])
-    method_rule = (_QUICK_GRADE_METHOD.get(grade, "")
-                   if intent in ("explain", "verify") else "")
+    # Quick nema razredni blok, pa metodu uzima direktno iz PP-1 politike —
+    # ISTA funkcija koju rules.py splajsa u ostale modove. Prazan string za
+    # razred bez metode nepoznatog člana; prazan red se dodaje samo kad blok
+    # stvarno postoji, pa je razmak u promptu bajt za bajt kao ranije.
+    method_text = practice_policy.equation_method_rule_text(
+        practice_policy.resolve(grade=grade))
+    method_rule = (method_text + "\n"
+                   if method_text and intent in ("explain", "verify") else "")
     shared_rules = build_shared_math_rules(grade, lesson_title, oblast, mode="quick")
     repair_rule = (
         "POSEBNA POPRAVKA RAZGOVORA (obavezno za ovu poruku):\n"

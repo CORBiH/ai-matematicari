@@ -154,18 +154,19 @@ _MATH_NOTATION_RULES = (
 # ---------------------------------------------------------------------------
 
 _GRADE_RULES = {
-    # Redovi metode nepoznatog člana dolaze IZ practice_policy (PP-1) — ista
-    # tabela relacija iz koje deterministički motor jednačina gradi hintove i
-    # rješenja. Divergencija dvije kopije istog pravila (uzrok grade-6
-    # defekta iz audita) time je strukturno nemoguća.
+    # METODA RJEŠAVANJA JEDNAČINA VIŠE NIJE OVDJE (forenzički trag modova,
+    # 2026-08-20). Zatečeni tekst je metodu vezivao zagradom za JEDNU oblast
+    # („oblast „Jednačine, nejednačine i izrazi u Q+““) iako je ograničenje
+    # razredno, pa je pitanje o jednačini postavljeno u lekciji iz druge
+    # oblasti dobijalo pravilo koje doslovno izgleda neprimjenjivo. Formulacija
+    # sada dolazi iz `practice_policy.equation_method_rule_text()` — ista PP-1
+    # tabela relacija, ali upućena i OBJAŠNJAVANJU i vezana za RAZRED. Blok se
+    # dodaje u `build_shared_math_rules` odmah ispod ovog razrednog bloka, pa
+    # ga dobijaju svi modovi koji dobijaju i razredna pravila.
     6: (
         "PRAVILA ZA 6. RAZRED:\n"
         "- Brojevi su iz N0 (prirodni brojevi i nula) i Q+ (nenegativni razlomci/decimalni "
         "brojevi) — NEMA negativnih brojeva i NEMA skupa Z u ovom razredu.\n"
-        "- Jednačine i nejednačine (oblast „Jednačine, nejednačine i izrazi u Q+“) rješavaju "
-        "se METODOM VEZE MEĐU ČLANOVIMA RAČUNSKIH OPERACIJA (nepoznati član), NE "
-        "„prebacivanjem preko znaka jednakosti“:\n"
-        + "\n".join(practice_policy.unknown_member_rule_lines()) + "\n"
         "- Pošto su svi brojevi nenegativni, pitanje okretanja znaka nejednačine množenjem/"
         "dijeljenjem negativnim brojem se u ovom razredu NE javlja.\n"
         # Granica zapisa korijena je JEDNA istina u practice_policy (PP-1) —
@@ -203,8 +204,18 @@ _GRADE_RULES = {
 _GRADE_FALLBACK = 6
 
 
+def _effective_grade(grade):
+    """Razred za koji STVARNO postoje pravila — nepodržan pada na fallback.
+
+    Postoji da bi razredni blok i razredna POLITIKA (PP-1) uvijek govorili o
+    istom razredu: bez ovoga bi 5. razred dobio tekst „PRAVILA ZA 6. RAZRED“
+    uz metodu naslovljenu „METODA ZA 5. RAZRED“ — razred koji ovaj kurikulum
+    uopšte ne poznaje (vidi test_unknown_grade_falls_back_to_grade_6_rules...)."""
+    return grade if grade in _GRADE_RULES else _GRADE_FALLBACK
+
+
 def _grade_rules(grade):
-    return _GRADE_RULES.get(grade, _GRADE_RULES[_GRADE_FALLBACK])
+    return _GRADE_RULES[_effective_grade(grade)]
 
 
 # ---------------------------------------------------------------------------
@@ -234,9 +245,14 @@ _TOPIC_METHOD_RULES = {
     ),
     "jednacine": (
         "OBLAST — JEDNAČINE:\n"
-        "- Metoda rješavanja zavisi od razreda (vidi pravila razreda iznad): 6. razred "
-        "koristi vezu među članovima; 7-9. razred smiju koristiti prebacivanje uz "
-        "promjenu znaka.\n"
+        # RAZRED SAZNAJE SAMO SVOJU METODU (forenzički trag modova, 2026-08-20).
+        # Zatečeni red je nabrajao metode SVIH razreda („7-9. razred smiju
+        # koristiti prebacivanje uz promjenu znaka“), a blok oblasti je
+        # grade-blind — pa je šestaš u istom promptu dobijao i zabranu
+        # prebacivanja i izričitu tvrdnju da je ono negdje dozvoljeno. Metodu
+        # sada imenuje isključivo razredna politika (PP-1), jednim glasom.
+        "- Metodu rješavanja propisuje politika razreda iznad — drugu metodu ne "
+        "uvodi i ne nudi kao alternativu.\n"
         "- Nakon rješavanja, provjeri rezultat uvrštavanjem u polaznu jednačinu kad je "
         "to prirodan dio postupka.\n"
     ),
@@ -449,6 +465,18 @@ def build_shared_math_rules(grade, lesson_title, oblast, mode, student_message="
     # x=-6 ne prestaje važiti zato što je UI postavljen na 6. razred).
     if mode != "quick":
         parts.append(_grade_rules(grade))
+        # METODA JEDNAČINA JE RAZREDNA POLITIKA (PP-1), NE TEKST OBLASTI.
+        # Blok stoji ODMAH uz razredna pravila i PRIJE svakog bloka oblasti, pa
+        # nijedan kasniji tekst ne može ponuditi metodu koju razred ne poznaje.
+        # Isti tekst (jedna funkcija, jedna formulacija) dobijaju Explain,
+        # Practice (Tutor, Recenzent, pomoć) i kontrolni; Quick ga uzima
+        # direktno, jer namjerno nema razredni blok — vidi prompts.py.
+        # Razred bez metode nepoznatog člana (7-9) dobija prazan string i
+        # njegov prompt ostaje bajt za bajt kao prije.
+        method_rule = practice_policy.equation_method_rule_text(
+            practice_policy.resolve(grade=_effective_grade(grade)))
+        if method_rule:
+            parts.append(method_rule)
 
     topic_ids = route_topic_rules(oblast, lesson_title)
     for topic_id in topic_ids:

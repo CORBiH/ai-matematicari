@@ -322,6 +322,77 @@ def unknown_member_rule_lines():
                  for _, relation in UNKNOWN_ROLE_RELATIONS.values())
 
 
+def equation_method_rule_text(policy=None):
+    """Metoda rješavanja/objašnjavanja jednačina, upućena SAMOM OBJAŠNJAVANJU.
+
+    ZAŠTO POSTOJI (forenzički trag modova, 2026-08-20): tabela relacija iznad
+    je do sada u prompt ulazila samo kroz razredni blok `rules._GRADE_RULES[6]`,
+    i to u dva oblika koja su joj oduzimala snagu baš tamo gdje je najpotrebnija:
+    formulisana je kao pravilo o tome kako se jednačina „rješava“ (a ne kako se
+    OBJAŠNJAVA), i vezana zagradom za JEDNU oblast („Jednačine, nejednačine i
+    izrazi u Q+“) iako je ograničenje razredno. Šestaš koji jednačinu spomene u
+    lekciji iz druge oblasti dobijao je pravilo koje doslovno izgleda kao da se
+    na njegovo pitanje ne odnosi.
+
+    Quick je ISTI nalaz već imao i riješio ga RUČNO PREPISANOM tabelom
+    (`prompts._QUICK_GRADE_METHOD`) — a ta kopija se od kanonske već razišla:
+    nije imala ulogu `unknown_minuend`. Tačno to je klasa kvara zbog koje ovaj
+    modul postoji, pa formulacija upućena objašnjavanju živi OVDJE, gradi se iz
+    `UNKNOWN_ROLE_RELATIONS` i nema drugu kopiju.
+
+    Razred čija politika metodu nepoznatog člana ne traži (7-9, `transposition`)
+    ne dobija nijedan dodatni red — prompt mu ostaje bajt za bajt kao prije."""
+    if policy is None or getattr(policy, "equation_method", "") != METHOD_UNKNOWN_MEMBER:
+        return ""
+    grade = getattr(policy, "grade", 6)
+    return (
+        f"METODA ZA {grade}. RAZRED (obavezno kad OBJAŠNJAVAŠ, pokazuješ "
+        "primjer ili rješavaš jednačinu ili nejednačinu — pravilo je RAZREDNO i "
+        "važi za svaku takvu poruku učenika, bez obzira na to iz koje je oblasti "
+        "izabrana lekcija):\n"
+        "- PRVI korak je uvijek: odredi KOJE MJESTO nepoznata zauzima u računskoj "
+        "operaciji (koji je član nepoznat), imenuj tu ulogu učeniku, pa primijeni "
+        "VEZU MEĐU ČLANOVIMA RAČUNSKIH OPERACIJA:\n"
+        + "\n".join(unknown_member_rule_lines()) + "\n"
+        "- Postupak NIKAD ne objašnjavaj „prebacivanjem preko znaka jednakosti“, "
+        "riječima „prebaci na drugu stranu“ ni „uradi isto s obje strane“ — to je "
+        "metoda starijih razreda i učenik je nije učio; ne pominji je ni kao "
+        "usputnu alternativu.\n"
+        "- Ne uvodi negativne brojeve samo da bi izveo takvo prebacivanje: "
+        "postupak ovog razreda ostaje unutar nenegativnih brojeva.\n"
+        "- Isto važi i za nejednačinu: prvo ime uloge nepoznatog člana, pa ista "
+        "veza među članovima, pa granica rješenja.\n"
+    )
+
+
+def unknown_member_role_mentions(text):
+    """Uloge nepoznatog člana koje se STVARNO pominju u tekstu (uzlazni signal).
+
+    ZAŠTO POSTOJI: `find_forbidden_method_prose` je LEKSIČKI detektor i ne
+    razlikuje „Prebacimo član na drugu stranu“ od „NE prebacujemo član na drugu
+    stranu“ — oba sadrže stem „prebac“. Proširivanje tog uzorka negacijom bi
+    OSLABILO živu kapiju Vježbajma (rečenica „Ne zaboravi: prebacimo član…“
+    prošla bi), pa se uzorak namjerno NE dira.
+
+    Umjesto toga se mjeri NEZAVISAN, POZITIVAN signal: imenuje li tekst uopšte
+    ijednu ulogu nepoznatog člana. Kombinacija „leksički pogodak + nijedna
+    uloga“ i „leksički pogodak + imenovana uloga“ razdvaja te dvije rečenice u
+    dijagnostici, bez ijednog novog pravila i bez ijedne nove tabele — imena
+    uloga se čitaju iz `UNKNOWN_ROLE_RELATIONS`.
+
+    GRANICA MJERENJA, izričito: traže se KANONSKI oblici (puno ime uloge i goli
+    nominativ imenice). Kosi padeži („umanjiocem“, „sabirka“) se NE hvataju, pa
+    je rezultat DONJA granica — signal je dijagnostika, nikad dokaz."""
+    lowered = (text or "").lower()
+    found = []
+    for key, (role_name, _relation) in UNKNOWN_ROLE_RELATIONS.items():
+        noun = role_name.split()[-1]
+        if role_name.lower() in lowered or re.search(
+                r"\b" + re.escape(noun) + r"\b", lowered):
+            found.append(key)
+    return tuple(found)
+
+
 def advanced_scope_rule_text():
     """Kurikularna granica naprednih operacija — ide u domenska pravila."""
     return (
@@ -457,6 +528,15 @@ METHOD_PROVENANCE_CODE = "method_provenance_mismatch"
 # Namjerno NIJE `wrong_math` ni `advanced_scope_violation`: matematika je
 # tačna i nije van osnovne škole — samo je van ovog razreda.
 GRADE_CAPABILITY_CODE = "grade_capability_mismatch"
+
+# Kodovi iz `text_policy_failures` razvrstani po TIPU DOKAZA, ne po težini.
+# STRUKTURNI kod dolazi iz matematičkog segmenta (zapis koji tamo ili jeste ili
+# nije); LEKSIČKI kod dolazi iz proze i zato može pogoditi i rečenicu koja isto
+# pravilo zapravo UČI (vidi `unknown_member_role_mentions`). Podjela postoji da
+# bi dijagnostika mogla reći KOJU vrstu dokaza ima — nijedan kod ovim ne postaje
+# blaži i nijedna postojeća kapija ovo ne konsumira.
+STRUCTURAL_POLICY_CODES = frozenset({VISIBLE_DOMAIN_CODE, GRADE_CAPABILITY_CODE})
+LEXICAL_POLICY_CODES = frozenset({FORBIDDEN_METHOD_CODE, ADVANCED_SCOPE_CODE})
 
 
 def text_policy_failures(policy, text):
