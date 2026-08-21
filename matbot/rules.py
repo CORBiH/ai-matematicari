@@ -119,6 +119,18 @@ _MATH_NOTATION_RULES = (
     "- Množenje: $\\cdot$. Školsko dijeljenje u običnom zapisu: „:“ (npr. $12:4$).\n"
     "- Stepen: $x^2$, $a^3$, $(2x)^2$. Korijen: $\\sqrt{20}$.\n"
     "- Decimalni separator u zapisu vidljivom učeniku je zarez: $2,5$, $0,75$ — nikad tačka.\n"
+    # OZNAKA SKUPA PRIRODNIH BROJEVA — konvencija ovog projekta, kurikularno
+    # potkrijepljena: 6. razred ima vlastitu lekciju „Skupovi N i N0“,
+    # a `matbot/mcq_integrity.py` N i N_0 tretira kao RAZLIČITE
+    # domene. Konvencija je dosad stajala samo u Quick promptu i, posredno, u
+    # razrednom bloku 6. razreda („N0 — prirodni brojevi i nula“), pa je
+    # 8. razred u živom auditu (slučaj G8-A1, lekcija o skupovima brojeva)
+    # napisao $\mathbb{N}=\{0,1,2,\dots\}$ — što je po ovoj konvenciji
+    # $\mathbb{N}_0$. Ovdje stoji JEDNOM, za sve modove i sve razrede.
+    "- OZNAKA SKUPA PRIRODNIH BROJEVA: $\\mathbb{N}$ NE sadrži nulu "
+    "($\\mathbb{N}=\\{1,2,3,\\dots\\}$), a $\\mathbb{N}_0$ je sadrži "
+    "($\\mathbb{N}_0=\\{0,1,2,3,\\dots\\}$). Nulu nikad ne navodi kao element "
+    "skupa $\\mathbb{N}$.\n"
     "\n"
     "OBAVEZNA SAMOPROVJERA RAČUNA (prije nego pošalješ odgovor):\n"
     "- PONOVO izračunaj svaku numeričku zamjenu koju si napisao i provjeri SVAKU "

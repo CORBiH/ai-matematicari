@@ -153,15 +153,16 @@ def run_explain_turn(llm, turn):
         validate_explain_output(result.output)
     except LLMError as e:
         logger.warning(
-            "explain_turn request_id=%s category=%s mode=explain %s",
+            "explain_turn request_id=%s stage=model_call category=%s mode=explain %s",
             request_id, e.category, failure_diagnostics_kv(e),
         )
         return {"answer": SAFE_ERROR_MESSAGE, "last_tutor_task": ""}
     except InvalidOutputError as e:
-        logger.warning("explain_turn request_id=%s category=invalid_output detail=%s", request_id, e)
+        logger.warning("explain_turn request_id=%s stage=schema category=invalid_output detail=%s",
+                       request_id, e)
         return {"answer": SAFE_ERROR_MESSAGE, "last_tutor_task": ""}
     except Exception:
-        logger.exception("explain_turn request_id=%s unexpected_error", request_id)
+        logger.exception("explain_turn request_id=%s stage=unexpected unexpected_error", request_id)
         return {"answer": SAFE_ERROR_MESSAGE, "last_tutor_task": ""}
 
     # Transport popravka PRIJE centralnog safety boundary-a (isto što Quick
@@ -180,7 +181,8 @@ def run_explain_turn(llm, turn):
     # InvalidOutputError iznad, bez drugog AI poziva.
     answer, is_safe = sanitize_and_validate_math_text(transported)
     if not transport_safe or not is_safe:
-        logger.warning("explain_turn request_id=%s category=unsafe_math_output", request_id)
+        logger.warning("explain_turn request_id=%s stage=mathsafe category=unsafe_math_output "
+                       "transport_safe=%s", request_id, transport_safe)
         return {"answer": SAFE_ERROR_MESSAGE, "last_tutor_task": ""}
     answer = normalize_terminology(answer)
 
@@ -189,8 +191,8 @@ def run_explain_turn(llm, turn):
     # Bez drugog AI poziva: dokazana nedosljednost → isti sigurni fallback.
     numeric_issues = find_numeric_inconsistencies(answer)
     if numeric_issues:
-        logger.warning("explain_turn request_id=%s category=invalid_output detail=%s",
-                       request_id, numeric_issues[0])
+        logger.warning("explain_turn request_id=%s stage=numeric_consistency "
+                       "category=invalid_output detail=%s", request_id, numeric_issues[0])
         return {"answer": SAFE_ERROR_MESSAGE, "last_tutor_task": ""}
 
     # Geometrijska notacija (matbot/geometrycheck.py). Explain odgovor je UVIJEK
@@ -200,7 +202,8 @@ def run_explain_turn(llm, turn):
     geometry_scope, geometry_figures = geometry_rules.route_geometry_topic(oblast, lesson_title)
     geometry_issues = geometrycheck.find_geometry_issues(answer, geometry_scope, geometry_figures)
     if geometry_issues:
-        logger.warning("explain_turn request_id=%s category=invalid_output detail=geometry_notation:%s",
+        logger.warning("explain_turn request_id=%s stage=geometry_notation "
+                       "category=invalid_output detail=geometry_notation:%s",
                        request_id, ",".join(geometry_issues))
         return {"answer": SAFE_ERROR_MESSAGE, "last_tutor_task": ""}
 

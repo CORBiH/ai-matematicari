@@ -178,17 +178,46 @@ _ADVANCED_PROSE_RE = re.compile(
 #     i približnim vrijednostima korijena); Pitagorina teorema je takođe
 #     8. razred.
 #
-# ZAŠTO ZABRANA VAŽI SAMO ZA 6. RAZRED, iako kurikulum korijen uvodi tek u 8:
-# mjereno nad 2698 zamrznutih objavljenih paketa svih kampanja —
-#   • 6. razred: TRI paketa s korijenom u cijelom korpusu, i sva tri su ISTI
-#     ovaj defekt (FW-G06, ponovljen u tri odvojene FINAL40 kampanje:
-#     c04d2a1, c17538a, 2fe5636). Nijedan legitiman slučaj ne postoji;
-#   • 7. razred: 14 paketa na 4 lekcije, a 37 od 122 lekcije 7. razreda već
-#     dobija geometrijski blok prompta koji SAM uči formule s korijenom
-#     (matbot/geometry_rules.py). Zabrana u 7. razredu bi protivrječila
-#     zatečenom promptu i njen učinak nije dokazan.
-# Granica se zato postavlja tačno tamo gdje je dokazana. Šire važenje je
-# posao kurikularne faze, ne popravke blokatora.
+# ZAŠTO JE ZABRANA RANIJE VAŽILA SAMO ZA 6. RAZRED — i zašto više ne važi tako.
+#
+# Zatečena granica je bila `(6,)`, uz izričito obrazloženje: mjereno nad 2698
+# zamrznutih objavljenih paketa, 6. razred je imao TRI paketa s korijenom i sva
+# tri su bila ISTI defekt (FW-G06), dok je 7. razred imao 14 paketa na 4
+# lekcije, a 37 od 122 lekcije 7. razreda već dobija geometrijski blok prompta
+# koji SAM uči formule s korijenom. Zaključak je tada bio da bi zabrana u
+# 7. razredu „protivrječila zatečenom promptu“ i da joj „učinak nije dokazan“.
+#
+# OBA RAZLOGA SU SADA RIJEŠENA, mjerenjem, ne mišljenjem:
+#
+#   1) UČINAK JE DOKAZAN. Živi cross-curriculum audit (120 poziva, slučaj
+#      G7-E4, lekcija 7. razreda o povrsini kvadrata „Površina pravougaonika i kvadrata“) pitao je
+#      koliko iznosi stranica kvadrata površine $20\,\text{cm}^2$ i dobio
+#      $a=\sqrt{20}=2\sqrt{5}\approx4,47$. Matematika je tačna, ali zapis
+#      7. razred nije sreo — tačno klasa FW-G06, samo jedan razred više.
+#
+#   2) PROTIVRJEČNOST JE, MEĐUTIM, STVARNA — i zato granica OSTAJE na (6,).
+#      Geometrijska strana jeste bezopasna: izmjereno nad svih 122 lekcije
+#      7. razreda, filter izostavlja isključivo formule koje traže Pitagorinu
+#      teoremu ($d=\sqrt{a^2+b^2}$, $a\sqrt{2}$, Heron, pravilni šestougao),
+#      dakle gradivo 8. razreda. ALI postoji druga, legitimna upotreba znaka
+#      koju paušalna zabrana ruši: lekcija 7. razreda o SKUPU RACIONALNIH
+#      BROJEVA Q nosi kanonski ishod „shvatiti potrebu PROŠIRIVANJA skupa racionalnih
+#      brojeva“, a to se predaje tako što se pokaže broj koji u Q NIJE — dakle
+#      $\sqrt{2}$ ili $\pi$ kao NEPRIMJER. Zatečeni paketi to i rade (14 paketa
+#      na 4 lekcije), a `tests/test_fast_single_call_route.py` upravo takav
+#      paket koristi kao svoj standardni fixture.
+#
+#      Razlika koju paušalna zabrana ne vidi: 7. razred smije PRIKAZATI
+#      iracionalan broj kao objekat prepoznavanja, ali ne smije RAČUNATI
+#      korijen kao postupak. `find_radical_notation` je regex nad matematičkim
+#      segmentima i tu razliku ne može napraviti, pa bi zabrana oborila i
+#      ispravan zadatak o skupu Q.
+#
+# ZAKLJUČAK: nalaz G7-E4 je stvaran (7. razred je dobio $\sqrt{20}$ kao redovan
+# postupak), ali blanket-zabrana nije njegov lijek. Pravi lijek traži novu
+# razliku u politici — „zapis smije biti prikazan“ naspram „odgovor ne smije
+# tražiti korijen“ — i to je zaseban, mjeren zahvat, ne popravka ove veličine.
+# Do tada granica ostaje tamo gdje je dokazano bezopasna.
 RADICAL_CURRICULUM_GRADE = 8
 _RADICAL_FORBIDDEN_GRADES = (6,)
 

@@ -64,7 +64,12 @@ _TOPIC_PATTERNS = {
     "procenat": r"procenat|procent\w*|posto",
     "jednacina": r"jedna[cč]in\w*|nejedna[cč]in\w*",
     "sistem": r"sistem\w*",
-    "stepen": r"stepen\w*|kvadriranj\w*|kor[ij]en\w*",
+    # `kor[ij]en` je hvatao SAMO „korjen“: klasa [ij] traži TAČNO JEDAN znak, pa
+    # ni ijekavsko „korijen“ (dva znaka, „ij“) ni ekavsko „koren“ (nijedan)
+    # nisu pogađali — a „korijen“ je upravo oblik koji ovaj projekat piše.
+    # Nađeno cross-curriculum auditom: uz znak `\sqrt`, ni RIJEČ „korijen“ nije
+    # rutirala pitanje van lekcije. Oblik ispod pokriva sve tri varijante.
+    "stepen": r"stepen\w*|kvadriranj\w*|kori?j?en\w*",
     "proporcija": r"proporcij\w*|razmj?er\w*",
     "funkcija": r"funkcij\w*|grafik\w*",
     "mjere": r"povrsin\w*|obim\w*|zapremin\w*",
@@ -175,11 +180,52 @@ _PERCENT_VALUE_RE = re.compile(r"\d+(?:[.,]\d+)?\s*%")
 # vjerovatnoći) pa bi ih proglasili drugom temom. Za njih guard i dalje ćuti.
 _SYMBOLIC_CONCEPTS = ((_PERCENT_VALUE_RE, "procenat"),)
 
+# ---------------------------------------------------------------------------
+# SIMBOL KOJI JE CIJELI PREDMET PORUKE (živi nalaz cross-curriculum audita)
+# ---------------------------------------------------------------------------
+# Slučaj G8-A7: izabrana lekcija „Stupčasti dijagram“, učenik pita „Koliko je
+# $\sqrt{144}$?“ — pitanje je potpuno prećutano i predata je lekcija o
+# dijagramima. Uzrok: `named_topics` nad porukom vraća prazan skup (leksikon
+# traži RIJEČ „korijen“, nikad znak `\sqrt`), pa slab kontekst nije dokaziv i
+# guard konzervativno vraća JAK kontekst.
+#
+# Zašto ovo NE ruši obrazloženje iznad: ono odbija znak kao POGODAK BILO GDJE u
+# poruci, i s pravom — `c=\sqrt{a^2+b^2}` je Pitagora, ne tema „korijen“. Ovdje
+# se traži strogo uže: znak je pogodak samo kad je CIJELI matematički sadržaj
+# poruke tačno taj izraz — jedan jedini `$…$` segment koji je doslovno
+# korjenovanje BROJA. Time:
+#   • „Koliko je $\sqrt{144}$?“            → pogodak (korijen JESTE tema);
+#   • „Zašto je $c=\sqrt{a^2+b^2}$?“       → NIJE pogodak (segment nosi i `c=`);
+#   • „Koliko je $2+\sqrt{9}$?“            → NIJE pogodak (šire od korijena);
+#   • bilo koja poruka s dva ili više segmenata → NIJE pogodak.
+# Pogodak je pritom samo POJAM iz istog leksikona: kad je izabrana lekcija baš
+# o korijenu, pojmovi se poklapaju i kontekst OSTAJE jak — democija se dešava
+# isključivo kad lekcija s tim pojmom nema veze.
+#
+# Struktura je opšta (ime pojma + obrazac cijelog segmenta), ne `\sqrt`-specifična,
+# pa se novi simbol dodaje podatkom, bez nove politike.
+_BS = "\\"
+_SOLE_SEGMENT_CONCEPTS = (
+    (re.compile(r"^\s*" + _BS + _BS + r"sqrt\s*\{\s*\d+(?:[.,]\d+)?\s*\}\s*$"),
+     "stepen"),
+)
+_MATH_SEGMENTS_RE = re.compile(r"\$([^$]+)\$")
+
+
+def sole_segment_topics(text):
+    """Pojam koji nosi znak kad je on CIJELI matematički sadržaj poruke."""
+    segments = _MATH_SEGMENTS_RE.findall(text or "")
+    if len(segments) != 1:
+        return set()
+    return {concept for pattern, concept in _SOLE_SEGMENT_CONCEPTS
+            if pattern.match(segments[0])}
+
 
 def symbolic_topics(text):
     """Pojmovi koje nosi matematički SIMBOL u sirovoj poruci."""
-    return {concept for pattern, concept in _SYMBOLIC_CONCEPTS
-            if pattern.search(text or "")}
+    found = {concept for pattern, concept in _SYMBOLIC_CONCEPTS
+             if pattern.search(text or "")}
+    return found | sole_segment_topics(text)
 
 
 def named_topics(text):
