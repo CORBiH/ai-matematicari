@@ -506,8 +506,30 @@ def _without_radical_formulas(block):
     return "".join(kept)
 
 
+_PYTHAGORAS_ROW_RE = re.compile(
+    r"pitagorin|\bc\^2\s*=\s*a\^2\s*\+\s*b\^2",
+    re.IGNORECASE)
+
+
+def _without_pythagoras_formulas(block):
+    """Blok formula bez reda koji NUDI Pitagorinu teoremu kao recept.
+
+    ZASTO POSEBNO OD KORIJENA: red `- Pitagorina teorema: $c^2 = a^2+b^2$.`
+    ne sadrzi nijedan korijen, pa ga `_without_radical_formulas` po
+    konstrukciji ne moze ukloniti — a bas je on gradivo 8. razreda (ziva
+    provjera R5). Filtrira se RED, ne blok: oznake kateta i hipotenuze,
+    povrsina i poluprecnici ostaju, jer pravougli trougao KAO POJAM jeste
+    gradivo i nizeg razreda."""
+    kept = [line for line in block.splitlines(keepends=True)
+            if not _PYTHAGORAS_ROW_RE.search(line)]
+    if len(kept) <= 1:
+        return ""
+    return "".join(kept)
+
+
 def build_geometry_rules(oblast, lesson_title, mode="practice",
-                         allow_radical_notation=True):
+                         allow_radical_notation=True,
+                         allow_pythagoras=True):
     """Sastavi SAMO geometrijske blokove relevantne za ovu lekciju.
 
     Vraća "" za negeometrijske lekcije — nijedan geometrijski simbol ni formula
@@ -529,6 +551,8 @@ def build_geometry_rules(oblast, lesson_title, mode="practice",
         block = _FIGURE_RULES.get(figure_id)
         if block and not allow_radical_notation:
             block = _without_radical_formulas(block)
+        if block and not allow_pythagoras:
+            block = _without_pythagoras_formulas(block)
         if block:
             parts.append(block)
     parts.append(_SYMBOL_SELF_CHECK)

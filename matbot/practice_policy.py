@@ -217,13 +217,41 @@ _ADVANCED_PROSE_RE = re.compile(
 # postupak), ali blanket-zabrana nije njegov lijek. Pravi lijek traži novu
 # razliku u politici — „zapis smije biti prikazan“ naspram „odgovor ne smije
 # tražiti korijen“ — i to je zaseban, mjeren zahvat, ne popravka ove veličine.
-# Do tada granica ostaje tamo gdje je dokazano bezopasna.
-RADICAL_CURRICULUM_GRADE = 8
-_RADICAL_FORBIDDEN_GRADES = (6,)
+#
+# TAJ ZAHVAT JE SADA URAĐEN: sposobnost je razdvojena na DVA nivoa.
+#
+# ZAŠTO DVA, A NE JEDAN (dokaz iz repozitorija, bez ijednog poziva modela):
+#   • naslovi/oblasti: 6. i 7. razred nemaju NIJEDNU lekciju koja imenuje
+#     korijen ili iracionalne brojeve; 8. razred ih ima 18, u vlastitoj oblasti
+#     („Kvadratni korijen nenegativnog racionalnog broja“, „Korijen proizvoda i
+#     količnika“, „Približne vrijednosti kvadratnog korijena“);
+#   • ALI kanonski ishod jedne lekcije 7. razreda o skupu Q glasi „shvatiti
+#     potrebu PROŠIRIVANJA skupa racionalnih brojeva“ — a to se predaje tako
+#     što se pokaže broj koji u Q nije, dakle $\\sqrt{2}$ kao NEPRIMJER;
+#   • mjereno nad 85 zamrznutih artefakata izdanja: korijen se u objavljenim
+#     paketima pojavljuje 32 puta, od toga 7. razred TAČNO JEDNOM — i to kao
+#     `expected_answer` ($\\sqrt{3}\\,\\text{cm}$), dakle kao vrijednost koju
+#     učenik MORA proizvesti. Nijedan objavljeni paket 7. razreda ne koristi
+#     korijen kao distraktor.
+#
+# Iz toga slijede DVIJE nezavisne kurikularne tačke uvođenja, a razredna
+# ponašanja se IZVODE iz njih — nema druge, ručno održavane tabele:
+#   • ZAPIS (prikaz/prepoznavanje) postaje dozvoljen od 7. razreda;
+#   • OPERACIJA (računanje/svođenje korijena kao metoda) tek od 8.
+_LOWEST_SUPPORTED_GRADE = 6
+RADICAL_NOTATION_GRADE = 7
+RADICAL_OPERATION_GRADE = 8
+# Zatečeno ime zadržano: postojeći tekstovi i recenzentski recept govore o
+# tački uvođenja SAME OPERACIJE, što je i dalje 8. razred.
+RADICAL_CURRICULUM_GRADE = RADICAL_OPERATION_GRADE
+_RADICAL_FORBIDDEN_GRADES = tuple(
+    range(_LOWEST_SUPPORTED_GRADE, RADICAL_NOTATION_GRADE))
+_RADICAL_OPERATION_FORBIDDEN_GRADES = tuple(
+    range(_LOWEST_SUPPORTED_GRADE, RADICAL_OPERATION_GRADE))
 
 
 def radical_notation_allowed_for_grade(grade):
-    """JEDINA tabela razred → smije li zapis korijena.
+    """JEDINA tabela razred → smije li se zapis korijena UOPŠTE POJAVITI.
 
     Zove je i `resolve()` (za polje politike) i `rules.py` (da geometrijski
     blok prompta ne bi ponudio formulu koju ista politika zabranjuje). Dvije
@@ -231,6 +259,76 @@ def radical_notation_allowed_for_grade(grade):
     ova funkcija zatvara."""
     try:
         return int(grade) not in _RADICAL_FORBIDDEN_GRADES
+    except (TypeError, ValueError):
+        return True
+
+
+# ---------------------------------------------------------------------------
+# PITAGORINA TEOREMA — ISTA DVONIVOVSKA SPOSOBNOST, DRUGI POJAM
+# ---------------------------------------------------------------------------
+# ZASTO POSTOJI (ziva provjera R5, dvonivovska kampanja korijena): 7. razred je
+# na „pravougaonik 6 i 8 cm, kolika je dijagonala" dobio $d^2=6^2+8^2=100$, pa
+# $d=10$. Korijen nije upotrijebljen — politika korijena je odradila svoje — ali
+# je upotrijebljena PITAGORINA TEOREMA, koju taj razred nije ucio. Red
+# `- Pitagorina teorema: $c^2 = a^2+b^2$.` ne sadrzi korijen, pa ga filter
+# korijena po konstrukciji ne moze ukloniti.
+#
+# KURIKULARNI DOKAZ (data/topics.json + lesson_objectives, bez poziva modela):
+#   • 6. i 7. razred: NIJEDNA lekcija ne imenuje Pitagorinu teoremu ni u
+#     naslovu ni u oblasti;
+#   • 8. razred: vlastita oblast „Pitagorina teorema i primjene u ravni" sa 16
+#     lekcija (formulacija, obrat, nepoznata kateta, dijagonale, visine);
+#   • 9. razred je primjenjuje na tijela.
+#
+# JEDINI prividni izuzetak je jedna lekcija 7. razreda o jednakokrakom trouglu
+# ciji KOMPAJLIRANI ishod pominje Pitagorinu teoremu. To NIJE ovlascenje:
+# `objectives_source` je za taj razred „compiled", a `tutor/prompts.py` uz
+# kompajlirane ishode izricito upozorava da je kanonsko mapiranje grubo i da
+# prenosi recenice sa SUSJEDNIH lekcija (ista recenica doslovno stoji uz
+# lekcije 8. razreda o nepoznatoj kateti). Naslov lekcije je provjeren podatak,
+# kompajlirani ishod nije.
+#
+# DVA NIVOA, kao i kod korijena — i iz istog razloga: 7. razred IMA lekciju
+# „Pravougli trougao i posebni uglovi", pa pravougli trougao, katetu i
+# hipotenuzu smije imenovati; ono sto ne smije jeste RIJESITI zadatak tom
+# teoremom.
+PYTHAGORAS_NOTATION_GRADE = 6    # pravougli trougao/kateta/hipotenuza: pojam je dozvoljen
+PYTHAGORAS_OPERATION_GRADE = 8   # teorema kao METODA rjesavanja
+_PYTHAGORAS_OPERATION_FORBIDDEN_GRADES = tuple(
+    range(_LOWEST_SUPPORTED_GRADE, PYTHAGORAS_OPERATION_GRADE))
+
+
+def pythagoras_operation_allowed_for_grade(grade):
+    """JEDINA tabela razred -> smije li se Pitagorina teorema koristiti kao
+    METODA rjesavanja. Pojam pravouglog trougla nije ogranicen ovim."""
+    try:
+        return int(grade) not in _PYTHAGORAS_OPERATION_FORBIDDEN_GRADES
+    except (TypeError, ValueError):
+        return True
+
+
+def pythagoras_operation_rule_text(policy=None):
+    """Koncizno pravilo za razred koji teoremu jos nema kao metodu."""
+    if policy is None or policy.pythagoras_operation_allowed:
+        return ""
+    return (
+        f"- PITAGORINA TEOREMA NIJE METODA {policy.grade}. RAZREDA (uvodi se u "
+        f"{PYTHAGORAS_OPERATION_GRADE}. razredu): pravougli trougao, katetu i "
+        "hipotenuzu smijes imenovati, ali zadatak NE rjesavaj vezom "
+        "$c^2=a^2+b^2$ niti njome racunaj dijagonalu, visinu ili nepoznatu "
+        "stranicu. Ako zadatak bez te teoreme nije rjesiv u ovom razredu, reci "
+        "da se taj postupak uci kasnije.\n"
+    )
+
+
+def radical_operation_allowed_for_grade(grade):
+    """JEDINA tabela razred → smije li se korijen RAČUNATI/SVODITI kao metoda.
+
+    Strože od `radical_notation_allowed_for_grade`: 7. razred smije $\\sqrt{2}$
+    VIDJETI (neprimjer pri proširivanju skupa Q), ali ne smije korjenovanje
+    dobiti kao traženi postupak ni kao oblik odgovora."""
+    try:
+        return int(grade) not in _RADICAL_OPERATION_FORBIDDEN_GRADES
     except (TypeError, ValueError):
         return True
 
@@ -278,6 +376,13 @@ class ResolvedPracticePolicy:
     # Kurikularna sposobnost razreda: smije li objavljeni sadržaj uopšte
     # koristiti zapis korijena (vidi RADICAL_CURRICULUM_GRADE iznad).
     radical_notation_allowed: bool = True
+    # DRUGI NIVO ISTE SPOSOBNOSTI (vidi RADICAL_NOTATION_GRADE /
+    # RADICAL_OPERATION_GRADE): smije li se korijen RAČUNATI/SVODITI kao
+    # tražena metoda. 7. razred ga smije vidjeti, ali ne i računati.
+    radical_operation_allowed: bool = True
+    # Ista dvonivovska logika za Pitagorinu teoremu (pojam smije,
+    # metoda ne) — vidi PYTHAGORAS_OPERATION_GRADE.
+    pythagoras_operation_allowed: bool = True
     # Metodska proza se skenira SAMO nad lekcijama o jednačinama/nejednačinama
     # kojima je politika zabranila prebacivanje: riječ „prebaci“ u lekciji o
     # mjernim jedinicama ili konstrukciji nije metodski prekršaj i ne smije
@@ -323,6 +428,8 @@ def resolve(grade, lesson_id="", family_id="", parameters=None,
         advanced_scope_allowed=(),
         arrow_method_lesson=arrow,
         radical_notation_allowed=radical_notation_allowed_for_grade(grade),
+        radical_operation_allowed=radical_operation_allowed_for_grade(grade),
+        pythagoras_operation_allowed=pythagoras_operation_allowed_for_grade(grade),
         scan_method_prose=bool(forbidden) and equation_lesson,
     )
 
@@ -429,6 +536,77 @@ def advanced_scope_rule_text():
         "kurikuluma 6-9. razreda: NIKAD ih ne uvodi u zadatak, opcije, hint ni "
         "rješenje. Ako učenik sam spomene takav pojam, smiješ kratko reći da to "
         "nije gradivo osnovne škole — bez rješavanja tim metodama.\n"
+    )
+
+
+def answer_policy_failures(policy, expected_answer):
+    r"""Kodovi prekršaja za POLJE KOJE UČENIK MORA PROIZVESTI.
+
+    ZAŠTO POSEBNA POVRŠINA, a ne još jedan prolaz kroz `text_policy_failures`:
+    razlika između „korijen je PRIKAZAN“ i „korijen je TRAŽEN“ nije u prozi
+    nego u POLJU. Isti zapis $\sqrt{2}$ je legitiman kao distraktor u zadatku
+    o skupu Q (7. razred smije prepoznati iracionalan broj), a nedopušten kao
+    `expected_answer`, jer tada učenik mora sam izvesti korjenovanje — postupak
+    koji njegov razred nije učio.
+
+    Mjereno nad 85 zamrznutih artefakata izdanja: jedini paket 7. razreda s
+    korijenom imao je upravo $\sqrt{3}\,\text{cm}$ kao `expected_answer`.
+    Nijedan nije koristio korijen kao distraktor — pa ova provjera pogađa
+    tačno dokazani prekršaj, a ne pretpostavljeni.
+
+    Namjerno NE skenira tekst zadatka, opcije ni hintove: tamo zapis smije
+    postojati. Zadatak koji korijen traži ionako mora imati korijen u
+    očekivanom odgovoru — MCQ ga dodatno drži i u označenoj opciji, koju
+    objava poredi s `expected_answer`.
+
+    IZMJERENA GRANICA (istraga zatvaranja pred izdanje) — ne zatvara se ovdje:
+    zadatak PREPOZNAVANJA cija je tacna opcija bas korijen („Koji broj nije
+    racionalan?" -> $\sqrt{2}$) ovdje pada, iako ucenik korijen samo BIRA.
+    Trazen je postojeci strukturni signal koji bi razdvojio „izabran" od
+    „izveden"; nijedan nije ovlascen:
+      • `task_type` i `task_signature.answer_type` su MODELOVA SAMOPRIJAVA —
+        nijedan validator ne provjerava njihovu VRIJEDNOST, pa ih
+        `matbot/hint_policy.py` izricito odbija kao klasifikator; polje koje
+        model sam popuni ne smije birati vlastiti reziim nadzora;
+      • `hint_policy.session_task_class` je server-vlasnicki, ali mjeren nad
+        ovim slucajem vraca `computational` (gola simbolicka vrijednost JESTE
+        vrijednost) — dakle ne pravi ovu razliku;
+      • semanticka porodica bi bila server-vlasnicka, ali lekcija 7. razreda o
+        skupu Q NEMA ugovor (family=None), pa signala nema.
+    Zato ostaje fail-closed: lazni pozitiv kosta jednu odbijenu (sigurnu)
+    poruku, a suprotna greska uci gradivo viseg razreda. Mjereno nad 85
+    zamrznutih artefakata: paket 7. razreda s korijenom kao tacnim odgovorom
+    PREPOZNAVANJA ne postoji; jedini postojeci je bio operacioni. Zatvaranje
+    trazi PODATAK, ne Python: semanticki ugovor s porodicom prepoznavanja za
+    tu lekciju (CLAUDE.md 5a: nova lekcija mijenja podatke, ne kod)."""
+    if policy is None or not expected_answer:
+        return ()
+    if policy.radical_operation_allowed:
+        return ()
+    if find_radical_notation(expected_answer):
+        return (RADICAL_OPERATION_CODE,)
+    return ()
+
+
+def radical_operation_rule_text(policy=None):
+    """Pravilo za razred koji korijen SMIJE VIDJETI, ali ne i računati.
+
+    Prazan string za razred kojem zapis uopšte nije dozvoljen (tamo važi
+    stroži `radical_capability_rule_text`) i za razred koji operaciju ima."""
+    if policy is None:
+        return ""
+    if not policy.radical_notation_allowed or policy.radical_operation_allowed:
+        return ""
+    return (
+        f"- KORIJEN U {policy.grade}. RAZREDU — SMIJE SE SPOMENUTI, NE I "
+        r"RAČUNATI: zapis $\sqrt{\;}$ smiješ prikazati kad je sam broj predmet "
+        r"prepoznavanja (npr. da $\sqrt{2}$ NIJE racionalan broj, pa skup $Q$ "
+        "nije dovoljan). ALI korjenovanje NIJE postupak ovog razreda "
+        f"(uvodi se u {RADICAL_OPERATION_GRADE}. razredu): ne računaj i ne "
+        "svodi korijene, ne traži odgovor u obliku korijena i ne rješavaj "
+        "zadatak vađenjem korijena. Ako tačan odgovor traži korjenovanje, "
+        "reci učeniku da se taj postupak uči kasnije i pokaži ono što ovaj "
+        "razred može — bez izvođenja korijena.\n"
     )
 
 
@@ -557,6 +735,14 @@ METHOD_PROVENANCE_CODE = "method_provenance_mismatch"
 # Namjerno NIJE `wrong_math` ni `advanced_scope_violation`: matematika je
 # tačna i nije van osnovne škole — samo je van ovog razreda.
 GRADE_CAPABILITY_CODE = "grade_capability_mismatch"
+# Zapis SMIJE biti prikazan, ali se od učenika TRAŽI da ga proizvede — a
+# korjenovanje kao postupak njegov razred još nije učio (živi nalaz G7-E4 i
+# jedini paket 7. razreda s korijenom u zamrznutom korpusu: `expected_answer`
+# je bio $\sqrt{3}\,\text{cm}$). Namjerno ODVOJEN kod od
+# `GRADE_CAPABILITY_CODE`: taj i dalje znači „zapis uopšte nije za ovaj
+# razred“ (6. razred), a ovaj „zapis smije postojati, ali ne kao traženi
+# rezultat“ (7. razred).
+RADICAL_OPERATION_CODE = "radical_operation_beyond_grade"
 
 # Kodovi iz `text_policy_failures` razvrstani po TIPU DOKAZA, ne po težini.
 # STRUKTURNI kod dolazi iz matematičkog segmenta (zapis koji tamo ili jeste ili
@@ -564,7 +750,8 @@ GRADE_CAPABILITY_CODE = "grade_capability_mismatch"
 # pravilo zapravo UČI (vidi `unknown_member_role_mentions`). Podjela postoji da
 # bi dijagnostika mogla reći KOJU vrstu dokaza ima — nijedan kod ovim ne postaje
 # blaži i nijedna postojeća kapija ovo ne konsumira.
-STRUCTURAL_POLICY_CODES = frozenset({VISIBLE_DOMAIN_CODE, GRADE_CAPABILITY_CODE})
+STRUCTURAL_POLICY_CODES = frozenset(
+    {VISIBLE_DOMAIN_CODE, GRADE_CAPABILITY_CODE, RADICAL_OPERATION_CODE})
 LEXICAL_POLICY_CODES = frozenset({FORBIDDEN_METHOD_CODE, ADVANCED_SCOPE_CODE})
 
 
@@ -588,7 +775,7 @@ def text_policy_failures(policy, text):
 
 
 def package_policy_failures(policy, question, option_texts=(), hints=(),
-                            solution="", method_id=""):
+                            solution="", method_id="", expected_answer=""):
     """Kodovi prekršaja za CIO deterministički kandidat-paket, prije objave.
 
     Metodska proza se skenira nad SVIM površinama (zadatak, hintovi,
@@ -600,6 +787,9 @@ def package_policy_failures(policy, question, option_texts=(), hints=(),
     failures = []
     if method_id and method_id in policy.forbidden_method_ids:
         failures.append(METHOD_PROVENANCE_CODE)
+    # Polje koje učenik MORA proizvesti ima strožu politiku od ostalih
+    # površina — vidi `answer_policy_failures`.
+    failures.extend(answer_policy_failures(policy, expected_answer))
     surfaces = [question or "", solution or ""]
     surfaces.extend(option_texts or ())
     surfaces.extend(hints or ())

@@ -193,16 +193,31 @@ def test_grade_eight_polygon_lessons_keep_the_hexagon_formula():
         grade=8, lesson_id="8-08-005").radical_notation_allowed
 
 
-def test_grade_seven_is_deliberately_untouched_by_this_repair():
-    """Uputa §7: granica 7. razreda se u ovom zadatku NE dira.
+def test_grade_seven_keeps_notation_but_loses_the_root_recipe():
+    r"""SVJESNA IZMJENA: sposobnost je razdvojena na dva nivoa.
 
-    7-06-004 je ista lekcija „Mnogougao/mnogokut" u 7. razredu i mora zadržati
-    zatečeni blok, bajt za bajt."""
+    Zatečeni test je tvrdio da se 7. razred „ne dira", i to je tada bilo tačno:
+    postojala je SAMO jedna sposobnost, pa bi svako diranje 7. razreda oborilo
+    i legitimno PREPOZNAVANJE iracionalnog broja. Sada su to dvije stvari:
+
+      • ZAPIS ostaje dozvoljen — `radical_notation_allowed` je i dalje True,
+        pa $\sqrt{2}$ kao neprimjer u lekciji o skupu Q prolazi netaknut;
+      • OPERACIJA nije — a formula JESTE recept za račun, pa red s korijenom
+        („Pravilni šestougao", $P=\frac{3a^2\sqrt{3}}{2}$) više ne stiže
+        7. razredu. Mjereno: svih 8 redova s korijenom koji su stizali
+        7. razredu traži Pitagorinu teoremu ili korjenovanje — gradivo 8.
+
+    Ono što je test STVARNO čuvao — da se blok figure ne obriše cio i da se
+    7. razredu ne oduzme ono što jeste njegovo gradivo — čuva se i dalje."""
     seven = lesson_context_module.build(7, "7-06-004")
-    assert seven.practice_policy.radical_notation_allowed
+    assert seven.practice_policy.radical_notation_allowed          # zapis: DA
+    assert not seven.practice_policy.radical_operation_allowed     # račun: NE
     prompt = tutor_prompts.build_tutor_instructions(seven)
-    assert "Pravilni šestougao" in prompt
-    assert geometry_rules._FIGURE_RULES["mnogougao"] in prompt
+    assert "Pravilni šestougao" not in prompt
+    # Blok figure ostaje — uklanja se RED s korijenom, nikad cijela tema.
+    assert "MNOGOUGAO" in prompt.upper()
+    for kept in ("broj dijagonala", "Zbir unutrašnjih uglova"):
+        assert kept in prompt, kept
 
 
 def test_only_grade_six_prompts_changed_at_all():
@@ -252,8 +267,12 @@ def test_quick_mode_is_untouched_because_it_carries_no_grade_rules():
 def test_the_grade_capability_table_has_exactly_one_owner():
     """`rules.py` NE smije ponovo izvoditi „koji razred smije korijen"."""
     source = (ROOT / "matbot" / "rules.py").read_text(encoding="utf-8")
-    assert "radical_notation_allowed_for_grade" in source
+    # rules.py smije PITATI politiku, ali nikad sam izvoditi odgovor. Sonda
+    # imenuje OPERACIONU sposobnost jer se formula (recept za račun) filtrira
+    # po njoj; tabele razreda ostaju iza granice modula.
+    assert "radical_operation_allowed_for_grade" in source
     assert "_RADICAL_FORBIDDEN_GRADES" not in source
+    assert "_RADICAL_OPERATION_FORBIDDEN_GRADES" not in source
     geometry_source = (ROOT / "matbot" / "geometry_rules.py").read_text(
         encoding="utf-8")
     # geometry_rules dobija BOOLEAN; ne zna ni za razred ni za tabelu.

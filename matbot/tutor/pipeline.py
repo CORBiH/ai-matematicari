@@ -482,6 +482,14 @@ def _validate_task_server_side(task, context, previous_signature=""):
             codes = practice_policy.text_policy_failures(policy, surface)
             if codes:
                 raise UnifiedOutputError(f"{','.join(codes)} [{where}]")
+        # POLJE KOJE UČENIK MORA PROIZVESTI ima STROŽU politiku od ostalih
+        # površina: zapis korijena smije stajati u tekstu i opcijama (7. razred
+        # smije PREPOZNATI iracionalan broj), ali ne smije biti traženi
+        # rezultat — tada zadatak zahtijeva korjenovanje, postupak koji taj
+        # razred nije učio. Vidi `practice_policy.answer_policy_failures`.
+        answer_codes = practice_policy.answer_policy_failures(policy, expected)
+        if answer_codes:
+            raise UnifiedOutputError(f"{','.join(answer_codes)} [expected_answer]")
 
     # USKI MATEMATIČKI ORAKL NEPOSREDNO PRIJE OBJAVE (živi produkcijski nalaz,
     # lekcija o pravilima djeljivosti): objavljen je MCQ bez ijednog tačnog
@@ -1299,7 +1307,8 @@ def _run_deterministic_task_turn(store, session, turn, context, request_id,
             policy_codes = practice_policy.package_policy_failures(
                 getattr(context, "practice_policy", None),
                 candidate.question, candidate.option_texts, candidate.hints,
-                candidate.solution, getattr(candidate, "method_id", ""))
+                candidate.solution, getattr(candidate, "method_id", ""),
+                expected_answer=getattr(candidate, "display_answer", "") or "")
             if policy_codes:
                 _log_rejection(request_id, context, "deterministic_policy",
                                ",".join(policy_codes), intent)

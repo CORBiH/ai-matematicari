@@ -485,10 +485,23 @@ def build_shared_math_rules(grade, lesson_title, oblast, mode, student_message="
         # direktno, jer namjerno nema razredni blok — vidi prompts.py.
         # Razred bez metode nepoznatog člana (7-9) dobija prazan string i
         # njegov prompt ostaje bajt za bajt kao prije.
-        method_rule = practice_policy.equation_method_rule_text(
-            practice_policy.resolve(grade=_effective_grade(grade)))
+        grade_policy = practice_policy.resolve(grade=_effective_grade(grade))
+        method_rule = practice_policy.equation_method_rule_text(grade_policy)
         if method_rule:
             parts.append(method_rule)
+        # DVONIVOVSKA SPOSOBNOST KORIJENA (jedna istina u practice_policy):
+        # razred koji zapis SMIJE vidjeti ali ga ne smije RAČUNATI dobija svoje
+        # pravilo ovdje. Razred bez zapisa (6.) i dalje nosi stroži tekst u
+        # svom razrednom bloku; razredi s operacijom (8-9) ne dobijaju ništa.
+        radical_rule = practice_policy.radical_operation_rule_text(grade_policy)
+        if radical_rule:
+            parts.append(radical_rule)
+        # ISTA DVONIVOVSKA LOGIKA ZA PITAGORINU TEOREMU (jedna istina u
+        # practice_policy): pojam pravouglog trougla ostaje, teorema kao
+        # METODA ne stize razredu koji je nema.
+        pythagoras_rule = practice_policy.pythagoras_operation_rule_text(grade_policy)
+        if pythagoras_rule:
+            parts.append(pythagoras_rule)
 
     topic_ids = route_topic_rules(oblast, lesson_title)
     for topic_id in topic_ids:
@@ -507,10 +520,19 @@ def build_shared_math_rules(grade, lesson_title, oblast, mode, student_message="
     # tačno tada je razredni blok (a s njim i zabrana) u promptu. Quick nema
     # razredna kurikularna ograničenja (vidi komentar iznad) i zato mu se
     # formule ne diraju: tamo protivrječnosti nema.
+    # FORMULA JE RECEPT ZA RAČUN, NE PRIKAZ — zato se filtrira po OPERACIONOJ
+    # sposobnosti, ne po sposobnosti zapisa. 7. razred smije $\sqrt{2}$ vidjeti
+    # kao neprimjer (to prolazi kroz `text_policy_failures`), ali mu se ne
+    # nudi $d=\sqrt{a^2+b^2}$ kao postupak — svaki takav red mjereno traži
+    # Pitagorinu teoremu ili korjenovanje, dakle gradivo 8. razreda.
     allow_radicals = (mode == "quick"
-                      or practice_policy.radical_notation_allowed_for_grade(grade))
+                      or practice_policy.radical_operation_allowed_for_grade(grade))
+    allow_pythagoras = (mode == "quick"
+                        or practice_policy.pythagoras_operation_allowed_for_grade(
+                            _effective_grade(grade)))
     geometry = geometry_rules.build_geometry_rules(
-        oblast, lesson_title, mode=mode, allow_radical_notation=allow_radicals)
+        oblast, lesson_title, mode=mode, allow_radical_notation=allow_radicals,
+        allow_pythagoras=allow_pythagoras)
     if geometry:
         parts.append(geometry)
 
