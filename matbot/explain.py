@@ -12,6 +12,7 @@ import uuid
 
 from matbot import (capability_requests, config, geometry_rules, geometrycheck,
                     lesson_relevance, practice_policy, prompts)
+from matbot.semantics import request_shapes
 from matbot.llm import LLMError, failure_diagnostics_kv
 from matbot.mathcheck import find_numeric_inconsistencies
 from matbot.mathsafe import normalize_result_math_transport, sanitize_and_validate_math_text
@@ -166,11 +167,27 @@ def run_explain_turn(llm, turn):
     )
     blocked = capability_requests.forbidden_operation_requests(
         turn["student_message"], policy)
+    source = "explicit"
+    if not blocked:
+        # DRUGI IZVOR DOKAZA: zahtjev koji operaciju NE IMENUJE, ali mu kanonski
+        # oblik traži operaciju koju razred nema (živi nalaz L5: „katete 3 i 4,
+        # kolika je hipotenuza?" ne spominje ni Pitagoru ni korijen).
+        #
+        # OBLIK SE ČITA IZ ZAHTJEVA, NIKAD IZ IZABRANE LEKCIJE: mjereno je da
+        # ista poruka daje `pythagoras_direct` u 8. i `angle_relationships_direct`
+        # u 6. razredu, pa bi lekcija kao signal blokirala baš razred koji smije
+        # računati. Sposobnost odlučuje — nema `if grade <= 7`.
+        required = request_shapes.required_operations_for_request(
+            turn["student_message"])
+        blocked = tuple(
+            operation for operation in required
+            if not capability_requests.operation_allowed(operation, policy))
+        source = "semantic_requirement"
     if blocked:
         logger.info(
             "explain_turn request_id=%s stage=grade_capability_preflight "
-            "capability=%s grade=%s operation_available=no calls=0",
-            request_id, ",".join(blocked), policy.grade,
+            "source=%s capability=%s grade=%s operation_available=no calls=0",
+            request_id, source, ",".join(blocked), policy.grade,
         )
         return _explain_response(
             capability_requests.boundary_answer(blocked[0], policy), lesson_id)

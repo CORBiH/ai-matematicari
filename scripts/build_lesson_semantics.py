@@ -55,7 +55,50 @@ def load_families():
     families = payload.get("families")
     if not isinstance(families, dict) or not families:
         raise SemanticSchemaError("nema definisanih porodica")
-    return _strip_comments(families)
+    families = _strip_comments(families)
+    _validate_shape_requirements(families)
+    return families
+
+
+def _known_operations():
+    """Rjecnik sposobnosti je JEDAN — isti koji cita Explain preflight.
+
+    Uvozi se iz `matbot.capability_requests` umjesto da se ovdje prepise, da
+    deklaracija u podacima i provjera u kodu ne mogu razici."""
+    sys.path.insert(0, str(ROOT))
+    from matbot import capability_requests
+    return set(capability_requests.KNOWN_OPERATIONS)
+
+
+def _validate_shape_requirements(families):
+    """`shape_required_operations` mora imenovati POSTOJECI oblik i POSTOJECU
+    operaciju. Tiho ignorisanje bi znacilo kapiju koja ne radi, a to je gore
+    od pada builda."""
+    operations = _known_operations()
+    for family_id, family in sorted(families.items()):
+        declared = family.get("shape_required_operations")
+        if declared is None:
+            continue
+        if not isinstance(declared, dict) or not declared:
+            raise SemanticSchemaError(
+                f"{family_id}: shape_required_operations mora biti neprazan objekat")
+        schema = family.get("parameter_schema", {})
+        shape_values = set()
+        for spec in schema.values():
+            if spec.get("kind") in ("enum_set", "enum"):
+                shape_values.update(spec.get("values", ()))
+        for shape, ops in sorted(declared.items()):
+            if shape not in shape_values:
+                raise SemanticSchemaError(
+                    f"{family_id}: shape_required_operations imenuje nepoznat "
+                    f"oblik '{shape}'")
+            if not isinstance(ops, list) or not ops:
+                raise SemanticSchemaError(
+                    f"{family_id}: '{shape}' mora imati nepraznu listu operacija")
+            unknown = sorted(set(ops) - operations)
+            if unknown:
+                raise SemanticSchemaError(
+                    f"{family_id}: '{shape}' imenuje nepoznatu operaciju {unknown}")
 
 
 def load_assignments():

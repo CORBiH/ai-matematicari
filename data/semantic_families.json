@@ -1693,7 +1693,55 @@
         ],
         "closing": "- ako prekršiš ovo, server odbija paket prije objave"
       },
-      "value_labels": {}
+      "value_labels": {},
+      "_shape_required_operations_readme": [
+        "KOJU OPERACIJU ZAHTIJEVA POJEDINI KANONSKI OBLIK ZAHTJEVA.",
+        "Do sada je `kinds` bio SAMO ogranicenje generisanja („vidljivi zadatak mora",
+        "pripadati ovim vrstama\"). Ovdje se isti kanonski oblici prvi put izjasnjavaju",
+        "i o tome KOJU KURIKULARNU OPERACIJU njihov rezultat trazi, pa server moze",
+        "odluciti PRIJE poziva modela — bez modelove samoprijave i bez ID-ja lekcije.",
+        "Kljuc MORA biti vrijednost iz `parameter_schema.kinds`; vrijednost MORA biti",
+        "sposobnost koju poznaje matbot/capability_requests.py. Oblik koji ovdje NIJE",
+        "naveden nije zabranjen nego NIJE DOKAZAN — izostanak se cita fail-open."
+      ],
+      "shape_required_operations": {
+        "hypotenuse": [
+          "pythagoras_operation"
+        ],
+        "leg": [
+          "pythagoras_operation"
+        ],
+        "verify_triple": [
+          "pythagoras_operation"
+        ],
+        "square_diagonal": [
+          "pythagoras_operation"
+        ],
+        "rectangle_diagonal": [
+          "pythagoras_operation"
+        ],
+        "isosceles_height": [
+          "pythagoras_operation"
+        ],
+        "equilateral_height": [
+          "pythagoras_operation"
+        ],
+        "equilateral_area": [
+          "pythagoras_operation"
+        ],
+        "rhombus_side": [
+          "pythagoras_operation"
+        ],
+        "isosceles_trapezoid_height": [
+          "pythagoras_operation"
+        ],
+        "right_trapezoid_leg": [
+          "pythagoras_operation"
+        ],
+        "chord_distance": [
+          "pythagoras_operation"
+        ]
+      }
     },
     "ratio_proportion_direct": {
       "family_version": 1,

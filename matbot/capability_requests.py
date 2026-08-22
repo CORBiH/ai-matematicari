@@ -100,6 +100,9 @@ _CAPABILITIES = (
         "introduced": practice_policy.RADICAL_OPERATION_GRADE,
         "concept_name": "Kvadratni korijen",
         "operation_name": "korjenovanje",
+        # Zamjenica u granicnoj poruci mora se slagati s rodom pojma:
+        # „Kvadratni korijen ... pa GA", ali „Pitagorina teorema ... pa JE".
+        "object_pronoun": "ga",
     },
     {
         "id": CAPABILITY_PYTHAGORAS,
@@ -109,10 +112,26 @@ _CAPABILITIES = (
         "introduced": practice_policy.PYTHAGORAS_OPERATION_GRADE,
         "concept_name": "Pitagorina teorema",
         "operation_name": "računanje Pitagorinom teoremom",
+        "object_pronoun": "je",
     },
 )
 
 _BY_ID = {spec["id"]: spec for spec in _CAPABILITIES}
+
+# JEDAN RJECNIK SPOSOBNOSTI za cio sistem. Cita ga i eksplicitni detektor
+# iznad, i semanticka deklaracija `shape_required_operations` u
+# `data/semantic_families.json` (provjerava je kompajler), pa se imena ne mogu
+# raziti izmedju podataka i koda.
+KNOWN_OPERATIONS = frozenset(_BY_ID)
+
+
+def operation_allowed(operation_id, policy):
+    """Smije li razred izvesti ovu operaciju. Nepoznata operacija -> True
+    (fail-open): nedokazano nikad ne znaci zabranjeno."""
+    spec = _BY_ID.get(operation_id)
+    if spec is None or policy is None:
+        return True
+    return spec["allows"](policy)
 
 
 def named_capabilities(message):
@@ -188,8 +207,9 @@ def boundary_answer(capability_id, policy):
             f"se uči u {introduced}. razredu, pa ga u {grade}. razredu još ne "
             "računamo. Reci mi šta iz ove lekcije da objasnimo umjesto toga."
         )
+    pronoun = spec.get("object_pronoun", "ga")
     return (
-        f"{concept} se uči u {introduced}. razredu, pa ga u {grade}. razredu "
-        "još ne računamo. Kad dođeš do te lekcije, radit ćemo je korak po "
-        "korak. Pitaj me nešto iz gradiva ovog razreda i rado ću objasniti."
+        f"{concept} se uči u {introduced}. razredu, pa {pronoun} u {grade}. "
+        "razredu još ne računamo. Kad dođeš do te lekcije, radit ćemo je korak "
+        "po korak. Pitaj me nešto iz gradiva ovog razreda i rado ću objasniti."
     )
