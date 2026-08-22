@@ -49,25 +49,47 @@ _NUMBER = re.compile(r"\d+(?:[.,]\d+)?")
 _PYTHAGOREAN_TARGET = re.compile(
     r"hipotenuz\w*|najduz\w*\s+stranic\w*|udaljenost\w*|dijagonal\w*|rastojanj\w*")
 
+# KORJENOVANJE TRAŽI ISTU VRSTU SEMANTIČKOG DOKAZA KAO I PITAGORA.
+# Živi defekt nađen na izdanjnoj kapiji: bez ovoga je gola aritmetička
+# podudarnost obarala sasvim običnu građu 6. razreda — „Marko ima 1,5 KM, a
+# Ivana 2 KM" ($1{,}5^2=2{,}25$, a $2$ nije potpun kvadrat) čitalo se kao
+# objavljena aproksimacija $\sqrt{2}$. Mjereno: 8/8 svakodnevnih tekstualnih
+# zadataka lažno blokirano.
+#
+# Operacija koja se OVDJE dokazuje je „izvadi korijen POVRŠINE i dobij DUŽINU".
+# Zato dokaz traži OBA konteksta, ne samo brojeve:
+#   • kvadratni/površinski kontekst — odakle se korijenuje;
+#   • imenovana dužinska veličina — šta se dobija.
+# Bez oba, veza je slučajna i vraća se prazno (fail-open).
+_SQUARE_CONTEXT = re.compile(r"\bpovrsin\w*|\bkvadrat\w*|\bcm2\b|\bm2\b|\^2|"
+                             r"\bsam\s+sa\s+sobom\b|\bna\s+kvadrat\b")
+_LENGTH_TARGET = re.compile(r"\bstranic\w*|\bstran[ae]\b|\bduzin\w*|\bivic\w*")
+
 # Gornja granica pretrage — odgovor učeniku je kratak, a ovo drži trošak
 # kvadratne pretlage zanemarivim.
 _MAX_NUMBERS = 40
-_APPROX_TOLERANCE = Fraction(35, 100)
 
 PYTHAGOREAN_RESULT_CODE = "published_pythagorean_result"
 ROOT_APPROXIMATION_CODE = "published_root_approximation"
 
 
-def _values(text):
+def _measured(text):
+    """[(vrijednost, broj decimala)] — decimale su dio DOKAZA, ne kozmetika."""
     out = []
     for token in _NUMBER.findall(textnorm.normalize_numeric(text))[:_MAX_NUMBERS]:
+        plain = token.replace(",", ".")
         try:
-            value = Fraction(token.replace(",", "."))
+            value = Fraction(plain)
         except (ValueError, ZeroDivisionError):
             continue
         if 0 < value < 100000:
-            out.append(value)
+            decimals = len(plain.split(".")[1]) if "." in plain else 0
+            out.append((value, decimals))
     return out
+
+
+def _values(text):
+    return [value for value, _ in _measured(text)]
 
 
 def find_pythagorean_result(text):
@@ -100,21 +122,36 @@ def find_pythagorean_result(text):
 def find_root_approximation(text):
     """(P, v) ako odgovor TVRDI približnu vrijednost korijena.
 
-    Dokaz: u tekstu stoji cio broj P koji NIJE potpun kvadrat, i necjelobrojna
-    vrijednost v takva da je v² blizu P. Potpun kvadrat se namjerno preskače —
-    tamo do rezultata vodi i dozvoljeni put množenja."""
-    values = _values(text)
-    for area in values:
-        if area.denominator != 1 or area < 2:
+    Dokaz traži TRI stvari zajedno: kvadratni/površinski kontekst, imenovanu
+    dužinsku veličinu, i cio broj P koji NIJE potpun kvadrat uz necjelobrojnu
+    vrijednost v takvu da je v² blizu P. Potpun kvadrat se namjerno preskače —
+    tamo do rezultata vodi i dozvoljeni put množenja.
+
+    Sama aritmetička podudarnost NIJE dokaz: bez konteksta bi obična cijena i
+    obična količina u istom zadatku slučajno zadovoljile relaciju."""
+    normalized = textnorm.normalize_numeric(text or "")
+    if not (_SQUARE_CONTEXT.search(normalized) and _LENGTH_TARGET.search(normalized)):
+        return None
+    measured = _measured(text)
+    for area, area_decimals in measured:
+        if area_decimals or area < 2:
             continue
         whole = int(area)
         if isqrt(whole) ** 2 == whole:
             continue                      # potpun kvadrat → dozvoljen put
-        for value in values:
-            if value.denominator == 1:
+        for value, decimals in measured:
+            if decimals == 0:
                 continue                  # aproksimacija je necjelobrojna
-            difference = value * value - area
-            if -_APPROX_TOLERANCE <= difference <= _APPROX_TOLERANCE:
+            # EGZAKTAN TEST ZAOKRUŽIVANJA umjesto proizvoljnog prozora: `value`
+            # je aproksimacija korijena tačno kad `area` leži u intervalu koji
+            # se na TOM broju decimala zaokružuje na `value`. Bez floata.
+            #
+            # Živi propust koji je ovo iznudio (izdanjska kampanja, 6. razred):
+            # „stranica je približno 4,2 cm" za P=18. Raniji fiksni prozor od
+            # 0,35 to je promašio jer je |4,2²−18| = 0,36 — a greška raste s
+            # √P, pa nijedan APSOLUTAN prag ne može biti tačan za sve P.
+            half = Fraction(1, 2 * 10 ** decimals)
+            if (value - half) ** 2 <= area <= (value + half) ** 2:
                 return (area, value)
     return None
 
@@ -128,8 +165,27 @@ _EVIDENCE = (
 )
 
 
-def executed_operation_failures(policy, answer):
+def _already_given(request, produced):
+    """Je li tražena vrijednost VEĆ STAJALA u učenikovom pitanju.
+
+    ŽIVI DEFEKT NAĐEN NA IZDANJNOJ KAPIJI: „Koliki je obim trougla sa
+    stranicama 3, 4 i 5 cm?" je legitiman zadatak 7. razreda, ali ako odgovor
+    usput kaže „najduža stranica je 5 cm", brojevi čine 3²+4²=5² i kapija bi
+    ga oborila. Tu ništa nije IZVEDENO — petica je DATA u pitanju.
+
+    Razlika između „izvedeno" i „dato" je server-vlasnička činjenica: pitanje
+    je učenikov tekst. Kad je vrijednost već u pitanju, dokaza o izvođenju
+    nema i vraća se fail-open."""
+    if not request or produced is None:
+        return False
+    return produced in set(_values(request))
+
+
+def executed_operation_failures(policy, answer, request=""):
     """Kodovi za operacije koje je odgovor DOKAZANO izveo, a razred ih nema.
+
+    `request` je učenikova poruka; služi SAMO da se odbaci lažni dokaz kad je
+    vrijednost bila data, nikad da nešto dodatno zabrani.
 
     Prazna torka znači „nije dokazano" — nikad „nema prekršaja s pouzdanjem"."""
     if policy is None or not answer:
@@ -138,6 +194,10 @@ def executed_operation_failures(policy, answer):
     for code, operation, detector in _EVIDENCE:
         if capability_requests.operation_allowed(operation, policy):
             continue
-        if detector(answer):
-            failures.append(code)
+        evidence = detector(answer)
+        if not evidence:
+            continue
+        if _already_given(request, evidence[-1]):
+            continue                      # vrijednost je DATA, nije izvedena
+        failures.append(code)
     return tuple(failures)

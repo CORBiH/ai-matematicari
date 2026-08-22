@@ -304,7 +304,8 @@ def run_explain_turn(llm, turn):
     # Dokaz je serverski i egzaktan: brojevi u odgovoru moraju činiti baš onu
     # vezu koju zabranjena operacija proizvodi. Modelova tvrdnja o postupku se
     # ne čita. Dozvolu daje ista razredna sposobnost kao svuda.
-    operation_codes = answer_operations.executed_operation_failures(policy, answer)
+    operation_codes = answer_operations.executed_operation_failures(
+        policy, answer, request=turn["student_message"])
     if operation_codes:
         logger.warning(
             "explain_turn request_id=%s stage=executed_operation category=%s "

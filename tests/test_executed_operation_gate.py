@@ -17,6 +17,8 @@ Posljednji je i dokaz zašto ulazna kapija ovo NE MOŽE riješiti: zahtjev je
 Dokaz je serverski i egzaktan (a²+b²=c², odnosno v²≈P za nepotpun kvadrat).
 Modelova tvrdnja o postupku se nikad ne čita.
 """
+import math
+
 import pytest
 
 from matbot import answer_operations, practice_policy
@@ -114,6 +116,18 @@ HARD_NEGATIVES = (
     # obična aritmetika s decimalama
     "Zbir je $2,5+1,5=4$.",
     "Polovina od $9$ je $4,5$.",
+    # ARITMETIČKA PODUDARNOST BEZ KONTEXTA — živi defekt nađen na izdanjnoj
+    # kapiji: svaka od ovih rečenica zadovoljava v²≈P nad nepotpunim kvadratom
+    # („1,5²=2,25" uz „2"), a sve su sasvim obična građa 6. razreda. Prije
+    # popravke bilo je 8/8 lažnih blokada.
+    "Olovka košta $2,5$ KM. Ana je kupila $6$ olovaka, pa je platila $15$ KM.",
+    "Pola od $5$ je $2,5$. U razredu ima $6$ djevojčica.",
+    "Trougao ima stranice $3,5$ cm i još $12$ cm žice ostaje.",
+    "Traka je duga $4,5$ m, a u kutiji ima $20$ traka.",
+    "Marko ima $1,5$ KM, a Ivana $2$ KM.",
+    "Svaka strana je $8,5$ cm, a ukupno ih je $72$.",
+    "Cijena je $9,5$ KM za $90$ grama.",
+    "Prosjek je $4,8$, a ukupno bodova $23$.",
 )
 
 
@@ -205,3 +219,98 @@ def test_unknown_evidence_fails_open():
     assert answer_operations.executed_operation_failures(None, "bilo šta") == ()
     assert answer_operations.executed_operation_failures(
         POLICY[6], "Ovo je obična rečenica bez brojeva.") == ()
+
+def test_arithmetic_coincidence_alone_never_triggers_the_root_detector():
+    """Bez kvadratnog konteksta I imenovane dužine, veza v²≈P je slučajnost.
+
+    Mjereno na izdanjnoj kapiji: gola aritmetika je obarala 8/8 svakodnevnih
+    tekstualnih zadataka 6. razreda."""
+    for reply in ("Marko ima $1,5$ KM, a Ivana $2$ KM.",
+                  "Olovka košta $2,5$ KM za $6$ olovaka.",
+                  "Prosjek je $4,8$, a bodova $23$."):
+        assert answer_operations.find_root_approximation(reply) is None, reply
+
+
+def test_root_detector_requires_both_square_context_and_length_target():
+    square_only = r"Površina kvadrata je $20\,\text{cm}^2$, a cijena $4,5$ KM."
+    length_only = "Stranica je $4,5$ cm, a ukupno ih je $20$."
+    both = (r"Površina kvadrata je $20\,\text{cm}^2$, pa je stranica "
+            r"približno $4,5$ cm.")
+    assert answer_operations.find_root_approximation(square_only) is None
+    assert answer_operations.find_root_approximation(length_only) is None
+    assert answer_operations.find_root_approximation(both) is not None
+
+# ---------------------------------------------------------------------------
+# IZVEDENO NAPRAM DATO — vrijednost iz pitanja nije dokaz izvodjenja
+# ---------------------------------------------------------------------------
+
+def test_value_given_in_the_question_is_not_evidence_of_derivation():
+    """ŽIVI DEFEKT NAĐEN NA IZDANJNOJ KAPIJI: „Koliki je obim trougla sa
+    stranicama 3, 4 i 5 cm?" je legitiman zadatak, ali odgovor koji usput
+    kaže „najduža stranica je 5 cm" nosi trojku 3-4-5. Ništa nije izvedeno —
+    petica je DATA u pitanju."""
+    request = "Koliki je obim trougla sa stranicama $3$, $4$ i $5$ cm?"
+    answer = "Obim je $3+4+5=12$ cm, a najduža stranica je $5$ cm."
+    assert answer_operations.executed_operation_failures(
+        POLICY[7], answer, request=request) == ()
+    # Bez tog pitanja isti odgovor OSTAJE dokaz izvođenja.
+    assert answer_operations.executed_operation_failures(POLICY[7], answer)
+
+
+def test_derived_value_absent_from_the_question_still_blocks():
+    for request, answer in (
+        ("Koliko je najduža stranica pravouglog trougla s katetama $3$ i $4$ cm?",
+         "Za katete $3$ i $4$ cm, hipotenuza je $5$ cm."),
+        ("Šta je hipotenuza?",
+         "Ako su katete $a=3$ i $b=4$, hipotenuza je $c=5$ cm."),
+        ("Kvadrat ima površinu $20$ cm². Kolika je stranica?",
+         "Površina kvadrata je $20$ cm², pa je stranica približno $4,47$ cm."),
+    ):
+        assert answer_operations.executed_operation_failures(
+            POLICY[6], answer, request=request), request
+
+
+def test_request_argument_can_only_relax_never_tighten():
+    """`request` služi SAMO da odbaci lažni dokaz — nikad da nešto zabrani."""
+    answer = "Hipotenuza je najduža stranica trougla."
+    for request in ("", "bilo šta", "$3$ $4$ $5$"):
+        assert answer_operations.executed_operation_failures(
+            POLICY[6], answer, request=request) == ()
+
+# ---------------------------------------------------------------------------
+# APROKSIMACIJA KORIJENA — EGZAKTAN TEST ZAOKRUZIVANJA, ne proizvoljan prozor
+# ---------------------------------------------------------------------------
+
+def _square_answer(area, value):
+    return ("Povrsina kvadrata je $%s$ cm2, pa je stranica priblizno $%s$ cm."
+            % (area, str(value).replace(".", ",")))
+
+
+@pytest.mark.parametrize("area", (2, 3, 5, 8, 12, 18, 20, 27, 30, 32, 50,
+                                  99, 200, 1000, 5000))
+@pytest.mark.parametrize("decimals", (1, 2))
+def test_rounded_roots_are_caught_at_every_magnitude(area, decimals):
+    """ZIVI PROPUST (izdanjska kampanja, 6. razred): „stranica je priblizno
+    4,2 cm" za P=18 je prosao, jer je |4,2^2-18| = 0,36 bilo van ranijeg
+    fiksnog prozora od 0,35. Greska raste s korijenom iz P, pa nijedan
+    APSOLUTAN prag ne moze biti tacan za sve P — zato se sada provjerava
+    interval zaokruzivanja, egzaktno."""
+    value = round(math.sqrt(area), decimals)
+    reply = _square_answer(area, value)
+    assert answer_operations.find_root_approximation(reply) is not None, (area, value)
+
+
+def test_the_exact_live_release_leak_is_blocked():
+    reply = (r"Za kvadrat vazi $P=a\cdot a$. Ako je $P=18$ cm2, stranica je "
+             r"priblizno $4,2$ cm, jer je $4,2\cdot4,2=17,64$.")
+    request = "Kvadrat ima povrsinu $18$ cm2. Kolika mu je stranica priblizno?"
+    assert answer_operations.executed_operation_failures(
+        POLICY[6], reply, request=request)
+
+
+@pytest.mark.parametrize("area,value", ((6, 2.5), (2, 1.5), (7, 2.5), (13, 3.5)))
+def test_decimals_that_do_not_round_to_the_root_are_not_claimed(area, value):
+    """Blizina nije dokaz: 2,5 nije zaokruzen korijen iz 6, jer se 6 ne
+    zaokruzuje na 2,5 ni na jednoj decimali."""
+    assert answer_operations.find_root_approximation(
+        _square_answer(area, value)) is None
