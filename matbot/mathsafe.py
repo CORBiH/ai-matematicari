@@ -520,6 +520,56 @@ _BARE_OTHER_COMMAND_RESIDUE_RE = re.compile(
 )
 
 # ---------------------------------------------------------------------------
+# OSIROTJELI FRAGMENT KOMANDE (D2) — backslash je NESTAO BEZ TRAGA
+# ---------------------------------------------------------------------------
+# ŽIVI NALAZ (velika Explain evaluacija, slučaj g6-10): učeniku je objavljeno
+# „$rac{2}{3}$“ umjesto „$\frac{2}{3}$“, četiri puta u istom odgovoru.
+#
+# MEHANIZAM (izmjeren na SIROVOM SDK tekstu, 32 ciljana Explain turna): Explain
+# koristi strukturirani izlaz, pa MODEL piše JSON. U pokvarenim odgovorima
+# `resp.output_text` doslovno sadrži `\u0000frac{2}{3}` — dakle model je sam
+# napisao VAŽEĆI JSON unicode escape za kontrolni znak umjesto `\\`. JSON je
+# ispravan, SDK ga dekodira tačno, i MAT-BOT ne kvari ništa: greška je u
+# GENERISANJU. Mjereno: jedan odgovor je imao 12 ispravnih `\\` uz jedan
+# zalutali `\u0000`, a drugi nijedan ispravan `\\` i sve backslasheve kao
+# `\u0005`. Zato bajt varira (0x00, 0x05, …) i zato je pojava stohastička.
+# Server ovo NE MOŽE popraviti uzvodno — može samo odbiti da objavi.
+#
+# Kad kontrolni bajt PREŽIVI, postojeći skeneri ga već rješavaju: `\x00frac`
+# i `\x05sqrt` padaju zatvoreno, a zalutali bajt uz ispravnu komandu se ukloni
+# i odgovor se objavi tačan. Rupa je bio slučaj kad bajta više NEMA, pa ostane
+# samo gola riječ ispred vitičaste zagrade — živi g6-10. Za taj oblik nije
+# dokazano da nastaje istim putem (u 32 turna nije se ponovio), ali je oblik
+# stvarno objavljen i ovdje se zatvara bez obzira na porijeklo.
+#
+# PRAVILO: u ISPRAVNOM MathJax-u argument u `{…}` uvijek pripada komandi
+# (backslash) ili grupisanju iza `_`/`^`. Niz od dva ili više slova ODMAH
+# ispred `{`, bez backslasha, ne postoji u ispravnom zapisu — zato je to
+# dokaz, a ne heuristika. Mjereno na stvarnim korpusima (1648 naslova lekcija,
+# 439 ugovornih niski, 190 objavljenih živih odgovora): nula lažnih pozitiva,
+# uz jedan pogodak koji je upravo živi nalaz g6-10.
+#
+# NE POPRAVLJA SE u `\frac`: pogađanje izgubljenog slova je tačno ono što
+# ovaj modul zabranjuje (vidi CLAUDE.md o allowlisti). Dokazana povreda →
+# odgovor pada zatvoreno.
+_ORPHAN_BRACE_FRAGMENT_RE = re.compile(r"(?<![\\A-Za-z])([A-Za-z]{2,})\s*\{")
+
+
+def _orphan_latex_fragments(scannable: str) -> list:
+    """Golе riječi ispred `{` unutar matematike — izgubljen backslash.
+
+    Puna imena komandi (`frac{`, `sqrt{`) su već pokrivena skenerima golih
+    komandi iznad, pa se ovdje preskaču da se isti nalaz ne prijavi dvaput.
+    """
+    found = []
+    for match in _ORPHAN_BRACE_FRAGMENT_RE.finditer(scannable or ""):
+        fragment = match.group(1)
+        if fragment in MATHJAX_COMMAND_ALLOWLIST:
+            continue
+        found.append(fragment)
+    return found
+
+# ---------------------------------------------------------------------------
 # GRANICA SKENERA GOLIH KOMANDI (živi A/B modela, 2026-08-18, zadatak UNI-2)
 # ---------------------------------------------------------------------------
 # Oba skenera iznad traže IZGUBLJEN BACKSLASH: poznata komanda koja je unutar
@@ -1031,6 +1081,9 @@ def find_unsafe_math_issues(text: str) -> list:
         bare_other = _BARE_OTHER_COMMAND_RESIDUE_RE.search(scannable)
         if bare_other:
             issues.append("bare_command_in_math:" + bare_other.group(0)[:24])
+        # D2: backslash nestao bez traga, ostala gola riječ ispred `{`.
+        for fragment in _orphan_latex_fragments(scannable):
+            issues.append("orphan_latex_fragment_in_math:" + fragment[:24])
         if _has_residual_literal_newline(part):
             issues.append("literal_newline_escape_in_math")
         if any(ord(ch) < 0x20 for ch in part):
