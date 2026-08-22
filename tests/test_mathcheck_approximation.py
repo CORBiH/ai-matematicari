@@ -214,3 +214,55 @@ def test_places_zero_requires_an_integer_right_hand_side():
 def test_small_magnitude_approximation_is_not_amnestied():
     """0,63 ≈ 0,20 nije zaokruživanje ni na koje mjesto."""
     assert rejected("3:5 + 1:36" + AP + "10:51")
+
+
+# ---------------------------------------------------------------------------
+# UNAKRSNE PORODICE — blokator izdanja (predao ga je audit prije pusha)
+#
+# Prva verzija ispravke množila je `scale` sa `_rounding_amplification`, a obje
+# veličine izražavaju ISTI odnos (veličina naspram literala koji nosi
+# preciznost). Uz iracionalan LIJEVI izraz amplifikacija je skakala na svoj
+# plafon (100) i dizala toleranciju sa ispravnih 550 na 55000, pa je
+# `$\\pi \\approx 4,7\\cdot10^4$` (π ≈ 47000) bilo PRIHVAĆENO.
+#
+# Ovi oblici ranije nisu bili testirani zajedno — samo odvojeno (iracionalno
+# ILI naučni zapis), pa ih nijedan test nije uhvatio.
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("segment", [
+    "\\pi" + AP + "4,7\\cdot10^4",
+    "\\sqrt{2}" + AP + "4,7\\cdot10^4",
+    "24\\sqrt{3}" + AP + "4,7\\cdot10^4",
+    "2\\pi" + AP + "2,3\\cdot10^6",
+    "\\sqrt{50}" + AP + "1,5\\cdot10^3",
+])
+def test_irrational_against_scientific_notation_is_rejected(segment):
+    """π nije 47000 ni pod jednom tolerancijom zaokruživanja."""
+    assert rejected(segment)
+
+
+def test_tolerance_depends_only_on_the_right_hand_side():
+    """Strukturna tvrdnja: nijedno svojstvo LIJEVE strane ne smije mijenjati
+    dozvoljeni interval zaokruživanja."""
+    right = "4,7\\cdot10^4"
+    value = mathcheck.evaluate_candidates(right)[0]
+    tolerances = set()
+    for left in ("4,732\\cdot10^4", "47320", "\\pi", "2\\pi",
+                 "\\sqrt{2}", "24\\sqrt{3}", "0,5"):
+        tolerances.add(round(mathcheck._tolerance(
+            left, right, "approx",
+            max(abs(mathcheck.evaluate_candidates(left)[0]), abs(value)),
+            right_value=value), 9))
+    assert len(tolerances) == 1, tolerances
+    assert tolerances == {round(0.5 * 10 ** -1 * 1.1 * 10000, 9)}   # 550
+
+
+def test_cofactor_form_still_passes_without_amplification():
+    """`scale` sam po sebi jednak je kofaktoru, pa oblik zbog kojeg je
+    `_rounding_amplification` uvedena i dalje prolazi na approx putu."""
+    assert not rejected("27\\sqrt{3}" + AP + "27\\cdot1,73205")
+
+
+def test_amplification_is_still_used_by_the_equality_path():
+    """Ispravka dira SAMO approx granu — živi slučaj 949e608 ostaje netaknut."""
+    assert not rejected("27\\sqrt{3}=27\\cdot1,73205")

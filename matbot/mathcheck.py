@@ -544,9 +544,17 @@ def _tolerance(left_expr, right_expr, relation, magnitude, right_value=None):
         precision = _approximation_precision(right_expr, right_value)
         if precision is not None:
             places, scale = precision
-            return (0.5 * (10 ** -places) * 1.1 * scale
-                    * _rounding_amplification(left_expr, right_expr, places,
-                                              magnitude))
+            # BEZ `_rounding_amplification`: ta funkcija izražava ISTI odnos
+            # (veličina naspram literala koji nosi preciznost) koji `scale` već
+            # nosi, pa bi njihov proizvod dvaput brojao skalu. Mjereno na
+            # `4,7\\cdot10^4`: ispravna jedinica posljednjeg mjesta je 1000, pa
+            # je pola 550 — i to je svojstvo SAMO desne strane. Uz iracionalan
+            # lijevi izraz amplifikacija je skakala na svoj plafon (100) i
+            # dizala toleranciju na 55000, čime je `$\\pi \\approx 4,7\\cdot
+            # 10^4$` (π ≈ 47000) bivalo PRIHVAĆENO. Blokator izdanja.
+            # Kofaktorski oblik (`27\\sqrt{3} \\approx 27\\cdot1,73205`) i dalje
+            # prolazi jer `scale` sam po sebi jednak je tom kofaktoru.
+            return 0.5 * (10 ** -places) * 1.1 * scale
         # Tvrdnja se ne može pročitati kao zaokruživanje → ranije ponašanje.
         return max(_APPROX_REL_TOL * abs(magnitude), 1e-9)
     places = _decimal_places(left_expr, right_expr)
