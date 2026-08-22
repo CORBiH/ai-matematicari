@@ -480,9 +480,58 @@ def _rounding_amplification(left_expr, right_expr, places, magnitude):
     return min(max(1.0, abs(magnitude) / smallest), _AMPLIFICATION_CAP)
 
 
-def _tolerance(left_expr, right_expr, relation, magnitude):
+def _approximation_precision(right_expr, right_value):
+    """Preciznost KOJU TVRDI desna strana relacije `\\approx`, i njena skala.
+
+    ŽIVI NALAZ D1 (velika evaluacija Explaina, 143 turna): cijela tema
+    zaokruživanja bila je nedostupna u 6–8. razredu. Uzrok NIJE bio „approx se
+    čita kao =“, nego to što je `_decimal_places` uzimao MAKSIMUM decimala
+    OBJE strane. Kod zaokruživanja je preciznija strana upravo ona koja se
+    zaokružuje, pa je tolerancija dolazila iz NEZAOKRUŽENOG broja:
+    `4,738 \\approx 4,74` → 3 decimale → 0,00055, a razlika je 0,002. Uz to,
+    grana `if places:` vraća prije nego se `relation` uopšte pogleda, pa su
+    `=` i `\\approx` tu bili doslovno isti test.
+
+    Mjera zaokruživanja je pola jedinice POSLJEDNJEG MJESTA REZULTATA, dakle
+    decimale DESNE strane. π je i ranije prolazio samo slučajno — sam nema
+    decimalni literal, pa je „max“ dolazio iz `3,14` i ispao tačan.
+
+    `scale` pokriva naučni zapis bez ijedne tvrdo kodirane potencije: kod
+    `4,7\\cdot10^4` literal je 4,7, a vrijednost 47000, pa je jedinica
+    posljednjeg mjesta 0,1·10⁴. Kad je desna strana sam literal, skala je 1.
+    """
+    places = 0
+    literals = []
+    for match in _FULL_DECIMAL_LITERAL_RE.finditer(right_expr or ""):
+        digits = len(match.group(2))
+        if digits > places:
+            places, literals = digits, []
+        if digits == places:
+            literals.append(abs(float(f"{match.group(1)}.{match.group(2)}")))
+    smallest = min((v for v in literals if v > 0), default=0.0)
+    if not places:
+        # Bez decimalnog literala tvrdnja glasi „zaokruženo na cijeli broj“.
+        # To je koherentno SAMO ako je desna strana zaista cijeli broj. Inače
+        # se ne smije uzeti apsolutnih pola jedinice: `$9:15 + 1:36 \\approx
+        # 10:51$` (sat koji ovaj modul čita kao dijeljenje, 0,196) bi tako bio
+        # amnestiran — a taj oblik po ugovoru ostaje dijeljenje i pada
+        # (tests/test_clock_arithmetic_in_math.py). Nedokazivo → None, pa
+        # pozivalac zadržava raniju konzervativnu relativnu toleranciju.
+        if right_value is None or abs(right_value - round(right_value)) > 1e-9:
+            return None
+        return 0, 1.0
+    if smallest > 0 and right_value:
+        scale = max(1.0, abs(right_value) / smallest)
+    else:
+        scale = 1.0
+    return places, scale
+
+
+def _tolerance(left_expr, right_expr, relation, magnitude, right_value=None):
     """Tolerancija poređenja.
 
+    • Relacija „\\approx“ → pola jedinice posljednjeg mjesta koje tvrdi DESNA
+      strana (vidi _approximation_precision). `=` ovu granu nikad ne koristi.
     • Oba dijela racionalna i bez decimalnog literala, relacija „=“ → egzaktno
       (samo šum float-a). Tako „$7/2=3$“ pada, kako i treba.
     • Postoji decimalni literal → tolerancija zaokruživanja iz njegove
@@ -491,6 +540,15 @@ def _tolerance(left_expr, right_expr, relation, magnitude):
       tolerancija skalira kofaktorom literala (vidi _rounding_amplification).
     • Iracionalno bez decimala uz „\\approx“ → mala relativna tolerancija.
     """
+    if relation == "approx":
+        precision = _approximation_precision(right_expr, right_value)
+        if precision is not None:
+            places, scale = precision
+            return (0.5 * (10 ** -places) * 1.1 * scale
+                    * _rounding_amplification(left_expr, right_expr, places,
+                                              magnitude))
+        # Tvrdnja se ne može pročitati kao zaokruživanje → ranije ponašanje.
+        return max(_APPROX_REL_TOL * abs(magnitude), 1e-9)
     places = _decimal_places(left_expr, right_expr)
     if places:
         return (0.5 * (10 ** -places) * 1.1
@@ -558,7 +616,8 @@ def check_segment(segment, pi_values=()):
         between = separators[left_i:right_i]
         relation = "approx" if any(s in ("\\approx", "≈") for s in between) else "eq"
         magnitude = max(abs(v) for v in left_vals + right_vals) or 1.0
-        tol = _tolerance(left_expr, right_expr, relation, magnitude)
+        tol = _tolerance(left_expr, right_expr, relation, magnitude,
+                         right_value=max(right_vals, key=abs))
         if not any(abs(a - b) <= tol for a in left_vals for b in right_vals):
             issues.append(
                 "numeric_equality_mismatch: "
