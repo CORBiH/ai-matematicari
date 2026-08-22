@@ -10,8 +10,8 @@ svoje stanje — isti mehanizam kao practice).
 import logging
 import uuid
 
-from matbot import (capability_requests, config, geometry_rules, geometrycheck,
-                    lesson_relevance, practice_policy, prompts)
+from matbot import (answer_operations, capability_requests, config, geometry_rules,
+                    geometrycheck, lesson_relevance, practice_policy, prompts)
 from matbot.semantics import request_shapes
 from matbot.llm import LLMError, failure_diagnostics_kv
 from matbot.mathcheck import find_numeric_inconsistencies
@@ -289,6 +289,26 @@ def run_explain_turn(llm, turn):
         logger.warning(
             "explain_turn request_id=%s stage=grade_capability category=%s "
             "grade=%s", request_id, ",".join(capability_codes), policy.grade)
+        return {"answer": SAFE_ERROR_MESSAGE, "last_tutor_task": ""}
+
+    # ------------------------------------------------------------------
+    # KAPIJA 3 — IZVEDENA OPERACIJA BEZ ZABRANJENOG SIMBOLA
+    # ------------------------------------------------------------------
+    # Kapija 2 gleda ZAPIS. Mjereno (kampanja od 20 poziva, 5 propusta): model
+    # zna odbiti METODU pa svejedno objaviti njen REZULTAT, bez ijednog
+    # zabranjenog simbola — „hipotenuza je 5 cm", „udaljenost je 5 cm",
+    # „stranica je oko 4,47 cm". Ta klasa je nevidljiva i ulaznoj i notacijskoj
+    # kapiji; jedan propust je došao i na ČISTO POJMOVNO pitanje („Šta je
+    # hipotenuza?"), koje nijedna ulazna kapija ne smije blokirati.
+    #
+    # Dokaz je serverski i egzaktan: brojevi u odgovoru moraju činiti baš onu
+    # vezu koju zabranjena operacija proizvodi. Modelova tvrdnja o postupku se
+    # ne čita. Dozvolu daje ista razredna sposobnost kao svuda.
+    operation_codes = answer_operations.executed_operation_failures(policy, answer)
+    if operation_codes:
+        logger.warning(
+            "explain_turn request_id=%s stage=executed_operation category=%s "
+            "grade=%s", request_id, ",".join(operation_codes), policy.grade)
         return {"answer": SAFE_ERROR_MESSAGE, "last_tutor_task": ""}
 
     _observe_method_policy(answer, turn["grade"], lesson_title, oblast,
