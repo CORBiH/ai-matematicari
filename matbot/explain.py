@@ -10,8 +10,8 @@ svoje stanje — isti mehanizam kao practice).
 import logging
 import uuid
 
-from matbot import (config, geometry_rules, geometrycheck, lesson_relevance,
-                    practice_policy, prompts)
+from matbot import (capability_requests, config, geometry_rules, geometrycheck,
+                    lesson_relevance, practice_policy, prompts)
 from matbot.llm import LLMError, failure_diagnostics_kv
 from matbot.mathcheck import find_numeric_inconsistencies
 from matbot.mathsafe import normalize_result_math_transport, sanitize_and_validate_math_text
@@ -115,6 +115,20 @@ def _observe_method_policy(answer, grade, lesson_title, oblast, lesson_id,
     )
 
 
+def _explain_response(answer, lesson_id):
+    """JEDAN oblik uspješnog Explain odgovora — model-backed i preflight put
+    moraju biti STRUKTURNO NERAZLUČIVI za frontend."""
+    return {
+        "status": "ready",
+        "answer": answer,
+        "answer_verdict": None,     # Explain NIKAD ne ocjenjuje
+        "last_tutor_task": "",      # Explain NIKAD nema aktivni zadatak
+        "next_state": {},           # bez Practice stanja (frontend ovo bezbjedno guta)
+        "session_mode": "explain",
+        "effective_topic": lesson_id or "",
+    }
+
+
 def run_explain_turn(llm, turn):
     """turn: očišćeni dict iz api.py. Vraća JSON-spreman dict."""
     request_id = uuid.uuid4().hex[:12]
@@ -133,6 +147,33 @@ def run_explain_turn(llm, turn):
     lesson_context_strong = lesson_relevance.lesson_context_is_strong(
         turn["student_message"], lesson_title, oblast
     )
+
+    # ------------------------------------------------------------------
+    # KAPIJA 1 — ZAHTJEV ZA OPERACIJU KOJU RAZRED NEMA (0 poziva modela)
+    # ------------------------------------------------------------------
+    # ŽIVI NALAZ: šestaš je na „Koliko je $\sqrt{36}$?" dobio granicu gradiva
+    # i ODMAH zatim „$\sqrt{36}=6$"; jedan mjereni propust bio je ČISTA PROZA
+    # („Kvadratni korijen broja $49$ je $7$") koju izlazni validator notacije
+    # po konstrukciji ne može vidjeti. Zato se odluka premješta na ULAZ: kad
+    # server DOKAŽE da poruka traži izvršenje zabranjene operacije, model se
+    # ne pita da odbije — ne dobije priliku da izračuna.
+    #
+    # Ovo NIJE greška: pitanje je legitimno, odgovor je granica kurikuluma, pa
+    # se vraća PUN ugovor odgovora, nikad `SAFE_ERROR_MESSAGE`.
+    policy = practice_policy.resolve(
+        grade=turn["grade"], lesson_id=lesson_id,
+        lesson_title=lesson_title, oblast=oblast,
+    )
+    blocked = capability_requests.forbidden_operation_requests(
+        turn["student_message"], policy)
+    if blocked:
+        logger.info(
+            "explain_turn request_id=%s stage=grade_capability_preflight "
+            "capability=%s grade=%s operation_available=no calls=0",
+            request_id, ",".join(blocked), policy.grade,
+        )
+        return _explain_response(
+            capability_requests.boundary_answer(blocked[0], policy), lesson_id)
 
     instructions = prompts.build_explain_instructions(
         turn["grade"], lesson_title=lesson_title, oblast=oblast,
@@ -207,6 +248,32 @@ def run_explain_turn(llm, turn):
                        request_id, ",".join(geometry_issues))
         return {"answer": SAFE_ERROR_MESSAGE, "last_tutor_task": ""}
 
+    # ------------------------------------------------------------------
+    # KAPIJA 2 — ZAPIS KOJI RAZRED NEMA, U VEĆ SASTAVLJENOM ODGOVORU
+    # ------------------------------------------------------------------
+    # Ulazna kapija hvata IZRIČIT zahtjev; ovdje pada zapis koji je model uveo
+    # sam, na turnu o nečem drugom (mjereno: „$\sqrt{36}=6$" uz uredno
+    # izgovorenu granicu gradiva).
+    #
+    # USLOV JE SPOSOBNOST, NE RAZRED: `radical_notation_allowed` je False samo
+    # tamo gdje zapis nije gradivo, pa 7. razred (prepoznavanje iracionalnog
+    # broja) i 8-9. razred prolaze netaknuti. NAMJERNO NIJE vezano za
+    # `policy.scan_method_prose` — ta zastavica je True za 10/536 lekcija i
+    # služi log-only osmatraču metodske proze, koji ostaje log-only.
+    #
+    # Odluka o proizvodu (D35-3): mlađi učenik SMIJE pitati o gradivu višeg
+    # razreda, ali to ne ovlašćuje izvođenje te operacije — granicu kurikuluma
+    # je bolje reći nego zabranjeni postupak pokazati.
+    capability_codes = practice_policy.text_policy_failures(policy, answer)
+    capability_codes = tuple(
+        code for code in capability_codes
+        if code == practice_policy.GRADE_CAPABILITY_CODE)
+    if capability_codes:
+        logger.warning(
+            "explain_turn request_id=%s stage=grade_capability category=%s "
+            "grade=%s", request_id, ",".join(capability_codes), policy.grade)
+        return {"answer": SAFE_ERROR_MESSAGE, "last_tutor_task": ""}
+
     _observe_method_policy(answer, turn["grade"], lesson_title, oblast,
                            lesson_id, request_id)
 
@@ -215,12 +282,4 @@ def run_explain_turn(llm, turn):
         request_id, result.latency_ms, result.usage,
     )
 
-    return {
-        "status": "ready",
-        "answer": answer,
-        "answer_verdict": None,     # Explain NIKAD ne ocjenjuje
-        "last_tutor_task": "",      # Explain NIKAD nema aktivni zadatak
-        "next_state": {},           # bez Practice stanja (frontend ovo bezbjedno guta)
-        "session_mode": "explain",
-        "effective_topic": lesson_id or "",
-    }
+    return _explain_response(answer, lesson_id)

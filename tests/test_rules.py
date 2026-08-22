@@ -265,15 +265,31 @@ def test_math_notation_forbids_display_dollars():
 
 
 def test_math_notation_allows_sqrt_and_caret_inside_dollars():
-    text = build_instructions(6)
+    """SONDA PREMJEŠTENA NA 8. RAZRED (živi nalaz S11, produkcija 0a2f087).
+
+    Uputa o zapisu korijena više nije razredno-neutralna: razred koji korijen
+    nema kao gradivo ne smije dobiti ni primjer ni komandu, jer je isti prompt
+    inače nosio i zabranu i recept (`Korijen: $\\sqrt{20}$`) — i šestaš je
+    dobio „$\\sqrt{36}=6$". Ono što je test STVARNO čuvao — da razred KOJI
+    korijen ima dobije ispravnu MathJax uputu — čuva se i dalje, samo na
+    razredu na koji se odnosi. Zabrana 6. razreda ima vlastiti test u
+    `tests/test_grade6_radical_prompt_coherence.py`."""
+    text = build_instructions(8)
     assert "\\sqrt" in text
     assert "x^2" in text
+    # 6. razred dobija ISTU uputu bez korijena — stepen ostaje njegovo gradivo.
+    assert "x^2" in build_instructions(6)
 
 
 def test_math_notation_forbids_raw_visible_sqrt_and_caret_examples():
-    text = build_instructions(6)
+    text = build_instructions(8)
     assert "sqrt(20)" in text  # spomenut kao PRIMJER ZABRANJENOG zapisa
     assert "1/2" in text       # spomenut kao PRIMJER ZABRANJENOG zapisa
+    # 6. razred: pravilo o sirovom zapisu OSTAJE, samo bez korijena u primjeru.
+    six = build_instructions(6)
+    assert "1/2" in six
+    assert "kao obični tekst" in six
+    assert "sqrt(20)" not in six
 
 
 def test_math_notation_uses_comma_decimal_separator():

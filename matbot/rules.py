@@ -460,6 +460,91 @@ _GEOMETRY_CONSTRUCTION_PRACTICE_MC = (
 )
 
 
+# ---------------------------------------------------------------------------
+# ZAPIS KORIJENA U ZAJEDNIČKOM BLOKU — PO KURIKULARNOJ SPOSOBNOSTI
+# ---------------------------------------------------------------------------
+# ŽIVI NALAZ (produkcija 0a2f087, slučaj S11): šestaš je na „Koliko je
+# $\sqrt{36}$?" dobio „Kvadratni korijen nije gradivo 6. razreda" — i odmah
+# zatim „$\sqrt{36}=6$". Matematika je tačna, kurikulum nije.
+#
+# UZROK KOJI SE OVDJE LIJEČI: isti prompt je nosio DVIJE suprotne poruke.
+# Razredni blok 6. razreda kaže „NIKAD ga ne uvodi ... ni kao međukorak", a
+# ovaj zajednički blok je SVIM razredima davao upute KAKO korijen zapisati i
+# računati: `Korijen: $\sqrt{20}$`, „uvijek $\sqrt{20}$", „Zadrži TAČAN oblik
+# s korijenom", pa i uzorno računanje `$24\sqrt{3}pprox41,57$`. Zabrana i
+# recept za istu stvar u istom promptu su stvaran sukob pravila, bez obzira
+# što ga model obično razriješi u korist zabrane.
+#
+# DVA NIVOA, ISTA PODJELA KAO U `practice_policy` — nema nove tabele razreda:
+#   • ZAPIS (`radical_notation_allowed`): smije li se korijen uopšte pojaviti.
+#     Razred koji ga ne smije vidjeti ne dobija ni primjer ni komandu u
+#     nabrajanju; transportno pravilo OSTAJE, samo bez tog tokena.
+#   • OPERACIJA (`radical_operation_allowed`): „zadrži tačan oblik" i
+#     aproksimacija korijena pretpostavljaju IZVEDEN korijen, pa idu samo
+#     razredu koji korjenovanje ima. Dio o $\pi$ ostaje svima — $\pi$ jeste
+#     gradivo 6. razreda (Ludolfov broj, kružnica).
+#
+# ZAMJENE SU DOSLOVNE I NABROJANE, a ne regex nad proizvoljnim tekstom: ako se
+# izvorni red ikad promijeni, `_apply` podigne grešku umjesto da tiho ne uradi
+# ništa. To je isti princip kao `geometry_rules._without_radical_formulas`.
+_NOTATION_WITHOUT_RADICAL_DISPLAY = (
+    (r"prave LaTeX komande \frac, \sqrt, ^ (stepen), \cdot",
+     r"prave LaTeX komande \frac, ^ (stepen), \cdot"),
+    (r"pravi razlomak/korijen/stepen", r"pravi razlomak/stepen"),
+    (r"nikad ne pišeš „sqrt(20)“, „x^2“ ili „1/2“ kao obični tekst — uvijek "
+     r"$\sqrt{20}$, $x^2$, $\frac{1}{2}$.",
+     r"nikad ne pišeš „x^2“ ili „1/2“ kao obični tekst — uvijek "
+     r"$x^2$, $\frac{1}{2}$."),
+    (r"- Stepen: $x^2$, $a^3$, $(2x)^2$. Korijen: $\sqrt{20}$.",
+     r"- Stepen: $x^2$, $a^3$, $(2x)^2$."),
+    (r"komande (\frac, \times, \sqrt, \cdot, ...)",
+     r"komande (\frac, \times, \cdot, ...)"),
+    (r"NIKAD ne ostavljaj \frac, \sqrt, \text, \cdot, \begin ili \end IZVAN",
+     r"NIKAD ne ostavljaj \frac, \text, \cdot, \begin ili \end IZVAN"),
+    # Primjer zapisa cijelog izraza u JEDNOM $...$ bloku ne mora nositi korijen
+    # da bi pokazao ono što pokazuje (jedinica mjere unutar bloka).
+    (r"$54\sqrt{3}\,\text{cm}^3$", r"$54\,\text{cm}^3$"),
+)
+
+_NOTATION_WITHOUT_RADICAL_OPERATION = (
+    (r"- Zadrži TAČAN oblik s korijenom/π prije decimalne aproksimacije.",
+     r"- Zadrži TAČAN oblik s $\pi$ prije decimalne aproksimacije."),
+    (r"(npr. $24\sqrt{3}\approx41,57$, a NE $\approx83,14$)",
+     r"(npr. $10\pi\approx31,4$, a NE $\approx15,7$)"),
+    # Samoprovjera „ne izgubi dijeljenje" je aritmetička pouka, a ne pouka o
+    # korijenu — isti primjer radi bez korijena, pa razred bez korjenovanja ne
+    # dobija uzorno RAČUNANJE s korijenom.
+    (r"(npr. $\frac{3\cdot16\sqrt{3}}{2}$ je $24\sqrt{3}$, NIKAD $48\sqrt{3}$)",
+     r"(npr. $\frac{3\cdot16}{2}$ je $24$, NIKAD $48$)"),
+)
+
+
+def _apply(text, replacements):
+    for old, new in replacements:
+        if old not in text:
+            raise AssertionError(
+                "rules._MATH_NOTATION_RULES se promijenio; zamjena vise ne "
+                "pogadja: %r" % (old[:60],))
+        text = text.replace(old, new)
+    return text
+
+
+def notation_rules_for_grade(grade, mode="practice"):
+    """Zajednicki blok zapisa, skrojen po kurikularnoj sposobnosti razreda.
+
+    Quick namjerno NEMA razredna kurikularna ogranicenja (vidi
+    `build_shared_math_rules`), pa dobija blok nepromijenjen."""
+    if mode == "quick":
+        return _MATH_NOTATION_RULES
+    effective = _effective_grade(grade)
+    text = _MATH_NOTATION_RULES
+    if not practice_policy.radical_operation_allowed_for_grade(effective):
+        text = _apply(text, _NOTATION_WITHOUT_RADICAL_OPERATION)
+    if not practice_policy.radical_notation_allowed_for_grade(effective):
+        text = _apply(text, _NOTATION_WITHOUT_RADICAL_DISPLAY)
+    return text
+
+
 def build_shared_math_rules(grade, lesson_title, oblast, mode, student_message=""):
     """Sastavlja SAMO relevantne dijeljene blokove za (grade, lesson_title, oblast,
     mode). Deterministička, bez AI poziva. `student_message` se trenutno ne
@@ -545,6 +630,6 @@ def build_shared_math_rules(grade, lesson_title, oblast, mode, student_message="
         parts.append(construction)
 
     parts.append(_LANGUAGE_RULES)
-    parts.append(_MATH_NOTATION_RULES)
+    parts.append(notation_rules_for_grade(grade, mode=mode))
 
     return "\n".join(parts)

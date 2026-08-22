@@ -472,11 +472,26 @@ def test_explain_literal_newline_escape_does_not_remain_visible():
 
 
 def test_explain_valid_sqrt_survives_unchanged():
+    """SONDA PREMJEŠTENA NA 8. RAZRED — svojstvo koje test čuva je da
+    `mathsafe` ne kvari ISPRAVAN `\\sqrt`, a ono ne zavisi od razreda.
+
+    Odluka o proizvodu (D35-3, ovaj zadatak): razred kojem zapis korijena nije
+    gradivo ne smije ga objaviti ni kad učenik pita — pa 6. razred sada pada
+    zatvoreno na razrednoj kapiji, PRIJE nego što se stigne do ovog svojstva.
+    Zato se isto svojstvo provjerava tamo gdje je zapis dozvoljen, a novo
+    ponašanje 6. razreda ima vlastitu tvrdnju ispod."""
     fake = FakeLLM()
     fake.queue(make_explain_output(reply="Uprošćeno: $2\\sqrt{5}$."))
-    r = run_explain_turn(fake, explain_turn_payload())
+    r = run_explain_turn(fake, explain_turn_payload(grade=8, selected_topic="8-01-008"))
     assert r["status"] == "ready"
     assert r["answer"] == "Uprošćeno: $2\\sqrt{5}$."
+
+
+def test_explain_sqrt_is_blocked_for_a_grade_without_the_notation():
+    fake = FakeLLM()
+    fake.queue(make_explain_output(reply="Uprošćeno: $2\\sqrt{5}$."))
+    r = run_explain_turn(fake, explain_turn_payload())      # 6. razred
+    assert r == {"answer": SAFE_ERROR_MESSAGE, "last_tutor_task": ""}
 
 
 def test_explain_ambiguous_damaged_form_never_reaches_answer():
