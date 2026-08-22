@@ -9,7 +9,6 @@ mehanizam kao practice/explain).
 """
 import logging
 import re
-import unicodedata
 import uuid
 
 from matbot import config, geometry_rules, geometrycheck, imagecheck, prompts, quick_context
@@ -27,6 +26,7 @@ from matbot.schema import (
 )
 from matbot.terminology import normalize_terminology
 from matbot.topics import lesson_info
+from matbot import textnorm
 
 logger = logging.getLogger("matbot.quick")
 
@@ -57,10 +57,7 @@ REPAIR_ACKNOWLEDGEMENT = "Izvini — prethodni odgovor nije bio dovoljno jasan. 
 
 def _normalized_conversation_phrase(value):
     """Lowercase/diacritics/punctuation normalization for narrow prose intents."""
-    folded = unicodedata.normalize("NFKD", value or "")
-    without_marks = "".join(char for char in folded if not unicodedata.combining(char))
-    words_only = re.sub(r"[^\w\s]", " ", without_marks.lower(), flags=re.UNICODE)
-    return " ".join(words_only.split())
+    return textnorm.normalize_lexical(value)
 
 
 def is_conversational_repair_message(message: str) -> bool:

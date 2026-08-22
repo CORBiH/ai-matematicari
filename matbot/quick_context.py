@@ -27,9 +27,9 @@ Za sve ostalo server pošteno kaže da ne vidi taj dio — nikad ne izmišlja.
 import copy
 import re
 import threading
-import unicodedata
 
 from matbot import config
+from matbot import textnorm
 
 # Granice — stanje sesije ne smije rasti s brojem poruka.
 MAX_TASK_TEXT_CHARS = 400
@@ -157,9 +157,11 @@ _LABEL_LETTER_RE = re.compile(r"(?:^|\b)(?:pod\s*)?([a-fđčćšž])\s*\)")
 
 
 def _fold(text):
-    folded = unicodedata.normalize("NFKD", text or "")
-    stripped = "".join(ch for ch in folded if not unicodedata.combining(ch))
-    return " ".join(re.sub(r"[^\w\s)]", " ", stripped.lower()).split())
+    """Leksicki ugovor koji ZADRZAVA „)" — oznaka zadatka („pod b)") je nosi.
+
+    „đ" se NAMJERNO ne preslikava: azbuka oznaka `_LABEL_LETTER_RE` ga sadrzi,
+    pa bi preslikavanje promijenilo odgovor. Vidi matbot/textnorm.py."""
+    return textnorm.normalize_lexical(text, keep=")")
 
 
 def requested_task_label(message):

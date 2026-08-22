@@ -32,7 +32,7 @@ lekciji“. Kad ne može dokazati da je poruka samostalna, vraća JAK kontekst �
 tj. ranije (nepromijenjeno) ponašanje.
 """
 import re
-import unicodedata
+from matbot import textnorm
 
 # Poruke koje bez izabrane lekcije ili historije NEMAJU značenje. Poredi se
 # normalizovan oblik (mala slova, bez dijakritika i interpunkcije), kao prefiks
@@ -92,10 +92,7 @@ _TOPIC_RES = {
 def _normalize(value):
     """Mala slova, bez dijakritika i interpunkcije — isti postupak kao uski
     prozni klasifikatori u matbot/quick.py."""
-    folded = unicodedata.normalize("NFKD", value or "")
-    without_marks = "".join(ch for ch in folded if not unicodedata.combining(ch))
-    words_only = re.sub(r"[^\w\s]", " ", without_marks.lower(), flags=re.UNICODE)
-    return " ".join(words_only.split())
+    return textnorm.normalize_lexical(value)
 
 
 def _is_deictic(normalized):

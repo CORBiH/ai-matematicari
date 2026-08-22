@@ -29,22 +29,19 @@ plus 3. SPOSOBNOST RAZREDA iz `ResolvedPracticePolicy` — ista zastavica koju
 koriste prompt i validatori, bez nove razredne tabele i bez ID-ja lekcije.
 """
 import re
-import unicodedata
 
-from matbot import practice_policy
+from matbot import practice_policy, textnorm
 
 # ---------------------------------------------------------------------------
 # NORMALIZACIJA — isti postupak kao uski prozni klasifikatori u `quick.py` i
 # `lesson_relevance.py`: mala slova, bez dijakritika. Znakovi se traže nad
 # SIROVIM tekstom, jer ih normalizacija briše.
 # ---------------------------------------------------------------------------
-_PUNCT = re.compile(r"[^\w\s]", re.UNICODE)
 
 
 def _normalize(value):
-    folded = unicodedata.normalize("NFKD", value or "")
-    stripped = "".join(ch for ch in folded if not unicodedata.combining(ch))
-    return _PUNCT.sub(" ", stripped.lower())
+    """Leksicki ugovor bez sazimanja razmaka (vidi matbot/textnorm.py)."""
+    return textnorm.normalize_lexical(value, collapse_whitespace=False)
 
 
 # ---------------------------------------------------------------------------

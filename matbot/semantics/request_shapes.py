@@ -32,29 +32,25 @@ nikad ne znači zabranjeno.
 """
 import json
 import re
-import unicodedata
+from matbot import textnorm
 from functools import lru_cache
 from pathlib import Path
 
 FAMILIES_PATH = (Path(__file__).resolve().parent.parent.parent
                  / "data" / "semantic_families.json")
 
-_PUNCT = re.compile(r"[^\w\s]", re.UNICODE)
-
-
-# NFKD NE rastavlja „đ" (U+0111 je zasebno slovo, ne slovo + znak), pa ga
-# treba preslikati ručno. Bez toga „Nađi hipotenuzu za katete 8 i 15." izmiče
-# kapiji — živi defekt nađen u pregledu. Isti propust postoji i u drugim
-# normalizatorima projekta; tamo ga zaobilaze same liste oblika, pa se ovdje
-# NE dira njihov kod, samo se ova kapija čini tačnom.
-_DSTROKE = str.maketrans({"đ": "d", "Đ": "D"})
 
 
 def _normalize(value):
-    """Isti postupak kao ostali uski prozni klasifikatori projekta, plus „đ"."""
-    folded = unicodedata.normalize("NFKD", (value or "").translate(_DSTROKE))
-    stripped = "".join(ch for ch in folded if not unicodedata.combining(ch))
-    return _PUNCT.sub(" ", stripped.lower())
+    """Leksički ugovor + preslikavanje „đ".
+
+    „đ" (U+0111) nema kanonsku dekompoziciju, pa preživi svaki NFKD-baziran
+    normalizator; bez preslikavanja „Nađi hipotenuzu za katete 8 i 15." izmiče
+    ovoj kapiji. Preslikavanje je IZRIČITO baš ovdje, jer ga drugi potrošači
+    ne smiju dobiti — `quick_context` čita oznaku zadatka azbukom koja „đ"
+    sadrži. Vidi `matbot/textnorm.py`."""
+    return textnorm.normalize_lexical(value, collapse_whitespace=False,
+                                      fold_dstroke=True)
 
 
 # ---------------------------------------------------------------------------
