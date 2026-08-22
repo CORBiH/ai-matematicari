@@ -65,6 +65,10 @@ ANGLE_DIVIDER_BOUNDARY_RAY = "angle_divider_boundary_ray"
 GEOMETRY_RELATION_CONTRADICTION = "geometry_relation_contradiction"
 COINCIDENT_RAYS_NONZERO_ANGLE = "coincident_rays_nonzero_angle"
 
+# Mjera ugla zapisana kao stepen nula (`$90^0$`) umjesto kanonskog `$90^\circ$`
+# — vidi odjeljak „ZAPIS STEPENA" niže.
+ANGLE_DEGREE_SUPERSCRIPT_ZERO = "angle_degree_superscript_zero"
+
 ALL_ISSUE_CODES = (
     CIRCLE_DIAMETER_USES_D, CIRCLE_DIAMETER_USES_LOWER_D, CIRCLE_RADIUS_USES_R,
     CIRCUMRADIUS_USES_R, PLANE_AREA_USES_S, PLANE_PERIMETER_AREA_SYMBOL_SWAP,
@@ -72,6 +76,7 @@ ALL_ISSUE_CODES = (
     SOLID_BASE_AREA_SYMBOL_MISMATCH, PYRAMID_APOTHEM_EDGE_CONFUSION,
     GEOMETRY_FORMULA_SYMBOL_CONFLICT, ANGLE_DIVIDER_VERTEX_MISMATCH,
     ANGLE_DIVIDER_BOUNDARY_RAY, GEOMETRY_RELATION_CONTRADICTION,
+    ANGLE_DEGREE_SUPERSCRIPT_ZERO,
 )
 
 # --- uloge sadržaja ---------------------------------------------------------
@@ -293,6 +298,74 @@ def _divider_coherence_issues(flat):
         elif ray_end in (first_arm, second_arm):
             issues.append(ANGLE_DIVIDER_BOUNDARY_RAY)
     return issues
+
+
+# ---------------------------------------------------------------------------
+# ZAPIS STEPENA: `^\circ`, NIKAD `^0`
+#
+# Živi nalaz (produkcijski smoke poslije izdanja 04baada, Explain 7. razred):
+# objavljeno je „…uglu od $90^0$“. To nije kozmetika — `90^0` je 90 na nulti
+# stepen, dakle 1, pa je objavljena tvrdnja MATEMATIČKI NETAČNA. Nijedan sloj
+# je nije odbio: mathsafe vidi dozvoljene komande, mathcheck nema jednakost
+# koju bi opovrgao (samostalna mjera ništa ne protivrječi), a geometrycheck
+# dotad nije poznavao zapis stepena. `\circ` je već u allowlisti i svi
+# deterministički generatori (matbot/deterministic/anglework.py) pišu
+# `^\circ`, pa je kanonski oblik odavno definisan — nedostajala je provjera.
+#
+# DOKAZ, NE NAGAĐANJE: sam oblik `90^0` je legitiman (stepen nula), pa se
+# prijavljuje SAMO kad je izraz gramatički vezan za imenicu „ugao“. Veznici su
+# ZATVOREN spisak, iz istog razloga koji je zapisan uz `_CONNECTOR_WORDS`:
+# slobodan prozor od N znakova lažno okida na „U zadatku o uglovima izračunaj
+# vrijednost izraza $2^0$“, gdje je `2^0` ispravan stepen nula, a „uglovima“
+# samo tema zadatka. Osnova mora biti CIJELI BROJ — `x^0` i `a^0` nikad nisu
+# mjera ugla, pa su bezuslovno dozvoljeni.
+#
+# Ne popravlja se u `^\circ`: modul po ugovoru nikad ne mijenja tekst, a
+# pogađanje namjere je upravo ono što mathsafe zabranjuje. Dokazana povreda →
+# isti sigurni fallback kao svaka druga notacijska povreda.
+# ---------------------------------------------------------------------------
+
+# Padeži imenice „ugao“. `\b` ispred NAMJERNO štiti „trougao“, „pravougaonik“
+# i „četverougao“ — u njima „ugao“ ne počinje na granici riječi. „Uglomjer“ ne
+# pogađa nijedan oblik (nema „uglo…“ u spisku).
+_ANGLE_NOUN = r"\b(?i:ugao|ugla|uglu|uglom|uglove|uglov\w*|ugaon\w*)\b"
+
+# Oznaka ugla između imenice i mjere: „ugao ABC“, „ugao \alpha“.
+_ANGLE_LABEL = r"(?:\s*(?:\\[a-zA-Z]+|[A-Z]{1,3})\b)?"
+
+# ZATVOREN spisak veznika — vidi obrazloženje uz `_CONNECTOR_WORDS`. Riječi
+# „izračunaj“, „vrijednost“ i „izraz“ ovdje NE SMIJU ući: one su upravo ono što
+# razdvaja stepen nula od mjere ugla.
+_DEGREE_CONNECTOR_WORDS = (
+    r"je|su|jesu|iznosi|iznose|ima|imaju|mjeri|mjere|mjera|mjeru|"
+    r"jednak\w*|dobij\w*|[čc]ini|[čc]ine|od|do|oko|kao|"
+    r"ta[čc]no|pribli[žz]no|pun|puni|puna|"
+    r"trougla|[čc]etverougla|kvadrata|romba|trapeza|mnogougla|kruga"
+)
+_DEG_COP = r"(?:\s*(?i:" + _DEGREE_CONNECTOR_WORDS + r")\b)*\s*"
+
+# Pogrešna mjera: cijeli broj sa eksponentom „nula“ (ili slovom „o“, koje je
+# ista greška — `90^o` je 90 na stepen promjenljive o). Osnova je isključivo
+# cijeli broj, pa `x^0`/`a^0` ne mogu okinuti.
+_DEGREE_ZERO_TOKEN = (r"(?<![\d.,])\d{1,3}\s*\^\s*"
+                      r"(?:0|o|\{\s*0\s*\}|\{\s*o\s*\})(?![\d.,\w])")
+
+_ANGLE_DEGREE_ZERO_FWD = re.compile(
+    _ANGLE_NOUN + _ANGLE_LABEL + _DEG_COP + _DEGREE_ZERO_TOKEN)
+
+# Obrnut red: „$90^0$ je pravi ugao.“
+_DEGREE_ZERO_PREDICATE = (r"\s*(?i:je|su|iznosi|[čc]ini|predstavlja)\b"
+                          r"(?:\s*(?i:pravi|prav|o[šs]tar|tup|opru[žz]en|"
+                          r"pun|puni|taj|ovaj|jedan)\b)*\s*")
+_ANGLE_DEGREE_ZERO_REV = re.compile(
+    _DEGREE_ZERO_TOKEN + _DEGREE_ZERO_PREDICATE + _ANGLE_NOUN)
+
+
+def _degree_superscript_zero_issues(flat):
+    """Kod ako je mjera ugla zapisana kao stepen nula umjesto `^\\circ`."""
+    if _ANGLE_DEGREE_ZERO_FWD.search(flat) or _ANGLE_DEGREE_ZERO_REV.search(flat):
+        return [ANGLE_DEGREE_SUPERSCRIPT_ZERO]
+    return []
 
 
 # ---------------------------------------------------------------------------
@@ -588,6 +661,10 @@ def find_geometry_issues(text, scope, figures=(), role=ROLE_AUTHORITATIVE,
     # NE zavisi od scope-a (lekcije o uglovima rutiraju scope "") — pokreće se
     # prije scope kapije, uz iste role/policy izuzetke iznad.
     issues.extend(_divider_coherence_issues(flat))
+    # Zapis stepena je notacijski i EGZAKTAN, bez konvencije simbola — isti
+    # razlog za mjesto poziva kao iznad: lekcije o uglovima rutiraju scope "",
+    # pa bi iza scope kapije baš najčešći slučaj ostao neprovjeren.
+    issues.extend(_degree_superscript_zero_issues(flat))
     # Ciljani blokator FW-G03: protivrječna geometrijska premisa (poklopljeni
     # zraci uz nenulti ugao). Isti razlog za mjesto poziva kao iznad — lekcije
     # o uglovima nemaju scope, a protivrječnost je egzaktna bez konvencije

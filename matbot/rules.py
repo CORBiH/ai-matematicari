@@ -118,6 +118,13 @@ _MATH_NOTATION_RULES = (
     "cijelog i razlomačkog dijela, bez zapisa „2 i 1/3“).\n"
     "- Množenje: $\\cdot$. Školsko dijeljenje u običnom zapisu: „:“ (npr. $12:4$).\n"
     "- Stepen: $x^2$, $a^3$, $(2x)^2$. Korijen: $\\sqrt{20}$.\n"
+    # Mjera ugla se piše ISKLJUČIVO sa \circ. Živi nalaz poslije izdanja
+    # 04baada: objavljeno „uglu od $90^0$“, a to je 90 na nulti stepen = 1,
+    # dakle netačna tvrdnja. Pravilo stoji OVDJE, u zajedničkom bloku, jer
+    # vrijedi za svaki mod i svaku lekciju — nije stvar teme „uglovi“.
+    # Prompt samo smanjuje učestalost; objavu jamči matbot/geometrycheck.py.
+    "- Mjera ugla: $90^\\circ$, $45^\\circ$, $180^\\circ$ — stepen ugla je UVIJEK "
+    "\\circ. NIKAD ne piši $90^0$ (to je 90 na nulti stepen, tj. $1$), niti $90^o$.\n"
     "- Decimalni separator u zapisu vidljivom učeniku je zarez: $2,5$, $0,75$ — nikad tačka.\n"
     # OZNAKA SKUPA PRIRODNIH BROJEVA — konvencija ovog projekta, kurikularno
     # potkrijepljena: 6. razred ima vlastitu lekciju „Skupovi N i N0“,
