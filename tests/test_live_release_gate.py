@@ -62,9 +62,9 @@ def _passing_document():
         "finished_at": datetime.now(timezone.utc).isoformat(),
         "scenario_count": 15,
         "required_scenario_count": 15,
-        # Kontrolni v1: plafon = Practice (23) + kontrolni (4); stvarni zbir
-        # nosi i kontrolni pozive (17 + 0 + 4).
-        "sdk_call_ceiling": 35,
+        # Plafon se izvodi iz plana (vidi runner.SDK_CALL_CEILING); ovaj
+        # artefakt samo renderuje konzolni sazetak, pa uzima aktuelnu vrijednost.
+        "sdk_call_ceiling": runner.SDK_CALL_CEILING,
         "planned_sdk_calls": 17,
         "escalated_sdk_calls": 0,
         "kontrolni_sdk_calls": 4,
@@ -113,7 +113,13 @@ def test_release_gate_plan_covers_every_route_class():
     assert runner.KONTROLNI_MAX_CALLS == 4
     # Plafon prati SVE mjerene modove: Practice (23) + Kontrolni + Explain +
     # Quick (tekst i slika). Explain i Quick troše tačno jedan poziv po turnu.
-    assert runner.SDK_CALL_CEILING == (23 + runner.KONTROLNI_MAX_CALLS
+    # PLAFON POSLIJE ODVAJANJA ZIVOSTI: cijena jednog prolaza kroz plan ostaje
+    # ista (23), ali stohasticki scenario smije dati najvise
+    # PRACTICE_LIVENESS_ATTEMPTS ekvivalentnih uzoraka. Determinicki scenariji
+    # doprinose nulom, pa ih mnozenje ne dira.
+    assert runner.max_planned_calls(plan) == 23
+    assert runner.SDK_CALL_CEILING == (23 * runner.PRACTICE_LIVENESS_ATTEMPTS
+                                       + runner.KONTROLNI_MAX_CALLS
                                        + runner.EXPLAIN_MAX_CALLS
                                        + runner.QUICK_MAX_CALLS)
     assert sum(item.expected_calls or 0 for item in plan) == 11

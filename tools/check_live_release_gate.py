@@ -46,7 +46,13 @@ EXPLAIN_REQUIRED_TURNS = 4
 EXPLAIN_MAX_CALLS = EXPLAIN_REQUIRED_TURNS
 QUICK_REQUIRED_TURNS = 4
 QUICK_MAX_CALLS = QUICK_REQUIRED_TURNS
-REQUIRED_CALL_CEILING = (PRACTICE_CALL_CEILING + KONTROLNI_MAX_CALLS
+# ODVAJANJE ZIVOSTI OD BEZBJEDNOSTI: stohasticki Practice scenario smije dati
+# najvise PRACTICE_LIVENESS_ATTEMPTS ekvivalentnih uzoraka prije nego se zivost
+# proglasi neuspjelom. Bezbjednosni prekrsaj se NIKAD ne uzorkuje. Vrijednost
+# mora pratiti runner (`tools/run_live_release_gate.py`).
+PRACTICE_LIVENESS_ATTEMPTS = 3
+REQUIRED_CALL_CEILING = (PRACTICE_CALL_CEILING * PRACTICE_LIVENESS_ATTEMPTS
+                         + KONTROLNI_MAX_CALLS
                          + EXPLAIN_MAX_CALLS + QUICK_MAX_CALLS)
 REQUIRED_COVERED_MODES = ["practice", "kontrolni", "explain", "quick_text",
                           "quick_image"]

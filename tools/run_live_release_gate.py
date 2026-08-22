@@ -125,6 +125,27 @@ _TUTOR_STAGE_NAMES = frozenset({"fast_turn", "tutor_turn"})
 _REVIEWER_STAGE_NAMES = frozenset({"reviewer_turn"})
 # Arhitektonska granica iz CLAUDE.md pravilo 4 — nikad se ne podiže.
 _MAX_CALLS_PER_TURN = 2
+
+# ---------------------------------------------------------------------------
+# ODVAJANJE BEZBJEDNOSTI OD ŽIVOSTI (Practice)
+# ---------------------------------------------------------------------------
+# MJERENO (audit pouzdanosti, 96 Practice turnova + izdanjske runove):
+#   • Practice objavljuje 137/138 turnova → pad zatvoreno ~0,72 %
+#     (Wilson 95 %: 0,13 %–3,99 %);
+#   • uz 12 stohastičkih scenarija i JEDAN uzorak po scenariju, kapija je
+#     padala u ~11 % runova BEZ ijedne stvarne greške kandidata.
+#
+# Kontrolni, Explain i Quick VEĆ razlikuju „siguran pad zatvoreno" od
+# „bezbjednosnog prekršaja" i traže samo ŽIVOST (bar jedna objava). Practice je
+# bio jedini koji je siguran pad tretirao kao pad izdanja — dakle spajao je
+# BEZBJEDNOST i RASPOLOŽIVOST u jednu tvrdnju.
+#
+# Ovdje se to razdvaja, i to SAMO za živost:
+#   • svaki bezbjednosni prekršaj i dalje obara izdanje ODMAH, bez uzorkovanja;
+#   • siguran pad zatvoreno postaje NEUSPJEŠAN UZORAK ŽIVOSTI.
+# Sekvencijalno: zaustavi se čim je ishod odlučen, pa zdrav run ne plaća ništa.
+PRACTICE_LIVENESS_ATTEMPTS = 3
+PRACTICE_LIVENESS_REQUIRED = 2
 # Brza ruta troši 1 poziv po scenariju izrade zadatka; recenzentski popravak je
 # uslovan i dodaje najviše još jedan. Plafon zato pokriva NAJGORI dozvoljeni
 # ishod (svaki modelski scenario eskalirao), a tačnost čuva ugovor po scenariju
@@ -171,8 +192,13 @@ QUICK_TEST_PLAN = (
 )
 QUICK_MAX_CALLS = len(QUICK_TEST_PLAN)
 
-SDK_CALL_CEILING = (23 + KONTROLNI_MAX_CALLS + EXPLAIN_MAX_CALLS
-                    + QUICK_MAX_CALLS)
+# NAJGORI SLUČAJ, izveden iz plana (vidi `max_planned_calls`): 12 stohastičkih
+# scenarija × (1 tutorski + 1 recenzentski) × PRACTICE_LIVENESS_ATTEMPTS, plus
+# server-vlasnički scenariji koji se nikad ne ponavljaju. Zdrav run i dalje
+# staje u ~18 poziva jer se uzorkuje SAMO poslije sigurnog pada zatvoreno.
+_PRACTICE_WORST_CASE = 23 * PRACTICE_LIVENESS_ATTEMPTS
+SDK_CALL_CEILING = (_PRACTICE_WORST_CASE + KONTROLNI_MAX_CALLS
+                    + EXPLAIN_MAX_CALLS + QUICK_MAX_CALLS)
 # Zbir svih scenarija čiji je ugovor statički (bez `first_hint`).
 _STATIC_PLAN_CALLS = 11
 # Sentinel: očekivanje se izvodi iz serverske politike pomoći PRIJE turna.
@@ -606,6 +632,48 @@ def _intro_errors(result) -> list[str]:
     return []
 
 
+def _rejection_safety_errors(result) -> list[str]:
+    """Bezbjednosne tvrdnje koje moraju važiti i kad je turn ISPRAVNO odbijen.
+
+    Klasifikacija se izvodi iz STRUKTURNIH činjenica rezultata, ne iz naziva
+    greške: naziv je dijagnostika, a dokaz su stanje sesije, granica poziva,
+    sastav faza i to da ništa iz odbijenog paketa nije procurilo."""
+    errors: list[str] = []
+    if result.session_unchanged_after_rejection is not True:
+        errors.append("state_mutation_after_rejection")
+    calls = result.sdk_calls_this_turn or 0
+    if calls > _MAX_CALLS_PER_TURN:
+        errors.append(f"more_than_two_calls_in_one_turn_{calls}")
+    stages = list(getattr(result, "sdk_call_stages", ()) or ())
+    tutor_stages = [name for name in stages if name in _TUTOR_STAGE_NAMES]
+    reviewer_stages = [name for name in stages if name in _REVIEWER_STAGE_NAMES]
+    if len(tutor_stages) > 1:
+        errors.append(f"repeated_tutor_stage_calls_{len(tutor_stages)}")
+    if len(reviewer_stages) > 1:
+        errors.append(f"repeated_reviewer_stage_calls_{len(reviewer_stages)}")
+    if stages and len(stages) > len(tutor_stages) + len(reviewer_stages):
+        errors.append("unknown_sdk_stage_in_turn")
+    # Odbijen turn ne smije ništa objaviti — ni zadatak, ni opcije, ni ključ.
+    if result.published_task_text:
+        errors.append("rejected_turn_published_task_text")
+    if result.next_state_options:
+        errors.append("rejected_turn_published_options")
+    if result.revealed_correct_option_id:
+        errors.append("rejected_turn_revealed_answer_key")
+    return errors
+
+
+def _is_liveness_eligible(expected_calls: int) -> bool:
+    """Uzorkuje se SAMO scenario koji stvarno zove model.
+
+    Kriterij je ZAMRZNUTA očekivana cijena poziva, ne spisak imena: scenario s
+    ugovorom „tačno nula poziva" je server-vlasnički (`full_solution`,
+    `semantic_fresh`, `semantic_harder`) i po konstrukciji ne može pasti zbog
+    stohastike, pa se nikad ne ponavlja. Uslovni `first_hint` time automatski
+    pada u ispravnu klasu: ponavlja se samo kad je izveden na 1 poziv."""
+    return expected_calls > 0
+
+
 def _scenario_errors(gate: GateScenario, result, prior_task: str, prior_options: Iterable[dict],
                      prior_signature=None, *, expected_calls=None) -> list[str]:
     """`expected_calls` je vrijednost ZAMRZNUTA PRIJE turna; kad nije data,
@@ -618,10 +686,10 @@ def _scenario_errors(gate: GateScenario, result, prior_task: str, prior_options:
             "expected call count.")
     errors = []
     if not result.published:
-        errors.append(result.failure_class or "turn_not_published")
-        if result.session_unchanged_after_rejection is not True:
-            errors.append("state_mutation_after_rejection")
-        return errors
+        # Odbijen turn NIJE automatski pad izdanja. Bezbjednosne tvrdnje se i
+        # ovdje provjeravaju u cijelosti (`_rejection_safety_errors`), a sama
+        # činjenica „nije objavljeno" je uzorak ŽIVOSTI i rješava je pozivalac.
+        return _rejection_safety_errors(result)
     # UGOVOR POZIVA BRZE RUTE (nije raspon). Očekuje se TAČNO `expected_calls`.
     # Drugi poziv je dozvoljen isključivo kad je to RECENZENTSKI POPRAVAK, i to
     # se dokazuje SASTAVOM poziva, ne brojem: u jednom turnu smije stajati samo
@@ -678,6 +746,102 @@ def _scenario_errors(gate: GateScenario, result, prior_task: str, prior_options:
         if not result.task_completed_after or result.revealed_correct_option_id != result.internal_correct_option_id_after:
             errors.append("full_solution_did_not_complete_committed_task")
     return errors
+
+
+def _run_practice_scenario(store, llm, capture, report, gate, expected_calls,
+                           before, prior_signature):
+    """Sekvencijalno uzorkovanje živosti za JEDAN Practice scenario.
+
+    Vraća (pokusaji, bezbjednosne_greske, greske_zivosti, potroseni_pozivi,
+    stop, prihvacen_rezultat).
+
+    STANJE JE OČUVANO PO POKUŠAJU: odbijen turn po ugovoru ne mijenja sesiju,
+    ali objavljen turn je mijenja. Da bi svaki pokušaj bio ZAISTA ekvivalentan
+    uzorak, ponovljeni pokušaj se izvodi nad IZOLOVANOM sesijom zasijanom istim
+    stanjem prije turna; na kraju se prihvaćeni ishod prepiše natrag na
+    kanonski `session_id`. Time se ne mijenja nijedno produkcijsko ponašanje —
+    koriste se samo `store.peek`/`store.save`.
+    """
+    import copy as _copy
+    from dataclasses import replace as _replace
+
+    base_session = gate.scenario.session_id
+    eligible = _is_liveness_eligible(expected_calls)
+    max_attempts = PRACTICE_LIVENESS_ATTEMPTS if eligible else 1
+    required = PRACTICE_LIVENESS_REQUIRED
+
+    attempts: list[dict] = []
+    successes = 0
+    spent = 0
+    accepted = None
+    accepted_session = base_session
+    stop = None
+    for index in range(1, max_attempts + 1):
+        scenario = gate.scenario
+        if index > 1:
+            session_id = f"{base_session}-liveness{index}"
+            scenario = _replace(gate.scenario, session_id=session_id)
+            if before:
+                seeded = _copy.deepcopy(before)
+                seeded["session_id"] = session_id
+                store.save(seeded)
+        calls_before = llm.call_count
+        result, stop = _run_one_turn(store, llm, capture, report, scenario,
+                                     "release-gate")
+        spent += llm.call_count - calls_before
+        errors = _scenario_errors(gate, result, (before or {}).get("current_task", ""),
+                                  (before or {}).get("current_options", []),
+                                  prior_signature, expected_calls=expected_calls)
+        record = {"attempt": index, "session_id": scenario.session_id,
+                  "published": bool(result.published),
+                  "failed_closed": not result.published,
+                  "failure_class": result.failure_class,
+                  "sdk_calls": result.sdk_calls_this_turn,
+                  "state_preserved": result.session_unchanged_after_rejection,
+                  "safety_errors": errors if (result.published or errors) else [],
+                  "sdk_call_stages": list(getattr(result, "sdk_call_stages", ()) or ())}
+        # KLASA A — bezbjednosni prekršaj. Nikad se ne uzorkuje dalje.
+        if errors:
+            record["classification"] = "safety_failure"
+            attempts.append(record)
+            return attempts, errors, [], spent, stop, result
+        if result.failure_is_infrastructure:
+            record["classification"] = "infrastructure"
+            attempts.append(record)
+            return attempts, [], ["infrastructure_failure"], spent, stop, result
+        if result.published:
+            # KLASA C — uspješna objava uz sve bezbjednosne tvrdnje.
+            record["classification"] = "safe_publication"
+            successes += 1
+            accepted = result
+            accepted_session = scenario.session_id
+        else:
+            # KLASA B — siguran pad zatvoreno; sadržan, ali nije živost.
+            record["classification"] = "safe_rejection"
+        attempts.append(record)
+        if stop:
+            break
+        if index == 1 and successes == 1:
+            break                      # zdrav slučaj: nijedan dodatni poziv
+        if successes >= required:
+            break
+        remaining = max_attempts - index
+        if successes + remaining < required:
+            break                      # 2 od 3 više nije dostižno
+
+    needed = required if len(attempts) > 1 else 1
+    liveness_errors = []
+    if successes < needed:
+        liveness_errors.append(
+            f"practice_liveness_below_threshold_{successes}_of_{len(attempts)}"
+            f"_required_{needed}")
+    # Prihvaćeni ishod mora živjeti na KANONSKOM session_id-u.
+    if accepted is not None and accepted_session != base_session:
+        migrated = store.peek(accepted_session)
+        if migrated:
+            migrated["session_id"] = base_session
+            store.save(migrated)
+    return attempts, [], liveness_errors, spent, stop, accepted
 
 
 def _selected_lessons(plan: Iterable[GateScenario]) -> list[dict]:
@@ -954,10 +1118,16 @@ def run_live_release_gate() -> int:
     if len(plan) != REQUIRED_SCENARIO_COUNT:
         raise GateRefusal("The committed release-gate plan is not the required "
                           f"{REQUIRED_SCENARIO_COUNT}-scenario plan.")
-    if (max_planned_calls(plan) + KONTROLNI_MAX_CALLS + EXPLAIN_MAX_CALLS
+    # `max_planned_calls` ostaje cijena JEDNOG prolaza kroz plan (nepromijenjen
+    # ugovor). Živost ga množi najviše PRACTICE_LIVENESS_ATTEMPTS puta, i to
+    # samo za scenarije koji zovu model — deterministički doprinose nulom, pa
+    # ih množenje ne dira.
+    practice_worst_case = max_planned_calls(plan) * PRACTICE_LIVENESS_ATTEMPTS
+    if (practice_worst_case + KONTROLNI_MAX_CALLS + EXPLAIN_MAX_CALLS
             + QUICK_MAX_CALLS != SDK_CALL_CEILING):
         raise GateRefusal(
             f"The committed plan's maximum is {max_planned_calls(plan)} SDK calls "
+            f"x {PRACTICE_LIVENESS_ATTEMPTS} liveness attempts "
             f"+ {KONTROLNI_MAX_CALLS} kontrolni + {EXPLAIN_MAX_CALLS} explain "
             f"+ {QUICK_MAX_CALLS} quick, but the ceiling is {SDK_CALL_CEILING}.")
 
@@ -991,23 +1161,39 @@ def run_live_release_gate() -> int:
             # ZAMRZAVANJE PRIJE TURNA — poslije turna bi bilo kruzno.
             expected_calls, expected_basis = resolve_expected_calls(gate, before)
             planned_calls += expected_calls
-            result, stop = _run_one_turn(store, llm, capture, report, gate.scenario, "release-gate")
-            errors = _scenario_errors(gate, result, before.get("current_task", ""),
-                                      before.get("current_options", []),
-                                      before.get("current_task_signature"),
-                                      expected_calls=expected_calls)
-            stages = list(getattr(result, "sdk_call_stages", ()) or ())
-            escalation = sum(1 for name in stages if name in _REVIEWER_STAGE_NAMES)                 if (not errors and expected_calls > 0) else 0
+            (attempts, safety_errors, liveness_errors, spent, stop,
+             result) = _run_practice_scenario(
+                store, llm, capture, report, gate, expected_calls, before,
+                before.get("current_task_signature"))
+            errors = list(safety_errors) + list(liveness_errors)
+            stages = list(getattr(result, "sdk_call_stages", ()) or ()) if result else []
+            # SVAKI potrošeni poziv se knjiži: uzorci živosti se NE gutaju.
+            # `planned_calls` je već primio `expected_calls` za ovaj scenario,
+            # pa je sve preko toga (recenzentski popravak I dodatni uzorci
+            # živosti) višak koji se mora vidjeti u tačnom zbiru.
+            escalation = spent - expected_calls
             escalated_calls += escalation
             scenario_rows.append({"role": gate.role, "expected_sdk_calls": expected_calls,
                                   "expected_call_basis": expected_basis,
                                   "reviewer_escalation_calls": escalation,
                                   "sdk_call_stages": stages,
-                                  "errors": errors, "result": asdict(result)})
-            if result.failure_is_infrastructure:
+                                  "liveness_attempts": attempts,
+                                  "liveness_attempt_count": len(attempts),
+                                  "liveness_successes": sum(
+                                      1 for a in attempts if a["published"]),
+                                  "liveness_required": (
+                                      PRACTICE_LIVENESS_REQUIRED if len(attempts) > 1 else 1),
+                                  "liveness_eligible": _is_liveness_eligible(expected_calls),
+                                  "safety_errors": list(safety_errors),
+                                  "liveness_errors": list(liveness_errors),
+                                  "errors": errors,
+                                  "result": asdict(result) if result else {}})
+            if result is not None and result.failure_is_infrastructure:
                 infrastructure_failures.append(gate.role)
             if errors or stop:
-                failures.extend(f"{gate.role}:{error}" for error in (errors or [result.stop_triggered or "stopped"]))
+                failures.extend(f"{gate.role}:{error}" for error in
+                                (errors or [(result.stop_triggered if result else None)
+                                            or "stopped"]))
                 break
         kontrolni_rows: list[dict] = []
         kontrolni_calls = 0
@@ -1127,7 +1313,8 @@ def _run_static_checks() -> None:
     """Inert plan/budget checks.  No SDK client is created or invoked."""
     plan = build_release_gate_plan("0123456789abcdef" * 4)
     assert len(plan) == REQUIRED_SCENARIO_COUNT
-    assert (max_planned_calls(plan) + KONTROLNI_MAX_CALLS + EXPLAIN_MAX_CALLS
+    assert (max_planned_calls(plan) * PRACTICE_LIVENESS_ATTEMPTS
+            + KONTROLNI_MAX_CALLS + EXPLAIN_MAX_CALLS
             + QUICK_MAX_CALLS == SDK_CALL_CEILING)
     assert sum(item.expected_calls or 0 for item in plan) == _STATIC_PLAN_CALLS
     assert [item.role for item in plan] == [

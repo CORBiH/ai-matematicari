@@ -303,7 +303,8 @@ def passing_document():
         "scenario_count": 15, "required_scenario_count": 15,
         # Kontrolni v1: plafon = Practice (23) + kontrolni (4); stvarni zbir
         # nosi i kontrolni pozive (17 + 0 + 4).
-        "sdk_call_ceiling": 35, "planned_sdk_calls": 17, "actual_sdk_calls": 29,
+        "sdk_call_ceiling": checker.REQUIRED_CALL_CEILING,
+        "planned_sdk_calls": 17, "actual_sdk_calls": 29,
         **gate_mode_coverage_fields(),
         "escalated_sdk_calls": 0,
         "kontrolni_sdk_calls": 4, "kontrolni_max_calls": 4,

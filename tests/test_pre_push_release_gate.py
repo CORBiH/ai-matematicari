@@ -26,6 +26,20 @@ import pytest
 
 from matbot import release_config
 
+
+def _required_call_ceiling():
+    """Plafon se cita IZ ALATA, nikad se ne prepisuje u test.
+
+    Odvajanje zivosti od bezbjednosti ga mnozi s PRACTICE_LIVENESS_ATTEMPTS, pa
+    bi zakucana vrijednost tiho zastarjela."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "_checker_ceiling", ROOT / "tools" / "check_live_release_gate.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.REQUIRED_CALL_CEILING
+
+
 ROOT = Path(__file__).resolve().parent.parent
 HOOK = ROOT / ".githooks" / "pre-push"
 CHECKER = ROOT / "tools" / "check_live_release_gate.py"
@@ -123,7 +137,7 @@ def passing_document(commit_sha, tree_hash):
              "errors": []},
         ],
         "actual_sdk_calls": 29,
-        "sdk_call_ceiling": 35,
+        "sdk_call_ceiling": _required_call_ceiling(),
         "call_above_ceiling_refused": True,
         "twentieth_call_refused_before_sdk": True,
         "validation_failures": [],
