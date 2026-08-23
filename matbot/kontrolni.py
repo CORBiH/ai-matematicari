@@ -45,8 +45,8 @@ import time
 
 from matbot import (config, exactly_one, geometrycheck, linear_system_mcq,
                     mcq_integrity, option_equivalence,
-                    point_plane_projection_mcq, square_pyramid_mcq,
-                    stem_disclosure, triangle_consistency)
+                    point_plane_projection_mcq, root_interval_mcq,
+                    square_pyramid_mcq, stem_disclosure, triangle_consistency)
 from matbot.llm import LLMError, failure_diagnostics_kv
 from matbot.mathcheck import find_numeric_inconsistencies
 from matbot.mathsegments import TEXT, tokenize_math
@@ -722,6 +722,7 @@ def validate_generated_question(parsed, slot, context, prior_signatures):
     if projection_failure:
         return None, f"point_plane_{projection_failure}"
 
+
     # ŽIVA KAMPANJA v1: uski dokazi povrh orakla (vidi blokove komentara gore).
     divisibility_failure = _divisibility_claim_failure(text, option_texts,
                                                        correct_index)
@@ -740,6 +741,25 @@ def validate_generated_question(parsed, slot, context, prior_signatures):
     statement_failure = _statement_options_failure(option_texts, correct_index)
     if statement_failure:
         return None, statement_failure
+
+    # KORIJEN IZMEĐU UZASTOPNIH CIJELIH BROJEVA (živi nalaz, verifikacija
+    # poslije izdanja): objavljeno je „između koja dva uzastopna prirodna broja
+    # se nalazi $\sqrt{70}$?“ s označenim „$7$ i $8$“, a tačno je „$8$ i $9$“ —
+    # i to je RJEŠENJE u istom paketu uredno izvelo. `expected_answer` je bio
+    # jednak označenoj opciji, pa je paket bio sam sa sobom „dosljedan“ i nijedan
+    # postojeći orakl nije bio primjenjiv (označena opcija nosi DVIJE
+    # vrijednosti, pa `_solution_contradicts_marked_value` ćuti). Server sada sam
+    # izračuna interval egzaktnom cjelobrojnom aritmetikom — vidi
+    # matbot/root_interval_mcq.py.
+    #
+    # REDOSLIJED: namjerno POSLIJE `_statement_options_failure`. Lančani
+    # oblik opcije („$7<\sqrt{70}<8$“) već ima svoj uži detektor i svoj
+    # kod; ovaj orakl pokriva ono što taj ne vidi — PROZNI par („Između $7$
+    # i $8$“), tačno oblik iz živog nalaza.
+    root_interval_failure = root_interval_mcq.publication_failure(
+        text, option_texts, correct_index)
+    if root_interval_failure:
+        return None, f"root_interval_{root_interval_failure}"
     if _solution_contradicts_marked_value(correct_text, solution):
         return None, "solution_marked_value_divergence"
     notation_failure = _damaged_notation_failure(text, option_texts, solution)
