@@ -2477,12 +2477,20 @@ def publication_failure(question: str, option_texts: Iterable[str], marked_index
         return failure, result
     if not expected_answer_matches_correct_option(expected_answer, result):
         return "marked_option_math_mismatch", result
+    # ORAKL KOJI SE UKLJUCIO ostaje zapamcen i na USPJEHU (zivi nalaz forenzike
+    # dostupnosti): svaka staza PADA vec vraca rezultat orakla koji je presudio,
+    # a uspjesna staza je jedina vracala uvijek rezultat djeljivosti — pa je
+    # POZITIVAN DOKAZ („tacno jedna opcija je tacna i to je oznacena") bio
+    # izracunat pa odbacen. Zbog toga je kasniji, slabiji `exactly_one` odbijao
+    # zadatke koje je server vec dokazao (t17/t18/t41).
+    engaged = result
     if not result.applicable:
         # Faza 4G: kad oblik NIJE djeljivost, isti poziv pita i uske orakle
         # direktnog računa i poređenja. `expected_answer` se ovdje ne poredi
         # ponovo — jednakost s označenom opcijom već garantuju šema i preflight.
         computation = evaluate_direct_computation_mcq(question, option_texts)
         if computation.applicable:
+            engaged = computation
             if not computation.valid:
                 return computation.reason_code, computation
             if marked_index != computation.correct_index:
@@ -2490,6 +2498,7 @@ def publication_failure(question: str, option_texts: Iterable[str], marked_index
         else:
             comparison = evaluate_comparison_mcq(question, option_texts)
             if comparison.applicable:
+                engaged = comparison
                 if not comparison.valid:
                     return comparison.reason_code, comparison
                 if marked_index != comparison.correct_index:
@@ -2502,6 +2511,7 @@ def publication_failure(question: str, option_texts: Iterable[str], marked_index
                 # bajt za bajt; ovaj se pita tek kad svi ostali ćute.
                 solve = evaluate_linear_solve_mcq(question, option_texts)
                 if solve.applicable:
+                    engaged = solve
                     if not solve.valid:
                         return solve.reason_code, solve
                     if marked_index != solve.correct_index:
@@ -2513,11 +2523,12 @@ def publication_failure(question: str, option_texts: Iterable[str], marked_index
                     # bajt za bajt; ovaj se pita tek kad svi ostali ćute.
                     table = evaluate_function_table_mcq(question, option_texts)
                     if table.applicable:
+                        engaged = table
                         if not table.valid:
                             return table.reason_code, table
                         if marked_index != table.correct_index:
                             return "marked_option_math_mismatch", table
-    return "", result
+    return "", engaged
 
 
 # ---------------------------------------------------------------------------
@@ -2794,3 +2805,36 @@ def numeric_option_shape_failure(option_texts, marked_index: int) -> str:
         if _option_is_corrupt(text):
             return "malformed_numeric_option"
     return ""
+
+
+# ---------------------------------------------------------------------------
+# POZITIVAN DOKAZ ORAKLA (živi nalaz forenzike dostupnosti, 48 generisanja)
+# ---------------------------------------------------------------------------
+# Izmjereno: 3 od 9 konačnih padova bila su MATEMATIČKI ISPRAVNA pitanja koja je
+# server SAM dokazao, pa ih je odbio. Za „$\frac{x}{3}-\frac{1}{2}\leq\frac{1}{6}$“
+# je `evaluate_linear_solve_mcq` vratio `applicable=True, valid=True,
+# correct_indices=(0,)`, što je TAČNO označena opcija — a `exactly_one` je isti
+# paket odbio kodom `unprovable_claim_selection`, jer njegov `pure_claim_truth`
+# ne umije presuditi oblik `$x\leq 2$`.
+#
+# Jači DOKAZ mora nadjačati slabiju APSTINENCIJU. To NIJE popuštanje: uslov traži
+# da je orakl bio primjenjiv, validan, da postoji TAČNO JEDNA tačna opcija i da je
+# ona baš označena. Kad bilo šta od toga ne važi, ništa se ne tvrdi i slabiji sloj
+# radi kao i dosad.
+#
+# Ugovor je zajednički SVIM oraklima ovog modula (`applicable`, `valid`,
+# `correct_indices`), pa se ne uvodi nova apstrakcija — koristi se postojeća.
+
+def proves_marked_option(result, marked_index) -> bool:
+    """True SAMO kad je orakl pozitivno dokazao da je označena opcija jedina tačna."""
+    if result is None or not isinstance(marked_index, int):
+        return False
+    try:
+        if not getattr(result, "applicable", False):
+            return False
+        if not getattr(result, "valid", False):
+            return False
+        indices = tuple(getattr(result, "correct_indices", ()) or ())
+    except Exception:                      # noqa: BLE001 — nedokaziv oblik ćuti
+        return False
+    return len(indices) == 1 and indices[0] == marked_index

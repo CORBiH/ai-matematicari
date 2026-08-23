@@ -692,7 +692,7 @@ def validate_generated_question(parsed, slot, context, prior_signatures):
 
     # Uski matematički orakl (rješava zadatak gdje umije) + poklapanje označene
     # opcije s kanonskim rezultatom. Neprimjenjiv oblik ćuti — ne pogađa.
-    mcq_failure, _result = mcq_integrity.publication_failure(
+    mcq_failure, mcq_result = mcq_integrity.publication_failure(
         text, option_texts, correct_index, expected)
     if mcq_failure:
         return None, f"mcq_integrity_{mcq_failure}"
@@ -783,8 +783,12 @@ def validate_generated_question(parsed, slot, context, prior_signatures):
     # (2/300) prošla su upravo zato što su svi raniji čuvari tražili dokazan
     # defekt, a nijedan nije tražio dokaz ispravnosti. Pitanja koja traže
     # konkretan rezultat ovdje prolaze nedirnuta.
+    # `mcq_result` nosi nalaz orakla koji se UKLJUČIO iznad. Kad je taj orakl
+    # POZITIVNO dokazao da je označena opcija jedina tačna, slabiji „izaberi
+    # tvrdnju“ sloj ne smije isti paket odbiti kao nedokaziv (živi nalaz
+    # forenzike dostupnosti: t17/t18/t41 su bili tačni i dokazani, pa odbijeni).
     exactly_one_failure = exactly_one.publication_failure(
-        text, option_texts, correct_index)
+        text, option_texts, correct_index, oracle_result=mcq_result)
     if exactly_one_failure:
         return None, exactly_one_failure
 

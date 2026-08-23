@@ -193,12 +193,26 @@ def evaluate(text, option_texts, marked_index):
     return PROVEN_ONE_CORRECT, "proven_one_correct"
 
 
-def publication_failure(text, option_texts, marked_index):
+def publication_failure(text, option_texts, marked_index, oracle_result=None):
     """Kod odbijanja za kontrolni objavu, ili prazan string.
 
     Kapija se PRIMJENJUJE samo na oblik „izaberi tvrdnju“. Pitanja vrijednosti
-    prolaze nedirnuta — njih već sude postojeći orakli vrijednosti."""
+    prolaze nedirnuta — njih već sude postojeći orakli vrijednosti.
+
+    `oracle_result` je nalaz JAČEG orakla vrijednosti koji je već presudio ovaj
+    isti paket. ŽIVI NALAZ (forenzika dostupnosti): za „riješi nejednačinu“
+    zadatke server je `evaluate_linear_solve_mcq`-om dokazao da je označena
+    opcija jedina tačna, a onda ih je OVAJ sloj odbio kao „nedokazive“, jer
+    `pure_claim_truth` ne umije presuditi oblik `$x\leq 2$`. Dokaz mora
+    nadjačati apstinenciju — ali samo POZITIVAN dokaz, i to nad ISTIM označenim
+    indeksom (vidi `mcq_integrity.proves_marked_option`). Bez takvog dokaza
+    ponašanje je nepromijenjeno: nedokazivo se i dalje odbija."""
     if not is_claim_selection(text, option_texts):
         return ""
     verdict, code = evaluate(text, option_texts, marked_index)
-    return "" if verdict == PROVEN_ONE_CORRECT else code
+    if verdict == PROVEN_ONE_CORRECT:
+        return ""
+    from matbot import mcq_integrity
+    if mcq_integrity.proves_marked_option(oracle_result, marked_index):
+        return ""
+    return code
