@@ -572,6 +572,9 @@ class TurnResult:
     structured_package_validation_passed: Optional[bool] = None
     structured_package_validation_errors: list = field(default_factory=list)
     committed_task_signature_matches_final: Optional[bool] = None
+    # Izvor STVARNO objavljenog paketa (odvojeno od
+    # `final_structured_package_source`, koji ostaje „posljednji pokušani").
+    published_structured_package_source: Optional[str] = None
     final_declared_answer_kind: Optional[str] = None
     final_canonical_answer_kind: Optional[str] = None
     final_detected_answer_kind: Optional[str] = None
@@ -949,6 +952,52 @@ def _record_cross_evidence_diagnostics(result: TurnResult, llm) -> object:
     return reviewer_evidence
 
 
+def _visible_task_text(raw) -> str:
+    """Vidljiv tekst zadatka NAKON iste normalizacije koju objava primjenjuje.
+
+    Ne reimplementira ništa: zove `package_preflight.safe_visible_text`, JEDNU
+    implementaciju koju i preflight i objava već koriste (`_safe_text`). Bez
+    toga bi poređenje palo na terminološkoj zamjeni koju objava radi legalno."""
+    from matbot.tutor import package_preflight
+    try:
+        cleaned, safe = package_preflight.safe_visible_text(raw or "")
+    except Exception:                       # noqa: BLE001 — dijagnostika, nikad ne ruši turn
+        cleaned, safe = raw or "", False
+    return " ".join((cleaned if safe else (raw or "")).split())
+
+
+def _package_actually_published(published_text, candidates):
+    """Vrati paket čiji se VIDLJIVI tekst poklapa sa STVARNO objavljenim.
+
+    ŽIVI NALAZ (mandatorna kapija, scenario `same_level_new`, lekcija o pojmu
+    razlomka): recenzentov zamjenski paket je ODBIJEN zbog pokvarenog zapisa
+    (`unknown_mathjax_command_outside_math:u`), Practice je izvršio dokumentovani
+    `fast_rotation_fallback` i objavio VEĆ VALIDAN tutorski nacrt, a sesija je
+    ispravno commitovala potpis tog nacrta. Kapija je ipak birala „posljednji
+    neprazan recenzentov paket“ kao konačan i prijavila lažan Class A pad
+    `committed_signature_does_not_match_final_package`.
+
+    Ista rupa postoji i na `approve` s eho-paketom: proizvod eho IGNORIŠE i
+    objavljuje nacrt (vidi `pipeline._two_call`), a kapija je poredila s ehom.
+
+    Zato se konačan paket bira iz NEZAVISNOG dokaza — teksta koji je stvarno
+    objavljen (odgovor turna / `session["current_task"]`) — a ne iz redoslijeda
+    modelskih izlaza. Kad se nijedan modelski paket ne poklapa (deterministička
+    objava), vraća se None: nad server-generisanim paketom modelsko poređenje
+    potpisa nema smisla i ne smije se izmišljati."""
+    if not published_text:
+        return None
+    target = _visible_task_text(published_text)
+    if not target:
+        return None
+    for candidate in candidates:
+        if candidate is None:
+            continue
+        if _visible_task_text(getattr(candidate, "text", "")) == target:
+            return candidate
+    return None
+
+
 def _record_answer_metadata(result: TurnResult, response, after_session, llm) -> None:
     """Record the real pipeline's answer metadata without changing it.
 
@@ -1024,11 +1073,28 @@ def _record_answer_metadata(result: TurnResult, response, after_session, llm) ->
         if isinstance(option, dict)
     }
     result.visible_correct_option_value = visible_by_id.get(correct_id)
-    if final_task is not None and hasattr(final_task, "task_signature"):
+    # POTPIS SE POREDI SA OBJAVLJENIM PAKETOM, NE S POSLJEDNJIM MODELSKIM.
+    # `final_task` iznad ostaje „posljednji pokušani strukturirani paket“ (tako
+    # ga koriste ostale dijagnostike i provjera vlasnika rute). Za invarijantu
+    # stanja je mjerodavno ISKLJUČIVO ono što je učenik stvarno dobio — vidi
+    # `_package_actually_published`.
+    decision = getattr(reviewer_output, "decision", None)
+    ordered = ((tutor_task, corrected_task, reviewer_final_task)
+               if decision == "approve"
+               else (corrected_task, reviewer_final_task, tutor_task))
+    published_task = _package_actually_published(result.published_task_text, ordered)
+    if published_task is not None:
+        result.published_structured_package_source = (
+            "reviewer_corrected_task" if published_task is corrected_task
+            else "reviewer_final_task" if published_task is reviewer_final_task
+            else "tutor_task")
+    if published_task is not None and hasattr(published_task, "task_signature"):
         committed = (after_session or {}).get("current_task_signature") or {}
         result.committed_task_signature_matches_final = (
-            committed.get("structured_signature") == result.final_task_signature_canonical
-            and committed.get("structured_signature_hash") == final_task.task_signature.digest()
+            committed.get("structured_signature")
+            == published_task.task_signature.canonical_json()
+            and committed.get("structured_signature_hash")
+            == published_task.task_signature.digest()
         )
 
     if final_task is not None and 0 <= final_task.correct_option_index < len(final_task.options):
