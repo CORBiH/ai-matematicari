@@ -1063,6 +1063,76 @@ def _is_disallowed_control(ch: str) -> bool:
     return code < 0x20 or code in _DISALLOWED_CONTROL_CODEPOINTS
 
 
+# ---------------------------------------------------------------------------
+# MIJEŠANJE PISAMA U PROZI — TRAG KVARA GENERISANOG TEKSTA
+# ---------------------------------------------------------------------------
+# ŽIVI NALAZ (verifikacija Kontrolnog poslije izdanja): objavljeno rješenje je
+# glasilo „…najvećim zajedničkim djelioцем…" — latinična riječ kojoj su TRI
+# slova ćirilična (U+0446, U+0435, U+043C). Nema kontrolnog znaka, LaTeX je
+# uredan, opcije nisu duplikati — pa je prošlo svaku postojeću provjeru.
+#
+# IZMJERENO NA KORPUSU (258.515 stringova iz kurikuluma, ugovora, fixtura i
+# svih živih kampanja): iznad U+00FF pojavljuju se latinična proširenja
+# (246.192 — bosanska dijakritika), interpunkcija (17.671), matematički
+# operatori (339), strelice, geometrijski oblici i grčka slova (21, sve „π").
+# Ćirilica se pojavljuje 98 puta u 26 stringova, a kanada 2 puta u jednom —
+# i NIJEDNA pojava nije legitimna: 25 od 27 su latinične riječi zaražene
+# ćiriličnim dvojnikom (`pravе`, `uređених`, `brojnikа`, `Dvа`, `uglа`,
+# `grafikа`, `dobijеш`, `djelioцем`), a preostale dvije su riječ „je" napisana
+# ćirilicom usred latinične rečenice. Arapsko, hebrejsko, devanagari i CJK
+# pismo ne postoje u korpusu uopšte.
+#
+# ZATO SE PISMO NE ZABRANJUJE GLOBALNO. Sudi se O RIJEČI: ako JEDNA riječ miješa
+# latinicu s drugim pismom, to nije jezik — to je kvar. Grčka slova su izuzeta
+# jer su legitimna matematička notacija („Broj π i obim kruga"), a unutar
+# `$…$` se ovo pravilo NE primjenjuje uopšte (tamo vlada MATHJAX_COMMAND_ALLOWLIST).
+_LATIN_RANGES = ((0x0041, 0x005A), (0x0061, 0x007A), (0x00C0, 0x024F),
+                 (0x1E00, 0x1EFF))
+_GREEK_RANGES = ((0x0370, 0x03FF), (0x1F00, 0x1FFF))
+_COMBINING_RANGES = ((0x0300, 0x036F),)
+
+
+def _in_ranges(code, ranges):
+    return any(low <= code <= high for low, high in ranges)
+
+
+def _script_class(ch):
+    """'latin' | 'greek' | 'foreign' | None (nije slovo / neutralno)."""
+    code = ord(ch)
+    if code < 0x0041:
+        return None
+    if _in_ranges(code, _LATIN_RANGES):
+        return "latin"
+    if _in_ranges(code, _GREEK_RANGES):
+        return "greek"
+    if _in_ranges(code, _COMBINING_RANGES):
+        return None          # dijakritika se lijepi na osnovu, ne nosi pismo
+    if ch.isalpha():
+        return "foreign"
+    return None
+
+
+_WORD_RE = re.compile(r"[^\W\d_]+", re.UNICODE)
+
+
+def find_script_corruption(part: str) -> list:
+    """Kodovi kvara za JEDAN dio teksta IZVAN matematike. Prazna lista = uredno.
+
+    Ne popravlja i ne pogađa koje je slovo „trebalo" biti — samo prijavljuje,
+    pa paket pada zatvoreno (ista doktrina kao U+007F)."""
+    issues = []
+    for match in _WORD_RE.finditer(part or ""):
+        word = match.group(0)
+        classes = {_script_class(ch) for ch in word}
+        classes.discard(None)
+        if "latin" in classes and "foreign" in classes:
+            issues.append("mixed_script_word")
+        elif classes == {"foreign"}:
+            # Cijela riječ u pismu koje korpus ne poznaje (grčki je izuzet gore).
+            issues.append("foreign_script_word")
+    return issues
+
+
 def find_unsafe_math_issues(text: str) -> list:
     """Vraća listu razloga zašto TEKST (već propušten kroz sanitize_math_text
     + gornje repair korake) NIJE bezbjedan za prikaz učeniku. Prazna lista =
@@ -1104,6 +1174,9 @@ def find_unsafe_math_issues(text: str) -> list:
             issues.append("literal_newline_escape")
         if any(_is_disallowed_control(ch) and ch not in ("\n", "\t") for ch in part):
             issues.append("control_character")
+        # Miješanje pisama unutar RIJEČI — samo izvan matematike (vidi
+        # `find_script_corruption`).
+        issues.extend(find_script_corruption(part))
     for part in _inside_math_parts(text):
         issues.extend(find_unknown_math_commands(part))
         # Skeneri IZGUBLJENOG BACKSLASHA ne smiju čitati sadržaj propisno

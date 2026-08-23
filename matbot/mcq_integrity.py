@@ -2702,3 +2702,95 @@ def difficulty_profile(question: str, option_texts: Iterable[str]) -> Divisibili
     if len(divisors) == 1:
         return DivisibilityDifficultyProfile(True, 2, divisors=divisors)
     return DivisibilityDifficultyProfile(False, reason_code="difficulty_direction_not_measurable")
+
+
+# ---------------------------------------------------------------------------
+# OBLIK DISTRAKTORA U NUMERIČKOM PITANJU (živi nalaz, verifikacija Kontrolnog
+# poslije izdanja)
+# ---------------------------------------------------------------------------
+# Objavljena su DVA pitanja čiji je ključ bio tačan, a jedan distraktor
+# besmislen:
+#
+#     „Zapiši razlomak $\frac{7}{20}$ u obliku decimalnog broja."
+#         opcije: 0,35 (tačna) / 0,25 / 0,7 / „0, intez"
+#
+#     „Zapiši razlomak $\frac{17}{20}$ u obliku decimalnog broja."
+#         opcije: $0,805$ / $0,<KANNADA>?85$ / $0,85$ (tačna) / $1,17$
+#
+# Ocjena je u oba slučaja ispravna — distraktor je ionako netačan — ali učenik
+# u ozbiljnom testu vidi besmislicu. Nijedan postojeći validator ne reaguje:
+# tekst je bezbjedan (nema kontrolnih znakova ni pokvarenog LaTeX-a), opcije
+# nisu duplikati ni ekvivalentne, a orakli nisu primjenjivi.
+#
+# PRAVILO NE TRAŽI DA DISTRAKTOR BUDE TAČAN — distraktori su namjerno netačni.
+# Traži se samo da bude SINTAKSNO MOGUĆ ODGOVOR istog tipa. Porodica se ne
+# pogađa iz jedne opcije: mora se dokazati iz VEĆINE ponuđenih odgovora I iz
+# označenog, jer je označeni jedini za koji server zna da nosi pravu matematiku.
+#
+# Kad se porodica ne može dokazati (pojmovna pitanja, tvrdnje, klasifikacija,
+# intervali, skupovi, algebarski izrazi, prozne jedinice poput „5 knjiga") —
+# orakl ĆUTI. Nedokazivo se ne kažnjava.
+_MIN_NUMERIC_OPTIONS_FOR_FAMILY = 3
+
+# ZASTO SE NE ODBIJA PROSTO „opcija se ne da izracunati": IZMJERENO na korpusu
+# (242 dokazano numericke porodice) takvo pravilo daje 4 od 4 LAZNA POZITIVA —
+# `$\pi$` uz `$\sqrt{2}$` i `$0,75$` (klasifikacija racionalnih/iracionalnih),
+# `$rac{-6}{x}$` kao algebarski distraktor, i „beskonacno mnogo" uz `0`, `1`,
+# `2` (broj rjesenja sistema). Sve su to POTPUNO ISPRAVNE opcije.
+#
+# Zato se ne trazi izracunljivost nego DOKAZ KVARA. Dva uska signala, oba
+# izvedena iz zivih nalaza:
+#
+#   A1  SLOMLJEN DECIMALNI BROJ — cifra, decimalni zarez, pa NEsto sto nije
+#       cifra: „0, intez", „0,<KANNADA>?85". U bosanskom zapisu iza decimalnog
+#       zareza MORAJU doci cifre. (Prozne nabrajanja tipa „2, 3 i 5" ovdje ne
+#       dolaze u obzir — pravilo gleda samo OPCIJE dokazano numericke porodice.)
+#
+#   A2  STRANO PISMO U OPCIJI — slovo koje nije ni latinica ni grcko. Grcka
+#       slova su legitimna matematicka notacija i izuzeta su; korpus ne poznaje
+#       nijednu legitimnu pojavu drugog pisma.
+_BROKEN_DECIMAL_RE = re.compile(r"\d\s*,\s*(?![\d\s]*$)(?!\d)")
+
+
+def _has_foreign_script(text: str) -> bool:
+    """Slovo izvan latinice i grckog — mjereno, u korpusu nema legitimne pojave."""
+    from matbot import mathsafe
+    return any(mathsafe._script_class(ch) == "foreign" for ch in (text or ""))
+
+
+def _option_is_corrupt(text: str) -> bool:
+    body = (text or "").strip()
+    if body.startswith("$") and body.endswith("$") and body.count("$") == 2:
+        body = body[1:-1].strip()
+    if _has_foreign_script(body):
+        return True
+    return bool(_BROKEN_DECIMAL_RE.search(body))
+
+
+def numeric_option_shape_failure(option_texts, marked_index: int) -> str:
+    """Kod odbijanja kad je porodica DOKAZANO numericka, a jedna opcija nosi
+    DOKAZ KVARA. Prazan string = uredno ili neprimjenjivo."""
+    options = [text for text in (option_texts or ())]
+    if len(options) < 3:
+        return ""
+    if not 0 <= marked_index < len(options):
+        return ""
+
+    parsed = []
+    for text in options:
+        status, _value, _expr = _option_numeric_value(text)
+        parsed.append(status == "value")
+
+    # Oznacena opcija nosi pravu matematiku; ako ni ona nije broj, pitanje nije
+    # numericko i ovdje se nista ne tvrdi.
+    if not parsed[marked_index]:
+        return ""
+    if sum(parsed) < _MIN_NUMERIC_OPTIONS_FOR_FAMILY:
+        return ""
+
+    for index, text in enumerate(options):
+        if parsed[index]:
+            continue                      # citljiv broj — nista se ne prigovara
+        if _option_is_corrupt(text):
+            return "malformed_numeric_option"
+    return ""

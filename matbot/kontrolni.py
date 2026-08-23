@@ -672,6 +672,17 @@ def validate_generated_question(parsed, slot, context, prior_signatures):
     if expected.strip() != correct_text.strip():
         return None, "expected_option_mismatch"
 
+    # OBLIK DISTRAKTORA U NUMERIČKOM PITANJU (živi nalaz, verifikacija poslije
+    # izdanja): objavljeni su „0, intez“ i „$0,<KANNADA>?85$“ kao opcije u
+    # pitanjima čiji su svi ostali odgovori decimalni brojevi. Ključ je bio
+    # tačan i ocjena ispravna, ali učenik je vidio besmislicu. Distraktor NE
+    # mora biti tačan — mora biti sintaksno moguć odgovor istog tipa. Vidi
+    # `mcq_integrity.numeric_option_shape_failure`.
+    shape_failure = mcq_integrity.numeric_option_shape_failure(
+        option_texts, correct_index)
+    if shape_failure:
+        return None, shape_failure
+
     if option_equivalence.find_textual_duplicate_pairs(option_texts):
         return None, "duplicate_options"
     # Semantička ekvivalencija dvije opcije = potencijalno dva tačna odgovora
