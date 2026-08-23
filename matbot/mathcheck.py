@@ -135,8 +135,45 @@ _UNSUPPORTED_RE = re.compile(
 )
 
 
+# ---------------------------------------------------------------------------
+# GRUPISANJE HILJADA: `10\,000` je JEDAN broj, ne dva
+# ---------------------------------------------------------------------------
+# ŽIVI NALAZ (verifikacija Kontrolnog, 9. razred, lekcija o pretvaranju
+# mjernih jedinica): objavljeno je OCJENJIVANO pitanje „2,4 m² u cm²“ sa
+# OZNAČENIM netačnim odgovorom
+# `2\,400\,\text{cm}^2`, dok je tačna opcija `24\,000\,\text{cm}^2` stajala
+# među ponuđenima. U rješenju je pisala doslovno netačna jednakost
+# `2,4\cdot10\,000\,\text{cm}^2=2\,400\,\text{cm}^2`.
+#
+# Zašto je prošla: `\,` se niže pretvara u RAZMAK, pa je `10\,000` postajalo
+# „10 000“ — dva broja razdvojena razmakom. Takav izraz nije parsabilan, pa je
+# `evaluate_candidates` dizao `_Unsupported`, a `check_segment` cijeli par
+# PRESKAKAO. Preskočeno po ugovoru NIJE dokaz ispravnosti — ali je ovdje
+# značilo da nijedan broj pisan s razdvojenim hiljadama nikad nije provjeren.
+# Mjereno: `$2,4\cdot10000=2400$` se hvata, `$2,4\cdot10\,000=2\,400$` ne.
+#
+# `\,` je tipografski tanki razmak i koristi se i uz jedinice (`5\,\text{cm}`)
+# i oko operatora (`2,4\,\cdot\,10\,000`). Zato se spaja SAMO kad stoji između
+# cifara i kad je iza njega TAČNO trocifrena grupa — kanonsko grupisanje.
+# Sve ostalo (`1\,00`, `1\,0000`, `\,1000`, `1000\,`) ostaje nespojeno, pa
+# ostaje i neparsabilno: nedokazivo se ne popravlja, nego se preskače kao i do
+# sada. Decimalni zarez se ne dira — pravilo gleda isključivo `\,`.
+_THOUSANDS_GROUP_RE = re.compile(r"(?<=\d)\\,(?=\d{3}(?!\d))")
+
+
+def _join_grouped_thousands(expr):
+    """`10\\,000` → `10000`; `1\\,234\\,567` → `1234567`. Vrijednost se ne mijenja."""
+    previous = None
+    while previous != expr:
+        previous = expr
+        expr = _THOUSANDS_GROUP_RE.sub("", expr)
+    return expr
+
+
 def _strip_units_and_spacing(expr):
     """Ukloni jedinice i razmake koji ne utiču na vrijednost."""
+    # PRIJE nego `\,` postane razmak: spoji kanonski razdvojene hiljade.
+    expr = _join_grouped_thousands(expr)
     expr = re.sub(r"\\,|\\;|\\!|\\quad|\\qquad|\\ ", " ", expr)
     expr = re.sub(r"\\left|\\right", "", expr)
     # \text{cm}, \text{cm}^2, \mathrm{...} — jedinica; uklanjamo i eksponent
