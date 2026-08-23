@@ -5,6 +5,7 @@ ijedne izmjene Python koda. Grep provjere (G1/G2) su nužne ali nedovoljne —
 težinu nose ponašajni testovi koji instanciraju SINTETIČKI ugovor i provuku ga
 kroz stvarni Practice turn (sada: serverski generator kostura, ne modelov dokaz).
 """
+import ast
 import copy
 import json
 import random
@@ -223,31 +224,75 @@ def test_other_modes_are_untouched_by_the_engine():
         assert "contracts" not in source, module
 
 
-def test_security_and_transport_files_are_unchanged_by_stage_a():
+# Sigurnosni i transportni fajlovi koje motor ugovora ne smije dosegnuti.
+# Lista je NEPROMIJENJENA u odnosu na raniji oblik ove kapije.
+CONTRACT_FREE_SECURITY_AND_TRANSPORT = (
+    "matbot/api.py", "matbot/auth.py", "matbot/ratelimit.py",
+    "matbot/turnlock.py",
+    "matbot/explain.py", "matbot/quick.py", "matbot/imagecheck.py",
+    "matbot/imageinput.py",
+)
+
+
+def test_security_and_transport_files_are_free_of_the_contract_engine():
     """Ugovor opisuje matematiku lekcije — ne autentikaciju, sesiju ni klijenta.
 
-    NAPOMENA O OBIMU: `templates/index.html` se namjerno NE provjerava ovdje jer
-    je već nosio nekomitovane izmjene od ranije (izolacija na reload, `v:2` u
-    localStorage) prije nego što je Faza A počela — poređenje s HEAD ne može te
-    dvije stvari razdvojiti. Frontend ugovor Faza A ipak ne mijenja: to čuva
-    tests/test_frontend_practice_context.py.
+    PROMIJENJEN MEHANIZAM (2026-08-23), NE OPSEG. Raniji oblik je tvrdio isto,
+    ali je mjerio `git diff --name-only HEAD` nad ovom istom listom, dakle
+    „nijedan od ovih fajlova nema nekomitovanu izmjenu“. Taj oblik je imao dvije
+    izmjerene mane:
 
-    `matbot/llm.py` i `matbot/config.py` su UKLONJENI iz zaštićene liste pri
-    pivotu na univerzalni dvopozivni put: taj put po dizajnu dodaje dvije nove
-    vrste poziva (`tutor_turn`, `reviewer_turn`) i dva podesiva izbora modela
-    (`TUTOR_MODEL`, `REVIEWER_MODEL`). To NIJE širenje ugovora lekcije nego
-    transportni sloj, pa ostaje pokriveno testovima univerzalnog puta."""
-    import subprocess
+      1. NIJE ŠTITIO NIŠTA TRAJNO. Poslije bilo kakvog `git commit` poredjenje s
+         HEAD-om je prazno, pa je kapija prolazila BEZUSLOVNO — zauvijek, ma šta
+         u tim fajlovima pisalo. Dakle: crvena dok se radi, slijepa čim se
+         komituje. Tačno obrnuto od onoga što arhitektonska kapija treba.
+      2. LAŽNO JE PADALA na svaku legitimnu izmjenu tih fajlova koja NEMA veze
+         s ugovorima lekcija — recimo na izvještajni identitet učenika, koji po
+         prirodi posla dira baš `auth.py` i `api.py`.
 
-    protected = [
-        "matbot/api.py", "matbot/auth.py", "matbot/ratelimit.py",
-        "matbot/turnlock.py",
-        "matbot/explain.py", "matbot/quick.py", "matbot/imagecheck.py",
-        "matbot/imageinput.py",
-    ]
-    result = subprocess.run(
-        ["git", "diff", "--name-only", "HEAD", "--", *protected],
-        cwd=ROOT, capture_output=True, text=True,
-    )
-    changed = [line for line in result.stdout.splitlines() if line.strip()]
-    assert not changed, f"Faza A ne smije dirati ove fajlove: {changed}"
+    Zato se sada tvrdi SADRŽAJ, a ne status radnog stabla: motor ugovora i ovi
+    fajlovi ne smiju se dodirivati ni u jednom smjeru. To važi i poslije
+    komita, pa je za deklarisanu namjeru STROŽE nego što je git-diff oblik ikad
+    bio. Isti obrazac već koristi
+    `test_other_modes_are_untouched_by_the_engine` iznad.
+
+    NAPOMENA O OBIMU (zadržana): `matbot/llm.py` i `matbot/config.py` su ranije
+    UKLONJENI iz ove liste pri pivotu na univerzalni dvopozivni put — taj put
+    dodaje `tutor_turn`/`reviewer_turn` i dva izbora modela, što je transportni
+    sloj, a ne širenje ugovora lekcije. `templates/index.html` čuva
+    tests/test_frontend_practice_context.py."""
+    offenders = []
+    for relative in CONTRACT_FREE_SECURITY_AND_TRANSPORT:
+        source = (ROOT / relative).read_text(encoding="utf-8")
+        if "contract" in source.lower():
+            offenders.append(relative)
+    assert not offenders, (
+        "motor ugovora je procurio u sigurnosni/transportni sloj: %s" % offenders)
+
+
+def test_contract_engine_never_imports_security_or_transport():
+    """Drugi smjer iste granice — bez njega bi kapija čuvala samo jednu stranu.
+
+    `matbot/contracts/` smije zavisiti od SEBE i od čistih podataka; čim uveze
+    autentikaciju, rate limit, sesijski transport ili obradu slike, ugovor više
+    ne opisuje samo matematiku lekcije."""
+    forbidden = {"auth", "api", "ratelimit", "turnlock",
+                 "imagecheck", "imageinput", "explain", "quick"}
+    offenders = []
+    for module in sorted((ROOT / "matbot" / "contracts").glob("*.py")):
+        tree = ast.parse(module.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            # `import matbot.auth` i `from matbot.auth import x`
+            names = []
+            if isinstance(node, ast.Import):
+                names = [alias.name for alias in node.names]
+            elif isinstance(node, ast.ImportFrom):
+                # `from matbot import auth` -> ime je u `names`, ne u `module`
+                names = [node.module or ""]
+                if (node.module or "") == "matbot":
+                    names += [alias.name for alias in node.names]
+            for dotted in names:
+                if forbidden & set(dotted.split(".")):
+                    offenders.append("%s -> %s" % (module.name, dotted))
+    assert not offenders, (
+        "sigurnosni/transportni sloj je procurio u motor ugovora: %s" % offenders)

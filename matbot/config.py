@@ -487,3 +487,51 @@ SESSION_LIMIT_PER_MINUTE = _int_env("MATBOT_SESSION_LIMIT_PER_MINUTE", 15)
 SESSION_LIMIT_PER_HOUR = _int_env("MATBOT_SESSION_LIMIT_PER_HOUR", 150)
 IP_LIMIT_PER_MINUTE = _int_env("MATBOT_IP_LIMIT_PER_MINUTE", 120)
 IP_LIMIT_PER_HOUR = _int_env("MATBOT_IP_LIMIT_PER_HOUR", 1000)
+
+
+# --- Izvještajna baza (Turso/libSQL) — SAMO identitet učenika ---------------
+# PRVI podsistem MAT-BOT-a koji uopšte piše van procesa. Tutor i dalje ne čuva
+# ništa: ovdje se vodi samo mapiranje vanjskog korisnika na interni
+# `students.id`, da bi kasniji mjesečni izvještaji imali stabilan identitet.
+#
+# NAMJERNO NE PIŠE „autentikovanog“: identitet je Thinkific e-mail iz URL-a
+# lekcije, dakle PRIPISIVANJE za izvještaj, a ne dokazana autentifikacija —
+# puna granica i šta se s njom NE smije raditi je u
+# `matbot/student_identity.py`. Vidi i `matbot/reporting_db.py`.
+#
+# TAJNE SE ČITAJU SAMO PO IMENU. Kao i `SECRET_KEY` iznad, vrijednost se nikad
+# ne loguje, ne vraća iz dijagnostike i ne ulazi u `deploy/production_release.env`
+# (taj fajl je u repozitoriju i tajnu ne smije vidjeti). Produkcijske
+# vrijednosti žive isključivo u `.env` na VPS-u, koji `docker-compose.yml`
+# prosljeđuje kontejneru kroz `env_file`.
+#
+# Funkcije (a ne konstante učitane pri importu) namjerno: tako test i
+# dijagnostika mogu promijeniti okruženje bez ponovnog učitavanja modula —
+# isti obrazac kao `fast_single_call_scope()`.
+def turso_database_url():
+    return (os.environ.get("TURSO_DATABASE_URL", "") or "").strip()
+
+
+def turso_auth_token():
+    return (os.environ.get("TURSO_AUTH_TOKEN", "") or "").strip()
+
+
+def reporting_db_configured():
+    """Obje vrijednosti moraju postojati. Polovična konfiguracija je ISTO što i
+    nikakva — nikad se ne pokušava „bez tokena, možda prođe“."""
+    return bool(turso_database_url() and turso_auth_token())
+
+
+# ROK JEDNE IZVJEŠTAJNE OPERACIJE. Namjerno kratak i namjerno NEZAVISAN od
+# `AI_TUTOR_TIMEOUT`: izvještavanje je sporedno, pa ne smije dodati primjetno
+# kašnjenje tutorskom turnu. Nema retryja — jedan pokušaj, pa odustajanje.
+REPORTING_DB_TIMEOUT_S = _float_env("MATBOT_REPORTING_DB_TIMEOUT_S", 2.0)
+
+# Koliko izvještajnih operacija smije biti u letu istovremeno. Iznad toga se
+# poziv ODMAH odbacuje umjesto da se stane u red — red bi pretvorio sporu bazu
+# u kašnjenje tutorskog turna, što je tačno ono što je zabranjeno.
+REPORTING_DB_MAX_INFLIGHT = _int_env("MATBOT_REPORTING_DB_MAX_INFLIGHT", 2)
+
+# Očekivana verzija izvještajne šeme (`schema_migrations`). Dijagnostika je
+# poredi; aplikacija NIKAD sama ne pokreće migracije.
+REPORTING_SCHEMA_VERSION = _int_env("MATBOT_REPORTING_SCHEMA_VERSION", 1)

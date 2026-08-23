@@ -13,7 +13,8 @@ import time
 
 from flask import Blueprint, Response, current_app, jsonify, request
 
-from matbot import auth, config, imageinput, kontrolni, quick_context, validation
+from matbot import (auth, config, imageinput, kontrolni, quick_context,
+                    student_identity, validation)
 from matbot.explain import run_explain_turn
 from matbot.practice import SAFE_ERROR_MESSAGE, run_practice_turn
 from matbot.quick import run_quick_turn
@@ -95,6 +96,37 @@ def _client_ip():
     # request.remote_addr ovdje i dalje ispravan izvor, bez direktnog čitanja
     # headera i bez rizika da klijent lažira dodatne hopove.
     return request.remote_addr or "unknown"
+
+
+def _resolve_reporting_student(token_data, grade=None):
+    """Potpisani token -> izvještajni `students.id`.
+
+    JEDNA implementacija za sva ČETIRI moda. Practice, Explain i Quick dijele
+    `_guarded_chat_turn`, a Kontrolni ima vlastiti guard lanac — oba zovu OVU
+    funkciju odmah nakon što je token već provjeren, dakle na najužoj tački na
+    kojoj identitet uopšte postoji.
+
+    TRI TVRDE GARANCIJE:
+      • identitet dolazi ISKLJUČIVO iz potpisanog tokena
+        (`auth.reporting_identity`) — nikad iz tijela zahtjeva, query stringa
+        API endpointa, `session_id`-ja, imena ili razreda. E-mail poslan u
+        JSON-u se ne čita NIGDJE;
+      • bez tvrdnje u tokenu se NE stvara nikakav zamjenski identitet;
+      • povratna vrijednost se trenutno NIGDJE ne koristi za odgovor učeniku —
+        postoji da bi budući izvještajni događaji imali `students.id`. Kvar
+        izvještajne baze zato ne može promijeniti nijedan tutorski ishod."""
+    try:
+        identity = auth.reporting_identity(token_data)
+        if not identity:
+            return None
+        return student_identity.resolve_student(identity, grade=grade)
+    except Exception:
+        # POJAS I TREGERI. Sloj ispod je već „nikad ne baca“, ali oba pozivna
+        # mjesta leže unutar `try` bloka čiji bi `except` učeniku vratio
+        # SAFE_ERROR_MESSAGE, odnosno „Nismo uspjeli pripremiti test.“ Izvještajni
+        # defekt tako ne može ni preko buduće greške promijeniti tutorski ishod.
+        logger.info("student_resolution_failed code=unexpected")
+        return None
 
 
 def _auth_error():
@@ -196,7 +228,7 @@ def _guarded_chat_turn():
     """
     token = request.headers.get(auth.TOKEN_HEADER, "")
     try:
-        auth.verify_token(token)
+        token_data = auth.verify_token(token)
     except auth.TokenError as e:
         logger.info("auth_failed category=%s", e.code)
         return 401, _auth_error()
@@ -264,6 +296,12 @@ def _guarded_chat_turn():
             except imageinput.ImageRejected as e:
                 logger.info("image_rejected category=%s detail=%s", e.category, e.detail)
                 return e.http_status, {"error": "IMAGE_REJECTED", "detail": e.message}
+
+        # Izvještajni identitet se razrješava PRIJE modela, ali njegov ishod ne
+        # ulazi ni u jedan argument tutorskog poziva — semantika turna ostaje
+        # bajt za bajt ista. Bez verifikovanog e-maila je ovo `None` i nema
+        # nijednog dodira s bazom.
+        _resolve_reporting_student(token_data, grade=turn.get("grade"))
 
         if mode == "explain":
             return 200, run_explain_turn(_get_llm(), turn)
@@ -344,7 +382,7 @@ def exam_start():
     started = time.perf_counter()
     token = request.headers.get(auth.TOKEN_HEADER, "")
     try:
-        auth.verify_token(token)
+        token_data = auth.verify_token(token)
     except auth.TokenError as e:
         logger.info("auth_failed category=%s endpoint=exam_start", e.code)
         return jsonify(_auth_error()), 401
@@ -377,6 +415,10 @@ def exam_start():
         return jsonify({"error": "TURN_IN_PROGRESS",
                         "detail": TURN_IN_PROGRESS_MESSAGE}), 409
     try:
+        # Isti zajednički resolver kao /chat — nijedna izvještajna logika ne
+        # postoji dvaput.
+        _resolve_reporting_student(token_data)
+
         status_code, result = kontrolni.run_start(_get_exam_store(), _get_llm(), payload)
     except kontrolni.ExamValidationError as e:
         logger.info("validation_failed endpoint=exam_start code=%s", e.code)

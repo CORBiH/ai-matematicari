@@ -5,7 +5,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 import logging
 import os
 
-from matbot import auth, config, release_config
+from matbot import auth, config, release_config, student_identity
 from matbot.api import REQUEST_TOO_LARGE_MESSAGE, ai_tutor_bp
 from matbot.request_limits import BoundedInMemoryRequest
 from matbot.topics import topics_response
@@ -82,10 +82,25 @@ app.wsgi_app = ProxyFix(
 
 @app.route("/")
 def index():
-    # Kratkotrajni potpisani token (anonimna zaštita API-ja, NE Thinkific
-    # identitet) — frontend ga već čita iz ove meta tag vrijednosti i šalje
-    # kao X-Tutor-Token na svaki /api/ai-tutor/* poziv (templates/index.html).
-    return render_template("index.html", embed_token=auth.issue_token())
+    # Kratkotrajni potpisani token — frontend ga već čita iz ove meta tag
+    # vrijednosti i šalje kao X-Tutor-Token na svaki /api/ai-tutor/* poziv
+    # (templates/index.html).
+    #
+    # OVO JE JEDINO MJESTO GDJE IZVJEŠTAJNI IDENTITET ULAZI U MAT-BOT.
+    # Thinkific Multimedia Lesson otvara app kao
+    # `https://bot.matematicari.com/?thinkific_email={{email}}` i sam zamijeni
+    # `{{email}}` adresom prijavljenog učenika. Ovdje se adresa normalizuje i
+    # UGRADI u token koji server potpisuje; od te tačke pripisivanje putuje
+    # kanalom koji klijent ne može izmijeniti, pa nijedan API endpoint ne mora
+    # — i ne smije — gledati e-mail iz tijela zahtjeva.
+    #
+    # GRANICA: ovo je pripisivanje za izvještaj, NE autentifikacija. Puna
+    # napomena i šta se s njom smije, a šta ne — `matbot/student_identity.py`.
+    #
+    # Bez parametra ili s neispravnom adresom token se kuje kao i do sada, BEZ
+    # identiteta: učenik radi normalno, anonimno.
+    identity = student_identity.reporting_identity_from_request(request.args)
+    return render_template("index.html", embed_token=auth.issue_token(identity))
 
 
 def _health_payload():
