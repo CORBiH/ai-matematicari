@@ -279,6 +279,11 @@ def _repair_control_chars(segment: str) -> str:
         if ord(ch) < 0x20:
             i += 1  # ostali rijetki kontrolni znakovi: ukloni, ne pogađaj slovo
             continue
+        # U+007F DELETE se NAMJERNO NE uklanja ovdje. Uklanjanje bi bilo TIHA
+        # POPRAVKA: `$<DEL>50^\circ$` bi postalo `$50^\circ$` i objavilo se kao
+        # da je sve u redu, iako ne znamo šta je znak pojeo. Umjesto toga DEL
+        # preživi sanitizaciju i `find_unsafe_math_issues` ga prijavi, pa cio
+        # paket padne zatvoreno. Vidi `_is_disallowed_control`.
         out.append(ch)
         i += 1
     return "".join(out)
@@ -1029,6 +1034,35 @@ def find_structured_math_issues(segment: str) -> list:
     return issues
 
 
+# ---------------------------------------------------------------------------
+# ZABRANJENI KONTROLNI ZNAKOVI — JEDAN IZVOR ISTINE
+# ---------------------------------------------------------------------------
+# ŽIVI NALAZ (kontrolni, verifikacija poslije izdanja): objavljeno pitanje je
+# učeniku prikazalo `$<U+007F>50^\circ$` — i to tri puta u istom pitanju.
+# U+007F DELETE je kontrolni znak, ali leži IZA granice `< 0x20` koju su obje
+# provjere ispod gledale, pa je prošao netaknut sve do browsera.
+#
+# Ista uzvodna porodica kvara escape-a kao U+0000/U+0005/U+0007/U+000C (D2):
+# model umjesto `\\` pošalje važeći JSON escape kontrolnog znaka. Razlika je
+# samo u tome što DEL ne upada u stari opseg.
+#
+# OPSEG JE NAMJERNO USKO VEZAN ZA DOKAZ: dodaje se TAČNO U+007F. U+0080–U+009F
+# (C1) se NE dodaju — za njih nema izmjerenog nalaza, a granica se ovdje širi
+# samo na osnovu dokaza. Vidi Part 3 obrazloženje u testu
+# `tests/test_control_character_delete.py`.
+_DISALLOWED_CONTROL_CODEPOINTS = frozenset({0x7F})
+
+
+def _is_disallowed_control(ch: str) -> bool:
+    """Jedina definicija „kontrolni znak koji se ne smije objaviti".
+
+    NE uklanja i NE popravlja — samo prijavljuje. Rekonstrukcija onoga što je
+    znak „trebao biti" je izričito zabranjena (D2 doktrina): oštećena
+    matematika pada zatvoreno, ne pogađa se."""
+    code = ord(ch)
+    return code < 0x20 or code in _DISALLOWED_CONTROL_CODEPOINTS
+
+
 def find_unsafe_math_issues(text: str) -> list:
     """Vraća listu razloga zašto TEKST (već propušten kroz sanitize_math_text
     + gornje repair korake) NIJE bezbjedan za prikaz učeniku. Prazna lista =
@@ -1068,7 +1102,7 @@ def find_unsafe_math_issues(text: str) -> list:
             issues.append("damaged_latex_form")
         if _has_residual_literal_newline(part):
             issues.append("literal_newline_escape")
-        if any(ord(ch) < 0x20 and ch not in ("\n", "\t") for ch in part):
+        if any(_is_disallowed_control(ch) and ch not in ("\n", "\t") for ch in part):
             issues.append("control_character")
     for part in _inside_math_parts(text):
         issues.extend(find_unknown_math_commands(part))
@@ -1086,7 +1120,7 @@ def find_unsafe_math_issues(text: str) -> list:
             issues.append("orphan_latex_fragment_in_math:" + fragment[:24])
         if _has_residual_literal_newline(part):
             issues.append("literal_newline_escape_in_math")
-        if any(ord(ch) < 0x20 for ch in part):
+        if any(_is_disallowed_control(ch) for ch in part):
             issues.append("control_character_in_math")
         # Faza A1 (docs/CURRENT_STATE.md): jedan neupareni "$" UNUTAR već
         # izdvojenog matematičkog segmenta (inline ili display) znači
