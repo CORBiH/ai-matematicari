@@ -296,7 +296,14 @@ _DAMAGED_LATEX_WORD_RE = re.compile(
 
 
 def _unique_value(expression):
-    """Jedina numerička vrijednost izraza, ili None (nedokazivo/višeznačno)."""
+    """Jedina numerička vrijednost izraza, ili None (nedokazivo/višeznačno).
+
+    ŽIVI NALAZ P1: označena opcija „$7$ boca“ je vraćala None, pa je
+    `_solution_contradicts_marked_value` ćutao i objavljen je POGREŠAN ključ
+    iako je rješenje izvelo $9$. Oznaka jedinice/brojive imenice iza kompletnog
+    izraza ne nosi vrijednost — skida je `mcq_integrity.strip_answer_label`,
+    koja pri svakom nejednoznačnom obliku vraća ulaz nepromijenjen."""
+    expression = mcq_integrity.strip_answer_label(expression)
     candidates = option_equivalence._numeric_candidates(expression)
     if not candidates:
         return None
@@ -382,7 +389,9 @@ def _solution_contradicts_marked_value(marked_option, solution):
     rješenje sadrži numeričke vrijednosti, a NIJEDNA se ne poklapa s označenom
     — tačan H12-oblik iz žive kampanje (rješenje izvodi 113,04, označeno
     56,52). Simbolički odgovori i rješenja bez brojeva ćute."""
-    bare = (marked_option or "").strip().strip("$")
+    # Oznaka jedinice se skida PRIJE `.strip("$")` — inace „$7$ boca" postane
+    # „7$ boca", sto vise nije prepoznatljiv oblik (zivi nalaz P1).
+    bare = mcq_integrity.strip_answer_label(marked_option).strip().strip("$")
     if _RELATION_SPLIT_RE.search(bare):
         return False                      # lanci se sude u _statement_options_failure
     marked_value = _unique_value(bare)

@@ -394,7 +394,9 @@ class DirectComputationMCQResult:
 
 
 def _option_numeric_value(option_text: str):
-    text = (option_text or "").strip()
+    # Oznaka jedinice/brojive imenice iza kompletnog izraza ne nosi vrijednost
+    # (zivi nalaz P1 „$7$ boca"). Vidi `strip_answer_label`.
+    text = strip_answer_label(option_text).strip()
     if text.startswith("$") and text.endswith("$") and text.count("$") == 2:
         text = text[1:-1].strip()
     if not text:
@@ -2838,3 +2840,73 @@ def proves_marked_option(result, marked_index) -> bool:
     except Exception:                      # noqa: BLE001 — nedokaziv oblik ćuti
         return False
     return len(indices) == 1 and indices[0] == marked_index
+
+
+# ---------------------------------------------------------------------------
+# NUMERIČKO JEZGRO + OZNAKA JEDINICE (živi nalaz P1, post-release mjerenje)
+# ---------------------------------------------------------------------------
+# ŽIVI NALAZ (Kontrolni, 6. razred, čitanje podataka iz tabele):
+#
+#     „Tabela: Amna $18$, Boris $25$, Dženan $16$, Ema $21$.
+#      Koliko je boca Boris sakupio više od Dženana?"
+#     opcije: „$7$ boca" (OZNAČENO) / „$9$ boca" / „$41$ boca" / …
+#     rješenje: „…Razlika je $25-16=9$ boca."
+#
+# Tačno je $9$, označeno je $7$, a paket je OBJAVLJEN. Izmjereno zašto:
+#
+#     _option_numeric_value("$7$ boca")  -> unsupported
+#     _unique_value("$7$ boca")          -> None
+#     _solution_contradicts_marked_value -> False   (ćuti)
+#
+#     KONTROLA bez oznake:
+#     _unique_value("$7$")               -> 7.0
+#     _solution_contradicts_marked_value -> True    <- POSTOJEĆI čuvar PALI
+#
+# Čuvar je dakle matematički dovoljan — samo je bio SLIJEP za proznu oznaku iza
+# broja. Jedinice UNUTAR matematike (`\text{cm}`) već uklanja
+# `mathcheck._strip_units_and_spacing`; ovo je ista stvar, samo IZVAN spana.
+#
+# OBLIK JE STRUKTURAN, ne „skini zadnju riječ": traži se JEDAN kompletan `$…$`
+# span (ili goli broj) na POČETKU, pa razmak, pa oznaka od najviše dvije čiste
+# riječi (slova + ² ³ °). Oznaka ne smije sadržati cifru, `$`, LaTeX ni ijednu
+# riječ iz zatvorene liste onih koje MIJENJAJU značenje.
+#
+# IZMJERENO NA KORPUSU (9.463 skupa opcija): pravilo čini čitljivim 1.948 opcija
+# kroz 52 oznake — sve stvarne jedinice i brojive imenice (`cm`, `cm²`, `KM`,
+# `kg`, `min`, `h`, `učenika`, `boca`, `knjiga`, …). Odbija sve što mijenja
+# smisao, a što korpus stvarno sadrži: „je veći", „cm od obje stranice",
+# „km prema istoku", „i 3 ostatka", „i $7$", parovi koordinata, sistemi.
+_ANSWER_CORE_MATH_RE = re.compile(r"^\s*(\$[^$]+\$)\s+(\S.*?)\s*$")
+_ANSWER_CORE_BARE_RE = re.compile(r"^\s*(-?\d[\d.,]*)\s+([^\W\d_].*?)\s*$", re.UNICODE)
+_ANSWER_LABEL_RE = re.compile(
+    r"^[^\W\d_]+[²³°]?(?:\s+[^\W\d_]+[²³°]?)?$", re.UNICODE)
+
+# Riječi koje oznaku pretvaraju u TVRDNJU ili u složen odgovor — tada se
+# vrijednost NE izvodi. Zatvoreno i izvedeno iz korpusa.
+_ANSWER_LABEL_STOPWORDS = frozenset({
+    "je", "su", "i", "ili", "do", "od", "prema", "vise", "više", "manje",
+    "oko", "priblizno", "približno", "najmanje", "najvise", "najviše",
+    "barem", "bar", "preko", "ispod", "iznad", "ostatak", "ostatka",
+    "ostataka", "veci", "veći", "manji", "puta", "put", "te", "a", "pa",
+    "nego", "kao", "svaki", "svaka", "po", "nije", "ima", "nema",
+})
+
+
+def strip_answer_label(option_text: str) -> str:
+    """Vrati numeričko JEZGRO opcije kad je oblik `<izraz> <oznaka>`.
+
+    Kad oblik ne odgovara, vraća ulaz NEPROMIJENJEN — ovo nikad ne pogađa i
+    nikad ne mijenja matematiku, samo skida oznaku koja vrijednost ne nosi."""
+    raw = (option_text or "").strip()
+    if not raw:
+        return option_text or ""
+    match = _ANSWER_CORE_MATH_RE.match(raw) or _ANSWER_CORE_BARE_RE.match(raw)
+    if not match:
+        return option_text or ""
+    core, label = match.group(1), match.group(2).strip().rstrip(".")
+    if not label or not _ANSWER_LABEL_RE.match(label):
+        return option_text or ""
+    for word in label.split():
+        if word.lower().strip("²³°") in _ANSWER_LABEL_STOPWORDS:
+            return option_text or ""
+    return core
