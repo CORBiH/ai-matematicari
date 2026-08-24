@@ -13,8 +13,8 @@ import time
 
 from flask import Blueprint, Response, current_app, jsonify, request
 
-from matbot import (auth, config, imageinput, kontrolni, quick_context,
-                    student_identity, validation)
+from matbot import (activity, auth, config, imageinput, kontrolni,
+                    quick_context, reporting_db, student_identity, validation)
 from matbot.explain import run_explain_turn
 from matbot.practice import SAFE_ERROR_MESSAGE, run_practice_turn
 from matbot.quick import run_quick_turn
@@ -127,6 +127,109 @@ def _resolve_reporting_student(token_data, grade=None):
         # defekt tako ne može ni preko buduće greške promijeniti tutorski ishod.
         logger.info("student_resolution_failed code=unexpected")
         return None
+
+
+def _flush_reporting(student_id, events, assessment=None):
+    """Preda sve izvještajno iz ovog zahtjeva JEDNIM odvojenim poslom.
+
+    Zove se TEK kad je turn već uspio i kad je odgovor spreman, pa neuspio upis
+    ne može ni odgoditi ni promijeniti ono što učenik vidi. Bez razriješenog
+    identiteta se ne piše NIŠTA — anoniman rad ne stvara učenika (Dio 13)."""
+    if not student_id or (not events and not assessment):
+        return
+    try:
+        reporting_db.record_turn(student_id, events, assessment)
+    except Exception:                      # pragma: no cover — defanzivno
+        logger.info("reporting_write_failed code=unexpected")
+
+
+ASSESSMENT_TYPE_KONTROLNI = "kontrolni"
+
+
+def _kontrolni_attempt(exam_id, *, grade=None, area_name="", total_count=None,
+                       score_percent=None, correct_count=None,
+                       started_at=None, completed_at=None):
+    """Jedan pokusaj testa. `title`, `lesson_id` i `lesson_name` ostaju NULL i to
+    je TACAN opis, ne rupa: kontrolni nema naslov u stanju testa, a obuhvata PET
+    RAZLICITIH lekcija - pa nijedna nije "lekcija pokusaja". Lekcije zive tamo
+    gdje stvarno postoje: po pitanju, u `assessment_item_results`."""
+    return {
+        "assessment_type": ASSESSMENT_TYPE_KONTROLNI,
+        "external_attempt_id": exam_id,
+        "grade": grade,
+        "area_name": area_name,
+        "total_count": total_count,
+        "score_percent": score_percent,
+        "correct_count": correct_count,
+        # VRIJEME DOGAĐAJA, uhvaćeno na pozivnom mjestu — nikad u radnoj niti.
+        "started_at": started_at,
+        "completed_at": completed_at,
+    }
+
+
+def _kontrolni_items(state, graded_questions):
+    """Po jedan ishod za svako AUTORITATIVNO ocijenjeno pitanje.
+
+    Spaja se po serverskom `id` pitanja (`q1`..`q5`): `graded_questions` nosi
+    ishod, a pohranjeno stanje testa nosi lekciju i tezinu. Lekcija se NAMJERNO
+    ne uzima iz odgovora klijentu - taj payload je po ugovoru bez metapodataka
+    lekcije (nikad ne smije doci do pregledaca prije predaje).
+
+    NE PRENOSI SE NISTA OD SADRZAJA: ni tekst pitanja, ni izabrana opcija, ni
+    tacan odgovor, ni rjesenje. Samo ishod, redni broj i kurikularne oznake."""
+    by_id = {question.get("id"): question
+             for question in (state or {}).get("questions", [])}
+    items = []
+    for graded in graded_questions or ():
+        item_key = graded.get("id")
+        if not item_key:
+            continue
+        stored = by_id.get(item_key, {})
+        items.append({
+            # STABILAN SERVERSKI ID pitanja iz samog testa - ne hes teksta.
+            "item_key": item_key,
+            "ordinal": graded.get("ordinal"),
+            "lesson_id": stored.get("lesson_id"),
+            "lesson_name": stored.get("lesson_title"),
+            "difficulty": stored.get("difficulty"),
+            "area_name": (state or {}).get("oblast_name"),
+            "is_correct": bool(graded.get("correct")),
+        })
+    return items
+
+
+def _note_simple_mode_activity(mode, result, turn):
+    """Explain i Quick: uspjeh je AUTORITATIVAN u samom odgovoru.
+
+    Oba moda vraćaju `status="ready"` isključivo kad je odgovor stvarno
+    objavljen; svaki neuspjeh (SAFE_ERROR_MESSAGE, nečitka slika, odbijena
+    validacija) vraća dict BEZ `status`. Zato se ovdje ništa ne pogađa i ne dira
+    se njihov kod — interni modelski poziv, retry i odbijen paket ne mogu
+    postati događaj učenja."""
+    if not isinstance(result, dict) or result.get("status") != "ready":
+        return
+    session_id = turn.get("session_id") or ""
+    client_turn_id = turn.get("client_turn_id") or ""
+    if not client_turn_id:
+        # Bez serverski stabilnog ID-ja akcije nema idempotentnog ključa, pa se
+        # događaj radije PRESKAČE nego što bi se upisao duplikat pri retryju.
+        return
+    lesson_id = result.get("effective_topic") or ""
+    if mode == "explain":
+        activity.note(
+            activity.EXPLAIN_COMPLETED,
+            activity.explain_key(session_id, client_turn_id),
+            mode="explain", grade=turn.get("grade"), lesson_id=lesson_id,
+        )
+    elif mode == "quick":
+        activity.note(
+            activity.QUICK_COMPLETED,
+            activity.quick_key(session_id, client_turn_id),
+            mode="quick", grade=turn.get("grade"),
+            # Quick često NEMA lekciju (učenik samo pošalje zadatak) — tada
+            # `lesson_id` ostaje prazan i to je tačan opis, ne rupa u podacima.
+            lesson_id=lesson_id,
+        )
 
 
 def _auth_error():
@@ -301,14 +404,21 @@ def _guarded_chat_turn():
         # ulazi ni u jedan argument tutorskog poziva — semantika turna ostaje
         # bajt za bajt ista. Bez verifikovanog e-maila je ovo `None` i nema
         # nijednog dodira s bazom.
-        _resolve_reporting_student(token_data, grade=turn.get("grade"))
+        student_id = _resolve_reporting_student(token_data, grade=turn.get("grade"))
 
-        if mode == "explain":
-            return 200, run_explain_turn(_get_llm(), turn)
-        if mode == "quick":
-            return 200, run_quick_turn(_get_llm(), turn, image=image,
-                                       context_store=_get_quick_context_store())
-        return 200, run_practice_turn(_get_store(), _get_llm(), turn)
+        # Događaji se SAKUPLJAJU tokom turna (motor ih bilježi na mjestu gdje
+        # činjenica postaje istinita), a PREDAJU tek kad je odgovor spreman.
+        with activity.capture() as events:
+            if mode == "explain":
+                result = run_explain_turn(_get_llm(), turn)
+            elif mode == "quick":
+                result = run_quick_turn(_get_llm(), turn, image=image,
+                                        context_store=_get_quick_context_store())
+            else:
+                result = run_practice_turn(_get_store(), _get_llm(), turn)
+            _note_simple_mode_activity(mode, result, turn)
+        _flush_reporting(student_id, events)
+        return 200, result
     except Exception:
         # Zadnja linija odbrane: interni exception NIKAD ne ide učeniku.
         logger.exception("chat_turn unexpected_error")
@@ -417,9 +527,34 @@ def exam_start():
     try:
         # Isti zajednički resolver kao /chat — nijedna izvještajna logika ne
         # postoji dvaput.
-        _resolve_reporting_student(token_data)
+        student_id = _resolve_reporting_student(token_data)
 
-        status_code, result = kontrolni.run_start(_get_exam_store(), _get_llm(), payload)
+        generated_attempt = None
+        with activity.capture() as events:
+            status_code, result = kontrolni.run_start(_get_exam_store(), _get_llm(),
+                                                      payload)
+            # SAMO stvarno generisan test. Pad zatvoreno ("Nismo uspjeli
+            # pripremiti test.") vraća status="failed" i NE SMIJE izgledati kao
+            # da je učenik dobio kontrolni.
+            if isinstance(result, dict) and result.get("status") == "ready":
+                activity.note(
+                    activity.KONTROLNI_GENERATED,
+                    activity.kontrolni_generated_key(result.get("exam_id") or ""),
+                    mode="kontrolni", grade=payload.get("grade"),
+                    area_name=result.get("oblast_name") or "",
+                    metadata={"question_count": result.get("question_count"),
+                              "difficulty": result.get("difficulty")},
+                )
+                generated_attempt = _kontrolni_attempt(
+                    result.get("exam_id") or "",
+                    grade=payload.get("grade"),
+                    area_name=result.get("oblast_name") or "",
+                    total_count=result.get("question_count"),
+                    # Test je OVDJE postao stvaran za učenika.
+                    started_at=activity.event_timestamp())
+        _flush_reporting(student_id, events,
+                         {"kind": reporting_db.ASSESSMENT_GENERATED,
+                          "attempt": generated_attempt} if generated_attempt else None)
     except kontrolni.ExamValidationError as e:
         logger.info("validation_failed endpoint=exam_start code=%s", e.code)
         status_code, result = 400, {"error": e.code, "detail": e.detail}
@@ -444,7 +579,7 @@ def exam_submit():
     sljedeći test zato što je predao ovaj."""
     token = request.headers.get(auth.TOKEN_HEADER, "")
     try:
-        auth.verify_token(token)
+        token_data = auth.verify_token(token)
     except auth.TokenError as e:
         logger.info("auth_failed category=%s endpoint=exam_submit", e.code)
         return jsonify(_auth_error()), 401
@@ -457,8 +592,44 @@ def exam_submit():
         return response, 429
 
     payload = request.get_json(silent=True)
+    student_id = _resolve_reporting_student(token_data)
+    completed_attempt, completed_items = None, None
     try:
-        status_code, result = kontrolni.run_submit(_get_exam_store(), payload)
+        with activity.capture() as events:
+            exam_store = _get_exam_store()
+            status_code, result = kontrolni.run_submit(exam_store, payload)
+            # JEDINI kontrolni događaj sa stvarnim rezultatom učenika.
+            # `status="graded"` daje `kontrolni.run_submit` nakon
+            # DETERMINISTIČKOG serverskog ocjenjivanja (nula modelskih poziva),
+            # pa su `score`/`total` mjerenje, a ne procjena. `status="incomplete"`
+            # (neodgovorena pitanja) NIJE završen test i ovdje se ne bilježi.
+            if isinstance(result, dict) and result.get("status") == "graded":
+                # AKTIVNOST NOSI SAMO "STA I KADA". Ocjena je namjerno UKLONJENA
+                # odavde (Dio 11): dvije autoritativne kopije istog rezultata
+                # razilaze se cim se jedna promijeni. Rezultat zivi iskljucivo u
+                # `assessment_attempts`, a ishodi po pitanju u
+                # `assessment_item_results`.
+                activity.note(
+                    activity.KONTROLNI_COMPLETED,
+                    activity.kontrolni_completed_key(result.get("exam_id") or ""),
+                    mode="kontrolni",
+                )
+                state = exam_store.get(payload.get("session_id")
+                                       if isinstance(payload, dict) else None)
+                completed_attempt = _kontrolni_attempt(
+                    result.get("exam_id") or "",
+                    grade=(state or {}).get("grade"),
+                    area_name=(state or {}).get("oblast_name") or "",
+                    total_count=result.get("total"),
+                    correct_count=result.get("score"),
+                    score_percent=result.get("percentage"),
+                    # Ocjena je OVDJE postala autoritativna.
+                    completed_at=activity.event_timestamp())
+                completed_items = _kontrolni_items(state, result.get("questions"))
+        _flush_reporting(student_id, events,
+                         {"kind": reporting_db.ASSESSMENT_COMPLETED,
+                          "attempt": completed_attempt,
+                          "items": completed_items} if completed_attempt else None)
     except kontrolni.ExamValidationError as e:
         logger.info("validation_failed endpoint=exam_submit code=%s", e.code)
         status_code, result = 400, {"error": e.code, "detail": e.detail}

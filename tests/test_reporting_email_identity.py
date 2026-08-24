@@ -47,9 +47,12 @@ def reporting(tmp_path, monkeypatch):
     monkeypatch.setenv("TURSO_DATABASE_URL", "libsql://test.invalid")
     monkeypatch.setenv("TURSO_AUTH_TOKEN", "test-token-not-real")
     database = reporting_db.ReportingDatabase(
-        connect_factory=lambda: libsql.connect(path, timeout=30.0, _check_same_thread=False))
+        connect_factory=lambda: libsql.connect(path, timeout=10.0, _check_same_thread=False))
     reporting_db.set_database(database)
     yield path
+    # Odvojene niti su daemon i prezivjele bi ovaj test; drenaza
+    # sprjecava da zaostao upis obori sljedeci test.
+    reporting_db.wait_for_pending_writes()
     reporting_db.set_database(None)
 
 
@@ -433,7 +436,7 @@ def test_concurrent_first_requests_create_one_student(reporting):
 
     def worker():
         database = reporting_db.ReportingDatabase(
-            connect_factory=lambda: libsql.connect(path, timeout=30.0, _check_same_thread=False))
+            connect_factory=lambda: libsql.connect(path, timeout=10.0, _check_same_thread=False))
         try:
             barrier.wait(timeout=10)
             results.append(database.get_or_create_student(
@@ -447,7 +450,7 @@ def test_concurrent_first_requests_create_one_student(reporting):
     for t in threads:
         t.start()
     for t in threads:
-        t.join(timeout=30)
+        t.join(timeout=60)
 
     assert errors == []
     assert len(set(results)) == 1

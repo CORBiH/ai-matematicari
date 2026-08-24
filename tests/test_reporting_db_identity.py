@@ -64,7 +64,7 @@ def db_path(tmp_path):
 @pytest.fixture
 def database(db_path):
     db = ReportingDatabase(
-        connect_factory=lambda: libsql.connect(db_path, timeout=30.0, _check_same_thread=False))
+        connect_factory=lambda: libsql.connect(db_path, timeout=10.0, _check_same_thread=False))
     yield db
     db.close()
 
@@ -203,7 +203,7 @@ def test_concurrent_first_requests_resolve_to_one_identity(db_path):
 
     def worker():
         db = ReportingDatabase(
-            connect_factory=lambda: libsql.connect(db_path, timeout=30.0, _check_same_thread=False))
+            connect_factory=lambda: libsql.connect(db_path, timeout=10.0, _check_same_thread=False))
         try:
             barrier.wait(timeout=10)
             results.append(db.get_or_create_student(PROVIDER_THINKIFIC, "42",
@@ -217,8 +217,15 @@ def test_concurrent_first_requests_resolve_to_one_identity(db_path):
     for t in threads:
         t.start()
     for t in threads:
-        t.join(timeout=30)
+        t.join(timeout=60)
 
+    # ZASTO JE PROZOR POSMATRANJA VECI OD BUSY-TIMEOUTA KONEKCIJE (10 s):
+    # dok su bili jednaki (30 s / 30 s), radnik koji legitimno ceka na zakljucan
+    # fajl je nadzivio `join` i test bi pao na `len(results)` BEZ ijedne greske
+    # u `errors` - dakle neuhvatljivo. Sada svako predugo cekanje padne kao
+    # vidljiv SQLITE_BUSY unutar radnika, mnogo prije isteka `join`.
+    still_running = [t.name for t in threads if t.is_alive()]
+    assert not still_running, "radnik nije zavrsio: %s" % still_running
     assert errors == []
     assert len(results) == 4
     assert len(set(results)) == 1, "ista Thinkific osoba je dobila više identiteta"

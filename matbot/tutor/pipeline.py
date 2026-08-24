@@ -39,6 +39,7 @@ from matbot.tutor import reviewer_authority
 from matbot.tutor import task_identity
 from matbot.tutor import prompts as tutor_prompts
 from matbot import deterministic as deterministic_generators
+from matbot import activity
 from matbot import archetype_support
 from matbot import form_variants
 from matbot import deterministic_variety
@@ -1057,12 +1058,14 @@ def _run_server_owned_help_turn(store, session, turn, context, request_id, ui_ac
         session["hint_level"] = min(session["hint_level"] + 1, config.MAX_HINT_LEVEL)
         session["current_task_had_hint"] = True
         route = "server_hint"
+        _note_help_activity(session, context, is_hint=True)
     else:
         session["last_result"] = "full_solution"
         if session["correct_option_id"]:
             session["task_completed"] = True
             reveal = True
         route = "server_solution"
+        _note_help_activity(session, context, is_hint=False)
 
     session["recent_turns"].append(
         {"student": turn["student_message"][:300], "tutor": answer[:400]}
@@ -1224,6 +1227,7 @@ def _run_deterministic_help_turn(store, session, turn, context, request_id,
         session["hint_level"] = min(session["hint_level"] + 1, config.MAX_HINT_LEVEL)
         session["current_task_had_hint"] = True
         route, intent = "deterministic_hint", "hint_request"
+        _note_help_activity(session, context, is_hint=True)
     else:
         answer = annex.get("solution") or ""
         if not answer:
@@ -1233,6 +1237,7 @@ def _run_deterministic_help_turn(store, session, turn, context, request_id,
             session["task_completed"] = True
             reveal = True
         route, intent = "deterministic_solution", "full_solution_request"
+        _note_help_activity(session, context, is_hint=False)
 
     session["recent_turns"].append(
         {"student": turn["student_message"][:300], "tutor": answer[:400]}
@@ -1541,6 +1546,23 @@ def _run_choice_turn(store, llm, session, turn, context, request_id):
         session["last_choice_turn_id"] = client_turn_id
         session["last_choice_response"] = copy.deepcopy(response)
 
+    # IZVJEŠTAVANJE: tačnost klika je SERVERSKA činjenica (`is_correct` gore je
+    # poređenje s `correct_option_id`), pa je ovo jedini dokaz koji izvještaju
+    # treba. Ponovljena isporuka istog `client_turn_id` se vraća iz keša u
+    # `_resolve_choice` i nikad ne stigne dovde; ako ipak stigne bez ID-ja,
+    # ključ nosi redni broj pokušaja, a UNIQUE(source, event_key) zatvara ostatak.
+    activity.note(
+        activity.PRACTICE_ANSWER_CORRECT if is_correct
+        else activity.PRACTICE_ANSWER_INCORRECT,
+        activity.practice_answer_key(
+            session.get("session_id", ""),
+            session.get("current_task_identity") or "",
+            client_turn_id or ("n%d" % wrong_before)),
+        mode="practice", grade=context.grade, area_name=context.oblast,
+        lesson_id=context.topic_id, lesson_name=context.title,
+        metadata=_activity_difficulty_metadata(session),
+    )
+
     store.save(session)   # JEDINA commit tačka
     logger.info(
         "tutor_choice request_id=%s topic=%s family=%s route=%s is_correct=%s "
@@ -1781,8 +1803,10 @@ def _run_text_turn(store, llm, session, turn, context, request_id):
                     session["hint_level"] + 1, config.MAX_HINT_LEVEL
                 )
                 session["current_task_had_hint"] = True
+                _note_help_activity(session, context, is_hint=True)
             elif final.intent == "full_solution_request":
                 session["last_result"] = "full_solution"
+                _note_help_activity(session, context, is_hint=False)
     except UnifiedOutputError as error:
         _log_rejection(request_id, context, "publication", error, final.intent)
         _log_turn_diagnostics(
@@ -2059,7 +2083,63 @@ def _publish_task(session, context, final, request_id, target_level=None):
             "text": task_text,
         })
     _log_difficulty(request_id, context, final)
+    # IZVJEŠTAVANJE (Faza 2): zadatak je PROŠAO sve validatore i od ovog reda
+    # postoji u sesiji, dakle stiže učeniku. Odbijeni model-paketi nikad ne
+    # dođu dovde, pa se pokušaji motora ne mogu prikazati kao vježba učenika.
+    # Poziv je no-op van `activity.capture()` i ne može promijeniti turn.
+    activity.note(
+        activity.PRACTICE_TASK_PRESENTED,
+        activity.practice_task_key(session.get("session_id", ""),
+                                   session.get("current_task_identity") or ""),
+        mode="practice", grade=context.grade, area_name=context.oblast,
+        lesson_id=context.topic_id, lesson_name=context.title,
+        metadata=_activity_difficulty_metadata(session),
+    )
     return task_text
+
+
+def _note_help_activity(session, context, is_hint):
+    """JEDAN vlasnik izvještajnog događaja pomoći, za sve tri rute (serverski
+    sastavljen tekst, deterministički dodatak, model-autorski nagovještaj).
+
+    Zove se TEK nakon što je stanje sesije već pomjereno, dakle kad je pomoć
+    dokazano poslužena. Ponovljen klik na nagovještaj ide kroz
+    `_hint_repeat_response`, koji ljestvicu NE pomjera i ovdje ne dolazi — pa
+    isti nagovještaj ne može dva puta ući u izvještaj."""
+    identity = session.get("current_task_identity") or ""
+    session_id = session.get("session_id", "")
+    if is_hint:
+        activity.note(
+            activity.PRACTICE_HINT_USED,
+            activity.practice_hint_key(session_id, identity,
+                                       session.get("hint_level", 0)),
+            mode="practice", grade=context.grade, area_name=context.oblast,
+            lesson_id=context.topic_id, lesson_name=context.title,
+            metadata={"hint_level": session.get("hint_level", 0)},
+        )
+    else:
+        activity.note(
+            activity.PRACTICE_FULL_SOLUTION_SHOWN,
+            activity.practice_solution_key(session_id, identity),
+            mode="practice", grade=context.grade, area_name=context.oblast,
+            lesson_id=context.topic_id, lesson_name=context.title,
+            metadata=_activity_difficulty_metadata(session),
+        )
+
+
+def _activity_difficulty_metadata(session):
+    """SAMO težina — i to samo kad je stvarno poznata.
+
+    Verdikt, nivo nagovještaja i lekcija se NE ponavljaju ovdje: verdikt je već
+    u imenu događaja, a lekcija/razred/oblast su prvorazredne kolone."""
+    level = session.get("difficulty_level")
+    label = session.get("difficulty")
+    meta = {}
+    if isinstance(level, int):
+        meta["difficulty_level"] = level
+    if isinstance(label, str) and label:
+        meta["difficulty"] = label[:40]
+    return meta or None
 
 
 def _log_sdk_entry(request_id, context, stage, call_index, result):

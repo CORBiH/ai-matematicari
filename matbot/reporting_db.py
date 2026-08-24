@@ -34,6 +34,7 @@ import hashlib
 import hmac
 import logging
 import threading
+import time
 
 from matbot import config
 
@@ -42,6 +43,10 @@ logger = logging.getLogger("matbot.reporting_db")
 # Jedini podržan provajder identiteta za sada. Postoji kao konstanta da se
 # string ne bi prepisivao po pozivnim mjestima kad ih bude.
 PROVIDER_THINKIFIC = "thinkific"
+
+# Vrijednost `learning_activity.source` za sve događaje koje piše MAT-BOT.
+# Drži se ovdje jer je dio UNIQUE(source, event_key) ugovora baze.
+SOURCE = "matbot"
 
 # Tabele koje izvještajna šema mora imati. Dijagnostika ih SAMO provjerava —
 # ovaj modul nikad ne kreira ni ne migrira šemu.
@@ -312,6 +317,183 @@ class ReportingDatabase:
                 raise ReportingUnavailable(
                     "student_touch_failed:" + type(exc).__name__, exc) from None
 
+    def record_learning_activity(self, student_id, events):
+        """Upiši dokazane događaje u `learning_activity`. Baca `ReportingUnavailable`.
+
+        IDEMPOTENTNO PO KONSTRUKCIJI: `ON CONFLICT (source, event_key) DO NOTHING`
+        prepušta odluku BAZI, a ne provjeri u Pythonu. Dvostruka HTTP isporuka,
+        retry pregledača ili ponovljena predaja testa zato ne mogu napraviti dva
+        reda — isti ključ, isti red.
+
+        `duration_seconds` i `progress_percent` se NAMJERNO ne upisuju: MAT-BOT
+        ih trenutno ne mjeri, a izmišljena nula bi u izvještaju izgledala kao
+        mjerenje. Ostaju NULL dok stvarno mjerenje ne postoji.
+
+        Vraća broj STVARNO upisanih redova (duplikat je 0)."""
+        if not events:
+            return 0
+        with self._lock:
+            try:
+                conn = self._connection()
+                written = 0
+                for event in events:
+                    cursor = conn.execute(
+                        "INSERT INTO learning_activity "
+                        "(student_id, source, event_type, event_key, grade, "
+                        " area_name, lesson_id, lesson_name, mode, occurred_at, "
+                        " metadata_json) "
+                        # `occurred_at` dolazi IZ DOGAĐAJA (uhvaćen kad je
+                        # činjenica dokazana), ne iz `CURRENT_TIMESTAMP`:
+                        # asinhroni upis ne smije određivati kad se nešto desilo.
+                        # `COALESCE` je samo pojas za slučaj da pozivalac ne
+                        # pošalje vrijeme — tada je vrijeme upisa jedino što
+                        # imamo, i to je poštenije od NULL-a.
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, "
+                        "        COALESCE(?, CURRENT_TIMESTAMP), ?) "
+                        "ON CONFLICT (source, event_key) DO NOTHING",
+                        (int(student_id), SOURCE, event.event_type, event.event_key,
+                         event.grade, event.area_name or None,
+                         event.lesson_id or None, event.lesson_name or None,
+                         event.mode or None,
+                         getattr(event, "occurred_at", None),
+                         event.metadata_json()),
+                    )
+                    written += 1 if cursor.rowcount == 1 else 0
+                conn.commit()
+                return written
+            except ReportingUnavailable:
+                self._safe_rollback()
+                self._drop_connection()
+                raise
+            except Exception as exc:
+                self._safe_rollback()
+                self._drop_connection()
+                raise ReportingUnavailable(
+                    "activity_write_failed:" + type(exc).__name__, exc) from None
+
+    def record_assessment_generated(self, student_id, attempt):
+        """Zabilježi da je test GENERISAN i predat učeniku. Nikad ne briše rezultat.
+
+        NEDESTRUKTIVNO PO KONSTRUKCIJI (Dio 5): upis dolazi asinhrono, pa se
+        teorijski može desiti POSLIJE upisa ocjene istog testa. Zato `DO UPDATE`
+        dira samo polja generisanja i to kroz `COALESCE` — `score_percent`,
+        `correct_count` i `completed_at` NISU ni navedeni, pa ih ova putanja ne
+        može dodirnuti ni slučajno.
+
+        Obrnut smjer je time takođe pokriven: ako je ocjena stigla prva i
+        napravila red bez `started_at`, ovaj upis ga naknadno POPUNI umjesto da
+        ostane prazan zauvijek."""
+        with self._lock:
+            try:
+                conn = self._connection()
+                conn.execute(
+                    "INSERT INTO assessment_attempts "
+                    "(student_id, source, assessment_type, external_attempt_id, "
+                    " grade, area_name, total_count, started_at) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?) "
+                    "ON CONFLICT (source, external_attempt_id) DO UPDATE SET "
+                    # NAJRANIJE VRIJEME POBJEĐUJE. `MIN` (a ne samo `COALESCE`)
+                    # znači da ponovljena isporuka istog generisanja ne može
+                    # pomjeriti početak unaprijed, a zakašnjeli upis popunjava
+                    # `started_at` koji ocjena nije znala.
+                    "  started_at  = MIN(COALESCE(assessment_attempts.started_at, "
+                    "                             excluded.started_at), "
+                    "                    excluded.started_at), "
+                    "  grade       = COALESCE(assessment_attempts.grade, excluded.grade), "
+                    "  area_name   = COALESCE(assessment_attempts.area_name, "
+                    "                         excluded.area_name), "
+                    "  total_count = COALESCE(assessment_attempts.total_count, "
+                    "                         excluded.total_count)",
+                    (int(student_id), SOURCE, attempt["assessment_type"],
+                     attempt["external_attempt_id"], attempt.get("grade"),
+                     attempt.get("area_name") or None, attempt.get("total_count"),
+                     attempt.get("started_at")),
+                )
+                conn.commit()
+                return True
+            except ReportingUnavailable:
+                self._safe_rollback()
+                self._drop_connection()
+                raise
+            except Exception as exc:
+                self._safe_rollback()
+                self._drop_connection()
+                raise ReportingUnavailable(
+                    "assessment_generated_failed:" + type(exc).__name__, exc) from None
+
+    def record_assessment_completed(self, student_id, attempt, items):
+        """Ocijenjen test: JEDAN `assessment_attempts` red + N `assessment_item_results`.
+
+        ATOMIČNOST (Dio 9): sve izjave idu kroz JEDNU implicitnu transakciju ove
+        konekcije i tek onda `commit()`. Izmjereno na libsql 0.1.11: prvi DML
+        otvara transakciju, a `rollback()` stvarno poništava upis — pa pad na
+        petom pitanju ne ostavlja polovično upisan test. Eksplicitni
+        `BEGIN IMMEDIATE` se NAMJERNO ne piše: klijent već vodi transakciju i
+        ručni `BEGIN` bi se sudario s njom.
+
+        UPSERT po `(source, external_attempt_id)` znači da ponovljena predaja ne
+        pravi drugi pokušaj, a `COALESCE` na `completed_at` čuva PRVO vrijeme
+        završetka umjesto da ga pomjera pri svakoj ponovljenoj isporuci."""
+        with self._lock:
+            try:
+                conn = self._connection()
+                conn.execute(
+                    "INSERT INTO assessment_attempts "
+                    "(student_id, source, assessment_type, external_attempt_id, "
+                    " grade, area_name, score_percent, correct_count, total_count, "
+                    " completed_at) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+                    "ON CONFLICT (source, external_attempt_id) DO UPDATE SET "
+                    "  score_percent = excluded.score_percent, "
+                    "  correct_count = excluded.correct_count, "
+                    "  total_count   = excluded.total_count, "
+                    "  grade         = COALESCE(assessment_attempts.grade, excluded.grade), "
+                    "  area_name     = COALESCE(assessment_attempts.area_name, "
+                    "                           excluded.area_name), "
+                    "  completed_at  = COALESCE(assessment_attempts.completed_at, "
+                    "                           excluded.completed_at)",
+                    (int(student_id), SOURCE, attempt["assessment_type"],
+                     attempt["external_attempt_id"], attempt.get("grade"),
+                     attempt.get("area_name") or None, attempt.get("score_percent"),
+                     attempt.get("correct_count"), attempt.get("total_count"),
+                     attempt.get("completed_at")),
+                )
+                # `lastrowid` se NE čita: izmjereno na libsql 0.1.11, na
+                # konfliktnoj grani ostaje zatečena tuđa vrijednost. Jedini
+                # pouzdan put do ID-ja je čitanje po prirodnom ključu.
+                found = _rows(conn.execute(
+                    "SELECT id FROM assessment_attempts "
+                    "WHERE source = ? AND external_attempt_id = ?",
+                    (SOURCE, attempt["external_attempt_id"])))
+                if not found:
+                    raise ReportingUnavailable("assessment_attempt_unresolved")
+                attempt_id = found[0][0]
+
+                for item in items or ():
+                    conn.execute(
+                        "INSERT INTO assessment_item_results "
+                        "(attempt_id, item_key, ordinal, area_name, lesson_id, "
+                        " lesson_name, difficulty, is_correct, hints_used) "
+                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0) "
+                        "ON CONFLICT (attempt_id, item_key) DO NOTHING",
+                        (attempt_id, item["item_key"], item.get("ordinal"),
+                         item.get("area_name") or None, item.get("lesson_id") or None,
+                         item.get("lesson_name") or None,
+                         item.get("difficulty") or None,
+                         1 if item.get("is_correct") else 0),
+                    )
+                conn.commit()
+                return attempt_id
+            except ReportingUnavailable:
+                self._safe_rollback()
+                self._drop_connection()
+                raise
+            except Exception as exc:
+                self._safe_rollback()
+                self._drop_connection()
+                raise ReportingUnavailable(
+                    "assessment_completed_failed:" + type(exc).__name__, exc) from None
+
     def check(self):
         """SAMO ČITANJE — dijagnostika za CLI (Dio 11). Nikad ne piše, nikad ne
         migrira i nikad ne vraća URL ni token.
@@ -337,7 +519,9 @@ class ReportingDatabase:
                     "columns": {},
                     "error": None,
                 }
-                for table in ("students", "student_accounts", "schema_migrations"):
+                for table in ("students", "student_accounts", "schema_migrations",
+                              "learning_activity", "assessment_attempts",
+                              "assessment_item_results"):
                     if table in tables:
                         report["columns"][table] = [
                             row[1] for row in _rows(conn.execute(f"PRAGMA table_info({table})"))
@@ -431,6 +615,42 @@ _database_lock = threading.Lock()
 _inflight = None
 _inflight_limit = None
 
+# --- KEŠ RAZRIJEŠENOG IDENTITETA -------------------------------------------
+# IZMJERENI RAZLOG (Faza 2): `resolve_student` je SINHRON — turn ga čeka jer mu
+# treba `students.id` da bi događaji dobili vlasnika. Dok baza radi, to je jedan
+# brz upit; kad Turso VISI, svaki identifikovan turn plaća pun rok od
+# `REPORTING_DB_TIMEOUT_S` (2 s), i to iznova. Izmjereno na zaglavljenoj bazi:
+# turn je trajao 2,02 s umjesto ~0 s.
+#
+# Mapiranje (provider, external_user_id) -> students.id je NEPROMJENJIVO: red u
+# `student_accounts` se nikad ne prevezuje na drugog učenika. Zato se smije
+# keširati u procesu, i tada se cijena plaća NAJVIŠE JEDNOM po učeniku po
+# procesu umjesto na svakom turnu.
+#
+# Granica je tvrda (`_IDENTITY_CACHE_MAX`) da keš ne raste neograničeno — isti
+# princip kao `MAX_SESSIONS_IN_MEMORY`. Prazni se pri svakoj zamjeni baze
+# (`set_database`), jer druga baza znači i druge ID-jeve.
+_IDENTITY_CACHE_MAX = 2000
+_identity_cache = {}
+
+
+def _identity_cache_get(provider, external_user_id):
+    with _database_lock:
+        return _identity_cache.get((provider, external_user_id))
+
+
+def _identity_cache_put(provider, external_user_id, student_id):
+    with _database_lock:
+        if len(_identity_cache) >= _IDENTITY_CACHE_MAX:
+            # Jednostavno FIFO odbacivanje — keš je ubrzanje, ne evidencija.
+            _identity_cache.pop(next(iter(_identity_cache)), None)
+        _identity_cache[(provider, external_user_id)] = student_id
+
+
+def clear_identity_cache():
+    with _database_lock:
+        _identity_cache.clear()
+
 
 def get_database():
     global _database
@@ -447,6 +667,8 @@ def set_database(database):
         if _database is not None and _database is not database:
             _database.close()
         _database = database
+        # Druga baza = drugi ID-jevi. Keš iz prethodne baze bi bio pogrešan.
+        _identity_cache.clear()
 
 
 def shutdown():
@@ -458,6 +680,7 @@ def shutdown():
             _database.close()
         _inflight = None
         _inflight_limit = None
+        _identity_cache.clear()
 
 
 def _get_inflight():
@@ -543,12 +766,25 @@ def resolve_student(provider, external_user_id, display_name=None, grade=None,
         logger.info("student_resolution_failed code=invalid_provider")
         return None
 
+    try:
+        external = _clean_external_id(external_user_id)
+    except ReportingUnavailable:
+        logger.info("student_resolution_failed code=invalid_external_user_id")
+        return None
+
+    cached = _identity_cache_get(provider_code, external)
+    if cached is not None:
+        # Nema mreže, nema niti, nema roka — najčešći slučaj poslije prvog turna.
+        return cached
+
     ok, value = _call_bounded(
         lambda: target.get_or_create_student(provider, external_user_id,
                                              display_name=display_name, grade=grade),
         config.REPORTING_DB_TIMEOUT_S,
     )
     if ok:
+        if value:
+            _identity_cache_put(provider_code, external, value)
         return value
     # Log nosi SAMO kod, provajder i nepovratan otisak — nikad ime, nikad ID,
     # nikad token ni URL.
@@ -569,6 +805,157 @@ def touch_last_seen(student_id, provider=None, external_user_id=None, database=N
     if ok:
         return bool(value)
     logger.info("reporting_db_unavailable code=%s operation=touch_last_seen", value)
+    return False
+
+
+def _run_detached(operation, label):
+    """Pokreni izvještajni upis NA STRANU i odmah se vrati. Nikad ne baca.
+
+    JEDAN mehanizam za sve asinhrone upise (događaji učenja, generisan test,
+    ocijenjen test) — tri kopije iste petlje bi se razišle. Ograničenja su ista
+    kao svuda u modulu: najviše `REPORTING_DB_MAX_INFLIGHT` niti, semafor se
+    uzima NEBLOKIRAJUĆE (preopterećenje se odbacuje, ne staje u red), niti su
+    `daemon` pa zaglavljen upis ne drži gašenje procesa, i nema retryja.
+
+    Vraća `True` samo ako je posao stvarno predat niti."""
+    inflight = _get_inflight()
+    if not inflight.acquire(blocking=False):
+        logger.info("reporting_db_unavailable code=reporting_db_busy operation=%s", label)
+        return False
+
+    def runner():
+        try:
+            operation()
+        except ReportingUnavailable as exc:
+            logger.info("%s_failed code=%s", label, exc.code)
+        except Exception as exc:
+            logger.info("%s_failed code=%s", label, "unexpected:" + type(exc).__name__)
+        finally:
+            inflight.release()
+
+    threading.Thread(target=runner, name="matbot-reporting", daemon=True).start()
+    return True
+
+
+def record_activity(student_id, events, database=None):
+    """SIGURAN ulaz za događaje učenja. Nikad ne baca i — kritično — NIKAD NE ČEKA.
+
+    ZAŠTO JE OVAJ POZIV ASINHRON, ZA RAZLIKU OD `resolve_student`: razrješenje
+    identiteta se dešava JEDNOM po turnu i njegov rezultat treba ostatku turna,
+    pa se na njega smije kratko čekati. Događaji učenja ne trebaju NIKOME u tom
+    zahtjevu — oni su čisto izvještajni. Sinhroni upis bi svakom turnu dodao
+    mrežni put do Turso servera bez ijedne koristi za učenika.
+
+    PRIHVAĆEN KOMPROMIS TRAJNOSTI: događaj predat niti koja još nije završila se
+    GUBI ako se proces sruši ili restartuje (deploy). Za MVP je to svjesno
+    izabrano — dostupnost tutora je važnija od garantovane isporuke jednog
+    analitičkog događaja, a mjesečni izvještaj mjeri navike kroz sedmice, gdje
+    izgubljen pojedinačan događaj ne mijenja zaključak. Ako to jednom postane
+    nedovoljno, lijek je perzistentan red PRIJE mreže, ne čekanje u zahtjevu."""
+    if not events or not student_id:
+        return False
+    if not config.reporting_db_configured() and database is None:
+        return False
+    target = database or get_database()
+    return _run_detached(
+        lambda: target.record_learning_activity(student_id, events),
+        "activity_write")
+
+
+ASSESSMENT_GENERATED = "generated"
+ASSESSMENT_COMPLETED = "completed"
+
+
+def record_turn(student_id, events=None, assessment=None, database=None):
+    """JEDAN odvojen posao po zahtjevu: događaji učenja + (opciono) procjena.
+
+    ZAŠTO SPOJENO, A NE DVA POZIVA — IZMJERENO: dok su upis aktivnosti i upis
+    procjene bili dva `_run_detached` posla, jedan zahtjev je tražio DVA slota
+    semafora. Pod opterećenjem (puna testna svita) prvi bi uzeo slot, a drugi
+    pao na `reporting_db_busy` — i to je u praksi značilo da se ODBACI baš upis
+    procjene, dakle autoritativan rezultat kontrolnog, dok je sporedni događaj
+    aktivnosti prošao. Odbacivanje pod opterećenjem je namjerno, ali mora
+    pogoditi CIJELI zahtjev ili ništa, nikad polovinu koja više vrijedi.
+
+    Dva upisa unutar posla imaju ODVOJEN `try`: pad aktivnosti ne smije spriječiti
+    upis procjene, ni obrnuto. Nijedan ne baca prema pozivaocu."""
+    if not student_id or (not events and not assessment):
+        return False
+    if not config.reporting_db_configured() and database is None:
+        return False
+    target = database or get_database()
+
+    def work():
+        if events:
+            try:
+                target.record_learning_activity(student_id, events)
+            except ReportingUnavailable as exc:
+                logger.info("activity_write_failed code=%s", exc.code)
+            except Exception as exc:
+                logger.info("activity_write_failed code=unexpected:%s",
+                            type(exc).__name__)
+        if assessment:
+            kind = assessment.get("kind")
+            try:
+                if kind == ASSESSMENT_GENERATED:
+                    target.record_assessment_generated(
+                        student_id, assessment["attempt"])
+                elif kind == ASSESSMENT_COMPLETED:
+                    target.record_assessment_completed(
+                        student_id, assessment["attempt"],
+                        assessment.get("items"))
+            except ReportingUnavailable as exc:
+                logger.info("assessment_%s_failed code=%s", kind, exc.code)
+            except Exception as exc:
+                logger.info("assessment_%s_failed code=unexpected:%s",
+                            kind, type(exc).__name__)
+
+    return _run_detached(work, "reporting_write")
+
+
+def wait_for_pending_writes(timeout=5.0):
+    """Cekaj da svi odvojeni izvjestajni upisi zavrse. Vraca True ako jesu.
+
+    POSTOJI ZBOG IZMJERENE POJAVE: odvojene niti su `daemon` i prezive kraj
+    zahtjeva (i kraj testa). U punoj testnoj sviti su zaostale niti dva puta
+    oborile TUDJE testove - jednom utrku identiteta nad datotecnom bazom
+    (SQLITE_BUSY), jednom vremenski osjetljiv tutorski test. Nije rijec o gresci
+    u produkcijskoj logici nego o curenju resursa preko granice testa.
+
+    Mehanizam je namjerno trivijalan: pokusaj zauzeti SVE slotove semafora. Kad
+    uspije, po definiciji nijedan upis nije u letu. Nista se ne prekida i
+    nijedan upis se ne gubi - samo se ceka.
+
+    Za testove i uredno gasenje; zahtjevni put ovo NIKAD ne zove."""
+    inflight = _get_inflight()
+    limit = max(1, _inflight_limit or config.REPORTING_DB_MAX_INFLIGHT)
+    acquired = 0
+    deadline = time.monotonic() + timeout
+    while acquired < limit and time.monotonic() < deadline:
+        if inflight.acquire(blocking=False):
+            acquired += 1
+        else:
+            time.sleep(0.01)
+    for _ in range(acquired):
+        inflight.release()
+    return acquired == limit
+
+
+def record_activity_blocking(student_id, events, database=None):
+    """Isti upis, ali se ČEKA na ishod. Postoji SAMO za testove i dijagnostiku —
+    nijedan zahtjevni put ga ne smije zvati, jer bi vratio mrežni put u turn."""
+    if not events or not student_id:
+        return False
+    if not config.reporting_db_configured() and database is None:
+        return False
+    target = database or get_database()
+    ok, value = _call_bounded(
+        lambda: target.record_learning_activity(student_id, events),
+        config.REPORTING_DB_TIMEOUT_S,
+    )
+    if ok:
+        return True
+    logger.info("activity_write_failed code=%s", value)
     return False
 
 
