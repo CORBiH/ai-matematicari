@@ -494,6 +494,313 @@ class ReportingDatabase:
                 raise ReportingUnavailable(
                     "assessment_completed_failed:" + type(exc).__name__, exc) from None
 
+    def find_student(self, provider, external_user_id):
+        """`students.id` za postojeci nalog, ili `None`. NE KREIRA nista.
+
+        Postoji da uvoz moze razlikovati NOV od POSTOJECEG ucenika bez drugog
+        upisa: `get_or_create_student` sam ne kaze koji je slucaj bio."""
+        with self._lock:
+            try:
+                conn = self._connection()
+                return self._lookup(conn, _clean_provider(provider),
+                                    _clean_external_id(external_user_id))
+            except ReportingUnavailable:
+                self._drop_connection()
+                raise
+            except Exception as exc:
+                self._drop_connection()
+                raise ReportingUnavailable(
+                    "student_lookup_failed:" + type(exc).__name__, exc) from None
+
+    # --- FAZA 3A: Thinkific snimci napretka --------------------------------
+    def update_student_profile(self, student_id, display_name=None, grade=None):
+        """Konzervativno dopuni PROFIL. Vrati `(name_set, grade_set, grade_conflict)`.
+
+        PROFIL NIJE IDENTITET. `students.display_name` i `students.grade` su
+        pogodnost za izvještaj; identitet je i dalje isključivo
+        `student_accounts(provider, external_user_id)`.
+
+        PRAVILA (Dio 7 i 8):
+          • ime se upisuje SAMO ako je novo neprazno i staro je prazno/NULL —
+            prazno ime iz izvoza nikad ne smije obrisati korisnu vrijednost;
+          • razred se upisuje samo kad je stari NULL;
+          • RAZLIČIT razred se NE prepisuje tiho nego se prijavi kao sukob za
+            administratora. Učenik koji je promijenio razred ili je greškom
+            uvezen u pogrešan slot mora se vidjeti, a ne tiho izmijeniti."""
+        with self._lock:
+            try:
+                conn = self._connection()
+                rows = _rows(conn.execute(
+                    "SELECT display_name, grade FROM students WHERE id = ?",
+                    (int(student_id),)))
+                if not rows:
+                    raise ReportingUnavailable("student_missing")
+                existing_name, existing_grade = rows[0][0], rows[0][1]
+
+                name_set = False
+                if display_name and not (existing_name or "").strip():
+                    conn.execute(
+                        "UPDATE students SET display_name = ?, "
+                        "updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                        (display_name, int(student_id)))
+                    name_set = True
+
+                grade_set = False
+                grade_conflict = False
+                if grade is not None:
+                    if existing_grade is None:
+                        conn.execute(
+                            "UPDATE students SET grade = ?, "
+                            "updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                            (int(grade), int(student_id)))
+                        grade_set = True
+                    elif int(existing_grade) != int(grade):
+                        grade_conflict = True
+                conn.commit()
+                return name_set, grade_set, grade_conflict
+            except ReportingUnavailable:
+                self._safe_rollback()
+                self._drop_connection()
+                raise
+            except Exception as exc:
+                self._safe_rollback()
+                self._drop_connection()
+                raise ReportingUnavailable(
+                    "profile_update_failed:" + type(exc).__name__, exc) from None
+
+    def record_progress_import(self, *, report_month, course_key, course_name,
+                               grade, source_sha256, row_count):
+        """Revizijski red o UČITANOM FAJLU. Vraća `import_id`.
+
+        Pamti se SAMO hash bajtova, nikad sam CSV: fajl je ulazni materijal, a
+        ne podatak koji izvještaj treba."""
+        with self._lock:
+            try:
+                conn = self._connection()
+                cursor = conn.execute(
+                    "INSERT INTO thinkific_progress_imports "
+                    "(report_month, course_key, course_name, grade, source_sha256, "
+                    " row_count) VALUES (?, ?, ?, ?, ?, ?)",
+                    (report_month, course_key, course_name, int(grade),
+                     source_sha256, int(row_count)))
+                import_id = cursor.lastrowid
+                conn.commit()
+                return import_id
+            except Exception as exc:
+                self._safe_rollback()
+                self._drop_connection()
+                raise ReportingUnavailable(
+                    "progress_import_failed:" + type(exc).__name__, exc) from None
+
+    def upsert_progress_snapshot(self, *, import_id, student_id, report_month,
+                                 course_key, course_name, grade, percent_viewed,
+                                 percent_completed, started_at, completed_at,
+                                 activated_at, expires_at, last_sign_in, sections):
+        """Jedno STANJE po (učenik, kurs, mjesec) + njegove sekcije. ATOMIČNO.
+
+        Vraća `("inserted"|"updated", snapshot_id, broj_sekcija)`.
+
+        IDEMPOTENTNOST JE NA STANJU, NE NA HASHU (Dio 14): ključ je
+        `UNIQUE(student_id, course_key, report_month)`. Isti fajl dva puta ne
+        pravi drugi red; NOVIJI izvoz ISTOG mjeseca deterministički prepisuje
+        stanje, jer je mjesečni izvještaj slika najsvježijeg poznatog napretka.
+
+        SEKCIJE SE ZAMJENJUJU U CJELINI, ne spajaju: kurikulum se mijenja
+        (sekcija se doda ili ukloni), pa bi spajanje ostavilo duhove sekcija
+        kojih u kursu više nema. Brisanje + upis idu u ISTOJ transakciji sa
+        snimkom, pa pad usred zamjene vraća prethodno valjano stanje umjesto da
+        ostavi test bez sekcija."""
+        with self._lock:
+            try:
+                conn = self._connection()
+                existing = _rows(conn.execute(
+                    "SELECT id FROM thinkific_progress_snapshots "
+                    "WHERE student_id = ? AND course_key = ? AND report_month = ?",
+                    (int(student_id), course_key, report_month)))
+                outcome = "updated" if existing else "inserted"
+
+                conn.execute(
+                    "INSERT INTO thinkific_progress_snapshots "
+                    "(import_id, student_id, report_month, course_key, course_name, "
+                    " grade, percent_viewed, percent_completed, started_at, "
+                    " completed_at, activated_at, expires_at, last_sign_in) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+                    "ON CONFLICT (student_id, course_key, report_month) DO UPDATE SET "
+                    "  import_id = excluded.import_id, "
+                    "  course_name = excluded.course_name, "
+                    "  grade = excluded.grade, "
+                    "  percent_viewed = excluded.percent_viewed, "
+                    "  percent_completed = excluded.percent_completed, "
+                    "  started_at = excluded.started_at, "
+                    "  completed_at = excluded.completed_at, "
+                    "  activated_at = excluded.activated_at, "
+                    "  expires_at = excluded.expires_at, "
+                    "  last_sign_in = excluded.last_sign_in",
+                    (int(import_id), int(student_id), report_month, course_key,
+                     course_name, int(grade), percent_viewed, percent_completed,
+                     started_at, completed_at, activated_at, expires_at, last_sign_in))
+
+                found = _rows(conn.execute(
+                    "SELECT id FROM thinkific_progress_snapshots "
+                    "WHERE student_id = ? AND course_key = ? AND report_month = ?",
+                    (int(student_id), course_key, report_month)))
+                if not found:
+                    raise ReportingUnavailable("snapshot_unresolved")
+                snapshot_id = found[0][0]
+
+                conn.execute(
+                    "DELETE FROM thinkific_progress_sections WHERE snapshot_id = ?",
+                    (snapshot_id,))
+                written = 0
+                for ordinal, name, percent in sections or ():
+                    conn.execute(
+                        "INSERT INTO thinkific_progress_sections "
+                        "(snapshot_id, ordinal, section_name, progress_percent) "
+                        "VALUES (?, ?, ?, ?)",
+                        (snapshot_id, ordinal, name, percent))
+                    written += 1
+                conn.commit()
+                return outcome, snapshot_id, written
+            except ReportingUnavailable:
+                self._safe_rollback()
+                self._drop_connection()
+                raise
+            except Exception as exc:
+                self._safe_rollback()
+                self._drop_connection()
+                raise ReportingUnavailable(
+                    "snapshot_upsert_failed:" + type(exc).__name__, exc) from None
+
+    # --- ČITANJE (izvještajni model) ---------------------------------------
+    def fetch_progress_snapshot(self, student_id, report_month, course_key=None):
+        """Snimak + sekcije za jedan mjesec, ili `None`."""
+        with self._lock:
+            try:
+                conn = self._connection()
+                sql = ("SELECT id, course_key, course_name, grade, percent_viewed, "
+                       "percent_completed, started_at, completed_at, activated_at, "
+                       "expires_at, last_sign_in FROM thinkific_progress_snapshots "
+                       "WHERE student_id = ? AND report_month = ?")
+                params = [int(student_id), report_month]
+                if course_key:
+                    sql += " AND course_key = ?"
+                    params.append(course_key)
+                sql += " ORDER BY id DESC LIMIT 1"
+                rows = _rows(conn.execute(sql, tuple(params)))
+                if not rows:
+                    return None
+                row = rows[0]
+                sections = _rows(conn.execute(
+                    "SELECT ordinal, section_name, progress_percent "
+                    "FROM thinkific_progress_sections WHERE snapshot_id = ? "
+                    "ORDER BY ordinal, id", (row[0],)))
+                return {
+                    "snapshot_id": row[0], "course_key": row[1], "course_name": row[2],
+                    "grade": row[3], "percent_viewed": row[4],
+                    "percent_completed": row[5], "started_at": row[6],
+                    "completed_at": row[7], "activated_at": row[8],
+                    "expires_at": row[9], "last_sign_in": row[10],
+                    "sections": [{"ordinal": s[0], "section_name": s[1],
+                                  "progress_percent": s[2]} for s in sections],
+                }
+            except ReportingUnavailable:
+                self._drop_connection()
+                raise
+            except Exception as exc:
+                self._drop_connection()
+                raise ReportingUnavailable(
+                    "snapshot_read_failed:" + type(exc).__name__, exc) from None
+
+    def fetch_student_profile(self, student_id):
+        with self._lock:
+            try:
+                conn = self._connection()
+                rows = _rows(conn.execute(
+                    "SELECT display_name, grade FROM students WHERE id = ?",
+                    (int(student_id),)))
+                if not rows:
+                    return None
+                return {"display_name": rows[0][0], "grade": rows[0][1]}
+            except Exception as exc:
+                self._drop_connection()
+                raise ReportingUnavailable(
+                    "profile_read_failed:" + type(exc).__name__, exc) from None
+
+    def fetch_matbot_month(self, student_id, month_start, next_month_start):
+        """Determinističke MAT-BOT brojke za mjesec. Granice su UTC, [start, next).
+
+        Sve dolazi iz Faze 2: `learning_activity` za brojanje i `assessment_*`
+        za rezultate kontrolnih. Nijedan broj se ne procjenjuje."""
+        with self._lock:
+            try:
+                conn = self._connection()
+                counts = dict(_rows(conn.execute(
+                    "SELECT event_type, COUNT(*) FROM learning_activity "
+                    "WHERE student_id = ? AND source = ? "
+                    "AND occurred_at >= ? AND occurred_at < ? GROUP BY event_type",
+                    (int(student_id), SOURCE, month_start, next_month_start))))
+                active_days = _rows(conn.execute(
+                    "SELECT COUNT(DISTINCT date(occurred_at)) FROM learning_activity "
+                    "WHERE student_id = ? AND source = ? "
+                    "AND occurred_at >= ? AND occurred_at < ?",
+                    (int(student_id), SOURCE, month_start, next_month_start)))[0][0]
+                exams = _rows(conn.execute(
+                    "SELECT COUNT(*), AVG(score_percent), SUM(correct_count), "
+                    "SUM(total_count) FROM assessment_attempts "
+                    "WHERE student_id = ? AND source = ? AND completed_at IS NOT NULL "
+                    "AND completed_at >= ? AND completed_at < ?",
+                    (int(student_id), SOURCE, month_start, next_month_start)))[0]
+                outcomes = _rows(conn.execute(
+                    "SELECT i.lesson_id, i.lesson_name, i.area_name, i.difficulty, "
+                    "       SUM(CASE WHEN i.is_correct = 0 THEN 1 ELSE 0 END), "
+                    "       COUNT(*) "
+                    "FROM assessment_item_results i "
+                    "JOIN assessment_attempts a ON a.id = i.attempt_id "
+                    "WHERE a.student_id = ? AND a.source = ? "
+                    "AND a.completed_at IS NOT NULL "
+                    "AND a.completed_at >= ? AND a.completed_at < ? "
+                    "AND i.lesson_id IS NOT NULL "
+                    "GROUP BY i.lesson_id, i.lesson_name, i.area_name, i.difficulty "
+                    "ORDER BY 5 DESC, i.lesson_id",
+                    (int(student_id), SOURCE, month_start, next_month_start)))
+                return {"counts": counts, "active_days": active_days,
+                        "exams": exams, "lesson_outcomes": outcomes}
+            except ReportingUnavailable:
+                self._drop_connection()
+                raise
+            except Exception as exc:
+                self._drop_connection()
+                raise ReportingUnavailable(
+                    "matbot_month_read_failed:" + type(exc).__name__, exc) from None
+
+    def fetch_report_population(self, month_start, next_month_start, report_month):
+        """UNIJA učenika koji zaslužuju izvještaj (Dio 23): oni sa Thinkific
+        snimkom TOG mjeseca I oni sa pripisanom MAT-BOT aktivnošću tog mjeseca.
+
+        Nijedna grupa se ne ispušta: učenik koji ne koristi MAT-BOT i dalje ima
+        napredak u kursu, a učenik bez snimka i dalje ima MAT-BOT rad."""
+        with self._lock:
+            try:
+                conn = self._connection()
+                rows = _rows(conn.execute(
+                    "SELECT student_id FROM thinkific_progress_snapshots "
+                    "WHERE report_month = ? "
+                    "UNION "
+                    "SELECT student_id FROM learning_activity "
+                    "WHERE source = ? AND occurred_at >= ? AND occurred_at < ? "
+                    "UNION "
+                    "SELECT student_id FROM assessment_attempts "
+                    "WHERE source = ? AND completed_at IS NOT NULL "
+                    "AND completed_at >= ? AND completed_at < ? "
+                    "ORDER BY 1",
+                    (report_month, SOURCE, month_start, next_month_start,
+                     SOURCE, month_start, next_month_start)))
+                return [row[0] for row in rows]
+            except Exception as exc:
+                self._drop_connection()
+                raise ReportingUnavailable(
+                    "population_read_failed:" + type(exc).__name__, exc) from None
+
     def check(self):
         """SAMO ČITANJE — dijagnostika za CLI (Dio 11). Nikad ne piše, nikad ne
         migrira i nikad ne vraća URL ni token.
@@ -521,7 +828,10 @@ class ReportingDatabase:
                 }
                 for table in ("students", "student_accounts", "schema_migrations",
                               "learning_activity", "assessment_attempts",
-                              "assessment_item_results"):
+                              "assessment_item_results",
+                              "thinkific_progress_imports",
+                              "thinkific_progress_snapshots",
+                              "thinkific_progress_sections"):
                     if table in tables:
                         report["columns"][table] = [
                             row[1] for row in _rows(conn.execute(f"PRAGMA table_info({table})"))

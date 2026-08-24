@@ -58,3 +58,7 @@ scratchpad/live_product_audit_2026_08_18/
 scratchpad/ab_reasoning_effort_2026_08_18/
 scratchpad/ab_model_2026_08_18/
 scratchpad/ab_model_confirm_2026_08_18/
+# STVARNI IZVOZI IZ THINKIFICA — SADRZE PII UCENIKA (ime, prezime, e-mail).
+# Nikad ne smiju u repozitorij: testovi koriste SINTETICKE fixture oblikovane
+# po istoj strukturi (tests/fixtures/thinkific/).
+scratchpad/thinkific/
