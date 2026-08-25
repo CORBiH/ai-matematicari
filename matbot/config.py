@@ -534,4 +534,11 @@ REPORTING_DB_MAX_INFLIGHT = _int_env("MATBOT_REPORTING_DB_MAX_INFLIGHT", 2)
 
 # Očekivana verzija izvještajne šeme (`schema_migrations`). Dijagnostika je
 # poredi; aplikacija NIKAD sama ne pokreće migracije.
-REPORTING_SCHEMA_VERSION = _int_env("MATBOT_REPORTING_SCHEMA_VERSION", 1)
+#
+# ZAŠTO 2 (ispravka poslije živog incidenta): ova vrijednost je ostala na 1 i
+# nakon što je izdanje uvelo šemu v2, pa je `python -m matbot.reporting_db --check`
+# nad NEMIGRIRANOM produkcijom prijavio „schema_version: 1 (expected 1) -> OK".
+# Provjera je time tvrdila da je sve u redu upravo dok je nedostajala cijela
+# verzija 2. Broj mora pratiti `reporting_schema.CURRENT_SCHEMA_VERSION`; test
+# to i dokazuje, da dvije vrijednosti ne mogu odlutati jedna od druge.
+REPORTING_SCHEMA_VERSION = _int_env("MATBOT_REPORTING_SCHEMA_VERSION", 2)

@@ -80,7 +80,8 @@ def build_schema(path):
                                 "assessment_item_results")) and block is IDENTITY_SCHEMA:
                 continue
             conn.execute(statement)
-    conn.execute("INSERT INTO schema_migrations (version) VALUES (1)")
+    conn.execute("INSERT INTO schema_migrations (version, description) "
+                 "VALUES (1, 'Initial Matematicari reporting schema')")
     conn.commit()
     conn.close()
 

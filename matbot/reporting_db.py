@@ -846,6 +846,17 @@ class ReportingDatabase:
                         report["schema_version_error"] = type(exc).__name__
                 report["schema_version_matches"] = (
                     report["schema_version"] == config.REPORTING_SCHEMA_VERSION)
+                # STRUKTURNI DOKAZ VERZIJE 2, ne samo broj u tabeli. Zivi
+                # incident je pokazao da baza moze imati tabele bez zapisa
+                # verzije (prekinuta migracija) ili zapis bez tabela; operator
+                # mora vidjeti OBOJE iz jedne komande.
+                try:
+                    from matbot import reporting_schema
+
+                    report["v2_schema_problems"] = reporting_schema.verify_v2_schema(conn)
+                except Exception:
+                    report["v2_schema_problems"] = ["v2_verification_unavailable"]
+                report["v2_schema_verified"] = not report["v2_schema_problems"]
                 return report
             except ReportingUnavailable as exc:
                 self._drop_connection()
@@ -1304,6 +1315,10 @@ def _format_report(report):
         lines.append("schema_version_error: %s" % report["schema_version_error"])
     missing = report.get("missing_tables") or []
     lines.append("missing_tables: %s" % (", ".join(missing) if missing else "none"))
+    if "v2_schema_verified" in report:
+        problems = report.get("v2_schema_problems") or []
+        lines.append("v2_schema: %s" % ("verified" if report["v2_schema_verified"]
+                                        else "INCOMPLETE -> " + ", ".join(problems)))
     for table, columns in sorted((report.get("columns") or {}).items()):
         lines.append("columns[%s]: %s" % (table, ", ".join(columns)))
     return "\n".join(lines)

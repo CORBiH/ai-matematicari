@@ -15,6 +15,11 @@ from matbot.reporting_db import PROVIDER_THINKIFIC, ReportingDatabase, Reporting
 
 libsql = pytest.importorskip("libsql")
 
+# STVARNI PRODUKCIJSKI UGOVOR `schema_migrations` (izmjeren 2026-08-25, nakon
+# zivog incidenta): `description` je NOT NULL BEZ default-a. Ranija verzija ove
+# fixture imala je samo (version, applied_at), pa je test potvrdjivao NASU
+# PRETPOSTAVKU umjesto produkcije -- migracija je zato pukla tek na stvarnoj bazi.
+#
 # Šema je NAMJERNO ista kao produkcijska u dijelu koji ovaj modul dodiruje —
 # uključujući UNIQUE(provider, external_user_id) i strani ključ, jer se baš na
 # njih oslanja algoritam. Ostale tabele postoje da dijagnostika ima šta naći.
@@ -44,7 +49,11 @@ CREATE TABLE matbot_sessions (id INTEGER PRIMARY KEY);
 CREATE TABLE instructor_notes (id INTEGER PRIMARY KEY);
 CREATE TABLE monthly_reports (id INTEGER PRIMARY KEY);
 CREATE TABLE sync_state (id INTEGER PRIMARY KEY);
-CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT);
+CREATE TABLE schema_migrations (
+    version INTEGER PRIMARY KEY,
+    description TEXT NOT NULL,
+    applied_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 """
 
 
@@ -55,7 +64,8 @@ def db_path(tmp_path):
     for statement in SCHEMA.strip().split(";"):
         if statement.strip():
             conn.execute(statement)
-    conn.execute("INSERT INTO schema_migrations (version) VALUES (1)")
+    conn.execute("INSERT INTO schema_migrations (version, description) "
+                 "VALUES (1, 'Initial Matematicari reporting schema')")
     conn.commit()
     conn.close()
     return path
@@ -282,12 +292,20 @@ def test_foreign_keys_are_enforced_on_the_canonical_connection(database, db_path
 
 # --- 11/12) dijagnostika: konekcija, tabele, verzija šeme -------------------
 def test_check_reports_schema_version_and_tables(database):
+    """Baza na v1 se NE smije prijaviti kao ispravna.
+
+    ZIVI INCIDENT: dok je ocekivana verzija bila zakucana na 1, `--check` nad
+    NEMIGRIRANOM produkcijom je ispisivao „schema_version: 1 (expected 1) -> OK"
+    iako je cijela verzija 2 nedostajala. Provjera je tvrdila da je sve u redu
+    tacno kad nije."""
     report = database.check()
 
     assert report["connected"] is True
     assert report["missing_tables"] == []
     assert report["schema_version"] == 1
-    assert report["schema_version_matches"] is True
+    assert report["expected_schema_version"] == 2
+    assert report["schema_version_matches"] is False,         "nemigrirana baza se prijavljuje kao ispravna"
+    assert report["v2_schema_verified"] is False
     assert "display_name" in report["columns"]["students"]
     assert "external_user_id" in report["columns"]["student_accounts"]
 
@@ -321,15 +339,17 @@ def test_cli_check_returns_nonzero_when_not_configured(monkeypatch, capsys):
     assert "reporting_db_not_configured" in out
 
 
-def test_cli_check_reports_healthy_database(monkeypatch, database, capsys):
+def test_cli_check_refuses_an_unmigrated_v1_database(monkeypatch, database, capsys):
     monkeypatch.setenv("TURSO_DATABASE_URL", "libsql://example.invalid")
     monkeypatch.setenv("TURSO_AUTH_TOKEN", "unused-because-database-is-injected")
     reporting_db.set_database(database)
     try:
-        assert reporting_db.main(["--check"]) == 0
+        assert reporting_db.main(["--check"]) == 1, "v1 baza ne smije proci kao OK"
     finally:
         reporting_db.set_database(None)
     out = capsys.readouterr().out
     assert "connection: ok" in out
     assert "foreign_keys: ON" in out
-    assert "schema_version: 1 (expected 1) -> OK" in out
+    # v1 baza NIJE zdrava za ovo izdanje -- CLI to mora reci i vratiti != 0.
+    assert "schema_version: 1 (expected 2) -> MISMATCH" in out
+    assert "v2_schema: INCOMPLETE" in out

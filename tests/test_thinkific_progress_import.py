@@ -44,7 +44,8 @@ def build_v1(path):
                                  "assessment_item_results")):
                 continue
             conn.execute(statement)
-    conn.execute("INSERT INTO schema_migrations (version) VALUES (1)")
+    conn.execute("INSERT INTO schema_migrations (version, description) "
+                 "VALUES (1, 'Initial Matematicari reporting schema')")
     conn.commit()
     conn.close()
 

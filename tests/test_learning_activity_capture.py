@@ -63,7 +63,8 @@ def reporting(tmp_path, monkeypatch):
     for statement in ACTIVITY_SCHEMA.strip().split(";"):
         if statement.strip():
             conn.execute(statement)
-    conn.execute("INSERT INTO schema_migrations (version) VALUES (1)")
+    conn.execute("INSERT INTO schema_migrations (version, description) "
+                 "VALUES (1, 'Initial Matematicari reporting schema')")
     conn.commit()
     conn.close()
 
