@@ -1,0 +1,64 @@
+{# Zajednicki okvir administratorskih stranica.
+   Dizajn slijedi postojeci MAT-BOT jezik (tamna paleta, iste boje i radijusi iz
+   templates/index.html) - bez ijednog vanjskog frameworka, jer ga aplikacija
+   nigdje ne koristi. #}
+<!doctype html>
+<html lang="bs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>{% block title %}MAT-BOT — Izvještaji{% endblock %}</title>
+<style>
+  :root{
+    --page-bg:#070b0e; --card-bg:#0d1418; --card-border:rgba(138,168,160,.20);
+    --text:#eef6f3; --muted:#9caeaa; --accent:#56c88f; --btn-bg:#1f6f5c;
+    --btn-bg-hover:#28846d; --input-bg:#10181d; --input-border:#26373d;
+    --danger:#d06262; --warn:#d8a657; --ok:#56c88f;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--page-bg);color:var(--text);
+       font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:1.2rem}
+  .wrap{max-width:960px;margin:0 auto}
+  h1{font-size:1.35rem;margin:.2rem 0 1.2rem}
+  h2{font-size:1.05rem;margin:1.6rem 0 .6rem;color:var(--accent)}
+  h3{font-size:.95rem;margin:1.1rem 0 .4rem}
+  .card{background:var(--card-bg);border:1px solid var(--card-border);
+        border-radius:14px;padding:1.1rem 1.2rem;margin-bottom:1rem}
+  label{display:block;font-size:.85rem;color:var(--muted);margin:.7rem 0 .25rem}
+  input[type=month],input[type=password],input[type=file]{
+    width:100%;background:var(--input-bg);color:var(--text);
+    border:1px solid var(--input-border);border-radius:10px;padding:.55rem .7rem;font:inherit}
+  button{background:var(--btn-bg);color:#fff;border:0;border-radius:10px;
+         padding:.65rem 1.1rem;font:inherit;font-weight:600;cursor:pointer;margin-top:1rem}
+  button:hover{background:var(--btn-bg-hover)}
+  button[disabled]{opacity:.55;cursor:progress}
+  a{color:var(--accent)}
+  .muted{color:var(--muted)}
+  .grid{display:grid;gap:.7rem;grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
+  table{width:100%;border-collapse:collapse;margin-top:.6rem;font-size:.9rem}
+  th,td{text-align:left;padding:.45rem .5rem;border-bottom:1px solid var(--card-border)}
+  th{color:var(--muted);font-weight:600;font-size:.8rem}
+  .banner{border-radius:10px;padding:.7rem .9rem;margin-bottom:1rem;font-size:.92rem}
+  .banner.ok{background:rgba(86,200,143,.12);border:1px solid var(--ok)}
+  .banner.warn{background:rgba(216,166,87,.12);border:1px solid var(--warn)}
+  .banner.err{background:rgba(208,98,98,.12);border:1px solid var(--danger)}
+  .pill{display:inline-block;border-radius:999px;padding:.1rem .55rem;font-size:.78rem;
+        border:1px solid var(--card-border);color:var(--muted)}
+  .stat{background:var(--input-bg);border:1px solid var(--input-border);
+        border-radius:10px;padding:.55rem .7rem}
+  .stat b{display:block;font-size:1.15rem}
+  .top{display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap}
+  @media (max-width:640px){body{padding:.7rem}.card{padding:.9rem}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <h1>{% block heading %}MAT-BOT — Mjesečni izvještaji{% endblock %}</h1>
+    {% block topright %}{% endblock %}
+  </div>
+  {% block content %}{% endblock %}
+</div>
+</body>
+</html>

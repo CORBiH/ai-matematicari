@@ -5,7 +5,8 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 import logging
 import os
 
-from matbot import auth, config, release_config, student_identity
+from matbot import admin_auth, auth, config, release_config, student_identity
+from matbot.admin_reports import admin_reports_bp
 from matbot.api import REQUEST_TOO_LARGE_MESSAGE, ai_tutor_bp
 from matbot.request_limits import BoundedInMemoryRequest
 from matbot.topics import topics_response
@@ -56,6 +57,14 @@ app.request_class = BoundedInMemoryRequest
 app.config["MAX_CONTENT_LENGTH"] = config.MAX_REQUEST_BYTES
 
 app.register_blueprint(ai_tutor_bp)
+
+# PRIVATNA administratorska stranica mjesecnih izvjestaja (Faza 3B).
+# Potpuno odvojen blueprint: ne dijeli stanje ni put izvrsavanja s tutorskim
+# rutama, pa njegov kvar ne moze promijeniti Practice, Explain, Quick ni
+# Kontrolni. Bez `MATBOT_ADMIN_PASSWORD` sve njene rute vracaju 404 -- stranica
+# se tada ponasa kao da ne postoji.
+admin_auth.apply_cookie_hardening(app)
+app.register_blueprint(admin_reports_bp)
 
 
 @app.errorhandler(RequestEntityTooLarge)

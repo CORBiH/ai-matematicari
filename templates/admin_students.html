@@ -1,0 +1,46 @@
+{% extends "admin_base.html" %}
+{% block heading %}Učenici za izvještaj — {{ month }}{% endblock %}
+{% block topright %}<a href="{{ url_for('admin_reports.index') }}">← Nazad</a>{% endblock %}
+{% block content %}
+{% if error %}<div class="banner err">{{ error }}</div>{% endif %}
+
+<div class="card">
+  <p class="muted" style="margin-top:0">
+    Populacija je UNIJA: učenik s Thinkific snapshotom za ovaj mjesec ILI s
+    pripisanom MAT-BOT aktivnošću. Nijedna grupa se ne ispušta.
+  </p>
+  <p><strong>Učenici za izvještaj: {{ rows|length }}</strong></p>
+
+  {% if rows %}
+  <table>
+    <tr>
+      <th>Učenik</th><th>Razred</th><th>Thinkific</th><th>Završeno</th>
+      <th>MAT-BOT</th><th>Kontrolni</th><th></th>
+    </tr>
+    {% for r in rows %}
+    <tr>
+      {# IDENTITET: ime ili neutralna oznaka. E-mail se NIKAD ne prikazuje. #}
+      <td>{{ r.label }}</td>
+      <td>{% if r.grade %}{{ r.grade }}. razred{% else %}<span class="muted">—</span>{% endif %}</td>
+      <td>
+        {% if r.has_snapshot %}<span class="pill" style="color:var(--ok)">dostupno</span>
+        {% else %}<span class="pill">nije importovano</span>{% endif %}
+      </td>
+      <td>
+        {% if r.percent_completed is not none %}{{ '%g' % r.percent_completed }}%
+          {% if r.delta_percent_completed is not none %}
+            <span class="muted">({{ '%+g' % r.delta_percent_completed }})</span>
+          {% endif %}
+        {% else %}<span class="muted">—</span>{% endif %}
+      </td>
+      <td>{{ r.practice_tasks }} zadataka</td>
+      <td>{{ r.kontrolni_attempts }}</td>
+      <td><a href="{{ url_for('admin_reports.student_preview', student_id=r.student_id, month=month) }}">Pregled →</a></td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="muted">Za ovaj mjesec nema nijednog učenika ni u Thinkific snapshotima ni u MAT-BOT aktivnosti.</p>
+  {% endif %}
+</div>
+{% endblock %}

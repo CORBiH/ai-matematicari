@@ -1,0 +1,141 @@
+{% extends "admin_base.html" %}
+{% block topright %}
+  <form method="post" action="{{ url_for('admin_reports.logout') }}" style="margin:0">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <button type="submit" style="margin:0;background:transparent;border:1px solid var(--card-border);color:var(--muted);font-weight:400">Odjava</button>
+  </form>
+{% endblock %}
+{% block content %}
+
+{% if schema_state != 'ready' %}
+  {# PADA ZATVORENO: uvoz se ne nudi dok baza nije na v2. Migracija je svjesna
+     operacija pri deployu, nikad nusproizvod uploada. #}
+  <div class="banner err">
+    <strong>Uvoz nije moguć.</strong> {{ schema_message }}
+  </div>
+{% endif %}
+
+{% if outcome %}
+  {% if outcome == 'full' %}
+    <div class="banner ok"><strong>Import potpuno uspješan.</strong></div>
+  {% elif outcome == 'partial' %}
+    <div class="banner warn"><strong>Import djelimično uspješan.</strong>
+      Neki fajlovi nisu uvezeni — pogledaj listu ispod. Uvezeni fajlovi su sačuvani.</div>
+  {% else %}
+    <div class="banner err"><strong>Import neuspješan.</strong> Ništa nije sačuvano.</div>
+  {% endif %}
+{% endif %}
+
+{% for e in errors %}
+  <div class="banner err">
+    {% if e.label %}<strong>{{ e.label }}</strong> — {% endif %}
+    {% if e.message %}{{ e.message }}
+    {% elif e.code == 'extension_not_csv' %}Fajl mora biti .csv
+    {% elif e.code == 'file_empty' %}Fajl je prazan
+    {% elif e.code == 'file_too_large' %}Fajl je prevelik
+    {% elif e.code == 'upload_total_too_large' %}Ukupan upload je prevelik
+    {% else %}{{ e.code }}{% endif %}
+  </div>
+{% endfor %}
+
+{% if summary %}
+<div class="card">
+  <h2>Rezultat importa — {{ summary.report_month }}</h2>
+  <div class="grid">
+    <div class="stat"><b>{{ summary.files_imported }}/{{ summary.files_received }}</b><span class="muted">fajlova uvezeno</span></div>
+    <div class="stat"><b>{{ summary.rows_seen }}</b><span class="muted">redova</span></div>
+    <div class="stat"><b>{{ summary.students_created }}</b><span class="muted">novih učenika</span></div>
+    <div class="stat"><b>{{ summary.students_reused }}</b><span class="muted">postojećih učenika</span></div>
+    <div class="stat"><b>{{ summary.snapshots_inserted }}</b><span class="muted">novih snapshotova</span></div>
+    <div class="stat"><b>{{ summary.snapshots_updated }}</b><span class="muted">ažuriranih snapshotova</span></div>
+    <div class="stat"><b>{{ summary.sections_written }}</b><span class="muted">sekcija</span></div>
+    <div class="stat"><b>{{ summary.grade_conflicts }}</b><span class="muted">konflikata razreda</span></div>
+  </div>
+
+  {% if summary.files %}
+  <h3>Po fajlu</h3>
+  <table>
+    <tr><th>Kurs</th><th>Status</th><th>Detalji</th></tr>
+    {% for f in summary.files %}
+    <tr>
+      <td>{{ labels.get(f.course_key, f.course_key) }}</td>
+      <td>
+        {% if f.status == 'imported' %}<span class="pill" style="color:var(--ok)">uvezeno</span>
+        {% elif f.status == 'rejected' %}<span class="pill" style="color:var(--danger)">odbijeno</span>
+        {% else %}<span class="pill" style="color:var(--warn)">greška</span>{% endif %}
+      </td>
+      <td class="muted">
+        {% if f.status == 'imported' %}{{ f.row_count }} redova
+        {% else %}
+          {% for e in summary.errors if e.course_key == f.course_key %}
+            kod: {{ e.code }}{% if e.row %}, red {{ e.row }}{% endif %}{% if e.column %}, kolona „{{ e.column }}"{% endif %}
+          {% endfor %}
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+
+  {% if summary.grade_conflicts %}
+  <div class="banner warn" style="margin-top:1rem">
+    {{ summary.grade_conflicts }} učenik/a ima profilni razred različit od uvezenog kursa.
+    Snapshot je sačuvan, profil nije automatski promijenjen.
+  </div>
+  {% endif %}
+
+  <p style="margin-top:1rem">
+    <a href="{{ url_for('admin_reports.students', month=summary.report_month) }}">Prikaži učenike za izvještaj →</a>
+  </p>
+</div>
+{% endif %}
+
+<div class="card">
+  <h2>Thinkific Student Progress</h2>
+  <form method="post" action="{{ url_for('admin_reports.import_files') }}"
+        enctype="multipart/form-data" id="importForm">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+    <label for="report_month">Mjesec izvještaja</label>
+    <input id="report_month" name="report_month" type="month" value="{{ month }}" required>
+    <p class="muted" style="font-size:.82rem;margin:.3rem 0 0">
+      Mjesec se ne izvodi iz fajla — biraš ga izričito.
+    </p>
+
+    {# CETIRI IZRICITA SLOTA. Ime fajla se NIKAD ne koristi za razred. #}
+    {% for key, label, course_name in course_fields %}
+      <label for="{{ key }}">{{ course_name }} <span class="muted">(opcionalno)</span></label>
+      <input id="{{ key }}" name="{{ key }}" type="file" accept=".csv,text/csv">
+    {% endfor %}
+
+    <button type="submit" id="importBtn"
+            {% if schema_state != 'ready' %}disabled{% endif %}>Importuj podatke</button>
+    <p class="muted" style="font-size:.82rem">
+      Bar jedan fajl je obavezan. Fajl s greškom se odbija u cijelosti; ostali razredi se svejedno uvoze.
+    </p>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Učenici</h2>
+  <form method="get" action="{{ url_for('admin_reports.students') }}">
+    <label for="month_lookup">Pogledaj učenike za mjesec</label>
+    <input id="month_lookup" name="month" type="month" value="{{ month }}" required>
+    <button type="submit">Prikaži učenike</button>
+  </form>
+</div>
+
+<script>
+/* JS je samo udobnost: sprjecava dvostruki klik i pokazuje da upload traje.
+   Ispravnost uvoza ne zavisi od njega - forma radi i bez JS-a. */
+(function(){
+  var form = document.getElementById('importForm');
+  var btn  = document.getElementById('importBtn');
+  if (!form || !btn) return;
+  form.addEventListener('submit', function(){
+    if (btn.disabled) return;
+    setTimeout(function(){ btn.disabled = true; btn.textContent = 'Importujem…'; }, 0);
+  });
+})();
+</script>
+{% endblock %}

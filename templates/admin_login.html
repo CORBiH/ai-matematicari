@@ -1,0 +1,18 @@
+{% extends "admin_base.html" %}
+{% block heading %}Prijava — Izvještaji{% endblock %}
+{% block content %}
+<div class="card" style="max-width:420px">
+  {% if error %}<div class="banner err">{{ error }}</div>{% endif %}
+  <form method="post" action="{{ url_for('admin_reports.login') }}">
+    {# CSRF token zivi u sesiji; bez njega POST se odbija. #}
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label for="password">Administratorska lozinka</label>
+    <input id="password" name="password" type="password" autocomplete="current-password"
+           required autofocus>
+    <button type="submit">Prijavi se</button>
+  </form>
+  <p class="muted" style="font-size:.82rem;margin-top:1rem">
+    Stranica sadrži podatke o učenicima i nije javna.
+  </p>
+</div>
+{% endblock %}

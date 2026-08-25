@@ -1,0 +1,111 @@
+{% extends "admin_base.html" %}
+{% block heading %}{{ label }} — {{ month }}{% endblock %}
+{% block topright %}<a href="{{ url_for('admin_reports.students', month=month) }}">← Nazad na listu</a>{% endblock %}
+{% block content %}
+{% if not payload %}
+  <div class="banner err">{{ schema_message }}</div>
+{% else %}
+{% set t = payload.thinkific %}
+{% set m = payload.matbot %}
+
+<div class="card">
+  <p class="muted" style="margin-top:0">
+    Administratorski pregled DETERMINISTIČKIH činjenica. Svaki broj je izračunao
+    SQL/Python — nema AI teksta, nema procjene.
+  </p>
+  <p><span class="pill">student_id {{ payload.student_id }}</span>
+     <span class="pill">{% if payload.profile.grade %}{{ payload.profile.grade }}. razred{% else %}razred nepoznat{% endif %}</span></p>
+</div>
+
+<div class="card">
+  <h2>Thinkific napredak</h2>
+  {% if t.snapshot_missing %}
+    {# NEDOSTAJE, ne nula. #}
+    <p class="muted">Thinkific Progress snapshot nije importovan za ovaj mjesec.</p>
+  {% else %}
+    <p class="muted" style="margin-top:0">{{ t.course_name }}</p>
+    <div class="grid">
+      <div class="stat"><b>{% if t.percent_viewed is not none %}{{ '%g' % t.percent_viewed }}%{% else %}—{% endif %}</b><span class="muted">pregledano</span></div>
+      <div class="stat"><b>{% if t.percent_completed is not none %}{{ '%g' % t.percent_completed }}%{% else %}—{% endif %}</b><span class="muted">završeno</span></div>
+      <div class="stat">
+        <b>{% if t.delta_percent_completed is not none %}{{ '%+g' % t.delta_percent_completed }} p.p.{% else %}—{% endif %}</b>
+        <span class="muted">promjena završenog</span>
+      </div>
+      <div class="stat"><b style="font-size:.9rem">{{ t.last_sign_in or '—' }}</b><span class="muted">zadnja prijava</span></div>
+    </div>
+    {% if t.previous_report_month %}
+      <p class="muted" style="font-size:.85rem">Poređeno s mjesecom {{ t.previous_report_month }}.</p>
+    {% else %}
+      <p class="muted" style="font-size:.85rem">Prethodni mjesec nije dostupan — promjena se ne može izračunati.</p>
+    {% endif %}
+
+    <h3>Sekcije kursa</h3>
+    <table>
+      <tr><th>#</th><th>Sekcija</th><th>Sada</th><th>Prošli mjesec</th><th>Promjena</th></tr>
+      {% for s in t.sections %}
+      <tr>
+        <td class="muted">{{ s.ordinal }}</td>
+        <td>{{ s.section_name }}</td>
+        <td>{% if s.current_progress_percent is not none %}{{ '%g' % s.current_progress_percent }}%{% else %}<span class="muted">—</span>{% endif %}</td>
+        <td>{% if s.previous_progress_percent is not none %}{{ '%g' % s.previous_progress_percent }}%{% else %}<span class="muted">nema podatka</span>{% endif %}</td>
+        <td>{% if s.delta_progress_percent is not none %}{{ '%+g' % s.delta_progress_percent }}{% else %}<span class="muted">—</span>{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>MAT-BOT aktivnost</h2>
+  {% if m.practice_tasks == 0 and m.explain_count == 0 and m.quick_count == 0
+        and m.kontrolni_attempts == 0 and m.active_days == 0 %}
+    <p class="muted">Nema zabilježene MAT-BOT aktivnosti u ovom mjesecu.</p>
+  {% else %}
+    <div class="grid">
+      <div class="stat"><b>{{ m.active_days }}</b><span class="muted">aktivnih dana</span></div>
+      <div class="stat"><b>{{ m.practice_tasks }}</b><span class="muted">zadataka</span></div>
+      <div class="stat"><b>{{ m.practice_correct }} / {{ m.practice_incorrect }}</b><span class="muted">tačno / netačno</span></div>
+      <div class="stat">
+        {# NULL tacnost se NIKAD ne prikazuje kao 0 %. #}
+        <b>{% if m.practice_accuracy is not none %}{{ '%g' % m.practice_accuracy }}%{% else %}—{% endif %}</b>
+        <span class="muted">{% if m.practice_accuracy is not none %}tačnost{% else %}tačnost (nema odgovora){% endif %}</span>
+      </div>
+      <div class="stat"><b>{{ m.hints_used }}</b><span class="muted">nagovještaja</span></div>
+      <div class="stat"><b>{{ m.full_solutions_shown }}</b><span class="muted">rješenja</span></div>
+      <div class="stat"><b>{{ m.explain_count }}</b><span class="muted">Objasni mi</span></div>
+      <div class="stat"><b>{{ m.quick_count }}</b><span class="muted">Samo rezultat</span></div>
+      <div class="stat"><b>{{ m.kontrolni_attempts }}</b><span class="muted">kontrolnih</span></div>
+      <div class="stat">
+        <b>{% if m.kontrolni_average is not none %}{{ '%g' % m.kontrolni_average }}%{% else %}—{% endif %}</b>
+        <span class="muted">prosjek kontrolnih</span>
+      </div>
+      <div class="stat">
+        <b>{% if m.kontrolni_total %}{{ m.kontrolni_correct }}/{{ m.kontrolni_total }}{% else %}—{% endif %}</b>
+        <span class="muted">tačnih pitanja</span>
+      </div>
+    </div>
+  {% endif %}
+
+  {% if m.lesson_outcomes %}
+  <h3>Ishodi po lekciji (iz kontrolnih)</h3>
+  <table>
+    <tr><th>Lekcija</th><th>Oblast</th><th>Težina</th><th>Netačno</th><th>Pitanja</th><th>Dokaz</th></tr>
+    {% for o in m.lesson_outcomes %}
+    <tr>
+      <td>{{ o.lesson_name or o.lesson_id }}</td>
+      <td class="muted">{{ o.area_name or '—' }}</td>
+      <td class="muted">{{ o.difficulty or '—' }}</td>
+      <td>{{ o.incorrect_items }}</td>
+      <td>{{ o.evidence_items }}</td>
+      <td>
+        {# Jedno promaseno pitanje NIJE nalaz o znanju - to se izricito kaze. #}
+        {% if o.low_evidence %}<span class="pill" style="color:var(--warn)">malo dokaza</span>
+        {% else %}<span class="pill">dovoljno</span>{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}
