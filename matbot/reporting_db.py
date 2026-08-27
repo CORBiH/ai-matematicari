@@ -159,6 +159,14 @@ def _rows(cursor):
     return cursor.fetchall()
 
 
+def _batches(values, size):
+    """Podijeli na komade — `IN (...)` i višeredni `VALUES` dijele istu granicu
+    broja parametara koju SQLite postavlja (999)."""
+    values = list(values)
+    for start in range(0, len(values), size):
+        yield values[start:start + size]
+
+
 class ReportingDatabase:
     """Tanak omotač oko jedne libSQL konekcije. Bez ORM-a, bez keširanja
     identiteta, bez ijednog upita van ovog fajla.
@@ -670,6 +678,259 @@ class ReportingDatabase:
                 self._drop_connection()
                 raise ReportingUnavailable(
                     "snapshot_upsert_failed:" + type(exc).__name__, exc) from None
+
+    # --- PAKETNI UVOZ JEDNOG THINKIFIC FAJLA -------------------------------
+    # IZMJERENO (34 učenika, 7 sekcija, sintetički fajl oblika stvarnog izvoza):
+    # red-po-red put je radio ~580 SQL izjava i **103 commita**, dakle ~683
+    # mrežna obrta po fajlu. Na udaljenom Tursu svaki obrt je puna mrežna tura, a
+    # commit je najskuplji jer mora trajno potvrditi upis — otud „uvoz traje
+    # vječno" iako u njemu nema nijednog modela.
+    #
+    # Uzrok NIJE bio jedan spor upit nego ARHITEKTURA POZIVA: `find_student`,
+    # `get_or_create_student`, `update_student_profile` i `upsert_progress_snapshot`
+    # su četiri odvojene javne metode, svaka sa svojim `_lock`-om i svojim
+    # `commit()`-om, pa je jedan učenik plaćao tri commita.
+    #
+    # Ova metoda radi ISTI posao u JEDNOJ transakciji i s JEDNIM commitom:
+    #   • unaprijed dovuče postojeće naloge, profile i snimke za CIJELI fajl
+    #     (tri `IN (...)` upita umjesto po jednog po učeniku);
+    #   • upiše samo ono što stvarno nedostaje ili se stvarno mijenja;
+    #   • sekcije briše JEDNIM `DELETE ... IN (...)` i upisuje jednim
+    #     `executemany`.
+    #
+    # SEMANTIKA JE NEPROMIJENJENA: isti identitet, ista pravila profila, isti
+    # `UNIQUE(student_id, course_key, report_month)`, ista potpuna zamjena skupa
+    # sekcija, isto ponašanje kod sukoba razreda.
+    #
+    # JEDNA GARANCIJA JE ČAK JAČA: ranije je pad baze na 20. redu ostavljao
+    # prvih 19 učenika UPISANIH (svaki je imao svoj commit). Sada je cijeli fajl
+    # jedna transakcija, pa pad ne ostavlja ništa — što je tačno ono što ugovor
+    # „jedan neispravan red odbija cijeli fajl" i traži.
+    def import_progress_file(self, *, report_month, course_key, course_name, grade,
+                             source_sha256, provider, rows):
+        """Uvezi CIJELI provjereni fajl u jednoj transakciji. Vrati brojače.
+
+        `rows` su već isparsirani i validirani redovi (`matbot/thinkific_progress.py`);
+        ovdje se ne parsira ništa i ne donosi nijedna kurikularna odluka."""
+        counters = {"students_created": 0, "students_reused": 0,
+                    "snapshots_inserted": 0, "snapshots_updated": 0,
+                    "sections_written": 0, "grade_conflicts": 0}
+        if not rows:
+            return counters
+
+        with self._lock:
+            try:
+                conn = self._connection()
+                cursor = conn.execute(
+                    "INSERT INTO thinkific_progress_imports "
+                    "(report_month, course_key, course_name, grade, source_sha256, "
+                    " row_count) VALUES (?, ?, ?, ?, ?, ?)",
+                    (report_month, course_key, course_name, int(grade),
+                     source_sha256, len(rows)))
+                import_id = cursor.lastrowid
+
+                emails = [row["email"] for row in rows]
+                accounts = self._existing_accounts(conn, provider, emails)
+
+                # Novi učenici: `students` pa `student_accounts`. Ne može se
+                # grupno jer svakom treba njegov `id`, ali NEMA commita po
+                # učeniku — sve ostaje u istoj transakciji.
+                for row in rows:
+                    if row["email"] in accounts:
+                        counters["students_reused"] += 1
+                        continue
+                    created = conn.execute(
+                        "INSERT INTO students (display_name, grade, created_at, "
+                        " updated_at, last_seen_at) VALUES (?, ?, CURRENT_TIMESTAMP, "
+                        " CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                        (row["display_name"], int(grade)))
+                    student_id = created.lastrowid
+                    conn.execute(
+                        "INSERT INTO student_accounts (student_id, provider, "
+                        " external_user_id, created_at, last_seen_at) "
+                        "VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                        (student_id, provider, row["email"]))
+                    accounts[row["email"]] = student_id
+                    counters["students_created"] += 1
+
+                student_ids = [accounts[row["email"]] for row in rows]
+                # `last_seen_at` se osvježava kao i do sada — samo grupno.
+                self._touch_students(conn, provider, student_ids, emails)
+
+                profiles = self._existing_profiles(conn, student_ids)
+                self._apply_profiles(conn, rows, accounts, profiles, grade, counters)
+
+                snapshots = self._existing_snapshots(conn, course_key, report_month,
+                                                     student_ids)
+                sections = self._apply_snapshots(conn, rows, accounts, snapshots,
+                                                 import_id, report_month, course_key,
+                                                 course_name, grade, counters)
+                self._replace_sections(conn, sections, counters)
+
+                conn.commit()          # JEDINI commit za cijeli fajl
+                return counters
+            except ReportingUnavailable:
+                self._safe_rollback()
+                self._drop_connection()
+                raise
+            except Exception as exc:
+                self._safe_rollback()
+                self._drop_connection()
+                raise ReportingUnavailable(
+                    "progress_import_failed:" + type(exc).__name__, exc) from None
+
+    # `IN (...)` se dijeli na komade: SQLite ima gornju granicu broja parametara,
+    # a jedan razred u BiH školi je daleko ispod nje — komadanje postoji da uvoz
+    # cijele škole ne pukne na granici, ne zato što je danas potrebno.
+    _IN_CHUNK = 200
+    # Četiri parametra po sekciji: 200 × 4 = 800 < 999.
+    _ROWS_PER_INSERT = 200
+
+    @staticmethod
+    def _chunks(values):
+        return _batches(values, ReportingDatabase._IN_CHUNK)
+
+    def _existing_accounts(self, conn, provider, emails):
+        """{e-mail: students.id} za sve adrese iz fajla — nekoliko upita ukupno."""
+        found = {}
+        for chunk in self._chunks(emails):
+            placeholders = ",".join("?" * len(chunk))
+            rows = _rows(conn.execute(
+                "SELECT external_user_id, student_id FROM student_accounts "
+                "WHERE provider = ? AND external_user_id IN (%s)" % placeholders,
+                (provider, *chunk)))
+            for email, student_id in rows:
+                found[email] = student_id
+        return found
+
+    def _touch_students(self, conn, provider, student_ids, emails):
+        for chunk in self._chunks(student_ids):
+            placeholders = ",".join("?" * len(chunk))
+            conn.execute(
+                "UPDATE students SET last_seen_at = CURRENT_TIMESTAMP "
+                "WHERE id IN (%s)" % placeholders, tuple(chunk))
+        for chunk in self._chunks(emails):
+            placeholders = ",".join("?" * len(chunk))
+            conn.execute(
+                "UPDATE student_accounts SET last_seen_at = CURRENT_TIMESTAMP "
+                "WHERE provider = ? AND external_user_id IN (%s)" % placeholders,
+                (provider, *chunk))
+
+    def _existing_profiles(self, conn, student_ids):
+        profiles = {}
+        for chunk in self._chunks(student_ids):
+            placeholders = ",".join("?" * len(chunk))
+            for student_id, name, grade in _rows(conn.execute(
+                    "SELECT id, display_name, grade FROM students "
+                    "WHERE id IN (%s)" % placeholders, tuple(chunk))):
+                profiles[student_id] = (name, grade)
+        return profiles
+
+    def _apply_profiles(self, conn, rows, accounts, profiles, grade, counters):
+        """ISTA pravila kao `update_student_profile`, samo bez upita po učeniku.
+
+        Ime se upisuje samo preko praznog, razred samo preko NULL-a, a različit
+        razred se NE prepisuje nego prijavljuje kao sukob."""
+        for row in rows:
+            student_id = accounts[row["email"]]
+            existing_name, existing_grade = profiles.get(student_id, (None, None))
+            if row["display_name"] and not (existing_name or "").strip():
+                conn.execute(
+                    "UPDATE students SET display_name = ?, "
+                    "updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                    (row["display_name"], student_id))
+                profiles[student_id] = (row["display_name"], existing_grade)
+            if grade is not None:
+                if existing_grade is None:
+                    conn.execute(
+                        "UPDATE students SET grade = ?, "
+                        "updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                        (int(grade), student_id))
+                    profiles[student_id] = (profiles.get(student_id, (None, None))[0],
+                                            int(grade))
+                elif int(existing_grade) != int(grade):
+                    counters["grade_conflicts"] += 1
+
+    def _existing_snapshots(self, conn, course_key, report_month, student_ids):
+        found = {}
+        for chunk in self._chunks(student_ids):
+            placeholders = ",".join("?" * len(chunk))
+            for student_id, snapshot_id in _rows(conn.execute(
+                    "SELECT student_id, id FROM thinkific_progress_snapshots "
+                    "WHERE course_key = ? AND report_month = ? "
+                    "AND student_id IN (%s)" % placeholders,
+                    (course_key, report_month, *chunk))):
+                found[student_id] = snapshot_id
+        return found
+
+    def _apply_snapshots(self, conn, rows, accounts, snapshots, import_id,
+                         report_month, course_key, course_name, grade, counters):
+        """Vrati [(snapshot_id, ordinal, naziv, procenat)] za sve sekcije fajla.
+
+        `lastrowid` se čita SAMO poslije stvarnog `INSERT`-a (nema konfliktne
+        grane), jer je na konfliktu izmjereno nepouzdan.
+
+        DVA REDA S ISTOM ADRESOM U ISTOM FAJLU: skup sekcija se DRŽI PO SNIMKU,
+        pa POSLJEDNJI red pobjeđuje u cjelini — tačno kao raniji red-po-red put,
+        koji je za svaki red brisao pa ponovo upisivao sekcije tog snimka
+        (izmjereno na roditeljskom komitu). Ravna lista bi ovdje nagomilala oba
+        reda i oborila `UNIQUE(snapshot_id, ordinal)`, dakle promijenila bi
+        ponašanje iz „prihvaćeno" u „fajl odbijen"."""
+        pending = {}
+        for row in rows:
+            student_id = accounts[row["email"]]
+            values = (row["percent_viewed"], row["percent_completed"],
+                      row["started_at"], row["completed_at"], row["activated_at"],
+                      row["expires_at"], row["last_sign_in"])
+            snapshot_id = snapshots.get(student_id)
+            if snapshot_id is None:
+                created = conn.execute(
+                    "INSERT INTO thinkific_progress_snapshots "
+                    "(import_id, student_id, report_month, course_key, course_name, "
+                    " grade, percent_viewed, percent_completed, started_at, "
+                    " completed_at, activated_at, expires_at, last_sign_in) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (import_id, student_id, report_month, course_key, course_name,
+                     int(grade), *values))
+                snapshot_id = created.lastrowid
+                snapshots[student_id] = snapshot_id
+                counters["snapshots_inserted"] += 1
+            else:
+                conn.execute(
+                    "UPDATE thinkific_progress_snapshots SET import_id = ?, "
+                    " course_name = ?, grade = ?, percent_viewed = ?, "
+                    " percent_completed = ?, started_at = ?, completed_at = ?, "
+                    " activated_at = ?, expires_at = ?, last_sign_in = ? "
+                    "WHERE id = ?",
+                    (import_id, course_name, int(grade), *values, snapshot_id))
+                counters["snapshots_updated"] += 1
+            pending[snapshot_id] = [(snapshot_id, ordinal, name, percent)
+                                    for ordinal, name, percent in row["sections"]]
+        return [entry for group in pending.values() for entry in group]
+
+    def _replace_sections(self, conn, sections, counters):
+        """Potpuna zamjena skupa sekcija: JEDAN `DELETE` i JEDAN `executemany`.
+
+        Djelimičan skup ne može postati vidljiv jer je sve u istoj transakciji
+        kao i snimak."""
+        snapshot_ids = sorted({row[0] for row in sections})
+        for chunk in self._chunks(snapshot_ids):
+            placeholders = ",".join("?" * len(chunk))
+            conn.execute(
+                "DELETE FROM thinkific_progress_sections "
+                "WHERE snapshot_id IN (%s)" % placeholders, tuple(chunk))
+        # VIŠEREDNI `VALUES`, NE `executemany`: oba rade, ali `executemany` ne
+        # garantuje da je na Hrani jedna mrežna tura — mogao bi poslati 238
+        # zasebnih izjava. Ovako je broj izjava DOKAZIV: 238 sekcija = 2 izjave.
+        # `_ROWS_PER_INSERT` × 4 parametra ostaje ispod SQLite granice od 999.
+        for chunk in _batches(sections, self._ROWS_PER_INSERT):
+            values = ",".join(["(?, ?, ?, ?)"] * len(chunk))
+            conn.execute(
+                "INSERT INTO thinkific_progress_sections "
+                "(snapshot_id, ordinal, section_name, progress_percent) "
+                "VALUES " + values,
+                tuple(field for row in chunk for field in row))
+        counters["sections_written"] = len(sections)
 
     # --- ČITANJE (izvještajni model) ---------------------------------------
     def fetch_progress_snapshot(self, student_id, report_month, course_key=None):

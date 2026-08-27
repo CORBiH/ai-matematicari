@@ -141,47 +141,50 @@ def import_progress_files(report_month, files, database=None):
 
 
 def _import_parsed_file(target, parsed, summary):
-    import_id = target.record_progress_import(
-        report_month=parsed.report_month, course_key=parsed.course_key,
-        course_name=parsed.course_name, grade=parsed.grade,
-        source_sha256=parsed.source_sha256, row_count=parsed.row_count)
+    """Predaj CIJELI provjereni fajl paketnom sloju u JEDNOJ transakciji.
 
+    ZASTO NE RED-PO-RED (izmjereno, 34 ucenika x 7 sekcija): raniji put je zvao
+    cetiri odvojene DB metode po ucenika, svaka sa svojim commitom -- ~580 SQL
+    izjava i 103 commita, dakle ~683 mrezna obrta po fajlu. Na udaljenom Tursu
+    to je bio cijeli razlog sto je uvoz djelovao beskonacno; nijedan model nije
+    ni ukljucen u ovaj put.
+
+    Adresa se ovdje normalizuje (Faza 1 semantika, nepromijenjena) prije nego sto
+    ijedan red ode u bazu -- neispravna adresa obara CIJELI fajl, kao i do sada."""
+    prepared = []
     for row in parsed.rows:
         summary.rows_seen += 1
         email = student_identity.normalize_email(row.email)
         if email is None:
             # Do ovdje dolazi samo adresa koja je NEPRAZNA ali neispravna;
-            # prazna je već oborila fajl u parseru.
+            # prazna je vec oborila fajl u parseru.
             raise reporting_db.ReportingUnavailable("email_unusable")
+        prepared.append({
+            "email": email,
+            "display_name": row.display_name,
+            "percent_viewed": row.percent_viewed,
+            "percent_completed": row.percent_completed,
+            "started_at": row.started_at,
+            "completed_at": row.completed_at,
+            "activated_at": row.activated_at,
+            "expires_at": row.expires_at,
+            "last_sign_in": row.last_sign_in,
+            "sections": row.sections,
+        })
 
-        student_id, created = _resolve_student(target, email, parsed.grade)
-        if created:
-            summary.students_created += 1
-        else:
-            summary.students_reused += 1
+    counters = target.import_progress_file(
+        report_month=parsed.report_month, course_key=parsed.course_key,
+        course_name=parsed.course_name, grade=parsed.grade,
+        source_sha256=parsed.source_sha256,
+        provider=student_identity.PROVIDER_THINKIFIC_EMAIL, rows=prepared)
 
-        name_set, grade_set, conflict = target.update_student_profile(
-            student_id, display_name=row.display_name, grade=parsed.grade)
-        if conflict:
-            summary.grade_conflicts += 1
-            # SAMO otisak — nikad e-mail ni ime u logu administratora.
-            logger.info("thinkific_grade_conflict course=%s subject=%s",
-                        parsed.course_key, student_identity.fingerprint(email))
-
-        outcome, _snapshot_id, written = target.upsert_progress_snapshot(
-            import_id=import_id, student_id=student_id,
-            report_month=parsed.report_month, course_key=parsed.course_key,
-            course_name=parsed.course_name, grade=parsed.grade,
-            percent_viewed=row.percent_viewed,
-            percent_completed=row.percent_completed,
-            started_at=row.started_at, completed_at=row.completed_at,
-            activated_at=row.activated_at, expires_at=row.expires_at,
-            last_sign_in=row.last_sign_in, sections=row.sections)
-        if outcome == "inserted":
-            summary.snapshots_inserted += 1
-        else:
-            summary.snapshots_updated += 1
-        summary.sections_written += written
+    for field in ("students_created", "students_reused", "snapshots_inserted",
+                  "snapshots_updated", "sections_written", "grade_conflicts"):
+        setattr(summary, field, getattr(summary, field) + counters[field])
+    if counters["grade_conflicts"]:
+        # SAMO broj i kurs -- nikad e-mail ni ime u logu administratora.
+        logger.info("thinkific_grade_conflict course=%s count=%s",
+                    parsed.course_key, counters["grade_conflicts"])
 
 
 def _resolve_student(target, email, grade):
