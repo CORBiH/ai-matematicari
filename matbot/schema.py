@@ -312,3 +312,27 @@ def validate_quick_image_output(out: QuickImageTurnOutput, max_reply_chars=None)
     for item in out.visible_values:
         if max(len(item.symbol), len(item.value), len(item.unit)) > MAX_VISIBLE_VALUE_FIELD_CHARS:
             raise InvalidOutputError("predugo polje u visible_values")
+
+
+# --- FAZA 3C: mjesečni izvještaj za roditelja -------------------------------
+# Granice su namjerno male. Izvještaj mora stati na jednu A4 stranu, a polje
+# koje model prekorači je znak da je krenuo pisati esej — to se odbija ovdje,
+# prije nego što išta stigne do administratora ili PDF-a.
+MAX_REPORT_SUMMARY_CHARS = 1200
+MAX_REPORT_ITEM_CHARS = 300
+MAX_REPORT_ITEMS = 3
+
+
+class ReportNarrativeOutput(BaseModel):
+    """JEDINO što model smije vratiti za mjesečni izvještaj.
+
+    Bez brojeva u shemi, bez oznaka, bez HTML-a — čist tekst u četiri polja.
+    Prazna lista je LEGITIMAN odgovor: kad dokazi ne postoje, ispravno je ne
+    reći ništa, a ne popuniti odjeljak."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    summary: str
+    strengths: list[str]
+    focus_areas: list[str]
+    next_month_recommendations: list[str]

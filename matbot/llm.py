@@ -38,6 +38,7 @@ from matbot.schema import (
     PracticeTurnOutput,
     QuickImageTurnOutput,
     QuickTurnOutput,
+    ReportNarrativeOutput,
 )
 from matbot.tutor.schema import ReviewerFinal, TutorDraft
 
@@ -411,6 +412,25 @@ class OpenAIPracticeLLM:
             model=config.KONTROLNI_MODEL,
             reasoning_effort=config.KONTROLNI_REASONING_EFFORT,
             timeout_s=timeout_s,
+        )
+
+    def report_turn(self, instructions: str, input_text: str) -> LLMResult:
+        """Faza 3C: JEDAN poziv koji piše prozu mjesečnog izvještaja.
+
+        NIJE tutorski put i ne smije se kroz njega provlačiti: nema Reviewera,
+        nema popravnog poziva, nema retryja. Ako izlaz ne prođe shemu ili
+        serversku provjeru činjeničnosti, nacrt se odbija i administrator
+        vidi sigurnu poruku — nikad se ne traži drugi pokušaj (Dio 32).
+
+        Model, effort i budžet su vlastiti (`config.REPORTING_*`) jer je posao
+        drukčiji: sva aritmetika je već determinističoki gotova, pa se ovdje
+        plaća samo pisanje."""
+        return self._structured_turn(
+            instructions, input_text, ReportNarrativeOutput,
+            max_output_tokens=config.MAX_OUTPUT_TOKENS_REPORTING,
+            model=config.REPORTING_MODEL,
+            reasoning_effort=config.REPORTING_REASONING_EFFORT,
+            timeout_s=config.REPORTING_TIMEOUT_S,
         )
 
     def _build_input(self, input_text, image):

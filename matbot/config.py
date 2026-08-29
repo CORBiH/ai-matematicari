@@ -161,6 +161,18 @@ QUICK_IMAGE_DETAIL = os.environ.get("MATBOT_QUICK_IMAGE_DETAIL", "original")
 # `release_config.REQUIRED_EFFECTIVE_CONFIG`. Mod NAMJERNO ne nasljeđuje
 # nijednu generičku varijablu (OPENAI_MODEL_TEXT) — batch generisanje testa je
 # zaseban put i njegov model ne smije tiho odlutati s tuđom migracijom.
+# --- FAZA 3C: mjesečni izvještaj za roditelja -------------------------------
+# Odvojen od tutorskih modela jer je i posao odvojen: sva aritmetika je već
+# gotova, pa ovaj poziv samo piše prozu. Zato NIZAK effort i skroman budžet —
+# skuplje razmišljanje ovdje ne kupuje ništa, a plaća se po izvještaju.
+REPORTING_MODEL = os.environ.get("MATBOT_REPORTING_MODEL", "gpt-5.6-luna")
+REPORTING_REASONING_EFFORT = os.environ.get(
+    "MATBOT_REPORTING_REASONING_EFFORT", "low")
+MAX_OUTPUT_TOKENS_REPORTING = _int_env("MATBOT_MAX_OUTPUT_TOKENS_REPORTING", 2000)
+# Rok je vlastiti i kraći od tutorskog: administrator čeka pred ekranom, a
+# izvještaj koji kasni nije hitan kao odgovor djetetu usred zadatka.
+REPORTING_TIMEOUT_S = _float_env("MATBOT_REPORTING_TIMEOUT", 40.0)
+
 KONTROLNI_MODEL = os.environ.get("MATBOT_KONTROLNI_MODEL", "gpt-5.6-luna")
 KONTROLNI_REASONING_EFFORT = os.environ.get(
     "MATBOT_KONTROLNI_REASONING_EFFORT", "low")

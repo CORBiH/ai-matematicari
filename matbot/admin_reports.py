@@ -21,7 +21,8 @@ import logging
 from flask import (Blueprint, abort, redirect, render_template, request,
                    session, url_for)
 
-from matbot import admin_auth, config, report_input, reporting_db, reporting_schema
+from matbot import admin_auth, config, parent_report, report_input, reporting_db
+from matbot import report_pdf, report_prompt, reporting_schema
 from matbot import thinkific_progress as progress
 from matbot.admin_auth import CSRF_FORM_FIELD, require_admin
 from matbot.ratelimit import RateLimiter
@@ -338,7 +339,141 @@ def student_preview(student_id):
                                label="", schema_message=message), 409
 
     payload = report_input.build_report_input(student_id, month)
+    return _render_student(student_id, month, payload)
+
+
+def _render_student(student_id, month, payload, *, ai_error="", notice=""):
+    """Jedan predložak za sve ishode — pregled, generisanje, snimanje.
+
+    OTVARANJE STRANICE NE ZOVE MODEL (Dio 32). Ovdje se sačuvani nacrt samo
+    ČITA; ako ga nema, prikazuju se determinističke činjenice i dugme."""
+    try:
+        saved = parent_report.load_saved(student_id, month)
+    except reporting_db.ReportingUnavailable as error:
+        # Tabela `monthly_reports` ne podnosi Fazu 3C ili je baza pala.
+        # Činjenice ostaju upotrebljive — izvještaj je taj koji nije dostupan.
+        logger.info("admin_report_load_failed code=%s", error.code)
+        saved = None
+        ai_error = ai_error or parent_report.SAFE_AI_ERROR
     return render_template(
         "admin_student.html", month=month, payload=payload,
         label=_student_label(payload["profile"], student_id),
-        previous_month=report_input.previous_month(month), schema_message="")
+        previous_month=report_input.previous_month(month), schema_message="",
+        saved=saved, csrf_token=admin_auth.csrf_token(),
+        ai_error=ai_error, notice=notice)
+
+
+def _require_csrf():
+    if not admin_auth.csrf_valid(request.form.get(CSRF_FORM_FIELD)):
+        logger.info("admin_report_csrf_rejected")
+        abort(400)
+
+
+def _month_or_400():
+    try:
+        return progress.parse_report_month(request.args.get("month", ""))
+    except progress.ProgressFormatError:
+        abort(400)
+
+
+def _narrative_from_form():
+    """Ono što je administrator otkucao. Server ne dopisuje ništa svoje."""
+    def lines(field):
+        raw = request.form.get(field, "")
+        return [line.strip() for line in raw.splitlines() if line.strip()]
+
+    return parent_report.normalize_narrative({
+        "summary": request.form.get("summary", ""),
+        "strengths": lines("strengths"),
+        "focus_areas": lines("focus_areas"),
+        "next_month_recommendations": lines("next_month_recommendations"),
+    })
+
+
+@admin_reports_bp.route("/student/<int:student_id>/generate", methods=["POST"])
+@require_admin
+def generate_report(student_id):
+    """TAČNO JEDAN plaćeni poziv. Komentar instruktora se ne dira (Dio 15)."""
+    _require_csrf()
+    month = _month_or_400()
+    payload, facts = parent_report.build_facts(student_id, month)
+
+    from matbot import llm as llm_module
+
+    try:
+        narrative = parent_report.generate_narrative(
+            facts, llm_module.OpenAIPracticeLLM())
+    except parent_report.ReportGenerationError as error:
+        # Interni kod SAMO u log (pravilo 7). Postojeći nacrt ostaje netaknut.
+        logger.info("admin_report_generate_failed code=%s", error.code)
+        return _render_student(student_id, month, payload,
+                               ai_error=parent_report.SAFE_AI_ERROR), 200
+
+    snapshot = parent_report.metrics_snapshot(
+        facts, model=config.REPORTING_MODEL,
+        prompt_version=report_prompt.REPORT_PROMPT_VERSION)
+    try:
+        # Model je STVARNO zvan, pa `generated_at` dobija novu vrijednost.
+        parent_report.save_narrative(student_id, month, narrative, snapshot,
+                                     generated_at=parent_report.utc_now())
+    except reporting_db.ReportingUnavailable as error:
+        logger.info("admin_report_save_failed code=%s", error.code)
+        return _render_student(student_id, month, payload,
+                               ai_error=parent_report.SAFE_AI_ERROR), 200
+    return redirect(url_for("admin_reports.student_preview",
+                            student_id=student_id, month=month))
+
+
+@admin_reports_bp.route("/student/<int:student_id>/save", methods=["POST"])
+@require_admin
+def save_report(student_id):
+    """Snimanje izmjena NIKAD ne zove model (Dio 32)."""
+    _require_csrf()
+    month = _month_or_400()
+    payload = report_input.build_report_input(student_id, month)
+    try:
+        parent_report.save_edits(student_id, month, _narrative_from_form(),
+                                 request.form.get("instructor_comment", ""))
+    except reporting_db.ReportingUnavailable as error:
+        logger.info("admin_report_save_failed code=%s", error.code)
+        return _render_student(student_id, month, payload,
+                               ai_error=parent_report.SAFE_AI_ERROR), 200
+    return redirect(url_for("admin_reports.student_preview",
+                            student_id=student_id, month=month))
+
+
+@admin_reports_bp.route("/student/<int:student_id>/pdf", methods=["GET"])
+@require_admin
+def report_pdf_download(student_id):
+    """PDF iz SAČUVANOG nacrta. Ne zove model i ne mijenja nijedan red."""
+    month = _month_or_400()
+    payload = report_input.build_report_input(student_id, month)
+    try:
+        saved = parent_report.load_saved(student_id, month)
+    except reporting_db.ReportingUnavailable:
+        saved = None
+    if saved is None:
+        # Bez sačuvanog nacrta nema šta da se štampa — nikad se ne generiše
+        # tekst „u letu" samo da bi PDF postojao.
+        abort(404)
+
+    # Činjenice dolaze IZ SNIMKA, ne iz današnje baze: dokument mora ostati ono
+    # što je administrator odobrio, i kad se izvorni podaci kasnije promijene.
+    facts = (saved.get("snapshot") or {}).get("facts")
+    if not facts:
+        _, facts = parent_report.build_facts(student_id, month)
+    label = _student_label(payload["profile"], student_id)
+    try:
+        data = report_pdf.render_report_pdf(
+            facts, saved["narrative"], saved["instructor_comment"], label)
+    except report_pdf.PdfTooLong as error:
+        logger.info("admin_report_pdf_too_long detail=%s", error)
+        abort(500)
+
+    from flask import Response
+
+    return Response(data, mimetype="application/pdf", headers={
+        "Content-Disposition": 'attachment; filename="%s"'
+                               % report_pdf.pdf_filename(label, month),
+        "Cache-Control": "no-store",
+    })

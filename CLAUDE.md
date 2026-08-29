@@ -37,6 +37,14 @@ Flask + a single-page frontend, one OpenAI call per turn, no database.
      it is a separate verification stage whose output **is** the published
      answer.
 
+   - **Parent monthly report (Phase 3C, admin-only): exactly one call per
+     explicit "Generiši" click, and zero on every other action.** Opening the
+     admin page, saving edits and generating/downloading the PDF never reach a
+     model. The model writes prose only — every number exists before the call
+     and is unchanged by it. Rejected output (schema, invented number, trend
+     without a baseline) fails closed to a safe message; the previously saved
+     draft is left untouched and no second call is made.
+
    In every mode: no retries, no repair loop, no third call, no SDK auto-retry,
    no hidden replacement call. If output is bad, reject it and return the canned
    safe message. A rejection never costs an extra call. See
@@ -288,6 +296,11 @@ Flask + a single-page frontend, one OpenAI call per turn, no database.
 | Result/Quick turn orchestration | `matbot/quick.py` |
 | Quick active-task context (per session, ephemeral) | `matbot/quick_context.py` |
 | Kontrolni test mode (generation, answer key, grading) | `matbot/kontrolni.py` |
+| Parent report: deterministic AI facts + evidence policy | `matbot/report_facts.py` |
+| Parent report: versioned reporting prompt | `matbot/report_prompt.py` |
+| Parent report: post-generation factuality checks | `matbot/report_validation.py` |
+| Parent report: orchestration (facts → 1 call → draft) | `matbot/parent_report.py` |
+| Parent report: A4 PDF from the saved draft | `matbot/report_pdf.py` |
 | Shared maths/language/notation prompt rules | `matbot/rules.py` |
 | Mode-specific prompt assembly | `matbot/prompts.py` |
 | Universal lesson-contract engine (Practice) | `matbot/contracts/` |

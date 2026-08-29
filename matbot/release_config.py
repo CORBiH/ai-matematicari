@@ -138,6 +138,13 @@ REQUIRED_EFFECTIVE_CONFIG = {
     # vlastiti, kodom auditiran identitet — isti mehanizam kao Explain/Quick.
     "kontrolni_model": "gpt-5.6-luna",
     "kontrolni_reasoning_effort": "low",
+    # Mjesečni izvještaj za roditelja (Faza 3C): jedan poziv po izričitom
+    # „Generiši“, i to SAMO za prozu — sva aritmetika je gotova prije njega.
+    # Identitet je vlastit i kodom auditiran, isti mehanizam kao Kontrolni.
+    # Bez ovoga bi jedina površina koja piše roditelju bila i jedina koja smije
+    # tiho odlutati na drugi model — a njen izlaz ne vidi učenik nego roditelj.
+    "reporting_model": "gpt-5.6-luna",
+    "reporting_reasoning_effort": "low",
 }
 
 # Imena koja se NIKAD ne ispisuju ni u jednoj dijagnostici ovog modula.
@@ -175,6 +182,8 @@ def _effective_config_problems():
         "quick_image_detail": _config.QUICK_IMAGE_DETAIL,
         "kontrolni_model": _config.KONTROLNI_MODEL,
         "kontrolni_reasoning_effort": _config.KONTROLNI_REASONING_EFFORT,
+        "reporting_model": _config.REPORTING_MODEL,
+        "reporting_reasoning_effort": _config.REPORTING_REASONING_EFFORT,
     }
     return [f"{key} ima pogrešnu vrijednost (očekivano: {expected})"
             for key, expected in sorted(REQUIRED_EFFECTIVE_CONFIG.items())
@@ -242,6 +251,10 @@ def effective_configuration(environ=None):
         "quick_image_detail": _config.QUICK_IMAGE_DETAIL,
         "kontrolni_model": _config.KONTROLNI_MODEL,
         "kontrolni_reasoning_effort": _config.KONTROLNI_REASONING_EFFORT,
+        # Faza 3C: bez ovoga se poslije deploya ne bi moglo dokazati kojim je
+        # modelom napisan izvještaj koji je roditelj već dobio.
+        "reporting_model": _config.REPORTING_MODEL,
+        "reporting_reasoning_effort": _config.REPORTING_REASONING_EFFORT,
         "deterministic_practice": ("enabled" if _config.deterministic_practice_enabled()
                                    else "disabled"),
         "deterministic_variety_gate": read("MATBOT_DETERMINISTIC_VARIETY_GATE"),

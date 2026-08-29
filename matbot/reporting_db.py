@@ -932,6 +932,129 @@ class ReportingDatabase:
                 tuple(field for row in chunk for field in row))
         counters["sections_written"] = len(sections)
 
+    # --- FAZA 3C: sačuvani mjesečni izvještaj -------------------------------
+    # JEDAN red po (učenik, mjesec). Upsert je SELECT pa INSERT/UPDATE u istoj
+    # transakciji, a ne `ON CONFLICT`, jer se na produkcijskoj `monthly_reports`
+    # ne smije pretpostaviti da UNIQUE(student_id, report_month) postoji —
+    # tabelu ovaj repo nikad nije kreirao (vidi `reporting_schema`).
+    #
+    # `metrics_json` je SNIMAK činjenica od kojih je izvještaj nastao, pa
+    # kasnija promjena izvornih podataka ne mijenja ono što je već sačuvano
+    # (Dio 14). `ai_summary` nosi cijeli narativ kao JSON — četiri polja u
+    # jednoj TEXT koloni, da Faza 3C ne bi tražila nove kolone i time nametnula
+    # migraciju šeme.
+    def save_monthly_report(self, *, student_id, report_month, metrics_json=None,
+                            ai_summary=None, instructor_comment=None,
+                            status="draft", generated_at=None):
+        """Upiši ili osvježi nacrt. `None` polje znači „ne diraj postojeće".
+
+        Time je sačuvano da snimanje komentara instruktora ne pregazi AI tekst,
+        a ponovno generisanje AI teksta ne pregazi komentar (Dio 15/17).
+
+        `generated_at` je vrijeme POSLJEDNJEG AI generisanja i šalje se SAMO kad
+        je model stvarno pozvan. Obično snimanje izmjena i pravljenje PDF-a ga
+        namjerno ostavljaju na miru — inače bi ručna ispravka zareza izgledala
+        kao nov AI nacrt. Kolona postoji u izmjerenoj produkcijskoj tabeli; ako
+        je zatečena tabela nema, upis se tiho odvija bez nje."""
+        with self._lock:
+            try:
+                conn = self._connection()
+                self._require_monthly_reports(conn)
+                existing = _rows(conn.execute(
+                    "SELECT id FROM monthly_reports "
+                    "WHERE student_id = ? AND report_month = ?",
+                    (int(student_id), report_month)))
+                has_generated_at = self._monthly_reports_has_generated_at(conn)
+                if existing:
+                    report_id = existing[0][0]
+                    sets, params = [], []
+                    columns = [("metrics_json", metrics_json),
+                               ("ai_summary", ai_summary),
+                               ("instructor_comment", instructor_comment),
+                               ("status", status)]
+                    if has_generated_at:
+                        columns.append(("generated_at", generated_at))
+                    for column, value in columns:
+                        if value is not None:
+                            sets.append(column + " = ?")
+                            params.append(value)
+                    sets.append("updated_at = CURRENT_TIMESTAMP")
+                    conn.execute(
+                        "UPDATE monthly_reports SET " + ", ".join(sets)
+                        + " WHERE id = ?", (*params, report_id))
+                else:
+                    names = ["student_id", "report_month", "status",
+                             "metrics_json", "ai_summary", "instructor_comment"]
+                    values = [int(student_id), report_month, status, metrics_json,
+                              ai_summary, instructor_comment or ""]
+                    if has_generated_at:
+                        names.append("generated_at")
+                        values.append(generated_at)
+                    cursor = conn.execute(
+                        "INSERT INTO monthly_reports (%s, created_at, updated_at) "
+                        "VALUES (%s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
+                        % (", ".join(names), ", ".join("?" * len(values))),
+                        tuple(values))
+                    report_id = cursor.lastrowid
+                conn.commit()
+                return report_id
+            except ReportingUnavailable:
+                self._safe_rollback()
+                self._drop_connection()
+                raise
+            except Exception as exc:
+                self._safe_rollback()
+                self._drop_connection()
+                raise ReportingUnavailable(
+                    "monthly_report_save_failed:" + type(exc).__name__, exc) from None
+
+    def fetch_monthly_report(self, student_id, report_month):
+        """Sačuvani nacrt ili None. Čisto čitanje — nikad ne kreira red."""
+        with self._lock:
+            try:
+                conn = self._connection()
+                self._require_monthly_reports(conn)
+                generated = ("generated_at"
+                             if self._monthly_reports_has_generated_at(conn)
+                             else "NULL AS generated_at")
+                rows = _rows(conn.execute(
+                    "SELECT id, student_id, report_month, status, metrics_json, "
+                    " ai_summary, instructor_comment, pdf_path, created_at, "
+                    " updated_at, " + generated + " FROM monthly_reports "
+                    "WHERE student_id = ? AND report_month = ?",
+                    (int(student_id), report_month)))
+            except ReportingUnavailable:
+                self._drop_connection()
+                raise
+            except Exception as exc:
+                self._drop_connection()
+                raise ReportingUnavailable(
+                    "monthly_report_read_failed:" + type(exc).__name__, exc) from None
+        if not rows:
+            return None
+        columns = ("id", "student_id", "report_month", "status", "metrics_json",
+                   "ai_summary", "instructor_comment", "pdf_path", "created_at",
+                   "updated_at", "generated_at")
+        return dict(zip(columns, rows[0]))
+
+    def _require_monthly_reports(self, conn):
+        """Padni ZATVORENO ako produkcijska tabela ne podnosi Fazu 3C.
+
+        Bolje je vidljiva greška nego upis u tabelu čiji oblik ne poznajemo."""
+        # Lokalni import kao i u `check()` — izbjegava kružnu zavisnost.
+        from matbot import reporting_schema
+
+        problems = reporting_schema.verify_monthly_reports_schema(conn)
+        if problems:
+            raise ReportingUnavailable("monthly_reports_unusable:" + problems[0])
+
+    def _monthly_reports_has_generated_at(self, conn):
+        """Ima li zatečena tabela `generated_at`. Izmjerena produkcija ima."""
+        from matbot import reporting_schema
+
+        return bool(reporting_schema.monthly_reports_capabilities(conn)
+                    .get("generated_at"))
+
     # --- ČITANJE (izvještajni model) ---------------------------------------
     def fetch_progress_snapshot(self, student_id, report_month, course_key=None):
         """Snimak + sekcije za jedan mjesec, ili `None`."""
@@ -1092,11 +1215,27 @@ class ReportingDatabase:
                               "assessment_item_results",
                               "thinkific_progress_imports",
                               "thinkific_progress_snapshots",
-                              "thinkific_progress_sections"):
+                              "thinkific_progress_sections",
+                              # Faza 3C: kolone se ISPISUJU jer ovaj repo tabelu
+                              # nikad nije kreirao — njen produkcijski oblik se
+                              # mora vidjeti, a ne pretpostaviti.
+                              "monthly_reports"):
                     if table in tables:
                         report["columns"][table] = [
                             row[1] for row in _rows(conn.execute(f"PRAGMA table_info({table})"))
                         ]
+                # Faza 3C: podnosi li `monthly_reports` izvještaje za roditelje.
+                try:
+                    from matbot import reporting_schema as _schema
+
+                    problems = _schema.verify_monthly_reports_schema(conn)
+                    report["monthly_reports_ready"] = not problems
+                    report["monthly_reports_problems"] = problems
+                except Exception as exc:
+                    report["monthly_reports_ready"] = False
+                    report["monthly_reports_problems"] = [
+                        "monthly_reports_check_failed:" + type(exc).__name__]
+
                 if "schema_migrations" in tables:
                     try:
                         rows = _rows(conn.execute("SELECT MAX(version) FROM schema_migrations"))
@@ -1580,6 +1719,11 @@ def _format_report(report):
         problems = report.get("v2_schema_problems") or []
         lines.append("v2_schema: %s" % ("verified" if report["v2_schema_verified"]
                                         else "INCOMPLETE -> " + ", ".join(problems)))
+    if "monthly_reports_ready" in report:
+        problems = report.get("monthly_reports_problems") or []
+        lines.append("monthly_reports: %s"
+                     % ("ready" if report["monthly_reports_ready"]
+                        else "UNUSABLE -> " + ", ".join(problems)))
     for table, columns in sorted((report.get("columns") or {}).items()):
         lines.append("columns[%s]: %s" % (table, ", ".join(columns)))
     return "\n".join(lines)

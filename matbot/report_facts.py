@@ -1,0 +1,243 @@
+"""Faza 3C — ČINJENICE koje model smije vidjeti, i DOKAZNA POLITIKA nad njima.
+
+Ovaj modul stoji između `report_input.build_report_input` (potpuno determinističan
+izvještajni ulaz) i modela koji piše prozu za roditelja. Radi tačno dvije stvari:
+
+  1. SUZI — iz administratorskog objekta izvuče samo ona polja koja su potrebna
+     da bi se napisala rečenica, i ništa više. Sve što je PII ili interni
+     identifikator ostaje s ove strane granice.
+  2. ODLUČI — svaki zaključak o dokaznoj snazi donese deterministički, u
+     Pythonu, i modelu preda GOTOVU OZNAKU (`evidence_level`), ne sirove
+     brojače iz kojih bi model sam procjenjivao koliko je nešto pouzdano.
+
+ZAŠTO JE (2) NEPREGOVARAČKO: model koji dobije „1 netačan odgovor iz lekcije X"
+napisaće „učenik ne zna X". To nije stvar tona nego mjerenja — jedno pitanje
+nije uzorak. Prag zato živi ovdje, u kodu, a ne u uputi modelu.
+
+NIJEDAN BROJ SE OVDJE NE RAČUNA IZNOVA. Sve aritmetike (tačnost, delte,
+prosjeci) već su izvedene u `report_input`; ovaj modul ih samo prosljeđuje ili
+označava. Jedini izuzeci su `answers_total = correct + incorrect` i
+`tasks_presented - answers_total`, koji postoje da model ne bi sabirao sam.
+
+NE ŠALJE SE MODELU: e-mail, `student_id`, Thinkific vanjski ID, `lesson_id`,
+`course_key`, sirovi tekst pitanja/odgovora, razgovori, `display_name`. Ime
+učenika ispisuje PDF predložak — model ga ne treba da bi napisao izvještaj, a
+svako ime koje model ne vidi je ime koje ne može procuriti ni pogrešno sklonuti.
+"""
+
+# --- DOKAZNA POLITIKA ------------------------------------------------------
+# Pragovi su NAMJERNO konzervativni i izraženi u broju OPAŽENIH pitanja, jer je
+# to jedino što stvarno mjerimo. `report_input.MIN_EVIDENCE_ITEMS_FOR_WEAKNESS`
+# (3) već označava red kao `low_evidence`; ovdje se ta binarna oznaka razlaže u
+# četiri nivoa da bi predložak i model mogli razlikovati „nemamo ništa" od
+# „imamo naznaku" i od „ovo se ponovilo".
+EVIDENCE_INSUFFICIENT = "insufficient"   # 0 pitanja — nema šta da se tvrdi
+EVIDENCE_LIMITED = "limited"             # 1–2 pitanja — samo oprezna naznaka
+EVIDENCE_MODERATE = "moderate"           # 3–5 pitanja — smije se imenovati
+EVIDENCE_STRONG = "strong"               # 6+ pitanja — smije se tvrditi
+
+EVIDENCE_LIMITED_MIN = 1
+EVIDENCE_MODERATE_MIN = 3
+EVIDENCE_STRONG_MIN = 6
+
+# Koliko lekcija najviše ide modelu i u PDF. Izvještaj za roditelja nije
+# administratorska tabela — vidi Dio 21.
+MAX_LESSON_ROWS = 5
+# Koliko sekcija kursa ide u činjenice. Bira se po korisnosti, ne po redoslijedu.
+MAX_SECTION_ROWS = 6
+
+# Kontrolni kao CJELINA: jedan test je premali uzorak da bi se o mjesecu
+# govorilo tvrdo, bez obzira što je 20 pitanja. Prati isti duh kao gore.
+KONTROLNI_LIMITED_MAX_ATTEMPTS = 1
+
+
+def evidence_level(evidence_items):
+    """Broj opaženih pitanja → dokazna oznaka. Jedina tačka koja to odlučuje."""
+    count = int(evidence_items or 0)
+    if count < EVIDENCE_LIMITED_MIN:
+        return EVIDENCE_INSUFFICIENT
+    if count < EVIDENCE_MODERATE_MIN:
+        return EVIDENCE_LIMITED
+    if count < EVIDENCE_STRONG_MIN:
+        return EVIDENCE_MODERATE
+    return EVIDENCE_STRONG
+
+
+def _lesson_rows(outcomes):
+    """Lekcije sortirane po DOKAZNOJ težini, pa po broju grešaka.
+
+    Namjerno se NE sortira samo po broju grešaka: lekcija s 1/1 netačnim
+    izgleda dramatično, a ne znači ništa. Jače potkrijepljen nalaz ide prvi."""
+    order = {EVIDENCE_STRONG: 0, EVIDENCE_MODERATE: 1,
+             EVIDENCE_LIMITED: 2, EVIDENCE_INSUFFICIENT: 3}
+    rows = []
+    for outcome in outcomes or []:
+        asked = int(outcome.get("evidence_items") or 0)
+        wrong = int(outcome.get("incorrect_items") or 0)
+        level = evidence_level(asked)
+        rows.append({
+            # `lesson_id` NE ide dalje — model piše o gradivu, ne o šifri.
+            "lesson_name": outcome.get("lesson_name") or "",
+            "area_name": outcome.get("area_name") or "",
+            "incorrect_items": wrong,
+            "correct_items": max(asked - wrong, 0),
+            "evidence_items": asked,
+            "evidence_level": level,
+            # Zadržano zbog saglasnosti s Fazom 2 i zbog testova koji mjere da
+            # se oznaka propagira sve do ugovora prema modelu.
+            "low_evidence": level in (EVIDENCE_INSUFFICIENT, EVIDENCE_LIMITED),
+        })
+    rows.sort(key=lambda r: (order[r["evidence_level"]], -r["incorrect_items"],
+                             r["lesson_name"]))
+    return rows[:MAX_LESSON_ROWS]
+
+
+def _section_rows(sections):
+    """Sekcije koje roditelju nešto znače: one s napretkom ili s promjenom.
+
+    Sedam redova „0 %" nije izvještaj nego buka (Dio 21). Ako baš nijedna
+    sekcija nema napredak, vraća se prvih nekoliko da odjeljak ne bude prazan —
+    činjenica „nigdje još nema napretka" je legitiman nalaz."""
+    useful = []
+    for section in sections or []:
+        current = section.get("current_progress_percent")
+        delta = section.get("delta_progress_percent")
+        if (current or 0) > 0 or (delta or 0) != 0:
+            useful.append(section)
+    chosen = useful or list(sections or [])[:MAX_SECTION_ROWS]
+    chosen = sorted(chosen,
+                    key=lambda s: (-(s.get("current_progress_percent") or 0),
+                                   s.get("ordinal") or 0))[:MAX_SECTION_ROWS]
+    return [{
+        "name": s.get("section_name") or "",
+        "current_percent": s.get("current_progress_percent"),
+        "previous_percent": s.get("previous_progress_percent"),
+        "delta_percent": s.get("delta_progress_percent"),
+    } for s in chosen]
+
+
+def build_ai_facts(payload):
+    """`build_report_input(...)` → objekat koji smije u prompt.
+
+    Ulaz je administratorski izvještajni ulaz; izlaz je namjerno siromašniji.
+    Sve što ovdje nije eksplicitno prepisano — ne postoji za model."""
+    thinkific = payload.get("thinkific") or {}
+    matbot = payload.get("matbot") or {}
+
+    correct = int(matbot.get("practice_correct") or 0)
+    incorrect = int(matbot.get("practice_incorrect") or 0)
+    answers_total = correct + incorrect
+    presented = int(matbot.get("practice_tasks") or 0)
+
+    snapshot_missing = bool(thinkific.get("snapshot_missing"))
+    # „Prethodni mjesec postoji" je ČINJENICA SERVERA, ne procjena modela.
+    # Bez nje model nema pravo ni na jednu riječ o trendu (Dio 3 i Dio 11).
+    previous_available = (not snapshot_missing
+                          and thinkific.get("previous_percent_viewed") is not None)
+
+    attempts = int(matbot.get("kontrolni_attempts") or 0)
+    question_total = int(matbot.get("kontrolni_total") or 0)
+    if attempts <= 0:
+        kontrolni_evidence = EVIDENCE_INSUFFICIENT
+    elif attempts <= KONTROLNI_LIMITED_MAX_ATTEMPTS:
+        # Jedan test — bez obzira na broj pitanja — ostaje naznaka.
+        kontrolni_evidence = EVIDENCE_LIMITED
+    else:
+        kontrolni_evidence = evidence_level(question_total)
+
+    lessons = _lesson_rows(matbot.get("lesson_outcomes"))
+    has_any_strong = any(row["evidence_level"] in (EVIDENCE_MODERATE, EVIDENCE_STRONG)
+                         for row in lessons)
+
+    facts = {
+        "report_month": payload.get("report_month"),
+        "grade": (payload.get("profile") or {}).get("grade"),
+        "thinkific": {
+            "available": not snapshot_missing,
+            "percent_viewed": thinkific.get("percent_viewed"),
+            "percent_completed": thinkific.get("percent_completed"),
+            "previous_available": previous_available,
+            "delta_percent_viewed": thinkific.get("delta_percent_viewed"),
+            "delta_percent_completed": thinkific.get("delta_percent_completed"),
+            "sections": _section_rows(thinkific.get("sections")),
+        },
+        "matbot": {
+            "any_activity": bool(matbot.get("active_days") or presented
+                                 or attempts or matbot.get("explain_count")
+                                 or matbot.get("quick_count")),
+            "active_days": int(matbot.get("active_days") or 0),
+            "practice": {
+                "tasks_presented": presented,
+                "answers_total": answers_total,
+                "correct": correct,
+                "incorrect": incorrect,
+                # Tačnost ostaje None kad nema imenioca — 0 % bi bila izmišljena
+                # mjera o učeniku koji nije odgovarao (Dio 23).
+                "accuracy_percent": matbot.get("practice_accuracy"),
+                "hints_used": int(matbot.get("hints_used") or 0),
+                "full_solutions_shown": int(matbot.get("full_solutions_shown") or 0),
+                # Razlika prikazanih i odgovorenih se PRENOSI kao broj, ali se
+                # nigdje ne tumači: zadatak je mogao biti zamijenjen novim, pa
+                # „napušteno" ne bi bilo mjerenje nego pretpostavka (Dio 4).
+                "presented_not_answered": max(presented - answers_total, 0),
+            },
+            "explain_count": int(matbot.get("explain_count") or 0),
+            "quick_count": int(matbot.get("quick_count") or 0),
+            "kontrolni": {
+                "attempts": attempts,
+                "average_score_percent": matbot.get("kontrolni_average"),
+                "correct_total": int(matbot.get("kontrolni_correct") or 0),
+                "question_total": question_total,
+                "evidence_level": kontrolni_evidence,
+            },
+            "lesson_evidence": lessons,
+        },
+        # Zbirna zastavica: kad ništa nije dovoljno potkrijepljeno, model mora
+        # to REĆI, a ne popuniti odjeljke izmišljenim jakim stranama (Dio 5).
+        "overall_evidence_sufficient": bool(has_any_strong
+                                            or kontrolni_evidence in
+                                            (EVIDENCE_MODERATE, EVIDENCE_STRONG)),
+    }
+    return facts
+
+
+def allowed_numbers(facts):
+    """Svi brojevi koje model SMIJE spomenuti. Osnova provjere činjeničnosti.
+
+    Vraća skup float-ova. Sve numeričko u izlazu modela koje nije ovdje je
+    izmišljeno — vidi `report_validation.unsupported_numbers`."""
+    values = set()
+
+    def add(value):
+        if isinstance(value, bool) or value is None:
+            return
+        if isinstance(value, (int, float)):
+            values.add(float(value))
+
+    thinkific = facts.get("thinkific") or {}
+    for key in ("percent_viewed", "percent_completed",
+                "delta_percent_viewed", "delta_percent_completed"):
+        add(thinkific.get(key))
+    for section in thinkific.get("sections") or []:
+        for key in ("current_percent", "previous_percent", "delta_percent"):
+            add(section.get(key))
+
+    matbot = facts.get("matbot") or {}
+    add(matbot.get("active_days"))
+    add(matbot.get("explain_count"))
+    add(matbot.get("quick_count"))
+    practice = matbot.get("practice") or {}
+    for key in ("tasks_presented", "answers_total", "correct", "incorrect",
+                "accuracy_percent", "hints_used", "full_solutions_shown",
+                "presented_not_answered"):
+        add(practice.get(key))
+    kontrolni = matbot.get("kontrolni") or {}
+    for key in ("attempts", "average_score_percent", "correct_total",
+                "question_total"):
+        add(kontrolni.get(key))
+    for lesson in matbot.get("lesson_evidence") or []:
+        for key in ("incorrect_items", "correct_items", "evidence_items"):
+            add(lesson.get(key))
+
+    add(facts.get("grade"))
+    return values

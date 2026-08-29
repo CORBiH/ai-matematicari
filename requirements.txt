@@ -6,3 +6,5 @@ itsdangerous>=2.1  # već tranzitivna Flask zavisnost; eksplicitno navedena jer 
 openpyxl>=3.1  # samo za scripts/build_topics_json.py (dev-time konverzija Excela)
 Pillow==11.3.0  # dekodiranje/normalizacija slike zadatka u Rezultat modu (matbot/imageinput.py) — TAČAN pin, verzija stvarno instalirana i testirana u ovom repou
 libsql==0.1.11  # zvanični Turso/libSQL klijent za izvještajnu bazu (matbot/reporting_db.py) — TAČAN pin, ima gotove cp311 wheel-ove za manylinux i Windows, pa Dockerfile ostaje bez build-essential
+reportlab==5.0.1  # PDF mjesečnog izvještaja za roditelja (matbot/report_pdf.py) — TAČAN pin; čist Python + gotovi wheel-ovi, i donosi Vera.ttf koji pokriva č/ć/ž/š/đ, pa u repo ne ulazi binarni font niti u Docker sistemski font
+pypdf==6.16.2  # SAMO testovi: čitanje generisanog PDF-a (broj strana, tekst, odsustvo PII-ja)

@@ -110,6 +110,94 @@ def test_the_fast_model_choice_stays_code_owned_but_is_still_verified():
         release_config.REQUIRED_EFFECTIVE_CONFIG["fast_reasoning_effort"]
 
 
+def test_the_reporting_model_choice_is_part_of_the_release_contract():
+    """Faza 3C: izvještaj roditelju ima vlastiti model, pa mora i vlastitu
+    stavku ugovora — inače bi jedina površina koja piše RODITELJU bila i jedina
+    koja smije tiho odlutati. Isti mehanizam kao Kontrolni: kodom auditiran
+    izbor, bez env varijable, ali s efektivnom provjerom."""
+    for name in ("MATBOT_REPORTING_MODEL", "MATBOT_REPORTING_REASONING_EFFORT"):
+        assert name not in release_config.REQUIRED_RELEASE_ENV
+    assert "reporting_model" in release_config.REQUIRED_EFFECTIVE_CONFIG
+    assert "reporting_reasoning_effort" in release_config.REQUIRED_EFFECTIVE_CONFIG
+
+
+def test_the_reporting_values_match_what_the_application_resolves():
+    """Ugovor i aplikacija moraju razrješavati ISTU vrijednost.
+
+    Vrijednost se čita kroz `matbot.config`, dakle kroz normalizaciju koju
+    stvarno izvršava proces — ne kroz drugi, paralelni put."""
+    from matbot import config as matbot_config
+
+    assert matbot_config.REPORTING_MODEL == \
+        release_config.REQUIRED_EFFECTIVE_CONFIG["reporting_model"]
+    assert matbot_config.REPORTING_REASONING_EFFORT == \
+        release_config.REQUIRED_EFFECTIVE_CONFIG["reporting_reasoning_effort"]
+    # Nepromijenjena konfiguracija se PRIHVATA — provjera koja uvijek prijavi
+    # odstupanje ne dokazuje ništa.
+    problems = release_config._effective_config_problems()
+    assert not [p for p in problems if p.startswith("reporting_")], problems
+
+
+@pytest.mark.parametrize("attribute, key, wrong", [
+    ("REPORTING_MODEL", "reporting_model", "gpt-5.6-sol"),
+    ("REPORTING_REASONING_EFFORT", "reporting_reasoning_effort", "high"),
+])
+def test_reporting_configuration_drift_is_reported(monkeypatch, attribute, key, wrong):
+    """Drift modela I drift effort-a moraju pasti, svaki za sebe.
+
+    Kapija izdanja zove `release_configuration_problems()` prije mjerenja
+    (`tools/run_live_release_gate.py`), a start aplikacije prije rada — pa
+    odstupanje ovdje znači da se izvještaj roditelju ne može napisati modelom
+    kojim izdanje nije mjereno."""
+    from matbot import config as matbot_config
+
+    monkeypatch.setattr(matbot_config, attribute, wrong)
+    problems = release_config._effective_config_problems()
+    expected = release_config.REQUIRED_EFFECTIVE_CONFIG[key]
+    assert f"{key} ima pogrešnu vrijednost (očekivano: {expected})" in problems
+    # Zatečena (pogrešna) vrijednost se NIKAD ne ispisuje — ista politika kao
+    # za svaku drugu poruku ovog modula.
+    assert wrong not in " ".join(problems)
+    # I puni guard pada, ne samo interna lista.
+    with pytest.raises(RuntimeError):
+        release_config.require_release_configuration(_env())
+
+
+def test_reporting_drift_does_not_disturb_the_other_audited_choices(monkeypatch):
+    """Postojeće ponašanje tutorskih i Kontrolni stavki ostaje netaknuto."""
+    from matbot import config as matbot_config
+
+    monkeypatch.setattr(matbot_config, "REPORTING_MODEL", "gpt-5.6-sol")
+    problems = release_config._effective_config_problems()
+    for key in ("fast_model", "explain_model", "quick_model", "quick_image_model",
+                "kontrolni_model", "kontrolni_reasoning_effort"):
+        assert not [p for p in problems if p.startswith(key)], (key, problems)
+    assert len([p for p in problems if p.startswith("reporting_")]) == 1
+
+
+def test_startup_diagnostics_record_the_reporting_model():
+    """Poslije deploya se mora vidjeti KOJIM je modelom pisan izvještaj koji je
+    roditelj već dobio — snimak se mijenja kad se konfiguracija promijeni."""
+    report = release_config.effective_configuration(_env())
+    assert report["reporting_model"] == \
+        release_config.REQUIRED_EFFECTIVE_CONFIG["reporting_model"]
+    assert report["reporting_reasoning_effort"] == \
+        release_config.REQUIRED_EFFECTIVE_CONFIG["reporting_reasoning_effort"]
+
+
+def test_the_startup_snapshot_changes_when_reporting_configuration_changes(monkeypatch):
+    """Zastario snimak ne smije prikazivati konfiguraciju koja se ne izvršava."""
+    from matbot import config as matbot_config
+
+    before = release_config.effective_configuration(_env())
+    monkeypatch.setattr(matbot_config, "REPORTING_MODEL", "gpt-5.6-sol")
+    monkeypatch.setattr(matbot_config, "REPORTING_REASONING_EFFORT", "high")
+    after = release_config.effective_configuration(_env())
+    assert before != after
+    assert after["reporting_model"] == "gpt-5.6-sol"
+    assert after["reporting_reasoning_effort"] == "high"
+
+
 def test_the_declaration_is_the_only_place_the_values_are_written():
     """Nijedan potrošač ne smije ponovo ukucati vrijednost kao literal."""
     declaration = DECLARATION.read_text(encoding="utf-8")

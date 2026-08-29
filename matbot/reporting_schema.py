@@ -429,3 +429,134 @@ def migrate_to_v2(conn):
     logger.info("reporting_schema_migrated from=%s to=%s",
                 SCHEMA_VERSION_V1, SCHEMA_VERSION_V2)
     return True
+
+
+# --- FAZA 3C: tabela `monthly_reports` -------------------------------------
+# OVAJ REPO NIKAD NIJE KREIRAO `monthly_reports`. Tabela postoji u produkciji iz
+# izvorne Matematičari šeme, a njen oblik je 2026-08-27 IZMJEREN čitajućom
+# introspekcijom na VPS-u — nije pretpostavljen i nije prepisan iz testa.
+# Izmišljen fixture je već jednom oborio migraciju u produkciji (v1→v2,
+# `description TEXT NOT NULL`), pa je ovdje jedini prihvatljiv izvor istine
+# stvarno mjerenje.
+#
+# IZMJERENO STANJE: svih devet kolona koje Faza 3C treba, PLUS `generated_at`,
+# uz UNIQUE(student_id, report_month) i strani ključ na `students` s ON DELETE
+# CASCADE. Migracija NIJE potrebna — nema šeme v3.
+#
+# PROVJERA JE PODSKUPOVNA, NE JEDNAKOSNA: traži se da tabela ima ono što Faza 3C
+# koristi, a dodatne saglasne kolone se DOPUŠTAJU. Jednakost skupa kolona bi
+# odbila upravo onu produkcijsku tabelu zbog koje provjera i postoji.
+# „Dopušteno" ne znači „slabo": ispod se provjeravaju i NOT NULL, podrazumijevana
+# vrijednost `status`-a, jedinstvenost i strani ključ — dakle svojstva na koja se
+# upis stvarno oslanja.
+MONTHLY_REPORTS_REQUIRED_COLUMNS = frozenset({
+    "id", "student_id", "report_month", "status", "metrics_json", "ai_summary",
+    "instructor_comment", "pdf_path", "created_at", "updated_at",
+})
+
+# Kolona koju produkcija ima i koju Faza 3C SVJESNO koristi: vrijeme posljednjeg
+# AI generisanja. Nije obavezna za rad (stariji oblik tabele bez nje i dalje
+# prolazi), ali kad postoji — puni se.
+MONTHLY_REPORTS_GENERATED_AT = "generated_at"
+
+# Kolone koje NE SMIJU primiti NULL, jer se upis na njih oslanja.
+_MONTHLY_REPORTS_NOT_NULL = ("student_id", "report_month", "status",
+                             "created_at", "updated_at")
+
+# DDL koji lokalni razvoj i testovi koriste. BAJT ZA BAJT ista svojstva kao
+# izmjerena produkcijska tabela (kolone, NOT NULL, CHECK, DEFAULT, UNIQUE, FK
+# s ON DELETE CASCADE). NIJE migracija i ne izvršava se nad produkcijom.
+MONTHLY_REPORTS_DDL = """
+CREATE TABLE IF NOT EXISTS monthly_reports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    student_id INTEGER NOT NULL,
+    report_month TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'draft'
+        CHECK (status IN ('draft', 'final')),
+    metrics_json TEXT,
+    ai_summary TEXT,
+    instructor_comment TEXT,
+    pdf_path TEXT,
+    generated_at TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
+    UNIQUE (student_id, report_month)
+)
+"""
+
+# Indeks koji produkcija ima uz autoindeks jedinstvenosti. Postojanje mu se
+# provjerava informativno — jedinstvenost je ta koja je obavezna.
+MONTHLY_REPORTS_INDEX_DDL = (
+    "CREATE INDEX IF NOT EXISTS idx_monthly_reports_student_month "
+    "ON monthly_reports (student_id, report_month)")
+
+
+def _column_details(conn, table):
+    """{ime: (notnull, podrazumijevana_vrijednost)} iz `PRAGMA table_info`."""
+    return {row[1]: (bool(row[3]), row[4])
+            for row in conn.execute("PRAGMA table_info(%s)" % table).fetchall()}
+
+
+def _foreign_keys_with_actions(conn, table):
+    """{(kolona, ciljna_tabela): on_delete} — CASCADE je dio ugovora, ne detalj."""
+    return {(row[3], row[2]): (row[6] or "").upper() for row
+            in conn.execute("PRAGMA foreign_key_list(%s)" % table).fetchall()}
+
+
+def monthly_reports_capabilities(conn):
+    """Šta zatečena tabela nudi. Čita, ne mijenja ništa."""
+    if "monthly_reports" not in table_names(conn):
+        return {"present": False, "generated_at": False}
+    try:
+        columns = _columns(conn, "monthly_reports")
+    except Exception:
+        return {"present": False, "generated_at": False}
+    return {"present": True,
+            "generated_at": MONTHLY_REPORTS_GENERATED_AT in columns}
+
+
+def verify_monthly_reports_schema(conn):
+    """Čitajuća provjera da `monthly_reports` podnosi Fazu 3C.
+
+    Vraća listu strukturnih kodova; prazna znači „dokazano upotrebljivo". Ne
+    kreira, ne mijenja i ne migrira ništa. Dodatne kolone se dopuštaju —
+    nedostajuće garancije NE."""
+    problems = []
+    if "monthly_reports" not in table_names(conn):
+        return ["monthly_reports_missing"]
+    try:
+        details = _column_details(conn, "monthly_reports")
+        uniques = _unique_column_sets(conn, "monthly_reports")
+        keys = _foreign_keys_with_actions(conn, "monthly_reports")
+    except Exception:
+        return ["monthly_reports_unreadable"]
+
+    missing = MONTHLY_REPORTS_REQUIRED_COLUMNS - set(details)
+    if missing:
+        # Bez kolona nema smisla provjeravati ostalo — ostatak bi lagao.
+        return ["monthly_reports_columns_missing:" + ",".join(sorted(missing))]
+
+    for column in _MONTHLY_REPORTS_NOT_NULL:
+        if not details[column][0]:
+            problems.append("monthly_reports_nullable:" + column)
+
+    # `status` mora imati podrazumijevanu vrijednost jer upis oslanja se na nju
+    # kad je ne pošalje izričito. Poredi se OČIŠĆENA vrijednost, jer SQLite
+    # podrazumijevanu vrijednost vraća s navodnicima ('draft').
+    default_status = (details["status"][1] or "").strip().strip("'\"")
+    if default_status != "draft":
+        problems.append("monthly_reports_status_default:" + (default_status or "none"))
+
+    if ("student_id", "report_month") not in uniques:
+        # Bez ovoga bi jedan (učenik, mjesec) mogao dobiti dva izvještaja.
+        problems.append("monthly_reports_unique_missing")
+
+    on_delete = keys.get(("student_id", "students"))
+    if on_delete is None:
+        problems.append("monthly_reports_foreign_key_missing")
+    elif on_delete != "CASCADE":
+        # Brisanje učenika ne smije ostaviti izvještaj bez vlasnika.
+        problems.append("monthly_reports_foreign_key_action:" + (on_delete or "none"))
+
+    return problems

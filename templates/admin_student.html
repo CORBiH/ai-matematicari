@@ -107,5 +107,74 @@
   </table>
   {% endif %}
 </div>
+
+{# --- FAZA 3C: izvjestaj za roditelja ------------------------------------ #}
+<div class="card">
+  <h2>Izvještaj za roditelja</h2>
+
+  {% if ai_error %}<div class="banner err">{{ ai_error }}</div>{% endif %}
+  {% if notice %}<div class="banner">{{ notice }}</div>{% endif %}
+
+  {% if not saved %}
+    <p class="muted">
+      Za ovaj mjesec još nije generisan izvještaj. Generisanje troši
+      <b>tačno jedan</b> AI poziv; sve brojke iznad su već izračunate i AI ih
+      ne mijenja.
+    </p>
+    <form method="post" action="{{ url_for('admin_reports.generate_report', student_id=payload.student_id, month=month) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit" onclick="this.disabled=true;this.form.submit()">Generiši AI izvještaj</button>
+    </form>
+  {% else %}
+    <form method="post" action="{{ url_for('admin_reports.save_report', student_id=payload.student_id, month=month) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+      <label><b>Sažetak</b></label>
+      <textarea name="summary" rows="5" style="width:100%">{{ saved.narrative.summary }}</textarea>
+
+      {# Jedna stavka po redu - server ih tako i cita nazad. #}
+      <label><b>Šta ide dobro</b> <span class="muted">(jedna stavka po redu)</span></label>
+      <textarea name="strengths" rows="3" style="width:100%">{{ saved.narrative.strengths | join('
+') }}</textarea>
+
+      <label><b>Na čemu treba raditi</b> <span class="muted">(jedna stavka po redu)</span></label>
+      <textarea name="focus_areas" rows="3" style="width:100%">{{ saved.narrative.focus_areas | join('
+') }}</textarea>
+
+      <label><b>Preporuke za naredni mjesec</b> <span class="muted">(jedna stavka po redu)</span></label>
+      <textarea name="next_month_recommendations" rows="3" style="width:100%">{{ saved.narrative.next_month_recommendations | join('
+') }}</textarea>
+
+      <label><b>Komentar instruktora</b>
+        <span class="muted">(ne piše ga AI; ostaje sačuvan i pri ponovnom generisanju)</span></label>
+      <textarea name="instructor_comment" rows="3" style="width:100%">{{ saved.instructor_comment }}</textarea>
+
+      <p><button type="submit">Sačuvaj nacrt</button></p>
+    </form>
+
+    <p class="muted">
+      Status: <span class="pill">{{ saved.status }}</span>
+      {# `generated_at` se mijenja SAMO kad je model stvarno zvan; `updated_at`
+         i na obicnu izmjenu teksta. Dva razlicita podatka, dva polja. #}
+      {% if saved.generated_at %}<span class="pill">AI tekst: {{ saved.generated_at }} UTC</span>{% endif %}
+      {% if saved.updated_at %}<span class="pill">izmijenjeno {{ saved.updated_at }}</span>{% endif %}
+      {% if saved.snapshot.generated_by %}
+        <span class="pill">prompt {{ saved.snapshot.generated_by.prompt_version }}</span>
+      {% endif %}
+    </p>
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <form method="post" action="{{ url_for('admin_reports.generate_report', student_id=payload.student_id, month=month) }}"
+            onsubmit="return confirm('AI tekst (sažetak, jake strane, fokus, preporuke) bit će zamijenjen novim. Komentar instruktora ostaje sačuvan. Nastaviti?')">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button type="submit">Ponovo generiši AI tekst</button>
+      </form>
+      <a href="{{ url_for('admin_reports.report_pdf_download', student_id=payload.student_id, month=month) }}">
+        <button type="button">Generiši PDF</button>
+      </a>
+      <span class="muted">PDF se pravi iz sačuvanog nacrta — bez AI poziva.</span>
+    </div>
+  {% endif %}
+</div>
 {% endif %}
 {% endblock %}
