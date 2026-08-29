@@ -491,7 +491,7 @@ def test_those_titles_do_not_license_invented_percentages(title):
 
 def test_the_prompt_asks_for_verbatim_lesson_names():
     assert "PREPIŠI naziv TAČNO" in report_prompt.SYSTEM_PROMPT
-    assert report_prompt.REPORT_PROMPT_VERSION == "3c-2"
+    assert report_prompt.REPORT_PROMPT_VERSION == "3c-3"
 
 
 @pytest.mark.parametrize("phrase", [
@@ -727,7 +727,7 @@ def test_pdf_contains_name_grade_and_month():
     _, text = text_of(render())
     assert "Đžemal Šćepanović" in text
     assert "6. razred" in text
-    assert "August 2026" in text
+    assert "august 2026." in text
 
 
 def test_pdf_contains_deterministic_metrics_with_correct_terminology():
@@ -931,9 +931,159 @@ def test_pdf_escapes_markup_typed_by_the_administrator():
     assert "Vidi <b>ovo</b> & ono." in text
 
 
+# ===========================================================================
+# FOKUS ZA RODITELJA — kratak i potkrijepljen, ne dijagnostički spisak
+# ===========================================================================
+def _outcome(name, area, items, wrong):
+    return {"lesson_id": "L-" + name, "lesson_name": name, "area_name": area,
+            "difficulty": "standard", "incorrect_items": wrong,
+            "evidence_items": items}
+
+
+def _plan(outcomes):
+    return report_facts.build_ai_facts(
+        payload(matbot={"lesson_outcomes": outcomes}))["matbot"]["focus_plan"]
+
+
+def test_focus_names_at_most_three_lessons():
+    plan = _plan([_outcome("A", "O1", 8, 4), _outcome("B", "O2", 8, 4),
+                  _outcome("C", "O3", 8, 4), _outcome("D", "O4", 8, 4),
+                  _outcome("E", "O5", 8, 4)])
+    assert len(plan["named_lessons"]) <= report_facts.MAX_NAMED_LESSONS == 3
+    assert plan["max_focus_bullets"] == 3
+
+
+def test_strong_and_moderate_outrank_a_single_wrong_item():
+    """1/1 netačnih izgleda dramatično, a znači manje od 4/8."""
+    plan = _plan([_outcome("Jednopitanje", "Oblast", 1, 1),
+                  _outcome("Razlomci", "Razlomci", 8, 4)])
+    assert plan["named_lessons"] == ["Razlomci"]
+    assert "Jednopitanje" not in plan["named_lessons"]
+
+
+def test_repeated_limited_signals_group_by_area():
+    plan = _plan([_outcome("L1", "Geometrija", 1, 1),
+                  _outcome("L2", "Geometrija", 2, 1),
+                  _outcome("L3", "Geometrija", 1, 1)])
+    assert plan["grouped_areas"] == [
+        {"area_name": "Geometrija", "lesson_count": 3,
+         "evidence_level": report_facts.EVIDENCE_LIMITED}]
+    # Nijedna od tri se ne imenuje — signal je o OBLASTI.
+    assert plan["named_lessons"] == []
+
+
+def test_limited_only_month_prefers_two_bullets():
+    plan = _plan([_outcome("L1", "Geometrija", 1, 1),
+                  _outcome("L2", "Geometrija", 1, 1)])
+    assert plan["max_focus_bullets"] == report_facts.MAX_FOCUS_BULLETS_LIMITED == 2
+
+
+def test_an_isolated_limited_signal_is_named_only_when_nothing_stronger_exists():
+    alone = _plan([_outcome("Samo ovo", "Oblast", 1, 1)])
+    assert alone["named_lessons"] == ["Samo ovo"]
+    withstronger = _plan([_outcome("Samo ovo", "Oblast", 1, 1),
+                          _outcome("Razlomci", "Razlomci", 8, 4)])
+    assert withstronger["named_lessons"] == ["Razlomci"]
+
+
+def test_isolated_limited_signals_never_become_a_long_list():
+    plan = _plan([_outcome("L1", "O1", 1, 1), _outcome("L2", "O2", 1, 1),
+                  _outcome("L3", "O3", 1, 1), _outcome("L4", "O4", 1, 1)])
+    assert len(plan["named_lessons"]) <= 1
+    assert plan["max_focus_bullets"] == 2
+
+
+def test_focus_plan_never_invents_a_signal():
+    plan = _plan([])
+    assert plan["named_lessons"] == []
+    assert plan["grouped_areas"] == []
+
+
+def test_full_evidence_still_reaches_the_admin_contract():
+    """Plan je za roditelja; puni dokaz ostaje u činjenicama i u adminu."""
+    facts = report_facts.build_ai_facts(payload())
+    names = [row["lesson_name"] for row in facts["matbot"]["lesson_evidence"]]
+    assert "Djeljivost sa 3" in names and "Razlomci" in names
+    by_name = {row["lesson_name"]: row for row in facts["matbot"]["lesson_evidence"]}
+    assert by_name["Djeljivost sa 3"]["evidence_level"] == \
+        report_facts.EVIDENCE_LIMITED
+
+
+def test_the_prompt_binds_naming_to_the_focus_plan():
+    prompt = report_prompt.SYSTEM_PROMPT
+    assert "focus_plan.named_lessons" in prompt
+    assert "focus_plan.max_focus_bullets" in prompt
+    assert "focus_plan.grouped_areas" in prompt
+
+
+def test_focus_plan_costs_no_extra_model_call():
+    facts = report_facts.build_ai_facts(payload())
+    llm = FakeReportLLM()
+    parent_report.generate_narrative(facts, llm)
+    assert llm.calls == 1
+
+
+def test_focus_plan_carries_no_identifiers():
+    facts = report_facts.build_ai_facts(payload())
+    blob = json.dumps(facts["matbot"]["focus_plan"], ensure_ascii=False)
+    for forbidden in ("lesson_id", "L-razlomci", "student_id", "@"):
+        assert forbidden not in blob
+
+
+# ===========================================================================
+# NASLOV POZITIVNOG ODJELJKA
+# ===========================================================================
+def test_pdf_uses_the_positive_habits_heading():
+    _, text = text_of(render())
+    assert "POZITIVNE NAVIKE U RADU" in text
+
+
+def test_the_old_judgemental_heading_is_gone_from_the_parent_pdf():
+    """„ŠTA IDE DOBRO" je zvučalo kao ocjena djeteta, ne izvještaj o radu."""
+    _, text = text_of(render())
+    assert "ŠTA IDE DOBRO" not in text
+
+
 def test_month_label_is_bosnian():
-    assert report_pdf.month_label("2026-08") == "August 2026"
-    assert report_pdf.month_label("2026-01") == "Januar 2026"
+    """Malo slovo i tačka iza godine — „August 2026" je bio engleski oblik."""
+    assert report_pdf.month_label("2026-08") == "august 2026."
+    assert report_pdf.month_label("2026-01") == "januar 2026."
+
+
+@pytest.mark.parametrize("value, expected", [
+    ("2026-01", "januar 2026."), ("2026-02", "februar 2026."),
+    ("2026-03", "mart 2026."), ("2026-04", "april 2026."),
+    ("2026-05", "maj 2026."), ("2026-06", "juni 2026."),
+    ("2026-07", "juli 2026."), ("2026-08", "august 2026."),
+    ("2026-09", "septembar 2026."), ("2026-10", "oktobar 2026."),
+    ("2026-11", "novembar 2026."), ("2026-12", "decembar 2026."),
+])
+def test_every_bosnian_month_name(value, expected):
+    assert report_pdf.month_label(value) == expected
+
+
+@pytest.mark.parametrize("bad", ["2026-00", "2026-13", "2026", "", None,
+                                 "kolovoz", "2026-xx"])
+def test_month_label_falls_back_instead_of_guessing(bad):
+    """`MONTH_NAMES[0 - 1]` bi tiho vratio „decembar" — zato provjera prije."""
+    assert report_pdf.month_label(bad) == (bad or "")
+
+
+def test_month_label_does_not_depend_on_os_locale(monkeypatch):
+    """Imena su ugrađena; kontejner bez `bs_BA` ne smije ispisati engleski."""
+    import locale
+
+    monkeypatch.setattr(locale, "setlocale", lambda *a, **k: None)
+    assert report_pdf.month_label("2026-08") == "august 2026."
+
+
+def test_canonical_report_month_is_never_mutated():
+    """Prikaz je prikaz; spremljena i poređena vrijednost ostaje YYYY-MM."""
+    facts = report_facts.build_ai_facts(payload())
+    assert facts["report_month"] == "2026-08"
+    # Naziv fajla nosi kanonski oblik, ne lokalizovani.
+    assert "2026-08" in report_pdf.pdf_filename("Neko Neko", "2026-08")
+    assert "august" not in report_pdf.pdf_filename("Neko Neko", "2026-08")
 
 
 # ===========================================================================

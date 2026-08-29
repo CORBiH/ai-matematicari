@@ -130,11 +130,23 @@ def _ensure_fonts():
 
 
 def month_label(report_month):
-    """„2026-08" → „August 2026". Pada nazad na ulaz ako oblik nije očekivan."""
+    """„2026-08" → „august 2026.". Pada nazad na ulaz ako oblik nije očekivan.
+
+    Bosanski se piše MALIM slovom i s tačkom iza godine; „August 2026" je bio
+    engleski oblik u dokumentu na bosanskom. Imena mjeseci su ugrađena
+    (`MONTH_NAMES`), pa prikaz NE zavisi od locale-a operativnog sistema —
+    kontejner bez `bs_BA` bi inače tiho ispisao engleski naziv.
+
+    KANONSKA VRIJEDNOST SE NE MIJENJA: `report_month` ostaje „YYYY-MM" svuda
+    gdje se poredi ili sprema; ovo je isključivo prikaz."""
     try:
         year, month = report_month.split("-")
-        name = MONTH_NAMES[int(month) - 1]
-        return name.capitalize() + " " + year
+        number = int(month)
+        # Provjera PRIJE indeksiranja: `MONTH_NAMES[0 - 1]` bi tiho vratio
+        # „decembar" umjesto da odbije neispravan mjesec.
+        if not 1 <= number <= 12:
+            raise IndexError(month)
+        return "%s %s." % (MONTH_NAMES[number - 1], year)
     except (ValueError, IndexError, AttributeError):
         return report_month or ""
 
@@ -326,7 +338,9 @@ def _story(facts, narrative, instructor_comment, label, styles, content_width):
 
     # --- AI proza --------------------------------------------------------
     for title, key, fallback in (
-            ("ŠTA IDE DOBRO", "strengths",
+            # „ŠTA IDE DOBRO" je zvučalo kao ocjena djeteta. Roditelju se
+            # izvještava o NAVIKAMA U RADU, koje su ono što se stvarno mjeri.
+            ("POZITIVNE NAVIKE U RADU", "strengths",
              "Za pouzdaniju procjenu jakih strana potrebno je više riješenih zadataka."),
             ("NA ČEMU TREBA RADITI", "focus_areas",
              "Trenutno nema dovoljno podataka za pouzdan zaključak."),

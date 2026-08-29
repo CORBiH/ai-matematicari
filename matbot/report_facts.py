@@ -191,6 +191,9 @@ def build_ai_facts(payload):
                 "evidence_level": kontrolni_evidence,
             },
             "lesson_evidence": lessons,
+            # Puni dokaz ostaje IZNAD (model ga smije koristiti kao kontekst);
+            # plan ispod kaže šta smije biti IMENOVANO roditelju.
+            "focus_plan": _focus_plan(lessons),
         },
         # Zbirna zastavica: kad ništa nije dovoljno potkrijepljeno, model mora
         # to REĆI, a ne popuniti odjeljke izmišljenim jakim stranama (Dio 5).
@@ -199,6 +202,60 @@ def build_ai_facts(payload):
                                             (EVIDENCE_MODERATE, EVIDENCE_STRONG)),
     }
     return facts
+
+
+# --- FOKUS ZA RODITELJA -----------------------------------------------------
+# Roditelj ne čita dijagnostiku. Pet imenovanih lekcija, od kojih tri stoje na
+# po jednom pitanju, čitaju se kao spisak propusta — a to nijedna od njih ne
+# dokazuje. Zato se izbor pravi OVDJE, deterministički, PRIJE modela: model
+# dobija gotov plan i nema šta da bira. Puni dokaz ostaje u administratorskom
+# pregledu (`report_input`), koji ova funkcija ne dira.
+MAX_NAMED_LESSONS = 3
+# Dvije ograničene lekcije u istoj oblasti su signal o OBLASTI, ne o lekcijama.
+LIMITED_GROUP_MIN = 2
+MAX_FOCUS_BULLETS = 3
+# Kad ničeg jačeg nema, kraće je poštenije: manje stavki, manje prividne težine.
+MAX_FOCUS_BULLETS_LIMITED = 2
+
+
+def _focus_plan(rows):
+    """Šta smije biti IMENOVANO roditelju i koliko stavki fokus smije imati.
+
+    Redoslijed je dokazni, ne dramaturški: strong pa moderate. Ograničeni nalazi
+    se ne imenuju dok postoji išta jače — jedan netačan odgovor nije nalaz o
+    znanju (Dio 5). Kad jačeg nema, imenuje se NAJVIŠE jedan, da izvještaj ne
+    ostane bez ijednog konkretnog traga."""
+    ranked = [row for row in rows
+              if row["evidence_level"] in (EVIDENCE_STRONG, EVIDENCE_MODERATE)]
+    limited = [row for row in rows if row["evidence_level"] == EVIDENCE_LIMITED]
+
+    named = [row["lesson_name"] for row in ranked if row["lesson_name"]]
+    named = named[:MAX_NAMED_LESSONS]
+
+    by_area = {}
+    for row in limited:
+        by_area.setdefault(row["area_name"] or "", []).append(row)
+
+    grouped, isolated = [], []
+    for area, items in sorted(by_area.items()):
+        if len(items) >= LIMITED_GROUP_MIN:
+            # Jedna oprezna rečenica o oblasti umjesto tri imena lekcija.
+            grouped.append({"area_name": area, "lesson_count": len(items),
+                            "evidence_level": EVIDENCE_LIMITED})
+        else:
+            isolated.extend(items)
+
+    if not named and isolated:
+        first = isolated[0]["lesson_name"]
+        named = [first] if first else []
+
+    return {
+        "named_lessons": named,
+        "grouped_areas": grouped,
+        "max_named_lessons": MAX_NAMED_LESSONS,
+        "max_focus_bullets": (MAX_FOCUS_BULLETS if ranked
+                              else MAX_FOCUS_BULLETS_LIMITED),
+    }
 
 
 def trusted_labels(facts):
