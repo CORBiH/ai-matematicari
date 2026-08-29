@@ -61,7 +61,14 @@
     {% for s in students %}
     <tr>
       <td>{{ s.display_name or "Učenik #%s"|format(s.student_id) }}</td>
-      <td>{% if s.grade %}{{ s.grade }}. razred{% else %}<span class="muted">—</span>{% endif %}</td>
+      <td>
+        {% if s.grade %}{{ s.grade }}. razred{% else %}<span class="muted">nije potvrđen</span>{% endif %}
+        {# Samo kad strukturni dokaz odstupa. Ime NIKAD nije dokaz. #}
+        {% if s.grade_needs_review %}
+        <a href="{{ url_for('admin_students.profile', student_id=s.student_id) }}"
+           title="Provjeri razred">⚠ provjeri</a>
+        {% endif %}
+      </td>
       <td>
         {% if s.thinkific_linked %}<span class="pill" style="color:var(--ok)">povezan</span>
         {% else %}<span class="pill">nije povezan</span>{% endif %}

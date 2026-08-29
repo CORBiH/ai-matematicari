@@ -393,3 +393,133 @@ def test_lesson_from_another_grade_is_refused_by_the_route(admin, db, student):
                data=_session_form(token, area_name="Cijeli brojevi",
                                   lesson_name="Skup cijelih brojeva Z"))
     assert db.fetch_sessions(student) == []
+
+
+# ---------------------------------------------------------------------------
+# TEKUĆI RAZRED: ispravka, blokada bez razreda, upozorenje iz dokaza
+# ---------------------------------------------------------------------------
+def _grade_of(db, student_id):
+    return db.fetch_student_profile(student_id)["grade"]
+
+
+def test_admin_can_change_the_current_grade(admin, db, student):
+    token = _csrf_from(admin.get("/admin/students/%d" % student))
+    response = admin.post("/admin/students/%d/grade" % student,
+                          data={"csrf_token": token, "grade": "7"})
+    assert response.status_code == 302
+    assert _grade_of(db, student) == 7
+
+
+def test_changing_grade_requires_csrf(admin, db, student):
+    response = admin.post("/admin/students/%d/grade" % student,
+                          data={"grade": "7"})
+    assert response.status_code == 400
+    assert _grade_of(db, student) == 6
+
+
+def test_changing_grade_requires_admin(client, db, student, admin_env):
+    assert client.post("/admin/students/%d/grade" % student,
+                       data={"grade": "7"}).status_code == 403
+    assert _grade_of(db, student) == 6
+
+
+def test_get_cannot_change_the_grade(admin, db, student):
+    assert admin.get("/admin/students/%d/grade?grade=7"
+                     % student).status_code in (404, 405)
+    assert _grade_of(db, student) == 6
+
+
+@pytest.mark.parametrize("grade", ["5", "10", "", "sedmi", "0"])
+def test_invalid_grade_is_refused(admin, db, student, grade):
+    token = _csrf_from(admin.get("/admin/students/%d" % student))
+    admin.post("/admin/students/%d/grade" % student,
+               data={"csrf_token": token, "grade": grade})
+    assert _grade_of(db, student) == 6
+
+
+def test_session_form_is_blocked_until_the_grade_is_confirmed(admin, db):
+    """Bez potvrđenog razreda nema kurikuluma — ni nasumičnog."""
+    from matbot.student_identity import PROVIDER_THINKIFIC_EMAIL
+
+    unknown = db.get_or_create_student(PROVIDER_THINKIFIC_EMAIL,
+                                       "bez-razreda@example.com")
+    page = admin.get("/admin/students/%d" % unknown)
+    assert "Potrebno je prvo potvrditi razred učenika.".encode() in page.data
+    # Forma gradiva se ne nudi.
+    assert b'name="area_name"' not in page.data
+
+    token = _csrf_from(page)
+    admin.post("/admin/students/%d/sessions" % unknown,
+               data=_session_form(token))
+    assert db.fetch_sessions(unknown) == []
+
+
+def test_confirming_the_grade_unlocks_the_session_form(admin, db):
+    from matbot.student_identity import PROVIDER_THINKIFIC_EMAIL
+
+    unknown = db.get_or_create_student(PROVIDER_THINKIFIC_EMAIL,
+                                       "bez-razreda@example.com")
+    token = _csrf_from(admin.get("/admin/students/%d" % unknown))
+    admin.post("/admin/students/%d/grade" % unknown,
+               data={"csrf_token": token, "grade": "6"})
+    page = admin.get("/admin/students/%d" % unknown)
+    assert b'name="area_name"' in page.data
+    assert "Potrebno je prvo potvrditi".encode() not in page.data
+
+
+def _add_thinkific_grade(db, student_id, month, grade):
+    conn = db._connection()
+    conn.execute(
+        "INSERT INTO thinkific_progress_imports (report_month, course_key, "
+        " course_name, grade, source_sha256, row_count) "
+        "VALUES (?, ?, 'M', ?, 'x', 1)", (month, "grade_%d" % grade, grade))
+    import_id = conn.execute(
+        "SELECT MAX(id) FROM thinkific_progress_imports").fetchall()[0][0]
+    conn.execute(
+        "INSERT INTO thinkific_progress_snapshots (import_id, student_id, "
+        " report_month, course_key, course_name, grade) "
+        "VALUES (?, ?, ?, ?, 'M', ?)",
+        (import_id, student_id, month, "grade_%d" % grade, grade))
+    conn.commit()
+
+
+def test_consistent_student_gets_no_warning(admin, db):
+    student_id = db.create_student("Uredan", 7)
+    _add_thinkific_grade(db, student_id, "2026-09", 7)
+    assert "provjeri".encode() not in admin.get("/admin/students").data
+    profile = admin.get("/admin/students/%d" % student_id)
+    assert "Razred zahtijeva provjeru".encode() not in profile.data
+
+
+def test_stale_student_gets_a_warning_from_structured_evidence(admin, db):
+    student_id = db.create_student("Zastario", 6)
+    _add_thinkific_grade(db, student_id, "2026-09", 7)
+
+    listing = admin.get("/admin/students")
+    assert "provjeri".encode() in listing.data
+    assert ("/admin/students/%d" % student_id).encode() in listing.data
+
+    profile = admin.get("/admin/students/%d" % student_id)
+    assert "Razred zahtijeva provjeru".encode() in profile.data
+    assert "Thinkific posljednji podatak: 7".encode() in profile.data
+    assert b"2026-09" in profile.data
+
+
+def test_warning_never_exposes_the_email(admin, db):
+    from matbot.student_identity import PROVIDER_THINKIFIC_EMAIL
+
+    student_id = db.get_or_create_student(PROVIDER_THINKIFIC_EMAIL,
+                                          "tajna@example.com")
+    db.set_student_grade(student_id, 6)
+    _add_thinkific_grade(db, student_id, "2026-09", 7)
+    for page in (admin.get("/admin/students"),
+                 admin.get("/admin/students/%d" % student_id)):
+        assert b"tajna@example.com" not in page.data
+
+
+def test_name_hint_alone_never_produces_a_warning(admin, db):
+    """„Adjan 7 PLUS" bez strukturnog dokaza NE smije podići upozorenje."""
+    db.create_student("Adjan 7 PLUS", 6)
+    listing = admin.get("/admin/students")
+    assert "Adjan 7 PLUS".encode() in listing.data
+    assert "provjeri".encode() not in listing.data

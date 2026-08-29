@@ -15,6 +15,37 @@
     <a href="{{ url_for('admin_reports.student_preview', student_id=student_id, month=month) }}">
       <button type="button">Izvještaj</button></a>
   </p>
+  {# TEKUĆI razred je PROFIL, ne identitet. Mijenja se svjesno i mijenja SAMO
+     ovo polje — istorija časova, aktivnosti i snimaka ostaje netaknuta. #}
+  <form method="post" action="{{ url_for('admin_students.update_grade', student_id=student_id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label>Trenutni razred<br>
+      <select name="grade" required>
+        {% for g in valid_grades %}
+        <option value="{{ g }}" {% if student.grade == g %}selected{% endif %}>{{ g }}. razred</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button type="submit">Promijeni razred</button>
+    <span class="muted">Mijenja samo profil; stari časovi i izvještaji ostaju nepromijenjeni.</span>
+  </form>
+
+  {% if grade_status in ('LIKELY_STALE', 'CONFLICTING_EVIDENCE') %}
+  {# Dokaz, ne ispravka. Broj iz imena se NIKAD ne koristi. #}
+  <div class="banner err" style="margin-top:10px">
+    ⚠ Razred zahtijeva provjeru.
+    Profil: {% if student.grade %}{{ student.grade }}. razred{% else %}nije potvrđen{% endif %}.
+    {% if grade_evidence.thinkific.grade %}
+      Thinkific posljednji podatak: {{ grade_evidence.thinkific.grade }}. razred
+      ({{ grade_evidence.thinkific.when }}).
+    {% endif %}
+    {% if grade_evidence.assessment.grade %}
+      Kontrolni: {{ grade_evidence.assessment.grade }}. razred.
+    {% endif %}
+    {% if grade_recommended %}Prijedlog za provjeru: {{ grade_recommended }}. razred.{% endif %}
+  </div>
+  {% endif %}
+
   {% if not thinkific_linked %}
   <form method="post" action="{{ url_for('admin_students.link_account', student_id=student_id) }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
@@ -29,6 +60,11 @@
 
 <div class="card">
   <h3 style="margin-top:0">Evidencija časa</h3>
+  {% if not grade_known %}
+  {# BEZ POTVRĐENOG RAZREDA NEMA KURIKULUMA. Nasumičan razred bi instruktoru dao
+     gradivo tuđe generacije, pa se forma ne nudi. #}
+  <p class="banner err">Potrebno je prvo potvrditi razred učenika.</p>
+  {% else %}
   <form method="post" action="{{ url_for('admin_students.create_session', student_id=student_id) }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <p><label>Datum<br><input type="date" name="session_date" required></label></p>
@@ -97,6 +133,7 @@
       });
     }
   </script>
+  {% endif %}
 </div>
 
 <div class="card">

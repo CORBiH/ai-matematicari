@@ -598,8 +598,12 @@
 
         <div class="home-step">
           <label class="home-step-label" for="homeGrade">Koji si razred?</label>
+          <!-- RAZRED SE BIRA SVJESNO. Ranije je `6` bio unaprijed izabran, pa je
+               ucenik koji meni nikad nije dodirnuo slao 6 — i taj broj je zavrsavao
+               u profilu kao trajan podatak. Prazna opcija je zato podrazumijevana. -->
           <select id="homeGrade" class="home-grade-select" aria-label="Razred">
-            <option value="6" selected>6. razred</option>
+            <option value="" selected disabled>— izaberi razred —</option>
+            <option value="6">6. razred</option>
             <option value="7">7. razred</option>
             <option value="8">8. razred</option>
             <option value="9">9. razred</option>
@@ -1038,7 +1042,7 @@ document.addEventListener('DOMContentLoaded', () => {
        "Objašnjenje" while the backend answered in Quick (returning a bare "1").
        Quick must always be an explicit user choice. */
     const state = {
-      grade: '6', mode: 'explain',
+      grade: '', mode: 'explain',
       topic: '', topicName: '', topicOblast: '', topicOblastId: '', topicSource: '',
       oblast: ''
     };
@@ -1800,7 +1804,11 @@ document.addEventListener('DOMContentLoaded', () => {
     /* mode kartice: explain/practice traže lekciju, exam traži oblast, quick ide odmah u chat */
     modeGrid.querySelectorAll('.home-mode-card').forEach(btn=>{
       btn.addEventListener('click', ()=>{
-        state.grade = gradeSel.value || '6';
+        state.grade = gradeSel.value || '';
+        if (!state.grade){
+          try { gradeSel.focus(); } catch(_){}
+          return;                              // prvo razred, pa nacin rada
+        }
         state.mode = btn.dataset.mode || 'quick';
         interactionPhase = null;                 // novi izbor prekida čekanje odgovora na zadatak
         modeGrid.querySelectorAll('.home-mode-card').forEach(x=>x.classList.toggle('active', x === btn));
@@ -1821,7 +1829,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     gradeSel.addEventListener('change', ()=>{
       invalidatePracticeCurriculumState();
-      state.grade = gradeSel.value || '6';
+      state.grade = gradeSel.value || '';
       state.topic = ''; state.topicName = ''; state.topicOblast = ''; state.topicOblastId = ''; state.topicSource = ''; state.oblast = '';
       clearStoredActiveTopic();
       hidePicker();
@@ -2307,7 +2315,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function loadTopicsForGrade(grade){
-      grade = grade || '6';
+      if (!grade) { return; }   // bez razreda se kurikulum ne ucitava
       if (topicsLoadedGrade === grade) return;
       try{
         resetTopicOptions();

@@ -20,7 +20,8 @@ import logging
 from flask import (Blueprint, abort, redirect, render_template, request,
                    url_for)
 
-from matbot import report_input, reporting_db, student_identity, student_sessions
+from matbot import (report_input, reporting_db, student_grades,
+                    student_identity, student_sessions)
 from matbot.admin_auth import CSRF_FORM_FIELD, require_admin
 
 logger = logging.getLogger("matbot.admin_students")
@@ -38,6 +39,7 @@ ERROR_EMAIL = "Thinkific e-mail nije u ispravnom obliku."
 ERROR_TAKEN = "Ovaj Thinkific nalog je već povezan sa drugim učenikom."
 ERROR_SESSION = "Podaci o času nisu ispravni."
 ERROR_UNAVAILABLE = "Izvještajna baza trenutno nije dostupna."
+ERROR_GRADE_UNKNOWN = "Potrebno je prvo potvrditi razred učenika."
 
 
 def _require_csrf():
@@ -75,7 +77,18 @@ def index():
     search = (request.args.get("q") or "").strip()[:MAX_NAME_CHARS]
     grade = _clean_grade(request.args.get("grade"))
     try:
-        students = _db().list_students(search=search or None, grade=grade)
+        database = _db()
+        students = database.list_students(search=search or None, grade=grade)
+        # ZASTAVICA ZA PREGLED, ne ispravka. Redovi koji se slažu s dokazom
+        # ostaju čisti — upozorenje na svakom redu ne bi značilo ništa.
+        for student in students:
+            try:
+                evidence = database.fetch_grade_evidence(student["student_id"])
+            except reporting_db.ReportingUnavailable:
+                student["grade_needs_review"] = False
+                continue
+            student["grade_needs_review"] = student_grades.needs_review(
+                student["grade"], evidence)
     except reporting_db.ReportingUnavailable as error:
         logger.info("admin_students_list_failed code=%s", error.code)
         students = []
@@ -150,12 +163,24 @@ def profile(student_id):
 
     from matbot import topics
 
-    # Kanonski izbor gradiva za razred OVOG učenika. Isti izvor kao Practice i
-    # Kontrolni (`data/topics.json`) — nema druge kopije kurikuluma.
-    curriculum = topics.curriculum_choices(student.get("grade"))
+    # DOKAZ O RAZREDU — prikaz, ne ispravka. Administrator odlučuje.
+    try:
+        evidence = database.fetch_grade_evidence(student_id)
+    except reporting_db.ReportingUnavailable as error:
+        logger.info("admin_grade_evidence_failed code=%s", error.code)
+        evidence = student_grades.evidence_from_rows()
+    status, recommended = student_grades.classify(student.get("grade"), evidence)
+
+    # BEZ POTVRĐENOG RAZREDA NEMA KURIKULUMA. Prazan izbor je pošteniji od
+    # nasumičnog razreda — instruktor bi inače upisao gradivo tuđe generacije.
+    grade_known = student.get("grade") in student_grades.VALID_GRADES
+    curriculum = topics.curriculum_choices(student.get("grade")) if grade_known else {}
     return render_template(
         "admin_student_profile.html", student_id=student_id, student=student,
         curriculum=curriculum, areas=list(curriculum),
+        grade_known=grade_known, grade_status=status,
+        grade_recommended=recommended, grade_evidence=evidence,
+        valid_grades=student_grades.VALID_GRADES,
         thinkific_linked=linked, sessions=list(reversed(sessions)),
         activity_labels=student_sessions.ACTIVITY_LABELS,
         homework_labels=student_sessions.HOMEWORK_LABELS,
@@ -191,6 +216,31 @@ def link_account(student_id):
     return redirect(url_for("admin_students.profile", student_id=student_id))
 
 
+@admin_students_bp.route("/<int:student_id>/grade", methods=["POST"])
+@require_admin
+def update_grade(student_id):
+    """Promijeni TEKUĆI razred. Mijenja samo profil, nikad istoriju.
+
+    Nema automatske promocije: dokaz se administratoru PRIKAZUJE, a odluku
+    donosi on. Stari časovi, aktivnost, kontrolni i snimci ostaju netaknuti."""
+    _require_csrf()
+    grade = _clean_grade(request.form.get("grade"))
+    if grade is None:
+        return redirect(url_for("admin_students.profile",
+                                student_id=student_id, error=ERROR_GRADE))
+    try:
+        if not _db().set_student_grade(student_id, grade):
+            abort(404)
+    except reporting_db.ReportingUnavailable as error:
+        logger.info("admin_grade_update_failed code=%s", error.code)
+        return redirect(url_for("admin_students.profile",
+                                student_id=student_id, error=ERROR_UNAVAILABLE))
+    # Bez PII: samo ID zapisa i nova vrijednost.
+    logger.info("admin_student_grade_changed student_id=%s grade=%s",
+                student_id, grade)
+    return redirect(url_for("admin_students.profile", student_id=student_id))
+
+
 def _session_from_form(grade):
     """Formular → provjeren zapis. Server je autoritet, ne klijent.
 
@@ -208,10 +258,18 @@ def _session_from_form(grade):
 
 
 def _student_grade(student_id):
+    """Razred IZ BAZE. Nepoznat razred zaustavlja unos gradiva (Dio 5)."""
     profile = _db().fetch_student_profile(student_id)
     if profile is None:
         abort(404)
-    return profile.get("grade")
+    grade = profile.get("grade")
+    if grade not in student_grades.VALID_GRADES:
+        raise _GradeUnknown()
+    return grade
+
+
+class _GradeUnknown(Exception):
+    """Razred nije potvrđen — čas s gradivom se ne smije upisati."""
 
 
 @admin_students_bp.route("/<int:student_id>/sessions", methods=["POST"])
@@ -220,6 +278,9 @@ def create_session(student_id):
     _require_csrf()
     try:
         record = _session_from_form(_student_grade(student_id))
+    except _GradeUnknown:
+        return redirect(url_for("admin_students.profile",
+                                student_id=student_id, error=ERROR_GRADE_UNKNOWN))
     except student_sessions.SessionValidationError as error:
         logger.info("admin_session_rejected code=%s", error.code)
         return redirect(url_for("admin_students.profile",
@@ -244,6 +305,9 @@ def update_session(student_id, session_id):
     _require_csrf()
     try:
         record = _session_from_form(_student_grade(student_id))
+    except _GradeUnknown:
+        return redirect(url_for("admin_students.profile",
+                                student_id=student_id, error=ERROR_GRADE_UNKNOWN))
     except student_sessions.SessionValidationError as error:
         logger.info("admin_session_rejected code=%s", error.code)
         return redirect(url_for("admin_students.profile",

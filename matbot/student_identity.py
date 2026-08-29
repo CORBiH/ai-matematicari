@@ -138,17 +138,24 @@ def fingerprint(external_user_id):
                                             external_user_id or "")
 
 
-def resolve_student(identity, grade=None):
+def resolve_student(identity):
     """Tvrdnja iz potpisanog tokena -> `students.id`, ili `None`.
 
     NIKAD ne baca i nikad ne blokira duže od izvještajnog roka — poziva se s
     tutorskog puta, pa važi ista invarijanta kao za cijeli izvještajni sloj:
     nedostupna baza ne smije promijeniti nijedan odgovor učeniku.
 
-    `grade` NIJE dio identiteta. Dolazi iz padajućeg menija u MAT-BOT-u, dakle
-    bira ga učenik, i upisuje se samo kao podatak o profilu pri PRVOM susretu.
-    Traženje učenika ide isključivo po (provider, external_user_id), pa promjena
-    razreda ne može napraviti drugog učenika.
+    RAZRED SE ODAVDE VIŠE NE UPISUJE (ispravka Faze 3D). Ranije je vrijednost iz
+    padajućeg menija ulazila u profil pri PRVOM susretu, a meni je u markupu
+    imao `6` kao unaprijed izabranu opciju — pa je učenik koji ga nikad nije
+    ni dodirnuo trajno dobijao `students.grade = 6`. Kako grade nikad nije bio
+    ni jednim putem osvježavan, ta vrijednost je ostajala zauvijek i sada bi
+    instruktoru davala pogrešan kurikulum.
+
+    Razred zahtjeva je PARAMETAR TURNUSA (koji kurikulum koristiti sada), a
+    `students.grade` je PROFIL (koji razred učenik zaista pohađa). Dvije
+    različite tvrdnje — pa se više ne miješaju: profil pišu administrator i
+    Thinkific uvoz, nikad tutorski padajući meni.
 
     `display_name` se NAMJERNO ne prosljeđuje: ime nije identitet, a MAT-BOT ga
     nema — iz e-maila se NE izvodi. Ostaje prazno dok ne dođe iz Thinkifica ili
@@ -159,4 +166,4 @@ def resolve_student(identity, grade=None):
     external = identity.get("external_user_id")
     if provider != PROVIDER_THINKIFIC_EMAIL or not external:
         return None
-    return reporting_db.resolve_student(provider, external, grade=grade)
+    return reporting_db.resolve_student(provider, external)

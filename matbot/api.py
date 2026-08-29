@@ -119,7 +119,9 @@ def _resolve_reporting_student(token_data, grade=None):
         identity = auth.reporting_identity(token_data)
         if not identity:
             return None
-        return student_identity.resolve_student(identity, grade=grade)
+        # RAZRED SE NE PROSLJEDJUJE (Faza 3D): to je parametar turnusa,
+        # ne tvrdnja o profilu. Vidi `student_identity.resolve_student`.
+        return student_identity.resolve_student(identity)
     except Exception:
         # POJAS I TREGERI. Sloj ispod je već „nikad ne baca“, ali oba pozivna
         # mjesta leže unutar `try` bloka čiji bi `except` učeniku vratio

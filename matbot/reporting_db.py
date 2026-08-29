@@ -1277,6 +1277,65 @@ class ReportingDatabase:
                 raise ReportingUnavailable(
                     "student_link_failed:" + type(exc).__name__, exc) from None
 
+    def set_student_grade(self, student_id, grade):
+        """Promijeni TEKUĆI razred učenika. Mijenja SAMO `students.grade`.
+
+        Istorija se ne dira: `learning_activity.grade`,
+        `assessment_attempts.grade`, `thinkific_progress_snapshots.grade` i
+        `student_sessions` su OPAŽANJA i ostaju kakva jesu. Učenik koji pređe iz
+        šestog u sedmi razred ne smije izgubiti niti izmijeniti svoj lanjski čas.
+
+        Poziva se ISKLJUČIVO iz administratorske akcije — nema automatske
+        promocije i nema masovne ispravke."""
+        if int(grade) not in (6, 7, 8, 9):
+            raise ReportingUnavailable("student_grade_invalid")
+        with self._lock:
+            try:
+                conn = self._connection()
+                cursor = conn.execute(
+                    "UPDATE students SET grade = ?, updated_at = CURRENT_TIMESTAMP "
+                    "WHERE id = ?", (int(grade), int(student_id)))
+                changed = cursor.rowcount
+                conn.commit()
+                return changed == 1
+            except Exception as exc:
+                self._safe_rollback()
+                self._drop_connection()
+                raise ReportingUnavailable(
+                    "student_grade_update_failed:" + type(exc).__name__, exc) from None
+
+    def fetch_grade_evidence(self, student_id):
+        """SAMO ČITANJE: datirani tragovi razreda iz sva tri strukturna izvora.
+
+        Ne vraća e-mail, `external_user_id` ni ijedan slobodan tekst. Redovi su
+        `(vrijeme, razred)` parovi koje `student_grades` pretvara u dokaz."""
+        with self._lock:
+            try:
+                conn = self._connection()
+                thinkific = _rows(conn.execute(
+                    "SELECT report_month, grade FROM thinkific_progress_snapshots "
+                    "WHERE student_id = ? AND grade IS NOT NULL",
+                    (int(student_id),)))
+                assessment = _rows(conn.execute(
+                    "SELECT MAX(completed_at), grade FROM assessment_attempts "
+                    "WHERE student_id = ? AND grade IS NOT NULL "
+                    "AND completed_at IS NOT NULL GROUP BY grade",
+                    (int(student_id),)))
+                matbot = _rows(conn.execute(
+                    "SELECT MAX(occurred_at), grade FROM learning_activity "
+                    "WHERE student_id = ? AND grade IS NOT NULL GROUP BY grade",
+                    (int(student_id),)))
+            except Exception as exc:
+                self._drop_connection()
+                raise ReportingUnavailable(
+                    "grade_evidence_read_failed:" + type(exc).__name__, exc) from None
+        from matbot import student_grades
+
+        return student_grades.evidence_from_rows(
+            thinkific_rows=[(m, g) for m, g in thinkific],
+            assessment_rows=[(w, g) for w, g in assessment],
+            matbot_rows=[(w, g) for w, g in matbot])
+
     def student_has_thinkific(self, student_id):
         with self._lock:
             try:
