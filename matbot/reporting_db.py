@@ -48,6 +48,13 @@ PROVIDER_THINKIFIC = "thinkific"
 # Drži se ovdje jer je dio UNIQUE(source, event_key) ugovora baze.
 SOURCE = "matbot"
 
+# Faza 3D: registar i povezivanje naloga rade nad ISTIM providerom kao Faza 1 —
+# nikad nov prostor imena. Drži se ovdje da se string ne bi prepisivao.
+_THINKIFIC_PROVIDER = "thinkific_email"
+
+# Razredi koje ručni upis smije primiti. Osnovna škola 6–9 (BiH).
+VALID_MANUAL_GRADES = (6, 7, 8, 9)
+
 # Tabele koje izvještajna šema mora imati. Dijagnostika ih SAMO provjerava —
 # ovaj modul nikad ne kreira ni ne migrira šemu.
 REQUIRED_TABLES = (
@@ -1110,6 +1117,231 @@ class ReportingDatabase:
                 raise ReportingUnavailable(
                     "profile_read_failed:" + type(exc).__name__, exc) from None
 
+    # --- FAZA 3D: registar učenika i evidencija časova ----------------------
+    # NEMA DRUGOG PROSTORA IMENA. Registar je pogled na POSTOJEĆU `students`
+    # tabelu; učenik koji je nastao kroz Thinkific i učenik kojeg je
+    # administrator upisao ručno su isti tip zapisa i vide se na istoj listi.
+    def list_students(self, search=None, grade=None):
+        """Registar: svi učenici + da li imaju povezan Thinkific nalog.
+
+        E-MAIL SE NE VRAĆA. Administratoru je dovoljno „povezan/nije povezan";
+        adresa nema šta da radi u listi, URL-u ni logu (Dio 40)."""
+        with self._lock:
+            try:
+                conn = self._connection()
+                sql = ("SELECT s.id, s.display_name, s.grade, "
+                       "       (SELECT COUNT(*) FROM student_accounts a "
+                       "        WHERE a.student_id = s.id AND a.provider = ?) "
+                       "FROM students s")
+                params = [_THINKIFIC_PROVIDER]
+                where = []
+                if (search or "").strip():
+                    where.append("LOWER(COALESCE(s.display_name, '')) LIKE ?")
+                    params.append("%" + search.strip().lower() + "%")
+                if grade is not None:
+                    where.append("s.grade = ?")
+                    params.append(int(grade))
+                if where:
+                    sql += " WHERE " + " AND ".join(where)
+                sql += " ORDER BY COALESCE(s.display_name, ''), s.id"
+                rows = _rows(conn.execute(sql, tuple(params)))
+            except Exception as exc:
+                self._drop_connection()
+                raise ReportingUnavailable(
+                    "student_list_failed:" + type(exc).__name__, exc) from None
+        return [{"student_id": r[0], "display_name": r[1], "grade": r[2],
+                 "thinkific_linked": bool(r[3])} for r in rows]
+
+    def create_student(self, display_name, grade):
+        """Ručno upisan učenik. BEZ naloga — nalog je zaseban, svjestan korak.
+
+        Učenik bez naloga je potpuno legitiman: časove dobija od instruktora, a
+        izvještaj mu pripada i kad nikad nije otvorio nijednu platformu."""
+        name = _clean_display_name(display_name)
+        if not name:
+            raise ReportingUnavailable("student_name_required")
+        student_grade = _clean_grade(grade)
+        # RUČNI UPIS TRAŽI TAČAN RAZRED. `_clean_grade` je namjerno širok (put
+        # identiteta smije primiti i nepoznat razred), ali učenik kojeg upisuje
+        # administrator ide u izvještaj s razredom na naslovnici — pa je ovdje
+        # skup zatvoren na 6–9, tačno kao u formularu.
+        if student_grade not in VALID_MANUAL_GRADES:
+            raise ReportingUnavailable("student_grade_required")
+        with self._lock:
+            try:
+                conn = self._connection()
+                cursor = conn.execute(
+                    "INSERT INTO students (display_name, grade, created_at, "
+                    " updated_at, last_seen_at) VALUES (?, ?, CURRENT_TIMESTAMP, "
+                    " CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                    (name, student_grade))
+                student_id = cursor.lastrowid
+                conn.commit()
+                return student_id
+            except Exception as exc:
+                self._safe_rollback()
+                self._drop_connection()
+                raise ReportingUnavailable(
+                    "student_create_failed:" + type(exc).__name__, exc) from None
+
+    def link_thinkific_account(self, student_id, external_user_id):
+        """Poveži Thinkific nalog s POSTOJEĆIM učenikom. Pada zatvoreno.
+
+        NIKAD NE PREUZIMA TUĐI NALOG. Ako adresa već pripada drugom učeniku,
+        `UNIQUE(provider, external_user_id)` to zaustavlja, a mi vraćamo
+        `student_account_taken` s ID-em postojećeg učenika da administrator zna
+        KOJI zapis da pogleda. Spajanje identiteta je destruktivno i nije
+        predmet ove faze."""
+        external = _clean_external_id(external_user_id)
+        with self._lock:
+            try:
+                conn = self._connection()
+                owner = _rows(conn.execute(
+                    "SELECT student_id FROM student_accounts "
+                    "WHERE provider = ? AND external_user_id = ?",
+                    (_THINKIFIC_PROVIDER, external)))
+                if owner:
+                    existing = owner[0][0]
+                    if int(existing) == int(student_id):
+                        return False              # već povezan s OVIM učenikom
+                    raise ReportingUnavailable(
+                        "student_account_taken:%s" % existing)
+                conn.execute(
+                    "INSERT INTO student_accounts (student_id, provider, "
+                    " external_user_id, created_at, last_seen_at) "
+                    "VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                    (int(student_id), _THINKIFIC_PROVIDER, external))
+                conn.commit()
+                return True
+            except ReportingUnavailable:
+                self._safe_rollback()
+                raise
+            except Exception as exc:
+                self._safe_rollback()
+                self._drop_connection()
+                raise ReportingUnavailable(
+                    "student_link_failed:" + type(exc).__name__, exc) from None
+
+    def student_has_thinkific(self, student_id):
+        with self._lock:
+            try:
+                conn = self._connection()
+                rows = _rows(conn.execute(
+                    "SELECT 1 FROM student_accounts WHERE student_id = ? "
+                    "AND provider = ?", (int(student_id), _THINKIFIC_PROVIDER)))
+                return bool(rows)
+            except Exception as exc:
+                self._drop_connection()
+                raise ReportingUnavailable(
+                    "student_account_read_failed:" + type(exc).__name__, exc) from None
+
+    _SESSION_COLUMNS = ("id", "student_id", "session_date", "attendance",
+                        "activity_rating", "homework_status", "area_name",
+                        "lesson_name", "comment", "created_at", "updated_at")
+
+    def insert_session(self, student_id, record):
+        """Upiši jedan čas. `record` je već PROŠAO `student_sessions.validate_session`."""
+        with self._lock:
+            try:
+                conn = self._connection()
+                cursor = conn.execute(
+                    "INSERT INTO student_sessions (student_id, session_date, "
+                    " attendance, activity_rating, homework_status, area_name, "
+                    " lesson_name, comment, created_at, updated_at) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, "
+                    " CURRENT_TIMESTAMP)",
+                    (int(student_id), record["session_date"], record["attendance"],
+                     record["activity_rating"], record["homework_status"],
+                     record["area_name"], record["lesson_name"], record["comment"]))
+                session_id = cursor.lastrowid
+                conn.commit()
+                return session_id
+            except Exception as exc:
+                self._safe_rollback()
+                self._drop_connection()
+                raise ReportingUnavailable(
+                    "session_insert_failed:" + type(exc).__name__, exc) from None
+
+    def update_session(self, session_id, student_id, record):
+        """Izmijeni čas. VLASNIŠTVO JE USLOV, ne pretpostavka.
+
+        `student_id` u `WHERE` je zaštita od IDOR-a: zapis tuđeg učenika se ne
+        može izmijeniti ni kad se pogodi tačan `session_id`."""
+        with self._lock:
+            try:
+                conn = self._connection()
+                cursor = conn.execute(
+                    "UPDATE student_sessions SET session_date = ?, attendance = ?, "
+                    " activity_rating = ?, homework_status = ?, area_name = ?, "
+                    " lesson_name = ?, comment = ?, updated_at = CURRENT_TIMESTAMP "
+                    "WHERE id = ? AND student_id = ?",
+                    (record["session_date"], record["attendance"],
+                     record["activity_rating"], record["homework_status"],
+                     record["area_name"], record["lesson_name"], record["comment"],
+                     int(session_id), int(student_id)))
+                changed = cursor.rowcount
+                conn.commit()
+                return changed == 1
+            except Exception as exc:
+                self._safe_rollback()
+                self._drop_connection()
+                raise ReportingUnavailable(
+                    "session_update_failed:" + type(exc).__name__, exc) from None
+
+    def delete_session(self, session_id, student_id):
+        with self._lock:
+            try:
+                conn = self._connection()
+                cursor = conn.execute(
+                    "DELETE FROM student_sessions WHERE id = ? AND student_id = ?",
+                    (int(session_id), int(student_id)))
+                changed = cursor.rowcount
+                conn.commit()
+                return changed == 1
+            except Exception as exc:
+                self._safe_rollback()
+                self._drop_connection()
+                raise ReportingUnavailable(
+                    "session_delete_failed:" + type(exc).__name__, exc) from None
+
+    def fetch_session(self, session_id, student_id):
+        return self._fetch_sessions(
+            "WHERE id = ? AND student_id = ?",
+            (int(session_id), int(student_id)), single=True)
+
+    def fetch_sessions(self, student_id, date_start=None, date_end=None):
+        """Časovi jednog učenika. Opseg je [start, end) — isti oblik kao mjesec.
+
+        Poredak je DETERMINISTIČAN (datum, pa `id`): dva časa istog dana ne
+        smiju mijenjati redoslijed između dva čitanja."""
+        clause = "WHERE student_id = ?"
+        params = [int(student_id)]
+        if date_start is not None:
+            clause += " AND session_date >= ?"
+            params.append(date_start)
+        if date_end is not None:
+            clause += " AND session_date < ?"
+            params.append(date_end)
+        clause += " ORDER BY session_date, id"
+        return self._fetch_sessions(clause, tuple(params))
+
+    def _fetch_sessions(self, clause, params, single=False):
+        columns = ", ".join(self._SESSION_COLUMNS)
+        with self._lock:
+            try:
+                conn = self._connection()
+                rows = _rows(conn.execute(
+                    "SELECT %s FROM student_sessions %s" % (columns, clause),
+                    params))
+            except Exception as exc:
+                self._drop_connection()
+                raise ReportingUnavailable(
+                    "session_read_failed:" + type(exc).__name__, exc) from None
+        records = [dict(zip(self._SESSION_COLUMNS, row)) for row in rows]
+        if single:
+            return records[0] if records else None
+        return records
+
     def fetch_matbot_month(self, student_id, month_start, next_month_start):
         """Determinističke MAT-BOT brojke za mjesec. Granice su UTC, [start, next).
 
@@ -1176,9 +1408,18 @@ class ReportingDatabase:
                     "SELECT student_id FROM assessment_attempts "
                     "WHERE source = ? AND completed_at IS NOT NULL "
                     "AND completed_at >= ? AND completed_at < ? "
+                    "UNION "
+                    # Faza 3D: čas je RAVNOPRAVAN izvor. Učenik koji nema
+                    # nijedan nalog ni jedan MAT-BOT događaj, a bio je na času,
+                    # zaslužuje izvještaj — to je i cijela poenta registra.
+                    # Granice su datumske ([start, end)), jer `session_date` je
+                    # `YYYY-MM-DD`, a ne vremenski žig.
+                    "SELECT student_id FROM student_sessions "
+                    "WHERE session_date >= ? AND session_date < ? "
                     "ORDER BY 1",
                     (report_month, SOURCE, month_start, next_month_start,
-                     SOURCE, month_start, next_month_start)))
+                     SOURCE, month_start, next_month_start,
+                     month_start[:10], next_month_start[:10])))
                 return [row[0] for row in rows]
             except Exception as exc:
                 self._drop_connection()
@@ -1216,6 +1457,9 @@ class ReportingDatabase:
                               "thinkific_progress_imports",
                               "thinkific_progress_snapshots",
                               "thinkific_progress_sections",
+                              # Faza 3D: kolone evidencije časova moraju se
+                              # vidjeti iz iste komande kao i sve ostalo.
+                              "student_sessions",
                               # Faza 3C: kolone se ISPISUJU jer ovaj repo tabelu
                               # nikad nije kreirao — njen produkcijski oblik se
                               # mora vidjeti, a ne pretpostaviti.
@@ -1257,6 +1501,16 @@ class ReportingDatabase:
                 except Exception:
                     report["v2_schema_problems"] = ["v2_verification_unavailable"]
                 report["v2_schema_verified"] = not report["v2_schema_problems"]
+                # Faza 3D: ista logika za v3. Baza koja tvrdi verziju 3 a nema
+                # ispravnu `student_sessions` mora se VIDJETI kao pokvarena, ne
+                # prijaviti „OK" (živi incident v1→v2 je bio upravo to).
+                try:
+                    from matbot import reporting_schema as _v3schema
+
+                    report["v3_schema_problems"] = _v3schema.verify_v3_schema(conn)
+                except Exception:
+                    report["v3_schema_problems"] = ["v3_verification_unavailable"]
+                report["v3_schema_verified"] = not report["v3_schema_problems"]
                 return report
             except ReportingUnavailable as exc:
                 self._drop_connection()
@@ -1718,6 +1972,10 @@ def _format_report(report):
     if "v2_schema_verified" in report:
         problems = report.get("v2_schema_problems") or []
         lines.append("v2_schema: %s" % ("verified" if report["v2_schema_verified"]
+                                        else "INCOMPLETE -> " + ", ".join(problems)))
+    if "v3_schema_verified" in report:
+        problems = report.get("v3_schema_problems") or []
+        lines.append("v3_schema: %s" % ("verified" if report["v3_schema_verified"]
                                         else "INCOMPLETE -> " + ", ".join(problems)))
     if "monthly_reports_ready" in report:
         problems = report.get("monthly_reports_problems") or []

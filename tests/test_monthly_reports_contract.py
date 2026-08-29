@@ -128,15 +128,22 @@ def test_our_local_ddl_matches_measured_production_properties(tmp_path):
         local.close()
 
 
-def test_no_schema_v3_is_introduced():
-    """Faza 3C ne dodaje migraciju — produkcija ostaje na verziji 2."""
+def test_monthly_reports_still_needs_no_migration_in_v3():
+    """Faza 3D dodaje v3, ali `monthly_reports` OSTAJE netaknuta.
+
+    Verzija 3 donosi SAMO `student_sessions`. Nijedna njena naredba ne dira
+    tabelu izvještaja — stari sačuvani nacrti se ne prepisuju (Dio 35)."""
     from matbot import config
 
-    assert reporting_schema.CURRENT_SCHEMA_VERSION == 2
-    assert config.REPORTING_SCHEMA_VERSION == 2
-    assert set(reporting_schema.MIGRATION_DESCRIPTIONS) == {2}
-    assert not hasattr(reporting_schema, "migrate_to_v3")
-    assert not hasattr(reporting_schema, "SCHEMA_V3_STATEMENTS")
+    assert reporting_schema.CURRENT_SCHEMA_VERSION == 3
+    assert config.REPORTING_SCHEMA_VERSION == 3
+    assert set(reporting_schema.MIGRATION_DESCRIPTIONS) == {2, 3}
+    assert reporting_schema.V3_TABLES == ("student_sessions",)
+    blob = " ".join(reporting_schema.SCHEMA_V3_STATEMENTS)
+    assert "monthly_reports" not in blob
+    for table in reporting_schema.V1_TABLES + reporting_schema.V2_TABLES:
+        assert "ALTER TABLE %s" % table not in blob
+        assert "DROP TABLE %s" % table not in blob
 
 
 # ---------------------------------------------------------------------------

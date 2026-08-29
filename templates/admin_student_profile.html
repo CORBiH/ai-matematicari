@@ -1,0 +1,101 @@
+{% extends "admin_base.html" %}
+{% block heading %}{{ student.display_name or "Učenik" }}{% endblock %}
+{% block topright %}<a href="{{ url_for('admin_students.index') }}">← Učenici</a>{% endblock %}
+{% block content %}
+{% if error %}<div class="banner err">{{ error }}</div>{% endif %}
+
+<div class="card">
+  <p style="margin-top:0">
+    <strong>{{ student.display_name or "Bez imena" }}</strong>
+    {% if student.grade %}<span class="pill">{{ student.grade }}. razred</span>{% endif %}
+    {% if thinkific_linked %}<span class="pill" style="color:var(--ok)">Thinkific: povezan</span>
+    {% else %}<span class="pill">Thinkific: nije povezan</span>{% endif %}
+  </p>
+  <p>
+    <a href="{{ url_for('admin_reports.student_preview', student_id=student_id, month=month) }}">
+      <button type="button">Izvještaj</button></a>
+  </p>
+  {% if not thinkific_linked %}
+  <form method="post" action="{{ url_for('admin_students.link_account', student_id=student_id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label>Poveži Thinkific nalog<br>
+      <input type="email" name="thinkific_email" maxlength="254" required style="width:50%">
+    </label>
+    <button type="submit">Poveži</button>
+    <span class="muted">Adresa se poslije povezivanja nigdje ne prikazuje.</span>
+  </form>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0">Evidencija časa</h3>
+  <form method="post" action="{{ url_for('admin_students.create_session', student_id=student_id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <p><label>Datum<br><input type="date" name="session_date" required></label></p>
+    <p>
+      Prisustvo<br>
+      <label><input type="radio" name="attendance" value="present" checked
+                    onclick="document.getElementById('act').disabled=false"> Prisutan</label>
+      {# Odsutan učenik NEMA angažman: polje se prazni i onemogućuje. Server to
+         svejedno provjerava ponovo — klijent nije autoritet. #}
+      <label><input type="radio" name="attendance" value="absent"
+                    onclick="var a=document.getElementById('act');a.value='';a.disabled=true"> Odsutan</label>
+    </p>
+    <p>
+      <label>Aktivnost na času <span class="muted">(angažman, nije ocjena iz matematike)</span><br>
+        <select name="activity_rating" id="act">
+          <option value="">—</option>
+          {% for value, text in activity_labels.items() %}
+          <option value="{{ value }}">{{ value }} — {{ text }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </p>
+    <p>
+      Zadaća<br>
+      {% for value, text in homework_labels.items() %}
+      <label><input type="radio" name="homework_status" value="{{ value }}"
+                    {% if value == 'not_assigned' %}checked{% endif %}> {{ text }}</label>
+      {% endfor %}
+    </p>
+    <p><label>Oblast<br><input type="text" name="area_name" maxlength="120" style="width:50%"></label></p>
+    <p><label>Lekcija<br><input type="text" name="lesson_name" maxlength="120" style="width:50%"></label></p>
+    <p><label>Komentar<br><textarea name="comment" rows="3" maxlength="1000" style="width:100%"></textarea></label></p>
+    <p><button type="submit">Sačuvaj čas</button></p>
+  </form>
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0">Historija časova ({{ sessions|length }})</h3>
+  {% if sessions %}
+  <table>
+    <tr><th>Datum</th><th>Prisustvo</th><th>Aktivnost</th><th>Zadaća</th>
+        <th>Gradivo</th><th>Komentar</th><th></th></tr>
+    {% for s in sessions %}
+    <tr>
+      <td>{{ s.session_date }}</td>
+      <td>{{ attendance_labels.get(s.attendance, s.attendance) }}</td>
+      <td>{% if s.activity_rating %}{{ s.activity_rating }}/5{% else %}<span class="muted">—</span>{% endif %}</td>
+      <td>{{ homework_labels.get(s.homework_status, s.homework_status) }}</td>
+      <td>
+        {{ s.area_name or "" }}{% if s.lesson_name %} · {{ s.lesson_name }}{% endif %}
+      </td>
+      {# Jinja escapuje po podrazumijevanoj postavci — komentar instruktora je
+         slobodan tekst i nikad se ne renderuje kao HTML. #}
+      <td>{{ s.comment or "" }}</td>
+      <td>
+        <form method="post" style="display:inline"
+              action="{{ url_for('admin_students.delete_session', student_id=student_id, session_id=s.id) }}"
+              onsubmit="return confirm('Obrisati ovaj čas? Ova radnja se ne može poništiti.')">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button type="submit">Obriši</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="muted">Nema evidentiranih časova.</p>
+  {% endif %}
+</div>
+{% endblock %}

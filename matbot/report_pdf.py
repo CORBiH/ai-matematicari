@@ -47,6 +47,11 @@ import os
 
 MAX_PAGES = 2
 
+# Zapažanja s časova u PDF-u: najviše tri, i svako kratko. Izvještaj je pregled
+# mjeseca, ne dnevnik — puna istorija ostaje administratoru.
+MAX_PARENT_COMMENTS = 3
+MAX_PARENT_COMMENT_CHARS = 220
+
 # Bosanski nazivi mjeseci — datum u izvještaju za roditelja ne smije biti
 # „2026-08", a ni engleski „August".
 MONTH_NAMES = ("januar", "februar", "mart", "april", "maj", "juni",
@@ -260,7 +265,23 @@ def _practice_rows(facts):
     return rows
 
 
-def _story(facts, narrative, instructor_comment, label, styles, content_width):
+def _story(facts, narrative, instructor_comment, label, styles, content_width,
+           parent_comments=None):
+    """Biraj raspored po OBLIKU snimka, ne po datumu ni po zastavici.
+
+    Snimak Faze 3C nema ključ `instruction`. Takav nacrt se renderuje STARIM
+    putem, bajt za bajt kako je i nastao — izvještaj koji je roditelj već dobio
+    ne smije se promijeniti zato što je aplikacija u međuvremenu napredovala, a
+    ni pasti zato što mu nedostaju polja koja tada nisu postojala (Dio 35)."""
+    if "instruction" not in (facts or {}):
+        return _story_3c(facts, narrative, instructor_comment, label, styles,
+                         content_width)
+    return _story_3d(facts, narrative, instructor_comment, label, styles,
+                     content_width, parent_comments)
+
+
+def _story_3c(facts, narrative, instructor_comment, label, styles, content_width):
+    """NASLIJEĐENI raspored (Faza 3C). Ne dirati — čuva stare nacrte."""
     from reportlab.platypus import KeepTogether, Paragraph, Spacer
 
     story = [
@@ -363,6 +384,170 @@ def _story(facts, narrative, instructor_comment, label, styles, content_width):
     return story
 
 
+def _fmt_activity(average):
+    """„4,1 / 5". Bez ocijenjenih časova NEMA prosjeka — nikad 0/5."""
+    if average is None:
+        return "nema dovoljno podataka"
+    number = float(average)
+    text = ("%d" % int(number)) if number == int(number) else ("%.1f" % number)
+    return "%s / 5" % text.replace(".", ",")
+
+
+def _fmt_date(value):
+    """`2026-08-22` → `22.08.` — kratak oblik uz zapažanje s časa."""
+    try:
+        year, month, day = str(value).split("-")
+        return "%s.%s." % (day, month)
+    except (ValueError, AttributeError):
+        return str(value or "")
+
+
+def _instruction_rows(instruction):
+    """PRIMARNA tabela mjera. Prisustvo je RAZLOMAK, ne procenat.
+
+    Razlomak je pošteniji na malim uzorcima: „7 od 8" nosi i brojnik i imenilac,
+    dok „88 %" krije da je riječ o osam časova."""
+    rows = [("Evidentiranih časova", str(instruction.get("sessions_total") or 0)),
+            ("Prisustvo", "%d od %d" % (instruction.get("present_count") or 0,
+                                        instruction.get("sessions_total") or 0)),
+            ("Prosječna aktivnost",
+             _fmt_activity(instruction.get("activity_average")))]
+
+    assigned = instruction.get("homework_assigned") or 0
+    if assigned:
+        rows.append(("Zadaća", "%d od %d urađenih"
+                     % (instruction.get("homework_done") or 0, assigned)))
+    areas = instruction.get("areas_worked") or []
+    if areas:
+        rows.append(("Rađene oblasti", " · ".join(areas)))
+    return rows
+
+
+def _parent_matbot_rows(matbot):
+    """SAŽETO. Prikazani zadaci, nagovještaji, gotova rješenja, Objašnjenja i
+    Rezultat NAMJERNO ne idu roditelju (Dio 25): to su načini rada, ne mjere
+    učinka, a zauzimali su pola izvještaja. Ostaju u bazi i u adminu."""
+    practice = matbot.get("practice") or {}
+    kontrolni = matbot.get("kontrolni") or {}
+    rows = [("Aktivnih dana", str(matbot.get("active_days") or 0)),
+            ("Odgovorenih zadataka", str(practice.get("answers_total") or 0)),
+            ("Tačnost", _fmt_percent(practice.get("accuracy_percent")))]
+    if kontrolni.get("attempts"):
+        rows.append(("Kontrolni", "%d · prosjek %s"
+                     % (kontrolni.get("attempts") or 0,
+                        _fmt_percent(kontrolni.get("average_score_percent")))))
+    return rows
+
+
+def _story_3d(facts, narrative, instructor_comment, label, styles, content_width,
+              parent_comments=None):
+    """Faza 3D — PEDAGOŠKI raspored: čas prvo, platforma zadnja.
+
+    Redoslijed nije kozmetika nego tvrdnja o tome šta je izvještaj: ono što je
+    instruktor vidio stoji iznad onoga što je platforma prebrojala."""
+    from reportlab.platypus import Paragraph
+
+    story = [
+        Paragraph(_escape(BRAND), styles["brand"]),
+        Paragraph(_escape(DOC_TITLE), styles["doctitle"]),
+    ]
+    grade = facts.get("grade")
+    story.append(_metric_table(
+        [("Učenik", label),
+         ("Razred", ("%d. razred" % int(grade)) if grade else "nije poznat"),
+         ("Period", month_label(facts.get("report_month")))],
+        styles, [content_width * 0.28, content_width * 0.72]))
+
+    widths = [content_width * 0.42, content_width * 0.58]
+
+    if (narrative.get("summary") or "").strip():
+        story.append(Paragraph("SAŽETAK MJESECA", styles["h2"]))
+        story.append(Paragraph(_escape(narrative["summary"]), styles["body"]))
+
+    # --- 2. RAD NA ČASOVIMA (primarni odjeljak) --------------------------
+    instruction = facts.get("instruction") or {}
+    story.append(Paragraph("RAD NA ČASOVIMA", styles["h2"]))
+    if not instruction.get("available"):
+        story.append(Paragraph("Nema evidentiranih časova u ovom mjesecu.",
+                               styles["body"]))
+    else:
+        story.append(_metric_table(_instruction_rows(instruction), styles, widths))
+        if not (instruction.get("homework_assigned") or 0):
+            # Nula zadanih NIJE nula urađenih. „0 %" bi bila optužba bez osnove.
+            story.append(Paragraph(
+                "Zadaća nije evidentirana kao zadana u ovom mjesecu.",
+                styles["note"]))
+
+    # --- 3. MAT-BOT (sažeto) ---------------------------------------------
+    matbot = facts.get("matbot") or {}
+    story.append(Paragraph("SAMOSTALNI RAD U MAT-BOT-U", styles["h2"]))
+    if not matbot.get("any_activity"):
+        story.append(Paragraph("Nema zabilježene MAT-BOT aktivnosti u ovom mjesecu.",
+                               styles["body"]))
+    else:
+        story.append(_metric_table(_parent_matbot_rows(matbot), styles, widths))
+        if not (matbot.get("kontrolni") or {}).get("attempts"):
+            story.append(Paragraph("Nema evidentiranih kontrolnih.", styles["note"]))
+
+    # --- 4. Thinkific (bez godišnjih ukupnih procenata) -------------------
+    thinkific = facts.get("thinkific") or {}
+    story.append(Paragraph("RAD NA PLATFORMI", styles["h2"]))
+    sections = thinkific.get("parent_sections") or []
+    if not thinkific.get("available"):
+        story.append(Paragraph("Thinkific podaci nisu dostupni za ovaj mjesec.",
+                               styles["body"]))
+    elif not sections:
+        story.append(Paragraph("Nema evidentiranog napretka po oblastima kursa.",
+                               styles["body"]))
+    elif thinkific.get("previous_available"):
+        story.append(_metric_table(
+            [(s["name"], _fmt_delta(s.get("delta_percent")) or
+              _fmt_percent(s.get("current_percent"))) for s in sections],
+            styles, widths))
+    else:
+        # BEZ PROŠLOG MJESECA NEMA MJESEČNOG NAPRETKA. Zato se sekcije samo
+        # NABRAJAJU — tvrdnja „rađeno je ovog mjeseca" nije izmjerena.
+        story.append(Paragraph("Evidentirani sadržaji na platformi:", styles["note"]))
+        story.append(Paragraph(_escape(" · ".join(s["name"] for s in sections)),
+                               styles["body"]))
+
+    # --- 5–7. AI proza ----------------------------------------------------
+    for title, key, fallback in (
+            ("POZITIVNE NAVIKE U RADU", "strengths",
+             "Za pouzdaniju procjenu jakih strana potrebno je više podataka."),
+            ("NA ČEMU TREBA RADITI", "focus_areas",
+             "Trenutno nema dovoljno podataka za pouzdan zaključak."),
+            ("PREPORUKA ZA NAREDNI MJESEC", "next_month_recommendations", None)):
+        items = narrative.get(key) or []
+        if not items and fallback is None:
+            continue
+        story.append(Paragraph(title, styles["h2"]))
+        if items:
+            for item in items:
+                story.append(Paragraph(_escape(item), styles["bullet"],
+                                       bulletText="•"))
+        else:
+            story.append(Paragraph(_escape(fallback), styles["body"]))
+
+    # --- 8. Zapažanja s časova -------------------------------------------
+    # Slobodan tekst instruktora. Modelu NIJE poslan (Dio 20/21); ovdje ide
+    # doslovno, escapovan, i ograničen na tri najsvježija da ne preplavi stranu.
+    comments = [c for c in (parent_comments or []) if (c.get("comment") or "").strip()]
+    if comments:
+        story.append(Paragraph("ZAPAŽANJA SA ČASOVA", styles["h2"]))
+        for entry in comments[:MAX_PARENT_COMMENTS]:
+            text = entry["comment"].strip()[:MAX_PARENT_COMMENT_CHARS]
+            story.append(Paragraph(
+                "%s — %s" % (_escape(_fmt_date(entry.get("date"))), _escape(text)),
+                styles["bullet"], bulletText="•"))
+
+    # --- 9. Mjesečni komentar instruktora --------------------------------
+    if (instructor_comment or "").strip():
+        story.append(Paragraph("KOMENTAR INSTRUKTORA", styles["h2"]))
+        story.append(Paragraph(_escape(instructor_comment.strip()), styles["body"]))
+    return story
+
+
 def _page_decoration(canvas, doc):
     """Broj strane SAMO kad ih ima više od jedne (Dio 18).
 
@@ -377,8 +562,13 @@ def _page_decoration(canvas, doc):
     canvas.restoreState()
 
 
-def render_report_pdf(facts, narrative, instructor_comment, label):
-    """Sačuvani nacrt → bajtovi PDF-a. Nikad ne zove model."""
+def render_report_pdf(facts, narrative, instructor_comment, label,
+                      parent_comments=None):
+    """Sačuvani nacrt → bajtovi PDF-a. Nikad ne zove model.
+
+    `parent_comments` se prosljeđuje ODVOJENO od `facts` namjerno: činjenice su
+    ono što je model vidio, a zapažanja s časova model ne vidi nikad. Da su u
+    istom objektu, jedan propušten filter bi ih poslao u prompt."""
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.units import mm
     from reportlab.platypus import BaseDocTemplate, Frame, PageTemplate
@@ -398,7 +588,8 @@ def render_report_pdf(facts, narrative, instructor_comment, label):
                   topPadding=0, bottomPadding=0)
     doc.addPageTemplates([PageTemplate(id="report", frames=[frame],
                                        onPage=_page_decoration)])
-    story = _story(facts, narrative, instructor_comment, label, styles, doc.width)
+    story = _story(facts, narrative, instructor_comment, label, styles, doc.width,
+                   parent_comments)
     doc.build(story)
     if doc.page > MAX_PAGES:
         # Radije vidljiv kvar nego dokument s odsječenom rečenicom.

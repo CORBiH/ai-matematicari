@@ -300,6 +300,21 @@ def build_matbot_section(student_id, report_month, database=None):
     }
 
 
+def build_instruction_section(student_id, report_month, database=None):
+    """Faza 3D — mjesečna evidencija časova. PRVI izvor izvještaja.
+
+    Granice su DATUMSKE i zatvoreno-otvorene, isto kao svuda drugdje:
+    `session_date` je `YYYY-MM-DD`, pa se `month_bounds` skraćuje na datum. Čas
+    održan 1. septembra ne smije upasti u augustovski izvještaj."""
+    from matbot import student_sessions
+
+    target = database or reporting_db.get_database()
+    month = progress.parse_report_month(report_month)
+    start, end = month_bounds(month)
+    rows = target.fetch_sessions(student_id, start[:10], end[:10])
+    return student_sessions.build_monthly_summary(rows)
+
+
 def build_report_input(student_id, report_month, database=None):
     """JEDAN determinističan objekat po (učenik, mjesec).
 
@@ -314,6 +329,8 @@ def build_report_input(student_id, report_month, database=None):
         "report_month": month,
         "profile": {"display_name": profile.get("display_name"),
                     "grade": profile.get("grade")},
+        # Redoslijed ključeva prati PEDAGOŠKI prioritet Faze 3D: čas prvo.
+        "instruction": build_instruction_section(student_id, month, database=target),
         "thinkific": build_thinkific_section(student_id, month, database=target),
         "matbot": build_matbot_section(student_id, month, database=target),
     }

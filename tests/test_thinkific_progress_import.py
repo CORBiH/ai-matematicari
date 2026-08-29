@@ -51,6 +51,21 @@ def build_v1(path):
 
 
 def migrate(path):
+    """Dovedi bazu do TEKUĆE verzije (v1 → v2 → v3).
+
+    Faza 3D: populacija izvještaja čita i `student_sessions`, pa fixture koji
+    stane na v2 više ne predstavlja bazu na koju se kod oslanja."""
+    conn = libsql.connect(path)
+    try:
+        applied = reporting_schema.migrate_to_v2(conn)
+        reporting_schema.migrate_to_v3(conn)
+        return applied
+    finally:
+        conn.close()
+
+
+def migrate_v2_only(path):
+    """Namjerno ZAUSTAVLJENO na v2 — za testove migracije v2 → v3."""
     conn = libsql.connect(path)
     try:
         return reporting_schema.migrate_to_v2(conn)

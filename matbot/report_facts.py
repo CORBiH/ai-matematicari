@@ -116,6 +116,59 @@ def _section_rows(sections):
     } for s in chosen]
 
 
+# Koliko sekcija platforme ide RODITELJU. Sedam sekcija s nula posto nije
+# izvještaj nego buka; puna lista ostaje administratoru.
+MAX_PARENT_SECTIONS = 3
+
+
+def _instruction_facts(instruction):
+    """Faza 3D — časovi u ugovoru prema modelu.
+
+    SLOBODAN TEKST NE ULAZI. `parent_comments` su zapažanja instruktora i mogu
+    slučajno nositi lični podatak, pa ostaju u PDF-u i administratorskom
+    pregledu, a modelu se ne šalju NIKAD (Dio 20). Model dobija samo brojeve,
+    kanonske nazive gradiva i gotove signale."""
+    instruction = instruction or {}
+    activity = instruction.get("activity") or {}
+    homework = instruction.get("homework") or {}
+    return {
+        "available": bool(instruction.get("available")),
+        "sessions_total": int(instruction.get("sessions_total") or 0),
+        "present_count": int(instruction.get("present_count") or 0),
+        "absent_count": int(instruction.get("absent_count") or 0),
+        # Prosjek ostaje None kad nema ocijenjenih časova — 0/5 bi bila
+        # izmišljena mjera o učeniku koji nije ocijenjen.
+        "activity_average": activity.get("average"),
+        "activity_rated_sessions": int(activity.get("rated_sessions") or 0),
+        "homework_assigned": int(homework.get("assigned_count") or 0),
+        "homework_done": int(homework.get("done_count") or 0),
+        "homework_not_done": int(homework.get("not_done_count") or 0),
+        "areas_worked": list(instruction.get("areas_worked") or [])[:MAX_LESSON_ROWS],
+        "lessons_worked": list(instruction.get("lessons_worked") or [])[:MAX_LESSON_ROWS],
+        # Signali su SERVERSKA odluka. Bez njih bi model sam procjenjivao da je
+        # „prisustvo odlično" na osnovu dva časa.
+        "signals": list(instruction.get("signals") or []),
+    }
+
+
+def _parent_sections(rows, previous_available):
+    """Najviše tri sekcije koje roditelju stvarno nešto govore.
+
+    Kad prošli mjesec postoji, prednost imaju sekcije s POZITIVNOM promjenom —
+    to je jedino što se smije opisati kao rad u ovom mjesecu. Bez prethodnog
+    snimka nema promjene, pa se biraju sekcije s najvećim tekućim napretkom i
+    NE tvrdi se da su rađene baš ovog mjeseca."""
+    rows = list(rows or [])
+    if previous_available:
+        moved = [r for r in rows if (r.get("delta_percent") or 0) > 0]
+        if moved:
+            moved.sort(key=lambda r: -(r.get("delta_percent") or 0))
+            return moved[:MAX_PARENT_SECTIONS]
+    active = [r for r in rows if (r.get("current_percent") or 0) > 0]
+    active.sort(key=lambda r: -(r.get("current_percent") or 0))
+    return active[:MAX_PARENT_SECTIONS]
+
+
 def build_ai_facts(payload):
     """`build_report_input(...)` → objekat koji smije u prompt.
 
@@ -149,9 +202,12 @@ def build_ai_facts(payload):
     has_any_strong = any(row["evidence_level"] in (EVIDENCE_MODERATE, EVIDENCE_STRONG)
                          for row in lessons)
 
+    sections = _section_rows(thinkific.get("sections"))
     facts = {
         "report_month": payload.get("report_month"),
         "grade": (payload.get("profile") or {}).get("grade"),
+        # PRVI U UGOVORU jer je prvi i po prioritetu (Faza 3D).
+        "instruction": _instruction_facts(payload.get("instruction")),
         "thinkific": {
             "available": not snapshot_missing,
             "percent_viewed": thinkific.get("percent_viewed"),
@@ -159,7 +215,11 @@ def build_ai_facts(payload):
             "previous_available": previous_available,
             "delta_percent_viewed": thinkific.get("delta_percent_viewed"),
             "delta_percent_completed": thinkific.get("delta_percent_completed"),
-            "sections": _section_rows(thinkific.get("sections")),
+            "sections": sections,
+            # Ono što roditelj STVARNO vidi: najviše tri sekcije. Ukupni godišnji
+            # procenti kursa ostaju iznad (i u adminu), ali kao naslovna mjera
+            # roditelju su zavodljivi — nisu znanje.
+            "parent_sections": _parent_sections(sections, previous_available),
         },
         "matbot": {
             "any_activity": bool(matbot.get("active_days") or presented
@@ -286,6 +346,11 @@ def trusted_labels(facts):
     for lesson in (facts.get("matbot") or {}).get("lesson_evidence") or []:
         labels.add((lesson.get("lesson_name") or "").strip())
         labels.add((lesson.get("area_name") or "").strip())
+    # Faza 3D: nazivi gradiva s časa su isti kurikulum i imaju isti problem —
+    # „Djeljivost sa 3" u prozi ne smije biti izmišljena mjera.
+    instruction = facts.get("instruction") or {}
+    for name in list(instruction.get("areas_worked") or []) +             list(instruction.get("lessons_worked") or []):
+        labels.add((name or "").strip())
     return {label for label in labels
             if label and any(ch.isdigit() for ch in label)}
 
@@ -327,6 +392,13 @@ def allowed_numbers(facts):
     for lesson in matbot.get("lesson_evidence") or []:
         for key in ("incorrect_items", "correct_items", "evidence_items"):
             add(lesson.get(key))
+
+    # Faza 3D: brojke s časova su izmjerene isto kao i sve ostale.
+    instruction = facts.get("instruction") or {}
+    for key in ("sessions_total", "present_count", "absent_count",
+                "activity_average", "activity_rated_sessions",
+                "homework_assigned", "homework_done", "homework_not_done"):
+        add(instruction.get(key))
 
     add(facts.get("grade"))
     return values

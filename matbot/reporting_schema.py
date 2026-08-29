@@ -40,7 +40,8 @@ logger = logging.getLogger("matbot.reporting_schema")
 
 SCHEMA_VERSION_V1 = 1
 SCHEMA_VERSION_V2 = 2
-CURRENT_SCHEMA_VERSION = SCHEMA_VERSION_V2
+SCHEMA_VERSION_V3 = 3
+CURRENT_SCHEMA_VERSION = SCHEMA_VERSION_V3
 
 # Tabele koje verzija 1 mora imati da bismo uopšte smjeli migrirati.
 V1_TABLES = (
@@ -153,6 +154,7 @@ class MigrationError(RuntimeError):
 # smislen — prazan ili razmakom popunjen opis se odbija prije upisa.
 MIGRATION_DESCRIPTIONS = {
     SCHEMA_VERSION_V2: "Add Thinkific progress reporting schema",
+    SCHEMA_VERSION_V3: "Add instructor student session records",
 }
 
 # `applied_at` se NAMJERNO ne upisuje: ima bazin DEFAULT i njegovo značenje je
@@ -428,6 +430,188 @@ def migrate_to_v2(conn):
     _record_migration(conn, SCHEMA_VERSION_V2)
     logger.info("reporting_schema_migrated from=%s to=%s",
                 SCHEMA_VERSION_V1, SCHEMA_VERSION_V2)
+    return True
+
+
+# --- FAZA 3D: evidencija časova (`student_sessions`) ------------------------
+# JEDAN RED PO ODRŽANOM ČASU. Ovo je prvi izvor u izvještaju koji NE dolazi ni iz
+# Thinkifica ni iz MAT-BOT-a nego od instruktora, pa je i jedini koji učenika bez
+# ijedne platforme čini vrijednim izvještaja.
+#
+# `activity_rating` NIJE OCJENA IZ MATEMATIKE nego angažman na času (1–5), i
+# CHECK ga veže uz prisustvo: odsutan učenik NE SMIJE imati ocjenu angažmana.
+# Lažna jedinica za odsutnog bi mjesecima obarala prosjek i čitala bi se kao
+# nezainteresovanost umjesto kao izostanak.
+#
+# `homework_status` ima TRI stanja, ne bulean: „nije zadana" ne smije ulaziti u
+# imenilac i ne smije se čitati kao neurađena zadaća.
+V3_TABLES = ("student_sessions",)
+
+SCHEMA_V3_STATEMENTS = (
+    """
+    CREATE TABLE IF NOT EXISTS student_sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        student_id INTEGER NOT NULL,
+        session_date TEXT NOT NULL,
+        attendance TEXT NOT NULL CHECK (attendance IN ('present', 'absent')),
+        activity_rating INTEGER CHECK (
+            (attendance = 'absent' AND activity_rating IS NULL)
+            OR (activity_rating IS NULL)
+            OR (activity_rating BETWEEN 1 AND 5)),
+        homework_status TEXT NOT NULL CHECK (
+            homework_status IN ('done', 'not_done', 'not_assigned')),
+        area_name TEXT,
+        lesson_name TEXT,
+        comment TEXT,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
+    )
+    """,
+    # Izvještaj UVIJEK čita po učeniku i po mjesecu (opseg datuma).
+    "CREATE INDEX IF NOT EXISTS idx_student_sessions_student_date "
+    "ON student_sessions (student_id, session_date)",
+)
+
+EXPECTED_V3_SCHEMA = {
+    "student_sessions": {
+        "required_columns": {"id", "student_id", "session_date", "attendance",
+                             "activity_rating", "homework_status", "area_name",
+                             "lesson_name", "comment", "created_at", "updated_at"},
+        "not_null": ("student_id", "session_date", "attendance",
+                     "homework_status", "created_at", "updated_at"),
+        "foreign_keys": {("student_id", "students"): "CASCADE"},
+    },
+}
+
+EXPECTED_V3_INDEXES = {
+    "idx_student_sessions_student_date": ("student_sessions",
+                                          ("student_id", "session_date")),
+}
+
+
+def _index_columns(conn, index_name):
+    return tuple(entry[2] for entry
+                 in conn.execute("PRAGMA index_info(%s)" % index_name).fetchall())
+
+
+def verify_v3_schema(conn):
+    """Strukturna provjera verzije 3. Prazna lista znači „dokazano ispravno".
+
+    PRAGMA introspekcija, ne poređenje teksta `CREATE TABLE` naredbe: razmak ili
+    redoslijed ograničenja ne smiju oboriti migraciju, ali nedostajuća kolona,
+    NOT NULL, strani ključ ili indeks moraju."""
+    problems = []
+    existing = table_names(conn)
+
+    for table, expected in EXPECTED_V3_SCHEMA.items():
+        if table not in existing:
+            problems.append("v3_table_missing:%s" % table)
+            continue
+        try:
+            details = _column_details(conn, table)
+            keys = _foreign_keys_with_actions(conn, table)
+        except Exception:
+            problems.append("v3_table_unreadable:%s" % table)
+            continue
+
+        missing = expected["required_columns"] - set(details)
+        if missing:
+            problems.append("v3_columns_missing:%s:%s"
+                            % (table, ",".join(sorted(missing))))
+            continue
+
+        for column in expected["not_null"]:
+            if not details[column][0]:
+                problems.append("v3_nullable:%s:%s" % (table, column))
+
+        for (column, target), action in expected["foreign_keys"].items():
+            found = keys.get((column, target))
+            if found is None:
+                problems.append("v3_foreign_key_missing:%s:%s" % (table, column))
+            elif found != action:
+                problems.append("v3_foreign_key_action:%s:%s:%s"
+                                % (table, column, found or "none"))
+
+    indexes = _index_definitions(conn)
+    for name, (table, columns) in EXPECTED_V3_INDEXES.items():
+        if indexes.get(name) != table:
+            problems.append("v3_index_missing:%s" % name)
+            continue
+        try:
+            if _index_columns(conn, name) != columns:
+                problems.append("v3_index_columns:%s" % name)
+        except Exception:
+            problems.append("v3_index_unreadable:%s" % name)
+    return problems
+
+
+def verify_existing_v3_tables(conn):
+    """Provjeri SAMO ono što već postoji — ulaz u djelimično stanje.
+
+    Postoji iz istog razloga kao v2 blizanac: `CREATE TABLE IF NOT EXISTS` nad
+    tuđom ili pokvarenom tabelom istog imena tiho ne uradi ništa, pa bi bez ove
+    provjere takva tabela bila blagoslovljena kao ispravna."""
+    existing = table_names(conn)
+    if not any(table in existing for table in EXPECTED_V3_SCHEMA):
+        return []
+    return [problem for problem in verify_v3_schema(conn)
+            if not problem.startswith(("v3_table_missing", "v3_index_missing"))]
+
+
+def _apply_v3_ddl(conn):
+    for statement in SCHEMA_V3_STATEMENTS:
+        try:
+            conn.execute(statement)
+        except Exception as exc:
+            raise MigrationError("v3_ddl_failed", type(exc).__name__) from None
+    try:
+        conn.commit()
+    except Exception as exc:
+        raise MigrationError("v3_ddl_commit_failed", type(exc).__name__) from None
+
+
+def migrate_to_v3(conn):
+    """v2 → v3. ADITIVNO, IDEMPOTENTNO i OTPORNO NA PREKID.
+
+    ISTA DOKTRINA KAO v1→v2, i to nije stil nego IZMJERENO ponašanje: na
+    libsql 0.1.11 `CREATE TABLE` PREŽIVI `rollback()`. Zato se ovdje NE tvrdi
+    atomičnost. Umjesto toga:
+
+      • DDL je `IF NOT EXISTS` i smije se ponoviti nad bilo kojim djelimičnim
+        stanjem;
+      • zapis verzije se upisuje TEK kad je cijela struktura DOKAZANA;
+      • prekid u bilo kojoj tački ostavlja bazu bez zapisa verzije 3, pa je
+        sljedeće pokretanje jednostavno dovrši.
+
+    TVRDI INVARIJANT: ZAPIS VERZIJE 3 NE SMIJE POSTOJATI BEZ PROVJERENE ŠEME V3.
+    Baza koja tvrdi v3 a nema ispravnu tabelu pada zatvoreno.
+
+    FAZA 3C SE NE DIRA: nijedna naredba ne mijenja `monthly_reports` ni bilo
+    koju v1/v2 tabelu — migracija samo dodaje."""
+    already = applied_versions(conn)
+    if SCHEMA_VERSION_V2 not in already:
+        raise MigrationError("v2_migration_record_missing")
+
+    if SCHEMA_VERSION_V3 in already:
+        problems = verify_v3_schema(conn)
+        if problems:
+            raise MigrationError(problems[0], "recorded v3 but schema incomplete")
+        return False
+
+    prior = verify_existing_v3_tables(conn)
+    if prior:
+        raise MigrationError(prior[0], "existing v3 object is incompatible")
+
+    _apply_v3_ddl(conn)
+
+    problems = verify_v3_schema(conn)
+    if problems:
+        raise MigrationError(problems[0], "verification failed after ddl")
+
+    _record_migration(conn, SCHEMA_VERSION_V3)
+    logger.info("reporting_schema_migrated from=%s to=%s",
+                SCHEMA_VERSION_V2, SCHEMA_VERSION_V3)
     return True
 
 

@@ -303,7 +303,7 @@ def test_check_reports_schema_version_and_tables(database):
     assert report["connected"] is True
     assert report["missing_tables"] == []
     assert report["schema_version"] == 1
-    assert report["expected_schema_version"] == 2
+    assert report["expected_schema_version"] == 3
     assert report["schema_version_matches"] is False,         "nemigrirana baza se prijavljuje kao ispravna"
     assert report["v2_schema_verified"] is False
     assert "display_name" in report["columns"]["students"]
@@ -351,5 +351,5 @@ def test_cli_check_refuses_an_unmigrated_v1_database(monkeypatch, database, caps
     assert "connection: ok" in out
     assert "foreign_keys: ON" in out
     # v1 baza NIJE zdrava za ovo izdanje -- CLI to mora reci i vratiti != 0.
-    assert "schema_version: 1 (expected 2) -> MISMATCH" in out
+    assert "schema_version: 1 (expected 3) -> MISMATCH" in out
     assert "v2_schema: INCOMPLETE" in out

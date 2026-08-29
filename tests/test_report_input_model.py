@@ -115,7 +115,7 @@ def test_migration_refuses_a_database_that_is_not_v1(tmp_path):
 
 def test_diagnostic_reports_version_two_after_migration(db):
     report = reporting_db.get_database().check()
-    assert report["schema_version"] == 2
+    assert report["schema_version"] == 3
     assert "thinkific_progress_snapshots" in report["columns"]
 
 

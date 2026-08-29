@@ -6,6 +6,7 @@
   </form>
 {% endblock %}
 {% block content %}
+<div class="card"><a href="{{ url_for('admin_students.index') }}">Učenici (registar i evidencija časova) →</a></div>
 
 {% if schema_state != 'ready' %}
   {# PADA ZATVORENO: uvoz se ne nudi dok baza nije na v2. Migracija je svjesna

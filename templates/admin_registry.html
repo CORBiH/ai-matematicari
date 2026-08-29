@@ -1,0 +1,72 @@
+{% extends "admin_base.html" %}
+{% block heading %}Učenici{% endblock %}
+{% block topright %}<a href="{{ url_for('admin_reports.index') }}">Izvještaji →</a>{% endblock %}
+{% block content %}
+{% if error %}<div class="banner err">{{ error }}</div>{% endif %}
+
+<div class="card">
+  <form method="get" action="{{ url_for('admin_students.index') }}">
+    <input type="text" name="q" value="{{ search }}" placeholder="Ime učenika">
+    <select name="grade">
+      <option value="">Svi razredi</option>
+      {% for g in grades %}
+      <option value="{{ g }}" {% if grade == g %}selected{% endif %}>{{ g }}. razred</option>
+      {% endfor %}
+    </select>
+    <button type="submit">Traži</button>
+  </form>
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0">+ Dodaj učenika</h3>
+  <form method="post" action="{{ url_for('admin_students.create_student') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <p>
+      <label>Ime i prezime<br>
+        <input type="text" name="display_name" maxlength="120" required style="width:60%">
+      </label>
+    </p>
+    <p>
+      <label>Razred<br>
+        <select name="grade" required>
+          {% for g in grades %}<option value="{{ g }}">{{ g }}. razred</option>{% endfor %}
+        </select>
+      </label>
+    </p>
+    <p>
+      {# NEOBAVEZNO. Adresa se koristi SAMO za povezivanje Thinkific naloga i
+         poslije se nigdje ne prikazuje. #}
+      <label>Thinkific e-mail <span class="muted">(neobavezno)</span><br>
+        <input type="email" name="thinkific_email" maxlength="254" style="width:60%">
+      </label>
+    </p>
+    <p><button type="submit">Sačuvaj učenika</button></p>
+  </form>
+</div>
+
+<div class="card">
+  <p><strong>Ukupno učenika: {{ students|length }}</strong></p>
+  {% if students %}
+  <table>
+    <tr><th>Učenik</th><th>Razred</th><th>Thinkific</th><th></th></tr>
+    {% for s in students %}
+    <tr>
+      <td>{{ s.display_name or "Učenik #%s"|format(s.student_id) }}</td>
+      <td>{% if s.grade %}{{ s.grade }}. razred{% else %}<span class="muted">—</span>{% endif %}</td>
+      <td>
+        {% if s.thinkific_linked %}<span class="pill" style="color:var(--ok)">povezan</span>
+        {% else %}<span class="pill">nije povezan</span>{% endif %}
+      </td>
+      <td>
+        <a href="{{ url_for('admin_students.profile', student_id=s.student_id) }}">Profil</a>
+        ·
+        <a href="{{ url_for('admin_reports.student_preview', student_id=s.student_id, month=month) }}">Izvještaj</a>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="muted">Nema učenika koji odgovaraju filteru.</p>
+  {% endif %}
+</div>
+{% endblock %}

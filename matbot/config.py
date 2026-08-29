@@ -553,4 +553,7 @@ REPORTING_DB_MAX_INFLIGHT = _int_env("MATBOT_REPORTING_DB_MAX_INFLIGHT", 2)
 # Provjera je time tvrdila da je sve u redu upravo dok je nedostajala cijela
 # verzija 2. Broj mora pratiti `reporting_schema.CURRENT_SCHEMA_VERSION`; test
 # to i dokazuje, da dvije vrijednosti ne mogu odlutati jedna od druge.
-REPORTING_SCHEMA_VERSION = _int_env("MATBOT_REPORTING_SCHEMA_VERSION", 2)
+# Faza 3D podiže ovo na 3 (evidencija časova). Isti razlog kao gore: broj mora
+# pratiti `reporting_schema.CURRENT_SCHEMA_VERSION`, inače provjera zdravlja
+# opet počne tvrditi „OK" nad bazom kojoj nedostaje cijela verzija.
+REPORTING_SCHEMA_VERSION = _int_env("MATBOT_REPORTING_SCHEMA_VERSION", 3)

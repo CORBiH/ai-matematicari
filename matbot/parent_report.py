@@ -133,7 +133,12 @@ def generate_narrative(facts, llm):
     return narrative
 
 
-def metrics_snapshot(facts, *, model, prompt_version):
+# Oblik snimka. Stari nacrti Faze 3C NEMAJU ovo polje i to je jedini pouzdan
+# način da se prepoznaju — po SADRŽAJU, ne po datumu ni po zastavici.
+REPORT_FORMAT_VERSION = "3d-1"
+
+
+def metrics_snapshot(facts, *, model, prompt_version, parent_comments=None):
     """Ono što se sprema kao `metrics_json`.
 
     Nosi činjenice OD KOJIH je izvještaj nastao plus minimalne metapodatke o
@@ -146,6 +151,11 @@ def metrics_snapshot(facts, *, model, prompt_version):
     ostaju ovdje jer za njih kolone nema."""
     return {
         "facts": facts,
+        # ZAPAŽANJA STOJE IZVAN `facts`, i to je granica a ne uredništvo:
+        # `facts` je tačno ono što je model vidio, pa slobodan tekst
+        # instruktora tu ne smije biti ni slučajno (Dio 21). PDF ih čita odavde.
+        "parent_comments": list(parent_comments or []),
+        "report_format_version": REPORT_FORMAT_VERSION,
         "generated_by": {"model": model, "prompt_version": prompt_version},
     }
 
@@ -180,6 +190,9 @@ def load_saved(student_id, report_month, database=None):
         "narrative": narrative,
         "instructor_comment": row.get("instructor_comment") or "",
         "snapshot": snapshot,
+        # Prazna lista za stare nacrte Faze 3C — oni nisu ni imali časove.
+        "parent_comments": list(snapshot.get("parent_comments") or []),
+        "report_format_version": snapshot.get("report_format_version"),
         "created_at": row.get("created_at"),
         "updated_at": row.get("updated_at"),
         # Vrijeme POSLJEDNJEG AI generisanja — mijenja se samo kad je model zvan.

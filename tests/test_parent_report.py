@@ -491,7 +491,7 @@ def test_those_titles_do_not_license_invented_percentages(title):
 
 def test_the_prompt_asks_for_verbatim_lesson_names():
     assert "PREPIŠI naziv TAČNO" in report_prompt.SYSTEM_PROMPT
-    assert report_prompt.REPORT_PROMPT_VERSION == "3c-3"
+    assert report_prompt.REPORT_PROMPT_VERSION == "3d-1"
 
 
 @pytest.mark.parametrize("phrase", [
@@ -731,13 +731,17 @@ def test_pdf_contains_name_grade_and_month():
 
 
 def test_pdf_contains_deterministic_metrics_with_correct_terminology():
+    """Faza 3D: roditelju ide SAŽET MAT-BOT odjeljak.
+
+    Prikazani zadaci, nagovještaji i brojači Objašnjenja/Rezultata namjerno su
+    izbačeni iz izvještaja (Dio 25) — načini rada, ne mjere učinka."""
     _, text = text_of(render())
-    assert "Zadataka prikazano" in text and "37" in text
-    assert "Zadataka odgovoreno" in text and "24" in text
-    assert "14 / 10" in text
+    assert "Odgovorenih zadataka" in text and "24" in text
     assert "58,3%" in text
-    # NIKAD „37 riješenih zadataka" (Dio: prikazano != riješeno).
     assert "riješenih zadataka" not in text
+    # Ono što je uklonjeno mora i OSTATI uklonjeno.
+    assert "Zadataka prikazano" not in text
+    assert "37" not in text
 
 
 BOSNIAN_LETTERS = "čćžšđĐŠČĆŽ"
@@ -745,7 +749,7 @@ BOSNIAN_LETTERS = "čćžšđĐŠČĆŽ"
 
 def test_pdf_renders_bosnian_diacritics():
     """Sva bosanska slova, i mala i VELIKA, u tekstu dokumenta."""
-    _, text = text_of(render(comment="ČĆŽŠĐ — Čitanje, Ćirilica, Žuto, Šuma, Đak."))
+    _, text = text_of(render(comment="ČĆŽŠĐ — Čitanje, Ćirilica, Žuto, Šuma, Đak, rođendan, đačko."))
     for char in BOSNIAN_LETTERS:
         assert char in text, char
 
@@ -837,8 +841,11 @@ def test_missing_font_asset_fails_visibly_instead_of_falling_back(monkeypatch):
 
 
 def test_pdf_states_missing_baseline_instead_of_inventing_a_trend():
+    """Bez prošlog mjeseca sekcije se samo NABRAJAJU, bez tvrdnje o napretku."""
     _, text = text_of(render())
-    assert "Prethodni mjesec nije dostupan za poređenje." in text
+    assert "Evidentirani sadržaji na platformi:" in text
+    for forbidden in ("Promjena", "p.p.", "napredak"):
+        assert forbidden not in text
 
 
 def test_pdf_shows_no_accuracy_when_nothing_answered():
@@ -846,8 +853,9 @@ def test_pdf_shows_no_accuracy_when_nothing_answered():
         "practice_tasks": 5, "practice_correct": 0, "practice_incorrect": 0,
         "practice_accuracy": None}))
     _, text = text_of(render(facts=facts))
-    assert "nema odgovorenih zadataka" in text
-    assert "0%" not in text.split("KONTROLNI")[0].split("Tačnost")[-1][:20]
+    # Bez odgovorenih zadataka NEMA tačnosti — nikad 0 %.
+    assert "nema podatka" in text
+    assert "0%" not in text
 
 
 def test_pdf_contains_edited_narrative_and_instructor_comment():
@@ -880,14 +888,13 @@ def test_pdf_reports_absent_matbot_activity_explicitly():
         "kontrolni_correct": 0, "kontrolni_total": 0, "lesson_outcomes": []}))
     _, text = text_of(render(facts=facts))
     assert "Nema zabilježene MAT-BOT aktivnosti u ovom mjesecu." in text
-    assert "nije zabilježen nijedan kontrolni" in text
 
 
 def test_pdf_reports_absent_thinkific_data_explicitly():
     facts = report_facts.build_ai_facts(payload(
         thinkific={"snapshot_missing": True}))
     _, text = text_of(render(facts=facts))
-    assert "Thinkific Progress podaci nisu dostupni za ovaj mjesec." in text
+    assert "Thinkific podaci nisu dostupni za ovaj mjesec." in text
 
 
 def test_large_valid_report_never_clips_and_stays_within_two_pages():

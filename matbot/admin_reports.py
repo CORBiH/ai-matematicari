@@ -411,7 +411,10 @@ def generate_report(student_id):
 
     snapshot = parent_report.metrics_snapshot(
         facts, model=config.REPORTING_MODEL,
-        prompt_version=report_prompt.REPORT_PROMPT_VERSION)
+        prompt_version=report_prompt.REPORT_PROMPT_VERSION,
+        # Zapažanja s časova IZ ISTOG trenutka kao i činjenice: snimak mora biti
+        # jedna konzistentna slika mjeseca (Dio 36).
+        parent_comments=(payload.get("instruction") or {}).get("parent_comments"))
     try:
         # Model je STVARNO zvan, pa `generated_at` dobija novu vrijednost.
         parent_report.save_narrative(student_id, month, narrative, snapshot,
@@ -465,7 +468,8 @@ def report_pdf_download(student_id):
     label = _student_label(payload["profile"], student_id)
     try:
         data = report_pdf.render_report_pdf(
-            facts, saved["narrative"], saved["instructor_comment"], label)
+            facts, saved["narrative"], saved["instructor_comment"], label,
+            saved.get("parent_comments"))
     except report_pdf.PdfTooLong as error:
         logger.info("admin_report_pdf_too_long detail=%s", error)
         abort(500)
