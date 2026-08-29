@@ -61,6 +61,13 @@ _INTERNAL_TOKENS = (
     "metrics_json", "insufficient", "moderate evidence", "json",
 )
 
+# RJECNIK OCJENE. Oba korijena: imenica/glagol `ocjen-` (ocjena, ocjenu,
+# ocjene, ocjenom, ocjenjuje, ocjenjivanje, ocjenjivati) i particip `ocijen-`
+# (ocijenjen, ocijenjena, ocijenjeno, ocijeniti). `\b` je ono sto cuva
+# `procjena`, `samoprocjena` i `procijeniti` — u njima ispred `o` stoji slovo,
+# pa granice rijeci nema.
+_GRADE_LANGUAGE_RE = re.compile(r"\b(?:ocjen|ocijen)\w*", re.IGNORECASE)
+
 _MARKUP_RE = re.compile(r"<[^>]+>|&(?:#\d+|[a-zA-Z]+);|\]\(|\*\*|```")
 _NUMBER_RE = re.compile(r"\d+(?:[.,]\d+)?")
 
@@ -136,6 +143,29 @@ def trend_violations(text, previous_available):
     return sorted(set(hits))
 
 
+def grade_language_violations(text):
+    """Rijeci koje aktivnost na casu pretvaraju u OCJENU. Prazna lista = uredu.
+
+    ZASTO POSTOJI: model je napisao „Aktivnost na casovima prosjecno je
+    ocijenjena sa 4,0, sto predstavlja angazman u radu, a ne ocjenu znanja."
+    Znacenje je tacno, ali roditelj koji preleti izvjestaj zapamti „ocijenjena
+    4,0" i procita ga kao skolsku ocjenu — poricanje u drugom dijelu recenice
+    ne stigne. Zato se zabranjuje i sam RJECNIK ocjene, ukljucujuci porice:
+    metrika se opisuje onim STO JEST (aktivnost, angazman), ne onim sto nije.
+
+    GRANICA RIJECI, NE PODNIZ. `ocjen` kao goli podniz pogadja `pr-OCJEN-a` —
+    rijec koju prompt IZRICITO trazi kao oprezan izraz kod slabog dokaza.
+    Zato `\b`: u „procjena" ispred `o` stoji `r`, pa granice nema. Isto vazi za
+    „samoprocjena" i za glagol „procijeniti".
+
+    Zabrana je NAD CIJELIM narativom, a ne samo oko recenice o aktivnosti:
+    izvjestaj roditelju nema nijednu legitimnu upotrebu rijeci „ocjena" —
+    Thinkific nije ocjena, kontrolni se iskazuje procentom, a aktivnost je
+    angazman. Uzi kontekstni obrazac bi bio krhkiji, ne sigurniji."""
+    found = _GRADE_LANGUAGE_RE.findall(text or "")
+    return sorted(set(word.lower() for word in found))
+
+
 def markup_violations(text):
     """HTML, markdown i interni nazivi polja."""
     hits = []
@@ -174,6 +204,12 @@ def validate_narrative(narrative, facts):
     markup = markup_violations(text)
     if markup:
         problems.append("report_markup_or_internal:" + ",".join(markup[:5]))
+
+    # Aktivnost na casu je ANGAZMAN, nikad ocjena — ni u porici.
+    grade_words = grade_language_violations(text)
+    if grade_words:
+        problems.append("report_activity_grade_language:"
+                        + ",".join(grade_words[:5]))
 
     # Prazan sažetak nije izvještaj. Liste smiju biti prazne — to je namjerno
     # dopušten ishod kad dokaza nema — ali sažetak mora nešto reći.

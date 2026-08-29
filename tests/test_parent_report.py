@@ -491,7 +491,7 @@ def test_those_titles_do_not_license_invented_percentages(title):
 
 def test_the_prompt_asks_for_verbatim_lesson_names():
     assert "PREPIŠI naziv TAČNO" in report_prompt.SYSTEM_PROMPT
-    assert report_prompt.REPORT_PROMPT_VERSION == "3d-1"
+    assert report_prompt.REPORT_PROMPT_VERSION == "3d-2"
 
 
 @pytest.mark.parametrize("phrase", [

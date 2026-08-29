@@ -925,7 +925,7 @@ def test_old_snapshot_without_the_new_fields_opens_safely(db, student):
 # 10) PROMPT
 # ===========================================================================
 def test_prompt_version_is_3d():
-    assert report_prompt.REPORT_PROMPT_VERSION == "3d-1"
+    assert report_prompt.REPORT_PROMPT_VERSION == "3d-2"
 
 
 def test_prompt_states_the_source_priority():
@@ -936,7 +936,10 @@ def test_prompt_states_the_source_priority():
 
 def test_prompt_forbids_treating_class_data_as_knowledge():
     prompt = report_prompt.SYSTEM_PROMPT
-    assert "NE ocjena iz matematike" in prompt
+    # 3d-2: metrika se opisuje onim STO JEST, pa se rijec „ocjena" vise
+    # ne pojavljuje ni u opisu ni u porici — samo u samoj zabrani.
+    assert "ANGAŽMAN NA ČASU" in prompt
+    assert "Zabrana važi I U PORICANJU" in prompt
     assert "RADNA NAVIKA" in prompt
     assert "činjenica, nikad moralni sud" in prompt
     assert "NISKA ZAVRŠENOST KURSA SAMA PO SEBI NIJE" in prompt
