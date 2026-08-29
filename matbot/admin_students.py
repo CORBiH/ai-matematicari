@@ -85,6 +85,7 @@ def index():
                            search=search, grade=grade, grades=VALID_GRADES,
                            csrf_token=admin_auth.csrf_token(),
                            error=request.args.get("error", ""),
+                           conflict=(request.args.get("conflict") or "").strip()[:20],
                            month=report_input.previous_month(_this_month()))
 
 
@@ -114,23 +115,19 @@ def create_student():
         if external is None:
             return redirect(url_for("admin_students.index", error=ERROR_EMAIL))
 
+    # JEDAN POZIV, JEDNA TRANSAKCIJA. Ranije se učenik komitovao pa se tek onda
+    # pokušavao nalog — sudar e-maila je tako ostavljao duplikat bez veze.
     try:
-        student_id = _db().create_student(name, grade)
+        student_id = _db().create_student(name, grade, external_user_id=external)
     except reporting_db.ReportingUnavailable as error:
         logger.info("admin_student_create_failed code=%s", error.code)
+        if str(error.code).startswith("student_account_taken"):
+            # NIŠTA NIJE UPISANO. Administrator dobija ID postojećeg učenika i
+            # vezu na njegov profil — bez ponavljanja adrese.
+            other = str(error.code).split(":", 1)[-1]
+            return redirect(url_for("admin_students.index",
+                                    error=ERROR_TAKEN, conflict=other))
         return redirect(url_for("admin_students.index", error=ERROR_UNAVAILABLE))
-
-    if external:
-        try:
-            _db().link_thinkific_account(student_id, external)
-        except reporting_db.ReportingUnavailable as error:
-            # Učenik OSTAJE upisan; samo nalog nije povezan. Administrator vidi
-            # zašto i može povezati kasnije s profila.
-            logger.info("admin_student_link_failed code=%s", error.code)
-            message = (ERROR_TAKEN if str(error.code).startswith("student_account_taken")
-                       else ERROR_UNAVAILABLE)
-            return redirect(url_for("admin_students.profile",
-                                    student_id=student_id, error=message))
     return redirect(url_for("admin_students.profile", student_id=student_id))
 
 
@@ -151,8 +148,14 @@ def profile(student_id):
         logger.info("admin_student_profile_failed code=%s", error.code)
         abort(503)
 
+    from matbot import topics
+
+    # Kanonski izbor gradiva za razred OVOG učenika. Isti izvor kao Practice i
+    # Kontrolni (`data/topics.json`) — nema druge kopije kurikuluma.
+    curriculum = topics.curriculum_choices(student.get("grade"))
     return render_template(
         "admin_student_profile.html", student_id=student_id, student=student,
+        curriculum=curriculum, areas=list(curriculum),
         thinkific_linked=linked, sessions=list(reversed(sessions)),
         activity_labels=student_sessions.ACTIVITY_LABELS,
         homework_labels=student_sessions.HOMEWORK_LABELS,
@@ -188,8 +191,11 @@ def link_account(student_id):
     return redirect(url_for("admin_students.profile", student_id=student_id))
 
 
-def _session_from_form():
-    """Formular → provjeren zapis. Server je autoritet, ne klijent."""
+def _session_from_form(grade):
+    """Formular → provjeren zapis. Server je autoritet, ne klijent.
+
+    `grade` dolazi iz BAZE (profil učenika), nikad iz formulara — inače bi
+    klijent mogao izabrati razred u kojem njegova izmišljena lekcija „postoji"."""
     return student_sessions.validate_session(
         session_date=request.form.get("session_date"),
         attendance=request.form.get("attendance"),
@@ -197,7 +203,15 @@ def _session_from_form():
         homework_status=request.form.get("homework_status"),
         area_name=request.form.get("area_name"),
         lesson_name=request.form.get("lesson_name"),
-        comment=request.form.get("comment"))
+        comment=request.form.get("comment"),
+        grade=grade)
+
+
+def _student_grade(student_id):
+    profile = _db().fetch_student_profile(student_id)
+    if profile is None:
+        abort(404)
+    return profile.get("grade")
 
 
 @admin_students_bp.route("/<int:student_id>/sessions", methods=["POST"])
@@ -205,7 +219,7 @@ def _session_from_form():
 def create_session(student_id):
     _require_csrf()
     try:
-        record = _session_from_form()
+        record = _session_from_form(_student_grade(student_id))
     except student_sessions.SessionValidationError as error:
         logger.info("admin_session_rejected code=%s", error.code)
         return redirect(url_for("admin_students.profile",
@@ -229,7 +243,7 @@ def update_session(student_id, session_id):
     tuđi zapis ne može biti izmijenjen ni s pogođenim `session_id`."""
     _require_csrf()
     try:
-        record = _session_from_form()
+        record = _session_from_form(_student_grade(student_id))
     except student_sessions.SessionValidationError as error:
         logger.info("admin_session_rejected code=%s", error.code)
         return redirect(url_for("admin_students.profile",

@@ -198,8 +198,8 @@ def student(db):
 def _session_form(token, **over):
     data = {"csrf_token": token, "session_date": "2026-08-05",
             "attendance": "present", "activity_rating": "4",
-            "homework_status": "done", "area_name": "Razlomci",
-            "lesson_name": "Sabiranje razlomaka", "comment": "Dobar rad."}
+            "homework_status": "done", "area_name": "Djeljivost brojeva",
+            "lesson_name": "Djeljivost zbira, razlike i proizvoda", "comment": "Dobar rad."}
     data.update(over)
     return data
 
@@ -317,3 +317,79 @@ def test_comment_markup_is_escaped_in_the_admin_history(admin, db, student):
 
 def test_unknown_student_profile_is_404(admin, db):
     assert admin.get("/admin/students/99999").status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Faza 3D otvrdnjavanje: atomičan identitet i kanonsko gradivo kroz RUTU
+# ---------------------------------------------------------------------------
+def _students_in_db(db):
+    conn = db._connection()
+    return conn.execute("SELECT COUNT(*) FROM students").fetchall()[0][0]
+
+
+def test_conflicting_email_leaves_no_new_student_through_the_route(admin, db):
+    """ŽIVI DEFEKT: ranije bi učenik ostao upisan iako nalog nije povezan."""
+    from matbot.student_identity import PROVIDER_THINKIFIC_EMAIL
+
+    owner = db.get_or_create_student(PROVIDER_THINKIFIC_EMAIL,
+                                     "zauzet@example.com", grade=6)
+    before = _students_in_db(db)
+
+    token = _csrf_from(admin.get("/admin/students"))
+    page = admin.post("/admin/students/create",
+                      data={"csrf_token": token, "display_name": "Duplikat",
+                            "grade": "6", "thinkific_email": "zauzet@example.com"},
+                      follow_redirects=True)
+
+    assert _students_in_db(db) == before, "ostao je duplikat"
+    assert "već povezan sa drugim učenikom".encode() in page.data
+    # Veza na POSTOJEĆI zapis, bez ponavljanja adrese.
+    assert ("/admin/students/%d" % owner).encode() in page.data
+    assert b"zauzet@example.com" not in page.data
+
+
+def test_mixed_case_email_is_normalized_by_the_route(admin, db):
+    token = _csrf_from(admin.get("/admin/students"))
+    admin.post("/admin/students/create",
+               data={"csrf_token": token, "display_name": "Prvi", "grade": "6",
+                     "thinkific_email": "Ucenik@Example.COM"})
+    first = _students_in_db(db)
+    # Ista adresa drukčijim slovima je ISTI identitet — drugi upis pada.
+    token = _csrf_from(admin.get("/admin/students"))
+    admin.post("/admin/students/create",
+               data={"csrf_token": token, "display_name": "Drugi", "grade": "6",
+                     "thinkific_email": "  ucenik@example.com "})
+    assert _students_in_db(db) == first
+
+
+def test_session_form_offers_only_this_grade_curriculum(admin, db):
+    from matbot import topics
+
+    student_id = db.create_student("Šestak", 6)
+    page = admin.get("/admin/students/%d" % student_id).data.decode("utf-8")
+    for area in topics.curriculum_areas(6)[:3]:
+        assert area in page
+    # Oblast SEDMOG razreda se ne nudi šestaku.
+    seventh_only = [a for a in topics.curriculum_areas(7)
+                    if a not in topics.curriculum_areas(6)]
+    assert seventh_only, "razredi dijele sve oblasti — test bi bio prazan"
+    assert seventh_only[0] not in page
+
+
+def test_non_canonical_curriculum_is_refused_by_the_route(admin, db, student):
+    token = _csrf_from(admin.get("/admin/students/%d" % student))
+    for area, lesson in (("Izmišljena oblast", "Bilo šta"),
+                         ("Djeljivost brojeva", "Izmišljena lekcija"),
+                         ("<script>x</script>", "y")):
+        admin.post("/admin/students/%d/sessions" % student,
+                   data=_session_form(token, area_name=area, lesson_name=lesson))
+    assert db.fetch_sessions(student) == []
+
+
+def test_lesson_from_another_grade_is_refused_by_the_route(admin, db, student):
+    """Razred dolazi IZ BAZE, pa klijent ne može izabrati povoljniji."""
+    token = _csrf_from(admin.get("/admin/students/%d" % student))
+    admin.post("/admin/students/%d/sessions" % student,
+               data=_session_form(token, area_name="Cijeli brojevi",
+                                  lesson_name="Skup cijelih brojeva Z"))
+    assert db.fetch_sessions(student) == []

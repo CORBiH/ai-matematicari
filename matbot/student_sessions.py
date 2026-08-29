@@ -122,12 +122,18 @@ def parse_session_date(raw):
 
 def validate_session(*, session_date, attendance, activity_rating,
                      homework_status, area_name=None, lesson_name=None,
-                     comment=None):
+                     comment=None, grade=None):
     """Sirov administratorski unos → zapis spreman za bazu.
 
     SERVER JE AUTORITET. Formular smije onemogućiti polje angažmana za odsutnog
     učenika, ali odluka se donosi OVDJE — klijent se ne provjerava, nego se
-    njegov unos ponovo izvodi."""
+    njegov unos ponovo izvodi.
+
+    `grade` uključuje KANONSKU provjeru gradiva: oblast i lekcija moraju
+    postojati u kurikulumu tog razreda (`matbot/topics.py`). Bez toga bi
+    mjesečno grupisanje po oblastima raslo iz tipfelera, a izvještaj roditelju
+    prikazivao dva imena za istu oblast. Administratorska ruta grade prosljeđuje
+    UVIJEK; `None` ostaje samo za odbranu pri čitanju zatečenog zapisa."""
     date = parse_session_date(session_date)
 
     attendance = (attendance or "").strip()
@@ -158,13 +164,25 @@ def validate_session(*, session_date, attendance, activity_rating,
     if len(text) > MAX_COMMENT_CHARS:
         raise SessionValidationError("session_comment_too_long")
 
+    area = _clean_label(area_name)
+    lesson = _clean_label(lesson_name)
+    if grade is not None and (area or lesson):
+        from matbot import topics
+
+        # Oba naziva ili nijedan — polovična evidencija („oblast bez lekcije")
+        # bi kasnije značila red koji se ne može grupisati.
+        if not (area and lesson):
+            raise SessionValidationError("session_curriculum_incomplete")
+        if not topics.curriculum_pair_valid(grade, area, lesson):
+            raise SessionValidationError("session_curriculum_unknown")
+
     return {
         "session_date": date,
         "attendance": attendance,
         "activity_rating": rating,
         "homework_status": homework,
-        "area_name": _clean_label(area_name),
-        "lesson_name": _clean_label(lesson_name),
+        "area_name": area,
+        "lesson_name": lesson,
         "comment": text or None,
     }
 

@@ -94,6 +94,31 @@ jobs:
             docker compose run --rm --no-deps -T matbot \
               python -m matbot.release_config --require < /dev/null
 
+            # SEMA SE MIGRIRA PRIJE ZAMJENE APLIKACIJE, NOVIM KODOM, U
+            # KRATKOTRAJNOM KONTEJNERU KOJI JOS NE POSLUZUJE. Redoslijed je
+            # sustinski:
+            #
+            #   stara aplikacija i dalje posluzuje
+            #     -> migracija v2 -> v3 (aditivna: dodaje student_sessions)
+            #     -> strukturna provjera
+            #     -> tek onda `up -d`
+            #
+            # Zato ne postoji prozor u kojem nova aplikacija trazi tabelu
+            # koje jos nema. Obrnut redoslijed bi ga garantovao.
+            #
+            # ADITIVNOST je ono sto ovo cini bezbjednim: stara aplikacija ne
+            # cita `student_sessions` i ne pada zbog zapisa verzije 3, pa
+            # smije nastaviti da radi i poslije migracije (dokazano testom
+            # `test_v3_is_additive_for_the_currently_running_app`).
+            #
+            # `set -e` obara deploy OVDJE ako migracija ne uspije, PRIJE
+            # `up -d` — stari kontejner ostaje netaknut i posluzuje dalje.
+            # `< /dev/null` je OBAVEZAN: `docker compose run` prikaci stdin
+            # na kontejner, a cijela skripta stize SSH-u kroz stdin — bez
+            # toga docker pojede ostatak skripte (izmjereno 2026-08-14).
+            docker compose run --rm --no-deps -T matbot \
+              python -m matbot.reporting_db --migrate < /dev/null
+
             docker compose up -d --remove-orphans
 
             docker compose ps

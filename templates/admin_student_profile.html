@@ -58,11 +58,45 @@
                     {% if value == 'not_assigned' %}checked{% endif %}> {{ text }}</label>
       {% endfor %}
     </p>
-    <p><label>Oblast<br><input type="text" name="area_name" maxlength="120" style="width:50%"></label></p>
-    <p><label>Lekcija<br><input type="text" name="lesson_name" maxlength="120" style="width:50%"></label></p>
+    {# KANONSKI IZBOR, ne slobodan tekst: mjesečno grupisanje po oblastima u
+       izvještaju roditelju oslanja se na to da su nazivi svuda isti. Izbornici
+       su POGODNOST — server svejedno provjerava par (oblast, lekcija) prema
+       razredu učenika. #}
+    <p>
+      <label>Oblast<br>
+        <select name="area_name" id="area" onchange="matbotFillLessons()">
+          <option value="">—</option>
+          {% for area in areas %}<option value="{{ area }}">{{ area }}</option>{% endfor %}
+        </select>
+      </label>
+    </p>
+    <p>
+      <label>Lekcija<br>
+        <select name="lesson_name" id="lesson"><option value="">—</option></select>
+      </label>
+    </p>
     <p><label>Komentar<br><textarea name="comment" rows="3" maxlength="1000" style="width:100%"></textarea></label></p>
     <p><button type="submit">Sačuvaj čas</button></p>
   </form>
+  {# Mali lokalni skript, bez ijednog frameworka: lekcije se filtriraju po
+     izabranoj oblasti. Podaci dolaze iz kurikuluma servera. #}
+  <script type="application/json" id="curriculum">{{ curriculum|tojson }}</script>
+  <script>
+    function matbotFillLessons() {
+      var data = JSON.parse(document.getElementById("curriculum").textContent);
+      var area = document.getElementById("area").value;
+      var lesson = document.getElementById("lesson");
+      lesson.innerHTML = "";
+      var blank = document.createElement("option");
+      blank.value = ""; blank.textContent = "—";
+      lesson.appendChild(blank);
+      (data[area] || []).forEach(function (title) {
+        var option = document.createElement("option");
+        option.value = title; option.textContent = title;
+        lesson.appendChild(option);
+      });
+    }
+  </script>
 </div>
 
 <div class="card">

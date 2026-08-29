@@ -2,7 +2,16 @@
 {% block heading %}Učenici{% endblock %}
 {% block topright %}<a href="{{ url_for('admin_reports.index') }}">Izvještaji →</a>{% endblock %}
 {% block content %}
-{% if error %}<div class="banner err">{{ error }}</div>{% endif %}
+{% if error %}
+<div class="banner err">
+  {{ error }}
+  {# Veza na POSTOJEĆI zapis: administrator mora moći pogledati učenika s kojim
+     je nalog već povezan, a da adresa nigdje ne bude ponovljena. #}
+  {% if conflict %}
+  <a href="{{ url_for('admin_students.profile', student_id=conflict) }}">Pogledaj postojećeg učenika →</a>
+  {% endif %}
+</div>
+{% endif %}
 
 <div class="card">
   <form method="get" action="{{ url_for('admin_students.index') }}">

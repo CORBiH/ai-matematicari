@@ -28,13 +28,19 @@ pypdf = pytest.importorskip("pypdf")
 # ---------------------------------------------------------------------------
 # Pomoćnici
 # ---------------------------------------------------------------------------
+# Kanonske vrijednosti iz STVARNOG kurikuluma 6. razreda — od Faze 3D
+# otvrdnjavanja gradivo se provjerava prema `data/topics.json`.
+CANON_AREA = "Djeljivost brojeva"
+CANON_LESSON = "Djeljivost zbira, razlike i proizvoda"
+
+
 def session(date="2026-08-05", attendance="present", activity=4,
-            homework="done", area="Razlomci", lesson="Sabiranje razlomaka",
-            comment=None):
+            homework="done", area=CANON_AREA, lesson=CANON_LESSON,
+            comment=None, grade=6):
     return student_sessions.validate_session(
         session_date=date, attendance=attendance, activity_rating=activity,
         homework_status=homework, area_name=area, lesson_name=lesson,
-        comment=comment)
+        comment=comment, grade=grade)
 
 
 @pytest.fixture
@@ -341,6 +347,9 @@ def test_comment_length_is_bounded():
 
 def test_labels_reject_markup():
     with pytest.raises(student_sessions.SessionValidationError):
+        session(area="<b>Razlomci</b>", grade=None)
+    # A s razredom pada i kao nekanonska vrijednost.
+    with pytest.raises(student_sessions.SessionValidationError):
         session(area="<b>Razlomci</b>")
 
 
@@ -478,6 +487,7 @@ def test_zero_assigned_homework_is_not_zero_percent():
 
 
 def test_worked_areas_are_distinct_and_ordered():
+    # `_row` gradi red kakav baza vraća — ovdje se mjeri SAŽETAK, ne validacija.
     summary = _summary([
         _row("2026-08-01", area="Razlomci", lesson="Sabiranje"),
         _row("2026-08-02", area="Razlomci", lesson="Oduzimanje"),
@@ -610,11 +620,13 @@ def test_instruction_numbers_are_decided_before_the_model(db, student):
 
 
 def test_class_curriculum_labels_are_trusted_spans(db, student):
+    """Naziv lekcije S CIFROM mora biti pouzdan raspon i kad dolazi s časa."""
+    digit_lesson = "Pravila djeljivosti sa 2, 3, 4, 5, 6, 9, 10, 15 i 25"
     db.insert_session(student, session(date="2026-08-04",
-                                       area="Djeljivost", lesson="Djeljivost sa 3"))
+                                       area=CANON_AREA, lesson=digit_lesson))
     payload = report_input.build_report_input(student, "2026-08", database=db)
     facts = report_facts.build_ai_facts(payload)
-    assert "Djeljivost sa 3" in report_facts.trusted_labels(facts)
+    assert digit_lesson in report_facts.trusted_labels(facts)
 
 
 # ===========================================================================

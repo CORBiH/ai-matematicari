@@ -1152,11 +1152,25 @@ class ReportingDatabase:
         return [{"student_id": r[0], "display_name": r[1], "grade": r[2],
                  "thinkific_linked": bool(r[3])} for r in rows]
 
-    def create_student(self, display_name, grade):
-        """Ručno upisan učenik. BEZ naloga — nalog je zaseban, svjestan korak.
+    def create_student(self, display_name, grade, external_user_id=None):
+        """Ručno upisan učenik. JEDNA LOGIČKA OPERACIJA, i kad nosi nalog.
 
-        Učenik bez naloga je potpuno legitiman: časove dobija od instruktora, a
-        izvještaj mu pripada i kad nikad nije otvorio nijednu platformu."""
+        ŽIVI DEFEKT KOJI OVO ISPRAVLJA: ranije se učenik upisivao i KOMITOVAO,
+        pa se tek onda pokušavao nalog. Kad je e-mail već pripadao drugom
+        učeniku, nalog bi pao a NOVI UČENIK BI OSTAO — duplikat bez ijedne veze,
+        koji se poslije ručno traži i briše. Zato se sada oboje dešava u jednoj
+        transakciji: ili prođu i učenik i nalog, ili nijedno.
+
+        BAZA JE KONAČNI ARBITAR NAD ISTOVREMENOŠĆU. Između provjere i upisa
+        stane drugi zahtjev, a `students` nema nijedan UNIQUE ključ koji bi to
+        zaustavio — jedini pouzdan sud je `UNIQUE(provider, external_user_id)`
+        na `student_accounts`. Zato se ne oslanjamo na prethodni `SELECT` nego
+        na `rowcount` upisa: izgubljena utrka povlači i spekulativni red u
+        `students`, pa siroče ne nastane ni tada.
+
+        Učenik BEZ naloga ostaje potpuno legitiman: časove dobija od
+        instruktora, a izvještaj mu pripada i kad nikad nije otvorio nijednu
+        platformu. Tada se `student_accounts` ne dira."""
         name = _clean_display_name(display_name)
         if not name:
             raise ReportingUnavailable("student_name_required")
@@ -1167,17 +1181,58 @@ class ReportingDatabase:
         # skup zatvoren na 6–9, tačno kao u formularu.
         if student_grade not in VALID_MANUAL_GRADES:
             raise ReportingUnavailable("student_grade_required")
+        external = (_clean_external_id(external_user_id)
+                    if external_user_id else None)
+
         with self._lock:
             try:
                 conn = self._connection()
+                if external:
+                    # Rani, jeftin i INFORMATIVAN pregled: daje administratoru
+                    # ID postojećeg učenika. NIJE zaštita od utrke — to je
+                    # `rowcount` niže.
+                    owner = _rows(conn.execute(
+                        "SELECT student_id FROM student_accounts "
+                        "WHERE provider = ? AND external_user_id = ?",
+                        (_THINKIFIC_PROVIDER, external)))
+                    if owner:
+                        raise ReportingUnavailable(
+                            "student_account_taken:%s" % owner[0][0])
+
                 cursor = conn.execute(
                     "INSERT INTO students (display_name, grade, created_at, "
                     " updated_at, last_seen_at) VALUES (?, ?, CURRENT_TIMESTAMP, "
                     " CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
                     (name, student_grade))
                 student_id = cursor.lastrowid
+
+                if external:
+                    linked = conn.execute(
+                        "INSERT INTO student_accounts (student_id, provider, "
+                        " external_user_id, created_at, last_seen_at) "
+                        "VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) "
+                        "ON CONFLICT (provider, external_user_id) DO NOTHING",
+                        (student_id, _THINKIFIC_PROVIDER, external))
+                    # `lastrowid` se OVDJE ne smije čitati (izmjereno na libsql
+                    # 0.1.11: na `DO NOTHING` grani ostaje tuđa vrijednost).
+                    # `rowcount` je jedini pouzdan signal.
+                    if linked.rowcount != 1:
+                        # Paralelni zahtjev je stigao prvi. `rollback` poništava
+                        # i NAŠ red u `students` — bez njega bi ostalo siroče.
+                        conn.rollback()
+                        winner = _rows(conn.execute(
+                            "SELECT student_id FROM student_accounts "
+                            "WHERE provider = ? AND external_user_id = ?",
+                            (_THINKIFIC_PROVIDER, external)))
+                        raise ReportingUnavailable(
+                            "student_account_taken:%s"
+                            % (winner[0][0] if winner else "unknown"))
+
                 conn.commit()
                 return student_id
+            except ReportingUnavailable:
+                self._safe_rollback()
+                raise
             except Exception as exc:
                 self._safe_rollback()
                 self._drop_connection()
@@ -1425,6 +1480,39 @@ class ReportingDatabase:
                 self._drop_connection()
                 raise ReportingUnavailable(
                     "population_read_failed:" + type(exc).__name__, exc) from None
+
+    def migrate(self):
+        """Dovedi izvještajnu bazu do TEKUĆE verzije. Idempotentno.
+
+        JEDINO MJESTO NA KOJEM SE ŠEMA MIJENJA, i namjerno je CLI/deploy korak,
+        a ne nusproizvod web zahtjeva. Migracijsko znanje ostaje u
+        `reporting_schema`; ovdje je samo redoslijed i konekcija — ad-hoc SQL u
+        GitHub Actionsu bi bio druga, neprovjerena implementacija istog pravila.
+
+        Svaki korak sam provjerava strukturu prije nego što upiše svoju verziju
+        (vidi `migrate_to_v2` / `migrate_to_v3`), pa prekid ostavlja bazu bez
+        zapisa te verzije i sljedeće pokretanje je dovrši. Vraća listu
+        primijenjenih verzija; prazna znači „već sve na mjestu"."""
+        from matbot import reporting_schema
+
+        applied = []
+        with self._lock:
+            try:
+                conn = self._connection()
+                versions = reporting_schema.applied_versions(conn)
+                if reporting_schema.SCHEMA_VERSION_V2 not in versions:
+                    if reporting_schema.migrate_to_v2(conn):
+                        applied.append(reporting_schema.SCHEMA_VERSION_V2)
+                if reporting_schema.migrate_to_v3(conn):
+                    applied.append(reporting_schema.SCHEMA_VERSION_V3)
+            except reporting_schema.MigrationError:
+                self._drop_connection()
+                raise
+            except Exception as exc:
+                self._drop_connection()
+                raise ReportingUnavailable(
+                    "migration_failed:" + type(exc).__name__, exc) from None
+        return applied
 
     def check(self):
         """SAMO ČITANJE — dijagnostika za CLI (Dio 11). Nikad ne piše, nikad ne
@@ -1988,11 +2076,16 @@ def _format_report(report):
 
 
 def main(argv=None):
-    """`python -m matbot.reporting_db --check`
+    """`python -m matbot.reporting_db [--check] [--migrate]`
 
-    SAMO ČITANJE i SAMO CLI — dijagnostika se namjerno NE izlaže kroz
-    `/healthz` (javni endpoint ne smije otkrivati stanje baze). Izlazni kod 0
-    znači: konekcija radi, sve tabele postoje i verzija šeme se poklapa."""
+    SAMO CLI — dijagnostika se namjerno NE izlaže kroz `/healthz` (javni
+    endpoint ne smije otkrivati stanje baze), a migracija se NIKAD ne pokreće iz
+    web zahtjeva. Izlazni kod 0 znači: konekcija radi, sve tabele postoje i
+    verzija šeme se poklapa.
+
+    `--migrate` prvo primijeni nedostajuće verzije pa provjeri ishod, pa deploy
+    ima jednu komandu koja ili dokaže ispravno stanje ili padne ne-nultim
+    izlazom PRIJE nego što se živa usluga zamijeni."""
     import argparse
     import sys
 
@@ -2003,13 +2096,34 @@ def main(argv=None):
     # ostaju s dijakriticima — oni se nikad ne ispisuju.
     parser = argparse.ArgumentParser(
         prog="python -m matbot.reporting_db",
-        description="Provjera izvjestajne baze (samo citanje, ne mijenja podatke).")
+        description="Provjera i migracija izvjestajne baze. "
+                    "--check samo cita; --migrate mijenja SEMU (nikad podatke).")
     parser.add_argument("--check", action="store_true",
                         help="provjeri kredencijale, konekciju, tabele i verziju seme")
+    parser.add_argument("--migrate", action="store_true",
+                        help="primijeni nedostajuce migracije seme, pa provjeri")
     args = parser.parse_args(argv)
-    if not args.check:
+    if not (args.check or args.migrate):
         parser.print_help()
         return 0
+
+    if args.migrate:
+        # MIGRACIJA PRIJE PROVJERE, u istom pozivu: deploy tako ima JEDNU
+        # komandu koja ili dovede bazu u ispravno stanje i to dokaze, ili padne
+        # ne-nultim izlazom prije nego sto se ziva usluga zamijeni.
+        from matbot import reporting_schema
+
+        try:
+            applied = get_database().migrate()
+        except reporting_schema.MigrationError as error:
+            # STRUKTURNI kod, nikad sirovi tekst baze i nikad URL ni token.
+            print("migration: FAILED -> %s" % error.code)
+            return 1
+        except ReportingUnavailable as error:
+            print("migration: FAILED -> %s" % error.code)
+            return 1
+        print("migration: applied %s" % (", ".join("v%d" % v for v in applied)
+                                         if applied else "nothing (already current)"))
 
     report = diagnose()
     print(_format_report(report))

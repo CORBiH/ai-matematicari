@@ -87,3 +87,47 @@ def topics_response(grade):
         )
 
     return {"grouped": grouped, "oblast_order": grade_data.get("oblast_order", [])}
+
+
+# --- FAZA 3D: kanonski izbor gradiva za evidenciju časa ---------------------
+# EVIDENCIJA ČASA KORISTI ISTI KURIKULUM KAO I SVE OSTALO. Drugi spisak oblasti
+# i lekcija bi značio drugu istinu o istom gradivu, a mjesečno grupisanje po
+# oblastima u izvještaju roditelju oslanja se upravo na to da su nazivi isti
+# svuda. Zato ovdje NEMA novih podataka — samo pogled na `data/topics.json`.
+#
+# PAMTE SE NAZIVI, NE ID-evi. Naziv oblasti i naslov lekcije su već kanonske
+# vrijednosti kojima cijeli projekat barata (Practice, Kontrolni, izvještaj), pa
+# bi uvođenje `topic_id` u `student_sessions` napravilo migracijski posao bez
+# ijedne nove garancije.
+
+
+def curriculum_areas(grade):
+    """Nazivi oblasti jednog razreda, u KURIKULARNOM redoslijedu."""
+    return list(topics_response(grade).get("oblast_order") or [])
+
+
+def curriculum_lessons(grade, area_name):
+    """Naslovi lekcija JEDNE oblasti, u kurikularnom redoslijedu.
+
+    Nepoznata oblast vraća praznu listu — nikad izuzetak, jer ovo poslužuje i
+    administratorski formular."""
+    grouped = topics_response(grade).get("grouped") or {}
+    return [entry["display_name"] for entry in grouped.get(str(area_name or "").strip(), [])]
+
+
+def curriculum_choices(grade):
+    """{oblast: [naslovi]} — sve što formular treba za dva povezana izbornika."""
+    return {area: curriculum_lessons(grade, area) for area in curriculum_areas(grade)}
+
+
+def curriculum_pair_valid(grade, area_name, lesson_name):
+    """Da li (oblast, lekcija) STVARNO postoji u kurikulumu tog razreda.
+
+    SERVER JE AUTORITET. Izbornici u pregledniku su pogodnost; ovo je jedina
+    provjera koja odlučuje šta smije u bazu. Lekcija iz druge oblasti, iz drugog
+    razreda ili izmišljena vrijednost padaju ovdje."""
+    area = str(area_name or "").strip()
+    lesson = str(lesson_name or "").strip()
+    if not area or not lesson:
+        return False
+    return lesson in curriculum_lessons(grade, area)
