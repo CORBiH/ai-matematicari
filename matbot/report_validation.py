@@ -80,6 +80,27 @@ def collect_text(narrative):
     return "\n".join(parts)
 
 
+# Zamjena za maskirani naziv. NEMA CIFARA, pa maskiranje ne može uvesti broj;
+# razmak je da se susjedne riječi ne slijepe.
+_TRUSTED_LABEL_PLACEHOLDER = " "
+
+
+def mask_trusted_labels(text, labels):
+    """Ukloni TAČNE nazive iz kurikuluma prije traženja brojeva.
+
+    Namjerno bez fuzzy poređenja, bez ignorisanja veličine slova i bez
+    djelimičnih podudaranja: maskira se samo ono što je server doslovno poslao
+    modelu. Ako model naziv prepriča umjesto da ga prepiše, cifra ostaje i
+    izvještaj pada ZATVORENO — to je prihvatljivo za v1, jer je pogrešno
+    propuštena izmišljena mjera mnogo skuplja od odbijenog nacrta.
+
+    Duži nazivi idu prvi da kraći naziv ne bi razbio duži kojem je dio."""
+    masked = text or ""
+    for label in sorted(labels or (), key=len, reverse=True):
+        masked = masked.replace(label, _TRUSTED_LABEL_PLACEHOLDER)
+    return masked
+
+
 def unsupported_numbers(text, allowed):
     """Brojevi iz proze kojih nema među izmjerenim vrijednostima.
 
@@ -137,7 +158,11 @@ def validate_narrative(narrative, facts):
     problems = []
     text = collect_text(narrative)
 
-    invented = unsupported_numbers(text, report_facts.allowed_numbers(facts))
+    # MASKIRANJE VAŽI SAMO ZA BROJEVE. Trend i markup i dalje gledaju PUN tekst:
+    # naziv lekcije koji bi sadržavao „napredak" ne smije sakriti tvrdnju o
+    # trendu, a maskiranje bi ga upravo sakrilo.
+    scannable = mask_trusted_labels(text, report_facts.trusted_labels(facts))
+    invented = unsupported_numbers(scannable, report_facts.allowed_numbers(facts))
     if invented:
         problems.append("report_unsupported_number:" + ",".join(invented[:5]))
 

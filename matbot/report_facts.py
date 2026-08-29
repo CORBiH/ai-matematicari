@@ -201,6 +201,38 @@ def build_ai_facts(payload):
     return facts
 
 
+def trusted_labels(facts):
+    """TAČNI nazivi iz kurikuluma koje je server SAM poslao modelu.
+
+    Postoji zbog žive greške: model je ispravno imenovao lekciju „Djeljivost sa
+    3", a provjera brojeva je „3" iz NAZIVA pročitala kao izmišljenu mjeru i
+    odbila cijeli izvještaj. Pogađa 11 od 513 stvarnih naziva (2,1 %), među
+    njima „Pravila djeljivosti sa 2, 3, 4, 5, 6, 9, 10, 15 i 25" i
+    „Konstrukcije uglova 60°, 30°, 90° i 45°" — dakle upravo one lekcije koje
+    prompt najviše i želi imenovati.
+
+    OVO NISU DOPUŠTENE VRIJEDNOSTI, NEGO POUZDANI RASPONI TEKSTA. Razlika je
+    suština ispravke: kad bi „60" postalo globalno dopušteno samo zato što
+    stoji u naslovu o uglovima, prošla bi i rečenica „Tačnost je 60 %" koja
+    nikad nije izmjerena. Zato se naziv MASKIRA prije traženja brojeva, a skup
+    dopuštenih mjera ostaje netaknut (`allowed_numbers`).
+
+    Vraćaju se samo nazivi S CIFROM — jedini koji uopšte mogu uticati na
+    traženje brojeva. Uži skup znači i užu površinu maskiranja.
+
+    Izvor je zatvoren: `lesson_name`, `area_name` i naziv Thinkific sekcije —
+    dakle tačno ona polja koja `build_ai_facts` šalje modelu. Tekst učenika,
+    sirova pitanja i odgovori ovdje ne ulaze NIKAD."""
+    labels = set()
+    for section in (facts.get("thinkific") or {}).get("sections") or []:
+        labels.add((section.get("name") or "").strip())
+    for lesson in (facts.get("matbot") or {}).get("lesson_evidence") or []:
+        labels.add((lesson.get("lesson_name") or "").strip())
+        labels.add((lesson.get("area_name") or "").strip())
+    return {label for label in labels
+            if label and any(ch.isdigit() for ch in label)}
+
+
 def allowed_numbers(facts):
     """Svi brojevi koje model SMIJE spomenuti. Osnova provjere činjeničnosti.
 

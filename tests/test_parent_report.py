@@ -340,6 +340,160 @@ def test_supplied_number_is_allowed():
     assert parent_report.generate_narrative(facts, FakeReportLLM(output=ok))
 
 
+# ---------------------------------------------------------------------------
+# CIFRA U NAZIVU LEKCIJE NIJE IZMIŠLJENA MJERA
+#
+# ŽIVI NALAZ (sintetički reporting smoke, kandidat c95826b): model je ispravno
+# napisao „Djeljivost sa 3", a provjera brojeva je „3" iz NAZIVA pročitala kao
+# izmišljen procenat i odbila cijeli izvještaj. Pogađa 11 od 513 stvarnih
+# naziva — dakle upravo lekcije koje prompt najviše i želi imenovati.
+#
+# Ispravka NE dodaje cifre iz naziva u dopuštene mjere: to bi propustilo
+# „Tačnost je 60 %" samo zato što u kurikulumu postoji naslov o uglu od 60°.
+# Naziv se maskira kao POUZDAN RASPON TEKSTA, i to samo pri traženju brojeva.
+# ---------------------------------------------------------------------------
+
+def _facts_with_lesson(name, area="Djeljivost", items=8, wrong=4):
+    return report_facts.build_ai_facts(payload(matbot={"lesson_outcomes": [
+        {"lesson_id": "L-1", "lesson_name": name, "area_name": area,
+         "difficulty": "standard", "incorrect_items": wrong,
+         "evidence_items": items, "low_evidence": False}]}))
+
+
+def test_exact_lesson_label_with_a_digit_is_accepted():
+    facts = _facts_with_lesson("Djeljivost sa 3")
+    assert 3.0 not in report_facts.allowed_numbers(facts)      # NE globalno
+    ok = good_narrative(
+        focus_areas=["Vrijedi dodatno uvježbati lekciju Djeljivost sa 3."])
+    assert parent_report.generate_narrative(facts, FakeReportLLM(output=ok))
+
+
+def test_the_same_digit_is_still_rejected_as_a_measurement():
+    """Isti broj, izvan naziva — i dalje izmišljena mjera."""
+    facts = _facts_with_lesson("Djeljivost sa 3")
+    bad = good_narrative(summary="Tačnost je 3%.")
+    with pytest.raises(parent_report.ReportGenerationError) as caught:
+        parent_report.generate_narrative(facts, FakeReportLLM(output=bad))
+    assert "unsupported_number:3" in caught.value.code
+
+
+def test_exact_degree_label_is_accepted():
+    facts = _facts_with_lesson("Konstrukcije uglova 60°, 30°, 90° i 45°",
+                               area="Uglovi")
+    ok = good_narrative(next_month_recommendations=[
+        "Preporučuje se dodatno uvježbati Konstrukcije uglova 60°, 30°, 90° i 45°."])
+    assert parent_report.generate_narrative(facts, FakeReportLLM(output=ok))
+
+
+def test_a_degree_number_from_that_label_is_not_a_valid_percentage():
+    """TVRDNJA KOJU OVAJ TEST ČUVA: naslov ne pretvara 60 u mjeru."""
+    facts = _facts_with_lesson("Konstrukcije uglova 60°, 30°, 90° i 45°",
+                               area="Uglovi")
+    bad = good_narrative(summary="Tačnost je 60%.")
+    with pytest.raises(parent_report.ReportGenerationError) as caught:
+        parent_report.generate_narrative(facts, FakeReportLLM(output=bad))
+    assert "unsupported_number:60" in caught.value.code
+
+
+def test_exact_section_name_with_a_digit_is_accepted():
+    facts = report_facts.build_ai_facts(payload(thinkific={"sections": [
+        {"ordinal": 1, "section_name": "Skupovi N i N0",
+         "current_progress_percent": 14, "previous_progress_percent": None,
+         "delta_progress_percent": None}]}))
+    ok = good_narrative(
+        strengths=["Pregledana je sekcija Skupovi N i N0."])
+    assert parent_report.generate_narrative(facts, FakeReportLLM(output=ok))
+
+
+def test_exact_area_name_with_a_digit_is_accepted():
+    facts = _facts_with_lesson("Razlomci", area="Djeljivost sa 9")
+    ok = good_narrative(focus_areas=["Vrijedi vježbati Djeljivost sa 9."])
+    assert parent_report.generate_narrative(facts, FakeReportLLM(output=ok))
+
+
+def test_a_paraphrased_label_still_fails_closed():
+    """Prepričan naziv nije TAČAN naziv — v1 svjesno pada zatvoreno."""
+    facts = _facts_with_lesson("Djeljivost sa 3")
+    bad = good_narrative(focus_areas=["Vrijedi uvježbati djeljivost brojem 3."])
+    with pytest.raises(parent_report.ReportGenerationError):
+        parent_report.generate_narrative(facts, FakeReportLLM(output=bad))
+
+
+def test_only_digit_bearing_labels_are_trusted_spans():
+    facts = _facts_with_lesson("Djeljivost sa 3")
+    labels = report_facts.trusted_labels(facts)
+    assert "Djeljivost sa 3" in labels
+    # Naziv bez cifre nema šta da maskira, pa se i ne prenosi.
+    assert all(any(ch.isdigit() for ch in label) for label in labels)
+
+
+def test_masking_never_hides_a_trend_claim():
+    """Maskiranje važi SAMO za brojeve; trend i dalje gleda pun tekst."""
+    facts = _facts_with_lesson("Napredak u 3 koraka")
+    assert facts["thinkific"]["previous_available"] is False
+    bad = good_narrative(summary="Zabilježen je napredak u odnosu na prošli mjesec.")
+    with pytest.raises(parent_report.ReportGenerationError) as caught:
+        parent_report.generate_narrative(facts, FakeReportLLM(output=bad))
+    assert "trend_without_baseline" in caught.value.code
+
+
+def test_masking_never_hides_markup():
+    facts = _facts_with_lesson("Djeljivost sa 3")
+    bad = good_narrative(summary="Djeljivost sa 3 <b>podebljano</b>.")
+    with pytest.raises(parent_report.ReportGenerationError) as caught:
+        parent_report.generate_narrative(facts, FakeReportLLM(output=bad))
+    assert "markup_or_internal" in caught.value.code
+
+
+def test_masking_costs_no_extra_model_call():
+    facts = _facts_with_lesson("Djeljivost sa 3")
+    llm = FakeReportLLM(output=good_narrative(
+        focus_areas=["Vrijedi uvježbati Djeljivost sa 3."]))
+    parent_report.generate_narrative(facts, llm)
+    assert llm.calls == 1
+
+
+def test_trusted_labels_never_carry_learner_identity():
+    """Zatvoren izvor: samo nazivi gradiva, nikad ime, e-mail ni šifra."""
+    facts = _facts_with_lesson("Djeljivost sa 3")
+    blob = " ".join(report_facts.trusted_labels(facts))
+    for forbidden in ("L-1", "student_id", "@", "Đžemal", "Šćepanović"):
+        assert forbidden not in blob
+
+
+@pytest.mark.parametrize("title", [
+    "Djeljivost sa 3",                                        # prost cijeli broj
+    "Pravila djeljivosti sa 2, 3, 4, 5, 6, 9, 10, 15 i 25",   # niz brojeva
+    "Konstrukcije uglova 60°, 30°, 90° i 45°",                # stepeni
+    "Množenje i dijeljenje u skupu N0",                       # alfanumerički
+    "Jednostavna kvadratna jednačina ax² + bx = 0",           # formula u naslovu
+])
+def test_real_curriculum_titles_are_accepted_verbatim(title):
+    """Stvarni naslovi iz `data/topics.json`, doslovno upotrijebljeni."""
+    facts = _facts_with_lesson(title)
+    ok = good_narrative(focus_areas=["Vrijedi dodatno uvježbati %s." % title])
+    assert parent_report.generate_narrative(facts, FakeReportLLM(output=ok))
+
+
+@pytest.mark.parametrize("title", [
+    "Pravila djeljivosti sa 2, 3, 4, 5, 6, 9, 10, 15 i 25",
+    "Konstrukcije uglova 60°, 30°, 90° i 45°",
+])
+def test_those_titles_do_not_license_invented_percentages(title):
+    """Ni jedan broj iz naslova ne postaje dopuštena mjera."""
+    facts = _facts_with_lesson(title)
+    for invented in ("15", "45"):
+        bad = good_narrative(summary="Tačnost je %s%%." % invented)
+        with pytest.raises(parent_report.ReportGenerationError) as caught:
+            parent_report.generate_narrative(facts, FakeReportLLM(output=bad))
+        assert "unsupported_number" in caught.value.code
+
+
+def test_the_prompt_asks_for_verbatim_lesson_names():
+    assert "PREPIŠI naziv TAČNO" in report_prompt.SYSTEM_PROMPT
+    assert report_prompt.REPORT_PROMPT_VERSION == "3c-2"
+
+
 @pytest.mark.parametrize("phrase", [
     "Zabilježen je napredak u odnosu na prošli mjesec.",
     "Rezultati pokazuju porast tokom mjeseca.",

@@ -12,7 +12,7 @@ tekst koji je roditelj već dobio — bez čuvanja samog prompta u bazi.
 
 # Podigni pri SVAKOJ semantičkoj izmjeni teksta ispod. Verzija je jedini trag
 # po kojem se sačuvani izvještaj kasnije može objasniti.
-REPORT_PROMPT_VERSION = "3c-1"
+REPORT_PROMPT_VERSION = "3c-2"
 
 SYSTEM_PROMPT = """\
 Ti si pedagoški asistent koji piše KRATAK mjesečni izvještaj za RODITELJA
@@ -58,6 +58,8 @@ Uz nalaze po lekcijama i uz kontrolne dobijaš `evidence_level`:
   „rezultat daje početni signal", „za pouzdaniju procjenu potrebno je više
   zadataka",
 - "moderate" — smiješ imenovati oblast kao onu na kojoj treba raditi,
+  a kad lekciju ili oblast imenuješ, PREPIŠI naziv TAČNO onako kako ti je dat
+  (npr. „Djeljivost sa 3"), bez skraćivanja i bez prepričavanja,
 - "strong" — smiješ jasno reći da se nešto ponavlja.
 Jedan netačan odgovor NIKAD nije dokaz da učenik nešto ne zna. Jedan tačan
 odgovor NIKAD nije dokaz da je nešto savladano. Ako je
