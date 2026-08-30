@@ -73,13 +73,27 @@
     <tr>
       <td>{{ s.display_name or "Učenik #%s"|format(s.student_id) }}</td>
       <td>
-        {% if s.grade %}{{ s.grade }}. razred{% else %}<span class="muted">nije unesen</span>{% endif %}
+        {% if s.grade %}
+          {% if s.grade_status == status_unconfirmed %}
+          <span class="muted">Trenutno zapisano: {{ s.grade }}. razred</span>
+          {% else %}{{ s.grade }}. razred{% endif %}
+        {% else %}<span class="muted">nije unesen</span>{% endif %}
         {# STANJE POTVRDE, ne ocjena tacnosti. Zatecena cifra bez potvrde je
            nepotvrdjena, ma koliko izgledala uvjerljivo. #}
         {% if s.grade_status == status_unconfirmed %}
         <span class="pill" style="color:var(--warn)">nepotvrđeno</span>
         {% else %}
         <span class="pill" style="color:var(--ok)">potvrđeno</span>
+        {% endif %}
+        {# BROJ IZ IMENA — pomoc covjeku, nikad odluka. Vidi se SAMO dok red
+           nije potvrdjen, da bi se znalo zasto je nesto predizabrano. #}
+        {% if s.name_note %}
+        <br>
+        <span class="muted">
+          {% if s.name_note['kind'] == note_grade %}Broj u imenu: {{ s.name_note['grade'] }}. razred
+          {% elif s.name_note['kind'] == note_unsupported %}Broj u imenu: {{ s.name_note['value'] }} — izvan podržanih razreda 6–9
+          {% else %}Brojevi u imenu: {{ s.name_note['values']|join(', ') }} — nije jednoznačno{% endif %}
+        </span>
         {% endif %}
       </td>
       <td class="muted">
@@ -94,14 +108,22 @@
         {% else %}<span class="pill">nije povezan</span>{% endif %}
       </td>
       <td>
-        {# Jedan klik za zatecenu vrijednost; razred se cita SA SERVERA. #}
-        {% if s.grade and s.grade_status == status_unconfirmed %}
+        {# NEMA JEDNOG KLIKA NAD ZATECENOM VRIJEDNOSCU. Administrator mora
+           VIDJETI i IZABRATI razred koji potvrdjuje; predizbor dolazi samo iz
+           broja u imenu, nikad iz stare automatske sestice. #}
+        {% if s.grade_status == status_unconfirmed %}
         <form method="post" style="display:inline"
-              action="{{ url_for('admin_students.confirm_grade', student_id=s.student_id) }}">
+              action="{{ url_for('admin_students.update_grade', student_id=s.student_id) }}">
           <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
           {# Vrati se na listu, da se 34 ucenika mogu proci jedan po jedan. #}
           <input type="hidden" name="next" value="index">
-          <button type="submit">Potvrdi {{ s.grade }}. razred</button>
+          <select name="grade" required>
+            <option value="" {% if not s.preselected_grade %}selected{% endif %} disabled>— izaberi razred —</option>
+            {% for g in grades %}
+            <option value="{{ g }}" {% if s.preselected_grade == g %}selected{% endif %}>{{ g }}. razred</option>
+            {% endfor %}
+          </select>
+          <button type="submit">Sačuvaj i potvrdi</button>
         </form>
         {% endif %}
         <a href="{{ url_for('admin_students.profile', student_id=s.student_id) }}">Profil</a>

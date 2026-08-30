@@ -77,6 +77,29 @@ def _clean_confirmed(raw):
     return None
 
 
+def _confirmation_view(row, confirmed):
+    """Šta administratorski formular smije ponuditi za JEDAN red.
+
+    DVA RAZDVOJENA SLUČAJA, i razlika je cijela poenta ove izmjene:
+
+      POTVRĐEN red  — predizabran je NJEGOV potvrđeni razred, a broj u imenu se
+                      ne gleda uopšte. Potvrđena vrijednost je autoritet dok je
+                      administrator izričito ne promijeni.
+      NEPOTVRĐEN red — predizabire se ISKLJUČIVO podržan broj iz imena, jer je
+                      operator potvrdio da je taj broj u zatečenim imenima
+                      namjeran. ZATEČENA VRIJEDNOST `students.grade` SE NE
+                      PREDIZABIRE NIKAD — ona je upravo ono što se provjerava.
+
+    Vraća `(napomena_o_imenu, predizabrani_razred)`. Ništa se ne upisuje."""
+    if confirmed:
+        return None, row.get("grade")
+    note = student_grades.name_grade_note(row.get("display_name"))
+    if note and note["kind"] == student_grades.NOTE_GRADE:
+        return note, note["grade"]
+    # Nema broja, više brojeva, ili broj izvan 6–9 → čovjek bira izričito.
+    return note, None
+
+
 def _grade_state(row):
     """Jedan red registra → stanje potvrde + sadržaj koji je učenik koristio.
 
@@ -117,7 +140,10 @@ def index():
             student.pop("_evidence", None)
             student["grade_status"] = status
             student["content_grades"] = content
-            if status == student_grades.STATUS_UNCONFIRMED:
+            confirmed_row = status != student_grades.STATUS_UNCONFIRMED
+            student["name_note"], student["preselected_grade"] = \
+                _confirmation_view(student, confirmed_row)
+            if not confirmed_row:
                 unconfirmed_total += 1
     except reporting_db.ReportingUnavailable as error:
         logger.info("admin_students_list_failed code=%s", error.code)
@@ -130,6 +156,9 @@ def index():
                            unconfirmed_total=unconfirmed_total,
                            status_unconfirmed=student_grades.STATUS_UNCONFIRMED,
                            status_mismatch=student_grades.STATUS_CONTENT_MISMATCH,
+                           note_grade=student_grades.NOTE_GRADE,
+                           note_unsupported=student_grades.NOTE_UNSUPPORTED,
+                           note_ambiguous=student_grades.NOTE_AMBIGUOUS,
                            csrf_token=admin_auth.csrf_token(),
                            error=request.args.get("error", ""),
                            conflict=(request.args.get("conflict") or "").strip()[:20],
@@ -216,6 +245,9 @@ def profile(student_id):
         student.get("grade_source"))
     curriculum = (topics.curriculum_choices(student.get("grade"))
                   if grade_confirmed else {})
+    # SAMO PRIKAZ. Iscrtavanje stranice ne upisuje ništa — razred se mijenja
+    # isključivo administratorovim POST-om na `update_grade`.
+    name_note, preselected_grade = _confirmation_view(student, grade_confirmed)
     return render_template(
         "admin_student_profile.html", student_id=student_id, student=student,
         curriculum=curriculum, areas=list(curriculum),
@@ -223,8 +255,10 @@ def profile(student_id):
         grade_content=content, grade_evidence=evidence,
         status_unconfirmed=student_grades.STATUS_UNCONFIRMED,
         status_mismatch=student_grades.STATUS_CONTENT_MISMATCH,
-        name_grade_hint=student_grades.name_grade_hint(
-            student.get("display_name")),
+        name_note=name_note, preselected_grade=preselected_grade,
+        note_grade=student_grades.NOTE_GRADE,
+        note_unsupported=student_grades.NOTE_UNSUPPORTED,
+        note_ambiguous=student_grades.NOTE_AMBIGUOUS,
         valid_grades=student_grades.VALID_GRADES,
         thinkific_linked=linked, sessions=list(reversed(sessions)),
         activity_labels=student_sessions.ACTIVITY_LABELS,
@@ -264,42 +298,26 @@ def link_account(student_id):
 @admin_students_bp.route("/<int:student_id>/grade", methods=["POST"])
 @require_admin
 def update_grade(student_id):
-    """POTVRDI ili promijeni TEKUĆI razred. Mijenja samo profil, nikad istoriju.
+    """SAČUVAJ I POTVRDI tekući razred. Mijenja samo profil, nikad istoriju.
 
-    Nema automatske promocije i nema masovne ispravke: sadržaj se administratoru
-    PRIKAZUJE, a odluku donosi on, po jednom učeniku. Stari časovi, aktivnost,
-    kontrolni i snimci ostaju netaknuti."""
+    JEDINA radnja nad tekućim razredom, i uvijek nosi IZABRANU vrijednost.
+    Ranije je pored nje postojala i „potvrdi zatečeni razred" — jedan klik koji
+    je pretvarao staru automatsku šesticu u potvrđenu šesticu, a da administrator
+    nijednom nije izabrao broj. Za 34 zatečena reda to je bilo tiho ozvaničenje
+    upravo one vrijednosti koja je i napravila problem, pa je ta ruta UKLONJENA.
+
+    Razred dolazi iz formulara i ovdje se NEZAVISNO provjerava (`_clean_grade`
+    prima samo 6–9); `grade_source` je serverski i nikad iz zahtjeva. Nema
+    automatske promocije i nema masovne ispravke — odluka je po jednom učeniku.
+    Stari časovi, aktivnost, kontrolni i snimci ostaju netaknuti."""
     _require_csrf()
     grade = _clean_grade(request.form.get("grade"))
     if grade is None:
+        # Prazan izbor („— izaberi razred —") je NORMALAN ulaz, ne napad: bez
+        # nagovještaja iz imena selektor namjerno nema predizabranu vrijednost.
         return redirect(url_for("admin_students.profile",
                                 student_id=student_id, error=ERROR_GRADE))
-    return _confirm(student_id, grade, "changed")
-
-
-@admin_students_bp.route("/<int:student_id>/grade/confirm", methods=["POST"])
-@require_admin
-def confirm_grade(student_id):
-    """„Potvrdi postojeći razred" — jedan klik za zatečenu vrijednost.
-
-    RAZRED SE ČITA IZ BAZE, NE IZ FORMULARA. Dugme smije samo potvrditi ono što
-    administrator vidi na ekranu; kad bi vrijednost stizala iz zahtjeva, klijent
-    bi mogao „potvrditi" razred koji nigdje ne piše. Profil bez razreda nema šta
-    da potvrdi, pa se traži izbor."""
-    _require_csrf()
-    try:
-        saved = _db().fetch_student_profile(student_id)
-    except reporting_db.ReportingUnavailable as error:
-        logger.info("admin_grade_confirm_failed code=%s", error.code)
-        return redirect(url_for("admin_students.profile",
-                                student_id=student_id, error=ERROR_UNAVAILABLE))
-    if saved is None:
-        abort(404)
-    grade = saved.get("grade")
-    if grade not in VALID_GRADES:
-        return redirect(url_for("admin_students.profile",
-                                student_id=student_id, error=ERROR_GRADE))
-    return _confirm(student_id, int(grade), "confirmed")
+    return _confirm(student_id, grade, "confirmed")
 
 
 def _return_to_listing():

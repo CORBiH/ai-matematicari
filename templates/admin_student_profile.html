@@ -21,28 +21,43 @@
     <a href="{{ url_for('admin_reports.student_preview', student_id=student_id, month=month) }}">
       <button type="button">Izvještaj</button></a>
   </p>
-  {# POTVRDA ZATECENE VRIJEDNOSTI - jedan klik. Razred se cita SA SERVERA, pa
-     dugme ne moze potvrditi nista sto administrator ne vidi. #}
-  {% if student.grade and not grade_confirmed %}
-  <form method="post" action="{{ url_for('admin_students.confirm_grade', student_id=student_id) }}">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-    <button type="submit">Potvrdi {{ student.grade }}. razred</button>
-    <span class="muted">Potvrđuje da učenik <b>sada pohađa</b> {{ student.grade }}. razred.</span>
-  </form>
+  {# TEKUĆI razred je PROFIL, ne identitet. Mijenja se svjesno i mijenja SAMO
+     ovo polje — istorija časova, aktivnosti i snimaka ostaje netaknuta.
+
+     JEDNA FORMA ZA OBOJE (potvrda i izmjena). Nema odvojenog „potvrdi zatecenu
+     vrijednost" dugmeta: administrator mora vidjeti i izabrati broj koji
+     potvrdjuje, jer je zatecena sestica bas ono sto se provjerava. #}
+  {% if not grade_confirmed %}
+  <p style="margin:10px 0 4px 0">
+    {% if student.grade %}
+    <b>Trenutno zapisano: {{ student.grade }}. razred (nepotvrđeno)</b>
+    {% else %}
+    <b>Trenutno nije zapisan razred.</b>
+    {% endif %}
+    {% if name_note %}
+    <br>
+    <span class="muted">
+      {% if name_note['kind'] == note_grade %}Broj u imenu: {{ name_note['grade'] }}. razred
+      {% elif name_note['kind'] == note_unsupported %}Broj u imenu: {{ name_note['value'] }} — izvan podržanih razreda 6–9
+      {% else %}Brojevi u imenu: {{ name_note['values']|join(', ') }} — nije jednoznačno{% endif %}
+    </span>
+    {% endif %}
+  </p>
   {% endif %}
 
-  {# TEKUĆI razred je PROFIL, ne identitet. Mijenja se svjesno i mijenja SAMO
-     ovo polje — istorija časova, aktivnosti i snimaka ostaje netaknuta. #}
   <form method="post" action="{{ url_for('admin_students.update_grade', student_id=student_id) }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <label>Trenutni razred<br>
       <select name="grade" required>
+        {# Bez predizabrane vrijednosti kad je nema odakle — prazan izbor je
+           posteniji od nagadjanja, a server prazan izbor odbija. #}
+        <option value="" {% if not preselected_grade %}selected{% endif %} disabled>— izaberi razred —</option>
         {% for g in valid_grades %}
-        <option value="{{ g }}" {% if student.grade == g %}selected{% endif %}>{{ g }}. razred</option>
+        <option value="{{ g }}" {% if preselected_grade == g %}selected{% endif %}>{{ g }}. razred</option>
         {% endfor %}
       </select>
     </label>
-    <button type="submit">{% if grade_confirmed %}Promijeni razred{% else %}Potvrdi izabrani razred{% endif %}</button>
+    <button type="submit">{% if grade_confirmed %}Sačuvaj razred{% else %}Sačuvaj i potvrdi{% endif %}</button>
     <span class="muted">Mijenja samo profil; stari časovi i izvještaji ostaju nepromijenjeni.</span>
   </form>
 
@@ -50,11 +65,6 @@
   <div class="banner warn" style="margin-top:10px">
     Trenutni razred nije potvrđen. Unos časa i novi izvještaj za roditelja
     traže potvrđen razred.
-    {% if name_grade_hint %}
-    {# SAMO ZA LJUDSKI PREGLED. Broj u imenu nije dokaz i ne mijenja nista sam
-       od sebe - „7" moze biti grupa, generacija ili popravni. #}
-    <span class="muted">U imenu se pojavljuje broj {{ name_grade_hint }} — provjerite s instruktorom.</span>
-    {% endif %}
   </div>
   {% endif %}
 

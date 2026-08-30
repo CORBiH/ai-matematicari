@@ -512,23 +512,37 @@ def test_legacy_student_shows_as_unconfirmed(admin, db):
     listing = admin.get("/admin/students")
     assert "nepotvrđeno".encode() in listing.data
     assert ("/admin/students/%d" % student_id).encode() in listing.data
-    # Dugme za potvrdu zatecene vrijednosti postoji na samoj listi.
-    assert "Potvrdi 6. razred".encode() in listing.data
+    # Zatecena vrijednost se VIDI, ali se ne moze potvrditi jednim klikom.
+    assert "Trenutno zapisano: 6. razred".encode() in listing.data
+    assert "Sačuvaj i potvrdi".encode() in listing.data
+    assert "Potvrdi 6. razred".encode() not in listing.data
 
     profile = admin.get("/admin/students/%d" % student_id)
     assert "Trenutni razred nije potvrđen".encode() in profile.data
+    assert "Trenutno zapisano: 6. razred (nepotvrđeno)".encode() in profile.data
     assert b"2026-09" in profile.data
 
 
-def test_confirm_button_on_the_listing_confirms_the_stored_grade(admin, db):
+def test_listing_confirmation_writes_the_submitted_grade(admin, db):
+    """Sa liste se potvrdjuje IZABRANI razred, ne zatecena vrijednost."""
     student_id = _legacy(db, db.create_student("Zatecen", 6), 6)
     token = _csrf_from(admin.get("/admin/students"))
-    admin.post("/admin/students/%d/grade/confirm" % student_id,
-               data={"csrf_token": token})
+    admin.post("/admin/students/%d/grade" % student_id,
+               data={"csrf_token": token, "grade": "8", "next": "index"})
     saved = db.fetch_student_profile(student_id)
-    assert saved["grade"] == 6, "potvrda ne smije promijeniti vrijednost"
+    assert saved["grade"] == 8
     assert saved["grade_source"] == "admin"
     assert saved["grade_confirmed_at"]
+
+
+def test_the_one_click_confirm_route_no_longer_exists(admin, db):
+    """Ruta koja je potvrdjivala zatecenu vrijednost je UKLONJENA."""
+    student_id = _legacy(db, db.create_student("Zatecen", 6), 6)
+    token = _csrf_from(admin.get("/admin/students"))
+    answer = admin.post("/admin/students/%d/grade/confirm" % student_id,
+                        data={"csrf_token": token})
+    assert answer.status_code == 404
+    assert db.fetch_student_profile(student_id)["grade_confirmed_at"] is None
 
 
 def test_confirmation_state_never_exposes_the_email(admin, db):
@@ -550,9 +564,11 @@ def test_name_hint_never_confirms_or_changes_a_grade(admin, db):
     assert "Adjan 7 PLUS".encode() in listing.data
     assert "nepotvrđeno".encode() in listing.data
     assert db.fetch_student_profile(student_id)["grade"] == 6
-    # Broj iz imena se smije POKAZATI covjeku, ali kao pitanje, ne kao odluka.
+    # Broj iz imena se smije POKAZATI covjeku i PREDIZABRATI u formularu, ali
+    # sam po sebi ne mijenja nijedan red.
     profile = admin.get("/admin/students/%d" % student_id)
-    assert "provjerite s instruktorom".encode() in profile.data
+    assert "Broj u imenu: 7. razred".encode() in profile.data
+    assert db.fetch_student_profile(student_id)["grade_confirmed_at"] is None
 
 
 # ---------------------------------------------------------------------------

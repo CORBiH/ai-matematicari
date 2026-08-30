@@ -62,15 +62,49 @@ SOURCE_MATBOT = "matbot_activity"
 
 EVIDENCE_KEYS = ("thinkific", "assessment", "matbot")
 
-# Broj u imenu — SAMO za ljudski pregled. Jedan jedini broj 6–9 u imenu daje
-# nagovještaj; dva ili više različitih ne daju ništa (npr. „7/8 grupa").
-_NAME_GRADE_RE = re.compile(r"(?<!\d)([6-9])(?!\d)")
+# Broj u imenu — SAMO za ljudski pregled i SAMO kao pomoć administratorskom
+# formularu. Traže se samostalni jedno- i dvocifreni brojevi: „Amar 7 Septembar"
+# nosi tvrdnju o razredu, a „Učenik 2026" nosi godinu i namjerno se ne gleda.
+_NAME_NUMBER_RE = re.compile(r"(?<!\d)(\d{1,2})(?!\d)")
+
+NOTE_GRADE = "grade"              # jedan broj, i to podržan razred 6–9
+NOTE_UNSUPPORTED = "unsupported"  # jedan broj, ali izvan 6–9 (npr. „10")
+NOTE_AMBIGUOUS = "ambiguous"      # dva ili više različitih (npr. „Grupa 7/8")
+
+
+def name_grade_note(display_name):
+    """Šta broj u imenu KAŽE ČOVJEKU. Nikad odluka, nikad upis.
+
+    ZAŠTO OVO SMIJE POSTOJATI (i samo ovdje): operator je izričito potvrdio da
+    je broj u imenima ZATEČENOG skupa namjeran i da označava stvarni tekući
+    razred („Amar 7 Septembar" = sedmi). To vrijedi za JEDNOKRATNI ljudski
+    pregled 34 zatečena reda, ne kao pravilo proizvoda.
+
+    GRANICA JE TVRDA: ova funkcija smije samo PREDIZABRATI vrijednost u
+    administratorskom formularu. Ne ulazi u `classify`, ne ulazi u identitet,
+    uvoz ni izvještaj, i sama po sebi ne mijenja nijedan red — razred upisuje
+    tek administratorov POST, i to onaj koji je administrator POSLAO.
+
+    Vraća `None` ili `{"kind": ..., "grade"|"value"|"values": ...}`."""
+    found = sorted({int(match) for match
+                    in _NAME_NUMBER_RE.findall(display_name or "")})
+    if not found:
+        return None
+    if len(found) > 1:
+        # „Grupa 7/8" može biti generacija, smjena ili dvije grupe — ne bira se.
+        return {"kind": NOTE_AMBIGUOUS, "values": found}
+    value = found[0]
+    if value in VALID_GRADES:
+        return {"kind": NOTE_GRADE, "grade": value}
+    # „Student 10 Gimnazija" NIJE deveti razred. Ne zaokružuje se, ne svodi na
+    # šesticu i ne predizabire — čovjeku se pokaže i traži se izričita odluka.
+    return {"kind": NOTE_UNSUPPORTED, "value": value}
 
 
 def name_grade_hint(display_name):
-    """Nagovještaj iz imena. NIKAD ne ulazi u status ni u ijednu preporuku."""
-    found = {int(match) for match in _NAME_GRADE_RE.findall(display_name or "")}
-    return found.pop() if len(found) == 1 else None
+    """Podržan razred iz imena, ili `None`. NIKAD ne ulazi u status."""
+    note = name_grade_note(display_name)
+    return note["grade"] if note and note["kind"] == NOTE_GRADE else None
 
 
 def evidence_month(when):

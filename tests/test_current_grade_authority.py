@@ -383,7 +383,7 @@ def test_20_every_grade_mutation_is_post_and_csrf_protected():
     for node in ast.walk(tree):
         if not isinstance(node, ast.FunctionDef):
             continue
-        if node.name not in ("update_grade", "confirm_grade"):
+        if node.name != "update_grade":
             continue
         guarded += 1
         routes = [d for d in node.decorator_list if isinstance(d, ast.Call)]
@@ -399,7 +399,9 @@ def test_20_every_grade_mutation_is_post_and_csrf_protected():
         # `require_admin` je i dalje na ruti.
         assert any(isinstance(d, ast.Name) and d.id == "require_admin"
                    for d in node.decorator_list), node.name
-    assert guarded == 2
+    assert guarded == 1
+    # Jedina radnja nad tekucim razredom; jednoklik ruta vise ne postoji.
+    assert "def confirm_grade(" not in source
 
 
 def test_21_confirmation_state_is_visible_in_the_registry(db):
