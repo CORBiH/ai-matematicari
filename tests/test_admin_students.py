@@ -523,3 +523,68 @@ def test_name_hint_alone_never_produces_a_warning(admin, db):
     listing = admin.get("/admin/students")
     assert "Adjan 7 PLUS".encode() in listing.data
     assert "provjeri".encode() not in listing.data
+
+
+# ---------------------------------------------------------------------------
+# SUKOB DOKAZA: upozorenje mora pasti i kad se Thinkific SLAŽE sa profilom
+# ---------------------------------------------------------------------------
+def _add_exam_and_activity(db, student_id, grade, when="2026-08-25 18:06:49"):
+    conn = db._connection()
+    conn.execute(
+        "INSERT INTO assessment_attempts (student_id, source, assessment_type, "
+        " external_attempt_id, grade, score_percent, correct_count, total_count, "
+        " completed_at) VALUES (?, 'matbot', 'kontrolni', ?, ?, 60.0, 3, 5, ?)",
+        (student_id, "e%d" % grade, grade, when))
+    conn.execute(
+        "INSERT INTO learning_activity (student_id, source, event_type, "
+        " event_key, grade, occurred_at) "
+        "VALUES (?, 'matbot', 'practice_answer_correct', ?, ?, ?)",
+        (student_id, "k%d" % grade, grade, "2026-08-25 18:06:31"))
+    conn.commit()
+
+
+def test_edin_shaped_conflict_raises_the_admin_warning(admin, db):
+    """Thinkific 6 slaže se s profilom, ali kontrolni i MAT-BOT kažu 9."""
+    student_id = db.create_student("Sintetički Sporni", 6)
+    _add_thinkific_grade(db, student_id, "2026-08", 6)
+    _add_exam_and_activity(db, student_id, 9)
+
+    listing = admin.get("/admin/students")
+    assert "provjeri".encode() in listing.data
+
+    profile = admin.get("/admin/students/%d" % student_id)
+    assert "Razred zahtijeva provjeru".encode() in profile.data
+
+
+def test_instructor_shaped_conflict_raises_the_admin_warning(admin, db):
+    student_id = db.create_student("Sintetički Sedmak", 6)
+    _add_thinkific_grade(db, student_id, "2026-08", 6)
+    _add_exam_and_activity(db, student_id, 7)
+    profile = admin.get("/admin/students/%d" % student_id)
+    assert "Razred zahtijeva provjeru".encode() in profile.data
+
+
+def test_agreeing_sources_still_show_no_warning(admin, db):
+    student_id = db.create_student("Sintetički Uredan", 6)
+    _add_thinkific_grade(db, student_id, "2026-08", 6)
+    _add_exam_and_activity(db, student_id, 6)
+    listing = admin.get("/admin/students")
+    assert "provjeri".encode() not in listing.data
+    profile = admin.get("/admin/students/%d" % student_id)
+    assert "Razred zahtijeva provjeru".encode() not in profile.data
+
+
+def test_old_year_evidence_does_not_raise_a_false_warning(admin, db):
+    """Šesti lani, šesti sada — napredak nije sukob."""
+    student_id = db.create_student("Sintetički Stari", 6)
+    _add_thinkific_grade(db, student_id, "2026-08", 6)
+    _add_exam_and_activity(db, student_id, 6, when="2026-08-20 10:00:00")
+    conn = db._connection()
+    conn.execute(
+        "INSERT INTO assessment_attempts (student_id, source, assessment_type, "
+        " external_attempt_id, grade, score_percent, correct_count, total_count, "
+        " completed_at) VALUES (?, 'matbot', 'kontrolni', 'old', 5, 60.0, 3, 5, "
+        " '2025-10-01 10:00:00')", (student_id,))
+    conn.commit()
+    profile = admin.get("/admin/students/%d" % student_id)
+    assert "Razred zahtijeva provjeru".encode() not in profile.data

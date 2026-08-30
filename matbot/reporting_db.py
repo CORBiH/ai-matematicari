@@ -1336,6 +1336,77 @@ class ReportingDatabase:
             assessment_rows=[(w, g) for w, g in assessment],
             matbot_rows=[(w, g) for w, g in matbot])
 
+    def fetch_progress_imports(self):
+        """SAMO ČITANJE: svi Thinkific uvozi + broj snimaka po razredu.
+
+        `grade` i `course_name` su ovdje ono što je administrator IZABRAO kao
+        slot, ne ono što je bilo u fajlu — vidi `thinkific_grade_forensics`."""
+        with self._lock:
+            try:
+                conn = self._connection()
+                rows = _rows(conn.execute(
+                    "SELECT id, report_month, course_key, course_name, grade, "
+                    " row_count, imported_at, source_sha256 "
+                    "FROM thinkific_progress_imports ORDER BY imported_at, id"))
+                counts = _rows(conn.execute(
+                    "SELECT import_id, grade, COUNT(*) "
+                    "FROM thinkific_progress_snapshots GROUP BY import_id, grade"))
+            except Exception as exc:
+                self._drop_connection()
+                raise ReportingUnavailable(
+                    "progress_imports_read_failed:" + type(exc).__name__, exc) from None
+        by_import = {}
+        for import_id, grade, count in counts:
+            by_import.setdefault(import_id, {})[grade] = count
+        columns = ("id", "report_month", "course_key", "course_name", "grade",
+                   "row_count", "imported_at", "source_sha256")
+        result = []
+        for row in rows:
+            item = dict(zip(columns, row))
+            item["snapshot_grades"] = by_import.get(item["id"], {})
+            result.append(item)
+        return result
+
+    def fetch_import_sections(self):
+        """SAMO ČITANJE: {import_id: [(ordinal, naziv_sekcije)]}.
+
+        Nazivi dolaze iz ZAGLAVLJA izvoza (`section_columns`), pa su jedini
+        podatak u cijelom lancu koji ne zavisi od izabranog slota."""
+        with self._lock:
+            try:
+                conn = self._connection()
+                rows = _rows(conn.execute(
+                    "SELECT DISTINCT p.import_id, s.ordinal, s.section_name "
+                    "FROM thinkific_progress_sections s "
+                    "JOIN thinkific_progress_snapshots p ON p.id = s.snapshot_id "
+                    "ORDER BY p.import_id, s.ordinal"))
+            except Exception as exc:
+                self._drop_connection()
+                raise ReportingUnavailable(
+                    "import_sections_read_failed:" + type(exc).__name__, exc) from None
+        grouped = {}
+        for import_id, ordinal, name in rows:
+            grouped.setdefault(import_id, []).append((ordinal, name))
+        return grouped
+
+    def fetch_student_thinkific_history(self, student_id):
+        """SAMO ČITANJE: svi snimci jednog učenika, najstariji prvi."""
+        with self._lock:
+            try:
+                conn = self._connection()
+                rows = _rows(conn.execute(
+                    "SELECT report_month, course_key, course_name, grade, "
+                    " percent_viewed, percent_completed "
+                    "FROM thinkific_progress_snapshots WHERE student_id = ? "
+                    "ORDER BY report_month, id", (int(student_id),)))
+            except Exception as exc:
+                self._drop_connection()
+                raise ReportingUnavailable(
+                    "student_history_read_failed:" + type(exc).__name__, exc) from None
+        columns = ("report_month", "course_key", "course_name", "grade",
+                   "percent_viewed", "percent_completed")
+        return [dict(zip(columns, row)) for row in rows]
+
     def student_has_thinkific(self, student_id):
         with self._lock:
             try:
