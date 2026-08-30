@@ -7,7 +7,13 @@
 <div class="card">
   <p style="margin-top:0">
     <strong>{{ student.display_name or "Bez imena" }}</strong>
-    {% if student.grade %}<span class="pill">{{ student.grade }}. razred</span>{% endif %}
+    {% if student.grade %}
+      <span class="pill">{{ student.grade }}. razred</span>
+      {% if grade_confirmed %}<span class="pill" style="color:var(--ok)">potvrđeno</span>
+      {% else %}<span class="pill" style="color:var(--warn)">nije potvrđeno</span>{% endif %}
+    {% else %}
+      <span class="pill" style="color:var(--warn)">razred nije unesen</span>
+    {% endif %}
     {% if thinkific_linked %}<span class="pill" style="color:var(--ok)">Thinkific: povezan</span>
     {% else %}<span class="pill">Thinkific: nije povezan</span>{% endif %}
   </p>
@@ -15,6 +21,16 @@
     <a href="{{ url_for('admin_reports.student_preview', student_id=student_id, month=month) }}">
       <button type="button">Izvještaj</button></a>
   </p>
+  {# POTVRDA ZATECENE VRIJEDNOSTI - jedan klik. Razred se cita SA SERVERA, pa
+     dugme ne moze potvrditi nista sto administrator ne vidi. #}
+  {% if student.grade and not grade_confirmed %}
+  <form method="post" action="{{ url_for('admin_students.confirm_grade', student_id=student_id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <button type="submit">Potvrdi {{ student.grade }}. razred</button>
+    <span class="muted">Potvrđuje da učenik <b>sada pohađa</b> {{ student.grade }}. razred.</span>
+  </form>
+  {% endif %}
+
   {# TEKUĆI razred je PROFIL, ne identitet. Mijenja se svjesno i mijenja SAMO
      ovo polje — istorija časova, aktivnosti i snimaka ostaje netaknuta. #}
   <form method="post" action="{{ url_for('admin_students.update_grade', student_id=student_id) }}">
@@ -26,23 +42,51 @@
         {% endfor %}
       </select>
     </label>
-    <button type="submit">Promijeni razred</button>
+    <button type="submit">{% if grade_confirmed %}Promijeni razred{% else %}Potvrdi izabrani razred{% endif %}</button>
     <span class="muted">Mijenja samo profil; stari časovi i izvještaji ostaju nepromijenjeni.</span>
   </form>
 
-  {% if grade_status in ('LIKELY_STALE', 'CONFLICTING_EVIDENCE') %}
-  {# Dokaz, ne ispravka. Broj iz imena se NIKAD ne koristi. #}
-  <div class="banner err" style="margin-top:10px">
-    ⚠ Razred zahtijeva provjeru.
-    Profil: {% if student.grade %}{{ student.grade }}. razred{% else %}nije potvrđen{% endif %}.
-    {% if grade_evidence.thinkific.grade %}
-      Thinkific posljednji podatak: {{ grade_evidence.thinkific.grade }}. razred
-      ({{ grade_evidence.thinkific.when }}).
+  {% if grade_status == status_unconfirmed %}
+  <div class="banner warn" style="margin-top:10px">
+    Trenutni razred nije potvrđen. Unos časa i novi izvještaj za roditelja
+    traže potvrđen razred.
+    {% if name_grade_hint %}
+    {# SAMO ZA LJUDSKI PREGLED. Broj u imenu nije dokaz i ne mijenja nista sam
+       od sebe - „7" moze biti grupa, generacija ili popravni. #}
+    <span class="muted">U imenu se pojavljuje broj {{ name_grade_hint }} — provjerite s instruktorom.</span>
     {% endif %}
-    {% if grade_evidence.assessment.grade %}
-      Kontrolni: {{ grade_evidence.assessment.grade }}. razred.
+  </div>
+  {% endif %}
+
+  {# SADRZAJ KOJI JE UCENIK KORISTIO. NIJE prijedlog razreda i NIJE greska:
+     ucenik sedmog razreda legitimno obnavlja gradivo sestog. #}
+  {% if grade_content %}
+  <div class="card" style="margin-top:10px">
+    <p style="margin:0 0 6px 0"><b>Korišteno gradivo</b>
+      <span class="muted">(sadržaj, ne trenutni razred)</span></p>
+    <ul style="margin:0">
+      {% if grade_evidence.thinkific.month %}
+      <li>Thinkific:
+        {% if grade_evidence.thinkific.grade %}{{ grade_evidence.thinkific.grade }}. razred
+        {% else %}više razreda{% endif %} ({{ grade_evidence.thinkific.month }})</li>
+      {% endif %}
+      {% if grade_evidence.assessment.month %}
+      <li>Kontrolni:
+        {% if grade_evidence.assessment.grade %}{{ grade_evidence.assessment.grade }}. razred
+        {% else %}više razreda{% endif %} ({{ grade_evidence.assessment.month }})</li>
+      {% endif %}
+      {% if grade_evidence.matbot.month %}
+      <li>MAT-BOT:
+        {% if grade_evidence.matbot.grade %}{{ grade_evidence.matbot.grade }}. razred
+        {% else %}više razreda{% endif %} ({{ grade_evidence.matbot.month }})</li>
+      {% endif %}
+    </ul>
+    {% if grade_status == status_mismatch %}
+    <p class="muted" style="margin:6px 0 0 0">
+      Gradivo se razlikuje od potvrđenog razreda. To je uobičajeno kod
+      obnavljanja ili pripreme i profil se zbog toga ne mijenja.
+    </p>
     {% endif %}
-    {% if grade_recommended %}Prijedlog za provjeru: {{ grade_recommended }}. razred.{% endif %}
   </div>
   {% endif %}
 
@@ -60,10 +104,10 @@
 
 <div class="card">
   <h3 style="margin-top:0">Evidencija časa</h3>
-  {% if not grade_known %}
-  {# BEZ POTVRĐENOG RAZREDA NEMA KURIKULUMA. Nasumičan razred bi instruktoru dao
-     gradivo tuđe generacije, pa se forma ne nudi. #}
-  <p class="banner err">Potrebno je prvo potvrditi razred učenika.</p>
+  {% if not grade_confirmed %}
+  {# BEZ POTVRĐENOG RAZREDA NEMA KURIKULUMA. Zatecena cifra bi instruktoru dala
+     gradivo tudje generacije, pa se forma ne nudi. #}
+  <p class="banner err">Potrebno je potvrditi trenutni razred učenika prije unosa časa.</p>
   {% else %}
   <form method="post" action="{{ url_for('admin_students.create_session', student_id=student_id) }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">

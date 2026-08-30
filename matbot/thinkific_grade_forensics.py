@@ -55,23 +55,27 @@ def _students(target):
     for student in target.list_students():
         student_id = student["student_id"]
         evidence = target.fetch_grade_evidence(student_id)
-        status, recommended = student_grades.classify(student["grade"], evidence)
+        status, _ = student_grades.classify(
+            student["grade"], student.get("grade_confirmed_at"),
+            student.get("grade_source"), evidence)
         rows.append({
             "student_id": student_id,
             "display_name": student["display_name"] or "",
             "stored_grade": student["grade"],
+            "grade_confirmed_at": student.get("grade_confirmed_at"),
+            "grade_source": student.get("grade_source"),
             "thinkific_connected": "yes" if student["thinkific_linked"] else "no",
-            "latest_thinkific_grade": evidence["thinkific"]["grade"],
-            "latest_thinkific_month": evidence["thinkific"]["month"],
-            "latest_assessment_grade": evidence["assessment"]["grade"],
-            "latest_assessment_date": evidence["assessment"]["when"],
-            "latest_matbot_grade": evidence["matbot"]["grade"],
-            "latest_matbot_date": evidence["matbot"]["when"],
-            # SAMO za ljudski pregled — ne ulazi u klasifikaciju.
+            # SADRŽAJ koji je učenik koristio — nikad prijedlog tekućeg razreda.
+            "content_thinkific_grade": evidence["thinkific"]["grade"],
+            "content_thinkific_month": evidence["thinkific"]["month"],
+            "content_assessment_grade": evidence["assessment"]["grade"],
+            "content_assessment_date": evidence["assessment"]["when"],
+            "content_matbot_grade": evidence["matbot"]["grade"],
+            "content_matbot_date": evidence["matbot"]["when"],
+            # SAMO za ljudski pregled — ne ulazi ni u status ni u ijednu radnju.
             "name_grade_hint": student_grades.name_grade_hint(
                 student["display_name"]),
-            "status_after_fixed_classifier": status,
-            "recommended_grade": recommended,
+            "grade_status": status,
             "history": target.fetch_student_thinkific_history(student_id),
         })
     return rows
@@ -145,45 +149,46 @@ def format_report(data):
             lines.append("      (nema sekcija)")
 
     # --- UČENICI ------------------------------------------------------------
+    # PITANJE JE POTVRDA, NE TAČNOST. Razred kursa iz ovog fajla je razred
+    # SADRŽAJA; tekući školski razred potvrđuje isključivo administrator.
     students = data["students"]
-    disagreeing = [s for s in students
-                   if s["status_after_fixed_classifier"] != student_grades.STATUS_CONSISTENT]
+    pending = [s for s in students
+               if s["grade_status"] != student_grades.STATUS_CONFIRMED]
     lines.append("")
-    lines.append("=== STUDENTS (corrected classifier) ===")
+    lines.append("=== STUDENTS (confirmation state) ===")
     tally = {}
     for s in students:
-        tally[s["status_after_fixed_classifier"]] = tally.get(
-            s["status_after_fixed_classifier"], 0) + 1
+        tally[s["grade_status"]] = tally.get(s["grade_status"], 0) + 1
     lines.append("TOTAL: %d" % len(students))
-    for status in (student_grades.STATUS_CONSISTENT,
-                   student_grades.STATUS_LIKELY_STALE,
-                   student_grades.STATUS_CONFLICTING,
-                   student_grades.STATUS_INSUFFICIENT):
-        lines.append("%-22s %d" % (status + ":", tally.get(status, 0)))
+    for status in (student_grades.STATUS_CONFIRMED,
+                   student_grades.STATUS_UNCONFIRMED,
+                   student_grades.STATUS_CONTENT_MISMATCH):
+        lines.append("%-23s %d" % (status + ":", tally.get(status, 0)))
 
     lines.append("")
-    lines.append("=== NON-CONSISTENT STUDENTS (%d) ===" % len(disagreeing))
-    lines.append("%-4s %-22s %-6s %-4s %-9s %-5s %-20s %-6s %-20s %-5s %-22s %s"
-                 % ("id", "display_name", "stored", "tk", "tk_month", "exam",
-                    "exam_date", "matbot", "matbot_date", "hint", "status",
-                    "recommended"))
-    for s in disagreeing:
-        lines.append("%-4s %-22s %-6s %-4s %-9s %-5s %-20s %-6s %-20s %-5s %-22s %s"
+    lines.append("=== STUDENTS NEEDING A LOOK (%d) ===" % len(pending))
+    lines.append("Kolone `tk`/`exam`/`matbot` su KORISTENO GRADIVO, ne prijedlog razreda.")
+    lines.append("%-4s %-22s %-6s %-19s %-4s %-9s %-5s %-20s %-6s %-20s %-5s %s"
+                 % ("id", "display_name", "grade", "potvrda", "tk", "tk_month",
+                    "exam", "exam_date", "matbot", "matbot_date", "hint",
+                    "status"))
+    for s in pending:
+        lines.append("%-4s %-22s %-6s %-19s %-4s %-9s %-5s %-20s %-6s %-20s %-5s %s"
                      % (s["student_id"], (s["display_name"] or "")[:22],
                         _short(s["stored_grade"]),
-                        _short(s["latest_thinkific_grade"]),
-                        _short(s["latest_thinkific_month"]),
-                        _short(s["latest_assessment_grade"]),
-                        _short(s["latest_assessment_date"]),
-                        _short(s["latest_matbot_grade"]),
-                        _short(s["latest_matbot_date"]),
+                        _short(s["grade_confirmed_at"]),
+                        _short(s["content_thinkific_grade"]),
+                        _short(s["content_thinkific_month"]),
+                        _short(s["content_assessment_grade"]),
+                        _short(s["content_assessment_date"]),
+                        _short(s["content_matbot_grade"]),
+                        _short(s["content_matbot_date"]),
                         _short(s["name_grade_hint"]),
-                        s["status_after_fixed_classifier"],
-                        _short(s["recommended_grade"])))
+                        s["grade_status"]))
 
     lines.append("")
-    lines.append("=== THINKIFIC HISTORY FOR NON-CONSISTENT STUDENTS ===")
-    for s in disagreeing:
+    lines.append("=== THINKIFIC HISTORY FOR THOSE STUDENTS ===")
+    for s in pending:
         lines.append("  student_id=%s %s (stored=%s)"
                      % (s["student_id"], (s["display_name"] or "")[:22],
                         _short(s["stored_grade"])))
@@ -197,6 +202,7 @@ def format_report(data):
             lines.append("      (nema Thinkific snimaka)")
 
     lines.append("")
+    lines.append("NO_RECOMMENDED_GRADE: forenzika ne predlaze razred ni iz jednog izvora.")
     lines.append("READ_ONLY: nijedan podatak nije promijenjen.")
     return "\n".join(lines)
 

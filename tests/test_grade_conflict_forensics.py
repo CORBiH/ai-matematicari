@@ -1,16 +1,21 @@
-"""Faza 3D — sukob dokaza o tekućem razredu i porijeklo Thinkific razreda.
+"""Faza 3D+ — razlika u korištenom gradivu i porijeklo Thinkific razreda.
 
-ŽIVI PRODUKCIJSKI KVAR KOJI OVAJ FAJL ČUVA: revizija je nad 34 stvarna učenika
-vratila 34/34 CONSISTENT, iako su neki imali Thinkific 6 uz kontrolni 9 i
-MAT-BOT 9 u ISTOM mjesecu.
+DVA ŽIVA NALAZA KOJE OVAJ FAJL ČUVA.
 
-Uzrok nije bio autoritet izvora nego POREĐENJE DATUMA: Thinkific pamti
-`report_month` („2026-08"), a kontrolni i aktivnost pune žigove
-(„2026-08-25 18:06:49"). Grana za sukob poredila je te SIROVE nizove na
-jednakost, pa se nije mogla okinuti nijednom. Revizija je time bila bezvrijedna
-— i, gore, izgledala je uvjerljivo.
+PRVI (poređenje datuma). Revizija je nad 34 stvarna učenika vratila 34/34
+CONSISTENT, iako su neki imali Thinkific 6 uz kontrolni 9 i MAT-BOT 9 u ISTOM
+mjesecu. Uzrok je bilo POREĐENJE SIROVIH ŽIGOVA: Thinkific pamti `report_month`
+(„2026-08"), a kontrolni i aktivnost pune žigove („2026-08-25 18:06:49") —
+jednaki ne mogu biti nikad. Normalizacija na mjesec je i dalje obavezna, jer bez
+nje se razlika u gradivu ne bi ni vidjela.
 
-DRUGA TVRDNJA: `imports.grade` i `imports.course_name` NISU dokaz o sadržaju
+DRUGI (šta ta razlika ZNAČI). Forenzika je pokazala da je augustovski uvoz
+STVARNO kurs šestog razreda — sekcije iz fajla su SKUPOVI, DJELJIVOST BROJEVA,
+RAZLOMCI — i da u njemu legitimno rade i sedmaci koji obnavljaju gradivo. Zato
+razlika više NIJE „sukob koji treba riješiti" nego KONTEKST, a tekući razred
+potvrđuje isključivo administrator. Preporuka razreda po sadržaju je uklonjena.
+
+TREĆA TVRDNJA: `imports.grade` i `imports.course_name` NISU dokaz o sadržaju
 fajla — izvode se iz slota koji je administrator izabrao. Jedini trag iz samog
 fajla su NAZIVI SEKCIJA, pa ih forenzika mora ispisati.
 
@@ -62,111 +67,129 @@ def test_month_is_carried_alongside_the_original_trace():
 
 
 # ===========================================================================
-# 2) STVARNI PRODUKCIJSKI OBLICI — MORAJU BITI SUKOB
+# 2) STVARNI PRODUKCIJSKI OBLICI — RAZLIKA U GRADIVU, NE SUKOB
 # ===========================================================================
-def test_edin_shaped_case_is_conflicting_not_consistent():
-    """Thinkific 6 vs kontrolni 9 i MAT-BOT 9 u istom mjesecu."""
+CONFIRMED_AT = "2026-08-29 09:00:00"
+ADMIN = student_grades.GRADE_SOURCE_ADMIN
+
+
+def test_edin_shaped_case_is_unconfirmed_while_nobody_confirmed_it():
+    """Thinkific 6 vs kontrolni 9 i MAT-BOT 9 — a razred niko nije potvrdio."""
     evidence = ev(tk=[("2026-08", 6)],
                   asm=[("2026-08-25 18:06:49", 9)],
                   mb=[("2026-08-25 18:06:31", 9)])
-    assert student_grades.classify(6, evidence) == (
-        student_grades.STATUS_CONFLICTING, None)
+    status, content = student_grades.classify(6, None, None, evidence)
+    assert status == student_grades.STATUS_UNCONFIRMED
+    # Sadrzaj je VIDLJIV, ali ne bira razred.
+    assert content["thinkific"]["grade"] == 6
+    assert content["assessment"]["grade"] == 9
 
 
-def test_instructor_shaped_case_is_conflicting():
+def test_edin_shaped_case_confirmed_as_ninth_keeps_the_ninth():
+    """Devetak koji obnavlja gradivo šestog razreda ostaje devetak."""
+    evidence = ev(tk=[("2026-08", 6)],
+                  asm=[("2026-08-25 18:06:49", 9)],
+                  mb=[("2026-08-25 18:06:31", 9)])
+    status, _ = student_grades.classify(9, CONFIRMED_AT, ADMIN, evidence)
+    assert status == student_grades.STATUS_CONTENT_MISMATCH
+
+
+def test_instructor_shaped_case_is_unconfirmed():
     evidence = ev(tk=[("2026-08", 6)],
                   asm=[("2026-08-25 18:06:49", 7)],
                   mb=[("2026-08-25 18:06:31", 7)])
-    assert student_grades.classify(6, evidence) == (
-        student_grades.STATUS_CONFLICTING, None)
+    assert student_grades.classify(6, None, None, evidence)[0] == \
+        student_grades.STATUS_UNCONFIRMED
 
 
-def test_thinkific_versus_assessment_alone_is_conflicting():
+def test_cross_source_difference_needs_the_month_normalisation():
+    """Bez normalizacije se razlika ne bi ni vidjela (prvi živi kvar)."""
     evidence = ev(tk=[("2026-08", 6)], asm=[("2026-08-25 10:00:00", 9)])
-    assert student_grades.classify(6, evidence)[0] == \
-        student_grades.STATUS_CONFLICTING
+    status, content = student_grades.classify(9, CONFIRMED_AT, ADMIN, evidence)
+    assert status == student_grades.STATUS_CONTENT_MISMATCH
+    assert content["thinkific"]["month"] == content["assessment"]["month"]
 
 
-def test_thinkific_versus_matbot_alone_is_conflicting():
-    """Slabiji izvor ne smije PREPORUČITI, ali smije OBORITI tvrdnju."""
+def test_matbot_content_alone_is_still_only_context():
+    """Najslabiji izvor smije PRIKAZATI razliku, ali ne mijenja profil."""
     evidence = ev(tk=[("2026-08", 6)], mb=[("2026-08-25 10:00:00", 9)])
-    assert student_grades.classify(6, evidence)[0] == \
-        student_grades.STATUS_CONFLICTING
+    assert student_grades.classify(9, CONFIRMED_AT, ADMIN, evidence)[0] == \
+        student_grades.STATUS_CONTENT_MISMATCH
 
 
-def test_conflict_yields_no_recommendation():
-    _, recommended = student_grades.classify(
-        6, ev(tk=[("2026-08", 6)], asm=[("2026-08-25 10:00:00", 9)]))
-    assert recommended is None, "sukob traži čovjeka, ne automatski izbor"
+def test_no_source_ever_yields_a_recommendation():
+    result = student_grades.classify(
+        6, CONFIRMED_AT, ADMIN, ev(tk=[("2026-08", 6)],
+                                   asm=[("2026-08-25 10:00:00", 9)]))
+    status, content = result
+    # Drugi element su DOKAZI O SADRZAJU, nikad predlozen razred.
+    assert isinstance(content, dict)
+    assert all(isinstance(item, dict) for item in content.values())
+    assert not hasattr(student_grades, "strongest_evidence")
+    assert not hasattr(student_grades, "_by_authority")
 
 
 # ===========================================================================
 # 3) SLAGANJE I JEDNOSTAVNI SLUČAJEVI
 # ===========================================================================
-def test_all_three_sources_agreeing_is_consistent():
+def test_all_three_sources_agreeing_with_a_confirmed_grade_is_confirmed():
     evidence = ev(tk=[("2026-08", 6)], asm=[("2026-08-25 10:00:00", 6)],
                   mb=[("2026-08-25 10:00:00", 6)])
-    assert student_grades.classify(6, evidence) == (
-        student_grades.STATUS_CONSISTENT, 6)
+    assert student_grades.classify(6, CONFIRMED_AT, ADMIN, evidence)[0] == \
+        student_grades.STATUS_CONFIRMED
 
 
-def test_single_strong_source_agreeing_is_consistent():
-    assert student_grades.classify(7, ev(tk=[("2026-08", 7)])) == (
-        student_grades.STATUS_CONSISTENT, 7)
+def test_single_source_agreeing_is_confirmed():
+    assert student_grades.classify(
+        7, CONFIRMED_AT, ADMIN, ev(tk=[("2026-08", 7)]))[0] == \
+        student_grades.STATUS_CONFIRMED
 
 
-def test_single_strong_source_disagreeing_is_stale():
-    assert student_grades.classify(6, ev(tk=[("2026-08", 7)])) == (
-        student_grades.STATUS_LIKELY_STALE, 7)
+def test_single_source_differing_is_content_context_not_an_error():
+    assert student_grades.classify(
+        6, CONFIRMED_AT, ADMIN, ev(tk=[("2026-08", 7)]))[0] == \
+        student_grades.STATUS_CONTENT_MISMATCH
 
 
-def test_no_usable_evidence_is_insufficient():
-    assert student_grades.classify(6, ev()) == (
-        student_grades.STATUS_INSUFFICIENT, None)
+def test_no_content_evidence_leaves_a_confirmed_grade_alone():
+    assert student_grades.classify(6, CONFIRMED_AT, ADMIN, ev())[0] == \
+        student_grades.STATUS_CONFIRMED
 
 
-def test_assessment_outranks_matbot_for_the_recommendation():
-    status, recommended = student_grades.classify(
-        6, ev(asm=[("2026-08-25 10:00:00", 8)], mb=[("2026-08-25 10:00:00", 8)]))
-    assert status == student_grades.STATUS_LIKELY_STALE
-    assert recommended == 8
-    ordered = student_grades._by_authority(
-        ev(tk=[("2026-08", 7)], asm=[("2026-08-25 10:00:00", 8)],
-           mb=[("2026-08-25 10:00:00", 9)]))
-    assert [item["source"] for item in ordered] == [
-        student_grades.SOURCE_THINKIFIC, student_grades.SOURCE_ASSESSMENT,
-        student_grades.SOURCE_MATBOT]
+def test_no_content_evidence_does_not_confirm_a_legacy_grade():
+    assert student_grades.classify(6, None, None, ev())[0] == \
+        student_grades.STATUS_UNCONFIRMED
 
 
 # ===========================================================================
-# 4) SVJEŽINA — prošla školska godina nije tekući sukob
+# 4) SVJEŽINA — prošla školska godina nije tekuće gradivo
 # ===========================================================================
-def test_last_year_evidence_does_not_create_a_current_conflict():
-    """Šesti lani i sedmi sada je NAPREDAK, ne sukob."""
+def test_last_year_content_does_not_disturb_a_confirmed_grade():
+    """Šesti lani i sedmi sada je NAPREDAK, ne razlika."""
     evidence = ev(tk=[("2025-08", 6)], asm=[("2026-08-25 10:00:00", 7)])
-    assert student_grades.classify(6, evidence) == (
-        student_grades.STATUS_LIKELY_STALE, 7)
+    assert student_grades.classify(7, CONFIRMED_AT, ADMIN, evidence)[0] == \
+        student_grades.STATUS_CONFIRMED
 
 
-def test_old_disagreeing_evidence_does_not_disturb_a_current_match():
+def test_old_differing_content_does_not_disturb_a_current_match():
     evidence = ev(tk=[("2026-08", 7)], asm=[("2025-10-01 10:00:00", 6)])
-    assert student_grades.classify(7, evidence) == (
-        student_grades.STATUS_CONSISTENT, 7)
+    assert student_grades.classify(7, CONFIRMED_AT, ADMIN, evidence)[0] == \
+        student_grades.STATUS_CONFIRMED
 
 
 def test_only_the_newest_month_across_all_sources_is_compared():
-    """Dokaz iz ranijih mjeseci se ne skuplja zauvijek."""
+    """Gradivo iz ranijih mjeseci se ne skuplja zauvijek."""
     evidence = ev(tk=[("2025-09", 6), ("2026-08", 7)],
                   asm=[("2025-11-01 10:00:00", 6)],
                   mb=[("2026-08-25 10:00:00", 7)])
-    assert student_grades.classify(7, evidence) == (
-        student_grades.STATUS_CONSISTENT, 7)
+    assert student_grades.classify(7, CONFIRMED_AT, ADMIN, evidence)[0] == \
+        student_grades.STATUS_CONFIRMED
 
 
-def test_same_source_ambiguity_in_one_month_is_still_a_conflict():
+def test_same_source_two_grades_in_one_month_is_still_a_difference():
     evidence = ev(tk=[("2026-08", 6), ("2026-08", 7)])
-    assert student_grades.classify(6, evidence)[0] == \
-        student_grades.STATUS_CONFLICTING
+    assert student_grades.classify(6, CONFIRMED_AT, ADMIN, evidence)[0] == \
+        student_grades.STATUS_CONTENT_MISMATCH
 
 
 # ===========================================================================
@@ -176,7 +199,7 @@ def test_name_hint_cannot_affect_the_classifier():
     import inspect
 
     assert set(inspect.signature(student_grades.classify).parameters) == {
-        "stored_grade", "evidence"}
+        "grade", "grade_confirmed_at", "grade_source", "evidence"}
     source = (ROOT / "matbot" / "student_grades.py").read_text(encoding="utf-8")
     body = source.split("def classify(")[1].split("\ndef ")[0]
     assert "name_grade_hint" not in body and "display_name" not in body
@@ -198,7 +221,8 @@ def test_both_clis_use_the_shared_classifier():
     # Nijedan ne reimplementira pravila.
     for module in ("student_grade_audit", "thinkific_grade_forensics"):
         source = (ROOT / "matbot" / (module + ".py")).read_text(encoding="utf-8")
-        assert "CONFLICTING_EVIDENCE\"" not in source, module
+        assert "CONTENT_GRADE_MISMATCH\"" not in source, module
+        assert "UNCONFIRMED\"" not in source, module
 
 
 # ===========================================================================
@@ -315,7 +339,11 @@ def test_forensics_reports_imports_sections_and_hashes(db):
 def test_forensics_flags_the_production_shape_and_shows_history(db):
     student_id = db.get_or_create_student(PROVIDER_THINKIFIC_EMAIL,
                                           "tajna@example.com")
-    db.set_student_grade(student_id, 6)
+    # ZATECEN OBLIK: razred postoji, potvrde nema — tacno kao 34 stvarna reda.
+    conn = db._connection()
+    conn.execute("UPDATE students SET grade = 6, grade_confirmed_at = NULL, "
+                 " grade_source = NULL WHERE id = ?", (student_id,))
+    conn.commit()
     _seed_import(db, import_id=1, month="2026-08", slot="grade_6", grade=6,
                  sha="b" * 64, sections=["SKUPOVI"], student_ids=[student_id])
     conn = db._connection()
@@ -333,22 +361,22 @@ def test_forensics_flags_the_production_shape_and_shows_history(db):
 
     data = thinkific_grade_forensics.collect(database=db)
     row = data["students"][0]
-    assert row["status_after_fixed_classifier"] == \
-        student_grades.STATUS_CONFLICTING
-    assert row["recommended_grade"] is None
-    assert row["latest_thinkific_month"] == "2026-08"
-    assert row["latest_assessment_grade"] == 9
+    assert row["grade_status"] == student_grades.STATUS_UNCONFIRMED
+    assert "recommended_grade" not in row
+    assert row["content_thinkific_month"] == "2026-08"
+    assert row["content_assessment_grade"] == 9
 
     text = thinkific_grade_forensics.format_report(data)
-    assert "NON-CONSISTENT STUDENTS (1)" in text
+    assert "STUDENTS NEEDING A LOOK (1)" in text
     assert "THINKIFIC HISTORY" in text
+    assert "NO_RECOMMENDED_GRADE" in text
     assert "grade_6" in text
     # NIKAD identitet.
     assert "tajna@example.com" not in text and "@" not in text
 
 
-def test_audit_cli_uses_the_corrected_classifier(db):
-    student_id = db.create_student("Sporni", 6)
+def test_audit_cli_uses_the_shared_confirmation_classifier(db):
+    student_id = db.create_student("Obnavlja Sesti", 9)
     _seed_import(db, import_id=1, month="2026-08", slot="grade_6", grade=6,
                  sha="c" * 64, sections=["SKUPOVI"], student_ids=[student_id])
     conn = db._connection()
@@ -360,7 +388,9 @@ def test_audit_cli_uses_the_corrected_classifier(db):
     conn.commit()
 
     rows = student_grade_audit.collect(database=db)
-    assert rows[0]["status"] == student_grades.STATUS_CONFLICTING
+    # Potvrdjen deveti razred + gradivo sestog iz uvoza = RAZLIKA U GRADIVU.
+    assert rows[0]["status"] == student_grades.STATUS_CONTENT_MISMATCH
     tally = student_grade_audit.summarize(rows)
-    assert tally[student_grades.STATUS_CONFLICTING] == 1
-    assert tally[student_grades.STATUS_CONSISTENT] == 0
+    assert tally[student_grades.STATUS_CONTENT_MISMATCH] == 1
+    assert tally[student_grades.STATUS_CONFIRMED] == 0
+    assert tally[student_grades.STATUS_UNCONFIRMED] == 0

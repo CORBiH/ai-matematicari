@@ -68,9 +68,12 @@ def db(tmp_path, monkeypatch):
 @pytest.fixture
 def student(db):
     student_id = reporting_db.get_database().get_or_create_student(
-        PROVIDER_THINKIFIC_EMAIL, "learner@example.com", grade=6)
+        PROVIDER_THINKIFIC_EMAIL, "learner@example.com")
     reporting_db.get_database().update_student_profile(
-        student_id, display_name="Đžemal Šćepanović", grade=6)
+        student_id, display_name="Đžemal Šćepanović")
+    # NOV IZVJESTAJ TRAZI POTVRDJEN RAZRED (verzija 4). Potvrda je
+    # administratorska radnja, pa je i ovdje ide kroz istu funkciju.
+    reporting_db.get_database().set_student_grade(student_id, 6)
     return student_id
 
 

@@ -115,7 +115,7 @@ def test_migration_refuses_a_database_that_is_not_v1(tmp_path):
 
 def test_diagnostic_reports_version_two_after_migration(db):
     report = reporting_db.get_database().check()
-    assert report["schema_version"] == 3
+    assert report["schema_version"] == 4
     assert "thinkific_progress_snapshots" in report["columns"]
 
 
@@ -252,7 +252,10 @@ def test_joined_report_input_has_both_sources(db):
 
     assert payload["student_id"] == student_id
     assert payload["report_month"] == "2026-09"
-    assert payload["profile"]["grade"] == 6
+    # RAZRED SADRZAJA NE PUNI PROFIL (verzija 4): uvoz kursa 6. razreda
+    # ostavlja tekuci razred nepotvrdjenim dok ga administrator ne potvrdi.
+    assert payload["profile"]["grade"] is None
+    assert payload["profile"]["grade_confirmed"] is False
     assert payload["thinkific"]["snapshot_missing"] is False
     assert payload["thinkific"]["course_name"] == "Matematika za 6. razred"
     assert payload["thinkific"]["delta_percent_completed"] == 17.0

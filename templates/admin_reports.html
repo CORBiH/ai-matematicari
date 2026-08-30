@@ -50,7 +50,7 @@
     <div class="stat"><b>{{ summary.snapshots_inserted }}</b><span class="muted">novih snapshotova</span></div>
     <div class="stat"><b>{{ summary.snapshots_updated }}</b><span class="muted">ažuriranih snapshotova</span></div>
     <div class="stat"><b>{{ summary.sections_written }}</b><span class="muted">sekcija</span></div>
-    <div class="stat"><b>{{ summary.grade_conflicts }}</b><span class="muted">konflikata razreda</span></div>
+    <div class="stat"><b>{{ summary.grade_conflicts }}</b><span class="muted">razlika u gradivu</span></div>
   </div>
 
   {% if summary.files %}
@@ -78,10 +78,13 @@
   </table>
   {% endif %}
 
+  {# RAZLIKA U GRADIVU NIJE GRESKA. Ucenik sedmog razreda koji obnavlja gradivo
+     sestog je normalan slucaj; uvoz nikad ne mijenja trenutni razred. #}
   {% if summary.grade_conflicts %}
-  <div class="banner warn" style="margin-top:1rem">
-    {{ summary.grade_conflicts }} učenik/a ima profilni razred različit od uvezenog kursa.
-    Snapshot je sačuvan, profil nije automatski promijenjen.
+  <div class="banner" style="margin-top:1rem">
+    {{ summary.grade_conflicts }} učenik/a ima potvrđen trenutni razred različit od
+    razreda uvezenog kursa. To je uobičajeno kod obnavljanja gradiva. Snapshot je
+    sačuvan, a trenutni razred se uvozom nikad ne mijenja.
   </div>
   {% endif %}
 

@@ -161,7 +161,7 @@ def test_duplicate_thinkific_account_fails_closed(admin, db):
     from matbot.student_identity import PROVIDER_THINKIFIC_EMAIL
 
     owner = db.get_or_create_student(PROVIDER_THINKIFIC_EMAIL,
-                                     "zauzet@example.com", grade=6)
+                                     "zauzet@example.com")
     student_id = db.create_student("Drugi", 6)
     token = _csrf_from(admin.get("/admin/students/%d" % student_id))
     page = admin.post("/admin/students/%d/link" % student_id,
@@ -332,7 +332,7 @@ def test_conflicting_email_leaves_no_new_student_through_the_route(admin, db):
     from matbot.student_identity import PROVIDER_THINKIFIC_EMAIL
 
     owner = db.get_or_create_student(PROVIDER_THINKIFIC_EMAIL,
-                                     "zauzet@example.com", grade=6)
+                                     "zauzet@example.com")
     before = _students_in_db(db)
 
     token = _csrf_from(admin.get("/admin/students"))
@@ -444,7 +444,8 @@ def test_session_form_is_blocked_until_the_grade_is_confirmed(admin, db):
     unknown = db.get_or_create_student(PROVIDER_THINKIFIC_EMAIL,
                                        "bez-razreda@example.com")
     page = admin.get("/admin/students/%d" % unknown)
-    assert "Potrebno je prvo potvrditi razred učenika.".encode() in page.data
+    assert ("Potrebno je potvrditi trenutni razred učenika prije unosa "
+            "časa.").encode() in page.data
     # Forma gradiva se ne nudi.
     assert b'name="area_name"' not in page.data
 
@@ -464,7 +465,19 @@ def test_confirming_the_grade_unlocks_the_session_form(admin, db):
                data={"csrf_token": token, "grade": "6"})
     page = admin.get("/admin/students/%d" % unknown)
     assert b'name="area_name"' in page.data
-    assert "Potrebno je prvo potvrditi".encode() not in page.data
+    assert "Potrebno je potvrditi trenutni razred".encode() not in page.data
+
+
+def _legacy(db, student_id, grade):
+    """Zatečen red: razred postoji, potvrde nema.
+
+    Ide direktno kroz SQL jer ga nijedna funkcija sloja više ne može
+    proizvesti — a upravo tako izgleda svih 34 stvarna učenika."""
+    conn = db._connection()
+    conn.execute("UPDATE students SET grade = ?, grade_confirmed_at = NULL, "
+                 " grade_source = NULL WHERE id = ?", (grade, student_id))
+    conn.commit()
+    return student_id
 
 
 def _add_thinkific_grade(db, student_id, month, grade):
@@ -483,46 +496,63 @@ def _add_thinkific_grade(db, student_id, month, grade):
     conn.commit()
 
 
-def test_consistent_student_gets_no_warning(admin, db):
+def test_confirmed_student_shows_as_confirmed(admin, db):
     student_id = db.create_student("Uredan", 7)
     _add_thinkific_grade(db, student_id, "2026-09", 7)
-    assert "provjeri".encode() not in admin.get("/admin/students").data
+    assert "nepotvrđeno".encode() not in admin.get("/admin/students").data
     profile = admin.get("/admin/students/%d" % student_id)
-    assert "Razred zahtijeva provjeru".encode() not in profile.data
+    assert "Trenutni razred nije potvrđen".encode() not in profile.data
 
 
-def test_stale_student_gets_a_warning_from_structured_evidence(admin, db):
-    student_id = db.create_student("Zastario", 6)
+def test_legacy_student_shows_as_unconfirmed(admin, db):
+    """Zatečen red: razred postoji, potvrde nema — i to se VIDI na listi."""
+    student_id = _legacy(db, db.create_student("Zatecen", 6), 6)
     _add_thinkific_grade(db, student_id, "2026-09", 7)
 
     listing = admin.get("/admin/students")
-    assert "provjeri".encode() in listing.data
+    assert "nepotvrđeno".encode() in listing.data
     assert ("/admin/students/%d" % student_id).encode() in listing.data
+    # Dugme za potvrdu zatecene vrijednosti postoji na samoj listi.
+    assert "Potvrdi 6. razred".encode() in listing.data
 
     profile = admin.get("/admin/students/%d" % student_id)
-    assert "Razred zahtijeva provjeru".encode() in profile.data
-    assert "Thinkific posljednji podatak: 7".encode() in profile.data
+    assert "Trenutni razred nije potvrđen".encode() in profile.data
     assert b"2026-09" in profile.data
 
 
-def test_warning_never_exposes_the_email(admin, db):
+def test_confirm_button_on_the_listing_confirms_the_stored_grade(admin, db):
+    student_id = _legacy(db, db.create_student("Zatecen", 6), 6)
+    token = _csrf_from(admin.get("/admin/students"))
+    admin.post("/admin/students/%d/grade/confirm" % student_id,
+               data={"csrf_token": token})
+    saved = db.fetch_student_profile(student_id)
+    assert saved["grade"] == 6, "potvrda ne smije promijeniti vrijednost"
+    assert saved["grade_source"] == "admin"
+    assert saved["grade_confirmed_at"]
+
+
+def test_confirmation_state_never_exposes_the_email(admin, db):
     from matbot.student_identity import PROVIDER_THINKIFIC_EMAIL
 
     student_id = db.get_or_create_student(PROVIDER_THINKIFIC_EMAIL,
                                           "tajna@example.com")
-    db.set_student_grade(student_id, 6)
+    _legacy(db, student_id, 6)
     _add_thinkific_grade(db, student_id, "2026-09", 7)
     for page in (admin.get("/admin/students"),
                  admin.get("/admin/students/%d" % student_id)):
         assert b"tajna@example.com" not in page.data
 
 
-def test_name_hint_alone_never_produces_a_warning(admin, db):
-    """„Adjan 7 PLUS" bez strukturnog dokaza NE smije podići upozorenje."""
-    db.create_student("Adjan 7 PLUS", 6)
+def test_name_hint_never_confirms_or_changes_a_grade(admin, db):
+    """„Adjan 7 PLUS" ostaje nepotvrđen ŠESTI — ime ništa ne mijenja."""
+    student_id = _legacy(db, db.create_student("Adjan 7 PLUS", 6), 6)
     listing = admin.get("/admin/students")
     assert "Adjan 7 PLUS".encode() in listing.data
-    assert "provjeri".encode() not in listing.data
+    assert "nepotvrđeno".encode() in listing.data
+    assert db.fetch_student_profile(student_id)["grade"] == 6
+    # Broj iz imena se smije POKAZATI covjeku, ali kao pitanje, ne kao odluka.
+    profile = admin.get("/admin/students/%d" % student_id)
+    assert "provjerite s instruktorom".encode() in profile.data
 
 
 # ---------------------------------------------------------------------------
@@ -543,39 +573,47 @@ def _add_exam_and_activity(db, student_id, grade, when="2026-08-25 18:06:49"):
     conn.commit()
 
 
-def test_edin_shaped_conflict_raises_the_admin_warning(admin, db):
+def test_edin_shaped_case_stays_unconfirmed_until_a_human_decides(admin, db):
     """Thinkific 6 slaže se s profilom, ali kontrolni i MAT-BOT kažu 9."""
-    student_id = db.create_student("Sintetički Sporni", 6)
+    student_id = _legacy(db, db.create_student("Sintetički Sporni", 6), 6)
     _add_thinkific_grade(db, student_id, "2026-08", 6)
     _add_exam_and_activity(db, student_id, 9)
 
     listing = admin.get("/admin/students")
-    assert "provjeri".encode() in listing.data
+    assert "nepotvrđeno".encode() in listing.data
 
     profile = admin.get("/admin/students/%d" % student_id)
-    assert "Razred zahtijeva provjeru".encode() in profile.data
+    assert "Trenutni razred nije potvrđen".encode() in profile.data
+    # Sadrzaj se PRIKAZUJE, ali nijedan razred se ne predlaze.
+    assert "Korišteno gradivo".encode() in profile.data
+    assert "Prijedlog".encode() not in profile.data
 
 
-def test_instructor_shaped_conflict_raises_the_admin_warning(admin, db):
-    student_id = db.create_student("Sintetički Sedmak", 6)
+def test_confirmed_ninth_grader_using_sixth_grade_content_keeps_the_profile(admin, db):
+    """SRŽ FAZE: gradivo šestog razreda ne obara potvrđeni deveti."""
+    student_id = db.create_student("Sintetički Devetak", 9)
     _add_thinkific_grade(db, student_id, "2026-08", 6)
-    _add_exam_and_activity(db, student_id, 7)
+    _add_exam_and_activity(db, student_id, 9)
+
     profile = admin.get("/admin/students/%d" % student_id)
-    assert "Razred zahtijeva provjeru".encode() in profile.data
+    assert "Trenutni razred nije potvrđen".encode() not in profile.data
+    assert "obnavljanja".encode() in profile.data
+    assert db.fetch_student_profile(student_id)["grade"] == 9
 
 
-def test_agreeing_sources_still_show_no_warning(admin, db):
+def test_confirmed_student_whose_content_agrees_shows_no_difference(admin, db):
     student_id = db.create_student("Sintetički Uredan", 6)
     _add_thinkific_grade(db, student_id, "2026-08", 6)
     _add_exam_and_activity(db, student_id, 6)
     listing = admin.get("/admin/students")
-    assert "provjeri".encode() not in listing.data
+    assert "nepotvrđeno".encode() not in listing.data
     profile = admin.get("/admin/students/%d" % student_id)
-    assert "Razred zahtijeva provjeru".encode() not in profile.data
+    assert "Trenutni razred nije potvrđen".encode() not in profile.data
+    assert "obnavljanja".encode() not in profile.data
 
 
 def test_old_year_evidence_does_not_raise_a_false_warning(admin, db):
-    """Šesti lani, šesti sada — napredak nije sukob."""
+    """Šesti lani, šesti sada — napredak nije razlika."""
     student_id = db.create_student("Sintetički Stari", 6)
     _add_thinkific_grade(db, student_id, "2026-08", 6)
     _add_exam_and_activity(db, student_id, 6, when="2026-08-20 10:00:00")
@@ -587,4 +625,5 @@ def test_old_year_evidence_does_not_raise_a_false_warning(admin, db):
         " '2025-10-01 10:00:00')", (student_id,))
     conn.commit()
     profile = admin.get("/admin/students/%d" % student_id)
-    assert "Razred zahtijeva provjeru".encode() not in profile.data
+    assert "Trenutni razred nije potvrđen".encode() not in profile.data
+    assert "obnavljanja".encode() not in profile.data

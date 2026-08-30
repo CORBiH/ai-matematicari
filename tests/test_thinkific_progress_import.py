@@ -51,14 +51,16 @@ def build_v1(path):
 
 
 def migrate(path):
-    """Dovedi bazu do TEKUĆE verzije (v1 → v2 → v3).
+    """Dovedi bazu do TEKUĆE verzije (v1 → v2 → v3 → v4).
 
     Faza 3D: populacija izvještaja čita i `student_sessions`, pa fixture koji
-    stane na v2 više ne predstavlja bazu na koju se kod oslanja."""
+    stane na v2 više ne predstavlja bazu na koju se kod oslanja. Verzija 4 dodaje
+    kolone potvrde razreda, bez kojih administratorski put pada zatvoreno."""
     conn = libsql.connect(path)
     try:
         applied = reporting_schema.migrate_to_v2(conn)
         reporting_schema.migrate_to_v3(conn)
+        reporting_schema.migrate_to_v4(conn)
         return applied
     finally:
         conn.close()
@@ -69,6 +71,16 @@ def migrate_v2_only(path):
     conn = libsql.connect(path)
     try:
         return reporting_schema.migrate_to_v2(conn)
+    finally:
+        conn.close()
+
+
+def migrate_v3_only(path):
+    """Namjerno ZAUSTAVLJENO na v3 — za testove migracije v3 → v4."""
+    conn = libsql.connect(path)
+    try:
+        reporting_schema.migrate_to_v2(conn)
+        return reporting_schema.migrate_to_v3(conn)
     finally:
         conn.close()
 
@@ -212,18 +224,43 @@ def test_display_name_collapses_whitespace_and_ignores_blank_parts():
     assert progress.build_display_name(None, None) is None
 
 
-def test_grade_fills_null_profile_but_conflict_is_not_silently_overwritten(db):
+def test_import_never_writes_a_profile_grade(db):
+    """RAZRED KURSA NIJE TEKUĆI RAZRED (verzija 4).
+
+    Ranije je uvoz punio prazan `students.grade` razredom slota. Forenzika je
+    dokazala da je to pogrešna tvrdnja: u izvozu kursa šestog razreda legitimno
+    rade i sedmaci koji obnavljaju gradivo. Uvoz zato ostavlja profil praznim, a
+    razred sadržaja i dalje ide u SNIMAK."""
     report_input.import_progress_files("2026-09", {"grade_6": simple_csv()})
-    assert rows(db, "SELECT grade FROM students")[0][0] == 6
+    assert rows(db, "SELECT grade FROM students")[0][0] is None
+    assert rows(db, "SELECT grade_confirmed_at, grade_source FROM students")[0] \
+        == (None, None)
+    assert [s[5] for s in snapshots(db)] == [6], "snimak mora zadržati svoj razred"
 
     # Isti učenik u izvozu 7. razreda: snimak se uvozi, profil se NE mijenja.
+    report_input.import_progress_files(
+        "2026-10", {"grade_7": build_csv([learner(E1)], sections=["NOVA OBLAST"])})
+
+    assert rows(db, "SELECT grade FROM students")[0][0] is None
+    stored = [(s[2], s[3], s[5]) for s in snapshots(db)]
+    assert ("2026-10", "grade_7", 7) in stored, "snimak mora zadržati svoj razred"
+
+
+def test_content_difference_is_counted_against_a_confirmed_profile(db):
+    """`grade_conflicts` sada broji RAZLIKU U GRADIVU, ne kvar.
+
+    Legitimna je (obnavljanje), ali može otkriti i pogrešno izabran slot, pa se
+    administratoru i dalje prikazuje kao broj — bez ijedne izmjene profila."""
+    report_input.import_progress_files("2026-09", {"grade_6": simple_csv()})
+    database = reporting_db.get_database()
+    student_id = rows(db, "SELECT id FROM students")[0][0]
+    database.set_student_grade(student_id, 9)          # potvrdio administrator
+
     summary = report_input.import_progress_files(
         "2026-10", {"grade_7": build_csv([learner(E1)], sections=["NOVA OBLAST"])})
 
     assert summary.grade_conflicts == 1
-    assert rows(db, "SELECT grade FROM students")[0][0] == 6, "profil je tiho prepisan"
-    stored = [(s[2], s[3], s[5]) for s in snapshots(db)]
-    assert ("2026-10", "grade_7", 7) in stored, "snimak mora zadržati svoj razred"
+    assert rows(db, "SELECT grade FROM students")[0][0] == 9, "profil je promijenjen"
 
 
 # ---------------------------------------------------------------------------

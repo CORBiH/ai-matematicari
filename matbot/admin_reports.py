@@ -319,6 +319,23 @@ def students():
                            schema_state=state, schema_message=message, error="")
 
 
+# NOV IZVJEŠTAJ TRAŽI POTVRĐEN TEKUĆI RAZRED (verzija 4). Poruka je za
+# administratora i ne nosi interni kod (pravilo 7). Stari sačuvani izvještaji se
+# ovim ne diraju — čitaju se i preuzimaju kao i do sada.
+ERROR_GRADE_UNCONFIRMED = (
+    "Trenutni razred učenika nije potvrđen. Potvrdite razred na profilu učenika "
+    "prije generisanja novog izvještaja.")
+
+
+def _grade_confirmed(payload):
+    """Je li tekući razred POTVRĐEN? Čita se iz profila, nikad iz sadržaja.
+
+    Razred kursa (Thinkific), razred kontrolnog i razred iz MAT-BOT aktivnosti
+    su OPAŽANJA o gradivu i ovdje se svjesno ne gledaju — izvještaj za roditelja
+    na naslovnici tvrdi koji razred dijete pohađa."""
+    return bool((payload.get("profile") or {}).get("grade_confirmed"))
+
+
 def _student_label(profile, student_id):
     name = (profile.get("display_name") or "").strip()
     # Bez imena se NIKAD ne pada nazad na e-mail — koristi se neutralna oznaka.
@@ -360,6 +377,11 @@ def _render_student(student_id, month, payload, *, ai_error="", notice=""):
         label=_student_label(payload["profile"], student_id),
         previous_month=report_input.previous_month(month), schema_message="",
         saved=saved, csrf_token=admin_auth.csrf_token(),
+        # Dugme za generisanje se ne nudi bez potvrđenog razreda; server to
+        # svejedno provjerava ponovo u `generate_report` — predložak nije
+        # zaštita nego objašnjenje.
+        grade_confirmed=_grade_confirmed(payload),
+        grade_unconfirmed_message=ERROR_GRADE_UNCONFIRMED,
         ai_error=ai_error, notice=notice)
 
 
@@ -397,6 +419,16 @@ def generate_report(student_id):
     _require_csrf()
     month = _month_or_400()
     payload, facts = parent_report.build_facts(student_id, month)
+
+    # BLOKADA PRIJE POZIVA, NE POSLIJE. Nepotvrđen razred znači da ni sam
+    # sistem ne zna koji razred dijete pohađa — izvještaj koji to tvrdi
+    # roditelju ne smije nastati, a plaćeni poziv se ne troši. Sačuvani nacrt
+    # ostaje netaknut.
+    if not _grade_confirmed(payload):
+        logger.info("admin_report_generate_blocked code=grade_unconfirmed "
+                    "student_id=%s", student_id)
+        return _render_student(student_id, month, payload,
+                               ai_error=ERROR_GRADE_UNCONFIRMED), 200
 
     from matbot import llm as llm_module
 

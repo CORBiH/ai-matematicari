@@ -90,7 +90,7 @@ def test_unavailable_database_returns_none_and_never_raises(configured_env, capl
     broken = ExplodingDatabase()
     with caplog.at_level(logging.INFO, logger="matbot.reporting_db"):
         result = reporting_db.resolve_student(PROVIDER_THINKIFIC, "42",
-                                              display_name="Amina", grade=7,
+                                              display_name="Amina",
                                               database=broken)
 
     assert result is None
@@ -184,7 +184,7 @@ def test_secrets_never_appear_in_logs_or_errors(configured_env, caplog):
     with caplog.at_level(logging.DEBUG):
         assert reporting_db.resolve_student(PROVIDER_THINKIFIC, "42",
                                             display_name="Amina Hodžić",
-                                            grade=7, database=broken) is None
+                                            database=broken) is None
 
     assert FAKE_TOKEN not in caplog.text
     assert FAKE_URL not in caplog.text

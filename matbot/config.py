@@ -556,4 +556,4 @@ REPORTING_DB_MAX_INFLIGHT = _int_env("MATBOT_REPORTING_DB_MAX_INFLIGHT", 2)
 # Faza 3D podiže ovo na 3 (evidencija časova). Isti razlog kao gore: broj mora
 # pratiti `reporting_schema.CURRENT_SCHEMA_VERSION`, inače provjera zdravlja
 # opet počne tvrditi „OK" nad bazom kojoj nedostaje cijela verzija.
-REPORTING_SCHEMA_VERSION = _int_env("MATBOT_REPORTING_SCHEMA_VERSION", 3)
+REPORTING_SCHEMA_VERSION = _int_env("MATBOT_REPORTING_SCHEMA_VERSION", 4)

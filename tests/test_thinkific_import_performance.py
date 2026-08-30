@@ -291,11 +291,12 @@ def test_database_failure_midway_leaves_nothing_written(measured):
         assert rows(path, "SELECT COUNT(*) FROM " + table)[0][0] == 0, table
 
 
-def test_grade_conflict_behaviour_is_unchanged(measured):
+def test_content_difference_behaviour_is_unchanged(measured):
     path, _ = measured
     database = reporting_db.get_database()
     student_id = database.get_or_create_student(
-        PROVIDER_THINKIFIC_EMAIL, "learner00@example.com", grade=6)
+        PROVIDER_THINKIFIC_EMAIL, "learner00@example.com")
+    database.set_student_grade(student_id, 6)          # potvrdio administrator
     assert rows(path, "SELECT grade FROM students WHERE id = ?",
                 (student_id,))[0][0] == 6
 
@@ -327,10 +328,13 @@ def test_display_name_policy_is_unchanged(measured):
     assert rows(path, "SELECT display_name FROM students")[0][0] == "Ana Anić"
 
 
-def test_grade_fills_a_null_profile(measured):
+def test_import_leaves_every_profile_grade_null(measured):
+    """Paketni put dijeli pravilo s red-po-red putem: razred se NE upisuje."""
     path, _ = measured
     report_input.import_progress_files("2026-09", {"grade_6": real_shaped_csv()})
-    assert {r[0] for r in rows(path, "SELECT grade FROM students")} == {6}
+    assert {r[0] for r in rows(path, "SELECT grade FROM students")} == {None}
+    assert {r[0] for r in rows(path, "SELECT grade_confirmed_at FROM students")} \
+        == {None}
 
 
 # ---------------------------------------------------------------------------
@@ -358,17 +362,18 @@ def test_no_email_in_logs(measured, caplog):
     assert "learner00" not in caplog.text
 
 
-def test_grade_conflict_log_carries_only_a_count(measured, caplog):
+def test_content_difference_log_carries_only_a_count(measured, caplog):
     path, _ = measured
     database = reporting_db.get_database()
-    database.get_or_create_student(PROVIDER_THINKIFIC_EMAIL,
-                                   "learner00@example.com", grade=6)
+    student_id = database.get_or_create_student(PROVIDER_THINKIFIC_EMAIL,
+                                                "learner00@example.com")
+    database.set_student_grade(student_id, 6)          # potvrdio administrator
     with caplog.at_level(logging.INFO):
         report_input.import_progress_files(
             "2026-09", {"grade_7": build_csv([learner("learner00@example.com",
                                                       first="Tajna", last="Osoba")],
                                              sections=["OBLAST"])})
-    assert "thinkific_grade_conflict" in caplog.text
+    assert "thinkific_content_grade_differs" in caplog.text
     assert "@" not in caplog.text and "Tajna" not in caplog.text
 
 

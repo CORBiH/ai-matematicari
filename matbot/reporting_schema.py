@@ -41,7 +41,8 @@ logger = logging.getLogger("matbot.reporting_schema")
 SCHEMA_VERSION_V1 = 1
 SCHEMA_VERSION_V2 = 2
 SCHEMA_VERSION_V3 = 3
-CURRENT_SCHEMA_VERSION = SCHEMA_VERSION_V3
+SCHEMA_VERSION_V4 = 4
+CURRENT_SCHEMA_VERSION = SCHEMA_VERSION_V4
 
 # Tabele koje verzija 1 mora imati da bismo uopšte smjeli migrirati.
 V1_TABLES = (
@@ -155,6 +156,7 @@ class MigrationError(RuntimeError):
 MIGRATION_DESCRIPTIONS = {
     SCHEMA_VERSION_V2: "Add Thinkific progress reporting schema",
     SCHEMA_VERSION_V3: "Add instructor student session records",
+    SCHEMA_VERSION_V4: "Require explicit current-grade confirmation",
 }
 
 # `applied_at` se NAMJERNO ne upisuje: ima bazin DEFAULT i njegovo značenje je
@@ -612,6 +614,161 @@ def migrate_to_v3(conn):
     _record_migration(conn, SCHEMA_VERSION_V3)
     logger.info("reporting_schema_migrated from=%s to=%s",
                 SCHEMA_VERSION_V2, SCHEMA_VERSION_V3)
+    return True
+
+
+# --- FAZA 3D+: POTVRDA TEKUCEG RAZREDA (verzija 4) -------------------------
+# ZASTO OVA VERZIJA POSTOJI (produkcijski nalaz, 2026-08-29). Forenzika je
+# dokazala da je augustovski Thinkific uvoz ZAISTA izvoz kursa 6. razreda
+# (sekcije: SKUPOVI, DJELJIVOST BROJEVA, RAZLOMCI, DECIMALNI BROJEVI...), a da
+# u njemu potpuno legitimno ucestvuju ucenici koje covjek prepoznaje kao sedmi,
+# osmi i deveti razred. Iz toga slijedi razlika koju sema do sada NIJE imala:
+#
+#   RAZRED SADRZAJA (koji kurs/gradivo je ucenik koristio)
+#   NIJE
+#   TEKUCI SKOLSKI RAZRED (koji razred ucenik pohadja).
+#
+# Sedmak koji obnavlja gradivo sestog razreda je NORMALAN slucaj, ne kvar. Zato
+# nijedan sadrzajni trag (Thinkific, kontrolni, MAT-BOT aktivnost) vise ne smije
+# ni napisati ni predloziti `students.grade`.
+#
+# STO SEMA MORA MOCI, A NIJE MOGLA: razlikovati razred koji je administrator
+# SVJESNO POTVRDIO od razreda koji je stara automatika tiho upisala. Obje
+# vrijednosti su danas obican `INTEGER` i nerazlucive su. Bez te razlike bi 34
+# zatecena ucenika izgledala kao potvrdjena, a nijedan to nije.
+#
+# NAJMANJE SIGURNO RJESENJE: dvije NULL kolone na `students`.
+#
+#   grade_confirmed_at TEXT NULL   kad je covjek potvrdio (NULL = nikad)
+#   grade_source       TEXT NULL   ko je potvrdio: 'admin' | 'manual_creation'
+#
+# ADITIVNO I NEDESTRUKTIVNO: `ALTER TABLE ... ADD COLUMN` bez DEFAULT-a ne
+# prepisuje nijedan postojeci red. Zatecene vrijednosti `students.grade` OSTAJU
+# (istorijski i administrativni kontekst se ne brise), ali dobijaju NULL potvrdu
+# — dakle tacno ono sto jesu: NEPOTVRDJENE. Potvrda se NE IZMISLJA iz postojece
+# vrijednosti; to bi bilo isto nagadjanje koje je i napravilo problem.
+#
+# ZASTO NEMA `CHECK` NA `grade_source`: SQLite ne moze dodati CHECK na postojecu
+# tabelu bez prepisivanja cijele tabele, a prepisivanje `students` u produkciji
+# nije prihvatljiv rizik za dvije opcione kolone. Skup vrijednosti se zato
+# zatvara u Pythonu (`matbot/student_grades.py::VALID_GRADE_SOURCES`), a upis
+# ide iskljucivo kroz dvije funkcije koje ga postuju.
+#
+# STARA APLIKACIJA I DALJE RADI: svaki upit nad `students` u ovom repozitoriju
+# navodi kolone IZRICITO (nema `SELECT *`), pa dodatne kolone ne mijenjaju
+# nijedan postojeci rezultat. Zato je redoslijed „migracija pa zamjena
+# aplikacije" i dalje ispravan i ostaje nepromijenjen.
+V4_STUDENT_COLUMNS = (
+    ("grade_confirmed_at", "TEXT"),
+    ("grade_source", "TEXT"),
+)
+
+EXPECTED_V4_SCHEMA = {
+    "students": {"required_columns": {name for name, _ in V4_STUDENT_COLUMNS}},
+}
+
+
+def verify_v4_schema(conn):
+    """Strukturna provjera verzije 4. Prazna lista znaci „dokazano ispravno".
+
+    Provjerava se i da su nove kolone NULLABLE: kolona s NOT NULL bi znacila da
+    ju je neko drugi napravio pod drugim pravilima, a `ALTER TABLE ADD COLUMN`
+    bi nad postojecim redovima uz NOT NULL bez DEFAULT-a i inace pukao."""
+    problems = []
+    existing = table_names(conn)
+    for table, expected in EXPECTED_V4_SCHEMA.items():
+        if table not in existing:
+            problems.append("v4_table_missing:%s" % table)
+            continue
+        try:
+            details = _column_details(conn, table)
+        except Exception:
+            problems.append("v4_table_unreadable:%s" % table)
+            continue
+        missing = expected["required_columns"] - set(details)
+        if missing:
+            problems.append("v4_columns_missing:%s:%s"
+                            % (table, ",".join(sorted(missing))))
+            continue
+        for column in sorted(expected["required_columns"]):
+            if details[column][0]:
+                problems.append("v4_not_nullable:%s:%s" % (table, column))
+    return problems
+
+
+def verify_existing_v4_columns(conn):
+    """Provjeri SAMO ono sto vec postoji — ulaz u djelimicno stanje.
+
+    Prekinuta migracija je mogla dodati prvu kolonu a ne i drugu. Odsutna
+    kolona je zato NORMALAN ulaz i ne prijavljuje se; postojeca kolona s
+    pogresnim svojstvima se prijavljuje i zaustavlja migraciju."""
+    return [problem for problem in verify_v4_schema(conn)
+            if not problem.startswith(("v4_table_missing", "v4_columns_missing"))]
+
+
+def _apply_v4_ddl(conn):
+    """Dodaj SAMO kolone kojih nema. `ADD COLUMN` nema `IF NOT EXISTS`.
+
+    Ovo je razlog zasto se ovdje prvo cita `PRAGMA table_info`: v2 i v3 su bili
+    `CREATE TABLE IF NOT EXISTS` i smjeli su se slijepo ponoviti, a `ALTER TABLE
+    ADD COLUMN` nad postojecom kolonom pukne. Nastavljivost se zato dobija
+    provjerom prije naredbe, a ne samom naredbom."""
+    try:
+        present = _columns(conn, "students")
+    except Exception as exc:
+        raise MigrationError("v4_students_unreadable", type(exc).__name__) from None
+    for name, sql_type in V4_STUDENT_COLUMNS:
+        if name in present:
+            continue
+        try:
+            conn.execute("ALTER TABLE students ADD COLUMN %s %s" % (name, sql_type))
+        except Exception as exc:
+            raise MigrationError("v4_ddl_failed", type(exc).__name__) from None
+    try:
+        conn.commit()
+    except Exception as exc:
+        raise MigrationError("v4_ddl_commit_failed", type(exc).__name__) from None
+
+
+def migrate_to_v4(conn):
+    """v3 -> v4. ADITIVNO, IDEMPOTENTNO i OTPORNO NA PREKID.
+
+    ISTA DOKTRINA KAO v1->v2 i v2->v3, iz istog izmjerenog razloga: na libsql
+    0.1.11 DDL PREZIVI `rollback()`, pa se atomicnost ne tvrdi. Umjesto toga:
+
+      • dodaju se samo kolone kojih NEMA, pa se korak smije ponoviti nad bilo
+        kojim djelimicnim stanjem;
+      • zapis verzije se upisuje TEK kad je struktura DOKAZANA;
+      • prekid u bilo kojoj tacki ostavlja bazu bez zapisa verzije 4, pa je
+        sljedece pokretanje jednostavno dovrsi.
+
+    NIJEDAN POSTOJECI RED SE NE MIJENJA. `students.grade` ostaje kakav jeste,
+    aktivnost, kontrolni, snimci, casovi i izvjestaji se ne diraju. Jedina
+    posljedica je da zatecena vrijednost razreda od sada ima NULL potvrdu —
+    dakle citala se kao NEPOTVRDJENA, sto je i istina."""
+    already = applied_versions(conn)
+    if SCHEMA_VERSION_V3 not in already:
+        raise MigrationError("v3_migration_record_missing")
+
+    if SCHEMA_VERSION_V4 in already:
+        problems = verify_v4_schema(conn)
+        if problems:
+            raise MigrationError(problems[0], "recorded v4 but schema incomplete")
+        return False
+
+    prior = verify_existing_v4_columns(conn)
+    if prior:
+        raise MigrationError(prior[0], "existing v4 column is incompatible")
+
+    _apply_v4_ddl(conn)
+
+    problems = verify_v4_schema(conn)
+    if problems:
+        raise MigrationError(problems[0], "verification failed after ddl")
+
+    _record_migration(conn, SCHEMA_VERSION_V4)
+    logger.info("reporting_schema_migrated from=%s to=%s",
+                SCHEMA_VERSION_V3, SCHEMA_VERSION_V4)
     return True
 
 

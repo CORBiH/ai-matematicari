@@ -1,35 +1,66 @@
-"""Faza 3D — TEKUĆI razred učenika: dokazi, klasifikacija, preporuka.
+"""Faza 3D+ — TEKUĆI školski razred: potvrda, dokazi o sadržaju, revizija.
 
-ŠTA `students.grade` ZNAČI OD OVE FAZE: razred koji učenik POHAĐA SADA. Koristi
-se za registar, izbor kurikuluma pri evidenciji časa i kontekst izvještaja. NIJE
-identitet, nije „prvi viđeni razred" i nije trajno svojstvo naloga.
+DVIJE RAZLIČITE STVARI KOJE SU SE DO SADA ZVALE ISTO:
 
-ZAŠTO OVAJ MODUL POSTOJI (živi nalaz): `students.grade` je bio zapiši-jednom.
-Nijedan put ga nije osvježavao, a tutorski padajući meni je u markupu imao `6`
-kao unaprijed izabranu opciju — pa je učenik koji ga nikad nije dodirnuo trajno
-dobijao šesti razred. Kad je Faza 3D počela birati kurikulum po tom polju,
-instruktor je za sedmaka dobijao gradivo šestog razreda.
+  TEKUĆI ŠKOLSKI RAZRED  = razred koji učenik POHAĐA. Živi u `students.grade` i
+                           vrijedi SAMO ako ga je administrator POTVRDIO.
+  RAZRED SADRŽAJA        = razred gradiva koje je učenik KORISTIO. Živi u
+                           `thinkific_progress_snapshots.grade`,
+                           `assessment_attempts.grade` i `learning_activity.grade`.
 
-DOKAZ NIJE ISPRAVKA. Ovdje se ništa ne mijenja i ništa ne upisuje: modul samo
-čita strukturne tragove s datumima i kaže administratoru šta zaslužuje pogled.
-Odluku donosi čovjek (`admin_students.update_grade`).
+ZAŠTO SU RAZDVOJENI (produkcijska forenzika, 2026-08-29): augustovski Thinkific
+uvoz je DOKAZANO izvoz kursa šestog razreda — sekcije iz samog fajla su SKUPOVI,
+DJELJIVOST BROJEVA, RAZLOMCI, DECIMALNI BROJEVI. U njemu potpuno legitimno
+učestvuju učenici koje čovjek prepoznaje kao sedmi, osmi i deveti razred.
+Sedmak koji obnavlja gradivo šestog razreda je NORMALAN slučaj, ne kvar.
+
+POSLJEDICA, IZRIČITO: nijedan sadržajni trag ne smije ni upisati ni PREDLOŽITI
+tekući razred. Ovaj modul zato više NE proizvodi `recommended_grade`. Prethodna
+verzija ga je proizvodila po „autoritetu izvora" (Thinkific > kontrolni >
+MAT-BOT) i time bi sedmaka koji obnavlja šesti razred gurala nazad u šesti.
+
+DOKAZ NIJE ISPRAVKA. Ovdje se ništa ne mijenja i ništa ne upisuje: modul čita
+strukturne tragove s datumima i kaže administratoru šta zaslužuje pogled. Odluku
+donosi čovjek (`admin_students.update_grade` / `confirm_grade`).
 
 IME UČENIKA NIJE DOKAZ. „Amar 7 Septembar" može biti grupa, generacija ili
 popravni — broj u imenu ide isključivo u zasebnu kolonu za ljudski pregled i
-NIKAD ne ulazi ni u `status` ni u `recommended_grade`.
+NIKAD ne ulazi ni u status ni u ijednu preporuku.
 """
 import re
 
 VALID_GRADES = (6, 7, 8, 9)
 
-STATUS_CONSISTENT = "CONSISTENT"
-STATUS_LIKELY_STALE = "LIKELY_STALE"
-STATUS_CONFLICTING = "CONFLICTING_EVIDENCE"
-STATUS_INSUFFICIENT = "INSUFFICIENT_EVIDENCE"
+# --- KO SMIJE POTVRDITI RAZRED ---------------------------------------------
+# Zatvoren skup, i namjerno kratak. Obje vrijednosti znače „čovjek je odlučio":
+# `admin` je izmjena ili potvrda na profilu, `manual_creation` je ručni upis
+# učenika u kojem je razred obavezno polje formulara. Sadržajni izvori NISU na
+# ovom spisku i neće biti — to je cijela poenta verzije 4.
+#
+# Ograničenje se drži u Pythonu, ne u bazi: SQLite ne može dodati `CHECK` na
+# postojeću tabelu bez prepisivanja cijele tabele, a prepisivanje `students` u
+# produkciji nije prihvatljiv rizik za dvije opcione kolone.
+GRADE_SOURCE_ADMIN = "admin"
+GRADE_SOURCE_MANUAL_CREATION = "manual_creation"
+VALID_GRADE_SOURCES = (GRADE_SOURCE_ADMIN, GRADE_SOURCE_MANUAL_CREATION)
+
+# --- STATUSI REVIZIJE -------------------------------------------------------
+# Pitanje revizije više NIJE „koji je razred tačan" nego „je li ga čovjek
+# potvrdio". Zato su i statusi drugačiji nego u prethodnoj verziji.
+STATUS_CONFIRMED = "CONFIRMED"
+STATUS_UNCONFIRMED = "UNCONFIRMED"
+STATUS_CONTENT_MISMATCH = "CONTENT_GRADE_MISMATCH"
+
+# CONTENT_GRADE_MISMATCH NIJE GREŠKA. Znači samo: potvrđeni tekući razred se
+# razlikuje od razreda gradiva koje je učenik nedavno koristio. To je najčešće
+# obnavljanje ili priprema, i profil se zbog toga NE dira. Riječi „zastarjelo",
+# „netačno" i „popravi" se ovdje svjesno ne koriste.
 
 SOURCE_THINKIFIC = "thinkific_progress"
 SOURCE_ASSESSMENT = "assessment"
 SOURCE_MATBOT = "matbot_activity"
+
+EVIDENCE_KEYS = ("thinkific", "assessment", "matbot")
 
 # Broj u imenu — SAMO za ljudski pregled. Jedan jedini broj 6–9 u imenu daje
 # nagovještaj; dva ili više različitih ne daju ništa (npr. „7/8 grupa").
@@ -37,7 +68,7 @@ _NAME_GRADE_RE = re.compile(r"(?<!\d)([6-9])(?!\d)")
 
 
 def name_grade_hint(display_name):
-    """Nagovještaj iz imena. NIKAD ne ulazi u klasifikaciju."""
+    """Nagovještaj iz imena. NIKAD ne ulazi u status ni u ijednu preporuku."""
     found = {int(match) for match in _NAME_GRADE_RE.findall(display_name or "")}
     return found.pop() if len(found) == 1 else None
 
@@ -47,11 +78,9 @@ def evidence_month(when):
 
     ZAŠTO POSTOJI (živi kvar u produkciji): Thinkific pamti `report_month`
     („2026-08"), a kontrolni i aktivnost pune vremenske žigove
-    („2026-08-25 18:06:49"). Prethodna verzija je sukob između izvora tražila
+    („2026-08-25 18:06:49"). Prethodna verzija je razliku između izvora tražila
     poređenjem tih SIROVIH nizova na jednakost — a oni se nikad ne mogu
-    izjednačiti. Grana za sukob zato nije mogla da se okine NIJEDNOM, pa je
-    učenik s Thinkific 6 i kontrolnim 9 u istom mjesecu prijavljivan kao
-    CONSISTENT. Revizija je vratila 34/34 CONSISTENT i bila bezvrijedna.
+    izjednačiti, pa se grana nije okinula NIJEDNOM.
 
     Mjesec je najgrublja zajednička rezolucija koju SVI izvori stvarno imaju —
     finija ne postoji, jer Thinkific dan uopšte ne bilježi."""
@@ -63,15 +92,14 @@ def evidence_month(when):
 
 
 def _pick_latest(rows):
-    """[(vrijeme, razred)] → dokaz o NAJSVJEŽIJEM MJESECU jednog izvora.
+    """[(vrijeme, razred)] → sadržaj NAJSVJEŽIJEG MJESECA jednog izvora.
 
     Vraća `(grade, when, month, ambiguous)`. `ambiguous` je True kad u istom
-    najsvježijem MJESECU isti izvor nosi dva različita razreda — tada se ne
-    bira nasumično nego se prijavljuje sukob.
+    najsvježijem MJESECU isti izvor nosi dva različita razreda — učenik je tada
+    u istom mjesecu radio gradivo dva razreda, što je i dalje samo KONTEKST.
 
-    ZAŠTO NAJSVJEŽIJI, A NE SVI: učenik legitimno ima šesti razred lani i sedmi
-    sada. Skup „svih ikad viđenih razreda" bi svakog naprednog učenika prijavio
-    kao sukob."""
+    ZAŠTO NAJSVJEŽIJI, A NE SVI: skup „svih ikad korištenih razreda" bi za
+    svakog učenika s istorijom bio šum, a pitanje je šta se koristi SADA."""
     usable = []
     for when, grade in (rows or []):
         month = evidence_month(when)
@@ -107,82 +135,70 @@ def evidence_from_rows(thinkific_rows=None, assessment_rows=None,
     }
 
 
-def _by_authority(evidence):
-    """Upotrebljivi dokazi po redu autoriteta. Dvosmisleni se preskaču."""
-    ordered = []
-    for key in ("thinkific", "assessment", "matbot"):
+def is_confirmed(grade, grade_confirmed_at, grade_source):
+    """Je li tekući razred SVJESNO potvrđen? Sva tri uslova, bez izuzetka.
+
+    POSTOJANJE VRIJEDNOSTI NIJE POTVRDA. Zatečenih 34 učenika ima
+    `students.grade = 6` koji je upisala stara automatika (Thinkific uvoz i
+    unaprijed izabrana opcija u padajućem meniju tutora). Bez ove funkcije bi
+    svi izgledali potvrđeno, a nijedan to nije."""
+    return (grade in VALID_GRADES
+            and bool(str(grade_confirmed_at or "").strip())
+            and (grade_source or "") in VALID_GRADE_SOURCES)
+
+
+def content_grades(evidence):
+    """{izvor: dokaz} — SADRŽAJ koji je učenik koristio, ne tekući razred.
+
+    Kontekst za administratora („u augustu je koristio gradivo 6. razreda"),
+    nikad ulaz u odluku. Izvori bez upotrebljivog traga se izostavljaju."""
+    found = {}
+    for key in EVIDENCE_KEYS:
         item = evidence.get(key) or {}
-        if item.get("grade") is not None and not item.get("ambiguous"):
-            ordered.append(item)
-    return ordered
+        if item.get("month") and (item.get("grade") is not None
+                                  or item.get("ambiguous")):
+            found[key] = item
+    return found
 
 
-def strongest_evidence(evidence):
-    """Najjači JEDNOZNAČAN dokaz, po redu autoriteta.
+def recent_content_grades(evidence):
+    """Sadržaj korišten u NAJSVJEŽIJEM mjesecu preko svih izvora.
 
-    1. Thinkific napredak — kurs u koji je učenik STVARNO upisan;
-    2. kontrolni — radio je gradivo tog razreda;
-    3. MAT-BOT aktivnost — najslabije, jer razred bira sam učenik iz menija
-       (isti izvor koji je i napravio kvar).
-
-    Dvosmislen izvor se PRESKAČE kao izvor preporuke, ali se pamti da bi
-    klasifikacija mogla prijaviti sukob."""
-    for key in ("thinkific", "assessment", "matbot"):
-        item = evidence.get(key) or {}
-        if item.get("grade") is not None and not item.get("ambiguous"):
-            return item
-    return None
+    Poređenje ide po MJESECU, nikad po sirovom žigu: Thinkific nosi „2026-08", a
+    kontrolni „2026-08-25 18:06:49" — jednaki ne mogu biti nikad."""
+    usable = content_grades(evidence)
+    if not usable:
+        return {}
+    newest = max(item["month"] for item in usable.values())
+    return {key: item for key, item in usable.items()
+            if item["month"] == newest}
 
 
-def classify(stored_grade, evidence):
-    """(status, recommended_grade). Isključivo iz strukturnih dokaza.
+def classify(grade, grade_confirmed_at, grade_source, evidence):
+    """(status, sadržaj_iz_najsvježijeg_mjeseca). BEZ IJEDNE PREPORUKE.
 
     PRAVILA, izričito:
-      • nema nijednog upotrebljivog dokaza            → INSUFFICIENT_EVIDENCE
-      • bilo koji izvor dvosmislen u svom najsvježijem trenutku → CONFLICTING
-      • dva izvora jednake svježine tvrde različito   → CONFLICTING
-      • najjači dokaz == sačuvani razred              → CONSISTENT
-      • najjači dokaz != sačuvani (ili sačuvani NULL) → LIKELY_STALE
-    Preporuka se daje SAMO uz LIKELY_STALE; sukob traži čovjeka.
+      • razred nije potvrđen (ili ga nema)            → UNCONFIRMED
+      • potvrđen, a nedavni sadržaj je drugog razreda → CONTENT_GRADE_MISMATCH
+      • potvrđen i bez razlike                        → CONFIRMED
 
-    ŠKOLSKA GODINA SE NE POGAĐA. Modul ne zna kad počinje septembar niti koja je
-    generacija — zato se oslanja na najsvježiji MJESEC, a ne na kalendar."""
-    if any((evidence.get(key) or {}).get("ambiguous")
-           for key in ("thinkific", "assessment", "matbot")):
-        return STATUS_CONFLICTING, None
+    ŠTA OVA FUNKCIJA NAMJERNO NE RADI: ne vraća predloženi razred, ne rangira
+    izvore po autoritetu i ne gleda ime učenika. Sadržaj se PRIKAZUJE, a razred
+    mijenja isključivo čovjek.
 
-    strongest = strongest_evidence(evidence)
-    if strongest is None:
-        return STATUS_INSUFFICIENT, None
-
-    # SUKOB SE MJERI PO MJESECU, NE PO SIROVOM ŽIGU. Ranije se poredilo
-    # `when == when`, a Thinkific nosi „2026-08" dok kontrolni nosi
-    # „2026-08-25 18:06:49" — jednaki nikad, pa se grana nije okidala nijednom.
-    # Zato se gleda NAJSVJEŽIJI MJESEC preko SVIH izvora i svi dokazi U NJEMU.
-    current_month = max(item["month"] for item in evidence.values()
-                        if item.get("month"))
-    in_current_month = [item for item in evidence.values()
-                        if item.get("grade") is not None
-                        and item.get("month") == current_month]
-
-    # AUTORITET NE BRIŠE NESLAGANJE. Slabiji izvor ne smije sam preporučiti
-    # razred, ali SMIJE oboriti tvrdnju da je sve u redu: dva različita razreda
-    # u istom tekućem mjesecu traže čovjeka, ne automatski izbor jačeg.
-    if len({item["grade"] for item in in_current_month}) > 1:
-        return STATUS_CONFLICTING, None
-
-    # Preporuka dolazi od NAJJAČEG izvora, ali samo iz tekućeg mjeseca; stariji
-    # dokaz ne smije ni preporučiti ni oboriti tekuće stanje (Dio 4).
-    current = [item for item in _by_authority(evidence)
-               if item in in_current_month]
-    recommended = (current[0]["grade"] if current else strongest["grade"])
-
-    if stored_grade is not None and int(stored_grade) == recommended:
-        return STATUS_CONSISTENT, recommended
-    return STATUS_LIKELY_STALE, recommended
+    CONTENT_GRADE_MISMATCH nije kvar nego zapažanje: sedmak koji obnavlja
+    gradivo šestog razreda dobija upravo ovaj status, a njegov profil ostaje
+    netaknut."""
+    recent = recent_content_grades(evidence)
+    if not is_confirmed(grade, grade_confirmed_at, grade_source):
+        return STATUS_UNCONFIRMED, recent
+    differing = [item for item in recent.values()
+                 if item.get("ambiguous") or int(item["grade"]) != int(grade)]
+    if differing:
+        return STATUS_CONTENT_MISMATCH, recent
+    return STATUS_CONFIRMED, recent
 
 
-def needs_review(stored_grade, evidence):
-    """Kratka zastavica za administratorski prikaz (registar i profil)."""
-    status, _ = classify(stored_grade, evidence)
-    return status in (STATUS_LIKELY_STALE, STATUS_CONFLICTING)
+def needs_confirmation(grade, grade_confirmed_at, grade_source):
+    """Kratka zastavica za administratorski prikaz i za blokade unosa."""
+    return not is_confirmed(grade, grade_confirmed_at, grade_source)

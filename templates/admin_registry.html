@@ -22,6 +22,12 @@
       <option value="{{ g }}" {% if grade == g %}selected{% endif %}>{{ g }}. razred</option>
       {% endfor %}
     </select>
+    {# Filter postoji da se 34 zatecena ucenika mogu obraditi jedan po jedan. #}
+    <select name="confirmed">
+      <option value="">Potvrda: sve</option>
+      <option value="nepotvrdjen" {% if confirmed == 'nepotvrdjen' %}selected{% endif %}>Nepotvrđen razred</option>
+      <option value="potvrdjen" {% if confirmed == 'potvrdjen' %}selected{% endif %}>Potvrđen razred</option>
+    </select>
     <button type="submit">Traži</button>
   </form>
 </div>
@@ -54,26 +60,50 @@
 </div>
 
 <div class="card">
-  <p><strong>Ukupno učenika: {{ students|length }}</strong></p>
+  <p>
+    <strong>Ukupno učenika: {{ students|length }}</strong>
+    {% if unconfirmed_total %}
+    <span class="pill" style="color:var(--warn)">nepotvrđen razred: {{ unconfirmed_total }}</span>
+    {% endif %}
+  </p>
   {% if students %}
   <table>
-    <tr><th>Učenik</th><th>Razred</th><th>Thinkific</th><th></th></tr>
+    <tr><th>Učenik</th><th>Trenutni razred</th><th>Korišteno gradivo</th><th>Thinkific</th><th></th></tr>
     {% for s in students %}
     <tr>
       <td>{{ s.display_name or "Učenik #%s"|format(s.student_id) }}</td>
       <td>
-        {% if s.grade %}{{ s.grade }}. razred{% else %}<span class="muted">nije potvrđen</span>{% endif %}
-        {# Samo kad strukturni dokaz odstupa. Ime NIKAD nije dokaz. #}
-        {% if s.grade_needs_review %}
-        <a href="{{ url_for('admin_students.profile', student_id=s.student_id) }}"
-           title="Provjeri razred">⚠ provjeri</a>
+        {% if s.grade %}{{ s.grade }}. razred{% else %}<span class="muted">nije unesen</span>{% endif %}
+        {# STANJE POTVRDE, ne ocjena tacnosti. Zatecena cifra bez potvrde je
+           nepotvrdjena, ma koliko izgledala uvjerljivo. #}
+        {% if s.grade_status == status_unconfirmed %}
+        <span class="pill" style="color:var(--warn)">nepotvrđeno</span>
+        {% else %}
+        <span class="pill" style="color:var(--ok)">potvrđeno</span>
         {% endif %}
+      </td>
+      <td class="muted">
+        {# KONTEKST, NE GRESKA: sedmak smije obnavljati gradivo sestog razreda. #}
+        {% for key, item in (s.content_grades or {}).items() %}
+          {% if item.grade %}{{ item.grade }}. razred{% else %}više razreda{% endif %}
+          ({{ item.month }}){% if not loop.last %}, {% endif %}
+        {% else %}—{% endfor %}
       </td>
       <td>
         {% if s.thinkific_linked %}<span class="pill" style="color:var(--ok)">povezan</span>
         {% else %}<span class="pill">nije povezan</span>{% endif %}
       </td>
       <td>
+        {# Jedan klik za zatecenu vrijednost; razred se cita SA SERVERA. #}
+        {% if s.grade and s.grade_status == status_unconfirmed %}
+        <form method="post" style="display:inline"
+              action="{{ url_for('admin_students.confirm_grade', student_id=s.student_id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          {# Vrati se na listu, da se 34 ucenika mogu proci jedan po jedan. #}
+          <input type="hidden" name="next" value="index">
+          <button type="submit">Potvrdi {{ s.grade }}. razred</button>
+        </form>
+        {% endif %}
         <a href="{{ url_for('admin_students.profile', student_id=s.student_id) }}">Profil</a>
         ·
         <a href="{{ url_for('admin_reports.student_preview', student_id=s.student_id, month=month) }}">Izvještaj</a>

@@ -46,7 +46,7 @@ def seeded(db):
         connect_factory=lambda: libsql.connect(db, timeout=30.0,
                                                _check_same_thread=False))
     student_id = database.get_or_create_student(
-        PROVIDER_THINKIFIC_EMAIL, "ucenik@example.com", grade=6)
+        PROVIDER_THINKIFIC_EMAIL, "ucenik@example.com")
 
     def event(event_type, key, **kw):
         return activity.ActivityEvent(event_type, key, **kw)

@@ -80,7 +80,7 @@ def test_student_with_fresh_email_creates_both(db):
 def test_conflicting_email_creates_no_student_row(db):
     """ŽIVI DEFEKT: ranije je učenik ostajao iako nalog nije povezan."""
     owner = db.get_or_create_student(PROVIDER_THINKIFIC_EMAIL,
-                                     "zauzet@example.com", grade=6)
+                                     "zauzet@example.com")
     before_students, before_accounts = _student_count(db), _account_count(db)
 
     with pytest.raises(reporting_db.ReportingUnavailable) as caught:
@@ -93,8 +93,7 @@ def test_conflicting_email_creates_no_student_row(db):
 
 
 def test_no_orphan_student_remains_after_a_conflict(db):
-    db.get_or_create_student(PROVIDER_THINKIFIC_EMAIL, "zauzet@example.com",
-                             grade=6)
+    db.get_or_create_student(PROVIDER_THINKIFIC_EMAIL, "zauzet@example.com")
     for _ in range(3):
         with pytest.raises(reporting_db.ReportingUnavailable):
             db.create_student("Duplikat", 6, external_user_id="zauzet@example.com")
@@ -104,8 +103,7 @@ def test_no_orphan_student_remains_after_a_conflict(db):
 
 
 def test_account_is_never_reassigned(db):
-    owner = db.get_or_create_student(PROVIDER_THINKIFIC_EMAIL, "zauzet@example.com",
-                                     grade=6)
+    owner = db.get_or_create_student(PROVIDER_THINKIFIC_EMAIL, "zauzet@example.com")
     other = db.create_student("Drugi", 6)
     with pytest.raises(reporting_db.ReportingUnavailable):
         db.link_thinkific_account(other, "zauzet@example.com")
@@ -165,10 +163,8 @@ def test_concurrent_duplicate_attempts_never_create_two_students(db):
 
 
 def test_existing_thinkific_student_remains_reusable(db):
-    first = db.get_or_create_student(PROVIDER_THINKIFIC_EMAIL, "stalni@example.com",
-                                     grade=6)
-    again = db.get_or_create_student(PROVIDER_THINKIFIC_EMAIL, "stalni@example.com",
-                                     grade=6)
+    first = db.get_or_create_student(PROVIDER_THINKIFIC_EMAIL, "stalni@example.com")
+    again = db.get_or_create_student(PROVIDER_THINKIFIC_EMAIL, "stalni@example.com")
     assert first == again
     assert _student_count(db) == 1
 
@@ -312,10 +308,12 @@ def _v2_database(tmp_path, monkeypatch, name="v2.db"):
 def test_migrate_command_moves_a_clean_v2_to_v3(tmp_path, monkeypatch):
     path, database = _v2_database(tmp_path, monkeypatch)
     try:
-        assert database.migrate() == [reporting_schema.SCHEMA_VERSION_V3]
+        assert database.migrate() == [reporting_schema.SCHEMA_VERSION_V3,
+                                      reporting_schema.SCHEMA_VERSION_V4]
         report = database.check()
-        assert report["schema_version"] == 3
+        assert report["schema_version"] == 4
         assert report["v3_schema_verified"] is True
+        assert report["v4_schema_verified"] is True
     finally:
         database.close()
 
@@ -369,9 +367,14 @@ def test_v3_is_additive_for_the_currently_running_app(tmp_path, monkeypatch):
     """DOKAZ KOMPATIBILNOSTI: stara aplikacija smije nastaviti da radi.
 
     Poslije migracije, sve što stara verzija koristi mora ostati netaknuto —
-    tabele i kolone v1/v2, ugovor v2 i zapis verzije 2. Jedina razlika je
-    DODATA tabela koju stara verzija ne čita i zapis verzije 3 koji joj mijenja
-    samo dijagnostiku, ne rad."""
+    tabele i kolone v1/v2, ugovor v2 i zapis verzije 2. Razlike su isključivo
+    DODACI: nova tabela `student_sessions` (v3) koju stara verzija ne čita, i
+    dvije NULL kolone potvrde razreda na `students` (v4).
+
+    ZAŠTO DODATE KOLONE NE RUŠE STARU VERZIJU: nijedan upit u ovom repozitoriju
+    ne koristi `SELECT *` nad `students` — sve kolone se navode izričito, pa
+    dodatna kolona ne mijenja nijedan postojeći rezultat, a `INSERT` bez nje
+    prolazi jer je NULL dozvoljen."""
     path, database = _v2_database(tmp_path, monkeypatch)
     conn = libsql.connect(path)
     before = {}
@@ -385,19 +388,27 @@ def test_v3_is_additive_for_the_currently_running_app(tmp_path, monkeypatch):
     finally:
         database.close()
 
+    added = {"students": [name for name, _ in reporting_schema.V4_STUDENT_COLUMNS]}
     conn = libsql.connect(path)
     try:
         for table, columns in before.items():
             after = [row[1] for row
                      in conn.execute("PRAGMA table_info(%s)" % table).fetchall()]
-            assert after == columns, "v3 je promijenila %s" % table
+            # Postojece kolone ostaju NA ISTOM MJESTU i istim redom; jedina
+            # dozvoljena razlika je DODATAK na kraju.
+            assert after[:len(columns)] == columns, "migracija je promijenila %s" % table
+            assert after[len(columns):] == added.get(table, []), table
         # Ugovor verzije 2 i dalje vrijedi.
         assert reporting_schema.verify_v2_schema(conn) == []
-        # Zapis v2 nije izgubljen; v3 je DODAT.
-        assert reporting_schema.applied_versions(conn) >= {1, 2, 3}
+        # Zapis v2 nije izgubljen; v3 i v4 su DODATI.
+        assert reporting_schema.applied_versions(conn) >= {1, 2, 3, 4}
         # Jedina nova tabela.
         tables = reporting_schema.table_names(conn)
         assert "student_sessions" in tables
+        # Nove kolone su NULL na svakom zatecenom redu — nista nije "potvrdjeno".
+        rows = conn.execute("SELECT grade_confirmed_at, grade_source "
+                            "FROM students").fetchall()
+        assert all(row[0] is None and row[1] is None for row in rows)
     finally:
         conn.close()
 

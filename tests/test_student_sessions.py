@@ -212,7 +212,7 @@ def test_v3_migration_touches_no_phase3c_data(tmp_path):
 
 def test_checker_exposes_v3_state(db):
     report = db.check()
-    assert report["schema_version"] == 3
+    assert report["schema_version"] == 4
     assert report["v3_schema_verified"] is True
     rendered = reporting_db._format_report(report)
     assert "v3_schema: verified" in rendered
@@ -230,7 +230,7 @@ def test_manual_student_can_be_created(db):
 
 def test_thinkific_students_appear_in_the_same_registry(db):
     thinkific_id = db.get_or_create_student(
-        PROVIDER_THINKIFIC_EMAIL, "ucenik@example.com", grade=6)
+        PROVIDER_THINKIFIC_EMAIL, "ucenik@example.com")
     manual_id = db.create_student("Ručno Upisan", 6)
     listed = {r["student_id"]: r for r in db.list_students()}
     assert thinkific_id in listed and manual_id in listed
@@ -239,7 +239,7 @@ def test_thinkific_students_appear_in_the_same_registry(db):
 
 
 def test_registry_never_returns_an_email(db):
-    db.get_or_create_student(PROVIDER_THINKIFIC_EMAIL, "tajna@example.com", grade=6)
+    db.get_or_create_student(PROVIDER_THINKIFIC_EMAIL, "tajna@example.com")
     blob = json.dumps(db.list_students(), ensure_ascii=False)
     assert "@" not in blob and "tajna" not in blob
 
@@ -264,8 +264,8 @@ def test_thinkific_account_can_be_linked_to_a_manual_student(db):
 
 
 def test_linking_an_account_owned_by_another_student_fails_closed(db):
-    owner = db.get_or_create_student(PROVIDER_THINKIFIC_EMAIL, "zauzet@example.com",
-                                     grade=6)
+    owner = db.get_or_create_student(PROVIDER_THINKIFIC_EMAIL,
+                                     "zauzet@example.com")
     other = db.create_student("Drugi Učenik", 6)
     with pytest.raises(reporting_db.ReportingUnavailable) as caught:
         db.link_thinkific_account(other, "zauzet@example.com")

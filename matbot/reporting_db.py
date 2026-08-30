@@ -55,6 +55,13 @@ _THINKIFIC_PROVIDER = "thinkific_email"
 # Razredi koje ručni upis smije primiti. Osnovna škola 6–9 (BiH).
 VALID_MANUAL_GRADES = (6, 7, 8, 9)
 
+# IZVOR POTVRDE RAZREDA (šema v4). Vrijednosti se preuzimaju iz
+# `student_grades`, gdje živi i pravilo šta se smije čitati kao potvrđeno —
+# dvije kopije istog stringa bi se razišle prvom izmjenom. Uvoz je lokalan u
+# ovom smjeru namjerno: `student_grades` ne uvozi `reporting_db`, pa nema kruga.
+from matbot.student_grades import (GRADE_SOURCE_ADMIN,          # noqa: E402
+                                   GRADE_SOURCE_MANUAL_CREATION)
+
 # Tabele koje izvještajna šema mora imati. Dijagnostika ih SAMO provjerava —
 # ovaj modul nikad ne kreira ni ne migrira šemu.
 REQUIRED_TABLES = (
@@ -187,6 +194,9 @@ class ReportingDatabase:
         self._connect_factory = connect_factory or _default_connect_factory
         self._conn = None
         self._lock = threading.Lock()
+        # Ima li baza kolone potvrde razreda (šema v4)? `None` = još nije
+        # provjereno. Vidi `_grade_confirmation_available`.
+        self._grade_confirmation = None
 
     # -- konekcija ---------------------------------------------------------
     def _connection(self):
@@ -222,6 +232,9 @@ class ReportingDatabase:
         libsql-a LIJEN (izmjereno: ne dira mrežu), pa je ponovno otvaranje
         jeftino i sljedeći poziv kreće čist."""
         conn, self._conn = self._conn, None
+        # Zapamćena sposobnost pripada KONEKCIJI, ne procesu: poslije migracije
+        # se konekcija ionako obnavlja, pa se i odgovor mora ponovo izmjeriti.
+        self._grade_confirmation = None
         if conn is not None:
             self._discard(conn)
 
@@ -229,9 +242,32 @@ class ReportingDatabase:
         with self._lock:
             self._drop_connection()
 
+    # -- potvrda tekućeg razreda (šema v4) ---------------------------------
+    def _grade_confirmation_available(self, conn):
+        """Postoje li `grade_confirmed_at` i `grade_source` na `students`?
+
+        ZAŠTO SE UOPŠTE PITA, umjesto da se pretpostavi: raspoređivanje pušta
+        migraciju u zasebnom kontejneru PRIJE zamjene aplikacije, ali baza koja
+        iz bilo kog razloga zaostane ne smije proizvesti neuhvaćen izuzetak
+        usred administratorske stranice. Odgovor `False` je BEZBJEDAN ISHOD:
+        nijedan razred se tada ne čita kao potvrđen, pa unos časa i novi
+        izvještaj padaju zatvoreno — tačno ono što želimo od nepoznatog stanja.
+
+        Mjeri se JEDNOM po konekciji: `PRAGMA table_info` je jeftin, ali ne po
+        svakom redu registra."""
+        if self._grade_confirmation is None:
+            try:
+                columns = {row[1] for row in _rows(
+                    conn.execute("PRAGMA table_info(students)"))}
+            except Exception:
+                return False
+            self._grade_confirmation = ("grade_confirmed_at" in columns
+                                        and "grade_source" in columns)
+        return self._grade_confirmation
+
     # -- javni strogi sloj -------------------------------------------------
     def get_or_create_student(self, provider, external_user_id,
-                              display_name=None, grade=None):
+                              display_name=None):
         """Vrati `students.id` za (provider, external_user_id); kreiraj pri prvom
         susretu. Baca `ReportingUnavailable`.
 
@@ -251,17 +287,23 @@ class ReportingDatabase:
         dobila bi se DVA identiteta za istog učenika. Jedini pouzdan arbitar je
         UNIQUE(provider, external_user_id) u bazi, pa se odluka prepušta njemu.
 
-        NAMJERNO SE NE PREPISUJU `display_name` i `grade` na postojećem redu:
-        ovo je identitetska putanja, ne sinhronizacija profila (to je zasebna
-        faza), a tiho prepisivanje bi napravilo upis pri SVAKOM zahtjevu."""
+        NAMJERNO SE NE PREPISUJE `display_name` na postojećem redu: ovo je
+        identitetska putanja, ne sinhronizacija profila (to je zasebna faza), a
+        tiho prepisivanje bi napravilo upis pri SVAKOM zahtjevu.
+
+        RAZRED SE OVDJE NE UPISUJE UOPŠTE, ni pri prvom susretu (verzija 4).
+        Ranije je identitet primao `grade` i upisivao ga u `students.grade` —
+        a jedini izvor te vrijednosti je bio padajući meni tutora, u kojem je
+        `6` bila unaprijed izabrana opcija. Tako je 34 učenika trajno dobilo
+        šesti razred, a Faza 3D je po tom polju birala kurikulum. Nov učenik
+        zato nastaje s `grade = NULL` i čeka da ga administrator POTVRDI."""
         provider = _clean_provider(provider)
         external = _clean_external_id(external_user_id)
         name = _clean_display_name(display_name)
-        student_grade = _clean_grade(grade)
 
         with self._lock:
             try:
-                return self._get_or_create_locked(provider, external, name, student_grade)
+                return self._get_or_create_locked(provider, external, name)
             except ReportingUnavailable:
                 self._safe_rollback()
                 self._drop_connection()
@@ -275,7 +317,7 @@ class ReportingDatabase:
                 raise ReportingUnavailable(
                     "student_resolution_failed:" + type(exc).__name__, exc) from None
 
-    def _get_or_create_locked(self, provider, external, name, grade):
+    def _get_or_create_locked(self, provider, external, name):
         conn = self._connection()
 
         existing = self._lookup(conn, provider, external)
@@ -283,10 +325,12 @@ class ReportingDatabase:
             self._touch_locked(conn, existing, provider, external)
             return existing
 
+        # `grade` se NE navodi: nov identitet nema potvrđen tekući razred i
+        # kolona ostaje NULL dok administrator ne odluči.
         cursor = conn.execute(
-            "INSERT INTO students (display_name, grade, created_at, updated_at, last_seen_at) "
-            "VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
-            (name, grade),
+            "INSERT INTO students (display_name, created_at, updated_at, last_seen_at) "
+            "VALUES (?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+            (name,),
         )
         student_id = cursor.lastrowid
 
@@ -528,8 +572,8 @@ class ReportingDatabase:
                     "student_lookup_failed:" + type(exc).__name__, exc) from None
 
     # --- FAZA 3A: Thinkific snimci napretka --------------------------------
-    def update_student_profile(self, student_id, display_name=None, grade=None):
-        """Konzervativno dopuni PROFIL. Vrati `(name_set, grade_set, grade_conflict)`.
+    def update_student_profile(self, student_id, display_name=None):
+        """Konzervativno dopuni IME u profilu. Vrati `name_set`.
 
         PROFIL NIJE IDENTITET. `students.display_name` i `students.grade` su
         pogodnost za izvještaj; identitet je i dalje isključivo
@@ -538,19 +582,19 @@ class ReportingDatabase:
         PRAVILA (Dio 7 i 8):
           • ime se upisuje SAMO ako je novo neprazno i staro je prazno/NULL —
             prazno ime iz izvoza nikad ne smije obrisati korisnu vrijednost;
-          • razred se upisuje samo kad je stari NULL;
-          • RAZLIČIT razred se NE prepisuje tiho nego se prijavi kao sukob za
-            administratora. Učenik koji je promijenio razred ili je greškom
-            uvezen u pogrešan slot mora se vidjeti, a ne tiho izmijeniti."""
+          • RAZRED SE NE DIRA. Parametar `grade` je od verzije 4 UKLONJEN, a ne
+            ignorisan: dok je postojao, sinhronizacija profila je smjela upisati
+            razred kursa kao tekući školski razred. Tekući razred mijenja
+            isključivo `set_student_grade`, iz administratorske akcije."""
         with self._lock:
             try:
                 conn = self._connection()
                 rows = _rows(conn.execute(
-                    "SELECT display_name, grade FROM students WHERE id = ?",
+                    "SELECT display_name FROM students WHERE id = ?",
                     (int(student_id),)))
                 if not rows:
                     raise ReportingUnavailable("student_missing")
-                existing_name, existing_grade = rows[0][0], rows[0][1]
+                existing_name = rows[0][0]
 
                 name_set = False
                 if display_name and not (existing_name or "").strip():
@@ -559,20 +603,8 @@ class ReportingDatabase:
                         "updated_at = CURRENT_TIMESTAMP WHERE id = ?",
                         (display_name, int(student_id)))
                     name_set = True
-
-                grade_set = False
-                grade_conflict = False
-                if grade is not None:
-                    if existing_grade is None:
-                        conn.execute(
-                            "UPDATE students SET grade = ?, "
-                            "updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                            (int(grade), int(student_id)))
-                        grade_set = True
-                    elif int(existing_grade) != int(grade):
-                        grade_conflict = True
                 conn.commit()
-                return name_set, grade_set, grade_conflict
+                return name_set
             except ReportingUnavailable:
                 self._safe_rollback()
                 self._drop_connection()
@@ -746,11 +778,17 @@ class ReportingDatabase:
                     if row["email"] in accounts:
                         counters["students_reused"] += 1
                         continue
+                    # RAZRED KURSA NIJE TEKUĆI RAZRED UČENIKA (verzija 4).
+                    # Šesti razred u ovom fajlu znači „koristi gradivo šestog
+                    # razreda", a ne „pohađa šesti razred" — forenzika je
+                    # dokazala da u izvozu kursa 6. razreda legitimno rade i
+                    # sedmaci. Nov učenik zato nastaje s `grade = NULL`; razred
+                    # sadržaja i dalje ide u snimak, gdje mu je i mjesto.
                     created = conn.execute(
-                        "INSERT INTO students (display_name, grade, created_at, "
-                        " updated_at, last_seen_at) VALUES (?, ?, CURRENT_TIMESTAMP, "
+                        "INSERT INTO students (display_name, created_at, "
+                        " updated_at, last_seen_at) VALUES (?, CURRENT_TIMESTAMP, "
                         " CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
-                        (row["display_name"], int(grade)))
+                        (row["display_name"],))
                     student_id = created.lastrowid
                     conn.execute(
                         "INSERT INTO student_accounts (student_id, provider, "
@@ -834,10 +872,22 @@ class ReportingDatabase:
         return profiles
 
     def _apply_profiles(self, conn, rows, accounts, profiles, grade, counters):
-        """ISTA pravila kao `update_student_profile`, samo bez upita po učeniku.
+        """Dopuni SAMO ime. Razred se od verzije 4 NE dira ni pod kojim uslovom.
 
-        Ime se upisuje samo preko praznog, razred samo preko NULL-a, a različit
-        razred se NE prepisuje nego prijavljuje kao sukob."""
+        ŠTA JE UKLONJENO I ZAŠTO: ranije se `grade` kursa upisivao u
+        `students.grade` kad je zatečena vrijednost bila NULL. To je bila tiha
+        tvrdnja da je razred KURSA ujedno i tekući školski razred učenika —
+        a produkcijska forenzika je dokazala suprotno: augustovski izvoz je
+        stvarno kurs šestog razreda, a u njemu legitimno rade i sedmaci koji
+        obnavljaju gradivo. Tekući razred od sada potvrđuje isključivo čovjek.
+
+        `grade_conflicts` OSTAJE, ali mu je značenje sada RAZLIKA SADRŽAJA:
+        koliko učenika ima potvrđen profil različit od razreda uvezenog kursa.
+        To je korisna informacija (može otkriti pogrešno izabran slot), ali NIJE
+        greška i ne pokreće nikakvu izmjenu.
+
+        Ime se i dalje upisuje samo preko praznog — prazno ime iz izvoza nikad
+        ne smije obrisati korisnu vrijednost."""
         for row in rows:
             student_id = accounts[row["email"]]
             existing_name, existing_grade = profiles.get(student_id, (None, None))
@@ -847,16 +897,9 @@ class ReportingDatabase:
                     "updated_at = CURRENT_TIMESTAMP WHERE id = ?",
                     (row["display_name"], student_id))
                 profiles[student_id] = (row["display_name"], existing_grade)
-            if grade is not None:
-                if existing_grade is None:
-                    conn.execute(
-                        "UPDATE students SET grade = ?, "
-                        "updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                        (int(grade), student_id))
-                    profiles[student_id] = (profiles.get(student_id, (None, None))[0],
-                                            int(grade))
-                elif int(existing_grade) != int(grade):
-                    counters["grade_conflicts"] += 1
+            if (grade is not None and existing_grade is not None
+                    and int(existing_grade) != int(grade)):
+                counters["grade_conflicts"] += 1
 
     def _existing_snapshots(self, conn, course_key, report_month, student_ids):
         found = {}
@@ -1103,15 +1146,28 @@ class ReportingDatabase:
                     "snapshot_read_failed:" + type(exc).__name__, exc) from None
 
     def fetch_student_profile(self, student_id):
+        """Profil + STANJE POTVRDE tekućeg razreda.
+
+        `grade_confirmed_at`/`grade_source` su `None` i kad kolone postoje ali
+        su prazne (zatečeni učenik) i kad ih baza još nema — oba stanja znače
+        NEPOTVRĐENO, pa se pozivaocu ne razlikuju."""
         with self._lock:
             try:
                 conn = self._connection()
-                rows = _rows(conn.execute(
-                    "SELECT display_name, grade FROM students WHERE id = ?",
-                    (int(student_id),)))
+                if self._grade_confirmation_available(conn):
+                    rows = _rows(conn.execute(
+                        "SELECT display_name, grade, grade_confirmed_at, grade_source "
+                        "FROM students WHERE id = ?", (int(student_id),)))
+                else:
+                    # Bez v4 kolona: isti oblik reda, potvrda je uvijek prazna.
+                    rows = [(row[0], row[1], None, None) for row in _rows(
+                        conn.execute("SELECT display_name, grade FROM students "
+                                     "WHERE id = ?", (int(student_id),)))]
                 if not rows:
                     return None
-                return {"display_name": rows[0][0], "grade": rows[0][1]}
+                return {"display_name": rows[0][0], "grade": rows[0][1],
+                        "grade_confirmed_at": rows[0][2],
+                        "grade_source": rows[0][3]}
             except Exception as exc:
                 self._drop_connection()
                 raise ReportingUnavailable(
@@ -1121,17 +1177,26 @@ class ReportingDatabase:
     # NEMA DRUGOG PROSTORA IMENA. Registar je pogled na POSTOJEĆU `students`
     # tabelu; učenik koji je nastao kroz Thinkific i učenik kojeg je
     # administrator upisao ručno su isti tip zapisa i vide se na istoj listi.
-    def list_students(self, search=None, grade=None):
-        """Registar: svi učenici + da li imaju povezan Thinkific nalog.
+    def list_students(self, search=None, grade=None, confirmed=None):
+        """Registar: svi učenici, stanje potvrde razreda i Thinkific veza.
 
         E-MAIL SE NE VRAĆA. Administratoru je dovoljno „povezan/nije povezan";
-        adresa nema šta da radi u listi, URL-u ni logu (Dio 40)."""
+        adresa nema šta da radi u listi, URL-u ni logu (Dio 40).
+
+        `confirmed` je `True`/`False`/`None` (bez filtera). Filtriranje ide u
+        SQL-u samo kad baza ima v4 kolone; bez njih je odgovor „nijedan nije
+        potvrđen", pa se `confirmed=True` svodi na praznu listu — što je tačno,
+        a ne prazno iz kvara."""
         with self._lock:
             try:
                 conn = self._connection()
+                has_v4 = self._grade_confirmation_available(conn)
+                columns = ("s.grade_confirmed_at, s.grade_source" if has_v4
+                           else "NULL, NULL")
                 sql = ("SELECT s.id, s.display_name, s.grade, "
                        "       (SELECT COUNT(*) FROM student_accounts a "
-                       "        WHERE a.student_id = s.id AND a.provider = ?) "
+                       "        WHERE a.student_id = s.id AND a.provider = ?), "
+                       "       " + columns + " "
                        "FROM students s")
                 params = [_THINKIFIC_PROVIDER]
                 where = []
@@ -1141,6 +1206,12 @@ class ReportingDatabase:
                 if grade is not None:
                     where.append("s.grade = ?")
                     params.append(int(grade))
+                if confirmed is not None and has_v4:
+                    # POTVRDA JE TROJKA (razred + vrijeme + izvor), pa filter
+                    # gleda vrijeme — izvor se provjerava u Pythonu, jer skup
+                    # dopuštenih izvora živi tamo.
+                    where.append("s.grade_confirmed_at IS %s NULL"
+                                 % ("NOT" if confirmed else ""))
                 if where:
                     sql += " WHERE " + " AND ".join(where)
                 sql += " ORDER BY COALESCE(s.display_name, ''), s.id"
@@ -1149,8 +1220,14 @@ class ReportingDatabase:
                 self._drop_connection()
                 raise ReportingUnavailable(
                     "student_list_failed:" + type(exc).__name__, exc) from None
-        return [{"student_id": r[0], "display_name": r[1], "grade": r[2],
-                 "thinkific_linked": bool(r[3])} for r in rows]
+        listed = [{"student_id": r[0], "display_name": r[1], "grade": r[2],
+                   "thinkific_linked": bool(r[3]),
+                   "grade_confirmed_at": r[4], "grade_source": r[5]}
+                  for r in rows]
+        if confirmed is not None and not has_v4:
+            # Bez v4 kolona nijedan razred nije potvrđen (vidi docstring).
+            listed = [] if confirmed else listed
+        return listed
 
     def create_student(self, display_name, grade, external_user_id=None):
         """Ručno upisan učenik. JEDNA LOGIČKA OPERACIJA, i kad nosi nalog.
@@ -1199,11 +1276,18 @@ class ReportingDatabase:
                         raise ReportingUnavailable(
                             "student_account_taken:%s" % owner[0][0])
 
+                # RUČNI UPIS JE POTVRDA. Razred je obavezno polje formulara i
+                # bira ga čovjek, pa se odmah bilježi i KO ga je potvrdio —
+                # inače bi ručno upisan učenik bio nerazlučiv od zatečenog,
+                # kojem je razred upisala stara automatika.
+                if not self._grade_confirmation_available(conn):
+                    raise ReportingUnavailable("grade_confirmation_unavailable")
                 cursor = conn.execute(
-                    "INSERT INTO students (display_name, grade, created_at, "
-                    " updated_at, last_seen_at) VALUES (?, ?, CURRENT_TIMESTAMP, "
+                    "INSERT INTO students (display_name, grade, grade_confirmed_at, "
+                    " grade_source, created_at, updated_at, last_seen_at) "
+                    "VALUES (?, ?, CURRENT_TIMESTAMP, ?, CURRENT_TIMESTAMP, "
                     " CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
-                    (name, student_grade))
+                    (name, student_grade, GRADE_SOURCE_MANUAL_CREATION))
                 student_id = cursor.lastrowid
 
                 if external:
@@ -1278,7 +1362,11 @@ class ReportingDatabase:
                     "student_link_failed:" + type(exc).__name__, exc) from None
 
     def set_student_grade(self, student_id, grade):
-        """Promijeni TEKUĆI razred učenika. Mijenja SAMO `students.grade`.
+        """POTVRDI tekući razred učenika. Mijenja SAMO profilne kolone.
+
+        Upisuje razred, VRIJEME POTVRDE i IZVOR `admin`. Ista funkcija služi i
+        za promjenu razreda i za potvrdu zatečene vrijednosti — u oba slučaja je
+        radnja ista: čovjek je pogledao i odlučio.
 
         Istorija se ne dira: `learning_activity.grade`,
         `assessment_attempts.grade`, `thinkific_progress_snapshots.grade` i
@@ -1286,18 +1374,29 @@ class ReportingDatabase:
         šestog u sedmi razred ne smije izgubiti niti izmijeniti svoj lanjski čas.
 
         Poziva se ISKLJUČIVO iz administratorske akcije — nema automatske
-        promocije i nema masovne ispravke."""
+        promocije, nema masovne ispravke i nema poziva iz uvoza ni iz tutora.
+
+        PADA ZATVORENO bez šeme v4: potvrda koja se ne može ZAPISATI ne smije se
+        ni tvrditi, jer bi sljedeće čitanje razred i dalje vidjelo kao
+        nepotvrđen a administrator bi mislio da je gotov."""
         if int(grade) not in (6, 7, 8, 9):
             raise ReportingUnavailable("student_grade_invalid")
         with self._lock:
             try:
                 conn = self._connection()
+                if not self._grade_confirmation_available(conn):
+                    raise ReportingUnavailable("grade_confirmation_unavailable")
                 cursor = conn.execute(
-                    "UPDATE students SET grade = ?, updated_at = CURRENT_TIMESTAMP "
-                    "WHERE id = ?", (int(grade), int(student_id)))
+                    "UPDATE students SET grade = ?, "
+                    " grade_confirmed_at = CURRENT_TIMESTAMP, grade_source = ?, "
+                    " updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                    (int(grade), GRADE_SOURCE_ADMIN, int(student_id)))
                 changed = cursor.rowcount
                 conn.commit()
                 return changed == 1
+            except ReportingUnavailable:
+                self._safe_rollback()
+                raise
             except Exception as exc:
                 self._safe_rollback()
                 self._drop_connection()
@@ -1635,6 +1734,10 @@ class ReportingDatabase:
                         applied.append(reporting_schema.SCHEMA_VERSION_V2)
                 if reporting_schema.migrate_to_v3(conn):
                     applied.append(reporting_schema.SCHEMA_VERSION_V3)
+                if reporting_schema.migrate_to_v4(conn):
+                    applied.append(reporting_schema.SCHEMA_VERSION_V4)
+                # Nove kolone mijenjaju ono što je konekcija zapamtila.
+                self._grade_confirmation = None
             except reporting_schema.MigrationError:
                 self._drop_connection()
                 raise
@@ -1729,6 +1832,15 @@ class ReportingDatabase:
                 except Exception:
                     report["v3_schema_problems"] = ["v3_verification_unavailable"]
                 report["v3_schema_verified"] = not report["v3_schema_problems"]
+                # Faza 3D+: ista logika za v4. Baza koja tvrdi verziju 4 a nema
+                # kolone potvrde razreda mora se VIDJETI kao pokvarena.
+                try:
+                    from matbot import reporting_schema as _v4schema
+
+                    report["v4_schema_problems"] = _v4schema.verify_v4_schema(conn)
+                except Exception:
+                    report["v4_schema_problems"] = ["v4_verification_unavailable"]
+                report["v4_schema_verified"] = not report["v4_schema_problems"]
                 return report
             except ReportingUnavailable as exc:
                 self._drop_connection()
@@ -1941,10 +2053,14 @@ def _call_bounded(operation, timeout_s):
     return True, outcome.get("value")
 
 
-def resolve_student(provider, external_user_id, display_name=None, grade=None,
+def resolve_student(provider, external_user_id, display_name=None,
                     database=None):
     """SIGURAN ulaz: `students.id` ili `None`. NIKAD ne baca i nikad ne čeka
     duže od `config.REPORTING_DB_TIMEOUT_S`.
+
+    RAZRED SE NE PRIMA (verzija 4). Parametar je uklonjen namjerno, a ne
+    ignorisan: dok je postojao, svaki pozivalac je mogao — i jedan jeste —
+    proslijediti razred iz klijentskog menija u `students.grade`.
 
     `None` znači samo „izvještavanje trenutno ne radi“ — nikad da je učeniku
     nešto uskraćeno. Pozivalac (kad ga bude) mora nastaviti normalno."""
@@ -1972,7 +2088,7 @@ def resolve_student(provider, external_user_id, display_name=None, grade=None,
 
     ok, value = _call_bounded(
         lambda: target.get_or_create_student(provider, external_user_id,
-                                             display_name=display_name, grade=grade),
+                                             display_name=display_name),
         config.REPORTING_DB_TIMEOUT_S,
     )
     if ok:
@@ -2194,6 +2310,10 @@ def _format_report(report):
     if "v3_schema_verified" in report:
         problems = report.get("v3_schema_problems") or []
         lines.append("v3_schema: %s" % ("verified" if report["v3_schema_verified"]
+                                        else "INCOMPLETE -> " + ", ".join(problems)))
+    if "v4_schema_verified" in report:
+        problems = report.get("v4_schema_problems") or []
+        lines.append("v4_schema: %s" % ("verified" if report["v4_schema_verified"]
                                         else "INCOMPLETE -> " + ", ".join(problems)))
     if "monthly_reports_ready" in report:
         problems = report.get("monthly_reports_problems") or []

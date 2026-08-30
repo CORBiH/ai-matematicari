@@ -115,16 +115,27 @@
   {% if ai_error %}<div class="banner err">{{ ai_error }}</div>{% endif %}
   {% if notice %}<div class="banner">{{ notice }}</div>{% endif %}
 
+  {# NOV IZVJESTAJ TRAZI POTVRDJEN TEKUCI RAZRED. Server odbija i bez ovoga -
+     ovdje se administratoru samo objasnjava zasto dugmeta nema. #}
+  {% if not grade_confirmed %}
+    <div class="banner err">
+      {{ grade_unconfirmed_message }}
+      <a href="{{ url_for('admin_students.profile', student_id=payload.student_id) }}">Otvori profil učenika →</a>
+    </div>
+  {% endif %}
+
   {% if not saved %}
     <p class="muted">
       Za ovaj mjesec još nije generisan izvještaj. Generisanje troši
       <b>tačno jedan</b> AI poziv; sve brojke iznad su već izračunate i AI ih
       ne mijenja.
     </p>
+    {% if grade_confirmed %}
     <form method="post" action="{{ url_for('admin_reports.generate_report', student_id=payload.student_id, month=month) }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <button type="submit" onclick="this.disabled=true;this.form.submit()">Generiši AI izvještaj</button>
     </form>
+    {% endif %}
   {% else %}
     <form method="post" action="{{ url_for('admin_reports.save_report', student_id=payload.student_id, month=month) }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
@@ -164,11 +175,15 @@
     </p>
 
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      {# STARI NACRT OSTAJE CITLJIV I PREUZIMLJIV i bez potvrdjenog razreda -
+         blokira se samo NOVO generisanje. #}
+      {% if grade_confirmed %}
       <form method="post" action="{{ url_for('admin_reports.generate_report', student_id=payload.student_id, month=month) }}"
             onsubmit="return confirm('AI tekst (sažetak, jake strane, fokus, preporuke) bit će zamijenjen novim. Komentar instruktora ostaje sačuvan. Nastaviti?')">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <button type="submit">Ponovo generiši AI tekst</button>
       </form>
+      {% endif %}
       <a href="{{ url_for('admin_reports.report_pdf_download', student_id=payload.student_id, month=month) }}">
         <button type="button">Generiši PDF</button>
       </a>

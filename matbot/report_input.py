@@ -24,6 +24,7 @@ NAMJERNO ne uvodi: jedna vremenska osnova kroz cijeli izvještajni sloj.
 import logging
 
 from matbot import reporting_db
+from matbot import student_grades
 from matbot import student_identity
 from matbot import thinkific_progress as progress
 from matbot.thinkific_progress import ProgressFormatError
@@ -182,19 +183,25 @@ def _import_parsed_file(target, parsed, summary):
                   "snapshots_updated", "sections_written", "grade_conflicts"):
         setattr(summary, field, getattr(summary, field) + counters[field])
     if counters["grade_conflicts"]:
-        # SAMO broj i kurs -- nikad e-mail ni ime u logu administratora.
-        logger.info("thinkific_grade_conflict course=%s count=%s",
+        # RAZLIKA SADRŽAJA, NE KVAR: toliko učenika ima potvrđen tekući razred
+        # različit od razreda uvezenog kursa. Legitimno je (obnavljanje), ali
+        # može otkriti i pogrešno izabran slot, pa se broji. SAMO broj i kurs --
+        # nikad e-mail ni ime u logu administratora.
+        logger.info("thinkific_content_grade_differs course=%s count=%s",
                     parsed.course_key, counters["grade_conflicts"])
 
 
-def _resolve_student(target, email, grade):
+def _resolve_student(target, email):
     """Isti identitet kao Faza 1 — nikad nov prostor imena.
 
     Učenik koji NIKAD nije koristio MAT-BOT se ovdje kreira: izvještaj mu i dalje
-    pripada, jer napredak u kursu postoji nezavisno od tutora."""
+    pripada, jer napredak u kursu postoji nezavisno od tutora.
+
+    RAZRED SE NE PROSLJEĐUJE (verzija 4). Razred kursa je razred SADRŽAJA i
+    završava u snimku napretka; tekući školski razred potvrđuje administrator."""
     existing = target.find_student(student_identity.PROVIDER_THINKIFIC_EMAIL, email)
     student_id = target.get_or_create_student(
-        student_identity.PROVIDER_THINKIFIC_EMAIL, email, grade=grade)
+        student_identity.PROVIDER_THINKIFIC_EMAIL, email)
     return student_id, existing is None
 
 
@@ -327,8 +334,16 @@ def build_report_input(student_id, report_month, database=None):
     return {
         "student_id": student_id,
         "report_month": month,
+        # RAZRED NOSI I SVOJE STANJE POTVRDE. Novi izvještaj se ne smije
+        # generisati nad nepotvrđenim razredom (vidi `admin_reports`), a
+        # pozivalac to ne može znati iz gole cifre.
         "profile": {"display_name": profile.get("display_name"),
-                    "grade": profile.get("grade")},
+                    "grade": profile.get("grade"),
+                    "grade_confirmed_at": profile.get("grade_confirmed_at"),
+                    "grade_source": profile.get("grade_source"),
+                    "grade_confirmed": student_grades.is_confirmed(
+                        profile.get("grade"), profile.get("grade_confirmed_at"),
+                        profile.get("grade_source"))},
         # Redoslijed ključeva prati PEDAGOŠKI prioritet Faze 3D: čas prvo.
         "instruction": build_instruction_section(student_id, month, database=target),
         "thinkific": build_thinkific_section(student_id, month, database=target),

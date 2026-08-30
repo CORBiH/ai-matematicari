@@ -140,23 +140,33 @@ def test_different_external_ids_stay_distinct(database, db_path):
     assert rows(db_path, "SELECT COUNT(*) FROM students")[0][0] == 2
 
 
-# --- 5) display_name i grade su OPCIONI -------------------------------------
-def test_display_name_and_grade_are_optional(database, db_path):
+# --- 5) display_name je OPCION, a razred se NE PRIMA UOPSTE -----------------
+def test_display_name_is_optional(database, db_path):
     minimal = database.get_or_create_student(PROVIDER_THINKIFIC, "1")
     full = database.get_or_create_student(PROVIDER_THINKIFIC, "2",
-                                          display_name="Emir", grade=7)
+                                          display_name="Emir")
 
     assert rows(db_path, "SELECT display_name, grade FROM students WHERE id = ?",
                 (minimal,)) == [(None, None)]
+    # RAZRED JE NULL I KAD IMA IMENA: identitet ne zna koji razred dijete
+    # pohadja, i od verzije 4 ni ne pokusava da pogodi.
     assert rows(db_path, "SELECT display_name, grade FROM students WHERE id = ?",
-                (full,)) == [("Emir", 7)]
+                (full,)) == [("Emir", None)]
 
 
-def test_out_of_range_grade_is_dropped_not_stored(database, db_path):
-    """Pogrešan razred u izvještaju je gori od nepoznatog."""
+def test_identity_creation_never_stores_a_grade(database, db_path):
+    """Pogrešan razred u izvještaju je gori od nepoznatog.
+
+    Potpis je uzi NAMJERNO: dok je `grade` postojao kao parametar, razred iz
+    klijentskog menija je zavrsavao u `students.grade` i 34 ucenika je trajno
+    dobilo sesticu."""
+    import inspect
+
+    assert "grade" not in inspect.signature(
+        database.get_or_create_student).parameters
+
     student_id = database.get_or_create_student(PROVIDER_THINKIFIC, "3",
-                                                grade=99, display_name="   ")
-
+                                                display_name="   ")
     assert rows(db_path, "SELECT display_name, grade FROM students WHERE id = ?",
                 (student_id,)) == [(None, None)]
 
@@ -217,7 +227,7 @@ def test_concurrent_first_requests_resolve_to_one_identity(db_path):
         try:
             barrier.wait(timeout=10)
             results.append(db.get_or_create_student(PROVIDER_THINKIFIC, "42",
-                                                    display_name="Amina", grade=7))
+                                                    display_name="Amina"))
         except Exception as exc:  # pragma: no cover - dijagnostika pri padu
             errors.append(repr(exc))
         finally:
@@ -303,7 +313,7 @@ def test_check_reports_schema_version_and_tables(database):
     assert report["connected"] is True
     assert report["missing_tables"] == []
     assert report["schema_version"] == 1
-    assert report["expected_schema_version"] == 3
+    assert report["expected_schema_version"] == 4
     assert report["schema_version_matches"] is False,         "nemigrirana baza se prijavljuje kao ispravna"
     assert report["v2_schema_verified"] is False
     assert "display_name" in report["columns"]["students"]
@@ -351,5 +361,5 @@ def test_cli_check_refuses_an_unmigrated_v1_database(monkeypatch, database, caps
     assert "connection: ok" in out
     assert "foreign_keys: ON" in out
     # v1 baza NIJE zdrava za ovo izdanje -- CLI to mora reci i vratiti != 0.
-    assert "schema_version: 1 (expected 3) -> MISMATCH" in out
+    assert "schema_version: 1 (expected 4) -> MISMATCH" in out
     assert "v2_schema: INCOMPLETE" in out

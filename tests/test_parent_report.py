@@ -140,8 +140,11 @@ def db(tmp_path, monkeypatch):
 
 @pytest.fixture
 def student(db):
-    return reporting_db.get_database().get_or_create_student(
-        PROVIDER_THINKIFIC_EMAIL, "learner@example.com", grade=6)
+    student_id = reporting_db.get_database().get_or_create_student(
+        PROVIDER_THINKIFIC_EMAIL, "learner@example.com")
+    # Potvrdu razreda pise ISKLJUCIVO administratorska radnja (verzija 4).
+    reporting_db.get_database().set_student_grade(student_id, 6)
+    return student_id
 
 
 # ===========================================================================
