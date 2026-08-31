@@ -400,5 +400,27 @@ def allowed_numbers(facts):
                 "homework_assigned", "homework_done", "homework_not_done"):
         add(instruction.get(key))
 
+    # GRANICE SKALE ANGAŽMANA SU ČINJENICA O MJERI, NE IZMIŠLJEN BROJ.
+    #
+    # ŽIVI NALAZ (izdanje 1ed172c): prompt 3d-2 IZRIČITO traži rečenicu
+    # „Prosječna aktivnost na časovima bila je 4,0 / 5.", a ovaj validator je
+    # peticu odbijao kao izmišljen broj kad se nijedna izmjerena vrijednost nije
+    # slučajno poklopila s njom. Mjesec sa četiri časa (3 prisutna, prosjek 4,0)
+    # je zato padao zatvoreno — prompt i provjera su tvrdili suprotno.
+    # Nedostupnost, ne netačnost, ali svejedno kvar.
+    #
+    # `ACTIVITY_MIN`/`ACTIVITY_MAX` dolaze iz `student_sessions`, gdje skala i
+    # živi — ovdje se namjerno NE prepisuju kao brojevi, da ne bi postojala dva
+    # izvora istine o istoj skali.
+    #
+    # SAMO KAD ANGAŽMAN STVARNO POSTOJI. Bez ijednog ocijenjenog časa granice se
+    # ne dodaju: proizvod podržava skalu uvijek, ali izvještaj bez mjerenja nema
+    # o čemu da govori, pa mu ni brojevi skale nisu činjenica.
+    if int(instruction.get("activity_rated_sessions") or 0) >= 1:
+        from matbot import student_sessions
+
+        add(student_sessions.ACTIVITY_MIN)
+        add(student_sessions.ACTIVITY_MAX)
+
     add(facts.get("grade"))
     return values
