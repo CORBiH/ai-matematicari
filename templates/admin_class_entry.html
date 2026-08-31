@@ -1,0 +1,212 @@
+{% extends "admin_base.html" %}
+{% block title %}MAT-BOT — Upiši čas{% endblock %}
+{% block heading %}Upiši čas{% endblock %}
+{% block topright %}
+<a href="{{ url_for('admin_students.index') }}">Učenici →</a>
+{% endblock %}
+{% block content %}
+
+{# Dodatni stil SAMO za ovu stranicu. Osnovni jezik (boje, radijusi, kartice)
+   dolazi iz `admin_base.html` i ovdje se ne mijenja. #}
+<style>
+  .row-student{border-bottom:1px solid var(--card-border);padding:.7rem 0}
+  .row-student:last-child{border-bottom:0}
+  .name{font-weight:600}
+  /* Segmentirani izbor: radio je i dalje pravi element (radi bez JS-a i s
+     tastaturom), a labela je samo njegov vidljivi oblik. */
+  .seg{display:inline-flex;flex-wrap:wrap;gap:.3rem;margin:0}
+  .seg input{position:absolute;opacity:0;width:0;height:0}
+  .seg label{display:inline-block;margin:0;padding:.3rem .6rem;border-radius:8px;
+             border:1px solid var(--input-border);background:var(--input-bg);
+             color:var(--muted);cursor:pointer;font-size:.85rem;line-height:1.2}
+  .seg input:checked + label{background:var(--btn-bg);border-color:var(--btn-bg);
+                             color:#fff}
+  .seg input:focus-visible + label{outline:2px solid var(--accent);outline-offset:2px}
+  .seg.small label{padding:.25rem .55rem;font-size:.82rem;min-width:2rem;
+                   text-align:center}
+  .fields{margin-top:.5rem;display:flex;gap:1.2rem;flex-wrap:wrap;align-items:flex-start}
+  .fields > div{min-width:0}
+  .field-label{font-size:.78rem;color:var(--muted);margin-bottom:.2rem}
+  .comment{width:100%;max-width:22rem;background:var(--input-bg);color:var(--text);
+           border:1px solid var(--input-border);border-radius:8px;padding:.4rem .55rem;
+           font:inherit;font-size:.88rem}
+  input[type=date],select{width:100%;background:var(--input-bg);color:var(--text);
+    border:1px solid var(--input-border);border-radius:10px;padding:.55rem .7rem;font:inherit}
+  /* Dugme prati listu: kod dugačkog spiska se ne mora skrolati nazad. */
+  .savebar{position:sticky;bottom:0;background:var(--card-bg);
+           border-top:1px solid var(--card-border);padding:.8rem 0;margin-top:.4rem;
+           display:flex;gap:1rem;align-items:center;flex-wrap:wrap}
+  .savebar button{margin-top:0}
+  /* Na uskom ekranu red postaje kartica, a ne stisnuta tabela. */
+  @media (max-width:640px){
+    .fields{gap:.7rem}
+    .comment{max-width:100%}
+  }
+</style>
+
+{% if error %}<div class="banner err">{{ error }}</div>{% endif %}
+
+{# --- KORAK 1: zajednička polja časa ----------------------------------- #}
+<div class="card">
+  <form method="get" action="{{ url_for('admin_sessions.new_class') }}">
+    <div class="grid">
+      <div>
+        <label for="session_date">Datum</label>
+        <input type="date" id="session_date" name="session_date"
+               value="{{ chosen.session_date or today }}" required>
+      </div>
+      <div>
+        <label for="grade">Razred</label>
+        <select id="grade" name="grade" onchange="this.form.submit()">
+          <option value="">— izaberi razred —</option>
+          {% for g in grades %}
+          <option value="{{ g }}" {% if chosen.grade == g %}selected{% endif %}>{{ g }}. razred</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% if chosen.grade %}
+      <div>
+        <label for="area_name">Oblast</label>
+        <select id="area_name" name="area_name" onchange="this.form.submit()">
+          <option value="">— izaberi oblast —</option>
+          {% for area in areas %}
+          <option value="{{ area }}" {% if chosen.area_name == area %}selected{% endif %}>{{ area }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="lesson_name">Lekcija</label>
+        <select id="lesson_name" name="lesson_name" onchange="this.form.submit()">
+          <option value="">— izaberi lekciju —</option>
+          {% for lesson in curriculum.get(chosen.area_name, []) %}
+          <option value="{{ lesson }}" {% if chosen.lesson_name == lesson %}selected{% endif %}>{{ lesson }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+    </div>
+    {# Bez JS-a stranica i dalje radi: `onchange` je pogodnost, a ovo je put. #}
+    <noscript><button type="submit">Prikaži učenike</button></noscript>
+  </form>
+</div>
+
+{% if not chosen.grade %}
+<div class="card">
+  <p class="muted" style="margin:0">Izaberite razred da biste vidjeli učenike.</p>
+</div>
+{% else %}
+
+{% if unconfirmed %}
+{# Nedostajući učenici se OBJASNE. Bez ovoga bi instruktor mislio da ih nema. #}
+<div class="banner warn">
+  Neki učenici nisu prikazani jer njihov trenutni razred nije potvrđen.
+  <a href="{{ url_for('admin_students.index', confirmed='nepotvrdjen') }}">Potvrdi razred →</a>
+</div>
+{% endif %}
+
+<form method="post" action="{{ url_for('admin_sessions.save_class') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <input type="hidden" name="session_date" value="{{ chosen.session_date or today }}">
+  <input type="hidden" name="grade" value="{{ chosen.grade }}">
+  <input type="hidden" name="area_name" value="{{ chosen.area_name }}">
+  <input type="hidden" name="lesson_name" value="{{ chosen.lesson_name }}">
+
+  <div class="card">
+    <div class="top" style="margin-bottom:.4rem">
+      <h3 style="margin:0">Učenici ({{ roster|length }})</h3>
+      {% if roster %}
+      {# IZRIČITO dugme, nikad podrazumijevano stanje. Svaki učenik se i poslije
+         ovoga može pojedinačno prebaciti u odsutan ili „nije na ovom času". #}
+      <button type="button" style="margin:0" onclick="markAllPresent()">Postavi sve prikazane kao prisutne</button>
+      {% endif %}
+    </div>
+
+    {% if not roster %}
+    <p class="muted">Nema učenika s potvrđenim {{ chosen.grade }}. razredom.</p>
+    {% else %}
+    {% for s in roster %}
+    {% set prior = saved.get(s.student_id) %}
+    {% set state = 'present' if prior and prior.attendance == 'present'
+                   else ('absent' if prior and prior.attendance == 'absent'
+                   else participation_default) %}
+    <div class="row-student" data-student="{{ s.student_id }}">
+      <div class="top" style="gap:.6rem">
+        <span class="name">{{ s.display_name or "Učenik #%s"|format(s.student_id) }}</span>
+        <div class="seg">
+          {% for value, label in participation_labels.items() %}
+          <input type="radio" id="p{{ s.student_id }}_{{ value }}"
+                 name="s{{ s.student_id }}_participation" value="{{ value }}"
+                 {% if state == value %}checked{% endif %}
+                 onchange="toggleFields({{ s.student_id }})">
+          <label for="p{{ s.student_id }}_{{ value }}">{{ label }}</label>
+          {% endfor %}
+        </div>
+      </div>
+
+      {# Polja prisutnog. Sakrivanje je pogodnost — server svejedno odbija
+         angažman kod odsutnog i traži ga kod prisutnog. #}
+      <div class="fields" id="f{{ s.student_id }}"
+           {% if state != 'present' %}style="display:none"{% endif %}>
+        <div>
+          <div class="field-label">Aktivnost na času</div>
+          <div class="seg small">
+            {% for value, meaning in activity_labels.items() %}
+            <input type="radio" id="a{{ s.student_id }}_{{ value }}"
+                   name="s{{ s.student_id }}_activity" value="{{ value }}"
+                   {% if prior and prior.activity_rating == value %}checked{% endif %}>
+            <label for="a{{ s.student_id }}_{{ value }}" title="{{ value }} — {{ meaning }}">{{ value }}</label>
+            {% endfor %}
+          </div>
+        </div>
+        <div>
+          <div class="field-label">Zadaća</div>
+          <div class="seg">
+            {% for value, label in homework_labels.items() %}
+            <input type="radio" id="h{{ s.student_id }}_{{ value }}"
+                   name="s{{ s.student_id }}_homework" value="{{ value }}"
+                   {% if (prior and prior.homework_status == value)
+                         or (not prior and value == homework_default) %}checked{% endif %}>
+            <label for="h{{ s.student_id }}_{{ value }}">{{ label }}</label>
+            {% endfor %}
+          </div>
+        </div>
+        <div style="flex:1">
+          <div class="field-label">Zapažanje <span class="muted">(neobavezno)</span></div>
+          <input type="text" class="comment" name="s{{ s.student_id }}_comment"
+                 maxlength="1000" value="{{ prior.comment if prior and prior.comment else '' }}">
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+
+    <div class="savebar">
+      <button type="submit">Sačuvaj čas</button>
+      <span class="muted">Snima se samo za prisutne i odsutne. „Nije na ovom
+        času" ne pravi zapis.</span>
+    </div>
+    {% endif %}
+  </div>
+</form>
+
+<p class="muted" style="font-size:.85rem">
+  Aktivnost 1–5 je <b>angažman na času</b>, ne ocjena iz matematike:
+  {% for value, meaning in activity_labels.items() %}{{ value }} — {{ meaning }}{% if not loop.last %} · {% endif %}{% endfor %}
+</p>
+
+<script>
+  function toggleFields(id){
+    var present = document.getElementById('p' + id + '_present');
+    var fields = document.getElementById('f' + id);
+    if (fields) { fields.style.display = present && present.checked ? '' : 'none'; }
+  }
+  function markAllPresent(){
+    var rows = document.querySelectorAll('.row-student');
+    for (var i = 0; i < rows.length; i++){
+      var id = rows[i].getAttribute('data-student');
+      var box = document.getElementById('p' + id + '_present');
+      if (box) { box.checked = true; toggleFields(id); }
+    }
+  }
+</script>
+{% endif %}
+{% endblock %}

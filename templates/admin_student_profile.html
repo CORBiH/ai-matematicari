@@ -113,7 +113,11 @@
 </div>
 
 <div class="card">
-  <h3 style="margin-top:0">Evidencija časa</h3>
+  <div class="top" style="margin-bottom:.2rem">
+    <h3 style="margin:0">Evidencija časa</h3>
+    {# POJEDINAČNI UNOS OSTAJE (ispravke i izuzeci); brzi put je za cijeli čas. #}
+    <a href="{{ url_for('admin_sessions.new_class', grade=student.grade) }}">Upiši čas za više učenika →</a>
+  </div>
   {% if not grade_confirmed %}
   {# BEZ POTVRĐENOG RAZREDA NEMA KURIKULUMA. Zatecena cifra bi instruktoru dala
      gradivo tudje generacije, pa se forma ne nudi. #}

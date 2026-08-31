@@ -1,0 +1,39 @@
+{% extends "admin_base.html" %}
+{% block title %}MAT-BOT — Čas sačuvan{% endblock %}
+{% block heading %}Čas sačuvan{% endblock %}
+{% block topright %}
+<a href="{{ url_for('admin_students.index') }}">Učenici →</a>
+{% endblock %}
+{% block content %}
+
+<div class="banner ok">Čas je sačuvan.</div>
+
+<div class="card">
+  <div class="grid">
+    <div class="stat"><b>{{ chosen.session_date }}</b><span class="muted">datum</span></div>
+    <div class="stat"><b>{{ chosen.grade }}. razred</b><span class="muted">razred</span></div>
+    <div class="stat"><b>{{ present }}</b><span class="muted">prisutnih</span></div>
+    <div class="stat"><b>{{ absent }}</b><span class="muted">odsutnih</span></div>
+  </div>
+  <p style="margin-top:1rem">
+    <b>Oblast:</b> {{ chosen.area_name }}<br>
+    <b>Lekcija:</b> {{ chosen.lesson_name }}
+  </p>
+</div>
+
+<div class="card">
+  {# IZMJENA JE ISTA STRANICA. Ista četvorka (datum, razred, oblast, lekcija)
+     učitava upravo sačuvane redove, pa se aktivnost, zadaća ili zapažanje
+     ispravljaju bez otvaranja profila svakog učenika. #}
+  <a href="{{ url_for('admin_sessions.new_class', session_date=chosen.session_date,
+                      grade=chosen.grade, area_name=chosen.area_name,
+                      lesson_name=chosen.lesson_name) }}">
+    <button type="button">Uredi čas</button></a>
+  <a href="{{ url_for('admin_sessions.new_class', grade=chosen.grade) }}">
+    <button type="button">Upiši novi čas</button></a>
+  <p class="muted" style="margin-bottom:0">
+    Ponovno čuvanje istog časa ne pravi duplikat — postojeći zapisi se
+    ažuriraju.
+  </p>
+</div>
+{% endblock %}

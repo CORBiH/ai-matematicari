@@ -7,6 +7,7 @@ import os
 
 from matbot import admin_auth, auth, config, release_config, student_identity
 from matbot.admin_reports import admin_reports_bp
+from matbot.admin_sessions import admin_sessions_bp
 from matbot.admin_students import admin_students_bp
 from matbot.api import REQUEST_TOO_LARGE_MESSAGE, ai_tutor_bp
 from matbot.request_limits import BoundedInMemoryRequest
@@ -68,6 +69,7 @@ admin_auth.apply_cookie_hardening(app)
 app.register_blueprint(admin_reports_bp)
 # Faza 3D: registar učenika i evidencija časova — ista admin autentikacija.
 app.register_blueprint(admin_students_bp)
+app.register_blueprint(admin_sessions_bp)
 
 
 @app.errorhandler(RequestEntityTooLarge)

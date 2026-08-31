@@ -1177,7 +1177,16 @@ class ReportingDatabase:
     # NEMA DRUGOG PROSTORA IMENA. Registar je pogled na POSTOJEĆU `students`
     # tabelu; učenik koji je nastao kroz Thinkific i učenik kojeg je
     # administrator upisao ručno su isti tip zapisa i vide se na istoj listi.
-    def list_students(self, search=None, grade=None, confirmed=None):
+    # STATUS UČENIKA: ovaj repozitorij kolonu `students.status` nikad nije ni
+    # čitao ni pisao — postoji u zatečenoj šemi verzije 1. Zato se NE tvrdi da
+    # znamo njen zatvoreni skup vrijednosti, nego se isključuju samo IZRIČITI
+    # markeri neaktivnosti. Nepoznata vrijednost pada OTVORENO (učenik se vidi):
+    # spisak časa je ionako ručni izbor instruktora, pa je suvišan red bezopasan,
+    # dok bi nestao učenik značio da se čas ne može evidentirati.
+    _INACTIVE_STATUSES = ("inactive", "archived", "deleted", "disabled")
+
+    def list_students(self, search=None, grade=None, confirmed=None,
+                      active=None):
         """Registar: svi učenici, stanje potvrde razreda i Thinkific veza.
 
         E-MAIL SE NE VRAĆA. Administratoru je dovoljno „povezan/nije povezan";
@@ -1206,6 +1215,12 @@ class ReportingDatabase:
                 if grade is not None:
                     where.append("s.grade = ?")
                     params.append(int(grade))
+                if active:
+                    placeholders = ",".join("?" * len(self._INACTIVE_STATUSES))
+                    where.append(
+                        "LOWER(COALESCE(s.status, 'active')) NOT IN (%s)"
+                        % placeholders)
+                    params.extend(self._INACTIVE_STATUSES)
                 if confirmed is not None and has_v4:
                     # POTVRDA JE TROJKA (razred + vrijeme + izvor), pa filter
                     # gleda vrijeme — izvor se provjerava u Pythonu, jer skup
@@ -1625,6 +1640,108 @@ class ReportingDatabase:
         if single:
             return records[0] if records else None
         return records
+
+    def save_class_sessions(self, records):
+        """CIJELI ČAS U JEDNOJ TRANSAKCIJI. `records` je [(student_id, zapis)].
+
+        Vraća `{"inserted": n, "updated": m}`.
+
+        ZAŠTO JEDAN COMMIT: djelimično sačuvan čas je gori od nesačuvanog — pola
+        odjeljenja bi imalo evidenciju, a instruktor bi vidio poruku o grešci i
+        ponovo poslao isti čas. Ili prođu svi redovi, ili nijedan.
+
+        ZAŠTITA OD DVOSTRUKOG SLANJA, BEZ ŠEME v5. Osvježena stranica i dvoklik
+        na „Sačuvaj" ne smiju napraviti drugi red za isti logički čas. Ključ je
+        `(student_id, session_date, area_name, lesson_name)`: postojeći red se
+        AŽURIRA, a novi se upisuje samo ako ga nema. Isti čas poslan dvaput zato
+        daje isto stanje kao poslan jednom.
+
+        GRANICA KOJU OVO NE PREĐE, izričito: `student_sessions` NEMA jedinstveni
+        indeks nad tim ključem (dodavanje bi bilo šema v5, a nad zatečenim
+        produkcijskim redovima bi moglo i pasti). Zaštita je zato „pročitaj pa
+        upiši" unutar JEDNE transakcije, serijalizovana bravom ove instance —
+        dovoljno za jednog administratora, ali ne i strukturna garancija protiv
+        dva istovremena procesa. Ako to ikad postane stvaran zahtjev, ispravka je
+        jedinstveni indeks, ne još jedna provjera u Pythonu."""
+        counters = {"inserted": 0, "updated": 0}
+        if not records:
+            return counters
+
+        with self._lock:
+            try:
+                conn = self._connection()
+                for student_id, record in records:
+                    existing = _rows(conn.execute(
+                        "SELECT id FROM student_sessions "
+                        "WHERE student_id = ? AND session_date = ? "
+                        " AND COALESCE(area_name, '') = COALESCE(?, '') "
+                        " AND COALESCE(lesson_name, '') = COALESCE(?, '') "
+                        "ORDER BY id LIMIT 1",
+                        (int(student_id), record["session_date"],
+                         record["area_name"], record["lesson_name"])))
+                    if existing:
+                        conn.execute(
+                            "UPDATE student_sessions SET attendance = ?, "
+                            " activity_rating = ?, homework_status = ?, "
+                            " comment = ?, updated_at = CURRENT_TIMESTAMP "
+                            "WHERE id = ? AND student_id = ?",
+                            (record["attendance"], record["activity_rating"],
+                             record["homework_status"], record["comment"],
+                             int(existing[0][0]), int(student_id)))
+                        counters["updated"] += 1
+                    else:
+                        conn.execute(
+                            "INSERT INTO student_sessions (student_id, "
+                            " session_date, attendance, activity_rating, "
+                            " homework_status, area_name, lesson_name, comment, "
+                            " created_at, updated_at) "
+                            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, "
+                            " CURRENT_TIMESTAMP)",
+                            (int(student_id), record["session_date"],
+                             record["attendance"], record["activity_rating"],
+                             record["homework_status"], record["area_name"],
+                             record["lesson_name"], record["comment"]))
+                        counters["inserted"] += 1
+                conn.commit()          # JEDINI commit za cijeli čas
+                return counters
+            except Exception as exc:
+                self._safe_rollback()
+                self._drop_connection()
+                raise ReportingUnavailable(
+                    "class_save_failed:" + type(exc).__name__, exc) from None
+
+    def fetch_class_sessions(self, session_date, area_name, lesson_name,
+                             student_ids):
+        """Već upisani redovi JEDNOG logičkog časa. Samo čitanje.
+
+        Služi da se stranica otvori kao IZMJENA: instruktor vidi šta je ranije
+        unio umjesto praznog formulara, i ispravlja bez otvaranja profila."""
+        found = {}
+        ids = [int(sid) for sid in (student_ids or [])]
+        if not ids:
+            return found
+        columns = ", ".join(self._SESSION_COLUMNS)
+        with self._lock:
+            try:
+                conn = self._connection()
+                for chunk in self._chunks(ids):
+                    placeholders = ",".join("?" * len(chunk))
+                    rows = _rows(conn.execute(
+                        "SELECT %s FROM student_sessions "
+                        "WHERE session_date = ? "
+                        " AND COALESCE(area_name, '') = COALESCE(?, '') "
+                        " AND COALESCE(lesson_name, '') = COALESCE(?, '') "
+                        " AND student_id IN (%s) ORDER BY id"
+                        % (columns, placeholders),
+                        (session_date, area_name, lesson_name, *chunk)))
+                    for row in rows:
+                        record = dict(zip(self._SESSION_COLUMNS, row))
+                        found.setdefault(record["student_id"], record)
+            except Exception as exc:
+                self._drop_connection()
+                raise ReportingUnavailable(
+                    "class_read_failed:" + type(exc).__name__, exc) from None
+        return found
 
     def fetch_matbot_month(self, student_id, month_start, next_month_start):
         """Determinističke MAT-BOT brojke za mjesec. Granice su UTC, [start, next).
