@@ -134,6 +134,54 @@ def class_roster(database, grade):
     return roster, unconfirmed
 
 
+def edit_roster(database, grade, class_id):
+    """Spisak za IZMJENU časa: dozvoljeni dodaci + SVI već upisani učesnici.
+
+    ŽIVI DEFEKT KOJI OVO ISPRAVLJA (izmjereno): spisak se gradio ISKLJUČIVO iz
+    potvrđenog TEKUĆEG razreda, pa učenik koji je u međuvremenu prešao u naredni
+    razred nestane sa stranice izmjene. Kako `save_class` briše djecu koja nisu
+    poslana, prvo sljedeće čuvanje mu je TIHO OBRISALO red — istorijski dokaz o
+    času na kojem je stvarno bio.
+
+    Zapis o održanom času je ČINJENICA O PROŠLOSTI. Tekući razred je tvrdnja o
+    danas i ne može je poništiti. Zato izmjena uvijek nosi i zatečene učesnike,
+    bez obzira na to gdje su sada — a novi se i dalje mogu dodati samo iz
+    potvrđenog razreda koji je izabran na stranici.
+
+    Server ostaje autoritet: dopušteni skup se izvodi iz `class_id`, nikad iz
+    onoga što je klijent poslao.
+
+    Vraća `(spisak, broj_nepotvrđenih, sačuvani_redovi, id-jevi_zatečenih)`."""
+    roster, unconfirmed = ([], 0)
+    if grade is not None:
+        roster, unconfirmed = class_roster(database, grade)
+    if not class_id:
+        return roster, unconfirmed, {}, set()
+
+    children = database.fetch_class_students(class_id)
+    saved = {row["student_id"]: row for row in children}
+    eligible = {student["student_id"] for student in roster}
+    carried = []
+    for row in children:
+        if row["student_id"] not in eligible:
+            carried.append({"student_id": row["student_id"],
+                            "display_name": row.get("display_name")})
+    carried.sort(key=lambda row: (row["display_name"] or "",
+                                  row["student_id"]))
+    return (roster + carried, unconfirmed, saved,
+            {row["student_id"] for row in carried})
+
+
+def _is_edit_draft(chosen):
+    """Je li ovo OBRT VEĆ OTVORENE forme, a ne prvo otvaranje časa?
+
+    EKSPLICITAN MARKER, ne pogađanje po praznom polju. „Prazno" je legitimno
+    međustanje nacrta (tema obrisana pri promjeni režima, vrijeme obrisano prije
+    ponovnog upisa), pa bi pravilo „ako je prazno, učitaj iz baze" vraćalo bazu
+    tačno u trenutku kad instruktor nešto briše."""
+    return bool(chosen.get("edit_draft") and chosen.get("class_id"))
+
+
 def _selection(source):
     """Zajednička polja časa iz `args` ili `form`. Ne validira — samo čita.
 
@@ -151,6 +199,8 @@ def _selection(source):
         # Režim s kojim je stranica bila ISCRTANA (`None` na prvom otvaranju).
         "previous_topic_mode": _known_topic_mode(
             source.get("previous_topic_mode")),
+        # Dolazi li ovo iz VEĆ ISCRTANE forme? Vidi `_is_edit_draft`.
+        "edit_draft": (source.get("edit_draft") or "").strip() == "1",
     }
 
 
@@ -190,38 +240,49 @@ def new_class():
     if previous_mode is not None and previous_mode != chosen["topic_mode"]:
         chosen["area_name"] = ""
         chosen["lesson_name"] = ""
-    roster, unconfirmed, saved = [], 0, {}
+    draft = _is_edit_draft(chosen)
+    chosen.pop("edit_draft", None)
+    roster, unconfirmed, saved, carried = [], 0, {}, set()
     try:
         database = _db()
-        # Otvaranje postojećeg časa popunjava zajednička polja IZ BAZE, pa se
-        # istorijski razred čita iz zapisa časa — nikad iz tekućeg profila.
+        # DVIJE RAZLIČITE STVARI: ono što je SAČUVANO i ono što instruktor
+        # UPRAVO MIJENJA. Čas se svejedno uvijek čita iz baze — postoji li,
+        # smije li se uređivati i koja su mu djeca — ali njegove zajedničke
+        # vrijednosti prepisuju formu SAMO pri prvom otvaranju.
+        #
+        # ŽIVI DEFEKT: prepisivanje je išlo na SVAKI GET, a svaki `onchange` na
+        # stranici je jedan GET. Instruktor promijeni vrijeme na 15:00, stranica
+        # se osvježi i vrati 10:00 — izmjena postojećeg časa je bila nemoguća
+        # iako je `save_class` premještanje odavno podržavao.
         if chosen["class_id"]:
             existing = database.fetch_class(chosen["class_id"])
             if existing is None:
                 return redirect(url_for("admin_sessions.class_list",
                                         error=ERROR_CLASS_MISSING))
-            chosen.update({
-                "session_date": existing["session_date"],
-                "session_time": existing["session_time"],
-                "grade": existing["grade"],
-                "topic_mode": existing["topic_source"],
-                "area_name": existing["area_name"] or "",
-                "lesson_name": existing["lesson_name"],
-            })
+            if not draft:
+                # PRVO OTVARANJE: istorijski razred dolazi iz zapisa časa —
+                # nikad iz tekućeg profila učenika.
+                chosen.update({
+                    "session_date": existing["session_date"],
+                    "session_time": existing["session_time"],
+                    "grade": existing["grade"],
+                    "topic_mode": existing["topic_source"],
+                    "area_name": existing["area_name"] or "",
+                    "lesson_name": existing["lesson_name"],
+                })
         grade = chosen["grade"]
-        if grade is not None:
-            roster, unconfirmed = class_roster(database, grade)
-            # IZMJENA IDE PO IDENTITETU ČASA, ne po skupu polja: `class_id` je
-            # jedino što ostaje isto i kad se datum, vrijeme ili tema promijene.
-            if chosen["class_id"]:
-                saved = {row["student_id"]: row for row
-                         in database.fetch_class_students(chosen["class_id"])}
+        # IZMJENA IDE PO IDENTITETU ČASA, ne po skupu polja: `class_id` je
+        # jedino što ostaje isto i kad se datum, vrijeme ili tema promijene.
+        roster, unconfirmed, saved, carried = edit_roster(
+            database, grade, chosen["class_id"])
     except reporting_db.ReportingUnavailable as error:
         logger.info("admin_class_roster_failed code=%s", error.code)
         chosen.setdefault("class_id", None)
         chosen.pop("previous_topic_mode", None)
+        chosen.pop("edit_draft", None)
         return render_template(
             "admin_class_entry.html", chosen=chosen, roster=[], saved={},
+            carried=set(),
             curriculum={}, areas=[], unconfirmed=0,
             grades=class_entry.VALID_GRADES,
             activity_labels=student_sessions.ACTIVITY_LABELS,
@@ -249,6 +310,7 @@ def new_class():
             chosen["lesson_name"] = ""
     return render_template(
         "admin_class_entry.html", chosen=chosen, roster=roster, saved=saved,
+        carried=carried,
         curriculum=curriculum, areas=list(curriculum), unconfirmed=unconfirmed,
         grades=class_entry.VALID_GRADES,
         activity_labels=student_sessions.ACTIVITY_LABELS,
@@ -297,13 +359,24 @@ def _submissions():
 
 
 def _back(chosen, message):
-    return redirect(url_for("admin_sessions.new_class",
-                            session_date=chosen["session_date"],
-                            session_time=chosen["session_time"],
-                            grade=chosen["grade"],
-                            topic_mode=chosen["topic_mode"],
-                            area_name=chosen["area_name"],
-                            lesson_name=chosen["lesson_name"], error=message))
+    """Nazad na formu s NACRTOM, ne s bazom.
+
+    `class_id` i marker nacrta MORAJU putovati: bez njih bi odbijena izmjena
+    postojećeg časa nastavila kao unos NOVOG časa i sljedeće čuvanje bi
+    napravilo dvojnika (ili palo na sudar termina). Bez markera bi se nacrt
+    prepisao sačuvanim vrijednostima, pa bi poruka o grešci stajala uz podatke
+    koje instruktor nije poslao."""
+    target = {"session_date": chosen["session_date"],
+              "session_time": chosen["session_time"],
+              "grade": chosen["grade"],
+              "topic_mode": chosen["topic_mode"],
+              "area_name": chosen["area_name"],
+              "lesson_name": chosen["lesson_name"],
+              "error": message}
+    if chosen.get("class_id"):
+        target["class_id"] = chosen["class_id"]
+        target["edit_draft"] = "1"
+    return redirect(url_for("admin_sessions.new_class", **target))
 
 
 @admin_sessions_bp.route("/bulk", methods=["POST"])
@@ -320,7 +393,12 @@ def save_class():
         return _back(chosen, ERROR_GRADE)
 
     try:
-        roster, _ = class_roster(_db(), chosen["grade"])
+        # ISTI spisak koji je stranica prikazala — uključujući zatečene učesnike
+        # koji više nisu u tom razredu. Da se dopušteni skup ovdje suzi na sam
+        # razred, red promovisanog učenika bi pao kao „ne pripada spisku" ili bi
+        # ga brisanje neposlanih tiho uklonilo.
+        roster, _, _, _ = edit_roster(_db(), chosen["grade"],
+                                      chosen["class_id"])
     except reporting_db.ReportingUnavailable as error:
         logger.info("admin_class_roster_failed code=%s", error.code)
         return _back(chosen, ERROR_UNAVAILABLE)

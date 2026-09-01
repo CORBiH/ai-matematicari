@@ -57,6 +57,11 @@
     {# IZMJENA POSTOJECEG CASA: identitet ide kroz formu, pa se cas ne udvaja
        ni kad se datum, vrijeme ili tema promijene. #}
     <input type="hidden" name="class_id" value="{{ chosen.class_id }}">
+    {# MARKER NACRTA. Prvo otvaranje časa dolazi kao gol `?class_id=N` i tada
+       server puni polja IZ BAZE. Svako sljedeće slanje dolazi IZ OVE forme i
+       nosi ovaj marker, pa server zna da gleda nacrt instruktora i da ga ne
+       smije prepisati sačuvanim vrijednostima. #}
+    <input type="hidden" name="edit_draft" value="1">
     {% endif %}
     {# REZIM S KOJIM JE STRANICA ISCRTANA. Bez njega server ne može razlikovati
        „promijenio sam temu" od „promijenio sam režim", pa bi planska lekcija
@@ -241,6 +246,11 @@
     <div class="row-student" data-student="{{ s.student_id }}">
       <div class="top" style="gap:.6rem">
         <span class="name">{{ s.display_name or "Učenik #%s"|format(s.student_id) }}</span>
+        {% if s.student_id in carried %}
+        {# Zatečeni učesnik koji više nije u ovom razredu. Prikazuje se da mu se
+           zapis ne bi izgubio, ali se OBJAŠNJAVA — inače izgleda kao greška. #}
+        <span class="pill" title="Već je upisan na ovaj čas, ali mu tekući razred više nije {{ chosen.grade }}.">upisan ranije</span>
+        {% endif %}
         <div class="seg">
           {% for value, label in participation_labels.items() %}
           <input type="radio" id="p{{ s.student_id }}_{{ value }}"
