@@ -232,7 +232,7 @@ test('practice: jezgro prečica dok se čeka odgovor', () => {
   const p = page('practice');
   p.ui.setInteractionPhase('awaiting_practice_answer');
   assert.deepStrictEqual(labels(p, ready('practice')), [
-    '🙋 Daj mi hint',
+    '🙋 Mala pomoć',
     '👉 Uradi ga ti',
     '➕ Novi zadatak',
   ]);
@@ -243,7 +243,7 @@ test('practice: težina se nudi tek poslije ocijenjenog odgovora', () => {
   p.ui.setInteractionPhase('awaiting_practice_answer');
   p.ui.setLastTurnWasGraded(true);
   assert.deepStrictEqual(labels(p, ready('practice')), [
-    '🙋 Daj mi hint',
+    '🙋 Mala pomoć',
     '👉 Uradi ga ti',
     '➕ Novi zadatak',
     '⬇️ Lakši zadatak',
@@ -272,12 +272,14 @@ test('practice: „Preporuči mi klip“ nigdje ne postoji', () => {
   assert.ok(!/video/i.test(all), all);
 });
 
+// Labela je 2026-09-01 preimenovana u „Mala pomoć"; PORUKA, NAMJERA i faza
+// ostaju bajt u bajt iste — ovaj test to i mjeri.
 test('practice: hint prečica zadržava TAČAN postojeći payload', async () => {
   const p = page('practice');
   p.ui.setAwaitingPracticeTask('Koji broj je djeljiv sa 6?');
   p.ui.setInteractionPhase('awaiting_practice_answer');
   respondJsonOnly(p, ready('practice'));
-  await clickChip(p, ready('practice'), '🙋 Daj mi hint');
+  await clickChip(p, ready('practice'), '🙋 Mala pomoć');
   const turn = p.turns().at(-1);
   assert.strictEqual(turn.body.student_message, 'Ne znam.');
   assert.strictEqual(turn.body.intent, 'hint_request');

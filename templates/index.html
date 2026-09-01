@@ -344,6 +344,10 @@
   .composer-plus:focus-visible,.composer-send:focus-visible{outline:2px solid #9ee6c4;outline-offset:2px;}
   .tutor-chip{margin:0 0 .45rem;flex:0 0 auto;}
   #tutorMeta{font-size:.82rem;margin-top:.35rem;min-height:1rem;flex:0 0 auto;}
+  /* Napomena je informativna, ne stanje greške: prigušena boja iz postojeće
+     palete, bez okvira i bez naglaska. */
+  .tutor-disclaimer{color:var(--muted);font-size:.75rem;line-height:1.35;
+    text-align:center;margin:.3rem 0 0;flex:0 0 auto;}
 
   /* Phase 2: quick-reply chips ispod razgovora (velike, tapabilne, dječije) */
   .tutor-chips{display:flex;flex-wrap:wrap;gap:.4rem;margin:.1rem 0 .45rem;flex:0 0 auto;}
@@ -575,6 +579,8 @@
     /* Ne ispod 36px: to je donja granica upotrebljive dodirne zone na mobitelu. */
     .composer-plus,.composer-send{width:36px;height:36px;}
     #tutorMeta{font-size:.78rem;}
+    /* Na mobitelu ostaje čitljiva: manja, ali ne ispod 11px. */
+    .tutor-disclaimer{font-size:.7rem;padding:0 .3rem;}
     body.tutor-fullscreen{padding:0;}
     body.tutor-fullscreen main{width:min(100% - 8px,1120px);height:100dvh;padding:4px 0;}
   }
@@ -703,6 +709,11 @@
         <button id="tutorSend" type="button" class="composer-send" title="Pošalji" aria-label="Pošalji"><span class="composer-send-icon" aria-hidden="true">↑</span></button>
       </div>
       <div class="muted" id="tutorMeta"></div>
+      <!-- Informativna mikrokopija ispod composera, u duhu male napomene ispod
+           ChatGPT unosa. Statična je: ne ulazi u historiju razgovora, ne šalje
+           se modelu, ne traži potvrdu i ne pravi nijedan zahtjev prema
+           serveru. -->
+      <p class="tutor-disclaimer" id="tutorDisclaimer">MAT-BOT može pogriješiti. Provjeri važne informacije.</p>
 
     </div><!-- /tutor-card -->
 
@@ -2655,7 +2666,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const out = [
           /* Labela je skraćena (audit 2026-08-16, ~390px): payload, intent i
              faza pomoći ostaju BAJT U BAJT isti — 'Ne znam.' + hint_request. */
-          { label: '🙋 Daj mi hint', msg: 'Ne znam.', intent: 'hint_request' },
+          { label: '🙋 Mala pomoć', msg: 'Ne znam.', intent: 'hint_request' },
           { label: '👉 Uradi ga ti', msg: 'Uradi ga ti.', intent: 'solution_request' },
           { label: '➕ Novi zadatak', msg: 'Daj mi novi zadatak.' }
         ];
