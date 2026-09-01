@@ -148,7 +148,20 @@ def _selection(source):
         "area_name": (source.get("area_name") or "").strip(),
         "lesson_name": (source.get("lesson_name") or "").strip(),
         "class_id": _clean_id(source.get("class_id")),
+        # Režim s kojim je stranica bila ISCRTANA (`None` na prvom otvaranju).
+        "previous_topic_mode": _known_topic_mode(
+            source.get("previous_topic_mode")),
     }
+
+
+def _known_topic_mode(raw):
+    """Poznat režim teme, ili `None`. Ne pretvara nepoznato u podrazumijevano.
+
+    `class_entry.clean_topic_mode` namjerno pada na stroži kurikularni režim, pa
+    ne razlikuje „nije poslano" od „poslano je kurikularno" — a upravo ta
+    razlika kaže je li se režim promijenio."""
+    value = (raw or "").strip()
+    return value if value in student_sessions.TOPIC_SOURCES else None
 
 
 def _clean_id(raw):
@@ -170,6 +183,13 @@ def new_class():
     from matbot import admin_auth
 
     chosen = _selection(request.args)
+    # PROMJENA REŽIMA BRIŠE SAMO POLJA TEME. Planska lekcija ne smije ostati kao
+    # „ručna tema" niti slobodan tekst kao kurikularna oblast — a razred i spisak
+    # se NE diraju, jer režim teme nema veze s tim ko pohađa taj razred.
+    previous_mode = chosen.pop("previous_topic_mode", None)
+    if previous_mode is not None and previous_mode != chosen["topic_mode"]:
+        chosen["area_name"] = ""
+        chosen["lesson_name"] = ""
     roster, unconfirmed, saved = [], 0, {}
     try:
         database = _db()
@@ -199,6 +219,7 @@ def new_class():
     except reporting_db.ReportingUnavailable as error:
         logger.info("admin_class_roster_failed code=%s", error.code)
         chosen.setdefault("class_id", None)
+        chosen.pop("previous_topic_mode", None)
         return render_template(
             "admin_class_entry.html", chosen=chosen, roster=[], saved={},
             curriculum={}, areas=[], unconfirmed=0,
@@ -216,6 +237,16 @@ def new_class():
             error=ERROR_UNAVAILABLE), 503
 
     curriculum = topics.curriculum_choices(grade) if grade is not None else {}
+    # ZASTAJELA VRIJEDNOST SE ODBACUJE, NE PRENOSI. U planskom režimu padajući
+    # meni prikazuje „— izaberi oblast —" kad zatečena vrijednost nije iz plana
+    # tog razreda, ali bi skrivena kopija u formi za čuvanje i dalje nosila
+    # staru — pa bi se slalo nešto što se na ekranu ne vidi.
+    if chosen["topic_mode"] != student_sessions.TOPIC_CUSTOM:
+        if chosen["area_name"] not in curriculum:
+            chosen["area_name"] = ""
+            chosen["lesson_name"] = ""
+        elif chosen["lesson_name"] not in curriculum[chosen["area_name"]]:
+            chosen["lesson_name"] = ""
     return render_template(
         "admin_class_entry.html", chosen=chosen, roster=roster, saved=saved,
         curriculum=curriculum, areas=list(curriculum), unconfirmed=unconfirmed,

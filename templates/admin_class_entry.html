@@ -28,8 +28,14 @@
   .comment{width:100%;max-width:22rem;background:var(--input-bg);color:var(--text);
            border:1px solid var(--input-border);border-radius:8px;padding:.4rem .55rem;
            font:inherit;font-size:.88rem}
-  input[type=date],select{width:100%;background:var(--input-bg);color:var(--text);
-    border:1px solid var(--input-border);border-radius:10px;padding:.55rem .7rem;font:inherit}
+  /* Sva zajednička polja časa izgledaju isto. Pravilo je ranije hvatalo samo
+     `date` i `select`, pa su vrijeme i ručno upisana tema ostajali sistemski
+     bijeli — jedina svijetla polja na tamnoj stranici, i to baš ona koja se u
+     režimu „Ručni unos" najviše koriste. */
+  input[type=date],input[type=time],select,
+  #custom_lesson,#custom_area{width:100%;background:var(--input-bg);
+    color:var(--text);border:1px solid var(--input-border);border-radius:10px;
+    padding:.55rem .7rem;font:inherit}
   /* Dugme prati listu: kod dugačkog spiska se ne mora skrolati nazad. */
   .savebar{position:sticky;bottom:0;background:var(--card-bg);
            border-top:1px solid var(--card-border);padding:.8rem 0;margin-top:.4rem;
@@ -52,18 +58,24 @@
        ni kad se datum, vrijeme ili tema promijene. #}
     <input type="hidden" name="class_id" value="{{ chosen.class_id }}">
     {% endif %}
+    {# REZIM S KOJIM JE STRANICA ISCRTANA. Bez njega server ne može razlikovati
+       „promijenio sam temu" od „promijenio sam režim", pa bi planska lekcija
+       ostajala u polju ručne teme (i obrnuto). #}
+    <input type="hidden" name="previous_topic_mode" value="{{ chosen.topic_mode }}">
     <div class="grid">
       <div>
         <label for="session_date">Datum</label>
         <input type="date" id="session_date" name="session_date"
-               value="{{ chosen.session_date or today }}" required>
+               value="{{ chosen.session_date or today }}" required
+               oninput="syncShared(this)">
       </div>
       <div>
         <label for="session_time">Vrijeme</label>
         {# OBAVEZNO od verzije 5: dvije grupe istog razreda istog dana razlikuju
            se samo po vremenu. `type=time` salje kanonski HH:MM. #}
         <input type="time" id="session_time" name="session_time"
-               value="{{ chosen.session_time }}" required>
+               value="{{ chosen.session_time }}" required
+               oninput="syncShared(this)">
       </div>
       <div>
         <label for="grade">Razred</label>
@@ -99,12 +111,13 @@
         <input type="text" id="custom_lesson" name="lesson_name"
                maxlength="{{ max_topic_chars }}" required
                placeholder="npr. Uvodni čas"
-               value="{{ chosen.lesson_name }}">
+               value="{{ chosen.lesson_name }}" oninput="syncShared(this)">
       </div>
       <div>
         <label for="custom_area">Oblast <span class="muted">(opcionalno)</span></label>
         <input type="text" id="custom_area" name="area_name"
-               maxlength="{{ max_topic_chars }}" value="{{ chosen.area_name }}">
+               maxlength="{{ max_topic_chars }}" value="{{ chosen.area_name }}"
+               oninput="syncShared(this)">
       </div>
       {% endif %}
       {% if chosen.grade and chosen.topic_mode != topic_custom %}
@@ -128,22 +141,57 @@
       </div>
       {% endif %}
     </div>
-    {# Bez JS-a stranica i dalje radi: `onchange` je pogodnost, a ovo je put. #}
+    {# Bez JS-a stranica i dalje radi: `onchange` je pogodnost, a ovo je put.
+       Klik na ovo dugme osvježava stranicu, pa su skrivene kopije ispod tačne
+       i bez skripte. #}
     <noscript><button type="submit">Prikaži učenike</button></noscript>
   </form>
 </div>
+
+<script>
+  // DVIJE FORME, JEDNA ISTINA.
+  //
+  // Zajednička polja žive u GET formi iznad, jer razred i oblast MORAJU do
+  // servera (razred donosi spisak, oblast donosi lekcije). Čuvanje ide zasebnom
+  // POST formom koja te iste vrijednosti nosi kao skrivene kopije.
+  //
+  // ŽIVI NALAZ: kopija koja se ne osvježava je tiha laž. Datum, vrijeme i ručna
+  // tema nemaju `onchange` slanje, pa se njihova kopija zamrzavala na
+  // vrijednosti iz zadnjeg osvježavanja — čas se mogao sačuvati na terminu koji
+  // instruktor vidi promijenjen na ekranu. Zato svaka izmjena odmah upiše i
+  // kopiju. Server svejedno provjerava sve iznova; ovo je prenos, ne povjerenje.
+  function syncShared(el){
+    var mirror = document.getElementById('h_' + el.name);
+    if (mirror) { mirror.value = el.value; }
+  }
+</script>
 
 {% if not chosen.grade %}
 <div class="card">
   <p class="muted" style="margin:0">Izaberite razred da biste vidjeli učenike.</p>
 </div>
-{% elif not chosen.session_time or not chosen.lesson_name %}
+{% else %}
+
+{# SPISAK ZAVISI SAMO OD POTVRĐENOG RAZREDA.
+   Ranije je stajao uslov `not session_time or not lesson_name`, pa se spisak
+   pojavljivao tek kad je tema izabrana. U planskom režimu se to dešavalo samo
+   uzgred — padajući meni lekcije nosi `onchange="this.form.submit()"`, pa je
+   izbor lekcije slučajno osvježavao stranicu. U režimu „Ručni unos" tema je
+   OBIČNO TEKSTUALNO POLJE bez slanja, a GET forma nema dugme van `<noscript>`,
+   pa Enter ne pravi implicitno slanje: ukucana tema NIKAD nije stizala do
+   servera i spisak se nije mogao pojaviti ni na koji način. Ćorsokak.
+   Tema je metapodatak časa i ne smije odlučivati ko je učenik sedmog razreda. #}
+{% if not chosen.session_time or not chosen.lesson_name %}
 <div class="card">
   <p class="muted" style="margin:0">
-    Unesite vrijeme i temu časa da biste vidjeli učenike.
+    Za čuvanje časa još nedostaje
+    {%- if not chosen.session_time %} vrijeme{% endif %}
+    {%- if not chosen.session_time and not chosen.lesson_name %} i{% endif %}
+    {%- if not chosen.lesson_name %} tema{% endif %}.
+    Učenike možete označiti odmah.
   </p>
 </div>
-{% else %}
+{% endif %}
 
 {% if unconfirmed %}
 {# Nedostajući učenici se OBJASNE. Bez ovoga bi instruktor mislio da ih nema. #}
@@ -158,15 +206,19 @@
   {% if chosen.class_id %}
   <input type="hidden" name="class_id" value="{{ chosen.class_id }}">
   {% endif %}
-  <input type="hidden" name="session_date" value="{{ chosen.session_date or today }}">
-  <input type="hidden" name="session_time" value="{{ chosen.session_time }}">
+  <input type="hidden" id="h_session_date" name="session_date"
+         value="{{ chosen.session_date or today }}">
+  <input type="hidden" id="h_session_time" name="session_time"
+         value="{{ chosen.session_time }}">
   {# Termin s kojim je stranica OTVORENA: ako ga instruktor promijeni, cas se
      PREMJESTI umjesto da nastane dvojnik na novom terminu. #}
   <input type="hidden" name="previous_session_time" value="{{ chosen.session_time }}">
   <input type="hidden" name="grade" value="{{ chosen.grade }}">
   <input type="hidden" name="topic_mode" value="{{ chosen.topic_mode }}">
-  <input type="hidden" name="area_name" value="{{ chosen.area_name }}">
-  <input type="hidden" name="lesson_name" value="{{ chosen.lesson_name }}">
+  <input type="hidden" id="h_area_name" name="area_name"
+         value="{{ chosen.area_name }}">
+  <input type="hidden" id="h_lesson_name" name="lesson_name"
+         value="{{ chosen.lesson_name }}">
 
   <div class="card">
     <div class="top" style="margin-bottom:.4rem">
