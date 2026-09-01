@@ -2149,6 +2149,210 @@ class ReportingDatabase:
                 raise ReportingUnavailable(
                     "class_delete_failed:" + type(exc).__name__, exc) from None
 
+    # --- ZATEČENI ČASOVI PRIJE ŠEME v6 -------------------------------------
+    # Redovi upisani između v5 i v6 nose termin (`session_time`), ali nemaju
+    # roditelja (`class_session_id IS NULL`) — objekat časa tada nije postojao.
+    # Pregled „Svi časovi" čita ISKLJUČIVO `class_sessions`, pa su ti stvarni,
+    # ispravno upisani časovi nevidljivi. Zato postoji most: administrator ih
+    # vidi, provjeri i IZRIČITO poveže.
+    #
+    # ZAŠTO SE RAZRED NE MOŽE IZVESTI: red učenika ne nosi razred časa, a
+    # `students.grade` je TEKUĆI razred — učenik koji je u međuvremenu prešao u
+    # naredni razred falsifikovao bi istoriju. Ni Thinkific, ni MAT-BOT, ni
+    # sadržaj lekcije nisu dokaz o razredu grupe. Razred stoga UNOSI čovjek.
+    #
+    # Grupisanje ide po istoj petorci koju v5 djelimični indeks već tretira kao
+    # identitet pojave; `topic_source IS NULL` na zatečenom redu čita se kao
+    # kurikularni izvor (isto pravilo kao u v5 migraciji).
+    _LEGACY_GROUP_KEY = (
+        "session_date, session_time, COALESCE(topic_source, 'curriculum'), "
+        "COALESCE(area_name, ''), lesson_name")
+    _LEGACY_WHERE = ("class_session_id IS NULL AND session_time IS NOT NULL")
+
+    def _legacy_supported(self, conn):
+        """Most postoji samo ako baza ima i v5 kolone i v6 vezu."""
+        return (self._session_v5_available(conn)
+                and self._class_entity_available(conn))
+
+    @staticmethod
+    def _legacy_match_clause():
+        """Uslov koji pogađa TAČNO jednu zatečenu pojavu. Uvijek uz `_LEGACY_WHERE`."""
+        return (" AND session_date = ? AND session_time = ?"
+                " AND COALESCE(topic_source, 'curriculum') = ?"
+                " AND COALESCE(area_name, '') = COALESCE(?, '')"
+                " AND lesson_name = ?")
+
+    def fetch_unlinked_timed_groups(self, limit=50):
+        """Zatečene pojave s terminom koje još nemaju objekat časa. SAMO ČITANJE.
+
+        Vraća `(spisak, ukupno_grupa)`. Baza bez v5 ili v6 vraća prazno — most
+        se tiho gasi umjesto da ruši stranicu."""
+        with self._lock:
+            try:
+                conn = self._connection()
+                if not self._legacy_supported(conn):
+                    return [], 0
+                total = _rows(conn.execute(
+                    "SELECT COUNT(*) FROM (SELECT 1 FROM student_sessions "
+                    "WHERE %s GROUP BY %s)"
+                    % (self._LEGACY_WHERE, self._LEGACY_GROUP_KEY)))[0][0]
+                rows = _rows(conn.execute(
+                    "SELECT session_date, session_time, "
+                    "       COALESCE(topic_source, 'curriculum'), "
+                    "       COALESCE(area_name, ''), lesson_name, COUNT(*) "
+                    "FROM student_sessions WHERE %s GROUP BY %s "
+                    "ORDER BY session_date DESC, session_time DESC, "
+                    "         lesson_name LIMIT ?"
+                    % (self._LEGACY_WHERE, self._LEGACY_GROUP_KEY),
+                    (int(limit),)))
+            except Exception as exc:
+                self._drop_connection()
+                raise ReportingUnavailable(
+                    "legacy_list_failed:" + type(exc).__name__, exc) from None
+        return ([{"session_date": r[0], "session_time": r[1],
+                  "topic_source": r[2], "area_name": r[3] or None,
+                  "lesson_name": r[4], "row_count": int(r[5])}
+                 for r in rows], int(total))
+
+    def fetch_unlinked_timed_rows(self, *, session_date, session_time,
+                                  topic_source, area_name, lesson_name):
+        """Redovi JEDNE zatečene pojave, s imenom učenika. SAMO ČITANJE.
+
+        Isti oblik zapisa kao `fetch_class_students`, da pregled prije
+        povezivanja prikazuje tačno ono što će čas sadržavati poslije njega."""
+        names = (list(self._SESSION_COLUMNS) + list(self._SESSION_V5_COLUMNS)
+                 + list(self._SESSION_V6_COLUMNS))
+        columns = ["s." + name for name in names]
+        with self._lock:
+            try:
+                conn = self._connection()
+                if not self._legacy_supported(conn):
+                    return []
+                rows = _rows(conn.execute(
+                    "SELECT %s, st.display_name FROM student_sessions s "
+                    "JOIN students st ON st.id = s.student_id "
+                    "WHERE s.class_session_id IS NULL "
+                    "  AND s.session_time IS NOT NULL "
+                    "  AND s.session_date = ? AND s.session_time = ? "
+                    "  AND COALESCE(s.topic_source, 'curriculum') = ? "
+                    "  AND COALESCE(s.area_name, '') = COALESCE(?, '') "
+                    "  AND s.lesson_name = ? "
+                    "ORDER BY COALESCE(st.display_name, ''), s.student_id"
+                    % ", ".join(columns),
+                    (session_date, session_time, topic_source, area_name,
+                     lesson_name)))
+            except Exception as exc:
+                self._drop_connection()
+                raise ReportingUnavailable(
+                    "legacy_read_failed:" + type(exc).__name__, exc) from None
+        listed = []
+        for row in rows:
+            record = dict(zip(names, row[:len(names)]))
+            record["display_name"] = row[len(names)]
+            listed.append(record)
+        return listed
+
+    def find_classes_at_occurrence(self, *, session_date, session_time,
+                                   area_name, lesson_name):
+        """`id`-jevi časova na tom terminu, BEZ obzira na razred. Samo čitanje.
+
+        Služi da drugi klik na „Poveži čas" (dvostruko slanje, `Nazad`, drugi
+        prozor) može da odvede na već napravljen čas umjesto da prijavi grešku."""
+        with self._lock:
+            try:
+                conn = self._connection()
+                if not self._class_entity_available(conn):
+                    return []
+                rows = _rows(conn.execute(
+                    "SELECT id FROM class_sessions WHERE session_date = ? "
+                    " AND session_time = ? "
+                    " AND COALESCE(area_name, '') = COALESCE(?, '') "
+                    " AND lesson_name = ? ORDER BY id",
+                    (session_date, session_time, area_name, lesson_name)))
+            except Exception as exc:
+                self._drop_connection()
+                raise ReportingUnavailable(
+                    "class_read_failed:" + type(exc).__name__, exc) from None
+        return [int(row[0]) for row in rows]
+
+    def adopt_legacy_class(self, *, session_date, session_time, topic_source,
+                           area_name, lesson_name, grade):
+        """Napravi objekat časa NAD ZATEČENIM redovima. JEDNA TRANSAKCIJA.
+
+        Radi TAČNO jednu stvar: doda roditelja i upiše vezu u već postojeće
+        redove. Nijedno polje učenika se ne prepisuje — ni prisustvo, ni
+        aktivnost, ni zadaća, ni komentar, ni datum, ni vrijeme, ni tema, ni
+        `created_at`, čak ni `updated_at`: red se ne mijenja, nego se SMJEŠTA.
+        Zato su mjesečne brojke poslije povezivanja bajt-identične onima prije
+        njega — izvještajni sloj i dalje čita `student_sessions`.
+
+        Redovi se biraju SERVERSKI, po pogođenoj pojavi, a ne po `id`-jevima iz
+        formulara: klijent ne smije birati koje redove usvaja.
+
+        PADA ZATVORENO:
+        - `legacy_group_empty` — nema nepovezanih redova (najčešće drugi klik);
+        - `class_occurrence_conflict` — termin već drži neki čas, pa bi
+          povezivanje spojilo dvije različite stvarne grupe;
+        - `legacy_adoption_raced` — neko je u međuvremenu povezao dio redova.
+
+        Vraća `{"class_id", "linked_rows"}`."""
+        with self._lock:
+            try:
+                conn = self._connection()
+                self._require_class_entity(conn)
+                if not self._session_v5_available(conn):
+                    raise ReportingUnavailable("class_entity_unavailable")
+
+                key = (session_date, session_time, topic_source, area_name,
+                       lesson_name)
+                ids = [int(row[0]) for row in _rows(conn.execute(
+                    "SELECT id FROM student_sessions WHERE "
+                    + self._LEGACY_WHERE + self._legacy_match_clause()
+                    + " ORDER BY id", key))]
+                if not ids:
+                    raise ReportingUnavailable("legacy_group_empty")
+
+                if self._occupied_class_id(conn, session_date, session_time,
+                                           grade, area_name,
+                                           lesson_name) is not None:
+                    raise ReportingUnavailable("class_occurrence_conflict")
+
+                cursor = conn.execute(
+                    "INSERT INTO class_sessions (session_date, session_time, "
+                    " grade, topic_source, area_name, lesson_name, "
+                    " created_at, updated_at) "
+                    "VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, "
+                    " CURRENT_TIMESTAMP)",
+                    (session_date, session_time, int(grade), topic_source,
+                     area_name or None, lesson_name))
+                class_id = int(cursor.lastrowid)
+
+                # `AND class_session_id IS NULL` je drugi ključ: ako je neko u
+                # međuvremenu usvojio isti red, pogodak je manji od očekivanog i
+                # cijela operacija se poništava.
+                linked = 0
+                for chunk in self._chunks(ids):
+                    placeholders = ",".join("?" * len(chunk))
+                    linked += conn.execute(
+                        "UPDATE student_sessions SET class_session_id = ? "
+                        "WHERE id IN (%s) AND class_session_id IS NULL"
+                        % placeholders,
+                        (class_id,) + tuple(chunk)).rowcount
+                if linked != len(ids):
+                    raise ReportingUnavailable("legacy_adoption_raced")
+
+                conn.commit()          # JEDINI commit
+                return {"class_id": class_id, "linked_rows": int(linked)}
+            except ReportingUnavailable:
+                self._safe_rollback()
+                raise
+            except Exception as exc:
+                self._safe_rollback()
+                self._drop_connection()
+                raise ReportingUnavailable(
+                    "legacy_adoption_failed:" + type(exc).__name__,
+                    exc) from None
+
     def count_classes_in_range(self, date_start, date_end):
         """Koliko je časova evidentirano u opsegu. Za nadzornu ploču."""
         with self._lock:

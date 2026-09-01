@@ -1,0 +1,127 @@
+{% extends "admin_base.html" %}
+{% set nav_active = 'classes' %}
+{% block title %}MAT-BOT — Poveži raniji čas{% endblock %}
+{% block heading %}Poveži raniji čas{% endblock %}
+{% block subheading %}
+<p class="muted" style="margin:-.4rem 0 1rem">
+  {{ occurrence.session_date }} · {{ occurrence.session_time }} —
+  <b>{{ occurrence.lesson_name }}</b>
+  {% if occurrence.topic_source == topic_custom %}<span class="pill">ručni unos</span>{% endif %}
+</p>
+{% endblock %}
+{% block content %}
+
+<style>
+  .who{font-weight:600}
+  .rowcards{display:none}
+  .stucard{border:1px solid var(--card-border);border-radius:12px;
+           padding:.75rem .85rem;margin-bottom:.55rem;background:var(--input-bg)}
+  .stucard .line{font-size:.88rem;color:var(--muted)}
+  /* Isto pravilo kao na stranici upisa časa — bez njega padajući meni ostane
+     bijeli sistemski, jedini svijetli element na tamnoj stranici. */
+  select{width:100%;background:var(--input-bg);color:var(--text);
+    border:1px solid var(--input-border);border-radius:10px;
+    padding:.55rem .7rem;font:inherit}
+  .gradepick{max-width:320px}
+  @media (max-width:720px){
+    .desk{display:none}
+    .rowcards{display:block}
+  }
+</style>
+
+{% if error %}<div class="banner err">{{ error }}</div>{% endif %}
+
+<div class="card">
+  <p style="margin-top:0">
+    Ovaj čas je upisan prije nego što je evidencija dobila zaseban zapis o času,
+    pa se ne pojavljuje u spisku „Svi časovi". Podaci učenika su <b>ispravni i
+    ostaju netaknuti</b> — nedostaje samo podatak o kojem se razredu radilo.
+  </p>
+  <p class="muted" style="margin-bottom:0">
+    Povezivanje ne mijenja nijedan unos o učenicima i ne mijenja nijedan
+    mjesečni izvještaj. Samo čini čas vidljivim na jednom mjestu.
+  </p>
+</div>
+
+<div class="card">
+  <div class="grid">
+    <div class="stat"><b>{{ occurrence.session_date }}</b><span class="muted">datum</span></div>
+    <div class="stat"><b>{{ occurrence.session_time }}</b><span class="muted">vrijeme</span></div>
+    <div class="stat"><b>{{ students|length }}</b><span class="muted">upisanih učenika</span></div>
+    <div class="stat"><b>{{ summary.present_count }}</b><span class="muted">prisutnih</span></div>
+    <div class="stat"><b>{{ summary.absent_count }}</b><span class="muted">odsutnih</span></div>
+  </div>
+  <p style="margin-top:1rem;margin-bottom:0">
+    {% if occurrence.area_name %}<b>Oblast:</b> {{ occurrence.area_name }}<br>{% endif %}
+    <b>Tema:</b> {{ occurrence.lesson_name }}<br>
+    <b>Tip:</b> {% if occurrence.topic_source == topic_custom %}ručni unos{% else %}iz nastavnog plana{% endif %}
+  </p>
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0">Učenici na tom času ({{ students|length }})</h3>
+  <table class="desk">
+    <tr><th>Učenik</th><th>Prisustvo</th><th>Aktivnost</th><th>Domaća zadaća</th><th>Komentar</th></tr>
+    {% for s in students %}
+    <tr>
+      <td class="who">{{ s.display_name or "Učenik #%s"|format(s.student_id) }}</td>
+      <td>{{ attendance_labels.get(s.attendance, s.attendance) }}</td>
+      <td>
+        {% if s.activity_rating %}{{ s.activity_rating }} — {{ activity_labels.get(s.activity_rating, '') }}
+        {% else %}—{% endif %}
+      </td>
+      <td>{{ homework_labels.get(s.homework_status, s.homework_status) }}</td>
+      <td class="muted">{{ s.comment or "" }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+
+  <div class="rowcards">
+    {% for s in students %}
+    <div class="stucard">
+      <div class="who">{{ s.display_name or "Učenik #%s"|format(s.student_id) }}</div>
+      <div class="line">{{ attendance_labels.get(s.attendance, s.attendance) }}
+        · {% if s.activity_rating %}aktivnost {{ s.activity_rating }}{% else %}bez aktivnosti{% endif %}
+        · {{ homework_labels.get(s.homework_status, s.homework_status) }}</div>
+      {% if s.comment %}<div class="line">{{ s.comment }}</div>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  <p class="muted" style="font-size:.84rem;margin-top:.8rem">
+    Aktivnost 1–5 je <b>angažman na času</b>, ne ocjena iz matematike.
+  </p>
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0">Koji je razred pohađao ovaj čas?</h3>
+  {# Razred se NE nudi unaprijed izabran. Zapis ga ne nosi, a tekući razred
+     učenika govori o DANAS, ne o danu časa — preduzabrana vrijednost bi
+     pretvorila odluku u puko potvrđivanje. #}
+  <p class="muted" style="margin-top:0">
+    Razred se ne može očitati iz podataka — čas ga nije zapisao. Upišite razred
+    koji je grupa pohađala <b>na dan tog časa</b>, a ne razred koji učenici
+    pohađaju danas.
+  </p>
+  <form method="post" action="{{ url_for('admin_sessions.adopt_legacy_class') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="session_date" value="{{ occurrence.session_date }}">
+    <input type="hidden" name="session_time" value="{{ occurrence.session_time }}">
+    <input type="hidden" name="topic_source" value="{{ occurrence.topic_source }}">
+    <input type="hidden" name="area_name" value="{{ occurrence.area_name }}">
+    <input type="hidden" name="lesson_name" value="{{ occurrence.lesson_name }}">
+    <div class="gradepick">
+      <label for="grade">Razred na dan časa</label>
+      <select id="grade" name="grade" required>
+        <option value="" selected>Odaberi razred</option>
+        {% for g in grades %}
+        <option value="{{ g }}">{{ g }}. razred</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="actions" style="margin-top:1rem">
+      <button type="submit" class="btn">Poveži čas</button>
+      <a class="btn btn--ghost" href="{{ url_for('admin_sessions.class_list') }}">Odustani</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

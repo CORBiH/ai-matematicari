@@ -24,9 +24,17 @@
             padding:.8rem .9rem;margin-bottom:.6rem;background:var(--input-bg)}
   .cls-card .when{color:var(--muted);font-size:.85rem}
   .cls-card .topic{font-weight:600;margin:.15rem 0}
+  /* Zatečeni čas nije greška nego nedovršen podatak, pa nosi ton upozorenja,
+     a ne opasnosti — radnja je „dopuni", ne „popravi štetu". */
+  .legacy{border-left:4px solid var(--warn, #d68a17)}
+  .legacy .lg-when{white-space:nowrap}
+  .lgcards{display:none}
+  .lg-card{border:1px solid var(--card-border);border-radius:12px;
+           padding:.8rem .9rem;margin-bottom:.6rem;background:var(--input-bg)}
   @media (max-width:720px){
     .desk{display:none}
     .cards{display:block}
+    .lgcards{display:block}
   }
 </style>
 
@@ -77,6 +85,68 @@
   </div>
 </div>
 
+{% if legacy %}
+{# --- ZATEČENI ČASOVI PRIJE ZAPISA O ČASU -----------------------------------
+   Ovi redovi su stvarni i ispravni, ali su nastali prije nego što je evidencija
+   dobila zaseban zapis o času, pa ih spisak iznad ne vidi. Sekcija stoji IZVAN
+   filtera mjeseca i razreda: zaturen čas se ne smije kriti još jednom.
+   Sam sebe prazni — svaki povezan čas nestaje odavde i pojavljuje se gore. #}
+<div class="card legacy">
+  <h3 style="margin-top:0">Raniji časovi za povezivanje ({{ legacy_total }})</h3>
+  <p class="muted" style="margin-top:0">
+    Ovi časovi su uredno upisani, ali im nedostaje podatak o razredu, pa se ne
+    prikazuju u spisku iznad. Otvorite čas, provjerite učenike i upišite razred.
+    Podaci o učenicima se pri tome <b>ne mijenjaju</b>.
+  </p>
+
+  <table class="desk">
+    <tr><th>Datum</th><th>Vrijeme</th><th>Tema</th><th>Tip</th><th>Učenika</th><th></th></tr>
+    {% for g in legacy %}
+    <tr>
+      <td class="lg-when">{{ g.session_date }}</td>
+      <td class="lg-when">{{ g.session_time }}</td>
+      <td>
+        <span class="cls-topic">{{ g.lesson_name }}</span>
+        {% if g.area_name %}<br><span class="muted" style="font-size:.82rem">{{ g.area_name }}</span>{% endif %}
+      </td>
+      <td>
+        {% if g.topic_source == topic_custom %}<span class="pill">Ručni unos</span>
+        {% else %}<span class="pill">Plan</span>{% endif %}
+      </td>
+      <td class="lg-when">{{ g.row_count }}</td>
+      <td>
+        <div class="actions">
+          <a class="btn" href="{{ url_for('admin_sessions.legacy_class',
+             session_date=g.session_date, session_time=g.session_time,
+             topic_source=g.topic_source, area_name=g.area_name or '',
+             lesson_name=g.lesson_name) }}">Poveži čas</a>
+        </div>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+
+  <div class="lgcards">
+    {% for g in legacy %}
+    <div class="lg-card">
+      <div class="muted" style="font-size:.85rem">{{ g.session_date }} · {{ g.session_time }}</div>
+      <div class="cls-topic">{{ g.lesson_name }}</div>
+      <div class="muted" style="font-size:.85rem;margin-bottom:.6rem">
+        {{ g.row_count }} upisanih učenika ·
+        {% if g.topic_source == topic_custom %}ručni unos{% else %}iz plana{% endif %}
+      </div>
+      <div class="actions">
+        <a class="btn" href="{{ url_for('admin_sessions.legacy_class',
+           session_date=g.session_date, session_time=g.session_time,
+           topic_source=g.topic_source, area_name=g.area_name or '',
+           lesson_name=g.lesson_name) }}">Poveži čas</a>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
 <div class="card">
   {% if not classes %}
     <div class="empty">
@@ -114,9 +184,16 @@
           {% else %}<span class="pill">Plan</span>{% endif %}
         </td>
         <td class="cls-when">{{ c.present_count }} prisutnih · {{ c.absent_count }} odsutnih</td>
-        <td class="actions">
-          <a class="btn btn--ghost" href="{{ url_for('admin_sessions.class_detail', class_id=c.class_id) }}">Pregled</a>
-          <a class="btn btn--ghost" href="{{ url_for('admin_sessions.new_class', class_id=c.class_id) }}">Uredi</a>
+        <td>
+          {# `display:flex` na samoj CELIJI ponisti `display:table-cell`, pa red
+             ispadne iz mreze tabele: obrub stane prije kraja, a dugmad prelije
+             preko ivice. Zato flex ide na UNUTRASNJI div, a celija ostaje
+             celija. Druge stranice vec koriste <div class="actions"> i rade
+             ispravno, pa se sam stil ne dira. #}
+          <div class="actions">
+            <a class="btn btn--ghost" href="{{ url_for('admin_sessions.class_detail', class_id=c.class_id) }}">Pregled</a>
+            <a class="btn btn--ghost" href="{{ url_for('admin_sessions.new_class', class_id=c.class_id) }}">Uredi</a>
+          </div>
         </td>
       </tr>
       {% endfor %}

@@ -48,11 +48,20 @@ ERROR_TOPIC_LONG = "Tema časa je predugačka."
 ERROR_CONFLICT = ("Na tom terminu već postoji čas s istom temom. Izaberite drugo "
                   "vrijeme ili uredite postojeći čas.")
 ERROR_CLASS_MISSING = "Taj čas više ne postoji."
+ERROR_LEGACY_GONE = ("Taj raniji čas je u međuvremenu povezan ili više ne "
+                     "postoji.")
+ERROR_LEGACY_GRADE = "Izaberite razred koji je pohađao taj čas."
+ERROR_LEGACY_RACED = ("Povezivanje nije završeno jer se evidencija u "
+                      "međuvremenu promijenila. Otvorite čas ponovo.")
 ERROR_CLASS_UNAVAILABLE = "Evidencija časova trenutno nije dostupna."
 
 # Koliko časova stane na jednu stranicu pregleda. Pregled je radni spisak, ne
 # izvoz — cjeloživotni skup se nikad ne povlači u pregledač.
 CLASSES_PER_PAGE = 25
+# Zatečeni časovi bez roditelja su konačan, mali i NEPONOVLJIV skup: nastaju samo
+# između šeme v5 i v6, i svaki nestaje čim se poveže. Gornja granica je zaštita
+# od patološke baze, a ne stranicanje.
+LEGACY_GROUPS_SHOWN = 50
 ERROR_ROSTER = "Neki učenik ne pripada izabranom razredu."
 ERROR_EMPTY = "Označite bar jednog učenika kao prisutnog ili odsutnog."
 ERROR_SESSION = "Podaci o času nisu ispravni."
@@ -65,6 +74,8 @@ _MESSAGES = {
     "class_student_not_in_roster": ERROR_ROSTER,
     "class_occurrence_conflict": ERROR_CONFLICT,
     "class_missing": ERROR_CLASS_MISSING,
+    "legacy_group_empty": ERROR_LEGACY_GONE,
+    "legacy_adoption_raced": ERROR_LEGACY_RACED,
     "class_entity_unavailable": ERROR_CLASS_UNAVAILABLE,
     "class_activity_required": ERROR_ACTIVITY,
     "class_topic_required": ERROR_TOPIC,
@@ -357,9 +368,20 @@ def class_list():
         logger.info("admin_class_list_failed code=%s", error.code)
         classes, total = [], 0
 
+    # NAMJERNO IZVAN FILTERA MJESECA I RAZREDA. Zatečeni čas je zaturen upravo
+    # zato što ga nijedan pregled ne pokazuje; kad bi ga sakrio i filtar, most
+    # bi imao istu rupu koju popravlja. Skup je mali i sam sebe prazni.
+    try:
+        legacy, legacy_total = _db().fetch_unlinked_timed_groups(
+            limit=LEGACY_GROUPS_SHOWN)
+    except reporting_db.ReportingUnavailable as error:
+        logger.info("admin_legacy_list_failed code=%s", error.code)
+        legacy, legacy_total = [], 0
+
     pages = max(1, (total + CLASSES_PER_PAGE - 1) // CLASSES_PER_PAGE)
     return render_template(
         "admin_class_list.html", classes=classes, total=total, month=month,
+        legacy=legacy, legacy_total=legacy_total,
         previous_month=report_input.previous_month(month),
         next_month=_next_month(month), grade=grade, topic_source=source,
         search=search, page=page, pages=pages,
@@ -374,6 +396,119 @@ def class_list():
 def _next_month(month):
     year, number = int(month[:4]), int(month[5:7])
     return "%04d-%02d" % ((year + 1, 1) if number == 12 else (year, number + 1))
+
+
+def _legacy_selection(source):
+    """Petorka koja određuje JEDNU zatečenu pojavu. Ne dokazuje da postoji.
+
+    Klijentu se ne vjeruje ni ovdje: ovo su samo POLJA PRETRAGE, a stvarni
+    redovi se svaki put iznova nalaze u bazi po istom uslovu. Zato se `id` reda
+    nikad ne prima iz formulara — inače bi pošiljalac birao šta se usvaja."""
+    mode = (source.get("topic_source") or "").strip()
+    if mode not in student_sessions.TOPIC_SOURCES:
+        mode = student_sessions.TOPIC_CURRICULUM
+    return {
+        "session_date": (source.get("session_date") or "").strip(),
+        "session_time": (source.get("session_time") or "").strip(),
+        "topic_source": mode,
+        "area_name": (source.get("area_name") or "").strip(),
+        "lesson_name": (source.get("lesson_name") or "").strip(),
+    }
+
+
+def _legacy_resolved(database, occurrence):
+    """Ako pojava više nije zatečena, na koji čas je otišla? Samo čitanje."""
+    try:
+        found = database.find_classes_at_occurrence(
+            session_date=occurrence["session_date"],
+            session_time=occurrence["session_time"],
+            area_name=occurrence["area_name"] or None,
+            lesson_name=occurrence["lesson_name"])
+    except reporting_db.ReportingUnavailable:
+        return None
+    return found[0] if len(found) == 1 else None
+
+
+@admin_sessions_bp.route("/legacy", methods=["GET"])
+@require_admin
+def legacy_class():
+    """Pregled zatečenog časa PRIJE povezivanja. GET NIŠTA NE MIJENJA.
+
+    Razred se NE nudi unaprijed izabran. Zapis ne nosi razred grupe, a tekući
+    razred učenika je tvrdnja o DANAS, ne o danu časa — preduzabran razred bi
+    pretvorio pogađanje u „samo potvrdi"."""
+    from matbot import admin_auth
+
+    occurrence = _legacy_selection(request.args)
+    try:
+        database = _db()
+        rows = database.fetch_unlinked_timed_rows(**occurrence)
+        if not rows:
+            existing = _legacy_resolved(database, occurrence)
+            if existing is not None:
+                return redirect(url_for("admin_sessions.class_detail",
+                                        class_id=existing))
+            return redirect(url_for("admin_sessions.class_list",
+                                    error=ERROR_LEGACY_GONE))
+    except reporting_db.ReportingUnavailable as error:
+        logger.info("admin_legacy_read_failed code=%s", error.code)
+        return redirect(url_for("admin_sessions.class_list",
+                                error=ERROR_UNAVAILABLE))
+
+    return render_template(
+        "admin_class_adopt.html", occurrence=occurrence, students=rows,
+        summary=student_sessions.build_monthly_summary(rows),
+        grades=class_entry.VALID_GRADES,
+        activity_labels=student_sessions.ACTIVITY_LABELS,
+        homework_labels=student_sessions.HOMEWORK_LABELS,
+        attendance_labels=student_sessions.ATTENDANCE_LABELS,
+        topic_custom=student_sessions.TOPIC_CUSTOM,
+        csrf_token=admin_auth.csrf_token(),
+        error=request.args.get("error", ""))
+
+
+def _legacy_back(occurrence, message):
+    return redirect(url_for("admin_sessions.legacy_class",
+                            error=message, **occurrence))
+
+
+@admin_sessions_bp.route("/legacy/adopt", methods=["POST"])
+@require_admin
+def adopt_legacy_class():
+    """Poveži zatečene redove u jedan čas. POST + CSRF + admin.
+
+    DODAJE, NE PREPISUJE: nastaje samo roditelj i veza ka njemu. Nijedna
+    činjenica o učeniku se ne mijenja, pa su mjesečne brojke poslije povezivanja
+    iste kao prije njega."""
+    _require_csrf()
+    occurrence = _legacy_selection(request.form)
+    grade = class_entry.clean_grade(request.form.get("grade"))
+    if grade is None:
+        return _legacy_back(occurrence, ERROR_LEGACY_GRADE)
+
+    try:
+        result = _db().adopt_legacy_class(grade=grade, **occurrence)
+    except reporting_db.ReportingUnavailable as error:
+        logger.info("admin_legacy_adopt_failed code=%s", error.code)
+        if error.code == "legacy_group_empty":
+            # Najčešće drugi klik: čas je već napravljen prvim. Odvedi na njega.
+            existing = _legacy_resolved(_db(), occurrence)
+            if existing is not None:
+                return redirect(url_for("admin_sessions.class_detail",
+                                        class_id=existing))
+            return redirect(url_for("admin_sessions.class_list",
+                                    error=ERROR_LEGACY_GONE))
+        return _legacy_back(occurrence,
+                            _MESSAGES.get(error.code, ERROR_UNAVAILABLE))
+
+    # Bez PII: identitet časa, termin i brojevi — nikad ime ni komentar.
+    logger.info("admin_legacy_adopted class_id=%s date=%s time=%s grade=%s "
+                "topic_source=%s linked_rows=%s",
+                result["class_id"], occurrence["session_date"],
+                occurrence["session_time"], grade, occurrence["topic_source"],
+                result["linked_rows"])
+    return redirect(url_for("admin_sessions.class_detail",
+                            class_id=result["class_id"], adopted=1))
 
 
 @admin_sessions_bp.route("/<int:class_id>", methods=["GET"])
@@ -403,6 +538,7 @@ def class_detail(class_id):
         topic_custom=student_sessions.TOPIC_CUSTOM,
         csrf_token=admin_auth.csrf_token(),
         saved=bool(request.args.get("saved")),
+        adopted=bool(request.args.get("adopted")),
         error=request.args.get("error", ""))
 
 
