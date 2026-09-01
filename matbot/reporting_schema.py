@@ -35,6 +35,7 @@ običan `JOIN`, dok bi nad JSON-om bilo raspakivanje u aplikaciji za svaki red.
 Nazivi sekcija se k tome razlikuju po razredu i mijenjaju kroz vrijeme.
 """
 import logging
+import re
 
 logger = logging.getLogger("matbot.reporting_schema")
 
@@ -839,11 +840,51 @@ EXPECTED_V5_SCHEMA = {
 # a NE `PRAGMA index_info`: izmjereno — za kolonu koja je izraz PRAGMA vraća
 # `-2` i ime `None`, pa bi provjera po kolonama bila slijepa upravo na dijelu
 # koji nosi garanciju.
-_V5_INDEX_FRAGMENTS = (
+# KLJUČ I PREDIKAT SE PROVJERAVAJU ODVOJENO, i to nije uljepšavanje.
+#
+# Dok je provjera bila jedan spisak odlomaka nad CIJELIM ispisom, indeks kojem
+# `session_time` NEDOSTAJE U KLJUČU prolazio je — jer se `session_time` i dalje
+# pojavljuje u `WHERE session_time IS NOT NULL`. Takav indeks je strukturno
+# pogrešan na najgori mogući način: zabranio bi dva časa iste lekcije istog dana
+# u RAZLIČITO vrijeme, dakle upravo ono zbog čega verzija 5 i postoji.
+#
+# Zato se kanonski ispis dijeli na `where`: ključ mora nositi svih pet dijelova,
+# a predikat mora biti tačno onaj koji ostavlja zatečene redove bez vremena van
+# indeksa.
+_V5_INDEX_KEY_FRAGMENTS = (
     "student_id", "session_date", "session_time",
-    "coalesce(area_name, '')", "coalesce(lesson_name, '')",
-    "where session_time is not null",
+    "coalesce(area_name,'')", "coalesce(lesson_name,'')",
 )
+_V5_INDEX_PREDICATE = "session_time is not null"
+
+# RAZMAK UZ ZAGRADU I ZAREZ NIJE STRUKTURA.
+#
+# ŽIVI NALAZ (produkcija, izdanje 9225dd9): raspoređivanje je palo iako je
+# indeks bio POTPUNO ISPRAVAN. Turso je isti objekat kanonizovao kao
+#
+#     COALESCE (area_name, '')
+#
+# a lokalno generisani oblik glasi `COALESCE(area_name, '')`. Sažimanje
+# uzastopnih razmaka (`" ".join(sql.split())`) razmak IZMEĐU imena funkcije i
+# otvorene zagrade ne dira, pa je provjera prijavila `v5_index_shape` nad
+# strukturno tačnim indeksom — LAŽNO NEGATIVNO, i migracija se nije upisala.
+#
+# Zato se prije poređenja uklanja razmak PRILJEPLJEN uz `(`, `)` i `,`. Uklanja
+# se isključivo PRAZNINA: nijedan identifikator, literal ni znak interpunkcije se
+# ne gubi, pa `coalesce(area_name,'x')`, goli `area_name` ili `COALESCE` nad
+# drugom kolonom i dalje padaju. Negativni testovi to i mjere — normalizacija
+# skida osjetljivost na oblik, ne na strukturu.
+_INSIGNIFICANT_SPACE_RE = re.compile(r"\s*([(),])\s*")
+
+
+def canonical_index_sql(sql):
+    """Ispis indeksa → oblik u kojem se smiju porediti STRUKTURNI dijelovi.
+
+    Dvije koraka, oba determinisitička: sažmi praznine i spusti u mala slova, pa
+    ukloni prazninu uz zagrade i zareze. Nema parsera, nema približnog
+    poređenja."""
+    collapsed = " ".join(str(sql or "").split()).lower()
+    return _INSIGNIFICANT_SPACE_RE.sub(r"\1", collapsed)
 
 
 def _normalized_index_sql(conn, name):
@@ -851,7 +892,7 @@ def _normalized_index_sql(conn, name):
                         "AND name = ?", (name,)).fetchall()
     if not rows or not rows[0][0]:
         return None
-    return " ".join(str(rows[0][0]).split()).lower()
+    return canonical_index_sql(rows[0][0])
 
 
 def verify_v5_schema(conn):
@@ -891,8 +932,14 @@ def verify_v5_schema(conn):
         return problems
     if "unique" not in index_sql:
         problems.append("v5_index_not_unique:%s" % V5_CLASS_INDEX)
-    for fragment in _V5_INDEX_FRAGMENTS:
-        if fragment not in index_sql:
+
+    # Podjela na `where`: lijevo je KLJUČ, desno PREDIKAT. Odlomak nađen na
+    # pogrešnoj strani ne dokazuje ništa (vidi komentar uz konstante).
+    key, separator, predicate = index_sql.partition("where")
+    if not separator or _V5_INDEX_PREDICATE not in predicate:
+        problems.append("v5_index_predicate:%s" % V5_CLASS_INDEX)
+    for fragment in _V5_INDEX_KEY_FRAGMENTS:
+        if fragment not in key:
             problems.append("v5_index_shape:%s" % V5_CLASS_INDEX)
             break
     return problems
