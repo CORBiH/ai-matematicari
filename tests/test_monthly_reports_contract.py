@@ -128,17 +128,18 @@ def test_our_local_ddl_matches_measured_production_properties(tmp_path):
         local.close()
 
 
-def test_monthly_reports_still_needs_no_migration_in_v3_and_v4():
-    """v3 i v4 dodaju, ali `monthly_reports` OSTAJE netaknuta.
+def test_monthly_reports_still_needs_no_migration_in_v3_v4_and_v5():
+    """v3, v4 i v5 dodaju, ali `monthly_reports` OSTAJE netaknuta.
 
-    Verzija 3 donosi SAMO `student_sessions`, a verzija 4 SAMO dvije NULL
-    kolone na `students`. Nijedna njihova naredba ne dira tabelu izvještaja —
+    Verzija 3 donosi SAMO `student_sessions`, verzija 4 SAMO dvije NULL kolone
+    na `students`, a verzija 5 SAMO vrijeme i izvor teme na `student_sessions`
+    (plus djelimičan indeks). Nijedna njihova naredba ne dira tabelu izvještaja —
     stari sačuvani nacrti se ne prepisuju (Dio 35)."""
     from matbot import config
 
-    assert reporting_schema.CURRENT_SCHEMA_VERSION == 4
-    assert config.REPORTING_SCHEMA_VERSION == 4
-    assert set(reporting_schema.MIGRATION_DESCRIPTIONS) == {2, 3, 4}
+    assert reporting_schema.CURRENT_SCHEMA_VERSION == 5
+    assert config.REPORTING_SCHEMA_VERSION == 5
+    assert set(reporting_schema.MIGRATION_DESCRIPTIONS) == {2, 3, 4, 5}
     assert reporting_schema.V3_TABLES == ("student_sessions",)
     blob = " ".join(reporting_schema.SCHEMA_V3_STATEMENTS)
     assert "monthly_reports" not in blob
@@ -150,6 +151,14 @@ def test_monthly_reports_still_needs_no_migration_in_v3_and_v4():
     assert [name for name, _ in reporting_schema.V4_STUDENT_COLUMNS] == [
         "grade_confirmed_at", "grade_source"]
     assert set(reporting_schema.EXPECTED_V4_SCHEMA) == {"students"}
+
+    # VERZIJA 5 DIRA SAMO `student_sessions`, i to samo dodavanjem.
+    assert [name for name, _ in reporting_schema.V5_SESSION_COLUMNS] == [
+        "session_time", "topic_source"]
+    assert set(reporting_schema.EXPECTED_V5_SCHEMA) == {"student_sessions"}
+    blob5 = " ".join(reporting_schema.SCHEMA_V5_STATEMENTS)
+    assert "monthly_reports" not in blob5
+    assert "DROP" not in blob5.upper() and "UPDATE" not in blob5.upper()
 
 
 # ---------------------------------------------------------------------------

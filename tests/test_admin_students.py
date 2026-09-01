@@ -196,7 +196,9 @@ def student(db):
 
 
 def _session_form(token, **over):
+    # Vrijeme je od verzije 5 obavezno za SVAKI nov zapis časa.
     data = {"csrf_token": token, "session_date": "2026-08-05",
+            "session_time": "10:00",
             "attendance": "present", "activity_rating": "4",
             "homework_status": "done", "area_name": "Djeljivost brojeva",
             "lesson_name": "Djeljivost zbira, razlike i proizvoda", "comment": "Dobar rad."}

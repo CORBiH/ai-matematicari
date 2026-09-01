@@ -353,16 +353,29 @@ def _session_from_form(grade):
     """Formular → provjeren zapis. Server je autoritet, ne klijent.
 
     `grade` dolazi iz BAZE (profil učenika), nikad iz formulara — inače bi
-    klijent mogao izabrati razred u kojem njegova izmišljena lekcija „postoji"."""
+    klijent mogao izabrati razred u kojem njegova izmišljena lekcija „postoji".
+
+    VRIJEME JE OBAVEZNO I OVDJE (verzija 5). Odluka je svjesna: da pojedinačni
+    unos smije praviti zapis BEZ vremena, nastao bi red koji „Uredi čas" ne može
+    razlikovati od druge grupe istog dana — pa bi jedan put popravljao ono što
+    drugi kvari. Svi NOVI časovi zato dijele isti identitet.
+
+    ZATEČENI redovi bez vremena i dalje se čitaju; ovaj put pravi i mijenja samo
+    nove, a `student_sessions.validate_session` prazan `session_time` odbija tek
+    kad `require_time` to traži."""
     return student_sessions.validate_session(
         session_date=request.form.get("session_date"),
+        session_time=request.form.get("session_time"),
         attendance=request.form.get("attendance"),
         activity_rating=request.form.get("activity_rating"),
         homework_status=request.form.get("homework_status"),
         area_name=request.form.get("area_name"),
         lesson_name=request.form.get("lesson_name"),
+        topic_source=student_sessions.clean_topic_source(
+            request.form.get("topic_source")),
         comment=request.form.get("comment"),
-        grade=grade)
+        grade=grade,
+        require_time=True)
 
 
 def _student_grade(student_id):

@@ -128,7 +128,7 @@ def test_migration_record_has_version_description_and_applied_at(v1):
 
 def test_expected_version_in_config_tracks_the_schema_module():
     """Da dvije vrijednosti ne mogu odlutati (uzrok laznog „-> OK")."""
-    assert config.REPORTING_SCHEMA_VERSION == reporting_schema.CURRENT_SCHEMA_VERSION == 4
+    assert config.REPORTING_SCHEMA_VERSION == reporting_schema.CURRENT_SCHEMA_VERSION == 5
 
 
 # ---------------------------------------------------------------------------
@@ -387,6 +387,7 @@ def test_checker_proves_v2_after_migration(v1, monkeypatch):
     reporting_schema.migrate_to_v2(conn)
     reporting_schema.migrate_to_v3(conn)
     reporting_schema.migrate_to_v4(conn)
+    reporting_schema.migrate_to_v5(conn)
     conn.close()
 
     monkeypatch.setenv("TURSO_DATABASE_URL", "libsql://test.invalid")
@@ -399,7 +400,7 @@ def test_checker_proves_v2_after_migration(v1, monkeypatch):
     finally:
         database.close()
 
-    assert report["schema_version"] == 4
+    assert report["schema_version"] == 5
     assert report["schema_version_matches"] is True
     assert report["missing_tables"] == []
     assert report["v3_schema_verified"] is True
@@ -407,7 +408,9 @@ def test_checker_proves_v2_after_migration(v1, monkeypatch):
     assert report["v2_schema_verified"] is True
     assert report["v4_schema_verified"] is True
     assert "v4_schema: verified" in rendered
-    assert "schema_version: 4 (expected 4) -> OK" in rendered
+    assert report["v5_schema_verified"] is True
+    assert "v5_schema: verified" in rendered
+    assert "schema_version: 5 (expected 5) -> OK" in rendered
     assert "v2_schema: verified" in rendered
     for table in reporting_schema.V2_TABLES:
         assert table in report["columns"]
@@ -428,7 +431,7 @@ def test_checker_reports_v2_incomplete_before_migration(v1, monkeypatch):
 
     assert report["v2_schema_verified"] is False
     assert "v2_schema: INCOMPLETE" in rendered
-    assert "schema_version: 1 (expected 4) -> MISMATCH" in rendered
+    assert "schema_version: 1 (expected 5) -> MISMATCH" in rendered
 
 
 def test_ddl_survives_rollback_which_is_why_migration_is_resumable(tmp_path):

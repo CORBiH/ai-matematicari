@@ -309,11 +309,13 @@ def test_migrate_command_moves_a_clean_v2_to_v3(tmp_path, monkeypatch):
     path, database = _v2_database(tmp_path, monkeypatch)
     try:
         assert database.migrate() == [reporting_schema.SCHEMA_VERSION_V3,
-                                      reporting_schema.SCHEMA_VERSION_V4]
+                                      reporting_schema.SCHEMA_VERSION_V4,
+                                      reporting_schema.SCHEMA_VERSION_V5]
         report = database.check()
-        assert report["schema_version"] == 4
+        assert report["schema_version"] == 5
         assert report["v3_schema_verified"] is True
         assert report["v4_schema_verified"] is True
+        assert report["v5_schema_verified"] is True
     finally:
         database.close()
 

@@ -41,6 +41,11 @@ ERROR_CURRICULUM = "Izaberite oblast i lekciju iz gradiva tog razreda."
 ERROR_GRADE = "Razred mora biti 6, 7, 8 ili 9."
 ERROR_DATE = "Datum časa nije ispravan."
 ERROR_ACTIVITY = "Za svakog prisutnog učenika izaberite aktivnost na času."
+ERROR_TIME = "Vrijeme časa mora biti u obliku HH:MM (na primjer 14:00)."
+ERROR_TOPIC = "Unesite temu časa."
+ERROR_TOPIC_LONG = "Tema časa je predugačka."
+ERROR_CONFLICT = ("Na tom terminu već postoji čas s istom temom. Izaberite drugo "
+                  "vrijeme ili uredite postojeći čas.")
 ERROR_ROSTER = "Neki učenik ne pripada izabranom razredu."
 ERROR_EMPTY = "Označite bar jednog učenika kao prisutnog ili odsutnog."
 ERROR_SESSION = "Podaci o času nisu ispravni."
@@ -52,6 +57,12 @@ _MESSAGES = {
     "class_curriculum_unknown": ERROR_CURRICULUM,
     "class_student_not_in_roster": ERROR_ROSTER,
     "class_activity_required": ERROR_ACTIVITY,
+    "class_topic_required": ERROR_TOPIC,
+    "class_topic_too_long": ERROR_TOPIC_LONG,
+    "class_area_too_long": ERROR_TOPIC_LONG,
+    "session_time_format": ERROR_TIME,
+    "session_time_required": ERROR_TIME,
+    "session_topic_required": ERROR_TOPIC,
     "session_date_format": ERROR_DATE,
     "session_date_invalid": ERROR_DATE,
     "session_curriculum_unknown": ERROR_CURRICULUM,
@@ -98,10 +109,16 @@ def class_roster(database, grade):
 
 
 def _selection(source):
-    """Zajednička polja časa iz `args` ili `form`. Ne validira — samo čita."""
+    """Zajednička polja časa iz `args` ili `form`. Ne validira — samo čita.
+
+    `topic_mode` se ovdje samo NORMALIZUJE u poznat režim; provjeru gradiva radi
+    `class_entry.build_class_records`, jer klijentu se ne vjeruje ni oko toga
+    koji je režim tražio."""
     return {
         "session_date": (source.get("session_date") or "").strip() or _today(),
+        "session_time": (source.get("session_time") or "").strip(),
         "grade": class_entry.clean_grade(source.get("grade")),
+        "topic_mode": class_entry.clean_topic_mode(source.get("topic_mode")),
         "area_name": (source.get("area_name") or "").strip(),
         "lesson_name": (source.get("lesson_name") or "").strip(),
     }
@@ -123,10 +140,13 @@ def new_class():
         database = _db()
         if grade is not None:
             roster, unconfirmed = class_roster(database, grade)
-            if chosen["area_name"] and chosen["lesson_name"]:
+            # VRIJEME JE DIO IDENTITETA: bez njega bi „Uredi čas" za 10:00
+            # učitao i grupu iz 14:00 nad istom lekcijom.
+            if (chosen["session_time"] and chosen["lesson_name"]):
                 saved = database.fetch_class_sessions(
-                    chosen["session_date"], chosen["area_name"],
-                    chosen["lesson_name"], [s["student_id"] for s in roster])
+                    chosen["session_date"], chosen["session_time"],
+                    chosen["area_name"] or None, chosen["lesson_name"],
+                    [s["student_id"] for s in roster])
     except reporting_db.ReportingUnavailable as error:
         logger.info("admin_class_roster_failed code=%s", error.code)
         return render_template(
@@ -138,6 +158,10 @@ def new_class():
             homework_default=class_entry.PRESENT_HOMEWORK_DEFAULT,
             participation_labels=class_entry.PARTICIPATION_LABELS,
             participation_default=class_entry.PARTICIPATION_DEFAULT,
+            topic_labels=class_entry.TOPIC_MODE_LABELS,
+            topic_curriculum=student_sessions.TOPIC_CURRICULUM,
+            topic_custom=student_sessions.TOPIC_CUSTOM,
+            max_topic_chars=student_sessions.MAX_LABEL_CHARS,
             csrf_token=admin_auth.csrf_token(), today=_today(),
             error=ERROR_UNAVAILABLE), 503
 
@@ -151,6 +175,10 @@ def new_class():
         homework_default=class_entry.PRESENT_HOMEWORK_DEFAULT,
         participation_labels=class_entry.PARTICIPATION_LABELS,
         participation_default=class_entry.PARTICIPATION_DEFAULT,
+        topic_labels=class_entry.TOPIC_MODE_LABELS,
+        topic_curriculum=student_sessions.TOPIC_CURRICULUM,
+        topic_custom=student_sessions.TOPIC_CUSTOM,
+        max_topic_chars=student_sessions.MAX_LABEL_CHARS,
         csrf_token=admin_auth.csrf_token(), today=_today(),
         error=request.args.get("error", ""))
 
@@ -190,7 +218,10 @@ def _submissions():
 def _back(chosen, message):
     return redirect(url_for("admin_sessions.new_class",
                             session_date=chosen["session_date"],
-                            grade=chosen["grade"], area_name=chosen["area_name"],
+                            session_time=chosen["session_time"],
+                            grade=chosen["grade"],
+                            topic_mode=chosen["topic_mode"],
+                            area_name=chosen["area_name"],
                             lesson_name=chosen["lesson_name"], error=message))
 
 
@@ -215,7 +246,9 @@ def save_class():
 
     try:
         records = class_entry.build_class_records(
-            session_date=chosen["session_date"], grade=chosen["grade"],
+            session_date=chosen["session_date"],
+            session_time=chosen["session_time"], grade=chosen["grade"],
+            topic_mode=chosen["topic_mode"],
             area_name=chosen["area_name"], lesson_name=chosen["lesson_name"],
             roster_ids=[s["student_id"] for s in roster],
             submissions=_submissions())
@@ -228,22 +261,32 @@ def save_class():
     if not records:
         return _back(chosen, ERROR_EMPTY)
 
+    # Vrijeme s kojim je stranica OTVORENA: kad ga instruktor promijeni, čas se
+    # PREMJESTI umjesto da nastane dvojnik na novom terminu.
+    previous_time = (request.form.get("previous_session_time") or "").strip()
     try:
-        counters = _db().save_class_sessions(records)
+        counters = _db().save_class_sessions(records,
+                                             previous_time=previous_time or None)
     except reporting_db.ReportingUnavailable as error:
         logger.info("admin_class_save_failed code=%s", error.code)
+        if error.code == "class_time_conflict":
+            return _back(chosen, ERROR_CONFLICT)
         return _back(chosen, ERROR_UNAVAILABLE)
 
     totals = class_entry.summarize_saved(records)
     # Bez PII: brojevi, datum i razred — nikad ime, komentar ni e-mail.
-    logger.info("admin_class_saved date=%s grade=%s rows=%s present=%s "
-                "absent=%s inserted=%s updated=%s",
-                chosen["session_date"], chosen["grade"], totals["rows"],
-                totals["present"], totals["absent"], counters["inserted"],
-                counters["updated"])
+    logger.info("admin_class_saved date=%s time=%s grade=%s topic_source=%s "
+                "rows=%s present=%s absent=%s inserted=%s updated=%s moved=%s",
+                chosen["session_date"], chosen["session_time"], chosen["grade"],
+                chosen["topic_mode"], totals["rows"], totals["present"],
+                totals["absent"], counters["inserted"], counters["updated"],
+                counters["moved"])
     return redirect(url_for("admin_sessions.saved_class",
                             session_date=chosen["session_date"],
-                            grade=chosen["grade"], area_name=chosen["area_name"],
+                            session_time=chosen["session_time"],
+                            grade=chosen["grade"],
+                            topic_mode=chosen["topic_mode"],
+                            area_name=chosen["area_name"],
                             lesson_name=chosen["lesson_name"],
                             present=totals["present"], absent=totals["absent"]))
 

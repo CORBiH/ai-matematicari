@@ -11,13 +11,17 @@
 <div class="card">
   <div class="grid">
     <div class="stat"><b>{{ chosen.session_date }}</b><span class="muted">datum</span></div>
+    <div class="stat"><b>{{ chosen.session_time }}</b><span class="muted">vrijeme</span></div>
     <div class="stat"><b>{{ chosen.grade }}. razred</b><span class="muted">razred</span></div>
     <div class="stat"><b>{{ present }}</b><span class="muted">prisutnih</span></div>
     <div class="stat"><b>{{ absent }}</b><span class="muted">odsutnih</span></div>
   </div>
   <p style="margin-top:1rem">
-    <b>Oblast:</b> {{ chosen.area_name }}<br>
-    <b>Lekcija:</b> {{ chosen.lesson_name }}
+    {% if chosen.area_name %}<b>Oblast:</b> {{ chosen.area_name }}<br>{% endif %}
+    <b>Tema:</b> {{ chosen.lesson_name }}
+    {% if chosen.topic_mode == 'custom' %}
+    <span class="pill">ručni unos</span>
+    {% endif %}
   </p>
 </div>
 
@@ -26,7 +30,8 @@
      učitava upravo sačuvane redove, pa se aktivnost, zadaća ili zapažanje
      ispravljaju bez otvaranja profila svakog učenika. #}
   <a href="{{ url_for('admin_sessions.new_class', session_date=chosen.session_date,
-                      grade=chosen.grade, area_name=chosen.area_name,
+                      session_time=chosen.session_time, grade=chosen.grade,
+                      topic_mode=chosen.topic_mode, area_name=chosen.area_name,
                       lesson_name=chosen.lesson_name) }}">
     <button type="button">Uredi čas</button></a>
   <a href="{{ url_for('admin_sessions.new_class', grade=chosen.grade) }}">

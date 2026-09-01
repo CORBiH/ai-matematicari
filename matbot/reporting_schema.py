@@ -42,7 +42,8 @@ SCHEMA_VERSION_V1 = 1
 SCHEMA_VERSION_V2 = 2
 SCHEMA_VERSION_V3 = 3
 SCHEMA_VERSION_V4 = 4
-CURRENT_SCHEMA_VERSION = SCHEMA_VERSION_V4
+SCHEMA_VERSION_V5 = 5
+CURRENT_SCHEMA_VERSION = SCHEMA_VERSION_V5
 
 # Tabele koje verzija 1 mora imati da bismo uopšte smjeli migrirati.
 V1_TABLES = (
@@ -157,6 +158,7 @@ MIGRATION_DESCRIPTIONS = {
     SCHEMA_VERSION_V2: "Add Thinkific progress reporting schema",
     SCHEMA_VERSION_V3: "Add instructor student session records",
     SCHEMA_VERSION_V4: "Require explicit current-grade confirmation",
+    SCHEMA_VERSION_V5: "Add class session time and topic source",
 }
 
 # `applied_at` se NAMJERNO ne upisuje: ima bazin DEFAULT i njegovo značenje je
@@ -769,6 +771,206 @@ def migrate_to_v4(conn):
     _record_migration(conn, SCHEMA_VERSION_V4)
     logger.info("reporting_schema_migrated from=%s to=%s",
                 SCHEMA_VERSION_V3, SCHEMA_VERSION_V4)
+    return True
+
+
+# --- VRIJEME I IZVOR TEME ČASA (verzija 5) ---------------------------------
+# ZAŠTO OVA VERZIJA POSTOJI — DVA STVARNA OPERATIVNA ZAHTJEVA.
+#
+# 1. VIŠE GRUPA ISTOG RAZREDA ISTOG DANA. Instruktor drži sedmi razred u 10:00 i
+#    opet u 14:00, ponekad NAD ISTOM lekcijom. Do sada je logički identitet časa
+#    bio (učenik, datum, oblast, lekcija), pa su se ta dva stvarna časa
+#    SUDARALA: drugo čuvanje je pregazilo prvo. Vrijeme je jedino što ih
+#    razlikuje, pa mora postojati u podacima — nije kozmetika.
+#
+# 2. NIJE SVAKI ČAS LEKCIJA IZ PLANA. „Uvodni čas", „Ponavljanje", „Priprema za
+#    kontrolni", „Konsultacije" su stvarni časovi koji u `topics.json` ne
+#    postoje i ne smiju se izmišljati kao kurikularna lekcija. `topic_source`
+#    čini razliku EKSPLICITNOM, umjesto da se kasnije nagađa pretragom naziva
+#    po kurikulumu — nagađanje bi se mijenjalo svaki put kad se plan izmijeni.
+#
+# ADITIVNO I NEDESTRUKTIVNO: dvije NULL kolone. Nijedan zatečeni red se ne
+# prepisuje i nijedno vrijeme se NE IZMIŠLJA. Stari red ostaje bez vremena, i to
+# je istina o njemu — ne znamo kad je čas bio.
+#
+# ZNAČENJE `topic_source = NULL` NA ZATEČENIM REDOVIMA: čita se kao kurikularni
+# čas, i to nije nagađanje nego činjenica o putu unosa — do ove verzije je
+# `validate_session` SVAKI čas s gradivom provjeravao prema `topics.json`, pa
+# drugačiji nije mogao ni nastati.
+V5_SESSION_COLUMNS = (
+    ("session_time", "TEXT"),
+    ("topic_source", "TEXT"),
+)
+
+# --- STRUKTURNA ZAŠTITA OD DUPLIKATA ---------------------------------------
+# Prethodno izdanje je SVJESNO izbjeglo jedinstveni indeks: nad zatečenim
+# produkcijskim redovima se nije moglo dokazati da ga zadovoljavaju, pa bi
+# migracija mogla pasti. Sada je taj problem NESTAO sam od sebe, i to je razlog
+# zašto se indeks konačno smije uvesti:
+#
+#   svi ZATEČENI redovi imaju `session_time IS NULL`
+#   svi NOVI redovi imaju vrijeme
+#
+# pa DJELIMIČAN indeks (`WHERE session_time IS NOT NULL`) ne dodiruje nijedan
+# postojeći red i ne može pasti na zatečenim podacima. Izmjereno na libsql
+# 0.1.11: djelimičan indeks nad izrazom je podržan, stvarno odbija duplikat
+# vremenskog reda, a redove bez vremena uopšte ne gleda.
+#
+# `COALESCE(..., '')` je OBAVEZAN, ne stil: u SQLite-u su dva NULL-a u
+# jedinstvenom indeksu RAZLIČITA, pa bi bez njega dva časa s praznom oblašću
+# (što je legitiman slučaj kod ručne teme) prošla kao različita i indeks ne bi
+# štitio ništa.
+V5_CLASS_INDEX = "idx_student_sessions_logical_class"
+
+SCHEMA_V5_STATEMENTS = (
+    "CREATE UNIQUE INDEX IF NOT EXISTS " + V5_CLASS_INDEX + " "
+    "ON student_sessions (student_id, session_date, session_time, "
+    " COALESCE(area_name, ''), COALESCE(lesson_name, '')) "
+    "WHERE session_time IS NOT NULL",
+)
+
+EXPECTED_V5_SCHEMA = {
+    "student_sessions": {
+        "required_columns": {name for name, _ in V5_SESSION_COLUMNS},
+    },
+}
+
+# Dijelovi koje ISPIS indeksa mora sadržavati. Provjerava se `sqlite_master.sql`,
+# a NE `PRAGMA index_info`: izmjereno — za kolonu koja je izraz PRAGMA vraća
+# `-2` i ime `None`, pa bi provjera po kolonama bila slijepa upravo na dijelu
+# koji nosi garanciju.
+_V5_INDEX_FRAGMENTS = (
+    "student_id", "session_date", "session_time",
+    "coalesce(area_name, '')", "coalesce(lesson_name, '')",
+    "where session_time is not null",
+)
+
+
+def _normalized_index_sql(conn, name):
+    rows = conn.execute("SELECT sql FROM sqlite_master WHERE type = 'index' "
+                        "AND name = ?", (name,)).fetchall()
+    if not rows or not rows[0][0]:
+        return None
+    return " ".join(str(rows[0][0]).split()).lower()
+
+
+def verify_v5_schema(conn):
+    """Strukturna provjera verzije 5. Prazna lista znači „dokazano ispravno"."""
+    problems = []
+    existing = table_names(conn)
+    for table, expected in EXPECTED_V5_SCHEMA.items():
+        if table not in existing:
+            problems.append("v5_table_missing:%s" % table)
+            continue
+        try:
+            details = _column_details(conn, table)
+        except Exception:
+            problems.append("v5_table_unreadable:%s" % table)
+            continue
+        missing = expected["required_columns"] - set(details)
+        if missing:
+            problems.append("v5_columns_missing:%s:%s"
+                            % (table, ",".join(sorted(missing))))
+            continue
+        for column in sorted(expected["required_columns"]):
+            if details[column][0]:
+                # NOT NULL bi značilo da je kolonu napravio neko drugi pod
+                # drugim pravilima — zatečeni redovi je nemaju.
+                problems.append("v5_not_nullable:%s:%s" % (table, column))
+
+    if "student_sessions" not in existing:
+        return problems
+
+    try:
+        index_sql = _normalized_index_sql(conn, V5_CLASS_INDEX)
+    except Exception:
+        problems.append("v5_index_unreadable:%s" % V5_CLASS_INDEX)
+        return problems
+    if index_sql is None:
+        problems.append("v5_index_missing:%s" % V5_CLASS_INDEX)
+        return problems
+    if "unique" not in index_sql:
+        problems.append("v5_index_not_unique:%s" % V5_CLASS_INDEX)
+    for fragment in _V5_INDEX_FRAGMENTS:
+        if fragment not in index_sql:
+            problems.append("v5_index_shape:%s" % V5_CLASS_INDEX)
+            break
+    return problems
+
+
+def verify_existing_v5_objects(conn):
+    """Provjeri SAMO ono što već postoji — ulaz u djelimično stanje.
+
+    Prekinuta migracija je mogla dodati prvu kolonu a ne i drugu, ili kolone a
+    ne i indeks. Odsutno je NORMALAN ulaz i ne prijavljuje se; postojeće s
+    pogrešnim svojstvima zaustavlja migraciju."""
+    return [problem for problem in verify_v5_schema(conn)
+            if not problem.startswith(("v5_table_missing", "v5_columns_missing",
+                                       "v5_index_missing"))]
+
+
+def _apply_v5_ddl(conn):
+    """Dodaj SAMO ono čega nema. `ADD COLUMN` nema `IF NOT EXISTS`."""
+    try:
+        present = _columns(conn, "student_sessions")
+    except Exception as exc:
+        raise MigrationError("v5_sessions_unreadable", type(exc).__name__) from None
+    for name, sql_type in V5_SESSION_COLUMNS:
+        if name in present:
+            continue
+        try:
+            conn.execute("ALTER TABLE student_sessions ADD COLUMN %s %s"
+                         % (name, sql_type))
+        except Exception as exc:
+            raise MigrationError("v5_ddl_failed", type(exc).__name__) from None
+    for statement in SCHEMA_V5_STATEMENTS:
+        try:
+            conn.execute(statement)
+        except Exception as exc:
+            # Ovdje bi pao jedinstveni indeks da zatečeni redovi imaju vrijeme.
+            # Ne mogu ga imati (kolona je upravo dodata kao NULL), pa je ovo
+            # zaštita od tuđeg objekta istog imena, ne od naših podataka.
+            raise MigrationError("v5_index_failed", type(exc).__name__) from None
+    try:
+        conn.commit()
+    except Exception as exc:
+        raise MigrationError("v5_ddl_commit_failed", type(exc).__name__) from None
+
+
+def migrate_to_v5(conn):
+    """v4 → v5. ADITIVNO, IDEMPOTENTNO i OTPORNO NA PREKID.
+
+    ISTA DOKTRINA KAO SVE RANIJE: DDL preživi `rollback()` (izmjereno na libsql
+    0.1.11), pa se atomičnost ne tvrdi. Dodaje se samo ono čega nema, struktura
+    se DOKAZUJE, a red verzije se upisuje TEK na kraju.
+
+    NIJEDAN ZATEČENI RED SE NE MIJENJA: nema `UPDATE`-a, nema izmišljenog
+    vremena i nema izmišljenog izvora teme. Djelimičan jedinstveni indeks gleda
+    isključivo redove S vremenom, a zatečeni ga nemaju — zato migracija ne može
+    pasti na produkcijskim podacima."""
+    already = applied_versions(conn)
+    if SCHEMA_VERSION_V4 not in already:
+        raise MigrationError("v4_migration_record_missing")
+
+    if SCHEMA_VERSION_V5 in already:
+        problems = verify_v5_schema(conn)
+        if problems:
+            raise MigrationError(problems[0], "recorded v5 but schema incomplete")
+        return False
+
+    prior = verify_existing_v5_objects(conn)
+    if prior:
+        raise MigrationError(prior[0], "existing v5 object is incompatible")
+
+    _apply_v5_ddl(conn)
+
+    problems = verify_v5_schema(conn)
+    if problems:
+        raise MigrationError(problems[0], "verification failed after ddl")
+
+    _record_migration(conn, SCHEMA_VERSION_V5)
+    logger.info("reporting_schema_migrated from=%s to=%s",
+                SCHEMA_VERSION_V4, SCHEMA_VERSION_V5)
     return True
 
 

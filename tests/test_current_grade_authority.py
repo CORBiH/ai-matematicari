@@ -561,9 +561,10 @@ def test_23f_version_row_is_written_only_after_verification():
     assert body.rindex("verify_v4_schema(conn)") < body.index("_record_migration(")
 
 
-def test_23g_config_and_schema_module_agree_on_version_four():
-    assert config.REPORTING_SCHEMA_VERSION == 4
-    assert reporting_schema.CURRENT_SCHEMA_VERSION == 4
+def test_23g_config_and_schema_module_agree_on_the_current_version():
+    """v4 je i dalje OBAVEZAN korak; tekuća verzija je od tada odmakla na v5."""
+    assert config.REPORTING_SCHEMA_VERSION == reporting_schema.CURRENT_SCHEMA_VERSION
+    assert reporting_schema.CURRENT_SCHEMA_VERSION >= 4
     assert reporting_schema.MIGRATION_DESCRIPTIONS[4].strip()
 
 

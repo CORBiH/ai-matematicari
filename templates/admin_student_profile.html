@@ -126,6 +126,8 @@
   <form method="post" action="{{ url_for('admin_students.create_session', student_id=student_id) }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <p><label>Datum<br><input type="date" name="session_date" required></label></p>
+    {# OBAVEZNO od verzije 5 — vidi `_session_from_form`. #}
+    <p><label>Vrijeme<br><input type="time" name="session_time" required></label></p>
     <p>
       Prisustvo<br>
       <label><input type="radio" name="attendance" value="present" checked

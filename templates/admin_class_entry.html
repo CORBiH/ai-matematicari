@@ -56,6 +56,13 @@
                value="{{ chosen.session_date or today }}" required>
       </div>
       <div>
+        <label for="session_time">Vrijeme</label>
+        {# OBAVEZNO od verzije 5: dvije grupe istog razreda istog dana razlikuju
+           se samo po vremenu. `type=time` salje kanonski HH:MM. #}
+        <input type="time" id="session_time" name="session_time"
+               value="{{ chosen.session_time }}" required>
+      </div>
+      <div>
         <label for="grade">Razred</label>
         <select id="grade" name="grade" onchange="this.form.submit()">
           <option value="">— izaberi razred —</option>
@@ -65,6 +72,39 @@
         </select>
       </div>
       {% if chosen.grade %}
+      <div>
+        <label>Tema časa</label>
+        <div class="seg">
+          {# Podrazumijevano „Iz nastavnog plana"; „Rucni unos" postoji jer nije
+             svaki stvarni cas lekcija iz plana. Server svejedno odlucuje. #}
+          <input type="radio" id="mode_curriculum" name="topic_mode"
+                 value="{{ topic_curriculum }}"
+                 {% if chosen.topic_mode != topic_custom %}checked{% endif %}
+                 onchange="this.form.submit()">
+          <label for="mode_curriculum">{{ topic_labels[topic_curriculum] }}</label>
+          <input type="radio" id="mode_custom" name="topic_mode"
+                 value="{{ topic_custom }}"
+                 {% if chosen.topic_mode == topic_custom %}checked{% endif %}
+                 onchange="this.form.submit()">
+          <label for="mode_custom">{{ topic_labels[topic_custom] }}</label>
+        </div>
+      </div>
+      {% endif %}
+      {% if chosen.grade and chosen.topic_mode == topic_custom %}
+      <div>
+        <label for="custom_lesson">Tema časa</label>
+        <input type="text" id="custom_lesson" name="lesson_name"
+               maxlength="{{ max_topic_chars }}" required
+               placeholder="npr. Uvodni čas"
+               value="{{ chosen.lesson_name }}">
+      </div>
+      <div>
+        <label for="custom_area">Oblast <span class="muted">(opcionalno)</span></label>
+        <input type="text" id="custom_area" name="area_name"
+               maxlength="{{ max_topic_chars }}" value="{{ chosen.area_name }}">
+      </div>
+      {% endif %}
+      {% if chosen.grade and chosen.topic_mode != topic_custom %}
       <div>
         <label for="area_name">Oblast</label>
         <select id="area_name" name="area_name" onchange="this.form.submit()">
@@ -94,6 +134,12 @@
 <div class="card">
   <p class="muted" style="margin:0">Izaberite razred da biste vidjeli učenike.</p>
 </div>
+{% elif not chosen.session_time or not chosen.lesson_name %}
+<div class="card">
+  <p class="muted" style="margin:0">
+    Unesite vrijeme i temu časa da biste vidjeli učenike.
+  </p>
+</div>
 {% else %}
 
 {% if unconfirmed %}
@@ -107,7 +153,12 @@
 <form method="post" action="{{ url_for('admin_sessions.save_class') }}">
   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
   <input type="hidden" name="session_date" value="{{ chosen.session_date or today }}">
+  <input type="hidden" name="session_time" value="{{ chosen.session_time }}">
+  {# Termin s kojim je stranica OTVORENA: ako ga instruktor promijeni, cas se
+     PREMJESTI umjesto da nastane dvojnik na novom terminu. #}
+  <input type="hidden" name="previous_session_time" value="{{ chosen.session_time }}">
   <input type="hidden" name="grade" value="{{ chosen.grade }}">
+  <input type="hidden" name="topic_mode" value="{{ chosen.topic_mode }}">
   <input type="hidden" name="area_name" value="{{ chosen.area_name }}">
   <input type="hidden" name="lesson_name" value="{{ chosen.lesson_name }}">
 

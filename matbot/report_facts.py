@@ -143,6 +143,11 @@ def _instruction_facts(instruction):
         "homework_assigned": int(homework.get("assigned_count") or 0),
         "homework_done": int(homework.get("done_count") or 0),
         "homework_not_done": int(homework.get("not_done_count") or 0),
+        # SAMO KURIKULARNO GRADIVO. `build_monthly_summary` ručne teme drži
+        # odvojeno (`custom_topics`) i one ovdje NAMJERNO ne ulaze: model ova
+        # polja čita kao gradivo iz plana, pa bi „Uvodni čas" u spisku lekcija
+        # mogao završiti kao „gradivo koje treba uvježbati". Čas se i dalje
+        # broji u prisustvu, angažmanu i zadaći — samo se ne imenuje kao lekcija.
         "areas_worked": list(instruction.get("areas_worked") or [])[:MAX_LESSON_ROWS],
         "lessons_worked": list(instruction.get("lessons_worked") or [])[:MAX_LESSON_ROWS],
         # Signali su SERVERSKA odluka. Bez njih bi model sam procjenjivao da je

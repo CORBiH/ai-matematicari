@@ -212,7 +212,7 @@ def test_v3_migration_touches_no_phase3c_data(tmp_path):
 
 def test_checker_exposes_v3_state(db):
     report = db.check()
-    assert report["schema_version"] == 4
+    assert report["schema_version"] == 5
     assert report["v3_schema_verified"] is True
     rendered = reporting_db._format_report(report)
     assert "v3_schema: verified" in rendered

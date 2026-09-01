@@ -59,6 +59,18 @@ PRESENT_HOMEWORK_DEFAULT = student_sessions.HOMEWORK_NOT_ASSIGNED
 
 VALID_GRADES = (6, 7, 8, 9)
 
+# --- REŽIM TEME ČASA -------------------------------------------------------
+# „Iz nastavnog plana" je podrazumijevano; „Ručni unos" postoji jer nije svaki
+# stvarni čas lekcija iz plana („Uvodni čas", „Ponavljanje", „Konsultacije").
+# REŽIM JE SERVERSKI RAZUMLJIV, ne slijepo preuzeto polje: nepoznata vrijednost
+# pada na kurikularni režim, koji je STROŽI — pa podmetnut režim ne može
+# zaobići provjeru gradiva, nego je uvijek uključuje.
+TOPIC_MODE_LABELS = {
+    student_sessions.TOPIC_CURRICULUM: "Iz nastavnog plana",
+    student_sessions.TOPIC_CUSTOM: "Ručni unos",
+}
+TOPIC_MODE_DEFAULT = student_sessions.TOPIC_CURRICULUM
+
 
 class ClassEntryError(ValueError):
     """Neispravan unos časa. `code` je INTERNI kod za log i test, ne za ekran."""
@@ -77,6 +89,12 @@ def clean_grade(raw):
     return grade if grade in VALID_GRADES else None
 
 
+def clean_topic_mode(raw):
+    """Nepoznat režim pada na KURIKULARNI, jer je stroži (vidi konstante)."""
+    value = str(raw or "").strip()
+    return value if value in student_sessions.TOPIC_SOURCES else TOPIC_MODE_DEFAULT
+
+
 def clean_participation(raw):
     """Nepoznata vrijednost pada na PODRAZUMIJEVANO, ne na „prisutan".
 
@@ -92,8 +110,9 @@ def _require(condition, code):
         raise ClassEntryError(code)
 
 
-def build_class_records(*, session_date, grade, area_name, lesson_name,
-                        roster_ids, submissions):
+def build_class_records(*, session_date, session_time, grade, area_name,
+                        lesson_name, roster_ids, submissions,
+                        topic_mode=TOPIC_MODE_DEFAULT):
     """Zajednička polja časa + red po učeniku → zapisi spremni za bazu.
 
     `roster_ids` je SERVERSKI izveden skup dozvoljenih `student_id` (aktivni
@@ -111,18 +130,33 @@ def build_class_records(*, session_date, grade, area_name, lesson_name,
     _require(clean_grade(grade) is not None, "class_grade_invalid")
     grade = clean_grade(grade)
 
-    # Datum i kurikulum se provjeravaju JEDNOM za cijeli čas: svi redovi dijele
-    # iste vrijednosti, pa bi provjera po učeniku bila isti posao osam puta.
+    # Datum, vrijeme i tema se provjeravaju JEDNOM za cijeli čas: svi redovi
+    # dijele iste vrijednosti, pa bi provjera po učeniku bila isti posao osam
+    # puta. Sve prije prvog upisa — vidi atomičnost u `save_class_sessions`.
     date = student_sessions.parse_session_date(session_date)
+    # VRIJEME JE OBAVEZNO ZA NOV ČAS (verzija 5): dvije grupe istog razreda
+    # istog dana razlikuju se samo po njemu.
+    time_text = student_sessions.parse_session_time(session_time)
 
+    mode = clean_topic_mode(topic_mode)
     area = str(area_name or "").strip()
     lesson = str(lesson_name or "").strip()
-    _require(area and lesson, "class_curriculum_incomplete")
 
-    from matbot import topics
+    if mode == student_sessions.TOPIC_CUSTOM:
+        # RUČNA TEMA: naziv je obavezan, oblast NIJE. „Uvodni čas" ne pripada
+        # nijednoj oblasti, a izmišljena oblast bi bila gora od prazne.
+        _require(lesson, "class_topic_required")
+        _require(len(lesson) <= student_sessions.MAX_LABEL_CHARS,
+                 "class_topic_too_long")
+        _require(len(area) <= student_sessions.MAX_LABEL_CHARS,
+                 "class_area_too_long")
+    else:
+        _require(area and lesson, "class_curriculum_incomplete")
 
-    _require(topics.curriculum_pair_valid(grade, area, lesson),
-             "class_curriculum_unknown")
+        from matbot import topics
+
+        _require(topics.curriculum_pair_valid(grade, area, lesson),
+                 "class_curriculum_unknown")
 
     allowed = {int(sid) for sid in roster_ids}
     records = []
@@ -153,15 +187,18 @@ def build_class_records(*, session_date, grade, area_name, lesson_name,
 
         record = student_sessions.validate_session(
             session_date=date,
+            session_time=time_text,
             attendance=(student_sessions.ATTENDANCE_PRESENT
                         if participation == PARTICIPATION_PRESENT
                         else student_sessions.ATTENDANCE_ABSENT),
             activity_rating=rating,
             homework_status=homework,
-            area_name=area,
+            area_name=(area or None),
             lesson_name=lesson,
+            topic_source=mode,
             comment=(fields or {}).get("comment"),
-            grade=grade)
+            grade=grade,
+            require_time=True)
         records.append((student_id, record))
     return records
 

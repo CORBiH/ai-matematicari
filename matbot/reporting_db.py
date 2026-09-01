@@ -197,6 +197,8 @@ class ReportingDatabase:
         # Ima li baza kolone potvrde razreda (šema v4)? `None` = još nije
         # provjereno. Vidi `_grade_confirmation_available`.
         self._grade_confirmation = None
+        # Isto za vrijeme i izvor teme časa (šema v5).
+        self._session_v5 = None
 
     # -- konekcija ---------------------------------------------------------
     def _connection(self):
@@ -235,12 +237,33 @@ class ReportingDatabase:
         # Zapamćena sposobnost pripada KONEKCIJI, ne procesu: poslije migracije
         # se konekcija ionako obnavlja, pa se i odgovor mora ponovo izmjeriti.
         self._grade_confirmation = None
+        self._session_v5 = None
         if conn is not None:
             self._discard(conn)
 
     def close(self):
         with self._lock:
             self._drop_connection()
+
+    # -- vrijeme i izvor teme časa (šema v5) -------------------------------
+    def _session_v5_available(self, conn):
+        """Postoje li `session_time` i `topic_source` na `student_sessions`?
+
+        ISTI RAZLOG KAO KOD v4: raspoređivanje pušta migraciju prije zamjene
+        aplikacije, ali baza koja zaostane ne smije proizvesti neuhvaćen izuzetak
+        usred administratorske stranice. `False` je BEZBJEDAN ISHOD — časovi se i
+        dalje ČITAJU (bez vremena i izvora teme), a upis novog časa pada
+        zatvoreno umjesto da tiho napravi red bez vremena, koji poslije nijedna
+        izmjena ne bi umjela razlikovati."""
+        if self._session_v5 is None:
+            try:
+                columns = {row[1] for row in _rows(
+                    conn.execute("PRAGMA table_info(student_sessions)"))}
+            except Exception:
+                return False
+            self._session_v5 = ("session_time" in columns
+                                and "topic_source" in columns)
+        return self._session_v5
 
     # -- potvrda tekućeg razreda (šema v4) ---------------------------------
     def _grade_confirmation_available(self, conn):
@@ -1537,24 +1560,41 @@ class ReportingDatabase:
     _SESSION_COLUMNS = ("id", "student_id", "session_date", "attendance",
                         "activity_rating", "homework_status", "area_name",
                         "lesson_name", "comment", "created_at", "updated_at")
+    # Kolone verzije 5. Čitaju se odvojeno da baza bez njih i dalje radi.
+    _SESSION_V5_COLUMNS = ("session_time", "topic_source")
 
     def insert_session(self, student_id, record):
-        """Upiši jedan čas. `record` je već PROŠAO `student_sessions.validate_session`."""
+        """Upiši jedan čas. `record` je već PROŠAO `student_sessions.validate_session`.
+
+        Vrijeme i izvor teme se upisuju kad ih baza ima (v5). Bez v5 kolona nov
+        čas s vremenom pada ZATVORENO: red bez vremena poslije ne bi mogao biti
+        razlikovan od druge grupe istog dana."""
         with self._lock:
             try:
                 conn = self._connection()
+                has_v5 = self._session_v5_available(conn)
+                if record.get("session_time") and not has_v5:
+                    raise ReportingUnavailable("session_time_unavailable")
+                extra_names = ", session_time, topic_source" if has_v5 else ""
+                extra_marks = ", ?, ?" if has_v5 else ""
+                extra_values = ((record.get("session_time"),
+                                 record.get("topic_source")) if has_v5 else ())
                 cursor = conn.execute(
                     "INSERT INTO student_sessions (student_id, session_date, "
                     " attendance, activity_rating, homework_status, area_name, "
-                    " lesson_name, comment, created_at, updated_at) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, "
-                    " CURRENT_TIMESTAMP)",
+                    " lesson_name, comment" + extra_names + ", created_at, updated_at) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?" + extra_marks +
+                    ", CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
                     (int(student_id), record["session_date"], record["attendance"],
                      record["activity_rating"], record["homework_status"],
-                     record["area_name"], record["lesson_name"], record["comment"]))
+                     record["area_name"], record["lesson_name"], record["comment"],
+                     *extra_values))
                 session_id = cursor.lastrowid
                 conn.commit()
                 return session_id
+            except ReportingUnavailable:
+                self._safe_rollback()
+                raise
             except Exception as exc:
                 self._safe_rollback()
                 self._drop_connection()
@@ -1569,18 +1609,29 @@ class ReportingDatabase:
         with self._lock:
             try:
                 conn = self._connection()
+                has_v5 = self._session_v5_available(conn)
+                if record.get("session_time") and not has_v5:
+                    raise ReportingUnavailable("session_time_unavailable")
+                extra_set = (", session_time = ?, topic_source = ?"
+                             if has_v5 else "")
+                extra_values = ((record.get("session_time"),
+                                 record.get("topic_source")) if has_v5 else ())
                 cursor = conn.execute(
                     "UPDATE student_sessions SET session_date = ?, attendance = ?, "
                     " activity_rating = ?, homework_status = ?, area_name = ?, "
-                    " lesson_name = ?, comment = ?, updated_at = CURRENT_TIMESTAMP "
+                    " lesson_name = ?, comment = ?" + extra_set +
+                    ", updated_at = CURRENT_TIMESTAMP "
                     "WHERE id = ? AND student_id = ?",
                     (record["session_date"], record["attendance"],
                      record["activity_rating"], record["homework_status"],
                      record["area_name"], record["lesson_name"], record["comment"],
-                     int(session_id), int(student_id)))
+                     *extra_values, int(session_id), int(student_id)))
                 changed = cursor.rowcount
                 conn.commit()
                 return changed == 1
+            except ReportingUnavailable:
+                self._safe_rollback()
+                raise
             except Exception as exc:
                 self._safe_rollback()
                 self._drop_connection()
@@ -1625,117 +1676,174 @@ class ReportingDatabase:
         return self._fetch_sessions(clause, tuple(params))
 
     def _fetch_sessions(self, clause, params, single=False):
-        columns = ", ".join(self._SESSION_COLUMNS)
         with self._lock:
             try:
                 conn = self._connection()
+                names = list(self._SESSION_COLUMNS)
+                if self._session_v5_available(conn):
+                    names += list(self._SESSION_V5_COLUMNS)
                 rows = _rows(conn.execute(
-                    "SELECT %s FROM student_sessions %s" % (columns, clause),
-                    params))
+                    "SELECT %s FROM student_sessions %s"
+                    % (", ".join(names), clause), params))
             except Exception as exc:
                 self._drop_connection()
                 raise ReportingUnavailable(
                     "session_read_failed:" + type(exc).__name__, exc) from None
-        records = [dict(zip(self._SESSION_COLUMNS, row)) for row in rows]
+        records = [dict(zip(names, row)) for row in rows]
+        # Zatečen red (i baza bez v5) izgleda isto pozivaocu: bez vremena i bez
+        # izvora teme. Nijedna vrijednost se ne izmišlja.
+        for record in records:
+            record.setdefault("session_time", None)
+            record.setdefault("topic_source", None)
         if single:
             return records[0] if records else None
         return records
 
-    def save_class_sessions(self, records):
+    # Identitet logickog casa BEZ ucenika (datum, vrijeme, tema) i s njim.
+    # Razdvojeno jer citanje cijelog casa filtrira `student_id IN (...)`, a
+    # provjera jednog reda `student_id = ?`.
+    _CLASS_MATCH_TOPIC = ("session_date = ? "
+                          " AND COALESCE(session_time, '') = COALESCE(?, '') "
+                          " AND COALESCE(area_name, '') = COALESCE(?, '') "
+                          " AND COALESCE(lesson_name, '') = COALESCE(?, '')")
+    _CLASS_MATCH = "student_id = ? AND " + _CLASS_MATCH_TOPIC
+
+    def _class_row_id(self, conn, student_id, record, session_time):
+        """`id` reda tog LOGIČKOG časa, ili `None`. Samo čitanje."""
+        rows = _rows(conn.execute(
+            "SELECT id FROM student_sessions WHERE " + self._CLASS_MATCH
+            + " ORDER BY id LIMIT 1",
+            (int(student_id), record["session_date"], session_time,
+             record["area_name"], record["lesson_name"])))
+        return int(rows[0][0]) if rows else None
+
+    def save_class_sessions(self, records, previous_time=None):
         """CIJELI ČAS U JEDNOJ TRANSAKCIJI. `records` je [(student_id, zapis)].
 
-        Vraća `{"inserted": n, "updated": m}`.
+        Vraća `{"inserted": n, "updated": m, "moved": k}`.
 
-        ZAŠTO JEDAN COMMIT: djelimično sačuvan čas je gori od nesačuvanog — pola
-        odjeljenja bi imalo evidenciju, a instruktor bi vidio poruku o grešci i
-        ponovo poslao isti čas. Ili prođu svi redovi, ili nijedan.
+        LOGIČKI IDENTITET ČASA (verzija 5):
 
-        ZAŠTITA OD DVOSTRUKOG SLANJA, BEZ ŠEME v5. Osvježena stranica i dvoklik
-        na „Sačuvaj" ne smiju napraviti drugi red za isti logički čas. Ključ je
-        `(student_id, session_date, area_name, lesson_name)`: postojeći red se
-        AŽURIRA, a novi se upisuje samo ako ga nema. Isti čas poslan dvaput zato
-        daje isto stanje kao poslan jednom.
+            (student_id, session_date, session_time, area_name, lesson_name)
 
-        GRANICA KOJU OVO NE PREĐE, izričito: `student_sessions` NEMA jedinstveni
-        indeks nad tim ključem (dodavanje bi bilo šema v5, a nad zatečenim
-        produkcijskim redovima bi moglo i pasti). Zaštita je zato „pročitaj pa
-        upiši" unutar JEDNE transakcije, serijalizovana bravom ove instance —
-        dovoljno za jednog administratora, ali ne i strukturna garancija protiv
-        dva istovremena procesa. Ako to ikad postane stvaran zahtjev, ispravka je
-        jedinstveni indeks, ne još jedna provjera u Pythonu."""
-        counters = {"inserted": 0, "updated": 0}
+        VRIJEME JE DIO IDENTITETA, i to je cijela poenta: sedmi razred u 10:00 i
+        sedmi razred u 14:00 nad ISTOM lekcijom su dva stvarna časa. Prije v5 su
+        se sudarali — drugo čuvanje je pregazilo prvo.
+
+        `previous_time` je vrijeme s kojim je stranica OTVORENA. Kad ga
+        instruktor promijeni, čas se PREMJESTI (isti red dobije novo vrijeme)
+        umjesto da nastane dvojnik na novom terminu, a stari ostane kao duh.
+
+        PADA ZATVORENO NA SUDAR: ako na CILJNOM terminu već postoji čas tog
+        učenika s istom temom, a premještamo neki drugi red — to su dva različita
+        časa i spajanje bi tiho uništilo jedan. Cijelo čuvanje se odbija.
+
+        ZAŠTO JE PROVJERA U DVA PROLAZA: sve odluke se donesu PRIJE prvog upisa,
+        pa sudar na petom učeniku ne ostavlja četiri upisana reda.
+
+        STRUKTURNA ZAŠTITA: od v5 postoji i DJELIMIČAN jedinstveni indeks nad
+        istim ključem (`WHERE session_time IS NOT NULL`), pa duplikat ne zavisi
+        samo od ove provjere. Zatečeni redovi bez vremena indeks ne dodiruje."""
+        counters = {"inserted": 0, "updated": 0, "moved": 0}
         if not records:
             return counters
 
         with self._lock:
             try:
                 conn = self._connection()
+                if not self._session_v5_available(conn):
+                    # Bez v5 kolona nov čas ne smije nastati: red bez vremena se
+                    # kasnije ne bi mogao razlikovati od druge grupe istog dana.
+                    raise ReportingUnavailable("session_time_unavailable")
+
+                moved_from = (previous_time or None)
+                plan = []
                 for student_id, record in records:
-                    existing = _rows(conn.execute(
-                        "SELECT id FROM student_sessions "
-                        "WHERE student_id = ? AND session_date = ? "
-                        " AND COALESCE(area_name, '') = COALESCE(?, '') "
-                        " AND COALESCE(lesson_name, '') = COALESCE(?, '') "
-                        "ORDER BY id LIMIT 1",
-                        (int(student_id), record["session_date"],
-                         record["area_name"], record["lesson_name"])))
-                    if existing:
-                        conn.execute(
-                            "UPDATE student_sessions SET attendance = ?, "
-                            " activity_rating = ?, homework_status = ?, "
-                            " comment = ?, updated_at = CURRENT_TIMESTAMP "
-                            "WHERE id = ? AND student_id = ?",
-                            (record["attendance"], record["activity_rating"],
-                             record["homework_status"], record["comment"],
-                             int(existing[0][0]), int(student_id)))
-                        counters["updated"] += 1
+                    target = self._class_row_id(conn, student_id, record,
+                                                record.get("session_time"))
+                    source = None
+                    if (moved_from and moved_from != record.get("session_time")):
+                        source = self._class_row_id(conn, student_id, record,
+                                                    moved_from)
+                    if target is not None and source is not None:
+                        # Ciljni termin je ZAUZET drugim časom istog učenika.
+                        raise ReportingUnavailable("class_time_conflict")
+                    if target is not None:
+                        plan.append(("update", target, student_id, record))
+                    elif source is not None:
+                        plan.append(("move", source, student_id, record))
                     else:
+                        plan.append(("insert", None, student_id, record))
+
+                for action, row_id, student_id, record in plan:
+                    if action == "insert":
                         conn.execute(
                             "INSERT INTO student_sessions (student_id, "
-                            " session_date, attendance, activity_rating, "
-                            " homework_status, area_name, lesson_name, comment, "
-                            " created_at, updated_at) "
-                            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, "
-                            " CURRENT_TIMESTAMP)",
+                            " session_date, session_time, attendance, "
+                            " activity_rating, homework_status, area_name, "
+                            " lesson_name, topic_source, comment, created_at, "
+                            " updated_at) "
+                            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, "
+                            " CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
                             (int(student_id), record["session_date"],
-                             record["attendance"], record["activity_rating"],
-                             record["homework_status"], record["area_name"],
-                             record["lesson_name"], record["comment"]))
+                             record.get("session_time"), record["attendance"],
+                             record["activity_rating"], record["homework_status"],
+                             record["area_name"], record["lesson_name"],
+                             record.get("topic_source"), record["comment"]))
                         counters["inserted"] += 1
+                        continue
+                    conn.execute(
+                        "UPDATE student_sessions SET session_time = ?, "
+                        " attendance = ?, activity_rating = ?, "
+                        " homework_status = ?, topic_source = ?, comment = ?, "
+                        " updated_at = CURRENT_TIMESTAMP "
+                        "WHERE id = ? AND student_id = ?",
+                        (record.get("session_time"), record["attendance"],
+                         record["activity_rating"], record["homework_status"],
+                         record.get("topic_source"), record["comment"],
+                         int(row_id), int(student_id)))
+                    counters["moved" if action == "move" else "updated"] += 1
+
                 conn.commit()          # JEDINI commit za cijeli čas
                 return counters
+            except ReportingUnavailable:
+                self._safe_rollback()
+                raise
             except Exception as exc:
                 self._safe_rollback()
                 self._drop_connection()
                 raise ReportingUnavailable(
                     "class_save_failed:" + type(exc).__name__, exc) from None
 
-    def fetch_class_sessions(self, session_date, area_name, lesson_name,
-                             student_ids):
+    def fetch_class_sessions(self, session_date, session_time, area_name,
+                             lesson_name, student_ids):
         """Već upisani redovi JEDNOG logičkog časa. Samo čitanje.
 
-        Služi da se stranica otvori kao IZMJENA: instruktor vidi šta je ranije
-        unio umjesto praznog formulara, i ispravlja bez otvaranja profila."""
+        VRIJEME SUŽAVA IZBOR. Bez njega bi „Uredi čas" za termin u 10:00 učitao
+        i grupu iz 14:00 nad istom lekcijom i tiho pomiješao dvije grupe."""
         found = {}
         ids = [int(sid) for sid in (student_ids or [])]
         if not ids:
             return found
-        columns = ", ".join(self._SESSION_COLUMNS)
         with self._lock:
             try:
                 conn = self._connection()
+                names = list(self._SESSION_COLUMNS)
+                if self._session_v5_available(conn):
+                    names += list(self._SESSION_V5_COLUMNS)
                 for chunk in self._chunks(ids):
                     placeholders = ",".join("?" * len(chunk))
                     rows = _rows(conn.execute(
-                        "SELECT %s FROM student_sessions "
-                        "WHERE session_date = ? "
-                        " AND COALESCE(area_name, '') = COALESCE(?, '') "
-                        " AND COALESCE(lesson_name, '') = COALESCE(?, '') "
+                        "SELECT %s FROM student_sessions WHERE %s "
                         " AND student_id IN (%s) ORDER BY id"
-                        % (columns, placeholders),
-                        (session_date, area_name, lesson_name, *chunk)))
+                        % (", ".join(names), self._CLASS_MATCH_TOPIC,
+                           placeholders),
+                        (session_date, session_time, area_name, lesson_name,
+                         *chunk)))
                     for row in rows:
-                        record = dict(zip(self._SESSION_COLUMNS, row))
+                        record = dict(zip(names, row))
+                        record.setdefault("session_time", None)
+                        record.setdefault("topic_source", None)
                         found.setdefault(record["student_id"], record)
             except Exception as exc:
                 self._drop_connection()
@@ -1853,8 +1961,11 @@ class ReportingDatabase:
                     applied.append(reporting_schema.SCHEMA_VERSION_V3)
                 if reporting_schema.migrate_to_v4(conn):
                     applied.append(reporting_schema.SCHEMA_VERSION_V4)
+                if reporting_schema.migrate_to_v5(conn):
+                    applied.append(reporting_schema.SCHEMA_VERSION_V5)
                 # Nove kolone mijenjaju ono što je konekcija zapamtila.
                 self._grade_confirmation = None
+                self._session_v5 = None
             except reporting_schema.MigrationError:
                 self._drop_connection()
                 raise
@@ -1958,6 +2069,15 @@ class ReportingDatabase:
                 except Exception:
                     report["v4_schema_problems"] = ["v4_verification_unavailable"]
                 report["v4_schema_verified"] = not report["v4_schema_problems"]
+                # Verzija 5: vrijeme i izvor teme časa + djelimičan jedinstveni
+                # indeks. Baza koja tvrdi v5 a nema ih mora se VIDJETI.
+                try:
+                    from matbot import reporting_schema as _v5schema
+
+                    report["v5_schema_problems"] = _v5schema.verify_v5_schema(conn)
+                except Exception:
+                    report["v5_schema_problems"] = ["v5_verification_unavailable"]
+                report["v5_schema_verified"] = not report["v5_schema_problems"]
                 return report
             except ReportingUnavailable as exc:
                 self._drop_connection()
@@ -2431,6 +2551,10 @@ def _format_report(report):
     if "v4_schema_verified" in report:
         problems = report.get("v4_schema_problems") or []
         lines.append("v4_schema: %s" % ("verified" if report["v4_schema_verified"]
+                                        else "INCOMPLETE -> " + ", ".join(problems)))
+    if "v5_schema_verified" in report:
+        problems = report.get("v5_schema_problems") or []
+        lines.append("v5_schema: %s" % ("verified" if report["v5_schema_verified"]
                                         else "INCOMPLETE -> " + ", ".join(problems)))
     if "monthly_reports_ready" in report:
         problems = report.get("monthly_reports_problems") or []

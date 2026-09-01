@@ -31,6 +31,8 @@ libsql = pytest.importorskip("libsql")
 PASSWORD = "administratorska-lozinka-123"
 
 DATE = "2026-09-07"
+# Vrijeme je od verzije 5 dio identiteta časa i obavezno za svaki NOV zapis.
+TIME = "10:00"
 GRADE = 7
 AREA = "Cijeli brojevi"
 LESSON = "Skup cijelih brojeva Z"
@@ -106,9 +108,12 @@ def legacy(db, name, grade=6):
     return student_id
 
 
-def form(rows, *, date=DATE, grade=GRADE, area=AREA, lesson=LESSON, token=None):
-    data = {"session_date": date, "grade": str(grade),
-            "area_name": area, "lesson_name": lesson}
+def form(rows, *, date=DATE, time=TIME, grade=GRADE, area=AREA, lesson=LESSON,
+         token=None, mode="curriculum", previous_time=None):
+    data = {"session_date": date, "session_time": time, "grade": str(grade),
+            "topic_mode": mode, "area_name": area, "lesson_name": lesson}
+    if previous_time:
+        data["previous_session_time"] = previous_time
     if token:
         data["csrf_token"] = token
     for student_id, fields in rows.items():
@@ -118,9 +123,10 @@ def form(rows, *, date=DATE, grade=GRADE, area=AREA, lesson=LESSON, token=None):
 
 
 def entry_page(admin, grade=GRADE, **extra):
-    query = "/admin/sessions/new?grade=%s&session_date=%s&area_name=%s&lesson_name=%s" % (
-        grade, extra.get("date", DATE), extra.get("area", AREA),
-        extra.get("lesson", LESSON))
+    query = ("/admin/sessions/new?grade=%s&session_date=%s&session_time=%s"
+             "&area_name=%s&lesson_name=%s"
+             % (grade, extra.get("date", DATE), extra.get("time", TIME),
+                extra.get("area", AREA), extra.get("lesson", LESSON)))
     return admin.get(query)
 
 
@@ -541,12 +547,13 @@ def test_21_to_24_bulk_metrics_equal_individual_entry_metrics(admin, db):
 
         # ISTI podaci, STARIM putem (pojedinačni unos kroz sloj profila).
         record = student_sessions.validate_session(
-            session_date=date,
+            session_date=date, session_time=TIME,
             attendance=state,
             activity_rating=activity if state == "present" else None,
             homework_status=(homework if state == "present"
                              else class_entry.ABSENT_HOMEWORK),
-            area_name=AREA, lesson_name=lesson, comment=comment, grade=7)
+            area_name=AREA, lesson_name=lesson, comment=comment, grade=7,
+            topic_source=student_sessions.TOPIC_CURRICULUM, require_time=True)
         db.insert_session(single, record)
 
     from_bulk = _month_summary(db, bulk)
@@ -613,13 +620,14 @@ def test_26_the_report_prompt_is_unchanged():
     assert report_prompt.REPORT_PROMPT_VERSION == "3d-2"
 
 
-def test_27_the_schema_stays_at_version_four():
+def test_27_the_schema_is_at_version_five():
+    """Verzija 5 je uvedena SVJESNO: vrijeme časa se bez nje ne može zapisati."""
     from matbot import config
 
-    assert reporting_schema.CURRENT_SCHEMA_VERSION == 4
-    assert config.REPORTING_SCHEMA_VERSION == 4
-    assert set(reporting_schema.MIGRATION_DESCRIPTIONS) == {2, 3, 4}
-    assert not hasattr(reporting_schema, "SCHEMA_VERSION_V5")
+    assert reporting_schema.CURRENT_SCHEMA_VERSION == 5
+    assert config.REPORTING_SCHEMA_VERSION == 5
+    assert set(reporting_schema.MIGRATION_DESCRIPTIONS) == {2, 3, 4, 5}
+    assert not hasattr(reporting_schema, "SCHEMA_VERSION_V6")
 
 
 def test_28_the_individual_per_student_workflow_still_works(admin, db):
@@ -630,7 +638,8 @@ def test_28_the_individual_per_student_workflow_still_works(admin, db):
 
     admin.post("/admin/students/%d/sessions" % student_id,
                data={"csrf_token": csrf_from(profile),
-                     "session_date": "2026-09-10", "attendance": "present",
+                     "session_date": "2026-09-10", "session_time": "11:30",
+                     "attendance": "present",
                      "activity_rating": "5", "homework_status": "done",
                      "area_name": AREA, "lesson_name": LESSON,
                      "comment": ""})
@@ -640,6 +649,7 @@ def test_28_the_individual_per_student_workflow_still_works(admin, db):
 
 def test_29_historical_sessions_are_untouched_by_a_new_class(admin, db):
     student_id = confirmed(db, "Sedmak", 7)
+    # ZATEČEN red: bez vremena (kakvi su svi redovi prije verzije 5).
     old = student_sessions.validate_session(
         session_date="2026-05-04", attendance="present", activity_rating=2,
         homework_status="not_done", area_name=AREA, lesson_name=LESSON,

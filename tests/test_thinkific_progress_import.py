@@ -51,7 +51,7 @@ def build_v1(path):
 
 
 def migrate(path):
-    """Dovedi bazu do TEKUĆE verzije (v1 → v2 → v3 → v4).
+    """Dovedi bazu do TEKUĆE verzije (v1 → v2 → v3 → v4 → v5).
 
     Faza 3D: populacija izvještaja čita i `student_sessions`, pa fixture koji
     stane na v2 više ne predstavlja bazu na koju se kod oslanja. Verzija 4 dodaje
@@ -61,6 +61,7 @@ def migrate(path):
         applied = reporting_schema.migrate_to_v2(conn)
         reporting_schema.migrate_to_v3(conn)
         reporting_schema.migrate_to_v4(conn)
+        reporting_schema.migrate_to_v5(conn)
         return applied
     finally:
         conn.close()
@@ -81,6 +82,17 @@ def migrate_v3_only(path):
     try:
         reporting_schema.migrate_to_v2(conn)
         return reporting_schema.migrate_to_v3(conn)
+    finally:
+        conn.close()
+
+
+def migrate_v4_only(path):
+    """Namjerno ZAUSTAVLJENO na v4 — za testove migracije v4 → v5."""
+    conn = libsql.connect(path)
+    try:
+        reporting_schema.migrate_to_v2(conn)
+        reporting_schema.migrate_to_v3(conn)
+        return reporting_schema.migrate_to_v4(conn)
     finally:
         conn.close()
 
