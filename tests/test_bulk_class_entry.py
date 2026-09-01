@@ -134,6 +134,14 @@ def sessions_of(db, student_id):
     return db.fetch_sessions(student_id)
 
 
+def class_id_from(answer):
+    """`/admin/sessions/<id>?saved=1` → id. Čuvanje vraća IDENTITET časa."""
+    location = answer.headers.get("Location", "")
+    match = re.search(r"/admin/sessions/(\d+)", location)
+    assert match, "čuvanje nije vratilo identitet časa: " + location
+    return int(match.group(1))
+
+
 # ===========================================================================
 # 1-3) PRISTUP
 # ===========================================================================
@@ -479,16 +487,19 @@ def test_20_an_existing_class_can_be_corrected_without_opening_profiles(admin, d
                                        "activity": "2", "homework": "not_done",
                                        "comment": "prva verzija"}}, token=token))
 
-    # Ista stranica s istom četvorkom UČITAVA ono što je već upisano.
-    page = entry_page(admin, 7)
+    # IZMJENA IDE PO IDENTITETU ČASA: stranica se otvara s `class_id`.
+    saved = sessions_of(db, student_id)
+    klass = db.fetch_class(saved[0]["class_session_id"])
+    page = admin.get("/admin/sessions/new?class_id=%d" % klass["id"])
     assert b"prva verzija" in page.data
     assert ('id="a%d_2"' % student_id).encode() in page.data
 
-    admin.post("/admin/sessions/bulk",
-               data=form({student_id: {"participation": "present",
-                                       "activity": "5", "homework": "done",
-                                       "comment": "ispravljeno"}},
-                         token=csrf_from(page)))
+    data = form({student_id: {"participation": "present",
+                              "activity": "5", "homework": "done",
+                              "comment": "ispravljeno"}},
+                token=csrf_from(page))
+    data["class_id"] = str(klass["id"])
+    admin.post("/admin/sessions/bulk", data=data)
 
     stored = sessions_of(db, student_id)
     assert len(stored) == 1, "ispravka je napravila drugi red"
@@ -620,14 +631,14 @@ def test_26_the_report_prompt_is_unchanged():
     assert report_prompt.REPORT_PROMPT_VERSION == "3d-2"
 
 
-def test_27_the_schema_is_at_version_five():
-    """Verzija 5 je uvedena SVJESNO: vrijeme časa se bez nje ne može zapisati."""
+def test_27_the_schema_is_at_version_six():
+    """v5 donosi vrijeme časa, v6 čas kao OBJEKAT (stabilan identitet + razred)."""
     from matbot import config
 
-    assert reporting_schema.CURRENT_SCHEMA_VERSION == 5
-    assert config.REPORTING_SCHEMA_VERSION == 5
-    assert set(reporting_schema.MIGRATION_DESCRIPTIONS) == {2, 3, 4, 5}
-    assert not hasattr(reporting_schema, "SCHEMA_VERSION_V6")
+    assert reporting_schema.CURRENT_SCHEMA_VERSION == 6
+    assert config.REPORTING_SCHEMA_VERSION == 6
+    assert set(reporting_schema.MIGRATION_DESCRIPTIONS) == {2, 3, 4, 5, 6}
+    assert not hasattr(reporting_schema, "SCHEMA_VERSION_V7")
 
 
 def test_28_the_individual_per_student_workflow_still_works(admin, db):
@@ -698,14 +709,14 @@ def test_saved_page_shows_the_class_summary_and_an_edit_link(admin, db):
                                    b: {"participation": "absent"}}, token=token))
     assert answer.status_code == 302
 
+    # Čuvanje sada vodi na PREGLED TOG ČASA (stabilan identitet).
     page = admin.get(answer.headers["Location"])
-    assert "Čas sačuvan".encode() in page.data
+    assert "Čas je sačuvan".encode() in page.data
     assert DATE.encode() in page.data
-    assert AREA.encode() in page.data and LESSON.encode() in page.data
+    assert LESSON.encode() in page.data
     assert b">1<" in page.data          # 1 prisutan, 1 odsutan
     assert "Uredi čas".encode() in page.data
-    # Nikad ime ni komentar na stranici potvrde.
-    assert b"Prvi" not in page.data and b"Drugi" not in page.data
+    assert "Obriši čas".encode() in page.data
 
 
 def test_logging_carries_no_names_or_comments(admin, db, caplog):

@@ -1,6 +1,7 @@
 {% extends "admin_base.html" %}
 {% block heading %}{{ label }} — {{ month }}{% endblock %}
-{% block topright %}<a href="{{ url_for('admin_reports.students', month=month) }}">← Nazad na listu</a>{% endblock %}
+{% set nav_active = 'reports' %}
+{% block topright %}<a class="btn btn--ghost" href="{{ url_for('admin_reports.students', month=month) }}">← Nazad na listu</a>{% endblock %}
 {% block content %}
 {% if not payload %}
   <div class="banner err">{{ schema_message }}</div>

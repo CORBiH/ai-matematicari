@@ -1,9 +1,7 @@
 {% extends "admin_base.html" %}
 {% block title %}MAT-BOT — Upiši čas{% endblock %}
-{% block heading %}Upiši čas{% endblock %}
-{% block topright %}
-<a href="{{ url_for('admin_students.index') }}">Učenici →</a>
-{% endblock %}
+{% block heading %}{% if chosen.class_id %}Uredi čas{% else %}Upiši čas{% endif %}{% endblock %}
+{% set nav_active = 'classes' %}
 {% block content %}
 
 {# Dodatni stil SAMO za ovu stranicu. Osnovni jezik (boje, radijusi, kartice)
@@ -49,6 +47,11 @@
 {# --- KORAK 1: zajednička polja časa ----------------------------------- #}
 <div class="card">
   <form method="get" action="{{ url_for('admin_sessions.new_class') }}">
+    {% if chosen.class_id %}
+    {# IZMJENA POSTOJECEG CASA: identitet ide kroz formu, pa se cas ne udvaja
+       ni kad se datum, vrijeme ili tema promijene. #}
+    <input type="hidden" name="class_id" value="{{ chosen.class_id }}">
+    {% endif %}
     <div class="grid">
       <div>
         <label for="session_date">Datum</label>
@@ -152,6 +155,9 @@
 
 <form method="post" action="{{ url_for('admin_sessions.save_class') }}">
   <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  {% if chosen.class_id %}
+  <input type="hidden" name="class_id" value="{{ chosen.class_id }}">
+  {% endif %}
   <input type="hidden" name="session_date" value="{{ chosen.session_date or today }}">
   <input type="hidden" name="session_time" value="{{ chosen.session_time }}">
   {# Termin s kojim je stranica OTVORENA: ako ga instruktor promijeni, cas se

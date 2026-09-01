@@ -26,7 +26,8 @@ import re
 from flask import (Blueprint, abort, redirect, render_template, request,
                    url_for)
 
-from matbot import (class_entry, reporting_db, student_grades, student_sessions,
+from matbot import (class_entry, report_input, reporting_db, student_grades,
+                    student_sessions,
                     topics)
 from matbot.admin_auth import CSRF_FORM_FIELD, require_admin
 
@@ -46,6 +47,12 @@ ERROR_TOPIC = "Unesite temu časa."
 ERROR_TOPIC_LONG = "Tema časa je predugačka."
 ERROR_CONFLICT = ("Na tom terminu već postoji čas s istom temom. Izaberite drugo "
                   "vrijeme ili uredite postojeći čas.")
+ERROR_CLASS_MISSING = "Taj čas više ne postoji."
+ERROR_CLASS_UNAVAILABLE = "Evidencija časova trenutno nije dostupna."
+
+# Koliko časova stane na jednu stranicu pregleda. Pregled je radni spisak, ne
+# izvoz — cjeloživotni skup se nikad ne povlači u pregledač.
+CLASSES_PER_PAGE = 25
 ERROR_ROSTER = "Neki učenik ne pripada izabranom razredu."
 ERROR_EMPTY = "Označite bar jednog učenika kao prisutnog ili odsutnog."
 ERROR_SESSION = "Podaci o času nisu ispravni."
@@ -56,6 +63,9 @@ _MESSAGES = {
     "class_curriculum_incomplete": ERROR_CURRICULUM,
     "class_curriculum_unknown": ERROR_CURRICULUM,
     "class_student_not_in_roster": ERROR_ROSTER,
+    "class_occurrence_conflict": ERROR_CONFLICT,
+    "class_missing": ERROR_CLASS_MISSING,
+    "class_entity_unavailable": ERROR_CLASS_UNAVAILABLE,
     "class_activity_required": ERROR_ACTIVITY,
     "class_topic_required": ERROR_TOPIC,
     "class_topic_too_long": ERROR_TOPIC_LONG,
@@ -72,6 +82,11 @@ _MESSAGES = {
 
 def _db():
     return reporting_db.get_database()
+
+
+def _this_month():
+    """Tekući mjesec `YYYY-MM` — podrazumijevani opseg pregleda časova."""
+    return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m")
 
 
 def _today():
@@ -121,7 +136,17 @@ def _selection(source):
         "topic_mode": class_entry.clean_topic_mode(source.get("topic_mode")),
         "area_name": (source.get("area_name") or "").strip(),
         "lesson_name": (source.get("lesson_name") or "").strip(),
+        "class_id": _clean_id(source.get("class_id")),
     }
+
+
+def _clean_id(raw):
+    """Pozitivan cijeli broj, ili `None`. Klijentu se ne vjeruje ni ovdje."""
+    try:
+        value = int(str(raw or "").strip())
+    except (TypeError, ValueError):
+        return None
+    return value if value > 0 else None
 
 
 @admin_sessions_bp.route("/new", methods=["GET"])
@@ -134,21 +159,35 @@ def new_class():
     from matbot import admin_auth
 
     chosen = _selection(request.args)
-    grade = chosen["grade"]
     roster, unconfirmed, saved = [], 0, {}
     try:
         database = _db()
+        # Otvaranje postojećeg časa popunjava zajednička polja IZ BAZE, pa se
+        # istorijski razred čita iz zapisa časa — nikad iz tekućeg profila.
+        if chosen["class_id"]:
+            existing = database.fetch_class(chosen["class_id"])
+            if existing is None:
+                return redirect(url_for("admin_sessions.class_list",
+                                        error=ERROR_CLASS_MISSING))
+            chosen.update({
+                "session_date": existing["session_date"],
+                "session_time": existing["session_time"],
+                "grade": existing["grade"],
+                "topic_mode": existing["topic_source"],
+                "area_name": existing["area_name"] or "",
+                "lesson_name": existing["lesson_name"],
+            })
+        grade = chosen["grade"]
         if grade is not None:
             roster, unconfirmed = class_roster(database, grade)
-            # VRIJEME JE DIO IDENTITETA: bez njega bi „Uredi čas" za 10:00
-            # učitao i grupu iz 14:00 nad istom lekcijom.
-            if (chosen["session_time"] and chosen["lesson_name"]):
-                saved = database.fetch_class_sessions(
-                    chosen["session_date"], chosen["session_time"],
-                    chosen["area_name"] or None, chosen["lesson_name"],
-                    [s["student_id"] for s in roster])
+            # IZMJENA IDE PO IDENTITETU ČASA, ne po skupu polja: `class_id` je
+            # jedino što ostaje isto i kad se datum, vrijeme ili tema promijene.
+            if chosen["class_id"]:
+                saved = {row["student_id"]: row for row
+                         in database.fetch_class_students(chosen["class_id"])}
     except reporting_db.ReportingUnavailable as error:
         logger.info("admin_class_roster_failed code=%s", error.code)
+        chosen.setdefault("class_id", None)
         return render_template(
             "admin_class_entry.html", chosen=chosen, roster=[], saved={},
             curriculum={}, areas=[], unconfirmed=0,
@@ -261,34 +300,151 @@ def save_class():
     if not records:
         return _back(chosen, ERROR_EMPTY)
 
-    # Vrijeme s kojim je stranica OTVORENA: kad ga instruktor promijeni, čas se
-    # PREMJESTI umjesto da nastane dvojnik na novom terminu.
-    previous_time = (request.form.get("previous_session_time") or "").strip()
     try:
-        counters = _db().save_class_sessions(records,
-                                             previous_time=previous_time or None)
+        class_id, counters = _db().save_class(
+            class_id=chosen["class_id"],
+            session_date=chosen["session_date"],
+            session_time=records[0][1]["session_time"],
+            grade=chosen["grade"], topic_source=chosen["topic_mode"],
+            area_name=chosen["area_name"] or None,
+            lesson_name=records[0][1]["lesson_name"], records=records)
     except reporting_db.ReportingUnavailable as error:
         logger.info("admin_class_save_failed code=%s", error.code)
-        if error.code == "class_time_conflict":
-            return _back(chosen, ERROR_CONFLICT)
-        return _back(chosen, ERROR_UNAVAILABLE)
+        return _back(chosen, _MESSAGES.get(error.code, ERROR_UNAVAILABLE))
 
     totals = class_entry.summarize_saved(records)
     # Bez PII: brojevi, datum i razred — nikad ime, komentar ni e-mail.
-    logger.info("admin_class_saved date=%s time=%s grade=%s topic_source=%s "
-                "rows=%s present=%s absent=%s inserted=%s updated=%s moved=%s",
-                chosen["session_date"], chosen["session_time"], chosen["grade"],
-                chosen["topic_mode"], totals["rows"], totals["present"],
-                totals["absent"], counters["inserted"], counters["updated"],
-                counters["moved"])
-    return redirect(url_for("admin_sessions.saved_class",
-                            session_date=chosen["session_date"],
-                            session_time=chosen["session_time"],
-                            grade=chosen["grade"],
-                            topic_mode=chosen["topic_mode"],
-                            area_name=chosen["area_name"],
-                            lesson_name=chosen["lesson_name"],
-                            present=totals["present"], absent=totals["absent"]))
+    # Bez PII: identitet časa i brojevi — nikad ime, komentar ni e-mail.
+    logger.info("admin_class_saved class_id=%s date=%s time=%s grade=%s "
+                "topic_source=%s rows=%s present=%s absent=%s inserted=%s "
+                "updated=%s removed=%s",
+                class_id, chosen["session_date"], chosen["session_time"],
+                chosen["grade"], chosen["topic_mode"], totals["rows"],
+                totals["present"], totals["absent"], counters["inserted"],
+                counters["updated"], counters["removed"])
+    return redirect(url_for("admin_sessions.class_detail", class_id=class_id,
+                            saved=1))
+
+
+@admin_sessions_bp.route("", methods=["GET"])
+@admin_sessions_bp.route("/", methods=["GET"])
+@require_admin
+def class_list():
+    """Svi časovi — JEDAN RED PO STVARNOM ČASU.
+
+    Podrazumijevano tekući mjesec: pregled je radni spisak, a ne izvoz cijele
+    istorije. Filtriranje i ograničenje idu u SQL."""
+    month = (request.args.get("month") or "").strip() or _this_month()
+    try:
+        start, end = report_input.month_bounds(month)
+    except Exception:
+        month = _this_month()
+        start, end = report_input.month_bounds(month)
+
+    grade = class_entry.clean_grade(request.args.get("grade"))
+    source = (request.args.get("topic_source") or "").strip()
+    if source not in student_sessions.TOPIC_SOURCES:
+        source = ""
+    search = (request.args.get("q") or "").strip()[:120]
+    page = max(1, _clean_id(request.args.get("page")) or 1)
+
+    try:
+        classes, total = _db().fetch_classes(
+            date_start=start[:10], date_end=end[:10], grade=grade,
+            topic_source=source or None, search=search or None,
+            limit=CLASSES_PER_PAGE, offset=(page - 1) * CLASSES_PER_PAGE)
+    except reporting_db.ReportingUnavailable as error:
+        logger.info("admin_class_list_failed code=%s", error.code)
+        classes, total = [], 0
+
+    pages = max(1, (total + CLASSES_PER_PAGE - 1) // CLASSES_PER_PAGE)
+    return render_template(
+        "admin_class_list.html", classes=classes, total=total, month=month,
+        previous_month=report_input.previous_month(month),
+        next_month=_next_month(month), grade=grade, topic_source=source,
+        search=search, page=page, pages=pages,
+        grades=class_entry.VALID_GRADES,
+        topic_labels=class_entry.TOPIC_MODE_LABELS,
+        topic_curriculum=student_sessions.TOPIC_CURRICULUM,
+        topic_custom=student_sessions.TOPIC_CUSTOM,
+        filtered=bool(grade or source or search),
+        error=request.args.get("error", ""))
+
+
+def _next_month(month):
+    year, number = int(month[:4]), int(month[5:7])
+    return "%04d-%02d" % ((year + 1, 1) if number == 12 else (year, number + 1))
+
+
+@admin_sessions_bp.route("/<int:class_id>", methods=["GET"])
+@require_admin
+def class_detail(class_id):
+    """Pregled jednog časa: zajedničke činjenice, sažetak i redovi učenika."""
+    from matbot import admin_auth
+
+    try:
+        database = _db()
+        found = database.fetch_class(class_id)
+        if found is None:
+            abort(404)
+        students = database.fetch_class_students(class_id)
+    except reporting_db.ReportingUnavailable as error:
+        logger.info("admin_class_detail_failed code=%s", error.code)
+        abort(503)
+
+    summary = student_sessions.build_monthly_summary(students)
+    return render_template(
+        "admin_class_detail.html", klass=found, students=students,
+        summary=summary,
+        activity_labels=student_sessions.ACTIVITY_LABELS,
+        homework_labels=student_sessions.HOMEWORK_LABELS,
+        attendance_labels=student_sessions.ATTENDANCE_LABELS,
+        topic_labels=class_entry.TOPIC_MODE_LABELS,
+        topic_custom=student_sessions.TOPIC_CUSTOM,
+        csrf_token=admin_auth.csrf_token(),
+        saved=bool(request.args.get("saved")),
+        error=request.args.get("error", ""))
+
+
+@admin_sessions_bp.route("/<int:class_id>/delete", methods=["GET"])
+@require_admin
+def confirm_delete(class_id):
+    """Potvrda brisanja. GET SAMO PRIKAZUJE — ništa se ne mijenja."""
+    from matbot import admin_auth
+
+    try:
+        database = _db()
+        found = database.fetch_class(class_id)
+        if found is None:
+            abort(404)
+        students = database.fetch_class_students(class_id)
+    except reporting_db.ReportingUnavailable as error:
+        logger.info("admin_class_detail_failed code=%s", error.code)
+        abort(503)
+    return render_template(
+        "admin_class_delete.html", klass=found, row_count=len(students),
+        topic_custom=student_sessions.TOPIC_CUSTOM,
+        csrf_token=admin_auth.csrf_token())
+
+
+@admin_sessions_bp.route("/<int:class_id>/delete", methods=["POST"])
+@require_admin
+def delete_class(class_id):
+    """Obriši TAČNO taj čas i njegove redove. POST + CSRF + admin."""
+    _require_csrf()
+    try:
+        result = _db().delete_class(class_id)
+    except reporting_db.ReportingUnavailable as error:
+        logger.info("admin_class_delete_failed code=%s", error.code)
+        return redirect(url_for("admin_sessions.class_detail",
+                                class_id=class_id,
+                                error=ERROR_CLASS_UNAVAILABLE))
+    if result is None:
+        abort(404)
+    # Bez PII: identitet časa i broj redova.
+    logger.info("admin_class_deleted class_id=%s removed_rows=%s",
+                result["class_id"], result["removed_rows"])
+    return redirect(url_for("admin_sessions.class_list", deleted=1))
 
 
 @admin_sessions_bp.route("/saved", methods=["GET"])

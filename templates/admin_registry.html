@@ -1,10 +1,6 @@
 {% extends "admin_base.html" %}
 {% block heading %}Učenici{% endblock %}
-{% block topright %}
-<a href="{{ url_for('admin_sessions.new_class') }}">Upiši čas →</a>
-·
-<a href="{{ url_for('admin_reports.index') }}">Izvještaji →</a>
-{% endblock %}
+{% set nav_active = 'students' %}
 {% block content %}
 {% if error %}
 <div class="banner err">

@@ -22,6 +22,7 @@ from flask import (Blueprint, abort, redirect, render_template, request,
                    session, url_for)
 
 from matbot import admin_auth, config, parent_report, report_input, reporting_db
+from matbot import student_grades
 from matbot import report_pdf, report_prompt, reporting_schema
 from matbot import thinkific_progress as progress
 from matbot.admin_auth import CSRF_FORM_FIELD, require_admin
@@ -155,17 +156,46 @@ def logout():
 @require_admin
 def index():
     state, message = schema_state()
+    month = _default_month()
     return render_template(
         "admin_reports.html",
         csrf_token=admin_auth.csrf_token(),
         course_fields=COURSE_FIELDS,
-        month=_default_month(),
+        month=month,
+        overview=_overview(month),
         schema_state=state,
         schema_message=message,
         summary=None,
         outcome=None,
         errors=[],
     )
+
+
+def _overview(month):
+    """Brojevi za nadzornu ploču. SAMO ono što je već jeftino dostupno.
+
+    Namjerno bez ijednog ukrasnog upita: svaka stavka odgovara na pitanje „šta
+    treba uraditi", a ne „koje tabele postoje". Kad baza nije dostupna, ploča
+    prikazuje prazno stanje umjesto da sruši stranicu — dijagnostika ima svoju
+    komandu."""
+    overview = {"classes": None, "students": None, "unconfirmed": None,
+                "available": False}
+    try:
+        database = reporting_db.get_database()
+        start, end = report_input.month_bounds(month)
+        overview["classes"] = database.count_classes_in_range(start[:10],
+                                                              end[:10])
+        listed = database.list_students(active=True)
+        overview["students"] = len(listed)
+        overview["unconfirmed"] = sum(
+            1 for row in listed
+            if student_grades.needs_confirmation(row.get("grade"),
+                                                 row.get("grade_confirmed_at"),
+                                                 row.get("grade_source")))
+        overview["available"] = True
+    except Exception:
+        logger.info("admin_overview_unavailable")
+    return overview
 
 
 def _default_month():

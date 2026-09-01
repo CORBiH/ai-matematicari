@@ -1,9 +1,7 @@
 {% extends "admin_base.html" %}
 {% block title %}MAT-BOT — Čas sačuvan{% endblock %}
 {% block heading %}Čas sačuvan{% endblock %}
-{% block topright %}
-<a href="{{ url_for('admin_students.index') }}">Učenici →</a>
-{% endblock %}
+{% set nav_active = 'classes' %}
 {% block content %}
 
 <div class="banner ok">Čas je sačuvan.</div>

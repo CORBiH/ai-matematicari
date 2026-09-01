@@ -1,6 +1,7 @@
 {% extends "admin_base.html" %}
 {% block heading %}{{ student.display_name or "Učenik" }}{% endblock %}
-{% block topright %}<a href="{{ url_for('admin_students.index') }}">← Učenici</a>{% endblock %}
+{% set nav_active = 'students' %}
+{% block topright %}<a class="btn btn--ghost" href="{{ url_for('admin_students.index') }}">← Učenici</a>{% endblock %}
 {% block content %}
 {% if error %}<div class="banner err">{{ error }}</div>{% endif %}
 

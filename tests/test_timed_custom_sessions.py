@@ -134,6 +134,16 @@ def sessions(db, student_id):
     return db.fetch_sessions(student_id)
 
 
+def class_of(db, student_id, index=0):
+    """Objekat časa kojem pripada taj zapis (šema v6)."""
+    rows = sessions(db, student_id)
+    return db.fetch_class(rows[index]["class_session_id"])
+
+
+def edit_page(admin, class_id):
+    return admin.get("/admin/sessions/new?class_id=%d" % class_id)
+
+
 # ===========================================================================
 # 1-4) VRIJEME POSTOJI, VALIDIRA SE I OBAVEZNO JE
 # ===========================================================================
@@ -225,7 +235,7 @@ def test_7_repeated_save_at_the_same_time_updates_instead_of_duplicating(admin, 
     assert len(stored) == 1 and stored[0]["activity_rating"] == 3
 
 
-def test_8_edit_loads_only_the_selected_time(admin, db):
+def test_8_edit_loads_only_the_selected_class(admin, db):
     morning_student = confirmed(db, "Jutarnja Grupa")
     afternoon_student = confirmed(db, "Popodnevna Grupa")
     token = csrf_from(page(admin))
@@ -236,11 +246,11 @@ def test_8_edit_loads_only_the_selected_time(admin, db):
                data=form({afternoon_student: present(comment="popodnevni zapis")},
                          time=AFTERNOON, token=token))
 
-    morning_page = page(admin, time=MORNING).data
+    morning_page = edit_page(admin, class_of(db, morning_student)["id"]).data
     assert b"jutarnji zapis" in morning_page
     assert b"popodnevni zapis" not in morning_page
 
-    afternoon_page = page(admin, time=AFTERNOON).data
+    afternoon_page = edit_page(admin, class_of(db, afternoon_student)["id"]).data
     assert b"popodnevni zapis" in afternoon_page
     assert b"jutarnji zapis" not in afternoon_page
 
@@ -269,14 +279,18 @@ def test_9b_changing_the_time_moves_the_class_instead_of_duplicating(admin, db):
     token = csrf_from(page(admin))
     admin.post("/admin/sessions/bulk",
                data=form({student_id: present()}, time=MORNING, token=token))
-    # Instruktor je pogriješio termin i ispravlja ga.
-    admin.post("/admin/sessions/bulk",
-               data=form({student_id: present()}, time="11:15", token=token,
-                         previous_time=MORNING))
+    klass = class_of(db, student_id)
+    # Instruktor je pogriješio termin i ispravlja ga NA ISTOM ČASU.
+    data = form({student_id: present()}, time="11:15", token=token)
+    data["class_id"] = str(klass["id"])
+    admin.post("/admin/sessions/bulk", data=data)
 
     stored = sessions(db, student_id)
     assert len(stored) == 1, "premještanje je napravilo dvojnik"
     assert stored[0]["session_time"] == "11:15"
+    # Isti OBJEKAT časa, samo drugo vrijeme — identitet preživi izmjenu.
+    assert stored[0]["class_session_id"] == klass["id"]
+    assert db.fetch_class(klass["id"])["session_time"] == "11:15"
 
 
 def test_9c_moving_onto_an_occupied_slot_fails_closed(admin, db):
@@ -290,10 +304,11 @@ def test_9c_moving_onto_an_occupied_slot_fails_closed(admin, db):
                data=form({student_id: present(activity="5")}, time=AFTERNOON,
                          token=token))
 
-    answer = admin.post("/admin/sessions/bulk",
-                        data=form({student_id: present(activity="1")},
-                                  time=AFTERNOON, token=token,
-                                  previous_time=MORNING))
+    morning_class = [r for r in sessions(db, student_id)
+                     if r["session_time"] == MORNING][0]["class_session_id"]
+    data = form({student_id: present(activity="1")}, time=AFTERNOON, token=token)
+    data["class_id"] = str(morning_class)
+    answer = admin.post("/admin/sessions/bulk", data=data)
     assert answer.status_code == 302
 
     stored = sorted(sessions(db, student_id), key=lambda r: r["session_time"])

@@ -1,0 +1,34 @@
+{% extends "admin_base.html" %}
+{% set nav_active = 'classes' %}
+{% block title %}MAT-BOT — Brisanje časa{% endblock %}
+{% block heading %}Obrisati ovaj čas?{% endblock %}
+{% block content %}
+
+<div class="card">
+  <p style="margin-top:0;font-size:1.02rem">
+    <b>{{ klass.session_date }} u {{ klass.session_time }}</b><br>
+    {{ klass.grade }}. razred<br>
+    {{ klass.lesson_name }}{% if klass.topic_source == topic_custom %}
+    <span class="pill">ručni unos</span>{% endif %}
+  </p>
+
+  <p>
+    Ovim će biti obrisana evidencija časa za
+    <b>{{ row_count }}</b> {% if row_count == 1 %}učenika{% else %}učenika{% endif %}.
+  </p>
+
+  <p class="muted" style="font-size:.9rem">
+    Brisanje se ne može poništiti. Mijenja podatke koji će se koristiti pri
+    budućem generisanju izvještaja; već sačuvani izvještaji ostaju nepromijenjeni.
+  </p>
+
+  {# POST + CSRF. GET ovu stranicu samo PRIKAZUJE i nista ne mijenja. #}
+  <form method="post" action="{{ url_for('admin_sessions.delete_class', class_id=klass.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="actions" style="margin-top:1rem">
+      <a class="btn btn--ghost" href="{{ url_for('admin_sessions.class_detail', class_id=klass.id) }}">Odustani</a>
+      <button type="submit" class="btn btn--solid-danger" style="margin-top:0">Obriši čas</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

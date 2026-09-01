@@ -273,10 +273,13 @@ def test_8_the_data_model_is_untouched():
     assert set(reporting_schema.EXPECTED_V5_SCHEMA) == {"student_sessions"}
 
 
-def test_9_there_is_no_schema_v6():
+def test_9_the_v5_contract_is_unchanged_by_later_versions():
+    """v5 ostaje tačno ono što je bio; v6 je DODAT, nije ga prepisao."""
     from matbot import config
 
-    assert reporting_schema.CURRENT_SCHEMA_VERSION == 5
-    assert config.REPORTING_SCHEMA_VERSION == 5
-    assert set(reporting_schema.MIGRATION_DESCRIPTIONS) == {2, 3, 4, 5}
-    assert not hasattr(reporting_schema, "SCHEMA_VERSION_V6")
+    assert config.REPORTING_SCHEMA_VERSION == reporting_schema.CURRENT_SCHEMA_VERSION
+    assert reporting_schema.SCHEMA_VERSION_V5 == 5
+    assert {2, 3, 4, 5} <= set(reporting_schema.MIGRATION_DESCRIPTIONS)
+    assert [name for name, _ in reporting_schema.V5_SESSION_COLUMNS] == [
+        "session_time", "topic_source"]
+    assert reporting_schema.V5_CLASS_INDEX == "idx_student_sessions_logical_class"

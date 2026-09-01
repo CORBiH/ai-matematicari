@@ -19,26 +19,44 @@
   *{box-sizing:border-box}
   body{margin:0;background:var(--page-bg);color:var(--text);
        font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:1.2rem}
-  .wrap{max-width:960px;margin:0 auto}
-  h1{font-size:1.35rem;margin:.2rem 0 1.2rem}
+  .wrap{max-width:1040px;margin:0 auto}
+  h1{font-size:1.35rem;margin:.2rem 0 .2rem}
   h2{font-size:1.05rem;margin:1.6rem 0 .6rem;color:var(--accent)}
   h3{font-size:.95rem;margin:1.1rem 0 .4rem}
   .card{background:var(--card-bg);border:1px solid var(--card-border);
         border-radius:14px;padding:1.1rem 1.2rem;margin-bottom:1rem}
   label{display:block;font-size:.85rem;color:var(--muted);margin:.7rem 0 .25rem}
-  input[type=month],input[type=password],input[type=file]{
+  input[type=month],input[type=password],input[type=file],input[type=search]{
     width:100%;background:var(--input-bg);color:var(--text);
     border:1px solid var(--input-border);border-radius:10px;padding:.55rem .7rem;font:inherit}
   button{background:var(--btn-bg);color:#fff;border:0;border-radius:10px;
          padding:.65rem 1.1rem;font:inherit;font-weight:600;cursor:pointer;margin-top:1rem}
   button:hover{background:var(--btn-bg-hover)}
   button[disabled]{opacity:.55;cursor:progress}
+  /* --- HIJERARHIJA DUGMADI ------------------------------------------------
+     Primarno = jedna radnja po ekranu. Sekundarno = navigacija i pregled.
+     Opasno = SAMO brisanje. Bez ovoga svaka radnja izgleda jednako vazno. */
+  .btn{display:inline-block;background:var(--btn-bg);color:#fff;border:0;
+       border-radius:10px;padding:.55rem 1rem;font:inherit;font-weight:600;
+       cursor:pointer;text-decoration:none;line-height:1.4;margin:0}
+  .btn:hover{background:var(--btn-bg-hover);color:#fff}
+  .btn--ghost{background:transparent;border:1px solid var(--input-border);
+              color:var(--text);font-weight:500}
+  .btn--ghost:hover{background:var(--input-bg);color:var(--text)}
+  .btn--danger{background:transparent;border:1px solid var(--danger);
+               color:var(--danger);font-weight:500}
+  .btn--danger:hover{background:rgba(208,98,98,.12);color:var(--danger)}
+  .btn--solid-danger{background:var(--danger);color:#fff;border:0}
+  .btn--solid-danger:hover{background:#b95252;color:#fff}
+  .actions{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
   a{color:var(--accent)}
-  .muted{color:var(--muted)}
+  .muted{color:var(--muted);font-size:.95rem}
   .grid{display:grid;gap:.7rem;grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
   table{width:100%;border-collapse:collapse;margin-top:.6rem;font-size:.9rem}
-  th,td{text-align:left;padding:.45rem .5rem;border-bottom:1px solid var(--card-border)}
-  th{color:var(--muted);font-weight:600;font-size:.8rem}
+  th,td{text-align:left;padding:.55rem .5rem;border-bottom:1px solid var(--card-border)}
+  th{color:var(--muted);font-weight:600;font-size:.78rem;text-transform:uppercase;
+     letter-spacing:.03em}
+  tbody tr:hover{background:rgba(255,255,255,.02)}
   .banner{border-radius:10px;padding:.7rem .9rem;margin-bottom:1rem;font-size:.92rem}
   .banner.ok{background:rgba(86,200,143,.12);border:1px solid var(--ok)}
   .banner.warn{background:rgba(216,166,87,.12);border:1px solid var(--warn)}
@@ -49,15 +67,60 @@
         border-radius:10px;padding:.55rem .7rem}
   .stat b{display:block;font-size:1.15rem}
   .top{display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap}
-  @media (max-width:640px){body{padding:.7rem}.card{padding:.9rem}}
+
+  /* --- TRAJNA NAVIGACIJA --------------------------------------------------
+     Sest odredista, uvijek vidljiva. Ranije je svaka stranica nosila svoje
+     ad-hoc veze u gornjem desnom uglu, pa se do „Svi casovi" dolazilo samo
+     kroz profil ucenika. */
+  .adminnav{display:flex;gap:.35rem;flex-wrap:wrap;align-items:center;
+            margin:0 0 1.1rem;padding:.4rem;background:var(--card-bg);
+            border:1px solid var(--card-border);border-radius:14px}
+  .adminnav a{display:inline-block;padding:.45rem .75rem;border-radius:9px;
+              color:var(--muted);text-decoration:none;font-size:.9rem;
+              font-weight:500;white-space:nowrap}
+  .adminnav a:hover{background:var(--input-bg);color:var(--text)}
+  .adminnav a.is-active{background:var(--input-bg);color:var(--text)}
+  /* Glavna radnja instruktora se vidi kao radnja, ne kao jos jedna veza. */
+  .adminnav a.is-primary{background:var(--btn-bg);color:#fff;font-weight:600}
+  .adminnav a.is-primary:hover{background:var(--btn-bg-hover)}
+  .adminnav .spacer{flex:1}
+  .adminnav form{margin:0}
+  .adminnav form button{margin:0;padding:.45rem .75rem;background:transparent;
+                        border:1px solid var(--input-border);color:var(--muted);
+                        font-weight:500;font-size:.9rem}
+
+  .empty{text-align:center;padding:2rem 1rem;color:var(--muted)}
+  .empty p{margin:0 0 1rem}
+
+  @media (max-width:640px){
+    body{padding:.7rem}
+    .card{padding:.9rem}
+    .adminnav{gap:.25rem;padding:.3rem}
+    .adminnav a{padding:.4rem .6rem;font-size:.85rem}
+    .adminnav .spacer{flex-basis:100%;height:0}
+  }
 </style>
+{% block head_extra %}{% endblock %}
 </head>
 <body>
 <div class="wrap">
+  {# Navigacija je ZAJEDNICKA: svaka stranica je jedan klik daleko. #}
+  {% set nav = nav_active|default('') %}
+  <nav class="adminnav">
+    <a href="{{ url_for('admin_reports.index') }}" {% if nav == 'home' %}class="is-active"{% endif %}>Pregled</a>
+    <a href="{{ url_for('admin_students.index') }}" {% if nav == 'students' %}class="is-active"{% endif %}>Učenici</a>
+    <a href="{{ url_for('admin_sessions.class_list') }}" {% if nav == 'classes' %}class="is-active"{% endif %}>Svi časovi</a>
+    <a href="{{ url_for('admin_reports.students', month=nav_month|default('')) }}" {% if nav == 'reports' %}class="is-active"{% endif %}>Izvještaji</a>
+    <a href="{{ url_for('admin_reports.index') }}#thinkific" {% if nav == 'thinkific' %}class="is-active"{% endif %}>Thinkific</a>
+    <span class="spacer"></span>
+    <a href="{{ url_for('admin_sessions.new_class') }}" class="is-primary">+ Upiši čas</a>
+  </nav>
+
   <div class="top">
     <h1>{% block heading %}MAT-BOT — Mjesečni izvještaji{% endblock %}</h1>
     {% block topright %}{% endblock %}
   </div>
+  {% block subheading %}{% endblock %}
   {% block content %}{% endblock %}
 </div>
 </body>

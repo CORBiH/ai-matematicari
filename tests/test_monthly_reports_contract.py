@@ -137,9 +137,9 @@ def test_monthly_reports_still_needs_no_migration_in_v3_v4_and_v5():
     stari sačuvani nacrti se ne prepisuju (Dio 35)."""
     from matbot import config
 
-    assert reporting_schema.CURRENT_SCHEMA_VERSION == 5
-    assert config.REPORTING_SCHEMA_VERSION == 5
-    assert set(reporting_schema.MIGRATION_DESCRIPTIONS) == {2, 3, 4, 5}
+    assert reporting_schema.CURRENT_SCHEMA_VERSION == 6
+    assert config.REPORTING_SCHEMA_VERSION == 6
+    assert set(reporting_schema.MIGRATION_DESCRIPTIONS) == {2, 3, 4, 5, 6}
     assert reporting_schema.V3_TABLES == ("student_sessions",)
     blob = " ".join(reporting_schema.SCHEMA_V3_STATEMENTS)
     assert "monthly_reports" not in blob

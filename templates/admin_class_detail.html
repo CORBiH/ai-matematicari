@@ -1,0 +1,99 @@
+{% extends "admin_base.html" %}
+{% set nav_active = 'classes' %}
+{% block title %}MAT-BOT — Pregled časa{% endblock %}
+{% block heading %}{{ klass.grade }}. razred{% endblock %}
+{% block subheading %}
+<p class="muted" style="margin:-.4rem 0 1rem">
+  {{ klass.session_date }} · {{ klass.session_time }} — <b>{{ klass.lesson_name }}</b>
+  {% if klass.topic_source == topic_custom %}<span class="pill">ručni unos</span>{% endif %}
+</p>
+{% endblock %}
+{% block content %}
+
+<style>
+  .who{font-weight:600}
+  .rowcards{display:none}
+  .stucard{border:1px solid var(--card-border);border-radius:12px;
+           padding:.75rem .85rem;margin-bottom:.55rem;background:var(--input-bg)}
+  .stucard .line{font-size:.88rem;color:var(--muted)}
+  @media (max-width:720px){
+    .desk{display:none}
+    .rowcards{display:block}
+  }
+</style>
+
+{% if saved %}<div class="banner ok">Čas je sačuvan.</div>{% endif %}
+{% if error %}<div class="banner err">{{ error }}</div>{% endif %}
+
+<div class="card">
+  <div class="grid">
+    <div class="stat"><b>{{ klass.session_date }}</b><span class="muted">datum</span></div>
+    <div class="stat"><b>{{ klass.session_time }}</b><span class="muted">vrijeme</span></div>
+    <div class="stat"><b>{{ klass.grade }}. razred</b><span class="muted">razred</span></div>
+    <div class="stat"><b>{{ summary.present_count }}</b><span class="muted">prisutnih</span></div>
+    <div class="stat"><b>{{ summary.absent_count }}</b><span class="muted">odsutnih</span></div>
+    <div class="stat">
+      <b>{% if summary.activity.average is not none %}{{ summary.activity.average }} / 5{% else %}—{% endif %}</b>
+      <span class="muted">prosječna aktivnost</span>
+    </div>
+    <div class="stat">
+      <b>{{ summary.homework.done_count }}/{{ summary.homework.assigned_count }}</b>
+      <span class="muted">urađena zadaća</span>
+    </div>
+  </div>
+  <p style="margin-top:1rem;margin-bottom:0">
+    {% if klass.area_name %}<b>Oblast:</b> {{ klass.area_name }}<br>{% endif %}
+    <b>Tema:</b> {{ klass.lesson_name }}<br>
+    <b>Tip:</b> {% if klass.topic_source == topic_custom %}ručni unos{% else %}iz nastavnog plana{% endif %}
+  </p>
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0">Učenici ({{ students|length }})</h3>
+  {% if not students %}
+    <div class="empty"><p>Ovaj čas nema evidentiranih učenika.</p></div>
+  {% else %}
+    <table class="desk">
+      <tr><th>Učenik</th><th>Prisustvo</th><th>Aktivnost</th><th>Domaća zadaća</th><th>Komentar</th></tr>
+      {% for s in students %}
+      <tr>
+        <td class="who">{{ s.display_name or "Učenik #%s"|format(s.student_id) }}</td>
+        <td>{{ attendance_labels.get(s.attendance, s.attendance) }}</td>
+        <td>
+          {# Aktivnost je ANGAZMAN, nikad ocjena — koriste se kanonske oznake. #}
+          {% if s.activity_rating %}{{ s.activity_rating }} — {{ activity_labels.get(s.activity_rating, '') }}
+          {% else %}—{% endif %}
+        </td>
+        <td>{{ homework_labels.get(s.homework_status, s.homework_status) }}</td>
+        <td class="muted">{{ s.comment or "" }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+
+    <div class="rowcards">
+      {% for s in students %}
+      <div class="stucard">
+        <div class="who">{{ s.display_name or "Učenik #%s"|format(s.student_id) }}</div>
+        <div class="line">{{ attendance_labels.get(s.attendance, s.attendance) }}
+          · {% if s.activity_rating %}aktivnost {{ s.activity_rating }}{% else %}bez aktivnosti{% endif %}
+          · {{ homework_labels.get(s.homework_status, s.homework_status) }}</div>
+        {% if s.comment %}<div class="line">{{ s.comment }}</div>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    <p class="muted" style="font-size:.84rem;margin-top:.8rem">
+      Aktivnost 1–5 je <b>angažman na času</b>, ne ocjena iz matematike.
+    </p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <div class="actions">
+    <a class="btn" href="{{ url_for('admin_sessions.new_class', class_id=klass.id) }}">Uredi čas</a>
+    <a class="btn btn--ghost" href="{{ url_for('admin_sessions.class_list', month=klass.session_date[:7]) }}">Nazad na sve časove</a>
+    <span style="flex:1"></span>
+    {# Opasna radnja je vidljiva, ali odvojena od primarnog skupa. #}
+    <a class="btn btn--danger" href="{{ url_for('admin_sessions.confirm_delete', class_id=klass.id) }}">Obriši čas</a>
+  </div>
+</div>
+{% endblock %}

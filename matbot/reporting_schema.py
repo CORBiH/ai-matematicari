@@ -44,7 +44,8 @@ SCHEMA_VERSION_V2 = 2
 SCHEMA_VERSION_V3 = 3
 SCHEMA_VERSION_V4 = 4
 SCHEMA_VERSION_V5 = 5
-CURRENT_SCHEMA_VERSION = SCHEMA_VERSION_V5
+SCHEMA_VERSION_V6 = 6
+CURRENT_SCHEMA_VERSION = SCHEMA_VERSION_V6
 
 # Tabele koje verzija 1 mora imati da bismo uopšte smjeli migrirati.
 V1_TABLES = (
@@ -160,6 +161,7 @@ MIGRATION_DESCRIPTIONS = {
     SCHEMA_VERSION_V3: "Add instructor student session records",
     SCHEMA_VERSION_V4: "Require explicit current-grade confirmation",
     SCHEMA_VERSION_V5: "Add class session time and topic source",
+    SCHEMA_VERSION_V6: "Add first-class class session records",
 }
 
 # `applied_at` se NAMJERNO ne upisuje: ima bazin DEFAULT i njegovo značenje je
@@ -1018,6 +1020,196 @@ def migrate_to_v5(conn):
     _record_migration(conn, SCHEMA_VERSION_V5)
     logger.info("reporting_schema_migrated from=%s to=%s",
                 SCHEMA_VERSION_V4, SCHEMA_VERSION_V5)
+    return True
+
+
+# --- ČAS KAO OBJEKAT (verzija 6) -------------------------------------------
+# ZAŠTO OVA VERZIJA POSTOJI — DVA IZMJERENA NEDOSTATKA MODELA v5.
+#
+# 1. RAZRED ČASA SE NIGDJE NE ČUVA. `student_sessions` nema kolonu razreda, pa se
+#    razred održanog časa mogao saznati SAMO iz `students.grade` — a to je TEKUĆI
+#    razred koji administrator svjesno mijenja. Izmjereno: učenik upisan na
+#    septembarski čas sedmog razreda, poslije promocije u osmi, prikazivao bi taj
+#    isti septembarski čas kao čas OSMOG razreda. To je falsifikovanje istorije,
+#    ne prikaz.
+#
+# 2. DVA STVARNA ČASA SE SPAJAJU U JEDAN. Identitet je bio četvorka (datum,
+#    vrijeme, oblast, lekcija) BEZ razreda. Izmjereno: sedmi i osmi razred s
+#    temom „Uvodni čas" istog dana u 17:00 daju JEDAN red u pregledu — a brisanje
+#    „tog časa" obrisalo bi evidenciju oba razreda.
+#
+# Proizvod od sada čas OTVARA, UREĐUJE i BRIŠE kao objekat, pa mu treba stabilan
+# identitet koji ne zavisi ni od jednog polja koje se kasnije smije mijenjati.
+#
+# `grade` JE OVDJE NEPROMJENJIVA ČINJENICA O DOGAĐAJU, ne pogled na učenika:
+# zapisuje se u trenutku evidencije i ostaje takav kad učenik napreduje.
+#
+# ADITIVNO: nova tabela + jedna NULL kolona na `student_sessions`. Nijedan
+# zatečeni red se ne prepisuje i nijedna istorijska vrijednost se ne izmišlja.
+V6_TABLES = ("class_sessions",)
+
+V6_SESSION_COLUMNS = (
+    ("class_session_id", "INTEGER"),
+)
+
+# Jedan ČAS po stvarnom terminu. Razred je DIO KLJUČA — bez njega bi se dva
+# razreda s istom temom u isto vrijeme opet sudarila (nalaz 2 gore).
+# `COALESCE` je obavezan iz istog razloga kao u v5: dva NULL-a su u SQLite
+# jedinstvenom indeksu različita, pa bi dva časa s praznom oblašću prošla.
+V6_CLASS_INDEX = "idx_class_sessions_occurrence"
+V6_CHILD_INDEX = "idx_student_sessions_class"
+
+SCHEMA_V6_STATEMENTS = (
+    """
+    CREATE TABLE IF NOT EXISTS class_sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_date TEXT NOT NULL,
+        session_time TEXT NOT NULL,
+        grade INTEGER NOT NULL CHECK (grade BETWEEN 6 AND 9),
+        topic_source TEXT NOT NULL CHECK (
+            topic_source IN ('curriculum', 'custom')),
+        area_name TEXT,
+        lesson_name TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+    """,
+    "CREATE UNIQUE INDEX IF NOT EXISTS " + V6_CLASS_INDEX + " "
+    "ON class_sessions (session_date, session_time, grade, "
+    " COALESCE(area_name, ''), lesson_name)",
+    # Pregled časa i brisanje uvijek idu po roditelju.
+    "CREATE INDEX IF NOT EXISTS " + V6_CHILD_INDEX + " "
+    "ON student_sessions (class_session_id)",
+)
+
+EXPECTED_V6_SCHEMA = {
+    "class_sessions": {
+        "required_columns": {"id", "session_date", "session_time", "grade",
+                             "topic_source", "area_name", "lesson_name",
+                             "created_at", "updated_at"},
+        "not_null": ("session_date", "session_time", "grade", "topic_source",
+                     "lesson_name", "created_at", "updated_at"),
+    },
+    "student_sessions": {
+        "required_columns": {"class_session_id"},
+        "not_null": (),
+    },
+}
+
+
+def verify_v6_schema(conn):
+    """Strukturna provjera verzije 6. Prazna lista znači „dokazano ispravno"."""
+    problems = []
+    existing = table_names(conn)
+    for table, expected in EXPECTED_V6_SCHEMA.items():
+        if table not in existing:
+            problems.append("v6_table_missing:%s" % table)
+            continue
+        try:
+            details = _column_details(conn, table)
+        except Exception:
+            problems.append("v6_table_unreadable:%s" % table)
+            continue
+        missing = expected["required_columns"] - set(details)
+        if missing:
+            problems.append("v6_columns_missing:%s:%s"
+                            % (table, ",".join(sorted(missing))))
+            continue
+        for column in expected["not_null"]:
+            if not details[column][0]:
+                problems.append("v6_nullable:%s:%s" % (table, column))
+        # VEZA PREMA ČASU MORA OSTATI NULL-ABLE: zatečeni redovi je nemaju i ne
+        # smije im se izmišljati roditelj.
+        if table == "student_sessions" and details["class_session_id"][0]:
+            problems.append("v6_child_not_nullable:student_sessions")
+
+    if "class_sessions" not in existing:
+        return problems
+
+    index_sql = _normalized_index_sql(conn, V6_CLASS_INDEX)
+    if index_sql is None:
+        problems.append("v6_index_missing:%s" % V6_CLASS_INDEX)
+    else:
+        if "unique" not in index_sql:
+            problems.append("v6_index_not_unique:%s" % V6_CLASS_INDEX)
+        for fragment in ("session_date", "session_time", "grade",
+                         "coalesce(area_name,'')", "lesson_name"):
+            if fragment not in index_sql:
+                problems.append("v6_index_shape:%s" % V6_CLASS_INDEX)
+                break
+    if _normalized_index_sql(conn, V6_CHILD_INDEX) is None:
+        problems.append("v6_index_missing:%s" % V6_CHILD_INDEX)
+    return problems
+
+
+def verify_existing_v6_objects(conn):
+    """Provjeri SAMO ono što već postoji — ulaz u djelimično stanje."""
+    return [problem for problem in verify_v6_schema(conn)
+            if not problem.startswith(("v6_table_missing", "v6_columns_missing",
+                                       "v6_index_missing"))]
+
+
+def _apply_v6_ddl(conn):
+    """Dodaj samo ono čega nema. `ADD COLUMN` nema `IF NOT EXISTS`."""
+    try:
+        present = _columns(conn, "student_sessions")
+    except Exception as exc:
+        raise MigrationError("v6_sessions_unreadable", type(exc).__name__) from None
+    for name, sql_type in V6_SESSION_COLUMNS:
+        if name in present:
+            continue
+        try:
+            conn.execute("ALTER TABLE student_sessions ADD COLUMN %s %s"
+                         % (name, sql_type))
+        except Exception as exc:
+            raise MigrationError("v6_ddl_failed", type(exc).__name__) from None
+    for statement in SCHEMA_V6_STATEMENTS:
+        try:
+            conn.execute(statement)
+        except Exception as exc:
+            raise MigrationError("v6_ddl_failed", type(exc).__name__) from None
+    try:
+        conn.commit()
+    except Exception as exc:
+        raise MigrationError("v6_ddl_commit_failed", type(exc).__name__) from None
+
+
+def migrate_to_v6(conn):
+    """v5 → v6. ADITIVNO, IDEMPOTENTNO i OTPORNO NA PREKID.
+
+    ISTA DOKTRINA KAO SVE RANIJE: DDL preživi `rollback()` (izmjereno na libsql
+    0.1.11), pa se atomičnost ne tvrdi. Dodaje se samo ono čega nema, struktura
+    se DOKAZUJE, a red verzije se upisuje TEK na kraju.
+
+    NIJEDAN ZATEČENI RED SE NE MIJENJA I NIŠTA SE NE POPUNJAVA UNAZAD.
+    `class_session_id` ostaje NULL na svim zatečenim redovima, i to je jedina
+    poštena vrijednost: razred održanog časa se iz njih ne može pouzdano
+    rekonstruisati (upravo zato ova verzija i postoji), pa bi svaki „backfill"
+    bio izmišljena istorija. Zatečeni redovi ostaju čitljivi kao ZAPISI ČASOVA
+    BEZ OBJEKTA ČASA."""
+    already = applied_versions(conn)
+    if SCHEMA_VERSION_V5 not in already:
+        raise MigrationError("v5_migration_record_missing")
+
+    if SCHEMA_VERSION_V6 in already:
+        problems = verify_v6_schema(conn)
+        if problems:
+            raise MigrationError(problems[0], "recorded v6 but schema incomplete")
+        return False
+
+    prior = verify_existing_v6_objects(conn)
+    if prior:
+        raise MigrationError(prior[0], "existing v6 object is incompatible")
+
+    _apply_v6_ddl(conn)
+
+    problems = verify_v6_schema(conn)
+    if problems:
+        raise MigrationError(problems[0], "verification failed after ddl")
+
+    _record_migration(conn, SCHEMA_VERSION_V6)
+    logger.info("reporting_schema_migrated from=%s to=%s",
+                SCHEMA_VERSION_V5, SCHEMA_VERSION_V6)
     return True
 
 

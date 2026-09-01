@@ -1,0 +1,159 @@
+{% extends "admin_base.html" %}
+{% set nav_active = 'classes' %}
+{% block title %}MAT-BOT — Svi časovi{% endblock %}
+{% block heading %}Svi časovi{% endblock %}
+{% block content %}
+
+<style>
+  .clsrow td{vertical-align:middle}
+  .cls-topic{font-weight:600}
+  .cls-when{white-space:nowrap}
+  .filters{display:flex;gap:.6rem;flex-wrap:wrap;align-items:flex-end}
+  .filters > div{flex:1 1 150px;min-width:0}
+  .filters label{margin-top:0}
+  .filters select,.filters input{width:100%;background:var(--input-bg);
+    color:var(--text);border:1px solid var(--input-border);border-radius:10px;
+    padding:.5rem .65rem;font:inherit}
+  .monthnav{display:flex;gap:.4rem;align-items:center;flex-wrap:wrap}
+  .pager{display:flex;gap:.5rem;align-items:center;justify-content:center;
+         margin-top:1rem;flex-wrap:wrap}
+  /* Na uskom ekranu red postaje kartica — tabela od sedam kolona se na
+     mobitelu ne cita, a horizontalno skrolanje je gore od kartice. */
+  .cards{display:none}
+  .cls-card{border:1px solid var(--card-border);border-radius:12px;
+            padding:.8rem .9rem;margin-bottom:.6rem;background:var(--input-bg)}
+  .cls-card .when{color:var(--muted);font-size:.85rem}
+  .cls-card .topic{font-weight:600;margin:.15rem 0}
+  @media (max-width:720px){
+    .desk{display:none}
+    .cards{display:block}
+  }
+</style>
+
+{% if error %}<div class="banner err">{{ error }}</div>{% endif %}
+{% if request.args.get('deleted') %}
+<div class="banner ok">Čas je obrisan.</div>
+{% endif %}
+
+<div class="card">
+  <form method="get" action="{{ url_for('admin_sessions.class_list') }}">
+    <div class="filters">
+      <div>
+        <label for="month">Mjesec</label>
+        <input type="month" id="month" name="month" value="{{ month }}">
+      </div>
+      <div>
+        <label for="grade">Razred</label>
+        <select id="grade" name="grade">
+          <option value="">Svi razredi</option>
+          {% for g in grades %}
+          <option value="{{ g }}" {% if grade == g %}selected{% endif %}>{{ g }}. razred</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="topic_source">Tema</label>
+        <select id="topic_source" name="topic_source">
+          <option value="">Sve teme</option>
+          <option value="{{ topic_curriculum }}" {% if topic_source == topic_curriculum %}selected{% endif %}>{{ topic_labels[topic_curriculum] }}</option>
+          <option value="{{ topic_custom }}" {% if topic_source == topic_custom %}selected{% endif %}>{{ topic_labels[topic_custom] }}</option>
+        </select>
+      </div>
+      <div style="flex:2 1 220px">
+        <label for="q">Pretraga teme</label>
+        <input type="search" id="q" name="q" value="{{ search }}" placeholder="npr. razlomci">
+      </div>
+      <div style="flex:0 0 auto">
+        <button type="submit" class="btn" style="margin-top:0">Prikaži</button>
+      </div>
+    </div>
+  </form>
+  <div class="monthnav" style="margin-top:.7rem">
+    <a class="btn btn--ghost" href="{{ url_for('admin_sessions.class_list', month=previous_month, grade=grade or '', topic_source=topic_source, q=search) }}">← Prethodni mjesec</a>
+    <a class="btn btn--ghost" href="{{ url_for('admin_sessions.class_list', month=next_month, grade=grade or '', topic_source=topic_source, q=search) }}">Sljedeći mjesec →</a>
+    {% if filtered %}
+    <a class="btn btn--ghost" href="{{ url_for('admin_sessions.class_list', month=month) }}">Očisti filtere</a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card">
+  {% if not classes %}
+    <div class="empty">
+      {% if filtered %}
+      <p>Nema časova za odabrane filtere.</p>
+      <a class="btn btn--ghost" href="{{ url_for('admin_sessions.class_list', month=month) }}">Očisti filtere</a>
+      {% else %}
+      <p>Još nema evidentiranih časova za ovaj mjesec.</p>
+      <a class="btn" href="{{ url_for('admin_sessions.new_class') }}">Upiši prvi čas</a>
+      {% endif %}
+    </div>
+  {% else %}
+    <p class="muted" style="margin:0 0 .3rem">
+      Ukupno časova: <b>{{ total }}</b>{% if pages > 1 %} · stranica {{ page }}/{{ pages }}{% endif %}
+    </p>
+
+    {# --- DESKTOP: jedan red = jedan STVARAN cas ------------------------- #}
+    <table class="desk">
+      <tr>
+        <th>Datum</th><th>Vrijeme</th><th>Razred</th><th>Tema</th>
+        <th>Tip</th><th>Prisustvo</th><th></th>
+      </tr>
+      {% for c in classes %}
+      <tr class="clsrow">
+        <td class="cls-when">{{ c.session_date }}</td>
+        <td class="cls-when">{{ c.session_time }}</td>
+        <td>{{ c.grade }}. razred</td>
+        <td>
+          <span class="cls-topic">{{ c.lesson_name }}</span>
+          {% if c.area_name %}<br><span class="muted" style="font-size:.82rem">{{ c.area_name }}</span>{% endif %}
+        </td>
+        <td>
+          {% if c.topic_source == topic_custom %}
+          <span class="pill">Ručni unos</span>
+          {% else %}<span class="pill">Plan</span>{% endif %}
+        </td>
+        <td class="cls-when">{{ c.present_count }} prisutnih · {{ c.absent_count }} odsutnih</td>
+        <td class="actions">
+          <a class="btn btn--ghost" href="{{ url_for('admin_sessions.class_detail', class_id=c.class_id) }}">Pregled</a>
+          <a class="btn btn--ghost" href="{{ url_for('admin_sessions.new_class', class_id=c.class_id) }}">Uredi</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+
+    {# --- MOBITEL: kartica po casu, bez horizontalnog skrolanja ---------- #}
+    <div class="cards">
+      {% for c in classes %}
+      <div class="cls-card">
+        <div class="when">{{ c.session_date }} · {{ c.session_time }}</div>
+        <div class="topic">{{ c.lesson_name }}</div>
+        <div class="muted" style="font-size:.85rem">
+          {{ c.grade }}. razred ·
+          {% if c.topic_source == topic_custom %}ručni unos{% else %}iz plana{% endif %}
+        </div>
+        <div class="muted" style="font-size:.85rem;margin-bottom:.6rem">
+          {{ c.present_count }} prisutnih · {{ c.absent_count }} odsutnih
+        </div>
+        <div class="actions">
+          <a class="btn btn--ghost" href="{{ url_for('admin_sessions.class_detail', class_id=c.class_id) }}">Pogledaj</a>
+          <a class="btn btn--ghost" href="{{ url_for('admin_sessions.new_class', class_id=c.class_id) }}">Uredi</a>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    {% if pages > 1 %}
+    <div class="pager">
+      {% if page > 1 %}
+      <a class="btn btn--ghost" href="{{ url_for('admin_sessions.class_list', month=month, grade=grade or '', topic_source=topic_source, q=search, page=page-1) }}">← Prethodna</a>
+      {% endif %}
+      <span class="muted">{{ page }} / {{ pages }}</span>
+      {% if page < pages %}
+      <a class="btn btn--ghost" href="{{ url_for('admin_sessions.class_list', month=month, grade=grade or '', topic_source=topic_source, q=search, page=page+1) }}">Sljedeća →</a>
+      {% endif %}
+    </div>
+    {% endif %}
+  {% endif %}
+</div>
+{% endblock %}

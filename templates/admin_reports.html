@@ -1,4 +1,7 @@
 {% extends "admin_base.html" %}
+{% set nav_active = 'home' %}
+{% block title %}MAT-BOT — Pregled{% endblock %}
+{% block heading %}Pregled{% endblock %}
 {% block topright %}
   <form method="post" action="{{ url_for('admin_reports.logout') }}" style="margin:0">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
@@ -6,7 +9,43 @@
   </form>
 {% endblock %}
 {% block content %}
-<div class="card"><a href="{{ url_for('admin_students.index') }}">Učenici (registar i evidencija časova) →</a></div>
+
+{# --- BRZE AKCIJE ---------------------------------------------------------
+   Ploca odgovara na pitanje „sta treba uraditi", ne „koje tabele postoje".
+   Najcesca instruktorska radnja je prva i jedina primarna. #}
+<div class="card">
+  <h3 style="margin-top:0">Brze akcije</h3>
+  <div class="actions">
+    <a class="btn" href="{{ url_for('admin_sessions.new_class') }}">Upiši čas</a>
+    <a class="btn btn--ghost" href="{{ url_for('admin_sessions.class_list') }}">Svi časovi</a>
+    <a class="btn btn--ghost" href="{{ url_for('admin_students.index') }}">Učenici</a>
+    <a class="btn btn--ghost" href="{{ url_for('admin_reports.students', month=month) }}">Izvještaji</a>
+  </div>
+</div>
+
+{% if overview and overview.available %}
+<div class="card">
+  <h3 style="margin-top:0">Ovaj mjesec</h3>
+  <div class="grid">
+    <div class="stat"><b>{{ overview.classes }}</b><span class="muted">evidentiranih časova</span></div>
+    <div class="stat"><b>{{ overview.students }}</b><span class="muted">aktivnih učenika</span></div>
+    <div class="stat"><b>{{ overview.unconfirmed }}</b><span class="muted">nepotvrđenih razreda</span></div>
+  </div>
+  {% if overview.unconfirmed %}
+  {# Nepotvrdjen razred je RADNI ZADATAK: bez njega ucenik ne moze na spisak
+     casa ni u nov izvjestaj. #}
+  <p style="margin-bottom:0;margin-top:.8rem">
+    <a href="{{ url_for('admin_students.index', confirmed='nepotvrdjen') }}">Potvrdi razrede →</a>
+  </p>
+  {% elif not overview.classes %}
+  <p class="muted" style="margin-bottom:0;margin-top:.8rem">
+    Još nema evidentiranih časova ovog mjeseca.
+  </p>
+  {% endif %}
+</div>
+{% endif %}
+
+<h2 id="thinkific">Thinkific — uvoz napretka</h2>
 
 {% if schema_state != 'ready' %}
   {# PADA ZATVORENO: uvoz se ne nudi dok baza nije na v2. Migracija je svjesna

@@ -62,6 +62,7 @@ def migrate(path):
         reporting_schema.migrate_to_v3(conn)
         reporting_schema.migrate_to_v4(conn)
         reporting_schema.migrate_to_v5(conn)
+        reporting_schema.migrate_to_v6(conn)
         return applied
     finally:
         conn.close()
@@ -82,6 +83,18 @@ def migrate_v3_only(path):
     try:
         reporting_schema.migrate_to_v2(conn)
         return reporting_schema.migrate_to_v3(conn)
+    finally:
+        conn.close()
+
+
+def migrate_v5_only(path):
+    """Namjerno ZAUSTAVLJENO na v5 — za testove migracije v5 → v6."""
+    conn = libsql.connect(path)
+    try:
+        reporting_schema.migrate_to_v2(conn)
+        reporting_schema.migrate_to_v3(conn)
+        reporting_schema.migrate_to_v4(conn)
+        return reporting_schema.migrate_to_v5(conn)
     finally:
         conn.close()
 
