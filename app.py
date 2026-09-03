@@ -66,6 +66,9 @@ app.register_blueprint(ai_tutor_bp)
 # Kontrolni. Bez `MATBOT_ADMIN_PASSWORD` sve njene rute vracaju 404 -- stranica
 # se tada ponasa kao da ne postoji.
 admin_auth.apply_cookie_hardening(app)
+# Navigacija se iscrtava po SERVERSKOM stanju prijave, a svaki
+# administratorski odgovor nosi `no-store`. Vidi docstring.
+admin_auth.install_admin_hardening(app)
 app.register_blueprint(admin_reports_bp)
 # Faza 3D: registar učenika i evidencija časova — ista admin autentikacija.
 app.register_blueprint(admin_students_bp)

@@ -101,10 +101,23 @@ def csrf_token():
 
 
 def csrf_valid(submitted):
+    """Poređenje u konstantnom vremenu. Neispravan token vraća `False`, nikad ne puca.
+
+    ŽIVI NALAZ: `hmac.compare_digest` nad DVA STRINGA diže `TypeError` čim ijedan
+    nosi znak van ASCII-ja. Naš token je uvijek ASCII, ali poslani NIJE — bira ga
+    pošiljalac. Poslano „pogrešan" (ili emoji) rušilo je zahtjev u 500 sa
+    ispisom traga, na svih trinaest administratorskih POST ruta i na samoj
+    prijavi (dakle i anonimno dostupno). Zahtjev se nije izvršio, pa propusta u
+    ovlaštenju nema — ali 500 umjesto čistog odbijanja je i loš signal i
+    nepotrebno otkrivanje unutrašnjosti.
+
+    Poređenje zato ide nad BAJTOVIMA: `compare_digest` nad `bytes` nema to
+    ograničenje i ostaje konstantnog vremena."""
     expected = session.get(CSRF_SESSION_KEY)
     if not expected or not isinstance(submitted, str) or not submitted:
         return False
-    return hmac.compare_digest(expected, submitted)
+    return hmac.compare_digest(expected.encode("utf-8"),
+                               submitted.encode("utf-8"))
 
 
 def require_admin(view):
@@ -133,6 +146,59 @@ def require_admin(view):
         return view(*args, **kwargs)
 
     return guarded
+
+
+# Putanje pod administratorskim nadzorom. Sve ispod ovog prefiksa nosi podatke
+# o učenicima, pa se ni ne kešira ni ne prikazuje kao da je otvoreno.
+ADMIN_PATH_PREFIX = "/admin"
+
+
+def install_admin_hardening(app):
+    """Dvije stvari koje se NE SMIJU pamtiti po ruti. Zove se JEDNOM.
+
+    ZAŠTO CENTRALNO: `require_admin` se već mora dodati svakoj novoj ruti, i to
+    je jedna prilika za zaborav. Ove dvije su druga i treća; da se rješavaju po
+    stranici, nova stranica bi ih tiho izgubila. Zato ne žive ni u jednom
+    pogledu nego ovdje.
+
+    1. `admin_authenticated` u ŠABLONIMA. Vrijednost dolazi iz serverske sesije,
+       nikad iz upita, polja ili bilo čega što pošiljalac kontroliše. Zajednički
+       okvir po njoj odlučuje hoće li iscrtati administratorsku navigaciju.
+
+       ŽIVI NALAZ: stranica prijave nasljeđuje isti okvir, pa je neprijavljenom
+       posjetiocu prikazivala pun meni („Pregled", „Učenici", „Svi časovi",
+       „Izvještaji", „Thinkific", „+ Upiši čas") iznad same forme za prijavu.
+       Nijedna od tih veza nije radila — sve su serverski odbijane — ali izgled
+       je tvrdio suprotno, i operater je s razlogom prijavio sumnju na propust u
+       ovlaštenju. Prikaz koji laže o pristupu je sam po sebi kvar.
+
+    2. `Cache-Control: no-store` na SVAKOM administratorskom odgovoru. Stranice
+       nose imena učenika, zapažanja i prisustvo; takav sadržaj ne smije ostati
+       u kešu pregledača ni u posredniku. Ovo je ujedno i drugi dio gornje
+       zbrke: bez direktive o kešu pregledač je „Nazad" mogao ponovo iscrtati
+       ZAPAMĆENU stranicu prijave dok je sesija još važila, pa je izgledalo kao
+       da se čas može upisati bez prijave. Sesija je bila stvarna i ispravna —
+       stranica prijave je bila stara slika.
+
+    Ovlaštenje je i dalje ISKLJUČIVO `require_admin`. Ovo je čitljivost i
+    higijena keša, ne kontrola pristupa."""
+
+    @app.context_processor
+    def _admin_template_state():
+        try:
+            return {"admin_authenticated": is_authenticated()}
+        except Exception:            # izvan konteksta zahtjeva, npr. CLI
+            return {"admin_authenticated": False}
+
+    @app.after_request
+    def _admin_no_store(response):
+        if request.path.startswith(ADMIN_PATH_PREFIX):
+            # `no-store` je jače od `no-cache`: zabranjuje i zapisivanje.
+            response.headers["Cache-Control"] = "no-store"
+            response.headers["Pragma"] = "no-cache"
+        return response
+
+    return app
 
 
 def apply_cookie_hardening(app):

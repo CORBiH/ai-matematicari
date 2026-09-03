@@ -104,8 +104,14 @@
 </head>
 <body>
 <div class="wrap">
-  {# Navigacija je ZAJEDNICKA: svaka stranica je jedan klik daleko. #}
+  {# Navigacija je ZAJEDNICKA: svaka stranica je jedan klik daleko — ali SAMO
+     poslije prijave. `admin_authenticated` dolazi iz serverske sesije
+     (`admin_auth.install_admin_hardening`), nikad iz upita ili polja, pa ga
+     pošiljalac ne može postaviti. Stranica prijave nasljeđuje ovaj okvir i bez
+     ovog uslova je neprijavljenom posjetiocu prikazivala pun administratorski
+     meni iznad forme za prijavu. #}
   {% set nav = nav_active|default('') %}
+  {% if admin_authenticated %}
   <nav class="adminnav">
     <a href="{{ url_for('admin_reports.index') }}" {% if nav == 'home' %}class="is-active"{% endif %}>Pregled</a>
     <a href="{{ url_for('admin_students.index') }}" {% if nav == 'students' %}class="is-active"{% endif %}>Učenici</a>
@@ -115,6 +121,7 @@
     <span class="spacer"></span>
     <a href="{{ url_for('admin_sessions.new_class') }}" class="is-primary">+ Upiši čas</a>
   </nav>
+  {% endif %}
 
   <div class="top">
     <h1>{% block heading %}MAT-BOT — Mjesečni izvještaji{% endblock %}</h1>
