@@ -217,7 +217,7 @@ def _classifier_calls(module_name):
 
 def test_both_clis_use_the_shared_classifier():
     for module in ("student_grade_audit", "thinkific_grade_forensics"):
-        assert "classify" in _classifier_calls(module), module
+        assert "classify_grades" in _classifier_calls(module), module
     # Nijedan ne reimplementira pravila.
     for module in ("student_grade_audit", "thinkific_grade_forensics"):
         source = (ROOT / "matbot" / (module + ".py")).read_text(encoding="utf-8")
@@ -343,6 +343,8 @@ def test_forensics_flags_the_production_shape_and_shows_history(db):
     conn = db._connection()
     conn.execute("UPDATE students SET grade = 6, grade_confirmed_at = NULL, "
                  " grade_source = NULL WHERE id = ?", (student_id,))
+    conn.execute("DELETE FROM student_current_grades WHERE student_id = ?",
+                 (student_id,))
     conn.commit()
     _seed_import(db, import_id=1, month="2026-08", slot="grade_6", grade=6,
                  sha="b" * 64, sections=["SKUPOVI"], student_ids=[student_id])

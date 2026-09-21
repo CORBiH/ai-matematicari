@@ -45,7 +45,8 @@ SCHEMA_VERSION_V3 = 3
 SCHEMA_VERSION_V4 = 4
 SCHEMA_VERSION_V5 = 5
 SCHEMA_VERSION_V6 = 6
-CURRENT_SCHEMA_VERSION = SCHEMA_VERSION_V6
+SCHEMA_VERSION_V7 = 7
+CURRENT_SCHEMA_VERSION = SCHEMA_VERSION_V7
 
 # Tabele koje verzija 1 mora imati da bismo uopšte smjeli migrirati.
 V1_TABLES = (
@@ -162,6 +163,7 @@ MIGRATION_DESCRIPTIONS = {
     SCHEMA_VERSION_V4: "Require explicit current-grade confirmation",
     SCHEMA_VERSION_V5: "Add class session time and topic source",
     SCHEMA_VERSION_V6: "Add first-class class session records",
+    SCHEMA_VERSION_V7: "Add reporting account types and current grades",
 }
 
 # `applied_at` se NAMJERNO ne upisuje: ima bazin DEFAULT i njegovo značenje je
@@ -897,6 +899,15 @@ def _normalized_index_sql(conn, name):
     return canonical_index_sql(rows[0][0])
 
 
+def _normalized_table_sql(conn, name):
+    """CREATE TABLE tekst u istom stabilnom obliku kao provjera indeksa."""
+    rows = conn.execute("SELECT sql FROM sqlite_master WHERE type = 'table' "
+                        "AND name = ?", (name,)).fetchall()
+    if not rows or not rows[0][0]:
+        return None
+    return canonical_index_sql(rows[0][0])
+
+
 def verify_v5_schema(conn):
     """Strukturna provjera verzije 5. Prazna lista znači „dokazano ispravno"."""
     problems = []
@@ -1210,6 +1221,179 @@ def migrate_to_v6(conn):
     _record_migration(conn, SCHEMA_VERSION_V6)
     logger.info("reporting_schema_migrated from=%s to=%s",
                 SCHEMA_VERSION_V5, SCHEMA_VERSION_V6)
+    return True
+
+
+# --- TIP NALOGA I VISE TEKUCIH RAZREDA (verzija 7) -------------------------
+#
+# `students.grade` ostaje netaknut radi kompatibilnosti sa starim kodom i
+# istorijskim podacima. Novi autoritet za POTVRDJENE tekuce razrede je
+# normalizovana tabela ispod. Jedan red znaci jednu izricitu administratorsku
+# potvrdu; PRIMARY KEY uklanja duplikate, a aplikacijski sloj ogranicava skup na
+# najvise dva razreda po uceniku.
+#
+# `account_type` je dodat na postojecu tabelu s DEFAULT-om STUDENT. Time svaki
+# zateceni red nastavlja da se ponasa tacno kao prije migracije, bez data
+# backfilla i bez prozora u kojem bi normalni ucenik nestao iz izvjestaja.
+V7_ACCOUNT_TYPE_COLUMN = (
+    "account_type",
+    "TEXT NOT NULL DEFAULT 'STUDENT' "
+    "CHECK (account_type IN ('STUDENT', 'SUPPORT', 'TEST'))",
+)
+V7_TABLES = ("student_current_grades",)
+
+SCHEMA_V7_STATEMENTS = (
+    """
+    CREATE TABLE IF NOT EXISTS student_current_grades (
+        student_id INTEGER NOT NULL,
+        grade INTEGER NOT NULL CHECK (grade BETWEEN 6 AND 9),
+        confirmed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        source TEXT NOT NULL CHECK (source IN ('admin', 'manual_creation')),
+        PRIMARY KEY (student_id, grade),
+        FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_student_current_grades_grade "
+    "ON student_current_grades (grade, student_id)",
+)
+
+V7_GRADE_INDEX = "idx_student_current_grades_grade"
+
+
+def verify_v7_schema(conn):
+    """Strukturna provjera v7 bez citanja ili mijenjanja studentskih podataka."""
+    problems = []
+    existing = table_names(conn)
+    if "students" not in existing:
+        problems.append("v7_table_missing:students")
+    else:
+        try:
+            details = _column_details(conn, "students")
+        except Exception:
+            details = {}
+            problems.append("v7_table_unreadable:students")
+        if "account_type" not in details:
+            problems.append("v7_columns_missing:students:account_type")
+        elif not details["account_type"][0]:
+            problems.append("v7_nullable:students:account_type")
+        else:
+            default_type = (details["account_type"][1] or "").strip().strip("'\"")
+            if default_type != "STUDENT":
+                problems.append("v7_account_type_default:%s"
+                                % (default_type or "none"))
+        if "account_type" in details:
+            students_sql = _normalized_table_sql(conn, "students") or ""
+            if ("check(account_type in('student','support','test'))"
+                    not in students_sql):
+                problems.append("v7_account_type_check:students")
+
+    if "student_current_grades" not in existing:
+        problems.append("v7_table_missing:student_current_grades")
+        return problems
+    try:
+        details = _column_details(conn, "student_current_grades")
+        uniques = _unique_column_sets(conn, "student_current_grades")
+        keys = _foreign_keys_with_actions(conn, "student_current_grades")
+    except Exception:
+        problems.append("v7_table_unreadable:student_current_grades")
+        return problems
+    required = {"student_id", "grade", "confirmed_at", "source"}
+    missing = required - set(details)
+    if missing:
+        problems.append("v7_columns_missing:student_current_grades:%s"
+                        % ",".join(sorted(missing)))
+    else:
+        for column in required:
+            if not details[column][0]:
+                problems.append("v7_nullable:student_current_grades:%s" % column)
+    if ("student_id", "grade") not in uniques:
+        problems.append("v7_unique_missing:student_current_grades")
+    if keys.get(("student_id", "students")) != "CASCADE":
+        problems.append("v7_foreign_key_missing:student_current_grades")
+    table_sql = _normalized_table_sql(conn, "student_current_grades") or ""
+    if "grade" in details and "check(grade between 6 and 9)" not in table_sql:
+        problems.append("v7_grade_check:student_current_grades")
+    if ("source" in details
+            and "check(source in('admin','manual_creation'))" not in table_sql):
+        problems.append("v7_source_check:student_current_grades")
+    if _normalized_index_sql(conn, V7_GRADE_INDEX) is None:
+        problems.append("v7_index_missing:%s" % V7_GRADE_INDEX)
+    elif _index_columns(conn, V7_GRADE_INDEX) != ("grade", "student_id"):
+        problems.append("v7_index_shape:%s" % V7_GRADE_INDEX)
+    return problems
+
+
+def verify_existing_v7_objects(conn):
+    """Provjeri samo v7 objekte koji vec postoje nakon moguceg prekida."""
+    return [problem for problem in verify_v7_schema(conn)
+            if not problem.startswith(("v7_table_missing",
+                                       "v7_columns_missing:students",
+                                       "v7_index_missing"))]
+
+
+def _apply_v7_ddl(conn):
+    try:
+        present = _columns(conn, "students")
+    except Exception as exc:
+        raise MigrationError("v7_students_unreadable", type(exc).__name__) from None
+    if V7_ACCOUNT_TYPE_COLUMN[0] not in present:
+        try:
+            conn.execute("ALTER TABLE students ADD COLUMN %s %s"
+                         % V7_ACCOUNT_TYPE_COLUMN)
+        except Exception as exc:
+            raise MigrationError("v7_ddl_failed", type(exc).__name__) from None
+    for statement in SCHEMA_V7_STATEMENTS:
+        try:
+            conn.execute(statement)
+        except Exception as exc:
+            raise MigrationError("v7_ddl_failed", type(exc).__name__) from None
+    try:
+        conn.commit()
+    except Exception as exc:
+        raise MigrationError("v7_ddl_commit_failed", type(exc).__name__) from None
+
+
+def _backfill_v7_confirmed_grades(conn):
+    """Kopiraj samo razrede za koje v4 vec dokazuje ljudsku potvrdu.
+
+    Zateceni nepotvrdjeni `students.grade` ostaje iskljucivo legacy kontekst i
+    namjerno se NE pretvara u potvrdu. INSERT OR IGNORE cini korak nastavljivim.
+    """
+    try:
+        conn.execute(
+            "INSERT OR IGNORE INTO student_current_grades "
+            "(student_id, grade, confirmed_at, source) "
+            "SELECT id, grade, grade_confirmed_at, grade_source FROM students "
+            "WHERE grade BETWEEN 6 AND 9 "
+            "AND TRIM(COALESCE(grade_confirmed_at, '')) <> '' "
+            "AND grade_source IN ('admin', 'manual_creation')")
+        conn.commit()
+    except Exception as exc:
+        raise MigrationError("v7_backfill_failed", type(exc).__name__) from None
+
+
+def migrate_to_v7(conn):
+    """v6 -> v7. Aditivno, nastavljivo i bez izmjene istorijskih zapisa."""
+    already = applied_versions(conn)
+    if SCHEMA_VERSION_V6 not in already:
+        raise MigrationError("v6_migration_record_missing")
+    if SCHEMA_VERSION_V7 in already:
+        problems = verify_v7_schema(conn)
+        if problems:
+            raise MigrationError(problems[0], "recorded v7 but schema incomplete")
+        return False
+
+    prior = verify_existing_v7_objects(conn)
+    if prior:
+        raise MigrationError(prior[0], "existing v7 object is incompatible")
+    _apply_v7_ddl(conn)
+    _backfill_v7_confirmed_grades(conn)
+    problems = verify_v7_schema(conn)
+    if problems:
+        raise MigrationError(problems[0], "verification failed after ddl")
+    _record_migration(conn, SCHEMA_VERSION_V7)
+    logger.info("reporting_schema_migrated from=%s to=%s",
+                SCHEMA_VERSION_V6, SCHEMA_VERSION_V7)
     return True
 
 

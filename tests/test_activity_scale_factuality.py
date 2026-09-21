@@ -307,9 +307,8 @@ def test_18_homework_denominator_semantics_unchanged():
     assert summary["activity"]["average"] == 4.5
 
 
-def test_19_report_prompt_version_is_still_3d_2():
-    """Validator je naučio postojeću skalu — prompt se nije mijenjao."""
-    assert report_prompt.REPORT_PROMPT_VERSION == "3d-2"
+def test_19_report_prompt_version_includes_shared_accounts():
+    assert report_prompt.REPORT_PROMPT_VERSION == "3d-3"
 
 
 def test_19b_the_prompt_still_asks_for_the_scale_sentence():

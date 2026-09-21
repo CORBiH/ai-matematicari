@@ -386,9 +386,7 @@ def test_11_existing_linked_children_stay_visible(admin, db, existing,
 def test_12_a_promoted_students_child_is_never_lost(admin, db, existing,
                                                     students):
     """ŽIVI DEFEKT: prvo čuvanje izmjene brisalo je red promovisanog učenika."""
-    db._connection().execute("UPDATE students SET grade = 7 WHERE id = ?",
-                             (students[1],))
-    db._connection().commit()
+    db.set_student_grade(students[1], 7)
 
     page = open_page(admin, class_id=str(existing))
     assert students[1] in page.student_ids(), "istorijski učesnik je nestao"
@@ -414,9 +412,7 @@ def test_12b_a_promoted_participant_can_be_removed_explicitly(admin, db,
                                                               existing,
                                                               students):
     """Ostaje mogućnost IZRIČITOG uklanjanja — brani se samo TIHI gubitak."""
-    db._connection().execute("UPDATE students SET grade = 7 WHERE id = ?",
-                             (students[1],))
-    db._connection().commit()
+    db.set_student_grade(students[1], 7)
     page = open_page(admin, class_id=str(existing))
     submit(admin, page, {
         students[0]: {"participation": "present", "activity": "4",
@@ -777,7 +773,7 @@ def test_26_draft_round_trips_change_zero_report_metrics(admin, db, existing,
         report_input.build_report_input(s, "2026-09", database=db))
         for s in students} == facts
     from matbot import report_prompt
-    assert report_prompt.REPORT_PROMPT_VERSION == "3d-2"
+    assert report_prompt.REPORT_PROMPT_VERSION == "3d-3"
 
 
 def test_26b_a_metadata_only_edit_keeps_the_classroom_evidence(admin, db,

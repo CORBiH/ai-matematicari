@@ -104,6 +104,8 @@ def legacy(db, name, grade=6):
     conn = db._connection()
     conn.execute("UPDATE students SET grade = ?, grade_confirmed_at = NULL, "
                  " grade_source = NULL WHERE id = ?", (grade, student_id))
+    conn.execute("DELETE FROM student_current_grades WHERE student_id = ?",
+                 (student_id,))
     conn.commit()
     return student_id
 
@@ -625,20 +627,21 @@ def test_25_comments_are_optional_and_stay_out_of_the_model_contract(admin, db):
 # ===========================================================================
 # 26-30) NEPROMIJENJENO OKRUŽENJE
 # ===========================================================================
-def test_26_the_report_prompt_is_unchanged():
+def test_26_the_report_prompt_has_shared_account_rule():
     from matbot import report_prompt
 
-    assert report_prompt.REPORT_PROMPT_VERSION == "3d-2"
+    assert report_prompt.REPORT_PROMPT_VERSION == "3d-3"
+    assert "ZAJEDNICKI THINKIFIC NALOG" in report_prompt.SYSTEM_PROMPT
 
 
-def test_27_the_schema_is_at_version_six():
+def test_27_the_schema_is_at_version_seven():
     """v5 donosi vrijeme časa, v6 čas kao OBJEKAT (stabilan identitet + razred)."""
     from matbot import config
 
-    assert reporting_schema.CURRENT_SCHEMA_VERSION == 6
-    assert config.REPORTING_SCHEMA_VERSION == 6
-    assert set(reporting_schema.MIGRATION_DESCRIPTIONS) == {2, 3, 4, 5, 6}
-    assert not hasattr(reporting_schema, "SCHEMA_VERSION_V7")
+    assert reporting_schema.CURRENT_SCHEMA_VERSION == 7
+    assert config.REPORTING_SCHEMA_VERSION == 7
+    assert set(reporting_schema.MIGRATION_DESCRIPTIONS) == {2, 3, 4, 5, 6, 7}
+    assert reporting_schema.SCHEMA_VERSION_V7 == 7
 
 
 def test_28_the_individual_per_student_workflow_still_works(admin, db):

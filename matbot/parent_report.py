@@ -46,6 +46,14 @@ class ReportGenerationError(RuntimeError):
         self.code = code
 
 
+class ReportEligibilityError(RuntimeError):
+    """Nalog nije normalan STUDENT i novi izvjestaj je zabranjen."""
+
+    def __init__(self, code="student_report_disabled"):
+        super().__init__(code)
+        self.code = code
+
+
 def empty_narrative():
     return {"summary": "", "strengths": [], "focus_areas": [],
             "next_month_recommendations": []}
@@ -85,6 +93,8 @@ def build_facts(student_id, report_month, database=None):
     """Determinističke činjenice za jedan (učenik, mjesec). Bez modela."""
     payload = report_input.build_report_input(student_id, report_month,
                                               database=database)
+    if not (payload.get("profile") or {}).get("reporting_enabled", True):
+        raise ReportEligibilityError()
     return payload, report_facts.build_ai_facts(payload)
 
 

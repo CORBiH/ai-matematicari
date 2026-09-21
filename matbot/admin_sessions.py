@@ -122,14 +122,18 @@ def class_roster(database, grade):
 
     Nepotvrđeni se broje nad ISTIM zatečenim razredom, jer je to jedino što se o
     njima zna; to je prikaz, ne tvrdnja o njihovom stvarnom razredu."""
-    listed = database.list_students(grade=grade, active=True)
+    # Cijeli aktivni spisak je potreban samo zato da se zadrži postojeće,
+    # informativno brojanje nepotvrđenih legacy vrijednosti. `grade` filter u
+    # bazi je autoritativan i zato ih ispravno ne vraća kao članove razreda.
+    listed = database.list_students(
+        active=True, account_type=reporting_db.ACCOUNT_TYPE_STUDENT)
     roster, unconfirmed = [], 0
     for student in listed:
-        if student_grades.is_confirmed(student.get("grade"),
-                                       student.get("grade_confirmed_at"),
-                                       student.get("grade_source")):
+        confirmed_grades = student_grades.normalize_confirmed_grades(
+            student.get("grades"))
+        if grade in confirmed_grades:
             roster.append(student)
-        else:
+        elif not confirmed_grades and student.get("grade") == grade:
             unconfirmed += 1
     return roster, unconfirmed
 

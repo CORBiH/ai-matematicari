@@ -494,7 +494,7 @@ def test_those_titles_do_not_license_invented_percentages(title):
 
 def test_the_prompt_asks_for_verbatim_lesson_names():
     assert "PREPIŠI naziv TAČNO" in report_prompt.SYSTEM_PROMPT
-    assert report_prompt.REPORT_PROMPT_VERSION == "3d-2"
+    assert report_prompt.REPORT_PROMPT_VERSION == "3d-3"
 
 
 @pytest.mark.parametrize("phrase", [
@@ -731,6 +731,17 @@ def test_pdf_contains_name_grade_and_month():
     assert "Đžemal Šćepanović" in text
     assert "6. razred" in text
     assert "august 2026." in text
+
+
+def test_shared_account_pdf_lists_both_grades_without_attribution():
+    facts = report_facts.build_ai_facts(payload(profile={
+        "grade": None, "grades": [7, 9], "shared_account": True}))
+    pages, text = text_of(render(facts=facts, label="Porodični nalog"))
+
+    assert pages == 1
+    assert "7. razred + 9. razred" in text
+    assert "zajedničkom nalogu" in text
+    assert "ne može se pouzdano pripisati" in text
 
 
 def test_pdf_contains_deterministic_metrics_with_correct_terminology():

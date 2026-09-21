@@ -63,6 +63,8 @@ def legacy(db, student_id, grade):
     conn = db._connection()
     conn.execute("UPDATE students SET grade = ?, grade_confirmed_at = NULL, "
                  " grade_source = NULL WHERE id = ?", (grade, student_id))
+    conn.execute("DELETE FROM student_current_grades WHERE student_id = ?",
+                 (student_id,))
     conn.commit()
     return student_id
 

@@ -31,6 +31,11 @@ admin_students_bp = Blueprint("admin_students", __name__,
 
 VALID_GRADES = (6, 7, 8, 9)
 MAX_NAME_CHARS = 120
+ACCOUNT_TYPE_LABELS = {
+    reporting_db.ACCOUNT_TYPE_STUDENT: "UČENIK",
+    reporting_db.ACCOUNT_TYPE_SUPPORT: "PODRŠKA",
+    reporting_db.ACCOUNT_TYPE_TEST: "TEST",
+}
 
 # Poruke za administratora. Nikad ne nose e-mail ni interni kod (pravilo 7).
 ERROR_NAME = "Ime učenika je obavezno."
@@ -39,6 +44,8 @@ ERROR_EMAIL = "Thinkific e-mail nije u ispravnom obliku."
 ERROR_TAKEN = "Ovaj Thinkific nalog je već povezan sa drugim učenikom."
 ERROR_SESSION = "Podaci o času nisu ispravni."
 ERROR_UNAVAILABLE = "Izvještajna baza trenutno nije dostupna."
+ERROR_ACCOUNT_TYPE = "Vrsta naloga nije ispravna."
+ERROR_BULK_SELECTION = "Odaberite najmanje jednog učenika."
 # Poruka iz Dijela 5: unos gradiva traži POTVRĐEN razred, ne samo neku cifru.
 ERROR_GRADE_UNKNOWN = ("Potrebno je potvrditi trenutni razred učenika prije "
                        "unosa časa.")
@@ -77,6 +84,37 @@ def _clean_confirmed(raw):
     return None
 
 
+def _clean_account_type(raw, *, allow_empty=False):
+    value = (raw or "").strip().upper()
+    if allow_empty and not value:
+        return None
+    return value if value in ACCOUNT_TYPE_LABELS else None
+
+
+def _clean_grades(values):
+    raw = list(values or ())
+    cleaned = []
+    for value in raw:
+        grade = _clean_grade(value)
+        if grade is None:
+            return None
+        cleaned.append(grade)
+    if not 1 <= len(cleaned) <= 2 or len(cleaned) != len(set(cleaned)):
+        return None
+    return sorted(cleaned)
+
+
+def _selected_ids(form):
+    raw = form.getlist("student_ids")
+    try:
+        ids = [int(value) for value in raw]
+    except (TypeError, ValueError):
+        return None
+    if not ids or len(ids) != len(set(ids)) or any(value <= 0 for value in ids):
+        return None
+    return ids
+
+
 def _confirmation_view(row, confirmed):
     """Šta administratorski formular smije ponuditi za JEDAN red.
 
@@ -92,12 +130,12 @@ def _confirmation_view(row, confirmed):
 
     Vraća `(napomena_o_imenu, predizabrani_razred)`. Ništa se ne upisuje."""
     if confirmed:
-        return None, row.get("grade")
+        return None, list(row.get("grades") or ())
     note = student_grades.name_grade_note(row.get("display_name"))
     if note and note["kind"] == student_grades.NOTE_GRADE:
-        return note, note["grade"]
+        return note, [note["grade"]]
     # Nema broja, više brojeva, ili broj izvan 6–9 → čovjek bira izričito.
-    return note, None
+    return note, []
 
 
 def _grade_state(row):
@@ -105,10 +143,8 @@ def _grade_state(row):
 
     RAZDVOJENO NAMJERNO: „nepotvrđeno" je radni zadatak za administratora, a
     „koristio gradivo drugog razreda" je samo kontekst i najčešće je normalno."""
-    return student_grades.classify(row.get("grade"),
-                                   row.get("grade_confirmed_at"),
-                                   row.get("grade_source"),
-                                   row.get("_evidence"))
+    return student_grades.classify_grades(row.get("grades"),
+                                          row.get("_evidence"))
 
 
 def _db():
@@ -123,11 +159,15 @@ def index():
     search = (request.args.get("q") or "").strip()[:MAX_NAME_CHARS]
     grade = _clean_grade(request.args.get("grade"))
     confirmed = _clean_confirmed(request.args.get("confirmed"))
+    account_type = _clean_account_type(request.args.get("account_type"),
+                                       allow_empty=True)
+    needs_action = request.args.get("needs_action") == "1"
     unconfirmed_total = 0
     try:
         database = _db()
         students = database.list_students(search=search or None, grade=grade,
-                                          confirmed=confirmed)
+                                          confirmed=confirmed,
+                                          account_type=account_type)
         # STANJE POTVRDE + SADRŽAJ, na svakom redu. Administrator radi po listi
         # (ima ih 34), pa mora vidjeti oboje bez otvaranja profila.
         for student in students:
@@ -140,11 +180,22 @@ def index():
             student.pop("_evidence", None)
             student["grade_status"] = status
             student["content_grades"] = content
-            confirmed_row = status != student_grades.STATUS_UNCONFIRMED
-            student["name_note"], student["preselected_grade"] = \
+            confirmed_row = student_grades.is_confirmed_grades(
+                student.get("grades"))
+            student["name_note"], student["preselected_grades"] = \
                 _confirmation_view(student, confirmed_row)
-            if not confirmed_row:
+            student["preselected_grade"] = (
+                student["preselected_grades"][0]
+                if len(student["preselected_grades"]) == 1 else None)
+            if (student.get("account_type") == reporting_db.ACCOUNT_TYPE_STUDENT
+                    and not confirmed_row):
                 unconfirmed_total += 1
+        if needs_action:
+            students = [student for student in students
+                        if (student.get("account_type")
+                            == reporting_db.ACCOUNT_TYPE_STUDENT
+                            and not student_grades.is_confirmed_grades(
+                                student.get("grades")))]
     except reporting_db.ReportingUnavailable as error:
         logger.info("admin_students_list_failed code=%s", error.code)
         students = []
@@ -153,6 +204,12 @@ def index():
     return render_template("admin_registry.html", students=students,
                            search=search, grade=grade, grades=VALID_GRADES,
                            confirmed=request.args.get("confirmed", ""),
+                           account_type=request.args.get("account_type", ""),
+                           account_type_labels=ACCOUNT_TYPE_LABELS,
+                           student_type=reporting_db.ACCOUNT_TYPE_STUDENT,
+                           support_type=reporting_db.ACCOUNT_TYPE_SUPPORT,
+                           test_type=reporting_db.ACCOUNT_TYPE_TEST,
+                           needs_action=needs_action,
                            unconfirmed_total=unconfirmed_total,
                            status_unconfirmed=student_grades.STATUS_UNCONFIRMED,
                            status_mismatch=student_grades.STATUS_CONTENT_MISMATCH,
@@ -161,6 +218,7 @@ def index():
                            note_ambiguous=student_grades.NOTE_AMBIGUOUS,
                            csrf_token=admin_auth.csrf_token(),
                            error=request.args.get("error", ""),
+                           notice=request.args.get("notice", ""),
                            conflict=(request.args.get("conflict") or "").strip()[:20],
                            month=report_input.previous_month(_this_month()))
 
@@ -233,33 +291,36 @@ def profile(student_id):
     except reporting_db.ReportingUnavailable as error:
         logger.info("admin_grade_evidence_failed code=%s", error.code)
         evidence = student_grades.evidence_from_rows()
-    status, content = student_grades.classify(
-        student.get("grade"), student.get("grade_confirmed_at"),
-        student.get("grade_source"), evidence)
+    status, content = student_grades.classify_grades(
+        student.get("grades"), evidence)
 
     # BEZ POTVRĐENOG RAZREDA NEMA KURIKULUMA. Zatečena cifra NIJE dovoljna:
     # instruktor bi inače upisao gradivo tuđe generacije na osnovu vrijednosti
     # koju nikad niko nije potvrdio.
-    grade_confirmed = student_grades.is_confirmed(
-        student.get("grade"), student.get("grade_confirmed_at"),
-        student.get("grade_source"))
-    curriculum = (topics.curriculum_choices(student.get("grade"))
-                  if grade_confirmed else {})
+    grade_confirmed = student_grades.is_confirmed_grades(student.get("grades"))
+    curricula = ({str(grade): topics.curriculum_choices(grade)
+                  for grade in student.get("grades")}
+                 if grade_confirmed else {})
+    curriculum = next(iter(curricula.values())) if curricula else {}
     # SAMO PRIKAZ. Iscrtavanje stranice ne upisuje ništa — razred se mijenja
     # isključivo administratorovim POST-om na `update_grade`.
-    name_note, preselected_grade = _confirmation_view(student, grade_confirmed)
+    name_note, preselected_grades = _confirmation_view(student, grade_confirmed)
     return render_template(
         "admin_student_profile.html", student_id=student_id, student=student,
-        curriculum=curriculum, areas=list(curriculum),
+        curriculum=curriculum, curricula=curricula, areas=list(curriculum),
         grade_confirmed=grade_confirmed, grade_status=status,
         grade_content=content, grade_evidence=evidence,
         status_unconfirmed=student_grades.STATUS_UNCONFIRMED,
         status_mismatch=student_grades.STATUS_CONTENT_MISMATCH,
-        name_note=name_note, preselected_grade=preselected_grade,
+        name_note=name_note, preselected_grades=preselected_grades,
+        preselected_grade=(preselected_grades[0]
+                           if len(preselected_grades) == 1 else None),
         note_grade=student_grades.NOTE_GRADE,
         note_unsupported=student_grades.NOTE_UNSUPPORTED,
         note_ambiguous=student_grades.NOTE_AMBIGUOUS,
         valid_grades=student_grades.VALID_GRADES,
+        account_type_labels=ACCOUNT_TYPE_LABELS,
+        student_type=reporting_db.ACCOUNT_TYPE_STUDENT,
         thinkific_linked=linked, sessions=list(reversed(sessions)),
         activity_labels=student_sessions.ACTIVITY_LABELS,
         homework_labels=student_sessions.HOMEWORK_LABELS,
@@ -311,13 +372,31 @@ def update_grade(student_id):
     automatske promocije i nema masovne ispravke — odluka je po jednom učeniku.
     Stari časovi, aktivnost, kontrolni i snimci ostaju netaknuti."""
     _require_csrf()
-    grade = _clean_grade(request.form.get("grade"))
-    if grade is None:
-        # Prazan izbor („— izaberi razred —") je NORMALAN ulaz, ne napad: bez
-        # nagovještaja iz imena selektor namjerno nema predizabranu vrijednost.
+    try:
+        saved = _db().fetch_student_profile(student_id)
+    except reporting_db.ReportingUnavailable:
+        saved = None
+    if saved is None:
+        abort(404)
+    account_type = _clean_account_type(
+        request.form.get("account_type")
+        or request.form.get("account_type_%d" % student_id)
+        or saved.get("account_type"))
+    if account_type is None:
+        return redirect(url_for("admin_students.profile",
+                                student_id=student_id,
+                                error=ERROR_ACCOUNT_TYPE))
+    raw_grades = request.form.getlist("grades")
+    if not raw_grades:
+        raw_grades = request.form.getlist("grades_%d" % student_id)
+    if not raw_grades and request.form.get("grade") is not None:
+        raw_grades = [request.form.get("grade")]
+    grades = (_clean_grades(raw_grades)
+              if account_type == reporting_db.ACCOUNT_TYPE_STUDENT else None)
+    if account_type == reporting_db.ACCOUNT_TYPE_STUDENT and grades is None:
         return redirect(url_for("admin_students.profile",
                                 student_id=student_id, error=ERROR_GRADE))
-    return _confirm(student_id, grade, "confirmed")
+    return _confirm(student_id, grades, account_type, "confirmed")
 
 
 def _return_to_listing():
@@ -330,23 +409,90 @@ def _return_to_listing():
     return (request.form.get("next") or "").strip() == "index"
 
 
-def _confirm(student_id, grade, action):
-    """Jedini put do `set_student_grade` iz web sloja. Uvijek POST + CSRF."""
+def _confirm(student_id, grades, account_type, action):
+    """Jedan atomski profilni upis. Uvijek POST + CSRF."""
     back_to_listing = _return_to_listing()
+    change = {"student_id": student_id, "account_type": account_type}
+    if grades is not None:
+        change["grades"] = grades
     try:
-        if not _db().set_student_grade(student_id, grade):
-            abort(404)
+        _db().update_student_profiles([change])
     except reporting_db.ReportingUnavailable as error:
-        logger.info("admin_grade_update_failed code=%s", error.code)
+        logger.info("admin_profile_update_failed code=%s", error.code)
         return redirect(url_for("admin_students.profile",
                                 student_id=student_id, error=ERROR_UNAVAILABLE))
-    # Bez PII: samo ID zapisa, radnja i nova vrijednost.
-    logger.info("admin_student_grade_%s student_id=%s grade=%s",
-                action, student_id, grade)
+    logger.info("admin_student_profile_%s student_id=%s type=%s grades=%s",
+                action, student_id, account_type,
+                ",".join(str(value) for value in (grades or ())))
     if back_to_listing:
         return redirect(url_for("admin_students.index",
                                 confirmed="nepotvrdjen"))
     return redirect(url_for("admin_students.profile", student_id=student_id))
+
+
+@admin_students_bp.route("/bulk-confirm", methods=["POST"])
+@require_admin
+def bulk_confirm():
+    """Potvrdi razlicite vrijednosti iz svakog odabranog reda, atomicki."""
+    _require_csrf()
+    student_ids = _selected_ids(request.form)
+    if student_ids is None:
+        return redirect(url_for("admin_students.index",
+                                error=ERROR_BULK_SELECTION))
+    changes = []
+    invalid = []
+    for student_id in student_ids:
+        account_type = _clean_account_type(
+            request.form.get("account_type_%d" % student_id))
+        grades = _clean_grades(
+            request.form.getlist("grades_%d" % student_id))
+        if account_type is None:
+            invalid.append(student_id)
+            continue
+        change = {"student_id": student_id, "account_type": account_type}
+        if account_type == reporting_db.ACCOUNT_TYPE_STUDENT:
+            if grades is None:
+                invalid.append(student_id)
+                continue
+            change["grades"] = grades
+        changes.append(change)
+    if invalid:
+        message = ("Neispravni ili nepotpuni podaci za učenike: "
+                   + ", ".join("#%d" % value for value in invalid))
+        return redirect(url_for("admin_students.index", error=message))
+    try:
+        updated = _db().update_student_profiles(changes)
+    except reporting_db.ReportingUnavailable as error:
+        logger.info("admin_students_bulk_confirm_failed code=%s", error.code)
+        return redirect(url_for("admin_students.index", error=ERROR_UNAVAILABLE))
+    logger.info("admin_students_bulk_confirmed count=%s", updated)
+    return redirect(url_for("admin_students.index",
+                            notice="Potvrđeno %d učenika." % updated))
+
+
+@admin_students_bp.route("/bulk-account-type", methods=["POST"])
+@require_admin
+def bulk_account_type():
+    """Promijeni samo klasifikaciju; potvrđeni razredi ostaju netaknuti."""
+    _require_csrf()
+    student_ids = _selected_ids(request.form)
+    account_type = _clean_account_type(request.form.get("bulk_account_type"))
+    if student_ids is None:
+        return redirect(url_for("admin_students.index",
+                                error=ERROR_BULK_SELECTION))
+    if account_type is None:
+        return redirect(url_for("admin_students.index",
+                                error=ERROR_ACCOUNT_TYPE))
+    try:
+        updated = _db().set_student_account_types(student_ids, account_type)
+    except reporting_db.ReportingUnavailable as error:
+        logger.info("admin_students_bulk_type_failed code=%s", error.code)
+        return redirect(url_for("admin_students.index", error=ERROR_UNAVAILABLE))
+    logger.info("admin_students_bulk_type count=%s type=%s", updated,
+                account_type)
+    return redirect(url_for(
+        "admin_students.index",
+        notice="Promijenjena vrsta naloga za %d učenika." % updated))
 
 
 def _session_from_form(grade):
@@ -378,7 +524,7 @@ def _session_from_form(grade):
         require_time=True)
 
 
-def _student_grade(student_id):
+def _student_grade(student_id, requested=None):
     """POTVRĐEN razred IZ BAZE. Nepotvrđen razred zaustavlja unos (Dio 5).
 
     ZATEČENA CIFRA NIJE DOVOLJNA. Trideset četiri učenika nose `grade = 6` koji
@@ -387,11 +533,15 @@ def _student_grade(student_id):
     saved = _db().fetch_student_profile(student_id)
     if saved is None:
         abort(404)
-    if not student_grades.is_confirmed(saved.get("grade"),
-                                       saved.get("grade_confirmed_at"),
-                                       saved.get("grade_source")):
+    grades = student_grades.normalize_confirmed_grades(saved.get("grades"))
+    if not grades:
         raise _GradeUnknown()
-    return saved["grade"]
+    if len(grades) == 1:
+        return grades[0]
+    grade = _clean_grade(requested)
+    if grade not in grades:
+        raise _GradeUnknown()
+    return grade
 
 
 class _GradeUnknown(Exception):
@@ -403,7 +553,8 @@ class _GradeUnknown(Exception):
 def create_session(student_id):
     _require_csrf()
     try:
-        record = _session_from_form(_student_grade(student_id))
+        record = _session_from_form(_student_grade(
+            student_id, request.form.get("session_grade")))
     except _GradeUnknown:
         return redirect(url_for("admin_students.profile",
                                 student_id=student_id, error=ERROR_GRADE_UNKNOWN))
@@ -430,7 +581,8 @@ def update_session(student_id, session_id):
     tuđi zapis ne može biti izmijenjen ni s pogođenim `session_id`."""
     _require_csrf()
     try:
-        record = _session_from_form(_student_grade(student_id))
+        record = _session_from_form(_student_grade(
+            student_id, request.form.get("session_grade")))
     except _GradeUnknown:
         return redirect(url_for("admin_students.profile",
                                 student_id=student_id, error=ERROR_GRADE_UNKNOWN))

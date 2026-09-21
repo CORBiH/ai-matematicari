@@ -15,7 +15,8 @@
     SQL/Python — nema AI teksta, nema procjene.
   </p>
   <p><span class="pill">student_id {{ payload.student_id }}</span>
-     <span class="pill">{% if payload.profile.grade %}{{ payload.profile.grade }}. razred{% else %}razred nepoznat{% endif %}</span></p>
+     <span class="pill">{% if payload.profile.grades %}{{ payload.profile.grades|join('. razred + ') }}. razred{% elif payload.profile.grade %}{{ payload.profile.grade }}. razred{% else %}razred nepoznat{% endif %}</span></p>
+  {% if payload.profile.shared_account %}<div class="banner warn">Aktivnost pripada zajedničkom Thinkific nalogu za oba razreda. Sistem ne može pouzdano odrediti koje je dijete napravilo pojedini događaj, pa se podaci ne dupliraju niti razdvajaju.</div>{% endif %}
 </div>
 
 <div class="card">
@@ -118,7 +119,9 @@
 
   {# NOV IZVJESTAJ TRAZI POTVRDJEN TEKUCI RAZRED. Server odbija i bez ovoga -
      ovdje se administratoru samo objasnjava zasto dugmeta nema. #}
-  {% if not grade_confirmed %}
+  {% if not reporting_enabled %}
+    <div class="banner warn">{{ report_disabled_message }} Postojeći sačuvani izvještaj, ako postoji, ostaje čitljiv i dostupan kao PDF.</div>
+  {% elif not grade_confirmed %}
     <div class="banner err">
       {{ grade_unconfirmed_message }}
       <a href="{{ url_for('admin_students.profile', student_id=payload.student_id) }}">Otvori profil učenika →</a>
@@ -131,7 +134,7 @@
       <b>tačno jedan</b> AI poziv; sve brojke iznad su već izračunate i AI ih
       ne mijenja.
     </p>
-    {% if grade_confirmed %}
+    {% if reporting_enabled and grade_confirmed %}
     <form method="post" action="{{ url_for('admin_reports.generate_report', student_id=payload.student_id, month=month) }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <button type="submit" onclick="this.disabled=true;this.form.submit()">Generiši AI izvještaj</button>
@@ -140,6 +143,7 @@
   {% else %}
     <form method="post" action="{{ url_for('admin_reports.save_report', student_id=payload.student_id, month=month) }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <fieldset {% if not reporting_enabled %}disabled{% endif %} style="border:0;padding:0;margin:0">
 
       <label><b>Sažetak</b></label>
       <textarea name="summary" rows="5" style="width:100%">{{ saved.narrative.summary }}</textarea>
@@ -161,7 +165,8 @@
         <span class="muted">(ne piše ga AI; ostaje sačuvan i pri ponovnom generisanju)</span></label>
       <textarea name="instructor_comment" rows="3" style="width:100%">{{ saved.instructor_comment }}</textarea>
 
-      <p><button type="submit">Sačuvaj nacrt</button></p>
+      {% if reporting_enabled %}<p><button type="submit">Sačuvaj nacrt</button></p>{% endif %}
+      </fieldset>
     </form>
 
     <p class="muted">
@@ -178,7 +183,7 @@
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
       {# STARI NACRT OSTAJE CITLJIV I PREUZIMLJIV i bez potvrdjenog razreda -
          blokira se samo NOVO generisanje. #}
-      {% if grade_confirmed %}
+      {% if reporting_enabled and grade_confirmed %}
       <form method="post" action="{{ url_for('admin_reports.generate_report', student_id=payload.student_id, month=month) }}"
             onsubmit="return confirm('AI tekst (sažetak, jake strane, fokus, preporuke) bit će zamijenjen novim. Komentar instruktora ostaje sačuvan. Nastaviti?')">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">

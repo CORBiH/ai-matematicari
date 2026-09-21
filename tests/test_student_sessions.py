@@ -212,7 +212,7 @@ def test_v3_migration_touches_no_phase3c_data(tmp_path):
 
 def test_checker_exposes_v3_state(db):
     report = db.check()
-    assert report["schema_version"] == 6
+    assert report["schema_version"] == 7
     assert report["v3_schema_verified"] is True
     rendered = reporting_db._format_report(report)
     assert "v3_schema: verified" in rendered
@@ -925,7 +925,7 @@ def test_old_snapshot_without_the_new_fields_opens_safely(db, student):
 # 10) PROMPT
 # ===========================================================================
 def test_prompt_version_is_3d():
-    assert report_prompt.REPORT_PROMPT_VERSION == "3d-2"
+    assert report_prompt.REPORT_PROMPT_VERSION == "3d-3"
 
 
 def test_prompt_states_the_source_priority():

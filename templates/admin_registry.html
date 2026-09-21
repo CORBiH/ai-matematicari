@@ -1,34 +1,31 @@
 {% extends "admin_base.html" %}
 {% block heading %}Učenici{% endblock %}
 {% set nav_active = 'students' %}
+{% block head_extra %}
+<style>
+  .registry-scroll{overflow-x:auto}.registry-table{min-width:1120px}
+  .registry-select{width:2.2rem;text-align:center}
+  .grade-checks{display:flex;gap:.45rem;flex-wrap:wrap;min-width:190px}
+  .grade-checks label{display:inline-flex;align-items:center;gap:.25rem;margin:0;color:var(--text);font-size:.82rem}
+  .bulk-actions{position:sticky;bottom:.5rem;display:none;align-items:center;gap:.7rem;flex-wrap:wrap;background:#111d21;border:1px solid var(--accent);border-radius:12px;padding:.75rem .9rem;margin-top:.8rem;z-index:2}
+  .bulk-actions.is-visible{display:flex}.bulk-actions button{margin:0}
+  .type-badge--STUDENT{color:var(--ok)}.type-badge--SUPPORT{color:#7dc4ff}.type-badge--TEST{color:var(--warn)}
+  .row-actions{display:flex;gap:.45rem;align-items:center;flex-wrap:wrap;min-width:210px}
+  .row-actions button{margin:0;padding:.45rem .7rem}
+</style>
+{% endblock %}
 {% block content %}
-{% if error %}
-<div class="banner err">
-  {{ error }}
-  {# Veza na POSTOJEĆI zapis: administrator mora moći pogledati učenika s kojim
-     je nalog već povezan, a da adresa nigdje ne bude ponovljena. #}
-  {% if conflict %}
-  <a href="{{ url_for('admin_students.profile', student_id=conflict) }}">Pogledaj postojećeg učenika →</a>
-  {% endif %}
-</div>
-{% endif %}
+{% if error %}<div class="banner err">{{ error }}{% if conflict %} <a href="{{ url_for('admin_students.profile', student_id=conflict) }}">Pogledaj postojećeg učenika →</a>{% endif %}</div>{% endif %}
+{% if notice %}<div class="banner ok">{{ notice }}</div>{% endif %}
 
 <div class="card">
-  <form method="get" action="{{ url_for('admin_students.index') }}">
+  <form method="get" action="{{ url_for('admin_students.index') }}" class="actions">
     <input type="text" name="q" value="{{ search }}" placeholder="Ime učenika">
-    <select name="grade">
-      <option value="">Svi razredi</option>
-      {% for g in grades %}
-      <option value="{{ g }}" {% if grade == g %}selected{% endif %}>{{ g }}. razred</option>
-      {% endfor %}
-    </select>
-    {# Filter postoji da se 34 zatecena ucenika mogu obraditi jedan po jedan. #}
-    <select name="confirmed">
-      <option value="">Potvrda: sve</option>
-      <option value="nepotvrdjen" {% if confirmed == 'nepotvrdjen' %}selected{% endif %}>Nepotvrđen razred</option>
-      <option value="potvrdjen" {% if confirmed == 'potvrdjen' %}selected{% endif %}>Potvrđen razred</option>
-    </select>
-    <button type="submit">Traži</button>
+    <select name="grade"><option value="">Svi razredi</option>{% for g in grades %}<option value="{{ g }}" {% if grade == g %}selected{% endif %}>{{ g }}. razred</option>{% endfor %}</select>
+    <select name="account_type"><option value="">Vrsta: svi</option>{% for value, label in account_type_labels.items() %}<option value="{{ value }}" {% if account_type == value %}selected{% endif %}>{{ label|capitalize }}</option>{% endfor %}</select>
+    <select name="confirmed"><option value="">Potvrda: svi</option><option value="nepotvrdjen" {% if confirmed == 'nepotvrdjen' %}selected{% endif %}>Nepotvrđeni</option><option value="potvrdjen" {% if confirmed == 'potvrdjen' %}selected{% endif %}>Potvrđeni</option></select>
+    <label style="display:inline-flex;align-items:center;gap:.35rem;margin:0"><input type="checkbox" name="needs_action" value="1" {% if needs_action %}checked{% endif %}> Samo zapisi koji traže potvrdu</label>
+    <button type="submit" style="margin:0">Traži</button>
   </form>
 </div>
 
@@ -36,105 +33,51 @@
   <h3 style="margin-top:0">+ Dodaj učenika</h3>
   <form method="post" action="{{ url_for('admin_students.create_student') }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-    <p>
-      <label>Ime i prezime<br>
-        <input type="text" name="display_name" maxlength="120" required style="width:60%">
-      </label>
-    </p>
-    <p>
-      <label>Razred<br>
-        <select name="grade" required>
-          {% for g in grades %}<option value="{{ g }}">{{ g }}. razred</option>{% endfor %}
-        </select>
-      </label>
-    </p>
-    <p>
-      {# NEOBAVEZNO. Adresa se koristi SAMO za povezivanje Thinkific naloga i
-         poslije se nigdje ne prikazuje. #}
-      <label>Thinkific e-mail <span class="muted">(neobavezno)</span><br>
-        <input type="email" name="thinkific_email" maxlength="254" style="width:60%">
-      </label>
-    </p>
+    <p><label>Ime i prezime<br><input type="text" name="display_name" maxlength="120" required style="width:60%"></label></p>
+    <p><label>Razred<br><select name="grade" required>{% for g in grades %}<option value="{{ g }}">{{ g }}. razred</option>{% endfor %}</select></label></p>
+    <p><label>Thinkific e-mail <span class="muted">(neobavezno)</span><br><input type="email" name="thinkific_email" maxlength="254" style="width:60%"></label></p>
     <p><button type="submit">Sačuvaj učenika</button></p>
   </form>
 </div>
 
 <div class="card">
-  <p>
-    <strong>Ukupno učenika: {{ students|length }}</strong>
-    {% if unconfirmed_total %}
-    <span class="pill" style="color:var(--warn)">nepotvrđen razred: {{ unconfirmed_total }}</span>
-    {% endif %}
-  </p>
+  <p><strong>Vidljivih zapisa: {{ students|length }}</strong>{% if unconfirmed_total %} <span class="pill" style="color:var(--warn)">nepotvrđeni učenici: {{ unconfirmed_total }}</span>{% endif %}</p>
   {% if students %}
-  <table>
-    <tr><th>Učenik</th><th>Trenutni razred</th><th>Korišteno gradivo</th><th>Thinkific</th><th></th></tr>
-    {% for s in students %}
-    <tr>
-      <td>{{ s.display_name or "Učenik #%s"|format(s.student_id) }}</td>
-      <td>
-        {% if s.grade %}
-          {% if s.grade_status == status_unconfirmed %}
-          <span class="muted">Trenutno zapisano: {{ s.grade }}. razred</span>
-          {% else %}{{ s.grade }}. razred{% endif %}
-        {% else %}<span class="muted">nije unesen</span>{% endif %}
-        {# STANJE POTVRDE, ne ocjena tacnosti. Zatecena cifra bez potvrde je
-           nepotvrdjena, ma koliko izgledala uvjerljivo. #}
-        {% if s.grade_status == status_unconfirmed %}
-        <span class="pill" style="color:var(--warn)">nepotvrđeno</span>
-        {% else %}
-        <span class="pill" style="color:var(--ok)">potvrđeno</span>
-        {% endif %}
-        {# BROJ IZ IMENA — pomoc covjeku, nikad odluka. Vidi se SAMO dok red
-           nije potvrdjen, da bi se znalo zasto je nesto predizabrano. #}
-        {% if s.name_note %}
-        <br>
-        <span class="muted">
-          {% if s.name_note['kind'] == note_grade %}Broj u imenu: {{ s.name_note['grade'] }}. razred
-          {% elif s.name_note['kind'] == note_unsupported %}Broj u imenu: {{ s.name_note['value'] }} — izvan podržanih razreda 6–9
-          {% else %}Brojevi u imenu: {{ s.name_note['values']|join(', ') }} — nije jednoznačno{% endif %}
-        </span>
-        {% endif %}
-      </td>
-      <td class="muted">
-        {# KONTEKST, NE GRESKA: sedmak smije obnavljati gradivo sestog razreda. #}
-        {% for key, item in (s.content_grades or {}).items() %}
-          {% if item.grade %}{{ item.grade }}. razred{% else %}više razreda{% endif %}
-          ({{ item.month }}){% if not loop.last %}, {% endif %}
-        {% else %}—{% endfor %}
-      </td>
-      <td>
-        {% if s.thinkific_linked %}<span class="pill" style="color:var(--ok)">povezan</span>
-        {% else %}<span class="pill">nije povezan</span>{% endif %}
-      </td>
-      <td>
-        {# NEMA JEDNOG KLIKA NAD ZATECENOM VRIJEDNOSCU. Administrator mora
-           VIDJETI i IZABRATI razred koji potvrdjuje; predizbor dolazi samo iz
-           broja u imenu, nikad iz stare automatske sestice. #}
-        {% if s.grade_status == status_unconfirmed %}
-        <form method="post" style="display:inline"
-              action="{{ url_for('admin_students.update_grade', student_id=s.student_id) }}">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-          {# Vrati se na listu, da se 34 ucenika mogu proci jedan po jedan. #}
-          <input type="hidden" name="next" value="index">
-          <select name="grade" required>
-            <option value="" {% if not s.preselected_grade %}selected{% endif %} disabled>— izaberi razred —</option>
-            {% for g in grades %}
-            <option value="{{ g }}" {% if s.preselected_grade == g %}selected{% endif %}>{{ g }}. razred</option>
-            {% endfor %}
-          </select>
-          <button type="submit">Sačuvaj i potvrdi</button>
-        </form>
-        {% endif %}
-        <a href="{{ url_for('admin_students.profile', student_id=s.student_id) }}">Profil</a>
-        ·
-        <a href="{{ url_for('admin_reports.student_preview', student_id=s.student_id, month=month) }}">Izvještaj</a>
-      </td>
-    </tr>
-    {% endfor %}
-  </table>
-  {% else %}
-  <p class="muted">Nema učenika koji odgovaraju filteru.</p>
-  {% endif %}
+  <form id="bulk-profile-form" method="post" action="{{ url_for('admin_students.bulk_confirm') }}" onsubmit="return matbotBulkSubmit(this)">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="next" value="index">
+    <div class="registry-scroll"><table class="registry-table">
+      <thead><tr><th class="registry-select"><input type="checkbox" id="select-visible" aria-label="Odaberi sve vidljive"></th><th>Učenik</th><th>Vrsta</th><th>Trenutni razred/i</th><th>Korišteno gradivo</th><th>Thinkific</th><th>Radnje</th></tr></thead>
+      <tbody>{% for s in students %}
+      <tr data-student-row="{{ s.student_id }}">
+        <td class="registry-select"><input type="checkbox" class="row-select" name="student_ids" value="{{ s.student_id }}" aria-label="Odaberi učenika #{{ s.student_id }}"></td>
+        <td><strong>{{ s.display_name or "Učenik #%s"|format(s.student_id) }}</strong>{% if s.name_note and s.grade_status == status_unconfirmed %}<br><span class="muted">{% if s.name_note['kind'] == note_grade %}Broj u imenu: {{ s.name_note['grade'] }}. razred{% elif s.name_note['kind'] == note_unsupported %}Broj u imenu: {{ s.name_note['value'] }} — izvan 6–9{% else %}Brojevi u imenu: {{ s.name_note['values']|join(', ') }} — izaberite ručno{% endif %}</span>{% endif %}</td>
+        <td><select name="account_type_{{ s.student_id }}" class="account-type" data-student-id="{{ s.student_id }}" aria-label="Vrsta naloga">{% for value, label in account_type_labels.items() %}<option value="{{ value }}" {% if s.account_type == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select><br><span class="pill type-badge--{{ s.account_type }}">{{ account_type_labels[s.account_type] }}</span></td>
+        <td><div class="grade-checks" data-grades-for="{{ s.student_id }}">{% for g in grades %}<label><input type="checkbox" name="grades_{{ s.student_id }}" value="{{ g }}" {% if g in s.preselected_grades %}checked{% endif %} {% if s.account_type != student_type %}disabled{% endif %}> {{ g }}.</label>{% endfor %}</div>
+          {% if s.account_type == student_type %}{% if s.grades %}<span class="muted">{{ s.grades|join('. razred + ') }}. razred</span> <span class="pill" style="color:var(--ok)">potvrđeno</span>{% elif s.grade %}<span class="muted">Trenutno zapisano: {{ s.grade }}. razred</span> <span class="pill" style="color:var(--warn)">nepotvrđeno</span>{% else %}<span class="pill" style="color:var(--warn)">nepotvrđeno</span>{% endif %}{% else %}<span class="muted">razred nije potreban za izvještaj</span>{% endif %}
+        </td>
+        <td class="muted">{% for key, item in (s.content_grades or {}).items() %}{% if item.grade %}{{ item.grade }}. razred{% else %}više razreda{% endif %} ({{ item.month }}){% if not loop.last %}, {% endif %}{% else %}—{% endfor %}</td>
+        <td>{% if s.thinkific_linked %}<span class="pill" style="color:var(--ok)">povezan</span>{% else %}<span class="pill">nije povezan</span>{% endif %}</td>
+        <td><div class="row-actions"><button type="submit" formaction="{{ url_for('admin_students.update_grade', student_id=s.student_id) }}">{% if s.account_type == student_type %}Sačuvaj i potvrdi{% else %}Sačuvaj{% endif %}</button><a href="{{ url_for('admin_students.profile', student_id=s.student_id) }}">Profil</a>{% if s.account_type == student_type %}<a href="{{ url_for('admin_reports.student_preview', student_id=s.student_id, month=month) }}">Izvještaj</a>{% else %}<span class="muted">Izvještaj isključen</span>{% endif %}</div></td>
+      </tr>{% endfor %}</tbody>
+    </table></div>
+    <div class="bulk-actions" id="bulk-actions"><strong>Odabrano: <span id="selected-count">0</span></strong><button type="submit">Sačuvaj i potvrdi odabrane</button><span class="muted">ili promijeni samo vrstu naloga:</span><select name="bulk_account_type">{% for value, label in account_type_labels.items() %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select><button type="submit" class="btn btn--ghost" formaction="{{ url_for('admin_students.bulk_account_type') }}">Primijeni na odabrane</button></div>
+  </form>
+  {% else %}<p class="muted">Nema učenika koji odgovaraju filteru.</p>{% endif %}
 </div>
+
+<script>
+(function () {
+  var all = document.getElementById("select-visible");
+  if (!all) return;
+  var rows = Array.prototype.slice.call(document.querySelectorAll(".row-select"));
+  var area = document.getElementById("bulk-actions"), count = document.getElementById("selected-count");
+  function refresh(){var n=rows.filter(function(b){return b.checked;}).length;count.textContent=String(n);area.classList.toggle("is-visible",n>0);all.checked=n>0&&n===rows.length;all.indeterminate=n>0&&n<rows.length;}
+  all.addEventListener("change",function(){rows.forEach(function(b){b.checked=all.checked;});refresh();});
+  rows.forEach(function(b){b.addEventListener("change",refresh);});
+  document.querySelectorAll(".grade-checks").forEach(function(group){group.addEventListener("change",function(event){if(group.querySelectorAll("input:checked").length>2)event.target.checked=false;});});
+  document.querySelectorAll(".account-type").forEach(function(select){select.addEventListener("change",function(){var group=document.querySelector('[data-grades-for="'+select.dataset.studentId+'"]');group.querySelectorAll("input").forEach(function(input){input.disabled=select.value!=="STUDENT";});});});
+})();
+function matbotBulkSubmit(form){window.setTimeout(function(){form.querySelectorAll("button[type=submit]").forEach(function(button){button.disabled=true;});},0);return true;}
+</script>
 {% endblock %}

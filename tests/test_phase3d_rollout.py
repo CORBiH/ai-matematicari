@@ -311,13 +311,15 @@ def test_migrate_command_moves_a_clean_v2_to_v3(tmp_path, monkeypatch):
         assert database.migrate() == [reporting_schema.SCHEMA_VERSION_V3,
                                       reporting_schema.SCHEMA_VERSION_V4,
                                       reporting_schema.SCHEMA_VERSION_V5,
-                                      reporting_schema.SCHEMA_VERSION_V6]
+                                      reporting_schema.SCHEMA_VERSION_V6,
+                                      reporting_schema.SCHEMA_VERSION_V7]
         report = database.check()
-        assert report["schema_version"] == 6
+        assert report["schema_version"] == 7
         assert report["v3_schema_verified"] is True
         assert report["v4_schema_verified"] is True
         assert report["v5_schema_verified"] is True
         assert report["v6_schema_verified"] is True
+        assert report["v7_schema_verified"] is True
     finally:
         database.close()
 
@@ -392,7 +394,9 @@ def test_v3_is_additive_for_the_currently_running_app(tmp_path, monkeypatch):
     finally:
         database.close()
 
-    added = {"students": [name for name, _ in reporting_schema.V4_STUDENT_COLUMNS]}
+    added = {"students": ([name for name, _ in
+                            reporting_schema.V4_STUDENT_COLUMNS]
+                           + [reporting_schema.V7_ACCOUNT_TYPE_COLUMN[0]])}
     conn = libsql.connect(path)
     try:
         for table, columns in before.items():

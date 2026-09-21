@@ -31,13 +31,14 @@ const INDEX_HTML = path.join(__dirname, '..', '..', 'templates', 'index.html');
 // --- sitan selektor engine: samo oblici koje stranica stvarno koristi -------
 function parseSelector(selector) {
   const parts = [];
-  const re = /(\.[A-Za-z0-9_-]+)|(#[A-Za-z0-9_-]+)|(\[[^\]]+\])|([A-Za-z][A-Za-z0-9]*)/g;
+  const re = /(:checked)|(\.[A-Za-z0-9_-]+)|(#[A-Za-z0-9_-]+)|(\[[^\]]+\])|([A-Za-z][A-Za-z0-9]*)/g;
   let match;
   while ((match = re.exec(selector)) !== null) {
-    if (match[1]) parts.push({ kind: 'class', value: match[1].slice(1) });
-    else if (match[2]) parts.push({ kind: 'id', value: match[2].slice(1) });
-    else if (match[3]) {
-      const body = match[3].slice(1, -1);
+    if (match[1]) parts.push({ kind: 'checked' });
+    else if (match[2]) parts.push({ kind: 'class', value: match[2].slice(1) });
+    else if (match[3]) parts.push({ kind: 'id', value: match[3].slice(1) });
+    else if (match[4]) {
+      const body = match[4].slice(1, -1);
       const eq = body.indexOf('=');
       if (eq === -1) parts.push({ kind: 'attr', name: body, value: null });
       else {
@@ -47,7 +48,7 @@ function parseSelector(selector) {
           value: body.slice(eq + 1).trim().replace(/^["']|["']$/g, ''),
         });
       }
-    } else if (match[4]) parts.push({ kind: 'tag', value: match[4].toLowerCase() });
+    } else if (match[5]) parts.push({ kind: 'tag', value: match[5].toLowerCase() });
   }
   return parts;
 }
@@ -81,6 +82,8 @@ class Element {
     this.style = {};
     this.attributes = {};
     this.disabled = false;
+    this.checked = false;
+    this.indeterminate = false;
     this.hidden = false;
     this.value = '';
     this.type = '';
@@ -139,6 +142,7 @@ class Element {
       if (part.kind === 'class') return this.classList.contains(part.value);
       if (part.kind === 'id') return this.id === part.value;
       if (part.kind === 'tag') return this.tagName.toLowerCase() === part.value;
+      if (part.kind === 'checked') return this.checked;
       const actual = this.getAttribute(part.name);
       return part.value === null ? actual !== null : actual === part.value;
     });

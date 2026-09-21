@@ -8,8 +8,8 @@
 <div class="card">
   <p style="margin-top:0">
     <strong>{{ student.display_name or "Bez imena" }}</strong>
-    {% if student.grade %}
-      <span class="pill">{{ student.grade }}. razred</span>
+    {% if student.grades %}
+      <span class="pill">{{ student.grades|join('. razred + ') }}. razred</span>
       {% if grade_confirmed %}<span class="pill" style="color:var(--ok)">potvrđeno</span>
       {% else %}<span class="pill" style="color:var(--warn)">nije potvrđeno</span>{% endif %}
     {% else %}
@@ -17,10 +17,16 @@
     {% endif %}
     {% if thinkific_linked %}<span class="pill" style="color:var(--ok)">Thinkific: povezan</span>
     {% else %}<span class="pill">Thinkific: nije povezan</span>{% endif %}
+    <span class="pill">{{ account_type_labels[student.account_type] }}</span>
   </p>
   <p>
+    {% if student.account_type == student_type %}
     <a href="{{ url_for('admin_reports.student_preview', student_id=student_id, month=month) }}">
       <button type="button">Izvještaj</button></a>
+    {% else %}
+      <span class="muted">Novi izvještaji su isključeni za ovaj nalog.</span>
+      <a href="{{ url_for('admin_reports.student_preview', student_id=student_id, month=month) }}">Pregledaj postojeće izvještaje</a>
+    {% endif %}
   </p>
   {# TEKUĆI razred je PROFIL, ne identitet. Mijenja se svjesno i mijenja SAMO
      ovo polje — istorija časova, aktivnosti i snimaka ostaje netaknuta.
@@ -48,21 +54,30 @@
 
   <form method="post" action="{{ url_for('admin_students.update_grade', student_id=student_id) }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-    <label>Trenutni razred<br>
-      <select name="grade" required>
-        {# Bez predizabrane vrijednosti kad je nema odakle — prazan izbor je
-           posteniji od nagadjanja, a server prazan izbor odbija. #}
-        <option value="" {% if not preselected_grade %}selected{% endif %} disabled>— izaberi razred —</option>
-        {% for g in valid_grades %}
-        <option value="{{ g }}" {% if preselected_grade == g %}selected{% endif %}>{{ g }}. razred</option>
-        {% endfor %}
-      </select>
-    </label>
+    <label>Vrsta naloga<br><select name="account_type" id="profile-account-type">
+      {% for value, label in account_type_labels.items() %}<option value="{{ value }}" {% if student.account_type == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select></label>
+    <fieldset id="profile-grades" {% if student.account_type != student_type %}disabled{% endif %}>
+      <legend>Trenutni razred/i <span class="muted">(najviše 2)</span></legend>
+      {% for g in valid_grades %}<label style="display:inline-block;margin-right:.8rem"><input type="checkbox" name="grades" value="{{ g }}" {% if g in preselected_grades %}checked{% endif %}> {{ g }}. razred</label>{% endfor %}
+    </fieldset>
     <button type="submit">{% if grade_confirmed %}Sačuvaj razred{% else %}Sačuvaj i potvrdi{% endif %}</button>
     <span class="muted">Mijenja samo profil; stari časovi i izvještaji ostaju nepromijenjeni.</span>
   </form>
+  <script>
+    (function () {
+      var type = document.getElementById("profile-account-type");
+      var grades = document.getElementById("profile-grades");
+      function syncType(){grades.disabled = type.value !== "STUDENT";}
+      type.addEventListener("change", syncType);
+      grades.addEventListener("change", function(event){
+        if(grades.querySelectorAll("input:checked").length > 2) event.target.checked=false;
+      });
+      syncType();
+    })();
+  </script>
 
-  {% if grade_status == status_unconfirmed %}
+  {% if student.account_type == student_type and grade_status == status_unconfirmed %}
   <div class="banner warn" style="margin-top:10px">
     Trenutni razred nije potvrđen. Unos časa i novi izvještaj za roditelja
     traže potvrđen razred.
@@ -117,15 +132,22 @@
   <div class="top" style="margin-bottom:.2rem">
     <h3 style="margin:0">Evidencija časa</h3>
     {# POJEDINAČNI UNOS OSTAJE (ispravke i izuzeci); brzi put je za cijeli čas. #}
-    <a href="{{ url_for('admin_sessions.new_class', grade=student.grade) }}">Upiši čas za više učenika →</a>
+    {% if student.grades|length == 1 %}
+    <a href="{{ url_for('admin_sessions.new_class', grade=student.grades[0]) }}">Upiši čas za više učenika →</a>
+    {% elif student.grades|length > 1 %}
+    <span>{% for g in student.grades %}<a href="{{ url_for('admin_sessions.new_class', grade=g) }}">Upiši čas za {{ g }}. razred →</a>{% if not loop.last %} · {% endif %}{% endfor %}</span>
+    {% endif %}
   </div>
-  {% if not grade_confirmed %}
+  {% if student.account_type != student_type %}
+  <p class="banner warn">Evidencija novih učeničkih časova nije potrebna za PODRŠKA/TEST nalog. Historija ostaje sačuvana.</p>
+  {% elif not grade_confirmed %}
   {# BEZ POTVRĐENOG RAZREDA NEMA KURIKULUMA. Zatecena cifra bi instruktoru dala
      gradivo tudje generacije, pa se forma ne nudi. #}
   <p class="banner err">Potrebno je potvrditi trenutni razred učenika prije unosa časa.</p>
   {% else %}
   <form method="post" action="{{ url_for('admin_students.create_session', student_id=student_id) }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    {% if student.grades|length > 1 %}<p><label>Razred časa<br><select name="session_grade" id="session-grade" onchange="matbotFillAreas()" required>{% for g in student.grades %}<option value="{{ g }}">{{ g }}. razred</option>{% endfor %}</select></label></p>{% else %}<input type="hidden" name="session_grade" id="session-grade" value="{{ student.grades[0] }}">{% endif %}
     <p><label>Datum<br><input type="date" name="session_date" required></label></p>
     {# OBAVEZNO od verzije 5 — vidi `_session_from_form`. #}
     <p><label>Vrijeme<br><input type="time" name="session_time" required></label></p>
@@ -177,10 +199,21 @@
   </form>
   {# Mali lokalni skript, bez ijednog frameworka: lekcije se filtriraju po
      izabranoj oblasti. Podaci dolaze iz kurikuluma servera. #}
-  <script type="application/json" id="curriculum">{{ curriculum|tojson }}</script>
+  <script type="application/json" id="curricula">{{ curricula|tojson }}</script>
   <script>
+    function matbotFillAreas() {
+      var all = JSON.parse(document.getElementById("curricula").textContent);
+      var grade = document.getElementById("session-grade").value;
+      var data = all[grade] || {};
+      var area = document.getElementById("area");
+      area.innerHTML = "";
+      var blank = document.createElement("option"); blank.value = ""; blank.textContent = "—"; area.appendChild(blank);
+      Object.keys(data).forEach(function (title) { var option = document.createElement("option"); option.value = title; option.textContent = title; area.appendChild(option); });
+      matbotFillLessons();
+    }
     function matbotFillLessons() {
-      var data = JSON.parse(document.getElementById("curriculum").textContent);
+      var all = JSON.parse(document.getElementById("curricula").textContent);
+      var data = all[document.getElementById("session-grade").value] || {};
       var area = document.getElementById("area").value;
       var lesson = document.getElementById("lesson");
       lesson.innerHTML = "";
@@ -193,6 +226,7 @@
         lesson.appendChild(option);
       });
     }
+    matbotFillAreas();
   </script>
   {% endif %}
 </div>

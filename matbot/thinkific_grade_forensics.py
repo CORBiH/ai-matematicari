@@ -40,6 +40,10 @@ def _short(value):
     return "-" if value in (None, "") else str(value)
 
 
+def _grade_set(values):
+    return "+".join(str(value) for value in (values or ())) or "-"
+
+
 def collect(database=None):
     """Sve što forenzika treba, u jednom čitanju. Ne mijenja ništa."""
     target = database or reporting_db.get_database()
@@ -55,13 +59,13 @@ def _students(target):
     for student in target.list_students():
         student_id = student["student_id"]
         evidence = target.fetch_grade_evidence(student_id)
-        status, _ = student_grades.classify(
-            student["grade"], student.get("grade_confirmed_at"),
-            student.get("grade_source"), evidence)
+        status, _ = student_grades.classify_grades(
+            student.get("grades"), evidence)
         rows.append({
             "student_id": student_id,
             "display_name": student["display_name"] or "",
             "stored_grade": student["grade"],
+            "current_grades": list(student.get("grades") or ()),
             "grade_confirmed_at": student.get("grade_confirmed_at"),
             "grade_source": student.get("grade_source"),
             "thinkific_connected": "yes" if student["thinkific_linked"] else "no",
@@ -164,18 +168,22 @@ def format_report(data):
                    student_grades.STATUS_UNCONFIRMED,
                    student_grades.STATUS_CONTENT_MISMATCH):
         lines.append("%-23s %d" % (status + ":", tally.get(status, 0)))
+    for s in students:
+        lines.append("  id=%-4s grades=%-5s status=%s" % (
+            s["student_id"], _grade_set(s["current_grades"]),
+            s["grade_status"]))
 
     lines.append("")
     lines.append("=== STUDENTS NEEDING A LOOK (%d) ===" % len(pending))
     lines.append("Kolone `tk`/`exam`/`matbot` su KORISTENO GRADIVO, ne prijedlog razreda.")
     lines.append("%-4s %-22s %-6s %-19s %-4s %-9s %-5s %-20s %-6s %-20s %-5s %s"
-                 % ("id", "display_name", "grade", "potvrda", "tk", "tk_month",
+                 % ("id", "display_name", "grades", "potvrda", "tk", "tk_month",
                     "exam", "exam_date", "matbot", "matbot_date", "hint",
                     "status"))
     for s in pending:
         lines.append("%-4s %-22s %-6s %-19s %-4s %-9s %-5s %-20s %-6s %-20s %-5s %s"
                      % (s["student_id"], (s["display_name"] or "")[:22],
-                        _short(s["stored_grade"]),
+                        _grade_set(s["current_grades"]),
                         _short(s["grade_confirmed_at"]),
                         _short(s["content_thinkific_grade"]),
                         _short(s["content_thinkific_month"]),
@@ -189,9 +197,9 @@ def format_report(data):
     lines.append("")
     lines.append("=== THINKIFIC HISTORY FOR THOSE STUDENTS ===")
     for s in pending:
-        lines.append("  student_id=%s %s (stored=%s)"
+        lines.append("  student_id=%s %s (grades=%s)"
                      % (s["student_id"], (s["display_name"] or "")[:22],
-                        _short(s["stored_grade"])))
+                        _grade_set(s["current_grades"])))
         for h in s["history"]:
             lines.append("      %-9s %-9s %-26s grade=%-4s viewed=%-6s completed=%s"
                          % (h["report_month"], h["course_key"],

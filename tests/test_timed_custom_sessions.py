@@ -636,6 +636,8 @@ def test_27_unconfirmed_student_injection_is_still_rejected(admin, db):
     conn = db._connection()
     conn.execute("UPDATE students SET grade_confirmed_at = NULL, "
                  " grade_source = NULL WHERE id = ?", (hidden,))
+    conn.execute("DELETE FROM student_current_grades WHERE student_id = ?",
+                 (hidden,))
     conn.commit()
     token = csrf_from(page(admin))
     admin.post("/admin/sessions/bulk",
@@ -896,4 +898,4 @@ def test_37_no_model_call_is_involved(admin, db, flask_app):
 def test_37b_the_report_prompt_version_is_unchanged():
     from matbot import report_prompt
 
-    assert report_prompt.REPORT_PROMPT_VERSION == "3d-2"
+    assert report_prompt.REPORT_PROMPT_VERSION == "3d-3"

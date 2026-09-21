@@ -685,7 +685,7 @@ def test_37_no_model_call_is_involved(admin, db, flask_app):
 def test_37b_the_report_prompt_version_is_unchanged():
     from matbot import report_prompt
 
-    assert report_prompt.REPORT_PROMPT_VERSION == "3d-2"
+    assert report_prompt.REPORT_PROMPT_VERSION == "3d-3"
 
 
 # ===========================================================================

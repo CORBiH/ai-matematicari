@@ -2,8 +2,13 @@
 
 DVIJE RAZLIČITE STVARI KOJE SU SE DO SADA ZVALE ISTO:
 
-  TEKUĆI ŠKOLSKI RAZRED  = razred koji učenik POHAĐA. Živi u `students.grade` i
-                           vrijedi SAMO ako ga je administrator POTVRDIO.
+  TEKUĆI ŠKOLSKI RAZRED  = razred koji učenik POHAĐA. U v7 autoritativni skup
+                           živi u `student_current_grades` kad postoji barem
+                           jedan red. `students.grade` je samo kompatibilni
+                           fallback kad normalizovanih redova nema I kad su
+                           legacy vrijeme i ljudski izvor potvrde valjani.
+                           Profil s dva razreda namjerno ima `students.grade`
+                           postavljen na NULL, da stari čitač ne izabere jedan.
   RAZRED SADRŽAJA        = razred gradiva koje je učenik KORISTIO. Živi u
                            `thinkific_progress_snapshots.grade`,
                            `assessment_attempts.grade` i `learning_activity.grade`.
@@ -181,6 +186,22 @@ def is_confirmed(grade, grade_confirmed_at, grade_source):
             and (grade_source or "") in VALID_GRADE_SOURCES)
 
 
+def normalize_confirmed_grades(grades):
+    """Kanonski skup jednog ili dva potvrđena razreda, ili prazna torka."""
+    try:
+        values = [int(value) for value in (grades or ())]
+    except (TypeError, ValueError):
+        return ()
+    if (not 1 <= len(values) <= 2 or len(values) != len(set(values))
+            or any(value not in VALID_GRADES for value in values)):
+        return ()
+    return tuple(sorted(values))
+
+
+def is_confirmed_grades(grades):
+    return bool(normalize_confirmed_grades(grades))
+
+
 def content_grades(evidence):
     """{izvor: dokaz} — SADRŽAJ koji je učenik koristio, ne tekući razred.
 
@@ -228,6 +249,24 @@ def classify(grade, grade_confirmed_at, grade_source, evidence):
         return STATUS_UNCONFIRMED, recent
     differing = [item for item in recent.values()
                  if item.get("ambiguous") or int(item["grade"]) != int(grade)]
+    if differing:
+        return STATUS_CONTENT_MISMATCH, recent
+    return STATUS_CONFIRMED, recent
+
+
+def classify_grades(grades, evidence):
+    """Klasifikacija za normalizovani skup trenutnih razreda.
+
+    Dva razreda su jedna svjesna administratorska tvrdnja o zajednickom nalogu,
+    ne dva izvjestaja. Sadrzaj je razlicit samo kad njegov razred nije ni u
+    jednom od potvrđenih razreda (ili je sam dokaz dvosmislen).
+    """
+    current = normalize_confirmed_grades(grades)
+    recent = recent_content_grades(evidence)
+    if not current:
+        return STATUS_UNCONFIRMED, recent
+    differing = [item for item in recent.values()
+                 if item.get("ambiguous") or int(item["grade"]) not in current]
     if differing:
         return STATUS_CONTENT_MISMATCH, recent
     return STATUS_CONFIRMED, recent

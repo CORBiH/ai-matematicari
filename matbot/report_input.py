@@ -331,6 +331,13 @@ def build_report_input(student_id, report_month, database=None):
     target = database or reporting_db.get_database()
     month = progress.parse_report_month(report_month)
     profile = target.fetch_student_profile(student_id) or {}
+    grades = list(profile.get("grades") or ())
+    if (not grades and student_grades.is_confirmed(
+            profile.get("grade"), profile.get("grade_confirmed_at"),
+            profile.get("grade_source"))):
+        grades = [int(profile["grade"])]
+    account_type = (profile.get("account_type")
+                    or reporting_db.ACCOUNT_TYPE_STUDENT)
     return {
         "student_id": student_id,
         "report_month": month,
@@ -339,11 +346,14 @@ def build_report_input(student_id, report_month, database=None):
         # pozivalac to ne može znati iz gole cifre.
         "profile": {"display_name": profile.get("display_name"),
                     "grade": profile.get("grade"),
+                    "grades": grades,
                     "grade_confirmed_at": profile.get("grade_confirmed_at"),
                     "grade_source": profile.get("grade_source"),
-                    "grade_confirmed": student_grades.is_confirmed(
-                        profile.get("grade"), profile.get("grade_confirmed_at"),
-                        profile.get("grade_source"))},
+                    "grade_confirmed": student_grades.is_confirmed_grades(grades),
+                    "account_type": account_type,
+                    "reporting_enabled": (
+                        account_type == reporting_db.ACCOUNT_TYPE_STUDENT),
+                    "shared_account": len(grades) == 2},
         # Redoslijed ključeva prati PEDAGOŠKI prioritet Faze 3D: čas prvo.
         "instruction": build_instruction_section(student_id, month, database=target),
         "thinkific": build_thinkific_section(student_id, month, database=target),

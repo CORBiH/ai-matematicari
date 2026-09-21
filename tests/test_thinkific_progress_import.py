@@ -63,6 +63,7 @@ def migrate(path):
         reporting_schema.migrate_to_v4(conn)
         reporting_schema.migrate_to_v5(conn)
         reporting_schema.migrate_to_v6(conn)
+        reporting_schema.migrate_to_v7(conn)
         return applied
     finally:
         conn.close()
@@ -269,6 +270,21 @@ def test_import_never_writes_a_profile_grade(db):
     assert rows(db, "SELECT grade FROM students")[0][0] is None
     stored = [(s[2], s[3], s[5]) for s in snapshots(db)]
     assert ("2026-10", "grade_7", 7) in stored, "snimak mora zadržati svoj razred"
+
+
+def test_import_preserves_v7_account_type_and_authoritative_grades(db):
+    database = reporting_db.get_database()
+    student_id = database.get_or_create_student(
+        PROVIDER_THINKIFIC_EMAIL, E1, "Shared Import")
+    database.set_student_grades(student_id, [7, 9])
+    database.set_student_account_types([student_id], "SUPPORT")
+
+    report_input.import_progress_files(
+        "2026-09", {"grade_6": simple_csv(first="CSV", last="Name")})
+
+    profile = database.fetch_student_profile(student_id)
+    assert profile["account_type"] == "SUPPORT"
+    assert profile["grades"] == [7, 9]
 
 
 def test_content_difference_is_counted_against_a_confirmed_profile(db):

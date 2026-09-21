@@ -97,24 +97,28 @@ def legacy(db, name, grade=6):
     conn = db._connection()
     conn.execute("UPDATE students SET grade = ?, grade_confirmed_at = NULL, "
                  " grade_source = NULL WHERE id = ?", (grade, student_id))
+    conn.execute("DELETE FROM student_current_grades WHERE student_id = ?",
+                 (student_id,))
     conn.commit()
     return student_id
 
 
 def selector(page):
-    """Sadržaj `<select name="grade">` s administratorske stranice."""
-    match = re.search(rb'<select name="grade"[^>]*>(.*?)</select>', page.data,
-                      re.S)
-    assert match, "selektor razreda nije prikazan"
-    return match.group(1).decode()
+    """Checkbox kontrole tekućih razreda s administratorske stranice."""
+    found = re.findall(
+        rb'<input type="checkbox" name="grades" value="([6789])"([^>]*)>',
+        page.data)
+    assert len(found) == 4, "kontrole razreda nisu prikazane"
+    return [(int(value), attributes.decode())
+            for value, attributes in found]
 
 
 def preselected(page):
-    """Koja je opcija PREDIZABRANA? `None` znači „— izaberi razred —"."""
-    block = selector(page)
-    chosen = re.findall(r'<option value="([^"]*)"[^>]*\bselected\b', block)
-    assert len(chosen) == 1, "tačno jedna opcija smije biti predizabrana"
-    return int(chosen[0]) if chosen[0] else None
+    """Koji je jedan razred predizabran; None znači nema predizbora."""
+    chosen = [grade for grade, attributes in selector(page)
+              if re.search(r"\bchecked\b", attributes)]
+    assert len(chosen) <= 1
+    return chosen[0] if chosen else None
 
 
 # ===========================================================================
@@ -190,7 +194,7 @@ def test_7_a_student_without_a_hint_never_preselects_the_legacy_value(
 
     assert "Trenutno zapisano: 6. razred (nepotvrđeno)".encode() in page.data
     assert preselected(page) is None
-    assert "izaberi razred".encode() in page.data
+    assert "najviše 2".encode() in page.data
     assert "Broj u imenu".encode() not in page.data
 
 
@@ -298,7 +302,7 @@ def test_12_a_confirmed_student_is_not_altered_by_a_later_name_hint(admin, db):
     assert db.fetch_student_profile(student_id)["grade"] == 9
 
     listing = admin.get("/admin/students")
-    assert "Sačuvaj i potvrdi".encode() not in listing.data
+    assert "9. razred".encode() in listing.data
 
 
 # ===========================================================================

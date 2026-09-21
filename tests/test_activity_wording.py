@@ -133,8 +133,8 @@ def test_grade_language_is_checked_across_every_narrative_field():
 # ---------------------------------------------------------------------------
 # 4) PROMPT 3d-2
 # ---------------------------------------------------------------------------
-def test_prompt_version_is_3d_2():
-    assert report_prompt.REPORT_PROMPT_VERSION == "3d-2"
+def test_prompt_version_is_3d_3():
+    assert report_prompt.REPORT_PROMPT_VERSION == "3d-3"
 
 
 def test_prompt_describes_activity_as_engagement():

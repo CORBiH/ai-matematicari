@@ -52,6 +52,12 @@ SOURCE = "matbot"
 # nikad nov prostor imena. Drži se ovdje da se string ne bi prepisivao.
 _THINKIFIC_PROVIDER = "thinkific_email"
 
+ACCOUNT_TYPE_STUDENT = "STUDENT"
+ACCOUNT_TYPE_SUPPORT = "SUPPORT"
+ACCOUNT_TYPE_TEST = "TEST"
+VALID_ACCOUNT_TYPES = (ACCOUNT_TYPE_STUDENT, ACCOUNT_TYPE_SUPPORT,
+                       ACCOUNT_TYPE_TEST)
+
 # Razredi koje ručni upis smije primiti. Osnovna škola 6–9 (BiH).
 VALID_MANUAL_GRADES = (6, 7, 8, 9)
 
@@ -75,6 +81,7 @@ REQUIRED_TABLES = (
     "monthly_reports",
     "sync_state",
     "schema_migrations",
+    "student_current_grades",
 )
 
 # Gornje granice ulaza. Nisu sigurnosna kapija baze nego zaštita od toga da
@@ -201,6 +208,7 @@ class ReportingDatabase:
         self._session_v5 = None
         # Isto za čas kao objekat (šema v6).
         self._session_v6 = None
+        self._student_profile_v7 = None
 
     # -- konekcija ---------------------------------------------------------
     def _connection(self):
@@ -241,6 +249,7 @@ class ReportingDatabase:
         self._grade_confirmation = None
         self._session_v5 = None
         self._session_v6 = None
+        self._student_profile_v7 = None
         if conn is not None:
             self._discard(conn)
 
@@ -308,6 +317,63 @@ class ReportingDatabase:
             self._grade_confirmation = ("grade_confirmed_at" in columns
                                         and "grade_source" in columns)
         return self._grade_confirmation
+
+    def _student_profile_v7_available(self, conn):
+        """Postoje li account_type i normalizovani potvrđeni razredi?"""
+        if self._student_profile_v7 is None:
+            try:
+                tables = {row[0] for row in _rows(conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type = 'table'"))}
+                columns = {row[1] for row in _rows(
+                    conn.execute("PRAGMA table_info(students)"))}
+            except Exception:
+                return False
+            self._student_profile_v7 = (
+                "account_type" in columns
+                and "student_current_grades" in tables)
+        return self._student_profile_v7
+
+    @staticmethod
+    def _clean_account_type(value):
+        account_type = str(value or "").strip().upper()
+        if account_type not in VALID_ACCOUNT_TYPES:
+            raise ReportingUnavailable("student_account_type_invalid")
+        return account_type
+
+    @staticmethod
+    def _clean_current_grades(values):
+        raw = list(values or ())
+        cleaned = []
+        for value in raw:
+            try:
+                grade = int(value)
+            except (TypeError, ValueError) as exc:
+                raise ReportingUnavailable("student_grade_invalid", exc) from None
+            if grade not in VALID_MANUAL_GRADES:
+                raise ReportingUnavailable("student_grade_invalid")
+            cleaned.append(grade)
+        if len(cleaned) != len(set(cleaned)):
+            raise ReportingUnavailable("student_grade_duplicate")
+        if not 1 <= len(cleaned) <= 2:
+            raise ReportingUnavailable("student_grade_count_invalid")
+        return tuple(sorted(cleaned))
+
+    @staticmethod
+    def _current_grades(conn, student_ids):
+        ids = list(dict.fromkeys(int(value) for value in student_ids))
+        found = {student_id: [] for student_id in ids}
+        for chunk in _batches(ids, 400):
+            placeholders = ",".join("?" * len(chunk))
+            rows = _rows(conn.execute(
+                "SELECT student_id, grade, confirmed_at, source "
+                "FROM student_current_grades WHERE student_id IN (%s) "
+                "ORDER BY student_id, grade" % placeholders, tuple(chunk)))
+            for student_id, grade, confirmed_at, source in rows:
+                found.setdefault(student_id, []).append({
+                    "grade": int(grade), "confirmed_at": confirmed_at,
+                    "source": source,
+                })
+        return found
 
     # -- javni strogi sloj -------------------------------------------------
     def get_or_create_student(self, provider, external_user_id,
@@ -1172,6 +1238,13 @@ class ReportingDatabase:
             try:
                 conn = self._connection()
                 self._require_monthly_reports(conn)
+                if self._student_profile_v7_available(conn):
+                    eligible = _rows(conn.execute(
+                        "SELECT 1 FROM students WHERE id = ? "
+                        "AND account_type = ?",
+                        (int(student_id), ACCOUNT_TYPE_STUDENT)))
+                    if not eligible:
+                        raise ReportingUnavailable("student_report_disabled")
                 existing = _rows(conn.execute(
                     "SELECT id FROM monthly_reports "
                     "WHERE student_id = ? AND report_month = ?",
@@ -1316,20 +1389,37 @@ class ReportingDatabase:
         with self._lock:
             try:
                 conn = self._connection()
+                has_v7 = self._student_profile_v7_available(conn)
                 if self._grade_confirmation_available(conn):
+                    account_column = ("account_type" if has_v7
+                                      else "'STUDENT' AS account_type")
                     rows = _rows(conn.execute(
-                        "SELECT display_name, grade, grade_confirmed_at, grade_source "
+                        "SELECT display_name, grade, grade_confirmed_at, grade_source, "
+                        + account_column + " "
                         "FROM students WHERE id = ?", (int(student_id),)))
                 else:
                     # Bez v4 kolona: isti oblik reda, potvrda je uvijek prazna.
-                    rows = [(row[0], row[1], None, None) for row in _rows(
+                    rows = [(row[0], row[1], None, None, ACCOUNT_TYPE_STUDENT)
+                            for row in _rows(
                         conn.execute("SELECT display_name, grade FROM students "
                                      "WHERE id = ?", (int(student_id),)))]
                 if not rows:
                     return None
+                current = (self._current_grades(conn, [student_id]).get(
+                    int(student_id), []) if has_v7 else [])
+                if not current:
+                    from matbot import student_grades
+                    if student_grades.is_confirmed(rows[0][1], rows[0][2],
+                                                   rows[0][3]):
+                        current = [{"grade": int(rows[0][1]),
+                                    "confirmed_at": rows[0][2],
+                                    "source": rows[0][3]}]
                 return {"display_name": rows[0][0], "grade": rows[0][1],
                         "grade_confirmed_at": rows[0][2],
-                        "grade_source": rows[0][3]}
+                        "grade_source": rows[0][3],
+                        "account_type": rows[0][4],
+                        "grades": [item["grade"] for item in current],
+                        "current_grades": current}
             except Exception as exc:
                 self._drop_connection()
                 raise ReportingUnavailable(
@@ -1348,7 +1438,7 @@ class ReportingDatabase:
     _INACTIVE_STATUSES = ("inactive", "archived", "deleted", "disabled")
 
     def list_students(self, search=None, grade=None, confirmed=None,
-                      active=None):
+                      active=None, account_type=None):
         """Registar: svi učenici, stanje potvrde razreda i Thinkific veza.
 
         E-MAIL SE NE VRAĆA. Administratoru je dovoljno „povezan/nije povezan";
@@ -1362,12 +1452,20 @@ class ReportingDatabase:
             try:
                 conn = self._connection()
                 has_v4 = self._grade_confirmation_available(conn)
+                has_v7 = self._student_profile_v7_available(conn)
+                legacy_confirmed = (
+                    "s.grade BETWEEN 6 AND 9 "
+                    "AND TRIM(COALESCE(s.grade_confirmed_at, '')) <> '' "
+                    "AND s.grade_source IN ('admin', 'manual_creation')"
+                    if has_v4 else "0 = 1")
                 columns = ("s.grade_confirmed_at, s.grade_source" if has_v4
                            else "NULL, NULL")
+                account_column = ("s.account_type" if has_v7
+                                  else "'STUDENT'")
                 sql = ("SELECT s.id, s.display_name, s.grade, "
                        "       (SELECT COUNT(*) FROM student_accounts a "
                        "        WHERE a.student_id = s.id AND a.provider = ?), "
-                       "       " + columns + " "
+                       "       " + columns + ", " + account_column + " "
                        "FROM students s")
                 params = [_THINKIFIC_PROVIDER]
                 where = []
@@ -1375,32 +1473,77 @@ class ReportingDatabase:
                     where.append("LOWER(COALESCE(s.display_name, '')) LIKE ?")
                     params.append("%" + search.strip().lower() + "%")
                 if grade is not None:
-                    where.append("s.grade = ?")
-                    params.append(int(grade))
+                    if has_v7:
+                        where.append(
+                            "(EXISTS (SELECT 1 FROM student_current_grades cg "
+                            "WHERE cg.student_id = s.id AND cg.grade = ?) "
+                            "OR (NOT EXISTS (SELECT 1 FROM student_current_grades cg "
+                            "WHERE cg.student_id = s.id) AND s.grade = ? "
+                            "AND (%s)))" % legacy_confirmed)
+                        params.extend((int(grade), int(grade)))
+                    else:
+                        where.append("s.grade = ?")
+                        params.append(int(grade))
                 if active:
                     placeholders = ",".join("?" * len(self._INACTIVE_STATUSES))
                     where.append(
                         "LOWER(COALESCE(s.status, 'active')) NOT IN (%s)"
                         % placeholders)
                     params.extend(self._INACTIVE_STATUSES)
-                if confirmed is not None and has_v4:
-                    # POTVRDA JE TROJKA (razred + vrijeme + izvor), pa filter
-                    # gleda vrijeme — izvor se provjerava u Pythonu, jer skup
-                    # dopuštenih izvora živi tamo.
-                    where.append("s.grade_confirmed_at IS %s NULL"
-                                 % ("NOT" if confirmed else ""))
+                if confirmed is not None and has_v7:
+                    normalized = (
+                        "EXISTS (SELECT 1 FROM student_current_grades cg "
+                        "WHERE cg.student_id = s.id)")
+                    no_normalized = (
+                        "NOT EXISTS (SELECT 1 FROM student_current_grades cg "
+                        "WHERE cg.student_id = s.id)")
+                    if confirmed:
+                        where.append("(%s OR (%s AND %s))" % (
+                            normalized, no_normalized, legacy_confirmed))
+                    else:
+                        where.append("(%s AND NOT (%s))" % (
+                            no_normalized, legacy_confirmed))
+                elif confirmed is not None and has_v4:
+                    # Potvrda je cijela legacy trojka: valjan razred,
+                    # neprazno vrijeme i zatvoreni skup ljudskih izvora.
+                    where.append(("(%s)" if confirmed else "NOT (%s)")
+                                 % legacy_confirmed)
+                if account_type is not None:
+                    cleaned_type = self._clean_account_type(account_type)
+                    if has_v7:
+                        where.append("s.account_type = ?")
+                        params.append(cleaned_type)
+                    elif cleaned_type != ACCOUNT_TYPE_STUDENT:
+                        return []
                 if where:
                     sql += " WHERE " + " AND ".join(where)
                 sql += " ORDER BY COALESCE(s.display_name, ''), s.id"
                 rows = _rows(conn.execute(sql, tuple(params)))
+                current_by_student = (
+                    self._current_grades(conn, [r[0] for r in rows])
+                    if has_v7 and rows else {})
             except Exception as exc:
                 self._drop_connection()
                 raise ReportingUnavailable(
                     "student_list_failed:" + type(exc).__name__, exc) from None
         listed = [{"student_id": r[0], "display_name": r[1], "grade": r[2],
                    "thinkific_linked": bool(r[3]),
-                   "grade_confirmed_at": r[4], "grade_source": r[5]}
+                   "grade_confirmed_at": r[4], "grade_source": r[5],
+                   "account_type": r[6],
+                   "grades": [item["grade"] for item in
+                              current_by_student.get(r[0], [])]}
                   for r in rows]
+        # Tokom rolling deploya stari proces moze, nakon v7 migracije, upisati
+        # samo legacy trojku. Normalizovani redovi su uvijek autoritet; samo
+        # kad ih nema dopusten je isti strogi, ljudski potvrdjen fallback koji
+        # koristi profil. Ovo je iskljucivo citanje -- tabela se ne dopunjava.
+        if has_v4:
+            from matbot import student_grades
+            for row in listed:
+                if (not row["grades"] and student_grades.is_confirmed(
+                        row["grade"], row["grade_confirmed_at"],
+                        row["grade_source"])):
+                    row["grades"] = [int(row["grade"])]
         if confirmed is not None and not has_v4:
             # Bez v4 kolona nijedan razred nije potvrđen (vidi docstring).
             listed = [] if confirmed else listed
@@ -1466,6 +1609,14 @@ class ReportingDatabase:
                     " CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
                     (name, student_grade, GRADE_SOURCE_MANUAL_CREATION))
                 student_id = cursor.lastrowid
+
+                if self._student_profile_v7_available(conn):
+                    conn.execute(
+                        "INSERT INTO student_current_grades "
+                        "(student_id, grade, confirmed_at, source) "
+                        "VALUES (?, ?, CURRENT_TIMESTAMP, ?)",
+                        (student_id, student_grade,
+                         GRADE_SOURCE_MANUAL_CREATION))
 
                 if external:
                     linked = conn.execute(
@@ -1556,21 +1707,110 @@ class ReportingDatabase:
         PADA ZATVORENO bez šeme v4: potvrda koja se ne može ZAPISATI ne smije se
         ni tvrditi, jer bi sljedeće čitanje razred i dalje vidjelo kao
         nepotvrđen a administrator bi mislio da je gotov."""
-        if int(grade) not in (6, 7, 8, 9):
-            raise ReportingUnavailable("student_grade_invalid")
+        return self.set_student_grades(student_id, [grade])
+
+    def set_student_grades(self, student_id, grades):
+        """Potvrdi jedan ili dva tekuca razreda; istorija ostaje netaknuta."""
+        return self.update_student_profiles([{
+            "student_id": student_id,
+            "grades": grades,
+        }]) == 1
+
+    def set_student_account_types(self, student_ids, account_type):
+        """Atomicki promijeni samo klasifikaciju odabranih naloga."""
+        ids = list(student_ids or ())
+        return self.update_student_profiles([
+            {"student_id": student_id, "account_type": account_type}
+            for student_id in ids
+        ])
+
+    def update_student_profiles(self, changes):
+        """Atomski validiraj i sačuvaj tip naloga i/ili potvrđene razrede.
+
+        Nijedna promjena se ne izvrsava dok svaki student, tip i skup razreda
+        nisu potvrđeni. SUPPORT/TEST ne mogu kroz ovaj put dobiti novu potvrdu
+        razreda, ali njihove ranije potvrđene vrijednosti ostaju sačuvane za
+        slučaj povratka na STUDENT.
+
+        Sve DML izjave dijele jednu implicitnu libSQL transakciju. Prvi upis je
+        otvara, commit dolazi tek nakon posljednjeg studenta, a bilo koji kvar
+        prolazi kroz rollback; djelimičan bulk rezultat zato nije vidljiv.
+        """
+        prepared = []
+        seen = set()
+        for change in list(changes or ()):
+            try:
+                student_id = int(change["student_id"])
+            except (KeyError, TypeError, ValueError) as exc:
+                raise ReportingUnavailable("student_profile_change_invalid",
+                                           exc) from None
+            if student_id <= 0 or student_id in seen:
+                raise ReportingUnavailable("student_profile_change_invalid")
+            seen.add(student_id)
+            account_type = None
+            if change.get("account_type") is not None:
+                account_type = self._clean_account_type(change["account_type"])
+            grades = None
+            if change.get("grades") is not None:
+                grades = self._clean_current_grades(change["grades"])
+            if account_type is None and grades is None:
+                raise ReportingUnavailable("student_profile_change_empty")
+            prepared.append((student_id, account_type, grades))
+        if not prepared:
+            raise ReportingUnavailable("student_profile_change_empty")
+
         with self._lock:
             try:
                 conn = self._connection()
                 if not self._grade_confirmation_available(conn):
                     raise ReportingUnavailable("grade_confirmation_unavailable")
-                cursor = conn.execute(
-                    "UPDATE students SET grade = ?, "
-                    " grade_confirmed_at = CURRENT_TIMESTAMP, grade_source = ?, "
-                    " updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                    (int(grade), GRADE_SOURCE_ADMIN, int(student_id)))
-                changed = cursor.rowcount
+                if not self._student_profile_v7_available(conn):
+                    raise ReportingUnavailable("student_profile_v7_unavailable")
+
+                ids = [item[0] for item in prepared]
+                current_types = {}
+                for chunk in self._chunks(ids):
+                    placeholders = ",".join("?" * len(chunk))
+                    current_types.update(dict(_rows(conn.execute(
+                        "SELECT id, account_type FROM students WHERE id IN (%s)"
+                        % placeholders, tuple(chunk)))))
+                if set(current_types) != set(ids):
+                    raise ReportingUnavailable("student_profile_not_found")
+
+                # Validacija zavisi od TRENUTNOG ili upravo izabranog tipa, ali
+                # se zavrsava prije prve DML naredbe.
+                for student_id, account_type, grades in prepared:
+                    effective = account_type or current_types[student_id]
+                    if grades is not None and effective != ACCOUNT_TYPE_STUDENT:
+                        raise ReportingUnavailable("student_grade_disabled")
+
+                for student_id, account_type, grades in prepared:
+                    if account_type is not None:
+                        conn.execute(
+                            "UPDATE students SET account_type = ?, "
+                            "updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                            (account_type, student_id))
+                    if grades is None:
+                        continue
+                    conn.execute("DELETE FROM student_current_grades "
+                                 "WHERE student_id = ?", (student_id,))
+                    for grade in grades:
+                        conn.execute(
+                            "INSERT INTO student_current_grades "
+                            "(student_id, grade, confirmed_at, source) "
+                            "VALUES (?, ?, CURRENT_TIMESTAMP, ?)",
+                            (student_id, grade, GRADE_SOURCE_ADMIN))
+                    # Jedan razred se ogleda u legacy koloni. Za dva je NULL
+                    # fail-closed projekcija: stari kod ne smije proizvoljno
+                    # izabrati jedno dijete.
+                    legacy_grade = grades[0] if len(grades) == 1 else None
+                    conn.execute(
+                        "UPDATE students SET grade = ?, "
+                        "grade_confirmed_at = CURRENT_TIMESTAMP, grade_source = ?, "
+                        "updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                        (legacy_grade, GRADE_SOURCE_ADMIN, student_id))
                 conn.commit()
-                return changed == 1
+                return len(prepared)
             except ReportingUnavailable:
                 self._safe_rollback()
                 raise
@@ -1578,7 +1818,8 @@ class ReportingDatabase:
                 self._safe_rollback()
                 self._drop_connection()
                 raise ReportingUnavailable(
-                    "student_grade_update_failed:" + type(exc).__name__, exc) from None
+                    "student_profile_update_failed:" + type(exc).__name__,
+                    exc) from None
 
     def fetch_grade_evidence(self, student_id):
         """SAMO ČITANJE: datirani tragovi razreda iz sva tri strukturna izvora.
@@ -2542,7 +2783,7 @@ class ReportingDatabase:
         with self._lock:
             try:
                 conn = self._connection()
-                rows = _rows(conn.execute(
+                union_sql = (
                     "SELECT student_id FROM thinkific_progress_snapshots "
                     "WHERE report_month = ? "
                     "UNION "
@@ -2560,10 +2801,19 @@ class ReportingDatabase:
                     # `YYYY-MM-DD`, a ne vremenski žig.
                     "SELECT student_id FROM student_sessions "
                     "WHERE session_date >= ? AND session_date < ? "
-                    "ORDER BY 1",
-                    (report_month, SOURCE, month_start, next_month_start,
-                     SOURCE, month_start, next_month_start,
-                     month_start[:10], next_month_start[:10])))
+                )
+                params = [report_month, SOURCE, month_start, next_month_start,
+                          SOURCE, month_start, next_month_start,
+                          month_start[:10], next_month_start[:10]]
+                if self._student_profile_v7_available(conn):
+                    sql = ("SELECT population.student_id FROM (" + union_sql
+                           + ") population JOIN students s "
+                             "ON s.id = population.student_id "
+                             "WHERE s.account_type = ? ORDER BY 1")
+                    params.append(ACCOUNT_TYPE_STUDENT)
+                else:
+                    sql = union_sql + " ORDER BY 1"
+                rows = _rows(conn.execute(sql, tuple(params)))
                 return [row[0] for row in rows]
             except Exception as exc:
                 self._drop_connection()
@@ -2600,9 +2850,13 @@ class ReportingDatabase:
                     applied.append(reporting_schema.SCHEMA_VERSION_V5)
                 if reporting_schema.migrate_to_v6(conn):
                     applied.append(reporting_schema.SCHEMA_VERSION_V6)
+                if reporting_schema.migrate_to_v7(conn):
+                    applied.append(reporting_schema.SCHEMA_VERSION_V7)
                 # Nove kolone mijenjaju ono što je konekcija zapamtila.
                 self._grade_confirmation = None
                 self._session_v5 = None
+                self._session_v6 = None
+                self._student_profile_v7 = None
             except reporting_schema.MigrationError:
                 self._drop_connection()
                 raise
@@ -2647,6 +2901,7 @@ class ReportingDatabase:
                               # vidjeti iz iste komande kao i sve ostalo.
                               "student_sessions",
                               "class_sessions",
+                              "student_current_grades",
                               # Faza 3C: kolone se ISPISUJU jer ovaj repo tabelu
                               # nikad nije kreirao — njen produkcijski oblik se
                               # mora vidjeti, a ne pretpostaviti.
@@ -2724,6 +2979,13 @@ class ReportingDatabase:
                 except Exception:
                     report["v6_schema_problems"] = ["v6_verification_unavailable"]
                 report["v6_schema_verified"] = not report["v6_schema_problems"]
+                try:
+                    from matbot import reporting_schema as _v7schema
+
+                    report["v7_schema_problems"] = _v7schema.verify_v7_schema(conn)
+                except Exception:
+                    report["v7_schema_problems"] = ["v7_verification_unavailable"]
+                report["v7_schema_verified"] = not report["v7_schema_problems"]
                 return report
             except ReportingUnavailable as exc:
                 self._drop_connection()
@@ -3206,6 +3468,10 @@ def _format_report(report):
         problems = report.get("v6_schema_problems") or []
         lines.append("v6_schema: %s" % ("verified" if report["v6_schema_verified"]
                                         else "INCOMPLETE -> " + ", ".join(problems)))
+    if "v7_schema_verified" in report:
+        problems = report.get("v7_schema_problems") or []
+        lines.append("v7_schema: %s" % ("verified" if report["v7_schema_verified"]
+                                        else "INCOMPLETE -> " + ", ".join(problems)))
     if "monthly_reports_ready" in report:
         problems = report.get("monthly_reports_problems") or []
         lines.append("monthly_reports: %s"
@@ -3238,7 +3504,8 @@ def main(argv=None):
     parser = argparse.ArgumentParser(
         prog="python -m matbot.reporting_db",
         description="Provjera i migracija izvjestajne baze. "
-                    "--check samo cita; --migrate mijenja SEMU (nikad podatke).")
+                    "--check samo cita; --migrate primjenjuje verzionisanu "
+                    "semu i njene aditivne backfillove.")
     parser.add_argument("--check", action="store_true",
                         help="provjeri kredencijale, konekciju, tabele i verziju seme")
     parser.add_argument("--migrate", action="store_true",

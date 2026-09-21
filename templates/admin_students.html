@@ -22,7 +22,7 @@
     <tr>
       {# IDENTITET: ime ili neutralna oznaka. E-mail se NIKAD ne prikazuje. #}
       <td>{{ r.label }}</td>
-      <td>{% if r.grade %}{{ r.grade }}. razred{% else %}<span class="muted">—</span>{% endif %}</td>
+      <td>{% if r.grades %}{{ r.grades|join('. razred + ') }}. razred{% elif r.grade %}{{ r.grade }}. razred{% else %}<span class="muted">—</span>{% endif %}</td>
       <td>
         {% if r.has_snapshot %}<span class="pill" style="color:var(--ok)">dostupno</span>
         {% else %}<span class="pill">nije importovano</span>{% endif %}

@@ -208,9 +208,25 @@ def build_ai_facts(payload):
                          for row in lessons)
 
     sections = _section_rows(thinkific.get("sections"))
+    profile = payload.get("profile") or {}
+    grades = sorted({int(value) for value in (profile.get("grades") or ())})
+    # Stari sačuvani ulazi i pozivaoci prije v7 imaju samo skalarno `grade`.
+    # Čitanje tog oblika ostaje kompatibilno; novi report_input uvijek šalje
+    # eksplicitni `grades` skup.
+    if not grades and profile.get("grade") is not None:
+        try:
+            grades = [int(profile["grade"])]
+        except (TypeError, ValueError):
+            grades = []
     facts = {
         "report_month": payload.get("report_month"),
-        "grade": (payload.get("profile") or {}).get("grade"),
+        # `grade` ostaje radi starih sacuvanih formata. Kod zajednickog naloga
+        # je namjerno None: nijedan razred se ne bira proizvoljno.
+        "grade": grades[0] if len(grades) == 1 else None,
+        "grades": grades,
+        "shared_account": len(grades) == 2,
+        "activity_attribution": ("shared_account_combined"
+                                 if len(grades) == 2 else "single_account"),
         # PRVI U UGOVORU jer je prvi i po prioritetu (Faza 3D).
         "instruction": _instruction_facts(payload.get("instruction")),
         "thinkific": {
@@ -428,4 +444,6 @@ def allowed_numbers(facts):
         add(student_sessions.ACTIVITY_MAX)
 
     add(facts.get("grade"))
+    for grade in facts.get("grades") or ():
+        add(grade)
     return values

@@ -280,6 +280,19 @@ def _story(facts, narrative, instructor_comment, label, styles, content_width,
                      content_width, parent_comments)
 
 
+def _grade_label(facts):
+    grades = list((facts or {}).get("grades") or ())
+    if not grades and (facts or {}).get("grade"):
+        grades = [(facts or {}).get("grade")]
+    try:
+        grades = sorted({int(value) for value in grades})
+    except (TypeError, ValueError):
+        grades = []
+    if not grades:
+        return "nije poznat"
+    return " + ".join("%d. razred" % value for value in grades)
+
+
 def _story_3c(facts, narrative, instructor_comment, label, styles, content_width):
     """NASLIJEĐENI raspored (Faza 3C). Ne dirati — čuva stare nacrte."""
     from reportlab.platypus import KeepTogether, Paragraph, Spacer
@@ -289,9 +302,8 @@ def _story_3c(facts, narrative, instructor_comment, label, styles, content_width
         Paragraph(_escape(DOC_TITLE), styles["doctitle"]),
     ]
 
-    grade = facts.get("grade")
     meta = [("Učenik", label),
-            ("Razred", ("%d. razred" % int(grade)) if grade else "nije poznat"),
+            ("Razred", _grade_label(facts)),
             ("Period", month_label(facts.get("report_month")))]
     story.append(_metric_table(meta, styles, [content_width * 0.28,
                                               content_width * 0.72]))
@@ -451,12 +463,15 @@ def _story_3d(facts, narrative, instructor_comment, label, styles, content_width
         Paragraph(_escape(BRAND), styles["brand"]),
         Paragraph(_escape(DOC_TITLE), styles["doctitle"]),
     ]
-    grade = facts.get("grade")
     story.append(_metric_table(
         [("Učenik", label),
-         ("Razred", ("%d. razred" % int(grade)) if grade else "nije poznat"),
+         ("Razred", _grade_label(facts)),
          ("Period", month_label(facts.get("report_month")))],
         styles, [content_width * 0.28, content_width * 0.72]))
+    if facts.get("shared_account"):
+        story.append(Paragraph(
+            "Napomena: aktivnost pripada zajedničkom nalogu i ne može se "
+            "pouzdano pripisati pojedinom djetetu ili razredu.", styles["body"]))
 
     widths = [content_width * 0.42, content_width * 0.58]
 

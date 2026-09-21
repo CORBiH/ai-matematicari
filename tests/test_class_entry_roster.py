@@ -109,6 +109,8 @@ def roster_students(db):
     conn = db._connection()
     conn.execute("UPDATE students SET grade_confirmed_at = NULL, "
                  "grade_source = NULL WHERE id = ?", (unconfirmed,))
+    conn.execute("DELETE FROM student_current_grades WHERE student_id = ?",
+                 (unconfirmed,))
     conn.commit()
     return {"confirmed": confirmed, "other_grade": other_grade,
             "unconfirmed": unconfirmed}

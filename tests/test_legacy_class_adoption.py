@@ -423,9 +423,7 @@ def test_24_the_historical_grade_survives_a_promotion(admin, db,
     """Razred časa je ISTORIJSKA činjenica, a `students.grade` je tvrdnja o danas."""
     class_id = adopted_class_id(adopt(admin, grade=7))
     for student_id in production_shape["students"]:
-        db._connection().execute("UPDATE students SET grade = 9 WHERE id = ?",
-                                 (student_id,))
-    db._connection().commit()
+        db.set_student_grade(student_id, 9)
     assert db.fetch_class(class_id)["grade"] == 7
     assert "7. razred" in admin.get(
         "/admin/sessions/%d" % class_id).data.decode("utf-8")

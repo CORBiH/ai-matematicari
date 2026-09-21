@@ -22,7 +22,7 @@ from flask import (Blueprint, abort, redirect, render_template, request,
                    session, url_for)
 
 from matbot import admin_auth, config, parent_report, report_input, reporting_db
-from matbot import student_grades
+from matbot import report_facts, student_grades
 from matbot import report_pdf, report_prompt, reporting_schema
 from matbot import thinkific_progress as progress
 from matbot.admin_auth import CSRF_FORM_FIELD, require_admin
@@ -185,13 +185,12 @@ def _overview(month):
         start, end = report_input.month_bounds(month)
         overview["classes"] = database.count_classes_in_range(start[:10],
                                                               end[:10])
-        listed = database.list_students(active=True)
+        listed = database.list_students(
+            active=True, account_type=reporting_db.ACCOUNT_TYPE_STUDENT)
         overview["students"] = len(listed)
         overview["unconfirmed"] = sum(
             1 for row in listed
-            if student_grades.needs_confirmation(row.get("grade"),
-                                                 row.get("grade_confirmed_at"),
-                                                 row.get("grade_source")))
+            if not student_grades.is_confirmed_grades(row.get("grades")))
         overview["available"] = True
     except Exception:
         logger.info("admin_overview_unavailable")
@@ -339,6 +338,7 @@ def students():
             # IDENTITET U UI-ju je ime ili neutralna oznaka — NIKAD e-mail.
             "label": _student_label(payload["profile"], student_id),
             "grade": payload["profile"].get("grade"),
+            "grades": payload["profile"].get("grades") or [],
             "has_snapshot": not thinkific.get("snapshot_missing"),
             "percent_completed": thinkific.get("percent_completed"),
             "delta_percent_completed": thinkific.get("delta_percent_completed"),
@@ -355,6 +355,7 @@ def students():
 ERROR_GRADE_UNCONFIRMED = (
     "Trenutni razred učenika nije potvrđen. Potvrdite razred na profilu učenika "
     "prije generisanja novog izvještaja.")
+ERROR_REPORT_DISABLED = "Izvještaji su isključeni za PODRŠKA i TEST naloge."
 
 
 def _grade_confirmed(payload):
@@ -412,6 +413,9 @@ def _render_student(student_id, month, payload, *, ai_error="", notice=""):
         # zaštita nego objašnjenje.
         grade_confirmed=_grade_confirmed(payload),
         grade_unconfirmed_message=ERROR_GRADE_UNCONFIRMED,
+        reporting_enabled=(payload.get("profile") or {}).get(
+            "reporting_enabled", True),
+        report_disabled_message=ERROR_REPORT_DISABLED,
         ai_error=ai_error, notice=notice)
 
 
@@ -448,7 +452,13 @@ def generate_report(student_id):
     """TAČNO JEDAN plaćeni poziv. Komentar instruktora se ne dira (Dio 15)."""
     _require_csrf()
     month = _month_or_400()
-    payload, facts = parent_report.build_facts(student_id, month)
+    payload = report_input.build_report_input(student_id, month)
+    if not (payload.get("profile") or {}).get("reporting_enabled", True):
+        logger.info("admin_report_generate_blocked code=report_disabled "
+                    "student_id=%s", student_id)
+        return _render_student(student_id, month, payload,
+                               ai_error=ERROR_REPORT_DISABLED), 200
+    facts = report_facts.build_ai_facts(payload)
 
     # BLOKADA PRIJE POZIVA, NE POSLIJE. Nepotvrđen razred znači da ni sam
     # sistem ne zna koji razred dijete pohađa — izvještaj koji to tvrdi
@@ -496,6 +506,11 @@ def save_report(student_id):
     _require_csrf()
     month = _month_or_400()
     payload = report_input.build_report_input(student_id, month)
+    if not (payload.get("profile") or {}).get("reporting_enabled", True):
+        logger.info("admin_report_save_blocked code=report_disabled "
+                    "student_id=%s", student_id)
+        return _render_student(student_id, month, payload,
+                               ai_error=ERROR_REPORT_DISABLED), 200
     try:
         parent_report.save_edits(student_id, month, _narrative_from_form(),
                                  request.form.get("instructor_comment", ""))
@@ -526,7 +541,10 @@ def report_pdf_download(student_id):
     # što je administrator odobrio, i kad se izvorni podaci kasnije promijene.
     facts = (saved.get("snapshot") or {}).get("facts")
     if not facts:
-        _, facts = parent_report.build_facts(student_id, month)
+        # Ovo je čitanje starog izvještaja, ne stvaranje novog. SUPPORT/TEST
+        # mora ostati bez novih izvještaja, ali već sačuvan dokument ostaje
+        # čitljiv i kad stari red nema snimak činjenica.
+        facts = report_facts.build_ai_facts(payload)
     label = _student_label(payload["profile"], student_id)
     try:
         data = report_pdf.render_report_pdf(
