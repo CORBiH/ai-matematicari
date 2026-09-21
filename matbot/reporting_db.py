@@ -615,6 +615,124 @@ class ReportingDatabase:
                 raise ReportingUnavailable(
                     "student_lookup_failed:" + type(exc).__name__, exc) from None
 
+    # --- NAME-ONLY BACKFILL ------------------------------------------------
+    def lookup_thinkific_students(self, normalized_emails):
+        """Bulk lookup za name-only backfill; ISKLJUCIVO cita.
+
+        Ulaz su vec kanonski normalizovane Thinkific adrese. Povratna vrijednost
+        je ``{email: {student_id, display_name}}`` samo za postojece veze iz
+        prostora ``thinkific_email``. Metoda nikad ne kreira identitet i nikad
+        ne osvjezava ``last_seen_at``.
+        """
+        emails = list(dict.fromkeys(normalized_emails or ()))
+        if not emails:
+            return {}
+        if any(not isinstance(email, str) or not email for email in emails):
+            raise ReportingUnavailable("name_backfill_email_invalid")
+
+        with self._lock:
+            try:
+                conn = self._connection()
+                found = {}
+                for chunk in self._chunks(emails):
+                    placeholders = ",".join("?" * len(chunk))
+                    rows = _rows(conn.execute(
+                        "SELECT a.external_user_id, s.id, s.display_name "
+                        "FROM student_accounts a "
+                        "JOIN students s ON s.id = a.student_id "
+                        "WHERE a.provider = ? "
+                        "AND a.external_user_id IN (%s)" % placeholders,
+                        (_THINKIFIC_PROVIDER, *chunk)))
+                    for email, student_id, display_name in rows:
+                        found[email] = {
+                            "student_id": student_id,
+                            "display_name": display_name,
+                        }
+                return found
+            except ReportingUnavailable:
+                self._drop_connection()
+                raise
+            except Exception as exc:
+                self._drop_connection()
+                raise ReportingUnavailable(
+                    "name_backfill_lookup_failed:" + type(exc).__name__,
+                    exc) from None
+
+    def apply_student_display_names(self, changes):
+        """Atomicki primijeni provjereni name-only plan.
+
+        Svaka promjena nosi ``student_id``, normalizovani ``external_user_id``,
+        tacnu prethodno pregledanu vrijednost ``expected_display_name`` i novi
+        ``display_name``. Jedina DML naredba je ``UPDATE students SET
+        display_name``. Identitetski ``EXISTS`` i poredenje stare vrijednosti
+        zatvaraju utrku izmedu previewa i applyja. Jedan neuspjeli guard povlaci
+        cijelu transakciju.
+        """
+        changes = list(changes or ())
+        if not changes:
+            return 0
+
+        prepared = []
+        seen_students = set()
+        seen_emails = set()
+        for change in changes:
+            try:
+                student_id = int(change["student_id"])
+                email = change["external_user_id"]
+                expected = change["expected_display_name"]
+                display_name = change["display_name"]
+            except (KeyError, TypeError, ValueError) as exc:
+                raise ReportingUnavailable(
+                    "name_backfill_change_invalid", exc) from None
+
+            if student_id <= 0 or not isinstance(email, str) or not email:
+                raise ReportingUnavailable("name_backfill_change_invalid")
+            if (not isinstance(display_name, str) or not display_name.strip()
+                    or len(display_name) > MAX_DISPLAY_NAME_CHARS):
+                raise ReportingUnavailable("name_backfill_name_invalid")
+            if expected is not None and (
+                    not isinstance(expected, str) or expected.strip()):
+                raise ReportingUnavailable("name_backfill_expected_not_blank")
+            if student_id in seen_students or email in seen_emails:
+                raise ReportingUnavailable("name_backfill_change_duplicate")
+            seen_students.add(student_id)
+            seen_emails.add(email)
+            prepared.append((student_id, email, expected, display_name))
+
+        with self._lock:
+            try:
+                conn = self._connection()
+                updated = 0
+                for student_id, email, expected, display_name in prepared:
+                    returned = _rows(conn.execute(
+                        "UPDATE students SET display_name = ? "
+                        "WHERE id = ? "
+                        "AND ((display_name IS NULL AND ? IS NULL) "
+                        "     OR display_name = ?) "
+                        "AND EXISTS ("
+                        "  SELECT 1 FROM student_accounts a "
+                        "  WHERE a.student_id = students.id "
+                        "    AND a.provider = ? "
+                        "    AND a.external_user_id = ?"
+                        ") RETURNING id",
+                        (display_name, student_id, expected, expected,
+                         _THINKIFIC_PROVIDER, email)))
+                    if returned != [(student_id,)]:
+                        raise ReportingUnavailable("name_backfill_guard_failed")
+                    updated += 1
+                conn.commit()
+                return updated
+            except ReportingUnavailable:
+                self._safe_rollback()
+                self._drop_connection()
+                raise
+            except Exception as exc:
+                self._safe_rollback()
+                self._drop_connection()
+                raise ReportingUnavailable(
+                    "name_backfill_apply_failed:" + type(exc).__name__,
+                    exc) from None
+
     # --- FAZA 3A: Thinkific snimci napretka --------------------------------
     def update_student_profile(self, student_id, display_name=None):
         """Konzervativno dopuni IME u profilu. Vrati `name_set`.
