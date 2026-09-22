@@ -100,6 +100,12 @@ def _database_for(path):
             path, timeout=10.0, _check_same_thread=False))
 
 
+def _add_expected_v7_account_type(conn):
+    conn.execute("ALTER TABLE students ADD COLUMN %s %s"
+                 % reporting_schema.V7_ACCOUNT_TYPE_COLUMN)
+    conn.commit()
+
+
 def test_existing_single_grade_student_still_works(db):
     student_id = db.create_student("Jedan Razred", 6)
 
@@ -284,6 +290,124 @@ def test_v7_migration_backfills_only_confirmed_legacy_grade_and_keeps_report(
     assert dict(types) == {confirmed: "STUDENT", pending: "STUDENT"}
     assert saved == [("legacy-report",)]
     assert reporting_schema.verify_v7_schema(conn) == []
+    conn.close()
+
+
+def test_v7_resumes_exact_production_partial_state_and_is_idempotent(tmp_path):
+    """Produkcija 2026-09-21: v1..v6 + validan account_type, bez grade tabele."""
+    path = str(tmp_path / "production-partial-v7.db")
+    conn = _migrate_through_v6(path)
+    student_id = conn.execute(
+        "INSERT INTO students (display_name, grade, grade_confirmed_at, "
+        "grade_source, created_at, updated_at, last_seen_at) VALUES "
+        "('Synthetic Partial', 8, '2026-09-20 10:11:12', 'admin', "
+        "CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)").lastrowid
+    conn.commit()
+    _add_expected_v7_account_type(conn)
+
+    account_sql_before = conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'students'"
+    ).fetchall()[0][0]
+    assert reporting_schema.applied_versions(conn) == set(range(1, 7))
+    assert "student_current_grades" not in reporting_schema.table_names(conn)
+    assert [row[1] for row in conn.execute(
+        "PRAGMA table_info(students)").fetchall()].count("account_type") == 1
+
+    assert reporting_schema.migrate_to_v7(conn) is True
+    assert reporting_schema.verify_v7_schema(conn) == []
+    assert conn.execute(
+        "SELECT student_id, grade, source FROM student_current_grades"
+    ).fetchall() == [(student_id, 8, "admin")]
+    assert conn.execute(
+        "SELECT account_type FROM students WHERE id = ?", (student_id,)
+    ).fetchall() == [("STUDENT",)]
+    assert conn.execute(
+        "SELECT COUNT(*) FROM schema_migrations WHERE version = 7"
+    ).fetchall() == [(1,)]
+    assert conn.execute(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'students'"
+    ).fetchall()[0][0] == account_sql_before
+
+    assert reporting_schema.migrate_to_v7(conn) is False
+    assert conn.execute(
+        "SELECT student_id, grade, source FROM student_current_grades"
+    ).fetchall() == [(student_id, 8, "admin")]
+    assert conn.execute(
+        "SELECT COUNT(*) FROM schema_migrations WHERE version = 7"
+    ).fetchall() == [(1,)]
+    assert [row[1] for row in conn.execute(
+        "PRAGMA table_info(students)").fetchall()].count("account_type") == 1
+    conn.close()
+
+
+def test_v7_grade_table_failure_reports_exact_stage_and_leaves_version_unrecorded(
+        tmp_path):
+    path = str(tmp_path / "v7-grade-table-failure.db")
+    conn = _migrate_through_v6(path)
+    _add_expected_v7_account_type(conn)
+
+    class RejectGradeTable:
+        def execute(self, statement, *args):
+            if "CREATE TABLE IF NOT EXISTS student_current_grades" in statement:
+                raise RuntimeError("synthetic remote DDL rejection")
+            return conn.execute(statement, *args)
+
+        def __getattr__(self, name):
+            return getattr(conn, name)
+
+    with pytest.raises(reporting_schema.MigrationError) as caught:
+        reporting_schema.migrate_to_v7(RejectGradeTable())
+
+    assert caught.value.code == "v7_ddl_failed"
+    assert caught.value.stage == "create_student_current_grades"
+    assert caught.value.exception_class == "RuntimeError"
+    assert caught.value.safe_detail == \
+        "database operation failed; raw detail withheld"
+    assert reporting_schema.SCHEMA_VERSION_V7 not in \
+        reporting_schema.applied_versions(conn)
+    assert "student_current_grades" not in reporting_schema.table_names(conn)
+    conn.close()
+
+
+def test_v7_resumes_when_grade_table_exists_but_index_is_absent(tmp_path):
+    path = str(tmp_path / "partial-v7-no-index.db")
+    conn = _migrate_through_v6(path)
+    _add_expected_v7_account_type(conn)
+    conn.execute(reporting_schema.SCHEMA_V7_STATEMENTS[0])
+    conn.commit()
+    assert conn.execute(
+        "SELECT name FROM sqlite_master WHERE type = 'index' "
+        "AND name = 'idx_student_current_grades_grade'"
+    ).fetchall() == []
+
+    assert reporting_schema.migrate_to_v7(conn) is True
+    assert reporting_schema.verify_v7_schema(conn) == []
+    assert conn.execute(
+        "PRAGMA index_info(idx_student_current_grades_grade)"
+    ).fetchall() == [(0, 1, "grade"), (1, 0, "student_id")]
+    assert reporting_schema.migrate_to_v7(conn) is False
+    conn.close()
+
+
+def test_v7_records_version_for_complete_unrecorded_schema_once(tmp_path):
+    path = str(tmp_path / "partial-v7-complete-unrecorded.db")
+    conn = _migrate_through_v6(path)
+    _add_expected_v7_account_type(conn)
+    for statement in reporting_schema.SCHEMA_V7_STATEMENTS:
+        conn.execute(statement)
+    conn.commit()
+    assert reporting_schema.verify_v7_schema(conn) == []
+    assert reporting_schema.SCHEMA_VERSION_V7 not in \
+        reporting_schema.applied_versions(conn)
+
+    assert reporting_schema.migrate_to_v7(conn) is True
+    assert conn.execute(
+        "SELECT COUNT(*) FROM schema_migrations WHERE version = 7"
+    ).fetchall() == [(1,)]
+    assert reporting_schema.migrate_to_v7(conn) is False
+    assert conn.execute(
+        "SELECT COUNT(*) FROM schema_migrations WHERE version = 7"
+    ).fetchall() == [(1,)]
     conn.close()
 
 

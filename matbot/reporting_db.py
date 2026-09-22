@@ -3524,8 +3524,16 @@ def main(argv=None):
         try:
             applied = get_database().migrate()
         except reporting_schema.MigrationError as error:
-            # STRUKTURNI kod, nikad sirovi tekst baze i nikad URL ni token.
+            # Kod i ime koraka su staticki. Tekst baze smije izaci samo kroz
+            # redakciju `reporting_schema._safe_database_error`: nikad URL,
+            # token, e-mail ni proizvoljan studentski podatak.
             print("migration: FAILED -> %s" % error.code)
+            if error.stage:
+                print("stage: %s" % error.stage)
+            if error.exception_class:
+                print("exception: %s" % error.exception_class)
+            if error.safe_detail:
+                print("detail: %s" % error.safe_detail)
             return 1
         except ReportingUnavailable as error:
             print("migration: FAILED -> %s" % error.code)

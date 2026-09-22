@@ -139,10 +139,58 @@ class MigrationError(RuntimeError):
     thinkific_progress_snapshots`), nikad sirovi tekst izuzetka baze — a nikad
     ni URL, token, e-mail ni bilo koji podatak učenika."""
 
-    def __init__(self, code, detail=""):
+    def __init__(self, code, detail="", *, stage="", exception_class="",
+                 safe_detail=""):
         super().__init__(code if not detail else "%s (%s)" % (code, detail))
         self.code = code
         self.detail = detail
+        # Ova tri polja su iskljucivo za operatorsku CLI dijagnostiku. `detail`
+        # ostaje kompatibilan sa starim pozivaocima i testovima, dok se tekst
+        # izuzetka smije prikazati samo nakon redakcije ispod.
+        self.stage = stage
+        self.exception_class = exception_class
+        self.safe_detail = safe_detail
+
+
+_SAFE_DATABASE_ERROR_CATEGORIES = (
+    ("not null constraint failed", "not-null constraint failed"),
+    ("foreign key constraint failed", "foreign-key constraint failed"),
+    ("check constraint failed", "check constraint failed"),
+    ("unique constraint failed", "unique constraint failed"),
+    ("syntax error", "database syntax error"),
+    ("duplicate column name", "duplicate database column"),
+    ("already exists", "database object already exists"),
+    ("no such table", "database table missing"),
+    ("no such column", "database column missing"),
+    ("timed out", "database operation timed out"),
+    ("timeout", "database operation timed out"),
+    ("connection", "database connection failed"),
+)
+
+
+def _safe_database_error(exc):
+    """Klasifikuj gresku bez ispisivanja njenog proizvoljnog teksta.
+
+    Redakcija poznatih oblika tajni nije dovoljna: proizvoljan tekst izuzetka
+    moze sadrzati obicno ime ucenika ili sadrzaj izvjestaja, sto se pouzdano ne
+    moze prepoznati regularnim izrazom. Zato se sirova poruka koristi ISKLJUCIVO
+    za izbor unaprijed definisane kategorije. Izlaz nikad ne sadrzi podniz iz
+    poruke baze, URL, token, e-mail, ime niti sadrzaj reda.
+    """
+    text = str(exc or "").lower()
+    for marker, category in _SAFE_DATABASE_ERROR_CATEGORIES:
+        if marker in text:
+            return category
+    return "database operation failed; raw detail withheld"
+
+
+def _database_migration_error(code, stage, exc):
+    """Jedinstven, siguran omotac za greske produkcijskog DDL/DML koraka."""
+    exception_class = type(exc).__name__
+    return MigrationError(
+        code, exception_class, stage=stage,
+        exception_class=exception_class,
+        safe_detail=_safe_database_error(exc))
 
 
 # --- ZAPIS MIGRACIJE -------------------------------------------------------
@@ -359,7 +407,7 @@ def _apply_v2_ddl(conn):
         raise MigrationError("v2_ddl_commit_failed", type(exc).__name__) from None
 
 
-def _record_migration(conn, version):
+def _record_migration(conn, version, stage=""):
     """Upiši red migracije SA SVIM OBAVEZNIM KOLONAMA.
 
     Ovo je tačka na kojoj je produkcija pukla: `description` je NOT NULL bez
@@ -379,6 +427,9 @@ def _record_migration(conn, version):
             conn.rollback()
         except Exception:
             pass
+        if stage:
+            raise _database_migration_error(
+                "migration_record_insert_failed", stage, exc) from None
         raise MigrationError("migration_record_insert_failed",
                              type(exc).__name__) from None
 
@@ -1242,8 +1293,7 @@ V7_ACCOUNT_TYPE_COLUMN = (
 )
 V7_TABLES = ("student_current_grades",)
 
-SCHEMA_V7_STATEMENTS = (
-    """
+_V7_CREATE_GRADES_SQL = """
     CREATE TABLE IF NOT EXISTS student_current_grades (
         student_id INTEGER NOT NULL,
         grade INTEGER NOT NULL CHECK (grade BETWEEN 6 AND 9),
@@ -1252,10 +1302,20 @@ SCHEMA_V7_STATEMENTS = (
         PRIMARY KEY (student_id, grade),
         FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
     )
-    """,
+    """
+_V7_CREATE_GRADE_INDEX_SQL = (
     "CREATE INDEX IF NOT EXISTS idx_student_current_grades_grade "
-    "ON student_current_grades (grade, student_id)",
+    "ON student_current_grades (grade, student_id)")
+
+# Ime koraka je dio operatorskog ugovora: ako udaljeni libSQL odbije naredbu,
+# deploy mora reci TACNO koja je to bila, bez ispisivanja URL-a ili podataka.
+V7_DDL_OPERATIONS = (
+    ("create_student_current_grades", _V7_CREATE_GRADES_SQL),
+    ("create_idx_student_current_grades_grade", _V7_CREATE_GRADE_INDEX_SQL),
 )
+# Javni tuple ostaje radi postojecih provjera ugovora i alata koji pregledaju
+# cijeli v7 DDL. Izvor istine je imenovani redoslijed iznad.
+SCHEMA_V7_STATEMENTS = tuple(statement for _, statement in V7_DDL_OPERATIONS)
 
 V7_GRADE_INDEX = "idx_student_current_grades_grade"
 
@@ -1335,22 +1395,26 @@ def _apply_v7_ddl(conn):
     try:
         present = _columns(conn, "students")
     except Exception as exc:
-        raise MigrationError("v7_students_unreadable", type(exc).__name__) from None
+        raise _database_migration_error(
+            "v7_students_unreadable", "inspect_students", exc) from None
     if V7_ACCOUNT_TYPE_COLUMN[0] not in present:
         try:
             conn.execute("ALTER TABLE students ADD COLUMN %s %s"
                          % V7_ACCOUNT_TYPE_COLUMN)
         except Exception as exc:
-            raise MigrationError("v7_ddl_failed", type(exc).__name__) from None
-    for statement in SCHEMA_V7_STATEMENTS:
+            raise _database_migration_error(
+                "v7_ddl_failed", "add_students_account_type", exc) from None
+    for stage, statement in V7_DDL_OPERATIONS:
         try:
             conn.execute(statement)
         except Exception as exc:
-            raise MigrationError("v7_ddl_failed", type(exc).__name__) from None
+            raise _database_migration_error(
+                "v7_ddl_failed", stage, exc) from None
     try:
         conn.commit()
     except Exception as exc:
-        raise MigrationError("v7_ddl_commit_failed", type(exc).__name__) from None
+        raise _database_migration_error(
+            "v7_ddl_commit_failed", "commit_v7_ddl", exc) from None
 
 
 def _backfill_v7_confirmed_grades(conn):
@@ -1369,7 +1433,8 @@ def _backfill_v7_confirmed_grades(conn):
             "AND grade_source IN ('admin', 'manual_creation')")
         conn.commit()
     except Exception as exc:
-        raise MigrationError("v7_backfill_failed", type(exc).__name__) from None
+        raise _database_migration_error(
+            "v7_backfill_failed", "backfill_confirmed_grades", exc) from None
 
 
 def migrate_to_v7(conn):
@@ -1391,7 +1456,8 @@ def migrate_to_v7(conn):
     problems = verify_v7_schema(conn)
     if problems:
         raise MigrationError(problems[0], "verification failed after ddl")
-    _record_migration(conn, SCHEMA_VERSION_V7)
+    _record_migration(conn, SCHEMA_VERSION_V7,
+                      stage="record_schema_version_7")
     logger.info("reporting_schema_migrated from=%s to=%s",
                 SCHEMA_VERSION_V6, SCHEMA_VERSION_V7)
     return True

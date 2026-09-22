@@ -369,6 +369,51 @@ def test_migrate_command_prints_no_secret(tmp_path, monkeypatch, capsys):
         assert forbidden not in out
 
 
+def test_migrate_command_prints_stage_and_sanitized_database_error(
+        monkeypatch, capsys):
+    raw = ValueError(
+        "prepare failed via libsql://db-user:db-password@db.invalid"
+        "?authToken=raw-secret for synthetic.student@example.test "
+        "student_name='Synthetic Student' auth_token=second-secret "
+        "TURSO_AUTH_TOKEN=environment-secret "
+        "report='raw monthly report' activity='raw activity content'")
+    failure = reporting_schema._database_migration_error(
+        "v7_ddl_failed", "create_student_current_grades", raw)
+
+    class BrokenMigration:
+        @staticmethod
+        def migrate():
+            raise failure
+
+    monkeypatch.setattr(reporting_db, "get_database", lambda: BrokenMigration())
+
+    assert reporting_db.main(["--migrate"]) == 1
+    out = capsys.readouterr().out
+    assert "migration: FAILED -> v7_ddl_failed" in out
+    assert "stage: create_student_current_grades" in out
+    assert "exception: ValueError" in out
+    assert "detail: database operation failed; raw detail withheld" in out
+    for forbidden in ("libsql://", "db-user", "db-password", "raw-secret",
+                      "second-secret", "environment-secret",
+                      "TURSO_AUTH_TOKEN", "synthetic.student@example.test",
+                      "Synthetic Student", "raw monthly report",
+                      "raw activity content"):
+        assert forbidden not in out
+
+
+def test_database_error_category_never_echoes_sensitive_suffix():
+    raw = RuntimeError(
+        "NOT NULL constraint failed: schema_migrations.description; "
+        "student Synthetic Student; report raw-report-body; token=raw-token")
+
+    detail = reporting_schema._safe_database_error(raw)
+
+    assert detail == "not-null constraint failed"
+    for forbidden in ("Synthetic Student", "raw-report-body", "raw-token",
+                      "schema_migrations.description"):
+        assert forbidden not in detail
+
+
 def test_v3_is_additive_for_the_currently_running_app(tmp_path, monkeypatch):
     """DOKAZ KOMPATIBILNOSTI: stara aplikacija smije nastaviti da radi.
 
