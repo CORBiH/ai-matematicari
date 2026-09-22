@@ -294,6 +294,22 @@ def profile(student_id):
     status, content = student_grades.classify_grades(
         student.get("grades"), evidence)
 
+    # Sažetak tekućeg mjeseca je isključivo čitalački prikaz već postojećih
+    # izvještajnih činjenica. Profil ostaje upotrebljiv i kad taj sloj nije
+    # dostupan (npr. prije nego što je produkcijska monthly_reports tabela
+    # provjerena).
+    current_month = _this_month()
+    try:
+        month_summary = report_input.build_report_input(
+            student_id, current_month, database=database)
+    except reporting_db.ReportingUnavailable:
+        month_summary = None
+    try:
+        month_report_saved = bool(
+            database.fetch_monthly_report(student_id, current_month))
+    except reporting_db.ReportingUnavailable:
+        month_report_saved = None
+
     # BEZ POTVRĐENOG RAZREDA NEMA KURIKULUMA. Zatečena cifra NIJE dovoljna:
     # instruktor bi inače upisao gradivo tuđe generacije na osnovu vrijednosti
     # koju nikad niko nije potvrdio.
@@ -322,12 +338,13 @@ def profile(student_id):
         account_type_labels=ACCOUNT_TYPE_LABELS,
         student_type=reporting_db.ACCOUNT_TYPE_STUDENT,
         thinkific_linked=linked, sessions=list(reversed(sessions)),
+        month_summary=month_summary, month_report_saved=month_report_saved,
         activity_labels=student_sessions.ACTIVITY_LABELS,
         homework_labels=student_sessions.HOMEWORK_LABELS,
         attendance_labels=student_sessions.ATTENDANCE_LABELS,
         csrf_token=admin_auth.csrf_token(),
         error=request.args.get("error", ""),
-        month=_this_month())
+        month=current_month)
 
 
 @admin_students_bp.route("/<int:student_id>/link", methods=["POST"])

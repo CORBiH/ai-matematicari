@@ -1,201 +1,188 @@
 {% extends "admin_base.html" %}
-{% block heading %}{{ label }} — {{ month }}{% endblock %}
+{% block title %}MAT-BOT — {{ label }}{% endblock %}
+{% block heading %}{{ label }}{% endblock %}
 {% set nav_active = 'reports' %}
-{% block topright %}<a class="btn btn--ghost" href="{{ url_for('admin_reports.students', month=month) }}">← Nazad na listu</a>{% endblock %}
+{% set nav_month = month %}
+{% block subheading %}
+{% if payload %}
+<div class="badge-row" style="margin-top:.55rem">
+  <span class="badge badge--neutral">{{ month_label }}</span>
+  <span class="badge badge--neutral">{% if payload.profile.grades %}{{ payload.profile.grades|join('. razred + ') }}. razred{% elif payload.profile.grade %}{{ payload.profile.grade }}. razred{% else %}Razred nepoznat{% endif %}</span>
+  {% if saved %}<span class="badge badge--success">Izvještaj sačuvan</span>{% else %}<span class="badge badge--warning">Nema izvještaja</span>{% endif %}
+</div>
+{% endif %}
+{% endblock %}
+{% block topright %}
+  {% if payload and saved %}
+  <a class="btn" href="{{ url_for('admin_reports.report_pdf_download', student_id=payload.student_id, month=month) }}">Preuzmi PDF</a>
+  <a class="btn btn--ghost" href="#report-editor">Uredi</a>
+  {% endif %}
+  <a class="btn btn--quiet" href="{{ url_for('admin_reports.students', month=month) }}">← Lista</a>
+{% endblock %}
 {% block content %}
 {% if not payload %}
-  <div class="banner err">{{ schema_message }}</div>
+  <div class="banner err" role="alert">{{ schema_message }}</div>
 {% else %}
 {% set t = payload.thinkific %}
 {% set m = payload.matbot %}
 
-<div class="card">
-  <p class="muted" style="margin-top:0">
-    Administratorski pregled DETERMINISTIČKIH činjenica. Svaki broj je izračunao
-    SQL/Python — nema AI teksta, nema procjene.
-  </p>
-  <p><span class="pill">student_id {{ payload.student_id }}</span>
-     <span class="pill">{% if payload.profile.grades %}{{ payload.profile.grades|join('. razred + ') }}. razred{% elif payload.profile.grade %}{{ payload.profile.grade }}. razred{% else %}razred nepoznat{% endif %}</span></p>
-  {% if payload.profile.shared_account %}<div class="banner warn">Aktivnost pripada zajedničkom Thinkific nalogu za oba razreda. Sistem ne može pouzdano odrediti koje je dijete napravilo pojedini događaj, pa se podaci ne dupliraju niti razdvajaju.</div>{% endif %}
-</div>
+{% if payload.profile.shared_account %}
+<div class="banner warn">Aktivnost pripada zajedničkom Thinkific nalogu za oba razreda. Sistem ne može pouzdano odrediti koje je dijete napravilo pojedini događaj, pa se podaci ne dupliraju niti razdvajaju.</div>
+{% endif %}
+{% if ai_error %}<div class="banner err" role="alert">{{ ai_error }}</div>{% endif %}
+{% if notice %}<div class="banner ok toast" role="status">{{ notice }}</div>{% endif %}
+{% if not reporting_enabled %}
+<div class="banner warn">{{ report_disabled_message }} Postojeći sačuvani izvještaj ostaje čitljiv i dostupan kao PDF.</div>
+{% elif not grade_confirmed %}
+<div class="banner warn">{{ grade_unconfirmed_message }} <a href="{{ url_for('admin_students.profile', student_id=payload.student_id) }}">Otvori profil učenika →</a></div>
+{% endif %}
 
-<div class="card">
-  <h2>Thinkific napredak</h2>
-  {% if t.snapshot_missing %}
-    {# NEDOSTAJE, ne nula. #}
-    <p class="muted">Thinkific Progress snapshot nije importovan za ovaj mjesec.</p>
-  {% else %}
-    <p class="muted" style="margin-top:0">{{ t.course_name }}</p>
-    <div class="grid">
-      <div class="stat"><b>{% if t.percent_viewed is not none %}{{ '%g' % t.percent_viewed }}%{% else %}—{% endif %}</b><span class="muted">pregledano</span></div>
-      <div class="stat"><b>{% if t.percent_completed is not none %}{{ '%g' % t.percent_completed }}%{% else %}—{% endif %}</b><span class="muted">završeno</span></div>
-      <div class="stat">
-        <b>{% if t.delta_percent_completed is not none %}{{ '%+g' % t.delta_percent_completed }} p.p.{% else %}—{% endif %}</b>
-        <span class="muted">promjena završenog</span>
-      </div>
-      <div class="stat"><b style="font-size:.9rem">{{ t.last_sign_in or '—' }}</b><span class="muted">zadnja prijava</span></div>
-    </div>
-    {% if t.previous_report_month %}
-      <p class="muted" style="font-size:.85rem">Poređeno s mjesecom {{ t.previous_report_month }}.</p>
-    {% else %}
-      <p class="muted" style="font-size:.85rem">Prethodni mjesec nije dostupan — promjena se ne može izračunati.</p>
-    {% endif %}
-
-    <h3>Sekcije kursa</h3>
-    <table>
-      <tr><th>#</th><th>Sekcija</th><th>Sada</th><th>Prošli mjesec</th><th>Promjena</th></tr>
-      {% for s in t.sections %}
-      <tr>
-        <td class="muted">{{ s.ordinal }}</td>
-        <td>{{ s.section_name }}</td>
-        <td>{% if s.current_progress_percent is not none %}{{ '%g' % s.current_progress_percent }}%{% else %}<span class="muted">—</span>{% endif %}</td>
-        <td>{% if s.previous_progress_percent is not none %}{{ '%g' % s.previous_progress_percent }}%{% else %}<span class="muted">nema podatka</span>{% endif %}</td>
-        <td>{% if s.delta_progress_percent is not none %}{{ '%+g' % s.delta_progress_percent }}{% else %}<span class="muted">—</span>{% endif %}</td>
-      </tr>
-      {% endfor %}
-    </table>
+{% if saved %}
+<article class="report-document">
+  <header class="report-document__header">
+    <p class="page-eyebrow">Mjesečni izvještaj</p>
+    <h2 style="font-size:1.45rem">{{ label }}</h2>
+    <p class="muted">{{ month_label }} · {% if payload.profile.grades %}{{ payload.profile.grades|join('. razred + ') }}. razred{% elif payload.profile.grade %}{{ payload.profile.grade }}. razred{% endif %}</p>
+  </header>
+  <section class="report-document__section">
+    <h2>Pregled mjeseca</h2>
+    <p>{{ saved.narrative.summary }}</p>
+  </section>
+  <section class="report-document__section">
+    <h2>Šta ide dobro</h2>
+    {% if saved.narrative.strengths %}<ul>{% for item in saved.narrative.strengths %}<li>{{ item }}</li>{% endfor %}</ul>{% else %}<p class="muted">Nema unesenih stavki.</p>{% endif %}
+  </section>
+  <section class="report-document__section">
+    <h2>Na čemu treba raditi</h2>
+    {% if saved.narrative.focus_areas %}<ul>{% for item in saved.narrative.focus_areas %}<li>{{ item }}</li>{% endfor %}</ul>{% else %}<p class="muted">Nema unesenih stavki.</p>{% endif %}
+  </section>
+  <section class="report-document__section">
+    <h2>Preporuke za naredni mjesec</h2>
+    {% if saved.narrative.next_month_recommendations %}<ul>{% for item in saved.narrative.next_month_recommendations %}<li>{{ item }}</li>{% endfor %}</ul>{% else %}<p class="muted">Nema unesenih stavki.</p>{% endif %}
+  </section>
+  {% if saved.instructor_comment %}
+  <section class="report-document__section"><h2>Komentar instruktora</h2><p>{{ saved.instructor_comment }}</p></section>
   {% endif %}
-</div>
-
-<div class="card">
-  <h2>MAT-BOT aktivnost</h2>
-  {% if m.practice_tasks == 0 and m.explain_count == 0 and m.quick_count == 0
-        and m.kontrolni_attempts == 0 and m.active_days == 0 %}
-    <p class="muted">Nema zabilježene MAT-BOT aktivnosti u ovom mjesecu.</p>
-  {% else %}
-    <div class="grid">
-      <div class="stat"><b>{{ m.active_days }}</b><span class="muted">aktivnih dana</span></div>
-      <div class="stat"><b>{{ m.practice_tasks }}</b><span class="muted">zadataka</span></div>
-      <div class="stat"><b>{{ m.practice_correct }} / {{ m.practice_incorrect }}</b><span class="muted">tačno / netačno</span></div>
-      <div class="stat">
-        {# NULL tacnost se NIKAD ne prikazuje kao 0 %. #}
-        <b>{% if m.practice_accuracy is not none %}{{ '%g' % m.practice_accuracy }}%{% else %}—{% endif %}</b>
-        <span class="muted">{% if m.practice_accuracy is not none %}tačnost{% else %}tačnost (nema odgovora){% endif %}</span>
-      </div>
-      <div class="stat"><b>{{ m.hints_used }}</b><span class="muted">nagovještaja</span></div>
-      <div class="stat"><b>{{ m.full_solutions_shown }}</b><span class="muted">rješenja</span></div>
-      <div class="stat"><b>{{ m.explain_count }}</b><span class="muted">Objasni mi</span></div>
-      <div class="stat"><b>{{ m.quick_count }}</b><span class="muted">Samo rezultat</span></div>
-      <div class="stat"><b>{{ m.kontrolni_attempts }}</b><span class="muted">kontrolnih</span></div>
-      <div class="stat">
-        <b>{% if m.kontrolni_average is not none %}{{ '%g' % m.kontrolni_average }}%{% else %}—{% endif %}</b>
-        <span class="muted">prosjek kontrolnih</span>
-      </div>
-      <div class="stat">
-        <b>{% if m.kontrolni_total %}{{ m.kontrolni_correct }}/{{ m.kontrolni_total }}{% else %}—{% endif %}</b>
-        <span class="muted">tačnih pitanja</span>
-      </div>
-    </div>
-  {% endif %}
-
-  {% if m.lesson_outcomes %}
-  <h3>Ishodi po lekciji (iz kontrolnih)</h3>
-  <table>
-    <tr><th>Lekcija</th><th>Oblast</th><th>Težina</th><th>Netačno</th><th>Pitanja</th><th>Dokaz</th></tr>
-    {% for o in m.lesson_outcomes %}
-    <tr>
-      <td>{{ o.lesson_name or o.lesson_id }}</td>
-      <td class="muted">{{ o.area_name or '—' }}</td>
-      <td class="muted">{{ o.difficulty or '—' }}</td>
-      <td>{{ o.incorrect_items }}</td>
-      <td>{{ o.evidence_items }}</td>
-      <td>
-        {# Jedno promaseno pitanje NIJE nalaz o znanju - to se izricito kaze. #}
-        {% if o.low_evidence %}<span class="pill" style="color:var(--warn)">malo dokaza</span>
-        {% else %}<span class="pill">dovoljno</span>{% endif %}
-      </td>
-    </tr>
-    {% endfor %}
-  </table>
-  {% endif %}
-</div>
-
-{# --- FAZA 3C: izvjestaj za roditelja ------------------------------------ #}
-<div class="card">
-  <h2>Izvještaj za roditelja</h2>
-
-  {% if ai_error %}<div class="banner err">{{ ai_error }}</div>{% endif %}
-  {% if notice %}<div class="banner">{{ notice }}</div>{% endif %}
-
-  {# NOV IZVJESTAJ TRAZI POTVRDJEN TEKUCI RAZRED. Server odbija i bez ovoga -
-     ovdje se administratoru samo objasnjava zasto dugmeta nema. #}
-  {% if not reporting_enabled %}
-    <div class="banner warn">{{ report_disabled_message }} Postojeći sačuvani izvještaj, ako postoji, ostaje čitljiv i dostupan kao PDF.</div>
-  {% elif not grade_confirmed %}
-    <div class="banner err">
-      {{ grade_unconfirmed_message }}
-      <a href="{{ url_for('admin_students.profile', student_id=payload.student_id) }}">Otvori profil učenika →</a>
-    </div>
-  {% endif %}
-
-  {% if not saved %}
-    <p class="muted">
-      Za ovaj mjesec još nije generisan izvještaj. Generisanje troši
-      <b>tačno jedan</b> AI poziv; sve brojke iznad su već izračunate i AI ih
-      ne mijenja.
-    </p>
+</article>
+{% else %}
+<section class="card">
+  <div class="empty">
+    <strong>Za ovaj mjesec još nema izvještaja</strong>
+    <p>Podaci su spremni za pregled. Generisanje pravi jedan AI nacrt koji poslije možete urediti.</p>
     {% if reporting_enabled and grade_confirmed %}
     <form method="post" action="{{ url_for('admin_reports.generate_report', student_id=payload.student_id, month=month) }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <button type="submit" onclick="this.disabled=true;this.form.submit()">Generiši AI izvještaj</button>
     </form>
     {% endif %}
-  {% else %}
+  </div>
+</section>
+{% endif %}
+
+<section class="card">
+  <div class="section-header">
+    <div><h2>Podaci mjeseca</h2><p>Činjenice iz Thinkifica i MAT-BOT aktivnosti.</p></div>
+  </div>
+
+  <div class="report-document__section">
+    <h2>Thinkific napredak</h2>
+    {% if t.snapshot_missing %}
+      <p class="muted">Thinkific Progress snapshot nije importovan za ovaj mjesec.</p>
+    {% else %}
+      <p class="muted">{{ t.course_name }}</p>
+      <div class="grid">
+        <div class="stat"><b>{% if t.percent_viewed is not none %}{{ '%g' % t.percent_viewed }}%{% else %}—{% endif %}</b><span class="muted">pregledano</span></div>
+        <div class="stat"><b>{% if t.percent_completed is not none %}{{ '%g' % t.percent_completed }}%{% else %}—{% endif %}</b><span class="muted">završeno</span></div>
+        <div class="stat"><b>{% if t.delta_percent_completed is not none %}{{ '%+g' % t.delta_percent_completed }} p.p.{% else %}—{% endif %}</b><span class="muted">promjena</span></div>
+        <div class="stat"><b>{{ t.last_sign_in or '—' }}</b><span class="muted">zadnja prijava</span></div>
+      </div>
+      {% if t.previous_report_month %}<p class="field-hint">Poređeno s mjesecom {{ t.previous_report_month }}.</p>{% else %}<p class="field-hint">Prethodni mjesec nije dostupan — promjena se ne može izračunati.</p>{% endif %}
+      {% if t.sections %}
+      <details class="disclosure" style="margin-top:1rem">
+        <summary>Sekcije kursa</summary>
+        <div class="disclosure__content table-wrap"><table class="responsive-table">
+          <thead><tr><th>Sekcija</th><th>Sada</th><th>Prošli mjesec</th><th>Promjena</th></tr></thead>
+          <tbody>{% for s in t.sections %}<tr><td class="cell-primary" data-label="Sekcija">{{ s.section_name }}</td><td data-label="Sada">{% if s.current_progress_percent is not none %}{{ '%g' % s.current_progress_percent }}%{% else %}—{% endif %}</td><td data-label="Ranije">{% if s.previous_progress_percent is not none %}{{ '%g' % s.previous_progress_percent }}%{% else %}<span class="muted">nema podatka</span>{% endif %}</td><td data-label="Promjena">{% if s.delta_progress_percent is not none %}{{ '%+g' % s.delta_progress_percent }}{% else %}—{% endif %}</td></tr>{% endfor %}</tbody>
+        </table></div>
+      </details>
+      {% endif %}
+    {% endif %}
+  </div>
+
+  <div class="report-document__section">
+    <h2>MAT-BOT aktivnost</h2>
+    {% if m.practice_tasks == 0 and m.explain_count == 0 and m.quick_count == 0 and m.kontrolni_attempts == 0 and m.active_days == 0 %}
+      <p class="muted">Nema zabilježene MAT-BOT aktivnosti u ovom mjesecu.</p>
+    {% else %}
+      <div class="grid">
+        <div class="stat"><b>{{ m.active_days }}</b><span class="muted">aktivnih dana</span></div>
+        <div class="stat"><b>{{ m.practice_tasks }}</b><span class="muted">zadataka</span></div>
+        <div class="stat"><b>{{ m.practice_correct }} / {{ m.practice_incorrect }}</b><span class="muted">tačno / netačno</span></div>
+        <div class="stat"><b>{% if m.practice_accuracy is not none %}{{ '%g' % m.practice_accuracy }}%{% else %}—{% endif %}</b><span class="muted">{% if m.practice_accuracy is not none %}tačnost{% else %}tačnost (nema odgovora){% endif %}</span></div>
+        <div class="stat"><b>{{ m.hints_used }}</b><span class="muted">nagovještaja</span></div>
+        <div class="stat"><b>{{ m.explain_count }}</b><span class="muted">Objasni mi</span></div>
+        <div class="stat"><b>{{ m.quick_count }}</b><span class="muted">Samo rezultat</span></div>
+        <div class="stat"><b>{{ m.kontrolni_attempts }}</b><span class="muted">kontrolnih</span></div>
+        <div class="stat"><b>{% if m.kontrolni_average is not none %}{{ '%g' % m.kontrolni_average }}%{% else %}—{% endif %}</b><span class="muted">prosjek kontrolnih</span></div>
+      </div>
+    {% endif %}
+    {% if m.lesson_outcomes %}
+    <details class="disclosure" style="margin-top:1rem">
+      <summary>Ishodi po lekciji (iz kontrolnih)</summary>
+      <div class="disclosure__content table-wrap"><table class="responsive-table">
+        <thead><tr><th>Lekcija</th><th>Oblast</th><th>Težina</th><th>Netačno</th><th>Pitanja</th><th>Dokaz</th></tr></thead>
+        <tbody>{% for o in m.lesson_outcomes %}<tr><td class="cell-primary" data-label="Lekcija">{{ o.lesson_name or o.lesson_id }}</td><td data-label="Oblast">{{ o.area_name or '—' }}</td><td data-label="Težina">{{ o.difficulty or '—' }}</td><td data-label="Netačno">{{ o.incorrect_items }}</td><td data-label="Pitanja">{{ o.evidence_items }}</td><td data-label="Dokaz">{% if o.low_evidence %}<span class="badge badge--warning">malo dokaza</span>{% else %}<span class="badge badge--neutral">dovoljno</span>{% endif %}</td></tr>{% endfor %}</tbody>
+      </table></div>
+    </details>
+    {% endif %}
+  </div>
+
+  <details class="disclosure" style="margin-top:1rem">
+    <summary>Tehnički detalji</summary>
+    <div class="disclosure__content muted text-small">Interna oznaka učenika: {{ payload.student_id }}. Prikazane brojke su deterministički izračunate iz sačuvanih podataka; AI ih ne mijenja.</div>
+  </details>
+</section>
+
+{% if saved %}
+<details class="card disclosure report-editor" id="report-editor" {% if ai_error %}open{% endif %}>
+  <summary>Uredi sadržaj izvještaja</summary>
+  <div class="disclosure__content">
     <form method="post" action="{{ url_for('admin_reports.save_report', student_id=payload.student_id, month=month) }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-      <fieldset {% if not reporting_enabled %}disabled{% endif %} style="border:0;padding:0;margin:0">
-
-      <label><b>Sažetak</b></label>
-      <textarea name="summary" rows="5" style="width:100%">{{ saved.narrative.summary }}</textarea>
-
-      {# Jedna stavka po redu - server ih tako i cita nazad. #}
-      <label><b>Šta ide dobro</b> <span class="muted">(jedna stavka po redu)</span></label>
-      <textarea name="strengths" rows="3" style="width:100%">{{ saved.narrative.strengths | join('
+      <fieldset {% if not reporting_enabled %}disabled{% endif %}>
+        <label for="report-summary">Sažetak</label>
+        <textarea id="report-summary" name="summary" rows="5">{{ saved.narrative.summary }}</textarea>
+        <label for="report-strengths" style="margin-top:.8rem">Šta ide dobro <span class="muted">(jedna stavka po redu)</span></label>
+        <textarea id="report-strengths" name="strengths" rows="3">{{ saved.narrative.strengths | join('
 ') }}</textarea>
-
-      <label><b>Na čemu treba raditi</b> <span class="muted">(jedna stavka po redu)</span></label>
-      <textarea name="focus_areas" rows="3" style="width:100%">{{ saved.narrative.focus_areas | join('
+        <label for="report-focus" style="margin-top:.8rem">Na čemu treba raditi <span class="muted">(jedna stavka po redu)</span></label>
+        <textarea id="report-focus" name="focus_areas" rows="3">{{ saved.narrative.focus_areas | join('
 ') }}</textarea>
-
-      <label><b>Preporuke za naredni mjesec</b> <span class="muted">(jedna stavka po redu)</span></label>
-      <textarea name="next_month_recommendations" rows="3" style="width:100%">{{ saved.narrative.next_month_recommendations | join('
+        <label for="report-next" style="margin-top:.8rem">Preporuke za naredni mjesec <span class="muted">(jedna stavka po redu)</span></label>
+        <textarea id="report-next" name="next_month_recommendations" rows="3">{{ saved.narrative.next_month_recommendations | join('
 ') }}</textarea>
-
-      <label><b>Komentar instruktora</b>
-        <span class="muted">(ne piše ga AI; ostaje sačuvan i pri ponovnom generisanju)</span></label>
-      <textarea name="instructor_comment" rows="3" style="width:100%">{{ saved.instructor_comment }}</textarea>
-
-      {% if reporting_enabled %}<p><button type="submit">Sačuvaj nacrt</button></p>{% endif %}
+        <label for="report-comment" style="margin-top:.8rem">Komentar instruktora <span class="muted">(AI ga ne mijenja)</span></label>
+        <textarea id="report-comment" name="instructor_comment" rows="3">{{ saved.instructor_comment }}</textarea>
+        {% if reporting_enabled %}<button type="submit" style="margin-top:.8rem">Sačuvaj nacrt</button>{% endif %}
       </fieldset>
     </form>
-
-    <p class="muted">
-      Status: <span class="pill">{{ saved.status }}</span>
-      {# `generated_at` se mijenja SAMO kad je model stvarno zvan; `updated_at`
-         i na obicnu izmjenu teksta. Dva razlicita podatka, dva polja. #}
-      {% if saved.generated_at %}<span class="pill">AI tekst: {{ saved.generated_at }} UTC</span>{% endif %}
-      {% if saved.updated_at %}<span class="pill">izmijenjeno {{ saved.updated_at }}</span>{% endif %}
-      {% if saved.snapshot.generated_by %}
-        <span class="pill">prompt {{ saved.snapshot.generated_by.prompt_version }}</span>
-      {% endif %}
-    </p>
-
-    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-      {# STARI NACRT OSTAJE CITLJIV I PREUZIMLJIV i bez potvrdjenog razreda -
-         blokira se samo NOVO generisanje. #}
+    <div class="section-header" style="margin:1rem 0 0">
+      <p>Status: <span class="badge badge--neutral">{{ saved.status }}</span>{% if saved.updated_at %} · izmijenjeno {{ saved.updated_at }}{% endif %}</p>
       {% if reporting_enabled and grade_confirmed %}
-      <form method="post" action="{{ url_for('admin_reports.generate_report', student_id=payload.student_id, month=month) }}"
-            onsubmit="return confirm('AI tekst (sažetak, jake strane, fokus, preporuke) bit će zamijenjen novim. Komentar instruktora ostaje sačuvan. Nastaviti?')">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <button type="submit">Ponovo generiši AI tekst</button>
-      </form>
+      <details class="action-menu">
+        <summary aria-label="Dodatne radnje">•••</summary>
+        <div class="action-menu__panel">
+          <form method="post" action="{{ url_for('admin_reports.generate_report', student_id=payload.student_id, month=month) }}" onsubmit="return confirm('AI tekst će biti zamijenjen novim. Komentar instruktora ostaje sačuvan. Nastaviti?')">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <p class="muted text-small">Ponovno generisanje mijenja AI tekst, ali čuva komentar instruktora.</p>
+            <button type="submit" class="btn btn--ghost">Ponovo generiši AI tekst</button>
+          </form>
+        </div>
+      </details>
       {% endif %}
-      <a href="{{ url_for('admin_reports.report_pdf_download', student_id=payload.student_id, month=month) }}">
-        <button type="button">Generiši PDF</button>
-      </a>
-      <span class="muted">PDF se pravi iz sačuvanog nacrta — bez AI poziva.</span>
     </div>
-  {% endif %}
-</div>
+  </div>
+</details>
+{% endif %}
 {% endif %}
 {% endblock %}

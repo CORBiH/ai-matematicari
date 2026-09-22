@@ -9,6 +9,7 @@ const vm = require('node:vm');
 const { Doc, Element, settle } = require('./browser_stub.js');
 
 const TEMPLATE = path.join(__dirname, '..', '..', 'templates', 'admin_registry.html');
+const ADMIN_CSS = path.join(__dirname, '..', '..', 'static', 'admin.css');
 
 function add(doc, parent, tag, attributes = {}) {
   const node = new Element(tag, doc);
@@ -31,6 +32,9 @@ function fixture(ids = ['35', '36']) {
   const bulkButton = add(doc, area, 'button', { type: 'submit' });
   const typeButton = add(doc, area, 'button', {
     type: 'submit', formaction: '/admin/students/bulk-account-type',
+  });
+  const clearButton = add(doc, area, 'button', {
+    id: 'clear-selection', type: 'button',
   });
   const rows = ids.map(id => {
     const row = add(doc, form, 'div', { 'data-student-row': id });
@@ -60,7 +64,10 @@ function fixture(ids = ['35', '36']) {
   const sandbox = { document: doc, window: win, setTimeout, Array };
   win.document = doc;
   vm.runInNewContext(blocks[0][1], sandbox, { filename: TEMPLATE });
-  return { doc, form, selectAll, area, count, bulkButton, typeButton, rows, sandbox };
+  return {
+    doc, form, selectAll, area, count, bulkButton, typeButton, clearButton,
+    rows, sandbox,
+  };
 }
 
 function selectedStudentIds(page) {
@@ -87,6 +94,21 @@ test('row checkboxes and select-all operate only on rendered rows', () => {
   assert.deepEqual(selectedStudentIds(page), ['35', '36']);
   assert.equal(notRendered.checked, false);
   assert.equal(page.selectAll.indeterminate, false);
+});
+
+test('Odustani clears the selection and hides bulk actions', () => {
+  const page = fixture(['35', '36']);
+  page.selectAll.checked = true;
+  page.selectAll.dispatch('change');
+  assert.equal(page.area.classList.contains('is-visible'), true);
+
+  page.clearButton.dispatch('click');
+
+  assert.deepEqual(selectedStudentIds(page), []);
+  assert.equal(page.count.textContent, '0');
+  assert.equal(page.selectAll.checked, false);
+  assert.equal(page.selectAll.indeterminate, false);
+  assert.equal(page.area.classList.contains('is-visible'), false);
 });
 
 test('unselected rows remain absent from a filtered bulk submission', () => {
@@ -151,4 +173,39 @@ test('bulk submit enters disabled loading state and single-row action remains us
   assert.equal(page.sandbox.matbotBulkSubmit(page.form), true);
   await settle(2);
   assert.equal(submitters.every(button => button.disabled), true);
+});
+
+test('filter, row-action and form payload contracts stay intact', () => {
+  const html = fs.readFileSync(TEMPLATE, 'utf8');
+  for (const name of ['q', 'grade', 'account_type', 'confirmed', 'needs_action']) {
+    assert.match(html, new RegExp(`name=["']${name}["']`), `missing ${name} filter`);
+  }
+  for (const name of [
+    'csrf_token', 'student_ids', 'bulk_account_type',
+    'account_type_{{ s.student_id }}', 'grades_{{ s.student_id }}',
+  ]) {
+    assert.equal(html.includes(`name="${name}"`), true, `missing ${name} payload`);
+  }
+  assert.match(html, /formaction="{{ url_for\('admin_students\.update_grade'/);
+  assert.match(html, /formaction="{{ url_for\('admin_students\.bulk_account_type'/);
+  assert.match(html, /href="{{ url_for\('admin_students\.profile'/);
+  assert.match(html, /href="{{ url_for\('admin_reports\.student_preview'/);
+});
+
+test('mobile layout transforms the same rows without removing actions', () => {
+  const html = fs.readFileSync(TEMPLATE, 'utf8');
+  const css = fs.readFileSync(ADMIN_CSS, 'utf8');
+  const row = html.slice(
+    html.indexOf('<tr data-student-row='),
+    html.indexOf('</tr>', html.indexOf('<tr data-student-row=')),
+  );
+
+  assert.match(html, /class="responsive-table registry-table"/);
+  assert.match(row, /data-label="Radnje"/);
+  assert.match(row, />Profil</);
+  assert.match(row, />Izvještaj</);
+  assert.match(row, /class="action-menu"/);
+  assert.match(css, /@media\(max-width:720px\)/);
+  assert.match(css, /\.responsive-table td\{/);
+  assert.match(css, /\.responsive-table tr\{/);
 });

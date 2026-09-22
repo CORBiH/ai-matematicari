@@ -1,49 +1,17 @@
 {% extends "admin_base.html" %}
 {% set nav_active = 'classes' %}
-{% block title %}MAT-BOT — Svi časovi{% endblock %}
-{% block heading %}Svi časovi{% endblock %}
+{% set nav_month = month %}
+{% block title %}MAT-BOT — Sesije{% endblock %}
+{% block heading %}Sesije{% endblock %}
+{% block subheading %}<p class="page-subtitle">Evidencija održanih časova, prisustva i tema.</p>{% endblock %}
 {% block content %}
-
-<style>
-  .clsrow td{vertical-align:middle}
-  .cls-topic{font-weight:600}
-  .cls-when{white-space:nowrap}
-  .filters{display:flex;gap:.6rem;flex-wrap:wrap;align-items:flex-end}
-  .filters > div{flex:1 1 150px;min-width:0}
-  .filters label{margin-top:0}
-  .filters select,.filters input{width:100%;background:var(--input-bg);
-    color:var(--text);border:1px solid var(--input-border);border-radius:10px;
-    padding:.5rem .65rem;font:inherit}
-  .monthnav{display:flex;gap:.4rem;align-items:center;flex-wrap:wrap}
-  .pager{display:flex;gap:.5rem;align-items:center;justify-content:center;
-         margin-top:1rem;flex-wrap:wrap}
-  /* Na uskom ekranu red postaje kartica — tabela od sedam kolona se na
-     mobitelu ne cita, a horizontalno skrolanje je gore od kartice. */
-  .cards{display:none}
-  .cls-card{border:1px solid var(--card-border);border-radius:12px;
-            padding:.8rem .9rem;margin-bottom:.6rem;background:var(--input-bg)}
-  .cls-card .when{color:var(--muted);font-size:.85rem}
-  .cls-card .topic{font-weight:600;margin:.15rem 0}
-  /* Zatečeni čas nije greška nego nedovršen podatak, pa nosi ton upozorenja,
-     a ne opasnosti — radnja je „dopuni", ne „popravi štetu". */
-  .legacy{border-left:4px solid var(--warn, #d68a17)}
-  .legacy .lg-when{white-space:nowrap}
-  .lgcards{display:none}
-  .lg-card{border:1px solid var(--card-border);border-radius:12px;
-           padding:.8rem .9rem;margin-bottom:.6rem;background:var(--input-bg)}
-  @media (max-width:720px){
-    .desk{display:none}
-    .cards{display:block}
-    .lgcards{display:block}
-  }
-</style>
 
 {% if error %}<div class="banner err">{{ error }}</div>{% endif %}
 {% if request.args.get('deleted') %}
 <div class="banner ok">Čas je obrisan.</div>
 {% endif %}
 
-<div class="card">
+<section class="card" aria-label="Filteri sesija">
   <form method="get" action="{{ url_for('admin_sessions.class_list') }}">
     <div class="filters">
       <div>
@@ -83,7 +51,7 @@
     <a class="btn btn--ghost" href="{{ url_for('admin_sessions.class_list', month=month) }}">Očisti filtere</a>
     {% endif %}
   </div>
-</div>
+</section>
 
 {% if legacy %}
 {# --- ZATEČENI ČASOVI PRIJE ZAPISA O ČASU -----------------------------------
@@ -91,7 +59,7 @@
    dobila zaseban zapis o času, pa ih spisak iznad ne vidi. Sekcija stoji IZVAN
    filtera mjeseca i razreda: zaturen čas se ne smije kriti još jednom.
    Sam sebe prazni — svaki povezan čas nestaje odavde i pojavljuje se gore. #}
-<div class="card legacy">
+<section class="card legacy">
   <h3 style="margin-top:0">Raniji časovi za povezivanje ({{ legacy_total }})</h3>
   <p class="muted" style="margin-top:0">
     Ovi časovi su uredno upisani, ali im nedostaje podatak o razredu, pa se ne
@@ -144,10 +112,10 @@
     </div>
     {% endfor %}
   </div>
-</div>
+</section>
 {% endif %}
 
-<div class="card">
+<section class="card">
   {% if not classes %}
     <div class="empty">
       {% if filtered %}
@@ -232,5 +200,5 @@
     </div>
     {% endif %}
   {% endif %}
-</div>
+</section>
 {% endblock %}

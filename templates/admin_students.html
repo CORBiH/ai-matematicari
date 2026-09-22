@@ -1,47 +1,60 @@
 {% extends "admin_base.html" %}
-{% block heading %}Učenici za izvještaj — {{ month }}{% endblock %}
-{% block topright %}<a href="{{ url_for('admin_reports.index') }}">← Nazad</a>{% endblock %}
+{% block title %}MAT-BOT — Izvještaji {{ month }}{% endblock %}
+{% block heading %}Mjesečni izvještaji{% endblock %}
+{% block subheading %}<p class="page-subtitle">{{ month }} · Učenici s evidentiranom aktivnošću ili Thinkific napretkom.</p>{% endblock %}
 {% set nav_active = 'reports' %}
+{% set nav_month = month %}
+{% block topright %}
+<form method="get" action="{{ url_for('admin_reports.students') }}" class="actions">
+  <label for="report-list-month" class="muted">Mjesec</label>
+  <input id="report-list-month" name="month" type="month" value="{{ month }}" required style="width:auto">
+  <button type="submit" class="btn btn--ghost">Prikaži</button>
+</form>
+{% endblock %}
 {% block content %}
-{% if error %}<div class="banner err">{{ error }}</div>{% endif %}
+{% if error %}<div class="banner err" role="alert">{{ error }}</div>{% endif %}
 
-<div class="card">
-  <p class="muted" style="margin-top:0">
-    Populacija je UNIJA: učenik s Thinkific snapshotom za ovaj mjesec ILI s
-    pripisanom MAT-BOT aktivnošću. Nijedna grupa se ne ispušta.
-  </p>
-  <p><strong>Učenici za izvještaj: {{ rows|length }}</strong></p>
+<section class="card">
+  <div class="section-header">
+    <div>
+      <h2>Učenici za izvještaj: {{ rows|length }}</h2>
+      <p>Sačuvani izvještaji i dostupni podaci za odabrani mjesec.</p>
+    </div>
+  </div>
 
   {% if rows %}
-  <table>
-    <tr>
-      <th>Učenik</th><th>Razred</th><th>Thinkific</th><th>Završeno</th>
-      <th>MAT-BOT</th><th>Kontrolni</th><th></th>
-    </tr>
-    {% for r in rows %}
-    <tr>
-      {# IDENTITET: ime ili neutralna oznaka. E-mail se NIKAD ne prikazuje. #}
-      <td>{{ r.label }}</td>
-      <td>{% if r.grades %}{{ r.grades|join('. razred + ') }}. razred{% elif r.grade %}{{ r.grade }}. razred{% else %}<span class="muted">—</span>{% endif %}</td>
-      <td>
-        {% if r.has_snapshot %}<span class="pill" style="color:var(--ok)">dostupno</span>
-        {% else %}<span class="pill">nije importovano</span>{% endif %}
-      </td>
-      <td>
-        {% if r.percent_completed is not none %}{{ '%g' % r.percent_completed }}%
-          {% if r.delta_percent_completed is not none %}
-            <span class="muted">({{ '%+g' % r.delta_percent_completed }})</span>
-          {% endif %}
-        {% else %}<span class="muted">—</span>{% endif %}
-      </td>
-      <td>{{ r.practice_tasks }} zadataka</td>
-      <td>{{ r.kontrolni_attempts }}</td>
-      <td><a href="{{ url_for('admin_reports.student_preview', student_id=r.student_id, month=month) }}">Pregled →</a></td>
-    </tr>
-    {% endfor %}
-  </table>
+  <div class="table-wrap">
+    <table class="responsive-table">
+      <thead><tr><th>Učenik</th><th>Razred</th><th>Napredak</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+      {% for r in rows %}
+      <tr data-report-row="{{ r.student_id }}">
+        <td class="cell-primary" data-label="Učenik"><span class="cell-title">{{ r.label }}</span><span class="cell-meta">{% if r.has_snapshot %}Thinkific dostupan{% else %}Thinkific nije importovano{% endif %}</span></td>
+        <td data-label="Razred">{% if r.grades %}<span class="badge badge--neutral">{{ r.grades|join('. + ') }}. razred</span>{% elif r.grade %}<span class="badge badge--neutral">{{ r.grade }}. razred</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+        <td data-label="Napredak">
+          <div>
+            {% if r.percent_completed is not none %}<strong>{{ '%g' % r.percent_completed }}%</strong>{% if r.delta_percent_completed is not none %} <span class="muted">({{ '%+g' % r.delta_percent_completed }})</span>{% endif %}{% else %}<span class="muted">—</span>{% endif %}
+            <span class="cell-meta">{{ r.practice_tasks }} zadataka · {{ r.kontrolni_attempts }} kontrolnih</span>
+          </div>
+        </td>
+        <td data-label="Status">
+          {% if r.has_report is sameas true %}<span class="badge badge--success">Sačuvan</span>
+          {% elif r.has_report is sameas false %}<span class="badge badge--warning">Nema izvještaja</span>
+          {% else %}<span class="badge badge--neutral">Status nedostupan</span>{% endif %}
+        </td>
+        <td data-label="Radnje"><div class="cell-actions"><a class="btn btn--ghost" href="{{ url_for('admin_reports.student_preview', student_id=r.student_id, month=month) }}">Pregled →</a></div></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
   {% else %}
-  <p class="muted">Za ovaj mjesec nema nijednog učenika ni u Thinkific snapshotima ni u MAT-BOT aktivnosti.</p>
+  <div class="empty"><strong>Za ovaj mjesec još nema izvještaja</strong><p>Nema učenika s Thinkific snapshotom ni evidentiranom MAT-BOT aktivnošću.</p></div>
   {% endif %}
-</div>
+
+  <details class="disclosure" style="margin-top:1rem">
+    <summary>Kako se lista formira</summary>
+    <div class="disclosure__content muted text-small">Lista je unija učenika s Thinkific snapshotom za ovaj mjesec i učenika s pripisanom MAT-BOT aktivnošću. Nijedna grupa se ne izostavlja.</div>
+  </details>
+</section>
 {% endblock %}

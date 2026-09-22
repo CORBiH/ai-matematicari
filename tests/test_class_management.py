@@ -17,6 +17,7 @@ Zato v6 uvodi `class_sessions` sa stabilnim `id` i NEPROMJENJIVIM razredom, a
 PII: svi učenici su sintetički.
 """
 import re
+from pathlib import Path
 
 import pytest
 
@@ -147,11 +148,12 @@ def class_rows(db, class_id):
 # ===========================================================================
 def test_1_the_admin_navigation_reaches_every_destination(admin, db):
     body = admin.get("/admin/reports").data
-    for label in ("Pregled", "Učenici", "Svi časovi", "Izvještaji", "Thinkific",
-                  "Upiši čas"):
+    for label in ("Pregled", "Učenici", "Izvještaji", "Sesije", "Upiši čas"):
         assert label.encode() in body, label
-    # Brze akcije na naslovnoj.
-    assert "Brze akcije".encode() in body
+    # Naslovna je radna ploča, bez dupliranja cijele navigacije.
+    assert "Potrebna akcija".encode() in body
+    nav = body.split(b'</nav>', 1)[0]
+    assert b">Thinkific<" not in nav
 
 
 def test_2_the_class_list_requires_admin_auth(client, db, admin_env):
@@ -577,7 +579,10 @@ def test_29_the_list_renders_mobile_cards_as_well_as_a_table(admin, db):
     body = admin.get("/admin/sessions?month=2026-09").data.decode("utf-8")
     assert 'class="cls-card"' in body      # kartica za mobitel
     assert "<table" in body                # tabela za desktop
-    assert "@media (max-width:720px)" in body
+    css = (Path(__file__).resolve().parents[1] / "static" / "admin.css").read_text(
+        encoding="utf-8")
+    assert "@media(max-width:720px)" in css
+    assert ".cards,.lgcards,.rowcards{display:block}" in css
 
 
 def test_30_empty_states_offer_the_next_action(admin, db):

@@ -450,7 +450,7 @@ def test_20_the_anonymous_login_page_shows_no_admin_navigation(anon, db):
     assert 'class="adminnav"' not in body
     assert re.findall(r'<a[^>]*href="/admin[^"]*"', body) == [], \
         "stranica prijave nudi veze u administratorski dio"
-    for label in ("Svi časovi", "Upiši čas", "Učenici", "Thinkific"):
+    for label in ("Sesije", "Upiši čas", "Učenici"):
         assert label not in body, label
     assert b'name="password"' in anon.get(LOGIN).data
 
@@ -461,7 +461,8 @@ def test_21_authenticated_pages_keep_the_navigation(admin, db, seeded):
                 "/admin/sessions/%d" % seeded["class_id"]):
         body = admin.get(url).data.decode("utf-8")
         assert 'class="adminnav"' in body, url
-        for label in ("Pregled", "Učenici", "Svi časovi", "Upiši čas"):
+        for label in ("Pregled", "Učenici", "Izvještaji", "Sesije",
+                      "Upiši čas"):
             assert label in body, (url, label)
 
 

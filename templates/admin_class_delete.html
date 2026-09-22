@@ -1,5 +1,6 @@
 {% extends "admin_base.html" %}
 {% set nav_active = 'classes' %}
+{% set nav_month = klass.session_date[:7] %}
 {% block title %}MAT-BOT — Brisanje časa{% endblock %}
 {% block heading %}Obrisati ovaj čas?{% endblock %}
 {% block content %}

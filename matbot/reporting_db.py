@@ -1322,6 +1322,29 @@ class ReportingDatabase:
                    "updated_at", "generated_at")
         return dict(zip(columns, rows[0]))
 
+    def fetch_monthly_report_student_ids(self, report_month):
+        """ID-jevi učenika sa sačuvanim izvještajem za mjesec.
+
+        Ovo je sažeti, isključivo čitalački upit za administratorski pregled.
+        Ne vraća sadržaj izvještaja niti podatke o identitetu učenika.
+        """
+        with self._lock:
+            try:
+                conn = self._connection()
+                self._require_monthly_reports(conn)
+                rows = _rows(conn.execute(
+                    "SELECT DISTINCT student_id FROM monthly_reports "
+                    "WHERE report_month = ?", (report_month,)))
+            except ReportingUnavailable:
+                self._drop_connection()
+                raise
+            except Exception as exc:
+                self._drop_connection()
+                raise ReportingUnavailable(
+                    "monthly_report_index_read_failed:" + type(exc).__name__,
+                    exc) from None
+        return {int(row[0]) for row in rows}
+
     def _require_monthly_reports(self, conn):
         """Padni ZATVORENO ako produkcijska tabela ne podnosi Fazu 3C.
 

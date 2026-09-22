@@ -179,7 +179,8 @@ def _overview(month):
     prikazuje prazno stanje umjesto da sruši stranicu — dijagnostika ima svoju
     komandu."""
     overview = {"classes": None, "students": None, "unconfirmed": None,
-                "available": False}
+                "report_total": None, "reports_saved": None,
+                "reports_missing": None, "available": False}
     try:
         database = reporting_db.get_database()
         start, end = report_input.month_bounds(month)
@@ -191,6 +192,16 @@ def _overview(month):
         overview["unconfirmed"] = sum(
             1 for row in listed
             if not student_grades.is_confirmed_grades(row.get("grades")))
+        population = set(report_input.report_population(month, database=database))
+        overview["report_total"] = len(population)
+        try:
+            saved = database.fetch_monthly_report_student_ids(month)
+        except reporting_db.ReportingUnavailable:
+            saved = None
+        if saved is not None:
+            overview["reports_saved"] = len(population & saved)
+            overview["reports_missing"] = (
+                overview["report_total"] - overview["reports_saved"])
         overview["available"] = True
     except Exception:
         logger.info("admin_overview_unavailable")
@@ -204,6 +215,17 @@ def _default_month():
 
     now = datetime.now(timezone.utc)
     return "%04d-%02d" % (now.year, now.month)
+
+
+def _month_label(month):
+    """Kratka lokalizovana oznaka mjeseca isključivo za prikaz."""
+    names = ("Januar", "Februar", "Mart", "April", "Maj", "Juni",
+             "Juli", "August", "Septembar", "Oktobar", "Novembar", "Decembar")
+    try:
+        year, number = month.split("-", 1)
+        return "%s %s" % (names[int(number) - 1], year)
+    except (AttributeError, IndexError, ValueError):
+        return month
 
 
 # ---------------------------------------------------------------------------
@@ -328,8 +350,13 @@ def students():
                                schema_state=state, schema_message=message,
                                error=message), 409
 
+    database = reporting_db.get_database()
+    try:
+        saved_report_ids = database.fetch_monthly_report_student_ids(month)
+    except reporting_db.ReportingUnavailable:
+        saved_report_ids = None
     rows = []
-    for student_id in report_input.report_population(month):
+    for student_id in report_input.report_population(month, database=database):
         payload = report_input.build_report_input(student_id, month)
         matbot = payload["matbot"]
         thinkific = payload["thinkific"]
@@ -344,6 +371,8 @@ def students():
             "delta_percent_completed": thinkific.get("delta_percent_completed"),
             "practice_tasks": matbot["practice_tasks"],
             "kontrolni_attempts": matbot["kontrolni_attempts"],
+            "has_report": (None if saved_report_ids is None
+                           else student_id in saved_report_ids),
         })
     return render_template("admin_students.html", month=month, rows=rows,
                            schema_state=state, schema_message=message, error="")
@@ -406,6 +435,7 @@ def _render_student(student_id, month, payload, *, ai_error="", notice=""):
     return render_template(
         "admin_student.html", month=month, payload=payload,
         label=_student_label(payload["profile"], student_id),
+        month_label=_month_label(month),
         previous_month=report_input.previous_month(month), schema_message="",
         saved=saved, csrf_token=admin_auth.csrf_token(),
         # Dugme za generisanje se ne nudi bez potvrđenog razreda; server to

@@ -1,52 +1,10 @@
 {% extends "admin_base.html" %}
 {% block title %}MAT-BOT — Upiši čas{% endblock %}
 {% block heading %}{% if chosen.class_id %}Uredi čas{% else %}Upiši čas{% endif %}{% endblock %}
+{% block subheading %}<p class="page-subtitle">Jedan unos za termin, temu i sve učenike u grupi.</p>{% endblock %}
 {% set nav_active = 'classes' %}
+{% set nav_month = (chosen.session_date or today)[:7] %}
 {% block content %}
-
-{# Dodatni stil SAMO za ovu stranicu. Osnovni jezik (boje, radijusi, kartice)
-   dolazi iz `admin_base.html` i ovdje se ne mijenja. #}
-<style>
-  .row-student{border-bottom:1px solid var(--card-border);padding:.7rem 0}
-  .row-student:last-child{border-bottom:0}
-  .name{font-weight:600}
-  /* Segmentirani izbor: radio je i dalje pravi element (radi bez JS-a i s
-     tastaturom), a labela je samo njegov vidljivi oblik. */
-  .seg{display:inline-flex;flex-wrap:wrap;gap:.3rem;margin:0}
-  .seg input{position:absolute;opacity:0;width:0;height:0}
-  .seg label{display:inline-block;margin:0;padding:.3rem .6rem;border-radius:8px;
-             border:1px solid var(--input-border);background:var(--input-bg);
-             color:var(--muted);cursor:pointer;font-size:.85rem;line-height:1.2}
-  .seg input:checked + label{background:var(--btn-bg);border-color:var(--btn-bg);
-                             color:#fff}
-  .seg input:focus-visible + label{outline:2px solid var(--accent);outline-offset:2px}
-  .seg.small label{padding:.25rem .55rem;font-size:.82rem;min-width:2rem;
-                   text-align:center}
-  .fields{margin-top:.5rem;display:flex;gap:1.2rem;flex-wrap:wrap;align-items:flex-start}
-  .fields > div{min-width:0}
-  .field-label{font-size:.78rem;color:var(--muted);margin-bottom:.2rem}
-  .comment{width:100%;max-width:22rem;background:var(--input-bg);color:var(--text);
-           border:1px solid var(--input-border);border-radius:8px;padding:.4rem .55rem;
-           font:inherit;font-size:.88rem}
-  /* Sva zajednička polja časa izgledaju isto. Pravilo je ranije hvatalo samo
-     `date` i `select`, pa su vrijeme i ručno upisana tema ostajali sistemski
-     bijeli — jedina svijetla polja na tamnoj stranici, i to baš ona koja se u
-     režimu „Ručni unos" najviše koriste. */
-  input[type=date],input[type=time],select,
-  #custom_lesson,#custom_area{width:100%;background:var(--input-bg);
-    color:var(--text);border:1px solid var(--input-border);border-radius:10px;
-    padding:.55rem .7rem;font:inherit}
-  /* Dugme prati listu: kod dugačkog spiska se ne mora skrolati nazad. */
-  .savebar{position:sticky;bottom:0;background:var(--card-bg);
-           border-top:1px solid var(--card-border);padding:.8rem 0;margin-top:.4rem;
-           display:flex;gap:1rem;align-items:center;flex-wrap:wrap}
-  .savebar button{margin-top:0}
-  /* Na uskom ekranu red postaje kartica, a ne stisnuta tabela. */
-  @media (max-width:640px){
-    .fields{gap:.7rem}
-    .comment{max-width:100%}
-  }
-</style>
 
 {% if error %}<div class="banner err">{{ error }}</div>{% endif %}
 

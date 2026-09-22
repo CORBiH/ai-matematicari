@@ -1,267 +1,209 @@
 {% extends "admin_base.html" %}
+{% block title %}MAT-BOT — {{ student.display_name or "Učenik" }}{% endblock %}
 {% block heading %}{{ student.display_name or "Učenik" }}{% endblock %}
+{% block subheading %}
+<div class="badge-row" style="margin-top:.55rem">
+  <span class="badge {% if student.account_type == student_type %}badge--student{% elif student.account_type == 'SUPPORT' %}badge--support{% else %}badge--test{% endif %}">{{ account_type_labels[student.account_type] }}</span>
+  {% if student.grades %}<span class="badge badge--neutral">{{ student.grades|join('. razred + ') }}. razred</span>{% else %}<span class="badge badge--warning">Razred nije potvrđen</span>{% endif %}
+  {% if thinkific_linked %}<span class="badge badge--success">Povezan</span>{% else %}<span class="badge badge--neutral">Thinkific nije povezan</span>{% endif %}
+</div>
+{% endblock %}
 {% set nav_active = 'students' %}
+{% set nav_month = month %}
 {% block topright %}<a class="btn btn--ghost" href="{{ url_for('admin_students.index') }}">← Učenici</a>{% endblock %}
 {% block content %}
-{% if error %}<div class="banner err">{{ error }}</div>{% endif %}
+{% if error %}<div class="banner err" role="alert">{{ error }}</div>{% endif %}
 
-<div class="card">
-  <p style="margin-top:0">
-    <strong>{{ student.display_name or "Bez imena" }}</strong>
-    {% if student.grades %}
-      <span class="pill">{{ student.grades|join('. razred + ') }}. razred</span>
-      {% if grade_confirmed %}<span class="pill" style="color:var(--ok)">potvrđeno</span>
-      {% else %}<span class="pill" style="color:var(--warn)">nije potvrđeno</span>{% endif %}
-    {% else %}
-      <span class="pill" style="color:var(--warn)">razred nije unesen</span>
+{% if student.account_type == student_type and grade_status == status_unconfirmed %}
+<div class="banner warn" role="status"><strong>Trenutni razred nije potvrđen.</strong> Potvrda je potrebna za unos časa i novi izvještaj.</div>
+{% endif %}
+
+<section class="card">
+  <div class="section-header">
+    <div><h2>Ovaj mjesec</h2><p>{{ month }} · sažetak evidentirane aktivnosti</p></div>
+  </div>
+  {% if month_summary %}
+  <div class="grid">
+    <div class="stat"><b>{{ month_summary.matbot.active_days }}</b><span class="muted">aktivnih dana</span></div>
+    <div class="stat"><b>{{ month_summary.instruction.sessions_total }}</b><span class="muted">evidentiranih časova</span></div>
+    <div class="stat"><b>{{ month_summary.matbot.practice_tasks }}</b><span class="muted">zadataka</span></div>
+    <div class="stat"><b>{{ month_summary.matbot.kontrolni_attempts }}</b><span class="muted">kontrolnih</span></div>
+    <div class="stat">
+      {% if student.account_type != student_type %}<b class="text-small">Isključen</b>
+      {% elif month_report_saved is sameas true %}<b class="text-success">Sačuvan</b>
+      {% elif month_report_saved is sameas false %}<b class="text-warning">Nije sačuvan</b>
+      {% else %}<b>—</b>{% endif %}
+      <span class="muted">status izvještaja</span>
+    </div>
+  </div>
+  {% else %}
+  <div class="empty"><p>Mjesečni sažetak trenutno nije dostupan.</p></div>
+  {% endif %}
+</section>
+
+<div class="profile-grid">
+  <section class="card">
+    <div class="section-header">
+      <div><h2>Razred i profil</h2><p>Trenutna postavka učenika.</p></div>
+    </div>
+    {% if not grade_confirmed %}
+    <div class="banner warn">
+      {% if student.grade %}<strong>Trenutno zapisano: {{ student.grade }}. razred (nepotvrđeno)</strong>{% else %}<strong>Trenutno nije zapisan razred.</strong>{% endif %}
+      {% if name_note %}<div class="text-small" style="margin-top:.25rem">{% if name_note['kind'] == note_grade %}Broj u imenu: {{ name_note['grade'] }}. razred{% elif name_note['kind'] == note_unsupported %}Broj u imenu: {{ name_note['value'] }} — izvan podržanih razreda 6–9{% else %}Brojevi u imenu: {{ name_note['values']|join(', ') }} — nije jednoznačno{% endif %}</div>{% endif %}
+    </div>
     {% endif %}
-    {% if thinkific_linked %}<span class="pill" style="color:var(--ok)">Thinkific: povezan</span>
-    {% else %}<span class="pill">Thinkific: nije povezan</span>{% endif %}
-    <span class="pill">{{ account_type_labels[student.account_type] }}</span>
-  </p>
-  <p>
+    <form method="post" action="{{ url_for('admin_students.update_grade', student_id=student_id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="field">
+        <label for="profile-account-type">Vrsta naloga</label>
+        <select name="account_type" id="profile-account-type">
+          {% for value, label in account_type_labels.items() %}<option value="{{ value }}" {% if student.account_type == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+      </div>
+      <fieldset id="profile-grades" style="margin-top:.8rem" {% if student.account_type != student_type %}disabled{% endif %}>
+        <legend>Trenutni razred/i <span class="muted">(najviše 2)</span></legend>
+        <div class="chip-group">
+          {% for g in valid_grades %}<label><input type="checkbox" name="grades" value="{{ g }}" {% if g in preselected_grades %}checked{% endif %}><span>{{ g }}.</span></label>{% endfor %}
+        </div>
+      </fieldset>
+      <div class="actions" style="margin-top:.9rem">
+        <button type="submit">{% if grade_confirmed %}Sačuvaj profil{% else %}Sačuvaj i potvrdi{% endif %}</button>
+      </div>
+      <p class="field-hint">Mijenja samo profil; historija ostaje nepromijenjena.</p>
+    </form>
+  </section>
+
+  <section class="card">
+    <div class="section-header">
+      <div><h2>Izvještaj</h2><p>Tekući mjesec · {{ month }}</p></div>
+    </div>
     {% if student.account_type == student_type %}
-    <a href="{{ url_for('admin_reports.student_preview', student_id=student_id, month=month) }}">
-      <button type="button">Izvještaj</button></a>
+      {% if grade_confirmed %}
+      <div class="badge-row" style="margin-bottom:.8rem"><span class="badge badge--success">Profil spreman</span></div>
+      <a class="btn" href="{{ url_for('admin_reports.student_preview', student_id=student_id, month=month) }}">Otvori izvještaj</a>
+      {% else %}
+      <span class="badge badge--warning">Nedostaje potvrda razreda</span>
+      {% endif %}
     {% else %}
-      <span class="muted">Novi izvještaji su isključeni za ovaj nalog.</span>
+      <div class="badge-row" style="margin-bottom:.6rem"><span class="badge badge--neutral">Izvještaji isključeni</span></div>
+      <p class="muted">{% if student.account_type == 'SUPPORT' %}Izvještaji su isključeni za ovaj profil podrške.{% else %}Demo/test nalog. Izvještaji su isključeni za ovaj profil.{% endif %}</p>
       <a href="{{ url_for('admin_reports.student_preview', student_id=student_id, month=month) }}">Pregledaj postojeće izvještaje</a>
     {% endif %}
-  </p>
-  {# TEKUĆI razred je PROFIL, ne identitet. Mijenja se svjesno i mijenja SAMO
-     ovo polje — istorija časova, aktivnosti i snimaka ostaje netaknuta.
+  </section>
 
-     JEDNA FORMA ZA OBOJE (potvrda i izmjena). Nema odvojenog „potvrdi zatecenu
-     vrijednost" dugmeta: administrator mora vidjeti i izabrati broj koji
-     potvrdjuje, jer je zatecena sestica bas ono sto se provjerava. #}
-  {% if not grade_confirmed %}
-  <p style="margin:10px 0 4px 0">
-    {% if student.grade %}
-    <b>Trenutno zapisano: {{ student.grade }}. razred (nepotvrđeno)</b>
+  <section class="card">
+    <div class="section-header">
+      <div><h2>Thinkific</h2><p>Veza s nalogom za napredak.</p></div>
+      {% if thinkific_linked %}<span class="badge badge--success">Povezan</span>{% else %}<span class="badge badge--neutral">Nije povezan</span>{% endif %}
+    </div>
+    {% if not thinkific_linked %}
+    <form method="post" action="{{ url_for('admin_students.link_account', student_id=student_id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label for="profile-thinkific-email">Thinkific e-mail</label>
+      <input id="profile-thinkific-email" type="email" name="thinkific_email" maxlength="254" required autocomplete="off">
+      <button type="submit" class="btn btn--ghost" style="margin-top:.75rem">Poveži nalog</button>
+      <p class="field-hint">Adresa se poslije povezivanja nigdje ne prikazuje.</p>
+    </form>
     {% else %}
-    <b>Trenutno nije zapisan razred.</b>
+    <p class="muted">Napredak s povezanog naloga može se uključiti u mjesečni izvještaj.</p>
     {% endif %}
-    {% if name_note %}
-    <br>
-    <span class="muted">
-      {% if name_note['kind'] == note_grade %}Broj u imenu: {{ name_note['grade'] }}. razred
-      {% elif name_note['kind'] == note_unsupported %}Broj u imenu: {{ name_note['value'] }} — izvan podržanih razreda 6–9
-      {% else %}Brojevi u imenu: {{ name_note['values']|join(', ') }} — nije jednoznačno{% endif %}
-    </span>
-    {% endif %}
-  </p>
-  {% endif %}
+  </section>
 
-  <form method="post" action="{{ url_for('admin_students.update_grade', student_id=student_id) }}">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-    <label>Vrsta naloga<br><select name="account_type" id="profile-account-type">
-      {% for value, label in account_type_labels.items() %}<option value="{{ value }}" {% if student.account_type == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
-    </select></label>
-    <fieldset id="profile-grades" {% if student.account_type != student_type %}disabled{% endif %}>
-      <legend>Trenutni razred/i <span class="muted">(najviše 2)</span></legend>
-      {% for g in valid_grades %}<label style="display:inline-block;margin-right:.8rem"><input type="checkbox" name="grades" value="{{ g }}" {% if g in preselected_grades %}checked{% endif %}> {{ g }}. razred</label>{% endfor %}
-    </fieldset>
-    <button type="submit">{% if grade_confirmed %}Sačuvaj razred{% else %}Sačuvaj i potvrdi{% endif %}</button>
-    <span class="muted">Mijenja samo profil; stari časovi i izvještaji ostaju nepromijenjeni.</span>
-  </form>
-  <script>
-    (function () {
-      var type = document.getElementById("profile-account-type");
-      var grades = document.getElementById("profile-grades");
-      function syncType(){grades.disabled = type.value !== "STUDENT";}
-      type.addEventListener("change", syncType);
-      grades.addEventListener("change", function(event){
-        if(grades.querySelectorAll("input:checked").length > 2) event.target.checked=false;
-      });
-      syncType();
-    })();
-  </script>
-
-  {% if student.account_type == student_type and grade_status == status_unconfirmed %}
-  <div class="banner warn" style="margin-top:10px">
-    Trenutni razred nije potvrđen. Unos časa i novi izvještaj za roditelja
-    traže potvrđen razred.
-  </div>
-  {% endif %}
-
-  {# SADRZAJ KOJI JE UCENIK KORISTIO. NIJE prijedlog razreda i NIJE greska:
-     ucenik sedmog razreda legitimno obnavlja gradivo sestog. #}
-  {% if grade_content %}
-  <div class="card" style="margin-top:10px">
-    <p style="margin:0 0 6px 0"><b>Korišteno gradivo</b>
-      <span class="muted">(sadržaj, ne trenutni razred)</span></p>
-    <ul style="margin:0">
-      {% if grade_evidence.thinkific.month %}
-      <li>Thinkific:
-        {% if grade_evidence.thinkific.grade %}{{ grade_evidence.thinkific.grade }}. razred
-        {% else %}više razreda{% endif %} ({{ grade_evidence.thinkific.month }})</li>
-      {% endif %}
-      {% if grade_evidence.assessment.month %}
-      <li>Kontrolni:
-        {% if grade_evidence.assessment.grade %}{{ grade_evidence.assessment.grade }}. razred
-        {% else %}više razreda{% endif %} ({{ grade_evidence.assessment.month }})</li>
-      {% endif %}
-      {% if grade_evidence.matbot.month %}
-      <li>MAT-BOT:
-        {% if grade_evidence.matbot.grade %}{{ grade_evidence.matbot.grade }}. razred
-        {% else %}više razreda{% endif %} ({{ grade_evidence.matbot.month }})</li>
-      {% endif %}
-    </ul>
-    {% if grade_status == status_mismatch %}
-    <p class="muted" style="margin:6px 0 0 0">
-      Gradivo se razlikuje od potvrđenog razreda. To je uobičajeno kod
-      obnavljanja ili pripreme i profil se zbog toga ne mijenja.
-    </p>
-    {% endif %}
-  </div>
-  {% endif %}
-
-  {% if not thinkific_linked %}
-  <form method="post" action="{{ url_for('admin_students.link_account', student_id=student_id) }}">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-    <label>Poveži Thinkific nalog<br>
-      <input type="email" name="thinkific_email" maxlength="254" required style="width:50%">
-    </label>
-    <button type="submit">Poveži</button>
-    <span class="muted">Adresa se poslije povezivanja nigdje ne prikazuje.</span>
-  </form>
-  {% endif %}
-</div>
-
-<div class="card">
-  <div class="top" style="margin-bottom:.2rem">
-    <h3 style="margin:0">Evidencija časa</h3>
-    {# POJEDINAČNI UNOS OSTAJE (ispravke i izuzeci); brzi put je za cijeli čas. #}
+  <section class="card">
+    <div class="section-header">
+      <div><h2>Aktivnost</h2><p>Evidentirane individualne sesije.</p></div>
+      <strong class="metric__value" style="font-size:1.35rem">{{ sessions|length }}</strong>
+    </div>
     {% if student.grades|length == 1 %}
-    <a href="{{ url_for('admin_sessions.new_class', grade=student.grades[0]) }}">Upiši čas za više učenika →</a>
+    <a class="btn btn--ghost" href="{{ url_for('admin_sessions.new_class', grade=student.grades[0]) }}">Upiši čas za više učenika →</a>
     {% elif student.grades|length > 1 %}
-    <span>{% for g in student.grades %}<a href="{{ url_for('admin_sessions.new_class', grade=g) }}">Upiši čas za {{ g }}. razred →</a>{% if not loop.last %} · {% endif %}{% endfor %}</span>
+    <div class="actions">{% for g in student.grades %}<a class="btn btn--ghost" href="{{ url_for('admin_sessions.new_class', grade=g) }}">Upiši čas za {{ g }}. razred →</a>{% endfor %}</div>
     {% endif %}
-  </div>
-  {% if student.account_type != student_type %}
-  <p class="banner warn">Evidencija novih učeničkih časova nije potrebna za PODRŠKA/TEST nalog. Historija ostaje sačuvana.</p>
-  {% elif not grade_confirmed %}
-  {# BEZ POTVRĐENOG RAZREDA NEMA KURIKULUMA. Zatecena cifra bi instruktoru dala
-     gradivo tudje generacije, pa se forma ne nudi. #}
-  <p class="banner err">Potrebno je potvrditi trenutni razred učenika prije unosa časa.</p>
-  {% else %}
-  <form method="post" action="{{ url_for('admin_students.create_session', student_id=student_id) }}">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-    {% if student.grades|length > 1 %}<p><label>Razred časa<br><select name="session_grade" id="session-grade" onchange="matbotFillAreas()" required>{% for g in student.grades %}<option value="{{ g }}">{{ g }}. razred</option>{% endfor %}</select></label></p>{% else %}<input type="hidden" name="session_grade" id="session-grade" value="{{ student.grades[0] }}">{% endif %}
-    <p><label>Datum<br><input type="date" name="session_date" required></label></p>
-    {# OBAVEZNO od verzije 5 — vidi `_session_from_form`. #}
-    <p><label>Vrijeme<br><input type="time" name="session_time" required></label></p>
-    <p>
-      Prisustvo<br>
-      <label><input type="radio" name="attendance" value="present" checked
-                    onclick="document.getElementById('act').disabled=false"> Prisutan</label>
-      {# Odsutan učenik NEMA angažman: polje se prazni i onemogućuje. Server to
-         svejedno provjerava ponovo — klijent nije autoritet. #}
-      <label><input type="radio" name="attendance" value="absent"
-                    onclick="var a=document.getElementById('act');a.value='';a.disabled=true"> Odsutan</label>
-    </p>
-    <p>
-      <label>Aktivnost na času <span class="muted">(angažman, nije ocjena iz matematike)</span><br>
-        <select name="activity_rating" id="act">
-          <option value="">—</option>
-          {% for value, text in activity_labels.items() %}
-          <option value="{{ value }}">{{ value }} — {{ text }}</option>
-          {% endfor %}
-        </select>
-      </label>
-    </p>
-    <p>
-      Zadaća<br>
-      {% for value, text in homework_labels.items() %}
-      <label><input type="radio" name="homework_status" value="{{ value }}"
-                    {% if value == 'not_assigned' %}checked{% endif %}> {{ text }}</label>
-      {% endfor %}
-    </p>
-    {# KANONSKI IZBOR, ne slobodan tekst: mjesečno grupisanje po oblastima u
-       izvještaju roditelju oslanja se na to da su nazivi svuda isti. Izbornici
-       su POGODNOST — server svejedno provjerava par (oblast, lekcija) prema
-       razredu učenika. #}
-    <p>
-      <label>Oblast<br>
-        <select name="area_name" id="area" onchange="matbotFillLessons()">
-          <option value="">—</option>
-          {% for area in areas %}<option value="{{ area }}">{{ area }}</option>{% endfor %}
-        </select>
-      </label>
-    </p>
-    <p>
-      <label>Lekcija<br>
-        <select name="lesson_name" id="lesson"><option value="">—</option></select>
-      </label>
-    </p>
-    <p><label>Komentar<br><textarea name="comment" rows="3" maxlength="1000" style="width:100%"></textarea></label></p>
-    <p><button type="submit">Sačuvaj čas</button></p>
-  </form>
-  {# Mali lokalni skript, bez ijednog frameworka: lekcije se filtriraju po
-     izabranoj oblasti. Podaci dolaze iz kurikuluma servera. #}
-  <script type="application/json" id="curricula">{{ curricula|tojson }}</script>
-  <script>
-    function matbotFillAreas() {
-      var all = JSON.parse(document.getElementById("curricula").textContent);
-      var grade = document.getElementById("session-grade").value;
-      var data = all[grade] || {};
-      var area = document.getElementById("area");
-      area.innerHTML = "";
-      var blank = document.createElement("option"); blank.value = ""; blank.textContent = "—"; area.appendChild(blank);
-      Object.keys(data).forEach(function (title) { var option = document.createElement("option"); option.value = title; option.textContent = title; area.appendChild(option); });
-      matbotFillLessons();
-    }
-    function matbotFillLessons() {
-      var all = JSON.parse(document.getElementById("curricula").textContent);
-      var data = all[document.getElementById("session-grade").value] || {};
-      var area = document.getElementById("area").value;
-      var lesson = document.getElementById("lesson");
-      lesson.innerHTML = "";
-      var blank = document.createElement("option");
-      blank.value = ""; blank.textContent = "—";
-      lesson.appendChild(blank);
-      (data[area] || []).forEach(function (title) {
-        var option = document.createElement("option");
-        option.value = title; option.textContent = title;
-        lesson.appendChild(option);
-      });
-    }
-    matbotFillAreas();
-  </script>
-  {% endif %}
+  </section>
 </div>
 
-<div class="card">
-  <h3 style="margin-top:0">Historija časova ({{ sessions|length }})</h3>
+{% if grade_content %}
+<details class="card disclosure">
+  <summary>Prikaži detalje korištenog gradiva</summary>
+  <div class="disclosure__content">
+    <h3>Korišteno gradivo <span class="muted">(sadržaj, ne trenutni razred)</span></h3>
+    <ul>
+      {% if grade_evidence.thinkific.month %}<li>Thinkific: {% if grade_evidence.thinkific.grade %}{{ grade_evidence.thinkific.grade }}. razred{% else %}više razreda{% endif %} ({{ grade_evidence.thinkific.month }})</li>{% endif %}
+      {% if grade_evidence.assessment.month %}<li>Kontrolni: {% if grade_evidence.assessment.grade %}{{ grade_evidence.assessment.grade }}. razred{% else %}više razreda{% endif %} ({{ grade_evidence.assessment.month }})</li>{% endif %}
+      {% if grade_evidence.matbot.month %}<li>MAT-BOT: {% if grade_evidence.matbot.grade %}{{ grade_evidence.matbot.grade }}. razred{% else %}više razreda{% endif %} ({{ grade_evidence.matbot.month }})</li>{% endif %}
+    </ul>
+    {% if grade_status == status_mismatch %}<p class="muted">Gradivo se razlikuje od potvrđenog razreda. To je uobičajeno kod obnavljanja ili pripreme i profil se zbog toga ne mijenja.</p>{% endif %}
+  </div>
+</details>
+{% endif %}
+
+<details class="card disclosure" {% if not sessions %}open{% endif %}>
+  <summary>Dodaj pojedinačni čas</summary>
+  <div class="disclosure__content">
+    {% if student.account_type != student_type %}
+    <p class="banner warn">Evidencija novih učeničkih časova nije potrebna za PODRŠKA/TEST nalog. Historija ostaje sačuvana.</p>
+    {% elif not grade_confirmed %}
+    <p class="banner err">Potrebno je potvrditi trenutni razred učenika prije unosa časa.</p>
+    {% else %}
+    <form method="post" action="{{ url_for('admin_students.create_session', student_id=student_id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="form-grid">
+        {% if student.grades|length > 1 %}
+        <div class="field"><label for="session-grade">Razred časa</label><select name="session_grade" id="session-grade" onchange="matbotFillAreas()" required>{% for g in student.grades %}<option value="{{ g }}">{{ g }}. razred</option>{% endfor %}</select></div>
+        {% else %}<input type="hidden" name="session_grade" id="session-grade" value="{{ student.grades[0] }}">{% endif %}
+        <div class="field"><label for="session-date">Datum</label><input id="session-date" type="date" name="session_date" required></div>
+        <div class="field"><label for="session-time">Vrijeme</label><input id="session-time" type="time" name="session_time" required></div>
+        <fieldset><legend>Prisustvo</legend>
+          <div class="seg">
+            <input id="attendance-present" type="radio" name="attendance" value="present" checked onclick="document.getElementById('act').disabled=false"><label for="attendance-present">Prisutan</label>
+            <input id="attendance-absent" type="radio" name="attendance" value="absent" onclick="var a=document.getElementById('act');a.value='';a.disabled=true"><label for="attendance-absent">Odsutan</label>
+          </div>
+        </fieldset>
+        <div class="field"><label for="act">Aktivnost na času <span class="muted">(angažman)</span></label><select name="activity_rating" id="act"><option value="">—</option>{% for value, text in activity_labels.items() %}<option value="{{ value }}">{{ value }} — {{ text }}</option>{% endfor %}</select></div>
+        <fieldset><legend>Zadaća</legend><div class="seg">{% for value, text in homework_labels.items() %}<input id="homework-{{ value }}" type="radio" name="homework_status" value="{{ value }}" {% if value == 'not_assigned' %}checked{% endif %}><label for="homework-{{ value }}">{{ text }}</label>{% endfor %}</div></fieldset>
+        <div class="field"><label for="area">Oblast</label><select name="area_name" id="area" onchange="matbotFillLessons()"><option value="">—</option>{% for area in areas %}<option value="{{ area }}">{{ area }}</option>{% endfor %}</select></div>
+        <div class="field"><label for="lesson">Lekcija</label><select name="lesson_name" id="lesson"><option value="">—</option></select></div>
+      </div>
+      <div class="field" style="margin-top:.8rem"><label for="session-comment">Komentar</label><textarea id="session-comment" name="comment" rows="3" maxlength="1000"></textarea></div>
+      <button type="submit" style="margin-top:.8rem">Sačuvaj čas</button>
+    </form>
+    <script type="application/json" id="curricula">{{ curricula|tojson }}</script>
+    <script>
+      function matbotFillAreas(){var all=JSON.parse(document.getElementById("curricula").textContent),grade=document.getElementById("session-grade").value,data=all[grade]||{},area=document.getElementById("area");area.innerHTML="";var blank=document.createElement("option");blank.value="";blank.textContent="—";area.appendChild(blank);Object.keys(data).forEach(function(title){var option=document.createElement("option");option.value=title;option.textContent=title;area.appendChild(option);});matbotFillLessons();}
+      function matbotFillLessons(){var all=JSON.parse(document.getElementById("curricula").textContent),data=all[document.getElementById("session-grade").value]||{},area=document.getElementById("area").value,lesson=document.getElementById("lesson");lesson.innerHTML="";var blank=document.createElement("option");blank.value="";blank.textContent="—";lesson.appendChild(blank);(data[area]||[]).forEach(function(title){var option=document.createElement("option");option.value=title;option.textContent=title;lesson.appendChild(option);});}
+      matbotFillAreas();
+    </script>
+    {% endif %}
+  </div>
+</details>
+
+<section class="card">
+  <div class="section-header"><div><h2>Historija časova</h2><p>{{ sessions|length }} evidentiranih sesija.</p></div></div>
   {% if sessions %}
-  <table>
-    <tr><th>Datum</th><th>Prisustvo</th><th>Aktivnost</th><th>Zadaća</th>
-        <th>Gradivo</th><th>Komentar</th><th></th></tr>
-    {% for s in sessions %}
+  <div class="table-wrap"><table class="responsive-table">
+    <thead><tr><th>Datum</th><th>Prisustvo</th><th>Aktivnost</th><th>Zadaća</th><th>Gradivo</th><th>Komentar</th><th></th></tr></thead>
+    <tbody>{% for s in sessions %}
     <tr>
-      <td>{{ s.session_date }}</td>
-      <td>{{ attendance_labels.get(s.attendance, s.attendance) }}</td>
-      <td>{% if s.activity_rating %}{{ s.activity_rating }}/5{% else %}<span class="muted">—</span>{% endif %}</td>
-      <td>{{ homework_labels.get(s.homework_status, s.homework_status) }}</td>
-      <td>
-        {{ s.area_name or "" }}{% if s.lesson_name %} · {{ s.lesson_name }}{% endif %}
-      </td>
-      {# Jinja escapuje po podrazumijevanoj postavci — komentar instruktora je
-         slobodan tekst i nikad se ne renderuje kao HTML. #}
-      <td>{{ s.comment or "" }}</td>
-      <td>
-        <form method="post" style="display:inline"
-              action="{{ url_for('admin_students.delete_session', student_id=student_id, session_id=s.id) }}"
-              onsubmit="return confirm('Obrisati ovaj čas? Ova radnja se ne može poništiti.')">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-          <button type="submit">Obriši</button>
-        </form>
-      </td>
+      <td class="cell-primary" data-label="Datum"><span class="cell-title">{{ s.session_date }}</span></td>
+      <td data-label="Prisustvo">{{ attendance_labels.get(s.attendance, s.attendance) }}</td>
+      <td data-label="Aktivnost">{% if s.activity_rating %}{{ s.activity_rating }}/5{% else %}<span class="muted">—</span>{% endif %}</td>
+      <td data-label="Zadaća">{{ homework_labels.get(s.homework_status, s.homework_status) }}</td>
+      <td data-label="Gradivo">{{ s.area_name or "" }}{% if s.lesson_name %} · {{ s.lesson_name }}{% endif %}</td>
+      <td data-label="Komentar">{{ s.comment or "" }}</td>
+      <td data-label="Radnje"><form method="post" action="{{ url_for('admin_students.delete_session', student_id=student_id, session_id=s.id) }}" onsubmit="return confirm('Obrisati ovaj čas? Ova radnja se ne može poništiti.')"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button type="submit" class="btn btn--danger">Obriši</button></form></td>
     </tr>
-    {% endfor %}
-  </table>
-  {% else %}
-  <p class="muted">Nema evidentiranih časova.</p>
-  {% endif %}
-</div>
+    {% endfor %}</tbody>
+  </table></div>
+  {% else %}<div class="empty"><strong>Nema evidentiranih časova</strong><p>Individualna historija će se pojaviti nakon prvog unosa.</p></div>{% endif %}
+</section>
+
+<script>
+(function(){
+  var type=document.getElementById("profile-account-type"),grades=document.getElementById("profile-grades");
+  function syncType(){grades.disabled=type.value!=="STUDENT";}
+  type.addEventListener("change",syncType);
+  grades.addEventListener("change",function(event){if(grades.querySelectorAll("input:checked").length>2)event.target.checked=false;});
+  syncType();
+})();
+</script>
 {% endblock %}

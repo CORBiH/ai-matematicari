@@ -1,5 +1,6 @@
 {% extends "admin_base.html" %}
 {% set nav_active = 'classes' %}
+{% set nav_month = occurrence.session_date[:7] %}
 {% block title %}MAT-BOT — Poveži raniji čas{% endblock %}
 {% block heading %}Poveži raniji čas{% endblock %}
 {% block subheading %}
@@ -10,24 +11,6 @@
 </p>
 {% endblock %}
 {% block content %}
-
-<style>
-  .who{font-weight:600}
-  .rowcards{display:none}
-  .stucard{border:1px solid var(--card-border);border-radius:12px;
-           padding:.75rem .85rem;margin-bottom:.55rem;background:var(--input-bg)}
-  .stucard .line{font-size:.88rem;color:var(--muted)}
-  /* Isto pravilo kao na stranici upisa časa — bez njega padajući meni ostane
-     bijeli sistemski, jedini svijetli element na tamnoj stranici. */
-  select{width:100%;background:var(--input-bg);color:var(--text);
-    border:1px solid var(--input-border);border-radius:10px;
-    padding:.55rem .7rem;font:inherit}
-  .gradepick{max-width:320px}
-  @media (max-width:720px){
-    .desk{display:none}
-    .rowcards{display:block}
-  }
-</style>
 
 {% if error %}<div class="banner err">{{ error }}</div>{% endif %}
 

@@ -16,7 +16,7 @@ import re
 
 import pytest
 
-from matbot import activity, admin_auth, report_input, reporting_db
+from matbot import activity, admin_auth, admin_reports, report_input, reporting_db
 from matbot.api import _kontrolni_attempt
 from matbot.student_identity import PROVIDER_THINKIFIC_EMAIL
 
@@ -411,6 +411,34 @@ def test_population_uses_display_name_when_present(admin, db):
     _upload(admin, files={"grade_6": (simple_csv(first="Ana", last="Anić"), "a.csv")})
     html = admin.get("/admin/reports/students?month=2026-09").get_data(as_text=True)
     assert "Ana Anić" in html
+
+
+def test_dashboard_and_month_list_show_saved_report_status(
+        admin, db, monkeypatch):
+    from tests.test_monthly_reports_contract import (
+        PRODUCTION_DDL, PRODUCTION_INDEX)
+
+    database = reporting_db.get_database()
+    conn = database._connection()
+    conn.execute("DROP TABLE monthly_reports")
+    conn.execute(PRODUCTION_DDL)
+    conn.execute(PRODUCTION_INDEX)
+    conn.commit()
+    student_id = _seed_matbot_only(db)
+    database.save_monthly_report(
+        student_id=student_id, report_month="2026-09",
+        metrics_json="{}", ai_summary="{}")
+
+    assert database.fetch_monthly_report_student_ids("2026-09") == {student_id}
+    monkeypatch.setattr(admin_reports, "_default_month", lambda: "2026-09")
+
+    dashboard = admin.get("/admin/reports").get_data(as_text=True)
+    listing = admin.get(
+        "/admin/reports/students?month=2026-09").get_data(as_text=True)
+
+    assert "1 / 1" in dashboard
+    assert "Izvještaji za ovaj mjesec" in dashboard
+    assert "Sačuvan" in listing
 
 
 def test_population_rejects_malformed_month(admin, db):

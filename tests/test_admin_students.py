@@ -105,6 +105,15 @@ def test_registry_lists_students(admin, db):
     assert "Sintetički Učenik".encode() in response.data
 
 
+def test_profile_prioritizes_current_month_summary(admin, db):
+    student_id = db.create_student("Mjesečni Sažetak", 7)
+    html = admin.get("/admin/students/%d" % student_id).get_data(as_text=True)
+
+    for label in ("Ovaj mjesec", "aktivnih dana", "evidentiranih časova",
+                  "zadataka", "kontrolnih", "status izvještaja"):
+        assert label in html
+
+
 # ---------------------------------------------------------------------------
 # Ručni upis i povezivanje
 # ---------------------------------------------------------------------------
