@@ -14,6 +14,7 @@
 {% endblock %}
 {% block topright %}
   {% if payload and saved %}
+  <a class="btn btn--ghost" target="_blank" rel="noopener" href="{{ url_for('admin_reports.report_pdf_download', student_id=payload.student_id, month=month, preview=1) }}">Pregled izvještaja</a>
   <a class="btn" href="{{ url_for('admin_reports.report_pdf_download', student_id=payload.student_id, month=month) }}">Preuzmi PDF</a>
   <a class="btn btn--ghost" href="#report-editor">Uredi</a>
   {% endif %}
@@ -38,11 +39,12 @@
 {% endif %}
 
 {% if saved %}
-<article class="report-document">
+<article class="report-document" id="report-preview">
   <header class="report-document__header">
-    <p class="page-eyebrow">Mjesečni izvještaj</p>
+    <p class="page-eyebrow">Pregled tekstualnih sekcija</p>
     <h2 style="font-size:1.45rem">{{ label }}</h2>
     <p class="muted">{{ month_label }} · {% if payload.profile.grades %}{{ payload.profile.grades|join('. razred + ') }}. razred{% elif payload.profile.grade %}{{ payload.profile.grade }}. razred{% endif %}</p>
+    <p class="field-hint">Konačan izgled sa svim sačuvanim statistikama i zapažanjima otvorite putem „Pregled izvještaja”.</p>
   </header>
   <section class="report-document__section">
     <h2>Pregled mjeseca</h2>
@@ -145,25 +147,32 @@
 
 {% if saved %}
 <details class="card disclosure report-editor" id="report-editor" {% if ai_error %}open{% endif %}>
-  <summary>Uredi sadržaj izvještaja</summary>
+  <summary>Uredi izvještaj</summary>
   <div class="disclosure__content">
-    <form method="post" action="{{ url_for('admin_reports.save_report', student_id=payload.student_id, month=month) }}">
+    <p class="field-hint report-metadata-note">Ime učenika, razred i period dolaze iz registra i ovdje se ne mijenjaju. Sve tekstualne sekcije izvještaja možete urediti.</p>
+    <form id="report-edit-form" method="post" action="{{ url_for('admin_reports.save_report', student_id=payload.student_id, month=month) }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
       <fieldset {% if not reporting_enabled %}disabled{% endif %}>
-        <label for="report-summary">Sažetak</label>
-        <textarea id="report-summary" name="summary" rows="5">{{ saved.narrative.summary }}</textarea>
-        <label for="report-strengths" style="margin-top:.8rem">Šta ide dobro <span class="muted">(jedna stavka po redu)</span></label>
-        <textarea id="report-strengths" name="strengths" rows="3">{{ saved.narrative.strengths | join('
-') }}</textarea>
-        <label for="report-focus" style="margin-top:.8rem">Na čemu treba raditi <span class="muted">(jedna stavka po redu)</span></label>
-        <textarea id="report-focus" name="focus_areas" rows="3">{{ saved.narrative.focus_areas | join('
-') }}</textarea>
-        <label for="report-next" style="margin-top:.8rem">Preporuke za naredni mjesec <span class="muted">(jedna stavka po redu)</span></label>
-        <textarea id="report-next" name="next_month_recommendations" rows="3">{{ saved.narrative.next_month_recommendations | join('
-') }}</textarea>
+        {% for field in narrative_fields %}
+        <div class="report-edit-field">
+          <label for="report-{{ field.name }}">{{ field.label }}</label>
+          <textarea id="report-{{ field.name }}" name="{{ field.name }}" rows="{{ field.rows }}">{% if field.kind == 'items' %}{{ saved.narrative[field.name] | join('\n') }}{% else %}{{ saved.narrative[field.name] }}{% endif %}</textarea>
+          <p class="field-hint">{{ field.hint }}</p>
+        </div>
+        {% endfor %}
+        {% if saved.parent_comments %}
+        <div class="report-edit-field">
+          <h3>Zapažanja sa časova</h3>
+          <p class="field-hint">Izmjene važe samo za ovaj izvještaj. Izvorna evidencija časa ostaje nepromijenjena.</p>
+          {% for entry in saved.parent_comments %}
+          <label for="parent-comment-{{ loop.index0 }}" style="margin-top:.8rem">Zapažanje od {{ entry.date }}</label>
+          <textarea id="parent-comment-{{ loop.index0 }}" name="parent_comment_{{ loop.index0 }}" rows="3" maxlength="{{ max_parent_comment_chars }}">{{ entry.comment[:max_parent_comment_chars] }}</textarea>
+          {% endfor %}
+        </div>
+        {% endif %}
         <label for="report-comment" style="margin-top:.8rem">Komentar instruktora <span class="muted">(AI ga ne mijenja)</span></label>
         <textarea id="report-comment" name="instructor_comment" rows="3">{{ saved.instructor_comment }}</textarea>
-        {% if reporting_enabled %}<button type="submit" style="margin-top:.8rem">Sačuvaj nacrt</button>{% endif %}
+        {% if reporting_enabled %}<div class="actions" style="margin-top:.8rem"><button type="submit">Sačuvaj izmjene</button><button type="button" class="btn btn--ghost" id="cancel-report-edit">Otkaži</button><a class="btn btn--quiet" target="_blank" rel="noopener" href="{{ url_for('admin_reports.report_pdf_download', student_id=payload.student_id, month=month, preview=1) }}">Pregled izvještaja</a></div>{% endif %}
       </fieldset>
     </form>
     <div class="section-header" style="margin:1rem 0 0">
@@ -183,6 +192,17 @@
     </div>
   </div>
 </details>
+<script>
+(function(){
+  var form=document.getElementById('report-edit-form');if(!form)return;
+  var initial=new FormData(form),dirty=false;
+  function changed(){var now=new FormData(form);for(var pair of initial.entries()){if(now.get(pair[0])!==pair[1])return true;}return false;}
+  form.addEventListener('input',function(){dirty=changed();});
+  form.addEventListener('submit',function(){dirty=false;});
+  window.addEventListener('beforeunload',function(event){if(!dirty)return;event.preventDefault();event.returnValue='';});
+  var cancel=document.getElementById('cancel-report-edit');if(cancel)cancel.addEventListener('click',function(){if(dirty&&!window.confirm('Odbaciti nesačuvane izmjene?'))return;form.reset();dirty=false;document.getElementById('report-editor').open=false;location.hash='report-preview';});
+})();
+</script>
 {% endif %}
 {% endif %}
 {% endblock %}

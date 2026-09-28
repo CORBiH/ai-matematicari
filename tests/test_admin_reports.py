@@ -445,6 +445,87 @@ def test_population_rejects_malformed_month(admin, db):
     assert admin.get("/admin/reports/students?month=rujan").status_code == 400
 
 
+def _seed_filter_student(name, grade, account_type, event_key, email):
+    database = reporting_db.get_database()
+    student_id = database.create_student(name, grade, email)
+    if account_type != reporting_db.ACCOUNT_TYPE_STUDENT:
+        database.set_student_account_types([student_id], account_type)
+    database.record_learning_activity(student_id, [
+        activity.ActivityEvent(
+            activity.PRACTICE_TASK_PRESENTED, event_key, mode="practice",
+            grade=grade, occurred_at="2026-09-10 10:00:00")])
+    return student_id
+
+
+def test_report_filters_share_grade_and_account_type_rules(admin, db):
+    _seed_filter_student("Redovni Sedam", 7, "STUDENT", "filter-r7",
+                         "regular7@example.com")
+    _seed_filter_student("Redovni Šest", 6, "STUDENT", "filter-r6",
+                         "regular6@example.com")
+    _seed_filter_student("Podrška Sedam", 7, "SUPPORT", "filter-s7",
+                         "support7@example.com")
+    _seed_filter_student("Test Sedam", 7, "TEST", "filter-t7",
+                         "test7@example.com")
+
+    default = admin.get(
+        "/admin/reports/students?month=2026-09&grade=7").get_data(as_text=True)
+    assert "Redovni Sedam" in default
+    assert "Redovni Šest" not in default
+    assert "Podrška Sedam" not in default
+    assert "Test Sedam" not in default
+
+    included = admin.get(
+        "/admin/reports/students?month=2026-09&grade=7&"
+        "include_support=1&include_test=1").get_data(as_text=True)
+    assert "Redovni Sedam" in included
+    assert "Podrška Sedam" in included
+    assert "Test Sedam" in included
+    assert included.count("disabled title=\"Izvještaji su isključeni") == 2
+    assert "Posebni nalozi prikazani su samo informativno" in included
+
+
+def test_student_without_period_data_is_not_silently_hidden(admin, db):
+    database = reporting_db.get_database()
+    database.create_student("Bez Podataka", 7, "no-data@example.com")
+    _seed_filter_student("Ima Podatke", 7, "STUDENT", "has-period-data",
+                         "has-data@example.com")
+    html = admin.get(
+        "/admin/reports/students?month=2026-09&grade=7").get_data(as_text=True)
+    assert "Ima Podatke" in html
+    assert "Bez Podataka" not in html
+    assert "Prikazani su učenici koji imaju podatke za odabrani period" in html
+    assert "bez časa, aktivnosti, kontrolnog ili Thinkific podataka" in html
+
+
+def test_report_search_accepts_email_without_returning_account_data(admin, db):
+    _seed_filter_student("Traženi Učenik", 7, "STUDENT", "filter-search",
+                         "known-address@example.com")
+    _seed_filter_student("Drugi Učenik", 7, "STUDENT", "filter-other",
+                         "other-address@example.com")
+    html = admin.get(
+        "/admin/reports/students?month=2026-09&search=known-address%40example.com"
+        ).get_data(as_text=True)
+    assert "Traženi Učenik" in html
+    assert "Drugi Učenik" not in html
+
+
+def test_filtered_csv_uses_the_same_grade_and_type_selection(admin, db):
+    _seed_filter_student("CSV Redovni", 7, "STUDENT", "csv-r7",
+                         "csv-r7@example.com")
+    _seed_filter_student("CSV Podrška", 7, "SUPPORT", "csv-s7",
+                         "csv-s7@example.com")
+    _seed_filter_student("CSV Šesti", 6, "STUDENT", "csv-r6",
+                         "csv-r6@example.com")
+
+    response = admin.get(
+        "/admin/reports/students.csv?month=2026-09&grade=7")
+    text = response.data.decode("utf-8-sig")
+    assert response.mimetype == "text/csv"
+    assert "CSV Redovni" in text
+    assert "CSV Podrška" not in text
+    assert "CSV Šesti" not in text
+
+
 # ---------------------------------------------------------------------------
 # 36-41) Pregled jednog učenika
 # ---------------------------------------------------------------------------

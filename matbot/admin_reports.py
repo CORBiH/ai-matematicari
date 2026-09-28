@@ -16,10 +16,13 @@ MIGRACIJA SE NIKAD NE POKREĆE IZ WEB ZAHTJEVA. Ako je baza još na šemi v1,
 stranica to KAŽE i onemogući uvoz; nadogradnja šeme ostaje svjesna operacija
 pri deployu, ne nusproizvod prvog uploada.
 """
+import csv
+import io
 import logging
+import zipfile
 
-from flask import (Blueprint, abort, redirect, render_template, request,
-                   session, url_for)
+from flask import (Blueprint, Response, abort, jsonify, redirect,
+                   render_template, request, url_for)
 
 from matbot import admin_auth, config, parent_report, report_input, reporting_db
 from matbot import report_facts, student_grades
@@ -48,6 +51,18 @@ COURSE_FIELDS = (
 MAX_CSV_BYTES = 2 * 1024 * 1024
 MAX_TOTAL_UPLOAD_BYTES = 4 * MAX_CSV_BYTES
 ALLOWED_EXTENSIONS = (".csv",)
+
+# Granice su namjerno niže od tehničkih mogućnosti servera. Pregledač šalje
+# generisanje redom, jednog učenika po zahtjevu, a server svejedno odbija
+# prevelik ili ručno sastavljen paket.
+MAX_BULK_GENERATE = 50
+MAX_BULK_EXPORT = 100
+VALID_REPORT_GRADES = (6, 7, 8, 9)
+ACCOUNT_TYPE_LABELS = {
+    reporting_db.ACCOUNT_TYPE_STUDENT: "Redovni učenik",
+    reporting_db.ACCOUNT_TYPE_SUPPORT: "Podrška",
+    reporting_db.ACCOUNT_TYPE_TEST: "Test",
+}
 
 STATUS_FULL = "full"
 STATUS_PARTIAL = "partial"
@@ -334,6 +349,96 @@ def _render_result(summary, outcome, upload_errors, *, month, schema):
 # ---------------------------------------------------------------------------
 # Populacija i pregled
 # ---------------------------------------------------------------------------
+def _student_filters(args):
+    """Jedan provjeren skup filtera za HTML listu i CSV izvoz."""
+    raw_grade = (args.get("grade") or "").strip()
+    if raw_grade:
+        try:
+            grade = int(raw_grade)
+        except ValueError:
+            raise ValueError("grade") from None
+        if grade not in VALID_REPORT_GRADES:
+            raise ValueError("grade")
+    else:
+        grade = None
+
+    raw_confirmed = (args.get("grade_status") or "all").strip().lower()
+    if raw_confirmed not in ("all", "confirmed", "unconfirmed"):
+        raise ValueError("grade_status")
+    confirmed = {"all": None, "confirmed": True,
+                 "unconfirmed": False}[raw_confirmed]
+    search = (args.get("search") or "").strip()
+    if len(search) > 120:
+        raise ValueError("search")
+    return {
+        "grade": grade,
+        "grade_status": raw_confirmed,
+        "confirmed": confirmed,
+        "search": search,
+        # Redovni učenici su uvijek uključeni. Posebni nalozi se prikazuju
+        # samo na izričit zahtjev i ostaju nepodobni za novi izvještaj.
+        "include_support": args.get("include_support") == "1",
+        "include_test": args.get("include_test") == "1",
+    }
+
+
+def _filter_account_types(filters):
+    values = [reporting_db.ACCOUNT_TYPE_STUDENT]
+    if filters["include_support"]:
+        values.append(reporting_db.ACCOUNT_TYPE_SUPPORT)
+    if filters["include_test"]:
+        values.append(reporting_db.ACCOUNT_TYPE_TEST)
+    return tuple(values)
+
+
+def _filtered_report_rows(month, filters, database):
+    """Isti redovi hrane tabelu, CSV i izbor u pregledaču."""
+    account_types = _filter_account_types(filters)
+    population = set(report_input.report_population(
+        month, database=database, account_types=account_types))
+    registry = database.list_students(
+        search=filters["search"], grade=filters["grade"],
+        confirmed=filters["confirmed"], active=True)
+    registry = [row for row in registry
+                if row["student_id"] in population
+                and row.get("account_type") in account_types]
+    try:
+        summaries = database.fetch_monthly_report_summaries(month)
+    except reporting_db.ReportingUnavailable:
+        summaries = None
+
+    rows = []
+    for student in registry:
+        student_id = student["student_id"]
+        payload = report_input.build_report_input(student_id, month,
+                                                  database=database)
+        matbot = payload["matbot"]
+        thinkific = payload["thinkific"]
+        report_summary = (None if summaries is None
+                          else summaries.get(student_id))
+        account_type = (student.get("account_type")
+                        or reporting_db.ACCOUNT_TYPE_STUDENT)
+        rows.append({
+            "student_id": student_id,
+            "label": _student_label(payload["profile"], student_id),
+            "grade": payload["profile"].get("grade"),
+            "grades": payload["profile"].get("grades") or [],
+            "grade_confirmed": payload["profile"].get("grade_confirmed", False),
+            "account_type": account_type,
+            "reporting_enabled": account_type == reporting_db.ACCOUNT_TYPE_STUDENT,
+            "has_snapshot": not thinkific.get("snapshot_missing"),
+            "percent_completed": thinkific.get("percent_completed"),
+            "delta_percent_completed": thinkific.get("delta_percent_completed"),
+            "practice_tasks": matbot["practice_tasks"],
+            "kontrolni_attempts": matbot["kontrolni_attempts"],
+            "has_report": (None if summaries is None
+                           else report_summary is not None),
+            "generated_at": (report_summary or {}).get("generated_at"),
+            "updated_at": (report_summary or {}).get("updated_at"),
+        })
+    return rows
+
+
 @admin_reports_bp.route("/students", methods=["GET"])
 @require_admin
 def students():
@@ -352,30 +457,53 @@ def students():
 
     database = reporting_db.get_database()
     try:
-        saved_report_ids = database.fetch_monthly_report_student_ids(month)
-    except reporting_db.ReportingUnavailable:
-        saved_report_ids = None
-    rows = []
-    for student_id in report_input.report_population(month, database=database):
-        payload = report_input.build_report_input(student_id, month)
-        matbot = payload["matbot"]
-        thinkific = payload["thinkific"]
-        rows.append({
-            "student_id": student_id,
-            # IDENTITET U UI-ju je ime ili neutralna oznaka — NIKAD e-mail.
-            "label": _student_label(payload["profile"], student_id),
-            "grade": payload["profile"].get("grade"),
-            "grades": payload["profile"].get("grades") or [],
-            "has_snapshot": not thinkific.get("snapshot_missing"),
-            "percent_completed": thinkific.get("percent_completed"),
-            "delta_percent_completed": thinkific.get("delta_percent_completed"),
-            "practice_tasks": matbot["practice_tasks"],
-            "kontrolni_attempts": matbot["kontrolni_attempts"],
-            "has_report": (None if saved_report_ids is None
-                           else student_id in saved_report_ids),
-        })
+        filters = _student_filters(request.args)
+    except ValueError:
+        return render_template("admin_students.html", month=month, rows=[],
+                               filters={}, csrf_token=admin_auth.csrf_token(),
+                               schema_state=state, schema_message=message,
+                               error="Filter nije ispravan."), 400
+    rows = _filtered_report_rows(month, filters, database)
     return render_template("admin_students.html", month=month, rows=rows,
+                           filters=filters, csrf_token=admin_auth.csrf_token(),
+                           max_bulk_generate=MAX_BULK_GENERATE,
                            schema_state=state, schema_message=message, error="")
+
+
+@admin_reports_bp.route("/students.csv", methods=["GET"])
+@require_admin
+def students_csv():
+    """CSV koristi potpuno isti mjesec i filtere kao radna lista."""
+    state, _message = schema_state()
+    if state != "ready":
+        abort(409)
+    try:
+        month = progress.parse_report_month(request.args.get("month", ""))
+        filters = _student_filters(request.args)
+    except (progress.ProgressFormatError, ValueError):
+        abort(400)
+    rows = _filtered_report_rows(month, filters, reporting_db.get_database())
+
+    stream = io.StringIO(newline="")
+    writer = csv.writer(stream)
+    writer.writerow(("Učenik", "Razred", "Vrsta naloga", "Status razreda",
+                     "Thinkific napredak", "MAT-BOT zadaci", "Kontrolni",
+                     "Status izvještaja", "Period"))
+    for row in rows:
+        grades = "+".join(str(value) for value in row["grades"])
+        writer.writerow((
+            row["label"], grades,
+            ACCOUNT_TYPE_LABELS.get(row["account_type"], row["account_type"]),
+            "Potvrđen" if row["grade_confirmed"] else "Nije potvrđen",
+            ("" if row["percent_completed"] is None
+             else "%g%%" % row["percent_completed"]),
+            row["practice_tasks"], row["kontrolni_attempts"],
+            "Sačuvan" if row["has_report"] else "Nema izvještaja", month))
+    data = ("\ufeff" + stream.getvalue()).encode("utf-8")
+    return Response(data, mimetype="text/csv; charset=utf-8", headers={
+        "Content-Disposition":
+            'attachment; filename="ucenici-izvjestaji-%s.csv"' % month,
+    })
 
 
 # NOV IZVJEŠTAJ TRAŽI POTVRĐEN TEKUĆI RAZRED (verzija 4). Poruka je za
@@ -446,6 +574,9 @@ def _render_student(student_id, month, payload, *, ai_error="", notice=""):
         reporting_enabled=(payload.get("profile") or {}).get(
             "reporting_enabled", True),
         report_disabled_message=ERROR_REPORT_DISABLED,
+        narrative_fields=parent_report.NARRATIVE_FIELD_SPECS,
+        max_parent_comment_chars=(
+            parent_report.MAX_EDITABLE_PARENT_COMMENT_CHARS),
         ai_error=ai_error, notice=notice)
 
 
@@ -464,16 +595,81 @@ def _month_or_400():
 
 def _narrative_from_form():
     """Ono što je administrator otkucao. Server ne dopisuje ništa svoje."""
-    def lines(field):
-        raw = request.form.get(field, "")
-        return [line.strip() for line in raw.splitlines() if line.strip()]
+    raw = {}
+    for field in parent_report.NARRATIVE_FIELD_SPECS:
+        value = request.form.get(field["name"], "")
+        if field["kind"] == "items":
+            value = [line.strip() for line in value.splitlines()
+                     if line.strip()]
+        raw[field["name"]] = value
+    return parent_report.normalize_narrative(raw)
 
-    return parent_report.normalize_narrative({
-        "summary": request.form.get("summary", ""),
-        "strengths": lines("strengths"),
-        "focus_areas": lines("focus_areas"),
-        "next_month_recommendations": lines("next_month_recommendations"),
-    })
+
+def _parent_comments_from_form(student_id, month):
+    """Tekst zapažanja iz forme uz datume iz sačuvanog izvještaja."""
+    saved = parent_report.load_saved(student_id, month)
+    comments = list((saved or {}).get("parent_comments") or [])
+    edited = []
+    for index, entry in enumerate(comments):
+        edited.append({
+            "date": entry.get("date"),
+            "comment": request.form.get(
+                "parent_comment_%d" % index, entry.get("comment") or ""),
+        })
+    return None if edited == comments else edited
+
+
+def _generate_one_report(student_id, month, *, replace):
+    """Generiši ili sigurno ponovo iskoristi jedan sačuvani izvještaj."""
+    payload = report_input.build_report_input(student_id, month)
+    profile = payload.get("profile") or {}
+    if not profile.get("reporting_enabled", True):
+        logger.info("admin_report_generate_blocked code=report_disabled "
+                    "student_id=%s", student_id)
+        return payload, "error", ERROR_REPORT_DISABLED
+
+    try:
+        saved_before = parent_report.load_saved(student_id, month)
+    except reporting_db.ReportingUnavailable as error:
+        logger.info("admin_report_load_failed code=%s", error.code)
+        return payload, "error", parent_report.SAFE_AI_ERROR
+    if saved_before is not None and not replace:
+        return payload, "reused", "Postojeći izvještaj je sačuvan."
+
+    if not _grade_confirmed(payload):
+        logger.info("admin_report_generate_blocked code=grade_unconfirmed "
+                    "student_id=%s", student_id)
+        return payload, "error", ERROR_GRADE_UNCONFIRMED
+
+    facts = report_facts.build_ai_facts(payload)
+    from matbot import llm as llm_module
+
+    try:
+        narrative = parent_report.generate_narrative(
+            facts, llm_module.OpenAIPracticeLLM())
+    except parent_report.ReportGenerationError as error:
+        logger.info("admin_report_generate_failed code=%s", error.code)
+        return payload, "error", parent_report.SAFE_AI_ERROR
+
+    parent_comments = (payload.get("instruction") or {}).get("parent_comments")
+    comments_were_edited = bool(
+        ((saved_before or {}).get("snapshot") or {}).get(
+            "parent_comments_edited"))
+    if comments_were_edited:
+        parent_comments = saved_before.get("parent_comments") or []
+    snapshot = parent_report.metrics_snapshot(
+        facts, model=config.REPORTING_MODEL,
+        prompt_version=report_prompt.REPORT_PROMPT_VERSION,
+        parent_comments=parent_comments)
+    if comments_were_edited:
+        snapshot["parent_comments_edited"] = True
+    try:
+        parent_report.save_narrative(student_id, month, narrative, snapshot,
+                                     generated_at=parent_report.utc_now())
+    except reporting_db.ReportingUnavailable as error:
+        logger.info("admin_report_save_failed code=%s", error.code)
+        return payload, "error", parent_report.SAFE_AI_ERROR
+    return payload, "ready", "Izvještaj je spreman."
 
 
 @admin_reports_bp.route("/student/<int:student_id>/generate", methods=["POST"])
@@ -482,51 +678,138 @@ def generate_report(student_id):
     """TAČNO JEDAN plaćeni poziv. Komentar instruktora se ne dira (Dio 15)."""
     _require_csrf()
     month = _month_or_400()
-    payload = report_input.build_report_input(student_id, month)
-    if not (payload.get("profile") or {}).get("reporting_enabled", True):
-        logger.info("admin_report_generate_blocked code=report_disabled "
-                    "student_id=%s", student_id)
+    payload, status, message = _generate_one_report(
+        student_id, month, replace=True)
+    if status == "error":
         return _render_student(student_id, month, payload,
-                               ai_error=ERROR_REPORT_DISABLED), 200
-    facts = report_facts.build_ai_facts(payload)
-
-    # BLOKADA PRIJE POZIVA, NE POSLIJE. Nepotvrđen razred znači da ni sam
-    # sistem ne zna koji razred dijete pohađa — izvještaj koji to tvrdi
-    # roditelju ne smije nastati, a plaćeni poziv se ne troši. Sačuvani nacrt
-    # ostaje netaknut.
-    if not _grade_confirmed(payload):
-        logger.info("admin_report_generate_blocked code=grade_unconfirmed "
-                    "student_id=%s", student_id)
-        return _render_student(student_id, month, payload,
-                               ai_error=ERROR_GRADE_UNCONFIRMED), 200
-
-    from matbot import llm as llm_module
-
-    try:
-        narrative = parent_report.generate_narrative(
-            facts, llm_module.OpenAIPracticeLLM())
-    except parent_report.ReportGenerationError as error:
-        # Interni kod SAMO u log (pravilo 7). Postojeći nacrt ostaje netaknut.
-        logger.info("admin_report_generate_failed code=%s", error.code)
-        return _render_student(student_id, month, payload,
-                               ai_error=parent_report.SAFE_AI_ERROR), 200
-
-    snapshot = parent_report.metrics_snapshot(
-        facts, model=config.REPORTING_MODEL,
-        prompt_version=report_prompt.REPORT_PROMPT_VERSION,
-        # Zapažanja s časova IZ ISTOG trenutka kao i činjenice: snimak mora biti
-        # jedna konzistentna slika mjeseca (Dio 36).
-        parent_comments=(payload.get("instruction") or {}).get("parent_comments"))
-    try:
-        # Model je STVARNO zvan, pa `generated_at` dobija novu vrijednost.
-        parent_report.save_narrative(student_id, month, narrative, snapshot,
-                                     generated_at=parent_report.utc_now())
-    except reporting_db.ReportingUnavailable as error:
-        logger.info("admin_report_save_failed code=%s", error.code)
-        return _render_student(student_id, month, payload,
-                               ai_error=parent_report.SAFE_AI_ERROR), 200
+                               ai_error=message), 200
     return redirect(url_for("admin_reports.student_preview",
                             student_id=student_id, month=month))
+
+
+def _selected_student_ids(limit):
+    """Uređen, jedinstven i ograničen spisak ID-jeva iz POST forme."""
+    raw_values = request.form.getlist("student_ids")
+    if not raw_values or len(raw_values) > limit:
+        abort(400)
+    result = []
+    for raw in raw_values:
+        try:
+            student_id = int(raw)
+        except (TypeError, ValueError):
+            abort(400)
+        if student_id <= 0 or student_id in result:
+            abort(400)
+        result.append(student_id)
+    return result
+
+
+def _bulk_allowed_student_ids(month, database):
+    """Aktivni redovni učenici koji pripadaju odabranom periodu."""
+    population = set(report_input.report_population(
+        month, database=database,
+        account_types=(reporting_db.ACCOUNT_TYPE_STUDENT,)))
+    active = database.list_students(
+        active=True, account_type=reporting_db.ACCOUNT_TYPE_STUDENT)
+    return population & {row["student_id"] for row in active}
+
+
+@admin_reports_bp.route("/bulk/generate", methods=["POST"])
+@require_admin
+def bulk_generate_reports():
+    """Ograničen paket; kvar jednog izvještaja ne prekida ostale."""
+    _require_csrf()
+    try:
+        month = progress.parse_report_month(request.form.get("month", ""))
+    except progress.ProgressFormatError:
+        abort(400)
+    student_ids = _selected_student_ids(MAX_BULK_GENERATE)
+    replace = request.form.get("replace") == "1"
+    database = reporting_db.get_database()
+    allowed = _bulk_allowed_student_ids(month, database)
+    results = []
+    for student_id in student_ids:
+        if student_id not in allowed:
+            results.append({"student_id": student_id, "status": "error",
+                            "message": "Učenik nije dostupan za ovaj period."})
+            continue
+        try:
+            _payload, status, message = _generate_one_report(
+                student_id, month, replace=replace)
+        except reporting_db.ReportingUnavailable as error:
+            logger.info("admin_bulk_report_failed code=%s", error.code)
+            status, message = "error", parent_report.SAFE_AI_ERROR
+        except Exception:
+            logger.exception("admin_bulk_report_failed code=unexpected")
+            status, message = "error", parent_report.SAFE_AI_ERROR
+        results.append({"student_id": student_id, "status": status,
+                        "message": message})
+    completed = sum(1 for item in results
+                    if item["status"] in ("ready", "reused"))
+    return jsonify({"results": results, "completed": completed,
+                    "total": len(results)})
+
+
+def _saved_pdf(student_id, month):
+    """Bajtovi i ime jednog već sačuvanog izvještaja, ili None."""
+    payload = report_input.build_report_input(student_id, month)
+    saved = parent_report.load_saved(student_id, month)
+    if saved is None:
+        return None
+    facts = (saved.get("snapshot") or {}).get("facts")
+    if not facts:
+        facts = report_facts.build_ai_facts(payload)
+    label = _student_label(payload["profile"], student_id)
+    data = report_pdf.render_report_pdf(
+        facts, saved["narrative"], saved["instructor_comment"], label,
+        saved.get("parent_comments"))
+    return data, report_pdf.pdf_filename(label, month)
+
+
+@admin_reports_bp.route("/bulk/download", methods=["POST"])
+@require_admin
+def bulk_download_reports():
+    """Jedan ZIP sa svim dostupnim sačuvanim PDF izvještajima."""
+    _require_csrf()
+    try:
+        month = progress.parse_report_month(request.form.get("month", ""))
+    except progress.ProgressFormatError:
+        abort(400)
+    student_ids = _selected_student_ids(MAX_BULK_EXPORT)
+    database = reporting_db.get_database()
+    allowed = _bulk_allowed_student_ids(month, database)
+    if any(student_id not in allowed for student_id in student_ids):
+        abort(400)
+
+    output = io.BytesIO()
+    written = 0
+    used_names = set()
+    with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for student_id in student_ids:
+            try:
+                rendered = _saved_pdf(student_id, month)
+            except (reporting_db.ReportingUnavailable, report_pdf.PdfTooLong):
+                logger.info("admin_bulk_pdf_skipped student_id=%s", student_id)
+                continue
+            if rendered is None:
+                continue
+            data, filename = rendered
+            original = filename
+            suffix = 2
+            while filename in used_names:
+                filename = original[:-4] + "-%d.pdf" % suffix
+                suffix += 1
+            used_names.add(filename)
+            archive.writestr(filename, data)
+            written += 1
+    if not written:
+        abort(404)
+    response = Response(output.getvalue(), mimetype="application/zip", headers={
+        "Content-Disposition":
+            'attachment; filename="izvjestaji-%s.zip"' % month,
+        "X-Reports-Included": str(written),
+    })
+    return response
 
 
 @admin_reports_bp.route("/student/<int:student_id>/save", methods=["POST"])
@@ -543,7 +826,9 @@ def save_report(student_id):
                                ai_error=ERROR_REPORT_DISABLED), 200
     try:
         parent_report.save_edits(student_id, month, _narrative_from_form(),
-                                 request.form.get("instructor_comment", ""))
+                                 request.form.get("instructor_comment", ""),
+                                 parent_comments=_parent_comments_from_form(
+                                     student_id, month))
     except reporting_db.ReportingUnavailable as error:
         logger.info("admin_report_save_failed code=%s", error.code)
         return _render_student(student_id, month, payload,
@@ -557,37 +842,22 @@ def save_report(student_id):
 def report_pdf_download(student_id):
     """PDF iz SAČUVANOG nacrta. Ne zove model i ne mijenja nijedan red."""
     month = _month_or_400()
-    payload = report_input.build_report_input(student_id, month)
     try:
-        saved = parent_report.load_saved(student_id, month)
+        rendered = _saved_pdf(student_id, month)
     except reporting_db.ReportingUnavailable:
-        saved = None
-    if saved is None:
-        # Bez sačuvanog nacrta nema šta da se štampa — nikad se ne generiše
-        # tekst „u letu" samo da bi PDF postojao.
-        abort(404)
-
-    # Činjenice dolaze IZ SNIMKA, ne iz današnje baze: dokument mora ostati ono
-    # što je administrator odobrio, i kad se izvorni podaci kasnije promijene.
-    facts = (saved.get("snapshot") or {}).get("facts")
-    if not facts:
-        # Ovo je čitanje starog izvještaja, ne stvaranje novog. SUPPORT/TEST
-        # mora ostati bez novih izvještaja, ali već sačuvan dokument ostaje
-        # čitljiv i kad stari red nema snimak činjenica.
-        facts = report_facts.build_ai_facts(payload)
-    label = _student_label(payload["profile"], student_id)
-    try:
-        data = report_pdf.render_report_pdf(
-            facts, saved["narrative"], saved["instructor_comment"], label,
-            saved.get("parent_comments"))
+        rendered = None
     except report_pdf.PdfTooLong as error:
         logger.info("admin_report_pdf_too_long detail=%s", error)
         abort(500)
-
-    from flask import Response
+    if rendered is None:
+        # Bez sačuvanog nacrta nema šta da se štampa — nikad se ne generiše
+        # tekst „u letu" samo da bi PDF postojao.
+        abort(404)
+    data, filename = rendered
 
     return Response(data, mimetype="application/pdf", headers={
-        "Content-Disposition": 'attachment; filename="%s"'
-                               % report_pdf.pdf_filename(label, month),
+        "Content-Disposition": '%s; filename="%s"'
+                               % ("inline" if request.args.get("preview") == "1"
+                                  else "attachment", filename),
         "Cache-Control": "no-store",
     })

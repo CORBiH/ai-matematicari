@@ -1,60 +1,134 @@
 {% extends "admin_base.html" %}
-{% block title %}MAT-BOT — Izvještaji {{ month }}{% endblock %}
-{% block heading %}Mjesečni izvještaji{% endblock %}
-{% block subheading %}<p class="page-subtitle">{{ month }} · Učenici s evidentiranom aktivnošću ili Thinkific napretkom.</p>{% endblock %}
+{% block title %}MAT-BOT — Bot Reports {{ month }}{% endblock %}
+{% block heading %}Bot Reports{% endblock %}
+{% block subheading %}<p class="page-subtitle">Izaberite grupu učenika, generišite izvještaje i preuzmite ih zajedno.</p>{% endblock %}
 {% set nav_active = 'reports' %}
 {% set nav_month = month %}
-{% block topright %}
-<form method="get" action="{{ url_for('admin_reports.students') }}" class="actions">
-  <label for="report-list-month" class="muted">Mjesec</label>
-  <input id="report-list-month" name="month" type="month" value="{{ month }}" required style="width:auto">
-  <button type="submit" class="btn btn--ghost">Prikaži</button>
-</form>
-{% endblock %}
+{% set f = filters|default({}) %}
+
 {% block content %}
 {% if error %}<div class="banner err" role="alert">{{ error }}</div>{% endif %}
 
-<section class="card">
+<ol class="workflow-steps" aria-label="Koraci za pripremu izvještaja">
+  <li class="is-current"><span>1</span> Izaberite period</li>
+  <li><span>2</span> Izaberite razred i filtere</li>
+  <li><span>3</span> Odaberite učenike</li>
+  <li><span>4</span> Generišite i pregledajte</li>
+  <li><span>5</span> Preuzmite</li>
+</ol>
+
+<section class="card" aria-labelledby="filter-title">
   <div class="section-header">
-    <div>
-      <h2>Učenici za izvještaj: {{ rows|length }}</h2>
-      <p>Sačuvani izvještaji i dostupni podaci za odabrani mjesec.</p>
-    </div>
+    <div><h2 id="filter-title">1. Izaberite period i učenike</h2><p>Filteri se primjenjuju na listu, izbor učenika i CSV.</p></div>
   </div>
+  <form method="get" action="{{ url_for('admin_reports.students') }}" class="report-filter-grid">
+    <div class="field"><label for="report-list-month">Period izvještaja</label><input id="report-list-month" name="month" type="month" value="{{ month }}" required></div>
+    <div class="field">
+      <label for="student-grade">Razred</label>
+      <select id="student-grade" name="grade"><option value="">Svi razredi</option>{% for grade in (6, 7, 8, 9) %}<option value="{{ grade }}" {% if f.grade == grade %}selected{% endif %}>{{ grade }}. razred</option>{% endfor %}</select>
+      <p class="field-hint">Prikaži samo učenike odabranog razreda.</p>
+    </div>
+    <div class="field report-filter-search"><label for="student-search">Pretraga</label><input id="student-search" name="search" type="search" value="{{ f.search|default('') }}" placeholder="Ime, prezime ili e-mail"></div>
+    <div class="field">
+      <label for="grade-status">Potvrda razreda</label>
+      <select id="grade-status" name="grade_status"><option value="all" {% if f.grade_status|default('all') == 'all' %}selected{% endif %}>Svi učenici</option><option value="confirmed" {% if f.grade_status == 'confirmed' %}selected{% endif %}>Potvrđen razred</option><option value="unconfirmed" {% if f.grade_status == 'unconfirmed' %}selected{% endif %}>Nepotvrđen razred</option></select>
+    </div>
+    <fieldset class="field report-type-filters">
+      <legend>Vrsta učenika</legend>
+      <label class="toggle-check"><input type="checkbox" checked disabled> <span>Redovni učenici</span></label>
+      <label class="toggle-check"><input type="checkbox" name="include_support" value="1" {% if f.include_support %}checked{% endif %}> <span>Uključi učenike podrške</span></label>
+      <label class="toggle-check"><input type="checkbox" name="include_test" value="1" {% if f.include_test %}checked{% endif %}> <span>Uključi testne korisnike</span></label>
+      <p class="field-hint">PODRŠKA i TEST se standardno ne uključuju i za njih se novi izvještaji ne generišu.</p>
+    </fieldset>
+    <div class="report-filter-actions"><button type="submit">Prikaži učenike</button><button type="submit" class="btn btn--ghost" formaction="{{ url_for('admin_reports.students_csv') }}">Preuzmi CSV</button></div>
+    <p class="field-hint report-filter-change-note">Promjena filtera prikazuje novu listu i poništava trenutni odabir.</p>
+  </form>
+</section>
+
+{% if f.include_support or f.include_test %}<div class="banner warn">Posebni nalozi prikazani su samo informativno. Za PODRŠKA i TEST naloge generisanje i preuzimanje izvještaja ostaju isključeni.</div>{% endif %}
+
+<section class="card" aria-labelledby="student-list-title">
+  <div class="section-header">
+    <div><h2 id="student-list-title">Učenici za izvještaj: {{ rows|length }}</h2><p>Prikazani su učenici koji imaju podatke za odabrani period.</p></div>
+    {% if rows %}<div class="actions"><button type="button" class="btn btn--ghost" id="select-all">Odaberi sve</button><button type="button" class="btn btn--quiet" id="clear-selection">Poništi odabir</button></div>{% endif %}
+  </div>
+  {% if rows %}<p class="field-hint report-select-hint">„Odaberi sve” bira sve redovne učenike koji odgovaraju trenutnim filterima. Učenik bez časa, aktivnosti, kontrolnog ili Thinkific podataka u ovom periodu neće biti na listi.</p>{% endif %}
+  <div id="bulk-result" class="banner" role="status" hidden></div>
 
   {% if rows %}
   <div class="table-wrap">
-    <table class="responsive-table">
-      <thead><tr><th>Učenik</th><th>Razred</th><th>Napredak</th><th>Status</th><th></th></tr></thead>
+    <table class="responsive-table report-review-table">
+      <thead><tr><th><span class="sr-only">Izbor</span></th><th>Učenik</th><th>Razred</th><th>Status</th><th>Period</th><th>Generisano / izmijenjeno</th><th></th></tr></thead>
       <tbody>
       {% for r in rows %}
-      <tr data-report-row="{{ r.student_id }}">
-        <td class="cell-primary" data-label="Učenik"><span class="cell-title">{{ r.label }}</span><span class="cell-meta">{% if r.has_snapshot %}Thinkific dostupan{% else %}Thinkific nije importovano{% endif %}</span></td>
-        <td data-label="Razred">{% if r.grades %}<span class="badge badge--neutral">{{ r.grades|join('. + ') }}. razred</span>{% elif r.grade %}<span class="badge badge--neutral">{{ r.grade }}. razred</span>{% else %}<span class="muted">—</span>{% endif %}</td>
-        <td data-label="Napredak">
-          <div>
-            {% if r.percent_completed is not none %}<strong>{{ '%g' % r.percent_completed }}%</strong>{% if r.delta_percent_completed is not none %} <span class="muted">({{ '%+g' % r.delta_percent_completed }})</span>{% endif %}{% else %}<span class="muted">—</span>{% endif %}
-            <span class="cell-meta">{{ r.practice_tasks }} zadataka · {{ r.kontrolni_attempts }} kontrolnih</span>
-          </div>
-        </td>
-        <td data-label="Status">
-          {% if r.has_report is sameas true %}<span class="badge badge--success">Sačuvan</span>
-          {% elif r.has_report is sameas false %}<span class="badge badge--warning">Nema izvještaja</span>
-          {% else %}<span class="badge badge--neutral">Status nedostupan</span>{% endif %}
-        </td>
-        <td data-label="Radnje"><div class="cell-actions"><a class="btn btn--ghost" href="{{ url_for('admin_reports.student_preview', student_id=r.student_id, month=month) }}">Pregled →</a></div></td>
+      <tr data-report-row="{{ r.student_id }}" data-has-report="{{ '1' if r.has_report else '0' }}">
+        <td class="cell-check" data-label="Izbor"><input class="row-select" type="checkbox" value="{{ r.student_id }}" aria-label="Odaberi {{ r.label }}" {% if not r.reporting_enabled %}disabled title="Izvještaji su isključeni za ovaj nalog"{% endif %}></td>
+        <td class="cell-primary" data-label="Učenik"><span class="cell-title">{{ r.label }}</span><span class="cell-meta">{% if r.has_snapshot %}Thinkific dostupan{% else %}Thinkific nije importovano{% endif %} · {{ r.practice_tasks }} zadataka · {{ r.kontrolni_attempts }} kontrolnih</span><span class="badge {% if r.account_type == 'STUDENT' %}badge--student{% elif r.account_type == 'SUPPORT' %}badge--support{% else %}badge--test{% endif %}">{% if r.account_type == 'STUDENT' %}Redovni{% elif r.account_type == 'SUPPORT' %}Podrška{% else %}Test{% endif %}</span></td>
+        <td data-label="Razred">{% if r.grades %}<span class="badge badge--neutral">{{ r.grades|join('. + ') }}. razred</span>{% elif r.grade %}<span class="badge badge--neutral">{{ r.grade }}. razred</span>{% else %}<span class="muted">—</span>{% endif %}<span class="cell-meta">{% if r.grade_confirmed %}Potvrđen{% else %}Nije potvrđen{% endif %}</span></td>
+        <td data-label="Status"><span class="report-row-status badge {% if r.has_report %}badge--success{% elif not r.reporting_enabled %}badge--neutral{% else %}badge--warning{% endif %}">{% if r.has_report %}Sačuvan · Spremno{% elif not r.reporting_enabled %}Nije dostupno{% else %}Čeka{% endif %}</span><span class="report-row-message cell-meta"></span></td>
+        <td data-label="Period">{{ month }}</td>
+        <td data-label="Vrijeme"><span class="cell-meta">Generisano: {{ r.generated_at or '—' }}</span><span class="cell-meta">Izmijenjeno: {{ r.updated_at or '—' }}</span></td>
+        <td data-label="Radnje"><div class="cell-actions"><a class="btn btn--ghost" href="{{ url_for('admin_reports.student_preview', student_id=r.student_id, month=month) }}">Pregled →</a><a class="btn btn--quiet row-report-action" href="{{ url_for('admin_reports.student_preview', student_id=r.student_id, month=month) }}#report-editor" {% if not r.has_report %}hidden{% endif %}>Uredi</a><a class="btn btn--quiet row-report-action" href="{{ url_for('admin_reports.report_pdf_download', student_id=r.student_id, month=month) }}" {% if not r.has_report %}hidden{% endif %}>Preuzmi</a></div></td>
       </tr>
       {% endfor %}
       </tbody>
     </table>
   </div>
+
+  <form id="bulk-form" method="post" action="{{ url_for('admin_reports.bulk_download_reports') }}" class="bulk-actions" novalidate>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="month" value="{{ month }}">
+    <strong class="bulk-actions__count">Odabrano učenika: <span id="selected-count">0</span></strong>
+    <button type="button" id="generate-selected">Generiši izvještaje</button>
+    <button type="button" id="retry-failed" class="btn btn--ghost" hidden>Pokušaj ponovo neuspjele</button>
+    <button type="button" id="regenerate-selected" class="btn btn--ghost">Ponovo generiši odabrane</button>
+    <button type="submit" id="download-selected" class="btn btn--ghost">Preuzmi odabrane</button>
+  </form>
   {% else %}
-  <div class="empty"><strong>Za ovaj mjesec još nema izvještaja</strong><p>Nema učenika s Thinkific snapshotom ni evidentiranom MAT-BOT aktivnošću.</p></div>
+  <div class="empty"><strong>Nema podataka za izvještaj</strong><p>Nijedan učenik koji odgovara filterima nema čas, aktivnost, kontrolni ili Thinkific podatke u odabranom periodu.</p></div>
   {% endif %}
 
-  <details class="disclosure" style="margin-top:1rem">
-    <summary>Kako se lista formira</summary>
-    <div class="disclosure__content muted text-small">Lista je unija učenika s Thinkific snapshotom za ovaj mjesec i učenika s pripisanom MAT-BOT aktivnošću. Nijedna grupa se ne izostavlja.</div>
-  </details>
+  <details class="disclosure" style="margin-top:1rem"><summary>Kako se lista formira</summary><div class="disclosure__content muted text-small">Lista obuhvata učenike s Thinkific snapshotom, MAT-BOT aktivnošću, kontrolnim ili evidentiranim časom u ovom periodu. Razred se uzima samo iz potvrđenog profila učenika.</div></details>
 </section>
+
+{% if rows %}
+<script>
+(function(){
+  'use strict';
+  var boxes=Array.prototype.slice.call(document.querySelectorAll('.row-select:not([disabled])'));
+  var count=document.getElementById('selected-count'),bulk=document.getElementById('bulk-form');
+  var result=document.getElementById('bulk-result'),retry=document.getElementById('retry-failed');
+  var failed=new Set(),running=false,max={{ max_bulk_generate }};
+  function selected(){return boxes.filter(function(box){return box.checked;});}
+  function sync(){var n=selected().length;count.textContent=String(n);bulk.classList.toggle('is-visible',n>0);}
+  boxes.forEach(function(box){box.addEventListener('change',sync);});
+  document.getElementById('select-all').addEventListener('click',function(){boxes.forEach(function(box){box.checked=true;});sync();});
+  document.getElementById('clear-selection').addEventListener('click',function(){boxes.forEach(function(box){box.checked=false;});sync();});
+  function rowState(id,label,message,kind){var row=document.querySelector('[data-report-row="'+id+'"]');if(!row)return;var badge=row.querySelector('.report-row-status'),note=row.querySelector('.report-row-message');badge.textContent=label;badge.className='report-row-status badge '+kind;note.textContent=message||'';}
+  function revealActions(id){var row=document.querySelector('[data-report-row="'+id+'"]');if(!row)return;row.dataset.hasReport='1';row.querySelectorAll('.row-report-action').forEach(function(link){link.hidden=false;});}
+  async function generate(replace,failedOnly){
+    if(running)return;var targets=selected().filter(function(box){return !failedOnly||failed.has(box.value);});
+    if(!targets.length){result.hidden=false;result.className='banner warn';result.textContent=failedOnly?'Nema neuspjelih izvještaja za ponovni pokušaj.':'Odaberite bar jednog učenika.';return;}
+    if(targets.length>max){result.hidden=false;result.className='banner err';result.textContent='Najviše '+max+' učenika može se generisati odjednom.';return;}
+    if(replace&&!window.confirm('Ponovno generisanje zamjenjuje ručne izmjene u AI sekcijama odabranih izvještaja. Nastaviti?'))return;
+    running=true;failed.clear();retry.hidden=true;var ok=0;result.hidden=false;result.className='banner';result.textContent='Generisanje: 0 od '+targets.length+'…';
+    for(var i=0;i<targets.length;i++){
+      var id=targets[i].value;rowState(id,'Generisanje…','Molimo sačekajte.','badge--warning');
+      var body=new URLSearchParams();body.append('csrf_token','{{ csrf_token }}');body.append('month','{{ month }}');body.append('student_ids',id);if(replace)body.append('replace','1');
+      try{
+        var response=await fetch('{{ url_for("admin_reports.bulk_generate_reports") }}',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:body.toString()});if(!response.ok)throw new Error('request');
+        var data=await response.json(),item=data.results[0];
+        if(item.status==='ready'||item.status==='reused'){ok++;revealActions(id);rowState(id,'Spremno',item.status==='reused'?'Postojeći izvještaj je zadržan.':'','badge--success');}else{failed.add(id);rowState(id,'Greška',item.message,'badge--warning');}
+      }catch(error){failed.add(id);rowState(id,'Greška','Zahtjev nije završen. Pokušajte ponovo.','badge--warning');}
+      result.textContent='Generisanje: '+(i+1)+' od '+targets.length+'…';
+    }
+    running=false;retry.hidden=failed.size===0;result.className='banner '+(failed.size?'warn':'ok');result.textContent=ok+' od '+targets.length+' izvještaja uspješno pripremljeno.'+(failed.size?' Neuspjelih: '+failed.size+'.':'');
+  }
+  document.getElementById('generate-selected').addEventListener('click',function(){generate(false,false);});
+  document.getElementById('regenerate-selected').addEventListener('click',function(){generate(true,false);});
+  retry.addEventListener('click',function(){generate(false,true);});
+  bulk.addEventListener('submit',function(event){bulk.querySelectorAll('input[data-selected-id]').forEach(function(input){input.remove();});var chosen=selected();if(!chosen.length){event.preventDefault();return;}chosen.forEach(function(box){var input=document.createElement('input');input.type='hidden';input.name='student_ids';input.value=box.value;input.dataset.selectedId='1';bulk.appendChild(input);});});
+  sync();
+})();
+</script>
+{% endif %}
 {% endblock %}

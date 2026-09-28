@@ -11,11 +11,15 @@ Druga tvrdnja je razlog zašto ovaj fajl postoji odvojeno: administrator koji
 uređuje tekst klikće često, a svaki klik koji bi tiho platio poziv bio bi kvar
 koji se primijeti tek na računu.
 """
+import io
 import re
+import zipfile
 
 import pytest
+from werkzeug.datastructures import MultiDict
 
-from matbot import parent_report, report_facts, reporting_db, reporting_schema
+from matbot import (activity, parent_report, report_facts, reporting_db,
+                    reporting_schema)
 from matbot.student_identity import PROVIDER_THINKIFIC_EMAIL
 
 from tests.test_parent_report import good_narrative, payload
@@ -290,6 +294,232 @@ def test_multiline_list_fields_become_separate_items(admin, db, student):
                      "instructor_comment": ""})
     saved = parent_report.load_saved(student, "2026-08")
     assert saved["narrative"]["strengths"] == ["Prva.", "Druga.", "Treća."]
+
+
+def _add_report_activity(student_id, key, month="2026-08"):
+    reporting_db.get_database().record_learning_activity(student_id, [
+        activity.ActivityEvent(
+            activity.PRACTICE_TASK_PRESENTED, key, mode="practice", grade=6,
+            occurred_at=month + "-10 10:00:00")])
+
+
+def test_bulk_generation_keeps_working_when_one_student_fails(
+        admin, db, student, counter):
+    database = reporting_db.get_database()
+    _add_report_activity(student, "bulk-good")
+    unconfirmed = database.get_or_create_student(
+        PROVIDER_THINKIFIC_EMAIL, "unconfirmed@example.com")
+    database.update_student_profile(unconfirmed, display_name="Nepotvrđen Učenik")
+    _add_report_activity(unconfirmed, "bulk-bad")
+    token = _csrf_from(admin.get("/admin/reports/students?month=2026-08"))
+
+    response = admin.post("/admin/reports/bulk/generate", data=MultiDict([
+        ("csrf_token", token), ("month", "2026-08"),
+        ("student_ids", str(student)),
+        ("student_ids", str(unconfirmed)),
+    ]))
+
+    assert response.status_code == 200
+    results = {item["student_id"]: item for item in response.get_json()["results"]}
+    assert results[student]["status"] == "ready"
+    assert results[unconfirmed]["status"] == "error"
+    assert counter.calls == 1
+    assert parent_report.load_saved(student, "2026-08") is not None
+    assert parent_report.load_saved(unconfirmed, "2026-08") is None
+
+
+def test_bulk_generation_reuses_a_saved_report_without_a_model_call(
+        admin, db, student, counter):
+    _add_report_activity(student, "bulk-reuse")
+    _seed_draft(student)
+    token = _csrf_from(admin.get("/admin/reports/students?month=2026-08"))
+    response = admin.post("/admin/reports/bulk/generate", data={
+        "csrf_token": token, "month": "2026-08",
+        "student_ids": str(student),
+    })
+    assert response.get_json()["results"][0]["status"] == "reused"
+    assert counter.calls == 0
+
+
+def test_all_declared_narrative_sections_are_saved_and_reports_are_isolated(
+        admin, db, student):
+    database = reporting_db.get_database()
+    other = database.create_student("Drugi Učenik", 7,
+                                    "other-edit@example.com")
+    _seed_draft(student)
+    _seed_draft(other)
+    original_other = parent_report.load_saved(other, "2026-08")["narrative"]
+    values = {
+        "summary": "Novi pregled.",
+        "strengths": "Prva snaga.\nDruga snaga.",
+        "focus_areas": "Prvo područje.\nDrugo područje.",
+        "next_month_recommendations": "Prva preporuka.\nDruga preporuka.",
+    }
+    response = admin.post(
+        "/admin/reports/student/%d/save?month=2026-08" % student,
+        data={"csrf_token": _page_csrf(admin, student),
+              **values, "instructor_comment": "Ručni komentar."})
+    assert response.status_code == 302
+    saved = parent_report.load_saved(student, "2026-08")
+    assert set(saved["narrative"]) == {
+        field["name"] for field in parent_report.NARRATIVE_FIELD_SPECS}
+    assert saved["narrative"]["summary"] == "Novi pregled."
+    assert saved["narrative"]["focus_areas"] == [
+        "Prvo područje.", "Drugo područje."]
+    assert saved["instructor_comment"] == "Ručni komentar."
+    assert parent_report.load_saved(other, "2026-08")["narrative"] == original_other
+
+
+def test_bulk_zip_contains_only_selected_saved_reports(
+        admin, db, student, counter):
+    database = reporting_db.get_database()
+    other = database.create_student("Drugi Učenik", 7,
+                                    "other-zip@example.com")
+    _add_report_activity(student, "zip-first")
+    _add_report_activity(other, "zip-second")
+    _seed_draft(student)
+    _seed_draft(other)
+    token = _csrf_from(admin.get("/admin/reports/students?month=2026-08"))
+
+    response = admin.post("/admin/reports/bulk/download", data={
+        "csrf_token": token, "month": "2026-08",
+        "student_ids": str(student),
+    })
+
+    assert response.status_code == 200
+    assert response.mimetype == "application/zip"
+    with zipfile.ZipFile(io.BytesIO(response.data)) as archive:
+        names = archive.namelist()
+        assert len(names) == 1
+        assert names[0].endswith("-2026-08.pdf")
+        assert archive.read(names[0]).startswith(b"%PDF")
+    assert response.headers["X-Reports-Included"] == "1"
+    assert counter.calls == 0
+
+
+def test_bulk_zip_rejects_support_and_test_accounts(admin, db, student):
+    database = reporting_db.get_database()
+    support = database.create_student("Učenik Podrške", 7,
+                                      "support-zip@example.com")
+    database.set_student_account_types([support], "SUPPORT")
+    _add_report_activity(student, "zip-regular")
+    _add_report_activity(support, "zip-support")
+    _seed_draft(student)
+    token = _csrf_from(admin.get(
+        "/admin/reports/students?month=2026-08&include_support=1"))
+
+    response = admin.post("/admin/reports/bulk/download", data=MultiDict([
+        ("csrf_token", token), ("month", "2026-08"),
+        ("student_ids", str(student)), ("student_ids", str(support)),
+    ]))
+    assert response.status_code == 400
+
+
+def test_parent_facing_class_observation_has_a_report_level_override(
+        admin, db, student, counter):
+    report_payload, facts = parent_report.build_facts(student, "2026-08")
+    snapshot = parent_report.metrics_snapshot(
+        facts, model="m", prompt_version="v", parent_comments=[{
+            "date": "2026-08-12", "comment": "Prvobitno zapažanje."}])
+    parent_report.save_narrative(
+        student, "2026-08", good_narrative(), snapshot)
+
+    response = admin.post(
+        "/admin/reports/student/%d/save?month=2026-08" % student,
+        data={"csrf_token": _page_csrf(admin, student),
+              "summary": "Sažetak.", "strengths": "Redovan rad.",
+              "focus_areas": "Uvježbati razlomke.",
+              "next_month_recommendations": "Nastaviti vježbanje.",
+              "parent_comment_0": "Ispravljeno zapažanje za roditelja.",
+              "instructor_comment": ""})
+    assert response.status_code == 302
+    saved = parent_report.load_saved(student, "2026-08")
+    assert saved["parent_comments"] == [{
+        "date": "2026-08-12",
+        "comment": "Ispravljeno zapažanje za roditelja.",
+    }]
+    assert saved["snapshot"]["facts"] == facts
+
+    pdf = admin.get("/admin/reports/student/%d/pdf?month=2026-08" % student)
+    text = "\n".join(page.extract_text() for page in
+                     pypdf.PdfReader(io.BytesIO(pdf.data)).pages)
+    assert "Ispravljeno zapažanje za roditelja" in text
+    assert "Prvobitno zapažanje" not in text
+    preview = admin.get(
+        "/admin/reports/student/%d/pdf?month=2026-08&preview=1" % student)
+    assert preview.headers["Content-Disposition"].startswith("inline;")
+    assert counter.calls == 0
+
+    assert _generate(admin, student).status_code == 302
+    regenerated = parent_report.load_saved(student, "2026-08")
+    assert regenerated["parent_comments"] == saved["parent_comments"]
+    assert regenerated["snapshot"]["parent_comments_edited"] is True
+    assert counter.calls == 1
+
+
+def test_grade_seven_bulk_flow_preserves_edit_in_download(
+        admin, db, counter):
+    database = reporting_db.get_database()
+    first = database.create_student("Prvi Sedmi", 7, "first7@example.com")
+    second = database.create_student("Drugi Sedmi", 7, "second7@example.com")
+    support = database.create_student("Podrška Sedmi", 7,
+                                      "support7-flow@example.com")
+    test_user = database.create_student("Test Sedmi", 7,
+                                        "test7-flow@example.com")
+    database.set_student_account_types([support], "SUPPORT")
+    database.set_student_account_types([test_user], "TEST")
+    for student_id, key in ((first, "flow-first"), (second, "flow-second"),
+                            (support, "flow-support"),
+                            (test_user, "flow-test")):
+        _add_report_activity(student_id, key)
+
+    listing = admin.get(
+        "/admin/reports/students?month=2026-08&grade=7")
+    html = listing.get_data(as_text=True)
+    assert "Prvi Sedmi" in html and "Drugi Sedmi" in html
+    assert "Podrška Sedmi" not in html and "Test Sedmi" not in html
+    token = _csrf_from(listing)
+    selected = MultiDict([
+        ("csrf_token", token), ("month", "2026-08"),
+        ("student_ids", str(first)), ("student_ids", str(second)),
+    ])
+    generated = admin.post("/admin/reports/bulk/generate", data=selected)
+    assert [item["status"] for item in generated.get_json()["results"]] == [
+        "ready", "ready"]
+    assert counter.calls == 2
+
+    edited_text = "Ručno uređeni sažetak koji mora biti u ZIP-u."
+    saved_edit = admin.post(
+        "/admin/reports/student/%d/save?month=2026-08" % first,
+        data={"csrf_token": _page_csrf(admin, first),
+              "summary": edited_text, "strengths": "Redovan rad.",
+              "focus_areas": "Uvježbati razlomke.",
+              "next_month_recommendations": "Nastaviti vježbanje.",
+              "instructor_comment": ""})
+    assert saved_edit.status_code == 302
+
+    reused = admin.post("/admin/reports/bulk/generate", data=selected)
+    assert [item["status"] for item in reused.get_json()["results"]] == [
+        "reused", "reused"]
+    assert counter.calls == 2
+    assert parent_report.load_saved(first, "2026-08")["narrative"][
+        "summary"] == edited_text
+
+    archive_response = admin.post("/admin/reports/bulk/download", data=selected)
+    assert archive_response.status_code == 200
+    with zipfile.ZipFile(io.BytesIO(archive_response.data)) as archive:
+        names = archive.namelist()
+        assert len(names) == 2 and len(set(names)) == 2
+        assert all(name.endswith("-2026-08.pdf") for name in names)
+        extracted = []
+        for name in names:
+            extracted.extend(page.extract_text() for page in
+                             pypdf.PdfReader(io.BytesIO(
+                                 archive.read(name))).pages)
+    combined = "\n".join(extracted)
+    assert edited_text in combined
+    assert "Podrška Sedmi" not in combined and "Test Sedmi" not in combined
+    assert counter.calls == 2
 
 
 def test_pdf_without_a_saved_draft_is_not_invented(admin, db, student, counter):

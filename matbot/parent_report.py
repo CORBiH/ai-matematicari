@@ -37,6 +37,26 @@ SAFE_AI_ERROR = "AI sažetak trenutno nije moguće generisati."
 NARRATIVE_FIELDS = ("summary", "strengths", "focus_areas",
                     "next_month_recommendations")
 
+# Jedan opis polja koriste i obrazac i čitanje forme. Model i baza i dalje
+# imaju isti postojeći oblik; ova tabela samo sprečava da novo tekstualno polje
+# jednoga dana bude sačuvano, a zaboravljeno u uređivaču.
+NARRATIVE_FIELD_SPECS = (
+    {"name": "summary", "label": "Pregled mjeseca", "kind": "text", "rows": 6,
+     "hint": "Sažetak aktivnosti i napretka učenika."},
+    {"name": "strengths", "label": "Šta ide dobro", "kind": "items", "rows": 4,
+     "hint": "Jedna stavka po redu."},
+    {"name": "focus_areas", "label": "Na čemu treba raditi", "kind": "items",
+     "rows": 4, "hint": "Jedna stavka po redu."},
+    {"name": "next_month_recommendations",
+     "label": "Preporuke za naredni mjesec", "kind": "items", "rows": 4,
+     "hint": "Jedna stavka po redu."},
+)
+
+# Izvještaj roditelju prikazuje najviše tri kratka zapažanja. Izmjena ovdje je
+# kopija samo za konkretan izvještaj; izvorni zapis časa ostaje netaknut.
+MAX_EDITABLE_PARENT_COMMENTS = 3
+MAX_EDITABLE_PARENT_COMMENT_CHARS = 220
+
 
 class ReportGenerationError(RuntimeError):
     """AI nacrt nije napravljen. `code` je INTERNI kod za log, ne za ekran."""
@@ -234,14 +254,32 @@ def save_narrative(student_id, report_month, narrative, snapshot,
 
 
 def save_edits(student_id, report_month, narrative, instructor_comment,
-               database=None):
+               database=None, *, parent_comments=None):
     """Spremi ono što je administrator uredio. NE zove model (Dio 32).
 
     `generated_at` se NE prosljeđuje: ručna ispravka rečenice nije novo AI
     generisanje i ne smije tako izgledati u reviziji."""
     target = database or reporting_db.get_database()
+    metrics_json = None
+    if parent_comments is not None:
+        saved = load_saved(student_id, report_month, database=target)
+        snapshot = dict((saved or {}).get("snapshot") or {})
+        cleaned = []
+        for entry in list(parent_comments)[:MAX_EDITABLE_PARENT_COMMENTS]:
+            comment = str((entry or {}).get("comment") or "").strip()
+            if not comment:
+                continue
+            cleaned.append({
+                # Datum je sačuvana metapodatkovna vrijednost časa, ne polje
+                # koje se uređuje u izvještaju.
+                "date": (entry or {}).get("date"),
+                "comment": comment[:MAX_EDITABLE_PARENT_COMMENT_CHARS],
+            })
+        snapshot["parent_comments"] = cleaned
+        snapshot["parent_comments_edited"] = True
+        metrics_json = json.dumps(snapshot, ensure_ascii=False, sort_keys=True)
     return target.save_monthly_report(
         student_id=student_id, report_month=report_month,
-        metrics_json=None,
+        metrics_json=metrics_json,
         ai_summary=json.dumps(narrative, ensure_ascii=False, sort_keys=True),
         instructor_comment=instructor_comment or "")

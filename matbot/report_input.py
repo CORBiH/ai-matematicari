@@ -361,9 +361,10 @@ def build_report_input(student_id, report_month, database=None):
     }
 
 
-def report_population(report_month, database=None):
+def report_population(report_month, database=None, account_types=None):
     """Svi učenici koji za taj mjesec zaslužuju izvještaj (unija oba izvora)."""
     target = database or reporting_db.get_database()
     month = progress.parse_report_month(report_month)
     start, end = month_bounds(month)
-    return target.fetch_report_population(start, end, month)
+    return target.fetch_report_population(start, end, month,
+                                          account_types=account_types)

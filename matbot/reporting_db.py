@@ -1345,6 +1345,33 @@ class ReportingDatabase:
                     exc) from None
         return {int(row[0]) for row in rows}
 
+    def fetch_monthly_report_summaries(self, report_month):
+        """Sažeti statusi izvještaja za radnu listu, bez teksta izvještaja."""
+        with self._lock:
+            try:
+                conn = self._connection()
+                self._require_monthly_reports(conn)
+                generated = ("generated_at"
+                             if self._monthly_reports_has_generated_at(conn)
+                             else "NULL AS generated_at")
+                rows = _rows(conn.execute(
+                    "SELECT student_id, status, created_at, updated_at, "
+                    + generated + " FROM monthly_reports WHERE report_month = ?",
+                    (report_month,)))
+            except ReportingUnavailable:
+                self._drop_connection()
+                raise
+            except Exception as exc:
+                self._drop_connection()
+                raise ReportingUnavailable(
+                    "monthly_report_summary_read_failed:" + type(exc).__name__,
+                    exc) from None
+        return {
+            int(row[0]): {"status": row[1], "created_at": row[2],
+                          "updated_at": row[3], "generated_at": row[4]}
+            for row in rows
+        }
+
     def _require_monthly_reports(self, conn):
         """Padni ZATVORENO ako produkcijska tabela ne podnosi Fazu 3C.
 
@@ -1493,8 +1520,17 @@ class ReportingDatabase:
                 params = [_THINKIFIC_PROVIDER]
                 where = []
                 if (search or "").strip():
-                    where.append("LOWER(COALESCE(s.display_name, '')) LIKE ?")
-                    params.append("%" + search.strip().lower() + "%")
+                    # Pretraga smije koristiti povezani e-mail, ali ga odgovor
+                    # i dalje ne vraća. Tako operater može pronaći učenika po
+                    # podatku koji već zna bez izlaganja adrese listi ili URL-u.
+                    needle = "%" + search.strip().lower() + "%"
+                    where.append(
+                        "(LOWER(COALESCE(s.display_name, '')) LIKE ? OR "
+                        " EXISTS (SELECT 1 FROM student_accounts search_account "
+                        " WHERE search_account.student_id = s.id "
+                        " AND search_account.provider = ? "
+                        " AND LOWER(search_account.external_user_id) LIKE ?))")
+                    params.extend((needle, _THINKIFIC_PROVIDER, needle))
                 if grade is not None:
                     if has_v7:
                         where.append(
@@ -2797,7 +2833,8 @@ class ReportingDatabase:
                 raise ReportingUnavailable(
                     "matbot_month_read_failed:" + type(exc).__name__, exc) from None
 
-    def fetch_report_population(self, month_start, next_month_start, report_month):
+    def fetch_report_population(self, month_start, next_month_start, report_month,
+                                account_types=None):
         """UNIJA učenika koji zaslužuju izvještaj (Dio 23): oni sa Thinkific
         snimkom TOG mjeseca I oni sa pripisanom MAT-BOT aktivnošću tog mjeseca.
 
@@ -2829,11 +2866,19 @@ class ReportingDatabase:
                           SOURCE, month_start, next_month_start,
                           month_start[:10], next_month_start[:10]]
                 if self._student_profile_v7_available(conn):
+                    requested_types = tuple(account_types or
+                                            (ACCOUNT_TYPE_STUDENT,))
+                    cleaned_types = tuple(self._clean_account_type(value)
+                                          for value in requested_types)
+                    if not cleaned_types:
+                        return []
+                    placeholders = ",".join("?" * len(cleaned_types))
                     sql = ("SELECT population.student_id FROM (" + union_sql
                            + ") population JOIN students s "
                              "ON s.id = population.student_id "
-                             "WHERE s.account_type = ? ORDER BY 1")
-                    params.append(ACCOUNT_TYPE_STUDENT)
+                             "WHERE s.account_type IN (%s) ORDER BY 1"
+                           % placeholders)
+                    params.extend(cleaned_types)
                 else:
                     sql = union_sql + " ORDER BY 1"
                 rows = _rows(conn.execute(sql, tuple(params)))

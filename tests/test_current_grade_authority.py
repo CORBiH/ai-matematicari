@@ -448,7 +448,10 @@ def test_22_report_payload_carries_the_confirmation_state(db):
 def test_22b_generation_is_blocked_before_any_model_call():
     """Blokada mora biti PRIJE poziva — inače se troši plaćeni poziv."""
     source = (ROOT / "matbot" / "admin_reports.py").read_text(encoding="utf-8")
-    body = source.split("def generate_report(")[1].split("\n@admin_reports_bp")[0]
+    # Pojedinačna i paketna ruta dijele isti put generisanja; kapija mora biti
+    # provjerena upravo u tom zajedničkom putu da je paket ne bi mogao zaobići.
+    body = source.split("def _generate_one_report(")[1].split(
+        "\n@admin_reports_bp")[0]
     guard = body.index("_grade_confirmed(payload)")
     call = body.index("generate_narrative")
     assert guard < call, "provjera potvrde mora prethoditi pozivu modela"
