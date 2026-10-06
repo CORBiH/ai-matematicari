@@ -36,9 +36,9 @@ import io
 import re
 
 # --- KURSNI SLOTOVI --------------------------------------------------------
-# Razred i naziv kursa dolaze ISKLJUČIVO odavde, jer izvoz „Student Progress"
-# nema pouzdano polje naziva kursa. Administrator bira slot; ništa se ne izvodi
-# iz imena učenika, e-maila ni vrijednosti napretka.
+# Razred i naziv kursa dolaze ISKLJUČIVO odavde. Upload sloj slot sigurno veže
+# punim potpisom kursnih kolona ili izričitim ručnim izborom kad je potpis
+# nepoznat; ništa se ne izvodi iz imena učenika, e-maila ni napretka.
 COURSE_SLOTS = {
     "grade_6": {"grade": 6, "course_name": "Matematika za 6. razred"},
     "grade_7": {"grade": 7, "course_name": "Matematika za 7. razred"},

@@ -20,16 +20,21 @@ import csv
 import hmac
 import io
 import logging
+import os
+import re
+import traceback
 import zipfile
 
 from flask import (Blueprint, Response, abort, jsonify, redirect,
                    render_template, request, url_for)
+from werkzeug.utils import secure_filename
 
 from matbot import admin_auth, config, parent_report, report_input, reporting_db
 from matbot import report_facts, student_grades
 from matbot import report_pdf, report_prompt, reporting_schema
 from matbot import thinkific_progress as progress
 from matbot import thinkific_roster
+from matbot import thinkific_upload
 from matbot.admin_auth import CSRF_FORM_FIELD, require_admin
 from matbot.ratelimit import RateLimiter
 
@@ -37,8 +42,9 @@ logger = logging.getLogger("matbot.admin_reports")
 
 admin_reports_bp = Blueprint("admin_reports", __name__, url_prefix="/admin/reports")
 
-# Četiri IZRIČITA slota. Razred NIKAD ne dolazi iz imena fajla ni iz sadržaja —
-# administrator bira polje, a polje je vezano za kurs.
+# Kanonski interni slotovi ostaju isti. Novi upload ih popunjava sigurnim
+# prepoznavanjem kursne strukture, a stara eksplicitna polja se još prihvataju
+# radi kompatibilnosti direktnog legacy importa i postojećih klijenata.
 COURSE_FIELDS = (
     ("grade_6", "6. razred", "Matematika za 6. razred"),
     ("grade_7", "7. razred", "Matematika za 7. razred"),
@@ -53,6 +59,8 @@ COURSE_FIELDS = (
 MAX_CSV_BYTES = 2 * 1024 * 1024
 MAX_TOTAL_UPLOAD_BYTES = 4 * MAX_CSV_BYTES
 ALLOWED_EXTENSIONS = (".csv",)
+MULTI_FILE_FIELD = "thinkific_files"
+MANUAL_COURSE_FIELD = "file_course_keys"
 
 # Granice su namjerno niže od tehničkih mogućnosti servera. Pregledač šalje
 # generisanje redom, jednog učenika po zahtjevu, a server svejedno odbija
@@ -71,6 +79,43 @@ STATUS_PARTIAL = "partial"
 STATUS_FAILED = "failed"
 
 LOGIN_LIMITER_KEY = "MATBOT_ADMIN_LOGIN_LIMITER"
+
+_ROSTER_FAILURE_PHASES = frozenset((
+    "build_plan", "select_actions", "schema_preflight", "validate_targets",
+    "validate_action", "freeze_historical_names", "create_students",
+    "update_name_or_status", "confirm_grade", "commit",
+))
+_ROSTER_ACTION_TYPES = frozenset((
+    "name", "add", "archive", "reactivate", "grade",
+))
+
+
+def _safe_diagnostic_token(value, allowed, fallback):
+    """Zatvorena lista za log polja koja nikad ne smiju nositi korisnički tekst."""
+    return value if value in allowed else fallback
+
+
+def _safe_exception_type(error):
+    """Samo Python ime klase; proizvoljna poruka izuzetka ostaje odbačena."""
+    name = type(error).__name__
+    cleaned = re.sub(r"[^A-Za-z0-9_.-]", "_", name)[:80]
+    return cleaned or "Exception"
+
+
+def _safe_traceback_frames(error):
+    """Traceback bez poruke, lokalnih vrijednosti, putanje i izvornog reda.
+
+    Standardni ``logger.exception`` na DB uzroku nije siguran: završni red
+    uključuje sirovu poruku biblioteke, koja može sadržati URL, token ili PII.
+    Ovdje ostaju samo basename fajla, funkcija i broj reda.
+    """
+    frames = traceback.extract_tb(getattr(error, "__traceback__", None))
+    if not frames:
+        return "none"
+    return " > ".join(
+        "%s:%s:%s" % (os.path.basename(frame.filename), frame.name, frame.lineno)
+        for frame in frames[-12:]
+    )
 
 
 def _limiter():
@@ -249,7 +294,7 @@ def _month_label(month):
 # Uvoz
 # ---------------------------------------------------------------------------
 def _collect_files(files_storage):
-    """Skupi bajtove iz ČETIRI IZRIČITA polja. Vraća `(files, errors)`.
+    """Legacy eksplicitna polja → bajtovi. Vraća `(files, errors)`.
 
     Ime fajla se NE gleda ni za razred ni za putanju — koristi se samo kao
     prikaz i to sanitizovano. Time otpadaju i „path traversal" i podmetanje
@@ -281,6 +326,177 @@ def _collect_files(files_storage):
             continue
         files[course_key] = raw
     return files, errors
+
+
+def _display_filename(value, index):
+    """Naziv samo za prikaz; putanja i kontrolni znakovi nikad ne izlaze."""
+    cleaned = secure_filename((value or "").strip())
+    return (cleaned or "fajl-%d.csv" % (index + 1))[:180]
+
+
+def _multi_upload_items(files_storage):
+    """Jedno ``multiple`` polje → ograničeni bajtovi sa stabilnim indeksom."""
+    storages = files_storage.getlist(MULTI_FILE_FIELD)
+    storages = [storage for storage in storages
+                if storage is not None and (storage.filename or "").strip()]
+    if not storages:
+        return [], [{"message": "Odaberi Thinkific CSV fajlove."}]
+    if len(storages) > len(COURSE_FIELDS):
+        return [], [{
+            "message": "Možeš učitati najviše četiri CSV fajla.",
+        }]
+
+    items, errors = [], []
+    total = 0
+    for index, storage in enumerate(storages):
+        filename = _display_filename(storage.filename, index)
+        item = {"index": index, "filename": filename, "raw": None,
+                "error": None}
+        if not (storage.filename or "").lower().endswith(ALLOWED_EXTENSIONS):
+            item["error"] = "Fajl mora biti u CSV formatu."
+        else:
+            raw = storage.read(MAX_CSV_BYTES + 1)
+            if not raw or not raw.strip():
+                item["error"] = "Fajl je prazan."
+            elif len(raw) > MAX_CSV_BYTES:
+                item["error"] = "Fajl je prevelik."
+            else:
+                total += len(raw)
+                if total > MAX_TOTAL_UPLOAD_BYTES:
+                    item["error"] = "Ukupan upload je prevelik."
+                else:
+                    item["raw"] = raw
+        if item["error"]:
+            errors.append({"label": filename, "message": item["error"]})
+        items.append(item)
+    return items, errors
+
+
+def _classify_multi_uploads(month, files_storage, manual_keys=(), *,
+                            require_all):
+    """Prepoznaj fajlove pa ih vrati u POSTOJEĆEM ``{grade_N: bytes}`` obliku.
+
+    Ručni izbor se smije koristiti samo kad puni kursni potpis nije poznat.
+    Automatsko podudaranje se ne može prepisati klijentskom vrijednošću.
+    """
+    items, errors = _multi_upload_items(files_storage)
+    choices = list(manual_keys or ())
+    if choices and len(choices) != len(items):
+        errors.append({
+            "message": "Mapiranje fajlova nije potpuno. Ponovi odabir fajlova.",
+        })
+    choices += [""] * max(0, len(items) - len(choices))
+
+    entries = []
+    resolved = []
+    parsed_by_index = {}
+    for item in items:
+        index, filename, raw = item["index"], item["filename"], item["raw"]
+        entry = {"index": index, "filename": filename, "status": "invalid",
+                 "course_key": None, "grade": None}
+        if raw is None:
+            entries.append(entry)
+            continue
+        try:
+            detected = thinkific_upload.detect_course_key(raw, month)
+        except progress.ProgressFormatError:
+            message = "Fajl nije ispravan Thinkific Student Progress CSV."
+            entry["message"] = message
+            errors.append({"label": filename, "message": message})
+            entries.append(entry)
+            continue
+
+        choice = choices[index].strip() if index < len(choices) else ""
+        if choice and choice not in progress.COURSE_SLOTS:
+            message = "Odabrani razred nije ispravan."
+            entry["message"] = message
+            errors.append({"label": filename, "message": message})
+            entries.append(entry)
+            continue
+        if detected and choice and choice != detected:
+            message = "Automatski prepoznat razred se ne može prepisati."
+            entry["message"] = message
+            errors.append({"label": filename, "message": message})
+            entries.append(entry)
+            continue
+
+        course_key = detected or choice or None
+        if course_key is None:
+            message = "Nije moguće automatski odrediti razred za ovaj fajl."
+            entry.update(status="ambiguous", message=message)
+            errors.append({"label": filename, "message": message})
+            entries.append(entry)
+            continue
+
+        try:
+            parsed_by_index[index] = progress.parse_progress_csv(
+                raw, course_key, month)
+        except progress.ProgressFormatError:
+            message = "Fajl nije ispravan Thinkific Student Progress CSV."
+            entry["message"] = message
+            errors.append({"label": filename, "message": message})
+            entries.append(entry)
+            continue
+        entry.update(status="detected" if detected else "manual",
+                     course_key=course_key,
+                     grade=progress.COURSE_SLOTS[course_key]["grade"])
+        entries.append(entry)
+        resolved.append((course_key, item, entry))
+
+    grouped = {}
+    for course_key, item, entry in resolved:
+        grouped.setdefault(course_key, []).append((item, entry))
+    for course_key, matches in grouped.items():
+        if len(matches) > 1:
+            grade = progress.COURSE_SLOTS[course_key]["grade"]
+            errors.append({
+                "message": "Za %d. razred pronađena su dva fajla." % grade,
+            })
+            for _item, entry in matches:
+                entry["status"] = "duplicate"
+
+    if require_all and items:
+        for course_key, _label, _name in COURSE_FIELDS:
+            if course_key not in grouped:
+                grade = progress.COURSE_SLOTS[course_key]["grade"]
+                errors.append({
+                    "message": "Nedostaje CSV za %d. razred." % grade,
+                })
+
+    files, parsed = {}, {}
+    for course_key, matches in grouped.items():
+        if len(matches) != 1:
+            continue
+        item, _entry = matches[0]
+        files[course_key] = item["raw"]
+        parsed[course_key] = parsed_by_index[item["index"]]
+
+    grades = []
+    for course_key, _label, _name in COURSE_FIELDS:
+        matches = grouped.get(course_key, ())
+        grade = progress.COURSE_SLOTS[course_key]["grade"]
+        grades.append({
+            "course_key": course_key,
+            "grade": grade,
+            "status": ("found" if len(matches) == 1 else
+                       "duplicate" if len(matches) > 1 else "missing"),
+            "filename": matches[0][0]["filename"] if len(matches) == 1 else "",
+        })
+
+    unique_errors = []
+    seen_messages = set()
+    for error in errors:
+        key = (error.get("label", ""), error.get("message", ""))
+        if key not in seen_messages:
+            seen_messages.add(key)
+            unique_errors.append(error)
+    ready = bool(files) and not unique_errors
+    if require_all:
+        ready = ready and set(files) == set(thinkific_roster.REQUIRED_COURSES)
+    return {
+        "files": files, "parsed": parsed, "entries": entries,
+        "grades": grades, "errors": unique_errors, "ready": ready,
+    }
 
 
 def _outcome(summary, blocked_count):
@@ -315,9 +531,16 @@ def import_files():
                                 "message": "Mjesec mora biti u obliku YYYY-MM."}],
                               month=raw_month, schema=(state, message)), 400
 
-    files, upload_errors = _collect_files(request.files)
+    if request.files.getlist(MULTI_FILE_FIELD):
+        mapped = _classify_multi_uploads(
+            month, request.files, request.form.getlist(MANUAL_COURSE_FIELD),
+            require_all=False)
+        files, upload_errors = mapped["files"], mapped["errors"]
+    else:
+        files, upload_errors = _collect_files(request.files)
     if not files:
-        code = upload_errors[0]["code"] if upload_errors else "no_file_selected"
+        code = upload_errors[0].get("code", "upload_invalid") \
+            if upload_errors else "no_file_selected"
         return _render_result(None, STATUS_FAILED,
                               upload_errors or [{"code": code,
                                                  "message": "Odaberi bar jedan CSV."}],
@@ -354,13 +577,28 @@ def _render_result(summary, outcome, upload_errors, *, month, schema):
 
 def _roster_sources():
     """Četiri uploada → sirovi fajlovi i četiri potpuno validirana objekta."""
+    try:
+        month = progress.parse_report_month(request.form.get("report_month", ""))
+    except progress.ProgressFormatError:
+        return None, None, "Mjesec mora biti u obliku YYYY-MM."
+
+    if request.files.getlist(MULTI_FILE_FIELD):
+        mapped = _classify_multi_uploads(
+            month, request.files, request.form.getlist(MANUAL_COURSE_FIELD),
+            require_all=True)
+        if not mapped["ready"]:
+            messages = [error.get("message", "")
+                        for error in mapped["errors"] if error.get("message")]
+            return None, None, " ".join(messages[:3]) or (
+                "Mapiranje Thinkific fajlova nije potpuno.")
+        return mapped["files"], mapped["parsed"], None
+
     files, upload_errors = _collect_files(request.files)
     missing = [key for key, _label, _name in COURSE_FIELDS if key not in files]
     if upload_errors or missing:
         return None, None, (
             "Za pregled registra odaberi sva četiri važeća CSV fajla.")
     try:
-        month = progress.parse_report_month(request.form.get("report_month", ""))
         parsed = {key: progress.parse_progress_csv(files[key], key, month)
                   for key, _label, _name in COURSE_FIELDS}
     except progress.ProgressFormatError as error:
@@ -369,6 +607,39 @@ def _roster_sources():
         return None, None, (
             "Jedan CSV nije ispravan. Provjeri fajlove i pokušaj ponovo.")
     return files, parsed, None
+
+
+@admin_reports_bp.route("/roster/classify", methods=["POST"])
+@require_admin
+def classify_roster_files():
+    """Read-only provjera jednog višestrukog uploada prije roster pregleda."""
+    _require_csrf()
+    try:
+        month = progress.parse_report_month(request.form.get("report_month", ""))
+    except progress.ProgressFormatError:
+        return jsonify({"status": "blocked", "ready": False,
+                        "message": "Mjesec mora biti u obliku YYYY-MM.",
+                        "files": [], "grades": [], "errors": [
+                            {"message": "Mjesec mora biti u obliku YYYY-MM."}]}), 400
+
+    mapped = _classify_multi_uploads(
+        month, request.files, (), require_all=True)
+    needs_mapping = any(entry["status"] == "ambiguous"
+                        for entry in mapped["entries"])
+    status = ("ready" if mapped["ready"] else
+              "needs_mapping" if needs_mapping else "blocked")
+    return jsonify({
+        "status": status,
+        "ready": mapped["ready"],
+        "files": mapped["entries"],
+        "grades": mapped["grades"],
+        "errors": mapped["errors"],
+        "message": (
+            "Sva četiri razreda su sigurno prepoznata."
+            if mapped["ready"] else
+            "Dopuni ili ispravi mapiranje fajlova prije pregleda promjena."
+        ),
+    })
 
 
 @admin_reports_bp.route("/roster/preview", methods=["POST"])
@@ -409,6 +680,7 @@ def apply_roster():
     if error:
         return jsonify({"status": "error", "message": error}), 400
     database = reporting_db.get_database()
+    phase = "build_plan"
     try:
         plan = thinkific_roster.build_plan(parsed, database)
         supplied = request.form.get("plan_id", "")
@@ -421,15 +693,26 @@ def apply_roster():
                     "Podaci su se promijenili nakon pregleda. Napravi novi "
                     "pregled prije primjene."),
             }), 409
+        phase = "select_actions"
         actions = thinkific_roster.selected_actions(
             plan, request.form.getlist("action_keys"))
+        phase = "schema_preflight"
         applied = database.apply_roster_reconciliation(actions)
     except thinkific_roster.RosterPlanError as caught:
         logger.info("thinkific_roster_apply_refused code=%s", caught.code)
         return jsonify({"status": "error",
                         "message": "Izbor promjena nije ispravan."}), 400
     except reporting_db.ReportingUnavailable as caught:
-        logger.info("thinkific_roster_apply_failed code=%s", caught.code)
+        cause = caught.cause or caught
+        failure_phase = _safe_diagnostic_token(
+            caught.phase or phase, _ROSTER_FAILURE_PHASES, "unknown")
+        action_type = _safe_diagnostic_token(
+            caught.action_type, _ROSTER_ACTION_TYPES, "none")
+        logger.error(
+            "thinkific_roster_apply_failed code=%s phase=%s action_type=%s "
+            "exception_type=%s traceback=%s",
+            caught.code, failure_phase, action_type,
+            _safe_exception_type(cause), _safe_traceback_frames(cause))
         return jsonify({"status": "error",
                         "message": "Promjene nisu sačuvane. Pokušaj ponovo."}), 503
 

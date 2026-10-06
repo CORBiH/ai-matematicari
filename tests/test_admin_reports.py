@@ -19,6 +19,7 @@ import pytest
 from matbot import (activity, admin_auth, admin_reports, report_input,
                     reporting_db, student_identity)
 from matbot import thinkific_progress as progress
+from matbot import thinkific_upload
 from matbot.api import _kontrolni_attempt
 from matbot.student_identity import PROVIDER_THINKIFIC_EMAIL
 
@@ -139,6 +140,31 @@ def _roster_upload(client, route, by_course=None, *, plan_id=None,
         key = "grade_%d" % grade
         payload = build_csv(by_course.get(key, []), sections=["OBLAST"])
         data[key] = (_io.BytesIO(payload), key + ".csv")
+    if plan_id is not None:
+        data["plan_id"] = plan_id
+    if action_keys is not None:
+        data["action_keys"] = list(action_keys)
+    return client.post(route, data=data, content_type="multipart/form-data")
+
+
+def _course_csv(course_key, email, *, first="Ucenik", last="Test"):
+    return build_csv(
+        [learner(email, first=first, last=last)],
+        sections=thinkific_upload.COURSE_SECTION_HEADERS[course_key])
+
+
+def _multi_roster_upload(client, route, ordered_files, *, manual_keys=None,
+                         plan_id=None, action_keys=None, csrf=None):
+    import io as _io
+
+    data = {
+        "csrf_token": csrf if csrf is not None else _csrf(client),
+        "report_month": "2026-09",
+        "thinkific_files": [(_io.BytesIO(payload), filename)
+                             for filename, payload in ordered_files],
+    }
+    if manual_keys is not None:
+        data["file_course_keys"] = list(manual_keys)
     if plan_id is not None:
         data["plan_id"] = plan_id
     if action_keys is not None:
@@ -415,6 +441,86 @@ def test_roster_preview_and_apply_refresh_name_but_not_unconfirmed_grade(admin, 
     assert rows(db, "SELECT grade FROM student_current_grades") == [(7,)]
 
 
+def test_roster_apply_logs_only_safe_failure_diagnostics(
+        admin, db, monkeypatch, caplog):
+    _upload(admin, month="2026-08", files={
+        "grade_7": (build_csv([
+            learner(E1, first="StaroTajno", last="7")]), "old.csv")})
+    current = {
+        "grade_8": [learner(E1, first="NovoTajno", last="8")],
+    }
+    preview = _roster_upload(
+        admin, "/admin/reports/roster/preview", current).get_json()
+    selected = [item["key"] for item in preview["actions"]
+                if item["default_selected"]]
+    raw_detail = (
+        "RAW_DB_DETAIL StaroTajno student1@example.com "
+        "libsql://private.example?authToken=token-secret "
+        "csrf=csrf-secret cookie=session-secret")
+
+    def fail_apply(_actions):
+        try:
+            raise RuntimeError(raw_detail)
+        except RuntimeError as cause:
+            raise reporting_db.ReportingUnavailable(
+                "roster_apply_failed:RuntimeError", cause,
+                phase="update_name_or_status", action_type="name") from None
+
+    monkeypatch.setattr(
+        reporting_db.get_database(), "apply_roster_reconciliation", fail_apply)
+    caplog.set_level(logging.ERROR, logger="matbot.admin_reports")
+
+    response = _roster_upload(
+        admin, "/admin/reports/roster/apply", current,
+        plan_id=preview["plan_id"], action_keys=selected)
+
+    assert response.status_code == 503
+    assert response.get_json() == {
+        "status": "error",
+        "message": "Promjene nisu sačuvane. Pokušaj ponovo.",
+    }
+    records = [record for record in caplog.records
+               if "thinkific_roster_apply_failed" in record.getMessage()]
+    assert len(records) == 1 and records[0].levelno == logging.ERROR
+    message = records[0].getMessage()
+    assert "code=roster_apply_failed:RuntimeError" in message
+    assert "phase=update_name_or_status" in message
+    assert "action_type=name" in message
+    assert "exception_type=RuntimeError" in message
+    assert re.search(r"traceback=test_admin_reports\.py:fail_apply:\d+", message)
+    for forbidden in (
+            raw_detail, "RAW_DB_DETAIL", "StaroTajno", E1,
+            "libsql://private.example", "token-secret", "csrf-secret",
+            "session-secret"):
+        assert forbidden not in message
+
+
+def test_roster_preview_keeps_unrelated_same_first_name_archive_and_add(admin, db):
+    """Ime nije identitet: dva Darisa s različitim adresama su dva učenika."""
+    database = reporting_db.get_database()
+    old_id = database.get_or_create_student(
+        PROVIDER_THINKIFIC_EMAIL, "old.daris@example.com", "Daris 7")
+
+    preview = _roster_upload(admin, "/admin/reports/roster/preview", {
+        "grade_8": [learner(
+            "  NEW.DARIS@EXAMPLE.COM  ", first="Daris", last="8")],
+    })
+
+    assert preview.status_code == 200
+    plan = preview.get_json()
+    assert plan["status"] == "ready"
+    assert plan["summary"]["missing_students"] == 1
+    assert plan["summary"]["new_students"] == 1
+
+    archived = [item for item in plan["actions"]
+                if item["kind"] == "archive"]
+    added = [item for item in plan["actions"] if item["kind"] == "add"]
+    assert [(item["student_id"], item["label"], item["default_selected"])
+            for item in archived] == [(old_id, "Daris 7", False)]
+    assert [(item["student_id"], item["label"], item["default_selected"])
+            for item in added] == [(None, "Daris 8", True)]
+
+
 def test_roster_preview_requires_all_four_exports(admin, db):
     import io as _io
 
@@ -424,6 +530,196 @@ def test_roster_preview_requires_all_four_exports(admin, db):
     }, content_type="multipart/form-data")
     assert preview.status_code == 400
     assert "sva četiri" in preview.get_json()["message"]
+
+
+def _detected_four(order=("grade_6", "grade_7", "grade_8", "grade_9")):
+    names = {"grade_6": "alfa.csv", "grade_7": "beta.csv",
+             "grade_8": "gama.csv", "grade_9": "delta.csv"}
+    return [(names[key], _course_csv(
+        key, "%s@example.com" % key.replace("grade_", "ucenik")))
+            for key in order]
+
+
+def test_multi_upload_random_order_detects_all_four_courses(admin, db):
+    files = _detected_four(("grade_8", "grade_6", "grade_9", "grade_7"))
+    response = _multi_roster_upload(
+        admin, "/admin/reports/roster/classify", files)
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["status"] == "ready"
+    assert {item["filename"]: item["course_key"] for item in payload["files"]} == {
+        "gama.csv": "grade_8", "alfa.csv": "grade_6",
+        "delta.csv": "grade_9", "beta.csv": "grade_7",
+    }
+    assert [(item["grade"], item["status"]) for item in payload["grades"]] == [
+        (6, "found"), (7, "found"), (8, "found"), (9, "found")]
+
+
+def test_multi_upload_order_does_not_change_roster_plan(admin, db):
+    first = _multi_roster_upload(
+        admin, "/admin/reports/roster/preview",
+        _detected_four(("grade_9", "grade_6", "grade_8", "grade_7")))
+    second = _multi_roster_upload(
+        admin, "/admin/reports/roster/preview",
+        _detected_four(("grade_7", "grade_8", "grade_6", "grade_9")))
+
+    assert first.status_code == second.status_code == 200
+    one, two = first.get_json(), second.get_json()
+    assert one["plan_id"] == two["plan_id"]
+    assert one["summary"] == two["summary"]
+    assert one["actions"] == two["actions"]
+
+
+def test_multi_upload_duplicate_detected_grade_blocks_preview(admin, db):
+    files = [
+        ("a.csv", _course_csv("grade_6", "a@example.com")),
+        ("b.csv", _course_csv("grade_7", "b@example.com")),
+        ("c.csv", _course_csv("grade_7", "c@example.com")),
+        ("d.csv", _course_csv("grade_8", "d@example.com")),
+    ]
+    classified = _multi_roster_upload(
+        admin, "/admin/reports/roster/classify", files).get_json()
+    preview = _multi_roster_upload(
+        admin, "/admin/reports/roster/preview", files,
+        manual_keys=["", "", "", ""])
+
+    assert classified["status"] == "blocked"
+    assert any("7. razred" in item["message"] and "dva fajla" in item["message"]
+               for item in classified["errors"])
+    assert preview.status_code == 400
+    assert "7. razred" in preview.get_json()["message"]
+
+
+def test_multi_upload_missing_grade_nine_blocks_preview(admin, db):
+    files = _detected_four(("grade_6", "grade_7", "grade_8"))
+    classified = _multi_roster_upload(
+        admin, "/admin/reports/roster/classify", files).get_json()
+    preview = _multi_roster_upload(
+        admin, "/admin/reports/roster/preview", files,
+        manual_keys=["", "", ""])
+
+    assert classified["status"] == "blocked"
+    assert any(item["message"] == "Nedostaje CSV za 9. razred."
+               for item in classified["errors"])
+    assert preview.status_code == 400
+    assert "9. razred" in preview.get_json()["message"]
+
+
+def test_multi_upload_more_than_four_files_is_blocked(admin, db):
+    files = _detected_four() + [
+        ("peti.csv", _course_csv("grade_6", "peti@example.com"))]
+    payload = _multi_roster_upload(
+        admin, "/admin/reports/roster/classify", files).get_json()
+
+    assert payload["status"] == "blocked"
+    assert payload["errors"] == [
+        {"message": "Možeš učitati najviše četiri CSV fajla."}]
+
+
+def test_multi_upload_invalid_csv_has_clear_error(admin, db):
+    files = _detected_four(("grade_6", "grade_7", "grade_8")) + [
+        ("pokvaren.csv", b"nije,thinkific\n1,2\n")]
+    payload = _multi_roster_upload(
+        admin, "/admin/reports/roster/classify", files).get_json()
+
+    assert payload["status"] == "blocked"
+    invalid = next(item for item in payload["files"]
+                   if item["filename"] == "pokvaren.csv")
+    assert invalid["status"] == "invalid"
+    assert invalid["message"] == \
+        "Fajl nije ispravan Thinkific Student Progress CSV."
+
+
+def test_ambiguous_file_requires_and_accepts_only_manual_mapping(admin, db):
+    files = _detected_four(("grade_6", "grade_7", "grade_8")) + [
+        ("nepoznat.csv", build_csv(
+            [learner("manual@example.com")], sections=["NOVA OBLAST"]))]
+
+    classified = _multi_roster_upload(
+        admin, "/admin/reports/roster/classify", files).get_json()
+    blocked = _multi_roster_upload(
+        admin, "/admin/reports/roster/preview", files,
+        manual_keys=["", "", "", ""])
+    resolved = _multi_roster_upload(
+        admin, "/admin/reports/roster/preview", files,
+        manual_keys=["", "", "", "grade_9"])
+
+    ambiguous = next(item for item in classified["files"]
+                     if item["filename"] == "nepoznat.csv")
+    assert classified["status"] == "needs_mapping"
+    assert ambiguous["status"] == "ambiguous"
+    assert "Nije moguće automatski odrediti razred" in ambiguous["message"]
+    assert blocked.status_code == 400
+    assert resolved.status_code == 200
+
+
+def test_manual_mapping_cannot_override_a_detected_course(admin, db):
+    files = _detected_four()
+    response = _multi_roster_upload(
+        admin, "/admin/reports/roster/preview", files,
+        manual_keys=["grade_9", "", "", ""])
+
+    assert response.status_code == 400
+    assert "ne može prepisati" in response.get_json()["message"]
+
+
+def test_student_name_number_never_determines_detected_course(admin, db):
+    files = [("grade-9-progress.csv", _course_csv(
+        "grade_6", "faris@example.com", first="Faris", last="8"))]
+    payload = _multi_roster_upload(
+        admin, "/admin/reports/roster/classify", files).get_json()
+
+    assert payload["files"][0]["course_key"] == "grade_6"
+    assert payload["files"][0]["grade"] == 6
+
+
+def test_detected_mapping_drives_existing_reconciliation_and_progress_import(
+        admin, db):
+    files = _detected_four(("grade_8", "grade_6", "grade_9", "grade_7"))
+    preview = _multi_roster_upload(
+        admin, "/admin/reports/roster/preview", files).get_json()
+    selected = [item["key"] for item in preview["actions"]
+                if item["kind"] == "add"]
+
+    applied = _multi_roster_upload(
+        admin, "/admin/reports/roster/apply", files,
+        plan_id=preview["plan_id"], action_keys=selected,
+        manual_keys=["", "", "", ""])
+
+    assert applied.status_code == 200
+    assert applied.get_json()["status"] == "applied"
+    stored = rows(db, "SELECT a.external_user_id, p.course_key, p.grade "
+                      "FROM thinkific_progress_snapshots p "
+                      "JOIN student_accounts a ON a.student_id = p.student_id "
+                      "ORDER BY a.external_user_id")
+    assert stored == [
+        ("ucenik6@example.com", "grade_6", 6),
+        ("ucenik7@example.com", "grade_7", 7),
+        ("ucenik8@example.com", "grade_8", 8),
+        ("ucenik9@example.com", "grade_9", 9),
+    ]
+
+
+def test_admin_page_has_one_multiple_thinkific_file_input(admin, db):
+    html = admin.get("/admin/reports").get_data(as_text=True)
+    assert 'name="thinkific_files"' in html
+    assert 'id="thinkific_files"' in html and "multiple" in html
+    for grade in range(6, 10):
+        assert 'name="grade_%d"' % grade not in html
+
+
+def test_roster_file_classification_requires_admin_and_csrf(client, admin_env,
+                                                            admin, db):
+    files = _detected_four()
+    unauthenticated = client.application.test_client()
+    denied = _multi_roster_upload(
+        unauthenticated, "/admin/reports/roster/classify", files, csrf="x")
+    bad_csrf = _multi_roster_upload(
+        admin, "/admin/reports/roster/classify", files, csrf="pogresan")
+
+    assert denied.status_code == 403
+    assert bad_csrf.status_code == 400
 
 
 def test_unselected_new_roster_student_is_not_created_by_progress_import(admin, db):

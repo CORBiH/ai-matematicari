@@ -103,10 +103,23 @@ class ReportingUnavailable(RuntimeError):
     (isti princip kao validator kodovi iz CLAUDE.md, tačka 7) — nikad ne ide
     učeniku i nikad ne nosi vrijednost tajne."""
 
-    def __init__(self, code, cause=None):
+    def __init__(self, code, cause=None, *, phase="", action_type=""):
         super().__init__(code)
         self.code = code
         self.cause = cause
+        # Opciono, zatvoreno dijagnostičko stanje za složene operacije.
+        # Vrijednosti su imena faze i vrste akcije iz koda, nikad ID, ime,
+        # e-mail ni sirova poruka baze. Stariji pozivaoci ostaju nepromijenjeni.
+        self.phase = phase
+        self.action_type = action_type
+
+    def add_diagnostics(self, *, phase="", action_type=""):
+        """Dopuni prvi poznati sigurni kontekst bez mijenjanja koda greške."""
+        if not self.phase:
+            self.phase = phase
+        if not self.action_type:
+            self.action_type = action_type
+        return self
 
 
 def _fingerprint(provider, external_user_id):
@@ -1632,9 +1645,12 @@ class ReportingDatabase:
 
         kinds = {"name", "add", "archive", "reactivate", "grade"}
         if any(getattr(action, "kind", None) not in kinds for action in actions):
-            raise ReportingUnavailable("roster_action_invalid")
+            raise ReportingUnavailable(
+                "roster_action_invalid", phase="validate_action")
 
         with self._lock:
+            phase = "schema_preflight"
+            action_type = ""
             try:
                 conn = self._connection()
                 if not self._grade_confirmation_available(conn):
@@ -1643,6 +1659,7 @@ class ReportingDatabase:
                     raise ReportingUnavailable("student_profile_v7_unavailable")
 
                 # Svi postojeći ciljevi se provjeravaju prije prvog upisa.
+                phase = "validate_targets"
                 existing_ids = sorted({int(action.student_id)
                                        for action in actions
                                        if action.student_id is not None})
@@ -1658,7 +1675,9 @@ class ReportingDatabase:
                     raise ReportingUnavailable("roster_student_missing")
 
                 current = self._current_grades(conn, existing_ids)
+                phase = "validate_action"
                 for action in actions:
+                    action_type = action.kind
                     if action.student_id is None:
                         continue
                     row = existing[int(action.student_id)]
@@ -1698,6 +1717,9 @@ class ReportingDatabase:
 
                 # Stari izvještaji bez sačuvanog naslova moraju dobiti staro
                 # ime prije prvog UPDATE-a profila u ovoj transakciji.
+                phase = "freeze_historical_names"
+                action_type = "name" if any(
+                    action.kind == "name" for action in actions) else ""
                 self._freeze_monthly_report_labels(conn, {
                     int(action.student_id): action.expected_name
                     for action in actions
@@ -1707,9 +1729,12 @@ class ReportingDatabase:
                 created_by_email = {}
                 # Novi identiteti prvi: prijedlog razreda istog plana smije ih
                 # zatim referencirati, ali se bez ADD akcije ništa ne stvara.
+                phase = "create_students"
+                action_type = ""
                 for action in actions:
                     if action.kind != "add":
                         continue
+                    action_type = "add"
                     name = _clean_display_name(action.proposed_name)
                     owner = _rows(conn.execute(
                         "SELECT student_id FROM student_accounts "
@@ -1731,8 +1756,11 @@ class ReportingDatabase:
                     created_by_email[action.email] = student_id
                     counters["students_created"] += 1
 
+                phase = "update_name_or_status"
+                action_type = ""
                 for action in actions:
                     if action.kind == "name":
+                        action_type = "name"
                         returned = _rows(conn.execute(
                             "UPDATE students SET display_name = ?, "
                             "updated_at = CURRENT_TIMESTAMP WHERE id = ? "
@@ -1744,6 +1772,7 @@ class ReportingDatabase:
                             raise ReportingUnavailable("roster_name_guard_failed")
                         counters["names_updated"] += 1
                     elif action.kind in ("archive", "reactivate"):
+                        action_type = action.kind
                         target_status = ("archived" if action.kind == "archive"
                                          else "active")
                         returned = _rows(conn.execute(
@@ -1758,9 +1787,12 @@ class ReportingDatabase:
                                    else "students_reactivated")
                         counters[counter] += 1
 
+                phase = "confirm_grade"
+                action_type = ""
                 for action in actions:
                     if action.kind != "grade":
                         continue
+                    action_type = "grade"
                     student_id = (int(action.student_id)
                                   if action.student_id is not None
                                   else created_by_email.get(action.email))
@@ -1783,16 +1815,20 @@ class ReportingDatabase:
                         (legacy_grade, GRADE_SOURCE_ADMIN, student_id))
                     counters["grades_confirmed"] += 1
 
+                phase = "commit"
+                action_type = ""
                 conn.commit()
                 return counters
-            except ReportingUnavailable:
+            except ReportingUnavailable as exc:
                 self._safe_rollback()
+                exc.add_diagnostics(phase=phase, action_type=action_type)
                 raise
             except Exception as exc:
                 self._safe_rollback()
                 self._drop_connection()
                 raise ReportingUnavailable(
-                    "roster_apply_failed:" + type(exc).__name__, exc) from None
+                    "roster_apply_failed:" + type(exc).__name__, exc,
+                    phase=phase, action_type=action_type) from None
 
     # --- FAZA 3D: registar učenika i evidencija časova ----------------------
     # NEMA DRUGOG PROSTORA IMENA. Registar je pogled na POSTOJEĆU `students`

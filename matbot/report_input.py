@@ -95,8 +95,9 @@ def import_progress_files(report_month, files, database=None, *,
                           create_missing=True, refresh_existing_names=True):
     """Uvezi 1–4 Thinkific izvoza za JEDAN mjesec. Vraća `ImportSummary`.
 
-    `files` je `{course_key: raw_bytes}` — administratorska stranica će imati
-    četiri izričita slota (`grade_6`…`grade_9`) i nijedan nije obavezan.
+    `files` je kanonski `{course_key: raw_bytes}`. Administratorski upload prvo
+    sigurno razvrsta više odabranih fajlova, pa ovdje i dalje ulazi isti dokazani
+    oblik (`grade_6`…`grade_9`); ovaj sloj ne poznaje redoslijed uploada.
 
     ATOMIČNO PO FAJLU, NE PO PAKETU (Dio 16, svjestan izbor):
     fajl koji ima ijedan neispravan red se ODBIJA U CIJELOSTI i ne upisuje ništa;

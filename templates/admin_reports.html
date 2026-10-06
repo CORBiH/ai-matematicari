@@ -156,16 +156,20 @@
           <label for="report_month">Mjesec izvještaja</label>
           <input id="report_month" name="report_month" type="month" value="{{ month }}" required>
         </div>
-        {% for key, label, course_name in course_fields %}
         <div class="field">
-          <label for="{{ key }}">{{ course_name }} <span class="muted">(obavezno za osvježavanje)</span></label>
-          <input id="{{ key }}" name="{{ key }}" type="file" accept=".csv,text/csv">
+          <label for="thinkific_files">Učitaj CSV fajlove za 6, 7, 8. i 9. razred</label>
+          <input id="thinkific_files" name="thinkific_files" type="file" accept=".csv,text/csv" multiple required>
+          <span class="field-hint">Možeš označiti ili prevući sva četiri fajla odjednom.</span>
         </div>
-        {% endfor %}
       </div>
+      <section id="fileMapping" style="margin-top:1rem" hidden aria-live="polite">
+        <div id="fileMappingMessage" class="banner"></div>
+        <div id="fileMappingRows" class="stack" style="margin-top:.75rem"></div>
+        <div id="fileGradeSummary" class="stack" style="margin-top:.75rem"></div>
+      </section>
       <div class="actions" style="margin-top:.9rem">
-        <button type="button" id="rosterPreviewBtn" {% if schema_state != 'ready' %}disabled{% endif %}>Pregled promjena</button>
-        <span class="muted text-small">Za sigurno osvježavanje registra odaberi sva četiri trenutna CSV fajla.</span>
+        <button type="button" id="rosterPreviewBtn" disabled>Pregled promjena</button>
+        <span class="muted text-small">Pregled je dostupan tek kada je za svaki razred pronađen tačno jedan fajl.</span>
       </div>
     </form>
     <section id="rosterPreview" style="margin-top:1rem" hidden aria-live="polite">
@@ -192,14 +196,82 @@
   var summary=document.getElementById('rosterSummary');
   var issues=document.getElementById('rosterIssues');
   var actions=document.getElementById('rosterActions');
+  var uploadInput=document.getElementById('thinkific_files');
+  var mappingPanel=document.getElementById('fileMapping');
+  var mappingMessage=document.getElementById('fileMappingMessage');
+  var mappingRows=document.getElementById('fileMappingRows');
+  var gradeSummary=document.getElementById('fileGradeSummary');
+  var schemaReady={{ 'true' if schema_state == 'ready' else 'false' }};
+  var mappedFiles=[];
+  var mappingErrors=[];
   var planId='';
-  if(!form||!previewButton||!applyButton)return;
+  if(!form||!previewButton||!applyButton||!uploadInput)return;
 
   function clear(node){while(node.firstChild)node.removeChild(node.firstChild);}
   function text(tag,value,className){var node=document.createElement(tag);node.textContent=value;if(className)node.className=className;return node;}
   function setBusy(button,busy,label){button.disabled=busy;if(label)button.textContent=label;}
   function showError(value){panel.hidden=false;message.className='banner err';message.textContent=value;applyButton.hidden=true;planId='';}
   function stat(value,label){var box=text('div','', 'stat');box.appendChild(text('b',String(value)));box.appendChild(text('span',label,'muted'));return box;}
+  function gradeFor(key){return Number((key||'').replace('grade_',''))||0;}
+  function selectedCourse(item){
+    if(item.status!=='ambiguous')return item.course_key||'';
+    var select=mappingRows.querySelector('select[data-file-index="'+item.index+'"]');
+    return select?select.value:'';
+  }
+  function resetPlan(){planId='';applyButton.hidden=true;panel.hidden=true;}
+  function mappedPayload(){
+    var payload=new FormData(form);
+    mappedFiles.forEach(function(item){payload.append('file_course_keys',selectedCourse(item));});
+    return payload;
+  }
+  function updateMappingState(){
+    clear(gradeSummary);
+    var invalid=mappedFiles.some(function(item){return item.status==='invalid';});
+    var unresolved=mappedFiles.some(function(item){return !selectedCourse(item);});
+    var duplicate=false;
+    [6,7,8,9].forEach(function(grade){
+      var key='grade_'+grade;
+      var matches=mappedFiles.filter(function(item){return selectedCourse(item)===key;});
+      var line;
+      if(matches.length===1){line='✓ '+grade+'. razred — '+matches[0].filename;}
+      else if(matches.length>1){line='! '+grade+'. razred — pronađena su dva fajla';duplicate=true;}
+      else line='— '+grade+'. razred — nije pronađen';
+      gradeSummary.appendChild(text('div',line,matches.length===1?'text-success':'text-warning'));
+    });
+    var ready=schemaReady&&mappedFiles.length===4&&!invalid&&!unresolved&&!duplicate&&!mappingErrors.length;
+    previewButton.disabled=!ready;
+    if(ready){mappingMessage.className='banner ok';mappingMessage.textContent='Sva četiri razreda su pronađena. Možeš pregledati promjene.';}
+    else if(unresolved&&!invalid){mappingMessage.className='banner warn';mappingMessage.textContent='Za neprepoznati fajl odaberi razred, pa provjeri sažetak.';}
+    else{mappingMessage.className='banner err';mappingMessage.textContent=(mappingErrors[0]&&mappingErrors[0].message)||'Mapiranje fajlova nije potpuno.';}
+  }
+  function renderMapping(data){
+    mappedFiles=data.files||[];mappingErrors=(data.errors||[]).filter(function(error){
+      return !mappedFiles.some(function(item){return item.status==='ambiguous'&&item.message===error.message;});
+    });
+    mappingPanel.hidden=false;clear(mappingRows);resetPlan();
+    mappedFiles.forEach(function(item){
+      var row=text('div','', 'field');
+      if(item.status==='ambiguous'){
+        var label=text('label',item.filename+' → ');
+        var select=document.createElement('select');select.dataset.fileIndex=String(item.index);
+        select.appendChild(new Option('Odaberi razred',''));
+        [6,7,8,9].forEach(function(grade){select.appendChild(new Option(grade+'. razred','grade_'+grade));});
+        select.addEventListener('change',function(){mappingErrors=[];resetPlan();updateMappingState();});
+        label.appendChild(select);row.appendChild(label);
+        row.appendChild(text('span','Nije moguće automatski odrediti razred za ovaj fajl.','field-hint'));
+      }else if(item.status==='invalid'){
+        row.appendChild(text('strong','✗ '+item.filename));
+        row.appendChild(text('span',item.message||'Fajl nije ispravan.','field-hint text-danger'));
+      }else{
+        row.appendChild(text('strong','✓ '+gradeFor(item.course_key)+'. razred — '+item.filename));
+      }
+      mappingRows.appendChild(row);
+    });
+    if(!mappedFiles.length){
+      (data.errors||[]).forEach(function(error){mappingRows.appendChild(text('div',error.message||'Fajlovi nisu ispravni.','banner err'));});
+    }
+    updateMappingState();
+  }
 
   function render(data){
     panel.hidden=false;clear(summary);clear(issues);clear(actions);
@@ -239,18 +311,34 @@
 
   form.addEventListener('submit',function(event){event.preventDefault();previewButton.click();});
 
+  uploadInput.addEventListener('change',async function(){
+    mappedFiles=[];mappingErrors=[];previewButton.disabled=true;resetPlan();
+    if(!uploadInput.files.length){mappingPanel.hidden=true;return;}
+    mappingPanel.hidden=false;clear(mappingRows);clear(gradeSummary);
+    mappingMessage.className='banner';mappingMessage.textContent='Prepoznajem kurseve i provjeravam fajlove…';
+    try{
+      var response=await fetch('{{ url_for("admin_reports.classify_roster_files") }}',{method:'POST',body:new FormData(form)});
+      var data=await response.json();
+      if(!response.ok&&!data.files)throw new Error(data.message||'Provjera fajlova nije uspjela.');
+      renderMapping(data);
+    }catch(error){
+      mappingMessage.className='banner err';mappingMessage.textContent=error.message||'Provjera fajlova nije uspjela.';
+      previewButton.disabled=true;
+    }
+  });
+
   previewButton.addEventListener('click',async function(){
     setBusy(previewButton,true,'Pregledam…');panel.hidden=false;message.className='banner';message.textContent='Čitam četiri izvoza i upoređujem registar…';applyButton.hidden=true;
     try{
-      var response=await fetch('{{ url_for("admin_reports.preview_roster") }}',{method:'POST',body:new FormData(form)});
+      var response=await fetch('{{ url_for("admin_reports.preview_roster") }}',{method:'POST',body:mappedPayload()});
       var data=await response.json();if(!response.ok||data.status==='error')throw new Error(data.message||'Pregled nije uspio.');render(data);
     }catch(error){showError(error.message||'Pregled nije uspio.');}
-    finally{setBusy(previewButton,false,'Pregled promjena');}
+    finally{previewButton.textContent='Pregled promjena';updateMappingState();}
   });
 
   applyButton.addEventListener('click',async function(){
     if(!planId)return;setBusy(applyButton,true,'Primjenjujem…');
-    var payload=new FormData(form);payload.append('plan_id',planId);
+    var payload=mappedPayload();payload.append('plan_id',planId);
     document.querySelectorAll('.roster-action:checked').forEach(function(box){payload.append('action_keys',box.value);});
     try{
       var response=await fetch('{{ url_for("admin_reports.apply_roster") }}',{method:'POST',body:payload});

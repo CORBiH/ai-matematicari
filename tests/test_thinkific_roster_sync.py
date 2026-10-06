@@ -74,6 +74,68 @@ def test_changed_name_is_default_but_grade_change_requires_confirmation(database
     assert rows(path, "SELECT grade FROM student_current_grades") == [(8,)]
 
 
+def test_roster_failure_carries_phase_and_action_without_partial_write(
+        database, monkeypatch):
+    target, path = database
+    target.get_or_create_student(
+        "thinkific_email", "dijagnostika@example.com", "Staro ime")
+    plan = thinkific_roster.build_plan(parsed("2026-09", {
+        "grade_7": [learner(
+            "dijagnostika@example.com", first="Novo", last="ime")],
+    }), target)
+    rename = action(plan, thinkific_roster.NAME, "Novo ime")
+
+    def fail_without_leaking(_conn, _names):
+        raise RuntimeError(
+            "Tajno ime dijagnostika@example.com libsql://tajna raw detalj")
+
+    monkeypatch.setattr(
+        target, "_freeze_monthly_report_labels", fail_without_leaking)
+
+    with pytest.raises(reporting_db.ReportingUnavailable) as caught:
+        target.apply_roster_reconciliation([rename])
+
+    assert caught.value.code == "roster_apply_failed:RuntimeError"
+    assert caught.value.phase == "freeze_historical_names"
+    assert caught.value.action_type == "name"
+    assert type(caught.value.cause).__name__ == "RuntimeError"
+    assert rows(path, "SELECT display_name FROM students") == [("Staro ime",)]
+
+
+def test_commit_failure_is_labelled_and_rolls_back(database):
+    target, path = database
+    target.get_or_create_student(
+        "thinkific_email", "commit@example.com", "Prije commita")
+    plan = thinkific_roster.build_plan(parsed("2026-09", {
+        "grade_7": [learner(
+            "commit@example.com", first="Poslije", last="commita")],
+    }), target)
+    rename = action(plan, thinkific_roster.NAME, "Poslije commita")
+    connection = target._connection()
+
+    class FailingCommitConnection:
+        def __init__(self, delegate):
+            self.delegate = delegate
+
+        def __getattr__(self, name):
+            return getattr(self.delegate, name)
+
+        def commit(self):
+            raise TimeoutError("raw commit detail must not reach the log")
+
+    target._conn = FailingCommitConnection(connection)
+
+    with pytest.raises(reporting_db.ReportingUnavailable) as caught:
+        target.apply_roster_reconciliation([rename])
+
+    assert caught.value.code == "roster_apply_failed:TimeoutError"
+    assert caught.value.phase == "commit"
+    assert caught.value.action_type == ""
+    assert type(caught.value.cause).__name__ == "TimeoutError"
+    assert rows(path, "SELECT display_name FROM students") == [
+        ("Prije commita",)]
+
+
 def test_union_of_four_courses_does_not_archive_student_in_any_one_export(database):
     target, path = database
     first = target.get_or_create_student(
