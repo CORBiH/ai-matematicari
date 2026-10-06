@@ -226,7 +226,7 @@ def test_6b_inactive_students_are_not_offered(admin, db):
     active = confirmed(db, "Aktivan Sedmak", 7)
     gone = confirmed(db, "Arhiviran Sedmak", 7)
     conn = db._connection()
-    conn.execute("UPDATE students SET status = 'archived' WHERE id = ?", (gone,))
+    conn.execute("UPDATE students SET status = 'inactive' WHERE id = ?", (gone,))
     conn.commit()
 
     page = entry_page(admin, 7)

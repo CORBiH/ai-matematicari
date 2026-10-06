@@ -258,6 +258,7 @@ def test_missing_student_is_only_archived_when_explicitly_selected(database):
     plan = thinkific_roster.build_plan(parsed("2026-09"), target)
     archive = action(plan, thinkific_roster.ARCHIVE, "Otišao 7")
     assert archive.default_selected is False
+    assert archive.after == reporting_db.STATUS_INACTIVE
     assert rows(path, "SELECT status FROM students") == [("active",)]
 
     # Prazan izbor je valjan preview/apply i ne arhivira ništa.
@@ -266,7 +267,9 @@ def test_missing_student_is_only_archived_when_explicitly_selected(database):
 
     target.apply_roster_reconciliation([archive])
     assert rows(path, "SELECT id, status FROM students") == \
-        [(student_id, "archived")]
+        [(student_id, reporting_db.STATUS_INACTIVE)]
+    assert student_id not in {
+        item["id"] for item in target.list_students(active=True)}
     assert preserved["reports"] == [(report_id, student_id, "2026-08")]
     assert rows(path, "SELECT id, student_id, provider, external_user_id "
                       "FROM student_accounts") == preserved["accounts"]
@@ -310,7 +313,7 @@ def test_name_grade_and_archive_apply_in_one_transaction(database):
     assert rows(path, "SELECT id, display_name, status FROM students "
                       "ORDER BY id") == [
         (promoted_id, "Promocija 8", "active"),
-        (archived_id, "Arhiva 7", "archived"),
+        (archived_id, "Arhiva 7", reporting_db.STATUS_INACTIVE),
     ]
     assert rows(path, "SELECT student_id, grade FROM student_current_grades "
                       "ORDER BY student_id") == [
@@ -423,7 +426,7 @@ def test_archive_reactivate_and_name_avoid_mutation_returning_fetch(database):
     assert all(" RETURNING " not in sql for sql in remote_shape.update_sql)
 
 
-def test_archived_student_requires_explicit_reactivation_without_other_mutation(
+def test_inactive_student_requires_explicit_reactivation_without_other_mutation(
         database):
     target, path = database
     # Pravi oblik historijske tabele omogućava da isti test dokaže i očuvanje
@@ -447,7 +450,7 @@ def test_archived_student_requires_explicit_reactivation_without_other_mutation(
         ai_summary=json.dumps({"summary": "historijski"}),
         instructor_comment="Sačuvaj komentar.")
     conn = libsql.connect(path)
-    conn.execute("UPDATE students SET status = 'archived' WHERE id = ?",
+    conn.execute("UPDATE students SET status = 'inactive' WHERE id = ?",
                  (student_id,))
     conn.commit()
     conn.close()
@@ -462,6 +465,10 @@ def test_archived_student_requires_explicit_reactivation_without_other_mutation(
     plan = thinkific_roster.build_plan(current, target)
     reactivate = action(plan, thinkific_roster.REACTIVATE, "Arhiviran 8")
     grade = action(plan, thinkific_roster.GRADE, "Arhiviran 8")
+    assert not [item for item in plan.actions
+                if item.kind == thinkific_roster.ADD]
+    assert reactivate.student_id == student_id
+    assert reactivate.after == reporting_db.STATUS_ACTIVE
     assert reactivate.default_selected is False
     assert grade.default_selected is False
     assert grade.selectable is True
@@ -469,7 +476,7 @@ def test_archived_student_requires_explicit_reactivation_without_other_mutation(
     defaults = [item for item in plan.actions if item.default_selected]
     target.apply_roster_reconciliation(defaults)
     assert rows(path, "SELECT id, status, grade FROM students") == \
-        [(student_id, "archived", 7)]
+        [(student_id, reporting_db.STATUS_INACTIVE, 7)]
 
     reviewed = thinkific_roster.build_plan(current, target)
     target.apply_roster_reconciliation([

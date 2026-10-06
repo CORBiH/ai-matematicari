@@ -328,7 +328,8 @@ def build_plan(parsed_files, database):
             actions.append(RosterAction(
                 key=_subject_key(REACTIVATE, student_id), kind=REACTIVATE,
                 student_id=student_id, email=email, label=label,
-                before=status, after="active", default_selected=False,
+                before=status, after=reporting_db.STATUS_ACTIVE,
+                default_selected=False,
                 expected_status=status))
             changed = True
 
@@ -366,7 +367,8 @@ def build_plan(parsed_files, database):
         actions.append(RosterAction(
             key=_subject_key(ARCHIVE, student_id), kind=ARCHIVE,
             student_id=student_id, email=None, label=label,
-            before=status, after="archived", default_selected=False,
+            before=status, after=reporting_db.STATUS_INACTIVE,
+            default_selected=False,
             expected_name=student["display_name"], expected_status=status,
             current_grades=tuple(student.get("grades") or ())))
 

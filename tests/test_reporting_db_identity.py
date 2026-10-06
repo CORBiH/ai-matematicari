@@ -28,7 +28,8 @@ CREATE TABLE students (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     display_name TEXT,
     grade INTEGER,
-    status TEXT DEFAULT 'active',
+    status TEXT NOT NULL DEFAULT 'active'
+        CHECK (status IN ('active', 'inactive')),
     created_at TEXT,
     updated_at TEXT,
     last_seen_at TEXT
@@ -85,6 +86,27 @@ def rows(db_path, sql, params=()):
         return conn.execute(sql, params).fetchall()
     finally:
         conn.close()
+
+
+@pytest.mark.parametrize("invalid_status", ["archived", "deleted", "disabled"])
+def test_students_status_constraint_matches_production_contract(
+        database, db_path, invalid_status):
+    student_id = database.get_or_create_student(
+        PROVIDER_THINKIFIC, "status-contract@example.com")
+    conn = libsql.connect(db_path)
+    try:
+        conn.execute("UPDATE students SET status = 'inactive' WHERE id = ?",
+                     (student_id,))
+        conn.commit()
+        with pytest.raises(ValueError):
+            conn.execute("UPDATE students SET status = ? WHERE id = ?",
+                         (invalid_status, student_id))
+        conn.rollback()
+    finally:
+        conn.close()
+
+    assert rows(db_path, "SELECT status FROM students WHERE id = ?",
+                (student_id,)) == [("inactive",)]
 
 
 # --- 1) prvi zahtjev kreira TAČNO jednog učenika ----------------------------

@@ -59,6 +59,12 @@ ACCOUNT_TYPE_TEST = "TEST"
 VALID_ACCOUNT_TYPES = (ACCOUNT_TYPE_STUDENT, ACCOUNT_TYPE_SUPPORT,
                        ACCOUNT_TYPE_TEST)
 
+# Produkcijska `students.status` CHECK granica dopušta samo ove dvije
+# kanonske vrijednosti. Starije oznake neaktivnosti se i dalje čitaju ispod,
+# ali nijedan novi upis ih ne smije proizvoditi.
+STATUS_ACTIVE = "active"
+STATUS_INACTIVE = "inactive"
+
 # Razredi koje ručni upis smije primiti. Osnovna škola 6–9 (BiH).
 VALID_MANUAL_GRADES = (6, 7, 8, 9)
 
@@ -1777,8 +1783,9 @@ class ReportingDatabase:
                         counters["names_updated"] += 1
                     elif action.kind in ("archive", "reactivate"):
                         action_type = action.kind
-                        target_status = ("archived" if action.kind == "archive"
-                                         else "active")
+                        target_status = (STATUS_INACTIVE
+                                         if action.kind == "archive"
+                                         else STATUS_ACTIVE)
                         updated = conn.execute(
                             "UPDATE students SET status = ?, "
                             "updated_at = CURRENT_TIMESTAMP WHERE id = ? "
@@ -1838,13 +1845,13 @@ class ReportingDatabase:
     # NEMA DRUGOG PROSTORA IMENA. Registar je pogled na POSTOJEĆU `students`
     # tabelu; učenik koji je nastao kroz Thinkific i učenik kojeg je
     # administrator upisao ručno su isti tip zapisa i vide se na istoj listi.
-    # STATUS UČENIKA: ovaj repozitorij kolonu `students.status` nikad nije ni
-    # čitao ni pisao — postoji u zatečenoj šemi verzije 1. Zato se NE tvrdi da
-    # znamo njen zatvoreni skup vrijednosti, nego se isključuju samo IZRIČITI
-    # markeri neaktivnosti. Nepoznata vrijednost pada OTVORENO (učenik se vidi):
+    # STATUS UČENIKA: kolona postoji u zatečenoj šemi verzije 1 i produkcijski
+    # CHECK dopušta samo active/inactive za nove upise. Stare
+    # oznake se ipak čitaju kao neaktivne radi kompatibilnosti sa eventualnim
+    # historijskim bazama. Nepoznata vrijednost pada OTVORENO (učenik se vidi):
     # spisak časa je ionako ručni izbor instruktora, pa je suvišan red bezopasan,
     # dok bi nestao učenik značio da se čas ne može evidentirati.
-    _INACTIVE_STATUSES = ("inactive", "archived", "deleted", "disabled")
+    _INACTIVE_STATUSES = (STATUS_INACTIVE, "archived", "deleted", "disabled")
 
     def list_students(self, search=None, grade=None, confirmed=None,
                       active=None, account_type=None):
